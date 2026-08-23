@@ -508,12 +508,34 @@ export function createWeather(game) {
   }
   function wxTetraGeo() { return new THREEx.TetrahedronGeometry(0.5, 0); }
 
-  function wxBuildField(geo, count, glow) {
-    const m = mat(0xffffff, { transparent: true, opacity: 0.92 }).clone();
+  // ---- ONE DRAW CALL PER FIELD, AND IT TOOK A MEASUREMENT TO GET THERE ----
+  //
+  // MEASURED: `transparent: true` together with `side: DoubleSide` makes three
+  // render the mesh TWICE — back faces, then front faces, which is how it gets
+  // transparency sorting right within a single object. One field of 150 motes
+  // cost 2 draw calls and 600 triangles; the same field opaque, or transparent
+  // and single-sided, costs 1 and 300. Nobody would ever find that by reading
+  // the code, and across two fields in seventeen chapters it was doubling the
+  // entire cost of this module for no visible benefit at all:
+  //
+  //   the motes  are 92 % opaque specks a few centimetres across, and a 0.92
+  //              alpha on something that small is indistinguishable from 1.0.
+  //              They go OPAQUE and keep DoubleSide, which the folded quad
+  //              genuinely needs — and being opaque they may write depth,
+  //              which also sorts them against each other properly.
+  //   the rain   is a closed BOX. There is no such thing as its back face, so
+  //              DoubleSide was pure waste. It stays transparent (it runs from
+  //              0.16 to 0.50 alpha and must) and goes FrontSide.
+  //
+  // `alpha` < 1 selects the transparent/FrontSide combination; alpha 1 selects
+  // the opaque/DoubleSide one.
+  function wxBuildField(geo, count, glow, alpha) {
+    const solid = !(alpha < 1);
+    const m = mat(0xffffff, solid ? {} : { transparent: true, opacity: alpha }).clone();
     m.vertexColors = false;
     if (glow) { m.emissive = new THREEx.Color(0xffffff); m.emissiveIntensity = glow; }
-    m.depthWrite = false;             // they overlap constantly and they are thin
-    m.side = THREEx.DoubleSide;
+    m.depthWrite = solid;
+    m.side = solid ? THREEx.DoubleSide : THREEx.FrontSide;
     const im = new THREEx.InstancedMesh(geo, m, count);
     im.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
     im.frustumCulled = false;         // the field IS the frustum
@@ -525,8 +547,8 @@ export function createWeather(game) {
     return im;
   }
 
-  const moteQuad = wxBuildField(wxQuadGeo(), wxMOTE_MAX, 0);
-  const moteTetra = wxBuildField(wxTetraGeo(), wxMOTE_MAX, 0.6);
+  const moteQuad = wxBuildField(wxQuadGeo(), wxMOTE_MAX, 0, 1);
+  const moteTetra = wxBuildField(wxTetraGeo(), wxMOTE_MAX, 0.6, 1);
   // A STREAK IS A BOX, NOT A QUAD, and this is the one place in the file where
   // the extra ten triangles are worth paying. A petal tumbles, so a folded
   // quad always has a face turned somewhere; a raindrop is welded to the fall
@@ -534,7 +556,7 @@ export function createWeather(game) {
   // every drop whose lean happens to point at the lens. Three hundred boxes is
   // 3 600 triangles against a 130 000 budget, and it is only ever drawn while
   // it is actually raining.
-  const rainMesh = wxBuildField(new THREEx.BoxGeometry(1, 1, 1), wxRAIN_MAX, 0.35);
+  const rainMesh = wxBuildField(new THREEx.BoxGeometry(1, 1, 1), wxRAIN_MAX, 0.35, 0.5);
   let moteMesh = moteQuad;          // whichever geometry the live row wants
 
   // Per-instance state. Allocated once, at max, for both fields.

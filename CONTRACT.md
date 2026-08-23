@@ -50,6 +50,7 @@ game = {
   npcs:  [],     // npc records — populated by npc.js
   capy:  null,   // set by capybara.js
   env:   null,   // set by environment.js
+  weather: null, // set by weather.js — see THE GLOBAL ENVIRONMENT
   physics: null, // set by props.js
   hud: null,     // set by systems.js
   completeTask(id),        // provided by main.js -> systems
@@ -1231,6 +1232,184 @@ atmospheres to prove a point is how you break eleven of them.
 table; a chapter whose air is an EVENT keeps its own block, and layers it on
 top of the table.**
 
+## THE GLOBAL ENVIRONMENT (v17 — the micro-weather pass, 23 Aug 2026)
+
+`sysAIR` above answers "what is the air in this chapter". This answers a
+different question — "what is happening to it this minute" — and it is a new
+file, `src/weather.js` (prefix `wx`), publishing `game.weather`. It runs after
+every biome and before props/capy/npc/systems.
+
+**There is no clock in it and there never will be.** Seventeen chapters are
+each welded to an hour, and that is the strongest thing about how they read: a
+place you can only ever see at one hour becomes THAT HOUR, the way a photograph
+does. A day/night cycle would take seventeen places and make them one place
+seen seven times. So `lock` — `'midday' | 'golden' | 'sunset' | 'dusk' |
+'night' | 'overcast' | 'predawn' | 'interior'` — is a LABEL. Nothing computes a
+light from it.
+
+### The mood table — `wxMOOD`
+
+One row per chapter, and **the row IS the configuration interface**. There is
+no per-biome code anywhere in that file, and no biome file was touched.
+
+```js
+{ label, lock, wet, rain: { odds, peak, hold, gap },
+  cloudK, pulseK, gust: { base, swing, hz }, dir,
+  motes, bed: { rain, wind, chirp, drip, rustle, thunder }, slipK, cold }
+```
+
+`wxBASE` is the all-zero row and it is what a chapter with no entry gets.
+**Measured: on that row `sunK`, `hemiK`, `fogNK` and `fogFK` are exactly 1 and
+`amb`, `hazeMix`, `bgMix`, `bloom` and `slip` are exactly 0.** That is the
+backwards-compatibility guarantee, and it is a measurement rather than a claim.
+
+### The four signals, and they are all centred on zero
+
+`drizzle` (a shower, on an asymmetric envelope — one arrives faster than it
+leaves, always), `cloud` (half-wave rectified: there is no such thing as
+negative shadow), `pulse` (the sky breathing at one to four per cent) and
+`gust` (which swings its HEADING as well as its speed). Each is three sines at
+incommensurable ratios so the sum has no loop a player can hear.
+
+**IT MAY MAKE AN HOUR WEATHER AND IT MAY NOT MAKE IT A DIFFERENT HOUR.** That
+is the rule every constant in the file was tuned against, and the test is: can
+you say what time it is in a screenshot taken at the bottom of the signal as
+well as one taken at the top? Measured across seventeen with showers forced —
+sun swings 0.14–0.32, hemisphere 0.05–0.13, far plane 0.00–0.26. The Drift is
+untouched in every channel; Marrakech moves its sun by three per cent, which is
+its cloud shadow and nothing else.
+
+When re-measuring a chapter's own atmosphere, read `game.weather.light()`
+rather than the resulting light: Goreme's sun swings 0.53 and Kowloon's
+hemisphere 0.27 through a soak, and both are the CHAPTERS' own events (the
+ridge letting go, the Symphony). At the weather module's own output they are
+0.03 and 0.13.
+
+### `wetness()` vs `shine()` — and this distinction is load-bearing
+
+`wetness()` is how wet the ground is. `shine()` is how much wetter than this
+chapter's own baseline. **Anything that changes how a chapter PLAYS or how it
+was TUNED to look reads `shine()`.** Son Doong's floor is wet limestone at a
+baseline of 0.52 and Kowloon's asphalt never dries; both were authored and
+shipped that way, and keying slip off the absolute handed Son Doong a permanent
+0.20 of slide the day a weather system arrived. That is a rebalance of finished
+work wearing a weather system's clothes.
+
+The one deliberate exception is `splash()`, the footfall's wet layer, which
+uses the absolute — a footstep is characterisation, not play or grade, and a
+wet cave floor sounding faintly of water is the brief rather than a regression
+of it.
+
+Wetness **saturates** at the shower's own intensity. Integrating a rate has no
+ceiling but the length of the shower, and Sydney's deliberately-lightest
+sunshower measured 0.559 — a wetter street than Kowloon's.
+
+### What reads it
+
+- **systems.js** layers `light()` on the atmosphere ABSOLUTELY LAST, after the
+  hand-written blocks as well as the `sysAIR` loop. **The sky moves less than
+  the fog** — rain is between you and the far half of the world and barely
+  between you and the zenith, and moving both equally is what makes video-game
+  rain look like somebody turned the lights down.
+- **systems.js** also layers the wet-street grade in `sysDressFrame`. A wet
+  road is not a darker road, it is the same road with a mirror on it: more
+  bloom, a threshold low enough for a reflection to clear, a little more colour
+  and contrast.
+- **capybara.js** ADDS `slip()` to the biome's own `groundSlip` (a glacier in a
+  shower is a glacier plus a shower), takes a FLOOR on `capyWetLevel` from the
+  sky, and passes `splash()` as `opts.wet` on the footfall.
+- **npc.js** gives every local an umbrella, a huddle, a glance upward and a
+  lean off the gust.
+
+### `wind()` IS NOT THE GUST, AND THE GUST MUST NEVER GO INTO IT
+
+The obvious thing to do with a seven-metre gust over the Erg is to add it to
+`capyWindAt()`, and it would be a serious bug. `wind()` is **the air as a
+reference frame** — a chapter-owned mechanic that goes into `platVX/platVZ`
+beside a moving ferry deck and a balloon's basket. A five-metre ambient breeze
+on that channel slides a capybara across Jemaa el-Fnaa at walking pace with
+nobody touching a key, and in Cappadocia it fights the one system that chapter
+IS. The gust drives the motes, the rain's lean, the wind bed and which way the
+locals turn. It does not touch the controller.
+
+### `cold` IS ITS OWN FIELD, NOT AN INFERENCE FROM `lock`
+
+npc.js originally derived "is anybody cold here" from `{ night, predawn,
+interior }`, which is true in sixteen chapters and wrong in the seventeenth:
+Antarctica is locked to `'midday'`, because it IS midday there for four months.
+Measured — a crowd standing in a 4.4 m/s katabatic wind at huddle 0.00 while
+Reykjavik, which is warmer, sat at 0.89. **A rung inferred from a different
+table is a rung waiting to be missing.**
+
+### The emitters
+
+Two `InstancedMesh`es, allocated once at max and never rebuilt on a biome
+change. Nine mote KINDS as data (`petal`, `leaf`, `seed`, `firefly`, `spore`,
+`mote`, `spray`, `drift`, `pollen`), so the update loop has no idea what a
+sakura petal is — only that it falls at 0.55 and spins at 1.9. Flat Lambert via
+`mat()`, no shadows, and **deliberately never handed to
+`registerShadowTarget`**: three hundred tumbling quads in the shadow pass is
+three hundred draw calls for a shadow nobody could resolve.
+
+Three things about them that were measured rather than chosen:
+
+- **A streak points the way it falls.** Built from Euler angles on the shared
+  quad, every drop lay flat and the first shower rendered as white tally marks
+  hanging in the air. `setFromUnitVectors` onto the fall vector, and a BOX
+  rather than a ribbon — a petal tumbles so a folded quad always has a face
+  turned somewhere, but a raindrop is welded to the fall vector and an edge-on
+  ribbon is not there at all.
+- **The field sits IN FRONT of the lens, not around it.** A box centred on the
+  camera spends half its instances behind the near plane, so the density you
+  author is twice the density you get.
+- **`transparent: true` + `side: DoubleSide` DRAWS THE MESH TWICE.** three
+  renders back faces then front faces to sort transparency within one object.
+  One field of 150 motes cost 2 draw calls and 600 triangles; the same field
+  opaque, or transparent and single-sided, costs 1 and 300. The motes are 92 %
+  opaque specks a few centimetres across — they go opaque and keep DoubleSide,
+  which the folded quad needs. The rain is a closed box, so DoubleSide was pure
+  waste — it stays transparent and goes FrontSide.
+
+### The bed (systems.js owns)
+
+Four continuous voices — rain in two bands, wind swayed on its CUTOFF rather
+than its level, gated crickets, leaves — plus a scheduled `drip`, which must
+NOT be continuous or it is a tap left running. Rain made of scheduled one-shots
+is a machine gun with a low-pass on it.
+
+**The score is the point and this is not.** Two mechanisms: a bus ceiling at a
+fifth of what the master would allow, and a duck against `musIntensity`, so the
+bed gets out of the way of a swell and comes back. Crickets stop when it rains.
+
+Two new synths. `thunder` is **always distant** — there is no lightning in this
+game and there will not be, because a flash is a hard cut in a game whose whole
+argument is that its light is stable, and the absence of a crack IS the
+distance. `drip`'s downward sweep is the whole sound; at a constant pitch it is
+a marimba.
+
+### What this cost (measured 23 Aug 2026)
+
+Draw calls read the way this file already insists on — `autoReset = false`,
+`reset()`, ONE tick, read — and as the difference between two ADJACENT frames
+with only the two fields' `visible` changed. **The first version of this
+measurement compared a dry frame with one ninety seconds later and reported
++113 draw calls in Kowloon; ninety seconds of Kowloon is a Symphony cue, two
+buses and a crowd. The tell was Sydney reporting MINUS six.**
+
+- **+1 draw call and ~300 triangles in a chapter that cannot rain** (Marrakech,
+  Son Doong: the mote field only).
+- **+2 draw calls and 2 484 to 3 756 triangles at the peak of the heaviest
+  shower** (Kowloon 289 streaks, Kyoto 265, the Pantanal 273).
+- **Frame time did not move**: 16.6–16.8 ms median and 17.6–18.0 ms p95, dry
+  AND wet, under rAF in Marrakech, Kowloon, the Pantanal and Kyoto.
+- **17/17 clean on a weather-forced `qa/wx-fuzz.js`** — eight seconds of random
+  input per chapter with `odds: 1`, so the wet path is actually exercised. No
+  NaN, no camera NaN, no void falls, no errors.
+
+**AND MEASURE A CHAPTER AT ITS WEATHER.** Marrakech's note further down this
+file is now live in seventeen places: the rain field draws nothing at all until
+it rains, so every number above is taken at a forced shower peak.
+
 ## THE PICKER SCALES NOW (v14)
 
 The title card's chapter picker was a bento: four columns, chapter one
@@ -1464,7 +1643,7 @@ See `capyRENDER_LAMBDA` in capybara.js and `condorRender()` in condor.js.
 
 ## Update order (v6)
 
-`env → pasto → quay → kyoto → cali → rio → iceland → sahara → drift → venice → kowloon → palawan → goreme → manly → pantanal → cave → physics/props → capy → condor → npcs → systems`
+`env → pasto → quay → kyoto → cali → rio → iceland → sahara → drift → venice → kowloon → palawan → goreme → manly → pantanal → cave → antarctic → weather → physics/props → capy → condor → npcs → systems`
 
 An updater that throws is NOT dropped on its first exception. main.js gives each module three
 strikes (reset by any good frame) and logs which module and which strike; only a module failing
@@ -1793,6 +1972,8 @@ frame and every water surface in the game moves. Do not add a second clock.
 | A Manly | `src/manly.js` | `export function createManly(game)` — prefix `man` |
 | A Pantanal | `src/pantanal.js` | `export function createPantanal(game)` — prefix `pan` |
 | A Son Doong | `src/cave.js` | `export function createCave(game)` — prefix `cav` |
+| A Antarctic | `src/antarctic.js` | `export function createAntarctic(game)` — prefix `ant` |
+| W Environment | `src/weather.js` | `export function createWeather(game)` — prefix `wx` |
 | B Capybara | `src/capybara.js` | `export function createCapybara(game)` |
 | B Condor | `src/condor.js` | `export function createCondor(game)` — prefix `condor` |
 | C Props/Physics | `src/props.js` | `export function createPhysicsWorld(game)`, `export function createProps(game)` |
@@ -1801,6 +1982,13 @@ frame and every water surface in the game moves. Do not add a second clock.
 | Coordinator | `src/main.js`, `src/shared.js`, `build.mjs`, `index.html`, `CONTRACT.md` | — |
 
 Each `create*` returns an object with an optional `update(dt)` method. Called in this order each frame:
-`env → pasto → quay → kyoto → cali → rio → iceland → sahara → drift → venice → kowloon → palawan → goreme → manly → pantanal → cave → props/physics → capy → condor → npcs → systems`.
+`env → pasto → quay → kyoto → cali → rio → iceland → sahara → drift → venice → kowloon → palawan → goreme → manly → pantanal → cave → antarctic → weather → props/physics → capy → condor → npcs → systems`.
+
+`weather.js` is **biome-neutral and always resident**, like the capybara, the condor and
+systems: the micro-weather is a property of wherever you are standing rather than something
+any one chapter owns, and its two instanced fields are one set of buffers every chapter
+borrows. It runs AFTER every biome (so it can ask the live chapter what it is) and BEFORE
+props/capy/npc/systems (so the wetness, the gust and the light deltas it computes are read
+the same frame by the controller's grip, the locals' umbrellas and the atmosphere pass).
 
 Draw-call and body budgets are **per live biome**, not global — the inactive biome costs zero.
