@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE } from './shared.js';
+import { PALETTE, clamp } from './shared.js';
 import { createEnvironment } from './environment.js';
 import { createPhysicsWorld, createProps } from './props.js';
 import { createCapybara } from './capybara.js';
@@ -42,6 +42,137 @@ function mainMakeEvents() {
       }
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// TIME AS A CHANNEL (coordinator-owned).
+//
+// Seventeen chapters of physics comedy and there has never been anything
+// between `clock.getDelta()` and the modules. Everything this game does to say
+// "THAT just happened" is spatial — a shake, a burst of paper, a banner — and
+// the one channel every comedy in the medium actually uses is TIME. A bin
+// going over at 9 m/s, a capybara landing a forty-metre drop, the moment a
+// chapter's marquee lands: all of them read as an event that the world had to
+// stop and take in, and none of them could be written that way.
+//
+// So there is one now, and it is deliberately two verbs and no more:
+//
+//   hitstop(dur, scale)  a near-freeze. Instant on, instant off, milliseconds
+//                        long. This is the impact one — it is punctuation, and
+//                        punctuation that fades in is not punctuation.
+//   slowmo(scale, dur)   a held beat. Eases in and out over ~0.1 s, because a
+//                        slow-motion that snaps is a dropped frame.
+//
+// FOUR RULES, and every one of them is here because the obvious version of
+// this feature is how you ship a game that stutters:
+//
+//   1. THE FLOOR IS NOT ZERO. Nine modules compute a kinematic velocity as
+//      (target - previous) / dt (antarctic's floes, cali's cart, the ferry,
+//      the van). At dt = 0 that is a division by zero and a body leaves the
+//      map; cannon's own integrator has the same problem. The scale can never
+//      go under MAIN_TIME_FLOOR, so "frozen" is 5% speed and nothing divides
+//      by nothing.
+//   2. IT IS CAPPED, IN BOTH DIMENSIONS. A hitstop may not exceed
+//      MAIN_HOLD_MAX and a slow-motion may not exceed MAIN_SLOW_MAX. A cosy
+//      game about a rodent must never be able to take the controls away, and
+//      a bug in a biome that asks for ten seconds gets a third of one.
+//   3. THE TIMERS RUN ON THE WALL CLOCK. A hitstop decremented by its own
+//      scaled dt takes 1/scale times as long to expire, so an 80 ms freeze at
+//      0.08 lasts a full second. They are decremented by the RAW frame time.
+//   4. IT DOES NOTHING WHILE PAUSED, AND NOTHING UNDER prefers-reduced-motion.
+//      Behind an open journal there is no world to stop; and a player who has
+//      asked the operating system for less motion has asked for exactly this.
+//
+// Everything downstream is free: `game.state.dt` is the scaled figure and every
+// module already reads the dt it is handed, so the whole world — physics, gait,
+// crowd, wind, tide, camera, the score's own lookahead — slows together with no
+// module knowing this exists. `game.state.rawDt` is there for the handful of
+// things that must not (nothing yet; it is published so the next one has it).
+// ---------------------------------------------------------------------------
+const MAIN_TIME_FLOOR = 0.05;    // the slowest the world may ever run
+const MAIN_HOLD_MAX   = 0.30;    // s — the longest freeze anyone may ask for
+const MAIN_SLOW_MAX   = 6.0;     // s — ...and the longest held beat
+const MAIN_SLOW_LAM   = 16;      // how quickly a slow-motion eases in and out
+
+function mainMakeTime(game) {
+  let holdT = 0, holdS = 1;      // hitstop: seconds left, and how close to stopped
+  let slowT = 0, slowS = 1;      // slow-motion: seconds left, and its target
+  let slowNow = 1;               // ...eased, so it never snaps
+  let calm = false;
+  try {
+    calm = !!(typeof window !== 'undefined' && window.matchMedia &&
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { calm = false; }
+
+  const time = {
+    /** True when the player has asked the OS for less motion. Read-only. */
+    calm: calm,
+    /** What was actually applied on the last frame. 1 = real time. */
+    scale: 1,
+    /** True while a freeze or a held beat is live — for anything that must sit it out. */
+    active: false,
+
+    /**
+     * A near-freeze. Instant on, instant off. `dur` seconds (capped at
+     * MAIN_HOLD_MAX), `scale` how close to stopped (default 8%).
+     * The strongest live request wins and a longer one still extends it, so
+     * two impacts in the same frame read as one slightly heavier impact
+     * rather than as two stutters.
+     */
+    hitstop(dur, scale) {
+      if (calm || !(dur > 0)) return;
+      const d = dur < MAIN_HOLD_MAX ? dur : MAIN_HOLD_MAX;
+      const s = clamp(scale === undefined ? 0.08 : scale, MAIN_TIME_FLOOR, 1);
+      if (holdT <= 0 || s < holdS) holdS = s;
+      if (d > holdT) holdT = d;
+    },
+
+    /**
+     * A held beat. Eases in and out. `scale` is the fraction of real time
+     * (0.45 is a good marquee), `dur` seconds (capped at MAIN_SLOW_MAX).
+     * A second request replaces the first outright rather than compounding —
+     * two overlapping slow-motions is how you get a game running at 0.2x and
+     * nobody able to say why.
+     */
+    slowmo(scale, dur) {
+      if (calm || !(dur > 0)) return;
+      slowT = dur < MAIN_SLOW_MAX ? dur : MAIN_SLOW_MAX;
+      slowS = clamp(scale === undefined ? 0.45 : scale, MAIN_TIME_FLOOR, 1);
+    },
+
+    /** Everything back to real time, now. Used on a biome change. */
+    clear() { holdT = 0; slowT = 0; holdS = 1; slowS = 1; slowNow = 1; time.scale = 1; time.active = false; },
+
+    /**
+     * Advance the channel by a real frame and answer with the dt the world
+     * should be run at. Called by game.tick and by nobody else.
+     */
+    step(raw) {
+      // Nothing to stop behind an open journal, and a freeze that survived a
+      // pause would be spent the instant the card closed.
+      if (game.state.paused) { time.clear(); return raw; }
+
+      if (slowT > 0) slowT -= raw;
+      const slowWant = slowT > 0 ? slowS : 1;
+      // A first-order ease, so the beat arrives and leaves like a breath.
+      slowNow += (slowWant - slowNow) * (1 - Math.exp(-MAIN_SLOW_LAM * raw));
+      if (slowT <= 0 && slowNow > 0.999) slowNow = 1;
+
+      let s = slowNow;
+      if (holdT > 0) {
+        holdT -= raw;
+        // Deliberately NOT eased: a freeze that ramps is a frame-rate dip.
+        if (holdS < s) s = holdS;
+        if (holdT <= 0) { holdT = 0; holdS = 1; }
+      }
+      if (s < MAIN_TIME_FLOOR) s = MAIN_TIME_FLOOR;
+      if (s > 1) s = 1;
+      time.scale = s;
+      time.active = s < 0.999;
+      return raw * s;
+    },
+  };
+  return time;
 }
 
 function mainSafe(label, fn) {
@@ -540,7 +671,9 @@ function mainBoot() {
       jump: false, jumpPressed: false,
       camYaw: 0,
     },
-    state: { time: 0, dt: 0, paused: false, started: false, score: 0, chaos: 0, sailing: false },
+    // `dt` is the SCALED frame time every module is handed; `rawDt` is the wall
+    // clock, and `timeScale` is the ratio. See mainMakeTime.
+    state: { time: 0, dt: 0, rawDt: 0, timeScale: 1, paused: false, started: false, score: 0, chaos: 0, sailing: false },
     mats: null,
     props: [], npcs: [],
     capy: null, env: null, physics: null, hud: null, post: null,
@@ -551,6 +684,10 @@ function mainBoot() {
     condor: null, biome: null,
     completeTask() {}, toast() {}, shake() {}, sfx() {},
     registerShadowTarget() {},
+    // THE TIME CHANNEL, filled in for real three lines below. Declared here so
+    // the shape of `game` is one object literal and a reader does not have to
+    // find the assignment to know these exist.
+    time: null, hitstop() {}, slowmo() {},
     // THE LOCALS SERVICE, stubbed here and filled in by npc.js below. A biome
     // build runs before OR after npc.js depending on the chapter, and a chapter
     // that is built lazily on first entry runs long after everything - so the
@@ -560,8 +697,19 @@ function mainBoot() {
   };
   window.__capy = game;
 
+  // Built before anything else: a module's constructor is allowed to ask for a
+  // beat, and the very first frame has to have a scale on it.
+  game.time = mainMakeTime(game);
+  game.hitstop = game.time.hitstop;
+  game.slowmo = game.time.slowmo;
+
   const biome = mainMakeBiomes(game);
   game.biome = biome;
+  // A held beat must not survive a hemisphere. Crossing a biome edge already
+  // white-outs, swaps the score and re-fits the shadow box; carrying somebody
+  // else's slow-motion into the arrival card would look like a hitch on the
+  // first second of a new place.
+  game.events.on('biome:enter', function () { game.time.clear(); });
 
   // The composite pass. Built before any module so systems.js can register a
   // grade in its constructor and the very first frame is already graded.
@@ -678,6 +826,13 @@ function mainBoot() {
   // (headless QA, deterministic capture) when requestAnimationFrame is throttled.
   game.tick = function (dt, render) {
     if (dt > 0.1) dt = 0.1;              // tab-switch guard
+    game.state.rawDt = dt;
+    // THE ONE PLACE THE WORLD'S CLOCK IS SET. Everything below — the solver,
+    // every module's update, the gait, the crowd, the score's lookahead — runs
+    // on this number, so a freeze or a held beat is one multiplication rather
+    // than twenty-three modules that each have to opt in. See mainMakeTime.
+    dt = game.time.step(dt);
+    game.state.timeScale = game.time.scale;
     game.state.dt = dt;
     game.state.time += dt;
 
