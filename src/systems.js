@@ -3731,6 +3731,10 @@ export function createSystems(game) {
     if (!c) return;
     if (c.state === 'suspended' && c.resume) { const p = c.resume(); if (p && p.catch) p.catch(function () {}); }
     if (!acAmbGain) ambientStart();
+    // The weather bed is built on the same gesture and for the same reason:
+    // eight nodes that run for the life of the page cannot be created before
+    // there is a context, and there is no context until somebody clicks.
+    if (!wxBedBus) { try { wxBedStart(); } catch (e) { wxBedBus = null; } }
   }
   function noiseBuf() {
     if (acNoise) return acNoise;
@@ -4238,6 +4242,63 @@ export function createSystems(game) {
     ns.start(t); ns.stop(t + 1.1);
   }
 
+  // ---- THUNDER, AND IT IS ALWAYS DISTANT -----------------------------------
+  // There is no lightning in this game and there is not going to be: a flash
+  // is a hard cut in a game whose whole argument is that its light is stable,
+  // and it would undo the one rule the micro-environment is built on. What is
+  // left is the sound of one a long way off, which is a serene noise rather
+  // than a frightening one — a very low, very slow swell with no transient in
+  // it at all. The absence of a crack IS the distance.
+  function sfxThunder(vol, pitch) {
+    const t = ac.currentTime;
+    const v = rand(0.86, 1.14) * pitch;
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 210 * v; lp.Q.value = 0.9;
+    const lp2 = ac.createBiquadFilter();
+    lp2.type = 'lowpass'; lp2.frequency.value = 400 * v; lp2.Q.value = 0.5;
+    const g = ac.createGain();
+    const gg = g.gain;
+    // Four seconds, and the attack is nearly a second of it. Anything faster
+    // reads as a door.
+    gg.setValueAtTime(0.0001, t);
+    gg.exponentialRampToValueAtTime(0.10 * vol, t + 0.85);
+    gg.exponentialRampToValueAtTime(0.055 * vol, t + 1.9);
+    gg.exponentialRampToValueAtTime(0.070 * vol, t + 2.5);   // the roll, coming back
+    gg.exponentialRampToValueAtTime(0.0001, t + 4.2);
+    // ...and it gets DARKER as it goes, because the high end of a distant
+    // rumble is what the air takes out of it first.
+    lp.frequency.setValueAtTime(260 * v, t);
+    lp.frequency.exponentialRampToValueAtTime(95 * v, t + 4.2);
+    ns.connect(lp); lp.connect(lp2); lp2.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + 4.3);
+  }
+
+  // ---- A DRIP. Water coming off an awning, a leaf or a hundred and seventy
+  // metres of limestone ceiling. One pitched blip with a very fast downward
+  // sweep — the sweep is the whole sound; at a constant pitch it is a marimba.
+  function sfxDrip(vol, pitch) {
+    const t = ac.currentTime;
+    const v = rand(0.78, 1.3) * pitch;
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(1500 * v, t);
+    o.frequency.exponentialRampToValueAtTime(430 * v, t + 0.085);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.085 * vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    // a breath of the splat underneath it, or it is a pluck rather than water
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 2600 * v; bp.Q.value = 1.4;
+    const ng = ac.createGain();
+    env(ng, t, 0.030 * vol, 0.004, 0.06);
+    o.connect(g); g.connect(acMaster);
+    ns.connect(bp); bp.connect(ng); ng.connect(acMaster);
+    o.start(t); o.stop(t + 0.24);
+    ns.start(t); ns.stop(t + 0.09);
+  }
+
   // The chapter-unlock chime: a rising bell figure with a long tail. Warm, not fanfare.
   function sfxChime(vol, pitch) {
     const t = ac.currentTime;
@@ -4315,6 +4376,145 @@ export function createSystems(game) {
     if (!acAmbGain || acAmbOn === on) return;
     acAmbOn = on;
     acAmbGain.gain.setTargetAtTime(on ? 0.05 : 0.0001, ac.currentTime, 0.6);
+  }
+
+  // =========================================================================
+  // 5a-bis. THE WEATHER BED — four continuous voices under everything.
+  //
+  // NOT one-shots. A rain sound made of scheduled one-shots is a machine gun
+  // with a low-pass on it; rain is a continuous noise process and the only
+  // honest way to mix it is a continuous node whose GAIN moves. Four sources,
+  // built once, running for the life of the page, and the entire per-frame
+  // cost is four `setTargetAtTime` calls on four gains.
+  //
+  // THE SCORE IS THE POINT AND THIS IS NOT. The brief is "without overpowering
+  // the primary musical score", and there are two separate mechanisms for it:
+  //
+  //   1. the bus ceiling (sysWX_BED_MAX) is a fifth of what the master would
+  //      let it be, so even a full Kowloon downpour sits under a solo pad;
+  //   2. it DUCKS against the music's own intensity, so the bed gets out of
+  //      the way of a swell and comes back afterwards. A bed that does not
+  //      duck is a bed that is either always too loud or always inaudible,
+  //      and the score in this game deliberately moves a long way.
+  //
+  // Every level arrives from game.weather.bed(). A chapter with an all-zero
+  // bed row (Marrakech's rain, the Drift's drip) never opens that gain at all,
+  // and a build with no weather module never calls sysWxBedSet.
+  // =========================================================================
+  let wxBedBus = null, wxBedRain = null, wxBedWind = null, wxBedChirp = null, wxBedRustle = null;
+  let wxBedWindLP = null, wxBedRainBP = null;
+  let wxDripAt = 0;
+  const sysWX_BED_MAX  = 0.19;   // ceiling on the whole bus, against a 0.85 master
+  const sysWX_BED_TAU  = 0.85;   // seconds. Slow: weather does not step.
+  const sysWX_DUCK     = 0.45;   // how much of the bed a full musical swell takes
+
+  function wxBedStart() {
+    if (!ac || wxBedBus) return;
+    wxBedBus = ac.createGain();
+    wxBedBus.gain.value = 0.0001;
+    wxBedBus.connect(acMaster);
+
+    // ---- rain. Two bands, because one is a hiss and rain is not a hiss: a
+    // bright band is the drops hitting things and a dark one is the general
+    // roar of a lot of them at once a long way off.
+    wxBedRain = ac.createGain(); wxBedRain.gain.value = 0.0001;
+    const rn = noiseSrc();
+    wxBedRainBP = ac.createBiquadFilter();
+    wxBedRainBP.type = 'bandpass'; wxBedRainBP.frequency.value = 1750; wxBedRainBP.Q.value = 0.42;
+    const rlo = ac.createBiquadFilter();
+    rlo.type = 'lowpass'; rlo.frequency.value = 620; rlo.Q.value = 0.4;
+    const rloG = ac.createGain(); rloG.gain.value = 0.55;
+    const rn2 = noiseSrc();
+    rn.connect(wxBedRainBP); wxBedRainBP.connect(wxBedRain);
+    rn2.connect(rlo); rlo.connect(rloG); rloG.connect(wxBedRain);
+    wxBedRain.connect(wxBedBus);
+    rn.start(); rn2.start();
+
+    // ---- wind. A lowpass on noise, with the CUTOFF swayed rather than the
+    // level: moving the level is a fan being switched on and off, moving the
+    // cutoff is air going round something.
+    wxBedWind = ac.createGain(); wxBedWind.gain.value = 0.0001;
+    const wn = noiseSrc();
+    wxBedWindLP = ac.createBiquadFilter();
+    wxBedWindLP.type = 'lowpass'; wxBedWindLP.frequency.value = 340; wxBedWindLP.Q.value = 0.7;
+    const whp = ac.createBiquadFilter(); whp.type = 'highpass'; whp.frequency.value = 70;
+    const wlfo = ac.createOscillator(); wlfo.frequency.value = 0.073;
+    const wlfoG = ac.createGain(); wlfoG.gain.value = 170;
+    wlfo.connect(wlfoG); wlfoG.connect(wxBedWindLP.frequency);
+    wn.connect(wxBedWindLP); wxBedWindLP.connect(whp); whp.connect(wxBedWind);
+    wxBedWind.connect(wxBedBus);
+    wn.start(); wlfo.start();
+
+    // ---- crickets. A high triangle gated hard by a fast LFO through a shaper
+    // — a cricket is a pulse train, not a tone, and an ungated oscillator up
+    // there is a mosquito and an immediate complaint.
+    wxBedChirp = ac.createGain(); wxBedChirp.gain.value = 0.0001;
+    const co = ac.createOscillator(); co.type = 'triangle'; co.frequency.value = 4320;
+    const co2 = ac.createOscillator(); co2.type = 'sine'; co2.frequency.value = 6510;
+    const co2g = ac.createGain(); co2g.gain.value = 0.35;
+    const gate = ac.createGain(); gate.gain.value = 0;
+    const glfo = ac.createOscillator(); glfo.type = 'square'; glfo.frequency.value = 13.5;
+    const glfoG = ac.createGain(); glfoG.gain.value = 0.5;
+    // ...and a second, much slower gate, because a field of crickets comes in
+    // and out in waves rather than running flat for an hour.
+    const wave = ac.createGain(); wave.gain.value = 0.55;
+    const wlfo2 = ac.createOscillator(); wlfo2.frequency.value = 0.19;
+    const wlfo2G = ac.createGain(); wlfo2G.gain.value = 0.4;
+    wlfo2.connect(wlfo2G); wlfo2G.connect(wave.gain);
+    glfo.connect(glfoG); glfoG.connect(gate.gain);
+    co.connect(gate); co2.connect(co2g); co2g.connect(gate);
+    gate.connect(wave); wave.connect(wxBedChirp);
+    wxBedChirp.connect(wxBedBus);
+    co.start(); co2.start(); glfo.start(); wlfo2.start();
+
+    // ---- leaves. Bright noise, swayed on its own slow LFO. This is the voice
+    // the gust actually drives, and it is the reason a wind shift is audible
+    // in a chapter that has no rain in it at all.
+    wxBedRustle = ac.createGain(); wxBedRustle.gain.value = 0.0001;
+    const sn = noiseSrc();
+    const shp = ac.createBiquadFilter(); shp.type = 'highpass'; shp.frequency.value = 2300;
+    const slp = ac.createBiquadFilter(); slp.type = 'lowpass'; slp.frequency.value = 7400;
+    const ssway = ac.createGain(); ssway.gain.value = 0.6;
+    const slfo = ac.createOscillator(); slfo.frequency.value = 0.147;
+    const slfoG = ac.createGain(); slfoG.gain.value = 0.45;
+    slfo.connect(slfoG); slfoG.connect(ssway.gain);
+    sn.connect(shp); shp.connect(slp); slp.connect(ssway); ssway.connect(wxBedRustle);
+    wxBedRustle.connect(wxBedBus);
+    sn.start(); slfo.start();
+  }
+
+  /** Drive the bed from weather.js's levels. Four gain writes and no more. */
+  function sysWxBedSet(dt) {
+    const W = game.weather;
+    if (!W || !ac || !wxBedBus) return;
+    const b = W.bed();
+    const t = ac.currentTime;
+    // The bus. Silent while the world is not being played, for exactly the
+    // reason sfx() is: an open journal or a background tab is not weather.
+    const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
+    const duck = 1 - clamp(musIntensity, 0, 1) * sysWX_DUCK;
+    const busy = playing ? sysWX_BED_MAX * duck : 0.0001;
+    wxBedBus.gain.setTargetAtTime(Math.max(0.0001, busy), t, sysWX_BED_TAU * 0.5);
+    wxBedRain.gain.setTargetAtTime(Math.max(0.0001, b.rain * 0.62), t, sysWX_BED_TAU);
+    wxBedWind.gain.setTargetAtTime(Math.max(0.0001, b.wind * 0.50), t, sysWX_BED_TAU);
+    wxBedChirp.gain.setTargetAtTime(Math.max(0.0001, b.chirp * 0.030), t, sysWX_BED_TAU);
+    wxBedRustle.gain.setTargetAtTime(Math.max(0.0001, b.rustle * 0.085), t, sysWX_BED_TAU);
+    // The rain gets BRIGHTER as it gets harder rather than only louder, which
+    // is the difference between a shower arriving and a volume knob turning.
+    wxBedRainBP.frequency.setTargetAtTime(1250 + b.rain * 1400, t, sysWX_BED_TAU);
+    wxBedWindLP.frequency.setTargetAtTime(230 + b.wind * 460, t, sysWX_BED_TAU);
+
+    // ---- and the drip, which is the one voice that must NOT be continuous.
+    // Water coming off a roof is a discrete event with a long gap; smeared
+    // into a noise bed it is a tap left running. Scheduled on a jittered timer
+    // so it never falls into a rhythm.
+    if (playing && b.drip > 0.04) {
+      wxDripAt -= dt;
+      if (wxDripAt <= 0) {
+        wxDripAt = rand(0.35, 1.9) / clamp(b.drip, 0.05, 1);
+        sfx('drip', { volume: 0.18 + b.drip * 0.5 });
+      }
+    }
   }
 
   // =========================================================================
@@ -6526,6 +6726,8 @@ export function createSystems(game) {
     gull: sfxGull, bark: sfxBark, strum: sfxStrum, horn: sfxHorn,
     hiss: sfxHiss, chime: sfxChime, tick: sfxTick, step: sfxStep,
     cheer: sfxCheer, organ: sfxOrgan,
+    // The micro-environment's two voices. See THE GLOBAL ENVIRONMENT.
+    thunder: sfxThunder, drip: sfxDrip,
     // What a hard thing sounds like. See physVOICE in props.js for who asks.
     clink: sfxClink,
   };
@@ -6533,6 +6735,10 @@ export function createSystems(game) {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
     gull: 0.8, bark: 0.35, strum: 0.5, horn: 2.2, hiss: 1.2, chime: 1.5, tick: 0.12,
     cheer: 3.0, organ: 4.0,
+    // Four seconds long and at most one per shower, so the gap is a formality;
+    // the drip's is real, because the bed schedules it on a jittered timer that
+    // at a high drip level can ask for one every third of a second.
+    thunder: 6.0, drip: 0.22,
     // a flat-out run is ~7 strides a second; the throttle must sit under that or
     // it starts eating every other footfall and the gait audibly limps
     step: 0.055,
@@ -9795,12 +10001,38 @@ export function createSystems(game) {
       bloom += pk * 0.12; thr += pk * 0.16; vig -= pk * 0.06;
     }
 
+    // ---- AND THE WET STREET, WHICH IS A GRADE AND NOT A LIGHT --------------
+    //
+    // The one thing in the micro-environment that belongs HERE rather than in
+    // the lighting section, because a wet road is not a brighter road — it is
+    // the same road with a mirror on it. What actually changes when it rains
+    // on Nathan Road is that every sign in Mong Kok acquires a second copy of
+    // itself lying on the ground, and the lens is the only part of this engine
+    // that can express that: more bloom, a threshold low enough for a
+    // reflection (which is always dimmer than the thing it reflects) to clear
+    // it, and a little more colour and contrast, which is what a specular
+    // sheet does to everything underneath it.
+    //
+    // It reads `shine()` and NOT `wetness()`. Venice's paving and Son Doong's
+    // floor are wet at their baseline and both chapters were graded that way
+    // on purpose; keying off the absolute would re-grade two finished chapters
+    // the moment this module was switched on. Only the water that was not
+    // there before is allowed to change the picture.
+    let cont = cur.contrast;
+    if (game.weather) {
+      const wl = game.weather.light();
+      if (wl.bloom > 0.001) {
+        bloom += wl.bloom; thr += wl.threshold;
+        sat += wl.saturation; cont += wl.contrast;
+      }
+    }
+
     const pp = post.params;
     pp.bloom = bloom < 0 ? 0 : bloom;
     pp.threshold = thr < 0.02 ? 0.02 : thr;
     pp.knee = cur.knee;
     pp.radius = rad;
-    pp.contrast = cur.contrast;
+    pp.contrast = cont;
     pp.saturation = sat;
     pp.vignette = vig;
     pp.vigStart = cur.vigStart;
@@ -11329,6 +11561,47 @@ export function createSystems(game) {
         amb.intensity = lerp(amb.intensity, sysCALI_N_AMB_I, nite);
       }
     }
+    // ---- THE MICRO-ENVIRONMENT --------------------------------------------
+    //
+    // ABSOLUTELY LAST, and after every hand-written block above as well as the
+    // table loop, because it is not a chapter's air — it is what is happening
+    // to a chapter's air this minute. weather.js has already decided how much
+    // of it there is; every number here is a MULTIPLIER or an ADDEND on what
+    // the seventeen blocks above have finished computing, so a chapter with no
+    // mood row (or a build in which weather.js failed to construct at all)
+    // passes through this untouched to the last float.
+    //
+    // The rule it obeys, which is the whole brief: it may make an hour
+    // WEATHER, and it may not make it a different hour. The sun may lose a
+    // third of itself to a shower and the fog may come in by a third, and at
+    // the bottom of that you can still say what time it is in every one of the
+    // seventeen. That was the test the constants in weather.js were tuned to.
+    const WX = game.weather;
+    if (WX) {
+      const wl = WX.light();
+      if (wl.sunK !== 1) sun.intensity *= wl.sunK;
+      if (wl.hemiK !== 1) hemi.intensity *= wl.hemiK;
+      if (wl.amb) amb.intensity += wl.amb;
+      if (scene.fog && (wl.fogFK !== 1 || wl.hazeMix > 0)) {
+        scene.fog.near *= wl.fogNK;
+        scene.fog.far *= wl.fogFK;
+        if (wl.hazeMix > 0.002) {
+          sysColB.set(wl.hazeHex);
+          scene.fog.color.lerp(sysColB, wl.hazeMix);
+        }
+      }
+      // THE SKY MOVES LESS THAN THE FOG, AND THAT IS NOT AN OVERSIGHT. Rain is
+      // between you and the far half of the world, so it greys the DISTANCE
+      // hard; it is barely between you and the zenith at all. Moving both by
+      // the same amount is what makes a video-game rainstorm look like
+      // somebody turned the lights down, and it is why bgMix is two thirds of
+      // hazeMix in weather.js rather than equal to it.
+      if (wl.bgMix > 0.002 && scene.background && scene.background.isColor) {
+        sysColB.set(wl.hazeHex);
+        scene.background.lerp(sysColB, wl.bgMix);
+      }
+    }
+
     // ---- THE DOME, THE FILL AND THE GRADE ---------------------------------
     // Last in the atmosphere section on purpose. Everything above has finished
     // moving the fog, the background and the three lights for this frame; these
@@ -11336,6 +11609,10 @@ export function createSystems(game) {
     // the only reason a chapter can add a new event without also having to
     // remember to tell the sky and the lens about it.
     sysDressFrame(dt);
+    // ...and the bed the atmosphere is heard over. Immediately after the
+    // picture, because it is the other half of the same state: the shower that
+    // just took a third of the sun is the shower you can now hear.
+    sysWxBedSet(dt);
 
     // ---- the score goes to sea -------------------------------------------
     // Palette 3 is only ever alive while somebody is actually driving. Taking

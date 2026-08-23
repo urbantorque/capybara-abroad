@@ -683,7 +683,16 @@ export function createWeather(game) {
     for (const k in base) next[k] = base[k];
     for (const k in cfg) next[k] = cfg[k];
     wxMOOD[n] = next;
-    if (n === name) { row = next; wxFieldTo(row); }
+    if (n === name) {
+      row = next;
+      wxFieldTo(row);
+      // A CONFIG CHANGE HAS TO TAKE EFFECT PROMPTLY. `rainNext` was seeded from
+      // the OLD row on arrival, so a caller that shortens the gap from ninety
+      // seconds to one still waits out the old ninety — which looks exactly
+      // like `set` not working, and is how the first audio soak measured a
+      // rain bed of zero after twenty seconds of a forced downpour.
+      rainNext = Math.min(rainNext, next.rain.gap);
+    }
   }
 
   // ---- the loop -----------------------------------------------------------
