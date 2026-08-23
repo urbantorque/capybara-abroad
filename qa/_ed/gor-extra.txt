@@ -1,0 +1,35 @@
+    // ---- AND THREE MORE, IN THE THREE PLACES THE CHAPTER GOES ------------
+    // The seven above are all in the town or on the launch field, which is the
+    // first ninety seconds. Everything after that — the valley, the dovecote
+    // cliff and the landing plain — had nobody in it, and those are the parts
+    // of the chapter you are IN a balloon for and cannot leave. A person on the
+    // ground you are drifting over is worth more than a person you can walk up
+    // to, because it is the only way of knowing how high you are.
+    gorLocals.dovecote = game.addLocal({
+      biome: 'goreme', x: gorCLIFF.x + 9, y: gorTerrain(gorCLIFF.x + 9, -30), z: -30, near: 9,
+      figure: { shirt: PALETTE.gorPigeon, legs: PALETTE.gorTuffDk, hat: PALETTE.gorBasaltDk },
+      lines: ['Four hundred holes. My grandfather cut about eighty of them.',
+              'Nobody eats the birds. It was never about the birds.',
+              'You want to know why the grapes grow in a valley made of ash? That is why.',
+              'They go out at first light and they are all back by nine.'],
+      wheek: ['Do that again and you will be picking them out of your teeth.',
+              'Every single one of them looked at you. Did you see that?'] });
+    gorLocals.vine = game.addLocal({
+      biome: 'goreme', x: -26, y: gorTerrain(-26, -52), z: -52, near: 8,
+      figure: { shirt: PALETTE.gorEnvB, legs: PALETTE.gorSoil },
+      lines: ['Before the sun. Always before the sun. After that it is not work, it is suffering.',
+              'No wires, no posts. They hold themselves up. They have had two thousand years of practice.',
+              'The wall is not mine. The wall was here. I just put the stones back on it.',
+              'You are standing on a vine. You are standing on a hundred-year-old vine.'],
+      wheek: ['Yes, yes. Very good. Now move.',
+              'The dogs will start, and then the whole valley starts.'] });
+    gorLocals.chase = game.addLocal({
+      biome: 'goreme', x: gorLAND.x + 11, y: gorTerrain(gorLAND.x + 11, gorLAND.z + 8),
+      z: gorLAND.z + 8, near: 9,
+      figure: { shirt: PALETTE.gorTruck, legs: PALETTE.gorBasaltDk },
+      lines: ['We do not catch them. We just get there first and hold the basket.',
+              'My father drives. I open the gates. There are a lot of gates.',
+              'Whichever way the wind is at four hundred feet — that is where I am going.',
+              'If you come down out here, do not get out. Wait. Everybody gets out too early.'],
+      wheek: ['I heard that from the road.',
+              'Save it for when you are up there. It goes a very long way from up there.'] });

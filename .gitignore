@@ -1,0 +1,4 @@
+dist/
+qa/*.png
+node_modules/
+.playwright-cli/

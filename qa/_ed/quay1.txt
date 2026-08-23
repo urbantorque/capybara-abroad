@@ -1,0 +1,231 @@
+// =================================================================== THE BUSH ==
+/**
+ * EVERY HEADLAND IN SYDNEY HARBOUR IS COVERED IN TREES AND THESE WERE BALD.
+ *
+ * quayHeadland draws a four-course sandstone cliff with a smooth scrub CAP on
+ * top of it — one flat green colour over an eleven-sided dome — and that is
+ * every piece of land in the chapter except the quay itself: Bradleys Head,
+ * Shark Island, Middle Head, North Head, Fort Denison and both shores. Thirteen
+ * of them, filling both banks of a seven-hundred-metre fairway that the player
+ * spends a minute and a half looking straight down.
+ *
+ * The harbour's headlands are not lawns. They are Hawkesbury sandstone with
+ * dry sclerophyll forest on them, and the three things that make that read at
+ * two hundred metres are exactly the three things the cap had none of:
+ *
+ *   ANGOPHORA, which is the tree everybody photographs — a pale orange trunk
+ *     that BENDS, a low fork, and a dark rounded crown. The trunk colour is
+ *     the whole tell; a green blob on a brown stick is a lollipop.
+ *   BANKSIA AND SCRUB, which fills between them and is what makes a wood a
+ *     canopy rather than a plantation.
+ *   SANDSTONE OUTCROP, breaking through the scrub at the top of every cliff,
+ *     because a headland is rock with a thin skin of soil on it and the rock
+ *     shows wherever the slope is over about thirty degrees.
+ *
+ * The brief for this pass was explicit that the investment goes on the
+ * FORESHORE and not on the water, and this is the foreshore: it is the whole
+ * silhouette of both banks and it is the thing you steer between.
+ *
+ * NONE OF IT IS SOLID and none of it needs to be. Every headland already
+ * carries one octagonal collider at 0.70 of its radius (see quayHEADS), the
+ * hull is stopped by quayHARD well outside that, and the player can only reach
+ * the two the chapter lands on. Adding four hundred bodies to put bark on a
+ * silhouette would be the most expensive way in the project to change nothing.
+ *
+ * The canopies do not cast either. The sun in this chapter is high and the
+ * headlands are seen from the water: a shadow under a tree on a hill two
+ * hundred metres away is four pixels, and there are four hundred of them.
+ * The TRUNKS cast, because on the two headlands you can actually stand on
+ * they are the only vertical thing in the frame.
+ */
+function quayBuildBush(root) {
+  const trunk = [], fork = [], crownA = [], crownB = [], scrub = [], rock = [], grassT = [];
+  // A headland's own numbers decide its wood: the exposed ocean ones (North
+  // Head, Middle Head) are wind-shorn heath and the sheltered inner ones
+  // (Bradleys, Shark) carry real trees. That is genuinely how the harbour
+  // works and it is one number.
+  for (let hI = 0; hI < quayHEADS.length; hI++) {
+    const H = quayHEADS[hI];
+    if (H.r < 6) continue;
+    const exposed = H.z < -330;
+    const n = Math.round(H.r * H.r * (exposed ? 0.055 : 0.085));
+    for (let i = 0; i < n; i++) {
+      // Sample inside the CAP, not inside the bounding box: the cap sits at
+      // 0.72 of the radius and everything outside it is cliff face. Ten
+      // chapters of this codebase have been bitten by sampling a rectangle.
+      const a = rand(0, 6.28318), u = Math.sqrt(Math.random()) * 0.80;
+      const x = H.x + Math.cos(a) * H.r * u, z = H.z + Math.sin(a) * H.r * u;
+      const y = quayGroundY(x, z);
+      if (y <= quayWATER_Y + 0.6) continue;
+      const s = (exposed ? rand(0.5, 0.9) : rand(0.85, 1.5)) * (1 - u * 0.35);
+      const lean = rand(-0.22, 0.22), ry = rand(0, 6.28318);
+      if (!exposed && i % 3 !== 2) {
+        // the tree: a leaning trunk, one fork, and two crowns of different
+        // greens, because a canopy that is one colour is a hedge
+        quayPush9(trunk, x, y + s * 1.6, z, lean * 0.5, ry, 0, s * 0.34, s * 3.2, s * 0.34);
+        quayPush9(fork, x + lean * s * 1.9, y + s * 3.5, z, lean, ry + 0.7, 0,
+                  s * 0.22, s * 1.9, s * 0.22);
+        quayPush9(crownA, x + lean * s * 2.4, y + s * 4.5, z, 0, ry, 0,
+                  s * 3.1, s * 2.0, s * 3.0);
+        quayPush9(crownB, x + lean * s * 3.0, y + s * 5.4, z + s * 0.4, 0, ry + 1.3, 0,
+                  s * 2.2, s * 1.5, s * 2.2);
+      } else {
+        // banksia and heath: no trunk worth drawing, all crown, and it is the
+        // stuff that actually covers the ground between the trees
+        quayPush9(scrub, x, y + s * 0.75, z, rand(-0.12, 0.12), ry, rand(-0.12, 0.12),
+                  s * 2.4, s * 1.5, s * 2.3);
+      }
+      // sandstone breaking through, and a grass tree beside about a sixth of
+      // them: the two things that say this soil is four centimetres deep
+      if (i % 4 === 1) {
+        const rs = rand(0.8, 2.3);
+        quayPush9(rock, x + rand(-2.5, 2.5), y + rs * 0.22, z + rand(-2.5, 2.5),
+                  rand(-0.2, 0.2), rand(0, 6.28), rand(-0.2, 0.2), rs * 1.5, rs * 0.6, rs * 1.2);
+      }
+      if (i % 6 === 3) {
+        const gs = rand(0.6, 1.1);
+        quayPush9(grassT, x + rand(-2, 2), y + gs * 0.55, z + rand(-2, 2),
+                  0, ry, 0, gs * 1.7, gs * 1.5, gs * 1.7);
+      }
+    }
+  }
+  quayInstance(root, quayG.cyl6, PALETTE.trunk, trunk, true, false);
+  quayInstance(root, quayG.cyl6, PALETTE.trunk, fork, false, false);
+  quayInstance(root, quayG.sph5, PALETTE.leafC, crownA, false, true);
+  quayInstance(root, quayG.sph5, PALETTE.leafA, crownB, false, true);
+  quayInstance(root, quayG.sph5, PALETTE.leafB, scrub, false, true);
+  quayInstance(root, quayG.sph5, PALETTE.cliffRock, rock, false, true);
+  quayInstance(root, quayG.cone6, PALETTE.fernLeaf, grassT, false, true);
+}
+
+// ================================================================ THE APRON ==
+/**
+ * SIX GRABBABLE PROPS OVER EIGHTY THOUSAND SQUARE METRES.
+ *
+ * That was the lowest absolute count in the game, and this chapter's low
+ * triangle density is largely honest — it IS a harbour, and the water is
+ * supposed to be empty. What is not honest is the APRON: a hundred metres of
+ * sandstone deck at the head of the busiest ferry terminal in the southern
+ * hemisphere, carrying three shelters, three berth boards, some bollards and
+ * nothing else. It is where the chapter starts, where the player spends the
+ * first minute looking for a boat, and where they come back to.
+ *
+ * What actually stands on Circular Quay, and what is here now: the row of
+ * Canary Island date palms along the promenade (the one piece of planting
+ * everybody remembers), the ferry timetable pylons, the awnings over the
+ * concourse, bench-and-bin pairs, a busker's pitch, luggage trolleys, and the
+ * chain-and-bollard line along the water's edge.
+ *
+ * The palms are the only thing here tall enough to matter to the camera, so
+ * they are the only thing set back from the walking line: the rig sits 7.2 m
+ * behind the animal and a nine-metre palm on the water's edge would be in
+ * every shot of the boat.
+ */
+function quayBuildApronDress(game, root) {
+  const M = quayMerger();
+  const F = quayPool();
+  const fronds = [], crowns = [];
+
+  // ---- the palms, in a row along the back of the promenade ----------------
+  for (let i = 0; i < 13; i++) {
+    const px = -44 + i * 7.3;
+    // never in front of a berth: the three fingers are the sight lines the
+    // whole first minute of the chapter runs along
+    let clear = true;
+    for (let w = 0; w < quayWHARF_X.length; w++) if (Math.abs(px - quayWHARF_X[w]) < 5.5) clear = false;
+    if (!clear) continue;
+    const pz = quayAPRON_Z + 8.5;
+    const h = rand(6.4, 8.2);
+    // a date palm's trunk is a stack of leaf scars and it tapers
+    for (let k = 0; k < 7; k++) {
+      const t = k / 7;
+      M.cyl(px + Math.sin(k * 1.1) * 0.06, 0.20 + h * (t + 0.07), pz,
+            0.42 - t * 0.13, h / 7 + 0.04,
+            k % 2 ? PALETTE.trunk : PALETTE.woodDark, 0, k * 0.5, 0, 6);
+    }
+    M.cyl(px, 0.20 + h * 1.02, pz, 0.30, 0.5, PALETTE.woodDark, 0, 0, 0, 6);
+    // eleven fronds, drooping, and a frond is a long thin box with a droop on
+    // it rather than a cone: a cone is a party hat
+    for (let f = 0; f < 11; f++) {
+      const a = f / 11 * 6.28318 + i;
+      quayPush9(fronds, px + Math.cos(a) * 1.5, 0.20 + h * 1.02 + 0.25 - (f % 3) * 0.14,
+                pz + Math.sin(a) * 1.5, Math.sin(a) * 0.52, a, -Math.cos(a) * 0.52,
+                0.55, 0.14, 3.4);
+    }
+    quayPush9(crowns, px, 0.20 + h * 1.02 + 0.1, pz, 0, i, 0, 1.5, 1.0, 1.5);
+    quayPoolBox(F, px, 0.20 + h * 0.5, pz, 0.42, h * 0.5, 0.42);
+    // and a ring of paving round the base, which is what a street tree gets
+    M.cyl(px, 0.27, pz, 1.25, 0.10, PALETTE.stone, 0, 0, 0, 8);
+  }
+
+  // ---- benches, bins and the timetable pylons -----------------------------
+  for (let i = 0; i < 9; i++) {
+    const bx = -40 + i * 10.2, bz = quayAPRON_Z + 4.2;
+    // bench: a plank seat, a back, and two cast ends. Facing the WATER, which
+    // is the only thing anybody has ever sat on Circular Quay to look at.
+    M.box(bx, 0.62, bz, 2.3, 0.12, 0.55, PALETTE.wood);
+    M.box(bx, 0.92, bz + 0.28, 2.3, 0.55, 0.10, PALETTE.wood, 0.16, 0, 0);
+    for (let e = -1; e <= 1; e += 2) {
+      M.box(bx + e * 1.05, 0.36, bz, 0.12, 0.52, 0.52, PALETTE.wharfIron);
+    }
+    quayPoolBox(F, bx, 0.50, bz, 1.2, 0.55, 0.35);
+    if (i % 2 === 0) {
+      const nx = bx + 3.4;
+      M.cyl(nx, 0.62, bz, 0.34, 0.85, PALETTE.wharfIron, 0, 0, 0, 8);
+      M.cyl(nx, 1.07, bz, 0.38, 0.10, PALETTE.stoneDark, 0, 0, 0, 8);
+      quayPoolBox(F, nx, 0.62, bz, 0.36, 0.45, 0.36);
+    }
+    if (i % 3 === 1) {
+      // the timetable pylon: a lit sign on a post, and every terminal in the
+      // world has one at the head of every finger
+      const sx = bx - 2.0, sz = quayAPRON_Z + 1.6;
+      M.cyl(sx, 1.35, sz, 0.11, 2.3, PALETTE.wharfIron, 0, 0, 0, 6);
+      M.box(sx, 2.55, sz, 1.15, 1.5, 0.14, PALETTE.wharfIron, 0, 0.2, 0);
+      M.box(sx, 2.55, sz - 0.10, 0.95, 1.25, 0.04, PALETTE.sail, 0, 0.2, 0);
+      quayPoolBox(F, sx, 1.5, sz, 0.6, 1.6, 0.14);
+    }
+  }
+
+  // ---- the chain line along the water's edge ------------------------------
+  // A hundred metres of unguarded stone lip over deep water reads as an
+  // unfinished world, and the chain is the cheapest possible sentence about
+  // where the edge is. Nothing collides with it — it is 40 cm high and the
+  // capybara is supposed to be able to get in the water.
+  for (let i = 0; i < 27; i++) {
+    const cx = -46 + i * 3.5;
+    let clear = true;
+    for (let w = 0; w < quayWHARF_X.length; w++) if (Math.abs(cx - quayWHARF_X[w]) < 6.5) clear = false;
+    if (!clear) continue;
+    M.cyl(cx, 0.44, quayAPRON_Z + 0.9, 0.11, 0.48, PALETTE.wharfIron, 0, 0, 0, 6);
+    M.sph(cx, 0.70, quayAPRON_Z + 0.9, 0.14, 0.14, 0.14, PALETTE.stoneDark);
+    // the chain: three sagging links to the next post
+    for (let k = 0; k < 3; k++) {
+      const t = (k + 0.5) / 3;
+      const sag = Math.sin(t * Math.PI) * 0.13;
+      M.box(cx + 1.17 + k * 1.17 - 1.17, 0.62 - sag, quayAPRON_Z + 0.9,
+            1.2, 0.06, 0.06, PALETTE.stoneDark, 0, 0, (t - 0.5) * 0.5);
+    }
+  }
+
+  // ---- the concourse awning, at the back --------------------------------
+  // Set at z = APRON_Z1 - 3 so it is against the colonnade and can never be
+  // between the camera and the water.
+  for (let i = 0; i < 5; i++) {
+    const ax = -36 + i * 18, az = quayAPRON_Z1 - 3.2;
+    for (let e = -1; e <= 1; e += 2) {
+      M.cyl(ax + e * 6.5, 1.7, az + 1.4, 0.16, 3.4, PALETTE.wharfIron, 0, 0, 0, 6);
+      quayPoolBox(F, ax + e * 6.5, 1.7, az + 1.4, 0.18, 1.7, 0.18);
+    }
+    M.box(ax, 3.48, az - 0.6, 14.0, 0.16, 5.4, PALETTE.sail, -0.13, 0, 0);
+    M.box(ax, 3.86, az - 3.2, 14.2, 0.22, 0.30, PALETTE.wharfIron);
+  }
+
+  quayPoolDone(game, F);
+  const m = new THREE.Mesh(M.build(), quayVC());
+  m.name = 'quayApronDress';
+  m.castShadow = true;
+  m.receiveShadow = true;
+  root.add(m);
+  quayInstance(root, quayG.box, PALETTE.palmLeaf, fronds, false, true);
+  quayInstance(root, quayG.sph5, PALETTE.leafA, crowns, false, true);
+}

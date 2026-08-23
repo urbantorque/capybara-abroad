@@ -1,0 +1,79 @@
+// ==================================================================== SOUND ==
+/**
+ * THE QUIETEST SOUNDSCAPE IN THE GAME, AND THE MIDDLE OF THE MAP WAS SILENT.
+ *
+ * systems.js gives Iceland the sparsest ambience in the project on purpose —
+ * wind off the ice, water on the harbour wall, and once in a very long while a
+ * bird, on a thirteen-to-twenty-eight second timer — and that is exactly right
+ * for the place. But it is ONE ambience for four hundred metres of map, so the
+ * lava field, the geothermal ground, the moraine and the town all sound the
+ * same, and the two hundred metres between the town and the ice — the walk
+ * every player makes twice — is the emptiest of the four.
+ *
+ * Three positional sources, all of them rationed on the distance to the thing
+ * making them, which is the only kind of positional this engine does (the
+ * Sahara rule: the biome computes the volume). None of them fires unless the
+ * player is near enough for the object to be IN THE FRAME, so nothing here
+ * makes the chapter busier from anywhere it used to be quiet.
+ */
+let iceSndSheep = 4, iceSndRack = 9, iceSndSea = 3;
+
+function iceUpdateSound(game, dt) {
+  const p = game.capy && game.capy.position;
+  if (!p) return;
+
+  // ---- THE SHEEP ---------------------------------------------------------
+  // The one sound in the middle of the map, and the only voice between the
+  // last house and the moraine. A bleat carries a very long way over open
+  // ground and it is the sound of the place being INHABITED, which is the
+  // whole reason the flocks are there.
+  iceSndSheep -= dt;
+  if (iceSndSheep <= 0) {
+    let best = 1e9;
+    for (let i = 0; i < iceFLOCKS.length; i++) {
+      const F = iceFLOCKS[i];
+      const d = Math.hypot(p.x - F.x, p.z - F.z);
+      if (d < best) best = d;
+    }
+    if (best < 60) {
+      const v = clamp(0.16 * (1 - best / 60), 0.02, 0.16);
+      // 'bark' at a low pitch with a wide random spread is a passable bleat and
+      // it is what the table has; a sheep and a dog are the same animal to a
+      // one-oscillator synthesiser.
+      iceSfx('bark', { volume: v, pitch: rand(0.62, 0.82) });
+      iceSndSheep = rand(5, 13);
+    } else iceSndSheep = rand(3, 6);
+  }
+
+  // ---- THE DRYING RACKS --------------------------------------------------
+  // Sixty split fish on two rails in an Atlantic wind. What you actually hear
+  // standing next to one is the timber, not the fish.
+  iceSndRack -= dt;
+  if (iceSndRack <= 0) {
+    let best = 1e9;
+    for (let i = 0; i < iceRACK.length; i++) {
+      const d = Math.hypot(p.x - iceRACK[i][0], p.z - iceRACK[i][1]);
+      if (d < best) best = d;
+    }
+    if (best < 26) {
+      iceSfx('rustle', { volume: clamp(0.13 * (1 - best / 26), 0.02, 0.13),
+                         pitch: rand(0.36, 0.54) });
+      iceSndRack = rand(4, 9);
+    } else iceSndRack = rand(4, 8);
+  }
+
+  // ---- THE SEA ON THE COLONNADE -----------------------------------------
+  // A swell hitting a vertical basalt face does not sound like a beach. It is
+  // a thump and then a long drain, and it is the loudest thing in the chapter
+  // if you stand at the headland — which is a fact worth knowing, because the
+  // headland is where the wheek empties eleven hundred puffins off the rock.
+  iceSndSea -= dt;
+  if (iceSndSea <= 0) {
+    const d = Math.hypot(p.x - iceCLIFF.x, p.z - iceCLIFF.z);
+    if (d < 54) {
+      const v = clamp(0.20 * (1 - d / 54), 0.02, 0.20);
+      iceSfx('splash', { volume: v, pitch: rand(0.30, 0.42) });
+      iceSndSea = rand(3.4, 6.5);
+    } else iceSndSea = rand(3, 5);
+  }
+}

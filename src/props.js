@@ -1,0 +1,3488 @@
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+
+// ===========================================================================
+// AGENT C — world physics + interactive props.
+// Every prop is authored as a little group of flat-shaded boxes/cylinders,
+// then baked ONCE per type into a single vertex-coloured BufferGeometry so a
+// whole prop costs exactly one draw call. Colours still come from PALETTE —
+// they are just carried on the vertices instead of on the material.
+// ===========================================================================
+
+// The baked PALETTE colours ride on the vertices, so the shared prop material
+// must be an exact 1.0 multiplier. Built from unit RGB rather than a hex
+// literal so no colour constant is hardcoded outside shared.js.
+const physNEUTRAL = new THREE.Color(1, 1, 1).getHex();
+
+const physIMPACT_MIN = 2.5;      // m/s before a bonk is worth reporting
+const physSPILL_MIN = 3.0;       // m/s before a hot drink gives up
+const physTIP_COS = 0.5;         // cos(60°) — bin considered toppled
+const physHOLD_LAMBDA = 26;      // mouth snap ~0.12s
+const physDUST_MAX = 30;
+const physFOAM_MAX = 8;
+const physRUBBISH_MAX = 18;
+const physWATER_FALLBACK = -0.5;
+// ---- buoyancy (Archimedes, forces only — never a scripted bob) -------------
+const physFLOAT_DEFAULT = 0.55;  // submerged fraction a prop is designed to settle at
+const physBUOY_CLAMP = 3.0;      // hard cap on lift, in multiples of the prop's own weight
+const physBUOY_DRAG_L = 6.0;     // linear drag, N per (m/s) per kg of submerged mass
+const physBUOY_DRAG_A = 3.4;     // angular drag, 1/s (scaled by the body's inertia)
+const physBUOY_RIGHT = 6.0;      // self-righting, rad/s² per unit sin(tilt)
+const physBUOY_SWELL = 0.09;     // harbour swell, as a fraction of weight
+const physBUOY_DRIFT = 0.30;     // lazy surface current, N per kg
+const physBUOY_SPIN = 1.2;       // lazy yaw, rad/s²
+const physBUOY_PROUD = 0.045;    // m of a floating prop that must stay above the (opaque) surface
+const physBUOY_SPAN_MIN = 0.06;  // m — floor on the depth ramp, NOT a waterline dial
+
+// ---- aerodynamics (quadratic drag; the air is a fluid like the water is) ----
+const physAERO_RHO  = 1.2;       // kg/m³, air
+const physAERO_AMAX = 40;        // m/s² ceiling on drag acceleration (integration guard)
+const physAERO_CD_BOX = 1.05;    // bluff body
+const physAERO_CD_SPH = 0.47;    // sphere
+const physSEABED = 2.3;          // metres of harbour under the surface
+const physGRP_STATIC = 1;        // ground / walls / capy / npcs (cannon default)
+const physGRP_DYN = 2;           // props + rubbish
+const physHELD_VMAX = 18;        // clamp on carried-body swing velocity
+
+// ---- task causation -------------------------------------------------------
+// Nothing on the checklist may tick itself. A task only counts if the capybara
+// is demonstrably responsible: it is holding the prop, it touched the prop, or
+// it threw the prop, within the relevant window.
+const physTASK_GRACE = 2.0;      // s — the opening settle earns the player nothing
+const physCAUSE_TIP = 1.5;       // s — bin must go over right after a capy hit
+const physCAUSE_SPILL = 4.0;     // s — a lobbed cup gets a longer arc
+const physCAUSE_WATER = 8.0;     // s — a thrown ball can take a while to bob in
+
+// ---- world surfaces -------------------------------------------------------
+// Props must be spawned ON the surface under them, not at y = 0. The only
+// raised walkable surface is the Opera House podium (CONTRACT.md world layout:
+// centred (0,0,-4), 26x16, deck top 1.2). Its static collider is x [-13,13],
+// z [-12,4]; the stair down to the forecourt occupies z 4 -> 7.
+const physPODIUM_Y = 1.2;
+// generous — anything even near the deck must resolve to the deck height
+const physDECK_FULL = { x0: -13.1, z0: -12.1, x1: 13.1, z1: 4.1 };
+// conservative — a prop may only be *scattered* well inside the deck
+const physDECK_SAFE = { x0: -12.2, z0: -11.2, x1: 12.2, z1: 3.2 };
+// the sloping stair: never a valid resting place
+const physSTAIR = { x0: -11.4, z0: 3.2, x1: 11.4, z1: 7.4 };
+// solid volumes standing ON the deck (shell bases + restaurant), + margin
+const physDECK_BLOCK = [
+  { x0: -13.6, z0: -11.8, x1: -1.6, z1: 0.8 },
+  { x0: 2.6, z0: -9.3, x1: 13.0, z1: -0.7 },
+  { x0: -12.7, z0: -1.2, x1: -8.5, z1: 3.6 },
+];
+const physDECK_ZONES = { operaStage: 1 };   // zones whose footprint IS the deck
+const physFALL_Y = -1.5;         // below this a prop has escaped the world
+
+// ---- Pasto, Nariño (chapter 2) --------------------------------------------
+// Everything below is Andean content. It is built ONLY on the first
+// 'biome:enter' for 'pasto', so every mesh and body it creates is auto-tagged
+// to the Pasto biome by main.js and costs Sydney exactly nothing.
+const physSTALL_MAX = 3;         // simultaneously collapsed stalls; the rest re-sleep
+const physSTALL_R = 2.4;         // m — barge/tug reach around a stall centre
+const physSTALL_BARGE = 3.4;     // m/s — capybara speed that brings a frame down
+const physSHATTER_MIN = 6.0;     // m/s along the normal ≈ a 0.75 m drop at g = 24
+const physUNWEDGE_MAX = 1.3;     // m — the most a collapsing frame may be hoisted
+const physTIP_W = 5.2;           // rad/s of tumble on a collapsing frame
+const physCAUSE_CRATER = 30;     // s — a lobbed prop can bounce a long way down
+// Measured off game.pasto.terrainHeight: the vent floor is flat out to r ≈ 4.5,
+// the inner wall runs 45 m -> 63 m between there and a rim crest at r ≈ 10.75.
+// The payoff has to play at the BOTTOM, so the eat radius is the floor, not the
+// bowl; the bowl itself is a no-resting zone (physCraterShove).
+const physCRATER_EAT_R = 4.6;    // m — inside this, and low, the volcano takes it
+const physCRATER_FLOOR_H = 2.4;  // m above craterCentre.y that still counts as "the vent"
+const physCRATER_RIM = 11.8;     // m — the crest plus a metre of forgiveness
+const physCRATER_STILL = 0.4;    // s without descending before the wall shrugs it on
+const physCRATER_DESCEND = 0.25; // m of drop that counts as "still on its way down"
+const physCRATER_GIVEUP = 9;     // shoves before the mountain just takes it anyway
+const physPUFF_MAX = 24;
+const physSHARD_MAX = 8;
+const physSHARD_LIFE = 6;
+const physHIDE_BOWL = 9;         // s before a shattered bowl is quietly restocked
+const physHIDE_CRATER = 7;
+const physPASTO_FALL = 9;        // m under the terrain before a prop is rescued
+// Radius^2 past which a prop is by definition lost. The widest biome (the Manly
+// fairway) reaches ~600 m out, so this has to clear that and still be tighter
+// than "wherever a blow-up threw it".
+const physESCAPE_R2 = 900 * 900;
+
+// ---- scratch (allocated once, reused forever) -----------------------------
+const physV1 = new THREE.Vector3();
+const physV2 = new THREE.Vector3();
+const physV3 = new THREE.Vector3();
+const physQ1 = new THREE.Quaternion();
+const physQ2 = new THREE.Quaternion();
+const physM4 = new THREE.Matrix4();
+const physEuler = new THREE.Euler();
+const physUp = new THREE.Vector3(0, 1, 0);
+const physCV1 = new CANNON.Vec3();
+const physCV2 = new CANNON.Vec3(0, 0.5, 0);   // off-centre lever for bin topples
+// Pasto scratch is kept separate: physStallCollapse can fire from inside a
+// cannon collide callback, i.e. halfway through physOnCollide's own use of CV1/CV2.
+const physCV3 = new CANNON.Vec3();
+const physCV4 = new CANNON.Vec3();
+const physPV1 = new THREE.Vector3();
+const physPQ1 = new THREE.Quaternion();
+const physPM4 = new THREE.Matrix4();
+const physImpactPayload = { prop: null, speed: 0, position: new THREE.Vector3() };
+const physWaterPayload = { prop: null };
+const physDestroyPayload = { prop: null };
+const physGrabPayload = { prop: null, from: null };
+const physDropPayload = { prop: null };
+const physSfxOpts = { volume: 1 };
+// A thud heard from the rim of a 60 m volcano: quiet AND an octave down. Kept as
+// its own literal so the shared physSfxOpts never carries a stale pitch.
+const physSfxDeep = { volume: 0.5, pitch: 0.5 };
+const physSfxDeep2 = { volume: 0.34, pitch: 0.36 };
+const physSpot = { x: 0, z: 0, ok: false };
+
+// ---- module state ---------------------------------------------------------
+let physGame = null;
+let physBallMat = null;
+let physLightMat = null;
+let physPropMat = null;
+let physNextId = 1;
+let physLastTick = -1;
+const physGeoCache = new Map();
+const physInstGroups = [];
+const physInstByKey = new Map();
+const physBins = [];
+const physRubbish = [];
+const physBodyToProp = new Map();   // cannon body id -> prop, for causation lookups
+let physDust = null;
+const physDustPos = new Float32Array(physDUST_MAX * 3);
+const physDustVel = new Float32Array(physDUST_MAX * 3);
+const physDustLife = new Float32Array(physDUST_MAX);
+let physDustHead = 0;
+let physDustDirty = true;
+let physFoam = null;
+const physFoamPos = new Float32Array(physFOAM_MAX * 3);
+const physFoamLife = new Float32Array(physFOAM_MAX);
+const physFoamMax = new Float32Array(physFOAM_MAX);
+let physFoamHead = 0;
+let physFoamDirty = true;
+
+// ---- Pasto module state ---------------------------------------------------
+let physPastoBuilt = false;
+let physBindTimer = 0;
+const physStalls = [];           // bound stall records (mine, not pasto.js's)
+const physStallSeen = new Set();  // stall objects already bound
+const physCollapsed = [];        // collapsed stalls, oldest first (max physSTALL_MAX)
+const physHidden = [];           // props parked out of the world, awaiting restock
+let physPuffMesh = null;
+const physPuffPos = new Float32Array(physPUFF_MAX * 3);
+const physPuffVel = new Float32Array(physPUFF_MAX * 3);
+const physPuffLife = new Float32Array(physPUFF_MAX);
+const physPuffSpan = new Float32Array(physPUFF_MAX);
+// Per-particle size multiplier. The crater payoff happens ~16 m below the rim
+// the player is standing on; at the default scuff size it is a few white pixels.
+const physPuffSize = new Float32Array(physPUFF_MAX);
+let physPuffHead = 0;
+let physPuffDirty = true;
+const physShards = [];
+const physShardGeos = [];
+let physShardHead = 0;
+
+// ===========================================================================
+// 1. PHYSICS WORLD
+// ===========================================================================
+export function createPhysicsWorld(game) {
+  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -24, 0) });
+  world.broadphase = new CANNON.SAPBroadphase(world);
+  world.broadphase.useBoundingBoxes = true;
+  world.solver.iterations = 10;
+  world.solver.tolerance = 0.002;
+  world.allowSleep = true;
+  world.defaultContactMaterial.friction = 0.4;
+  world.defaultContactMaterial.restitution = 0.12;
+
+  const ground = new CANNON.Material('ground');
+  const prop = new CANNON.Material('prop');
+  const capy = new CANNON.Material('capy');
+  const npc = new CANNON.Material('npc');
+  physBallMat = new CANNON.Material('ball');
+  physLightMat = new CANNON.Material('light');
+
+  game.mats = { ground, prop, capy, npc };
+
+  physPair(world, ground, prop, 0.35, 0.34);
+  // ---- THE GROUND MAY NOT BRAKE THE CHARACTER ------------------------------
+  // capybara.js owns horizontal motion outright: it writes body.velocity every
+  // frame from an acceleration model and damps to a stop at capySTOP_LAMBDA. A
+  // Coulomb contact underneath that is not "grip", it is a second controller
+  // fighting the first — and it wins, because it acts inside the solver.
+  // MEASURED at mu 0.90 on flat ground with the stick held: the solver removed
+  // 1.83 m/s of horizontal velocity on every frame the body had contact, the
+  // controller could only add capyACCEL*dt = 0.92 m/s back, and the body ended up
+  // oscillating 2.40 <-> 1.48 m/s for ever — a 4:1 swing in per-frame travel at a
+  // metronome 60 Hz, which is exactly the jerk that was reported. It also cost
+  // more than half the walk: 4.2 m/s authored, 1.9 m/s achieved.
+  // The impulse is not proportional to mu (0.90 and 0.30 measured identically),
+  // so it cannot be tuned out — the friction equations are cancelling the
+  // sliding outright across three contact points. It has to be zero.
+  // Swept: mu 0.05 -> 1.94 m/s and CV 0.31; mu 0.02 -> 3.71 m/s and CV 0.19;
+  // mu 0.00 -> 4.20 m/s, CV 0.000, vertical range 0.0000 m, and the micro-bounce
+  // that broke contact every other frame stops happening at all.
+  // Moving platforms are handled where they belong, in the controller — see the
+  // platform-frame block in capybara.js. They never needed friction.
+  physPair(world, ground, capy, 0.00, 0.00);
+  physPair(world, prop, capy, 0.30, 0.35);
+  physPair(world, prop, prop, 0.30, 0.40);
+  // sensible extras so NPCs and the beach ball behave
+  physPair(world, ground, npc, 0.80, 0.00);
+  physPair(world, prop, npc, 0.30, 0.30);
+  physPair(world, capy, npc, 0.30, 0.10);
+  physPair(world, ground, physBallMat, 0.22, 0.72);
+  physPair(world, prop, physBallMat, 0.20, 0.60);
+  physPair(world, capy, physBallMat, 0.20, 0.55);
+  physPair(world, npc, physBallMat, 0.20, 0.55);
+  // light tier — hats, thongs, frisbees. They must skitter, hop and cartwheel.
+  physPair(world, ground, physLightMat, 0.22, 0.52);
+  physPair(world, prop, physLightMat, 0.22, 0.55);
+  physPair(world, capy, physLightMat, 0.22, 0.50);
+  physPair(world, npc, physLightMat, 0.22, 0.50);
+  physPair(world, physLightMat, physLightMat, 0.22, 0.55);
+  physPair(world, physLightMat, physBallMat, 0.20, 0.58);
+
+  game.world = world;
+  return { update() {} };
+}
+
+function physPair(world, a, b, friction, restitution) {
+  world.addContactMaterial(new CANNON.ContactMaterial(a, b, {
+    friction, restitution,
+    contactEquationStiffness: 1e7,
+    contactEquationRelaxation: 3,
+  }));
+}
+
+// ===========================================================================
+// 2. GEOMETRY BAKERY
+// ===========================================================================
+function physAdd(group, geo, color, x, y, z, rx, ry, rz) {
+  const m = new THREE.Mesh(geo, mat(color));
+  m.position.set(x, y, z);
+  if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+  group.add(m);
+  return m;
+}
+function physBoxG(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
+function physCylG(rt, rb, h, seg) { return new THREE.CylinderGeometry(rt, rb, h, seg || 8, 1); }
+function physSphG(r) { return new THREE.SphereGeometry(r, 8, 6); }
+function physConeG(r, h) { return new THREE.ConeGeometry(r, h, 8); }
+
+/** Bakes a small authored hierarchy into one vertex-coloured geometry. */
+function physFlatten(root, originY, def) {
+  root.updateMatrixWorld(true);
+  const pos = [];
+  const nrm = [];
+  const col = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const src = o.geometry;
+    const g = src.index ? src.toNonIndexed() : src.clone();
+    g.applyMatrix4(o.matrixWorld);
+    const p = g.attributes.position;
+    const n = g.attributes.normal;
+    const c = o.material.color;
+    for (let i = 0; i < p.count; i++) {
+      pos.push(p.getX(i), p.getY(i), p.getZ(i));
+      nrm.push(n.getX(i), n.getY(i), n.getZ(i));
+      col.push(c.r, c.g, c.b);
+    }
+    g.dispose();
+    src.dispose();
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  if (def) physFitDef(def, geo);
+  geo.translate(def ? def.fitDX : 0, def ? def.fitDY : -originY, def ? def.fitDZ : 0);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * THE COLLIDER IS THE THING THAT WAS DRAWN.
+ *
+ * Every `shape` in physTYPES used to be a hand-typed guess at the size of the
+ * prop above it, and thirty guesses drift. Measured against the baked geometry
+ * before this: the sign's collider was HALF the depth of the sign, so you walked
+ * to the middle of it; the picnic basket's stopped 22 cm under its own handle;
+ * the camera's enclosed 36% of the camera; the plantains' was 1.83x too wide in
+ * x, 29% too short in y, and hung 4.6 cm of fruit through the ground because the
+ * builder had authored the bunch below its own origin.
+ *
+ * So it is not typed any more. The prop is built, measured, and the box and the
+ * origin both come off the measurement: the geometry is recentred on x/z, its
+ * base is put exactly on -hy whatever the builder did, and hy is half the real
+ * height — which is what makes the collider bracket the mesh exactly and the
+ * drawn base rest exactly on the ground.
+ */
+function physFitDef(def, geo) {
+  if (def.fitted) return;
+  def.fitted = true;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const w = bb.max.x - bb.min.x, h = bb.max.y - bb.min.y, d = bb.max.z - bb.min.z;
+  const hy = h * 0.5;
+  def.hy = hy;
+  def.shape = def.shape[0] === 'sph'
+    ? ['sph', Math.max(w, h, d) * 0.5]
+    : ['box', w * 0.5, hy, d * 0.5];
+  def.fitDX = -(bb.min.x + bb.max.x) * 0.5;
+  def.fitDZ = -(bb.min.z + bb.max.z) * 0.5;
+  def.fitDY = -bb.min.y - hy;
+}
+
+// ---- prop builders (authored with their base sitting on y = 0) ------------
+function physBuildHat(g) {
+  physAdd(g, physCylG(0.44, 0.44, 0.045), PALETTE.khaki, 0, 0.03, 0);
+  physAdd(g, physCylG(0.23, 0.26, 0.2), PALETTE.cloth6, 0, 0.14, 0);
+  physAdd(g, physCylG(0.265, 0.265, 0.055), PALETTE.cloth1, 0, 0.08, 0);
+  physAdd(g, physCylG(0.2, 0.22, 0.03), PALETTE.cloth6, 0, 0.25, 0);
+}
+function physBuildCoffee(g) {
+  physAdd(g, physCylG(0.115, 0.085, 0.28), PALETTE.coffee, 0, 0.14, 0);
+  physAdd(g, physCylG(0.12, 0.105, 0.09), PALETTE.wood, 0, 0.13, 0);
+  physAdd(g, physCylG(0.13, 0.13, 0.05), PALETTE.coffeeLid, 0, 0.3, 0);
+  physAdd(g, physBoxG(0.05, 0.03, 0.05), PALETTE.coffeeLid, 0.05, 0.33, 0);
+}
+function physBuildCoffeeSpill(g) {
+  physAdd(g, physCylG(0.6, 0.52, 0.025), PALETTE.coffeeLiquid, 0.12, 0.012, 0.05);
+  physAdd(g, physCylG(0.22, 0.18, 0.03), PALETTE.coffeeLiquid, -0.34, 0.015, -0.2);
+  physAdd(g, physCylG(0.115, 0.085, 0.28), PALETTE.coffee, -0.28, 0.12, 0.02, 0, 0, Math.PI * 0.5);
+  physAdd(g, physCylG(0.13, 0.13, 0.05), PALETTE.coffeeLid, -0.05, 0.04, 0.16, 0, 0, Math.PI * 0.5);
+}
+function physBuildSandwich(g) {
+  physAdd(g, physBoxG(0.36, 0.08, 0.32), PALETTE.bread, 0, 0.04, 0);
+  physAdd(g, physBoxG(0.34, 0.045, 0.3), PALETTE.lettuce, 0.01, 0.1, 0.01, 0, 0.12, 0);
+  physAdd(g, physBoxG(0.3, 0.05, 0.28), PALETTE.tomato, -0.01, 0.145, 0);
+  physAdd(g, physBoxG(0.36, 0.09, 0.32), PALETTE.bread, 0, 0.21, 0, 0, -0.08, 0);
+}
+function physBuildBall(g) {
+  physAdd(g, physSphG(0.38), PALETTE.ball, 0, 0.38, 0);
+  const a = physAdd(g, physSphG(0.385), PALETTE.ballStripe, 0, 0.38, 0);
+  a.scale.set(1, 0.32, 1);
+  const b = physAdd(g, physSphG(0.385), PALETTE.cloth2, 0, 0.38, 0);
+  b.scale.set(0.32, 1, 1);
+}
+function physBuildBin(g) {
+  physAdd(g, physCylG(0.44, 0.36, 1.06), PALETTE.binGreen, 0, 0.53, 0);
+  physAdd(g, physCylG(0.47, 0.47, 0.09), PALETTE.binLid, 0, 1.03, 0);
+  const dome = physAdd(g, physSphG(0.45), PALETTE.binLid, 0, 1.06, 0);
+  dome.scale.set(1, 0.34, 1);
+  physAdd(g, physBoxG(0.24, 0.3, 0.03), PALETTE.cloth6, 0, 0.6, 0.37);
+}
+function physBuildDeckchair(g) {
+  physAdd(g, physBoxG(0.66, 0.06, 0.52), PALETTE.cloth2, 0, 0.44, 0.06, -0.13, 0, 0);
+  physAdd(g, physBoxG(0.66, 0.06, 0.58), PALETTE.cloth3, 0, 0.74, -0.3, -0.95, 0, 0);
+  physAdd(g, physBoxG(0.05, 0.56, 0.05), PALETTE.wood, -0.34, 0.28, 0.24, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.05, 0.56, 0.05), PALETTE.wood, 0.34, 0.28, 0.24, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.05, 0.7, 0.05), PALETTE.woodDark, -0.34, 0.35, -0.28, -0.3, 0, 0);
+  physAdd(g, physBoxG(0.05, 0.7, 0.05), PALETTE.woodDark, 0.34, 0.35, -0.28, -0.3, 0, 0);
+  physAdd(g, physBoxG(0.72, 0.05, 0.05), PALETTE.wood, 0, 0.16, 0.02);
+}
+function physBuildFlower(g, petal) {
+  physAdd(g, physCylG(0.21, 0.15, 0.26), PALETTE.cone, 0, 0.13, 0);
+  physAdd(g, physCylG(0.22, 0.22, 0.05), PALETTE.sandstoneDark, 0, 0.25, 0);
+  physAdd(g, physCylG(0.17, 0.17, 0.05), PALETTE.soil, 0, 0.26, 0);
+  physAdd(g, physBoxG(0.05, 0.4, 0.05), PALETTE.leafC, 0, 0.47, 0, 0, 0, 0.06);
+  physAdd(g, physBoxG(0.18, 0.03, 0.09), PALETTE.leafB, 0.11, 0.42, 0, 0, 0.3, 0.35);
+  physAdd(g, physBoxG(0.18, 0.03, 0.09), PALETTE.leafB, -0.11, 0.52, 0.02, 0, -0.4, -0.3);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    physAdd(g, physBoxG(0.15, 0.045, 0.1), petal, Math.cos(a) * 0.1, 0.7, Math.sin(a) * 0.1, 0, -a, 0.22);
+  }
+  physAdd(g, physSphG(0.08), PALETTE.petalYellow, 0, 0.72, 0);
+}
+function physBuildEsky(g) {
+  physAdd(g, physBoxG(0.72, 0.4, 0.46), PALETTE.esky, 0, 0.2, 0);
+  physAdd(g, physBoxG(0.76, 0.1, 0.5), PALETTE.eskyLid, 0, 0.45, 0);
+  physAdd(g, physBoxG(0.06, 0.14, 0.22), PALETTE.eskyLid, -0.38, 0.24, 0);
+  physAdd(g, physBoxG(0.06, 0.14, 0.22), PALETTE.eskyLid, 0.38, 0.24, 0);
+  physAdd(g, physBoxG(0.5, 0.05, 0.05), PALETTE.plastic, 0, 0.52, 0);
+}
+function physBuildThong(g) {
+  physAdd(g, physBoxG(0.3, 0.05, 0.12), PALETTE.cloth2, 0, 0.025, 0);
+  physAdd(g, physBoxG(0.1, 0.04, 0.1), PALETTE.cloth2, 0.14, 0.025, 0, 0, 0.5, 0);
+  physAdd(g, physBoxG(0.16, 0.03, 0.03), PALETTE.cloth6, -0.04, 0.07, 0.04, 0.5, 0.4, 0);
+  physAdd(g, physBoxG(0.16, 0.03, 0.03), PALETTE.cloth6, -0.04, 0.07, -0.04, -0.5, -0.4, 0);
+}
+function physBuildFrisbee(g) {
+  physAdd(g, physCylG(0.33, 0.29, 0.045), PALETTE.cloth4, 0, 0.025, 0);
+  physAdd(g, physCylG(0.24, 0.24, 0.06), PALETTE.cloth6, 0, 0.05, 0);
+  physAdd(g, physCylG(0.1, 0.1, 0.02), PALETTE.cloth1, 0, 0.08, 0);
+}
+function physBuildBasket(g) {
+  physAdd(g, physCylG(0.36, 0.3, 0.34), PALETTE.wood, 0, 0.17, 0);
+  physAdd(g, physCylG(0.3, 0.3, 0.05), PALETTE.woodDark, 0, 0.33, 0);
+  physAdd(g, physCylG(0.375, 0.375, 0.05), PALETTE.woodDark, 0, 0.24, 0);
+  physAdd(g, physBoxG(0.05, 0.3, 0.05), PALETTE.woodDark, -0.28, 0.46, 0, 0, 0, 0.35);
+  physAdd(g, physBoxG(0.05, 0.3, 0.05), PALETTE.woodDark, 0.28, 0.46, 0, 0, 0, -0.35);
+  physAdd(g, physBoxG(0.48, 0.05, 0.05), PALETTE.woodDark, 0, 0.6, 0);
+  physAdd(g, physBoxG(0.34, 0.04, 0.24), PALETTE.cloth6, 0, 0.35, 0, 0, 0.3, 0);
+}
+function physBuildCone(g) {
+  physAdd(g, physBoxG(0.58, 0.06, 0.58), PALETTE.cone, 0, 0.03, 0);
+  physAdd(g, physConeG(0.28, 0.72), PALETTE.cone, 0, 0.42, 0);
+  physAdd(g, physCylG(0.155, 0.185, 0.13), PALETTE.cloth6, 0, 0.44, 0);
+}
+function physBuildHandbag(g) {
+  physAdd(g, physBoxG(0.34, 0.26, 0.16), PALETTE.cloth5, 0, 0.15, 0);
+  physAdd(g, physBoxG(0.35, 0.09, 0.17), PALETTE.cloth7, 0, 0.31, 0);
+  physAdd(g, physBoxG(0.05, 0.22, 0.05), PALETTE.cloth7, -0.13, 0.44, 0, 0, 0, 0.3);
+  physAdd(g, physBoxG(0.05, 0.22, 0.05), PALETTE.cloth7, 0.13, 0.44, 0, 0, 0, -0.3);
+  physAdd(g, physBoxG(0.24, 0.05, 0.05), PALETTE.cloth7, 0, 0.55, 0);
+  physAdd(g, physBoxG(0.07, 0.05, 0.03), PALETTE.petalYellow, 0, 0.27, 0.09);
+}
+function physBuildIcecream(g) {
+  physAdd(g, physConeG(0.13, 0.36), PALETTE.bread, 0, 0.18, 0, Math.PI, 0, 0);
+  physAdd(g, physCylG(0.14, 0.13, 0.05), PALETTE.bread, 0, 0.37, 0);
+  physAdd(g, physSphG(0.16), PALETTE.petalPink, 0, 0.47, 0);
+  physAdd(g, physSphG(0.11), PALETTE.petalWhite, 0.03, 0.6, -0.02);
+  physAdd(g, physSphG(0.05), PALETTE.petalRed, 0, 0.69, 0);
+}
+function physBuildIcecreamSpill(g) {
+  physAdd(g, physCylG(0.34, 0.28, 0.03), PALETTE.petalPink, 0.16, 0.015, 0.04);
+  physAdd(g, physSphG(0.13), PALETTE.petalPink, 0.16, 0.05, 0.04);
+  physAdd(g, physConeG(0.13, 0.36), PALETTE.bread, -0.22, 0.12, 0, 0, 0, Math.PI * 0.5);
+  physAdd(g, physSphG(0.05), PALETTE.petalRed, 0.34, 0.05, -0.12);
+}
+function physBuildSign(g) {
+  physAdd(g, physBoxG(0.09, 1.34, 0.09), PALETTE.metal, 0, 0.67, 0);
+  physAdd(g, physBoxG(0.94, 0.52, 0.07), PALETTE.cloth6, 0, 1.3, 0);
+  physAdd(g, physBoxG(0.86, 0.1, 0.09), PALETTE.cloth2, 0, 1.4, 0);
+  physAdd(g, physBoxG(0.62, 0.08, 0.09), PALETTE.cloth2, -0.1, 1.2, 0);
+  physAdd(g, physBoxG(0.4, 0.06, 0.4), PALETTE.metal, 0, 0.03, 0);
+}
+function physBuildTowel(g) {
+  physAdd(g, physBoxG(0.94, 0.1, 0.62), PALETTE.towel, 0, 0.05, 0);
+  physAdd(g, physBoxG(0.9, 0.09, 0.32), PALETTE.cloth6, 0.01, 0.14, -0.1, 0, 0.05, 0);
+  physAdd(g, physBoxG(0.86, 0.06, 0.14), PALETTE.cloth1, 0, 0.2, -0.05);
+}
+
+// ---- Circular Quay set (chapter 1) ---------------------------------------
+function physBuildChips(g) {
+  // paper cone, apex down, stuffed with chips — readable from directly above
+  physAdd(g, physConeG(0.17, 0.42), PALETTE.cloth6, 0, 0.22, 0, Math.PI, 0, 0);
+  physAdd(g, physCylG(0.175, 0.175, 0.05), PALETTE.cloth1, 0, 0.4, 0);
+  physAdd(g, physCylG(0.155, 0.155, 0.04), PALETTE.bread, 0, 0.41, 0);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    physAdd(g, physBoxG(0.05, 0.24, 0.05), i % 2 ? PALETTE.petalYellow : PALETTE.bread,
+      Math.cos(a) * 0.07, 0.5, Math.sin(a) * 0.07, Math.sin(a) * 0.3, -a, Math.cos(a) * 0.3);
+  }
+}
+function physBuildCamera(g) {
+  physAdd(g, physBoxG(0.3, 0.18, 0.15), PALETTE.metal, 0, 0.12, 0);
+  physAdd(g, physBoxG(0.2, 0.06, 0.13), PALETTE.stoneDark, -0.02, 0.23, 0);
+  physAdd(g, physCylG(0.026, 0.026, 0.035), PALETTE.binRed, 0.09, 0.27, 0);
+  physAdd(g, physBoxG(0.07, 0.045, 0.03), PALETTE.cloth6, -0.09, 0.25, 0.05);
+  physAdd(g, physCylG(0.085, 0.095, 0.13), PALETTE.stoneDark, 0, 0.12, 0.13, Math.PI * 0.5, 0, 0);
+  physAdd(g, physCylG(0.062, 0.062, 0.03), PALETTE.glass, 0, 0.12, 0.2, Math.PI * 0.5, 0, 0);
+  // strap, looped up over the top
+  physAdd(g, physBoxG(0.035, 0.22, 0.05), PALETTE.khaki, -0.16, 0.28, 0, 0, 0, 0.5);
+  physAdd(g, physBoxG(0.035, 0.22, 0.05), PALETTE.khaki, 0.16, 0.28, 0, 0, 0, -0.5);
+  physAdd(g, physBoxG(0.26, 0.035, 0.05), PALETTE.khaki, 0, 0.39, 0);
+}
+function physBuildSunglasses(g) {
+  // Chunky folded shades. The folded arms are the *base*; the frame plate,
+  // lenses and bridge all sit above y = 0.09 so nothing that reads as
+  // "sunglasses" can end up buried under the quay's paving decals.
+  physAdd(g, physBoxG(0.26, 0.04, 0.035), PALETTE.denim, 0.02, 0.022, 0.05, 0, 0.13, 0);
+  physAdd(g, physBoxG(0.26, 0.04, 0.035), PALETTE.denim, 0.02, 0.022, -0.05, 0, -0.13, 0);
+  physAdd(g, physBoxG(0.32, 0.055, 0.1), PALETTE.denim, 0, 0.1, 0);
+  physAdd(g, physBoxG(0.115, 0.04, 0.085), PALETTE.glass, -0.095, 0.145, 0);
+  physAdd(g, physBoxG(0.115, 0.04, 0.085), PALETTE.glass, 0.095, 0.145, 0);
+  physAdd(g, physBoxG(0.06, 0.05, 0.07), PALETTE.cloth7, 0, 0.15, 0);
+}
+function physBuildTicket(g) {
+  // A thick, slightly curled card. Chunky proportions on purpose: a wafer-thin
+  // ticket disappears into the ground decals and reads as nothing at all.
+  physAdd(g, physBoxG(0.26, 0.07, 0.17), PALETTE.cloth6, -0.02, 0.038, 0);
+  physAdd(g, physBoxG(0.25, 0.05, 0.06), PALETTE.cloth2, -0.02, 0.095, -0.05);
+  physAdd(g, physBoxG(0.08, 0.05, 0.05), PALETTE.petalYellow, -0.09, 0.095, 0.035);
+  physAdd(g, physCylG(0.032, 0.032, 0.05), PALETTE.cloth2, 0.04, 0.095, 0.04);
+  // the far end curls up off the deck — the silhouette from above
+  physAdd(g, physBoxG(0.1, 0.07, 0.17), PALETTE.cloth6, 0.135, 0.062, 0, 0, 0, -0.6);
+  physAdd(g, physBoxG(0.09, 0.065, 0.17), PALETTE.cloth2, 0.185, 0.135, 0, 0, 0, -1.15);
+}
+function physBuildMenu(g) {
+  // A-frame chalkboard on the dining terrace
+  physAdd(g, physBoxG(0.64, 0.92, 0.05), PALETTE.woodDark, 0, 0.48, 0.13, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.64, 0.92, 0.05), PALETTE.woodDark, 0, 0.48, -0.13, -0.22, 0, 0);
+  physAdd(g, physBoxG(0.5, 0.74, 0.02), PALETTE.stoneDark, 0, 0.5, 0.18, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.5, 0.74, 0.02), PALETTE.stoneDark, 0, 0.5, -0.18, -0.22, 0, 0);
+  physAdd(g, physBoxG(0.36, 0.05, 0.02), PALETTE.cloth6, -0.02, 0.74, 0.2, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.3, 0.04, 0.02), PALETTE.cloth6, 0.02, 0.6, 0.23, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.26, 0.04, 0.02), PALETTE.cloth3, -0.04, 0.46, 0.26, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.68, 0.06, 0.34), PALETTE.wood, 0, 0.94, 0);
+}
+function physBuildWinebottle(g) {
+  physAdd(g, physCylG(0.09, 0.085, 0.34), PALETTE.leafC, 0, 0.17, 0);
+  physAdd(g, physCylG(0.093, 0.093, 0.13), PALETTE.cloth6, 0, 0.16, 0);
+  physAdd(g, physCylG(0.042, 0.09, 0.12), PALETTE.leafC, 0, 0.4, 0);
+  physAdd(g, physCylG(0.04, 0.042, 0.13), PALETTE.leafC, 0, 0.52, 0);
+  physAdd(g, physCylG(0.045, 0.045, 0.055), PALETTE.binRed, 0, 0.59, 0);
+}
+
+// ---- Pasto market set (chapter 2) ----------------------------------------
+// Oversized on purpose: everything here has to read as itself from the fixed
+// ~35 degree overhead camera, so silhouettes are fat and the details are few.
+function physBuildEmpanada(g) {
+  // The hero prop of the chapter, so the silhouette does the work: a fat golden
+  // half-moon built as a tapered arc of squashed spheres, with a pale crimped
+  // seam running along the outer curve. From the overhead camera the outline
+  // reads as a crescent even at two pixels of detail.
+  const R = 0.24;
+  for (let i = 0; i < 5; i++) {
+    const a = -1.15 + i * 0.575;
+    const t = 1 - Math.abs(i - 2) * 0.24;
+    const s = physAdd(g, physSphG(0.155), PALETTE.empanada,
+      Math.sin(a) * R, 0.1, Math.cos(a) * R - 0.15);
+    s.scale.set(t * 1.15, t * 0.72, t * 1.15);
+  }
+  const gloss = physAdd(g, physSphG(0.13), PALETTE.arepa, 0, 0.15, 0.03);
+  gloss.scale.set(1.5, 0.34, 0.85);
+  for (let i = 0; i < 6; i++) {
+    const a = -1.22 + i * 0.488;
+    const t = 1 - Math.abs(i - 2.5) * 0.16;
+    physAdd(g, physBoxG(0.085 * t, 0.095 * t, 0.07), PALETTE.arepa,
+      Math.sin(a) * (R + 0.095), 0.085, Math.cos(a) * (R + 0.095) - 0.15, 0, a, 0.32);
+  }
+  physAdd(g, physBoxG(0.06, 0.03, 0.05), PALETTE.bread, -0.05, 0.185, -0.04, 0, 0.4, 0);
+  physAdd(g, physBoxG(0.05, 0.03, 0.04), PALETTE.bread, 0.07, 0.18, -0.02, 0, -0.3, 0);
+}
+function physBuildArepa(g) {
+  physAdd(g, physCylG(0.26, 0.245, 0.13), PALETTE.arepa, 0, 0.065, 0);
+  physAdd(g, physCylG(0.225, 0.225, 0.04), PALETTE.bread, 0, 0.145, 0);
+  physAdd(g, physCylG(0.1, 0.1, 0.025), PALETTE.empanada, 0.05, 0.16, -0.04);
+  physAdd(g, physBoxG(0.11, 0.025, 0.06), PALETTE.empanada, -0.09, 0.16, 0.07, 0, 0.6, 0);
+}
+function physBuildMaiz(g) {
+  physAdd(g, physCylG(0.095, 0.085, 0.42), PALETTE.maiz, 0, 0.1, 0, Math.PI * 0.5, 0, 0);
+  physAdd(g, physConeG(0.09, 0.15), PALETTE.maiz, 0, 0.1, 0.27, -Math.PI * 0.5, 0, 0);
+  physAdd(g, physBoxG(0.035, 0.035, 0.38), PALETTE.empanada, -0.055, 0.155, 0);
+  physAdd(g, physBoxG(0.035, 0.035, 0.38), PALETTE.empanada, 0.02, 0.165, 0);
+  physAdd(g, physBoxG(0.035, 0.035, 0.34), PALETTE.bread, 0.075, 0.13, 0);
+  physAdd(g, physBoxG(0.13, 0.035, 0.3), PALETTE.coffeeLeaf, 0.08, 0.055, -0.2, 0.3, 0.3, 0);
+  physAdd(g, physBoxG(0.13, 0.035, 0.26), PALETTE.paramoPale, -0.08, 0.05, -0.22, -0.25, -0.35, 0);
+}
+function physBuildPlantain(g) {
+  physAdd(g, physCylG(0.05, 0.055, 0.16), PALETTE.coffeeLeaf, 0, 0.12, -0.19, 0.5, 0, 0);
+  for (let i = 0; i < 4; i++) {
+    const a = -0.45 + i * 0.3;
+    physAdd(g, physCylG(0.055, 0.065, 0.34), PALETTE.plantain,
+      Math.sin(a) * 0.11, 0.06 + (i & 1) * 0.055, Math.cos(a) * 0.12,
+      Math.PI * 0.5 - 0.26, a, 0);
+  }
+  physAdd(g, physCylG(0.05, 0.06, 0.3), PALETTE.maiz, 0.02, 0.17, 0.02, Math.PI * 0.5 - 0.32, 0.12, 0);
+}
+function physBuildRuana(g) {
+  // Folded wool, four bulky layers of ruana stripes plus a fringe. Heavy and
+  // wide on purpose — it drags.
+  physAdd(g, physBoxG(0.66, 0.07, 0.5), PALETTE.ruana1, 0, 0.035, 0);
+  physAdd(g, physBoxG(0.62, 0.06, 0.46), PALETTE.ruana2, 0.02, 0.095, -0.01, 0, 0.09, 0);
+  physAdd(g, physBoxG(0.58, 0.06, 0.42), PALETTE.ruana3, -0.02, 0.15, 0.01, 0, -0.07, 0);
+  physAdd(g, physBoxG(0.54, 0.06, 0.36), PALETTE.ruana1, 0.01, 0.2, 0, 0, 0.05, 0);
+  physAdd(g, physBoxG(0.56, 0.035, 0.08), PALETTE.ruana3, 0, 0.235, -0.1);
+  physAdd(g, physBoxG(0.56, 0.035, 0.08), PALETTE.ruana2, 0, 0.235, 0.09);
+  for (let i = 0; i < 5; i++) {
+    physAdd(g, physBoxG(0.045, 0.035, 0.13), PALETTE.ruana3, -0.24 + i * 0.12, 0.03, 0.3);
+  }
+}
+function physBuildMug(g) {
+  physAdd(g, physCylG(0.16, 0.14, 0.30, 10), PALETTE.cloth6, 0, 0.15, 0);
+  physAdd(g, physCylG(0.13, 0.13, 0.03, 10), PALETTE.coffeeLiquid, 0, 0.29, 0);
+  physAdd(g, physCylG(0.17, 0.17, 0.035, 10), PALETTE.cloth2, 0, 0.30, 0);
+  physAdd(g, physBoxG(0.045, 0.15, 0.045), PALETTE.cloth6, 0.185, 0.17, 0);
+  physAdd(g, physBoxG(0.075, 0.045, 0.045), PALETTE.cloth6, 0.155, 0.245, 0);
+  physAdd(g, physBoxG(0.075, 0.045, 0.045), PALETTE.cloth6, 0.155, 0.095, 0);
+}
+function physBuildCoffeesack(g) {
+  physAdd(g, physCylG(0.3, 0.34, 0.5), PALETTE.potatoSack, 0, 0.25, 0);
+  const top = physAdd(g, physSphG(0.3), PALETTE.potatoSack, 0, 0.5, 0);
+  top.scale.set(1, 0.55, 1);
+  physAdd(g, physCylG(0.13, 0.2, 0.15), PALETTE.potatoSack, 0, 0.66, 0);
+  physAdd(g, physCylG(0.155, 0.155, 0.055), PALETTE.wood, 0, 0.62, 0);
+  physAdd(g, physBoxG(0.24, 0.16, 0.02), PALETTE.coffeeLeaf, 0, 0.33, 0.3);
+  physAdd(g, physSphG(0.07), PALETTE.coffeeCherry, 0, 0.33, 0.32);
+}
+function physBuildSackBurst(g) {
+  physAdd(g, physCylG(0.34, 0.4, 0.26), PALETTE.potatoSack, -0.05, 0.13, 0, 0.2, 0, 0.55);
+  physAdd(g, physCylG(0.15, 0.2, 0.1), PALETTE.potatoSack, 0.3, 0.06, 0.1, 0, 0, 1.35);
+  physAdd(g, physCylG(0.5, 0.44, 0.03), PALETTE.coffeeLiquid, 0.3, 0.015, 0.12);
+  physAdd(g, physCylG(0.26, 0.22, 0.03), PALETTE.coffeeLiquid, -0.24, 0.015, -0.3);
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.05;
+    physAdd(g, physSphG(0.055), PALETTE.coffeeLiquid,
+      0.3 + Math.cos(a) * 0.34, 0.04, 0.12 + Math.sin(a) * 0.3);
+  }
+}
+function physBuildCuencobowl(g) {
+  physAdd(g, physCylG(0.11, 0.14, 0.055), PALETTE.churchTrim, 0, 0.027, 0);
+  physAdd(g, physCylG(0.3, 0.16, 0.2), PALETTE.churchWhite, 0, 0.15, 0);
+  physAdd(g, physCylG(0.31, 0.31, 0.05), PALETTE.awning1, 0, 0.215, 0);
+  physAdd(g, physCylG(0.265, 0.265, 0.035), PALETTE.awning3, 0, 0.14, 0);
+  physAdd(g, physCylG(0.27, 0.2, 0.04), PALETTE.awning2, 0, 0.235, 0);
+}
+function physBuildSombrero(g) {
+  physAdd(g, physCylG(0.52, 0.5, 0.05), PALETTE.khaki, 0, 0.035, 0);
+  physAdd(g, physCylG(0.46, 0.46, 0.04), PALETTE.potatoSack, 0, 0.08, 0);
+  physAdd(g, physCylG(0.2, 0.245, 0.22), PALETTE.potatoSack, 0, 0.2, 0);
+  physAdd(g, physCylG(0.22, 0.25, 0.065), PALETTE.ruana1, 0, 0.14, 0);
+  physAdd(g, physCylG(0.19, 0.2, 0.035), PALETTE.khaki, 0, 0.32, 0);
+}
+
+// ---- type table -----------------------------------------------------------
+// hy = half height of the collision box; geometry origin is moved there so the
+// mesh's origin and the body's centre agree, and the visual base rests on y=0.
+const physTYPES = {
+  hat:       { name: 'sun hat',      mass: 0.35, hy: 0.14, shape: ['box', 0.34, 0.14, 0.34], hold: [0, 0.04, 0.06],  spin: 1.5, build: physBuildHat },
+  coffee:    { name: 'flat white',   mass: 0.5,  hy: 0.17, shape: ['box', 0.12, 0.17, 0.12], hold: [0, 0.02, 0.07],  spin: 1.0, build: physBuildCoffee, spill: physBuildCoffeeSpill },
+  sandwich:  { name: 'sandwich',     mass: 0.45, hy: 0.13, shape: ['box', 0.18, 0.13, 0.16], hold: [0, 0.0, 0.06],   spin: 1.2, build: physBuildSandwich },
+  ball:      { name: 'beach ball',   mass: 0.22, hy: 0.38, shape: ['sph', 0.38],             hold: [0, 0.06, 0.2],   spin: 2.0, bouncy: true, build: physBuildBall },
+  bin:       { name: 'rubbish bin',  mass: 9.0,  hy: 0.56, shape: ['box', 0.4, 0.56, 0.4],   hold: [0, 0.12, 0.42],  spin: 0.4, grabbable: false, receive: true, build: physBuildBin },
+  deckchair: { name: 'deck chair',   mass: 2.6,  hy: 0.45, shape: ['box', 0.36, 0.45, 0.36], hold: [0, 0.1, 0.34],   spin: 0.7, receive: true, build: physBuildDeckchair },
+  flower:    { name: 'prize rose',   mass: 4.5,  hy: 0.4,  shape: ['box', 0.19, 0.4, 0.19],  hold: [0, 0.06, 0.16],  spin: 1.0, planted: true, build: physBuildFlower },
+  esky:      { name: 'esky',         mass: 4.2,  hy: 0.26, shape: ['box', 0.37, 0.26, 0.24], hold: [0, 0.08, 0.3],   spin: 0.6, receive: true, build: physBuildEsky },
+  thong:     { name: 'thong',        mass: 0.12, hy: 0.05, shape: ['box', 0.16, 0.05, 0.07], hold: [0, 0.0, 0.06],   spin: 2.2, build: physBuildThong },
+  frisbee:   { name: 'frisbee',      mass: 0.18, hy: 0.05, shape: ['box', 0.3, 0.05, 0.3],   hold: [0, 0.0, 0.1],    spin: 2.6, build: physBuildFrisbee },
+  basket:    { name: 'picnic basket',mass: 1.2,  hy: 0.2,  shape: ['box', 0.32, 0.2, 0.32],  hold: [0, 0.06, 0.22],  spin: 0.9, receive: true, build: physBuildBasket },
+  cone:      { name: 'traffic cone', mass: 4.5,  hy: 0.4,  shape: ['box', 0.28, 0.4, 0.28],  hold: [0, 0.08, 0.24],  spin: 1.1, receive: true, build: physBuildCone },
+  handbag:   { name: 'handbag',      mass: 1.0,  hy: 0.2,  shape: ['box', 0.18, 0.2, 0.1],   hold: [0, 0.04, 0.16],  spin: 1.2, build: physBuildHandbag },
+  icecream:  { name: 'ice cream',    mass: 0.3,  hy: 0.3,  shape: ['box', 0.15, 0.3, 0.15],  hold: [0, 0.04, 0.1],   spin: 1.4, build: physBuildIcecream, spill: physBuildIcecreamSpill },
+  sign:      { name: 'sign',         mass: 3.2,  hy: 0.8,  shape: ['box', 0.46, 0.8, 0.1],   hold: [0, 0.14, 0.5],   spin: 0.5, receive: true, build: physBuildSign },
+  towel:     { name: 'beach towel',  mass: 0.5,  hy: 0.12, shape: ['box', 0.46, 0.12, 0.3],  hold: [0, 0.02, 0.14],  spin: 1.0, build: physBuildTowel },
+
+  // ---- Circular Quay (chapter 1) ----
+  // Buoyancy is not authored here. Each type's material density lives in
+  // physRHO and physFloatFrac turns it into a draft — see the note there.
+  // `shape` and `hy` are re-derived from the baked geometry at bake time
+  // (physFitDef), so the numbers below are only a starting guess.
+  // `splash` scales the entry sfx / foam / shake on top of the prop's mass.
+  chips:      { name: 'hot chips',      mass: 0.3,  hy: 0.22, shape: ['box', 0.17, 0.22, 0.17], hold: [0, 0.02, 0.09], spin: 1.5, build: physBuildChips },
+  camera:     { name: 'tourist camera', mass: 1.5,  hy: 0.13, shape: ['box', 0.16, 0.13, 0.11], hold: [0, 0.03, 0.13], spin: 1.0, splash: 1.8, build: physBuildCamera },
+  sunglasses: { name: 'sunglasses',     mass: 0.1,  hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.07],  spin: 2.4, build: physBuildSunglasses },
+  ticket:     { name: 'ferry ticket',   mass: 0.008, hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.06],  spin: 2.8, build: physBuildTicket },
+  menu:       { name: 'menu board',     mass: 2.6,  hy: 0.5,  shape: ['box', 0.33, 0.5, 0.2],   hold: [0, 0.12, 0.38], spin: 0.6, receive: true, build: physBuildMenu },
+  winebottle: { name: 'wine bottle',    mass: 0.9,  hy: 0.3,  shape: ['box', 0.095, 0.3, 0.095],hold: [0, 0.04, 0.11], spin: 1.1, build: physBuildWinebottle },
+
+  // ---- Pasto market (chapter 2) ----
+  // `fragile` shatters into pooled shards past physSHATTER_MIN. Pasto has no
+  // water, but these props travel now — the market's baskets and bowls turn up
+  // in Cappadocia and Marrakech — so they carry a density like everything else.
+  empanada:   { name: 'empanada',       mass: 0.28, hy: 0.11, shape: ['box', 0.3, 0.11, 0.19],  hold: [0, 0.01, 0.07], spin: 1.5, build: physBuildEmpanada },
+  arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, build: physBuildArepa },
+  maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, build: physBuildMaiz },
+  plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, build: physBuildPlantain },
+  ruana:      { name: 'ruana',          mass: 1.3,  hy: 0.13, shape: ['box', 0.34, 0.13, 0.27], hold: [0, 0.05, 0.32], spin: 0.45, receive: true, build: physBuildRuana },
+  coffeesack: { name: 'sack of coffee', mass: 18,  hy: 0.34, shape: ['box', 0.3, 0.34, 0.3],   hold: [0, 0.1, 0.42],  spin: 0.35, receive: true, build: physBuildCoffeesack, spill: physBuildSackBurst, spillSfx: 'rustle' },
+  cuencobowl: { name: 'painted bowl',   mass: 0.8,  hy: 0.13, shape: ['box', 0.29, 0.13, 0.29], hold: [0, 0.02, 0.12], spin: 1.2, fragile: true, build: physBuildCuencobowl },
+  // ---- Antarctica (chapter 17) ----
+  mug:        { name: 'enamel mug',     mass: 0.42, hy: 0.16, shape: ['box', 0.2, 0.16, 0.17], hold: [0, 0.02, 0.09], spin: 1.3, build: physBuildMug },
+  sombrero:   { name: 'Nariño hat',     mass: 0.4,  hy: 0.16, shape: ['box', 0.46, 0.16, 0.46], hold: [0, 0.04, 0.1],  spin: 1.7, build: physBuildSombrero },
+};
+
+/** Displaced volume of a type's collision shape, in m³. Cached on the def. */
+function physVolume(def) {
+  if (def.volume) return def.volume;
+  const s = def.shape;
+  const v = s[0] === 'sph' ? 4.18879 * s[1] * s[1] * s[1] : 8 * s[1] * s[2] * s[3];
+  def.volume = v > 1e-4 ? v : 1e-4;
+  return def.volume;
+}
+
+// ---- WHAT THE THING IS MADE OF --------------------------------------------
+// Mean density of the real object in kg/m³, air pockets and all: a sealed
+// wheelie bin is mostly air, a camera is glass and magnesium, a beach ball is
+// a skin around nothing. This is the ONE physical fact each prop needs to
+// behave in water, and it replaces the old `float:` dial, which was a hand-set
+// submerged fraction with no reasoning behind it and no way to be wrong.
+//
+// Everything at or above physFLUID_RHO sinks, because that is what denser than
+// water means. Before this table only the tourist's camera could sink: a full
+// wine bottle, a glazed bowl, a potted plant and a pair of sunglasses all
+// bobbed, because their `float` was simply never set and the default was 0.55.
+//
+// The masses in physTYPES stay as they are — they are tuned for how a prop
+// feels in the mouth and against a shoulder-charge, and the collision boxes are
+// deliberately larger than life so a prop reads at a distance. Which means
+// mass/volume is NOT the density of the depicted object, and the solver must
+// not pretend it is. physFloatFrac turns the number below into a draft, and
+// physMakeProp's back-solve makes the lift come out at the prop's own weight —
+// so the equilibrium waterline is honest even though the displacement box is not.
+const physFLUID_RHO = 1000;      // kg/m³, fresh water; the sea is 1025 and it does not matter here
+const physRHO = {
+  ball:       12,    // a skin around air
+  hat:        70,    // straw, open crown
+  sombrero:   90,
+  bin:        90,    // sealed HDPE, empty
+  esky:      110,
+  thong:     160,    // EVA foam
+  basket:    180,    // open wicker
+  towel:     220,    // dry cotton terry
+  ruana:     300,    // dry wool
+  maiz:      320,    // cob in the husk
+  sandwich:  350,
+  icecream:  380,    // aerated, on a wafer
+  chips:     480,
+  deckchair: 480,    // timber and canvas
+  sign:      560,
+  empanada:  620,
+  cuencobowl:620,    // glazed, hollow, sitting upright — it floats until it swamps
+  coffeesack:680,    // jute over green beans, with air between them
+  menu:      700,
+  ticket:    700,    // paper card
+  cone:      720,    // PVC cone on a rubber base
+  handbag:   880,
+  arepa:     900,
+  frisbee:   930,    // polyethylene, and it floats by a whisker — as it does
+  coffee:    930,    // a full cup floats brim-deep, then fills
+  plantain:  970,
+  // ---- and everything from here down goes to the bottom ----
+  sunglasses:1150,   // acetate and glass
+  winebottle:1180,   // full, corked
+  flower:    1450,   // terracotta and wet soil
+  camera:    1500,   // glass and magnesium
+  mug:       1600,   // enamel over pressed steel — it goes straight down
+};
+
+for (const k in physRHO) { if (physTYPES[k]) physTYPES[k].rho = physRHO[k]; }
+
+/**
+ * Submerged fraction a type ACTUALLY settles at, from its material density.
+ * The water mesh is opaque, so a prop that is meant to float has to keep
+ * physBUOY_PROUD metres of itself above the surface or it simply vanishes;
+ * equilibrium leaves 2*hy*(1 - floatFrac) proud, hence the cap. A value over 1
+ * is passed through untouched — that is a prop denser than water, and it sinks.
+ */
+function physFloatFrac(def) {
+  if (def.floatFrac) return def.floatFrac;
+  const rho = def.rho || (def.float ? def.float * physFLUID_RHO : physFLOAT_DEFAULT * physFLUID_RHO);
+  const f = rho / physFLUID_RHO;
+  let v = f;
+  if (f <= 1) {
+    const cap = 1 - physBUOY_PROUD / (2 * def.hy);
+    v = clamp(f, 0.05, cap > 0.05 ? cap : 0.05);
+  }
+  def.floatFrac = v;
+  return v;
+}
+
+const physFLOWER_PETALS = [PALETTE.petalRed, PALETTE.petalPink, PALETTE.petalPurple];
+
+function physGetGeo(type, variant) {
+  const key = variant ? type + '#' + variant : type;
+  let g = physGeoCache.get(key);
+  if (g) return g;
+  const def = physTYPES[type];
+  const root = new THREE.Group();
+  if (type === 'flower') def.build(root, physFLOWER_PETALS[(variant || 0) % physFLOWER_PETALS.length]);
+  else def.build(root);
+  g = physFlatten(root, def.hy, def);
+  physGeoCache.set(key, g);
+  return g;
+}
+function physGetSpillGeo(type) {
+  const def = physTYPES[type];
+  if (!def || !def.spill) return null;
+  const key = type + '@spill';
+  let g = physGeoCache.get(key);
+  if (g) return g;
+  const root = new THREE.Group();
+  def.spill(root);
+  g = physFlatten(root, def.hy);
+  physGeoCache.set(key, g);
+  return g;
+}
+
+// ===========================================================================
+// 3. PROPS
+// ===========================================================================
+export function createProps(game) {
+  physGame = game;
+  physPropMat = mat(physNEUTRAL, { vertexColors: true });
+
+  physInitParticles();
+  physInitRubbish();
+  physScatter();
+
+  game.events.on('capy:dig', physOnDig);
+  // A hard landing throws up whatever it lands on. capybara.js only fires this
+  // past 5.5 m/s of descent, so a walk off a kerb costs nothing.
+  game.events.on('capy:land', function (e) {
+    const p = e && e.position;
+    if (p) physDust3(p.x, p.y - 0.30, p.z, 6);
+  });
+  // ...and a run kicks up a scuff behind every other stride. One particle, so a
+  // sustained sprint costs a couple of matrix writes a second and nothing else.
+  game.events.on('capy:step', function (e) {
+    const p = e && e.position;
+    if (p) physDust3(p.x, p.y - 0.28, p.z, 1);
+  });
+  // Chapter 2. Nothing Andean exists until the biome is first entered, and the
+  // capture tag is already 'pasto' by the time this event fires, so everything
+  // built inside belongs to Pasto rather than to Sydney.
+  game.events.on('biome:enter', physOnBiomeEnter);
+
+  game.physics = {
+    grab: physGrab,
+    release: physRelease,
+    nearestGrabbable: physNearestGrabbable,
+    spawnProp: physSpawnProp,
+    removeProp: physRemoveProp,
+    update: physUpdate,
+    // extras (handy for npc.js / systems.js — additive, nothing depends on them)
+    dropOwned: physDropOwned,
+    spill: physSpill,
+    dust: physDust3,
+    foam: physFoamRing,
+    // ---- Pasto (chapter 2) ----
+    collapseStall: physCollapseStallByRef,
+    shatter: physShatter,
+    puff: physPuff3,
+    scatterShards: physThrowShards,
+  };
+
+  return { update: physUpdate };
+}
+
+// ---- instanced draw pool --------------------------------------------------
+// One InstancedMesh per baked geometry. A prop only falls back to its own
+// standalone Mesh while it is in the capybara's mouth, in an NPC's hand, or
+// spilled (its geometry swaps). Everything else is one draw call per type.
+function physScatterCount(type) {
+  let n = 0;
+  for (let i = 0; i < physSCATTER.length; i++) if (physSCATTER[i][1] === type) n += physSCATTER[i][2];
+  for (let i = 0; i < physQUAY_SCATTER.length; i++) if (physQUAY_SCATTER[i][0] === type) n += physQUAY_SCATTER[i][1];
+  for (const k in physBIOME_SCATTER) {
+    const rows = physBIOME_SCATTER[k].props;
+    for (let i = 0; i < rows.length; i++) if (rows[i][0] === type) n += rows[i][1];
+  }
+  return n;
+}
+
+/**
+ * One InstancedMesh per (baked geometry x BIOME).
+ *
+ * The biome half is not an optimisation, it is correctness. main.js claims
+ * whatever is added to the scene while a capture tag is live, so the first
+ * prop of a type decides which biome owns the shared draw call for ever. Key
+ * this on the geometry alone and a rubbish bin scattered in Venice joins
+ * Sydney's bin mesh — which Venice has set invisible — so the body is there,
+ * solid and grabbable, and nothing is drawn. Splitting on the biome gives each
+ * chapter its own mesh, built under its own tag, shown and hidden with it.
+ */
+function physInstGroupFor(type, key, geo, receive) {
+  let g = physInstByKey.get(key);
+  if (g) return g;
+  const cap = physScatterCount(type) + 12;
+  const imesh = new THREE.InstancedMesh(geo, physPropMat, cap);
+  imesh.castShadow = true;
+  imesh.receiveShadow = !!receive;
+  imesh.frustumCulled = false;
+  imesh.count = 0;
+  imesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  physGame.scene.add(imesh);
+  g = { mesh: imesh, cap, used: 0, dirty: false };
+  physInstByKey.set(key, g);
+  physInstGroups.push(g);
+  return g;
+}
+
+/**
+ * After ANY direct write to body.position / body.quaternion (teleport, respawn,
+ * kinematic placement) the render-time transform must be dragged along with it,
+ * or the interpolator lerps from a stale origin and the prop smears across the
+ * map for a frame.
+ */
+function physSyncBodyTransform(b) {
+  b.previousPosition.copy(b.position);
+  b.interpolatedPosition.copy(b.position);
+  b.previousQuaternion.copy(b.quaternion);
+  b.interpolatedQuaternion.copy(b.quaternion);
+}
+
+/**
+ * Render transform of a prop. `exact` reads the solver transform and is ONLY for
+ * a body that has just been placed or has just gone to sleep — every per-frame
+ * sync reads the interpolated fields, which is the transform at display time.
+ * Reading body.position every frame pins the whole scatter to a 60Hz ladder.
+ */
+function physWriteInstance(prop, exact) {
+  const g = prop.instGroup;
+  if (!g) return;
+  const b = prop.body;
+  const bp = exact ? b.position : b.interpolatedPosition;
+  const bq = exact ? b.quaternion : b.interpolatedQuaternion;
+  const s = prop.mesh.scale.x;
+  physM4.compose(
+    physV1.set(bp.x, bp.y, bp.z),
+    physQ1.set(bq.x, bq.y, bq.z, bq.w),
+    physV2.set(s, s, s)
+  );
+  g.mesh.setMatrixAt(prop.instIdx, physM4);
+  g.dirty = true;
+}
+
+/** Same rule for the standalone mesh a prop falls back to. */
+function physSyncMesh(prop, exact) {
+  const b = prop.body;
+  const bp = exact ? b.position : b.interpolatedPosition;
+  const bq = exact ? b.quaternion : b.interpolatedQuaternion;
+  prop.mesh.position.set(bp.x, bp.y, bp.z);
+  prop.mesh.quaternion.set(bq.x, bq.y, bq.z, bq.w);
+}
+
+function physZeroInstance(prop) {
+  const g = prop.instGroup;
+  if (!g) return;
+  physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+  g.mesh.setMatrixAt(prop.instIdx, physM4);
+  // hide immediately — this can fire mid-frame, after physUpdate has flushed
+  g.mesh.instanceMatrix.needsUpdate = true;
+  g.dirty = false;
+}
+
+/** solo = drawn by its own Mesh (mouth / NPC hand / spilled decal). */
+function physSetSolo(prop, solo) {
+  if (prop.solo === solo) return;
+  prop.solo = solo;
+  prop.mesh.visible = solo || !prop.instGroup;
+  if (solo) physZeroInstance(prop);
+  else physWriteInstance(prop);
+}
+
+function physFlushInstances() {
+  for (let i = 0; i < physInstGroups.length; i++) {
+    const g = physInstGroups[i];
+    if (!g.dirty) continue;
+    g.mesh.instanceMatrix.needsUpdate = true;
+    g.dirty = false;
+  }
+}
+
+/** Restores the dry-land damping profile for this prop. */
+function physDryOut(prop) {
+  const b = prop.body;
+  b.linearDamping = prop.dampL;
+  b.angularDamping = prop.dampA;
+  b.allowSleep = true;
+  prop.sunk = false;
+}
+
+/**
+ * A prop has left the world. Put it back exactly where it was scattered, dead
+ * still, and let it fall asleep there — never leave a body under the map awake.
+ */
+function physRescue(prop) {
+  const b = prop.body;
+  b.position.set(prop.homeX, prop.homeY + prop.originY + 0.05, prop.homeZ);
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.force.set(0, 0, 0);
+  b.torque.set(0, 0, 0);
+  physQ1.setFromAxisAngle(physUp, rand(0, Math.PI * 2));
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  physSyncBodyTransform(b);
+  prop.inWater = false;
+  prop.spillArmed = false;
+  physDryOut(prop);
+  b.sleep();
+  prop.settled = true;
+  physSyncMesh(prop, true);
+  if (!prop.solo) physWriteInstance(prop, true);
+}
+
+/**
+ * Which biome is live right now. Everything a module adds at runtime is tagged
+ * with this by main.js, so a prop's tag is simply the biome it was born into.
+ */
+function physLiveBiome() {
+  const bm = physGame && physGame.biome;
+  return bm && bm.current ? bm.current : 'sydney';
+}
+
+/** True while the Andes are the attached biome. Every water path is behind this. */
+function physPastoLive() {
+  const bm = physGame && physGame.biome;
+  return !!(bm && bm.isActive && bm.isActive('pasto'));
+}
+
+function physMakeProp(type, x, z, variant, yaw, restY) {
+  const def = physTYPES[type];
+  if (!def) return null;
+  const geoKey = variant ? type + '#' + variant : type;
+  const biomeTag = physLiveBiome();
+  const grpKey = geoKey + '@' + biomeTag;
+  const geo = physGetGeo(type, variant);
+  const mesh = new THREE.Mesh(geo, physPropMat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = !!def.receive;
+  mesh.matrixAutoUpdate = true;
+  mesh.visible = false;
+  physGame.scene.add(mesh);
+
+  const light = def.mass < 0.6;
+  const body = new CANNON.Body({
+    mass: def.mass,
+    material: def.bouncy && physBallMat
+      ? physBallMat
+      : (light && physLightMat ? physLightMat : (physGame.mats ? physGame.mats.prop : undefined)),
+    linearDamping: light ? 0.02 : 0.06,
+    angularDamping: light ? 0.04 : 0.12,
+  });
+  body.collisionFilterGroup = physGRP_DYN;
+  const s = def.shape;
+  if (s[0] === 'sph') body.addShape(new CANNON.Sphere(s[1]));
+  else body.addShape(new CANNON.Box(new CANNON.Vec3(s[1], s[2], s[3])));
+  // Rest ON whatever is under (x, z) — the podium deck is 1.2m up, and spawning
+  // at ground height there buries the body inside the podium collider.
+  // `restY` overrides that for a prop laid on a raised surface someone else owns
+  // — a market stall table, whose top pasto.js reports and props.js cannot guess.
+  const surfY = typeof restY === 'number' && restY === restY ? restY : physSurfaceY(x, z);
+  body.position.set(x, surfY + def.hy + 0.015, z);
+  physQ1.setFromAxisAngle(physUp, yaw === undefined ? rand(0, Math.PI * 2) : yaw);
+  body.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  // placed by hand, so the render-time transform starts there too (a fresh body
+  // interpolates from the origin otherwise, and flies in from (0,0,0))
+  physSyncBodyTransform(body);
+  body.allowSleep = true;
+  body.sleepSpeedLimit = 0.16;
+  body.sleepTimeLimit = 0.5;
+  physGame.world.addBody(body);
+
+  const prop = {
+    id: physNextId++,
+    type,
+    name: def.name,
+    mesh, body,
+    grabbable: def.grabbable === false ? false : (def.planted ? false : true),
+    mass: def.mass,
+    holdOffset: new THREE.Vector3(def.hold[0], def.hold[1], def.hold[2]),
+    holdQuat: new THREE.Quaternion(),
+    owner: null,
+    held: false,
+    spilled: false,
+    // internals
+    originY: def.hy,
+    planted: !!def.planted,
+    frozen: false,
+    settled: false,            // body asleep AND its final transform already drawn
+    tipped: false,
+    removed: false,
+    inWater: false,
+    sunk: false,
+    hidden: false,             // parked out of the world (shattered / eaten), will restock
+    hiddenUntil: 0,
+    stall: null,               // the market stall this prop was laid out on
+    craterIn: false,           // currently inside Galeras' bowl
+    craterIdle: 0,             // s since it last made progress toward the vent
+    craterY: 0,                // lowest y reached on this trip down
+    craterTries: 0,            // shoves already given on the way to the vent
+    fragile: !!def.fragile,
+    // buoyancy: rho is the fluid density that makes THIS prop sit at `float`
+    // submerged, so F = rho * g * (vol * submergedFraction) is genuine
+    // Archimedes and the designed waterline falls straight out of it.
+    biome: biomeTag,
+    vol: physVolume(def),
+    floatFrac: physFloatFrac(def),
+    rho: def.mass / (physVolume(def) * physFloatFrac(def)),
+    // ½·ρ·Cd·A, so drag is one multiply per frame. Area is the mean face of the
+    // collision shape — honest enough that a beach ball floats down and a full
+    // esky drops like the nine kilos it is.
+    aeroK: 0.5 * physAERO_RHO * (s[0] === 'sph'
+      ? physAERO_CD_SPH * Math.PI * s[1] * s[1]
+      : physAERO_CD_BOX * (4 * (s[1] * s[2] + s[2] * s[3] + s[1] * s[3]) / 3)),
+    splash: def.splash || 1,
+    spillArmed: false,
+    wasStolen: false,
+    stolenFrom: null,
+    lastImpact: -1,
+    homeX: x, homeY: surfY, homeZ: z,
+    // causation ledger — no task ticks unless the capybara earned it
+    disturbed: false,          // has anything external ever moved this prop?
+    lastCapyTouch: -1e9,       // last contact with the capy (or its cargo)
+    releaseTime: -1e9,         // last time the capy let go of / threw it
+    spin: def.spin,
+    dampL: light ? 0.02 : 0.06,
+    dampA: light ? 0.04 : 0.12,
+    lastWX: x, lastWY: surfY + def.hy, lastWZ: z,
+    instGroup: null,
+    instIdx: -1,
+    solo: true,
+    onCollide: null,
+  };
+  prop.holdQuat.setFromEuler(physEuler.set(0.2, 0, 0));
+  mesh.position.set(body.position.x, body.position.y, body.position.z);
+  mesh.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
+
+  const grp = physInstGroupFor(type, grpKey, geo, def.receive);
+  if (grp.used < grp.cap) {
+    prop.instGroup = grp;
+    prop.instIdx = grp.used++;
+    grp.mesh.count = grp.used;
+    prop.solo = false;
+    physWriteInstance(prop);
+  } else {
+    mesh.visible = true;   // pool overflow — fall back to a standalone draw
+  }
+
+  if (prop.planted) {
+    body.type = CANNON.Body.STATIC;
+    body.updateMassProperties();
+    prop.frozen = true;
+    body.sleep();
+  }
+
+  prop.onCollide = (e) => physOnCollide(prop, e);
+  body.addEventListener('collide', prop.onCollide);
+  physBodyToProp.set(body.id, prop);
+
+  physGame.props.push(prop);
+  if (type === 'bin') physBins.push(prop);
+  return prop;
+}
+
+function physSpawnProp(type, x, z, restY, yaw) {
+  return physMakeProp(type, x, z, type === 'flower' ? randInt(0, 2) : 0, yaw, restY);
+}
+
+function physRemoveProp(prop) {
+  if (!prop || prop.removed) return;
+  const arr = physGame.props;
+  const i = arr.indexOf(prop);
+  if (i >= 0) arr.splice(i, 1);
+  prop.removed = true;
+  prop.grabbable = false;
+  if (prop.held) {
+    prop.held = false;
+    if (physGame.capy && physGame.capy.heldProp === prop) physGame.capy.heldProp = null;
+  }
+  if (prop.owner && prop.owner.heldProp === prop) prop.owner.heldProp = null;
+  prop.owner = null;
+  const bi = physBins.indexOf(prop);
+  if (bi >= 0) physBins.splice(bi, 1);
+  physZeroInstance(prop);
+  prop.instGroup = null;
+  if (prop.mesh.parent) prop.mesh.parent.remove(prop.mesh);
+  prop.mesh.visible = false;
+  if (prop.onCollide) prop.body.removeEventListener('collide', prop.onCollide);
+  physBodyToProp.delete(prop.body.id);
+  physGame.world.removeBody(prop.body);
+  physDestroyPayload.prop = prop;
+  physGame.events.emit('prop:destroy', physDestroyPayload);
+}
+
+// ---- scatter --------------------------------------------------------------
+// Counts are held down by CONTRACT.md's 130-body budget, not by taste: every
+// row here is one live CANNON.Body. Duplicates past the second add nothing the
+// player can tell apart, so the second copy is the first thing to go.
+const physSCATTER = [
+  ['promenade', 'hat', 2], ['promenade', 'coffee', 2], ['promenade', 'icecream', 1],
+  ['promenade', 'towel', 1], ['promenade', 'deckchair', 1], ['promenade', 'thong', 1],
+  ['promenade', 'esky', 1], ['promenade', 'ball', 1], ['promenade', 'frisbee', 1],
+  ['promenade', 'handbag', 1], ['promenade', 'bin', 1],
+  ['picnic', 'sandwich', 1], ['picnic', 'basket', 1], ['picnic', 'esky', 1],
+  ['picnic', 'towel', 1], ['picnic', 'ball', 1],
+  ['picnic', 'hat', 1],
+  ['operaStage', 'cone', 2], ['operaStage', 'bin', 2], ['operaStage', 'sign', 1],
+  ['operaStage', 'coffee', 1], ['operaStage', 'hat', 1],
+  ['gardens', 'flower', 1], ['gardens', 'sign', 1], ['gardens', 'bin', 1],
+  ['gardens', 'basket', 1], ['gardens', 'handbag', 1],
+  ['flowerbed', 'flower', 2],
+];
+
+const physFALLBACK_ZONES = {
+  promenade:  { x0: -58, z0: -6, x1: -18, z1: 26 },
+  picnic:     { x0: 23,  z0: 19, x1: 37,  z1: 33 },
+  operaStage: { x0: -11, z0: 8,  x1: 11,  z1: 17 },
+  gardens:    { x0: 18,  z0: 8,  x1: 58,  z1: 54 },
+  flowerbed:  { x0: 25,  z0: 11, x1: 35,  z1: 19 },
+};
+
+function physZoneRect(name) {
+  const env = physGame.env;
+  if (env && env.zones && env.zones[name]) {
+    const r = env.zones[name];
+    if (typeof r.x0 === 'number' && typeof r.x1 === 'number') return r;
+  }
+  return physFALLBACK_ZONES[name] || physFALLBACK_ZONES.picnic;
+}
+
+function physRectIn(r, x, z, m) {
+  return x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m;
+}
+
+/**
+ * Height of the surface a prop dropped at (x, z) would come to rest on.
+ * Prefers a real query from environment.js if one ever appears; otherwise the
+ * only raised deck in the world is the Opera House podium.
+ */
+function physSurfaceY(x, z) {
+  // No biome is flat by decree. This used to know two worlds — Sydney's env and
+  // Pasto's volcano — and answered with Sydney's flat harbour apron for the
+  // eleven chapters written since, so a prop rescued in Rio or spawned in Uji
+  // was measured against ground that only exists in Sydney. Ask the LIVE biome,
+  // exactly the way capybara.js does.
+  if (physGame.biome && !physGame.biome.isActive('sydney')) {
+    const h = physTerrainAt(x, z);
+    if (h === h) return h;
+    return 0;
+  }
+  const env = physGame.env;
+  if (env) {
+    if (typeof env.surfaceY === 'function') return env.surfaceY(x, z);
+    if (typeof env.groundY === 'function') return env.groundY(x, z);
+  }
+  if (physRectIn(physDECK_FULL, x, z, 0)) return physPODIUM_Y;
+  return 0;
+}
+
+/** Deck points clear of the shell bases and safely inboard of every edge. */
+function physDeckClear(x, z, radius) {
+  if (!physRectIn(physDECK_SAFE, x, z, -radius)) return false;
+  for (let i = 0; i < physDECK_BLOCK.length; i++) {
+    if (physRectIn(physDECK_BLOCK[i], x, z, radius)) return false;
+  }
+  return true;
+}
+
+/** Collision radius a prop of this type needs kept clear around it. */
+function physPropRadius(type) {
+  const def = physTYPES[type];
+  if (!def) return 0.5;
+  if (!def.fitted) physGetGeo(type, 0);     // the fit lives in the bake
+  const s = def.shape;
+  return s[0] === 'sph' ? s[1] : Math.max(s[1], s[3]);
+}
+
+/**
+ * Every candidate spawn point is tested here — including env.navBlocked, for
+ * EVERY prop. The podium deck reports as nav-blocked (it is raised, not
+ * impassable); that one verdict is forgiven for forecourt props, which are
+ * meant to stand on it and are spawned at deck height. Nothing else is.
+ */
+function physSpotOk(x, z, radius, deckZone) {
+  // ---- ASK THE LIVE BIOME, NOT SYDNEY --------------------------------------
+  // This used to read physGame.env — Sydney's environment — for isOverWater AND
+  // navBlocked whatever biome was attached, and reject anything outside
+  // Sydney's own box (z -8.6..68, x +-68). It cost nothing while Sydney and
+  // Pasto were the only two biomes that scattered; the moment any other chapter
+  // does, that box rejects every candidate point in the world and the whole
+  // scatter silently produces nothing. Same fix as physSurfaceY.
+  const sydney = !physGame.biome || physGame.biome.isActive('sydney');
+  const api = physBiomeApi();
+  if (!(x === x) || !(z === z)) return false;
+  if (sydney) {
+    if (z < -8.6 || z > 68 || x < -68 || x > 68) return false;
+  } else if (x < -500 || x > 500 || z < -700 || z > 500) {
+    return false;                                          // sanity only; the zone rect does the work
+  }
+  if (api && api.isOverWater && api.isOverWater(x, z)) return false;
+  if (sydney) {
+    if (physRectIn(physSTAIR, x, z, radius)) return false; // the Opera House stair
+    const onDeck = physRectIn(physDECK_FULL, x, z, radius);
+    if (onDeck && !deckZone) return false;                 // never bury a prop in the podium
+    if (api && api.navBlocked && api.navBlocked(x, z, radius)) {
+      if (!(onDeck && physDeckClear(x, z, radius))) return false;
+    }
+    return true;
+  }
+  if (api && api.navBlocked && api.navBlocked(x, z, radius)) return false;
+  return true;
+}
+
+function physFindSpot(zone, radius) {
+  const env = physGame.env;
+  const rect = physZoneRect(zone);
+  const deckZone = !!physDECK_ZONES[zone];
+  const gap = radius + 0.8;
+  for (let attempt = 0; attempt < 64; attempt++) {
+    let x = NaN;
+    let z = NaN;
+    if (env && env.randomPointIn && attempt < 44) {
+      const p = env.randomPointIn(zone);
+      if (p && typeof p.x === 'number' && typeof p.z === 'number') { x = p.x; z = p.z; }
+    }
+    if (!(x === x)) {
+      x = rand(Math.min(rect.x0, rect.x1), Math.max(rect.x0, rect.x1));
+      z = rand(Math.min(rect.z0, rect.z1), Math.max(rect.z0, rect.z1));
+    }
+    if (!physSpotOk(x, z, radius, deckZone)) continue;
+    // crowding is a nicety, not a correctness rule — relax it on the last tries
+    if (attempt < 56 && physCrowded(x, z, gap)) continue;
+    physSpot.x = x; physSpot.z = z; physSpot.ok = true;
+    return physSpot;
+  }
+  // No legal point. A missing bin is infinitely better than a bin inside a wall.
+  physSpot.ok = false;
+  return physSpot;
+}
+
+function physCrowded(x, z, minDist) {
+  const arr = physGame.props;
+  const live = physLiveBiome();
+  const d2 = minDist * minDist;
+  for (let i = 0; i < arr.length; i++) {
+    // Biomes share one coordinate space, so a prop parked in Sydney sits at the
+    // same (x, z) as a legal spot in Venice. Only what is actually in the world
+    // beside us can crowd us.
+    if (arr[i].biome !== live) continue;
+    const b = arr[i].body.position;
+    const dx = b.x - x;
+    const dz = b.z - z;
+    if (dx * dx + dz * dz < d2) return true;
+  }
+  return false;
+}
+
+// ---- Circular Quay band ---------------------------------------------------
+// SYDNEY's boardwalk, not the chapter-3 'quay' biome. The names collide and the
+// coordinates look like a mis-tag, but 'seagull-chips', 'cafe-table' and
+// 'dog-loose' are all CHAPTER ONE tasks played out on this band, and they read
+// these very props. It is scattered at boot, under Sydney's tag, on purpose.
+// Placed from an explicit rect rather than env.randomPointIn: environment.js may
+// not publish a zone for it at all.
+// CONTRACT world layout: boardwalk / dining terrace x [-46,-14], z [-10,10]
+// (clipped to z > -8.5, the far side of that is open harbour).
+const physQUAY = { x0: -45.4, z0: -8.2, x1: -14.8, z1: 9.4 };
+const physQUAY_SCATTER = [
+  ['chips', 2], ['camera', 1], ['sunglasses', 1],
+  ['ticket', 1], ['menu', 1], ['winebottle', 1],
+];
+
+// ---- the other fifteen chapters -------------------------------------------
+// Every chapter from Circular Quay on shipped with ZERO dynamic bodies. Nothing
+// was broken: physScatter() simply runs once at boot, physScatterPasto() runs on
+// the first entry into Pasto, and no third call was ever written — so fifteen
+// worlds full of tables, stalls, crates and counters had nothing in them a
+// capybara could pick up, shove or knock over.
+//
+// Placement is deliberately NOT a hand-authored rect per world. Fifteen rects
+// is fifteen chances to bury a bin in a wall the day someone moves a building;
+// instead each chapter names a centre and an annulus, and physSpotOk does the
+// rest against that biome's OWN navBlocked / isOverWater / terrainHeight. A
+// point that fails is skipped, and a missing bin is always better than a bin
+// inside a façade.
+//
+// Types are drawn from what already exists — no new geometry — and chosen so
+// nothing reads as imported from the wrong hemisphere: no beach balls in
+// Reykjavik, no eskies in the Sơn Đoòng.
+const physBIOME_SCATTER = {
+  // SIX GRABBABLE PROPS OVER EIGHTY THOUSAND SQUARE METRES — the lowest
+  // absolute count in the game, on the apron of the busiest ferry terminal in
+  // the southern hemisphere. Four more, and they are all the same four things:
+  // what a person waiting for a boat is carrying and puts down. The chips are
+  // not decoration — quayBuildApronGulls has a flock standing on this paving
+  // and quayBurstChips is already written; a dropped packet is what it is for.
+  quay:      { x: 4, z: 26, r0: 4, r1: 20,
+               props: [['bin', 1], ['cone', 2], ['sign', 1], ['esky', 1], ['basket', 1],
+                       ['coffee', 1], ['camera', 1], ['handbag', 1], ['chips', 1]] },
+  kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]] },
+  cali:      { x: 0, z: 24, r0: 5, r1: 26, props: [['empanada', 2], ['arepa', 1], ['plantain', 1], ['sombrero', 1], ['basket', 1], ['bin', 1], ['cone', 2], ['sign', 1]] },
+  rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['esky', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]] },
+  iceland:   { x: 0, z: 99, r0: 5, r1: 24, props: [['coffee', 2], ['camera', 1], ['handbag', 1], ['basket', 1], ['bin', 2], ['cone', 1], ['sign', 2]] },
+  // Was `sombrero, plantain, maiz` — a Nariño hat, a bunch of plantains and a
+  // cob of maize, scattered across Jemaa el-Fnaa. The Pasto market's props
+  // travel and that is deliberate, but three of them are the wrong CONTINENT
+  // and the square is the most identifiable place in the chapter.
+  sahara:    { x: 0, z: 8,  r0: 5, r1: 24, props: [['basket', 3], ['cuencobowl', 3], ['hat', 1], ['mug', 1], ['camera', 1], ['handbag', 1], ['cone', 1]] },
+  // The Shelf is high, thin and windy, so nothing here is light enough to blow
+  // about — but the list that enforced that was TWO WHEELIE BINS, TWO ROAD
+  // SIGNS, TWO TRAFFIC CONES, AN ESKY AND A MENU BOARD, scattered over the
+  // meadow of an abandoned floating island under one moon. Measured off the
+  // rendered frame of the spawn: orange cones and a green council bin, ten
+  // metres from a lamp somebody left burning two hundred years ago. The Drift's
+  // whole premise is that the ground came off and took a household with it, and
+  // that household is drawn all over the chapter (a hearth, a jetty, a drying
+  // rack, three offering bowls) — so its loose props are the same household's.
+  drift:     { x: 2, z: 42, r0: 5, r1: 20, props: [['basket', 3], ['cuencobowl', 2], ['mug', 2], ['winebottle', 1], ['esky', 1]] },
+  venice:    { x: -4, z: 13, r0: 4, r1: 22, props: [['winebottle', 2], ['menu', 1], ['coffee', 1], ['camera', 1], ['handbag', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['basket', 1]] },
+  kowloon:   { x: 0, z: 34, r0: 4, r1: 22, props: [['chips', 2], ['coffee', 1], ['sign', 2], ['cone', 2], ['bin', 2], ['basket', 1], ['camera', 1]] },
+  // ...and no TRAFFIC CONE. There is no road within forty kilometres of that
+  // beach and there is not a wheeled vehicle in the chapter — same argument as
+  // the sombrero on Jemaa el-Fnaa and the wheelie bins on the Drift. The rest of
+  // the beach household stays: props are allowed to travel, they are just not
+  // allowed to be from a different KIND of place.
+  palawan:   { x: 0, z: 46, r0: 5, r1: 24, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['basket', 2], ['frisbee', 1], ['sunglasses', 1], ['cuencobowl', 1]] },
+  // Was 'sombrero' — a Nariño hat scattered across a square in Anatolia, which
+  // is the same mistake Jemaa el-Fnaa had and which was fixed there for the same
+  // reason: the Pasto market's props are allowed to travel, but not onto the one
+  // piece of ground in the chapter the player is put down on. A Cappadocian
+  // square at ten past five has tea glasses, clay from Avanos and baskets on it.
+  goreme:    { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 3], ['mug', 2], ['hat', 1], ['cone', 1], ['sign', 1], ['bin', 1]] },
+  manly:     { x: 0, z: 46, r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['frisbee', 1], ['hat', 1], ['sunglasses', 1], ['deckchair', 1], ['bin', 1]] },
+  pantanal:  { x: 0, z: 62, r0: 5, r1: 24, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]] },
+  cave:      { x: 0, z: 62, r0: 5, r1: 22, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
+  antarctic: { x: 0, z: 52, r0: 5, r1: 24, props: [['esky', 1], ['bin', 1], ['sign', 2], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]] },
+};
+const physBiomeScattered = {};   // biome name -> true, so re-entry never doubles up
+
+/**
+ * Scatter one chapter's list in an annulus about its centre. Every candidate is
+ * put through physSpotOk, which now asks the LIVE biome, so water, buildings and
+ * anything else that biome calls blocked are all refused for free.
+ */
+function physScatterBiome(name) {
+  const def = physBIOME_SCATTER[name];
+  if (!def || physBiomeScattered[name]) return;
+  physBiomeScattered[name] = true;
+  let placed = 0;
+  for (let i = 0; i < def.props.length; i++) {
+    const type = def.props[i][0];
+    const radius = physPropRadius(type);
+    for (let n = 0; n < def.props[i][1]; n++) {
+      for (let a = 0; a < 64; a++) {
+        const ang = rand(0, Math.PI * 2);
+        const rad = Math.sqrt(rand(def.r0 * def.r0, def.r1 * def.r1));   // uniform over the ring
+        const x = def.x + Math.cos(ang) * rad;
+        const z = def.z + Math.sin(ang) * rad;
+        if (!physSpotOk(x, z, radius, false)) continue;
+        if (a < 56 && physCrowded(x, z, radius + 1.1)) continue;
+        if (physMakeProp(type, x, z, 0, undefined)) placed++;
+        break;
+      }
+    }
+  }
+  // Placed resting on their own surface, so there is nothing to solve.
+  const arr = physGame.props;
+  for (let i = 0; i < arr.length; i++) {
+    const p = arr[i];
+    if (p.biome !== name || p.body.type !== CANNON.Body.DYNAMIC) continue;
+    p.body.velocity.set(0, 0, 0);
+    p.body.angularVelocity.set(0, 0, 0);
+    p.body.force.set(0, 0, 0);
+    p.body.torque.set(0, 0, 0);
+    p.body.sleep();
+  }
+  return placed;
+}
+
+let physQuayScattered = false;
+function physScatterQuay() {
+  if (physQuayScattered) return;
+  physQuayScattered = true;
+  for (let i = 0; i < physQUAY_SCATTER.length; i++) {
+    const type = physQUAY_SCATTER[i][0];
+    const radius = physPropRadius(type);
+    for (let n = 0; n < physQUAY_SCATTER[i][1]; n++) {
+      for (let a = 0; a < 48; a++) {
+        const x = rand(physQUAY.x0, physQUAY.x1);
+        const z = rand(physQUAY.z0, physQUAY.z1);
+        if (!physSpotOk(x, z, radius, false)) continue;
+        if (a < 40 && physCrowded(x, z, radius + 0.9)) continue;
+        physMakeProp(type, x, z, 0, undefined);
+        break;
+      }
+    }
+  }
+}
+
+function physScatter() {
+  for (let i = 0; i < physSCATTER.length; i++) {
+    const row = physSCATTER[i];
+    const zone = row[0];
+    const type = row[1];
+    const radius = physPropRadius(type);
+    for (let n = 0; n < row[2]; n++) {
+      const spot = physFindSpot(zone, radius);
+      if (!spot.ok) continue;          // skip rather than place it badly
+      physMakeProp(type, spot.x, spot.z, type === 'flower' ? randInt(0, 2) : 0, undefined);
+    }
+  }
+  physScatterQuay();
+  // Everything above was placed resting on its own surface, so there is nothing
+  // to solve: settle the whole scatter immediately. Cannon wakes any of them the
+  // instant something touches it, and until then they cost the solver nothing.
+  const arr = physGame.props;
+  for (let i = 0; i < arr.length; i++) {
+    const b = arr[i].body;
+    if (b.type !== CANNON.Body.DYNAMIC) continue;
+    b.velocity.set(0, 0, 0);
+    b.angularVelocity.set(0, 0, 0);
+    b.force.set(0, 0, 0);
+    b.torque.set(0, 0, 0);
+    b.sleep();
+  }
+}
+
+// ===========================================================================
+// 4. GRAB / RELEASE
+// ===========================================================================
+function physGrab(prop) {
+  if (!prop || prop.removed || prop.held || !prop.grabbable) return false;
+  const capy = physGame.capy;
+  const anchor = capy && capy.mouthAnchor;
+  if (!anchor) return false;
+  if (capy.heldProp && capy.heldProp !== prop) physRelease(null);
+
+  const b = prop.body;
+  b.type = CANNON.Body.KINEMATIC;
+  b.updateMassProperties();
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.force.set(0, 0, 0);
+  b.torque.set(0, 0, 0);
+  // Stay solid against other props (so a carried sign can flatten a bin) but
+  // pass straight through ground, walls and people so nothing ever jams.
+  b.collisionResponse = true;
+  b.collisionFilterMask = physGRP_DYN;
+  b.allowSleep = false;
+  b.wakeUp();
+
+  prop.mesh.getWorldPosition(physV1);
+  prop.mesh.getWorldQuaternion(physQ1);
+  anchor.updateWorldMatrix(true, false);
+  anchor.add(prop.mesh);
+  prop.mesh.position.copy(physV1);
+  anchor.worldToLocal(prop.mesh.position);
+  anchor.getWorldQuaternion(physQ2);
+  physQ2.invert();
+  prop.mesh.quaternion.copy(physQ2).multiply(physQ1);
+  prop.mesh.scale.setScalar(1.18);
+
+  // NOTE: prop.owner is deliberately LEFT SET here. capybara.js is the contract
+  // owner of 'capy:grab' and emits it immediately after this call; npc.js's
+  // subscriber needs an intact owner to start the chase. It clears it itself.
+  const prev = prop.owner;
+  prop.held = true;
+  prop.frozen = false;
+  prop.inWater = false;
+  physDryOut(prop);
+  b.allowSleep = false;
+  if (prev) {
+    prop.stolenFrom = prev;
+    if (prop.type === 'hat') prop.wasStolen = true;
+  }
+  capy.heldProp = prop;
+  // Fired here for the same reason as 'capy:drop' above. prop.owner is deliberately
+  // still set, and `from` carries the victim, so npc.js can start the outrage chase
+  // and tick 'steal-hat' whichever field it reads.
+  physGrabPayload.prop = prop;
+  physGrabPayload.from = prev || null;
+  physGame.events.emit('capy:grab', physGrabPayload);
+  physStampTouch(prop);
+  prop.lastWX = b.position.x;
+  prop.lastWY = b.position.y;
+  prop.lastWZ = b.position.z;
+  physSetSolo(prop, true);
+  if (prop.type === 'sandwich') physTask('picnic-thief');
+  else if (prop.type === 'empanada') physTask('steal-empanada');
+  else if (prop.type === 'ruana') physTask('ruana-thief');
+  return true;
+}
+
+function physRelease(impulse) {
+  const capy = physGame.capy;
+  const prop = capy && capy.heldProp;
+  if (!prop) return;
+  const m = prop.mesh;
+  const b = prop.body;
+
+  m.getWorldPosition(physV1);
+  m.getWorldQuaternion(physQ1);
+  physGame.scene.add(m);
+  m.position.copy(physV1);
+  m.quaternion.copy(physQ1);
+  m.scale.setScalar(1);
+
+  b.position.set(physV1.x, physV1.y + 0.02, physV1.z);
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  physSyncBodyTransform(b);
+  b.type = CANNON.Body.DYNAMIC;
+  b.updateMassProperties();
+  b.collisionResponse = true;
+  b.collisionFilterMask = -1;
+  physDryOut(prop);
+  b.wakeUp();
+
+  const cv = capy.velocity;
+  b.velocity.set(
+    (cv ? cv.x : 0) * 1.05,
+    Math.max(cv ? cv.y : 0, 0) * 0.35 + 0.7,
+    (cv ? cv.z : 0) * 1.05
+  );
+  if (impulse) {
+    physCV1.set(impulse.x, impulse.y, impulse.z);
+    b.applyImpulse(physCV1);
+  }
+  const sp = prop.spin;
+  b.angularVelocity.set(rand(-6, 6) * sp, rand(-5, 5) * sp, rand(-6, 6) * sp);
+
+  prop.held = false;
+  prop.owner = null;          // safety net if npc.js never saw the theft
+  prop.inWater = false;
+  physStampTouch(prop);
+  prop.releaseTime = physGame.state.time;   // the capybara owns what happens next
+  capy.heldProp = null;
+  physSetSolo(prop, false);
+  // Only a real throw arms a spill — setting a cup down gently leaves it intact.
+  if (impulse && physTYPES[prop.type].spill && !prop.spilled) prop.spillArmed = true;
+  // Emitted HERE, not in capybara.js: both modules deferred to the other and the
+  // event was never fired at all, leaving npc.js and systems.js listening forever.
+  physDropPayload.prop = prop;
+  physGame.events.emit('capy:drop', physDropPayload);
+}
+
+/** Lets npc.js hand a carried prop back to the simulation. */
+function physDropOwned(prop, vx, vy, vz) {
+  if (!prop || prop.held || prop.spilled || prop.removed) return;
+  const m = prop.mesh;
+  const b = prop.body;
+  m.getWorldPosition(physV1);
+  m.getWorldQuaternion(physQ1);
+  physGame.scene.add(m);
+  m.position.copy(physV1);
+  m.quaternion.copy(physQ1);
+  m.scale.setScalar(1);
+  b.position.set(physV1.x, physV1.y, physV1.z);
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  physSyncBodyTransform(b);
+  b.type = CANNON.Body.DYNAMIC;
+  b.updateMassProperties();
+  b.collisionResponse = true;
+  b.collisionFilterMask = -1;
+  prop.inWater = false;
+  physDryOut(prop);
+  b.wakeUp();
+  b.velocity.set(vx || 0, vy || 0.5, vz || 0);
+  b.angularVelocity.set(rand(-4, 4), rand(-4, 4), rand(-4, 4));
+  prop.owner = null;
+  prop.frozen = false;
+  prop.grabbable = physTYPES[prop.type].grabbable !== false && !prop.planted && !prop.spilled;
+  physSetSolo(prop, false);
+  if (physTYPES[prop.type].spill && !prop.spilled) prop.spillArmed = true;
+}
+
+function physNearestGrabbable(pos, radius) {
+  if (!pos) return null;
+  const arr = physGame.props;
+  const r = radius === undefined ? 2 : radius;
+  let best = null;
+  let bestD = r * r;
+  const live = physLiveBiome();
+  for (let i = 0; i < arr.length; i++) {
+    const p = arr[i];
+    if (p.removed || p.held || !p.grabbable) continue;
+    // Detached biomes' props keep their frozen positions in the one shared
+    // coordinate space — without this filter an invisible Sydney sandwich is
+    // grabbable from the middle of Cali (and ticks picnic-thief there).
+    if (p.biome && p.biome !== live) continue;
+    let x;
+    let y;
+    let z;
+    if (p.owner) {
+      p.mesh.getWorldPosition(physV2);
+      x = physV2.x; y = physV2.y; z = physV2.z;
+    } else {
+      x = p.body.position.x; y = p.body.position.y; z = p.body.position.z;
+    }
+    const dx = x - pos.x;
+    const dy = (y - pos.y) * 0.6;
+    const dz = z - pos.z;
+    const d = dx * dx + dy * dy + dz * dz;
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
+// ===========================================================================
+// 5. REACTIONS
+// ===========================================================================
+// ---- causation ------------------------------------------------------------
+/** Marks a prop as "the capybara did this to it, just now". */
+function physStampTouch(prop) {
+  if (!prop) return;
+  prop.disturbed = true;
+  prop.lastCapyTouch = physGame.state ? physGame.state.time : 0;
+}
+
+/** True if `body` is the capybara, its cargo, or something it just threw. */
+function physIsCapyAgent(body) {
+  if (!body) return false;
+  const capy = physGame.capy;
+  if (capy && body === capy.body) return true;
+  const other = physBodyToProp.get(body.id);
+  if (!other) return false;
+  if (other.held) return true;
+  if (!physGame.state) return false;
+  return (physGame.state.time - other.releaseTime) < physCAUSE_TIP;
+}
+
+/**
+ * The single gate every completeTask call in this file goes through. A prop
+ * that tips, spills or drifts into the harbour on its own earns nothing.
+ */
+function physCausedByCapy(prop, win) {
+  if (!physGame.state || physGame.state.time < physTASK_GRACE) return false;
+  if (!prop.disturbed) return false;
+  if (prop.held) return true;
+  const t = physGame.state.time;
+  return (t - prop.lastCapyTouch) < win || (t - prop.releaseTime) < win;
+}
+
+function physOnCollide(prop, e) {
+  // Stamp causation BEFORE any speed gate: a slow shove that eventually topples
+  // a bin is still the capybara's doing, and must be credited as such.
+  if (physIsCapyAgent(e.body)) physStampTouch(prop);
+  if (prop.held || prop.frozen || prop.hidden) return;
+  const c = e.contact;
+  if (!c) return;
+  const speed = Math.abs(c.getImpactVelocityAlongNormal());
+  if (speed < physIMPACT_MIN) return;
+  const t = physGame.state.time;
+  if (t - prop.lastImpact < 0.12) return;
+  prop.lastImpact = t;
+
+  physImpactPayload.prop = prop;
+  physImpactPayload.speed = speed;
+  physImpactPayload.position.set(prop.body.position.x, prop.body.position.y, prop.body.position.z);
+  // Presentation (thud + shake) belongs to systems.js's 'prop:impact' handler —
+  // firing it here too double-shakes and flanges the sample.
+  physGame.events.emit('prop:impact', physImpactPayload);
+  if (speed > 5) {
+    physDust3(prop.body.position.x, prop.body.position.y - prop.originY * 0.5, prop.body.position.z, 3);
+  }
+
+  // Bin chicken: a low capybara shoulder-barge mostly slides a 9kg bin. Convert
+  // the hit into an off-centre impulse so it actually goes over.
+  if (prop.type === 'bin' && !prop.tipped && speed > 3.5 &&
+      physGame.capy && e.body === physGame.capy.body && c.ni) {
+    const push = speed * 1.4;
+    // c.ni points bi->bj and which body is bi is arbitrary: resolve the sign
+    // so the impulse always sends the bin away from the capybara.
+    const away = (c.bi === prop.body) ? -1 : 1;
+    physCV1.set(c.ni.x * away * push, 0.3 * push, c.ni.z * away * push);
+    prop.body.wakeUp();
+    prop.body.applyImpulse(physCV1, physCV2);
+  }
+
+  // Ceramic does not negotiate. A set-down is ~2 m/s; physSHATTER_MIN is the
+  // impact speed of a drop from roughly head height at this gravity.
+  if (prop.fragile && speed > physSHATTER_MIN) { physShatter(prop); return; }
+
+  if (!prop.spilled && speed > physSPILL_MIN && physTYPES[prop.type].spill) physSpill(prop);
+}
+
+function physSpill(prop) {
+  if (!prop || prop.spilled) return;
+  const def = physTYPES[prop.type];
+  if (!def || !def.spill) return;
+  prop.spilled = true;
+  prop.spillArmed = false;
+  prop.grabbable = false;
+  physSetSolo(prop, true);
+
+  const g = physGetSpillGeo(prop.type);
+  if (g) prop.mesh.geometry = g;
+
+  const b = prop.body;
+  if (prop.held && physGame.capy) {
+    physGame.capy.heldProp = null;
+    prop.held = false;
+    prop.mesh.getWorldPosition(physV1);
+    physGame.scene.add(prop.mesh);
+    b.position.set(physV1.x, physV1.y, physV1.z);
+  }
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  physQ1.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  physEuler.setFromQuaternion(physQ1, 'YXZ');
+  physQ1.setFromAxisAngle(physUp, physEuler.y);
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  b.position.y = physSurfaceY(b.position.x, b.position.z) + prop.originY;
+  physSyncBodyTransform(b);
+  b.type = CANNON.Body.STATIC;
+  b.updateMassProperties();
+  b.collisionResponse = false;
+  b.sleep();
+  prop.frozen = true;
+  prop.settled = true;
+
+  prop.mesh.position.set(b.position.x, b.position.y, b.position.z);
+  prop.mesh.quaternion.copy(physQ1);
+  prop.mesh.scale.setScalar(1);
+
+  // The task reads "make SOMEONE spill their flat white" — an unowned cup on a
+  // bench is a sandbox toy, not social mischief — and the capybara has to be
+  // the cause. Decided BEFORE the emit below: npc.js's 'prop:impact' handler
+  // clears prop.owner/stolenFrom when the victim reacts, which used to erase
+  // the evidence a frame before it was read.
+  const earnedSpill = prop.type === 'coffee' && (prop.owner || prop.stolenFrom) &&
+                      physCausedByCapy(prop, physCAUSE_SPILL);
+
+  physImpactPayload.prop = prop;
+  physImpactPayload.speed = 0;
+  physImpactPayload.position.set(b.position.x, b.position.y, b.position.z);
+  physGame.events.emit('prop:impact', physImpactPayload);
+  physSfxOpts.volume = 0.8;
+  physGame.sfx(def.spillSfx || 'splash', physSfxOpts);
+  physDust3(b.position.x, b.position.y - prop.originY + 0.12, b.position.z, 5);
+  if (earnedSpill) physTask('coffee-spill');
+  // A burst sack throws its harvest across the drying patio.
+  if (prop.type === 'coffeesack') {
+    physThrowShards(b.position.x, b.position.y + 0.15, b.position.z, 6, 1);
+    physSfxOpts.volume = 0.55;
+    physGame.sfx('hiss', physSfxOpts);
+    physGame.shake(0.22);
+    if (physCausedByCapy(prop, physCAUSE_SPILL)) physTask('coffee-scatter');
+  }
+  prop.owner = null;
+}
+
+function physCheckTip(prop) {
+  const b = prop.body;
+  physQ1.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  physV1.set(0, 1, 0).applyQuaternion(physQ1);
+  if (physV1.y > physTIP_COS) return;
+  prop.tipped = true;
+  const n = randInt(4, 6);
+  for (let i = 0; i < n; i++) {
+    physSpawnRubbish(
+      b.position.x + rand(-0.35, 0.35),
+      b.position.y + 0.3 + rand(0, 0.3),
+      b.position.z + rand(-0.35, 0.35)
+    );
+  }
+  physDust3(b.position.x, 0.15, b.position.z, 6);
+  physSfxOpts.volume = 0.9;
+  physGame.sfx('rustle', physSfxOpts);
+  physGame.shake(0.3);
+  // A bin that a tourist blunders into still spills its rubbish — but only the
+  // capybara can tick the checklist, and only if it hit the thing just now.
+  if (physCausedByCapy(prop, physCAUSE_TIP)) physTask('bin-chicken');
+}
+
+function physOnDig(payload) {
+  const p = payload && payload.position;
+  if (!p) return;
+  const arr = physGame.props;
+  let best = null;
+  let bestD = 2.4 * 2.4;
+  for (let i = 0; i < arr.length; i++) {
+    const prop = arr[i];
+    if (prop.type !== 'flower' || !prop.planted) continue;
+    const b = prop.body.position;
+    const dx = b.x - p.x;
+    const dz = b.z - p.z;
+    const d = dx * dx + dz * dz;
+    if (d < bestD) { bestD = d; best = prop; }
+  }
+  physDust3(p.x, 0.12, p.z, 5);
+  if (!best) return;
+  best.planted = false;
+  best.grabbable = true;
+  best.frozen = false;
+  physStampTouch(best);   // the dig is a player action by definition
+  const b = best.body;
+  b.type = CANNON.Body.DYNAMIC;
+  b.updateMassProperties();
+  b.wakeUp();
+  b.position.y += 0.12;
+  physSyncBodyTransform(b);   // hand-lifted out of the soil: no smear from below
+  best.settled = false;
+  b.velocity.set(rand(-0.6, 0.6), 2.4, rand(-0.6, 0.6));
+  b.angularVelocity.set(rand(-2, 2), rand(-2, 2), rand(-2, 2));
+  physDust3(b.position.x, 0.15, b.position.z, 6);
+  physSfxOpts.volume = 0.85;
+  physGame.sfx('rustle', physSfxOpts);
+  physTask('dig-flower');
+}
+
+function physTask(id) {
+  for (let i = 0; i < TASKS.length; i++) {
+    if (TASKS[i].id === id) { physGame.completeTask(id); return; }
+  }
+}
+
+// ===========================================================================
+// 6. WATER
+// ===========================================================================
+/**
+ * THE LIVE BIOME'S API — the same resolution rule capybara.js uses.
+ * Every water and terrain question below asks the biome the player is actually
+ * standing in. game.env (Sydney) answers only when Sydney is live; it stays
+ * resident abroad and its isOverWater says yes to everything north of z = -10,
+ * which is a volcano in Pasto and a basilica in Venice.
+ */
+function physBiomeApi() {
+  const bm = physGame && physGame.biome;
+  const n = bm && bm.current;
+  if (!n) return physGame ? physGame.env : null;
+  return n === 'sydney' ? physGame.env : (physGame[n] || null);
+}
+function physWaterLevel() {
+  const api = physBiomeApi();
+  return api && typeof api.waterLevel === 'number' && api.waterLevel === api.waterLevel
+    ? api.waterLevel : physWATER_FALLBACK;
+}
+function physOverWater(x, z) {
+  const api = physBiomeApi();
+  if (api && typeof api.isOverWater === 'function') return !!api.isOverWater(x, z);
+  return false;                       // a biome with no water publishes nothing
+}
+/** Surface height of the live biome's water at (x, z) — swell included, if modelled. */
+function physWaterHeightAt(x, z) {
+  const api = physBiomeApi();
+  if (api && typeof api.waterHeightAt === 'function') {
+    const h = api.waterHeightAt(x, z);
+    if (typeof h === 'number' && h === h) return h;
+  }
+  return physWaterLevel();
+}
+/** Terrain height under (x, z) in the live biome, or NaN where none is published. */
+function physTerrainAt(x, z) {
+  const api = physBiomeApi();
+  if (api && typeof api.terrainHeight === 'function') {
+    const h = api.terrainHeight(x, z);
+    if (typeof h === 'number' && h === h) return h;
+  }
+  return NaN;
+}
+/** The live biome's water current at (x, z) — {x, z}, zeros where none flows. */
+const physFlowOut = { x: 0, z: 0 };
+function physFlowAt(x, z) {
+  physFlowOut.x = 0; physFlowOut.z = 0;
+  const api = physBiomeApi();
+  if (api && typeof api.flow === 'function') {
+    const f = api.flow(x, z);
+    if (f) {
+      if (typeof f.x === 'number' && f.x === f.x) physFlowOut.x = clamp(f.x, -12, 12);
+      if (typeof f.z === 'number' && f.z === f.z) physFlowOut.z = clamp(f.z, -12, 12);
+    }
+  }
+  return physFlowOut;
+}
+/** The live biome's wind — {x, z}, zeros in still air. Cached once per frame. */
+const physWindOut = { x: 0, z: 0 };
+let physWindTick = -1;
+function physWindNow() {
+  const t = physGame.state ? physGame.state.time : 0;
+  if (t === physWindTick) return physWindOut;
+  physWindTick = t;
+  physWindOut.x = 0; physWindOut.z = 0;
+  const api = physBiomeApi();
+  if (api && typeof api.wind === 'function') {
+    const w = api.wind();
+    if (w) {
+      if (typeof w.x === 'number' && w.x === w.x) physWindOut.x = clamp(w.x, -12, 12);
+      if (typeof w.z === 'number' && w.z === w.z) physWindOut.z = clamp(w.z, -12, 12);
+    }
+  }
+  return physWindOut;
+}
+
+/** Splash, foam and the one-shot 'prop:water'. Idempotent: guarded by inWater. */
+function physEnterWater(prop) {
+  const b = prop.body;
+  prop.inWater = true;
+  prop.sunk = false;
+  // Cannon's own damping is left mild — the drag below is what actually thickens
+  // the water — but a little of it keeps the explicit integration well behaved.
+  b.linearDamping = 0.35;
+  b.angularDamping = 0.72;
+  b.allowSleep = false;      // floating props must keep integrating, forever
+  // Weight has to be audible AND visible. The sfx goes FIRST: listeners of
+  // 'prop:water' may fire their own unweighted splash, and whoever gets in
+  // first claims the mixer's throttle slot for this frame.
+  const sp = prop.splash;
+  const mw = 0.6 + clamp(prop.mass * 0.25, 0, 1);   // 0.6 (ticket) .. 1.6 (bin)
+  physSfxOpts.volume = clamp(0.34 + prop.mass * 0.1 * sp, 0.34, 1);
+  physGame.sfx('splash', physSfxOpts);
+  physWaterPayload.prop = prop;
+  physGame.events.emit('prop:water', physWaterPayload);
+  physFoamRing(b.position.x, b.position.z, 0.9 * sp * mw);
+  physFoamRing(b.position.x, b.position.z, 1.8 * sp * mw);
+  physFoamRing(b.position.x, b.position.z, 2.6 * sp * mw);
+  if (sp * mw > 1.2) physGame.shake(clamp(0.1 * sp * mw, 0, 0.32));
+  // Same causation rule as everywhere else: something that rolls into the
+  // harbour by itself is scenery, not mischief.
+  const earned = physCausedByCapy(prop, physCAUSE_WATER);
+  if (prop.type === 'ball' && earned) physTask('ball-harbour');
+  if (prop.type === 'hat' && prop.wasStolen && earned) physTask('hat-harbour');
+}
+
+/**
+ * A prop that has sunk past the harbour floor. Park it on the bottom and let it
+ * sleep — a body falling forever under the map costs the solver real money.
+ */
+function physRestOnSeabed(prop, floorY) {
+  const b = prop.body;
+  b.position.y = floorY + prop.originY;
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.force.set(0, 0, 0);
+  b.torque.set(0, 0, 0);
+  physSyncBodyTransform(b);
+  prop.sunk = true;
+  prop.settled = false;
+  b.allowSleep = true;
+  b.sleep();
+}
+
+/**
+ * Buoyancy, done as forces rather than as velocity fiddling.
+ *
+ *   F = rho * g * displacedVolume
+ *
+ * `rho` is baked per prop at spawn from its designed waterline (`float`), so a
+ * fully submerged prop gets weight/float of lift and equilibrium lands exactly
+ * where the type table asked for it. Nothing here writes a velocity or a
+ * position, which is why props bob and settle instead of popping like corks:
+ * gravity never stops pulling, the lift ramps with depth, and drag eats the
+ * overshoot. A prop with float > 1 (the tourist's camera) can never displace
+ * its own weight — it sinks, slowly, because the same drag holds it back.
+ *
+ * The lift is applied at the centre of BUOYANCY — a point below the centre of
+ * mass in the prop's own frame — so a tilted prop gets a righting torque for
+ * free, and the drift keeps it turning lazily on the swell.
+ */
+function physCheckWater(prop, dt) {
+  const b = prop.body;
+  const wl = physWaterHeightAt(b.position.x, b.position.z);
+  const over = physOverWater(b.position.x, b.position.z);
+  // Threshold scales with the prop so a tall sign does not flicker in and out
+  // of buoyancy as it bobs: "base is 0.3m clear of the surface".
+  if (!over || b.position.y > wl + prop.originY + 0.3) {
+    if (!over && prop.inWater) {
+      prop.inWater = false;
+      physDryOut(prop);
+    }
+    return;
+  }
+  if (!prop.inWater) physEnterWater(prop);
+
+  // The seabed is the terrain where the biome publishes one — Palawan's sand is
+  // eleven metres down and Venice's is the paving of the square — and the old
+  // harbour constant everywhere else.
+  let floorY = wl - physSEABED;
+  const terr = physTerrainAt(b.position.x, b.position.z);
+  if (terr === terr && terr < wl - 0.2) floorY = terr;
+  if (b.position.y - prop.originY < floorY) { physRestOnSeabed(prop, floorY); return; }
+  prop.sunk = false;                           // shoved back off the bottom
+
+  // The ramp from "just touching" to "fully under" is the prop's OWN height.
+  // A fixed floor here would silently deepen every thin prop's equilibrium
+  // (depth = floatFrac * span) until it settled under an opaque water plane.
+  const span = prop.originY * 2 > physBUOY_SPAN_MIN ? prop.originY * 2 : physBUOY_SPAN_MIN;
+  const sub = clamp((wl - (b.position.y - prop.originY)) / span, 0, 1);
+  if (sub <= 0) return;
+
+  const g = -physGame.world.gravity.y;
+  const w = prop.mass * g;
+  const t = physGame.state ? physGame.state.time : 0;
+
+  // ---- Archimedes ----------------------------------------------------------
+  let lift = prop.rho * g * (prop.vol * sub);
+  const cap = physBUOY_CLAMP * w;
+  if (lift > cap) lift = cap;                  // no catapults out of the harbour
+  lift += w * physBUOY_SWELL * sub * Math.sin(t * 1.7 + prop.id);
+  b.force.y += lift;
+
+  // ---- linear drag + a lazy surface current -------------------------------
+  const kl = physBUOY_DRAG_L * sub * prop.mass;
+  b.force.x += Math.sin(t * 0.31 + prop.id * 1.7) * physBUOY_DRIFT * prop.mass * sub
+             - b.velocity.x * kl;
+  b.force.y -= b.velocity.y * kl;
+  b.force.z += Math.cos(t * 0.23 + prop.id * 2.3) * physBUOY_DRIFT * prop.mass * sub
+             - b.velocity.z * kl;
+
+  // ---- righting + angular drag + a lazy turn on the swell -----------------
+  // Every torque is scaled by the body's OWN inertia, so these constants are an
+  // angular-acceleration budget rather than a torque: a 60g ferry ticket and a
+  // 9kg bin turn over at the same rate, and the thin light props cannot be
+  // flung into a stiff-spring oscillation by a lever they have no inertia for.
+  physQ1.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  physV1.set(0, 1, 0).applyQuaternion(physQ1);
+  physV2.crossVectors(physV1, physUp);         // roll-upright axis, |v| = sin(tilt)
+  const ka = physBUOY_DRAG_A * sub;
+  const kr = physBUOY_RIGHT * sub;
+  const inr = b.inertia;
+  b.torque.x += inr.x * (kr * physV2.x - ka * b.angularVelocity.x);
+  b.torque.y += inr.y * (kr * physV2.y - ka * b.angularVelocity.y +
+                         physBUOY_SPIN * sub * Math.sin(t * 0.4 + prop.id));
+  b.torque.z += inr.z * (kr * physV2.z - ka * b.angularVelocity.z);
+}
+
+// ===========================================================================
+// 7. PARTICLES (pooled, preallocated)
+// ===========================================================================
+function physInitParticles() {
+  physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), mat(PALETTE.soil), physDUST_MAX);
+  physDust.frustumCulled = false;
+  physDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  physGame.scene.add(physDust);
+
+  const ring = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
+  physFoam = new THREE.InstancedMesh(
+    ring,
+    mat(PALETTE.foam, { transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }),
+    physFOAM_MAX
+  );
+  physFoam.frustumCulled = false;
+  physFoam.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  physGame.scene.add(physFoam);
+
+  for (let i = 0; i < physDUST_MAX; i++) physDustLife[i] = 0;
+  for (let i = 0; i < physFOAM_MAX; i++) physFoamLife[i] = 0;
+  physWriteDust();
+  physWriteFoam();
+}
+
+function physDust3(x, y, z, count) {
+  // The dust pool was built while Sydney was capturing, so it is a Sydney object
+  // and is invisible in the Andes. Route every scuff there to the Pasto puff pool
+  // instead, so one call site serves both biomes.
+  if (physPuffMesh && physPastoLive()) { physPuff3(x, y, z, count); return; }
+  const n = count || 4;
+  for (let k = 0; k < n; k++) {
+    const i = physDustHead;
+    physDustHead = (physDustHead + 1) % physDUST_MAX;
+    physDustPos[i * 3] = x + rand(-0.16, 0.16);
+    physDustPos[i * 3 + 1] = y + rand(0.02, 0.2);
+    physDustPos[i * 3 + 2] = z + rand(-0.16, 0.16);
+    physDustVel[i * 3] = rand(-1.6, 1.6);
+    physDustVel[i * 3 + 1] = rand(1.4, 3.4);
+    physDustVel[i * 3 + 2] = rand(-1.6, 1.6);
+    physDustLife[i] = rand(0.4, 0.8);
+  }
+  physDustDirty = true;
+}
+
+function physFoamRing(x, z, delay) {
+  const i = physFoamHead;
+  physFoamHead = (physFoamHead + 1) % physFOAM_MAX;
+  physFoamPos[i * 3] = x;
+  // The swell is ±0.18m and the water mesh is opaque, so a ring pinned to the
+  // flat waterLevel spends a third of its life behind the surface. Ride the
+  // actual wave here, and keep re-sampling it in physParticleUpdate.
+  physFoamPos[i * 3 + 1] = physWaterHeightAt(x, z) + 0.06;
+  physFoamPos[i * 3 + 2] = z;
+  physFoamLife[i] = 0.9 + (delay || 0) * 0.12;
+  physFoamMax[i] = 0.9 + (delay || 0) * 0.55;
+  physFoamDirty = true;
+}
+
+function physWriteDust() {
+  for (let i = 0; i < physDUST_MAX; i++) {
+    if (physDustLife[i] > 0) {
+      const s = clamp(physDustLife[i] * 1.6, 0.12, 1);
+      physV1.set(physDustPos[i * 3], physDustPos[i * 3 + 1], physDustPos[i * 3 + 2]);
+      physQ1.setFromAxisAngle(physUp, physDustLife[i] * 6);
+      physV2.set(s, s, s);
+      physM4.compose(physV1, physQ1, physV2);
+    } else {
+      physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+    }
+    physDust.setMatrixAt(i, physM4);
+  }
+  physDust.instanceMatrix.needsUpdate = true;
+}
+
+function physWriteFoam() {
+  for (let i = 0; i < physFOAM_MAX; i++) {
+    if (physFoamLife[i] > 0 && physFoamLife[i] <= 0.9) {
+      const t = 1 - physFoamLife[i] / 0.9;
+      const r = lerp(0.35, physFoamMax[i], t);
+      physV1.set(physFoamPos[i * 3], physFoamPos[i * 3 + 1], physFoamPos[i * 3 + 2]);
+      physV2.set(r, 1, r);
+      physM4.compose(physV1, physQ2.identity(), physV2);
+    } else {
+      physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+    }
+    physFoam.setMatrixAt(i, physM4);
+  }
+  physFoam.instanceMatrix.needsUpdate = true;
+}
+
+function physParticleUpdate(dt) {
+  let anyDust = false;
+  for (let i = 0; i < physDUST_MAX; i++) {
+    if (physDustLife[i] <= 0) continue;
+    anyDust = true;
+    physDustLife[i] -= dt;
+    physDustVel[i * 3 + 1] -= 9 * dt;
+    physDustPos[i * 3] += physDustVel[i * 3] * dt;
+    physDustPos[i * 3 + 1] += physDustVel[i * 3 + 1] * dt;
+    physDustPos[i * 3 + 2] += physDustVel[i * 3 + 2] * dt;
+    if (physDustPos[i * 3 + 1] < 0.04) {
+      physDustPos[i * 3 + 1] = 0.04;
+      physDustVel[i * 3 + 1] *= -0.24;
+      physDustVel[i * 3] *= 0.5;
+      physDustVel[i * 3 + 2] *= 0.5;
+    }
+    if (physDustLife[i] <= 0) physDustLife[i] = 0;
+  }
+  if (anyDust || physDustDirty) { physWriteDust(); physDustDirty = anyDust; }
+
+  let anyFoam = false;
+  for (let i = 0; i < physFOAM_MAX; i++) {
+    if (physFoamLife[i] <= 0) continue;
+    anyFoam = true;
+    physFoamLife[i] -= dt;
+    // a ring lives ~1s; the swell moves under it the whole time
+    physFoamPos[i * 3 + 1] = physWaterHeightAt(physFoamPos[i * 3], physFoamPos[i * 3 + 2]) + 0.06;
+    if (physFoamLife[i] <= 0) physFoamLife[i] = 0;
+  }
+  if (anyFoam || physFoamDirty) { physWriteFoam(); physFoamDirty = anyFoam; }
+}
+
+// ===========================================================================
+// 8. RUBBISH POOL (bin chicken payload)
+// ===========================================================================
+function physBuildRubbishGeo(kind) {
+  const g = new THREE.Group();
+  if (kind === 0) {
+    physAdd(g, new THREE.TetrahedronGeometry(0.14), PALETTE.cloth6, 0, 0.12, 0);
+    physAdd(g, new THREE.TetrahedronGeometry(0.11), PALETTE.plastic, 0.06, 0.16, 0.04, 0.6, 0.4, 0);
+  } else if (kind === 1) {
+    physAdd(g, physCylG(0.08, 0.08, 0.22), PALETTE.metal, 0, 0.11, 0);
+    physAdd(g, physCylG(0.085, 0.085, 0.05), PALETTE.binRed, 0, 0.11, 0);
+  } else {
+    physAdd(g, physBoxG(0.06, 0.03, 0.24), PALETTE.petalYellow, 0, 0.03, 0, 0, 0, 0.1);
+    physAdd(g, physBoxG(0.06, 0.03, 0.22), PALETTE.petalYellow, 0.05, 0.04, 0.02, 0, 0.9, -0.1);
+    physAdd(g, physBoxG(0.06, 0.03, 0.2), PALETTE.petalYellow, -0.05, 0.04, -0.02, 0, -1.1, 0.1);
+  }
+  return physFlatten(g, 0.1);
+}
+
+/**
+ * Litter is BODY-FREE. It used to be physRUBBISH_MAX real CANNON bodies added
+ * to the world on demand, which meant four tipped bins pushed Sydney from 135
+ * live bodies to a measured 153 — 23 over CONTRACT.md's hard budget of 130, and
+ * spent entirely on chip packets nobody interacts with. They are now integrated
+ * here: gravity, a bounce off physSurfaceY, tumble, friction, sleep. From the
+ * 35° camera it is indistinguishable, it collides with nothing (litter never
+ * usefully did), and it costs the solver and the budget exactly zero.
+ */
+function physInitRubbish() {
+  const geos = [physBuildRubbishGeo(0), physBuildRubbishGeo(1), physBuildRubbishGeo(2)];
+  for (let i = 0; i < physRUBBISH_MAX; i++) {
+    const mesh = new THREE.Mesh(geos[i % 3], physPropMat);
+    mesh.castShadow = true;
+    mesh.visible = false;
+    physGame.scene.add(mesh);
+    physRubbish.push({
+      mesh, active: false, life: 0, rest: false, biome: 'sydney',
+      x: 0, y: -900, z: 0, vx: 0, vy: 0, vz: 0,
+      rx: 0, ry: 0, rz: 0, sx: 0, sy: 0, sz: 0,
+    });
+  }
+}
+
+function physSpawnRubbish(x, y, z) {
+  let slot = null;
+  let oldest = 1e9;
+  for (let i = 0; i < physRubbish.length; i++) {
+    const r = physRubbish[i];
+    if (!r.active) { slot = r; break; }
+    if (r.life < oldest) { oldest = r.life; slot = r; }
+  }
+  if (!slot) return;
+  slot.active = true;
+  slot.rest = false;
+  slot.biome = physLiveBiome();
+  slot.life = 26;
+  slot.mesh.visible = true;
+  slot.mesh.scale.setScalar(1);
+  slot.x = x; slot.y = y; slot.z = z;
+  slot.vx = rand(-3.2, 3.2); slot.vy = rand(1.6, 4.2); slot.vz = rand(-3.2, 3.2);
+  slot.rx = rand(0, 6.283); slot.ry = rand(0, 6.283); slot.rz = rand(0, 6.283);
+  slot.sx = rand(-8, 8); slot.sy = rand(-8, 8); slot.sz = rand(-8, 8);
+  slot.mesh.position.set(x, y, z);
+  slot.mesh.rotation.set(slot.rx, slot.ry, slot.rz);
+}
+
+const physRUB_G = 24;            // matches the world gravity in main.js
+const physRUB_BOUNCE = 0.34;
+const physRUB_SKID = 0.55;       // horizontal speed kept through a bounce
+const physRUB_REST_V = 0.55;     // m/s below which a grounded scrap gives up
+
+function physRubbishUpdate(dt, live) {
+  for (let i = 0; i < physRubbish.length; i++) {
+    const r = physRubbish[i];
+    if (!r.active) continue;
+    if (r.biome !== live) continue;    // frozen with its biome, not aged out unseen
+    r.life -= dt;
+    if (r.life <= 0 || r.y < -14) {
+      r.active = false;
+      r.rest = false;
+      r.mesh.visible = false;
+      r.mesh.scale.setScalar(1);
+      r.y = -900;
+      continue;
+    }
+    // shrink away over the last 0.8s instead of blinking out of existence
+    if (r.life < 0.8) r.mesh.scale.setScalar(clamp(r.life / 0.8, 0.02, 1));
+    if (r.rest) continue;              // settled: nothing left to integrate
+
+    r.vy -= physRUB_G * dt;
+    r.x += r.vx * dt;
+    r.y += r.vy * dt;
+    r.z += r.vz * dt;
+    const floor = physSurfaceY(r.x, r.z) + 0.1;
+    if (r.y <= floor) {
+      r.y = floor;
+      if (r.vy < -physRUB_REST_V) {
+        r.vy = -r.vy * physRUB_BOUNCE;
+        r.vx *= physRUB_SKID;
+        r.vz *= physRUB_SKID;
+        r.sx *= physRUB_SKID; r.sy *= physRUB_SKID; r.sz *= physRUB_SKID;
+      } else {
+        r.vy = 0;
+        // ground friction, frame-rate independent
+        const k = Math.exp(-7 * dt);
+        r.vx *= k; r.vz *= k;
+        r.sx *= k; r.sy *= k; r.sz *= k;
+        if (r.vx * r.vx + r.vz * r.vz < 0.02 && Math.abs(r.sx) + Math.abs(r.sz) < 0.5) {
+          r.rest = true;
+          // lie flat where it stopped, the way a dropped wrapper does
+          r.rx = 0; r.rz = 0;
+          r.mesh.position.set(r.x, r.y - 0.06, r.z);
+          r.mesh.rotation.set(0, r.ry, 0);
+          continue;
+        }
+      }
+    }
+    r.rx += r.sx * dt;
+    r.ry += r.sy * dt;
+    r.rz += r.sz * dt;
+    r.mesh.position.set(r.x, r.y, r.z);
+    r.mesh.rotation.set(r.rx, r.ry, r.rz);
+  }
+}
+
+// ===========================================================================
+// 8b. PASTO — ANDEAN PROPS, MARKET STALLS, THE CRATER (chapter 2)
+//
+// Everything in this section is built lazily on the first 'biome:enter' for
+// 'pasto' and is therefore auto-tagged to that biome: Sydney pays nothing for
+// it, and the Andes pay nothing for Sydney's harbour code (see physPastoLive,
+// which gates every water path).
+//
+// The stall contract (pasto.js owns the record, props.js owns the physics).
+// EVERY field is optional and typeof-guarded, because pasto.js is being built
+// concurrently and may publish `stalls` a frame — or a round — after we look:
+//
+//   game.pasto.stalls[i] = {
+//     x, z, y, yaw, radius, tableY,      // numbers; sensible fallbacks below
+//     bodies: [CANNON.Body],             // frame: posts, table, awning
+//     supports: [CANNON.Body],           // alternative name for the same thing
+//     parts: [{ body, mesh }],           // pairing, if the frame is mesh-backed
+//     awning: CANNON.Body,               // flops DOWN rather than out
+//     collapsed: bool,                   // props.js mirrors its own state here
+//     collapse(opts)                     // INSTALLED HERE if pasto.js leaves it
+//   }
+// ===========================================================================
+function physNum(v, d) { return typeof v === 'number' && v === v ? v : d; }
+
+// Fallback stall ring, straight off CONTRACT.md's Pasto layout table
+// (market stalls x [-26, 26], z [10, 30]). Used only until pasto.js publishes.
+const physPASTO_STALLS = [
+  [-19, 13], [-7, 12], [7, 12], [19, 13], [-19, 27], [19, 27],
+];
+// What each stall sells, cycled. Three items per table keeps the produce
+// readable from above and the body count honest.
+const physSTALL_MENU = [
+  ['empanada', 'empanada', 'arepa'],
+  ['maiz', 'plantain', 'arepa'],
+  ['cuencobowl', 'empanada', 'maiz'],
+  ['ruana', 'sombrero', 'cuencobowl'],
+  ['plantain', 'maiz', 'empanada'],
+  ['sombrero', 'ruana', 'arepa'],
+];
+// The coffee drying patio, laid out around one anchor point on the terraces.
+const physPATIO = [
+  ['coffeesack', -1.2, -0.9], ['coffeesack', 0.5, -1.3], ['coffeesack', 1.6, 0.4],
+  ['coffeesack', -0.4, 1.2], ['cuencobowl', 2.4, -0.6], ['arepa', -2.1, 0.3],
+];
+
+function physOnBiomeEnter(e) {
+  // A prop carried through the departures board cannot be released abroad: its
+  // body was removed from the world with its home biome, so physRelease would
+  // leave it dynamic-but-unsimulated and invisible (its instance slot lives in
+  // the home biome's InstancedMesh) — a task soft-lock. Customs are strict:
+  // travel empties the mouth and the prop goes home, whole.
+  const capy = physGame && physGame.capy;
+  const held = capy && capy.heldProp;
+  if (held && e && held.biome && held.biome !== e.name) {
+    const b = held.body;
+    if (held.mesh) {
+      // Raw add, not the patched scene.add: the capture tag is already the NEW
+      // biome, and this mesh must not be claimed by it — it is going home.
+      THREE.Object3D.prototype.add.call(physGame.scene, held.mesh);
+      held.mesh.scale.setScalar(1);
+    }
+    b.type = CANNON.Body.DYNAMIC;
+    b.updateMassProperties();
+    b.collisionResponse = true;
+    b.collisionFilterMask = -1;
+    b.allowSleep = true;
+    held.held = false;
+    held.owner = null;
+    capy.heldProp = null;
+    physSetSolo(held, false);
+    physRescue(held);
+  }
+  if (!e) return;
+  if (e.name !== 'pasto') { physScatterBiome(e.name); return; }
+  physBindStalls();
+  if (physPastoBuilt) return;
+  physPastoBuilt = true;
+  physInitPuff();
+  physInitShards();
+  physScatterPasto();
+}
+
+// ---- stall binding --------------------------------------------------------
+function physCollectStallBodies(s, rec) {
+  const seen = rec.bodies;
+  const awn = rec.awn;
+  const meshes = rec.meshes;
+  const take = function (b, m, isAwning) {
+    if (!b || typeof b.addShape !== 'function') return;
+    if (seen.indexOf(b) >= 0) return;
+    seen.push(b);
+    awn.push(!!isAwning);
+    meshes.push(m && m.isObject3D ? m : (b.mesh && b.mesh.isObject3D ? b.mesh : null));
+  };
+  const awning = s.awning || s.awningBody || s.canopy || null;
+  if (Array.isArray(s.parts)) {
+    for (let i = 0; i < s.parts.length; i++) {
+      const p = s.parts[i];
+      if (p) take(p.body, p.mesh, p.awning || p.body === awning);
+    }
+  }
+  if (Array.isArray(s.bodies)) for (let i = 0; i < s.bodies.length; i++) take(s.bodies[i], null, s.bodies[i] === awning);
+  if (Array.isArray(s.supports)) for (let i = 0; i < s.supports.length; i++) take(s.supports[i], null, false);
+  // pasto.js pairs the awning frame's mesh with the awning body and drives it
+  // from the body only WHILE `collapsed` is set — so props.js takes the same
+  // pairing, and can put the mesh back on its rest transform when it re-sleeps
+  // the stall (at which point pasto.js has stopped looking at it).
+  if (awning) take(awning, s.awningMesh || s.mesh, true);
+}
+
+function physBindStall(s, idx) {
+  const fb = physPASTO_STALLS[idx % physPASTO_STALLS.length];
+  const pos = s && s.position && typeof s.position.x === 'number' ? s.position : null;
+  const grp = s && s.group && s.group.position ? s.group.position : null;
+  const x = physNum(s && s.x, physNum(pos && pos.x, physNum(grp && grp.x, fb[0])));
+  const z = physNum(s && s.z, physNum(pos && pos.z, physNum(grp && grp.z, fb[1])));
+  const ground = physSurfaceY(x, z);
+  const rec = {
+    stall: s,
+    x, z,
+    y: physNum(s && s.y, physNum(pos && pos.y, ground)),
+    yaw: physNum(s && s.yaw, physNum(s && s.rotation, 0)),
+    radius: physNum(s && s.radius, physSTALL_R),
+    tableY: physNum(s && s.tableY, physNum(s && s.tableTop, ground + 0.95)),
+    bodies: [], awn: [], meshes: [],
+    rest: null, mass0: null, type0: null,
+    collapsed: false, inCollapse: false, prevCollapse: null,
+    onHit: null,
+    // A collide callback fires from inside world.step. Flipping bodies from
+    // static to dynamic there would mutate the solver mid-solve, so the hit is
+    // recorded and the collapse runs at the top of the next physPastoUpdate.
+    pending: false, pdx: 0, pdz: 1, pf: 1,
+  };
+  if (s) {
+    physCollectStallBodies(s, rec);
+    const n = rec.bodies.length;
+    rec.rest = new Float32Array(n * 7);
+    rec.mass0 = new Float32Array(n);
+    rec.type0 = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      const b = rec.bodies[i];
+      const o = i * 7;
+      rec.rest[o] = b.position.x; rec.rest[o + 1] = b.position.y; rec.rest[o + 2] = b.position.z;
+      rec.rest[o + 3] = b.quaternion.x; rec.rest[o + 4] = b.quaternion.y;
+      rec.rest[o + 5] = b.quaternion.z; rec.rest[o + 6] = b.quaternion.w;
+      rec.mass0[i] = b.mass;
+      rec.type0[i] = b.type;
+    }
+    if (n) {
+      rec.onHit = function (e) { physStallHit(rec, e); };
+      for (let i = 0; i < n; i++) rec.bodies[i].addEventListener('collide', rec.onHit);
+    }
+    // Publish the physics behind stalls[i].collapse(). If pasto.js authored its
+    // own (a visual flourish, say) it is kept and called after the impulses.
+    rec.prevCollapse = typeof s.collapse === 'function' ? s.collapse : null;
+    s.collapse = function (opts) {
+      physStallCollapse(rec,
+        physNum(opts && opts.dx, 0), physNum(opts && opts.dz, 1),
+        physNum(opts && opts.force, 1));
+    };
+  }
+  return rec;
+}
+
+/** Idempotent: binds any stall pasto.js has published that we have not seen. */
+function physBindStalls() {
+  const p = physGame.pasto;
+  const list = p && Array.isArray(p.stalls) ? p.stalls : null;
+  if (!list) return false;
+  let added = false;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
+    if (!s || typeof s !== 'object' || physStallSeen.has(s)) continue;
+    physStallSeen.add(s);
+    physStalls.push(physBindStall(s, physStalls.length));
+    added = true;
+  }
+  return added;
+}
+
+/** No stalls published yet — lay the market out from the contract table. */
+function physFallbackStalls() {
+  for (let i = 0; i < physPASTO_STALLS.length; i++) physStalls.push(physBindStall(null, i));
+}
+
+// ---- the collapse ---------------------------------------------------------
+/** Lowest point of a body's shapes, in world y. Yaw does not change it. */
+function physBodyBottom(b) {
+  let lo = 0;
+  for (let i = 0; i < b.shapes.length; i++) {
+    const s = b.shapes[i];
+    const o = b.shapeOffsets[i];
+    const hy = s.halfExtents ? s.halfExtents.y
+      : (typeof s.radius === 'number' ? s.radius : (s.boundingSphereRadius || 0));
+    const y = o.y - hy;
+    if (i === 0 || y < lo) lo = y;
+  }
+  return b.position.y + lo;
+}
+
+/**
+ * A stall frame is authored STANDING IN its own counter: the awning posts run
+ * from the ground up through the market's merged table collider. While that
+ * overlap exists the solver clamps the body and no impulse can tip it — the
+ * frame just sits there being barged. So the instant it goes dynamic it is
+ * lifted clear of the counter, once, and from there the fall is entirely
+ * physics: gravity, the tipping impulse and whatever it lands on.
+ *
+ * A hand write to body.position MUST drag previousPosition / interpolatedPosition
+ * with it (physSyncBodyTransform) or the renderer smears it in from the old spot.
+ */
+function physUnwedge(rec, b) {
+  const clear = rec.tableY + 0.08;
+  const bottom = physBodyBottom(b);
+  if (bottom >= clear) return 0;
+  const want = clear - bottom;
+  const lift = want < physUNWEDGE_MAX ? want : physUNWEDGE_MAX;
+  b.position.y += lift;
+  physSyncBodyTransform(b);
+  return lift;
+}
+
+/**
+ * Tipping a four-legged awning frame.
+ *
+ * Measured: pasto.js's frame is four 2.7 m posts at (±1.5, ±0.9) carrying a
+ * 3.5 x 2.2 m canopy — a 16 kg body standing on a 3 x 1.8 m footprint with all
+ * four feet flat on the cobbles (32 live contact points, traced). Every torque
+ * you can apply to a body in that state is eaten by the contact solver: a spin
+ * about its own centre of mass drives the leading legs into the ground, and the
+ * trace showed 4.4 rad/s collapsing to 0.1 within two frames. Rotating about
+ * the far row of feet instead (v = ω × r about the pivot edge) was measured
+ * too, and dies the same way.
+ *
+ * What works is getting the posts out of the COUNTER they are standing inside.
+ * Swept the hoist against a measured tip: at +0.45 m and +0.8 m the spin is
+ * dead within 12 frames and the body does not even fall (0.06 m in 3 s — it is
+ * still resting on the counter collider); at +1.1 m — i.e. `tableY + 0.08`,
+ * exactly the constant physUnwedge already used — the spin survives and the
+ * frame ends flat on its side (up·y = 0.03). An upward LAUNCH instead of the
+ * hoist was tried and is eaten the same way, because the obstruction is
+ * horizontal, not underfoot. So the hoist stays; what changes is that the frame
+ * is thrown DOWN out of it rather than left to hang, and physStallCollapse
+ * fires a wide puff at the legs on the same frame to cover the jump.
+ */
+function physTipFrame(rec, b, nx, nz, f) {
+  physUnwedge(rec, b);
+  // Down, not up: the frame is already as high as it will ever be, and every
+  // extra frame it spends hanging there is a frame the player reads as a bug.
+  // -1.2 m/s buys back a third of the fall time; at physTIP_W it is still 60°
+  // past vertical before the posts touch anything, which is over the edge.
+  b.velocity.set(nx * 2.6 * f, -1.2, nz * 2.6 * f);
+  b.angularVelocity.set(nz * physTIP_W * f, rand(-1, 1), -nx * physTIP_W * f);
+}
+
+function physStallCollapse(rec, dx, dz, force) {
+  if (!rec || rec.collapsed || rec.inCollapse) return false;
+  rec.inCollapse = true;
+  // pasto.js owns the frame's own drop — the awning body's mass, its mesh sync
+  // and its own flourish — and guards on `stall.collapsed`, so its hook runs
+  // FIRST, while the flag is still clear. props.js then adds the physics that
+  // makes it a market disaster rather than a falling roof.
+  let handed = false;
+  if (rec.prevCollapse) {
+    try { handed = rec.prevCollapse.call(rec.stall, { dx: dx, dz: dz, force: force }) !== false; }
+    catch (err) { handed = false; }
+  }
+  rec.collapsed = true;
+  if (rec.stall) rec.stall.collapsed = true;
+  physCollapsed.push(rec);
+  // Never leave more than physSTALL_MAX frames loose in the solver: the oldest
+  // goes back to its exact rest transform, static and asleep.
+  while (physCollapsed.length > physSTALL_MAX) physStallRestore(physCollapsed.shift());
+
+  let nx = dx;
+  let nz = dz;
+  const l = Math.sqrt(nx * nx + nz * nz);
+  if (l > 1e-3) { nx /= l; nz /= l; } else { nx = 0; nz = 1; }
+  const f = force > 0 ? force : 1;
+
+  for (let i = 0; i < rec.bodies.length; i++) {
+    const b = rec.bodies[i];
+    const isAwn = rec.awn[i];
+    // Only promote what pasto.js left standing, and never overwrite a mass it
+    // chose for itself.
+    if (b.type !== CANNON.Body.DYNAMIC) {
+      b.type = CANNON.Body.DYNAMIC;
+      if (b.mass <= 0) b.mass = isAwn ? 12 : 5;
+      b.updateMassProperties();
+    }
+    b.collisionResponse = true;
+    b.allowSleep = true;
+    b.sleepSpeedLimit = 0.3;
+    b.sleepTimeLimit = 0.7;
+    b.linearDamping = 0.04;
+    b.angularDamping = 0.2;
+    b.wakeUp();
+    const m = b.mass > 0 ? b.mass : 1;
+    if (isAwn) {
+      physTipFrame(rec, b, nx, nz, f);
+    } else {
+      physUnwedge(rec, b);
+      physCV3.set(nx * 2.6 * f * m, 1.5 * f * m, nz * 2.6 * f * m);
+      physCV4.set(rand(-0.25, 0.25), 0.4, rand(-0.25, 0.25));
+      b.applyImpulse(physCV3, physCV4);
+      b.angularVelocity.set(rand(-3.4, 3.4), rand(-2.2, 2.2), rand(-3.4, 3.4));
+    }
+  }
+
+  physStallScatter(rec, nx, nz, f);
+
+  // The clatter. pasto.js already thuds and shakes if it handled the drop —
+  // doubling either one just flanges the sample and jolts the camera twice.
+  if (!handed) {
+    physSfxOpts.volume = 1;
+    physGame.sfx('thud', physSfxOpts);
+    physGame.shake(clamp(0.55 * f, 0.2, 0.8));
+  } else {
+    physGame.shake(clamp(0.2 * f, 0.1, 0.3));
+  }
+  physSfxOpts.volume = 0.95;
+  physGame.sfx('rustle', physSfxOpts);
+  // Wide and low, at the feet: this fires on the same frame the frame is
+  // hoisted out of its counter, and is what the eye reads instead of the jump.
+  physPuff3(rec.x, rec.y + 0.35, rec.z, 10, 2.4);
+  physTask('market-chaos');
+
+  rec.inCollapse = false;
+  return true;
+}
+
+/** Everything on (or near) the table goes flying. */
+function physStallScatter(rec, nx, nz, f) {
+  const arr = physGame.props;
+  const t = physGame.state ? physGame.state.time : 0;
+  const r = rec.radius + 1.2;
+  const r2 = r * r;
+  for (let i = 0; i < arr.length; i++) {
+    const p = arr[i];
+    if (p.removed || p.hidden || p.held || p.frozen || p.spilled) continue;
+    if (p.stall !== rec) {
+      const dx = p.body.position.x - rec.x;
+      const dz = p.body.position.z - rec.z;
+      if (dx * dx + dz * dz > r2) continue;
+    }
+    const b = p.body;
+    b.wakeUp();
+    const m = p.mass;
+    // Gravity here is 24 m/s², not 9.8. The impulses this used to apply gave
+    // 3 m/s of lift, which is a 0.19 m hop and a 0.5 m skid: measured against a
+    // screenshot, the produce simply landed back on its own table in formation.
+    // These throw an empanada 1–2 m clear of the stall, which is the joke.
+    physCV3.set(
+      (nx * 3.6 + rand(-3.0, 3.0)) * f * m,
+      rand(5.5, 8.5) * f * m,
+      (nz * 3.6 + rand(-3.0, 3.0)) * f * m
+    );
+    b.applyImpulse(physCV3);
+    b.angularVelocity.set(rand(-11, 11), rand(-11, 11), rand(-11, 11));
+    physStampTouch(p);
+    p.releaseTime = t;
+    p.settled = false;
+    if (physTYPES[p.type].spill && !p.spilled) p.spillArmed = true;
+  }
+}
+
+function physStallRestore(rec) {
+  if (!rec || !rec.collapsed) return;
+  rec.collapsed = false;
+  if (rec.stall) rec.stall.collapsed = false;
+  for (let i = 0; i < rec.bodies.length; i++) {
+    const b = rec.bodies[i];
+    const o = i * 7;
+    b.velocity.set(0, 0, 0);
+    b.angularVelocity.set(0, 0, 0);
+    b.force.set(0, 0, 0);
+    b.torque.set(0, 0, 0);
+    b.position.set(rec.rest[o], rec.rest[o + 1], rec.rest[o + 2]);
+    b.quaternion.set(rec.rest[o + 3], rec.rest[o + 4], rec.rest[o + 5], rec.rest[o + 6]);
+    physSyncBodyTransform(b);
+    b.mass = rec.mass0[i];
+    b.type = rec.type0[i];
+    b.updateMassProperties();
+    b.allowSleep = true;
+    b.sleep();
+    physStallSyncOne(rec, i, true);
+  }
+}
+
+/** Drives any mesh pasto.js paired with a frame body. No pairing, no work. */
+function physStallSyncOne(rec, i, exact) {
+  const o3d = rec.meshes[i];
+  if (!o3d) return;
+  const b = rec.bodies[i];
+  const bp = exact ? b.position : b.interpolatedPosition;
+  const bq = exact ? b.quaternion : b.interpolatedQuaternion;
+  physPV1.set(bp.x, bp.y, bp.z);
+  physPQ1.set(bq.x, bq.y, bq.z, bq.w);
+  // The body transform is world-space; the mesh may hang under pasto.js's own
+  // root, so fold it back through the parent's inverse before writing it.
+  const parent = o3d.parent;
+  if (parent && parent !== physGame.scene) {
+    parent.updateWorldMatrix(true, false);
+    physPM4.copy(parent.matrixWorld).invert();
+    physPV1.applyMatrix4(physPM4);
+    physQ2.setFromRotationMatrix(physPM4);
+    physPQ1.premultiply(physQ2);
+  }
+  o3d.position.copy(physPV1);
+  o3d.quaternion.copy(physPQ1);
+}
+
+function physStallSync(rec) {
+  for (let i = 0; i < rec.bodies.length; i++) physStallSyncOne(rec, i, false);
+}
+
+function physStallHit(rec, e) {
+  if (rec.collapsed || rec.pending) return;
+  const capy = physGame.capy;
+  if (!capy || !capy.body || !capy.position) return;
+  if (!(e.body === capy.body || physIsCapyAgent(e.body))) return;
+  const c = e.contact;
+  const sp = c ? Math.abs(c.getImpactVelocityAlongNormal()) : 0;
+  const v = capy.velocity;
+  const cs = v ? Math.sqrt(v.x * v.x + v.z * v.z) : 0;
+  if (sp < 2.8 && cs < physSTALL_BARGE) return;
+  rec.pending = true;
+  rec.pdx = rec.x - capy.position.x;
+  rec.pdz = rec.z - capy.position.z;
+  rec.pf = clamp(0.7 + cs * 0.14, 0.7, 1.6);
+}
+
+/** Public: game.physics.collapseStall(stallRecordOrIndex). */
+function physCollapseStallByRef(which) {
+  for (let i = 0; i < physStalls.length; i++) {
+    const rec = physStalls[i];
+    if (rec === which || rec.stall === which || i === which) {
+      return physStallCollapse(rec, rand(-1, 1), rand(-1, 1), 1);
+    }
+  }
+  return false;
+}
+
+/** Barge / tug detection for stalls whose frame we could not get bodies for. */
+function physStallTriggers() {
+  const capy = physGame.capy;
+  if (!capy || !capy.position) return;
+  const v = capy.velocity;
+  const sp = v ? Math.sqrt(v.x * v.x + v.z * v.z) : 0;
+  const input = physGame.input;
+  // A grab press with nothing in reach and nothing in the mouth is a tug on the
+  // awning rope — the player is clearly pulling at the stall itself.
+  const tug = !!(input && input.actionPressed) && !capy.heldProp &&
+              physNearestGrabbable(capy.position, 1.5) === null;
+  if (sp <= physSTALL_BARGE && !tug) return;
+  for (let i = 0; i < physStalls.length; i++) {
+    const rec = physStalls[i];
+    if (rec.collapsed) continue;
+    const dx = rec.x - capy.position.x;
+    const dz = rec.z - capy.position.z;
+    const d2 = dx * dx + dz * dz;
+    if (sp > physSTALL_BARGE && d2 < rec.radius * rec.radius) {
+      physStallCollapse(rec, dx, dz, clamp(0.7 + sp * 0.14, 0.7, 1.6));
+    } else if (tug) {
+      const r = rec.radius + 1.1;
+      if (d2 < r * r) physStallCollapse(rec, dx, dz, 0.8);
+    }
+  }
+}
+
+// ---- the crater -----------------------------------------------------------
+function physCraterAt(out) {
+  const p = physGame.pasto;
+  const c = p && p.craterCentre;
+  out.set(physNum(c && c.x, -40), physNum(c && c.y, 44), physNum(c && c.z, -70));
+  return out;
+}
+
+// Fixed lines — a toast built by concatenation would allocate on an event that
+// fires from inside physUpdate.
+const physCRATER_LINES = [
+  'Galeras swallows it whole',
+  'gone — straight down the vent',
+  'the mountain accepts your offering',
+];
+let physCraterLine = 0;
+let physCraterToastAt = -1e9;
+
+/**
+ * Galeras is only funny if the prop makes the whole journey: over the crest,
+ * down the inner wall, and out of sight at the vent. Two rules do that.
+ *
+ * 1. It is EATEN only on the floor (physCRATER_EAT_R ≈ the flat bit at the
+ *    bottom) — never halfway down the wall, where the puff would go off at eye
+ *    level and read as "it hit a rock".
+ * 2. Inside the rim crest it may not come to rest AT ALL. The volcano collider
+ *    is a 4 m heightfield, so its inner wall has ledges the real surface does
+ *    not have, and a prop balanced on one — visible from the rim, mocking you —
+ *    kills the gag. Anything that stops in the bowl gets shoved on (below).
+ */
+function physCraterCheck(p, dt) {
+  const b = p.body;
+  const c = physCraterAt(physPV1);
+  const dx = b.position.x - c.x;
+  const dz = b.position.z - c.z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 > physCRATER_RIM * physCRATER_RIM) {
+    if (p.craterIn) { p.craterIn = false; p.craterIdle = 0; p.craterTries = 0; }
+    return;
+  }
+  if (!p.craterIn) {
+    p.craterIn = true;
+    p.craterIdle = 0;
+    p.craterTries = 0;
+    p.craterY = b.position.y;
+  }
+  // Height is measured off craterCentre.y — the vent floor — and NOT off
+  // physSurfaceY. The collider is a 4 m heightfield and on a wall this steep it
+  // sits metres away from the analytic surface, so "am I on the ground" is not
+  // an answerable question here. "Am I at the bottom" is.
+  if (b.position.y <= c.y + physCRATER_FLOOR_H && d2 <= physCRATER_EAT_R * physCRATER_EAT_R) {
+    physCraterEat(p);
+    return;
+  }
+  physCraterShove(p, dx, dz, d2, dt);
+}
+
+/** The payoff: ash, a thud from a long way down, a jolt, and a line. */
+function physCraterEat(p) {
+  const b = p.body;
+  // A column, not a scuff: 16 m of volcano between this and the player's eye.
+  physPuff3(b.position.x, b.position.y + 0.4, b.position.z, 9, 4.5);
+  physPuff3(b.position.x, b.position.y + 2.2, b.position.z, 6, 3);
+  physGame.sfx('thud', physSfxDeep);
+  physGame.sfx('hiss', physSfxDeep2);
+  physGame.shake(0.2);
+  physDestroyPayload.prop = p;
+  physGame.events.emit('prop:destroy', physDestroyPayload);
+  const earned = physCausedByCapy(p, physCAUSE_CRATER);
+  if (earned) physTask('crater-drop');
+  // The checklist ticks once; the joke should land every single time.
+  const t = physGame.state ? physGame.state.time : 0;
+  if (earned && t - physCraterToastAt > 2.5 && typeof physGame.toast === 'function') {
+    physCraterToastAt = t;
+    physGame.toast(physCRATER_LINES[physCraterLine]);
+    physCraterLine = (physCraterLine + 1) % physCRATER_LINES.length;
+  }
+  physHide(p, physHIDE_CRATER);
+}
+
+/**
+ * Stopped on the inner wall. Wake it, kick it at the vent and spin it, so what
+ * the player sees is a continuous tumble rather than a thing perched on a ledge.
+ * The kick grows each time; after physCRATER_GIVEUP the mountain stops being
+ * polite about it, which makes "balanced on the rim" unreachable by construction.
+ */
+function physCraterShove(p, dx, dz, d2, dt) {
+  const b = p.body;
+  const y = b.position.y;
+  // The test is DESCENT, not stillness: a light prop on a 60° heightfield wall
+  // buzzes against the facets forever without ever going anywhere, and a
+  // velocity gate would read that as "moving" and never intervene.
+  if (y < p.craterY - physCRATER_DESCEND) { p.craterY = y; p.craterIdle = 0; return; }
+  p.craterIdle += dt;
+  if (p.craterIdle < physCRATER_STILL) return;
+  p.craterIdle = 0;
+  p.craterY = y;
+  p.craterTries++;
+  const c = physCraterAt(physPV1);
+  if (p.craterTries > physCRATER_GIVEUP) {
+    // Wedged. Rather than leave it perched where the player can see it, drop it
+    // down the vent by hand — the puff, the thud and the toast all still play
+    // at the bottom, which is the only place they read.
+    b.position.set(c.x + rand(-1, 1), c.y + 0.5, c.z + rand(-1, 1));
+    physSyncBodyTransform(b);
+    physCraterEat(p);
+    return;
+  }
+  const d = d2 > 1e-6 ? Math.sqrt(d2) : 1;
+  const m = b.mass > 0 ? b.mass : 1;
+  const f = (1.5 + p.craterTries * 0.4) * m;
+  b.wakeUp();
+  p.settled = false;
+  physCV3.set(-dx / d * f, 0.8 * m, -dz / d * f);
+  b.applyImpulse(physCV3);
+  b.angularVelocity.set(rand(-6, 6), rand(-3, 3), rand(-6, 6));
+  physPuff3(b.position.x, b.position.y, b.position.z, 2);
+}
+
+// ---- shatter / hide / restock ---------------------------------------------
+function physShatter(prop) {
+  if (!prop || prop.hidden || prop.removed) return false;
+  const b = prop.body;
+  const x = b.position.x;
+  const y = b.position.y;
+  const z = b.position.z;
+  physThrowShards(x, y, z, randInt(5, 6), 0);
+  physPuff3(x, y + 0.05, z, 4);
+  physSfxOpts.volume = 0.95;
+  physGame.sfx('pop', physSfxOpts);
+  physSfxOpts.volume = 0.5;
+  physGame.sfx('thud', physSfxOpts);
+  physGame.shake(0.26);
+  physDestroyPayload.prop = prop;
+  physGame.events.emit('prop:destroy', physDestroyPayload);
+  physHide(prop, physHIDE_BOWL);
+  return true;
+}
+
+/** Parks a prop out of play WITHOUT destroying it: same body, asleep, off-map. */
+function physHide(prop, delay) {
+  if (!prop || prop.hidden) return;
+  if (prop.held) {
+    if (physGame.capy && physGame.capy.heldProp === prop) physGame.capy.heldProp = null;
+    prop.held = false;
+    if (prop.mesh.parent !== physGame.scene) physGame.scene.add(prop.mesh);
+    physDropPayload.prop = prop;
+    physGame.events.emit('capy:drop', physDropPayload);
+  }
+  prop.hidden = true;
+  prop.hiddenUntil = (physGame.state ? physGame.state.time : 0) + delay;
+  prop.grabbable = false;
+  prop.spillArmed = false;
+  prop.owner = null;
+  const b = prop.body;
+  if (b.type !== CANNON.Body.DYNAMIC) { b.type = CANNON.Body.DYNAMIC; b.updateMassProperties(); }
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.force.set(0, 0, 0);
+  b.torque.set(0, 0, 0);
+  b.collisionResponse = false;
+  b.collisionFilterMask = -1;
+  b.position.set(prop.homeX, -900, prop.homeZ);
+  physSyncBodyTransform(b);
+  b.allowSleep = true;
+  b.sleep();
+  prop.mesh.visible = false;
+  prop.mesh.scale.setScalar(1);
+  physZeroInstance(prop);
+  physHidden.push(prop);
+}
+
+function physUnhide(prop) {
+  const def = physTYPES[prop.type];
+  prop.hidden = false;
+  prop.frozen = false;
+  prop.tipped = false;
+  prop.craterIn = false;
+  prop.craterIdle = 0;
+  prop.craterTries = 0;
+  prop.grabbable = def.grabbable === false ? false : !prop.planted;
+  prop.body.collisionResponse = true;
+  prop.mesh.visible = prop.solo || !prop.instGroup;
+  physRescue(prop);                      // home, dead still, asleep, transforms synced
+  physPuff3(prop.homeX, prop.homeY + 0.35, prop.homeZ, 3);
+}
+
+// ---- the puff pool (Pasto's dust; built inside the biome, so it is tagged) --
+function physInitPuff() {
+  if (physPuffMesh) return;
+  physPuffMesh = new THREE.InstancedMesh(
+    new THREE.SphereGeometry(0.17, 6, 4),
+    mat(PALETTE.smoke, { transparent: true, opacity: 0.6, depthWrite: false }),
+    physPUFF_MAX
+  );
+  physPuffMesh.frustumCulled = false;
+  physPuffMesh.castShadow = false;
+  physPuffMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  physGame.scene.add(physPuffMesh);
+  for (let i = 0; i < physPUFF_MAX; i++) physPuffLife[i] = 0;
+  physWritePuff();
+}
+
+function physPuff3(x, y, z, count, size) {
+  if (!physPuffMesh) return;
+  const n = count || 4;
+  const s = size > 0 ? size : 1;
+  for (let k = 0; k < n; k++) {
+    const i = physPuffHead;
+    physPuffHead = (physPuffHead + 1) % physPUFF_MAX;
+    physPuffPos[i * 3] = x + rand(-0.2, 0.2) * s;
+    physPuffPos[i * 3 + 1] = y + rand(0.02, 0.24) * s;
+    physPuffPos[i * 3 + 2] = z + rand(-0.2, 0.2) * s;
+    physPuffVel[i * 3] = rand(-0.9, 0.9) * s;
+    physPuffVel[i * 3 + 1] = rand(0.7, 1.9) * s;
+    physPuffVel[i * 3 + 2] = rand(-0.9, 0.9) * s;
+    physPuffSize[i] = s;
+    physPuffSpan[i] = rand(0.7, 1.15) * (s > 1 ? 1 + (s - 1) * 0.45 : 1);
+    physPuffLife[i] = physPuffSpan[i];
+  }
+  physPuffDirty = true;
+}
+
+function physWritePuff() {
+  for (let i = 0; i < physPUFF_MAX; i++) {
+    if (physPuffLife[i] > 0) {
+      const age = 1 - physPuffLife[i] / physPuffSpan[i];
+      const s = (0.55 + age * 1.5) * (1 - age * 0.55) * (physPuffSize[i] || 1);
+      physV1.set(physPuffPos[i * 3], physPuffPos[i * 3 + 1], physPuffPos[i * 3 + 2]);
+      physQ1.setFromAxisAngle(physUp, physPuffLife[i] * 2.4);
+      physV2.set(s, s * 0.86, s);
+      physM4.compose(physV1, physQ1, physV2);
+    } else {
+      physM4.compose(physV3.set(0, -900, 0), physQ2.identity(), physV2.set(0, 0, 0));
+    }
+    physPuffMesh.setMatrixAt(i, physM4);
+  }
+  physPuffMesh.instanceMatrix.needsUpdate = true;
+}
+
+function physPuffUpdate(dt) {
+  if (!physPuffMesh) return;
+  let any = false;
+  for (let i = 0; i < physPUFF_MAX; i++) {
+    if (physPuffLife[i] <= 0) continue;
+    any = true;
+    physPuffLife[i] -= dt;
+    physPuffVel[i * 3 + 1] += 1.4 * dt;          // warm air, it keeps climbing
+    physPuffPos[i * 3] += physPuffVel[i * 3] * dt;
+    physPuffPos[i * 3 + 1] += physPuffVel[i * 3 + 1] * dt;
+    physPuffPos[i * 3 + 2] += physPuffVel[i * 3 + 2] * dt;
+    if (physPuffLife[i] <= 0) physPuffLife[i] = 0;
+  }
+  if (any || physPuffDirty) { physWritePuff(); physPuffDirty = any; }
+}
+
+// ---- the shard pool (ceramic slivers + spilled coffee beans) ---------------
+// physSHARD_MAX bodies, created once, added to the world once and never removed:
+// a break costs zero allocations and zero body churn.
+function physShardGeo(kind) {
+  const g = new THREE.Group();
+  if (kind === 0) {
+    physAdd(g, new THREE.TetrahedronGeometry(0.11), PALETTE.churchWhite, 0, 0.06, 0);
+    physAdd(g, physBoxG(0.11, 0.03, 0.05), PALETTE.awning1, 0.02, 0.09, 0.01, 0.4, 0.6, 0.2);
+  } else {
+    physAdd(g, physSphG(0.06), PALETTE.coffeeLiquid, 0, 0.06, 0);
+    physAdd(g, physSphG(0.05), PALETTE.coffeeLiquid, 0.06, 0.05, 0.03);
+    physAdd(g, physBoxG(0.02, 0.02, 0.1), PALETTE.wood, 0, 0.1, 0);
+  }
+  return physFlatten(g, 0.06);
+}
+
+function physInitShards() {
+  if (physShards.length) return;
+  physShardGeos.push(physShardGeo(0), physShardGeo(1));
+  for (let i = 0; i < physSHARD_MAX; i++) {
+    const mesh = new THREE.Mesh(physShardGeos[0], physPropMat);
+    mesh.castShadow = true;
+    mesh.visible = false;
+    physGame.scene.add(mesh);
+    const body = new CANNON.Body({
+      mass: 0.1,
+      material: physLightMat || (physGame.mats ? physGame.mats.prop : undefined),
+      linearDamping: 0.06,
+      angularDamping: 0.16,
+    });
+    body.addShape(new CANNON.Sphere(0.075));
+    body.collisionFilterGroup = physGRP_DYN;
+    body.allowSleep = true;
+    body.sleepSpeedLimit = 0.25;
+    body.sleepTimeLimit = 0.5;
+    body.collisionResponse = false;
+    body.position.set(0, -900, 0);
+    physSyncBodyTransform(body);
+    body.sleep();
+    physGame.world.addBody(body);
+    physShards.push({ mesh, body, active: false, life: 0 });
+  }
+}
+
+function physThrowShards(x, y, z, count, kind) {
+  if (!physShards.length) return;
+  const geo = physShardGeos[kind === 1 ? 1 : 0];
+  const n = count || 5;
+  for (let k = 0; k < n; k++) {
+    const s = physShards[physShardHead];
+    physShardHead = (physShardHead + 1) % physSHARD_MAX;
+    s.active = true;
+    s.life = physSHARD_LIFE;
+    s.mesh.geometry = geo;
+    s.mesh.visible = true;
+    s.mesh.scale.setScalar(1);
+    const b = s.body;
+    b.collisionResponse = true;
+    b.position.set(x + rand(-0.12, 0.12), y + rand(0.02, 0.22), z + rand(-0.12, 0.12));
+    b.quaternion.set(0, 0, 0, 1);
+    physSyncBodyTransform(b);
+    b.velocity.set(rand(-3.4, 3.4), rand(1.4, 4.2), rand(-3.4, 3.4));
+    b.angularVelocity.set(rand(-9, 9), rand(-9, 9), rand(-9, 9));
+    b.wakeUp();
+    s.mesh.position.set(b.position.x, b.position.y, b.position.z);
+    s.mesh.quaternion.set(0, 0, 0, 1);
+  }
+}
+
+function physParkShard(s) {
+  s.active = false;
+  s.life = 0;
+  s.mesh.visible = false;
+  s.mesh.scale.setScalar(1);
+  const b = s.body;
+  b.collisionResponse = false;
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.force.set(0, 0, 0);
+  b.torque.set(0, 0, 0);
+  b.position.set(0, -900, 0);
+  physSyncBodyTransform(b);
+  b.sleep();
+}
+
+function physShardUpdate(dt) {
+  for (let i = 0; i < physShards.length; i++) {
+    const s = physShards[i];
+    if (!s.active) continue;
+    s.life -= dt;
+    if (s.life <= 0 || s.body.position.y < -40) { physParkShard(s); continue; }
+    if (s.life < 0.7) s.mesh.scale.setScalar(clamp(s.life / 0.7, 0.02, 1));
+    const b = s.body;
+    if (b.sleepState === CANNON.Body.SLEEPING) continue;
+    s.mesh.position.set(b.interpolatedPosition.x, b.interpolatedPosition.y, b.interpolatedPosition.z);
+    s.mesh.quaternion.set(
+      b.interpolatedQuaternion.x, b.interpolatedQuaternion.y,
+      b.interpolatedQuaternion.z, b.interpolatedQuaternion.w
+    );
+  }
+}
+
+// ---- layout ---------------------------------------------------------------
+function physScatterPasto() {
+  if (!physStalls.length) physFallbackStalls();
+
+  // Capped at the menu length: six stalls x three items is 18 bodies, which is
+  // all the Pasto budget can spare once pasto.js's town is standing.
+  for (let i = 0; i < physStalls.length && i < physSTALL_MENU.length; i++) {
+    const rec = physStalls[i];
+    const menu = physSTALL_MENU[i % physSTALL_MENU.length];
+    const cy = Math.cos(rec.yaw);
+    const sy = Math.sin(rec.yaw);
+    for (let k = 0; k < menu.length; k++) {
+      const off = (k - 1) * 0.55;
+      const x = rec.x + cy * off;
+      const z = rec.z + sy * off;
+      const prop = physMakeProp(menu[k], x, z, 0, rand(0, Math.PI * 2), rec.tableY);
+      if (prop) prop.stall = rec;
+    }
+  }
+
+  // The coffee drying patio, out on the terraces.
+  const p = physGame.pasto;
+  let ax = 44;
+  let az = 8;
+  if (p && typeof p.randomPointIn === 'function') {
+    const spot = p.randomPointIn('coffee');
+    if (spot && typeof spot.x === 'number' && typeof spot.z === 'number') { ax = spot.x; az = spot.z; }
+  }
+  for (let i = 0; i < physPATIO.length; i++) {
+    const row = physPATIO[i];
+    physMakeProp(row[0], ax + row[1], az + row[2], 0, rand(0, Math.PI * 2));
+  }
+
+  // Everything was laid down exactly on its surface: settle it all immediately
+  // so a market full of produce costs the solver nothing until it is touched.
+  const arr = physGame.props;
+  for (let i = 0; i < arr.length; i++) {
+    const b = arr[i].body;
+    if (arr[i].biome !== 'pasto' || b.type !== CANNON.Body.DYNAMIC) continue;
+    b.velocity.set(0, 0, 0);
+    b.angularVelocity.set(0, 0, 0);
+    b.force.set(0, 0, 0);
+    b.torque.set(0, 0, 0);
+    b.sleep();
+  }
+}
+
+// ---- per-frame ------------------------------------------------------------
+function physPastoUpdate(dt) {
+  physPuffUpdate(dt);
+  physShardUpdate(dt);
+
+  // hits recorded during the step, applied now that the solver has finished
+  for (let i = 0; i < physStalls.length; i++) {
+    const rec = physStalls[i];
+    if (!rec.pending) continue;
+    rec.pending = false;
+    physStallCollapse(rec, rec.pdx, rec.pdz, rec.pf);
+  }
+
+  // pasto.js may publish `stalls` after our first look — keep glancing, cheaply.
+  physBindTimer -= dt;
+  if (physBindTimer <= 0) { physBindTimer = 1.5; physBindStalls(); }
+
+  physStallTriggers();
+  for (let i = 0; i < physCollapsed.length; i++) physStallSync(physCollapsed[i]);
+
+  const t = physGame.state ? physGame.state.time : 0;
+  for (let i = physHidden.length - 1; i >= 0; i--) {
+    const p = physHidden[i];
+    if (t < p.hiddenUntil) continue;
+    physHidden[i] = physHidden[physHidden.length - 1];
+    physHidden.pop();
+    physUnhide(p);
+  }
+}
+
+// ===========================================================================
+// 9. FRAME UPDATE
+// ===========================================================================
+function physUpdateHeld(prop, dt) {
+  const capy = physGame.capy;
+  const anchor = capy && capy.mouthAnchor;
+  if (!anchor || capy.heldProp !== prop) {
+    // something else took it away from us — hand it back to the simulation
+    prop.held = false;
+    physDropOwned(prop, 0, 0.4, 0);
+    return;
+  }
+  const m = prop.mesh;
+  m.position.x = damp(m.position.x, prop.holdOffset.x, physHOLD_LAMBDA, dt);
+  m.position.y = damp(m.position.y, prop.holdOffset.y, physHOLD_LAMBDA, dt);
+  m.position.z = damp(m.position.z, prop.holdOffset.z, physHOLD_LAMBDA, dt);
+  m.quaternion.slerp(prop.holdQuat, 1 - Math.exp(-physHOLD_LAMBDA * dt));
+  if (m.scale.x !== 1) {
+    const s = damp(m.scale.x, 1, 14, dt);
+    const v = Math.abs(s - 1) < 0.004 ? 1 : s;
+    m.scale.set(v, v, v);
+  }
+  m.getWorldPosition(physV1);
+  m.getWorldQuaternion(physQ1);
+  const b = prop.body;
+  b.position.set(physV1.x, physV1.y, physV1.z);
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  // Give the carried body real momentum so swinging a sign into a bin bites.
+  if (dt > 1e-5) {
+    b.velocity.set(
+      clamp((physV1.x - prop.lastWX) / dt, -physHELD_VMAX, physHELD_VMAX),
+      clamp((physV1.y - prop.lastWY) / dt, -physHELD_VMAX, physHELD_VMAX),
+      clamp((physV1.z - prop.lastWZ) / dt, -physHELD_VMAX, physHELD_VMAX)
+    );
+  }
+  prop.lastWX = physV1.x;
+  prop.lastWY = physV1.y;
+  prop.lastWZ = physV1.z;
+}
+
+/** Barge a tourist at speed and whatever they are carrying goes flying. */
+function physBarge(prop, speed) {
+  const capy = physGame.capy;
+  const owner = prop.owner;
+  const b = prop.body;
+  prop.lastImpact = physGame.state.time;
+  physImpactPayload.prop = prop;
+  physImpactPayload.speed = speed;
+  physImpactPayload.position.set(b.position.x, b.position.y, b.position.z);
+  physGame.events.emit('prop:impact', physImpactPayload);   // npc.js reacts while owner is intact
+  const cv = capy.velocity;
+  physDropOwned(prop, cv.x * 0.6, 2.0, cv.z * 0.6);
+  prop.stolenFrom = owner;
+  prop.spillArmed = true;
+  physStampTouch(prop);                       // the barge IS the capybara's doing
+  prop.releaseTime = physGame.state.time;
+  physDust3(b.position.x, b.position.y, b.position.z, 3);
+}
+
+function physUpdate(dt) {
+  if (!physGame || !physGame.world) return;
+  // game.physics.update is contract-published AND returned to main.js's updater
+  // list — make a second call in the same frame a no-op instead of double-stepping.
+  if (physGame.state) {
+    if (physGame.state.time === physLastTick) return;
+    physLastTick = physGame.state.time;
+  }
+  // ---- biome gate ---------------------------------------------------------
+  // Props are tagged with the biome they were born into (main.js auto-tags
+  // everything added at runtime). A detached biome's bodies are out of the
+  // world entirely, so simulating or re-syncing them is pure waste — skip
+  // them wholesale. Sydney's scatter is skipped the moment Sydney detaches;
+  // anything spawned while Pasto is live keeps running there instead.
+  const live = physLiveBiome();
+  const sydneyLive = physGame.biome ? physGame.biome.isActive('sydney') : true;
+  const arr = physGame.props;
+  const capy = physGame.capy;
+  for (let i = 0; i < arr.length; i++) {
+    const p = arr[i];
+    if (p.removed || p.hidden) continue;      // hidden = parked off-map, awaiting restock
+    // a prop in the capybara's mouth travels with it, whatever it was born into
+    if (p.biome !== live && !p.held) continue;
+    physSetSolo(p, p.held || p.spilled || p.owner !== null);
+    if (p.held) { physUpdateHeld(p, dt); continue; }
+    if (p.frozen) continue;
+    // if something reparented the mesh (an NPC carrying it) that owner drives it
+    if (p.mesh.parent !== physGame.scene) continue;
+    const b = p.body;
+
+    // shoulder-barge: knock a carried coffee out of a tourist's hand
+    if (p.owner && !p.spilled && capy && capy.position && capy.velocity &&
+        physGame.state.time - p.lastImpact > 0.5) {
+      const bx = b.position.x - capy.position.x;
+      const bz = b.position.z - capy.position.z;
+      if (bx * bx + bz * bz < 1.21) {
+        const sp = Math.sqrt(capy.velocity.x * capy.velocity.x + capy.velocity.z * capy.velocity.z);
+        if (sp > 3.2) physBarge(p, sp);
+      }
+    }
+
+    // Escaped the world (tunnelled, or was ejected out of a static box): put it
+    // back on its scatter point. Checked BEFORE the sleep gate, or a body that
+    // fell through and then fell asleep down there would never be recovered.
+    // The harbour is a Sydney fact. In Pasto there is no water at all, and the
+    // ground is a 60 m volcano — "escaped the world" has to be measured against
+    // the terrain under the prop, not against a flat plane.
+    // Sideways counts as escaped too. The fall tests below only catch a prop that
+    // goes DOWN; one that gets flung horizontally lands somewhere the terrain
+    // function still answers for, sits happily at ground level 400 m outside the
+    // world, and takes its task with it. No biome here is wider than ~250 m.
+    if (b.position.x * b.position.x + b.position.z * b.position.z > physESCAPE_R2) {
+      physRescue(p);
+      continue;
+    }
+    if (sydneyLive) {
+      if (b.position.y < physFALL_Y && !p.inWater && !physOverWater(b.position.x, b.position.z)) {
+        physRescue(p);
+        continue;
+      }
+    } else if (b.position.y < physSurfaceY(b.position.x, b.position.z) - physPASTO_FALL &&
+               !p.inWater && !physOverWater(b.position.x, b.position.z)) {
+      physRescue(p);
+      continue;
+    }
+
+    // Galeras eats what falls into it. Tested BEFORE the sleep gate: a prop that
+    // came to rest on the crater floor and then dozed off must still be taken.
+    // PASTO ONLY, not merely "not Sydney": the crater is a set of shared-space
+    // coordinates like everything else, and running this abroad had an invisible
+    // volcano shoving and eating props out of the middle of eleven other cities.
+    if (physPastoLive()) {
+      physCraterCheck(p, dt);
+      if (p.hidden) continue;
+    }
+
+    if (p.inWater && !p.sunk) b.wakeUp();      // a prop on the seabed stays asleep
+    // a real gust flips a light prop off the paving rather than politely
+    // ignoring it — sleeping bodies skip narrowphase AND the drag below
+    if (p.mass < 0.6 && b.sleepState === CANNON.Body.SLEEPING) {
+      const wg = physWindNow();
+      if (wg.x * wg.x + wg.z * wg.z > 16) b.wakeUp();
+    }
+    if (b.sleepState === CANNON.Body.SLEEPING) {
+      p.spillArmed = false;          // a settled cup stops being a time bomb
+      // A sleeping body is never synced again, so the frame it drops off must
+      // land ON its true rest transform — the last interpolated write was a
+      // fraction of a step behind it, and that offset would be permanent.
+      if (p.settled) continue;
+      p.settled = true;
+      physSyncMesh(p, true);
+      if (!p.solo) physWriteInstance(p, true);
+      continue;
+    }
+    p.settled = false;
+
+    physSyncMesh(p, false);
+    if (p.mesh.scale.x !== 1) {
+      const s = damp(p.mesh.scale.x, 1, 14, dt);
+      const v = Math.abs(s - 1) < 0.004 ? 1 : s;
+      p.mesh.scale.set(v, v, v);
+    }
+
+    // BUOYANCY EVERYWHERE THERE IS WATER. This used to be gated on Sydney —
+    // written when the harbour was the only water in the game — which meant a
+    // prop thrown into Venice's flooded square, Palawan's bay, Kyoto's pond or
+    // the Río Cali fell through the surface like a stone and lay on the bottom
+    // with no Archimedes at all. Every query inside now asks the LIVE biome, so
+    // a biome with no water (no isOverWater published) costs one property miss.
+    physCheckWater(p, dt);
+
+    // ---- the air is a fluid too ---------------------------------------------
+    // Quadratic aerodynamic drag against the moving air, per-shape: a hat and a
+    // bin no longer fall identically, a thrown frisbee sheds speed the way a
+    // frisbee does, and the Drift's wind (and Marrakech's storm) carries light
+    // props exactly as far as it should. F = ½·ρ·Cd·A·|v_rel|·v_rel, with the
+    // area and Cd baked per prop at spawn (prop.aeroK = ½·ρ·Cd·A).
+    if (!p.inWater && p.aeroK > 0) {
+      const wnd = physWindNow();
+      const rvx = wnd.x - b.velocity.x, rvy = -b.velocity.y, rvz = wnd.z - b.velocity.z;
+      const rl2 = rvx * rvx + rvy * rvy + rvz * rvz;
+      if (rl2 > 0.36) {
+        const rl = Math.sqrt(rl2);
+        // capped as an acceleration so a near-massless prop can never be made
+        // to ring by its own drag inside one 60 Hz step
+        let f = p.aeroK * rl;
+        const fCap = (physAERO_AMAX * p.mass) / rl;
+        if (f > fCap) f = fCap;
+        b.force.x += f * rvx; b.force.y += f * rvy; b.force.z += f * rvz;
+      }
+    }
+
+    if (p.inWater) p.spillArmed = false;
+    // "has it hit the deck yet" — measured against the surface under it, so a
+    // cup thrown onto the Opera House podium still lands.
+    else if (p.spillArmed && !p.spilled &&
+             b.position.y < physSurfaceY(b.position.x, b.position.z) + p.originY + 0.12 &&
+             (Math.abs(b.velocity.y) > 2.2 || b.velocity.lengthSquared() > 9)) physSpill(p);
+
+    if (!p.solo) physWriteInstance(p);
+  }
+
+  // No tip may register during the opening settle — nothing the player has done
+  // yet can have caused one.
+  if (!physGame.state || physGame.state.time >= physTASK_GRACE) {
+    for (let i = 0; i < physBins.length; i++) {
+      const bin = physBins[i];
+      if (bin.biome !== live) continue;
+      if (bin.tipped || bin.held || bin.removed) continue;
+      if (bin.body.sleepState === CANNON.Body.SLEEPING) continue;
+      physCheckTip(bin);
+    }
+  }
+
+  physRubbishUpdate(dt, live);
+  // Dust and foam are Sydney-side decor; their pools freeze with the biome
+  // rather than ageing out invisibly while the player is in the Andes.
+  if (sydneyLive) physParticleUpdate(dt);
+  // Pasto only, not merely "not Sydney": the stall triggers compare the
+  // capybara's position against stall coordinates that every biome shares, so
+  // running this abroad collapses invisible stalls and ticks market-chaos
+  // from the middle of Cali.
+  else if (physPastoBuilt && physGame.biome && physGame.biome.isActive('pasto')) physPastoUpdate(dt);
+  physFlushInstances();
+}

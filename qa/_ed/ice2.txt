@@ -1,0 +1,252 @@
+// ================================================================= SCATTER ==
+/**
+ * SEVEN INSTANCES PER THOUSAND SQUARE METRES.
+ *
+ * Measured across all seventeen chapters, the median world carries 46 pieces
+ * of scatter per 1,000 m² of walkable ground. Iceland carried SEVEN — 576
+ * instances over 81,952 m², the lowest density in the project by a factor of
+ * six, on a landmass the player walks the entire length of twice. The Sahara,
+ * which is mostly empty desert on purpose, carries 7,848.
+ *
+ * It is the same failure the Antarctic had before the last pass and it has the
+ * same shape: one big beautifully-built landform with nothing standing on it.
+ * iceBuildFlora's three loops (240 lupins, 200 moss discs, 320 rocks) are
+ * spread EVENLY over four hundred metres of map, which is the second half of
+ * the problem — an even wash of anything reads as a texture, and half of these
+ * were rejected by the height test anyway.
+ *
+ * Nothing here is new geography and nothing here changes a published API. It
+ * is what actually grows on the four grounds this chapter is made of:
+ *
+ *   THE LAVA FIELD (z 20..118) — Eldhraun. Broken basalt under a metre of
+ *     woolly moss, and it is the strangest ground in Europe. Moss CUSHIONS
+ *     (squashed spheres, never plates — a disc lying flat photographs as a
+ *     green sheet of paper under a camera looking down 0.7 rad), rubble, and
+ *     the lupins that were brought in to hold it down and now own the place.
+ *   THE COAST AND THE TOWN (z 70..130) — tussock, drift timber, marker posts,
+ *     and the racks fish are dried on.
+ *   THE GEOTHERMAL FIELD (z -26..24) — sinter crust, mud pots, boiled-white
+ *     ground and the sulphur that grows round a vent.
+ *   THE MORAINE AND THE ICE (z < -78) — erratics, snow drifts, and the
+ *     ablation stones that sit on their own pedestals.
+ *
+ * EVERY BATCH IS PER-REGION, and that is a performance decision rather than a
+ * bookkeeping one: one instanced mesh spanning four hundred metres is never
+ * frustum-culled, so at any moment the chapter pays for scatter in three
+ * regions it cannot see. Twenty-eight batches of fifty metres each cull.
+ *
+ * AND ALMOST NONE OF IT CASTS. A moss cushion is 40 cm high on a black lava
+ * field lit by a sun that never rises. Only the erratics, the posts and the
+ * drying racks — the things that are taller than the animal — go in the
+ * casting batches.
+ */
+const iceSCAT_BANDS = [
+  // id            x0     x1     z0     z1
+  ['lava-w',     -170,   -55,    18,    72],
+  ['lava-c',      -55,    55,    18,    72],
+  ['lava-e',       55,   170,    18,    72],
+  ['town-w',     -170,   -55,    72,   130],
+  ['town-e',       55,   170,    72,   130],
+  ['geo-w',      -170,   -34,   -26,    18],
+  ['geo-c',       -34,    34,   -26,    18],
+  ['geo-e',        34,   170,   -26,    18],
+  ['shore-w',    -180,   -62,   -78,   -26],
+  ['shore-e',      62,   180,   -78,   -26],
+  ['mor-s',      -180,   180,  -122,   -78],
+  ['mor-n',      -180,   180,  -196,  -122],
+];
+
+/** Which of the four grounds is (x, z) on? Decided by the geography, once. */
+function iceGroundKind(x, z) {
+  if (z < iceGL_Z0 + 4) return iceGroundSlip(x, z) > 0.28 ? 'ice' : 'moraine';
+  if (z < -26) return 'shore';
+  if (z < 22) return 'geo';
+  if (z < 70) return 'lava';
+  return 'town';
+}
+
+/**
+ * True where nothing may be planted: on the street, in the doorway of the
+ * church, on the pier, inside the hot pool, on the geyser's catchment, and in
+ * the two places the chapter puts the player down.
+ *
+ * Trap 10 in the other direction: it is no use sampling inside the land if the
+ * land you sample is the one strip the player has to walk.
+ */
+function iceScatBlocked(x, z) {
+  if (Math.abs(z - iceLANES[0]) < 7 && Math.abs(x) < 56) return true;        // the street
+  if (Math.abs(x - iceSPAWN.x) < 7 && Math.abs(z - iceSPAWN.z) < 7) return true;
+  if (Math.abs(x - icePIER.x) < 6 && z > icePIER.z - 6) return true;         // the pier
+  if (Math.abs(x - iceCHURCH.x) < 13 && Math.abs(z - iceCHURCH.z) < 15) return true;
+  {
+    const dx = x - iceSPRING.x, dz = z - iceSPRING.z;
+    if (dx * dx + dz * dz < (iceSPRING.r + 3) * (iceSPRING.r + 3)) return true;
+  }
+  {
+    const dx = x - iceSTROKKUR.x, dz = z - iceSTROKKUR.z;
+    if (dx * dx + dz * dz < 9 * 9) return true;                              // the catchment
+  }
+  {
+    const dx = x - iceGEYSIR.x, dz = z - iceGEYSIR.z;
+    if (dx * dx + dz * dz < 7 * 7) return true;
+  }
+  // the two rows of houses, and the back row
+  if (z > 66 && z < 128) {
+    for (let i = 0; i < iceROWS.length; i++) if (Math.abs(z - iceROWS[i]) < 6) return true;
+    if (Math.abs(z - iceBACKROW) < 6) return true;
+  }
+  return false;
+}
+
+/**
+ * The clumped sampler. A stand of lupins is a STAND — forty of them in eleven
+ * metres of ground and none for the next forty — and so is a moss field, a
+ * patch of tussock and a scatter of erratics off one boulder that broke up.
+ * An even spread of anything is a texture; a clump is a plant.
+ *
+ * Returns the number actually planted, because every one of these is gated on
+ * a height test and a blocked test and the caller has no other way to know.
+ */
+function iceScatClumps(band, tries, perClump, spread, kind, place) {
+  let n = 0;
+  for (let c = 0; c < tries; c++) {
+    const cx = rand(band[1], band[2]), cz = rand(band[3], band[4]);
+    if (iceGroundKind(cx, cz) !== kind) continue;
+    if (iceIsOverWater(cx, cz)) continue;
+    const cy = iceTerrain(cx, cz);
+    if (cy < 0.15) continue;
+    const m = perClump[0] + ((c * 7) % Math.max(1, perClump[1] - perClump[0] + 1));
+    for (let k = 0; k < m; k++) {
+      const a = rand(0, 6.28318), r = Math.sqrt(Math.random()) * spread;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      if (iceScatBlocked(x, z)) continue;
+      if (iceIsOverWater(x, z)) continue;
+      const y = iceTerrain(x, z);
+      if (y < 0.12) continue;
+      place(x, y, z, k, c);
+      n++;
+    }
+  }
+  return n;
+}
+
+let iceScatMeshes = [];
+
+function iceBuildScatter(game, root) {
+  iceScatMeshes = [];
+  const mkBatch = (geo, colour, list, cast, recv, name, two) => {
+    if (!list.length) return;
+    const m = iceInstance(root, geo, colour, list, cast, recv, two);
+    if (m) { m.name = name; iceScatMeshes.push(m); }
+  };
+  for (let b = 0; b < iceSCAT_BANDS.length; b++) {
+    const band = iceSCAT_BANDS[b];
+    const id = band[0];
+    // one list per shape per band, so every batch is a box fifty metres across
+    // and the frustum can throw it away
+    const moss = [], lupin = [], lupinHead = [], rubble = [], tussock = [];
+    const crust = [], sulphur = [], erratic = [], drift = [], post = [];
+
+    // ---- THE LAVA FIELD ---------------------------------------------------
+    // Moss cushions: SQUASHED SPHERES. The existing field draws these as
+    // cyl6 discs 3.6 m across and 32 cm high — under a camera that looks down
+    // about 0.7 rad that is a green sheet of paper, which is the single most
+    // repeated mistake in this codebase (Manly's rock pools, the Pantanal's
+    // lily rims, the cave's moss discs, the Antarctic sastrugi, the Drift's
+    // ferns). Woolly fringe moss actually grows in domes the size of a
+    // football and merges into a mattress of them.
+    iceScatClumps(band, 26, [7, 16], 5.5, 'lava', (x, y, z, k, c) => {
+      const s = 0.55 + ((k * 5 + c) % 7) * 0.16;
+      icePush9(moss, x, y + s * 0.26, z, 0, (k + c) * 1.1, 0, s, s * 0.62, s * 0.92);
+      if ((k + c) % 3 === 0) {
+        const r2 = 0.30 + ((k * 3) % 4) * 0.16;
+        icePush9(rubble, x + s * 0.9, y + r2 * 0.3, z - s * 0.6,
+                 (k % 3) * 0.4, k * 1.7, (c % 3) * 0.3, r2, r2 * 0.75, r2 * 1.1);
+      }
+    });
+    // Lupins, in stands, and a lupin is a SPIKE with a head on it — the whole
+    // reason the place looks the way it does in June is the purple candle, and
+    // a 22 cm stick in iceLupin is a twig.
+    iceScatClumps(band, 14, [14, 30], 4.2, 'lava', (x, y, z, k, c) => {
+      const h = 0.62 + ((k * 3 + c) % 5) * 0.13;
+      const tl = ((k * 11 + c) % 7) * 0.03;
+      icePush9(lupin, x, y + h * 0.42, z, tl, k * 2.1, tl * 0.5, 0.055, h, 0.055);
+      icePush9(lupinHead, x + tl * h, y + h * 0.86, z, tl, k * 2.1, tl * 0.5,
+               0.14, h * 0.52, 0.14);
+    });
+
+    // ---- THE COAST AND THE TOWN ------------------------------------------
+    iceScatClumps(band, 22, [8, 18], 4.8, 'town', (x, y, z, k, c) => {
+      const h = 0.34 + ((k * 7 + c) % 5) * 0.10;
+      // tussock: three blades to a tuft, and they STAND UP. 1.25 rad, not the
+      // 0.3 that turns a blade into a card.
+      for (let q = 0; q < 3; q++) {
+        icePush9(tussock, x + Math.cos(k + q * 2.1) * 0.09, y + h * 0.42,
+                 z + Math.sin(k + q * 2.1) * 0.09, 1.25 - (q % 2) * 0.14,
+                 k + q * 2.1, 0, 0.09, 1, h);
+      }
+      if ((k + c) % 5 === 2) {
+        const r2 = 0.26 + ((k * 5) % 4) * 0.14;
+        icePush9(rubble, x, y + r2 * 0.3, z, (k % 3) * 0.3, k * 1.3, 0, r2, r2 * 0.8, r2);
+      }
+    });
+    // driftwood and marker posts, along the shore only. These are the ones
+    // that DO cast: they are the height of the animal and they stand on the
+    // one strip of this chapter that has a light on it.
+    if (id.indexOf('town') === 0 || id.indexOf('shore') === 0) {
+      iceScatClumps(band, 9, [1, 3], 6.0, id.indexOf('town') === 0 ? 'town' : 'shore',
+        (x, y, z, k, c) => {
+          if (z < 96 && id.indexOf('town') === 0) return;
+          if ((k + c) % 2) {
+            const l = 1.6 + ((c * 3) % 4) * 0.7;
+            icePush9(drift, x, y + 0.18, z, 0.06, c * 1.7, Math.PI * 0.5, 0.22, l, 0.22);
+          } else {
+            const h = 1.1 + ((c * 5) % 4) * 0.35;
+            icePush9(post, x, y + h * 0.5, z, 0.04 * ((c % 3) - 1), c * 0.9, 0.03, 0.13, h, 0.13);
+          }
+        });
+    }
+
+    // ---- THE GEOTHERMAL FIELD --------------------------------------------
+    // Sinter: the ground round a hot spring is boiled white and it crusts in
+    // PLATES, which is the one place in this chapter a flat disc is honest —
+    // and it is a MARK, so it is 4 cm proud and never casts.
+    iceScatClumps(band, 20, [6, 14], 4.4, 'geo', (x, y, z, k, c) => {
+      const s = 0.7 + ((k * 5 + c) % 6) * 0.34;
+      icePush9(crust, x, y + 0.045, z, 0, k * 1.4, 0, s, 0.09, s * 0.86);
+      if ((k + c) % 4 === 1) {
+        const s2 = 0.18 + ((k * 3) % 4) * 0.09;
+        icePush9(sulphur, x + s * 0.5, y + s2 * 0.4, z + s * 0.3, 0, k * 2.2, 0,
+                 s2, s2 * 0.8, s2);
+      }
+    });
+
+    // ---- THE MORAINE AND THE ICE -----------------------------------------
+    // Erratics: a boulder carried down and dropped, and they come in TRAINS —
+    // a line of them off one break in the valley wall, which is the only
+    // scatter in the chapter that says the ice used to be higher than this.
+    iceScatClumps(band, 16, [3, 7], 7.0, 'moraine', (x, y, z, k, c) => {
+      const s = 0.7 + ((k * 7 + c) % 6) * 0.55;
+      icePush9(erratic, x, y + s * 0.30, z, (k % 4) * 0.22, k * 1.9, (c % 4) * 0.19,
+               s, s * 0.68, s * 1.05);
+    });
+    // and on the ice, ablation stones — a dark stone on white ice melts a pit
+    // under itself, so it always sits in a dish. They are what gives the run
+    // any optical flow at all at nineteen metres a second.
+    iceScatClumps(band, 14, [4, 10], 6.5, 'ice', (x, y, z, k, c) => {
+      const s = 0.26 + ((k * 5 + c) % 5) * 0.13;
+      icePush9(rubble, x, y + s * 0.24, z, (k % 3) * 0.3, k * 2.3, 0, s, s * 0.6, s);
+    });
+
+    mkBatch(iceG.sph6, PALETTE.iceMoss, moss, false, true, 'iceScat:moss:' + id);
+    mkBatch(iceG.cyl4, PALETTE.iceMoss, lupin, false, false, 'iceScat:lupinStem:' + id);
+    mkBatch(iceG.cone6, PALETTE.iceLupin, lupinHead, false, false, 'iceScat:lupin:' + id);
+    mkBatch(iceG.rock, PALETTE.iceBasalt, rubble, false, true, 'iceScat:rubble:' + id);
+    mkBatch(iceG.quad, PALETTE.iceMossPale, tussock, false, false, 'iceScat:tussock:' + id, true);
+    mkBatch(iceG.disc, PALETTE.iceGeoRim, crust, false, true, 'iceScat:crust:' + id);
+    mkBatch(iceG.sph6, PALETTE.iceMud, sulphur, false, false, 'iceScat:sulphur:' + id);
+    mkBatch(iceG.rock, PALETTE.iceMoraine, erratic, true, true, 'iceScat:erratic:' + id);
+    mkBatch(iceG.cyl6, PALETTE.iceRope, drift, true, true, 'iceScat:drift:' + id);
+    mkBatch(iceG.cyl6, PALETTE.iceRope, post, true, true, 'iceScat:post:' + id);
+  }
+}

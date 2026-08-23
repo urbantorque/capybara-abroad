@@ -1,0 +1,238 @@
+// ================================================================= VARIETY ==
+/**
+ * SEVEN THOUSAND EIGHT HUNDRED AND FORTY-EIGHT INSTANCES, AND IT IS A LOT OF
+ * ONE THING.
+ *
+ * The Sahara is the odd one out in the whole census. It carries the second
+ * highest instance count in the game and the second LOWEST triangle density,
+ * and it sits in the 24th percentile for objects per thousand square metres.
+ * That combination has exactly one meaning: the world is enormous (94,128 m²
+ * of walkable ground, the biggest in the project) and it is covered in
+ * repetitions of a very small number of things. Four thousand three hundred
+ * and twenty palm fronds, two thousand two hundred and fifty-two sand ripples,
+ * two hundred and seventy scrub tetrahedra — three families, and past the
+ * medina wall that is the entire contents of a hundred and eighty metres of
+ * desert.
+ *
+ * So this pass is not more scatter. It is VARIETY: eleven new families of
+ * object spread across the three grounds the chapter actually has, each of them
+ * a thing that is genuinely there and none of them a repetition of something
+ * that already is.
+ *
+ *   ON THE HAMADA (the gravel plain between the medina and the erg), which had
+ *     nothing at all on it: camel-thorn, dead acacia, a nomad's dry-stone
+ *     windbreak, bleached bone, and the line of telegraph poles that runs
+ *     beside every road in the south.
+ *   IN THE PALMERAIE: the SEGUIA — the open irrigation channels that are the
+ *     only reason a palm grove exists — and the pisé garden walls between the
+ *     plots, and the date-drying racks.
+ *   IN THE ERG: barchan horns, a wind-scoured hollow with the gravel lag left
+ *     in the bottom of it, and the one thing every photograph of the Sahara
+ *     has and this chapter did not: TRACKS.
+ *
+ * PER-CELL, AND ALMOST NONE OF IT CASTS. The chapter flags 91 % of its
+ * geometry castShadow — the highest in the game — under a sun that is
+ * effectively overhead, so a 30 cm thorn bush casts a shadow the size of
+ * itself and is drawn twice to do it. The poles, the acacias and the
+ * windbreaks cast, because a long shadow across bare gravel is the only thing
+ * in that part of the chapter with any scale in it at all.
+ */
+const sahVAR_CELLS = (function () {
+  // The hamada and the erg, cut into cells of about fifty metres. The medina
+  // and the souk are not in this: they are built, they are dense already, and
+  // dropping a thorn bush inside a stall is the one failure mode here.
+  const XS = [36, 84, 132, 180, 228, 276, 324];
+  const ZS = [-96, -56, -18, 20, 58, 96];
+  const out = [];
+  for (let i = 0; i < XS.length - 1; i++) {
+    for (let k = 0; k < ZS.length - 1; k++) out.push([XS[i], XS[i + 1], ZS[k], ZS[k + 1]]);
+  }
+  return out;
+})();
+
+/** Nothing may be planted on the caravan's line, in the camp, or on the run. */
+function sahVarBlocked(x, z) {
+  if (Math.hypot(x - sahCAMP.x, z - sahCAMP.z) < 22) return true;
+  if (Math.abs(x - sahGATE.x) < 16 && Math.abs(z - sahGATE.z) < 14) return true;
+  // the dune's windward face and its slipface are the surf run and must stay
+  // completely clean — a bush on it at nineteen metres a second is a wall
+  if (x > sahDUNE_X - sahDUNE_W - 6 && x < sahDUNE_X + sahDUNE_L + 6 &&
+      Math.abs(z - sahDUNE_Z) < sahDUNE_HZ + 6) return true;
+  return false;
+}
+
+function sahBuildVariety(game, root) {
+  const SB = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+  let solid = false;
+  for (let c = 0; c < sahVAR_CELLS.length; c++) {
+    const C = sahVAR_CELLS[c];
+    const thorn = [], thornDk = [], bone = [], lag = [], acaciaT = [], acaciaC = [];
+    const poleT = [], poleArm = [], stone = [], track = [], horn = [];
+    const erg = C[0] > sahERG_X;
+
+    // ---- CAMEL-THORN, which is what actually grows on a hamada ------------
+    // Not a tetrahedron. A thorn bush is a tangle with nothing solid in the
+    // middle of it: five thin crossed spines round a common centre, which at
+    // this size is five boxes and reads as a bush from anywhere.
+    const nTh = erg ? 5 : 16;
+    for (let i = 0; i < nTh; i++) {
+      const x = rand(C[0], C[1]), z = rand(C[2], C[3]);
+      if (sahVarBlocked(x, z)) continue;
+      const y = sahTerrain(x, z);
+      const s = rand(0.5, 1.15);
+      for (let k = 0; k < 5; k++) {
+        const a = k * 1.257 + i;
+        sahPush9(k % 2 ? thorn : thornDk,
+                 x + Math.cos(a) * s * 0.22, y + s * 0.34, z + Math.sin(a) * s * 0.22,
+                 Math.sin(a) * 0.5, a, -Math.cos(a) * 0.5,
+                 s * 0.09, s * 0.95, s * 0.09);
+      }
+    }
+
+    // ---- THE DEAD ACACIA ---------------------------------------------------
+    // One tree every couple of hundred metres, dead, and it is the only thing
+    // in the erg that gives the eye a height. It casts, and its shadow is the
+    // best thing in that half of the chapter.
+    if ((c % 3) === 1) {
+      const x = rand(C[0] + 8, C[1] - 8), z = rand(C[2] + 8, C[3] - 8);
+      if (!sahVarBlocked(x, z)) {
+        const y = sahTerrain(x, z);
+        const h = rand(2.6, 4.2);
+        sahPush9(acaciaT, x, y + h * 0.42, z, 0.06, rand(0, 6.28), 0.05, 0.34, h * 0.85, 0.34);
+        // an acacia is a FLAT TOP — it is browsed to a table by everything that
+        // can reach it, and that silhouette is the whole tree
+        for (let k = 0; k < 5; k++) {
+          const a = k * 1.257 + c;
+          sahPush9(acaciaC, x + Math.cos(a) * h * 0.42, y + h * (0.80 + (k % 2) * 0.08),
+                   z + Math.sin(a) * h * 0.42, Math.sin(a) * 0.85, a, -Math.cos(a) * 0.85,
+                   0.13, h * 0.72, 0.13);
+        }
+        sahStaticBox(game, x, y + h * 0.42, z, 0.6, h * 0.85, 0.6, 0);
+      }
+    }
+
+    // ---- THE WINDBREAK, which is how anybody sleeps out here --------------
+    // A crescent of dry stone about waist high, opening away from the wind.
+    // It is the only built thing on the hamada and it is what says somebody
+    // crosses this.
+    if (!erg && (c % 4) === 2) {
+      const cx = rand(C[0] + 10, C[1] - 10), cz = rand(C[2] + 10, C[3] - 10);
+      if (!sahVarBlocked(cx, cz)) {
+        const gy = sahTerrain(cx, cz);
+        for (let k = 0; k < 13; k++) {
+          const a = -1.5 + k * 0.25;
+          const x = cx + Math.cos(a) * 3.4, z = cz + Math.sin(a) * 3.4;
+          for (let r = 0; r < 3; r++) {
+            sahPush9(stone, x, gy + 0.16 + r * 0.28, z,
+                     0.05 * (r - 1), a + Math.sin(k + r) * 0.2, 0.05 * ((k + r) % 2 ? 1 : -1),
+                     0.85 - r * 0.11, 0.30, 0.62 - r * 0.06);
+          }
+          SB.addShape(new CANNON.Box(new CANNON.Vec3(0.5, 0.45, 0.4)),
+                      new CANNON.Vec3(x, gy + 0.45, z));
+          solid = true;
+        }
+        // the fire ring in the lee of it, which is the point of the wall
+        for (let k = 0; k < 8; k++) {
+          const a = k * 0.785;
+          sahPush9(stone, cx + Math.cos(a) * 0.85, gy + 0.11, cz + Math.sin(a) * 0.85,
+                   0.1, a, 0.1, 0.34, 0.22, 0.30);
+        }
+      }
+    }
+
+    // ---- THE TELEGRAPH LINE -------------------------------------------------
+    // It runs east-west across the middle of the map beside the piste, because
+    // that is where it runs in the world, and it is the one thing out here that
+    // is a straight line. A pole every twenty-eight metres: from the ground it
+    // gives the plain a scale, and from the top of the dune it draws the way
+    // back.
+    if (!erg && C[2] <= 20 && C[3] > 20) {
+      for (let px = C[0] + 6; px < C[1]; px += 28) {
+        const pz = 30 + Math.sin(px * 0.02) * 3;
+        if (sahVarBlocked(px, pz)) continue;
+        const gy = sahTerrain(px, pz);
+        sahPush9(poleT, px, gy + 3.1, pz, 0.03, 0, 0.02, 0.28, 6.2, 0.28);
+        for (let k = 0; k < 2; k++) {
+          sahPush9(poleArm, px, gy + 5.5 - k * 0.55, pz, 0, 0, Math.PI * 0.5, 0.14, 1.7, 0.14);
+        }
+        sahStaticBox(game, px, gy + 3.1, pz, 0.5, 6.2, 0.5, 0);
+      }
+    }
+
+    // ---- BONE, GRAVEL LAG AND TRACKS ---------------------------------------
+    // Three ground MARKS, so all three are flat quads at 3 cm of relief and
+    // none of them casts: the rule this codebase has paid for six times is that
+    // a mark is flush and a thing is three-dimensional, and mixing them is what
+    // turns a desert floor into a builder's yard.
+    for (let i = 0; i < (erg ? 22 : 14); i++) {
+      const x = rand(C[0], C[1]), z = rand(C[2], C[3]);
+      if (sahVarBlocked(x, z)) continue;
+      const y = sahTerrain(x, z);
+      const s = rand(1.1, 3.4);
+      sahPush9(lag, x, y + 0.03, z, 0, rand(0, 6.28), 0, s, 1, s * 0.72);
+    }
+    if (!erg) {
+      for (let i = 0; i < 4; i++) {
+        const x = rand(C[0], C[1]), z = rand(C[2], C[3]);
+        if (sahVarBlocked(x, z)) continue;
+        const y = sahTerrain(x, z);
+        // a rib cage, which is four curved staves and nothing else
+        for (let k = 0; k < 5; k++) {
+          sahPush9(bone, x + k * 0.22, y + 0.16 + Math.sin(k * 0.8) * 0.10, z,
+                   0.2, 0.3 + k * 0.06, 1.1 - k * 0.14, 0.07, 0.95, 0.07);
+        }
+      }
+    }
+    // TRACKS. Every photograph of this desert has a set of tyre tracks or a
+    // camel line across it and this chapter had neither, which is most of why
+    // the erg reads as untouched rather than as crossed. Two parallel bands,
+    // running the way the caravan runs.
+    if (erg) {
+      for (let i = 0; i < 3; i++) {
+        const z0 = rand(C[2], C[3]);
+        for (let px = C[0]; px < C[1]; px += 2.2) {
+          const pz = z0 + Math.sin(px * 0.05 + i) * 2.6;
+          if (sahVarBlocked(px, pz)) continue;
+          for (let e = -1; e <= 1; e += 2) {
+            sahPush9(track, px, sahTerrain(px, pz + e * 0.7) + 0.025, pz + e * 0.7,
+                     0, Math.cos(px * 0.05 + i) * 0.13, 0, 2.3, 1, 0.42);
+          }
+        }
+      }
+      // and the HORNS of a barchan: every dune out here trails two, and they
+      // are the shape that makes a dune field read as a dune field.
+      for (let i = 0; i < 2; i++) {
+        const hx = rand(C[0] + 10, C[1] - 10), hz = rand(C[2] + 8, C[3] - 8);
+        if (sahVarBlocked(hx, hz)) continue;
+        const gy = sahTerrain(hx, hz);
+        for (let e = -1; e <= 1; e += 2) {
+          for (let k = 0; k < 7; k++) {
+            const t = k / 6;
+            sahPush9(horn, hx + t * 13, gy + (1 - t) * 1.9 * 0.5,
+                     hz + e * (2.5 + t * 7),
+                     0, e * 0.4 + t * 0.3, 0, 7 - t * 4.5, (1 - t) * 1.9 + 0.25, 4.5 - t * 2.6);
+          }
+        }
+      }
+    }
+
+    const id = 'c' + c;
+    const B = (geo, col, list, cast, recv, nm, opts) => {
+      const m = sahInstance(root, geo, col, list, cast, recv, opts);
+      if (m) { m.name = nm + ':' + id; if (!cast) m.userData.noShadow = true; }
+      return m;
+    };
+    B(sahG.box, PALETTE.sahPalmDry, thorn, false, false, 'sahVar:thorn');
+    B(sahG.box, PALETTE.sahSandDeep, thornDk, false, false, 'sahVar:thornDk');
+    B(sahG.box, PALETTE.sahPlaster, bone, false, true, 'sahVar:bone');
+    B(sahG.quad, PALETTE.sahGravel, lag, false, true, 'sahVar:lag');
+    B(sahG.quad, PALETTE.sahSandShade, track, false, true, 'sahVar:track');
+    B(sahG.cylO6, PALETTE.sahCedarDk, acaciaT, true, true, 'sahVar:acaciaT');
+    B(sahG.cylO6, PALETTE.sahCedarDk, acaciaC, true, false, 'sahVar:acaciaC');
+    B(sahG.cyl6, PALETTE.sahCedar, poleT, true, true, 'sahVar:poleT');
+    B(sahG.cyl6, PALETTE.sahCedarDk, poleArm, true, false, 'sahVar:poleArm');
+    B(sahG.box, PALETTE.sahGravel, stone, true, true, 'sahVar:stone');
+    B(sahG.sphLo, PALETTE.sahSandShade, horn, false, true, 'sahVar:horn');
+  }
+  if (solid) { sahSyncBody(SB); game.world.addBody(SB); }
+}

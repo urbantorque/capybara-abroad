@@ -1,0 +1,338 @@
+// ============================================================ WHAT IS BUILT ==
+/**
+ * FOUR THINGS EVERY PHOTOGRAPH OF THIS COUNTRY HAS IN IT AND THIS CHAPTER HAD
+ * NONE OF.
+ *
+ * Iceland shipped with a town, a church, a harbour, a pier, a hot-dog stand and
+ * a snowcat — six built things over eighty-two thousand square metres, all of
+ * them within fifty metres of each other at the south end. Everything north of
+ * the lava field was landscape with nothing made in it, which is why the walk
+ * to the glacier reads as twice as long as it is: there is no way to measure
+ * progress against anything.
+ *
+ *   VÖRÐUR, the cairns. Before there were roads, the way across a lava field
+ *     was marked by a line of stacked stones you could see from the last one.
+ *     They are the single most useful object that could be added to this
+ *     chapter — a route marker on the one walk everybody makes twice — and
+ *     they are eleven stones each.
+ *   TORFBÆIR, the turf houses. Walls and roof of cut turf on a timber frame,
+ *     because there was no wood and no stone worth quarrying. Grass growing on
+ *     the roof, which is the postcard.
+ *   HJALLUR, the drying rack. A frame of poles with rows of fish hanging in it,
+ *     standing in the wind on the shore, and the one piece of industry in the
+ *     landscape.
+ *   COLUMNAR BASALT. The headland is called basalt in the header, is the thing
+ *     the chapter frames, and was drawn as a lump. Cooling lava contracts into
+ *     hexagonal columns, and that is the reason anybody photographs Iceland.
+ *
+ * Each is its own mesh. That is not bookkeeping: they are in four different
+ * places forty to two hundred metres apart, and a merged mesh spanning all of
+ * them can never be frustum-culled.
+ */
+
+/** The line of cairns, from the last house to the foot of the glacier. */
+const iceCAIRN_PATH = [
+  [22, 66], [26, 44], [30, 24], [34, 4], [37, -16], [38, -34],
+  [37, -52], [35, -68], [34, -84], [33, -98], [32, -112], [31, -126],
+];
+
+function iceBuildCairns(game, root) {
+  const M = iceMerger();
+  const SG = iceStaticGroup(game);
+  for (let i = 0; i < iceCAIRN_PATH.length; i++) {
+    const x = iceCAIRN_PATH[i][0], z = iceCAIRN_PATH[i][1];
+    if (iceIsOverWater(x, z)) continue;
+    const gy = iceTerrain(x, z);
+    if (gy < 0.1) continue;
+    // eleven stones, each smaller than the last, each turned a little, and the
+    // stack LEANS: a cairn built by hand out of what was lying about is never
+    // plumb and that is the whole of why it reads as built rather than grown.
+    const lean = 0.05 + (i % 3) * 0.035;
+    const la = i * 1.7;
+    let y = gy, top = 0;
+    for (let k = 0; k < 11; k++) {
+      const r = 0.66 - k * 0.045;
+      const h = 0.20 - k * 0.008;
+      const off = (y - gy) * lean;
+      M.box(x + Math.cos(la) * off + Math.sin(k * 2.3) * 0.05, y + h * 0.5,
+            z + Math.sin(la) * off + Math.cos(k * 1.9) * 0.05,
+            r * 2, h, r * 1.7,
+            k % 3 === 0 ? PALETTE.iceMoraineDk : (k % 3 === 1 ? PALETTE.iceMoraine : PALETTE.iceBasalt),
+            0.04 * Math.sin(k), la + k * 0.5, 0.04 * Math.cos(k));
+      y += h; top = y - gy;
+    }
+    // and a flat one on the very top, laid the other way, which is what a
+    // cairn-builder does last
+    M.box(x + Math.cos(la) * top * lean, y + 0.06, z + Math.sin(la) * top * lean,
+          0.62, 0.12, 0.86, PALETTE.iceMoraineDk, 0, la + 1.2, 0);
+    SG.add(x, gy + top * 0.5, z, 1.25, top, 1.25, 0);
+  }
+  SG.done();
+  const m = new THREE.Mesh(M.build(), iceVC());
+  m.name = 'iceCairns';
+  m.castShadow = true;
+  m.receiveShadow = true;
+  root.add(m);
+}
+
+/** Three turf houses, dug into the bank on the west side of the lava field. */
+const iceTURF = [[-58, 46, 0.5], [-72, 38, -0.35], [-64, 30, 1.15]];
+
+function iceBuildTurfHouses(game, root) {
+  const M = iceMerger();
+  const G = iceMerger();          // the grass on the roof, which is a second tone
+  const SG = iceStaticGroup(game);
+  for (let i = 0; i < iceTURF.length; i++) {
+    const x = iceTURF[i][0], z = iceTURF[i][1], yaw = iceTURF[i][2];
+    const gy = iceTerrain(x, z);
+    if (gy < 0.2) continue;
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (rx, fz) => [x + rx * c + fz * sn, z - rx * sn + fz * c];
+    // three gables in a row, which is what a torfbær is: not one building but
+    // a terrace of little ones sharing walls, each with its own end wall of
+    // stacked turf facing the weather
+    for (let g2 = 0; g2 < 3; g2++) {
+      const off = (g2 - 1) * 3.6;
+      const [wx, wz] = P(off, 0);
+      // the turf walls: courses of cut sod, laid herringbone, which is why
+      // they are drawn as alternating blocks rather than as a slab
+      for (let k = 0; k < 5; k++) {
+        M.box(wx, gy + 0.30 + k * 0.52, wz, 3.3, 0.50, 4.6,
+              k % 2 ? PALETTE.iceMoss : PALETTE.iceMossPale,
+              0, yaw + (k % 2 ? 0.02 : -0.02), 0);
+      }
+      // the gable end, and the one small window in it
+      const [fx, fz2] = P(off, 2.35);
+      M.box(fx, gy + 1.55, fz2, 3.0, 3.1, 0.22, PALETTE.iceRope, 0, yaw, 0);
+      M.box(fx, gy + 0.85, fz2 - sn * 0.14, 0.85, 1.5, 0.10, PALETTE.iceBasaltDk, 0, yaw, 0);
+      // the roof: two slopes of turf, and grass growing on top of it
+      for (let sd = -1; sd <= 1; sd += 2) {
+        const [rx2, rz2] = P(off + sd * 0.9, 0);
+        M.box(rx2, gy + 3.05, rz2, 2.3, 0.34, 4.9, PALETTE.iceMossPale,
+              0, yaw, -sd * 0.62);
+        G.box(rx2 - sd * 0.06, gy + 3.26, rz2, 2.2, 0.16, 4.8, PALETTE.iceMoss,
+              0, yaw, -sd * 0.62);
+      }
+      SG.add(wx, gy + 1.7, wz, 3.5, 3.4, 4.8, yaw);
+    }
+    // a low turf wall running off the end of the terrace, and a gate post
+    for (let k = 0; k < 7; k++) {
+      const [ax, az] = P(6.2 + k * 1.35, -1.2 - k * 0.25);
+      M.box(ax, gy + 0.34, az, 1.4, 0.68, 1.0, k % 2 ? PALETTE.iceMoss : PALETTE.iceMossPale,
+            0, yaw + k * 0.06, 0);
+      SG.add(ax, gy + 0.34, az, 1.5, 0.70, 1.1, yaw);
+    }
+  }
+  SG.done();
+  const m = new THREE.Mesh(M.build(), iceVC());
+  m.name = 'iceTurfHouses';
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+  const g3 = new THREE.Mesh(G.build(), iceVC());
+  g3.name = 'iceTurfRoofs';
+  // The grass on a roof is a MARK on it — flush, two centimetres of edge, and
+  // it never casts. The alternative is every roof in the row throwing a second
+  // hard shadow eight centimetres inside its own.
+  g3.castShadow = false;
+  g3.userData.noShadow = true;
+  g3.receiveShadow = true;
+  root.add(g3);
+}
+
+/** Two drying racks on the shore by the harbour, and the fish in them. */
+const iceRACK = [[44, 122, 0.35], [52, 114, -0.2]];
+
+function iceBuildRacks(game, root) {
+  const M = iceMerger();
+  const SG = iceStaticGroup(game);
+  for (let i = 0; i < iceRACK.length; i++) {
+    const x = iceRACK[i][0], z = iceRACK[i][1], yaw = iceRACK[i][2];
+    const gy = iceTerrain(x, z);
+    if (gy < 0.2) continue;
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (rx, fz) => [x + rx * c + fz * sn, z - rx * sn + fz * c];
+    const N = 5;
+    for (let k = 0; k < N; k++) {
+      const off = (k - (N - 1) * 0.5) * 2.6;
+      // an A-frame, because a rack has to stand up in an Atlantic gale
+      for (let sd = -1; sd <= 1; sd += 2) {
+        const [px, pz] = P(off, sd * 1.5);
+        M.cyl(px, gy + 1.5, pz, 0.11, 3.1, PALETTE.iceRope, -sd * 0.14, yaw, 0, 6);
+      }
+      const [tx, tz] = P(off, 0);
+      M.cyl(tx, gy + 3.0, tz, 0.09, 3.2, PALETTE.iceRope, Math.PI * 0.5, yaw, 0, 6);
+      SG.add(tx, gy + 1.55, tz, 0.4, 3.1, 3.2, yaw);
+    }
+    // the two long rails, and the fish
+    for (let r = 0; r < 2; r++) {
+      const [rx2, rz2] = P(0, (r - 0.5) * 1.9);
+      M.cyl(rx2, gy + 2.55 + r * 0.34, rz2, 0.07, (N - 1) * 2.6 + 1.2, PALETTE.iceRope,
+            0, yaw, Math.PI * 0.5, 6);
+      for (let f = 0; f < 22; f++) {
+        const [fx, fz2] = P(-((N - 1) * 2.6) * 0.5 + f * ((N - 1) * 2.6 / 21),
+                            (r - 0.5) * 1.9);
+        // a split fish hung by the tail is a long flat wedge, and it TURNS in
+        // the wind: every one at a slightly different angle is the only thing
+        // that stops twenty-two of them reading as a comb
+        M.box(fx, gy + 2.10 + r * 0.34, fz2, 0.10, 0.86, 0.30,
+              f % 3 ? PALETTE.iceRope : PALETTE.iceMud, 0, yaw + f * 0.31, 0.05 * ((f % 3) - 1));
+      }
+    }
+  }
+  SG.done();
+  const m = new THREE.Mesh(M.build(), iceVC());
+  m.name = 'iceRacks';
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+}
+
+/**
+ * COLUMNAR BASALT, on the headland the chapter frames.
+ *
+ * iceBuildCliff draws a nineteen-metre lump with 1,100 puffins on it. The rock
+ * it is made of contracts into HEXAGONS as it cools, in colonnades that step
+ * down to the sea, and it is the single most photographed thing in the country.
+ * Six-sided cylinders, packed on a hex lattice, each a different height and
+ * each with a broken top: it is the same trick the seracs use and it costs
+ * twelve triangles a column.
+ *
+ * They stand round the SEAWARD half of the headland only, and never inside the
+ * puffin colony's ledges — the birds are placed off iceCLIFF.r and a colonnade
+ * standing in that band would have a hundred and fifty birds inside it.
+ */
+function iceBuildColumns(game, root) {
+  const M = iceMerger();
+  const SG = iceStaticGroup(game);
+  const cx = iceCLIFF.x, cz = iceCLIFF.z, R = iceCLIFF.r;
+  const PITCH = 1.55;
+  let n = 0;
+  for (let ring = 0; ring < 5; ring++) {
+    const rr = R + 2.0 + ring * PITCH * 0.87;
+    const count = Math.max(6, Math.round(6.28318 * rr / PITCH));
+    for (let k = 0; k < count; k++) {
+      const a = k / count * 6.28318 + ring * 0.22;
+      // the seaward half only: the landward side is where the player walks up
+      if (Math.sin(a) < -0.15) continue;
+      const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
+      if (z < iceSEA_Z - 26) continue;
+      // stepping down to the water, and broken: a colonnade is a staircase of
+      // hexagons and the tops are never level
+      const h = Math.max(1.6, iceCLIFF.h * (1 - ring * 0.19) - ((k * 7) % 5) * 0.85);
+      M.cyl(x, iceSEA_Y + h * 0.5, z, PITCH * 0.5, h,
+            (k + ring) % 3 ? PALETTE.iceBasalt : PALETTE.iceBasaltDk,
+            0, a * 0.3 + k, 0, 6);
+      // the fractured cap, tilted, which is what makes a colonnade read as
+      // broken rock rather than as organ pipes
+      M.cyl(x, iceSEA_Y + h + 0.09, z, PITCH * 0.48, 0.18,
+            (k % 2) ? PALETTE.iceMoraineDk : PALETTE.iceBasalt,
+            0.06 * Math.sin(k * 1.7), a, 0.06 * Math.cos(k * 1.3), 6);
+      if (ring < 2 && (k % 3) === 0) SG.add(x, iceSEA_Y + h * 0.5, z, PITCH, h, PITCH, 0);
+      n++;
+    }
+  }
+  SG.done();
+  if (!n) return;
+  const m = new THREE.Mesh(M.build(), iceVC());
+  m.name = 'iceColumns';
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+}
+
+/**
+ * THE SHEEP, which outnumber the people three to one and are the only thing
+ * moving in the landscape between the town and the ice.
+ *
+ * Three small flocks, each on its own instanced pair (body and head), each
+ * grazing round a centre on its own slow clock. They are not a mechanic and
+ * they are not a task: they are the thing that makes a hundred and fifty
+ * metres of empty moss read as somewhere rather than as a gap between two
+ * places. They scatter when wheeked at, which is the only thing they do.
+ */
+const iceFLOCKS = [
+  { x: -40, z: 54, r: 13, n: 14 },
+  { x: 62, z: 40, r: 11, n: 11 },
+  { x: -20, z: -46, r: 12, n: 12 },
+];
+const iceSheep = [];             // { body, head, data:Float32Array, def }
+const iceSHEEP_STRIDE = 6;       // x, z, yaw, phase, home a, spook
+
+function iceBuildSheep(root) {
+  iceSheep.length = 0;
+  for (let f = 0; f < iceFLOCKS.length; f++) {
+    const F = iceFLOCKS[f];
+    if (iceTerrain(F.x, F.z) < 0.2) continue;
+    const bodies = [], heads = [];
+    const data = new Float32Array(F.n * iceSHEEP_STRIDE);
+    for (let i = 0; i < F.n; i++) {
+      const a = rand(0, 6.28318), r = Math.sqrt(Math.random()) * F.r;
+      const x = F.x + Math.cos(a) * r, z = F.z + Math.sin(a) * r;
+      const o = i * iceSHEEP_STRIDE;
+      data[o] = x; data[o + 1] = z; data[o + 2] = rand(0, 6.28318);
+      data[o + 3] = rand(0, 6.28318); data[o + 4] = a; data[o + 5] = 0;
+      icePush9(bodies, x, iceTerrain(x, z) + 0.42, z, 0, data[o + 2], 0, 0.52, 0.50, 0.86);
+      icePush9(heads, x, iceTerrain(x, z) + 0.40, z, 0, data[o + 2], 0, 0.26, 0.26, 0.30);
+    }
+    const bm = iceInstance(root, iceG.sph6, PALETTE.iceSnow, bodies, true, true);
+    const hm = iceInstance(root, iceG.box, PALETTE.iceBasaltDk, heads, false, false);
+    if (!bm) continue;
+    bm.name = 'iceSheep' + f;
+    bm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (hm) { hm.name = 'iceSheepHead' + f; hm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+    iceSheep.push({ body: bm, head: hm, data: data, def: F });
+  }
+}
+
+let iceSheepSpook = 0;
+
+function iceUpdateSheep(game, dt) {
+  if (!iceSheep.length) return;
+  const p = game.capy && game.capy.position;
+  if (iceSheepSpook > 0) iceSheepSpook -= dt;
+  for (let f = 0; f < iceSheep.length; f++) {
+    const S = iceSheep[f], D = S.data, F = S.def;
+    for (let i = 0; i < F.n; i++) {
+      const o = i * iceSHEEP_STRIDE;
+      D[o + 3] += dt * (0.18 + (i % 5) * 0.03);
+      // a grazing sheep walks two metres and stops for a minute. The wander is
+      // a slow circle round its own patch of the flock's ground, and the
+      // ANIMAL is the head: it is down in the grass except when it is not.
+      let tx = F.x + Math.cos(D[o + 4]) * F.r * (0.35 + 0.6 * Math.abs(Math.sin(D[o + 3] * 0.31)));
+      let tz = F.z + Math.sin(D[o + 4]) * F.r * (0.35 + 0.6 * Math.abs(Math.cos(D[o + 3] * 0.27)));
+      D[o + 4] += dt * 0.06 * ((i % 2) ? 1 : -1);
+      // and they get out of the way. A capybara is not a threat and they know
+      // it, so this is a shuffle rather than a stampede — six metres of reach
+      // and they come straight back.
+      if (p) {
+        const dx = D[o] - p.x, dz = D[o + 1] - p.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < 42 && d2 > 0.01) {
+          const inv = 1 / Math.sqrt(d2);
+          tx = D[o] + dx * inv * 5.5;
+          tz = D[o + 1] + dz * inv * 5.5;
+          D[o + 5] = 1;
+        } else if (D[o + 5] > 0) D[o + 5] = Math.max(0, D[o + 5] - dt * 0.5);
+      }
+      const spd = (D[o + 5] > 0.02 ? 2.4 : 0.42) + iceSheepSpook * 1.8;
+      const mx = tx - D[o], mz = tz - D[o + 1];
+      const md = Math.hypot(mx, mz);
+      if (md > 0.05) {
+        const step = Math.min(md, spd * dt);
+        D[o] += mx / md * step; D[o + 1] += mz / md * step;
+        D[o + 2] = Math.atan2(mx, mz);
+      }
+      const y = iceTerrain(D[o], D[o + 1]);
+      // the head goes DOWN when it is not moving, which is the whole animation
+      const graze = md > 0.4 ? 0 : 1;
+      S.body.setMatrixAt(i, iceXform(D[o], y + 0.42, D[o + 1], 0, D[o + 2], 0,
+                                     0.52, 0.50, 0.86));
+      if (S.head) {
+        S.head.setMatrixAt(i, iceXform(
+          D[o] + Math.sin(D[o + 2]) * 0.46, y + 0.44 - graze * 0.26,
+          D[o + 1] + Math.cos(D[o + 2]) * 0.46,
+          graze * 0.9, D[o + 2], 0, 0.26, 0.26, 0.30));
+      }
+    }
+    S.body.instanceMatrix.needsUpdate = true;
+    if (S.head) S.head.instanceMatrix.needsUpdate = true;
+  }
+}

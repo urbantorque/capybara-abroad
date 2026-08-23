@@ -1,0 +1,123 @@
+// ================================================================ THE TRADES ==
+/**
+ * A SOUK IS NOT A GRID OF STALLS. IT IS SIX TRADES, AND THEY ARE NOT MIXED.
+ *
+ * The census says this chapter is "a lot of one thing repeated over the biggest
+ * land area in the project" — second-highest instance count, second-lowest
+ * triangle density, 24th percentile for object density. The souk is where that
+ * shows worst: eight by four cells of identical booth, in the one place in the
+ * chapter where the whole point is that every alley smells different from the
+ * last one.
+ *
+ * Marrakech's souks are organised by trade and always have been — the
+ * dyers, the leather, the brass, the spice, the baskets and the carpets each
+ * have their own lanes — so each cell gets ONE of six, decided by its own
+ * coordinates so the trades come in runs rather than a chessboard, and each
+ * trade is a different family of object:
+ *
+ *   DYERS      skeins of wool over a pole, in six colours, dripping.
+ *   BRASS      lanterns strung on wires across the alley, which is the one
+ *              thing that changes the shape of the SPACE rather than filling it.
+ *   SPICE      cones. Nothing else in this game is a cone of powder and
+ *              nothing else looks remotely like one.
+ *   LEATHER    stacked slippers and hides over a rail.
+ *   BASKETS    stacked, nested, and hung up the posts.
+ *   CARPETS    hung flat down the front of the booth, which is the only object
+ *              in the medina that is a big flat coloured rectangle and is the
+ *              reason the alleys read as colourful at all.
+ *
+ * All six are batched per TRADE rather than per cell: a trade runs in a lane,
+ * so its batch is already a long thin box and culls about as well as a cell
+ * would, and six batches beat thirty-two.
+ *
+ * None of it casts. It is all under an awning that already does, in an alley
+ * three metres wide, and a hanging carpet's shadow lands on the wall nine
+ * inches behind it.
+ */
+function sahBuildTrades(game, root) {
+  const wool = [], woolPole = [], lantern = [], wire = [], spice = [], hide = [];
+  const basket = [], carpet = [], carpetTrim = [];
+  for (let ix = 0; ix < sahSOUK_NX; ix++) {
+    for (let iz = 0; iz < sahSOUK_NZ; iz++) {
+      // Trades come in RUNS. (ix + iz*2) walks along a lane before it changes,
+      // so the dyers are three booths together and then the brass starts —
+      // which is what a souk is and what a chessboard is not.
+      const trade = ((ix + iz * 2) / 2 | 0) % 6;
+      const cx = sahSOUK_X0 + ix * sahSOUK_CELL + sahSOUK_BLOCK * 0.5;
+      const cz = sahSOUK_Z0 + iz * sahSOUK_CELL + sahSOUK_BLOCK * 0.5;
+      const gy = sahTerrain(cx, cz);
+      // the stall front faces the alley, which runs in +x
+      const fz = cz + sahSOUK_BLOCK * 0.5 + 0.35;
+      if (trade === 0) {
+        // the dyers' skeins over a pole
+        sahPush9(woolPole, cx, gy + 2.05, fz, 0, 0, Math.PI * 0.5, 0.09, 5.6, 0.09);
+        for (let k = 0; k < 11; k++) {
+          const x = cx - 2.4 + k * 0.48;
+          sahPush9(wool, x, gy + 1.52, fz, 0, k * 0.4, 0, 0.34, 1.05, 0.26);
+          sahPush9(wool, x, gy + 0.98, fz + 0.05, 0.2, k * 0.4, 0, 0.30, 0.55, 0.22);
+        }
+      } else if (trade === 1) {
+        // lanterns on a wire across the alley — the one object here that hangs
+        // in the SPACE rather than standing in it
+        sahPush9(wire, cx, gy + 3.4, fz + 1.6, 0, 0, Math.PI * 0.5, 0.035, 6.4, 0.035);
+        for (let k = 0; k < 9; k++) {
+          const x = cx - 2.7 + k * 0.68;
+          const drop = 0.28 + ((k * 5) % 4) * 0.12;
+          sahPush9(wire, x, gy + 3.4 - drop * 0.5, fz + 1.6, 0, 0, 0, 0.03, drop, 0.03);
+          sahPush9(lantern, x, gy + 3.4 - drop - 0.22, fz + 1.6, 0, k * 0.6, 0,
+                   0.34, 0.46, 0.34);
+        }
+      } else if (trade === 2) {
+        // spice, in cones, in a rank, and the cones are the whole picture
+        for (let k = 0; k < 8; k++) {
+          const x = cx - 2.1 + (k % 4) * 1.35, z = fz - ((k / 4) | 0) * 0.85;
+          const s = 0.36 + (k % 3) * 0.09;
+          sahPush9(spice, x, gy + 0.92 + s * 0.5, z, 0, k, 0, s * 2.0, s * 1.7, s * 2.0);
+        }
+      } else if (trade === 3) {
+        // leather: a rail of hides and four stacks of slippers
+        sahPush9(woolPole, cx, gy + 1.95, fz, 0, 0, Math.PI * 0.5, 0.07, 5.2, 0.07);
+        for (let k = 0; k < 7; k++) {
+          sahPush9(hide, cx - 2.1 + k * 0.72, gy + 1.30, fz, 0.06, k * 0.3, 0,
+                   0.62, 1.20, 0.09);
+        }
+        for (let k = 0; k < 12; k++) {
+          sahPush9(hide, cx - 2.0 + (k % 4) * 1.3, gy + 0.94 + ((k / 4) | 0) * 0.13,
+                   fz - 0.55, 0, k * 0.5, 0, 0.44, 0.12, 0.30);
+        }
+      } else if (trade === 4) {
+        // baskets, stacked and nested and hung up the post
+        for (let k = 0; k < 13; k++) {
+          const col = k % 4;
+          const x = cx - 2.2 + col * 1.5;
+          const lev = (k / 4) | 0;
+          const s = 0.52 - lev * 0.06;
+          sahPush9(basket, x, gy + 0.95 + lev * 0.42, fz - 0.3, 0.04, k * 0.7, 0.03,
+                   s * 2, s * 0.8, s * 2);
+        }
+      } else {
+        // and the carpets, hung flat, which is the only large flat colour in
+        // the medina and the reason the alleys photograph the way they do
+        for (let k = 0; k < 4; k++) {
+          const x = cx - 2.1 + k * 1.42;
+          sahPush9(carpet, x, gy + 1.62, fz, 0.05, 0, 0, 1.24, 2.35, 0.08);
+          sahPush9(carpetTrim, x, gy + 2.78, fz, 0.05, 0, 0, 1.30, 0.14, 0.11);
+        }
+      }
+    }
+  }
+  const B = (geo, col, list, nm, opts) => {
+    const m = sahInstance(root, geo, col, list, false, true, opts);
+    if (m) { m.name = nm; m.userData.noShadow = true; }
+    return m;
+  };
+  B(sahG.cyl6, PALETTE.sahCedarDk, woolPole, 'sahTrade:pole');
+  B(sahG.cyl6, PALETTE.sahTileBlue, wool, 'sahTrade:wool');
+  B(sahG.box, PALETTE.sahCedarDk, wire, 'sahTrade:wire');
+  B(sahG.sphLo, PALETTE.sahBrass, lantern, 'sahTrade:lantern');
+  B(sahG.cone6, PALETTE.sahOrange, spice, 'sahTrade:spice');
+  B(sahG.box, PALETTE.sahCedar, hide, 'sahTrade:hide');
+  B(sahG.cyl8, PALETTE.sahRope, basket, 'sahTrade:basket');
+  B(sahG.box, PALETTE.sahTileGreen, carpet, 'sahTrade:carpet');
+  B(sahG.box, PALETTE.sahBrassDk, carpetTrim, 'sahTrade:carpetTrim');
+}

@@ -1,0 +1,977 @@
+# Untitled Capybara Game — sixteen places, one rodent
+
+A physics sandbox where a mischievous capybara terrorises sixteen places: the Royal Botanic
+Gardens and the Opera House forecourt in Sydney; Sydney Harbour from Circular Quay out to
+Manly, which you cross by DRIVING A FERRY; the plaza, market and Galeras volcano of Pasto,
+Nariño; the torii, temples and matcha terraces of Kyoto and Uji; the river, the painted street
+and the salsa floor of Cali; Copacabana, the Selarón steps and a Carnival avenue in Rio de
+Janeiro; Reykjavík, a geyser field and a glacier in Iceland, **at night**; and the medina,
+the souk and the great dune of Marrakech and the Erg; **the Drift**, which is not a place
+at all; Piazza San Marco and the Grand Canal in Venice, **with the tide coming in**; and a
+neon street in Mong Kok with a bamboo scaffold up the side of it; a bay in **Palawan** whose
+interesting half is **underneath the water**; and a valley of fairy chimneys in **Cappadocia**
+at ten past five in the morning, where the only vehicle has no steering; **Manly**, on the ocean side of the peninsula, where the sea has a shape and it is moving; the flooded campo of the **Pantanal**, which is the one place in this game the animal is actually from; and **Sơn Đoòng**, the largest cave passage on earth, where the only light is the one you make; and the **Antarctic Peninsula**, where the land is four rocks eleven hundred metres apart, the sea has broken ice in it, and the only sensible way to get anywhere is a small orange boat with an outboard on the back. Built with Three.js + cannon-es, styled after *Untitled Goose Game*: flat-shaded
+low-poly, high-key pastel palette, slapstick physics.
+
+In Pasto you can whistle down an Andean condor, grab its talons, and ride thermals off the
+volcano. The flight is real aerodynamics — lift proportional to airspeed squared, banking to
+turn, thermals as a rising airmass. Nothing is on rails.
+
+On the harbour you take the wheel of a small timber ferry and take her to Manly: throttle on one
+stick, rudder on the other, rudder authority that only exists while she has way on, and seventy
+seconds of open water with the Bridge, a regatta, a dolphin escort and two headlands in it. The
+score changes key for the passage and changes back when you step away from the wheel.
+
+In Cali there is a dance floor, and the game asks you to move on the beat of the salsa the band
+is actually playing. The judgement runs off the AudioContext clock the notes themselves are
+scheduled on, so it cannot drift out of sync with what you are hearing — it is the one task in
+the game you cannot brute-force by standing in the right rectangle.
+
+In Rio the beat comes back, and it is deliberately not the same beat. Salsa lets you dance on
+any pulse; samba is in 2/4 and the surdo — the big drum you feel in your chest two streets away
+— lands on the **two**. So Rio's floor is not a floor: it is a hundred and fifty drums walking
+down an avenue, the scoring zone walks with them, and hitting the one is not a near miss, it is
+the wrong beat. Keep station in the column and move on the two.
+
+In Iceland it is dark, and **the ground stops holding you**. A glacier has no friction worth
+the name, so a hundred and thirty metres of ice tongue turns the animal into a toboggan that
+steers badly and tops out near twenty metres a second — the one genuinely new verb in seven
+chapters, and biomes ask for it by publishing `groundSlip(x, z)`. Strokkur will throw you
+twenty-five metres straight up if you are standing on it when it goes; there is a second and a
+half of warning and it is the water doming up blue. And the last two lines of the chapter are
+the quietest things in the game: sit still in a hot spring for seven seconds, and then look up,
+because the aurora comes out and the score grows a **choir**.
+
+The Drift is the ninth chapter and the first one with nobody in it. It is an archipelago of
+floating islands hung over a sea of cloud, in **a third of a gravity**, and it is built on
+three things nothing else here has. The ground is optional: there is far more air than island,
+and every gap is a decision rather than a corridor. **The wheek is a wing** — press the voice
+key with your feet off the ground and the animal squeaks and bounces, one puff per flight, and
+after eight chapters of that noise startling people and buying ferry tickets it is the first
+time it has ever moved the capybara itself. And **the wind turns**: a current runs through the
+void, you can read it in the seed-fluff and in a weathervane on the spawn island, and it swings
+all the way over and back on a thirty-eight second breath. The twenty-five metre crossing at
+the top of the world is impossible into it, marginal in dead calm with a puff, and easy with it
+behind you — so the chapter's hardest task is one you solve by *waiting*, which is a thing this
+game has asked for exactly once before.
+
+Nothing up there can kill you and the design leans on that hard: fall off and you drop for
+several seconds through the dark, land in cloud, and the cloud gathers underneath and hands you
+back up. A chapter about leaping between rocks with nothing underneath cannot also be a chapter
+about being punished for missing — you would stop leaping, and leaping is the chapter. The list
+ends with a paper lantern nine metres tall on the highest island, which will not light until
+six lampflies are following you, and when it does the whole sky comes up with it.
+
+In Marrakech there is a task you can **lose**. Rob the orange cart on Jemaa el-Fnaa and six
+traders come after you through a covered souk they know much better than you do — and they
+chase where they last SAW you, not where you are, so a corner is worth something. Out east
+past the palmeraie there is a sandstorm that takes the visibility to nothing and leans on you
+hard enough to move you, and when it has gone through it is evening, there is a fire, and a
+gnawa band is playing round it.
+
+
+In Venice **the floor is negotiable**. Ten places have quietly agreed on one thing without
+ever saying it — that the ground is where it was the last time you looked — and Venice has
+never agreed to that in its life. A tide runs under the whole chapter on a three-and-a-half
+minute cycle: low, then four rising tones off a siren, then ninety seconds during which
+Piazza San Marco stops being a square and becomes a lagoon with a basilica on the end of it.
+The city puts out its *passerelle* — raised duckboards a metre wide — and while the water is
+up they are the route, which is a real thing that a real city really does. It is one number:
+`isOverWater(x, z)` is simply "is the tide over the paving here", so a place is dry at one
+o'clock and swimmable at two and nothing else in the codebase has to know that is unusual.
+Making it possible meant unpicking a constant nine chapters deep — capybara.js had the sea
+hardcoded at −0.5 in three separate places — and the fix is exact: every other chapter is
+unchanged to the last decimal.
+
+The rest of the chapter is what you would hope. Two hundred pigeons on the paving that all go
+up at once if you run at them, and the game counts how many. A gondola on the Grand Canal you
+can ride the prow of. The Rialto, taken at a run without stopping. And when the water is at
+the top, the whole square swum end to end, under a basilica, in a city that has gone the
+colour of the sky.
+
+Hong Kong is the eleventh chapter and the answer to a question the other ten never asked:
+**up**. Every one of them is locomotion on a plane plus a hop; the Drift added air, but air is
+not height. So Mong Kok gets the first genuinely new verb since the condor — hold the grab key
+against a **bamboo scaffold** and push the stick INTO it, and the animal climbs. Pull away and
+it comes down, sideways shuffles, Space kicks off the wall. It needs no new key, because with
+the camera behind the animal and the wall in front of it, W is up for exactly the reason W is
+forward. Hong Kong is the last place on earth that still builds forty-storey scaffolds out of
+a grass, lashed by hand, and there is one going up on some street there every day of the week.
+
+Above the street, eleven metres up, three bundles of laundry poles cross from one side to the
+other with somebody's washing on the middle one; drop off them onto the biggest neon sign in
+the street and it swings, because you did that. And at eight o'clock the far shore runs the
+Symphony of Lights: sixteen towers across a kilometre of black water coming up **one per beat
+of the chapter's own music**, off the same audio clock the notes are scheduled against, so it
+cannot drift from what you are hearing. The only place you can watch it from is a roof, and
+the only way onto a roof is the bamboo — so the chapter's last verb and its best picture are
+the same gesture. Miss it and it comes round again in two and a half minutes, because nothing
+in this game may be missable for ever.
+
+Palawan is the twelfth chapter and it exists because of a hole in the other eleven. Water in
+this game has been a wall (the harbour), a floor (the tide), a road (the Uji run) and a hazard
+(a glacier's meltwater), and in every one of them the animal paddled across the top of it like
+a duck. A capybara is the finest swimmer of any rodent alive — webbed feet, eyes and ears and
+nostrils all on top of its head so it can sit submerged and watch you, five minutes of breath.
+So: **hold the grab key in the water and it goes down.** Release and it comes back up on its
+own buoyancy; Space is a hard kick for the surface; and the breath is the stamina bar, because
+a bar that already means "how much have you got left" means the right thing.
+
+There is a reef to go over, a drop-off with a wrecked outrigger at the bottom of it, a giant
+clam that opens if you get down to it, and a turtle on a sixty-year lap that you cannot keep up
+with from the surface. And there is a **crack in a limestone cliff whose roof is a metre and a
+half under the water** — the one door into the hidden lagoon, and the new verb is its key.
+Beyond the lagoon a thirteen-metre tunnel goes through to a chamber with a hole in the roof and
+one shaft of light coming down it onto white sand. Twice an evening the plankton comes into the
+bay and every stroke you take lights up behind you, which you have to be *under* to see: the
+chapter's whole argument, in one picture.
+
+Cappadocia is the thirteenth and it is the opposite chapter on purpose — dry, cold, upward,
+and the one place in the game where **you cannot steer**. You get in a balloon and there is no
+stick input at all. There is a burner, it takes about four seconds to answer, and the wind goes
+a different way at every height. So you steer by choosing a height. That is not an invented
+mechanic: it is exactly and only how balloon pilots navigate, everywhere, and it is why they
+all fly at dawn — the layers are cleanest before the ground warms up and stirs them together.
+The whole wind map is drawn in the sky as thin streaks of cloud moving at their own layer's
+speed and bearing, so there is nothing on the HUD to read: look out of the basket.
+
+On the ground there are fairy chimneys to climb — the bamboo's verb, back for a second time,
+now solved against the outward radial of a cone instead of a flat face — a cliff drilled with
+four hundred hand-cut pigeon holes to let the birds out of, a launch field with five crews at
+five different points of the same twenty minutes, and a tether that is not yours. In the air
+there is a chase truck that drives to wherever you are, all flight, so the landing can never be
+unwinnable; and there is the sun coming over the ridge with a hundred and fifty envelopes
+already up, which is the one thing everybody who has ever been there gets out of bed for.
+
+### And when one of them lands
+
+Every chapter has exactly one line on its list that is the reason the chapter exists — the
+condor, the Uji, the chiva up to the mirador, the sky over the glacier, the square going under.
+For a long time all ninety-one ticks sounded identical: stealing a hat in the Botanic Gardens
+and bringing down the northern lights both got one chime and twelve scraps of paper.
+
+They do not any more. A set piece **lifts the score**: three voices open up an octave and a
+twelfth above the pad and a figure climbs the chord, and because that chord is whatever is
+actually sounding, the celebration is in Kyoto's key in Kyoto and in Mong Kok's in Mong Kok
+without a note of it being written per-place. The pad widens under it, the filter opens, the
+paper comes out by the handful, and instead of a toast you get the card the game uses when you
+arrive somewhere — the place, in large letters, and what you just did underneath it. Then it
+takes nine seconds to go away.
+
+It is once a chapter, sixteen times in the game, and that is the whole mechanism: a second one
+in a chapter would halve what the first is worth.
+
+## The middle rung
+
+Every chapter has one moment it is for — the condor over Galeras, the Adriatic arriving in San
+Marco, the far shore of Victoria Harbour lighting a tower per beat — and the game says so, once,
+with a banner and a lift in the score that resolves in that place's own key.
+
+Underneath it there was nothing at all. A hundred and fifteen other lines all got the same tick,
+the same twelve scraps of paper and the same rounded toast, whether they took four seconds or
+half a minute. So there is a **middle rung** now: one set piece per chapter that is worth
+crossing the map for and is emphatically not the postcard. Half the lift, a card instead of a
+toast, and **seventeen of them in a hundred and thirty-three lines** — one everywhere, and a
+second one in the four chapters the pacing audit measured shortest.
+
+They are also what the places are made of between the tasks. Eight of the thirteen are the first
+thing in their biome that MOVES on its own:
+
+| | |
+|---|---|
+| Sydney | a Mr Whippy van doing the promenade, chiming, that you ride the roof of |
+| Pasto | a Carnaval de Negros y Blancos float, four metres of papier-mâché, up the plaza |
+| the Harbour | the Freshwater, thirty-four metres of her, who answers your horn and then washes you over |
+| Kyoto | the bonshō — pull the rope, and you have four seconds to be *inside the bell* |
+| Cali | a fruit barrow chocked on the mirador. Kick the stone out and get in with the mangoes |
+| Rio | the set at Arpoador, built out of `flow()`, so you surf it rather than being shoved by it |
+| Iceland | a humpback in the bay: a fin, a blow, four seconds of nothing, and then thirty tonnes |
+| Marrakech | the acrobats of Amizmiz, who throw you ten metres over Jemaa el-Fnaa |
+| the Drift | seed-heads on the wind. Catch one and you stop falling |
+| Venice | the traghetto — and you stand up for it, because everybody who lives there does |
+| Hong Kong | an open-top down the street, so the neon goes past at head height on both sides |
+| Palawan | eight hundred sardines holding one shape, which opens around you and closes behind |
+| Cappadocia | eleven horses on the valley floor before dawn, because *katpatuka* means the land of beautiful ones |
+
+Two of them fix a pacing hole rather than merely filling one. Cali's barrow runs **down the
+chiva's own road**, so the ninety-second climb to the mirador finally has a way back that is not
+a hundred and sixty metres of walking; and the Freshwater put something on four hundred metres of
+open water that had eleven buoys and six yachts on it and nothing else.
+
+### And a second one where the chapter was short
+
+`qa/pacing.mjs` measures every chapter against a twenty-to-thirty-five minute target and prints
+which are under it. Four were furthest under, and each of them now has a second middle rung —
+chosen so that no chapter has two of the same KIND of moment in it:
+
+| | |
+|---|---|
+| Rio | **o bonde.** The Arcos da Lapa had a deck across it with the comment *"where the tram runs"* and nothing on it, no floor to stand on and no way up. Now there is a viaduct off Rua Lapa, a yellow open tram, and a second one that comes the other way and passes a metre from your feet, out in the middle of the arches |
+| Venice | **il Volo dell'Angelo.** The one chapter whose whole argument is about a metre of water, and the only one that never showed you itself from above. A wire from the belfry of the Campanile to a gilded stage at the far end of the Piazza; the eleven seconds going UP are the set piece, not the flight |
+| Hong Kong | **the lion.** Nine plum-blossom poles in the road, a drum, a gong, and a head of lettuce on a bamboo rig four metres over the last pole. The lion rests on the tarmac with its head down — which is a ramp — and then goes up the poles in eight leaps with you on its back |
+| Palawan | **the manta.** Everything else that has ever carried this animal was on rails. This one is going where it likes: out over the drop-off, a full barrel roll at ten metres, and then it leaves the water with you still on it |
+
+## Things that are simply there
+
+A chapter needs objects that are not switches. Seven places got something that moves on its own,
+is not on any list, and cannot be ridden, robbed or completed:
+
+- **Sydney** — a floatplane on the harbour. It idles at its mooring, taxis, makes its run, does
+  one wide circuit at sixty metres and puts down again. Ninety-four seconds, and it is never the
+  thing you are watching: it is the thing that turns out to have been happening.
+- **Kyoto** — a grey heron in the shallows of the mirror pond. It stands still for a very long
+  time, and if you get within nine metres it goes, with a croak much uglier than the garden it
+  lives in.
+- **Marrakech** — five white storks on the Koutoubia. Four wheeling it on the thermal off eight
+  hundred years of warm stone, and one on the parapet clattering its bill, which is the only
+  noise a stork can make.
+- **Pasto** — twenty-eight vencejos round the bell tower, screaming, at the hour of the evening
+  when they do it. Ring the bell and they all leave at once and take fifteen seconds to forgive
+  you, which is the only interaction there is and it is not a task either.
+- **Cali** — five cometas over San Antonio on forty metres of string, because August is the month
+  of the wind and every hill in that country has kites on it. They hang, they sulk, they take a
+  gust and dive, and somebody you never see hauls them back up.
+- **Iceland** — an arctic fox on the moraine. It is the right animal for this chapter for one
+  specific reason: it does not run away. It stops at about eight metres, looks at you for as long
+  as you can stand it, and goes back to what it was doing.
+- **the Drift** — a skein of long birds crossing the void every couple of minutes, a long way off
+  and a long way down. They exist to give the emptiness a size: there was nothing in the middle
+  distance to measure a twenty-five metre gap against.
+
+Cappadocia has none and does not need one — balloons in the sky, eleven horses on the valley
+floor, a chase truck, a hundred and sixty pigeons on the cliff and five crews on the launch
+field. It is the busiest chapter in the game already.
+
+## Play
+
+**Single file, no build, no server:**
+
+```bash
+start dist/untitled-capybara-game.html
+```
+
+Everything is inlined into that one HTML file; Three.js and cannon-es load from CDN via an
+import map. If your browser blocks module scripts on `file://`, serve it instead:
+
+```bash
+node server.mjs
+```
+
+Then open <http://localhost:5173> (modular source) or
+<http://localhost:5173/dist/untitled-capybara-game.html> (the bundle). Set `PORT` to use
+another port.
+
+## Controls
+
+| Input | Action |
+|---|---|
+| `WASD` / arrows | Move (camera-relative) · steer the condor · **throttle + rudder at the helm** |
+| `Shift` | Run — until the wind goes. Ten seconds flat out empties the bar; blown, it is a walk and no hops until it comes back. |
+| `Space` | **Hop.** Tap it for a kerb; hold it for a ledge — 1.4 m, which is the Opera House podium. Costs stamina. |
+| `E` / `Numpad0` / left click | Grab · press again to throw. Hold while still on soil to **dig**. Grab the condor's talons. Take the ship's wheel. |
+| `Q` | **WHEEK.** One mouth, one button. It startles everyone nearby, it is the ferry's horn, it flaps the condor's wings, it calls a condor down if one is up there — and three of them at a departure point is the ticket to the next place. |
+| `Z` / `X`, right-drag | Orbit camera |
+| `C` | Snap the camera behind you |
+| Mouse wheel | Zoom |
+| `M` | Mute · `` ` `` Perf overlay · `\` debug biome swap |
+| `Tab` | **The journal.** Everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. |
+| `1`..`0`, then `–  =  [  ]  ;  '` | On the title card: pick a place. Ten digits and seventeen chapters, so the last seven are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |
+| `Enter` | On the title card, if there is a saved journey: carry on from where you stopped |
+
+Walk into the harbour and the capybara swims, riding the waterline with its back above the
+surface. It dries off over about eight seconds. Push the stick at the shore and it **hauls
+itself out** — up the sea wall, up the Opera House footing, onto the deck of a boat. It also
+**climbs kerbs and stair treads automatically**: walk into anything under about 0.4 m and the
+legs simply find it.
+
+## The list
+
+198 tasks across seventeen chapters — one per place, because a chapter is somewhere you have to
+travel to.
+
+- **Chapter 1 — Sydney (18).** *Royal Botanic Gardens and the Opera House:* wheek, steal a
+  tourist's hat, make someone spill their flat white, dig up the gardener's prize rose, steal
+  the picnic sandwich, get your photo taken, put the beach ball in the harbour, take the stage
+  at the Opera House, knock over a bin, get chased by the gardener, have a dignified swim, drop
+  the stolen hat in the harbour. *Up the promenade at Circular Quay:* rob the busker mid-song,
+  introduce the seagulls to the chips, stand on a café table, let the dog off its lead, soak a
+  tourist with the sprinkler, stow away on the ferry.
+- **Chapter 2 — Pasto, Nariño (10).** Emigrate (somehow), call down a condor, hitch a ride on
+  its talons, ride a thermal to the crater rim, steal an empanada, bring down a market stall,
+  post something into the crater, make off with a ruana, scatter the coffee harvest, ring the
+  church bell badly.
+- **Chapter 3 — Sydney Harbour (7).** Cast off from Circular Quay, take the helm, sound off
+  under the Bridge, cut through the yacht race, earn a dolphin escort, bring her alongside at
+  Manly, raid the chip shop on the Corso.
+- **Chapter 4 — Kyoto & Uji (8).** Turn up in Kyoto, run the whole torii tunnel, topple a stone
+  lantern, redesign the rock garden, swim in the golden pond, tear through the bamboo grove, get
+  into the matcha at Uji, whisk the largest bowl of tea in Japan.
+- **Chapter 5 — Cali (7).** Land in Cali, sit on the Cat of Tejada, make off with a lulada, get on
+  the chiva, disappear into the sugarcane, **dance salsa properly**, climb up to Cristo Rey.
+- **Chapter 6 — Rio de Janeiro (8).** Turn up in Rio, rob the biscoito Globo man, head the ball
+  into the Atlantic, take Selarón's steps at speed, get in among the bateria, **samba down the
+  avenue on the two**, stow away on the Sugarloaf cable car, take the applause at Arpoador.
+
+The paper only ever shows **four open tasks**, plus the one you have just ticked while it is
+being struck through — never the whole checklist, and never a task from the hemisphere you are
+not standing in. The window follows the biome, so crossing the Pacific swaps the list wholesale.
+
+The top row carries a **bearing arrow and a distance** to wherever that task actually is, a line
+naming the verb underneath it, and a soft beacon standing on the spot itself. Every target is
+resolved live — "the nearest tourist still wearing a hat" moves, and gets robbed — so the arrow
+is never pointing at a stale answer. A task with no place (wheek, whistle) shows the clue and no
+arrow rather than inventing one.
+
+Order is pacing, not filing. Chapter 1 opens on something you can do in ten seconds without
+walking anywhere; chapter 2 puts the condor fourth, so two bits of market mischief teach grab
+and barge and then the bird arrives while it is still the best thing on offer.
+
+The title card lets you start in any of the sixteen, and it is a grid rather than a row of
+tickets now — thirteen torn stubs wrapped into ragged rows and pushed the last chapters
+below the fold on a 720p laptop. Every row carries its own tally once there is one, because
+"Cali, 3 of 8" is the single most useful thing a returning player can be told about a place.
+
+**How you actually travel.** Every place that is not Sydney has exactly one way out of it,
+standing somewhere obvious, using a verb you already have — three wheeks. What has changed is
+where it LEADS: the third wheek opens the **departures board** (the same card Tab opens
+read-only) and you pick. Getting abroad used to cost a ferry, a boat, seven hundred metres of
+open water and a walk up the Corso, and with seventeen chapters that toll would have been paid
+twelve times.
+
+```
+   three wheeks at:                 opens the board, and the board goes to:
+
+   the crater on Galeras            Sydney, always
+   the Uji bridge                   anywhere you have already stood
+   the bridge over the Río Cali     ...plus the lowest chapter you have not finished
+   the rock at Arpoador
+   the end of the pier, Reykjavík   (counting from two: Sydney is eighteen tasks and is
+   the fire at the desert camp       almost never finished early, so "lowest incomplete"
+   the lantern's plinth              would have been Sydney for the first two hours)
+   the two columns on the Molo
+   the end of the Star Ferry pier
+   the end of the bamboo jetty
+   the landing plain, Cappadocia
+```
+
+Five of those are gated by the world rather than by a rule, which is the same trick played
+five times: the desert fire only exists after the storm has passed, the Drift's plinth only
+works once the lantern is lit, Venice's Molo only offers a boat once you have seen the square
+go under, Palawan's jetty only once you have been under the water while it was alight, and
+Cappadocia's landing plain only once you have actually flown — which makes it the one exit in
+the game you have to arrive at by NOT steering. In each case the chapter's last line happens
+where the way out is, by construction.
+
+Task completions are **causation-gated** — a prop that rolls into the water on its own is
+scenery, not mischief, and won't tick anything.
+
+## The voyage to Manly
+
+Chapter 3's verb is not "walk", it is "steer", and the whole chapter is one seventy-second
+passage up the harbour.
+
+The ferry is a **kinematic body driven by velocity**, which is the same trick Sydney's own
+ferry uses — capybara.js already solves in the frame of whatever it is standing on, so the deck
+carries its passenger exactly rather than approximately. Three things make her feel like a boat
+rather than a car:
+
+1. the throttle sets a target SPEED that the engine chases, so it has weight;
+2. **turn rate is proportional to speed** — stopped, the rudder does nothing, which is the
+   entire reason coming alongside feels like coming alongside;
+3. she heels into the turn and squats by the stern under power.
+
+The passage is sized against the map, not against a feeling: 566 m at 10.4 m/s is 64 seconds
+flat out on a dead straight course with nothing to look at. Measured end to end with the Bridge,
+the fleet and the turn alongside, an ordinary passage runs **about 71 seconds**.
+
+The score changes with it. Palette 3 (E lydian, every chord major with a ninth on top, filter
+wide open, root walking I–V–vi–IV) is alive *only while somebody is actually driving* — take
+your hands off the wheel and the quay's own key comes back, so the euphoria is attached to the
+passage rather than to the postcode.
+
+## Eleven biomes, one set of coordinates
+
+All four are authored in the *same* world coordinates. Only one is ever attached, so they cannot
+overlap and none needs an offset. Ownership is captured by intercepting `scene.add` and
+`world.addBody`, so anything a module spawns at runtime — a prop, an NPC — automatically belongs
+to the live biome without any module opting in.
+
+Detaching a biome sets `visible = false` on its scene roots (zero draw calls, geometry stays
+resident so re-entry is instant) and removes every body from the CANNON world (zero broadphase
+and solver cost). Only Sydney is built at boot; the other three are built the first time you
+travel to them.
+
+Anything that asks "is there water under me" or "how high is the ground here" asks the LIVE
+biome, never `game.env`. Sydney's `isOverWater` says yes to everything north of z = -10, which
+is a volcano in Pasto and a shrine hill in Kyoto — see `capyWater()` and `capyGroundY()` in
+capybara.js and `sysGroundY()` in systems.js.
+
+## Layout
+
+```
+CONTRACT.md    locked inter-module contract: palette law, world layout in metres,
+               event names, published API shapes, perf budget, file ownership
+index.html     import map + boot card + error surface
+build.mjs      bundler -> dist/, gated on contract violations and name collisions
+server.mjs     zero-dependency static server (also a QA screenshot sink)
+src/shared.js       PALETTE, cached flat-shaded mat(), TASKS, maths helpers
+src/main.js         bootstrap, frame loop, biome streaming
+src/environment.js  Sydney: terrain, harbour, Opera House, Gardens, promenade, ferry
+src/pasto.js        Pasto: Galeras, Andean terrain, plaza, church, market, coffee farm
+src/quay.js         Sydney Harbour: Circular Quay, the Bridge, the fairway, the
+                    drivable ferry, the regatta, the dolphins, Manly
+src/kyoto.js        Kyoto & Uji: the torii tunnel, Kinkaku-ji and its pond, the dry
+                    garden, Gion, the bamboo grove, the Uji river, the matcha terraces
+src/cali.js         Cali: the Rio Cali, El Gato de Tejada, La Ermita, San Antonio,
+                    the chiva, the sugarcane, Cristo Rey — and the dance floor
+src/rio.js          Rio: Copacabana and its wave pavement, Arpoador, Sugarloaf and a
+                    working cable car, the Lapa arches, the Selaron steps, Santa
+                    Teresa — and the avenue the bateria comes down
+src/props.js        cannon world + 30 prop types, grab/throw, buoyancy, stall collapse
+src/capybara.js     mesh, rig, movement, grab/dig/wheek/swim
+src/condor.js       condor mesh, summon, talon mount, aerodynamics, thermals
+src/npc.js          Sydney tourists/gardeners/ibis and Pasto vendors/abuelas/llamas — FSMs
+src/systems.js      lighting, cameras, input, HUD, WebAudio synth, biome transitions
+qa/                 screenshots captured during live browser QA
+```
+
+Modules only talk through the `game` object and the event bus defined in `CONTRACT.md`. The
+bundler enforces the contract: it fails the build on illegal imports, `export default`,
+`fetch`, dynamic `import()`, or any top-level name declared in two modules.
+
+## The salsa engine
+
+Chapter 5 is the only music in the game the player is asked to move in time with, so it had to be
+right rather than evocative. 100 bpm, because salsa caleña is fast — the local footwork runs
+ahead of Cuban or New York timing.
+
+Four things make it salsa rather than latin-flavoured, and all four are in  in
+systems.js:
+
+1. **The clave is the bar line.** Son clave 2-3, five strokes across TWO bars, written out as
+   absolute eighths over the whole cycle so the two halves can never be swapped — the one mistake
+   that sounds wrong to everybody in Cali and to nobody else.
+2. **The bass does not play on one.** The tumbao plays the bombo (the and of two) and beat
+   four, and the four ANTICIPATES the next chord.
+3. **The piano plays a guajeo, not chords** — an ostinato of syncopated octaves whose accents
+   fall on the off-eighths, so it interlocks with the bass instead of doubling it.
+4. **The harmony is a vamp**: i – iv – V7 – i in A minor, two bars a chord, round and round.
+   Salsa is not a progression you follow, it is a groove you stand inside.
+
+Six synthesised voices: clave (two hardwood partials, 80 ms), congas (heel / slap / open tone,
+each a struck membrane that drops in pitch), campana, tumbao bass, montuno piano, and a brass
+stab that only shows up once a cycle.
+
+The dance floor reads the same clock the notes are scheduled on.  publishes
+,  (signed distance to the nearest beat, in beats) and ; cali.js
+scores a step when the capybara turns, hops or wheeks within 0.19 of a beat, one step per beat,
+eight in a row to pass. Measured: 24 key presses over eleven seconds produced exactly 8 scored
+steps, because the presses inside an already-scored beat are correctly ignored.
+
+## The salsa engine
+
+Chapter 5 is the only music in the game the player is asked to move in time with, so it had to
+be right rather than evocative. 100 bpm, because salsa caleña is fast — the local footwork runs
+ahead of Cuban or New York timing.
+
+Four things make it salsa rather than "latin-flavoured", and all four live in the `sysMUS_*`
+tables in systems.js:
+
+1. **The clave is the bar line.** Son clave 2-3, five strokes across TWO bars, written out as
+   absolute eighths over the whole cycle so the two halves can never be swapped — the one
+   mistake that sounds wrong to everybody in Cali and to nobody else.
+2. **The bass does not play on one.** The tumbao plays the bombo (the "and" of two) and beat
+   four, and the four ANTICIPATES the next chord.
+3. **The piano plays a guajeo, not chords** — an ostinato of syncopated octaves whose accents
+   fall on the off-eighths, so it interlocks with the bass instead of doubling it.
+4. **The harmony is a vamp**: i – iv – V7 – i in A minor, two bars a chord, round and round.
+   Salsa is not a progression you follow, it is a groove you stand inside.
+
+Six synthesised voices: clave (two hardwood partials, gone in 80 ms), congas (heel / slap / open
+tone, each a struck membrane that drops in pitch as the head relaxes), campana, tumbao bass,
+montuno piano, and a brass stab that only turns up once a cycle.
+
+**The dance floor reads the same clock the notes are scheduled on.** `game.music` publishes
+`beats()`, `off()` — signed distance to the nearest beat, in beats — and `beatInBar()`; cali.js
+scores a step when the capybara turns, hops or wheeks within 0.19 of a beat, one step per beat,
+eight in a row to pass. Measured: 24 key presses over eleven seconds produced exactly 8 scored
+steps, because presses inside an already-scored beat are correctly ignored.
+
+## The journey
+
+Eight chapters is a different shape of game from two, and four things had to change with it.
+
+**It saves.** Seventy-four tasks is well over two hours and a session is twenty minutes; those
+two numbers cannot both be true unless the game can be put down. One `localStorage` key holds
+your ticks, your records, where you were and how long you have been at it. The title card grows
+a **Carry on** row. Starting somewhere fresh from the picker clears it — deliberately, and only
+once you have actually chosen.
+
+**There is no commute.** Getting abroad used to mean: find the ferry in Sydney, stow away,
+arrive at the Quay, find the wheel, sail seven hundred metres to Manly, walk up the Corso,
+three wheeks. That is a chapter the first time and a toll booth the seventh. Every place still
+has exactly **one** way out of it, standing somewhere obvious, using a verb you already have —
+but the third wheek now opens a **departures board** instead of picking your destination for
+you. Anywhere you have stood is two minutes away rather than twenty.
+
+**Finishing a place is a moment.** The last tick in a chapter used to look exactly like the
+third, and then the paper quietly changed country. Now the place card comes back up with the
+tally, the time that chapter took, and how many of the eight you have closed.
+
+**Some things are worth doing well.** Every task is a switch — you have done it or you have
+not — which is right for *steal a hat* and quietly wasted the best twenty seconds in the game.
+Eight tasks now keep a number: the top speed off the glacier and off the great dune, how fast
+you shook the souk, Selarón's steps against the clock, the longest run on the beat in Cali and
+on the two in Rio, how far Strokkur threw you, and how long you sat in the hot spring. Nothing
+is ever gated on one. A record that blocked progress would put an exam inside a game about
+being a nuisance.
+
+## The water, the hills and the air
+
+Three things the physics had never actually modelled, all of them found by asking what a
+shared module knew about the twelve chapters written after it.
+
+**Water existed in eight chapters and Archimedes existed in one.** `physCheckWater` was
+gated on Sydney being live, with a comment explaining that every water path was Sydney's —
+which was true when the harbour was the only water in the game and had been wrong since
+Kyoto. A prop thrown into Venice's flooded square, Palawan's bay, the Río Cali, the Uji or
+the harbour at the Quay fell through the surface and slept on the bottom. Every query
+inside it now asks the LIVE biome, the same rule capybara.js has always used, and the
+seabed comes from the biome's own terrain rather than a fixed 2.3 m of harbour. Measured
+after: a ball dropped six metres into a Venice canal settles at `waterLevel - 0.03`, which
+is the waterline its type table asked for.
+
+Four more of the same shape were in the same file: an invisible Galeras crater shoving and
+eating props in eleven worlds, `physOverWater` falling back to Sydney's `z < -10` rule so
+half of every world counted as harbour, `physSurfaceY` answering 0 for eleven biomes, and a
+fall-rescue that teleported home anything legitimately afloat.
+
+**A hill cost nothing to walk up.** Eleven biomes publish `slopeAt(x, z)` and nothing in the
+codebase had ever read it, so the great dune, the flank of Galeras, the switchbacks up
+Cristo Rey and the moraine all walked at exactly the speed of flat paving. The grade is now
+sampled from the terrain along the direction of travel — signed, which `slopeAt` cannot be —
+and run through **Tobler's hiking function**, the standard empirical curve for walking speed
+on a gradient. It is not symmetric, and that is the interesting part: it peaks slightly
+DOWNHILL, which is why a gentle descent is free and a steep one is not. Floored at 0.42 of
+the flat speed, because a slope you cannot climb is a wall rather than a run, and switched
+off wherever the ground is already sliding so it cannot fight the slip model. Measured: flat
+ground is still 4.2 m/s to the decimal, and a 46° pitch is 1.76.
+
+**The air is a fluid.** Props carry quadratic drag, ½·ρ·Cd·A·|v|v, with the area and drag
+coefficient baked per shape at spawn — so a hat and a bin no longer fall identically, and
+the Drift's wind and Marrakech's storm carry light things exactly as far as they should.
+
+### Three ways to move a capybara, and only one of them is a velocity write
+
+    platVX / platVZ   a FRAME you are standing or flying in    deck, wind aloft, current
+    capy.launch()     being THROWN, feet off the ground        geyser, cable, wave
+    capy.shove()      being LEANED ON, still on your feet      sandstorm, bow wave, crowd
+
+The third one is new, and it exists because **Marrakech's sandstorm moved the animal a
+measured nothing**. Every biome updates before capybara.js, whose movement solve re-derives
+the horizontal velocity, damps it at λ = 60 — 63% of anything injected, gone in one frame —
+and then snaps whatever is left under 0.9 m/s to exactly zero. The storm was pushing 0.103
+m/s per frame into that. `capy.shove()` is added after the damper and after the snap and
+widens the speed cap by its own size, so it is the one channel a sustained lean survives.
+Iceland's geyser had the milder form of the same disease: the vertical throw survived
+because nothing damps vertical, but the outward scatter was inside the damper, so everybody
+came off Strokkur going perfectly straight up.
+
+And a kinematic carrier must difference its velocity against its **previous target**, never
+against its own position: cannon integrates kinematic bodies inside `world.step`, which runs
+before every module update, so `(target - body.position)` is the distance the last velocity
+already travelled and the sign flips every frame. Measured on a parked machine: +7, −7, +7
+m/s for ever, which is the number a passenger's reference frame is solved against.
+
+## Iceland gets a way back up
+
+The world-size audit measured scenery density along every chapter's walking route and found
+one failure. More than half of Iceland is empty ground, and the dead stretch is the hundred
+and sixty metres between the town and the top of the glacier — the approach to the best
+twenty seconds in the game. Because `glacier-run` keeps a record, that walk is paid again on
+every attempt: the emptiest ground in the game was the toll charged, repeatedly, on the best
+thing in it.
+
+The fix is deliberately not more scenery — the austerity is the chapter. It is a **piste
+machine that patrols the moraine**, the same trick as the caravan across the hamada and the
+Star Ferry across Victoria Harbour, which is exactly why those two long chapters measure
+fine and this one did not. Slide down, step on at the snout, ride back to the cairn, go
+again. It holds at the bottom while you are walking towards it, capped, because a fixed
+timetable just moves the waiting thirty metres down the hill.
+
+Its deck is 0.9 m off the ground, which is a deliberate hop and nothing more. The first cut
+put it at 2.7 m, which is a machine you can admire and cannot board.
+
+## Every chapter has a number in it now
+
+Twenty-eight records across sixteen places, and not one of them in the first three chapters —
+so the three places a player meets first were the only three with nothing to come back for.
+Three were added, each hanging off the task that is already the best thing in its chapter:
+**the passage up the harbour against the clock**, **how high the condor carried you** (above
+the ground under you, and only while you are actually hanging off the talons), and **how
+many gulls you got onto the chips at once**.
+
+And a finished chapter is no longer a blank card. The paper used to jump to the lowest
+incomplete chapter the moment you ticked the last thing, which put tasks on it that cannot
+be attempted from where you are standing — the one rule the todo window has always had is
+that it never shows a task from the hemisphere you are not in. It now stays on the place you
+are in and turns into that place's **record board**: every number you hold here, and the way
+on, in words, because a player who has just finished somewhere is exactly the player who has
+stopped looking at the map.
+
+## The title card is sixteen postcards
+
+It was thirteen identical beige rectangles with words in them, which told a returning player
+nothing about anywhere. Every chapter now carries a small flat-shaded scene of its own
+place, drawn out of **that biome's own palette** — the Opera House shells leaning and
+stepping down in size, a torii on a matcha hill, Galeras under a plume with a condor off to
+one side, the void under the Drift's islands, neon over Mong Kok, karst standing in water
+with the reef visible under the line of it, balloons over Cappadocia at dawn.
+
+Hand-authored geometry rather than art assets, because the contract forbids external files
+of any kind and because it is exactly what the game itself is: a handful of flat polygons in
+the same colours at the same grain. Every mark is under a dozen shapes.
+
+The grid used to be a bento with an exact cell count — chapter one spanning two columns and
+two rows, four columns, therefore exactly twelve other chapters. That is arithmetic, not
+layout, and it broke on the fourteenth. The hero is out of the grid now and the column count
+is computed; see **The picker had to stop being arithmetic**, above. A finished place still
+shows what you are going back to beat, which is the single most useful thing the picker can
+say to somebody deciding between sixteen doors.
+
+## Manly, and the sea gets a shape
+
+Three of these chapters are in Sydney and two of them are played on the harbour, which is a
+flat pale sheet that exists to be fallen into. That is what harbour water IS. Seven hundred
+metres north-east of the last one, over a low sandstone spine and down the Corso, is the other
+kind — and the whole argument for a fourteenth chapter is that they are not the same thing and
+the game had never once said so.
+
+**The waterline is a function of position now.** For thirteen chapters `waterLevel` was a
+number, one height for the whole sea, which is why Venice could have a tide (the number moves)
+and nowhere could have a wave (the number is not a function of where you are). A biome may now
+declare `localWater: true` and the controller asks `waterHeightAt(x, z)` instead. That is the
+entire change to capybara.js; the other fifteen chapters cost one property miss. Everything
+falls out of it: the animal rides up and down on the swell because the buoyancy spring it has
+always had is now chasing a surface that moves, the swash picks you up off the sand because
+"is there water here" is a question about both the water and the ground, and a wave arriving
+is a thing that happens TO you rather than a thing drawn near you.
+
+The swell is real shallow-water physics and it had to be, because the fake version does not
+read. A wave travels at `sqrt(g*d)`, so as it comes up the beach it slows down and — its
+period being fixed — it gets **shorter**: sixty-six metres out the back, thirty-two over the
+bank, nineteen in the shorebreak. Waves bunch up as they arrive, which is what a beach actually
+looks like from a beach and which hands the player three or four separate lines of white to
+read instead of one long gradient. It is integrated once into a table of phase against distance
+from the sandbar, and because the crest lines are contours of the bathymetry the swell refracts
+round the bar without a line of code about refraction.
+
+Nine crests in the set, eight and a half seconds apart — five of the nine break on the bank and
+exactly one is *the* wave, and it comes round every seventy-six seconds whether anybody is
+watching. Get in front of it and the water takes you: measured, forty-four to forty-six metres
+from the bank to dry sand at five and a half metres a second. The bank is bent, so the break
+peels along the beach and there is a peak to stand on. There is a **rip** at the west end — a
+gutter through the bar where nothing breaks and everything drains, at 4.2 m/s against a swim
+speed of 2.6, so it cannot be beaten by swimming at it, only crossed. That is not a difficulty
+setting, it is the actual advice, and it is also the fast way out the back, which is exactly
+what the locals use it for. And you can **duck-dive**: hold E and the bore, which is the top
+metre of the column and nothing else, goes over you.
+
+Also on the beach: a surf boat that launches on its own clock whether or not you are in it and
+rows straight at the thing everybody else is swimming away from; an ocean pool cut into the
+rock at Fairy Bower with flat water in it ten metres from water that is anything but; a blue
+groper round the point at Shelly who will come and have a look at you; and the red and yellow
+flags, which you can **pick up and plant somewhere else**, at which point the entire beach gets
+up and follows.
+
+## The Pantanal, where the capybara is not a novelty
+
+Fifteen places and the animal had never once been anywhere it is from. That is the joke the
+whole game is built on — a capybara in an opera house, a capybara in a souk, a capybara in a
+hot air balloon — and it only works because there is somewhere it would not be a joke.
+
+Nothing here is startled by you. Nothing chases you. Nobody takes your photograph. You are
+about the fourth strangest thing in the frame, behind a bird the size of a person, a lizard the
+length of a car and something with a tail like a chimney brush.
+
+**The herd is the mechanic.** Wheek near another capybara and it comes; wheek again and the
+next one comes. They string out behind you in a real line — each follower walks to where you
+actually WERE, off a trail sampled every thirty-five centimetres, so the line bends round the
+termite mound because *you* bent round it. There is no flocking and no steering behaviour,
+which is why it cannot pile up, orbit, oscillate or walk through the thing you just went round.
+The marquee is not a stunt: it is being at the front of five of your own kind going into a
+river at sundown, and the sundown is not on a clock — it starts when you go in.
+
+The rest of it is a road. The Transpantaneira is a hundred and forty-seven kilometres of dirt
+on an embankment with a hundred and twenty-two wooden bridges, and the real one is missing
+planks, so this one is too. Off it: a bay you cross on floating meadow that holds a capybara
+for about a second and a half a mat, jacarés asleep on a sandbar (you can sit on one; they
+genuinely do not mind), giant otters who will tell you exactly what they think of you, a jabiru
+nest the size of a car up a dead tree with termite mounds for stairs, hyacinth macaws shouting
+in an acuri palm, a cowbird that rides on your back because that is its whole job description,
+and a giant anteater walking its lap of the campo on its knuckles, which will carry you the
+length of it without breaking stride or ever noticing.
+
+## Sơn Đoòng, and your voice is the torch
+
+Sixteen chapters and the game had never turned the lights off. It has been night four times and
+every one of those is a night with a sky in it — which is to say a night you can see perfectly
+well.
+
+Press **Q** in the dark and the cave answers. A pulse of light goes out from the animal, lights
+whatever it reaches, and dies. So the wheek — which for fifteen chapters has been a noise you
+make because it is funny — is the torch. That is not a new control and it is not a new button:
+a capybara has one mouth and the context decides what the noise means. It has meant hello, a
+condor, a ferry's horn, a burst of lift in the Drift and a ticket out of a chapter. Here it
+means *where am I*.
+
+Three things make light in here and they are the whole palette. Your echo, on a one-second
+clock, reaching forty metres. The glow-worms, faint and permanent, which are the map — they
+hang over the river and nowhere else, because that is where the insects are, so a player who
+has understood nothing else can follow the blue-green dots and get where they are going, and
+the reason that works is entomology rather than level design. And the **doline**: two hundred
+and fifty metres up, the roof has fallen in, and there is a jungle growing on the floor
+underneath the hole. None of that is invented.
+
+The passage is ninety metres across and sixty to the roof. There is a river down one side with
+something in it that has no eyes, a stalagmite twenty-six metres tall with a spiral of
+flowstone ledges up it, a roost of swiftlets — who steer on sound as well, which is the joke
+and is also true — and, at the far end, seventy metres of calcite across the whole passage
+that you have to climb. Everything green in here leans the same way, because everything green
+in here is growing toward the light.
+
+## The picker had to stop being arithmetic
+
+The title card's chapter grid was a bento: four columns, chapter one spanning two by two, and
+therefore *exactly* twelve other chapters or a ragged half-row at the bottom. That is a layout
+problem disguised as a maths problem and it held for precisely as long as there were thirteen
+places.
+
+- **The hero is out of the grid entirely.** Chapter one is a full-width row of its own above
+  the shelf. It gets more space than it ever had, and the number of chapters no longer has to
+  divide by anything.
+- **The column count is computed.** `sysPickCols(n)` tries four, five and six and takes the one
+  that leaves the fullest last row. Fifteen gives five and three full rows; seventeen gives
+  six; nineteen gives five. Nine lines, and it will still have an answer at forty.
+- **The shelf scrolls; the card does not grow.** Fifteen tiles is three rows and thirty would
+  be six, and a card that grows without limit pushes the control legend — the only statement of
+  the control scheme this game has — off the bottom of a 720p laptop. Measured: the card was
+  803 px in a 720 px window before this and 717 after, which is the whole of it visible
+  including the key list.
+- **Every tile is the same object.** The subtitles run from three words to nine; clamped to two
+  lines with a floor under the body, the shelf is a grid the eye can run down rather than a
+  ragged wall of boxes.
+- **The keyboard runs to twenty places** (`1`-`9`, `0`, then `–  =  [  ]  ;  '  ,  .  /  \`),
+  and a row past the end of the table simply gets no badge and stays clickable.
+- **The departures board carries the same pictures.** It is the other half of the same
+  decision — which of these places do I want to be in — and it was answering it in a completely
+  different language. Sixteen lines of text is a timetable; one small mark per row makes the
+  board scannable by colour, which at sixteen rows is the only way anybody scans anything.
+
+## Performance
+
+Measured live at 1280×760:
+
+| | draw calls | triangles | bodies |
+|---|---|---|---|
+| Sydney | 130 | 61.5k | 129 |
+| Pasto | 77 | 68.8k | 61 |
+| Sydney Harbour | 50 | 12.2k | 10 |
+| Kyoto & Uji | 50 | 44.5k | 128 |
+| Cali | 53 | 59.0k | 62 |
+| Rio de Janeiro | 47 | 48.6k | 44 |
+
+Budget is <220 calls, <130k triangles, <130 bodies **per live biome**, 60 fps. Repeated flora
+and crowd filler use `InstancedMesh` — the whole Andean landscape is one draw call, 700 plants
+are six, and 260 bamboo stems are one. Static architecture bakes to one vertex-coloured merged
+geometry per set-piece: the entire Circular Quay terminal is a single draw call and so is every
+headland in the harbour. No allocations in any per-frame update.
+
+Kyoto's forty-four torii are eighty-eight box colliders on **forty-four bodies**, not
+eighty-eight: both legs of a gate ride one body (`kyoStaticPair`). That one change is the
+difference between 172 bodies and 128.
+
+## How it was built
+
+A capped swarm: 1 coordinator, 5 developer agents (one per module), 4 harsh critic agents,
+across a 30-round campaign. The coordinator locked `CONTRACT.md` first so the developers could
+work in parallel without conflicting, then ran develop → build → critique → fix each round,
+doing integration and live browser verification itself.
+
+The pattern that mattered most was **independent verification**. Developer agents reported
+confidently on work that did not survive measurement, three times. An adversarial verifier
+agent — told to reproduce from a fresh page load and assume nothing — caught two hidden
+gravity-cancellation cheats in the flight model that would otherwise have shipped, including a
+launch assist worth +10.1 m of free altitude, farmable on every re-grab.
+
+Bugs that only live playtesting caught, all fixed:
+
+**The fourth pass — a verification sweep over all five chapters,** driving `game.tick()` from a
+headless harness and reading the RENDERED frame back. Two faults survived the third pass, both
+of them invisible to any test that only asks whether a task can be ticked:
+
+- **The capybara was off screen for the whole of the torii run.** The tunnel is forty-four
+  gates, 4 m tall and 5 m wide in the clear, spread over about 61 m of S-curving path — so they
+  stand roughly 1.4 m apart. The camera boom is a straight line back from the animal at a fixed
+  pitch, and the hill climbs at very nearly that same pitch, so all the way up the run the eye
+  rode about 2.2 m over the ground it was passing. That is leg height. Measured on the live rig:
+  boom 9.77 m, three meshes across the sight line at 5.1, 5.3 and 6.4 m, and no capybara in
+  frame — for the longest task in the chapter. Raising the eye over the gates does not fix it
+  either: at 1.4 m spacing under a kasagi 0.8 m deep the tunnel has a ROOF, and from above you
+  get a red floor and still no animal. What works is the shot the place is actually famous for.
+  The eye goes INSIDE the corridor, on the centreline, back along the **path** rather than along
+  the boom, looking up the tunnel through the gate openings. Three things had to be true
+  together and each was found by getting it wrong first: the eye is referenced to the ground
+  under the **animal**, not the ground under itself (the rail point is downhill, and referencing
+  it locally put the eye level with the animal's feet); the sight line is **solved** rather than
+  guessed, by sampling the ground along it and lifting until it clears (eight samples, exact for
+  the straight line it is testing); and the rail **stops walking back** once the path has fallen
+  more than 1.5 m below the animal, because staying under the gate over the eye and staying above
+  the animal only coexist near its own level — which also shortens the boom on the steep pitches,
+  leaving fewer stair noses in the way.
+
+  Honest about where this landed: the tunnel now reads as the tunnel and the animal is framed in
+  it for most of the climb, against a baseline where it was visible nowhere on the run. On the
+  steepest two or three pitches a stone tread can still cut across the animal when it comes to
+  rest in exactly the wrong spot; it clears as soon as it moves. Three separate automated
+  visibility metrics were tried and all three proved invalid — a raycast that counted the
+  capybara's own body as an occluder, a colour histogram that missed it under shaded light, and
+  a hide-and-diff that hid the wrong node — so the framing above was judged from rendered frames
+  by eye, and the residual is stated rather than measured.
+- **The second passage to Manly was dead scenery.** `onEnter` put the ferry back alongside at
+  Circular Quay — "a fresh arrival is always a fresh departure" — but left the voyage flags
+  where the last trip had ended them. The travel chain loops back through Sydney, so you can
+  stow away and return to the Quay; on that second visit `arrived()` already answered true
+  before you had cast off, so the arrival never re-armed, the horn under the Bridge had no joke
+  in it, the regatta mask was spent at -1, and the dolphins had been earned once and would never
+  come back. The checklist stays ticked — that is systems.js's business — but the staging now
+  resets with the boat.
+
+Verified after both: a 120-second random-walk soak in Sydney with the hop bound in (zero
+exceptions, camera 8.3–13.1 m, longest stall one frame); a complete chapter-3 passage in 63.6 s
+ticking cast-off, the dolphins, the Bridge, the regatta and the arrival, and a second passage
+after a round trip that stages all of it again; all seven of Kyoto’s playable tasks; *Post
+something into the crater* and *Scatter the coffee harvest* end to end off a 60 ms tap on the
+grab key; and all five biomes inside the perf budget with no exceptions.
+
+**The third pass — smoothness, juice, and a bug hunt.** Measured with a headless harness that
+drives `game.tick()` at chosen frame times and reads the RENDERED transform back:
+
+- **The landing had never fired.** `const wasAir = !grounded`, evaluated on the very frame the
+  contact appears — on which `grounded` is already true. So the branch required
+  `grounded && !grounded`, and the landing thud, the camera bump for a long fall and the
+  squash had never been seen or heard by anybody. Now keyed off the previous frame's air time,
+  with the impact speed remembered from the fall (the solver has already resolved the contact by
+  the time capybara.js runs, so `velocity.y` on the landing frame is about zero).
+- **The rendered transform sawtoothed under variable frame time.** cannon's interpolation alpha
+  is `accumulator / step` measured AFTER the substeps, so when frame times wobble some frames
+  take two steps and some take none and the alpha is not monotonic. Both the capybara and the
+  condor now PREDICT with the velocity the solver just produced and correct toward the
+  interpolated transform, which is exact at constant velocity — measured, rendered speed holds
+  to 0.1% under ±30% of jitter on dt — and eats the sawtooth the rest of the time.
+- **The camera's eye and its look target were damped at different rates** (7 and 5). The camera's
+  ANGLE is the difference between two independently smoothed points, so unequal rates wobble the
+  angle even when both points are perfectly smooth. Harmless at 9.5 m on the ground; a visible
+  shimmy of the whole horizon at 24 m behind a condor. Matched in flight.
+- **The harbour rippled at the display rate**, not in seconds: `quayRippleT += 1/60` inside a
+  `dt`-driven update, so the swell ran 2.4× too fast on a 144 Hz panel.
+- **The capybara moved in total silence.** Everything else in the mix is an EVENT; a footfall is
+  the texture underneath them. Footsteps now fire off the gait phase itself (two per cycle — a
+  capybara is a diagonal-couplet walker), with three surface voices chosen by a handful of
+  rectangle tests: soft ground, stone, and hollow timber for a wharf or a deck.
+- **The ambient bed put Sydney seagulls over a Kyoto temple garden.** It was written as "a gull,
+  unless you are in the Andes", which was right for two biomes and wrong for five.
+
+**The second pass — reported as "the Sydney map seems very buggy: after a few moments the capy
+drifts off the screen and it can't move any more and the game kind of stops."** That is two
+separate faults, both reproduced in a headless harness that drives `game.tick()` with synthetic
+key events:
+
+- **The harbour was a one-way trip.** The sea wall is a solid box whose top stands at y = 0.45
+  and the capybara floats at y = -0.42, so a swimmer pressing the stick at the shore pushed
+  into the wall for ever: position pinned at z = -10.68 with a standing 0.92 m/s of intent, and
+  no way back onto land anywhere within 25 m of the Opera House. Fixed by giving the animal a
+  clamber — latched, not per-frame, because the swim state switches off 0.25 m into the climb
+  and a per-frame version oscillates at 2 Hz and never gets out.
+- **The camera's Opera House keep-out was four times the size of the Opera House.** One fat AABB
+  (x ±14.5, z -13.5..5.5, y < 17) covering the whole podium footprint from the ground up. Walk
+  north across the forecourt, or swim anywhere off the seaward face, and the boom was inside it
+  on every frame; the pull-in bottomed out and the last-resort fallback parked the eye at y = 20
+  and left it there. From twenty metres up at a 41° pitch the capybara is four pixels of brown.
+  Replaced with one leaning ellipse per vault and a rise capped at 6.5 m above the anchor.
+- **A quick click never picked anything up.** The 0.10 s grab wind-up was cancelled the instant
+  the key came back up — and 0.10 s is shorter than a mouse click. Measured against a 60 ms tap
+  the grab never fired at all. This is also why *Scatter the coffee harvest* and *Post something
+  into the crater* both read as broken: they are grab tasks.
+- **Boarding the condor threw away whatever you were carrying.** capybara.js runs before
+  condor.js, so one press of E released the prop *and* mounted the bird. The crater is only
+  reachable by air, so 'Post something into the crater' had no route at all. Now the capybara
+  defers when the talons are in reach, and while flying the action key is a bomb release rather
+  than a dismount.
+- **One exception killed a module for the rest of the session.** main.js spliced any updater out
+  of the loop on its first throw, silently. A single bad frame in capybara.js therefore ended
+  the game — the animal stopped answering the keys and drifted wherever the solver left it,
+  which is the other half of the reported symptom. Modules now get three strikes and a visible
+  report.
+- **The bamboo dash could never complete.** `if (kyoBambooEnter < 0)` as a not-yet-entered
+  sentinel, in a grove centred at z = -44: every honest entry z is negative, so the mark was
+  re-armed every frame and the distance travelled was always zero.
+
+- **The condor could not carry the capybara.** Airspeed collapsed from 19.3 to 0.7 m/s on
+  mounting; ceiling 8.8 m against a 45.6 m crater rim, so Pasto was unfinishable. Three
+  real causes: the roll stick was sign-inverted (commanded east, the bird rolled west and
+  locked onto the exact reciprocal heading, so it could never be flown into a thermal at all);
+  lift was applied along the body up-axis instead of perpendicular to the relative wind, so
+  letting the nose fall off the flight path stopped the wing being a wing; and the wingbeat
+  added 15% of body weight as free vertical lift.
+- **Half of all pickups flew the passenger into the church.** The autopilot's obstacle table
+  entered built structures 3 m lower than they stand, and the capybara hangs 2.43 m below the
+  talons — so the bird flew a "1.29 m clearance" and put its passenger 1.71 m inside an 8.9 m
+  roof. Every failed drop clustered at the church's leading edge.
+- **A phugoid pumped by the ground-avoidance wingbeat.** Clearance extrapolated the momentary
+  sink rate over a full 1.4 s, so a bird 10 m above the flat plaza read 0.2 m of clearance and
+  lit the avoidance beat at the bottom of every cycle — a 20 m porpoise every 3 seconds.
+- **The bird crossed the lift instead of circling it.** The trim schedule made it fly *faster*
+  as it banked, giving a 28 m circle across a 26 m thermal.
+- **Grab was impossible.** `input.action` was recomputed in systems.js, which runs *last*, so on
+  the press frame the capybara saw `actionPressed === true` while `action` was still `false`.
+- **`capy:grab` and `capy:drop` were never emitted by anyone.** props.js deferred to
+  capybara.js, capybara.js deferred to props.js, and npc.js + systems.js listened forever.
+- **The ground was an infinite `CANNON.Plane`**, which also floored the harbour, making `swim`,
+  `ball-harbour` and `hat-harbour` unreachable.
+- **The ferry did not exist** — only its state variables and route table did.
+- **Six synthesised audio voices were missing from the dispatch table**, so every cross-module
+  call to them was silently dropped.
+- **The smoke plume and thermal motes rendered as dark floating rocks.** Both passed
+  `vertexColors: true` on geometry with no colour attribute; WebGL supplies (0,0,0), so every
+  puff was multiplied to black.
+
+## Antarctica, and you are not walking anywhere
+
+The seventeenth place, and the first one where WALKING is the exception. Everywhere else in
+this game the animal's feet are the chapter and a vehicle is a set piece; here it is the other
+way round. The verb is STEER — the same verb chapter 3 taught on a warm harbour — and this is
+what it looks like when the water is trying to stop you.
+
+**The pack is a field, not scenery.** `antIceAt(x, z)` returns how much broken ice is on the
+water, and everything reads it: the tender's top speed, her acceleration, the sound she makes,
+and the colour of the sea. Threaded down the middle is a **lead** — a wandering trough of open
+water — and finding it is the difference between a two-minute run to the gate and a
+seven-minute one. Nothing marks it and nothing needs to: open water is dark and pack is white,
+from a hundred metres.
+
+**Six frictions, and they are places.** Station rock holds you completely. Snow nearly.
+Iced timber not quite. A pan of sea ice less than that. The packed track four thousand gentoos
+have worn down the hill, less again. And the polished blue tongue of the glacier not at all.
+Every slippery place has a grippy way back to the top of it, because a slope you cannot climb
+is a wall and not a run.
+
+**And the pod.** Six orcas patrolling the deep, on their own clock, whether or not anybody is
+watching. Wheek at them from the tiller and they come; they form up on the bows and quarters
+and stay there; and a hull sitting in that much moving water goes faster than it has any right
+to. Holding station with them at speed, in the pack, is the marquee — and it is deliberately
+not a cutscene, because it is made of the two mechanics the chapter has already taught you.
+Stop the boat instead and one of them will come up and look at you.
+
+Thirteen lines on the list, one marquee and two set pieces. The way out is the head of the
+station jetty, once the pod has come at least once.

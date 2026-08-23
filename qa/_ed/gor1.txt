@@ -1,0 +1,245 @@
+// ================================================================= SCATTER ==
+/**
+ * FIVE HUNDRED AND EIGHTY-EIGHT INSTANCES IN THE EASIEST WORLD IN THE PROJECT
+ * TO SCATTER.
+ *
+ * Measured against all seventeen chapters, the median world carries 46 pieces
+ * of scatter per 1,000 m² of walkable ground. Göreme carries fifteen — and it
+ * is a valley of eroded tuff, which is a landform that BY DEFINITION is
+ * surrounded by the pieces that fell off it. Every fairy chimney in Cappadocia
+ * stands in an apron of its own rubble; the cones erode, the basalt caps drop,
+ * and the whole valley floor between them is scree, tufa blocks, and — because
+ * this is some of the most fertile volcanic soil in Anatolia — vines.
+ *
+ * None of that existed. gorBuildValley draws seventy beautiful chimneys onto a
+ * clean floor, and the 588 instances the chapter did carry are 260 pigeons, 120
+ * wisps and 26 balloons: three flying things and nothing on the ground at all.
+ *
+ * What is here now, and all of it is what is actually there at five in the
+ * morning in Love Valley:
+ *
+ *   TALUS. An apron of tuff blocks and scree round the foot of every chimney,
+ *     graded — big blocks close in, gravel further out — because that is how a
+ *     talus fan sorts itself and it is the only thing that makes a cone read as
+ *     having ERODED rather than having been placed.
+ *   VINES. Bush vines, unstaked, in rows, on every flat piece of the valley
+ *     floor. They are the reason anybody has ever lived in this valley.
+ *   TERRACE WALLS. Dry tufa, following the contour, holding the vine rows.
+ *   POPLARS, in lines along the wet ground, which are the only tall green
+ *     thing in the chapter and the only vertical that is not rock.
+ *   SCRUB AND PUMPKINS, on the dry slopes and in the field corners.
+ *
+ * EVERY BATCH IS PER-CELL. One instanced mesh spanning the whole valley is
+ * inside the frustum from everywhere; a hundred and eighty metres of world cut
+ * into cells of about forty is culled properly. That matters more here than
+ * anywhere else in the game, because half of this chapter is flown at a
+ * hundred and twenty metres and sees all of it at once.
+ *
+ * AND ALMOST NONE OF IT CASTS. The chapter flags 82 % of its geometry
+ * castShadow, which for a world lit by a sun ON THE HORIZON — the whole
+ * marquee is the sun coming over the ridge — is thousands of triangles drawn
+ * twice to lay shadows inside a valley that is still in shadow. The terraces
+ * and the poplars cast, because they are the two things tall enough to throw
+ * one across a vine row when the light finally arrives.
+ */
+function gorInstance(root, geo, colour, list, cast, recv, name) {
+  const n = list.length / 9;
+  if (n < 1) return null;
+  const im = new THREE.InstancedMesh(geo, mat(colour), n);
+  for (let i = 0; i < n; i++) {
+    const o = i * 9;
+    im.setMatrixAt(i, gorXform(list[o], list[o + 1], list[o + 2], list[o + 3], list[o + 4],
+                               list[o + 5], list[o + 6], list[o + 7], list[o + 8]));
+  }
+  im.instanceMatrix.needsUpdate = true;
+  im.computeBoundingSphere();
+  im.castShadow = !!cast;
+  im.receiveShadow = !!recv;
+  im.name = name || 'gorScat';
+  // gorNoShadowOnGhosts only recognises TRANSPARENT materials, and every batch
+  // below is opaque — so without this flag the traverse behind
+  // registerShadowTarget puts castShadow back on all of it.
+  if (!cast) im.userData.noShadow = true;
+  root.add(im);
+  return im;
+}
+function gorPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) {
+  l.push(px, py, pz, rx, ry, rz, sx, sy, sz);
+}
+
+/** The cells the scatter is cut into, and they are also the culling boxes. */
+const gorSCAT_CELLS = (function () {
+  const XS = [-96, -56, -20, 20, 56, 96, 132];
+  const ZS = [-110, -78, -48, -18, 12, 40, 62];
+  const out = [];
+  for (let i = 0; i < XS.length - 1; i++) {
+    for (let k = 0; k < ZS.length - 1; k++) out.push([XS[i], XS[i + 1], ZS[k], ZS[k + 1]]);
+  }
+  return out;
+})();
+
+/**
+ * Nothing may be planted on the arrival square, on the road, on the launch
+ * field, inside a chimney, or in the truck's lane across the landing plain.
+ * gorNavBlocked answers the buildings; the rest is written down here because
+ * they are places the PLAYER needs rather than places geometry already is.
+ */
+function gorScatBlocked(x, z) {
+  if (Math.abs(x - gorSPAWN.x) < 8 && Math.abs(z - gorSPAWN.z) < 8) return true;
+  if (Math.abs(x - gorFIELD.x) < gorFIELD.w * 0.5 + 4 &&
+      Math.abs(z - gorFIELD.z) < gorFIELD.d * 0.5 + 4) return true;
+  if (z > gorTOWN_Z - 4) return true;                      // the town builds its own
+  if (gorNavBlocked(x, z, 1.2)) return true;
+  return false;
+}
+
+let gorScatMeshes = [];
+
+function gorBuildScatter(game, root) {
+  gorScatMeshes = [];
+  const SB = gorPoolBody();
+  let solid = false;
+  for (let c = 0; c < gorSCAT_CELLS.length; c++) {
+    const C = gorSCAT_CELLS[c];
+    const block = [], scree = [], vine = [], vineLeaf = [], scrub = [];
+    const poplarT = [], poplarC = [], wall = [], pumpkin = [];
+
+    // ---- THE TALUS ROUND EVERY CHIMNEY ------------------------------------
+    // gorCHIMNEYS is the authored list and it is what the valley IS, so the
+    // fan is sampled off the cone itself rather than off the cell: a talus
+    // that does not touch the thing it fell off is gravel on a lawn.
+    for (let i = 0; i < gorCHIM_POS.length; i += 3) {
+      const kx = gorCHIM_POS[i], kz = gorCHIM_POS[i + 1], R = gorCHIM_POS[i + 2];
+      if (kx < C[0] || kx >= C[1] || kz < C[2] || kz >= C[3]) continue;
+      const n = Math.round(R * 5 + 8);
+      for (let k = 0; k < n; k++) {
+        const a = rand(0, 6.28318);
+        // graded: u near 1 is close in and carries the big blocks
+        const u = Math.random();
+        const rr = R * (1.05 + (1 - u) * 2.4);
+        const x = kx + Math.cos(a) * rr, z = kz + Math.sin(a) * rr;
+        if (gorScatBlocked(x, z)) continue;
+        const y = gorTerrain(x, z);
+        const s = (0.22 + u * u * 1.25) * rand(0.75, 1.25);
+        if (s > 0.75) {
+          // a BLOCK: a piece of the cone, still square-ish, still capped dark
+          // on one face if it came off the top
+          gorPush9(block, x, y + s * 0.34, z, rand(-0.25, 0.25), rand(0, 6.28),
+                   rand(-0.25, 0.25), s * 1.15, s * 0.82, s * 1.05);
+          if (s > 1.25) {
+            SB.addShape(new CANNON.Box(new CANNON.Vec3(s * 0.5, s * 0.42, s * 0.46)),
+                        new CANNON.Vec3(x, y + s * 0.34, z));
+            solid = true;
+          }
+        } else {
+          gorPush9(scree, x, y + s * 0.30, z, rand(-0.3, 0.3), rand(0, 6.28),
+                   rand(-0.3, 0.3), s * 1.4, s * 0.7, s * 1.2);
+        }
+      }
+    }
+
+    // ---- THE VINEYARDS ----------------------------------------------------
+    // In ROWS, because a vineyard is rows and the rows are the only man-made
+    // line in the whole valley floor. Four to seven rows a block, eleven to
+    // twenty vines a row, and a terrace wall along the downhill edge of it.
+    for (let b = 0; b < 4; b++) {
+      const bx = rand(C[0] + 6, C[1] - 6), bz = rand(C[2] + 6, C[3] - 6);
+      if (gorScatBlocked(bx, bz)) continue;
+      // The north-west corner of the valley floor (x -52..6, z -7..19) already
+      // carries a hand-authored eleven-row vineyard inside gorValley. Planting
+      // a second one on top of it is two vines in the same hole; everything
+      // SOUTH of that is Love Valley, which is farmed in exactly the same way
+      // and had nothing on it at all.
+      if (bx > -56 && bx < 10 && bz > -10 && bz < 22) continue;
+      if (gorTerrain(bx, bz) > 14) continue;      // vines are on the FLOOR
+      if (gorSlope(bx, bz) > 0.28) continue;
+      const yaw = rand(0, 3.14159);
+      const cs = Math.cos(yaw), sn = Math.sin(yaw);
+      const rows = 4 + (b % 4), per = 11 + ((b * 5 + c) % 10);
+      for (let r = 0; r < rows; r++) {
+        for (let v = 0; v < per; v++) {
+          const lx = (r - (rows - 1) * 0.5) * 2.6;
+          const lz = (v - (per - 1) * 0.5) * 1.5;
+          const x = bx + lx * cs - lz * sn, z = bz + lx * sn + lz * cs;
+          if (gorScatBlocked(x, z)) continue;
+          const y = gorTerrain(x, z);
+          if (y > 16) continue;
+          // A BUSH VINE IS NOT A STICK. Cappadocian vines are unstaked and
+          // trained low into a goblet — a short thick trunk with a wide flat
+          // head of leaf on it, about knee high. It is two instances and it is
+          // the difference between a vineyard and a field of pegs.
+          const s = 0.9 + ((v * 3 + r) % 4) * 0.11;
+          gorPush9(vine, x, y + 0.20 * s, z, 0, (v + r) * 1.3, 0, 0.17 * s, 0.42 * s, 0.17 * s);
+          gorPush9(vineLeaf, x, y + 0.52 * s, z, rand(-0.1, 0.1), (v * 2 + r) * 0.9,
+                   rand(-0.1, 0.1), 1.05 * s, 0.44 * s, 0.95 * s);
+        }
+        // the terrace wall along the top edge of the block
+        if (r === 0) {
+          for (let w = 0; w < per; w++) {
+            const lx = (-(rows - 1) * 0.5 - 1.4) * 2.6 * 0.5;
+            const lz = (w - (per - 1) * 0.5) * 1.5;
+            const x = bx + lx * cs - lz * sn, z = bz + lx * sn + lz * cs;
+            if (gorScatBlocked(x, z)) continue;
+            const y = gorTerrain(x, z);
+            for (let k2 = 0; k2 < 2; k2++) {
+              gorPush9(wall, x, y + 0.16 + k2 * 0.28, z, 0, yaw + Math.sin(w + k2) * 0.09, 0,
+                       0.9 - k2 * 0.1, 0.30, 1.55);
+            }
+          }
+        }
+      }
+      // and a poplar or three at the wet end of it
+      for (let t = 0; t < 3; t++) {
+        const lx = ((rows - 1) * 0.5 + 2.2) * 2.6;
+        const lz = (t - 1) * 3.4;
+        const x = bx + lx * cs - lz * sn, z = bz + lx * sn + lz * cs;
+        if (gorScatBlocked(x, z)) continue;
+        const y = gorTerrain(x, z);
+        if (y > 18) continue;
+        const h = 7.5 + ((t * 7 + c) % 5) * 1.5;
+        gorPush9(poplarT, x, y + h * 0.5, z, 0, t + c, 0, 0.30, h, 0.30);
+        // A LOMBARDY POPLAR IS A COLUMN. Three tall thin cones stacked is the
+        // whole silhouette and it is the only one in the chapter that is not
+        // a cone of rock.
+        for (let k2 = 0; k2 < 3; k2++) {
+          gorPush9(poplarC, x, y + h * (0.34 + k2 * 0.27), z, 0, t * 1.7 + k2, 0,
+                   2.5 - k2 * 0.55, h * 0.42, 2.5 - k2 * 0.55);
+        }
+      }
+      if (b % 3 === 0) {
+        for (let p2 = 0; p2 < 7; p2++) {
+          const x = bx + rand(-9, 9), z = bz + rand(-9, 9);
+          if (gorScatBlocked(x, z)) continue;
+          const s = rand(0.28, 0.46);
+          gorPush9(pumpkin, x, gorTerrain(x, z) + s * 0.42, z, 0, rand(0, 6.28), 0,
+                   s, s * 0.82, s);
+        }
+      }
+    }
+
+    // ---- SCRUB, on everything too steep or too dry for a vine -------------
+    for (let i = 0; i < 34; i++) {
+      const x = rand(C[0], C[1]), z = rand(C[2], C[3]);
+      if (gorScatBlocked(x, z)) continue;
+      const y = gorTerrain(x, z);
+      if (y > 40) continue;                    // not on the tops of the chimneys
+      const s = rand(0.5, 1.35);
+      gorPush9(scrub, x, y + s * 0.34, z, rand(-0.15, 0.15), rand(0, 6.28),
+               rand(-0.15, 0.15), s * 1.5, s * 0.8, s * 1.4);
+    }
+
+    const id = 'c' + c;
+    gorScatMeshes.push(
+      gorInstance(root, gorG.box, PALETTE.gorTuff, block, false, true, 'gorScat:block:' + id),
+      gorInstance(root, gorG.sph6, PALETTE.gorTuffDk, scree, false, true, 'gorScat:scree:' + id),
+      gorInstance(root, gorG.cyl4, PALETTE.gorTuffDk, vine, false, false, 'gorScat:vineStem:' + id),
+      gorInstance(root, gorG.sph6, PALETTE.gorVine, vineLeaf, false, true, 'gorScat:vine:' + id),
+      gorInstance(root, gorG.sph6, PALETTE.gorScrub, scrub, false, true, 'gorScat:scrub:' + id),
+      gorInstance(root, gorG.cyl6, PALETTE.gorPoplarDk, poplarT, true, false, 'gorScat:poplarT:' + id),
+      gorInstance(root, gorG.cone6, PALETTE.gorPoplar, poplarC, true, true, 'gorScat:poplar:' + id),
+      gorInstance(root, gorG.box, PALETTE.gorTuffPale, wall, true, true, 'gorScat:wall:' + id),
+      gorInstance(root, gorG.sph6, PALETTE.gorPot, pumpkin, false, true, 'gorScat:pumpkin:' + id));
+  }
+  gorScatMeshes = gorScatMeshes.filter(Boolean);
+  if (solid) gorPoolDone(game, SB);
+}
