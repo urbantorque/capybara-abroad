@@ -15,6 +15,7 @@ const re = /\{\s*id:\s*'([^']+)'[^}]*?chapter:\s*(\d+)([^}]*)\}/g;
 let m;
 while ((m = re.exec(tasksBlock))) {
   tasks.push({ id: m[1], chapter: Number(m[2]),
+               act: Number(/act:\s*(\d+)/.exec(m[3])?.[1] || 1),
                wow: /wow:\s*'([^']+)'/.exec(m[3])?.[1] || null,
                mini: /mini:\s*'([^']+)'/.exec(m[3])?.[1] || null });
 }
@@ -101,6 +102,64 @@ for (const c of chapNs) {
 for (const c of chapNs) {
   if (!new RegExp('\\n  ' + c.biome + ':\\s*\\{').test(systems)) {
     P('WARN', c.biome, 'no sysMAP_WORLDS entry — no minimap in this chapter');
+  }
+}
+
+// ---- 7a. the souvenirs, and the shape of each chapter (v18) --------------
+// One `keep` per chapter, no exceptions: the shelf is seventeen slots wide and
+// a table cannot be missing a rung. And if a chapter declares `acts`, the acts
+// its tasks actually use have to be exactly the acts it declared — an act with
+// nothing in it never opens, and a task in an act the chapter never announces
+// is a row that silently disappears off the paper.
+const chapRows = chapBlock.split(/\n  \{ n: /).slice(1);
+const chapMeta = {};
+for (const row of chapRows) {
+  const n = Number(/^(\d+)/.exec(row)?.[1]);
+  if (!n) continue;
+  const actsRaw = /acts:\s*\[([\s\S]*?)\n    \]/.exec(row)?.[1] || '';
+  chapMeta[n] = {
+    keep: /keep:\s*'([^']*)'/.exec(row)?.[1] || null,
+    win: Number(/win:\s*(\d+)/.exec(row)?.[1] || 0),
+    acts: actsRaw ? [...actsRaw.matchAll(/\{\s*kick:\s*'([^']*)',\s*line:\s*'([^']*)'/g)].map(x => x[1]) : [],
+  };
+}
+for (const c of chapNs) {
+  const meta = chapMeta[c.n] || {};
+  const list = byChap[c.n] || [];
+  if (!meta.keep) P('BLOCKER', 'chapter ' + c.n + ' (' + c.biome + ')', 'has no `keep` — nothing to take away from it');
+  if (meta.win && (meta.win < 1 || meta.win > 8)) P('BLOCKER', 'chapter ' + c.n, 'win ' + meta.win + ' is outside 1..8');
+  const used = [...new Set(list.map(t => t.act))].sort((a, b) => a - b);
+  const declared = (meta.acts || []).length;
+  if (!declared) {
+    if (used.some(a => a !== 1)) P('BLOCKER', 'chapter ' + c.n + ' (' + c.biome + ')',
+      'tasks carry act ' + used.join('/') + ' but the chapter declares no `acts`');
+  } else {
+    if (declared < 2) P('BLOCKER', 'chapter ' + c.n, 'declares ' + declared + ' act — an act structure needs at least 2');
+    for (let a = 1; a <= declared; a++) {
+      if (!used.includes(a)) P('BLOCKER', 'chapter ' + c.n + ' (' + c.biome + ')', 'act ' + a + ' is declared but has no tasks in it');
+    }
+    for (const a of used) {
+      if (a > declared) P('BLOCKER', 'chapter ' + c.n + ' (' + c.biome + ')', 'a task is in act ' + a + ' but only ' + declared + ' acts are declared');
+    }
+    // The arrival is act one by definition: you cannot turn up in act two.
+    const arr = [...chapBlock.matchAll(/\{ n: (\d+),[\s\S]*?arrive:\s*'([a-z0-9-]*)'/g)];
+    const mine = arr.find(x => Number(x[1]) === c.n)?.[2];
+    if (mine) {
+      const t = list.find(x => x.id === mine);
+      if (t && t.act !== 1) P('BLOCKER', mine, 'the arrival task is in act ' + t.act + ', must be act 1');
+    }
+    // A `wow` in the FIRST act of a multi-act chapter means the chapter peaks
+    // before it starts. That is a warning, not a blocker — Marrakech peaks on
+    // the dune and ends round a fire on purpose.
+    const w = list.find(t => t.wow);
+    if (w && w.act === 1) P('WARN', 'chapter ' + c.n + ' (' + c.biome + ')', 'the marquee is in act 1 of ' + declared);
+  }
+}
+
+// ---- 7b. every souvenir has a glyph --------------------------------------
+for (const c of chapNs) {
+  if (!new RegExp('\\n  ' + c.biome + ':\\s*\\{\\s*s:').test(systems.slice(systems.indexOf('const sysKEEPS')))) {
+    P('WARN', c.biome, 'no sysKEEPS entry — the shelf slot draws empty');
   }
 }
 

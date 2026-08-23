@@ -1142,6 +1142,32 @@ export function mat(color, opts) {
 // a target of twenty to thirty-five; a mini is worth two or three of those
 // minutes on its own and more than that in reasons to wander about looking for
 // the thing that makes it happen.
+//
+// ---- `act` — AND WHAT SHAPE THE CHAPTER IS (v18) --------------------------
+//
+// Seventeen chapters had exactly one structure between them: turn up, work
+// through eight to nineteen switches in whatever order you like, tick the one
+// marquee somewhere in the middle, leave. The CONTENT of them could not be more
+// different and the SHAPE of them never varied once in eight hours, and shape
+// is the thing a player feels at hour four rather than hour one.
+//
+// So a row may carry `act: 2` or `act: 3`. No `act` means act 1. The paper
+// offers the lowest act that still has something open in it, and CHAPTERS.acts
+// names the movement as it opens.
+//
+// TWO RULES, AND THE SECOND ONE IS THE WHOLE SAFETY ARGUMENT:
+//
+//   1. Nothing is GATED. `completeTask` has never heard of an act and never
+//      will — do an act-3 thing in the first minute and it ticks, exactly as
+//      it always did. An act stages the TELLING, not the world.
+//   2. F and a tap still reach every open row in the chapter, whatever act it
+//      is in (see todoStep/todoPinTo). A player who wants to shop the whole
+//      list can, always, one keypress away. So a chapter cannot be soft-locked
+//      by an act, and a task cannot be hidden from somebody looking for it.
+//
+// Six chapters carry one; eleven are flat lists and are untouched. That ratio
+// is the point — variety means SOME of them are different, not that all of them
+// are, and a game where every chapter has a twist has no twists in it.
 // ---------------------------------------------------------------------------
 export const TASKS = [
   // ---- Chapter 1: Sydney. The gardens, then the forecourt, then the quay ----
@@ -1197,14 +1223,14 @@ export const TASKS = [
   // water. Everything else on it is something worth turning the wheel for.
   { id: 'to-quay',        text: 'Cast off from the Quay',                chapter: 3 },
   { id: 'take-helm',      text: 'Take the helm',                         chapter: 3 },
-  { id: 'under-bridge',   text: 'Sound off under the Bridge',            chapter: 3 },
-  { id: 'yacht-race',     text: 'Cut through the yacht race',            chapter: 3 },
-  { id: 'dolphin-escort', text: 'Earn a dolphin escort',                 chapter: 3 },
-  { id: 'manly-voyage',   text: 'Bring her alongside at Manly',          chapter: 3, wow: 'THE HARBOUR' },
-  { id: 'manly-pine',     text: 'Raid the chip shop on the Corso',       chapter: 3 },
+  { id: 'under-bridge',   text: 'Sound off under the Bridge',            chapter: 3, act: 2 },
+  { id: 'yacht-race',     text: 'Cut through the yacht race',            chapter: 3, act: 2 },
+  { id: 'dolphin-escort', text: 'Earn a dolphin escort',                 chapter: 3, act: 2 },
+  { id: 'manly-voyage',   text: 'Bring her alongside at Manly',          chapter: 3, act: 2, wow: 'THE HARBOUR' },
+  { id: 'manly-pine',     text: 'Raid the chip shop on the Corso',       chapter: 3, act: 3 },
   // The mini. The shortest list in the game, on four hundred metres of
   // water that had nothing else moving on it.
-  { id: 'ferry-salute',  text: 'Trade horns with the Manly ferry',               chapter: 3,
+  { id: 'ferry-salute',  text: 'Trade horns with the Manly ferry',               chapter: 3, act: 2,
     mini: 'THE FRESHWATER' },
 
   // ---- Chapter 4: Kyoto & Uji ----
@@ -1307,20 +1333,20 @@ export const TASKS = [
   { id: 'to-iceland',     text: 'Turn up in Iceland',                    chapter: 7 },
   { id: 'pylsa',          text: 'Rob the hot dog stand',                 chapter: 7 },
   { id: 'organ',          text: 'Lean on the church organ',              chapter: 7 },
-  { id: 'geysir',         text: 'Ride Strokkur',                         chapter: 7 },
+  { id: 'geysir',         text: 'Ride Strokkur',                         chapter: 7, act: 2 },
   { id: 'puffins',        text: 'Get in among the puffins',              chapter: 7 },
-  { id: 'glacier-run',    text: 'Take the glacier down in one go',       chapter: 7 },
+  { id: 'glacier-run',    text: 'Take the glacier down in one go',       chapter: 7, act: 2 },
   // The snowcat was built as a pacing fix — the moraine is the toll on the best
   // twenty seconds in the chapter, charged every attempt — and it did the job so
   // quietly that a player could finish Iceland without ever noticing the one
   // thing in it that offers them a lift.
-  { id: 'snowcat',        text: 'Cadge a lift off the piste machine',    chapter: 7 },
-  { id: 'hot-spring',     text: 'Have a long sit in the hot spring',     chapter: 7 },
+  { id: 'snowcat',        text: 'Cadge a lift off the piste machine',    chapter: 7, act: 2 },
+  { id: 'hot-spring',     text: 'Have a long sit in the hot spring',     chapter: 7, act: 3 },
   // The mini. Iceland had a carrier already and did not need a second one;
   // what it had nothing of at all was something alive.
   { id: 'the-whale',     text: 'Be on the pier when the whale comes up',         chapter: 7,
     mini: 'THE BAY' },
-  { id: 'aurora',         text: 'Bring the sky down',                    chapter: 7, wow: 'ICELAND' },
+  { id: 'aurora',         text: 'Bring the sky down',                    chapter: 7, act: 3, wow: 'ICELAND' },
 
   // ---- Chapter 8: Marrakech & the Erg ----
   // The densest place in the game immediately followed by the emptiest, which
@@ -1336,11 +1362,11 @@ export const TASKS = [
   { id: 'snake-basket',   text: 'Sit in the snake charmer’s basket',     chapter: 8 },
   { id: 'souk-escape',    text: 'Lose them in the souk',                 chapter: 8 },
   // Ninety palms in the palmeraie, and not one of them had anything on it.
-  { id: 'date-palm',      text: 'Bring the dates down',                   chapter: 8 },
-  { id: 'caravan',        text: 'Ride out with the caravan',             chapter: 8 },
-  { id: 'dune-surf',      text: 'Come down the great dune',              chapter: 8, wow: 'THE ERG' },
-  { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8 },
-  { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8 },
+  { id: 'date-palm',      text: 'Bring the dates down',                   chapter: 8, act: 2 },
+  { id: 'caravan',        text: 'Ride out with the caravan',             chapter: 8, act: 2 },
+  { id: 'dune-surf',      text: 'Come down the great dune',              chapter: 8, act: 2, wow: 'THE ERG' },
+  { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8, act: 3 },
+  { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8, act: 3 },
   // The mini, and the only one of the thirteen that uses capy.launch():
   // everything else carries you or leans on you. This throws you.
   { id: 'acrobats',      text: 'Let the acrobats throw you',                     chapter: 8,
@@ -1393,7 +1419,7 @@ export const TASKS = [
   { id: 'to-venice',    text: 'Turn up in Venice',                      chapter: 10 },
   { id: 'spritz-theft', text: 'Make off with somebody’s spritz',        chapter: 10 },
   { id: 'pigeon-storm', text: 'Put up every pigeon in the piazza',      chapter: 10 },
-  { id: 'passerelle',   text: 'Run the duckboards, end to end',         chapter: 10 },
+  { id: 'passerelle',   text: 'Run the duckboards, end to end',         chapter: 10, act: 2 },
   // The duckboards end at the campo, and in the middle of the campo is the one
   // thing every square in Venice has: the cap of a rainwater cistern, because a
   // city standing in water has none of it fit to drink.
@@ -1402,8 +1428,8 @@ export const TASKS = [
   { id: 'the-calli',    text: 'Cross the calli, side to side',          chapter: 10 },
   { id: 'gondola-ride', text: 'Ride the prow of a gondola',             chapter: 10 },
   { id: 'rialto',       text: 'Take the Rialto at a run',               chapter: 10 },
-  { id: 'acqua-alta',   text: 'Be in San Marco when it goes under',     chapter: 10, wow: 'SAN MARCO' },
-  { id: 'mirror-swim',  text: 'Swim the length of the flooded square',  chapter: 10 },
+  { id: 'acqua-alta',   text: 'Be in San Marco when it goes under',     chapter: 10, act: 2, wow: 'SAN MARCO' },
+  { id: 'mirror-swim',  text: 'Swim the length of the flooded square',  chapter: 10, act: 2 },
   // The mini. Everybody who lives here stands up for it; everybody who
   // does not sits down, and is laughed at.
   { id: 'traghetto',     text: 'Cross on the traghetto, standing',               chapter: 10,
@@ -1584,26 +1610,26 @@ export const TASKS = [
   // and something very large that has decided to come and look at you.
   { id: 'to-antarctic',    text: 'Get to the bottom of the world',        chapter: 17 },
   { id: 'take-tiller',     text: 'Take the tiller',                       chapter: 17 },
-  { id: 'the-lead',        text: 'Find the lead through the pack',        chapter: 17 },
+  { id: 'the-lead',        text: 'Find the lead through the pack',        chapter: 17, act: 2 },
   { id: 'station-mug',     text: 'Rob the southernmost bar on earth',     chapter: 17 },
-  { id: 'haul-out',        text: 'Haul out on a floe',                    chapter: 17 },
-  { id: 'leopard-seal',    text: 'Be looked at by a leopard seal',        chapter: 17 },
-  { id: 'berg-arch',       text: 'Take her through the arch in the berg', chapter: 17 },
-  { id: 'whale-bones',     text: 'Sit down inside the whale',             chapter: 17 },
-  { id: 'spy-hop',         text: 'Get spy-hopped',                        chapter: 17 },
+  { id: 'haul-out',        text: 'Haul out on a floe',                    chapter: 17, act: 2 },
+  { id: 'leopard-seal',    text: 'Be looked at by a leopard seal',        chapter: 17, act: 3 },
+  { id: 'berg-arch',       text: 'Take her through the arch in the berg', chapter: 17, act: 2 },
+  { id: 'whale-bones',     text: 'Sit down inside the whale',             chapter: 17, act: 2 },
+  { id: 'spy-hop',         text: 'Get spy-hopped',                        chapter: 17, act: 3 },
   // ...and the one thing on this list that is done with the voice rather than
   // with the boat. Four thousand of them answer, and it rolls up the hill.
-  { id: 'colony-chorus',   text: 'Start something at the rookery',        chapter: 17 },
+  { id: 'colony-chorus',   text: 'Start something at the rookery',        chapter: 17, act: 2 },
   // The first mini: four thousand gentoos wore a track down that hill and it
   // is polished. You will go down it whether or not you meant to.
-  { id: 'penguin-highway', text: 'Take the penguin highway down',         chapter: 17,
+  { id: 'penguin-highway', text: 'Take the penguin highway down',         chapter: 17, act: 2,
     mini: 'THE HIGHWAY' },
-  { id: 'blue-ice',        text: 'Slide the glacier into the sea',        chapter: 17 },
+  { id: 'blue-ice',        text: 'Slide the glacier into the sea',        chapter: 17, act: 2 },
   // The second mini, and the only carrier in the game that is a piece of the
   // sea. It is going north through the gate with or without you.
-  { id: 'floe-drift',      text: 'Ride a floe down the channel',          chapter: 17,
+  { id: 'floe-drift',      text: 'Ride a floe down the channel',          chapter: 17, act: 2,
     mini: 'THE FLOE' },
-  { id: 'orca-ride',       text: 'Run with the pod',                      chapter: 17, wow: 'THE PENINSULA' },
+  { id: 'orca-ride',       text: 'Run with the pod',                      chapter: 17, act: 3, wow: 'THE PENINSULA' },
 ];
 
 
@@ -1631,58 +1657,118 @@ export const TASKS = [
 //           (alongside and under way), so everything after it is offset by one.
 //   hint    the line under the name on the title card's picker
 //   open    the first thing the game says to you when you arrive
+//   way     the one way out of the place, in words
+//
+// ---- AND THREE THAT SAY WHAT SHAPE THE CHAPTER IS (v18) -------------------
+//
+//   keep    THE SOUVENIR. What you take away from this place — held the moment
+//           the chapter is finished and never again lost. It is a PROJECTION of
+//           the save rather than a new field in it: you hold chapter n's keep
+//           exactly when every task in chapter n is ticked, so there is nothing
+//           to migrate, nothing to desync, and no way to hold one you did not
+//           earn. Seventeen of them are the only thing in this game that
+//           crosses a chapter boundary; see the shelf in systems.js.
+//   acts    OPTIONAL. A chapter may be a list — eleven of them are, and that is
+//           the default and costs nothing — or it may have MOVEMENTS. One entry
+//           per act, `{ kick, line }`, the caption and the sentence shown when
+//           that act opens. Entry 0 describes act 1 and is never announced,
+//           because the chapter's arrival card has just said it.
+//   win     OPTIONAL. How many open rows the paper shows at once here. Default
+//           is sysTODO_WINDOW (4). A chapter that wants to be a corridor rather
+//           than a menu sets 2; one that wants to be a sprawl sets 6.
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
     arrive: '',           far: 400,  tall: false, pal: 0,
-    hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry at the Quay' },
+    hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry at the Quay',
+    keep: 'a tourist’s hat' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
-    hint: '2 527 m up, and a condor',                 open: 'be a menace.', way: 'the crater on Galeras' },
+    hint: '2 527 m up, and a condor',                 open: 'be a menace.', way: 'the crater on Galeras',
+    keep: 'a condor’s flight feather' },
   { n: 3, biome: 'quay',    name: 'Circular Quay',   sub: 'she sails when you say she sails',
     arrive: 'to-quay',    far: 1600, tall: false, pal: 2,
-    hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly' },
+    hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
+    keep: 'an unpunched ferry ticket', win: 3,
+    acts: [
+      { kick: 'THE QUAY', line: 'she is yours. find the wheel.' },
+      { kick: 'OPEN WATER', line: 'seven hundred metres, and nothing to hit but the headlands.' },
+      { kick: 'MANLY', line: 'bring her alongside. the Corso is up the hill.' },
+    ] },
   { n: 4, biome: 'kyoto',   name: 'Kyoto & Uji',     sub: 'and Uji, an hour down the river',
     arrive: 'to-kyoto',   far: 700,  tall: false, pal: 4,
-    hint: 'ten thousand gates and a lot of tea',      open: 'be a menace. quietly.', way: 'the bridge at Uji' },
+    hint: 'ten thousand gates and a lot of tea',      open: 'be a menace. quietly.', way: 'the bridge at Uji',
+    keep: 'a tea whisk, slightly chewed' },
   { n: 5, biome: 'cali',    name: 'Cali',            sub: 'the salsa capital of the world',
     arrive: 'to-cali',    far: 1000, tall: false, pal: 5,
-    hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Rio Cali' },
+    hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Rio Cali',
+    keep: 'a stick of sugarcane' },
   { n: 6, biome: 'rio',     name: 'Rio de Janeiro',  sub: 'and the bateria is already moving',
     arrive: 'to-rio',     far: 1400, tall: false, pal: 6,
-    hint: 'a bateria, and it is not waiting for you', open: 'follow the drums.', way: 'the rock at Arpoador' },
+    hint: 'a bateria, and it is not waiting for you', open: 'follow the drums.', way: 'the rock at Arpoador',
+    keep: 'a tile off Selarón’s steps' },
   { n: 7, biome: 'iceland', name: 'Iceland',         sub: 'half past eleven, and the sun is not the plan',
     arrive: 'to-iceland', far: 1200, tall: true,  pal: 7,
-    hint: 'dark, and the ground does not hold',       open: 'nobody is out. that is the good news.', way: 'the end of the pier' },
+    hint: 'dark, and the ground does not hold',       open: 'nobody is out. that is the good news.', way: 'the end of the pier',
+    keep: 'a piece of the glacier',
+    acts: [
+      { kick: 'REYKJAVÍK', line: 'nobody is out. that is the good news.' },
+      { kick: 'OUT OF TOWN', line: 'the ground stops holding you somewhere past here.' },
+      { kick: 'AND THEN SIT STILL', line: 'there is nothing left to knock over. good.' },
+    ] },
   { n: 8, biome: 'sahara',  name: 'Marrakech',       sub: 'and forty minutes east of it, nothing at all',
     arrive: 'to-sahara',  far: 1600, tall: true,  pal: 8,
-    hint: 'a maze, and then no maze at all',          open: 'do not rob anybody yet. or do.', way: 'the fire at the desert camp' },
+    hint: 'a maze, and then no maze at all',          open: 'do not rob anybody yet. or do.', way: 'the fire at the desert camp',
+    keep: 'an orange off the cart',
+    acts: [
+      { kick: 'JEMAA EL-FNAA', line: 'do not rob anybody yet. or do.' },
+      { kick: 'EAST, THEN', line: 'the maze stops. everything stops.' },
+      { kick: 'AFTER THE STORM', line: 'it is evening, and somebody has lit a fire.' },
+    ] },
   { n: 9, biome: 'drift',   name: 'The Drift',       sub: 'nobody is entirely sure how you got up here',
     arrive: 'to-drift',   far: 1500, tall: true,  pal: 9,
-    hint: 'no ground to speak of, and a wind',        open: 'nothing here is nailed down. including the ground.', way: 'the lantern plinth, once it is lit' },
+    hint: 'no ground to speak of, and a wind',        open: 'nothing here is nailed down. including the ground.', way: 'the lantern plinth, once it is lit',
+    keep: 'a seed-head, still trying to leave' },
   { n: 10, biome: 'venice', name: 'Venice',          sub: 'and the water is coming in',
     arrive: 'to-venice',  far: 900,  tall: false, pal: 10,
-    hint: 'the floor is negotiable',                  open: 'the tide is early. mind the paving.', way: 'the two columns on the Molo' },
+    hint: 'the floor is negotiable',                  open: 'the tide is early. mind the paving.', way: 'the two columns on the Molo',
+    keep: 'a pigeon feather from the Piazza',
+    acts: [
+      { kick: 'LOW WATER', line: 'the tide is early. mind the paving.' },
+      { kick: 'ACQUA ALTA', line: 'the siren went four times. the square is going under.' },
+    ] },
   { n: 11, biome: 'kowloon', name: 'Hong Kong',      sub: 'up is a direction here',
     arrive: 'to-kowloon', far: 1300, tall: true,  pal: 11,
-    hint: 'a wall of light, and a way up it',         open: 'nothing on this street is at ground level.', way: 'the end of the Star Ferry pier' },
+    hint: 'a wall of light, and a way up it',         open: 'nothing on this street is at ground level.', way: 'the end of the Star Ferry pier',
+    keep: 'a length of scaffold bamboo' },
   { n: 12, biome: 'palawan', name: 'Palawan',        sub: 'the interesting half is underneath',
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
-    hint: 'twelve chapters of paddling. enough.',     open: 'you are a semi-aquatic rodent. act like one.', way: 'the end of the bamboo jetty' },
+    hint: 'twelve chapters of paddling. enough.',     open: 'you are a semi-aquatic rodent. act like one.', way: 'the end of the bamboo jetty',
+    keep: 'a pearl out of the giant clam' },
   { n: 13, biome: 'goreme',  name: 'Cappadocia',     sub: 'and you do not get a steering wheel',
     arrive: 'to-cappadocia', far: 2200, tall: true, pal: 13,
-    hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown' },
+    hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown',
+    keep: 'a scrap of balloon envelope' },
   { n: 14, biome: 'manly',  name: 'Manly',            sub: 'the other side of the Corso, and it is not the harbour',
     arrive: 'to-manly',   far: 1500, tall: false, pal: 14,
-    hint: 'the sea has a shape here',                 open: 'the white bits are where it is breaking.', way: 'between the red and yellow flags' },
+    hint: 'the sea has a shape here',                 open: 'the white bits are where it is breaking.', way: 'between the red and yellow flags',
+    keep: 'a Norfolk pine cone' },
   { n: 15, biome: 'pantanal', name: 'The Pantanal',   sub: 'where you are, as it happens, from',
     arrive: 'to-pantanal', far: 1300, tall: false, pal: 15,
-    hint: 'you are not the strangest thing here',     open: 'nobody here is going to look at you twice.', way: 'the last bridge on the Transpantaneira' },
+    hint: 'you are not the strangest thing here',     open: 'nobody here is going to look at you twice.', way: 'the last bridge on the Transpantaneira',
+    keep: 'a water hyacinth, flowering' },
   { n: 16, biome: 'cave',   name: 'Sơn Đoòng',        sub: 'and the only light is the one you make',
     arrive: 'to-cave',    far: 800,  tall: false, pal: 16,
-    hint: 'no light in here but yours',               open: 'wheek. it is the only way to see anything.', way: 'the slot of daylight at the far end' },
+    hint: 'no light in here but yours',               open: 'wheek. it is the only way to see anything.', way: 'the slot of daylight at the far end',
+    keep: 'a cave pearl', win: 2 },
   { n: 17, biome: 'antarctic', name: 'Antarctica',   sub: 'and you are not walking anywhere',
     arrive: 'to-antarctic', far: 2000, tall: true, pal: 17,
-    hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty' },
+    hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
+    keep: 'the station’s enamel mug', win: 3,
+    acts: [
+      { kick: 'THE STATION', line: 'too cold to walk. take the boat.' },
+      { kick: 'THE ICE', line: 'four rocks, eleven hundred metres apart.' },
+      { kick: 'THE PACK', line: 'there is something under the boat.' },
+    ] },
 ];
 export function chapterOf(biome) {
   for (let i = 0; i < CHAPTERS.length; i++) if (CHAPTERS[i].biome === biome) return CHAPTERS[i].n;

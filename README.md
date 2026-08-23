@@ -242,6 +242,78 @@ Cappadocia has none and does not need one — balloons in the sky, eleven horses
 floor, a chase truck, a hundred and sixty pigeons on the cliff and five crews on the launch
 field. It is the busiest chapter in the game already.
 
+## Six of them are not a list
+
+Seventeen chapters had exactly one structure between them. You turn up, you work
+through eight to nineteen switches in whatever order you like, the marquee lands
+somewhere in the middle, you wheek three times and you leave. The places could not
+be more different and the *shape* of them never varied once in eight hours — and
+shape is the thing you feel at hour four rather than at hour one.
+
+So a task may now belong to a **movement** of its chapter, and six of them have one.
+The paper offers the lowest act with anything still open in it, and the card's own
+header stops saying "To do" and starts saying where you are in the place: REYKJAVÍK,
+then OUT OF TOWN, then AND THEN SIT STILL. A movement opening gets the arrival card
+and a soft chime and *nothing else* — no lift, no confetti, no tick, because the
+marquee keeps all four of those and has to go on being worth what it is worth.
+
+| | |
+|---|---|
+| Circular Quay | THE QUAY · OPEN WATER · MANLY. The chapter is a voyage and it finally reads as one: two lines at the wharf, five in seven hundred metres of open water, and one when you have tied her up |
+| Iceland | REYKJAVÍK · OUT OF TOWN · AND THEN SIT STILL. Five, then three, then two — a narrowing, into the only chapter that ends in stillness |
+| Marrakech | JEMAA EL-FNAA · EAST, THEN · AFTER THE STORM. The world has always gated the fire behind the sandstorm; the paper had simply never said so |
+| Venice | LOW WATER · ACQUA ALTA. The one chapter whose whole argument is a turn, and it used to list *swim the length of the flooded square* next to *look down the well* at one o'clock in the afternoon |
+| Sơn Đoòng | no movements, but the paper only ever shows **two** lines. In the dark, two things at a time |
+| Antarctica | THE STATION · THE ICE · THE PACK |
+
+**Nothing is gated, and that is load-bearing.** Do an act-three thing in the first
+minute and it ticks, exactly as it always did — an act stages the telling, not the
+world. And F still reaches every open line in the chapter whatever movement it is in,
+so the paper is a default rather than a wall and a place can never be soft-locked by
+one. The other eleven chapters are flat lists and are untouched, which is the point:
+a game where every chapter has a twist has no twists in it.
+
+## And you take something with you
+
+Seventeen places and nothing had ever crossed a boundary between two of them. The
+departures board made travel cheap, and in doing so it made the chapters *more*
+sealed rather than less — a menu of seventeen dioramas, each one leaving no mark on
+the next.
+
+Finish a place now and you **keep** something out of it: a tourist's hat, a condor's
+flight feather, a tile off Selarón's steps, a piece of the glacier that is not going
+to survive the flight, a length of scaffold bamboo, the station's enamel mug. It
+arrives as the second beat of the chapter's own ceremony — after the card that says
+you are done here, before the line that tells you where the door is — and it is
+drawn, like the sixteen postcards, out of a dozen flat polygons in that place's own
+colours.
+
+There are seventeen slots at the top of the journal and there are always seventeen.
+The ones you have not earned are drawn grey and nearly out, so you can see that there
+is a shape in the box and not what it is. A finished postcard on the title card wears
+its souvenir in the corner. And you hold one exactly when the chapter is finished,
+which means the game does not store a single new thing to know it — it is the tick
+list, read a different way.
+
+## The end is not a receipt
+
+The ending was a full-screen rectangle reading MISCHIEF COMPLETE, a number, and then
+it reloaded the page. A hundred and ninety-nine tasks, forty-two records, seventeen
+places and the better part of a working day, resolved to one string and then thrown
+away — and almost nobody had ever seen it, because it only existed at 199 out of 199.
+
+It is a **ledger** now, and it is made of what the journey actually left behind: one
+leaf per place you have stood in, each with its postcard, what you took out of it,
+every number it got out of you and how long you were there, arriving one at a time.
+Then the total, on the road.
+
+Two things about it matter more than what it looks like. It is **openable from the
+journal at any point** — the departures board answers *where can I go* and this
+answers *where have I been* — so it is a surface you can visit at three chapters
+rather than a trophy for finishing. And **Escape closes it and the world is still
+there.** Reloading was the only thing you could ever do with the end of this game,
+and a sandbox whose ending throws the sandbox away has it the wrong way round.
+
 ## Play
 
 **Single file, no build, no server:**
@@ -274,7 +346,7 @@ another port.
 | `C` | Snap the camera behind you |
 | Mouse wheel | Zoom |
 | `M` | Mute · `` ` `` Perf overlay · `\` debug biome swap |
-| `Tab` | **The journal.** Everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. |
+| `Tab` | **The journal.** The shelf of souvenirs, everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. It is also the way into **the ledger**: the whole journey, laid out. |
 | `1`..`0`, then `–  =  [  ]  ;  '` | On the title card: pick a place. Ten digits and seventeen chapters, so the last seven are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |
 | `Enter` | On the title card, if there is a saved journey: carry on from where you stopped |
 
@@ -516,7 +588,8 @@ you. Anywhere you have stood is two minutes away rather than twenty.
 
 **Finishing a place is a moment.** The last tick in a chapter used to look exactly like the
 third, and then the paper quietly changed country. Now the place card comes back up with the
-tally, the time that chapter took, and how many of the eight you have closed.
+tally, the time that chapter took, and how many of the seventeen you have closed — and then,
+a beat later, the thing you are taking with you. See **And you take something with you**, above.
 
 **Some things are worth doing well.** Every task is a switch — you have done it or you have
 not — which is right for *steal a hat* and quietly wasted the best twenty seconds in the game.

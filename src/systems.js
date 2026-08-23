@@ -999,8 +999,13 @@ const sysHINT_Y     = 1.5;    // m the beacon stands above its ground point
 // --- THE TO-DO LIST ---------------------------------------------------------
 // How many OPEN tasks are on the paper at once. Four, plus the one you have just
 // ticked while it is being struck through, so the card never exceeds five rows
-// and never needs to scroll.
+// and never needs to scroll. A chapter may ask for its own figure — see
+// CHAPTERS.win in shared.js — and six of the seventeen do.
 const sysTODO_WINDOW = 4;
+// ms between the tick that closes a movement and the card that opens the next
+// one. Long enough for that tick's own card to have been read and gone: the
+// moment card runs sysMOMENT_CARD and the tick's linger is sysTODO_LINGER.
+const sysACT_CARD_WAIT = 2900;
 const sysTODO_LINGER = 1700;   // ms a ticked row stays before it rolls up
 const sysTODO_ROLL   = 520;    // ms of the roll-up itself (matches .capyui-fold)
 // Two ticks inside this window read as a combo and the flourish climbs a tone.
@@ -1046,6 +1051,15 @@ const sysMINI_SWELL = 0.55;  // how far a `mini` lifts the score. Half, near eno
 const sysMOMENT_CARD = 2600; // ms the mini-moment card stays up — longer than a
                              // toast (2200) and shorter than the banner, which is
                              // the whole hierarchy in one number
+// ---- and the two beats a finished PLACE gets (v18) ------------------------
+const sysKEEP_WAIT  = 2700;  // ms after the chapter card before the souvenir. The
+                             // card runs sysFADE_CARD, so this lands while it is
+                             // still leaving rather than after a silence
+const sysKEEP_CARD  = 3400;  // ms the souvenir card stays up. Longer than the
+                             // moment card: there is a picture on it to look at
+const sysLED_STAGGER = 90;   // ms between two leaves of the ledger arriving. The
+                             // ledger is READ, top to bottom, and seventeen rows
+                             // landing at once is a table rather than a journey
 
 // --- AMBIENT MUSIC ----------------------------------------------------------
 // D lydian / major-pentatonic colour: sunny harbour afternoon, faintly wistful.
@@ -2322,14 +2336,141 @@ function sysMarkTint(biome, alpha) {
 /** One place mark as an <svg>, or null for a biome with no scene authored. */
 function sysBuildMark(biome) {
   const def = sysMARKS[biome];
-  if (!def) return null;
+  // `none` — a postcard STRETCHES to its tile, which is right for a scene and
+  // wrong for an object. See sysBuildKeep, which does the opposite.
+  return def ? sysDrawShapes(def.s, sysMARK_VB, 'none') : null;
+}
+
+// ---------------------------------------------------------------------------
+// THE SHELF — one souvenir per place (v18)
+//
+// Seventeen chapters and nothing has ever crossed a boundary between two of
+// them. You arrive, you are a menace, the paper changes country, and the place
+// you were in an hour ago has left no mark on the place you are in now. The
+// departures board made travel cheap and in doing so it made the chapters more
+// sealed rather than less: a menu of sixteen dioramas.
+//
+// A `keep` is the one thing that comes with you. See CHAPTERS in shared.js for
+// what holding one means (finish the place; it is a projection of the save, not
+// a new field in it). This is only how it is DRAWN: the same little data format
+// as sysMARKS above, in the same flat-shaded palette, three to six shapes each,
+// because seventeen more hand-cut pictures is exactly what this game is made of
+// and an icon font is not.
+//
+// A 32-square rather than the postcard's 64x40: a souvenir is an OBJECT, it
+// wants a square, and it has to stay legible at the 22 px the journal's shelf
+// draws it at.
+// ---------------------------------------------------------------------------
+const sysKEEP_VB = '0 0 32 32';
+const sysKEEPS = {
+  /* a wide-brim sun hat, off a tourist who is still looking for it */
+  sydney: { s: [
+    ['p', '3,22 29,22 26,25 6,25', 'cloth3'],
+    ['p', '10,22 11,11 21,11 22,22', 'cloth3'],
+    ['r', 10, 16.5, 12, 2.6, 'petalRed'] ] },
+  /* a primary off the bird that carried you to the crater rim */
+  pasto: { s: [
+    ['p', '16,2 21,13 19,27 16,30 13,27 11,13', 'condorWing'],
+    ['r', 15.3, 5, 1.4, 24, 'condorBody'],
+    ['p', '16,2 19,9 13,9', 'condorRuff'] ] },
+  /* nobody ever punched it. you were not exactly a paying passenger */
+  quay: { s: [
+    ['r', 4, 10, 24, 13, 'sail'],
+    ['r', 4, 10, 24, 3.2, 'hullGreen'],
+    ['c', 9, 18, 2.2, 'wharfIron'],
+    ['r', 14, 15.6, 10, 1.4, 'stoneDark'],
+    ['r', 14, 19, 7, 1.4, 'stoneDark'] ] },
+  /* a chasen. eighty tines cut from one piece of bamboo, and you chewed it */
+  kyoto: { s: [
+    ['p', '11,17 6,7 8,6 13,17', 'bambooPale'],
+    ['p', '13,17 10,4 12,4 15,17', 'bambooPale'],
+    ['p', '15,17 15.4,3 17,3 17,17', 'bambooPale'],
+    ['p', '17,17 20,4 22,4 19,17', 'bambooPale'],
+    ['r', 13, 16.6, 6, 2.6, 'bambooLeaf'],
+    ['r', 13.5, 19, 5, 11, 'bambooStem'] ] },
+  cali: { s: [
+    ['r', 13, 3, 6, 26, 'caliCane'],
+    ['r', 13, 9, 6, 1.6, 'caliCaneStem'],
+    ['r', 13, 16, 6, 1.6, 'caliCaneStem'],
+    ['r', 13, 23, 6, 1.6, 'caliCaneStem'],
+    ['p', '19,6 28,2 21,10', 'caliGrass'] ] },
+  /* one azulejo. there are two thousand of them and he wanted them all kept */
+  rio: { s: [
+    ['r', 5, 5, 22, 22, 'rioTileBlue'],
+    ['r', 9, 9, 14, 14, 'rioTileWhite'],
+    ['p', '16,10 22,16 16,22 10,16', 'rioTileYellow'],
+    ['c', 16, 16, 2.6, 'rioTileGreen'] ] },
+  /* it will not last the flight and that is rather the point of it */
+  iceland: { s: [
+    ['p', '6,21 5,11 13,4 24,8 27,19 16,28', 'iceGlacierBl'],
+    ['p', '13,4 24,8 17,15 8,12', 'iceGlacier'],
+    ['p', '17,15 27,19 16,28', 'iceGlacierDp'] ] },
+  sahara: { s: [
+    ['c', 16, 19, 9, 'sahOrange'],
+    ['c', 12.5, 15.5, 2.4, 'sahSandLit'],
+    ['r', 15.2, 7, 1.6, 4.5, 'sahPalmTrunk'],
+    ['p', '17,9 25,4 24,10', 'sahMint'] ] },
+  /* still trying to leave. it has been trying to leave the whole way */
+  drift: { s: [
+    ['p', '15,9 4,4 5,2 16,8', 'driPaper'],
+    ['p', '16,8 11,0 13,0 17,8', 'driPaper'],
+    ['p', '16,8 20,0 22,1 17,8.5', 'driPaper'],
+    ['p', '17,9 28,4 28,6 17,10.5', 'driPaper'],
+    ['r', 15.4, 11, 1.2, 18, 'driSeed'],
+    ['c', 16, 10, 2.6, 'driSeed'] ] },
+  venice: { s: [
+    ['p', '16,4 19,13 17,26 16,29 15,26 13,13', 'venPigeon'],
+    ['r', 15.5, 7, 1, 21, 'venPigeonDk'],
+    ['p', '16,4 18,9 14,9', 'venStone'] ] },
+  /* a grass. they build forty storeys out of it and lash every joint by hand */
+  kowloon: { s: [
+    ['r', 12, 2, 8, 28, 'hkBamboo'],
+    ['r', 12, 8.6, 8, 1.8, 'hkBambooDk'],
+    ['r', 12, 20, 8, 1.8, 'hkBambooDk'],
+    ['r', 10, 13, 12, 3.4, 'hkLash'],
+    ['r', 10, 17, 12, 1.6, 'hkLash'] ] },
+  palawan: { s: [
+    ['p', '3,21 29,21 26,28 6,28', 'palClamLip'],
+    ['c', 16, 14, 7.5, 'palPearl'],
+    ['c', 13, 11, 2.2, 'foam'] ] },
+  goreme: { s: [
+    ['p', '5,7 16,4 16,27 7,25', 'gorEnvA'],
+    ['p', '16,4 27,6 25,26 16,27', 'gorEnvC'],
+    ['p', '7,25 16,27 25,26 22,29 16,28 10,29', 'gorEnvE'] ] },
+  manly: { s: [
+    ['p', '16,2 22,9 23,21 16,30 9,21 10,9', 'manPine'],
+    ['p', '10,12 22,12 21,15 11,15', 'manPineLt'],
+    ['p', '10.5,18 21.5,18 20,21 12,21', 'manPineLt'],
+    ['r', 15.2, 28, 1.6, 3, 'manTrunk'] ] },
+  /* the flood is made of these. so, mostly, is the chapter */
+  pantanal: { s: [
+    ['p', '5,29 12,15 16,29', 'panHyacinth'],
+    ['p', '16,29 20,15 27,29', 'panHyacinth'],
+    ['r', 15.4, 13, 1.2, 9, 'panGrassDk'],
+    ['c', 16, 10, 6, 'panHyaFlower'],
+    ['c', 16, 10, 2, 'panLilyRim'] ] },
+  /* one drip at a time, turning over, for about the age of the species */
+  cave: { s: [
+    ['p', '2,23 30,23 28,29 4,29', 'cavRockDk'],
+    ['p', '8,22 24,22 22,25 10,25', 'cavRock'],
+    ['c', 16, 15, 8, 'cavPearl'],
+    ['c', 12.6, 11.6, 2.4, 'cavCalciteLt'] ] },
+  antarctic: { s: [
+    ['r', 7, 9, 15, 18, 'antHutRed'],
+    ['r', 6, 8, 17, 3, 'foam'],
+    ['p', '22,13 28,13 28,23 22,23 22,21 25.5,21 25.5,15 22,15', 'antHutRed'],
+    ['c', 9.5, 12.5, 1.6, 'antIce'] ] },
+};
+
+/** One shape list as an <svg>. Shared by the place marks and the souvenirs. */
+function sysDrawShapes(list, vb, fit) {
   const svg = document.createElementNS(sysMARK_NS, 'svg');
-  svg.setAttribute('viewBox', sysMARK_VB);
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('viewBox', vb);
+  svg.setAttribute('preserveAspectRatio', fit);
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
-  for (let i = 0; i < def.s.length; i++) {
-    const sh = def.s[i];
+  for (let i = 0; i < list.length; i++) {
+    const sh = list[i];
     // A missing palette key must not punch a black hole in the picker: every
     // colour is looked up and falls back to the paper stone.
     const raw = PALETTE[sh[sh.length - 1]];
@@ -2352,6 +2493,14 @@ function sysBuildMark(biome) {
   return svg;
 }
 
+/** One souvenir as an <svg>, or null for a chapter with none authored. */
+function sysBuildKeep(biome) {
+  const def = sysKEEPS[biome];
+  // A souvenir is an object on a shelf, not a scene: it keeps its aspect at
+  // every size, where the postcards deliberately stretch to their tile.
+  return def ? sysDrawShapes(def.s, sysKEEP_VB, 'xMidYMid meet') : null;
+}
+
 function sysEl(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -2363,11 +2512,20 @@ function sysEnableShadows(o3d) {
     if (n.isMesh) n.castShadow = true;
   });
 }
+// A JOURNEY IS HOURS LONG AND THIS ONLY EVER COUNTED MINUTES. Seventeen
+// chapters at twenty to thirty-five minutes each is somewhere north of eight
+// hours, and the journal's own header was printing it as "504:11" — which is a
+// number nobody can read and which the ledger, whose whole subject is the
+// clock, would have printed twice more. Under an hour is untouched, to the
+// character, so every chapter time and every record still reads as it did.
 function sysFmtTime(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(s / 60);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor(s / 60) % 60;
   const r = s % 60;
-  return m + ':' + (r < 10 ? '0' : '') + r;
+  const ss = (r < 10 ? '0' : '') + r;
+  if (h <= 0) return Math.floor(s / 60) + ':' + ss;
+  return h + ':' + (m < 10 ? '0' : '') + m + ':' + ss;
 }
 function sysMaxDPR() {
   const px = window.innerWidth * window.innerHeight *
@@ -2944,6 +3102,15 @@ function sysBuildCSS() {
   'background:' + sysRgba(PALETTE.stoneDark, 0.72) + ';border-radius:3px;padding:1px 4px;',
   'font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}',
 '.capyui-picktally.full{background:' + tick + ';}',
+/* A FINISHED PLACE WEARS WHAT YOU TOOK OUT OF IT (v18). Bottom-left of the
+   scene, because the other two corners are already the key and the tally. The
+   picker is the only screen in the game where seventeen places are compared
+   against each other, so it is where a shelf reads best. */
+'.capyui-pickkeep{position:absolute;left:5px;bottom:5px;width:20px;height:20px;',
+  'border-radius:3px;padding:2px;display:block;',
+  'background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:0 1px 3px ' + shadow + ';}',
+'.capyui-pickkeep svg{display:block;width:100%;height:100%;}',
+'.capyui-pick.hero .capyui-pickkeep{width:28px;height:28px;left:7px;bottom:7px;}',
 /* The short-screen budget for the scenes, and it MUST live after the rules it
    overrides: same specificity, so source order is the whole argument. Written
    up in the title-card block first, where it was outranked by the picker's own
@@ -3119,16 +3286,109 @@ function sysBuildCSS() {
   'border-radius:5px;display:none;white-space:pre;letter-spacing:.02em;}',
 '.capyui-perf.show{display:block;}',
 
-/* ---------- end flourish ---------- */
-'.capyui-end{position:absolute;inset:0;z-index:55;display:flex;flex-direction:column;',
-  'align-items:center;justify-content:center;gap:10px;background:' + veil2 + ';',
-  'opacity:0;pointer-events:none;transition:opacity 1.1s ease;padding:20px;text-align:center;}',
-'.capyui-end.show{opacity:1;}',
-'.capyui-end h2{font-size:clamp(26px,8vw,68px);color:' + ink + ';letter-spacing:.06em;',
-  'font-weight:700;transform:rotate(-1.4deg);}',
-'.capyui-end .capyui-time{font-size:clamp(13px,3vw,20px);color:' + accent + ';font-weight:700;',
-  'letter-spacing:.2em;text-transform:uppercase;}',
-'.capyui-end .capyui-hint{margin-top:10px;font-size:clamp(11px,2.4vw,14px);color:' + inkSoft + ';',
+/* ---------- THE SHELF (v18) ----------
+   Seventeen slots, and ALWAYS seventeen: the empty ones are half of what the
+   shelf is for. An unearned souvenir is drawn, but grey and nearly out — you
+   can see that there is a shape in the box and not what it is, which is the
+   difference between a promise and a spoiler. */
+'.capyui-shelf{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:2px 0 5px;}',
+'.capyui-slot{position:relative;width:30px;height:30px;border-radius:4px;padding:3px;',
+  'border:1px dashed ' + inkFaint + ';background:none;font:inherit;color:inherit;',
+  'display:flex;align-items:center;justify-content:center;opacity:.3;',
+  '-webkit-tap-highlight-color:transparent;',
+  'transition:opacity .35s ease,border-color .35s ease,background .35s ease,transform .2s ease;',
+  'touch-action:manipulation;cursor:default;}',
+'.capyui-slot svg{display:block;width:100%;height:100%;filter:grayscale(1);}',
+'.capyui-slot.have{opacity:1;border-style:solid;border-color:' + rule + ';background:' + veil2 + ';',
+  'cursor:pointer;}',
+'.capyui-slot.have svg{filter:none;}',
+'@media (hover:hover){.capyui-slot.have:hover{transform:translateY(-2px);}}',
+'.capyui-slot:focus{outline:none;}',
+'.capyui-slot:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-shelfcap{text-align:center;font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';',
+  'font-style:italic;min-height:1.3em;margin-bottom:2px;}',
+/* the way into the ledger, sat between the board and the controls. Styled off
+   the controls' own summary so the card has two of one thing, not one of two. */
+'.capyui-jrled{display:block;width:100%;margin-top:12px;border:1px solid ' + rule + ';',
+  'border-radius:3px;padding:5px 0;background:none;font:inherit;cursor:pointer;',
+  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
+  'letter-spacing:.12em;text-transform:uppercase;touch-action:manipulation;',
+  '-webkit-tap-highlight-color:transparent;}',
+'@media (hover:hover){.capyui-jrled:hover{background:' + veil2 + ';color:' + ink + ';}}',
+'.capyui-jrled:focus{outline:none;}',
+'.capyui-jrled:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+
+/* ---------- the souvenir card, at the end of a place (v18) ----------
+   The chapter ceremony's second beat. Composed like the moment card — a
+   kicker over a rule over a line — with the thing itself above all three,
+   because the picture IS the point of it. */
+'.capyui-keep{position:absolute;left:50%;top:50%;z-index:53;',
+  'transform:translate(-50%,-46%) rotate(-1.1deg) scale(.95);opacity:0;pointer-events:none;',
+  'transition:opacity .42s ease,transform .55s cubic-bezier(.2,.9,.3,1);',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
+  'box-shadow:0 14px 34px ' + shadow2 + ';padding:15px 30px 14px;text-align:center;}',
+'.capyui-keep.show{opacity:1;transform:translate(-50%,-50%) rotate(-1.1deg) scale(1);}',
+'.capyui-keepart{width:78px;height:78px;margin:0 auto 9px;display:block;}',
+'.capyui-keepart svg{display:block;width:100%;height:100%;}',
+'.capyui-keepkick{font-size:clamp(8px,1.7vw,10px);letter-spacing:.34em;text-transform:uppercase;',
+  'color:' + accent + ';font-weight:700;}',
+'.capyui-keeprule{height:2px;background:' + rule + ';border-radius:2px;margin:6px auto;width:44px;}',
+'.capyui-keeptext{font-size:clamp(13px,2.9vw,18px);color:' + ink + ';font-weight:700;}',
+
+/* ---------- THE LEDGER (v18) ----------
+   What the end card used to be was a string. This is the journey, made out of
+   the pieces the journey actually left behind: the postcards, the souvenirs,
+   the numbers and the clock. It is also openable from the journal at any
+   point, so it is not a screen that one player in a hundred sees once. */
+/* 66 — over the place card (58) and over the journal (62), under the biome
+   fade (70). The ledger is the last word about a journey and nothing may be
+   drawn across it; the sequencing in completeTask means nothing should TRY
+   to, and this is the belt to that pair of braces. */
+'.capyui-led{position:absolute;inset:0;z-index:66;overflow:auto;overscroll-behavior:contain;',
+  'background:' + veil2 + ';opacity:0;pointer-events:none;transition:opacity .7s ease;',
+  'display:flex;flex-direction:column;align-items:center;',
+  // Full-bleed, so the notch is its problem: the title sits at the very top of
+  // the viewport and would otherwise be under the camera housing on a phone.
+  'padding-top:calc(clamp(16px,4vw,34px) + env(safe-area-inset-top,0px));',
+  'padding-bottom:calc(clamp(16px,4vw,34px) + env(safe-area-inset-bottom,0px));',
+  'padding-left:calc(14px + env(safe-area-inset-left,0px));',
+  'padding-right:calc(14px + env(safe-area-inset-right,0px));}',
+'.capyui-led.show{opacity:1;pointer-events:auto;}',
+'.capyui-led h2{font-size:clamp(20px,5.4vw,42px);color:' + ink + ';letter-spacing:.05em;',
+  'font-weight:700;transform:rotate(-1.2deg);text-align:center;text-wrap:balance;}',
+'.capyui-ledsub{font-size:clamp(10px,2.1vw,13px);color:' + accent + ';font-weight:700;',
+  'letter-spacing:.2em;text-transform:uppercase;text-align:center;margin-top:5px;',
+  'font-variant-numeric:tabular-nums;}',
+'.capyui-ledlist{width:100%;max-width:620px;margin-top:clamp(10px,2.4vw,18px);',
+  'display:flex;flex-direction:column;gap:5px;}',
+/* Each leaf comes in on its own beat. It is the one place in this HUD where a
+   stagger is right: the ledger is READ, top to bottom, and arriving all at
+   once makes seventeen rows look like a table rather than a journey. */
+'.capyui-ledrow{display:grid;grid-template-columns:58px 1fr auto;gap:2px 11px;align-items:center;',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:4px;padding:7px 10px;',
+  'opacity:0;transform:translateY(10px) rotate(-.3deg);',
+  'animation:capyui-ledin .5s cubic-bezier(.2,.9,.3,1) forwards;}',
+'@keyframes capyui-ledin{to{opacity:1;transform:translateY(0) rotate(-.3deg);}}',
+'.capyui-ledmark{grid-row:1 / 3;position:relative;width:56px;height:35px;border-radius:3px;',
+  'overflow:hidden;border:1px solid ' + rule + ';}',
+'.capyui-ledmark svg{display:block;width:100%;height:100%;}',
+'.capyui-ledname{font-size:clamp(12px,2.5vw,15px);color:' + ink + ';font-weight:700;}',
+'.capyui-ledtime{font-size:clamp(10px,2vw,12px);color:' + inkSoft + ';font-weight:700;',
+  'white-space:nowrap;font-variant-numeric:tabular-nums;}',
+/* min-width:0 on both, or a long chain of records — Venice holds three — makes
+   the flex row refuse to shrink and pushes the tally off the card. */
+'.capyui-ledline{grid-column:2 / 4;display:flex;align-items:center;gap:6px;min-width:0;',
+  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-style:italic;',
+  'white-space:pre-line;line-height:1.35;}',
+'.capyui-ledline span{min-width:0;overflow-wrap:anywhere;}',
+'.capyui-ledname{overflow-wrap:anywhere;}',
+'.capyui-ledkeep{flex:0 0 auto;width:19px;height:19px;display:block;}',
+'.capyui-ledkeep svg{display:block;width:100%;height:100%;}',
+'.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
+  'font-size:clamp(10px,2.1vw,13px);color:' + ink + ';font-weight:700;',
+  'font-variant-numeric:tabular-nums;}',
+'.capyui-ledhint{margin-top:8px;text-align:center;font-size:clamp(10px,2.1vw,12px);',
+  'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;',
   'animation:capyui-blink 2s ease-in-out infinite;}',
 
 /* ---------- biome transition ---------- */
@@ -7093,6 +7353,18 @@ export function createSystems(game) {
     // number in there with your name on it. Only ever shown once the list is
     // done, so it cannot crowd a chapter you are still working through.
     if (done >= ids.length && ids.length) {
+      // ...AND WHAT YOU TOOK OUT OF IT. The souvenir is a projection of the
+      // ticks — see CHAPTERS.keep — so the title card can draw it off the file
+      // alone, before a frame of the game has run and before systems has a
+      // chapRec to ask.
+      const cd = CHAPTERS[d.n - 1];
+      const kg = sysBuildKeep(d.biome);
+      if (kg) {
+        const kw = sysEl('span', 'capyui-pickkeep');
+        kw.appendChild(kg);
+        if (cd && cd.keep) kw.title = cd.keep;
+        art.appendChild(kw);
+      }
       const fileRecs = (jrFile && jrFile.recs) || {};
       let bestId = '';
       for (let k = 0; k < ids.length; k++) {
@@ -7193,6 +7465,32 @@ export function createSystems(game) {
   const jrCount = sysEl('div', 'capyui-jrsub', '');
   jrCard.appendChild(jrTitle);
   jrCard.appendChild(jrCount);
+  // ---- THE SHELF (v18) ----------------------------------------------------
+  // The one thing on this card that is not about a place. Seventeen chapters
+  // and nothing had ever crossed a boundary between two of them — the
+  // departures board made travel cheap and in doing so made the chapters more
+  // sealed rather than less, a menu of seventeen dioramas. The shelf is the
+  // answer: finish a place and you take something out of it, and it is still
+  // on the shelf eight hours later.
+  //
+  // It is filled in by the chapters loop below, which is the only place that
+  // knows how many there are; the container has to exist up here because this
+  // is where it goes on the card — above the board, under the tally, the first
+  // thing you see when the journal opens.
+  const jrShelf = sysEl('div', 'capyui-shelf');
+  // `group`, not `list`. The slots are real buttons and `role="listitem"` on a
+  // button REPLACES the button role rather than adding to it, so a screen
+  // reader would have been told these were list items you could not press.
+  jrShelf.setAttribute('role', 'group');
+  jrShelf.setAttribute('aria-label', 'souvenirs');
+  const jrShelfCap = sysEl('div', 'capyui-shelfcap', '');
+  // It is rewritten when a slot is pressed, which is exactly the case
+  // aria-live exists for: the answer appears somewhere other than the thing
+  // you touched.
+  jrShelfCap.setAttribute('aria-live', 'polite');
+  const jrSlots = [];
+  jrCard.appendChild(jrShelf);
+  jrCard.appendChild(jrShelfCap);
   jrCard.appendChild(sysEl('div', 'capyui-rule'));
   const jrRows = [];
   // THE CONTROLS LIVE HERE TOO, because this is the card that is still in the
@@ -7797,13 +8095,60 @@ export function createSystems(game) {
   homeEl.appendChild(homeDotsEl);
   hudRoot.appendChild(homeEl);
 
-  // --- end overlay ---
-  const endEl = sysEl('div', 'capyui-end');
-  endEl.appendChild(sysEl('h2', null, 'MISCHIEF COMPLETE'));
-  const endTimeEl = sysEl('div', 'capyui-time', '');
-  endEl.appendChild(endTimeEl);
-  endEl.appendChild(sysEl('div', 'capyui-hint', 'tap or press Enter to cause it all again'));
-  hudRoot.appendChild(endEl);
+  // --- THE LEDGER: what the journey actually was (v18) ---------------------
+  // What used to be here was a full-screen div reading MISCHIEF COMPLETE and a
+  // single number, and then location.reload(). That is a receipt, not an
+  // ending — a hundred and ninety-nine tasks, forty-two records, seventeen
+  // places and eight hours all resolved to one string and were thrown away.
+  //
+  // It is also the screen almost nobody ever saw, because it only existed at
+  // 199 of 199. So it is not only rebuilt out of the pieces the journey
+  // actually leaves behind — the postcards, the souvenirs, the numbers and the
+  // clock — it is OPENABLE FROM THE JOURNAL at any point. A retrospective that
+  // one player in a hundred sees once is not a feature, it is a trophy.
+  const ledEl = sysEl('div', 'capyui-led');
+  ledEl.setAttribute('role', 'dialog');
+  ledEl.setAttribute('aria-modal', 'true');
+  ledEl.setAttribute('aria-label', 'The journey');
+  ledEl.tabIndex = -1;
+  const ledTitle = sysEl('h2', null, 'THE JOURNEY');
+  const ledSub = sysEl('div', 'capyui-ledsub', '');
+  const ledList = sysEl('div', 'capyui-ledlist');
+  const ledFoot = sysEl('div', 'capyui-ledfoot', '');
+  const ledHint = sysEl('div', 'capyui-ledhint', '');
+  ledEl.appendChild(ledTitle);
+  ledEl.appendChild(ledSub);
+  ledEl.appendChild(ledList);
+  ledEl.appendChild(ledFoot);
+  ledEl.appendChild(ledHint);
+  ledEl.inert = true;
+  hudRoot.appendChild(ledEl);
+  let ledShown = false, ledFinal = false, ledReturnFocus = null;
+
+  // --- the souvenir card: the second beat of a chapter's ceremony ----------
+  // Finishing a place used to pay out a tally and a time and nothing you could
+  // carry. This is the one thing in the game that crosses a chapter boundary;
+  // see CHAPTERS.keep in shared.js.
+  const keepEl = sysEl('div', 'capyui-keep');
+  const keepArt = sysEl('div', 'capyui-keepart');
+  const keepText = sysEl('div', 'capyui-keeptext', '');
+  keepEl.appendChild(keepArt);
+  keepEl.appendChild(sysEl('div', 'capyui-keepkick', 'you are taking'));
+  keepEl.appendChild(sysEl('div', 'capyui-keeprule'));
+  keepEl.appendChild(keepText);
+  hudRoot.appendChild(keepEl);
+  let keepTimer = 0;
+  function showKeep(n) {
+    const def = chapterDef(n);
+    if (!def || !def.keep) return;
+    while (keepArt.firstChild) keepArt.removeChild(keepArt.firstChild);
+    const g = sysBuildKeep(def.biome);
+    if (g) keepArt.appendChild(g);
+    keepText.textContent = def.keep;
+    keepEl.classList.add('show');
+    if (keepTimer) clearTimeout(keepTimer);
+    keepTimer = setTimeout(function () { keepEl.classList.remove('show'); }, sysKEEP_CARD);
+  }
 
   // --- biome transition: white-out + place card ---
   const fadeEl = sysEl('div', 'capyui-fade');
@@ -7864,18 +8209,137 @@ export function createSystems(game) {
   let ended = false;
   let startMs = 0;
 
+  /**
+   * THE SHELF. A souvenir is held exactly when its chapter is finished — see
+   * CHAPTERS.keep in shared.js. It is a PROJECTION of the save rather than a
+   * field in it, so there is nothing to migrate, nothing that can desync, and
+   * no way to be holding one you did not earn.
+   */
+  function keepHeld(n) { return chapComplete(n); }
+  function keepCount() {
+    let k = 0;
+    for (let n = 1; n <= chapMax; n++) if (keepHeld(n)) k++;
+    return k;
+  }
+
+  /** ms on the clock right now, this session and every earlier one. */
+  function jrTotalMs() {
+    return jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+  }
+
+  /**
+   * Built fresh every time it opens, because it is a snapshot of a journey
+   * that is still going. Only the places you have actually stood in get a
+   * leaf: seventeen rows with eleven of them blank is a table, and the ones
+   * you have been to are a journey.
+   */
+  function ledBuild() {
+    while (ledList.firstChild) ledList.removeChild(ledList.firstChild);
+    let places = 0, kept = 0, done = 0, rows = 0;
+    for (let n = 1; n <= chapMax; n++) {
+      const def = chapterDef(n);
+      const rec = chapRec[n];
+      let d = 0;
+      for (let i = 0; i < rec.ids.length; i++) if (taskRec[rec.ids[i]].done) d++;
+      done += d;
+      const full = rec.ids.length > 0 && d >= rec.ids.length;
+      if (full) places++;
+      if (keepHeld(n)) kept++;
+      // Arriving ticks a task in fifteen of the seventeen; jrSeen covers the
+      // two it does not, and a place you have never stood in says nothing.
+      if (!d && !jrSeen[n]) continue;
+      const row = sysEl('div', 'capyui-ledrow');
+      row.style.animationDelay = (rows * sysLED_STAGGER) + 'ms';
+      rows++;
+      const mk = sysEl('div', 'capyui-ledmark');
+      mk.style.background = sysMarkTint(def.biome, 0.42);
+      const mark = sysBuildMark(def.biome);
+      if (mark) mk.appendChild(mark);
+      row.appendChild(mk);
+      row.appendChild(sysEl('div', 'capyui-ledname', def.name));
+      const ms = jrChapMs[n];
+      row.appendChild(sysEl('div', 'capyui-ledtime',
+        d + ' / ' + rec.ids.length + (ms > 0 ? '   ·   ' + sysFmtTime(ms) : '')));
+      // The line under the name: what you took out of the place, then every
+      // number the place got out of you.
+      const line = sysEl('div', 'capyui-ledline');
+      const held = keepHeld(n);
+      if (held) {
+        const kg = sysEl('span', 'capyui-ledkeep');
+        const g = sysBuildKeep(def.biome);
+        if (g) kg.appendChild(g);
+        line.appendChild(kg);
+      }
+      const bits = [];
+      if (held && def.keep) bits.push(def.keep);
+      for (let i = 0; i < rec.ids.length; i++) {
+        const t = recText(rec.ids[i]);
+        if (t) bits.push(t);
+      }
+      line.appendChild(sysEl('span', null, bits.length ? bits.join('  ·  ') : def.sub));
+      row.appendChild(line);
+      ledList.appendChild(row);
+    }
+    ledSub.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
+      ' places  ·  ' + kept + ' kept';
+    ledFoot.textContent = sysFmtTime(jrTotalMs()) + ' on the road';
+    // A journey of nowhere is still a card, and it should say something.
+    if (!rows) {
+      const row = sysEl('div', 'capyui-ledrow');
+      row.appendChild(sysEl('div', 'capyui-ledname', 'Nowhere, yet.'));
+      ledList.appendChild(row);
+    }
+  }
+
+  function ledShow(final) {
+    if (ledShown) return;
+    ledFinal = !!final;
+    ledShown = true;
+    ledTitle.textContent = ledFinal ? 'MISCHIEF COMPLETE' : 'THE JOURNEY SO FAR';
+    // The old card's line, kept word for word for the one player who gets
+    // here — plus the way out that did not used to exist. Reloading was the
+    // ONLY thing you could do with the end of this game, and a sandbox whose
+    // ending throws the sandbox away has the ending the wrong way round.
+    ledHint.textContent = ledFinal
+      ? 'tap or press Enter to cause it all again  ·  ESC to stay'
+      : 'ESC to close';
+    ledBuild();
+    ledEl.inert = false;
+    ledEl.classList.add('show');
+    ledEl.scrollTop = 0;
+    game.state.paused = true;
+    ledReturnFocus = document.activeElement;
+    ledEl.focus();
+  }
+  function ledHide() {
+    if (!ledShown) return;
+    ledShown = false;
+    ledFinal = false;
+    ledEl.classList.remove('show');
+    ledEl.inert = true;
+    if (ledReturnFocus && ledReturnFocus.focus) { try { ledReturnFocus.focus(); } catch (e) {} }
+    ledReturnFocus = null;
+    if (!document.hidden && !jrShown) game.state.paused = false;
+  }
+  ledEl.addEventListener('pointerdown', function (e) {
+    // At the true end, a tap anywhere still does what it always did.
+    if (ledFinal) { location.reload(); return; }
+    // Otherwise only the surround closes it — the leaves are there to be read
+    // and a card that shuts when you touch it cannot be scrolled on a phone.
+    if (e.target === ledEl) ledHide();
+  });
+
   function showEnd() {
     if (ended) return;
     ended = true;
-    // Elapsed is measured from the click-to-begin, never from page load.
-    const elapsed = startMs > 0 ? performance.now() - startMs : 0;
-    endTimeEl.textContent = 'all ' + TASKS.length + ' in ' + sysFmtTime(elapsed);
-    endEl.classList.add('show');
-    endEl.style.pointerEvents = 'auto';
-    endEl.addEventListener('pointerdown', function () { location.reload(); });
     sfx('whistle');
     setTimeout(function () { sfx('wheek', { pitch: 1.12 }); }, 420);
     shake(0.3);
+    // The lift, one last time, in whatever key the last place was in. It is
+    // the same figure the seventeen marquees used and it cannot be out of key
+    // by construction; see musSwell.
+    musSwell(1);
+    ledShow(true);
   }
 
   // =========================================================================
@@ -7927,9 +8391,54 @@ export function createSystems(game) {
     row.addEventListener('click', go);
     jrCard.appendChild(row);
     jrRows.push({ n: n, row: row, tally: tally, rec: rec, bar: barFill, def: def });
+
+    // ---- and this chapter's slot on the shelf ----------------------------
+    // A <button> so a tap can name it — a tooltip is not a thing a phone has,
+    // and the noun is the whole reward. Out of the tab order on purpose: the
+    // rows underneath are the ones a keyboard player is trying to reach, and
+    // seventeen non-destinations in front of them is a worse card.
+    const slot = sysEl('button', 'capyui-slot');
+    slot.type = 'button';
+    slot.tabIndex = -1;
+    const kg = sysBuildKeep(def.biome);
+    if (kg) slot.appendChild(kg);
+    slot.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    slot.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      jrShelfSay(n);
+    });
+    jrShelf.appendChild(slot);
+    jrSlots.push({ n: n, el: slot, def: def });
   }
+  // ---- THE WAY INTO THE LEDGER -------------------------------------------
+  // The retrospective used to be reachable at 199 of 199 and nowhere else,
+  // which is to say almost nowhere. From here it is one press, at any point,
+  // and it is a genuinely different reading of the same save: the board is
+  // "where can I go", the ledger is "where have I been".
+  const jrLedBtn = sysEl('button', 'capyui-jrled');
+  jrLedBtn.type = 'button';
+  jrLedBtn.textContent = 'the journey, laid out';
+  jrLedBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  jrLedBtn.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    jrHide();
+    ledShow(false);
+  });
+  jrCard.appendChild(jrLedBtn);
   jrCard.appendChild(jrKeys);
   jrCard.appendChild(jrFoot);
+
+  /** Name one souvenir under the shelf, or say what it would take to get it. */
+  function jrShelfSay(n) {
+    const d = chapterDef(n);
+    if (!d) return;
+    if (keepHeld(n)) {
+      jrShelfCap.textContent = d.keep + '  ·  ' + d.name;
+      sfx('pop', { volume: 0.2, pitch: 1.6 });
+    } else {
+      jrShelfCap.textContent = 'nothing from ' + d.name + ' yet';
+    }
+  }
 
   /**
    * Chapter n is somewhere you may travel to directly.
@@ -7966,6 +8475,21 @@ export function createSystems(game) {
     jrCount.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
       ' places  ·  ' + sysFmtTime(total);
     const here = game.biome ? chapterOf(game.biome.current) : 1;
+    // ---- the shelf ---------------------------------------------------------
+    const kept = keepCount();
+    for (let i = 0; i < jrSlots.length; i++) {
+      const s = jrSlots[i];
+      const have = keepHeld(s.n);
+      s.el.classList.toggle('have', have);
+      s.el.setAttribute('aria-label', have
+        ? (s.def.keep + ', from ' + s.def.name)
+        : ('nothing from ' + s.def.name + ' yet'));
+    }
+    // The caption is only ever reset by a REFRESH, so a souvenir the player
+    // has just tapped stays named while they read the rest of the card.
+    jrShelfCap.textContent = kept
+      ? kept + ' of ' + chapMax + ' kept  ·  tap one'
+      : 'finish a place and you take something out of it';
     for (let i = 0; i < jrRows.length; i++) {
       const r = jrRows[i];
       const rec = chapRec[r.n];
@@ -8868,6 +9392,10 @@ export function createSystems(game) {
   // ids that are ticked but still on the paper, being struck through
   const todoLinger = Object.create(null);
   let todoChapShown = 0;
+  // The movement last drawn, for the chapter last drawn. Reset on arrival, so
+  // it can only ever go UP inside one visit to one place — which is what makes
+  // "actNow > todoActShown" a curtain rather than a flicker.
+  let todoActShown = 1;
   // ---- THE ARROW POINTS WHERE THE PLAYER WANTS IT TO ------------------------
   // The tracked row — the one that owns the clue, the bearing and the distance —
   // was always the FIRST unticked task in the chapter, in the order they happen
@@ -8923,17 +9451,54 @@ export function createSystems(game) {
       if (r.done) { done++; if (todoLinger[rec.ids[i]]) show[rec.ids[i]] = true; }
       else openIds.push(rec.ids[i]);
     }
+    // ---- WHICH MOVEMENT OF THE CHAPTER THIS IS (v18) ---------------------
+    // See the `act` note in shared.js. Eleven chapters declare no acts and
+    // take the first branch of everything below at a cost of one property
+    // miss; the six that do are the only reason any of this exists.
+    const cdef = chapterDef(n);
+    const win = (cdef && cdef.win > 0) ? cdef.win : sysTODO_WINDOW;
+    const acts = (cdef && cdef.acts) || null;
+    // The live act is the LOWEST one with anything still open in it — not a
+    // counter that advances. Order does not matter, doing an act-3 thing early
+    // does not skip act 2, and a restored save lands on the right movement
+    // without anything about the act being written to the file.
+    let actNow = 1;
+    if (acts) {
+      actNow = acts.length;
+      for (let i = 0; i < openIds.length; i++) {
+        const d = taskRec[openIds[i]].def;
+        const a = (d && d.act) || 1;
+        if (a < actNow) actNow = a;
+      }
+    }
+
     // A pin only survives while it is still open and still in this chapter.
+    // It may sit in ANY act: F and a tap reach the whole open list, which is
+    // the promise that stops a movement from ever being a wall.
     let pi = todoPin ? openIds.indexOf(todoPin) : -1;
-    if (pi < 0) { todoPin = ''; pi = 0; }
-    // CLAMPED, NOT WRAPPED. The rows are built once and live in a fixed DOM
-    // order, so a window that wrapped past the end would draw its last two
-    // entries ABOVE its first two and the clue would sit in the middle of the
-    // card. Sliding the window back off the end keeps the paper readable and
-    // still shows the pinned row.
-    const start = Math.min(pi, Math.max(0, openIds.length - sysTODO_WINDOW));
-    const top = openIds.length ? openIds[pi] : '';
-    for (let i = start; i < openIds.length && i < start + sysTODO_WINDOW; i++) show[openIds[i]] = true;
+    if (pi < 0) todoPin = '';
+    let winIds, top;
+    if (pi >= 0) {
+      // CLAMPED, NOT WRAPPED. The rows are built once and live in a fixed DOM
+      // order, so a window that wrapped past the end would draw its last two
+      // entries ABOVE its first two and the clue would sit in the middle of the
+      // card. Sliding the window back off the end keeps the paper readable and
+      // still shows the pinned row.
+      const start = Math.min(pi, Math.max(0, openIds.length - win));
+      winIds = openIds.slice(start, start + win);
+      top = openIds[pi];
+    } else {
+      // No pin: the paper is the live act's own rows and only those. In a
+      // chapter with no acts that is simply the first `win` open rows, which
+      // is exactly what it has always been.
+      winIds = [];
+      for (let i = 0; i < openIds.length && winIds.length < win; i++) {
+        const d = taskRec[openIds[i]].def;
+        if (((d && d.act) || 1) === actNow) winIds.push(openIds[i]);
+      }
+      top = winIds[0] || '';
+    }
+    for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     if (top !== todoTopId) {
       // clear the aim off whoever used to be top
       const old = taskRec[todoTopId];
@@ -8983,8 +9548,12 @@ export function createSystems(game) {
       // and where the way on is, in words. A player who has just finished a
       // place is exactly the player who has stopped looking at the map, and
       // every chapter hides its exit somewhere specific on purpose.
-      const cd = chapterDef(n);
-      if (cd && cd.way) best += (best ? '\n' : '') + 'the way on: ' + cd.way;
+      // ---- AND WHAT YOU ARE TAKING WITH YOU (v18) -------------------------
+      // The record board is the last thing the paper ever says about a place,
+      // so it is where the souvenir belongs: it is the one line on it that is
+      // about somewhere else.
+      if (cdef && cdef.way) best += (best ? '\n' : '') + 'the way on: ' + cdef.way;
+      if (cdef && cdef.keep) best += (best ? '\n' : '') + 'you kept: ' + cdef.keep;
       clueEl.textContent = best || 'nothing left undone here';
       clueEl.classList.remove('off');
       if (clueEl.parentNode !== todoEl) todoEl.insertBefore(clueEl, countEl);
@@ -8992,14 +9561,47 @@ export function createSystems(game) {
       todoHeadEl.textContent = 'Done here';
     } else {
       clueEl.classList.remove('recs');
-      todoHeadEl.textContent = 'To do';
+      // THE PAPER IS HEADED BY THE MOVEMENT YOU ARE IN. In eleven chapters
+      // that is 'To do', as it always was; in six it is the act, which is the
+      // whole of the structure being visible without a single extra element
+      // on the card.
+      const ad = acts && acts[actNow - 1];
+      todoHeadEl.textContent = ad ? ad.kick : 'To do';
     }
 
 
     if (todoChapShown !== n) {
       todoChapShown = n;
+      // Arriving somewhere is not an act break — the place card has just said
+      // where you are, and a restored save in the middle of act three must not
+      // replay two curtains on the first frame.
+      todoActShown = actNow;
       todoEl.classList.add('grow');
       setTimeout(function () { todoEl.classList.remove('grow'); }, 760);
+    } else if (acts && actNow > todoActShown) {
+      // ---- A MOVEMENT OPENS ------------------------------------------------
+      // Deliberately NOT a reward channel. No lift, no confetti, no tick: the
+      // place card is this game's "something has changed" card — it is what an
+      // arrival uses — and an act break is precisely that and nothing more.
+      // `wow` keeps the lift, the crowd, the slow motion and the fistful of
+      // paper, and stays worth what it was worth.
+      //
+      // Held back, because the tick that CLOSED the last act very often has a
+      // card of its own (four of the six act chapters end an act on a `mini`),
+      // and two cards on one frame is one card nobody reads.
+      const to = actNow;
+      todoActShown = actNow;
+      setTimeout(function () {
+        const ad = acts[to - 1];
+        // Still here, and still that act — a player who left for the
+        // departures board in the meantime does not want a curtain. And not
+        // if the whole place has been finished inside the wait: a movement
+        // opening is nonsense once there is nothing left in the chapter, and
+        // it would land on top of the ceremony's own card.
+        if (!ad || todoChapter() !== n || todoActShown !== to || chapComplete(n)) return;
+        showPlace(ad.kick, ad.line);
+        sfx('chime', { volume: 0.42, pitch: 0.82 });
+      }, sysACT_CARD_WAIT);
     }
   }
 
@@ -9047,9 +9649,13 @@ export function createSystems(game) {
       for (const k in taskRec) if (taskRec[k].done) tasks.push(k);
       const seen = [];
       for (const k in jrSeen) seen.push(+k);
+      // `chapms` is additive and the version does not move for it: a file
+      // written before the ledger existed simply has no times in it, and the
+      // ledger prints a tally with no clock beside it rather than a zero.
       localStorage.setItem(sysSAVE_KEY, JSON.stringify({
         v: 1, tasks: tasks, seen: seen, recs: jrRecs, told: 1,
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
+        chapms: jrChapMs,
         biome: (game.biome && game.biome.current) || 'sydney',
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
@@ -9195,16 +9801,31 @@ export function createSystems(game) {
     // the paper quietly changed country. A chapter is the unit this game is
     // actually built out of; finishing one has to be a moment.
     const cn = r.chapter;
+    let ceremony = false;
     if (chapComplete(cn) && !jrChapDone[cn]) {
       jrChapDone[cn] = true;
+      ceremony = true;
       setTimeout(function () { chapterCeremony(cn); }, 1100);
     }
-    if (doneCount >= TASKS.length) setTimeout(showEnd, 900);
+    // ---- AND IF THAT WAS THE LAST ONE OF ALL -------------------------------
+    // The final tick of the game is ALWAYS also the final tick of a chapter,
+    // so these two used to land on top of each other: the ledger opened at
+    // 900 ms and the last chapter's DONE card was drawn across it at 1100,
+    // with its souvenir following two seconds later. The order that reads is
+    // the other one — finish the place, take the thing, and only then lay the
+    // whole journey out — so the end waits for the ceremony it just started.
+    if (doneCount >= TASKS.length) {
+      setTimeout(showEnd, ceremony ? 1100 + sysKEEP_WAIT + sysKEEP_CARD + 500 : 900);
+    }
     return true;
   }
 
   const jrChapDone = Object.create(null);
   const jrChapAt = Object.create(null);       // ms at which each chapter finished
+  // ...and how long each one actually took, which is the number the ledger
+  // wants and the only one of the two worth keeping across a session. The
+  // running total above is derivable from it and is not saved.
+  const jrChapMs = Object.create(null);
 
   /**
    * The end of a place. Deliberately built out of the pieces that already exist
@@ -9219,6 +9840,7 @@ export function createSystems(game) {
     const prev = jrChapAt.lastTotal || 0;
     jrChapAt[n] = total;
     jrChapAt.lastTotal = total;
+    jrChapMs[n] = Math.max(0, total - prev);
     let doneChaps = 0;
     for (let k = 1; k <= chapMax; k++) if (chapComplete(k)) doneChaps++;
     showPlace(def.name.toUpperCase() + '  ·  DONE',
@@ -9238,10 +9860,21 @@ export function createSystems(game) {
     // down in CHAPTERS — so it arrives after the card, in the game's own voice,
     // as the last thing said about the chapter rather than the first thing said
     // about the next one.
+    //
+    // ---- AND WHAT YOU TAKE WITH YOU (v18) ---------------------------------
+    // Between the two: the souvenir. It is the SECOND beat of the ceremony and
+    // not a third channel of reward — no lift, no confetti, no tick, because
+    // the ceremony has just spent all three. What it does instead is the one
+    // thing nothing else in this game does, which is point at somewhere you
+    // are not: the shelf in the journal now has a thing on it that says you
+    // were here, and it will still say so in Antarctica.
+    setTimeout(function () { showKeep(n); }, sysKEEP_WAIT);
     if (def.way && n !== chapMax) {
       setTimeout(function () {
-        if (chapterOf(game.biome.current) === n) toast('the way on: ' + def.way);
-      }, 4200);
+        // ...unless the journey has just ended on some OTHER chapter's last
+        // tick, in which case "the way on" is the wrong sentence entirely.
+        if (!ledShown && chapterOf(game.biome.current) === n) toast('the way on: ' + def.way);
+      }, sysKEEP_WAIT + sysKEEP_CARD + 400);
     }
   }
 
@@ -9355,6 +9988,12 @@ export function createSystems(game) {
       const rc = jrFile.recs || {};
       for (const k in rc) if (typeof rc[k] === 'number') jrRecs[k] = rc[k];
       jrCarriedMs = typeof jrFile.ms === 'number' ? jrFile.ms : 0;
+      const cms = jrFile.chapms || {};
+      for (const k in cms) if (typeof cms[k] === 'number') jrChapMs[k] = cms[k];
+      // The running total the NEXT ceremony measures against. Without this a
+      // chapter finished after a reload reads as "eleven hours", because the
+      // previous mark was zero and the total carries every earlier session.
+      jrChapAt.lastTotal = jrCarriedMs;
       // Carrying on IS the proof that the file works, so the line about it has
       // been earned and must not be said again.
       saveTold = true;
@@ -9475,6 +10114,21 @@ export function createSystems(game) {
         else startGame('sydney');
         return;
       }
+    }
+    // THE LEDGER SWALLOWS THE KEYBOARD WHILE IT IS OPEN. It is a modal and it
+    // pauses, so nothing underneath it — not Tab, not the digits, and least of
+    // all a movement key — may be reached past it.
+    if (ledShown) {
+      if (c === 'Escape') { e.preventDefault(); ledHide(); return; }
+      // The end card's own key, kept: Enter starts the whole thing again.
+      if (ledFinal && (c === 'Enter' || c === 'NumpadEnter')) {
+        e.preventDefault(); location.reload(); return;
+      }
+      // Tab would otherwise walk the browser's own focus order straight out of
+      // the back of a modal and into the HUD underneath it. The ledger has
+      // nothing focusable inside it, so focus simply stays where it is put.
+      if (c === 'Tab') e.preventDefault();
+      return;
     }
     // TAB OPENS IT AND THEN GETS OUT OF THE WAY.
     // Tab was the toggle in both directions, which meant that once the board was

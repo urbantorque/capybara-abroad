@@ -1494,8 +1494,10 @@ held for precisely as long as there were thirteen places.
 
 `CHAPTERS` in shared.js carries, per chapter: `biome`, `name`, `sub`, `arrive`
 (the task ticked by turning up), `far` (camera far plane), `tall` (deep shadow
-frustum), `pal` (index into `sysMUS_PAL`), `hint` (the title card's line) and
-`open` (the first thing the game says on arrival).
+frustum), `pal` (index into `sysMUS_PAL`), `hint` (the title card's line),
+`open` (the first thing the game says on arrival), `way` (the one way out, in
+words), `keep` (the souvenir), and optionally `acts` and `win` (the shape of the
+chapter — see **THE SHAPE OF A CHAPTER** below).
 
 It absorbed eleven separate if-ladders across five files — the spawn point, the
 far plane, the shadow box, the palette, the arrival task, the place card, the
@@ -1628,6 +1630,139 @@ anything below it straight up. Measured — a capybara teleported twelve metres 
 the Anvil and the Arch arrived on all three of their upper surfaces inside a frame. **The keels
 are drawn and they are not a place.** It became 'Let the cloud hand you back' instead, which is
 the chapter's own safety promise and had never been said out loud.
+
+## THE SHAPE OF A CHAPTER — `act`, `acts`, `win` (v18 — 23 Aug 2026)
+
+Seventeen chapters had exactly one structure between them: turn up, work
+through eight to nineteen switches in any order you like, tick the one marquee
+somewhere in the middle, three wheeks, leave. The CONTENT of them could not be
+more different and the SHAPE of them never varied once in eight hours — and
+shape is what a player feels at hour four rather than at hour one.
+
+```js
+// shared.js — TASKS, on any row
+{ id: 'sandstorm', text: 'Stand in the sandstorm', chapter: 8, act: 3 }
+
+// shared.js — CHAPTERS, on any row
+win: 3,                                  // how many open rows the paper shows here
+acts: [                                  // one entry per movement
+  { kick: 'JEMAA EL-FNAA',   line: 'do not rob anybody yet. or do.' },
+  { kick: 'EAST, THEN',      line: 'the maze stops. everything stops.' },
+  { kick: 'AFTER THE STORM', line: 'it is evening, and somebody has lit a fire.' },
+]
+```
+
+No `act` means act 1. The paper offers **the lowest act that still has anything
+open in it** — not a counter that advances, so order does not matter, doing an
+act-3 thing early does not skip act 2, and a restored save lands on the right
+movement with nothing about the act written to the file. The paper's own header
+becomes the act, so the structure is visible without one extra element on the
+card. `todoActShown` is reset on arrival, so an act break can only fire once,
+inside one visit, going up.
+
+**TWO RULES, AND THE SECOND IS THE WHOLE SAFETY ARGUMENT:**
+
+1. **Nothing is gated.** `completeTask` has never heard of an act and never
+   will. An act stages the TELLING, not the world.
+2. **F and a tap still reach every open row in the chapter**, whatever act it
+   is in — `todoStep`/`todoPinTo` run on the full open list and the window
+   follows the pin across a boundary. So an act cannot soft-lock a chapter and
+   cannot hide a task from somebody looking for it. Measured in Iceland: one F
+   from act 2 puts both act-3 rows on the paper.
+
+**An act break is not a reward channel.** It gets `showPlace` — the game's
+"something has changed" card, which is what an ARRIVAL uses — and a soft chime,
+and nothing else. No lift, no confetti, no tick, no slow motion: `wow` keeps all
+four and stays worth what it was worth. It is held back `sysACT_CARD_WAIT`
+(2.9 s) because the tick that CLOSED the last act very often has a card of its
+own, and two cards on one frame is one card nobody reads. It is cancelled if the
+chapter finished inside that wait, or if the player left.
+
+**Six of seventeen carry one, and eleven are flat lists.** That ratio is the
+point: a game where every chapter has a twist has no twists in it. The six:
+
+| | |
+|---|---|
+| 3 Circular Quay | THE QUAY (2) · OPEN WATER (5) · MANLY (1), `win: 3` — the chapter is a voyage and now reads as one |
+| 7 Iceland | REYKJAVÍK (5) · OUT OF TOWN (3) · AND THEN SIT STILL (2) — a narrowing, into a chapter that ends in stillness |
+| 8 Marrakech | JEMAA EL-FNAA (5) · EAST, THEN (3) · AFTER THE STORM (2) — the world already gated the fire behind the storm; the paper now says so |
+| 10 Venice | LOW WATER (9) · ACQUA ALTA (3) — the one chapter whose entire argument is a turn |
+| 16 Sơn Đoòng | no acts, `win: 2` — in the dark, two things at a time |
+| 17 Antarctica | THE STATION (3) · THE ICE (8) · THE PACK (3), `win: 3` |
+
+`qa/audit-tasks.mjs` enforces it: an act that is declared must have tasks, a
+task may not be in an act that is not declared, the arrival is act 1 by
+definition, and a chapter with no `acts` may not carry `act` on any row. It
+warns if the marquee is in act 1 of a multi-act chapter — the chapter would
+peak before it started. None of the six do.
+
+## THE SHELF — `keep` (v18)
+
+Seventeen chapters and nothing had ever crossed a boundary between two of them.
+The departures board made travel cheap and in doing so made the chapters MORE
+sealed rather than less: a menu of seventeen dioramas.
+
+`CHAPTERS.keep` is one noun per place — *a tourist's hat*, *a piece of the
+glacier*, *the station's enamel mug*. **You hold it exactly when the chapter is
+finished**, and that is a PROJECTION of the save rather than a field in it
+(`keepHeld(n) === chapComplete(n)`), so there is nothing to migrate, nothing
+that can desync, and no way to hold one you did not earn.
+
+It is drawn from `sysKEEPS` in systems.js — the same little shape table as
+`sysMARKS`, three to six shapes each, in the biome's own palette keys, on a
+32-square rather than the postcard's 64x40 because a souvenir is an OBJECT and
+wants a square. `sysDrawShapes` is now shared by both; the marks keep
+`preserveAspectRatio="none"` (a scene stretches to its tile) and the souvenirs
+take `xMidYMid meet` (an object does not).
+
+It surfaces in four places, and it is a REWARD FOR FINISHING A PLACE, which had
+no per-item payoff at all before:
+
+- the chapter ceremony's **second beat** — the souvenir card, `sysKEEP_WAIT`
+  after the DONE card, no lift and no confetti because the ceremony has just
+  spent all three channels;
+- **the shelf** at the top of the journal — seventeen slots, always all
+  seventeen, the unearned ones drawn greyscale at 0.30 so you can see there is a
+  shape in the box and not what it is;
+- **the title card**, bottom-left of a finished place's postcard;
+- **the ledger**, below.
+
+## THE LEDGER (v18)
+
+`showEnd` was a full-screen div reading MISCHIEF COMPLETE, one number, and
+`location.reload()`. A hundred and ninety-nine tasks, forty-two records,
+seventeen places and eight hours resolved to one string and were then thrown
+away — and it was the screen almost nobody ever saw, because it only existed at
+199 of 199.
+
+It is now built out of what the journey actually leaves behind: the postcards,
+the souvenirs, the records and the clock, one leaf per place you have STOOD IN
+(seventeen rows with eleven blank is a table; the ones you have been to are a
+journey), each arriving on its own `sysLED_STAGGER` beat.
+
+**And it is openable from the journal at any point** — "the journey, laid out".
+The board answers *where can I go*; the ledger answers *where have I been*. A
+retrospective one player in a hundred sees once is a trophy, not a feature.
+
+- `jrChapMs[n]` is how long each chapter actually took, and it is saved
+  (`chapms`). Additive: the version does not move, and a file written before
+  this prints a tally with no clock beside it rather than a zero.
+- **`jrChapAt.lastTotal` is now seeded from `jrCarriedMs` on restore.** It was
+  not, so the first chapter finished after a reload reported its duration as
+  every session that had ever been played.
+- `sysFmtTime` grew hours. Under an hour it is unchanged to the character, so
+  every record and every chapter time still reads as it did; the journal header
+  was printing an eight-hour journey as `504:11`.
+- z-index **66** — over the place card (58) and the journal (62), under the
+  biome fade (70). Nothing may be drawn across the last word about a journey.
+- The final tick of the game is always also the final tick of a chapter, so
+  `showEnd` **waits for the ceremony it just started** (`1100 + sysKEEP_WAIT +
+  sysKEEP_CARD + 500`) instead of opening underneath it at 900 ms. Finish the
+  place, take the thing, then lay the journey out.
+- Escape closes it and the world is still there. Reloading was the only thing
+  you could ever do with the end of this game, and a sandbox whose ending throws
+  the sandbox away has it the wrong way round. At the true end, a tap or Enter
+  still reloads, exactly as it always did.
 
 ### A KINEMATIC CARRIER: FIVE RULES, AND THE ONE THAT KEEPS BEING RELEARNT
 
