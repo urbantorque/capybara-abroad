@@ -822,6 +822,30 @@ export function createNPCs(game) {
                'You are just taking that, are you.', 'Right. Yes. Fine.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
                'Slow down!', 'It has somewhere to be.'],
+    // ---- AND FOUR MORE, ABOUT THE WEATHER --------------------------------
+    // Chapter-neutral to the same standard as the four above: every one of
+    // these has to work on a Venetian quay, in a Mong Kok doorway, on an
+    // Antarctic jetty and inside a mountain, which rules out naming a season,
+    // a month, a country or a kind of building. What is left is what people
+    // actually say about weather, which is almost nothing and is the point.
+    drizzle:  ['Here it comes.', 'Of course it is.', 'That was not forecast.',
+               'Ah. Lovely.', 'Right on time.', 'I did not bring a coat.',
+               'It will pass.'],
+    clearing: ['There we are.', 'That is better.', 'It has stopped.',
+               'Blue, look.', 'Short one, that.', 'Told you it would pass.'],
+    // What you say when something drifts past your face. Deliberately smaller
+    // than the others — this is a person noticing, not a person commenting.
+    //
+    // AND IT MAY NOT BE ABOUT BLOSSOM. The first cut had 'Every year.' and
+    // 'Where do they all come from?', which are lines about falling leaves —
+    // and this list is spoken over nine different mote fields including the
+    // dust in Jemaa el-Fnaa and the spindrift off the Antarctic ice, where a
+    // stallholder wistfully remarking that it happens every year is nonsense.
+    // Every line here has to work for petals, dust, spray, spores and snow.
+    drift:    ['Oh —', 'Hm.', 'Look at that.', 'Where does it all come from?',
+               'That is nice, actually.', 'It is in my eyes.'],
+    chill:    ['Bit sharp.', 'Ooh.', 'Cold one.', 'That went right through me.',
+               'Feel that?', 'Brr.'],
   };
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
@@ -839,6 +863,124 @@ export function createNPCs(game) {
   const npcLOC_REACT_N = 2;      // never more than two people speak at once
   const npcLOC_RUSH_V  = 6.2;    // m/s past somebody that counts as belting past
   const npcLOC_RUSH_R  = 3.4;    // ...and how close you have to be for it to matter
+
+  // =======================================================================
+  // ...AND THEY NOTICE THE WEATHER.
+  //
+  // The locals are the population of fifteen chapters, and until now the only
+  // thing that could change their behaviour was the capybara. A shower could
+  // arrive, soak the square and leave, and every person standing in it would
+  // carry on breathing gently — which is the same failure the flinch was
+  // written to fix, one layer out: nothing in those worlds ACKNOWLEDGES the
+  // world.
+  //
+  // Four reactions, in descending order of how much they cost:
+  //
+  //   UMBRELLA  it is raining hard enough, so up it goes. A real object, not
+  //             a pose — two meshes on shared geometry, built the first time
+  //             a given person needs one and kept thereafter.
+  //   HUDDLE    a cold, dark, windy chapter: shoulders up, arms in, head
+  //             down. This is what people do when there is nowhere to go.
+  //   LOOK UP   something drifted past. The head tilts for a second and a
+  //             third of the time they say so.
+  //   LEAN      the body leans off the gust, which is one number and is the
+  //             only one of the four you will notice without meaning to.
+  //
+  // WHAT IS DELIBERATELY NOT HERE: people walking to shelter, or crowding a
+  // streetlamp. A local is a FIXED POINT — it is the ninety per cent of a cast
+  // that is not a rewrite, and it has no nav mesh, no path and no destination.
+  // Making them walk means giving fifteen chapters a nav graph, and inventing
+  // shelter points means editing fifteen biome files, which this pass is not
+  // allowed to do. The huddle is the honest version of the same beat: it is
+  // what standing in the cold with nowhere to go actually looks like.
+  // =======================================================================
+  const npcLOC_UMB_ON   = 0.30;   // drizzle at which an umbrella is worth it
+  const npcLOC_UMB_OFF  = 0.16;   // ...and hysteresis, or it flickers on the tail
+  const npcLOC_UMB_LAM  = 3.2;    // how fast it opens. Fast: it is raining.
+  // HOW FAR THE HOLDING ARM COMES UP, and it was measured rather than guessed.
+  // The arm is one box hanging 0.60 m below a pivot at (0.30, 1.32), rotated
+  // about X — so at -1.42 rad it points FORWARD and horizontal, and the first
+  // cut had every local in Venice holding a canopy out at arm's length beside
+  // their own ear like a waiter. At -2.55 the hand lands at (0.30, 1.82, 0.33),
+  // which is up, slightly forward, and under the canopy.
+  const npcLOC_UMB_ARM  = 2.55;
+  const npcLOC_HUD_LAM  = 1.5;    // the huddle, which is a slow decision
+  const npcLOC_LOOK_LAM = 4.0;
+  const npcLOC_LOOK_DUR = 1.6;    // s a glance upward lasts
+  const npcLOC_LOOK_GAP = 26;     // s between glances, jittered per person
+  const npcLOC_WIND_REF = 6.0;    // m/s of gust that earns the full lean
+  const npcLOC_WIND_MAX = 0.085;  // rad. Small — a lean, not a bow.
+  const npcLOC_CHILL_G  = 3.4;    // m/s at which a cold chapter is worth saying
+  // How cold a chapter is comes from the MOOD ROW and not from its `lock`.
+  // This started as `{ night: 1, predawn: 1, interior: 1 }` — the dark
+  // chapters are the cold ones — which is true in sixteen places and wrong in
+  // the seventeenth, because Antarctica is locked to 'midday'. Measured: a
+  // crowd standing in a 4.4 m/s katabatic wind on the peninsula at huddle 0.00
+  // while Reykjavik, which is warmer, sat at 0.89. Cold is now its own number.
+  const npcLOC_COLD_FALL = { night: 0.7, predawn: 0.8, interior: 0.6 };
+  // ---- the weather, read ONCE for the whole population --------------------
+  // Not per person. It is the same sky over all of them, and asking the
+  // weather module forty times a frame for the same five floats is the sort of
+  // cost that only shows up in the chapter with the most people in it, which
+  // is the chapter you least want it to show up in. Read at the top of
+  // update() rather than inside localsStep, because localsStep returns early
+  // when a chapter has no locals and the Sydney cast below still needs them.
+  let npcWxRain = 0, npcWxGustS = 0, npcWxGustX = 0, npcWxGustZ = 0;
+  let npcWxMotes = 0, npcWxCold = 0;
+  function npcWxRead() {
+    const WX = game.weather;
+    if (!WX) { npcWxRain = 0; npcWxGustS = 0; npcWxGustX = 0; npcWxGustZ = 0;
+               npcWxMotes = 0; npcWxCold = 0; return; }
+    npcWxRain = WX.drizzle();
+    const gu = WX.gust();
+    npcWxGustX = gu.x; npcWxGustZ = gu.z;
+    npcWxGustS = Math.sqrt(gu.x * gu.x + gu.z * gu.z);
+    const mood = WX.mood();
+    npcWxMotes = mood.motes ? 1 : 0;
+    // A cold chapter is one that SAYS it is cold and whose air is moving.
+    // Marrakech at noon is windier than Reykjavik and nobody there is cold;
+    // Antarctica is bright daylight and everybody there is. The wind is the
+    // other half of it either way — cold still air is bearable and cold moving
+    // air is not, which is the only reason a chill is worth drawing at all.
+    const cd = typeof mood.cold === 'number' ? mood.cold
+                                             : (npcLOC_COLD_FALL[mood.lock] || 0);
+    npcWxCold = cd * clamp(npcWxGustS / npcLOC_WIND_REF, 0, 1);
+  }
+  // Shared umbrella geometry — built once, lazily, and only if some chapter
+  // in this run ever actually rains on somebody.
+  let npcUmbCanopy = null, npcUmbShaft = null;
+  const npcUMB_COL = [PALETTE.cloth2, PALETTE.cloth4, PALETTE.cloth6,
+                      PALETTE.cloth8, PALETTE.stoneDark];
+  function npcMakeUmbrella(rec) {
+    if (!npcUmbCanopy) {
+      npcUmbCanopy = new THREE_.ConeGeometry(0.44, 0.30, 8);
+      npcUmbShaft = new THREE_.CylinderGeometry(0.022, 0.022, 0.78, 5);
+    }
+    const g = new THREE_.Group();
+    const col = npcUMB_COL[randInt(0, npcUMB_COL.length - 1)];
+    // mat(), NOT npcLocMat(). The figures are boxes and a box shades the same
+    // either way, so npcLocMat has always got away with a plain Lambert — but
+    // a cone does not. Smooth-shaded, an eight-sided canopy renders as a soft
+    // grey dome with no facets in it, which is the one thing in this game that
+    // is not allowed to look round. mat() is flat-shaded and cached.
+    const cm = new THREE_.Mesh(npcUmbCanopy, mat(col));
+    cm.position.y = 0.30;
+    cm.castShadow = true;
+    const sm = new THREE_.Mesh(npcUmbShaft, npcLocMat(PALETTE.stoneDark));
+    sm.castShadow = false;                     // a 2 cm stick is not a shadow
+    g.add(cm); g.add(sm);
+    // Over the head and a little to the holding side. It is NOT parented to
+    // the arm: the arm is a single box with no elbow, so a canopy welded to
+    // the hand swings through the figure's own skull on every raise. Held over
+    // the head and the arm raised to meet it reads correctly at six metres and
+    // cannot intersect anything.
+    g.position.set(0.27, 1.80, 0.17);
+    g.scale.setScalar(0.001);
+    g.visible = false;
+    rec.group.add(g);
+    rec.umbG = g;
+    return g;
+  }
   /**
    * @param o {biome, x, y, z, group?, lines?, wheek?, near?, cool?, face?}
    *   biome  which chapter this person is standing in - they exist nowhere else
@@ -885,6 +1027,12 @@ export function createNPCs(game) {
       fl: 0, flV: 0,            // the flinch spring
       flYaw: 0,                 // ...and which way to turn while it runs
       rushWas: false,
+      // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
+      umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
+      hud: 0,                             // the huddle, 0..1
+      look: 0, lookT: rand(4, npcLOC_LOOK_GAP),   // the glance up
+      wetWas: false,                      // rising edge of "it has started"
+      chillWas: false,
       // The bubble reader wants something with a .group.position, and a fixed
       // local has no head node to hang one off - so it carries a point.
       anchor: { group: { position: new THREE_.Vector3(
@@ -1037,6 +1185,8 @@ export function createNPCs(game) {
     const cv = capy && capy.velocity;
     const csp = cv ? Math.sqrt(cv.x * cv.x + cv.z * cv.z) : 0;
     const rushing = csp > npcLOC_RUSH_V;
+    const wxRain = npcWxRain, wxGustS = npcWxGustS, wxGustX = npcWxGustX;
+    const wxGustZ = npcWxGustZ, wxMotes = npcWxMotes, wxCold = npcWxCold;
     for (let i = 0; i < locals.length; i++) {
       const r = locals[i];
       if (r.biome !== live) continue;
@@ -1059,6 +1209,71 @@ export function createNPCs(game) {
         }
       }
       r.rushWas = rushNow;
+      // ---- ...and the sky, which is happening to them too -----------------
+      // Only a person this module BUILT gets any of this. A chapter that
+      // handed over its own Group — a fisherman merged into a jetty, a monk
+      // who is four boxes — has no head node, no arms and no known scale, and
+      // stapling an umbrella to the middle of it would put a canopy through
+      // somebody's face. They still get the lines.
+      if (r.fig) {
+        // THE UMBRELLA, ON A LATCH. Without hysteresis it opens and shuts
+        // repeatedly all the way down the shower's long tail, which is the
+        // single most irritating thing a background figure can do.
+        if (!r.umbUp && wxRain > npcLOC_UMB_ON) r.umbUp = true;
+        else if (r.umbUp && wxRain < npcLOC_UMB_OFF) r.umbUp = false;
+        r.umb = damp(r.umb, r.umbUp ? 1 : 0, npcLOC_UMB_LAM, dt);
+        if (r.umb > 0.01) {
+          const g2 = r.umbG || npcMakeUmbrella(r);
+          g2.visible = true;
+          // It OPENS. The scale is the gesture — a canopy that fades in is a
+          // ghost and one that pops in at full size is a bug report.
+          g2.scale.set(0.28 + r.umb * 0.72, 0.45 + r.umb * 0.55, 0.28 + r.umb * 0.72);
+          // ...and it tips into the wind, which is the whole body language of
+          // holding one.
+          g2.rotation.z = clamp(-wxGustX * 0.045, -0.34, 0.34);
+          g2.rotation.x = clamp(wxGustZ * 0.045, -0.34, 0.34);
+        } else if (r.umbG && r.umbG.visible) {
+          r.umbG.visible = false;
+        }
+        r.hud = damp(r.hud, wxCold * (1 - r.umb * 0.5), npcLOC_HUD_LAM, dt);
+        // THE GLANCE UP. Only where there is something to glance at, and on a
+        // long jittered gap so that a square full of people is not a Mexican
+        // wave of heads.
+        r.lookT -= dt;
+        if (r.lookT <= -npcLOC_LOOK_DUR) {
+          r.lookT = npcLOC_LOOK_GAP * rand(0.55, 1.6);
+          // A third of the time they mention it. The line is on the SAME
+          // cooldown as the greeting, so somebody who has just said hello does
+          // not also remark on the leaves.
+          if (wxMotes && !wxRain && r.cd <= 0 && Math.random() < 0.34) {
+            r.cd = r.cool * rand(0.9, 1.6);
+            localLine(r, r.says.drift || npcLOC_SAY.drift);
+          }
+        }
+        const looking = wxMotes && r.lookT <= 0 && wxRain < 0.25;
+        r.look = damp(r.look, looking ? 1 : 0, npcLOC_LOOK_LAM, dt);
+      }
+      // ---- and they say when it starts and when it stops ------------------
+      // Rising edges on both, so one shower is one remark and not a running
+      // commentary. Everybody in earshot has their own cooldown, so a square
+      // of twelve people produces two or three voices rather than twelve.
+      const raining = wxRain > 0.26;
+      if (raining !== r.wetWas) {
+        r.wetWas = raining;
+        if (r.cd <= 0 && Math.random() < 0.5) {
+          r.cd = r.cool * rand(0.8, 1.5);
+          localLine(r, raining ? (r.says.drizzle || npcLOC_SAY.drizzle)
+                               : (r.says.clearing || npcLOC_SAY.clearing));
+        }
+      }
+      const chilly = wxCold > 0 && wxGustS > npcLOC_CHILL_G;
+      if (chilly !== r.chillWas) {
+        r.chillWas = chilly;
+        if (chilly && r.cd <= 0 && Math.random() < 0.3) {
+          r.cd = r.cool * rand(1.0, 1.8);
+          localLine(r, r.says.chill || npcLOC_SAY.chill);
+        }
+      }
       // ---- the flinch, which is a spring ---------------------------------
       if (r.fl !== 0 || r.flV !== 0) {
         r.flV += (-npcLOC_FL_K * r.fl - npcLOC_FL_C * r.flV) * dt;
@@ -1089,8 +1304,23 @@ export function createNPCs(game) {
         // which on a figure whose legs are a merged mesh is the only honest way
         // to say "recoiled" without a skeleton.
         const f = -r.fl;                       // 0..1, positive while recoiling
-        r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB - f * 0.045;
-        r.group.rotation.x = -f * npcLOC_FL_LEAN;
+        // ---- THE LEAN, off the gust ---------------------------------------
+        // Projected onto the direction the person is FACING, so somebody with
+        // their back to the wind leans back and somebody facing it leans in,
+        // which is the whole reason it reads as wind rather than as a wobble.
+        // It ADDS to the flinch's lean rather than fighting it: a startled
+        // person in a gale is both, and both are small.
+        let lean = 0;
+        if (wxGustS > 0.2) {
+          const fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
+          lean = clamp((wxGustX * fx + wxGustZ * fz) / npcLOC_WIND_REF,
+                       -1, 1) * npcLOC_WIND_MAX;
+        }
+        // ...and the huddle takes a couple of centimetres out of them, which
+        // on a figure with no spine is how you draw shoulders coming up.
+        r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB
+                             - f * 0.045 - r.hud * 0.035;
+        r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06;
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
@@ -1103,7 +1333,15 @@ export function createNPCs(game) {
           // the dip and has to win, or a startled person is drawn peering
           // fondly downwards at the thing that just exploded.
           const dip = watch ? clamp(0.55 - Math.sqrt(d2) * 0.03, 0, 0.42) : 0;
-          r.fig.head.rotation.x = damp(r.fig.head.rotation.x, dip - f * npcLOC_FL_HEAD,
+          // ...and two more things the head does. A GLANCE UP at whatever is
+          // drifting past — negative, because the dip is positive — and a
+          // HUDDLE, which is the chin going into the collar and is the
+          // opposite. Both lose to the flinch, which is already the rule for
+          // the dip and is right for the same reason: a person reacting to a
+          // bang is not also admiring the blossom.
+          r.fig.head.rotation.x = damp(r.fig.head.rotation.x,
+                                       dip - f * npcLOC_FL_HEAD
+                                       - r.look * 0.62 + r.hud * 0.22,
                                        f > 0.02 ? 14 : 5, dt);
           // arms: a slow shift of weight, and one of them comes up while they
           // are actually talking — and BOTH come up, fast, on a flinch.
@@ -1112,10 +1350,25 @@ export function createNPCs(game) {
           const talk = r.gest > 0 ? 0.5 + Math.sin(r.t * 7.5) * 0.22 : 0;
           const guard = f * npcLOC_FL_ARM;
           const armL = f > 0.02 ? 22 : 4, armR = f > 0.02 ? 22 : 8;
-          r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x, sway - guard, armL, dt);
-          r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x, -sway - talk - guard, armR, dt);
-          r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z, -talk * 0.7 - f * 0.4, armR, dt);
-          r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z, f * 0.4, armL, dt);
+          // THE ARM THAT IS HOLDING THE UMBRELLA CANNOT ALSO BE SWAYING. It
+          // goes up and it stays there; the talking gesture is suppressed on
+          // that side for as long as there is something in the hand, which is
+          // what stops a person waving a canopy about while they speak.
+          const hold = r.umb;
+          // ...and the huddle folds BOTH arms in across the body: rotation.z
+          // toward the centre line, which on two boxes with no elbows is the
+          // only crossed-arms available and reads correctly from six metres.
+          const fold = r.hud;
+          r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
+                                       sway - guard - fold * 0.42, armL, dt);
+          r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
+                                       -sway - talk * (1 - hold) - guard
+                                       - hold * npcLOC_UMB_ARM - fold * 0.42, armR, dt);
+          r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
+                                       -talk * 0.7 * (1 - hold) - f * 0.4
+                                       - hold * 0.20 - fold * 0.34, armR, dt);
+          r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z,
+                                       f * 0.4 + fold * 0.34, armL, dt);
         }
       }
       // ---- and they say something the first time you arrive -------------
@@ -3053,6 +3306,35 @@ export function createNPCs(game) {
     n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * maskR;
     n.armL.rotation.z = 0.09 + rec.poseArmL * 0.06;
     n.armR.rotation.z = -0.09 - rec.poseArmR * 0.06;
+
+    // ---- ...AND THIS CAST FEELS THE WEATHER TOO, WITHIN LIMITS -----------
+    // Sydney's and Pasto's people are a richer rig than a local — a real state
+    // machine, a nav mesh, an errand — but they are drawn as INSTANCED boxes,
+    // one InstancedMesh per body part, so a per-person prop is not a mesh you
+    // can add: it is a whole new instanced buffer, a new draw call and a new
+    // write in pushInstances. That is why the umbrella is locals-only and is
+    // not an oversight. What this cast gets is the half that costs nothing:
+    // the arms come in and the shoulders come up in the cold, on the same
+    // numbers the locals use, blended UNDER whatever the state machine is
+    // already doing with the arms so a gardener still gardens and a waiter
+    // still carries a tray.
+    //
+    // AND IT IS DRIVEN BY THE RAIN AS WELL AS THE COLD, because keyed on cold
+    // alone it was DEAD CODE: this cast is gated to Sydney by biomeLive(), and
+    // Sydney's mood row says cold 0.00 — correctly, it is midday in the
+    // Botanic Gardens. What actually happens to those people is that it
+    // drizzles on them, and somebody caught in a shower with no umbrella
+    // hunches and pulls their arms in exactly the way somebody cold does. Same
+    // pose, reachable trigger.
+    const brace = Math.max(npcWxCold, npcWxRain * 0.85);
+    if (brace > 0.01) {
+      const fold = brace * maskL * 0.34;
+      const foldR = brace * maskR * 0.34;
+      n.armL.rotation.z += fold;
+      n.armR.rotation.z -= foldR;
+      n.armL.rotation.x -= fold * 1.15;
+      n.armR.rotation.x -= foldR * 1.15;
+    }
 
     // fumbling for a cup that is already halfway to the pavement
     if (rec.flail > 0) {
@@ -5394,6 +5676,7 @@ export function createNPCs(game) {
 
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
+    npcWxRead();
 
     // --- biome gate ------------------------------------------------------
     // In Pasto every Sydneysider is detached from the scene and the physics

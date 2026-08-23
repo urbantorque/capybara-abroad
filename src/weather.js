@@ -78,8 +78,9 @@ const wxCalm = !!(typeof window !== 'undefined' && window.matchMedia &&
 //
 //   label     what this place is. Shown nowhere yet; worth having a name for.
 //   lock      the hour this chapter is welded to. DESCRIPTIVE — nothing in
-//             this file reads it to compute a light. It picks the mote field
-//             and it tells npc.js whether people should be crowding a lamp.
+//             this file reads it to compute a light, and nothing outside it
+//             should infer anything physical from it either (see `cold`).
+//             It picks the colour a rain streak is drawn in, and that is all.
 //             'midday' | 'golden' | 'sunset' | 'dusk' | 'night' | 'overcast'
 //             | 'predawn' | 'interior'
 //   wet       0..1 baseline. How wet the ground is when NOTHING is falling —
@@ -105,6 +106,16 @@ const wxCalm = !!(typeof window !== 'undefined' && window.matchMedia &&
 //             and paving lose a lot; sand loses nothing, because wet sand is
 //             GRIPPIER than dry, which is why nobody has ever slipped on a
 //             beach.
+//   cold      0..1 how cold it is here, and IT IS ITS OWN FIELD FOR A REASON.
+//             npc.js originally derived this from `lock`, on the reasoning
+//             that the dark chapters are the cold ones — which is true in
+//             sixteen places and catastrophically false in the seventeenth.
+//             Antarctica is locked to 'midday', because it IS midday there for
+//             four months, so the coldest chapter in the game had a crowd
+//             standing about in a four-metre katabatic wind entirely at their
+//             ease while Reykjavik shivered. A table cannot be missing a rung,
+//             and a rung inferred from a different table is a rung waiting to
+//             be missing.
 // ===========================================================================
 
 /** The all-zero row. A chapter with no entry in wxMOOD gets this, and this
@@ -116,7 +127,7 @@ const wxBASE = {
   gust: { base: 0, swing: 0, hz: 0.05 }, dir: 0,
   motes: null,
   bed: { rain: 0, wind: 0, chirp: 0, drip: 0, rustle: 0, thunder: 0 },
-  slipK: 0,
+  slipK: 0, cold: 0,
 };
 
 /** Mote behaviours. A kind is DATA — the update loop below has no idea what a
@@ -163,7 +174,7 @@ const wxMOOD = {
     gust: { base: 1.5, swing: 1.1, hz: 0.055 }, dir: 1.05,
     motes: wxMotes('pollen', 0.85),
     bed: { rain: 0.55, wind: 0.40, chirp: 0.10, drip: 0.18, rustle: 0.42, thunder: 0.20 },
-    slipK: 0.16,
+    slipK: 0.16, cold: 0.00,
   },
   // ---- Chapter 2. Pasto is 2 527 m up on the side of a live volcano and it
   // drizzles there most of the time. The cloud shadow is the strongest in the
@@ -175,7 +186,7 @@ const wxMOOD = {
     gust: { base: 2.6, swing: 1.9, hz: 0.085 }, dir: -0.55,
     motes: wxMotes('mote', 0.55, 0.9),
     bed: { rain: 0.72, wind: 0.62, chirp: 0.06, drip: 0.30, rustle: 0.22, thunder: 0.44 },
-    slipK: 0.30,
+    slipK: 0.30, cold: 0.50,
   },
   // ---- Chapter 3. Seven hundred metres of open water throwing the sun back
   // at you, and a sea breeze that never stops. No shower: it would be falling
@@ -187,7 +198,7 @@ const wxMOOD = {
     gust: { base: 3.4, swing: 1.6, hz: 0.070 }, dir: 1.90,
     motes: wxMotes('spray', 0.55, 0.85),
     bed: { rain: 0.36, wind: 0.66, chirp: 0.00, drip: 0.10, rustle: 0.18, thunder: 0.10 },
-    slipK: 0.14,
+    slipK: 0.14, cold: 0.10,
   },
   // ---- Chapter 4. THE SHOWCASE. A Kyoto sunshower is a real and specific
   // thing — rain falling out of a sky that is still bright — and the chapter
@@ -200,7 +211,7 @@ const wxMOOD = {
     gust: { base: 1.1, swing: 0.9, hz: 0.048 }, dir: 2.35,
     motes: wxMotes('petal', 1.0),
     bed: { rain: 0.68, wind: 0.30, chirp: 0.24, drip: 0.44, rustle: 0.52, thunder: 0.16 },
-    slipK: 0.26,
+    slipK: 0.26, cold: 0.20,
   },
   // ---- Chapter 5. A warm valley afternoon. Cali gets an aguacero — hard,
   // short, and over — rather than a drizzle.
@@ -211,7 +222,7 @@ const wxMOOD = {
     gust: { base: 1.8, swing: 1.3, hz: 0.062 }, dir: 0.30,
     motes: wxMotes('seed', 0.80),
     bed: { rain: 0.70, wind: 0.36, chirp: 0.30, drip: 0.26, rustle: 0.40, thunder: 0.46 },
-    slipK: 0.24,
+    slipK: 0.24, cold: 0.00,
   },
   // ---- Chapter 6. The loudest daylight in the game, and a tropical shower
   // that arrives in ninety seconds and is gone in two minutes.
@@ -222,7 +233,7 @@ const wxMOOD = {
     gust: { base: 2.2, swing: 1.4, hz: 0.058 }, dir: 2.90,
     motes: wxMotes('pollen', 0.55, 0.85),
     bed: { rain: 0.74, wind: 0.42, chirp: 0.14, drip: 0.24, rustle: 0.34, thunder: 0.52 },
-    slipK: 0.20,
+    slipK: 0.20, cold: 0.00,
   },
   // ---- Chapter 7. Half past eleven at night, and the weather that matters
   // there is not rain, it is a cold sea mist coming off the water. The bed is
@@ -234,7 +245,7 @@ const wxMOOD = {
     gust: { base: 4.2, swing: 2.4, hz: 0.090 }, dir: -1.35,
     motes: wxMotes('drift', 0.70, 0.85),
     bed: { rain: 0.44, wind: 0.86, chirp: 0.00, drip: 0.28, rustle: 0.10, thunder: 0.06 },
-    slipK: 0.34,
+    slipK: 0.34, cold: 1.00,
   },
   // ---- Chapter 8. AND THIS IS THE ROW THAT PROVES THE ZEROES WORK. It does
   // not rain in the Erg. `odds: 0` means the shower branch is never taken, the
@@ -248,7 +259,7 @@ const wxMOOD = {
     gust: { base: 5.0, swing: 3.2, hz: 0.075 }, dir: 0.85,
     motes: wxMotes('mote', 1.0, 1.1),
     bed: { rain: 0, wind: 0.92, chirp: 0.00, drip: 0, rustle: 0.26, thunder: 0 },
-    slipK: 0,
+    slipK: 0, cold: 0.00,
   },
   // ---- Chapter 9. You are ABOVE the weather. No rain, no cloud shadow —
   // there is nothing up there to cast one — and the gust is deliberately tiny
@@ -261,7 +272,7 @@ const wxMOOD = {
     gust: { base: 0.5, swing: 0.5, hz: 0.040 }, dir: 1.60,
     motes: wxMotes('spore', 1.0),
     bed: { rain: 0, wind: 0.70, chirp: 0.00, drip: 0, rustle: 0.14, thunder: 0 },
-    slipK: 0,
+    slipK: 0, cold: 0.60,
   },
   // ---- Chapter 10. The paving is ALREADY wet, before anything falls on it —
   // that is what the chapter is about — so the baseline is the highest in the
@@ -273,7 +284,7 @@ const wxMOOD = {
     gust: { base: 1.4, swing: 1.0, hz: 0.052 }, dir: -2.10,
     motes: wxMotes('mote', 0.45, 0.85),
     bed: { rain: 0.62, wind: 0.34, chirp: 0.08, drip: 0.56, rustle: 0.16, thunder: 0.24 },
-    slipK: 0.40,
+    slipK: 0.40, cold: 0.30,
   },
   // ---- Chapter 11. NEON RAIN, and it is the name the brief asked for because
   // it is the right one. The wettest street in the game: the whole chapter is
@@ -287,7 +298,7 @@ const wxMOOD = {
     gust: { base: 1.6, swing: 1.2, hz: 0.066 }, dir: 0.10,
     motes: wxMotes('mote', 0.40, 0.8),
     bed: { rain: 0.78, wind: 0.36, chirp: 0.00, drip: 0.60, rustle: 0.12, thunder: 0.30 },
-    slipK: 0.42,
+    slipK: 0.42, cold: 0.15,
   },
   // ---- Chapter 12. Bleached, and the shower is a squall that crosses the bay
   // in a minute and a half. Sand does not get slippery.
@@ -298,7 +309,7 @@ const wxMOOD = {
     gust: { base: 2.4, swing: 1.5, hz: 0.064 }, dir: -0.90,
     motes: wxMotes('spray', 0.45, 0.8),
     bed: { rain: 0.66, wind: 0.52, chirp: 0.12, drip: 0.20, rustle: 0.30, thunder: 0.36 },
-    slipK: 0.06,
+    slipK: 0.06, cold: 0.00,
   },
   // ---- Chapter 13. Twenty minutes before sunrise. Balloons do not fly in
   // weather, so there is none — what there is instead is the coldest, stillest
@@ -310,7 +321,7 @@ const wxMOOD = {
     gust: { base: 0.6, swing: 0.6, hz: 0.038 }, dir: 1.25,
     motes: wxMotes('mote', 0.75, 0.95),
     bed: { rain: 0, wind: 0.44, chirp: 0.18, drip: 0.08, rustle: 0.10, thunder: 0 },
-    slipK: 0.10,
+    slipK: 0.10, cold: 0.85,
   },
   // ---- Chapter 14. Four o'clock, a westerly behind you, and salt in the air.
   // The most spray in the game and no rain to speak of.
@@ -321,7 +332,7 @@ const wxMOOD = {
     gust: { base: 4.6, swing: 2.2, hz: 0.078 }, dir: 1.75,
     motes: wxMotes('spray', 1.0),
     bed: { rain: 0.38, wind: 0.80, chirp: 0.06, drip: 0.14, rustle: 0.24, thunder: 0.12 },
-    slipK: 0.08,
+    slipK: 0.08, cold: 0.10,
   },
   // ---- Chapter 15. The end of the wet season, an hour before sundown, over
   // a hundred thousand square kilometres of standing water. Fireflies, because
@@ -334,7 +345,7 @@ const wxMOOD = {
     gust: { base: 1.2, swing: 1.0, hz: 0.046 }, dir: -2.60,
     motes: wxMotes('firefly', 1.0),
     bed: { rain: 0.70, wind: 0.28, chirp: 0.62, drip: 0.40, rustle: 0.46, thunder: 0.50 },
-    slipK: 0.30,
+    slipK: 0.30, cold: 0.00,
   },
   // ---- Chapter 16. There is no sky, so there is no shower and no cloud
   // shadow. What a cave has instead is a permanently wet floor, a river you
@@ -346,7 +357,7 @@ const wxMOOD = {
     gust: { base: 0.4, swing: 0.4, hz: 0.030 }, dir: 0.55,
     motes: wxMotes('mote', 0.90, 1.05),
     bed: { rain: 0, wind: 0.24, chirp: 0.00, drip: 0.90, rustle: 0.06, thunder: 0 },
-    slipK: 0.38,
+    slipK: 0.38, cold: 0.70,
   },
   // ---- Chapter 17. The clearest air on earth, and the driest continent on
   // it. No rain. Spindrift — snow that is already down and is being moved
@@ -358,7 +369,7 @@ const wxMOOD = {
     gust: { base: 4.8, swing: 2.8, hz: 0.082 }, dir: -0.20,
     motes: wxMotes('drift', 1.0),
     bed: { rain: 0, wind: 0.94, chirp: 0.00, drip: 0.06, rustle: 0.04, thunder: 0 },
-    slipK: 0.12,
+    slipK: 0.12, cold: 1.00,
   },
 };
 
