@@ -125,7 +125,12 @@ const physCV4 = new CANNON.Vec3();
 const physPV1 = new THREE.Vector3();
 const physPQ1 = new THREE.Quaternion();
 const physPM4 = new THREE.Matrix4();
-const physImpactPayload = { prop: null, speed: 0, position: new THREE.Vector3() };
+// `voice`, `vpitch` and `vgain` are the acoustic half of what the thing is made
+// of — see physVOICE. They are OPTIONAL on the payload: a listener that has
+// never heard of them (and every listener outside systems.js has not) reads
+// prop, speed and position exactly as it always did.
+const physImpactPayload = { prop: null, speed: 0, position: new THREE.Vector3(),
+                            voice: 'thud', vpitch: 1, vgain: 1 };
 const physWaterPayload = { prop: null };
 const physDestroyPayload = { prop: null };
 const physGrabPayload = { prop: null, from: null };
@@ -753,6 +758,153 @@ const physRHO = {
 
 for (const k in physRHO) { if (physTYPES[k]) physTYPES[k].rho = physRHO[k]; }
 
+// ---- WHAT THE THING SOUNDS LIKE -------------------------------------------
+// Thirty-eight prop types and every single one of them went 'thud'. A straw
+// hat, an enamel mug, a wine bottle, a glazed bowl, a jute sack of green
+// coffee, a beach ball and a wheelie bin were, acoustically, the same object at
+// slightly different volumes — and knocking things over is not A verb in this
+// game, it is THE verb. The one channel that could have told you what you had
+// just hit was reporting the same syllable a hundred and forty times an hour.
+//
+// This is the same shape as physRHO above and for the same reason: one physical
+// fact per material, applied by a table rather than by a switch at the call
+// site. `sfx` names an existing voice, `pitch` and `gain` shape it, and both
+// are multiplied ON TOP of the speed-derived figures systems.js already
+// computes — so a hard hit is still louder and lower than a soft one, it is
+// just now also made of something.
+const physVOICE = {
+  soft:    { key: 'soft',    sfx: 'thud',   pitch: 0.80, gain: 0.55 },  // cloth, foam, fruit, bread
+  straw:   { key: 'straw',   sfx: 'rustle', pitch: 0.95, gain: 0.80 },  // woven: hats, baskets, jute
+  paper:   { key: 'paper',   sfx: 'rustle', pitch: 1.60, gain: 0.35 },  // a ticket, a menu card
+  timber:  { key: 'timber',  sfx: 'thud',   pitch: 1.20, gain: 0.85 },  // a deck chair, a sign
+  plastic: { key: 'plastic', sfx: 'pop',    pitch: 0.65, gain: 0.85 },  // a cone, a frisbee, a thong
+  hollow:  { key: 'hollow',  sfx: 'thud',   pitch: 1.70, gain: 1.00 },  // a sealed bin, an esky: a drum
+  ceramic: { key: 'ceramic', sfx: 'clink',  pitch: 1.00, gain: 0.90 },
+  glass:   { key: 'glass',   sfx: 'clink',  pitch: 1.30, gain: 0.85 },
+  metal:   { key: 'metal',   sfx: 'clink',  pitch: 0.70, gain: 1.00 },
+};
+const physMAT = {
+  hat: 'straw', sombrero: 'straw', basket: 'straw', coffeesack: 'straw', ruana: 'soft',
+  towel: 'soft', thong: 'plastic', ball: 'plastic', frisbee: 'plastic', cone: 'plastic',
+  bin: 'hollow', esky: 'hollow',
+  deckchair: 'timber', sign: 'timber', menu: 'timber', flower: 'ceramic',
+  sandwich: 'soft', icecream: 'soft', chips: 'soft', empanada: 'soft', arepa: 'soft',
+  maiz: 'soft', plantain: 'soft', handbag: 'soft',
+  ticket: 'paper',
+  coffee: 'paper',            // a takeaway cup, and it is the joke that it is
+  cuencobowl: 'ceramic', mug: 'metal', winebottle: 'glass', sunglasses: 'glass',
+  camera: 'metal',
+};
+/**
+ * The voice for a type. A type with no row falls back on its DENSITY, which is
+ * the one physical fact every prop already has — so a thirty-ninth prop added
+ * to physTYPES tomorrow gets a plausible material rather than silently
+ * rejoining the thuds. There is no list here that can go stale.
+ */
+// ---- AND WHAT IT LOOKS LIKE WHEN IT LANDS ---------------------------------
+// A rigid body in a low-poly comedy is the one place squash-and-stretch is
+// almost free and almost always missing. Thirty-eight prop types hit the
+// paving at nine metres a second and every one of them stayed a perfect,
+// unmoved box. It is render only — mesh.scale, which the instance writer now
+// reads all three components of — and it is a spring, so it recovers rather
+// than steps.
+//
+// The amount is scaled by the material's OWN give: a straw hat and a beach
+// ball deform, an enamel mug does not, and that is exactly the physRHO/physMAT
+// distinction again rather than a new dial.
+// MEASURED, AND THE FIRST NUMBERS WERE WRONG. At k = 210 / c = 29 the spring's
+// time constant is 69 ms — four frames at 60 Hz — so the discrete integrator
+// clipped the peak before it arrived: a towel dropped from six metres squashed
+// by 0.035 where 0.20 was intended, which is a third of a pixel on screen. At
+// k = 90 the constant is 105 ms, the peak survives the stepping, and the whole
+// gesture reads over about a quarter of a second, which is how long a bin
+// actually takes to stop wobbling.
+const physSQ_K     = 90;     // spring, rad^2/s^2
+const physSQ_C     = 19;     // ...critically damped: c ~= 2*sqrt(k)
+const physSQ_KICK  = 46;    // 1/s — turns a squash fraction into a spring velocity
+const physSQ_POP_LAM = 14;   // the grab-pop's recovery, unchanged from where it used to live
+const physSQ_MAX   = 0.30;   // hard cap on the flatten, as a fraction
+const physSQ_SPEED = 22;     // m/s of impact that would reach the cap
+const physSQ_GIVE  = { soft: 1.0, straw: 0.8, paper: 1.0, plastic: 0.55,
+                       hollow: 0.4, timber: 0.22, ceramic: 0.10, glass: 0.08, metal: 0.06 };
+
+/** Kick a prop's squash spring. `speed` is the impact along the normal. */
+function physSquashHit(prop, speed) {
+  const def = physTYPES[prop.type];
+  if (!def) return;
+  const v = physVoiceOf(def, prop.type);
+  const give = (v && physSQ_GIVE[v.key]) || 0.35;
+  const a = clamp(speed / physSQ_SPEED, 0, 1) * physSQ_MAX * give;
+  if (a < 0.012) return;
+  // Add to the velocity, never to the position: two hits in quick succession
+  // then read as one harder hit rather than as a scale that steps.
+  prop.sqV = (prop.sqV || 0) - a * physSQ_KICK;
+}
+
+/**
+ * Advance one prop's squash. Flatten on the prop's own Y and bulge on X and Z
+ * to keep the volume roughly honest, which is the whole reason the eye reads it
+ * as a solid thing hitting something rather than as a sprite being scaled.
+ */
+function physSquashStep(prop, dt) {
+  let s = prop.sq || 0, v = prop.sqV || 0;
+  let pop = prop.pop === undefined ? 1 : prop.pop;
+  if (s === 0 && v === 0 && pop === 1) return false;
+  if (s !== 0 || v !== 0) {
+    v += (-physSQ_K * s - physSQ_C * v) * dt;
+    s += v * dt;
+    if (s < -physSQ_MAX) { s = -physSQ_MAX; if (v < 0) v = 0; }
+    if (s > physSQ_MAX * 0.5) { s = physSQ_MAX * 0.5; if (v > 0) v = 0; }
+    if (Math.abs(s) < 0.003 && Math.abs(v) < 0.03) { s = 0; v = 0; }
+    prop.sq = s; prop.sqV = v;
+  }
+  // ---- THE POP AND THE SQUASH ARE ONE WRITE, NOT TWO --------------------
+  // A grabbed prop is popped to 1.18 and eased back to 1, and that easing used
+  // to live in its own block immediately after this one — reading scale.x and
+  // writing all three components UNIFORMLY. Which meant it ran a frame after
+  // the squash had written a non-uniform scale, read the flattened x, and
+  // rewrote the whole thing as a uniform pulse: measured, a bin that should
+  // have squashed to (0.955, 1.089, 0.955) was drawn at (1.018, 1.018, 1.018)
+  // — the squash turned into the prop briefly getting bigger. There is exactly
+  // one writer of prop.mesh.scale in the free path now, and it is this line.
+  if (pop !== 1) {
+    pop = damp(pop, 1, physSQ_POP_LAM, dt);
+    if (Math.abs(pop - 1) < 0.004) pop = 1;
+    prop.pop = pop;
+  }
+  const bulge = (1 - s * 0.5) * pop;
+  prop.mesh.scale.set(bulge, (1 + s) * pop, bulge);
+  return true;
+}
+
+/** Put a prop back to a perfect box, now. Used before a settled prop's last sync. */
+function physSquashClear(prop) {
+  if (!prop.sq && !prop.sqV && (prop.pop === undefined || prop.pop === 1)) return;
+  prop.sq = 0; prop.sqV = 0; prop.pop = 1;
+  prop.mesh.scale.set(1, 1, 1);
+}
+
+function physStampVoice(prop) {
+  const def = physTYPES[prop.type];
+  const v = def ? physVoiceOf(def, prop.type) : null;
+  physImpactPayload.voice = v ? v.sfx : 'thud';
+  physImpactPayload.vpitch = v ? v.pitch : 1;
+  physImpactPayload.vgain = v ? v.gain : 1;
+}
+function physVoiceOf(def, type) {
+  if (def.voice) return def.voice;
+  let v = physVOICE[physMAT[type]];
+  if (!v) {
+    const rho = def.rho || 600;
+    v = rho < 200 ? physVOICE.soft
+      : rho < 520 ? physVOICE.straw
+      : rho < 1000 ? physVOICE.timber
+      : physVOICE.ceramic;
+  }
+  def.voice = v;
+  return v;
+}
+
 /**
  * Submerged fraction a type ACTUALLY settles at, from its material density.
  * The water mesh is opaque, so a prop that is meant to float has to keep
@@ -919,11 +1071,14 @@ function physWriteInstance(prop, exact) {
   const b = prop.body;
   const bp = exact ? b.position : b.interpolatedPosition;
   const bq = exact ? b.quaternion : b.interpolatedQuaternion;
-  const s = prop.mesh.scale.x;
+  // All THREE components, not scale.x three times: the squash (physSQUASH) is
+  // non-uniform by construction, and a uniform read would have drawn it as the
+  // prop simply getting smaller and coming back.
+  const ms = prop.mesh.scale;
   physM4.compose(
     physV1.set(bp.x, bp.y, bp.z),
     physQ1.set(bq.x, bq.y, bq.z, bq.w),
-    physV2.set(s, s, s)
+    physV2.set(ms.x, ms.y, ms.z)
   );
   g.mesh.setMatrixAt(prop.instIdx, physM4);
   g.dirty = true;
@@ -1519,6 +1674,11 @@ function physGrab(prop) {
   const capy = physGame.capy;
   const anchor = capy && capy.mouthAnchor;
   if (!anchor) return false;
+  // A prop in the mouth is driven by physUpdateHeld, which damps the scale back
+  // to 1 on its own and knows nothing about the squash spring. Cleared here so
+  // the spring cannot carry a stale value across the pickup and re-apply it the
+  // moment the thing is dropped.
+  physSquashClear(prop);
   if (capy.heldProp && capy.heldProp !== prop) physRelease(null);
 
   const b = prop.body;
@@ -1544,6 +1704,7 @@ function physGrab(prop) {
   anchor.getWorldQuaternion(physQ2);
   physQ2.invert();
   prop.mesh.quaternion.copy(physQ2).multiply(physQ1);
+  prop.pop = 1.18;
   prop.mesh.scale.setScalar(1.18);
 
   // NOTE: prop.owner is deliberately LEFT SET here. capybara.js is the contract
@@ -1741,6 +1902,8 @@ function physOnCollide(prop, e) {
 
   physImpactPayload.prop = prop;
   physImpactPayload.speed = speed;
+  physStampVoice(prop);
+  physSquashHit(prop, speed);
   physImpactPayload.position.set(prop.body.position.x, prop.body.position.y, prop.body.position.z);
   // Presentation (thud + shake) belongs to systems.js's 'prop:impact' handler —
   // firing it here too double-shakes and flanges the sample.
@@ -1806,6 +1969,7 @@ function physSpill(prop) {
 
   prop.mesh.position.set(b.position.x, b.position.y, b.position.z);
   prop.mesh.quaternion.copy(physQ1);
+  prop.pop = 1; prop.sq = 0; prop.sqV = 0;
   prop.mesh.scale.setScalar(1);
 
   // The task reads "make SOMEONE spill their flat white" — an unowned cup on a
@@ -1818,6 +1982,7 @@ function physSpill(prop) {
 
   physImpactPayload.prop = prop;
   physImpactPayload.speed = 0;
+  physStampVoice(prop);
   physImpactPayload.position.set(b.position.x, b.position.y, b.position.z);
   physGame.events.emit('prop:impact', physImpactPayload);
   physSfxOpts.volume = 0.8;
@@ -2416,6 +2581,7 @@ function physOnBiomeEnter(e) {
       // Raw add, not the patched scene.add: the capture tag is already the NEW
       // biome, and this mesh must not be claimed by it — it is going home.
       THREE.Object3D.prototype.add.call(physGame.scene, held.mesh);
+      held.pop = 1; held.sq = 0; held.sqV = 0;
       held.mesh.scale.setScalar(1);
     }
     b.type = CANNON.Body.DYNAMIC;
@@ -2994,6 +3160,7 @@ function physHide(prop, delay) {
   b.allowSleep = true;
   b.sleep();
   prop.mesh.visible = false;
+  prop.pop = 1; prop.sq = 0; prop.sqV = 0;
   prop.mesh.scale.setScalar(1);
   physZeroInstance(prop);
   physHidden.push(prop);
@@ -3279,10 +3446,16 @@ function physUpdateHeld(prop, dt) {
   m.position.y = damp(m.position.y, prop.holdOffset.y, physHOLD_LAMBDA, dt);
   m.position.z = damp(m.position.z, prop.holdOffset.z, physHOLD_LAMBDA, dt);
   m.quaternion.slerp(prop.holdQuat, 1 - Math.exp(-physHOLD_LAMBDA * dt));
-  if (m.scale.x !== 1) {
-    const s = damp(m.scale.x, 1, 14, dt);
-    const v = Math.abs(s - 1) < 0.004 ? 1 : s;
-    m.scale.set(v, v, v);
+  // The grab-pop, easing out in the mouth. Tracked on the prop rather than read
+  // back off the scale, so it is the same number the free path eases — a prop
+  // dropped mid-pop carries on from where it was instead of restarting.
+  // A held prop never squashes: it is not hitting anything.
+  let pop = prop.pop === undefined ? 1 : prop.pop;
+  if (pop !== 1) {
+    pop = damp(pop, 1, physSQ_POP_LAM, dt);
+    if (Math.abs(pop - 1) < 0.004) pop = 1;
+    prop.pop = pop;
+    m.scale.setScalar(pop);
   }
   m.getWorldPosition(physV1);
   m.getWorldQuaternion(physQ1);
@@ -3310,6 +3483,7 @@ function physBarge(prop, speed) {
   prop.lastImpact = physGame.state.time;
   physImpactPayload.prop = prop;
   physImpactPayload.speed = speed;
+  physStampVoice(prop);
   physImpactPayload.position.set(b.position.x, b.position.y, b.position.z);
   physGame.events.emit('prop:impact', physImpactPayload);   // npc.js reacts while owner is intact
   const cv = capy.velocity;
@@ -3409,20 +3583,22 @@ function physUpdate(dt) {
       // A sleeping body is never synced again, so the frame it drops off must
       // land ON its true rest transform — the last interpolated write was a
       // fraction of a step behind it, and that offset would be permanent.
-      if (p.settled) continue;
+      // ...and it must land on a PERFECT BOX. A prop that dozed off while its
+      // squash spring was still running would have that frame's scale written
+      // once, exactly, and then never be synced again — a permanently dented
+      // bin, for the rest of the session. Cleared before the final write, not
+      // after it.
+      if (p.settled && !p.sq && !p.sqV) continue;
+      physSquashClear(p);
       p.settled = true;
       physSyncMesh(p, true);
       if (!p.solo) physWriteInstance(p, true);
       continue;
     }
     p.settled = false;
+    physSquashStep(p, dt);
 
     physSyncMesh(p, false);
-    if (p.mesh.scale.x !== 1) {
-      const s = damp(p.mesh.scale.x, 1, 14, dt);
-      const v = Math.abs(s - 1) < 0.004 ? 1 : s;
-      p.mesh.scale.set(v, v, v);
-    }
 
     // BUOYANCY EVERYWHERE THERE IS WATER. This used to be gated on Sydney —
     // written when the harbour was the only water in the game — which meant a

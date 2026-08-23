@@ -3928,6 +3928,54 @@ export function createSystems(game) {
     g.connect(acMaster);
   }
 
+  /**
+   * CLINK — the one voice this game was missing.
+   *
+   * Everything hard and hollow in the prop table (a glazed bowl, an enamel mug,
+   * a wine bottle, a pair of acetate sunglasses, a camera body, a terracotta
+   * pot) was going 'thud', which is a low-passed noise burst — the sound of a
+   * sandbag. What makes a hard thing sound hard is INHARMONICITY: three or four
+   * partials at ratios that are not whole numbers, so they beat against each
+   * other instead of fusing into a note, and a decay measured in a couple of
+   * hundred milliseconds rather than twenty.
+   *
+   * `pitch` carries the material, exactly the way it does for the footfall:
+   * around 0.7 is metal (low, long, and the partials spread wide), 1.0 is fired
+   * clay (mid, short, dead), 1.3 is glass (high, bright, and it rings).
+   */
+  function sfxClink(vol, pitch) {
+    const t = ac.currentTime;
+    const v = rand(0.95, 1.08) * pitch;
+    const f0 = 900 * v;
+    // Deliberately not harmonic: 1, 2.76, 5.40 is roughly a struck bar, and the
+    // ear reads the beating between them as "that is a solid object".
+    const parts = [1, 2.76, 5.40, 8.93];
+    const bright = clamp((pitch - 0.7) / 0.6, 0, 1);      // glass rings, metal booms
+    const ring = lerp(0.42, 0.20, bright);
+    for (let i = 0; i < parts.length; i++) {
+      const o = ac.createOscillator();
+      o.type = i === 0 ? 'triangle' : 'sine';
+      o.frequency.value = f0 * parts[i] * rand(0.995, 1.005);
+      const g = ac.createGain();
+      // Higher partials die first, which is what stops it sounding like a bell.
+      const rel = ring / (1 + i * 0.85);
+      const pk = (0.15 / (1 + i * 1.15)) * vol;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + rel);
+      o.connect(g); g.connect(acMaster);
+      o.start(t); o.stop(t + rel + 0.03);
+    }
+    // The strike itself: 8 ms of filtered noise. Without it the partials fade
+    // up out of nothing and the whole thing reads as a synthesiser.
+    const ns = noiseSrc();
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400 * v;
+    const ng = ac.createGain();
+    env(ng, t, 0.075 * vol, 0.002, 0.03);
+    ns.connect(hp); hp.connect(ng); ng.connect(acMaster);
+    ns.start(t); ns.stop(t + 0.06);
+  }
+
   function sfxRustle(vol, pitch) {
     const t = ac.currentTime;
     const v = rand(0.9, 1.15) * pitch;
@@ -6478,6 +6526,8 @@ export function createSystems(game) {
     gull: sfxGull, bark: sfxBark, strum: sfxStrum, horn: sfxHorn,
     hiss: sfxHiss, chime: sfxChime, tick: sfxTick, step: sfxStep,
     cheer: sfxCheer, organ: sfxOrgan,
+    // What a hard thing sounds like. See physVOICE in props.js for who asks.
+    clink: sfxClink,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -6486,6 +6536,10 @@ export function createSystems(game) {
     // a flat-out run is ~7 strides a second; the throttle must sit under that or
     // it starts eating every other footfall and the gait audibly limps
     step: 0.055,
+    // The same gap 'thud' has, and for the same reason: clink is the other half
+    // of the impact channel, so a tumbling stack of bowls has to be allowed to
+    // sound like a tumbling stack of bowls.
+    clink: 0.05,
   };
 
   function sfx(name, opts) {
@@ -10200,10 +10254,19 @@ export function createSystems(game) {
     if (s < 1.5) return;
     // Only a genuinely hard bonk earns a shake — everything softer is sfx only.
     if (s >= sysSHAKE_HIT) punch(clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16));
-    sysSpatial.volume = clamp(s * 0.13, 0.25, 1);
-    sysSpatial.pitch = clamp(1.25 - s * 0.03, 0.7, 1.25);
+    // WHAT IT IS MADE OF, ON TOP OF HOW HARD IT WAS HIT. props.js stamps a
+    // voice, a pitch and a gain onto the payload from its material table; the
+    // speed-derived figures below are unchanged, so a hard hit is still louder
+    // and lower than a soft one — it is just now also a bowl rather than a
+    // sandbag. A payload with no voice (anything emitting this by hand) reads
+    // as 'thud' at unity, which is exactly what every impact was until now.
+    const voice = (p && p.voice) || 'thud';
+    const vp = (p && p.vpitch > 0) ? p.vpitch : 1;
+    const vg = (p && p.vgain > 0) ? p.vgain : 1;
+    sysSpatial.volume = clamp(s * 0.13, 0.25, 1) * vg;
+    sysSpatial.pitch = clamp(clamp(1.25 - s * 0.03, 0.7, 1.25) * vp, 0.4, 2.5);
     sysSpatial.at = (p && p.position) || null;
-    sfx('thud', sysSpatial);
+    sfx(voice, sysSpatial);
     sysSpatial.at = null;
     game.state.chaos = clamp(game.state.chaos + clamp(s * 0.012, 0, 0.12), 0, 1);
   });
