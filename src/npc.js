@@ -786,9 +786,59 @@ export function createNPCs(game) {
     return { group: g, head: headN, armL: armL, armR: armR };
   }
 
+  // =======================================================================
+  // ...AND THEY ANSWER MORE THAN TWO QUESTIONS NOW.
+  //
+  // A local reacted to exactly two things: you walking up to them, and you
+  // wheeking. Which means that in the fifteen chapters whose entire population
+  // is locals, you could shatter a crate of bowls at somebody's feet, put a
+  // wine bottle through a shop window, drag a sack of coffee past their nose
+  // or belt across a square at seven metres a second, and the nearest human
+  // being would carry on breathing gently and watching you with mild interest.
+  // Everything that makes this game funny is a thing you DO to the world, and
+  // nobody in fifteen worlds had any opinion about any of it.
+  //
+  // Nothing new has to be plumbed: props.js already emits 'prop:impact' and
+  // 'prop:water' with a position on them, and capybara.js emits 'capy:grab'.
+  // They were being listened to by systems.js, for a sound, and by nobody else.
+  //
+  // The reaction is a FLINCH plus a line, and the flinch is the important half:
+  // it is four numbers on a rig that already exists, it lands on the same frame
+  // as the crash, and it works when the player is too far away to read a speech
+  // bubble — which, for a thing that happens across a square, is most of the
+  // time. The lines are on the same cooldown the greeting is on and the same
+  // never-twice-running rule, because a crowd that comments on every bump is
+  // a crowd you stop listening to.
+  // =======================================================================
+  // Deliberately chapter-neutral: npcLINES above is broad Sydney and these have
+  // to work in a Venetian sacristy and on an Antarctic jetty. A local may
+  // override any of them by passing its own array to addLocal.
+  const npcLOC_SAY = {
+    startled: ['!', 'Whoa —', 'What was that?', 'Careful!', 'Oh — steady.', 'Do you mind?',
+               'That was not nothing.', 'I felt that.', 'Was that necessary?'],
+    splash:   ['In it goes.', 'Well. It is gone now.', 'Was that on purpose?', 'Lovely.',
+               'That is not coming back.', 'Hope it floats.'],
+    thief:    ['That is not yours.', 'Excuse me?', 'Put that down.', 'Oh, wonderful.',
+               'You are just taking that, are you.', 'Right. Yes. Fine.'],
+    rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
+               'Slow down!', 'It has somewhere to be.'],
+  };
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
   const npcLOC_BOB = 0.014;     // metres of breathing
+  // ---- the flinch ---------------------------------------------------------
+  // A spring, like everything else in this codebase that has to recover rather
+  // than step. Critically damped at a ~180 ms constant: fast enough to read as
+  // a reaction to the bang and slow enough not to look like a glitch.
+  const npcLOC_FL_K    = 34;
+  const npcLOC_FL_C    = 11.7;
+  const npcLOC_FL_LEAN = 0.30;   // rad of lean-back at full strength
+  const npcLOC_FL_ARM  = 1.15;   // rad the arms come up
+  const npcLOC_FL_HEAD = 0.34;   // rad the head snaps back
+  const npcLOC_REACT_R = 13;     // m — you have to be near enough to have done it
+  const npcLOC_REACT_N = 2;      // never more than two people speak at once
+  const npcLOC_RUSH_V  = 6.2;    // m/s past somebody that counts as belting past
+  const npcLOC_RUSH_R  = 3.4;    // ...and how close you have to be for it to matter
   /**
    * @param o {biome, x, y, z, group?, lines?, wheek?, near?, cool?, face?}
    *   biome  which chapter this person is standing in - they exist nowhere else
@@ -824,6 +874,17 @@ export function createNPCs(game) {
       yaw: g ? g.rotation.y : 0, baseY: g ? g.position.y : 0,
       cd: rand(0, 3), t: rand(0, 6.28), was: false, last: '',
       fig: fig, gest: 0,
+      // What they say when the world does something to them. All optional; a
+      // local that names none of them falls back on npcLOC_SAY, so every
+      // person already registered in every chapter gets the whole vocabulary
+      // without one biome file being touched.
+      says: {
+        startled: o.startled || null, splash: o.splash || null,
+        thief: o.thief || null, rush: o.rush || null,
+      },
+      fl: 0, flV: 0,            // the flinch spring
+      flYaw: 0,                 // ...and which way to turn while it runs
+      rushWas: false,
       // The bubble reader wants something with a .group.position, and a fixed
       // local has no head node to hang one off - so it carries a point.
       anchor: { group: { position: new THREE_.Vector3(
@@ -888,12 +949,94 @@ export function createNPCs(game) {
       said++;
     }
   }
+  /**
+   * SOMETHING HAPPENED AT (x, z). Whoever is near enough flinches, and at most
+   * npcLOC_REACT_N of them say so.
+   *
+   * `strength` 0..1 scales the flinch only — the line is the same line whether
+   * a cup fell over or a crate exploded, because a person's vocabulary does not
+   * have a magnitude. The lines are on the local's OWN cooldown, shared with
+   * the greeting: somebody who has just said hello does not also shout about a
+   * bin, which is the difference between a crowd and a nuisance.
+   */
+  function localsReact(kind, x, z, strength, radius) {
+    if (!locals.length) return;
+    const live = game.biome && game.biome.current;
+    if (!live) return;
+    const r = radius > 0 ? radius : npcLOC_REACT_R;
+    const r2 = r * r;
+    const s = clamp(strength === undefined ? 1 : strength, 0, 1);
+    let said = 0;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (L.biome !== live) continue;
+      const dx = x - L.x, dz = z - L.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > r2) continue;
+      // Nearer is a bigger jump, and it never quite reaches nothing at the rim.
+      const near = 1 - Math.sqrt(d2) / r;
+      const kick = s * (0.35 + near * 0.65);
+      // MEASURED: at *9 a typical bang — 9 m/s, three metres away — peaked the
+      // spring at 0.21, which is 3.7 degrees of lean and 14 of arm. That is
+      // under the threshold at which anybody can tell a person reacted at all.
+      // At *21 the same event peaks near 0.5: 8.6 degrees of lean, 33 of arm,
+      // and the clamp at 1.0 keeps a point-blank crate from folding anyone in
+      // half.
+      if (kick > 0.06) {
+        L.flV -= kick * 21;
+        L.flYaw = Math.atan2(dx, dz);          // they turn TOWARD the bang
+      }
+      if (said < npcLOC_REACT_N && L.cd <= 0) {
+        const arr = L.says[kind] || npcLOC_SAY[kind];
+        if (arr && arr.length) {
+          L.cd = L.cool * rand(0.7, 1.3);
+          localLine(L, arr);
+          said++;
+        }
+      }
+    }
+  }
+
+  // ---- WHAT THEY NOTICE ---------------------------------------------------
+  // Three events that already existed, already carried a position, and were
+  // heard by the sound manager and by nobody else. The gates are deliberately
+  // high: a prop settling on a table is not a bang, and a local who reacts to
+  // one is a local who is reacting all day.
+  const npcLOC_BANG = 4.2;      // m/s along the normal before it is worth turning round for
+  game.events.on('prop:impact', function (p) {
+    if (!p || !p.position) return;
+    const sp = typeof p.speed === 'number' ? p.speed : 0;
+    if (sp < npcLOC_BANG) return;
+    localsReact('startled', p.position.x, p.position.z, clamp((sp - npcLOC_BANG) / 9, 0.25, 1));
+  });
+  game.events.on('prop:water', function (p) {
+    if (!p || !p.position) return;
+    // A splash is heard further than it is felt, so it is a wider circle and a
+    // softer jump — you look up, you do not duck.
+    localsReact('splash', p.position.x, p.position.z, 0.35, npcLOC_REACT_R * 1.5);
+  });
+  game.events.on('capy:grab', function (e) {
+    // Robbing somebody in front of them is the funniest thing in the game and
+    // fifteen chapters of people had no opinion about it. Tight radius: this is
+    // 'that happened right here', not 'something happened somewhere'.
+    const pr = e && e.prop;
+    const b = pr && pr.body;
+    if (!b) return;
+    localsReact('thief', b.position.x, b.position.z, 0.5, 6.5);
+  });
+
   function localsStep(dt) {
     if (!locals.length) return;
     const capy = game.capy;
     const live = game.biome && game.biome.current;
     const cx = capy && capy.position ? capy.position.x : 1e6;
     const cz = capy && capy.position ? capy.position.z : 1e6;
+    // Belting past somebody is an event too, and it is the one the player
+    // causes most often. Measured once per frame here rather than per local,
+    // because the speed is the same for all of them.
+    const cv = capy && capy.velocity;
+    const csp = cv ? Math.sqrt(cv.x * cv.x + cv.z * cv.z) : 0;
+    const rushing = csp > npcLOC_RUSH_V;
     for (let i = 0; i < locals.length; i++) {
       const r = locals[i];
       if (r.biome !== live) continue;
@@ -902,21 +1045,52 @@ export function createNPCs(game) {
       const dx = cx - r.x, dz = cz - r.z;
       const d2 = dx * dx + dz * dz;
       const near = d2 < r.near * r.near;
+      // ---- ...and you just went past them at a sprint -------------------
+      // A rising edge on "close AND fast", so one pass is one reaction and
+      // running circles round somebody is not a machine gun (their own
+      // cooldown is what actually stops that; this stops the flinch).
+      const rushNow = rushing && d2 < npcLOC_RUSH_R * npcLOC_RUSH_R;
+      if (rushNow && !r.rushWas) {
+        r.flV -= 9.5;   // scaled with the react kick above
+        r.flYaw = Math.atan2(dx, dz);
+        if (r.cd <= 0) {
+          const arr = r.says.rush || npcLOC_SAY.rush;
+          if (arr && arr.length) { r.cd = r.cool * rand(0.8, 1.4); localLine(r, arr); }
+        }
+      }
+      r.rushWas = rushNow;
+      // ---- the flinch, which is a spring ---------------------------------
+      if (r.fl !== 0 || r.flV !== 0) {
+        r.flV += (-npcLOC_FL_K * r.fl - npcLOC_FL_C * r.flV) * dt;
+        r.fl += r.flV * dt;
+        if (r.fl < -1) { r.fl = -1; if (r.flV < 0) r.flV = 0; }
+        if (r.fl > 0.4) { r.fl = 0.4; if (r.flV > 0) r.flV = 0; }
+        if (Math.abs(r.fl) < 0.004 && Math.abs(r.flV) < 0.04) { r.fl = 0; r.flV = 0; }
+      }
       // ---- they watch you go past --------------------------------------
       if (r.group) {
         // Twice the talking radius: you are noticed a long way before you are
         // spoken to, which is how being looked at actually works.
         const watch = d2 < (r.near * 2) * (r.near * 2) && d2 > 0.25;
-        const want = watch ? Math.atan2(dx, dz) : r.face;
+        // ...and while a flinch is running they are looking at whatever just
+        // went off, not at you. That is the whole point of turning round.
+        const flin = r.fl < -0.02;
+        const want = flin ? r.flYaw : watch ? Math.atan2(dx, dz) : r.face;
         let dyaw = want - r.yaw;
         while (dyaw > Math.PI) dyaw -= 6.283185;
         while (dyaw < -Math.PI) dyaw += 6.283185;
-        const step = npcLOC_TURN * dt;
+        // A flinch turns you faster than curiosity does.
+        const step = npcLOC_TURN * (flin ? 2.4 : 1) * dt;
         r.yaw += clamp(dyaw, -step, step);
         r.group.rotation.y = r.yaw;
         // ...and they are breathing, which costs one sine and is the whole
         // difference between a person standing still and a statue.
-        r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB;
+        // The flinch rides on top: a lean back from the waist and a small drop,
+        // which on a figure whose legs are a merged mesh is the only honest way
+        // to say "recoiled" without a skeleton.
+        const f = -r.fl;                       // 0..1, positive while recoiling
+        r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB - f * 0.045;
+        r.group.rotation.x = -f * npcLOC_FL_LEAN;
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
@@ -925,16 +1099,23 @@ export function createNPCs(game) {
           r.fig.head.rotation.y = damp(r.fig.head.rotation.y, lead, 7, dt);
           // ...and the head DIPS a little for something the size of a capybara,
           // which is the whole joke of being looked at by a person.
+          // ...and the head goes BACK during a flinch, which is the opposite of
+          // the dip and has to win, or a startled person is drawn peering
+          // fondly downwards at the thing that just exploded.
           const dip = watch ? clamp(0.55 - Math.sqrt(d2) * 0.03, 0, 0.42) : 0;
-          r.fig.head.rotation.x = damp(r.fig.head.rotation.x, dip, 5, dt);
+          r.fig.head.rotation.x = damp(r.fig.head.rotation.x, dip - f * npcLOC_FL_HEAD,
+                                       f > 0.02 ? 14 : 5, dt);
           // arms: a slow shift of weight, and one of them comes up while they
-          // are actually talking
+          // are actually talking — and BOTH come up, fast, on a flinch.
           if (r.gest > 0) r.gest -= dt;
           const sway = Math.sin(r.t * 0.83) * 0.07;
           const talk = r.gest > 0 ? 0.5 + Math.sin(r.t * 7.5) * 0.22 : 0;
-          r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x, sway, 4, dt);
-          r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x, -sway - talk, 8, dt);
-          r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z, -talk * 0.7, 8, dt);
+          const guard = f * npcLOC_FL_ARM;
+          const armL = f > 0.02 ? 22 : 4, armR = f > 0.02 ? 22 : 8;
+          r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x, sway - guard, armL, dt);
+          r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x, -sway - talk - guard, armR, dt);
+          r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z, -talk * 0.7 - f * 0.4, armR, dt);
+          r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z, f * 0.4, armL, dt);
         }
       }
       // ---- and they say something the first time you arrive -------------
