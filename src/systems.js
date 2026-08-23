@@ -197,6 +197,34 @@ const sysPUNCH_SCALE = 0.10;   // how close to stopped
 // nobody has time to try to steer out of it. Only `wow` may ask.
 const sysWOW_SLOW    = 0.55;
 const sysWOW_SLOW_T  = 0.75;
+
+// --- THE PAD ----------------------------------------------------------------
+// This game has had two input devices since it was written — a keyboard and a
+// touchscreen — and no third. Which is odd, because of the three it is the one
+// a cosy third-person comedy is most often actually played on, and because
+// every single thing the scheme needs is already here: ONE VOICE on a button,
+// a grab, a hop, a run modifier and a camera that wants an analogue orbit far
+// more than it wants Z and X.
+//
+// It is a POLLED device and that is the whole subtlety, because this file's
+// edge flags are set at the event source and cleared at the very end of
+// update() — and systems runs LAST. A press latched at the top of update()
+// would therefore be cleared at the bottom of the same frame and never be seen
+// by anybody. So the poll queues its edges and they are published AFTER the
+// clear, which costs one frame (16 ms, well under the threshold at which a
+// polled pad feels laggy) and is the only correct place for them.
+//
+// Standard mapping, and deliberately forgiving: two buttons wheek, two run,
+// and the d-pad works as well as the stick, because a player who has just
+// picked the pad up should not have to be told which one is which.
+const sysPAD_DEAD    = 0.22;   // radial deadzone. Rescaled, so response starts at 0.
+const sysPAD_RUN     = 0.86;   // stick deflection that counts as a run on its own
+const sysPAD_TRIG    = 0.55;   // analogue trigger travel that counts as pressed
+const sysPAD_YAW     = 2.6;    // rad/s at full right-stick deflection
+const sysPAD_ZOOM    = 7.0;    // m/s of dolly at full right-stick vertical
+const sysPAD_LOOKD   = 0.18;   // the right stick's own deadzone — it is a camera, be gentle
+const sysPAD_RUMBLE  = 0.10;   // s of buzz at a full-magnitude event
+const sysPAD_RUM_MIN = 0.12;   // ...below this magnitude the pad stays still
 // Galeras' summit. Doubles as the altimeter's full-scale and the reference for how
 // far the fog is pushed back as you climb.
 const sysALT_REF     = 62;
@@ -1944,6 +1972,12 @@ const sysLEGEND_MORE = [
   ['Tab  ·  Esc', 'the journal  ·  close'],
   ['P', 'hide the paper'],
   ['M  ·  N  ·  [  ]', 'mute  ·  music  ·  volume'],
+  // The pad belongs in the fold and not on the front of the game, by the same
+  // argument as everything else down here: it is not a thing you have to know
+  // first, it is a thing you go and look up once. Two rows, because that is
+  // the whole scheme — a stick, three face buttons and a shoulder.
+  ['pad  ·  sticks', 'move  ·  look, and click to recentre'],
+  ['pad  ·  A  X  B', 'hop  ·  grab  ·  WHEEK   (RT runs)'],
 ];
 /**
  * Fill `el` with a control legend. `which` picks the table: undefined or
@@ -8955,6 +8989,17 @@ export function createSystems(game) {
   const backRing = [];
   let backT = 0, backHold = 0, backBusy = 0;
   let dragId = -1;
+  // ---- THE PAD ------------------------------------------------------------
+  // See sysPAD_* and padPoll(). Held state is recomputed every frame from the
+  // poll; the four edges are queued here and published at the very END of
+  // update(), because that is the only place they can be published from.
+  let padOn = false, padIdx = -1, padSeen = false;
+  let padX = 0, padZ = 0, padRun = false;
+  let padHonk = false, padAction = false, padJump = false;
+  let padWasHonk = false, padWasAction = false, padWasJump = false;
+  let padWasStart = false, padWasBack = false, padWasSnap = false;
+  let padEdgeHonk = false, padEdgeAction = false, padEdgeJump = false;
+  let padRumbleT = 0;
   let perfOn = false;
   let hudBare = false;                 // P — the furniture is off the window
   let started = false;
@@ -8995,6 +9040,8 @@ export function createSystems(game) {
     shake(a);
     const m = clamp(a / sysSHAKE_MAX, 0, 1);
     if (!sysCalmMotion) fovKickV += sysFOV_KICK_D * m * 12;
+    // The fourth channel, and the only one the player feels in their hands.
+    padRumble(a);
     if (freeze !== false && m > sysPUNCH_MIN && game.time) {
       game.time.hitstop(sysPUNCH_HOLD * (m - sysPUNCH_MIN) / (1 - sysPUNCH_MIN), sysPUNCH_SCALE);
     }
@@ -9361,6 +9408,147 @@ export function createSystems(game) {
   bindBtn(hopBtn, function () {
     touchJump = true; touchJumpPend = true; input.jumpPressed = true; input.jump = true;
   }, function () { touchJump = false; });
+
+  // ---- THE PAD, POLLED ----------------------------------------------------
+  // See the sysPAD_* block. Called once at the top of update(). Writes the held
+  // state directly and QUEUES the three edges; publishing them is the last
+  // thing update() does.
+  addEventListener('gamepadconnected', function (e) {
+    padIdx = e.gamepad ? e.gamepad.index : 0;
+    // A pad is a pointing device as much as the mouse is: the moment one is in
+    // use the thumb-stick overlay is in the way rather than in the game.
+    touchLayer.classList.remove('on');
+    audioUnlock();
+    // The one moment the scheme is actually wanted. The journal's fold has it
+    // too, but a player who has just picked a pad up is not going to go and
+    // open a card to find out which button wheeks.
+    toast('pad:  A hop  ·  X grab  ·  B WHEEK');
+  });
+  addEventListener('gamepaddisconnected', function () { padIdx = -1; padOn = false; });
+
+  /** Radial deadzone, rescaled so the first millimetre of travel is not a jump. */
+  function padAxis2(ax, ay, dead, out) {
+    const m = Math.hypot(ax, ay);
+    if (m <= dead) { out.x = 0; out.y = 0; return 0; }
+    const s = (m - dead) / (1 - dead) / m;
+    out.x = ax * s; out.y = ay * s;
+    return (m - dead) / (1 - dead);
+  }
+  const padL = { x: 0, y: 0 }, padR = { x: 0, y: 0 };
+  function padBtn(g, i) {
+    const b = g.buttons[i];
+    if (!b) return false;
+    // Analogue triggers report `value`; everything else reports `pressed`.
+    return typeof b === 'object' ? (b.pressed || b.value > sysPAD_TRIG) : b > sysPAD_TRIG;
+  }
+
+  function padPoll(dt) {
+    let pads = null;
+    try { pads = navigator.getGamepads ? navigator.getGamepads() : null; } catch (e) { pads = null; }
+    let g = null;
+    if (pads) {
+      if (padIdx >= 0 && pads[padIdx] && pads[padIdx].connected) g = pads[padIdx];
+      else for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) { g = pads[i]; padIdx = i; break; }
+    }
+    if (!g || !g.axes || !g.buttons) {
+      padOn = false; padX = 0; padZ = 0; padRun = false;
+      padHonk = padAction = padJump = false;
+      padWasHonk = padWasAction = padWasJump = false;
+      return;
+    }
+    padOn = true;
+    const a = g.axes;
+
+    // ---- move: left stick, and the d-pad, which must work identically -----
+    const mag = padAxis2(a[0] || 0, a[1] || 0, sysPAD_DEAD, padL);
+    padX = padL.x; padZ = padL.y;
+    if (padBtn(g, 14)) padX -= 1;                 // d-pad left
+    if (padBtn(g, 15)) padX += 1;                 // d-pad right
+    if (padBtn(g, 12)) padZ -= 1;                 // d-pad up
+    if (padBtn(g, 13)) padZ += 1;                 // d-pad down
+    const pm = Math.hypot(padX, padZ);
+    if (pm > 1) { padX /= pm; padZ /= pm; }
+
+    // ---- run: the right trigger, the left stick click, or simply leaning ---
+    // on it. Three ways, because a sprint that only one of them reaches is a
+    // sprint half the people holding a pad never find.
+    padRun = padBtn(g, 7) || padBtn(g, 10) || mag > sysPAD_RUN;
+
+    // ---- the verbs --------------------------------------------------------
+    // ONE VOICE is on two buttons and grab is on two: B and Y both wheek, X and
+    // the left trigger both grab. Nothing else is competing for them and a
+    // player who guesses wrong should still get the thing they meant.
+    const wantJump   = padBtn(g, 0);
+    const wantHonk   = padBtn(g, 1) || padBtn(g, 3);
+    const wantAction = padBtn(g, 2) || padBtn(g, 6);
+    if (started) {
+      if (wantJump   && !padWasJump)   padEdgeJump = true;
+      if (wantHonk   && !padWasHonk)   padEdgeHonk = true;
+      if (wantAction && !padWasAction) padEdgeAction = true;
+    }
+    padWasJump = wantJump; padWasHonk = wantHonk; padWasAction = wantAction;
+    padJump = started && wantJump;
+    padHonk = started && wantHonk;
+    padAction = started && wantAction;
+
+    // ---- the camera, which is the real reason to hold one of these --------
+    // Z and X are a 2.4 rad/s ramp with no middle. A stick has a middle.
+    padAxis2(a[2] || 0, a[3] || 0, sysPAD_LOOKD, padR);
+    if (padR.x || padR.y) {
+      if (padR.x) { camYawTarget -= padR.x * sysPAD_YAW * dt; camHandT = sysCAM_HAND_T; }
+      if (padR.y) camDistTarget = clamp(camDistTarget + padR.y * sysPAD_ZOOM * dt, sysCAM_MIN, sysCAM_MAX);
+    }
+    // The shoulders nudge the rig too — the same job the keyboard's Z and X do.
+    if (padBtn(g, 4)) { camYawTarget += dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
+    if (padBtn(g, 5)) { camYawTarget -= dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
+    // Right stick click: put the rig behind me, exactly as C does.
+    const snap = padBtn(g, 11);
+    if (snap && !padWasSnap && started) {
+      const cg = game.capy && game.capy.group;
+      if (cg) { camYawTarget = cg.rotation.y; camHandT = 0; camIdleT = 0; }
+    }
+    padWasSnap = snap;
+
+    // ---- and the two cards ------------------------------------------------
+    const start = padBtn(g, 9), back = padBtn(g, 8);
+    if (start && !padWasStart) {
+      if (!started) { if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true); else startGame('sydney'); }
+      else jrToggle();
+    }
+    if (back && !padWasBack && started) {
+      hudBare = !hudBare;
+      hudRoot.classList.toggle('bare', hudBare);
+    }
+    padWasStart = start; padWasBack = back;
+
+    if (!padSeen && padOn) { padSeen = true; touchLayer.classList.remove('on'); }
+  }
+
+  /**
+   * THE PAD FEELS THE PUNCH. Same 0..1 magnitude everything else takes, and
+   * gated well above the floor for the same reason the freeze is: a pad that
+   * buzzes on every prop impact in a market is a pad the player puts down.
+   * Guarded end to end — vibrationActuator is absent on Safari, present and
+   * throwing on some Linux builds, and unavailable in an insecure context.
+   */
+  function padRumble(a) {
+    if (!padOn || padIdx < 0 || a < sysPAD_RUM_MIN) return;
+    if (padRumbleT > 0) return;                    // never queue them up
+    padRumbleT = 0.22;
+    try {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : null;
+      const g = pads && pads[padIdx];
+      const act = g && (g.vibrationActuator || (g.hapticActuators && g.hapticActuators[0]));
+      if (!act || !act.playEffect) return;
+      const m = clamp(a / sysSHAKE_MAX, 0, 1);
+      const p = act.playEffect('dual-rumble', {
+        duration: Math.round(sysPAD_RUMBLE * 1000 * (0.5 + m * 0.5)),
+        strongMagnitude: m * 0.75,
+        weakMagnitude: 0.15 + m * 0.5,
+      });
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) { /* no actuator on this pad, or this browser */ }
+  }
 
   // =========================================================================
   // 5c. BIOME TRANSITION
@@ -10103,6 +10291,11 @@ export function createSystems(game) {
   // =========================================================================
   function update(dt) {
     // ---- input ----
+    // The pad is polled FIRST so its held state is in this frame's flags. Its
+    // three edges are queued and published at the very bottom of update() —
+    // see the note by padPoll and the clear at the end of this function.
+    padPoll(dt);
+    if (padRumbleT > 0) padRumbleT -= dt;
     let ix = 0, iz = 0;
     if (started) {
       if (keys.KeyA || keys.ArrowLeft) ix -= 1;
@@ -10110,16 +10303,18 @@ export function createSystems(game) {
       if (keys.KeyW || keys.ArrowUp) iz -= 1;
       if (keys.KeyS || keys.ArrowDown) iz += 1;
       if (stickActive) { ix += stickX; iz += stickZ; }
+      if (padX || padZ) { ix += padX; iz += padZ; }
       const m = Math.hypot(ix, iz);
       if (m > 1) { ix /= m; iz /= m; }
     }
     input.x = ix;
     input.z = iz;
-    input.run = !!(keys.ShiftLeft || keys.ShiftRight) || (stickActive && Math.hypot(stickX, stickZ) > 0.86);
-    input.honk = started && (!!keys.KeyQ || touchHonk);
-    input.action = started && (!!keys.KeyE || mouseAction || touchAction);
+    input.run = !!(keys.ShiftLeft || keys.ShiftRight) || padRun ||
+                (stickActive && Math.hypot(stickX, stickZ) > 0.86);
+    input.honk = started && (!!keys.KeyQ || touchHonk || padHonk);
+    input.action = started && (!!keys.KeyE || mouseAction || touchAction || padAction);
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
-    input.jump = started && (!!keys.Space || touchJump);
+    input.jump = started && (!!keys.Space || touchJump || padJump);
 
     // ---- put me back --------------------------------------------------------
     // Sampled every frame, acted on after sysBACK_HOLD of held R. backBusy is a
@@ -11830,6 +12025,17 @@ export function createSystems(game) {
     actionPend = false; touchActionPend = false;
     whistlePend = false; touchWhistlePend = false;
     jumpPend = false; touchJumpPend = false;
+
+    // ...AND THE PAD'S EDGES ARE PUBLISHED HERE, AFTER THE CLEAR.
+    // A pad has no event to latch at, and systems runs last: a press written at
+    // the top of update() would be wiped four lines above this one, on the same
+    // frame, having been seen by nobody. Published here it survives into the
+    // next frame, where capybara.js — which runs BEFORE systems — reads it with
+    // the held flag already true and agreeing with it. That is one frame of
+    // latency and it is the only correct place for them.
+    if (padEdgeHonk)   { input.honkPressed = true; input.whistlePressed = true; padEdgeHonk = false; }
+    if (padEdgeAction) { input.actionPressed = true; padEdgeAction = false; }
+    if (padEdgeJump)   { input.jumpPressed = true; padEdgeJump = false; }
   }
 
   return { update: update, sun: sun, hemi: hemi };
