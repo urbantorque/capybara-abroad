@@ -60,6 +60,76 @@ game = {
 }
 ```
 
+## THE FOUR CHANNELS OF "THAT LANDED" (v16 — the global core pass, 23 Aug 2026)
+
+Four things a biome may now ask for that did not exist before. Every one of them
+is **additive**: a chapter that asks for none of them behaves exactly as it did.
+
+```js
+game.punch(a)                 // shake + lens kick + freeze + rumble, one call
+game.hitstop(dur, scale)      // a near-freeze. Instant on, instant off.
+game.slowmo(scale, dur)       // a held beat. Eased. `wow` only — see below.
+game.sfx(name, { at: pos })   // ...and the sound comes from where it happened
+```
+
+**`game.punch(a)` is the one to reach for.** `a` is the SAME 0..1 magnitude
+`game.shake(a)` already takes, so a call site moves over by changing four
+letters and nothing needs re-tuning. It fires all four channels at once and
+each has its own floor, so a small event is only a shake and a big one is
+everything.
+
+**Do not call `slowmo()` from a biome.** It is paid out by `completeTask` on a
+`wow` row and nowhere else, for exactly the reason the banner is: seventeen rows
+in ninety-odd carry the flag, and a second caller halves what the first is
+worth. If a new set piece deserves it, MOVE the flag.
+
+**Nothing needs to opt into slow motion.** `game.state.dt` is the scaled frame
+time and every `update(dt)` already reads the dt it is handed, so the solver,
+the gait, the crowd, the wind, the tide and the score all slow together.
+`game.state.rawDt` is the wall clock if you genuinely must not.
+`game.time.scale` is the ratio; `game.time.slow` is the slow-motion component
+with the freeze taken out — **presentation must read `slow`, never `scale`**, or
+a 55 ms hitstop reads as a dropped frame.
+
+Time stands down entirely while paused and under `prefers-reduced-motion`, and
+is cleared on `biome:enter`. So does `shake()`.
+
+### THE SOUND COMES FROM SOMEWHERE (v16)
+
+`game.sfx(name, opts)` takes an optional position — `{ at: body.position }`, or
+a bare `{ x, y, z }`, plus optional `near` and `far` in metres. It is attenuated
+on one inverse-distance law with a taper into a 140 m far plane, and panned
+against the camera's own right vector. **A call with no position is untouched**:
+mono, full level, exactly as all 290 of them behaved before.
+
+Do not hand-roll `clamp(0.30 - far * 0.0026, ...)` any more. There were three
+different such laws in the biome files and none of them panned.
+
+`game.hud.audioProbe(x, y, z)` answers what the mix would do with a sound there.
+
+### A PROP SOUNDS LIKE WHAT IT IS MADE OF (v16, props.js owns)
+
+`prop:impact` carries three more optional fields — `voice`, `vpitch`, `vgain` —
+stamped from `physVOICE`/`physMAT`. A listener that ignores them reads `prop`,
+`speed` and `position` as it always did. A prop type with no material row falls
+back on its **density**, so a new type gets a plausible voice rather than
+silently rejoining the thuds.
+
+### THE PAD (v16, systems.js owns)
+
+Polled into `game.input`; no reader changes. Left stick and d-pad move, right
+stick looks and zooms and clicks to recentre, RT/L3/full deflection run, A hops,
+X or LT grabs, B or Y wheeks, Start opens the journal, Back hides the paper.
+Its press edges are published at the very END of `update()`, after the clear —
+a polled press latched at the top would be wiped on the same frame.
+
+### RELIEF IS NOT A LIST OF CHAPTERS (v16)
+
+Camera terrain clearance and the shadow box's altitude used to be gated on
+`inPasto || inKyoto || inCali || inRio`. **Never add a rung to a list like
+that.** The question is `sysHasRelief()` — does the live biome answer
+`terrainHeight` — and sixteen of seventeen do.
+
 `game.input` (read-only for everyone but systems.js):
 ```js
 { x: -1..1, z: -1..1,   // desired move on camera-relative axes
