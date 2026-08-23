@@ -1370,6 +1370,57 @@ Three things about them that were measured rather than chosen:
   which the folded quad needs. The rain is a closed box, so DoubleSide was pure
   waste — it stays transparent and goes FrontSide.
 
+### The wet ground — `wetTick()` (shared.js owns, and it is a THIRD half of `grain()`)
+
+`grain()` now takes two more shared uniforms — a level and a colour — set once
+a frame by `wetTick(shine, hemiColour)` from `sysDressFrame`. Same deal the
+sparkle clock gets: one float and one colour written per frame moves every
+grained surface in the live chapter at no per-material cost.
+
+**This exists because expressing a wet street ONLY in the composite pass does
+not work.** The first version did exactly that — more bloom, a lower threshold,
+more saturation — and in Kowloon it looked right, because Mong Kok is full of
+lights for a wet road to reflect. In Kyoto and Venice it did almost nothing: a
+lowered bloom threshold needs something bright on the ground to bite on, and
+the grass and the stone were exactly as light as they had been in the dry. The
+wetness was in the lens and not on the floor.
+
+What wet ground does is two things, and only the second can be faked in a post
+pass. **It goes darker** — water fills the surface's micro-pores and traps
+light that would have scattered back out; porous things lose 20–40 % of their
+diffuse. **And it acquires a sheen at grazing angles**, which is the half that
+makes it read as WET rather than as merely in shadow. The sheen is deliberately
+allowed to run over 1.0, so the wet-street grade's lowered threshold finally
+has the highlight it was lowered for — exactly the relationship `sparkle`
+already has with the composite pass on water.
+
+Three things about it:
+
+- **It is gated on which way the face points** (`vGrainN.y` squared), and that
+  gate is most of what makes it convincing for free: water lies on TOP of
+  things. Measured in Mong Kok at full wetness — **the road −15 %, a vertical
+  shop front −0.6 %.** A per-mesh flag would have been the only other way to
+  get that and there are seventeen chapters of meshes.
+- **It is not applied to water.** `spark > 0` is this helper's existing and only
+  marker for "this material is a sea", and darkening a sea because it is
+  raining on it is nonsense twice over.
+- **The sheen colour comes from the HEMISPHERE**, so a wet street reflects the
+  sky it is actually under — neon over Mong Kok, flat grey over Kyoto — and
+  every event that already moves the atmosphere moves the reflection with it,
+  without a table and without either chapter knowing this exists. Same argument
+  the sky dome's horizon colour is built on.
+
+The world normal is taken in the vertex shader at the existing `begin_vertex`
+replacement: `objectNormal` is defined by `<beginnormal_vertex>`, which three
+emits BEFORE `<begin_vertex>`, so no second hook is needed. It must be world
+space and not view space, because the whole question is "is this facing up".
+
+Cost: a branch on one uniform, so a dry chapter pays a uniform read and nothing
+else. Measured over four chapters — **16.5–16.9 ms median, dry and wet,
+unchanged.** (p95 moved from 17.6–18.0 to 18.3–19.4 across the board INCLUDING
+the dry control, Marrakech, whose branch never runs — so that is machine noise
+rather than the shader.)
+
 ### The bed (systems.js owns)
 
 Four continuous voices — rain in two bands, wind swayed on its CUTOFF rather

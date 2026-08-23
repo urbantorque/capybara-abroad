@@ -1882,6 +1882,57 @@ const _grainTime = { value: 0 };
 /** Advance the sparkle clock. systems.js calls this once per frame. */
 export function grainTick(t) { _grainTime.value = t; }
 
+// ---------------------------------------------------------------------------
+// ...AND TWO MORE SHARED UNIFORMS, FOR THE WET GROUND.
+//
+// Same trick as the sparkle clock and for the same reason: one float and one
+// colour written per frame move every grained surface in the live chapter, at
+// no per-material cost at all.
+//
+// WHY THIS IS IN THE SURFACE SHADER AND NOT ONLY IN THE COMPOSITE PASS. The
+// first version of the micro-weather expressed a wet street entirely through
+// the grade — more bloom, a lower threshold, a little more saturation — and in
+// Kowloon that looked right, because Mong Kok is full of lights for a wet road
+// to reflect. In Kyoto and Venice it did almost nothing, because a lowered
+// bloom threshold needs something bright on the ground to bite on and there
+// was nothing: the grass and the stone were exactly as light as they had been
+// in the dry. Wetness was in the lens and not on the floor.
+//
+// What wet ground actually does is two things, and only the second of them
+// can be faked in a post pass:
+//
+//   1. IT GOES DARKER. Water fills the surface's micro-pores and light that
+//      would have scattered straight back out is trapped instead. Porous
+//      things — stone, soil, sand, grass — lose 20-40 % of their diffuse.
+//   2. IT ACQUIRES A SHEEN at grazing angles, which is the half that makes it
+//      read as WET rather than merely as in shadow.
+//
+// The sheen is also what gives the composite pass its missing subject: it is
+// allowed to run over 1.0, so the biome's own lowered threshold now has a real
+// highlight on the ground to bloom, exactly the way `sparkle` feeds it on
+// water.
+//
+// The colour is written from the HEMISPHERE, so a wet street reflects the sky
+// it is actually under — neon over Mong Kok, flat grey over Kyoto — and every
+// event that already moves the atmosphere moves the reflection with it. That
+// is the same argument the sky dome's horizon colour is built on.
+const _grainWet = { value: 0 };
+const _grainWetC = { value: new THREE.Color(1, 1, 1) };
+/**
+ * How wet every grained surface is, and what colour the sky it is reflecting.
+ * systems.js calls this once per frame. `level` is weather.js's `shine()` —
+ * wetness ABOVE the chapter's own baseline — for the reason stated there: a
+ * chapter authored wet was coloured that way on purpose and must not be
+ * re-graded the day a weather system arrives.
+ */
+export function wetTick(level, color) {
+  _grainWet.value = level > 0 ? (level < 1 ? level : 1) : 0;
+  if (color) _grainWetC.value.copy(color);
+}
+const _wetDARK  = 0.26;   // fraction of the diffuse a fully wet surface loses
+const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
+const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};
@@ -1920,16 +1971,36 @@ export function grain(m, opts) {
 
   const g = m.clone();
   const sc = new THREE.Color(sparkCol);
+  // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
+  // existing and only marker for "this material is a sea", and darkening a sea
+  // because it is raining on it is nonsense twice over — it is already water,
+  // and it already has the sparkle doing the same job better.
+  const wet = spark <= 0;
   g.onBeforeCompile = function (shader) {
     if (spark > 0) shader.uniforms.uGrainT = _grainTime;
+    if (wet) {
+      shader.uniforms.uGrainWet = _grainWet;
+      shader.uniforms.uGrainWetC = _grainWetC;
+    }
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainW;')
+      .replace('#include <common>',
+               '#include <common>\nvarying vec3 vGrainW;' +
+               (wet ? '\nvarying vec3 vGrainN;' : ''))
+      // `objectNormal` is defined by <beginnormal_vertex>, which three emits
+      // BEFORE <begin_vertex> — so the world normal can be taken here without
+      // a second replacement. It is needed in world space rather than view
+      // space because the whole question the fragment asks is "is this facing
+      // UP", and up is a world direction.
       .replace('#include <begin_vertex>',
-               '#include <begin_vertex>\nvGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+               '#include <begin_vertex>\nvGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;' +
+               (wet ? '\nvGrainN = normalize(mat3(modelMatrix) * objectNormal);' : ''));
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', [
         '#include <common>',
         'varying vec3 vGrainW;',
+        wet ? 'varying vec3 vGrainN;' : '',
+        wet ? 'uniform float uGrainWet;' : '',
+        wet ? 'uniform vec3 uGrainWetC;' : '',
         spark > 0 ? 'uniform float uGrainT;' : '',
         'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
         'float grNoise(vec2 p){',
@@ -1948,6 +2019,29 @@ export function grain(m, opts) {
         '                 vGrainW.z + vGrainW.y * ' + (0.43 * warp).toFixed(4) + ') * ' + scale.toFixed(4) + ';',
         '  float gn = grNoise(gq) * 0.64 + grNoise(gq * 2.83 + 19.31) * 0.36 - 0.5;',
         '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) + ';',
+        wet ? [
+          // ---- THE WET SURFACE ------------------------------------------
+          // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what
+          // makes it convincing for free: water lies on TOP of things. A road,
+          // a lawn, a roof and a jetty get the whole effect; a wall, a tree
+          // trunk and the side of a market stall get almost none of it, which
+          // is exactly what a street looks like after rain and would have cost
+          // a per-mesh flag to fake any other way.
+          '  if (uGrainWet > 0.001) {',
+          '    float wUp = clamp(vGrainN.y, 0.0, 1.0);',
+          '    float wK = uGrainWet * wUp * wUp;',
+          '    diffuseColor.rgb *= 1.0 - wK * ' + _wetDARK.toFixed(4) + ';',
+          // The sheen. A grazing-angle term against the real view vector —
+          // `cameraPosition` is one of three's default uniforms and is there in
+          // every fragment shader it compiles. Deliberately allowed to run over
+          // 1.0: the composite pass blooms whatever clears the biome's
+          // threshold, and the wet-street grade has already LOWERED that
+          // threshold, so this is the highlight it was lowered for.
+          '    vec3 wV = normalize(cameraPosition - vGrainW);',
+          '    float wF = pow(1.0 - clamp(dot(vGrainN, wV), 0.0, 1.0), ' + _wetPOW.toFixed(1) + ');',
+          '    diffuseColor.rgb += wK * wF * ' + _wetSHEEN.toFixed(4) + ' * uGrainWetC;',
+          '  }',
+        ].join('\n') : '',
         spark > 0 ? [
           '  vec2 sq = (vGrainW.xz + vec2(uGrainT * ' + sparkSpeed.toFixed(3) + ',',
           '                               uGrainT * ' + (-sparkSpeed * 0.62).toFixed(3) + '))',

@@ -735,6 +735,13 @@ export function createWeather(game) {
       // like `set` not working, and is how the first audio soak measured a
       // rain bed of zero after twenty seconds of a forced downpour.
       rainNext = Math.min(rainNext, next.rain.gap);
+      // ...AND A SHOWER ALREADY IN FLIGHT HAS TO BE RE-FITTED TO THE NEW HOLD.
+      // `rainAt` counts down and the envelope reads `1 - rainAt / hold`, so
+      // changing the hold under a running shower moves it to a completely
+      // different point on its own curve: a set() to hold 400 partway through
+      // a 64-second shower put u at 0.84, which is deep in the tail, and the
+      // shower measured 0.15 when it should have been near its peak.
+      rainAt = Math.min(rainAt, next.rain.hold);
     }
   }
 

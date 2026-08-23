@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, grainTick } from './shared.js';
+         CHAPTERS, chapterOf, chapterDef, RECORDS, grainTick, wetTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -9903,6 +9903,22 @@ export function createSystems(game) {
     // goes green a second late over a glacier.
     fill.color.copy(hemi.color);
     fill.intensity = Math.max(0, hemi.intensity) * sysFILL_K;
+
+    // ---- the wet ground ---------------------------------------------------
+    // One float and one colour, and every grained surface in the live chapter
+    // moves — the same deal grainTick() gets for the sparkle. It is set HERE,
+    // immediately after the fill, because it wants the same argument the fill
+    // is built on: a reflection is bounce light and bounce light is the sky,
+    // so the sheen takes the hemisphere's own colour AFTER every atmosphere
+    // block and every event has finished moving it. A wet street in Mong Kok
+    // then reflects Mong Kok and a wet lane in Kyoto reflects a grey sky,
+    // without a table and without either chapter knowing this exists.
+    if (game.weather) {
+      sysColB.copy(hemi.color).multiplyScalar(clamp(hemi.intensity * 0.55, 0.15, 1.35));
+      wetTick(game.weather.shine(), sysColB);
+    } else {
+      wetTick(0, null);
+    }
 
     // ---- the dome ---------------------------------------------------------
     if (sysSkyMesh && sysSkyMesh.visible) {
