@@ -1044,6 +1044,26 @@ export const PALETTE = {
   antBone:      0xd7ceb9,      // what the whalers left, and it is still there
   antWindow:    0xffd79a,
 
+  // ---- THE MICRO-ENVIRONMENT (weather.js owns; see GLOBAL ENVIRONMENT) -----
+  // Every colour the micro-atmosphere can put ON TOP of a biome. None of them
+  // replaces a biome's own palette: they are what a drizzle, a cloud shadow or
+  // a drifting mote ADDS, and at zero intensity none of them is drawn at all.
+  wxDrizzle:    0xc9d8e2,      // a rain streak seen against a light sky
+  wxDrizzleNt:  0x9fb4c6,      // ...and against a dark one, where it catches lamps
+  wxHazeWet:    0xb9c6cc,      // the colour the fog goes when the air has water in it
+  wxSheen:      0xd6e2e8,      // the lift a wet surface puts on whatever it reflects
+  wxMist:       0xcfd9d6,      // ground mist, and the breath of a cave river
+  wxFirefly:    0xd8ff9c,      // the Pantanal at dusk, and the Drift all night
+  wxFireflyHot: 0xfaffd8,      // the middle of the same spark, where it blooms
+  wxMote:       0xe8dfc9,      // dust in a shaft of light. Interiors, and Goreme.
+  wxMoteWarm:   0xf0d9a8,
+  wxSpore:      0xcfe6d2,      // whatever it is that floats about up in the Drift
+  wxLeafAut:    0xd9975a,      // an autumn leaf, on its way down
+  wxLeafAutB:   0xc46f42,
+  wxSpray:      0xeef4f4,      // salt, thrown up the beach by a westerly
+  wxSnowflake:  0xf6fbff,      // spindrift, which is not snow falling but snow moving
+  wxSeed:       0xf2ead6,      // the fluff off a valley tree in Cali
+
   // atmosphere (Sydney)
   groundLight:  0xbcae86,
 };

@@ -32,6 +32,7 @@ const ORDER = [
   'src/pantanal.js',
   'src/cave.js',
   'src/antarctic.js',
+  'src/weather.js',
   'src/props.js',
   'src/capybara.js',
   'src/condor.js',

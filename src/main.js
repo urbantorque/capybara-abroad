@@ -22,6 +22,7 @@ import { createManly } from './manly.js';
 import { createPantanal } from './pantanal.js';
 import { createCave } from './cave.js';
 import { createAntarctic } from './antarctic.js';
+import { createWeather } from './weather.js';
 import { createCondor } from './condor.js';
 
 // ---------------------------------------------------------------------------
@@ -697,6 +698,10 @@ function mainBoot() {
     iceland: null, sahara: null, drift: null, venice: null, kowloon: null,
     palawan: null, goreme: null, manly: null, pantanal: null, cave: null,
     antarctic: null,
+    // THE GLOBAL ENVIRONMENT. Biome-neutral and always resident, like the
+    // capybara and the systems: the micro-weather is a property of wherever
+    // you are standing, not a thing any one chapter owns. See weather.js.
+    weather: null,
     condor: null, biome: null,
     completeTask() {}, toast() {}, shake() {}, sfx() {},
     registerShadowTarget() {},
@@ -763,6 +768,11 @@ function mainBoot() {
   const pantanal = mainSafe('pantanal',   () => createPantanal(game));
   const cave    = mainSafe('cave',        () => createCave(game));
   const antarctic = mainSafe('antarctic', () => createAntarctic(game));
+  // Deliberately NOT captured into a biome: its two instanced fields are one
+  // set of buffers that every chapter borrows, so they must survive a
+  // hemisphere change rather than being detached with the place that was live
+  // when they happened to be allocated.
+  const weather = mainSafe('weather',     () => createWeather(game));
   const systems = mainSafe('systems',     () => createSystems(game));
 
   // The locals service, now that npc.js exists. Biomes call game.addLocal()
@@ -778,12 +788,16 @@ function mainBoot() {
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.
   biome._setTag(biome.current);
 
+  // weather runs AFTER every biome and BEFORE props/capy/npc/systems. After,
+  // because it asks the live chapter what it is; before, because the wetness,
+  // the gust and the light deltas it computes are read the same frame by the
+  // controller's grip, the locals' umbrellas and the atmosphere pass.
   const all = [env, pasto, quay, kyoto, cali, rio, iceland, sahara, drift, venice, kowloon,
-               palawan, goreme, manly, pantanal, cave, antarctic,
+               palawan, goreme, manly, pantanal, cave, antarctic, weather,
                props, capy, condor, npcs, systems];
   const updaterNames = ['environment', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                         'drift', 'venice', 'kowloon', 'palawan', 'goreme',
-                        'manly', 'pantanal', 'cave', 'antarctic',
+                        'manly', 'pantanal', 'cave', 'antarctic', 'weather',
                         'props', 'capybara', 'condor', 'npc', 'systems'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');
