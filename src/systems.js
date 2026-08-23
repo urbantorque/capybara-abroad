@@ -218,6 +218,48 @@ const sysOPERA_MARG = 0.55;      // metres of don't-clip-the-lens forgiveness
 // code jumped to a fixed y = 20 regardless of where the capybara was standing.
 const sysOPERA_RISE_MAX = 6.5;
 
+// --- THE AUDIO BUS HAS A SPACE IN IT NOW -------------------------------------
+// Every one of the ~290 sfx() calls in this game landed MONO on the master
+// gain. A bus door popping ninety metres down Nathan Road was exactly as loud,
+// and exactly as central, as one at the animal's shoulder. Thirty-odd call
+// sites had noticed and hand-rolled a distance curve — `clamp(0.30 - far *
+// 0.0026, 0.04, 0.30)` in Rio, `clamp(0.20 - d * 0.0011, 0.03, 0.20)` on the
+// Quay, a bare `if (far < 34)` in another — three different laws, none of them
+// panned, and the other two hundred and sixty calls had no distance at all.
+//
+// So there is one law, and a sound may simply say WHERE IT IS:
+//
+//     game.sfx('thud', { at: prop.body.position })
+//     game.sfx('gull', { x: gx, y: gy, z: gz, near: 12 })
+//
+// and it is attenuated and panned against the listener. A call with no position
+// is untouched — mono, full level, exactly as it behaves today — so all 290 of
+// them keep working and a biome adopts this one line at a time.
+//
+// THE LISTENER IS NOT THE CAMERA. The rig sits 9.5 m behind the animal and up
+// at 41 degrees, so listening at the lens puts a sound at the capybara's own
+// feet nearly ten metres away and a third of the way down the curve. It is not
+// the capybara either — pan has to agree with what is on screen, and the
+// capybara has no screen orientation. So: the POSITION is a point three
+// quarters of the way from the eye to the animal, and the ORIENTATION is the
+// camera's. That is the standard third-person answer and it is the only one
+// where a thing on the left of the frame is on the left of the mix.
+const sysSFX_EAR    = 0.75;   // how far from the eye toward the animal the ear sits
+const sysSFX_NEAR   = 6.0;    // m — inside this a sound is at full level
+const sysSFX_ROLL   = 0.35;   // inverse-distance rolloff past NEAR. Lower = gentler.
+const sysSFX_FAR    = 140;    // m — hard silence, so the far field actually stops
+const sysSFX_FADE   = 45;     // m of taper up to FAR, so it stops without a click
+const sysSFX_CULL   = 0.012;  // below this the graph is never built at all
+const sysSFX_PAN    = 0.82;   // never hard left/right — that reads as a broken mix
+const sysSFX_PAN_K  = 1.35;   // widen the middle: 45 degrees off axis is well panned
+// Reused by the core event handlers: they run on every prop impact in the game
+// and update() may not allocate. `at` is nulled after every use so a stale
+// position can never be inherited by the next caller.
+const sysSpatial    = { volume: 1, pitch: 1, at: null };
+const sysEar        = new THREE.Vector3();
+const sysEarRight   = new THREE.Vector3();
+const sysEarTo      = new THREE.Vector3();
+
 // --- CAMERA SHAKE -----------------------------------------------------------
 // ONE knob for the whole game. 0 disables shake entirely. Shake must be RARE:
 // a punctuation mark on a real collision, never a texture of normal play.
@@ -3497,6 +3539,8 @@ export function createSystems(game) {
   // 5. AUDIO — pure WebAudio synth, lazily created on first gesture.
   // =========================================================================
   let ac = null, acMaster = null, acNoise = null, acAmbGain = null, acAmbOn = false;
+  let acLimit = null;      // the master compressor — see audioEnsure
+  let acEarAt = -1;        // the frame the listener was last resolved on
   let muted = false;
   const lastPlay = Object.create(null);
 
@@ -3507,8 +3551,87 @@ export function createSystems(game) {
     try { ac = new AC(); } catch (e) { return null; }
     acMaster = ac.createGain();
     acMaster.gain.value = muted ? 0 : 0.85;
-    acMaster.connect(ac.destination);
+    // ---- ONE LIMITER, AND IT IS NOT AN EFFECT -----------------------------
+    // Seventeen chapters' worth of ambience, a generative score, a crowd and a
+    // physics engine all summed into one gain and went straight at the DAC.
+    // Nothing in the game asks how loud everything else already is, so the
+    // busy moments — a chapter ceremony over Rio's bateria, the storm in the
+    // Erg with a cheer in it — clipped, and a clip on a soft pastel score is
+    // the ugliest sound this game can make. A gentle compressor with a high
+    // threshold and a slow release is inaudible until it is needed and is the
+    // difference between a peak and a crackle. It is one node.
+    // If the browser has no compressor, the master goes straight out and this
+    // is exactly the graph it was before.
+    let out = ac.destination;
+    try {
+      if (ac.createDynamicsCompressor) {
+        acLimit = ac.createDynamicsCompressor();
+        acLimit.threshold.value = -8;
+        acLimit.knee.value = 12;      // soft: it must never sound like an effect
+        acLimit.ratio.value = 6;
+        acLimit.attack.value = 0.006;
+        acLimit.release.value = 0.22;
+        acLimit.connect(ac.destination);
+        out = acLimit;
+      }
+    } catch (e) { acLimit = null; out = ac.destination; }
+    acMaster.connect(out);
     return ac;
+  }
+
+  /**
+   * WHERE THE PLAYER IS LISTENING FROM. Refreshed once a frame by update(), not
+   * per sound: a hundred impacts in one frame are all heard from the same head.
+   * `sysEar` is the point, `sysEarRight` is the camera's own +x in world space,
+   * which is all a stereo pan needs.
+   */
+  function audioEar() {
+    // Once a frame, however many sounds ask. A collapsing stack of crates can
+    // fire twenty impacts in one step and they are all heard from one head.
+    if (acEarAt === game.state.time) return;
+    acEarAt = game.state.time;
+    const cp = camera.position;
+    const capy = game.capy;
+    if (capy && capy.position) {
+      sysEar.set(cp.x + (capy.position.x - cp.x) * sysSFX_EAR,
+                 cp.y + (capy.position.y - cp.y) * sysSFX_EAR,
+                 cp.z + (capy.position.z - cp.z) * sysSFX_EAR);
+    } else {
+      sysEar.copy(cp);
+    }
+    // Column 0 of the camera's world matrix IS its right vector, already
+    // normalised, and it is recomputed for the render anyway.
+    const e = camera.matrixWorld.elements;
+    sysEarRight.set(e[0], e[1], e[2]);
+  }
+
+  /**
+   * The distance law and the pan, for a sound that said where it is.
+   * Returns the gain multiplier, and writes the pan into sysSfxPan.
+   * Answers 0 for anything the player cannot hear, which is the point: the
+   * far field used to build a full oscillator graph to be inaudible with.
+   */
+  let sysSfxPan = 0;
+  function audioPlace(x, y, z, near, far) {
+    audioEar();
+    const n = near > 0 ? near : sysSFX_NEAR;
+    const f = far > 0 ? far : sysSFX_FAR;
+    sysEarTo.set(x - sysEar.x, y - sysEar.y, z - sysEar.z);
+    const d = sysEarTo.length();
+    if (d >= f) return 0;
+    let g = d <= n ? 1 : n / (n + sysSFX_ROLL * (d - n));
+    // ...and a taper into the far plane, so a sound does not sit at 0.1 for
+    // eighty metres and then stop dead when it crosses it.
+    if (d > f - sysSFX_FADE) g *= (f - d) / sysSFX_FADE;
+    if (!(g > sysSFX_CULL)) return 0;
+    // Pan is the component along the camera's right, over the distance: the
+    // sine of the bearing off the screen's centre line. Widened, then held off
+    // the hard edges — a fully panned mono source on headphones sounds broken.
+    sysSfxPan = d > 0.001
+      ? clamp((sysEarTo.x * sysEarRight.x + sysEarTo.y * sysEarRight.y +
+               sysEarTo.z * sysEarRight.z) / d * sysSFX_PAN_K, -1, 1) * sysSFX_PAN
+      : 0;
+    return g;
   }
   function audioUnlock() {
     const c = audioEnsure();
@@ -6310,12 +6433,56 @@ export function createSystems(game) {
     // them in the whole game.
     const gap = sfxGap[name] || 0.05;
     const force = !!(opts && opts.force);
-    if (!force && lastPlay[name] !== undefined && now - lastPlay[name] < gap) return;
-    lastPlay[name] = now;
-    const vol = opts && opts.volume !== undefined ? clamp(opts.volume, 0, 2) : 1;
+    let vol = opts && opts.volume !== undefined ? clamp(opts.volume, 0, 2) : 1;
     const pitch = opts && opts.pitch !== undefined ? clamp(opts.pitch, 0.4, 2.5) : 1;
     const extra = opts && opts.streak !== undefined ? opts.streak : 0;
-    try { fn(vol, pitch, extra); } catch (e) { /* audio node budget exhausted — ignore */ }
+
+    // ---- DOES THIS SOUND KNOW WHERE IT IS? --------------------------------
+    // `at` (anything with x/y/z — a THREE.Vector3, a CANNON.Vec3, a prop's
+    // body.position) or a bare x/y/z on the options. Anything else is the mono
+    // path this game has always had, unchanged to the last sample.
+    let px = 0, py = 0, pz = 0, placed = false;
+    const at = opts && opts.at;
+    if (at && typeof at.x === 'number' && at.x === at.x) { px = at.x; py = at.y || 0; pz = at.z || 0; placed = true; }
+    else if (opts && typeof opts.x === 'number' && opts.x === opts.x) { px = opts.x; py = opts.y || 0; pz = opts.z || 0; placed = true; }
+
+    let pan = 0;
+    if (placed) {
+      const g = audioPlace(px, py, pz, opts.near, opts.far);
+      // THE CULL IS THE POINT, AND IT COMES BEFORE THE THROTTLE. A gull four
+      // hundred metres out over the Bacino used to build eleven oscillators,
+      // three filters and a noise source in order to be inaudible — and, worse,
+      // it then stamped lastPlay and swallowed the next gull, the one you could
+      // actually have heard. Silence must not consume the throttle.
+      if (g <= 0) return;
+      vol *= g;
+      pan = sysSfxPan;
+    }
+    if (!force && lastPlay[name] !== undefined && now - lastPlay[name] < gap) return;
+    lastPlay[name] = now;
+
+    // ---- ONE SWAP, SEVENTEEN SYNTHS ---------------------------------------
+    // Every voice in this file ends its graph with `.connect(acMaster)`, in
+    // about forty places. Rather than thread an output node through all of
+    // them — which is forty chances to miss one, and the one you miss is a
+    // sound that never pans — the destination is pointed at a per-call panner
+    // for the duration of the call and put straight back. The synths build
+    // their whole graph synchronously, so there is no window in which this can
+    // be observed by anything else, and a synth that is not placed sees the
+    // real master exactly as before.
+    const saved = acMaster;
+    let node = null;
+    if (placed && c.createStereoPanner) {
+      try {
+        node = c.createStereoPanner();
+        node.pan.value = pan;
+        node.connect(saved);
+        acMaster = node;
+      } catch (e) { node = null; acMaster = saved; }
+    }
+    try { fn(vol, pitch, extra); }
+    catch (e) { /* audio node budget exhausted — ignore */ }
+    finally { acMaster = saved; }
   }
   function setMuted(m) {
     muted = m;
@@ -9677,6 +9844,17 @@ export function createSystems(game) {
 
   game.hud = {
     mapMarkAudit: mapMarkAudit,
+    /**
+     * What the mix would do with a sound at this point: its gain multiplier and
+     * its pan, -1..1. For the same reason mapMarkAudit exists — a law applied
+     * to two hundred and ninety call sites is exactly the sort of thing that
+     * goes quietly wrong and can never be heard going wrong.
+     */
+    audioProbe: function (x, y, z, near, far) {
+      const g = audioPlace(x, y, z, near, far);
+      return { gain: g, pan: g > 0 ? sysSfxPan : 0,
+               ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z } };
+    },
     root: hudRoot,
     toast: toast,
     completeTask: completeTask,
@@ -9696,18 +9874,37 @@ export function createSystems(game) {
     const pr = e && e.prop;
     if (pr && pr.type === 'sandwich') completeTask('picnic-thief');
   });
+  // The three payloads that already carry a position get it spatialised here
+  // rather than in seventeen biomes: props.js and npc.js are core, so every
+  // chapter inherits a bonk that comes from where the bin actually is.
   game.events.on('prop:impact', function (p) {
     // speed 0 is props.js signalling a spill, not a bonk — do not coerce it to 2.
     const s = (p && typeof p.speed === 'number') ? p.speed : 2;
     if (s < 1.5) return;
     // Only a genuinely hard bonk earns a shake — everything softer is sfx only.
     if (s >= sysSHAKE_HIT) shake(clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16));
-    sfx('thud', { volume: clamp(s * 0.13, 0.25, 1), pitch: clamp(1.25 - s * 0.03, 0.7, 1.25) });
+    sysSpatial.volume = clamp(s * 0.13, 0.25, 1);
+    sysSpatial.pitch = clamp(1.25 - s * 0.03, 0.7, 1.25);
+    sysSpatial.at = (p && p.position) || null;
+    sfx('thud', sysSpatial);
+    sysSpatial.at = null;
     game.state.chaos = clamp(game.state.chaos + clamp(s * 0.012, 0, 0.12), 0, 1);
   });
-  game.events.on('prop:water', function () { sfx('splash'); });
-  game.events.on('npc:startled', function () {
-    sfx('gasp');
+  game.events.on('prop:water', function (p) {
+    sysSpatial.volume = 1; sysSpatial.pitch = 1;
+    sysSpatial.at = (p && p.position) || null;
+    sfx('splash', sysSpatial);
+    sysSpatial.at = null;
+  });
+  game.events.on('npc:startled', function (p) {
+    // A gasp from behind you is one of the funniest things this game does and
+    // it has always come out of the middle of the mix.
+    const n = p && p.npc;
+    const g = n && n.group;
+    sysSpatial.volume = 1; sysSpatial.pitch = 1;
+    sysSpatial.at = (g && g.position) || null;
+    sfx('gasp', sysSpatial);
+    sysSpatial.at = null;
     musChaseT = Math.max(musChaseT, 2.5);
     game.state.chaos = clamp(game.state.chaos + 0.06, 0, 1);
   });
