@@ -138,6 +138,65 @@ const sysFLY_LEADMAX = 9;
 const sysFLY_RAISE   = 2.2;
 // Never let the eye end up inside Galeras. Sampled against pasto.terrainHeight.
 const sysFLY_CLEAR   = 2;
+
+// --- THE LENS BREATHES ------------------------------------------------------
+// `camera.fov` was written once, in main.js, and never again — not in one of
+// seventeen chapters, not at a waddle and not at forty metres a second behind a
+// stooping condor. Field of view is the cheapest speed cue in the medium and
+// the only one that works when the ground is a featureless glacier, an ocean or
+// the inside of a cloud, which is four of these chapters.
+//
+// Three terms, summed onto the base, and all three are RENDER ONLY — nothing
+// below reads a physics number or writes one:
+//
+//   speed   widens with how fast the animal is actually going, normalised
+//           against whichever rig is live (7.4 m/s is flat out on the ground
+//           and utterly sedate on a condor, so one reference would be wrong
+//           in one of the two places).
+//   kick    a critically-damped spring, hit by the same impacts that shake the
+//           rig. A punch out and back over ~0.4 s. This is the one that makes
+//           a bin going over feel like it went over.
+//   slow    the lens leans IN during a held beat, because that is what a slow
+//           motion is for — you are being shown something.
+//
+// Bounded hard at both ends: a lens that can reach 70 degrees distorts the
+// low-poly silhouettes this whole art direction is built on, and one that can
+// go under 40 makes the rig feel like it is standing on the animal.
+const sysFOV_BASE    = 48;
+const sysFOV_MIN     = 41;
+const sysFOV_MAX     = 61;
+const sysFOV_SPEED   = 7.0;    // degrees added at the reference speed
+const sysFOV_REF     = 7.4;    // m/s — the capybara flat out on the ground
+const sysFOV_REF_AIR = 26;     // m/s — ...and roughly a condor on a glide
+const sysFOV_LAMBDA  = 2.0;    // how lazily the speed term follows. Slow on purpose.
+const sysFOV_KICK_K  = 150;    // punch spring, rad^2/s^2
+const sysFOV_KICK_C  = 24.5;   // ...critically damped: c ~= 2*sqrt(k)
+// Measured, not chosen: at 5.5 the peak of the spring was 1.25 degrees over
+// base on a full-magnitude event, which is under the threshold at which anyone
+// notices there was a lens at all. 11 puts the peak at about 2.5 degrees —
+// roughly a third of what a flat-out run is worth, which is the ratio that
+// reads as punctuation rather than as a second speed cue.
+const sysFOV_KICK_D  = 11;     // degrees of punch at a full-strength impact
+const sysFOV_SLOW    = 5.0;    // degrees the lens leans in at a full slow-motion
+const sysFOV_EPS     = 0.03;   // degrees of change worth rebuilding the projection for
+
+// --- THE PUNCH: WHEN THE WORLD IS ALLOWED TO STOP ---------------------------
+// A freeze is the loudest thing in the toolbox and it is the one that gets
+// abused. The rule here is that it is RARER THAN A SHAKE: shake() fires on any
+// prop impact over 4.5 m/s, which in a busy market is several a second, and a
+// stutter several times a second is not comedy, it is a bad frame rate.
+// So the freeze needs 55% of the shake scale before it engages at all, and even
+// at a full-magnitude event it is 55 ms. Measured against the reference: a bin
+// going over at 9 m/s asks for shake(0.09), which is 0.26 of the cap — under
+// the floor, so it shakes and punches the lens and does NOT stop the world. A
+// chapter's marquee (0.14) and a ceremony (0.18) do.
+const sysPUNCH_MIN   = 0.55;   // fraction of the shake cap below which nothing freezes
+const sysPUNCH_HOLD  = 0.055;  // s of freeze at a full-magnitude event
+const sysPUNCH_SCALE = 0.10;   // how close to stopped
+// The marquee beat. Long enough to register as deliberate, short enough that
+// nobody has time to try to steer out of it. Only `wow` may ask.
+const sysWOW_SLOW    = 0.55;
+const sysWOW_SLOW_T  = 0.75;
 // Galeras' summit. Doubles as the altimeter's full-scale and the reference for how
 // far the fog is pushed back as you climb.
 const sysALT_REF     = 62;
@@ -8769,7 +8828,14 @@ export function createSystems(game) {
       // the type is sized for. The task text is a sentence and would be 60 px of
       // wrapped headline in the other order.
       showPlace(wow, r.def ? r.def.text : id);
-      shake(0.14);
+      punch(0.14);
+      // THE ONE MOMENT THE CHAPTER IS FOR gets the fourth channel. The banner,
+      // the lift, the crowd and the paper all say "that was the big one" AFTER
+      // the fact — the beat is the only one of the five that says it while it
+      // is still happening. Seventeen of ninety-odd rows carry `wow` and no
+      // other caller in the game may ask for this: the scarcity is the whole
+      // mechanism, exactly as it is for the banner itself.
+      if (game.slowmo) game.slowmo(sysWOW_SLOW, sysWOW_SLOW_T);
     } else if (mini) {
       musSwell(sysMINI_SWELL);
       // 'chime' and not 'cheer': the crowd noise belongs to the banner alone,
@@ -8778,11 +8844,11 @@ export function createSystems(game) {
       sfx('chime', { volume: 0.5, pitch: 1.18, force: true });
       if (cp) confettiBurst(cp.x, cp.y + 0.5, cp.z, 18);
       showMoment(mini, r.def ? r.def.text : id);
-      shake(0.09);
+      punch(0.09);
     } else {
       if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, taskStreak > 0 ? 16 : 12);
       toast('✔  ' + (r.def ? r.def.text : id));
-      shake(0.06);
+      punch(0.06);
     }
     todoEl.classList.remove('stamp');
     void todoEl.offsetWidth;                 // restart the animation, not queue it
@@ -8836,7 +8902,7 @@ export function createSystems(game) {
     setTimeout(function () { sfx('cheer', { volume: 0.8 }); }, 520);
     const cp = game.capy && game.capy.position;
     if (cp) { confettiBurst(cp.x, cp.y + 0.6, cp.z, 34); }
-    shake(0.18);
+    punch(0.18);
     saveSoon();
     // ---- AND THEN WHAT ----------------------------------------------------
     // The ceremony was a full stop. It said what you had done, how long it took
@@ -8893,9 +8959,45 @@ export function createSystems(game) {
   let hudBare = false;                 // P — the furniture is off the window
   let started = false;
 
+  // ---- THE LENS: SPEED, PUNCH AND THE LEAN-IN ----------------------------
+  // See the sysFOV_* block. All three terms are presentation; none of them is
+  // read by anything that decides where the animal is.
+  let fovSpeed = 0;              // damped, 0..1 of the live rig's reference speed
+  let fovKick = 0, fovKickV = 0; // the punch spring, in degrees
+  let fovLast = sysFOV_BASE;
+
   function shake(a) {
     if (!(a > sysSHAKE_MIN)) return;
+    // A player who asked the operating system for less motion asked for this
+    // one before anything else in the file. sysCalmMotion was already honoured
+    // by the minimap sweep and the glitter on eight seas and was never wired to
+    // the one effect that actually moves the whole frame.
+    if (sysCalmMotion) return;
     shakeAmt = clamp(shakeAmt + a, 0, sysSHAKE_MAX);
+  }
+
+  /**
+   * THE ONE CALL FOR "THAT LANDED".
+   *
+   * Shake, the lens punch and a freeze are three views of the same event and
+   * were three unrelated call sites, of which two did not exist. `a` is the
+   * SAME 0..1 magnitude shake() already takes, so every existing shake(0.14)
+   * in the game means exactly what it meant — this is the one that also gets
+   * the other two channels, and callers move over to it as they are touched.
+   *
+   * The freeze is deliberately tiny and deliberately not linear in `a`: below
+   * sysPUNCH_MIN there is no freeze at all, because a hitch on a medium event
+   * is not emphasis, it is a dropped frame. Only the genuinely big ones stop
+   * the world, and then only for a few dozen milliseconds.
+   */
+  function punch(a, freeze) {
+    if (!(a > 0)) return;
+    shake(a);
+    const m = clamp(a / sysSHAKE_MAX, 0, 1);
+    if (!sysCalmMotion) fovKickV += sysFOV_KICK_D * m * 12;
+    if (freeze !== false && m > sysPUNCH_MIN && game.time) {
+      game.time.hitstop(sysPUNCH_HOLD * (m - sysPUNCH_MIN) / (1 - sysPUNCH_MIN), sysPUNCH_SCALE);
+    }
   }
 
   /** `where` is 'sydney' (default) or 'pasto' — whichever the player picked. */
@@ -9671,6 +9773,30 @@ export function createSystems(game) {
     return (typeof h === 'number' && h === h) ? h : 0;
   }
 
+  /**
+   * DOES THE LIVE WORLD HAVE A FLOOR THAT MOVES?
+   *
+   * The camera's terrain clearance and the shadow box's altitude were both
+   * gated on `inPasto || inKyoto || inCali || inRio` — the four chapters that
+   * happened to have relief in them WHEN THOSE LINES WERE WRITTEN. Twelve more
+   * arrived afterwards and not one of them added a rung, so:
+   *
+   *   - the eye was free to travel through the rock in Iceland, the Erg, the
+   *     Drift, Kowloon, Palawan, Cappadocia, Manly, the Pantanal, Sơn Đoòng
+   *     and Antarctica; and
+   *   - `sunFollow` was handed y = 0 in all twelve, so the shadow box sat on
+   *     the datum while the animal stood 8.4 m up a Cappadocian hill, 7.1 m up
+   *     an Antarctic one or 62 m down a cave.
+   *
+   * There is nothing to enumerate: a world either answers terrainHeight or it
+   * does not, and exactly one of the seventeen does not (Sydney, which is flat
+   * at zero by contract and keeps the constant floor it was tuned with).
+   */
+  function sysHasRelief() {
+    const api = sysLiveBiomeApi(game);
+    return !!(api && typeof api.terrainHeight === 'function');
+  }
+
   function thermalAt(x, y, z) {
     const pa = game.pasto;
     const list = pa && pa.thermals;
@@ -9778,6 +9904,9 @@ export function createSystems(game) {
   game.record = recordValue;
   game.toast = toast;
   game.shake = shake;
+  // The three channels at once. Same 0..1 magnitude shake() takes, so a caller
+  // moves over by changing four letters and nothing has to be re-tuned.
+  game.punch = punch;
   game.sfx = sfx;
   game.registerShadowTarget = registerShadowTarget;
   // The modules that call registerShadowTarget ran before systems existed and hit
@@ -9882,7 +10011,7 @@ export function createSystems(game) {
     const s = (p && typeof p.speed === 'number') ? p.speed : 2;
     if (s < 1.5) return;
     // Only a genuinely hard bonk earns a shake — everything softer is sfx only.
-    if (s >= sysSHAKE_HIT) shake(clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16));
+    if (s >= sysSHAKE_HIT) punch(clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16));
     sysSpatial.volume = clamp(s * 0.13, 0.25, 1);
     sysSpatial.pitch = clamp(1.25 - s * 0.03, 0.7, 1.25);
     sysSpatial.at = (p && p.position) || null;
@@ -10275,9 +10404,12 @@ export function createSystems(game) {
     // Galeras is 62 m of solid mountain and the rig sits 24 m behind a flying
     // animal: banking round the cone WILL put the eye inside the rock unless the
     // desired position is lifted clear of the terrain under it, every frame.
-    // Kyoto's shrine hill is 34 m of exactly the same problem, so the test is
-    // on the LIVE biome's terrain rather than on Pasto's specifically.
-    if (inPasto || inKyoto || inCali || inRio) {
+    // Kyoto's shrine hill is 34 m of exactly the same problem — and so is a
+    // glacier, a dune, a karst, a fairy chimney, a headland and an ice shelf.
+    // See sysHasRelief: this was four chapters by name and is now every chapter
+    // that has a floor worth asking about.
+    const relief = sysHasRelief();
+    if (relief) {
       const gy = sysGroundY(sysDesired.x, sysDesired.z) + sysFLY_CLEAR;
       if (sysDesired.y < gy) sysDesired.y = gy;
     }
@@ -10320,9 +10452,41 @@ export function createSystems(game) {
     }
     // Second clearance test, on the position actually being rendered from: the
     // spring lags the desired point by a few metres and a shake can add half of one.
-    if (inPasto || inKyoto || inCali || inRio) {
+    if (relief) {
       const gy2 = sysGroundY(camera.position.x, camera.position.z) + sysFLY_CLEAR;
       if (camera.position.y < gy2) camera.position.y = gy2;
+    }
+    // ---- THE LENS BREATHES ------------------------------------------------
+    // Three terms onto sysFOV_BASE, all render-only. See the sysFOV_* block.
+    // The reference speed follows whichever rig is live, so a full-tilt waddle
+    // and a condor on a glide both read as "flat out" rather than the ground
+    // rig being permanently pegged the moment a bird is involved.
+    {
+      const fovRef = lerp(sysFOV_REF, sysFOV_REF_AIR, Math.max(flyT, sailT * 0.5));
+      const want = clamp(sp / fovRef, 0, 1.15);
+      fovSpeed = damp(fovSpeed, want, sysFOV_LAMBDA, dt);
+      // The punch: a critically-damped spring, integrated semi-implicitly so it
+      // cannot gain energy on a long frame the way an explicit one does.
+      if (fovKick !== 0 || fovKickV !== 0) {
+        fovKickV += (-sysFOV_KICK_K * fovKick - sysFOV_KICK_C * fovKickV) * dt;
+        fovKick += fovKickV * dt;
+        if (Math.abs(fovKick) < 0.004 && Math.abs(fovKickV) < 0.04) { fovKick = 0; fovKickV = 0; }
+      }
+      // ...and the lean-in, off the SLOW-MOTION component and not off the total
+      // scale. A hitstop must hold the lens still, not narrow it — see the note
+      // on game.time.slow. This term is exactly zero in all but the few hundred
+      // frames a session where a marquee has actually landed.
+      const slow = 1 - clamp(game.time ? game.time.slow : 1, 0, 1);
+      const breathe = sysCalmMotion ? 0 : 1;
+      const fovWant = clamp(sysFOV_BASE + (fovSpeed * sysFOV_SPEED + fovKick - slow * sysFOV_SLOW) * breathe,
+                            sysFOV_MIN, sysFOV_MAX);
+      // updateProjectionMatrix rebuilds a matrix and dirties the frustum, so it
+      // is only called when a viewer could tell.
+      if (Math.abs(fovWant - fovLast) > sysFOV_EPS) {
+        fovLast = fovWant;
+        camera.fov = fovWant;
+        camera.updateProjectionMatrix();
+      }
     }
     // The look target is never shaken — only the eye moves.
     camera.lookAt(sysLook);
@@ -10333,14 +10497,29 @@ export function createSystems(game) {
     // box has to ride the animal's altitude or everything above it goes unlit —
     // and it has to WIDEN with height, or a flight over the valley outruns it and
     // every shadow in frame quietly disappears.
-    const groundY = (inPasto || inKyoto || inCali || inRio) ? sysGroundY(p.x, p.z) : 0;
+    const groundY = relief ? sysGroundY(p.x, p.z) : 0;
     // In the Drift there is no ground under the animal for most of the chapter,
     // so the shadow box rides the ANIMAL and widens with the drop the way the
     // flight box does in Pasto — otherwise everything below a leap goes unlit
     // the moment you leave a deck.
+    //
+    // ...AND EVERY OTHER CHAPTER WITH RELIEF HAS THE SAME PROBLEM. Height off
+    // the deck is what the box has to widen for, and it is not a Pasto fact: a
+    // hop off a fairy chimney, a dive off the bamboo jetty, a drop down the
+    // Antarctic hill and a fall into a doline are all the animal a long way
+    // above the ground its shadow has to land on. Pasto and the Drift keep
+    // their measured curves; everywhere else gets the same 'how far up am I'
+    // figure Pasto uses, which is 0 in the sixteen frames a chapter where the
+    // animal is stood on something.
     const agl = inPasto ? Math.max(0, p.y - groundY)
-              : inDri ? clamp(p.y * 0.35, 0, 26) : 0;
-    sunFollow(p.x, (inPasto || inKyoto || inCali || inRio || inDri) ? p.y : 0, p.z);
+              : inDri ? clamp(p.y * 0.35, 0, 26)
+              : relief ? clamp(p.y - groundY, 0, 26) : 0;
+    // The box rides the ANIMAL's height wherever there is relief. This was the
+    // same four-chapter list, so in twelve worlds the shadow frustum sat on the
+    // datum: everything the player stood on above y = 0 — a Cappadocian hill at
+    // 8.4 m, an Antarctic ridge at 7.1, the whole of Sơn Đoòng — was outside
+    // the box and therefore unlit by anything that casts.
+    sunFollow(p.x, (relief || inDri) ? p.y : 0, p.z);
     shadowFitAlt(agl);
 
     // ---- where the next thing is ------------------------------------------

@@ -109,6 +109,18 @@ function mainMakeTime(game) {
     calm: calm,
     /** What was actually applied on the last frame. 1 = real time. */
     scale: 1,
+    /**
+     * The SLOW-MOTION component alone, eased, with the hitstop taken out.
+     *
+     * These have to be separable and it is not a nicety. A hitstop is a hole in
+     * time: the correct thing for a lens, a grade or a UI to do during one is
+     * NOTHING, because the whole frame is being held. A slow-motion is a shot:
+     * it is the one a lens should lean into. Driving anything presentational
+     * off `scale` conflates them — measured, a 55 ms freeze pulled the field of
+     * view from 48 to 43.6 degrees and snapped it back, which is precisely the
+     * dropped-frame artefact the freeze exists to avoid looking like.
+     */
+    slow: 1,
     /** True while a freeze or a held beat is live — for anything that must sit it out. */
     active: false,
 
@@ -141,7 +153,10 @@ function mainMakeTime(game) {
     },
 
     /** Everything back to real time, now. Used on a biome change. */
-    clear() { holdT = 0; slowT = 0; holdS = 1; slowS = 1; slowNow = 1; time.scale = 1; time.active = false; },
+    clear() {
+      holdT = 0; slowT = 0; holdS = 1; slowS = 1; slowNow = 1;
+      time.scale = 1; time.slow = 1; time.active = false;
+    },
 
     /**
      * Advance the channel by a real frame and answer with the dt the world
@@ -168,6 +183,7 @@ function mainMakeTime(game) {
       if (s < MAIN_TIME_FLOOR) s = MAIN_TIME_FLOOR;
       if (s > 1) s = 1;
       time.scale = s;
+      time.slow = slowNow;
       time.active = s < 0.999;
       return raw * s;
     },
