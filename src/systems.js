@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, grainTick, wetTick } from './shared.js';
+         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -934,11 +934,73 @@ const sysPAL_GND_C = new THREE.Color(PALETTE.palShallow);
 const sysPAL_BG_C = new THREE.Color(PALETTE.palSkyTop).lerp(new THREE.Color(PALETTE.palSkyLow), 0.40);
 const sysPAL_HAZE_C = new THREE.Color(PALETTE.palFog);
 // and the second sky
-const sysPAL_SUB_FOG_N = 4;
-const sysPAL_SUB_FOG_F = 62;
-const sysPAL_SUB_C = new THREE.Color(PALETTE.palFogUnder);
-const sysPAL_SUB_DEEP = new THREE.Color(PALETTE.palAbyss);
 const sysPAL_BLOOM_C = new THREE.Color(PALETTE.palBloom);
+
+// ---- UNDER THE WATER, ANYWHERE (v19) --------------------------------------
+// The dive stopped being a property of the chapter and became a property of the
+// water — see capyCanDive in capybara.js — and eight more chapters have enough
+// of it. None of them had ever needed to know what their own water looks like
+// from UNDERNEATH, so this is that, one row each, and it is the whole of the
+// per-place work: the fog distances and two colours.
+//
+// Palawan's row is its four shipped constants, unchanged to the character, so
+// the one chapter that was authored down there is authored down there still.
+//
+// `near`/`far` are the fog, and they do most of it: water is not clear and the
+// single number that makes a picture read as underwater is how fast the world
+// goes away. Venice's canals get 26 m and Rio's Atlantic gets 70.
+const sysSUB = {
+  kyoto:     { near: 5, far: 46, c: 'ujiRiver',    deep: 'ujiRiverDeep' },
+  cali:      { near: 4, far: 34, c: 'caliRiver',   deep: 'caliRiverDeep' },
+  rio:       { near: 6, far: 70, c: 'rioSea',      deep: 'rioSeaDeep' },
+  iceland:   { near: 4, far: 40, c: 'iceWater',    deep: 'iceWaterDeep' },
+  venice:    { near: 3, far: 26, c: 'venCanal',    deep: 'venCanalDeep' },
+  kowloon:   { near: 3, far: 24, c: 'hkHarbour',   deep: 'hkHarbour' },
+  palawan:   { near: 4, far: 62, c: 'palFogUnder', deep: 'palAbyss' },
+  manly:     { near: 5, far: 44, c: 'manSeaMid',   deep: 'manSea' },
+  pantanal:  { near: 3, far: 22, c: 'panWater',    deep: 'panWaterDeep' },
+  cave:      { near: 4, far: 30, c: 'cavWater',    deep: 'cavRockDk' },
+  antarctic: { near: 5, far: 52, c: 'antSeaLt',    deep: 'antSeaDeep' },
+};
+// Resolved once, on demand — a THREE.Color per row rather than per frame.
+const sysSubCache = Object.create(null);
+function sysSubRow(name) {
+  if (!name) return null;
+  let r = sysSubCache[name];
+  if (r === undefined) {
+    const d = sysSUB[name];
+    r = d ? { near: d.near, far: d.far,
+              cCol: new THREE.Color(PALETTE[d.c] !== undefined ? PALETTE[d.c] : PALETTE.water),
+              dCol: new THREE.Color(PALETTE[d.deep] !== undefined ? PALETTE[d.deep] : PALETTE.waterDeep) }
+           : null;
+    sysSubCache[name] = r;
+  }
+  return r;
+}
+// How far the lens has to be under before the picture is fully underwater. A
+// hard switch at the surface reads as a dropped frame; 0.6 m is about the time
+// it takes the eye to go through, and the surface is the one place in this
+// game where a transition is genuinely a physical thing happening.
+const sysSUB_FADE = 0.3;
+// The lens floor while diving, for a chapter with no camFloor of its own. It is
+// Palawan's number — palTerrain + 0.95 — because that one was measured against
+// a reef and there is no reason for anybody else's to be different.
+const sysDIVE_CAM_CLEAR = 0.95;
+// ...and the rig that goes with it, which is Palawan's measured pair and the
+// note above it in palawan.js is the argument for both numbers: 5.0 m at 0.12
+// rad is 1.6 m over the animal (so the lens goes under from about a metre and a
+// half of depth) and clear of anything standing on the floor.
+const sysDIVE_RIG_D = 5.0;
+const sysDIVE_RIG_P = 0.12;
+const sysDIVE_RIG_R = 0.5;
+const sysDIVE_RIG_L = 2.4;
+// How far under the surface the eye must stay while the animal is under it,
+// and how hard the boom is allowed to come in to manage it. Four halvings takes
+// a 5 m boom to 1.2 m, which is close enough to sit inside a canal.
+const sysDIVE_LENS   = 0.75;
+const sysDIVE_PULL_N = 8;   // gentle steps, and it stops at the first one that clears
+const sysDIVE_PULL_K = 0.85;
+const sysDIVE_EYE_CLEAR = 0.4;   // m of ground the eye must be standing clear of
 
 // ---- CAPPADOCIA: five in the morning, and then the sun ---------------------
 // The only sunRISE in the game — Iceland's night never ends and Marrakech's
@@ -1010,6 +1072,10 @@ const sysTODO_LINGER = 1700;   // ms a ticked row stays before it rolls up
 const sysTODO_ROLL   = 520;    // ms of the roll-up itself (matches .capyui-fold)
 // Two ticks inside this window read as a combo and the flourish climbs a tone.
 const sysTASK_STREAK = 6.0;    // seconds
+// s between sweeps of the finds. Four a second is far more often than any of
+// them needs and still costs nothing: twenty predicates over a handful of
+// numbers, and every one that has been found is skipped for ever.
+const sysFIND_TICK = 0.25;
 
 // ---------------------------------------------------------------------------
 // THE JOURNEY — save, records, and the departures board.
@@ -3382,6 +3448,14 @@ function sysBuildCSS() {
   'white-space:pre-line;line-height:1.35;}',
 '.capyui-ledline span{min-width:0;overflow-wrap:anywhere;}',
 '.capyui-ledname{overflow-wrap:anywhere;}',
+/* the finds: a line of their own under the records, and a different voice —
+   a record is how well you did what you were asked, a find is a thing nobody
+   asked about at all. The bullet is drawn rather than typed so it lines up. */
+'.capyui-ledfind{grid-column:2 / 4;margin-top:2px;display:flex;flex-direction:column;gap:1px;',
+  'font-size:clamp(9px,1.85vw,11px);color:' + accent + ';min-width:0;}',
+'.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
+'.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
+  'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
 '.capyui-ledkeep{flex:0 0 auto;width:19px;height:19px;display:block;}',
 '.capyui-ledkeep svg{display:block;width:100%;height:100%;}',
 '.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
@@ -8247,7 +8321,12 @@ export function createSystems(game) {
       if (keepHeld(n)) kept++;
       // Arriving ticks a task in fifteen of the seventeen; jrSeen covers the
       // two it does not, and a place you have never stood in says nothing.
-      if (!d && !jrSeen[n]) continue;
+      // ...unless you noticed something there, which is a reason on its own.
+      let anyFind = false;
+      for (let i = 0; i < FINDS.length && !anyFind; i++) {
+        if (findDone[FINDS[i].id] && findWhere[FINDS[i].id] === n) anyFind = true;
+      }
+      if (!d && !jrSeen[n] && !anyFind) continue;
       const row = sysEl('div', 'capyui-ledrow');
       row.style.animationDelay = (rows * sysLED_STAGGER) + 'ms';
       rows++;
@@ -8278,10 +8357,25 @@ export function createSystems(game) {
       }
       line.appendChild(sysEl('span', null, bits.length ? bits.join('  ·  ') : def.sub));
       row.appendChild(line);
+      // ---- ...and anything you noticed here that nobody mentioned (v19) ---
+      // A line of their own rather than another entry in the list above,
+      // because a find is a different KIND of thing from a record: one is how
+      // well you did something you were asked to do, and the other is that you
+      // did something nobody asked about at all.
+      let fl = null;
+      for (let i = 0; i < FINDS.length; i++) {
+        const f = FINDS[i];
+        if (!findDone[f.id] || findWhere[f.id] !== n) continue;
+        if (!fl) fl = sysEl('div', 'capyui-ledfind');
+        fl.appendChild(sysEl('span', null, f.text));
+      }
+      if (fl) row.appendChild(fl);
       ledList.appendChild(row);
     }
+    const noticed = findCount();
     ledSub.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
-      ' places  ·  ' + kept + ' kept';
+      ' places  ·  ' + kept + ' kept' +
+      (noticed ? '  ·  ' + noticed + ' noticed' : '');
     ledFoot.textContent = sysFmtTime(jrTotalMs()) + ' on the road';
     // A journey of nowhere is still a card, and it should say something.
     if (!rows) {
@@ -8472,8 +8566,13 @@ export function createSystems(game) {
     let places = 0;
     for (let k = 1; k <= chapMax; k++) if (chapComplete(k)) places++;
     const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+    // The finds only appear here once there is at least one, because "0 of 20
+    // noticed" is a list of things you have not done, and a find that is
+    // advertised before it is found has stopped being a find.
+    const nf = findCount();
     jrCount.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
-      ' places  ·  ' + sysFmtTime(total);
+      ' places  ·  ' + sysFmtTime(total) +
+      (nf ? '  ·  ' + nf + ' noticed' : '');
     const here = game.biome ? chapterOf(game.biome.current) : 1;
     // ---- the shelf ---------------------------------------------------------
     const kept = keepCount();
@@ -9652,10 +9751,15 @@ export function createSystems(game) {
       // `chapms` is additive and the version does not move for it: a file
       // written before the ledger existed simply has no times in it, and the
       // ledger prints a tally with no clock beside it rather than a zero.
+      // `finds` and `foundAt` are additive, like `chapms`: a file written
+      // before they existed simply has none, which is the correct history for
+      // a player who could not have found any.
+      const finds = [];
+      for (const k in findDone) if (findDone[k]) finds.push(k);
       localStorage.setItem(sysSAVE_KEY, JSON.stringify({
         v: 1, tasks: tasks, seen: seen, recs: jrRecs, told: 1,
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
-        chapms: jrChapMs,
+        chapms: jrChapMs, finds: finds, foundAt: findWhere,
         biome: (game.biome && game.biome.current) || 'sydney',
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
@@ -9707,6 +9811,269 @@ export function createSystems(game) {
     if (!def || jrRecs[id] === undefined) return '';
     return def.label + ' ' + jrRecs[id].toFixed(def.dp) + def.unit;
   }
+
+  // =========================================================================
+  // THE FINDS — the things nobody tells you about
+  // =========================================================================
+  // See FINDS in shared.js for what one is and the three rules they all keep.
+  // This is the other half: every predicate, because every one of them is a
+  // question about live world state and this is where the live world state is.
+  //
+  // Evaluated on a slow tick — sysFIND_TICK, four times a second — over the
+  // ones that are still open, and nothing in here may allocate or the cheapest
+  // thing in the game becomes the most expensive. Once a find is found it is
+  // never tested again.
+  const findDone = Object.create(null);
+  const findS = Object.create(null);        // scratch: timers, edges, peaks
+  let findT = 0;
+  let findChap = -1;                        // the chapter the scratch belongs to
+
+  /** Everybody this game owns, near a point: both crowds, one number. */
+  function findPeople(x, z, r) {
+    const r2 = r * r;
+    let n = 0;
+    const arr = game.npcs;
+    if (arr) {
+      for (let i = 0; i < arr.length; i++) {
+        const q = arr[i];
+        if (!q || !q.group) continue;
+        const dx = q.group.position.x - x, dz = q.group.position.z - z;
+        if (dx * dx + dz * dz < r2) n++;
+      }
+    }
+    const loc = game.locals;
+    const live = game.biome && game.biome.current;
+    if (loc) {
+      for (let i = 0; i < loc.length; i++) {
+        const L = loc[i];
+        if (!L || L.biome !== live) continue;
+        const dx = L.x - x, dz = L.z - z;
+        if (dx * dx + dz * dz < r2) n++;
+      }
+    }
+    return n;
+  }
+  function findHeat(x, z, r) {
+    return typeof game.npcHeat === 'function' ? game.npcHeat(x, z, r) : 0;
+  }
+  /** The highest ground in the live chapter, sampled once and remembered. */
+  function findPeak(name) {
+    if (findS.peakOf === name) return findS.peak;
+    const w = sysMAP_WORLDS[name];
+    let best = -Infinity;
+    if (w) {
+      const sx = (w.x1 - w.x0) / 24, sz = (w.z1 - w.z0) / 24;
+      for (let x = w.x0; x <= w.x1; x += sx) {
+        for (let z = w.z0; z <= w.z1; z += sz) {
+          const h = sysGroundY(x, z);
+          if (h > best) best = h;
+        }
+      }
+    }
+    findS.peakOf = name;
+    findS.peak = best;
+    return best;
+  }
+
+  // The three chapters that TAUGHT each verb. Bringing one anywhere else is the
+  // whole point of the find — and of making the verb a property of the world
+  // rather than of a chapter in the first place. See capyCanDive.
+  const sysDIVE_TAUGHT  = { 12: 1, 14: 1, 16: 1 };
+  const sysCLIMB_TAUGHT = { 11: 1, 13: 1, 16: 1 };
+  // Chapters where the water has no daylight in it worth the name.
+  const sysDARK_WATER   = { 7: 1, 11: 1, 16: 1, 17: 1 };
+
+  const sysFINDS = {
+    // ---- what you brought with you --------------------------------------
+    'brought-dive':  function (c) { return c.capy.diving && !sysDIVE_TAUGHT[c.n]; },
+    'long-breath':   function (c) { return (c.capy.diveTime || 0) > 25; },
+    'dark-water':    function (c) { return c.capy.diving && !!sysDARK_WATER[c.n]; },
+    'brought-climb': function (c) { return c.capy.climbing && !sysCLIMB_TAUGHT[c.n]; },
+    'cold-swim':     function (c) { return c.capy.swimming && c.cold > 0.55; },
+    // The floor, and it has to be the floor rather than a depth: the deepest
+    // water in the game is thirty metres and the shallowest you can dive in is
+    // under two, so any fixed number is either unreachable or free.
+    'the-deep-end':  function (c) {
+      return c.capy.diving && (c.capy.depth || 0) > 2.5 &&
+             (c.p.y - sysGroundY(c.p.x, c.p.z)) < 1.15;
+    },
+
+    // ---- what nobody saw -------------------------------------------------
+    // Wariness denies nothing anywhere else in the game. This is where it bites.
+    'not-a-soul':    function (c) {
+      return !!c.capy.heldProp && findPeople(c.p.x, c.p.z, 14) >= 4 &&
+             findHeat(c.p.x, c.p.z, 14) === 0;
+    },
+    'most-wanted':   function (c) { return findHeat(c.p.x, c.p.z, 20) >= 5; },
+    // You stood still, in plain sight, next to somebody who had had enough of
+    // you, until they stopped minding. It is the only thing in this game that
+    // is completed by waiting and not moving, and wariness is the only clock
+    // that could ever have asked for it.
+    'forgiven':      function (c) {
+      const watched = findHeat(c.p.x, c.p.z, 7) > 0;
+      if (watched && c.sp < 0.7) { findS.forgiveT = (findS.forgiveT || 0) + c.dt; return false; }
+      if (watched) { findS.forgiveT = 0; return false; }
+      const t = findS.forgiveT || 0;
+      findS.forgiveT = 0;
+      return t > 11 && findPeople(c.p.x, c.p.z, 7) > 0;
+    },
+    // ...and the opposite, which is braver: take it anyway, off somebody who
+    // is already looking straight at you. Set by the grab listener below.
+    'red-handed':    function () { return !!findS.redHanded; },
+
+    // ---- what you did with the time --------------------------------------
+    'perfectly-still': function (c) {
+      if (c.sp > 0.15 || !c.capy.grounded || c.capy.carriedBy) { findS.stillT = 0; return false; }
+      findS.stillT = (findS.stillT || 0) + c.dt;
+      return findS.stillT > 60;
+    },
+    // A whole shower, start to finish, with you out in it. The accumulator is
+    // reset by shelter rather than by the rain stopping, so ducking inside
+    // halfway does not count and waiting it out does.
+    'out-in-it':     function (c) {
+      const rain = c.rain;
+      if (c.n === 16) { findS.rainT = 0; return false; }   // it does not rain in a cave
+      if (rain > 0.28) { findS.rainT = (findS.rainT || 0) + c.dt; return false; }
+      const t = findS.rainT || 0;
+      if (rain > 0.05) return false;
+      findS.rainT = 0;
+      return t > 22;
+    },
+    'wrung-out':     function (c) { return (c.capy.wet || 0) >= 0.995; },
+    'nothing-left':  function (c) { return !!c.capy.blown; },
+    // Eight bars of moving on the beat somewhere the game is not counting. The
+    // two chapters that DO count are excluded, because there it is a task.
+    'own-beat':      function (c) {
+      const m = game.music;
+      if (!m || !m.playing || c.n === 5 || c.n === 6 || c.sp < 1.4) { findS.beatRun = 0; return false; }
+      const b = Math.floor(m.beats());
+      if (b === findS.beatAt) return false;
+      findS.beatAt = b;
+      findS.beatRun = Math.abs(m.off()) < 0.17 ? (findS.beatRun || 0) + 1 : 0;
+      return findS.beatRun >= 32;
+    },
+    'scenic-route':  function (c) { return (findS.walked || 0) > 1000; },
+
+    // ---- where you went ---------------------------------------------------
+    'high-point':    function (c) {
+      // A CHAPTER WITH NO HILL IN IT HAS NO HIGH POINT, and Sydney is flat at
+      // zero by contract — so sysGroundY answers 0 everywhere, the peak is 0,
+      // and standing anywhere at all used to satisfy this. Measured: it fired
+      // in the first ten seconds of a new file, on the lawn.
+      if (!c.capy.grounded || !sysHasRelief()) return false;
+      const pk = findPeak(c.name);
+      if (!(pk > 3)) return false;
+      return sysGroundY(c.p.x, c.p.z) >= pk - 1.5;
+    },
+    'far-corner':    function (c) {
+      const w = sysMAP_WORLDS[c.name];
+      if (!w) return false;
+      const cx = (w.x0 + w.x1) * 0.5, cz = (w.z0 + w.z1) * 0.5;
+      const hx = (w.x1 - w.x0) * 0.5, hz = (w.z1 - w.z0) * 0.5;
+      const dx = Math.abs(c.p.x - cx) / hx, dz = Math.abs(c.p.z - cz) / hz;
+      return Math.max(dx, dz) > 0.94;
+    },
+    // Somewhere with nobody in it, in a chapter that has people in it — so it
+    // is a real corner of a populated place and not a free tick in the Drift.
+    'quiet-corner':  function (c) {
+      return findPeople(c.p.x, c.p.z, 55) === 0 && findPeople(c.p.x, c.p.z, 1e4) >= 6;
+    },
+    'long-drop':     function () { return !!findS.bigDrop; },
+  };
+
+  /**
+   * One find, found. Deliberately the SMALLEST channel in the game: a toast, a
+   * chime a fifth above the tick, and a line in the journal. A find is a private
+   * pleasure and a banner would turn it into an achievement — and an
+   * achievement is a thing you are told to go and get, which is the one thing a
+   * find may never be.
+   */
+  function foundFind(id, silent) {
+    if (findDone[id]) return false;
+    findDone[id] = true;
+    if (silent) return true;
+    const def = sysFindDef(id);
+    toast('·  ' + (def ? def.text : id));
+    sfx('chime', { volume: 0.42, pitch: 1.62 });
+    const cp = game.capy && game.capy.position;
+    if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, 6);
+    findWhere[id] = chapterOf(game.biome && game.biome.current);
+    saveSoon();
+    return true;
+  }
+  const findWhere = Object.create(null);    // id -> chapter it happened in
+  function sysFindDef(id) {
+    for (let i = 0; i < FINDS.length; i++) if (FINDS[i].id === id) return FINDS[i];
+    return null;
+  }
+  function findCount() {
+    let n = 0;
+    for (let i = 0; i < FINDS.length; i++) if (findDone[FINDS[i].id]) n++;
+    return n;
+  }
+
+  /** The grab edge, which is the only find that cannot be sampled on a tick. */
+  game.events.on('capy:grab', function (p) {
+    if (findDone['red-handed']) return;
+    const pr = p && p.prop;
+    const cp = game.capy && game.capy.position;
+    if (!pr || !cp) return;
+    // Somebody has to be watching, and it has to be near enough to be brazen.
+    if (findHeat(cp.x, cp.z, 9) > 0) { findS.redHanded = true; }
+  });
+
+  function findTick(dt) {
+    if (!started || game.state.paused) return;
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    const name = (game.biome && game.biome.current) || 'sydney';
+    const n = chapterOf(name);
+    // The scratch belongs to ONE visit to ONE place. Travelling resets every
+    // timer, every accumulator and every edge, or a kilometre walked over four
+    // chapters would read as a kilometre walked in the fourth.
+    if (n !== findChap) {
+      findChap = n;
+      for (const k in findS) delete findS[k];
+    }
+    const p = capy.position;
+    const v = capy.velocity;
+    const sp = v ? Math.sqrt(v.x * v.x + v.z * v.z) : 0;
+    // ---- the two accumulators that must run every frame, not every tick ---
+    if (capy.grounded && !capy.carriedBy) findS.walked = (findS.walked || 0) + sp * dt;
+    // the fall: the highest point of a flight, and how far it ended up being
+    if (!capy.grounded) {
+      if (findS.fallTop === undefined || p.y > findS.fallTop) findS.fallTop = p.y;
+    } else if (findS.fallTop !== undefined) {
+      if (findS.fallTop - p.y > 25 && !capy.swimming) findS.bigDrop = true;
+      findS.fallTop = undefined;
+    }
+
+    findT -= dt;
+    if (findT > 0) return;
+    findT = sysFIND_TICK;
+    const wx = game.weather;
+    const mood = wx && typeof wx.mood === 'function' ? wx.mood() : null;
+    findCtx.n = n;
+    findCtx.name = name;
+    findCtx.capy = capy;
+    findCtx.p = p;
+    findCtx.sp = sp;
+    findCtx.dt = sysFIND_TICK;
+    findCtx.rain = wx && typeof wx.drizzle === 'function' ? wx.drizzle() : 0;
+    findCtx.cold = mood && typeof mood.cold === 'number' ? mood.cold : 0;
+    for (let i = 0; i < FINDS.length; i++) {
+      const id = FINDS[i].id;
+      if (findDone[id]) continue;
+      const f = sysFINDS[id];
+      if (!f) continue;
+      let hit = false;
+      try { hit = !!f(findCtx); } catch (e) { hit = false; }
+      if (hit) foundFind(id);
+    }
+    findS.redHanded = false;
+    findS.bigDrop = false;
+  }
+  const findCtx = { n: 1, name: 'sydney', capy: null, p: null, sp: 0, dt: 0, rain: 0, cold: 0 };
 
   function completeTask(id, silent) {
     const r = taskRec[id];
@@ -9990,6 +10357,10 @@ export function createSystems(game) {
       jrCarriedMs = typeof jrFile.ms === 'number' ? jrFile.ms : 0;
       const cms = jrFile.chapms || {};
       for (const k in cms) if (typeof cms[k] === 'number') jrChapMs[k] = cms[k];
+      const fnd = jrFile.finds || [];
+      for (let i = 0; i < fnd.length; i++) foundFind(fnd[i], true);
+      const fat = jrFile.foundAt || {};
+      for (const k in fat) if (typeof fat[k] === 'number') findWhere[k] = fat[k];
       // The running total the NEXT ceremony measures against. Without this a
       // chapter finished after a reload reads as "eleven hours", because the
       // previous mark was zero and the total carries every earlier session.
@@ -10511,6 +10882,10 @@ export function createSystems(game) {
   let hkT = 0;                    // 0 = anywhere else, 1 = a city that lights itself
   let palT = 0;                   // 0 = anywhere else, 1 = a bleached tropical noon
   let subT = 0;                   // 0 = above the water, 1 = under it. THE SECOND SKY.
+  // The live chapter's sysSUB row, or null. Closure-level rather than a const
+  // inside update(), because the grade and the sky dome are painted from other
+  // functions in this closure and both of them need it.
+  let sysSubNow = null;
   let gorT = 0;                   // 0 = anywhere else, 1 = twenty minutes before sunrise
 
   /**
@@ -10600,9 +10975,13 @@ export function createSystems(game) {
       if (iceT > 0.002 && auroraT > 0.01) sysColA.lerp(sysAURORA_C, auroraT * iceT * 0.30);
 
       // FLATTEN — the states in which there is no gradient to draw, because
-      // there is no sky: under the water in Palawan, and inside the sand.
+      // there is no sky: under the water ANYWHERE, and inside the sand. This
+      // was `subT * palT` and had to stop being: subT can only be lit where
+      // there is a sysSUB row, so it is already the whole condition, and with
+      // the Palawan term still in it the other eight chapters would have drawn
+      // a dawn gradient at the bottom of a canal.
       let flat = 0;
-      if (palT > 0.002) flat = Math.max(flat, subT * palT);
+      if (subT > 0.002) flat = Math.max(flat, subT);
       if (sahT > 0.002) flat = Math.max(flat, stormT * sahT * 0.88);
 
       const hz = (scene.background && scene.background.isColor) ? scene.background : sysColA;
@@ -10642,14 +11021,14 @@ export function createSystems(game) {
       const glow = clamp(game.drift.glow(), 0, 1) * driT;
       bloom += glow * 0.22; thr -= glow * 0.06;
     }
-    if (palT > 0.002) {
-      if (B.isActive('palawan') && game.palawan) {
-        bloom += clamp(game.palawan.bloom(), 0, 1) * palT * 0.35;
-      }
-      // Under the water the light is coming through eleven metres of it: less
-      // of it, less colour in it, and the corners close right down.
-      const sk = subT * palT;
-      vig += sk * 0.18; sat -= sk * 0.10; thr -= sk * 0.34;
+    if (palT > 0.002 && B.isActive('palawan') && game.palawan) {
+      bloom += clamp(game.palawan.bloom(), 0, 1) * palT * 0.35;
+    }
+    // Under the water the light is coming through metres of it: less of it,
+    // less colour in it, and the corners close right down. Out of the Palawan
+    // block, because it was never about Palawan — it is about being under.
+    if (subT > 0.002) {
+      vig += subT * 0.18; sat -= subT * 0.10; thr -= subT * 0.34;
     }
     if (gorT > 0.002 && B.isActive('goreme') && game.goreme) {
       // Before the ridge lets go, every bulb in the town is a light. After it,
@@ -10947,6 +11326,26 @@ export function createSystems(game) {
     const h = api.terrainHeight(x, z);
     // NaN would silently poison the camera and never come back.
     return (typeof h === 'number' && h === h) ? h : 0;
+  }
+
+  /**
+   * WHERE THE LIVE WATERLINE IS at a point — capybara.js's capyWaterY, on this
+   * side of the fence, because the picture now has to know too: what makes a
+   * frame read as underwater is decided by where the LENS is, and the lens is
+   * eleven metres behind the animal and four above it. See sysSUB.
+   *
+   * Returns -Infinity where the live biome has no water at all, so "is the
+   * camera under it" is false without a special case anywhere.
+   */
+  function sysWaterY(x, z) {
+    const api = sysLiveBiomeApi(game);
+    if (!api) return -Infinity;
+    if (api.localWater === true && typeof api.waterHeightAt === 'function') {
+      const y = api.waterHeightAt(x, z);
+      if (typeof y === 'number' && y === y) return y;
+    }
+    const w = api.waterLevel;
+    return (typeof w === 'number' && w === w) ? w : -Infinity;
   }
 
   /**
@@ -11348,6 +11747,10 @@ export function createSystems(game) {
     const inHk = !!(game.biome && game.biome.isActive('kowloon'));
     const inPal = !!(game.biome && game.biome.isActive('palawan'));
     const inGor = !!(game.biome && game.biome.isActive('goreme'));
+    // What this chapter's water looks like from underneath, or null for the six
+    // that have none worth going into. Resolved per frame from one property
+    // lookup and a cache — see sysSUB.
+    sysSubNow = sysSubRow(game.biome && game.biome.current);
     const capy = game.capy;
     // p = AUTHORITATIVE physics position (gameplay: zone tests, shadow fitting).
     const p = capy && capy.position ? capy.position : sysZERO;
@@ -11544,6 +11947,26 @@ export function createSystems(game) {
         if (typeof rq.lambda === 'number') rigLam = rq.lambda;
       }
     }
+    // ---- THE DIVE RIG, for everybody (v19) --------------------------------
+    // The standing rig puts the eye about six metres over the animal, so a two
+    // metre dive leaves the lens in the air and the whole verb happens off the
+    // bottom of the screen. Palawan published `rig()` for exactly this and was
+    // the only chapter that could dive; eight more can now and none of them has
+    // a lens of its own.
+    //
+    // A CANDIDATE, NOT AN OVERRIDE, and strictly greater — so Palawan, whose
+    // own rig returns this same `w` off this same formula, is untouched to the
+    // character, and a biome that wants the camera more than the dive does
+    // (a river, a balloon, a helm) keeps it.
+    if (game.capy && game.capy.diving) {
+      const dd2 = game.capy.depth || 0;
+      const dw = clamp((dd2 - 0.45) / 1.1, 0, 1) * (1 - Math.max(flyT, sailT));
+      if (dw > rigWant) {
+        rigWant = dw;
+        rigDist = sysDIVE_RIG_D; rigPitch = sysDIVE_RIG_P;
+        rigRaise = sysDIVE_RIG_R; rigLam = sysDIVE_RIG_L;
+      }
+    }
     rigT = damp(rigT, rigWant, rigLam, dt);
     if (rigT > 0.002) {
       camReach = lerp(camReach, rigDist, rigT);
@@ -11567,8 +11990,40 @@ export function createSystems(game) {
         if (t < 0.34) { t = 0.34; break; }
       }
     }
-    const dd = camReach * t;
+    let dd = camReach * t;
     sysDesired.set(sysAnchor.x + ox * dd, sysAnchor.y + sn * dd, sysAnchor.z + oz * dd);
+    // ---- UNDER THE WATER, THE EYE COMES IN RATHER THAN GOING UP (v19) -----
+    // Every clearance rule below is right in sixteen chapters and exactly wrong
+    // in one state. An animal three metres down in a lagoon has the eye five
+    // metres behind it, the bank is four metres behind THAT, and the terrain
+    // clearance dutifully lifts the eye two metres over the paving — so the
+    // dive is watched from the pavement, through the top of the water, and the
+    // grade never fires because the lens never went under. Measured in Venice
+    // before this existed: animal at −3.04, eye at +2.90.
+    //
+    // Shortening the boom is what a camera should reach for first and it is the
+    // only answer that keeps the picture underwater. Four halvings at most, and
+    // it stops the moment the ground under the eye is deep enough to sit over.
+    const diveOn = !!(game.capy && game.capy.diving);
+    let diveCeil = Infinity;
+    if (diveOn) {
+      const wy = sysWaterY(sysAnchor.x, sysAnchor.z);
+      if (wy > -Infinity) {
+        diveCeil = wy - sysDIVE_LENS;
+        // The test is the real constraint and nothing more: IS THE EYE INSIDE
+        // THE GROUND. Being under water beside a quay wall is a fine place to
+        // be; being inside the quay wall is not. Stated as "is there deep water
+        // under the eye" instead, this pulled the boom to 1.2 m in a lagoon
+        // whose far bank happened to be five metres away, and the frame was a
+        // capybara's back from end to end.
+        const eyeY = Math.min(sysDesired.y, diveCeil);
+        for (let i = 0; i < sysDIVE_PULL_N; i++) {
+          if (sysGroundY(sysDesired.x, sysDesired.z) + sysDIVE_EYE_CLEAR < eyeY) break;
+          dd *= sysDIVE_PULL_K;
+          sysDesired.set(sysAnchor.x + ox * dd, sysAnchor.y + sn * dd, sysAnchor.z + oz * dd);
+        }
+      }
+    }
     // Asked of the LIVE biome, and of nobody by name — the same property lookup
     // every other optional hook uses, so a chapter that has no opinion costs a
     // failed lookup and gets the constant.
@@ -11576,6 +12031,16 @@ export function createSystems(game) {
     if (rigApi && typeof rigApi.camFloor === 'function') {
       const cf = rigApi.camFloor(sysDesired.x, sysDesired.z);
       if (typeof cf === 'number' && cf === cf) camFloorY = cf;
+    } else if (game.capy && game.capy.diving) {
+      // A HARD FLOOR AT 1.7 IS A CEILING OVER A DIVING ANIMAL (v19).
+      // Palawan published camFloor precisely because of this, and it was the
+      // only chapter that could dive. Eight more can now, none of them publish
+      // one, and without this the lens stops dead at the waterline and the
+      // whole verb happens off the bottom of the screen. Same number Palawan
+      // measured — the biome's own floor plus a metre — and it is applied ONLY
+      // while diving, so no chapter's surface camera moves by a millimetre.
+      camFloorY = Math.min(sysCAM_FLOOR,
+                           sysGroundY(sysDesired.x, sysDesired.z) + sysDIVE_CAM_CLEAR);
     }
     if (sysDesired.y < camFloorY) sysDesired.y = camFloorY;
     // Last resort: the pull-in still lands inside a shell (the vaults are
@@ -11602,7 +12067,12 @@ export function createSystems(game) {
     // that has a floor worth asking about.
     const relief = sysHasRelief();
     if (relief) {
-      const gy = sysGroundY(sysDesired.x, sysDesired.z) + sysFLY_CLEAR;
+      let gy = sysGroundY(sysDesired.x, sysDesired.z) + sysFLY_CLEAR;
+      // ...but it may not lift the eye out of the water while the animal is
+      // under it. If the boom could not be pulled in far enough to find deep
+      // ground, the eye sits just under the surface and looks down, which is a
+      // picture; two metres over the bank is not one.
+      if (gy > diveCeil) gy = diveCeil;
       if (sysDesired.y < gy) sysDesired.y = gy;
     }
     // The torii tunnel gets a RAIL rather than a boom. Forty-four gates 4 m tall
@@ -11638,14 +12108,18 @@ export function createSystems(game) {
       camera.position.x += (Math.sin(tt * 31.4) * 0.6 + Math.sin(tt * 19.7 + 1.7) * 0.4) * sysSHAKE_AMPXZ * s;
       camera.position.y += (Math.sin(tt * 27.1 + 0.6) * 0.55 + Math.sin(tt * 15.3 + 2.4) * 0.45) * sysSHAKE_AMPY * s;
       camera.position.z += (Math.cos(tt * 35.2 + 1.1) * 0.6 + Math.cos(tt * 23.1 + 0.3) * 0.4) * sysSHAKE_AMPXZ * s;
-      if (camera.position.y < sysCAM_FLOOR) camera.position.y = sysCAM_FLOOR;
+      // camFloorY, not the constant: a shake underwater used to pop the eye up
+      // to 1.7 and back, which is a chapter's worth of dive in every chapter
+      // that has one — Palawan included, since the day it shipped.
+      if (camera.position.y < camFloorY) camera.position.y = camFloorY;
     } else {
       shakeAmt = 0;
     }
     // Second clearance test, on the position actually being rendered from: the
     // spring lags the desired point by a few metres and a shake can add half of one.
     if (relief) {
-      const gy2 = sysGroundY(camera.position.x, camera.position.z) + sysFLY_CLEAR;
+      let gy2 = sysGroundY(camera.position.x, camera.position.z) + sysFLY_CLEAR;
+      if (gy2 > diveCeil) gy2 = diveCeil;      // and here too, for the same reason
       if (camera.position.y < gy2) camera.position.y = gy2;
     }
     // ---- THE LENS BREATHES ------------------------------------------------
@@ -11718,6 +12192,11 @@ export function createSystems(game) {
     // Resolved on a timer (targets move; a per-frame search over every prop and
     // NPC would not be free), but the ARROW is written every frame, because it
     // is measured against the camera and the camera is always turning.
+    // The finds run on the same beat as the hints and for the same reason: it
+    // is a sweep over a table of questions about live state, and the answer
+    // cannot change usefully faster than four times a second. Raw dt, not the
+    // scaled one — a find should not take longer to notice in slow motion.
+    findTick(game.state.rawDt || dt);
     hintT -= dt;
     if (hintT <= 0) {
       hintT = sysHINT_TICK;
@@ -11821,7 +12300,24 @@ export function createSystems(game) {
     // picture goes green when the lens goes under and the lens is eleven metres
     // behind and four above — judging it from the capybara turns the surface
     // into a light switch that fires a second before anything on screen moves.
-    subT = inPal && game.palawan ? clamp(game.palawan.submerged(), 0, 1) : damp(subT, 0, 4, dt);
+    // THE SECOND SKY IS NOW EVERY CHAPTER'S, and it is still a camera flag.
+    // palawan.js has smoothed its own against the lens since the day it was
+    // written, and it keeps that; everywhere else the question is asked here,
+    // of the lens, against the live waterline — which is the same question, and
+    // it is the reason the note above is worth obeying rather than repeating.
+    // A chapter with no sysSUB row can never light this at all, so the eight
+    // that gained the verb get the picture and the nine that did not are
+    // untouched by a property lookup that misses.
+    if (inPal && game.palawan) {
+      subT = clamp(game.palawan.submerged(), 0, 1);
+    } else {
+      let subWant = 0;
+      if (sysSubNow) {
+        const wy = sysWaterY(camera.position.x, camera.position.z);
+        if (wy > -Infinity) subWant = clamp((wy - camera.position.y) / sysSUB_FADE, 0, 1);
+      }
+      subT = damp(subT, subWant, 4, dt);
+    }
     // These two are WORLD state, not camera state, so they are read from the
     // biome rather than damped toward a flag — sahara.js owns the storm clock
     // and it has already smoothed both of them.
@@ -11992,35 +12488,6 @@ export function createSystems(game) {
       hemi.intensity = lerp(hemi.intensity, hemi.intensity * sysPAL_HEMI_I, palT);
       amb.intensity = lerp(amb.intensity, sysPAL_AMB_I, palT);
 
-      // ---- AND UNDER IT ---------------------------------------------------
-      // Applied on TOP of the above rather than instead of it, so surfacing is
-      // a crossfade between two complete looks rather than a switch between
-      // two settings. The fog does most of the work: at four metres near and
-      // sixty far, the reef fades out at exactly the distance it does in real
-      // water, and that single number is most of why it reads as underwater.
-      if (subT > 0.002) {
-        const k = subT * palT;
-        if (scene.fog) {
-          scene.fog.near = lerp(scene.fog.near, sysPAL_SUB_FOG_N, k);
-          scene.fog.far = lerp(scene.fog.far, sysPAL_SUB_FOG_F, k);
-          scene.fog.color.lerp(sysPAL_SUB_C, k * 0.95);
-        }
-        if (scene.background && scene.background.isColor) {
-          scene.background.lerp(sysPAL_SUB_C, k * 0.9);
-          // and it goes properly dark past the drop-off, which is the only
-          // thing that makes eleven metres feel like eleven metres
-          const capy = game.capy;
-          const dp = capy ? clamp(((capy.depth || 0) - 4) / 8, 0, 1) : 0;
-          scene.background.lerp(sysPAL_SUB_DEEP, dp * k * 0.7);
-          if (scene.fog) scene.fog.color.lerp(sysPAL_SUB_DEEP, dp * k * 0.6);
-        }
-        // the sun cannot reach you and the water can: the key light drops away
-        // and the fill goes up, which is what actually happens down there
-        sun.intensity = lerp(sun.intensity, sun.intensity * 0.30, k);
-        hemi.color.lerp(sysPAL_SUB_C, k);
-        hemi.groundColor.lerp(sysPAL_SUB_DEEP, k);
-        amb.intensity = lerp(amb.intensity, 0.72, k);
-      }
       if (bloom > 0.01) {
         // for forty seconds the WATER is the light source, and it is the only
         // time in this game that anything but the sun and the neon is
@@ -12304,6 +12771,43 @@ export function createSystems(game) {
       }
     }
 
+    // ---- AND UNDER IT ---------------------------------------------------
+    // Applied on TOP of the above rather than instead of it, so surfacing is
+    // a crossfade between two complete looks rather than a switch between
+    // two settings. The fog does most of the work: at four metres near and
+    // sixty far, the reef fades out at exactly the distance it does in real
+    // water, and that single number is most of why it reads as underwater.
+    // ...and this is the whole of it, for all eleven chapters you can now go
+    // under in. It was gated on palT and hard-wired to Palawan's two colours;
+    // it is the live chapter's sysSUB row now, and Palawan's row IS those
+    // four constants, so the chapter this was written for is unchanged to the
+    // character.
+    if (subT > 0.002 && sysSubNow) {
+      const k = subT;
+      const subC = sysSubNow.cCol, subD = sysSubNow.dCol;
+      if (scene.fog) {
+        scene.fog.near = lerp(scene.fog.near, sysSubNow.near, k);
+        scene.fog.far = lerp(scene.fog.far, sysSubNow.far, k);
+        scene.fog.color.lerp(subC, k * 0.95);
+      }
+      if (scene.background && scene.background.isColor) {
+        scene.background.lerp(subC, k * 0.9);
+        // and it goes properly dark past the drop-off, which is the only
+        // thing that makes eleven metres feel like eleven metres. In Venice's
+        // canals and Victoria Harbour the water runs out before this does,
+        // so it is simply zero there and the shallow colour is the answer.
+        const capy = game.capy;
+        const dp = capy ? clamp(((capy.depth || 0) - 4) / 8, 0, 1) : 0;
+        scene.background.lerp(subD, dp * k * 0.7);
+        if (scene.fog) scene.fog.color.lerp(subD, dp * k * 0.6);
+      }
+      // the sun cannot reach you and the water can: the key light drops away
+      // and the fill goes up, which is what actually happens down there
+      sun.intensity = lerp(sun.intensity, sun.intensity * 0.30, k);
+      hemi.color.lerp(subC, k);
+      hemi.groundColor.lerp(subD, k);
+      amb.intensity = lerp(amb.intensity, 0.72, k);
+    }
     // ---- THE DOME, THE FILL AND THE GRADE ---------------------------------
     // Last in the atmosphere section on purpose. Everything above has finished
     // moving the fog, the background and the three lights for this frame; these

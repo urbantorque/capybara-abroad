@@ -156,6 +156,32 @@ for (const c of chapNs) {
   }
 }
 
+// ---- 7c. the finds (v19) -------------------------------------------------
+// A find with no predicate can never happen; a predicate with no find can
+// never be shown. Both are silent failures, which is exactly the kind of thing
+// a table is supposed to make impossible.
+const findsBlock = shared.slice(shared.indexOf('export const FINDS = ['),
+                                shared.indexOf('\n];', shared.indexOf('export const FINDS = [')));
+const findIdsDecl = [...findsBlock.matchAll(/\{\s*id:\s*'([^']+)'\s*,\s*text:\s*'([^']*)'/g)].map(x => x[1]);
+console.log('FINDS parsed:', findIdsDecl.length);
+const findPreds = new Set(
+  [...systems.slice(systems.indexOf('const sysFINDS = {'),
+                    systems.indexOf('\n  };', systems.indexOf('const sysFINDS = {')))
+    .matchAll(/^\s*'([a-z0-9-]+)':\s*function/gm)].map(x => x[1]));
+for (const id of findIdsDecl) {
+  if (!findPreds.has(id)) P('BLOCKER', id, 'FINDS row with no sysFINDS predicate — can never happen');
+}
+for (const id of findPreds) {
+  if (!findIdsDecl.includes(id)) P('BLOCKER', id, 'sysFINDS predicate with no FINDS row — can never be shown');
+}
+// A find id may not collide with a task id: both live in the same save file and
+// the same journal, and the ledger looks both up by name.
+for (const id of findIdsDecl) {
+  if (ids.has(id)) P('BLOCKER', id, 'find id collides with a task id');
+}
+// ...and no find may be advertised. If it is on the paper it is a task.
+if (findIdsDecl.some(id => hintIds.has(id))) P('BLOCKER', 'finds', 'a find has a hint row — finds are never pointed at');
+
 // ---- 7b. every souvenir has a glyph --------------------------------------
 for (const c of chapNs) {
   if (!new RegExp('\\n  ' + c.biome + ':\\s*\\{\\s*s:').test(systems.slice(systems.indexOf('const sysKEEPS')))) {

@@ -242,6 +242,80 @@ Cappadocia has none and does not need one — balloons in the sky, eleven horses
 floor, a chase truck, a hundred and sixty pigeons on the cliff and five crews on the launch
 field. It is the busiest chapter in the game already.
 
+## The dive stopped belonging to Palawan
+
+A capybara is the finest swimmer of any rodent alive, and for seventeen chapters it
+could prove it in three of them. The verb was taught in Palawan and then taken away
+again — which is the shape every new verb in this game had, and the single reason hour
+five was never mechanically richer than hour one.
+
+It is not a chapter's property any more. It is the water's. If the place you are
+standing in has more than a metre and three quarters of its own water under you, you
+can go down into it, and the rule sorts the seventeen out by itself: a chapter that
+**modelled a seabed** gets the verb, and a chapter whose water is a flat plate over
+nothing does not answer the question at all and is left exactly as it was.
+
+Sydney's harbour is still a wall. The Drift's cloud is still cloud. But the Uji and
+the golden pond, the Río Cali, the canals and the lagoon of Venice, Victoria Harbour,
+the flooded campo of the Pantanal, the Atlantic off Copacabana, the black bay in
+Iceland and thirty metres of water under the Antarctic ice are all somewhere you can
+now go. **Three chapters could dive. Eleven can.**
+
+Making it work meant admitting how much of a verb is the *picture* of it. Every
+chapter needed to know what its own water looks like from underneath — one row each,
+two colours and how fast the world goes away, which is the number that does most of
+the work; Venice's canals close down at twenty-six metres and Rio's Atlantic at
+seventy. And the camera had to be taught that the rule it obeys everywhere else is
+exactly wrong down here: an animal three metres under a lagoon has the bank four
+metres behind the lens, and the terrain clearance dutifully lifted the eye out over
+the paving, so the dive was watched from the pavement through the top of the water.
+The boom comes **in** now rather than up, and stops at the first length where the eye
+is not inside anything.
+
+## The things nobody tells you about
+
+Every one of the hundred and ninety-nine tasks arrives the same way: it appears on the
+paper, an arrow points at it, a beacon stands on the spot and a distance counts down.
+That is a very good net, and it was the only way anything in this game had ever been
+handed over — so in seventeen dense, hand-built worlds, nothing had ever been *found*.
+
+There are twenty things now that are never on the paper. No arrow, no beacon, no clue,
+no distance; nothing needs them and nothing is gated on them. They tick quietly into
+the journal and then stand on the ledger next to the place they happened, and the whole
+of the design is that the game turns out to have been watching something you did not
+know it could see.
+
+Some are the moveset turning up where it was never taught — *went under somewhere
+nobody asked you to*, *climbed something in a place that never mentioned climbing*,
+*swam in water nobody sensible swims in*. Some are what you did with the time — a full
+minute of doing nothing at all, a whole shower stood out in from the first drop to the
+last, eight bars moved on the beat somewhere the game is not counting. Some are where
+you went: the highest ground there is, the far edge of the world, the one part of a
+busy place with nobody in it, the bottom of the deepest water.
+
+And four of them are about being seen, which is the other thing that changed.
+
+## People remember you now, for about half a minute
+
+For eighteen versions a person's alarm faded to nothing in under a second. You could
+rob the same stallholder, be chased across a square and shouted at, and four seconds
+later you were an unremarkable rodent again — which quietly removed the half of the
+mischief loop this kind of game is actually made of: approach, get spotted, back off,
+come at it from somewhere else.
+
+So people remember. Do something to somebody and they are **wary** of you for
+twenty-six seconds: they turn and watch you from further away and go on watching, they
+notice you again sooner, and they have something to say about it — *you again*, *I know
+your game*, *don't even think about it*.
+
+**It takes nothing away.** Not one task is harder, no grab fails, nothing is lost and
+nothing can be failed; the only thing wariness buys is attention. The stakes went into
+the finds instead, which is content written knowing it exists: take something with four
+people in sight and not one of them looking; get five people watching you at once; rob
+somebody who is already staring straight at you. And the best of them is the one you
+complete by *not* moving — stand where you can be seen, next to somebody who has had
+enough of you, and wait until they stop minding.
+
 ## Six of them are not a list
 
 Seventeen chapters had exactly one structure between them. You turn up, you work

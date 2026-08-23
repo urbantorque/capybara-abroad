@@ -1764,6 +1764,140 @@ retrospective one player in a hundred sees once is a trophy, not a feature.
   the sandbox away has it the wrong way round. At the true end, a tap or Enter
   still reloads, exactly as it always did.
 
+## THE DIVE IS A PROPERTY OF THE WATER (v19 — 23 Aug 2026)
+
+`capyCanDive` was `!!api.canDive` and exactly three chapters published it. The
+comment under it gave a good reason — the harbour is two metres of nothing over
+a collision plane, and sinking into it would be a way to be STUCK — but that is
+an argument about **depth**, and the game has a depth.
+
+```js
+function capyCanDive(game, x, z) {
+  const api = capyBiomeApi(game);
+  if (api.canDive === true)  return true;    // an explicit yes still wins
+  if (api.canDive === false) return false;   // ...and so does an explicit no
+  return capyWaterY(api, x, z) - capyGroundY(game, x, z) >= capyDIVE_MIN_D;  // 1.75
+}
+```
+
+**The rule self-selects, which is the tell that it is the real question.** A
+chapter that MODELLED a seabed gets the verb; one whose water is a flat plate
+over nothing does not publish `terrainHeight`, answers 0, and is left alone.
+Measured over all seventeen, as a percentage of wet cells with ≥1.75 m under
+them and the deepest point found:
+
+| | | |
+|---|---|---|
+| Sydney, Circular Quay | **0%** | no `terrainHeight`; the harbour stays a wall, exactly as the old comment demanded |
+| the Drift | **0%** | the cloud is not water and has no floor. `handed-back` is untouched |
+| Pasto, Marrakech, Cappadocia | — | no water at all |
+| Cali | 24%, 1.9 m | a shallow city river; only the deepest cells |
+| Kyoto | 47%, 3.9 m | the golden pond and the Uji |
+| Venice | 100%, 2.5 m | the canals and the lagoon |
+| Kowloon | 100%, 3.7 m | Victoria Harbour |
+| the Pantanal | 41%, 4.5 m | the flooded campo — the one place the animal is from |
+| Iceland | 91%, 13.2 m | the bay, in the dark |
+| Rio | 96%, 13.0 m | the Atlantic off Copacabana |
+| Antarctica | 95%, 30.1 m | under the ice |
+
+Three chapters could dive; **eleven can now**. Nothing is gated on it and no
+task changed.
+
+### AND THE PICTURE HAD TO FOLLOW, OR THE VERB IS INVISIBLE
+
+Palawan published `rig()`, `camFloor()` and `submerged()` for exactly this and
+was the only chapter that could dive. Four things in systems.js, all of them
+"the thing Palawan already measured, for everybody":
+
+- **`sysSUB`** — one row per divable chapter: the fog near/far and two palette
+  keys. Palawan's row is its four shipped constants, so that chapter is
+  unchanged to the character. The fog does most of the work: Venice's canals get
+  26 m and Rio's Atlantic gets 70.
+- **`subT` is fed from the LENS**, against `sysWaterY` at the camera, in every
+  chapter — the note that says to judge it from the lens rather than the animal
+  was already there and is now obeyed twice. Palawan keeps its own smoothed
+  value. `sysSUB_FADE` is 0.3 m.
+- **The dive rig and the dive camera floor** are Palawan's numbers (5.0 m at
+  0.12 rad; terrain + 0.95) offered as a **candidate, strictly greater** — so
+  Palawan's own request wins on a tie and a biome that wants the camera more
+  than the dive does (a river, a balloon, a helm) keeps it.
+- **The eye comes IN rather than going UP.** Every clearance rule in the file is
+  right in sixteen chapters and exactly wrong under water: an animal three
+  metres down in a lagoon has the bank four metres behind the lens, and the
+  terrain clearance dutifully lifted the eye over the paving. Measured in Venice
+  before the fix: animal at −3.04, eye at **+2.90**, and the grade never fired
+  because the lens never went under. The boom now shortens in eight gentle
+  steps, stopping at the first one where the eye is not inside the ground, and
+  the clearance is capped at `waterY − sysDIVE_LENS` at both call sites.
+
+**And the grade block had to move.** It was nested inside `if (palT > 0.002)`
+and is now after every chapter's own atmosphere and before the dome — because
+`subT` can only be lit where there is a `sysSUB` row, which is already the whole
+condition. `flat` (no sky to draw) and the vignette/saturation/threshold under
+water came out of the Palawan block with it.
+
+## THE FINDS — the things nobody tells you about (v19)
+
+Every one of the 199 tasks is delivered the same way: on the paper, with an
+arrow, a beacon and a distance. That is an excellent net, and it was the ONLY
+way anything had ever been handed over — so in seventeen dense hand-built worlds
+nothing had ever been **found**.
+
+`FINDS` in shared.js is twenty rows of text; `sysFINDS` in systems.js is twenty
+predicates over live world state, swept four times a second (`sysFIND_TICK`) and
+never again once found. **Three rules they all keep:**
+
+1. **Nothing is ever listed.** No paper row, no arrow, no beacon, no clue. If it
+   needs telling it is a task and belongs in `TASKS`.
+2. **Nothing can be missed** — any point, any order, for ever.
+3. **Nothing is blocked by one.** No task, record, chapter or exit depends on a
+   find, so a player who notices none of them plays the game that shipped.
+
+The payoff is deliberately the **smallest channel in the game**: a toast, a
+chime a fifth above the tick, six scraps of paper. A find is a private pleasure
+and a banner would make it an achievement — and an achievement is something you
+are told to go and get, which is the one thing a find may never be. They
+accumulate on the **ledger**, under the place each one happened, in their own
+line and their own colour.
+
+`qa/audit-tasks.mjs` enforces: every row has a predicate, every predicate has a
+row, no find id collides with a task id, and no find has a hint row.
+
+Two of the four families are load-bearing on the other two passes: **what you
+brought** is the moveset arriving where it was never taught (dive, climb, cold
+water), and **what nobody saw** is the only place wariness is allowed to bite.
+
+## WARINESS — the world remembers you for half a minute (v19)
+
+For eighteen versions `rec.alarm` damped to zero in under a second and nothing
+survived it: rob a stallholder, be chased, be shouted at, and four seconds later
+you were an unremarkable rodent again. That is the missing half of the mischief
+loop — approach, get spotted, back off, come at it another way.
+
+`wary` is 0..1 on every person in both crowds this codebase owns, and it is
+**derived rather than set**: `stepHuman` takes it from `alarm` (so all six
+existing causes feed it for free and no call site learned a new word), and the
+locals take it from `localsReact` — but only when the animal was within
+`npcWARY_BLAME` (7 m) of the event, or a square would turn to watch you because
+a shutter fell over on the far side of it. It decays **linearly** over
+`npcWARY_T` (26 s), because a memory that fades exponentially never quite goes.
+
+**What it buys is attention and nothing else:**
+
+- locals watch you from `npcWARY_NEAR` × further out, and go on watching;
+- the Sydney/Quay crowd notices you from `npcWARY_SEE` m further and re-notices
+  three times as often;
+- and both have a line for it (`npcLOC_SAY.wary`, `npcLINES.wary`).
+
+**IT DOES NOT DENY ANYTHING.** Not one of the 199 tasks is harder, no grab
+fails, nothing is lost. The stakes live in the finds instead, where four rows
+were written knowing wariness exists — which is why the old content could not be
+destabilised by it. `game.npcHeat(x, z, r)` answers how many people near a point
+are currently watching for you, both crowds in one number.
+
+Measured: three wheeks beside the Botanic Gardens crowd took the maximum from
+0.00 to 0.95 with five people watching; twenty seconds later the heat was 0.
+
 ### A KINEMATIC CARRIER: FIVE RULES, AND THE ONE THAT KEEPS BEING RELEARNT
 
 Nine of the thirteen minis are things that carry the animal, so this is written down once:

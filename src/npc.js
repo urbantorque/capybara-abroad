@@ -138,6 +138,11 @@ const npcLINES = {
             'Get a photo of that.', 'Don’t make eye contact.',
             'He’s doing better than I am.', 'Look at the little face on him.',
             'That’s the most relaxed animal I’ve ever seen.', 'He owns the place, apparently.'],
+  // What somebody says the second time you come near them. See the npcWARY_*
+  // block: this is the whole of what being remembered sounds like.
+  wary:    ['You again.', 'Oh, it’s you.', 'I’m watching you, mate.', 'Not again.',
+            'Right. I see you.', 'Don’t even think about it.', 'I know your game.',
+            'Nope. Nope nope nope.'],
   stolen:  ['That’s my hat!', 'Get out of it!', 'Oi! Come back here!', 'You little ratbag!',
             'Give it back, mate!', 'That was forty dollars!', 'I need that! I’m ginger!'],
   giveUp:  ['…where’d he go?', 'Unbelievable.', 'Right. Yep.', 'Fair enough, I suppose.',
@@ -822,6 +827,13 @@ export function createNPCs(game) {
                'You are just taking that, are you.', 'Right. Yes. Fine.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
                'Slow down!', 'It has somewhere to be.'],
+    // ---- AND ONE MORE, FOR SOMEBODY WHO REMEMBERS YOU (v19) --------------
+    // Said when you come back to a person you have already had a go at, and
+    // held to the same chapter-neutral standard as the four above: no season,
+    // no country, no building, nothing that assumes what you did. A person who
+    // is watching you is not a person accusing you of anything specific.
+    wary:     ['You again.', 'I am watching you.', 'Mm.', 'I know what you are.',
+               'Not this time.', 'I have got my eye on you.', 'Oh, it is back.'],
     // ---- AND FOUR MORE, ABOUT THE WEATHER --------------------------------
     // Chapter-neutral to the same standard as the four above: every one of
     // these has to work on a Venetian quay, in a Mong Kok doorway, on an
@@ -863,6 +875,34 @@ export function createNPCs(game) {
   const npcLOC_REACT_N = 2;      // never more than two people speak at once
   const npcLOC_RUSH_V  = 6.2;    // m/s past somebody that counts as belting past
   const npcLOC_RUSH_R  = 3.4;    // ...and how close you have to be for it to matter
+
+  // ---- WARINESS (v19) -----------------------------------------------------
+  // The mildest possible version of the world pushing back, and deliberately
+  // so. For eighteen versions a person's alarm damped to zero in under a second
+  // and nothing survived it: you could rob the same stallholder, be chased, be
+  // shouted at, and four seconds later be an unremarkable rodent again. That is
+  // the half of the mischief loop this game has never had — approach, get
+  // spotted, back off, come at it another way.
+  //
+  // So: a person REMEMBERS. `wary` rises the moment you do something to them
+  // and falls off over npcWARY_T seconds, and what it buys is ATTENTION and
+  // nothing else:
+  //
+  //   - they turn and watch you from further away, and go on watching;
+  //   - they notice you again sooner;
+  //   - and they have a line for it.
+  //
+  // IT DOES NOT DENY ANYTHING. Not one of the hundred and ninety-nine tasks is
+  // harder to complete, no grab fails, nothing is taken away and nothing can be
+  // lost — the stakes live in the FINDS instead (see sysFINDS in systems.js),
+  // where a handful of unlisted things ask you to do something with nobody
+  // watching. That is the whole of the design: the old content is untouched and
+  // the new content is where the tension went.
+  const npcWARY_T     = 26;      // s from full wariness back to none. Linear.
+  const npcWARY_NEAR  = 1.7;     // how much further a wary person watches you
+  const npcWARY_HEAT  = 0.35;    // over this, npcHeat() counts you as watched
+  const npcWARY_BLAME = 7;       // m from an event inside which it was probably you
+  const npcWARY_SEE   = 5;       // m of extra notice range at full wariness
 
   // =======================================================================
   // ...AND THEY NOTICE THE WEATHER.
@@ -1114,6 +1154,15 @@ export function createNPCs(game) {
     const r = radius > 0 ? radius : npcLOC_REACT_R;
     const r2 = r * r;
     const s = clamp(strength === undefined ? 1 : strength, 0, 1);
+    // ---- WAS THIS YOU? (v19) ---------------------------------------------
+    // Wariness is a memory of what the ANIMAL did, so it may only be set by an
+    // event the animal was standing next to. localsReact is also how a chapter
+    // announces its own bangs — a crate off a barrow, a gate, a wave — and a
+    // square that turns to watch you because a shutter fell over on the far
+    // side of it is a square that is wrong about you.
+    const cpR = game.capy && game.capy.position;
+    const mine = !!(cpR && (cpR.x - x) * (cpR.x - x) + (cpR.z - z) * (cpR.z - z)
+                           < npcWARY_BLAME * npcWARY_BLAME);
     let said = 0;
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
@@ -1133,6 +1182,8 @@ export function createNPCs(game) {
       if (kick > 0.06) {
         L.flV -= kick * 21;
         L.flYaw = Math.atan2(dx, dz);          // they turn TOWARD the bang
+        // ...and they remember it was you, for about half a minute.
+        if (mine) L.wary = Math.min(1, (L.wary || 0) + kick);
       }
       if (said < npcLOC_REACT_N && L.cd <= 0) {
         const arr = L.says[kind] || npcLOC_SAY[kind];
@@ -1194,7 +1245,23 @@ export function createNPCs(game) {
       r.t += dt;
       const dx = cx - r.x, dz = cz - r.z;
       const d2 = dx * dx + dz * dz;
-      const near = d2 < r.near * r.near;
+      // ---- WARINESS: what they remember, rather than what they just felt ---
+      // Linear, because this is a memory fading and not a spring settling, and
+      // a memory that fades exponentially never quite goes.
+      if (r.wary > 0) { r.wary -= dt / npcWARY_T; if (r.wary < 0) r.wary = 0; }
+      // The one thing it buys: they watch you from further out. `near` is what
+      // makes a local turn and track the animal, so this is the whole effect —
+      // do something and the circle of people paying attention to you widens
+      // for half a minute, and then it does not.
+      const nearR = r.near * (1 + (r.wary || 0) * (npcWARY_NEAR - 1));
+      const near = d2 < nearR * nearR;
+      // ...and they have a line for it, once, when you come back into range.
+      const nearNow = near && (r.wary || 0) > npcWARY_HEAT;
+      if (nearNow && !r.waryWas && r.cd <= 0) {
+        const arr = r.says.wary || npcLOC_SAY.wary;
+        if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
+      }
+      r.waryWas = nearNow;
       // ---- ...and you just went past them at a sprint -------------------
       // A rising edge on "close AND fast", so one pass is one reaction and
       // running circles round somebody is not a machine gun (their own
@@ -2312,11 +2379,21 @@ export function createNPCs(game) {
       }
       // anybody: notice the strange rodent. The head-turn tell is nearly always
       // available; only the spoken line is on the long cooldown.
-      if (d < 9 && vis > 0.28 && rec.kind !== 'jogger' && st !== 'lookAt' && rec.noticeCd <= 0) {
+      // A PERSON WHO REMEMBERS YOU WATCHES FOR YOU. Further out, more often,
+      // and with a different thing to say about it — and that is the entire
+      // mechanical consequence of wariness in this crowd. Nothing here decides
+      // whether anything can be taken, only how soon you are looked at.
+      const wary = rec.wary || 0;
+      const hot = wary > npcWARY_HEAT;
+      if (d < 9 + wary * npcWARY_SEE && vis > 0.28 && rec.kind !== 'jogger' &&
+          st !== 'lookAt' && rec.noticeCd <= 0) {
         setState(rec, 'lookAt');
-        rec.noticeCd = 3.0;
+        rec.noticeCd = hot ? 1.4 : 3.0;
         lookAtCapy(rec);
-        if (rec.talkCd <= 0 && Math.random() < 0.6) { rec.talkCd = rand(8, 20); pickLine(rec, 'laugh'); }
+        if (rec.talkCd <= 0 && Math.random() < 0.6) {
+          rec.talkCd = rand(8, 20);
+          pickLine(rec, hot ? 'wary' : 'laugh');
+        }
         return;
       }
     }
@@ -2730,6 +2807,14 @@ export function createNPCs(game) {
     rec.talkCd -= dt;
     rec.noticeCd -= dt;
     rec.alarm = damp(rec.alarm, 0, 0.9, dt);
+    // ---- ...AND WHAT THEY STILL REMEMBER (v19) ---------------------------
+    // Alarm is what a person feels and it is gone in under a second. Wariness
+    // is what they remember, and it is DERIVED from alarm rather than set at
+    // each of the six places that raise it — so being startled, robbed, chased,
+    // soaked or barged all feed it for free and none of those call sites had to
+    // learn a new word. See the npcWARY_* block.
+    if (rec.alarm > (rec.wary || 0)) rec.wary = rec.alarm;
+    else if (rec.wary > 0) { rec.wary -= dt / npcWARY_T; if (rec.wary < 0) rec.wary = 0; }
     rec.moveX = rec.moveX || 0; rec.moveZ = rec.moveZ || 0;
 
     // --- dejection is a timer, not a state ---------------------------------
@@ -5726,8 +5811,40 @@ export function createNPCs(game) {
   qdRoot.updateMatrixWorld(true);
   pushInstances();
 
+  /**
+   * HOW MANY PEOPLE NEAR (x, z) ARE CURRENTLY WATCHING FOR YOU.
+   *
+   * Both crowds this module owns — the Sydney/Quay humans and the locals of the
+   * other fifteen chapters — answer in one number, so a caller never has to
+   * know which kind of person is standing in front of it. Zero in a chapter
+   * with nobody in it, which is the right answer rather than a special case.
+   *
+   * It exists for the finds (sysFINDS in systems.js): wariness deliberately
+   * denies nothing, so the only place it is allowed to have teeth is in content
+   * that was written knowing about it.
+   */
+  function npcHeat(x, z, radius) {
+    const r = radius > 0 ? radius : 14;
+    const r2 = r * r;
+    let n = 0;
+    for (let i = 0; i < humans.length; i++) {
+      const h = humans[i];
+      if (!h || (h.wary || 0) <= npcWARY_HEAT || !h.group) continue;
+      const dx = h.group.position.x - x, dz = h.group.position.z - z;
+      if (dx * dx + dz * dz < r2) n++;
+    }
+    const live = game.biome && game.biome.current;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (!L || L.biome !== live || (L.wary || 0) <= npcWARY_HEAT) continue;
+      const dx = L.x - x, dz = L.z - z;
+      if (dx * dx + dz * dz < r2) n++;
+    }
+    return n;
+  }
+
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
-           addLocal: addLocal, say: sayAt,
+           addLocal: addLocal, say: sayAt, heat: npcHeat,
            // The register itself, for the audit that walks the capybara up to
            // every person in the game and checks somebody answers. Twenty-six
            // of them across twelve chapters is exactly the sort of list that

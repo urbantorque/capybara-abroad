@@ -1789,6 +1789,80 @@ export function chapterDef(n) { return CHAPTERS[n - 1] || CHAPTERS[0]; }
 // and it is shown. Nothing is gated on it — a record is never a requirement,
 // because the moment it is, a cosy game about a rodent has an exam in it.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// FINDS — the things nobody tells you about (v19)
+//
+// A hundred and ninety-nine tasks, and every single one of them is delivered
+// the same way: it appears on the paper, an arrow points at it, a beacon stands
+// on the spot and a distance counts down. That is an excellent net and it is
+// also the ONLY way anything in this game has ever been handed over — so in
+// seventeen dense, hand-built worlds, nothing has ever been FOUND.
+//
+// A find is the other kind. It is never on the paper, it has no arrow, no
+// beacon, no clue and no distance; it is not required for anything and it gates
+// nothing. It ticks quietly into the journal and stands on the ledger next to
+// the place it happened, and the whole of its design is that the game turns out
+// to have been watching something you did not know it could see.
+//
+// THREE RULES THEY ALL OBEY:
+//
+//   1. NOTHING IS EVER LISTED. If it needs telling, it is a task and belongs in
+//      TASKS with the other hundred and ninety-nine.
+//   2. NOTHING CAN BE MISSED. Every one of them can be done at any point, in
+//      any order, for ever — the same law the chapters already keep.
+//   3. NOTHING IS BLOCKED BY ONE. No task, no record, no chapter and no exit
+//      depends on a find existing, so a player who never notices any of them
+//      plays exactly the game that shipped yesterday.
+//
+// `where` is the line the ledger prints under the place it happened. `chapter`
+// is 0 for the ones that can happen anywhere and a number for the ones that
+// belong to a place. The predicates are sysFINDS in systems.js, because every
+// one of them is a question about live world state and that is where the live
+// world state is.
+// ---------------------------------------------------------------------------
+export const FINDS = [
+  // ---- WHAT YOU BROUGHT WITH YOU ----------------------------------------
+  // The dive, the climb and the cold are the moveset arriving somewhere it was
+  // never taught, which is the entire argument for making them properties of
+  // the world instead of properties of a chapter. See capyCanDive.
+  { id: 'brought-dive',   text: 'Went under somewhere nobody asked you to' },
+  { id: 'long-breath',    text: 'Held one breath for twenty-five seconds' },
+  { id: 'dark-water',     text: 'Went under where you could not see the bottom' },
+  { id: 'brought-climb',  text: 'Climbed something in a place that never mentioned climbing' },
+  { id: 'cold-swim',      text: 'Swam in water nobody sensible swims in' },
+  { id: 'the-deep-end',   text: 'Found the bottom of the deepest water here' },
+
+  // ---- WHAT NOBODY SAW --------------------------------------------------
+  // Wariness denies nothing anywhere in the game (see the npcWARY_ block in
+  // npc.js). This is the one place it is allowed to have teeth, because this is
+  // the only content that was written knowing it exists.
+  { id: 'not-a-soul',     text: 'Took something with four people in sight and not one of them looking' },
+  { id: 'most-wanted',    text: 'Got five people watching you at once' },
+  { id: 'forgiven',       text: 'Stayed where you could be seen until somebody stopped minding' },
+  { id: 'red-handed',     text: 'Robbed somebody who was already watching you' },
+
+  // ---- WHAT YOU DID WITH THE TIME ---------------------------------------
+  { id: 'perfectly-still', text: 'Did nothing whatsoever for a full minute' },
+  { id: 'out-in-it',      text: 'Stood out in a shower from the first drop to the last' },
+  { id: 'wrung-out',      text: 'Got as wet as it is possible to get' },
+  { id: 'nothing-left',   text: 'Ran until there was nothing left in you' },
+  { id: 'own-beat',       text: 'Moved on the beat for eight bars, with nobody scoring it' },
+  { id: 'scenic-route',   text: 'Walked a kilometre in one place' },
+
+  // ---- WHERE YOU WENT ---------------------------------------------------
+  { id: 'high-point',     text: 'Stood on the highest ground there is here' },
+  { id: 'far-corner',     text: 'Went as far out as this world goes' },
+  { id: 'quiet-corner',   text: 'Found the one part of this place with nobody in it' },
+  { id: 'long-drop',      text: 'Fell twenty-five metres and walked away from it' },
+];
+
+/** Every find id, for the audit and the save. */
+export function findIds() {
+  const out = [];
+  for (let i = 0; i < FINDS.length; i++) out.push(FINDS[i].id);
+  return out;
+}
+
 export const RECORDS = {
   'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },
   'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },

@@ -783,6 +783,9 @@ function mainBoot() {
     game.addLocal = npcs.addLocal;
     game.say = npcs.say;
     game.locals = npcs.locals;
+    // How many people near a point are currently watching FOR you — both crowds
+    // in one number. See the npcWARY_* block in npc.js; the finds read it.
+    game.npcHeat = npcs.heat;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

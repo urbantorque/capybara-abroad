@@ -147,6 +147,11 @@ const capyDIVE_V      = 2.05;       // m/s of descent under a held key
 const capyDIVE_SPEED  = 3.10;       // horizontal, and FASTER than paddling (it is)
 const capyDIVE_GRACE  = 0.42;       // s of held depth after the key comes up
 const capyDIVE_FLOOR  = 0.55;       // how far off the seabed the animal levels out
+// HOW MUCH WATER MAKES A DIVE (v19). Under this it is a puddle and holding E in
+// it would be a key that does nothing. 1.75 leaves 1.2 m of travel once the
+// animal has levelled out capyDIVE_FLOOR off the bottom, which is enough to be
+// under, to be worth it, and to be visibly a decision. See capyCanDive.
+const capyDIVE_MIN_D  = 1.75;
 const capyRISE_MAX    = 3.60;       // cap on the buoyancy spring — see the note by it
 const capySTAM_BREATH = 0.0620;     // per second under water -> about sixteen seconds
 const capySTRIDE = 0.62;            // metres of ground per half gait cycle (~= foot arc)
@@ -632,15 +637,43 @@ function capyCarryAt(game) {
 }
 
 /**
- * IS THERE ANYTHING UNDER THIS WATER WORTH GOING TO?
+ * IS THERE ANYTHING UNDER THIS WATER WORTH GOING TO?  (v19 — measured)
  *
- * A biome says yes by publishing canDive. Exactly one does. Everywhere else the
- * harbour is two metres of nothing over a collision plane, and letting the
- * player sink into it would be a way to be stuck, not a mechanic.
+ * This used to be `!!api.canDive`, and exactly three chapters published it. The
+ * comment underneath said the reason, and it was a good one: the harbour is two
+ * metres of nothing over a collision plane, and letting the player sink into it
+ * would be a way to be STUCK rather than a mechanic.
+ *
+ * But that is an argument about DEPTH, not about which chapter you are in — and
+ * the game has a depth. A capybara is the finest swimmer of any rodent alive and
+ * for seventeen chapters it could only prove it in three of them; the verb was
+ * taught in Palawan and then taken away again, which is the shape every new verb
+ * in this game had and the one thing that stops hour five being richer than
+ * hour one.
+ *
+ * So: the biome may still answer, and an explicit answer always wins — `true`
+ * for the three that built a floor to look at, and `false` for anything that
+ * ever needs to say "not here". Everybody else is MEASURED. If the live biome's
+ * own terrainHeight says there is more than capyDIVE_MIN_D of water under this
+ * point, there is somewhere to go and going there is safe, because the dive
+ * levels out capyDIVE_FLOOR above that same number.
+ *
+ * The rule self-selects almost exactly right, which is the tell that it is the
+ * real question: a chapter that MODELLED a seabed gets the verb, and a chapter
+ * whose water is a flat plate over nothing does not publish terrainHeight at
+ * all, answers 0, and is left exactly as it was. Sydney's harbour stays a wall.
+ *
+ * See RELIEF IS NOT A LIST OF CHAPTERS in CONTRACT.md — the same argument, and
+ * the fourth time this codebase has replaced a list of biome names with the
+ * question the list was standing in for.
  */
-function capyCanDive(game) {
+function capyCanDive(game, x, z) {
   const api = capyBiomeApi(game);
-  return !!(api && api.canDive);
+  if (!api) return false;
+  if (api.canDive === true) return true;
+  if (api.canDive === false) return false;
+  const d = capyWaterY(api, x, z) - capyGroundY(game, x, z);
+  return d >= capyDIVE_MIN_D;
 }
 
 /**
@@ -1361,7 +1394,10 @@ export function createCapybara(game) {
     // ---- THE DIVE (chapter 12) -------------------------------------------
     // Decided here, with the swim, because everything below reads it: the speed
     // cap, the breath, the buoyancy spring and the pose all branch on it.
-    if (capySwimming && capyCanDive(game)) {
+    // ...and it is asked WHERE THE ANIMAL IS, every frame, because the answer is
+    // now a property of the water rather than of the chapter: paddle out of the
+    // shallows in a place with a floor and the verb arrives under you.
+    if (capySwimming && capyCanDive(game, px, pz)) {
       if (input.action && !capyStamBlown) {
         if (!capyDiving) {
           capyDiving = true; capyDiveT = 0; capyDiveDeep = 0;
