@@ -3889,7 +3889,7 @@ export function createSystems(game) {
   //   timber — a low resonant peak that rings for a moment (a wharf, a deck)
   // Volume is scaled by the caller with the animal's speed, so a walk whispers
   // and a run is audible across the plaza.
-  function sfxStep(vol, pitch) {
+  function sfxStep(vol, pitch, extra, wet) {
     const t = ac.currentTime;
     const soft = pitch < 0.9, wood = pitch > 1.15;
     const v = rand(0.94, 1.07);
@@ -3930,6 +3930,33 @@ export function createSystems(game) {
       ns.start(t); ns.stop(t + 0.12);
     }
     g.connect(acMaster);
+
+    // ---- THE PUDDLE, ON TOP OF WHATEVER THAT WAS -------------------------
+    // A SECOND LAYER, not a different material. The three branches above are
+    // what the ground is MADE of; this is what is lying on it, and a wet
+    // cobble is not a softer cobble — it is a cobble with a splash on it. So
+    // the material voice is untouched and the water is mixed in beside it,
+    // which also means a caller that never passes `wet` (every one of them
+    // except the footfall) gets the identical sample it always got.
+    //
+    // A splash is a noise burst whose BAND OPENS UPWARD as it goes: the low
+    // part is the displacement and the bright part is the spray coming off it.
+    // A fixed band is a hiss, and a downward sweep is a drain.
+    if (wet > 0.02) {
+      const w = clamp(wet, 0, 1);
+      const wv = rand(0.9, 1.14);
+      const wn = noiseSrc();
+      const wf = ac.createBiquadFilter();
+      wf.type = 'bandpass'; wf.Q.value = 0.75;
+      wf.frequency.setValueAtTime(950 * wv, t);
+      wf.frequency.exponentialRampToValueAtTime(3400 * wv, t + 0.055);
+      const wg = ac.createGain();
+      wg.gain.setValueAtTime(0.0001, t);
+      wg.gain.exponentialRampToValueAtTime(0.070 * vol * w, t + 0.005);
+      wg.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+      wn.connect(wf); wf.connect(wg); wg.connect(acMaster);
+      wn.start(t); wn.stop(t + 0.15);
+    }
   }
 
   /**
@@ -6789,6 +6816,11 @@ export function createSystems(game) {
     let vol = opts && opts.volume !== undefined ? clamp(opts.volume, 0, 2) : 1;
     const pitch = opts && opts.pitch !== undefined ? clamp(opts.pitch, 0.4, 2.5) : 1;
     const extra = opts && opts.streak !== undefined ? opts.streak : 0;
+    // A fourth channel, and the only voice that reads it is the footfall. It
+    // is threaded here rather than folded into `pitch` because pitch already
+    // carries the MATERIAL and a wet cobble is not a softer cobble. Every
+    // other synth in the table takes two arguments and ignores this one.
+    const wetness = opts && opts.wet !== undefined ? clamp(opts.wet, 0, 1) : 0;
 
     // ---- DOES THIS SOUND KNOW WHERE IT IS? --------------------------------
     // `at` (anything with x/y/z — a THREE.Vector3, a CANNON.Vec3, a prop's
@@ -6833,7 +6865,7 @@ export function createSystems(game) {
         acMaster = node;
       } catch (e) { node = null; acMaster = saved; }
     }
-    try { fn(vol, pitch, extra); }
+    try { fn(vol, pitch, extra, wetness); }
     catch (e) { /* audio node budget exhausted — ignore */ }
     finally { acMaster = saved; }
   }

@@ -281,6 +281,12 @@ const capyWATER_MEM   = 0.60;       // s after leaving the water it still counts
 const capySHAKE_DUR = 1.05;         // shake-dry length
 const capySHAKE_DELAY = 0.55;       // beat ashore before the shake starts
 const capyWET_FAST = 7.0;           // wet decay multiplier while shaking it off
+// How much of the ground's wetness ends up on the animal. Under 0.42 the fur
+// never crosses capyWetDark's 0.42 threshold and a downpour leaves no mark at
+// all; at 1.0 a drizzle looks identical to swimming the harbour, which throws
+// away the one thing the wet coat was for. 0.72 puts a full shower plainly
+// into the dark-fur state and still leaves the swim visibly wetter.
+const capyRAIN_WET = 0.85;
 const capyIDLE_DELAY = 4.0;         // seconds of nothing before the first idle beat
 
 // --- shared geometry (built once) -----------------------------------------
@@ -320,7 +326,7 @@ const capyRingS = new THREE.Vector3();
 const capyMovePayload = { position: capyPosition, speed: 0 };
 const capyWheekPayload = { position: capyPosition };
 const capyDigPayload = { position: capyPosition };
-const capySfxOpts = { pitch: 1, volume: 1 };   // reused — update() may not allocate
+const capySfxOpts = { pitch: 1, volume: 1, wet: 0 };   // reused — update() may not allocate
 
 // --- pools -----------------------------------------------------------------
 // Three splash rings, plus ONE more slot on the end of the same instanced mesh
@@ -483,7 +489,21 @@ function capyGroundY(game, x, z) {
  * property lookup that misses. Most of them do not.
  */
 function capySlipAt(game, x, z) {
-  return clamp(capyAskNum(game, 'groundSlip', x, z, 0), 0, 1);
+  let s = capyAskNum(game, 'groundSlip', x, z, 0);
+  // ---- AND THE RAIN, WHICH IS EVERY CHAPTER'S PROBLEM AND NO CHAPTER'S ----
+  // Added to whatever the biome says rather than replacing it: a glacier in a
+  // shower is a glacier plus a shower, and taking the max would make the two
+  // wettest chapters in the game no more slippery than they already were.
+  //
+  // It reads weather.slip(), which is keyed off wetness ABOVE the chapter's
+  // own baseline. Son Doong's floor is wet limestone at 0.52 and Kowloon's
+  // asphalt never dries; both were authored, tuned and shipped with the grip
+  // they have, and handing them a permanent slide the day a weather system
+  // arrived would be a rebalance of finished work. Only water that was not
+  // there before costs anything.
+  const W = game.weather;
+  if (W) s += W.slip(x, z);
+  return clamp(s, 0, 1);
 }
 
 /**
@@ -520,6 +540,22 @@ function capyClimbAt(game, x, y, z) {
  * hard bug to find. Most biomes have still air and simply do not publish
  * wind(), so this is a property lookup that misses.
  */
+// ---- AND THE MICRO-GUST DELIBERATELY DOES NOT COME IN HERE ----------------
+// weather.js publishes a gust for every chapter — up to seven metres a second
+// over the Erg — and the obvious thing to do with it is add it to this, and it
+// would be a serious bug. `wind()` is not "how windy is it": it is THE AIR AS
+// A REFERENCE FRAME, a chapter-owned mechanic that moves the world the animal
+// is standing in, and it is added to `platVX/platVZ` alongside a moving ferry
+// deck and a hot-air balloon's basket. A five-metre ambient breeze on that
+// channel would slide a capybara across Jemaa el-Fnaa at walking pace with
+// nobody touching a key, and in Cappadocia it would fight the one system that
+// chapter IS.
+//
+// So the gust drives the things a gust visibly and audibly drives — the motes,
+// the rain's lean, the wind bed, and which way the locals turn their backs —
+// and it does not touch the controller. A chapter that wants the air to carry
+// the animal says so itself, through wind(), exactly as the Drift and
+// Cappadocia already do.
 const capyWindOut = { x: 0, z: 0 };
 function capyWindAt(game) {
   capyWindOut.x = 0; capyWindOut.z = 0;
@@ -1938,6 +1974,21 @@ export function createCapybara(game) {
     } else {
       capyWetLevel = clamp(capyWetLevel - capyWET_DECAY * dt, 0, 1);
     }
+    // ---- ...AND STANDING IN THE RAIN IS ALSO BEING WET --------------------
+    // The whole dry/wet material pair, the shake, the darkened fur and the
+    // drips already existed and were reachable by exactly one route: getting
+    // in the water. An animal that walks through a sixty-second downpour and
+    // comes out with a dry coat is the tell that the weather is a decal.
+    //
+    // A FLOOR, not an assignment. Swimming still slams it to 1 and the shake
+    // still works, because the shake sets capyWetLevel down and the floor only
+    // holds it where the sky has genuinely put it. And it is deliberately
+    // BELOW the level a swim gives: getting rained on is damp, getting in the
+    // harbour is soaked, and the two must not read the same.
+    if (game.weather) {
+      const sky = game.weather.wetness() * capyRAIN_WET;
+      if (sky > capyWetLevel) capyWetLevel = sky;
+    }
     capy.wet = capyWetLevel;
 
     // ---- upright lock + yaw drive, both CRITICALLY DAMPED ------------
@@ -2143,6 +2194,18 @@ export function createCapybara(game) {
           // a walk whispers, a run carries — and the very first stride out of
           // a standstill is quiet rather than a slap
           capySfxOpts.volume = clamp(gaitSpeed / capyRUN, 0, 1) * 0.85 + 0.15;
+          // ---- AND WHAT IT SOUNDS LIKE WHEN THE GROUND HAS WATER ON IT ----
+          // The surface pitch already says what the ground is MADE of; this
+          // says what is lying on it. They are two different questions and
+          // folding the second into the first would have been the obvious
+          // mistake — a wet cobble is not a softer cobble, it is a cobble with
+          // a splash on top, so it is mixed in as its own layer inside the
+          // step voice rather than by shifting the material.
+          //
+          // `splash()` is deliberately zero below a damp baseline: a cave
+          // floor is wet and does not splash under every step, and a street in
+          // a shower does.
+          capySfxOpts.wet = game.weather ? game.weather.splash() : 0;
           game.sfx('step', capySfxOpts);
           // ...and at a run it kicks up whatever it is running on
           if (gaitSpeed > capyWALK * 1.05 && capyStepPhase % 2 === 0) {

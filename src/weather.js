@@ -602,9 +602,19 @@ export function createWeather(game) {
   function cloud() { return cloudV; }
   function pulse() { return pulseV; }
   function wetness() { return wet; }
-  /** How splashy a footfall should be. Below the baseline of a place that is
-   *  simply damp there is no splash at all — a cave floor is wet and does not
-   *  splash under every step, a street in a shower does. */
+  /** How splashy a footfall should be.
+   *
+   *  THE ONE READING THAT USES THE ABSOLUTE RATHER THAN `shine()`, and it is a
+   *  deliberate exception rather than the place the rule was forgotten. Slip
+   *  changes how a chapter PLAYS and the grade changes how it was TUNED to
+   *  look, so both key off the change; a footfall is neither — it is
+   *  characterisation, and a wet cave floor in Son Doong or wet paving in
+   *  Venice sounding faintly of water underfoot is the thing the brief was
+   *  asking for rather than a regression of it. Measured: 0.13 in the cave and
+   *  0.17 in Venice at rest, against 0.64 in a Kowloon downpour.
+   *
+   *  It is still zero below a damp baseline, because a floor that is merely
+   *  wet does not splash under every step and a street in a shower does. */
   function splash() {
     return clamp((wet - 0.34) / 0.5, 0, 1) * clamp(0.35 + rainT, 0, 1);
   }
