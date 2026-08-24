@@ -53,7 +53,7 @@ const caliFLOOR = { x: -22, z: 52, r: 11 };   // the salsoteca floor
 const caliCANE = { x0: 62, x1: 168, z0: -46, z1: 74 };
 const caliCRISTO = { x: -122, z: -84, h: 46 };
 const caliCRUCES = { x: 58, z: -152 };
-const caliSPAWN = { x: 0, y: 1.4, z: 24 };
+const caliSPAWN = { x: -16.5, y: 1.4, z: -19.5 };  // see CALI_SPAWN in main.js — it carries the arrival heading
 // The lookout the chiva climbs to, on the flank below Cristo Rey. Belalcázar in
 // all but name: forty metres short of the statue, seventeen metres over the
 // valley, and pointed at the whole city. The statue is visible from it, up and
@@ -141,6 +141,9 @@ const caliSc = new THREE.Vector3();
 const caliM = new THREE.Matrix4();
 
 // ---------------------------------------------------------------- module ----
+// The people this chapter needs a HANDLE on, because they talk to each other.
+// See the addExchange block at the foot of caliBuild.
+let caliLocTeach = null, caliLocBar = null, caliLocCart = null, caliLocLean = null;
 let caliGame = null;
 let caliBuilt = false;
 let caliRoot = null;
@@ -179,6 +182,8 @@ let caliStopIdx = 0;
 let caliMiradorDone = false;
 let caliNightT = 0, caliVistaT = 0;
 let caliWires = null;               // [{ s, x0, z0, x1, z1, y, hit, side }]
+// How many cables this ride has been got under cleanly. Scored at the mirador.
+let caliWireClear = 0;
 let caliWireMesh = null;
 let caliBandGroup = null, caliBandDuck = 0, caliBandMembers = null;
 let caliCityLights = null, caliCityMat = null;
@@ -1375,6 +1380,11 @@ let caliCartS = 0;              // arclength along the chiva's road
 let caliCartV = 0;
 let caliCartRolling = false;
 let caliCartTopV = 0;
+// s before a spent barrow is walked back up to the ridge. Long enough that the
+// player sees it stop where it stopped; short enough to try again. See the
+// stop branch in caliUpdateCart.
+const caliCART_BACK = 5.0;
+let caliCartBack = 0;
 let caliCartDone = false;
 let caliCartRattle = 0;
 let caliCartPX = 0, caliCartPZ = 0, caliCartPY = 0;
@@ -1490,6 +1500,22 @@ function caliUpdateCart(game, dt) {
   const cp = capy && capy.position;
   const aboard = caliInCart(cp);
 
+  // ---- ...and here is the walk back up. See the note in the stop branch. ---
+  // It will not do it while the animal is standing in it: yanking the barrow
+  // out from under a passenger is a teleport with somebody on board, which is
+  // the one thing the carrier rules in CONTRACT.md forbid outright.
+  if (caliCartBack > 0) {
+    if (aboard) { caliCartBack = caliCART_BACK; }
+    else {
+      caliCartBack -= dt;
+      if (caliCartBack <= 0) {
+        caliCartReset();
+        if (game.sfx) game.sfx('thud', { volume: 0.28, pitch: 1.15,
+                                         at: { x: caliCartPos.x, y: caliCartPos.y + 0.5, z: caliCartPos.z } });
+      }
+    }
+  }
+
   // ---- kick the chock out -------------------------------------------------
   if (!caliCartRolling && game.input && game.input.actionPressed && cp) {
     const dx = cp.x - caliCartPos.x, dz = cp.z - caliCartPos.z;
@@ -1518,13 +1544,39 @@ function caliUpdateCart(game, dt) {
     // in which case say nothing, put the chock back, and let it be tried again.
     if (caliCartV <= 0.02) {
       caliCartRolling = false;
-      if (caliCartTopV <= 4) { caliCartTopV = 0; return; }
+      // ---- SOMEBODY PUSHES IT BACK UP (v20) -----------------------------
+      //
+      // THE CHAPTER'S MINI COULD BE SPENT IN THREE SECONDS AND NEVER COME BACK.
+      // The comment above says a barrow that never got going has "the chock put
+      // back and can be tried again", and it was not true of the position: this
+      // branch cleared the flags and left the barrow wherever it had rolled to.
+      // And the far worse case is the ordinary one — the toast literally says
+      // "get in." AFTER the chock is out, so the first thing most players do is
+      // watch it leave without them. caliCartReset() is called from exactly one
+      // place in this file and that place is the build, so from that moment
+      // 'Run the fruit barrow off the ridge' was uncompletable for the life of
+      // the page and the hint arrow pointed at a barrow parked at the bottom of
+      // a hill it cannot climb.
+      //
+      // So it goes back. Not instantly — that is a teleport and it reads as a
+      // bug — but after a beat, which is how long it takes a chontaduro seller
+      // to walk down the road swearing and push it back up. The task keeps its
+      // tick either way; what comes back is the OBJECT.
+      if (caliCartTopV <= 4) { caliCartTopV = 0; caliCartBack = caliCART_BACK; return; }
       if (game.sfx) game.sfx('thud', { volume: 0.5, pitch: 0.8 });
       if (!caliCartDone && aboard) {
         caliCartDone = true;
         if (game.record) game.record('cart-run', caliCartTopV);
         caliTask('cart-run');
+        // AND THE RUN HAD NO NUMBER ON IT. A gravity ride whose whole content
+        // is how fast it got is worth saying out loud.
+        if (game.toast) game.toast(Math.round(caliCartTopV * 3.6) + ' km/h in a fruit barrow');
+      } else if (!caliCartDone) {
+        // it went without you, which is the joke and should be said as one
+        if (game.toast) game.toast(aboard ? 'it stopped. that is a hill, not a road.'
+                                          : 'it went without you. it is very good at that.');
       }
+      caliCartBack = caliCART_BACK;
     }
   }
 
@@ -1736,7 +1788,27 @@ function caliCheckWires(game, dt) {
     w.prev = d;
     if (!crossed || w.hit > 0) continue;
     const dy = w.y - p.y;
-    if (dy < caliWIRE_BAND[0] || dy > caliWIRE_BAND[1]) continue;   // hopped it, or stood under it
+    if (dy < caliWIRE_BAND[0] || dy > caliWIRE_BAND[1]) {
+      // ---- AND CLEARING ONE WAS WORTH NOTHING AT ALL (v20) --------------
+      // Seven cables over four hundred and sixty-five metres, and the ONLY
+      // thing the mechanic could ever do to you was take you off the roof.
+      // A skill test that has a punishment and no reward is a hazard, not a
+      // game — the player who reads the band's duck and gets under it in time
+      // got precisely the same silence as the player who was not looking.
+      //
+      // So a clean one answers: the cable whips overhead, and the tally is
+      // spoken at the end of the ride rather than per wire, because seven
+      // toasts in forty seconds is a notification feed.
+      caliWireClear++;
+      w.hit = 1.4;                      // the same latch a strike uses: once per pass
+      if (game.sfx) {
+        game.sfx('hiss', { volume: clamp(0.16 + caliChivaV * 0.02, 0.16, 0.34),
+                           pitch: 1.5 + Math.min(caliWireClear, 7) * 0.08,
+                           at: { x: w.x, y: w.y, z: w.z } });
+      }
+      if (caliWireClear === 3 && game.toast) game.toast('three. the band has stopped watching you.');
+      continue;
+    }
     caliWireSweep(game, w);
   }
   caliBandDuck = duckWant ? Math.min(1, caliBandDuck + dt * 9) : damp(caliBandDuck, 0, 6, dt);
@@ -2012,6 +2084,19 @@ function caliStepChiva(game, dt) {
       caliChivaState = 'arrived';
       caliHornT = 2.2;
       if (typeof game.sfx === 'function') game.sfx('horn', { pitch: 0.9, volume: 0.9 });
+      // ---- AND THE CABLES ARE SCORED AT THE TOP ------------------------
+      // Seven of them over four hundred and sixty-five metres. The tally is
+      // spoken here rather than per wire, because seven toasts in forty
+      // seconds is a notification feed — and it only counts if you were still
+      // on the roof at the end, which is the whole point of them.
+      if (caliOnRoof && typeof game.toast === 'function') {
+        if (caliWireClear >= caliWires.length) {
+          game.toast('every cable, clean. the band would like a word.');
+        } else if (caliWireClear > 0) {
+          game.toast(caliWireClear + ' of ' + caliWires.length + ' cables. the rest of them got you.');
+        }
+      }
+      caliWireClear = 0;
     }
   }
 
@@ -3247,6 +3332,123 @@ const caliKITE = { x: -6, z: caliSTREET_Z + 26 };   // anchored over the hill, d
 let caliKiteMesh = null, caliKiteLineMesh = null, caliKiteSeed = null;
 let caliKiteT = 0;
 
+// ============================================================ THE PARAKEETS ==
+/**
+ * CALI HAD NOTHING IN THE AIR.
+ *
+ * Sixteen chapters and this was the only one of the three cities with no
+ * flying thing in it at all: Kyoto has its cormorants and its swallows, Rio has
+ * seventy frigatebirds over the point, and the whole sky over a valley of two
+ * and a half million people was five kites on strings and nothing else. From
+ * this camera the upper third of most frames is air, and air with nothing in it
+ * is the single cheapest way for a world to read as a diorama.
+ *
+ * The right bird here is not a gull. It is the loro — the green parakeet flock
+ * that goes over Cali twice a day, and does it in a shrieking ragged line about
+ * twenty metres up. Two things that matter:
+ *
+ *   1. THEY FLAP. Constantly, fast, and slightly out of phase with each other.
+ *      A frigatebird soars and Rio's rig is built for that; a parakeet that
+ *      soars is a paper aeroplane.
+ *   2. THEY GO OVER AT DUSK. This chapter is the one that puts the sun down
+ *      itself — see caliNight() — so the flock has something to do with the
+ *      chapter's own clock rather than being weather. When the lights come on,
+ *      the whole flock crosses the valley at once and says so, which turns a
+ *      lighting change into an EVENT that happens in the world.
+ *
+ * One instanced draw, no allocation after the build, no collider, no shadow.
+ */
+const caliLORO_N = 38;
+let caliLoroMesh = null, caliLoroSeed = null, caliLoroT = 0;
+let caliLoroCall = 6, caliLoroDusk = 0, caliLoroWas = 0;
+
+function caliBuildLoros(root) {
+  const M = caliMerger();
+  // A parakeet in plan is a dart: a short fat body, a very long tail and two
+  // stubby swept wings. The tail is the only part anybody would name.
+  M.box(0, 0, 0, 0.16, 0.15, 0.34, PALETTE.caliPlantain);
+  M.box(0, 0.03, 0.22, 0.11, 0.10, 0.14, PALETTE.caliCane);
+  M.cone(0, 0.01, 0.31, 0.045, 0.14, PALETTE.caliChivaTrim, Math.PI / 2, 0, 0, 4);
+  M.box(0, 0, -0.42, 0.075, 0.045, 0.62, PALETTE.caliCeiba);
+  for (let side = -1; side <= 1; side += 2) {
+    M.box(side * 0.26, 0.05, -0.02, 0.42, 0.04, 0.22, PALETTE.caliPlantain, 0, side * 0.30, 0);
+  }
+  caliLoroMesh = new THREE.InstancedMesh(M.build(), caliVC(), caliLORO_N);
+  caliLoroMesh.name = 'caliLoros';
+  caliLoroMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  caliLoroMesh.frustumCulled = false;
+  caliLoroMesh.castShadow = false;
+  root.add(caliLoroMesh);
+  caliLoroSeed = [];
+  for (let i = 0; i < caliLORO_N; i++) {
+    // two loose flocks: one over the river, one over the painted street
+    const g = i % 2;
+    caliLoroSeed.push({
+      cx: g ? -18 : 22, cz: g ? caliSTREET_Z - 8 : caliRIVER_Z + 4,
+      a: (i / caliLORO_N) * 6.283 * 2.7,
+      r: 12 + ((i * 7919) % 100) / 100 * 22,
+      y: 17 + ((i * 65537) % 100) / 100 * 11,
+      w: 0.30 + ((i * 31337) % 100) / 100 * 0.16,
+      b: ((i * 104729) % 628) / 100,
+      f: 17 + ((i * 40507) % 100) / 100 * 7,     // wingbeat, fast and per-bird
+    });
+  }
+}
+
+function caliUpdateLoros(game, dt) {
+  if (!caliLoroMesh) return;
+  caliLoroT += dt;
+
+  // ---- THE DUSK CROSSING ------------------------------------------------
+  // One shot, on the rising edge of the lights coming on. caliNightT only ever
+  // climbs within a visit and is forced to 1 on a revisit where the mirador is
+  // already ticked, so the edge has to be a real crossing rather than a level.
+  const nt = (game.cali && typeof game.cali.night === 'function') ? game.cali.night() : 0;
+  if (nt > 0.30 && caliLoroWas <= 0.30 && caliLoroDusk <= 0) {
+    caliLoroDusk = 9.0;
+    if (typeof game.sfx === 'function') {
+      game.sfx('pop', { volume: 0.5, pitch: 2.9 });
+      game.sfx('pop', { volume: 0.4, pitch: 3.3 });
+    }
+    if (typeof game.toast === 'function') game.toast('the loros are going home. all of them, at once, loudly.');
+  }
+  caliLoroWas = nt;
+  if (caliLoroDusk > 0) caliLoroDusk -= dt;
+  // 0 while they are circling, 1 while the whole flock is crossing the valley
+  const cross = clamp(caliLoroDusk / 9.0, 0, 1);
+  const drift = (1 - cross) * 0 + cross * (9.0 - caliLoroDusk) * 26;
+
+  for (let i = 0; i < caliLORO_N; i++) {
+    const sd = caliLoroSeed[i];
+    const a = sd.a + caliLoroT * sd.w;
+    const rr = sd.r * (1 + Math.sin(caliLoroT * 0.21 + sd.b) * 0.14);
+    // circling, plus the whole flock sliding west across the valley at dusk
+    const x = sd.cx + Math.cos(a) * rr - drift + (cross > 0 ? 0 : 0);
+    const z = sd.cz + Math.sin(a) * rr * 0.7 + cross * Math.sin(sd.b) * 6;
+    const y = sd.y + Math.sin(caliLoroT * 0.5 + sd.b) * 2.4 + cross * 5;
+    const yaw = cross > 0.02 ? -1.5708
+              : Math.atan2(-Math.sin(a), Math.cos(a) * 0.7) + Math.PI * 0.5;
+    // A parakeet flaps the whole time. The wing angle rides on the roll so the
+    // body rocks with the beat, which is what makes a dart read as a bird.
+    const flap = Math.sin(caliLoroT * sd.f + sd.b * 5);
+    caliLoroMesh.setMatrixAt(i, caliXform(x, y, z, flap * 0.10, yaw, flap * 0.34, 1, 1, 1));
+  }
+  caliLoroMesh.instanceMatrix.needsUpdate = true;
+
+  // ---- and they are never quiet for long -------------------------------
+  caliLoroCall -= dt;
+  if (caliLoroCall <= 0) {
+    caliLoroCall = (caliLoroDusk > 0 ? 0.55 : 9) + Math.random() * (caliLoroDusk > 0 ? 0.6 : 9);
+    const cp = game.capy && game.capy.position;
+    if (!cp || typeof game.sfx !== 'function') return;
+    // over the river, which is the middle of the chapter
+    const far = Math.hypot(cp.x - 0, cp.z - caliRIVER_Z);
+    if (far > 120) return;
+    game.sfx('pop', { volume: clamp(0.24 - far * 0.0014, 0.03, 0.24),
+                      pitch: 2.5 + Math.random() * 0.9 });
+  }
+}
+
 function caliBuildKites(root) {
   // A COMETA IS A DIAMOND AND A TAIL. Two triangles' worth of box, a cross spar
   // that catches the light differently, and six paper bows down forty
@@ -3413,6 +3615,23 @@ function caliUpdateDance(game, dt) {
       // the tighter the step, the brighter the answer
       game.sfx('tick', { volume: clamp(0.5 + caliCombo * 0.06, 0.5, 1), pitch: 1 + caliCombo * 0.03 });
     }
+    // ---- THE ROOM COMES WITH YOU (v20) ---------------------------------
+    // The combo paid out in one place — a tick, four sparks, and then nothing
+    // at all until eight, when ten people whooped at once. Everything in
+    // between, which is most of the mechanic, was a run of identical clicks.
+    //
+    // From the fourth step the floor starts answering: one voice at a time,
+    // quiet, from where the dancers actually are, and a step brighter each
+    // beat. It is the same escalation the torii tunnel got and it is the whole
+    // difference between counting to eight and being carried to eight.
+    if (caliCombo >= 3 && typeof game.sfx === 'function') {
+      const k = Math.min(caliCombo - 2, 6);
+      game.sfx('cheer', { volume: 0.10 + k * 0.055, pitch: 1.05 + k * 0.05,
+                          at: { x: caliFLOOR.x + Math.cos(caliCombo * 2.4) * 7,
+                                y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 1.2,
+                                z: caliFLOOR.z + Math.sin(caliCombo * 2.4) * 7 } });
+      caliDanceCheer = Math.max(caliDanceCheer, 0.30 + k * 0.09);
+    }
     if (caliCombo === 4 && typeof game.toast === 'function') game.toast('¡eso!');
     if (caliCombo >= caliDANCE_TARGET) {
       caliDanceDone = true;
@@ -3510,7 +3729,11 @@ function caliUpdateTasks(game, dt) {
     const inside = p.x > caliCANE.x0 && p.x < caliCANE.x1 && p.z > caliCANE.z0 && p.z < caliCANE.z1;
     if (inside) {
       if (!caliCaneIn) { caliCaneIn = true; caliCaneEnterX = p.x; }
-      if (p.x - caliCaneEnterX > 34) {
+      // ABS, AND IT WAS NOT. The cane block runs east-west and the road down
+      // the ridge comes at it from the EAST, so a player who entered from that
+      // side ran the whole hundred metres of it in -x and the task never fired.
+      // Nothing said so; the field simply does not end.
+      if (Math.abs(p.x - caliCaneEnterX) > 34) {
         caliCaneDone = true;
         caliTask('cane-run');
         if (typeof game.sfx === 'function') game.sfx('rustle', { volume: 1 });
@@ -3573,7 +3796,14 @@ export function createCali(game) {
     // there, because that is where she now lives and the road down is walkable.
     onEnter() {
       caliCombo = 0; caliLastBeat = -1; caliOnFloor = false;
-      caliRoofT = 0; caliOnRoof = false; caliBandDuck = 0;
+      // ---- AND THE REST OF THE FLOOR'S STATE (v20) ---------------------
+      // caliLastYaw holds the capybara's heading from wherever it was standing
+      // when it left, so the first frame back on the floor differences a Cali
+      // yaw against a Rio one and scores a step the player did not take;
+      // caliOffFloorT and caliFlash are a lapse timer and a lit board carried
+      // in from another country. Three lines, same rule as the latches below.
+      caliLastYaw = 0; caliOffFloorT = 0; caliStepCool = 0; caliFlash = 0;
+      caliRoofT = 0; caliOnRoof = false; caliBandDuck = 0; caliWireClear = 0;
       // SAYING SHE HAS ARRIVED IS NOT THE SAME AS PUTTING HER THERE.
       // This set the state and left `caliChivaS` alone, and caliStepChiva
       // places her from the arclength — so a player who ticked the mirador on
@@ -3591,6 +3821,11 @@ export function createCali(game) {
       // for the life of the page, so a second visit found a stand with a vendor
       // shouting "Lulada! Con hielo!" over an empty counter. Quay's chip basket
       // and Kyoto's matcha heap were the same omission; this is the third.
+      // AND THE BARROW IS AT THE TOP. Same family as the jug below: the object
+      // is a thing in the world and it does not stay where a previous visit
+      // left it, thirty metres down a hill it cannot climb.
+      caliCartBack = 0;
+      caliCartReset();
       caliLuladaGone = false;
       caliLuladaT = 0;
       if (caliLuladaMesh) {
@@ -3606,8 +3841,9 @@ export function createCali(game) {
       // space, and a latch left set is a task that ticks in the wrong country.
       caliOrtizIn = false;
       caliCombo = 0;
-      caliOnRoof = false; caliRoofT = 0;
+      caliOnRoof = false; caliRoofT = 0; caliWireClear = 0;
       caliCaneIn = false;
+      caliCartBack = 0;
       caliDanceCheer = 0;
       if (!caliMiradorDone && caliChivaState !== 'parked') caliChivaReset();
     },
@@ -3747,6 +3983,7 @@ export function createCali(game) {
       caliUpdateCart(game, dt);
       caliCheckWires(game, dt);
       caliUpdateKites(dt);
+      caliUpdateLoros(game, dt);
       caliUpdateNight();
     },
   };
@@ -3782,6 +4019,7 @@ function caliBuild(game) {
   caliBuildStreetLife(game, caliRoot);
   caliBuildPaseo(game, caliRoot);
   caliBuildKites(caliRoot);
+  caliBuildLoros(caliRoot);
   caliBuildMirador(game, caliRoot);
   // ...and somebody selling chontaduro on it, which is what the end of the
   // chapter's marquee ride was missing
@@ -3814,27 +4052,56 @@ function caliBuild(game) {
       y: caliTerrain(caliLULADA.x - 0.4, caliLULADA.z - 1.9),
       z: caliLULADA.z - 1.9, near: 6, face: 0,
       figure: { shirt: PALETTE.cloth3, skin: PALETTE.skin3 },
-      lines: ['Lulada! Con hielo! Two thousand!',
+      // ---- AND THEY KNOW WHAT HAS HAPPENED (v20) -------------------------
+      // Every person in this chapter said the same three sentences whether the
+      // sun was up, the bus was at the kerb and the jug was on the counter — or
+      // whether it was dark, the chiva was on the ridge and the jug was gone.
+      // See localResolve in npc.js: a line may now carry `before`/`after` a
+      // task id or a `when` predicate, and `onTask` is what they say at the
+      // moment you do it in front of them.
+      lines: [{ t: 'Lulada! Con hielo! Two thousand!', before: 'lulada' },
               'Crushed, not blended. There is a difference and it is everything.',
-              'Mi amor, that cup is bigger than your head.'],
+              { t: 'Mi amor, that cup is bigger than your head.', before: 'lulada' },
+              { t: 'You have had one. I saw you have one. Two thousand.', after: 'lulada' },
+              { t: 'The lulo comes down from Nariño on the bus, with everything else.', after: 'lulada' },
+              { t: 'Nobody buys lulada at night. Everybody buys lulada at night.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() > 0.5); } }],
       wheek: ['Ay! The whole Ermita heard you.',
-              'Take it, take it. Go and be loud somewhere else.'] });
+              'Take it, take it. Go and be loud somewhere else.'],
+      onTask: { 'lulada': ['That is two thousand pesos of lulada in a rodent.',
+                           'Con hielo. It had ICE in it.'],
+                'gato-sit': ['You are ON him. Nobody sits on the Gato.'] } });
     game.addLocal({ biome: 'cali', x: caliCHIVA.x,
       y: caliRoadY(caliCHIVA.x, caliCHIVA.z + 4.6),
       z: caliCHIVA.z + 4.6, near: 7, face: Math.PI,
       figure: { shirt: PALETTE.cloth2, skin: PALETTE.skin3, hat: PALETTE.khaki },
-      lines: ['Chiva leaves when it leaves. Sit on the roof if you like.',
-              'Hold on going up. The road remembers nothing.',
-              'Mirador in twenty minutes. Or forty. Depends.'],
-      wheek: ['That is the horn taken care of, then.'] });
-    game.addLocal({ biome: 'cali', x: caliFLOOR.x + Math.cos(2.2) * 9.0,
+      lines: [{ t: 'Chiva leaves when it leaves. Sit on the roof if you like.', before: 'chiva-ride' },
+              { t: 'Hold on going up. The road remembers nothing.', before: 'chiva-mirador' },
+              { t: 'Mirador in twenty minutes. Or forty. Depends.', before: 'chiva-mirador' },
+              { t: 'Cables at head height the whole way. That is not my department.', before: 'chiva-mirador' },
+              { t: 'She sleeps up there now. She has earned it.', after: 'chiva-mirador' },
+              { t: 'You walked back DOWN? There is a barrow for that.', after: 'chiva-mirador' },
+              { t: 'She is going. She is going NOW. Get on or do not.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.riding()); } }],
+      wheek: ['That is the horn taken care of, then.'],
+      onTask: { 'chiva-ride': ['On the ROOF. Everybody on the roof.'],
+                'chiva-mirador': ['Four hundred and sixty-five metres. Nobody rides the whole way.',
+                                  'You did not fall off. Most people fall off.'] } });
+    caliLocTeach = game.addLocal({ biome: 'cali', x: caliFLOOR.x + Math.cos(2.2) * 9.0,
       y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
       z: caliFLOOR.z + Math.sin(2.2) * 9.0, near: 9, face: -0.94,
       figure: { shirt: PALETTE.cloth1, skin: PALETTE.skin3 },
-      lines: ['On the ONE. Everybody comes in on the one.',
-              'Feet small. Feet small! Cali is all feet.',
-              'You have the hips for it. I did not expect that.'],
-      wheek: ['Eso! Now dance.'] });
+      lines: [{ t: 'On the ONE. Everybody comes in on the one.', before: 'salsa-dance' },
+              { t: 'Feet small. Feet small! Cali is all feet.', before: 'salsa-dance' },
+              { t: 'You have the hips for it. I did not expect that.', before: 'salsa-dance' },
+              { t: 'Nobody learns this in a week. Nobody.', before: 'salsa-dance' },
+              { t: 'You learned that in a week. I am not talking about it.', after: 'salsa-dance' },
+              { t: 'Again. From the top. You are not tired, you have four legs.', after: 'salsa-dance' },
+              { t: 'Yes! Yes. No. Yes.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.onFloor()); } }],
+      wheek: ['Eso! Now dance.'],
+      onTask: { 'salsa-dance': ['Eso! ESO! Somebody get the trumpet.',
+                                'A capybara. On the clave. In Cali.'] } });
     // ---- and three more, because a city of two and a half million had three --
     // THE KITE HAD NOBODY ON THE END OF IT. caliBuildKites' own comment says
     // the cometas get "hauled back up by somebody the player cannot see", which
@@ -3846,8 +4113,12 @@ function caliBuild(game) {
       figure: { shirt: PALETTE.caliNeonCyan, legs: PALETTE.denim },
       lines: ['August is the month of the wind. Everybody knows this.',
               'Forty metres of string. My father made this one.',
-              'If it dives, you let it. You do not pull. Pulling is how you lose it.'],
-      wheek: ['She felt that! Look — look at her go!'] });
+              'If it dives, you let it. You do not pull. Pulling is how you lose it.',
+              { t: 'You can see her from the mirador. She is the only thing up there that is ours.', after: 'chiva-mirador' },
+              { t: 'She flies better at night. Nobody believes me.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() > 0.5); } }],
+      wheek: ['She felt that! Look — look at her go!'],
+      praise: ['Ha! Did you see that? No — you did it. You saw it.'] });
     // somebody on the steps down to the water, which caliBuildRiverside builds
     // and describes as "where people sit", and where nobody has ever sat
     // ON THE EMBANKMENT, NOT ON THE STEPS. The steps are drawn inside
@@ -3858,9 +4129,16 @@ function caliBuild(game) {
       z: caliRIVER_Z + caliRIVER_HZ + 2.4, near: 7, face: -1.5,
       figure: { shirt: PALETTE.caliWall5, hat: PALETTE.caliWall2 },
       lines: ['It comes down off the Farallones. It is always this cold.',
-              'I sit here every afternoon. It is free and it is the best thing in Cali.',
-              'The Gato has a girlfriend for every artist in the city. Count them.'],
-      wheek: ['The whole river heard that.'] });
+              { t: 'I sit here every afternoon. It is free and it is the best thing in Cali.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() < 0.5); } },
+              { t: 'I am still here. Where else would I be.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() >= 0.5); } },
+              'The Gato has a girlfriend for every artist in the city. Count them.',
+              { t: 'You went UNDER the Ortiz. There are two arches and you took the wrong one.', after: 'puente-ortiz' },
+              { t: 'Cold, is it not. I did say.', after: 'puente-ortiz' }],
+      wheek: ['The whole river heard that.'],
+      onTask: { 'puente-ortiz': ['All the way through. In THAT.'],
+                'gato-sit': ['Sixty years that cat has sat there and now something is sitting on it.'] } });
     // and a woman in a doorway on the painted street, which is eighteen houses
     // with the doors standing open and nobody behind any of them
     game.addLocal({ biome: 'cali', x: -29, y: caliRoadY(-29, caliSTREET_Z - 6.6),
@@ -3868,8 +4146,13 @@ function caliBuild(game) {
       figure: { shirt: PALETTE.caliWall6, skin: PALETTE.skin2 },
       lines: ['Blue was my mother’s idea. The whole street argued for a year.',
               'They dance down there until six. SIX. And then they go to work.',
-              'Sit in the shade, mijo. Whatever you are.'],
-      wheek: ['Ay! Not before eleven!'] });    // ---- AND THREE MORE, ONE OF THEM AT THE END OF THE CHAPTER ----------
+              { t: 'Sit in the shade, mijo. Whatever you are.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() < 0.5); } },
+              { t: 'There it is. The whole valley, all at once. Every night.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() >= 0.5); } },
+              { t: 'You were on the roof of the chiva. My cousin drives that chiva.', after: 'chiva-ride' }],
+      wheek: ['Ay! Not before eleven!'],
+      praise: ['Mm. In MY street.', 'I have seen everything now. Everything.'] });    // ---- AND THREE MORE, ONE OF THEM AT THE END OF THE CHAPTER ----------
     // THE MIRADOR HAD NOBODY ON IT. Four hundred and sixty-five metres of
     // chiva, three cables, the sun going down and the whole city coming on
     // underneath you — and you stepped off onto an empty concrete slab. The one
@@ -3877,28 +4160,38 @@ function caliBuild(game) {
     // chontaduro cart is the cheapest possible fix: somebody was already here,
     // and he is not remotely impressed.
     // Behind the cart, not in it — see caliBuildMiradorLife for where it stands.
-    game.addLocal({ biome: 'cali',
+    caliLocCart = game.addLocal({ biome: 'cali',
       x: caliMirLife.kx - caliMirLife.ox * 1.25, y: caliMIR_DECK + 0.02,
       z: caliMirLife.kz - caliMirLife.oz * 1.25, near: 9,
       face: Math.atan2(caliMirLife.ox, caliMirLife.oz),
       figure: { shirt: PALETTE.caliWall1, legs: PALETTE.denim, hat: PALETTE.caliWall2 },
       lines: ['Chontaduro con miel y sal. Do not argue, just eat it.',
               'Everybody comes up on the chiva and everybody says the same thing.',
-              'Wait for the lights. Another ten minutes. It is worth ten minutes.'],
+              { t: 'Wait for the lights. Another ten minutes. It is worth ten minutes.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() < 0.6); } },
+              { t: 'There. Two million people, and every one of them has a light on.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() >= 0.6); } },
+              { t: 'The barrow is not a toy. …the barrow is a little bit of a toy.', before: 'cart-run' },
+              { t: 'My barrow. My BARROW. It is at the bottom of the hill again.', after: 'cart-run' }],
       wheek: ['Ay! You will have the whole ridge awake.',
-              'The dogs down in Siloé heard that.'] });
+              'The dogs down in Siloé heard that.'],
+      onTask: { 'chiva-mirador': ['Everybody says the same thing. You have not said anything.'],
+                'cart-run': ['THAT IS MY BARROW.', 'Sixty kilos of chontaduro. Gone. Down a hill.'] } });
     // THE BAR AT THE SALSOTECA. caliBuildSalsoteca draws seven metres of
     // counter, a stone top and nine bottles on it, and there has never been
     // anybody behind it — which is the empty-awning failure the locals system
     // exists to fix, sitting in the middle of the chapter's marquee mechanic.
-    game.addLocal({ biome: 'cali', x: caliFLOOR.x + caliFLOOR.r * 0.1,
+    caliLocBar = game.addLocal({ biome: 'cali', x: caliFLOOR.x + caliFLOOR.r * 0.1,
       y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
       z: caliFLOOR.z + caliFLOOR.r + 1.4, near: 7, face: Math.PI,
       figure: { shirt: PALETTE.caliWall4, skin: PALETTE.skin4 },
       lines: ['Aguardiente or nothing. There is no third thing.',
               'They started at ten. They will still be here at six.',
-              'You want to dance? Watch the feet. Never watch the face.'],
-      wheek: ['That is the loudest thing in here and the band has a trumpet.'] });
+              { t: 'You want to dance? Watch the feet. Never watch the face.', before: 'salsa-dance' },
+              { t: 'I watched the feet. I do not know what I watched.', after: 'salsa-dance' },
+              { t: 'Nine bottles. Do not.', after: 'lulada' }],
+      wheek: ['That is the loudest thing in here and the band has a trumpet.'],
+      praise: ['Mm-hm.', 'I have worked here nineteen years and that is new.'] });
     // CRISTO REY. Forty-six metres of statue on a ridge with a task on it and
     // not one person at the foot — and the whole of what that place is, is the
     // people who walked up.
@@ -3908,9 +4201,64 @@ function caliBuild(game) {
       figure: { shirt: PALETTE.caliWall5, legs: PALETTE.khaki },
       lines: ['Twenty-six metres of him, on a plinth, on a mountain. It adds up.',
               'My mother walked up here every year. I drive. She would have something to say.',
-              'On a clear day you can see the whole valley to the Cauca.'],
-      wheek: ['…the echo off the plinth. Do it again. No — do not do it again.'] });
+              { t: 'On a clear day you can see the whole valley to the Cauca.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() < 0.5); } },
+              { t: 'At night you cannot see the valley. You can see where everybody in it is.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() >= 0.5); } },
+              { t: 'You came up on the bus. Everybody comes up on the bus.', after: 'chiva-mirador' }],
+      wheek: ['…the echo off the plinth. Do it again. No — do not do it again.'],
+      onTask: { 'cristo-rey': ['All the way up. On four legs.',
+                               'He has seen a lot from up here. Not that.'] } });
 
+    // ---- AND SOMEBODY TO LEAN ON THE PARAPET WITH ------------------------
+    // The mirador is where the chapter's marquee ride ENDS and it had exactly
+    // one person on it, which is one person short of the thing everybody
+    // actually does up there: stand at the wall with somebody and not say very
+    // much. She is also the other half of the only conversation at four hundred
+    // and sixty-five metres — see the exchange below.
+    // On the deck, at the wall, three metres along from the cart.
+    caliLocLean = game.addLocal({ biome: 'cali',
+      x: caliMirLife.kx - caliMirLife.ox * 1.25 + caliMirLife.oz * 4.2,
+      y: caliMIR_DECK + 0.02,
+      z: caliMirLife.kz - caliMirLife.oz * 1.25 - caliMirLife.ox * 4.2,
+      near: 8, face: Math.atan2(caliMirLife.ox, caliMirLife.oz),
+      figure: { shirt: PALETTE.caliWall3, legs: PALETTE.denim },
+      lines: ['I come up on the last chiva and I walk down. It is better that way.',
+              'Everything you can see was a cane field. All of it.',
+              { t: 'The lights go on street by street. You can watch it happen.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() >= 0.5); } },
+              { t: 'Give it an hour. It is worth the hour.',
+                when: function () { return !!(caliGame && caliGame.cali && caliGame.cali.night() < 0.5); } },
+              { t: 'You rode up on the roof. I saw you on the roof.', after: 'chiva-mirador' }],
+      wheek: ['…listen. It comes back off the ridge.'],
+      praise: ['Mm. From up here it looked like a plan.'] });
+
+    // ---- AND TWO CONVERSATIONS THAT ARE NOT WITH YOU (v20) --------------
+    // See addExchange in npc.js. A salsoteca with a teacher and a barman in it
+    // was silent unless the player stood between them; a terrace with two
+    // people on it was two people looking at a view in total silence. These
+    // run when you are near enough to read both bubbles and far enough not to
+    // be the subject, so what you catch is something already going on.
+    if (typeof game.addExchange === 'function') {
+      if (caliLocTeach && caliLocBar) {
+        game.addExchange({ biome: 'cali', a: caliLocTeach, b: caliLocBar, lines: [
+          ['Turn the trumpet down.', 'The trumpet is a man. Tell the man.'],
+          ['Who let the animal in?', 'It is not drinking. It is fine.'],
+          ['Four couples. On a Tuesday.', 'It is Thursday.'],
+          ['One more and then I am going home.', 'You said that at ten.'],
+          ['That floor needs waxing.', 'That floor needs a new roof. Wax is further down.'],
+        ] });
+      }
+      if (caliLocCart && caliLocLean) {
+        game.addExchange({ biome: 'cali', a: caliLocCart, b: caliLocLean, gap: 36, lines: [
+          ['Chontaduro?', 'Not tonight.'],
+          ['She is late again.', 'She is always late. That is the timetable.'],
+          ['Clear all the way to the Cauca.', 'Mm. It was clearer in July.'],
+          ['Do you ever get tired of it?', '…no.'],
+          ['There goes Siloé.', 'There goes everything.'],
+        ] });
+      }
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(caliRoot);

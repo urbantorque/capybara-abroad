@@ -50,7 +50,7 @@ const kyoUJI = { x: 24, z: 176 };                             // the tea town
 const kyoBOWL = { x: 24, z: 196 };                            // the enormous tea bowl
 const kyoBAMBOO = { x: -84, z: -44, hx: 26, hz: 34 };         // the grove
 
-const kyoSPAWN = { x: 0, y: 1.4, z: 34 };
+const kyoSPAWN = { x: -16, y: 1.4, z: 52 };   // see KYOTO_SPAWN in main.js — it carries the arrival heading
 
 // The torii tunnel: a polyline of gates climbing the hill. The run is scored on
 // passing through every gate IN ORDER, which is why it is a list and not a
@@ -121,6 +121,10 @@ const kyoSc = new THREE.Vector3();
 const kyoM = new THREE.Matrix4();
 
 // ---------------------------------------------------------------- module ----
+// The people this chapter needs a HANDLE on, because they talk to each other.
+// See the addExchange block at the foot of kyoBuild.
+let kyoLocRake = null, kyoLocLate = null, kyoLocSweep = null;
+let kyoLocTea = null, kyoLocTea2 = null;
 let kyoGame = null;
 let kyoBuilt = false;
 let kyoRoot = null;
@@ -907,6 +911,24 @@ function kyoBuildLanterns(kyoLanternGame, root) {
   root.add(kyoLanternMesh);
 }
 
+// One line per lantern, and the ninth is the punchline. See kyoUpdateLanterns.
+const kyoLANTERN_LINES = [
+  'eight hundred years. oh well.',
+  'two. that is a pattern, not an accident.',
+  'three. somebody is going to have to stand these up.',
+  'four. the moss will not grow back either.',
+  'five. this was a UNESCO thing.',
+  'six. nobody has come out. that is the strange part.',
+  'seven. you are doing them in order, which is somehow worse.',
+  'eight. one left. you know it and I know it.',
+  'nine of nine. the gardener has gone home.',
+];
+let kyoLanternN = 0;
+// The bang payload, reused: npc.js reads .position and .speed off it and this
+// runs on a frame where nine other things are also happening.
+const kyoBangPos = { x: 0, y: 0, z: 0 };
+const kyoBangPayload = { position: kyoBangPos, speed: 9.5 };
+
 function kyoUpdateLanterns(game, dt) {
   if (!kyoLanternMesh) return;
   const capy = game.capy;
@@ -924,10 +946,32 @@ function kyoUpdateLanterns(game, dt) {
       kyoLanternState[o] = 1;
       kyoLanternState[o + 1] = 0;
       kyoLanternState[o + 3] = Math.atan2(capy.velocity.x, capy.velocity.z);
-      if (typeof game.sfx === 'function') { game.sfx('thud', { volume: 0.9, pitch: 0.72 }); }
-      if (typeof game.shake === 'function') game.shake(0.24);
+      kyoLanternN++;
+      if (typeof game.sfx === 'function') {
+        // Granite on gravel, and the note drops as the tally climbs: nine of
+        // these went over on ONE sample and pitch, which is a sound effect
+        // rather than an escalation.
+        game.sfx('thud', { volume: 0.9, pitch: 0.78 - Math.min(kyoLanternN, 9) * 0.02,
+                           at: { x: x, y: kyoTerrain(x, z) + 1, z: z } });
+        game.sfx('rustle', { volume: 0.4, pitch: 0.6 });
+      }
+      if (typeof game.punch === 'function') game.punch(0.24); else if (game.shake) game.shake(0.24);
       if (typeof game.completeTask === 'function') game.completeTask('lantern-topple');
-      if (typeof game.toast === 'function') game.toast('eight hundred years. oh well.');
+      // ---- AND SOMEBODY IS STANDING TEN METRES AWAY -----------------------
+      // props.js emits 'prop:impact' for anything the physics owns and npc.js
+      // has listened to it since the flinch was written — but a stone lantern
+      // is a KINEMATIC body the chapter animates itself, so eight hundred years
+      // of granite could go over at a monk's elbow and the only thing that
+      // moved was a number on the card. Same channel, same payload shape.
+      if (game.events && typeof game.events.emit === 'function') {
+        kyoBangPos.x = x; kyoBangPos.y = kyoTerrain(x, z) + 0.6; kyoBangPos.z = z;
+        kyoBangPayload.speed = 9.5;
+        game.events.emit('prop:impact', kyoBangPayload);
+      }
+      // ---- ...AND THE TALLY IS THE JOKE ----------------------------------
+      // One line, fired nine times, is a bug report. There are nine lanterns in
+      // this garden and the whole point of them is that nothing stops you.
+      if (typeof game.toast === 'function') game.toast(kyoLANTERN_LINES[Math.min(kyoLanternN, kyoLANTERN_LINES.length) - 1]);
       kyoLanternFell(i, x, z, s, kyoLanternState[o + 3]);
     }
     if (kyoLanternState[o] && kyoLanternState[o + 1] < 1) {
@@ -1020,6 +1064,8 @@ let kyoBellGroup = null;       // the bell itself, which wobbles
 let kyoBellBeam = null;        // the shumoku
 let kyoBellRope = null;
 let kyoBellWind = -1;          // counting down to the strike
+let kyoBellTick = 0;           // the one-a-second knock during the wind-up
+let kyoBellSaid = 0;           // cooldown on 'it is still going'
 let kyoBellRing = 0;           // s of note left
 let kyoBellRung = false;
 let kyoBellHit = false;        // task 'the-bell' already paid
@@ -1301,13 +1347,47 @@ function kyoUpdateBell(game, dt) {
   const input = game.input;
 
   // ---- the pull -----------------------------------------------------------
-  if (kyoBellWind < 0 && kyoBellRing <= 0 && cp && input && input.actionPressed) {
+  if (cp && input && input.actionPressed) {
     const r = kyoBellRopeAt();
     const dx = cp.x - r.x, dz = cp.z - r.z;
     if (dx * dx + dz * dz < 2.6 * 2.6) {
-      kyoBellWind = kyoBELL_WIND;
-      if (game.sfx) game.sfx('rustle', { volume: 0.8 });
-      if (game.toast) game.toast('four seconds. you know where you want to be.');
+      if (kyoBellWind < 0 && kyoBellRing <= 0) {
+        kyoBellWind = kyoBELL_WIND;
+        kyoBellTick = 0;
+        if (game.sfx) game.sfx('rustle', { volume: 0.8 });
+        if (game.toast) game.toast('four seconds. you know where you want to be.');
+      } else if (game.toast) {
+        // ---- IT WAS SILENT ABOUT BEING BUSY -------------------------------
+        // The rope refuses for nine seconds after a strike and said nothing at
+        // all about it, so a player who missed the run under the rim pressed E
+        // at a rope that had simply stopped working. A bell that is already
+        // going is a fact about the world, and it is funnier said out loud.
+        if (kyoBellSaid <= 0) {
+          kyoBellSaid = 2.2;
+          game.toast(kyoBellRing > 0 ? 'it is still going. everything is still going.'
+                                     : 'it is on its way. go.');
+        }
+      }
+    }
+  }
+  if (kyoBellSaid > 0) kyoBellSaid -= dt;
+
+  // ---- THE FOUR SECONDS ARE THE MECHANIC AND THERE WAS NO CLOCK ----------
+  // The whole of the mini is "you have four seconds to get a metre of daylight
+  // under the rim", and between the pull and the strike absolutely nothing
+  // happened: no count, no rising anything, no tell that the beam was coming
+  // in. A wooden knock a second, climbing, so the last one lands on the strike
+  // and you can hear how long you have without looking away from the ground.
+  if (kyoBellWind >= 0) {
+    kyoBellTick -= dt;
+    if (kyoBellTick <= 0) {
+      kyoBellTick = 1.0;
+      const left = Math.max(0, kyoBellWind);
+      if (game.sfx) {
+        game.sfx('tick', { volume: 0.34 + (kyoBELL_WIND - left) * 0.10,
+                           pitch: 0.72 + (kyoBELL_WIND - left) * 0.22,
+                           at: { x: kyoBELL.x, y: kyoTerrain(kyoBELL.x, kyoBELL.z) + 3, z: kyoBELL.z } });
+      }
     }
   }
 
@@ -2101,6 +2181,99 @@ function kyoUpdateMirror(game) {
   kyoMirMesh.instanceMatrix.needsUpdate = true;
 }
 
+// ============================================================== THE SANDO ===
+/**
+ * THIRTY-FIVE METRES OF NOTHING BETWEEN THE LANE AND THE POND.
+ *
+ * Measured off the arrival frame: the ground from Gion's south row (z = 40) to
+ * the top of the pond (z ≈ 16) is a hundred and twenty metres wide, entirely
+ * open, and carries a hundred per cent grass. It is also the ONLY route from
+ * where the chapter puts you down to where the chapter's first four tasks are,
+ * so it is the piece of Kyoto every player walks through first — and there was
+ * nothing on it. kyoBuildMaples explicitly refuses to plant within sixteen
+ * metres of the lane, which is what left the near half of it bare.
+ *
+ * The fix is not scatter. What is actually between a machiya street and a
+ * garden pond in this city is an APPROACH: a gravel sando between two lengths
+ * of yotsume-gaki — the four-eyed bamboo fence, which is the single most
+ * characteristic object in Kyoto and is nine boxes a bay — with maples over it
+ * and a stone marker where it turns. It fills the corridor, it tells the player
+ * which way the chapter goes without a beacon, and it is one merged mesh.
+ *
+ * DELIBERATELY NOT SOLID. It is a knee-high fence beside a path: colliders here
+ * would turn the one route out of the arrival into a funnel, and a player who
+ * wants to walk on the grass is allowed to walk on the grass.
+ */
+// Routed to miss the bell tower at (-15, 24) — it leaves the lane at the
+// arrival point and bends east to the head of the pond.
+const kyoSANDO = [-16, 46, -14, 37, -9, 29, -2, 23, 5, 19];   // x, z pairs
+function kyoBuildSando(root) {
+  const S = kyoMerger();
+  const trunks = [], canopy = [];
+  const N = kyoSANDO.length / 2;
+  let run = 0;
+  for (let i = 0; i < N - 1; i++) {
+    const x0 = kyoSANDO[i * 2], z0 = kyoSANDO[i * 2 + 1];
+    const x1 = kyoSANDO[i * 2 + 2], z1 = kyoSANDO[i * 2 + 3];
+    const dx = x1 - x0, dz = z1 - z0;
+    const len = Math.hypot(dx, dz) || 1;
+    const yaw = Math.atan2(dx, dz);
+    const nx = dz / len, nz = -dx / len;                 // across the path
+    const STEPS = Math.max(2, Math.round(len / 2.2));
+    for (let k = 0; k < STEPS; k++) {
+      const t0 = k / STEPS, t1 = (k + 1) / STEPS;
+      const mx = x0 + dx * (t0 + t1) * 0.5, mz = z0 + dz * (t0 + t1) * 0.5;
+      const gy = kyoTerrain(mx, mz);
+      // ---- the gravel, one slab a bay, following the ground it is on -----
+      // Not one long box: the terrain rolls, and a single slab over a rolling
+      // surface is a plank on stilts at one end and buried at the other.
+      S.box(mx, gy + 0.055, mz, 4.0, 0.11, len / STEPS + 0.15, PALETTE.granite, 0, yaw, 0);
+      // ---- the yotsume-gaki, both sides ---------------------------------
+      for (let s = -1; s <= 1; s += 2) {
+        const px = mx + nx * s * 2.35, pz = mz + nz * s * 2.35;
+        const py = kyoTerrain(px, pz);
+        S.box(px, py + 0.46, pz, 0.09, 0.92, 0.09, PALETTE.bambooPale);
+        // three rails, and they are what makes it read as a fence rather than
+        // as a row of sticks
+        for (let r = 0; r < 3; r++) {
+          S.box(px, py + 0.24 + r * 0.28, pz, 0.065, 0.065, len / STEPS + 0.2,
+                PALETTE.bambooStem, 0, yaw, 0);
+        }
+      }
+      run += len / STEPS;
+      // ---- a maple every eight metres or so, alternating sides ----------
+      if (k % 4 === 1) {
+        const s = (i + k) % 2 ? 1 : -1;
+        const tx = mx + nx * s * 4.4, tz = mz + nz * s * 4.4;
+        const ty = kyoTerrain(tx, tz);
+        const h = rand(4.2, 6.0);
+        kyoPush9(trunks, tx, ty + h * 0.5, tz, 0, rand(0, 6.28), 0, 0.34, h, 0.34);
+        // three overlapping lumps rather than one ball: a momiji is wide, flat
+        // and layered, and one sphere at this camera angle is a lollipop
+        for (let c = 0; c < 3; c++) {
+          const a = c * 2.1 + i;
+          kyoPush9(canopy, tx + Math.cos(a) * 0.8, ty + h * 0.80 + c * 0.42,
+                   tz + Math.sin(a) * 0.8, 0, a, 0,
+                   h * (1.0 - c * 0.18), h * 0.19, h * (1.0 - c * 0.18));
+        }
+      }
+    }
+  }
+  // ---- and a stone at the turn, which is where a marker actually goes -----
+  {
+    const mx = kyoSANDO[4], mz = kyoSANDO[5];
+    const my = kyoTerrain(mx, mz);
+    S.box(mx - 3.0, my + 0.55, mz, 0.72, 1.10, 0.72, PALETTE.stoneDark);
+    S.box(mx - 3.0, my + 1.16, mz, 0.92, 0.14, 0.92, PALETTE.granite);
+  }
+  const m = new THREE.Mesh(S.build(), kyoVCG());
+  m.receiveShadow = true;
+  m.castShadow = true;
+  root.add(m);
+  kyoInstance(root, kyoG.cyl6, PALETTE.trunkDark, trunks, true, false);
+  kyoInstance(root, kyoG.cyl6, PALETTE.momiji, canopy, true, false);
+}
+
 function kyoBuildMaples(root) {
   const trunks = [], canopy = [], under = [];
   for (let i = 0; i < kyoMOMIJI_N; i++) {
@@ -2109,6 +2282,8 @@ function kyoBuildMaples(root) {
       x = rand(-120, 130); z = rand(-170, 120);
       if (kyoSlope(x, z) > 0.55) continue;
       if (Math.abs(x - kyoPOND.x) < kyoPOND.rx + 4 && Math.abs(z - kyoPOND.z) < kyoPOND.rz + 4) continue;
+      // The lane, its two rows of machiya and their gardens. Anything planted
+      // in here lands on a roof: the rows are at z = 40..46 and 58..64.
       if (Math.abs(z - kyoGION_Z) < 16) continue;
       if (Math.abs(z - kyoRIVER_Z) < kyoRIVER_HZ + 6) continue;
       if (x > kyoZEN.x - kyoZEN.hx - 3 && x < kyoZEN.x + kyoZEN.hx + 3 &&
@@ -3239,6 +3414,20 @@ function kyoCheckTorii(game, dt) {
   if (dx * dx + dz * dz < 6.0 * 6.0) {
     kyoToriiSeq++;
     kyoToriiT = 0;
+    // ---- EVERY GATE MAKES A SOUND, AND THE SOUND CLIMBS -----------------
+    // Forty-four gates and the only feedback the run had was a line of text on
+    // the eleventh, the twenty-second and the thirty-third. Twenty-five seconds
+    // of the chapter's second-biggest set piece with nothing under it at all.
+    //
+    // A wooden block per gate — quiet, positional, and rising a semitone-ish
+    // over the length of the tunnel — is the cheapest possible version of "this
+    // is going somewhere", and going up a scale is the whole feeling of the
+    // climb. Deliberately soft: forty-four loud ticks is a smoke alarm.
+    if (typeof game.sfx === 'function' && !kyoToriiDone) {
+      const f = kyoToriiSeq / kyoTORII_N;
+      game.sfx('tick', { volume: 0.16 + f * 0.16, pitch: 0.86 + f * 0.85,
+                         at: { x: gx, y: kyoTerrain(gx, gz) + 2.4, z: gz } });
+    }
     if (kyoToriiSeq >= kyoTORII_N) {
       kyoToriiDone = true;
       kyoTask('torii-run');
@@ -3267,14 +3456,22 @@ function kyoCheckZen(game, dt) {
   if (!capy.grounded) return;
   const sp = Math.sqrt(capy.velocity.x * capy.velocity.x + capy.velocity.z * capy.velocity.z);
   if (sp < 0.6) return;
-  // one print every ~0.9 m of travel
-  if (kyoTrackN > 0) {
-    const o = (kyoTrackN - 1) * 3;
+  // one print every ~0.9 m of travel, measured against the LAST one written —
+  // which is not `kyoTrackN - 1` once the pool has wrapped
+  if (kyoTrackLast >= 0) {
+    const o = kyoTrackLast * 3;
     const dx = p.x - kyoTrackPos[o], dz = p.z - kyoTrackPos[o + 2];
     if (dx * dx + dz * dz < 0.81) return;
   }
-  if (kyoTrackN >= kyoZEN_TRACKS) return;
-  const i = kyoTrackN++;
+  // ---- THE POOL RECYCLES, IT DOES NOT STOP ------------------------------
+  // `return` here meant that after twenty-six prints the gravel took no more:
+  // you could run laps of the garden and nothing appeared under you, which
+  // reads as the mechanic having broken rather than as a budget being spent.
+  // A ring buffer costs one modulo and means the garden can always be walked
+  // through again — the oldest print is the one the rake got to first, which
+  // is also the honest fiction.
+  const i = kyoTrackN < kyoZEN_TRACKS ? kyoTrackN++ : (kyoTrackLast + 1) % kyoZEN_TRACKS;
+  kyoTrackLast = i;
   kyoTrackPos[i * 3] = p.x; kyoTrackPos[i * 3 + 1] = 0; kyoTrackPos[i * 3 + 2] = p.z;
   kyoTrackMesh.setMatrixAt(i, kyoXform(p.x, kyoTerrain(p.x, p.z) + 0.22, p.z,
                                        -Math.PI / 2, rand(0, 3), 0, 0.55, 0.9, 1));
@@ -3288,6 +3485,7 @@ function kyoCheckZen(game, dt) {
   }
 }
 const kyoTrackPos = new Float32Array(kyoZEN_TRACKS * 3);
+let kyoTrackLast = -1;      // index of the most recent print — see the ring in kyoCheckZen
 
 function kyoCheckSwim(game, dt) {
   if (kyoSwimDone) return;
@@ -3350,6 +3548,9 @@ function kyoCheckBamboo(game, dt) {
 // chapter already pays you for.
 const kyoDRY_STONES = 6;
 let kyoDryArmed = false, kyoDryDone = false;
+// Which stones this attempt has touched — cleared with the arming, so a fall
+// in and a fresh start re-plays the scale rather than going silent.
+const kyoDryHit = new Uint8Array(kyoDRY_STONES);
 
 function kyoStoneAt(i, out) {
   out.x = kyoPAVILION.x - 9 - i * 2.6;
@@ -3367,16 +3568,29 @@ function kyoCheckDry(game) {
   // WET DISARMS IT, and wet is read off capy.wet rather than off the height:
   // the stones stand 30 cm proud of the water and a capybara that clips the
   // edge of one is briefly lower than its own top without having got in.
-  if ((capy.wet || 0) > 0.35) { kyoDryArmed = false; return; }
+  if ((capy.wet || 0) > 0.35) { if (kyoDryArmed) kyoDryHit.fill(0); kyoDryArmed = false; return; }
 
-  if (!kyoDryArmed) {
-    for (let i = 0; i < kyoDRY_STONES; i++) {
-      kyoStoneAt(i, kyoDryPt);
-      const dx = p.x - kyoDryPt.x, dz = p.z - kyoDryPt.z;
-      if (dx * dx + dz * dz < 1.5 * 1.5 && p.y > kyoWATER_Y + 0.45) { kyoDryArmed = true; break; }
+  // ---- EVERY STONE ANSWERS ---------------------------------------------
+  // Six stones a hop apart, and the ONLY thing that ever happened was the
+  // payout on the island — so the whole of the crossing, which is the actual
+  // skill test, was silent. A water-drop note per stone, rising, and each one
+  // counted once: you can hear how many you have left, which is the entire
+  // difference between a sequence and six identical jumps.
+  for (let i = 0; i < kyoDRY_STONES; i++) {
+    kyoStoneAt(i, kyoDryPt);
+    const dx = p.x - kyoDryPt.x, dz = p.z - kyoDryPt.z;
+    if (dx * dx + dz * dz > 1.5 * 1.5 || p.y <= kyoWATER_Y + 0.45) continue;
+    if (!kyoDryArmed) kyoDryArmed = true;
+    if (!kyoDryHit[i]) {
+      kyoDryHit[i] = 1;
+      if (typeof game.sfx === 'function') {
+        game.sfx('pop', { volume: 0.30, pitch: 1.30 + i * 0.14,
+                          at: { x: kyoDryPt.x, y: kyoWATER_Y + 0.4, z: kyoDryPt.z } });
+      }
     }
-    return;
+    break;
   }
+  if (!kyoDryArmed) return;
   // and it pays out on the ISLAND, not on the last stone — the point of the
   // stones is that they go somewhere
   const dx = p.x - kyoPAVILION.x, dz = p.z - kyoPAVILION.z;
@@ -3525,18 +3739,20 @@ export function createKyoto(game) {
           kyoLanternStand(i, lx, lz, ls);
         }
         kyoLanternMesh.instanceMatrix.needsUpdate = true;
+        kyoLanternN = 0;   // the tally, and its nine lines, start again
       }
       if (kyoTrackMesh && kyoTrackN) {
         for (let i = 0; i < kyoTrackN; i++) {
           kyoTrackMesh.setMatrixAt(i, kyoXform(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001));
         }
         kyoTrackMesh.instanceMatrix.needsUpdate = true;
-        kyoTrackN = 0; kyoZenTouched = 0;
+        kyoTrackN = 0; kyoTrackLast = -1; kyoZenTouched = 0;
       }
       // the whisk is not left at a full froth either
       kyoWhiskFroth = 0; kyoWhiskSpin = 0;
       // the bell is not left mid-swing, and the garden is not left ringing
       kyoBellWind = -1; kyoBellRing = 0; kyoBellWave = 0; kyoBellPulse = 0; kyoKoiSpeed = 1;
+      kyoBellTick = 0; kyoBellSaid = 0;
       if (kyoBellGroup) { kyoBellGroup.scale.set(1, 1, 1); kyoBellGroup.rotation.z = 0; }
       // the first frame of a re-entry must not solve against the water you left
       const kp = game.capy && game.capy.position;
@@ -3547,7 +3763,23 @@ export function createKyoto(game) {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
       kyoDryArmed = false;
+      kyoDryHit.fill(0);
       kyoRunT = -1; kyoInRiver = false; kyoRunFlow = 0;
+      // ---- ...AND SO DOES THE TUNNEL (v20) ------------------------------
+      // kyoToriiSeq is the index of the NEXT gate on the run and it was on
+      // neither list. Leave Kyoto twenty gates up Fushimi Inari, come back, and
+      // the chapter is still waiting for gate twenty-one: the paper's arrow
+      // points sixty metres up the mountain, and a player who walks back into
+      // the bottom of the tunnel passes twenty gates that no longer count while
+      // the counter decays one every twelve seconds underneath them. The
+      // sequence is a RUN, and a run you walked away from is over.
+      //
+      // kyoBambooIn is the same shape one task along: it holds a z from a
+      // previous visit, so the first frame back inside the grove measures the
+      // dash against a mark nobody set this time.
+      if (!kyoToriiDone) { kyoToriiSeq = 0; kyoToriiT = 0; }
+      kyoBambooIn = false;
+      kyoSwamT = 0;
     },
   });
 
@@ -3771,6 +4003,8 @@ function kyoBuild(game) {
   kyoBuildFoam(kyoRoot);
   kyoBuildBowl(game, kyoRoot);
   kyoBuildMaples(kyoRoot);
+  // ...and the approach between the lane and the pond — see kyoBuildSando.
+  kyoBuildSando(kyoRoot);
   // THE WOOD, and it goes in after the maples so its rejection list is read
   // against a hill that is otherwise finished. See kyoBuildSugi.
   kyoBuildSugi(kyoRoot);
@@ -3827,13 +4061,34 @@ function kyoBuild(game) {
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'kyoto', x: kyoZEN.x + 8, y: kyoTerrain(kyoZEN.x + 8, kyoZEN.z),
+    // ---- AND THEY KNOW WHAT YOU HAVE DONE (v20) -------------------------
+    // Every person in this chapter said the same three sentences whether you
+    // had just arrived or had spent ten minutes wrecking the thing they are
+    // standing next to. See localResolve in npc.js: an entry may now carry
+    // `before` or `after` a task id, so a pool grows and shrinks as the
+    // chapter happens, and `onTask` is what they say at the moment you do it.
+    //
+    // The rake monk is the clearest case in the game. He has been saying 'I
+    // raked that this morning. I will rake it again.' at a garden with
+    // twenty-six paw prints in it since the chapter shipped.
+    kyoLocRake = game.addLocal({ biome: 'kyoto', x: kyoZEN.x + 8, y: kyoTerrain(kyoZEN.x + 8, kyoZEN.z),
       z: kyoZEN.z, near: 6,
       figure: { shirt: PALETTE.hair2, legs: PALETTE.hair2 },
-      lines: ['Fifteen stones. You can never see all fifteen at once.',
-              'I raked that this morning. I will rake it again.',
-              'Please. Look with the eyes.'],
-      wheek: ['…that is one interpretation of the garden.'] });
+      lines: [{ t: 'Fifteen stones. You can never see all fifteen at once.', before: 'zen-ruin' },
+              { t: 'I raked that this morning. I will rake it again.', before: 'zen-ruin' },
+              { t: 'Please. Look with the eyes.', before: 'zen-ruin' },
+              { t: 'The gravel is not a path. It has never once been a path.', before: 'zen-ruin' },
+              { t: 'I will rake it again. I said I would.', after: 'zen-ruin' },
+              { t: 'Fourteen stones, now. You are standing on the fifteenth.', after: 'zen-ruin' },
+              { t: 'Six hundred years, and you are the first to run in it. Diagonally.', after: 'zen-ruin' },
+              { t: 'No, do not help.', after: 'zen-ruin' }],
+      wheek: [{ t: '…that is one interpretation of the garden.', before: 'zen-ruin' },
+              { t: 'Yes. I heard the first one too.', after: 'zen-ruin' }],
+      onTask: { 'zen-ruin': ['…a bold reinterpretation. Yes.',
+                             'Right. Well. That is one morning gone.',
+                             'You have signed it. With feet.'],
+                'lantern-topple': ['That was not the garden. That was eight hundred years.',
+                                   'I heard it. The whole valley heard it.'] } });
     // OUTSIDE THE BOWL. kyoBOWL.x + 3 is three metres from the centre of a bowl
     // whose rim is at 5.4, so the tea master has been standing IN the tea, in
     // the middle of the only piece of ground the whisk task asks you to run
@@ -3843,17 +4098,33 @@ function kyoBuild(game) {
       y: kyoTerrain(kyoBOWL.x + 8.5, kyoBOWL.z + 1.5),
       z: kyoBOWL.z + 1.5, near: 7, face: -1.5,
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.cloth6 },
-      lines: ['Whisk in a W. Never a circle. A circle makes nothing.',
+      lines: [{ t: 'Whisk in a W. Never a circle. A circle makes nothing.', before: 'whisk-spin' },
               'Four hundred grams of matcha in that bowl.',
-              'Do not fall in. Somebody always falls in.'],
-      wheek: ['The bowl carries it. Listen.'] });
+              { t: 'Do not fall in. Somebody always falls in.', before: 'whisk-spin' },
+              { t: 'A circle. You did the whole thing in a circle.', after: 'whisk-spin' },
+              { t: 'It is the finest bowl of usucha I have seen. I am not pleased about it.', after: 'whisk-spin' },
+              // and one that is only true while you are dripping on his tea
+              { t: 'You are wet. The bowl is over there and you are wet.',
+                when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) > 0.4); } }],
+      wheek: ['The bowl carries it. Listen.'],
+      onTask: { 'whisk-spin': ['Thirty years. Thirty years, and a rodent.',
+                               'Do not tell anybody how that was done.'],
+                'matcha-raid': ['That was nine thousand yen a bowl.',
+                                'It is IN you. It is not coming out.'] } });
     game.addLocal({ biome: 'kyoto', x: kyoMILL_STAND.x, y: kyoMILL_STAND.y,
       z: kyoMILL_STAND.z, near: 7,
       figure: { shirt: PALETTE.denim, hat: PALETTE.khaki },
       lines: ['The wheel has turned since before the war. Either war.',
-              'River is quick today. Do not get in above the weir.',
-              'You came down the Uji? On purpose?'],
-      wheek: ['The wheel is louder. Only just.'] });
+              { t: 'River is quick today. Do not get in above the weir.', before: 'uji-run' },
+              { t: 'Nobody comes down that. Nobody has ever come down that.', before: 'uji-run' },
+              { t: 'You came down the Uji? On purpose?', after: 'uji-run' },
+              { t: 'Two hundred metres, no paddle, and you are not even out of breath.', after: 'uji-run' },
+              // ...and one he only says while the river actually has you
+              { t: 'Left! Go LEFT! …no. All right. That works too.',
+                when: function () { return !!(kyoGame && kyoGame.kyoto && kyoGame.kyoto.inRiver()); } }],
+      wheek: ['The wheel is louder. Only just.'],
+      onTask: { 'uji-run': ['Forty seconds. The river does it in forty seconds.',
+                            'I have watched that water for sixty years. That is new.'] } });
     // ---- GION HAD EIGHTEEN HOUSES AND NOBODY IN THEM --------------------
     // Three locals for a valley: a rake in a garden, a whisk by a bowl, a
     // wheel at a mill — and all three of them stand at a TASK. The lane the
@@ -3863,20 +4134,31 @@ function kyoBuild(game) {
     // place where people are being quiet on purpose.
     // + 0.13 is the top of the granite setts over kyoTerrain; the lane is only
     // 9 m wide, so ±3.8 keeps both of them ON it rather than in the gutter.
-    game.addLocal({ biome: 'kyoto', x: -6.5, y: kyoTerrain(-6.5, kyoGION_Z + 3.8) + 0.13,
+    kyoLocLate = game.addLocal({ biome: 'kyoto', x: -6.5, y: kyoTerrain(-6.5, kyoGION_Z + 3.8) + 0.13,
       z: kyoGION_Z + 3.8, near: 6, face: -1.4,
       figure: { shirt: PALETTE.indigo, legs: PALETTE.indigo, hat: PALETTE.shoji },
       lines: ['I am late. I have been late since 1846.',
               'Walk on the stones, not the gutter. The gutter is the gutter.',
-              'Do not photograph me. …you have no camera. Good.'],
-      wheek: ['Every dog in Gion. Thank you.'] });
-    game.addLocal({ biome: 'kyoto', x: 13.5, y: kyoTerrain(13.5, kyoGION_Z - 3.8) + 0.13,
+              'Do not photograph me. …you have no camera. Good.',
+              { t: 'You have been up the mountain. There is a needle in your fur.', after: 'torii-run' },
+              { t: 'You smell of the river. Which river. Never mind.', after: 'uji-run' },
+              { t: 'Blossom. Every year. It gets in everything.',
+                when: function () { return !!(kyoGame && kyoGame.weather && kyoGame.weather.mood
+                                              && kyoGame.weather.mood().motes); } }],
+      wheek: ['Every dog in Gion. Thank you.'],
+      praise: ['Yes. Very good. I am still late.', 'Mm. Congratulations. Move.'] });
+    kyoLocSweep = game.addLocal({ biome: 'kyoto', x: -2.0, y: kyoTerrain(-2.0, kyoGION_Z - 3.8) + 0.13,
       z: kyoGION_Z - 3.8, near: 6, face: 1.6,
       figure: { shirt: PALETTE.templeWood, legs: PALETTE.stoneDark },
       lines: ['Sixty years my family has swept this step. It is a good step.',
               'The lanterns go up at four. They have gone up at four since my grandfather.',
-              'You are wet. Everything you have touched is now also wet.'],
-      wheek: ['The lanterns did not even swing. Impressive.'] });
+              { t: 'You are wet. Everything you have touched is now also wet.',
+                when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) > 0.4); } },
+              { t: 'Sweeping. Still sweeping. It is the job.',
+                when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) <= 0.4); } },
+              { t: 'They say the bell went. I did not hear the bell. I hear everything.', after: 'the-bell' }],
+      wheek: ['The lanterns did not even swing. Impressive.'],
+      praise: ['On my step. Of course on my step.', 'I saw. I sweep, but I also see.'] });
     // ON THE BRIDGE, at the shrine bay — which is the exact spot the Uji run
     // starts from. The deck's collider tops out at the hump's y + 0.02, and the
     // hump at mid-span is 3.0, so 3.02. Not the drawn 3.175: stand a figure on
@@ -3888,17 +4170,25 @@ function kyoBuild(game) {
       z: kyoRIVER_Z + 2.5, near: 6, face: 1.6,
       figure: { shirt: PALETTE.matchaField, hat: PALETTE.templeWood },
       lines: ['The water for the tea comes from under this bridge. It always has.',
-              'Nobody swims the Uji. Nobody sensible swims the Uji.',
-              'Two hundred metres to the mill. It takes the river about forty seconds.'],
-      wheek: ['…the cormorants heard that. They are not impressed.'] });
+              { t: 'Nobody swims the Uji. Nobody sensible swims the Uji.', before: 'uji-run' },
+              'Two hundred metres to the mill. It takes the river about forty seconds.',
+              { t: 'You are not sensible. I have revised my position.', after: 'uji-run' },
+              { t: 'Go on, then. It is right there. It is going the right way.',
+                when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) > 0.4); } }],
+      wheek: ['…the cormorants heard that. They are not impressed.'],
+      onTask: { 'uji-run': ['From this bridge to that mill. I have never seen it done.'] } });
     game.addLocal({ biome: 'kyoto', x: kyoBAMBOO.x + kyoBAMBOO.hx + 3.4,
       y: kyoTerrain(kyoBAMBOO.x + kyoBAMBOO.hx + 3.4, kyoBAMBOO.z + 8),
       z: kyoBAMBOO.z + 8, near: 6, face: -1.5,
       figure: { shirt: PALETTE.bambooPale, legs: PALETTE.khaki, hat: PALETTE.khaki },
       lines: ['Cut in winter, dried a year, and then it is a fence.',
               'Listen. That knocking is the grove talking to itself.',
-              'Go on through. It is quieter in there than it is out here.'],
-      wheek: ['Two thousand culms just said it back to you.'] });
+              { t: 'Go on through. It is quieter in there than it is out here.', before: 'bamboo-dash' },
+              { t: 'You went through it at a run. It is not that kind of quiet.', after: 'bamboo-dash' },
+              { t: 'Four culms down. I am not counting. I am counting.', after: 'bamboo-dash' }],
+      wheek: ['Two thousand culms just said it back to you.'],
+      onTask: { 'bamboo-dash': ['End to end. At a sprint. Through a grove.',
+                                'The grove will recover. I said that about the last one.'] } });
     // ---- AND FIVE MORE, BECAUSE THE THREE PLACES THE CHAPTER IS PROUDEST OF
     // HAD NOBODY IN THEM -------------------------------------------------
     // The seven above stand at the pond, the bowl, the mill, the lane, the
@@ -3915,10 +4205,14 @@ function kyoBuild(game) {
       const sx = kyoHILL_X + 5.2, sz = kyoHILL_Z + 22.5;
       game.addLocal({ biome: 'kyoto', x: sx, y: kyoTerrain(sx, sz), z: sz, near: 8, face: 0.2,
         figure: { shirt: PALETTE.shoji, legs: PALETTE.torii, hat: PALETTE.shoji },
-        lines: ['You came all the way up. Most of them stop at the fork.',
+        lines: [{ t: 'Most of them stop at the fork. You will stop at the fork.', before: 'torii-run' },
+                { t: 'You came all the way up. Most of them stop at the fork.', after: 'torii-run' },
                 'Every gate down there was paid for by somebody. Look at the backs.',
-                'Inari is rice, and rice is money, and money buys gates. That is the whole story.'],
-        wheek: ['The foxes have heard worse. Not much worse.'] });
+                'Inari is rice, and rice is money, and money buys gates. That is the whole story.',
+                { t: 'Down is faster. Down is always faster. That is how people get hurt.', after: 'torii-run' }],
+        wheek: ['The foxes have heard worse. Not much worse.'],
+        onTask: { 'torii-run': ['Forty-four. In one go. Without stopping.',
+                                'The foxes saw. The foxes tell each other things.'] } });
     }
     // THE BELL. Somebody has to be responsible for the loudest object in Japan,
     // and the mini is much funnier if there is a man standing next to the rope
@@ -3927,20 +4221,48 @@ function kyoBuild(game) {
       y: kyoTerrain(kyoBELL.x + 3.4, kyoBELL.z + kyoBELL_R + kyoBELL_ROPE_D - 1.2),
       z: kyoBELL.z + kyoBELL_R + kyoBELL_ROPE_D - 1.2, near: 7, face: -1.4,
       figure: { shirt: PALETTE.templeWoodDk, legs: PALETTE.templeWoodDk },
-      lines: ['One hundred and eight times, at the new year. I count.',
-              'Pull it if you like. Everybody does. Nobody stands under it.',
-              'Four seconds from the pull. You would be amazed what people do with four seconds.'],
-      wheek: ['That is not the note. That is nowhere near the note.'] });
+      lines: [{ t: 'One hundred and eight times, at the new year. I count.', before: 'the-bell' },
+              { t: 'Pull it if you like. Everybody does. Nobody stands under it.', before: 'the-bell' },
+              { t: 'Four seconds from the pull. You would be amazed what people do with four seconds.', before: 'the-bell' },
+              { t: 'Nobody stands under it. I have said that for thirty years and it was true for twenty-nine.', after: 'the-bell' },
+              { t: 'Can you hear me? …no. No, you cannot.', after: 'the-bell' },
+              { t: 'One hundred and nine, then.', after: 'the-bell' },
+              // and while it is actually going
+              { t: 'Wait. Wait. …there. That is the note.',
+                when: function () { return !!(kyoGame && kyoGame.kyoto && kyoGame.kyoto.bellRinging()); } }],
+      wheek: ['That is not the note. That is nowhere near the note.'],
+      onTask: { 'the-bell': ['You were UNDER it. You were under the bell.',
+                             'Nine seconds. You were in there for the whole nine seconds.'] } });
     // THE TEA TOWN. Twelve shops all selling the same thing, and the chapter
     // ends here — see kyoBuildUjiStreet.
-    game.addLocal({ biome: 'kyoto', x: kyoUJI.x - 12.6,
+    kyoLocTea = game.addLocal({ biome: 'kyoto', x: kyoUJI.x - 12.6,
       y: kyoTerrain(kyoUJI.x - 12.6, kyoUJI.z - 4.6) + 0.13,
       z: kyoUJI.z - 4.6, near: 6, face: 0,
       figure: { shirt: PALETTE.matchaField, legs: PALETTE.indigo },
       lines: ['Twelve shops. All tea. Yes, all of it. No, they are not the same.',
               'First flush is April. What you are looking at is the second.',
-              'You are dripping on the gyokuro. That is nine thousand yen an ounce.'],
-      wheek: ['…the whole street just went quiet. Well done.'] });
+              { t: 'You are dripping on the gyokuro. That is nine thousand yen an ounce.',
+                when: function () { return !!(kyoGame && kyoGame.capy && (kyoGame.capy.wet || 0) > 0.4); } },
+              { t: 'You are GREEN. You are a green animal. That is our matcha.', after: 'matcha-raid' },
+              { t: 'Eleven shops now. The twelfth has nothing left to sell.', after: 'matcha-raid' }],
+      wheek: ['…the whole street just went quiet. Well done.'],
+      onTask: { 'matcha-raid': ['Four hundred grams. FOUR HUNDRED.',
+                                'I am going to have to write that down as weather.'] } });
+    // ---- AND ONE MORE, ACROSS THE STREET --------------------------------
+    // Twelve shops facing each other, all selling the same leaf, and exactly
+    // one person in the street. A rival is both the cheapest possible way to
+    // double the population of the place the chapter ENDS in and the setup for
+    // the only argument in Uji — see the exchange registered below.
+    kyoLocTea2 = game.addLocal({ biome: 'kyoto', x: kyoUJI.x - 8.4,
+      y: kyoTerrain(kyoUJI.x - 8.4, kyoUJI.z + 4.6) + 0.13,
+      z: kyoUJI.z + 4.6, near: 6, face: 3.14,
+      figure: { shirt: PALETTE.templeWood, legs: PALETTE.stoneDark, hat: PALETTE.shoji },
+      lines: ['Ours is stone-ground. Theirs is ground by a machine that is also stone.',
+              'Do not buy from the shop with the big sign. That is all I will say.',
+              'Sencha in the morning, gyokuro when somebody is watching.',
+              { t: 'The bell went. It always tastes better after the bell. It does not, but it does.', after: 'the-bell' }],
+      wheek: ['We heard you at the mill. We heard you at the SHRINE.'],
+      onTask: { 'matcha-raid': ['They had that coming. Twelve years I have said so.'] } });
     // THE TERRACES. One of the twenty-two, at the near end of the bottom shelf,
     // and she is the only person in the chapter who is at WORK.
     {
@@ -3950,8 +4272,11 @@ function kyoBuild(game) {
         figure: { shirt: PALETTE.indigo, legs: PALETTE.indigo, hat: PALETTE.shoji },
         lines: ['Two leaves and a bud. Only ever two leaves and a bud.',
                 'Under the black cloth for twenty days. That is what makes it sweet.',
-                'My grandmother picked this row. So did hers. It is a long row.'],
-        wheek: ['Four terraces of us just stood up. I hope you are pleased.'] });
+                'My grandmother picked this row. So did hers. It is a long row.',
+                { t: 'Somebody has been in the drying shed. Somebody green.', after: 'matcha-raid' },
+                { t: 'You are standing in row nine. Row nine is fine. Row eight was not.', after: 'zen-ruin' }],
+        wheek: ['Four terraces of us just stood up. I hope you are pleased.'],
+        praise: ['Two leaves and a bud. Whatever that was, it was not that.'] });
     }
     // THE UKAI MASTER, on the bank beside the moored boats at the first narrow.
     // The cormorants have been the chapter's gates since the run was written and
@@ -3966,8 +4291,41 @@ function kyoBuild(game) {
         figure: { shirt: PALETTE.toriiBase, legs: PALETTE.toriiBase, hat: PALETTE.toriiBase },
         lines: ['Twelve birds. Each one has a name and each one knows it.',
                 'The season is June. The rest of the year we sit here and mend things.',
-                'A ring round the throat, not tight. They swallow the small ones. That is the deal.'],
-        wheek: ['Do not do that near the birds. …too late.'] });
+                'A ring round the throat, not tight. They swallow the small ones. That is the deal.',
+                { t: 'You went between the boats. Nobody goes between the boats.', after: 'uji-run' },
+                { t: 'The water is going faster than you think. It always is.', before: 'uji-run' }],
+        wheek: ['Do not do that near the birds. …too late.'],
+        onTask: { 'uji-run': ['Kichi has not moved. Kichi does not move for anything.',
+                              'All the way to the mill. On your back, most of it.'] } });
+    }
+    // ---- AND TWO CONVERSATIONS THAT ARE NOT WITH YOU (v20) --------------
+    // See addExchange in npc.js. Every voice in this chapter — in every
+    // chapter — was addressed to the capybara, so a lane with two people in it
+    // was silent unless you walked up and stood between them. These run when
+    // you are near enough to read both bubbles and far enough not to be the
+    // subject, which means the thing you catch is a conversation that was
+    // already happening. That is most of what makes a street a street.
+    if (typeof game.addExchange === 'function') {
+      // Gion, across the lane: the one who is late, and the one who is not.
+      if (kyoLocLate && kyoLocSweep) {
+        game.addExchange({ biome: 'kyoto', a: kyoLocLate, b: kyoLocSweep, lines: [
+          ['You have swept that step twice.', 'I have swept it four times. You are late.'],
+          ['Is it four o’clock?', 'It is not four o’clock. It is never four o’clock when you ask.'],
+          ['There is an animal in the lane.', 'There is always something in the lane. Sweep round it.'],
+          ['Lovely evening.', 'It is the afternoon.'],
+          ['I shall be back before the lanterns.', 'You will not.'],
+        ] });
+      }
+      // Uji, across the street: two shops, one leaf, sixty years.
+      if (kyoLocTea && kyoLocTea2) {
+        game.addExchange({ biome: 'kyoto', a: kyoLocTea, b: kyoLocTea2, gap: 34, lines: [
+          ['Your sign is over my step again.', 'My sign has been there since before your step.'],
+          ['Second flush.', 'FIRST flush. …second flush.'],
+          ['A customer.', 'That is a capybara.', ],
+          ['Ninety yen a gram is robbery.', 'Ninety yen a gram is Uji.'],
+          ['Your awning drips on my tins.', 'Your tins are under my awning.'],
+        ] });
+      }
     }
   }
 

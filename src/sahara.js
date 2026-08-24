@@ -145,12 +145,26 @@ let sahStormWall = null;
 let sahPursuerMesh = null, sahPursuerHeads = null;
 // x, z, homeX, homeZ, yaw, state, lastSeenX, lastSeenZ
 const sahPurData = new Float32Array(sahPURSUER_N * 8);
+// One latch per trader for THE NEAR MISS (see sahUpdateChase), cleared the
+// moment they see you again and on every fresh chase.
+const sahPurMiss = new Uint8Array(sahPURSUER_N);
+let sahMissN = 0;
+const sahPUR_MISS_R = 4.2;     // m of "and he did not look"
 let sahCamelMesh = null, sahCamelLegs = null;
 const sahCamelData = new Float32Array(sahCARAVAN_N * 4);  // t, x, z, yaw
 // The three people travelling with the caravan, by index into sahPplData.
 const sahCarPeople = [];
 let sahCaravanBody = null, sahCarPX = 0, sahCarPY = 0, sahCarPZ = 0;
 let sahCartGroup = null, sahBasketGroup = null;
+// The ten people who live here, kept so addExchange can pair them up. See
+// THE PEOPLE WHO LIVE HERE at the foot of sahBuild.
+let sahLocCart = null, sahLocSnake = null, sahLocAcro = null, sahLocHalqa = null;
+let sahLocDyer = null, sahLocWater = null, sahLocMaalem = null, sahLocGate = null;
+let sahLocPalm = null, sahLocDune = null;
+let sahStallLamps = null;      // the fourteen lamps over the food stalls
+let sahCobraGroup = null;      // the cobra that lives in the basket you sit in
+let sahCobraUp = 0;            // 0..1 of the way out of it
+let sahBasketSit = 0;          // s the animal has been inside the ring
 let sahFireGroup = null, sahFireLight = 0, sahFirePool = null;
 let sahSoukRoofs = null;
 let sahSeguia = null;
@@ -517,6 +531,26 @@ function sahSoukBlocked(x, z, r) {
   const h = sahSOUK_BLOCK * 0.5 + (r || 0);
   return Math.abs(x - cx) < h && Math.abs(z - cz) < h;
 }
+// ---- WHERE THE LENS MAY NOT GO ABOVE (v20) ---------------------------------
+// The souk is roofed at 6.6 m over every alley — see the ROOF note in
+// sahBuildSouk — and the roof is drawn geometry with no rigid body, which is
+// right for a palm-frond mat nobody will ever stand on and fatal for a camera
+// that decides its height from the GROUND. Measured in a north-south lane: the
+// eye at y = 7.6, the mats at 6.6, and the whole frame filled with the top of a
+// market the capybara was somewhere underneath.
+//
+// systems.js asks for this by name, per frame, at the position the eye WANTS
+// rather than at the animal's — the boom reaches eight metres back and it is
+// the far end of it that comes up through the roof. Outside the souk footprint
+// there is no answer and the camera keeps every bit of the sky it had.
+const sahROOF_Y = 6.6;
+const sahCAM_CEIL = sahROOF_Y - 0.35;
+function sahCamCeil(x, z) {
+  if (x < sahSOUK_X0 - 3 || x > sahSOUK_X0 + sahSOUK_NX * sahSOUK_CELL + 3) return Infinity;
+  if (z < sahSOUK_Z0 - 3 || z > sahSOUK_Z0 + sahSOUK_NZ * sahSOUK_CELL + 3) return Infinity;
+  return sahCAM_CEIL;
+}
+
 /** Four of the thirty-two cells are little squares rather than blocks, because
  *  a perfectly regular grid is a car park and reads as one. */
 function sahSoukOpen(i, j) {
@@ -676,7 +710,9 @@ function sahBuildSouk(game, root) {
   // every alley — but the ROOFSCAPE now has parapets on it (see the block
   // loop), which is what actually stops the mats reading as a grid floating
   // over a heap of boxes.
-  const ROOF_Y = 6.6;
+  // The one number, and it is now shared with sahCamCeil — a roof the camera
+  // has to stay under is the same roof the mats are laid at.
+  const ROOF_Y = sahROOF_Y;
   for (let i = 0; i <= sahSOUK_NX; i++) {
     const x = sahSOUK_X0 + i * sahSOUK_CELL;
     for (let k = 0; k < 34; k++) {
@@ -942,7 +978,27 @@ function sahBuildSquare(game, root) {
 
   // --- the food stalls. At dusk a hundred of them go up in an hour; there are
   //     twelve here and they ring the square, which is the arrangement.
+  // ---- FOURTEEN STALLS AND ONE COLOUR BETWEEN THEM -----------------------
+  // `awn` was [sahCanvas 0xe4d5b8, sahAwning 0xd9c9a4, sahTileWhite 0xf2ece0]
+  // — three shades of the same cream, four values apart, cycled by index. So
+  // the fourteen brightest objects in the busiest square in Africa were, to the
+  // eye, ONE object drawn fourteen times, and the ring of them round the
+  // capybara read as a ring of identical white tables.
+  //
+  // Two things fix it and neither costs a triangle. The canvas keeps its cream
+  // — a food stall in Jemaa el-Fnaa really is white canvas and painting them
+  // all in dye colours would be a lie and a mess — but the VALANCE, the
+  // number board and the ridge are struck in the souk's own dye palette, one
+  // per stall, so each pitch has an identity from across the square. And every
+  // third stall carries a striped tarp over the cream, which is the other
+  // thing the real ones have.
   const awn = [PALETTE.sahCanvas, PALETTE.sahAwning, PALETTE.sahTileWhite];
+  const trim = [PALETTE.sahDye1, PALETTE.sahDye2, PALETTE.sahDye3, PALETTE.sahDye4,
+                PALETTE.sahTileGreen, PALETTE.sahBrass, PALETTE.sahMint];
+  // The lamps hang in their own merged mesh under an emissive material: a
+  // Lambert bulb in a chapter that ends after dark is a grey pebble. Their
+  // intensity follows sahDusk — see sahUpdateTasks.
+  const LAMP = sahMerger();
   const stallGrp = sahStaticGroup(game);
   for (let i = 0; i < 14; i++) {
     const a = i / 14 * 6.283;
@@ -963,17 +1019,36 @@ function sahBuildSquare(game, root) {
     for (let s2 = -1; s2 <= 1; s2 += 2) {
       M.box(x, 2.62, z + s2 * 0.88, 4.3, 0.09, 1.85, awn[i % 3], s2 * 0.13, 0, 0);
     }
-    M.box(x, 2.80, z, 4.35, 0.12, 0.34, awn[(i + 1) % 3]);
+    const tc = trim[i % trim.length];
+    M.box(x, 2.80, z, 4.35, 0.12, 0.34, tc);          // the ridge, in the pitch's colour
+    // every third pitch has a striped tarp thrown over the cream, which is the
+    // one thing that stops fourteen white slabs being one white slab
+    if (i % 3 === 1) {
+      for (let s3 = -1; s3 <= 1; s3 += 2) {
+        for (let k = 0; k < 3; k++) {
+          M.box(x - 1.4 + k * 1.4, 2.66, z + s3 * 0.88, 0.62, 0.05, 1.9, tc, s3 * 0.13, 0, 0);
+        }
+      }
+    }
     // a valance along the front of the awning, which every one of them has and
     // which is the difference between a market stall and a trestle under a slab
     const zf = z + (z > 4 ? -1.72 : 1.72);          // the edge facing the crowd
     for (let k = 0; k < 6; k++) {
-      M.box(x - 1.75 + k * 0.7, 2.51, zf, 0.6, 0.32, 0.05, awn[(i + k) % 3]);
+      M.box(x - 1.75 + k * 0.7, 2.51, zf, 0.6, 0.32, 0.05, k % 2 ? tc : awn[(i + k) % 3]);
     }
     // the numbered board every stall on that square carries, and it really is
     // a number — there are a hundred of them and they are licensed
     M.box(x - 1.5, 2.30, z - 1.6, 0.7, 0.44, 0.06, PALETTE.sahTileWhite);
-    M.box(x - 1.5, 2.30, z - 1.62, 0.28, 0.26, 0.02, PALETTE.sahDye3);
+    M.box(x - 1.5, 2.30, z - 1.62, 0.28, 0.26, 0.02, tc);
+    // ---- AND A LAMP UNDER EVERY ONE ---------------------------------------
+    // The chapter ends after dark at the desert camp and its third act begins
+    // with the storm, so the medina is seen under a dusk sky for a good part of
+    // the playing time — and there was not one light source in the whole
+    // square except fourteen discs of ember paint in the braziers. A pressure
+    // lamp hung off the ridge pole is what every one of these actually has.
+    M.cyl(x + 0.9, 2.44, zf, 0.03, 0.30, PALETTE.sahBrassDk);      // the flex
+    M.cyl(x + 0.9, 2.16, zf, 0.17, 0.10, PALETTE.sahBrassDk, 0, 0, 0, 6);
+    LAMP.sph(x + 0.9, 2.05, zf, 0.13, 0.15, 0.13, 0xffffff);
     // a brazier, and the smoke off them is why the square is a photograph
     M.cyl(x + 1.9, 0.4, z + 1.4, 0.4, 0.8, PALETTE.sahBrassDk, 0, 0, 0, 6);
     M.cyl(x + 1.9, 0.85, z + 1.4, 0.36, 0.2, PALETTE.sahEmber, 0, 0, 0, 6);
@@ -1014,6 +1089,17 @@ function sahBuildSquare(game, root) {
   }
 
   stallGrp.done();
+
+  // the fourteen lamps, self-illuminated, one draw call, never a caster
+  {
+    const lm = new THREE.Mesh(LAMP.build(),
+      mat(0x000000, { emissive: PALETTE.sahLamp, emissiveIntensity: 0.5 }));
+    lm.castShadow = false;
+    lm.receiveShadow = false;
+    lm.userData.noShadow = true;
+    root.add(lm);
+    sahStallLamps = lm;
+  }
 
   // --- the storytellers' rings ---------------------------------------------
   // A halqa is a RING OF PEOPLE. Drawn as "a bare patch with a drum in the
@@ -1361,18 +1447,82 @@ function sahBuildProps(game, root) {
                sahCART.z, 3.2, 1.24, 1.8);
 
   // --- the basket ------------------------------------------------------------
+  // ======= AND IT HAD A LID ON IT, WHICH IS THE ICELAND BUG AGAIN ==========
+  //
+  // The task is 'Sit in the snake charmer's basket'. What stood here was a
+  // SOLID cylinder 1.44 m across and 85 cm tall with a cone dead-centre on top
+  // of it — the comment says "the lid, off to one side" and the geometry puts
+  // it at (0, 1.16, 0), i.e. on. There was no hole, no floor and no way in, and
+  // `sahUpdateTasks` ticked the row the moment the animal came within 2.2 m of
+  // the middle with no input at all. So the chapter's third line — the one it
+  // gives you before it shows you the chase — was 'walk within two metres of a
+  // sealed drum'. Exactly the shape of Iceland's hot spring, whose silica rim
+  // was a plate over the whole pool.
+  //
+  // A basket is a RING. Sixteen staves round an open middle, a floor sunk to
+  // ankle height, a rim at 45 cm (the animal steps 0.4 and hops 1.4, so getting
+  // in is a deliberate hop and getting out can never fail), and the lid where
+  // the comment always said it was: on the sand, leaning against the side.
   const bg = new THREE.Group();
   const B = sahMerger();
-  B.cyl(0, 0.42, 0, 0.72, 0.85, PALETTE.sahRope, 0, 0, 0, 8);
-  B.cyl(0, 0.88, 0, 0.80, 0.10, PALETTE.sahCedarDk, 0, 0, 0, 8);
-  B.cone(0, 1.16, 0, 0.62, 0.5, PALETTE.sahRope, 0, 0, 0, 8);   // the lid, off to one side
+  const bR = 0.98;                       // inside radius: a capybara is 0.9 long
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * 6.283;
+    const lean = 0.05 + (i % 3) * 0.015;   // it bulges, because it is woven
+    B.box(Math.cos(a) * bR, 0.24, Math.sin(a) * bR, 0.30, 0.48, 0.13,
+          i % 2 ? PALETTE.sahRope : PALETTE.sahCedar, 0, -a, lean);
+  }
+  // two woven hoops, which is what stops sixteen staves reading as a fence
+  B.cyl(0, 0.14, 0, bR + 0.07, 0.09, PALETTE.sahCedarDk, 0, 0, 0, 8);
+  B.cyl(0, 0.44, 0, bR + 0.09, 0.10, PALETTE.sahCedarDk, 0, 0, 0, 8);
+  // the floor, sunk, so the inside is a place and not a hole in the ground
+  B.cyl(0, 0.06, 0, bR - 0.02, 0.12, PALETTE.sahTent, 0, 0, 0, 8);
+  // the lid, OFF and leaning against the side, which is how you know it is open
+  // (small, and nearly flat on the sand: the first cut was a 1.3 m cone stood
+  //  on end beside the basket and it photographed as a boulder.)
+  B.cyl(bR + 0.62, 0.09, -0.46, 0.60, 0.13, PALETTE.sahRope, 0.34, 0.4, 0.16, 8);
+  B.cyl(bR + 0.66, 0.17, -0.50, 0.22, 0.10, PALETTE.sahCedarDk, 0.34, 0.4, 0.16, 6);
   // the man, his flute, and a cobra that has heard this tune before
-  B.cyl(-1.7, 0.5, 0.4, 0.42, 1.0, PALETTE.sahCanvas, 0, 0, 0, 6);
-  B.sph(-1.7, 1.25, 0.4, 0.28, 0.30, 0.28, PALETTE.sahOchreDk);
-  B.cyl(-1.2, 1.1, 0.4, 0.05, 0.9, PALETTE.sahCedar, 0, 0, 1.1);
+  B.cyl(-1.9, 0.5, 0.4, 0.42, 1.0, PALETTE.sahCanvas, 0, 0, 0, 6);
+  B.sph(-1.9, 1.25, 0.4, 0.28, 0.30, 0.28, PALETTE.sahOchreDk);
+  B.cyl(-1.4, 1.1, 0.4, 0.05, 0.9, PALETTE.sahCedar, 0, 0, 1.1);
   const bm = new THREE.Mesh(B.build(), sahVC());
   bm.castShadow = true;
   bg.add(bm);
+  // ---- THE COBRA, WHICH IS THE WHOLE JOKE AND WAS NOT DRAWN --------------
+  // Its own group, because it comes up out of the basket when something sits
+  // in it and goes back down when whatever it is leaves. Seven segments on a
+  // taper with a hood and two eyes, and it sways: see sahUpdateTasks.
+  const cg2 = new THREE.Group();
+  const C = sahMerger();
+  for (let i = 0; i < 7; i++) {
+    const u = i / 6;
+    C.cyl(Math.sin(u * 3.1) * 0.10, 0.10 + u * 0.62, 0, 0.13 - u * 0.045, 0.16,
+          i % 2 ? PALETTE.sahTileGreen : PALETTE.sahCedarDk, 0, 0, 0, 6);
+  }
+  C.box(0.02, 0.80, 0, 0.34, 0.30, 0.10, PALETTE.sahTileGreen);      // the hood
+  C.sph(0.02, 0.86, 0, 0.11, 0.10, 0.13, PALETTE.sahCedarDk);        // the head
+  C.sph(0.06, 0.89, 0.07, 0.03, 0.03, 0.03, PALETTE.sahTileWhite);
+  C.sph(0.06, 0.89, -0.07, 0.03, 0.03, 0.03, PALETTE.sahTileWhite);
+  const cm = new THREE.Mesh(C.build(), sahVC());
+  cm.castShadow = false;
+  cg2.add(cm);
+  cg2.position.set(0, -0.9, 0);          // asleep, below the rim
+  cg2.visible = false;
+  bg.add(cg2);
+  sahCobraGroup = cg2;
+  // THE RIM IS SOLID. Eight small boxes on one body — you have to hop in, which
+  // is the entire difference between a task and a proximity switch. Nothing is
+  // taller than 48 cm, so the hop out is never in doubt.
+  {
+    const rg = sahStaticGroup(game);
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * 6.283;
+      rg.add(sahSNAKE.x + Math.cos(a) * bR, sahTerrain(sahSNAKE.x, sahSNAKE.z) + 0.24,
+             sahSNAKE.z + Math.sin(a) * bR, 0.62, 0.48, 0.22, -a);
+    }
+    rg.done();
+  }
   bg.position.set(sahSNAKE.x, sahTerrain(sahSNAKE.x, sahSNAKE.z), sahSNAKE.z);
   root.add(bg);
   sahBasketGroup = bg;
@@ -1413,9 +1563,31 @@ function sahBuildProps(game, root) {
  */
 const sahPPL_MAX = 250;
 const sahPPL_STAND = 0, sahPPL_SIT = 1, sahPPL_PLAY = 2;
-const sahPPL_STRIDE = 9;
+// ---- A CROWD THAT MOVES LESS THAN A PIXEL IS A CROWD OF STATUES (v20) -----
+// The idle motion in sahUpdatePeople was a 1.4 cm bob at 0.9 rad/s and a 0.16
+// rad sway at 0.23 rad/s — a twenty-seven second period on the only term big
+// enough to see. MEASURED, from the chapter's own spawn, for the ninety-eight
+// people inside thirty metres: the median person moved 0.58 PIXELS in seven
+// tenths of a second and only 163 of 588 samples cleared one pixel at all.
+// Every number in there was defensible on its own and the sum of them was a
+// waxwork, which is exactly what "a lot of them do not animate at all" is.
+//
+// The fix is not a bigger sine. A person standing in a market square does not
+// sway continuously — they stand still for several seconds and then MOVE:
+// shift their weight, turn a quarter of the way round, lean in. So each person
+// gets a decision clock, and between decisions they are as still as they
+// always were. Staggered by construction (the interval is re-drawn per person
+// per fidget), so the square can never beat in time with itself — which is the
+// failure the original amplitudes were chosen to avoid, and it is avoided here
+// by the stagger instead of by being too small to see.
+const sahFID_A = 2.6, sahFID_B = 8.5;   // s between one person's decisions
+const sahFID_STAND = 0.42;              // rad they turn through, either way
+const sahFID_SIT   = 0.30;              // ...and a seated rock is smaller
+const sahFID_L     = 2.6;               // damping: a fidget takes about 0.4 s
+const sahPPL_STRIDE = 14;
 let sahPplBody = null, sahPplHead = null, sahPplN = 0;
-// x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height
+// x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height,
+// fidget clock, fidget now, fidget target, step distance this frame, gait phase
 const sahPplData = new Float32Array(sahPPL_MAX * sahPPL_STRIDE);
 let sahPplBodyCol = null, sahPplHeadCol = null;
 const sahPplCol = new THREE.Color();
@@ -1467,6 +1639,11 @@ function sahBuildPeople(root) {
 
   sahPplBody = new THREE.InstancedMesh(bodyGeo, sahVC(), sahPPL_MAX);
   sahPplHead = new THREE.InstancedMesh(headGeo, sahVC(), sahPPL_MAX);
+  // Named like sahStorks and sahFronds are, because an anonymous InstancedMesh
+  // is invisible to every audit that walks the scene graph — and the crowd is
+  // the thing most worth measuring in this chapter.
+  sahPplBody.name = 'sahPeople';
+  sahPplHead.name = 'sahPeopleHeads';
   sahPplBodyCol = new Float32Array(sahPPL_MAX * 3);
   sahPplHeadCol = new Float32Array(sahPPL_MAX * 3);
   sahPplBody.instanceColor = new THREE.InstancedBufferAttribute(sahPplBodyCol, 3);
@@ -1513,6 +1690,11 @@ function sahAddPerson(x, y, z, yaw, kind) {
   // before it picks up the model. Eight per cent either way is invisible as a
   // measurement and obvious as a crowd.
   sahPplData[o + 8] = 0.92 + ((i * 37) % 17) / 17 * 0.17;
+  // The decision clock, seeded across the whole interval so the square is not
+  // silent for three seconds and then entirely in motion. See sahFID_A.
+  sahPplData[o + 9] = rand(0, sahFID_B);
+  sahPplData[o + 10] = 0; sahPplData[o + 11] = 0;
+  sahPplData[o + 12] = 0; sahPplData[o + 13] = rand(0, 6.283);
   sahPplCol.set(sahROBE[randInt(0, sahROBE.length - 1)]);
   sahPplBodyCol[i * 3] = sahPplCol.r;
   sahPplBodyCol[i * 3 + 1] = sahPplCol.g;
@@ -1537,6 +1719,16 @@ function sahAddPerson(x, y, z, yaw, kind) {
 function sahMovePerson(i, x, y, z, yaw) {
   if (i === undefined || i < 0 || i >= sahPplN) return;
   const o = i * sahPPL_STRIDE;
+  // ---- ...AND HOW FAR THEY WENT, WHICH IS WHAT A GAIT IS MADE OF (v20) ----
+  // A djellaba has no legs to swing — it is a cone, deliberately — so the only
+  // thing that can say "this person is walking" is that they rise and fall on
+  // the stride. Without it the caravan's three cameleers slide across the sand
+  // at walking pace like chess pieces, which is the same tell sahPursuerSync's
+  // own comment names ("a figure that slides across the ground without moving")
+  // and the three people who actually travel in this chapter never got it.
+  // Recorded here rather than differenced in the update, because this is the
+  // only writer and it already has both positions in hand.
+  sahPplData[o + 12] = Math.hypot(x - sahPplData[o], z - sahPplData[o + 2]);
   sahPplData[o] = x; sahPplData[o + 1] = y; sahPplData[o + 2] = z; sahPplData[o + 3] = yaw;
 }
 
@@ -1564,6 +1756,33 @@ function sahUpdatePeople(dt) {
     const x = sahPplData[o], z = sahPplData[o + 2];
     let y = sahPplData[o + 1], yaw = sahPplData[o + 3];
     let rx = 0, rz = -lean, sy = tall;
+    // ---- THE DECISION CLOCK. See sahFID_A ---------------------------------
+    // Three floats and a damp per person. Between decisions `fid` is a
+    // constant and this whole block is worth nothing at all, which is the
+    // point: the crowd is still, and then somebody moves.
+    let fid = 0;
+    if (kind !== sahPPL_PLAY) {
+      sahPplData[o + 9] -= dt;
+      if (sahPplData[o + 9] <= 0) {
+        sahPplData[o + 9] = rand(sahFID_A, sahFID_B);
+        sahPplData[o + 11] = rand(-1, 1) * (kind === sahPPL_SIT ? sahFID_SIT : sahFID_STAND);
+      }
+      sahPplData[o + 10] = damp(sahPplData[o + 10], sahPplData[o + 11], sahFID_L, dt);
+      fid = sahPplData[o + 10];
+    }
+    // ---- AND THE STRIDE, for the three people who go anywhere -------------
+    // sahMovePerson records the distance; here it becomes a bob and a lean, and
+    // it decays to nothing the moment they stop. `step` is metres this frame,
+    // so the phase advances with distance covered rather than with time and the
+    // gait cannot moonwalk when the caravan slows for the dune.
+    const step = sahPplData[o + 12];
+    sahPplData[o + 12] = 0;
+    if (step > 1e-5) {
+      sahPplData[o + 13] += step * 3.2;
+      const g = Math.abs(Math.sin(sahPplData[o + 13]));
+      y += g * 0.055;
+      rz -= 0.10 + Math.sin(sahPplData[o + 13]) * 0.035;
+    }
     if (kind === sahPPL_SIT) {
       y -= 0.44 * tall;
       sy = 0.62 * tall;
@@ -1571,6 +1790,12 @@ function sahUpdatePeople(dt) {
       // leaning in, and every so often somebody shifts
       y += Math.sin(sahTime * 0.7 * rate + ph) * 0.012;
       yaw += Math.sin(sahTime * 0.31 * rate + ph) * 0.09;
+      // ...and the rock. A seated fidget is forward and back at the waist
+      // rather than a turn — that is what somebody sitting cross-legged in a
+      // ring actually does — with a little yaw carried along with it.
+      rx += fid * 0.55;
+      yaw += fid * 0.5;
+      y -= Math.abs(fid) * 0.02;
       if (ring > 0) {
         // ...and the ring does it TOGETHER, a beat apart round the circle so it
         // travels rather than switching
@@ -1586,11 +1811,18 @@ function sahUpdatePeople(dt) {
       y += Math.abs(Math.sin(sahTime * (2.6 + band * 2.2) * rate + ph)) * (0.02 + band * 0.09);
       sy = tall * (1 + band * 0.05);
     } else {
-      // standing: a slow weight shift and a breath, which is enough — a crowd
-      // that all bobs in time is a chorus line
+      // standing: a breath, and then whatever the decision clock last decided.
+      // The breath is the old continuous term and is still deliberately tiny —
+      // a crowd that all bobs in time is a chorus line. What carries the
+      // motion now is `fid`: a real quarter-turn onto the other foot, taken
+      // once every few seconds, at a moment nobody else has chosen.
       y += Math.sin(sahTime * 0.9 * rate + ph) * 0.014;
-      yaw += Math.sin(sahTime * 0.23 * rate + ph) * 0.16;
-      rz -= Math.sin(sahTime * 0.41 * rate + ph) * 0.02;
+      yaw += Math.sin(sahTime * 0.23 * rate + ph) * 0.16 + fid;
+      // the weight goes onto the foot they turned toward, and they settle a
+      // centimetre or two onto it — which is the half of a weight shift that
+      // actually reads at fifteen metres
+      rz -= Math.sin(sahTime * 0.41 * rate + ph) * 0.02 + fid * 0.22;
+      y -= Math.abs(fid) * 0.028;
     }
     sahPplBody.setMatrixAt(i, sahXform(x, y, z, rx, yaw, rz, tall, sy, tall));
     sahPplHead.setMatrixAt(i, sahXform(x - rz * 1.3 * tall, y + 1.42 * sy, z + rx * 1.3 * tall,
@@ -1661,7 +1893,9 @@ function sahBuildPursuers(root) {
     sahPurData[o + 5] = 0;
     sahPurData[o + 6] = sahPurData[o];
     sahPurData[o + 7] = sahPurData[o + 1];
+    sahPurMiss[i] = 0;
   }
+  sahMissN = 0;
   root.add(im);
   sahPursuerMesh = im;
   sahPursuerSync();
@@ -1776,6 +2010,22 @@ function sahUpdateChase(game, dt) {
     if (canSee) {
       seen = true;
       sahPurData[o + 6] = p.x; sahPurData[o + 7] = p.z;
+      sahPurMiss[i] = 0;
+    } else if (d < sahPUR_MISS_R && sahPurMiss[i] <= 0) {
+      // ---- THE NEAR MISS -------------------------------------------------
+      // The one thing a chase through a maze has that a chase across a square
+      // does not is the moment somebody goes past the end of your alley and
+      // does not look down it. It was happening constantly and the game said
+      // nothing about it at all — the whole payout was a tick, thirty seconds
+      // later, for the escape. So: the first time each trader gets within four
+      // metres of the animal WITHOUT a line of sight, a very small sound and,
+      // once per chase, a line. Once per pursuer per chase, because a maze
+      // that congratulates you every second is a maze you stop reading.
+      sahPurMiss[i] = 1;
+      sahMissN++;
+      sahSfx('rustle', { volume: 0.22 + 0.16 * (1 - d / sahPUR_MISS_R), pitch: 1.5 });
+      if (sahMissN === 2) sahToast('he went straight past the end of the alley.');
+      else if (sahMissN === 5) sahToast('five of them, and not one of them has looked up.');
     }
     const tx = sahPurData[o + 6], tz = sahPurData[o + 7];
     let gx = tx - px, gz = tz - pz;
@@ -4390,14 +4640,48 @@ function sahUpdateTasks(game, dt) {
   }
 
   // --- the basket ------------------------------------------------------------
-  if (!sahSnakeDone) {
+  // IN IT, not near it. The old test was a 2.2 m circle on the ground with no
+  // height term and no input, over a sealed drum — see the note in the builder.
+  // The basket is open now and the rim is solid, so 'in' means what it says:
+  // inside a 98 cm ring and standing on its floor rather than on its edge.
+  {
     const dx = p.x - sahSNAKE.x, dz = p.z - sahSNAKE.z;
-    if (dx * dx + dz * dz < 2.2 * 2.2) {
-      sahSnakeDone = true;
-      sahTask('snake-basket');
-      sahToast('the cobra has gone to look for somewhere quieter.');
-      sahSfx('rustle', { volume: 0.8, pitch: 1.4 });
-      if (sahBasketGroup) sahBasketGroup.rotation.y += 1.1;
+    const ground = sahTerrain(sahSNAKE.x, sahSNAKE.z);
+    const inIt = dx * dx + dz * dz < 0.92 * 0.92 && p.y < ground + 0.85;
+    if (inIt) {
+      sahBasketSit += dt;
+      if (!sahSnakeDone && sahBasketSit > 0.35) {
+        sahSnakeDone = true;
+        sahTask('snake-basket');
+        sahToast('the cobra has gone to look for somewhere quieter.');
+        sahSfx('rustle', { volume: 0.8, pitch: 1.4 });
+        sahSfx('gasp', { volume: 0.5, pitch: 1.1 });
+      }
+    } else if (sahBasketSit > 0) {
+      sahBasketSit = 0;
+    }
+    // ---- AND THE COBRA COMES UP TO SEE WHO IT IS ------------------------
+    // The cheapest good joke in the chapter: something else lives in there, it
+    // is displaced, and it takes it personally. It rises whenever the basket is
+    // occupied — every time, not once — and it sways to the flute the rest of
+    // the time from just under the rim, so you can see a bit of it moving
+    // before you ever decide to get in.
+    if (sahCobraGroup) {
+      const wantUp = inIt ? 1 : 0;
+      sahCobraUp = damp(sahCobraUp, wantUp, inIt ? 4.5 : 2.0, dt);
+      const vis = sahCobraUp > 0.02;
+      if (sahCobraGroup.visible !== vis) sahCobraGroup.visible = vis;
+      if (vis) {
+        // BESIDE whatever is in the basket, not through it: at 0.34 m the
+        // cobra came up out of the capybara's back.
+        sahCobraGroup.position.set(Math.cos(sahTime * 0.9) * 0.66,
+                                   -0.86 + sahCobraUp * 1.34,
+                                   Math.sin(sahTime * 0.9) * 0.66);
+        // it looks at whatever is in its basket
+        sahCobraGroup.rotation.y = Math.atan2(p.x - sahSNAKE.x, p.z - sahSNAKE.z) +
+                                   Math.sin(sahTime * 1.7) * 0.30;
+        sahCobraGroup.rotation.z = Math.sin(sahTime * 2.3) * 0.10 * sahCobraUp;
+      }
     }
   }
 
@@ -4429,6 +4713,13 @@ function sahUpdateTasks(game, dt) {
       sahDustSpawn(sahCAMP.x + rand(-1, 1), sahTerrain(sahCAMP.x, sahCAMP.z) + rand(1, 5),
         sahCAMP.z + rand(-1, 1), rand(-2, 2), rand(0.15, 0.4), rand(0.8, 2.0));
     }
+  }
+
+  // the stall lamps come up as the light goes, and they gutter — one shared
+  // material, so it is one number a frame for all fourteen
+  if (sahStallLamps) {
+    sahStallLamps.material.emissiveIntensity =
+      0.28 + sahDusk * 1.45 + Math.sin(sahTime * 5.7) * 0.05 * sahDusk;
   }
 
   // the fire itself, which grows when the capybara is running the band
@@ -4499,6 +4790,9 @@ export function createSahara(game) {
       sahAcroFlying = false; sahAcroTop = 0; sahAcroFly = 0;
       sahAcroWind = -1; sahAcroCool = 0;
       sahCatchT = 0; sahChaseDelay = 0; sahChaseNear = 999;
+      // the cobra goes back in its basket, and the basket forgets you were in it
+      sahBasketSit = 0; sahCobraUp = 0;
+      if (sahCobraGroup) sahCobraGroup.visible = false;
       sahBoom = 0; sahBoomT = 0; sahFireTakeover = 0; sahAcroPuff = 0;
       // ---- AND THE WEATHER DOES NOT TRAVEL WITH YOU ------------------------
       // `sahStorm` is a plain 0..1 that only sahUpdateStorm writes and
@@ -4535,6 +4829,9 @@ export function createSahara(game) {
     waterHeightAt() { return -400; },
     inZone: sahInZone,
     navBlocked: sahNavBlocked,
+    // The lens may not climb out through the souk's roof. See sahCamCeil —
+    // this is camFloor's mirror and systems.js asks for it by name.
+    camCeil: sahCamCeil,
     SPAWN: sahSPAWN,
     // the acrobats of Amizmiz, and the mat they throw you off
     acrobats: sahACRO,
@@ -4644,95 +4941,289 @@ function sahBuild(game) {
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,
   // a few things they might say when the capybara turns up, and a different
-  // few for when it wheeks at them. Where the chapter owns a Group for the
-  // figure, it is handed over too and the figure turns to watch.
+  // few for when it wheeks at them.
+  //
+  // ---- THREE OF THEM WERE STANDING INSIDE THEIR OWN FURNITURE (v21) ------
+  // Measured with a body-overlap audit rather than by eye, which is the only
+  // way this class is ever found: `addLocal` gives every person a 0.52 x 1.70 x
+  // 0.48 collider at their feet, and
+  //
+  //   * the juice seller was authored at sahCART — the exact centre of a 3.2 x
+  //     1.24 x 1.8 solid cart. Invisible from every angle, his collider inside
+  //     its collider. This is the fourth instance of the class (Rio's kiosk
+  //     vendor, Iceland's harbourmaster, the pylsa man) and it keeps happening
+  //     for the same reason: the landmark constant is the thing you want the
+  //     BEACON to point at, and it is never a place a person can stand.
+  //   * the snake charmer was authored at sahSNAKE — which, now that the basket
+  //     is a basket you can get into rather than a sealed drum, is the middle
+  //     of the task. A capybara hopping in landed on a man.
+  //   * the dyer was authored at (sahSOUK_X0 + 3.5·CELL, sahSOUK_Z0 + 1.2·CELL),
+  //     and 3.5 cells is exactly a BLOCK CENTRE: he was in the shop wall, half
+  //     in the alley and half in the masonry.
+  //
+  // Every one of them is placed off its landmark now, facing it.
+  //
+  // ---- AND THEY KNOW WHAT YOU HAVE DONE ----------------------------------
+  // Ten people, thirty sentences, and none of them changed from the first
+  // second of the chapter to the last: the man whose cart you had just emptied
+  // was still inviting you to look, for free. See localResolve in npc.js —
+  // `before`/`after` a task id, `when` for anything else, `onTask` for the
+  // moment itself. Chapters 4, 5 and 6 have had this since their passes and
+  // this one never got it.
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'sahara', x: sahCART.x, y: 0, z: sahCART.z, near: 6,
+    const storming = function () { return sahStorm > 0.35; };
+    const chased = function () { return sahChase === 1 && sahChaseDelay <= 0; };
+    // BESIDE THE CART, NOT IN IT. See the note above.
+    sahLocCart = game.addLocal({ biome: 'sahara', x: sahCART.x - 2.4, y: 0, z: sahCART.z + 0.5,
+      near: 7, face: 1.78,
       figure: { shirt: PALETTE.cloth8, skin: PALETTE.skin3 },
-      lines: ['Four dirham! Fresh! Squeezed while you watch!',
-              'My friend. My friend. Only look. Looking is free.',
-              'Same price for everyone. Almost everyone.'],
+      lines: [{ t: 'Four dirham! Fresh! Squeezed while you watch!', before: 'orange-cart' },
+              { t: 'My friend. My friend. Only look. Looking is free.', before: 'orange-cart' },
+              'Same price for everyone. Almost everyone.',
+              { t: 'You did not even pretend to reach for a pocket.', after: 'orange-cart' },
+              { t: 'Four dirham. FOUR. It is written on the cart.', after: 'orange-cart' },
+              { t: 'They are still out looking for you. I told them where you went.',
+                after: 'souk-escape' },
+              { t: 'Run. Do not stand there telling me about it. RUN.', when: chased },
+              { t: 'Nothing is fresh in this. Come back when it has blown through.',
+                when: storming }],
       wheek: ['Ha! A voice like that belongs in the square.',
-              'Take the orange. Take it. Go on.'] });
-    game.addLocal({ biome: 'sahara', x: sahSNAKE.x, y: 0, z: sahSNAKE.z, near: 6,
+              'Take the orange. Take it. Go on.',
+              { t: 'Do not shout at me. You have had quite enough from me.', after: 'orange-cart' }],
+      onTask: { 'orange-cart': ['THAT IS MY CART.',
+                                'Ya latif. Ya LATIF.'],
+                'souk-escape': ['Six of them. Six grown men.'],
+                'acrobats': ['Sixty dirham to be thrown in the air. He does it for nothing.'] },
+      praise: ['I am not paying for whatever that was either.'] });
+    // BESIDE THE BASKET, NOT IN IT — and where the drawn figure has always
+    // stood, which is 1.9 m west of it. The old record put an invisible person
+    // and a solid box in the middle of the thing the task asks you to sit in.
+    sahLocSnake = game.addLocal({ biome: 'sahara', x: sahSNAKE.x - 1.9, y: 0, z: sahSNAKE.z + 0.4,
+      near: 6, face: 1.78,
       figure: { shirt: PALETTE.cloth7, skin: PALETTE.skin3 },
-      lines: ['Do not sit in the basket. Everyone sits in the basket.',
+      lines: [{ t: 'Do not sit in the basket. Everyone sits in the basket.', before: 'snake-basket' },
+              { t: 'The lid is off. That is not an invitation.', before: 'snake-basket' },
               'He is not deaf. He simply has no ears.',
-              'The pipe is for me, not for him. He cannot hear a note of it.'],
-      wheek: ['Now THAT he felt. Through the ground.'] });
-    game.addLocal({ biome: 'sahara', x: sahACRO.x, y: 0, z: sahACRO.z, near: 7,
+              'The pipe is for me, not for him. He cannot hear a note of it.',
+              { t: 'He has been in a very bad mood since you did that.', after: 'snake-basket' },
+              { t: 'Forty years that basket. Nobody has ever fitted.', after: 'snake-basket' },
+              { t: 'He is out. He is always out when you are in.',
+                when: function () { return sahCobraUp > 0.5; } },
+              { t: 'Get out of my basket and go and get out of THEIRS.', when: chased }],
+      wheek: ['Now THAT he felt. Through the ground.',
+              { t: 'Two of you in there and both of you shouting.',
+                when: function () { return sahCobraUp > 0.5; } }],
+      onTask: { 'snake-basket': ['OUT. Out of the — he LIVES in there.',
+                                 'You have taken a cobra’s house. In front of everybody.'],
+                'orange-cart': ['I saw nothing. I am a busy man.'] },
+      praise: ['Mm. The snake is unimpressed. So am I.'] });
+    // BESIDE THE MAT, NOT ON IT. sahOnMat is a 1.6 m circle round sahACRO and
+    // his collider was in the middle of it: the mini of this chapter asked the
+    // player to stand exactly where a solid person was standing.
+    sahLocAcro = game.addLocal({ biome: 'sahara', x: sahACRO.x - 2.3, y: 0, z: sahACRO.z - 1.4,
+      near: 7, face: 2.1,
       figure: { shirt: PALETTE.cloth1, skin: PALETTE.skin3, legs: PALETTE.cloth6 },
-      lines: ['Hands here, feet there, and trust us. Mostly trust us.',
+      lines: [{ t: 'Hands here, feet there, and trust us. Mostly trust us.', before: 'acrobats' },
+              { t: 'On the mat. ON the mat. We are not chasing you round the square.',
+                before: 'acrobats' },
               'We have thrown heavier. Not much heavier.',
-              'Ready? Nobody is ever ready.'],
-      wheek: ['Yalla! He is ready!'] });
+              'Ready? Nobody is ever ready.',
+              { t: 'Again? We can go again. We can always go again.', after: 'acrobats' },
+              { t: 'Straight up and straight down. Textbook. Unnerving, but textbook.',
+                after: 'acrobats' },
+              { t: 'Not while it is blowing. We would lose you over the wall.',
+                when: storming }],
+      wheek: ['Yalla! He is ready!',
+              'That is the count. That is exactly the count.'],
+      onTask: { 'acrobats': ['TEN METRES. Did anybody get that? Did ANYBODY get that?',
+                             'We are putting that in the show. That is the show now.'],
+                'orange-cart': ['We saw. We are saying nothing, we are performers.'] },
+      praise: ['Amizmiz! We are from Amizmiz! Tell people!'] });
     // FOUR MORE. Three people in the busiest square in Africa is a census, not
     // a chapter — and two of the four places the chapter actually stops you
     // (the storytellers' ring and the fire at the camp) had nobody to talk to
     // at all. One at a halqa, one dyer in the souk, the guerrab everybody
     // photographs and does not buy from, and the maalem at the fire.
-    game.addLocal({ biome: 'sahara', x: -14, y: 0, z: 12.6, near: 8,
+    sahLocHalqa = game.addLocal({ biome: 'sahara', x: -14, y: 0, z: 12.6, near: 8,
       figure: { shirt: PALETTE.sahCanvas, skin: PALETTE.skin4, hat: PALETTE.sahOchreDk },
       lines: ['Sit down. It is a long one and it is not free.',
               'Same story since my grandfather. He got it wrong too.',
-              'You have come in at the part where everybody dies.'],
+              'You have come in at the part where everybody dies.',
+              { t: 'There is a story about a rodent that emptied a juice cart. It is new.',
+                after: 'orange-cart' },
+              { t: 'And then it went into the souk, and then — well. You know how it ends.',
+                after: 'souk-escape' },
+              { t: 'Tonight I am doing the one about the dune that sings. Come back for it.',
+                before: 'dune-surf' },
+              { t: 'The dune sang for you. It does not do that for everybody.',
+                after: 'dune-surf' },
+              { t: 'Nobody listens to a story in this. Come back after.', when: storming }],
       wheek: ['Do not interrupt the halqa.',
-              'Right. YOU tell it, then.'] });
-    game.addLocal({ biome: 'sahara', x: sahSOUK_X0 + 3.5 * sahSOUK_CELL,
-      y: 0, z: sahSOUK_Z0 + 1.2 * sahSOUK_CELL, near: 7,
+              'Right. YOU tell it, then.'],
+      onTask: { 'souk-escape': ['Six of them! Round the dyers and out by the gate!'],
+                'acrobats': ['I shall need a word for the noise it made.'],
+                'snake-basket': ['I am writing this down. I am actually writing this down.'] },
+      praise: ['Everything is material. Even that.'] });
+    // IN THE ALLEY, NOT IN THE WALL. 3.5 cells from the origin is a block
+    // CENTRE and 1.2 cells is the block's own face — see the note above.
+    sahLocDyer = game.addLocal({ biome: 'sahara', x: sahSOUK_X0 + 3.5 * sahSOUK_CELL,
+      y: 0, z: sahSOUK_Z0 + 1.0 * sahSOUK_CELL, near: 7, face: 0,
       figure: { shirt: PALETTE.sahDye2, skin: PALETTE.skin3 },
       lines: ['Saffron, indigo, cochineal. And one of them is beetroot.',
               'Do not touch. It takes a week to come off.',
-              'You would look very good in blue. Everyone does.'],
-      wheek: ['In here? That will come back to you three times.'] });
-    game.addLocal({ biome: 'sahara', x: 16, y: 0, z: -4, near: 7,
+              'You would look very good in blue. Everyone does.',
+              { t: 'If you are being followed, go left, then left, then straight. Do not run at a wall.',
+                when: chased },
+              { t: 'They came through here shouting. I sent them the other way.',
+                after: 'souk-escape' },
+              { t: 'Four alleys and a roof over all of them. Nobody finds anybody in here.',
+                before: 'souk-escape' }],
+      wheek: ['In here? That will come back to you three times.',
+              { t: 'Quiet! They are two alleys away and they can hear you.', when: chased }],
+      onTask: { 'souk-escape': ['This is the best souk in Morocco for exactly that reason.'] },
+      praise: ['Whatever colour that was, it was not one of mine.'] });
+    sahLocWater = game.addLocal({ biome: 'sahara', x: 16, y: 0, z: -4, near: 7,
       figure: { shirt: PALETTE.sahDye1, skin: PALETTE.skin3, hat: PALETTE.sahDye1 },
       lines: ['Water! Cold water! Photograph is five dirham, water is free.',
               'Everybody wants the hat. Nobody wants the water.',
-              'The bell is brass. The cups are brass. The water is water.'],
-      wheek: ['THAT is a bell. Mine is only a bell.'] });
+              'The bell is brass. The cups are brass. The water is water.',
+              { t: 'You have been out east. I can see the sand on you.', after: 'dune-surf' },
+              { t: 'Take some before you go through the gate. There is nothing out there.',
+                before: 'caravan' },
+              { t: 'Now everybody wants the water. Now. Of course.', when: storming }],
+      wheek: ['THAT is a bell. Mine is only a bell.'],
+      onTask: { 'orange-cart': ['He charges four dirham for that. FOUR.'],
+                'caravan': ['Four days to the wells. Take the water. Take the WATER.'] },
+      praise: ['Five dirham for a photograph of that. Anybody?'] });
     // sahTerrain, NOT ZERO. Everything west of the palmeraie is at y = 0 and
     // the three locals that were already here could get away with the literal;
     // the camp is at x = 182, where the hamada has lifted the ground four
     // metres, so a maalem anchored at zero is a maalem buried to the shoulders.
-    game.addLocal({ biome: 'sahara', x: sahCAMP.x - 4.6,
+    sahLocMaalem = game.addLocal({ biome: 'sahara', x: sahCAMP.x - 4.6,
       y: sahTerrain(sahCAMP.x - 4.6, sahCAMP.z + 3.2), z: sahCAMP.z + 3.2, near: 9,
       figure: { shirt: PALETTE.sahTileWhite, skin: PALETTE.skin4, legs: PALETTE.sahTent },
       lines: ['Three strings. That is all it has ever needed.',
               'We play until it is finished. It is never finished.',
-              'Sit by the fire. Everything east of here is colder than it looks.'],
-      wheek: ['Ha! Put that on the two and you are in the band.'] });
+              'Sit by the fire. Everything east of here is colder than it looks.',
+              { t: 'Wait for it to pass. Nothing here is going anywhere.', when: storming },
+              { t: 'You came down the big one. We heard it from here.', after: 'dune-surf' },
+              { t: 'Take the low end. I will take the high end. Nobody will notice.',
+                before: 'fire-circle' },
+              { t: 'You can have it again whenever you like. It is not my guembri either.',
+                after: 'fire-circle' }],
+      wheek: ['Ha! Put that on the two and you are in the band.',
+              { t: 'On the TWO. Not on the one. Never on the one.', after: 'fire-circle' }],
+      onTask: { 'fire-circle': ['Somebody give it the qraqeb. Give it the QRAQEB.',
+                                'Three strings and a rodent. That is the whole tradition, that.'],
+                'dune-surf': ['A hundred metres of sand and it is still standing up.'],
+                'sandstorm': ['You stood in it. Nobody stands in it.'] },
+      praise: ['Put it in the second half. Everything goes in the second half.'] });
     // ---- AND THREE MORE, BECAUSE THE HALF OF THE CHAPTER EAST OF THE GATE
     // HAD ONE PERSON IN IT. Marrakech's cast was seven locals and every one of
     // them stood inside a forty-metre circle round the spawn, except the maalem
     // — so the gate, the caravan, the palmeraie and the entire erg, which is
     // half the chapter's playing time and where the `wow` is, had nobody to
     // talk to at all.
-    game.addLocal({ biome: 'sahara', x: 74, y: 0, z: sahGATE.z - 7.4, near: 8,
+    sahLocGate = game.addLocal({ biome: 'sahara', x: 74, y: 0, z: sahGATE.z - 7.4, near: 8,
       figure: { shirt: PALETTE.sahOchreDust, skin: PALETTE.skin4, hat: PALETTE.sahTileWhite },
-      lines: ['They go out at four. They come back when they come back.',
+      lines: [{ t: 'They go out at four. They come back when they come back.', before: 'caravan' },
               'Four days to Timbuktu, my grandfather said. He never went.',
-              'The lead one bites. The second one bites. Ride the third.'],
-      wheek: ['Do not do that near the camels. Do it near the camels.'] });
+              // THE SADDLE IS ON THE LEAD CAMEL. This line used to say 'ride the
+              // third', which is a good joke and was flatly wrong: sahBuildCaravan
+              // puts the one kinematic platform in the chapter on the FIRST animal,
+              // and the task card says so. A local may be rude about a task; a local
+              // may not send the player to the wrong animal.
+              { t: 'The saddle is on the lead one. It bites. That is the deal.', before: 'caravan' },
+              { t: 'You got up on the lead one. It bit you and you stayed. Good.', after: 'caravan' },
+              { t: 'There is a brown line on the horizon. Get behind something.',
+                when: function () { return sahStorm > 0.05 && sahStorm < 0.5; } },
+              { t: 'Do not go out in this. Do not — well. Off he goes.', when: storming },
+              { t: 'Nothing out there but the dune, and the dune is worth it.',
+                before: 'dune-surf' }],
+      wheek: ['Do not do that near the camels. Do it near the camels.'],
+      onTask: { 'caravan': ['Forty years of tourists and not one of them got on the THIRD one.'],
+                'dune-surf': ['From here it looked like the dune was coming apart.'] },
+      praise: ['The camels saw. The camels forget nothing.'] });
     // by the seguia, where the one palm with a crop on it stands
-    game.addLocal({ biome: 'sahara', x: sahDATE.x - 3.4, y: 0, z: sahDATE.z + 2.8, near: 8,
+    sahLocPalm = game.addLocal({ biome: 'sahara', x: sahDATE.x - 3.4, y: 0, z: sahDATE.z + 2.8, near: 8,
       figure: { shirt: PALETTE.sahMint, skin: PALETTE.skin3, legs: PALETTE.sahCanvas },
       lines: ['Water comes down that channel from the mountains. It has done for eight hundred years.',
               'A hundred and twenty kilos a year off one tree. And it asks for nothing.',
-              'You want the tall one with the notches. Everybody wants the tall one with the notches.'],
-      wheek: ['The whole grove heard that. So did the dates.'] });
+              { t: 'You want the tall one with the notches. Everybody wants the tall one.',
+                before: 'date-palm' },
+              { t: 'Ninety trees out here and you found the one. Somebody told you.',
+                after: 'date-palm' },
+              { t: 'There are dates all over my channel now. Thank you for that.',
+                after: 'date-palm' },
+              { t: 'Get under a tree. It will be over in a few minutes.', when: storming }],
+      wheek: ['The whole grove heard that. So did the dates.'],
+      onTask: { 'date-palm': ['ALL of them. It brought down ALL of them.',
+                              'Eight hundred years of irrigation and a rodent shakes the tree.'] },
+      praise: ['Do that in the channel and we will have words.'] });
     // AT THE TOP OF THE WALK-UP TRACK, which is the last thing you pass before
     // committing to the chapter's marquee.
     {
       const tz = sahDUNE_Z + sahDUNE_HZ * Math.sqrt(1 - sahSURF_BAND) * 1.06;
-      game.addLocal({ biome: 'sahara', x: sahDUNE_X - 10, z: tz + 1.8, near: 10,
+      sahLocDune = game.addLocal({ biome: 'sahara', x: sahDUNE_X - 10, z: tz + 1.8, near: 10,
         y: sahTerrain(sahDUNE_X - 10, tz + 1.8),
         figure: { shirt: PALETTE.sahDye3, skin: PALETTE.skin4, hat: PALETTE.sahCanvas },
-        lines: ['Straight down the middle. The sides are where it holds you.',
+        lines: [{ t: 'Straight down the middle. The sides are where it holds you.',
+                  before: 'dune-surf' },
                 'It makes a noise. Everybody thinks it is them. It is the dune.',
-                'Walk up on the hard track, go down anywhere you like.',
-                'Nobody has ever done it once.'],
-        wheek: ['Save it. You will want it on the way down.'] });
+                { t: 'Walk up on the hard track, go down anywhere you like.', before: 'dune-surf' },
+                { t: 'Nobody has ever done it once.', after: 'dune-surf' },
+                { t: 'Faster than that. It will go faster than that.', after: 'dune-surf' },
+                { t: 'Hear it? That is you. That is the sand under you.',
+                  when: function () { return sahSurfT >= 0; } },
+                { t: 'Not now. Get off the top of it and get down.', when: storming }],
+        wheek: ['Save it. You will want it on the way down.',
+                { t: 'The dune is louder. The dune is always louder.',
+                  when: function () { return sahSurfT >= 0; } }],
+        onTask: { 'dune-surf': ['A HUNDRED METRES. And it sang the whole way.',
+                                'I have watched four thousand people do that. Not like that.'],
+                  'sandstorm': ['You stayed out in it. On the top. On purpose.'] },
+        praise: ['The dune does not care. I care a bit.'] });
+    }
+
+    // ---- AND FOUR CONVERSATIONS THAT ARE NOT WITH YOU --------------------
+    // See addExchange in npc.js. Every voice in the busiest square in Africa
+    // was addressed to the capybara, so a square with three pitches inside
+    // twenty metres of each other was SILENT unless the player walked up and
+    // stood in front of somebody. Jemaa el-Fnaa is a place made entirely of
+    // people talking to each other over your head; this is the only mechanism
+    // in the game that can say so.
+    if (typeof game.addExchange === 'function') {
+      if (sahLocCart && sahLocWater) {
+        game.addExchange({ biome: 'sahara', a: sahLocCart, b: sahLocWater, lines: [
+          ['Four dirham is not expensive.', 'Mine is free and nobody takes it.'],
+          ['Quiet today.', 'It is forty-one degrees. Everybody is under something.'],
+          ['Something has been at my cart.', 'Something has been at everything.'],
+          ['Is that thing coming back?', 'It always comes back.'],
+          ['They are chasing something through the souk again.', 'They are always chasing something.'],
+        ] });
+      }
+      if (sahLocSnake && sahLocHalqa) {
+        game.addExchange({ biome: 'sahara', a: sahLocHalqa, b: sahLocSnake, gap: 33, lines: [
+          ['Your snake is asleep.', 'My snake is listening.'],
+          ['How many today?', 'Two. And one of them was a rodent.'],
+          ['You are on my pitch.', 'I have been on this pitch since 1988.'],
+          ['Give me a better ending.', 'They all end the same way. Somebody sits in the basket.'],
+        ] });
+      }
+      if (sahLocAcro && sahLocHalqa) {
+        game.addExchange({ biome: 'sahara', a: sahLocAcro, b: sahLocHalqa, gap: 38, lines: [
+          ['Watch this one.', 'I have watched nine hundred of them.'],
+          ['We are from Amizmiz.', 'Everybody is from Amizmiz.'],
+          ['Who is catching?', 'Nobody is catching. Nobody has ever been catching.'],
+        ] });
+      }
+      if (sahLocGate && sahLocDune) {
+        game.addExchange({ biome: 'sahara', a: sahLocGate, b: sahLocDune, gap: 44, lines: [
+          ['Anything moving out there?', 'Sand. Just the sand.'],
+          ['Wind is getting up.', 'Wind is always getting up. This one means it.'],
+          ['Caravan is late.', 'Caravan is four days late. That is on time.'],
+        ] });
+      }
     }
   }
 

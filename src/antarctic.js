@@ -202,6 +202,7 @@ let antPodCX = 0, antPodCZ = -300, antPodYaw = 0, antPodU = 0;
 let antPodState = 'patrol';
 let antPodStateT = 0, antPodRide = 0, antPodBest = 0, antPodBlow = 0;
 let antSpyT = -1, antSpyIdx = 0, antSlowT = 0, antSeenPod = false;
+let antSpyTold = false;   // the toast is once per spy-hop, not once per frame of one
 
 let antWinLight = [], antWinPane = [];   // the lit windows. See antBuildStation
 let antPengMesh = null, antPengData = null, antPengScale = null;
@@ -233,6 +234,32 @@ let antPetrelData = null;
 let antCapes = null, antCapeData = null, antCapeScat = 0;
 let antSealGroup = null, antSealJaw = null, antSealHead = null;
 let antSealFloe = 3, antSealLook = 0, antSealSeen = false;
+// ---------------------------------------------------------------------------
+// ...AND SHE COMES IN AFTER YOU, WHICH IS THE WHOLE ANIMAL.
+//
+// 'Be looked at by a leopard seal' was a PROXIMITY CHECK — get within thirteen
+// metres of a three-hundred-kilo mesh lying on a floe and the line ticks. That
+// is the same task as 'walk past a rock', and it is the one line on chapter
+// 17's card about the only thing in Antarctica that has ever thought about
+// eating anybody. Everyone who has been in a small boat down there has the
+// same story and it is never 'I saw one on some ice': it is that she slid off,
+// went under the hull, and came up on the other side to have a proper look at
+// you, and did it again, and then lost interest and left.
+//
+// Four states and one timer. Nothing about it can fail: she gives up on her
+// own clock, she is steered to deep water every frame like the pod (a leopard
+// seal that follows you up a beach is the same bug the orcas had), and the
+// task ticks the first time she surfaces beside you — which she always does,
+// within about six seconds of going in.
+const antSEAL_NOTICE = 24;    // m — how close before she takes an interest
+const antSEAL_ABEAM  = 7.4;   // m — how far off she runs when she is on you
+const antSEAL_MIN    = 5.6;   // ...and how close she is ever allowed to get
+const antSEAL_SPD    = 6.4;   // m/s — faster than the animal, slower than the boat
+const antSEAL_BORED  = 30;    // s — and then she has seen enough
+const antSEAL_CYCLE  = 4.6;   // s per dive-and-surface
+let antSealState = 'hauled';  // hauled | watching | in | leaving
+let antSealT = 0, antSealX = 0, antSealZ = 0, antSealY = 0, antSealYaw = 0;
+let antSealSurf = 0, antSealTold = false, antSealBr = 0;
 let antWeddell = null;
 
 let antCalveT = 16, antCalveBits = null, antCalveData = null, antCalveLive = 0;
@@ -254,6 +281,27 @@ let antToldPack = false, antToldSlip = false, antToldNeutral = false, antToldCol
 
 // what the wheek does on LAND, which for the chapter's whole life was nothing
 let antColonyCall = 0, antSkuaFlush = 0, antPetrelScat = 0, antEchoT = -1;
+// ---------------------------------------------------------------------------
+// ...AND THE CHORUS IS A WAVE, WHICH IS THE ONLY THING THAT MAKES IT A CHORUS.
+//
+// The whole design note on the colony answer says it out loud — "a colony
+// answering is not a sound, it is a WAVE: one bird starts, its neighbours
+// join, and it goes up the hill" — and it was true of the AUDIO only. Three
+// calls at 0.10, 0.55 and 1.25 s spread outward beautifully in the mix, and
+// what the eye saw was `Math.random() < dt * (0.012 + antColonyCall * 2.4)`
+// applied identically to all hundred and seventy-four birds: the entire
+// rookery threw its head back on the same frame, everywhere, at once. The
+// colony local's line is 'do it again, I want to see if it goes all the way up
+// the hill' — a promise about the picture that only the speakers ever kept.
+//
+// One front, expanding from wherever the noise came from at the speed a bird
+// notices its neighbour, with a tail behind it: a bird joins when the front
+// reaches it and goes on calling for a couple of seconds afterwards, which is
+// what makes it read as a wave passing rather than as a ring.
+const antCALL_SPD  = 13.5;   // m/s the front travels. Slower than sound, faster than a walk.
+const antCALL_TAIL = 17;     // m of still-calling colony behind the front
+const antCALL_MAX  = 78;     // how far it carries before it has died out
+let antCallX = 0, antCallZ = 0, antCallR = -1;
 const antCallT = [-1, -1, -1];
 // the spindrift: the wind off a glacier, which is the signature picture of the
 // place and the one thing in it that is always moving
@@ -877,22 +925,56 @@ function antBuildGround(game, root) {
         c.lerp(scree, wk * grit * 0.34);
       }
     }
-    // the colony stain, and the track worn out of it
-    const dcx = x - antCOLONY.x, dcz = z - antCOLONY.z;
-    const gk = clamp(1 - Math.sqrt(dcx * dcx + dcz * dcz) / (antCOLONY.r * 1.35), 0, 1);
-    // ...AND IT IS THE ONE THING ABOUT A ROOKERY VISIBLE FROM A MILE OFFSHORE,
-    // so it has to survive the flattest light in the game. 0.55 came out as a
-    // barely-tinted white under an ambient of 0.36 with a hemisphere at 1.24.
-    // ...and it is BLOTCHY. An even wash over a disc reads as a change of
-    // ground; a stain reads as a stain because it is patchy at about the size
-    // of the thing that made it, which here is a bird.
-    if (gk > 0 && h > antWATER) {
-      const mot = 0.66 + 0.34 * Math.sin(x * 0.42 + z * 0.31) * Math.sin(z * 0.55 - x * 0.19);
-      c.lerp(guano, Math.pow(gk, 1.2) * 0.96 * mot);
-    }
+    // ---- THE TRACK, and it goes UNDER the stain now ----------------------
+    // Order matters and it was the wrong way round. `antHIGH` starts AT the
+    // middle of the rookery — [24, 92] is antCOLONY exactly — so a five-metre
+    // stripe of `antIceSh` (0xb4cbd6, a cool pale blue) was painted over the
+    // strongest part of the guano and then never repainted. MEASURED off the
+    // ground mesh: the colony centre carried (0.448, 0.558, 0.614), which is
+    // ice-shade with a hint of brown in it, in the one place in the chapter
+    // that is supposed to be brown. Below the sea a gentoo highway is polished
+    // blue snow; through a rookery it is polished GUANO, and it is the dirtiest
+    // strip of ground on the continent.
     const hd = antHighwayD(x, z);
     if (hd >= 0 && hd < antHIGH_W * 1.5 && h > antWATER) {
       c.lerp(shade, antSmooth(1 - hd / (antHIGH_W * 1.5)) * 0.85);
+    }
+    // ---- AND THE STAIN, WHICH IS THE POINT OF A ROOKERY ------------------
+    //
+    // MEASURED, and it is the fourth time this chapter has hidden something in
+    // plain sight. The falloff was `1 - d / (r * 1.35)` — LINEAR from the
+    // exact centre — so a bird standing nine metres out (which is most of
+    // them; the nests fill 0.94 of the radius) sat on gk = 0.45, and after
+    // `pow(1.2)` and the blotch that is about a quarter of the way from snow
+    // to brown. Sampled off the mesh: (0.675, 0.721, 0.723) nine metres out
+    // and (0.722, 0.783, 0.792) at the rim — that is white, twice. Photographed
+    // from the rig, a hundred and seventy gentoos and a hundred and thirty-six
+    // nests are standing on clean plaster.
+    //
+    // A colony stain is not a radial gradient. It is FLAT across the ground the
+    // birds actually stand on and it stops, more or less, where they do — so
+    // this is a plateau out to the nest field with ten metres of ragged edge
+    // on it, and the edge is ragged at two different sizes because that is
+    // what makes it read as a stain rather than as a painted disc.
+    const dcx = x - antCOLONY.x, dcz = z - antCOLONY.z;
+    const dCol = Math.sqrt(dcx * dcx + dcz * dcz);
+    if (dCol < antCOLONY.r * 1.9 && h > antWATER) {
+      // ragged at the edge: the wobble is on the RADIUS, so the outline is
+      // lobed rather than circular
+      const wob = 1.5 * Math.sin(Math.atan2(dcz, dcx) * 3.1 + 0.7)
+                + 0.9 * Math.sin(Math.atan2(dcz, dcx) * 7.3 - 2.1);
+      // FLAT to the edge of the nest field, then out over eight and a half
+      // metres. Written as `(r*0.98 - d)/10` the plateau only reached 6.7 m
+      // and it was the same gradient as before by another name — measured at
+      // (0.781, 0.855, 0.869) nine metres out, which is whiter than the bug it
+      // replaced. R_out and the width, not R_in and a slope.
+      const gk = clamp((antCOLONY.r * 1.52 + wob - dCol) / 9.5, 0, 1);
+      if (gk > 0) {
+        // blotchy at two sizes: the size of a nest, and the size of a group
+        const mot = (0.72 + 0.28 * Math.sin(x * 0.42 + z * 0.31) * Math.sin(z * 0.55 - x * 0.19))
+                  * (0.84 + 0.16 * Math.sin(x * 0.13 - z * 0.09));
+        c.lerp(guano, antSmooth(gk) * 0.97 * mot);
+      }
     }
     // ...AND THE PEOPLE HAVE WORN ONE TOO. The penguins got a track drawn into
     // the hill and the nine humans who live here did not, so the station apron
@@ -3167,6 +3249,52 @@ function antBuildLocals(game) {
     }
     return rec;
   };
+  // =========================================================================
+  // ...AND THEY KNOW WHAT YOU HAVE DONE.
+  //
+  // Six people, seventy-odd sentences, and every one of them was true on the
+  // first frame of the chapter and true on the last. The boatman says 'take
+  // the tender if you like, everyone does' after you have taken it, brought it
+  // back, and been escorted by six orcas. The barman says 'you are the
+  // southernmost customer we have ever had' while you are holding his mug. The
+  // glaciologist says 'you can slide it, everybody slides it' to somebody who
+  // has just come down it at ten and a half metres a second.
+  //
+  // npc.js has carried the whole apparatus since v20 — `{ t, after: 'task-id' }`,
+  // `{ t, before }`, `onTask` for the specific thing you just did in front of
+  // them, `praise` for their general opinion, and four reaction pools — and
+  // this chapter used none of it. The four defaults are chapter-neutral by
+  // design and include 'Do you mind?' and 'Somebody is in a hurry', which are
+  // lines for a market square. There is no square. There are nine people and
+  // eleven hundred kilometres.
+  //
+  // THE RULE FOR ALL OF IT: nobody down here is surprised and nobody down here
+  // is annoyed. They have been in one hut since March, the wind has not
+  // stopped since the eleventh of May, and a capybara is comfortably the best
+  // thing that has happened all season. Everything is DELIGHTED and DEADPAN,
+  // and every single one of them wants to talk for longer than you do.
+  // =========================================================================
+  const ANT_STARTLED = ['Nothing breaks down here that was not already broken.',
+                        'Leave it. It has been there since 1957.',
+                        'Ha! Do that again.', 'That is the most exciting thing since March.',
+                        'The wind does worse. Every night.',
+                        'Right. Yes. I saw that.'];
+  const ANT_SPLASH   = ['That is minus one point eight. It is gone.',
+                        'Well, it floats. That is something.',
+                        'It will be off the Falklands by Thursday.',
+                        'We are not getting that back.',
+                        'Ooh. Cold. Very cold.'];
+  const ANT_THIEF    = ['Take it. Nine of us and two hundred of everything.',
+                        'That is station property. That is a joke. Take it.',
+                        'Sign for it. — no, do not, there is nobody to sign to.',
+                        'Everything down here belongs to whoever is holding it.',
+                        'Oh, we are looting now. Fine.'];
+  const ANT_RUSH     = ['Careful! It is all ice under that!',
+                        'You will end up in the water!',
+                        'Nothing runs down here. Nothing has to.',
+                        'Where. Where is it going. There is nowhere to go.',
+                        'That is how the doctor got the doctor’s knee.'];
+
   put(antHUTS.x - 3.4, antHUTS.z + 4.2, {
     near: 8, face: 0.4, kit: 'clipboard',
     figure: { shirt: PALETTE.antHull, legs: PALETTE.antHutRoof, hat: PALETTE.antHutRed },
@@ -3175,34 +3303,99 @@ function antBuildLocals(game) {
             'Nine months. I have read the back of the cereal box in four languages.',
             'Sign in. Everyone signs in. It is the only paperwork we have left.',
             'That wind does not stop. It has not stopped since the eleventh of May.',
-            'Do not go anywhere the flags do not go. That is the whole of the rules.'],
+            'Do not go anywhere the flags do not go. That is the whole of the rules.',
+            // A base commander keeps a log, so the log is what the lines are.
+            { t: 'The orange boat at the end of the jetty. Take her. Everyone takes her.',
+              before: 'take-tiller' },
+            { t: 'You have got the tender out. Bring her back on the same side she left on.',
+              after: 'take-tiller' },
+            { t: 'Nobody has been past the gate in six weeks. There is nothing past it.',
+              before: 'orca-ride' },
+            { t: 'Six of them. On your beam. I am putting it in the log and nobody will believe it.',
+              after: 'orca-ride' },
+            { t: 'If something very large comes up alongside, that is normal. Sort of.',
+              before: 'spy-hop' }],
     wheek: ['ARGENTINA! No? Worth a try.',
             'Listen — off the hill behind us. It comes back. It always comes back.'],
+    onTask: {
+      'take-tiller': ['There she goes. Two hundred days and somebody finally took her out.'],
+      'orca-ride': ['I am going to have to write that down and I do not know how.',
+                    'Nobody at home is going to believe one word of this.'],
+      'station-mug': ['That is — yes. Fine. It is a mug. We have eleven.'],
+      'floe-drift': ['You went down the channel on a piece of the sea. Right.'],
+    },
+    praise: ['That is going in the log.', 'Right. Noted. It all goes in the log.',
+             'The log is getting strange this season.'],
+    startled: ANT_STARTLED, splash: ANT_SPLASH, thief: ANT_THIEF, rush: ANT_RUSH,
   });
   put(antJETTY.x - 0.55, antJETTY.z0 - 7.0, {
     near: 8, face: 3.0, kit: 'rope',
     figure: { shirt: PALETTE.antDrum, legs: PALETTE.antHutRoof },
-    lines: ['Take the tender if you like. Everyone does. Bring her back.',
-            'Watch the pack. Full ahead into brash is how you lose a propeller.',
-            'There is a lane of open water out there. Find it and you will fly.',
+    lines: ['Watch the pack. Full ahead into brash is how you lose a propeller.',
             'Dark water is open water. That is all the chart you are getting.',
             'Sound your horn in the narrows. You will hear how wide it is.',
-            'If something big comes up alongside, hold your speed. Do not slow down.'],
+            { t: 'Take the tender if you like. Everyone does. Bring her back.',
+              before: 'take-tiller' },
+            { t: 'She handles all right, does she? She is forty years old.',
+              after: 'take-tiller' },
+            { t: 'There is a lane of open water out there. Find it and you will fly.',
+              before: 'the-lead' },
+            { t: 'You found the lead. Twelve knots. There is nothing else out there that does twelve knots.',
+              after: 'the-lead' },
+            { t: 'If something big comes up alongside, hold your speed. Do not slow down.',
+              before: 'orca-ride' },
+            { t: 'You held your speed. Good. Most people do not hold their speed.',
+              after: 'orca-ride' },
+            { t: 'There is a hole through the big berg. It is nine metres. It is plenty.',
+              before: 'berg-arch' }],
     wheek: ['That is not a noise I have heard down here before.',
             'Save it for out there. Something out there is listening.'],
+    onTask: {
+      'the-lead': ['Twelve knots. In a forty-year-old tender. Listen to her.'],
+      'berg-arch': ['Through the arch. In MY boat. With MY propeller.',
+                    'Nine metres of headroom and you used about two of it.'],
+      'orca-ride': ['I have been here four seasons and I have never had that.'],
+      'spy-hop': ['It stood up and looked at you. They do that. It never stops being awful.'],
+      'floe-drift': ['That is not a boat. I want to be clear that that is not a boat.'],
+    },
+    praise: ['Bring her back in one piece and we will say no more about it.',
+             'Mm. Fine. She is a tough old thing.',
+             'That is not what she is for, but go on.'],
+    startled: ANT_STARTLED, splash: ANT_SPLASH, thief: ANT_THIEF, rush: ANT_RUSH,
   }, antJETTY.y + 0.11);
   put(antCOLONY.x - 8, antCOLONY.z - 9, {
     near: 8, face: 1.6, kit: 'counter',
     figure: { shirt: PALETTE.antHutRed, legs: PALETTE.antMast, hat: PALETTE.antIceLt },
     lines: ['Four thousand two hundred and six. Give or take. Mostly give.',
-            'They walk that track every single day. They wore it into the hill.',
             'Do not stand between a gentoo and the sea. You will lose.',
             'Every stone in every one of those nests was stolen. Every one.',
             'Watch that one. Watch — there. Straight into next door and out again.',
             'The grey ones are this year. Half of them will not see next year.',
-            'The brown on the snow is what four thousand of anything does to a hill.'],
+            'The brown on the snow is what four thousand of anything does to a hill.',
+            { t: 'They walk that track every single day. They wore it into the hill.',
+              before: 'penguin-highway' },
+            { t: 'You went down their road. On your back, most of it. They noticed.',
+              after: 'penguin-highway' },
+            { t: 'Make a noise near them. Go on. I will wait. It is worth waiting for.',
+              before: 'colony-chorus' },
+            { t: 'Four thousand of them, and it went all the way up the hill. Every time.',
+              after: 'colony-chorus' },
+            { t: 'Half of them are in the water right now. That is where the food is.' }],
     wheek: ['Right, well, now they are all looking at you. Thank you for that.',
             'Do it again. I want to see if it goes all the way up the hill.'],
+    onTask: {
+      'colony-chorus': ['THERE it goes. Up the hill. Every single one of them.',
+                        'You have set off four thousand penguins. How do you feel.'],
+      'penguin-highway': ['That is their road. You are not a penguin. It did not care.',
+                          'They do that twice a day and they do not fall over.'],
+      'leopard-seal': ['You have met her, then. She eats about six of mine a week.'],
+    },
+    praise: ['I have lost count. I have completely lost count.',
+             'Four thousand two hundred and — no. Gone.',
+             'That is going to unsettle them for an hour.'],
+    startled: ANT_STARTLED, splash: ANT_SPLASH, thief: ANT_THIEF,
+    rush: ['Not through the middle! Not through the MIDDLE —',
+           'You will have them off their nests!', 'Careful! It is all ice under that!'],
   });
   // ---- THREE MORE, and the chapter has three PLACES it had nobody in -----
   // A base is not a village, which is why there were only ever three — but
@@ -3216,12 +3409,30 @@ function antBuildLocals(game) {
     figure: { shirt: PALETTE.antDrum, legs: PALETTE.antTimber, hat: PALETTE.antHutRoof },
     lines: ['A hundred and ten blue whales out of this bay in one season.',
             'Nineteen twenty-two. Then there were none left and they went home.',
-            'Those ribs are load-bearing. Somebody lived in that for a winter.',
             'Nothing rots down here. That is the whole problem with the place.',
             'Five graves up the beach. Four names. One of them we never worked out.',
-            'The skull is a third of the animal. People never believe me until they see it.',
-            'Black sand, in Antarctica. It is a volcano. Everybody forgets that.'],
+            'Black sand, in Antarctica. It is a volcano. Everybody forgets that.',
+            { t: 'Those ribs are load-bearing. Somebody lived in that for a winter.',
+              before: 'whale-bones' },
+            { t: 'You sat inside it. Everybody does, in the end. It is the size.',
+              after: 'whale-bones' },
+            { t: 'The skull is a third of the animal. People never believe me until they see it.',
+              before: 'whale-bones' },
+            { t: 'There are six of them out there again, you know. Alive. It took a century.',
+              after: 'orca-ride' }],
     wheek: ['First noise off that beach in about eighty years, I should think.'],
+    onTask: {
+      'whale-bones': ['Now put your paw on a rib and tell me how big it was.',
+                      'Everybody goes quiet in there. Every single person.'],
+      'orca-ride': ['They came back. That is the only good sentence about this beach.'],
+    },
+    praise: ['Do not move anything. — you have moved something.',
+             'This is a protected site, technically. Technically.',
+             'A hundred years and you are the first one to do that.'],
+    startled: ANT_STARTLED, splash: ANT_SPLASH,
+    thief: ['That is a historic artefact. It is also a bit of a barrel.',
+            'Put it — no. Fine. It is fine.', 'Everything down here belongs to whoever is holding it.'],
+    rush: ANT_RUSH,
   });
   // 5 — the glaciologist, on the moraine at the toe, watching a stake
   put(antGLAC.xToe - 10, antBLUE.z1 + 26, {
@@ -3229,12 +3440,30 @@ function antBuildLocals(game) {
     figure: { shirt: PALETTE.antHull, legs: PALETTE.antHutRoof, hat: PALETTE.antHutRed },
     lines: ['Eleven metres this year. It was four when I started.',
             'The blue is the old stuff. All the air has been squeezed out of it.',
-            'You can slide it. Everybody slides it. I have slid it.',
-            'Do not go up the middle. Go up the edge and come down the middle.',
             'The dark lines are holes. The white lines are water. Learn the difference.',
             'It lets go about once a minute. You will hear it before you see it.',
-            'Every stone on that black stripe was carried here. By the ice. Slowly.'],
+            'Every stone on that black stripe was carried here. By the ice. Slowly.',
+            { t: 'You can slide it. Everybody slides it. I have slid it.',
+              before: 'blue-ice' },
+            { t: 'Do not go up the middle. Go up the edge and come down the middle.',
+              before: 'blue-ice' },
+            { t: 'Ten and a half metres a second. I timed you. I time everything.',
+              after: 'blue-ice' },
+            { t: 'The pans go north through the gate. All of them. Every day.',
+              before: 'floe-drift' },
+            { t: 'You rode one out. That is sea ice, that is. It is going to Argentina.',
+              after: 'floe-drift' }],
     wheek: ['That is going to come back off the wall in about two seconds. Listen.'],
+    onTask: {
+      'blue-ice': ['Ten point six. I have it on the board. Nobody has beaten it.',
+                   'Nothing on that hill has any grip and you found that out at speed.'],
+      'floe-drift': ['That floe is a MEASUREMENT. You have ridden a measurement.'],
+      'haul-out': ['Out on a pan. Like a seal. You are not a seal.'],
+    },
+    praise: ['I will put a stake in wherever that was.',
+             'That is data. I do not know of what.',
+             'Everything down here is data if you look at it long enough.'],
+    startled: ANT_STARTLED, splash: ANT_SPLASH, thief: ANT_THIEF, rush: ANT_RUSH,
   });
   // 6 — and the one behind the bar, because a bar with nobody behind it is a
   //     plank on two drums
@@ -3243,11 +3472,38 @@ function antBuildLocals(game) {
     figure: { shirt: PALETTE.antHutRed, legs: PALETTE.antTimber },
     lines: ['We open at six. It is always six somewhere. It is six.',
             'Rule one: you bring something to hang on the wall. Rule two: no rule two.',
-            'The mugs are enamel because everything glass has already broken.',
             'Nine of us, one bar, two hundred days. You do the arithmetic.',
             'No roof. There was a roof. The wind had opinions about the roof.',
-            'You are the southernmost customer we have ever had. Probably.'],
+            { t: 'The mugs are enamel because everything glass has already broken.',
+              before: 'station-mug' },
+            { t: 'You are the southernmost customer we have ever had. Probably.',
+              before: 'station-mug' },
+            { t: 'That is my mug. That was my mug. It is going to Brazil, is it.',
+              after: 'station-mug' },
+            { t: 'Rule one, remember. You bring something back for the wall.',
+              after: 'station-mug' },
+            { t: 'Whatever happens out there, it is all anybody talks about at six.',
+              before: 'orca-ride' },
+            { t: 'Six orcas. Right. Drinks are on the rodent and the rodent has no money.',
+              after: 'orca-ride' }],
     wheek: ['Right! One for the rodent. Do not tell the doctor.'],
+    onTask: {
+      'station-mug': ['THAT IS THE MUG. — no, take it. Take it. It is a good story.',
+                      'Eleven mugs. Ten mugs. This is how it starts.'],
+      'orca-ride': ['Sit down. Start at the beginning. We have got all winter.'],
+      'spy-hop': ['It looked at you? Properly looked? Oh, that is a drink, that is.'],
+      'colony-chorus': ['We heard that from here. We hear everything from here.'],
+    },
+    praise: ['That is worth a drink. Everything is worth a drink.',
+             'Go on then. Tell me about it. I have got nowhere to be.',
+             'You are the most interesting thing that has happened since the resupply.'],
+    startled: ['Nothing behind the bar is breakable any more. It is all been broken.',
+               'Ha! Do that again.', 'The wind does worse. Every night.'],
+    splash: ANT_SPLASH,
+    thief: ['Take it. Nine of us and two hundred of everything.',
+            'That is coming out of your tab. You do not have a tab.',
+            'Oh, we are looting now. Fine.'],
+    rush: ANT_RUSH,
   });
 }
 
@@ -3863,6 +4119,7 @@ function antUpdatePod(game, dt) {
       antSlowT += dt;
       if (antSlowT > 1.6 && antSpyT < 0) {
         antSpyT = 0;
+        antSpyTold = false;
         antSpyIdx = 1;
         antSfx('splash', { volume: 0.55, pitch: 0.42 });
       }
@@ -3921,7 +4178,15 @@ function antUpdatePod(game, dt) {
       pitch = -1.16 * u;
       antPodX[i] = damp(antPodX[i], antBoatX + 5.2 * cs, 3.0, dt);
       antPodZ[i] = damp(antPodZ[i], antBoatZ - 5.2 * sn, 3.0, dt);
-      if (antSpyT > 1.2 && antSpyT < 1.4) {
+      // ...AND ONCE, NOT TWELVE TIMES. `antSpyT > 1.2 && antSpyT < 1.4` is a
+      // two-hundred-millisecond WINDOW on a sixty-hertz clock, evaluated every
+      // frame the bull is up — so the marquee beat of act three fired twelve
+      // toasts, of which the wrapper keeps the last four, and the player was
+      // told 'it is looking AT you' four times in a stack while a six-tonne
+      // animal stood up out of the sea in front of them. `completeTask` is
+      // idempotent and covered for the tick; nothing covers `toast`.
+      if (!antSpyTold && antSpyT > 1.2) {
+        antSpyTold = true;
         antTask('spy-hop');
         antToast('it is looking AT you. not at the boat.');
       }
@@ -4005,6 +4270,11 @@ function antUpdatePenguins(game, dt) {
   const px = capy && capy.position ? capy.position.x : 0;
   const pz = capy && capy.position ? capy.position.z : 0;
   antColonyCall = damp(antColonyCall, 0, 0.9, dt);
+  // ---- AND THE FRONT MOVES OUTWARD. See antCALL_SPD ---------------------
+  if (antCallR >= 0) {
+    antCallR += antCALL_SPD * dt;
+    if (antCallR > antCALL_MAX + antCALL_TAIL) antCallR = -1;
+  }
   // ---- THE ROLL, and it is three calls rather than one -------------------
   // A colony answering is not a sound, it is a WAVE: one bird starts, its
   // neighbours join, and it goes up the hill. Three at 0.10, 0.55 and 1.25 s,
@@ -4114,8 +4384,25 @@ function antUpdatePenguins(game, dt) {
         y = antLandOnly(x, z) + 0.05 * k;
         roll = Math.sin(antTime * 22 + i) * 0.13 * k;
         stretch = 1 + 0.16 * k;
-      } else if (Math.random() < dt * (0.012 + antColonyCall * 2.4)) {
-        antPengData[o + 4] = rand(1.1, 1.9);
+      } else {
+        // THE BASELINE, plus whatever the front is doing HERE. A bird joins
+        // when the wave arrives at IT — so what the eye sees is a crescent of
+        // heads going back sweeping out of the colony and up the hill, which
+        // is the thing the sound has always done and the picture never did.
+        // Behind the front there is a tail, because a gentoo that has started
+        // does not stop for a couple of seconds.
+        let want = 0.012;
+        if (antCallR >= 0) {
+          const cdx = x - antCallX, cdz = z - antCallZ;
+          const cd = Math.sqrt(cdx * cdx + cdz * cdz);
+          // 1 exactly as the front passes, falling away over the tail behind
+          // it, and nothing at all in front of it
+          const behind = antCallR - cd;
+          if (behind > 0 && behind < antCALL_TAIL) {
+            want += 4.2 * (1 - behind / antCALL_TAIL) * clamp(1 - cd / antCALL_MAX, 0, 1);
+          }
+        }
+        if (Math.random() < dt * want) antPengData[o + 4] = rand(1.1, 1.9);
       }
     } else {
       antPengData[o + 4] += antPengData[o + 5] * dt * (mode === 2 ? 1 : 0.5);
@@ -4306,24 +4593,159 @@ function antUpdateBirds(game, dt) {
 function antUpdateSeal(game, dt) {
   if (!antSealGroup) return;
   const i = antSealFloe;
-  const x = antFloeX[i], z = antFloeZ[i];
-  antSealGroup.position.set(x, antWATER + antFLOE_TOP + 0.32, z);
+  const fx = antFloeX[i], fz = antFloeZ[i];
+  const fy = antWATER + antFLOE_TOP + 0.32;
 
+  // ---- WHO SHE IS LOOKING AT ---------------------------------------------
+  // Whichever of the two is nearer — a leopard seal is interested in a boat
+  // and in a swimming rodent for exactly the same reason.
   const capy = game.capy;
-  let dx = 1e9, dz = 1e9;
-  if (capy && capy.position) { dx = capy.position.x - x; dz = capy.position.z - z; }
-  const bx = antBoatX - x, bz = antBoatZ - z;
-  const dCapy = Math.sqrt(dx * dx + dz * dz);
-  const dBoat = Math.sqrt(bx * bx + bz * bz);
-  const near = Math.min(dCapy, dBoat);
-  const tx = dCapy <= dBoat ? dx : bx;
-  const tz = dCapy <= dBoat ? dz : bz;
+  let px = antBoatX, pz = antBoatZ;
+  if (!antHelmOn && capy && capy.position) {
+    const dbx = antBoatX - antSealX, dbz = antBoatZ - antSealZ;
+    const dcx = capy.position.x - antSealX, dcz = capy.position.z - antSealZ;
+    if (dcx * dcx + dcz * dcz <= dbx * dbx + dbz * dbz) { px = capy.position.x; pz = capy.position.z; }
+  }
+  const dFloe = Math.hypot(px - fx, pz - fz);
 
-  const want = near < 22 ? clamp(1 - (near - 6) / 16, 0, 1) : 0;
+  // ---- THE STATE MACHINE. See antSEAL_NOTICE -----------------------------
+  antSealT += dt;
+  if (antSealState === "watching") {
+    antSealX = fx; antSealZ = fz; antSealY = fy;
+    if (dFloe > antSEAL_NOTICE * 1.35) { antSealState = "hauled"; antSealT = 0; }
+    // she looks at you for a moment, and then she is simply not on the ice
+    // any more, which is the thing everybody says about them
+    else if (antSealT > 1.9) {
+      antSealState = "in"; antSealT = 0; antSealSurf = 0;
+      antSfx("splash", { volume: 0.34, pitch: 0.62, at: { x: fx, y: antWATER, z: fz } });
+      for (let k = 0; k < 5; k++) {
+        antSpray(fx + rand(-1.4, 1.4), antWATER + 0.3, fz + rand(-1.4, 1.4),
+                 rand(-2, 2), rand(1.4, 3.2), rand(-2, 2));
+      }
+    }
+  } else if (antSealState === "in") {
+    // STATION: abeam of whatever she is following and a little astern of it,
+    // and the side she picks is the side she is already on — so she does not
+    // cut across the bow to swap every time the helm moves.
+    const hdg = antHelmOn ? antBoatYaw : Math.atan2(px - antSealX, pz - antSealZ);
+    const cs = Math.cos(hdg), sn = Math.sin(hdg);
+    const side = ((antSealX - px) * cs - (antSealZ - pz) * sn) >= 0 ? 1 : -1;
+    let sx = px + side * antSEAL_ABEAM * cs - 2.4 * sn;
+    let sz = pz - side * antSEAL_ABEAM * sn - 2.4 * cs;
+    // ...AND SHE KEEPS HER DISTANCE. `hdg` is her own bearing to the target
+    // when the target is not under way, so the station point rotates with her
+    // and the whole thing is a pursuit spiral: measured against a swimming
+    // capybara she converged to 2.6 m and sat there, which is inside the
+    // camera boom. Push the station back out to a minimum standoff and the
+    // spiral has a floor.
+    {
+      let ox = sx - px, oz = sz - pz;
+      const od = Math.hypot(ox, oz);
+      if (od < antSEAL_MIN) {
+        const k = od > 0.01 ? antSEAL_MIN / od : 0;
+        sx = px + ox * k; sz = pz + oz * k;
+        if (od <= 0.01) { sx = px + antSEAL_MIN; sz = pz; }
+      }
+    }
+    // ...AND SHE DOES NOT FOLLOW YOU ONTO A BEACH. Same rule as the pod, for
+    // the same reason: the target is a point and nothing had ever asked
+    // whether the point was wet.
+    antToDeep(sx, sz);
+    sx = antDeep.x; sz = antDeep.z;
+    const mvx = sx - antSealX, mvz = sz - antSealZ;
+    const md = Math.hypot(mvx, mvz) || 1;
+    const step = Math.min(md, antSEAL_SPD * dt);
+    antSealX += (mvx / md) * step;
+    antSealZ += (mvz / md) * step;
+    antSealYaw = Math.atan2(px - antSealX, pz - antSealZ);
+    // ---- the cycle: down, along, up, LOOK, and down again ---------------
+    // A TRIANGLE IS NOT A SURFACING. The first cut peaked for an instant at
+    // the middle of each cycle and this sea is OPAQUE — the same trap the pod
+    // fell into, where six orcas at waterLevel - 0.85 broke the surface for a
+    // third of each porpoise and the photograph of the escort had none in it.
+    // A seal that comes up to look at you HOLDS there while it looks. So the
+    // profile is a trapezoid: nine tenths of a second up, a second and a half
+    // with her back and her head clear of the water and her eye on you, and
+    // nine tenths back down. Just over half the cycle, and every bit of the
+    // half is the half that is worth seeing.
+    const u = (antSealT % antSEAL_CYCLE) / antSEAL_CYCLE;
+    const upK = clamp((0.26 - Math.abs(u - 0.5)) / 0.10, 0, 1);
+    antSealY = antWATER - 1.55 + upK * 1.45;
+    antSealSurf = upK;
+    // AND SHE IS AUDIBLE WHEN SHE IS NOT VISIBLE, which is the whole feeling.
+    // One breath as she comes up, once per cycle, positioned — so what you get
+    // standing in the water is a noise behind you and then nothing, four or
+    // five times, and a very large animal you can only see half the time.
+    if (upK > 0.02 && antSealBr <= 0) {
+      antSealBr = antSEAL_CYCLE * 0.5;
+      antSfx('hiss', { volume: 0.20, pitch: rand(0.34, 0.44),
+                       at: { x: antSealX, y: antWATER, z: antSealZ } });
+    }
+    if (upK <= 0.02) antSealBr = 0;
+    if (upK > 0.9 && md < antSEAL_ABEAM * 2.4) {
+      if (!antSealSeen) {
+        antSealSeen = true;
+        antTask("leopard-seal");
+        antSfx("hiss", { volume: 0.28, pitch: 0.30, at: { x: antSealX, y: antWATER, z: antSealZ } });
+        antToast("it is smiling. it is not smiling.");
+      } else if (!antSealTold && antSealT > antSEAL_CYCLE * 2.4) {
+        antSealTold = true;
+        antToast("she is going to keep doing that until she is bored.");
+      }
+    }
+    if (antSealT > antSEAL_BORED || dFloe > 210) { antSealState = "leaving"; antSealT = 0; }
+  } else if (antSealState === "leaving") {
+    // ---- BACK TO WHATEVER PAN IS NEAREST, WHICH IS NOT NECESSARILY HERS --
+    // Her floe is on the same conveyor as the other fourteen: it drifts south
+    // to the shelf and is then RECYCLED four hundred and eighty metres north
+    // to the top of the bay (see antUpdateFloes). Only the capybara blocks
+    // that recycle, so a seal three hundred metres down the channel could be
+    // sent home to a piece of ice that had just teleported past her — a
+    // seventy-five-second swim north through the middle of the chapter with
+    // her head coming up every four and a half seconds all the way. A seal
+    // hauls out on whatever ice is handy; so does this one, and the pan she
+    // picks becomes the one she lives on.
+    if (antFloeX) {
+      let bi = antSealFloe, bd = 1e18;
+      for (let k = 0; k < antFLOE_N; k++) {
+        const ddx = antFloeX[k] - antSealX, ddz = antFloeZ[k] - antSealZ;
+        const d2 = ddx * ddx + ddz * ddz;
+        if (d2 < bd) { bd = d2; bi = k; }
+      }
+      antSealFloe = bi;
+    }
+    const mvx = antFloeX[antSealFloe] - antSealX, mvz = antFloeZ[antSealFloe] - antSealZ;
+    const md = Math.hypot(mvx, mvz) || 1;
+    const step = Math.min(md, antSEAL_SPD * 0.8 * dt);
+    antSealX += (mvx / md) * step;
+    antSealZ += (mvz / md) * step;
+    antSealYaw = Math.atan2(mvx, mvz);
+    antSealY = damp(antSealY, md < 4 ? antWATER + antFLOE_TOP + 0.32 : antWATER - 0.9, 2.2, dt);
+    antSealSurf = clamp(1 - md / 12, 0, 1);
+    if (md < 2.2) { antSealState = "hauled"; antSealT = 0; antSealTold = false; }
+  } else {
+    // hauled out, and she goes where her pan goes
+    antSealX = fx; antSealZ = fz; antSealY = fy;
+    if (dFloe < antSEAL_NOTICE) { antSealState = "watching"; antSealT = 0; }
+  }
+
+  antSealGroup.position.set(antSealX, antSealY, antSealZ);
+
+  // ---- what she is doing with her head -----------------------------------
+  const onIce = antSealState === "hauled" || antSealState === "watching";
+  const near = Math.hypot(px - antSealX, pz - antSealZ);
+  const want = onIce ? (near < 22 ? clamp(1 - (near - 6) / 16, 0, 1) : 0) : antSealSurf;
   antSealLook = damp(antSealLook, want, 2.4, dt);
+  const faceYaw = onIce ? Math.atan2(px - antSealX, pz - antSealZ) : antSealYaw;
   antSealGroup.rotation.y = damp(antSealGroup.rotation.y,
-                                 near < 30 ? Math.atan2(tx, tz) : antSealGroup.rotation.y,
-                                 1.6, dt);
+                                 (!onIce || near < 30) ? faceYaw : antSealGroup.rotation.y,
+                                 onIce ? 1.6 : 4.0, dt);
+  // ...and in the water she is NOSE-UP, which is how one looks at you — in
+  // 'YXZ', because the default XYZ order applies the pitch about the WORLD x
+  // axis after the yaw, so a seal heading east came up ROLLED ONTO HER SIDE.
+  // Same order the pod uses, for the same reason.
+  antSealGroup.rotation.set(onIce ? 0 : -antSealSurf * 0.34,
+                            antSealGroup.rotation.y, 0, 'YXZ');
   if (antSealHead) {
     antSealHead.rotation.x = -0.15 - antSealLook * 0.30;
     antSealHead.position.y = 0.30 + antSealLook * 0.42;
@@ -4331,6 +4753,12 @@ function antUpdateSeal(game, dt) {
   // THE GAPE. It is the whole animal, and it is the reason this is the one
   // thing down here that nobody is relaxed about.
   if (antSealJaw) antSealJaw.rotation.x = antSealLook * antSealLook * 0.62;
+  // ...and she moves water. A three-hundred-kilo animal surfacing at six
+  // metres a second throws exactly this, and it is the only warning you get.
+  if (!onIce && antSealSurf > 0.55 && Math.random() < dt * 7) {
+    antSpray(antSealX + rand(-0.9, 0.9), antWATER + 0.2, antSealZ + rand(-0.9, 0.9),
+             rand(-1.4, 1.4), rand(1.0, 2.4), rand(-1.4, 1.4));
+  }
 
   // ---- AND THE WEDDELL ON THE BEACH IS BREATHING ------------------------
   // "It is on no list, it wants nothing, and it is the only thing in the
@@ -4350,12 +4778,6 @@ function antUpdateSeal(game, dt) {
     antWeddell.rotation.x = roll < 0.10 ? -Math.sin(roll / 0.10 * Math.PI) * 0.22 : 0;
   }
 
-  if (near < 13 && !antSealSeen) {
-    antSealSeen = true;
-    antTask('leopard-seal');
-    antSfx('hiss', { volume: 0.24, pitch: 0.32 });
-    antToast('it is smiling. it is not smiling.');
-  }
 }
 
 // ---------------------------------------------------------------- calving ---
@@ -4747,7 +5169,20 @@ function antUpdateTasks(game, dt) {
   }
 
   // ---- the bones -----------------------------------------------------------
-  if (antInZone('bones', p.x, p.z) && p.y > antWATER && sp < 0.6) {
+  // ...AND THE SPEED GATE IS MEASURED AGAINST A VELOCITY THAT INCLUDES THE
+  // SOLVER'S OWN SHOVE. MEASURED at the exact centre of the skeleton — the
+  // point `api.bones` sends the hint arrow to — the animal stood perfectly
+  // still for eight and a half seconds with every condition on this line
+  // reading true from outside, and the task never ticked: cannon is ejecting
+  // it from the spine collider on every step, this function runs on the far
+  // side of that step, and capybara.js damps the ejection away before anything
+  // else can see it. So `sp` here spikes over 0.6 every frame, `antBoneSitT`
+  // is reset to zero every frame, and 'Sit down inside the whale' is
+  // uncompletable in the one place the card points at. Two fixes and they are
+  // both needed: the landmark moved off the backbone and into the rib cage
+  // (which is where you would sit anyway), and a tolerance that survives being
+  // nudged. 1.2 m/s is still a great deal slower than a walk.
+  if (antInZone('bones', p.x, p.z) && p.y > antWATER && sp < 1.2) {
     antBoneSitT += dt;
     if (antBoneSitT > 2.4 && antBoneSitT < 900) {
       antBoneSitT = 1000;
@@ -4791,6 +5226,10 @@ function antWheek(game) {
     // sound. Three calls on the frame clock, spreading outward.
     antColonyCall = 1;
     antCallT[0] = 0.10; antCallT[1] = 0.55; antCallT[2] = 1.25;
+    // ...and the FRONT starts where you are standing, not at the middle of the
+    // colony: shout from the beach and it goes up the hill away from you,
+    // shout from the top and it runs down past you to the sea. See antCALL_SPD.
+    antCallX = p.x; antCallZ = p.z; antCallR = 0;
     if (!antToldColony && dCol < 30) {
       antToldColony = true;
       antToast('four thousand of them. all at once. every time.');
@@ -4852,9 +5291,14 @@ export function createAntarctic(game) {
         antSyncBody(antBoatBody);
       }
       antPodState = 'patrol'; antPodU = 0; antPodStateT = 0;
-      antPodRide = 0; antSpyT = -1; antSlowT = 0;
+      antPodRide = 0; antSpyT = -1; antSpyTold = false; antSlowT = 0;
       antPodCX = 8; antPodCZ = -168;
       antOnFloe = -1; antFloeRide = 0;
+      // the seal is back on her pan, watching nothing. See antSEAL_NOTICE.
+      antSealState = 'hauled'; antSealT = 0; antSealSurf = 0; antSealTold = false; antSealBr = 0;
+      antSealLook = 0;
+      if (antFloeX) { antSealX = antFloeX[antSealFloe]; antSealZ = antFloeZ[antSealFloe]; }
+      antSealY = antWATER + antFLOE_TOP + 0.32;
       // ...AND THE CHAIN OF PANS IS RE-LAID. They are a line of stepping
       // stones from the bay to the gate — that is what makes riding one
       // something a player finds by accident — and after ten minutes of
@@ -4880,6 +5324,7 @@ export function createAntarctic(game) {
       antCalveT = 16; antCalveLive = 0; antCrackT = -1;
       antCalveWave = 0; antCalveLift = 0;
       antColonyCall = 0; antSkuaFlush = 0; antPetrelScat = 0; antEchoT = -1;
+      antCallR = -1;
       antCallT[0] = -1; antCallT[1] = -1; antCallT[2] = -1;
       // ONCE PER VISIT, not once per session. The tick on the list stays
       // ticked (that is systems.js's business); the SHOW replays, for the same
@@ -4946,7 +5391,10 @@ export function createAntarctic(game) {
     colony: { x: antCOLONY.x, z: antCOLONY.z },
     highTop: { x: antHIGH[0], z: antHIGH[1] },
     whalers: { x: antWHAL.x, z: antWHAL.z },
-    bones: { x: antBONES.x, z: antBONES.z },
+    // OFF THE BACKBONE. See the note by the 'bones' task in antUpdateTasks:
+    // the middle of the skeleton is inside the spine collider, and the arrow
+    // was sending the player to stand in it.
+    bones: { x: antBONES.x + 2.8, z: antBONES.z + 1.4 },
     berg: { x: antBERG.x, z: antBERG.z },
     gate: { x: 0, z: antGATE_Z },
     blueIce: { x: antBLUE.xIn - 44, z: (antBLUE.z0 + antBLUE.z1) / 2 },
@@ -4959,10 +5407,15 @@ export function createAntarctic(game) {
       return antV3b;
     },
     pod() { antV3b.set(antPodCX, antWATER, antPodCZ); return antV3b; },
-    seal() {
-      antV3b.set(antFloeX ? antFloeX[antSealFloe] : 0, antWATER, antFloeZ ? antFloeZ[antSealFloe] : 0);
-      return antV3b;
-    },
+    /**
+     * SHE MOVES NOW, AND SHE DOES NOT ONLY MOVE WITH HER PAN.
+     *
+     * This used to answer the FLOE's position, which was correct for as long
+     * as a leopard seal was a mesh lying on one — and the hint arrow for
+     * 'Be looked at by a leopard seal' would have gone on pointing at a bare
+     * piece of ice for the whole of the encounter. See antSEAL_NOTICE.
+     */
+    seal() { antV3b.set(antSealX, antWATER, antSealZ); return antV3b; },
     nearestFloe() {
       const capy = antGame && antGame.capy;
       const px = capy && capy.position ? capy.position.x : antBoatX;

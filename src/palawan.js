@@ -1882,6 +1882,8 @@ let palBallMesh = null;
 let palBallSeed = [];
 let palBallT = 0;
 let palBallIn = 0;
+// the grace out of the ball, and the rising shimmer inside it
+let palBallOff = 0, palBallVox = 0;
 let palBallDone = false;
 const palBallPos = new THREE.Vector3(palBALL.x, palBALL_Y, palBALL.z);
 
@@ -1943,16 +1945,42 @@ function palUpdateBaitBall(game, dt) {
   }
   palBallMesh.instanceMatrix.needsUpdate = true;
 
-  if (palBallDone || !cp) return;
+  if (!cp) return;
   const dx = cp.x - palBALL.x, dy = cp.y - palBALL_Y, dz = cp.z - palBALL.z;
-  if (dx * dx + dy * dy + dz * dz < palBALL_IN * palBALL_IN) {
+  const inside = dx * dx + dy * dy + dz * dz < palBALL_IN * palBALL_IN;
+  if (inside) {
+    palBallOff = 0;
     palBallIn += dt;
-    if (palBallIn >= palBALL_HOLD) {
+    // ---- AND IT CLOSES BEHIND YOU, WHICH IS THE WHOLE SENSATION ----------
+    // The ball opens away from the animal — that has always worked — and then
+    // absolutely nothing else happened. Being inside a bait ball is the one
+    // place in this game where the world is on all six sides of you at once,
+    // and the only feedback it had was a task tick at the end of it.
+    //
+    // A rising shimmer of the reef's own voice, faster the longer you stay in,
+    // so the hold has a shape you can hear. Throttled on its own clock and
+    // silent the moment you are out, which is the difference between a texture
+    // and a tinnitus.
+    palBallVox -= dt;
+    if (palBallVox <= 0) {
+      const k = clamp(palBallIn / palBALL_HOLD, 0, 1);
+      palBallVox = lerp(0.34, 0.13, k);
+      palSfx('tick', { volume: 0.05 + k * 0.10, pitch: 1.5 + k * 1.1 });
+      if (k > 0.55) palSfx('rustle', { volume: 0.05 + k * 0.06, pitch: 2.1 });
+    }
+    if (!palBallDone && palBallIn >= palBALL_HOLD) {
       palBallDone = true;
       palTask('bait-ball');
+      // one clean note out, and the whole torus scatters and reforms
+      palSfx('chime', { volume: 0.7, pitch: 1.75, force: true });
+      palToast('several thousand sardines, and every one of them moved for you.');
     }
-  } else {
-    palBallIn = 0;
+  } else if (palBallIn > 0) {
+    // Half a second of grace, the same as the bangka's deck and the turtle's
+    // lap: the ball is four metres across, the animal is thirty centimetres of
+    // it, and one stroke too wide should not be a restart.
+    palBallOff += dt;
+    if (palBallOff > 0.5) { palBallIn = 0; palBallOff = 0; palBallVox = 0; }
   }
 }
 
@@ -2048,6 +2076,8 @@ function palUpdateTurtle(dt) {
   }
 }
 let palTurtleWasUp = false;
+// the grace on the follow, and the one nudge. See THE TURTLE’S OWN BREATH.
+let palTurtleOff = 0, palTurtleTold = false;
 
 // =============================================================== THE MANTA ==
 // THE SECOND MINI, and it is the only thing in this game that takes you
@@ -2932,7 +2962,24 @@ function palUpdateBloom(game, dt) {
     palMoteData[o] = x; palMoteData[o + 1] = y; palMoteData[o + 2] = z;
     palMoteData[o + 3] *= 0.995; palMoteData[o + 5] *= 0.995;
     const tw = 0.6 + 0.4 * Math.sin(palTime * 3.1 + i * 1.7);
-    const s = scale * tw;
+    // ---- AND THE SHELL FROM A WHEEK RUNS THROUGH THEM -------------------
+    // See THE WHEEK, UNDER at the bottom of this file. It is one function call
+    // and one multiply in a loop that was already writing all two hundred and
+    // forty matrices, and it costs nothing at all when nobody has wheeked:
+    // palWheekAt returns a hard zero while palWheekT is -1.
+    //
+    // It multiplies rather than adds, so a shell crossing the dark bay lights
+    // silt faintly and a shell crossing the bloom is a wall of green — which is
+    // the right relationship. The plankton were always there; the wheek does
+    // not create them, it disturbs them.
+    // 3.2, NOT 4.2. Measured off the rendered frame with the shell passing the
+    // camera: a mote is a five-by-three sphere, which is a hexagon, and at 4.2x
+    // in bloom the nearest ones resolve to half-metre hexagons — recognisable
+    // polygons rather than points of light, which is the one thing a glow may
+    // not become. At 3.2 the wave is just as legible across the bay and the
+    // near ones stay blobs.
+    const shk = palWheekAt(x, y, z);
+    const s = scale * tw * (1 + shk * 3.2);
     palMoteMesh.setMatrixAt(i, palXform(x, y, z, 0, 0, 0, s, s, s));
   }
   palMoteMesh.instanceMatrix.needsUpdate = true;
@@ -3690,6 +3737,8 @@ function palCheckJetty(game) {
 // and nothing happens (and nothing should — this game does not do damage). Wet,
 // thirty kilos of soaked capybara puts it out, and the steam is the payoff.
 const palFIRE = { x: 2, z: 55 };
+// how long the steam plume lives. Named, because two places have to agree on it.
+const palFIRE_STEAM = 3.4;
 let palFireDone = false, palFireOut = 0, palFireFlame = null, palFireSteam = null;
 
 function palBuildFire(root) {
@@ -3722,23 +3771,36 @@ function palUpdateFire(game, dt) {
   const g = palFireFlame.position.y;
 
   if (palFireOut > 0) {
+    // ---- AND IT STOPS WHEN IT IS OUT --------------------------------------
+    // This branch ran for ever. Once the fire was out — which is a task, so it
+    // stays out for the rest of the chapter — it went on incrementing a
+    // counter, writing a scale, filling twenty-two instance matrices and
+    // flagging instanceMatrix.needsUpdate EVERY FRAME, for a plume whose
+    // opacity had been clamped to zero nineteen seconds earlier. One number of
+    // waste is nothing; one number of waste that never ends is a leak, and it
+    // is the kind that never shows up in a profile because it is small.
+    if (palFireOut > palFIRE_STEAM + 0.2) {
+      if (palFireSteam && palFireSteam.visible) palFireSteam.visible = false;
+      if (palFireFlame.visible) palFireFlame.visible = false;
+      return;
+    }
     palFireOut += dt;
     const k = clamp(1 - palFireOut / 0.7, 0, 1);
     palFireFlame.scale.set(k, k * k, k);
     palFireFlame.visible = k > 0.02;
     if (palFireSteam) {
       const t = palFireOut;
-      palFireSteam.visible = t < 3.4;
+      palFireSteam.visible = t < palFIRE_STEAM;
       for (let i = 0; i < 22; i++) {
         const a = i * 2.399;
         const r = 0.5 + (i % 5) * 0.28 + t * 0.75;
-        const s = clamp(0.5 + t * 0.55, 0, 2.2) * clamp(1 - t / 3.4, 0, 1);
+        const s = clamp(0.5 + t * 0.55, 0, 2.2) * clamp(1 - t / palFIRE_STEAM, 0, 1);
         palFireSteam.setMatrixAt(i, palXform(
           palFIRE.x + Math.cos(a) * r, g + 0.3 + t * (1.1 + (i % 3) * 0.4),
           palFIRE.z + Math.sin(a) * r, 0, a, 0, s, s, s));
       }
       palFireSteam.instanceMatrix.needsUpdate = true;
-      palFireSteam.material.opacity = 0.5 * clamp(1 - palFireOut / 3.4, 0, 1);
+      palFireSteam.material.opacity = 0.5 * clamp(1 - palFireOut / palFIRE_STEAM, 0, 1);
     }
     return;
   }
@@ -3792,12 +3854,44 @@ let palFireTold = false;
  * hung on a task the player has actually completed, so nobody ever congratulates
  * you for something you did not do.
  */
+/**
+ * ...AND IT USED TO DO THAT BY THROWING THE OLD ONES AWAY (v21 refactor).
+ *
+ * `palSaysNow(who, lines, wheek)` assigned `rec.lines = lines`, which is the
+ * obvious way to make somebody react and has three faults, all of them the
+ * same fault:
+ *
+ *   1. IT FORGETS. Do the crack, then the turtle, and the boy's three lines
+ *      about the turtle wipe out the lagoon woman's — no, worse: do the turtle
+ *      and then the bloom in front of the same person and the second swap
+ *      erases the first, so a chapter where you have done five things reads
+ *      exactly like a chapter where you have done one.
+ *   2. IT IS BLIND TO EVERYTHING ELSE. A pool that has been overwritten cannot
+ *      also know what time it is, whether the water is lit, or whether the
+ *      player is under it. Palawan is a chapter with a CLOCK on it — the bloom
+ *      comes round every hundred and twenty-four seconds — and nobody in it
+ *      ever mentioned that.
+ *   3. IT IS A SECOND MECHANISM. npc.js has had `{ t, after: 'task-id' }`
+ *      since v20 and every other chapter that reacts to the player uses it.
+ *      Two systems doing one job is one system too many, and the one that was
+ *      here is the one that loses information.
+ *
+ * So the pools below carry their own `after:` and `when:` entries and compose
+ * properly, and this function keeps only the half that `after:` cannot do: SAY
+ * IT NOW, out loud, on the spot, because the moment somebody finds out is worth
+ * more than the moment they next happen to speak. It no longer touches the
+ * pool, so nothing it says can cost anything else.
+ */
 const palLocals = {};
 function palSaysNow(who, lines, wheek) {
   const r = palLocals[who];
-  if (!r) return;
-  if (lines) r.lines = lines;
-  if (wheek) r.wheekLines = wheek;
+  if (!r || !lines || !lines.length) return;
+  // one line, chosen off the running clock so two people reacting to the same
+  // event do not both open with the first entry
+  const i = Math.floor(palTime * 0.37 + (who.length || 0)) % lines.length;
+  r.cd = (r.cool || 13) * 1.1;
+  r.gest = 1.4;
+  try { r.anchor.speak(lines[i]); } catch (e) {}
 }
 
 function palTask(id) {
@@ -3869,7 +3963,28 @@ function palUpdateTasks(game, dt) {
   // ---- the turtle ---------------------------------------------------------
   palTurtlePos(palTurtleT, palPt);
   const td = Math.hypot(p.x - palPt.x, p.z - palPt.z, (p.y - palPt.y) * 0.8);
-  if (td < 4.6 && under) {
+  // ---- THE TURTLE'S OWN BREATH WAS BREAKING THE TURTLE'S OWN TASK --------
+  //
+  // She surfaces for six seconds every ninety-two — which is the best-written
+  // beat in this chapter and is documented as such three hundred lines up: "you
+  // are out of air at exactly the moment she is, you break the surface
+  // together". And the hold that scores it required SIX CONTINUOUS SECONDS
+  // UNDER, so the instant she went up and the player followed her up, `under`
+  // went false and the timer was thrown away.
+  //
+  // The two numbers are six and six. Following her exactly as the chapter asks
+  // you to, at the moment the chapter is proudest of, is the one way to
+  // guarantee you never finish. Measured, not reasoned about: a run that stayed
+  // inside four metres of her for twenty-two seconds scored 3.1 s.
+  //
+  // So: being at the surface WITH HER is keeping up with her. `under` is only
+  // required while she is down, and a moment out of range decays the hold
+  // instead of deleting it — the same half-second grace the bangka's deck has
+  // had since it shipped, for exactly the same reason.
+  const sheIsUp = palTurtleUp(palTurtleT);
+  const withHer = td < 4.6 && (under || sheIsUp);
+  if (withHer) {
+    palTurtleOff = 0;
     palTurtleWith += dt;
     if (!palTurtleDone && palTurtleWith > 6) {
       palTurtleDone = true;
@@ -3885,8 +4000,20 @@ function palUpdateTasks(game, dt) {
     if (typeof game.record === 'function' && palTurtleWith > 1.5) {
       game.record('sea-turtle', palTurtleWith);
     }
+    // ---- AND THE CHAPTER SAYS WHAT IT WANTS ------------------------------
+    // Six seconds is not long, but a bar with no face on it is a bar nobody
+    // knows they are filling. One line, once, at the halfway mark, and then
+    // never again — enough to turn 'swimming near a turtle' into 'doing a
+    // thing'. It is deliberately about her rather than about the timer.
+    if (!palTurtleTold && palTurtleWith > 3) {
+      palTurtleTold = true;
+      palToast('she has not changed course once. stay with her.');
+    }
   } else if (palTurtleWith > 0) {
-    palTurtleWith = 0;
+    // A BUMP INTO A BOMMIE IS NOT LOSING HER. Half a second, the same grace
+    // the bangka's deck gets, and then the run is over.
+    palTurtleOff += dt;
+    if (palTurtleOff > 0.6) { palTurtleWith = 0; palTurtleOff = 0; }
   }
 
   // ---- the giant clam -----------------------------------------------------
@@ -3960,6 +4087,16 @@ function palUpdateTasks(game, dt) {
 export function createPalawan(game) {
   palGame = game;
 
+  // The wheek lights the water. Bound once; it gates on the live biome and on
+  // the animal actually being under, so it costs one comparison per wheek
+  // anywhere else in the game. See THE WHEEK, UNDER.
+  if (game.events && typeof game.events.on === 'function') {
+    game.events.on('capy:wheek', function (payload) {
+      if (!game.biome || !game.biome.isActive('palawan')) return;
+      try { palWheekUnder(payload); } catch (e) {}
+    });
+  }
+
   game.biome.register('palawan', {
     ensureBuilt() { palBuild(game); },
     onEnter() {
@@ -3968,7 +4105,7 @@ export function createPalawan(game) {
       palPhase = 0.10;
       palBloom = 0; palBloomT = -1; palWarned = false;
       palTime = 0; palSub = 0;
-      palTurtleWith = 0; palBreathIn = 0;
+      palTurtleWith = 0; palBreathIn = 0; palTurtleOff = 0; palTurtleTold = false;
       palBangkaT = 0; palBangkaDir = 1; palBangkaHold = 0; palBangkaRideT = 0;
       palBangkaPX = palBANGKA_A.x; palBangkaPZ = palBANGKA_A.z;
 
@@ -3986,6 +4123,7 @@ export function createPalawan(game) {
       palRayX = palRAY.x; palRayZ = palRAY.z; palRayYaw = 0.6;
       palHeartT = 0; palLastDepth = 0; palGaspArmed = false; palCrackT = 0;
       palSwiftOut = 0;
+      palWheekT = -1; palWheekEcho = -1;
       palBubT = 0;
       // ...and the rest of it. Every one of these is a latch or a running total
       // that only makes sense inside one visit: a bait-ball hold banked in a
@@ -3995,7 +4133,7 @@ export function createPalawan(game) {
       // it is deliberately NOT zeroed to the same phase as palTime — she starts
       // her lap a third of the way round, well clear of a surfacing, so the
       // first thing a returning player sees is a turtle swimming.
-      palBallIn = 0; palBallT = 0;
+      palBallIn = 0; palBallT = 0; palBallOff = 0; palBallVox = 0;
       palTurtleT = 24;
       palJumpArmed = false;
       palFireTold = false; palToldBreath = false;
@@ -4137,6 +4275,7 @@ export function createPalawan(game) {
       palUpdateRay(game, dt);
       palUpdateSwiftlets(game, dt);
       palUpdateBreath(game, dt);
+      palUpdateWheek(game, dt);
       palUpdateReefSound(game, dt);
       palUpdateTurtle(dt);
       palUpdateBaitBall(game, dt);
@@ -4297,6 +4436,29 @@ function palBuild(game) {
   // a few things they might say when the capybara turns up, and a different
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
+  //
+  // ---- AND THEY KNOW WHAT THE WATER IS DOING (v21) -----------------------
+  //
+  // Seven people on a beach, in a chapter with a clock on it — the bloom comes
+  // round every hundred and twenty-four seconds — and not one of them ever
+  // mentioned it happening. The man who is literally waiting for it said "wait
+  // for the water to light up, then you will see something" WHILE THE WHOLE
+  // BAY WAS LIT UP.
+  //
+  // Four states of the evening plus one that is about the player rather than
+  // the world, and the six line-swaps that used to be done destructively by
+  // palSaysNow are now `after:` entries that compose with all of it. See the
+  // long note on palSaysNow for why that mattered.
+  //
+  // Same rule as the other two chapters in this pass: EVERY POOL KEEPS AT
+  // LEAST ONE UNCONDITIONAL LINE, or there is a state in which somebody has
+  // nothing to say and just stands there being scenery.
+  const palDark   = () => palBloom < 0.15 && !palSeenBloom;
+  const palSoon   = () => palBloom < 0.15 && palSeenBloom;
+  const palLit    = () => palBloom > 0.4;
+  const palWet    = () => !!(game.capy && (game.capy.wet || 0) > 0.5);
+  const palDown   = () => !!(game.capy && (game.capy.depth || 0) > 0.65);
+
   if (typeof game.addLocal === 'function') {
     // -0.7, NOT -3. The jetty deck is palJETTY.w = 2.4 m wide about x = 6, so
     // x - 3 is a metre and a half off the side of it: the boatman has been
@@ -4305,17 +4467,46 @@ function palBuild(game) {
     // terrainHeight — see [[the locals]], rule 4.
     palLocals.boatman = game.addLocal({ biome: 'palawan', x: palJETTY.x - 0.7, y: palJETTY.y, z: palJETTY.z0 + 2, near: 7,
       figure: { shirt: PALETTE.cloth2, skin: PALETTE.skin3, hat: PALETTE.khaki },
-      lines: ['Bangka leaves when the bangka leaves. Sit at the front.',
+      lines: [{ t: 'Bangka leaves when the bangka leaves. Sit at the front.',
+                before: 'outrigger' },
+              { t: 'You sat at the front. Good. Everybody sits at the back and gets wet.',
+                after: 'outrigger' },
+              { t: 'Same crossing, eleven thousand times. Still the same crossing.',
+                after: 'outrigger' },
               'Outriggers keep her up. Do not stand on them.',
-              'Big water today. Good water.'],
-      wheek: ['Ho! You will bring the whole bay over.'] });
+              'Big water today. Good water.',
+              { t: 'She goes out and she comes back. That is the timetable.', when: palDark },
+              { t: 'No fishing tonight. Nobody puts a net in that.', when: palLit },
+              { t: 'You are dripping on my rope.', when: palWet },
+              { t: 'Anything under the island, you tell me. I have never been under it.',
+                before: 'the-crack' }],
+      wheek: ['Ho! You will bring the whole bay over.',
+              { t: 'Do that out there and the whole island answers.', when: palLit }],
+      onTask: { 'outrigger': ['At the front. Standing. On MY boat.'],
+                'jetty-jump': ['Off the end. Everybody goes off the end eventually.'],
+                'the-manta': ['You were ON it. It came out of the water and you were ON it.'] } });
     palLocals.fire = game.addLocal({ biome: 'palawan', x: palFIRE.x + 2.5, y: palTerrain(palFIRE.x + 2.5, palFIRE.z),
       z: palFIRE.z, near: 6,
       figure: { shirt: PALETTE.cloth8, skin: PALETTE.skin3 },
       lines: ['Fire is for after dark. It is barely after dark.',
-              'Wait for the water to light up. Then you will see something.',
-              'Do not put that out. I only just got it going.'],
-      wheek: ['Everybody down the beach heard that.'] });
+              { t: 'Wait for the water to light up. Then you will see something.',
+                when: palDark },
+              { t: 'It went once already. It will go again — it always goes again.',
+                when: palSoon },
+              // ...and when it IS lit he stops selling it and just looks at it,
+              // which is the entire difference between a person and a sign
+              { t: 'Told you. Wait for the water. Every time.', when: palLit },
+              { t: 'My grandmother called it the sea remembering something.', when: palLit },
+              { t: 'Do not put that out. I only just got it going.', before: 'beach-fire' },
+              { t: 'Half an hour of driftwood and one wet rodent.', after: 'beach-fire' },
+              { t: 'Go on. Go and be wet somewhere else.', after: 'beach-fire' },
+              { t: 'You are extremely wet and you are extremely near my fire.',
+                before: 'beach-fire', when: palWet }],
+      wheek: ['Everybody down the beach heard that.',
+              { t: 'Quiet. Look at the water.', when: palLit }],
+      onTask: { 'beach-fire': ['Well. That is the fire.',
+                               'Thirty kilos of wet rodent. I never stood a chance.'],
+                'the-bloom': ['You were UNDER it. Nobody is ever under it.'] } });
 
     // ---- AND FIVE MORE. Four houses on stilts with nobody in them is a model
     // village, and this chapter had the second-emptiest cast in the game.
@@ -4323,22 +4514,52 @@ function palBuild(game) {
       figure: { shirt: PALETTE.palBangkaTrim, skin: PALETTE.skin3, hat: PALETTE.palThatch },
       lines: ['Net has a hole in it. Net always has a hole in it.',
               'Two hundred fish in that bay and every one of them knows me.',
-              'You are standing on the good end. Move up.'],
-      wheek: ['Fish heard that. Fish are gone. Thank you.'] });
+              'You are standing on the good end. Move up.',
+              { t: 'Now you see why nobody fishes tonight. Nobody can see a net in that.',
+                when: palLit },
+              { t: 'Every fish in the bay is lit up from underneath. Every one.',
+                when: palLit },
+              { t: 'Twice a year, maybe. And you turn up on the day.',
+                when: palLit, after: 'the-bloom' },
+              { t: 'There is a ball of sardines out past the coral. Do not ask me why.',
+                before: 'bait-ball' },
+              { t: 'You swam into the middle of it. Of course you did.', after: 'bait-ball' },
+              { t: 'Mending is the job. Fishing is what happens in between mending.',
+                when: palDark }],
+      wheek: ['Fish heard that. Fish are gone. Thank you.',
+              { t: 'Not now. Look at it.', when: palLit }],
+      onTask: { 'bait-ball': ['Straight through the middle. They closed up behind him.'],
+                'the-bloom': ['Twice a year, and he turns up on the day.'],
+                'giant-clam': ['That clam is older than this village. It did not even shut.'] } });
 
     palLocals.drying = game.addLocal({ biome: 'palawan', x: 16, y: palTerrain(16, 52.5), z: 52.5, near: 7,
       figure: { shirt: PALETTE.palCoralOrange, skin: PALETTE.skin3 },
       lines: ['Dry them two days. Three if the rain comes. It comes.',
               'That is not washing. Half of it is lunch.',
-              'Under the house is cooler than in the house. Always was.'],
-      wheek: ['The whole row is going to want to know what that was.'] });
+              'Under the house is cooler than in the house. Always was.',
+              { t: 'You are standing on my drying mat and you are made of seawater.',
+                when: palWet },
+              { t: 'Everyone comes out for that. Even the ones who say they do not.',
+                when: palLit },
+              { t: 'Fifty-one years under this house and I have seen it maybe ninety times.',
+                when: palLit }],
+      wheek: ['The whole row is going to want to know what that was.',
+              'Half the dogs on this beach just stood up.'],
+      praise: ['I saw. I see everything from under here.',
+               'That is going round the whole village by morning.'] });
 
     palLocals.painter = game.addLocal({ biome: 'palawan', x: 38, y: palTerrain(38, 42), z: 42, near: 7,
       figure: { shirt: PALETTE.palWeed, skin: PALETTE.skin3, hat: PALETTE.palBamboo },
       lines: ['Scrape her, paint her, scrape her again. Every dry season.',
               'She has been out to the island eleven thousand times.',
-              'Bamboo, not fibreglass. Bamboo bends. Fibreglass argues.'],
-      wheek: ['Careful. Wet paint and a loud animal.'] });
+              'Bamboo, not fibreglass. Bamboo bends. Fibreglass argues.',
+              { t: 'Eleven thousand and one, now. He rode her out.', after: 'outrigger' },
+              { t: 'I paint by the fire and I paint badly. Tomorrow, then.', when: palDark },
+              { t: 'Brush down. Nobody paints through that.', when: palLit },
+              { t: 'Do not shake yourself here. Do NOT shake yourself here.', when: palWet }],
+      wheek: ['Careful. Wet paint and a loud animal.',
+              'That went right through the hull. I felt it in the wood.'],
+      onTask: { 'outrigger': ['She goes out and she comes back. Every time. Good boat.'] } });
 
     // ON THE DECK, NOT BESIDE IT. The jetty is 2.4 m wide about x = 6, so
     // x + 2.2 is a metre off the planking and the boy was standing on the sea
@@ -4346,10 +4567,29 @@ function palBuild(game) {
     palLocals.boy = game.addLocal({ biome: 'palawan', x: palJETTY.x + 0.6, y: palJETTY.y,
       z: palJETTY.z1 - 2.5, near: 6.5,
       figure: { shirt: PALETTE.palFishA, skin: PALETTE.skin3 },
-      lines: ['You go off the end. Everybody goes off the end.',
-              'Deeper at the far post. Do not check. Just go.',
-              'Turtle comes through about now. Sixty years old, they say.'],
-      wheek: ['Go on then. Off the end.'] });
+      lines: [{ t: 'You go off the end. Everybody goes off the end.', before: 'jetty-jump' },
+              { t: 'See? Everybody goes off the end.', after: 'jetty-jump' },
+              { t: 'Now do it from the far post. That is the real one.', after: 'jetty-jump' },
+              { t: 'Deeper at the far post. Do not check. Just go.', before: 'jetty-jump' },
+              { t: 'Turtle comes through about now. Sixty years old, they say.',
+                before: 'sea-turtle' },
+              { t: 'You kept up with her! Nobody keeps up with her.', after: 'sea-turtle' },
+              { t: 'Sixty years. My father followed her when he was my size.',
+                after: 'sea-turtle' },
+              // he is on the jetty, so he is the person who would notice the
+              // one thing this chapter asks you to do that nobody can see
+              { t: 'Are you down there? You have been down there ages.',
+                when: palDown },
+              { t: 'It does that when you kick it. Kick it. Go on, kick it.',
+                when: palLit },
+              'This is my jetty. I have decided.'],
+      wheek: ['Go on then. Off the end.',
+              { t: 'She has heard that a thousand times. She does not care.',
+                after: 'sea-turtle' }],
+      onTask: { 'jetty-jump': ['You did not even check how deep it was. Respect.'],
+                'sea-turtle': ['She comes up for air about now. Watch. Right about now.'],
+                'first-dive': ['He went UNDER. Properly under. Did you see how long?'],
+                'cathedral': ['You found the room with the hole? Nobody finds that.'] } });
 
     // ...and the landing beach shelves, so its height is a function and not a
     // guess: measured, palTerrain there is -0.21 and the hard-coded 1.6 had
@@ -4357,14 +4597,145 @@ function palBuild(game) {
     palLocals.lagoon = game.addLocal({ biome: 'palawan', x: palFOOT.x - 4,
       y: palTerrain(palFOOT.x - 4, palFOOT.z + 4), z: palFOOT.z + 4, near: 7,
       figure: { shirt: PALETTE.palPearl, skin: PALETTE.skin3, hat: PALETTE.palThatch },
-      lines: ['Only two ways into the lagoon and one of them is under the rock.',
-              'You will not swim it on top. Nobody swims it on top.',
-              'Wait for the water to go quiet. Then hold your breath and go down.'],
-      wheek: ['That goes all the way through the crack, that does.'] });
+      lines: [{ t: 'Only two ways into the lagoon and one of them is under the rock.',
+                before: 'the-crack' },
+              { t: 'You went under it. Of course you went under it.', after: 'the-crack' },
+              { t: 'Nobody from the village has been in there in nine years.',
+                after: 'the-crack' },
+              { t: 'It is bigger than the bay, in there. Nobody believes me.',
+                after: 'the-crack' },
+              { t: 'You will not swim it on top. Nobody swims it on top.',
+                before: 'the-crack' },
+              { t: 'Wait for the water to go quiet. Then hold your breath and go down.',
+                before: 'the-crack' },
+              'The rock goes all the way round. All the way. I have walked it.',
+              { t: 'In there it will be going too. Same water.', when: palLit }],
+      wheek: ['That goes all the way through the crack, that does.',
+              { t: 'Do that in the lagoon. Just once. You will see.', after: 'the-crack' }],
+      onTask: { 'the-crack': ['Nine years. Nine years and a rodent does it on the first go.'],
+                'cathedral': ['The hole in the roof. So it IS real. I told them it was real.'] } });
+
+    // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
+    // Seven people on one beach, all of them facing the sea, none of them ever
+    // saying a word to each other — so unless the player walked up and stood
+    // in front of somebody, this village was silent. Pairs chosen by measured
+    // distance, because npcEX_MAX bounds the PLAYER's distance to the nearer
+    // speaker and does nothing at all about how far apart the two of them are:
+    // boatman to boy is 4.5 m down the same jetty, and the fire to the netman
+    // is 24 m along the sand, which is about as far as anybody shouts at dusk.
+    if (typeof game.addExchange === 'function') {
+      if (palLocals.boatman && palLocals.boy) {
+        game.addExchange({ biome: 'palawan', a: palLocals.boy, b: palLocals.boatman, lines: [
+          ['Can I go on the boat?', 'You went on the boat yesterday.'],
+          ['That animal has been under for a very long time.', 'That animal knows what it is doing.'],
+          ['Is she coming through tonight?', 'She comes through every night. That is what she does.'],
+          ['I could swim to the island.', 'You could not swim to the end of the jetty.'],
+        ] });
+      }
+      if (palLocals.fire && palLocals.netman) {
+        game.addExchange({ biome: 'palawan', a: palLocals.netman, b: palLocals.fire, lines: [
+          ['Is it going tonight?', 'It is always going. You just have to wait for it.'],
+          ['Put more wood on, I cannot see the net.', 'Put the net down and look at the water.'],
+          ['Two hundred fish out there and I have caught none.', 'Because you are talking to me.'],
+        ] });
+      }
+      if (palLocals.drying && palLocals.painter) {
+        game.addExchange({ biome: 'palawan', a: palLocals.drying, b: palLocals.painter, lines: [
+          ['Your paint is on my washing.', 'Your washing is on my boat.'],
+          ['Every dry season, the same argument.', 'Every dry season, the same washing.'],
+          ['Did you see what went past?', 'I am painting. I see nothing. Ever.'],
+        ] });
+      }
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(palRoot);
   // ...AND THEN TAKE IT BACK OFF THE THINGS THAT ARE NOT THERE. The last line of
   // the build, after the register, because the register is what set them.
   palNoShadowOnGhosts(palRoot);
+}
+
+// ========================================================= THE WHEEK, UNDER =
+/**
+ * THE ONE VERB THIS GAME IS NAMED AFTER, IN THE ONE CHAPTER IT MEANS MOST IN.
+ *
+ * `capy:wheek` is the first task in the game and the only button that is never
+ * about anything else. Above water it is a shout: it puts up pigeons, it makes
+ * a foreman lean over a scaffold, it empties a square. Under water — in the
+ * chapter whose entire subject is being under water — it did NOTHING. The
+ * school bolted (palUpdateFish has watched `honkPressed` since the chapter
+ * shipped) and that was the whole of it: no sound of its own, no picture, and
+ * no reason at all to press it while diving.
+ *
+ * Which is a waste of the best physical fact available here. SOUND TRAVELS
+ * FOUR AND A HALF TIMES FASTER IN WATER AND IT DOES NOT ATTENUATE THE WAY IT
+ * DOES IN AIR, so a noise made under the surface is felt as much as heard, it
+ * arrives everywhere at once, and it is LOW. And this bay is full of
+ * bioluminescent plankton that light up when something moves them.
+ *
+ * So: wheek under water and a shell of light leaves the animal at about eight
+ * metres a second and runs out through the marine snow. It is not a new object
+ * and not a new draw call — it is a term added to the size of motes the shell
+ * is passing through, in the loop that was already writing all two hundred and
+ * forty of them. In bloom it is a wall of green going away from you across the
+ * whole bay. Out of bloom it is a faint ring in the silt, which is honest: the
+ * plankton are still there, they are just not switched on.
+ *
+ * And it works on the bait ball, the turtle and the terns for free, because
+ * those already read palFishBolt / their own scare hooks.
+ *
+ * There is no task on this and there never will be. It is a thing that is true
+ * about the water, the player finds it by pressing the button they have been
+ * pressing since Sydney, and the first time it happens in the dark it is the
+ * best twenty seconds in the chapter that nobody designed.
+ */
+const palWHEEK_V = 8.2;            // m/s — the shell's speed. Slow enough to SEE.
+const palWHEEK_W = 2.6;            // m — how thick the shell is
+const palWHEEK_LIFE = 4.2;         // s — it fades out at about thirty-four metres
+let palWheekT = -1;
+const palWheekP = new THREE.Vector3();
+
+/** Bound to capy:wheek in createPalawan. Gates on being genuinely under. */
+function palWheekUnder(payload) {
+  const capy = palGame && palGame.capy;
+  const p = (payload && payload.position) || (capy && capy.position);
+  if (!p || !capy) return;
+  if ((capy.depth || 0) < 0.5) return;
+  palWheekT = 0;
+  palWheekP.set(p.x, p.y, p.z);
+  // ---- AND IT SOUNDS LIKE IT IS HAPPENING TO YOUR RIBS -------------------
+  // Two voices under the animal's own wheek (systems.js plays that one on the
+  // event, unconditionally, and it should — it is the same animal). A long low
+  // thud arriving with it, and a second one a beat later off the karst, which
+  // is what a bay with a limestone wall round three sides of it does with a
+  // noise. Both are quiet: this is a feeling, not an announcement.
+  palSfx('thud', { volume: 0.34, pitch: 0.30 });
+  palWheekEcho = 0.38;
+}
+let palWheekEcho = -1;
+
+function palUpdateWheek(game, dt) {
+  if (palWheekEcho >= 0) {
+    palWheekEcho -= dt;
+    if (palWheekEcho <= 0) {
+      palWheekEcho = -1;
+      palSfx('thud', { volume: 0.16, pitch: 0.26 });
+    }
+  }
+  if (palWheekT < 0) return;
+  palWheekT += dt;
+  if (palWheekT > palWHEEK_LIFE) palWheekT = -1;
+}
+
+/** 0..1 — how hard the shell is lighting a mote at (x, y, z). Zero when idle. */
+function palWheekAt(x, y, z) {
+  if (palWheekT < 0) return 0;
+  const r = palWheekT * palWHEEK_V;
+  const d = Math.hypot(x - palWheekP.x, y - palWheekP.y, z - palWheekP.z);
+  const off = Math.abs(d - r);
+  if (off > palWHEEK_W) return 0;
+  // a soft shell, and the whole thing fades as it gets further out — a ring of
+  // constant brightness at thirty metres reads as a hoop rather than a wave
+  const k = 1 - off / palWHEEK_W;
+  return k * k * clamp(1 - palWheekT / palWHEEK_LIFE, 0, 1);
 }

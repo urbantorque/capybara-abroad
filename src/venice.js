@@ -209,6 +209,10 @@ let venBoardBodies = null;
 let venPigeonMesh = null;
 let venPigeonData = null;           // x,z,phase,up,vy,y,vx,vz per bird
 let venPigeonUp = 0, venPigeonPeak = 0, venPigeonHold = 0;
+// The clatter ladder. Counts, not fractions, so they survive a resize of the
+// flock. See the note at the bottom of venUpdatePigeons.
+const venPIGEON_RUNGS = [18, 45, 90, 140];
+let venPigeonRung = 0;
 let venClatter = 0, venClatterN = 0, venClatterV = 0;
 // the centre of the wheel, when the square is under and the flock is up. It
 // drifts down the length of the Piazza on its own slow clock, which is what
@@ -224,6 +228,11 @@ let venSirenT = -1, venSirenStep = 0;
 let venSeenFlood = false;
 let venFloodedNow = false;
 let venWasFlooded = false;
+// How long the marquee stays claimable after the water crosses the square.
+// See the long note in venUpdateTide — this is the difference between a set
+// piece and a coin toss.
+const venFLOOD_GRACE = 18;
+let venFloodWin = 0;
 let venBoardRunT = -1, venBoardRunBest = 0, venBoardFrom = 0, venBoardOff = 0;
 let venOnBoards = false, venBoardIdx = -1;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
@@ -2921,6 +2930,37 @@ function venUpdatePigeons(game, dt) {
   // task is mischief. Count the flock only while the square is dry.
   if (!venFloodedNow && up > venPigeonPeak) { venPigeonPeak = up; venPigeonHold = 1.6; }
 
+  // ---- AND IT IS AN AVALANCHE, NOT A SWITCH ------------------------------
+  // A hundred and eighty birds and the only thing the chapter ever said about
+  // them was one toast, once, at forty. Which means the whole middle of the
+  // best physical joke in Venice — the moment where you realise the flock is
+  // going up FASTER THAN YOU ARE RUNNING and the square in front of you turns
+  // into a wall of wings — happened in silence and paid nothing.
+  //
+  // Four rungs. Each one fires ONCE per storm (the ladder only ever climbs, and
+  // it is reset with the peak), each is a bigger and lower clatter than the one
+  // under it, and the top one is a shove in the chest. Forty is still where the
+  // task ticks; the ladder is what makes the run to it feel like something. The
+  // rungs are counts and not fractions, so they mean the same thing if the
+  // flock is ever resized.
+  if (!venFloodedNow) {
+    while (venPigeonRung < venPIGEON_RUNGS.length && up >= venPIGEON_RUNGS[venPigeonRung]) {
+      const r = venPigeonRung++;
+      const k = (r + 1) / venPIGEON_RUNGS.length;
+      // the clatter goes DOWN in pitch as it goes up in size, because a
+      // hundred wings together is not fifty wings louder, it is deeper
+      venSfx('rustle', { volume: 0.26 + k * 0.55, pitch: 1.62 - k * 0.5 });
+      if (r >= 2) venSfx('gull', { volume: 0.16 + k * 0.20, pitch: 1.25 - k * 0.2 });
+      // and the last rung — nearly the whole square in the air at once — is the
+      // one moment in this chapter that is allowed to hit the player
+      if (r === venPIGEON_RUNGS.length - 1) {
+        if (typeof game.punch === 'function') game.punch(0.20);
+        else if (typeof game.shake === 'function') game.shake(0.20);
+        venToast('a hundred and forty of them. the square has gone dark.');
+      }
+    }
+  }
+
   if (venPigeonHold > 0) {
     venPigeonHold -= dt;
     if (venPigeonHold <= 0) {
@@ -2933,6 +2973,7 @@ function venUpdatePigeons(game, dt) {
         if (typeof game.record === 'function') game.record('pigeon-storm', venPigeonPeak);
       }
       venPigeonPeak = 0;
+      venPigeonRung = 0;
     }
   }
 }
@@ -2967,6 +3008,9 @@ let venSeedRec = null;             // the local, so his arm can go up
 // the one moment in his working life that he would definitely have an opinion
 // about. Nothing in this game may announce a thing and then ignore it.
 let venCrewRec = null;
+// ...and the rest of the cast, for the exchanges and for anything that wants to
+// make one of them react. See THE PEOPLE WHO LIVE HERE at the bottom.
+let venWaiterRec = null, venWellRec = null, venGondRec = null, venFruitRec = null;
 let venCrewSaid = -1;              // which line he used last
 let venCrewCall = -1;              // s until he says it
 const venCREW_CALL = [
@@ -4306,22 +4350,76 @@ function venUpdateVolo(game, dt) {
 // The rim is 1.1 m over the paving, which is one deliberate hop, and that is the
 // whole task: get up on it and put your head in.
 let venWellDone = false;
+// ---- AND IT ANSWERS YOU -------------------------------------------------
+// A stone shaft four metres deep with a foot of standing water in the bottom
+// is the single most obvious echo in this game and the chapter had it as a
+// collider. Wheek from the rim and it comes back — twice, quieter and lower,
+// on the delay a four-metre shaft actually has — and there is no task on it,
+// no counter, and no toast the second time. It is a thing that is simply true
+// about the object, which is the whole point of it: the player finds it, tries
+// it again to check they did not imagine it, and then tells somebody.
+const venWELL_ECHO = [[0.30, 0.62, 0.90], [0.62, 0.40, 0.80]];   // delay, gain, pitch
+let venWellEcho = -1, venWellEchoN = 0, venWellEchoX = 0, venWellEchoZ = 0;
+let venWellSaid = false;
+
+/** True when the animal is up on the cistern head rather than beside it. */
+function venOnWell(p) {
+  if (!p) return false;
+  const dx = p.x - venCAMPO.x, dz = p.z - venCAMPO.z;
+  return dx * dx + dz * dz < 2.2 * 2.2 && p.y > venCITY_Y + 0.7;
+}
+
+/** Bound to capy:wheek in createVenice. The shaft is what makes this legal. */
+function venWellWheek(payload) {
+  const p = payload && payload.position;
+  // NEAR it, not on it — leaning over the rim is close enough to shout down a
+  // well, and demanding the player be balanced on top of a 1.9 m block to hear
+  // the joke is how a discovery becomes a chore.
+  if (!p) return;
+  const dx = p.x - venCAMPO.x, dz = p.z - venCAMPO.z;
+  if (dx * dx + dz * dz > 3.4 * 3.4) return;
+  venWellEcho = 0; venWellEchoN = 0;
+  venWellEchoX = venCAMPO.x; venWellEchoZ = venCAMPO.z;
+}
+
+function venUpdateWell(game, dt) {
+  if (venWellEcho < 0) return;
+  venWellEcho += dt;
+  while (venWellEchoN < venWELL_ECHO.length &&
+         venWellEcho >= venWELL_ECHO[venWellEchoN][0]) {
+    const e = venWELL_ECHO[venWellEchoN++];
+    // FROM THE WELL, not from the animal: the whole tell is that the sound is
+    // coming out of the hole rather than out of you. game.sfx pans and
+    // attenuates against the camera, so this genuinely arrives from over there.
+    venSfx('wheek', { volume: e[1], pitch: e[2],
+                      at: { x: venWellEchoX, y: venCITY_Y + 0.4, z: venWellEchoZ } });
+  }
+  if (venWellEchoN >= venWELL_ECHO.length) {
+    venWellEcho = -1;
+    if (!venWellSaid) {
+      venWellSaid = true;
+      venToast('four metres of stone and a foot of rainwater. it answers.');
+    }
+  }
+}
 
 function venCheckWell(game) {
   if (venWellDone) return;
   const capy = game.capy;
   const input = game.input;
   if (!capy || !capy.position || !input || !input.actionPressed) return;
-  const p = capy.position;
-  const dx = p.x - venCAMPO.x, dz = p.z - venCAMPO.z;
   // ON it, not beside it: the collider tops out at venCITY_Y + 1.1 and the
   // paving is at venCITY_Y, so anything over half a metre up is standing on the
   // cistern head rather than leaning against it.
-  if (dx * dx + dz * dz > 2.2 * 2.2 || p.y < venCITY_Y + 0.7) return;
+  if (!venOnWell(capy.position)) return;
   venWellDone = true;
   venTask('the-well');
   venSfx('chime', { volume: 0.5, pitch: 0.6 });
   venToast('rainwater, filtered through the whole square. eleven hundred years of it.');
+  // ...and it tells you the other thing it does, because a player who has just
+  // been asked to put their head in a well is the one player in the game who
+  // will definitely try shouting down it.
+  if (!venWellSaid) venToast('try a wheek down it.');
 }
 
 // ================================================================ THE CALLI ==
@@ -4335,8 +4433,24 @@ function venCheckWell(game) {
 // the two bridges, and the tide decides how unpleasant that is — the calli
 // stand at venCITY_Y, so they are the DRY route while San Marco is under, and
 // the same walk at low water is just a walk.
+// ---- THE EXTENT, NOT THE DISPLACEMENT FROM WHEREVER YOU CAME IN ----------
+// Exactly the bug that was found and fixed on `mirror-swim` and then left
+// standing here, ten lines away, in the same file. `Math.abs(p.x - entryX)`
+// asks "how far are you from the door you used", and the maze is FORTY-EIGHT
+// metres wide against a required thirty-six — so a player who enters anywhere
+// but within twelve metres of an edge (down from a bridge, in off the campo,
+// back through a lane they had already used) can walk the whole thing east to
+// west and score at most twenty-four. The task is not hard in that state, it is
+// IMPOSSIBLE, and nothing says so.
+//
+// Track the furthest east and the furthest west of the whole visit and score
+// the distance between them, which is what "side to side" actually means. It
+// also, for free, lets a crossing be made in two goes with a look at the rio in
+// between, which is how anybody actually crosses a maze.
 const venCALLI_CROSS = 36;
-let venCalliDone = false, venCalliIn = false, venCalliFrom = 0;
+let venCalliDone = false, venCalliIn = false;
+let venCalliW = 0, venCalliE = 0;      // the extent of this visit, in x
+let venCalliTold = false;
 
 function venCheckCalli(game) {
   if (venCalliDone) return;
@@ -4345,8 +4459,19 @@ function venCheckCalli(game) {
   const p = capy.position;
   const inside = p.x > venCAL_X0 && p.x < venCAL_X1 && p.z > venCAL_Z0 && p.z < venCAL_Z1;
   if (!inside) { venCalliIn = false; return; }
-  if (!venCalliIn) { venCalliIn = true; venCalliFrom = p.x; return; }
-  if (Math.abs(p.x - venCalliFrom) >= venCALLI_CROSS) {
+  if (!venCalliIn) { venCalliIn = true; venCalliW = p.x; venCalliE = p.x; }
+  if (p.x < venCalliW) venCalliW = p.x;
+  if (p.x > venCalliE) venCalliE = p.x;
+  const run = venCalliE - venCalliW;
+  // ---- and it says how it is going, once, in the middle -------------------
+  // A maze is the one place in this chapter where the player cannot see where
+  // they are going, so a task measured in metres crossed needs to admit that it
+  // is being measured. Half way, once a visit, and then never again.
+  if (!venCalliTold && run > venCALLI_CROSS * 0.5) {
+    venCalliTold = true;
+    venToast('half way across. the rio is the hard bit — there are two bridges.');
+  }
+  if (run >= venCALLI_CROSS) {
     venCalliDone = true;
     venTask('the-calli');
     venSfx('pop', { volume: 0.5, pitch: 1.3 });
@@ -4648,15 +4773,55 @@ function venUpdateTide(game, dt) {
     venSeenFlood = true;
     if (typeof game.shake === 'function') game.shake(0.1);
     venSfx('splash', { volume: 0.65, pitch: 0.5 });
-    if (p && venInZone('square', p.x, p.z) && !venFloodDone) {
-      venFloodDone = true;
-      venTask('acqua-alta');
-      venToast('the whole square, in about ninety seconds. nobody is surprised but you.');
-    } else if (!venFloodDone) {
-      venToast('san marco has gone under. it does that.');
+    // ---- THE WINDOW OPENS HERE. It does not also close here. --------------
+    // See venFLOOD_GRACE below.
+    venFloodWin = venFLOOD_GRACE;
+    if (!venFloodDone && !(p && venInZone('square', p.x, p.z))) {
+      venToast('san marco is going under. if you want to be in it, go now.');
     }
   }
   venWasFlooded = venFloodedNow;
+
+  // ---- YOU ARE ALLOWED TO ARRIVE WHILE IT IS HAPPENING -------------------
+  // This is the chapter's marquee — the one row in eleven that carries `wow` —
+  // and it was a SINGLE-FRAME TEST. The water crosses the middle of the square
+  // on exactly one frame of a two-hundred-and-five second cycle, and if the
+  // capybara was not already inside the zone on that frame the whole set piece
+  // was scenery and the player waited a hundred and seventy-five seconds for
+  // another go with nothing at all to do in between. Measured: running for the
+  // square from the Rialto the moment the siren goes is not fast enough, which
+  // makes the siren — the chapter's only warning, and the entire reason the
+  // flood is a plan rather than an ambush — a warning about something you have
+  // already missed.
+  //
+  // "Be in San Marco when it goes under" is a THING THAT TAKES A WHILE, and it
+  // is still going under for as long as it is still rising. So the window opens
+  // on the front and stays open for as long as the water is shallow enough that
+  // arriving is arriving rather than turning up afterwards: eighteen seconds,
+  // which is about half of the rise, and it closes early if the square is
+  // already deep. Nobody can bank it by swimming in at the top of the tide.
+  // THE WINDOW IS THE ONLY GATE, AND THAT IS DELIBERATE. The first cut of this
+  // also required the tide to be under 0.72 — reasoning that arriving at the
+  // top of the flood is not arriving during it. MEASURED, and it was nearly a
+  // no-op: venTerrain over the middle of the piazza is 0, isOverWater wants
+  // 0.22 m of clearance, and 0.22 on a −1.30…0.95 range is tide 0.676 — so the
+  // front crosses at 0.676 and the extra gate shut two seconds later. A player
+  // walking into the square eight seconds after the water still got nothing,
+  // which is the exact bug the window was written to fix.
+  //
+  // The window alone already says everything the level check was trying to:
+  // it opens ONLY on the crossing edge and it is eighteen seconds long, so
+  // there is no way to bank the marquee by swimming in at high water twenty
+  // minutes later. Two gates for one idea, and the second one was wrong.
+  if (venFloodWin > 0) {
+    venFloodWin -= dt;
+    if (!venFloodDone && p && venInZone('square', p.x, p.z)) {
+      venFloodDone = true;
+      venFloodWin = 0;
+      venTask('acqua-alta');
+      venToast('the whole square, in about ninety seconds. nobody is surprised but you.');
+    }
+  }
 }
 
 // ================================================================== TASKS ===
@@ -4713,7 +4878,22 @@ function venUpdateTasks(game, dt) {
     // controller rather than about the route. Eight tenths of a second is long
     // enough to stumble and get back on and far too short to swim anywhere.
     venBoardOff += dt;
-    if (venBoardOff > 0.8) venBoardRunT = -1;
+    if (venBoardOff > 0.8) {
+      // ---- AND IT SAYS SO ------------------------------------------------
+      // The run ended silently. Nothing on screen changed, the paper still
+      // showed the row open, and the only way to find out was to reach the far
+      // end and get nothing — which is thirty seconds of a player believing
+      // they are doing a task they stopped doing at the second plank. The one
+      // rule this game has about state is that it may not be invisible.
+      //
+      // Only if the run had got somewhere, though: a two-second stumble off
+      // the first plank is not a failure worth a sentence about it.
+      if (venBoardRunT > 3 && !venBoardDone) {
+        venToast('off the boards. that is the run gone — start again from either end.');
+        venSfx('splash', { volume: 0.30, pitch: 1.35 });
+      }
+      venBoardRunT = -1;
+    }
   }
   if (onBoards) venBoardOff = 0;
 
@@ -4788,8 +4968,18 @@ function venUpdateTasks(game, dt) {
       venToast('a capybara, swimming the length of piazza san marco. as intended.');
       venSfx('splash', { volume: 0.8, pitch: 0.9 });
     }
-  } else if (venSwimHas && !venInZone('piazza', p.x, p.z)) {
-    venSwimHas = false;
+  } else if (venSwimHas) {
+    // ---- THE TIDE CAN END A SWIM TOO, NOT ONLY A WALK OUT OF THE SQUARE ---
+    // The old test was `venSwimHas && !inZone('piazza')`, so an animal standing
+    // in the middle of the square while the water fell out from under it kept
+    // the run armed for ever: `swimRun()` — which the beacon and the paper both
+    // read — went on reporting a figure from a tide that had finished, and the
+    // next crossing was scored against a start point from the one before it.
+    // The run ends when the SWIM ends, whichever way it ended.
+    if (!venInZone('piazza', p.x, p.z) || !venIsOverWater(p.x, p.z)) {
+      venSwimHas = false;
+      venSwimRun = 0;
+    }
   }
 
   // ---- one nudge, once ----------------------------------------------------
@@ -4802,6 +4992,16 @@ function venUpdateTasks(game, dt) {
 // =============================================================== LIFECYCLE ===
 export function createVenice(game) {
   venGame = game;
+
+  // The well answers a wheek. Bound once, and it gates on the animal actually
+  // being at the campo's wellhead, so it costs one distance test per wheek
+  // anywhere in the game.
+  if (game.events && typeof game.events.on === 'function') {
+    game.events.on('capy:wheek', function (payload) {
+      if (!game.biome || !game.biome.isActive('venice')) return;
+      try { venWellWheek(payload); } catch (e) {}
+    });
+  }
 
   game.biome.register('venice', {
     ensureBuilt() { venBuild(game); },
@@ -4819,13 +5019,36 @@ export function createVenice(game) {
       venGondRideT = 0;
       venTideTold = 0;
       venTime = 0;
-      venPigeonPeak = 0; venPigeonHold = 0;
+      venPigeonPeak = 0; venPigeonHold = 0; venPigeonRung = 0;
       // The clock is re-read rather than re-rung: without this the first frame
       // back in the chapter sees the hour jump from wherever the tide was left
       // to hour 0 and strikes six times at somebody who has just walked in.
       venOroLast = -1; venOroStruck = 0; venOroStrike = -1;
       venClatter = 0; venClatterN = 0;
       venBellsTold = false; venBandWetTold = false; venLapT = 0;
+      // ---- AND THE REST OF THE AMBIENT CLOCKS -----------------------------
+      // Every one of these is a running counter that only makes sense inside
+      // one visit, and none of them was being put back. What it produced on a
+      // return: the orchestra picking up in the middle of a phrase a tone flat
+      // (venBandN is the note index and it decides both pitch and the gap to
+      // the next one), the passerelle foreman answering a siren that went off
+      // in a different country twenty minutes ago (venCrewCall), the seed man
+      // mid-throw with thirty grains hanging in the air over a dry square, and
+      // the Volo's bird-scare on a phase from the last flight. Cheap to clear,
+      // invisible until you look for it, and all four of them are things the
+      // player is meant to read as the world starting up around them.
+      venBandT = 5; venBandN = 0;
+      venCryT = 12;
+      venCrewCall = -1;
+      venSeedT = 7; venSeedThrow = -1;
+      if (venSeedMesh) venSeedMesh.visible = false;
+      venVoloScare = 0;
+      venSwimRun = 0;
+      venCalliIn = false; venCalliW = 0; venCalliE = 0; venCalliTold = false;
+      venFloodWin = 0;
+      venBoardOff = 0;
+      venWellEcho = -1; venWellEchoN = 0;
+      venMurmurT = 2.5; venVoloWatch = false; venVoloCheered = false;
       // The rig is put back on the stage, so the chapter opens with the cradle
       // where the player can walk into it rather than thirty metres up.
       venVoloPhase = 0; venVoloT = 0; venVoloU = 0; venVoloAboard = false;
@@ -4939,9 +5162,11 @@ export function createVenice(game) {
       venUpdateTraghetto(game, dt);
       venUpdateVolo(game, dt);
       venCheckWell(game);
+      venUpdateWell(game, dt);
       venCheckCalli(game);
       venUpdateSeed(game, dt);
       venUpdatePigeons(game, dt);
+      venUpdateCrowd(game, dt);
       venUpdateFlags(dt);
       venUpdateFlotsam(dt);
       venUpdateVoices(game, dt);
@@ -4997,6 +5222,7 @@ function venBuild(game) {
     venFloatGroup.position.y = venWaterY;
     venRoot.add(venFloatGroup);
   }
+  venBuildCrowd(venRoot);
   venBuildFlotsam(venRoot);
   venBuildFar(venRoot);
   venBuildWater(venRoot);
@@ -5020,6 +5246,31 @@ function venBuild(game) {
   // a few things they might say when the capybara turns up, and a different
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
+  //
+  // ---- AND THEY KNOW WHAT THE WATER IS DOING (v21) -----------------------
+  //
+  // Nine people, in the one chapter in this game whose entire premise is that
+  // the floor is about to change, and every one of them said the same three
+  // sentences at low water, during the siren, at the top of the tide and after
+  // it had gone out again. The waiter's line was 'the water comes at four,
+  // everybody says nothing will happen' — said while standing in it.
+  //
+  // npc.js has had the machinery for this since v20 and this chapter used none
+  // of it: a line may be `{ t, when }` for a live condition, `{ t, after }` /
+  // `{ t, before }` for a task, and `onTask` names what somebody says about a
+  // specific thing you did in front of them. So the tide is a CONVERSATION now
+  // — three states, and everybody in the square has an opinion about each one —
+  // and the cast reacts to the six tasks that happen where they are standing.
+  //
+  // The rule that keeps it from becoming a quiz: EVERY POOL STILL HAS AT LEAST
+  // ONE UNCONDITIONAL LINE IN IT. localResolve returns only what is true right
+  // now, and a person whose whole pool is gated is a person who says nothing at
+  // the moment you walk up to them, which is worse than saying the wrong thing.
+  const venDry  = () => venTideLevel() < 0.18;
+  const venComing = () => venPhase >= venTIDE_WARN && venTideLevel() < 0.55;
+  const venHigh = () => venTideLevel() >= 0.55;
+  const venGoneOut = () => venSeenFlood && venTideLevel() < 0.18;
+
   if (typeof game.addLocal === 'function') {
     // ---- A LOCAL'S y IS NOT SNAPPED, IT IS BELIEVED ------------------------
     // npc.js puts the figure exactly where it is told, and this chapter is the
@@ -5030,14 +5281,30 @@ function venBuild(game) {
     // person the chapter's second task is about stood SIXTY-TWO CENTIMETRES in
     // the air, with his own shadow on the paving underneath him. Every local
     // in this chapter is placed off venTerrain now.
-    game.addLocal({ biome: 'venice', x: venCAFE.x, y: venTerrain(venCAFE.x, venCAFE.z),
+    venWaiterRec = game.addLocal({ biome: 'venice', x: venCAFE.x, y: venTerrain(venCAFE.x, venCAFE.z),
       z: venCAFE.z, near: 6,
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.hair2 },
       lines: ['Signore. The tables are for the guests.',
-              'Eleven euros for the spritz. Sitting down.',
-              'The water comes at four. Everybody says nothing will happen.'],
+              { t: 'Eleven euros for the spritz. Sitting down.', before: 'spritz-theft' },
+              { t: 'Eleven euros. I am putting it on somebody’s bill. Yours, ideally.',
+                after: 'spritz-theft' },
+              { t: 'The water comes at four. Everybody says nothing will happen.', when: venDry },
+              { t: 'There. Four notes. Now everybody believes me.', when: venComing },
+              { t: 'The chairs go up at ten centimetres. We are past ten centimetres.',
+                when: venComing },
+              { t: 'Do not apologise. Everybody’s shoes are in the same state.', when: venHigh },
+              { t: 'We serve standing in it. We have always served standing in it.',
+                when: venHigh },
+              { t: 'And it is gone, and nobody will mention it again until Thursday.',
+                when: venGoneOut }],
       wheek: ['Basta! You will have the whole arcade looking.',
-              'Madonna. Take the olive and go.'] });
+              'Madonna. Take the olive and go.',
+              { t: 'Not over the water. It carries. Everyone in the square heard that.',
+                when: venHigh }],
+      onTask: { 'spritz-theft': ['That was somebody’s. That was somebody’s SPRITZ.',
+                                 'The olive as well. Unbelievable.'],
+                'acqua-alta': ['You stood in it on purpose. You are one of us now, God help you.'],
+                'mirror-swim': ['He is SWIMMING. In the piazza. Somebody get a photograph.'] } });
     // ---- AND HE WAS STANDING IN THE WELL -----------------------------------
     // The man at the campo was authored at venCAMPO, which is the wellhead's
     // own centre — so he stood inside a 1.9 m box of solid Istrian stone with
@@ -5045,19 +5312,48 @@ function venBuild(game) {
     // this chapter that asks the player to climb ON that box. Three and a half
     // metres north of it, facing it, which is where somebody talking about a
     // well would actually stand.
-    game.addLocal({ biome: 'venice', x: venCAMPO.x + 3.4, y: venTerrain(venCAMPO.x + 3.4, venCAMPO.z - 1.2),
+    venWellRec = game.addLocal({ biome: 'venice', x: venCAMPO.x + 3.4, y: venTerrain(venCAMPO.x + 3.4, venCAMPO.z - 1.2),
       z: venCAMPO.z - 1.2, near: 7, face: -2.0,
       figure: { shirt: PALETTE.cloth5 },
       lines: ['The well has been dry since my grandmother.',
-              'Duckboards go up tonight. You will see.',
-              'You are the first of you I have seen in this campo.'],
-      wheek: ['Every pigeon in the sestiere just left. Well done.'] });
-    game.addLocal({ biome: 'venice', x: 4, y: venTerrain(4, 11), z: 11, near: 7,
+              { t: 'Duckboards go up tonight. You will see.', when: venDry },
+              { t: 'There they go. Always the campo last. Always.', when: venComing },
+              { t: 'Half of Venice is standing on a plank and the other half is at home.',
+                when: venHigh },
+              'You are the first of you I have seen in this campo.',
+              // he is standing three metres from the one echo in the chapter,
+              // so he is the person who would obviously mention it
+              { t: 'Put your head over it and make a noise. Go on. Everybody does it once.',
+                before: 'the-well' },
+              { t: 'It comes back at you, doesn’t it. Four metres of stone will do that.',
+                after: 'the-well' }],
+      wheek: ['Every pigeon in the sestiere just left. Well done.',
+              { t: 'Not at me. At the WELL. There is a difference and you will hear it.',
+                before: 'the-well' }],
+      onTask: { 'the-well': ['Eleven hundred years and you are the first to put a nose in it.'],
+                'the-calli': ['You came through the calli? Which bridge? — no. Do not tell me.'],
+                'passerelle': ['End to end without going in. That is more than the mayor managed.'] } });
+    venGondRec = game.addLocal({ biome: 'venice', x: 4, y: venTerrain(4, 11), z: 11, near: 7,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth3 },
       lines: ['Gondola, gondola? Fifty minutes, eighty euro.',
-              'Stand at the front if you like. Everybody stands at the front.',
-              'Do not lean. Please. Do not lean.'],
-      wheek: ['I have heard worse singing in this boat.'] });
+              { t: 'Stand at the front if you like. Everybody stands at the front.',
+                before: 'gondola-ride' },
+              { t: 'You stood at the front the whole way. Most people sit down at the bridge.',
+                after: 'gondola-ride' },
+              'Do not lean. Please. Do not lean.',
+              { t: 'Eighty euro is for the boat. The singing is free and it is not on offer.',
+                when: venDry },
+              { t: 'High water I go where I like. Under the bridges is the problem, not over.',
+                when: venHigh },
+              // and the one piece of real navigation in the chapter, from the
+              // one person qualified to give it
+              { t: 'Òoi. That is what you shout at a blind corner. The Rialto is the blindest.',
+                when: venDry }],
+      wheek: ['I have heard worse singing in this boat.',
+              'That is the corner call, near enough. Keep it.'],
+      onTask: { 'gondola-ride': ['On the PROW. Like a figurehead that pays nothing.'],
+                'traghetto': ['Standing. He crossed standing. Did everybody see that?'],
+                'rialto': ['Over the top at a run. There are steps on that for a reason.'] } });
     // ---- AND FIVE MORE, because three people is not a city -----------------
     // Venice took eleven chapters to get anybody in it and then got a waiter, a
     // man by a well and a gondolier — in the most photographed square in Europe,
@@ -5071,38 +5367,504 @@ function venBuild(game) {
       figure: { shirt: PALETTE.venStone, legs: PALETTE.venGondola },
       lines: ['We play until the water is over the pedals. Then we play standing up.',
               'Vivaldi. Always Vivaldi. They want the one from the advertisement.',
-              'The cellist has wellingtons. I have shoes. This is the arrangement.'],
+              { t: 'The cellist has wellingtons. I have shoes. This is the arrangement.',
+                when: venDry },
+              { t: 'He is putting the wellingtons on. He does it four notes in, every time.',
+                when: venComing },
+              // and at the top of the tide he is standing in it, playing, which
+              // is the one fact about this city everybody knows and nobody
+              // believes until they see it
+              { t: 'Standing up. Told you. Andante, and mind the pedals.', when: venHigh },
+              { t: 'It is a tone flat in this. The whole instrument is. So am I.',
+                when: venHigh },
+              { t: 'Sit down again, Paolo. It has gone. — He will not sit down.',
+                when: venGoneOut }],
       wheek: ['A tenor! Sit down, we are in the middle of the andante.',
-              'That is a B flat and it is nowhere in this piece.'] });
+              'That is a B flat and it is nowhere in this piece.',
+              { t: 'Hold it — hold it — no. Gone. You had it for a moment.',
+                when: venHigh }],
+      onTask: { 'acqua-alta': ['He stayed for it. Nobody stays for it.'],
+                'mirror-swim': ['Do not stop playing. Do NOT stop playing.'],
+                'volo': ['That is the Flight of the Angel, and that is a rodent doing it.'] } });
     venCrewRec = game.addLocal({ biome: 'venice', x: -8.5, y: venTerrain(-8.5, 10.0), z: 10.0, near: 7, face: 2.6,
       figure: { shirt: PALETTE.venBriccolaR, hat: PALETTE.cloth3 },
       lines: ['Passerelle. Six hundred metres of them, and they all live in a shed.',
-              'One metre ten, the forecast says. That is the square and half the calli.',
-              'When you hear the four notes, you have ninety seconds. Not eighty-nine.'],
-      wheek: ['Save it for the siren, eh? It has a better range than you.'] });
+              { t: 'One metre ten, the forecast says. That is the square and half the calli.',
+                when: venDry },
+              { t: 'When you hear the four notes, you have ninety seconds. Not eighty-nine.',
+                when: venDry },
+              { t: 'Boards are out. Single file, keep left, and do not stop in the middle.',
+                when: venComing },
+              { t: 'Yes it wobbles. It is a plank on a trestle in the sea. It wobbles.',
+                when: venHigh },
+              { t: 'Now we take them all up again. That is the part nobody photographs.',
+                when: venGoneOut },
+              { t: 'You want to run it? Everybody wants to run it. End to end, and mind the joins.',
+                before: 'passerelle' },
+              { t: 'End to end, dry. Right. I am putting you on the crew.',
+                after: 'passerelle' }],
+      wheek: ['Save it for the siren, eh? It has a better range than you.',
+              { t: 'Four notes, that is the siren. You did one. Keep practising.',
+                when: venDry }],
+      onTask: { 'passerelle': ['Six hundred metres of that and he did the good bit.'],
+                'acqua-alta': ['He was standing in the square. On purpose. In it.'],
+                'the-calli': ['Through the calli at high water. That is the local route, that is.'] } });
     venSeedRec = game.addLocal({ biome: 'venice', x: venSEED_AT.x, y: venTerrain(venSEED_AT.x, venSEED_AT.z), z: venSEED_AT.z, near: 6, face: 0.4,
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.venStone },
       lines: ['Corn is forbidden since 2008. This is birdseed. Entirely different.',
               'They know me. Watch — no, they knew my father. They know the coat.',
-              'Do not run at them. Everyone runs at them.'],
-      wheek: ['THERE. You see? Every one of them. That took me nine years to learn.'] });
+              { t: 'Do not run at them. Everyone runs at them.', before: 'pigeon-storm' },
+              { t: 'You ran at them. Of course you ran at them.', after: 'pigeon-storm' },
+              // he counts, because a man who has fed the same flock for nine
+              // years is exactly the person who would know the number
+              { t: 'Hundred and eighty in this square. I have counted. Twice.', when: venDry },
+              { t: 'They go up before the water does. Every time. Better forecast than the phone.',
+                when: venComing },
+              { t: 'Nothing to feed. They are all on the Procuratie waiting it out.',
+                when: venHigh }],
+      wheek: ['THERE. You see? Every one of them. That took me nine years to learn.',
+              { t: 'And they did not move. Nine years, and a rodent gets the same result.',
+                when: venHigh }],
+      onTask: { 'pigeon-storm': ['ALL of them. In one go. I have never seen all of them.',
+                                 'Nine years I have been trying to do that by accident.'] } });
     game.addLocal({ biome: 'venice', x: -50, y: venTerrain(-50, -35), z: -35, near: 6, face: 1.6,
       figure: { shirt: PALETTE.venMosaic, legs: PALETTE.hair2 },
       lines: ['Papier mâché. Fourteen layers. The nose takes a day on its own.',
               'The plague doctor sells. I hate the plague doctor.',
-              'A face like yours does not need one of these.'],
-      wheek: ['In this lane? You could crack the plaster.'] });
+              'A face like yours does not need one of these.',
+              // he is in the calli, which is the one place in the chapter you
+              // can be lost, so he is the signpost
+              { t: 'Lost? Everybody is lost. Follow the yellow signs and you will be lost slower.',
+                before: 'the-calli' },
+              { t: 'Two bridges over that rio. You found one. Most people find neither.',
+                after: 'the-calli' },
+              { t: 'Up here we stay dry. That is the whole reason anybody lives up here.',
+                when: venHigh },
+              { t: 'Carnevale I sell four hundred of these. Today, one. To nobody.',
+                when: venDry }],
+      wheek: ['In this lane? You could crack the plaster.',
+              'A metre and a half of wall either side. That went straight up my spine.'],
+      onTask: { 'the-calli': ['Side to side, first go. You are either lucky or you are from here.'] } });
     // the greengrocer stands beside his boat rather than four metres inland of
     // it: venFRUIT is filled in while the barge is built, off the same canal
     // table the barge is placed from, so the two cannot drift apart.
-    game.addLocal({ biome: 'venice', x: venFRUIT.lx, y: venTerrain(venFRUIT.lx, venFRUIT.lz),
+    venFruitRec = game.addLocal({ biome: 'venice', x: venFRUIT.lx, y: venTerrain(venFRUIT.lx, venFRUIT.lz),
       z: venFRUIT.lz, near: 7, face: venFRUIT.face,
       figure: { shirt: PALETTE.venShutter, legs: PALETTE.cloth3 },
       lines: ['The boat is the shop. It has been the shop since my grandmother.',
               'Radicchio, castraure, and whatever the market did not want at six.',
-              'High water is fine for me. I float. The greengrocer does not.'],
-      wheek: ['You are frightening the artichokes.'] });
+              'High water is fine for me. I float. The greengrocer does not.',
+              { t: 'Bridge over your head is the Rialto. Everybody photographs it from down here.',
+                before: 'rialto' },
+              { t: 'You went over the top of it at a run. There are STEPS.', after: 'rialto' },
+              { t: 'Castraure. Two weeks a year, and this is the second week.', when: venDry },
+              { t: 'I am tying on. Whole boat comes up with it and the awning does not.',
+                when: venComing },
+              { t: 'See? Level with the fondamenta. I could step off onto the street.',
+                when: venHigh }],
+      wheek: ['You are frightening the artichokes.',
+              'The whole canal heard that and it came back twice.'],
+      onTask: { 'rialto': ['Over the Rialto at a RUN. In front of the tour boats as well.'],
+                'traghetto': ['Standing up the whole way. He is showing off and it is working.'] } });
+
+    // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
+    // Nine people in the most crowded square in Europe and not one word of it
+    // was ever addressed to anybody but the capybara — so unless the player
+    // walked up and stood there, San Marco was silent. Five other chapters
+    // have had exchanges since v20 and this one, which has more standing cast
+    // than any of them, had none.
+    //
+    // Each pair is two people who can genuinely see each other, and every
+    // scrap is about the thing they are both looking at: the water. They run
+    // when the player is near enough to read both bubbles and far enough not
+    // to be the subject, which is what makes them feel overheard rather than
+    // performed.
+    if (typeof game.addExchange === 'function') {
+      if (venWaiterRec && venBandRec) {
+        game.addExchange({ biome: 'venice', a: venWaiterRec, b: venBandRec, lines: [
+          ['Are you going to move the cello, or am I?', 'The cello has been through worse than you.'],
+          ['One metre ten, they are saying.', 'Then we are playing the Vivaldi standing up. Again.'],
+          ['Table six wants to know if it is safe.', 'Tell table six it is Tuesday.'],
+          ['Your man has wellingtons and you have shoes.', 'My man has wellingtons and no tone.'],
+        ] });
+      }
+      if (venCrewRec && venGondRec) {
+        game.addExchange({ biome: 'venice', a: venCrewRec, b: venGondRec, lines: [
+          ['Boards out in ninety seconds. Move the boat.', 'The boat has been here since 1580.'],
+          ['You will not get under the Rialto at that height.', 'I will not be going under the Rialto.'],
+          ['Forecast says one ten.', 'Forecast said ninety on Tuesday and I swam home.'],
+        ] });
+      }
+      if (venSeedRec && venWellRec) {
+        game.addExchange({ biome: 'venice', a: venSeedRec, b: venWellRec, lines: [
+          ['They went up on their own. Before the siren.', 'They always do. Nobody ever believes you.'],
+          ['Hundred and eighty. I counted twice.', 'You counted the same forty four times.'],
+          ['That animal is not from here.', 'Nothing in this square is from here. Look at the horses.'],
+        ] });
+      }
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(venRoot);
+}
+
+// ============================================================== THE CROWD ===
+/**
+ * SAN MARCO HAD NINE PEOPLE IN IT.
+ *
+ * Nine named locals, a hundred and eighty pigeons, and — in the most walked-on
+ * square in Europe, on the one afternoon a year anybody photographs it — nobody
+ * else at all. Hong Kong has had eighty instanced pedestrians on its pavement
+ * since chapter eleven shipped; this square, which is four times the area, had
+ * a waiter and a man with a bag of seed.
+ *
+ * Forty-eight of them, six instanced meshes, one draw call each. What makes
+ * them worth the buffer is not the count — it is that THEY READ THE TIDE, and
+ * therefore the crowd is the chapter's own mechanic drawn at forty-eight
+ * places at once:
+ *
+ *   DRY      they wander the square on errands, at a stroll, and about a third
+ *            of them stop dead and look up at the campanile, because that is
+ *            what people do in that square and nothing else.
+ *   COMING   the siren has gone. They stop strolling and make for the nearest
+ *            end of the passerelle at a proper walk. Nobody runs; Venetians do
+ *            not run for this.
+ *   HIGH     single file on the boards, one behind another, the whole length of
+ *            the square. That is the photograph.
+ *   ...and whoever cannot reach a plank wades, at half speed, for the arcade.
+ *
+ * So the passerelle stops being a bare plank the player runs along and becomes
+ * a plank with a QUEUE on it, and the player has to get past them or go round —
+ * which is exactly what the real thing is like and is much funnier.
+ *
+ * COST. Six InstancedMeshes of 48, no bodies (a crowd you can walk through is
+ * the right crowd), and one pass of forty-eight in the update.
+ */
+const venCROWD_N = 48;
+let venCrowd = null;
+// x, z, yaw, phase, speed, state, target x, target z, gawp, queue slot
+const venCrowdData = new Float32Array(venCROWD_N * 10);
+const venCROWD_WALK = 0, venCROWD_TOBOARD = 1, venCROWD_ONBOARD = 2, venCROWD_WADE = 3;
+
+function venCrowdGeo(parts) { const M = venMerger(); parts(M); return M.build(); }
+
+function venBuildCrowd(root) {
+  const limb = (sgn) => venCrowdGeo((M) => {
+    M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);
+    M.box(sgn * 0.11, -0.79, 0.03, 0.17, 0.1, 0.26, 0xdcdcdc);
+    M.box(-sgn * 0.29, 0.24, 0, 0.13, 0.54, 0.14, 0xffffff);
+    M.box(-sgn * 0.29, -0.06, 0, 0.12, 0.12, 0.13, 0xe8e8e8);
+  });
+  const gBody = venCrowdGeo((M) => {
+    M.box(0, 0, 0, 0.46, 0.62, 0.27, 0xffffff);
+    M.box(0, 0.35, 0, 0.5, 0.08, 0.29, 0xf0f0f0);
+  });
+  const gHead = venCrowdGeo((M) => {
+    M.box(0, 0, 0, 0.25, 0.29, 0.24, 0xffffff);
+    M.box(0, 0.16, -0.01, 0.27, 0.09, 0.26, 0x9c9c9c);
+    M.box(0, 0.0, 0.135, 0.05, 0.05, 0.05, 0xffffff);
+  });
+  // ---- AND WHAT THEY ARE CARRYING ---------------------------------------
+  // A camera held up at the face, which is the ONE prop that says "this is
+  // Piazza San Marco" rather than "this is a street". Drawn at the head rather
+  // than the hand, because that is where it goes.
+  const gCam = venCrowdGeo((M) => {
+    M.box(0, 0, 0.10, 0.19, 0.13, 0.09, 0xffffff);
+    M.cyl(0, 0, 0.18, 0.055, 0.09, 0xd8d8d8, Math.PI * 0.5, 0, 0, 6);
+  });
+  // and the other half of the square: an umbrella, up, because the acqua alta
+  // arrives with the weather that caused it
+  const gBrolly = venCrowdGeo((M) => {
+    M.cyl(0, -0.1, 0, 0.03, 1.0, 0x8a8a8a, 0, 0, 0, 4);
+    M.cone(0, 0.56, 0, 0.66, 0.34, 0xffffff, 0, 0, 0, 8);
+    M.cyl(0, 0.4, 0, 0.64, 0.03, 0xdedede, 0, 0, 0, 8);
+  });
+  const mk = (geo) => {
+    const m = new THREE.InstancedMesh(geo, mat(0xffffff, { vertexColors: true }), venCROWD_N);
+    m.castShadow = true; m.frustumCulled = false;
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(venCROWD_N * 3), 3);
+    root.add(m);
+    return m;
+  };
+  venCrowd = { a: mk(limb(1)), b: mk(limb(-1)), body: mk(gBody), head: mk(gHead),
+               cam: mk(gCam), brolly: mk(gBrolly) };
+  let seed = 91741;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  // A WINTER SQUARE, NOT A SUMMER ONE. It is four in the afternoon in the wet
+  // season, so the crowd is a range of greys with one or two coats that were a
+  // colour once — which is also what keeps forty-eight people from fighting the
+  // two loud things in this palette.
+  const COAT = [0x6b6f74, 0x8a8f94, 0x4f545a, 0xa89c8c, 0x5d6b6f, 0x9aa0a6,
+                0x7a6a62, 0x3f4650, 0xb0a894, 0x6f5a52];
+  const SKIN = [0xe8c9a6, 0xdcb894, 0xf0d4b4, 0xc9a077];
+  const col = new THREE.Color();
+  for (let i = 0; i < venCROWD_N; i++) {
+    const o = i * 10;
+    // scattered over the paving and clear of the buildings — venNavBlocked is
+    // the same test everything else in this chapter steers by
+    let x = 0, z = 0;
+    for (let k = 0; k < 12; k++) {
+      x = venPZ_X0 + 2 + rnd() * (venPZ_X1 - venPZ_X0 - 4);
+      z = venPZ_Z0 + 2 + rnd() * (venPT_Z1 - venPZ_Z0 - 4);
+      if (!venNavBlocked(x, z, 1.2)) break;
+    }
+    venCrowdData[o] = x; venCrowdData[o + 1] = z;
+    venCrowdData[o + 2] = rnd() * 6.28;
+    venCrowdData[o + 3] = rnd() * 6.28;
+    venCrowdData[o + 4] = 0.72 + rnd() * 0.55;
+    venCrowdData[o + 5] = venCROWD_WALK;
+    venCrowdData[o + 6] = x; venCrowdData[o + 7] = z;
+    venCrowdData[o + 8] = 0;
+    // Their place in the queue, fixed at build. A queue whose order is decided
+    // per frame by distance is a queue that swaps people round in front of you.
+    venCrowdData[o + 9] = i / venCROWD_N;
+    col.set(COAT[(rnd() * COAT.length) | 0]);
+    for (const m of [venCrowd.a, venCrowd.b, venCrowd.body]) m.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    col.set(SKIN[(rnd() * SKIN.length) | 0]);
+    venCrowd.head.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    col.set(0x2f3438);
+    venCrowd.cam.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    col.set(rnd() < 0.55 ? 0x2f3438 : 0x54606a);
+    venCrowd.brolly.instanceColor.setXYZ(i, col.r, col.g, col.b);
+  }
+  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
+    venCrowd[k].instanceColor.needsUpdate = true;
+  }
+}
+
+/** A new errand somewhere else on the paving, clear of the buildings. */
+function venCrowdErrand(i) {
+  const o = i * 10;
+  for (let k = 0; k < 10; k++) {
+    const x = venPZ_X0 + 2.5 + Math.random() * (venPZ_X1 - venPZ_X0 - 5);
+    const z = venPZ_Z0 + 2.5 + Math.random() * (venPT_Z1 - venPZ_Z0 - 5);
+    if (venNavBlocked(x, z, 1.2)) continue;
+    // and it has to be somewhere worth walking to
+    if (Math.hypot(x - venCrowdData[o], z - venCrowdData[o + 1]) < 8) continue;
+    venCrowdData[o + 6] = x; venCrowdData[o + 7] = z;
+    return;
+  }
+}
+
+// ---- AND THE SQUARE MAKES A NOISE ---------------------------------------
+// Forty-eight people, and it was as quiet as an empty room. A crowd is a SOUND
+// before it is a picture: the thing that tells you San Marco is full is not
+// counting the coats, it is the flat wash of forty conversations bouncing off
+// four hundred metres of stone.
+//
+// One throttled voice, level from how many of them are actually within earshot,
+// and it goes UP a third at high water because a crowd standing on a plank in
+// the sea is a crowd with opinions. It is deliberately quiet — this is weather,
+// not an event, and the chapter already has a siren, an orchestra, a clock and
+// a hundred and eighty birds to get past.
+let venMurmurT = 2.5;
+// The Volo is up and low enough to be worth turning round for.
+let venVoloWatch = false;
+let venVoloCheered = false;
+
+function venUpdateCrowd(game, dt) {
+  if (!venCrowd || !venBrdX) return;
+  const cp = game.capy && game.capy.position;
+  const lvl = venTideLevel();
+  const boardsUp = venBoardOut > 0.7;
+  // The cradle is out on the wire and it is over the square rather than parked
+  // on its stage: the same test the pigeon bow-wave uses, so the birds and the
+  // people react to exactly the same thing.
+  venVoloWatch = (venVoloPhase === 1 || venVoloPhase === 2 || venVoloPhase === 3) &&
+                 venVoloPos.y > 6;
+  // The three states of the square, from the one number the whole chapter is
+  // about. `coming` is the siren having gone and the water not yet up.
+  const coming = venPhase >= venTIDE_WARN && lvl < 0.55;
+  const high = lvl >= 0.55;
+
+  for (let i = 0; i < venCROWD_N; i++) {
+    const o = i * 10;
+    let x = venCrowdData[o], z = venCrowdData[o + 1];
+    let yaw = venCrowdData[o + 2];
+    let st = venCrowdData[o + 5];
+    const spd = venCrowdData[o + 4];
+    const wet = venWaterY > venTerrain(x, z) + 0.06;
+
+    // ---- what they should be doing ---------------------------------------
+    // ONE TRANSITION PER FRAME AND ALWAYS FORWARD THROUGH THE LADDER. A state
+    // machine that can be pushed both ways by a damped number — and the tide is
+    // damped — chatters on the boundary, and forty-eight people flickering
+    // between "stroll" and "evacuate" is worse than either of them.
+    if (high || (coming && wet)) {
+      if (boardsUp) { if (st !== venCROWD_ONBOARD) st = venCROWD_TOBOARD; }
+      else st = venCROWD_WADE;
+    } else if (coming && boardsUp) {
+      if (st === venCROWD_WALK) st = venCROWD_TOBOARD;
+    } else if (!coming && !high) {
+      // the water has gone. They get off the planks and go back to strolling.
+      if (st !== venCROWD_WALK) { st = venCROWD_WALK; venCrowdErrand(i); }
+    }
+
+    let moving = 0;
+    if (st === venCROWD_ONBOARD) {
+      // ---- SINGLE FILE, AND IT IS THE PICTURE ---------------------------
+      // Their fixed queue slot walks the resampled duckboard centreline, so
+      // nobody overtakes and nobody swaps, and the whole line shuffles up and
+      // back over about a minute.
+      let t = venCrowdData[o + 9] + Math.sin(venTime * 0.10 + i * 0.21) * 0.045;
+      t = t - Math.floor(t);              // wrap, or the two ends pile up
+      venLinePoint(venBrdX, venBrdZ, venBrdS, venBrdLen, t, venLineOut);
+      x = venLineOut.x; z = venLineOut.z;
+      yaw = venLineOut.yaw;
+      moving = 1;
+      venCrowdData[o + 3] += dt * 3.4;
+    } else if (st === venCROWD_TOBOARD) {
+      const n = venNearLine(venBrdX, venBrdZ, venBrdS, venBrdLen, x, z);
+      venLinePoint(venBrdX, venBrdZ, venBrdS, venBrdLen, n.t, venLineOut);
+      const dx = venLineOut.x - x, dz = venLineOut.z - z;
+      const d = Math.hypot(dx, dz);
+      if (d < 1.1) {
+        st = venCROWD_ONBOARD;
+        // ...and they take the slot nearest where they got on, so the line
+        // does not shuffle sideways the moment it forms
+        venCrowdData[o + 9] = n.t;
+      } else {
+        const k = spd * 1.35 * dt / d;
+        x += dx * k; z += dz * k;
+        yaw = Math.atan2(dx, dz);
+        moving = 1;
+        venCrowdData[o + 3] += dt * 5.2;
+      }
+    } else if (st === venCROWD_WADE) {
+      // knees up, half speed, heading for the arcade — which is the edge of
+      // the piazza in x, and is the only dry thing left
+      const wantX = x < (venPZ_X0 + venPZ_X1) * 0.5 ? venPZ_X0 + 1.2 : venPZ_X1 - 1.2;
+      const dx = wantX - x;
+      if (Math.abs(dx) > 0.5) {
+        const k = spd * 0.45 * dt * (dx > 0 ? 1 : -1);
+        x += k;
+        yaw = dx > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+        moving = 1;
+        venCrowdData[o + 3] += dt * 3.0;
+      }
+    } else {
+      // ---- STROLLING, AND SOMETIMES STOPPING TO LOOK UP ------------------
+      // The gawp is the whole reason this reads as a SQUARE rather than a
+      // pavement: about a third of them are standing still at any moment with
+      // their heads back, which is what people in San Marco actually do and is
+      // also free — a person not walking costs no movement code at all.
+      let gawp = venCrowdData[o + 8];
+      if (gawp > 0) {
+        gawp -= dt;
+        // AND WHAT THEY ARE LOOKING AT IS WHATEVER IS WORTH LOOKING AT.
+        // Normally the campanile; but if the Volo is up, the whole square turns
+        // and follows the cradle. Forty-eight people all facing the same way at
+        // something the player is standing IN is the entire reason to build a
+        // crowd — the mini stops being a ride and becomes a thing that is
+        // happening to a square full of people.
+        const at = venVoloWatch ? venVoloPos : venCAMPANILE;
+        const wy = Math.atan2(at.x - x, at.z - z);
+        yaw = yaw + ((wy - yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) * clamp(dt * 2.4, 0, 1);
+      } else {
+        const dx = venCrowdData[o + 6] - x, dz = venCrowdData[o + 7] - z;
+        const d = Math.hypot(dx, dz);
+        if (d < 1.4) {
+          venCrowdErrand(i);
+          if (Math.random() < 0.45) gawp = 2.5 + Math.random() * 5.5;
+        } else {
+          const k = spd * dt / d;
+          x += dx * k; z += dz * k;
+          yaw = Math.atan2(dx, dz);
+          moving = 1;
+          venCrowdData[o + 3] += dt * 4.4;
+        }
+      }
+      venCrowdData[o + 8] = gawp;
+    }
+
+    // ---- AND THEY GET OUT OF THE WAY --------------------------------------
+    // A capybara at a run through a crowd that does not move is a capybara
+    // running through furniture. Two metres, pushed out along the line between
+    // them, and it is a POSITION nudge rather than a velocity so it cannot
+    // accumulate into somebody being launched across the square.
+    if (cp) {
+      const px = x - cp.x, pz = z - cp.z;
+      const pd = Math.hypot(px, pz);
+      if (pd < 2.0 && pd > 1e-3 && st !== venCROWD_ONBOARD) {
+        const push = (2.0 - pd) * clamp(dt * 6, 0, 0.5);
+        x += px / pd * push; z += pz / pd * push;
+      }
+    }
+
+    venCrowdData[o] = x; venCrowdData[o + 1] = z;
+    venCrowdData[o + 2] = yaw;
+    venCrowdData[o + 5] = st;
+
+    // ---- draw it ----------------------------------------------------------
+    // The feet stand on whatever they are standing on: the paving, the deck of
+    // the passerelle, or — wading — a little lower, because somebody in thirty
+    // centimetres of water is thirty centimetres shorter.
+    let fy = venTerrain(x, z);
+    if (st === venCROWD_ONBOARD) fy += venBOARD_Y + 0.14;
+    else if (st === venCROWD_WADE) fy -= clamp(venWaterY - fy, 0, 0.34);
+    const ph = venCrowdData[o + 3];
+    const sw = moving ? Math.sin(ph) * 0.52 : Math.sin(ph * 0.12) * 0.03;
+    const bob = moving ? Math.abs(Math.sin(ph)) * 0.045 : 0;
+    // ---- THE THREE OFFSETS ARE NOT FREE PARAMETERS ------------------------
+    // The limb geometry hangs DOWN from its own origin (the hip is at 0 and the
+    // shoe is at -0.79) and the body and head are centred on theirs, so the
+    // three heights are a rig and not three numbers: hip 0.82, body centre
+    // 1.14, head centre 1.62 over the feet. The first cut of this authored one
+    // origin at fy + 0.86 and hung everything off it, which put a sixteen-
+    // centimetre gap between every shoulder and every head — forty-eight
+    // floating heads, and it is the first thing in the frame. Measured off the
+    // rendered PNG, 24 Aug 2026; same rig as Mong Kok's eighty, deliberately.
+    venCrowd.a.setMatrixAt(i, venXform(x, fy + 0.82 + bob, z, sw, yaw, 0, 1, 1, 1));
+    venCrowd.b.setMatrixAt(i, venXform(x, fy + 0.82 + bob, z, -sw, yaw, 0, 1, 1, 1));
+    venCrowd.body.setMatrixAt(i, venXform(x, fy + 1.14 + bob, z, 0, yaw, 0, 1, 1, 1));
+    // the head tips back for the campanile, which is the whole gesture
+    const upv = (st === venCROWD_WALK && venCrowdData[o + 8] > 0) ? -0.42 : 0;
+    venCrowd.head.setMatrixAt(i, venXform(x, fy + 1.62 + bob, z, upv, yaw, 0, 1, 1, 1));
+    // ---- the camera is only up while they are actually looking ------------
+    // A crowd all holding cameras to their faces while they walk is a crowd of
+    // mannequins. It appears on the gawpers, and it is the only reason the
+    // gawp reads from across the square.
+    const cs = (st === venCROWD_WALK && venCrowdData[o + 8] > 0 && (i % 3) === 0) ? 1 : 0.0001;
+    venCrowd.cam.setMatrixAt(i, venXform(x, fy + 1.60 + bob, z, upv, yaw, 0, cs, cs, cs));
+    // and the umbrella, once the water is on its way, on some of them
+    const bs = ((coming || high) && (i % 4) === 1) ? 1 : 0.0001;
+    venCrowd.brolly.setMatrixAt(i, venXform(
+      x + Math.sin(yaw) * 0.16, fy + 1.62 + bob, z + Math.cos(yaw) * 0.16,
+      0.12, yaw, 0, bs, bs, bs));
+  }
+  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
+    venCrowd[k].instanceMatrix.needsUpdate = true;
+  }
+
+  // ---- the murmur ---------------------------------------------------------
+  venMurmurT -= dt;
+  if (venMurmurT <= 0) {
+    venMurmurT = 2.6 + Math.random() * 2.2;
+    if (cp) {
+      // how many of them are within earshot, which is the level
+      let n = 0;
+      for (let i = 0; i < venCROWD_N; i++) {
+        const o = i * 10;
+        const dx = venCrowdData[o] - cp.x, dz = venCrowdData[o + 1] - cp.z;
+        if (dx * dx + dz * dz < 26 * 26) n++;
+      }
+      if (n > 3) {
+        const v = clamp(n / venCROWD_N, 0, 1);
+        venSfx('rustle', { volume: 0.045 + v * 0.075, pitch: 0.52 + Math.random() * 0.14 });
+        if (high) venSfx('rustle', { volume: 0.03 + v * 0.05, pitch: 0.78 });
+      }
+    }
+  }
+
+  // ---- AND THEY CHEER THE ANGEL, ONCE ------------------------------------
+  // The Volo's own payoff has always been a chime, some paper and a shake, all
+  // of it happening to nobody. The square is full; the square should be the
+  // payoff. Fires on the frame the cradle reaches the far tower and only if
+  // there are people in earshot, and it is cleared when the rig resets.
+  if (venVoloPhase === 3 && !venVoloCheered) {
+    venVoloCheered = true;
+    if (cp && Math.hypot(cp.x - venVoloPos.x, cp.z - venVoloPos.z) < 70) {
+      venSfx('cheer', { volume: 0.55, force: true, at: { x: -4, y: 1, z: -34 } });
+    }
+  } else if (venVoloPhase === 0) venVoloCheered = false;
 }

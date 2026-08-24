@@ -246,7 +246,8 @@ let quayLineT = -1;                                  // s into the line being th
 let quayOperaSeen = false;
 let quayOperaLamp = null;
 
-let quayRaceT = 0, quayRaceMask = 0, quayEscortT = 0;
+let quayRaceT = 0, quayRaceMask = 0, quayEscortT = 0, quayEscorted = false;
+let quayCallMask = 0;               // which of the wharf hand's four calls have gone
 let quayArrivalT = 0;
 let quayHand = null;                // the deckhand, who watches you steal her
 let quayLand = null;                // and the one at Manly, who takes the line
@@ -254,6 +255,24 @@ const quayCASTOFF = ['…that is not how any of this works!',
                      'Bring her back by six! SIX!',
                      'Right. Right. That is a first.',
                      'She takes a while to answer! Mind the Bridge!'];
+// ---- THE APPROACH, CALLED FROM THE WHARF -------------------------------
+// Seventy seconds of open water ended with one line of text and a rope. The
+// last two hundred metres of a ferry passage is the part a wharf hand actually
+// talks through — he can see you coming, he can see how fast you are coming,
+// and he has opinions about both. Three ranges and a speed check, each fired
+// once per passage, which turns the arrival from an event into an approach.
+const quayCALL_FAR  = ['That is you, is it? Come on in then.',
+                       'I see you! Line up on the wharf head!',
+                       'Right. Nice and straight. Nice and straight.'];
+const quayCALL_MID  = ['Ease her back now. She carries her way.',
+                       'Take the way off. TAKE THE WAY OFF.',
+                       'Lovely. Bit of port rudder and you are on it.'];
+const quayCALL_NEAR = ['Alright — hold her there. Hold her.',
+                       'Fenders. …we have no fenders. Never mind.',
+                       'That will do! That will absolutely do!'];
+const quayCALL_FAST = ['SLOW DOWN. Slow — no. No no no.',
+                       'That is a WHARF, mate, not a ramp!',
+                       'I am going to stand further back.'];
 const quayARRIVE = ['Got it! …you are a capybara.',
                     'Nice bit of steering. Nobody is going to believe me.',
                     'Line! …thank you. Ropes on. Welcome to Manly.',
@@ -431,6 +450,9 @@ function quayStaticBox(game, x, y, z, hx, hy, hz, ry) {
 // this scale the eye reads the horizon and the glitter, not the mesh.
 const quaySEA_X0 = -420, quaySEA_X1 = 460;
 const quaySEA_Z0 = -760, quaySEA_Z1 = 120;
+// The same rectangle, published — see api.bounds(). It is exactly the extent
+// of the drawn sea, because outside it there is neither water nor ground.
+const quayBOUNDS = { x0: quaySEA_X0, x1: quaySEA_X1, z0: quaySEA_Z0, z1: quaySEA_Z1 };
 const quaySEA_STEP = 22;
 
 function quayBuildWater() {
@@ -1938,6 +1960,65 @@ function quayUpdateCockatoos(game, dt) {
  *     fairway into a place with two edges instead of a plane.
  */
 let quaySndTerm = 3, quaySndBush = 2;
+
+// ================================================================ THE ENGINE ==
+// YOU HAVE BEEN DRIVING A FOUR-HUNDRED-TONNE DIESEL FERRY IN SILENCE.
+//
+// The chapter's whole body is one long run up the harbour at the wheel, and
+// the only sounds attached to the boat were the horn and the spray. There is
+// no feedback loop at all between the thing the player is doing — winding the
+// throttle on and off — and what they hear, which is the single most important
+// loop a vehicle can have.
+//
+// A slow-speed marine diesel is a BEAT, not a drone: a hard low thump at a few
+// hertz with a rasp on top of it, and what changes with the throttle is mostly
+// the RATE. So it is built out of what the table already has: 'thud' at the
+// bottom of its pitch range, on an interval that shortens as the revs come up,
+// with a 'hiss' every few beats for the exhaust. Both are placed AT the funnel,
+// so the boat is a thing you can hear the direction of, and both are jittered
+// on volume, pitch and interval so this never becomes the metronome that
+// Cappadocia's burners were.
+//
+// It also idles. She is a running boat sitting at a wharf before you ever
+// touch the wheel, and an engine that only exists above four knots is a motor,
+// not a ship.
+const quayENG_IDLE = 0.62;      // s between beats at rest
+const quayENG_FULL = 0.20;      // ...and flat out
+let quayEngT = 0, quayEngRpm = 0, quayEngPuff = 0;
+
+function quayUpdateEngine(game, dt) {
+  if (typeof game.sfx !== 'function') return;
+  // Revs follow the THROTTLE, not the speed — that is the difference between
+  // an engine and a speedometer, and it is what makes going astern audible.
+  const want = clamp(Math.abs(quayThrottle) * 0.82 + Math.abs(quayBoatSpeed) / quayBOAT_VMAX * 0.18, 0, 1);
+  quayEngRpm = damp(quayEngRpm, want, 2.4, dt);
+  const rpm = quayEngRpm;
+  quayEngT -= dt;
+  if (quayEngT > 0) return;
+  // interval, jittered — never the same gap twice
+  quayEngT = lerp(quayENG_IDLE, quayENG_FULL, rpm) * rand(0.90, 1.12);
+  // the funnel, in world coordinates, so the beat comes from the right place
+  const cs = Math.cos(quayBoatYaw), sn = Math.sin(quayBoatYaw);
+  const ex = quayBoatX - sn * 2.2, ez = quayBoatZ - cs * 2.2;
+  const ey = quayWATER_Y + quayBOAT_DECK + 2.6;
+  game.sfx('thud', {
+    volume: (0.11 + rpm * 0.20) * rand(0.88, 1.12),
+    pitch: (0.30 + rpm * 0.13) * rand(0.96, 1.05),
+    at: { x: ex, y: ey, z: ez }, near: 14, far: 120,
+  });
+  // …and the stack clears its throat every few beats, harder the more you ask
+  quayEngPuff -= 1;
+  if (quayEngPuff <= 0) {
+    quayEngPuff = randInt(3, 7);
+    game.sfx('hiss', {
+      volume: (0.05 + rpm * 0.13) * rand(0.85, 1.15),
+      pitch: 0.42 + rpm * 0.24 + rand(-0.05, 0.05),
+      at: { x: ex, y: ey, z: ez }, near: 12, far: 100,
+    });
+    // and you can see it, which is the other half of a diesel under load
+    if (rpm > 0.25) quayHornSteam = Math.max(quayHornSteam, 0.16 + rpm * 0.22);
+  }
+}
 
 function quayUpdateSound(game, dt) {
   const p = game.capy && game.capy.position;
@@ -3465,6 +3546,68 @@ function quayBuildBuoys(root) {
   quayUpdateBuoys();
 }
 
+// ---- WHAT HAPPENS WHEN YOU HIT ONE -------------------------------------
+// Nine fairway marks strung up seven hundred metres of open water, and until
+// now the only thing they did was hold gulls. quayHARD is deliberately hard —
+// rock, pylons, the Freshwater — and a buoy is the opposite of hard: it is a
+// float on a chain, and a ferry that clouts one pushes it clean under and
+// leaves it bobbing back up behind her with the bell going.
+//
+// That is worth having because it is the one collision in the chapter that is
+// FUNNY rather than a punishment. Bad steering into rock stops you dead and
+// tells you off; bad steering into a mark makes a noise, rings a bell, throws
+// water and costs you absolutely nothing. A boat chapter needs both.
+const quayBuoyDunk = new Float32Array(quayBUOYS.length / 3);
+let quayBuoyHitCd = 0;
+
+function quayBuoyStrike(game, dt) {
+  const n = quayBUOYS.length / 3;
+  if (quayBuoyHitCd > 0) quayBuoyHitCd -= dt;
+  for (let i = 0; i < n; i++) {
+    if (quayBuoyDunk[i] > 0) quayBuoyDunk[i] = Math.max(0, quayBuoyDunk[i] - dt);
+  }
+  if (quayBuoyHitCd > 0 || Math.abs(quayBoatSpeed) < 1.4) return;
+  for (let i = 0; i < n; i++) {
+    if (quayBuoyDunk[i] > 0) continue;
+    const dx = quayBoatX - quayBUOYS[i * 3], dz = quayBoatZ - quayBUOYS[i * 3 + 1];
+    if (dx * dx + dz * dz > 4.6 * 4.6) continue;
+    quayBuoyDunk[i] = 2.4;
+    quayBuoyHitCd = 0.8;
+    const k = clamp(Math.abs(quayBoatSpeed) / quayBOAT_VMAX, 0, 1);
+    const bx = quayBUOYS[i * 3], bz = quayBUOYS[i * 3 + 1];
+    if (typeof game.sfx === 'function') {
+      // the bell on the cage, then the water closing over it
+      game.sfx('clink', { volume: 0.55 + k * 0.35, pitch: 0.72,
+                          at: { x: bx, y: quayWATER_Y + 1.4, z: bz }, near: 12, far: 140 });
+      game.sfx('splash', { volume: 0.45 + k * 0.4, pitch: 0.85,
+                           at: { x: bx, y: quayWATER_Y, z: bz }, near: 12, far: 140 });
+    }
+    for (let q = 0; q < 7; q++) {
+      quaySprayEmit(bx + rand(-1.1, 1.1), quayWATER_Y + 0.3, bz + rand(-1.1, 1.1),
+                    rand(-2.4, 2.4), rand(2.2, 5.0) * (0.6 + k), rand(-2.4, 2.4), 0.8);
+    }
+    if (typeof game.shake === 'function') game.shake(0.06 + k * 0.06);
+    if (typeof game.toast === 'function' && k > 0.55) game.toast('that mark was there for a reason');
+    // …AND WHOEVER WAS SITTING ON IT. quayUpdateGulls pins a perched bird to
+    // the buoy's OWN bob and not to the dunk, so without this the mark goes a
+    // metre and a half under and leaves its gull standing on the sea.
+    for (let q = 0; q < quayGullN; q++) {
+      if (quayGullPerch[q] <= 0 || quayGullBuoy[q] !== i) continue;
+      const o = q * 6;
+      quayGullPerch[q] = 0;
+      quayGullData[o] = bx + rand(-10, 10);
+      quayGullData[o + 1] = rand(6, 13);
+      quayGullData[o + 2] = bz + rand(-10, 10);
+      quayGullData[o + 4] = rand(8, 20);
+      if (typeof game.sfx === 'function') {
+        game.sfx('gull', { volume: 0.5, pitch: rand(0.95, 1.2),
+                           at: { x: bx, y: quayWATER_Y + 2, z: bz }, near: 12, far: 140 });
+      }
+    }
+    break;
+  }
+}
+
 function quayUpdateBuoys() {
   if (!quayBuoyMesh) return;
   for (let m = 0; m < quayBuoyMesh.length; m++) {
@@ -3472,7 +3615,11 @@ function quayUpdateBuoys() {
     for (let k = 0; k < idx.length; k++) {
       const i = idx[k];
       const x = quayBUOYS[i * 3], z = quayBUOYS[i * 3 + 1];
-      const y = quaySurfaceY(x, z);
+      // …and one that has just been run down is still on its way back up. The
+      // curve is a decaying bounce, not a ramp: under fast, up slow, overshoot
+      // once, which is what a float on a chain actually does.
+      const dk = quayBuoyDunk[i];
+      const y = quaySurfaceY(x, z) - (dk > 0 ? Math.sin(dk / 2.4 * Math.PI) * 1.55 * Math.cos(dk * 4.4) : 0);
       // the LEAN is the slope of the water it is sitting in, sampled a metre
       // either side. Nothing to tune, and it is always in phase with the swell.
       const gx = (quaySurfaceY(x + 1, z) - quaySurfaceY(x - 1, z)) * 0.5;
@@ -3580,6 +3727,122 @@ function quayUpdateGulls(dt) {
     }
   }
   quayGullMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ============================================================== WAKE GULLS ==
+// SEVEN HUNDRED METRES OF OPEN WATER AND NOTHING CAME WITH YOU.
+//
+// The dolphins are a reward — they only turn up over 6.5 m/s and they are the
+// point of a task. The gulls on the buoys are scenery, and they stay on their
+// buoys. Between the two there was nothing at all that simply CAME ALONG, and
+// there is no ferry on this harbour without half a dozen silver gulls hanging
+// off the stern hoping somebody drops a chip.
+//
+// They are not physics and they are not a task. They station-keep in the
+// updraught over the transom while she has way on, they fan out and settle
+// when she stops, and if you sound the horn under them they scatter and come
+// straight back — which is the whole of what a gull thinks about anything.
+//
+// Deliberately the ONLY thing in the chapter that follows the boat without
+// being asked: a reward you have to earn stops feeling like one if the world
+// is full of things doing it for free.
+const quayWG_N = 9;
+const quayWG_STRIDE = 6;      // x, y, z, phase, lag, spook
+let quayWakeGull = null;
+let quayWGData = null;
+let quayWGSpook = 0;
+
+function quayBuildWakeGulls(root) {
+  const G = new THREE.BufferGeometry();
+  G.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, -0.35, -1.15, 0.30, 0.20, 0, 0.02, 0.30,
+    0, 0, -0.35, 0, 0.02, 0.30, 1.15, 0.30, 0.20,
+  ], 3));
+  G.setIndex([0, 1, 2, 3, 4, 5]);
+  G.computeVertexNormals();
+  const im = new THREE.InstancedMesh(G, mat(PALETTE.ibis, { side: THREE.DoubleSide }), quayWG_N);
+  im.name = 'quayWakeGulls';
+  im.castShadow = false;
+  im.frustumCulled = false;
+  quayWakeGull = im;
+  quayWGData = new Float32Array(quayWG_N * quayWG_STRIDE);
+  for (let i = 0; i < quayWG_N; i++) {
+    const o = i * quayWG_STRIDE;
+    quayWGData[o]     = quayBERTH.x + rand(-16, 16);
+    quayWGData[o + 1] = quayWATER_Y + rand(5, 12);
+    quayWGData[o + 2] = quayBERTH.z + rand(6, 26);
+    quayWGData[o + 3] = rand(0, Math.PI * 2);
+    quayWGData[o + 4] = rand(0.9, 2.4);         // how far astern this one sits
+    quayWGData[o + 5] = 0;
+  }
+  root.add(im);
+}
+
+/** The horn scatters them. Called from the same place the bridge echo is. */
+function quayScareWakeGulls(hard) {
+  if (!quayWGData) return;
+  quayWGSpook = hard ? 2.6 : 1.6;
+  for (let i = 0; i < quayWG_N; i++) quayWGData[i * quayWG_STRIDE + 5] = 1;
+}
+
+function quayUpdateWakeGulls(game, dt) {
+  const im = quayWakeGull;
+  if (!im || !quayWGData) return;
+  if (quayWGSpook > 0) quayWGSpook -= dt;
+  const sp = Math.abs(quayBoatSpeed);
+  // Under way? Then the station is the wash behind the transom. Stopped, they
+  // hold a loose circle over wherever she happens to be, so a boat left
+  // alongside still has a few birds over it.
+  const under = clamp((sp - 1.2) / 4.0, 0, 1);
+  const cs = Math.cos(quayBoatYaw), sn = Math.sin(quayBoatYaw);
+  for (let i = 0; i < quayWG_N; i++) {
+    const o = i * quayWG_STRIDE;
+    const ph = quayWGData[o + 3] + quayTime * (0.55 + (i % 4) * 0.11);
+    const lag = quayWGData[o + 4];
+    // station: astern and to one side, in the boat's own frame
+    const side = ((i % 3) - 1) * 3.1 + Math.sin(ph) * 1.9;
+    const back = -(5.0 + lag * 4.2) - Math.cos(ph * 0.7) * 1.6;
+    let tx = quayBoatX + sn * back + cs * side;
+    let tz = quayBoatZ + cs * back - sn * side;
+    // MEASURED FROM THE PICTURE, not from the number that sounded right. At
+    // 3.4 they sat in the plane of the wash and read as debris; the eye wants
+    // them above the transom rail, which is at about 1.9.
+    let ty = quayWATER_Y + 5.2 + lag * 1.8 + Math.sin(ph * 1.3) * 0.9;
+    // stopped: widen out and climb, so they read as loitering rather than towed
+    if (under < 1) {
+      const w = 1 - under;
+      const a = ph * 0.8 + i;
+      tx = tx * under + (quayBoatX + Math.cos(a) * (11 + i * 1.7)) * w;
+      tz = tz * under + (quayBoatZ + Math.sin(a) * (11 + i * 1.7)) * w;
+      ty += w * (2.5 + (i % 5));
+    }
+    // …and the horn puts them straight up and out for a couple of seconds
+    const sc = quayWGData[o + 5];
+    if (sc > 0) {
+      quayWGData[o + 5] = Math.max(0, sc - dt * 0.55);
+      const k = quayWGData[o + 5];
+      const a = i * 2.1 + quayTime * 3.2;
+      tx += Math.cos(a) * 22 * k;
+      tz += Math.sin(a) * 22 * k;
+      ty += 12 * k;
+    }
+    // A gull does not teleport. Damped in all three axes, at a rate that is
+    // slow enough to trail and fast enough to keep up with 10.4 m/s.
+    const lam = 1.7 + under * 1.6;
+    quayWGData[o]     = damp(quayWGData[o], tx, lam, dt);
+    quayWGData[o + 1] = damp(quayWGData[o + 1], ty, lam * 0.8, dt);
+    quayWGData[o + 2] = damp(quayWGData[o + 2], tz, lam, dt);
+    const x = quayWGData[o], y = quayWGData[o + 1], z = quayWGData[o + 2];
+    // heading: where they are going, which under way is simply the boat's head
+    const yaw = quayBoatYaw + Math.PI + Math.sin(ph) * 0.4 * (1 - under);
+    const beat = Math.sin(quayTime * (4.5 + under * 2.5) + i * 1.7) * (0.14 + 0.22 * (1 - under));
+    im.setMatrixAt(i, quayXform(x, y, z, beat, yaw, 0.30 * (1 - under * 0.6), 1, 1, 1));
+  }
+  im.instanceMatrix.needsUpdate = true;
+  // and they say so, now and then, while she is running
+  if (under > 0.6 && quayWGSpook <= 0 && Math.random() < dt * 0.11) {
+    if (typeof game.sfx === 'function') game.sfx('gull', { volume: rand(0.20, 0.34), pitch: rand(0.94, 1.14) });
+  }
 }
 
 // ================================================================= DOLPHINS ==
@@ -4284,6 +4547,8 @@ function quayStepBoat(game, dt) {
       // funnel that arrives with the sound and hangs about after it.
       quayHornSteam = 1.1;
       if (typeof game.sfx === 'function') game.sfx('horn');
+      // …and everything sitting in the wash goes straight up. See quayScareWakeGulls.
+      quayScareWakeGulls(false);
       // ...and if the Freshwater is inside eighty metres, she has heard it.
       if (quayBigHail() && typeof game.toast === 'function') game.toast('she heard that.');
       // Under the arch, with the horn: the oldest joke on the harbour — and now
@@ -4702,7 +4967,13 @@ function quayCheckVoyage(game, dt) {
   // different periods, so a simultaneous pair is a matter of luck, and a task
   // you cannot deliberately do is not a task. Two different boats, at speed, and
   // the mark is yours.
-  if (quayRaceMask !== -1 && quayHelmOn && Math.abs(quayBoatSpeed) > 4) {
+  // THE MASK USED TO BE THROWN AWAY THE MOMENT THE TASK TICKED. Two yachts
+  // and quayRaceMask went to -1, which shut the whole block off — so the
+  // fleet is six boats on six different legs and the game stopped counting at
+  // the second one, for ever. It keeps counting now, and the number is how
+  // many of the six you got close aboard on one passage, which is a thing you
+  // can go back and be better at. Nothing is gated on it.
+  if (quayHelmOn && Math.abs(quayBoatSpeed) > 4) {
     const n = quayFLEET.length / 6;
     for (let i = 0; i < n; i++) {
       if (quayRaceMask & (1 << i)) continue;
@@ -4716,27 +4987,65 @@ function quayCheckVoyage(game, dt) {
       quayRaceMask |= (1 << i);
       quayRaceT++;
       if (typeof game.sfx === 'function') game.sfx('gasp', { volume: 0.5 });
-      if (quayRaceT >= 2) {
-        quayRaceMask = -1;
+      if (quayRaceT === 2) {
         quayTask('yacht-race');
         if (typeof game.toast === 'function') game.toast('starboard! …probably');
         if (typeof game.shake === 'function') game.shake(0.12);
+      } else if (quayRaceT > 2) {
+        // …and every one after that is its own small thing, because six for
+        // six on one run up the harbour is genuinely hard to steer.
+        if (typeof game.toast === 'function') {
+          game.toast(quayRaceT >= n ? 'the whole fleet. every one of them.'
+                                    : quayRaceT + ' of ' + n + ', and still going');
+        }
+        if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.45, pitch: 1.1 + quayRaceT * 0.06 });
       }
+      if (quayRaceT >= 2 && typeof game.record === 'function') game.record('yacht-race', quayRaceT);
       break;
     }
   }
 
   // --- the escort: hold better than 6.5 m/s for six seconds ----------------
+  // …AND HOW LONG YOU KEPT THEM. The old shape set the timer to 1000 the
+  // instant the task ticked, which both completed it and destroyed the only
+  // number in it — hold a dolphin escort for a minute and a half and the game
+  // could not tell you. It runs on now, and the run is posted when they leave.
   if (quayDolphinOn > 0.7) {
     quayEscortT += dt;
-    if (quayEscortT > 6 && quayEscortT < 900) {
-      quayEscortT = 1000;
+    if (quayEscortT > 6 && !quayEscorted) {
+      quayEscorted = true;
       quayTask('dolphin-escort');
       if (typeof game.toast === 'function') game.toast('they always know');
       if (typeof game.sfx === 'function') game.sfx('splash', { volume: 0.6 });
     }
-  } else if (quayEscortT < 900) {
+  } else {
+    if (quayEscortT > 6 && typeof game.record === 'function') game.record('dolphin-escort', quayEscortT);
     quayEscortT = 0;
+  }
+
+  // --- somebody on the wharf talks you in -----------------------------------
+  // One call per range per passage (quayCallMask), and the fast one outranks
+  // whichever range you are in, because "you are coming in too hot" is more
+  // useful than "you are two hundred metres out".
+  if (!quayVoyaged && quayLand && quayLand.anchor) {
+    const ax = quayBoatX - quayMANLY.x, az = quayBoatZ - (quayMANLY.z + 12);
+    const ad = Math.sqrt(ax * ax + az * az);
+    const sp = Math.abs(quayBoatSpeed);
+    let bit = -1, list = null;
+    if (ad < 46 && sp > 7.5 && !(quayCallMask & 8)) { bit = 8; list = quayCALL_FAST; }
+    else if (ad < 22 && !(quayCallMask & 4)) { bit = 4; list = quayCALL_NEAR; }
+    else if (ad < 52 && !(quayCallMask & 2)) { bit = 2; list = quayCALL_MID; }
+    else if (ad < 130 && !(quayCallMask & 1)) { bit = 1; list = quayCALL_FAR; }
+    if (list && quayLand.cd <= 0) {
+      quayCallMask |= bit;
+      quayLand.anchor.speak(list[randInt(0, list.length - 1)]);
+      quayLand.cd = 5.5;
+      if (typeof game.sfx === 'function') {
+        game.sfx('whistle', { volume: 0.34, pitch: bit === 8 ? 1.35 : 1.05,
+                               at: { x: quayMANLY.x, y: quayWATER_Y + 2.2, z: quayMANLY.z + 6 },
+                               near: 30, far: 220 });
+      }
+    }
   }
 
   // --- alongside at Manly ---------------------------------------------------
@@ -4801,6 +5110,7 @@ function quayBuild(game) {
   quayBuildBigFerry(game, quayRoot);
   quayBuildBigWake(quayRoot);
   quayBuildGulls(quayRoot);
+  quayBuildWakeGulls(quayRoot);
   quayBuildBridgeGulls(quayRoot);
   quayBuildDolphins(quayRoot);
   quayBuildWake(quayRoot);
@@ -4813,6 +5123,31 @@ function quayBuild(game) {
   quayBuildLine(quayRoot);
   quayBuildChips(quayRoot);
   quayBuildBoat(game, quayRoot);
+
+  // ---- WHAT THEY SAY WHEN SOMETHING HAPPENS ------------------------------
+  // addLocal takes four optional reaction lists — startled / splash / thief /
+  // rush — and every one of the eleven people on this harbour was falling
+  // through to npcLOC_SAY, which is deliberately chapter-neutral: it has to
+  // work in a Venetian sacristy and inside a mountain, so it can never mention
+  // a wharf, a ferry, a gull or the water. On a chapter that is ENTIRELY
+  // wharf, ferry, gull and water, the most characterful cast in the game was
+  // answering everything with "Mm." One table, shared by all of them, and
+  // nobody has to be given their own.
+  const W = {
+    startled: ['Oi — watch it!', 'That is coming out of somebody’s wages.',
+               'Mind the paintwork.', 'Every day. Every single day.',
+               'Right on the timetable, that.', 'I did not see anything.'],
+    splash:   ['Straight in the harbour.', 'That is the tide’s problem now.',
+               'Twelve metres down, that is.', 'It will wash up at Kirribilli.',
+               'The bream will love that.', 'Do not go in after it. Please.'],
+    thief:    ['You have not paid for that.', 'That is wharf property.',
+               'There is a form for that. There is always a form.',
+               'Put it back before somebody official comes.',
+               'I am going to write "seagull" in the book.'],
+    rush:     ['No running on the wharf!', 'It is going somewhere.',
+               'Slow down — the boards are wet!', 'Ferry’s not for ten minutes, mate.',
+               'Somebody is late for the four fifteen.'],
+  };
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. A deckhand at the berth and the chip shop at the
@@ -4827,6 +5162,7 @@ function quayBuild(game) {
       lines: ['Mind the gap. Everybody minds the gap eventually.',
               'She goes when she goes. Wheel is unlocked.',
               'Thirty minutes across, if the harbour behaves.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['That is the horn, near enough.'] });
     // ...AND HE WAS STANDING INSIDE HIS OWN SHOP. (quayMANLY.x, quayMANLY.z-30)
     // is the exact centre of the chip shop's footprint, walls, roof and all —
@@ -4838,6 +5174,7 @@ function quayBuild(game) {
       lines: ['Chips are two minutes. They are always two minutes.',
               'Do not feed the seagulls. Do not even look at them.',
               'You came the whole way across for chips. Respect.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Right, that has done it. Here they come.'] });
     // A FERRY TERMINAL IS MOSTLY A MACHINE FOR QUEUEING and there were two
     // people in the whole of it — one at each end of seven hundred metres.
@@ -4850,12 +5187,14 @@ function quayBuild(game) {
       lines: ['The four fifteen has never once left at four fifteen.',
               'I do this crossing twice a day. It is still the best commute in the world.',
               'You are not on the timetable. I have checked.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Nobody even looked up. That is Sydney for you.'] });
     game.addLocal({ biome: 'quay', x: -11, y: 0.20, z: quayAPRON_Z1 - 9.2, near: 6, face: 0.2,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.wharfIron },
       lines: ['Tap on, tap off. There is no tap for whatever you are.',
               'Wharf three for Manly, wharf five for Taronga. Do not ask me why.',
               'If you are going to be sick, be sick on the outside deck.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Right through the barrier. Marvellous.'] });
     game.addLocal({ biome: 'quay', x: quayWHARF_X[0] - 1.4, y: quayWHARF_Y + 0.07, z: -3.0,
       near: 6, face: Math.PI,
@@ -4863,6 +5202,7 @@ function quayBuild(game) {
       lines: ['Yellowtail, mostly. Sometimes a bream that has made a mistake.',
               'Been coming here since before the tunnel. Water is cleaner now.',
               'You will scare them. …ah, they were not biting anyway.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Well. That is the afternoon finished.'] });
 
     // ---- and five more, because the chapter had two ends and nothing in the
@@ -4876,6 +5216,7 @@ function quayBuild(game) {
       lines: ['Four hours a day, six days. The acoustics under here are free.',
               'Everybody stops for the last eight bars and nobody stops for the first.',
               'You are the second capybara this month. The first one had a hat.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['That is a B flat. Do it again on the two.'] });
 
     // the woman photographing the Bridge, who is facing the wrong way on purpose
@@ -4884,6 +5225,7 @@ function quayBuild(game) {
       lines: ['Nine hundred photographs of the same arch. This one will be the one.',
               'You cannot get it and the Opera House in one shot. Everyone tries.',
               'The light goes gold at about five. Stay for it.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['—and there it is. Best one all week.'] });
 
     // the man on the Opera House steps, on the podium she can actually reach
@@ -4893,6 +5235,7 @@ function quayBuild(game) {
       lines: ['Second interval. Fourteen minutes and then it is the whole of act three.',
               'The shells are tiles. A million of them, and every one is a different white.',
               'You are not on the ticket. …nor is anyone, at these prices.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['They will hear that from the Concert Hall.'] });
 
     // THE WHARF HAND AT MANLY, who is the other end of the voyage and who
@@ -4903,6 +5246,7 @@ function quayBuild(game) {
       lines: ['She is not due for twenty minutes and she is not that colour.',
               'Throw us a line when you come alongside. If you come alongside.',
               'Everything on this wharf came off a boat. Including me.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Heard you coming from the Heads, mate.'] });
 
     // the lifeguard on the tower, who has the only job at Manly
@@ -4912,6 +5256,7 @@ function quayBuild(game) {
       lines: ['Between the flags. That is the whole of the law down here.',
               'Rip out past the third bank all afternoon. You will be fine — you float.',
               'Bluebottles this morning. Nobody told the bluebottles about the flags.'],
+      startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['…that is not a whistle I know.'] });
   }
 
@@ -5105,7 +5450,8 @@ export function createQuay(game) {
       quayVoyaged = false; quayCastOff = false; quayBridged = false; quayWalled = false;
       quayRunT = -1;
 
-      quayRaceT = 0; quayRaceMask = 0; quayEscortT = 0; quayArrivalT = 0;
+      quayRaceT = 0; quayRaceMask = 0; quayEscortT = 0; quayEscorted = false; quayArrivalT = 0;
+      quayCallMask = 0;
       quayDolphinT = 0; quayDolphinOn = 0;
       quayBumpCool = 0;
       // THE STAGING HAS TO REPLAY, AND TWO SET PIECES WERE NOT REPLAYING.
@@ -5131,11 +5477,25 @@ export function createQuay(game) {
       // back, so a second visit began with the entire flock already circling
       // a basket that was not there.
       quayScatterGulls();
+      // …and the ones that ride the transom go back to loitering over the berth.
+      quayWGSpook = 0;
+      if (quayWGData) {
+        for (let i = 0; i < quayWG_N; i++) {
+          const o = i * quayWG_STRIDE;
+          quayWGData[o]     = quayBERTH.x + rand(-16, 16);
+          quayWGData[o + 1] = quayWATER_Y + rand(5, 12);
+          quayWGData[o + 2] = quayBERTH.z + rand(6, 26);
+          quayWGData[o + 5] = 0;
+        }
+      }
       // ...and the salute itself re-arms with everything else. `quayBigSaluted`
       // was set once at build and never cleared, so the second visit's horn got
       // the reply and the wash but the Freshwater had already been "met" — the
       // one flag in the set that was still living in the old world.
       quayBigAnswerT = -1; quayBigWashT = -1; quayBigRoll = 0; quayBigSaluted = false;
+      quayEngT = 0; quayEngRpm = 0; quayEngPuff = 0;
+      quayBuoyHitCd = 0;
+      for (let i = 0; i < quayBuoyDunk.length; i++) quayBuoyDunk[i] = 0;
       quayBigWave = 0; quayHornSteam = 0; quayBridgeFlush = 0; quayLineT = -1; quayOperaSeen = false;
       game.state.sailing = false;
       if (game.capy) game.capy.atHelm = false;
@@ -5159,6 +5519,15 @@ export function createQuay(game) {
 
   const api = {
     built() { return quayBuilt; },
+    // ---- AND WHERE IT STOPS -----------------------------------------------
+    // MEASURED, the same way Sydney's was: put the animal at z = 200 or at
+    // x = 400 and it neither falls nor is put back — quayGroundY answers zero
+    // for the whole plane, so it simply treads water outside the drawn sea for
+    // ever. The sea MESH is x -420..460, z -760..120 and there is nothing
+    // beyond it in any direction, so that rectangle is the world. The boat is
+    // already clamped forty metres inside it (see quayStepBoat); this is for
+    // the swimmer, who was not clamped at all.
+    bounds() { return quayBOUNDS; },
     // capybara.js reads these two through whichever biome is live
     waterLevel: quayWATER_Y,
     isOverWater: quayIsOverWater,
@@ -5204,10 +5573,13 @@ export function createQuay(game) {
       quayUpdateBigFerry(game, dt);
       quayUpdateBigWake(dt);
       quayUpdateGulls(dt);
+      quayUpdateWakeGulls(game, dt);
       quayUpdateCockatoos(game, dt);
       quayUpdateSound(game, dt);
+      quayUpdateEngine(game, dt);
       quayUpdateApronGulls(game, dt);
       quayUpdateBridgeGulls(dt);
+      quayBuoyStrike(game, dt);
       quayUpdateBuoys();
       quayUpdateMoorings();
       quayUpdateSurf();

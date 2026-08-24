@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -184,6 +184,8 @@ let manBoatT = 0, manBoatPhase = 'beached';
 const manBoatTarget = { x: manBOAT_HOME.x, y: 0.55, z: manBOAT_HOME.z };
 const manBoatPrev = { x: manBOAT_HOME.x, y: 0.55, z: manBOAT_HOME.z };
 let manBoatCarrying = false, manBoatRideT = -1, manBoatOut = false;
+// the sweep calls it three seconds before they go. See manUpdateBoat.
+let manBoatCalled = false;
 let manBoatStroke = 0;
 const manBoatFrame = { x: 0, z: 0 };
 
@@ -191,6 +193,8 @@ const manBoatFrame = { x: 0, z: 0 };
 let manDolphins = null;
 const manDOLPH_N = 4;
 let manDolphT = 0, manDolphActive = false, manDolphWait = 26;
+// the note, on a countdown rather than on a modulo window — see manUpdateDolphins
+let manDolphNote = 0;
 let manDolphCrest = 0;
 let manDolphX = -14;                 // where the line is, so it can move to a rider
 
@@ -212,6 +216,10 @@ let manPoolEnd = 0;
 let manSeenSet = false;
 let manToldRip = false, manToldSet = false;
 let manSandcastle = null, manCastleGone = false;
+// what is left of it once you have run through it. See manBuildBeachThings.
+let manCastleRuin = null;
+// the edge of the wave detonating on the bommie. See manUpdateSurfTasks.
+let manBommieHit = false;
 let manConeT = 0, manConeMesh = null;
 let manBigNear = 0;                  // 0..1 — how close the wave of the set is
 // the sound of the beach, which is a property of the BREAK and not of the
@@ -895,72 +903,134 @@ function manBuild(game) {
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'manly', x: manFLAG_HOME.x, y: manTerrain(manFLAG_HOME.x, manFLAG_HOME.z),
+    // ---- AND THEY ARE KEPT, BECAUSE THEY HAVE TO BE ABLE TO NOTICE -------
+    // npc.js reads a local's `lines` array LIVE, which is the whole mechanism
+    // by which somebody can know what you have done — and this chapter threw
+    // every reference away at the point of registration, so all eight of them
+    // said the same three sentences whether the capybara had just walked past
+    // or had moved the council's flags twenty-nine metres, flattened a child's
+    // castle, gone out through the break in the surfboat and taken the wave of
+    // the set the length of the beach. Cappadocia has had gorSaysNow since it
+    // shipped. This is the same argument, one chapter along.
+    //
+    // The other half is `praise`/`onTask`, which nine chapters already use and
+    // this one did not: without it the nearest person to any completed task
+    // falls back on npc.js's chapter-neutral pool, so the reward for the
+    // largest consequence any button press has in this game was a stranger
+    // saying '…was that deliberate?'
+    manLocals.guard = game.addLocal({ biome: 'manly', x: manFLAG_HOME.x, y: manTerrain(manFLAG_HOME.x, manFLAG_HOME.z),
       z: manFLAG_HOME.z, near: 8,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.cloth1, hat: PALETTE.hiVis },
       lines: ['Swim between the flags, mate. That is the whole system.',
               'See that gutter? That is where you would go. Straight out.',
               'Do not fight it. Nobody wins that one. Swim across it.'],
       wheek: ['Yeah, righto. Between the flags.',
-              'Oi. You right?'] });
-    game.addLocal({ biome: 'manly', x: 24, y: manTerrain(24, 47), z: 47, near: 7,
+              'Oi. You right?'],
+      praise: ['Yeah, nah, that was all right.',
+               'I am putting that in the log. I do not know what to write.',
+               'Not against the rules. Not covered by the rules either.'],
+      onTask: { 'move-flags': ['You MOVED them. Sixty years and nobody has moved them.'],
+                'the-rip': ['That is the gutter. That is exactly what I told you.'],
+                'duck-dive': ['Under it. Good. Everybody else gets rolled first.'],
+                'all-the-way': ['All the way to the sand. From the bank. Yes, all right.'],
+                'take-off': ['He caught one. He actually caught one.'],
+                'sandcastle': ['I saw nothing. I was looking at the water.'] } });
+    manLocals.club = game.addLocal({ biome: 'manly', x: 24, y: manTerrain(24, 47), z: 47, near: 7,
       figure: { shirt: PALETTE.cloth2 },
       lines: ['Boat goes out at four if the bank holds.',
               'Nippers finish at eleven. It gets loud.',
               'You are dripping on the honour board.'],
-      wheek: ['Half the beach just looked up.'] });
+      wheek: ['Half the beach just looked up.'],
+      praise: ['That is going on the board. Somewhere on the board.',
+               'We have a form for this. We do not have a form for this.',
+               'Membership is thirty dollars and you are not eligible.'],
+      onTask: { 'the-surfboat': ['You went out in the BOAT. In the boat!'],
+                'all-the-way': ['Longest one anybody has had off that bank all week.'],
+                'pine-cone': ['Council planted those in 1953 and you have just pruned one.'] } });
 
     // ---- AND SIX MORE, because two people on a beach with a Corso behind it
     // is the emptiest cast in the game. Venice has eight, Rio has eight, Mong
     // Kok has nine; this had the lifeguard and the club secretary and a
     // hundred and twenty metres of nobody between them.
-    game.addLocal({ biome: 'manly', x: -13.5, y: manPROM_Y, z: manSHOP_Z - 0.5, near: 7.5,
+    manLocals.chips = game.addLocal({ biome: 'manly', x: -13.5, y: manPROM_Y, z: manSHOP_Z - 0.5, near: 7.5,
       face: Math.PI,
       figure: { shirt: PALETTE.manClub, hat: PALETTE.manFlagRed, legs: PALETTE.cloth1 },
       lines: ['Flake and chips, minimum chips, and no I will not do half a scoop.',
               'The seagulls have worked out the awning. Do not sit under it.',
               'Everything is fried. That is the menu. That is the whole menu.'],
       wheek: ['Mate. There are people eating.',
-              'You are not getting a chip. You are getting three chips.'] });
+              'You are not getting a chip. You are getting three chips.'],
+      praise: ['Not in here. Whatever it was, not in here.',
+               'Three chips. That is the whole conversation.',
+               'I have seen worse on a Saturday.'],
+      onTask: { 'pine-cone': ['That is going to be somebody’s windscreen one day.'],
+                'move-flags': ['Everybody has moved. My whole queue has moved.'],
+                'sandcastle': ['The gulls are going to have that. Watch.'] } });
 
-    game.addLocal({ biome: 'manly', x: manPOOL.x0 + 2.5,
+    manLocals.pool = game.addLocal({ biome: 'manly', x: manPOOL.x0 + 2.5,
       y: manTerrain(manPOOL.x0 + 2.5, manPOOL.z1 + 2.6), z: manPOOL.z1 + 2.6, near: 7,
       figure: { shirt: PALETTE.manTowelD, skin: PALETTE.skin2, hat: PALETTE.manBoardC },
       lines: ['Sixty-one years I have swum this pool. Every day but one.',
               'The wall keeps the swell out. Mostly. Not always.',
               'Cold? It is not cold. You are just soft.'],
-      wheek: ['You will scare the pelican. He is very highly strung.'] });
+      wheek: ['You will scare the pelican. He is very highly strung.'],
+      praise: ['Sixty-one years and that is new.',
+               'Hm. In my pool.',
+               'You are not soft after all. I withdraw it.'],
+      onTask: { 'bower-pool': ['End to end. Sixty-one years I have done that. Every day but one.'],
+                'blue-groper': ['He came to YOU? He does not come to me.'] } });
 
-    game.addLocal({ biome: 'manly', x: manPOINT_X + 4.6, y: manTerrain(manPOINT_X + 4.6, -12),
+    manLocals.fish = game.addLocal({ biome: 'manly', x: manPOINT_X + 4.6, y: manTerrain(manPOINT_X + 4.6, -12),
       z: -12, near: 7, face: 1.6,
       figure: { shirt: PALETTE.manScrub, hat: PALETTE.manSand },
       lines: ['Been here since five. Two bites. Both of them crabs.',
               'Do not stand there. That is the ledge that gets you.',
               'Groper comes past about now. Do not tell anyone.'],
-      wheek: ['Right, well, that is the afternoon gone.'] });
+      wheek: ['Right, well, that is the afternoon gone.'],
+      praise: ['There goes the afternoon.',
+               'Everything on this ledge just left. Everything.',
+               'I am not going to say anything and neither are you.'],
+      onTask: { 'blue-groper': ['Do not tell anyone. I mean it. Do not tell anyone.'],
+                'the-bommie': ['On the bommie? While it was breaking? On the BOMMIE?'] } });
 
-    game.addLocal({ biome: 'manly', x: manSHELLY.x + 3.5, y: manTerrain(manSHELLY.x + 3.5, manSHELLY.z + 4),
+    manLocals.shelly = game.addLocal({ biome: 'manly', x: manSHELLY.x + 3.5, y: manTerrain(manSHELLY.x + 3.5, manSHELLY.z + 4),
       z: manSHELLY.z + 4, near: 7,
       figure: { shirt: PALETTE.manAwning2, skin: PALETTE.skin3 },
       lines: ['Round the corner and the whole ocean gives up. Look at it.',
               'Kiosk has been there since nineteen thirty-two. So has the queue.',
               'People walk past the pool to get here. They are correct.'],
-      wheek: ['Nothing wakes up over here. That is the point of over here.'] });
+      wheek: ['Nothing wakes up over here. That is the point of over here.'],
+      praise: ['Even round here. Even round here!',
+               'Well. There goes the quiet side.',
+               'Somebody has filmed that. Somebody always films it.'],
+      onTask: { 'blue-groper': ['That is Bluey. Everybody knows Bluey. Now you know Bluey.'],
+                'the-bommie': ['That rock has been standing that swell up since before the kiosk.'] } });
 
-    game.addLocal({ biome: 'manly', x: 41, y: manTerrain(41, manSHORE_Z + 16), z: manSHORE_Z + 16,
+    manLocals.volley = game.addLocal({ biome: 'manly', x: 41, y: manTerrain(41, manSHORE_Z + 16), z: manSHORE_Z + 16,
       near: 7,
       figure: { shirt: PALETTE.manFlagYel, hat: PALETTE.manFlagYel, legs: PALETTE.manBoardC },
       lines: ['We are two down. You do not happen to play.',
               'Serve into the wind, it comes back. Every time.',
               'That ball has been in the rip twice this week.'],
-      wheek: ['Take it as a yes, shall we.'] });
+      wheek: ['Take it as a yes, shall we.'],
+      praise: ['Right. Yes. Still two down, though.',
+               'Was that a serve? I am counting that as a serve.',
+               'You are on my team. You do not get a say.'],
+      onTask: { 'sandcastle': ['Straight through it. That is a spike. That is technically a spike.'],
+                'move-flags': ['We are inside the flags now. We have never been inside the flags.'] } });
 
-    game.addLocal({ biome: 'manly', x: -58, y: manPROM_Y, z: manSHOP_Z - 5.6, near: 7.5,
+    manLocals.ferry = game.addLocal({ biome: 'manly', x: -58, y: manPROM_Y, z: manSHOP_Z - 5.6, near: 7.5,
       figure: { shirt: PALETTE.manShopB, hat: PALETTE.manSand, skin: PALETTE.skin2 },
       lines: ['Ferry every half hour. Rough one today. Sit at the back.',
               'Forty minutes from the middle of the city to that.',
               'Manly. Seven miles from Sydney, a thousand miles from care.'],
-      wheek: ['They will hear that at the Quay.'] });
+      wheek: ['They will hear that at the Quay.'],
+      praise: ['Forty minutes from the city and this is what happens.',
+               'I will mention it on the boat. Nobody will believe me.',
+               'Seven miles from Sydney, a thousand miles from care.'],
+      onTask: { 'to-manly': ['Over the hill and there it is. Gets everybody, that.'],
+                'all-the-way': ['The whole ferry saw that. The WHOLE ferry.'],
+                'the-surfboat': ['In the boat. With the crew. Forty minutes from Wynyard.'] } });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(manRoot);
@@ -1302,6 +1372,50 @@ function manBuildTown(game, root) {
     M.box(-1 + (i - 4) * 0.9, manPROM_Y + 0.035, manSHOP_Z - 6.4, 0.55, 0.07, 4.2, PALETTE.manClub);
   }
   M.box(0, manPROM_Y + 0.05, manSHOP_Z - 8.6, 116, 0.10, 0.22, PALETTE.manKerb);
+  // ---- AND THE ROAD ITSELF, WHICH WAS ONE HUNDRED AND SIXTEEN METRES OF
+  // ONE FLAT VALUE.
+  //
+  // The chapter draws the shopfronts, the awnings, the queue rail, the tables,
+  // the shelter and the bollards — and then lays them on a single unbroken
+  // sheet of manPromenade that is the lower half of every frame taken on the
+  // Corso. It is the same failure the wrack line, the plaza and the campo have
+  // all been fixed for, and this is the largest single surface left in the
+  // three chapters. A street has a CENTRELINE, it has slab joints, it has
+  // patches where somebody has been at the water main, and it has the dark
+  // smear along the kerb where the gutter never dries.
+  {
+    const SY = manPROM_Y + 0.028;
+    // the centreline: broken, and it wanders the way a repainted one does
+    for (let i = 0; i < 26; i++) {
+      const cx = -113 + i * 4.5 + Math.sin(i * 1.7) * 0.3;
+      M.box(cx, SY, manSHOP_Z - 12.6 + Math.sin(i * 0.4) * 0.12, 2.4, 0.05, 0.13,
+            PALETTE.manClub, 0, Math.sin(i * 2.1) * 0.006, 0);
+    }
+    // the gutter line, which is always a shade darker than the road
+    M.box(0, SY - 0.004, manSHOP_Z - 8.95, 116, 0.05, 0.55, PALETTE.manKerbDk);
+    M.box(0, SY - 0.004, manSHOP_Z - 16.1, 116, 0.05, 0.55, PALETTE.manKerbDk);
+    // slab joints across the footpath, every two and a half metres, which is
+    // the one thing that gives a pavement a scale
+    // 2.4 m, not 5. A footpath slab is about eight feet; joints five metres
+    // apart photographed as a chessboard rather than as paving.
+    for (let i = 0; i < 95; i++) {
+      const jx = -112 + i * 2.4;
+      M.box(jx, SY, manSHOP_Z - 4.4, 0.07, 0.05, 7.4, PALETTE.manKerbDk);
+    }
+    // ...and the courses running the other way, which is what makes it slabs
+    for (let k = 0; k < 3; k++) {
+      M.box(0, SY, manSHOP_Z - 2.6 - k * 2.4, 116, 0.05, 0.07, PALETTE.manKerbDk);
+    }
+    M.box(0, SY, manSHOP_Z - 1.1, 116, 0.05, 0.09, PALETTE.manKerbDk);
+    M.box(0, SY, manSHOP_Z - 7.6, 116, 0.05, 0.09, PALETTE.manKerbDk);
+    // and the patches. A council road is a map of everything that has ever
+    // been dug up in it, and no two of them are the same shape.
+    for (let i = 0; i < 22; i++) {
+      const px = rand(-108, 108), pz = manSHOP_Z - rand(9.4, 15.6);
+      M.box(px, SY - 0.006, pz, rand(1.4, 3.8), 0.05, rand(0.9, 2.2),
+            i % 3 === 0 ? PALETTE.manKerb : PALETTE.manKerbDk, 0, rand(-0.06, 0.06), 0);
+    }
+  }
 
   // THE FISH AND CHIP SHOP, and it is the loudest thing on the street: a
   // counter under a raised awning, a chalkboard, a stack of crates, and the
@@ -1453,12 +1567,30 @@ function manBuildTown(game, root) {
     }
     // ...and the couch grass on it, which is ankle-high and is the only thing
     // that stops a green slab reading as a green slab.
-    for (let i = 0; i < 150; i++) {
-      const x = rand(manBEACH_X0, manBEACH_X1);
-      const z = manPINE_Z + (i % 2 ? rand(0.6, 2.9) : rand(-2.9, -0.6));
-      const hh = rand(0.16, 0.34);
-      G.box(x, manPROM_Y + 0.06 + hh * 0.5, z, 0.05, hh, 0.16,
-            i % 3 === 0 ? PALETTE.manScrub : PALETTE.manGrass, 0, rand(0, 3), rand(-0.3, 0.3));
+    // A HUNDRED AND FIFTY BLADES OVER TWO HUNDRED AND THIRTY SQUARE METRES is
+    // one every metre and a half, which is not couch grass, it is a green slab
+    // with debris on it — and off the rendered promenade that is exactly what
+    // it read as: scattered chips. This is the Pantanal's grass lesson arriving
+    // in a different chapter. Off a JITTERED GRID rather than a rand() over
+    // the whole strip (a scatter clumps, a grid tiles, three quarters of a
+    // cell of jitter does neither), five times as many, and in TUFTS of three
+    // — because grass does not grow as individual blades a metre apart.
+    {
+      const CW = 2.05;                       // one seed every couple of metres
+      const NX = Math.floor((manBEACH_X1 - manBEACH_X0) / CW);
+      for (let gx = 0; gx < NX; gx++) {
+        for (let gz = 0; gz < 4; gz++) {
+          const bx = manBEACH_X0 + (gx + 0.5) * CW + rand(-CW * 0.36, CW * 0.36);
+          const bz = manPINE_Z + [-2.5, -1.2, 1.2, 2.5][gz] + rand(-0.55, 0.55);
+          for (let k = 0; k < 3; k++) {
+            const hh = rand(0.13, 0.30);
+            G.box(bx + rand(-0.22, 0.22), manPROM_Y + 0.06 + hh * 0.5, bz + rand(-0.18, 0.18),
+                  0.045, hh, 0.14,
+                  (gx + k) % 4 === 0 ? PALETTE.manScrub : PALETTE.manGrass,
+                  0, rand(0, 3), rand(-0.34, 0.34));
+          }
+        }
+      }
     }
     // ...and the low wind-shorn coastal scrub. Knee-high, so it never reaches
     // the lens, and clumped rather than sprayed down the row.
@@ -1715,21 +1847,116 @@ function manBuildPoint(game, root) {
 function manBuildBeachThings(game, root) {
   const M = manMerger();
 
-  // towels, in the four colours everybody's towel is
+  // ---- A BEACH IS NOT A SCATTER, IT IS A FIELD OF CAMPS -------------------
+  //
+  // Twenty-two towels and six umbrellas, each dropped at an independent
+  // rand() over a hundred and twenty metres of sand: one object every four
+  // metres, all of them alone, none of them related to any other. Photographed
+  // from the promenade the dry half of this beach was pale sand with coloured
+  // paper on it — and this chapter measures 72,000 triangles against 199,000
+  // in Cappadocia and 212,000 in the Pantanal, so it is also the one place in
+  // the three with room to fix it properly.
+  //
+  // What is actually on that sand at four in the afternoon is FAMILIES. A
+  // towel, a second towel beside it at a slightly different angle, a bag, a
+  // pair of thongs kicked off, an esky, and — for about half of them — an
+  // umbrella leaning out of the vertical because nobody has ever put one in
+  // straight. Sixteen of those reads as a full beach where seventy scattered
+  // singles read as litter, and it costs the same order of geometry.
+  //
+  // ...AND A BEACH TOWEL IS 0.9 BY 1.7 METRES. These were 1.5-2.1 by 2.4-3.2,
+  // which is a double bed. Against a capybara 1.1 m long they were the reason
+  // the beach read as a card table from six metres up.
   const tow = [PALETTE.manTowelA, PALETTE.manTowelB, PALETTE.manTowelC, PALETTE.manTowelD];
-  for (let i = 0; i < 22; i++) {
-    const x = rand(manBEACH_X0 + 6, manBEACH_X1 - 6);
-    const z = rand(manSHORE_Z + 3.5, manDUNE_Z + 1);
-    const h = manTerrain(x, z);
-    M.box(x, h + 0.03, z, rand(1.5, 2.1), 0.06, rand(2.4, 3.2), tow[i % 4], 0, rand(-0.5, 0.5), 0);
+  const bagC = [PALETTE.manBoardA, PALETTE.manBoardC, PALETTE.manAwning2, PALETTE.manClub];
+  for (let i = 0; i < 16; i++) {
+    // spread along the beach on a jittered spacing — a grid tiles and a scatter
+    // clumps; three quarters of a cell of jitter does neither
+    const cx = manBEACH_X0 + 7 + (i + 0.5) * ((manBEACH_X1 - manBEACH_X0 - 14) / 16) +
+               rand(-2.6, 2.6);
+    const cz = rand(manSHORE_Z + 4.0, manDUNE_Z + 0.5);
+    const face = rand(-0.55, 0.55);          // the whole camp faces the water
+    const n = 1 + (i % 3 === 0 ? 2 : 1);     // one, two or three towels
+    for (let k = 0; k < n; k++) {
+      const tx = cx + (k - (n - 1) * 0.5) * rand(1.15, 1.5);
+      const tz = cz + rand(-0.4, 0.4);
+      const h = manTerrain(tx, tz);
+      if (h < 0.15) continue;
+      M.box(tx, h + 0.025, tz, rand(0.82, 0.98), 0.05, rand(1.55, 1.85),
+            tow[(i + k) % 4], 0, face + rand(-0.22, 0.22), 0);
+    }
+    // the bag at the head of it, which is where the bag always is
+    {
+      const bx = cx + rand(-1.4, 1.4), bz = cz + rand(0.9, 1.5);
+      const h = manTerrain(bx, bz);
+      if (h > 0.15) {
+        M.box(bx, h + 0.16, bz, 0.44, 0.32, 0.26, bagC[i % 4], 0, rand(0, 3), 0);
+        // ...and the thongs, kicked off, never together
+        M.box(bx + rand(-0.7, 0.7), h + 0.02, bz + rand(-0.6, 0.2), 0.11, 0.03, 0.26,
+              PALETTE.manRockDk, 0, rand(0, 3), 0);
+        M.box(bx + rand(-0.7, 0.7), h + 0.02, bz + rand(-0.6, 0.2), 0.11, 0.03, 0.26,
+              PALETTE.manRockDk, 0, rand(0, 3), 0);
+      }
+    }
+    // ...and about half of them have got the umbrella up, and not one of them
+    // is vertical
+    if (i % 2 === 0) {
+      const ux = cx + rand(-1.6, 1.6), uz = cz + rand(0.6, 1.6);
+      const h = manTerrain(ux, uz);
+      if (h > 0.2) {
+        const tilt = rand(-0.16, 0.16), tilt2 = rand(-0.16, 0.16);
+        M.cyl(ux, h + 1.05, uz, 0.055, 2.1, PALETTE.manPole, tilt, 0, tilt2, 4);
+        const hx = ux + Math.sin(tilt2) * 2.0, hz = uz - Math.sin(tilt) * 2.0;
+        // 1.06, NOT 1.42. cone() takes a RADIUS and scales it by two, so the
+        // first cut was a two-metre-eighty canopy — a marquee, not a beach
+        // umbrella, and with a contrasting underside cone inside it the thing
+        // photographed as a fairground carousel in the middle of the beach.
+        // A real one is about two metres across.
+        M.cone(hx, h + 2.16, hz, 1.06, 0.52,
+               i % 4 === 0 ? PALETTE.manAwning : PALETTE.manAwning2, tilt, rand(0, 1), tilt2, 8);
+        // ...and NO second cone underneath it. A cone geometry already has a
+        // base, and a contrasting disc inside the canopy turned every umbrella
+        // on this beach into a dartboard seen from above — which is the one
+        // angle this game's camera ever looks at anything from.
+        // an esky in the shade, which is the only reason the umbrella is there
+        M.box(hx + rand(-0.6, 0.6), h + 0.17, hz + rand(-0.6, 0.6), 0.52, 0.34, 0.36,
+              PALETTE.manFoam, 0, rand(0, 3), 0);
+      }
+    }
   }
-  // umbrellas
-  for (let i = 0; i < 6; i++) {
-    const x = rand(manBEACH_X0 + 10, manBEACH_X1 - 10);
-    const z = rand(manSHORE_Z + 6, manDUNE_Z);
-    const h = manTerrain(x, z);
-    M.cyl(x, h + 1.0, z, 0.07, 2.0, PALETTE.manPole, 0, 0, 0, 4);
-    M.cone(x, h + 2.15, z, 1.7, 0.7, i % 2 ? PALETTE.manAwning : PALETTE.manAwning2, 0, 0, 0, 8);
+  // ---- AND SOMEBODY'S BOARD, STUCK IN THE SAND ---------------------------
+  // The single most recognisable object on an Australian surf beach, and there
+  // were none of them anywhere on the sand: the only boards in the chapter
+  // were seven foamies stacked flat in the nippers' pile and six on the club
+  // rack. A board goes in the sand nose-up beside its owner's towel while its
+  // owner is out the back, and a row of them along the top of the beach is a
+  // skyline in the one part of the frame that had nothing standing up in it.
+  {
+    const bc = [PALETTE.manBoardA, PALETTE.manBoardB, PALETTE.manBoardC, PALETTE.manBoardD];
+    for (let i = 0; i < 11; i++) {
+      const x = manBEACH_X0 + 10 + i * ((manBEACH_X1 - manBEACH_X0 - 20) / 10) + rand(-2.2, 2.2);
+      const z = rand(manSHORE_Z + 7.5, manDUNE_Z + 1.2);
+      const h = manTerrain(x, z);
+      if (h < 0.3) continue;
+      const lean = rand(-0.24, 0.24), lean2 = rand(-0.18, 0.18), yaw = rand(0, 3.14);
+      // A BOARD IS A TAPER, NOT A BOX WITH A DART ON IT. The first cut put a
+      // 0.52 m cone on the top of a 0.52 m plank, which from the promenade is
+      // a lawn dart. The shape that reads as a surfboard at this distance is
+      // the outline: narrow at the tail, widest a third of the way up, and
+      // drawn to a point over the last quarter.
+      M.box(x + Math.sin(lean2) * 0.22, h + 0.22, z - Math.sin(lean) * 0.22,
+            0.30, 0.46, 0.075, bc[i % 4], lean, yaw, lean2);            // the tail
+      M.box(x + Math.sin(lean2) * 0.90, h + 0.90, z - Math.sin(lean) * 0.90,
+            0.48, 0.96, 0.075, bc[i % 4], lean, yaw, lean2);            // the widest part
+      M.box(x + Math.sin(lean2) * 1.62, h + 1.62, z - Math.sin(lean) * 1.62,
+            0.32, 0.52, 0.075, bc[i % 4], lean, yaw, lean2);            // and the nose
+      // ...and the stripe down the deck, which every one of them has
+      M.box(x + Math.sin(lean2) * 0.55, h + 1.00, z - Math.sin(lean) * 0.55,
+            0.09, 1.9, 0.09, PALETTE.manRockDk, lean, yaw, lean2);
+      // ...and the leg-rope, coiled at the foot of it
+      M.cyl(x + rand(-0.3, 0.3), h + 0.04, z + rand(-0.3, 0.3), 0.20, 0.06,
+            PALETTE.manRockDk, 0, 0, 0, 8);
+    }
   }
   // a board rack outside the club
   for (let i = 0; i < 6; i++) {
@@ -1837,7 +2064,14 @@ function manBuildBeachThings(game, root) {
   // ripples running along the beach. Both are flat, both are one triangle
   // pair, and between them they are the only texture there is up there.
   const SD = manMerger();
-  for (let i = 0; i < 230; i++) {
+  // 460 AND SHORTER, NOT 230 AND LONGER. The note below already says a wind
+  // ripple wants to be "short, dense and barely a shade off the sand", and
+  // then the numbers under it were 0.8-2.1 m long, 5.5 cm proud, and every
+  // fifth one in manSandWet — which off the rendered beach is a scatter of
+  // two-metre pale PLANKS lying on the dry sand, one every three square
+  // metres, each one individually resolvable. A ripple field is a texture: at
+  // half the length and twice the count the eye stops counting them.
+  for (let i = 0; i < 460; i++) {
     // the ripples: LONG in x and short in z, because the wind here is a
     // southerly and they run with the beach. Drawn 2 cm proud so they catch
     // the low sun rather than being a colour on a flat plane.
@@ -1851,8 +2085,8 @@ function manBuildBeachThings(game, root) {
     const z = rand(manDUNE_Z - 5.5, manPROM_Z - 0.6);
     const h = manTerrain(x, z);
     if (h < 0.5) continue;
-    SD.box(x, h + 0.028, z, rand(0.8, 2.1), 0.055, rand(0.16, 0.26),
-           i % 5 === 0 ? PALETTE.manSandWet : PALETTE.manSand, 0, rand(-0.07, 0.07), 0);
+    SD.box(x, h + 0.022, z, rand(0.5, 1.15), 0.035, rand(0.10, 0.17),
+           i % 9 === 0 ? PALETTE.manSandWet : PALETTE.manSand, 0, rand(-0.07, 0.07), 0);
   }
   for (let i = 0; i < 150; i++) {
     // the wrack line. It follows the last high tide, which on this profile is
@@ -1868,26 +2102,60 @@ function manBuildBeachThings(game, root) {
     // beach was a scatter of coloured paper. Dried kelp is nearly the colour
     // of wet sand, it lies ALONG the tide line rather than across it, and the
     // one saturated thing in it is a bluebottle, which is the size of a thumb.
-    const c = i % 4 === 0 ? PALETTE.manSandDeep : PALETTE.manKelp;
-    SD.box(x, h + 0.030, z, rand(0.7, 2.2), 0.055, rand(0.09, 0.20), c,
-           0, rand(-0.28, 0.28), 0);
-    if (i % 11 === 0) {
-      SD.sph(x + rand(-0.8, 0.8), h + 0.04, z + rand(-0.5, 0.5), 0.11, 0.05, 0.09,
+    // ---- AND IT IS STILL TOO BIG AND TOO GREEN --------------------------
+    // Second pass on the same line. Pieces up to 2.2 m long in manKelp
+    // (0x5a6b3a, a saturated olive) against manSand (0xe9dcb8, pale cream) is
+    // a two-and-a-quarter-stop contrast at a length the eye resolves
+    // individually from six metres up — measured off the beach, a hundred and
+    // fifty dark green PLANKS scattered over the sand, and they were the most
+    // conspicuous objects in the chapter. Dried kelp is 20-70 cm of ribbon,
+    // it is closer to the colour of wet sand than to the colour of a leaf, and
+    // two thirds of a wrack line is not kelp at all — it is cuttlebone,
+    // shell grit and dry weed, all of which are the colour of the beach.
+    const r = i % 7;
+    const c = r < 3 ? PALETTE.manSandDeep : (r < 5 ? PALETTE.manSandWet : PALETTE.manKelp);
+    SD.box(x, h + 0.026, z, rand(0.22, 0.72), 0.045, rand(0.07, 0.15), c,
+           0, rand(-0.42, 0.42), 0);
+    // ...and a bluebottle, which is the size of a thumb and is the ONE
+    // saturated thing that belongs in a wrack line
+    if (i % 13 === 0) {
+      SD.sph(x + rand(-0.8, 0.8), h + 0.04, z + rand(-0.5, 0.5), 0.09, 0.045, 0.075,
              PALETTE.manAwning2, 6);
     }
   }
   // ...and the tracks of everybody who has walked down to the water today,
   // which is the one thing on a beach that says people came this way.
-  for (let t = 0; t < 7; t++) {
+  // ---- AND A FOOTPRINT IS A HOLE, NOT A TILE -----------------------------
+  // Seven tracks of twenty-two prints, each a 16 x 27 cm box drawn 12 mm PROUD
+  // of the sand in manSandWet — which is a stop and a half off manSand — at a
+  // dead-regular 52 cm pitch with a ±13 cm shuffle. Photographed from the
+  // promenade those were not footprints, they were two rows of pale stepping
+  // stones running down the beach, and they were the most legible thing in the
+  // frame after the flags.
+  //
+  // Three things are wrong and all three are the same thing. A human stride is
+  // 70-75 cm, not 52, and the left and right prints are 20 cm apart, so a
+  // track is a staggered pair and not a dotted line. A print in dry sand is a
+  // DEPRESSION: what you can see of it is the shadow inside it and the collapsed
+  // rim round it, both of which are darker than the beach and neither of which
+  // stands up off it. And a print is 26 cm long by 11 wide, not 16 by 27, which
+  // was wider than it was long and pointing across the track.
+  for (let t = 0; t < 9; t++) {
     const x0 = rand(manBEACH_X0 + 8, manBEACH_X1 - 8);
-    const drift = rand(-0.16, 0.16);
-    for (let k = 0; k < 22; k++) {
-      const z = manDUNE_Z + 0.5 - k * 0.52;
-      const x = x0 + drift * k * 0.52;
+    const drift = rand(-0.14, 0.14);
+    // some of them are walking up the beach and some down it, which is the
+    // whole reason there are two rows of anything
+    const dir = t % 3 === 0 ? -1 : 1;
+    for (let k = 0; k < 17; k++) {
+      const s = k * 0.73;
+      const z = dir > 0 ? manDUNE_Z + 0.5 - s : manSHORE_Z + 1.5 + s;
+      const x = x0 + drift * s;
       const h = manTerrain(x, z);
-      if (h < -0.05) break;
-      SD.box(x + (k % 2 ? 0.13 : -0.13), h + 0.012, z, 0.16, 0.03, 0.27,
-             PALETTE.manSandWet, 0, drift, 0);
+      if (h < -0.05 || h > 2.4) break;
+      // sunk 8 mm rather than raised 12, and in the shadow tone rather than
+      // the highlight one
+      SD.box(x + (k % 2 ? 0.10 : -0.10), h - 0.008, z, 0.11, 0.03, 0.26,
+             PALETTE.manSandDeep, 0, drift, 0);
     }
   }
   const sdm = new THREE.Mesh(SD.build(), manVCG());
@@ -1917,6 +2185,27 @@ function manBuildBeachThings(game, root) {
     manSandcastle.castShadow = true;
     manSandcastle.userData.at = { x: x, z: z, y: h };
     root.add(manSandcastle);
+
+    // ---- AND WHAT IS LEFT OF IT AFTERWARDS ------------------------------
+    // Built here and hidden, at the origin, so it can be dropped on the spot
+    // the moment the castle goes: the keep slumped to a third of its height,
+    // the four towers lying where they fell, and the moat still there, because
+    // a moat is a hole and a hole survives being run through.
+    const Rn = manMerger();
+    Rn.box(0, 0.24, 0, 2.9, 0.46, 2.9, PALETTE.manSandWet, 0, 0.14, 0);
+    Rn.box(0, 0.52, 0.1, 1.5, 0.34, 1.4, PALETTE.manSand, 0, 0.5, 0);
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.57 + 0.6, r = 1.5 + (i % 2) * 0.5;
+      Rn.cyl(Math.cos(a) * r, 0.20, Math.sin(a) * r, 0.40, 0.85,
+             PALETTE.manSand, 1.57, a + 0.4, 0, 6);
+      Rn.cone(Math.cos(a) * (r + 0.7), 0.18, Math.sin(a) * (r + 0.7), 0.44, 0.6,
+              PALETTE.manSandWet, 1.4, a, 0.3, 6);
+    }
+    manCastleRuin = new THREE.Mesh(Rn.build(), manVC());
+    manCastleRuin.castShadow = true;
+    manCastleRuin.receiveShadow = true;
+    manCastleRuin.visible = false;
+    root.add(manCastleRuin);
   }
 
   // ---- one pine cone, hidden until it is knocked down
@@ -2851,8 +3140,19 @@ function manUpdateBathers(game, dt) {
       manBathZ[i] += (dz / d) * sp * dt;
       walking = 1;
     }
-    // and they get out of the way of a capybara, because everybody does
-    if (capy) {
+    // and they get out of the way of a capybara, because everybody does.
+    //
+    // ...EXCEPT WHILE THEY ARE WALKING TO A NEW FLAG LINE, and that is not a
+    // nicety. 'move-flags' is the chapter's headline task and it tests that
+    // twenty of the twenty-two bathers have reached their own target within a
+    // metre and a half. A capybara standing in the middle of the crowd it has
+    // just relocated pushes the nearest two or three permanently off theirs at
+    // 2.2 m/s — against a walk speed of 2.0, so the shove WINS — and the task
+    // that fired at fifteen seconds in the clean case simply never fires. It
+    // is the same silent never-completes the previous pass found in this task
+    // for a different reason, arriving from the other side, and the player's
+    // only clue is that they are standing where they were told to stand.
+    if (capy && manFlagMovedT <= 0) {
       const cx = manBathX[i] - capy.position.x, cz = manBathZ[i] - capy.position.z;
       const cd = Math.sqrt(cx * cx + cz * cz);
       if (cd < 3.2 && cd > 0.01) {
@@ -2943,7 +3243,11 @@ function manUpdateBathers(game, dt) {
   // set, which is out to sea.
   const riding = manRideDist > 5 && capy && capy.position;
   let look = clamp((manBigNear - 0.30) / 0.35, 0, 1);
-  if (riding || manBathCheer > 0) {
+  // `manBathCheer > 0` used to be enough to enter this branch on its own, and
+  // the branch dereferences capy.position — one frame with no capybara (the
+  // frame a chapter is entered on, and every frame of the end card) and the
+  // whole beach throws.
+  if ((riding || manBathCheer > 0) && capy && capy.position) {
     look = 1;
     manBathAimX = damp(manBathAimX, capy.position.x, 2.5, dt);
     manBathAimZ = damp(manBathAimZ, capy.position.z, 2.5, dt);
@@ -3019,7 +3323,17 @@ function manUpdateDolphins(game, dt) {
   }
   manDolphins.instanceMatrix.needsUpdate = true;
   // ONE NOTE, RATIONED, AND SCALED BY DISTANCE — the plane in Sydney's rule.
-  if (manDolphT % 3 < dt && game.capy) {
+  //
+  // ...ON A COUNTDOWN, NOT ON A WINDOW. `manDolphT % 3 < dt` is the exact
+  // shape that made the Antarctic skua cry nine times per dive and the
+  // Pantanal otters bark like a smoke alarm: it is a test on a clock that
+  // advances by a variable amount, so at a frame time that straddles the
+  // boundary it is true twice and at one that steps over it it is true never.
+  // A countdown redrawn from a range cannot do either, and it also stops four
+  // dolphins sounding like a metronome.
+  manDolphNote -= dt;
+  if (manDolphNote <= 0 && game.capy) {
+    manDolphNote = rand(2.2, 4.1);
     const far = Math.abs(game.capy.position.z - crestZ);
     manSfx.volume = clamp(0.22 - far * 0.0035, 0.02, 0.22);
     manSfx.pitch = rand(2.1, 2.6);
@@ -3079,7 +3393,7 @@ function manUpdateGroper(game, dt) {
   manGroper.position.x = damp(manGroper.position.x, tx, 1.2, dt);
   manGroper.position.z = damp(manGroper.position.z, tz, 1.2, dt);
   manGroper.position.y = damp(manGroper.position.y, gy, 1.6, dt);
-  manGroper.rotation.y = damp(manGroper.rotation.y,
+  manGroper.rotation.y = dampAngle(manGroper.rotation.y,
     Math.atan2(tx - manGroper.position.x, tz - manGroper.position.z), 2, dt);
   manGroper.rotation.z = Math.sin(manTime * 3) * 0.08;
 }
@@ -3101,7 +3415,26 @@ function manUpdateBoat(game, dt) {
   let yaw = 0;
   if (manBoatPhase === 'beached') {
     manBoatTarget.x = H.x; manBoatTarget.z = H.z;
-    if (manBoatT > 14) { manBoatPhase = 'out'; manBoatT = 0; manBoatOut = false; }
+    // ---- THE CREW CALL IT, AND UNTIL NOW THEY DID NOT ------------------
+    // Fourteen seconds beached, then seventeen out through the break, on a
+    // clock that runs whether or not anybody is aboard — and the ONLY line
+    // about it fired once the boat was already moving, which is a second and
+    // a bit after the last moment you could have got into it. From the
+    // player's side a nine-metre boat sat on the sand doing nothing for
+    // fourteen seconds and then left without them, four times in a row, with
+    // no way at all of knowing when.
+    //
+    // A surfboat crew does not leave silently. Three seconds out the sweep
+    // calls it and they take the gunwales, which is both the warning and the
+    // most recognisable thing on that beach.
+    if (manBoatT > 11 && !manBoatCalled) {
+      manBoatCalled = true;
+      manSfx.volume = 0.34; manSfx.pitch = 1.15;
+      game.sfx('cheer', manSfx);
+      manCall(game, 'launch', H.x, manTerrain(H.x, H.z + 2) + 0.7, H.z + 2,
+              'Boat! Hands on! Three, two —', 30);
+    }
+    if (manBoatT > 14) { manBoatPhase = 'out'; manBoatT = 0; manBoatOut = false; manBoatCalled = false; }
   } else if (manBoatPhase === 'out') {
     // straight at it. A surfboat does not go round.
     const t = clamp(manBoatT / 17, 0, 1);
@@ -3231,6 +3564,29 @@ function manTask(game, id) { game.completeTask(id); }
  * long clocks, never twice for the same event, and never while it is already
  * saying something.
  */
+/**
+ * ...AND THE PEOPLE WHO REMEMBER IT AFTERWARDS.
+ *
+ * The other half of the same idea, and the half Cappadocia has had since it
+ * shipped and this chapter never did. `say` is a line about NOW, from a point;
+ * `lines` is what somebody says when you walk up to them, and npc.js reads
+ * that array live — so a chapter that keeps its references can change what a
+ * person says the moment the world changes under them.
+ *
+ * Everything below is hung on a task that has actually completed, so nobody is
+ * ever congratulating you for something you have not done. Deliberately not
+ * everybody for everything: the lifeguard gets the flags and the rip, the club
+ * secretary gets the boat, the pool swimmer gets the pool, and the fisherman
+ * gets the groper — each of them the thing they were standing in front of.
+ */
+const manLocals = {};
+function manSaysNow(who, lines, wheek) {
+  const r = manLocals[who];
+  if (!r) return;
+  if (lines) r.lines = lines;
+  if (wheek) r.wheekLines = wheek;
+}
+
 const manSaid = {};
 let manSayCool = 0;
 function manCall(game, key, x, y, z, text, cool) {
@@ -3315,6 +3671,12 @@ function manUpdateFlags(game, dt) {
       manSfx.volume = 0.30; manSfx.pitch = 1.35;
       game.sfx('cheer', manSfx);
       manTask(game, 'move-flags');
+      manSaysNow('guard',
+        ['You moved them. I am not saying I approve. I am saying nobody drowned.',
+         'Everyone followed. Every single one. That is the system, that is.',
+         'Sixty years those poles have gone in the same two holes.',
+         'Right. New holes. I will have to redo the board.'],
+        ['Yes, all right, I have moved. Everybody has moved.']);
     }
   }
   // pick one up — EITHER of them. The first build only tested the western
@@ -3356,6 +3718,20 @@ function manUpdateCone(game, dt) {
           manSfx.volume = 0.42; manSfx.pitch = 1.45;
           game.sfx('thud', manSfx);
           manPuffSpray(manConeMesh.position.x, g + 0.15, manConeMesh.position.z, 3, 0.5);
+          // ---- AND THIRTY GULLS ARE STANDING RIGHT THERE ----------------
+          // The pines are on the promenade, the gulls live on the shopfronts
+          // twelve metres behind them, and a pine cone arriving out of a
+          // thirteen-metre tree is the loudest thing that has happened on the
+          // Corso all afternoon. They went on standing there. A world that
+          // does not react to the one physical event a task produces is the
+          // same failure as a marquee that ticks a box and makes no noise —
+          // and the gull scatter is already built, already the chip-shop
+          // man's entire character, and cost one line to cause.
+          if (Math.abs(manConeMesh.position.x - manGULL_HOME.x) < 34 && manGullUp < 0.5) {
+            manGullUp = 1;
+            manSfx.volume = 0.30; manSfx.pitch = rand(1.05, 1.3);
+            game.sfx('gull', manSfx);
+          }
         }
         manConeMesh.position.y = g + 0.24;
       }
@@ -3374,6 +3750,16 @@ function manUpdateCone(game, dt) {
     if (Math.abs(p.x - x) > 2.4) continue;
     manConeT = 4;
     if (manConeMesh) {
+      // ...AND THE LAST ONE DOES NOT SIMPLY BLINK OUT OF EXISTENCE. There is
+      // exactly one cone mesh, so rattling a second tree teleported the cone
+      // that was lying on the sand into the top of the new one — a small brown
+      // object vanishing from where the player put it, in plain sight. A puff
+      // of sand where it was is the whole cost of it looking like a gull took
+      // it rather than like a bug.
+      if (manConeMesh.visible && manConeMesh.userData.landed) {
+        manPuffSpray(manConeMesh.position.x, manConeMesh.position.y + 0.1,
+                     manConeMesh.position.z, 3, 0.6);
+      }
       manConeMesh.visible = true;
       manConeMesh.position.set(x + rand(-0.6, 0.6), manPROM_Y + 13, manPINE_Z + rand(-0.5, 0.5));
       manConeMesh.userData.vy = 0;
@@ -3458,6 +3844,16 @@ function manUpdateSurfTasks(game, dt) {
         // taken up for four seconds rather than fired at the tick.
         manPuffSpray(p.x, manWave.y + 0.4, p.z + 1.2, 12, 0.9);
         manRideEndT = 4.0;
+        manSaysNow('guard',
+          ['From the bank to the sand. I timed it. I am not telling you what I got.',
+           'That is the wave of the set and you had it the whole way.',
+           'You do not stand up, do you. You just... go.'],
+          ['Everybody heard. Everybody on the front heard.']);
+        manSaysNow('ferry',
+          ['The whole boat saw that. They will be talking about it at Circular Quay.',
+           'Forty minutes from the middle of the city to a rodent doing THAT.',
+           'I am going to describe it badly and nobody is going to believe me.'],
+          ['They will hear that at the Quay.']);
         game.shake(0.30);
         manSfx.volume = 0.9; manSfx.pitch = 0.55;
         game.sfx('splash', manSfx);
@@ -3506,18 +3902,58 @@ function manUpdateSurfTasks(game, dt) {
   } else if (!capy.diving) manDuckT = 0;
 
   // ---- the bommie -------------------------------------------------------
-  if (manInZone('bommie', p.x, p.z) && manWave.foam > 0.4 && p.y < manWave.y + 1.6) {
-    manTask(game, 'the-bommie');
+  // AND IT IS A DETONATION, NOT A CHECKBOX. A bommie is a rock out the back
+  // that stands a swell on end and blows it up, and the task is to be sitting
+  // on the thing while that happens to you. For the chapter's whole life it
+  // ticked a box in silence: the one set piece in Manly that is a physical
+  // event happening TO the player, and it had less feedback than the pine
+  // cone. Every time it goes over now — not only the first — because the
+  // pleasure of the bommie is that it keeps doing it.
+  {
+    const onIt = manInZone('bommie', p.x, p.z) && p.y < manWave.y + 1.6;
+    const hit = onIt && manWave.foam > 0.4;
+    if (hit) manTask(game, 'the-bommie');
+    if (hit && !manBommieHit) {
+      manBommieHit = true;
+      manPuffSpray(manBOMMIE.x + rand(-2, 2), manWave.y + 0.9, manBOMMIE.z + rand(-2, 2), 14, 2.4);
+      manPuffSpray(manBOMMIE.x + rand(-4, 4), manWave.y + 0.5, manBOMMIE.z - 3, 8, 1.8);
+      game.shake(0.26);
+      manSfx.volume = 0.72; manSfx.pitch = 0.48;
+      game.sfx('splash', manSfx);
+      manSfx.volume = 0.30; manSfx.pitch = 0.36;
+      game.sfx('thud', manSfx);
+      manRideEndT = Math.max(manRideEndT, 1.8);
+    } else if (!hit && manWave.foam < 0.2) manBommieHit = false;
   }
 
   // ---- the ocean pool ---------------------------------------------------
   if (manInZone('pool', p.x, p.z) && swimming) {
     if (p.z > manPOOL.z1 - 3.5) manPoolEnd = 1;
-    else if (p.z < manPOOL.z0 + 3.5 && manPoolEnd === 1) { manPoolEnd = 2; manTask(game, 'bower-pool'); }
+    else if (p.z < manPOOL.z0 + 3.5 && manPoolEnd === 1) {
+      manPoolEnd = 2;
+      manTask(game, 'bower-pool');
+      manSaysNow('pool',
+        ['End to end. Sixty-one years I have swum that. You did it in one breath.',
+         'The wall keeps the swell out. Mostly. You would know, you were in it.',
+         'Same time tomorrow. I am here whatever the weather does.'],
+        ['In MY pool. At this hour.']);
+    }
   }
 
   // ---- the groper -------------------------------------------------------
   if (manGroper && capy.position.distanceTo(manGroper.position) < 3.2) {
+    if (!game.taskDone || !game.taskDone('blue-groper')) {
+      manSaysNow('fish',
+        ['He came to you. He does not come to me and I have been here since five.',
+         'Blue means he is old and he is a he. They all start out the other way.',
+         'Do not tell anybody. I mean it. Do not tell anybody about Bluey.'],
+        ['You will not scare him. Nothing scares him. That is his problem.']);
+      manSaysNow('shelly',
+        ['That is Bluey. Everybody round here knows Bluey.',
+         'He follows the snorkellers about. He is looking for somebody to turn a rock over.',
+         'Protected since seventy-four. Somebody speared one and the whole beach lost its mind.'],
+        ['Nothing wakes up over here. Not even for that.']);
+    }
     manTask(game, 'blue-groper');
   }
 
@@ -3531,8 +3967,29 @@ function manUpdateSurfTasks(game, dt) {
       game.shake(0.35);
       manSfx.volume = 0.6; manSfx.pitch = 0.7;
       game.sfx('thud', manSfx);
-      manPuffSpray(at.x, at.y + 0.6, at.z, 10, 0.8);
+      // ---- A CASTLE DOES NOT STOP EXISTING, IT FALLS OVER ----------------
+      // `visible = false` and ten motes of spray: the best-modelled small
+      // object on this beach — a keep, four towers, four cones — blinked out
+      // of the world in one frame and left bare sand. The task's own clue is
+      // 'run at it, do not be polite about it', and the entire payoff for
+      // doing so was that the thing was suddenly not there.
+      //
+      // It is a HEAP now: the mound stays, and the towers become four lumps of
+      // wet sand lying where they landed, which is what a demolished
+      // sandcastle looks like from six metres up and is the only evidence the
+      // player has that they were the one who did it.
+      if (manCastleRuin) {
+        manCastleRuin.visible = true;
+        manCastleRuin.position.set(at.x, at.y, at.z);
+      }
+      manPuffSpray(at.x, at.y + 0.6, at.z, 16, 1.1);
+      manPuffSpray(at.x + 1.1, at.y + 0.4, at.z - 1.1, 6, 0.7);
+      manPuffSpray(at.x - 1.1, at.y + 0.4, at.z + 1.1, 6, 0.7);
       manTask(game, 'sandcastle');
+      // ...and somebody built it. The beach has twenty-nine merged figures on
+      // it and not one of them had an opinion about this.
+      manCall(game, 'castle', at.x + 3.2, at.y + 0.7, at.z + 2.4,
+              'Oh, that took ALL AFTERNOON. That took all afternoon!', 999);
     }
   }
 
@@ -3675,7 +4132,7 @@ export function createManly(game) {
       manTime = 4 * manPERIOD - 20;
       manRideDist = 0; manRideOff = 0; manRideTop = 0;
       manRipT = -1;
-      manDuckT = 0; manPoolEnd = 0; manBigNear = 0;
+      manDuckT = 0; manPoolEnd = 0; manBigNear = 0; manBommieHit = false;
       manFlagHeld = false; manFlagHeldB = false; manFlagCool = 0; manFlagMovedT = 0;
       manFlagX = manFLAG_HOME.x; manFlagZ = manFLAG_HOME.z;
       manFlagFromX = manFLAG_HOME.x; manFlagFromZ = manFLAG_HOME.z;
@@ -3688,7 +4145,7 @@ export function createManly(game) {
       manGullUp = 0; manGullNext = rand(10, 20); manLipT = 0;
       manSayCool = 0;
       for (const k in manSaid) delete manSaid[k];
-      manBoatPhase = 'beached'; manBoatT = 0;
+      manBoatPhase = 'beached'; manBoatT = 0; manBoatCalled = false;
       manBoatCarrying = false; manBoatOut = false;
       manBoatTarget.x = manBOAT_HOME.x; manBoatTarget.z = manBOAT_HOME.z; manBoatTarget.y = 0.55;
       manBoatPrev.x = manBoatTarget.x; manBoatPrev.y = manBoatTarget.y; manBoatPrev.z = manBoatTarget.z;
@@ -3697,7 +4154,7 @@ export function createManly(game) {
         manBoatBody.velocity.set(0, 0, 0);
         manSyncBody(manBoatBody);
       }
-      manDolphActive = false; manDolphWait = rand(22, 40);
+      manDolphActive = false; manDolphWait = rand(22, 40); manDolphNote = 0;
       if (manDolphins) manDolphins.visible = false;
       manPelState = 'stand'; manPelT = 0;
       manConeT = 0;

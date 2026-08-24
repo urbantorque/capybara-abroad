@@ -57,7 +57,15 @@ const cavDOLINE = { x: 4, z: -48, r: 26 };
 const cavHAND = { x: 16, z: -4 };    // the big stalagmite
 const cavROOST = { x: -30, z: -126 };
 const cavPEARLS = { x: 22, z: -132 };
-const cavPHYTO = { x: -12, z: -34 };
+// ...AND IT WAS IN THE RIVER. The river runs at x = cavRIVER_X (−20) with a
+// half-width of cavRIVER_W (15), so it occupies x ∈ [−35, −5] for the whole
+// length of the passage — and the phytokarst landmark was at x = −12, which is
+// eight metres inside it. The hint arrow for 'Find the garden that leans'
+// pointed at open water, the tick fired while you were swimming, and the first
+// thing built there (a hundred rock fins) came out standing in the channel.
+// East side, on the near rim of the doline, where the light actually reaches
+// and where the animal is already walking on its way down from the Hand.
+const cavPHYTO = { x: 15, z: -28 };
 const cavEXIT_Z = -168;
 const cavWALL = { z: -104, top: 13.5, foot: -10.5 };
 const cavRIVER_X = -20;
@@ -129,6 +137,61 @@ const cavEchoBackV = [0, 0, 0];
 let cavShaftMesh = null, cavSkyDisc = null, cavShaftLight = null, cavShaftLow = null;
 let cavMist = null;
 
+// ---------------------------------------------------------------------------
+// ...AND THE CHAPTER LOOKS UP.
+//
+// Every vertical thing in this chapter — a hole a hundred and forty metres
+// across, two hundred and ten metres of shaft standing on the floor under it,
+// a two-hundred-metre waterfall, an arch with a cloud pouring out of it and a
+// slot of daylight at the far end — is ABOVE the animal, and the follow rig
+// looks forty-one degrees DOWN. Photographed standing on the hint arrow's own
+// target, at the moment `the-doline` ticks and the banner goes up, the marquee
+// of chapter 16 is a photograph of some ferns.
+//
+// systems.js has had the answer since chapter 7: publish `skyward()` and the
+// rig cranes to eleven degrees and steps back. Iceland is the only chapter
+// that ever asked. Three places here want it and one of them is the wow.
+const cavSKY_DOLINE = 0.92;   // under the hole. The whole reason to be here.
+const cavSKY_SLOT   = 0.34;   // the way out: a chink forty metres up a wall
+const cavSKY_MOUTH  = 0.40;   // the arch, and the cloud coming out of it
+let cavSkyK = 0;
+
+// --- AND THERE IS SOMETHING IN THE COLUMN. See cavBuildShaftLife -----------
+// The doline is a light with nothing in it. Sơn Đoòng's is not: swifts pour in
+// and out of the hole all day, and what a two-hundred-metre column of lit air
+// actually shows you is the litter of the forest two hundred metres up coming
+// down through it, very slowly, one leaf at a time. Both are only readable at
+// all now the rig cranes — and between them they are the difference between a
+// beam and a place with weather in it.
+const cavSWIRL_N = 16;
+let cavSwirl = null, cavSwirlPh = null;
+const cavFALL_N = 34;
+let cavFallLeaf = null, cavFallLeafD = null;
+
+// ---------------------------------------------------------------------------
+// THE GARDEN THAT LEANS, WHICH DID NOT EXIST.
+//
+// `phytokarst` — 'Find the garden that leans' — was the only line on chapter
+// 16's card with NO OBJECT BEHIND IT. It ticked at nine and a half metres from
+// (−12, −34), the hint arrow pointed at (−12, −34), and there was nothing at
+// (−12, −34) but doline floor: the note by the wood says the leaning trees are
+// "also the answer to the phytokarst line", and they are twenty metres away
+// and are trees. A player who followed the arrow walked to a patch of ground,
+// heard a tick, and never found out what a phytokarst was.
+//
+// It is a real and very odd thing and it deserves its own object. Limestone
+// that has been eaten by photosynthetic algae grows in thin blades and combs
+// that all lean the same way — AT THE LIGHT — so a phytokarst garden is a
+// field of rock fins, green on the side that faces the opening and bare grey
+// on the side that does not, and the entire field is a compass needle pointing
+// at a hole you cannot see yet. This one sits on the near rim of the doline,
+// which is the first green thing you meet coming down the passage.
+const cavPHY_N = 104;
+let cavPhyBlades = null, cavPhyD = null;
+let cavPhyShake = 0, cavPhyDone = false;
+const cavSPORE_N = 54;
+let cavSpores = null, cavSporeD = null;
+
 // -- the slot at the far end, which is the way out. See cavBuildExit --------
 let cavExitLight = null, cavExitBeam = null;
 const cavSLOT_MOTE_N = 130;
@@ -159,12 +222,14 @@ let cavSeenLight = false, cavDayK = 0;
 let cavWallT = -1, cavWallDone = false;
 let cavRiverSwum = 0;
 let cavToldEcho = false, cavToldWorms = false, cavToldDim = false, cavToldOpen = false;
+let cavToldPhyto = false;
 let cavPearlOne = null, cavPearlTook = false;
 
 // scratch
 const cavV3 = new THREE.Vector3();
 const cavV3b = new THREE.Vector3();
 const cavQ = new THREE.Quaternion();
+const cavAxisY = new THREE.Vector3(0, 1, 0);
 const cavE = new THREE.Euler();
 const cavSc = new THREE.Vector3();
 const cavM = new THREE.Matrix4();
@@ -291,7 +356,19 @@ function cavPoolBody(game) {
   b.allowSleep = true;
   return b;
 }
-function cavPoolBox(b, x, y, z, hx, hy, hz) {
+function cavPoolBox(b, x, y, z, hx, hy, hz, ry) {
+  // ...AND IT TAKES A YAW NOW. cannon's addShape has always accepted a per-
+  // shape orientation and this helper threw it away, which is why every
+  // collider in the chapter was axis-aligned — fine for a boulder, wrong for
+  // anything round, because a box collider for a circular spire is either too
+  // fat at its diagonals or too thin at its flats. Two boxes at forty-five
+  // degrees is an octagon, and an octagon is within five per cent of a circle.
+  if (ry) {
+    cavQ.setFromAxisAngle(cavAxisY, ry);
+    b.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, hz)), new CANNON.Vec3(x, y, z),
+               new CANNON.Quaternion(cavQ.x, cavQ.y, cavQ.z, cavQ.w));
+    return b;
+  }
   b.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, hz)), new CANNON.Vec3(x, y, z));
   return b;
 }
@@ -441,6 +518,10 @@ function cavInZone(name, x, z) {
     case 'roost':    return Math.abs(x - cavROOST.x) < 18 && Math.abs(z - cavROOST.z) < 18;
     case 'pearls':   return Math.abs(x - cavPEARLS.x) < 12 && Math.abs(z - cavPEARLS.z) < 12;
     case 'exit':     return z < cavEXIT_Z + 10 && Math.abs(x) < 20;
+    case 'phyto': {
+      const dx = x - cavPHYTO.x, dz = z - cavPHYTO.z;
+      return dx * dx / (15 * 15) + dz * dz / (11 * 11) < 1;
+    }
     default: return false;
   }
 }
@@ -1471,27 +1552,107 @@ function cavBuildFormations(game, root) {
   // ---- THE HAND OF DOG. Twenty-six metres, and the way up it is a spiral of
   // flowstone ledges, because a chapter with a climb verb in it should not use
   // the climb verb for everything.
+  //
+  // ...AND FOR THE WHOLE LIFE OF THE CHAPTER IT COULD NOT BE CLIMBED.
+  //
+  // MEASURED. A capybara's standing hop in this chapter is 1.09 m — the animal
+  // was put on the first ledge and told to jump, and it got 1.09. The ledges
+  // were `base + 1.0 + k * 2.45`: TWO AND A HALF METRES between each one, on a
+  // stalagmite whose task line is 'Top out on the biggest stalagmite'. Nothing
+  // in this chapter publishes climbHold except the Great Wall, and the trunk
+  // collider is a BOX with vertical sides, so there was no ramp either. The
+  // second ledge of ten was unreachable by every verb the animal owns, and the
+  // tick sits at base + 24 with the highest ledge at base + 19.1 — so even a
+  // player who cheated their way up nine of them still could not have it.
+  //
+  // Two things were wrong underneath that, and both are the same mistake:
+  //
+  //   1. THE STEP WAS NEVER MEASURED AGAINST THE HOP. Nine shelves, and it is
+  //      two and a half metres from each to the next.
+  //   2. THE TRUNK COLLIDER WAS ONE BOX FOR A CONE. `7.0` half-width for the
+  //      whole 24 m of a spire that tapers from 7.5 m of radius to 1.6 —
+  //      five and a half metres of invisible rock round the top of it, which
+  //      is also why the last four shelves were BURIED (their radius runs down
+  //      to 3.0 and the box reaches 3.5).
+  //
+  // AND IT IS A RAMP NOW, NOT A STAIRCASE. The first fix was thirty-two
+  // shelves at 0.78 — inside the hop, and measured as such — and it failed for
+  // a third reason nobody had thought about: a spiral of two-metre discs at a
+  // fixed angle per step OVERLAPS ITSELF at the top, where the spire is only
+  // two metres across, so the animal stood on shelf twenty-four with shelf
+  // twenty-five seventy-eight centimetres over its head. It could not stand up
+  // to jump. **A helix has to be checked for HEADROOM as well as for rise**,
+  // and the number that fixes both at once is the gradient: one continuous
+  // flowstone shelf at twelve degrees, three and a half turns, a hundred and
+  // fourteen metres of walking to gain twenty-four — which is what a stalagmite
+  // with a skirt on it actually looks like, and you walk up it.
   {
     const x = cavHAND.x, z = cavHAND.z;
     const base = cavTerrain(x, z);
+    const HAND_H = 24;
+    // how wide the spire is at a given height above its foot
+    const handR = function (dy) { return lerp(7.5, 1.8, clamp(dy / 25, 0, 1)); };
     for (let k = 0; k < 8; k++) {
       const t = k / 7;
-      const rr = lerp(7.5, 1.6, t);
-      M.cone(x, base + t * 24 + 2, z, rr, 7.5, k % 2 ? PALETTE.cavFlow : PALETTE.cavRockWarm, 0, k * 0.8, 0, 8);
+      M.cone(x, base + t * HAND_H + 2, z, handR(t * HAND_H), 7.5,
+             k % 2 ? PALETTE.cavFlow : PALETTE.cavRockWarm, 0, k * 0.8, 0, 8);
     }
-    cavStaticBox(game, x, base + 12, z, 7.0, 24, 7.0);
-    // the ledges: nine of them, spiralling, each a deliberate hop
-    for (let k = 0; k < 10; k++) {
-      const a = k * 1.05;
-      const rr = lerp(8.4, 3.0, k / 9);
-      const lx = x + Math.cos(a) * rr, lz = z + Math.sin(a) * rr;
-      const ly = base + 1.0 + k * 2.45;
-      M.cyl(lx, ly, lz, 2.1, 0.7, PALETTE.cavFlow, 0, 0, 0, 6);
-      cavStaticBox(game, lx, ly, lz, 3.6, 0.7, 3.6);
+    // ---- THE TRUNK, as an OCTAGON rather than as one fat box -------------
+    // Two boxes per level at forty-five degrees. A square's corners reach
+    // 1.414 of its half-width, so a box collider for a round spire is either
+    // too fat at the diagonals (walk into thin air) or too thin at the flats
+    // (walk into the rock); an octagon is 1.082, which is inside the five per
+    // cent nobody can see.
+    {
+      // ...AND EVERY LEVEL IS SIZED FROM ITS OWN TOP, not from its middle.
+      // Sized from the middle, the corner of each level is FATTER than the
+      // flank over the upper half of it — and the ramp's inner edge follows
+      // the flank exactly, so once a turn the animal walked into a corner of
+      // invisible rock and was pushed off a shelf twelve metres up. Measured:
+      // it made it a third of the way and then fell 3.2 m, which is one level.
+      let bT = cavPoolBody(game), nT = 0;
+      for (let k = 0; k < 12; k++) {
+        const y0 = k * 2.15, y1 = y0 + 2.15;
+        const rr = handR(y1) * 0.86;
+        cavPoolBox(bT, x, base + (y0 + y1) * 0.5, z, rr, 1.08, rr);
+        cavPoolBox(bT, x, base + (y0 + y1) * 0.5, z, rr, 1.08, rr, Math.PI / 4);
+        nT += 2;
+        if (nT >= 16) { cavPoolDone(game, bT); bT = cavPoolBody(game); nT = 0; }
+      }
+      cavPoolDone(game, bT);
     }
-    // the tip, which is what you are standing on when it ticks
-    M.cone(x, base + 25.4, z, 1.4, 3.2, PALETTE.cavCalcite, 0, 0, 0, 6);
-    cavStaticBox(game, x, base + 25.4, z, 2.6, 1.0, 2.6);
+    // ---- THE RAMP ---------------------------------------------------------
+    // A hundred and twenty short segments, and EVERY ONE OF THEM IS COLLIDED.
+    // The first cut collided every other one to save bodies: 1.6 m boxes 1.9 m
+    // apart along the path, so there was a thirty-centimetre hole in the floor
+    // between each pair and the animal fell off the shelf on its fourth step,
+    // measured, from a metre and a half up. **A ramp made of discrete boxes has
+    // to have the boxes OVERLAP** — at 0.95 m of chord and 1.6 m of box they
+    // overlap by two thirds, and the rise from one to the next is 0.20, which
+    // is half a capybara's step height. The whole climb is therefore WALKED and
+    // nothing about it can be missed by a hop that came up short. The shelf
+    // always sits 0.9 m proud of the flank the spire actually has at that
+    // height, so it is outside the octagon everywhere.
+    const RAMP_N = 120, RAMP_RISE = 0.20, RAMP_CHORD = 0.95;
+    let ra = 0;
+    let bL = cavPoolBody(game), nL = 0;
+    for (let k = 0; k < RAMP_N; k++) {
+      const dy = 0.5 + k * RAMP_RISE;
+      const rr = handR(dy) + 1.15;
+      const lx = x + Math.cos(ra) * rr, lz = z + Math.sin(ra) * rr;
+      M.cyl(lx, base + dy, lz, 0.88, 0.40,
+            k % 7 === 0 ? PALETTE.cavCalcite : PALETTE.cavFlow, 0, ra, 0, 6);
+      cavPoolBox(bL, lx, base + dy - 0.02, lz, 0.86, 0.20, 0.86);
+      if (++nL >= 16) { cavPoolDone(game, bL); bL = cavPoolBody(game); nL = 0; }
+      ra += RAMP_CHORD / rr;
+    }
+    cavPoolDone(game, bL);
+    // the tip, which is what you are standing on when it ticks. The ramp tops
+    // out at base + 24.3 and the tick is at base + 24, so arriving IS the
+    // task; the tip is what you climb the last step onto.
+    const tipY = base + 0.5 + (RAMP_N - 1) * RAMP_RISE + 0.36;
+    M.cone(x, tipY + 1.2, z, 1.5, 3.2, PALETTE.cavCalcite, 0, 0, 0, 6);
+    cavStaticBox(game, x, tipY, z, 2.8, 0.7, 2.8);
   }
 
   // ---- the rest of them, and there are a great many
@@ -1916,6 +2077,26 @@ function cavBuildDoline(game, root) {
   // has somewhere to LAND and the player has somewhere to stand in it. So the
   // very middle — five metres, which is the foot of the column — is left bare,
   // and nothing on the pile is more than about waist high on the animal.
+  //
+  // ...AND WHAT IS DRAWN IS WHAT IS SOLID, WHICH IT WAS NOT. The box was drawn
+  // `s * 0.44` tall and collided `s * 0.15` half-height — so a block that
+  // stood a metre and a half out of the floor was a knee-high kerb to
+  // everything in the game that reasons about the world, and to one thing in
+  // particular. MEASURED from the middle of the glade, which is the marquee:
+  // a ray from the eye to the animal was blocked at 6.5 m in ALL FOUR compass
+  // directions, by the same ring of blocks, on every yaw. systems.js pulls the
+  // boom in when a BODY is in the way and there was no body in the way — the
+  // clearance ray sailed over a 0.6 m collider and the 1.6 m mesh it belonged
+  // to filled the frame. The one shot the whole chapter is for was a
+  // photograph of a rock.
+  //
+  // Not by making them all tall and solid: forty-four full-height blocks in a
+  // three-hundred-square-metre annulus is a wall round the glade, which is
+  // the failure this note is already about. So the pile is what the comment
+  // has always claimed it was — LOW rubble you scuff over, drawn at exactly
+  // the height it is collided at — and the silhouettes come from nine proper
+  // boulders out at the RIM, which are solid, are worth going round, and are
+  // behind the camera rather than between it and the animal.
   let bR = cavPoolBody(game), nR = 0;
   for (let i = 0; i < 44; i++) {
     const a = rand(0, 6.283), rr = 5 + Math.sqrt(Math.random()) * (GLADE - 1);
@@ -1923,13 +2104,13 @@ function cavBuildDoline(game, root) {
     const h = cavTerrain(x, z);
     const s = lerp(3.6, 1.4, (rr - 5) / (GLADE - 1)) * rand(0.7, 1.2);
     const ry = rand(0, 3.14), tilt = rand(-0.16, 0.16);
-    M.box(x, h + s * 0.17, z, s * 1.25, s * 0.44, s * 1.05,
+    M.box(x, h + s * 0.15, z, s * 1.25, s * 0.30, s * 1.05,
           i % 3 ? PALETTE.cavRock : PALETTE.cavRockDk, tilt, ry, rand(-0.14, 0.14));
     // ...and the top of it is green, because that is the one surface in a
     // hundred and seventy metres of mountain with the sky over it. In PATCHES:
     // one green slab the size of the whole block is a snooker table.
     for (let k = 0; k < 3; k++) {
-      M.box(x + Math.cos(k * 2.1 + i) * s * 0.32, h + s * 0.375,
+      M.box(x + Math.cos(k * 2.1 + i) * s * 0.32, h + s * 0.285,
             z + Math.sin(k * 2.1 + i) * s * 0.28,
             s * rand(0.16, 0.34), s * 0.06, s * rand(0.16, 0.34),
             (i + k) % 3 ? PALETTE.cavPhyto : PALETTE.cavJungleDk, tilt, ry + k, 0);
@@ -1940,6 +2121,29 @@ function cavBuildDoline(game, root) {
     if (++nR >= 16) { cavPoolDone(game, bR); bR = cavPoolBody(game); nR = 0; }
   }
   cavPoolDone(game, bR);
+  // ---- AND NINE PROPER BOULDERS, OUT AT THE RIM -------------------------
+  // The silhouettes the pile was supposed to give and cannot any more, put
+  // where they cost the marquee nothing: outside the boom, at the foot of the
+  // wood, drawn and collided at the SAME height, and big enough that going
+  // round one is a decision. This is the whole of the solid-or-drawn rule in
+  // eight lines — if it is taller than the animal it is a thing, and a thing
+  // is made of rock.
+  {
+    const bB = cavPoolBody(game);
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * 6.283 + 0.4, rr = GLADE + 2.4 + rand(0, 5.5);
+      const x = D.x + Math.cos(a) * rr, z = D.z + Math.sin(a) * rr * 0.9;
+      const h = cavTerrain(x, z);
+      const w = rand(3.0, 5.2), hh = rand(1.9, 3.4);
+      const ry = rand(0, 3.14);
+      M.box(x, h + hh * 0.5, z, w, hh, w * rand(0.7, 1.0),
+            i % 3 ? PALETTE.cavRock : PALETTE.cavRockDk, rand(-0.10, 0.10), ry, rand(-0.10, 0.10));
+      M.box(x + Math.cos(ry) * w * 0.2, h + hh * 0.94, z + Math.sin(ry) * w * 0.2,
+            w * 0.42, hh * 0.10, w * 0.34, PALETTE.cavPhyto, 0, ry, 0);
+      cavPoolBox(bB, x, h + hh * 0.5, z, w * 0.42, hh * 0.5, w * 0.36, ry);
+    }
+    cavPoolDone(game, bB);
+  }
   // ferns and the phytokarst itself — the green film on the rock, and it is
   // combed toward the light like a lawn somebody has mown one way.
   // SMALL IN THE GLADE. At 1.4 m across and 2.6 m tall these are the size of
@@ -1974,6 +2178,318 @@ function cavBuildDoline(game, root) {
     cavMist.renderOrder = 5;
     cavMist.frustumCulled = false;
     root.add(cavMist);
+  }
+
+  cavBuildShaftLife(root);
+  cavBuildPhyto(game, root);
+}
+
+/** See cavPHY_N. A field of rock fins, all of them pointed at the hole. */
+function cavBuildPhyto(game, root) {
+  const P = cavPHYTO, D = cavDOLINE;
+  // ---- one blade, built once, instanced a hundred times ------------------
+  // A metre tall and unit-scaled, so every instance is a scale and a rotation.
+  // The GREEN IS A SKIN ON ONE FACE, not a tint on the whole fin: that is the
+  // entire visual fact about phytokarst and it is what makes the field read as
+  // a direction rather than as a patch of moss. Walk round it and it goes grey.
+  const M = cavMerger();
+  // ...AND THE BACK OF IT IS STONE, NOT A HOLE. In an ambient of 0.11 a fin
+  // in cavRockDk photographs as a black slab, and a hundred black slabs in the
+  // one lit room in the chapter is a field of missing polygons. The unlit side
+  // of a blade is limestone with no algae on it: pale, and it is the CONTRAST
+  // with the green face that carries the read, not the darkness of the back.
+  M.box(0, 0.50, 0, 0.17, 1.00, 0.86, PALETTE.cavRock);
+  M.box(0, 0.62, 0.16, 0.13, 0.74, 0.62, PALETTE.cavRockWarm, 0, 0, 0.06);
+  // the lit face
+  M.box(0, 0.52, 0.45, 0.145, 0.94, 0.055, PALETTE.cavPhyto);
+  M.box(0, 0.88, 0.42, 0.115, 0.30, 0.075, PALETTE.cavFern);
+  // and the comb along the top edge, which is what a blade actually looks
+  // like close to: it is dissolving, so it is serrated
+  for (let k = 0; k < 3; k++) {
+    M.cone(0, 1.02 + 0.05, (k - 1) * 0.26, 0.075, 0.20, PALETTE.cavPhyto, 0, 0, 0.22, 4);
+  }
+  cavPhyBlades = new THREE.InstancedMesh(M.build(), cavVC(), cavPHY_N);
+  cavPhyBlades.castShadow = true;
+  cavPhyBlades.receiveShadow = true;
+  cavPhyBlades.frustumCulled = false;
+  cavPhyD = new Float32Array(cavPHY_N * 6);   // x, y, z, yaw, scale, phase
+  let n = 0;
+  let bP = cavPoolBody(game), nP = 0;
+  for (let i = 0; i < cavPHY_N * 3 && n < cavPHY_N; i++) {
+    // an oval patch on the rim, longer along the passage than across it
+    const a = rand(0, 6.283), rr = Math.sqrt(Math.random());
+    const x = P.x + Math.cos(a) * rr * 13, z = P.z + Math.sin(a) * rr * 9;
+    if (cavIsOverWater(x, z)) continue;
+    const h = cavTerrain(x, z);
+    // WHICH WAY THE LIGHT IS. Every blade points its green face at the middle
+    // of the hole, and the further from the light it is the harder it leans —
+    // which is both what a plant does and the reason the field reads as an
+    // arrow when you are standing in the middle of it.
+    const yaw = Math.atan2(D.x - x, D.z - z);
+    const far = clamp(Math.hypot(D.x - x, D.z - z) / 34, 0, 1);
+    const o = n * 6;
+    cavPhyD[o] = x; cavPhyD[o + 1] = h; cavPhyD[o + 2] = z;
+    cavPhyD[o + 3] = yaw;
+    // KNEE HIGH, WITH A FEW OVER. Measured from the rig at the first cut
+    // (0.35–1.15 m) the field photographed as green confetti lying on the
+    // floor — the flat-mark failure again, because a blade seen from forty
+    // degrees up is only a blade if it is TALL enough to present its face. A
+    // capybara is about 0.6 m at the shoulder, so the field runs from half
+    // that to three times it and every eighth one is a proper fin.
+    cavPhyD[o + 4] = (n % 8 === 0 ? rand(1.5, 2.2) : rand(0.5, 1.35)) * (1 - far * 0.22);
+    cavPhyD[o + 5] = rand(0, 6.283);
+    n++;
+    // the tall ones are solid, because a rock fin you walk through is a rock
+    // fin that is not made of rock
+    if (cavPhyD[o + 4] > 0.95) {
+      cavPoolBox(bP, x, h + cavPhyD[o + 4] * 0.5, z, 0.30, cavPhyD[o + 4] * 0.5, 0.46);
+      if (++nP >= 16) { cavPoolDone(game, bP); bP = cavPoolBody(game); nP = 0; }
+    }
+  }
+  cavPoolDone(game, bP);
+  cavPhyBlades.count = n;
+  // WRITTEN ONCE, HERE. cavUpdatePhyto only touches the matrices while the
+  // field is actually moving (it is a garden; it holds still), so a field that
+  // has never been shouted at has to arrive already standing up.
+  for (let i = 0; i < n; i++) {
+    const o = i * 6;
+    const s = cavPhyD[o + 4];
+    cavM.compose(cavV3.set(cavPhyD[o], cavPhyD[o + 1], cavPhyD[o + 2]),
+                 cavQ.setFromEuler(cavE.set(-0.10, cavPhyD[o + 3], 0, 'YXZ')),
+                 cavSc.set(s, s, s));
+    cavPhyBlades.setMatrixAt(i, cavM);
+  }
+  cavPhyBlades.instanceMatrix.needsUpdate = true;
+  root.add(cavPhyBlades);
+
+  // ---- AND IT LETS GO OF SOMETHING WHEN YOU SHOUT AT IT ------------------
+  // A pressure wave off a shelf of damp algae puts a cloud of spores in the
+  // air; the drips, the crickets, the dust in the shaft and the fish in the
+  // river are all already written to that rule, and this is the fifth. It is
+  // the payoff for the one task in the chapter that had none — and because
+  // spores are pale and the echo is a real light, the cloud is lit by the
+  // shout that made it and by nothing else.
+  {
+    const S = cavMerger();
+    S.box(0, 0, 0, 0.10, 0.10, 0.10, PALETTE.cavPhyto);
+    cavSpores = new THREE.InstancedMesh(S.build(), cavGlow(PALETTE.cavFern, 0.55, 0.85), cavSPORE_N);
+    cavSpores.frustumCulled = false;
+    cavSpores.visible = false;
+    cavSporeD = new Float32Array(cavSPORE_N * 7);   // x,y,z, vx,vy,vz, t
+    for (let i = 0; i < cavSPORE_N; i++) cavSporeD[i * 7 + 6] = 1e9;
+    root.add(cavSpores);
+  }
+}
+
+/** The garden, on the frame clock. Still unless something disturbs it. */
+function cavUpdatePhyto(dt) {
+  if (!cavPhyBlades) return;
+  const had = cavPhyShake;
+  cavPhyShake = damp(cavPhyShake, 0, 1.1, dt);
+  // NOTHING IS WRITTEN WHILE IT IS STILL. A hundred instance matrices a frame
+  // for a field of rock that is not moving is the whole cost of this feature
+  // paid every frame for nothing; it is a garden, and a garden holds still.
+  if (had > 0.004 || cavPhyShake > 0.004) {
+    const k = cavPhyShake;
+    for (let i = 0; i < cavPhyBlades.count; i++) {
+      const o = i * 6;
+      const s = cavPhyD[o + 4];
+      const w = Math.sin(cavTime * 17 + cavPhyD[o + 5]) * k * 0.16;
+      cavM.compose(cavV3.set(cavPhyD[o], cavPhyD[o + 1], cavPhyD[o + 2]),
+                   cavQ.setFromEuler(cavE.set(-0.10 - k * 0.05, cavPhyD[o + 3], w, 'YXZ')),
+                   cavSc.set(s, s, s));
+      cavPhyBlades.setMatrixAt(i, cavM);
+    }
+    cavPhyBlades.instanceMatrix.needsUpdate = true;
+  }
+  if (!cavSpores) return;
+  let live = 0;
+  for (let i = 0; i < cavSPORE_N; i++) {
+    const o = i * 7;
+    if (cavSporeD[o + 6] > 4.2) continue;
+    cavSporeD[o + 6] += dt;
+    // they do not fall, they HANG — a spore is lighter than the air it is in
+    // and this is a cave with a draught through it
+    cavSporeD[o + 3] *= 1 - Math.min(1, 1.7 * dt);
+    cavSporeD[o + 5] *= 1 - Math.min(1, 1.7 * dt);
+    cavSporeD[o] += cavSporeD[o + 3] * dt;
+    cavSporeD[o + 1] += cavSporeD[o + 4] * dt;
+    cavSporeD[o + 2] += cavSporeD[o + 5] * dt;
+    cavSporeD[o + 4] = damp(cavSporeD[o + 4], 0.16, 1.2, dt);
+    const t = cavSporeD[o + 6];
+    const sc = clamp(t / 0.25, 0, 1) * clamp((4.2 - t) / 1.6, 0, 1);
+    cavM.compose(cavV3.set(cavSporeD[o], cavSporeD[o + 1], cavSporeD[o + 2]),
+                 cavQ.setFromEuler(cavE.set(t * 1.4, t * 0.9, 0)),
+                 cavSc.set(sc, sc, sc));
+    cavSpores.setMatrixAt(i, cavM);
+    live++;
+  }
+  if (live > 0) {
+    cavSpores.visible = true;
+    cavSpores.instanceMatrix.needsUpdate = true;
+  } else if (cavSpores.visible) {
+    cavSpores.visible = false;
+  }
+}
+
+/** Put a cloud of spores in the air over the garden. See cavBuildPhyto. */
+function cavPuffSpores(x, z) {
+  if (!cavSporeD) return;
+  let n = 0;
+  for (let i = 0; i < cavSPORE_N && n < 26; i++) {
+    const o = i * 7;
+    if (cavSporeD[o + 6] < 4.2) continue;
+    const a = rand(0, 6.283), rr = Math.sqrt(Math.random()) * 7;
+    cavSporeD[o] = x + Math.cos(a) * rr;
+    cavSporeD[o + 1] = cavTerrain(x + Math.cos(a) * rr, z + Math.sin(a) * rr) + rand(0.15, 1.1);
+    cavSporeD[o + 2] = z + Math.sin(a) * rr;
+    cavSporeD[o + 3] = rand(-1.1, 1.1);
+    cavSporeD[o + 4] = rand(0.5, 1.6);
+    cavSporeD[o + 5] = rand(-1.1, 1.1);
+    cavSporeD[o + 6] = -rand(0, 0.22);       // a stagger, so it is a cloud
+    n++;
+  }
+}
+
+/**
+ * WHAT IS ACTUALLY IN A TWO-HUNDRED-METRE COLUMN OF DAYLIGHT.
+ *
+ * Two things, and both of them are silhouettes — which is the only kind of
+ * detail that survives being drawn against the brightest surface in the
+ * chapter. A lit object in front of a lit disc is a smudge; a dark one is a
+ * shape, and there is nothing else in a hundred and seventy metres of mountain
+ * that gets to be a shape against anything.
+ *
+ *   THE SWIFTS. Not the swiftlets — those live at the far end in the dark and
+ *     navigate on clicks. These are the ones that use the hole: they come in
+ *     over the rim, drop the whole two hundred metres in a spiral inside the
+ *     column, and go out again. It is the one thing that gives the shaft a
+ *     SIZE, because a bird you can barely see at the top is the same bird you
+ *     can count the wings on by the time it reaches the floor.
+ *
+ *   THE FALL. A forest grows round the rim of a collapse doline and everything
+ *     it drops comes down the hole. From underneath that is a slow, sparse,
+ *     endless drift of leaves through the beam, and it is the single cheapest
+ *     way of saying that the bright thing overhead is an OPENING and not a
+ *     lamp. They tumble (a leaf falls edge-over-edge, not like a stone) and
+ *     they take the better part of a minute, because two hundred metres is a
+ *     very long way and the whole point is that you have time to watch one.
+ *
+ * Neither is collided, neither makes a sound and neither is on any list. They
+ * are two instanced meshes and they exist to be looked at.
+ */
+function cavBuildShaftLife(root) {
+  const D = cavDOLINE;
+  const floor = cavTerrain(D.x, D.z);
+  // ---- the swifts --------------------------------------------------------
+  {
+    const M = cavMerger();
+    // A DART AND TWO SWEPT WINGS. A swift's silhouette is the most recognisable
+    // in the air and it is entirely in the wings: back-swept, thin, and much
+    // longer than the body. Twelve triangles.
+    M.box(0, 0, 0, 0.16, 0.14, 0.62, PALETTE.cavRockDk);
+    for (let s = -1; s <= 1; s += 2) {
+      M.box(s * 0.48, 0.02, -0.10, 0.86, 0.045, 0.20, PALETTE.cavRockDk, 0, s * 0.62, 0);
+    }
+    M.box(0, 0.01, -0.42, 0.20, 0.04, 0.26, PALETTE.cavRockDk);
+    cavSwirl = new THREE.InstancedMesh(M.build(), cavVC(), cavSWIRL_N);
+    cavSwirl.frustumCulled = false;
+    cavSwirlPh = new Float32Array(cavSWIRL_N * 3);
+    for (let i = 0; i < cavSWIRL_N; i++) {
+      cavSwirlPh[i * 3] = Math.random();               // where round the drop it is
+      cavSwirlPh[i * 3 + 1] = rand(0.055, 0.098);      // how fast it falls, 0..1/s
+      cavSwirlPh[i * 3 + 2] = rand(0, 6.283);          // ...and which way round
+    }
+    root.add(cavSwirl);
+  }
+  // ---- and the litter coming down the hole -------------------------------
+  {
+    const M = cavMerger();
+    M.box(0, 0, 0, 0.40, 0.02, 0.62, PALETTE.cavJungleLt);
+    cavFallLeaf = new THREE.InstancedMesh(M.build(), cavVC(), cavFALL_N);
+    cavFallLeaf.frustumCulled = false;
+    cavFallLeafD = new Float32Array(cavFALL_N * 5);
+    for (let i = 0; i < cavFALL_N; i++) {
+      const o = i * 5;
+      const a = rand(0, 6.283), rr = Math.sqrt(Math.random()) * D.r * 0.80;
+      cavFallLeafD[o] = D.x + Math.cos(a) * rr;
+      cavFallLeafD[o + 1] = floor + Math.random() * 200;   // seeded up the column
+      cavFallLeafD[o + 2] = D.z + Math.sin(a) * rr * 0.9;
+      cavFallLeafD[o + 3] = rand(2.6, 5.4);                // m/s down
+      cavFallLeafD[o + 4] = rand(0, 6.283);                // tumble phase
+    }
+    root.add(cavFallLeaf);
+  }
+}
+
+/**
+ * The column, on the frame clock. Nothing here is rationed by distance because
+ * the doline is a hundred and forty metres across and the whole point of both
+ * populations is that they are visible from outside it.
+ */
+function cavUpdateShaftLife(dt) {
+  const D = cavDOLINE;
+  const floor = cavTerrain(D.x, D.z);
+  if (cavSwirl) {
+    for (let i = 0; i < cavSWIRL_N; i++) {
+      const o = i * 3;
+      cavSwirlPh[o] += cavSwirlPh[o + 1] * dt;
+      if (cavSwirlPh[o] > 1) cavSwirlPh[o] -= 1;
+      const u = cavSwirlPh[o];
+      // down the column, and the spiral tightens as it comes: a bird arriving
+      // through a hole a hundred and forty metres across is nowhere near the
+      // middle at the top and is threading the trees by the bottom
+      // ...AND THEY COME DOWN TO HEAD HEIGHT. At floor + 10 the whole flight
+      // was ten metres over the animal, and with the crane the top of the
+      // frame is only thirteen degrees above horizontal — so from inside the
+      // glade the birds were above the picture for every metre of the drop.
+      // A swift that has come in through the hole finishes by THREADING THE
+      // TREES, which is both what they do and the only part of the flight
+      // anybody standing underneath was ever going to see.
+      const y = lerp(196, floor + 3.4, u);
+      const turns = 3.4;
+      const a = cavSwirlPh[o + 2] + u * turns * Math.PI * 2;
+      const rr = lerp(D.r * 1.05, 5.5, cavSmooth(u));
+      const x = D.x + Math.cos(a) * rr;
+      const z = D.z + Math.sin(a) * rr * 0.9;
+      // the tangent of that spiral IS the heading, and the bank is how hard it
+      // is turning — which at the bottom, on a five-metre radius, is hard over
+      const yaw = a + Math.PI * 0.5;
+      const bank = -lerp(0.35, 1.15, cavSmooth(u));
+      // ...and it FADES IN rather than popping: the last tenth of the drop is
+      // spent leaving under the rim, so it is smallest exactly where it appears
+      const sc = lerp(0.7, 1.25, cavSmooth(u)) * clamp(Math.min(u, 1 - u) / 0.07, 0.06, 1);
+      cavM.compose(cavV3.set(x, y, z),
+                   cavQ.setFromEuler(cavE.set(0.18, yaw, bank, 'YXZ')),
+                   cavSc.set(sc, sc, sc));
+      cavSwirl.setMatrixAt(i, cavM);
+    }
+    cavSwirl.instanceMatrix.needsUpdate = true;
+  }
+  if (cavFallLeaf) {
+    for (let i = 0; i < cavFALL_N; i++) {
+      const o = i * 5;
+      cavFallLeafD[o + 1] -= cavFallLeafD[o + 3] * dt;
+      cavFallLeafD[o + 4] += dt * (1.4 + (i % 5) * 0.4);
+      // it does not fall straight: a leaf slips sideways on every flip, which
+      // is why one takes so long to come down
+      const ph = cavFallLeafD[o + 4];
+      const x = cavFallLeafD[o] + Math.sin(ph * 0.62) * 3.4;
+      const z = cavFallLeafD[o + 2] + Math.cos(ph * 0.47) * 3.0;
+      if (cavFallLeafD[o + 1] < floor + 0.3) {
+        // back up the hole. A leaf that lands is litter; there is already
+        // litter on that floor and none of it needs to be an instance.
+        const a = rand(0, 6.283), rr = Math.sqrt(Math.random()) * D.r * 0.80;
+        cavFallLeafD[o] = D.x + Math.cos(a) * rr;
+        cavFallLeafD[o + 1] = floor + rand(150, 205);
+        cavFallLeafD[o + 2] = D.z + Math.sin(a) * rr * 0.9;
+      }
+      cavM.compose(cavV3.set(x, cavFallLeafD[o + 1], z),
+                   cavQ.setFromEuler(cavE.set(ph, ph * 0.31, ph * 0.7)),
+                   cavSc.set(1, 1, 1));
+      cavFallLeaf.setMatrixAt(i, cavM);
+    }
+    cavFallLeaf.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -2485,6 +3001,49 @@ function cavBuildCamp(game, root) {
     }
     return rec;
   };
+  // =========================================================================
+  // ...AND THEY KNOW WHAT YOU HAVE DONE.
+  //
+  // Seven people, ninety-odd sentences between them, and for the chapter's
+  // whole life every one of those sentences was true on the first frame and
+  // true on the last. The man at the entrance says "shout if you get lost, it
+  // is not a joke, it is the method" whether you have never made a noise in
+  // your life or have just put ninety swiftlets off a wall with it. The
+  // surveyor at the far end says "do not take the pearls, everybody takes the
+  // pearls" — and then you take one, in front of him, and he says it again.
+  //
+  // npc.js has had the whole apparatus since v20 and this chapter used none of
+  // it: a line may be `{ t, after: 'task-id' }` or `{ t, before: ... }` or
+  // `{ t, when: fn }`; a person may carry `onTask` (what they say about a
+  // specific thing you just did in front of them) and `praise` (their general
+  // opinion); and the four reaction pools — startled, thief, rush, splash —
+  // fall back on a deliberately chapter-neutral default that includes "Do you
+  // mind?" and "Somebody is in a hurry", which are lines for a market square
+  // and not for six people in the dark two kilometres inside a mountain.
+  //
+  // THE RULE FOR ALL OF IT: a caver is not a shopkeeper. Nobody down here is
+  // offended by anything, because being startled underground is a thing that
+  // happens forty times a day and everyone present has already agreed that
+  // the capybara is the least strange thing about the situation.
+  // =========================================================================
+  const CAVE_STARTLED = ['Rock. That is just rock.', 'Everything does that in here.',
+                         'Sound like that, you count to two and then you worry.',
+                         'Fine. It is fine. It is all fine.',
+                         'That was you, was it. Good.', 'Ah — that is a big one.'];
+  const CAVE_SPLASH   = ['That is going to Laos.', 'Gone. That is the sump, that is.',
+                         'It will come out somewhere. They usually do.',
+                         'Eighty metres down and it is still going.',
+                         'Do not go in after it.'];
+  const CAVE_THIEF    = ['Take it. Nothing in here is anybody’s.',
+                         'That has been growing since before the Romans, but go on.',
+                         'Oh, we are doing that, are we.',
+                         'Put it back. — you are not going to put it back.',
+                         'Every single person. Every one.'];
+  const CAVE_RUSH     = ['Walk! It is all holes!', 'Nobody runs in here. Nobody.',
+                         'That is how people end up in the river.',
+                         'Where. Where is it going.',
+                         'Slow. Slow is fast in here.'];
+
   // 1 & 2 — the camp, under the hole
   put(cx + 3.4, cz + 4.0, {
     face: 2.4, kit: 'survey',
@@ -2494,10 +3053,33 @@ function cavBuildCamp(game, root) {
             'That hole is a hundred and forty metres across. Look up.',
             'Everything you can see grew because the roof fell in. Everything.',
             'Nobody knew this was here until 2009. A man went in for the shade.',
-            'The far end has weather. Actual weather. There is a cloud in there.'],
+            'The far end has weather. Actual weather. There is a cloud in there.',
+            // ...and what he says depends on how far you have got, which is the
+            // whole point of a man with a survey book: he is keeping score.
+            { t: 'You came down the passage in the dark. On your own. Right.',
+              after: 'first-echo' },
+            { t: 'Nobody has been over that wall in four days. Well. Three now.',
+              after: 'great-wall' },
+            { t: 'Two hundred and twenty metres of passage past that wall. It goes on.',
+              before: 'great-wall' },
+            { t: 'You have been in the river. I can hear you dripping.',
+              after: 'cave-river' },
+            { t: 'When you get out the other end — and you will — tell them it is bigger.',
+              after: 'the-doline' }],
     wheek: ['Hear that? Count it. Two seconds is a hundred metres of room.',
             'That is the loudest thing in this cave and it is a rodent.',
             'Nothing came back. You are standing under the hole — it went out.'],
+    onTask: {
+      'the-doline': ['There. That is the face everybody makes.',
+                     'Everyone stops there. Everyone. Nobody has ever not.'],
+      'great-wall': ['Over the Wall. Under two minutes, was it? Do not tell the porters.'],
+      'hand-of-dog': ['You have been up the Hand. Nothing has been up the Hand.'],
+      'phytokarst': ['That is rock. That is rock GROWING. Nobody believes me either.'],
+    },
+    praise: ['Noted. It all goes in the book.',
+             'I am writing that down. I am not sure how.',
+             'Right. Yes. That is new.'],
+    startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
   put(cx - 1.4, cz - 5.4, {
     face: 1.0, kit: 'pot',
@@ -2505,10 +3087,29 @@ function cavBuildCamp(game, root) {
     lines: ['Boil it. Everything. Even in here. Especially in here.',
             'Twenty of us carried this camp in. I carried the stove.',
             'Sleep with your boots inside the tent. Crickets.',
-            'Dinner is at whatever o\'clock it is. There is no o\'clock.',
-            'Do not eat anything green in here. It has never seen the sun properly.'],
+            'Dinner is at whatever o’clock it is. There is no o’clock.',
+            'Do not eat anything green in here. It has never seen the sun properly.',
+            { t: 'You are wet. Sit by the stove. No — sit by the stove.',
+              after: 'cave-river' },
+            { t: 'There is a wall down there. When you have done it, come back and eat.',
+              before: 'great-wall' },
+            { t: 'Sit down. You have earned a sit down. That is my professional opinion.',
+              after: 'great-wall' }],
     wheek: ['If you are going to do that, do it at the wall. It is worth it.',
             'You will have every swiftlet at the far end awake. Good.'],
+    onTask: {
+      'cave-river': ['In the river. In THIS river. Get by the stove.'],
+      'cave-pearl': ['I did not see that and I am not going to have seen it.'],
+      'the-log': ['You RODE it. It goes to the sump, you know. It goes to the sump.'],
+    },
+    praise: ['Good. Eat something.', 'Lovely. Now eat something.',
+             'That is very good and you still have not eaten.'],
+    startled: ['That is my pan.', 'It is a cave. Things fall over in it.',
+               'Fine. Nothing was in it.', 'Ah well.'],
+    splash: CAVE_SPLASH,
+    thief: ['That was going to be dinner.', 'Take it. There is more. There is always more.',
+            'Oh, help yourself, honestly.'],
+    rush: CAVE_RUSH,
   }, true);
   // 3 — the rope man at the entrance, where the daylight stops
   put(12, 33, {
@@ -2516,11 +3117,35 @@ function cavBuildCamp(game, root) {
     figure: { shirt: PALETTE.cavTent, hat: PALETTE.cavRockDk, legs: PALETTE.cavRockDk },
     lines: ['Rope is good. Rope is always good. That is my whole job.',
             'From here it is dark for four hundred metres. Genuinely dark.',
-            'Shout if you get lost. It is not a joke, it is the method.',
             'Eighty metres down and the river is still going. It started somewhere.',
-            'Everybody stops here. Everybody. Then they go anyway.'],
+            'Everybody stops here. Everybody. Then they go anyway.',
+            // BEFORE you have worked out what the voice is for, this is the
+            // instruction. After, it is a compliment — the same man, the same
+            // subject, and the difference between them is the whole chapter.
+            { t: 'Shout if you get lost. It is not a joke, it is the method.',
+              before: 'first-echo' },
+            { t: 'Make a noise and wait. That is all it is. That is the whole trick.',
+              before: 'first-echo' },
+            { t: 'You have got the hang of the shouting, then. That is the hard part done.',
+              after: 'first-echo' },
+            { t: 'Follow the little blue lights. They are only ever over water.',
+              before: 'glow-trail' },
+            { t: 'You found the river. Everything in here follows the river.',
+              after: 'glow-trail' },
+            { t: 'On your way back out, you will not believe how bright this is.',
+              after: 'the-doline' }],
     wheek: ['THAT is the idea. Do it every ten steps and you will not fall in anything.',
             'Count the gap. That is how far away the next thing you can hit is.'],
+    onTask: {
+      'first-echo': ['There. Now you can see. That is the only lesson I have got.',
+                     'Two seconds is a hundred metres. Now you have an instrument.'],
+      'glow-trail': ['Told you. Blue lights, water, every time.'],
+    },
+    praise: ['That is one way of doing it.', 'Rope would have been easier.',
+             'You are not going to use the rope at all, are you.'],
+    startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF,
+    rush: ['Walk! It is all holes!', 'You have got no rope on!',
+           'Nobody runs in here. Nobody.'],
   }, false);
   // 4 — the porter at the boulder choke, who is not carrying anything at the
   //     moment and would like that noted
@@ -2529,11 +3154,25 @@ function cavBuildCamp(game, root) {
     figure: { shirt: PALETTE.cavJungle, legs: PALETTE.cavRockWarm },
     lines: ['Forty kilos over that. Twice. Today.',
             'It is warmer in here than outside. Everybody is surprised by that.',
-            'There is a wall up ahead. You will hear it before you see it.',
             'The ones with the cameras go first. We go with the cameras.',
-            'Up the flowstone at the side. Never up the middle. Ever.'],
+            'Up the flowstone at the side. Never up the middle. Ever.',
+            { t: 'There is a wall up ahead. You will hear it before you see it.',
+              before: 'great-wall' },
+            { t: 'Seventy metres of it. And you went straight up the middle, did you.',
+              after: 'great-wall' },
+            { t: 'The rock that leans — back that way, on the rim. Shout at it.',
+              before: 'phytokarst' }],
     wheek: ['Ha! Wait for it. Wait — there.',
             'Two and a bit. That is a very long way to the far side.'],
+    onTask: {
+      'great-wall': ['Straight up the middle. I said never up the middle.',
+                     'Forty kilos, that wall. You did it with nothing on your back.'],
+      'the-log': ['You got ON it? We use those to find out where the water goes.'],
+    },
+    praise: ['Carry something next time.',
+             'Very good. Now do it with a stove on your back.',
+             'You make it look easy. It is not easy.'],
+    startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, false);
   // 5 — the one at the far end who has been counting things
   put(-24, -136, {
@@ -2541,11 +3180,31 @@ function cavBuildCamp(game, root) {
     figure: { shirt: PALETTE.cavTentB, hat: PALETTE.cavTent, legs: PALETTE.cavRockDk },
     lines: ['Nine hundred metres of survey and I have three days of it left.',
             'The fish has no eyes and no pigment. It has never needed either.',
-            'Do not take the pearls. Everybody takes the pearls.',
             'Keep going that way. There is a slot, and there is daylight in it.',
-            'The nests on that wall are worth more per kilo than I am.'],
+            'The nests on that wall are worth more per kilo than I am.',
+            // The best line in the chapter, and it was said in both directions.
+            { t: 'Do not take the pearls. Everybody takes the pearls.',
+              before: 'cave-pearl' },
+            { t: 'There is a gap in that pool now. I am not going to say anything.',
+              after: 'cave-pearl' },
+            { t: 'Something lives in that water and it has never seen anything. Ever.',
+              before: 'blind-fish' },
+            { t: 'You found it, then. Four million years and it still bolts.',
+              after: 'blind-fish' },
+            { t: 'Ninety of them on that wall. I count them twice and get two numbers.',
+              before: 'swiftlets' }],
     wheek: ['The whole roost. Every time. I have stopped flinching.',
             'They answer, you know. Listen — clicks. They are doing what you are doing.'],
+    onTask: {
+      'cave-pearl': ['Everybody. Takes. The pearls.',
+                     'I said. I said it out loud, to your face, with my mouth.'],
+      'swiftlets': ['Well, now I have to count them again. Thank you.',
+                    'Ninety. It was ninety. Now it is a cloud.'],
+      'blind-fish': ['It has no idea what you are. It has no idea what anything is.'],
+    },
+    praise: ['That is not in the survey.', 'I have no column for that.',
+             'Right. Yes. I will put it under “other”.'],
+    startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
   // ---- 6 & 7 — AND TWO MORE, IN THE TWO PLACES THAT HAD NOBODY -----------
   // Five people over a hundred and seventy metres, and the two biggest rooms
@@ -2561,9 +3220,28 @@ function cavBuildCamp(game, root) {
     lines: ['Thirty seconds at f/8 and it still comes out looking like a lie.',
             'It moves. Eleven in the morning it is on the far bank, and then it goes.',
             'Do not walk through it. — no, do. Walk through it. Slowly.',
-            'You cannot photograph a size. That is the entire problem with this place.'],
+            'You cannot photograph a size. That is the entire problem with this place.',
+            'Watch the leaves. They come all the way down. It takes about a minute.',
+            'The birds come in over the rim and drop the whole two hundred metres.',
+            { t: 'Stand in it. Go on. I need something in the frame for scale.',
+              before: 'the-doline' },
+            { t: 'You are in every one of the last forty of those. You are the scale.',
+              after: 'the-doline' }],
     wheek: ['Perfect. Hold that. Hold — no, you moved. It is fine.',
             'Nothing came back at all, did it. It all went straight up the hole.'],
+    onTask: {
+      'the-doline': ['Got it. I have got it. Do not move — no, that is it, that is the one.',
+                     'Eleven days I have been waiting for something to stand in that.'],
+      'phytokarst': ['The green rock! Yes! Nobody ever photographs the green rock.'],
+    },
+    praise: ['Hold still — no. Gone.', 'That would have been a lovely picture.',
+             'I got about a third of that.'],
+    startled: ['Oh — thirty second exposure. That is thirty seconds of you.',
+               'It is fine. It is all digital. It is fine.',
+               'Well, that is that one ruined.'],
+    splash: CAVE_SPLASH, thief: CAVE_THIEF,
+    rush: ['Do not — the tripod —', 'You are a blur. You are a lovely brown blur.',
+           'Slower! Slower is a photograph!'],
   }, false);
   // 7 — the one at the slot, who has been out and come back in, and is the
   //     only person in the chapter who knows what is on the other side
@@ -2573,9 +3251,17 @@ function cavBuildCamp(game, root) {
     lines: ['That is the way out. Ninety metres of ladder and then a hillside.',
             'You feel the draught? That is the mountain breathing out. All day.',
             'Everything green in here is pointed at that hole. Look at it. Everything.',
-            'Six days in the dark and then a gap you could drive a bus through.'],
+            'Six days in the dark and then a gap you could drive a bus through.',
+            'Two more days and I go out through there and I do not come back in.',
+            { t: 'You have not been under the roof-hole yet. Go back. Genuinely, go back.',
+              before: 'the-doline' },
+            { t: 'You stood under the hole. Then you have seen it. That is the cave.',
+              after: 'the-doline' }],
     wheek: ['Straight out. No echo at all that way. That is how you know it is open.',
             'Save it. There is nothing left in here to shout at.'],
+    praise: ['You are nearly out, you know.', 'Take it with you. Whatever it was.',
+             'Do that outside. It is better outside.'],
+    startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
 }
 
@@ -2915,6 +3601,24 @@ function cavWheek(game) {
   // ---- and the dust in the shaft is blown about, which is what a pressure
   //      wave does to dust ---------------------------------------------------
   if (cavInZone('doline', cavEchoX, cavEchoZ)) cavMoteStir = 1;
+  // ---- AND THE GARDEN LETS GO -------------------------------------------
+  // See cavBuildPhyto. The one line on this card that had no object behind it
+  // now has an object AND a verb: a shout over a shelf of damp algae puts a
+  // cloud of spores in the air, and because the echo is a real point light the
+  // cloud is lit by the noise that made it. The blades themselves do not turn
+  // — rock does not — and the joke is that they do not have to: every one of
+  // them is already pointing at the light, and for two seconds you are it.
+  if (cavInZone('phyto', cavEchoX, cavEchoZ)) {
+    cavPhyShake = 1;
+    cavPuffSpores(cavEchoX, cavEchoZ);
+    cavSfx.volume = 0.16; cavSfx.pitch = 2.9;
+    game.sfx('rustle', cavSfx);
+    if (!cavPhyDone) {
+      cavPhyDone = true;
+      cavTask(game, 'phytokarst');
+      game.toast('every blade of it is pointed at a hole you cannot see yet.');
+    }
+  }
   // ---- and the fish, which is blind and is therefore ALL lateral line -----
   if (cavFish && cavInZone('river', cavEchoX, cavEchoZ) &&
       Math.abs(cavEchoZ - cavFish.position.z) < 40) cavFishBolt = 1;
@@ -3385,6 +4089,40 @@ function cavUpdateTasks(game, dt) {
 
   cavDayK = damp(cavDayK, cavDaylightAt(p.x, p.z), 3.0, dt);
 
+  // ---- AND THE RIG LOOKS UP, IN THE THREE PLACES THAT ARE UP -------------
+  // See cavSKY_DOLINE. Computed here rather than inside skyward() because
+  // systems.js asks for it once a frame and this is already the once-a-frame
+  // function that has the animal's position in it; the damp is systems' own
+  // (0.9 lambda, ~three seconds), so this is a hard target and it still
+  // arrives as a slow crane.
+  //
+  // THE DOLINE IS THE ONLY ONE THAT GETS THE FULL CRANE, and it is gated on
+  // being IN it rather than near it — a hundred and forty metres across, with
+  // the column of light standing in the middle, is a room you walk into, and
+  // the camera should come up as you do rather than from the far side of the
+  // Great Passage. The other two are half-measures on purpose: at the slot and
+  // under the arch there is something worth seeing forty metres up, not two
+  // hundred, and taking the ground out of the frame at the exact moment the
+  // player is trying to walk through a gap is a camera fighting the game.
+  {
+    const D = cavDOLINE;
+    const ddx = p.x - D.x, ddz = p.z - D.z;
+    const dd = Math.sqrt(ddx * ddx + ddz * ddz * 1.2);
+    let want = cavSKY_DOLINE * cavSmooth((D.r + 2 - dd) / 10);
+    // the slot: only once you are close enough that the chink is the subject
+    want = Math.max(want, cavSKY_SLOT * cavSmooth((cavEXIT_Z + 34 - p.z) / 16));
+    // and the arch on the way in, where the cloud comes out of the mountain
+    want = Math.max(want, cavSKY_MOUTH * cavSmooth((14 - Math.abs(p.z - (cavMOUTH_Z - 2))) / 8));
+    // ...AND NEVER WHILE THE ANIMAL IS DOING SOMETHING WITH THE GROUND. A
+    // crane to eleven degrees while you are half-way up seventy metres of
+    // calcite, swimming a river in the dark or riding a log takes the thing
+    // you are standing on out of the picture, which is the one state in which
+    // this camera has a job. (The wall is inside the doline's own falloff at
+    // the top: cavWALL.z is -104 and the doline reaches -74.)
+    if (capy.climbing || capy.swimming || cavLogCarrying) want = 0;
+    cavSkyK = want;
+  }
+
   // ---- the glow-worm trail: it has done its job when you reach the water --
   if (cavInZone('river', p.x, p.z) && p.z < 26) {
     cavTask(game, 'glow-trail');
@@ -3422,9 +4160,13 @@ function cavUpdateTasks(game, dt) {
     game.sfx('tick', cavSfx);
   }
   // ---- the garden that leans ---------------------------------------------
-  {
-    const dx = p.x - cavPHYTO.x, dz = p.z - cavPHYTO.z;
-    if (dx * dx + dz * dz < 90) cavTask(game, 'phytokarst');
+  // The tick is in cavWheek now — see cavBuildPhyto. What is left here is the
+  // teach, once, because a player who walks into a field of rock fins has no
+  // reason to guess that shouting at it does anything and the chapter's whole
+  // grammar is that shouting at things is what you do.
+  if (!cavPhyDone && !cavToldPhyto && cavInZone('phyto', p.x, p.z)) {
+    cavToldPhyto = true;
+    game.toast('rock, and it is growing. all of it leaning the same way.');
   }
   // ---- THE WALL ----------------------------------------------------------
   if (capy.climbing && cavInZone('wall', p.x, p.z)) {
@@ -3557,8 +4299,10 @@ export function createCave(game) {
       cavMoteStir = 0;
       cavEchoBack[0] = -1; cavEchoBack[1] = -1; cavEchoBack[2] = -1;
       cavToldEcho = false; cavToldWorms = false; cavToldDim = false; cavToldOpen = false;
+      cavToldPhyto = false; cavPhyShake = 0;
       cavSeenSlot = false; cavSwiftMine = false;
       cavRiverT = 0; cavFallT = 0;
+      cavSkyK = 0;
     },
     onExit() {
       // anything stateful that could hold the player, cleared on the way out
@@ -3591,6 +4335,43 @@ export function createCave(game) {
 
     /** 0..1 — how hard the echo is ringing. systems.js lifts the room on it. */
     echo() { return cavEchoT < 0 ? 0 : Math.pow(clamp(1 - cavEchoT / cavECHO_LIFE, 0, 1), 1.6); },
+    /**
+     * 0..1 — HOW FAR THE RIG SHOULD CRANE UP. See cavSKY_DOLINE and CONTRACT.
+     *
+     * Chapter 7 wrote this contract for an aurora and was the only chapter
+     * that ever used it. Everything worth seeing in this one is overhead.
+     */
+    skyward() { return cavSkyK; },
+    /**
+     * ...AND THE LENS FLOOR IS A NUMBER ABOUT SEA LEVEL, WHICH THIS IS NOT.
+     *
+     * `sysCAM_FLOOR` is 1.7 in WORLD Y, and the contract's own note says in so
+     * many words that it "is right for every chapter whose ground is at zero
+     * and wrong for the one whose ground is at minus eleven". This chapter's
+     * ground runs from +4 at the spawn to −6.3 under the doline, −7.4 in the
+     * river and −10.5 at the foot of the Great Wall — so for the whole of the
+     * Great Passage and the whole of the doline the eye was PINNED eight to
+     * twelve metres over an animal it is supposed to sit six behind, and the
+     * lower the floor went the further above the capybara the camera rode.
+     *
+     * Measured standing in the marquee at (−4, −40): capybara at −6.31, eye at
+     * 1.70 — the clamp, exactly — which is why the crane above could not get
+     * the lens under the canopy and photographed the tops of the breakdown
+     * blocks instead. Palawan published this for exactly the same reason and
+     * was the only chapter that ever did.
+     */
+    camFloor(x, z) { return cavTerrain(x, z) + 1.1; },
+    /**
+     * ...and its mirror, because this chapter has a literal ceiling.
+     *
+     * The roof was RAISED to 27 m at the far end in an earlier pass because
+     * the last shot of the chapter came out completely black — the camera was
+     * inside it. That was a workaround for a missing hook; this is the hook.
+     * The roof runs down to fourteen metres at the mouth and the rig rides
+     * seven above the animal on a slope, which is the same collision by a
+     * different door.
+     */
+    camCeil(x, z) { return cavRoofH(x, z) - 1.8; },
     /** 0..1 — how much natural light is on the animal. THE chapter number. */
     daylight() { return cavDayK; },
     seenLight() { return cavSeenLight; },
@@ -3632,6 +4413,8 @@ export function createCave(game) {
       cavUpdateCrickets(dt);
       cavUpdateMotes(dt);
       cavUpdateSlotMotes(dt);
+      cavUpdateShaftLife(dt);
+      cavUpdatePhyto(dt);
       cavUpdateSound(game, dt);
       cavUpdateTasks(game, dt);
     },

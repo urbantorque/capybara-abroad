@@ -538,6 +538,10 @@ const pastoSHELF_Z1 = 66;     // = 6 + 15*4
 const pastoHF_FAR = 132;      // = 36 + 24*4
 const pastoHF_ZLO = -130;     // = 6 - 34*4
 const pastoHF_ZHI = 134;      // = 66 + 17*4
+// The same rectangle, published. See api.bounds() — this is the entire extent
+// of the ground that exists as a rigid body, and therefore the entire extent of
+// the world anything with the player in its feet is allowed to visit.
+const pastoBOUNDS = { x0: -pastoHF_FAR, x1: pastoHF_FAR, z0: pastoHF_ZLO, z1: pastoHF_ZHI };
 
 /** One heightfield over [x0,x1] x [z0,z1]. Spans MUST be multiples of `es`. */
 function pastoHeightfieldStrip(game, x0, x1, z0, z1, es) {
@@ -1201,6 +1205,98 @@ function pastoBenchAt(parts, i) {
   return { x: bx, z: bz };
 }
 
+// ---------------------------------------------------------- PAPEL PICADO ----
+// THE CHAPTER IS A CARNIVAL AND THE PLAZA WAS BARE OVERHEAD.
+//
+// Everything in this square is at knee height or below — kerb, benches,
+// planters, market trestles — and the one band of the frame a plaza actually
+// fills is the one between two and five metres up, strung from side to side.
+// Nariño hangs papel picado (cut paper flags) across a plaza for Carnaval and
+// leaves it up until the weather takes it, and the shape it makes — a shallow
+// catenary of little coloured triangles, sagging in the middle — is the single
+// most recognisable thing about a South American square in January.
+//
+// Six runs across the plaza, each a chain of flags on a sag. One extra merged
+// mesh and one extra draw call for the whole lot — and it has to be its own
+// mesh rather than part of the plaza furniture, because it must NOT cast.
+//
+// MEASURED, not assumed: with the runs merged into pastoPlazaFurniture (which
+// casts) the cords threw a dozen chunky grey bars across the paving. A 5 cm
+// cord six metres up is thinner than one shadow-map texel at this scene scale,
+// so what the map actually stores is a blocky approximation several texels
+// wide — the classic thin-geometry shadow artefact, and it read as scaffolding
+// poles lying in the square. Bunting does not shade a plaza anyway.
+//
+// ---- AND IT HAS TO BE ABOVE THE CAMERA -------------------------------
+// The first cut hung the runs at 6.4-7.0 m with a two-metre sag, which is a
+// perfectly sensible height for bunting and completely wrong for this game.
+// Measured from the rendered frame at the plaza: the follow camera's eye sits
+// at y = 8.6, so every one of those runs was BELOW it — cords cutting grey
+// bars straight across the paving on either side of the animal and flags
+// hanging round its ears. The chapter's prettiest addition was also the one
+// thing standing between the player and their own capybara.
+//
+// So the whole canopy goes up: 11.6 m at the posts, sag 1.4-1.8, lowest point
+// 9.8 m — a metre and a bit clear of the eye at its deepest. It now frames the
+// TOP of the shot, which is what an overhead run is for, and the camera passes
+// under it exactly as a person would.
+//
+// Both longitudinal runs are gone with it. They ran the length of the play
+// space, so they were the two that spent the most time between the eye and the
+// animal; four more cross runs put the density back without ever lying along
+// the camera's own axis. Clear of everything below: the carroza's sun tops
+// out at 5.15 m and the fountain jet at 4.42.
+const pastoBUNT = [
+  // x0, z0, x1, z1, height at the posts, sag
+  [-22.5, 12, 22.5, 12, 11.6, 1.6],
+  [-22.5, 17, 22.5, 17, 11.4, 1.5],
+  [-22.5, 22, 22.5, 22, 11.7, 1.8],
+  [-22.5, 28, 22.5, 28, 11.5, 1.7],
+  [-22.5, 34, 22.5, 34, 11.6, 1.6],
+  [-22.5, 40, 22.5, 40, 11.3, 1.4],
+];
+const pastoBUNT_COL = [PALETTE.awning1, PALETTE.awning2, PALETTE.awning3, PALETTE.awning4,
+                       PALETTE.churchTrim];
+
+function pastoBuildBunting(parts) {
+  const flagG = new THREE.ConeGeometry(0.5, 1, 3);
+  for (let r = 0; r < pastoBUNT.length; r++) {
+    const B = pastoBUNT[r];
+    const x0 = B[0], z0 = B[1], x1 = B[2], z1 = B[3], hy = B[4], sag = B[5];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const yaw = Math.atan2(x1 - x0, z1 - z0);
+    // a post at each end, so the line is HELD UP by something
+    for (let e = 0; e < 2; e++) {
+      const px = e ? x1 : x0, pz = e ? z1 : z0;
+      pastoBox(parts, null, PALETTE.stoneDark, px, hy * 0.5, pz, 0.11, hy * 0.5, 0.11);
+      pastoBox(parts, null, PALETTE.stoneDark, px, hy, pz, 0.20, 0.09, 0.20);
+    }
+    const n = Math.max(6, Math.round(len / 1.5));
+    let prevY = hy, prevT = 0;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const x = lerp(x0, x1, t), z = lerp(z0, z1, t);
+      // a parabola is close enough to a catenary at this sag, and it is one mul
+      const y = hy - sag * 4 * t * (1 - t);
+      if (i > 0) {
+        // the cord itself: one thin box per span, pitched along the sag
+        const mx = lerp(x0, x1, (t + prevT) * 0.5), mz = lerp(z0, z1, (t + prevT) * 0.5);
+        const seg = len / n;
+        const pitch = Math.atan2(y - prevY, seg);
+        pastoBox(parts, null, PALETTE.stoneDark, mx, (y + prevY) * 0.5, mz,
+                 Math.hypot(seg, y - prevY) * 0.5, 0.025, 0.025, yaw, 0, -pitch);
+      }
+      if (i === 0 || i === n) { prevY = y; prevT = t; continue; }
+      // the flag: a triangle hanging point-down off the cord
+      const c = pastoBUNT_COL[(i + r * 3) % pastoBUNT_COL.length];
+      pastoPart(parts, null, c, flagG, x, y - 0.24, z,
+                Math.PI, yaw + 0.22 * Math.sin(i * 1.7), 0, 0.46, 0.48, 0.05);
+      prevY = y; prevT = t;
+    }
+  }
+  flagG.dispose();
+}
+
 function pastoBuildPlazaFurniture(game, root) {
   const parts = [];
 
@@ -1243,6 +1339,11 @@ function pastoBuildPlazaFurniture(game, root) {
   }
 
   root.add(pastoTownMesh(parts, 'pastoPlazaFurniture', true, true));
+
+  // …and the sky over the square, in its own non-casting mesh. See PAPEL PICADO.
+  const bunt = [];
+  pastoBuildBunting(bunt);
+  root.add(pastoTownMesh(bunt, 'pastoBunting', false, false));
   oct8.dispose(); octOpen.dispose(); clump.dispose();
 
   // -- collision. One compound body for the fountain (two crossed boxes make a
@@ -1657,8 +1758,12 @@ const pastoSTALL_SPEC = [
   { x: 22,  z: 20, yaw: -Math.PI / 2 },
   { x: -22, z: 28, yaw: Math.PI / 2 },
   { x: 22,  z: 28, yaw: -Math.PI / 2 },
-  { x: -12, z: 30, yaw: Math.PI },
-  { x: 12,  z: 30, yaw: Math.PI },
+  // MOVED OUT TO ±15.5. These two used to stand at ±12, which put the eastern
+  // one squarely across the carroza's new lane — see pastoCAR_X. The plaza is
+  // 48 m wide and the north pair sitting a little further out reads better
+  // anyway: it opens the approach to the church instead of funnelling it.
+  { x: -15.5, z: 30, yaw: Math.PI },
+  { x: 15.5,  z: 30, yaw: Math.PI },
 ];
 // AWNING CLOTH. Each stall gets ONE hue plus a chalk partner and stripes the
 // two — the way a market awning is actually woven. It used to cycle all four of
@@ -1814,7 +1919,20 @@ const pastoCAR_Z0 = 10.5;     // the south end, and ON the cobbles: at 7 she sto
                               // with her back wheels on the grass, which reads as a
                               // prop that missed its mark rather than as a parked float
 const pastoCAR_Z1 = 39.0;     // and short of the church steps at the north end
-const pastoCAR_X  = 0;
+// ---- THE FLOAT WAS DRIVING THROUGH THE FOUNTAIN ------------------------
+// The lane was the plaza's centreline, and the plaza's centreline is where
+// the fountain is. Measured with pasto.navBlocked at the float's own half
+// width: x = 0 is SOLID from z 14.5 to 25.5 — the octagonal basin and the six
+// benches round it — and again from z 35 to the end of the probe, which is the
+// church. So for the whole life of this mini the carroza has driven through a
+// two-tier stone fountain, six benches and the front of the cathedral, and
+// anybody standing on the deck was driven through them with it.
+//
+// x = 10.5 is clear for the entire route and past it (measured 7 to 43, with
+// the north pair of market stalls moved out to ±15.5 — see pastoSTALL_SPEC).
+// A procession lane down one side of a plaza is also simply what happens: the
+// float goes round the square, not over the fountain in the middle of it.
+const pastoCAR_X  = 10.5;
 const pastoCAR_SPEED = 2.15;  // m/s — walking pace, because it is a procession
 const pastoCAR_DWELL = 7.5;   // s at each end: this is the boarding window
 const pastoCAR_RIDE  = 11.0;  // s aboard that count as 'across the plaza'
@@ -1829,6 +1947,7 @@ let pastoCarZ = pastoCAR_Z0;
 let pastoCarDir = 1;
 let pastoCarDwell = pastoCAR_DWELL;
 let pastoCarPZ = pastoCAR_Z0;
+let pastoCarRideM = 0;        // metres of plaza covered on this one ride
 let pastoCarRideT = 0;
 let pastoCarRode = false;
 let pastoCarCheerT = 0;
@@ -1907,7 +2026,7 @@ function pastoBuildCarroza(game, root) {
              new CANNON.Vec3(0, pastoCAR_HITCH, -HZ - 0.42));
   b.allowSleep = false;
   pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL;
-  pastoCarPZ = pastoCAR_Z0; pastoCarRideT = 0; pastoCarRode = false;
+  pastoCarPZ = pastoCAR_Z0; pastoCarRideT = 0; pastoCarRideM = 0; pastoCarRode = false;
   b.position.set(pastoCAR_X, 0, pastoCAR_Z0);
   b.previousPosition.copy(b.position);
   b.interpolatedPosition.copy(b.position);
@@ -1958,16 +2077,142 @@ function pastoUpdateCarroza(game, dt) {
     pastoCarCheerT = 4.2;
     if (game.sfx) game.sfx('cheer', { volume: 0.5, pitch: 1.1 });
   }
-  if (pastoCarRode) return;
+  // …AND HOW FAR. The plaza is twenty-eight and a half metres end to end and
+  // she turns round at both ends, so "how far did you ride in one go" is a
+  // number worth going back for — and the tick, at eleven seconds, is not.
   if (aboard && pastoCarDwell <= 0) {
     pastoCarRideT += dt;
-    if (pastoCarRideT >= pastoCAR_RIDE) {
+    pastoCarRideM += pastoCAR_SPEED * dt;
+    if (!pastoCarRode && pastoCarRideT >= pastoCAR_RIDE) {
       pastoCarRode = true;
       if (game.completeTask) game.completeTask('carroza');
     }
   } else if (!aboard) {
+    if (pastoCarRideM > 6 && typeof game.record === 'function') game.record('carroza', pastoCarRideM);
     pastoCarRideT = 0;
+    pastoCarRideM = 0;
   }
+}
+
+// ================================================================== THE TALC ==
+// THE CHAPTER IS THE CARNAVAL DE NEGROS Y BLANCOS AND NOTHING WAS EVER WHITE.
+//
+// The float exists, it crosses the plaza, the crowd cheers — and the one thing
+// that everybody who has ever been to this carnival remembers about it is that
+// on the sixth of January the entire city throws talc at each other until the
+// air over the plaza is opaque. A mini called EL CARNAVAL with no talc in it
+// is a parade float at a village fete.
+//
+// Two hundred flakes, one InstancedMesh, no physics: emitted in bursts from
+// the float and from the crowd along the route, gravity, drag and a spin, and
+// they die white on the cobbles. They are emitted ONLY while somebody is
+// aboard and she is rolling, which makes them the reward rather than the
+// weather — the plaza is ordinary until you climb up, and then it is not.
+const pastoTALC_N = 220;
+const pastoTALC_STRIDE = 8;   // x, y, z, vx, vy, vz, life, size
+let pastoTalcMesh = null;
+let pastoTalcData = null;
+let pastoTalcCur = 0;
+let pastoTalcT = 0;
+let pastoTalcLive = false;
+
+function pastoBuildTalc() {
+  const g = new THREE.OctahedronGeometry(0.085, 0);
+  const m = mat(PALETTE.volcanoSnow, { transparent: true, opacity: 0.92, depthWrite: false });
+  const im = new THREE.InstancedMesh(g, m, pastoTALC_N);
+  im.name = 'pastoTalc';
+  im.frustumCulled = false;
+  im.castShadow = false;
+  im.receiveShadow = false;
+  pastoTalcData = new Float32Array(pastoTALC_N * pastoTALC_STRIDE);
+  for (let i = 0; i < pastoTALC_N; i++) {
+    // parked below the world, at zero scale — a flake with no life is not drawn
+    im.setMatrixAt(i, pastoXf(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001));
+  }
+  im.instanceMatrix.needsUpdate = true;
+  pastoTalcMesh = im;
+  return im;
+}
+
+/** One handful, thrown from (x,y,z) in roughly the direction (dx,dz). */
+function pastoTalcBurst(x, y, z, dx, dz, n, power) {
+  if (!pastoTalcData) return;
+  for (let k = 0; k < n; k++) {
+    const o = (pastoTalcCur % pastoTALC_N) * pastoTALC_STRIDE;
+    pastoTalcCur++;
+    const spread = rand(-0.7, 0.7);
+    const cs = Math.cos(spread), sn = Math.sin(spread);
+    const ax = dx * cs - dz * sn, az = dx * sn + dz * cs;
+    const sp = rand(1.4, 4.6) * power;
+    pastoTalcData[o]     = x + rand(-0.3, 0.3);
+    pastoTalcData[o + 1] = y + rand(-0.2, 0.35);
+    pastoTalcData[o + 2] = z + rand(-0.3, 0.3);
+    pastoTalcData[o + 3] = ax * sp;
+    pastoTalcData[o + 4] = rand(1.9, 4.4) * power;
+    pastoTalcData[o + 5] = az * sp;
+    pastoTalcData[o + 6] = rand(1.3, 2.6);
+    pastoTalcData[o + 7] = rand(0.55, 1.5);
+  }
+  pastoTalcLive = true;
+}
+
+function pastoUpdateTalc(game, dt) {
+  const im = pastoTalcMesh;
+  if (!im || !pastoTalcData) return;
+
+  // ---- who is throwing ---------------------------------------------------
+  const capy = game.capy;
+  const aboard = !!(capy && capy.position && pastoCarAboard(capy.position));
+  if (aboard && pastoCarDwell <= 0) {
+    pastoTalcT -= dt;
+    if (pastoTalcT <= 0) {
+      // Never a fixed interval — see the burner metronome. Redrawn every time.
+      pastoTalcT = rand(0.26, 0.62);
+      const cz = pastoCarPos.z, cx = pastoCarPos.x;
+      // …from the float itself, straight up over the sun
+      pastoTalcBurst(cx + rand(-1.2, 1.2), pastoCAR_DECK + 2.4, cz + rand(-2.6, 2.6),
+                     rand(-1, 1), rand(-1, 1), 5, 0.7);
+      // …and from somebody standing at the side of the road, at the float
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const sx = cx + side * rand(3.4, 6.2), sz = cz + rand(-4, 4);
+      pastoTalcBurst(sx, pastoHeight(sx, sz) + 1.5, sz, -side, rand(-0.4, 0.4), 6, 1.0);
+      if (typeof game.sfx === 'function' && Math.random() < 0.45) {
+        game.sfx('rustle', { volume: rand(0.22, 0.4), pitch: rand(1.3, 1.75),
+                             at: { x: sx, y: 1.5, z: sz }, near: 8, far: 60 });
+      }
+    }
+  }
+
+  if (!pastoTalcLive) return;
+  let any = false;
+  for (let i = 0; i < pastoTALC_N; i++) {
+    const o = i * pastoTALC_STRIDE;
+    let life = pastoTalcData[o + 6];
+    if (life <= 0) continue;
+    life -= dt;
+    pastoTalcData[o + 6] = life;
+    if (life <= 0) { im.setMatrixAt(i, pastoXf(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001)); continue; }
+    any = true;
+    // Talc is not sand: it hangs. Heavy drag, weak gravity, and it drifts.
+    const drag = Math.exp(-2.4 * dt);
+    pastoTalcData[o + 3] *= drag;
+    pastoTalcData[o + 5] *= drag;
+    pastoTalcData[o + 4] = pastoTalcData[o + 4] * drag - 2.1 * dt;
+    pastoTalcData[o]     += pastoTalcData[o + 3] * dt;
+    pastoTalcData[o + 1] += pastoTalcData[o + 4] * dt;
+    pastoTalcData[o + 2] += pastoTalcData[o + 5] * dt;
+    // it settles ON the cobbles rather than through them
+    const gy = pastoHeight(pastoTalcData[o], pastoTalcData[o + 2]) + 0.06;
+    if (pastoTalcData[o + 1] < gy) {
+      pastoTalcData[o + 1] = gy;
+      pastoTalcData[o + 3] *= 0.3; pastoTalcData[o + 5] *= 0.3; pastoTalcData[o + 4] = 0;
+    }
+    const s = pastoTalcData[o + 7] * clamp(life * 1.4, 0.15, 1);
+    im.setMatrixAt(i, pastoXf(pastoTalcData[o], pastoTalcData[o + 1], pastoTalcData[o + 2],
+                              life * 5.1 + i, life * 3.3, life * 2.2, s, s, s));
+  }
+  im.instanceMatrix.needsUpdate = true;
+  pastoTalcLive = any;
 }
 
 function pastoBuildMarket(game, root) {
@@ -2390,6 +2635,16 @@ export function createPasto(game) {
   const api = {
     built() { return pastoBuilt; },
     terrainHeight: pastoHeight,
+    // ---- WHERE THERE IS ACTUALLY A FLOOR (v20) ----------------------------
+    // pastoHeight is an ANALYTIC law and answers for every point in the plane;
+    // the four heightfield strips that back it with a rigid body cover exactly
+    // this rectangle and not one metre more. Anything dropped outside it falls
+    // for ever, because there is nothing out there to land on — and Galeras is
+    // centred at z = -70 with a 70 m radius, so its own northern apron runs ten
+    // metres past the north edge of the physics. condor.js is the only thing in
+    // the game that can carry the player out there, and this is what it fences
+    // itself in with; see the containment note in its edge branch.
+    bounds() { return pastoBOUNDS; },
     slopeAt: pastoSlope,
     inZone: pastoInZone,
     navBlocked: pastoNavBlocked,
@@ -2430,6 +2685,7 @@ export function createPasto(game) {
       pastoUpdateBell(dt);
       pastoUpdateStalls();
       pastoUpdateCarroza(game, dt);
+      pastoUpdateTalc(game, dt);
       pastoUpdateSwifts(game, dt);
     },
   };
@@ -2461,6 +2717,7 @@ function pastoBuild(game) {
   pastoBuildSwifts(pastoRoot);
   pastoBuildMarket(game, pastoRoot);
   pastoBuildCarroza(game, pastoRoot);
+  pastoRoot.add(pastoBuildTalc());
   pastoBuildStreet(game, pastoRoot);
   pastoBuildCoffeeFarm(game, pastoRoot);
 
@@ -2469,6 +2726,23 @@ function pastoBuild(game) {
     // CONSTRAINTS, so the bell's hinge has to be attached and detached by hand
     // or it would keep solving against a body that is no longer simulated.
     onEnter() {
+      // THE STAGING HAS TO REPLAY. A second visit to Pasto — which the
+      // departures board allows from anywhere — used to find every flake of
+      // talc still hanging where it was when you left, and the float's ride
+      // clock exactly where the last visit put it. The CHECKLIST stays ticked;
+      // the plaza starts again.
+      pastoTalcT = 0;
+      pastoTalcLive = false;
+      if (pastoTalcData && pastoTalcMesh) {
+        for (let i = 0; i < pastoTALC_N; i++) {
+          pastoTalcData[i * pastoTALC_STRIDE + 6] = 0;
+          pastoTalcMesh.setMatrixAt(i, pastoXf(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001));
+        }
+        pastoTalcMesh.instanceMatrix.needsUpdate = true;
+      }
+      pastoCarRideT = 0;
+      pastoCarRideM = 0;
+      pastoCarCheerT = 0;
       if (!pastoBellHinge) return;
       if (game.world.constraints.indexOf(pastoBellHinge) < 0) game.world.addConstraint(pastoBellHinge);
       // A freshly re-added hinge snaps its bodies into place on the first solve,

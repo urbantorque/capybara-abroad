@@ -244,14 +244,30 @@ function mainMakeBiomes(game) {
     SYDNEY_SPAWN: { x: 0, y: 1.2, z: 22 },
     // Circular Quay: on the apron, one wharf east of the berth, facing the water.
     QUAY_SPAWN: { x: 4, y: 1.0, z: 26 },
+    // ---- AND WHICH WAY YOU ARE POINTING WHEN YOU LAND --------------------
+    // `yaw` is the direction the CAMERA sits in relative to the animal (the
+    // same convention systems.js's camYaw uses), so `yaw: 0` puts the eye to
+    // the south and the shot looks north up +z. It is optional and it is new:
+    // every comment in this block has described a heading since the chapters
+    // were written and none of them were ever set, so the first frame of a
+    // chapter pointed wherever you had been looking in the LAST one. Arriving
+    // in Cali from Sydney put a rosa wall four metres in front of the lens.
+    // See teleportCapy in systems.js.
+    //
     // Kyoto: on the Gion lane, with the torii hill in front and Uji behind.
-    KYOTO_SPAWN: { x: 0, y: 1.4, z: 34 },
+    // Looking a shade west of due south: the hill's summit is at (-34, -128),
+    // the mirror pond and the pavilion fill the middle distance, and Gion's
+    // machiya — six metres behind the animal's tail — stay out of the frame.
+    KYOTO_SPAWN: { x: -16, y: 1.4, z: 52, yaw: -1.5708 },
     // Cali: on the south bank of the river, the Ermita on one hand and the
-    // painted street on the other.
-    CALI_SPAWN: { x: 0, y: 1.4, z: 24 },
+    // painted street on the other. Due south, down the length of the Río Cali:
+    // the painted street's back row stands one metre off the animal's tail and
+    // was the entire arrival shot.
+    CALI_SPAWN: { x: -16.5, y: 1.4, z: -19.5, yaw: -3.1416 },
     // Rio: on the calcadao at Copacabana, the Atlantic straight ahead and the
-    // biscoito Globo man three steps to the right.
-    RIO_SPAWN: { x: 0, y: 1.4, z: 0 },
+    // biscoito Globo man three steps to the right. Due south is the sea, the
+    // break off Arpoador and the wave paving running out to both edges of frame.
+    RIO_SPAWN: { x: 0, y: 1.4, z: 0, yaw: 0 },
     // Iceland: on Laugavegur in the middle of Reykjavik, the church up the hill
     // behind you and the hot dog stand four steps away.
     ICELAND_SPAWN: { x: 0, y: 1.4, z: 99 },
@@ -714,7 +730,7 @@ function mainBoot() {
     // that is built lazily on first entry runs long after everything - so the
     // two calls have to exist on frame zero and be harmless if nobody has
     // wired them up yet. See npc.js, THE LOCALS.
-    addLocal() { return null; }, say() {},
+    addLocal() { return null; }, addExchange() { return null; }, say() {},
   };
   window.__capy = game;
 
@@ -781,6 +797,7 @@ function mainBoot() {
   // are none - every one of them is lazy).
   if (npcs && typeof npcs.addLocal === 'function') {
     game.addLocal = npcs.addLocal;
+    game.addExchange = npcs.addExchange;
     game.say = npcs.say;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds

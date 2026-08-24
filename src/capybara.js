@@ -1094,6 +1094,29 @@ export function createCapybara(game) {
     diveTime: 0,                     // s this breath has lasted
     threwAt: -1,
     /**
+     * POINT THE ANIMAL. For arrivals, and for arrivals only.
+     *
+     * `capyYaw` is integrated toward whatever the stick is asking for and is
+     * written to the model every frame, so a caller that sets `group.rotation.y`
+     * from outside is overwritten before it is ever drawn. Every chapter's
+     * spawn comment in main.js describes a HEADING — "the torii hill in front
+     * and Uji behind", "the Atlantic straight ahead" — and none of them were
+     * ever set: you arrived facing wherever you had been looking in the last
+     * country. This is the one line that makes those comments true.
+     *
+     * Sets the render yaw and the body's, so the first frame is already right
+     * and there is nothing to spring out of.
+     */
+    face(yaw) {
+      if (typeof yaw !== 'number' || yaw !== yaw) return;
+      capyYaw = yaw; capyPrevYaw = yaw; capyBodyYaw = yaw; capyYawRate = 0;
+      capyRoot.rotation.y = yaw;
+      body.quaternion.setFromAxisAngle(capyUpLocal, yaw);
+      if (body.previousQuaternion) body.previousQuaternion.copy(body.quaternion);
+      if (body.interpolatedQuaternion) body.interpolatedQuaternion.copy(body.quaternion);
+      body.angularVelocity.set(0, 0, 0);
+    },
+    /**
      * THROW THE ANIMAL, and mean it.
      *
      * The one supported way for the world to take the capybara off its feet:

@@ -126,6 +126,59 @@ const iceSTAR_N    = 260;
 const iceSTEAM_N   = 54;
 const iceCURTAIN_N = 6;
 
+// ---- WHERE THE VENTS ARE, DECIDED ONCE AND BEFORE ANYTHING IS BUILT --------
+//
+// The ground mesh is the first thing in iceBuild and the geothermal field is
+// the sixth, so for as long as the vents were scattered with rand() inside
+// their own builder the ground had no way of knowing where they were — and the
+// whole basin was painted by the same bare `else` that paints an old lava
+// field, i.e. it came out a LAWN. Sixty-odd metres of green with twenty-six
+// black stacks standing on it, in the one part of the chapter the player
+// crosses in every direction.
+//
+// The sites are laid out here instead, deterministically, so that both the
+// ground and the geometry can ask the same question. A vent is not a thing
+// standing ON the ground; it is a hole in ground that the vent has BLEACHED,
+// and the bleach is much wider than the hole.
+const iceVENT_SITES = (function () {
+  const out = [];
+  // a tiny LCG, seeded, so the field is the same every load and the painted
+  // sinter lands exactly under the geometry
+  let s = 20260824;
+  const r = function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  for (let i = 0; i < 26; i++) {
+    const a = r() * 6.283, rr = 15 + r() * 31;
+    out.push({
+      x: 10 + Math.cos(a) * rr, z: -4 + Math.sin(a) * rr,
+      // A FUMAROLE IS NOT AN OIL DRUM. The first cut was 1.0-3.6 m tall and up
+      // to 4.2 m across in iceMoraineDk — twenty-six black cylinders, taller
+      // than the animal, on dark ground under a night sky. What that
+      // photographs as is a tank farm. A fumarole is a low broken cone of
+      // crusted rock with a bright mouth in it; three of them are allowed to
+      // be a landmark and the rest are ankle-high.
+      h: (i % 9 === 0) ? (1.5 + r() * 0.9) : (0.22 + r() * 0.42),
+      r: 0.75 + r() * 0.85,
+      sinter: 4.5 + r() * 5.5,          // how far the bleach reaches
+      hot: 0.45 + r() * 0.55,
+    });
+  }
+  return out;
+})();
+/** 0..1: how altered the ground at (x, z) is by the vents standing on it. */
+function iceSinterAt(x, z) {
+  let v = 0;
+  for (let i = 0; i < iceVENT_SITES.length; i++) {
+    const s = iceVENT_SITES[i];
+    const dx = x - s.x, dz = z - s.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < s.sinter) {
+      const t = 1 - d / s.sinter;
+      v = Math.max(v, t * t * s.hot);
+    }
+  }
+  return v;
+}
+
 // ------------------------------------------------------------------ scratch --
 const iceV3 = new THREE.Vector3();
 const iceV3b = new THREE.Vector3();   // the snowcat accessor, and nothing else
@@ -138,6 +191,10 @@ const iceM  = new THREE.Matrix4();
 let iceGame = null;
 let iceBuilt = false;
 let iceRoot = null;
+// The eight people who live here, kept so that addExchange can pair them up.
+// See THE PEOPLE WHO LIVE HERE at the foot of iceBuild.
+let iceLocPylsa = null, iceLocPier = null, iceLocStreet = null, iceLocChurch = null;
+let iceLocSpring = null, iceLocCat = null, iceLocSheep = null, iceLocRack = null;
 let iceTime = 0;
 
 let iceSeaMesh = null, iceSeaAttr = null, iceRipT = 0;
@@ -166,6 +223,18 @@ const iceLampPools = [];             // x, y, z of every sodium lamp's ground di
 let iceGeyPhase = 0, iceGeyT = 0, iceGeyFired = 0;
 let iceAurora = 0, iceAuroraArmed = false;
 let iceSoak = 0, iceSoakShown = false;
+let iceSoakMark = 0;
+// The marks for the overstay. See THE LONG SIT in iceUpdateSpring: the last
+// one is at four minutes because somebody will, and when they do the game
+// should have something to say about it.
+const iceSOAK_MARKS = [
+  [16,  'thirty-eight degrees. no plans.'],
+  [32,  'half a minute of nothing. the sky is doing the work now.'],
+  [58,  'a minute. somewhere a glacier is waiting and it can keep waiting.'],
+  [95,  'you have now been in this pool longer than you spent in Venice.'],
+  [150, 'two and a half minutes. the steam has stopped asking questions.'],
+  [240, 'four minutes. this is, technically, the whole game.'],
+];
 let iceSlideT = -1, iceSlideStall = 0, iceSlideBest = 0;
 let icePylsaDone = false, iceOrganDone = false, iceGeysirDone = false;
 let icePuffinDone = false, iceSlideDone = false, iceSoakDone = false, iceAuroraDone = false;
@@ -608,6 +677,11 @@ function iceBuildGroundMesh() {
   const mossP = new THREE.Color(PALETTE.iceMossPale);
   const basalt = new THREE.Color(PALETTE.iceBasalt);
   const rim = new THREE.Color(PALETTE.iceGeoRim);
+  const sinter = new THREE.Color(PALETTE.iceSinter);
+  const sulphur = new THREE.Color(PALETTE.iceSulphur);
+  const iron = new THREE.Color(PALETTE.iceIron);
+  const clay = new THREE.Color(PALETTE.iceClay);
+  const base = new THREE.Color();
   for (let i = 0; i < p.length; i += 3) {
     const x = p[i], z = p[i + 2];
     const y = iceTerrain(x, z);
@@ -679,6 +753,64 @@ function iceBuildGroundMesh() {
         c.copy(lava).lerp(basalt, 0.20);
         if (m > 0.55) c.lerp(moss, (m - 0.55) * 1.7);
         if (m > 0.86) c.lerp(mossP, (m - 0.86) * 2.4);
+      }
+      // ---- AND THE HIGH-TEMPERATURE FIELD IS NOT ANY OF THOSE THINGS ------
+      //
+      // Everything between the lagoon and the lava was falling through the
+      // bare `else` above, which is the moss-on-aa rule — so the geyser basin,
+      // the one piece of ground the chapter walks you across in every
+      // direction, was an ARMY BLANKET with a hot pool and twenty-six vents
+      // sitting on top of it. Exactly the shape of Rio's beach-sand `else`
+      // painting the whole city shelf.
+      //
+      // A hverasvaedi is ground that boiling water has taken to pieces. It
+      // bleaches to silica white where the water is at the surface, crusts
+      // sulphur-yellow round anything still venting, and dries to iron-red
+      // over the whole margin. It also has NO PLANTS ON IT, which is the half
+      // the eye actually reads at this camera: the green has to stop.
+      //
+      // The falloff is deliberately wide and soft-edged. Every earlier attempt
+      // at ground detail in this chapter that had a RADIUS in it came out as a
+      // disc with a rim; a basin is a stain, so this is a squared falloff over
+      // sixty metres with two incommensurable waves cut into it and no test
+      // anywhere that a polygon edge can land on.
+      {
+        const gx = (x - 4) / 62, gz = (z + 2) / 34;
+        let g0 = 1 - (gx * gx + gz * gz);
+        if (g0 > 0) {
+          // the shore of the lagoon and the sea both cut it off, so the basin
+          // is a basin rather than a wash across the whole chapter
+          g0 *= clamp((z - iceLAG_Z1 - 2) / 12, 0, 1) * clamp((44 - z) / 16, 0, 1);
+          const wob = Math.sin(x * 0.081 + z * 0.037) * 0.5 +
+                      Math.sin(x * 0.031 - z * 0.093 + 1.7) * 0.35;
+          const g = clamp(g0 * 1.25 + wob * 0.22, 0, 1);
+          if (g > 0.01) {
+            // the base of the basin: dried grey-brown clay with iron in it
+            base.copy(c);
+            // A HVERASVAEDI IS PALE. First cut had the whole basin at
+            // clay->iron 0.35..0.80, and the render is a red-brown desert with
+            // a glacier at the end of it. Boiled ground is grey-buff with
+            // orange only where the run-off has dried, so the base is mostly
+            // bleached and the iron is a STREAK.
+            c.copy(clay).lerp(sinter, 0.42);
+            c.lerp(iron, clamp((wob - 0.15) * 0.85, 0, 0.55));
+            // and the sinter, which is where the vents have been running
+            const s = iceSinterAt(x, z);
+            if (s > 0) {
+              c.lerp(sulphur, clamp(s * 1.5, 0, 0.62));
+              c.lerp(sinter, clamp((s - 0.30) * 1.8, 0, 0.85));
+            }
+            // the wettest ground — the run-off lines between Strokkur, the old
+            // geysir and the pool — goes palest of all
+            const wet = Math.max(
+              1 - Math.hypot(x - iceSTROKKUR.x, z - iceSTROKKUR.z) / 22,
+              1 - Math.hypot(x - iceGEYSIR.x, z - iceGEYSIR.z) / 20,
+              1 - Math.hypot(x - iceSPRING.x, z - iceSPRING.z) / 19);
+            if (wet > 0) c.lerp(sinter, clamp(wet * wet * 1.1, 0, 0.8));
+            // and it fades into whatever the ground already was at the margin
+            c.lerp(base, 1 - clamp(g * 1.35, 0, 1));
+          }
+        }
       }
     }
     col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b;
@@ -2029,28 +2161,78 @@ function iceBuildGeothermal(game, root) {
   // sinter terraces (the pale stepped rings that build up round any vent that
   // has been running a while), an emissive pool on the ground at every mouth,
   // and a great deal more steam standing over it.
+  // ================= AND THEY WERE TWENTY-SIX OIL DRUMS =====================
+  //
+  // MEASURED off the instrumented shot from the middle of the field: `h =
+  // rand(1.0, 3.6)`, `rr = rand(0.85, 2.1)` in iceMoraineDk and iceBasalt. That
+  // is a stack up to four metres across and three and a half tall — taller than
+  // the animal, wider than the hot dog stand — in the two darkest greys in the
+  // palette, twenty-six times, on the one piece of ground the chapter crosses
+  // in every direction. What it photographs as is a TANK FARM, and it is the
+  // first thing the eye lands on in a chapter whose whole subject is emptiness.
+  //
+  // The note above is right about what a fumarole is and the geometry was
+  // drawing something else. A fumarole is a HOLE: a wide low crust of boiled
+  // rock, a broken lip you can see the heat through, and a plume. It belongs at
+  // ankle height, and the only reason to build one taller is as a landmark —
+  // so three of the twenty-six are, and they are the ones that stand where the
+  // boardwalk turns.
+  //
+  // The sites come from iceVENT_SITES, decided before the ground was painted,
+  // so the bleach under each one is exactly under it. See iceSinterAt.
   const VENT = [];
-  for (let i = 0; i < 26; i++) {
-    const a = rand(0, 6.283), r = rand(15, 46);
-    const x = iceSTROKKUR.x + Math.cos(a) * r, z = iceSTROKKUR.z + Math.sin(a) * r;
+  const MOUTH = iceMerger();
+  for (let i = 0; i < iceVENT_SITES.length; i++) {
+    const s = iceVENT_SITES[i];
+    const x = s.x, z = s.z, h = s.h, rr = s.r;
     const y = iceTerrain(x, z);
-    const h = rand(1.0, 3.6);
-    const rr = rand(0.85, 2.1);
-    M.cyl(x, y + h * 0.5, z, rr, h, i % 3 ? PALETTE.iceMoraineDk : PALETTE.iceBasalt,
-      rand(-0.1, 0.1), rand(0, 1), rand(-0.1, 0.1), 6);
-    M.cyl(x, y + h + 0.05, z, rand(0.45, 0.9), 0.2, PALETTE.iceGeoRim, 0, 0, 0, 6);
-    // THE SINTER TERRACES. Silica comes out of solution the instant the water
-    // cools, so a vent that has been going for a century sits on a stack of
-    // pale shelves that get wider as they go down — which is also the only
-    // thing in this field with a horizontal line in it.
-    for (let k = 0; k < 3; k++) {
-      M.cyl(x, y + 0.06 + k * 0.11, z, rr * (2.6 - k * 0.55), 0.10,
-            k === 2 ? PALETTE.iceSnow : PALETTE.iceGeoRim, 0, rand(0, 1), 0, 6);
+    const tall = h > 1.0;
+    // THE APRON IS NOT GEOMETRY. First cut gave every vent three concentric
+    // discs — sulphur, silica, snow — and the render is twenty-six FRIED EGGS:
+    // a yellow ring round a white ring round an orange yolk, which is the
+    // "however many rings you draw, each one is a flat value" note that Iceland
+    // has now learned three times (the sodium pools, the moss cap, this). The
+    // bleach round a vent belongs in the ground's own vertex colours, where it
+    // has no edge at all, and iceSinterAt already puts it there.
+    //
+    // What is left in geometry is only the thing that is genuinely a THING: the
+    // broken rim of the hole. Four crust slabs round the mouth at different
+    // heights and angles, so it is a rim rather than a ring, and nothing
+    // concentric anywhere.
+    for (let k = 0; k < 4; k++) {
+      const ka = i * 1.1 + k * 1.63;
+      const kr = rr * (0.82 + ((i + k) % 3) * 0.16);
+      M.lump(x + Math.cos(ka) * kr, y + 0.05 + h * (0.35 + (k % 2) * 0.30),
+             z + Math.sin(ka) * kr,
+             rr * (0.55 + (k % 3) * 0.14), h * 0.75 + 0.10, rr * 0.52,
+             (i + k) % 3 ? PALETTE.iceGeoRim : PALETTE.iceMud,
+             0.10 - (k % 2) * 0.2, -ka, Math.sin(ka) * 0.14);
     }
-    // SOLID. Chest-high rock stacks in the one part of the biome the player
-    // crosses on foot in every direction.
-    SG.add(x, y + h * 0.5, z, rr * 1.7, h, rr * 1.7);
-    VENT.push(x, y + h + 0.16, z, rr);
+    // and a taller one has a proper stack in the middle of it, which is what
+    // makes the three landmarks read as landmarks from across the field
+    if (tall) {
+      M.cone(x, y + 0.06 + h * 0.55, z, rr * 0.92, h * 1.1, PALETTE.iceMud,
+             Math.sin(i * 1.7) * 0.07, i * 0.9, Math.cos(i * 2.1) * 0.07, 6);
+    }
+    // THE MOUTH, WHICH IS THE ONLY WARM THING ON THE GROUND AT NIGHT. It goes
+    // in its own merger under an EMISSIVE material, never into the vertex-
+    // coloured Lambert with the rest of the vent: the same law as the windows,
+    // the beacon and the stars — a diffuse surface under a sky with almost no
+    // light in it comes back black whichever way it faces, and this one has to
+    // read from thirty metres.
+    // SMALL. A vent mouth is a crack, not a hob ring: at rr * 0.52 the first
+    // cut put a metre and a half of pure orange flat on the ground, twenty-six
+    // times, and the field read as a runway.
+    MOUTH.cyl(x, y + h * 0.45, z, rr * 0.24, 0.05, 0xffffff, 0, i * 0.5, 0, 6);
+    // SOLID, AND THE BOX IS THE SIZE OF THE THING. The old line gave every one
+    // of the twenty-six a box `h` tall where h was up to 3.6 — chest-high
+    // invisible walls all over the one part of the biome the player crosses in
+    // every direction. The vents are ankle-high now, so the collider is too:
+    // under the capybara's 0.4 m step it is walked straight over and never
+    // noticed, and the three that are landmarks are the only ones you go round.
+    // (It costs no body either way — iceStaticGroup is one body for the field.)
+    SG.add(x, y + h * 0.5, z, rr * 1.5, h, rr * 1.5);
+    VENT.push(x, y + h + 0.10, z, rr);
   }
   // the mud pools between them, which plop and are the warmest colour out here
   for (let i = 0; i < 7; i++) {
@@ -2081,6 +2263,17 @@ function iceBuildGeothermal(game, root) {
   mesh.receiveShadow = true;
   mesh.castShadow = true;
   root.add(mesh);
+
+  // the vent mouths, self-illuminated. One mesh, one draw call, never a
+  // shadow caster and never a shadow receiver: it is a hole with heat in it.
+  {
+    const mm = new THREE.Mesh(MOUTH.build(),
+      mat(0x000000, { emissive: 0xc4682f, emissiveIntensity: 0.62 }));
+    mm.castShadow = false;
+    mm.receiveShadow = false;
+    mm.userData.noShadow = true;
+    root.add(mm);
+  }
 
   // ---- THE GLOW OFF THE VENTS ---------------------------------------------
   // Additive, unfogged, never shadowed. Rings of flat discs on the ground, the
@@ -3635,6 +3828,44 @@ function iceUpdateSpring(game, dt) {
       iceSfx('chime', { volume: 0.9, pitch: 0.7 });
       iceToast('this is what the species is for.');
       iceAuroraArmed = true;
+      // AND THE FIELD ANSWERS. Twenty-six vents, one puff each, all at once —
+      // one line, no new state, and it turns a tick into a thing the whole
+      // basin did. (Rationed nowhere else: iceUpdateGeyser picks the nearest
+      // vent and only the nearest, so the field has never been seen going
+      // together and this is the one moment it should.)
+      if (iceVents) {
+        for (let i = 0; i < iceVents.length; i += 4) {
+          iceSteamSpawn(iceVents[i], iceVents[i + 1] + 0.2, iceVents[i + 2],
+                        2.2, iceVents[i + 3] * 0.6, rand(0.5, 1.0));
+        }
+      }
+    }
+    // ---- THE LONG SIT ------------------------------------------------------
+    // The task is 'have a LONG sit' and the whole of it was over in seven
+    // seconds. `game.record('hot-spring', …)` has always banked the overstay
+    // and nothing in the world ever mentioned it, so the one line in this game
+    // that rewards a player for doing absolutely nothing paid out silently, in
+    // a menu, minutes later.
+    //
+    // Six marks. They are the only escalating thing in the chapter and they
+    // deliberately escalate DOWNWARD — each one is a smaller event than the
+    // last, the sound gets quieter and the joke gets drier, because the reward
+    // for staying in a hot spring has to be less exciting than the reward for
+    // getting into it or the whole chapter is arguing with itself.
+    if (iceSoakDone && iceSoakMark < iceSOAK_MARKS.length &&
+        iceSoak >= iceSOAK_MARKS[iceSoakMark][0]) {
+      const m = iceSOAK_MARKS[iceSoakMark];
+      iceSoakMark++;
+      iceToast(m[1]);
+      iceSfx('chime', { volume: 0.34 - iceSoakMark * 0.04, pitch: 1.5 - iceSoakMark * 0.13 });
+      // and the water answers, once, in a ring — the only visible thing out
+      // here that is about time passing rather than about temperature
+      for (let k = 0; k < 9; k++) {
+        const a = k / 9 * 6.283 + iceSoak;
+        iceSteamSpawn(p.x + Math.cos(a) * (1.4 + iceSoakMark * 0.5), iceSPRING_Y + 0.2,
+                      p.z + Math.sin(a) * (1.4 + iceSoakMark * 0.5), 0.7, 0.4, rand(0.3, 0.55));
+      }
+      if (typeof game.record === 'function') game.record('hot-spring', iceSoak);
     }
   } else if (iceSoak > 0) {
     // Getting out simply stops the clock — no punishment. But it also BANKS it:
@@ -3642,7 +3873,7 @@ function iceUpdateSpring(game, dt) {
     // capybara thing in this game and it deserves a number.
     if (iceSoak > 1.5 && typeof game.record === 'function') game.record('hot-spring', iceSoak);
     iceSoak = damp(iceSoak, 0, 3.2, dt);
-    if (iceSoak < 0.05) iceSoak = 0;
+    if (iceSoak < 0.05) { iceSoak = 0; iceSoakMark = 0; }
   }
 
   // --- the sky ---------------------------------------------------------------
@@ -3981,7 +4212,7 @@ export function createIceland(game) {
     onEnter() {
       iceGeyPhase = 0; iceGeyT = iceGEY_QUIET * 0.45;   // it is nearly due when you arrive
       iceSlideT = -1; iceSlideStall = 0;
-      iceSoak = 0;
+      iceSoak = 0; iceSoakMark = 0;
       iceCatT = 0; iceCatDir = 1; iceCatHold = 0; iceCatPrevZ = iceCAT_Z0;
       iceCatRodeT = 0;
       iceCatCarrying = false; iceCatRodeT = 0;
@@ -4194,7 +4425,31 @@ const iceWHALE_CYCLE = 54;             // s between passes
 const iceWHALE_RUN = 15;               // s of fin, from the far side to the dive
 const iceWHALE_HOLD = 4.0;             // s under, which is the whole trick
 const iceWHALE_UP = 3.4;               // s of breach
-const iceWHALE_NEAR = 34;              // m inside which you have genuinely seen it
+// ---- AND THE TRIGGER WAS A THREE-METRE COIN FLIP -------------------------
+// MEASURED. She breaches at (icePIER.x - 20, icePIER.head + 24) = (6, 164).
+// The head of the pier is (26, 140), which is 31.2 m away; the point the task
+// BEACON aims at is api.pier = (26, icePIER.head - 3) = (26, 137), which is
+// 33.6 m away — four tenths of a metre inside a 34 m radius. So the chapter's
+// mini ticked if you stood on the last three metres of decking and silently
+// did not if you stood anywhere else on the pier the task names, and the
+// penalty for missing was a fifty-four second wait for the next pass.
+//
+// A radius round the WHALE was the wrong question anyway: the task is 'be on
+// the pier when the whale comes up'. It is answered by the pier now, with the
+// radius kept as a generous second way in for anybody watching from the beach
+// or swimming in the harbour.
+const iceWHALE_NEAR = 52;              // m inside which you have genuinely seen it
+// ---- AND SHE COMES WHEN THERE IS SOMEBODY TO SEE HER --------------------
+// The circuit ran on a fifty-four second metronome whether the player was on
+// the pier or a hundred and eighty metres up the moraine, so the fifteen
+// seconds of fin — the entire build the set piece is made of — happened, on
+// average, to nobody. Standing at the end of the pier looking out to sea is
+// the most legible possible statement of intent in this chapter, and the bay
+// answers it: the wait winds down four times as fast while you are out there,
+// so turning up produces a whale inside about a quarter of a minute instead of
+// half a minute of nothing followed by a coin toss.
+const iceWHALE_CALL_R = 42;            // m from the pier head that counts as waiting
+const iceWHALE_CALL_K = 4.0;           // how much faster the clock runs while you are
 let iceWhaleGroup = null;
 let iceWhaleFin = null;
 let iceWhaleT = 12;                    // s until the next pass
@@ -4288,7 +4543,13 @@ function iceUpdateWhale(game, dt) {
   const cp = capy && capy.position;
 
   if (iceWhalePhase === 0) {
-    iceWhaleT -= dt;
+    // the clock runs faster while somebody is standing on the pier looking out
+    let k = 1;
+    if (cp) {
+      const wx = cp.x - icePIER.x, wz = cp.z - (icePIER.head - 4);
+      if (wx * wx + wz * wz < iceWHALE_CALL_R * iceWHALE_CALL_R) k = iceWHALE_CALL_K;
+    }
+    iceWhaleT -= dt * k;
     iceWhaleFin.visible = false;
     iceWhaleGroup.visible = false;
     if (iceWhaleT <= 0) { iceWhalePhase = 1; iceWhaleP = 0; iceWhaleBlow = 0; }
@@ -4356,7 +4617,10 @@ function iceUpdateWhale(game, dt) {
     }
     if (!iceWhaleSeen && cp) {
       const dx = cp.x - iceWHALE_X, dz = cp.z - iceWHALE_Z;
-      if (dx * dx + dz * dz < iceWHALE_NEAR * iceWHALE_NEAR) {
+      // on the pier, OR near enough to the breach to have been rained on
+      const onPier = iceInZone('pier', cp.x, cp.z) ||
+                     (Math.abs(cp.x - icePIER.x) < 6 && cp.z > icePIER.z - 2);
+      if (onPier || dx * dx + dz * dz < iceWHALE_NEAR * iceWHALE_NEAR) {
         iceWhaleSeen = true;
         iceTask('the-whale');
       }
@@ -4391,6 +4655,17 @@ let iceFoxT = 0, iceFoxStare = 0;
 let iceFoxCurious = 0;                // s of coming to have a look
 let iceFoxDraw = 0;                   // 0..1 of the way toward the animal
 let iceFoxYip = 0;
+// ---- AND IT WAS BEING TOWED ----------------------------------------------
+// The approach was `lerp(itsWanderPoint, thePlayer, draw)` evaluated fresh
+// every frame, which is not an animal walking toward you: it is an animal
+// welded to 62 % of YOUR motion. Wheek at it from forty metres and it covers
+// twenty-five of them in the time the damper takes; then run, and it slides
+// sideways across the moraine at two thirds of your speed, feet moving at
+// trot pace, never getting anywhere. A fox has a position and a top speed.
+let iceFoxX = 0, iceFoxZ = 0;         // where it actually is
+let iceFoxHas = false;                // ...once it has been anywhere at all
+const iceFOX_RUN = 4.2;               // m/s — a trotting fox, and it is quick
+const iceFOX_KEEP = 4.5;              // m it stops short at, which is the joke
 
 function iceBuildFox(root) {
   const M = iceMerger();
@@ -4472,13 +4747,42 @@ function iceUpdateFox(game, dt) {
   iceFoxT += dt * iceFOX_SPEED * (1 - iceFoxStare * 0.94);
 
   iceFoxAt(iceFoxT, iceFoxPt);
-  // ...and while it is curious it is not where its wander says it is: it comes
-  // toward you, and drifts back to its own line when it loses interest.
-  const x = cp ? lerp(iceFoxPt.x, cp.x, iceFoxDraw) : iceFoxPt.x;
-  const z = cp ? lerp(iceFoxPt.z, cp.z, iceFoxDraw) : iceFoxPt.z;
+  // ...and while it is curious it is not where its wander says it is: it walks
+  // toward you and stops short, and walks back to its own line when it loses
+  // interest. A TARGET and a SPEED CAP, never a lerp against the player's live
+  // position — see the note by iceFoxX.
+  let tx = iceFoxPt.x, tz = iceFoxPt.z;
+  if (cp && iceFoxDraw > 0.01) {
+    const vx = cp.x - iceFoxPt.x, vz = cp.z - iceFoxPt.z;
+    const vd = Math.max(0.001, Math.hypot(vx, vz));
+    // it aims for a point iceFOX_KEEP short of the animal, and only comes the
+    // fraction of the way its interest is worth
+    const reach = Math.max(0, vd - iceFOX_KEEP) * iceFoxDraw / 0.62;
+    tx = iceFoxPt.x + vx / vd * reach;
+    tz = iceFoxPt.z + vz / vd * reach;
+  }
+  if (!iceFoxHas) { iceFoxX = tx; iceFoxZ = tz; iceFoxHas = true; }
+  {
+    const dx2 = tx - iceFoxX, dz2 = tz - iceFoxZ;
+    const d2 = Math.hypot(dx2, dz2);
+    // the cap is generous when it is only following its own wander (that line
+    // moves at iceFOX_SPEED and must never be lagged behind) and tight when it
+    // is crossing open ground to look at you
+    const cap = Math.max(iceFOX_SPEED * 1.6, iceFOX_RUN) * dt;
+    if (d2 > cap) { iceFoxX += dx2 / d2 * cap; iceFoxZ += dz2 / d2 * cap; }
+    else { iceFoxX = tx; iceFoxZ = tz; }
+  }
+  const x = iceFoxX, z = iceFoxZ;
   const y = iceTerrain(x, z);
+  // IT FACES WHERE IT IS GOING, which is the target it is actually walking to
+  // and not the next point on a wander line it has stepped off. (The old line
+  // asked the wander for its heading even while the fox was thirty metres away
+  // from it coming over to look at you, so the one thing in the chapter that is
+  // alive spent the approach walking sideways.)
   iceFoxAt(iceFoxT + 0.35, iceFoxPt);
-  let yaw = Math.atan2(iceFoxPt.x - x, iceFoxPt.z - z);
+  let hx = iceFoxPt.x - x, hz = iceFoxPt.z - z;
+  if (Math.hypot(tx - x, tz - z) > 0.25) { hx = tx - x; hz = tz - z; }
+  let yaw = Math.atan2(hx, hz);
   // while it is looking at you, it is looking AT YOU
   if (cp && iceFoxStare > 0.02) {
     const toYou = Math.atan2(cp.x - x, cp.z - z);
@@ -4818,60 +5122,171 @@ function iceBuild(game) {
   // a few things they might say when the capybara turns up, and a different
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
+  //
+  // ---- AND THEY KNOW WHAT TIME IT IS NOW (v21) ---------------------------
+  // Eight people, twenty-four sentences, and not one of them changed between
+  // the first second of the chapter and the last. You could rob the hot dog
+  // stand, ride Strokkur, take the glacier down in one go and sit in the pool
+  // until the whole northern sky lit up over the town — and the man at the
+  // stand would still be offering you one with everything. See localResolve in
+  // npc.js: a line may carry `before`/`after` a task id or a `when` predicate,
+  // `onTask` is what somebody says at the moment you do a thing in front of
+  // them, and `praise` is their general opinion of you. All of it existed and
+  // none of it was wired up in this chapter — chapters 4, 5 and 6 have had it
+  // since their own passes.
+  //
+  // The rule the lines are written to: a person in Reykjavik at half past
+  // eleven at night is NOT amazed by the aurora. They have seen four thousand
+  // of them. What they are is mildly interested that you sat still long enough
+  // to get one.
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'iceland', x: icePYLSA.x, y: iceTerrain(icePYLSA.x, icePYLSA.z),
-      z: icePYLSA.z, near: 6,
+    const lit = function () { return iceAurora > 0.35; };
+    const soaking = function () {
+      return !!(iceGame && iceGame.iceland && iceGame.iceland.soak() > 0.1);
+    };
+    // AT THE HATCH, NOT INSIDE THE VAN. Found with a body-overlap audit: the
+    // stand is a 4.2 x 2.6 x 2.6 solid box centred on icePYLSA and he was
+    // authored at icePYLSA — completely enclosed by the thing he serves out of,
+    // invisible from every angle, his collider inside its collider. Fifth
+    // instance of the class in the game (Rio's kiosk vendor, the harbourmaster,
+    // Marrakech's juice seller and snake charmer), and it keeps happening for
+    // one reason: the landmark constant is the point the task BEACON aims at,
+    // and that is never a place a person can stand. He is at the end of his own
+    // counter now, on the hatch side, which is the side the task is on.
+    iceLocPylsa = game.addLocal({ biome: 'iceland',
+      x: icePYLSA.x + 2.9, y: iceTerrain(icePYLSA.x + 2.9, icePYLSA.z + 1.5),
+      z: icePYLSA.z + 1.5, near: 7, face: -2.05,
       figure: { shirt: PALETTE.cloth1, hat: PALETTE.cloth6 },
-      lines: ['Eina med ollu? One with everything?',
+      lines: [{ t: 'Eina með öllu? One with everything?', before: 'pylsa' },
+              { t: 'Four hundred and ninety krona. To you, four hundred and ninety krona.', before: 'pylsa' },
               'It is not that cold. You are just wet.',
-              'Bill Clinton stood exactly where you are standing.'],
+              'Bill Clinton stood exactly where you are standing.',
+              { t: 'You did not even wait for the remoulade.', after: 'pylsa' },
+              { t: 'I have been robbed by gulls before. This is a first.', after: 'pylsa' },
+              { t: 'Come back in the day and pay for one. I am open in the day.', after: 'pylsa' },
+              { t: 'You are dripping on the counter. Again.',
+                when: function () { return !!(iceGame && iceGame.capy && (iceGame.capy.wet || 0) > 0.4); } },
+              { t: 'Everybody comes out for that. Nobody buys anything.', when: lit }],
       wheek: ['We do not shout at the stand. It is a small country.',
-              'Fine. FINE. One with everything.'] });
+              'Fine. FINE. One with everything.',
+              { t: 'That is the second loudest thing that has happened tonight.', when: lit }],
+      onTask: { 'pylsa': ['HEY. That was four hundred and ninety krona.',
+                          'With everything. It had EVERYTHING on it.'],
+                'organ': ['That was you? From here it sounded like the building falling over.'],
+                'aurora': ['Well. Yes. It does that.'] },
+      praise: ['I saw that from the stand. I am not saying anything.'] });
     // ON THE BOARDS. The pier deck's top face is at 1.4 (deckY 1.2 plus half of
     // a 0.4 slab) and he was placed at 0.8 — buried to the shins in the one
     // piece of decking in the chapter, with his collider in it too. Probing
     // terrainHeight would not have saved him either: the causeway under the
     // boards reads 1.0. Some floors are drawn, and you have to ask the drawing.
-    game.addLocal({ biome: 'iceland', x: icePIER.x - 1.6, y: 1.4, z: icePIER.z + 4, near: 8,
+    iceLocPier = game.addLocal({ biome: 'iceland', x: icePIER.x - 1.6, y: 1.4, z: icePIER.z + 4, near: 8,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
       lines: ['Weather is coming. Weather is always coming.',
               'If you are getting on, get on.',
-              'Sky does that most nights. Still worth stopping for.'],
-      wheek: ['Aye. Loud out here, is it not.'] });
+              'Sky does that most nights. Still worth stopping for.',
+              // the humpback: three different people to be, depending on
+              // whether she is out there and whether you have seen her yet
+              { t: 'Stay out on the end a while. There is something in the bay tonight.',
+                before: 'the-whale' },
+              { t: 'Fin came past twice last night. Nobody was up to see it.',
+                before: 'the-whale' },
+              { t: 'You saw her, then. Thirty tonnes and she still takes a run-up.',
+                after: 'the-whale' },
+              { t: 'THERE. Out past the moorings — look now, not in a minute.',
+                when: function () { return !!(iceGame && iceGame.iceland && iceGame.iceland.whaleUp()); } },
+              { t: 'Green sky and a whale in the same night. That is a Tuesday, that is.',
+                when: lit }],
+      wheek: ['Aye. Loud out here, is it not.',
+              { t: 'Do that again and she will come and look at YOU.', before: 'the-whale' }],
+      onTask: { 'the-whale': ['THIRTY TONNES. Out of the water. Eight metres off my boards.',
+                              'Eleven years I have stood here. Twice, I have seen that. Twice.'],
+                'aurora': ['That is a good one. Nine, I would say. Out of ten.'] },
+      praise: ['Mm. This harbour has seen worse.'] });
     // FOUR MORE. Two people in a chapter is not austerity, it is an oversight
     // dressed as one: the emptiness of Iceland is the LANDSCAPE, and the town
     // in the middle of it is supposed to be the warm bit. One in the street,
     // one at the church door, one at the hot pool and one at the head of the
     // moraine, which are the four places the chapter stops you anyway.
-    game.addLocal({ biome: 'iceland', x: -6, y: iceTerrain(-6, iceLANES[0] + 4.5),
+    iceLocStreet = game.addLocal({ biome: 'iceland', x: -6, y: iceTerrain(-6, iceLANES[0] + 4.5),
       z: iceLANES[0] + 4.5, near: 7, face: Math.PI,
       figure: { shirt: PALETTE.iceHullBlue, legs: PALETTE.denim, hat: PALETTE.iceRoofRed },
       lines: ['Half eleven. It does not get darker than this until October.',
               'Everybody is inside. That is not rudeness, that is sense.',
-              'You are the second strangest thing on this street tonight.'],
+              'You are the second strangest thing on this street tonight.',
+              { t: 'Straight up that hill for the church. You cannot miss it, it IS the hill.',
+                before: 'organ' },
+              { t: 'Somebody has been at the organ. The whole street heard it.', after: 'organ' },
+              { t: 'The pool is out past the vents. Go and sit in it. Everybody does.',
+                before: 'hot-spring' },
+              { t: 'Look up, then. Go on. That is what we all came out for.', when: lit },
+              { t: 'It is raining sideways. It is always raining sideways.',
+                when: function () { return !!(iceGame && iceGame.weather && iceGame.weather.drizzle()); } }],
       wheek: ['That will have woken the whole road.',
-              'Keep it down. There are people asleep behind every one of those.'] });
-    game.addLocal({ biome: 'iceland', x: iceCHURCH.x + 6.5,
+              'Keep it down. There are people asleep behind every one of those.'],
+      onTask: { 'organ': ['Was that the ORGAN? At this hour?'],
+                'pylsa': ['He will be talking about that for a decade.'],
+                'aurora': ['Right. Right. Everybody out.'] } });
+    iceLocChurch = game.addLocal({ biome: 'iceland', x: iceCHURCH.x + 6.5,
       y: iceTerrain(iceCHURCH.x + 6.5, iceCHURCH.z + 6), z: iceCHURCH.z + 6, near: 7,
       figure: { shirt: PALETTE.iceChurchDk, legs: PALETTE.stoneDark },
-      lines: ['Five thousand two hundred and seventy-five pipes. Do not touch it.',
+      lines: [{ t: 'Five thousand two hundred and seventy-five pipes. Do not touch it.',
+                before: 'organ' },
+              { t: 'It is locked. It is always locked. Do not get any ideas.', before: 'organ' },
               'The wings are basalt columns. The whole building is a picture of the coast.',
-              'It took forty-one years. Nobody who started it saw it finished.'],
-      wheek: ['...that was very nearly in tune.'] });
-    game.addLocal({ biome: 'iceland', x: iceSPRING.x + 9.5,
+              'It took forty-one years. Nobody who started it saw it finished.',
+              { t: 'Five thousand two hundred and seventy-five pipes, and you found the loudest.',
+                after: 'organ' },
+              { t: 'It is voiced for a room with people in it. There were no people in it.',
+                after: 'organ' },
+              'You can see the whole town from the tower. You are not going up the tower.',
+              { t: 'The concrete goes green on nights like this. Worth the walk up for.',
+                when: lit }],
+      wheek: ['...that was very nearly in tune.',
+              { t: 'Do that inside and I shall have to write to somebody.', after: 'organ' }],
+      onTask: { 'organ': ['FORTY-ONE YEARS to build, and a rodent leans on it.',
+                          'That was the thirty-two foot. That was the THIRTY-TWO FOOT.'],
+                'aurora': ['I have photographed four hundred of those. Still come out.'] },
+      praise: ['This is a place of worship. Nominally.'] });
+    iceLocSpring = game.addLocal({ biome: 'iceland', x: iceSPRING.x + 9.5,
       y: iceTerrain(iceSPRING.x + 9.5, iceSPRING.z + 2), z: iceSPRING.z + 2, near: 8,
       figure: { shirt: PALETTE.iceHouse4, legs: PALETTE.iceRope },
-      lines: ['Get in. Sit still. That is the whole of it.',
-              'Thirty-eight degrees, all year, for nothing.',
-              'People come a very long way to do absolutely nothing here.'],
-      wheek: ['You are in a hot spring. What could you possibly need?'] });
-    game.addLocal({ biome: 'iceland', x: iceMOR_X0 + 9, y: iceTerrain(iceMOR_X0 + 9, iceGL_Z1 + 26),
+      lines: [{ t: 'Get in. Sit still. That is the whole of it.', before: 'hot-spring' },
+              { t: 'Thirty-eight degrees, all year, for nothing.', before: 'hot-spring' },
+              'People come a very long way to do absolutely nothing here.',
+              { t: 'You are still in it. Good. Nobody stays in long enough.', when: soaking },
+              { t: 'Best sit I have seen, and I watch this pool for a living.', after: 'hot-spring' },
+              { t: 'That is what it is FOR. Everybody else gets out to check something.',
+                after: 'hot-spring' },
+              { t: 'The sky did that because you sat down. Cause and effect. Do not argue.',
+                when: lit },
+              'Mind the vents on the way back. The little ones are the hot ones.'],
+      wheek: ['You are in a hot spring. What could you possibly need?',
+              { t: 'Sssh. Sssh. You will put the sky off.', when: soaking }],
+      onTask: { 'hot-spring': ['Seven seconds. Most people manage two.',
+                               'And THAT is the correct way to use a country.'],
+                'aurora': ['I have said it for years. Sit down and it comes.'] },
+      praise: ['Whatever that was, do it somewhere that is not my pool.'] });
+    iceLocCat = game.addLocal({ biome: 'iceland', x: iceMOR_X0 + 9, y: iceTerrain(iceMOR_X0 + 9, iceGL_Z1 + 26),
       z: iceGL_Z1 + 26, near: 9,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.iceBasaltDk, hat: PALETTE.iceRoofRed },
-      lines: ['Cat runs all night. Get on it at the bottom, it will wait for you.',
+      lines: [{ t: 'Cat runs all night. Get on it at the bottom, it will wait for you.',
+                before: 'snowcat' },
+              { t: 'You do not have to walk up. Nobody walks up. I have never walked up.',
+                before: 'snowcat' },
               'Down the middle, not the sides. The sides are where the seracs are.',
-              'Forty years I have groomed this and I have never once gone down it.'],
-      wheek: ['There is nothing up here to hear you but me.'] });
+              'Forty years I have groomed this and I have never once gone down it.',
+              { t: 'You rode it, then. Everybody works that out eventually.', after: 'snowcat' },
+              { t: 'Second one is always faster. Go again.', after: 'glacier-run' },
+              { t: 'Whatever you did down there, the whole tongue heard it.', after: 'glacier-run' },
+              { t: 'Sky is out. I shall still be up here when it goes back in.', when: lit }],
+      wheek: ['There is nothing up here to hear you but me.',
+              'And the fox. There is always the fox.'],
+      onTask: { 'glacier-run': ['In ONE. Nobody takes it in one.',
+                                'A hundred and thirty metres and it never touched the sides.'],
+                'snowcat': ['Hold on to something. It is not a bus.'],
+                'geysir': ['I watched that from up here. You went a LONG way up.'] },
+      praise: ['Forty years. Forty years, and I have not seen that.'] });
     // ---- AND TWO MORE, WITH THE THINGS THAT ARE NEW ----------------------
     // The six above are all inside forty metres of the town or standing at a
     // set piece. The two hundred metres between the last house and the moraine
@@ -4879,26 +5294,80 @@ function iceBuild(game) {
     // half of this chapter's emptiness that is an oversight rather than the
     // point. One with the flock and one at the racks: both of them are the
     // reason the thing beside them exists.
-    game.addLocal({ biome: 'iceland', x: iceFLOCKS[0].x + 9,
+    iceLocSheep = game.addLocal({ biome: 'iceland', x: iceFLOCKS[0].x + 9,
       y: iceTerrain(iceFLOCKS[0].x + 9, iceFLOCKS[0].z + 4), z: iceFLOCKS[0].z + 4, near: 9,
       figure: { shirt: PALETTE.iceHouse6, legs: PALETTE.iceMoraineDk, hat: PALETTE.iceRoofGrey },
       lines: ['Round-up is September. Until then they go where they like.',
               'There are more of them than us. There have always been more of them than us.',
               'Do not walk at them. Walk past them and they will come to you.',
-              'The cairns take you to the ice. Follow them, do not follow the ground.'],
+              'The cairns take you to the ice. Follow them, do not follow the ground.',
+              { t: 'They have been jumpy since the geyser went. Everything is.',
+                when: function () { return !!(iceGame && iceGame.iceland && iceGame.iceland.geyserSwelling()); } },
+              { t: 'Green sky. They will not settle now until it goes.', when: lit },
+              { t: 'You have been on the ice. It is all over your feet.', after: 'glacier-run' }],
       wheek: ['Now look what you have done.',
-              'They will be halfway to the lagoon by morning. Thank you.'] });
-    game.addLocal({ biome: 'iceland', x: iceRACK[0][0] - 4,
+              'They will be halfway to the lagoon by morning. Thank you.'],
+      onTask: { 'glacier-run': ['Down the whole thing? On purpose?'],
+                'aurora': ['Aye. That will be the sheep awake all night, then.'] },
+      praise: ['The sheep saw. The sheep tell me everything.'] });
+    iceLocRack = game.addLocal({ biome: 'iceland', x: iceRACK[0][0] - 4,
       y: iceTerrain(iceRACK[0][0] - 4, iceRACK[0][1] - 3), z: iceRACK[0][1] - 3, near: 8,
       figure: { shirt: PALETTE.iceHull, legs: PALETTE.iceBasaltDk },
       lines: ['Six weeks in the wind and it will keep for three years.',
               'You can smell it from the church. That is how you know it is working.',
               'No, you cannot have one.',
-              'That rock out there is the oldest thing you will see today.'],
+              'That rock out there is the oldest thing you will see today.',
+              { t: 'The birds are on the stack tonight. Go and stand among them, they do not mind.',
+                before: 'puffins' },
+              { t: 'You went in among them. They will talk about you for a week.',
+                after: 'puffins' },
+              { t: 'There is a whale in the bay. She comes in on the ebb.', before: 'the-whale' }],
       wheek: ['Everything on this shore heard that.',
-              'The birds will be up. Go and watch, it is worth it.'] });
-  }
+              'The birds will be up. Go and watch, it is worth it.'],
+      onTask: { 'puffins': ['ELEVEN HUNDRED of them. All at once. Off my cliff.'],
+                'the-whale': ['She has not come in that close since the spring.'] },
+      praise: ['Right. Whatever that was.'] });
 
+    // ---- AND THREE CONVERSATIONS THAT ARE NOT WITH YOU -------------------
+    // See addExchange in npc.js. Everything anybody said in this chapter was
+    // addressed to the capybara, so a town of eight people at half past eleven
+    // at night was completely silent unless you walked up and stood in front of
+    // one of them. These run when you are near enough to read both bubbles and
+    // far enough not to be the subject.
+    //
+    // In this chapter it does a second job. The emptiness is the point, and an
+    // empty place has two possible readings — LEFT ALONE, or unfinished — and
+    // the difference between them is entirely whether the few people in it have
+    // anything to say to each other. Four words overheard across a wet street
+    // is the cheapest way there is to buy the first reading.
+    if (typeof game.addExchange === 'function') {
+      if (iceLocPylsa && iceLocStreet) {
+        game.addExchange({ biome: 'iceland', a: iceLocStreet, b: iceLocPylsa, lines: [
+          ['Still open?', 'I am always open. That is the entire business model.'],
+          ['Busy?', 'Two Germans and a rodent.'],
+          ['Cold one.', 'It is nine degrees.'],
+          ['Sky is coming out.', 'Sky is always coming out. Nobody buys a pylsa for the sky.'],
+          ['Did you hear it go, out at the vents?', 'I hear everything from here. That is the job.'],
+        ] });
+      }
+      if (iceLocPier && iceLocRack) {
+        game.addExchange({ biome: 'iceland', a: iceLocRack, b: iceLocPier, gap: 34, lines: [
+          ['Anything in the bay?', 'Something big. Not saying what.'],
+          ['Wind is backing.', 'Wind is backing. It will be a filthy morning.'],
+          ['Six weeks and they are done.', 'They smell done now.'],
+          ['Birds are up.', 'Something has been at them.'],
+          ['Is that an animal on your pier?', 'It has been on my pier for a while.'],
+        ] });
+      }
+      if (iceLocSpring && iceLocCat) {
+        game.addExchange({ biome: 'iceland', a: iceLocCat, b: iceLocSpring, gap: 40, lines: [
+          ['Still watching that puddle?', 'It is thirty-eight degrees and it is free.'],
+          ['Anybody up the hill?', 'Nobody goes up the hill. That is why you have a job.'],
+          ['Sky is due.', 'Sky is due. Sit down for it.'],
+        ] });
+      }
+    }
+  }
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(iceRoot);
   // ...and then take it back off the things that must never have had it.
   iceNoShadowOnGhosts(iceRoot);

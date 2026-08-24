@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+// systems.js has never needed the solver's own types before — it reads the
+// world, it does not build in it. The camera's occlusion ray does: one Vec3 pair
+// and the two shape-type constants it must ignore. See sysCamClear.
+import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick } from './shared.js';
 
@@ -8,6 +12,18 @@ import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp
 // Zero allocations inside update(): all scratch lives here.
 // ---------------------------------------------------------------------------
 
+// The two shape kinds the camera's occlusion ray must ignore — see sysCamClear.
+// Read off CANNON.Shape.types rather than written as the numbers they happen to
+// be, and defaulted, so a cannon-es that renumbers them cannot silently turn
+// this into "ignore boxes".
+const sysSHAPE_HEIGHTFIELD = (CANNON.Shape && CANNON.Shape.types &&
+                              CANNON.Shape.types.HEIGHTFIELD) || 32;
+const sysSHAPE_PLANE = (CANNON.Shape && CANNON.Shape.types &&
+                        CANNON.Shape.types.PLANE) || 2;
+// skipBackfaces:false — the eye is regularly ALREADY inside something when this
+// runs (that is the bug it exists for), and a ray that ignores back faces walks
+// straight out of the wall it is standing in and reports the alley clear.
+const sysCAM_RAY_OPTS = { skipBackfaces: false };
 const sysZERO      = new THREE.Vector3(0, 0, 0);
 const sysV1        = new THREE.Vector3();
 const sysV2        = new THREE.Vector3();
@@ -98,6 +114,10 @@ const sysTORII_BACK = 5.2;
 // is a ceiling over it, and it pins the lens in the air above a diving animal.
 // A biome may publish camFloor(x, z); everybody else gets the constant.
 const sysCAM_FLOOR = 1.7;
+// ---- THE BOOM STOPS AT THE FIRST WALL. See sysCamClear --------------------
+const sysCAM_CLEAR_MIN = 1.9;   // m — the shortest the boom may ever be cut to
+const sysCAM_CLEAR_PAD = 0.45;  // m of daylight kept between the lens and the wall
+const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
 // Subtle speed dolly — the camera eases out at a run so running reads as fast.
 const sysCAM_DOLLY   = 1.2;
 const sysRUN_SPEED   = 7.4;   // capybara top ground speed
@@ -266,6 +286,28 @@ const sysBACK_HOLD   = 0.55;   // s of held R. Long enough not to be a typo.
 const sysBACK_EVERY  = 1.4;    // s between breadcrumbs
 const sysBACK_KEEP   = 3;      // how many we hold — the oldest is ~4 s of walking
 const sysBACK_SPEED  = 1.2;    // m/s below which "here" is not evidence of anything
+// ---- AND THE ONE CASE THE HELD KEY CANNOT COVER ---------------------------
+// R is a rescue you have to KNOW ABOUT and reach for, which is right for being
+// wedged in a gap — you can see that you are stuck, and you have all the time in
+// the world to remember. Falling out of the bottom of the world is neither: the
+// screen is empty, nothing says what has happened, and the animal is accelerating
+// away from every landmark that would have told you. Seventeen chapters, three of
+// which can put the player in the air over ground that stops (the condor, the
+// balloon, the Drift), and the only answer was a key nobody is looking for.
+//
+// The floor is absolute and deliberately a long way down. Every chapter's own
+// terrain, seabed and cave floor is above -60 (measured: the deepest legitimate
+// point in the game is Antarctica's sea at -34); this sits well under all of
+// them, so nothing that is merely DEEP can ever trip it, and a real void fall
+// crosses it about three seconds after there stops being anything to land on.
+const sysVOID_Y      = -90;
+const sysVOID_HOLD   = 0.35;   // s outside before it fires — never on one bad frame
+// How far past a chapter's own bounds() counts as out. Generous, because the
+// edge of a published rectangle is a place a chapter may legitimately put you
+// (Pasto's fence sits six metres inside its own) and because being rescued
+// from somewhere you can still see the world from would be the more annoying
+// bug of the two.
+const sysVOID_PAD    = 4;
 
 // ---- Opera House camera keep-out -------------------------------------------
 // This USED to be one fat AABB (x +/-14.5, z -13.5..5.5, y < 17) covering the
@@ -1698,6 +1740,39 @@ const sysMUS_CHORDS18 = [
 const sysMUS_ROOTS18 = [19, 21, 17, 19];
 const sysMUS_NEXT18  = [[1, 2], [3], [0], [0, 1]];
 
+// ---------------------------------------------------------------------------
+// THE TITLE. The one palette in this table that is not a place.
+//
+// The front of the game was SILENT — the only screen in seventeen chapters
+// that was, and the first one anybody ever sees. A menu is not nothing: it is
+// the ten or thirty seconds in which a player decides what kind of game this
+// is, and it was deciding that on a still picture with no sound at all.
+//
+// It is not a new engine and it is not a stinger. It is one more row in this
+// table, so the whole generative score — the voice-leading pad, the mallet, the
+// bass, the reverb, the player's own volume and mute keys — is simply RUNNING
+// while the card is up, and `startGame` glides it into whichever place was
+// chosen instead of starting anything. Nothing "begins" when you press a
+// ticket; the music was already there and it goes with you.
+//
+// Deliberately the same key centre as chapter one (D lydian, open fifths, no
+// third in two of the four voicings) for two reasons: the crossfade into
+// Sydney is then not a change at all, and a rootless open voicing is the sound
+// of somewhere unspecified — which is exactly what the card is asking.
+// Slower than any chapter (a chord for a quarter of a minute), sparser plucks,
+// filter almost shut, and the pad a shade under the gardens', because it is
+// underneath words that are being read.
+const sysMUS_CHORDS_T = [
+  [50, 57, 61, 64, 69],   // D A C# E A     — Dmaj9, no third in the bass
+  [45, 52, 57, 61, 66],   // A E A C# F#    — A6/9
+  [43, 50, 54, 59, 62],   // G D F# B D     — Gmaj7
+  [47, 54, 57, 62, 66],   // B F# A D F#    — Bm11
+];
+const sysMUS_ROOTS_T = [38, 33, 31, 35];
+const sysMUS_NEXT_T  = [[1, 2, 3], [2, 3, 0], [3, 0], [0, 1]];
+/** Index of the title row in sysMUS_PAL — appended, so no chapter's `pal` moves. */
+const sysMUS_PAL_TITLE = 18;
+
 const sysMUS_PAL = [
   // 0 — Sydney. Felt mallets over a wide, slow pad: a hot afternoon in a public
   // garden where nothing is in a hurry.
@@ -1931,6 +2006,16 @@ const sysMUS_PAL = [
     // along by something enormously bigger than it. Nine notes, opening out.
     lift: { inst: 'glass', shape: 'soar', n: 9, gap: 0.22, oct: 0, vel: 1.00,
             up: 2.6, dn: 12.0 } },
+  // 18 - THE TITLE CARD. Not a place. See sysMUS_CHORDS_T above for why it
+  // sounds like chapter one heard from the next room, and sysMUS_PAL_TITLE for
+  // the index — appended, so not one chapter's `pal` moved.
+  { chords: sysMUS_CHORDS_T, roots: sysMUS_ROOTS_T, next: sysMUS_NEXT_T,
+    dwellA: 13.0, dwellB: 21.0, pluckA: 3.0, pluckB: 7.5, cut: 540, bus: 0.135, bass: 0.20,
+    lead: 'mallet', xfade: 5.5, rhythm: null,
+    // A menu never earns a marquee, but a table cannot be missing a rung: if
+    // one is ever fired from here it should be the gardens' plain ascent,
+    // because that is what this palette is a quieter version of.
+    lift: { shape: 'up', n: 9, gap: 0.115, oct: 0, vel: 1.00 } },
 ];
 // The Circular Quay palette (A lydian) got the PLACE trigger it wanted: biome
 // entry selects it, and stepping off the wheel returns to it from the passage
@@ -2080,6 +2165,29 @@ function sysFillLegend(el, which) {
       el.appendChild(sysEl('span', null, rows[i][1]));
     }
   }
+  return el;
+}
+
+/**
+ * THE RAIL ALONG THE FOOT OF A TITLE PAGE.
+ *
+ * `rows` is [[keycaps...], what it does], and `note` is an optional sentence
+ * set apart from them in italic. Replaces `.capyui-begin`, which was one line
+ * of blinking uppercase — on page two, a bare list of the eighteen characters
+ * that pick a chapter, under seventeen tiles each of which already prints its
+ * own key. That is not a legend, it is the same information twice with the
+ * useful copy taken away, and it blinked.
+ */
+function sysTitleFoot(rows, note) {
+  const el = sysEl('div', 'capyui-foot');
+  for (let i = 0; i < rows.length; i++) {
+    const s = sysEl('span');
+    const caps = rows[i][0];
+    for (let k = 0; k < caps.length; k++) s.appendChild(sysEl('kbd', null, caps[k]));
+    s.appendChild(document.createTextNode(rows[i][1]));
+    el.appendChild(s);
+  }
+  if (note) el.appendChild(sysEl('span', 'capyui-footnote', note));
   return el;
 }
 
@@ -2549,6 +2657,12 @@ function sysDrawShapes(list, vb, fit) {
     } else if (sh[0] === 'c') {
       n = document.createElementNS(sysMARK_NS, 'circle');
       n.setAttribute('cx', sh[1]); n.setAttribute('cy', sh[2]); n.setAttribute('r', sh[3]);
+    } else if (sh[0] === 'e') {
+      // A capybara is not made of circles. Added for the masthead device and
+      // available to every mark and souvenir from here on: cx cy rx ry.
+      n = document.createElementNS(sysMARK_NS, 'ellipse');
+      n.setAttribute('cx', sh[1]); n.setAttribute('cy', sh[2]);
+      n.setAttribute('rx', sh[3]); n.setAttribute('ry', sh[4]);
     } else {
       n = document.createElementNS(sysMARK_NS, 'polygon');
       n.setAttribute('points', sh[1]);
@@ -2557,6 +2671,32 @@ function sysDrawShapes(list, vb, fit) {
     svg.appendChild(n);
   }
   return svg;
+}
+
+// ---------------------------------------------------------------------------
+// THE DEVICE UNDER THE MASTHEAD.
+//
+// The animal the game is about, in profile, in eleven shapes and the same
+// palette as everything else. It goes between the two halves of the ornament
+// rule on the front of the card — see .capyui-orn. Built out of sysDrawShapes
+// like the postcards and the souvenirs, so it obeys the aesthetic law by
+// construction: no file, no path data, no curve that is not a circle.
+const sysCAPY_MARK = [
+  ['e', 15, 13.5, 11, 6.2, 'capy'],           // body
+  ['e', 6.5, 15.5, 3.2, 4.2, 'capyDark'],     // haunch, a shade deeper
+  ['r', 8, 17, 2.4, 4, 'capyDark'],           // back leg
+  ['r', 19, 17.5, 2.4, 3.5, 'capyDark'],      // front leg
+  ['c', 25, 9.5, 5.4, 'capyLight'],           // head
+  ['e', 29.6, 9.6, 2.6, 2.2, 'capy'],         // the blunt muzzle
+  ['c', 22.4, 5.2, 1.9, 'capyEar'],
+  ['c', 27.2, 5.0, 1.9, 'capyEar'],
+  ['c', 26.6, 8.4, 1.1, 'capyEye'],
+  ['c', 31.2, 10.2, 1.0, 'capyNose'],
+];
+const sysCAPY_VB = '0 0 34 22';
+/** The masthead device. Always available — it is not per-chapter. */
+function sysBuildCapyMark() {
+  return sysDrawShapes(sysCAPY_MARK, sysCAPY_VB, 'xMidYMid meet');
 }
 
 /** One souvenir as an <svg>, or null for a chapter with none authored. */
@@ -2943,22 +3083,109 @@ function sysBuildCSS() {
    measured at 1280x720 the card ran from -146 to 866 and the last chapter was
    below the fold and unclickable. Start-aligned, the card's own scroller can
    reach all of it. */
+/* THE VEIL IS A SKY, NOT A SHEET OF TRACING PAPER. A flat 78% wash over the
+   live world threw away the one thing this screen has that no menu can buy:
+   there is a game running behind it. A vertical gradient — thinner at the top
+   where the sky is, heavier at the bottom where the words are — keeps the
+   harbour readable and still gives the card something quiet to sit on. */
 '.capyui-title{position:absolute;inset:0;z-index:60;display:flex;align-items:flex-start;',
-  'justify-content:center;pointer-events:auto;cursor:pointer;background:' + veil + ';',
+  'justify-content:center;pointer-events:auto;cursor:pointer;',
+  'background:linear-gradient(180deg,' + sysRgba(PALETTE.fog, 0.34) + ' 0%,',
+  sysRgba(PALETTE.fog, 0.62) + ' 38%,' + sysRgba(PALETTE.skyBottom, 0.84) + ' 100%);',
   'overflow-y:auto;overscroll-behavior:contain;',
-  'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);',
+  'backdrop-filter:blur(5px) saturate(1.08);-webkit-backdrop-filter:blur(5px) saturate(1.08);',
   'transition:opacity .75s ease,transform .75s ease;padding:18px;}',
 '.capyui-title.gone{opacity:0;transform:scale(1.06);pointer-events:none;}',
-'.capyui-card{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
-  'box-shadow:0 18px 40px ' + shadow2 + ';padding:clamp(20px,4vw,40px) clamp(22px,5vw,54px);',
-  'transform:rotate(-1deg);max-width:880px;width:100%;text-align:center;',
+/* ---- THE PLACE YOU ARE LOOKING AT WARMS THE WHOLE SCREEN ----------------
+   One soft wash behind the card, in the palette of whichever chapter the
+   cursor is resting on — the same colour its picture is drawn in. It is the
+   visual half of the thing the score does when you hover a tile: the card
+   leans towards the place before you have chosen it.
+   `currentColor` inside the gradient rather than a variable inside it, because
+   `color` is an animatable property and a gradient stop is not: this way the
+   wash CROSSFADES between chapters instead of cutting. */
+/* No `filter: blur()` on it. A 1500 px element repaints for every frame of the
+   1.1 s crossfade, and a blur on top of that is a full-size separated
+   convolution seventy times over for a wash that a radial gradient with a soft
+   74% stop already draws — the gradient IS the blur. */
+/* Sized to be seen AROUND the card, not under it: the card is opaque and
+   centred, so the only place this reads is the margins — which is exactly
+   right for something that is meant to be noticed peripherally and never
+   looked at. */
+'.capyui-glow{position:absolute;left:50%;top:0;width:min(2000px,170%);height:100%;',
+  'transform:translateX(-50%);pointer-events:none;z-index:0;',
+  'color:' + sysRgba(PALETTE.cloth1, 0) + ';',
+  'background:radial-gradient(62% 62% at 50% 44%,currentColor,transparent 76%);',
+  'transition:color 1.1s ease;}',
+'.capyui-card{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:7px;',
+  /* a printed sheet: a warm rake of light across it and the faintest laid
+     texture, both pure CSS — the aesthetic law forbids an image file, not a
+     gradient */
+  'background-image:linear-gradient(158deg,' + sysRgba(PALETTE.sail, 1) + ' 0%,',
+  sysRgba(PALETTE.sandstone, 0.34) + ' 100%),',
+  'repeating-linear-gradient(92deg,' + sysRgba(PALETTE.stoneDark, 0.05) + ' 0 1px,',
+  'transparent 1px 4px);',
+  'box-shadow:0 24px 60px ' + shadow2 + ',0 2px 0 ' + sysRgba(PALETTE.sail, 0.9) + ' inset,',
+  '0 0 0 1px ' + sysRgba(PALETTE.stoneDark, 0.22) + ';',
+  'padding:clamp(20px,4vw,40px) clamp(22px,5vw,54px);',
+  'position:relative;z-index:1;',
+  'transform:rotate(-.8deg);max-width:880px;width:100%;text-align:center;',
   /* centred when it fits, scrolled from the top when it does not */
-  'margin:auto;}',
+  'margin:auto;transition:max-width .3s ease,transform .3s ease;}',
+/* THE PICKER IS NOT A NOTE PINNED TO A BOARD. Page one is a title card and the
+   tilt is its signature; page two is a grid of seventeen rectangles, and a
+   grid on the skew reads as a mistake rather than as charm. */
+'.capyui-card.two{transform:none;}',
 '.capyui-card h1{font-size:clamp(24px,6.2vw,46px);line-height:1.05;color:' + ink + ';',
   'text-wrap:balance;',
   'font-weight:700;letter-spacing:-.01em;}',
 '.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
   'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
+/* ---------- the ornament ----------
+   A hairline rule broken in the middle by the animal the game is about. It is
+   doing one job and it is not decoration for its own sake: the masthead had a
+   title, a subtitle and then immediately a control legend, so the top of the
+   card read as a form. A printed sheet has a device under its masthead; this
+   is one, it is eleven shapes of SVG, and it costs nothing. */
+'.capyui-orn{display:flex;align-items:center;justify-content:center;gap:clamp(8px,2vw,14px);',
+  'margin-top:clamp(9px,1.8vw,14px);}',
+'.capyui-orn:before,.capyui-orn:after{content:"";height:1px;flex:1 1 0;max-width:160px;',
+  'background:linear-gradient(90deg,transparent,' + sysRgba(PALETTE.ibisHead, 0.42) + ');}',
+'.capyui-orn:after{background:linear-gradient(270deg,transparent,' +
+  sysRgba(PALETTE.ibisHead, 0.42) + ');}',
+'.capyui-orn svg{display:block;width:clamp(38px,7vw,52px);height:auto;}',
+/* ---------- the key rail, which used to be a blinking list of punctuation ----
+   The line under the picker read
+       OR PRESS ITS KEY · 1 2 3 4 5 6 7 8 9 0 - = [ ] ; ' , .
+   in blinking uppercase, which is a keyboard map for a thing that already
+   prints its own key on every tile: eighteen characters of noise under
+   seventeen pictures, and the only animated element on the screen.
+   What a player actually needs to be told here is how to MOVE — arrows, Enter,
+   Escape — and that is three chips and a sentence, held still. */
+'.capyui-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;',
+  'gap:6px clamp(10px,2.2vw,20px);margin-top:clamp(10px,2vw,16px);',
+  'padding-top:clamp(8px,1.6vw,12px);border-top:1px solid ' + inkFaint + ';',
+  'font-size:clamp(9.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
+  'letter-spacing:.1em;text-transform:uppercase;}',
+'.capyui-foot span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}',
+'.capyui-foot kbd{display:inline-flex;align-items:center;justify-content:center;',
+  'min-width:19px;height:19px;padding:0 5px;border-radius:4px;font:inherit;',
+  'font-size:11px;letter-spacing:0;color:' + ink + ';background:' + paper2 + ';',
+  'border:1px solid ' + rule + ';box-shadow:0 1px 0 ' + rule + ';}',
+/* the shelf's own "there is more of this" control — see picksFade() */
+'.capyui-more2{display:block;margin:6px auto 0;padding:3px 12px 4px;border-radius:999px;',
+  'font:inherit;font-size:clamp(8.5px,1.7vw,10.5px);font-weight:700;letter-spacing:.14em;',
+  'text-transform:uppercase;cursor:pointer;pointer-events:auto;touch-action:manipulation;',
+  'background:' + paper2 + ';border:1px solid ' + rule + ';color:' + inkSoft + ';',
+  'transition:color .16s ease,border-color .16s ease,transform .16s ease;}',
+'.capyui-more2:after{content:"  \\25BE";}',
+'.capyui-more2:hover{color:' + accent + ';border-color:' + accent + ';transform:translateY(1px);}',
+'.capyui-more2:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-more2[hidden]{display:none;}',
+'.capyui-footnote{text-transform:none;letter-spacing:.02em;font-weight:400;',
+  'font-size:.95em;opacity:.8;font-style:italic;}',
+'@media (max-height:770px){.capyui-foot{margin-top:8px;padding-top:7px;',
+  'gap:4px clamp(8px,1.8vw,14px);}}',
 '.capyui-rule{height:2px;background:' + rule + ';border-radius:2px;margin:clamp(14px,3vw,22px) auto;',
   'width:64%;transform:rotate(.4deg);}',
 '.capyui-legend{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;text-align:left;',
@@ -2979,9 +3206,10 @@ function sysBuildCSS() {
   '.capyui-legend{gap:2px 12px;font-size:clamp(9px,2vw,11px);}}',
 '.capyui-legend kbd{color:' + ink + ';font-weight:700;white-space:nowrap;',
 'font-family:inherit;font-size:inherit;background:none;border:0;padding:0;}',
-'.capyui-begin{margin-top:clamp(12px,2.6vw,18px);font-size:clamp(10px,2.2vw,12px);',
-  'color:' + inkSoft + ';font-weight:700;letter-spacing:.16em;text-transform:uppercase;',
-  'animation:capyui-blink 1.7s ease-in-out infinite;}',
+/* .capyui-begin is gone: both pages ended in one line of blinking uppercase,
+   and neither of them earned the only animation on the screen. See
+   sysTitleFoot and .capyui-foot for what replaced it. The keyframe stays —
+   the stamina ring and the low-battery warning are its real users. */
 '@keyframes capyui-blink{0%,100%{opacity:.35}50%{opacity:1}}',
 /* ---------- the two pages ---------- */
 /* [hidden] is only display:none by a UA rule that ANY later display
@@ -2995,10 +3223,32 @@ function sysBuildCSS() {
    picker and wants every pixel it can get, so the card widens for it. */
 '.capyui-p1{gap:0;}',
 '.capyui-card{max-width:640px;}',
-'.capyui-card.two{max-width:880px;}',
+/* Wider than it was. Seventeen pictures in a scroll region is a shop window,
+   and a shop window wants the glass: at 880 the shelf showed two and a half
+   rows of four and the tiles were 200 px, which is smaller than the thing they
+   are pictures of. */
+'.capyui-card.two{max-width:min(1140px,96vw);}',
 /* the page-two heading, which is an h1 doing an h2's job so the card still has
    exactly one top-level heading on whichever page is showing */
-'.capyui-h2{font-size:clamp(16px,3.4vw,26px)!important;text-align:center;}',
+'.capyui-h2{font-size:clamp(16px,3.4vw,26px)!important;text-align:center;',
+  'grid-column:2;margin:0;}',
+/* ---------- page two: a masthead of its own ----------
+   The back button used to be a chip floating above a centred heading, so the
+   top of the picker was two left-aligned pixels and a lot of nothing. Three
+   columns — the way out, the question, and where the journey has got to —
+   makes it a header, and it puts the one number a returning player wants
+   (how much of this game have I actually seen) on the screen that is asking
+   them to choose. The outer columns are the same width so the heading is
+   optically centred rather than pushed by whichever side has more words. */
+'.capyui-p2head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;',
+  'gap:clamp(6px,1.6vw,14px);}',
+'.capyui-p2stat{grid-column:3;justify-self:end;text-align:right;',
+  'font-size:clamp(8.5px,1.7vw,10.5px);letter-spacing:.14em;text-transform:uppercase;',
+  'font-weight:700;color:' + inkSoft + ';line-height:1.35;}',
+'.capyui-p2stat b{display:block;color:' + accent + ';font-variant-numeric:tabular-nums;}',
+'@media (max-width:560px){.capyui-p2head{grid-template-columns:auto 1fr;}',
+  '.capyui-h2{grid-column:1 / -1;grid-row:2;text-align:left;}',
+  '.capyui-p2stat{grid-column:2;grid-row:1;}}',
 /* ---------- page one: the six verbs ---------- */
 /* THE LEGEND IS THE CONTENT OF THIS PAGE, not its footnote. On the old card it
    was 10-13px under a rule at the very bottom; here it is the thing the player
@@ -3048,9 +3298,12 @@ function sysBuildCSS() {
 '.capyui-go.alt{background:none;color:' + accent + ';box-shadow:none;',
   'border-color:' + rule + ';}',
 '.capyui-go.alt:hover{border-color:' + accent + ';background:' + veil2 + ';filter:none;}',
+/* an ink ring is right on the filled button and reads as a second border on
+   the outline one, which is what this variant already is */
+'.capyui-go.alt:focus-visible{outline-color:' + accent + ';}',
 '.capyui-go.alt i{opacity:.7;color:' + inkSoft + ';}',
 /* ---------- page two: the way back ---------- */
-'.capyui-back{align-self:flex-start;margin-bottom:clamp(4px,1vw,8px);',
+'.capyui-back{grid-column:1;justify-self:start;',
   'padding:4px 12px 4px 8px;border-radius:999px;font:inherit;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
   'background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';',
@@ -3059,9 +3312,11 @@ function sysBuildCSS() {
 '.capyui-back:before{content:"\\2190";margin-right:7px;}',
 '.capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
 '.capyui-back:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
-/* On a short screen page two gets the shelf back that the old single card had
-   to fight the legend for - there is nothing under it any more but one line. */
-'@media (max-height:900px){.capyui-picks{max-height:clamp(150px,50vh,560px);}}',
+/* The short-screen shelf budget USED TO LIVE HERE and did nothing at all: it
+   is the same specificity as the base .capyui-picks rule forty lines below,
+   so source order decided it and the base rule won every time. Measured at
+   1280x760 the shelf was 319 px — 42vh, the base — not the 380 this claimed.
+   It is now stated after the rule it has to beat; see the note down there. */
 /* ---------- the chapter picker (title card) ---------- */
 /* A GRID, NOT A WRAP. Eleven torn tickets flex-wrapped into four ragged rows of
    different widths and pushed the last chapter below the fold on a 720p laptop.
@@ -3074,69 +3329,147 @@ function sysBuildCSS() {
    spans 2x2 in a four-column grid, so the picker is 4 + 12 = sixteen cells and
    the last row is full. Two columns below 900px (chapter one spans the row),
    one column on a phone. */
-'.capyui-picks{display:grid;grid-template-columns:1fr;gap:clamp(5px,1vw,8px);',
+'.capyui-picks{display:grid;grid-template-columns:1fr;gap:clamp(6px,1.1vw,10px);',
   'margin-top:clamp(6px,1.2vw,9px);text-align:left;',
   /* THE SHELF SCROLLS, THE CARD DOES NOT GROW. --cols is written per build by
      sysPickCols(); below 900px the column count is a function of the WIDTH
      rather than of the chapter count, because at 320px nothing else matters. */
-  'max-height:clamp(150px,42vh,520px);overflow-y:auto;overscroll-behavior:contain;',
+  'max-height:clamp(150px,56vh,760px);overflow-y:auto;overscroll-behavior:contain;',
   'padding:2px;margin-left:-2px;margin-right:-2px;',
   'scrollbar-width:thin;scrollbar-color:' + rule + ' transparent;}',
 '.capyui-picks::-webkit-scrollbar{width:7px;}',
 '.capyui-picks::-webkit-scrollbar-thumb{background:' + rule + ';border-radius:4px;}',
 '.capyui-picks::-webkit-scrollbar-track{background:transparent;}',
+/* ---- A CUT ROW MUST LOOK CUT ON PURPOSE ---------------------------------
+   The shelf scrolls, which is right, and the row at the fold was sliced off
+   square by the overflow — so the bottom of the picker looked like a bug
+   rather than like there being more. Fading the last few pixels is the whole
+   fix, and the class is only on while there is genuinely something below:
+   fading the end of a list you have already reached is its own small lie.
+   `.padded` keeps room for the lift on the last row's hover, which the
+   overflow was otherwise clipping. */
+'.capyui-picks{padding-bottom:5px;}',
+'.capyui-picks.more{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 38px),transparent);',
+  'mask-image:linear-gradient(180deg,#000 calc(100% - 38px),transparent);}',
+'.capyui-picks.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 22px);',
+  'mask-image:linear-gradient(180deg,transparent,#000 22px);}',
+'.capyui-picks.up.more{',
+  '-webkit-mask-image:linear-gradient(180deg,transparent,#000 22px,#000 calc(100% - 38px),transparent);',
+  'mask-image:linear-gradient(180deg,transparent,#000 22px,#000 calc(100% - 38px),transparent);}',
 '@media (min-width:430px){.capyui-picks{grid-template-columns:repeat(2,1fr);}}',
 '@media (min-width:640px){.capyui-picks{grid-template-columns:repeat(3,1fr);}}',
 '@media (min-width:900px){.capyui-picks{grid-template-columns:repeat(var(--cols,5),1fr);}}',
+/* The short-screen budget, AFTER the base rule so it actually wins — see the
+   note where it used to be. A 720p laptop is the commonest window this game
+   opens in and the picker is the screen with the most to show, so the shelf
+   takes what the card's own chrome does not need: at 760 this is three rows
+   of tiles rather than two and a half, and the footer stays above the fold. */
+'@media (max-height:900px){.capyui-picks{max-height:clamp(140px,50vh,600px);}}',
+'@media (max-height:770px){.capyui-picks{max-height:clamp(130px,46vh,420px);}}',
 /* ---- the hero: chapter one, out of the grid and across the card ---- */
-'.capyui-pick.hero{flex-direction:row;align-items:stretch;margin-top:clamp(7px,1.4vw,11px);',
-  /* a LETTERBOX, not a portrait: without a height the panel took whatever the
-     body needed and the picture stretched to fill a box twice as tall as the
-     shape it was drawn in */
-  /* HEIGHT, not min-height, and it is measured rather than chosen: at 720p the
-     body's own content came to 190 px and the whole card ran to 803 in a 720
-     window, which put the control legend below the fold on the commonest
-     screen this game will ever open in. Fixed, the card is 706. */
-  'height:clamp(84px,13.5vh,124px);overflow:hidden;',
-  'border-color:' + accent + ';box-shadow:0 3px 14px ' + shadow2 + ';}',
-'.capyui-pick.hero .capyui-pickart{width:38%;flex:0 0 38%;aspect-ratio:auto;',
+/* ---- MIN-HEIGHT, NOT HEIGHT. THIS IS THE LINE THAT ATE 'SYDNEY'. ----------
+   The hero used to be `height:clamp(84px,13.5vh,124px)` with `overflow:hidden`,
+   chosen so the card would fit a 720 px window. A fixed box around text that is
+   clamp()-sized in a DIFFERENT unit is a box that is right at exactly one
+   window size: at 13.5vh of a 700 px viewport the panel is 94 px and the body
+   wants 118, so the third line was cut through the middle and the subtitle
+   under 'Sydney' was sliced in half lengthways — which is precisely what it
+   looked like, and it looked like a rendering fault rather than a layout one.
+   A minimum with content above it can never do that. The card's height budget
+   is defended where it should be, on the SHELF, which is a scroll region and
+   is the only thing here that grows without limit. */
+'.capyui-pick.hero{flex-direction:row;align-items:stretch;margin-top:clamp(8px,1.6vw,13px);',
+  'min-height:clamp(100px,15vh,150px);',
+  'border-color:' + accent + ';box-shadow:0 4px 18px ' + shadow2 + ';}',
+/* ...AND THE PANEL KEEPS AN ASPECT OF ITS OWN. `aspect-ratio:auto` on a box
+   whose height is no longer fixed hands the decision to the <svg> inside it,
+   which is authored 64 x 40 — so the hero grew to 205 px, three quarters of it
+   empty paper beside four lines of text. A letterbox is what this panel is,
+   and now it says so rather than inheriting it from a fixed height that had
+   to be maintained by hand. */
+'.capyui-pick.hero .capyui-pickart{width:40%;flex:0 0 40%;aspect-ratio:64 / 25;',
   'border-bottom:0;border-right:1px solid ' + rule + ';}',
 '.capyui-pick.hero .capyui-pickbody{display:flex;flex-direction:column;justify-content:center;',
-  'padding:clamp(8px,1.6vw,14px) clamp(10px,2vw,16px);min-height:0;}',
+  'padding:clamp(10px,1.9vw,16px) clamp(12px,2.2vw,20px);min-height:0;',
+  /* room for the arrow that lives on the right-hand edge */
+  'padding-right:clamp(46px,7vw,74px);}',
+/* ---- THE HERO IS A DOOR AND IT SHOULD LOOK LIKE ONE ---------------------
+   Widened to 1140, the hero's word side is six hundred pixels of paper with
+   four short lines pinned to the left of it. An arrow on the far edge is the
+   cheapest possible way to say that the whole slab is one press — it puts
+   something at the end of the line the eye is already travelling along, and
+   it leans out when you touch it. */
+'.capyui-pickarrow{position:absolute;right:clamp(12px,2vw,22px);top:50%;',
+  'transform:translateY(-50%);display:flex;align-items:center;justify-content:center;',
+  'width:clamp(28px,4vw,38px);height:clamp(28px,4vw,38px);border-radius:50%;',
+  'border:1px solid ' + rule + ';color:' + accent + ';',
+  'font-size:clamp(13px,2.2vw,17px);font-weight:700;line-height:1;',
+  'transition:transform .2s ease,background .2s ease,border-color .2s ease,color .2s ease;}',
+'.capyui-pick.hero:hover .capyui-pickarrow,.capyui-pick.hero:focus-visible .capyui-pickarrow{',
+  'background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
+  'transform:translateY(-50%) translateX(3px);}',
+'@media (max-width:520px){.capyui-pickarrow{display:none;}',
+  '.capyui-pick.hero .capyui-pickbody{padding-right:clamp(12px,2.2vw,20px);}}',
+/* the hero's eyebrow — one line of small caps above the name, so the biggest
+   thing on the card says what it IS as well as where it is */
+'.capyui-pickeyebrow{display:block;margin-bottom:4px;font-style:normal;font-weight:700;',
+  'font-size:clamp(8px,1.6vw,9.5px);letter-spacing:.24em;text-transform:uppercase;',
+  'color:' + sysRgba(PALETTE.ibisHead, 0.5) + ';}',
 /* ...AND IT LOSES ITS FIXED HEIGHT WITH IT. The hero is 84-124 px tall with
    overflow:hidden, which is right when the picture is beside the words and
    clips the words off entirely once it is above them: measured at 390 px the
    hero tile showed the Opera House and no longer said 'Sydney'. */
-'@media (max-width:520px){.capyui-pick.hero{flex-direction:column;height:auto;}',
+'@media (max-width:520px){.capyui-pick.hero{flex-direction:column;min-height:0;}',
   '.capyui-pick.hero .capyui-pickart{width:100%;flex:none;aspect-ratio:64/22;',
   'border-right:0;border-bottom:1px solid ' + rule + ';}}',
 '.capyui-pick{display:flex;flex-direction:column;height:100%;position:relative;',
   'cursor:pointer;pointer-events:auto;width:100%;text-align:left;overflow:hidden;',
   'font:inherit;color:inherit;touch-action:manipulation;',
-  'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:6px;',
-  'padding:0;',
+  'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:7px;',
+  'padding:0;box-shadow:0 1px 2px ' + shadow + ';',
   'transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease;}',
 '.capyui-pick:hover,.capyui-pick:focus-visible{border-color:' + accent + ';',
-  'transform:translateY(-2px);box-shadow:0 6px 16px ' + shadow2 + ';}',
+  'transform:translateY(-3px);box-shadow:0 9px 20px ' + shadow2 + ';}',
 '.capyui-pick:active{transform:translateY(0);}',
 '.capyui-pick:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* the place itself: a flat-shaded scene in the chapter's own palette */
 '.capyui-pickart{display:block;position:relative;width:100%;aspect-ratio:64 / 26;',
   'overflow:hidden;border-bottom:1px solid ' + rule + ';}',
-'.capyui-pick.hero .capyui-pickart{aspect-ratio:auto;}',
+/* The hero's own letterbox, restated after the tile rule it has to outrank.
+   `auto` here handed the panel's height to the <svg>'s intrinsic 64 x 40 box
+   and grew the hero to 205 px — see the note by .capyui-pick.hero above. */
+'.capyui-pick.hero .capyui-pickart{aspect-ratio:64 / 25;}',
 '.capyui-pickart svg{display:block;width:100%;height:100%;',
   'transition:transform .35s cubic-bezier(.16,1,.3,1);}',
 '.capyui-pick:hover .capyui-pickart svg,.capyui-pick:focus-visible .capyui-pickart svg{',
   'transform:scale(1.045);}',
 /* the key badge sits ON the scene, so the eye can still run straight down it */
-'.capyui-pickkey{position:absolute;top:5px;left:5px;',
+/* A PRINTED STUB, NOT A SYSTEM CHIP. Dark grey on every scene made seventeen
+   identical blobs march down the left edge in a colour belonging to none of
+   the places they were sitting on; in paper with an ink hairline it reads as
+   part of the ticket, and it is legible over a night sky and over a dune. */
+'.capyui-pickkey{position:absolute;top:6px;left:6px;',
   'display:flex;align-items:center;justify-content:center;',
-  'min-width:clamp(16px,3.2vw,19px);height:clamp(16px,3.2vw,19px);padding:0 3px;',
-  'border-radius:3px;background:' + sysRgba(PALETTE.stoneDark, 0.82) + ';',
-  'color:' + paper + ';font-weight:700;',
+  'min-width:clamp(17px,3.3vw,20px);height:clamp(17px,3.3vw,20px);padding:0 3px;',
+  'border-radius:4px;background:' + sysRgba(PALETTE.sail, 0.92) + ';',
+  'border:1px solid ' + sysRgba(PALETTE.ibisHead, 0.22) + ';',
+  'color:' + ink + ';font-weight:700;box-shadow:0 1px 3px ' + shadow + ';',
+  'transition:background .16s ease,color .16s ease,border-color .16s ease;',
   'font-size:clamp(9px,1.9vw,11px);font-variant-numeric:tabular-nums;}',
 '.capyui-pick:hover .capyui-pickkey,.capyui-pick:focus-visible .capyui-pickkey{',
-  'background:' + accent + ';}',
+  'background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
+/* ---- HOW FAR THROUGH THIS PLACE YOU ARE, WITHOUT READING A NUMBER --------
+   A hairline along the foot of the tile. The tally in the corner is exact and
+   is what you read when you are deciding; the bar is what you SCAN, and at
+   seventeen tiles scanning is the only thing anybody does. Drawn only for a
+   place that has been visited, for the same reason the tally is: seventeen
+   empty rails on a fresh file is wallpaper. */
+'.capyui-pickbar{position:absolute;left:0;right:0;bottom:0;height:4px;',
+  'background:' + sysRgba(PALETTE.ibisHead, 0.14) + ';}',
+'.capyui-pickbar i{display:block;height:100%;background:' + accent + ';',
+  'border-radius:0 2px 2px 0;transition:width .3s ease;}',
+'.capyui-pickbar.full i{background:' + tick + ';border-radius:0;}',
+'.capyui-pick.hero .capyui-pickbar{height:5px;}',
 '.capyui-pickbody{min-width:0;flex:1 1 auto;',
   'padding:clamp(5px,1.1vw,7px) clamp(7px,1.4vw,9px) clamp(6px,1.2vw,8px);}',
 '.capyui-pick b{display:block;font-size:clamp(11.5px,2.2vw,13.5px);font-weight:700;',
@@ -3145,7 +3478,7 @@ function sysBuildCSS() {
      container that will one day be overflowed by one */
   'overflow-wrap:anywhere;',
   'color:' + ink + ';line-height:1.15;}',
-'.capyui-pick.hero b{font-size:clamp(15px,3vw,21px);}',
+'.capyui-pick.hero b{font-size:clamp(17px,3.4vw,26px);letter-spacing:-.01em;}',
 /* TWO LINES, ALWAYS. The subtitles run from three words to nine, and left to
    themselves they made every tile a different height — so the shelf was a
    ragged wall of boxes and the eye had nothing straight to run down. Clamped,
@@ -3163,9 +3496,10 @@ function sysBuildCSS() {
   'font-size:clamp(9px,1.8vw,11px);letter-spacing:.1em;text-transform:uppercase;',
   'color:' + accent + ';}',
 /* the tally rides the bottom-right corner of the scene, clear of the words */
-'.capyui-picktally{position:absolute;top:5px;right:5px;',
+'.capyui-picktally{position:absolute;top:6px;right:6px;',
   'font-size:clamp(8.5px,1.7vw,10px);color:' + paper + ';',
-  'background:' + sysRgba(PALETTE.stoneDark, 0.72) + ';border-radius:3px;padding:1px 4px;',
+  'background:' + sysRgba(PALETTE.ibisHead, 0.62) + ';border-radius:999px;padding:1.5px 6px;',
+  'box-shadow:0 1px 3px ' + shadow + ';',
   'font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}',
 '.capyui-picktally.full{background:' + tick + ';}',
 /* A FINISHED PLACE WEARS WHAT YOU TOOK OUT OF IT (v18). Bottom-left of the
@@ -3182,9 +3516,10 @@ function sysBuildCSS() {
    up in the title-card block first, where it was outranked by the picker's own
    aspect-ratio further down the sheet and did nothing at all. */
 '@media (max-height:900px){.capyui-pickart{aspect-ratio:64 / 19;}',
-  '.capyui-pick.hero .capyui-pickart{aspect-ratio:auto;}}',
+  '.capyui-pick.hero .capyui-pickart{aspect-ratio:64 / 22;}}',
 '@media (max-height:770px){.capyui-pickart{aspect-ratio:64 / 15;}',
-  '.capyui-pick.hero .capyui-pickart{aspect-ratio:auto;}',
+  '.capyui-pick.hero{min-height:96px;}',
+  '.capyui-pick.hero .capyui-pickart{aspect-ratio:64 / 20;}',
   '.capyui-pickbody{padding:4px 7px 5px;}}',
 /* The places arrive one after another, which is the only motion on the card and
    is doing one job: it walks the eye across the shelf so the player sees that
@@ -4069,6 +4404,22 @@ export function createSystems(game) {
     // eight nodes that run for the life of the page cannot be created before
     // there is a context, and there is no context until somebody clicks.
     if (!wxBedBus) { try { wxBedStart(); } catch (e) { wxBedBus = null; } }
+  }
+  // ---- THE FRONT OF THE GAME HAS A SCORE NOW -------------------------------
+  // Same unlock, same engine, one row further down sysMUS_PAL. Called from
+  // every gesture on the title card that is NOT "start the game" — the first
+  // keypress, the press on 'Choose a place', the press on the picker — because
+  // a browser will not give anybody an AudioContext until one of those
+  // happens, and the ones that DO start the game already get their music from
+  // startGame. Idempotent: musicStart returns immediately once musVol exists.
+  function titleAudio() {
+    audioUnlock();
+    if (started || !ac || musVol) return;
+    // The palette FIRST: musicStart voices its opening chord out of musPal, so
+    // setting it afterwards would open the card in the gardens and drift out of
+    // them over five seconds for no reason.
+    musSetPalette(sysMUS_PAL_TITLE);
+    musicStart();
   }
   function noiseBuf() {
     if (acNoise) return acNoise;
@@ -7257,6 +7608,12 @@ export function createSystems(game) {
   // rebuild, so the shelf keeps its scroll position and the deal-in animation
   // can never run twice.
   const titleEl = sysEl('div', 'capyui-title');
+  // The wash behind the card, which takes the colour of whichever place the
+  // cursor is resting on. Appended FIRST so it is under the card in paint
+  // order without either of them needing a z-index fight.
+  const glowEl = sysEl('div', 'capyui-glow');
+  glowEl.setAttribute('aria-hidden', 'true');
+  titleEl.appendChild(glowEl);
   const cardEl = sysEl('div', 'capyui-card');
   const p1El = sysEl('div', 'capyui-page capyui-p1');
   const p2El = sysEl('div', 'capyui-page capyui-p2');
@@ -7265,6 +7622,11 @@ export function createSystems(game) {
   p1El.appendChild(sysEl('h1', null, 'Untitled Capybara Game'));
   p1El.appendChild(sysEl('div', 'capyui-sub',
     'one capybara, ' + CHAPTERS.length + ' places, no supervision'));
+  {
+    const orn = sysEl('div', 'capyui-orn');
+    orn.appendChild(sysBuildCapyMark());
+    p1El.appendChild(orn);
+  }
 
   // ---- WHAT IS ALREADY ON THE FILE ---------------------------------------
   // Read before anything is built: both the carry-on row and every per-chapter
@@ -7321,7 +7683,7 @@ export function createSystems(game) {
     // summary is a control; only the summary should eat a click.
     const more = sysEl('details', 'capyui-more');
     const sum = sysEl('summary', null, 'and a few extras');
-    sum.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    sum.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     more.appendChild(sum);
     const moreLeg = sysFillLegend(sysEl('div', 'capyui-legend'), 'more');
     moreLeg.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -7339,27 +7701,63 @@ export function createSystems(game) {
   // thinks you want. On a fresh file there is nothing to compete with and it
   // stays the filled one.
   if (jrFileCount > 0) goEl.classList.add('alt');
-  goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  // ...AND THIS IS WHERE THE MUSIC COMES IN. A browser will not hand out a
+  // running AudioContext until a real gesture, and this press is the one
+  // gesture on the front of the game that does NOT start the game — so it is
+  // the first moment the card is allowed to make a sound. On the press rather
+  // than the click, so the score is already fading up as the page turns.
+  goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
   goEl.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
     titlePage(2);
   });
   p1El.appendChild(goEl);
-  p1El.appendChild(sysEl('div', 'capyui-begin',
-    jrFileCount > 0 ? 'ENTER to carry on' : 'ENTER to begin'));
+  p1El.appendChild(sysTitleFoot([
+    [['Enter'], jrFileCount > 0 ? 'carry on' : 'begin'],
+    [['→'], 'choose a place'],
+    [['M'], 'sound'],
+    [['N'], 'music'],
+  ]));
 
   // ---- PAGE TWO: NOTHING BUT THE PICKER ----------------------------------
+  const p2Head = sysEl('div', 'capyui-p2head');
   const backEl = sysEl('button', 'capyui-back');
   backEl.type = 'button';
   backEl.textContent = 'back';
   backEl.setAttribute('aria-label', 'back to the front of the card');
-  backEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  backEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
   backEl.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
     titlePage(1);
   });
-  p2El.appendChild(backEl);
-  p2El.appendChild(sysEl('h1', 'capyui-h2', 'Where would you like to start?'));
+  p2Head.appendChild(backEl);
+  p2Head.appendChild(sysEl('h1', 'capyui-h2', 'Where would you like to start?'));
+  // ---- WHERE THE JOURNEY HAS GOT TO ---------------------------------------
+  // The third column of the header. On a fresh file it says how many places
+  // there are and that the order is yours; once there is anything on the file
+  // it says how much of the whole game has actually been seen, which is the
+  // one number the picker is the right screen for — it is the only screen
+  // where every place is on show at once.
+  {
+    const st = sysEl('span', 'capyui-p2stat');
+    if (jrFileCount > 0) {
+      let placesSeen = 0;
+      for (let n = 1; n <= CHAPTERS.length; n++) {
+        const ids = tasksInChapter(n);
+        let any = jrFileSeen[n] ? 1 : 0;
+        for (let k = 0; k < ids.length && !any; k++) if (jrFileDone[ids[k]]) any = 1;
+        placesSeen += any;
+      }
+      st.appendChild(sysEl('b', null, jrFileCount + ' of ' + TASKS.length + ' done'));
+      st.appendChild(document.createTextNode(
+        placesSeen + ' of ' + CHAPTERS.length + ' places seen'));
+    } else {
+      st.appendChild(sysEl('b', null, CHAPTERS.length + ' places'));
+      st.appendChild(document.createTextNode('in any order'));
+    }
+    p2Head.appendChild(st);
+  }
+  p2El.appendChild(p2Head);
 
   // --- the grid ------------------------------------------------------------
   // ONE ROW PER CHAPTER, AND THE ROW IS IN shared.js. This used to be a
@@ -7376,8 +7774,35 @@ export function createSystems(game) {
   // arithmetic anywhere in here that knows how many places there are.
   const pickDefs = CHAPTERS.map(function (c, i) {
     return { biome: c.biome, name: c.name, n: c.n, hint: c.hint || c.sub,
-             key: sysPickLabel(i) };
+             key: sysPickLabel(i), pal: c.pal || 0 };
   });
+
+  // ---- LEANING TOWARDS A PLACE -------------------------------------------
+  // The colour behind the card and the key the score is in, both following
+  // whichever tile is under the pointer or holding focus. `wait` is the dwell:
+  // 420 ms for a hover, so crossing the shelf costs nothing, and 0 for focus,
+  // which is already a deliberate act. See the note on the tile's listeners.
+  let titleLeanT = 0, titleLeanAt = '';
+  function titleLeanCancel() { if (titleLeanT) { clearTimeout(titleLeanT); titleLeanT = 0; } }
+  function titleLean(d, wait) {
+    titleLeanCancel();
+    if (started || titleLeanAt === d.biome) return;
+    titleLeanT = setTimeout(function () {
+      titleLeanT = 0;
+      if (started) return;
+      titleLeanAt = d.biome;
+      glowEl.style.color = sysMarkTint(d.biome, 0.62);
+      musSetPalette(d.pal);
+    }, wait);
+  }
+  /** Back to nowhere in particular: the front of the card, and the title key. */
+  function titleLeanHome() {
+    titleLeanCancel();
+    if (started || titleLeanAt === '') return;
+    titleLeanAt = '';
+    glowEl.style.color = '';
+    musSetPalette(sysMUS_PAL_TITLE);
+  }
   function buildPick(d, i, hero) {
     const ids = tasksInChapter(d.n);
     let done = 0;
@@ -7403,6 +7828,13 @@ export function createSystems(game) {
     if (d.key) art.appendChild(sysEl('span', 'capyui-pickkey', d.key));
     el.appendChild(art);
     const body = sysEl('span', 'capyui-pickbody');
+    // The hero, and only the hero, gets an eyebrow: it is twice the size of
+    // everything else on the shelf and it should say what it IS as well as
+    // where it is, or the biggest thing on the card is just a bigger tile.
+    if (hero) {
+      body.appendChild(sysEl('em', 'capyui-pickeyebrow',
+        done > 0 ? 'chapter one' : 'chapter one  ·  start here'));
+    }
     body.appendChild(sysEl('b', null, d.name));
     body.appendChild(sysEl('i', null, d.hint));
     // The hero is the only one with room for a third line, and there is
@@ -7412,13 +7844,28 @@ export function createSystems(game) {
         ids.length + ' things to do, and nobody watching'));
     }
     el.appendChild(body);
+    if (hero) el.appendChild(sysEl('span', 'capyui-pickarrow', '→'));
+    // ---- THE RAIL ALONG THE FOOT ------------------------------------------
+    // Same rule as the tally: only for a place that has actually been visited.
+    if ((done > 0 || jrFileSeen[d.n]) && ids.length) {
+      const bar = sysEl('span', 'capyui-pickbar');
+      const fill = sysEl('i');
+      fill.style.width = Math.round(done / ids.length * 100) + '%';
+      if (done >= ids.length) bar.classList.add('full');
+      bar.appendChild(fill);
+      el.appendChild(bar);
+    }
     // The tally is only ever shown for somewhere you have actually been. On a
     // fresh file it says nothing at all, because "0 / 8" fifteen times over is
     // not information, it is wallpaper.
     if (done > 0 || jrFileSeen[d.n]) {
       const tally = sysEl('span', 'capyui-picktally', done + '/' + ids.length);
       if (done >= ids.length && ids.length) tally.classList.add('full');
-      el.appendChild(tally);
+      // ON THE PICTURE, not on the tile. They are the same corner for the
+      // fifteen tiles whose picture is the full width of them — and on the
+      // hero, whose picture is two fifths of it, the tally used to float
+      // unattached in the top right of an empty field of paper.
+      art.appendChild(tally);
     }
     // A FINISHED PLACE STILL HAS A REASON TO GO BACK, and this is where it has
     // to be said, because the picker is the only screen where a returning
@@ -7454,12 +7901,28 @@ export function createSystems(game) {
       (d.key ? ', key ' + d.key : '') +
       (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : ''));
     // stopPropagation, or the card's own catch-all listener starts Sydney first
-    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     el.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
       startGame(d.biome);
     });
+    // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
+    // Resting on a tile warms the whole screen in that chapter's own colour
+    // and drifts the score into that chapter's own key. Both are free: the
+    // colour is the tint the tile's picture is already drawn in, and the key
+    // change is the same musSetPalette() a real arrival uses, so hovering
+    // Kyoto is literally a preview of what Kyoto sounds like.
+    //
+    // Nothing is REVERTED when the pointer leaves, only cancelled if it leaves
+    // before the dwell is up. The score in this game never snaps back to
+    // anything and it must not learn to here — a mouse crossing the shelf to
+    // reach the far side would otherwise fire seventeen key changes and a
+    // seventeenth back again.
+    el.addEventListener('pointerenter', function () { titleLean(d, 420); });
+    el.addEventListener('pointerleave', titleLeanCancel);
+    // Focus is a deliberate arrival, so it does not wait out a dwell.
+    el.addEventListener('focus', function () { titleLean(d, 0); });
     return el;
   }
 
@@ -7470,7 +7933,8 @@ export function createSystems(game) {
   // bottom. That held for precisely as long as there were thirteen places.
   // Out here it is a row of its own, it gets more space than it ever had, and
   // the number of chapters no longer has to divide by anything.
-  p2El.appendChild(buildPick(pickDefs[0], 0, true));
+  const heroEl = buildPick(pickDefs[0], 0, true);
+  p2El.appendChild(heroEl);
 
   p2El.appendChild(sysEl('div', 'capyui-label',
     'or go straight somewhere else'));
@@ -7490,13 +7954,106 @@ export function createSystems(game) {
   }
   p2El.appendChild(picksEl);
 
-  p2El.appendChild(sysEl('div', 'capyui-begin',
-    // Derived from CHAPTERS, not typed. It read "1 – 8" for the whole of the
-    // session that added the ninth one, and the next chapter caught it out the
-    // same way — so it is now the actual key list, generated.
-    'or press its key  ·  ' +
-    pickDefs.map(function (d) { return d.key; }).join(' ') +
-    '  ·  ESC to go back'));
+  // ---- IS THERE MORE BELOW THE FOLD, OR IS THAT THE END OF THE SHELF? ----
+  // Two classes and a scroll listener. The mask they turn on is in the sheet;
+  // all this decides is WHETHER a row is being cut off, because a permanent
+  // fade at the bottom of a list you have already reached the end of is a
+  // promise of places that are not there.
+  // ...and it SAYS HOW MANY, because a soft edge is a hint and a hint is not
+  // enough when four of the seventeen places are below it. Counted rather than
+  // assumed: the column count changes with the window and the row height
+  // changes with the longest hint, so the only honest number is the one you
+  // get by asking each tile where it is.
+  const moreEl = sysEl('button', 'capyui-more2');
+  moreEl.type = 'button';
+  moreEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+  moreEl.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    picksEl.scrollTop += Math.max(60, picksEl.clientHeight - 40);
+  });
+  function picksFade() {
+    // EVERY READ, THEN EVERY WRITE. This runs on scroll, and a class toggle
+    // between two getBoundingClientRect() calls invalidates the layout the
+    // second one then has to rebuild — eighteen forced reflows per wheel
+    // notch. The order below is the whole fix and it costs nothing.
+    const over = picksEl.scrollHeight - picksEl.clientHeight;
+    const below = over > 4 && picksEl.scrollTop < over - 4;
+    let n = 0;
+    if (below) {
+      // RECTANGLES, NOT offsetTop. The shelf is not positioned, so a tile's
+      // offsetParent is the CARD and offsetTop is measured from the masthead:
+      // the count came out as twelve when four were hidden. Viewport rects are
+      // in one frame of reference by construction.
+      const pr = picksEl.getBoundingClientRect();
+      const kids = picksEl.children;
+      for (let i = 0; i < kids.length; i++) {
+        if (kids[i].getBoundingClientRect().bottom > pr.bottom - 10) n++;
+      }
+    }
+    picksEl.classList.toggle('more', below);
+    picksEl.classList.toggle('up', over > 4 && picksEl.scrollTop > 4);
+    moreEl.textContent = n ? n + ' more below' : '';
+    moreEl.hidden = !n;
+  }
+  picksEl.addEventListener('scroll', picksFade, { passive: true });
+
+  // ---- THE ARROWS WALK THE SHELF ------------------------------------------
+  // Seventeen places and the only way through them from the keyboard was Tab,
+  // seventeen times, in one direction. A grid you can see is a grid you should
+  // be able to steer, and the shelf is genuinely a grid — so the arrows are
+  // two dimensional here and the column count is READ off the resolved
+  // layout rather than re-derived, which means it is automatically right in
+  // every one of the four media queries the shelf has.
+  function pickCols() {
+    try {
+      const t = getComputedStyle(picksEl).gridTemplateColumns;
+      const n = t ? t.trim().split(/\s+/).length : 1;
+      return n > 0 ? n : 1;
+    } catch (e) { return 1; }
+  }
+  function pickList() {
+    const l = [heroEl];
+    const kids = picksEl.children;
+    for (let i = 0; i < kids.length; i++) l.push(kids[i]);
+    return l;
+  }
+  /**
+   * Move the focus by (dx, dy) tiles. The hero is index 0 and is a row of its
+   * own above the grid, so up from the shelf's first row lands on it and down
+   * from it enters the shelf. Returns false only when the move walks off the
+   * left-hand edge, which is the caller's cue to turn the page back.
+   */
+  function pickMove(dx, dy) {
+    const l = pickList();
+    let i = l.indexOf(document.activeElement);
+    if (i < 0) { l[0].focus(); return true; }
+    if (dy) {
+      if (i === 0) { if (dy < 0) return true; i = 1; }
+      else {
+        const s = i - 1 + dy * pickCols();
+        i = s < 0 ? 0 : (s > l.length - 2 ? i : s + 1);
+      }
+    } else {
+      if (i + dx < 0) return false;
+      i = clamp(i + dx, 0, l.length - 1);
+    }
+    const el = l[i];
+    if (!el) return true;
+    el.focus();
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) { /* old browser */ }
+    picksFade();
+    return true;
+  }
+  // The shelf has no layout until it is in the flow, so the first measurement
+  // has to wait for the page to turn — see titlePage.
+  addEventListener('resize', picksFade);
+
+  p2El.appendChild(moreEl);
+  p2El.appendChild(sysTitleFoot([
+    [['←', '→', '↑', '↓'], 'look around the shelf'],
+    [['Enter'], 'go there'],
+    [['Esc'], 'back'],
+  ], 'every place has its own key, printed on the corner of its picture'));
   titleEl.appendChild(cardEl);
   hudRoot.appendChild(titleEl);
 
@@ -7517,8 +8074,14 @@ export function createSystems(game) {
     // one, and coming back to a masthead scrolled out of view reads as the
     // card having been replaced rather than turned.
     if (titleEl.scrollTop) titleEl.scrollTop = 0;
-    try { (n === 2 ? (picksEl.querySelector('.capyui-pick') || backEl) : goEl).focus(); }
+    // The front of the card is nowhere in particular; the picker is wherever
+    // the first tile is. Both the colour and the key follow.
+    if (n === 1) titleLeanHome();
+    try { (n === 2 ? (heroEl || backEl) : goEl).focus(); }
     catch (e) { /* focus is a nicety, never a crash */ }
+    // The shelf has no scrollHeight until it is in the flow, so this is the
+    // first moment the fade can be measured at all.
+    if (n === 2) picksFade();
   }
   p2El.hidden = true;
 
@@ -9071,7 +9634,19 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.drift && game.drift.jetty); } },
     'lampfly':        { clue: 'get near one and WHEEK at it',
                     where: function () { return hintObj(game.drift && game.drift.lamp); } },
-    'weathervane':    { clue: 'stand by it until it comes right round. it takes half a breath.',
+    // AND IT COUNTS. Standing at the post can ask for up to nineteen seconds
+    // and the card used to say the same sentence for all of them, so a player
+    // holding still had nothing telling them it was working. Same treatment
+    // 'souk-escape' has: a live line while the thing is actually happening.
+    'weathervane':    { clue: function () {
+                      const d = game.drift;
+                      if (d && d.vaneWatch && d.vaneWatch() > 0.4) {
+                        const t = d.vaneToTurn();
+                        return t < 3 ? 'here it comes — do not move'
+                             : 'holding. the breath turns in ' + Math.ceil(t) + ' s';
+                      }
+                      return 'stand by it until it comes right round. it takes half a breath.';
+                    },
                     where: function () { return hintObj(game.drift && game.drift.vane); } },
     'handed-back':    { clue: 'go all the way into the cloud, and then wait in it',
                     where: function () { return null; } },
@@ -10405,6 +10980,14 @@ export function createSystems(game) {
     audioUnlock();
     // Music is born only from the real gesture that starts the game, and only once.
     if (ac) musicStart();
+    // ...unless the card was already singing, which it is the moment the player
+    // touches anything at all — see titleAudio(). Then musicStart() above is a
+    // no-op and the ONE thing that has to happen is the key change: the title
+    // palette, or whichever place the player was last hovering over, glides
+    // into the place they actually chose. For a chapter that is travelled to,
+    // biomeGo() has already done exactly this and the call below returns at its
+    // first line; Sydney is not travelled to, so this is the only writer.
+    musSetPalette(cdef.pal || 0);
 
     if (landed) {
       // You did emigrate. Somehow.
@@ -10412,6 +10995,11 @@ export function createSystems(game) {
       showPlace(cdef.name.toUpperCase(), cdef.sub);
     }
 
+    // The card is thrown away here, and its one listener on `window` has to go
+    // with it or the shelf's fade goes on being recomputed off a detached node
+    // for the rest of the session every time the window is dragged.
+    titleLeanCancel();
+    removeEventListener('resize', picksFade);
     setTimeout(function () { if (titleEl.parentNode) titleEl.parentNode.removeChild(titleEl); }, 900);
     setTimeout(function () {
       toast((landed && cdef.open) || 'be a menace.');
@@ -10431,14 +11019,20 @@ export function createSystems(game) {
   // nothing at all, which is the correct amount.
   titleEl.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (titlePageN !== 1) return;
+    // A press on the backdrop of page two does not start anything — but it is
+    // still a gesture, and a gesture is the only currency a browser accepts
+    // for an AudioContext. Page one does not need this: a press there starts
+    // the game, and startGame brings the score up itself.
+    if (titlePageN !== 1) { titleAudio(); return; }
     if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
     else startGame('sydney');
   });
 
   // --- keyboard ---
   addEventListener('keydown', function (e) {
-    audioUnlock();
+    // On the card this also brings the score up; in the game it is the plain
+    // unlock it has always been. titleAudio() is audioUnlock() plus two lines.
+    if (started) audioUnlock(); else titleAudio();
     const c = e.code;
     if (c === 'Space' || c === 'ArrowUp' || c === 'ArrowDown' || c === 'ArrowLeft' || c === 'ArrowRight') e.preventDefault();
     if (!started) {
@@ -10467,8 +11061,18 @@ export function createSystems(game) {
       if (titlePageN === 1 && (c === 'ArrowRight' || c === 'ArrowDown')) {
         e.preventDefault(); titlePage(2); return;
       }
-      if (titlePageN === 2 && c === 'ArrowLeft' && !onPick) {
-        e.preventDefault(); titlePage(1); return;
+      // ...and on page two they steer the shelf. Off the left-hand edge of the
+      // first tile is the one move that leaves the grid, and it goes back to
+      // the front of the card — which is where ArrowLeft used to go from
+      // anywhere on the page, including from the middle of the fourth row.
+      if (titlePageN === 2) {
+        const dx = c === 'ArrowLeft' ? -1 : c === 'ArrowRight' ? 1 : 0;
+        const dy = c === 'ArrowUp' ? -1 : c === 'ArrowDown' ? 1 : 0;
+        if (dx || dy) {
+          e.preventDefault();
+          if (!pickMove(dx, dy)) titlePage(1);
+          return;
+        }
       }
       if (c === 'Enter' || c === 'NumpadEnter') {
         if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
@@ -11190,6 +11794,30 @@ export function createSystems(game) {
     if (capy.velocity) capy.velocity.set(0, 0, 0);
     if (capy.group) capy.group.position.set(sp.x, sp.y, sp.z);
 
+    // ---- WHICH WAY YOU ARE FACING WHEN YOU LAND (v20) ---------------------
+    //
+    // Every spawn record in main.js carries a comment describing a HEADING —
+    // "the torii hill in front and Uji behind", "the Atlantic straight ahead",
+    // "the Ermita on one hand and the painted street on the other" — and not
+    // one of them was ever set. `camYaw` simply persisted across the white-out,
+    // so the first frame of a new chapter pointed wherever you happened to have
+    // been looking in the last one. Measured: arriving in Cali from Sydney puts
+    // a rosa wall four metres in front of the lens and the river, the Ermita,
+    // the Gato and the bridge all behind the player's shoulder.
+    //
+    // `sp.yaw` is the direction the CAMERA sits in relative to the animal — the
+    // same convention camYaw already has — so `yaw: 0` means "camera to the
+    // south, looking north". Optional: a spawn without one behaves exactly as
+    // it did, which is what keeps this additive across seventeen chapters.
+    if (typeof sp.yaw === 'number' && sp.yaw === sp.yaw) {
+      camYaw = sp.yaw;
+      camYawTarget = sp.yaw;
+      camHandT = 0;
+      // ...and the animal is pointed the way the camera is looking, or it
+      // arrives with its back to the thing the shot is of.
+      if (typeof capy.face === 'function') capy.face(sp.yaw + Math.PI);
+    }
+
     // The camera rig would otherwise spring across the world for two seconds.
     sysAnchor.set(sp.x, sp.y + 1.0, sp.z);
     sysLook.set(sp.x, sp.y + sysLOOK_RAISE, sp.z);
@@ -11236,11 +11864,71 @@ export function createSystems(game) {
   }
 
   /**
+   * OUTSIDE THE WORLD. Two tests, and the SECOND one is the one that fires.
+   *
+   * The obvious version of this — "has the animal fallen below everything" —
+   * is very nearly dead code in this game, and it is worth writing down why,
+   * because it is the version anybody would reach for first. capybara.js
+   * carries a soft floor in velocity space that holds the animal at
+   * `terrainHeight(x, z) + capyFOOT_Y` whether or not there is a rigid body
+   * under it, and every chapter's terrainHeight is an ANALYTIC law that
+   * answers for the whole plane. Measured: dropped at (-300, -95, -300) in
+   * Pasto, four hundred metres outside the last heightfield strip, the
+   * capybara does not fall — it is caught on the second frame and stands on
+   * the analytic hillside at y = -18. So it never reaches a void floor, and a
+   * guard that only watched the floor would never once run.
+   *
+   * What actually happens is worse and quieter: the animal is standing on
+   * ground that HAS a height and no mesh and no collider, outside the 260 m
+   * square that pasto.js draws, in the fog, with the whole chapter behind it.
+   * That is what "dropped outside of the map" is, and the test for it is the
+   * rectangle, not the altitude.
+   *
+   * `bounds()` is an optional per-biome hook, like camFloor and localWater: a
+   * chapter that does not publish one is not checked, which is right, because
+   * only a chapter that can carry the player past its own edge needs to be.
+   * The floor test stays as well — it costs one comparison and it is the only
+   * thing that would catch a genuine fall through a chapter with no terrain
+   * law at all.
+   */
+  let backVoidT = 0;
+  function backVoid(dt) {
+    const capy = game.capy;
+    if (!capy || !capy.body || !capy.position || ended || transBusy) { backVoidT = 0; return; }
+    const p = capy.position;
+    let lost = !(p.y === p.y) ? false : p.y < sysVOID_Y;
+    if (!lost) {
+      const api = sysLiveBiomeApi(game);
+      if (api && typeof api.bounds === 'function') {
+        const b = api.bounds();
+        if (b && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) {
+          lost = p.x < b.x0 - sysVOID_PAD || p.x > b.x1 + sysVOID_PAD ||
+                 p.z < b.z0 - sysVOID_PAD || p.z > b.z1 + sysVOID_PAD;
+        }
+      }
+    }
+    if (!lost) { backVoidT = 0; return; }
+    backVoidT += dt;
+    if (backVoidT < sysVOID_HOLD) return;
+    backVoidT = 0;
+    // Whatever was carrying the animal has taken it somewhere that does not
+    // exist, so it does not get to keep hold of it through the rescue.
+    if (game.condor && game.condor.mounted && typeof game.condor.release === 'function') {
+      try { game.condor.release(); } catch (e) { /* it may already have let go */ }
+    }
+    capy.carriedBy = null;
+    if (backRescue(true)) toast('that is not part of the world. put you back.');
+  }
+
+  /**
    * Put the animal back. The oldest crumb, or the chapter's own spawn if there
    * is no trail yet — which is exactly the case of somebody who has walked
    * three steps off the spawn and fallen into something.
+   *
+   * `quiet` suppresses the toast for a caller that wants to say something more
+   * specific — see backVoid.
    */
-  function backRescue() {
+  function backRescue(quiet) {
     const capy = game.capy;
     if (!capy || !capy.body || transBusy) return false;
     if (game.condor && game.condor.mounted) return false;
@@ -11259,7 +11947,7 @@ export function createSystems(game) {
     fadeEl.classList.add('on');
     setTimeout(function () { fadeEl.classList.remove('on'); }, 120);
     sfx('pop', { volume: 0.5, pitch: 0.8 });
-    toast('back you go');
+    if (!quiet) toast('back you go');
     return true;
   }
 
@@ -11320,6 +12008,74 @@ export function createSystems(game) {
    * arrow pointing into a hillside. There is only one live biome; ask it.
    * Per-frame, so it stays a property lookup and a call.
    */
+  // ---- CAN THE EYE SEE THE ANIMAL FROM THERE? -------------------------------
+  // One ray a frame, from just over the capybara out along the boom, against
+  // the physics world. Returns the fraction of the boom that is clear, 1 for
+  // "nothing in the way".
+  //
+  // WHAT IT DELIBERATELY DOES NOT HIT, and each of these is load-bearing:
+  //
+  //   * TERRAIN AND WATER PLANES. A hill between the eye and the animal is a
+  //     real occlusion and it is ALREADY handled, forty lines up, by lifting
+  //     the eye clear of the ground under it — see sysHasRelief. Letting the
+  //     ray hit a heightfield as well means two corrections for one problem,
+  //     and on rolling ground they fight: the lift raises the eye, the pull-in
+  //     shortens the boom, the shorter boom lands on higher ground, and the
+  //     camera breathes. Excluding them means no chapter's outdoor camera moves
+  //     by a millimetre — this feature can only ever change what happens inside
+  //     a building.
+  //   * ANYTHING WITH MASS. A prop is a thing the player throws, and a camera
+  //     that flinches every time a bin rolls behind it is worse than one that
+  //     is briefly behind a bin. Static geometry only.
+  //   * TRIGGERS. They are volumes, not walls, and several of them are enormous.
+  //   * THE CAPYBARA, and whatever is carrying it. The ray starts inside the
+  //     animal's own body, and a boat, a raft or a floe is a floor rather than
+  //     an obstruction.
+  //
+  // The near cap means the boom can be cut to nothing but never inverted, and
+  // the small step back off the hit point keeps the near plane out of the wall.
+  const sysCamFrom = new CANNON.Vec3();
+  const sysCamTo = new CANNON.Vec3();
+  let camClearF = 1;
+  // The callback, the running best and the three things it has to skip all live
+  // out here rather than in a closure built per frame — this file's whole
+  // premise is that update() allocates nothing.
+  let sysCamBest = 1, sysCamLen = 1, sysCamSkipA = null, sysCamSkipB = null;
+  function sysCamRayHit(res) {
+    if (!res.hasHit) return;
+    const b = res.body;
+    if (!b || b.mass > 0 || b.isTrigger) return;
+    if (b === sysCamSkipA || b === sysCamSkipB) return;
+    const t = res.shape && res.shape.type;
+    if (t === sysSHAPE_HEIGHTFIELD || t === sysSHAPE_PLANE) return;
+    const f = res.distance / sysCamLen;
+    if (f >= 0 && f < sysCamBest) sysCamBest = f;
+  }
+  function sysCamClear(anchor, want) {
+    const w = game.world;
+    if (!w || typeof w.raycastAll !== 'function') return 1;
+    const dx = want.x - anchor.x, dy = want.y - anchor.y, dz = want.z - anchor.z;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!(len > 0.2)) return 1;
+    sysCamFrom.set(anchor.x, anchor.y, anchor.z);
+    sysCamTo.set(want.x, want.y, want.z);
+    const capy = game.capy;
+    const carrier = capy && capy.carriedBy;
+    sysCamSkipA = (capy && capy.body) || null;
+    sysCamSkipB = (carrier && (carrier.body || carrier)) || null;
+    sysCamBest = 1;
+    sysCamLen = len;
+    try { w.raycastAll(sysCamFrom, sysCamTo, sysCAM_RAY_OPTS, sysCamRayHit); }
+    catch (e) { return 1; }
+    if (sysCamBest >= 1) return 1;
+    // Back off the wall by a fixed DISTANCE rather than a fraction, or a long
+    // boom stops a metre short of the wall and a short one stops a centimetre
+    // short. The floor is a distance too, and it wins: a boom cut to nothing
+    // puts the near plane inside the capybara.
+    const lo = Math.min(sysCAM_CLEAR_MIN / len, 1);
+    return clamp(sysCamBest - sysCAM_CLEAR_PAD / len, lo, 1);
+  }
+
   function sysGroundY(x, z) {
     const api = sysLiveBiomeApi(game);
     if (!api || typeof api.terrainHeight !== 'function') return 0;
@@ -11468,6 +12224,9 @@ export function createSystems(game) {
     }
   });
 
+  // Where the surf starts drowning everything else in Rio. One number, named,
+  // because it is read from the ambience ladder and nowhere else.
+  const rioAmbSurfZ = -14;
   let fpsAcc = 0, fpsFrames = 0, fps = 60, perfAcc = 0;
   let ambTimer = rand(5, 12);
 
@@ -11475,6 +12234,14 @@ export function createSystems(game) {
   // wiring
   // =========================================================================
   game.completeTask = completeTask;
+  /**
+   * HAS THIS ONE BEEN DONE. Read-only, and it exists because the people
+   * standing in the chapters need it: a line that is only true after you have
+   * rung the bell has to be able to ask whether you have rung the bell. See
+   * localResolve in npc.js. Unknown ids answer false rather than throwing —
+   * a chapter naming a task that has been renamed should go quiet, not crash.
+   */
+  game.taskDone = function (id) { const r = taskRec[id]; return !!(r && r.done); };
   /** A measured task hands its number here. See RECORDS in shared.js. */
   game.record = recordValue;
   game.toast = toast;
@@ -11497,6 +12264,14 @@ export function createSystems(game) {
   // silence-safe values when there is no audio context (muted, or the player
   // has not clicked yet), so gameplay never depends on sound being audible.
   game.music = {
+    /**
+     * IS THERE A SCORE AT ALL. `playing` means "there is a PULSE to play
+     * against" and is false for every pad palette in the game, which is the
+     * right answer for cali.js asking whether it can judge a dance step and
+     * the wrong one for anybody asking whether the music is on. The title
+     * card's score is a pad, so this is the only way to see it from outside.
+     */
+    get live() { return !!(ac && musVol && ac.state === 'running'); },
     get playing() { return !!(ac && musBeatLen > 0 && ac.state === 'running'); },
     get beatLen() { return musBeatLen; },
     /** beats since the anchor, as a float. -1 when there is no pulse. */
@@ -11718,6 +12493,7 @@ export function createSystems(game) {
     // the player's thumb comes off it.
     if (started) {
       backCrumb(dt);
+      backVoid(dt);
       if (keys.KeyR && !jrShown && !ended) {
         backHold += dt;
         if (backHold >= sysBACK_HOLD && !backBusy) { backBusy = 1; backRescue(); }
@@ -12087,6 +12863,59 @@ export function createSystems(game) {
         sysDesired.x = lerp(sysDesired.x, rail.x, rail.w);
         sysDesired.y = lerp(sysDesired.y, rail.y, rail.w);
         sysDesired.z = lerp(sysDesired.z, rail.z, rail.w);
+      }
+    }
+
+    // ---- ...AND A ROOF IS A CEILING OVER THE LENS (v20) -------------------
+    // camFloor's mirror image, and the other half of the indoor camera. The
+    // relief lift twenty lines up raises the eye clear of the GROUND, which is
+    // the right answer on a dune and precisely the wrong one under a covered
+    // market: in the Marrakech souk it put the eye at y = 7.6 with the roof
+    // mats at 6.6, so the camera was above the roof looking down at the top of
+    // it and the capybara was under three hundred square metres of palm frond.
+    //
+    // It cannot be solved by the occlusion ray below, because a roof mat is
+    // render-only geometry — there is no body in the world to hit, and there
+    // should not be one: the animal is never going to walk on it. So the
+    // chapter that knows where its roofs are says so, exactly as the chapter
+    // that knows where its water is publishes camFloor.
+    //
+    // Clamped above the floor, because a chapter that publishes both and gets
+    // them the wrong way round should give a squashed camera and not an
+    // inverted one.
+    if (rigApi && typeof rigApi.camCeil === 'function') {
+      const cc = rigApi.camCeil(sysDesired.x, sysDesired.z);
+      if (typeof cc === 'number' && cc === cc && cc > camFloorY && sysDesired.y > cc) {
+        sysDesired.y = cc;
+      }
+    }
+
+    // ---- AND NOW LOOK WHETHER THERE IS ANYTHING IN THE WAY (v20) ----------
+    // Everything above this line adjusts where the eye WANTS to be. Nothing
+    // above it has ever asked whether the eye can see the animal from there,
+    // and in seventeen chapters that is nine hundred and something metres of
+    // souk alley, covered market, tong lau stairwell, cave passage and colonnade
+    // in which it demonstrably cannot. MEASURED in the Marrakech souk — 4.8 m
+    // alleys under a 6.9 m roof, which is the chapter the report is about — the
+    // eye sat at (-2.4, 7.6, -45.2) with the capybara at (-2.4, 0.3, -38.0):
+    // inside the wall of a block, ten metres from an animal that was not on the
+    // screen at all. The whole frame was one wall face and the underside of a
+    // roof.
+    //
+    // The one thing this is allowed to do is SHORTEN the boom. It never moves
+    // the eye sideways, never raises it, never overrides a chapter's own rail —
+    // it takes the line the rest of this function has already chosen and stops
+    // it at the first solid thing along it. See sysCamClear for what counts as
+    // solid and, more importantly, what does not.
+    {
+      const f = sysCamClear(sysAnchor, sysDesired);
+      // In, immediately: a frame spent inside a wall is a frame the player
+      // cannot play. Out, slowly, or every doorway is a lurch.
+      camClearF = f < camClearF ? f : damp(camClearF, f, sysCAM_CLEAR_OUT, dt);
+      if (camClearF < 0.999) {
+        sysDesired.set(sysAnchor.x + (sysDesired.x - sysAnchor.x) * camClearF,
+                       sysAnchor.y + (sysDesired.y - sysAnchor.y) * camClearF,
+                       sysAnchor.z + (sysDesired.z - sysAnchor.z) * camClearF);
       }
     }
 
@@ -13172,15 +14001,47 @@ export function createSystems(game) {
               ambTimer = rand(11, 22);
             }
           } else if (bio === 'rio') {
-            // Copacabana from the pavement: surf, and every so often a whistle
-            // off the beach or a cheer from the sand. Not drums — the bateria is
-            // the SCORE here, and an ambient drum would fight the thing the
-            // player is being asked to listen to.
+            // FOUR PLACES, NOT ONE BED. This was a flat three-way roll for the
+            // whole chapter — the same surf, the same gull and the same distant
+            // cheer on the sand, on the avenue, in Lapa and on the rock — while
+            // Kyoto and Cali both got a positional layer in the last pass. Rio
+            // is the biggest chapter of the three and the one that walks you
+            // furthest inland: a hundred and twenty metres from the water, up
+            // under the arches, the sea should not be the loudest thing.
+            //
+            // Still NOT drums. The bateria is the SCORE here and an ambient
+            // drum fights the one thing the player is being asked to listen to.
+            const cp = capy && capy.position;
+            const zz = cp ? cp.z : 0;
             const r = Math.random();
-            if (r < 0.5) sfx('splash', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.7) });
-            else if (r < 0.8) sfx('gull', { volume: rand(0.08, 0.14), pitch: rand(1.1, 1.4) });
-            else sfx('cheer', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.2) });
-            ambTimer = rand(6, 13);
+            if (cp && zz > 34) {
+              // inland: Lapa, the arches, Santa Teresa. Traffic, a shutter, a
+              // bonde bell somewhere above you, and the sea barely at all.
+              if (r < 0.34) sfx('horn', { volume: rand(0.05, 0.11), pitch: rand(1.4, 2.0) });
+              else if (r < 0.60) sfx('cheer', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.25) });
+              else if (r < 0.82) sfx('chime', { volume: rand(0.05, 0.10), pitch: rand(1.7, 2.2) });
+              else sfx('bark', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.3) });
+              ambTimer = rand(7, 15);
+            } else if (cp && zz > 4) {
+              // the avenue and the median: the city side of the beach.
+              if (r < 0.40) sfx('horn', { volume: rand(0.06, 0.12), pitch: rand(1.5, 2.1) });
+              else if (r < 0.68) sfx('splash', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
+              else if (r < 0.88) sfx('rustle', { volume: rand(0.05, 0.11), pitch: rand(0.7, 1.0) });
+              else sfx('gull', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
+              ambTimer = rand(7, 14);
+            } else if (cp && zz < rioAmbSurfZ) {
+              // in it, or nearly: the break is the only thing you can hear.
+              if (r < 0.72) sfx('splash', { volume: rand(0.12, 0.21), pitch: rand(0.42, 0.62) });
+              else sfx('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.75) });
+              ambTimer = rand(3.5, 8);
+            } else {
+              // the sand and the calçadão, which is where the chapter opens.
+              if (r < 0.44) sfx('splash', { volume: rand(0.08, 0.14), pitch: rand(0.5, 0.7) });
+              else if (r < 0.74) sfx('gull', { volume: rand(0.08, 0.14), pitch: rand(1.1, 1.4) });
+              else if (r < 0.90) sfx('cheer', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.2) });
+              else sfx('tick', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });  // a ball, somewhere
+              ambTimer = rand(6, 13);
+            }
           } else if (bio === 'iceland') {
             // The quietest soundscape in the game, and it should be: wind off
             // the ice, water on the harbour wall, and once in a very long while

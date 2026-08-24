@@ -164,6 +164,27 @@ const npcLINES = {
             'Where’s the ferry?', 'Twelve dollars for a coffee.', 'It’s bigger in person, isn’t it.',
             'I said we should’ve gone to Bondi.', 'Is that a bin chicken or a real bird?'],
 
+  // ---- TWO PEOPLE TALKING (see chatStep) -------------------------------
+  // Openers and replies are separate lists on purpose: an exchange must never
+  // be two people saying the same sort of thing at each other. Every reply has
+  // to work after every opener, which is the whole craft of writing these —
+  // so they are all deflections, agreements and non-sequiturs, and none of
+  // them answers a specific question.
+  chatA:   ['Did you book the ferry, or did I?', 'What time did they say?',
+            'Is that the one on the postcard?', 'I told you it was up this end.',
+            'How much was the parking?', 'Have you got the sunscreen?',
+            'Are we doing the bridge climb or not?', 'Is he asleep or is that just his face?',
+            'What is that, a wombat?', 'I could live here, you know.',
+            'Do you want to sit down for a bit?', 'Is it always this bright?',
+            'Nine dollars. For a coffee.', 'Have we been here before?',
+            'Right, so where are we meeting them?'],
+  chatB:   ['Mm.', 'You said that yesterday.', 'Probably.', 'I wasn’t listening, sorry.',
+            'That’s what I said.', 'Ask your father.', 'It’s in the other bag.',
+            'Don’t start.', 'We’ll see.', 'It’s the humidity, that.',
+            'I’m not walking back up that hill.', 'Lovely, though. Isn’t it.',
+            'Well. There you go.', 'Have a look on your phone.',
+            'That is genuinely the biggest one I have ever seen.'],
+
   // ---- Circular Quay (chapter 1) ----
   busk:    ['Any requests?', 'Cheers, mate.', 'This one’s in G.', 'Ta very much.',
             'Everything’s in G, mate.', 'Tips go in the hat. The HAT.'],
@@ -186,6 +207,20 @@ const npcLINES = {
   queueUp: ['There’s a line, mate.', 'Oi. Back of the queue.', 'We were all waiting.', 'Unbelievable.'],
   soaked:  ['AAGH!', 'That is COLD.', 'Oh, marvellous.', 'I am drenched.', 'Wonderful. Just wonderful.'],
   mugged:  ['Get off! GET OFF!', 'They’re on me!', 'Not the chips! NOT THE CHIPS!', 'Aaagh — birds!'],
+  // ---- Mr Whippy, when she stops -------------------------------------
+  // Six lines to join, four to leave, and one for the small tragedy of
+  // arriving at the window as she pulls away. Nobody in this crowd had
+  // anything at all to say about the only vehicle on the promenade.
+  whippyQ: ['Is he stopping? He’s stopping.', 'Two, please.',
+            'Do you do a ninety-nine?', 'I’m not queueing. I’m standing near it.',
+            'It’s got the flake. It has to have the flake.',
+            'We are on holiday. That is the entire argument.',
+            'Have you got change for a fifty?'],
+  whippyGot:['Worth every cent.', 'Oh, that’s good.', 'Eight dollars. Worth it.',
+             'Don’t tell your mother.', 'Quick, before it goes everywhere.',
+             'Right. Now the seagulls know.'],
+  whippyMiss:['—no. No! Come back!', 'He drove off. He actually drove off.',
+              'I was NEXT.', 'Every time. Every single time.'],
   ferrySay:['That’s our ferry.', 'Manly, is it?', 'Mind the gap.', 'Tap on, tap on.'],
 
   // ---- the sea wall ----
@@ -248,6 +283,40 @@ const npcLINES = {
               'The courtyard is lovely at this hour.'],
   paScandal: ['THE BELL!', 'Who is ringing at this hour?!', 'That is sacrilege!',
               '¡Ave María purísima!', 'In the middle of Mass!'],
+  // ---- TWO PEOPLE TALKING, IN PASTO (see chatStep) ---------------------
+  // Same rules as chatA/chatB, salted the same way the rest of this chapter
+  // is: the sentence in English, the address and the local noun in Spanish.
+  // A market at two thousand five hundred metres is a place where everybody
+  // knows everybody, so these are all continuations of conversations that
+  // started some time before the player got here.
+  paChatA: ['Did your brother come down from the finca?',
+            'It is going to rain by four. Look at it.',
+            'Have you seen the price of gas?', 'Is the road open past the church?',
+            'Did you sell the black ones?', 'My knee knows before the sky does.',
+            'Are you going up for the Carnaval, pues?',
+            'The mountain is smoking again, mijo.',
+            'Two thousand for THAT?', 'Did you hear about Doña Marta?',
+            'Whose animal is that, hombre?'],
+  paChatB: ['Ay, do not start with me.', 'Same as always, pues.',
+            'That is what my mother said.', 'It will hold. It always holds.',
+            'You say that every year.', 'Ave María.',
+            'I am not paying that.', 'Ask the woman with the broom. She knows everything.',
+            'Tomorrow, tomorrow.', 'It is not mine, I can tell you that.',
+            'Bueno. Life goes on.'],
+  // ---- THE CARROZA GOES PAST (see paThink) -----------------------------
+  // Two lists, because a float with a capybara standing on it is not the same
+  // event as a float. The first are what you say about a parade you have seen
+  // every January of your life; the second are what you say when the parade
+  // has a two-metre rodent on it.
+  paFloat:     ['There it goes.', 'They made the sun bigger this year.',
+                'Bueno. It is Carnaval, pues.', 'My cousin built the wings.',
+                'Slower than last year. Everything is.',
+                'The talc gets into everything. Everything, mijo.'],
+  paFloatRode: ['¡Ave María — look at it!', 'There is a chigüiro on the carroza.',
+                'Somebody get a photograph. SOMEBODY.',
+                'It is riding it. It is actually riding it.',
+                'That is the best one they have ever done.',
+                'Throw it some talc! Go on!', '¡Que viva el chigüiro!'],
   paCondor:  ['Look! Up there!', '¡El cóndor!', 'A condor. An actual condor.',
               'Look at the size of that thing.'],
   paGawp:    ['…it is flying.', 'The chigüiro is flying.',
@@ -507,6 +576,15 @@ export function createNPCs(game) {
     { w: 0.05, h: 0.12, d: 0.05, x: -0.16, y: -0.31, z: -0.28 },
     { w: 0.05, h: 0.12, d: 0.05, x: 0.16, y: -0.31, z: -0.28 },
   ]);
+  // A ninety-nine, held at the shoulder. Two cones and three balls, and it is
+  // the only thing anybody in this chapter ever walks away from the van with.
+  const gCone = npcMakeGeo([
+    { k: "cone", r: 0.055, h: 0.20, seg: 5, y: -0.10, rx: Math.PI },
+    { k: "sph", r: 0.062, y: 0.02 },
+    { k: "sph", r: 0.050, y: 0.08 },
+    { k: "sph", r: 0.036, y: 0.13 },
+    { w: 0.015, h: 0.13, d: 0.015, x: 0.035, y: 0.19, rz: -0.28 },
+  ]);
   const gIbisBody = npcMakeGeo([
     { k: 'sph', r: 0.16 },
     { w: 0.10, h: 0.07, d: 0.24, y: 0.02, z: -0.20 },
@@ -562,6 +640,7 @@ export function createNPCs(game) {
   const iHat   = mkInst(gHat, HUMANS);
   const iCam   = mkInst(gCam, HUMANS);
   const iTool  = mkInst(gTool, HUMANS);
+  const iCone  = mkInst(gCone, HUMANS);
   const iIbisB = mkInst(gIbisBody, IBIS);
   const iIbisN = mkInst(gIbisNeck, IBIS);
   const iIbisLA = mkInst(gIbisLeg, IBIS);
@@ -1055,6 +1134,12 @@ export function createNPCs(game) {
       face: o.face === undefined ? (g ? g.rotation.y : 0) : o.face,
       yaw: g ? g.rotation.y : 0, baseY: g ? g.position.y : 0,
       cd: rand(0, 3), t: rand(0, 6.28), was: false, last: '',
+      // The draw bags, one per pool this person ever speaks from. See localLine.
+      bags: {},
+      // What they say when you finish something in front of them, keyed by task
+      // id, plus a catch-all. Optional; the chapter-neutral default below is
+      // what the other sixty-odd people use.
+      onTask: o.onTask || null, praise: o.praise || null,
       fig: fig, gest: 0,
       // What they say when the world does something to them. All optional; a
       // local that names none of them falls back on npcLOC_SAY, so every
@@ -1111,13 +1196,87 @@ export function createNPCs(game) {
     sayBubble(owner, text);
   }
   /** One line from `arr`, never the one this local said last. */
+  // =======================================================================
+  // A LINE POOL IS NOT A FLAT LIST OF STRINGS ANY MORE (v20).
+  //
+  // Every one of the seventy-odd people standing in the sixteen chapters was a
+  // fixed bag of three sentences, chosen with `randInt`, forever. Two things
+  // were wrong with that and both are about the same thing — a person who
+  // cannot say anything NEW is a person you stop walking up to:
+  //
+  //   1. THE DIE ROLL REPEATS. Three lines drawn at random with only a
+  //      never-twice-running guard means the second thing you hear is the first
+  //      thing you heard about half the time. A BAG fixes it for nothing: the
+  //      pool is shuffled, drawn down to empty and refilled, so you hear all of
+  //      somebody's material before you hear any of it twice.
+  //   2. NOBODY KNOWS WHAT YOU HAVE DONE. The man beside the bell says 'pull it
+  //      if you like, everybody does' whether you have never touched it or have
+  //      just been standing under it when it went. A chapter is a sequence of
+  //      things happening and the people in it were outside time.
+  //
+  // So an entry in `lines`/`wheek`/anything else may now be:
+  //
+  //     'a plain string'                       — always available
+  //     { t: '…', after: 'task-id' }           — only once that task is ticked
+  //     { t: '…', before: 'task-id' }          — only until it is
+  //     { t: '…', when: () => bool }           — anything else at all
+  //
+  // ...and the pool itself may be a FUNCTION returning such an array, for the
+  // cases where the whole set depends on something (night, the tide, whether
+  // the bus has left). Nothing existing changes: an array of bare strings
+  // resolves to itself, and the cost of the check is one `typeof` per entry.
+  // =======================================================================
+  const npcRESOLVED = [];          // scratch; localLine is called ~once a second
+  function npcTaskDone(id) {
+    return !!(id && game && typeof game.taskDone === 'function' && game.taskDone(id));
+  }
+  /** Flatten a pool to the strings that are true RIGHT NOW. Never allocates. */
+  function localResolve(arr) {
+    let src = arr;
+    if (typeof src === 'function') { try { src = src(); } catch (e) { src = null; } }
+    npcRESOLVED.length = 0;
+    if (!src || !src.length) return npcRESOLVED;
+    for (let i = 0; i < src.length; i++) {
+      const e = src[i];
+      if (typeof e === 'string') { npcRESOLVED.push(e); continue; }
+      if (!e || !e.t) continue;
+      if (e.after && !npcTaskDone(e.after)) continue;
+      if (e.before && npcTaskDone(e.before)) continue;
+      if (e.when) { let ok = false; try { ok = !!e.when(); } catch (err) { ok = false; } if (!ok) continue; }
+      npcRESOLVED.push(e.t);
+    }
+    return npcRESOLVED;
+  }
+  /**
+   * One line from `arr`, drawn from a BAG rather than rolled.
+   *
+   * The bag is keyed by a cheap signature of the resolved pool, so a person's
+   * greetings, their answer to a wheek and their opinion about a dropped crate
+   * each drain independently — and a pool that CHANGES (a conditional line
+   * becoming available) refills, which is the behaviour you want: the new line
+   * is the next thing they say.
+   */
   function localLine(rec, arr) {
-    if (!arr || !arr.length) return;
-    let i = randInt(0, arr.length - 1);
-    for (let k = 0; k < 3 && arr.length > 1 && arr[i] === rec.last; k++) i = (i + 1) % arr.length;
-    rec.last = arr[i];
-    rec.gest = 1.5 + arr[i].length * 0.045;   // as long as the bubble, near enough
-    rec.anchor.speak(arr[i]);
+    const pool = localResolve(arr);
+    if (!pool.length) return;
+    const sig = pool.length + '' + pool[0];
+    let bag = rec.bags[sig];
+    if (!bag || !bag.length) {
+      bag = rec.bags[sig] = pool.slice();
+      // Fisher-Yates, and then one guard: if the bag would open on the line
+      // they have just said, swap it with the one behind it.
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        const t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+      }
+      if (bag.length > 1 && bag[bag.length - 1] === rec.last) {
+        const t = bag[bag.length - 1]; bag[bag.length - 1] = bag[0]; bag[0] = t;
+      }
+    }
+    const line = bag.pop();
+    rec.last = line;
+    rec.gest = 1.5 + line.length * 0.045;   // as long as the bubble, near enough
+    rec.anchor.speak(line);
   }
   function localsSay(kind) {
     // The wheek reaches everybody in earshot, which is a wider circle than the
@@ -1223,6 +1382,131 @@ export function createNPCs(game) {
     if (!b) return;
     localsReact('thief', b.position.x, b.position.z, 0.5, 6.5);
   });
+
+  // =======================================================================
+  // ...AND SOMEBODY SAW YOU DO IT (v20).
+  //
+  // Ninety-odd tasks, and the entire acknowledgement for finishing one was a
+  // tick, a toast and a burst of paper — all of them UI. The world itself never
+  // said anything, which is the odd half of a game whose whole comedy is that
+  // there are people standing about while you do this.
+  //
+  // So: whoever is NEAREST, and only if they are near enough to have actually
+  // watched, says something. One person, not the crowd — a square that
+  // applauds in unison is a cutscene, and one bloke turning round and going 'was
+  // that deliberate?' is the joke. On the same cooldown as everything else, so
+  // a fast run of three ticks does not produce three lines from the same mouth.
+  //
+  // A chapter may name the reaction per task (`onTask: { 'the-bell': [...] }`)
+  // or per person (`praise: [...]`), and everything falls back to a
+  // chapter-neutral pool that has to work in a Kyoto garden and on an
+  // Antarctic jetty alike: nothing here names a place, a task or an object.
+  const npcLOC_PRAISE = ['…was that deliberate?', 'Well. That happened.',
+                         'Nobody asked you to do that.', 'Hm. Yes. Good.',
+                         'I saw that.', 'You are pleased with yourself.',
+                         'Right in front of me, as well.',
+                         'I am going to tell people about this.',
+                         'That is going to be somebody’s problem.'];
+  const npcLOC_PRAISE_R = 15;    // m. Further than a conversation, nearer than a shout.
+  game.events.on('task:complete', function (e) {
+    const id = e && e.id;
+    const capy = game.capy;
+    const cp = capy && capy.position;
+    const live = game.biome && game.biome.current;
+    if (!cp || !live || !locals.length) return;
+    let best = null, bd = npcLOC_PRAISE_R * npcLOC_PRAISE_R;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (L.biome !== live || L.cd > 0) continue;
+      const dx = cp.x - L.x, dz = cp.z - L.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bd) { bd = d2; best = L; }
+    }
+    if (!best) return;
+    // A person with something specific to say about THIS says it; otherwise the
+    // general opinion. `arrive` rows are excluded by the chapter naming them —
+    // being congratulated for turning up is the one line that would be silly.
+    const arr = (best.onTask && best.onTask[id]) || best.praise || npcLOC_PRAISE;
+    best.cd = best.cool * rand(0.9, 1.5);
+    // They turn round for it, which is what makes it read from across a square.
+    best.flV -= 5.5;
+    best.flYaw = Math.atan2(cp.x - best.x, cp.z - best.z);
+    localLine(best, arr);
+  });
+
+  // =======================================================================
+  // TWO PEOPLE, TALKING TO EACH OTHER (v20).
+  //
+  // Every voice in sixteen chapters was addressed to the capybara. Which means
+  // that in a street with nine people in it, nothing was ever said unless the
+  // player walked up and stood there — the world had no conversation of its
+  // own to overhear, and overhearing is most of what makes a place feel
+  // inhabited.
+  //
+  // An EXCHANGE is two locals who are near each other and a list of two-line
+  // scraps. It runs when the player is close enough to read both bubbles and
+  // far enough not to be the subject, on a long jittered gap, and it takes the
+  // pair's own cooldowns with it so nobody is talking over themselves.
+  //
+  // Deliberately not a dialogue tree: it is a spoken pair, once, and then it is
+  // over. The point is to walk past something already in progress.
+  const npcEX = [];
+  const npcEX_MIN = 6;       // m — nearer than this and it is about you
+  const npcEX_MAX = 26;      // m — further and you cannot read the bubbles
+  const npcEX_GAP = 30;      // s between exchanges, jittered per pair
+  /**
+   * @param o {biome, a, b, lines:[[first, second], …], gap?}
+   *   a, b  the two locals (records returned by addLocal), in speaking order
+   */
+  function addExchange(o) {
+    if (!o || !o.a || !o.b || !o.lines || !o.lines.length) return null;
+    const rec = { biome: o.biome || o.a.biome, a: o.a, b: o.b, lines: o.lines,
+                  gap: o.gap || npcEX_GAP, t: rand(8, 22), step: 0, bag: [] };
+    npcEX.push(rec);
+    return rec;
+  }
+  function npcExStep(dt) {
+    if (!npcEX.length) return;
+    const live = game.biome && game.biome.current;
+    const cp = game.capy && game.capy.position;
+    for (let i = 0; i < npcEX.length; i++) {
+      const X = npcEX[i];
+      if (X.biome !== live) continue;
+      X.t -= dt;
+      // ---- the answer, a beat after the opening line -------------------
+      if (X.step === 1) {
+        if (X.t <= 0) {
+          X.step = 0;
+          X.t = X.gap * rand(0.7, 1.6);
+          X.b.cd = X.b.cool * rand(0.6, 1.1);
+          localLine(X.b, [X.said[1]]);
+        }
+        continue;
+      }
+      if (X.t > 0 || !cp) continue;
+      if (X.a.cd > 0 || X.b.cd > 0) { X.t = rand(2, 5); continue; }
+      const da = Math.hypot(cp.x - X.a.x, cp.z - X.a.z);
+      const db = Math.hypot(cp.x - X.b.x, cp.z - X.b.z);
+      const near = Math.min(da, db);
+      if (near < npcEX_MIN || near > npcEX_MAX) { X.t = rand(2, 5); continue; }
+      // a bag, for the same reason the lines are: you hear all of them first
+      if (!X.bag.length) {
+        X.bag = X.lines.slice();
+        for (let k = X.bag.length - 1; k > 0; k--) {
+          const j = randInt(0, k); const t = X.bag[k]; X.bag[k] = X.bag[j]; X.bag[j] = t;
+        }
+      }
+      X.said = X.bag.pop();
+      X.a.cd = X.a.cool * rand(0.6, 1.1);
+      localLine(X.a, [X.said[0]]);
+      // they turn to each other, which is the whole tell that this is not
+      // aimed at the player
+      X.a.flYaw = Math.atan2(X.b.x - X.a.x, X.b.z - X.a.z); X.a.flV -= 2.2;
+      X.b.flYaw = Math.atan2(X.a.x - X.b.x, X.a.z - X.b.z); X.b.flV -= 2.2;
+      X.step = 1;
+      X.t = 1.6 + X.said[0].length * 0.035;
+    }
+  }
 
   function localsStep(dt) {
     if (!locals.length) return;
@@ -1564,6 +1848,7 @@ export function createNPCs(game) {
     const handR = new THREE_.Object3D();
     const camN = new THREE_.Object3D();
     const toolN = new THREE_.Object3D();
+    const coneN = new THREE_.Object3D();   // the 99, only while somebody has one
     const legL = new THREE_.Object3D();
     const legR = new THREE_.Object3D();
     const holdN = new THREE_.Object3D();   // guitar / waiter's tray, carried on the chest
@@ -1571,7 +1856,7 @@ export function createNPCs(game) {
     root.add(bob); root.add(legL); root.add(legR);
     bob.add(head); bob.add(armL); bob.add(armR);
     head.add(hatN);
-    armR.add(handR); handR.add(camN); handR.add(toolN);
+    armR.add(handR); handR.add(camN); handR.add(toolN); handR.add(coneN);
     bob.add(holdN);
     holdN.position.set(0.02, 1.02, 0.20);
     holdN.scale.setScalar(0);
@@ -1582,11 +1867,13 @@ export function createNPCs(game) {
     handR.position.set(0, -0.56, 0);
     camN.position.set(0, 0.02, 0.12);
     toolN.position.set(0, 0.0, 0.06);
+    coneN.position.set(0, -0.02, 0.12);
     legL.position.set(-0.13, 0.62, 0);
     legR.position.set(0.13, 0.62, 0);
     hatN.scale.setScalar(0);
     camN.scale.setScalar(0);
     toolN.scale.setScalar(0);
+    coneN.scale.setScalar(0);
 
     const build = kind === 'ibis' ? 1 : rand(0.93, 1.08);
     root.scale.setScalar(build);
@@ -1601,7 +1888,7 @@ export function createNPCs(game) {
       target: new THREE_.Vector3(),
       heldProp: null,
       idx,
-      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, legL, legR, holdN },
+      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, legL, legR, holdN },
       yaw: rand(-Math.PI, Math.PI),
       speed: 0,
       wantSpeed: 0,
@@ -1619,6 +1906,9 @@ export function createNPCs(game) {
       dejected: 0, dejectStage: 0, reactMode: 0, flashed: false, stolenType: '',
       home: new THREE_.Vector3(),
       poiA: 0, loopI: 0, jogOff: 0,
+      mate: null,         // who they came with — see pickPOI and chatStep
+      // ---- Mr Whippy ----
+      queueI: 0, queueCd: rand(4, 40), coneT: -1,
       // ---- Circular Quay ----
       quay: !!npcQUAY_KINDS[kind], homeState: 'idle', homeYaw: 0,
       seated: 0, seatPose: 0, chatPhase: rand(0, 6.28), sipT: rand(2, 8),
@@ -1636,6 +1926,13 @@ export function createNPCs(game) {
       cornerT: 0, swimT: 0, wet: 0, saidWet: false,
       seatX: 0, seatZ: 0, seatYaw: 0, tableX: 0, tableZ: 0,
       sawTable: false, serveI: 0,
+      // Can this one be half of a conversation? See chatStep. Llamas, street
+      // dogs and ibises are built by their own constructors and never get it,
+      // which is the whole test — paBuildBeast's speak() is a deliberate
+      // no-op, so without this a beast picked as the listener would swallow
+      // the reply and the exchange would be one person talking to a llama.
+      chatty: true,
+      chatCd: rand(3, 22),   // …and when they last had one. NOT talkCd — see chatStep.
       speak(t) { sayBubble(rec, t); },
       update(dt) { stepHuman(rec, dt); },
     };
@@ -1676,6 +1973,7 @@ export function createNPCs(game) {
     iHat.setColorAt(rec.idx, npcColor.setHex(cHat));
     iCam.setColorAt(rec.idx, npcColor.setHex(cCam));
     iTool.setColorAt(rec.idx, npcColor.setHex(PALETTE.wood));
+    iCone.setColorAt(rec.idx, npcColor.setHex(PALETTE.cloth6));
   }
 
   function addBody(rec, x, z) { return addBodyAt(rec, x, 0.85, z, 0.26, 0.8, 0.22); }
@@ -1911,6 +2209,26 @@ export function createNPCs(game) {
     game.npcs.push(rec);
   }
 
+  // ---- WHO CAME WITH WHOM ------------------------------------------------
+  // Pair off the tourists and the commuters, two by two, leaving any odd one
+  // out on their own — a park with one person visibly by themselves in it is
+  // right, a park with eleven of them is not. The link is symmetric and it is
+  // the ONLY thing rec.mate is used for: see pickPOI, which is where a
+  // companion turns into two people standing together.
+  (function () {
+    const singles = [];
+    for (let i = 0; i < humans.length; i++) {
+      const k = humans[i].kind;
+      if (k === 'tourist' || k === 'commuter') singles.push(humans[i]);
+    }
+    for (let i = 0; i + 1 < singles.length; i += 2) {
+      // …and not all of them. Two of every five walk the gardens alone.
+      if (Math.random() < 0.25) continue;
+      singles[i].mate = singles[i + 1];
+      singles[i + 1].mate = singles[i];
+    }
+  })();
+
   // props for tourists (asked of props.js, carried in-hand each frame)
   for (let i = 0; i < humans.length; i++) {
     const rec = humans[i];
@@ -2019,6 +2337,7 @@ export function createNPCs(game) {
   iHat.instanceColor.needsUpdate = true;
   iCam.instanceColor.needsUpdate = true;
   iTool.instanceColor.needsUpdate = true;
+  iCone.instanceColor.needsUpdate = true;
   iIbisB.instanceColor.needsUpdate = true;
   iIbisN.instanceColor.needsUpdate = true;
   iIbisLA.instanceColor.needsUpdate = true;
@@ -2042,12 +2361,65 @@ export function createNPCs(game) {
   iCup.visible = !!buskerRec;
 
   // ================================================================ steering
+  // ------------------------------------------------------- MR WHIPPY'S QUEUE
+  // At most three at a time, in order, and the line is a plain array: the
+  // index IS the place, so when the person at the window leaves everybody
+  // behind them shuffles up on the very next frame without a single timer.
+  //
+  // The one rule that matters is that a queue must EMPTY. Every exit from
+  // 'queue' — served, van left, startled, chased, shoved into the harbour —
+  // goes through vanQueueLeave, and setState() calls it for anybody leaving
+  // the state by any route at all, so there is no path that can strand a
+  // ghost in the line and wedge the queue at three for the rest of the run.
+  const vanQueue = [];
+  const vanQFallback = { x: 0, z: 0 };
+  const vanQMAX = 3;
+  function vanEnv() {
+    const e = game.env;
+    // ALL THREE, not two. case 'queue' calls e.van() as well, and a build of
+    // environment.js that published the two new hooks but not the old one
+    // would have thrown inside a state machine — the one place in this file a
+    // throw takes the whole crowd down with it.
+    return (e && typeof e.vanQueueSpot === 'function' &&
+            typeof e.vanDwellLeft === 'function' && typeof e.van === 'function') ? e : null;
+  }
+  /** Is she stopped, with enough of the stop left to be worth walking over for? */
+  function vanQueueOpen() {
+    if (!biomeLive()) return false;
+    const e = vanEnv();
+    if (!e) return false;
+    // Three seconds, not five: eleven is the whole stop and somebody twenty
+    // metres away needs eight of them to walk it. Anybody who does not make
+    // the window says so — see whippyMiss — which is a better joke than a
+    // queue that only ever forms for people already standing next to the van.
+    return e.vanDwellLeft() > 3.0 && vanQueue.length < vanQMAX;
+  }
+  function vanQueueSpotAt(i) {
+    const e = vanEnv();
+    if (!e) return vanQFallback;
+    return e.vanQueueSpot(i);
+  }
+  function vanQueueJoin(rec) {
+    if (vanQueue.indexOf(rec) < 0) vanQueue.push(rec);
+    return vanQueue.indexOf(rec);
+  }
+  function vanQueueLeave(rec) {
+    const i = vanQueue.indexOf(rec);
+    if (i >= 0) vanQueue.splice(i, 1);
+  }
+
   function setState(rec, s) {
     // Only fleeing and swimming open the harbour up. Hand the sea wall back the
     // moment they are inland again, so an interrupted plunge cannot leave
     // someone free to stroll off the quay ten minutes later.
     if (rec.zMin !== undefined && s !== 'flee' && s !== 'plunge' && s !== 'swim' &&
         rec.group.position.z >= npcEDGE_STOP) rec.zMin = npcEDGE_STOP;
+    // LEAVING THE LINE IS A ROUTE, NOT AN EVENT. Every exit from 'queue' —
+    // served, van gone, startled, chased, carried off by the gardener, shoved
+    // into the harbour — arrives here, so a person cannot be left holding a
+    // place in a queue they walked away from. Without this the line wedges at
+    // three and Mr Whippy never has a customer again.
+    if (rec.state === 'queue' && s !== 'queue') vanQueueLeave(rec);
     rec.state = s;
     rec.stateT = 0;
     rec.dwell = -1;              // a new state draws a new dwell — see npcDwell
@@ -2272,6 +2644,23 @@ export function createNPCs(game) {
   }
 
   function pickPOI(rec) {
+    // ---- PEOPLE COME IN TWOS -------------------------------------------
+    // Eleven tourists picking independently out of a fifteen-point table over
+    // a hundred and thirty metres of park produced eleven people standing on
+    // their own, evenly spaced, for ever. Nobody visits the Botanic Gardens
+    // alone. Half of them have a companion, and a companion follows you to
+    // roughly where you went — near enough to be together, far enough not to
+    // be inside you, and never so reliably that the pair reads as a rig.
+    //
+    // It is also what makes a conversation POSSIBLE: chatStep needs two calm
+    // people inside three and a half metres, and without this that state of
+    // affairs came about about once every three minutes by luck.
+    const mate = rec.mate;
+    if (mate && mate.group && Math.random() < 0.62) {
+      const a = rand(0, 6.283), d = rand(1.5, 2.6);
+      rec.target.set(mate.target.x + Math.cos(a) * d, 0, mate.target.z + Math.sin(a) * d);
+      return;
+    }
     // Quay folk mill about the quay; Opera House folk mill about the podium.
     const src = rec.quay ? npcQUAY_PTS : npcPOI;
     const pi = randInt(0, (src.length / 2) - 1) * 2;
@@ -2294,9 +2683,15 @@ export function createNPCs(game) {
     const st = rec.state;
     // rec.dejected > 0 joins the list: a dejection beat is a performance, and
     // merely noticing the capybara must not cut it off half way through.
+    // 'queue' joins the list, and it has to. A person in a line who turns to
+    // look at a capybara loses their place to the person behind them, which
+    // made the queue thrash between two and three people every second the
+    // player stood anywhere near the van. Being startled, robbed or chased
+    // still takes them out of it — those all come through startle()/setState()
+    // and not through here — so the line still empties for the right reasons.
     if (st === 'chase' || st === 'flee' || st === 'photo' || st === 'startled' ||
         st === 'fluster' || st === 'cornered' || st === 'plunge' || st === 'swim' ||
-        st === 'shoo' || rec.carryT >= 0 || rec.dejected > 0) return;
+        st === 'shoo' || st === 'queue' || rec.carryT >= 0 || rec.dejected > 0) return;
 
     // --- terrace cast: their whole world is one table or four ---------------
     if (rec.kind === 'patron') {
@@ -2408,6 +2803,27 @@ export function createNPCs(game) {
       else if (st === 'idle' || st === 'lookAt') { pickBed(rec); setState(rec, 'wander'); }
       return;
     }
+    // ---- MR WHIPPY STOPS AND NOBODY EVER WANTED ANYTHING -----------------
+    // She dwells eleven seconds at each end of the promenade and for the life
+    // of this chapter she was the only van in the world with no queue at it.
+    // A tourist inside forty metres who is not doing anything else walks over,
+    // stands in line, and leaves with a cone; if she pulls out first they say
+    // so. It costs one state, it is entirely optional, and it turns the mini
+    // into something the crowd is visibly interested in — which is the whole
+    // reason to ride the roof of it.
+    if ((rec.kind === 'tourist' || rec.kind === 'commuter') && st !== 'queue' &&
+        rec.coneT < 0 && rec.queueCd <= 0 && vanQueueOpen()) {
+      const q = vanQueueSpotAt(vanQueue.length);
+      const dvx = q.x - rec.group.position.x, dvz = q.z - rec.group.position.z;
+      if (dvx * dvx + dvz * dvz < 20 * 20) {
+        rec.queueI = vanQueueJoin(rec);
+        setState(rec, 'queue');
+        if (rec.talkCd <= 0) { rec.talkCd = rand(9, 20); pickLine(rec, 'whippyQ'); }
+        return;
+      }
+      rec.queueCd = rand(12, 30);       // too far — do not ask again this stop
+    }
+
     // tourists
     if (st === 'lookAt' && rec.stateT > 2.5) setState(rec, 'idle');
     if (st === 'idle' && npcDwell(rec, rec.stateT, 2.5, 7)) { pickPOI(rec); setState(rec, 'wander'); }
@@ -2423,9 +2839,24 @@ export function createNPCs(game) {
   }
 
   function thinkIbis(rec) {
+    // ---- THE TASK IS CALLED BIN-CHICKEN AND YOU NEVER SAW ONE -------------
+    // The bin tips, fourteen bits of rubbish come out, the row ticks — and the
+    // ibises, whose entire reason for being in this chapter is that moment,
+    // were four metres into a flee because the capybara that knocked it over
+    // was standing next to it. So the payoff happened behind the player, if it
+    // happened at all.
+    //
+    // A bin chicken is not frightened of you. That is the whole national joke
+    // about them: they will take a chip out of your hand. So the flee radius
+    // COLLAPSES when there is an open bin in reach — from four metres to one
+    // and a half, which is close enough that they still scatter if you charge
+    // straight through them and far enough that you can stand there and watch
+    // six of them work.
+    const feast = ibisOpenBin(rec);
     if (capyOk) {
       const dx = capyX - rec.group.position.x, dz = capyZ - rec.group.position.z;
-      if (dx * dx + dz * dz < 16) {
+      const fr = feast ? 1.55 : 4.0;
+      if (dx * dx + dz * dz < fr * fr) {
         rec.target.set(rec.group.position.x - dx * 2.2, 0, rec.group.position.z - dz * 2.2);
         setState(rec, 'flee');
         return;
@@ -2457,6 +2888,54 @@ export function createNPCs(game) {
         0, clamp(rec.group.position.z + rand(-7, 7), 2, npcBOUND_Z1));
       rec.stateT = 0;
     }
+  }
+
+  /**
+   * Is there a bin lying on its side within reach of this bird? Returns the
+   * prop or null. Kept separate from thinkIbis's own loop because the answer
+   * is wanted BEFORE the flee test, and re-walking the prop list twice a think
+   * for six birds on a staggered cursor is nothing.
+   */
+  function ibisOpenBin(rec) {
+    const props = game.props;
+    if (!props) return null;
+    const px = rec.group.position.x, pz = rec.group.position.z;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i];
+      if (!p || p.type !== 'bin' || !p.body || p.removed) continue;
+      const dx = p.body.position.x - px, dz = p.body.position.z - pz;
+      if (dx * dx + dz * dz > 14 * 14) continue;
+      npcQ1.set(p.body.quaternion.x, p.body.quaternion.y, p.body.quaternion.z, p.body.quaternion.w);
+      npcV1.set(0, 1, 0).applyQuaternion(npcQ1);
+      if (npcV1.y < 0.6) return p;
+    }
+    return null;
+  }
+
+  // How many of them are actually on it, and the squabble that goes with it.
+  let ibisFeastT = 0, ibisSaidIt = false;
+  function ibisFeastStep(dt) {
+    ibisFeastT -= dt;
+    if (ibisFeastT > 0) return;
+    let n = 0, cx = 0, cz = 0;
+    for (let i = 0; i < ibises.length; i++) {
+      const r = ibises[i];
+      if (r.state !== 'work' || r.speed > 0.5) continue;
+      n++; cx += r.group.position.x; cz += r.group.position.z;
+    }
+    if (n < 2) { ibisFeastT = 0.6; return; }
+    cx /= n; cz /= n;
+    // Never a fixed gap — a squabble on a metronome is a car alarm.
+    ibisFeastT = rand(0.7, 2.1) / (1 + n * 0.18);
+    sfxAt('gull', cx, cz, clamp(0.16 + n * 0.055, 0.16, 0.44), rand(0.62, 0.82));
+    if (n >= 4 && !ibisSaidIt) {
+      ibisSaidIt = true;
+      if (typeof game.toast === 'function') game.toast('the bin chickens have found it');
+    }
+  }
+  function sfxAt(name, x, z, vol, pitch) {
+    try { game.sfx(name, { volume: vol, pitch: pitch, at: { x: x, y: 0.6, z: z }, near: 7, far: 70 }); }
+    catch (e) { /* optional */ }
   }
 
   // =============================================================== reactions
@@ -2806,6 +3285,17 @@ export function createNPCs(game) {
     rec.photoCd -= dt;
     rec.talkCd -= dt;
     rec.noticeCd -= dt;
+    rec.queueCd -= dt;
+    if (rec.chatCd !== undefined) rec.chatCd -= dt;
+    // The 99 has a life. It is eaten, and then the hand is empty again — a
+    // crowd in which every third person is permanently holding an ice cream
+    // reads as a bug within about a minute.
+    if (rec.coneT >= 0) {
+      rec.coneT -= dt;
+      const eat = clamp(rec.coneT / 6, 0, 1);          // the last six seconds shrink it
+      rec.nodes.coneN.scale.setScalar(rec.coneT > 0 ? 0.55 + eat * 0.45 : 0);
+      if (rec.coneT < 0) { rec.coneT = -1; rec.nodes.coneN.scale.setScalar(0); }
+    }
     rec.alarm = damp(rec.alarm, 0, 0.9, dt);
     // ---- ...AND WHAT THEY STILL REMEMBER (v19) ---------------------------
     // Alarm is what a person feels and it is gone in under a second. Wariness
@@ -3308,6 +3798,52 @@ export function createNPCs(game) {
         if (rec.stateT > 3.2) setState(rec, 'idle');
         break;
       }
+      case 'queue': {
+        // The place in the line is read LIVE off the array, not off the index
+        // stored when they joined: the person at the window walks away and
+        // everybody behind them steps up on the next frame, for free.
+        const place = vanQueue.indexOf(rec);
+        if (place < 0 || !vanEnv()) { pickPOI(rec); setState(rec, 'wander'); break; }
+        rec.queueI = place;
+        const q = vanQueueSpotAt(place);
+        const d = steerTo(rec, q.x, q.z, dt);
+        // …and they hurry, a bit. Nobody strolls to an ice cream van.
+        spd = d > 6 ? 1.9 : 1.15;
+        const vp = game.env.van();
+        rec.lookX = vp.x; rec.lookZ = vp.z;
+        if (d < 1.05) {
+          spd = 0;
+          rec.tgtLean = Math.sin(rec.stateT * 1.4 + rec.idlePhase) * 0.04;
+          // First in line, and she is still stopped: the window, the cone, and
+          // the walk away with it. rec.coneT is the seconds left holding it.
+          if (place === 0 && npcDwell(rec, rec.stateT, 2.2, 3.4)) {
+            rec.coneT = rand(14, 26);
+            rec.nodes.coneN.scale.setScalar(1);
+            rec.queueCd = rand(70, 140);       // one each, and not again soon
+            pickLine(rec, 'whippyGot');
+            sfx('pop');
+            pickPOI(rec);
+            setState(rec, 'wander');
+            break;
+          }
+        }
+        // She has pulled out. Nobody gets anything, and they have a view on it.
+        if (vanEnv().vanDwellLeft() <= 0) {
+          if (place === 0 && rec.talkCd <= 0) { rec.talkCd = rand(8, 18); pickLine(rec, 'whippyMiss'); }
+          rec.queueCd = rand(20, 45);
+          pickPOI(rec);
+          setState(rec, 'wander');
+        } else if (rec.stateT > 26) {
+          // A LINE CANNOT BE PERMANENT. If steering never gets them within a
+          // metre of their place — a bench in the way, a nav pocket, a shove —
+          // they give up rather than standing in the road for ever holding
+          // slot zero against everybody behind them.
+          rec.queueCd = rand(30, 60);
+          pickPOI(rec);
+          setState(rec, 'wander');
+        }
+        break;
+      }
       case 'wander': {
         if (rec.kind === 'jogger') {
           const li = rec.loopI * 2;
@@ -3344,6 +3880,11 @@ export function createNPCs(game) {
         break;
       }
     }
+
+    // …and the arm that is holding it. After the switch, so it overrides
+    // whatever the state wanted the right arm to do, and before the stumble
+    // handling, so tripping over with an ice cream still reads as a trip.
+    if (rec.coneT >= 0) rec.tgtArmR = -1.15 + Math.sin(rec.stateT * 1.7) * 0.08;
 
     if (rec.stumble > 0) {
       rec.stumble = Math.max(0, rec.stumble - dt * 1.7);
@@ -4139,6 +4680,34 @@ export function createNPCs(game) {
     }
     if (st === 'gawp' || st === 'point') return;      // paStep owns the exit
 
+    // --- THE FLOAT IS GOING PAST AND NOBODY WAS WATCHING IT ---------------
+    // The carroza crosses the plaza twice a minute with the sun turning on the
+    // back of it, and for the life of this chapter the entire town carried on
+    // stacking potatoes. A parade that nobody watches is a trailer.
+    //
+    // Deliberately NOT a state: the vendor is still minding his stall and the
+    // abuela is still coming for you. It is a head turn and, when they have
+    // something to say, a line — which is exactly the weight a thing happening
+    // in the background of your own errand deserves. The reaction is bigger
+    // when the animal is ON it, because that is the joke.
+    if (rec.kind !== 'llama' && rec.kind !== 'streetdog' && game.pasto &&
+        typeof game.pasto.carroza === 'function' && rec.carCd <= 0) {
+      const cp = game.pasto.carroza();
+      const cdx = cp.x - rec.group.position.x, cdz = cp.z - rec.group.position.z;
+      const cd2 = cdx * cdx + cdz * cdz;
+      const rode = typeof game.pasto.onCarroza === 'function' && game.pasto.onCarroza();
+      const reach = rode ? 15 : 9;
+      if (cd2 < reach * reach && !(typeof game.pasto.carrozaParked === 'function' && game.pasto.carrozaParked())) {
+        rec.carCd = rand(7, 16);
+        paAim(rec, cp.x, cp.z);
+        rec.lookUp = Math.max(rec.lookUp, 0.5);
+        if (rec.talkCd <= 0 && Math.random() < (rode ? 0.75 : 0.3)) {
+          rec.talkCd = rand(9, 20);
+          paSay(rec, rode ? 'paFloatRode' : 'paFloat');
+        }
+      }
+    }
+
     if (rec.kind === 'vendor') {
       if (st === 'chase' || st === 'wheeze' || st === 'restock') return;
       if (capyOk) {
@@ -4263,6 +4832,8 @@ export function createNPCs(game) {
     rec.noticeCd -= dt;
     rec.swatCd -= dt;
     rec.gawpCd -= dt;
+    if (rec.carCd !== undefined) rec.carCd -= dt;   // the parade — see paThink
+    if (rec.chatCd !== undefined) rec.chatCd -= dt; // two people talking — see chatStep
     rec.alarm = damp(rec.alarm, 0, 0.9, dt);
     let spd = 0;
     let up = 0;
@@ -4656,6 +5227,7 @@ export function createNPCs(game) {
     rec.slope = 0; rec.dhillT = 0; rec.overshoot = 0;
     rec.swatCd = 0; rec.gawpT = 0; rec.gawpCd = 0; rec.lookUp = 0;
     rec.fidgetAt = rand(15, 27);
+    rec.carCd = rand(2, 12);      // …and when they last looked at the float
     rec.avoidSide = Math.random() < 0.5 ? -1 : 1;
     rec.bestD = 1e9; rec.stallT = 0; rec.stallN = 0;
     rec.detT = 0; rec.detX = 0; rec.detZ = 0;
@@ -5660,6 +6232,7 @@ export function createNPCs(game) {
       iLegR.setMatrixAt(i, n.legR.matrixWorld);
       iCam.setMatrixAt(i, n.camN.matrixWorld);
       iTool.setMatrixAt(i, n.toolN.matrixWorld);
+      iCone.setMatrixAt(i, n.coneN.matrixWorld);
     }
     iTorso.instanceMatrix.needsUpdate = true;
     iHips.instanceMatrix.needsUpdate = true;
@@ -5672,6 +6245,7 @@ export function createNPCs(game) {
     iLegR.instanceMatrix.needsUpdate = true;
     iCam.instanceMatrix.needsUpdate = true;
     iTool.instanceMatrix.needsUpdate = true;
+    iCone.instanceMatrix.needsUpdate = true;
 
     for (let i = 0; i < ibises.length; i++) {
       const n = ibises[i].nodes;
@@ -5759,6 +6333,112 @@ export function createNPCs(game) {
     }
   }
 
+  // ====================================================== TWO PEOPLE TALKING ==
+  // EVERYBODY IN THIS GAME WAS TALKING TO NOBODY.
+  //
+  // Sixteen tourists, a gardener, a busker, a waiter and four commuters, and
+  // every line any of them has ever said has been a soliloquy: a bubble pops
+  // over one head, nobody answers, and the bubble goes away. A crowd like that
+  // is a room full of people on the phone.
+  //
+  // A conversation is a bubble, a pause, and a SECOND bubble over somebody
+  // else, and that is all it is. No new state, no steering, no pathing: two
+  // people who happen to be standing near each other and are not doing
+  // anything more interesting. The reply is queued as a timer on the listener,
+  // so if the capybara knocks either of them into the harbour in the meantime
+  // the answer simply never arrives — which is funnier than making it robust.
+  //
+  // Held to four rules, all of them learned from the crowd noise this game has
+  // been fixed for before:
+  //   1. Never periodic. The scheduler's own countdown is re-drawn from a
+  //      range every time it fires, and nothing here is on a modulo.
+  //   2. One at a time, anywhere in the world. Two overlapping exchanges read
+  //      as a hubbub, not as a conversation.
+  //   3. Only people who are idle, seated or ambling. Anybody startled, robbed,
+  //      chased, photographing, queueing or in the harbour has better things to
+  //      be saying, and all of those already have their own lines.
+  //   4. Openers and replies are separate lists, so an exchange can never be
+  //      two people saying the same kind of thing at each other.
+  // Both crowds' quiet states, in one table. Sydney and Pasto name their
+  // states differently — 'idle'/'wander' against 'stand'/'walk'/'stall' — and a
+  // single map is cheaper and much harder to get wrong than two.
+  const npcCHAT_CALM = {
+    // Sydney
+    idle: 1, wander: 1, lookAt: 1, calm: 1, seated: 1, work: 1, busk: 1,
+    // Pasto
+    stand: 1, walk: 1, stall: 1, patrol: 1, plod: 1, pray: 1, restock: 1,
+  };
+  let chatT = rand(6, 16);
+  let chatReplyRec = null, chatReplyT = 0, chatReplyKey = '';
+
+  /** Openers and replies, per chapter. Sydney and Pasto have their own. */
+  function chatKeys() {
+    return paLive() ? ['paChatA', 'paChatB'] : ['chatA', 'chatB'];
+  }
+
+  function chatStep(dt, pool) {
+    // the reply, first — it is owed from an earlier frame
+    if (chatReplyRec) {
+      chatReplyT -= dt;
+      if (chatReplyT <= 0) {
+        const r = chatReplyRec;
+        chatReplyRec = null;
+        // …unless something happened to them in the meantime, in which case
+        // the question simply hangs, which is the better joke anyway.
+        if (r.group && npcCHAT_CALM[r.state] && r.dejected <= 0) pickLine(r, chatReplyKey);
+      }
+      return;
+    }
+    chatT -= dt;
+    if (chatT > 0) return;
+    // TWO DIFFERENT COUNTDOWNS, AND THE SHORT ONE MATTERS MORE. The long one
+    // is the pace of conversation once a pair has been found; the short one is
+    // how often we LOOK. Measured over two hundred seconds in Sydney with only
+    // the long one, the scan found a pair about once — the crowd is eleven
+    // people over a hundred and thirty metres of park and a suitable pair is
+    // simply not a common state of the world. A failed scan costs one pass
+    // over the roster, so it can afford to happen every three seconds.
+    chatT = rand(2.5, 5.5);
+    if (!pool || pool.length < 2) return;
+    const K = chatKeys();
+    // one probe, from a random starting index — a full O(n^2) sweep for a bit
+    // of chatter is not a trade worth making
+    const n = pool.length;
+    const s0 = randInt(0, n - 1);
+    for (let k = 0; k < n; k++) {
+      const a = pool[(s0 + k) % n];
+      // chatCd, NOT talkCd. They are different channels and conflating them
+      // very nearly killed the feature: in Sydney the crowd is eleven people in
+      // a small park, the capybara is almost always inside noticing range, and
+      // noticing sets talkCd to eight-to-twenty seconds. So for as long as the
+      // player was anywhere near the conversation — which is the only time
+      // they could ever see one — nobody was allowed to have one. Measured at
+      // zero exchanges in two hundred seconds standing on the spawn lawn.
+      // A remark AT the animal and a conversation with the person next to you
+      // now cool independently, which is also simply true.
+      if (!a || !a.chatty || !a.group || !npcCHAT_CALM[a.state] || a.chatCd > 0 || a.dejected > 0) continue;
+      for (let j = 1; j < n; j++) {
+        const b = pool[(s0 + k + j) % n];
+        if (!b || b === a || !b.chatty || !b.group || !npcCHAT_CALM[b.state] ||
+            b.chatCd > 0 || b.dejected > 0) continue;
+        const dx = a.group.position.x - b.group.position.x;
+        const dz = a.group.position.z - b.group.position.z;
+        if (dx * dx + dz * dz > 3.6 * 3.6) continue;
+        // they turn to each other, which is most of what sells it
+        a.lookX = b.group.position.x; a.lookZ = b.group.position.z;
+        b.lookX = a.group.position.x; b.lookZ = a.group.position.z;
+        a.chatCd = rand(20, 55);
+        b.chatCd = rand(20, 55);
+        pickLine(a, K[0]);
+        chatReplyRec = b;
+        chatReplyKey = K[1];
+        chatReplyT = rand(1.5, 2.4);
+        chatT = rand(9, 24);        // …and now the long one, so it is not a chorus
+        return;
+      }
+    }
+  }
+
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
     npcWxRead();
@@ -5775,12 +6455,15 @@ export function createNPCs(game) {
       // AND THE OTHER FOURTEEN CHAPTERS GET THEIR PEOPLE HERE. Both of these
       // used to sit below the Sydney gate, which is why a bubble was a thing
       // that could only happen on one lawn in the world.
+      if (paLive()) chatStep(dt, paCast);
       localsStep(dt);
+      npcExStep(dt);
       updateBubbles(dt);
       return;
     }
     wasLive = true;
     localsStep(dt);
+    npcExStep(dt);
 
     refreshCapy();
 
@@ -5794,7 +6477,10 @@ export function createNPCs(game) {
 
     for (let i = 0; i < humans.length; i++) stepHuman(humans[i], dt);
     for (let i = 0; i < ibises.length; i++) stepIbis(ibises[i], dt);
+    ibisFeastStep(dt);
     quayStep(dt);
+
+    chatStep(dt, humans);
 
     pushInstances();
     if (colorDirty) { flushColors(); colorDirty = false; }
@@ -5844,7 +6530,7 @@ export function createNPCs(game) {
   }
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
-           addLocal: addLocal, say: sayAt, heat: npcHeat,
+           addLocal: addLocal, addExchange: addExchange, say: sayAt, heat: npcHeat,
            // The register itself, for the audit that walks the capybara up to
            // every person in the game and checks somebody answers. Twenty-six
            // of them across twelve chapters is exactly the sort of list that

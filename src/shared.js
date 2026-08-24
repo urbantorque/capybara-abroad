@@ -287,6 +287,18 @@ export const PALETTE = {
   iceGeoRim:    0xd8c9a4,      // the silica rim round it
   iceSteam:     0xe4ecef,
   iceMud:       0x8a7263,
+  // ---- ALTERED GROUND, WHICH IS WHAT A HIGH-TEMPERATURE FIELD IS MADE OF --
+  // The floor of a hverasvaedi is not a lava field and it is emphatically not
+  // a lawn: boiling water coming up through basalt strips the rock of
+  // everything but its silica, and what is left is bleached white where it is
+  // wettest, sulphur-yellow where the gas comes through, and iron-red where
+  // it has dried and oxidised. Three values, painted into the ground mesh's
+  // own vertex colours, so the basin costs nothing and can never read as
+  // something lying on the grass.
+  iceSinter:    0xcfc9bb,      // bleached silica, the palest ground in Iceland
+  iceSulphur:   0xc9b25f,      // the crust round every vent that is still going
+  iceIron:      0x9a6448,      // oxidised clay, which is most of the margin
+  iceClay:      0x7a6f63,      // and the grey-brown between the two
   // Reykjavik. Corrugated iron, painted, because there was no timber worth
   // cutting and no stone worth quarrying — so the whole city is primary
   // colours arranged on a grey day.
@@ -354,6 +366,7 @@ export const PALETTE = {
   sahMint:      0x7fa85f,
   sahOrange:    0xf0913f,
   sahAwning:    0xd9c9a4,
+  sahLamp:      0xffdc9a,      // the pressure lamp over every food stall on the square
   sahCanvas:    0xe4d5b8,
   sahRope:      0xb09a72,
   // the erg
@@ -835,6 +848,8 @@ export const PALETTE = {
   manTrunk:     0x6b6050,
   manPromenade: 0xcfc5ae,      // the paving along the front
   manKerb:      0xb0a68e,
+  manKerbDk:    0x8e856f,      // the gutter, the slab joints, and every patch
+                               // the council has ever put in the Corso
   manGrass:     0x7d9558,
   manClub:      0xf2eee0,      // the surf club: cream deco, and one red stripe
   manClubTrim:  0xc2453a,
@@ -1031,8 +1046,16 @@ export const PALETTE = {
   antPengBill:  0xd9542b,
   antSkua:      0x6a5e4d,
   antPetrel:    0xf7fbfb,
-  antSealHide:  0x6d7a79,      // the leopard seal, which is the wrong shape
-  antSealBelly: 0xc3cccb,
+  // ...AND SHE IS DARK, BECAUSE THIS CHAPTER HAS AN ALBEDO CEILING.
+  // 0x6d7a79 is 0.43 of albedo, and on a continent lit by a hemisphere at 1.24
+  // with a white ground bounce and an ambient of 0.36, anything much over 0.25
+  // saturates toward white — the same fact that hid the guano, the whalers'
+  // beach and the hut windows. Photographed alongside a swimming capybara, the
+  // one animal in the chapter that is supposed to be alarming came out the
+  // colour of the brash ice it was swimming through. A leopard seal is almost
+  // black on top and it is the darkest thing in the water for a thousand miles.
+  antSealHide:  0x323d3f,      // the leopard seal, which is the wrong shape
+  antSealBelly: 0x93a09e,
   antWeddell:   0x8b8678,
   antOrca:      0x121517,      // and the pod, which is the reason to come
   antOrcaW:     0xf5f7f5,
@@ -1582,20 +1605,33 @@ export const TASKS = [
   // your own voice is a torch, the middle four are things worth pointing it
   // at, and the last three are the argument — that the biggest cave passage on
   // earth has a hole in the roof, and a forest growing under the hole.
+  //
+  // ...AND IT IS THE MOST LITERAL SHAPE IN THE GAME (see `act` below). This
+  // chapter is a LINE — z 80 to z −176, one way, through three rooms with two
+  // doors between them — and it was the only chapter whose structure was
+  // already a three-act play on the map and a flat list of twelve switches on
+  // the card. The mouth teaches you the verb and hands you the river; the
+  // Great Passage is the biggest room on earth and has a hole in the roof; and
+  // the far side is over a seventy-metre wall and is where the things that
+  // live here live. Nothing is gated — an act stages the telling, not the
+  // world — so a player who bolts straight for the slot ticks everything on
+  // the way in whatever order they meet it.
   { id: 'to-cave',       text: 'Get inside the mountain',                chapter: 16 },
   { id: 'first-echo',    text: 'Find out what your voice is for',        chapter: 16 },
   { id: 'glow-trail',    text: 'Follow the glow-worms down to the river', chapter: 16 },
   { id: 'cave-river',    text: 'Swim the river in the dark',             chapter: 16 },
-  { id: 'hand-of-dog',   text: 'Top out on the biggest stalagmite',      chapter: 16 },
-  { id: 'swiftlets',     text: 'Put up the swiftlets (they steer on sound too)', chapter: 16 },
-  { id: 'cave-pearl',    text: 'Pocket a cave pearl',                    chapter: 16 },
-  { id: 'blind-fish',    text: 'Meet something with no eyes',            chapter: 16 },
+  { id: 'hand-of-dog',   text: 'Top out on the biggest stalagmite',      chapter: 16, act: 2 },
+  { id: 'swiftlets',     text: 'Put up the swiftlets (they steer on sound too)', chapter: 16, act: 3 },
+  { id: 'cave-pearl',    text: 'Pocket a cave pearl',                    chapter: 16, act: 3 },
+  { id: 'blind-fish',    text: 'Meet something with no eyes',            chapter: 16, act: 2 },
   // The mini, and the third chapter to publish climbHold. Seventy metres of
-  // calcite across the whole passage, and the only way on is over it.
-  { id: 'great-wall',    text: 'Climb the Great Wall of Vietnam',        chapter: 16,
+  // calcite across the whole passage, and the only way on is over it — which
+  // is why it OPENS the last act rather than closing the middle one.
+  { id: 'great-wall',    text: 'Climb the Great Wall of Vietnam',        chapter: 16, act: 3,
     mini: 'THE GREAT WALL' },
-  { id: 'the-doline',    text: 'Stand in the light inside the mountain', chapter: 16, wow: 'SƠN ĐOÒNG' },
-  { id: 'phytokarst',    text: 'Find the garden that leans',             chapter: 16 },
+  { id: 'the-doline',    text: 'Stand in the light inside the mountain', chapter: 16, act: 2,
+    wow: 'SƠN ĐOÒNG' },
+  { id: 'phytokarst',    text: 'Shout at the garden that leans',         chapter: 16, act: 2 },
   // The second mini. There is a river in here and things come down it.
   { id: 'the-log',       text: 'Ride a log through the dark',            chapter: 16,
     mini: 'THE DRIFTWOOD' },
@@ -1759,7 +1795,12 @@ export const CHAPTERS = [
   { n: 16, biome: 'cave',   name: 'Sơn Đoòng',        sub: 'and the only light is the one you make',
     arrive: 'to-cave',    far: 800,  tall: false, pal: 16,
     hint: 'no light in here but yours',               open: 'wheek. it is the only way to see anything.', way: 'the slot of daylight at the far end',
-    keep: 'a cave pearl', win: 2 },
+    keep: 'a cave pearl', win: 2,
+    acts: [
+      { kick: 'THE MOUTH', line: 'wheek. it is the only way to see anything.' },
+      { kick: 'THE GREAT PASSAGE', line: 'ninety metres across, and there is a hole in the roof.' },
+      { kick: 'THE FAR SIDE', line: 'seventy metres of calcite, and then whatever lives past it.' },
+    ] },
   { n: 17, biome: 'antarctic', name: 'Antarctica',   sub: 'and you are not walking anywhere',
     arrive: 'to-antarctic', far: 2000, tall: true, pal: 17,
     hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
@@ -1890,8 +1931,20 @@ export const RECORDS = {
   // with nothing to come back for once the list was ticked. Each of these hangs
   // off the task that is already the best thing in its chapter.
   'manly-voyage':  { label: 'the passage in', unit: ' s', better: 'lower', dp: 1 },
+  // …and the two other things on the harbour worth doing WELL rather than
+  // merely doing. Both were switches that flipped at two and at six seconds
+  // and then stopped caring, on a chapter whose whole body is one long run.
+  'yacht-race':    { label: 'threaded', unit: ' of the six', better: 'higher', dp: 0 },
+  'dolphin-escort':{ label: 'they stayed', unit: ' s', better: 'higher', dp: 1 },
   'thermal-peak':  { label: 'carried up to', unit: ' m', better: 'higher', dp: 0 },
   'seagull-chips': { label: 'put up', unit: ' gulls at once', better: 'higher', dp: 0 },
+  // …and the chapter's mini. Twelve seconds on the roof ticks it; the number
+  // is how far you actually rode, which is a different and much better
+  // question, because the promenade is sixty-two metres long and the van
+  // turns round at both ends.
+  'whippy-run':    { label: 'rode', unit: ' m in one go', better: 'higher', dp: 0 },
+  // Same question, on the other chapter whose mini is a ride you climb onto.
+  'carroza':       { label: 'carried', unit: ' m up the plaza', better: 'higher', dp: 0 },
   // The minis that are worth doing WELL as well as doing. Only two of the
   // thirteen are: a gravity ride has a number in it by construction, and so
   // does anything with a clock on it.
@@ -2003,6 +2056,32 @@ export function lerp(a, b, t) { return a + (b - a) * t; }
 /** Frame-rate independent exponential smoothing. */
 export function damp(current, target, lambda, dt) {
   return lerp(current, target, 1 - Math.exp(-lambda * dt));
+}
+
+/**
+ * damp(), FOR A HEADING, AND EVERY CHAPTER IN THIS GAME NEEDED IT.
+ *
+ * damp() is a plain lerp and knows nothing about circles; atan2 returns
+ * (-pi, pi]. Put the two together — which is what `yaw = damp(yaw,
+ * Math.atan2(dx, dz), k, dt)` does — and the moment the bearing crosses due
+ * south the error flips from +3.14 to -3.14 and the thing takes THE LONG WAY
+ * ROUND: a full turn on the spot, at damping speed, every single time.
+ *
+ * Cappadocia's chase truck found this and wrapped it by hand. Nothing else
+ * did, and there were six more of them: Manly's blue groper (which swims a
+ * closed circle, so it crossed twice a lap, for ever), the Pantanal's cattle
+ * turning to look at you, its jabiru turning to face the nest — and, worst of
+ * all, THE FOLLOWER HERD, which is the marquee of chapter 15: nine capybaras
+ * walking down the player's own trail, spinning on their own axis every time
+ * the player rounded a corner through south.
+ *
+ * The fix is one line of arithmetic and it belongs here rather than in seven
+ * files. Feed it a heading and it takes the short way, always.
+ */
+export function dampAngle(current, target, lambda, dt) {
+  let d = target - current;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  return current + d * (1 - Math.exp(-lambda * dt));
 }
 
 // ---------------------------------------------------------------------------

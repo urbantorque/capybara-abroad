@@ -64,6 +64,10 @@ const rioSELARON_RISE = 0.32, rioSELARON_RUN = 1.05;
 // The column walks. Everything about the samba task is measured against where
 // the bateria IS, not against a rectangle painted on the ground.
 const rioPARADE_SPEED = 2.4;        // m/s — a desfile walks, it does not march
+// s the head of the column will mark time at the end of the avenue rather than
+// wrap away from a capybara that is standing in it. See rioUpdateParade.
+const rioPARADE_HOLD_MAX = 24;
+let rioParadeHold = 0;
 const rioCOL_HX = 11;               // half-length of the scoring column, along x
 const rioCOL_HZ = 6.5;              // half-width, across the avenue
 // A step is judged against the actual audio clock (game.music), same as Cali.
@@ -80,6 +84,7 @@ const rioSTEP_COOL = 0.30;          // s between steps — no mashing
 // clearance floor in rioSpanPoint() agrees with the towers exactly.
 const rioCABLE_CLEAR = 9;
 const rioSELARON_PAR = 8.5;         // s to take the whole flight and have it count
+let rioSelaronTold = false;         // the 'go' line is said once a visit, not once a pass
 // FEWER, AND FURTHER APART. With the median gardens in, seventy-four palms
 // landed in a strip eight metres deep and the shot from the spawn is a
 // PALISADE — a trunk every two and a half metres across the whole of the first
@@ -97,6 +102,10 @@ const rioSc = new THREE.Vector3();
 const rioM = new THREE.Matrix4();
 
 // ---------------------------------------------------------------- module ----
+// The people this chapter needs a HANDLE on, because they talk to each other.
+// See the addExchange block at the foot of rioBuild.
+let rioLocGlobo = null, rioLocKiosk = null, rioLocSel = null, rioLocSel2 = null;
+let rioLocBonde = null;
 let rioGame = null;
 let rioBuilt = false;
 let rioRoot = null;
@@ -110,6 +119,9 @@ let rioFloatGroup = null;
 let rioCabinGroup = null, rioCabinBody = null, rioCabinT = 0, rioCabinDir = 1;
 let rioCabinPX = 0, rioCabinPY = 0, rioCabinPZ = 0;
 let rioGloboGroup = null, rioGloboGone = false;
+// The yaw he stands at, so a re-entry can put him back — see rioBuildGlobo and
+// the onEnter note about one-shot objects.
+const rioGloboYaw = -2.2;
 let rioBallMesh = null, rioBallBody = null;
 let rioSpark = null;
 const rioSPARK_N = 34;
@@ -484,8 +496,34 @@ function rioGroundColor(x, z, y, c, P) {
   }
   if (z > 64) {
     // Lapa, and then the hill: the ground goes green as the houses climb it
-    c.lerp(P.forestP, clamp((z - 66) / 22, 0, 0.75));
-    c.lerp(P.forestD, clamp((z - 84) / 30, 0, 0.5));
+    // ---- EXCEPT THAT LAPA ITSELF IS NOT A LAWN (v20) -------------------
+    //
+    // Measured off the shot from the foot of Selarón's steps: at z = 84 the
+    // ramp above was returning 0.75 forestP, so the whole of Lapa — the square
+    // under a forty-two arch aqueduct, the tram alignment on top of it and the
+    // most photographed staircase in Brazil — was standing on BRIGHT GREEN
+    // GRASS. It is the same class of error as the beach-sand `else` this
+    // function was written to fix, one district further inland: a rule about
+    // the hill was applied to the flat thing at the bottom of it.
+    //
+    // Lapa is asphalt and Portuguese paving. So the green is held OFF over the
+    // square, and the strip under the arches is road, because the bonde runs
+    // along it and a tram runs on a street.
+    const lx = Math.abs(x - rioLAPA.x), lz = Math.abs(z - (rioLAPA.z + 5));
+    const town = clamp(1 - Math.max(lx / 46, lz / 17), 0, 1);
+    const green = Math.max(0, 1 - town * 1.35);
+    c.lerp(P.forestP, clamp((z - 66) / 22, 0, 0.75) * green);
+    c.lerp(P.forestD, clamp((z - 84) / 30, 0, 0.5) * green);
+    if (town > 0.02) {
+      // the alignment: a band of asphalt under the arches, with the paving
+      // grain still reading through at the edges
+      const road = clamp(1 - Math.abs(z - rioLAPA.z) / 7.5, 0, 1) * town;
+      c.lerp(P.road, road * 0.85);
+      // ...and a lick of terracotta where two hundred and fifteen tiled steps
+      // have been shedding chips on to the pavement for twenty years
+      const sd2 = Math.hypot(x - rioSELARON.x, z - rioSELARON.z);
+      c.lerp(P.tileR, clamp(1 - sd2 / 11, 0, 1) * 0.22);
+    }
   }
   // and a wash of warm dust off the sand over the first few metres of it
   if (z < 10) c.lerp(P.sand, clamp((10 - z) / 12, 0, 0.5));
@@ -522,6 +560,8 @@ function rioBuildGroundMesh() {
     paveD: new THREE.Color(PALETTE.rioGraniteFar),
     road: new THREE.Color(PALETTE.rioAsphalt),
     foam: new THREE.Color(PALETTE.rioSeaFoam),
+    // the chips off Selaron's steps, ground into the pavement round their foot
+    tileR: new THREE.Color(PALETTE.rioTileRed),
   };
   for (let i = 0; i < p.length; i += 3) {
     const x = p[i], z = p[i + 2];
@@ -893,7 +933,7 @@ function rioBuildGlobo(root) {
   mesh.castShadow = true;
   g.add(mesh);
   g.position.set(rioGLOBO.x, y, rioGLOBO.z);
-  g.rotation.y = -2.2;
+  g.rotation.y = rioGloboYaw;
   root.add(g);
   rioGloboGroup = g;
   return g;
@@ -2558,6 +2598,25 @@ function rioUpdateBirds(dt) {
 
 // ==================================================================== FLORA ==
 /** Coconut palms down the calcadao, and Atlantic forest on the granite. */
+// ---- AND ONE GAP IN THE PALM LINE, WHERE THE CHAPTER STARTS ---------------
+// The arrival heading (see RIO_SPAWN in main.js) looks south down the wave
+// paving at the Atlantic, which puts the camera boom seven metres INLAND of
+// the animal — straight into the promenade row, whose members at x = ±3.6
+// carry seven fronds arching 2.8 m out of a crown six metres up. Measured: the
+// first frame of chapter six was green blades filling the whole screen with a
+// capybara the size of a thumbnail behind them.
+//
+// Fushimi Inari's cedars already solve this exact problem the same way — the
+// corridor is cut OUT of the placement rather than the camera being fought.
+// Seven metres of gap in a twenty-six palm row does not read as a hole; it
+// reads as the crossing where the pavement meets the beach, which on
+// Copacabana is what it would be.
+const rioPALM_GAP_X = 4.6;      // half-width of the corridor, > a frond's reach
+const rioPALM_GAP_Z0 = 0.5, rioPALM_GAP_Z1 = 11.0;
+function rioInArrivalGap(x, z) {
+  return Math.abs(x - rioSPAWN.x) < rioPALM_GAP_X && z > rioPALM_GAP_Z0 && z < rioPALM_GAP_Z1;
+}
+
 function rioBuildFlora(root) {
   const trunk = [], frond = [];
   for (let i = 0; i < rioPALM_N; i++) {
@@ -2576,6 +2635,7 @@ function rioBuildFlora(root) {
       z = rand(4.2, 10.8);
       if (i % 7 === 0) z = rand(68, 74);      // and a few in front of the arches
     }
+    if (rioInArrivalGap(x, z)) continue;      // see rioPALM_GAP_X above
     const y = rioTerrain(x, z);
     const h = rand(5.0, 8.5);
     const lean = rand(-0.09, 0.09);
@@ -3062,6 +3122,7 @@ function rioUpdateBonde(game, dt) {
 const rioCALC_Z0 = rioPROM_Z, rioCALC_Z1 = 2.6;
 const rioCALC_RUN = 132;               // m of it that count, of about 190 drawn
 let rioCalcDone = false, rioCalcFrom = 0, rioCalcOn = false;
+let rioCalcMark = 0;                   // which quarter of the run has been marked
 
 function rioCheckCalcadao(game) {
   if (rioCalcDone) return;
@@ -3073,12 +3134,46 @@ function rioCheckCalcadao(game) {
   // off onto either is exactly the thing this task is measuring.
   const on = p.z > rioCALC_Z0 - 0.6 && p.z < rioCALC_Z1 + 0.6 &&
              Math.abs(p.x) < 94 && p.y < rioTerrain(p.x, p.z) + 1.6;
-  if (!on) { rioCalcOn = false; return; }
-  if (!rioCalcOn) { rioCalcOn = true; rioCalcFrom = p.x; return; }
-  if (Math.abs(p.x - rioCalcFrom) >= rioCALC_RUN) {
+  if (!on) {
+    // ---- AND STEPPING OFF IT NOW MEANS SOMETHING (v20) ------------------
+    // The task is 'run the whole wave WITHOUT stepping off it' and stepping off
+    // was completely silent: the counter reset and the player, who was probably
+    // not watching their own z, had no idea it had happened until they reached
+    // the end and nothing ticked. One soft note, and only if the run was
+    // actually worth losing — under twenty metres is a person walking about.
+    if (rioCalcOn && Math.abs(p.x - rioCalcFrom) > 20) {
+      rioBondeSfx('thud', { volume: 0.20, pitch: 0.65 });
+      rioBondeToast('off the paving. the wave starts again.');
+    }
+    rioCalcOn = false; rioCalcMark = 0; return;
+  }
+  if (!rioCalcOn) { rioCalcOn = true; rioCalcFrom = p.x; rioCalcMark = 0; return; }
+  const run = Math.abs(p.x - rioCalcFrom);
+  // ---- THIRTY-TWO SECONDS OF THE FIRST TASK IN THE CHAPTER, IN SILENCE ---
+  // A hundred and thirty-two metres with nothing at all between the start and
+  // the tick. Four marks, a step brighter each time, and the last one is one
+  // stride short of the end so that finishing is a beat you can hear coming.
+  // The same escalation the torii tunnel and the salsa floor got.
+  const mark = Math.min(3, Math.floor(run / (rioCALC_RUN / 4)));
+  if (mark > rioCalcMark) {
+    rioCalcMark = mark;
+    rioBondeSfx('tick', { volume: 0.20 + mark * 0.10, pitch: 1.0 + mark * 0.20 });
+  }
+  if (run >= rioCALC_RUN) {
     rioCalcDone = true;
     rioTask('calcadao');
     rioBondeSfx('chime', { volume: 0.6, pitch: 1.3 });
+    // ---- AND THE END OF IT IS WORTH LANDING (v20) ----------------------
+    // A hundred and thirty-two metres flat out, and the whole payoff was a
+    // chime and a line of text — the same channel as walking into a kiosk.
+    // Black-and-white chips off the paving under the animal and a kick, which
+    // is the vocabulary this chapter already uses for Selarón's treads, plus
+    // the frigatebirds going up off the sand, because a thing this loud should
+    // move something that is not the player.
+    rioBurstSparks(p.x, rioTerrain(p.x, p.z) + 0.9, p.z, 16, 1.1);
+    if (rioGame && typeof rioGame.punch === 'function') rioGame.punch(0.12);
+    rioBirdT += 0.9;                     // the flock breaks its circle
+    rioBondeSfx('gull', { volume: 0.5, pitch: 1.35 });
     rioBondeToast('four kilometres of it in real life. you did a hundred and thirty.');
   }
 }
@@ -3195,7 +3290,34 @@ function rioInCol(x, z) {
 function rioUpdateParade(game, dt) {
   rioBateriaX += rioPARADE_SPEED * dt;
   let wrapped = false;
-  if (rioBateriaX > rioAVE_X1 + 24) { rioBateriaX = rioAVE_X0 - 24; wrapped = true; }
+  if (rioBateriaX > rioAVE_X1 + 24) {
+    // ---- IT DOES NOT WRAP OUT FROM UNDER YOU (v20) --------------------
+    //
+    // The column teleports two hundred and sixteen metres up the avenue when
+    // it runs out of road, and the chapter's ONE `wow` — six consecutive
+    // surdos, keeping station inside it — is scored on being inside the column.
+    // So a player who joined near the east end had the parade vanish mid-run,
+    // the combo lapse three seconds later, and no explanation of any kind; a
+    // player standing on the float went with it as far as the solver allowed
+    // and then did not.
+    //
+    // It holds instead. The head simply waits at the end of the avenue until
+    // the animal is clear, which is also what a desfile actually does — the
+    // section stops at the end of the sambadrome and the drums keep going. The
+    // cap is there so a player who parks in the column for ever does not pin
+    // the parade at the east end for the rest of the chapter.
+    const cp = game.capy && game.capy.position;
+    const held = !!(cp && Math.abs(cp.x - rioBateriaX) < rioCOL_HX + 14 &&
+                    Math.abs(cp.z - rioAVE_Z) < rioCOL_HZ + 10) && rioParadeHold < rioPARADE_HOLD_MAX;
+    if (held) {
+      rioParadeHold += dt;
+      rioBateriaX = rioAVE_X1 + 24;      // marking time at the end of the road
+    } else {
+      rioParadeHold = 0;
+      rioBateriaX = rioAVE_X0 - 24;
+      wrapped = true;
+    }
+  } else if (rioParadeHold > 0) rioParadeHold = 0;
 
   const mus = game.music;
   // The pump is driven by the audio clock, never by a timer of its own — a
@@ -3383,6 +3505,22 @@ function rioUpdateSamba(game, dt) {
   if (typeof game.sfx === 'function') {
     game.sfx('tick', { volume: clamp(0.55 + rioCombo * 0.06, 0.55, 1), pitch: 0.9 + rioCombo * 0.04 });
   }
+  // ---- AND A HUNDRED AND FIFTY DRUMMERS NOTICE (v20) -------------------
+  // The run to six paid out at six and nowhere else, so five of the six steps
+  // were an identical click inside a section that is already playing. The
+  // section itself answers from the third: rioBateriaPulse is what the whole
+  // bateria bobs on, so forcing it means the drums visibly come UP under you,
+  // and one voice out of the ala goes with it. Cali's floor got the same
+  // treatment and for the same reason — an escalation you can hear is the
+  // difference between counting and being carried.
+  if (rioCombo >= 2) {
+    const k = Math.min(rioCombo - 1, 5);
+    rioBateriaPulse = Math.max(rioBateriaPulse, 0.45 + k * 0.11);
+    if (typeof game.sfx === 'function') {
+      game.sfx('cheer', { volume: 0.09 + k * 0.05, pitch: 1.0 + k * 0.06,
+                          at: { x: rioBateriaX, y: rioTerrain(rioBateriaX, rioAVE_Z) + 1.4, z: rioAVE_Z } });
+    }
+  }
   if (rioCombo === 3 && typeof game.toast === 'function') game.toast('isso!');
   if (rioCombo >= rioSAMBA_TARGET) {
     rioSambaDone = true;
@@ -3445,7 +3583,15 @@ function rioUpdateTasks(game, dt) {
     if (df < 5 * 5) {
       if (rioSelaronT < 0) {
         rioSelaronT = 0;
-        if (typeof game.toast === 'function') game.toast('two hundred and fifteen of them. go.');
+        // ONCE. The clock re-arms every time you come within five metres of the
+        // foot, and Lapa is somewhere the chapter walks you through on the way
+        // to three other things — so passing the steps twice printed the same
+        // instruction twice, and passing them six times printed it six times.
+        // The clock still restarts; the LINE does not.
+        if (!rioSelaronTold && typeof game.toast === 'function') {
+          rioSelaronTold = true;
+          game.toast('two hundred and fifteen of them. go.');
+        }
       } else rioSelaronT = 0;              // re-entering the bottom restarts the clock
     } else if (rioSelaronT >= 0) {
       rioSelaronT += dt;
@@ -3621,15 +3767,47 @@ export function createRio(game) {
       // wherever it happened to be when they left.
       rioBateriaX = rioAVE_X0 + 20;
       rioBateriaPX = rioBateriaX;
+      rioParadeHold = 0;
       rioBondeRideT = 0; rioBondePassed = false; rioBondeTold = false;
       rioSalute = 0; rioConfetti = 0; rioClap = 0;
       rioWaveRide = 0; rioWaveFrom = 1e9; rioWaveSurf = 0;
       rioVoleiT = 3.0; rioVoleiLast = -1; rioVoleiCel = 0;
+      // ---- AND THE BALL COMES BACK OUT OF THE ATLANTIC (v20) -----------
+      //
+      // The one-shot-mini family, for the fourth time in this project (Quay's
+      // chip basket, Kyoto's matcha heap, Cali's lulada jug). 'Head the ball
+      // into the Atlantic' ends with the ball IN the Atlantic, and nothing
+      // ever put it back: come to Rio a second time — which the departures
+      // board allows from anywhere — and the court is four people, a net, and
+      // no ball, with the rally permanently stopped because rioVoleiDone gates
+      // it. The CHECKLIST stays ticked; the BALL is a thing in the world.
+      //
+      // Only if it has actually left the court: a ball the player has carried
+      // up the beach is theirs, and snatching it back on a re-entry is the
+      // rudest possible way to fix this.
+      if (rioBallBody) {
+        const vy = rioTerrain(rioVOLEI.x, rioVOLEI.z);
+        const b = rioBallBody.position;
+        if (Math.abs(b.x - rioVOLEI.x) > 9 || Math.abs(b.z - rioVOLEI.z) > 8 || b.y < vy - 1.5) {
+          b.set(rioVOLEI.x + 1.6, vy + 0.9, rioVOLEI.z - 2.2);
+          rioBallBody.velocity.set(0, 0, 0);
+          rioBallBody.angularVelocity.set(0, 0, 0);
+          rioBallBody.previousPosition.copy(b);
+          rioBallBody.interpolatedPosition.copy(b);
+          rioBallBody.wakeUp();
+        }
+        // ...and the four of them start playing again. The task keeps its tick.
+        rioVoleiDone = false;
+      }
+      // The Globo man turned away when he was robbed and stayed turned for the
+      // life of the page, with his bag gone. Same argument: put the object back.
+      if (rioGloboDone && rioGloboGroup) { rioGloboGroup.rotation.y = rioGloboYaw; rioGloboDone = false; }
+      rioSelaronTold = false;
     },
     onExit() {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
-      rioCalcOn = false;
+      rioCalcOn = false; rioCalcMark = 0;
       rioCombo = 0; rioRiding = false; rioBondeRideT = 0;
       // AND THE WAVE WAS NOT ON THE LIST. `rioWaveFrom` is the z the current
       // ride started at and `rioWaveRide` is how far it has run; both are set
@@ -3813,32 +3991,57 @@ function rioBuild(game) {
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'rio', group: rioGloboGroup, face: -2.2,
+    rioLocGlobo = game.addLocal({ biome: 'rio', group: rioGloboGroup, face: -2.2,
       x: rioGLOBO.x, y: rioTerrain(rioGLOBO.x, rioGLOBO.z), z: rioGLOBO.z, near: 6,
-      lines: ['Biscoito Globo! Doce ou salgado!',
-              'Not for you, my friend. These are for people with money.',
-              'Every day I walk this beach. Never once a capybara.'],
+      // ---- AND THEY KNOW WHAT HAS HAPPENED (v20) -------------------------
+      // Everybody in this chapter said the same three sentences whether you had
+      // just arrived or had robbed them, put their ball in the Atlantic and
+      // taken the applause on Arpoador. See localResolve in npc.js: a line may
+      // carry `before`/`after` a task id or a `when` predicate, and `onTask`
+      // is what they say at the moment you do it in front of them.
+      lines: [{ t: 'Biscoito Globo! Doce ou salgado!', before: 'globo-biscuit' },
+              { t: 'Not for you, my friend. These are for people with money.', before: 'globo-biscuit' },
+              'Every day I walk this beach. Never once a capybara.',
+              { t: 'Never once a capybara, and now I am down a bag.', after: 'globo-biscuit' },
+              { t: 'Doce or salgado. You did not even ask which.', after: 'globo-biscuit' },
+              { t: 'There is sand in them. There is always sand in them.', after: 'globo-biscuit' }],
       wheek: ['All right, all right — one. Do not tell the others.',
-              'You have a voice on you.'] });
+              'You have a voice on you.'],
+      onTask: { 'globo-biscuit': ['One real! ONE REAL!',
+                                  'Ai. Ai ai ai.'],
+                'kiosk': ['He gets robbed too. Good.'] } });
     // BEHIND THE COUNTER, NOT INSIDE THE DRUM. The kiosk is a 4.6 m solid box
     // centred on rioKIOSK and the man was standing at its centre — completely
     // enclosed by the thing he serves out of, invisible from every angle, with
     // his collider inside the kiosk's. He stands at the hatch now, on the
     // seaward side, which is the side the counter and the whole task are on.
-    game.addLocal({ biome: 'rio', x: rioKIOSK.x - 3.3, y: rioTerrain(rioKIOSK.x - 3.3, rioKIOSK.z - 1.5),
+    rioLocKiosk = game.addLocal({ biome: 'rio', x: rioKIOSK.x - 3.3, y: rioTerrain(rioKIOSK.x - 3.3, rioKIOSK.z - 1.5),
       z: rioKIOSK.z - 1.5, near: 6, face: Math.PI,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth3 },
       lines: ['Agua de coco? No? Suit yourself.',
-              'You are dripping on my counter.',
-              'Sit down, have something. Everybody sits down eventually.'],
-      wheek: ['That is the loudest order I have taken all week.'] });
+              { t: 'You are dripping on my counter.',
+                when: function () { return !!(rioGame && rioGame.capy && (rioGame.capy.wet || 0) > 0.4); } },
+              { t: 'Sit down, have something. Everybody sits down eventually.', before: 'kiosk' },
+              { t: 'You had the mate, the coco AND a biscoito. I watched you do it.', after: 'kiosk' },
+              { t: 'No, there is no tab. There has never been a tab.', after: 'kiosk' },
+              { t: 'Hot one today. Everybody is in the water and nobody is buying anything.',
+                when: function () { return !!(rioGame && rioGame.weather && !rioGame.weather.drizzle()); } }],
+      wheek: ['That is the loudest order I have taken all week.'],
+      onTask: { 'kiosk': ['That is four things and no money.',
+                          'Put it on the animal’s tab. The animal has no tab.'],
+                'futevolei': ['They will be looking for that ball for a week.'] } });
     game.addLocal({ biome: 'rio', x: rioVOLEI.x, y: rioTerrain(rioVOLEI.x, rioVOLEI.z),
       z: rioVOLEI.z, near: 7,
       figure: { shirt: PALETTE.cloth4, legs: PALETTE.cloth2 },
-      lines: ['No hands! Nobody told him no hands.',
-              'You want in? You are the right height for a header.',
-              'Ai — that is our ball.'],
-      wheek: ['He is calling for it! Give him the ball!'] });
+      lines: [{ t: 'No hands! Nobody told him no hands.', before: 'futevolei' },
+              { t: 'You want in? You are the right height for a header.', before: 'futevolei' },
+              { t: 'Ai — that is our ball.', before: 'futevolei' },
+              { t: 'That was our ball. It is Angola’s ball now.', after: 'futevolei' },
+              { t: 'Best header anybody on this beach has ever seen. Worst outcome.', after: 'futevolei' },
+              { t: 'Four of us, one ball, no hands. It is not complicated.', before: 'futevolei' }],
+      wheek: ['He is calling for it! Give him the ball!'],
+      onTask: { 'futevolei': ['GOL! …no. No, that is not a gol.',
+                              'Straight into the Atlantic. With its HEAD.'] } });
     // FIVE MORE, BECAUSE THREE PEOPLE IS NOT A CITY OF SIX MILLION.
     // One at each of the places the chapter actually sends you: the lifeguard
     // post you run past on the calçadão, the foot of Selarón's steps, the
@@ -3848,17 +4051,30 @@ function rioBuild(game) {
       figure: { shirt: PALETTE.rioTileRed, legs: PALETTE.rioTileWhite, hat: PALETTE.rioTileYellow },
       face: Math.PI,
       lines: ['Between the flags. There are no flags. Use your judgement.',
-              'The rip runs west off the point. You are built for it, but still.',
-              'Sixty saves this summer. None of them a rodent.'],
+              { t: 'The rip runs west off the point. You are built for it, but still.', before: 'take-a-wave' },
+              'Sixty saves this summer. None of them a rodent.',
+              { t: 'You took one all the way in. On your back. I have notes.', after: 'take-a-wave' },
+              { t: 'Sets of three. Always three. Let the first one go.', before: 'take-a-wave' },
+              { t: 'It is out there now. Go on, it is doing nothing without you.',
+                when: function () { return !!(rioGame && rioGame.rio && !rioGame.rio.surfing()
+                                              && rioGame.capy && (rioGame.capy.wet || 0) > 0.5); } }],
       wheek: ['I heard that from the water, my friend.',
-              'If that is a distress signal it is a new one on me.'] });
-    game.addLocal({ biome: 'rio', x: rioSELARON.x + 4.6, y: rioTerrain(rioSELARON.x + 4.6, rioSELARON.z - 1),
+              'If that is a distress signal it is a new one on me.'],
+      onTask: { 'take-a-wave': ['Sixty-one saves. I am counting that one.',
+                                'That is a rodent surfing. I want that on record.'] } });
+    rioLocSel = game.addLocal({ biome: 'rio', x: rioSELARON.x + 4.6, y: rioTerrain(rioSELARON.x + 4.6, rioSELARON.z - 1),
       z: rioSELARON.z - 1, near: 7,
       figure: { shirt: PALETTE.rioTileBlue, legs: PALETTE.rioPaveDark },
       lines: ['Two hundred and fifteen. He did them one at a time, for twenty years.',
               'Every tile came from somewhere else. Go on, find your country.',
-              'People run up these. He would have hated that. Probably.'],
-      wheek: ['Careful — half of Lapa is asleep.'] });
+              { t: 'People run up these. He would have hated that. Probably.', before: 'selaron-steps' },
+              { t: 'He would have hated that. He would have put it on a tile.', after: 'selaron-steps' },
+              { t: 'There are two hundred and fourteen now. Do not ask me about it.', after: 'selaron-steps' },
+              { t: 'Nobody does it in under nine. Nobody who is not late for something.', before: 'selaron-steps' }],
+      wheek: ['Careful — half of Lapa is asleep.'],
+      onTask: { 'selaron-steps': ['Two hundred and fifteen steps. At a SPRINT.',
+                                  'Half of them came off with you.'],
+                'o-bonde': ['The tram goes over there. Everybody waves. You did not wave.'] } });
     // ON LAND. rioSTATION is (58, -24) and rioSHORE_Z is -18, so anywhere
       // 'beside the station' is in the Atlantic — terrainHeight there returns
       // the SEA FLOOR and the man was standing on it, two metres under, talking
@@ -3868,24 +4084,89 @@ function rioBuild(game) {
     game.addLocal({ biome: 'rio', x: rioSTATION.x, y: rioTerrain(rioSTATION.x, -8),
       z: -8, near: 8,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.cloth6 },
-      lines: ['Cars go every ten minutes. Nobody has ever checked a ticket.',
+      lines: [{ t: 'Cars go every ten minutes. Nobody has ever checked a ticket.', before: 'bondinho' },
               'It has run since nineteen twelve. It has never once fallen off.',
-              'Two stages. Get out at Urca if you want the good photograph.'],
-      wheek: ['That will carry to the summit, that will.'] });
+              { t: 'Two stages. Get out at Urca if you want the good photograph.', before: 'bondinho' },
+              { t: 'Nobody has ever checked a ticket, and now I see why.', after: 'bondinho' },
+              { t: 'Sixty metres over the bay in a box. And you went twice.', after: 'bondinho' },
+              { t: 'She is coming down now. You can hear the cable before you see it.',
+                when: function () { return !!(rioGame && rioGame.rio && !rioGame.rio.riding()); } }],
+      wheek: ['That will carry to the summit, that will.'],
+      onTask: { 'bondinho': ['No ticket. NO TICKET.',
+                             'Nineteen twelve, and that is the first stowaway with fur.'] } });
     game.addLocal({ biome: 'rio', x: rioARPOADOR.x + 5, y: rioTerrain(rioARPOADOR.x + 5, rioARPOADOR.z + 3),
       z: rioARPOADOR.z + 3, near: 9, face: -1.57,
       figure: { shirt: PALETTE.rioFeather3, legs: PALETTE.denim },
-      lines: ['We clap it down. Every evening. You will see.',
-              'Do not stand in front. Everybody in Ipanema is behind you.',
-              'Best free thing in the city, and it is on twice a day.'],
-      wheek: ['Save it for the sunset, eh?'] });
-    game.addLocal({ biome: 'rio', x: 34, y: rioTerrain(34, rioBONDE_Z + 2.4), z: rioBONDE_Z + 2.4,
+      lines: [{ t: 'We clap it down. Every evening. You will see.', before: 'arpoador' },
+              { t: 'Do not stand in front. Everybody in Ipanema is behind you.', before: 'arpoador' },
+              'Best free thing in the city, and it is on twice a day.',
+              { t: 'You stood in front. Everybody clapped anyway.', after: 'arpoador' },
+              { t: 'Half of that was for the sun. Only half.', after: 'arpoador' },
+              { t: 'The set is coming. Look left — no, LEFT.',
+                when: function () { return !!(rioGame && rioGame.rio && rioGame.rio.surfing()); } }],
+      wheek: ['Save it for the sunset, eh?'],
+      onTask: { 'arpoador': ['LISTEN to them. That is for you, that is.',
+                             'Two hundred people. Clapping. At a rodent.'],
+                'take-a-wave': ['From up here that looked deliberate.'] } });
+    rioLocBonde = game.addLocal({ biome: 'rio', x: 34, y: rioTerrain(34, rioBONDE_Z + 2.4), z: rioBONDE_Z + 2.4,
       near: 8,
       figure: { shirt: PALETTE.cloth3, legs: PALETTE.khaki },
       lines: ['Nobody sits down. The step is the seat, and the step is better.',
-              'When the other one comes past, hold on. Not for safety. For the noise.',
-              'Up to Santa Teresa and back. Fifteen minutes, if the driver behaves.'],
-      wheek: ['That is louder than the bell, and the bell is the point.'] });
+              { t: 'When the other one comes past, hold on. Not for safety. For the noise.', before: 'o-bonde' },
+              'Up to Santa Teresa and back. Fifteen minutes, if the driver behaves.',
+              { t: 'You were on the step when they passed. Everybody remembers their first one.', after: 'o-bonde' },
+              { t: 'Forty-two arches. Count them going over. Nobody ever gets the same number.', before: 'o-bonde' }],
+      wheek: ['That is louder than the bell, and the bell is the point.'],
+      onTask: { 'o-bonde': ['On the running board! On the RUNNING BOARD!',
+                            'Fifteen minutes and you did not pay any of it.'],
+                'samba-parade': ['They can hear that section from up in Santa Teresa.'] } });
+
+    // ---- AND ONE MORE ON THE STEPS, SO THERE IS SOMEBODY TO ARGUE WITH ---
+    // Selarón's steps carry more people per square metre than anywhere else in
+    // the chapter and had exactly one, at the bottom, facing out. A second one
+    // sitting halfway up doubles the population of the busiest landmark in Rio
+    // for one figure, and gives the flight the only conversation in Lapa.
+    {
+      const hh = rioSelaronHead(), ff = rioSelaronFoot();
+      const mx = (hh.x + ff.x) * 0.5 - 3.4, mz = (hh.z + ff.z) * 0.5;
+      rioLocSel2 = game.addLocal({ biome: 'rio', x: mx, y: rioTerrain(mx, mz), z: mz,
+        near: 7, face: 1.4,
+        figure: { shirt: PALETTE.rioTileYellow, legs: PALETTE.rioTileBlue },
+        lines: ['I sit on the same step every day. It is the ninetieth. It is the best one.',
+                'That tile is from Wales. I have no idea either.',
+                { t: 'People run up these all day. All DAY.', after: 'selaron-steps' },
+                { t: 'Do not run up these. Everybody runs up these.', before: 'selaron-steps' }],
+        wheek: ['Two hundred and fifteen steps of echo. Thank you.'],
+        praise: ['From the ninetieth step, that looked ridiculous.'] });
+    }
+
+    // ---- AND TWO CONVERSATIONS THAT ARE NOT WITH YOU (v20) --------------
+    // See addExchange in npc.js. Everything anybody said in this chapter was
+    // addressed to the capybara, so a beach with a biscuit man and a kiosk
+    // twelve metres apart was silent unless you stood between them. These run
+    // when you are near enough to read both bubbles and far enough not to be
+    // the subject — what you catch is something already in progress, which is
+    // most of what makes a beach a beach.
+    if (typeof game.addExchange === 'function') {
+      if (rioLocGlobo && rioLocKiosk) {
+        game.addExchange({ biome: 'rio', a: rioLocGlobo, b: rioLocKiosk, lines: [
+          ['Two reais for a coco. Two!', 'Two reais for a biscuit made of air.'],
+          ['Quiet today.', 'It is Tuesday. It is always quiet on Tuesday.'],
+          ['Something has taken a bag off my pole.', 'Something has been at my counter as well.'],
+          ['Rain later.', 'There is never rain later.'],
+          ['Did you see that go in the water?', 'I have stopped looking at the water.'],
+        ] });
+      }
+      if (rioLocSel && rioLocSel2) {
+        game.addExchange({ biome: 'rio', a: rioLocSel2, b: rioLocSel, gap: 33, lines: [
+          ['How many today?', 'Four hundred. Before lunch.'],
+          ['Somebody has been running.', 'Somebody is always running.'],
+          ['That tile is loose again.', 'That tile has been loose since 2005.'],
+          ['I found Wales.', 'Everybody finds Wales. Nobody finds Peru.'],
+          ['Is that an animal on the steps?', 'It is Lapa. Do not start.'],
+        ] });
+      }
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(rioRoot);

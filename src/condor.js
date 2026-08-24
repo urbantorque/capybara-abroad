@@ -163,6 +163,13 @@ const condorMAX_BANK = 0.85;
 const condorMAX_PITCH = 0.46;
 const condorEDGE_SOFT = 112;
 const condorEDGE_HARD = 130;
+// How far inside pasto.bounds() the hard fence sits. Six metres, which is a
+// little over the bird's own span, so the passenger swinging on the end of the
+// talons is still over ground that exists. See condorFence.
+const condorFENCE_PAD = 6;
+// Only used if the chapter publishes no bounds() at all — the old symmetric
+// square this file used to assume.
+const condorFENCE_FALLBACK = { x0: -130, x1: 130, z0: -130, z1: 130 };
 const condorBORED = 25;                 // seconds circling before it gives up
 const condorINBOUND_T = 4.0;
 const condorORBIT_HIGH_Y = 14.0, condorORBIT_HIGH_R = 9.5;
@@ -201,6 +208,12 @@ const condorFLAP_THRUST = 9.0;          // m/s^2 along the nose, at the top of a
 // both of which are stable, and the band is deliberately inside the 11-18 m/s the
 // bird is supposed to thermal at.
 const condorSTICK_V = 0.18;             // +/- fraction of trim speed the stick can bias
+// How fast the pilot's wrist moves. See the note where the stick is read: these
+// filter the PLAYER, never the aeroplane. 4.5 is a ~0.22 s rise into a turn;
+// 9 is a ~0.11 s release out of one, because a control that is slow to centre
+// reads as a control that is stuck.
+const condorSTICK_ON  = 4.5;
+const condorSTICK_OFF = 9.0;
 // ---- THE CIRCLING SPEED ----------------------------------------------------
 // The speed the bird aims for once it is banked over, i.e. once it is trying to
 // stay inside something rather than get somewhere. See the block in the trim
@@ -307,6 +320,9 @@ const condorRenderTmpQ = new THREE.Quaternion();
 let condorRenderInit = false;
 let condorPathPrev = 0, condorPathRate = 0;   // flight-path rotation, fed forward to the elevator
 let condorTurnSign = 1;                       // which way it committed to go round — see the reversal note
+// The filtered stick, in camera space. Zeroed on every spawn so a new bird is
+// never born mid-input; see condorSTICK_ON.
+let condorStickX = 0, condorStickZ = 0;
 let condorSyncHold = 0;                       // frames of velocity hold after a mount repair
 let condorStuckT = 0;                         // seconds pinned against scenery with a passenger
 let condorWindT = 0;
@@ -505,6 +521,14 @@ export function createCondor(game) {
      * you to the crater. Cheap and allocation-free; safe to call every frame.
      */
     talonInReach() { return condorTalonInReach(); },
+    /**
+     * LET GO OF THE PASSENGER, FROM OUTSIDE. The only caller is the void
+     * rescue in systems.js: a rescue that teleports the capybara while the
+     * constraint is still live drags it straight back to the talons, so
+     * whatever has hold of it has to be told first. Safe at any time — it
+     * returns false when there is nothing to release.
+     */
+    release() { return condorRelease(true); },
     update(dt) { condorUpdate(dt); },
   };
   condorApi = api;
@@ -904,6 +928,11 @@ function condorMount() {
   const game = condorGame;
   const capy = game && game.capy;
   if (!capy || !capy.body || condorConstraint) return false;
+  // The pilot's hands are empty at the moment of the grab. Without this the
+  // filtered stick still holds whatever the capybara was walking in when the
+  // talons closed, and the first half second of every ride is a turn nobody
+  // asked for. See condorSTICK_ON.
+  condorStickX = 0; condorStickZ = 0;
 
   // ---- SNAP THE PASSENGER INTO THE TALONS BEFORE THE ROD EXISTS ------------
   // The grab fires whenever the capybara is within condorREACH of the talon, so
@@ -1319,13 +1348,42 @@ function condorUpdate(dt) {
     // ---- player command: camera-relative stick -----------------------------
     // ACROSS the nose it is a heading command (bank). ALONG the nose it is a TRIM
     // SPEED bias, never a raw elevator angle — see condorSTICK_V.
+    //
+    // ---- AND THE STICK IS A WRIST, NOT A SWITCH (v20) ----------------------
+    // Everything downstream of here — the heading error, the bank command, the
+    // trim-speed bias — was being driven off `input.x/z` RAW, and on a keyboard
+    // that is a step function: nothing, then a full-deflection command on the
+    // next frame, then nothing again when the finger comes off. A step into a
+    // heading loop whose plant is roll-rate-then-turn-rate is the textbook way
+    // to make an aeroplane feel twitchy, and it is the whole of what "the
+    // steering should be smoother" is describing. The aerodynamics are not the
+    // problem and none of them are touched: the filter is on the PILOT.
+    //
+    // Two constants and they do different jobs. condorSTICK_ON is deliberately
+    // slower than condorSTICK_OFF, because rolling INTO a turn is a decision
+    // (and a big bird takes about a third of a second to make it) whereas
+    // coming out of one is letting go, and a control that is sluggish to
+    // centre feels like a control that is stuck.
+    //
+    // It is filtered in CARTESIAN camera space rather than as an angle, so
+    // crossing the dead zone from one direction to another sweeps through the
+    // middle instead of jumping the long way round the circle.
     let sx = 0, sz = 0, mag = 0;
     if (input) {
       const cyaw = Math.cos(input.camYaw), syaw = Math.sin(input.camYaw);
-      sx = input.x * cyaw + input.z * syaw;
-      sz = -input.x * syaw + input.z * cyaw;
+      let rx = input.x * cyaw + input.z * syaw;
+      let rz = -input.x * syaw + input.z * cyaw;
+      const rm = Math.sqrt(rx * rx + rz * rz);
+      if (rm > 1) { rx /= rm; rz /= rm; }
+      const lam = rm > 0.05 ? condorSTICK_ON : condorSTICK_OFF;
+      condorStickX = damp(condorStickX, rx, lam, dt);
+      condorStickZ = damp(condorStickZ, rz, lam, dt);
+      sx = condorStickX; sz = condorStickZ;
       mag = Math.sqrt(sx * sx + sz * sz);
       if (mag > 1) { sx /= mag; sz /= mag; mag = 1; }
+    } else {
+      condorStickX = damp(condorStickX, 0, condorSTICK_OFF, dt);
+      condorStickZ = damp(condorStickZ, 0, condorSTICK_OFF, dt);
     }
     const fhx = condorFwd.x, fhz = condorFwd.z;
     const fh = Math.sqrt(fhx * fhx + fhz * fhz);
@@ -1497,6 +1555,22 @@ function condorUpdate(dt) {
       condorBody.force.x += (hx / hl) * mEff * 6 * w;
       condorBody.force.z += (hz / hl) * mEff * 6 * w;
     }
+    // ---- ...AND A SOFT EDGE IS NOT A WORLD BOUNDARY (v20) -----------------
+    // Everything above is a persuasion: a bank home and 0.6 g of nudge, both
+    // saturating at 130 m and neither of them able to stop a bird that is
+    // pointed out and diving. Past the persuasion there has to be something
+    // that CANNOT be argued with, because outside pasto.bounds() there is no
+    // rigid body at all — the four heightfield strips end, the analytic terrain
+    // does not, and a capybara put down out there falls until the session ends.
+    // Galeras makes this reachable rather than theoretical: the cone is centred
+    // at z = -70 with a 70 m radius, so flying up the volcano and over the top
+    // takes the bird straight at the one edge its own apron already crosses.
+    //
+    // The fence removes only the OUTWARD component of velocity, so the bird
+    // slides along it and keeps every bit of the speed it was carrying parallel
+    // to it. That is a wall you can lean on rather than one you hit, and it is
+    // invisible unless you go looking for it.
+    condorFence(dt);
 
     // ---- SEE THE GROUND — with the PASSENGER on the end of the string ------
     // See condorGND_CLEAR. This is the fix for the crater. There is no force
@@ -2122,7 +2196,16 @@ function condorFlightFeedback(dt, airspeed, speed) {
     scrapeY = pass.body.position.y - 0.5;
   }
   const terr = condorTerrain(scrapeX, scrapeZ);
-  if (condorLaunchLift <= 0 && scrapeY < terr) {
+  // ...AND NEVER OUTSIDE THE WORLD. condorTerrain is the ANALYTIC height law,
+  // which answers for the whole plane; the rigid heightfields stop at
+  // pasto.bounds(). So out past the edge this test reads a hillside that has no
+  // collision behind it, decides the pair has scraped it, and drops the
+  // capybara into a place with no floor — which is the "flying up the volcano
+  // drops you outside the map" bug, and it is a release rather than a fall.
+  // condorFence now makes this unreachable; the guard stays because a check
+  // that would be catastrophic if it ever fired should not depend on another
+  // function being correct.
+  if (condorLaunchLift <= 0 && scrapeY < terr && condorOverGround(scrapeX, scrapeZ)) {
     if (typeof game.shake === 'function') game.shake(clamp(speed / 24, 0, 1) * 0.5);
     condorRelease(false);
     condorLowered = true;
@@ -2205,6 +2288,57 @@ function condorClearance(vel) {
 }
 
 // ---------------------------------------------------------------------------
+/**
+ * WHERE THERE IS GROUND TO LAND ON. pasto.bounds(), inset by condorFENCE_PAD so
+ * the bird turns round before the passenger's shadow leaves the world rather
+ * than after. Falls back to the old symmetric square if the chapter has not
+ * published one, so this file still works against a pasto.js that predates it.
+ */
+function condorBounds() {
+  const pasto = condorGame && condorGame.pasto;
+  if (pasto && typeof pasto.bounds === 'function') {
+    const b = pasto.bounds();
+    if (b && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) return b;
+  }
+  return condorFENCE_FALLBACK;
+}
+
+/**
+ * THE FENCE. Kill the outward component of velocity outside the world, and
+ * carry the body back in if a frame has already put it there.
+ *
+ * Not a force and not a bounce: a force can be out-flown (the soft edge above
+ * is one, and it can) and a bounce is a thing the player can feel and will
+ * therefore go looking for. Zeroing the outward component leaves the tangential
+ * speed untouched, so at the boundary the bird simply runs along it — which
+ * from the saddle reads as a bird that has decided not to go that way.
+ */
+function condorFence(dt) {
+  void dt;
+  const b = condorBounds();
+  const p = condorBody.position, v = condorBody.velocity;
+  const x0 = b.x0 + condorFENCE_PAD, x1 = b.x1 - condorFENCE_PAD;
+  const z0 = b.z0 + condorFENCE_PAD, z1 = b.z1 - condorFENCE_PAD;
+  let hit = false;
+  if (p.x < x0) { if (v.x < 0) v.x = 0; p.x = x0; hit = true; }
+  else if (p.x > x1) { if (v.x > 0) v.x = 0; p.x = x1; hit = true; }
+  if (p.z < z0) { if (v.z < 0) v.z = 0; p.z = z0; hit = true; }
+  else if (p.z > z1) { if (v.z > 0) v.z = 0; p.z = z1; hit = true; }
+  // A position write is a teleport and the interpolation history goes with it,
+  // or the render lerps the bird across the map for a frame. Contract,
+  // "Rendering physics transforms".
+  if (hit) {
+    condorBody.previousPosition.copy(p);
+    condorBody.interpolatedPosition.copy(p);
+  }
+}
+
+/** Is (x, z) somewhere the game actually has a floor? See condorFence. */
+function condorOverGround(x, z) {
+  const b = condorBounds();
+  return x > b.x0 + 1 && x < b.x1 - 1 && z > b.z0 + 1 && z < b.z1 - 1;
+}
+
 function condorTerrain(x, z) {
   const pasto = condorGame.pasto;
   if (pasto && typeof pasto.terrainHeight === 'function') {

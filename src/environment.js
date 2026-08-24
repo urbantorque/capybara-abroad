@@ -116,7 +116,14 @@ let envFerryVoyage = false;   // 'ferry:departed' already emitted for this trip
 const envVAN_ROUTE = [-2.0, 7.6, -9.0, 7.0, -15.0, 4.2, -20.5, 0.4, -26.0, -2.6,
                       -34.0, -4.6, -44.0, -5.4, -54.0, -4.6, -61.0, -3.3];
 const envVAN_SPEED = 3.15;    // m/s. A van on a footpath, not a getaway.
-const envVAN_DWELL = 8.0;     // s parked at each end — this is the boarding window
+// s parked at each end. EIGHT WAS TOO SHORT FOR THE THING IT IS FOR. The
+// boarding window is the whole point of the stop — you have to get round to
+// the port side, up onto the counter and onto the roof from a standing start —
+// and eight seconds meant a missed step cost you a full lap of the promenade.
+// It is also the window a queue has to form in; see npc.js's vanQueueOpen.
+// Nothing about the ride itself changes: the twelve seconds on the roof only
+// count while she is ROLLING.
+const envVAN_DWELL = 11.0;
 const envVAN_RIDE  = 12.0;    // s on the roof that count as 'the length of it'
 const envVAN_HX = 1.02;       // half-width
 const envVAN_HZ = 2.35;       // half-length (local +z is the front)
@@ -132,7 +139,8 @@ let envVanDwell = envVAN_DWELL;
 let envVanYaw = 0;
 let envVanPX = 0, envVanPZ = 0;
 let envVanChimeT = 0;
-let envVanRideT = 0;          // s the capybara has been continuously on the roof
+let envVanRideT = 0;
+let envVanRideM = 0;      // metres of route covered on this one ride          // s the capybara has been continuously on the roof
 let envVanRode = false;       // 'whippy-run' already ticked
 const envVanPos = new THREE.Vector3();
 const envVanTmp = new THREE.Vector3();
@@ -435,6 +443,43 @@ function envDisc(M, cx, cz, r, seg, y, color) {
 }
 
 // ------------------------------------------------------------------ zones --
+// ---------------------------------------------------------- CANOPY CEILING --
+// THE CAMERA HAS BEEN SITTING INSIDE EVERY FIG IN THE GARDENS.
+//
+// MEASURED from a rendered frame, standing the animal at (-19, 8) — which is
+// under the fig at (-19, 5), one of thirteen: the eye ends up at y = 8.6 and a
+// Moreton Bay fig's canopy is five overlapping spheres between y = 3.4 and
+// y = 7.8. The entire frame is leaves. The capybara is not on screen at all.
+//
+// systems.js's occlusion ray cannot help here and should not be asked to: a
+// canopy is RENDER-ONLY geometry — there is no body to ray against, and giving
+// twenty-one trees one would be absurd — which is exactly the case camCeil
+// exists for. The chapter says where its roofs are, and in a botanic garden the
+// roofs are trees.
+//
+// The ceiling is the underside of the crown, not the top of the trunk: duck the
+// eye to just under the lowest leaves and the shot becomes a capybara framed by
+// a canopy, which is the nicest picture in the chapter rather than the worst.
+// Outside every crown it answers Infinity and costs twenty-one distance tests.
+const envCAM_FIG_R = 4.6;     // crown radius, figs — blobs out to ~4.1 plus a margin
+const envCAM_FIG_Y = 3.15;    // underside of the crown; the trunk tops out at 3.4
+const envCAM_JAC_R = 3.6;
+const envCAM_JAC_Y = 2.65;
+function envCamCeil(x, z) {
+  for (let i = 0; i < envFIG_SPOTS.length; i++) {
+    const dx = x - envFIG_SPOTS[i][0], dz = z - envFIG_SPOTS[i][1];
+    if (dx * dx + dz * dz < envCAM_FIG_R * envCAM_FIG_R) return envCAM_FIG_Y;
+  }
+  for (let i = 0; i < envJAC_SPOTS.length; i++) {
+    const dx = x - envJAC_SPOTS[i][0], dz = z - envJAC_SPOTS[i][1];
+    if (dx * dx + dz * dz < envCAM_JAC_R * envCAM_JAC_R) return envCAM_JAC_Y;
+  }
+  return Infinity;
+}
+
+// The whole of the world that has a floor or a sea under it. See api.bounds().
+const envBOUNDS = { x0: -142, x1: 142, z0: -152, z1: 96 };
+
 const envZONES = {
   operaStage: { x0: -9.0, z0: 1.05, x1: 9.0, z1: 3.9 },
   gardens:    { x0: 14, z0: 4, x1: 62, z1: 58 },
@@ -963,7 +1008,7 @@ function envBuildVan(game, root, material) {
   b.allowSleep = false;
   envVanInitRoute();
   envVanU = 0; envVanDir = 1; envVanDwell = envVAN_DWELL;
-  envVanRideT = 0; envVanRode = false; envVanChimeT = 2.0;
+  envVanRideT = 0; envVanRideM = 0; envVanRode = false; envVanChimeT = 2.0;
   envVanAt(0, envVanAtTmp);
   envVanYaw = envVanAtTmp.yaw + Math.PI;   // she starts pointing west, down the run
   envVanPX = envVanAtTmp.x; envVanPZ = envVanAtTmp.z;
@@ -979,6 +1024,25 @@ function envBuildVan(game, root, material) {
   envVanGroup.position.copy(envVanPos);
   envVanGroup.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
   return b;
+}
+
+// ---------------------------------------------------------- THE QUEUE ------
+// WHERE PEOPLE STAND WHEN SHE STOPS.
+//
+// Mr Whippy dwells eleven seconds at each end of the promenade and for the
+// whole of that time she was the only van in the world nobody wanted anything
+// from. npc.js reads these two: the spot is recomputed live off the van's own
+// yaw, because she creeps for a second after the brake and a queue nailed to a
+// stale transform stands in the road.
+const envVanQ = { x: 0, z: 0 };
+/** World point for the i-th place in the queue at the serving hatch. */
+function envVanQueueSpot(i) {
+  const cs = Math.cos(envVanYaw), sn = Math.sin(envVanYaw);
+  // local: out to port of the hatch, then strung back along her own axis
+  const lx = -(envVAN_HX + 1.55), lz = -0.35 + i * 1.15;
+  envVanQ.x = envVanPos.x + sn * lz + cs * lx;
+  envVanQ.z = envVanPos.z + cs * lz - sn * lx;
+  return envVanQ;
 }
 
 /** True when `p` is standing on the van's ROOF, and not merely near the van. */
@@ -1064,15 +1128,28 @@ function envVanStep(game, dt) {
   // Twelve seconds ON THE ROOF, continuously. Not "reached the far end", which
   // would pay a two-second ride to anybody who climbed on at the last node, and
   // not "was ever aboard", which standing on the counter alone would satisfy.
-  if (envVanRode) return;
+  // AND HOW FAR, which is the better question. The tick is a switch and the
+  // switch is thrown once; the promenade is sixty-two metres long and she
+  // turns at both ends, so "how far did you ride in one go" is a number a
+  // player can go back and beat. Measured in metres of ROUTE covered while
+  // aboard and rolling, and posted when they get off — not while they are
+  // still on, or the record board flickers all the way down the front.
   if (riding && envVanDwell <= 0) {
     envVanRideT += dt;
-    if (envVanRideT >= envVAN_RIDE) {
+    envVanRideM += envVAN_SPEED * dt;
+    if (!envVanRode && envVanRideT >= envVAN_RIDE) {
       envVanRode = true;
       game.completeTask('whippy-run');
     }
   } else if (!riding) {
+    // Eight metres, not one: stepping onto the roof at a terminus and off
+    // again should not post a record, and the task is NOT the gate — a good
+    // first run has to be allowed to be the first entry on the board.
+    if (envVanRideM > 8 && typeof game.record === 'function') {
+      game.record('whippy-run', envVanRideM);
+    }
     envVanRideT = 0;
+    envVanRideM = 0;
   }
 }
 
@@ -1264,6 +1341,335 @@ function envPlaneStep(game, dt) {
                              pitch: 0.34 + rpm * 0.16 });
     }
   }
+}
+
+// ================================================================ LORIKEETS ==
+// SYDNEY'S TREES WERE FURNITURE.
+//
+// Thirteen Moreton Bay figs and eight jacarandas, every one of them a silent
+// green blob you walk under and never look at again. There are rainbow
+// lorikeets in every one of those trees in life and they are the loudest thing
+// in the Domain — they do not sing, they SCREAM, and they do it thirty at a
+// time at four in the afternoon.
+//
+// So: a bird in a canopy is a thing that is simply there, and a bird that
+// LEAVES when you walk under it is a thing you did. The flush is free — no
+// task, no tick, no counter — it re-arms in nine seconds, and it is the only
+// interaction in the chapter that costs the player nothing at all and pays out
+// every single time. That ratio is the point; see the ambient-mover rules —
+// repeatable, ignorable, and never in the way.
+const envLORI_N = 26;                   // birds, total
+const envLORI_R = 6.2;                  // m — walk this close to the trunk and they go
+const envLORI_UP = 7.2;                 // s — perch to perch, the whole arc
+const envLORI_STRIDE = 9;               // floats per bird
+let envLoriMesh = null;
+let envLoriData = null;
+let envLoriTrees = null;                // x, z, canopy y, cooldown  (4 per tree)
+let envLoriSeen = false;
+
+/** One bird: body, breast, head, beak, tail, two wings. */
+function envLorikeetGeo() {
+  const B = envMerger(envBaseA);
+  B.add(envG.sph6, envXform(0, 0, 0, 0, 0, 0, 0.20, 0.17, 0.30), PALETTE.leafC);
+  B.add(envG.sph6, envXform(0, -0.03, 0.06, 0, 0, 0, 0.18, 0.14, 0.20), PALETTE.petalRed);
+  B.add(envG.sph6, envXform(0, 0.07, 0.15, 0, 0, 0, 0.15, 0.15, 0.15), PALETTE.petalBlue);
+  B.add(envG.cone4, envXform(0, 0.05, 0.24, Math.PI * 0.5, 0, 0, 0.07, 0.10, 0.07), PALETTE.petalYellow);
+  B.add(envG.box, envXform(0, 0.02, -0.24, 0, 0, 0, 0.09, 0.03, 0.26), PALETTE.leafA);
+  B.add(envG.box, envXform(-0.13, 0.04, -0.02, 0, 0.16, 0.30, 0.07, 0.04, 0.26), PALETTE.leafA);
+  B.add(envG.box, envXform(0.13, 0.04, -0.02, 0, -0.16, -0.30, 0.07, 0.04, 0.26), PALETTE.leafA);
+  return B.build();
+}
+
+/**
+ * Perches, drawn from the canopies that actually exist. Both spot tables are
+ * module constants, so this cannot drift out of step with the trees the way a
+ * hand-written list would.
+ */
+function envBuildLorikeets(root) {
+  // x, z, perch height, cooldown, canopy radius — five per tree.
+  //
+  // THE FIRST CUT PUT THEM INSIDE THE LEAVES. A fig canopy here is five
+  // overlapping spheres of radius ~2 centred 2.1 m out from the trunk at
+  // y = 4.9, so a bird at the canopy CENTRE is buried in solid green and the
+  // whole flock was invisible until it flushed. They sit on the outer shell,
+  // a metre above the blob centres — which is also where a lorikeet actually
+  // sits, out on the thin stuff at the end of a branch.
+  const trees = [];
+  for (let i = 0; i < envFIG_SPOTS.length; i++) trees.push(envFIG_SPOTS[i][0], envFIG_SPOTS[i][1], 6.3, 0, 3.1);
+  for (let i = 0; i < envJAC_SPOTS.length; i++) trees.push(envJAC_SPOTS[i][0], envJAC_SPOTS[i][1], 4.4, 0, 2.2);
+  envLoriTrees = trees;
+  const nT = trees.length / 5;
+
+  envLoriData = new Float32Array(envLORI_N * envLORI_STRIDE);
+  for (let i = 0; i < envLORI_N; i++) {
+    const t = i % nT;                    // one each, then round again — never a bare tree
+    const o = i * envLORI_STRIDE;
+    const a = envRR(0, 6.283), r = trees[t * 5 + 4] * envRR(0.72, 1.06);
+    envLoriData[o]     = trees[t * 5] + Math.cos(a) * r;
+    envLoriData[o + 1] = trees[t * 5 + 2] + envRR(-0.55, 0.55);
+    envLoriData[o + 2] = trees[t * 5 + 1] + Math.sin(a) * r;
+    envLoriData[o + 3] = envRR(0, 6.283);
+    envLoriData[o + 4] = -1;             // <0 = sitting; >=0 = seconds into the arc
+    envLoriData[o + 5] = envRR(0, 6.283);
+    envLoriData[o + 6] = envRR(0.85, 1.25);
+    envLoriData[o + 7] = envRnd() < 0.5 ? -1 : 1;
+    envLoriData[o + 8] = t;              // which tree it belongs to
+  }
+
+  const im = new THREE.InstancedMesh(envLorikeetGeo(),
+    mat(envVC_BASE, { vertexColors: true }), envLORI_N);
+  im.name = 'envLorikeets';
+  im.castShadow = false;                 // 26 shadow casters for a 30 cm bird is not a trade
+  im.receiveShadow = false;
+  im.frustumCulled = false;
+  envLoriMesh = im;
+  root.add(im);
+}
+
+/** Everything in one tree leaves at once — that is what makes it read as a flock. */
+function envFlushTree(game, t, loud) {
+  const T = envLoriTrees;
+  if (!T || T[t * 5 + 3] > 0) return false;
+  let any = false;
+  for (let i = 0; i < envLORI_N; i++) {
+    const o = i * envLORI_STRIDE;
+    if (envLoriData[o + 8] !== t || envLoriData[o + 4] >= 0) continue;
+    envLoriData[o + 4] = 0;
+    any = true;
+  }
+  if (!any) return false;
+  T[t * 5 + 3] = envLORI_UP + 1.8;       // the arc, plus a beat to settle
+  if (typeof game.sfx === 'function') {
+    // A lorikeet is a gull's voice a fifth higher and half as long. Jittered on
+    // both axes, because a flock that screeches on one pitch is a car alarm —
+    // nothing in this game's ambience is allowed to be periodic.
+    game.sfx('gull', { volume: loud ? 0.55 : 0.42, pitch: rand(1.62, 1.86) });
+    game.sfx('rustle', { volume: 0.5, pitch: rand(1.1, 1.35) });
+  }
+  return true;
+}
+
+function envLoriStep(game, dt) {
+  if (!envLoriMesh || !envLoriData) return;
+  const T = envLoriTrees, nT = T.length / 5;
+  const cp = game.capy && game.capy.position;
+  // A wheek under the canopy takes the whole tree from further out; walking
+  // under it takes it too, but the cooldown means a lap of the gardens is a
+  // handful of separate flushes and not one continuous shriek.
+  const wheeked = !!(game.input && game.input.honkPressed);
+  for (let t = 0; t < nT; t++) {
+    if (T[t * 5 + 3] > 0) { T[t * 5 + 3] -= dt; continue; }
+    if (!cp) continue;
+    const dx = cp.x - T[t * 5], dz = cp.z - T[t * 5 + 1];
+    const r = wheeked ? envLORI_R * 2.6 : envLORI_R;
+    if (dx * dx + dz * dz > r * r) continue;
+    if (envFlushTree(game, t, wheeked) && !envLoriSeen) {
+      envLoriSeen = true;
+      if (typeof game.toast === 'function') game.toast('the figs were full of lorikeets, apparently');
+    }
+  }
+
+  for (let i = 0; i < envLORI_N; i++) {
+    const o = i * envLORI_STRIDE;
+    let x = envLoriData[o], y = envLoriData[o + 1], z = envLoriData[o + 2];
+    let yaw = envLoriData[o + 5], roll = 0, sc = envLoriData[o + 6];
+    const f = envLoriData[o + 4];
+    if (f < 0) {
+      // sitting: a shuffle along the branch, and a head that is never still
+      const ph = envLoriData[o + 3];
+      y += Math.sin(envTime * 1.9 + ph) * 0.035;
+      yaw += Math.sin(envTime * 0.55 + ph) * 0.55;
+      roll = Math.sin(envTime * 3.1 + ph) * 0.05;
+    } else {
+      const u = clamp(f / envLORI_UP, 0, 1);
+      const arc = Math.sin(u * Math.PI);
+      const spin = envLoriData[o + 7] * (u * 5.6) + envLoriData[o + 3];
+      const rr = arc * (4.5 + (i % 5) * 2.2);
+      x += Math.cos(spin) * rr;
+      z += Math.sin(spin) * rr;
+      y += arc * (3.4 + (i % 4) * 1.6);
+      yaw = -spin + Math.PI * 0.5;
+      roll = 0.55 * envLoriData[o + 7] * arc + Math.sin(envTime * 22 + i) * 0.30;
+      sc *= 1 + arc * 0.10;
+      const nf = f + dt;
+      envLoriData[o + 4] = nf >= envLORI_UP ? -1 : nf;
+    }
+    envLoriMesh.setMatrixAt(i, envXform(x, y, z, roll, yaw, 0, sc, sc, sc));
+  }
+  envLoriMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ============================================================== THE SUN PATH ==
+// SYDNEY'S HARBOUR HAD NO LIGHT ON IT.
+//
+// The water is the biggest single surface in the chapter — a hundred and forty
+// metres of it filling the top third of every shot out over the Opera House —
+// and it was a flat ripple in two blues with nothing happening on it at all.
+// Chapter 3 has had a sun path since it was written and it is the single
+// biggest reason that harbour looks like water and this one looks like a
+// tabletop.
+//
+// The same trick, and the same two lessons that were learned the expensive way
+// over there:
+//   - It must be laid on the ACTUAL surface, not on the datum. envWaterHeightAt
+//     swings ±0.18 and a decal at a fixed height spends most of its life
+//     behind the ripple mesh, chopped into flickering bands.
+//   - The lozenges are LONG AND THIN and they follow the camera, so the path
+//     always lies between the eye and the sun. Square patches at low opacity
+//     read as litter on the water rather than as light on it.
+const envGLIT_N = 96;
+let envGlitter = null, envGlitData = null;
+
+function envBuildGlitter() {
+  const N = envGLIT_N;
+  envGlitData = new Float32Array(N * 6);        // dx, dz, yaw, w, l, phase
+  for (let i = 0; i < N; i++) {
+    const d = 14 + i * 1.9;                     // out to ~200 m, thickening near
+    const sp = 2.4 + i * 0.22;
+    const o = i * 6;
+    envGlitData[o] = envRR(-sp, sp);
+    envGlitData[o + 1] = -d + envRR(-3.5, 3.5);
+    envGlitData[o + 2] = envRR(-0.12, 0.12);
+    envGlitData[o + 3] = envRR(0.3, 0.85);
+    envGlitData[o + 4] = envRR(2.2, 6.4);
+    envGlitData[o + 5] = envRR(0, Math.PI * 2);
+  }
+  const im = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    mat(PALETTE.seaGlitter, { transparent: true, opacity: 0.16, depthWrite: false, fog: false }),
+    N);
+  im.name = 'envGlitter';
+  im.frustumCulled = false;
+  im.castShadow = false; im.receiveShadow = false;
+  im.renderOrder = 2;
+  envGlitter = im;
+  return im;
+}
+
+function envGlitStep(game) {
+  const im = envGlitter;
+  if (!im || !game.camera || !envGlitData) return;
+  const cx = game.camera.position.x, cz = game.camera.position.z;
+  for (let i = 0; i < envGLIT_N; i++) {
+    const o = i * 6;
+    const x = cx + envGlitData[o], z = cz + envGlitData[o + 1];
+    // …and NOT on the land. The harbour is everything north of z = -10, and a
+    // lozenge of sunlight lying across the Opera House podium is a bug you can
+    // see from the far end of the gardens.
+    if (z > -10.6 || !envIsOverWaterFast(x, z)) {
+      im.setMatrixAt(i, envXform(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001));
+      continue;
+    }
+    const k = 0.55 + 0.45 * Math.sin(envTime * 1.7 + envGlitData[o + 5]);
+    im.setMatrixAt(i, envXform(x, envWaterY(x, z) + 0.05, z,
+                               -Math.PI / 2, envGlitData[o + 2], 0,
+                               envGlitData[o + 3] * (0.6 + k * 0.7),
+                               envGlitData[o + 4], 1));
+  }
+  im.instanceMatrix.needsUpdate = true;
+}
+
+/** The two solid things standing in the harbour, without the closure lookup. */
+function envIsOverWaterFast(x, z) {
+  if (x >= -13.4 && x <= 13.4 && z >= -12.4) return false;   // opera podium
+  if (x >= -43.7 && x <= -36.3 && z >= -24.4) return false;  // ferry wharf
+  return true;
+}
+
+/** Module-scope twin of the closure's envWaterHeightAt — identical maths. */
+function envWaterY(x, z) {
+  return -0.5 + Math.sin(x * 0.09 + envTime * 0.9) * 0.10
+              + Math.sin(z * 0.14 - envTime * 0.7) * 0.08;
+}
+
+// ============================================================ HARBOUR TRAFFIC ==
+// THE BIGGEST SURFACE IN THE CHAPTER HAD TWO THINGS ON IT.
+//
+// Sydney's harbour runs from z = -10 to the far shore at -126 and fills the top
+// third of every shot that faces the Opera House. On it: one ferry, on a berth,
+// and one seaplane, for ninety-four seconds out of every ninety-four. The rest
+// is a hundred and sixteen metres of unbroken blue — and Sydney Harbour is one
+// of the busiest stretches of water in the southern hemisphere.
+//
+// Nine sails and two small ferries, on slow independent reaches, all of them
+// beyond z = -46 so they are scenery and nothing else: no colliders, no
+// wakes to write, no way for the player to reach them, and nothing that has to
+// be reset when the biome sleeps. Two instanced draws for the lot.
+//
+// The periods are deliberately co-prime-ish and none of them is a multiple of
+// another, so the fleet never lines up into a pattern the eye can catch —
+// the same rule the ambience is on.
+const envTRAF = [
+  //  x0     z0     x1     z1   period  kind (0 sail, 1 ferry)
+  [-108, -58,  -18, -74,  96, 0],
+  [ -22, -70,   84, -56, 112, 0],
+  [  72, -92,  -46, -80, 128, 0],
+  [-120, -96,   16, -108, 104, 0],
+  [  34, -104, 132, -88,  88, 0],
+  [-140, -120, -20, -114, 146, 0],
+  [ 118, -122,  -8, -130, 158, 0],
+  [ -74, -46,   26, -52,  74, 0],
+  [  92, -64,  -60, -68, 134, 0],
+  [-150, -84,  150, -78, 172, 1],
+  [ 150, -110, -150, -100, 196, 1],
+];
+let envTrafHull = null, envTrafSail = null;
+
+function envBuildTraffic(root, material) {
+  const n = envTRAF.length;
+  // the hull: one shape, scaled per instance so a ferry is simply a bigger,
+  // squarer version of the same silhouette at this distance
+  const H = envMerger(envBaseA);
+  H.box(0, 0.10, 0, 1.6, 0.66, 6.6, PALETTE.cloth4);
+  H.box(0, -0.22, 0, 1.4, 0.30, 6.2, PALETTE.hiVis);
+  H.box(0, 0.42, 0, 1.2, 0.16, 5.0, PALETTE.cloth3);
+  H.box(0, 0.90, -0.9, 0.9, 0.80, 1.6, PALETTE.sail);
+  envTrafHull = new THREE.InstancedMesh(H.build(), material, n);
+  envTrafHull.name = 'envTraffic';
+  envTrafHull.castShadow = false;      // forty to a hundred metres out; nothing to cast onto
+  envTrafHull.receiveShadow = false;
+  envTrafHull.frustumCulled = false;
+  root.add(envTrafHull);
+
+  const S = new THREE.BufferGeometry();
+  S.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0.4, 0.4, 0, 7.6, 0.6, 0, 0.5, -3.2,
+    0, 0.4, 0.7, 0, 6.0, 0.7, 0, 0.5, 3.1,
+  ], 3));
+  S.setIndex([0, 1, 2, 3, 4, 5]);
+  S.computeVertexNormals();
+  envTrafSail = new THREE.InstancedMesh(S, mat(PALETTE.sail, { side: THREE.DoubleSide, fog: true }), n);
+  envTrafSail.name = 'envTrafficSails';
+  envTrafSail.castShadow = false;
+  envTrafSail.frustumCulled = false;
+  root.add(envTrafSail);
+  envTrafStep();
+}
+
+function envTrafStep() {
+  if (!envTrafHull) return;
+  const n = envTRAF.length;
+  for (let i = 0; i < n; i++) {
+    const T = envTRAF[i];
+    const per = T[4], ferry = T[5] === 1;
+    // there and back on a cosine, so she slows, turns and comes back rather
+    // than teleporting to the start of her leg
+    const u = 0.5 - 0.5 * Math.cos((envTime / per + i * 0.382) * Math.PI * 2);
+    const x = lerp(T[0], T[2], u), z = lerp(T[1], T[3], u);
+    // heading is the direction of travel, which reverses at each end
+    const dir = Math.sin((envTime / per + i * 0.382) * Math.PI * 2) >= 0 ? 1 : -1;
+    const yaw = Math.atan2((T[2] - T[0]) * dir, (T[3] - T[1]) * dir);
+    const roll = Math.sin(envTime * 0.7 + i) * (ferry ? 0.02 : 0.06);
+    const sc = ferry ? 2.1 : 1;
+    envTrafHull.setMatrixAt(i, envXform(x, -0.42 + Math.sin(envTime * 0.6 + i * 2.1) * 0.06, z,
+                                        0, yaw, roll, sc, sc * 0.9, sc));
+    // a ferry has no sails: park them under the water rather than branching
+    envTrafSail.setMatrixAt(i, ferry
+      ? envXform(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001)
+      : envXform(x, -0.2, z, 0, yaw, roll * 1.6, 1, 1, 1));
+  }
+  envTrafHull.instanceMatrix.needsUpdate = true;
+  envTrafSail.instanceMatrix.needsUpdate = true;
 }
 
 // ==================================================================== FERRY ==
@@ -1460,6 +1866,7 @@ export function createEnvironment(game) {
   envSprayAng = 0;
   envTime = 0;
   envRippleT = 0;
+  envLoriSeen = false;
   envFerryVoyage = false;
   envFerryDocked = true;
   envAsleep = false;
@@ -2445,6 +2852,13 @@ export function createEnvironment(game) {
   bridge.frustumCulled = false;
   root.add(bridge);
 
+  // The flock goes in LAST, after every other envRR() consumer in the build,
+  // so adding it cannot walk the shared seed and move a single palm or a
+  // single block of the far skyline. See envBuildLorikeets.
+  envBuildLorikeets(root);
+  envBuildTraffic(root, matVC);
+  root.add(envBuildGlitter());
+
   // ------------------------------------------------------- nav: the harbour
   envNavR.push(-260, -260, 260, -10.4);
 
@@ -2519,6 +2933,9 @@ export function createEnvironment(game) {
     envFerryStep(game, dt);
     envVanStep(game, dt);
     envPlaneStep(game, dt);
+    envLoriStep(game, dt);
+    envTrafStep();
+    envGlitStep(game);
     envSprayStep(game, dt);
     // harbour ripple — 30 Hz is plenty and halves the per-frame buffer upload
     envRippleT += dt;
@@ -2561,6 +2978,27 @@ export function createEnvironment(game) {
 
   const api = {
     group: root,
+    // ---- WHERE THE WORLD ACTUALLY STOPS -----------------------------------
+    // MEASURED: drop the animal at z = 200, or at x = ±140, and it does not
+    // fall and it is never rescued — it stands at y = 0.18 on capybara.js's
+    // soft floor, hundreds of metres outside anything that is drawn, for ever.
+    // Sydney's ground BODY is a box over x ±70, z -10..70 and nothing at all
+    // exists past it; the lawn MESH runs to z = 150 purely so the horizon has
+    // no hard edge in it, and the soft floor answers for the whole infinite
+    // plane. So walking north out of the gardens is a one-way trip into
+    // featureless grey with no fall to trigger a rescue — the exact failure
+    // Pasto was given bounds() for, in the one chapter every player walks in
+    // first, and never fixed here.
+    //
+    // The rectangle is the UNION of the two places there is something under
+    // you: the land box, and the harbour, which is much the wider of the two
+    // (the water mesh runs x ±140, z -150..-10, and the seabed body under it
+    // is wider still). Swimming to the far shore stays legal; walking off the
+    // north end of the lawn does not. systems.js's backVoid adds its own four
+    // metres of grace on top of this — see sysVOID_PAD.
+    bounds() { return envBOUNDS; },
+    // The trees are this chapter's roofs. See CANOPY CEILING.
+    camCeil: envCamCeil,
     waterLevel: -0.5,
     waterEdgeZ: -10,
     isOverWater: envIsOverWater,
@@ -2583,6 +3021,11 @@ export function createEnvironment(game) {
     van: function () { return envVanPos; },
     vanParked: function () { return envVanDwell > 0; },
     vanRiding: function () { return !!(game.capy && envVanOnRoof(game.capy.position)); },
+    // Where a queue forms while she is stopped. Live — see envVanQueueSpot.
+    vanQueueSpot: envVanQueueSpot,
+    // How long she has been stopped, so nobody joins a queue that is about to
+    // watch the van drive off. envVAN_DWELL is the whole stop.
+    vanDwellLeft: function () { return envVanDwell; },
     kioskSpot: envKIOSK_SPOT,
     update: envUpdate,
   };

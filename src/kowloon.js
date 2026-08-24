@@ -94,10 +94,18 @@ const hkTOWER_N = 16;
 
 // ---- the clock -------------------------------------------------------------
 const hkCYCLE = 152;                 // s — a whole evening, on a loop
+// twenty-five seconds before the warning, which is what a climb actually costs
+const hkSHOW_SOON = 0.305;
 const hkSHOW_WARN = 0.470;           // the towers dim and the street is told
 const hkSHOW_ON   = 0.545;           // and it starts
 const hkSHOW_OFF  = 0.800;           // and it stops
 const hkSHOW_BEATS = 0.42;           // s between towers when the band is silent
+// HOW HIGH IS 'ON THE ROOF'. The scaffold's second working deck is at 11.66 and
+// the roof it leads to is at hkSCAF.top; twenty-six clears every balcony, every
+// laundry pole (11.4) and the big sign, and is below the roof itself with room
+// to spare. One constant, so the task and the thing that tells you off for
+// missing it can never disagree about where you are supposed to be.
+const hkSHOW_ROOF = 26;
 
 // SIXTY, NOT NINETY-SIX. The first cut hung ninety-six signs of up to six
 // metres' reach over a thirteen-metre street and they closed over the top of it
@@ -178,11 +186,29 @@ let hkBakeryGroup = null, hkTankGroup = null;
 let hkFishMesh = null, hkFishData = null, hkFishOut = 0;
 
 let hkClimbBest = 0, hkClimbTold = false;
+// The height ladder. Metres, and the last entry is a sentinel above the roof so
+// the index can never run off the end. See THE WAY UP PAYS AS YOU GO.
+const hkCLIMB_RUNGS = [8, 15, 22, 30, 36, 1e9];
+const hkCLIMB_SAY = [
+  'above the awnings. nobody down there has noticed.',
+  'the poles get thinner from here. that is not a mistake, it is the design.',
+  'nine floors of somebody’s washing, and you have passed all of it.',
+  'the street noise stops about here. listen.',
+  'the roof. that is what the bamboo is for.',
+];
+let hkClimbRung = 0;
 let hkPoleT = -1, hkPoleFrom = 0;
 let hkTartDone = false, hkClimbDone = false, hkPoleDone = false;
 let hkMarketDone = false, hkSignDone = false, hkShowDone = false, hkFerryDone = false;
 let hkSignStandT = 0;
 let hkWarned = false;
+// the earlier of the two warnings — see TWO WARNINGS in hkUpdateShow
+let hkSoonSaid = false;
+// The cast, kept so the exchanges can name them and so anything in the chapter
+// can make one of them react. See THE PEOPLE WHO LIVE HERE at the bottom.
+let hkBakerRec = null, hkFishRec = null, hkPierRec = null, hkScafRec = null;
+let hkNeonRec = null, hkBusRec = null;
+let hkLaundryRec = null, hkCookRec = null, hkSitRec = null, hkRiggerRec = null;
 let hkSeenShow = false;
 
 // =========================================================== GEOMETRY UTIL ==
@@ -616,6 +642,22 @@ function hkBuildStreet(game, root) {
           grilles.push(side * (hkFACE - 0.06), y, wz, 0, 0, 0, 0.12, 1.7, 1.5);
           if ((f + k) % 2 === 0) {
             acs.push(side * (hkFACE - 0.55), y - 0.75, wz, 0, 0, 0, 1.0, 0.7, 0.9);
+            // ---- AND IT DRIPS ON YOU -----------------------------------
+            // Ninety split units hung over a pavement four metres wide, and
+            // every one of them bone dry. Ask anybody who has walked down Fa
+            // Yuen Street what the street DOES and this is the answer before
+            // the neon is: the whole elevation is plumbed with condensate and
+            // none of it goes anywhere except onto the person underneath.
+            //
+            // Only the low ones — under about fourteen metres, so the drop is
+            // legible against the shopfront light rather than falling out of a
+            // black sky — and only every third, or the street is a car wash.
+            // Collected here because the positions already exist; building
+            // them a second time from a different loop is how two things that
+            // are supposed to be in the same place stop being.
+            if (y < 14 && hkDRIP_AT.length < hkDRIP_N * 3 && (f + k + (z | 0)) % 3 === 0) {
+              hkDRIP_AT.push(side * (hkFACE - 0.55), y - 1.12, wz);
+            }
           }
           // ---- SOMEBODY IS IN, AND THE WINDOW SAYS SO --------------------
           // Every tong lau on this street was a dark tower with a grille on
@@ -928,7 +970,6 @@ function hkBuildCrossing(root) {
 
 function hkUpdateCrossing(game, dt) {
   hkCrossT += dt;
-  const wasGreen = hkCrossT - dt >= hkX_RED;
   if (hkCrossT >= hkX_RED + hkX_GREEN) hkCrossT -= hkX_RED + hkX_GREEN;
   const green = hkCrossGreen();
   // the head: the red man is on OR the green man is, never both and never
@@ -2423,7 +2464,7 @@ function hkBuildCrowd(game, root) {
     hkCrowd.head.instanceColor.setXYZ(i, col.r, col.g, col.b);
     col.set(rnd() < 0.5 ? 0x2f3438 : 0x8c3f3a);
     hkCrowd.brolly.instanceColor.setXYZ(i, col.r, col.g, col.b);
-    col.set(BAG[(rnd() * BAG.length) | 0]);
+    col.set(hkBAG[(rnd() * hkBAG.length) | 0]);
     hkCrowd.bag.instanceColor.setXYZ(i, col.r, col.g, col.b);
   }
   for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag']) {
@@ -2432,7 +2473,7 @@ function hkBuildCrowd(game, root) {
 }
 // what a Hong Kong carrier bag is: white plastic, a supermarket red, and the
 // pink-and-blue-striped nylon one that everything in this city moves in
-const BAG = [0xe8e4dc, 0xc4483f, 0xd8c9a0, 0xdc8fa8, 0x7fa8c4];
+const hkBAG = [0xe8e4dc, 0xc4483f, 0xd8c9a0, 0xdc8fa8, 0x7fa8c4];
 
 function hkUpdateCrowd(game, dt) {
   if (!hkCrowd) return;
@@ -3206,6 +3247,27 @@ function hkUpdateShow(game, dt) {
   const warnNow = hkPhase >= hkSHOW_WARN && hkPhase < hkSHOW_ON;
   const onNow = hkPhase >= hkSHOW_ON && hkPhase < hkSHOW_OFF;
 
+  // ---- TWO WARNINGS, BECAUSE ELEVEN SECONDS IS NOT A CLIMB ---------------
+  // The only notice was hkSHOW_WARN, which is 11.4 s before the lights and is
+  // measurably less than the time it takes to get from the pavement to the
+  // roof — so the chapter's own alarm was an alarm about something you had
+  // already lost. The first one goes twenty-five seconds earlier and says the
+  // one useful thing (START CLIMBING); the second is the original, and by then
+  // anybody who took the hint is most of the way up and hears it from the
+  // scaffold, which is where it sounds best.
+  const soonNow = hkPhase >= hkSHOW_SOON && hkPhase < hkSHOW_WARN;
+  if (soonNow && !hkSoonSaid) {
+    hkSoonSaid = true;
+    if (!hkShowDone) {
+      const cy = game.capy && game.capy.position ? game.capy.position.y : 0;
+      hkToast(cy > hkSHOW_ROOF
+        ? 'nearly eight. stay exactly where you are.'
+        : 'nearly eight. if you are going up the bamboo, go now.');
+      hkSfx('chime', { volume: 0.26, pitch: 1.15 });
+    }
+  }
+  if (!soonNow && !onNow) hkSoonSaid = false;
+
   if (warnNow && !hkWarned) {
     hkWarned = true;
     hkToast('eight o’clock. the other side of the water is about to show off.');
@@ -3223,21 +3285,41 @@ function hkUpdateShow(game, dt) {
     hkChase = 0;
     hkFinaleDone = false;
     hkSeenShow = true;
-    // ---- the marquee -----------------------------------------------------
-    // It only counts from a roof, and the only way onto a roof is the bamboo.
-    // The chapter's last verb and its last picture are the same gesture.
-    const capy = game.capy;
-    if (capy && capy.position && capy.position.y > 26) {
-      if (!hkShowDone) {
-        hkShowDone = true;
-        hkTask('symphony');
-        hkToast('all of it, from up here, for nothing.');
+    if (!hkShowDone) {
+      const capy0 = game.capy;
+      if (!(capy0 && capy0.position && capy0.position.y > hkSHOW_ROOF)) {
+        // ...and it says WHERE, because 'wrong floor' with a forty-metre
+        // scaffold somewhere behind you is a reprimand rather than a direction.
+        hkToast('it has started. get up the bamboo — you have about half a minute.');
       }
-    } else if (!hkShowDone) {
-      hkToast('it has started. you are on the wrong floor.');
     }
   }
   if (!onNow && hkShowT >= 0) hkShowT = -1;
+
+  // ---- THE MARQUEE IS THE SHOW, NOT THE FIRST FRAME OF IT ----------------
+  //
+  // This was a SINGLE-FRAME TEST, and it is the one row in this chapter that
+  // carries `wow`. The show runs for thirty-nine seconds out of a hundred and
+  // fifty-two, and the task ticked only if the capybara was already above
+  // twenty-six metres on the exact frame the phase crossed hkSHOW_ON. Which
+  // means: hear the warning chime, start climbing, arrive on the roof four
+  // seconds into the best twenty seconds in the chapter, watch the whole thing
+  // from the right place — and get nothing, with the paper still showing the
+  // row open and no way at all to find out why. The next go is a hundred and
+  // thirteen seconds of standing on a roof.
+  //
+  // 'Be on the roof when the lights come on' is satisfied by BEING ON THE ROOF
+  // WHILE THE LIGHTS ARE ON. Checked every frame the show is running, which
+  // also means a player who climbs during the count-in gets it the moment they
+  // top out rather than at some arbitrary later beat.
+  if (!hkShowDone && hkShowT >= 0) {
+    const capy = game.capy;
+    if (capy && capy.position && capy.position.y > hkSHOW_ROOF) {
+      hkShowDone = true;
+      hkTask('symphony');
+      hkToast('all of it, from up here, for nothing.');
+    }
+  }
 
   hkShow = damp(hkShow, onNow ? 1 : 0, onNow ? 3.5 : 1.2, dt);
 
@@ -3931,12 +4013,18 @@ function hkUpdateLion(game, dt) {
       // accelerating and then falling away, with the paper coming down after.
       hkCrackT = 0; hkCrackN = 0;
       if (game.shake) game.shake(0.22);
-      if (aboard && !hkLionDone) {
-        hkLionDone = true;
-        hkTask('choi-cheng');
-      } else if (!aboard) {
-        hkToast('you were supposed to be on it.');
-      }
+      if (!aboard) hkToast('you were supposed to be on it.');
+    }
+    // ---- AND IT COUNTS FOR THE WHOLE REAR, NOT FOR ONE FRAME OF IT -------
+    // The old form tested `aboard` inside the `u > 0.48` edge, which is a
+    // single frame of a forty-one second cycle. A player thrown a foot off the
+    // back by the eighth leap and scrambling on again at the top — which is
+    // the most likely way anybody actually rides this — got nothing and had to
+    // sit through the whole run once more. The choi cheng is four and a half
+    // seconds long and being on the lion for any of it is being on the lion.
+    if (hkLionGotIt && aboard && !hkLionDone) {
+      hkLionDone = true;
+      hkTask('choi-cheng');
     }
     if (u >= 1) { hkLionPhase = 4; hkLionT = 0; }
   } else {
@@ -4179,6 +4267,29 @@ function hkUpdateTasks(game, dt) {
       game.record('bamboo-climb', hkClimbBest);
     }
   }
+  // ---- AND THE WAY UP PAYS AS YOU GO -------------------------------------
+  // The bamboo is this chapter's whole reason to exist — the one verb in
+  // eighteen chapters that is about the other axis — and forty metres of it
+  // paid out exactly once, at twenty, and then nothing for the second half.
+  // A climb that goes quiet halfway is a climb the player starts wondering
+  // about, and wondering is the opposite of what this chapter is for.
+  //
+  // Five rungs, each once per session. Each is a creak of lashing under the
+  // weight plus one line, and they get quieter and drier as they go up because
+  // the street does: at eight metres you are above the awnings, at thirty-four
+  // the loudest thing near you is the wind. The last one is the roof, and it is
+  // the only one that is a full stop.
+  //
+  // hkClimbRung only ever climbs and is reset with the biome, so a player who
+  // goes up and down the same pole is not read a list of achievements.
+  if (p.y > hkCLIMB_RUNGS[hkClimbRung] &&
+      hkInZone('scaffold', p.x, p.z) && hkClimbRung < hkCLIMB_RUNGS.length - 1) {
+    const r = hkClimbRung++;
+    const q = 1 - r / hkCLIMB_RUNGS.length;
+    hkSfx('rustle', { volume: 0.16 + q * 0.16, pitch: 0.72 + r * 0.12 });
+    hkSfx('tick', { volume: 0.10 + q * 0.10, pitch: 1.4 + r * 0.2 });
+    if (hkCLIMB_SAY[r]) hkToast(hkCLIMB_SAY[r]);
+  }
   if (!hkClimbTold && hkInZone('scaffold', p.x, p.z) && p.y < 3) {
     hkClimbTold = true;
     hkToast('hold E against the bamboo and push toward it.');
@@ -4206,6 +4317,17 @@ function hkUpdateTasks(game, dt) {
       } else if (hkPoleT > 45) hkPoleT = -1;
     }
   } else if (hkPoleT >= 0 && p.y < hkPOLE_Y - 2.5) {
+    // ---- YOU FELL OFF, AND IT SAYS SO -----------------------------------
+    // Falling off IS the task and there should be a cost, but the cost was
+    // SILENCE: the run ended, nothing on screen changed, and the player went
+    // on carefully balancing across a street on a crossing that had already
+    // stopped counting. Same rule as the passerelle in Venice — no invisible
+    // state. Only for a run that had got somewhere; a slip off the first pole
+    // does not need a sentence about it.
+    if (hkPoleT > 1.6 && !hkPoleDone) {
+      hkToast('back to the pavement. the crossing starts at a wall, not in the middle.');
+      hkSfx('thud', { volume: 0.34, pitch: 1.15 });
+    }
     hkPoleT = -1;                       // you fell off. that is the task.
   }
 
@@ -4269,13 +4391,13 @@ export function createKowloon(game) {
       // The evening is put back to a couple of minutes before eight, so a
       // chapter you come back to opens the way it opened the first time.
       hkPhase = 0.06;
-      hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false;
+      hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false; hkSoonSaid = false;
       hkSkyward = 0;
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0;
       hkSignSway = 0; hkSignSwayV = 0;
       hkCrossT = 4.0; hkCrossTick = 0;
       if (hkCrossMesh) hkCrossMesh.userData.g = undefined;
-      hkClimbTold = false;
+      hkClimbTold = false; hkClimbRung = 0;
       hkTime = 0;
       hkFerryT = 0; hkFerryDir = 1;
       // The lion is put back on the tarmac with its head down, which is where
@@ -4286,6 +4408,23 @@ export function createKowloon(game) {
       hkQueueT = 0; hkQueueGoing = -1;
       if (hkQueue) for (let i = 0; i < hkQ_N; i++) hkQueueData[i * 3] = i;
       hkHornT = 9; hkWokT = 4; hkBellRung = 0;
+      // ---- AND THE BUS, WHICH NOTHING WAS PUTTING BACK ---------------------
+      // Every other moving thing in this chapter is reset here — the ferry, the
+      // lion, the queue, the crossing — and the open-top was not, so a return
+      // visit opened with the bus parked wherever it had been abandoned,
+      // possibly halfway through a fourteen-second dwell at a stop with its
+      // doors metaphorically open, and with a PART-COMPLETED RIDE banked:
+      // seven seconds of hkBUS_RIDE carried across a chapter boundary, so the
+      // mini could tick after a fraction of the ride it is scored on. She goes
+      // back to the north end, pointing down the street, with nothing owed.
+      hkBusZ = hkBUS_Z0; hkBusDir = -1; hkBusDwell = hkBUS_END;
+      hkBusStop = -1; hkBusRideT = 0; hkBusBell = 0;
+      hkBusPZ = hkBUS_Z0;
+      if (hkBusBody) {
+        hkBusBody.position.z = hkBUS_Z0;
+        hkBusBody.velocity.setZero();
+        hkSyncBody(hkBusBody);
+      }
     },
     onExit() {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
@@ -4293,7 +4432,7 @@ export function createKowloon(game) {
       hkHarbourT = 0;
       // Anything stateful that could hold the player, cleared on the way out.
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0; hkShowT = -1;
-      hkLionShredT = -1;
+      hkLionShredT = -1; hkBusRideT = 0; hkHarbourT = 0; hkClimbBest = 0;
     },
   });
 
@@ -4363,6 +4502,7 @@ export function createKowloon(game) {
       hkUpdateQueue(dt);
       hkUpdateFish(game, dt);
       hkUpdateCrowd(game, dt);
+      hkUpdateDrip(game, dt);
       hkUpdateTasks(game, dt);
 
       if (hkWaterMesh) hkWaterMesh.position.y = -0.5 + Math.sin(hkTime * 0.7) * 0.06;
@@ -4442,42 +4582,115 @@ function hkBuild(game) {
   hkBuildCrowd(game, hkRoot);
   hkBuildCrossing(hkRoot);
   hkBuildLitPanes(hkRoot);
+  hkBuildDrip(hkRoot);
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,
   // a few things they might say when the capybara turns up, and a different
   // few for when it wheeks at them. Where the chapter owns a Group for the
   // figure, it is handed over too and the figure turns to watch.
+  //
+  // ---- AND THEY KNOW WHAT TIME IT IS (v21) -------------------------------
+  //
+  // Twelve people on a hundred metres of Mong Kok pavement, in the one chapter
+  // in this game that is on a CLOCK — eight o'clock, every hundred and fifty-two
+  // seconds, the far shore lights up — and not one of them ever mentioned it
+  // having happened, was about to happen, or having just finished. The man on
+  // the pier said 'lights start at eight, everybody stops walking' at half past
+  // seven, at eight exactly, and at twenty past.
+  //
+  // Four states of the evening, the same conditional machinery Venice's tide
+  // now uses (npc.js localResolve, since v20), and the whole street knows which
+  // one it is in. Plus `after`/`before` on the six tasks that happen where
+  // somebody is standing, and `onTask` so the thing you just did in front of
+  // somebody is a thing they saw.
+  //
+  // Same rule as Venice: EVERY POOL KEEPS AT LEAST ONE UNCONDITIONAL LINE, or
+  // there is a state in which somebody has nothing to say and stands there.
+  const hkBefore  = () => hkPhase < hkSHOW_SOON;
+  const hkSoon    = () => hkPhase >= hkSHOW_SOON && hkPhase < hkSHOW_ON;
+  const hkDuring  = () => hkShowT >= 0;
+  const hkAfter   = () => hkShowT < 0 && hkSeenShow && hkPhase >= hkSHOW_OFF;
+  const hkUpHigh  = () => !!(game.capy && game.capy.position && game.capy.position.y > 9);
+
   if (typeof game.addLocal === 'function') {
-    game.addLocal({ biome: 'kowloon', x: hkBAKERY.x - 0.2, y: 0, z: hkBAKERY.z + 3.2, near: 6, face: 1.5,
+    hkBakerRec = game.addLocal({ biome: 'kowloon', x: hkBAKERY.x - 0.2, y: 0, z: hkBAKERY.z + 3.2, near: 6, face: 1.5,
       figure: { shirt: PALETTE.cloth3 },
       lines: ['Egg tart! Just out! Two minutes ago!',
-              'Hey. Hey. That tray is not for you.',
-              'You want pineapple bun? No pineapple in it. Nobody knows why.'],
+              { t: 'Hey. Hey. That tray is not for you.', before: 'egg-tart' },
+              { t: 'That tray WAS not for you. Past tense. Thank you.', after: 'egg-tart' },
+              'You want pineapple bun? No pineapple in it. Nobody knows why.',
+              { t: 'Three more trays before eight. Nobody buys after the lights.',
+                when: hkBefore },
+              { t: 'Half the queue has gone to look at the water. Every night.',
+                when: hkDuring },
+              { t: 'Everything half price. It is nine o’clock and I am not carrying it home.',
+                when: hkAfter }],
       wheek: ['Aiya! The whole street heard that.',
-              'Take one. TAKE ONE. Then go.'] });
-    game.addLocal({ biome: 'kowloon', x: hkMARKET.x - 2, y: 0, z: hkMARKET.z, near: 7,
+              'Take one. TAKE ONE. Then go.'],
+      onTask: { 'egg-tart': ['THE WHOLE TRAY. He took the whole — no. One. He took one.',
+                             'Still warm. Of course it was still warm. That is the point of them.'],
+                'symphony': ['You watched it from up THERE? I have lived here forty years.'] } });
+    hkFishRec = game.addLocal({ biome: 'kowloon', x: hkMARKET.x - 2, y: 0, z: hkMARKET.z, near: 7,
       figure: { shirt: PALETTE.cloth2, legs: PALETTE.stoneDark },
       lines: ['Grouper still swimming. You can see it is swimming.',
-              'Do not put your face in the tank.',
-              'Everything fresh. Everything alive. Some of it too alive.'],
-      wheek: ['You have upset the fish.'] });
-    game.addLocal({ biome: 'kowloon', x: 0, y: 0, z: hkPIER_Z + 4, near: 8,
+              { t: 'Do not put your face in the tank.', before: 'wet-market' },
+              { t: 'You did not put your face in the tank. You emptied it.', after: 'wet-market' },
+              'Everything fresh. Everything alive. Some of it too alive.',
+              { t: 'Twenty-six in that tank this morning. Twenty-six tonight.',
+                before: 'wet-market' },
+              { t: 'Do you know how long it takes to catch twenty-six fish off a floor?',
+                after: 'wet-market' },
+              { t: 'Nobody buys fish at eight. They all go and look at buildings.',
+                when: hkDuring }],
+      wheek: ['You have upset the fish.',
+              { t: 'They have been upset since Tuesday. Since YOU.', after: 'wet-market' }],
+      onTask: { 'wet-market': ['ALL of them. On the floor. Immediately.',
+                               'Grouper is under the crate. The grouper is ALWAYS under the crate.'] } });
+    hkPierRec = game.addLocal({ biome: 'kowloon', x: 0, y: 0, z: hkPIER_Z + 4, near: 8,
       figure: { shirt: PALETTE.denim, hat: PALETTE.cloth6 },
       lines: ['Lower deck two dollars sixty. Upper deck more.',
-              'Lights start at eight. Everybody stops walking.',
-              'Hundred and twenty years this crossing. Same eight minutes.'],
-      wheek: ['Save it for the horn, would you.'] });
+              'Hundred and twenty years this crossing. Same eight minutes.',
+              { t: 'Lights start at eight. Everybody stops walking. You will see.',
+                when: hkBefore },
+              { t: 'Any minute. Get high or get nothing — from down here it is a glow.',
+                when: hkSoon },
+              { t: 'There. Look at them all. Not one person on this pier is moving.',
+                when: hkDuring },
+              { t: 'And that is that until tomorrow. Boat still goes, though.',
+                when: hkAfter },
+              { t: 'She has a horn on her and nobody ever asks. Go on. Ask.',
+                before: 'ferry-horn' },
+              { t: 'I heard that from the pier. Everyone in Central heard that.',
+                after: 'ferry-horn' }],
+      wheek: ['Save it for the horn, would you.',
+              { t: 'Not while she is alongside. You will have people running.',
+                when: hkBefore }],
+      onTask: { 'star-ferry': ['Eight minutes, two dollars sixty, and he paid neither.'],
+                'ferry-horn': ['NINETEEN FIFTY-SEVEN, that horn. And you leant on it.'],
+                'harbour-swim': ['Out. OUT. That is a shipping lane and you are a rodent.'] } });
     // ---- AND FOUR MORE, because a hundred metres of Mong Kok pavement had
     // three people on it. Each of these stands where the chapter already sends
     // you: the foot of the scaffold, under the laundry poles, at the big sign,
     // and beside the open-top bus.
-    game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: -14, near: 6, face: 1.7,
+    hkRiggerRec = game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: -14, near: 6, face: 1.7,
       figure: { shirt: PALETTE.hkNeonGold, legs: PALETTE.stoneDark, hat: PALETTE.hkConcrete },
       lines: ['No nails. No bolts. Nylon, and it holds a twenty-storey job.',
               'Six weeks to learn the knot. Thirty years to learn the ladder.',
-              'You are welcome to climb it. I am not carrying you down.'],
-      wheek: ['Do that again up there and you will be down here.'] });
+              { t: 'You are welcome to climb it. I am not carrying you down.',
+                before: 'bamboo-climb' },
+              { t: 'You went up it. Fine. Now come down it the same way.',
+                after: 'bamboo-climb' },
+              { t: 'Hold E and push into it. That is the whole trick and it took me a month.',
+                before: 'bamboo-climb' },
+              { t: 'If you are going up for the lights, go now. It is four floors a minute.',
+                when: hkSoon },
+              { t: 'Every roof on this street has somebody on it tonight. Every one.',
+                when: hkDuring }],
+      wheek: ['Do that again up there and you will be down here.',
+              'The lashings do not like it and neither do I.'],
+      onTask: { 'bamboo-climb': ['Forty metres of grass. He went up forty metres of GRASS.'],
+                'symphony': ['From my scaffold. He watched it from MY scaffold.'] } });
     // ---- AND ONE OF THEM IS ACTUALLY UP IT --------------------------------
     // The foreman stands on the pavement saying good things about a scaffold
     // that nobody is working on: forty metres of bamboo, the verb the whole
@@ -4490,61 +4703,326 @@ function hkBuild(game) {
     // A local's y is BELIEVED (npc.js does not snap; see the Venice waiter),
     // and that is exactly what makes this possible: 4 * (34.8 / 12) is the
     // deck's own datum, so if the bay count ever changes he moves with it.
-    game.addLocal({ biome: 'kowloon',
+    hkScafRec = game.addLocal({ biome: 'kowloon',
       x: hkSCAF.x + hkSCAF.out * 0.5 + 0.5, y: 4 * (hkSCAF.top / 12) + 0.12, z: 6.4,
       near: 8.5, face: 1.5,
       figure: { shirt: PALETTE.hkNeonGold, legs: PALETTE.denim, hat: PALETTE.hkTaxi },
       lines: ['Eh! You are on my deck.',
               'Mind the third pole from the end. It has been a bit sorry since Tuesday.',
               'Everybody looks at the harbour. Look DOWN — that is the good one.',
-              'One hand for the job, one hand for yourself. You have four. Show off.'],
+              'One hand for the job, one hand for yourself. You have four. Show off.',
+              // he is a third of the way up the thing the player is climbing, so
+              // he is the natural signpost for the two tasks that live above him
+              { t: 'Keep going. Roof is another six decks and the view is the reason.',
+                before: 'symphony' },
+              { t: 'Two minutes to eight and you are standing on a plank talking to me.',
+                when: hkSoon },
+              { t: 'From here you get half of it. From the roof you get all of it. Go.',
+                when: hkDuring },
+              { t: 'Poles across the road are at eleven four. You are above them. Mind that.',
+                before: 'laundry-pole' },
+              { t: 'You went across on the washing poles. Somebody is short a shirt.',
+                after: 'laundry-pole' }],
       wheek: ['Not up here. Somebody will look out of a window.',
-              'The whole block heard that and none of them are pleased.'] });
-    game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: 20.5, near: 6, face: 1.5,
+              'The whole block heard that and none of them are pleased.',
+              'Forty metres of bamboo just rang like a xylophone. Well done.'],
+      onTask: { 'laundry-pole': ['Wall to wall, over the traffic. I am not watching that again.'],
+                'neon-sign': ['That is half a tonne of glass and he is HANGING off it.'],
+                'symphony': ['Told you it was the reason. Nobody ever believes me.'] } });
+    hkLaundryRec = game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: 20.5, near: 6, face: 1.5,
       figure: { shirt: PALETTE.cloth5 },
       lines: ['Forty years I have hung washing over that road.',
               'It dries in an hour up here. Smells of the street, but it dries.',
-              'If a shirt comes down, it belongs to whoever is under it.'],
-      wheek: ['You will have the whole building at the windows.'] });
-    game.addLocal({ biome: 'kowloon', x: 9.2, y: 0, z: -3, near: 6, face: -1.5,
+              { t: 'If a shirt comes down, it belongs to whoever is under it.',
+                before: 'laundry-pole' },
+              { t: 'A shirt came down. I know exactly whose fault that was.',
+                after: 'laundry-pole' },
+              { t: 'Do not walk on them. — I say that to everybody and nobody listens.',
+                before: 'laundry-pole' },
+              { t: 'Bring it in before eight. Everybody stands at the window at eight.',
+                when: hkSoon },
+              { t: 'Look at that. Forty years and I still come out for it.',
+                when: hkDuring }],
+      wheek: ['You will have the whole building at the windows.',
+              { t: 'Do that up on the poles and somebody will drop a wok on you.',
+                when: hkUpHigh }],
+      onTask: { 'laundry-pole': ['ACROSS them. Wall to wall. Over the buses.'] } });
+    hkNeonRec = game.addLocal({ biome: 'kowloon', x: 9.2, y: 0, z: -3, near: 6, face: -1.5,
       figure: { shirt: PALETTE.hkNeonRed, legs: PALETTE.denim },
       lines: ['That sign has been up since my father ran the shop.',
               'Council says take it down. Council has been saying it for nine years.',
-              'Nine thousand tubes on this street. I have bent about six hundred.'],
-      wheek: ['You sound like the transformer on a wet night.'] });
-    game.addLocal({ biome: 'kowloon', x: 9.3, y: 0, z: 9.5, near: 6, face: -2.2,
+              'Nine thousand tubes on this street. I have bent about six hundred.',
+              { t: 'Argon is the blue. Neon is only ever red. Everybody gets that wrong.',
+                when: hkBefore },
+              { t: 'You want to get ON it? — of course you do. Everybody wants to get on it.',
+                before: 'neon-sign' },
+              { t: 'It swung for ten minutes after you. I felt it in the shop.',
+                after: 'neon-sign' },
+              { t: 'Watch the far shore go and then look back at this street. THIS is the light.',
+                when: hkDuring }],
+      wheek: ['You sound like the transformer on a wet night.',
+              'Every tube on the frontage just buzzed. I heard it.'],
+      onTask: { 'neon-sign': ['Half a tonne. HALF A TONNE. And it held.',
+                              'My father hung that. My father would have loved this.'] } });
+    hkBusRec = game.addLocal({ biome: 'kowloon', x: 9.3, y: 0, z: 9.5, near: 6, face: -2.2,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.hkTaxi },
       lines: ['Top deck is open. Yes, in this weather. That is the point.',
-              'Sit at the front. Duck at the signs.',
-              'Eight minutes to the pier if the lights are kind. They are not.'],
-      wheek: ['That is roughly the horn, actually. Not bad.'] });
+              { t: 'Sit at the front. Duck at the signs.', before: 'bus-top' },
+              { t: 'You rode the front of the top deck. Standing. In the signs.',
+                after: 'bus-top' },
+              'Eight minutes to the pier if the lights are kind. They are not.',
+              { t: 'Last one before eight. After that nobody wants to be on a bus.',
+                when: hkSoon },
+              { t: 'Half my top deck is standing up facing the wrong way. Every night.',
+                when: hkDuring }],
+      wheek: ['That is roughly the horn, actually. Not bad.',
+              'Do that on the top deck and I will put you off at the next stop.'],
+      onTask: { 'bus-top': ['On the ROOF of it. There is a deck. There is a whole deck.'],
+                'star-ferry': ['Boat, was it. Everybody takes the boat. Nobody takes the bus.'] } });
     // ---- AND THE TWO AT THE DAI PAI DONG ---------------------------------
     // The only two people in the chapter who are not standing up. Everybody
     // else on this street is either walking past or minding a shop; a street
     // where nobody is SITTING is a street nobody lives on.
-    game.addLocal({ biome: 'kowloon', x: hkDPD.x + 2.6, y: 0, z: hkDPD.z - 2.6,
+    hkCookRec = game.addLocal({ biome: 'kowloon', x: hkDPD.x + 2.6, y: 0, z: hkDPD.z - 2.6,
       near: 6, face: -1.5,
       figure: { shirt: PALETTE.hkLaundry, legs: PALETTE.hkGrille },
       lines: ['Wok hei. You cannot get it off a domestic hob. Not enough fire.',
               'Sit anywhere. If somebody is already there, sit there anyway.',
               'Beef and ho fun, and I am not writing it down.',
-              'Forty years on this corner. Three years of it with a licence.'],
+              'Forty years on this corner. Three years of it with a licence.',
+              { t: 'Rush is over at eight. Everybody goes to look at the buildings.',
+                when: hkSoon },
+              { t: 'Nobody eats during the lights. I turn the gas down and watch it too.',
+                when: hkDuring },
+              { t: 'Now they all come back at once. Every night. Every single night.',
+                when: hkAfter },
+              { t: 'The lion goes up the poles later. Do not stand under the lettuce.',
+                before: 'choi-cheng' },
+              { t: 'You were ON it. When it took the lettuce. On the LION.',
+                after: 'choi-cheng' }],
       wheek: ['Not at the burners. It is a flame, it does not want your opinion.',
-              'Order or move, please. There is a queue somewhere behind you.'] });
+              'Order or move, please. There is a queue somewhere behind you.'],
+      onTask: { 'choi-cheng': ['Forty years on this corner and that is the first rodent.'],
+                'egg-tart': ['He has done the bakery. He will do me next.'] } });
     const seat = hkSeatedFigure(PALETTE.cloth3, PALETTE.denim, PALETTE.skin2 || 0xc79063);
     seat.position.set(hkDPD.x - 2.95 + 1.25, 0, hkDPD.z + 1.4);
     seat.rotation.y = -1.6;
     hkRoot.add(seat);
     if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(seat);
-    game.addLocal({ biome: 'kowloon', group: seat,
+    hkSitRec = game.addLocal({ biome: 'kowloon', group: seat,
       near: 5.5, face: -1.6, cool: 16,
       lines: ['I have been at this table since the six o\u2019clock news.',
               'The stool is too low and I am too old and I come here anyway.',
-              'They put the lights on at eight. From here you see the glow, not the show.',
-              'Do not tell him the tea has gone cold. He will start again.'],
+              { t: 'They put the lights on at eight. From here you see the glow, not the show.',
+                when: hkBefore },
+              { t: 'Off you go, then. Somebody ought to see it properly.', when: hkSoon },
+              { t: 'That orange on the wall opposite. That is all of it I get, and it does.',
+                when: hkDuring },
+              'Do not tell him the tea has gone cold. He will start again.',
+              { t: 'You were on a roof for it, were you. Good. Somebody should be.',
+                after: 'symphony' }],
       wheek: ['Sit down. Something will arrive.',
-              'That is about how the extractor sounds, to be fair.'] });
+              'That is about how the extractor sounds, to be fair.'],
+      praise: ['I saw that from here. I see everything from here.',
+               'Forty years at this table and that is new.'] });
+
+    // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
+    // Twelve people on one street and every word of it was addressed to the
+    // capybara, so unless the player walked up and stood there, Mong Kok was
+    // silent \u2014 in the chapter whose whole argument is that this is the loudest
+    // hundred metres in the world. Each pair can actually see each other and
+    // every scrap is about the thing they are both near.
+    //
+    // WHO CAN ACTUALLY SEE WHOM. npcEX_MAX is the distance from the PLAYER to
+    // the nearer speaker, not the distance between the two \u2014 so nothing stops a
+    // chapter pairing two people sixty metres apart, and the result is two
+    // bubbles the player can never have both of on screen. Measured off the
+    // authored positions: baker to laundry 8.7 m, neon to conductor 12.5 m, the
+    // two at the dai pai dong 5 m, and the scaffold's foot to the neon shop 21 m
+    // across the road, which is exactly the distance people shout over.
+    if (typeof game.addExchange === 'function') {
+      if (hkBakerRec && hkLaundryRec) {
+        game.addExchange({ biome: 'kowloon', a: hkBakerRec, b: hkLaundryRec, lines: [
+          ['Two trays left and it is quarter to.', 'Then stop shouting and sell them.'],
+          ['Your washing drips on my window.', 'Your window steams up my washing.'],
+          ['Something went past. Low. Brown. Fast.', 'It was on my poles. I watched it from the kitchen.'],
+          ['Forty years I have been out here at this time.', 'Forty-one. And I was here first.'],
+        ] });
+      }
+      if (hkNeonRec && hkBusRec) {
+        game.addExchange({ biome: 'kowloon', a: hkNeonRec, b: hkBusRec, lines: [
+          ['Your top deck clips my sign every night.', 'Then your sign is in my road.'],
+          ['Nine years the council has said take it down.', 'Nine years I have ducked under it.'],
+          ['Eight o\u2019clock. Watch them all stop walking.', 'Watch them all stop walking in front of my BUS.'],
+          ['Argon is the blue, you know.', 'I know. You tell me. Every night.'],
+        ] });
+      }
+      if (hkCookRec && hkSitRec) {
+        game.addExchange({ biome: 'kowloon', a: hkSitRec, b: hkCookRec, lines: [
+          ['This tea is cold.', 'That tea has been cold since the six o\u2019clock news.'],
+          ['Turn the gas down, it is nearly eight.', 'I know what time it is. I have a wok, not a watch.'],
+          ['There is a rodent under table four.', 'There is a rodent under every table in Mong Kok.'],
+          ['Beef and ho fun.', 'I heard you the first time. In 1994.'],
+        ] });
+      }
+      if (hkRiggerRec && hkNeonRec) {
+        game.addExchange({ biome: 'kowloon', a: hkRiggerRec, b: hkNeonRec, lines: [
+          ['If that sign comes down it comes down on my scaffold.', 'If your scaffold goes up any further it takes my sign.'],
+          ['Nylon. No bolts. Twenty storeys.', 'Glass. No bolts. Half a tonne. We are both mad.'],
+          ['Somebody is on your sign.', 'Somebody is on my SIGN?'],
+        ] });
+      }
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(hkRoot);
 }
+
+// ================================================================ THE DRIP ==
+/**
+ * WHAT THE AIR-CONDITIONERS ARE FOR.
+ *
+ * Ninety split units on the two elevations of this street, every one of them a
+ * dry grey box. The thing everybody who has walked down Fa Yuen Street after
+ * dark remembers is not the neon, it is that the WHOLE STREET DRIPS ON YOU —
+ * four hundred condensate trays with nowhere to go, and you learn within a
+ * minute which two metres of pavement to walk on.
+ *
+ * Thirty-two of them, chosen at build from the units that are low enough for
+ * the drop to read against the shopfront light. Each has its own clock: a drop
+ * appears at the tray, falls, and when it lands it leaves a ring on the wet
+ * road and — if the player is near — makes the one sound in this chapter that
+ * is smaller than a footstep.
+ *
+ * It is a joke and it is also the best thing this chapter can do with the
+ * vertical band between the awnings and the laundry poles, which was empty.
+ * Two instanced meshes, sixty-four instances between them, no bodies.
+ *
+ * THE SOUND IS THROTTLED ACROSS ALL THIRTY-TWO. Thirty-two independent Poisson
+ * clocks near a listener is a drum roll; one voice, at most twice a second,
+ * from whichever drop actually landed nearest, is a street with water coming
+ * off it.
+ */
+const hkDRIP_N = 32;
+const hkDRIP_AT = [];              // x, y, z per emitter — filled in hkBuildStreet
+let hkDripMesh = null, hkDripRing = null, hkDripRingMat = null;
+// t (negative = waiting), fall speed, ring age
+const hkDripData = new Float32Array(hkDRIP_N * 3);
+let hkDripVoice = 0;
+
+function hkBuildDrip(root) {
+  const n = hkDRIP_AT.length / 3 | 0;
+  if (!n) return;
+  const M = hkMerger();
+  // A DROP IS NOT A SPHERE AT THIS SCALE. Two centimetres across from nine
+  // metres away is one pixel, and one pixel of grey is nothing — so it is a
+  // short bright streak, which is what a falling drop lit from the side
+  // actually looks like and is also the only way it is visible at all.
+  M.box(0, 0, 0, 0.035, 0.26, 0.035, PALETTE.hkNeonWhite);
+  hkDripMesh = new THREE.InstancedMesh(M.build(),
+    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55 }), n);
+  hkDripMesh.frustumCulled = false;
+  hkDripMesh.name = 'hkDrip';
+  root.add(hkDripMesh);
+
+  // and the ring it leaves on the wet road, flat, unlit, additive-ish
+  const R = hkMerger();
+  R.cyl(0, 0, 0, 0.5, 0.01, PALETTE.hkNeonWhite, 0, 0, 0, 8);
+  hkDripRingMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true,
+                                                opacity: 0.0, depthWrite: false });
+  hkDripRing = new THREE.InstancedMesh(R.build(), hkDripRingMat, n);
+  hkDripRing.frustumCulled = false;
+  hkDripRing.renderOrder = 4;
+  hkDripRing.name = 'hkDripRing';
+  root.add(hkDripRing);
+
+  for (let i = 0; i < n; i++) {
+    // stagger them, or the whole street drips in unison on the first frame
+    hkDripData[i * 3] = -(0.4 + Math.random() * 5.5);
+    hkDripData[i * 3 + 1] = 0;
+    hkDripData[i * 3 + 2] = 99;
+  }
+}
+
+function hkUpdateDrip(game, dt) {
+  if (!hkDripMesh) return;
+  const n = hkDRIP_AT.length / 3 | 0;
+  const cp = game.capy && game.capy.position;
+  hkDripVoice -= dt;
+  let bestD = 1e9, bestX = 0, bestZ = 0, landed = false;
+
+  for (let i = 0; i < n; i++) {
+    const o = i * 3;
+    const ex = hkDRIP_AT[o], ey = hkDRIP_AT[o + 1], ez = hkDRIP_AT[o + 2];
+    let t = hkDripData[o];
+    let ring = hkDripData[o + 2];
+
+    if (t < 0) {
+      t += dt;
+      if (t >= 0) t = 1e-4;                 // it has just let go
+      hkDripMesh.setMatrixAt(i, hkXform(0, -900, 0, 0, 0, 0, 0.0001, 0.0001, 0.0001));
+    } else {
+      t += dt;
+      // free fall from the tray. hkTerrain is the pavement, and the pavement
+      // under a façade is flat, so the landing height is one lookup.
+      const fall = 0.5 * 9.8 * t * t;
+      const y = ey - fall;
+      const gy = hkTerrain(ex, ez);
+      if (y <= gy + 0.02) {
+        // it landed. Next one in a few seconds, and a ring.
+        t = -(1.6 + Math.random() * 5.0);
+        ring = 0;
+        landed = true;
+        if (cp) {
+          const d = Math.hypot(cp.x - ex, cp.z - ez);
+          if (d < bestD) { bestD = d; bestX = ex; bestZ = ez; }
+        }
+        hkDripMesh.setMatrixAt(i, hkXform(0, -900, 0, 0, 0, 0, 0.0001, 0.0001, 0.0001));
+      } else {
+        // the streak stretches as it speeds up, which is the whole readability
+        const st = clamp(1 + t * 3.4, 1, 3.4);
+        hkDripMesh.setMatrixAt(i, hkXform(ex, y, ez, 0, 0, 0, 1, st, 1));
+      }
+    }
+    hkDripData[o] = t;
+
+    // ---- the ring -------------------------------------------------------
+    if (ring < 0.9) {
+      ring += dt * 1.9;
+      const k = clamp(ring, 0, 1);
+      const s = 0.18 + k * 0.62;
+      hkDripRing.setMatrixAt(i, hkXform(ex, hkTerrain(ex, ez) + 0.012, ez, 0, 0, 0, s, 1, s));
+    } else if (ring < 99) {
+      ring = 99;
+      hkDripRing.setMatrixAt(i, hkXform(0, -900, 0, 0, 0, 0, 0.0001, 0.0001, 0.0001));
+    }
+    hkDripData[o + 2] = ring;
+  }
+  hkDripMesh.instanceMatrix.needsUpdate = true;
+  hkDripRing.instanceMatrix.needsUpdate = true;
+  // the rings fade as one, which is close enough and is one uniform write
+  if (hkDripRingMat) hkDripRingMat.opacity = 0.22;
+
+  // ---- ONE VOICE FOR THE WHOLE STREET ------------------------------------
+  if (landed && hkDripVoice <= 0 && bestD < 18) {
+    hkDripVoice = 0.42;
+    hkSfx('drip', { volume: clamp(0.30 - bestD * 0.014, 0.03, 0.30),
+                    pitch: 0.85 + Math.random() * 0.5,
+                    at: { x: bestX, y: 0.2, z: bestZ } });
+    // ---- AND IT LANDS ON YOU, WHICH IS THE JOKE --------------------------
+    // Within about half a metre of the animal it is not a sound in the street,
+    // it is a thing that has happened to it: the coat goes a shade darker for
+    // a moment. capy.wet has existed since Sydney and this is the cheapest
+    // possible honest use of it — no damage, no state, no task, just the
+    // universal experience of walking under a Hong Kong air-conditioner.
+    if (bestD < 0.9 && game.capy) {
+      const c = game.capy;
+      if (typeof c.wet === 'number') c.wet = Math.max(c.wet, 0.22);
+      if (!hkDripToldOnce) {
+        hkDripToldOnce = true;
+        hkToast('that is an air-conditioner, and there are ninety of them.');
+      }
+    }
+  }
+}
+let hkDripToldOnce = false;

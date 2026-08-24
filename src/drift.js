@@ -269,6 +269,18 @@ let driPuffReady = true, driPuffT = 0, driAirT = 0;
 let driWasGrounded = true;
 let driFlightX = 0, driFlightZ = 0, driFlightOn = false, driFlightBest = 0;
 let driInCloud = 0;                  // s continuously in the cloud
+// ---- AND THE CLOUD ANSWERS THE WHEEK ------------------------------------
+// The wheek does four things in this chapter — it wakes a lampfly, it flushes
+// the roost, it holds you up in mid-air, and two people at the far end answer
+// it — and the fifth place a player uses it constantly is the one place it did
+// nothing at all: sitting in the cloud at the bottom of the world, having just
+// fallen off something, waiting for the bloom. That is a low moment by
+// construction (it is the chapter's own apology for the drop) and it is
+// exactly where a world should say something back. A ring runs out across the
+// whole sheet, which is four multiplies a vertex on a mesh that is already
+// being rewritten every other frame.
+let driWhoopT = -1, driWhoopX = 0, driWhoopZ = 0, driWhoopSaid = false;
+const driWHOOP_LIFE = 4.2;
 let driBloomOn = false, driBloomT = 0, driBloomX = 0, driBloomZ = 0;
 let driBloomMesh = null;
 const driBloomData = new Float32Array(driBLOOM_N * 4);   // ang, radius, yOff, scale
@@ -487,6 +499,53 @@ function driStaticBox(game, x, y, z, sx, sy, sz, ry) {
   driSyncBody(b);
   game.world.addBody(b);
   return b;
+}
+/**
+ * ONE BODY PER ROW OF THINGS — AND THIS CHAPTER WAS FIFTY PER CENT OVER.
+ *
+ * MEASURED, by walking `world.bodies` with the biome live: 197 static bodies
+ * against CONTRACT.md's hard limit of 130, and every one of them carrying
+ * exactly one Box because `driStaticBox` spends a whole `CANNON.Body` per call.
+ * It is not one big thing: SEVENTY-FIVE of them are the field walls, one body
+ * per stone, on nine islands. The rest are the twenty-nine island decks, the
+ * column monoliths, the two camps and the keepers' furniture.
+ *
+ * Rio, Iceland and Marrakech all took this fix during their own passes
+ * (`rioStaticGroup`, `iceStaticGroup`, `sahStaticGroup`) and the Drift is the
+ * one chapter that never got the helper, which is exactly why it is the one
+ * chapter over the budget. A CANNON.Body takes any number of shapes with
+ * offsets and a compound body is ONE broadphase entry.
+ *
+ * IT IS DELIBERATELY GROUPED PER ISLAND, not per file. A compound body's AABB
+ * is the union of its shapes, so one body holding all seventy-five wall stones
+ * would have an AABB spanning four hundred metres of sky and would be tested
+ * against everything, every step, for ever — which is the trap noted against
+ * `qa/audit-solid.js` in the Rio/Iceland pass. Grouped per island the AABBs
+ * stay the size of an island, which is what the broadphase wants.
+ *
+ * Returns a collector: `.add(x, y, z, sx, sy, sz, ry)` in FULL extents, then
+ * `.done()`.
+ */
+function driStaticGroup(game) {
+  const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+  const q = new CANNON.Quaternion();
+  const G = {
+    n: 0,
+    add(x, y, z, sx, sy, sz, ry) {
+      const s = new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5));
+      if (ry) { q.setFromEuler(0, ry, 0); b.addShape(s, new CANNON.Vec3(x, y, z), q.clone()); }
+      else b.addShape(s, new CANNON.Vec3(x, y, z));
+      G.n++;
+      return G;
+    },
+    done() {
+      if (!G.n) return null;
+      driSyncBody(b);
+      game.world.addBody(b);
+      return b;
+    },
+  };
+  return G;
 }
 
 // ================================================================ GEOGRAPHY ==
@@ -1815,7 +1874,8 @@ function driBuildShelf(game, root) {
   // the capybara's 40 cm step and too small to read as architecture, which is
   // the size of thing that looks like a bug when you walk through it. It is
   // also three metres from where the chapter begins.
-  driStaticBox(game, 13, SY + 0.45, 30, 1.0, 0.9, 2.8, 0.5);
+  const driShelfGrp = driStaticGroup(game);        // the Shelf's own furniture, one body
+  driShelfGrp.add(13, SY + 0.45, 30, 1.0, 0.9, 2.8, 0.5);
   M.box(13, 0.5, 30, 0.7, 0.16, 2.6, PALETTE.driTimber, 0, 0.5, 0);
   M.box(13.5, 0.9, 30, 0.14, 0.7, 2.6, PALETTE.driTimber, 0, 0.5, 0);
   M.box(13, 0.25, 29, 0.6, 0.5, 0.16, PALETTE.driTimber, 0, 0.5, 0);
@@ -1928,12 +1988,13 @@ function driBuildShelf(game, root) {
   g0.add(vg);
   // The vane's own post, which is a 22 cm timber standing three metres up on
   // the island the chapter opens on and had no collider on it at all.
-  driStaticBox(game, 11, SY + 2.0, 31, 0.40, 4.0, 0.40, 0);
+  driShelfGrp.add(11, SY + 2.0, 31, 0.40, 4.0, 0.40, 0);
 
   // The jetty is the only walkable thing in the biome that is not an island, so
   // it is the only collider that does not come out of driISLES. Deep enough
   // (1.2 m) that a capybara arriving at terminal velocity cannot tunnel it.
-  driStaticBox(game, 22, SY - 0.6, 34, 17, 1.2, 3.4, 0);   // x 13.5 .. 30.5, matching the planks
+  driShelfGrp.add(22, SY - 0.6, 34, 17, 1.2, 3.4, 0);       // x 13.5 .. 30.5, matching the planks
+  driShelfGrp.done();
 }
 
 /**
@@ -2356,6 +2417,8 @@ function driBuildColumnMarks(game, root) {
   const spiral = [];
   for (let i = 0; i < driCOLS.length; i++) {
     const c = driCOLS[i];
+    // one body per column's ring of monoliths — see driStaticGroup
+    const RG = driStaticGroup(game);
     const ring = 9 + i;
     for (let k = 0; k < ring; k++) {
       const a = k / ring * 6.28318 + i * 0.7;
@@ -2370,8 +2433,9 @@ function driBuildColumnMarks(game, root) {
             0.05 * Math.sin(a), a, 0.04 * Math.cos(a));
       M.oct(x, driCLOUD_Y + h + 0.3, z, 0.5, PALETTE.driStone, a * 0.3, a, 0.1);
       driAddBeacon(x, driCLOUD_Y + h + 0.75, z);
-      driStaticBox(game, x, driCLOUD_Y + h * 0.5, z, 1.3, h, 1.1, a);
+      RG.add(x, driCLOUD_Y + h * 0.5, z, 1.3, h, 1.1, a);
     }
+    RG.done();
     // the spiral. Two and a half turns from the ring to the top, thinning all
     // the way, so the shaft has a HEIGHT you can read off the sky.
     const turns = 2.5, nStone = 40;
@@ -2424,6 +2488,13 @@ function driBuildWalls(game, root) {
   for (let i = 0; i < driISLES.length; i++) {
     const s = driISLES[i];
     if (WALLED.indexOf(s.id) < 0) continue;
+    // ONE BODY PER ISLAND. Seventy-five wall stones were seventy-five separate
+    // CANNON bodies — more than half of a chapter that was measured at 197
+    // against a hard limit of 130. See driStaticGroup, and note that the group
+    // is per island and never per file: a compound body's AABB is the union of
+    // its shapes, and one holding the whole archipelago's walls would be tested
+    // against everything, every step.
+    const WG = driStaticGroup(game);
     // one wall, running across the short axis, offset off centre so it never
     // reads as an axis of symmetry
     const off = ((i % 3) - 1) * s.hx * 0.42;
@@ -2452,7 +2523,7 @@ function driBuildWalls(game, root) {
       }
       if (k % 2 === 0) M.oct(wx, s.y + 1.02, wz, 0.30, PALETTE.driStone, k * 0.3, k * 0.7, 0.1);
       // A wall a metre high is a thing you walk into.
-      driStaticBox(game, wx, s.y + 0.45, wz, 0.8, 0.90, 1.1, s.yaw);
+      WG.add(wx, s.y + 0.45, wz, 0.8, 0.90, 1.1, s.yaw);
     }
     // and the gate: two posts and a rail that has slipped
     {
@@ -2464,6 +2535,7 @@ function driBuildWalls(game, root) {
       }
       const wx3 = s.x + off * s.cos - t * s.sin, wz3 = s.z + off * s.sin + t * s.cos;
       M.box(wx3, s.y + 0.44, wz3, 0.09, 0.09, 2.1, PALETTE.driTimber, 0.22, s.yaw, 0);
+      WG.done();
     }
   }
   const mesh = new THREE.Mesh(M.build(), driVC());
@@ -2498,6 +2570,21 @@ function driBuildWalls(game, root) {
  * Their kit is built here and merged into ONE mesh with one draw call. A voice
  * with nothing round it is a ghost story: see npc.js, THE LOCALS.
  */
+// ---- AND THEY KNOW HOW FAR YOU HAVE GOT (v21) -----------------------------
+// Six people strung out along a route, each of them alone on an island, each
+// of them saying the same four sentences from the first minute of the chapter
+// to the last. In a place with nobody else in it that is a much bigger loss
+// than it is in a city: the ONLY thing that can tell a solitary player they
+// are getting somewhere is the next solitary person, and every one of them was
+// outside time.
+//
+// See localResolve in npc.js — `before`/`after` a task id, `when` for anything
+// else, `onTask` for the moment it happens. Deliberately NO addExchange here,
+// unlike chapters 5 through 8: the design of this chapter is one voice per
+// island and forty metres of sky between them, and two people talking would
+// mean two people standing together, which is the one thing the Drift has
+// spent nine tasks not having.
+const driLitNow = function () { return !!(driGame && driGame.drift && driGame.drift.lit() > 0.4); };
 const driTRAVELLERS = [
   // 1 — THE JETTY. The end of a broken pier over four hundred metres of
   // nothing, and somebody sitting on it with a line paid out into the cloud.
@@ -2507,9 +2594,24 @@ const driTRAVELLERS = [
     lines: ['There is nothing down there. I have been at it eleven years.',
             'It is not about the fish. There are no fish. It is about the sitting.',
             'Lamp is my grandfather’s. It has not gone out. Nobody knows why.',
-            'Wind is coming round. You will feel it before you see it.'],
+            'Wind is coming round. You will feel it before you see it.',
+            { t: 'Go on. Off the end. It is the only way anybody finds out.',
+              before: 'cloud-dive' },
+            { t: 'You went off my jetty. Eleven years and nobody has done that.',
+              after: 'cloud-dive' },
+            { t: 'It gave you back. It always gives you back. I did check.',
+              after: 'handed-back' },
+            { t: 'There is a lit thing at the top now. I can see it from here.',
+              when: driLitNow }],
     wheek: ['Do you mind. I am concentrating on nothing.',
-            'That is the first noise anybody has made out here since spring.'] },
+            'That is the first noise anybody has made out here since spring.',
+            { t: 'You have got a lot louder since the top of the world lit up.',
+              when: driLitNow }],
+    onTask: { 'cloud-dive': ['THAT is the way to find out.',
+                             'Eleven years I have looked at that. Never once got in it.'],
+              'handed-back': ['I told you. Nothing up here falls all the way.'],
+              'puff-up': ['Do that at the top of a jump and see what happens.'] },
+    praise: ['Mm. Do it quietly, the fish are — there are no fish.'] },
   // 2 — THE STAIRS. A surveyor with a board, counting the islands, and the
   // count keeps changing because two of them move.
   { id: 'survey', x: -1.5, y: 38.6, z: -36.5, face: 1.1, near: 8,
@@ -2518,9 +2620,25 @@ const driTRAVELLERS = [
     lines: ['Thirty-one. No. Thirty-three. Two of them will not hold still.',
             'I am making a map. The map is wrong by the time I have drawn it.',
             'If you find the edge of it, come back and tell me where.',
-            'Go up. Everything up here goes up.'],
+            'Go up. Everything up here goes up.',
+            { t: 'Two of them wander. Stand on one and it will take you somewhere.',
+              before: 'wander-isle' },
+            { t: 'You rode one. Which one? WHICH ONE? I need to know which one.',
+              after: 'wander-isle' },
+            { t: 'The column at the far end of the Anvil. That is the lift. Take it.',
+              before: 'updraft' },
+            { t: 'You went up the column. Add a hundred metres to my map.',
+              after: 'updraft' },
+            { t: 'I have got as far as the gap. Nobody has ever surveyed past the gap.',
+              before: 'long-gap' },
+            { t: 'You crossed the gap. I am putting a line on the map. A dotted line.',
+              after: 'long-gap' }],
     wheek: ['Right. Yes. I shall put that down as one.',
-            'Do that again by the far one and I can measure how long it takes.'] },
+            'Do that again by the far one and I can measure how long it takes.'],
+    onTask: { 'wander-isle': ['THAT ONE. It is that one. It has always been that one.'],
+              'long-gap': ['Twenty-three metres. I measured it. TWENTY-THREE.'],
+              'lantern': ['Well, now I have to redraw the whole thing.'] },
+    praise: ['I shall not be recording that.'] },
   // 3 — THE ANVIL. The hoist has a rope paid out into the cloud and somebody at
   // the other end of it, still hauling.
   { id: 'winch', x: -35.2, y: 41.5, z: -49.6, face: 0.6, near: 8,
@@ -2528,10 +2646,22 @@ const driTRAVELLERS = [
     figure: { shirt: PALETTE.driLamp, legs: PALETTE.driSoil },
     lines: ['Something is on the end of this. Has been for a while.',
             'Do not lean on the frame. The frame is the newest thing here.',
-            'Up the column when it comes. It will not ask twice.',
-            'I have hauled eleven metres this year. I am ahead of schedule.'],
+            { t: 'Up the column when it comes. It will not ask twice.', before: 'updraft' },
+            { t: 'You took the column. Everybody takes the column eventually.',
+              after: 'updraft' },
+            'I have hauled eleven metres this year. I am ahead of schedule.',
+            { t: 'If you are going to fall, fall on purpose. It is nicer.',
+              before: 'cloud-dive' },
+            { t: 'Shout in the air. Halfway up, not at the top. Halfway.',
+              before: 'puff-up' },
+            { t: 'You have worked out the shout, then. That is the chapter, that.',
+              after: 'puff-up' }],
     wheek: ['Every time. Every single time somebody does that.',
-            'Save it. You will want it for the pale ones up the top.'] },
+            'Save it. You will want it for the pale ones up the top.'],
+    onTask: { 'updraft': ['Straight up. On a noise and a lot of nerve.'],
+              'puff-up': ['THERE it is. Did you feel it hold you?'],
+              'driftseed': ['A seed. You crossed on a SEED. I have a rope and I am here.'] },
+    praise: ['I am not stopping hauling for that.'] },
   // 4 — THE SHOALS. Asleep, in a blanket, under a stone. Wakes if you wheek.
   { id: 'sleeper', x: -54.5, y: 76, z: -83, face: 2.7, near: 8,
     kit: 'camp',
@@ -2539,18 +2669,43 @@ const driTRAVELLERS = [
     lines: ['Mm. Is it turned yet.',
             'Wake me when it goes southerly. Not before.',
             'Thirty-eight seconds. It is always thirty-eight seconds.',
-            'You are the first thing to come up that column in a month.'],
+            'You are the first thing to come up that column in a month.',
+            { t: 'There are lights in the orchard. Go and be introduced.',
+              before: 'lampfly' },
+            { t: 'You have been at the lampflies. You smell of paper.',
+              after: 'lampfly' },
+            { t: 'Somebody has lit the top of the world. Marvellous. Now go away.',
+              when: driLitNow }],
     wheek: ['I am AWAKE. I have been awake since you were on the stairs.',
-            'Yes. Yes. Very good. Go and do it at the gateway, they love it.'] },
+            'Yes. Yes. Very good. Go and do it at the gateway, they love it.'],
+    onTask: { 'lampfly': ['They only come for people who ask nicely. You shouted.'],
+              'lantern': ['Fine. FINE. I am up.'],
+              'long-gap': ['From here that looked like a mistake that worked.'] },
+    praise: ['Mm. Congratulations. Good night.'] },
   // 5 — THE ARCH. She reads the wind, and this is the one line in the chapter
-  // that says what the chapter is. driUpdateTravellers rewrites it every few
-  // seconds off the real driWindAng.
+  // that says what the chapter is. driUpdateTravellers rewrites the FIRST FOUR
+  // of these every 1.4 s off the real driWindAng — so nothing conditional may
+  // be put in those four slots, and everything conditional goes after them.
   { id: 'reader', x: 6.5, y: 84, z: -99.5, face: -0.7, near: 9,
     kit: 'vane',
     figure: { shirt: PALETTE.driBlossom, legs: PALETTE.driRockDark, hat: PALETTE.driPaper },
-    lines: ['Wait for it.', 'Wait for it.', 'Wait for it.', 'Wait for it.'],
+    lines: ['Wait for it.', 'Wait for it.', 'Wait for it.', 'Wait for it.',
+            { t: 'Watch the vane go all the way round once. Then you will know.',
+              before: 'weathervane' },
+            { t: 'You watched it round. Now you are reading it instead of guessing.',
+              after: 'weathervane' },
+            { t: 'Twenty-three metres and twelve down. Wait for the turn and it is nothing.',
+              before: 'long-gap' },
+            { t: 'You went on the turn. That is the only way it has ever been done.',
+              after: 'long-gap' },
+            { t: 'There is a slower way. The seed-heads go over on the same breath.',
+              before: 'driftseed' }],
     wheek: ['Shh. Listen to it instead.',
-            'The birds do that when it turns as well. They are better at it.'] },
+            'The birds do that when it turns as well. They are better at it.'],
+    onTask: { 'long-gap': ['ON THE TURN. Did everybody see that? There is nobody. I saw it.'],
+              'weathervane': ['Round it goes. Thirty-eight seconds, over and back.'],
+              'driftseed': ['You let a SEED do the waiting for you. That is cheating and it is lovely.'] },
+    praise: ['The wind does not care. I noticed, though.'] },
   // 6 — THE FAR SIDE. Somebody who has just made the crossing, sitting down
   // very suddenly, absolutely delighted about it.
   { id: 'crosser', x: 39.5, y: 72, z: -133, face: 2.9, near: 8,
@@ -2559,9 +2714,20 @@ const driTRAVELLERS = [
     lines: ['I made it. I want you to know that I made it.',
             'Twelve metres down. That is the trick. You fall the difference.',
             'Do not go back. There is nothing back there but the way you came.',
-            'One more island and it is the lantern and then I am going to sit down.'],
+            { t: 'One more island and it is the lantern and then I am going to sit down.',
+              before: 'lantern' },
+            { t: 'It is lit. Somebody lit it. I am not moving for a week.',
+              after: 'lantern' },
+            { t: 'You came the same way I did. Nobody believes me about the drop.',
+              after: 'long-gap' },
+            { t: 'There is a column past the Crown that puts you straight back. Straight back.',
+              after: 'updraft' }],
     wheek: ['HA. Yes. That is exactly the noise I made.',
-            'Careful, you will have the whole gateway up.'] },
+            'Careful, you will have the whole gateway up.'],
+    onTask: { 'lantern': ['THE WHOLE SKY. Look at it. LOOK at it.'],
+              'long-gap': ['I KNOW. I know. Sit down. Sit down here a minute.'],
+              'handed-back': ['It does that. It is the kindest thing up here.'] },
+    praise: ['Everything is astonishing today. Including that.'] },
 ];
 
 /**
@@ -2778,6 +2944,8 @@ function driBuildFarDressing(game, root) {
   // out, past everything, and are silhouettes: a static body apiece would be
   // pure broadphase.
   function dress(x, z, y, hx, hz, yaw, kind, seed, solid) {
+    // one body per island, never one for the whole rank: see driStaticGroup
+    const DG = solid ? driStaticGroup(game) : null;
     const c = driIsleColours(kind);
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     const dark = kind === 'bare';
@@ -2796,7 +2964,7 @@ function driBuildFarDressing(game, root) {
         M.box(wx, y + h * 0.5, wz, 0.9 + (k % 3) * 0.3, h, 0.7 + (k % 2) * 0.3,
               k % 2 ? c[2] : c[3], 0.04 * (k - 2), a, 0.03 * ((k % 2) ? 1 : -1));
         M.oct(wx, y + h + 0.25, wz, 0.45, PALETTE.driStone, a * 0.3, a, 0.1);
-        if (solid) driStaticBox(game, wx, y + h * 0.5, wz, 1.2, h, 1.0, a);
+        if (DG) DG.add(wx, y + h * 0.5, wz, 1.2, h, 1.0, a);
       } else {
         // and the wood: a trunk, a shoulder and a crown, at four heights, so
         // the top edge of the island is a line that goes up and down
@@ -2827,6 +2995,7 @@ function driBuildFarDressing(game, root) {
     // the emitter and the warmer of the two lamp colours.
     E.cyl(lx, y + 3.45, lz, 0.15, 0.22, PALETTE.driLamp, 0, 0, 0, 6);
     driFARLAMP.push(lx, y + 3.45, lz);
+    if (DG) DG.done();
   }
   for (let i = 0; i < driISLES.length; i++) {
     const s = driISLES[i];
@@ -3030,21 +3199,28 @@ function driBuildArch(game, root) {
   // so twenty-five centimetres of stone stuck out all the way round at exactly
   // the height the capybara is, on the island the hardest jump in the game
   // starts from. Two bodies per leg: the plinth and the shaft.
+  const RG2 = driStaticGroup(game);         // the gateway, one body
   for (let side = -1; side <= 1; side += 2) {
-    driStaticBox(game, AXf(side * LEG, 0), AY + SPRING * 0.5 + 0.3, AZf(side * LEG, 0),
-                 1.1, SPRING, 1.5, yaw);
-    driStaticBox(game, AXf(side * LEG, 0), AY + 0.28, AZf(side * LEG, 0),
-                 1.6, 0.56, 2.0, yaw);
+    RG2.add(AXf(side * LEG, 0), AY + SPRING * 0.5 + 0.3, AZf(side * LEG, 0),
+            1.1, SPRING, 1.5, yaw);
+    RG2.add(AXf(side * LEG, 0), AY + 0.28, AZf(side * LEG, 0),
+            1.6, 0.56, 2.0, yaw);
   }
+  RG2.add(11, AY + 1.7, -110, 0.8, 3.4, 0.8, 0.55);
+  RG2.done();
   // AND SO ARE THE TWO POSTS ON THE LIPS. Seventy centimetres across and three
   // and a half metres tall, standing on the two square metres of ground the
   // player spends the longest looking at in this chapter — deciding whether the
   // wind will let them go. That is exactly the size of thing (too tall to step
   // over at 40 cm, too small to read as architecture) that looks like a bug the
   // moment you walk through it. Sydney's bollards, again.
-  driStaticBox(game, 11, AY + 1.7, -110, 0.8, 3.4, 0.8, 0.55);
-  driStaticBox(game, 34, 73.7, -130, 0.8, 3.4, 0.8, 0.55);
-  driStaticBox(game, 38, 72.6, -130.5, 0.4, 2.4, 0.4, 0);
+  // the far lip's post and the little one beside it: their own body, because
+  // the far side of the Long Gap is forty-five metres from the near side and a
+  // compound AABB spanning the gap would be tested against everything in it.
+  const FG = driStaticGroup(game);
+  FG.add(34, 73.7, -130, 0.8, 3.4, 0.8, 0.55);
+  FG.add(38, 72.6, -130.5, 0.4, 2.4, 0.4, 0);
+  FG.done();
 }
 
 // ================================================== WHO USED TO LIVE HERE ===
@@ -3170,22 +3346,88 @@ function driBuildKeepers(game, root) {
     driStaticBox(game, cx, s2.y + 0.9, cz, 1.1, 1.8, 1.1, 0);
   }
 
+  // ---- AND THE FIRST FIVE MINUTES HAD NOTHING IN THEM ---------------------
+  //
+  // The Stairs are the chapter's opening: four leaps, nine metres then twelve
+  // then fourteen then fifteen, and they are where a player learns that the
+  // ground here is a series of decisions. Each of those islands is 12 x 10 m of
+  // grass carrying THREE trees (driBuildFlora's green density is 0.058 and the
+  // clamp floor is 3) and one cairn. Rendered, the first five minutes of the
+  // Drift is a lawn with some poles on it, and it is the emptiest ground in the
+  // chapter at exactly the moment the chapter is making its first impression.
+  //
+  // The fix is not more scenery, it is the same fix the Crown's flagged
+  // approach got: mark the ROUTE. Everybody who has ever crossed these gaps
+  // took off from the same square metre and landed on the same one, so both are
+  // worn to bare rock, and somebody has driven a marker at each with a rag on
+  // it. It reads as a used path from thirty metres, it is four hundred
+  // triangles, and it does a second job that is worth more than the first:
+  // THE PLAYER CAN NOW SEE WHERE TO JUMP FROM. Standing on the wrong corner of
+  // stepB is the difference between clearing fourteen metres and not.
+  {
+    const legs = [[driISLES[0], driISLES[1]], [driISLES[1], driISLES[2]],
+                  [driISLES[2], driISLES[3]], [driISLES[3], driISLES[4]]];
+    for (let L = 0; L < legs.length; L++) {
+      const a = legs[L][0], b = legs[L][1];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const d = Math.max(0.001, Math.hypot(dx, dz));
+      const ux = dx / d, uz = dz / d;
+      // the lip of each island on the line between them, pulled 1.4 m inboard
+      // so the mark is on the deck rather than hanging over the torn edge
+      const reach = function (s2, sign) {
+        const r = Math.min(s2.hx, s2.hz) - 1.4;
+        return [s2.x + ux * r * sign, s2.z + uz * r * sign, s2.y];
+      };
+      const ends = [reach(a, 1), reach(b, -1)];
+      for (let e = 0; e < 2; e++) {
+        const px = ends[e][0], pz = ends[e][1], py = ends[e][2];
+        // the worn patch: three flat overlapping plates, so it has no rim
+        for (let k = 0; k < 3; k++) {
+          const ka = L * 1.9 + k * 2.1;
+          M.cyl(px + Math.cos(ka) * 0.35, py + 0.012 + k * 0.004, pz + Math.sin(ka) * 0.35,
+                1.05 - k * 0.22, 0.03,
+                k === 1 ? PALETTE.driRockPale : PALETTE.driRock, 0, ka, 0, 8);
+        }
+        // the marker: a leaning post with a rag, and a hand-sized stack beside
+        // it. Set OFF the line, so it frames the jump rather than standing in
+        // the middle of the run-up.
+        const ox = -uz * 1.5, oz = ux * 1.5;
+        M.cyl(px + ox, py + 0.78, pz + oz, 0.065, 1.56, PALETTE.driTimber,
+              ux * 0.10, 0, uz * 0.10, 6);
+        M.box(px + ox + ux * 0.22, py + 1.34, pz + oz + uz * 0.22, 0.42, 0.30, 0.03,
+              L % 2 ? PALETTE.driRibbonA : PALETTE.driRibbonC,
+              0.12, Math.atan2(ux, uz), 0.2);
+        for (let k = 0; k < 3; k++) {
+          M.oct(px - ox * 0.8 + Math.sin(k * 2.3) * 0.14, py + 0.10 + k * 0.16,
+                pz - oz * 0.8 + Math.cos(k * 1.9) * 0.14, 0.20 - k * 0.04,
+                k % 2 ? PALETTE.driStone : PALETTE.driRockPale, k, k * 1.4, 0);
+        }
+        // and a warm point on the take-off side only, so the line the beacons
+        // draw when the lantern catches runs UP the stairs rather than round
+        // both sides of every gap
+        if (e === 0) driAddBeacon(px + ox, py + 1.62, pz + oz);
+      }
+    }
+  }
+
   // ---- THE ANVIL: it is called the Anvil ---------------------------------
   // A bare stone island with the first column beside it and, until now, six
   // pebbles on it. Somebody put a hoist here: a block, a frame over it and a
   // windlass, all leaning toward the column, because the way up from here is
   // the column.
   {
+    const AG = driStaticGroup(game);          // one body for the hoist
     const s3 = driISLES[4], ax = s3.x + 1.5, az = s3.z - 1.0, ay = s3.y;
     M.box(ax, ay + 0.55, az, 2.6, 1.1, 1.8, PALETTE.driRockDark, 0, 0.3, 0);
     M.box(ax, ay + 1.24, az, 2.9, 0.28, 2.1, PALETTE.driStone, 0, 0.3, 0);
-    driStaticBox(game, ax, ay + 0.7, az, 2.9, 1.4, 2.1, 0.3);
+    AG.add(ax, ay + 0.7, az, 2.9, 1.4, 2.1, 0.3);
     for (let side = -1; side <= 1; side += 2) {
       M.box(ax + side * 2.4, ay + 1.7, az + side * 0.7, 0.30, 3.4, 0.30,
             PALETTE.driTimber, 0, 0.3, -side * 0.10);
-      driStaticBox(game, ax + side * 2.4, ay + 1.7, az + side * 0.7, 0.44, 3.4, 0.44, 0);
+      AG.add(ax + side * 2.4, ay + 1.7, az + side * 0.7, 0.44, 3.4, 0.44, 0);
     }
     M.box(ax, ay + 3.4, az, 5.6, 0.28, 0.34, PALETTE.driTimber, 0, 0.3, 0);
+    AG.done();
     driAddBeacon(ax - 2.0, ay + 3.75, az - 0.6);
     M.cyl(ax + 0.9, ay + 3.2, az + 0.3, 0.34, 1.2, PALETTE.driTimber, 0, 0, Math.PI * 0.5, 6);
     // the rope, gone slack and hanging down into nothing
@@ -3201,11 +3443,12 @@ function driBuildKeepers(game, root) {
   // island the chapter asks you to spend the longest on and the only thing on
   // it was nine trees.
   {
+    const OG = driStaticGroup(game);          // one body for the whole yard
     const ox = driORCH_KEEP.x + 1.6, oy = driORCH_KEEP.y, oz = driORCH_KEEP.z + 2.4;
     for (let i = 0; i < 4; i++) {
       const px = ox + (i & 1 ? 2.3 : -2.3), pz = oz + (i & 2 ? 2.0 : -2.0);
       M.cyl(px, oy + 1.35, pz, 0.13, 2.7, PALETTE.driTimber, 0, 0, 0, 6);
-      driStaticBox(game, px, oy + 1.35, pz, 0.34, 2.7, 0.34, 0);
+      OG.add(px, oy + 1.35, pz, 0.34, 2.7, 0.34, 0);
     }
     M.box(ox - 1.2, oy + 2.95, oz, 3.0, 0.16, 4.6, PALETTE.driTimber, 0, 0, 0.24);
     M.box(ox + 1.2, oy + 2.95, oz, 3.0, 0.16, 4.6, PALETTE.driTimber, 0, 0, -0.24);
@@ -3225,7 +3468,7 @@ function driBuildKeepers(game, root) {
       M.box(ox - 1.6 + (i & 1 ? 0.6 : -0.6), oy + 0.26, oz + 1.5 + (i & 2 ? 0.32 : -0.32),
             0.09, 0.52, 0.09, PALETTE.driTimber);
     }
-    driStaticBox(game, ox - 1.6, oy + 0.30, oz + 1.5, 1.5, 0.60, 0.9, 0.3);
+    OG.add(ox - 1.6, oy + 0.30, oz + 1.5, 1.5, 0.60, 0.9, 0.3);
     for (let i = 0; i < 3; i++) {
       const bx = ox + 1.7 + (i % 2) * 0.9, bz = oz - 1.4 + i * 1.1;
       M.cyl(bx, oy + 0.26, bz, 0.44 - i * 0.05, 0.52, PALETTE.driSeed, 0, i * 0.7, 0, 8);
@@ -3233,10 +3476,11 @@ function driBuildKeepers(game, root) {
       // A basket is 90 cm across and 52 tall: too tall to step over (the animal
       // manages 40) and too small to read as architecture, which is precisely
       // the size of thing that looks like a bug when you walk through it.
-      driStaticBox(game, bx, oy + 0.26, bz, 0.92 - i * 0.1, 0.52, 0.92 - i * 0.1, 0);
+      OG.add(bx, oy + 0.26, bz, 0.92 - i * 0.1, 0.52, 0.92 - i * 0.1, 0);
     }
     M.cyl(ox + 0.2, oy + 0.22, oz + 1.9, 0.26, 0.44, PALETTE.driTimber, 0, 0, 0, 6);
-    driStaticBox(game, ox + 0.2, oy + 0.22, oz + 1.9, 0.56, 0.44, 0.56, 0);
+    OG.add(ox + 0.2, oy + 0.22, oz + 1.9, 0.56, 0.44, 0.56, 0);
+    OG.done();
   }
 
   // ---- THE CROWN: the approach to the lantern ----------------------------
@@ -3263,13 +3507,14 @@ function driBuildKeepers(game, root) {
     M.box(kx - 0.6, ky + 0.86, kz + 1.5, 2.4, 0.60, 0.12, PALETTE.driTimber, 0, 0.4, 0);
     M.box(kx - 1.5, ky + 0.24, kz + 1.2, 0.14, 0.48, 0.55, PALETTE.driTimber, 0, 0.4, 0);
     M.box(kx + 0.3, ky + 0.24, kz + 1.2, 0.14, 0.48, 0.55, PALETTE.driTimber, 0, 0.4, 0);
-    driStaticBox(game, kx - 0.6, ky + 0.45, kz + 1.3, 2.5, 0.90, 0.9, 0.4);
+    const KG = driStaticGroup(game);          // one body for the Crown's furniture
+    KG.add(kx - 0.6, ky + 0.45, kz + 1.3, 2.5, 0.90, 0.9, 0.4);
     // the ones nobody has lit: a stack of six, folded flat
     for (let k = 0; k < 6; k++) {
       M.cyl(kx + 2.3, ky + 0.10 + k * 0.13, kz - 0.9, 0.62 - k * 0.03, 0.12,
             k % 2 ? PALETTE.driPaperDim : PALETTE.driPaper, 0.04, k * 0.5, 0.03, 8);
     }
-    driStaticBox(game, kx + 2.3, ky + 0.42, kz - 0.9, 1.3, 0.84, 1.3, 0);
+    KG.add(kx + 2.3, ky + 0.42, kz - 0.9, 1.3, 0.84, 1.3, 0);
     driAddBeacon(driLANTERN.x + Math.cos(-2.5) * 8.6, ky + 1.35, driLANTERN.z + Math.sin(-2.5) * 8.6);
     driAddBeacon(driLANTERN.x + Math.cos(-0.4) * 8.6, ky + 1.35, driLANTERN.z + Math.sin(-0.4) * 8.6);
     // three bowls, on the line between the bench and the plinth
@@ -3307,10 +3552,11 @@ function driBuildKeepers(game, root) {
         const sx = px1 + s2 * 2.4, sz = pz1 - s2 * 2.4;
         M.box(sx, ky + 1.35, sz, 0.78, 2.7, 0.62, PALETTE.driRockPale, 0.05, s2 * 0.4, s2 * 0.06);
         M.oct(sx, ky + 2.95, sz, 0.42, PALETTE.driStone, 0.2, s2 * 0.5, 0);
-        driStaticBox(game, sx, ky + 1.35, sz, 0.9, 2.7, 0.9, s2 * 0.4);
+        KG.add(sx, ky + 1.35, sz, 0.9, 2.7, 0.9, s2 * 0.4);
         driAddBeacon(sx, ky + 3.2, sz);
       }
     }
+    KG.done();
   }
 
   const mesh = new THREE.Mesh(M.build(), driVC());
@@ -3593,6 +3839,9 @@ function driUpdateWind(dt) {
 // one half-breath — nineteen seconds — and what it buys is the mechanic.
 const driVANE = { x: 11, y: 30, z: 31 };
 let driVaneSign = 0, driVaneDone = false, driVaneT = 0;
+// THE WATCH. See driCheckVane: the task can ask for nineteen seconds of
+// standing still and none of it used to be visible from anywhere.
+let driVaneWatch = 0, driVaneSlack = 0, driVaneHint = false;
 
 function driCheckVane(game, dt) {
   if (driVaneDone) return;
@@ -3607,8 +3856,36 @@ function driCheckVane(game, dt) {
   // nothing and coming back the other way, and that is a sign change on `swing`.
   const swing = Math.sin(driTime * 6.28318 / driBREATH);
   const sign = swing >= 0 ? 1 : -1;
-  if (!near) { driVaneSign = 0; driVaneT = 0; return; }
+  if (!near) { driVaneSign = 0; driVaneT = 0; driVaneWatch = 0; return; }
   driVaneT += dt;
+  // ---- AND IT WAS NINETEEN SECONDS OF NOTHING ---------------------------
+  // MEASURED: `sign` flips on a half breath, so standing at the post can ask
+  // for anything up to nineteen seconds — and the whole of that was a task
+  // that had not ticked yet. No count, no sound, no change in the world;
+  // `driVaneT` was accumulated and then never read by anything. A player who
+  // walked up, stood for eight seconds and wandered off had no way of knowing
+  // they had been doing it right, and the reset on leaving the circle meant
+  // they then had to do the whole thing again.
+  //
+  // Three things, and none of them says a number out loud: a line once you have
+  // clearly settled, a ripple of paper off the post as the wind goes slack
+  // (which is the moment, and it is the same puff ring the seed-head uses), and
+  // `vaneToTurn()` on the API so the task card can count it down — the same
+  // treatment 'souk-escape' has had since Marrakech was written.
+  driVaneWatch = driVaneT;
+  if (driVaneT > 2.6 && !driVaneHint) {
+    driVaneHint = true;
+    driToast('stay there. it comes all the way round every thirty-eight seconds.');
+  }
+  const slack = Math.abs(swing) < 0.13;
+  if (slack && driVaneSlack <= 0) {
+    driVaneSlack = 2.0;
+    driRingT = 0;
+    driRingX = driVANE.x; driRingY = driVANE.y + 2.2; driRingZ = driVANE.z;
+    driSfx('rustle', { volume: 0.30, pitch: 1.25 });
+  } else if (!slack && driVaneSlack > 0) {
+    driVaneSlack -= dt;
+  }
   if (driVaneSign === 0) { driVaneSign = sign; return; }
   if (sign !== driVaneSign) {
     driVaneDone = true;
@@ -3616,6 +3893,11 @@ function driCheckVane(game, dt) {
     driSfx('chime', { volume: 0.55, pitch: 1.15 });
     driToast('all the way over, and all the way back, every thirty-eight seconds.');
   }
+}
+/** Seconds until the breath next goes slack, for the task card. */
+function driSecondsToTurn() {
+  const ph = (driTime % (driBREATH * 0.5)) / (driBREATH * 0.5);
+  return (1 - ph) * driBREATH * 0.5;
 }
 
 // ============================================================== THE CROSSING ==
@@ -3987,6 +4269,13 @@ function driUpdateSeeds(game, dt) {
   if (driSeedCool > 0) driSeedCool -= dt;
 
   // ---- they drift, on the same wind everything else here reads -------------
+  // THE GUARD HAS TO BE ABOVE THE LOOP. `if (!body || !cp) return;` was four
+  // lines BELOW this, and the held branch dereferences `cp` — so a single frame
+  // with no capybara position (the first frame of a build, or a reload landing
+  // mid-attach) throws inside systems.update, and one throw in there takes the
+  // whole module out for the rest of the session: the animal keeps walking and
+  // nothing else in the world updates again. See capy3-module-drop-failure.
+  if (!cp) { if (driSeedHeld >= 0) driSeedHeld = -1; return; }
   for (let i = 0; i < driSeeds.length; i++) {
     const sd = driSeeds[i];
     if (i === driSeedHeld) {
@@ -4003,7 +4292,7 @@ function driUpdateSeeds(game, dt) {
       1, 1, 1));
   }
   driSeedMesh.instanceMatrix.needsUpdate = true;
-  if (!body || !cp) return;
+  if (!body) return;
 
   // ---- catch one ----------------------------------------------------------
   const input = game.input;
@@ -4183,6 +4472,27 @@ function driUpdateCloud(game, dt) {
       }
     }
     driInCloud += dt;
+    // shout at four hundred metres of cloud and four hundred metres of cloud
+    // shouts back. On a cooldown, because a ring you can retrigger every frame
+    // is a texture rather than an event.
+    const inp = game.input;
+    if (inp && inp.honkPressed && (driWhoopT < 0 || driWhoopT > 1.1)) {
+      driWhoopT = 0; driWhoopX = p.x; driWhoopZ = p.z;
+      // AND A BURST YOU CAN SEE FROM INSIDE IT. The sheet's wave is the thing
+      // that reads from thirty metres up; down here the animal's eye is ten
+      // centimetres over the vapour and the whole horizon is cloud lumps, so
+      // the ring on the mesh is invisible from exactly the place the shout came
+      // from. The puff ring — the same instanced burst the seed-head sheds —
+      // costs nothing and lands on the frame the noise does.
+      driRingT = 0;
+      driRingX = p.x; driRingY = driCLOUD_Y + 0.35; driRingZ = p.z;
+      driSfx('hiss', { volume: 0.24, pitch: 0.7 });
+      driSfx('chime', { volume: 0.18, pitch: 0.62 });
+      if (!driWhoopSaid) {
+        driWhoopSaid = true;
+        driToast('the whole sea of it heard that.');
+      }
+    }
     if (driInCloud > driBLOOM_WAIT && !driBloomOn) {
       driBloomOn = true;
       driBloomT = driBLOOM_LIFE;
@@ -4193,6 +4503,7 @@ function driUpdateCloud(game, dt) {
   } else {
     driInCloud = 0;
   }
+  if (driWhoopT >= 0) { driWhoopT += dt; if (driWhoopT > driWHOOP_LIFE) driWhoopT = -1; }
 }
 
 // ================================================================ THE FLIGHT ==
@@ -4964,11 +5275,35 @@ function driBuild(game) {
       near: 8, face: 2.3,
       figure: { shirt: PALETTE.driLampGlow, legs: PALETTE.driBark, hat: PALETTE.driPaper },
       lines: ['They sleep in the day. There is no day. They sleep anyway.',
-              'Shout at one and it wakes. Shout at six and you can go on.',
+              { t: 'Shout at one and it wakes. Shout at six and you can go on.',
+                before: 'lampfly' },
               'Do not carry them. They come if they want to come.',
-              'The wind was southerly for eleven years. Then it was not.'],
+              'The wind was southerly for eleven years. Then it was not.',
+              // she counts them out loud while you are collecting, which is the
+              // only progress read the task has outside the card
+              { t: 'Six. That will do it. Take them up and do not look back at me.',
+                when: function () {
+                  return !!(driGame && driGame.drift && !driGame.taskDone('lampfly') &&
+                            driGame.drift.lampflies() >= driGame.drift.lampfliesNeeded);
+                } },
+              { t: 'Two so far. Keep going, they are all out there.',
+                when: function () {
+                  const d = driGame && driGame.drift;
+                  return !!(d && d.lampflies() > 0 && d.lampflies() < d.lampfliesNeeded);
+                } },
+              { t: 'You have got them all up. They will not settle for an hour now.',
+                after: 'lampfly' },
+              { t: 'It is lit. I can stop counting. Eleven years I have been counting.',
+                when: function () { return !!(driGame && driGame.drift && driGame.drift.lit() > 0.4); } }],
       wheek: ['There. That is the noise. Do it at the pale ones.',
-              'Every one of them heard that. Two of them cared.'] });
+              'Every one of them heard that. Two of them cared.',
+              { t: 'Not at me. At THEM. They are the ones with the lights on.',
+                before: 'lampfly' }],
+      onTask: { 'lampfly': ['All six. In one go. Nobody does it in one go.',
+                            'Look at them. Look at what you have started.'],
+                'lantern': ['Oh — oh, that is what they were FOR.'],
+                'updraft': ['You came up the column. Everything comes up the column.'] },
+      praise: ['Careful. Half of what is up here is asleep.'] });
     // ON THE CROWN, beside the lantern, and this is the last thing in the
     // chapter. Nine tasks of absolute solitude and then somebody says hello.
     // BESIDE the bench, not behind it. driCROWN_KEEP is where the FURNITURE is
@@ -4978,12 +5313,37 @@ function driBuild(game) {
     game.addLocal({ biome: 'drift', x: driCROWN_KEEP.x - 2.2, y: driCROWN_KEEP.y,
       z: driCROWN_KEEP.z - 2.0, near: 9, face: -1.9,
       figure: { shirt: PALETTE.driPaper, legs: PALETTE.driTimber },
-      lines: ['I light it when there are enough of them. There are never enough of them.',
+      lines: [{ t: 'I light it when there are enough of them. There are never enough of them.',
+                before: 'lantern' },
               'You came the long way. Everybody comes the long way. There is no other way.',
-              'It is not for anybody. It is just the last lit thing before the dark bit.',
-              'Sit down. The breath turns in about twenty seconds and you will want to see it.'],
+              { t: 'It is not for anybody. It is just the last lit thing before the dark bit.',
+                before: 'lantern' },
+              'Sit down. The breath turns in about twenty seconds and you will want to see it.',
+              { t: 'You have got six of them with you. Go on then. Go on.',
+                when: function () {
+                  return !!(driGame && driGame.drift && !driGame.taskDone('lantern') &&
+                            driGame.drift.lampflies() >= driGame.drift.lampfliesNeeded);
+                } },
+              { t: 'You are two short. They are down in the orchard, in the pale trees.',
+                when: function () {
+                  const d = driGame && driGame.drift;
+                  return !!(d && !driGame.taskDone('lantern') &&
+                            d.lampflies() < d.lampfliesNeeded);
+                } },
+              { t: 'There. Now every island in the world can see this one.', after: 'lantern' },
+              { t: 'Look south. They are all coming up. One at a time, look.', after: 'lantern' },
+              { t: 'Stay as long as you like. The plinth is the way down when you want it.',
+                after: 'lantern' }],
       wheek: ['I know. I heard you three islands ago.',
-              'Careful. Half of what is up here is only up here out of politeness.'] });
+              'Careful. Half of what is up here is only up here out of politeness.',
+              { t: 'That is the second loudest thing that has ever happened up here.',
+                after: 'lantern' }],
+      onTask: { 'lantern': ['Nine metres of paper and a rodent.',
+                            'Eleven years. Eleven years and it took you an afternoon.'],
+                'lampfly': ['Six. Bring them here. Straight here, do not stop.'],
+                'long-gap': ['I watched that from the bench. I could not look.'],
+                'driftseed': ['You came the SLOW way. Hardly anybody finds the slow way.'] },
+      praise: ['Mm. Sit down, you are making the place untidy.'] });
     // ---- AND THE SIX WHO ARE ALSO WAITING ---------------------------------
     // See driTRAVELLERS. Registered here, inside the biome's own build, so the
     // capture in main.js tags every figure to chapter nine and detaches it with
@@ -5047,7 +5407,7 @@ export function createDrift(game) {
     onExit() {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
-      driVaneSign = 0; driVaneT = 0;
+      driVaneSign = 0; driVaneT = 0; driVaneWatch = 0; driVaneSlack = 0;
       if (game.world && game.world.gravity) game.world.gravity.y = driPrevGravity || -24;
       driBloomOn = false;
       driFlightOn = false;
@@ -5065,7 +5425,7 @@ export function createDrift(game) {
       // latch that does not survive travel because it is never told not to.
       if (driSeedHeld >= 0) driSeedRespawn(driSeeds[driSeedHeld], driSeedHeld);
       driSeedHeld = -1; driSeedRide = 0; driSeedCool = 0;
-      driRingT = -1; driInCloud = 0;
+      driRingT = -1; driInCloud = 0; driWhoopT = -1;
       driRoostUp = 0; driRoostSettle = 0;
       driColWas = false; driColRing = 0;
     },
@@ -5133,6 +5493,10 @@ export function createDrift(game) {
     lantern: driLANTERN,
     /** The weathervane on the spawn island: the chapter's only instrument. */
     vane: { x: driVANE.x, z: driVANE.z },
+    /** > 0 while the animal is standing at the post, in seconds. */
+    vaneWatch() { return driVaneWatch; },
+    /** Seconds until the breath next goes slack — the task card counts it down. */
+    vaneToTurn() { return driSecondsToTurn(); },
     /** The wanderers MOVE — ask, never cache. */
     wanderer() {
       const m = driMovers[0];
@@ -5166,6 +5530,16 @@ export function createDrift(game) {
           for (let i = 0; i < a.length; i += 3) {
             let y = driCLOUD_Y + Math.sin(a[i + 2] * 0.035 + driTime * 0.33) * 0.55
                                + Math.sin(a[i] * 0.021 - driTime * 0.21) * 0.35;
+            if (driWhoopT >= 0) {
+              // the same shape as the bloom's crest, half the height and twice
+              // the reach: a shout goes further than a body does
+              const wx = a[i] - driWhoopX, wz = a[i + 2] - driWhoopZ;
+              const wd = Math.sqrt(wx * wx + wz * wz);
+              const front = driWhoopT * 13.0;
+              const ww = Math.exp(-Math.abs(wd - front) * 0.075) * Math.exp(-wd * 0.007) *
+                         clamp(1 - driWhoopT / driWHOOP_LIFE, 0, 1);
+              y += Math.sin((wd - front) * 0.26) * ww * 2.3;
+            }
             if (bl > 0) {
               const dx = a[i] - driBloomX, dz = a[i + 2] - driBloomZ;
               const d = Math.sqrt(dx * dx + dz * dz);

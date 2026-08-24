@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 15 — THE PANTANAL. WHERE YOU ARE, AS IT HAPPENS, FROM.
@@ -191,6 +191,9 @@ let panMacawFly = 0, panMacawHome = 1;
 // the two returns off the gallery forest, on the frame clock
 const panEchoT = [-1, -1];
 let panJabiru = null, panJabT = 0, panJabState = 'nest';
+// the bill-clatter and the macaw call, on countdowns rather than on modulo
+// windows — see the notes at their call sites
+let panJabNote = 0, panMacawNote = 0;
 let panJabStep = 0, panJabTx = 0, panJabTz = 0;
 const panJabFrom = { x: 0, z: 0, a: 0 };
 let panMacaws = null, panMacawT = 0;
@@ -198,6 +201,8 @@ let panOtterMesh = null, panOtterT = 0, panOtterUp = 0;
 // ...and the telling-off, which is a volley and not a metronome. See panUpdateOtters.
 let panOtterArmed = false, panOtterVolley = 0, panOtterNext = 0, panToldOtter = false;
 let panCowbird = null, panCowState = 'ground', panCowT = 0, panCowRide = 0;
+// the bird's patrol up and down the back, and the peck. See panUpdateCowbird.
+let panCowWalk = 0, panCowPeck = 0, panCowDip = 0;
 // ...and which nelore it is sitting on, or -1. See panCowPerch.
 let panCowOn = -1;
 let panCowHome = { x: 12, z: 30 };
@@ -210,6 +215,8 @@ let panCrossT = 0, panCrossN = 0;
 let panSeenHerd = false;
 let panToldWheek = false, panToldMat = false, panToldCaiman = false;
 let panCaimanSit = 0;
+// which one you are on, and the beat before it opens an eye. See panUpdateTasks.
+let panCaimanSat = -1, panCaimanNotice = 0;
 
 // scratch
 const panV3 = new THREE.Vector3();
@@ -683,17 +690,27 @@ function panBuild(game) {
   // live terrain rather than guessed, because two of the game's locals once
   // shipped standing on a riverbed.
   if (typeof game.addLocal === 'function') {
-    const put = function (x, z, o) {
+    // ---- AND THE RECORD COMES BACK, BECAUSE IT HAS TO ---------------------
+    // put() threw away everything addLocal handed it, so not one of these
+    // seven people could ever be told anything. npc.js reads `lines` LIVE —
+    // that is the entire mechanism by which a chapter's cast can know what the
+    // player has done — and Cappadocia has used it since it shipped. Here the
+    // cattleman said the same four sentences whether the capybara had walked
+    // past him or had just taken nine of his neighbours across the river at
+    // sundown, which is the thing the whole chapter exists for.
+    const put = function (key, x, z, o) {
       const h = panTerrain(x, z);
       if (h < panWATER + 0.05) {
         console.warn('[pantanal] local at', x, z, 'is in the water (' + h.toFixed(2) + ') - skipped');
-        return;
+        return null;
       }
       o.biome = 'pantanal'; o.x = x; o.z = z; o.y = h;
       if (o.near === undefined) o.near = 9;
-      game.addLocal(o);
+      const r = game.addLocal(o);
+      if (r) panLocals[key] = r;
+      return r;
     };
-    put(panFAZENDA.x - 6, panFAZENDA.z, {
+    put('boss', panFAZENDA.x - 6, panFAZENDA.z, {
       face: 3.0,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       lines: ['Road floods in March. Road floods in April. Road floods.',
@@ -702,8 +719,15 @@ function panBuild(game) {
               'Ninety centimetres of water on the campo and the cattle do not mind.',
               'My grandfather built this. The water has taken it back four times.'],
       wheek: ['Half the fazenda just looked up.',
-              'You want to be careful. Something always answers out here.'] });
-    put(panCROSS.x + 5, panCROSS.z0 + 6, {
+              'You want to be careful. Something always answers out here.'],
+      praise: ['Hm. Write that one down, somebody.',
+               'Nothing surprises me on this road. That surprised me.',
+               'You are still not the strangest thing here. Close, though.'],
+      onTask: { 'the-crossing': ['You took them OVER. My grandfather would have paid to see that.'],
+                'gather': ['They have gone with you. Just like that. Just like that!'],
+                'tamandua': ['On the tamandua. It has not noticed. It never notices.'],
+                'missing-plank': ['You went over the gap. The truck still cannot.'] } });
+    put('cattleman', panCROSS.x + 5, panCROSS.z0 + 6, {
       face: 0.2,
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       lines: ['They go over here. Same place every evening.',
@@ -711,19 +735,31 @@ function panBuild(game) {
               'Count them. There are always more than you counted.',
               'Jacare in the water and nobody minds. They eat fish. Mostly.'],
       wheek: ['Now they will follow you. That is on you.',
-              'Do that at the water and see who comes.'] });
+              'Do that at the water and see who comes.'],
+      praise: ['I have been standing at this crossing for thirty years. That is new.',
+               'Right. Yes. Carry on.',
+               'Somebody is going to ask me about that and I will not have an answer.'],
+      onTask: { 'the-crossing': ['Every evening, same place. Tonight there was one extra at the front.'],
+                'gather': ['Count them again. There is always one more than you counted.'],
+                'caiman-nap': ['On a jacare. It knew. It decided not to care.'] } });
     // THE PEAO, at the gate of his own corral, and he is the only person here
     // who is actually working.
-    put(panFAZENDA.x - 22 + 13.6, panFAZENDA.z + 1.5, {
+    put('peao', panFAZENDA.x - 22 + 13.6, panFAZENDA.z + 1.5, {
       face: 3.4, near: 8,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.panFence, legs: PALETTE.denim, skin: PALETTE.skin4 },
       lines: ['Eleven in the pen. Six out there somewhere. Six is optimistic.',
               'Cattle first, road second, everything else whenever.',
               'You are the wrong shape to help and the right shape to watch.'],
-      wheek: ['The whole pen turned round. Do it again, I liked that.'] });
+      wheek: ['The whole pen turned round. Do it again, I liked that.'],
+      praise: ['Cattle first, road second, whatever that was third.',
+               'You are the wrong shape to help and the right shape to watch.',
+               'Six still out there. Still six.'],
+      onTask: { 'cowbird': ['It has picked you. It usually picks the fattest nelore in the pen.'],
+                'gather': ['Nine of them behind one. That is a lead animal, that is.'],
+                'the-locals': ['They did not look up. They never look up. Do not take it badly.'] } });
     // THE GUIDE, under the dead tree, with binoculars and a list. Every person
     // who has ever been to this place professionally has a list.
-    put(panNEST.x - 7, panNEST.z - 5, {
+    put('guide', panNEST.x - 7, panNEST.z - 5, {
       face: 1.2, near: 9,
       figure: { shirt: PALETTE.cloth7, hat: PALETTE.khaki, skin: PALETTE.skin2 },
       lines: ['Tuiuiu. The big one. It is on the state flag and it is up there.',
@@ -731,36 +767,58 @@ function panBuild(game) {
               'Six hundred and fifty species of bird. I have four hundred and two.',
               'The nest is older than I am. They keep adding to it.'],
       wheek: ['You have just cost me a heron. Thank you.',
-              'Write it down: capybara, one, extremely loud.'] });
+              'Write it down: capybara, one, extremely loud.'],
+      praise: ['That is going on the list. I do not have a column for it.',
+               'Four hundred and two species and none of them do that.',
+               'I am writing "unusual behaviour" and leaving it there.'],
+      onTask: { 'jabiru-nest': ['You looked IN it. Nobody has looked in it. I have not looked in it.'],
+                'macaw-nut': ['Hyacinth macaw, one nut, stolen. I will have to word that carefully.'],
+                'the-crossing': ['Thirteen egrets up in a line. That is the photograph. That is it.'] } });
     // THE BOATMAN, on the bank above the otters, who has views about the otters.
     // ...on the capao above the river rather than on the bank. `z1 + 4` looks
     // like the bank and is not: the river's blend reaches 1.6 half-widths, so
     // -52 is still 77 cm UNDER the water. Probed, not guessed.
-    put(-46, -40, {
+    put('boatman', -46, -40, {
       face: 3.6, near: 10,
       figure: { shirt: PALETTE.cloth1, skin: PALETTE.skin3, legs: PALETTE.khaki },
       lines: ['Ariranha. Giant otter. Loudest animal on this river by a mile.',
               'They will shout at a jaguar. They will certainly shout at you.',
               'Five in that family. There were seven. There will be seven again.'],
-      wheek: ['Now you have started something.'] });
+      wheek: ['Now you have started something.'],
+      praise: ['The river heard that. The river hears everything.',
+               'Ariranha will have opinions. They always have opinions.',
+               'Hm. Yes. That happened.'],
+      onTask: { 'the-otters': ['All five of them, at once, at you. That is a family, that is.'],
+                'the-crossing': ['Straight across, at dusk, with the whole family behind. That is how it is done.'] } });
     // THE ROAD CREW. A hundred and twenty-two bridges and every one of them is
     // somebody's problem this week.
-    put(panRoadX(panBRIDGES[1].z) + 4.6, panBRIDGES[1].z + 5, {
+    put('crew', panRoadX(panBRIDGES[1].z) + 4.6, panBRIDGES[1].z + 5, {
       face: 3.1, near: 8,
       figure: { shirt: PALETTE.cloth5, hat: PALETTE.khaki, skin: PALETTE.skin4 },
       lines: ['One plank. I have had one plank on order since February.',
               'You can jump it. The truck cannot jump it.',
               'A hundred and twenty-two bridges on this road. This is number sixty.'],
-      wheek: ['Right. Yes. Very good. Still one plank short.'] });
+      wheek: ['Right. Yes. Very good. Still one plank short.'],
+      praise: ['Not my department. Whatever that was, not my department.',
+               'A hundred and twenty-two bridges. This is number sixty. Do the sums.',
+               'If it broke, it was already broken.'],
+      onTask: { 'missing-plank': ['Over the gap. You did not even slow down. The truck slows down.'],
+                'camalote': ['On the camalote? Those go DOWN. Everybody finds that out.'] } });
     // AND THE ONE WHO IS NOT WORKING, in a hammock under the mango tree, which
     // is the correct response to four in the afternoon in the Pantanal.
-    put(panFAZENDA.x + 13, panFAZENDA.z + 8, {
+    put('hammock', panFAZENDA.x + 13, panFAZENDA.z + 8, {
       face: 4.4, near: 8,
       figure: { shirt: PALETTE.cloth3, skin: PALETTE.skin1, legs: PALETTE.stoneDark },
       lines: ['It is four o clock. Nothing happens here at four o clock.',
               'Sit down. Something will come past. Something always comes past.',
               'That is a good tree. That is the best tree for forty kilometres.'],
-      wheek: ['...no. Not at four o clock.'] });
+      wheek: ['...no. Not at four o clock.'],
+      praise: ['Mm. Something came past. I said something always comes past.',
+               'That is the most that has happened here since March.',
+               'I am not getting up for that. I am not getting up for anything.'],
+      onTask: { 'caiman-nap': ['Now THAT is the correct attitude to four o clock.'],
+                'the-crossing': ['Ah. It is that time. Listen — the frogs start in about ten minutes.'],
+                'tamandua': ['Slowest ride in South America. Very sensible.'] } });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(panRoot);
@@ -919,10 +977,41 @@ function panBuildRoad(game, root) {
     const cx = panRoadX(zc);
     if (bridge) {
       M.box(cx, panROAD_Y - 0.15, zc, panROAD_W * 2, 0.3, SEG, PALETTE.panPlank);
-      // the planks, drawn across, because a bridge that is one box is a kerb
-      for (let k = 0; k < 5; k++) {
-        M.box(cx, panROAD_Y + 0.02, zc - SEG * 0.5 + 0.4 + k * 0.8, panROAD_W * 2 - 0.2, 0.06, 0.55,
-              k % 2 ? PALETTE.panPost : PALETTE.panPlank);
+      // ---- THE DECK, AND IT WAS FIVE WIDE BANDS ------------------------
+      // Five 55 cm planks on 80 cm centres, alternating two colours, over a
+      // four-metre bay: photographed from the spawn — which is ON one of these
+      // bridges, so it is the FIRST FRAME OF CHAPTER 15 and the lower half of
+      // it — that is not a timber deck, it is a floor with five stripes ruled
+      // across it. A Transpantaneira bridge is thirty or forty separate baulks
+      // of hardwood laid loose on two stringers: no two the same colour, no two
+      // quite the same width, gaps you can see the water through, and the two
+      // strips where every wheel for sixty years has gone worn pale.
+      //
+      // Twelve to a bay at 33 cm centres, seeded off the world position so the
+      // pattern is stable across a rebuild and does not tile.
+      {
+        const NP = 12, PITCH = SEG / NP;
+        for (let k = 0; k < NP; k++) {
+          const pz = zc - SEG * 0.5 + PITCH * (k + 0.5);
+          const hsh = ((pz * 977.13) | 0) & 7;
+          // the wheel tracks: two pale bands where the timber is polished
+          const wide = panROAD_W * 2 - 0.16;
+          const col = hsh < 2 ? PALETTE.panPost : (hsh < 5 ? PALETTE.panPlank : PALETTE.panMudRut);
+          M.box(cx, panROAD_Y + 0.02 + (hsh === 6 ? 0.035 : 0), pz,
+                wide, 0.07, PITCH * (0.62 + (hsh % 3) * 0.07), col,
+                0, 0, hsh === 3 ? 0.012 : 0);
+          // ...and where the tyres run, it is worn to the pale wood
+          if (hsh !== 6) {
+            for (let s = -1; s <= 1; s += 2) {
+              M.box(cx + s * 1.30, panROAD_Y + 0.058, pz, 0.66, 0.02,
+                    PITCH * (0.62 + (hsh % 3) * 0.07) * 0.92, PALETTE.panFence);
+            }
+          }
+        }
+        // the two stringers underneath, which is what says it is laid loose
+        for (let s = -1; s <= 1; s += 2) {
+          M.box(cx + s * 1.34, panROAD_Y - 0.06, zc, 0.22, 0.16, SEG, PALETTE.panPost);
+        }
       }
       // handrails, which the real ones mostly do not have and which look
       // wonderful when a capybara goes under them
@@ -1380,6 +1469,101 @@ function panBuildLilies(root) {
   for (let i = 0; i < panFLOWER_N; i++) { fc[i * 3] = 1; fc[i * 3 + 1] = 1; fc[i * 3 + 2] = 1; }
   panLilyFlower.instanceColor = new THREE.InstancedBufferAttribute(fc, 3);
   root.add(panLilyFlower);
+
+  // ---- AND WHAT IS FLOATING ON THE REST OF IT --------------------------
+  //
+  // The baia is a forty-metre bay and, photographed from the water with the
+  // lilies at the top of the frame, the other two thirds of the picture was a
+  // single unbroken sheet of olive — the same "one flat value" the wrack line,
+  // the Corso and the Göreme plaza have all been fixed for, and the largest
+  // remaining one in these three chapters. It is also wrong about the place:
+  // an oxbow in the Pantanal in the wet is not open water, it is COVERED, and
+  // the chapter's own palette has had panHyacinth in it since it shipped for
+  // exactly this.
+  //
+  // Three things, all flat, all in one static mesh, and none of them anything
+  // the animal can stand on — this is surface, not floor, and the swim is the
+  // mechanic:
+  //
+  //   DUCKWEED. Big soft-edged patches of it, which is what actually breaks a
+  //   sheet of still water up at this distance. Two triangles each.
+  //   HYACINTH. Clumps of three or four rosettes with a leaf or two standing
+  //   up out of them, so there is something with a HEIGHT on the surface.
+  //   AND THE ODD DEAD LEAF, because a mirror with nothing on it is a floor.
+  {
+    const W = panMerger();
+    let seed = 4471;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const rr2 = (a, b) => a + rnd() * (b - a);
+    // the duckweed, off a jittered grid over the bay so it cannot clump in one
+    // corner or starve the middle
+    const CELL = 6.5;
+    for (let gx = -6; gx <= 6; gx++) {
+      for (let gz = -6; gz <= 6; gz++) {
+        const x = panBAIA.x + gx * CELL + rr2(-2.6, 2.6);
+        const z = panBAIA.z + gz * CELL + rr2(-2.6, 2.6);
+        const dx = x - panBAIA.x, dz = z - panBAIA.z;
+        if (dx * dx + dz * dz > panBAIA.r * panBAIA.r) continue;
+        if (panWATER - panBedH(x, z) < 0.20) continue;
+        if (rnd() < 0.30) continue;                 // it is patchy, not a lawn
+        // ---- SMALL, AND CLOSE IN VALUE --------------------------------
+        // First cut: 1.6-4.4 m quads in panGrassLt over an olive bay. From
+        // the water that is forty PALE LIME RECTANGLES lying on a green
+        // sheet — the exact failure the Göreme valley floor's wash channels
+        // paid for, arriving on water instead of sand. Duckweed is two
+        // millimetres across; what you can see of it at eight metres is a
+        // slight change of value over a patch, so the pieces have to be
+        // small enough not to be resolved individually and dark enough not
+        // to be the brightest thing in the frame.
+        // ...AND THEY HAVE TO OVERLAP. A patch made of pieces that do not
+        // touch is a patch made of pieces; the outline of a raft of duckweed
+        // is ragged because the pieces at its edge are half over each other.
+        const n2 = 9 + ((rnd() * 7) | 0);
+        for (let k = 0; k < n2; k++) {
+          const s = rr2(0.38, 1.15);
+          // FLAT, and the spin goes in rz. panMerger's quad() is UPRIGHT (see
+          // its note) and panXform composes an 'XYZ' euler, so Rx(-pi/2) lays
+          // it down and Rz is then a spin about its own normal — which after
+          // the tip is the world's Y. Passing the spin as ry instead turns the
+          // plane on edge before laying it down, which is a different quad
+          // altogether and the mistake the lily rim already paid for.
+          W.quad(x + rr2(-1.5, 1.5), panWATER + 0.012, z + rr2(-1.5, 1.5), s, s * rr2(0.6, 1.0),
+                 rnd() < 0.5 ? PALETTE.panHyacinth : PALETTE.panGrassDk,
+                 -Math.PI / 2, 0, rr2(0, 3.14));
+        }
+      }
+    }
+    // the hyacinth clumps, which are the only thing on this water with a
+    // silhouette
+    for (let i = 0; i < 46; i++) {
+      const a = rr2(0, 6.28), rad = Math.sqrt(rnd()) * (panBAIA.r - 3);
+      const cx = panBAIA.x + Math.cos(a) * rad, cz = panBAIA.z + Math.sin(a) * rad * 0.9;
+      if (panWATER - panBedH(cx, cz) < 0.35) continue;
+      const n2 = 3 + ((rnd() * 3) | 0);
+      for (let k = 0; k < n2; k++) {
+        const x = cx + rr2(-1.5, 1.5), z = cz + rr2(-1.5, 1.5);
+        W.sph(x, panWATER + 0.06, z, rr2(0.34, 0.6), 0.10, rr2(0.34, 0.6),
+              PALETTE.panHyacinth, 6);
+        // one leaf up out of it — a hyacinth stands about a hand high
+        W.box(x + rr2(-0.2, 0.2), panWATER + 0.22, z + rr2(-0.2, 0.2),
+              0.30, 0.34, 0.06, PALETTE.panGrassLt, rr2(-0.3, 0.3), rr2(0, 3.14), rr2(-0.3, 0.3));
+      }
+    }
+    // and the leaf litter the gallery forest drops on it all year
+    for (let i = 0; i < 90; i++) {
+      const a = rr2(0, 6.28), rad = Math.sqrt(rnd()) * panBAIA.r;
+      const x = panBAIA.x + Math.cos(a) * rad, z = panBAIA.z + Math.sin(a) * rad * 0.9;
+      if (panWATER - panBedH(x, z) < 0.15) continue;
+      W.quad(x, panWATER + 0.008, z, rr2(0.16, 0.42), rr2(0.10, 0.24),
+             i % 3 === 0 ? PALETTE.panDead : PALETTE.panGrassDk,
+             -Math.PI / 2, 0, rr2(0, 3.14));
+    }
+    const wm = new THREE.Mesh(W.build(), panVC());
+    wm.receiveShadow = true;
+    wm.castShadow = false;
+    wm.renderOrder = 1;
+    root.add(wm);
+  }
 }
 
 /** The gallery forest, the capoes, and one tree in flower. */
@@ -1846,21 +2030,42 @@ function panBuildGrass(root) {
   // argument as Manly's boulders); and the count is what the blade geometry
   // now affords — 4 600 tufts at ten triangles is 46 000, which is what 1 250
   // tufts at thirty-six cost before.
-  const N = 4600;             // ...plus up to 150 more down the crown of the road
-  const mesh = new THREE.InstancedMesh(M.build(), panVCL(), N + 150);
+  // ---- AND THE CAP TRUNCATED IT GEOGRAPHICALLY -------------------------
+  //
+  // Third time on this loop, and the previous fix made the failure WORSE by
+  // making it deterministic. The grid is 35 x 33 = 1,155 cells at four to
+  // eight tufts each, which wants about 6,300 — against a ceiling of 4,600
+  // tested inside all three loops. So the sweep filled cells in `gz` order
+  // and then simply STOPPED, twenty-four rows in, and twenty-four rows of
+  // seven metres is z = +42.
+  //
+  // Everything north of that line had no grass at all. That is the whole top
+  // third of the chapter, and it contains the spawn (z = 62) and the fazenda
+  // (z = 76) — so THE FIRST FRAME OF CHAPTER 15, and the approach to the only
+  // building for eighty kilometres, were played on bald plaster, which is the
+  // exact symptom this function's own note has been rewritten twice to
+  // prevent. Photographed from the fazenda: six tufts in the entire frame.
+  //
+  // A cap must never be a `break` on a spatial sweep. The budget is spent PER
+  // CELL instead — every cell gets its share whatever its index — and the pool
+  // is sized for the whole grid, with mesh.count trimmed to what actually
+  // survived the water, road and height rejections at the bottom.
+  const X0 = -122, X1 = 122, Z0 = -126, Z1 = 104;
+  const CELL = 7.0;
+  const NX = Math.ceil((X1 - X0) / CELL), NZ = Math.ceil((Z1 - Z0) / CELL);
+  const PER_LO = 3, PER_HI = 6;         // ~4.5 a cell over 1,155 cells
+  const N = NX * NZ * PER_HI;           // the pool. n is what is used.
+  const mesh = new THREE.InstancedMesh(M.build(), panVCL(), N + 220);
   mesh.frustumCulled = false;
   mesh.castShadow = false;
   let n = 0;
   {
-    const X0 = -122, X1 = 122, Z0 = -126, Z1 = 104;
-    const CELL = 7.0;
-    const nx = Math.ceil((X1 - X0) / CELL), nz = Math.ceil((Z1 - Z0) / CELL);
-    for (let gz = 0; gz < nz && n < N; gz++) {
-      for (let gx = 0; gx < nx && n < N; gx++) {
+    for (let gz = 0; gz < NZ; gz++) {
+      for (let gx = 0; gx < NX; gx++) {
         const sx = X0 + (gx + 0.5) * CELL + rand(-2.6, 2.6);
         const sz = Z0 + (gz + 0.5) * CELL + rand(-2.6, 2.6);
-        const per = randInt(4, 8);
-        for (let k = 0; k < per && n < N; k++) {
+        const per = randInt(PER_LO, PER_HI + 1);
+        for (let k = 0; k < per; k++) {
           const x = sx + rand(-3.1, 3.1), z = sz + rand(-3.1, 3.1);
           const h = panBedH(x, z);
           // ...AND THE FAZENDA IS NOT BALD. The cap was 2.2 m and the one
@@ -1884,7 +2089,7 @@ function panBuildGrass(root) {
   // dirt road in the world grows a beard of and which is the cheapest way to
   // say "this is not tarmac". It grows THERE and nowhere else on the causeway,
   // which is what makes the ruts read as ruts.
-  for (let z = -108; z < 94 && n < N + 150; z += 1.15) {
+  for (let z = -108; z < 94 && n < N + 220; z += 1.15) {
     let bridge = false;
     for (let i = 0; i < panBRIDGES.length; i++) {
       if (Math.abs(z - panBRIDGES[i].z) < panBRIDGES[i].len * 0.5 + 1) bridge = true;
@@ -2131,7 +2336,9 @@ function panBuildHerd(root) {
                    tx: spots[i][0], tz: spots[i][1],
                    // where it was PUT. A grazer never leaves this by more than
                    // about fourteen metres — see the note in panUpdateHerd.
-                   hx: spots[i][0], hz: spots[i][1], rip: rand(0, 1) });
+                   hx: spots[i][0], hz: spots[i][1], rip: rand(0, 1),
+                   // the answering call and the look that goes with it. See panWheek.
+                   reply: 0, replyP: 1.2, look: 0 });
     // three of them are young, and the difference is only in the size
     const young = (i === 6 || i === 8);
     panCol.set(young ? PALETTE.panCapyPup : PALETTE.panCapy);
@@ -2719,6 +2926,29 @@ function panTask(game, id) { game.completeTask(id); }
  * cattleman who comments on the herd going into the river on a forty-second
  * timer is scenery; one who comments the moment it happens is a person.
  */
+/**
+ * ...AND WHAT THEY SAY AFTERWARDS.
+ *
+ * The other half. `say` is a line about now; `lines` is the shuffle bag they
+ * draw from when you walk up to them, and npc.js reads it live — so a chapter
+ * that keeps its records can change what somebody says the moment the world
+ * changes under them.
+ *
+ * Also `praise`/`onTask`, which nine of the seventeen chapters already use and
+ * this one did not: without a pool of its own, the nearest person to any
+ * completed task falls back on npc.js's chapter-neutral bag. So the reward for
+ * taking nine capybaras across the Paraguai at sundown — the chapter's wow,
+ * the thing on the title of the whole list — was a cattleman turning round and
+ * saying "…was that deliberate?"
+ */
+const panLocals = {};
+function panSaysNow(who, lines, wheek) {
+  const r = panLocals[who];
+  if (!r) return;
+  if (lines) r.lines = lines;
+  if (wheek) r.wheekLines = wheek;
+}
+
 const panSaid = {};
 let panSayCool = 0;
 function panCall(game, key, x, y, z, text, cool) {
@@ -2808,9 +3038,25 @@ function panUpdateHerd(game, dt) {
       const sp = r.st === 'follow' ? clamp(1.4 + (d - 2) * 1.5, 1.4, 8.5) : 1.05;
       const k = Math.min(1, (sp * dt) / d);
       r.x += dx * k; r.z += dz * k;
-      r.yaw = damp(r.yaw, Math.atan2(dx, dz), 8, dt);
+      r.yaw = dampAngle(r.yaw, Math.atan2(dx, dz), 8, dt);
       r.moving = 1;
     } else r.moving = 0;
+    // ---- the answer, and the look that goes with it ----------------------
+    if (r.reply > 0) {
+      r.reply -= dt;
+      if (r.reply <= 0) {
+        r.reply = 0;
+        panSfx.volume = rand(0.26, 0.36);
+        panSfx.pitch = r.replyP * rand(0.97, 1.04);
+        game.sfx('wheek', panSfx);
+      }
+    }
+    // it turns to look at you for a moment before it falls in behind, which is
+    // the half-second that makes the recruit read as a decision
+    if (r.look > 0 && p) {
+      r.look -= dt;
+      r.yaw = dampAngle(r.yaw, Math.atan2(p.x - r.x, p.z - r.z), 6, dt);
+    }
     const bed = panTerrain(r.x, r.z);
     // in the deep, they swim, which for a capybara means most of it is under
     const swim = bed < panWATER - 0.45;
@@ -2880,7 +3126,14 @@ function panUpdateHerd(game, dt) {
     panBestString = following;
     game.record('gather', panBestString);
   }
-  if (following >= 5) panTask(game, 'gather');
+  if (following >= 5 && (!game.taskDone || !game.taskDone('gather'))) {
+    panTask(game, 'gather');
+    panSaysNow('peao',
+      ['Five of them behind one animal. That is a lead animal, that is.',
+       'They will follow you into the river. They will follow you anywhere. Be careful.',
+       'Do not stop suddenly. Nobody at the back is watching where they are going.'],
+      ['The whole line just went up. I liked that a lot.']);
+  } else if (following >= 5) panTask(game, 'gather');
 
   // ---- meeting one of them ----------------------------------------------
   if (p && !panSeenHerd) {
@@ -2973,6 +3226,21 @@ function panWheek(game) {
   for (let i = 0; i < panHERD_N; i++) if (panHerd[i].st === 'follow') order++;
   panHerd[best].st = 'follow';
   panHerd[best].order = order;
+  // ---- AND IT ANSWERS YOU -----------------------------------------------
+  // The one new mechanic in the chapter, and the entire acknowledgement of a
+  // successful recruit was one wheek from the PLAYER'S own throat and a
+  // capybara that started walking. Which reads as the animal having decided
+  // this on its own — there is nothing anywhere that says the shout reached
+  // it, let alone that it was addressed to you.
+  //
+  // A capybara answers a contact call. So: it looks up at you, it wheeks
+  // BACK, at a slightly higher pitch and a beat later, and each one that joins
+  // answers a little further up the scale, so recruiting the line has a rising
+  // figure in it that nobody has to be told about. The delay is a frame
+  // counter and not a setTimeout, so it cannot fire after a chapter change.
+  panHerd[best].reply = 0.28 + order * 0.04;
+  panHerd[best].replyP = 1.12 + order * 0.055;
+  panHerd[best].look = 1.6;
   panSfx.volume = 0.45; panSfx.pitch = rand(1.1, 1.35);
   game.sfx('wheek', panSfx);
   if (order === 0) game.toast('it is coming with you.');
@@ -3005,12 +3273,40 @@ function panUpdateMats(game, dt) {
     const rate = (loaded ? 0.16 : 0.055) * dt;
     const dy = clamp(want - m.y, -rate, rate);
     m.y += dy;
+    // ---- AND YOU CAN HEAR AND FEEL IT GO ---------------------------------
+    // The mechanic is that the ground under you is failing, and for the whole
+    // life of the chapter it did so in complete silence and perfectly level —
+    // a mat took the animal's weight and slid straight down like a lift. What
+    // a raft of hyacinth does when four stone lands on it is TIP, toward the
+    // corner you are standing on, and make a wet fibrous noise the whole way.
+    // The tilt is on the mesh only (rule 4): the collider is the flat top and
+    // has to stay flat, or standing on the low edge becomes a slope.
+    if (loaded && p) {
+      m.tip = damp(m.tip === undefined ? 0 : m.tip, 1, 3.2, dt);
+      m.tx = damp(m.tx === undefined ? 0 : m.tx, clamp((p.x - m.x) / m.r, -1, 1), 3.0, dt);
+      m.tz = damp(m.tz === undefined ? 0 : m.tz, clamp((p.z - m.z) / m.r, -1, 1), 3.0, dt);
+      m.creak = (m.creak || 0) - dt;
+      if (m.creak <= 0) {
+        m.creak = rand(0.55, 1.05);
+        panSfx.volume = clamp(0.05 + (panWATER - m.y) * 0.22, 0.04, 0.17);
+        panSfx.pitch = rand(0.55, 0.85);
+        game.sfx('rustle', panSfx);
+      }
+    } else {
+      m.tip = damp(m.tip === undefined ? 0 : m.tip, 0, 1.4, dt);
+      m.creak = 0;
+    }
     // RULE 2: move it with VELOCITY, never by assigning position — a body whose
     // position is assigned every frame is a body cannon never integrates, and
     // the contact under the passenger is remade from scratch every step.
     m.body.velocity.set(0, dy / Math.max(dt, 0.0001), 0);
     const ip = m.body.interpolatedPosition;
-    panM.compose(panV3.set(m.x, ip.y, m.z), panQ.setFromEuler(panE.set(0, i * 0.7, 0)),
+    // the tip, and it is small: eight degrees at the far edge of a four-metre
+    // mat is twenty-eight centimetres of drop, which is plenty to read and not
+    // enough to argue with the flat collider underneath it
+    const tk = (m.tip || 0) * 0.14;
+    panM.compose(panV3.set(m.x, ip.y, m.z),
+                 panQ.setFromEuler(panE.set((m.tz || 0) * tk, i * 0.7, -(m.tx || 0) * tk, 'XYZ')),
                  panSc.set(m.r * 2, 1, m.r * 2));
     panMatMesh.setMatrixAt(i, panM);
   }
@@ -3100,7 +3396,7 @@ function panUpdateAnteater(game, dt) {
       const face = panAntDigAt >= 0
         ? Math.atan2(panMoundAt[panAntDigAt] - ip.x, panMoundAt[panAntDigAt + 1] - ip.z) : yaw;
       panAnt.rotation.set(0.34 * k + Math.sin(panTime * 12) * 0.05 * k,
-                          damp(panAnt.rotation.y, face, 3, dt),
+                          dampAngle(panAnt.rotation.y, face, 3, dt),
                           Math.sin(panTime * 5.5) * 0.09 * k);
       if (panRipMesh && panRipCool <= 0 && panBedH(ip.x, ip.z) < panWATER + 0.05) {
         panRipCool = 0.5; panRipple(ip.x, ip.z, 1.1);
@@ -3165,7 +3461,7 @@ function panUpdateJabiru(game, dt) {
         const k = Math.min(1, (1.15 * dt) / d);
         panJabiru.position.x += dx * k;
         panJabiru.position.z += dz * k;
-        panJabiru.rotation.y = damp(panJabiru.rotation.y, Math.atan2(dx, dz), 4, dt);
+        panJabiru.rotation.y = dampAngle(panJabiru.rotation.y, Math.atan2(dx, dz), 4, dt);
         if (Math.random() < dt * 1.6 && panBedH(panJabiru.position.x, panJabiru.position.z) < panWATER + 0.1) {
           panRipple(panJabiru.position.x, panJabiru.position.z, 0.34);
         }
@@ -3207,7 +3503,16 @@ function panUpdateJabiru(game, dt) {
     if (t >= 1) { panJabState = 'nest'; panJabT = 0; panJabStep = 0.4; }
     // ONE NOTE, RATIONED AND SCALED BY DISTANCE. A jabiru has no syrinx and
     // cannot call at all — the only noise it makes is its bill.
-    if (panJabT % 2.6 < dt && capy) {
+    //
+    // ...ON A COUNTDOWN, NOT A MODULO WINDOW. `panJabT % 2.6 < dt` is a test on
+    // a clock that advances by a variable amount: at a frame time straddling
+    // the boundary it is true twice in a row and at one that steps over it it
+    // is true never. It is the shape the otters two functions down carry a
+    // whole paragraph about, and it was still here. A bill-clatter is also not
+    // a metronome — it comes in bursts of a different length every time.
+    panJabNote -= dt;
+    if (panJabNote <= 0 && capy) {
+      panJabNote = rand(1.9, 3.4);
       const far = panJabiru.position.distanceTo(capy.position);
       panSfx.volume = clamp(0.20 - far * 0.0022, 0.02, 0.20);
       panSfx.pitch = rand(2.6, 3.4);
@@ -3254,7 +3559,12 @@ function panUpdateMacaws(game, dt) {
   // ...and they SHOUT while they are up, which is what they are famous for.
   // Rationed: this is the loudest bird in South America and three of them on a
   // loop is a thing to be muted.
-  if (home < 0.6 && panMacawT % 1.15 < dt) {
+  // ...and on a countdown rather than a modulo window, for the third time in
+  // this file: see the note on the jabiru's bill. Three of the loudest birds
+  // in South America firing twice on one frame is not rationing.
+  panMacawNote -= dt;
+  if (home < 0.6 && panMacawNote <= 0) {
+    panMacawNote = rand(0.85, 1.6);
     panSfx.volume = rand(0.14, 0.24); panSfx.pitch = rand(2.1, 2.9);
     game.sfx('bark', panSfx);
   }
@@ -3294,6 +3604,14 @@ function panUpdateOtters(game, dt) {
   // slow clock. It re-arms when you leave, which is the only way a set piece
   // that is a NOISE stays worth walking into twice.
   if (near) {
+    if (!panToldOtter) {
+      panSaysNow('boatman',
+        ['All five at once. They do that to jaguars. You are in good company.',
+         'They are not frightened of you. They are telling you whose river it is.',
+         'There were seven. There will be seven again. Give it a year.',
+         'Five kilos of fish each, every day, and they shout the whole time.'],
+        ['You cannot out-shout them. Nothing out-shouts them.']);
+    }
     panTask(game, 'the-otters');
     if (!panOtterArmed) {
       panOtterArmed = true;
@@ -3371,7 +3689,32 @@ function panUpdateCowbird(game, dt) {
   } else {
     panCowRide += dt;
     const yaw = capy.group ? capy.group.rotation.y : 0;
-    panCowbird.position.set(p.x - Math.sin(yaw) * 0.15, p.y + 0.60, p.z - Math.cos(yaw) * 0.15);
+    // ---- AND IT IS DOING SOMETHING UP THERE ------------------------------
+    // Twenty seconds is a long time to look at a bird standing perfectly still
+    // on your own back — which is what it did, at a fixed offset, with one
+    // slow sine on its yaw. A cowbird on a capybara is WORKING: it walks up
+    // and down the back picking ticks, and every few seconds it puts its head
+    // down hard. That is the entire joke of the animal and the reason the task
+    // exists, and none of it was drawn.
+    //
+    // Three numbers. It patrols shoulder to rump; it dips on its own clock;
+    // and the dip is a pitch and a drop rather than a new animation.
+    panCowWalk += dt * 0.55;
+    const along = Math.sin(panCowWalk) * 0.22;           // shoulder to rump
+    const across = Math.sin(panCowWalk * 1.7) * 0.09;
+    panCowPeck -= dt;
+    if (panCowPeck <= 0) {
+      panCowPeck = rand(1.4, 3.6);
+      panCowDip = 0.34;
+      panSfx.volume = 0.055; panSfx.pitch = rand(2.6, 3.3);
+      game.sfx('tick', panSfx);
+    }
+    if (panCowDip > 0) panCowDip -= dt;
+    const dip = panCowDip > 0 ? Math.sin(clamp(panCowDip / 0.34, 0, 1) * Math.PI) : 0;
+    panCowbird.position.set(p.x - Math.sin(yaw) * (0.15 + along) - Math.cos(yaw) * across,
+                            p.y + 0.60 - dip * 0.16,
+                            p.z - Math.cos(yaw) * (0.15 + along) + Math.sin(yaw) * across);
+    panCowbird.rotation.x = dip * 1.0;
     panCowbird.rotation.y = yaw + Math.sin(panTime * 0.9) * 0.6;
     panCowbird.rotation.z = 0;
     if (panCowRide > 20) panTask(game, 'cowbird');
@@ -3483,14 +3826,14 @@ function panUpdateCattle(game, dt) {
     if (d > 0.3) {
       const k = Math.min(1, (0.62 * dt) / d);
       c.x += dx * k; c.z += dz * k;
-      c.yaw = damp(c.yaw, Math.atan2(dx, dz), 3, dt);
+      c.yaw = dampAngle(c.yaw, Math.atan2(dx, dz), 3, dt);
       c.moving = 1;
     } else c.moving = 0;
     // ...and when something shouts, they all look at it, which is the single
     // most cow thing a cow does
     if (c.look > 0) {
       c.look -= dt;
-      c.yaw = damp(c.yaw, Math.atan2(c.lx - c.x, c.lz - c.z), 2.6, dt);
+      c.yaw = dampAngle(c.yaw, Math.atan2(c.lx - c.x, c.lz - c.z), 2.6, dt);
     }
     const y = panBedH(c.x, c.z);
     const bob = c.moving ? Math.abs(Math.sin(panTime * 4 + c.ph)) * 0.045
@@ -3899,6 +4242,35 @@ function panUpdateTasks(game, dt) {
     }
     if (on) {
       panCaimanSit += dt;
+      // ---- AND IT DECIDES NOT TO CARE, VISIBLY ---------------------------
+      // The toast says "it knows. it has decided not to care." — which is a
+      // very good line about an animal that did precisely nothing. The whole
+      // pleasure of this task is that a two-hundred-kilo predator opens one
+      // eye, works out what has happened, and goes back to sleep, and the
+      // chapter asserted all of that in a sentence rather than drawing any of
+      // it. `gape` and `gapeOn` are already built for the thermoregulating
+      // yawn (see panUpdateCaimans); this is the same jaw, used for the joke.
+      if (panCaimanSat < 0) {
+        for (let i = 0; i < panCAIMAN_N; i++) {
+          const c = panCaimanAt[i];
+          const dx = p.x - c.x, dz = p.z - c.z;
+          if (dx * dx + dz * dz < 6.5) { panCaimanSat = i; break; }
+        }
+        if (panCaimanSat >= 0) {
+          // it opens one eye about a second in — long enough that the player
+          // has already decided nothing is going to happen
+          panCaimanNotice = 1.1;
+        }
+      }
+      if (panCaimanNotice > 0) {
+        panCaimanNotice -= dt;
+        if (panCaimanNotice <= 0 && panCaimanSat >= 0) {
+          const c = panCaimanAt[panCaimanSat];
+          c.gapeOn = 1; c.gapeT = rand(3.4, 5.5);
+          panSfx.volume = 0.13; panSfx.pitch = rand(0.42, 0.55);
+          game.sfx('hiss', panSfx);
+        }
+      }
       if (panCaimanSit > 0.9) {
         panTask(game, 'caiman-nap');
         if (!panToldCaiman) {
@@ -3906,7 +4278,7 @@ function panUpdateTasks(game, dt) {
           game.toast('it knows. it has decided not to care.');
         }
       }
-    } else panCaimanSit = 0;
+    } else { panCaimanSit = 0; panCaimanSat = -1; panCaimanNotice = 0; }
   }
   // ---- the missing plank -------------------------------------------------
   {
@@ -3963,6 +4335,22 @@ function panUpdateTasks(game, dt) {
     }
     panShakeT = 2.4;
     game.shake(0.22);
+    // ---- AND THE TWO PEOPLE WHO WATCHED IT HAPPEN ---------------------
+    // The chapter's wow, and until now the cattleman standing at the crossing
+    // — whose entire reason for existing is that he watches this happen every
+    // evening — went on saying the same four sentences he had been saying
+    // before the capybara arrived.
+    panSaysNow('cattleman',
+      ['You brought them over. All of them. I counted, and I stopped counting.',
+       'Thirty years at this crossing and I have never seen one at the FRONT.',
+       'They go over here every evening. Tonight somebody led them.',
+       'Sit down. It goes orange for about ten minutes and then the frogs start.'],
+      ['They are all across. You can stop now.']);
+    panSaysNow('guide',
+      ['Thirteen egrets up in a line off the snags. That is the photograph.',
+       'I have brought people here for eleven years for exactly that and never got it.',
+       'Capybara, one, leading. I do not have a column for leading.'],
+      ['Quietly. It is nearly dark and everything is settling.']);
     panSfx.volume = 0.42; panSfx.pitch = rand(1.0, 1.2);
     game.sfx('wheek', panSfx);
     panCrossT = 0; panCrossN = 0;
@@ -3994,6 +4382,21 @@ function panUpdateTasks(game, dt) {
       panCall(game, 'mat', panBAIA.x + panBAIA.r + 3,
               panTerrain(panBAIA.x + panBAIA.r + 3, panBAIA.z) + 0.6, panBAIA.z,
               'Keep going. It only holds while you are moving.', 40);
+    } else if (panMacawFly > 4.5) {
+      // the guide, under the dead tree, and this is the loudest thing that
+      // happens all afternoon
+      panCall(game, 'macaw', panNEST.x - 7, panTerrain(panNEST.x - 7, panNEST.z - 5) + 0.6,
+              panNEST.z - 5, 'Arara-azul. Three of them. Do you know how few of those are left?', 70);
+    } else if (panDusk > 0.35 && panDusk < 0.9) {
+      // the man in the hammock, who is right about four o'clock and is also
+      // right about what happens at six
+      panCall(game, 'frogs', panFAZENDA.x + 13,
+              panTerrain(panFAZENDA.x + 13, panFAZENDA.z + 8) + 0.6, panFAZENDA.z + 8,
+              'There. Hear that? The birds stop and the frogs start. Ten minutes, every night.', 300);
+    } else if (panCowState === 'ride' && panCowRide > 6 && panCowRide < 9) {
+      panCall(game, 'bird', panFAZENDA.x - 22 + 13.6,
+              panTerrain(panFAZENDA.x - 22 + 13.6, panFAZENDA.z + 1.5) + 0.6, panFAZENDA.z + 1.5,
+              'It has picked you over seventeen cattle. Do not let it go to your head.', 80);
     }
   }
   panDusk = damp(panDusk, panDuskGo ? 1 : 0, 0.22, dt);
@@ -4024,6 +4427,7 @@ export function createPantanal(game) {
       for (let i = 0; i < panHerd.length; i++) {
         const r = panHerd[i];
         r.st = 'graze'; r.order = -1; r.restT = rand(0, 6); r.wet = 0;
+        r.reply = 0; r.replyP = 1.2; r.look = 0;
       }
       panHerdChat = 4; panShakeT = 0;
       panSayCool = 0;
@@ -4031,6 +4435,7 @@ export function createPantanal(game) {
       panMatRun = 0; panMatLast = -1;
       for (let i = 0; i < panMats.length; i++) {
         panMats[i].y = panWATER + 0.06; panMats[i].load = 0;
+        panMats[i].tip = 0; panMats[i].tx = 0; panMats[i].tz = 0; panMats[i].creak = 0;
         panMats[i].body.position.y = panWATER + 0.06;
         panMats[i].body.velocity.set(0, 0, 0);
         panSyncBody(panMats[i].body);
@@ -4038,9 +4443,10 @@ export function createPantanal(game) {
       panAntCarrying = false; panAntRide = 0;
       panAntDig = 0; panAntDigAt = -1; panAntDigCool = rand(6, 14);
       panCowState = 'ground'; panCowT = 0; panCowRide = 0;
+      panCowWalk = 0; panCowPeck = 0; panCowDip = 0;
       panCowOn = -1;
       panCowHome.x = 12; panCowHome.z = 30;
-      panJabState = 'nest'; panJabT = 0; panJabStep = 0;
+      panJabState = 'nest'; panJabT = 0; panJabStep = 0; panJabNote = 0; panMacawNote = 0;
       panOtterUp = 0;
       panOtterArmed = false; panOtterVolley = 0; panOtterNext = 0;
       panCrossT = 0; panCrossN = 0;
@@ -4048,7 +4454,7 @@ export function createPantanal(game) {
       panEgretT = -1;
       panEgretGone = false;
       panEchoT[0] = -1; panEchoT[1] = -1;
-      panCaimanSit = 0;
+      panCaimanSit = 0; panCaimanSat = -1; panCaimanNotice = 0;
       panRipCool = 0;
       panRaftReset();
       for (let i = 0; i < panRIP_N; i++) panRipT[i] = 1e9;
