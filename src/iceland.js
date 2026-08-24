@@ -3845,6 +3845,22 @@ function iceUpdateSpring(game, dt) {
       iceToast('nothing to do here. that is the instruction.');
     }
     iceSoak += dt;
+    // ---- AND IT ACTUALLY SITS IN IT NOW (v23) ---------------------------
+    // THE MARQUEE ADOPTION OF THE LOAF. This is the one task in the game whose
+    // whole content is being still, and until now "being still" was a number
+    // in this file and nothing on screen: the animal trod water in a hot pool
+    // for seven seconds with the same pose it uses to cross a fjord.
+    //
+    // It is `loafAsk` and not the rest timer because capySwimming is on the
+    // capyBusy list — correctly, or the animal would sit down mid-crossing in
+    // five chapters — so the loaf could never arrive in the one place the game
+    // explicitly asks for it. Asked every frame; stop asking and it stands up.
+    //
+    // AND IT BRINGS THE WHOLE VERB WITH IT: the camera eases back off the
+    // basin, the score takes its wider lean and goes soft, and the sheep's
+    // registry entry inverts, so anything on the near bank comes down to look.
+    // Nothing here had to be written for any of that — the pose is the input.
+    capy.loafAsk = 1;
     // and it thickens round the animal while the clock runs — which is the only
     // feedback the soak has, so it has to be legible rather than opaque
     if (Math.random() < dt * 9) {
@@ -4288,6 +4304,25 @@ export function createIceland(game) {
     waterLevel: iceSEA_Y,
     isOverWater: iceIsOverWater,
     waterHeightAt: iceSurfaceY,
+    // ---- AND THE ANIMAL HAS TO BE TOLD TO READ IT (v23) ------------------
+    // THIS CHAPTER HAS THREE BODIES OF WATER AT TWO HEIGHTS. iceSurfaceY has
+    // said so since it was written and NOTHING ASKED IT: capyWaterY only calls
+    // waterHeightAt when the biome declares `localWater`, and Iceland never
+    // did, so the capybara floated to `waterLevel` — iceSEA_Y, -1.0 — in all
+    // three of them. The hot pool is drawn at iceSPRING_Y (-0.30), which is
+    // seventy centimetres higher.
+    //
+    // MEASURED, mid-soak: the top of the drawn animal at -0.594 against a
+    // drawn surface at -0.300. The whole capybara was TWENTY-NINE CENTIMETRES
+    // UNDER THE WATER for the entire seven seconds of the chapter's quietest
+    // and best-loved moment — a marquee failing silently, in the one channel
+    // (framed) that a metric never checks.
+    //
+    // One flag. The swim threshold, the float target, the clamber ceiling and
+    // the wake rings were all already written as offsets from "wherever the
+    // water is", so all four become correct in the spring for free, and the
+    // sea and the lagoon are both iceSEA_Y so nothing outside it moves at all.
+    localWater: true,
     inZone: iceInZone,
     SPAWN: iceSPAWN,
     /** The fourth chapter to declare a moving floor. See iceUpdateSnowcat. */

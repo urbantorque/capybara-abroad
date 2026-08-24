@@ -16282,7 +16282,16 @@ export function createSystems(game) {
       // see the two timers in capybara.js. Reading stillT here collapsed the
       // whole field the instant the animal picked anything up.
       const still = (game.capy && game.capy.restT) || 0;
-      const want = clamp(still / sysCALM_FULL, 0, 1) *
+      // ---- ...AND THE LOAF IS ALSO A WAY OF BEING STILL (v23) -----------
+      // The two are the same thing everywhere except in water, where
+      // capySwimming zeroes restT — correctly — and the animal can still be
+      // sat in a hot spring because the chapter asked for it (capy.loafAsk).
+      // Without this the marquee of the whole verb had a calm field of ZERO:
+      // measured in the spring, loaf 1.00 and calm 0.00, so the score's lean
+      // (which multiplies musCalm) was exactly nothing and "the score goes
+      // soft" did not happen in the one place it was written for.
+      const loafT = (game.capy && game.capy.loaf) || 0;
+      const want = Math.max(clamp(still / sysCALM_FULL, 0, 1), loafT) *
                    clamp(1 - game.state.chaos * sysCALM_CHAOS, 0, 1);
       sysCalmNow = damp(sysCalmNow, want, want > sysCalmNow ? sysCALM_RISE : sysCALM_FALL, dt);
       game.state.calm = sysCalmNow;

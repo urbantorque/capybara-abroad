@@ -1365,6 +1365,9 @@ export function createCapybara(game) {
     restT: 0,                        // ...and with anything in it. THE CALM reads this.
     loaf: 0,                         // 0..1 sat down. The camera, the score and
                                      // the critters read this. See THE LOAF.
+    loafAsk: 0,                      // a biome writes 1 here per frame to ASK
+                                     // for the loaf where the rest test cannot
+                                     // reach — a hot spring. Cleared every frame.
 
     // The velocity of the FRAME the animal is currently solving in — a deck, the
     // air, a river. Published because "is the world moving under me, and how
@@ -1659,7 +1662,7 @@ export function createCapybara(game) {
     // the helm is not settling, and a wheek from the wheel is not a soft one.
     capyStillT = 0; capyRestT = 0;
     capy.stillT = 0; capy.restT = 0; // ...and the calm reads the published ones
-    capyLoaf = 0; capy.loaf = 0;    // ...and so does the loaf. See THE LOAF.
+    capyLoaf = 0; capy.loaf = 0; capy.loafAsk = 0;   // ...and the loaf. See THE LOAF.
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
     capyIdleAct = -1; capyIdleT = 0;
@@ -2602,7 +2605,18 @@ export function createCapybara(game) {
     // NO NEW BUTTON. The control scheme is settled and the wheek and the
     // whistle are one voice; this is a thing the animal does when you stop
     // asking it to do anything, which is the only input this verb can have.
-    const loafWant = (!capyBusy && !capy.atHelm && capyRestT >= capyLOAF_T) ? 1 : 0;
+    //
+    // ---- ...AND A PLACE MAY ASK FOR IT (see capy.loafAsk) ----------------
+    // One chapter in seventeen has a task whose entire content is sitting
+    // still, and it is in a POOL — where capySwimming is true, which is on the
+    // capyBusy list, so the animal could never have loafed in the one place the
+    // game explicitly asks it to. Rather than take swimming off that list
+    // (which would have the animal sitting down mid-crossing in five chapters),
+    // a biome may ask, per frame. It is re-asked every frame and cleared here,
+    // so a chapter that stops asking cannot leave the animal sat down.
+    const ask = capy.loafAsk > 0;
+    capy.loafAsk = 0;
+    const loafWant = (ask || (!capyBusy && !capy.atHelm && capyRestT >= capyLOAF_T)) ? 1 : 0;
     // Asymmetric, like the calm it belongs to: slow to settle, quick to get up.
     // A capybara that took two seconds to stand up would feel like a bug.
     capyLoaf = damp(capyLoaf, loafWant, loafWant > capyLoaf ? capyLOAF_LAM : capyLOAF_LAM * 6, dt);
@@ -2844,8 +2858,11 @@ export function createCapybara(game) {
         }
         const phase = capyLegPhase + ((i === 0 || i === 3) ? 0 : Math.PI);
         if (capySwimming) {
-          legs[i].rotation.x = Math.sin(phase * 1.6) * swingAmp - 0.45;
-          legs[i].rotation.z = (i % 2 === 0 ? 1 : -1) * 0.22;
+          // ...and the paddle folds away into the loaf too, or an animal
+          // "sitting still" in a hot spring is still swimming for its life.
+          legs[i].rotation.x = lerp(Math.sin(phase * 1.6) * swingAmp - 0.45,
+                                    i < 2 ? capyLOAF_LEG_F : capyLOAF_LEG_R, capyLoaf);
+          legs[i].rotation.z = (i % 2 === 0 ? 1 : -1) * 0.22 * (1 - capyLoaf);
         } else {
           // Airborne the legs stop being a gait and become a POSE: fronts reach,
           // rears trail. Cross-faded on capyAirPose so a one-frame contact blip
@@ -2972,7 +2989,9 @@ export function createCapybara(game) {
     // ...and the loaf, on the same channel and for the same reason: the
     // COLLIDER is untouched, so sitting down cannot change what you are
     // standing on, what you can reach or what task you are inside.
-    capyModel.position.y -= capyLoaf * capyLOAF_DROP;
+    // ...and less of it in the water, where buoyancy already owns the height
+    // and a full 14.5 cm would put the animal's eyes under the surface.
+    capyModel.position.y -= capyLoaf * capyLOAF_DROP * (capySwimming ? 0.30 : 1);
     capyModel.rotation.z = (carried
       ? Math.sin(capyLegPhase * 0.5) * 0.12
       : clamp(capyYawRate * 0.075, -0.34, 0.34) * (running ? 1.35 : 1)) + capyIdleRoll;
