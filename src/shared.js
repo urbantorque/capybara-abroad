@@ -2318,7 +2318,18 @@ export function grain(m, opts) {
   // shared clock makes it travel. The amount is deliberately allowed to exceed
   // 1.0, because the composite pass in main.js blooms anything over the biome's
   // threshold — which is what turns a bright pixel into a glint.
-  const spark = o.sparkle === undefined ? 0 : o.sparkle;
+  // WET WITHOUT GRAIN — for the things STANDING on the ground rather than the
+  // ground itself. The wet term below is gated on which way a face points, and
+  // that gate is the whole reason this option is cheap: the top of a bin faces
+  // up and its sides do not, so a prop takes the rain correctly for free. What
+  // a prop must NOT take is the world-space grain noise — it is scaled for a
+  // road or a lawn and on a half-metre object it reads as dirt. props.js builds
+  // ONE shared material for every instanced prop in the game, so this is one
+  // shader compile for all thirty-one types in all seventeen chapters.
+  const wetOnly = o.wetOnly === true;
+  // wetOnly wins over a sparkle, so the invariant above ("the wet gate and
+  // nothing else") holds no matter what a call site passes.
+  const spark = (wetOnly || o.sparkle === undefined) ? 0 : o.sparkle;
   const sparkScale = o.sparkleScale === undefined ? 2.2 : o.sparkleScale;
   const sparkSpeed = o.sparkleSpeed === undefined ? 0.42 : o.sparkleSpeed;
   // The threshold, and the WIDTH of the ramp above it. The ramp matters more
@@ -2330,7 +2341,8 @@ export function grain(m, opts) {
   const sparkBand = o.sparkleBand === undefined ? 0.11 : o.sparkleBand;
   const sparkCol = o.sparkleColor === undefined ? 0xffffff : o.sparkleColor;
   const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' +
-              spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol;
+              spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
+              '|' + (wetOnly ? 'w' : '');
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -2367,23 +2379,25 @@ export function grain(m, opts) {
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
         spark > 0 ? 'uniform float uGrainT;' : '',
-        'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
-        'float grNoise(vec2 p){',
-        '  vec2 i = floor(p), f = fract(p);',
-        '  vec2 u = f * f * (3.0 - 2.0 * f);',
-        '  return mix(mix(grHash(i), grHash(i + vec2(1.0, 0.0)), u.x),',
-        '             mix(grHash(i + vec2(0.0, 1.0)), grHash(i + vec2(1.0, 1.0)), u.x), u.y);',
-        '}',
+        // Nothing samples the noise field in the wet-only build, so the helpers
+        // do not go in either — the shader is the wet gate and nothing else.
+        wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
+        wetOnly ? '' : 'float grNoise(vec2 p){',
+        wetOnly ? '' : '  vec2 i = floor(p), f = fract(p);',
+        wetOnly ? '' : '  vec2 u = f * f * (3.0 - 2.0 * f);',
+        wetOnly ? '' : '  return mix(mix(grHash(i), grHash(i + vec2(1.0, 0.0)), u.x),',
+        wetOnly ? '' : '             mix(grHash(i + vec2(0.0, 1.0)), grHash(i + vec2(1.0, 1.0)), u.x), u.y);',
+        wetOnly ? '' : '}',
       ].join('\n'))
       // AFTER color_fragment, so it modulates the vertex colours a biome has
       // already baked in rather than being overwritten by them.
       .replace('#include <color_fragment>', [
         '#include <color_fragment>',
         '{',
-        '  vec2 gq = vec2(vGrainW.x + vGrainW.y * ' + (0.71 * warp).toFixed(4) + ',',
-        '                 vGrainW.z + vGrainW.y * ' + (0.43 * warp).toFixed(4) + ') * ' + scale.toFixed(4) + ';',
-        '  float gn = grNoise(gq) * 0.64 + grNoise(gq * 2.83 + 19.31) * 0.36 - 0.5;',
-        '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) + ';',
+        wetOnly ? '' : '  vec2 gq = vec2(vGrainW.x + vGrainW.y * ' + (0.71 * warp).toFixed(4) + ',',
+        wetOnly ? '' : '                 vGrainW.z + vGrainW.y * ' + (0.43 * warp).toFixed(4) + ') * ' + scale.toFixed(4) + ';',
+        wetOnly ? '' : '  float gn = grNoise(gq) * 0.64 + grNoise(gq * 2.83 + 19.31) * 0.36 - 0.5;',
+        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) + ';',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what

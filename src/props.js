@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
 
 // ===========================================================================
 // AGENT C — world physics + interactive props.
@@ -40,6 +40,57 @@ const physAERO_RHO  = 1.2;       // kg/m³, air
 const physAERO_AMAX = 40;        // m/s² ceiling on drag acceleration (integration guard)
 const physAERO_CD_BOX = 1.05;    // bluff body
 const physAERO_CD_SPH = 0.47;    // sphere
+// ---- ...AND THE GUST IS PART OF THAT AIR (see physWindNow) -----------------
+// weather.js's gust is centred on a per-chapter BASE that never stops blowing,
+// so it cannot be fed to the props raw: a 1.5 m/s permanent breeze in Sydney
+// would walk a ferry ticket off the quay while nobody was touching a key, and
+// "a prop stays exactly where the player put it" is worth more than any of
+// this. The floor is subtracted first and only the EXCESS is scaled, so:
+//   - the nine calmest chapters produce exactly 0.000 and are untouched;
+//   - five mid chapters top out at 0.4-2.6 m/s at the peak of the swing, which
+//     stirs paper and nothing else;
+//   - the four squall chapters (Reykjavik 4.6, Manly 4.8, Marrakech 6.5,
+//     Antarctica 5.8 at peak) push past the 4 m/s test that has always guarded
+//     the wake-a-sleeping-prop branch below, which is what that branch was
+//     written for and has never once been able to do.
+const physGUST_MIN = 2.8;        // m/s of gust that buys nothing at all
+const physGUST_K = 1.2;          // ...and how hard the excess above it bites
+// THE WAKE TEST, in m/s of EFFECTIVE wind (compared squared, below). A sleeping
+// body is skipped by the solver entirely, so this gate — not the drag — decides
+// whether the air exists at all for a prop at rest. It was 4.0, which the
+// effective wind NEVER REACHES: measured over a 20 s sample in Manly, the
+// windiest row in `wxMOOD`, the top of the range was 3.7 m/s and a settled prop
+// was asleep for all 1200 frames. At 2.0 a squall wakes light props and the drag
+// below is applied to them.
+const physGUST_WAKE = 2.0;
+//
+// AND WHAT THIS DELIBERATELY DOES NOT DO: BLOW A PROP ACROSS A SQUARE.
+// That was the intent and it is not reachable with drag alone, because a prop's
+// terminal velocity under drag IS the wind speed. Swept in Manly at held raw
+// gusts of 2/4/6/8/10/14 m/s, with ground-to-prop friction at 0.35, every light
+// prop shows a stiction CLIFF and no band between the two sides of it:
+//
+//   sunglasses (0.10 kg)   raw 6 -> 0.002 m over 5 s   |   raw 8 -> 9.86 m
+//   thong      (0.12 kg)   raw 6 -> 0.000 m            |   raw 8 -> 4.55 m
+//
+// Under the cliff nothing stirs; over it the prop accelerates toward the wind
+// and sails four to ten metres in five seconds, which is not charm — it is
+// props migrating away from where the player set them down, and tasks read
+// prop positions. So `physGUST_K` stays at the value that keeps the effective
+// wind (4.8 m/s at Manly's absolute peak) FAR under the cliff, and what the
+// gust buys is what a prop already in motion or in the air feels: a thrown
+// frisbee drifting downwind, not a hat leaving the beach.
+//
+// Doing it properly needs a second mechanism this does not have: a turbulent
+// KICK to break stiction, and a cap on the speed it may leave with, so the
+// prop skitters and stops instead of reaching wind speed. That is a design
+// task, not a tuning one.
+// ---- a current is a drag, not a velocity write ----------------------------
+// Toward the water rather than toward zero, so it composes with physBUOY_DRAG_L
+// and the righting torque instead of fighting them. A floating prop therefore
+// settles at k/(k + physBUOY_DRAG_L) = 0.60 of the current and LAGS the river,
+// which is what a thing being carried looks like.
+const physFLOW_DRAG = 9.0;       // N per (m/s) per kg of submerged mass
 const physSEABED = 2.3;          // metres of harbour under the surface
 const physGRP_STATIC = 1;        // ground / walls / capy / npcs (cannon default)
 const physGRP_DYN = 2;           // props + rubbish
@@ -53,6 +104,32 @@ const physTASK_GRACE = 2.0;      // s — the opening settle earns the player no
 const physCAUSE_TIP = 1.5;       // s — bin must go over right after a capy hit
 const physCAUSE_SPILL = 4.0;     // s — a lobbed cup gets a longer arc
 const physCAUSE_WATER = 8.0;     // s — a thrown ball can take a while to bob in
+
+// ---- the wheek is a pressure wave -----------------------------------------
+// THIS IS EXPRESSION AND IT IS NOT A MECHANIC. Same rule wariness follows — IT
+// DOES NOT DENY ANYTHING — read the other way round: it does not GRANT anything
+// either. The nudge is capped as a velocity change rather than as an impulse,
+// because 1/mass over a range from an 8 g ferry ticket to an 18 kg sack of
+// coffee is four orders of magnitude and a fixed impulse would fire the ticket
+// into the harbour. Capped, the lightest props all get the same small shove and
+// a 9 kg bin gets 0.033 m/s and ignores you.
+// MEASURED at the cap, on ordinary ground (mu 0.22, g 24): a prop travels
+// v²/2a = 8 cm before friction takes it back, and hops 1.5 mm. That is too
+// little to tick a task, to move a prop out of reach, or to walk one off a
+// ledge it was deliberately left on — which is the whole design constraint.
+const physWHEEK_R = 5.0;         // m — how far a wheek is felt by a prop
+const physWHEEK_IMP = 0.30;      // N·s at zero distance, before the cap
+const physWHEEK_DVMAX = 0.9;     // m/s — hard ceiling on the resulting nudge
+const physWHEEK_LIFT = 0.3;      // ...of which this fraction is upward
+const physWHEEK_SOFT = 0.34;     // a calm call is about a third of a loud one
+const physWHEEK_FLINCH = 6;      // virtual m/s of impact per m/s of nudge
+const physWHEEK_VOICE_DV = 0.35; // m/s below which a prop is stirred but silent
+// systems.js drops a 'prop:impact' under 1.5 m/s outright, so a voice has to be
+// reported just over that gate or it is not a voice at all. ONE prop per wheek
+// gets it — the nearest one that actually moved. A burst of them off the most
+// pressed button in the game would be a thud fest AND would inflate
+// game.state.chaos, which drives the music and the crowd, for free.
+const physWHEEK_VOICE_SPD = 1.6;
 
 // ---- world surfaces -------------------------------------------------------
 // Props must be spawned ON the surface under them, not at y = 0. The only
@@ -122,6 +199,10 @@ const physCV2 = new CANNON.Vec3(0, 0.5, 0);   // off-centre lever for bin topple
 // cannon collide callback, i.e. halfway through physOnCollide's own use of CV1/CV2.
 const physCV3 = new CANNON.Vec3();
 const physCV4 = new CANNON.Vec3();
+// A permanently-zero lever, for an impulse that must produce NO rotation at all
+// — see physOnWheek. Kept as its own vector because every other CANNON scratch
+// in this file is written by somebody.
+const physCV0 = new CANNON.Vec3(0, 0, 0);
 const physPV1 = new THREE.Vector3();
 const physPQ1 = new THREE.Quaternion();
 const physPM4 = new THREE.Matrix4();
@@ -156,6 +237,7 @@ const physBins = [];
 const physRubbish = [];
 const physBodyToProp = new Map();   // cannon body id -> prop, for causation lookups
 let physDust = null;
+let physDustColor = -1;          // hex currently on the (own, not shared) dust material
 const physDustPos = new Float32Array(physDUST_MAX * 3);
 const physDustVel = new Float32Array(physDUST_MAX * 3);
 const physDustLife = new Float32Array(physDUST_MAX);
@@ -957,9 +1039,26 @@ function physGetSpillGeo(type) {
 // ===========================================================================
 export function createProps(game) {
   physGame = game;
-  physPropMat = mat(physNEUTRAL, { vertexColors: true });
+  // ---- A PROP IS WET TOO ---------------------------------------------------
+  // The weather pass puts a mirror on the road and left everything standing on
+  // it bone dry. `wetOnly` is the wet half of grain() with none of the
+  // world-space noise (which is scaled for a road and reads as dirt on a
+  // half-metre object) and none of the sparkle (which is only ever for a sea).
+  // The term is gated on which way a face points, so the top of a bin takes the
+  // rain and its sides do not, for free and with no per-mesh flag.
+  // This is ONE material for every instanced prop in the game, so all thirty-one
+  // types in all seventeen chapters cost exactly one extra shader compile. It is
+  // keyed off shine() — wetness above the chapter's own baseline — so a chapter
+  // authored wet is not re-graded, and a dry frame pays one uniform read.
+  physPropMat = grain(mat(physNEUTRAL, { vertexColors: true }), { wetOnly: true });
 
+  // The pools are built BEFORE anything can fire one, and deliberately outside
+  // any biome — see physSceneAddLoose. physInitPuff/physInitShards used to live
+  // in physOnBiomeEnter's `pasto` branch, which is both a capture and a chapter
+  // nobody has visited yet on frame 1.
   physInitParticles();
+  physInitPuff();
+  physInitShards();
   physInitRubbish();
   physScatter();
 
@@ -980,6 +1079,9 @@ export function createProps(game) {
   // capture tag is already 'pasto' by the time this event fires, so everything
   // built inside belongs to Pasto rather than to Sydney.
   game.events.on('biome:enter', physOnBiomeEnter);
+  // The signature verb drew a ring on the ground and shook the camera and could
+  // not move a tin mug. See physOnWheek.
+  game.events.on('capy:wheek', physOnWheek);
 
   game.physics = {
     grab: physGrab,
@@ -2023,6 +2125,90 @@ function physCheckTip(prop) {
   if (physCausedByCapy(prop, physCAUSE_TIP)) physTask('bin-chicken');
 }
 
+/**
+ * THE WHEEK IS A PRESSURE WAVE.
+ *
+ * The signature verb of the game drew a shockwave on the ground, shook the
+ * camera, startled every tourist in earshot and could not move a tin mug —
+ * props.js had no listener for it at all. It has one now: a distance-falloff
+ * radial nudge over the props of the LIVE biome, plus a flinch on each one's
+ * own squash spring so a paper bag gives and a bowl barely twitches.
+ *
+ * THE SIZE OF IT IS THE WHOLE DESIGN. See the physWHEEK_* block: it is capped
+ * as a velocity change, it is centre-of-mass so it produces no rotation and
+ * cannot topple anything, and at the cap a prop travels about eight
+ * centimetres. It may not solve a task, move a prop out of reach, or walk one
+ * off a ledge the player needed it on. Expression, not a mechanic.
+ *
+ * `soft` on the payload is capybara.js's calm/quiet call. A soft wheek is about
+ * a third of a loud one: it stirs and flinches things, it does not scatter them.
+ */
+function physOnWheek(e) {
+  const pos = e && e.position;
+  if (!pos || !physGame || !physGame.props) return;
+  const scale = (e && e.soft === true) ? physWHEEK_SOFT : 1;
+  const live = physLiveBiome();
+  const arr = physGame.props;
+  const r2 = physWHEEK_R * physWHEEK_R;
+  const t = physGame.state ? physGame.state.time : 0;
+  let voiced = null;
+  let voicedD = 1e9;
+  for (let i = 0; i < arr.length; i++) {
+    const p = arr[i];
+    // held / carried / planted / parked props are somebody else's business, and
+    // the biome filter is physNearestGrabbable's: a detached chapter's props
+    // keep their frozen positions in the one shared coordinate space, so
+    // without it a wheek in Cali rattles an invisible Sydney sandwich.
+    if (p.removed || p.hidden || p.held || p.frozen || p.owner) continue;
+    if (p.biome && p.biome !== live) continue;
+    const b = p.body;
+    const dx = b.position.x - pos.x;
+    const dy = b.position.y - pos.y;
+    const dz = b.position.z - pos.z;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 > r2) continue;
+    // Linear falloff that reaches zero AT the radius, so nothing pops on at the
+    // edge of earshot.
+    const fall = 1 - Math.sqrt(d2) / physWHEEK_R;
+    if (fall <= 0.02) continue;
+    // 1/mass falls straight out of an impulse; the cap is what stops an 8 g
+    // ferry ticket being fired across the harbour by the same push that a bin
+    // shrugs off.
+    let dv = (physWHEEK_IMP * fall * scale) / p.mass;
+    const cap = physWHEEK_DVMAX * fall * scale;
+    if (dv > cap) dv = cap;
+    if (dv < 0.01) continue;
+    // Radial in the HORIZONTAL plane with a fixed lift on top: taking the
+    // direction in 3D would push a prop on the ground DOWNWARD into it, while
+    // the falloff still wants the full 3D distance so a prop on a balcony above
+    // is felt less. A prop directly overhead gets the lift and nothing else.
+    const hd = Math.sqrt(dx * dx + dz * dz);
+    const inv = hd > 1e-3 ? 1 / hd : 0;
+    const j = dv * p.mass;
+    physCV3.set(dx * inv * j, physWHEEK_LIFT * j, dz * inv * j);
+    b.wakeUp();
+    b.applyImpulse(physCV3, physCV0);   // at the centre of mass: no torque, ever
+    // The causation ledger stays honest — the capybara did this, just now — for
+    // exactly the same reason a shove does. It cannot tick anything by itself:
+    // nothing here moves a prop far enough to complete a task.
+    physStampTouch(p);
+    physSquashHit(p, dv * physWHEEK_FLINCH);
+    if (dv >= physWHEEK_VOICE_DV && d2 < voicedD && t - p.lastImpact > 0.25) {
+      voicedD = d2; voiced = p;
+    }
+  }
+  // ...and one of them answers, in its own material's voice.
+  if (voiced) {
+    voiced.lastImpact = t;
+    physImpactPayload.prop = voiced;
+    physImpactPayload.speed = physWHEEK_VOICE_SPD;
+    physStampVoice(voiced);
+    physImpactPayload.position.set(voiced.body.position.x, voiced.body.position.y,
+                                   voiced.body.position.z);
+    physGame.events.emit('prop:impact', physImpactPayload);
+  }
+}
+
 function physOnDig(payload) {
   const p = payload && payload.position;
   if (!p) return;
@@ -2123,22 +2309,63 @@ function physFlowAt(x, z) {
   }
   return physFlowOut;
 }
-/** The live biome's wind — {x, z}, zeros in still air. Cached once per frame. */
+/**
+ * THE AIR THE PROPS FEEL — the live biome's own wind() PLUS weather.js's gust.
+ * {x, z}, zeros in still air, cached once per frame.
+ *
+ * THE GUST IS IN HERE ON PURPOSE AND IT MUST NOT BE PUT INTO capyWindAt().
+ * CONTRACT.md's "wind() IS NOT THE GUST, AND THE GUST MUST NEVER GO INTO IT" is
+ * about the REFERENCE-FRAME channel: the one a biome publishes to say "the
+ * ground under you is moving", which feeds platVX/platVZ in capybara.js beside a
+ * ferry deck and a balloon basket. A five-metre ambient breeze on THAT channel
+ * slides a capybara across Jemaa el-Fnaa at walking pace with nobody touching a
+ * key, and in Cappadocia it fights the one system that chapter IS.
+ *
+ * This function merely SHARES THAT CHANNEL'S NAME. It is private to props.js,
+ * it has exactly two readers — the quadratic aero drag and the wake-a-sleeping-
+ * light-prop test, both in physUpdate — and capybara.js's own capyWindAt() is
+ * untouched and still asks the biome alone. Nothing the controller sees changes.
+ * Please do not "fix" this back.
+ *
+ * Only ONE chapter (the Drift) publishes wind() at all, so before this the whole
+ * aero block ran against a zero vector in sixteen of seventeen chapters and the
+ * wake branch — written specifically for gusts — could never fire anywhere.
+ */
 const physWindOut = { x: 0, z: 0 };
 let physWindTick = -1;
 function physWindNow() {
   const t = physGame.state ? physGame.state.time : 0;
   if (t === physWindTick) return physWindOut;
   physWindTick = t;
-  physWindOut.x = 0; physWindOut.z = 0;
+  let wx = 0;
+  let wz = 0;
   const api = physBiomeApi();
   if (api && typeof api.wind === 'function') {
     const w = api.wind();
     if (w) {
-      if (typeof w.x === 'number' && w.x === w.x) physWindOut.x = clamp(w.x, -12, 12);
-      if (typeof w.z === 'number' && w.z === w.z) physWindOut.z = clamp(w.z, -12, 12);
+      if (typeof w.x === 'number' && w.x === w.x) wx = clamp(w.x, -12, 12);
+      if (typeof w.z === 'number' && w.z === w.z) wz = clamp(w.z, -12, 12);
     }
   }
+  // gust() swings its HEADING as well as its speed, so the floor is taken off
+  // the SPEED and the direction is carried through untouched — subtracting a
+  // constant vector would turn a wind shift into a wind reversal.
+  const wxr = physGame.weather;
+  if (wxr && typeof wxr.gust === 'function') {
+    const g = wxr.gust();
+    if (g) {
+      const gx = typeof g.x === 'number' && g.x === g.x ? g.x : 0;
+      const gz = typeof g.z === 'number' && g.z === g.z ? g.z : 0;
+      const sp = Math.sqrt(gx * gx + gz * gz);
+      if (sp > physGUST_MIN) {
+        const k = ((sp - physGUST_MIN) * physGUST_K) / sp;
+        wx += gx * k;
+        wz += gz * k;
+      }
+    }
+  }
+  physWindOut.x = clamp(wx, -12, 12);
+  physWindOut.z = clamp(wz, -12, 12);
   return physWindOut;
 }
 
@@ -2249,12 +2476,34 @@ function physCheckWater(prop, dt) {
   lift += w * physBUOY_SWELL * sub * Math.sin(t * 1.7 + prop.id);
   b.force.y += lift;
 
-  // ---- linear drag + a lazy surface current -------------------------------
+  // ---- linear drag, and THE CURRENT CARRIES WHAT YOU DROP IN IT ------------
+  // Six chapters publish flow(x, z) — the Uji, the Manly rip, the Pantanal
+  // flood among them — and the capybara has been carried by it since it was
+  // written, while anything thrown in beside it got physBUOY_DRIFT, a
+  // decorative sine, and wobbled on the spot.
+  //
+  // It goes in as a DRAG TOWARD THE WATER, never as a velocity write: a write
+  // would stamp on the frame's linear drag and on the centre-of-buoyancy
+  // righting torque both, and a prop being carried downstream would stop
+  // bobbing and stop righting itself the moment it entered the current. As a
+  // force it simply composes — the two drags settle the prop at
+  // physFLOW_DRAG/(physFLOW_DRAG + physBUOY_DRAG_L) = 0.60 of the water's own
+  // speed, so it is carried and still visibly LAGS the river.
+  //
+  // Scaled by `sub` like everything else here, so a prop barely touching the
+  // surface is barely taken. In still water — and in the eleven chapters that
+  // publish no flow() at all, where this is one property lookup that misses —
+  // the sine below is bit-for-bit what it always was.
   const kl = physBUOY_DRAG_L * sub * prop.mass;
-  b.force.x += Math.sin(t * 0.31 + prop.id * 1.7) * physBUOY_DRIFT * prop.mass * sub
+  const fl = physFlowAt(b.position.x, b.position.z);
+  const flowing = fl.x !== 0 || fl.z !== 0;
+  const kf = flowing ? physFLOW_DRAG * sub * prop.mass : 0;
+  b.force.x += (flowing ? (fl.x - b.velocity.x) * kf
+                        : Math.sin(t * 0.31 + prop.id * 1.7) * physBUOY_DRIFT * prop.mass * sub)
              - b.velocity.x * kl;
   b.force.y -= b.velocity.y * kl;
-  b.force.z += Math.cos(t * 0.23 + prop.id * 2.3) * physBUOY_DRIFT * prop.mass * sub
+  b.force.z += (flowing ? (fl.z - b.velocity.z) * kf
+                        : Math.cos(t * 0.23 + prop.id * 2.3) * physBUOY_DRIFT * prop.mass * sub)
              - b.velocity.z * kl;
 
   // ---- righting + angular drag + a lazy turn on the swell -----------------
@@ -2277,11 +2526,42 @@ function physCheckWater(prop, dt) {
 // ===========================================================================
 // 7. PARTICLES (pooled, preallocated)
 // ===========================================================================
+/**
+ * THE POOLS COME WITH YOU. Add to the scene WITHOUT joining a biome's set.
+ *
+ * main.js claims everything added while a capture tag is up, and these pools
+ * were built inside createProps — which main.js wraps in
+ * biome.capture('sydney'). So physDust and physFoam were SYDNEY OBJECTS and
+ * went visible = false the instant Sydney detached. Landing dust, sprint
+ * scuffs, impact dust, bin-tip dust, spill dust and — the big one — the three
+ * physFoamRings on water entry drew nothing at all in chapters 3 to 17: the
+ * splash sound played over an empty screen for fifteen chapters.
+ *
+ * A pool is one set of buffers that every chapter borrows, which is exactly
+ * what main.js says about weather.js's two emitter fields where it notes they
+ * are "deliberately NOT captured into a biome" — they must survive a hemisphere
+ * change rather than being detached with whatever happened to be live when they
+ * were allocated. Same argument, same treatment.
+ */
+function physSceneAddLoose(obj) {
+  THREE.Object3D.prototype.add.call(physGame.scene, obj);
+}
+/** ...and the same for a body, so a pooled shard is not removed with a biome. */
+function physWorldAddLoose(body) {
+  CANNON.World.prototype.addBody.call(physGame.world, body);
+}
+
 function physInitParticles() {
-  physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), mat(PALETTE.soil), physDUST_MAX);
+  if (physDust) return;
+  // Its OWN material, not the shared cached one: physDust3 tints it per biome
+  // (physDUST_BIOME) and mat() hands back one instance per hex, so writing to
+  // the cached material would recolour every soil-coloured mesh in the game.
+  const dustMat = mat(PALETTE.soil).clone();
+  physDustColor = PALETTE.soil;
+  physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), dustMat, physDUST_MAX);
   physDust.frustumCulled = false;
   physDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  physGame.scene.add(physDust);
+  physSceneAddLoose(physDust);
 
   const ring = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
   physFoam = new THREE.InstancedMesh(
@@ -2291,7 +2571,7 @@ function physInitParticles() {
   );
   physFoam.frustumCulled = false;
   physFoam.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  physGame.scene.add(physFoam);
+  physSceneAddLoose(physFoam);
 
   for (let i = 0; i < physDUST_MAX; i++) physDustLife[i] = 0;
   for (let i = 0; i < physFOAM_MAX; i++) physFoamLife[i] = 0;
@@ -2299,11 +2579,42 @@ function physInitParticles() {
   physWriteFoam();
 }
 
+// ---- WHAT THE GROUND HERE IS MADE OF --------------------------------------
+// The pool is biome-neutral now, so the one thing left that was ever chapter-
+// specific about a scuff is its COLOUR. This replaces a hard-coded
+// `physPastoLive()` branch whose stated reason ("the dust pool is a Sydney
+// object") stopped being true two functions ago.
+//
+// One shared material, so a palette change is a hex write on emit rather than a
+// second draw call, and a chapter has exactly one ground under it so two
+// palettes are never wanted in the same frame.
+//
+// A chapter with no row gets soil, which is what all seventeen got before this
+// table existed — so every unlisted chapter is unchanged to the pixel.
+//
+// physDUST_ASH is the one row that is not a colour but a POOL. Volcanic dust on
+// the flank of Galeras RISES and billows rather than falling, which is the puff
+// pool's entire behaviour and is how chapter 2 has looked since it shipped.
+// Keeping Pasto identical is the point of the row, not an exception to it.
+const physDUST_ASH = -1;
+const physDUST_SOIL = 0;
+const physDUST_SAND = 1;
+const physDUST_SNOW = 2;
+const physDUST_SPRAY = 3;
+const physDUST_COLOR = [PALETTE.soil, PALETTE.sand, PALETTE.antIce, PALETTE.foam];
+const physDUST_BIOME = {
+  pasto: physDUST_ASH,
+  sahara: physDUST_SAND, goreme: physDUST_SAND, manly: physDUST_SAND, palawan: physDUST_SAND,
+  iceland: physDUST_SNOW, antarctic: physDUST_SNOW,
+  pantanal: physDUST_SPRAY,
+};
+
 function physDust3(x, y, z, count) {
-  // The dust pool was built while Sydney was capturing, so it is a Sydney object
-  // and is invisible in the Andes. Route every scuff there to the Pasto puff pool
-  // instead, so one call site serves both biomes.
-  if (physPuffMesh && physPastoLive()) { physPuff3(x, y, z, count); return; }
+  const kind = physDUST_BIOME[physLiveBiome()];
+  if (kind === physDUST_ASH && physPuffMesh) { physPuff3(x, y, z, count); return; }
+  if (!physDust) return;
+  const col = physDUST_COLOR[kind === undefined || kind < 0 ? physDUST_SOIL : kind];
+  if (col !== physDustColor) { physDustColor = col; physDust.material.color.setHex(col); }
   const n = count || 4;
   for (let k = 0; k < n; k++) {
     const i = physDustHead;
@@ -2600,8 +2911,9 @@ function physOnBiomeEnter(e) {
   physBindStalls();
   if (physPastoBuilt) return;
   physPastoBuilt = true;
-  physInitPuff();
-  physInitShards();
+  // physInitPuff/physInitShards used to be called from HERE, inside the pasto
+  // capture — which is what made both pools Pasto's property. They are built at
+  // boot and biome-neutral now; see physSceneAddLoose.
   physScatterPasto();
 }
 
@@ -3192,7 +3504,7 @@ function physInitPuff() {
   physPuffMesh.frustumCulled = false;
   physPuffMesh.castShadow = false;
   physPuffMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  physGame.scene.add(physPuffMesh);
+  physSceneAddLoose(physPuffMesh);   // biome-neutral — see physSceneAddLoose
   for (let i = 0; i < physPUFF_MAX; i++) physPuffLife[i] = 0;
   physWritePuff();
 }
@@ -3273,7 +3585,7 @@ function physInitShards() {
     const mesh = new THREE.Mesh(physShardGeos[0], physPropMat);
     mesh.castShadow = true;
     mesh.visible = false;
-    physGame.scene.add(mesh);
+    physSceneAddLoose(mesh);
     const body = new CANNON.Body({
       mass: 0.1,
       material: physLightMat || (physGame.mats ? physGame.mats.prop : undefined),
@@ -3289,7 +3601,10 @@ function physInitShards() {
     body.position.set(0, -900, 0);
     physSyncBodyTransform(body);
     body.sleep();
-    physGame.world.addBody(body);
+    // Loose, like the mesh: a bowl travels now (the type table says so) and a
+    // shard whose body was detached with Pasto would be a sliver frozen in the
+    // air over Marrakech.
+    physWorldAddLoose(body);
     physShards.push({ mesh, body, active: false, life: 0 });
   }
 }
@@ -3401,8 +3716,9 @@ function physScatterPasto() {
 
 // ---- per-frame ------------------------------------------------------------
 function physPastoUpdate(dt) {
-  physPuffUpdate(dt);
-  physShardUpdate(dt);
+  // physPuffUpdate/physShardUpdate used to be driven from here and therefore
+  // only ever ran in Pasto. They are integrated for every chapter now, at the
+  // end of physUpdate, beside the dust and the foam.
 
   // hits recorded during the step, applied now that the solver has finished
   for (let i = 0; i < physStalls.length; i++) {
@@ -3576,7 +3892,7 @@ function physUpdate(dt) {
     // ignoring it — sleeping bodies skip narrowphase AND the drag below
     if (p.mass < 0.6 && b.sleepState === CANNON.Body.SLEEPING) {
       const wg = physWindNow();
-      if (wg.x * wg.x + wg.z * wg.z > 16) b.wakeUp();
+      if (wg.x * wg.x + wg.z * wg.z > physGUST_WAKE * physGUST_WAKE) b.wakeUp();
     }
     if (b.sleepState === CANNON.Body.SLEEPING) {
       p.spillArmed = false;          // a settled cup stops being a time bomb
@@ -3652,13 +3968,19 @@ function physUpdate(dt) {
   }
 
   physRubbishUpdate(dt, live);
-  // Dust and foam are Sydney-side decor; their pools freeze with the biome
-  // rather than ageing out invisibly while the player is in the Andes.
-  if (sydneyLive) physParticleUpdate(dt);
+  // EVERY POOL, EVERY CHAPTER. This used to read `if (sydneyLive)`, which meant
+  // the pools were not even integrated abroad — so on the two occasions a
+  // particle did get emitted outside Sydney it hung in the air for ever. All
+  // four loops are O(pool) early-outs on `life <= 0` / `!active`, sixty-two
+  // slots between them, and a dead slot parks offscreen at scale 0: an idle
+  // chapter pays a few dozen array reads a frame and nothing else.
+  physParticleUpdate(dt);
+  physPuffUpdate(dt);
+  physShardUpdate(dt);
   // Pasto only, not merely "not Sydney": the stall triggers compare the
   // capybara's position against stall coordinates that every biome shares, so
   // running this abroad collapses invisible stalls and ticks market-chaos
   // from the middle of Cali.
-  else if (physPastoBuilt && physGame.biome && physGame.biome.isActive('pasto')) physPastoUpdate(dt);
+  if (physPastoBuilt && physGame.biome && physGame.biome.isActive('pasto')) physPastoUpdate(dt);
   physFlushInstances();
 }

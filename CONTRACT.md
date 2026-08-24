@@ -2049,6 +2049,134 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE DELIGHT PASS, WAVES ONE AND TWO (v21 — 24 Aug 2026)
+
+Nine items over four files. **The theme of the wave is that most of it was already
+written.** Three systems had been built, commented and left unwired; one verb had
+its constants and its spec in a comment and no implementation; and one four-channel
+API the props already used had never once been called by the animal itself.
+
+### What is new, by file
+
+**shared.js** — `grain(m, { wetOnly: true })`. The wet darken/sheen term with none
+of the world-space noise and none of the sparkle, and it forces `sparkle = 0` so the
+invariant holds whatever a call site passes. It exists because the grain's scale is
+authored for a road and on a half-metre prop it reads as dirt, while the up-facing
+gate (`vGrainN.y²`) already does the right thing on a bin lid for free.
+
+**props.js**
+- **The gust reaches the solver.** `physWindNow()` sums `weather.gust()` on top of
+  the biome's `wind()`, with the floor taken off the SPEED and the heading carried
+  through — subtracting a constant vector turns a wind shift into a wind reversal.
+  **This is not the thing CONTRACT §"`wind()` IS NOT THE GUST" forbids:** that rule
+  protects `capyWindAt()`, the reference-frame channel feeding `platVX/platVZ`, and
+  that function is untouched and still asks the biome alone.
+- `physFlowAt()` **is called now**, for the first time since it was written. Flow
+  enters as a drag toward the water, never a velocity write, so it composes with the
+  linear drag and the righting torque; a prop settles at 0.60 of the current. The old
+  `physBUOY_DRIFT` sine survives as the still-water fallback.
+- **The particle pools are biome-neutral.** `physDust`, `physFoam`, `physPuffMesh`
+  and the shard meshes AND their bodies now go in through `physSceneAddLoose` /
+  `physWorldAddLoose` (raw prototype calls, the same escape hatch weather.js uses),
+  and the `if (sydneyLive)` gate on the updates is gone. Landing dust, sprint scuffs,
+  spill dust and the three foam rings on water entry drew NOTHING in fifteen chapters
+  for the life of the game; the splash sound has been playing over an empty screen.
+  Dust colour became `physDUST_BIOME` → `physDUST_COLOR` (soil/sand/snow/spray) on
+  the pool's OWN cloned material — `mat()` hands back a shared instance and writing
+  to it recolours every soil-coloured mesh in the game.
+- **`capy:wheek` moves things.** Radial nudge over the live biome's props, `1/mass`,
+  capped as a velocity change, applied at the centre of mass so it can never topple
+  anything, with `physSquashHit` so each prop flinches in its own material's give.
+  One prop answers with a `prop:impact` voice — only one, because that event feeds
+  `chaos`, which drives the music and the crowd, and the wheek is the most-pressed
+  button in the game.
+
+**capybara.js**
+- The hop gate and `capyTryGrabStart` read the buffer. `capyBUF_WINDOW = capyCOYOTE`
+  by construction, so forgiveness is symmetric in both directions.
+- Water entry, the hard landing and the dig scoop call `game.punch()` at their
+  existing magnitudes. A refused hop (blown) and a grab whiff now have a body.
+- **The shake-dry is implemented** — `capySHAKE_DUR`/`capySHAKE_DELAY`/`capyWET_FAST`
+  were dead constants under a comment asserting the system worked. Wet 0.998 → 0.017
+  in 1.6 s where the flat decay took 8.
+- **Gaze**, added to the idle look rather than replacing it. **A held prop resolves to
+  a FIXED downward glance and never to its live position:** the prop is pinned to the
+  mouth anchor, the anchor is derived from `head.rotation`, and aiming the head at it
+  is a control loop feeding its own output back in — the gaze walks off centre and
+  takes the prop with it.
+- The idle roster is a weighted table conditioned on `mood().cold`, wetness, held prop
+  and stamina, and **`!capy.heldProp` is gone from `idleOk`** — it disabled all
+  personality during the activity the game is mostly about.
+- `capyWheekPayload.soft` is true when the animal has been settled `capyWHEEK_CALM_T`
+  (1.2 s). No new button, no fire-on-release, no latency: **you settle before you call
+  and the call comes out gentle**, so a player mid-mischief always gets the loud one
+  and every existing listener's content is preserved.
+
+**systems.js**
+- The four `*Pend` flags are timers and `jumpBuf`/`actionBuf`/`clearJumpBuf()`/
+  `clearActionBuf()` are published. Aged on `rawDt`, never the scaled `dt`, so a
+  buffered press cannot outlive its window in slow motion. Cleared on `blur`.
+- **`musSwell(1)` in `chapterCeremony`.** The scarcity law in §THE LIFT governs TASKS;
+  a chapter close is a different and rarer event — seventeen in the game. And the
+  ceremony's `confettiBurst(..., 34)` ATE ITS OWN FRONT (`sysCONF_MAX` is 26 and
+  `confHead` wraps), so the biggest moment in a chapter looked thinner than a `wow`'s
+  24: it is two bursts of 26, `sysCONF_REFILL` apart. New `showDone()` card, so the
+  chapter close is no longer the same paper as "you have arrived".
+- **`sysWAY_ID = '__way'`** — a pseudo-row, not in TASKS, the tally, the save or the
+  ledger. On `chapComplete` the arrow, the beacon and the metres come back pointed at
+  the exit, and every one of the seventeen `sysMAP_WORLDS` rows carries a `way` mark.
+  Navigation used to switch off at the exact moment the exit started to mattering.
+- **The picker cannot wipe a save by mis-click.** A tile is restore-and-travel; three
+  bare `startGame()` calls (canvas press, both touch buttons) were each a silent
+  `saveClear()` and now go to `startResume()`. Wiping is an explicit labelled path
+  that names the cost and defaults focus to **keep it**.
+- The crossing has a `musCross(dir)` built from the live chord, the destination's
+  postcard in the white, and `sysFADE_CARD_LAG` so the place card is not rising
+  underneath an opaque sheet.
+
+### AND THE ONE THAT DID NOT LAND ITS INTENT — read this before retuning it
+
+**A gust cannot blow a prop across a square with drag alone, and the numbers say so.**
+Swept in Manly (the windiest `wxMOOD` row) at held raw gusts of 2/4/6/8/10/14 m/s
+against ground-to-prop friction 0.35, every light prop shows a stiction CLIFF with no
+band between its sides:
+
+| prop | raw 6 m/s | raw 8 m/s |
+|---|---|---|
+| sunglasses 0.10 kg | 0.002 m in 5 s | **9.86 m** |
+| thong 0.12 kg | 0.000 m | **4.55 m** |
+
+Under the cliff nothing stirs. Over it the prop accelerates toward the wind — a
+prop's terminal velocity under drag IS the wind speed — and sails four to ten metres,
+which is not charm, it is props migrating away from where the player set them down,
+and tasks read prop positions. So `physGUST_K` stays at 1.2, which keeps the effective
+wind (4.8 m/s at Manly's absolute peak) far under the cliff, and **what the gust buys
+is what a prop already moving or in the air feels**: a thrown frisbee drifting
+downwind, not a hat leaving the beach. Measured after tuning: 3 mm of drift in 10 s in
+Manly, 0 everywhere else.
+
+What DID have to change is the wake test. It was `> 16` (4 m/s of effective wind) and
+the effective wind NEVER REACHES IT — measured over 20 s in Manly the top of the range
+was 3.7 and a settled prop was asleep for all 1200 frames, so the drag was not being
+applied to anything at rest at all. `physGUST_WAKE = 2.0`.
+
+**Doing it properly needs a second mechanism this does not have:** a turbulent KICK to
+break stiction and a cap on the speed the prop may leave with, so it skitters and
+stops instead of reaching wind speed. That is a design task, not a tuning one.
+
+### What was measured, in a browser, after the wave
+
+Bundle 5461 top-level declarations, no collisions. `qa/audit-tasks.mjs` 0 blockers /
+0 warnings over 199 tasks. Console 0 errors, 0 warnings across a played session and a
+17-biome sweep; `state.lastError` null in all seventeen. Pools visible in all
+seventeen (dust Tetrahedron×30, foam Cylinder×8, puff Sphere×24 — **identify them by
+geometry, not by `count`: several biome-owned meshes also have a count of 8** and a
+naive match reads a hidden Sydney mesh and reports a bug that is not there). Wheek on
+a settled prop: control 0, loud 1.0–1.4 mm, soft 0.3–0.4 mm. Kyoto completed: arrow
+opacity 1 after the last tick, paper reading "the way on: the bridge at Uji · 79 m",
+done card "11 OF 11 · 0:06 · 1 OF 17 PLACES", souvenir card following. Save: 145 bytes
+survived a reload and a tile click, and progress restored.
+
 ## RENDER TRANSFORMS — PREDICT, THEN CORRECT (v6)
 
 Reading `body.interpolatedPosition` straight into a mesh is correct at a steady frame rate and

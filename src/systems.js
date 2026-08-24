@@ -260,6 +260,29 @@ const sysALT_FOG_N   = 55;
 const sysALT_FOG_F   = 170;
 const sysALT_LAMBDA  = 2.2;
 
+// --- THE PRESS THAT ARRIVED A FRAME EARLY -----------------------------------
+// A player who taps jump eight hundredths of a second before the feet land
+// MEANT to jump, and every game that feels good in the hands agrees with them.
+// The storage for this — jumpPend / actionPend and their touch twins — has
+// existed since chapter two and NOTHING HAS EVER READ IT: it was set on the key
+// edge and hard-cleared at the bottom of the same frame, so a buffer with a
+// window of exactly one frame, which is not a buffer.
+//
+// It is a TIMER now: seconds since the press was latched, -1 when there is
+// nothing in it, published as `game.input.jumpBuf` / `actionBuf` for
+// capybara.js to consume and drop with clearJumpBuf() / clearActionBuf().
+//
+// 0.14 s, and the number matters in both directions. Shorter than about a
+// tenth and the buffer cannot be felt at all; longer than about a fifth and a
+// press you had already given up on fires by itself, which reads as the animal
+// doing something you did not ask for. Two to three frames at sixty.
+//
+// AND IT IS DECAYED ON THE WALL CLOCK, NEVER THE SCALED dt. Every `wow` in the
+// game runs a slow-motion at 0.45x; a buffer decayed on the scaled figure would
+// live three tenths of a second there and a press held over from before the set
+// piece would land in the middle of it.
+const sysINPUT_BUF = 0.14;
+
 // --- THE WAY HOME -----------------------------------------------------------
 // Three whistles, stood in the crater. Backslash stays the debug hard-cut.
 const sysHOME_WINDOW = 3.5;    // seconds the count survives between whistles
@@ -1153,6 +1176,14 @@ const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 const sysFADE_OUT   = 820;   // ms of white coming up  (CSS transition is .8s)
 const sysFADE_HOLD  = 460;   // ms of held white — the swap happens in here
 const sysFADE_CARD  = 3600;  // ms the place card stays up
+// ms after the white STARTS LEAVING before the place card is asked to rise.
+// It used to be shown at the top of the hold — 460 ms before the white even
+// began to go — and `.capyui-place` transitions over 900 ms, so the entire
+// arrival of the card that announces an arrival happened underneath an opaque
+// sheet and the player only ever saw it already landed. 380 ms puts the rise
+// across the tail of the white: the name is legible through it at about half
+// alpha and settles a beat after the world is back.
+const sysFADE_CARD_LAG = 380;
 const sysMINI_SWELL = 0.55;  // how far a `mini` lifts the score. Half, near enough:
                              // the figure is the same and in the same key, so the
                              // only thing separating it from the banner's is size
@@ -1165,6 +1196,24 @@ const sysKEEP_WAIT  = 2700;  // ms after the chapter card before the souvenir. T
                              // still leaving rather than after a silence
 const sysKEEP_CARD  = 3400;  // ms the souvenir card stays up. Longer than the
                              // moment card: there is a picture on it to look at
+// ---- THE CARD A FINISHED CHAPTER GETS, AND IT IS ITS OWN CARD -------------
+// Arrival, travel arrival, an act break, a `wow` banner and CHAPTER DONE were
+// all the same piece of paper for 3.6 s. Four of those five happen many times a
+// chapter; the fifth happens seventeen times in the whole game and is the
+// biggest thing that ever happens in one — and it was indistinguishable from
+// "you have arrived". It gets the chapter's own postcard, its name, its tally
+// and its clock, on a card of its own.
+const sysDONE_CARD  = 3600;  // ms it stays up. The same figure as the place card
+                             // on purpose: sysKEEP_WAIT (2700) is measured
+                             // against it, so the souvenir still lands while the
+                             // DONE card is leaving rather than after a silence
+const sysCONF_REFILL = 400;  // ms between the ceremony's two bursts. The scrap
+                             // ring holds sysCONF_MAX and confHead wraps modulo
+                             // it, so ONE burst bigger than the ring eats its own
+                             // front: the ceremony asked for 34 and drew 26, the
+                             // first 8 of them overwritten before they were seen.
+                             // Two full bursts, far enough apart that the first
+                             // is airborne and dying when the second lands
 const sysLED_STAGGER = 90;   // ms between two leaves of the ledger arriving. The
                              // ledger is READ, top to bottom, and seventeen rows
                              // landing at once is a table rather than a journey
@@ -2241,6 +2290,23 @@ const sysMUS_LIFT_GAP = 0.115;           // s between them
 // and the same number of stacked octaves means a different note in each.
 const sysMUS_LIFT_LO  = 60;
 const sysMUS_LIFT_HI  = 96;
+// --- THE CROSSING -----------------------------------------------------------
+// The white-out is the most repeated moment in the game — every chapter change,
+// the ferry, every line off the departures board — and for its whole 1.28 s it
+// was blank paper with NOTHING IN IT: no sound, no art, no line. Two short
+// figures, and they are built the way the lift is, out of `musCurChord` and
+// through musLiftNote, so they are in the key of the place by construction and
+// cannot be a stinger. Going out it walks DOWN the chord that is sounding;
+// coming in it walks UP the destination's opening chord, which the palette
+// swap during the held white has already made the live one.
+//
+// An octave below the lift's register — a crossing is a settling, not a
+// flourish — and at half a lift's velocity, because it plays UNDER a card and
+// a place name rather than over a set piece.
+const sysMUS_CROSS_LO = 45;
+const sysMUS_CROSS_HI = 71;
+const sysMUS_CROSS_N   = 4;      // notes. Four is a breath; six is a tune
+const sysMUS_CROSS_GAP = 0.19;   // s between them
 
 // ---------------------------------------------------------------------------
 // AND WHAT IT SOUNDS LIKE *HERE*.
@@ -2794,17 +2860,51 @@ const sysMAP_TRAIL_D = 3.0;         // metres between them — distance, not tim
 const sysMAP_TRAIL_BANDS = 3;       // age bands the track fades through
 const sysMAP_ROSE = 4;              // ticks on the compass rose (N E S W)
 
+// ---------------------------------------------------------------------------
+// AND WHERE THE DOOR IS — `way`, one per world
+//
+// Every chapter has exactly ONE way out of it, standing somewhere obvious
+// (see THE JOURNEY in the contract), CHAPTERS.way has carried the SENTENCE
+// describing it since the departures board was built — and of seventeen charts
+// exactly one, Sơn Đoòng's, had a mark on it for the place the sentence is
+// about. Everywhere else the exit was a line of prose and nothing you could
+// steer by, which is worst at exactly the moment it matters most: the tick that
+// finishes a chapter empties `todoTopId`, and the arrow, the beacon and the
+// metres all switch off together.
+//
+// One point per world, in the same shape a `marks` entry takes — `get` names a
+// key on the biome's own published api (a fixture object, a {position}, or a
+// method, all resolved by mapMarkPos) and a literal x/z is used where the exit
+// is a piece of geometry the biome does not publish. It feeds two readers: the
+// way-out mark on the chart, and `sysHINTS.__way`, which is what puts the arrow
+// and the beacon back on the door once the list is done.
+//
+// It is GUIDANCE and never urgency: no timer, no nag, nothing gated. A player
+// who wants to stand in a finished Venice for an hour may.
+//
+// The pseudo-task id the door is pinned under. Two underscores so it can never
+// collide with a row in TASKS, which are all lower-case-and-hyphens.
+const sysWAY_ID = '__way';
 const sysMAP_WORLDS = {
   // Sydney publishes zones rather than landmarks, so these come from the world
   // layout table in the contract.
-  sydney: { x0: -80, x1: 80, z0: -44, z1: 76, pad: 4, marks: [
+  sydney: { x0: -80, x1: 80, z0: -44, z1: 76, pad: 4,
+    // 'the ferry at the Quay'. `get` resolves through game.env — see
+    // sysLiveBiomeApi — and she is on a timetable, so the mark and the arrow
+    // follow her round the harbour and back to the berth. The chart's own copy
+    // is the berth, because the chart resolves getters off game[biome] and
+    // there is no game.sydney.
+    way: { get: 'ferry', x: -45.8, z: -19.0, t: 'the ferry' }, marks: [
     { x: 0, z: -4, k: 'star', t: 'Opera House' },
     { x: 38, z: 30, k: 'leaf', t: 'gardens' },
     { x: 30, z: 26, k: 'dot', t: 'picnic' },
     { x: -38, z: 10, k: 'dot', t: 'promenade' },
     { x: -34, z: -62, k: 'faint', t: 'the Bridge' },
   ] },
-  quay: { x0: -150, x1: 290, z0: -600, z1: 70, pad: 10, marks: [
+  // 'up the Corso at Manly' — the foot of the hill, ashore. A literal, because
+  // quay.js publishes the zone and not its centre.
+  quay: { x0: -150, x1: 290, z0: -600, z1: 70, pad: 10,
+    way: { x: 118, z: -586, t: 'up the Corso' }, marks: [
     { get: 'SPAWN', k: 'dot', t: 'Circular Quay' },
     { x: 0, z: -58, k: 'faint', t: 'the Bridge' },
     // Bennelong Point. It is the biggest thing on the chart after the Bridge and
@@ -2816,7 +2916,8 @@ const sysMAP_WORLDS = {
     { get: 'freshwater', k: 'boat', t: 'the big ferry' },
     { x: 118, z: -586, k: 'dot', t: 'the Corso' },
   ] },
-  pasto: { x0: -115, x1: 115, z0: -115, z1: 115, pad: 6, marks: [
+  pasto: { x0: -115, x1: 115, z0: -115, z1: 115, pad: 6,
+    way: { get: 'craterCentre', t: 'the crater' }, marks: [
     { get: 'craterCentre', k: 'star', t: 'Galeras' },
     { get: 'bell', k: 'dot', t: 'the church' },
     { get: 'coffeePatio', k: 'leaf', t: 'the coffee farm' },
@@ -2824,7 +2925,10 @@ const sysMAP_WORLDS = {
     { x: 0, z: 26, k: 'dot', t: 'the plaza' },
     { x: 0, z: -66, k: 'faint', t: 'the road up' },
   ] },
-  kyoto: { x0: -100, x1: 60, z0: -70, z1: 215, pad: 8, marks: [
+  // 'the bridge at Uji' — the deck itself, which is nine metres north of the
+  // town mark and is the only bit of it the three wheeks are answered at.
+  kyoto: { x0: -100, x1: 60, z0: -70, z1: 215, pad: 8,
+    way: { x: 4, z: 128, t: 'the bridge at Uji' }, marks: [
     { get: 'toriiStart', k: 'star', t: 'the gates' },
     { get: 'pond', k: 'water', t: 'the golden pond' },
     { get: 'zen', k: 'dot', t: 'the rock garden' },
@@ -2833,7 +2937,10 @@ const sysMAP_WORLDS = {
     { get: 'mill', k: 'dot', t: 'the mill' },
     { get: 'bowl', k: 'star', t: 'the great bowl' },
   ] },
-  cali: { x0: -135, x1: 130, z0: -110, z1: 70, pad: 8, marks: [
+  // 'the bridge over the Río Cali'. A literal: cali.js publishes the mirador
+  // and the gato, not the crossing.
+  cali: { x0: -135, x1: 130, z0: -110, z1: 70, pad: 8,
+    way: { x: -6, z: 0, t: 'the bridge' }, marks: [
     { get: 'gato', k: 'dot', t: 'the cat' },
     { get: 'ermita', k: 'star', t: 'La Ermita' },
     { get: 'chiva', k: 'dot', t: 'the chiva stop' },
@@ -2842,7 +2949,8 @@ const sysMAP_WORLDS = {
     { get: 'cristo', k: 'peak', t: 'Cristo Rey' },
     { get: 'cane', k: 'leaf', t: 'the cane' },
   ] },
-  iceland: { x0: -120, x1: 130, z0: -210, z1: 150, pad: 8, marks: [
+  iceland: { x0: -120, x1: 130, z0: -210, z1: 150, pad: 8,
+    way: { get: 'pier', t: 'the end of the pier' }, marks: [
     { get: 'pylsa', k: 'dot', t: 'the hot dog stand' },
     { get: 'church', k: 'star', t: 'Hallgrimskirkja' },
     { get: 'strokkur', k: 'dot', t: 'Strokkur' },
@@ -2851,7 +2959,8 @@ const sysMAP_WORLDS = {
     { get: 'cliff', k: 'dot', t: 'the puffins' },
     { get: 'pier', k: 'boat', t: 'the old harbour' },
   ] },
-  sahara: { x0: -90, x1: 350, z0: -110, z1: 100, pad: 8, marks: [
+  sahara: { x0: -90, x1: 350, z0: -110, z1: 100, pad: 8,
+    way: { get: 'camp', t: 'the fire at the camp' }, marks: [
     { get: 'cart', k: 'dot', t: 'the orange cart' },
     { get: 'koutoubia', k: 'star', t: 'the Koutoubia' },
     { get: 'souk', k: 'dot', t: 'the souk' },
@@ -2861,7 +2970,8 @@ const sysMAP_WORLDS = {
   ] },
   // The only map in the game where most of the rectangle is nothing at all,
   // which is honest: it IS mostly nothing.
-  drift: { x0: -110, x1: 110, z0: -180, z1: 60, pad: 8, marks: [
+  drift: { x0: -110, x1: 110, z0: -180, z1: 60, pad: 8,
+    way: { get: 'crown', t: 'the lantern plinth' }, marks: [
     { get: 'lamp', k: 'dot', t: 'the lamp' },
     { get: 'jetty', k: 'boat', t: 'the end of the jetty' },
     { get: 'column', k: 'peak', t: 'the first column' },
@@ -2872,7 +2982,8 @@ const sysMAP_WORLDS = {
   ] },
   // Venice. The one map in the game where the WATER is the thing that moves,
   // and the bake is redone as the tide changes — see sysMapBake's tide watch.
-  venice: { x0: -160, x1: 60, z0: -80, z1: 60, pad: 8, marks: [
+  venice: { x0: -160, x1: 60, z0: -80, z1: 60, pad: 8,
+    way: { get: 'molo', t: 'the two columns' }, marks: [
     { get: 'campanile', k: 'peak', t: 'the campanile' },
     { get: 'basilica', k: 'star', t: 'San Marco' },
     { get: 'cafe', k: 'dot', t: 'the caffe' },
@@ -2881,7 +2992,8 @@ const sysMAP_WORLDS = {
     { get: 'campo', k: 'dot', t: 'the campo' },
     { get: 'gondola', k: 'boat', t: 'the gondola' },
   ] },
-  kowloon: { x0: -60, x1: 60, z0: -170, z1: 70, pad: 8, marks: [
+  kowloon: { x0: -60, x1: 60, z0: -170, z1: 70, pad: 8,
+    way: { get: 'pier', t: 'the Star Ferry pier' }, marks: [
     { get: 'bakery', k: 'dot', t: 'the bakery' },
     { get: 'scaffold', k: 'peak', t: 'the bamboo' },
     { get: 'poles', k: 'faint', t: 'the poles' },
@@ -2894,7 +3006,8 @@ const sysMAP_WORLDS = {
   // Palawan. The one map in the game where the interesting half of the world
   // is UNDER the blue — so the water shading, which everywhere else is a nicety,
   // is here the actual terrain read-out.
-  palawan: { x0: -80, x1: 80, z0: -145, z1: 70, pad: 8, marks: [
+  palawan: { x0: -80, x1: 80, z0: -145, z1: 70, pad: 8,
+    way: { get: 'jetty', t: 'the bamboo jetty' }, marks: [
     { get: 'jetty', k: 'boat', t: 'the jetty' },
     { get: 'reef', k: 'leaf', t: 'the coral' },
     { get: 'wreck', k: 'faint', t: 'the wreck' },
@@ -2908,7 +3021,8 @@ const sysMAP_WORLDS = {
   // is vertical and a plan view is the one projection that cannot show that.
   // What it IS good for is the only thing it is asked to do: where is the
   // truck, and where am I relative to it.
-  goreme: { x0: -90, x1: 110, z0: -120, z1: 70, pad: 8, marks: [
+  goreme: { x0: -90, x1: 110, z0: -120, z1: 70, pad: 8,
+    way: { get: 'landing', t: 'the landing plain' }, marks: [
     { get: 'town', k: 'dot', t: 'Göreme' },
     { get: 'field', k: 'star', t: 'the launch field' },
     { get: 'tether', k: 'faint', t: 'the tethered one' },
@@ -2916,7 +3030,8 @@ const sysMAP_WORLDS = {
     { get: 'cliff', k: 'dot', t: 'the dovecote' },
     { get: 'landing', k: 'star', t: 'the landing plain' },
   ] },
-  rio: { x0: -110, x1: 120, z0: -70, z1: 100, pad: 8, marks: [
+  rio: { x0: -110, x1: 120, z0: -70, z1: 100, pad: 8,
+    way: { get: 'arpoadorRock', t: 'the rock at Arpoador' }, marks: [
     { get: 'volei', k: 'dot', t: 'the net' },
     { get: 'arpoadorRock', k: 'star', t: 'Arpoador' },
     { get: 'sugarloaf', k: 'peak', t: 'Sugarloaf' },
@@ -2927,7 +3042,8 @@ const sysMAP_WORLDS = {
   // Manly. The one map in the game whose most useful mark is a piece of open
   // water: the gutter through the bank is invisible from the beach and it is
   // the fastest thing in the chapter.
-  manly: { x0: -110, x1: 120, z0: -90, z1: 90, pad: 8, marks: [
+  manly: { x0: -110, x1: 120, z0: -90, z1: 90, pad: 8,
+    way: { get: 'flags', t: 'between the flags' }, marks: [
     { get: 'flags', k: 'star', t: 'the flags' },
     { get: 'club', k: 'dot', t: 'the surf club' },
     { get: 'rip', k: 'water', t: 'the rip' },
@@ -2936,7 +3052,10 @@ const sysMAP_WORLDS = {
     { get: 'shelly', k: 'dot', t: 'Shelly' },
     { get: 'boat', k: 'boat', t: 'the surfboat' },
   ] },
-  pantanal: { x0: -130, x1: 130, z0: -130, z1: 110, pad: 8, marks: [
+  // 'the last bridge on the Transpantaneira'. A literal, and the x is where
+  // panRoadX() puts the road at that z — the road wanders, the bridge does not.
+  pantanal: { x0: -130, x1: 130, z0: -130, z1: 110, pad: 8,
+    way: { x: -3.3, z: -96, t: 'the last bridge' }, marks: [
     { get: 'fazenda', k: 'dot', t: 'the fazenda' },
     { get: 'baia', k: 'water', t: 'the bay' },
     { get: 'nest', k: 'star', t: 'the jabiru tree' },
@@ -2947,6 +3066,9 @@ const sysMAP_WORLDS = {
   // Sơn Đoòng. Almost nothing on it, which is right — a plan view of a cave is
   // a corridor, and the whole point of the place is that it is vertical.
   cave: { x0: -80, x1: 80, z0: -200, z1: 80, pad: 8,
+    // The one chart in the game that already had its exit on it — the shape
+    // every other row above now copies.
+    way: { get: 'exit', t: 'daylight, at the far end' },
     pal: { lo: PALETTE.cavMud, mid: PALETTE.cavRock, hi: PALETTE.cavCalcite,
            wat: PALETTE.cavWaterLt, dp: PALETTE.cavWater }, marks: [
     { get: 'mouth', k: 'star', t: 'the entrance' },
@@ -2962,6 +3084,7 @@ const sysMAP_WORLDS = {
   // paddock — and the WATER colours are the ones doing the work here, since
   // nine tenths of this map is sea.
   antarctic: { x0: -212, x1: 212, z0: -500, z1: 122, pad: 10,
+    way: { get: 'jetty', t: 'the head of the jetty' },
     pal: { lo: PALETTE.antScree, mid: PALETTE.antIceSh, hi: PALETTE.antIceLt,
            wat: PALETTE.antSeaLt, dp: PALETTE.antSeaDeep }, marks: [
     { get: 'jetty', k: 'boat', t: 'the jetty' },
@@ -3182,6 +3305,36 @@ function sysBuildCSS() {
 '.capyui-more2:hover{color:' + accent + ';border-color:' + accent + ';transform:translateY(1px);}',
 '.capyui-more2:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-more2[hidden]{display:none;}',
+/* ---------- start over, and the question it asks first ----------
+   The only control on this card that can throw a journey away. Deliberately
+   the quietest thing on the page — small, unfilled, at the bottom, under a
+   rule — because the loud controls here are the seventeen that CARRY ON. */
+'.capyui-over{margin:clamp(10px,2.4vw,16px) auto 0;padding-top:clamp(8px,2vw,12px);',
+  'border-top:1px solid ' + inkFaint + ';text-align:center;max-width:520px;}',
+'.capyui-overbtn{font:inherit;font-size:clamp(8.5px,1.7vw,10.5px);font-weight:700;',
+  'letter-spacing:.14em;text-transform:uppercase;color:' + inkSoft + ';background:none;',
+  'border:1px solid transparent;border-radius:999px;padding:3px 12px 4px;cursor:pointer;',
+  'pointer-events:auto;touch-action:manipulation;',
+  'transition:color .16s ease,border-color .16s ease;}',
+'.capyui-overbtn:hover{color:' + ink + ';border-color:' + rule + ';}',
+'.capyui-overbtn:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-overbtn[hidden]{display:none;}',
+'.capyui-overask[hidden]{display:none;}',
+'.capyui-overline{font-size:clamp(9.5px,1.9vw,12px);line-height:1.4;color:' + ink + ';',
+  'font-style:italic;max-width:44ch;margin:0 auto 8px;text-wrap:balance;}',
+'.capyui-overrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}',
+'.capyui-overyes,.capyui-overno{font:inherit;font-size:clamp(9px,1.8vw,11px);font-weight:700;',
+  'letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:5px 14px 6px;',
+  'cursor:pointer;pointer-events:auto;touch-action:manipulation;',
+  'transition:transform .16s ease,border-color .16s ease,color .16s ease;}',
+'.capyui-overyes{background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';}',
+'.capyui-overyes:hover{color:' + ink + ';border-color:' + ink + ';}',
+/* KEEP IT is the filled one. The card should look like it wants you to say no. */
+'.capyui-overno{background:' + accent + ';border:1px solid ' + accent + ';',
+  'color:' + paper + ';}',
+'.capyui-overno:hover{transform:translateY(-1px);}',
+'.capyui-overyes:focus-visible,.capyui-overno:focus-visible{outline:2px solid ' + accent + ';',
+  'outline-offset:2px;}',
 '.capyui-footnote{text-transform:none;letter-spacing:.02em;font-weight:400;',
   'font-size:.95em;opacity:.8;font-style:italic;}',
 '@media (max-height:770px){.capyui-foot{margin-top:8px;padding-top:7px;',
@@ -3598,6 +3751,12 @@ function sysBuildCSS() {
 '.capyui-task{pointer-events:auto;cursor:pointer;touch-action:manipulation;',
   '-webkit-tap-highlight-color:transparent;}',
 '.capyui-task.done{cursor:default;}',
+/* THE WAY ON. A row, so it inherits the bearing and the distance and the whole
+   of the card's navigation for free — but not a TASK: no checkbox, nothing to
+   tick, and nothing that can be pinned. It reads as the sentence it is. */
+'.capyui-task.capyui-way{cursor:default;pointer-events:none;color:' + accent + ';',
+  'font-weight:700;font-style:italic;padding-left:1.75em;}',
+'@media (hover:hover){.capyui-task.capyui-way:hover .capyui-txt{color:' + accent + ';}}',
 '@media (hover:hover){.capyui-task:hover .capyui-txt{color:' + accent + ';}}',
 /* Out of the window is out of the FLOW: a zero-height row still collects the ul
    flex gap, and twenty-three of them would be 69 px of blank paper. */
@@ -3607,6 +3766,14 @@ function sysBuildCSS() {
 '.capyui-task.capyui-fold{max-height:0 !important;opacity:0;padding-top:0;padding-bottom:0;',
   'overflow:hidden;pointer-events:none;margin-top:-3px;',
   'transition:max-height .5s cubic-bezier(.4,0,.3,1),opacity .3s ease;}',
+/* ...AND THE SAME TRANSITION ON THE ROW ITSELF, WHICH IS WHAT MAKES THE ROW
+   ARRIVE RATHER THAN APPEAR. A transition is read off the state being moved
+   TO, so with this declared only on `.capyui-fold` the roll-up animated and
+   the un-roll could not: dropping the class left the element with no
+   transition at all and the height snapped. Declared here it is symmetric, and
+   nothing else on a task row ever moves max-height or opacity, so this can
+   only ever animate the fold. */
+'.capyui-task{transition:max-height .5s cubic-bezier(.4,0,.3,1),opacity .3s ease;}',
 '.capyui-box{flex:0 0 auto;width:1.05em;height:1.05em;margin-top:.06em;border:1.6px solid ' + inkFaint + ';',
   'border-radius:3px;position:relative;transform:rotate(-2deg);}',
 '.capyui-box:after{content:"\\2713";position:absolute;left:50%;top:48%;',
@@ -3736,6 +3903,37 @@ function sysBuildCSS() {
 '.capyui-keeprule{height:2px;background:' + rule + ';border-radius:2px;margin:6px auto;width:44px;}',
 '.capyui-keeptext{font-size:clamp(13px,2.9vw,18px);color:' + ink + ';font-weight:700;}',
 
+/* ---------- the chapter card, at the end of a place ----------
+   THE ONE CARD THAT SHOULD BE THE BIGGEST THING IN A CHAPTER, and until now it
+   was `.capyui-place` — the same paper an ARRIVAL uses, and an act break, and
+   a `wow`. Composed instead like the souvenir card and the ledger's leaves are:
+   the chapter's own postcard above its name, a rule, and one line of numbers.
+   z-index 59, so it sits over the place card (58) it used to BE and under the
+   ledger (66) and the crossing (70). */
+'.capyui-done{position:absolute;left:50%;top:44%;z-index:59;pointer-events:none;',
+  'transform:translate(-50%,-46%) rotate(-.9deg) scale(.96);opacity:0;',
+  'transition:opacity .5s ease,transform .62s cubic-bezier(.2,.95,.3,1);',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:6px;',
+  'box-shadow:0 20px 46px ' + shadow2 + ';padding:14px 14px 16px;text-align:center;',
+  'width:min(84vw,420px);}',
+'.capyui-done.show{opacity:1;transform:translate(-50%,-50%) rotate(-.9deg) scale(1);}',
+/* the postcard, at the aspect it is authored in (64 x 40) */
+'.capyui-doneart{width:100%;aspect-ratio:64 / 40;border-radius:4px;overflow:hidden;',
+  'border:1px solid ' + rule + ';display:block;}',
+/* aspect-ratio is not universal; a height floor keeps the picture a picture on
+   an engine that ignores it rather than collapsing it to nothing. */
+'@supports not (aspect-ratio:1/1){.capyui-doneart{height:clamp(90px,26vw,170px);}}',
+'.capyui-doneart svg{display:block;width:100%;height:100%;}',
+'.capyui-donekick{margin-top:10px;font-size:clamp(8px,1.7vw,10px);letter-spacing:.34em;',
+  'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
+'.capyui-donename{font-size:clamp(19px,4.6vw,32px);color:' + ink + ';font-weight:700;',
+  'letter-spacing:.05em;line-height:1.06;margin-top:3px;text-wrap:balance;}',
+'.capyui-donerule{height:2px;background:' + rule + ';border-radius:2px;margin:8px auto 7px;',
+  'width:min(30vw,140px);transform:rotate(.5deg);}',
+'.capyui-donesub{font-size:clamp(9.5px,2vw,12px);letter-spacing:.16em;font-weight:700;',
+  'text-transform:uppercase;color:' + inkSoft + ';font-variant-numeric:tabular-nums;',
+  'line-height:1.5;}',
+
 /* ---------- THE LEDGER (v18) ----------
    What the end card used to be was a string. This is the journey, made out of
    the pieces the journey actually left behind: the postcards, the souvenirs,
@@ -3804,8 +4002,22 @@ function sysBuildCSS() {
 /* One full-screen chalk-white div. 0.8 s out, a held beat while the world is
    swapped underneath it, 0.8 s back in. Nothing else moves during the hold. */
 '.capyui-fade{position:absolute;inset:0;z-index:70;background:' + sysHex(PALETTE.sail) + ';',
-  'opacity:0;pointer-events:none;transition:opacity .8s ease;}',
+  'opacity:0;pointer-events:none;transition:opacity .8s ease;',
+  'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;}',
 '.capyui-fade.on{opacity:1;}',
+/* WHAT IS IN THE WHITE. Both children ride the parent's opacity, so they arrive
+   with the sheet and leave with it and there is no second transition to keep in
+   step. `trip` is the gate: backRescue flashes this same element for 120 ms as
+   a blink and must stay a blink, with nothing in it. */
+'.capyui-fademark,.capyui-fadename{display:none;}',
+'.capyui-fade.trip .capyui-fademark{display:block;width:min(58vw,520px);',
+  'aspect-ratio:64 / 40;opacity:.08;}',
+'@supports not (aspect-ratio:1/1){.capyui-fade.trip .capyui-fademark{',
+  'height:min(36vh,325px);}}',
+'.capyui-fademark svg{display:block;width:100%;height:100%;}',
+'.capyui-fade.trip .capyui-fadename{display:block;font-size:clamp(10px,2.2vw,13px);',
+  'letter-spacing:.4em;text-transform:uppercase;font-weight:700;text-align:center;',
+  'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';}',
 '.capyui-place{position:absolute;left:0;right:0;top:31%;z-index:58;display:flex;',
   'flex-direction:column;align-items:center;gap:7px;pointer-events:none;text-align:center;',
   'padding:0 18px;opacity:0;transform:translateY(12px);',
@@ -4260,6 +4472,19 @@ export function createSystems(game) {
     }
     confAny = true;
     confDirty = true;
+  }
+
+  /**
+   * A burst thrown from wherever the capybara is RIGHT NOW, `dy` above it, or
+   * nothing at all if there is no animal. Exists because the chapter ceremony
+   * throws twice, four hundred milliseconds apart, and a delayed burst that
+   * closed over a position read at the first one would land on the ground the
+   * player has already walked away from.
+   */
+  function confettiAt(dy, n) {
+    const cp = game.capy && game.capy.position;
+    if (!cp) return;
+    confettiBurst(cp.x, cp.y + dy, cp.z, Math.min(n, sysCONF_MAX));
   }
 
   function confettiStep(dt) {
@@ -5534,6 +5759,46 @@ export function createSystems(game) {
     // every third of a second; anything scheduled from here would be overwritten
     // by the next tick of it and the lean-in would last 300 ms. It reads
     // musLiftEnv() instead.
+  }
+
+  /**
+   * THE CROSSING, HEARD. `dir` is -1 for the white coming up and +1 for the
+   * white leaving. See sysMUS_CROSS_*.
+   *
+   * It reads `musCurChord` — the chord ACTUALLY SOUNDING — exactly as musSwell
+   * does, and for the same reason: the score is generative and never stops, so
+   * a fixed figure would be in the wrong key half the time and would sound
+   * like a notification. On the way out that is the place being left; on the
+   * way in, the palette has already been swapped inside the held white by
+   * biome:enter, so it is the destination's own opening chord.
+   *
+   * Safe with no audio context, a suspended one, or music muted — the crossing
+   * is a picture first and a sound second, and it must not need this.
+   */
+  function musCross(dir) {
+    if (!ac || !musVol || ac.state !== 'running' || musMuted) return;
+    const chord = musCurChord;
+    if (!chord || !chord.length) return;
+    const inst = (musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck';
+    const n = sysMUS_CROSS_N;
+    const out = dir < 0;
+    const when = ac.currentTime + 0.05;
+    let t = 0;
+    for (let i = 0; i < n; i++) {
+      // Down, going out; up, coming in. Read off the chord's own degrees so a
+      // four-tone palette and a five-tone one both land on chord tones.
+      const deg = out ? (n - 1 - i) : i;
+      const idx = ((deg % chord.length) + chord.length) % chord.length;
+      const midi = musFold(chord[idx] + 12 * Math.floor(deg / chord.length),
+                           sysMUS_CROSS_LO, sysMUS_CROSS_HI);
+      // Fading out as it descends, opening up as it rises: the shape of the
+      // two halves of the crossing, in the only two lines that can say it.
+      const k = n > 1 ? i / (n - 1) : 0;
+      const vel = 0.052 * (out ? 1 - k * 0.55 : 0.55 + k * 0.55);
+      const gap = sysMUS_CROSS_GAP * (out ? 1.15 : 0.92);
+      musLiftNote(inst, when + t, midi, (i % 2 ? 0.22 : -0.22), vel, gap);
+      t += gap;
+    }
   }
 
   // Sparse bell / marimba-ish pluck, long release, always a tone of the chord.
@@ -7692,8 +7957,12 @@ export function createSystems(game) {
   }
   const goEl = sysEl('button', 'capyui-go');
   goEl.type = 'button';
+  // 'Start somewhere fresh' was the only place the card ever said the word
+  // fresh, and it did not mean it: this button turns the page, and it was the
+  // TILE on the far side of it that quietly wiped the file. The page turns; the
+  // label now says so, and starting over is its own control on page two.
   goEl.appendChild(sysEl('b', null,
-    jrFileCount > 0 ? 'Start somewhere fresh' : 'Choose a place'));
+    jrFileCount > 0 ? 'Go somewhere else' : 'Choose a place'));
   goEl.appendChild(sysEl('i', null, CHAPTERS.length + ' of them, in any order'));
   // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL. With a
   // journey on file the primary action is carrying on with it, and this one
@@ -7899,13 +8168,28 @@ export function createSystems(game) {
     }
     el.setAttribute('aria-label', d.name + ', chapter ' + d.n +
       (d.key ? ', key ' + d.key : '') +
-      (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : ''));
+      (done > 0 ? ', ' + done + ' of ' + ids.length + ' done' : '') +
+      (jrFileCount > 0 ? ', carry on from here' : ''));
     // stopPropagation, or the card's own catch-all listener starts Sydney first
     el.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     el.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      startGame(d.biome);
+      // ---- THE SAFE THING IS THE DEFAULT --------------------------------
+      // This used to be startGame(d.biome) with `restore` undefined, which
+      // takes startGame's else-branch and calls saveClear(). The tile the
+      // player just pressed had their tally on it, their progress rail, their
+      // souvenir and their best record — all read off the very file the press
+      // was about to delete — and the only place the word "fresh" appeared was
+      // on a button two screens back. Eight hours, to a mis-click, on a screen
+      // that was showing you what you were about to lose.
+      //
+      // A tile is now "go there", never "throw it away": with anything on the
+      // file it RESTORES and travels, which is the departures board's own
+      // behaviour and the one every part of this tile already implied.
+      // Starting over is still possible and is its own clearly-labelled
+      // control, below the shelf, and it asks first.
+      startGame(d.biome, jrFileCount > 0);
     });
     // ---- THE CARD LEANS TOWARDS WHATEVER YOU ARE LOOKING AT ---------------
     // Resting on a tile warms the whole screen in that chapter's own colour
@@ -8049,6 +8333,82 @@ export function createSystems(game) {
   addEventListener('resize', picksFade);
 
   p2El.appendChild(moreEl);
+
+  // ---- AND THE ONE CONTROL THAT IS ALLOWED TO THROW A JOURNEY AWAY --------
+  // Every tile above carries on. This is the only thing on the card that does
+  // not, it says so in as many words, and it asks before it does it — an
+  // in-DOM question in the card's own paper rather than window.confirm(),
+  // which is a browser chrome dialog in the middle of a hand-drawn menu and
+  // is blocked outright in some embeddings.
+  //
+  // It only exists when there is something to lose. On a fresh file there is
+  // nothing to start over FROM and the row is not built at all.
+  if (jrFileCount > 0) {
+    const overEl = sysEl('div', 'capyui-over');
+    const overBtn = sysEl('button', 'capyui-overbtn', 'start over — wipe this journey');
+    overBtn.type = 'button';
+    const overAsk = sysEl('div', 'capyui-overask');
+    overAsk.hidden = true;
+    // The question appears in place of the button it replaces, so a screen
+    // reader needs telling it is there — and focus lands inside it, which is
+    // the half that actually matters.
+    overAsk.setAttribute('role', 'group');
+    overAsk.setAttribute('aria-label', 'start over — are you sure?');
+    const overLine = sysEl('div', 'capyui-overline',
+      'this deletes ' + jrFileCount + ' of ' + TASKS.length + ' ticks, every record and every ' +
+      'souvenir, and it cannot be undone.');
+    const overRow = sysEl('div', 'capyui-overrow');
+    const overYes = sysEl('button', 'capyui-overyes', 'yes, wipe it and start at chapter one');
+    overYes.type = 'button';
+    const overNo = sysEl('button', 'capyui-overno', 'keep it');
+    overNo.type = 'button';
+    overYes.setAttribute('aria-label',
+      'yes, delete this journey and start again at chapter one');
+    overNo.setAttribute('aria-label', 'keep this journey');
+    overRow.appendChild(overYes);
+    overRow.appendChild(overNo);
+    overAsk.appendChild(overLine);
+    overAsk.appendChild(overRow);
+    overEl.appendChild(overBtn);
+    overEl.appendChild(overAsk);
+    function overShut() {
+      overAsk.hidden = true;
+      overBtn.hidden = false;
+      try { overBtn.focus(); } catch (e) {}
+    }
+    overBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+    overBtn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      overBtn.hidden = true;
+      overAsk.hidden = false;
+      // Focus lands on KEEP IT, never on the destructive one: a stray Enter
+      // after the press must not be the second half of the mis-click this
+      // whole control exists to prevent.
+      try { overNo.focus(); } catch (err) {}
+    });
+    overNo.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    overNo.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      overShut();
+    });
+    overYes.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    overYes.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      // startGame's own non-restore branch does the clearing. Chapter one,
+      // because "start over" has exactly one honest destination.
+      startGame('sydney');
+    });
+    // Escape backs out of the question without leaving the page. It is bound
+    // on the row rather than on the window so the card's own Escape — which
+    // turns back to page one — is untouched everywhere else.
+    overEl.addEventListener('keydown', function (e) {
+      if (e.code === 'Escape' && !overAsk.hidden) {
+        e.preventDefault(); e.stopPropagation(); overShut();
+      }
+    });
+    p2El.appendChild(overEl);
+  }
+
   p2El.appendChild(sysTitleFoot([
     [['←', '→', '↑', '↓'], 'look around the shelf'],
     [['Enter'], 'go there'],
@@ -8204,6 +8564,30 @@ export function createSystems(game) {
       taskRec[ids[i]] = { def: null, li: li, txt: txt, done: false, chapter: n, tilt: tilt,
                           shown: false, aim: aim, arrow: arrow, dist: dist };
     }
+  }
+  // ---- ONE MORE ROW, AND IT IS NOT A TASK ---------------------------------
+  // THE WAY ON. Tick the last thing in a place and `todoTopId` went to '' — so
+  // the arrow, the beacon and the metres all switched off together, at the one
+  // moment in a chapter when the player has exactly one thing left to find and
+  // no idea where it is. This row is what they point at instead. It is built
+  // exactly like a task row so that every reader downstream — the aim, the
+  // bearing, the distance, the rise glyph, the beacon — works on it unchanged,
+  // and it is deliberately NOT in TASKS, chapRec, the tally, the save or the
+  // ledger: `chapter: 0` keeps it out of todoPinTo, `done: false` keeps it out
+  // of every count, and nothing can ever complete it.
+  {
+    const li = sysEl('li', 'capyui-task capyui-way capyui-hidden');
+    const txt = sysEl('span', 'capyui-txt', '');
+    li.appendChild(txt);
+    const aim = sysEl('span', 'capyui-aim');
+    const arrow = sysEl('i', 'capyui-arrow');
+    const dist = sysEl('span', null, '');
+    aim.appendChild(arrow);
+    aim.appendChild(dist);
+    li.appendChild(aim);
+    listEl.appendChild(li);
+    taskRec[sysWAY_ID] = { def: null, li: li, txt: txt, done: false, chapter: 0, tilt: '',
+                           shown: false, aim: aim, arrow: arrow, dist: dist };
   }
   for (let i = 0; i < TASKS.length; i++) {
     const r = taskRec[TASKS[i].id];
@@ -8477,16 +8861,25 @@ export function createSystems(game) {
   // can take the frame down with it is worse than a chart missing a dot.
   function mapMarkPos(m) {
     if (!m.get) return m;
+    // ...and a mark may carry BOTH a getter and a literal, in which case the
+    // literal is the fallback for every way the getter can come back empty.
+    // That is how the way-out mark works in Sydney: the ARROW follows the
+    // ferry through game.env (see wayPoint, which resolves through
+    // sysLiveBiomeApi), and the CHART — which resolves getters off
+    // game[biome], and there is no game.sydney — falls back to the berth she
+    // keeps coming home to. No mark in `marks` carries both, so every one of
+    // them still resolves to null exactly as it did.
+    const back = typeof m.x === 'number' ? m : null;
     const api = game[mapBakedFor];
     let v = api && api[m.get];
-    if (!v) return null;
+    if (!v) return back;
     if (typeof v === 'function') {
-      try { v = v.call(api); } catch (e) { return null; }
-      if (!v) return null;
+      try { v = v.call(api); } catch (e) { return back; }
+      if (!v) return back;
     }
     if (typeof v.x === 'number') return v;
     if (v.position && typeof v.position.x === 'number') return v.position;
-    return null;
+    return back;
   }
 
   function mapDraw(p, yaw, camYawNow, goal) {
@@ -8576,6 +8969,29 @@ export function createSystems(game) {
         g2.fillStyle = m.k === 'faint' ? mapC.faint : m.k === 'leaf' ? sysHex(PALETTE.leafB)
                      : m.k === 'water' ? mapC.deep : mapC.soft;
         g2.beginPath(); g2.arc(mx, mz, (m.k === 'faint' ? 1.7 : 2.1) * u, 0, 6.284); g2.fill();
+      }
+    }
+
+    // ---- AND THE DOOR ------------------------------------------------------
+    // See `way` in sysMAP_WORLDS. A hollow ring with a gap in the top of it —
+    // a doorway, drawn rather than typed, and deliberately not any of the five
+    // shapes a landmark uses: it is the one mark on the chart that is not a
+    // thing to go and look at but a thing to leave by. Every chart has one now;
+    // Sơn Đoòng's was the only one that ever did.
+    const wm = mapSpec.way;
+    if (wm) {
+      const wq = mapMarkPos(wm);
+      if (wq) {
+        const wx = PX(wq.x), wz = PZ(wq.z);
+        g2.strokeStyle = mapC.ink;
+        g2.lineWidth = 1.5 * u;
+        g2.beginPath();
+        g2.arc(wx, wz, 3.4 * u, -Math.PI * 0.72, Math.PI * 1.22);
+        g2.stroke();
+        g2.fillStyle = mapC.ink;
+        g2.beginPath();
+        g2.arc(wx, wz, 1.15 * u, 0, 6.284);
+        g2.fill();
       }
     }
 
@@ -8787,8 +9203,61 @@ export function createSystems(game) {
     keepTimer = setTimeout(function () { keepEl.classList.remove('show'); }, sysKEEP_CARD);
   }
 
+  // --- the chapter card: the FIRST beat of a chapter's ceremony -------------
+  // See sysDONE_CARD. It used to borrow showPlace, which is the card an
+  // arrival, a travel arrival, an act break and a `wow` banner all use — so the
+  // rarest and largest event in the game (seventeen of them in eight hours) was
+  // drawn in exactly the same paper as "you have arrived", four times a
+  // chapter. Built once and reused, like every other card here.
+  const doneEl = sysEl('div', 'capyui-done');
+  const doneArt = sysEl('div', 'capyui-doneart');
+  const doneName = sysEl('div', 'capyui-donename', '');
+  const doneSub = sysEl('div', 'capyui-donesub', '');
+  doneEl.appendChild(doneArt);
+  doneEl.appendChild(sysEl('div', 'capyui-donekick', 'that is the whole place'));
+  doneEl.appendChild(doneName);
+  doneEl.appendChild(sysEl('div', 'capyui-donerule'));
+  doneEl.appendChild(doneSub);
+  hudRoot.appendChild(doneEl);
+  let doneTimer = 0;
+  function showDone(n, sub) {
+    const def = chapterDef(n);
+    if (!def) return;
+    while (doneArt.firstChild) doneArt.removeChild(doneArt.firstChild);
+    doneArt.style.background = sysMarkTint(def.biome, 0.30);
+    // The same postcard the picker tile and the ledger leaf are drawn from —
+    // the art is authored, it is this chapter's, and it had never once been
+    // shown at a size worth looking at.
+    const g = sysBuildMark(def.biome);
+    if (g) doneArt.appendChild(g);
+    doneName.textContent = def.name.toUpperCase();
+    doneSub.textContent = sub || '';
+    doneEl.classList.add('show');
+    if (doneTimer) clearTimeout(doneTimer);
+    doneTimer = setTimeout(function () { doneEl.classList.remove('show'); }, sysDONE_CARD);
+  }
+
   // --- biome transition: white-out + place card ---
+  // ---- AND THERE IS SOMETHING IN THE WHITE NOW ----------------------------
+  // 1.28 s of blank paper, and it is the single most repeated moment in the
+  // game: every chapter change, the ferry, and every line off the departures
+  // board. The destination's postcard is already authored, already drawn on
+  // every picker tile and every ledger leaf, and had never once been shown
+  // during the one second the player is looking at nothing but white. At 8%
+  // it is a watermark rather than a picture — you are meant to half-notice it
+  // and then find yourself somewhere.
+  //
+  // The children ride the fade's own opacity, so they arrive with the white
+  // and leave with it at no cost. `trip` gates them: backRescue flashes this
+  // same element for 120 ms as a blink and must stay a blink.
   const fadeEl = sysEl('div', 'capyui-fade');
+  const fadeMark = sysEl('div', 'capyui-fademark');
+  const fadeName = sysEl('div', 'capyui-fadename', '');
+  // Decorative, both of them: the place card that follows says the same name
+  // out loud a moment later, and a watermark read twice is a stutter.
+  fadeEl.setAttribute('aria-hidden', 'true');
+  fadeEl.appendChild(fadeMark);
+  fadeEl.appendChild(fadeName);
   hudRoot.appendChild(fadeEl);
   const placeEl = sysEl('div', 'capyui-place');
   const placeH = sysEl('h2', null, '');
@@ -8831,13 +9300,52 @@ export function createSystems(game) {
     if (text == null) return;
     const el = sysEl('div', 'capyui-toast', String(text));
     toastWrap.appendChild(el);
-    requestAnimationFrame(function () { el.classList.add('in'); });
+    // ...unless it has already been pushed off the top by four more toasts
+    // landing in the same turn, in which case it is on its way out and must
+    // not be told to arrive.
+    requestAnimationFrame(function () { if (!el.dataset.going) el.classList.add('in'); });
     setTimeout(function () {
       el.classList.remove('in');
       el.classList.add('out');
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
     }, 2200);
-    while (toastWrap.children.length > 4) toastWrap.removeChild(toastWrap.firstChild);
+    // ---- AND THE FIFTH TOAST LETS THE FIRST ONE GO, RATHER THAN DELETING IT --
+    // This was `while (children.length > 4) removeChild(firstChild)`: the
+    // oldest pill was torn out of the document mid-frame with no `.out` on it,
+    // so on a busy moment — a streak of ticks, or an arrival that says three
+    // things at once — the top of the stack vanished between frames while the
+    // four under it slid up. Every other exit in this HUD is eased and this
+    // was the one that was not.
+    //
+    // It is given the same 400 ms it would have got if its own timer had come
+    // round, and it is taken out of the flow immediately so the stack collapses
+    // on the same beat rather than waiting for the animation. `going` is the
+    // latch: a pill can be pushed out only once, however many toasts land
+    // while it is leaving.
+    // Counted over the LIVE pills only. A pill that is already on its way out
+    // is out of the flow and out of the stack, so counting it would push a
+    // second one for every one that was leaving and the stack would empty
+    // itself two toasts at a time.
+    let live = 0;
+    for (let i = 0; i < toastWrap.children.length; i++) {
+      if (!toastWrap.children[i].dataset.going) live++;
+    }
+    for (let i = 0; live > 4 && i < toastWrap.children.length; i++) {
+      const old = toastWrap.children[i];
+      if (old.dataset.going) continue;
+      old.dataset.going = '1';
+      live--;
+      old.classList.remove('in');
+      old.classList.add('out');
+      // Out of the flow at once, so the four below it slide up on the same
+      // frame instead of waiting out the fade. The wrapper is positioned, so
+      // this leaves the pill exactly where it already was.
+      old.style.position = 'absolute';
+      old.style.pointerEvents = 'none';
+      (function (el2) {
+        setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 400);
+      })(old);
+    }
   }
 
   let doneCount = 0;
@@ -9180,7 +9688,12 @@ export function createSystems(game) {
       // wants to go and do something else, and for them the only card in the
       // game that answers "how do I leave" said nothing at all. It is one line,
       // it is already written, and it goes on the row for the place you are in.
-      if (r.n === here && !full && r.def.way) bits.unshift('the way on: ' + r.def.way);
+      // ...AND IT SURVIVES FINISHING THE PLACE. The `!full` on this line meant
+      // the one card in the game that answers "how do I leave" went silent
+      // about the door on the exact tick that made the door the only thing
+      // left to find. Every other line on this row changes when a chapter
+      // fills up; this one is the last one that should.
+      if (r.n === here && r.def.way) bits.unshift('the way on: ' + r.def.way);
       r.rec.textContent = bits.length ? bits.join('  ·  ') : (full ? '' : r.def.sub);
       const open = jrOpen(r.n);
       r.row.classList.toggle('locked', !open);
@@ -10027,6 +10540,43 @@ export function createSystems(game) {
   };
   function hintHoldingBall() { return hintHolding('ball') ? 'carry it into the harbour' : 'grab the ball with E'; }
 
+  // ---- THE WAY ON IS A DESTINATION ----------------------------------------
+  // Not a task, and it is deliberately not in TASKS: it is the point the arrow
+  // and the beacon fall back to once there is nothing else to point at. See
+  // `way` in sysMAP_WORLDS for where each chapter's door is and why some of the
+  // seventeen are a getter and some a literal.
+  /** Where the live chapter's exit is, or null while its biome is still building. */
+  function wayPoint() {
+    const bio = game.biome;
+    const spec = bio && sysMAP_WORLDS[bio.current];
+    const w = spec && spec.way;
+    if (!w) return null;
+    const api = sysLiveBiomeApi(game);
+    let v = w.get && api ? api[w.get] : null;
+    if (typeof v === 'function') {
+      try { v = v.call(api); } catch (e) { v = null; }
+    }
+    if (v) {
+      if (typeof v.x === 'number') return hintAt(v.x, v.z, v.y);
+      if (v.position && typeof v.position.x === 'number') {
+        return hintAt(v.position.x, v.position.z, v.position.y);
+      }
+    }
+    return typeof w.x === 'number' ? hintAt(w.x, w.z) : null;
+  }
+  /** The sentence under the row: what the door is, and what to do at it. */
+  function wayClue() {
+    const n = todoChapter();
+    const def = chapterDef(n);
+    // Sydney has no three-wheek departure point — its exit is a boat — so it
+    // must not be told to wheek at one.
+    const verb = (def && def.biome === 'sydney')
+      ? 'or open the board with Tab, from anywhere'
+      : 'three wheeks when you get there, and the board opens';
+    return verb;
+  }
+  sysHINTS[sysWAY_ID] = { clue: wayClue, where: wayPoint };
+
   let hintT = 0, hintHas = false, hintX = 0, hintZ = 0, hintY = NaN;
   let todoTopId = '';
 
@@ -10114,6 +10664,10 @@ export function createSystems(game) {
     sfx('pop', { volume: 0.22, pitch: 1.5 });
   }
 
+  // Rows put into the flow folded this refresh, waiting for their unfold. See
+  // the note at the bottom of the visibility loop: one array so the whole card
+  // costs one forced reflow rather than one per row.
+  const todoEntering = [];
   function todoRefresh() {
     const n = todoChapter();
     const rec = chapRec[n];
@@ -10176,6 +10730,25 @@ export function createSystems(game) {
       }
       top = winIds[0] || '';
     }
+    // ---- AND WHEN THERE IS NOTHING LEFT, THE DOOR IS THE NEXT THING --------
+    // The tick that FINISHES a chapter used to leave `top` as '' — so the whole
+    // of the card's navigation switched off at the exact moment the player has
+    // one thing left to find and the chapter has hidden it somewhere specific
+    // on purpose. The pseudo-row takes over: same arrow, same beacon, same
+    // metres, pointed at the way on. See sysWAY_ID and `way` in sysMAP_WORLDS.
+    //
+    // GUIDANCE, NOT URGENCY. There is no timer on it, nothing counts down,
+    // nothing nags, and standing in a finished place is still a thing you may
+    // do for as long as you like. It is the same amount of help the card gives
+    // for every other line in the chapter, given for the last one as well.
+    const wayRec = taskRec[sysWAY_ID];
+    const wayOn = openIds.length === 0 && chapComplete(n) && !!(cdef && cdef.way);
+    if (wayOn) {
+      top = sysWAY_ID;
+      show[sysWAY_ID] = true;
+      const wtxt = 'the way on: ' + cdef.way;
+      if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
+    }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     if (top !== todoTopId) {
       // clear the aim off whoever used to be top
@@ -10194,8 +10767,43 @@ export function createSystems(game) {
       const want = !!show[id];
       if (want === r.shown) continue;
       r.shown = want;
-      if (want) { r.li.classList.remove('capyui-hidden'); r.li.style.transform = r.tilt; }
-      else { r.li.classList.add('capyui-hidden'); r.li.classList.remove('capyui-fold'); }
+      if (want) {
+        // ---- A ROW ARRIVING GETS THE UNFOLD ITS EXIT ALREADY HAS ----------
+        // Leaving the window has had a max-height transition since the window
+        // existed (.capyui-fold, 520 ms) and arriving had NOTHING: the row
+        // simply lost `display:none` and popped in at full height, in one
+        // frame, pushing everything under it down a line. Two halves of one
+        // motion, and only one of them was there.
+        //
+        // It is done as fold-then-unfold rather than as a keyframe because the
+        // roll-up already owns max-height, and two writers of one property is
+        // how a transition ends up snapping anyway: the row enters folded, is
+        // put into the flow, and the class is dropped on the next frame so
+        // there is a resolved height to animate FROM. Under
+        // prefers-reduced-motion the sheet crushes both durations to 0.01 ms
+        // and this costs the player one extra frame of nothing.
+        r.li.classList.add('capyui-fold');
+        r.li.classList.remove('capyui-hidden');
+        r.li.style.transform = r.tilt;
+        todoEntering.push(r.li);
+      } else { r.li.classList.add('capyui-hidden'); r.li.classList.remove('capyui-fold'); }
+    }
+    // ONE READ FOR THE WHOLE CARD, NOT ONE PER ROW. Every write above is done
+    // before anything is measured; the single offsetHeight below resolves the
+    // folded height of all of them at once, and interleaving a read with each
+    // write would have been up to five forced reflows on one refresh — the
+    // same mistake picksFade() has a note about.
+    if (todoEntering.length) {
+      void listEl.offsetHeight;
+      requestAnimationFrame(function () {
+        for (let i = 0; i < todoEntering.length; i++) {
+          const li = todoEntering[i];
+          // ...unless it has been hidden or retired again in the meantime, in
+          // which case the fold on it is somebody else's.
+          if (!li.classList.contains('capyui-hidden')) li.classList.remove('capyui-fold');
+        }
+        todoEntering.length = 0;
+      });
     }
     // The clue belongs directly under the row it is about, not at the foot of
     // the card with three unrelated rows in between.
@@ -10223,14 +10831,17 @@ export function createSystems(game) {
         const t = recText(rec.ids[i]);
         if (t) best += (best ? '\n' : '') + t;
       }
-      // and where the way on is, in words. A player who has just finished a
-      // place is exactly the player who has stopped looking at the map, and
-      // every chapter hides its exit somewhere specific on purpose.
+      // ...and what to DO at the door. Naming the door is now the row above
+      // this board rather than a line inside it — the row carries a bearing and
+      // a distance, which a sentence cannot — so the board says the other half,
+      // which is the verb. Said as guidance and never as a nudge: there is no
+      // clock on it and nothing about it changes if it is ignored.
+      if (wayOn) best = wayClue() + (best ? '\n' + best : '');
+      else if (cdef && cdef.way) best += (best ? '\n' : '') + 'the way on: ' + cdef.way;
       // ---- AND WHAT YOU ARE TAKING WITH YOU (v18) -------------------------
       // The record board is the last thing the paper ever says about a place,
       // so it is where the souvenir belongs: it is the one line on it that is
       // about somewhere else.
-      if (cdef && cdef.way) best += (best ? '\n' : '') + 'the way on: ' + cdef.way;
       if (cdef && cdef.keep) best += (best ? '\n' : '') + 'you kept: ' + cdef.keep;
       clueEl.textContent = best || 'nothing left undone here';
       clueEl.classList.remove('off');
@@ -11235,9 +11846,12 @@ export function createSystems(game) {
 
   /**
    * The end of a place. Deliberately built out of the pieces that already exist
-   * — the place card, the confetti, the tick chime — rather than a new screen,
+   * — a card, the confetti, the lift, the chime — rather than a new screen,
    * because a full-screen interruption every twenty minutes is a worse reward
    * than a good ten seconds that lets you keep playing.
+   *
+   * THREE BEATS: the chapter card (its own paper now, see showDone), the
+   * souvenir at sysKEEP_WAIT, and the sentence about the way on after that.
    */
   function chapterCeremony(n) {
     const def = chapterDef(n);
@@ -11249,13 +11863,38 @@ export function createSystems(game) {
     jrChapMs[n] = Math.max(0, total - prev);
     let doneChaps = 0;
     for (let k = 1; k <= chapMax; k++) if (chapComplete(k)) doneChaps++;
-    showPlace(def.name.toUpperCase() + '  ·  DONE',
+    showDone(n,
       rec.ids.length + ' of ' + rec.ids.length + '  ·  ' + sysFmtTime(total - prev) +
       '  ·  ' + doneChaps + ' of ' + chapMax + ' places');
+    // ---- AND THE SCORE LIFTS FOR IT ---------------------------------------
+    // THE GAME'S BIGGEST INVERSION, and it was here: a single `wow` task got
+    // the full lift AND slow motion, and closing an entire nineteen-task
+    // chapter got neither — so the loudest thing in an eight-hour game was
+    // picking up one sandwich.
+    //
+    // THE SCARCITY LAW IN "THE LIFT" IS ABOUT TASKS, AND THIS IS NOT ONE.
+    // "Exactly one task per chapter carries `wow`" is a rule about a hundred
+    // and ninety-nine rows, and it is untouched: no biome may call musSwell for
+    // a tick, and no chapter may grow a second `wow`. A chapter CLOSE is a
+    // different kind of event and a rarer one — seventeen in the whole game,
+    // against a hundred and eighty-five ticks — so paying it in the same
+    // currency does not dilute the banner, it puts the banner in proportion.
+    // No slow motion, though: that stays the marquee's alone, because the
+    // ceremony fires 1.1 s after a tick that has already finished and there is
+    // nothing left happening for the world to hold still for.
+    musSwell(1);
     sfx('chime', { volume: 1.0, pitch: 1.2 });
     setTimeout(function () { sfx('cheer', { volume: 0.8 }); }, 520);
-    const cp = game.capy && game.capy.position;
-    if (cp) { confettiBurst(cp.x, cp.y + 0.6, cp.z, 34); }
+    // ---- TWO BURSTS, AND NEITHER OF THEM IS BIGGER THAN THE RING ----------
+    // This asked for 34 scraps out of a pool of sysCONF_MAX (26) and confHead
+    // wraps modulo that, so the last 8 landed on top of the first 8 — the
+    // ceremony drew TWENTY-SIX and looked THINNER than a `wow`'s 24, because
+    // eight of its scraps were re-thrown before anybody saw them. Capped at the
+    // ring, and a second full burst once the first is airborne and the pool has
+    // paper to spare: twice the confetti a marquee gets, which is the ratio the
+    // moment deserves and the one it was reaching for.
+    confettiAt(0.6, sysCONF_MAX);
+    setTimeout(function () { confettiAt(0.6, sysCONF_MAX); }, sysCONF_REFILL);
     punch(0.18);
     saveSoon();
     // ---- AND THEN WHAT ----------------------------------------------------
@@ -11293,7 +11932,34 @@ export function createSystems(game) {
   input.whistle = false;
   input.whistlePressed = false;
   const keys = Object.create(null);
-  let honkPend = false, actionPend = false, whistlePend = false, jumpPend = false;
+  // ---- THE BUFFER ---------------------------------------------------------
+  // Four timers, in SECONDS SINCE THE PRESS, -1 for empty. See sysINPUT_BUF.
+  // They used to be booleans that were set on a key edge and wiped at the
+  // bottom of the same frame, which nothing ever read. sysBufPress() latches
+  // one and publishes it in the same breath, because capybara.js runs BEFORE
+  // systems and has to be able to see a press on the frame it happened.
+  let honkPend = -1, actionPend = -1, whistlePend = -1, jumpPend = -1;
+  // ...and the two the contract pins are published on game.input, along with
+  // the two functions that empty them. A consumer that never calls the clear
+  // is not a bug: the timer expires on its own after sysINPUT_BUF, so the
+  // worst case is the press being available for two frames instead of one.
+  input.jumpBuf = -1;
+  input.actionBuf = -1;
+  input.clearJumpBuf = function () { jumpPend = -1; input.jumpBuf = -1; };
+  input.clearActionBuf = function () { actionPend = -1; input.actionBuf = -1; };
+  function sysBufJump()   { jumpPend = 0; input.jumpBuf = 0; }
+  function sysBufAction() { actionPend = 0; input.actionBuf = 0; }
+  function sysBufVoice()  { honkPend = 0; whistlePend = 0; }
+  function sysBufClearAll() {
+    honkPend = -1; actionPend = -1; whistlePend = -1; jumpPend = -1;
+    input.jumpBuf = -1; input.actionBuf = -1;
+  }
+  /** One timer, aged on RAW wall-clock seconds and expired at the window. */
+  function sysBufAge(t, rdt) {
+    if (t < 0) return -1;
+    const n = t + rdt;
+    return n > sysINPUT_BUF ? -1 : n;
+  }
   let touchJump = false, touchJumpPend = false;
   let mouseAction = false;
   let touchHonk = false, touchHonkPend = false, touchAction = false, touchActionPend = false;
@@ -11468,9 +12134,21 @@ export function createSystems(game) {
     setTimeout(function () {
       toast((landed && cdef.open) || 'be a menace.');
     }, 700);
-    honkPend = false; actionPend = false; whistlePend = false; jumpPend = false;
+    sysBufClearAll();
     input.honkPressed = false; input.actionPressed = false; input.whistlePressed = false;
     input.jumpPressed = false;
+  }
+  /**
+   * CARRY ON, OR BEGIN — the answer to a gesture that did not name a place.
+   * Three call sites used to be a bare `startGame()`, which takes the
+   * non-restore branch and calls saveClear() on a file the player never asked
+   * to lose: a press on the canvas behind the card, and either of the two touch
+   * buttons, before the game has started. Nothing that is merely a TAP may
+   * wipe a journey — starting over is one control, on page two, and it asks.
+   */
+  function startResume() {
+    if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
+    else startGame('sydney');
   }
   // Catch-all: anywhere on the card that is not a ticket. With a journey on
   // file this must CARRY ON, not start fresh — startGame's non-restore path
@@ -11488,8 +12166,7 @@ export function createSystems(game) {
     // for an AudioContext. Page one does not need this: a press there starts
     // the game, and startGame brings the score up itself.
     if (titlePageN !== 1) { titleAudio(); return; }
-    if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
-    else startGame('sydney');
+    startResume();
   });
 
   // --- keyboard ---
@@ -11506,15 +12183,25 @@ export function createSystems(game) {
       // below would otherwise fire FIRST and start Sydney, which made tabbing
       // to a chapter and pressing Enter do the one thing it did not say.
       // Measured: Tab x9 to "The Drift", Enter, and the game opened in Sydney.
+      // ...AND THAT IS TRUE OF EVERY BUTTON ON THE CARD, NOT ONLY A TILE.
+      // This tested for `.capyui-pick` alone, so Enter on the focused "choose a
+      // place" button, on "back", on "more below" or on the carry-on row fired
+      // the two reflex shortcuts below FIRST and started a game instead of
+      // doing what the focused control says. The rule wanted is simply: if the
+      // browser is about to activate a button, let it.
       const focus = document.activeElement;
-      const onPick = !!(focus && focus.classList && focus.classList.contains('capyui-pick'));
-      if (onPick && (c === 'Enter' || c === 'NumpadEnter' || c === 'Space')) return;
+      const onBtn = !!(focus && focus.tagName === 'BUTTON' && titleEl.contains(focus));
+      if (onBtn && (c === 'Enter' || c === 'NumpadEnter' || c === 'Space')) return;
       // 1-9 pick a chapter and 0 is the tenth; everything past that comes off
       // sysPICK_EXTRA, because a keyboard has ten digits and this game has
       // thirteen places. The card says which; nothing here is guessable and
       // nothing here needs to be.
+      // Same rule as a tile press, for the same reason: with a journey on file
+      // a digit is "go there", not "throw it away". See the note on the tile's
+      // click listener — this was the second door into the same data loss and
+      // it was the quicker one.
       const pick = sysPickFromKey(c);
-      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome); return; }
+      if (pick > 0) { startGame(CHAPTERS[pick - 1].biome, jrFileCount > 0); return; }
       // THE PAGE TURNS BOTH WAYS FROM THE KEYBOARD. Escape is the one key
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
@@ -11539,8 +12226,7 @@ export function createSystems(game) {
         }
       }
       if (c === 'Enter' || c === 'NumpadEnter') {
-        if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
-        else startGame('sydney');
+        startResume();
         return;
       }
       if (c === 'Space') {
@@ -11549,8 +12235,7 @@ export function createSystems(game) {
         // On page two it turns back instead, because a reflex key that starts
         // a chapter you did not point at is the same bug as the backdrop one.
         if (titlePageN === 2) { titlePage(1); return; }
-        if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true);
-        else startGame('sydney');
+        startResume();
         return;
       }
     }
@@ -11621,17 +12306,17 @@ export function createSystems(game) {
     // out. whistle* stays as an alias so every reader keeps working unchanged.
     // Q, because it is the one key the left hand reaches without leaving WASD.
     if (c === 'KeyQ' && started) {
-      honkPend = true; input.honkPressed = true; input.honk = true;
-      whistlePend = true; input.whistlePressed = true; input.whistle = true;
+      sysBufVoice(); input.honkPressed = true; input.honk = true;
+      input.whistlePressed = true; input.whistle = true;
     }
     // GRAB on E: the interact key in every third-person game of the last twenty
     // years, and the capybara's grab is exactly that verb.
-    if (c === 'KeyE' && started) { actionPend = true; input.actionPressed = true; input.action = true; }
+    if (c === 'KeyE' && started) { sysBufAction(); input.actionPressed = true; input.action = true; }
     // HOP on Space — the universal jump key, and the thumb never has to leave it.
     // Same latch-at-source rule: the capybara runs BEFORE systems and must see
     // the press on its own frame.
     if (c === 'Space' && started) {
-      jumpPend = true; input.jumpPressed = true; input.jump = true;
+      sysBufJump(); input.jumpPressed = true; input.jump = true;
     }
     // Snap the rig behind the capybara, right now. The only loop-free way to get
     // "put the camera behind me" WHILE moving (see the idle tidy-up in update),
@@ -11671,15 +12356,19 @@ export function createSystems(game) {
   addEventListener('blur', function () {
     for (const k in keys) keys[k] = false;
     mouseAction = false; dragId = -1;
+    // rAF stops while the tab is hidden, so a buffered press taken half a
+    // second before an alt-tab would still be 0.02 s old on the way back and
+    // would fire by itself. A press does not survive leaving the window.
+    sysBufClearAll();
   });
 
   // --- mouse / pointer on the canvas ---
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   canvas.addEventListener('pointerdown', function (e) {
     audioUnlock();
-    if (!started) { startGame(); return; }
+    if (!started) { startResume(); return; }
     if (e.pointerType === 'mouse') {
-      if (e.button === 0) { mouseAction = true; actionPend = true; input.actionPressed = true; input.action = true; }
+      if (e.button === 0) { mouseAction = true; sysBufAction(); input.actionPressed = true; input.action = true; }
       else if (e.button === 2) { dragId = e.pointerId; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
     } else {
       dragId = e.pointerId;
@@ -11738,7 +12427,7 @@ export function createSystems(game) {
   zoneEl.addEventListener('pointerdown', function (e) {
     e.preventDefault();
     audioUnlock();
-    if (!started) { startGame(); return; }
+    if (!started) { startResume(); return; }
     stickId = e.pointerId;
     const r = zoneEl.getBoundingClientRect();
     stickOx = e.clientX - r.left; stickOy = e.clientY - r.top;
@@ -11773,7 +12462,7 @@ export function createSystems(game) {
     el.addEventListener('pointerdown', function (e) {
       e.preventDefault();
       audioUnlock();
-      if (!started) { startGame(); return; }
+      if (!started) { startResume(); return; }
       el.classList.add('press');
       down();
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
@@ -11783,15 +12472,21 @@ export function createSystems(game) {
     el.addEventListener('pointercancel', off);
     el.addEventListener('pointerleave', off);
   }
+  // A THUMB IS THE READER THIS BUFFER WAS BUILT FOR. The touch fan is the one
+  // input in the game with no travel and no feel, so an early tap is not a
+  // slip, it is the normal case — these buffer exactly as the keys do.
   bindBtn(wheekBtn, function () {
     touchHonk = true; touchHonkPend = true; input.honkPressed = true; input.honk = true;
     touchWhistlePend = true; input.whistlePressed = true; input.whistle = true;
+    sysBufVoice();
   }, function () { touchHonk = false; });
   bindBtn(grabBtn, function () {
     touchAction = true; touchActionPend = true; input.actionPressed = true; input.action = true;
+    sysBufAction();
   }, function () { touchAction = false; });
   bindBtn(hopBtn, function () {
     touchJump = true; touchJumpPend = true; input.jumpPressed = true; input.jump = true;
+    sysBufJump();
   }, function () { touchJump = false; });
 
   // ---- THE PAD, POLLED ----------------------------------------------------
@@ -11897,7 +12592,7 @@ export function createSystems(game) {
     // ---- and the two cards ------------------------------------------------
     const start = padBtn(g, 9), back = padBtn(g, 8);
     if (start && !padWasStart) {
-      if (!started) { if (jrFileCount > 0) startGame(jrFile.biome || 'sydney', true); else startGame('sydney'); }
+      if (!started) { startResume(); }
       else jrToggle();
     }
     if (back && !padWasBack && started) {
@@ -12430,19 +13125,57 @@ export function createSystems(game) {
     return true;
   }
 
-  /** The ceremonial version: white out, swap inside the held white, fade back in. */
+  /**
+   * The ceremonial version: white out, swap inside the held white, fade back
+   * in. THE CROSSING IS A MOMENT, NOT A GAP — see sysFADE_CARD_LAG and
+   * musCross. Four things happen in a second and a quarter and until now the
+   * player experienced none of them:
+   *
+   *  0 ms      the white starts, a low figure walks DOWN the chord that is
+   *            sounding, and the destination's postcard fades up inside the
+   *            white with its name under it;
+   *  FADE_OUT  the world is swapped and the palette with it, and the new key's
+   *            opening chord walks UP as the white begins to leave;
+   *  +LAG      the place card starts to rise, so it is seen ARRIVING through
+   *            the tail of the white rather than being already there when the
+   *            white clears — its whole 900 ms rise used to happen underneath
+   *            an opaque sheet.
+   */
   function biomeFadeTo(name, title, sub, onArrive) {
     if (transBusy) return false;
     const bio = game.biome;
     if (!bio || bio.isActive(name)) return false;
     transBusy = true;
+    // ---- what is in the white ---------------------------------------------
+    while (fadeMark.firstChild) fadeMark.removeChild(fadeMark.firstChild);
+    const cdef = chapterDef(chapterOf(name));
+    const g = sysBuildMark(name);
+    if (g) fadeMark.appendChild(g);
+    fadeName.textContent = title || (cdef ? cdef.name.toUpperCase() : '');
+    fadeEl.classList.add('trip');
     fadeEl.classList.add('on');
+    // ---- and the sound of leaving ------------------------------------------
+    musCross(-1);
     setTimeout(function () {
       biomeGo(name);
-      if (title) showPlace(title, sub || '');
       setTimeout(function () {
         fadeEl.classList.remove('on');
         transBusy = false;
+        // The palette was swapped by biome:enter inside the hold, so this is
+        // the place you have ARRIVED in answering, in its own key.
+        musCross(1);
+        // THE CARD LANDS IN THE CLEAR. Held back from the top of the hold,
+        // where it used to be: .capyui-place rises over 900 ms and the white
+        // is opaque for the first 460 of them, so the arrival that the card is
+        // supposed to BE was performed entirely behind a sheet of paper.
+        if (title) setTimeout(function () { showPlace(title, sub || ''); }, sysFADE_CARD_LAG);
+        // and the art goes with the white, once it has finished leaving
+        setTimeout(function () {
+          if (transBusy) return;             // another crossing has started
+          fadeEl.classList.remove('trip');
+          while (fadeMark.firstChild) fadeMark.removeChild(fadeMark.firstChild);
+          fadeName.textContent = '';
+        }, sysFADE_OUT + 60);
         if (onArrive) setTimeout(onArrive, 600);
       }, sysFADE_HOLD);
     }, sysFADE_OUT);
@@ -12793,6 +13526,12 @@ export function createSystems(game) {
       const m = spec.marks[i];
       (mapMarkPos(m) ? ok : missing).push(m.t + (m.get ? ' <' + m.get + '>' : ''));
     }
+    // The way out is a mark like any other and is audited like one — it is the
+    // one on the chart that would be worst to be silently missing.
+    if (spec.way) {
+      const w = spec.way;
+      (mapMarkPos(w) ? ok : missing).push('WAY OUT: ' + w.t + (w.get ? ' <' + w.get + '>' : ''));
+    }
     return { biome: mapBakedFor, ok: ok, missing: missing };
   }
 
@@ -12942,6 +13681,23 @@ export function createSystems(game) {
     // see the note by padPoll and the clear at the end of this function.
     padPoll(dt);
     if (padRumbleT > 0) padRumbleT -= dt;
+    // ---- THE BUFFER AGES ----------------------------------------------------
+    // On game.state.rawDt, NEVER on the scaled dt — see sysINPUT_BUF. A press
+    // that arrived a frame early must not turn into a press that arrives a
+    // third of a second late because a `wow` put the world at 0.45x.
+    // Aged here rather than at the bottom of update() so that a press latched
+    // between two frames is handed to capybara.js — which runs BEFORE systems
+    // — at an age of zero on the frame it happened, and one tick older on each
+    // frame after that.
+    {
+      const rdt = game.state.rawDt || dt;
+      jumpPend = sysBufAge(jumpPend, rdt);
+      actionPend = sysBufAge(actionPend, rdt);
+      honkPend = sysBufAge(honkPend, rdt);
+      whistlePend = sysBufAge(whistlePend, rdt);
+      input.jumpBuf = jumpPend;
+      input.actionBuf = actionPend;
+    }
     let ix = 0, iz = 0;
     if (started) {
       if (keys.KeyA || keys.ArrowLeft) ix -= 1;
@@ -14903,10 +15659,18 @@ export function createSystems(game) {
     // the frame, so every earlier module has already seen them.
     input.honkPressed = false; input.actionPressed = false; input.whistlePressed = false;
     input.jumpPressed = false;
-    honkPend = false; touchHonkPend = false;
-    actionPend = false; touchActionPend = false;
-    whistlePend = false; touchWhistlePend = false;
-    jumpPend = false; touchJumpPend = false;
+    // ...AND THE BUFFER IS NOT CLEARED HERE ANY MORE.
+    // These four used to be wiped on this line, one frame after they were set,
+    // by nobody's request and to nobody's benefit — a buffer whose window is a
+    // single frame cannot buffer anything. They are timers now and they age at
+    // the top of update() on the wall clock; the only things that empty them
+    // early are the consumer (clearJumpBuf / clearActionBuf), leaving the
+    // window, and starting a game. The one-frame edge flags above are
+    // untouched and still mean exactly what they meant.
+    touchHonkPend = false;
+    touchActionPend = false;
+    touchWhistlePend = false;
+    touchJumpPend = false;
 
     // ...AND THE PAD'S EDGES ARE PUBLISHED HERE, AFTER THE CLEAR.
     // A pad has no event to latch at, and systems runs last: a press written at
@@ -14915,9 +15679,15 @@ export function createSystems(game) {
     // next frame, where capybara.js — which runs BEFORE systems — reads it with
     // the held flag already true and agreeing with it. That is one frame of
     // latency and it is the only correct place for them.
-    if (padEdgeHonk)   { input.honkPressed = true; input.whistlePressed = true; padEdgeHonk = false; }
-    if (padEdgeAction) { input.actionPressed = true; padEdgeAction = false; }
-    if (padEdgeJump)   { input.jumpPressed = true; padEdgeJump = false; }
+    // ...and a pad press goes into the BUFFER on the same line, or the one
+    // input in the game that cannot latch at an event source would be the only
+    // one that does not buffer. The timer is set here and aged from the top of
+    // the NEXT update(), which is the same frame the edge above is read on —
+    // so a pad and a keyboard hand the consumer the same age for the same
+    // press.
+    if (padEdgeHonk)   { input.honkPressed = true; input.whistlePressed = true; padEdgeHonk = false; sysBufVoice(); }
+    if (padEdgeAction) { input.actionPressed = true; padEdgeAction = false; sysBufAction(); }
+    if (padEdgeJump)   { input.jumpPressed = true; padEdgeJump = false; sysBufJump(); }
   }
 
   return { update: update, sun: sun, hemi: hemi };
