@@ -2049,6 +2049,68 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE PAYOFF PASS, BATCH TWO — THE LAWN (v24 — 25 Aug 2026)
+
+**Finishing this game was a RECEIPT.** The last tick anywhere scheduled `showEnd`, which paused
+everything and opened the ledger on top of whatever you were standing in — most likely Antarctica,
+because chapter 17 is where a completionist ends up. The journey has a thread (the shelf) and a
+spine (the souvenirs) and both were only ever shown to you on a card.
+
+**Now: come home.** Return to Sydney with all seventeen chapters complete and the seventeen
+souvenirs are laid out on the Botanic Gardens picnic lawn in a horseshoe. Walk into the mouth of
+it and SIT DOWN, and that is the ending — the loaf, then one line, then the ledger. The last thing
+the game asks of you is the first thing it taught you to do for its own sake.
+
+    sysFIN_X, sysFIN_Z   30, 26     the picnic lawn (envZONES.picnic, 16 x 16 m, bed-free)
+    sysFIN_R             2.6 m      horseshoe radius — A COMPOSITION NUMBER (see below)
+    sysFIN_GAP           1.75 rad   the mouth, ~100 deg, aimed at the sydney spawn
+    sysFIN_IN            1.8 m      "inside", for the closing test
+    sysFIN_LOAF          0.6        ...and settled, not merely standing there
+    sysFIN_HOLD          1.1 s      held, so that a pause is not an ending
+    sysFIN_BEAT          2600 ms    between the line and the ledger
+
+**`physStageKeep(place, x, z, restY)`** (props.js, published as `game.physics.stageKeep`).
+`physSpawnKeep` is idempotent — which is what makes it safe to call on every restore and exactly
+what stops a caller ARRANGING the seventeen: ask for one that exists and you get the one lying
+wherever the last border crossing fanned it. This is the mover. It clears velocity, angular
+velocity, force and torque, **sleeps the body**, and moves `homeX/Y/Z` — where `homeY` is a
+SURFACE, not a body centre, because `physRescue` adds `originY` back on.
+
+**FOUR THINGS THAT DECIDE THE SHAPE OF THE CODE:**
+
+1. **`showEnd` is dead on a restored save.** `completeTask`'s `silent` early return sits ABOVE the
+   `doneCount >= TASKS.length` branch, so a player who reloads with everything done never triggers
+   anything. The lawn has its own trigger and does not reuse that branch.
+2. **props.js relocates every loose keepsake to the spawn on EVERY chapter entry** and rewrites
+   `homeX/Y/Z` doing it. Its `biome:enter` listener is registered before systems.js's, so staging
+   from systems.js simply happens after the huddle and overrides it. Nothing in props.js had to
+   change; only a mover had to be published.
+3. **The ledger may not open on arrival.** `ledShow(true)` pauses the game and arms a
+   tap-anywhere `location.reload()`. Opening it on arrival would replace the ending with its own
+   receipt again and put a page-reload footgun under the player's first click.
+4. **TWO DOORS IN, because Sydney is the one chapter that emits no `biome:enter`:** the
+   `biome:enter` handler for a return, and the `else` branch of `startGame`'s `landed` test for a
+   restored file that opens straight into Sydney.
+
+**Staged every time, closed once.** Leaving Sydney clears the staging flag (props.js will huddle
+them at the next spawn), so the lawn is laid on every return, for ever. `fin` in the save —
+additive, `v` does not move — only suppresses the closing beat. Coming home must not stop working
+because you have already been home.
+
+**RADIUS IS A COMPOSITION NUMBER, NOT A GEOMETRY ONE, AND ONLY THE RENDERED PNG CAN TELL YOU.**
+The first build used 4.2 m, which is geometrically fine and reads as LITTER: a keepsake is a 24 cm
+box, and seventeen at 1.55 m spacing is seventeen specks scattered over eight metres of lawn. And
+a closed ring puts one souvenir between the shoulder camera and the animal at every approach
+angle — the capybara was behind a jar in its own ending. Both were found by looking at the
+screenshot and neither would ever have shown up in a number.
+
+**STILL OPEN:** the seventeen vary enormously in DRAWN scale though their physics shape is a
+uniform 0.12 box — Rio's is a two-metre tram, Cappadocia's a waist-high jar, Sydney's a hat. At
+2.6 m the big ones still crowd the frame. Sort the horseshoe by drawn size so the big ones sit at
+the horns, or give the finale its own wider camera. The moment works; it is not yet as good as it
+should be.
+
+
 ## THE PAYOFF PASS, BATCH ONE (v23 — 25 Aug 2026)
 
 Three jobs: a baseline audit, the mischief economy, and stillness as a verb.

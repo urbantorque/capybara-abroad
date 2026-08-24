@@ -1308,6 +1308,7 @@ export function createProps(game) {
     nearestGrabbable: physNearestGrabbable,
     spawnProp: physSpawnProp,
     spawnKeep: physSpawnKeep,
+    stageKeep: physStageKeep,
     keepOut: physKeepOut,
     removeProp: physRemoveProp,
     update: physUpdate,
@@ -1671,6 +1672,47 @@ function physSpawnKeep(place, x, z, restY) {
   const have = physKeepOut(place);
   if (have) return have;
   return physMakeProp('keep-' + place, x, z, 0, undefined, restY, true);
+}
+
+/**
+ * SET A SOUVENIR DOWN SOMEWHERE ON PURPOSE, AND LEAVE IT THERE.
+ *
+ * physSpawnKeep is idempotent, which is what makes it safe to call on every
+ * restore — and it is exactly what stops a caller ARRANGING the seventeen: ask
+ * for one that already exists and you get the one lying wherever the last
+ * border crossing fanned it, not a new one where you asked. The finale needs
+ * them laid out, so this is the mover: spawn if absent, otherwise pick the
+ * existing one up and put it down at the point given.
+ *
+ * Three things beyond the position, all of which were bugs when they were left
+ * out somewhere else in this file:
+ *  - `homeX/Y/Z` moves too, or physRescue drags a keepsake that goes over an
+ *    edge back to the chapter it was first put down in.
+ *  - velocity, angular velocity, force and torque are all cleared. A body
+ *    teleported with its momentum intact carries the fall it was already in.
+ *  - it is put to SLEEP. Seventeen loose props are seventeen awake dynamic
+ *    bodies otherwise, and an arrangement that is nudging itself apart on the
+ *    frame you first see it is not an arrangement.
+ * A held keepsake is left alone: the animal's mouth outranks the display.
+ */
+function physStageKeep(place, x, z, restY) {
+  const p = physSpawnKeep(place, x, z, restY);
+  if (!p || p.held) return p;
+  // `homeY` is a SURFACE, not a body centre — physRescue adds originY back on
+  // (see physRescue), and physMakeProp stores `homeY: surfY` for the same
+  // reason. Setting it to the body's own y here would raise the prop by its own
+  // half-height on every rescue, one half-height per rescue, for ever.
+  const surfY = (typeof restY === 'number' && restY === restY) ? restY : physSurfaceY(x, z);
+  p.body.position.set(x, surfY + p.originY + 0.015, z);
+  p.body.velocity.set(0, 0, 0);
+  p.body.angularVelocity.set(0, 0, 0);
+  p.body.force.set(0, 0, 0);
+  p.body.torque.set(0, 0, 0);
+  p.homeX = x; p.homeY = surfY; p.homeZ = z;
+  physSyncBodyTransform(p.body);
+  physSyncMesh(p, true);
+  if (p.body.sleep) p.body.sleep();
+  return p;
 }
 
 /** The live keepsake for a place, wherever it has got to. Null if none. */

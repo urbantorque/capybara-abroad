@@ -11451,6 +11451,12 @@ export function createSystems(game) {
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         biome: (game.biome && game.biome.current) || 'sydney',
+        // Additive, exactly like `chapms` and `finds` above, and the version
+        // does not move for it. `fin` means the closing beat on the lawn has
+        // been spent — NOT that the game is finished, which is a projection of
+        // the ticks and needs no field. Without it a returning player is handed
+        // the ledger every single time they come home and sit down.
+        fin: sysFinDone ? 1 : 0,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -12411,6 +12417,149 @@ export function createSystems(game) {
     }
   }
 
+  // ======================================================================
+  // THE LAWN — what happens when there is nothing left to do (v24)
+  // ======================================================================
+  // Finishing this game used to be a RECEIPT. The last tick anywhere in the
+  // world scheduled `showEnd`, which pauses everything and opens the ledger on
+  // top of whatever you happened to be standing in — most likely Antarctica,
+  // because chapter 17 is where a completionist ends up. The journey has a
+  // thread (the shelf) and a spine (the souvenirs) and both of them were only
+  // ever shown to you on a CARD.
+  //
+  // So: come home. Bring it all back to the lawn you started on, and the
+  // seventeen things you took are set out there waiting — not dumped at the
+  // spawn in a two-metre huddle the way every border crossing leaves them, but
+  // laid in a ring you can walk into the middle of. Then sit down among them.
+  // That is the whole ending: the last thing the game asks of you is the first
+  // thing it taught you to do for its own sake.
+  //
+  // FOUR THINGS THAT DECIDE THE SHAPE OF THIS CODE:
+  //  1. `showEnd` IS DEAD ON A RESTORED SAVE. completeTask's `silent` early
+  //     return sits ABOVE the doneCount branch, so a player who reloads with
+  //     everything done never triggers anything. The finale therefore has its
+  //     own trigger and does not reuse that branch.
+  //  2. props.js relocates every loose keepsake to the spawn on EVERY entry to
+  //     a chapter, and rewrites homeX/Y/Z doing it. Its biome:enter listener is
+  //     registered before this file's, so staging from here happens after the
+  //     huddle and simply overrides it. Nothing in props.js had to change for
+  //     that; only a mover had to be published (physStageKeep).
+  //  3. THE LEDGER MAY NOT OPEN ON ARRIVAL. `ledShow(true)` pauses the game and
+  //     arms a tap-anywhere reload, so opening it the moment you walk in would
+  //     replace the ending with its own receipt again — and put a page-reload
+  //     footgun under the player's first click.
+  //  4. IT IS NOT A ONE-SHOT. The lawn is laid every time you come back with
+  //     everything done, for ever; only the closing beat is once, and `fin` in
+  //     the save is what remembers that. Coming home should not stop working
+  //     because you have already been home.
+  const sysFIN_X = 30, sysFIN_Z = 26;   // the picnic lawn, 16 x 16 m and bed-free
+  // RADIUS IS A COMPOSITION NUMBER, NOT A GEOMETRY ONE, and the first guess was
+  // wrong for a reason worth writing down: a keepsake is a 24 cm box. Seventeen
+  // of them on a 4.2 m ring sit 1.55 m apart, which from the shoulder camera is
+  // seventeen specks scattered over eight metres of lawn — it reads as litter,
+  // not as an arrangement, and the screenshot is what said so. At 2.6 m they are
+  // 96 cm apart and the whole ring is inside one frame with the animal in it.
+  // Still ample to stand in: the capybara is 0.6 m across.
+  const sysFIN_R = 2.6;
+  const sysFIN_IN = 1.8;                // "inside the ring", for the closing test
+  const sysFIN_LOAF = 0.6;              // and settled, not merely standing there
+  const sysFIN_HOLD = 1.1;              // s held before it counts, so a pause is not an ending
+  const sysFIN_BEAT = 2600;             // ms between the line and the ledger
+  let sysFinStaged = false;             // laid out this session
+  let sysFinDone = false;               // the closing beat has been spent (persisted as `fin`)
+  let sysFinT = 0;                      // how long we have been sat in the middle
+  let sysFinClosing = false;
+
+  /** Every chapter ticked. A projection, like chapComplete — never a counter. */
+  function sysFinaleAll() {
+    for (let k = 1; k <= chapMax; k++) if (!chapComplete(k)) return false;
+    return true;
+  }
+
+  // A HORSESHOE, NOT A RING, AND THE MOUTH FACES THE WAY YOU COME IN. Two
+  // reasons, and the screenshot found both. A closed ring puts one souvenir
+  // between the shoulder camera and the animal at every approach angle, so the
+  // capybara is behind a jar in its own ending. And a ring you are standing in
+  // the middle of means SURROUNDED, which is not the feeling: these are things
+  // you brought back and set down, so they should be laid out in front of you.
+  // The mouth is aimed at the spawn, because walking east from the spawn is how
+  // anybody actually arrives on this lawn.
+  const sysFIN_GAP = 1.75;              // rad of opening, ~100 degrees
+
+  /**
+   * Lay the seventeen out, in chapter order round the horseshoe, so one horn is
+   * Sydney and the other is Antarctica and the whole journey is one glance.
+   */
+  function sysFinaleStage() {
+    const ph = game.physics;
+    if (!ph || typeof ph.stageKeep !== 'function') return;
+    const bm = game.biome;
+    let open = Math.PI;                 // fallback: mouth to the west
+    if (bm && typeof bm.spawnOf === 'function') {
+      try {
+        const sp = bm.spawnOf('sydney');
+        open = Math.atan2(sp.z - sysFIN_Z, sp.x - sysFIN_X);
+      } catch (e) { /* the fallback is a real direction, not a guess */ }
+    }
+    const span = Math.PI * 2 - sysFIN_GAP;
+    const n = chapMax > 1 ? chapMax - 1 : 1;
+    for (let k = 1; k <= chapMax; k++) {
+      if (!chapComplete(k)) continue;
+      const a = open + sysFIN_GAP / 2 + ((k - 1) / n) * span;
+      try {
+        ph.stageKeep(chapterDef(k).biome,
+                     sysFIN_X + Math.cos(a) * sysFIN_R,
+                     sysFIN_Z + Math.sin(a) * sysFIN_R);
+      } catch (e) { /* one souvenir is not worth the ending */ }
+    }
+    sysFinStaged = true;
+  }
+
+  /**
+   * Called on arrival in Sydney (both ways in — see the biome:enter handler and
+   * startGame; Sydney is the one chapter that is not travelled to, so it does
+   * not emit biome:enter when you begin there).
+   */
+  function sysFinaleCheck() {
+    if (sysFinStaged || !sysFinaleAll()) return;
+    sysFinaleStage();
+    // The line is the only instruction, and it is deliberately not a task: the
+    // paper is finished, and putting a nineteenth row on it would make coming
+    // home a chore. See THE FINDS for the same argument.
+    setTimeout(function () {
+      if (sysFinDone) toast('it is all still here.');
+      else toast('everything you took is on the lawn. sit with it a while.');
+    }, 1400);
+  }
+
+  function sysFinaleStep(dt) {
+    if (!sysFinStaged || sysFinDone || sysFinClosing || !game.capy) return;
+    const p = game.capy.position;
+    if (!p) return;
+    const dx = p.x - sysFIN_X, dz = p.z - sysFIN_Z;
+    // Inside the ring AND settled. The loaf is the point: the ending is not
+    // reached by walking to a coordinate, it is reached by stopping.
+    if (dx * dx + dz * dz < sysFIN_IN * sysFIN_IN && (game.capy.loaf || 0) >= sysFIN_LOAF) {
+      sysFinT += dt;
+      if (sysFinT >= sysFIN_HOLD) sysFinaleClose();
+    } else {
+      sysFinT = 0;
+    }
+  }
+
+  function sysFinaleClose() {
+    if (sysFinClosing || sysFinDone) return;
+    sysFinClosing = true;
+    sysFinDone = true;
+    saveSoon();
+    try { sfx('chime'); } catch (e) {}
+    musSwell(1);
+    toast('and that is the lot.');
+    // THEN the ledger — after the line has been read, and never before the
+    // player has stopped moving, which by construction they have.
+    setTimeout(function () { sysFinClosing = false; ledShow(true); }, sysFIN_BEAT);
+  }
+
   function chapterCeremony(n) {
     const def = chapterDef(n);
     const rec = chapRec[n];
@@ -12642,6 +12791,10 @@ export function createSystems(game) {
       // Carrying on IS the proof that the file works, so the line about it has
       // been earned and must not be said again.
       saveTold = true;
+      // ...and the lawn must not hand over its ledger again either. Same shape
+      // as jrChapDone below: the world is still laid out on every return, only
+      // the once-ever beat is remembered. See THE LAWN.
+      sysFinDone = !!jrFile.fin;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -12692,6 +12845,12 @@ export function createSystems(game) {
       // You did emigrate. Somehow.
       if (cdef.arrive) completeTask(cdef.arrive);
       showPlace(cdef.name.toUpperCase(), cdef.sub);
+    } else {
+      // ...and if you did not, you are in Sydney, which is the one chapter that
+      // emits no biome:enter — so this is the second and only other door THE
+      // LAWN can be reached through. A restored file with all seventeen done
+      // that opens straight into Sydney comes in exactly here.
+      sysFinaleCheck();
     }
 
     // The card is thrown away here, and its one listener on `window` has to go
@@ -14327,6 +14486,11 @@ export function createSystems(game) {
     // Everything a returning player has already earned, put back into the
     // world once. See sysKeepsRestore.
     sysKeepsRestore();
+    // ...and if there is nothing left to do anywhere, coming back to Sydney
+    // lays the lawn. Leaving clears the staging flag because props.js will
+    // huddle all seventeen at the next chapter's spawn on the way out, so the
+    // arrangement has to be made again the next time you walk in. See THE LAWN.
+    if (name === 'sydney') sysFinaleCheck(); else sysFinStaged = false;
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
@@ -14967,6 +15131,9 @@ export function createSystems(game) {
     // cannot change usefully faster than four times a second. Raw dt, not the
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
+    // Raw dt for the same reason the finds use it: sitting down among the
+    // seventeen should not take longer because something else slowed time.
+    sysFinaleStep(game.state.rawDt || dt);
     hintT -= dt;
     if (hintT <= 0) {
       hintT = sysHINT_TICK;
