@@ -2578,8 +2578,20 @@ export function createCapybara(game) {
     // `capyStillT` KEEPS ITS ORIGINAL MEANING TO THE LETTER. It is the soft
     // wheek's, its list has not changed, and an empty mouth is part of what
     // that register means. Two names because they are two questions.
+    // ...AND NEITHER CLOCK MAY RUN BEFORE THE PLAYER HAS THE ANIMAL. The world
+    // ticks behind the title card, and nothing on that list is true of a
+    // capybara nobody is driving yet — so both clocks used to accrue the whole
+    // time the card was up. Measured: six seconds on the menu put `capyRestT`
+    // at 6.83 and the loaf at 0.54 BEFORE the first frame of play, and pressing
+    // start put it at 1.00 within a second. Every new player's first sight of
+    // this animal was it already sitting down, with the camera eased wide and
+    // the score gone soft — the one gesture in the game that is supposed to be
+    // earned by holding still, given away before they touched a key. It only
+    // shows in Sydney: every other chapter is arrived at through a teleport,
+    // and teleport zeroes both (see capyTeleport). Sydney is not travelled to.
     const capyBusy = mag > 0.02 || groundSpeed > 0.35 || !grounded ||
-                     capySwimming || capyClinging || carried || capyDiving;
+                     capySwimming || capyClinging || carried || capyDiving ||
+                     !game.state.started;
     if (capyBusy || capy.heldProp) capyStillT = 0; else capyStillT += dt;
     if (capyBusy) capyRestT = 0; else capyRestT += dt;
     // Published because THE CALM is built on them and systems.js owns that.
