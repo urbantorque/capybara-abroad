@@ -32,3 +32,21 @@ Started 25 Aug 2026. Model: claude-opus-5.
 - [ ] chain batch 2 (VERY LAST ACTION)
 
 ## Log
+
+### Log
+
+- **Job 1(a)** — `qa/pf-soak.js`: a two-direction fresh-save journey through all 17
+  chapters (act order and reverse). 199 tasks, 0 issues, 0 console errors both ways.
+  Static audits green: `audit-tasks.mjs` 0/0 over 199, `lines.mjs` 0/0 over 426
+  conditional lines, `pacing.mjs` 1 ordinary task short of band (Kyoto) — unchanged.
+- **Job 1(a)** — `qa/pf-restore.js`: save/reload at mid-act, mid-carrier, mid-dive,
+  mid-ceremony. FOUND AND FIXED: the save debounce aged on the SCALED dt, so a marquee
+  tick wrote at 1046 ms against a spec of 700 (713/719 after). `qa/pf-savelag.js`.
+- **Job 1(b)** — solidity 14-17 + 1-3: no new bugs. Everything left is on the
+  cry-wolf list (instanced vegetation, the terrain shell, the sky dome) or is the
+  Manly flag, which is a 5.5 cm pole you are meant to pick up.
+  `qa/audit-solid.js` now prints an identity that survives a reload.
+- **Job 1(b)** — `qa/pf-npchealth.js`: locals audited for the first time (fifteen
+  chapters' entire population). All live-gated. 0 drift, 0 body desync, 0 sunk after
+  the gate was corrected.
+- **Job 2** — the mischief economy landed. See the commit and CONTRACT v23.
