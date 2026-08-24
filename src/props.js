@@ -85,6 +85,40 @@ const physGUST_WAKE = 2.0;
 // KICK to break stiction, and a cap on the speed it may leave with, so the
 // prop skitters and stops instead of reaching wind speed. That is a design
 // task, not a tuning one.
+//
+// ---- AND HERE IT IS (v23) --------------------------------------------------
+// Both halves, because either one on its own is a different bug.
+//
+//   THE KICK is a PUFF and not a force: an impulse, a few times a second, at a
+//   scattered heading, with a small vertical component so the thing skips
+//   rather than slides. It breaks stiction because it arrives all at once —
+//   which is exactly what the sweep above says continuous drag cannot do — and
+//   between puffs ordinary friction stops the prop dead. The result is a
+//   skitter: a few centimetres, a pause, a few more.
+//
+//   THE CAP is what stops the kick becoming the cliff. Drag may slow anything
+//   down at any speed; it may not speed anything UP past physGUST_VMAX along
+//   the wind. So a prop cannot reach wind speed and sail, and a thrown frisbee
+//   is untouched because drag against its own velocity is still drag.
+//
+// And three things the kick refuses outright, which together are why this is
+// safe to switch on in seventeen chapters:
+//   - anything heavier than physGUST_LIGHT, the same 0.6 kg the wake test uses;
+//   - anything held, owned, planted or frozen;
+//   - anything that is a SOUVENIR (`keep`), because seventeen of those are the
+//     spine of the journey and none of them may blow into the sea;
+//   - and anything already more than physGUST_ROAM from its own home, which is
+//     the promise that a square full of props is still a square full of props
+//     twenty minutes later.
+const physGUST_LIGHT   = 0.6;   // kg — a hat, a thong, a pair of sunglasses
+const physGUST_KICK_W  = 2.0;   // m/s of EFFECTIVE wind before anything skitters. MEASURED.
+const physGUST_KICK_V  = 4.5;   // m/s the strongest puff may leave it with. MEASURED.
+const physGUST_KICK_UP = 1.5;   // m/s of hop. Without it a puff does nothing at all.
+const physGUST_KICK_T  = 0.55;  // s mean gap between puffs, jittered per prop
+const physGUST_KICK_SP = 1.1;   // rad of scatter on a puff's heading. Turbulence.
+const physGUST_VMAX    = 2.2;   // m/s downwind the air may never accelerate past
+const physGUST_REST    = 0.6;   // m/s under which a prop counts as settled enough to catch
+const physGUST_ROAM    = 8;     // m from home the wind may ever carry a prop
 // ---- a current is a drag, not a velocity write ----------------------------
 // Toward the water rather than toward zero, so it composes with physBUOY_DRAG_L
 // and the righting torque instead of fighting them. A floating prop therefore
@@ -1571,6 +1605,7 @@ function physMakeProp(type, x, z, variant, yaw, restY, loose) {
     lastCapyTouch: -1e9,       // last contact with the capy (or its cargo)
     releaseTime: -1e9,         // last time the capy let go of / threw it
     spin: def.spin,
+    gustT: Math.random() * physGUST_KICK_T,   // the puff clock. See physGustKick.
     dampL: light ? 0.02 : 0.06,
     dampA: light ? 0.04 : 0.12,
     lastWX: x, lastWY: surfY + def.hy, lastWZ: z,
@@ -2569,6 +2604,44 @@ function physFlowAt(x, z) {
  * aero block ran against a zero vector in sixteen of seventeen chapters and the
  * wake branch — written specifically for gusts — could never fire anywhere.
  */
+/**
+ * ONE PUFF. See the block on physGUST_LIGHT for why this exists and what it
+ * refuses. Called from the aero block, once per prop per frame; almost every
+ * call falls straight out of the first two lines.
+ */
+function physGustKick(p, wnd, dt) {
+  if (p.mass > physGUST_LIGHT) return;
+  if (p.held || p.owner || p.frozen || p.planted || p.keep) return;
+  const w2 = wnd.x * wnd.x + wnd.z * wnd.z;
+  if (w2 < physGUST_KICK_W * physGUST_KICK_W) { p.gustT = 0; return; }
+  const b = p.body;
+  // A prop already moving is the drag's business, not the puff's: kicking one
+  // that is in flight is how a skitter becomes a launch.
+  if (b.velocity.lengthSquared() > physGUST_REST * physGUST_REST) return;
+  const dx = b.position.x - p.homeX, dz = b.position.z - p.homeZ;
+  if (dx * dx + dz * dz > physGUST_ROAM * physGUST_ROAM) return;
+  p.gustT = (p.gustT || 0) - dt;
+  if (p.gustT > 0) return;
+  p.gustT = physGUST_KICK_T * (0.5 + Math.random());
+  const wl = Math.sqrt(w2);
+  const ux = wnd.x / wl, uz = wnd.z / wl;
+  // TURBULENT: a puff is never straight downwind, or a row of props tracks
+  // across a square in formation, which reads as a conveyor belt.
+  const a = (Math.random() - 0.5) * physGUST_KICK_SP;
+  const c = Math.cos(a), s = Math.sin(a);
+  const kx = ux * c - uz * s, kz = ux * s + uz * c;
+  // ...and how hard, off how far over the threshold the wind is. Manly's
+  // absolute peak effective wind is 4.8 m/s, so `g` never reaches 1 anywhere
+  // in this game and the numbers above are headroom rather than a target.
+  const g = clamp((wl - physGUST_KICK_W) / 1.8, 0.45, 1);
+  b.wakeUp();
+  b.velocity.x += kx * physGUST_KICK_V * g;
+  b.velocity.z += kz * physGUST_KICK_V * g;
+  b.velocity.y += physGUST_KICK_UP * g;
+  b.angularVelocity.x += (Math.random() - 0.5) * 5 * g;
+  b.angularVelocity.z += (Math.random() - 0.5) * 5 * g;
+}
+
 const physWindOut = { x: 0, z: 0 };
 let physWindTick = -1;
 function physWindNow() {
@@ -4294,7 +4367,30 @@ function physUpdate(dt) {
     // area and Cd baked per prop at spawn (prop.aeroK = ½·ρ·Cd·A).
     if (!p.inWater && p.aeroK > 0) {
       const wnd = physWindNow();
-      const rvx = wnd.x - b.velocity.x, rvy = -b.velocity.y, rvz = wnd.z - b.velocity.z;
+      // ---- THE KICK, which is the half drag cannot do --------------------
+      physGustKick(p, wnd, dt);
+      let rvx = wnd.x - b.velocity.x;
+      const rvy = -b.velocity.y;
+      let rvz = wnd.z - b.velocity.z;
+      // ---- ...AND THE CAP, which is the half that keeps it charming -------
+      // A prop's terminal velocity under drag IS the wind speed, so drag on
+      // its own turns a squall into props migrating downwind at five metres a
+      // second — which is not comedy, it is a prop leaving the place the
+      // player set it down, and tasks read prop positions. The air may
+      // DECELERATE anything at any speed (a thrown frisbee still sheds speed
+      // exactly as it did), and it may not ACCELERATE anything past
+      // physGUST_VMAX along the wind. Only the accelerating component along
+      // the wind axis is removed; everything sideways and vertical is
+      // untouched, so a prop still gets turned by a gust, just not launched.
+      const w2 = wnd.x * wnd.x + wnd.z * wnd.z;
+      if (w2 > 1e-6) {
+        const wl = Math.sqrt(w2);
+        const ux = wnd.x / wl, uz = wnd.z / wl;
+        if (b.velocity.x * ux + b.velocity.z * uz > physGUST_VMAX) {
+          const rvw = rvx * ux + rvz * uz;
+          if (rvw > 0) { rvx -= rvw * ux; rvz -= rvw * uz; }
+        }
+      }
       const rl2 = rvx * rvx + rvy * rvy + rvz * rvz;
       if (rl2 > 0.36) {
         const rl = Math.sqrt(rl2);
