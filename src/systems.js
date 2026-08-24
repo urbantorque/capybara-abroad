@@ -16329,8 +16329,18 @@ export function createSystems(game) {
       inHk && game.kowloon ? clamp(game.kowloon.show(), 0, 1) : 0, 2.2, dt);
 
     // ---- the save file ---------------------------------------------------
+    // ON rawDt, NEVER ON THE SCALED dt — main.js's own doctrine block, rule 3:
+    // a timer decremented by scaled time takes 1/scale times as long to expire.
+    // This debounce is a promise about WALL-CLOCK milliseconds ("a streak of
+    // ticks writes once"), and the ticks that arrive with the clock slowed down
+    // are precisely the ones worth keeping: every `wow` brings sysWOW_SLOW
+    // (0.55) and every chapter close brings a punch, which is a hitstop at
+    // sysPUNCH_SCALE. MEASURED before the fix: a plain tick wrote at 718 ms and
+    // Kyoto's marquee at 1046 ms, at a live timeScale of 0.62 — the biggest
+    // moment in a chapter was the one whose save was latest, which is exactly
+    // backwards, and a player who closes the tab on the ceremony loses it.
     if (savePending) {
-      saveT += dt * 1000;
+      saveT += (game.state.rawDt || dt) * 1000;
       if (saveT >= sysSAVE_DEBOUNCE) saveWrite();
     }
     if (jrShown) jrRefresh();
