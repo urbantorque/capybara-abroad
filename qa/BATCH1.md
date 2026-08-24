@@ -95,6 +95,32 @@ Project memory: `capy3-payoff-batch-one`, `capy3-gust-is-an-impulse`,
 - THREE `object.id` is a global counter and changes on every reload; an audit
   that names a hit by id names nothing an hour later.
 
+## FINAL REGRESSION — all green
+
+| suite | result |
+|---|---|
+| `qa/audit-tasks.mjs` | 0 blockers, 0 warnings over 199 tasks in 17 chapters |
+| `qa/lines.mjs` | 0 blockers, 0 warnings over 426 conditional lines |
+| `qa/pf-soak.js` | 199/199 in act order AND in reverse, 0 issues, 0 console errors |
+| `qa/pf-restore.js` | 4 hostile moments, all entered, 0 issues |
+| `qa/pf-savelag.js` | plain 713 ms · marquee 719 ms · journal open 717 ms |
+| `qa/audit-solid.js` | nothing off the cry-wolf list in 14–17 or 1–3 |
+| `qa/pf-npchealth.js` | 17 chapters, live-gated: 0 drift, 0 body desync, 0 off-ground |
+| `qa/pf-parent.js` | 0 of 224 props detached from the scene |
+| `qa/pf-loaf.js` | 0 issues — including the loaf arriving with a prop in the mouth |
+| `qa/pf-soak-ice.js` | 0 issues — task at 5.52 s, calm 0.99, sheep inverted |
+| `qa/pf-gust2.js` | Manly 2.24 m · Marrakech 0.61 · Antarctica 0.67 · calm chapters 0.00 |
+| `qa/pf-mischief.js` | the walk, the two ceilings and the chain all green; 2 adoption notes |
+| `qa/fuzz.js` | **ALL CLEAN across 17.** 0 NaN, 0 camera NaN, 0 void frames, 0 errors |
+
+The fuzz's new columns, after eight seconds of random keys per chapter: the
+loaf finite and in range everywhere and down in all seventeen; one live
+retrieval caught in Manly (`ownT` 2.3 s, the local 1.75 m off its anchor); and
+the furthest an untouched light prop got from its home on the wind's account was
+**3.2 m in Sydney** — a chapter whose effective wind never reaches the kick
+threshold at all, so that one is the ibises — then Antarctica 1.49, Manly 0.87,
+Marrakech 0.76, the Drift 0.68, Iceland 0.32 and **0.00 in the other eleven**.
+
 ## New qa files
 
 `pf-soak.js` · `pf-restore.js` · `pf-savelag.js` · `pf-probe.js` ·
