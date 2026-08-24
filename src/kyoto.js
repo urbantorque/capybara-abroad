@@ -1259,6 +1259,17 @@ function kyoBuildHeron(root) {
   kyoHeronGroup.add(kyoHeronWing);
   root.add(kyoHeronGroup);
   kyoHeronPhase = 0; kyoHeronT = 0; kyoHeronAt = 0;
+  kyoHeronWadeX = kyoHERON_A.x; kyoHeronWadeZ = kyoHERON_A.z;
+}
+
+const kyoHERON_APPR_STOP = 3.2;   // m short of the animal a heron will stop
+const kyoHERON_APPR_MAX  = 9.0;   // m it will ever leave its perch by
+let kyoHeronWadeX = 0, kyoHeronWadeZ = 0;
+/** Shortest signed angle, so the stalk never spins the long way round. */
+function kyoWrapY(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
 }
 
 function kyoUpdateHeron(game, dt) {
@@ -1271,10 +1282,39 @@ function kyoUpdateHeron(game, dt) {
   const standY = kyoWATER_Y + 0.86;
 
   if (kyoHeronPhase === 0) {
-    kyoHeronGroup.position.set(from.x, standY, from.z);
+    // ---- ...AND IF YOU SIT DOWN IT COMES OVER (v23) --------------------
+    // THE REGISTRY INVERTS. Past the loaf threshold systems.js publishes
+    // `appr` on this heron's row and takes its flee radius to nothing; what
+    // this chapter owns, and the only thing it owns, is where the bird's feet
+    // are allowed to go. It wades from its perch toward the animal and stops
+    // kyoHERON_APPR_STOP short — a heron does not stand next to you, it stands
+    // NEAR you and pretends it has not noticed, which is exactly what a heron
+    // in a pond actually does.
+    //
+    // The target is recomputed every frame off the LIVE capybara position and
+    // damped, so it never becomes a path: get up and walk away and the bird
+    // simply follows more slowly and then, as `appr` decays, wades back.
+    let hx = from.x, hz = from.z;
+    const ap = kyoHeronCrit ? (kyoHeronCrit.appr || 0) : 0;
+    if (ap > 0.01 && cp) {
+      const dx = cp.x - from.x, dz = cp.z - from.z;
+      const d = Math.hypot(dx, dz);
+      if (d > kyoHERON_APPR_STOP) {
+        const reach = Math.min(kyoHERON_APPR_MAX, d - kyoHERON_APPR_STOP) * ap;
+        hx = from.x + dx / d * reach;
+        hz = from.z + dz / d * reach;
+      }
+    }
+    kyoHeronWadeX = damp(kyoHeronWadeX, hx, 1.1, dt);
+    kyoHeronWadeZ = damp(kyoHeronWadeZ, hz, 1.1, dt);
+    kyoHeronGroup.position.set(kyoHeronWadeX, standY, kyoHeronWadeZ);
     // it turns its head, very slowly, and about once every eleven seconds it
-    // moves one foot
-    kyoHeronStalk = damp(kyoHeronStalk, Math.sin(kyoHeronT * 0.21) * 0.9, 1.4, dt);
+    // moves one foot — unless it is coming over, in which case it is looking
+    // at you, because a bird that walks toward you facing sideways is a bug.
+    const stalkWant = ap > 0.5 && cp
+      ? kyoWrapY(Math.atan2(cp.x - kyoHeronWadeX, cp.z - kyoHeronWadeZ))
+      : Math.sin(kyoHeronT * 0.21) * 0.9;
+    kyoHeronStalk = damp(kyoHeronStalk, stalkWant, 1.4, dt);
     kyoHeronGroup.rotation.set(0, kyoHeronStalk, 0);
     kyoHeronWing.visible = false;
     // ...and the reach shrinks as the animal settles, which is the one place
@@ -1282,7 +1322,9 @@ function kyoUpdateHeron(game, dt) {
     // NOT happening. The rest timer is untouched, so the heron still goes up
     // on its own clock and the moment can never be locked out. See THE CALM.
     if (!kyoHeronCrit && typeof game.addCritter === 'function') {
-      kyoHeronCrit = game.addCritter({ biome: 'kyoto', r: kyoHERON_NEAR });
+      // bold: a heron in a garden pond is the boldest animal in the game and
+      // is the direct test of the inverted registry. See THE LOAF.
+      kyoHeronCrit = game.addCritter({ biome: 'kyoto', r: kyoHERON_NEAR, bold: 1 });
     }
     const near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) <
                  (kyoHeronCrit ? kyoHeronCrit.near : kyoHERON_NEAR);

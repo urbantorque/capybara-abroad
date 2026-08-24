@@ -732,7 +732,7 @@ function mainBoot() {
     calm(x) { return x === undefined ? 0 : 1; },
     addCritter(o) {
       const r = (o && o.r > 0) ? o.r : 10;
-      return { biome: (o && o.biome) || '', r: r, k: 1, near: r, calm: 0 };
+      return { biome: (o && o.biome) || '', r: r, k: 1, near: r, calm: 0, bold: 0, appr: 0 };
     },
     // THE TIME CHANNEL, filled in for real three lines below. Declared here so
     // the shape of `game` is one object literal and a reader does not have to

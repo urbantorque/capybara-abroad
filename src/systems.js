@@ -558,6 +558,28 @@ const sysCALM_CHAOS = 1.6;    // how hard live chaos suppresses the whole field
 const sysCALM_CRIT  = 0.62;   // most a critter's flee radius may ever shrink by
 const sysCALM_MUS   = 0.30;   // ...and how far the score is allowed to lean
 
+// ---- THE LOAF, from this side (v23) ---------------------------------------
+// capybara.js owns the verb and publishes `capy.loaf`, 0..1. Three readers, and
+// they are the three channels a moment in this game has ever had: the lens, the
+// score, and the animals.
+//
+// WHY THE LOAF AND NOT THE CALM FIELD ITSELF. sysCalmNow rises off restT over
+// eight seconds and is suppressed by chaos anywhere in the world; the loaf is a
+// thing the animal DID, at a specific moment, on purpose. The camera easing
+// back because a bin stopped rattling two streets away would be a lens with an
+// opinion about nothing. So the camera and the inverted critters read the pose
+// and not the field, and the field goes on doing what it did.
+const sysLOAF_DOLLY = 1.15;   // m the camera eases back
+const sysLOAF_PITCH = 0.035;  // rad it settles down with it
+const sysLOAF_MUS   = 0.26;   // ...and how much further the score is allowed to lean
+// ---- ...AND THE ANIMALS TURN ROUND ---------------------------------------
+// Past this much loaf a critter's registry entry stops answering "how close may
+// this thing get before I run" and starts answering "how close will I come to
+// it". Held high on purpose: the inversion is the reward for the whole verb and
+// it must not happen by accident on the way past.
+const sysCALM_INVERT = 0.72;  // loaf past which a bold species approaches
+const sysCALM_APPR_L = 1.6;   // damp lambda on the approach term. Slow either way.
+
 // --- CAMERA SHAKE -----------------------------------------------------------
 // ONE knob for the whole game. 0 disables shake entirely. Shake must be RARE:
 // a punctuation mark on a real collision, never a texture of normal play.
@@ -14005,6 +14027,7 @@ export function createSystems(game) {
   // in them that runs away, and is never removed from — a biome is built once
   // (see toSet.built in main.js) and its animals outlive every visit.
   let sysCalmNow = 0;
+  let sysLoafNow = 0;      // capy.loaf, read once a frame. See THE LOAF.
   const sysCritters = [];
 
   // =========================================================================
@@ -14085,6 +14108,14 @@ export function createSystems(game) {
       k: (o && o.k !== undefined) ? clamp(o.k, 0, 1) : 1,
       near: (o && o.r > 0) ? o.r : 10,
       calm: 0,
+      // ---- HOW BOLD IS THIS ANIMAL (v23) ----
+      // 0..1, default 0, so every one of the seventeen chapters' existing
+      // registrations is untouched and nothing starts walking toward the
+      // player because a shared file changed under it. Opting in is one
+      // property on the call: bold: 1 for a heron, 0.7 for a sheep, 0 for
+      // anything with teeth. See THE LOAF in the calm block.
+      bold: (o && o.bold !== undefined) ? clamp(o.bold, 0, 1) : 0,
+      appr: 0,      // 0..1 published: how much this animal is coming over
     };
     sysCritters.push(rec);
     return rec;
@@ -14187,10 +14218,14 @@ export function createSystems(game) {
      */
     calmAudit: function () {
       const live = game.biome && game.biome.current;
-      const out = { calm: sysCalmNow, biome: live, critters: [] };
+      // `loaf` and the two per-critter inversion fields are here for the same
+      // reason the rest of it is: an inversion that quietly stops inverting is
+      // a change nobody can see happening. See THE LOAF.
+      const out = { calm: sysCalmNow, loaf: sysLoafNow, biome: live, critters: [] };
       for (let i = 0; i < sysCritters.length; i++) {
         const c = sysCritters[i];
-        out.critters.push({ biome: c.biome, r: c.r, near: c.near, live: c.biome === live });
+        out.critters.push({ biome: c.biome, r: c.r, near: c.near,
+                            bold: c.bold, appr: c.appr, live: c.biome === live });
       }
       return out;
     },
@@ -14587,6 +14622,23 @@ export function createSystems(game) {
     skyT = damp(skyT, (flyT > 0.1 || sailT > 0.1) ? 0 : skyWant, sysSKY_LAMBDA, dt);
     let camReach = lerp(lerp(lerp(camDist + camDolly, sysSKY_DIST, skyT), sysSAIL_DIST, sailT), sysFLY_DIST, flyT);
     let camPitch = lerp(lerp(lerp(sysCAM_PITCH, sysSKY_PITCH, skyT), sysSAIL_PITCH, sailT), sysFLY_PITCH, flyT);
+    // ---- ...AND IT EASES BACK WHEN THE ANIMAL SITS DOWN (v23) ------------
+    // Small — a metre and two degrees — and it is a metre the player did not
+    // ask for, so it has to be small. What it buys is that the moment the
+    // animal settles the frame opens out a little and shows you where you are,
+    // which is the whole argument for a verb that rewards stopping.
+    //
+    // Multiplied down by the three rigs that own the lens outright: at the
+    // helm, in flight or under a skyward pull the loaf is not what the camera
+    // is for, and adding a metre to any of those is one more thing fighting
+    // over one number. The loaf cannot be up in flight anyway — the first frame
+    // off the ground zeroes capyRestT — but the helm can, and the helm camera
+    // has been wrong once already for exactly this kind of reason.
+    if (sysLoafNow > 0.001) {
+      const lw = sysLoafNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
+      camReach += sysLOAF_DOLLY * lw;
+      camPitch += sysLOAF_PITCH * lw;
+    }
 
     // ---- A BIOME MAY ASK FOR ITS OWN LENS -------------------------------
     // Four hardcoded rigs (ground, crane, helm, flight) were enough for as long
@@ -16237,13 +16289,45 @@ export function createSystems(game) {
       // ...and the animals. Only the live chapter's, because the other sixteen
       // chapters' flee radii are not being tested against anything.
       const live = game.biome && game.biome.current;
+      // ---- AND PAST A THRESHOLD THE REGISTRY INVERTS (v23) ----------------
+      // A critter's whole relationship with the player has been one number:
+      // how close you may get before it runs. The calm field shrank that
+      // radius, which is a smaller fear and not a different feeling. So: sit
+      // down — really sit down, the pose, not the field — and a BOLD species
+      // stops fleeing and starts coming over.
+      //
+      // PER SPECIES, through `bold` on the registry row: a heron in a Kyoto
+      // pond is 1, a sheep in Iceland is 0.7, a jacare in the Pantanal is 0
+      // and always will be. Nothing with bold 0 is touched by any of this.
+      //
+      // `appr` is the published 0..1, damped BOTH ways (sysCALM_APPR_L) so an
+      // animal that has decided to come over does not change its mind on the
+      // frame the loaf wobbles — the one thing that would make this read as a
+      // glitch rather than as an animal.
+      const loafNow = (game.capy && game.capy.loaf) || 0;
+      const inv = clamp((loafNow - sysCALM_INVERT) / (1 - sysCALM_INVERT), 0, 1);
       for (let i = 0; i < sysCritters.length; i++) {
         const cr = sysCritters[i];
-        if (cr.biome !== live) continue;
+        if (cr.biome !== live) {
+          // Everybody else's approach decays to nothing rather than being
+          // frozen mid-way: come back to a chapter and its animals have not
+          // been standing there waiting with their minds made up.
+          if (cr.appr > 0) cr.appr = 0;
+          continue;
+        }
         cr.calm = sysCalmNow;
-        cr.near = cr.r * (1 - sysCalmNow * cr.k * sysCALM_CRIT);
+        cr.appr = damp(cr.appr, inv * cr.bold, sysCALM_APPR_L, dt);
+        // ---- AND THE INVERSION IS ONE LINE, ON THE CHANNEL THAT EXISTS ----
+        // Every consumer of this registry is `if (d < cr.near) spook()`. So the
+        // fleeing half of the inversion needs no biome file to change at all:
+        // an animal that has decided to come over has a flee radius of nothing,
+        // and it simply stops being startled. The APPROACHING half does need
+        // the chapter, because only the chapter knows where its animal's feet
+        // may go — that is what `appr` is published for.
+        cr.near = cr.r * (1 - sysCalmNow * cr.k * sysCALM_CRIT) * (1 - cr.appr);
       }
       musCalm = sysCalmNow;
+      sysLoafNow = loafNow;
     }
 
     // ---- music intensity: a shift in mood on a chase, never a stinger ----
@@ -16270,13 +16354,23 @@ export function createSystems(game) {
       // because the palettes run from cut 470 to cut 1320 and a flat 500 Hz
       // subtraction would take the Drift's pad below its own fundamental.
       const lift = musLift * musLiftEnv();
+      // ---- ...AND THE LOAF SWELLS IT FURTHER (v23) ---------------------
+      // musCalm saturates at 1 and sysCalmNow gets there on eight seconds of
+      // rest, which is only a beat and a half after the animal sits down — so
+      // ADDING the loaf to musCalm would buy nothing at all. What it does
+      // instead is widen the LEAN: the same three parameters, allowed to go
+      // further. The pad comes up half as much again, the filter closes
+      // further, the bass thins further. Which is to say the score gets
+      // quieter and closer for as long as the animal is sitting there, and
+      // goes back the moment it gets up.
+      const calmLean = musCalm * (1 + sysLoafNow * (sysLOAF_MUS / sysCALM_MUS));
       musPad.gain.setTargetAtTime(musPal.bus * (1 - musIntensity * 0.3) *
-        (1 + 0.5 * lift) * (1 + musCalm * sysCALM_MUS),
+        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS),
         nowA, lift > 0.02 ? 0.6 : 1.2);
-      musFilt.frequency.setTargetAtTime(musPal.cut * (1 - musCalm * 0.22) +
+      musFilt.frequency.setTargetAtTime(musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
         musIntensity * 780 + lift * 1100,
         nowA, lift > 0.02 ? 0.7 : 1.4);
-      musBassGain.gain.setTargetAtTime(musPal.bass * (1 - musCalm * 0.30) +
+      musBassGain.gain.setTargetAtTime(musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
         musIntensity * 0.08 + lift * 0.05, nowA, 1.5);
       // the thickening layer: silent at zero tasks, a shimmer at all of them
       if (musShimGain) musShimGain.gain.setTargetAtTime(0.0001 + musProg * 0.85, nowA, 2.5);

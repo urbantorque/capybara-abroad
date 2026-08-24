@@ -3154,6 +3154,8 @@ let iceSheepSpook = 0;
 // that keeps its distance from an animal walking about and closes over one
 // that has stopped. See THE CALM in systems.js.
 const iceSHEEP_NEAR = 6.48;
+const iceSHEEP_APPR_STOP = 2.6;   // m short of a sat-down capybara a sheep stops
+const iceSHEEP_APPR_SEE  = 22;    // m — beyond this it has not noticed you at all
 let iceSheepCrit = null;
 
 function iceUpdateSheep(game, dt) {
@@ -3161,10 +3163,13 @@ function iceUpdateSheep(game, dt) {
   const p = game.capy && game.capy.position;
   if (iceSheepSpook > 0) iceSheepSpook -= dt;
   if (!iceSheepCrit && typeof game.addCritter === 'function') {
-    iceSheepCrit = game.addCritter({ biome: 'iceland', r: iceSHEEP_NEAR });
+    // bold 0.7: a sheep will come and look at you, and it will take longer to
+    // make up its mind about it than a heron does. See THE LOAF in systems.js.
+    iceSheepCrit = game.addCritter({ biome: 'iceland', r: iceSHEEP_NEAR, bold: 0.7 });
   }
   const near = iceSheepCrit ? iceSheepCrit.near : iceSHEEP_NEAR;
   const iceSheepNear2 = near * near;
+  const sheepAppr = iceSheepCrit ? (iceSheepCrit.appr || 0) : 0;
   for (let f = 0; f < iceSheep.length; f++) {
     const S = iceSheep[f], D = S.data, F = S.def;
     for (let i = 0; i < F.n; i++) {
@@ -3188,6 +3193,19 @@ function iceUpdateSheep(game, dt) {
           tz = D[o + 1] + dz * inv * 5.5;
           D[o + 5] = 1;
         } else if (D[o + 5] > 0) D[o + 5] = Math.max(0, D[o + 5] - dt * 0.5);
+        // ---- ...AND THE OTHER WAY ROUND, IF YOU SIT DOWN (v23) ---------
+        // The registry has inverted: `near` is already at nothing so the
+        // shuffle above cannot fire, and `appr` says how much of the flock's
+        // mind is made up. They wander IN instead of out, to iceSHEEP_APPR_STOP
+        // and no closer, and only the ones already within iceSHEEP_APPR_SEE —
+        // a sheep two hundred metres up the fell has not noticed you sit down.
+        if (sheepAppr > 0.01 && d2 > iceSHEEP_APPR_STOP * iceSHEEP_APPR_STOP &&
+            d2 < iceSHEEP_APPR_SEE * iceSHEEP_APPR_SEE) {
+          const d = Math.sqrt(d2);
+          const pull = Math.min(d - iceSHEEP_APPR_STOP, 4.0) * sheepAppr;
+          tx = D[o] - dx / d * pull;
+          tz = D[o + 1] - dz / d * pull;
+        }
       }
       const spd = (D[o + 5] > 0.02 ? 2.4 : 0.42) + iceSheepSpook * 1.8;
       const mx = tx - D[o], mz = tz - D[o + 1];

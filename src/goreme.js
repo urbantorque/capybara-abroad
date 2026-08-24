@@ -1245,6 +1245,8 @@ const gorCAT_N = 9;
 // nearer. Nine cats declining to get up for you is the joke; nine cats letting
 // you sit down among them is the joke's second half.
 const gorCAT_NEAR = 2.5;
+const gorCAT_APPR_STOP = 1.5;   // m from a sat-down capybara a cat settles for
+const gorCAT_APPR_SEE  = 16;    // m — past this it has not noticed you at all
 let gorCatCrit = null;
 let gorCatMesh = null;
 // said once, the first time the whole square declines to be impressed
@@ -1294,9 +1296,12 @@ function gorUpdateCats(game, dt) {
   // first entry and systems.js is created at boot — but the ORDER of those two
   // is a coordinator detail and this is one null check a frame. See THE CALM.
   if (!gorCatCrit && typeof game.addCritter === 'function') {
-    gorCatCrit = game.addCritter({ biome: 'goreme', r: gorCAT_NEAR });
+    // bold 0.85: a town cat will absolutely come and sit next to something that
+    // has stopped moving, and it is the funniest of the four. See THE LOAF.
+    gorCatCrit = game.addCritter({ biome: 'goreme', r: gorCAT_NEAR, bold: 0.85 });
   }
   const catNear = gorCatCrit ? gorCatCrit.near : gorCAT_NEAR;
+  const catAppr = gorCatCrit ? (gorCatCrit.appr || 0) : 0;
   for (let i = 0; i < gorCAT_N; i++) {
     const c = gorCats[i];
     // ---- a capybara at two and a half metres is a reason to be elsewhere ---
@@ -1307,6 +1312,19 @@ function gorUpdateCats(game, dt) {
         const away = Math.atan2(dx, dz);
         c.tx = clamp(c.x + Math.sin(away) * rand(3, 5.5), gorPLAZA.x - 13, gorPLAZA.x + 13);
         c.tz = clamp(c.z + Math.cos(away) * rand(3, 5.5), gorPLAZA.z - 13, gorPLAZA.z + 13);
+      }
+      // ---- ...AND ONE THAT HAS SAT DOWN IS SOMETHING TO SIT NEXT TO ------
+      // THE REGISTRY INVERTS (see THE LOAF in systems.js): `near` is already
+      // at nothing, so the branch above cannot fire, and `appr` is how much of
+      // the cat's mind is made up. It re-aims its NEXT walk rather than being
+      // dragged — a cat is never seen to decide, only to have arrived — and
+      // once it is close enough it flops, which is the whole joke.
+      if (catAppr > 0.5 && c.st === 'walk') {
+        const d = Math.hypot(dx, dz);
+        if (d > gorCAT_APPR_STOP && d < gorCAT_APPR_SEE) {
+          c.tx = clamp(p.x + dx / d * gorCAT_APPR_STOP, gorPLAZA.x - 13, gorPLAZA.x + 13);
+          c.tz = clamp(p.z + dz / d * gorCAT_APPR_STOP, gorPLAZA.z - 13, gorPLAZA.z + 13);
+        } else if (d <= gorCAT_APPR_STOP) { c.st = 'flop'; c.t = rand(10, 24); }
       }
     }
     c.t -= dt;

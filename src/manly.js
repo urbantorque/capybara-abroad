@@ -2561,7 +2561,14 @@ function manUpdateGulls(game, dt) {
   // a capybara that walks into the middle of them puts them up, and so does a
   // wheek — which is the only reason the chip-shop man's line is true
   if (!manGullCrit && typeof game.addCritter === 'function') {
-    manGullCrit = game.addCritter({ biome: 'manly', r: manGULL_NEAR });
+    // bold 0.9: a Corso gull that has decided you are not a threat is standing
+    // on your feet inside ten seconds, which is what a Corso gull is for. The
+    // registry takes `near` to nothing on its own, so putting the birds up by
+    // walking into them stops happening while you are sat down — and the WHEEK
+    // path below is untouched and still reaches thirty-four metres, so the one
+    // thing this chapter asks you to do with the gulls is unaffected either
+    // way. See THE LOAF in systems.js.
+    manGullCrit = game.addCritter({ biome: 'manly', r: manGULL_NEAR, bold: 0.9 });
   }
   if (capy && capy.position) {
     const d = Math.hypot(capy.position.x - manGULL_HOME.x, capy.position.z - manGULL_HOME.z);

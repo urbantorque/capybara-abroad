@@ -477,6 +477,17 @@ let capyWhiffT = 0;                 // s left of the whiffed reach's head dip
 let capyWhiffPend = false;          // a grab attempt found nothing THIS frame
 let capyStillT = 0;                 // s settled, mouth EMPTY — see capyWHEEK_CALM_T
 let capyRestT  = 0;                 // ...and the same with something in it. See THE CALM.
+let capyLoaf   = 0;                 // 0..1 sat down. See THE LOAF.
+// ---- THE LOAF -------------------------------------------------------------
+// 6.5 s, which is under sysCALM_FULL (8.0) on purpose: the animal sits down a
+// beat BEFORE the world goes quiet around it, so the sitting reads as the cause
+// of the calm rather than as a second symptom of it.
+const capyLOAF_T     = 6.5;    // s of rest before it sits
+const capyLOAF_LAM   = 2.2;    // damp lambda settling in; ×6 getting up
+const capyLOAF_DROP  = 0.145;  // m the model sinks as the barrel meets the ground
+const capyLOAF_PITCH = -0.05;  // rad of nose-up, because the front end goes down
+const capyLOAF_LEG_F = -1.05;  // front legs folded under
+const capyLOAF_LEG_R = 0.85;   // ...and the rears tucked forward alongside
 let capyWakeT = 0;
 let capyBreathAmt = 0;
 let capyStageTime = 0;
@@ -1352,6 +1363,8 @@ export function createCapybara(game) {
     grade: 0,                        // signed gradient underfoot, + is uphill
     stillT: 0,                       // s settled with an EMPTY mouth (the soft wheek)
     restT: 0,                        // ...and with anything in it. THE CALM reads this.
+    loaf: 0,                         // 0..1 sat down. The camera, the score and
+                                     // the critters read this. See THE LOAF.
 
     // The velocity of the FRAME the animal is currently solving in — a deck, the
     // air, a river. Published because "is the world moving under me, and how
@@ -1463,6 +1476,7 @@ export function createCapybara(game) {
     capySwimming = false; capySwimAgo = 99;
     capyDiving = false; capyDiveGrace = 0; capyDiveT = 0; capyDiveDeep = 0;
     capy.diving = false; capy.swimming = false; capy.depth = 0; capy.diveTime = 0;
+    capyLoaf = 0; capy.loaf = 0;
     capyLaunchT = 0;
     capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
   });
@@ -1645,6 +1659,7 @@ export function createCapybara(game) {
     // the helm is not settling, and a wheek from the wheel is not a soft one.
     capyStillT = 0; capyRestT = 0;
     capy.stillT = 0; capy.restT = 0; // ...and the calm reads the published ones
+    capyLoaf = 0; capy.loaf = 0;    // ...and so does the loaf. See THE LOAF.
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
     capyIdleAct = -1; capyIdleT = 0;
@@ -2571,6 +2586,29 @@ export function createCapybara(game) {
     capy.stillT = capyStillT;
     capy.restT = capyRestT;
 
+    // ---- THE LOAF (v23) ---------------------------------------------------
+    // STILLNESS AS A VERB. This game rewards being settled — the calm field,
+    // the soft wheek, the graze, the critters' flee radius all read it — and
+    // the animal itself did not do one thing differently for it. You stood
+    // there and were told, by a number you cannot see, that you were being
+    // still. So: hold still long enough and it sits down.
+    //
+    // ON capyRestT, NEVER ON capyStillT. The two are one entry apart and the
+    // entry is `heldProp`: stillT is zeroed by having anything in your mouth,
+    // correctly, because that is what the soft wheek means. Reading it here
+    // would mean the loaf collapses the moment you pick anything up — which is
+    // exactly the bug the calm field and the graze both shipped with, twice.
+    //
+    // NO NEW BUTTON. The control scheme is settled and the wheek and the
+    // whistle are one voice; this is a thing the animal does when you stop
+    // asking it to do anything, which is the only input this verb can have.
+    const loafWant = (!capyBusy && !capy.atHelm && capyRestT >= capyLOAF_T) ? 1 : 0;
+    // Asymmetric, like the calm it belongs to: slow to settle, quick to get up.
+    // A capybara that took two seconds to stand up would feel like a bug.
+    capyLoaf = damp(capyLoaf, loafWant, loafWant > capyLoaf ? capyLOAF_LAM : capyLOAF_LAM * 6, dt);
+    if (capyLoaf < 0.0015 && loafWant === 0) capyLoaf = 0;
+    capy.loaf = capyLoaf;
+
     if (input.honkPressed) capyWheek();
 
     // The action key is shared with the condor, and condor.js runs AFTER this
@@ -2814,7 +2852,13 @@ export function createCapybara(game) {
           // during a stair climb cannot make the legs snap.
           const walk = Math.sin(phase) * swingAmp;
           const tuck = (i < 2 ? -0.62 : 0.52) + (body.velocity.y > 0 ? -0.16 : 0.20);
-          legs[i].rotation.x = lerp(walk, tuck, capyAirPose);
+          // ...and the LOAF is a third pose on the same cross-fade. It cannot
+          // fight the air tuck: capyLoaf is only ever non-zero when the animal
+          // has been on the ground and doing nothing for capyLOAF_T, and the
+          // first frame off the ground zeroes capyRestT, so capyAirPose and
+          // capyLoaf cannot both be up.
+          legs[i].rotation.x = lerp(lerp(walk, tuck, capyAirPose),
+                                    i < 2 ? capyLOAF_LEG_F : capyLOAF_LEG_R, capyLoaf);
           legs[i].rotation.z = damp(legs[i].rotation.z, 0, 8, dt);
         }
       }
@@ -2925,6 +2969,10 @@ export function createCapybara(game) {
     capyIdleBreath = damp(capyIdleBreath, capyIdleAct === 4 ? idleEnv : 0, 5, dt);
     // the huddle, on the bob the line above already wrote — render only
     capyModel.position.y -= capyIdleCrouch;
+    // ...and the loaf, on the same channel and for the same reason: the
+    // COLLIDER is untouched, so sitting down cannot change what you are
+    // standing on, what you can reach or what task you are inside.
+    capyModel.position.y -= capyLoaf * capyLOAF_DROP;
     capyModel.rotation.z = (carried
       ? Math.sin(capyLegPhase * 0.5) * 0.12
       : clamp(capyYawRate * 0.075, -0.34, 0.34) * (running ? 1.35 : 1)) + capyIdleRoll;
@@ -2934,7 +2982,7 @@ export function createCapybara(game) {
     const leanTarget = capyDiving || (capySwimming && capy.depth > 0.6)
                        ? clamp(-body.velocity.y * 0.16, -0.42, 0.42)
                        : capySwimming ? -0.05 : gaitSpeed * (running ? 0.030 : 0.013);
-    capyModel.rotation.x = damp(capyModel.rotation.x, leanTarget, 8, dt);
+    capyModel.rotation.x = damp(capyModel.rotation.x, lerp(leanTarget, capyLOAF_PITCH, capyLoaf), 8, dt);
     const sqY = 1 + capyPop * 0.38;
     const sqXZ = 1 - capyPop * 0.19;
     capySquash.scale.set(sqXZ, sqY, sqXZ);
