@@ -17,20 +17,37 @@ Predecessor: `qa/BATCH1.md` (complete, all green, CONTRACT v23).
 
 ## Checklist
 
-### Job 1 — the finale
-- [ ] Map the current end: `showEnd`, `chapterCeremony`, `chapComplete`,
+### Job 1 — the finale  ✅
+- [x] Map the current end: `showEnd`, `chapterCeremony`, `chapComplete`,
       `doneCount >= TASKS.length` scheduling in systems.js
-- [ ] Stage the seventeen keepsakes in the Botanic Gardens via `spawnKeep`
-- [ ] Gather a cast from existing systems (locals, critters, calm, loaf)
-- [ ] One last postcard beat, then the ledger
-- [ ] Survives save/reload; revisitable; guarded on `chapComplete` not elapsed time
-- [ ] Certified from the rendered PNG
+- [x] Stage the seventeen keepsakes in the Botanic Gardens (via `stageKeep`,
+      new — `spawnKeep` is idempotent and therefore cannot arrange anything)
+- [~] Gather a cast — PARTIAL. The loaf and the calm field carry the moment.
+      **Sydney registers ZERO `game.locals` and zero critters**: it uses
+      npc.js's older `humans[]`/`stepHuman` cast instead. A gathering therefore
+      needs a new npc.js state with a `thinkHuman` early-return, on the terrace
+      patrons' `resit`/`seated` idiom (slots assigned once, arrival test plus a
+      hard ceiling, then damp yaw and position). Deferred to job 4 pillar 2,
+      where that same cast is being audited anyway.
+- [x] One last postcard beat, then the ledger
+- [x] Survives save/reload; revisitable; guarded on `chapComplete` not elapsed time
+- [x] Certified from the rendered PNG (and the PNG changed the design twice)
 
-### Job 2 — the album
-- [ ] Size-capped thumbnails persisted in the save
-- [ ] Album page in the journal
-- [ ] One gentle photo prompt per chapter (a suggestion, never a task)
-- [ ] Title-screen postcards prefer the player's own photos once they exist
+### Job 2 — the album  ✅
+- [x] Size-capped thumbnails persisted — own key `capy3.album.v1`, 288x180 JPEG
+      q0.72, ~6 KB each measured, 36 cap, evict-oldest-and-retry on quota
+- [x] Album card in the journal (the LEDGER'S SIBLING — the journal has no page
+      mechanism at all, so a "page" was never available without restructuring)
+- [x] One gentle photo prompt per chapter, on the ceremony, only when there is
+      no picture of that chapter yet. Ticks nothing, counted nowhere.
+- [x] Title-screen postcards prefer the player's own photos
+
+Measured: 0 pictures -> button hidden; 3 taken with real K/Enter -> button
+live, 17541 chars, captions from `weather.label()` ("Sydney · Harbour Midday ·
+0:09" — only its second reader ever); survives reload byte-identical; card
+shows 3 figures whose images DECODE at 288x180; Escape closes and unpauses;
+`lastError` null. Title card: 1 of 17 tiles carries the photo, the other 16
+correctly fall back to their authored marks.
 
 ### Job 3 — the first hour
 - [ ] Measure fresh-save Sydney: time to each verb, hint cadence, first find,
@@ -121,10 +138,39 @@ it taught you to do for its own sake.
    Now a horseshoe with a ~100° mouth aimed at the spawn, which is also the
    better meaning: these are things you set down in front of you, not a circle
    you are surrounded by.
-3. **STILL OPEN — the keepsakes vary enormously in visual scale.** The physics
+3. **STILL OPEN — the keepsakes vary enormously in visual scale.** (see below) The physics
    shape is a uniform 0.12 box but the drawn parts are not: Rio's is a tram
    roughly two metres long and Cappadocia's is a waist-high jar, while others
    are a hat or a stone. At 2.6 m the big ones still crowd the frame. Options
    for a later pass: sort the horseshoe by drawn size so the big ones sit at the
    horns, or give the finale its own wider camera. Not blocking — the moment
    works and is verified — but it is not yet as good as it should be.
+
+## JOB 2 — THE ALBUM, and the trap that cost the most time
+
+**THE DECLARATION-ORDER TRAP.** `sysALB_KEY` and `albShots` had to move to the
+top of systems.js beside `sysSAVE_KEY`. The title card asks the album for a
+postcard WHILE IT BUILDS, and the title card is built earlier in the file than
+the album's own block. Two ways of getting it wrong, and the second is worse:
+
+- as `const`, the read threw a ReferenceError — swallowed by the try/catch;
+- as `var` it stopped throwing and **cached an empty album for the session**,
+  because the declaration hoists but the assignment does not, so the key was
+  `undefined` and `localStorage.getItem(undefined)` answered null.
+
+Both measured identically from outside: 0 of 17 tiles, no error anywhere, and
+`albumAudit()` called a moment later reported the album perfectly because by
+then the assignments had run. **If a thing is read during construction, declare
+it above the constructor, not beside its friends.**
+
+**AND A HARNESS TRAP THAT INVALIDATED TWO RUNS:** `playwright-cli close-all`
+then `open` is a FRESH BROWSER CONTEXT and localStorage does not survive it. A
+script that writes a save, then close-all/opens, then checks, is measuring an
+empty store and will report the feature missing. Take the pictures and check the
+title card in ONE session. This is a sibling of harness traps 8 and 10 in
+[[headless-qa-harness]] and belongs with them.
+
+## Screenshots
+`qa/PF2-lawn2.png` (the seventeen staged) · `qa/PF2-approach.png` (loafing among
+them) · `qa/PF2-album.png` (the album card) · `qa/PF2-picker.png` (the title
+picker, Sydney's tile carrying the player's own photograph).

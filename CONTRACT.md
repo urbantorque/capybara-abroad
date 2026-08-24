@@ -2111,6 +2111,71 @@ the horns, or give the finale its own wider camera. The moment works; it is not 
 should be.
 
 
+## THE ALBUM (v24 — 25 Aug 2026)
+
+Photo mode has existed since v22 and **every picture it ever took left immediately**: `photoShoot`
+rendered, read the canvas, hung the dataURL off a hidden `<a download>`, clicked it and dropped it
+on the floor. The game has never been able to show you a photograph you took of it. The journal
+remembers every place you stood, every record, every find and every souvenir — and not one of your
+own pictures.
+
+    sysALB_KEY   'capy3.album.v1'   a SEPARATE key from the journey save (see below)
+    sysALB_W/H   288 x 180          the thumbnail; 16:10, legible at the 150 px the grid uses
+    sysALB_Q     0.72               jpeg quality — ~6 KB of base64 per picture, measured
+    sysALB_MAX   36                 oldest-out; ~0.5-0.7 MB of characters at worst
+
+`albAll` / `albWrite` / `albAdd` / `albBest` are the store; `albEl` + `albBuild/Show/Hide/Refresh`
+are the card; `game.hud.albumAudit()` reports without returning 36 dataURLs.
+
+**FOUR CONSTRAINTS, THREE OF THEM THE STORE:**
+
+1. **It may not ride in the journey save.** `saveWrite` puts the whole file through ONE `setItem`
+   and its catch swallows the failure, so an album that grew too big would silently take the
+   tasks, the records and the finds with it. Separate key, separate try/catch.
+2. **A full-frame PNG is 1-3 MB** and base64 adds 1.37x. Two of those is the whole origin quota.
+   What is kept is a 288x180 JPEG thumbnail — measured at ~6 KB each.
+3. **Quota is handled, not hoped for**: evict the oldest and retry.
+4. **The downscale must happen in the same JS turn as the render.** No `preserveDrawingBuffer`, so
+   the drawing buffer is gone by the next turn — `drawImage` straight off the live canvas, one
+   blit, no loading the full PNG into an `Image`.
+
+**THE JOURNAL HAS NO PAGE MECHANISM** — it is one flat, source-ordered scrolling card, so an album
+could not be "a page in the journal" without restructuring it. The album is the LEDGER'S SIBLING
+instead: same veil, same title, same hint, its own overlay, reached by a button on the journal
+exactly as the ledger is. The ledger is the only modal in the file that has already solved pause,
+`inert`, focus return, Escape and the keyboard swallow, and a second half-solved one is how a card
+ends up leaking keys into the game behind it. Its button is hidden until there is a first picture.
+
+**THE TITLE POSTCARDS PREFER YOUR OWN PICTURE.** `buildPick` still builds and appends the authored
+mark — it stays the ground the photograph sits on, and a chapter you have never photographed looks
+exactly as it always did — then lays `albBest(biome)` over it. The menu of a game about going
+places should show the places as YOU saw them.
+
+**AND ONE MENTION OF THE CAMERA PER PLACE, AT MOST ONCE**, on the chapter ceremony, only when there
+is no picture of that chapter yet. A SUGGESTION AND NEVER A TASK: it goes nowhere near the paper,
+ticks nothing, blocks nothing and is counted nowhere. A photograph you were told to take is an
+errand, and the album is worth having precisely because nobody asked.
+
+**THE DECLARATION-ORDER TRAP, WHICH COST THE MOST TIME AND GENERALISES.** `sysALB_KEY` and
+`albShots` are declared at the TOP of systems.js beside `sysSAVE_KEY`, not with the rest of the
+album. The title card asks the album for a postcard **while it builds**, and the title card is
+built earlier in the file than the album's block. Declared down there, both were in their temporal
+dead zone at that moment, and the two ways of getting it wrong are the lesson:
+
+- as **`const`**, the read threw a `ReferenceError` — swallowed by the caller's `try/catch`;
+- changed to **`var`** it stopped throwing and got WORSE: the declaration hoists but the assignment
+  does not, so the key was `undefined`, `localStorage.getItem(undefined)` answered null, and
+  `albAll` **cached an empty album for the rest of the session**.
+
+Both measured identically from outside — 0 of 17 tiles, no error anywhere — and `albumAudit()`
+called later reported the album perfectly, because by then the assignments had run. **If a thing is
+read during construction, declare it above the constructor, not beside its friends.**
+
+One harness note that invalidated a test: **`playwright-cli close-all` then `open` is a fresh
+browser context and localStorage does not survive it.** A run that writes a save and then re-opens
+is measuring an empty store. Take the pictures and check the title card in ONE session.
+
+
 ## THE PAYOFF PASS, BATCH ONE (v23 — 25 Aug 2026)
 
 Three jobs: a baseline audit, the mischief economy, and stillness as a verb.

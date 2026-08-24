@@ -1339,6 +1339,23 @@ const sysFIND_TICK = 0.25;
 // ---------------------------------------------------------------------------
 const sysSAVE_KEY = 'capy3.journey.v1';
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
+// THE ALBUM'S KEY AND ITS CACHE LIVE UP HERE, AWAY FROM THE REST OF THE ALBUM,
+// and the reason is worth the four lines. The title card asks the album for a
+// postcard WHILE IT BUILDS, and the title card is built earlier in this file
+// than the album's own block. Declared down there, both of these were still in
+// their temporal dead zone at that moment, and the two ways of getting it wrong
+// are instructive: as `const` the read threw a ReferenceError, which the
+// caller's try/catch swallowed; changed to `var` it stopped throwing and got
+// WORSE — the declaration hoists but the assignment does not, so the key was
+// `undefined`, localStorage.getItem(undefined) answered null, and albAll cached
+// an empty album for the rest of the session. Silent, and it measured as "the
+// player has no photographs" on all seventeen tiles. A separate key from the
+// journey save on purpose: saveWrite puts the whole file through one setItem
+// and swallows a quota throw, so an oversized album must not be able to take
+// the tasks, the records and the finds down with it.
+const sysALB_KEY = 'capy3.album.v1';
+let albShots = null;               // lazily read; [{u, place, cap, n}]
+let albCan = null, albCtx = null;  // the offscreen downscaler, made on first use
 
 // --- BIOME TRANSITION -------------------------------------------------------
 const sysFADE_OUT   = 820;   // ms of white coming up  (CSS transition is .8s)
@@ -3765,6 +3782,12 @@ function sysBuildCSS() {
    `auto` here handed the panel's height to the <svg>'s intrinsic 64 x 40 box
    and grew the hero to 205 px — see the note by .capyui-pick.hero above. */
 '.capyui-pick.hero .capyui-pickart{aspect-ratio:64 / 25;}',
+/* The player's own photograph, laid over the authored mark and filling the same
+   panel. `cover` because the thumbnail is 8:5 and the tile is 64:26 — letterbox
+   bars inside a postcard would read as a rendering fault. Absolute, so it does
+   not disturb the key badge that is positioned against this same box. */
+'.capyui-pickshot{position:absolute;inset:0;width:100%;height:100%;display:block;',
+  'object-fit:cover;border-radius:inherit;}',
 '.capyui-pickart svg{display:block;width:100%;height:100%;',
   'transition:transform .35s cubic-bezier(.16,1,.3,1);}',
 '.capyui-pick:hover .capyui-pickart svg,.capyui-pick:focus-visible .capyui-pickart svg{',
@@ -4199,6 +4222,41 @@ function sysBuildCSS() {
   'font-variant-numeric:tabular-nums;}',
 '.capyui-ledlist{width:100%;max-width:620px;margin-top:clamp(10px,2.4vw,18px);',
   'display:flex;flex-direction:column;gap:5px;}',
+/* THE ALBUM. The ledger's frame exactly — same veil, same title, same hint —
+   because it is the ledger's sibling and two different full-screen cards in one
+   HUD is a seam the player has to learn twice. Only the body differs: a grid of
+   photographs instead of a column of rows, so it wants width where the ledger
+   wants a reading measure. auto-fill, not auto-fit: with one picture in the
+   album auto-fit stretches it to the full 900 px and a 288 px thumbnail
+   upscaled three times is a blurry mess. */
+'.capyui-alb{position:absolute;inset:0;z-index:66;overflow:auto;overscroll-behavior:contain;',
+  'background:' + veil2 + ';opacity:0;pointer-events:none;transition:opacity .7s ease;',
+  'display:flex;flex-direction:column;align-items:center;',
+  'padding-top:calc(clamp(16px,4vw,34px) + env(safe-area-inset-top,0px));',
+  'padding-bottom:calc(clamp(16px,4vw,34px) + env(safe-area-inset-bottom,0px));',
+  'padding-left:calc(14px + env(safe-area-inset-left,0px));',
+  'padding-right:calc(14px + env(safe-area-inset-right,0px));}',
+'.capyui-alb.show{opacity:1;pointer-events:auto;}',
+'.capyui-alb h2{font-size:clamp(20px,5.4vw,42px);color:' + ink + ';letter-spacing:.05em;',
+  'font-weight:700;transform:rotate(-1.2deg);text-align:center;text-wrap:balance;}',
+'.capyui-albgrid{width:100%;max-width:900px;margin-top:clamp(10px,2.4vw,18px);',
+  'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));',
+  'gap:clamp(8px,1.6vw,14px);}',
+/* A photograph in this game is a snapshot in a shoebox, so it gets the paper,
+   the border and a degree of tilt — but the tilt alternates rather than being
+   random, because a random rake re-rolls on every rebuild and the grid appears
+   to twitch when a new picture is added. */
+'.capyui-albshot{margin:0;background:' + paper + ';border:1px solid ' + paper2 + ';',
+  'border-radius:3px;padding:6px 6px 4px;transform:rotate(-.7deg);',
+  'box-shadow:0 2px 7px rgba(0,0,0,.16);}',
+'.capyui-albshot:nth-child(even){transform:rotate(.8deg);}',
+'.capyui-albshot img{display:block;width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;',
+  'border-radius:2px;background:' + paper2 + ';}',
+'.capyui-albshot figcaption{font-size:clamp(8px,1.5vw,10px);color:' + accent + ';',
+  'font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px;',
+  'text-align:center;font-variant-numeric:tabular-nums;}',
+'.capyui-albnone{grid-column:1/-1;text-align:center;color:' + ink + ';opacity:.75;',
+  'font-size:clamp(11px,2.2vw,14px);padding:clamp(18px,5vw,44px) 10px;text-wrap:balance;}',
 /* Each leaf comes in on its own beat. It is the one place in this HUD where a
    stagger is right: the ledger is READ, top to bottom, and arriving all at
    once makes seventeen rows look like a table rather than a journey. */
@@ -8455,6 +8513,24 @@ export function createSystems(game) {
     // vertical spikes. `slice` fills the panel and crops the overflow.
     if (mark && hero) mark.setAttribute('preserveAspectRatio', 'xMidYMid slice');
     if (mark) art.appendChild(mark);
+    // ...AND IF YOU HAVE TAKEN A PICTURE THERE, IT IS YOUR PICTURE. The mark is
+    // still built and still appended, so it remains the ground the photograph
+    // sits on and the tint behind it is unchanged; a chapter you have never
+    // photographed looks exactly as it always did. This is the point of keeping
+    // the album at all: the menu of a game about going places should show the
+    // places as YOU saw them, not as seventeen hand-authored polygons.
+    try {
+      const shot = albBest(d.biome);
+      if (shot && shot.u) {
+        const im = document.createElement('img');
+        im.className = 'capyui-pickshot';
+        im.src = shot.u;
+        im.alt = '';
+        im.setAttribute('aria-hidden', 'true');
+        im.decoding = 'async';
+        art.appendChild(im);
+      }
+    } catch (e) { /* the mark underneath is a complete tile on its own */ }
     // A ROW WITH NO KEY IS STILL A ROW YOU CAN CLICK. Past the twentieth
     // chapter sysPickLabel runs out; the badge simply is not drawn, and
     // nothing else about the tile changes.
@@ -9082,6 +9158,98 @@ export function createSystems(game) {
    * the flash and the shutter still happen either way, because the player
    * pressed a button and something has to answer.
    */
+  // =========================================================================
+  // THE ALBUM (v24) — the pictures stay in the game
+  // =========================================================================
+  // Photo mode has existed since v22 and every picture it has ever taken left
+  // immediately: `photoShoot` renders, reads the canvas, hangs the dataURL off
+  // a hidden <a download>, clicks it and drops it on the floor. The game has
+  // never once been able to show you a photograph you took of it. The journal
+  // remembers every place you stood, every record, every find and every
+  // souvenir — and not one of your own pictures.
+  //
+  // FOUR CONSTRAINTS, THREE OF WHICH ARE THE STORE:
+  //  1. IT MAY NOT RIDE IN THE JOURNEY SAVE. `saveWrite` puts the whole file
+  //     through ONE setItem, and a quota throw there is caught and swallowed —
+  //     so an album that grew too big would silently take the tasks, the
+  //     records and the finds down with it. Separate key, separate try/catch.
+  //  2. A FULL-FRAME PNG IS 1-3 MB, and base64 is another 1.37x on top. Two of
+  //     those is the whole 5 MB origin quota. So what is kept is a THUMBNAIL:
+  //     288x180 JPEG at 0.72, which measures ~12-20 KB of base64 each.
+  //  3. QUOTA IS HANDLED, NOT HOPED FOR. Evict the oldest and retry, rather
+  //     than losing the write. The one thing worse than a small album is an
+  //     album that stops accepting pictures without saying so.
+  //  4. THE DOWNSCALE MUST HAPPEN IN THE SAME JS TURN AS THE RENDER. There is
+  //     no preserveDrawingBuffer on this renderer, so the drawing buffer is
+  //     gone by the next turn — the same reason toDataURL is already called
+  //     inline below. drawImage straight off the live canvas costs one blit
+  //     and skips loading the full PNG into an Image entirely.
+  // `sysALB_KEY`, `albShots`, `albCan` and `albCtx` are declared at the top of
+  // this file beside sysSAVE_KEY, not here — see the note there. The four below
+  // stay put: they are read only by albAdd and albWrite, neither of which can
+  // run before the player has taken a picture.
+  const sysALB_W = 288, sysALB_H = 180;   // 16:10, legible at the 150 px the grid uses
+  const sysALB_Q = 0.72;
+  const sysALB_MAX = 36;                  // ~0.5-0.7 MB of characters at worst
+
+  function albAll() {
+    if (albShots) return albShots;
+    albShots = [];
+    try {
+      const raw = localStorage.getItem(sysALB_KEY);
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (o && o.v === 1 && Array.isArray(o.shots)) albShots = o.shots;
+      }
+    } catch (e) { albShots = []; }
+    return albShots;
+  }
+
+  /** Oldest-out until it fits. Returns false only if even one picture will not. */
+  function albWrite() {
+    for (let guard = 0; guard < sysALB_MAX + 2; guard++) {
+      try {
+        localStorage.setItem(sysALB_KEY, JSON.stringify({ v: 1, shots: albShots }));
+        return true;
+      } catch (e) {
+        if (!albShots.length) return false;
+        albShots.shift();                 // the oldest picture is the cheapest to lose
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Called from photoShoot, in the same turn as the render. `place` and `cap`
+   * are stored with the picture because the caption is built out of live state
+   * (the chapter, weather.label(), the clock) and none of it can be recovered
+   * an hour later.
+   */
+  function albAdd(place, cap) {
+    try {
+      if (!albCan) {
+        albCan = document.createElement('canvas');
+        albCan.width = sysALB_W; albCan.height = sysALB_H;
+        albCtx = albCan.getContext('2d');
+      }
+      if (!albCtx) return false;
+      albCtx.drawImage(canvas, 0, 0, sysALB_W, sysALB_H);
+      const u = albCan.toDataURL('image/jpeg', sysALB_Q);
+      if (!u || u.length < 64) return false;
+      const arr = albAll();
+      arr.push({ u: u, place: place, cap: cap, n: photoShots });
+      while (arr.length > sysALB_MAX) arr.shift();
+      return albWrite();
+    } catch (e) { return false; }
+  }
+
+  /** The newest picture taken in a place, or null. The title card asks this. */
+  function albBest(place) {
+    const arr = albAll();
+    for (let i = arr.length - 1; i >= 0; i--) if (arr[i].place === place) return arr[i];
+    return null;
+  }
+
   function photoShoot() {
     if (!photoOn) return;
     photoShots++;
@@ -9096,13 +9264,23 @@ export function createSystems(game) {
     sfx('tick', { volume: 0.62, pitch: 2.1, ui: true, force: true });
     punch(0.05);
     let url = '';
+    let kept = false;
+    const place = (game.biome && game.biome.current) || 'sydney';
     try {
       // Draw, then read. In that order, in this turn, with nothing between them.
       if (game.post && game.post.enabled) game.post.render();
       else renderer.render(scene, camera);
+      // ...and the album's thumbnail is blitted off the same drawing buffer,
+      // BEFORE the turn ends, for exactly the reason the read below is here.
+      // The caption is composed now because every field of it is live state.
+      kept = albAdd(place, photoPlace.textContent +
+                    (photoSky.textContent && photoSky.textContent !== '·'
+                       ? ' ' + photoSky.textContent : '') +
+                    ' ' + photoTime.textContent);
       url = canvas.toDataURL('image/png');
     } catch (e) { url = ''; }
     if (!url) { toast('the camera did not catch that one'); return; }
+    if (kept) albRefresh();
     try {
       const name = (game.biome && game.biome.current) || 'sydney';
       const a = document.createElement('a');
@@ -9678,6 +9856,94 @@ export function createSystems(game) {
   hudRoot.appendChild(ledEl);
   let ledShown = false, ledFinal = false, ledReturnFocus = null;
 
+  // --- THE ALBUM's card ----------------------------------------------------
+  // The ledger's shape, deliberately: it is the only modal in this file that
+  // has already solved pause, inert, focus return, Escape and the keyboard
+  // swallow, and a second half-solved one is how a card ends up leaking keys
+  // into the game behind it. The journal itself has no page or tab mechanism —
+  // it is one flat scrolling card — so an album could not have been "a page in
+  // the journal" without restructuring it. This is a sibling instead, reached
+  // by a button on the journal, exactly as the ledger is.
+  const albEl = sysEl('div', 'capyui-alb');
+  albEl.setAttribute('role', 'dialog');
+  albEl.setAttribute('aria-modal', 'true');
+  albEl.setAttribute('aria-label', 'Your photographs');
+  albEl.tabIndex = -1;
+  const albTitle = sysEl('h2', null, 'THE ALBUM');
+  const albSub = sysEl('div', 'capyui-ledsub', '');
+  const albGrid = sysEl('div', 'capyui-albgrid');
+  const albHint = sysEl('div', 'capyui-ledhint', 'ESC to close');
+  albEl.appendChild(albTitle);
+  albEl.appendChild(albSub);
+  albEl.appendChild(albGrid);
+  albEl.appendChild(albHint);
+  albEl.inert = true;
+  hudRoot.appendChild(albEl);
+  let albShown = false, albReturnFocus = null;
+
+  function albBuild() {
+    const arr = albAll();
+    while (albGrid.firstChild) albGrid.removeChild(albGrid.firstChild);
+    if (!arr.length) {
+      albSub.textContent = 'no photographs yet';
+      const em = sysEl('div', 'capyui-albnone',
+        'press K anywhere to put the camera up, then Enter to keep the picture.');
+      albGrid.appendChild(em);
+      return;
+    }
+    const places = Object.create(null);
+    for (let i = 0; i < arr.length; i++) places[arr[i].place] = 1;
+    let np = 0; for (const k in places) np++;
+    albSub.textContent = arr.length + (arr.length === 1 ? ' picture' : ' pictures') +
+                         '  ·  ' + np + (np === 1 ? ' place' : ' places');
+    // Newest first: the last thing you photographed is the thing you want to see.
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const s = arr[i];
+      const fig = sysEl('figure', 'capyui-albshot');
+      const im = document.createElement('img');
+      im.src = s.u;
+      im.alt = s.cap || 'a photograph';
+      im.decoding = 'async';
+      im.loading = 'lazy';
+      fig.appendChild(im);
+      fig.appendChild(sysEl('figcaption', null, s.cap || ''));
+      albGrid.appendChild(fig);
+    }
+  }
+  function albShow() {
+    if (albShown) return;
+    albShown = true;
+    albBuild();
+    albEl.inert = false;
+    albEl.classList.add('show');
+    albEl.scrollTop = 0;
+    game.state.paused = true;
+    albReturnFocus = document.activeElement;
+    albEl.focus();
+  }
+  function albHide() {
+    if (!albShown) return;
+    albShown = false;
+    albEl.classList.remove('show');
+    albEl.inert = true;
+    if (albReturnFocus && albReturnFocus.focus) { try { albReturnFocus.focus(); } catch (e) {} }
+    albReturnFocus = null;
+    if (!document.hidden && !jrShown) game.state.paused = false;
+  }
+  /**
+   * Called after a shot is kept, so an open card grows a picture live — and so
+   * the journal's button stops being stale. jrRefresh is the other writer of
+   * that flag, but it only runs when the journal is opened, so without this the
+   * button was correct only from the SECOND time the player looked at it.
+   */
+  function albRefresh() {
+    try { jrAlbBtn.hidden = !albAll().length; } catch (e) { /* pre-init */ }
+    if (albShown) albBuild();
+  }
+  albEl.addEventListener('pointerdown', function (e) {
+    if (e.target === albEl) albHide();
+  });
+
   // --- the souvenir card: the second beat of a chapter's ceremony ----------
   // Finishing a place used to pay out a tally and a time and nothing you could
   // carry. This is the one thing in the game that crosses a chapter boundary;
@@ -10094,6 +10360,27 @@ export function createSystems(game) {
     ledShow(false);
   });
   jrCard.appendChild(jrLedBtn);
+  // ...and the album beside it. The journal answers "where have I been"; the
+  // ledger answers it in numbers and this answers it in pictures. It is shown
+  // only once there is something in it — an empty button that opens an empty
+  // card is a worse answer than no button, and the card's own empty state is
+  // for the player who opens it from a session where they have just deleted
+  // the last picture rather than for the eighteen hours before the first one.
+  const jrAlbBtn = sysEl('button', 'capyui-jrled');
+  jrAlbBtn.type = 'button';
+  jrAlbBtn.textContent = 'the album';
+  // Hidden until jrRefresh finds a picture. The DEFAULT has to be hidden, not
+  // merely the refreshed state: jrRefresh has not necessarily run by the time
+  // the card is first built, and a button offering an empty album was exactly
+  // what the audit caught.
+  jrAlbBtn.hidden = true;
+  jrAlbBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  jrAlbBtn.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    jrHide();
+    albShow();
+  });
+  jrCard.appendChild(jrAlbBtn);
   jrCard.appendChild(jrKeys);
   jrCard.appendChild(jrFoot);
 
@@ -10136,6 +10423,9 @@ export function createSystems(game) {
   }
 
   function jrRefresh() {
+    // The album's button appears the moment there is a first picture in it and
+    // never before. See where it is built.
+    try { jrAlbBtn.hidden = !albAll().length; } catch (e) { /* pre-init */ }
     let done = 0;
     for (const k in taskRec) if (taskRec[k].done) done++;
     let places = 0;
@@ -12639,6 +12929,22 @@ export function createSystems(game) {
         if (!ledShown && chapterOf(game.biome.current) === n) toast('the way on: ' + def.way);
       }, sysKEEP_WAIT + sysKEEP_CARD + 400);
     }
+    // ---- AND ONE MENTION OF THE CAMERA, PER PLACE, AT MOST ONCE ----------
+    // A SUGGESTION AND NEVER A TASK. It goes nowhere near the paper, ticks
+    // nothing, blocks nothing and is not counted anywhere — a photograph you
+    // were told to take is an errand, and the album is worth having precisely
+    // because nobody asked. It is said here because finishing a place is the
+    // one moment the player is certainly about to leave it, and only when
+    // there is no picture of this chapter yet: telling somebody to photograph
+    // a place they have already photographed is how a suggestion becomes nag.
+    // K is in the fold on the title card, so for many players this is the
+    // first time they learn the camera exists at all.
+    setTimeout(function () {
+      if (ledShown || albShown || jrShown) return;
+      if (!game.biome || chapterOf(game.biome.current) !== n) return;
+      if (albBest(def.biome)) return;
+      toast('no picture of ' + def.name + ' yet · K, then Enter');
+    }, sysKEEP_WAIT + sysKEEP_CARD + 3200);
   }
 
   // =========================================================================
@@ -12979,6 +13285,15 @@ export function createSystems(game) {
       // Tab would otherwise walk the browser's own focus order straight out of
       // the back of a modal and into the HUD underneath it. The ledger has
       // nothing focusable inside it, so focus simply stays where it is put.
+      if (c === 'Tab') e.preventDefault();
+      return;
+    }
+    // ...and so does the album, for the same reason and by the same rules. It
+    // is checked BEFORE the ledger's siblings below because it can be opened
+    // from the journal, so both can be up in the same session and only the one
+    // actually on top may answer a key.
+    if (albShown) {
+      if (c === 'Escape') { e.preventDefault(); albHide(); return; }
       if (c === 'Tab') e.preventDefault();
       return;
     }
@@ -14397,6 +14712,22 @@ export function createSystems(game) {
     },
     /** Is the camera out, and how many pictures has it taken. */
     photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
+    /** The album, without the pictures — the harness cannot hold 36 dataURLs. */
+    albumAudit: function () {
+      const arr = albAll();
+      const places = Object.create(null);
+      let bytes = 0;
+      for (let i = 0; i < arr.length; i++) {
+        places[arr[i].place] = (places[arr[i].place] || 0) + 1;
+        bytes += (arr[i].u || '').length;
+      }
+      let stored = -1;
+      try { stored = (localStorage.getItem(sysALB_KEY) || '').length; } catch (e) {}
+      return { n: arr.length, cap: sysALB_MAX, places: places, chars: bytes,
+               stored: stored, shown: albShown, btn: !jrAlbBtn.hidden,
+               caps: arr.map(function (s) { return s.cap; }) };
+    },
+    albumShow: function () { albShow(); },
     root: hudRoot,
     toast: toast,
     completeTask: completeTask,
