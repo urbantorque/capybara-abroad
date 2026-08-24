@@ -706,7 +706,10 @@ function mainBoot() {
     },
     // `dt` is the SCALED frame time every module is handed; `rawDt` is the wall
     // clock, and `timeScale` is the ratio. See mainMakeTime.
-    state: { time: 0, dt: 0, rawDt: 0, timeScale: 1, paused: false, started: false, score: 0, chaos: 0, sailing: false },
+    // `chaos` is the mayhem input and `calm` is the other end of the same
+    // stick — a spike that decays and a hold that accrues. See THE CALM in
+    // systems.js, which owns both.
+    state: { time: 0, dt: 0, rawDt: 0, timeScale: 1, paused: false, started: false, score: 0, chaos: 0, calm: 0, sailing: false },
     mats: null,
     props: [], npcs: [],
     capy: null, env: null, physics: null, hud: null, post: null,
@@ -721,6 +724,16 @@ function mainBoot() {
     condor: null, biome: null,
     completeTask() {}, toast() {}, shake() {}, sfx() {},
     registerShadowTarget() {},
+    // THE CALM, stubbed here and filled in by systems.js. `calm()` answers 1 —
+    // "nothing is disturbing anything" — because a world with no systems in it
+    // yet is exactly that, and a critter registered before systems exists gets
+    // a record that simply never shrinks. Neither stub can produce a wrong
+    // behaviour; both exist so that the shape of `game` is one object literal.
+    calm(x) { return x === undefined ? 0 : 1; },
+    addCritter(o) {
+      const r = (o && o.r > 0) ? o.r : 10;
+      return { biome: (o && o.biome) || '', r: r, k: 1, near: r, calm: 0 };
+    },
     // THE TIME CHANNEL, filled in for real three lines below. Declared here so
     // the shape of `game` is one object literal and a reader does not have to
     // find the assignment to know these exist.

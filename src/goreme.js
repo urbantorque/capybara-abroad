@@ -1240,6 +1240,12 @@ function gorBuildScatter(game, root) {
  *   nine cats, simultaneously, deciding it was not worth getting up for.
  */
 const gorCAT_N = 9;
+// How close a capybara may get before a cat leaves — the number the chapter
+// has always used, now the BASE of one, because a settled animal is allowed
+// nearer. Nine cats declining to get up for you is the joke; nine cats letting
+// you sit down among them is the joke's second half.
+const gorCAT_NEAR = 2.5;
+let gorCatCrit = null;
 let gorCatMesh = null;
 // said once, the first time the whole square declines to be impressed
 let gorToldCats = false;
@@ -1283,12 +1289,20 @@ function gorBuildCats(root) {
 function gorUpdateCats(game, dt) {
   if (!gorCatMesh) return;
   const p = game.capy && game.capy.position;
+  // ---- ...UNLESS YOU HAVE BEEN SITTING THERE A WHILE ----------------------
+  // Registered here rather than at build time because a chapter is built on
+  // first entry and systems.js is created at boot — but the ORDER of those two
+  // is a coordinator detail and this is one null check a frame. See THE CALM.
+  if (!gorCatCrit && typeof game.addCritter === 'function') {
+    gorCatCrit = game.addCritter({ biome: 'goreme', r: gorCAT_NEAR });
+  }
+  const catNear = gorCatCrit ? gorCatCrit.near : gorCAT_NEAR;
   for (let i = 0; i < gorCAT_N; i++) {
     const c = gorCats[i];
     // ---- a capybara at two and a half metres is a reason to be elsewhere ---
     if (p) {
       const dx = c.x - p.x, dz = c.z - p.z;
-      if (dx * dx + dz * dz < 2.5 * 2.5 && c.st !== 'walk') {
+      if (dx * dx + dz * dz < catNear * catNear && c.st !== 'walk') {
         c.st = 'walk'; c.t = rand(1.6, 3.0);
         const away = Math.atan2(dx, dz);
         c.tx = clamp(c.x + Math.sin(away) * rand(3, 5.5), gorPLAZA.x - 13, gorPLAZA.x + 13);
@@ -5051,9 +5065,19 @@ function gorBuild(game) {
     gorLocals.chief = game.addLocal({ biome: 'goreme', x: gorFIELD.x + 6, y: gorTerrain(gorFIELD.x + 6, gorFIELD.z),
       z: gorFIELD.z, near: 8,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
+      // ---- AND SOME OF IT DEPENDS ON WHAT YOU HAVE DONE (see localResolve
+      // in npc.js). Cappadocia used the conditional-line system in exactly
+      // nought places, which meant the man who runs the launch field said the
+      // same three sentences to an animal who had never seen a balloon and to
+      // one who had ridden three winds and put it down on his trailer. A
+      // `before:` line is the thing they say while you are still a stranger; an
+      // `after:` line is the thing they can only say once it has happened.
       lines: ['We do not steer. Nobody steers. We choose a height.',
               'Wind goes one way down low and the other way up high.',
-              'In the basket, please. Both feet. All four feet.'],
+              { t: 'In the basket, please. Both feet. All four feet.', before: 'aboard' },
+              { t: 'You have been in one now. So you know.', after: 'aboard' },
+              { t: 'Three winds. You found all three. Most pilots take a season.', after: 'three-winds' },
+              { t: 'Nobody has ever put one down on that trailer first go. Nobody.', after: 'on-the-trailer' }],
       wheek: ['Careful — the burner is louder and it is right there.'],
       praise: ['Right. Noted. Carry on.',
                'You are going to be a story I tell at the tea house.',
@@ -5068,7 +5092,9 @@ function gorBuild(game) {
       figure: { shirt: PALETTE.cloth5, skin: PALETTE.skin2 },
       lines: ['Whole town is cut into the rock. Warm in winter.',
               'Five in the morning and everyone is awake. Every day.',
-              'Look up. Go on. Look up.'],
+              { t: 'Look up. Go on. Look up.', before: 'sunrise' },
+              { t: 'You were up there when it came over the rim. I saw you.', after: 'sunrise' },
+              { t: 'The one on the end. That is the one you were on top of.', after: 'chimney-top' }],
       wheek: ['The valley gives that back to you twice.'],
       praise: ['In MY square. At five in the morning.',
                'I will be telling people about that all day.',
@@ -5091,7 +5117,9 @@ function gorBuild(game) {
       figure: { shirt: PALETTE.gorEnvE, legs: PALETTE.gorTuffDk, skin: PALETTE.skin2 },
       lines: ['Sit. There is tea. There is always tea.',
               'We are here at five because they go up at five. Every day of my life.',
-              'Two glasses. Then I go and look at the sky like everybody else.'],
+              { t: 'Two glasses. Then I go and look at the sky like everybody else.', before: 'sunrise' },
+              { t: 'You have seen it now. Sit down. Second glass.', after: 'sunrise' },
+              { t: 'He came in here talking about a rodent on his mare. That was you.', after: 'the-herd' }],
       wheek: ['Ha! Listen — there. And again. Told you.'],
       praise: ['Sit down. You have earned a glass and you are getting one anyway.',
                'Mm. Yes. Tea.',
@@ -5104,7 +5132,9 @@ function gorBuild(game) {
       figure: { shirt: PALETTE.gorPot, legs: PALETTE.gorBasaltDk, skin: PALETTE.skin2 },
       lines: ['Avanos clay. Red as the valley, because it IS the valley.',
               'Seventeen out of the kiln, fourteen came through. Good week.',
-              'Do not lean on that one. It is Thursday’s.'],
+              'Do not lean on that one. It is Thursday’s.',
+              { t: 'Every bird off that cliff came over my racks. Every one.', after: 'dovecote' },
+              { t: 'You have stood on top of the rock I dig out of. Bit strange, that.', after: 'chimney-top' }],
       wheek: ['Nothing in this yard is dry yet. Please.'],
       praise: ['If anything in this yard is cracked it was already cracked.',
                'Hands. I mean feet. Whatever you have. Off.',
@@ -5116,9 +5146,10 @@ function gorBuild(game) {
     gorLocals.dove = game.addLocal({ biome: 'goreme', x: gorCLIFF.x + 13, y: gorTerrain(gorCLIFF.x + 13, -42),
       z: -42, near: 8,
       figure: { shirt: PALETTE.gorEnvF, legs: PALETTE.gorTuffDk },
-      lines: ['My grandfather cut forty of those holes. On a rope. At night.',
+      lines: [{ t: 'My grandfather cut forty of those holes. On a rope. At night.', before: 'dovecote' },
               'The white patch is so the birds can find the door.',
-              'Guano. That is what the vines are grown on. All of them.'],
+              'Guano. That is what the vines are grown on. All of them.',
+              { t: 'Forty of those holes were my grandfather’s. You emptied all four hundred.', after: 'dovecote' }],
       wheek: ['Well. There they all go.'],
       praise: ['Hm. The birds noticed. That is more than most people manage.',
                'Right in front of the holes, as well.',
@@ -5129,9 +5160,11 @@ function gorBuild(game) {
     gorLocals.crew = game.addLocal({ biome: 'goreme', x: gorFIELD.x - 12, y: gorTerrain(gorFIELD.x - 12, gorFIELD.z + 12),
       z: gorFIELD.z + 12, near: 7,
       figure: { shirt: PALETTE.gorEnvD, legs: PALETTE.denim, hat: PALETTE.hiVis },
-      lines: ['Walk the length of it. Look for tears. Every single morning.',
+      lines: [{ t: 'Walk the length of it. Look for tears. Every single morning.', before: 'the-envelope' },
               'Fan first, then the burner. Never the other way. Never.',
-              'Fifteen metres of nylon and it holds up four people. Think about that.'],
+              'Fifteen metres of nylon and it holds up four people. Think about that.',
+              { t: 'You walked it. End to end. Found nothing, did you. Nobody ever does.', after: 'the-envelope' },
+              { t: 'Cold in the mouth of one, isn’t it. Everybody goes quiet in there.', after: 'the-mouth' }],
       wheek: ['The fan is louder. You will not win.'],
       praise: ['Fine. Fine. As long as nothing tore.',
                'Sixteen years and that is a first.',
@@ -5144,8 +5177,9 @@ function gorBuild(game) {
       z: -70, near: 8,
       figure: { shirt: PALETTE.gorCarpet, legs: PALETTE.gorBasaltDk, hat: PALETTE.gorTuffDk },
       lines: ['Katpatuka. The land of beautiful horses. That is the whole name.',
-              'She wears the bell. The rest of them just follow the bell.',
-              'Up the valley and back before the sun. They know it better than I do.'],
+              { t: 'She wears the bell. The rest of them just follow the bell.', before: 'the-herd' },
+              'Up the valley and back before the sun. They know it better than I do.',
+              { t: 'She carried you. She has never carried me. I have asked.', after: 'the-herd' }],
       wheek: ['She has heard worse. She has heard me.'],
       praise: ['The horses saw that. They have opinions.',
                'Hm. Katpatuka.',
@@ -5165,7 +5199,8 @@ function gorBuild(game) {
       lines: ['Four hundred holes. My grandfather cut about eighty of them.',
               'Nobody eats the birds. It was never about the birds.',
               'You want to know why the grapes grow in a valley made of ash? That is why.',
-              'They go out at first light and they are all back by nine.'],
+              { t: 'They go out at first light and they are all back by nine.', before: 'dovecote' },
+              { t: 'They went out an hour early because of you. They are still cross.', after: 'dovecote' }],
       wheek: ['Do that again and you will be picking them out of your teeth.',
               'Every single one of them looked at you. Did you see that?'],
       praise: ['Four hundred witnesses and not one of them will say a word.',
@@ -5179,7 +5214,9 @@ function gorBuild(game) {
       lines: ['Before the sun. Always before the sun. After that it is not work, it is suffering.',
               'No wires, no posts. They hold themselves up. They have had two thousand years of practice.',
               'The wall is not mine. The wall was here. I just put the stones back on it.',
-              'You are standing on a vine. You are standing on a hundred-year-old vine.'],
+              'You are standing on a vine. You are standing on a hundred-year-old vine.',
+              { t: 'Three times over my field. I stopped work for the third one.', after: 'three-winds' },
+              { t: 'We all stop for it. Two minutes. Then back to the vines.', after: 'sunrise' }],
       wheek: ['Yes, yes. Very good. Now move.',
               'The dogs will start, and then the whole valley starts.'],
       praise: ['Yes. Very good. Now get off the vine.',
@@ -5195,7 +5232,8 @@ function gorBuild(game) {
       lines: ['We do not catch them. We just get there first and hold the basket.',
               'My father drives. I open the gates. There are a lot of gates.',
               'Whichever way the wind is at four hundred feet — that is where I am going.',
-              'If you come down out here, do not get out. Wait. Everybody gets out too early.'],
+              { t: 'If you come down out here, do not get out. Wait. Everybody gets out too early.', before: 'on-the-trailer' },
+              { t: 'Straight onto the trailer. I did not have to move the truck once.', after: 'on-the-trailer' }],
       wheek: ['I heard that from the road.',
               'Save it for when you are up there. It goes a very long way from up there.'],
       praise: ['I have got the whole valley in a mirror. I saw that.',

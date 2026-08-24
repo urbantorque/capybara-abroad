@@ -921,9 +921,18 @@ function manBuild(game) {
     manLocals.guard = game.addLocal({ biome: 'manly', x: manFLAG_HOME.x, y: manTerrain(manFLAG_HOME.x, manFLAG_HOME.z),
       z: manFLAG_HOME.z, near: 8,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.cloth1, hat: PALETTE.hiVis },
+      // ---- AND HALF OF IT IS CONDITIONAL NOW (see localResolve in npc.js).
+      // `onTask` below is what somebody says the MOMENT you finish something
+      // in front of them; this is what they say for the rest of the chapter.
+      // Manly used the conditional-line system in nought places, so the
+      // lifeguard warned an animal that had already been out the back in the
+      // gutter and back in on the wave of the set not to fight the rip.
       lines: ['Swim between the flags, mate. That is the whole system.',
-              'See that gutter? That is where you would go. Straight out.',
-              'Do not fight it. Nobody wins that one. Swim across it.'],
+              { t: 'See that gutter? That is where you would go. Straight out.', before: 'the-rip' },
+              { t: 'Do not fight it. Nobody wins that one. Swim across it.', before: 'the-rip' },
+              { t: 'You have been out in it now. Told you it was quicker than walking.', after: 'the-rip' },
+              { t: 'They are your flags now, as far as I am concerned.', after: 'move-flags' },
+              { t: 'From the bank all the way to the sand. I have got it in the log.', after: 'all-the-way' }],
       wheek: ['Yeah, righto. Between the flags.',
               'Oi. You right?'],
       praise: ['Yeah, nah, that was all right.',
@@ -937,9 +946,11 @@ function manBuild(game) {
                 'sandcastle': ['I saw nothing. I was looking at the water.'] } });
     manLocals.club = game.addLocal({ biome: 'manly', x: 24, y: manTerrain(24, 47), z: 47, near: 7,
       figure: { shirt: PALETTE.cloth2 },
-      lines: ['Boat goes out at four if the bank holds.',
+      lines: [{ t: 'Boat goes out at four if the bank holds.', before: 'the-surfboat' },
               'Nippers finish at eleven. It gets loud.',
-              'You are dripping on the honour board.'],
+              'You are dripping on the honour board.',
+              { t: 'The crew are still arguing about who let you in the boat.', after: 'the-surfboat' },
+              { t: 'Longest ride off that bank all week and it was not a member.', after: 'all-the-way' }],
       wheek: ['Half the beach just looked up.'],
       praise: ['That is going on the board. Somewhere on the board.',
                'We have a form for this. We do not have a form for this.',
@@ -957,7 +968,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manClub, hat: PALETTE.manFlagRed, legs: PALETTE.cloth1 },
       lines: ['Flake and chips, minimum chips, and no I will not do half a scoop.',
               'The seagulls have worked out the awning. Do not sit under it.',
-              'Everything is fried. That is the menu. That is the whole menu.'],
+              'Everything is fried. That is the menu. That is the whole menu.',
+              { t: 'My whole queue moved up the beach after you. Every one of them.', after: 'move-flags' },
+              { t: 'The gulls had that castle before the kid got back. I did warn him.', after: 'sandcastle' }],
       wheek: ['Mate. There are people eating.',
               'You are not getting a chip. You are getting three chips.'],
       praise: ['Not in here. Whatever it was, not in here.',
@@ -972,7 +985,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manTowelD, skin: PALETTE.skin2, hat: PALETTE.manBoardC },
       lines: ['Sixty-one years I have swum this pool. Every day but one.',
               'The wall keeps the swell out. Mostly. Not always.',
-              'Cold? It is not cold. You are just soft.'],
+              { t: 'Cold? It is not cold. You are just soft.', before: 'bower-pool' },
+              { t: 'You did the length. You are not soft. I said what I said.', after: 'bower-pool' },
+              { t: 'Bluey came to you. Sixty-one years and he has never come to me.', after: 'blue-groper' }],
       wheek: ['You will scare the pelican. He is very highly strung.'],
       praise: ['Sixty-one years and that is new.',
                'Hm. In my pool.',
@@ -985,7 +1000,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manScrub, hat: PALETTE.manSand },
       lines: ['Been here since five. Two bites. Both of them crabs.',
               'Do not stand there. That is the ledge that gets you.',
-              'Groper comes past about now. Do not tell anyone.'],
+              { t: 'Groper comes past about now. Do not tell anyone.', before: 'blue-groper' },
+              { t: 'You have met him. Right. Now you are in on it as well.', after: 'blue-groper' },
+              { t: 'Nothing has come past this ledge since you sat on that bommie.', after: 'the-bommie' }],
       wheek: ['Right, well, that is the afternoon gone.'],
       praise: ['There goes the afternoon.',
                'Everything on this ledge just left. Everything.',
@@ -998,7 +1015,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manAwning2, skin: PALETTE.skin3 },
       lines: ['Round the corner and the whole ocean gives up. Look at it.',
               'Kiosk has been there since nineteen thirty-two. So has the queue.',
-              'People walk past the pool to get here. They are correct.'],
+              'People walk past the pool to get here. They are correct.',
+              { t: 'You came round the corner the hard way. Through the water.', after: 'the-rip' },
+              { t: 'Somebody filmed you on that rock. Somebody always films it.', after: 'the-bommie' }],
       wheek: ['Nothing wakes up over here. That is the point of over here.'],
       praise: ['Even round here. Even round here!',
                'Well. There goes the quiet side.',
@@ -1011,7 +1030,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manFlagYel, hat: PALETTE.manFlagYel, legs: PALETTE.manBoardC },
       lines: ['We are two down. You do not happen to play.',
               'Serve into the wind, it comes back. Every time.',
-              'That ball has been in the rip twice this week.'],
+              { t: 'That ball has been in the rip twice this week.', before: 'the-rip' },
+              { t: 'You went out in the gutter on purpose. The ball does it by accident.', after: 'the-rip' },
+              { t: 'We are inside the flags now. We have never been inside the flags.', after: 'move-flags' }],
       wheek: ['Take it as a yes, shall we.'],
       praise: ['Right. Yes. Still two down, though.',
                'Was that a serve? I am counting that as a serve.',
@@ -1023,7 +1044,9 @@ function manBuild(game) {
       figure: { shirt: PALETTE.manShopB, hat: PALETTE.manSand, skin: PALETTE.skin2 },
       lines: ['Ferry every half hour. Rough one today. Sit at the back.',
               'Forty minutes from the middle of the city to that.',
-              'Manly. Seven miles from Sydney, a thousand miles from care.'],
+              'Manly. Seven miles from Sydney, a thousand miles from care.',
+              { t: 'Half the boat was at the rail watching you come in on that.', after: 'all-the-way' },
+              { t: 'In the surfboat. I told them on the four o’clock. Nobody believed me.', after: 'the-surfboat' }],
       wheek: ['They will hear that at the Quay.'],
       praise: ['Forty minutes from the city and this is what happens.',
                'I will mention it on the boat. Nobody will believe me.',
@@ -2462,6 +2485,8 @@ const manGULL_N = 30;
 let manGullMesh = null, manGullData = null;
 let manGullUp = 0, manGullNext = 14;
 const manGULL_HOME = { x: -13.5, z: 47.0 };
+const manGULL_NEAR = 7;             // m — walk inside this and they go up
+let manGullCrit = null;             // ...and the calm shrinks it. See THE CALM.
 // the ledges they perch on, filled in by manBuildTown as it draws them
 const manPerch = [];
 /**
@@ -2535,9 +2560,17 @@ function manUpdateGulls(game, dt) {
   }
   // a capybara that walks into the middle of them puts them up, and so does a
   // wheek — which is the only reason the chip-shop man's line is true
+  if (!manGullCrit && typeof game.addCritter === 'function') {
+    manGullCrit = game.addCritter({ biome: 'manly', r: manGULL_NEAR });
+  }
   if (capy && capy.position) {
     const d = Math.hypot(capy.position.x - manGULL_HOME.x, capy.position.z - manGULL_HOME.z);
-    if (d < 7 && manGullUp < 0.5) manGullUp = 1;
+    // Seven metres, unless you have been standing still — in which case they
+    // will let you stand in the middle of them. The WHEEK path below is
+    // untouched and still reaches thirty-four metres, so the one thing in this
+    // chapter a player is asked to do with the gulls cannot be made harder by
+    // being calm. See THE CALM in systems.js.
+    if (d < (manGullCrit ? manGullCrit.near : manGULL_NEAR) && manGullUp < 0.5) manGullUp = 1;
     // THE WHEEK REACHES FURTHER THAN THE CAPYBARA DOES, which is the whole
     // point of having one, and thirty gulls going up off a shopfront is the
     // largest thing in this chapter that one button can cause on dry land.

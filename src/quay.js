@@ -3942,6 +3942,8 @@ function quayUpdateDolphins(dt) {
  * thing in the chapter that reacts to you at all.
  */
 const quayAG_N = 11;
+const quayAG_NEAR = 3.5;            // m off a bollard before she has had enough
+let quayAGCrit = null;              // ...and the calm shrinks it. See THE CALM.
 let quayApronGull = null, quayAGData = null;
 const quayAG_PERCH = [
   [-46, 0.84, quayAPRON_Z + 1.4], [-36, 0.84, quayAPRON_Z + 1.4],
@@ -3989,14 +3991,20 @@ function quayUpdateApronGulls(game, dt) {
   const im = quayApronGull;
   if (!im) return;
   const capy = game && game.capy && game.capy.position ? game.capy.position : null;
+  if (!quayAGCrit && game && typeof game.addCritter === 'function') {
+    quayAGCrit = game.addCritter({ biome: 'quay', r: quayAG_NEAR });
+  }
+  const agNear = quayAGCrit ? quayAGCrit.near : quayAG_NEAR;
+  const agNear2 = agNear * agNear;
   for (let i = 0; i < quayAG_N; i++) {
     const o = i * 4;
     const p = quayAG_PERCH[quayAGData[o] | 0];
     let f = quayAGData[o + 1];
     if (f <= 0 && capy) {
       const dx = capy.x - p[0], dz = capy.z - p[2];
-      // three and a half metres, and not a centimetre sooner
-      if (dx * dx + dz * dz < 3.5 * 3.5 && Math.abs(capy.y - p[1]) < 3) {
+      // three and a half metres, and not a centimetre sooner — less than that
+      // if you have stopped moving. See THE CALM in systems.js.
+      if (dx * dx + dz * dz < agNear2 && Math.abs(capy.y - p[1]) < 3) {
         f = 1;
         if (game && typeof game.sfx === 'function' && Math.random() < 0.5) {
           game.sfx('gull', { volume: 0.4 });
@@ -5159,9 +5167,18 @@ function quayBuild(game) {
     // never guess it — see the note on the Kyoto miller in npc.js.
     quayHand = game.addLocal({ biome: 'quay', x: 0, y: 0.20, z: 24, near: 7,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
+      // ---- AND SOME OF THESE ONLY EXIST ONCE SOMETHING HAS HAPPENED -------
+      // localResolve in npc.js has taken conditional lines since v20 and this
+      // chapter used it nowhere, which meant the deckhand who unlocks the
+      // wheel for you went on telling you the wheel was unlocked while you
+      // were standing at Manly having driven the boat there yourself. A
+      // `before:` line belongs to a stranger; an `after:` line can only be
+      // said to somebody who was there.
       lines: ['Mind the gap. Everybody minds the gap eventually.',
-              'She goes when she goes. Wheel is unlocked.',
-              'Thirty minutes across, if the harbour behaves.'],
+              { t: 'She goes when she goes. Wheel is unlocked.', before: 'take-helm' },
+              { t: 'Thirty minutes across, if the harbour behaves.', before: 'manly-voyage' },
+              { t: 'You have got the wheel. I am going to sit down.', after: 'take-helm' },
+              { t: 'Alongside at Manly, first go. Thirty years I have been watching people not do that.', after: 'manly-voyage' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['That is the horn, near enough.'] });
     // ...AND HE WAS STANDING INSIDE HIS OWN SHOP. (quayMANLY.x, quayMANLY.z-30)
@@ -5172,8 +5189,9 @@ function quayBuild(game) {
       z: quayCHIPS.z + 1.6, near: 8, face: Math.PI,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth6 },
       lines: ['Chips are two minutes. They are always two minutes.',
-              'Do not feed the seagulls. Do not even look at them.',
-              'You came the whole way across for chips. Respect.'],
+              { t: 'Do not feed the seagulls. Do not even look at them.', before: 'manly-pine' },
+              { t: 'You came the whole way across for chips. Respect.', after: 'manly-voyage' },
+              { t: 'You did not feed them. You WERE them. Whole different thing.', after: 'manly-pine' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Right, that has done it. Here they come.'] });
     // A FERRY TERMINAL IS MOSTLY A MACHINE FOR QUEUEING and there were two
@@ -5186,14 +5204,18 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.cloth4, legs: PALETTE.stoneDark },
       lines: ['The four fifteen has never once left at four fifteen.',
               'I do this crossing twice a day. It is still the best commute in the world.',
-              'You are not on the timetable. I have checked.'],
+              { t: 'You are not on the timetable. I have checked.', before: 'take-helm' },
+              { t: 'You are not on the timetable and you are DRIVING. I have checked twice.', after: 'take-helm' },
+              { t: 'Twice a day for eleven years and I have never once been under it that close.', after: 'under-bridge' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Nobody even looked up. That is Sydney for you.'] });
     game.addLocal({ biome: 'quay', x: -11, y: 0.20, z: quayAPRON_Z1 - 9.2, near: 6, face: 0.2,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.wharfIron },
       lines: ['Tap on, tap off. There is no tap for whatever you are.',
-              'Wharf three for Manly, wharf five for Taronga. Do not ask me why.',
-              'If you are going to be sick, be sick on the outside deck.'],
+              { t: 'Wharf three for Manly, wharf five for Taronga. Do not ask me why.', before: 'to-quay' },
+              'If you are going to be sick, be sick on the outside deck.',
+              { t: 'You did not tap on. You did not tap off. You took the boat.', after: 'take-helm' },
+              { t: 'She came back alongside at Manly. Somebody owes somebody a form.', after: 'manly-voyage' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Right through the barrier. Marvellous.'] });
     game.addLocal({ biome: 'quay', x: quayWHARF_X[0] - 1.4, y: quayWHARF_Y + 0.07, z: -3.0,
@@ -5201,7 +5223,9 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.cloth5, hat: PALETTE.khaki },
       lines: ['Yellowtail, mostly. Sometimes a bream that has made a mistake.',
               'Been coming here since before the tunnel. Water is cleaner now.',
-              'You will scare them. …ah, they were not biting anyway.'],
+              'You will scare them. …ah, they were not biting anyway.',
+              { t: 'Dolphins came in off the Heads for you. They do not do that for me.', after: 'dolphin-escort' },
+              { t: 'Whole harbour heard that horn. So did every fish under this wharf.', after: 'under-bridge' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Well. That is the afternoon finished.'] });
 
@@ -5215,7 +5239,9 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.cloth7, hat: PALETTE.hair1 },
       lines: ['Four hours a day, six days. The acoustics under here are free.',
               'Everybody stops for the last eight bars and nobody stops for the first.',
-              'You are the second capybara this month. The first one had a hat.'],
+              'You are the second capybara this month. The first one had a hat.',
+              { t: 'I heard the horn under the arch. Right in my key, as it happens.', after: 'under-bridge' },
+              { t: 'You left. You came back. Nobody comes back.', after: 'manly-voyage' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['That is a B flat. Do it again on the two.'] });
 
@@ -5224,7 +5250,9 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.cloth1, legs: PALETTE.khaki },
       lines: ['Nine hundred photographs of the same arch. This one will be the one.',
               'You cannot get it and the Opera House in one shot. Everyone tries.',
-              'The light goes gold at about five. Stay for it.'],
+              'The light goes gold at about five. Stay for it.',
+              { t: 'Nine hundred and one, and there is a ferry under the arch in this one.', after: 'under-bridge' },
+              { t: 'I got the whole yacht race with you going through the middle of it.', after: 'yacht-race' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['—and there it is. Best one all week.'] });
 
@@ -5234,7 +5262,9 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.hair2 },
       lines: ['Second interval. Fourteen minutes and then it is the whole of act three.',
               'The shells are tiles. A million of them, and every one is a different white.',
-              'You are not on the ticket. …nor is anyone, at these prices.'],
+              'You are not on the ticket. …nor is anyone, at these prices.',
+              { t: 'A horn under the Bridge in the second interval. Best thing all evening.', after: 'under-bridge' },
+              { t: 'Half of act three watched you go past the window instead.', after: 'manly-voyage' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['They will hear that from the Concert Hall.'] });
 
@@ -5243,9 +5273,11 @@ function quayBuild(game) {
     quayLand = game.addLocal({ biome: 'quay', x: quayMANLY.x - 6.4, y: quayWATER_Y + 1.61,
       z: quayMANLY.z + 6.0, near: 9, face: Math.PI * 0.5,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
-      lines: ['She is not due for twenty minutes and she is not that colour.',
-              'Throw us a line when you come alongside. If you come alongside.',
-              'Everything on this wharf came off a boat. Including me.'],
+      lines: [{ t: 'She is not due for twenty minutes and she is not that colour.', before: 'manly-voyage' },
+              { t: 'Throw us a line when you come alongside. If you come alongside.', before: 'manly-voyage' },
+              'Everything on this wharf came off a boat. Including me.',
+              { t: 'Alongside. On the wharf. That is a boat that has arrived, that is.', after: 'manly-voyage' },
+              { t: 'Chip shop is up the Corso. You will not need directions, by the sound of it.', after: 'manly-pine' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Heard you coming from the Heads, mate.'] });
 
@@ -5255,7 +5287,9 @@ function quayBuild(game) {
       figure: { shirt: PALETTE.manFlagYel, legs: PALETTE.manFlagRed },
       lines: ['Between the flags. That is the whole of the law down here.',
               'Rip out past the third bank all afternoon. You will be fine — you float.',
-              'Bluebottles this morning. Nobody told the bluebottles about the flags.'],
+              'Bluebottles this morning. Nobody told the bluebottles about the flags.',
+              { t: 'You came in on the boat, not the ferry. I had to look twice.', after: 'manly-voyage' },
+              { t: 'The gulls are all up the Corso now. That is somebody’s doing.', after: 'manly-pine' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['…that is not a whistle I know.'] });
   }

@@ -730,18 +730,18 @@ function physBuildSombrero(g) {
 const physTYPES = {
   hat:       { name: 'sun hat',      mass: 0.35, hy: 0.14, shape: ['box', 0.34, 0.14, 0.34], hold: [0, 0.04, 0.06],  spin: 1.5, build: physBuildHat },
   coffee:    { name: 'flat white',   mass: 0.5,  hy: 0.17, shape: ['box', 0.12, 0.17, 0.12], hold: [0, 0.02, 0.07],  spin: 1.0, build: physBuildCoffee, spill: physBuildCoffeeSpill },
-  sandwich:  { name: 'sandwich',     mass: 0.45, hy: 0.13, shape: ['box', 0.18, 0.13, 0.16], hold: [0, 0.0, 0.06],   spin: 1.2, build: physBuildSandwich },
+  sandwich:  { name: 'sandwich',     mass: 0.45, hy: 0.13, shape: ['box', 0.18, 0.13, 0.16], hold: [0, 0.0, 0.06],   spin: 1.2, edible: true, grazeSfx: 'rustle', build: physBuildSandwich },
   ball:      { name: 'beach ball',   mass: 0.22, hy: 0.38, shape: ['sph', 0.38],             hold: [0, 0.06, 0.2],   spin: 2.0, bouncy: true, build: physBuildBall },
   bin:       { name: 'rubbish bin',  mass: 9.0,  hy: 0.56, shape: ['box', 0.4, 0.56, 0.4],   hold: [0, 0.12, 0.42],  spin: 0.4, grabbable: false, receive: true, build: physBuildBin },
   deckchair: { name: 'deck chair',   mass: 2.6,  hy: 0.45, shape: ['box', 0.36, 0.45, 0.36], hold: [0, 0.1, 0.34],   spin: 0.7, receive: true, build: physBuildDeckchair },
-  flower:    { name: 'prize rose',   mass: 4.5,  hy: 0.4,  shape: ['box', 0.19, 0.4, 0.19],  hold: [0, 0.06, 0.16],  spin: 1.0, planted: true, build: physBuildFlower },
+  flower:    { name: 'prize rose',   mass: 4.5,  hy: 0.4,  shape: ['box', 0.19, 0.4, 0.19],  hold: [0, 0.06, 0.16],  spin: 1.0, planted: true, edible: true, grazeSfx: 'rustle', build: physBuildFlower },
   esky:      { name: 'esky',         mass: 4.2,  hy: 0.26, shape: ['box', 0.37, 0.26, 0.24], hold: [0, 0.08, 0.3],   spin: 0.6, receive: true, build: physBuildEsky },
   thong:     { name: 'thong',        mass: 0.12, hy: 0.05, shape: ['box', 0.16, 0.05, 0.07], hold: [0, 0.0, 0.06],   spin: 2.2, build: physBuildThong },
   frisbee:   { name: 'frisbee',      mass: 0.18, hy: 0.05, shape: ['box', 0.3, 0.05, 0.3],   hold: [0, 0.0, 0.1],    spin: 2.6, build: physBuildFrisbee },
   basket:    { name: 'picnic basket',mass: 1.2,  hy: 0.2,  shape: ['box', 0.32, 0.2, 0.32],  hold: [0, 0.06, 0.22],  spin: 0.9, receive: true, build: physBuildBasket },
   cone:      { name: 'traffic cone', mass: 4.5,  hy: 0.4,  shape: ['box', 0.28, 0.4, 0.28],  hold: [0, 0.08, 0.24],  spin: 1.1, receive: true, build: physBuildCone },
   handbag:   { name: 'handbag',      mass: 1.0,  hy: 0.2,  shape: ['box', 0.18, 0.2, 0.1],   hold: [0, 0.04, 0.16],  spin: 1.2, build: physBuildHandbag },
-  icecream:  { name: 'ice cream',    mass: 0.3,  hy: 0.3,  shape: ['box', 0.15, 0.3, 0.15],  hold: [0, 0.04, 0.1],   spin: 1.4, build: physBuildIcecream, spill: physBuildIcecreamSpill },
+  icecream:  { name: 'ice cream',    mass: 0.3,  hy: 0.3,  shape: ['box', 0.15, 0.3, 0.15],  hold: [0, 0.04, 0.1],   spin: 1.4, edible: true, grazeSfx: 'pop', build: physBuildIcecream, spill: physBuildIcecreamSpill },
   sign:      { name: 'sign',         mass: 3.2,  hy: 0.8,  shape: ['box', 0.46, 0.8, 0.1],   hold: [0, 0.14, 0.5],   spin: 0.5, receive: true, build: physBuildSign },
   towel:     { name: 'beach towel',  mass: 0.5,  hy: 0.12, shape: ['box', 0.46, 0.12, 0.3],  hold: [0, 0.02, 0.14],  spin: 1.0, build: physBuildTowel },
 
@@ -751,7 +751,7 @@ const physTYPES = {
   // `shape` and `hy` are re-derived from the baked geometry at bake time
   // (physFitDef), so the numbers below are only a starting guess.
   // `splash` scales the entry sfx / foam / shake on top of the prop's mass.
-  chips:      { name: 'hot chips',      mass: 0.3,  hy: 0.22, shape: ['box', 0.17, 0.22, 0.17], hold: [0, 0.02, 0.09], spin: 1.5, build: physBuildChips },
+  chips:      { name: 'hot chips',      mass: 0.3,  hy: 0.22, shape: ['box', 0.17, 0.22, 0.17], hold: [0, 0.02, 0.09], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildChips },
   camera:     { name: 'tourist camera', mass: 1.5,  hy: 0.13, shape: ['box', 0.16, 0.13, 0.11], hold: [0, 0.03, 0.13], spin: 1.0, splash: 1.8, build: physBuildCamera },
   sunglasses: { name: 'sunglasses',     mass: 0.1,  hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.07],  spin: 2.4, build: physBuildSunglasses },
   ticket:     { name: 'ferry ticket',   mass: 0.008, hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.06],  spin: 2.8, build: physBuildTicket },
@@ -762,10 +762,10 @@ const physTYPES = {
   // `fragile` shatters into pooled shards past physSHATTER_MIN. Pasto has no
   // water, but these props travel now — the market's baskets and bowls turn up
   // in Cappadocia and Marrakech — so they carry a density like everything else.
-  empanada:   { name: 'empanada',       mass: 0.28, hy: 0.11, shape: ['box', 0.3, 0.11, 0.19],  hold: [0, 0.01, 0.07], spin: 1.5, build: physBuildEmpanada },
-  arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, build: physBuildArepa },
-  maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, build: physBuildMaiz },
-  plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, build: physBuildPlantain },
+  empanada:   { name: 'empanada',       mass: 0.28, hy: 0.11, shape: ['box', 0.3, 0.11, 0.19],  hold: [0, 0.01, 0.07], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildEmpanada },
+  arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, edible: true, grazeSfx: 'rustle', build: physBuildArepa },
+  maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, edible: true, grazeSfx: 'tick', build: physBuildMaiz },
+  plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, edible: true, grazeSfx: 'rustle', build: physBuildPlantain },
   ruana:      { name: 'ruana',          mass: 1.3,  hy: 0.13, shape: ['box', 0.34, 0.13, 0.27], hold: [0, 0.05, 0.32], spin: 0.45, receive: true, build: physBuildRuana },
   coffeesack: { name: 'sack of coffee', mass: 18,  hy: 0.34, shape: ['box', 0.3, 0.34, 0.3],   hold: [0, 0.1, 0.42],  spin: 0.35, receive: true, build: physBuildCoffeesack, spill: physBuildSackBurst, spillSfx: 'rustle' },
   cuencobowl: { name: 'painted bowl',   mass: 0.8,  hy: 0.13, shape: ['box', 0.29, 0.13, 0.29], hold: [0, 0.02, 0.12], spin: 1.2, fragile: true, build: physBuildCuencobowl },
@@ -773,6 +773,191 @@ const physTYPES = {
   mug:        { name: 'enamel mug',     mass: 0.42, hy: 0.16, shape: ['box', 0.2, 0.16, 0.17], hold: [0, 0.02, 0.09], spin: 1.3, build: physBuildMug },
   sombrero:   { name: 'Nariño hat',     mass: 0.4,  hy: 0.16, shape: ['box', 0.46, 0.16, 0.46], hold: [0, 0.04, 0.1],  spin: 1.7, build: physBuildSombrero },
 };
+
+// ===========================================================================
+// THE KEEPSAKES — a souvenir you can pick up (v22)
+// ===========================================================================
+//
+// Version eighteen gave the journey a spine: one souvenir per place, drawn as
+// a little flat-shaded picture on a shelf in the journal (sysKEEPS in
+// systems.js). It is the one thing in this game that crosses a border, and for
+// four versions it has crossed it as an ICON. You could look at the hat you
+// took off a tourist in Sydney. You could not pick it up.
+//
+// So each of the seventeen is also a real object now: a prop with a body, a
+// mass and a mouth, built out of the same shapes and the SAME PALETTE KEYS as
+// the picture on the shelf, so the thing in the journal and the thing in the
+// grass are recognisably one object.
+//
+// TWO THINGS MAKE A KEEPSAKE DIFFERENT FROM EVERY OTHER PROP IN THE GAME:
+//
+//   1. IT HAS NO BIOME. Every other prop is tagged with the chapter it was
+//      born into, and physOnBiomeEnter confiscates a held prop at the border
+//      for a good reason — its body leaves the world with its home biome, so a
+//      prop released abroad would be dynamic, unsimulated and invisible. A
+//      keepsake is added through physSceneAddLoose / physWorldAddLoose (the
+//      hatch the particle pools and weather.js already use) and carries
+//      `biome: ''`, which three of the four gates in this file already read as
+//      "everywhere". It is the only object in the game that genuinely travels.
+//   2. IT IS ALWAYS SOLO. An InstancedMesh is created under the live capture
+//      tag and is therefore owned by whichever chapter happened to be up when
+//      the first one spawned — which is precisely the bug the per-biome
+//      instance key was invented to fix. A keepsake draws itself.
+//
+// The cost of the second one is seventeen draw calls if a player collects all
+// seventeen and carries them about, against a budget of 220 and a worst case
+// of 122. It is affordable and it is the price of the feature.
+//
+// The shape language is deliberately tiny — a box or a cylinder, a size, a
+// place, a colour and up to three rotations — because seventeen hand-written
+// builder functions to make seventeen objects out of three boxes each is how
+// this table goes stale. Every colour is the key its own icon already uses.
+//
+//   ['b', w, h, d,      x, y, z, colour, rx, ry, rz]
+//   ['c', rTop, rBot, h, x, y, z, colour, rx, ry, rz]
+//   ['s', r, 0, 0,       x, y, z, colour]
+//
+// Authored with the base on y = 0, like every other builder here; physFitDef
+// re-derives `hy` and the collision box from the baked geometry, so the shape
+// below each row is a starting guess and not a measurement.
+const physKEEPS = {
+  /* the wide-brim sun hat, off a tourist who is still looking for it */
+  sydney: { name: 'a stolen sun hat', mass: 0.16, parts: [
+    ['c', 0.20, 0.20, 0.018, 0, 0.012, 0, 'cloth3'],
+    ['c', 0.098, 0.112, 0.10, 0, 0.070, 0, 'cloth3'],
+    ['c', 0.116, 0.116, 0.024, 0, 0.036, 0, 'petalRed'] ] },
+  /* a primary off the bird that carried you to the crater rim */
+  pasto: { name: 'a condor primary', mass: 0.05, parts: [
+    ['b', 0.062, 0.010, 0.30, 0, 0.016, 0.02, 'condorWing'],
+    ['b', 0.014, 0.014, 0.36, 0, 0.014, 0, 'condorBody'],
+    ['b', 0.034, 0.011, 0.07, 0, 0.018, 0.175, 'condorRuff'] ] },
+  /* nobody ever punched it. you were not exactly a paying passenger */
+  quay: { name: 'an unpunched ferry ticket', mass: 0.02, parts: [
+    ['b', 0.20, 0.006, 0.115, 0, 0.004, 0, 'sail'],
+    ['b', 0.20, 0.008, 0.028, 0, 0.008, -0.042, 'hullGreen'],
+    ['c', 0.016, 0.016, 0.010, -0.072, 0.008, 0.020, 'wharfIron'],
+    ['b', 0.088, 0.008, 0.010, 0.020, 0.008, 0.006, 'stoneDark'],
+    ['b', 0.062, 0.008, 0.010, 0.007, 0.008, 0.034, 'stoneDark'] ] },
+  /* a chasen. eighty tines cut from one piece of bamboo, and you chewed it */
+  kyoto: { name: 'a chewed tea whisk', mass: 0.04, parts: [
+    ['c', 0.026, 0.028, 0.10, 0, 0.050, 0, 'bambooStem'],
+    ['c', 0.034, 0.034, 0.016, 0, 0.104, 0, 'bambooLeaf'],
+    ['b', 0.008, 0.10, 0.008, -0.022, 0.164, 0, 'bambooPale', 0, 0, 0.22],
+    ['b', 0.008, 0.11, 0.008, -0.008, 0.170, 0.014, 'bambooPale', -0.14, 0, 0.07],
+    ['b', 0.008, 0.11, 0.008, 0.009, 0.170, -0.012, 'bambooPale', 0.14, 0, -0.07],
+    ['b', 0.008, 0.10, 0.008, 0.022, 0.164, 0, 'bambooPale', 0, 0, -0.22] ] },
+  /* a length of cane. it is where the whole city's sugar comes from */
+  cali: { name: 'a stick of cane', mass: 0.11, parts: [
+    ['c', 0.022, 0.024, 0.34, 0, 0.170, 0, 'caliCane'],
+    ['c', 0.027, 0.027, 0.012, 0, 0.075, 0, 'caliCaneStem'],
+    ['c', 0.027, 0.027, 0.012, 0, 0.170, 0, 'caliCaneStem'],
+    ['c', 0.027, 0.027, 0.012, 0, 0.262, 0, 'caliCaneStem'],
+    ['b', 0.11, 0.005, 0.035, 0.062, 0.300, 0.014, 'caliGrass', 0, 0.4, -0.3] ] },
+  /* one azulejo. there are two thousand of them and he wanted them all kept */
+  rio: { name: 'one of Selarón’s tiles', mass: 0.22, parts: [
+    ['b', 0.17, 0.020, 0.17, 0, 0.010, 0, 'rioTileBlue'],
+    ['b', 0.115, 0.022, 0.115, 0, 0.021, 0, 'rioTileWhite'],
+    ['b', 0.062, 0.024, 0.062, 0, 0.024, 0, 'rioTileYellow', 0, 0.785, 0],
+    ['c', 0.021, 0.021, 0.026, 0, 0.026, 0, 'rioTileGreen'] ] },
+  /* it will not last the flight and that is rather the point of it */
+  iceland: { name: 'a piece of the glacier', mass: 0.30, parts: [
+    ['b', 0.17, 0.075, 0.14, 0, 0.038, 0, 'iceGlacierBl'],
+    ['b', 0.115, 0.055, 0.10, -0.018, 0.098, -0.014, 'iceGlacier', 0.10, 0.5, 0.06],
+    ['b', 0.075, 0.040, 0.070, 0.048, 0.088, 0.030, 'iceGlacierDp', -0.14, 0.9, 0.10] ] },
+  /* an orange off the cart, with the mint still in it */
+  sahara: { name: 'an orange, with mint', mass: 0.18, parts: [
+    ['s', 0.072, 0, 0, 0, 0.072, 0, 'sahOrange'],
+    ['c', 0.020, 0.020, 0.008, -0.030, 0.126, -0.028, 'sahSandLit'],
+    ['b', 0.012, 0.048, 0.012, 0.006, 0.158, 0, 'sahPalmTrunk'],
+    ['b', 0.052, 0.006, 0.022, 0.036, 0.176, 0.006, 'sahMint', 0, 0.3, -0.4] ] },
+  /* still trying to leave. it has been trying to leave the whole way */
+  drift: { name: 'a seed that never landed', mass: 0.01, parts: [
+    ['c', 0.005, 0.006, 0.17, 0, 0.085, 0, 'driSeed'],
+    ['s', 0.019, 0, 0, 0, 0.180, 0, 'driSeed'],
+    ['b', 0.006, 0.006, 0.10, -0.030, 0.212, 0.006, 'driPaper', 0.5, 0.4, 0],
+    ['b', 0.006, 0.006, 0.10, 0.028, 0.214, -0.010, 'driPaper', -0.5, -0.5, 0],
+    ['b', 0.006, 0.006, 0.10, 0.004, 0.222, 0.032, 'driPaper', 0.55, 1.5, 0],
+    ['b', 0.006, 0.006, 0.10, -0.008, 0.216, -0.032, 'driPaper', -0.55, 2.4, 0] ] },
+  /* off one of the hundred and forty that went up off the Piazzetta */
+  venice: { name: 'a pigeon’s feather', mass: 0.01, parts: [
+    ['b', 0.040, 0.007, 0.20, 0, 0.012, 0.012, 'venPigeon'],
+    ['b', 0.010, 0.010, 0.24, 0, 0.010, 0, 'venPigeonDk'],
+    ['b', 0.022, 0.008, 0.045, 0, 0.013, 0.115, 'venStone'] ] },
+  /* a grass. they build forty storeys out of it and lash every joint by hand */
+  kowloon: { name: 'a length of scaffold', mass: 0.26, parts: [
+    ['c', 0.027, 0.029, 0.36, 0, 0.180, 0, 'hkBamboo'],
+    ['c', 0.032, 0.032, 0.014, 0, 0.084, 0, 'hkBambooDk'],
+    ['c', 0.032, 0.032, 0.014, 0, 0.276, 0, 'hkBambooDk'],
+    ['c', 0.035, 0.035, 0.032, 0, 0.150, 0, 'hkLash'],
+    ['c', 0.034, 0.034, 0.016, 0, 0.198, 0, 'hkLash'] ] },
+  /* it was already open when you got there. that is the story you are keeping */
+  palawan: { name: 'a shell, with a pearl in it', mass: 0.20, parts: [
+    ['c', 0.115, 0.098, 0.028, 0, 0.014, 0, 'palClamLip'],
+    ['c', 0.086, 0.096, 0.016, 0, 0.034, 0, 'palClamLip'],
+    ['s', 0.042, 0, 0, 0, 0.062, 0, 'palPearl'],
+    ['c', 0.014, 0.014, 0.008, -0.020, 0.098, -0.018, 'foam'] ] },
+  /* a hand-width of envelope, off the one you chewed the tether of */
+  goreme: { name: 'a scrap of envelope', mass: 0.06, parts: [
+    ['b', 0.085, 0.010, 0.19, -0.045, 0.012, 0, 'gorEnvA', 0, 0, 0.10],
+    ['b', 0.085, 0.010, 0.19, 0.045, 0.016, 0.004, 'gorEnvC', 0, 0, -0.10],
+    ['b', 0.16, 0.010, 0.045, 0, 0.026, -0.082, 'gorEnvE', 0.35, 0, 0] ] },
+  /* council planted them in 1953 and you brought one down */
+  manly: { name: 'a Norfolk pine cone', mass: 0.14, parts: [
+    ['c', 0.052, 0.068, 0.070, 0, 0.038, 0, 'manPine'],
+    ['c', 0.068, 0.052, 0.075, 0, 0.110, 0, 'manPine'],
+    ['c', 0.072, 0.072, 0.014, 0, 0.062, 0, 'manPineLt'],
+    ['c', 0.062, 0.062, 0.012, 0, 0.112, 0, 'manPineLt'],
+    ['b', 0.016, 0.030, 0.016, 0, 0.160, 0, 'manTrunk'] ] },
+  /* the flood is made of these. so, mostly, is the chapter */
+  pantanal: { name: 'a water hyacinth', mass: 0.09, parts: [
+    ['b', 0.10, 0.010, 0.13, -0.052, 0.010, 0, 'panHyacinth', 0, -0.4, 0.16],
+    ['b', 0.10, 0.010, 0.13, 0.052, 0.010, 0.008, 'panHyacinth', 0, 0.4, -0.16],
+    ['c', 0.010, 0.012, 0.09, 0, 0.056, 0, 'panGrassDk'],
+    ['c', 0.046, 0.030, 0.036, 0, 0.118, 0, 'panHyaFlower'],
+    ['c', 0.015, 0.015, 0.012, 0, 0.140, 0, 'panLilyRim'] ] },
+  /* one drip at a time, turning over, for about the age of the species */
+  cave: { name: 'a cave pearl', mass: 0.24, parts: [
+    ['c', 0.098, 0.108, 0.024, 0, 0.012, 0, 'cavRockDk'],
+    ['c', 0.072, 0.086, 0.018, 0, 0.032, 0, 'cavRock'],
+    ['s', 0.050, 0, 0, 0, 0.070, 0, 'cavPearl'],
+    ['c', 0.016, 0.016, 0.008, -0.024, 0.104, -0.020, 'cavCalciteLt'] ] },
+  /* the paint is what everybody photographs. this is a bit of the paint */
+  antarctic: { name: 'a board off the hut', mass: 0.19, parts: [
+    ['b', 0.15, 0.018, 0.20, 0, 0.009, 0, 'antHutRed'],
+    ['b', 0.16, 0.010, 0.030, 0, 0.022, -0.078, 'foam'],
+    ['b', 0.030, 0.012, 0.088, 0.046, 0.024, 0.030, 'antHutRed'],
+    ['b', 0.052, 0.012, 0.030, 0.033, 0.024, -0.014, 'antHutRed'],
+    ['c', 0.014, 0.014, 0.012, -0.048, 0.024, 0.038, 'antIce'] ] },
+};
+
+/** The one builder the seventeen share. See the note on physKEEPS. */
+function physBuildKeep(g, parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const col = PALETTE[p[7]];
+    const geo = p[0] === 'b' ? physBoxG(p[1], p[2], p[3])
+              : p[0] === 's' ? physSphG(p[1])
+                             : physCylG(p[1], p[2], p[3]);
+    physAdd(g, geo, col === undefined ? PALETTE.stone : col,
+            p[4], p[5], p[6], p[8] || 0, p[9] || 0, p[10] || 0);
+  }
+}
+
+// One prop type per keepsake, generated rather than written out: the table
+// above IS the seventeen definitions and a second hand-maintained list of the
+// same seventeen names is a list that goes stale. `keep-<place>` because the
+// type string is also the geometry cache key and the instance group key, and
+// neither may collide with a real prop type.
+for (const physKeepK in physKEEPS) {
+  const K = physKEEPS[physKeepK];
+  physTYPES['keep-' + physKeepK] = {
+    name: K.name, mass: K.mass, hy: 0.10,
+    shape: ['box', 0.12, 0.10, 0.12],
+    hold: [0, 0.01, 0.075], spin: 1.6,
+    keep: physKeepK,
+    build: (function (parts) { return function (g) { physBuildKeep(g, parts); }; })(K.parts),
+  };
+}
 
 /** Displaced volume of a type's collision shape, in m³. Cached on the def. */
 function physVolume(def) {
@@ -1088,6 +1273,8 @@ export function createProps(game) {
     release: physRelease,
     nearestGrabbable: physNearestGrabbable,
     spawnProp: physSpawnProp,
+    spawnKeep: physSpawnKeep,
+    keepOut: physKeepOut,
     removeProp: physRemoveProp,
     update: physUpdate,
     // extras (handy for npc.js / systems.js — additive, nothing depends on them)
@@ -1270,11 +1457,15 @@ function physPastoLive() {
   return !!(bm && bm.isActive && bm.isActive('pasto'));
 }
 
-function physMakeProp(type, x, z, variant, yaw, restY) {
+function physMakeProp(type, x, z, variant, yaw, restY, loose) {
   const def = physTYPES[type];
   if (!def) return null;
   const geoKey = variant ? type + '#' + variant : type;
-  const biomeTag = physLiveBiome();
+  // A LOOSE PROP BELONGS TO NO CHAPTER — see the note on physKEEPS. The empty
+  // tag is what three of the four biome gates in this file already read as
+  // "everywhere", and the raw adds below are the same hatch weather.js and the
+  // particle pools use to survive a hemisphere change.
+  const biomeTag = loose ? '' : physLiveBiome();
   const grpKey = geoKey + '@' + biomeTag;
   const geo = physGetGeo(type, variant);
   const mesh = new THREE.Mesh(geo, physPropMat);
@@ -1282,7 +1473,7 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
   mesh.receiveShadow = !!def.receive;
   mesh.matrixAutoUpdate = true;
   mesh.visible = false;
-  physGame.scene.add(mesh);
+  if (loose) physSceneAddLoose(mesh); else physGame.scene.add(mesh);
 
   const light = def.mass < 0.6;
   const body = new CANNON.Body({
@@ -1311,7 +1502,7 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
   body.allowSleep = true;
   body.sleepSpeedLimit = 0.16;
   body.sleepTimeLimit = 0.5;
-  physGame.world.addBody(body);
+  if (loose) physWorldAddLoose(body); else physGame.world.addBody(body);
 
   const prop = {
     id: physNextId++,
@@ -1336,6 +1527,7 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
     sunk: false,
     hidden: false,             // parked out of the world (shattered / eaten), will restock
     hiddenUntil: 0,
+    eaten: 0, grazeT: 0,       // bites taken, and the clock between them. See THE GRAZE.
     stall: null,               // the market stall this prop was laid out on
     craterIn: false,           // currently inside Galeras' bowl
     craterIdle: 0,             // s since it last made progress toward the vent
@@ -1346,6 +1538,9 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
     // submerged, so F = rho * g * (vol * submergedFraction) is genuine
     // Archimedes and the designed waterline falls straight out of it.
     biome: biomeTag,
+    // Which place's souvenir this is, or '' for the four hundred props that
+    // are not one. See physKEEPS.
+    keep: def.keep || '',
     vol: physVolume(def),
     floatFrac: physFloatFrac(def),
     rho: def.mass / (physVolume(def) * physFloatFrac(def)),
@@ -1378,15 +1573,24 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
   mesh.position.set(body.position.x, body.position.y, body.position.z);
   mesh.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
 
-  const grp = physInstGroupFor(type, grpKey, geo, def.receive);
-  if (grp.used < grp.cap) {
-    prop.instGroup = grp;
-    prop.instIdx = grp.used++;
-    grp.mesh.count = grp.used;
-    prop.solo = false;
-    physWriteInstance(prop);
+  // A LOOSE PROP IS ALWAYS SOLO. An InstancedMesh is created under whatever
+  // capture tag is live, so it is owned by that chapter and goes invisible with
+  // it — which is exactly the bug the per-biome instance key was invented to
+  // fix, and it cannot be fixed for an object whose whole point is that it has
+  // no chapter. It draws itself, for one draw call.
+  if (loose) {
+    mesh.visible = true;
   } else {
-    mesh.visible = true;   // pool overflow — fall back to a standalone draw
+    const grp = physInstGroupFor(type, grpKey, geo, def.receive);
+    if (grp.used < grp.cap) {
+      prop.instGroup = grp;
+      prop.instIdx = grp.used++;
+      grp.mesh.count = grp.used;
+      prop.solo = false;
+      physWriteInstance(prop);
+    } else {
+      mesh.visible = true;   // pool overflow — fall back to a standalone draw
+    }
   }
 
   if (prop.planted) {
@@ -1407,6 +1611,30 @@ function physMakeProp(type, x, z, variant, yaw, restY) {
 
 function physSpawnProp(type, x, z, restY, yaw) {
   return physMakeProp(type, x, z, type === 'flower' ? randInt(0, 2) : 0, yaw, restY);
+}
+
+/**
+ * PUT A CHAPTER'S SOUVENIR ON THE GROUND, AS AN OBJECT. See physKEEPS.
+ *
+ * Idempotent per place — a chapter can only be finished once, but the save
+ * restores a finished chapter and systems.js is entitled to ask again, and two
+ * copies of the same souvenir is a bug you can pick up. `restY` is passed
+ * through so a ceremony that happens on a deck does not bury it in the deck.
+ */
+function physSpawnKeep(place, x, z, restY) {
+  if (!place || !physKEEPS[place]) return null;
+  const have = physKeepOut(place);
+  if (have) return have;
+  return physMakeProp('keep-' + place, x, z, 0, undefined, restY, true);
+}
+
+/** The live keepsake for a place, wherever it has got to. Null if none. */
+function physKeepOut(place) {
+  const arr = physGame.props;
+  for (let i = 0; i < arr.length; i++) {
+    if (!arr[i].removed && arr[i].keep === place) return arr[i];
+  }
+  return null;
 }
 
 function physRemoveProp(prop) {
@@ -2906,6 +3134,47 @@ function physOnBiomeEnter(e) {
     physSetSolo(held, false);
     physRescue(held);
   }
+  // ---- ...AND THE ONE KIND OF PROP CUSTOMS DOES NOT TOUCH ----------------
+  // A keepsake in the mouth crosses with the animal and is not confiscated:
+  // the gate above only fires on a prop with a biome tag, and a keepsake has
+  // none. What DOES have to happen is the ones lying on the ground: every
+  // chapter is authored in the same coordinate space, so a pine cone left on
+  // the sand at Manly is, in Venice, thirty metres out in the Bacino or inside
+  // the campanile. They are moved to wherever the animal is about to be put
+  // down, which is the only point in a new world that is guaranteed to be
+  // standable — that is what a spawn point IS.
+  if (e && physGame.biome && typeof physGame.biome.spawnOf === 'function') {
+    const sp = physGame.biome.spawnOf(e.name);
+    const arr = physGame.props;
+    let n = 0;
+    for (let i = 0; i < arr.length; i++) {
+      const p = arr[i];
+      if (p.removed || p.biome || p.held || !p.keep) continue;
+      // Fanned out around the spawn rather than stacked on it: seventeen
+      // keepsakes dropped on one point is a physics explosion on frame one.
+      // TIGHT, though — the golden angle over a radius that reaches 2.7 m and
+      // not 4.5 — because a spawn point is only guaranteed standable AT the
+      // spawn point, and four metres off the Drift's shelf or the Quay's apron
+      // is open air.
+      const a = (n++) * 2.399963;                  // the golden angle
+      const r = 0.7 + n * 0.12;
+      const kx = sp.x + Math.cos(a) * r, kz = sp.z + Math.sin(a) * r;
+      p.body.position.set(kx, sp.y + 0.6, kz);
+      p.body.velocity.set(0, 0, 0);
+      p.body.angularVelocity.set(0, 0, 0);
+      p.body.force.set(0, 0, 0);
+      p.body.torque.set(0, 0, 0);
+      // AND ITS HOME MOVES WITH IT. `homeX/Y/Z` is where physRescue puts a prop
+      // that has fallen out of the world, and for a keepsake it was still the
+      // coordinates of the chapter it was first put down in — so one that went
+      // over an edge in Venice was rescued to a point in Sydney's gardens,
+      // which in Venice is somewhere in the Bacino.
+      p.homeX = kx; p.homeZ = kz; p.homeY = sp.y;
+      physSyncBodyTransform(p.body);
+      p.body.wakeUp();
+      physSyncMesh(p, true);
+    }
+  }
   if (!e) return;
   if (e.name !== 'pasto') { physScatterBiome(e.name); return; }
   physBindStalls();
@@ -3771,8 +4040,14 @@ function physUpdateHeld(prop, dt) {
     pop = damp(pop, 1, physSQ_POP_LAM, dt);
     if (Math.abs(pop - 1) < 0.004) pop = 1;
     prop.pop = pop;
-    m.scale.setScalar(pop);
   }
+  // ONE WRITER ON mesh.scale, and it is this line. The pop and the graze are
+  // two independent reasons for a held prop not to be its own size, and two
+  // separate setScalar calls a few lines apart is the trap that has already
+  // been paid for once in this codebase (see the note on springs and scale in
+  // capybara.js): whichever ran second simply erased the other.
+  physGrazeStep(prop, dt);
+  m.scale.setScalar(pop * (1 - prop.eaten * physGRAZE_TAKE));
   m.getWorldPosition(physV1);
   m.getWorldQuaternion(physQ1);
   const b = prop.body;
@@ -3789,6 +4064,81 @@ function physUpdateHeld(prop, dt) {
   prop.lastWX = physV1.x;
   prop.lastWY = physV1.y;
   prop.lastWZ = physV1.z;
+}
+
+// ===========================================================================
+// THE GRAZE (v22)
+// ===========================================================================
+//
+// A hundred and fourteen thousand lines about a capybara, and `nibble`,
+// `graze` and `forage` between them appeared nowhere in any of them. The
+// animal could steal a sandwich, carry a sandwich, throw a sandwich into a
+// harbour and be chased for a sandwich, and could not eat one. It is the most
+// obviously missing verb in the game and it has been missing since v1.
+//
+// It is also the verb with the highest chance of breaking something, so it is
+// built out of the two most conservative decisions available:
+//
+//   NO NEW BUTTON. You graze by holding something edible and STANDING STILL —
+//   the same settle the soft wheek is built on and the same one THE CALM is
+//   built on (capy.stillT), so eating is a thing that happens to a player who
+//   has stopped, which is exactly what eating is. Anybody mid-mischief never
+//   sees it.
+//   NOTHING IS EVER DESTROYED. The last bite HIDES the prop rather than
+//   removing it, on the restock path this file has had since the market stalls
+//   — so a sandwich you ate is a sandwich that is back on the picnic rug half a
+//   minute later, and no task can be starved of the object it needs. That is
+//   the whole safety argument: there is no state this verb can reach that the
+//   world does not repair by itself.
+//
+// FOUR VISIBLE BITES rather than a smooth shrink, because a thing that scales
+// down continuously reads as a bug and a thing that goes in steps reads as
+// being eaten. Each bite is a squash, a crumb and a noise.
+const physGRAZE_STILL = 0.9;    // s settled before the first bite is taken
+const physGRAZE_BITE  = 1.05;   // s between bites after that
+const physGRAZE_BITES = 4;      // how many it takes
+const physGRAZE_TAKE  = 0.19;   // ...and how much of it each one removes
+const physGRAZE_BACK  = 34;     // s before the world quietly puts another one out
+
+/**
+ * One frame of eating whatever is in the animal's mouth. Called from
+ * physUpdateHeld and from nowhere else.
+ *
+ * The stillness test is the animal's own published settle timer, not a speed
+ * read here: capybara.js zeroes it for a dozen reasons (in the air, in the
+ * water, on a wall, at the helm, being carried) and duplicating that list over
+ * here is how the two of them drift apart.
+ *
+ * `capy.restT`, though, and not `capy.stillT` — the two are the same list with
+ * one entry's difference and the difference is exactly this verb. See the note
+ * on capyRestT in capybara.js.
+ */
+function physGrazeStep(prop, dt) {
+  const def = physTYPES[prop.type];
+  if (!def || !def.edible) return;
+  const capy = physGame.capy;
+  // restT, not stillT: stillT is zeroed by having anything in the mouth, and
+  // having something in the mouth is the precondition of this entire verb.
+  const still = (capy && capy.restT) || 0;
+  if (still < physGRAZE_STILL) { prop.grazeT = 0; return; }
+  prop.grazeT = (prop.grazeT || 0) + dt;
+  if (prop.grazeT < physGRAZE_BITE) return;
+  prop.grazeT = 0;
+  prop.eaten = (prop.eaten || 0) + 1;
+  const b = prop.body;
+  physSfxOpts.volume = 0.30 + Math.random() * 0.12;
+  physGame.sfx(def.grazeSfx || 'rustle', physSfxOpts);
+  physDust3(b.position.x, b.position.y - 0.06, b.position.z, 2);
+  physSquashHit(prop, 6);
+  physGame.events.emit('capy:graze', prop);
+  if (prop.eaten < physGRAZE_BITES) return;
+  // Gone. The scale is put back FIRST — physHide parks the body but the mesh
+  // keeps whatever transform it had, and a prop that restocks at nineteen per
+  // cent of its size is a prop nobody can see.
+  prop.eaten = 0;
+  prop.pop = 1;
+  prop.mesh.scale.setScalar(1);
+  physHide(prop, physGRAZE_BACK);
 }
 
 /** Barge a tourist at speed and whatever they are carrying goes flying. */
@@ -3833,7 +4183,9 @@ function physUpdate(dt) {
     const p = arr[i];
     if (p.removed || p.hidden) continue;      // hidden = parked off-map, awaiting restock
     // a prop in the capybara's mouth travels with it, whatever it was born into
-    if (p.biome !== live && !p.held) continue;
+    // — and a KEEPSAKE has no biome at all and is simulated everywhere, which
+    // is the whole of what makes it a keepsake. See physKEEPS.
+    if (p.biome && p.biome !== live && !p.held) continue;
     physSetSolo(p, p.held || p.spilled || p.owner !== null);
     if (p.held) { physUpdateHeld(p, dt); continue; }
     if (p.frozen) continue;

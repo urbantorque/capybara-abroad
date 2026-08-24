@@ -1211,6 +1211,7 @@ let kyoHeronGroup = null, kyoHeronWing = null;
 const kyoV3h = new THREE.Vector3();
 let kyoHeronPhase = 0;                     // 0 standing, 1 up, 2 round, 3 down
 let kyoHeronSpooked = 0;                   // 1 if the bonsho is what moved it
+let kyoHeronCrit = null;                   // the calm-aware radius. See THE CALM.
 let kyoHeronT = 0;
 let kyoHeronAt = 0;                        // 0 at A, 1 at B
 let kyoHeronStalk = 0;
@@ -1276,7 +1277,15 @@ function kyoUpdateHeron(game, dt) {
     kyoHeronStalk = damp(kyoHeronStalk, Math.sin(kyoHeronT * 0.21) * 0.9, 1.4, dt);
     kyoHeronGroup.rotation.set(0, kyoHeronStalk, 0);
     kyoHeronWing.visible = false;
-    const near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) < kyoHERON_NEAR;
+    // ...and the reach shrinks as the animal settles, which is the one place
+    // in this garden where standing perfectly still is rewarded with something
+    // NOT happening. The rest timer is untouched, so the heron still goes up
+    // on its own clock and the moment can never be locked out. See THE CALM.
+    if (!kyoHeronCrit && typeof game.addCritter === 'function') {
+      kyoHeronCrit = game.addCritter({ biome: 'kyoto', r: kyoHERON_NEAR });
+    }
+    const near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) <
+                 (kyoHeronCrit ? kyoHeronCrit.near : kyoHERON_NEAR);
     if (near || kyoHeronT > kyoHERON_REST) {
       kyoHeronPhase = 1; kyoHeronT = 0;
       // A heron's alarm call is a single harsh bark and it is genuinely the

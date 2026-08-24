@@ -3149,11 +3149,22 @@ function iceBuildSheep(root) {
 }
 
 let iceSheepSpook = 0;
+// SIX AND A HALF METRES OF SHUFFLE, and it used to be the literal `42` in a
+// squared-distance test. It is the base of a calm-aware radius now — a flock
+// that keeps its distance from an animal walking about and closes over one
+// that has stopped. See THE CALM in systems.js.
+const iceSHEEP_NEAR = 6.48;
+let iceSheepCrit = null;
 
 function iceUpdateSheep(game, dt) {
   if (!iceSheep.length) return;
   const p = game.capy && game.capy.position;
   if (iceSheepSpook > 0) iceSheepSpook -= dt;
+  if (!iceSheepCrit && typeof game.addCritter === 'function') {
+    iceSheepCrit = game.addCritter({ biome: 'iceland', r: iceSHEEP_NEAR });
+  }
+  const near = iceSheepCrit ? iceSheepCrit.near : iceSHEEP_NEAR;
+  const iceSheepNear2 = near * near;
   for (let f = 0; f < iceSheep.length; f++) {
     const S = iceSheep[f], D = S.data, F = S.def;
     for (let i = 0; i < F.n; i++) {
@@ -3171,7 +3182,7 @@ function iceUpdateSheep(game, dt) {
       if (p) {
         const dx = D[o] - p.x, dz = D[o + 1] - p.z;
         const d2 = dx * dx + dz * dz;
-        if (d2 < 42 && d2 > 0.01) {
+        if (d2 < iceSheepNear2 && d2 > 0.01) {
           const inv = 1 / Math.sqrt(d2);
           tx = D[o] + dx * inv * 5.5;
           tz = D[o + 1] + dz * inv * 5.5;

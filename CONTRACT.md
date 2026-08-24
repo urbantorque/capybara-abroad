@@ -2049,6 +2049,244 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE DELIGHT PASS, WAVES THREE AND FOUR (v22 — 24 Aug 2026)
+
+Six items over nine files. **If wave one was about code that had been written and
+never wired, this one is about numbers that had been written and never read** — a
+mayhem input with nothing on the other end of it, seventeen weather names with zero
+call sites, a hundred and ten people welded to a coordinate, six hundred and fourteen
+sound effects with no room to be in, and a hundred and fourteen thousand lines about a
+capybara in which nothing could eat anything.
+
+### WAVE THREE — the systems
+
+#### 1. THE CALM (systems.js owns; capybara.js feeds it; five chapters read it)
+
+`game.state.chaos` has been the game's mayhem input since v2 and there has never been
+anything on the other side of it. There is now, and **it is not the negation of chaos**:
+
+- **chaos is a SPIKE.** It jumps on an event and decays. Resting value zero.
+- **calm is a HOLD.** It accrues while nothing happens and collapses the instant
+  something does. Resting value zero as well, because a player who is playing is
+  never still.
+
+A single signed number could not hold both shapes, which is why there are two.
+
+**`game.calm(x, z)`** answers 0..1 and — this is the whole geometry of it — **blends
+toward 1 with distance**, because the only disturbance in any of these worlds is the
+capybara. A heron on the far bank does not care that you are sprinting. With no
+argument it is the global figure.
+
+**`game.addCritter({ biome, r, k })`** is a registry, not seventeen calls to
+`game.calm()`, and the reason is that this is a feel knob which will be retuned: a
+curve that lives in seventeen biome files gets retuned in fourteen of them. It writes
+`rec.near` once a frame for the LIVE chapter only. Adopted in five places, each of
+which was already a literal number in a distance test — Göreme's cats (2.5 m),
+Reykjavík's sheep (6.48, and it was the literal `42` in a squared test), Manly's gulls
+(7), Kyoto's heron (9) and the Quay's apron gulls (3.5).
+
+**`musCalm`**, beside `musIntensity`, on the same three centralised writers in the
+opposite direction: the pad comes UP, the filter closes DOWN, the bass thins. The
+filter and bass terms are PROPORTIONAL rather than absolute — the palettes run from
+cut 470 to cut 1320 and a flat 500 Hz subtraction takes the Drift below its own
+fundamental.
+
+**AND capybara.js NEEDED A SECOND TIMER, WHICH IS THE ONE THING HERE THAT MEASURED
+WRONG.** `capyStillT` is zeroed by `capy.heldProp` — correctly, because an empty mouth
+is part of what the soft wheek's register MEANS. Reading it for the calm meant the
+whole field collapsed the moment the animal picked anything up, and it made THE GRAZE
+(below) impossible in every circumstance: its precondition is standing still holding
+food. So `capyRestT` is the same list minus that one entry, `capyStillT` keeps its
+original meaning to the letter, and both are published. **Two names because they are
+two questions.**
+
+#### 2. THE LOCALS LIVE (npc.js, plus four chapter files)
+
+- **The shuffle.** A hundred and ten locals had never moved a metre. The note in npc.js
+  ruling out walking is still right — a local has no nav mesh — but "may not cross a
+  square" and "may not shift their feet" are not the same sentence. A local now takes a
+  step every fifteen seconds or so, **always to a point within 0.55 m of the ANCHOR THE
+  CHAPTER CHOSE** and never from where they have got to, which is what stops a random
+  walk from wandering off one step at a time. It moves the group, the speech anchor and
+  the collider. No legs are drawn — a local's legs are a merged mesh — so what sells it
+  is a second bob at step frequency and a lean into the move. Gated on `r.fig` for the
+  same reason the umbrella is: a chapter that handed over its own Group may have merged
+  that person into a jetty.
+- **`fam`, the positive twin of `wary`.** Same shape, same arithmetic, pointed the other
+  way. It rises while you are inside somebody's circle and NOTHING IS HAPPENING — which
+  is THE CALM, read once for the whole population — and it buys attention and nothing
+  else: a warmer pool, a shorter cooldown, one line the first time it crosses. **And it
+  is what finally answers the soft wheek**, which wave one built and nothing in the game
+  listened to: a soft call at somebody you have been standing beside is worth
+  `npcFAM_WHEEK`, a loud one is worth nothing, and a familiar person answers a soft call
+  from the `fam` pool instead of the wheek pool.
+- **Two locals talking to each other**, which `chatStep` has done in two chapters of
+  seventeen since it was written, because it is written against the Sydney roster's
+  shape. `localsChat` is its twin against the locals' shape — a separate function, not a
+  generalisation, because a Sydney human is a state machine with a nav target and a
+  local is a fixed point with a bubble anchor, and one function reading both is four
+  `||`s in a hot loop to avoid twenty lines twice.
+- **`after:` / `before:` lines in the four chapters that had none.** Circular Quay,
+  Cappadocia, Manly and the Pantanal used the conditional-line system in exactly nought
+  places, so the deckhand who unlocks the wheel went on telling you the wheel was
+  unlocked while you stood at Manly having driven the boat there yourself. 426
+  conditional lines now, across all fifteen chapters that carry a cast.
+
+#### 3. THE SOUND OF SOMEWHERE (systems.js)
+
+- **One `ConvolverNode` on a wet send off the sfx bus** fixes all 614 call sites at once
+  and costs one node. `musIR` — the impulse-response generator that has been in this
+  file since the score was written — had one caller and now has two. Four things are
+  deliberate: **it is a send, not an insert** (the dry path is untouched to the sample,
+  so `wet: 0` is bit-identical to before); **the music does not go through it** (the
+  score has its own convolver, and a pad through two reverbs in series is mud); **nor
+  does the UI** (a menu tick is not standing anywhere, and it is the one sound allowed
+  to play while the world is not); and **the IR is regenerated on a chapter change, not
+  cached** — seventeen stereo buffers of up to 5.5 s is thirteen megabytes to avoid one
+  JS loop that runs behind the white hold of `biomeFadeTo`.
+  `sysROOMS` is one row per chapter. Sơn Đoòng is the whole reason it exists: 5.5 s of
+  tail at a send twice the next loudest room in the game, in a chapter whose entire
+  argument is the size of the space you are standing in, which until now sounded exactly
+  like Manly (1.0 s, and the driest room in the game).
+- **The ambience knows where it is.** The 440-line ladder makes 96 `sfx()` calls and
+  passed `at:` on none of them, so every gull, bell, horn and bark that says which
+  country you are in arrived dead centre at the animal's own nose. They go through
+  `sysAmb()` now, which puts each event on a ring 14–34 m out at a random bearing.
+  **NO LEVEL CHANGES, and that is the design**: the ring is inside `sysAMB_NEAR` (40),
+  so `audioPlace` answers a gain of exactly 1 and the ninety-six hand-tuned volumes are
+  untouched. What changes is the pan. The two rungs that already knew where their sound
+  was — the bell on the yellow buoy at the turn, the other ferry's engine — pass `at`
+  and go straight through.
+
+### WAVE FOUR — the keepsakes
+
+#### 4. A SOUVENIR YOU CAN PICK UP (props.js; systems.js drops it)
+
+Seventeen souvenirs, drawn on a shelf since v18, crossing every border as an ICON. Each
+is now also a real object, built from the same shapes and **the same PALETTE keys** as
+its own icon, so the thing in the journal and the thing in the grass are recognisably
+one object. `physKEEPS` is a table of boxes and cylinders and one shared builder rather
+than seventeen builder functions, because seventeen hand-written functions to make
+seventeen objects out of three boxes each is how a table goes stale.
+
+**TWO THINGS MAKE A KEEPSAKE DIFFERENT FROM EVERY OTHER PROP AND BOTH ARE LOAD-BEARING:**
+
+1. **It has no biome.** `physOnBiomeEnter` confiscates a held prop at the border for a
+   good reason — its body leaves the world with its home biome, so a prop released
+   abroad is dynamic, unsimulated and invisible. A keepsake goes in through
+   `physSceneAddLoose` / `physWorldAddLoose` (the hatch the particle pools and
+   weather.js already use) and carries `biome: ''`, which **three of the four biome
+   gates in props.js already read as "everywhere"**; the fourth was changed. It is the
+   only object in the game that genuinely travels.
+2. **It is always solo.** An `InstancedMesh` is created under the live capture tag and
+   is owned by whichever chapter was up when the first one spawned — exactly the bug the
+   per-biome instance key was invented to fix, and unfixable for an object whose whole
+   point is having no chapter. It draws itself.
+
+On a border crossing the loose ones are moved to the arrival spawn — every chapter is
+authored in the same coordinate space, so a pine cone left on the sand at Manly is, in
+Venice, thirty metres out in the Bacino — **and `homeX/Y/Z` is moved with them**, or
+`physRescue` returns a keepsake that went over an edge in Venice to a point in Sydney's
+gardens. The fan is tight (0.7 + 0.12n, reaching 2.7 m and not 4.5): a spawn point is
+only guaranteed standable AT the spawn point, and four metres off the Drift's shelf is
+open air.
+
+#### 5. THE POSTCARD (systems.js)
+
+Photo mode, and **every part of it already existed**: `bare` (v12) takes the furniture
+off the window and already knows which things are the game talking and must stay; the
+composite pass (v13) is the lens; and `weather.label()` has had seventeen authored
+names since the micro-environment shipped — 'Harbour Midday', 'Violet Nowhere', 'Neon
+Rain', 'Inside the Mountain' — and **zero call sites in 114k lines**. K puts a 3:2
+letterbox, four corner ticks and a caption on the frame; the caption is the chapter's
+own name, the sky's own name and the journey's own clock. Enter takes the picture, and
+it is a PNG the player keeps — the only thing in this game that leaves it.
+
+**THE RENDER AND THE READ ARE IN ONE JS TURN** and that is not a style choice: the
+renderer has no `preserveDrawingBuffer`, so `toDataURL` called from a key handler reads
+back a blank canvas about as often as it does not. The frame is drawn again inside
+`photoShoot` and read on the very next line. The grade lean is small on purpose
+(saturation +0.06, contrast +0.05, vignette +0.10) and is applied AFTER the events, so a
+marquee moment still out-blooms the camera.
+
+#### 6. THE GRAZE (props.js; capybara.js animates it)
+
+`nibble`, `graze` and `forage` appeared nowhere in 114k lines about a capybara. The verb
+is built out of the two most conservative decisions available:
+
+- **No new button.** You graze by holding something edible and standing still — the same
+  settle THE CALM is built on — so eating happens to a player who has stopped, which is
+  what eating is. Anybody mid-mischief never sees it.
+- **Nothing is ever destroyed.** The last bite `physHide`s the prop on the restock path
+  this file has had since the market stalls, so a sandwich you ate is a sandwich that is
+  back on the picnic rug 34 s later and no task can be starved of the object it needs.
+  **There is no state this verb can reach that the world does not repair by itself**,
+  and that is the whole safety argument.
+
+Four visible bites, not a smooth shrink: a thing that scales down continuously reads as
+a bug and a thing that goes in steps reads as being eaten. `mesh.scale` has **one
+writer** — the pop and the graze are two independent reasons for a held prop not to be
+its own size, and two `setScalar` calls a few lines apart is the trap this codebase has
+already paid for once.
+
+### The two things that measured wrong, so nobody re-derives them
+
+1. **`npcLOC_CHAT_R` WAS 4.6 m AND AT 4.6 m THE FEATURE DOES NOT EXIST.** A local is a
+   fixed point, so unlike the Sydney crowd — which walks and therefore forms pairs on
+   its own — this radius is the entire question of whether anybody in fifteen chapters
+   ever speaks to anybody. Measured, closest pair per chapter:
+
+   | under 4.6 m | under 13 m | never |
+   |---|---|---|
+   | Cali 4.20 · Marrakech 2.25 · the Pantanal 2.83 | twelve of fifteen | Reykjavík 17.16 · Manly 18.38 · the Drift 36.16 |
+
+   Thirteen metres is a word across a square rather than a confidence, and the pool was
+   already written for that: every line in it is a greeting you can call. The three it
+   never fires in are the right three — Reykjavík's cast is at separate stalls down a
+   street, Manly's is over 120 m of beach, and the Drift is a chapter about being the
+   only one there.
+
+2. **THE TRIANGLE BUDGET IS ALREADY EXCEEDED AND THIS WAVE IS NOT WHY.** Measured 24 Aug
+   2026, one scene render, shadow map off: the Pantanal 207,072, the Drift 201,886,
+   Antarctica 179,788, Kowloon 130,390 and Circular Quay 132,423 are all over the 130k
+   line in the budget below, before a single keepsake exists. Seventeen keepsakes out at
+   once add **1,612 to 2,388 triangles** (under 1.2%) and 16–22 draw calls. This is a
+   standing item for a later pass, not a thing to fix by deleting a souvenir.
+
+### What was measured, in a browser, after the wave
+
+Bundle 5,499 top-level declarations, no collisions. `qa/audit-tasks.mjs` 0 blockers /
+0 warnings over 199 tasks. **New: `qa/lines.mjs`** — 426 conditional lines over fifteen
+chapters, every id a real task, every id in its own chapter, 0 blockers / 0 warnings;
+it also fails outright if any of the four chapters this wave opened up goes back to
+having none. `qa/fuzz.js` **17/17 clean** — no NaN, no void falls, no solver saves, no
+errors, `state.lastError` null in all seventeen.
+
+- **Frame time, worst case (all seventeen keepsakes out in every chapter): 16.6–17.0 ms
+  median, 18.4–19.5 ms p95, in all seventeen.**
+- **Draw calls** (one scene render, shadow map off) 64–129 base → 80–147 with all
+  seventeen out, against a budget of 220.
+- **Cannon bodies** 48–198 base → 65–215. Sơn Đoòng, Kyoto and Venice are the three over
+  200 and all three were near it already.
+- **The calm**: half at ~8 s of stillness, nine tenths at ~24 s, 0.99 at 38 s — and one
+  step takes it from 0.96 to 0.005 in under a second. Göreme's cats measured 2.5 m base
+  → 1.01 m at calm 0.96.
+- **The room**: all seventeen load their own IR on the border (Manly 1.0 s → Sơn Đoòng
+  5.5 s) and cross to their own send level. Cave 0.365 of a 0.42 target 3.2 s after
+  arrival, still crossing.
+- **The locals**: all ten in Cappadocia had left their anchor within 20 s, maximum drift
+  0.52 m against a 0.55 m cap. Conversations fired in Marrakech, Venice and Sơn Đoòng
+  within 22 s of arriving. `fam` 0 → 0.494 in 26 s of standing beside somebody, and the
+  line that came out was "Hello, you." from the `fam` pool.
+- **The keepsakes**: all seventeen build (36–176 triangles each), rest on their own
+  ground, and survive two border crossings still visible, still in the world, none
+  fallen through, arriving 4.5–7.5 m from the animal.
+- **The graze**: four bites at ~1 s, scale 1 → 0.81 → 0.62 → 0.43, hidden, mouth
+  emptied, restocking in 29 s.
+- **The postcard**: K on → lens 0.96, `bare` on, caption "SYDNEY · HARBOUR MIDDAY ·
+  0:04"; Enter → a 1.4 MB PNG named `capybara-sydney-1.png`; K off → `bare` restored to
+  what it was before, not to false.
+
 ## THE DELIGHT PASS, WAVES ONE AND TWO (v21 — 24 Aug 2026)
 
 Nine items over four files. **The theme of the wave is that most of it was already

@@ -404,6 +404,105 @@ const sysSFX_FADE   = 45;     // m of taper up to FAR, so it stops without a cli
 const sysSFX_CULL   = 0.012;  // below this the graph is never built at all
 const sysSFX_PAN    = 0.82;   // never hard left/right — that reads as a broken mix
 const sysSFX_PAN_K  = 1.35;   // widen the middle: 45 degrees off axis is well panned
+
+// --- ...AND THE PLACE HAS A SHAPE AS WELL AS A DIRECTION ---------------------
+// The pan above tells you WHERE a sound is. Nothing has ever told you what it
+// is in. Six hundred and fourteen sfx() call sites landed bone dry on the
+// master gain, so a footfall in a Mong Kok stairwell, a footfall on an open
+// beach and a footfall four hundred metres inside the largest cave passage on
+// earth were the same recording at the same level with the same tail, which is
+// no tail at all. Sơn Đoòng is a chapter whose entire argument is the SIZE of
+// the room you are standing in, and it sounded exactly like Manly.
+//
+// One ConvolverNode on a wet send off the sfx bus fixes all six hundred and
+// fourteen at once and costs one node. The impulse response generator has been
+// in this file since the score was written (musIR) and had one caller.
+//
+// FOUR THINGS THAT ARE DELIBERATE:
+//
+//   1. IT IS A SEND, NOT AN INSERT. The dry path is untouched to the sample,
+//      so every level tuned by ear over nineteen versions is exactly what it
+//      was and the room is added on top. `wet: 0` is bit-identical to before.
+//   2. THE MUSIC DOES NOT GO THROUGH IT. The score already has its own
+//      convolver and its own IR (see musConv), tuned per palette; feeding a pad
+//      through two reverbs in series is how you get mud. Same for the weather
+//      bed, which is a noise field and has no transient to reflect.
+//   3. NOR DOES THE UI. A menu tick is a sound the interface makes about
+//      itself and is not standing anywhere. It goes straight to the master,
+//      which is also the only sound allowed to play while the game is not.
+//   4. THE IR IS REGENERATED ON A CHAPTER CHANGE, NOT CACHED. Seventeen stereo
+//      buffers of up to five and a half seconds is thirteen megabytes to avoid
+//      one JS loop that runs behind the white hold of biomeFadeTo. Measured at
+//      1.5 ms for a typical row and 14 ms for the cave.
+//
+// `size` is the tail in seconds and `decay` is its curve (higher = faster
+// collapse, so a hard little room is a short size AND a high decay). `wet` is
+// the send level against a 0.85 master.
+const sysROOM_LAM   = 0.9;    // how fast the wet level crosses on a chapter change
+const sysROOM_DEF   = { size: 1.5, decay: 2.6, wet: 0.07 };
+const sysROOMS = {
+  // Open, grassy, nothing to reflect off but the Opera House.
+  sydney:    { size: 1.4, decay: 2.8, wet: 0.06 },
+  // A plaza at 2,500 m with a cathedral on one side and a volcano behind it.
+  pasto:     { size: 2.0, decay: 2.4, wet: 0.10 },
+  // Open water, and then a colonnade and a terminal roof over the apron.
+  quay:      { size: 1.8, decay: 2.5, wet: 0.08 },
+  // A valley with a bamboo grove in it. Long and soft: everything here is wood.
+  kyoto:     { size: 2.2, decay: 2.9, wet: 0.10 },
+  // A street. Buildings both sides, and they are plaster over brick.
+  cali:      { size: 1.6, decay: 2.2, wet: 0.12 },
+  rio:       { size: 1.8, decay: 2.4, wet: 0.09 },
+  // Cold air over a small town. Cold air is the reason this one is long.
+  iceland:   { size: 2.4, decay: 2.6, wet: 0.11 },
+  // A square with a souk behind it: short, dense, and full of cloth.
+  sahara:    { size: 1.5, decay: 3.2, wet: 0.13 },
+  // Fog over nothing. The one room in the game with no walls and a tail
+  // anyway, which is what a whiteout actually sounds like.
+  drift:     { size: 3.4, decay: 1.9, wet: 0.16 },
+  // The wettest thing above ground, and it should be: the Piazzetta is stone
+  // on five sides and every arcade in it is a corridor.
+  venice:    { size: 2.6, decay: 2.3, wet: 0.20 },
+  // A street canyon. Hard, close and SHORT — a slap, not a tail.
+  kowloon:   { size: 1.5, decay: 4.0, wet: 0.17 },
+  // Open bay. Almost nothing, which is the point of arriving there.
+  palawan:   { size: 1.2, decay: 3.0, wet: 0.05 },
+  // A valley cut out of tuff, with four hundred holes in one wall of it.
+  goreme:    { size: 2.8, decay: 2.2, wet: 0.14 },
+  // The driest room in the game. There is nothing on that beach to reflect.
+  manly:     { size: 1.0, decay: 3.4, wet: 0.04 },
+  pantanal:  { size: 1.6, decay: 2.6, wet: 0.06 },
+  // AND THE WHOLE REASON THIS EXISTS. Five and a half seconds, and the send is
+  // twice the next loudest room in the game.
+  cave:      { size: 5.5, decay: 1.6, wet: 0.42 },
+  // Ice is hard and the air is thin. Bright and long and not very loud.
+  antarctic: { size: 2.2, decay: 2.0, wet: 0.09 },
+};
+
+// --- AND THE AMBIENCE HAS TO COME FROM SOMEWHERE -----------------------------
+// The four-hundred-and-forty-line ambience ladder makes ninety-six sfx() calls
+// and passed `at:` on none of them, so every gull, bell, horn and bark that
+// says which country you are in arrived dead centre, in both ears, at the
+// capybara's own nose. The ladder is the one part of the mix whose entire job
+// is to describe a place you are standing in the middle of.
+//
+// THE LEVELS ARE NOT TOUCHED, AND THAT IS THE DESIGN. Every volume in that
+// ladder was tuned by ear over nineteen versions as "a distant thing", and
+// running it through the distance law would quietly drop the whole bed by a
+// third. So the spot is always inside sysAMB_NEAR (which is larger than the
+// ring) and audioPlace answers a gain of exactly 1: what changes is the PAN
+// and nothing else. A bell is now somewhere, rather than everywhere.
+const sysAMB_R0   = 14;   // m — nearest an ambient event may be placed
+const sysAMB_R1   = 34;   // ...and furthest
+const sysAMB_NEAR = 40;   // > R1, so the gain multiplier is 1 for every spot
+const sysAMB_UP   = 6;    // m of height jitter, mostly upward: birds and bells
+
+// --- THE POSTCARD -----------------------------------------------------------
+// How far photo mode is allowed to lean on the chapter's own grade. Small on
+// purpose: the picture the player is taking has to be the picture the game was
+// already drawing, or the postcard is a lie about the place.
+const sysPHOTO_SAT = 0.06;
+const sysPHOTO_CON = 0.05;
+const sysPHOTO_VIG = 0.10;
 // Reused by the core event handlers: they run on every prop impact in the game
 // and update() may not allocate. `at` is nulled after every use so a stale
 // position can never be inherited by the next caller.
@@ -411,6 +510,53 @@ const sysSpatial    = { volume: 1, pitch: 1, at: null };
 const sysEar        = new THREE.Vector3();
 const sysEarRight   = new THREE.Vector3();
 const sysEarTo      = new THREE.Vector3();
+
+// --- THE CALM ---------------------------------------------------------------
+// This game has had a MAYHEM input since version two. `game.state.chaos` rises
+// on every prop impact and every gasp, drives the score's intensity, the
+// crowd's temper and the camera's field of view, and damps back to zero. There
+// has never been anything on the other side of it: standing perfectly still for
+// half a minute in the middle of the Pantanal — which is the single most
+// capybara thing a player can do — was, to every system in the game, identical
+// to standing still for one frame.
+//
+// So there is a second number, and it is not the negation of the first:
+//
+//   chaos  is a SPIKE. It jumps on an event and decays. It asks "what just
+//          happened?" and its natural resting value is zero.
+//   calm   is a HOLD. It accrues while nothing happens and collapses the
+//          instant something does. It asks "how long has nothing happened?"
+//          and its natural resting value is zero as well, because a player who
+//          is playing is never still.
+//
+// A rise you have to EARN and a fall you cannot avoid, and both halves are
+// measured rather than asserted: standing perfectly still reaches half in
+// about eight seconds, nine tenths in about twenty-four, and 0.99 at
+// thirty-eight — while ONE STEP takes it from 0.96 to 0.005 in under a second.
+// Any of the dozen ways of being busy that capybara.js already tracks zeroes
+// capy.stillT, so it is deliberately hard to hold and deliberately worth it.
+//
+// WHAT READS IT, and all three are the same idea in three registers:
+//
+//   1. THE ANIMALS. game.addCritter registers a flee radius and the registry
+//      shrinks it — settle, and the sheep, the terns and the gulls let you
+//      inside a distance they never otherwise would.
+//   2. THE SCORE. musCalm, beside musIntensity, on the same three writers in
+//      the opposite direction: the pad comes UP, the filter closes DOWN and
+//      the bass thins. A chase opens the mix; the calm closes it.
+//   3. THE AMBIENCE. Events space out. A world you have stopped moving in gets
+//      quieter, not busier.
+//
+// NOT TO BE CONFUSED WITH `game.time.calm`, which is a boolean and is the
+// player's prefers-reduced-motion setting. Different thing entirely; the
+// collision is unfortunate and both names are the right name for their own job.
+const sysCALM_FULL  = 8.0;    // s of stillness that counts as fully settled
+const sysCALM_RISE  = 0.22;   // damp lambda upward. Slow: this is earned.
+const sysCALM_FALL  = 5.5;    // ...and downward. Fast: it is lost in a step.
+const sysCALM_REACH = 26;     // m — past this the world is calm whatever you do
+const sysCALM_CHAOS = 1.6;    // how hard live chaos suppresses the whole field
+const sysCALM_CRIT  = 0.62;   // most a critter's flee radius may ever shrink by
+const sysCALM_MUS   = 0.30;   // ...and how far the score is allowed to lean
 
 // --- CAMERA SHAKE -----------------------------------------------------------
 // ONE knob for the whole game. 0 disables shake entirely. Shake must be RARE:
@@ -2185,6 +2331,11 @@ const sysLEGEND_MORE = [
   ['R (held)', 'put me back'],
   ['Tab  ·  Esc', 'the journal  ·  close'],
   ['P', 'hide the paper'],
+  // Photo mode goes in the FOLD and not on the front, by the rule the fold
+  // exists for: it is not a verb the capybara has and nothing is needed to
+  // play. The row names both keys because a camera you cannot press the
+  // shutter on is not a camera. See the postcard block in this file.
+  ['K  ·  Enter', 'the camera  ·  keep the picture'],
   ['M  ·  N  ·  [  ]', 'mute  ·  music  ·  volume'],
   // The pad belongs in the fold and not on the front of the game, by the same
   // argument as everything else down here: it is not a thing you have to know
@@ -3717,6 +3868,72 @@ function sysBuildCSS() {
    pointer themselves, so it goes out of the layout rather than to zero alpha */
 '#hud.bare .capyui-touch{display:none !important;}',
 
+/* ---------- K: THE POSTCARD (v22) ----------
+   Photo mode. Built ON TOP of `bare` rather than beside it — the furniture
+   already knows how to get out of the way and a second list of the same
+   elements is a second list that goes stale — plus three things bare does not
+   do: a frame, a caption and a lens.
+
+   NOTE ON THE NAME. This game already has seventeen things called postcards:
+   the little authored SVG scenes on the picker tiles and the ledger's leaves.
+   Those are pictures OF a place, drawn by hand. This is a picture FROM one,
+   taken by the player, and it is the only image in the game that did not exist
+   before somebody chose to make it. */
+'.capyui-photo{position:absolute;inset:0;z-index:44;pointer-events:none;',
+  'opacity:0;transition:opacity .38s ease;}',
+'.capyui-photo.show{opacity:1;}',
+/* the bars. 3:2, which is the shape a postcard actually is, held with vh so a
+   letterbox on a tall phone is not the whole screen. */
+'.capyui-pbar{position:absolute;left:0;right:0;height:9vh;max-height:88px;',
+  'background:' + sysRgba(PALETTE.screenShadow, 0.82) + ';}',
+'.capyui-pbar.t{top:0;}',
+'.capyui-pbar.b{bottom:0;}',
+/* four corner ticks, which is the whole of the viewfinder. A rectangle drawn
+   round the frame reads as a border; four corners read as a lens. */
+'.capyui-ptick{position:absolute;width:26px;height:26px;',
+  'border:2px solid ' + sysRgba(PALETTE.sail, 0.72) + ';}',
+'.capyui-ptick.tl{left:26px;top:calc(9vh + 18px);border-right:none;border-bottom:none;}',
+'.capyui-ptick.tr{right:26px;top:calc(9vh + 18px);border-left:none;border-bottom:none;}',
+'.capyui-ptick.bl{left:26px;bottom:calc(9vh + 18px);border-right:none;border-top:none;}',
+'.capyui-ptick.br{right:26px;bottom:calc(9vh + 18px);border-left:none;border-top:none;}',
+/* the caption, ON the bottom bar, which is where a caption goes. The three
+   fields clip rather than push each other out of the bar: 'Circular Quay' and
+   'Inside the Mountain' are both real values and both are long. And the clock
+   is tabular, or a centred line jitters sideways once a second. */
+'.capyui-pcap{position:absolute;left:0;right:0;bottom:0;height:9vh;max-height:88px;',
+  'display:flex;align-items:center;justify-content:center;gap:14px;overflow:hidden;',
+  'color:' + sysHex(PALETTE.sail) + ';font-size:clamp(9px,1.9vw,12px);',
+  'letter-spacing:.22em;text-transform:uppercase;font-weight:700;',
+  'text-align:center;',
+  'padding-left:calc(18px + env(safe-area-inset-left,0px));',
+  'padding-right:calc(18px + env(safe-area-inset-right,0px));',
+  'padding-bottom:env(safe-area-inset-bottom,0px);}',
+'.capyui-pcap > *{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+'.capyui-pcap b{font-weight:700;color:' + sysHex(PALETTE.cloth1) + ';}',
+'.capyui-pcap i{font-style:normal;opacity:.62;font-weight:400;letter-spacing:.14em;',
+  'font-variant-numeric:tabular-nums;}',
+/* the hint, on the top bar, and it is the only instruction in photo mode */
+'.capyui-phint{position:absolute;left:0;right:0;top:0;height:9vh;max-height:88px;',
+  'display:flex;align-items:center;justify-content:center;text-align:center;',
+  'padding:env(safe-area-inset-top,0px) 14px 0;',
+  'color:' + sysRgba(PALETTE.sail, 0.55) + ';font-size:clamp(8px,1.6vw,10px);',
+  'letter-spacing:.24em;text-transform:uppercase;}',
+/* the shutter. One white sheet, one frame long, on its own layer above the
+   frame so it flashes the PICTURE and not the furniture.
+
+   AND IT IS THE ONE THING HERE THAT prefers-reduced-motion TURNS OFF. A
+   full-screen white flash is the single most photosensitivity-hostile thing
+   this game can draw, and a player who has asked the operating system for less
+   motion has asked for exactly this — the same argument shake() makes, one
+   file down. The shutter SOUND and the punch still fire, so the camera still
+   answers the button; it simply does not strobe. */
+'.capyui-pflash{position:absolute;inset:0;z-index:56;background:' + sysHex(PALETTE.sail) + ';',
+  'opacity:0;pointer-events:none;transition:opacity .42s ease;}',
+'.capyui-pflash.show{opacity:0.92;transition:none;}',
+'@media (prefers-reduced-motion:reduce){.capyui-pflash,.capyui-pflash.show{',
+  'opacity:0 !important;transition:none !important;}',
+  '.capyui-photo{transition:none;}}',
+
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
   'background:' + paper + ';border-radius:3px;padding:10px 12px 12px;transform:rotate(-1.7deg);',
@@ -4527,6 +4744,13 @@ export function createSystems(game) {
   // =========================================================================
   let ac = null, acMaster = null, acNoise = null, acAmbGain = null, acAmbOn = false;
   let acLimit = null;      // the master compressor — see audioEnsure
+  // THE ROOM (see sysROOMS). `acSfxIn` is what every placed and unplaced sound
+  // effect in the game is pointed at; the dry half of it goes straight on to
+  // the master and the wet half goes round the convolver. `acRoomFor` is which
+  // chapter's IR is currently loaded, so the buffer is rebuilt once per border
+  // crossing and never per frame.
+  let acSfxIn = null, acRoomSend = null, acRoomConv = null, acRoomOut = null;
+  let acRoomFor = '', acRoomWet = 0;
   let acEarAt = -1;        // the frame the listener was last resolved on
   let muted = false;
   const lastPlay = Object.create(null);
@@ -4563,7 +4787,51 @@ export function createSystems(game) {
       }
     } catch (e) { acLimit = null; out = ac.destination; }
     acMaster.connect(out);
+    // ---- THE ROOM, AND IT IS FOUR NODES -----------------------------------
+    //
+    //   every sfx synth -> [panner] -> acSfxIn --+--> acMaster        (dry)
+    //                                            \-> send -> conv -> out
+    //
+    // Wrapped, because a browser without a ConvolverNode must still have a
+    // game with sound in it: if any of this throws, acSfxIn stays null and
+    // sfx() points the synths at the master exactly as it did before.
+    try {
+      acSfxIn = ac.createGain();
+      acSfxIn.gain.value = 1;
+      acSfxIn.connect(acMaster);
+      acRoomConv = ac.createConvolver();
+      acRoomConv.normalize = true;
+      acRoomSend = ac.createGain();
+      acRoomSend.gain.value = 0.0001;
+      acRoomOut = ac.createGain();
+      acRoomOut.gain.value = 1;
+      acSfxIn.connect(acRoomSend);
+      acRoomSend.connect(acRoomConv);
+      acRoomConv.connect(acRoomOut);
+      acRoomOut.connect(acMaster);
+      sysRoomLoad(game.biome && game.biome.current);
+    } catch (e) {
+      acSfxIn = null; acRoomSend = null; acRoomConv = null; acRoomOut = null;
+    }
     return ac;
+  }
+
+  /**
+   * Point the convolver at this chapter's room. Once per border crossing.
+   *
+   * The buffer is regenerated rather than cached — see the note on sysROOMS.
+   * A failure here is not fatal: a convolver with no buffer passes silence, so
+   * the send goes to nothing and the dry path is the whole signal, which is
+   * the mix this game had before any of this existed.
+   */
+  function sysRoomLoad(name) {
+    if (!ac || !acRoomConv) return;
+    const key = name || 'sydney';
+    if (acRoomFor === key) return;
+    acRoomFor = key;
+    const R = sysROOMS[key] || sysROOM_DEF;
+    try { acRoomConv.buffer = musIR(R.size, R.decay); }
+    catch (e) { acRoomConv.buffer = null; }
   }
 
   /**
@@ -5454,6 +5722,26 @@ export function createSystems(game) {
     }
   }
 
+  /**
+   * DRIVE THE ROOM. One gain write, and the IR swap when the chapter changes.
+   *
+   * The send is CROSS-FADED rather than switched, and the buffer is swapped at
+   * the bottom of the fade: a convolver whose buffer changes while it is
+   * ringing drops the tail of whatever is in it, and a five-second cave tail
+   * cut off mid-decay is a click. sysROOM_LAM is roughly the fog's own rate,
+   * which is what everything else in this file crosses at.
+   */
+  function sysRoomSet(dt) {
+    if (!ac || !acRoomSend) return;
+    const live = (game.biome && game.biome.current) || 'sydney';
+    const R = sysROOMS[live] || sysROOM_DEF;
+    const want = acRoomFor === live ? R.wet : 0;
+    acRoomWet = damp(acRoomWet, want, sysROOM_LAM * (want > 0 ? 1 : 2.6), dt);
+    acRoomSend.gain.setTargetAtTime(Math.max(0.0001, acRoomWet), ac.currentTime, 0.12);
+    // Down to nothing, and only then is it a different place.
+    if (acRoomFor !== live && acRoomWet < 0.006) sysRoomLoad(live);
+  }
+
   // =========================================================================
   // 5b. MUSIC — generative lush pad, pure synthesis, lookahead-scheduled.
   // Signal: pad voices -> filter -> pad gain --+--> dry --+
@@ -5468,6 +5756,12 @@ export function createSystems(game) {
   let musChordAt = 0, musPluckAt = 0, musIdx = 0, musChordStart = 0;
   let musMuted = false, musLevel = 1;
   let musIntensity = 0, musChaseT = 0, musApplyT = 0;
+  // The other end of the same stick. musIntensity is written from chaos and
+  // opens the mix; musCalm is written from the calm field and closes it. They
+  // are separate numbers rather than one signed one because they are not
+  // opposites in time: chaos spikes and decays, calm accrues and collapses,
+  // and a single number could not hold both shapes. See THE CALM.
+  let musCalm = 0;
   // The beat clock. Published as game.music so cali.js can judge a dance step
   // against the ACTUAL audio timeline rather than against a parallel timer that
   // would drift out of sync inside a minute.
@@ -7805,20 +8099,68 @@ export function createSystems(game) {
     // their whole graph synchronously, so there is no window in which this can
     // be observed by anything else, and a synth that is not placed sees the
     // real master exactly as before.
+    //
+    // ...AND THE SAME SWAP IS WHAT PUTS THE SOUND IN A ROOM. `acSfxIn` is the
+    // head of the send (see sysROOMS); everything that goes through it is
+    // heard dry AND through the convolver. A UI sound is deliberately not:
+    // the noise a menu makes about itself is not standing anywhere, and it is
+    // also the one sound allowed to play while the world is not running, when
+    // there is no room to be in.
     const saved = acMaster;
+    const bus = (acSfxIn && !(opts && opts.ui)) ? acSfxIn : saved;
     let node = null;
     if (placed && c.createStereoPanner) {
       try {
         node = c.createStereoPanner();
         node.pan.value = pan;
-        node.connect(saved);
+        node.connect(bus);
         acMaster = node;
-      } catch (e) { node = null; acMaster = saved; }
-    }
+      } catch (e) { node = null; acMaster = bus; }
+    } else acMaster = bus;
     try { fn(vol, pitch, extra, wetness); }
     catch (e) { /* audio node budget exhausted — ignore */ }
     finally { acMaster = saved; }
   }
+  /**
+   * AN AMBIENT SOUND, WHICH IS A SOUND THAT COMES FROM SOMEWHERE.
+   *
+   * The one call the ambience ladder makes instead of sfx(). It puts the event
+   * on a ring around the animal at a random bearing and hands the point to
+   * sfx() as `at`, which pans it.
+   *
+   * IT DOES NOT CHANGE ANY LEVEL, and that is deliberate — see the note on
+   * sysAMB_R0. The ring is inside `near`, so audioPlace answers a gain of
+   * exactly 1 and the ladder's ninety-six hand-tuned volumes are untouched to
+   * the sample. What the player gets is a bell that is over there rather than
+   * inside their own head.
+   *
+   * A ladder rung that already knows where its sound is — the bell on the
+   * yellow buoy at the turn, the ferry's engine — passes `at` or `x/y/z` and
+   * goes straight through. Those are the only ones in the game that were ever
+   * positional and they stay exactly as they were.
+   */
+  const sysAmbAt = { x: 0, y: 0, z: 0 };
+  function sysAmb(name, opts) {
+    if (opts && (opts.at || typeof opts.x === 'number')) { sfx(name, opts); return; }
+    const c = game.capy && game.capy.position;
+    const a = Math.random() * 6.283185;
+    const d = rand(sysAMB_R0, sysAMB_R1);
+    sysAmbAt.x = (c ? c.x : 0) + Math.cos(a) * d;
+    sysAmbAt.z = (c ? c.z : 0) + Math.sin(a) * d;
+    // Mostly upward: the things a place says about itself are birds, bells,
+    // horns and weather, and almost none of them are underfoot.
+    sysAmbAt.y = (c ? c.y : 0) + rand(-1.2, sysAMB_UP);
+    if (!opts) opts = sysAmbBare;
+    opts.at = sysAmbAt;
+    opts.near = sysAMB_NEAR;
+    sfx(name, opts);
+    // Never leave a position on an object the caller may hold: the ladder
+    // builds a fresh literal per rung today, and the day one of them is
+    // hoisted to a shared object this is what stops it inheriting a stale spot.
+    opts.at = null;
+  }
+  const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0 };
+
   function setMuted(m) {
     muted = m;
     if (acMaster) acMaster.gain.setTargetAtTime(m ? 0.0001 : 0.85, ac.currentTime, 0.05);
@@ -8614,6 +8956,142 @@ export function createSystems(game) {
   // --- perf ---
   const perfEl = sysEl('div', 'capyui-perf');
   hudRoot.appendChild(perfEl);
+
+  // =========================================================================
+  // THE POSTCARD — photo mode (v22)
+  // =========================================================================
+  //
+  // Seventeen places have been built to be looked at and version thirteen gave
+  // them a lens to be looked at THROUGH — a bright pass, a grade, a vignette, a
+  // per-chapter tint. Version twelve gave them a key that takes the paper off
+  // the window. And weather.js has, since the micro-environment shipped, given
+  // every one of them a NAME: 'Harbour Midday', 'Violet Nowhere', 'Neon Rain',
+  // 'Inside the Mountain', seventeen of them, authored, saved, and read by
+  // absolutely nothing — `weather.label()` had zero call sites in 114k lines.
+  //
+  // The postcard is those three things put together and nothing else invented:
+  //
+  //   the furniture goes  — `bare`, which already exists and already knows
+  //                         which things are the game talking and must stay;
+  //   the frame arrives   — a 3:2 letterbox, four corner ticks and a caption;
+  //   the caption is real — the chapter's own name, the sky's own name, and
+  //                         the time on the journey's own clock.
+  //
+  // And then Enter takes the picture, which is a PNG the player keeps. That is
+  // the only thing in this game that leaves it.
+  const photoEl = sysEl('div', 'capyui-photo');
+  // A viewfinder is furniture drawn over a canvas, and the caption's clock
+  // ticks once a second: announcing it would be a screen-reader metronome.
+  // The game's one announced channel is the toast, which already carries
+  // role="status" and aria-live="polite".
+  photoEl.setAttribute('aria-hidden', 'true');
+  photoEl.appendChild(sysEl('div', 'capyui-pbar t'));
+  photoEl.appendChild(sysEl('div', 'capyui-pbar b'));
+  photoEl.appendChild(sysEl('div', 'capyui-ptick tl'));
+  photoEl.appendChild(sysEl('div', 'capyui-ptick tr'));
+  photoEl.appendChild(sysEl('div', 'capyui-ptick bl'));
+  photoEl.appendChild(sysEl('div', 'capyui-ptick br'));
+  const photoHint = sysEl('div', 'capyui-phint', 'enter to keep it  ·  k to put the camera away');
+  photoEl.appendChild(photoHint);
+  const photoCap = sysEl('div', 'capyui-pcap');
+  const photoPlace = sysEl('b');
+  const photoSky = sysEl('span');
+  const photoTime = sysEl('i');
+  photoCap.appendChild(photoPlace);
+  photoCap.appendChild(photoSky);
+  photoCap.appendChild(photoTime);
+  photoEl.appendChild(photoCap);
+  hudRoot.appendChild(photoEl);
+  const photoFlash = sysEl('div', 'capyui-pflash');
+  photoFlash.setAttribute('aria-hidden', 'true');
+  hudRoot.appendChild(photoFlash);
+  let photoOn = false, photoBareWas = false, photoShots = 0, photoCapT = 0;
+
+  /** The caption. Three facts, and every one of them was already written down. */
+  function photoCaption() {
+    const name = (game.biome && game.biome.current) || 'sydney';
+    const def = chapterDef(chapterOf(name));
+    photoPlace.textContent = def.name;
+    // The one and only reader of weather.label(), which has been authored
+    // seventeen times and shown nought times since the micro-environment
+    // shipped. A chapter with no mood row answers 'default'; the caption drops
+    // the middle field rather than printing that.
+    let sky = '';
+    try { sky = (game.weather && game.weather.label && game.weather.label()) || ''; }
+    catch (e) { sky = ''; }
+    if (sky === 'default') sky = '';
+    photoSky.textContent = sky ? '· ' + sky + ' ·' : '·';
+    // The journey's own clock, not the wall clock: the number under a postcard
+    // from this game should say how long you have been away.
+    const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+    photoTime.textContent = sysFmtTime(total);
+  }
+
+  function photoSet(on) {
+    if (on === photoOn) return;
+    photoOn = on;
+    if (on) {
+      // Remember whether the paper was already off, so leaving photo mode puts
+      // the player back where they were rather than always switching it on.
+      photoBareWas = hudBare;
+      hudBare = true;
+      hudRoot.classList.add('bare');
+      photoCaption();
+    } else {
+      hudBare = photoBareWas;
+      hudRoot.classList.toggle('bare', hudBare);
+    }
+    photoEl.classList.toggle('show', on);
+    sfx('tick', { volume: 0.34, pitch: on ? 1.5 : 1.1, ui: true });
+  }
+
+  /**
+   * TAKE IT. The one thing in this game that leaves the game.
+   *
+   * THE RENDER AND THE READ ARE IN ONE JS TURN and that is not a style choice:
+   * the renderer is built without `preserveDrawingBuffer`, so the colour buffer
+   * is not guaranteed to survive to the next task and a toDataURL called from a
+   * key handler reads back a blank canvas about as often as it does not. So the
+   * frame is drawn again, right here, and read on the very next line.
+   *
+   * Everything about this is allowed to fail quietly. A browser that refuses
+   * the download, a canvas that comes back tainted, a post chain that is not
+   * there — none of them is worth an exception in a game about a rodent, and
+   * the flash and the shutter still happen either way, because the player
+   * pressed a button and something has to answer.
+   */
+  function photoShoot() {
+    if (!photoOn) return;
+    photoShots++;
+    // The flash first: it is on its own layer above the frame and it is what
+    // the eye reads as the shutter, whatever happens to the file. Not under
+    // prefers-reduced-motion — the CSS pins it to zero there anyway, and this
+    // saves two class writes and a timer for a sheet that will not be drawn.
+    if (!sysCalmMotion) {
+      photoFlash.classList.add('show');
+      setTimeout(function () { photoFlash.classList.remove('show'); }, 40);
+    }
+    sfx('tick', { volume: 0.62, pitch: 2.1, ui: true, force: true });
+    punch(0.05);
+    let url = '';
+    try {
+      // Draw, then read. In that order, in this turn, with nothing between them.
+      if (game.post && game.post.enabled) game.post.render();
+      else renderer.render(scene, camera);
+      url = canvas.toDataURL('image/png');
+    } catch (e) { url = ''; }
+    if (!url) { toast('the camera did not catch that one'); return; }
+    try {
+      const name = (game.biome && game.biome.current) || 'sydney';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'capybara-' + name + '-' + photoShots + '.png';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) { /* a browser that will not save it has still shown it */ }
+  }
 
   // --- flight readout: altimeter, airspeed, thermal tell ---
   // Only ever on screen while the capybara is hanging off the condor. The bar is
@@ -11853,6 +12331,64 @@ export function createSystems(game) {
    * THREE BEATS: the chapter card (its own paper now, see showDone), the
    * souvenir at sysKEEP_WAIT, and the sentence about the way on after that.
    */
+  /**
+   * PUT CHAPTER n's SOUVENIR ON THE GROUND, at the animal's feet.
+   *
+   * Idempotent (props.js will not make a second one), silent if the physics
+   * module is an older build than this one, and deliberately NOT a reward
+   * channel: no toast, no tick, no chime. The card is already up and saying
+   * what it is; this is just the thing itself, arriving where you are standing.
+   */
+  function sysDropKeep(n) {
+    const ph = game.physics;
+    if (!ph || typeof ph.spawnKeep !== 'function') return;
+    const place = chapterDef(n).biome;
+    const c = game.capy && game.capy.position;
+    if (!c) return;
+    // A pace in front and a little to one side: dropping it inside the animal
+    // means the solver's first act is to push the two of them apart.
+    const a = (game.capy.group ? game.capy.group.rotation.y : 0) + 0.7;
+    try { ph.spawnKeep(place, c.x + Math.sin(a) * 0.9, c.z + Math.cos(a) * 0.9, c.y - 0.32); }
+    catch (e) { /* a keepsake is never worth an exception */ }
+  }
+
+  /**
+   * ...AND EVERYTHING YOU HAVE ALREADY EARNED, ONCE PER SESSION.
+   *
+   * A reload restores the shelf but not the world, so without this a returning
+   * player has sixteen souvenirs in the journal and nothing at their feet. Run
+   * on the first border crossing rather than at boot, because props.js's
+   * biome-enter hook is what puts loose keepsakes down at the arrival point
+   * and it has to have somewhere to put them.
+   *
+   * After this they simply follow you: a keepsake has no biome, so travel moves
+   * it to the next chapter's spawn instead of confiscating it.
+   */
+  let sysKeepsBack = false;
+  function sysKeepsRestore() {
+    if (sysKeepsBack) return;
+    sysKeepsBack = true;
+    const ph = game.physics;
+    if (!ph || typeof ph.spawnKeep !== 'function') return;
+    // THE SPAWN POINT, NOT THE ANIMAL. This runs from the biome:enter handler
+    // and teleportCapy has not moved anybody yet, so capy.position is still the
+    // coordinates of the chapter you have just LEFT — and every chapter is
+    // authored in the same coordinate space, so those are a real point in the
+    // new world and quite possibly the inside of a basilica. The spawn is the
+    // one point in a new chapter that is known to be standable.
+    const bm = game.biome;
+    if (!bm || typeof bm.spawnOf !== 'function') return;
+    const sp = bm.spawnOf(bm.current);
+    for (let k = 1; k <= chapMax; k++) {
+      if (!chapComplete(k)) continue;
+      const a = k * 2.399963, r = 0.7 + k * 0.12;
+      // No restY: physSurfaceY asks the LIVE biome, which is already the one
+      // being entered, so each lands on the ground that is actually there.
+      try { ph.spawnKeep(chapterDef(k).biome, sp.x + Math.cos(a) * r, sp.z + Math.sin(a) * r); }
+      catch (e) { /* ditto */ }
+    }
+  }
+
   function chapterCeremony(n) {
     const def = chapterDef(n);
     const rec = chapRec[n];
@@ -11913,7 +12449,18 @@ export function createSystems(game) {
     // thing nothing else in this game does, which is point at somewhere you
     // are not: the shelf in the journal now has a thing on it that says you
     // were here, and it will still say so in Antarctica.
-    setTimeout(function () { showKeep(n); }, sysKEEP_WAIT);
+    //
+    // ---- AND YOU CAN PICK IT UP (v22) -------------------------------------
+    // For four versions the souvenir was a picture, and a picture of a hat is
+    // not a hat. It is also a real object now — see physKEEPS in props.js: a
+    // prop with a body and a mass, built from the same shapes and the same
+    // palette keys as the icon, and the only object in this game with no biome
+    // on it, so it crosses a border in the animal's mouth instead of being
+    // confiscated by customs at the departures board.
+    //
+    // It lands WITH the card, not before it: the picture on the paper is what
+    // tells you what the thing at your feet is.
+    setTimeout(function () { showKeep(n); sysDropKeep(n); }, sysKEEP_WAIT);
     if (def.way && n !== chapMax) {
       setTimeout(function () {
         // ...unless the journey has just ended on some OTHER chapter's last
@@ -12342,10 +12889,23 @@ export function createSystems(game) {
     // card, a moment card and the white of a crossing are the game speaking and
     // still get through, so nothing can be missed by having it on.
     if (c === 'KeyP' && started) {
+      // Leaving photo mode by the other door: P is the same idea one notch
+      // coarser, and having both on at once would mean two ways out of one
+      // state and a `bare` flag that photo mode had to guess the history of.
+      if (photoOn) photoSet(false);
       hudBare = !hudBare;
       hudRoot.classList.toggle('bare', hudBare);
       if (hudBare) toast('P again for the paper');
     }
+    // ---- K: THE POSTCARD -------------------------------------------------
+    // See the block by photoEl. K because it is next to J (the journal) and
+    // because every other letter within reach of the right hand is already a
+    // verb; the camera is not a verb and must not be anywhere near WASD.
+    if (c === 'KeyK' && started) photoSet(!photoOn);
+    // ...and Enter takes it. Deliberately NOT the action key: E is the grab and
+    // a player who pressed it while the camera was out would take a photograph
+    // AND put a traffic cone in their mouth.
+    if ((c === 'Enter' || c === 'NumpadEnter') && photoOn) photoShoot();
     // QA hotkey: hard-cut between biomes, no fade, no ceremony, no task ticks.
     if (c === 'Backslash' && !transBusy) {
       const to = (game.biome && game.biome.isActive('pasto')) ? 'sydney' : 'pasto';
@@ -12596,6 +13156,7 @@ export function createSystems(game) {
       else jrToggle();
     }
     if (back && !padWasBack && started) {
+      if (photoOn) photoSet(false);      // same door as KeyP, same reason
       hudBare = !hudBare;
       hudRoot.classList.toggle('bare', hudBare);
     }
@@ -12882,7 +13443,20 @@ export function createSystems(game) {
     pp.vigStart = cur.vigStart;
     pp.tintR = cur.tintR; pp.tintG = cur.tintG; pp.tintB = cur.tintB;
     pp.liftR = cur.liftR; pp.liftG = cur.liftG; pp.liftB = cur.liftB;
+    // ---- AND THE POSTCARD LEANS ON THE SAME THREE ------------------------
+    // Not a second grade and not a filter: photo mode nudges the row the
+    // chapter is already on, by an amount you would not notice as an effect
+    // and would notice as a better picture. Applied HERE, after the events,
+    // because a marquee moment happening while the camera is out must still
+    // out-bloom the camera. Damped, so K is a lens opening rather than a cut.
+    photoLens = damp(photoLens, photoOn ? 1 : 0, 2.6, game.state.dt || 0.016);
+    if (photoLens > 0.002) {
+      pp.saturation += photoLens * sysPHOTO_SAT;
+      pp.contrast += photoLens * sysPHOTO_CON;
+      pp.vignette += photoLens * sysPHOTO_VIG;
+    }
   }
+  let photoLens = 0;
 
   /**
    * THE SKY AND THE LENS ARE BIOME STATE, so they are slammed on the first
@@ -13426,6 +14000,12 @@ export function createSystems(game) {
   const rioAmbSurfZ = -14;
   let fpsAcc = 0, fpsFrames = 0, fps = 60, perfAcc = 0;
   let ambTimer = rand(5, 12);
+  // THE CALM (see the block at the top of this file). One number and one list;
+  // the list is appended to at build time by whichever chapters have something
+  // in them that runs away, and is never removed from — a biome is built once
+  // (see toSet.built in main.js) and its animals outlive every visit.
+  let sysCalmNow = 0;
+  const sysCritters = [];
 
   // =========================================================================
   // wiring
@@ -13458,6 +14038,57 @@ export function createSystems(game) {
   // moves over by changing four letters and nothing has to be re-tuned.
   game.punch = punch;
   game.sfx = sfx;
+  /**
+   * HOW SETTLED THE WORLD IS AT A POINT, 0..1. See THE CALM above.
+   *
+   * With no argument it is the global figure — how still the animal has been,
+   * suppressed by whatever chaos is live. With a point it is that figure
+   * BLENDED TOWARD 1 BY DISTANCE, which is the whole geometry of the idea: the
+   * only disturbance in any of these worlds is the capybara, so a place the
+   * capybara is nowhere near is calm no matter what the capybara is doing. A
+   * heron on the far bank does not care that you are sprinting.
+   *
+   * Never throws, never allocates, safe before the animal exists.
+   */
+  game.calm = function (x, z) {
+    if (x === undefined) return sysCalmNow;
+    const c = game.capy && game.capy.position;
+    if (!c) return 1;
+    const d = Math.hypot(x - c.x, z - c.z);
+    const far = clamp(d / sysCALM_REACH, 0, 1);
+    return sysCalmNow + (1 - sysCalmNow) * far * far;
+  };
+  /**
+   * REGISTER AN ANIMAL THAT IS FRIGHTENED OF YOU.
+   *
+   *     const c = game.addCritter({ biome: 'iceland', r: 14 });
+   *     ...later, in the biome's own update:
+   *     if (d < c.near) spook();
+   *
+   * `r` is the radius the animal has always used and `near` is that radius
+   * after the calm has been taken out of it — up to sysCALM_CRIT of it, so a
+   * fully settled player is let sixty per cent closer than a moving one. The
+   * registry writes `near` once a frame for the LIVE chapter only; everybody
+   * else's sits at their base radius costing nothing.
+   *
+   * It is a registry rather than seventeen calls to game.calm() for one
+   * reason: this is a feel knob, it will be retuned, and a curve that lives in
+   * seventeen biome files is a curve that gets retuned in fourteen of them.
+   *
+   * `k` (0..1, default 1) is how much of the shrink this particular animal
+   * takes — a jacare is not impressed by anybody being quiet and passes 0.3.
+   */
+  game.addCritter = function (o) {
+    const rec = {
+      biome: (o && o.biome) || (game.biome && game.biome.current) || 'sydney',
+      r: (o && o.r > 0) ? o.r : 10,
+      k: (o && o.k !== undefined) ? clamp(o.k, 0, 1) : 1,
+      near: (o && o.r > 0) ? o.r : 10,
+      calm: 0,
+    };
+    sysCritters.push(rec);
+    return rec;
+  };
   game.registerShadowTarget = registerShadowTarget;
   // The modules that call registerShadowTarget ran before systems existed and hit
   // main.js's no-op stub, so sweep them retroactively.
@@ -13548,6 +14179,30 @@ export function createSystems(game) {
       return { gain: g, pan: g > 0 ? sysSfxPan : 0,
                ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z } };
     },
+    /**
+     * WHAT THE CALM IS DOING TO THE ANIMALS, for the harness. Same argument as
+     * mapMarkAudit and audioProbe: a flee radius that quietly stops shrinking
+     * is a change nobody can see happening and nobody can see stop happening.
+     * `near` is the live radius, `r` the base it was registered with.
+     */
+    calmAudit: function () {
+      const live = game.biome && game.biome.current;
+      const out = { calm: sysCalmNow, biome: live, critters: [] };
+      for (let i = 0; i < sysCritters.length; i++) {
+        const c = sysCritters[i];
+        out.critters.push({ biome: c.biome, r: c.r, near: c.near, live: c.biome === live });
+      }
+      return out;
+    },
+    /** ...and which room the sfx bus is in. See sysROOMS. */
+    roomAudit: function () {
+      return { biome: acRoomFor, wet: acRoomWet,
+               conv: !!(acRoomConv && acRoomConv.buffer),
+               secs: acRoomConv && acRoomConv.buffer ? acRoomConv.buffer.duration : 0,
+               bus: !!acSfxIn };
+    },
+    /** Is the camera out, and how many pictures has it taken. */
+    photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
     root: hudRoot,
     toast: toast,
     completeTask: completeTask,
@@ -13634,6 +14289,9 @@ export function createSystems(game) {
     const name = (p && p.name) || 'sydney';
     jrSeen[chapterOf(name)] = 1;
     saveSoon();
+    // Everything a returning player has already earned, put back into the
+    // world once. See sysKeepsRestore.
+    sysKeepsRestore();
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
@@ -14879,6 +15537,9 @@ export function createSystems(game) {
     // picture, because it is the other half of the same state: the shower that
     // just took a third of the sun is the shower you can now hear.
     sysWxBedSet(dt);
+    // ...and so is the room it is all heard in, for the same reason and in the
+    // same breath. See sysROOMS.
+    sysRoomSet(dt);
 
     // ---- the score goes to sea -------------------------------------------
     // Palette 3 is only ever alive while somebody is actually driving. Taking
@@ -15105,12 +15766,26 @@ export function createSystems(game) {
     const homeVis = homeOk && !transBusy;
     if (homeVis !== homeShown) { homeShown = homeVis; homeEl.classList.toggle('show', homeVis); }
 
+    // The postcard's caption, while the camera is out. Once a second, because
+    // the only thing in it that moves is a clock that counts in seconds — and
+    // three textContent writes a frame for a number that has not changed is
+    // three layout invalidations a frame for nothing.
+    if (photoOn) {
+      photoCapT -= dt;
+      if (photoCapT <= 0) { photoCapT = 1; photoCaption(); }
+    }
+
     // ---- ambient bed ----
     if (ac && acAmbGain) {
       const wantAmb = started && !muted && !game.state.paused && !document.hidden;
       ambientSet(wantAmb);
       if (wantAmb) {
-        ambTimer -= dt;
+        // THE CALM STRETCHES THE GAPS. Not the levels — a settled world is not
+        // a quieter world, it is a world in which less is happening — so the
+        // clock runs slow rather than the bus coming down, and at a full hold
+        // a place speaks up about two thirds as often. It is the cheapest of
+        // the three calm readers and the one you notice last, which is right.
+        ambTimer -= dt * (1 - sysCalmNow * 0.35);
         // ---- ONE SOUNDSCAPE PER PLACE -----------------------------------
         // This used to be "a silver gull, unless you are in the Andes", which
         // was right when there were two biomes and became wrong the moment
@@ -15122,11 +15797,11 @@ export function createSystems(game) {
         if (ambTimer <= 0) {
           const bio = game.biome && game.biome.current;
           if (bio === 'pasto') {
-            sfx('hiss', { volume: rand(0.10, 0.20), pitch: rand(0.55, 0.75) });
+            sysAmb('hiss', { volume: rand(0.10, 0.20), pitch: rand(0.55, 0.75) });
             ambTimer = rand(11, 24);
           } else if (bio === 'quay') {
             // THE ONE CHAPTER THAT HAD NO SOUNDSCAPE AT ALL. Circular Quay fell
-            // through every rung of this ladder to the bare `sfx('gull')` at the
+            // through every rung of this ladder to the bare `sysAmb('gull')` at the
             // bottom — Sydney's fallback, on a working harbour, for the whole of
             // a seventy-second passage. It is three places and they sound
             // nothing like each other, so it is positional, which is the sahara
@@ -15138,15 +15813,15 @@ export function createSystems(game) {
             const atManly = qz < -480;
             const r = Math.random();
             if (atTerminal) {
-              if (r < 0.30) sfx('horn', { volume: rand(0.07, 0.13), pitch: rand(0.38, 0.52) });
-              else if (r < 0.56) sfx('rustle', { volume: rand(0.07, 0.13), pitch: rand(0.45, 0.7) });
-              else if (r < 0.80) sfx('gull', { volume: rand(0.09, 0.16), pitch: rand(1.1, 1.5) });
-              else sfx('thud', { volume: rand(0.05, 0.10), pitch: rand(0.32, 0.46) });
+              if (r < 0.30) sysAmb('horn', { volume: rand(0.07, 0.13), pitch: rand(0.38, 0.52) });
+              else if (r < 0.56) sysAmb('rustle', { volume: rand(0.07, 0.13), pitch: rand(0.45, 0.7) });
+              else if (r < 0.80) sysAmb('gull', { volume: rand(0.09, 0.16), pitch: rand(1.1, 1.5) });
+              else sysAmb('thud', { volume: rand(0.05, 0.10), pitch: rand(0.32, 0.46) });
               ambTimer = rand(6, 13);
             } else if (atManly) {
-              if (r < 0.44) sfx('splash', { volume: rand(0.08, 0.15), pitch: rand(0.48, 0.68) });
-              else if (r < 0.74) sfx('gull', { volume: rand(0.10, 0.18), pitch: rand(1.0, 1.4) });
-              else sfx('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.1, 1.4) });
+              if (r < 0.44) sysAmb('splash', { volume: rand(0.08, 0.15), pitch: rand(0.48, 0.68) });
+              else if (r < 0.74) sysAmb('gull', { volume: rand(0.10, 0.18), pitch: rand(1.0, 1.4) });
+              else sysAmb('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.1, 1.4) });
               ambTimer = rand(5, 12);
             } else {
               // Out in the stream it should mostly be nothing — and when it is
@@ -15155,19 +15830,19 @@ export function createSystems(game) {
               const nearTurn = capy && capy.position &&
                 Math.hypot(capy.position.x - 100, capy.position.z + 516) < 150;
               if (nearTurn && r < 0.24) {
-                sfx('chime', { volume: rand(0.07, 0.13), pitch: rand(0.52, 0.66) });
+                sysAmb('chime', { volume: rand(0.07, 0.13), pitch: rand(0.52, 0.66) });
                 ambTimer = rand(6, 12);
               } else if (r < 0.50) {
-                sfx('splash', { volume: rand(0.05, 0.11), pitch: rand(0.44, 0.64) });
+                sysAmb('splash', { volume: rand(0.05, 0.11), pitch: rand(0.44, 0.64) });
                 ambTimer = rand(8, 17);
               } else if (r < 0.80) {
-                sfx('gull', { volume: rand(0.06, 0.12), pitch: rand(1.2, 1.7) });
+                sysAmb('gull', { volume: rand(0.06, 0.12), pitch: rand(1.2, 1.7) });
                 ambTimer = rand(9, 19);
               } else {
                 // and once in a long while, the other ferry's engine, from
                 // wherever she actually is
                 const far = qy && typeof qy.freshwaterRange === 'function' ? qy.freshwaterRange() : 999;
-                sfx('hiss', { volume: clamp(0.16 - far * 0.0006, 0.03, 0.13), pitch: rand(0.30, 0.44) });
+                sysAmb('hiss', { volume: clamp(0.16 - far * 0.0006, 0.03, 0.13), pitch: rand(0.30, 0.44) });
                 ambTimer = rand(11, 22);
               }
             }
@@ -15186,23 +15861,23 @@ export function createSystems(game) {
               // A grove of eighteen-metre culms in any wind at all knocks
               // against itself, and that hollow clack is the entire reason
               // anybody goes to Arashiyama.
-              if (r < 0.6) sfx('tick', { volume: rand(0.10, 0.19), pitch: rand(0.30, 0.46) });
-              else sfx('rustle', { volume: rand(0.08, 0.15), pitch: rand(1.2, 1.7) });
+              if (r < 0.6) sysAmb('tick', { volume: rand(0.10, 0.19), pitch: rand(0.30, 0.46) });
+              else sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(1.2, 1.7) });
               ambTimer = rand(2.4, 6.0);
             } else if (onRiver) {
-              if (r < 0.62) sfx('hiss', { volume: rand(0.09, 0.16), pitch: rand(0.85, 1.20) });
-              else if (r < 0.86) sfx('splash', { volume: rand(0.06, 0.12), pitch: rand(0.7, 1.0) });
-              else sfx('gull', { volume: rand(0.04, 0.08), pitch: rand(0.42, 0.56) });
+              if (r < 0.62) sysAmb('hiss', { volume: rand(0.09, 0.16), pitch: rand(0.85, 1.20) });
+              else if (r < 0.86) sysAmb('splash', { volume: rand(0.06, 0.12), pitch: rand(0.7, 1.0) });
+              else sysAmb('gull', { volume: rand(0.04, 0.08), pitch: rand(0.42, 0.56) });
               ambTimer = rand(4, 9);
             } else if (r < 0.42) {
-              sfx('chime', { volume: rand(0.12, 0.22), pitch: rand(0.44, 0.58) });
+              sysAmb('chime', { volume: rand(0.12, 0.22), pitch: rand(0.44, 0.58) });
               ambTimer = rand(16, 34);
             } else if (r < 0.72) {
-              sfx('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
+              sysAmb('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
               ambTimer = rand(9, 19);
             } else {
               // a bush warbler, twice, a long way off
-              sfx('pop', { volume: rand(0.04, 0.09), pitch: rand(2.6, 3.4) });
+              sysAmb('pop', { volume: rand(0.04, 0.09), pitch: rand(2.6, 3.4) });
               ambTimer = rand(13, 26);
             }
           } else if (bio === 'cali') {
@@ -15214,21 +15889,21 @@ export function createSystems(game) {
             const inCane = !!(cp && cp.x > 62 && cp.z > -46 && cp.z < 74);
             const r = Math.random();
             if (inCane) {
-              if (r < 0.66) sfx('rustle', { volume: rand(0.10, 0.18), pitch: rand(0.7, 1.0) });
-              else sfx('pop', { volume: rand(0.04, 0.08), pitch: rand(2.4, 3.2) });
+              if (r < 0.66) sysAmb('rustle', { volume: rand(0.10, 0.18), pitch: rand(0.7, 1.0) });
+              else sysAmb('pop', { volume: rand(0.04, 0.08), pitch: rand(2.4, 3.2) });
               ambTimer = rand(4, 10);
             } else if (r < 0.34) {
-              sfx('horn', { volume: rand(0.10, 0.18), pitch: rand(1.5, 2.1) });
+              sysAmb('horn', { volume: rand(0.10, 0.18), pitch: rand(1.5, 2.1) });
               ambTimer = rand(7, 15);
             } else if (r < 0.62) {
-              sfx('strum', { volume: rand(0.10, 0.20), pitch: rand(1.2, 1.7) });
+              sysAmb('strum', { volume: rand(0.10, 0.20), pitch: rand(1.2, 1.7) });
               ambTimer = rand(7, 15);
             } else if (r < 0.82) {
               // somebody's radio two streets over, and a dog
-              sfx('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.0, 1.35) });
+              sysAmb('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.0, 1.35) });
               ambTimer = rand(9, 18);
             } else {
-              sfx('bark', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
+              sysAmb('bark', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
               ambTimer = rand(11, 22);
             }
           } else if (bio === 'rio') {
@@ -15248,29 +15923,29 @@ export function createSystems(game) {
             if (cp && zz > 34) {
               // inland: Lapa, the arches, Santa Teresa. Traffic, a shutter, a
               // bonde bell somewhere above you, and the sea barely at all.
-              if (r < 0.34) sfx('horn', { volume: rand(0.05, 0.11), pitch: rand(1.4, 2.0) });
-              else if (r < 0.60) sfx('cheer', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.25) });
-              else if (r < 0.82) sfx('chime', { volume: rand(0.05, 0.10), pitch: rand(1.7, 2.2) });
-              else sfx('bark', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.3) });
+              if (r < 0.34) sysAmb('horn', { volume: rand(0.05, 0.11), pitch: rand(1.4, 2.0) });
+              else if (r < 0.60) sysAmb('cheer', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.25) });
+              else if (r < 0.82) sysAmb('chime', { volume: rand(0.05, 0.10), pitch: rand(1.7, 2.2) });
+              else sysAmb('bark', { volume: rand(0.04, 0.09), pitch: rand(0.9, 1.3) });
               ambTimer = rand(7, 15);
             } else if (cp && zz > 4) {
               // the avenue and the median: the city side of the beach.
-              if (r < 0.40) sfx('horn', { volume: rand(0.06, 0.12), pitch: rand(1.5, 2.1) });
-              else if (r < 0.68) sfx('splash', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
-              else if (r < 0.88) sfx('rustle', { volume: rand(0.05, 0.11), pitch: rand(0.7, 1.0) });
-              else sfx('gull', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
+              if (r < 0.40) sysAmb('horn', { volume: rand(0.06, 0.12), pitch: rand(1.5, 2.1) });
+              else if (r < 0.68) sysAmb('splash', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
+              else if (r < 0.88) sysAmb('rustle', { volume: rand(0.05, 0.11), pitch: rand(0.7, 1.0) });
+              else sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
               ambTimer = rand(7, 14);
             } else if (cp && zz < rioAmbSurfZ) {
               // in it, or nearly: the break is the only thing you can hear.
-              if (r < 0.72) sfx('splash', { volume: rand(0.12, 0.21), pitch: rand(0.42, 0.62) });
-              else sfx('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.75) });
+              if (r < 0.72) sysAmb('splash', { volume: rand(0.12, 0.21), pitch: rand(0.42, 0.62) });
+              else sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.75) });
               ambTimer = rand(3.5, 8);
             } else {
               // the sand and the calçadão, which is where the chapter opens.
-              if (r < 0.44) sfx('splash', { volume: rand(0.08, 0.14), pitch: rand(0.5, 0.7) });
-              else if (r < 0.74) sfx('gull', { volume: rand(0.08, 0.14), pitch: rand(1.1, 1.4) });
-              else if (r < 0.90) sfx('cheer', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.2) });
-              else sfx('tick', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });  // a ball, somewhere
+              if (r < 0.44) sysAmb('splash', { volume: rand(0.08, 0.14), pitch: rand(0.5, 0.7) });
+              else if (r < 0.74) sysAmb('gull', { volume: rand(0.08, 0.14), pitch: rand(1.1, 1.4) });
+              else if (r < 0.90) sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.2) });
+              else sysAmb('tick', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });  // a ball, somewhere
               ambTimer = rand(6, 13);
             }
           } else if (bio === 'iceland') {
@@ -15278,9 +15953,9 @@ export function createSystems(game) {
             // the ice, water on the harbour wall, and once in a very long while
             // a bird. Anything busier and the point of the place is gone.
             const r = Math.random();
-            if (r < 0.55) sfx('hiss', { volume: rand(0.09, 0.17), pitch: rand(0.35, 0.5) });
-            else if (r < 0.8) sfx('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.6) });
-            else sfx('gull', { volume: rand(0.06, 0.11), pitch: rand(1.3, 1.7) });
+            if (r < 0.55) sysAmb('hiss', { volume: rand(0.09, 0.17), pitch: rand(0.35, 0.5) });
+            else if (r < 0.8) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.6) });
+            else sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(1.3, 1.7) });
             ambTimer = rand(13, 28);
           } else if (bio === 'drift') {
             // The emptiest soundscape in the game, emptier even than Iceland's:
@@ -15291,10 +15966,10 @@ export function createSystems(game) {
             const dr = game.drift;
             const w = dr ? dr.windSpeed() : 0;
             if (w > 1.5) {
-              sfx('hiss', { volume: clamp(0.05 + w * 0.045, 0.05, 0.20), pitch: rand(0.30, 0.46) });
+              sysAmb('hiss', { volume: clamp(0.05 + w * 0.045, 0.05, 0.20), pitch: rand(0.30, 0.46) });
               ambTimer = rand(5, 11);
             } else {
-              sfx('chime', { volume: rand(0.08, 0.16), pitch: rand(0.36, 0.52) });
+              sysAmb('chime', { volume: rand(0.08, 0.16), pitch: rand(0.36, 0.52) });
               ambTimer = rand(15, 32);
             }
           } else if (bio === 'venice') {
@@ -15306,16 +15981,16 @@ export function createSystems(game) {
             const tide = ve ? ve.tide() : 0;
             const r = Math.random();
             if (tide > 0.5) {
-              sfx('splash', { volume: rand(0.08, 0.16), pitch: rand(0.5, 0.75) });
+              sysAmb('splash', { volume: rand(0.08, 0.16), pitch: rand(0.5, 0.75) });
               ambTimer = rand(3.5, 8);
             } else if (r < 0.4) {
-              sfx('splash', { volume: rand(0.05, 0.10), pitch: rand(0.7, 1.0) });
+              sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.7, 1.0) });
               ambTimer = rand(6, 13);
             } else if (r < 0.75) {
-              sfx('gull', { volume: rand(0.09, 0.16), pitch: rand(1.0, 1.35) });
+              sysAmb('gull', { volume: rand(0.09, 0.16), pitch: rand(1.0, 1.35) });
               ambTimer = rand(7, 16);
             } else {
-              sfx('chime', { volume: rand(0.10, 0.18), pitch: rand(0.5, 0.66) });
+              sysAmb('chime', { volume: rand(0.10, 0.18), pitch: rand(0.5, 0.66) });
               ambTimer = rand(14, 30);
             }
           } else if (bio === 'kowloon') {
@@ -15327,15 +16002,15 @@ export function createSystems(game) {
             const hk = game.kowloon;
             const show = hk ? hk.show() : 0;
             if (show > 0.4) {
-              if (Math.random() < 0.6) sfx('cheer', { volume: rand(0.06, 0.12), pitch: rand(1.0, 1.3) });
-              else sfx('chime', { volume: rand(0.05, 0.10), pitch: rand(1.5, 2.0) });
+              if (Math.random() < 0.6) sysAmb('cheer', { volume: rand(0.06, 0.12), pitch: rand(1.0, 1.3) });
+              else sysAmb('chime', { volume: rand(0.05, 0.10), pitch: rand(1.5, 2.0) });
               ambTimer = rand(5, 11);
             } else {
               const r = Math.random();
-              if (r < 0.42) sfx('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
-              else if (r < 0.68) sfx('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
-              else if (r < 0.86) sfx('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
-              else sfx('pop', { volume: rand(0.05, 0.09), pitch: rand(0.6, 0.9) });
+              if (r < 0.42) sysAmb('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
+              else if (r < 0.68) sysAmb('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
+              else if (r < 0.86) sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
+              else sysAmb('pop', { volume: rand(0.05, 0.09), pitch: rand(0.6, 0.9) });
               ambTimer = rand(3.5, 8);
             }
           } else if (bio === 'palawan') {
@@ -15353,18 +16028,18 @@ export function createSystems(game) {
             const bloom = game.palawan ? game.palawan.bloom() : 0;
             if (sub > 0.5) {
               if (bloom > 0.4 && Math.random() < 0.55) {
-                sfx('chime', { volume: rand(0.07, 0.15), pitch: rand(1.8, 2.6) });
+                sysAmb('chime', { volume: rand(0.07, 0.15), pitch: rand(1.8, 2.6) });
                 ambTimer = rand(2.4, 5.5);
               } else {
-                sfx('splash', { volume: rand(0.02, 0.05), pitch: rand(0.30, 0.45) });
+                sysAmb('splash', { volume: rand(0.02, 0.05), pitch: rand(0.30, 0.45) });
                 ambTimer = rand(11, 22);
               }
             } else {
               const r = Math.random();
-              if (r < 0.46) sfx('splash', { volume: rand(0.07, 0.14), pitch: rand(0.5, 0.8) });
-              else if (r < 0.74) sfx('gull', { volume: rand(0.08, 0.15), pitch: rand(1.1, 1.5) });
-              else if (r < 0.90) sfx('rustle', { volume: rand(0.06, 0.12), pitch: rand(0.6, 0.9) });
-              else sfx('pop', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
+              if (r < 0.46) sysAmb('splash', { volume: rand(0.07, 0.14), pitch: rand(0.5, 0.8) });
+              else if (r < 0.74) sysAmb('gull', { volume: rand(0.08, 0.15), pitch: rand(1.1, 1.5) });
+              else if (r < 0.90) sysAmb('rustle', { volume: rand(0.06, 0.12), pitch: rand(0.6, 0.9) });
+              else sysAmb('pop', { volume: rand(0.04, 0.08), pitch: rand(0.5, 0.7) });
               ambTimer = rand(5, 12);
             }
           } else if (bio === 'goreme') {
@@ -15398,20 +16073,20 @@ export function createSystems(game) {
             if (aboard && g.burner() > 0.4) {
               // ...and the one over your head gets LOUDER with height, because
               // it is the only thing left to hear
-              sfx('hiss', { volume: rand(0.16, 0.26) * (1 + sky * 0.5), pitch: rand(1.4, 1.9) });
+              sysAmb('hiss', { volume: rand(0.16, 0.26) * (1 + sky * 0.5), pitch: rand(1.4, 1.9) });
               ambTimer = rand(0.5, 1.1);
             } else if (r < 0.34) {
               // a dog, two kilometres away, answered by another one
-              sfx('bark', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.85) });
+              sysAmb('bark', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.85) });
               ambTimer = rand(6, 13) * (1 + sky * 1.6);
             } else if (r < 0.60) {
-              sfx('rustle', { volume: rand(0.06, 0.12) * gnd, pitch: rand(0.5, 0.8) });
+              sysAmb('rustle', { volume: rand(0.06, 0.12) * gnd, pitch: rand(0.5, 0.8) });
               ambTimer = rand(7, 15) * (1 + sky * 1.6);
             } else if (r < 0.84 && alt < 6) {
-              sfx('gull', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.8) });
+              sysAmb('gull', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.8) });
               ambTimer = rand(10, 22);
             } else {
-              sfx('chime', { volume: rand(0.07, 0.14) * gnd, pitch: rand(0.45, 0.62) });
+              sysAmb('chime', { volume: rand(0.07, 0.14) * gnd, pitch: rand(0.45, 0.62) });
               ambTimer = rand(14, 30) * (1 + sky * 1.6);
             }
           } else if (bio === 'sahara') {
@@ -15423,16 +16098,16 @@ export function createSystems(game) {
             const st = sa ? sa.storm() : 0;
             const east = capy && capy.position && capy.position.x > 150;
             if (st > 0.25) {
-              sfx('hiss', { volume: rand(0.20, 0.34), pitch: rand(0.7, 1.1) });
+              sysAmb('hiss', { volume: rand(0.20, 0.34), pitch: rand(0.7, 1.1) });
               ambTimer = rand(1.4, 3.0);
             } else if (east) {
-              sfx('hiss', { volume: rand(0.06, 0.13), pitch: rand(0.5, 0.8) });
+              sysAmb('hiss', { volume: rand(0.06, 0.13), pitch: rand(0.5, 0.8) });
               ambTimer = rand(9, 20);
             } else {
               const r = Math.random();
-              if (r < 0.4) sfx('horn', { volume: rand(0.07, 0.13), pitch: rand(1.7, 2.3) });
-              else if (r < 0.7) sfx('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
-              else sfx('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
+              if (r < 0.4) sysAmb('horn', { volume: rand(0.07, 0.13), pitch: rand(1.7, 2.3) });
+              else if (r < 0.7) sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
+              else sysAmb('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
               ambTimer = rand(5, 12);
             }
           } else if (bio === 'manly') {
@@ -15444,16 +16119,16 @@ export function createSystems(game) {
             // from the tower, and somebody's radio.
             const r = Math.random();
             if (r < 0.42) {
-              sfx('gull', { volume: rand(0.09, 0.17), pitch: rand(0.95, 1.3) });
+              sysAmb('gull', { volume: rand(0.09, 0.17), pitch: rand(0.95, 1.3) });
               ambTimer = rand(5, 12);
             } else if (r < 0.62) {
-              sfx('whistle', { volume: rand(0.06, 0.11), pitch: rand(1.5, 1.9) });
+              sysAmb('whistle', { volume: rand(0.06, 0.11), pitch: rand(1.5, 1.9) });
               ambTimer = rand(12, 26);
             } else if (r < 0.82) {
-              sfx('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.2, 1.5) });
+              sysAmb('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.2, 1.5) });
               ambTimer = rand(10, 20);
             } else {
-              sfx('hiss', { volume: rand(0.07, 0.13), pitch: rand(1.1, 1.5) });
+              sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(1.1, 1.5) });
               ambTimer = rand(8, 16);
             }
           } else if (bio === 'pantanal') {
@@ -15476,14 +16151,14 @@ export function createSystems(game) {
             if (frogs) {
               // the frog wall. Two notes, very close together, and the gap
               // between them shrinks to nothing as the light goes.
-              if (Math.random() < 0.6) sfx('tick', { volume: rand(0.06, 0.13) * pdk, pitch: rand(0.5, 0.7) });
-              else sfx('bark', { volume: rand(0.05, 0.11) * pdk, pitch: rand(1.5, 2.0) });
+              if (Math.random() < 0.6) sysAmb('tick', { volume: rand(0.06, 0.13) * pdk, pitch: rand(0.5, 0.7) });
+              else sysAmb('bark', { volume: rand(0.05, 0.11) * pdk, pitch: rand(1.5, 2.0) });
               ambTimer = rand(0.9, 2.4);
-            } else if (r < 0.30) sfx('gull', { volume: rand(0.08, 0.15) * (1 - pdk * 0.7), pitch: rand(0.55, 0.85) });
-            else if (r < 0.52) sfx('pop', { volume: rand(0.07, 0.13), pitch: rand(2.2, 3.0) });
-            else if (r < 0.72) sfx('chime', { volume: rand(0.05, 0.11), pitch: rand(1.6, 2.2) });
-            else if (r < 0.88) sfx('rustle', { volume: rand(0.07, 0.13), pitch: rand(0.8, 1.2) });
-            else sfx('bark', { volume: rand(0.05, 0.10), pitch: rand(0.6, 0.9) });
+            } else if (r < 0.30) sysAmb('gull', { volume: rand(0.08, 0.15) * (1 - pdk * 0.7), pitch: rand(0.55, 0.85) });
+            else if (r < 0.52) sysAmb('pop', { volume: rand(0.07, 0.13), pitch: rand(2.2, 3.0) });
+            else if (r < 0.72) sysAmb('chime', { volume: rand(0.05, 0.11), pitch: rand(1.6, 2.2) });
+            else if (r < 0.88) sysAmb('rustle', { volume: rand(0.07, 0.13), pitch: rand(0.8, 1.2) });
+            else sysAmb('bark', { volume: rand(0.05, 0.10), pitch: rand(0.6, 0.9) });
             if (!frogs) ambTimer = rand(2.6, 6.5) * (1 - pdk * 0.45);
           } else if (bio === 'antarctic') {
             // THE EMPTIEST SOUNDSCAPE IN THE GAME, emptier than the Drift's,
@@ -15498,23 +16173,23 @@ export function createSystems(game) {
             const podK = an ? an.withPod() : 0;
             const rr = Math.random();
             if (podK > 0.35) {
-              if (rr < 0.55) sfx('splash', { volume: rand(0.12, 0.22), pitch: rand(0.36, 0.52) });
-              else sfx('hiss', { volume: rand(0.10, 0.18), pitch: rand(0.28, 0.40) });
+              if (rr < 0.55) sysAmb('splash', { volume: rand(0.12, 0.22), pitch: rand(0.36, 0.52) });
+              else sysAmb('hiss', { volume: rand(0.10, 0.18), pitch: rand(0.28, 0.40) });
               ambTimer = rand(2.2, 5.0);
             } else if (packK > 0.4) {
-              sfx('rustle', { volume: rand(0.07, 0.14), pitch: rand(0.34, 0.52) });
+              sysAmb('rustle', { volume: rand(0.07, 0.14), pitch: rand(0.34, 0.52) });
               ambTimer = rand(5, 11);
             } else if (rr < 0.34) {
-              sfx('hiss', { volume: rand(0.07, 0.14), pitch: rand(0.26, 0.40) });
+              sysAmb('hiss', { volume: rand(0.07, 0.14), pitch: rand(0.26, 0.40) });
               ambTimer = rand(12, 26);
             } else if (rr < 0.62) {
-              sfx('bark', { volume: rand(0.05, 0.11), pitch: rand(1.7, 2.4) });
+              sysAmb('bark', { volume: rand(0.05, 0.11), pitch: rand(1.7, 2.4) });
               ambTimer = rand(9, 19);
             } else if (rr < 0.84) {
-              sfx('splash', { volume: rand(0.05, 0.10), pitch: rand(0.40, 0.60) });
+              sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.40, 0.60) });
               ambTimer = rand(10, 21);
             } else {
-              sfx('gull', { volume: rand(0.05, 0.10), pitch: rand(1.6, 2.1) });
+              sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(1.6, 2.1) });
               ambTimer = rand(16, 34);
             }
           } else if (bio === 'cave') {
@@ -15524,13 +16199,13 @@ export function createSystems(game) {
             // silent, it is EMPTY, and the difference between the two is that
             // an empty place lets you hear how big it is.
             const r = Math.random();
-            if (r < 0.44) sfx('tick', { volume: rand(0.10, 0.19), pitch: rand(0.35, 0.55) });
-            else if (r < 0.70) sfx('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.62) });
-            else if (r < 0.88) sfx('pop', { volume: rand(0.05, 0.10), pitch: rand(3.0, 4.2) });
-            else sfx('thud', { volume: rand(0.05, 0.11), pitch: rand(0.28, 0.42) });
+            if (r < 0.44) sysAmb('tick', { volume: rand(0.10, 0.19), pitch: rand(0.35, 0.55) });
+            else if (r < 0.70) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.62) });
+            else if (r < 0.88) sysAmb('pop', { volume: rand(0.05, 0.10), pitch: rand(3.0, 4.2) });
+            else sysAmb('thud', { volume: rand(0.05, 0.11), pitch: rand(0.28, 0.42) });
             ambTimer = rand(6, 17);
           } else {
-            // THROUGH sfx(), NEVER sfxGull() DIRECTLY. The direct call passed no
+            // THROUGH sysAmb(), NEVER sfxGull() DIRECTLY. The direct call passed no
             // volume, so pk went NaN, exponentialRampToValueAtTime threw, and the
             // throw landed in systems.update — four strikes and main.js dropped
             // the whole module, taking the camera, the input poll and the HUD with
@@ -15538,11 +16213,37 @@ export function createSystems(game) {
             // bug, and it could only ever fire in Sydney and Quay because every
             // other biome above already goes through the dispatcher. The defaults
             // it fills in (volume 1, pitch 1) are exactly what the bare call meant.
-            sfx('gull');
+            sysAmb('gull');
             ambTimer = rand(8, 20);
           }
         }
       }
+    }
+
+    // ---- THE CALM, which is the whole of it: one number, three readers ----
+    // Asymmetric on purpose (sysCALM_RISE vs sysCALM_FALL): eight seconds of
+    // genuine stillness to earn, one step to lose. Chaos suppresses the target
+    // rather than the value, so a bin going over across the square does not
+    // wipe a hold — it just stops it growing while the noise is live.
+    {
+      // restT, NOT stillT. Carrying something is not a way of being busy —
+      // see the two timers in capybara.js. Reading stillT here collapsed the
+      // whole field the instant the animal picked anything up.
+      const still = (game.capy && game.capy.restT) || 0;
+      const want = clamp(still / sysCALM_FULL, 0, 1) *
+                   clamp(1 - game.state.chaos * sysCALM_CHAOS, 0, 1);
+      sysCalmNow = damp(sysCalmNow, want, want > sysCalmNow ? sysCALM_RISE : sysCALM_FALL, dt);
+      game.state.calm = sysCalmNow;
+      // ...and the animals. Only the live chapter's, because the other sixteen
+      // chapters' flee radii are not being tested against anything.
+      const live = game.biome && game.biome.current;
+      for (let i = 0; i < sysCritters.length; i++) {
+        const cr = sysCritters[i];
+        if (cr.biome !== live) continue;
+        cr.calm = sysCalmNow;
+        cr.near = cr.r * (1 - sysCalmNow * cr.k * sysCALM_CRIT);
+      }
+      musCalm = sysCalmNow;
     }
 
     // ---- music intensity: a shift in mood on a chase, never a stinger ----
@@ -15560,12 +16261,23 @@ export function createSystems(game) {
       // direction: a chase DUCKS the pad to make room for the noise, a wow opens
       // it. Both are folded in here because this is the only writer either
       // parameter has — see musSwell().
+      //
+      // ...AND THE CALM IS THE SAME THREE PARAMETERS, THE OTHER WAY.
+      // A chase ducks the pad and opens the filter to make room for noise. A
+      // held stillness does the reverse: the pad comes up, the filter closes,
+      // and the bass thins out — which is not "quieter", it is CLOSER. The
+      // filter and the bass terms are proportional rather than absolute
+      // because the palettes run from cut 470 to cut 1320 and a flat 500 Hz
+      // subtraction would take the Drift's pad below its own fundamental.
       const lift = musLift * musLiftEnv();
-      musPad.gain.setTargetAtTime(musPal.bus * (1 - musIntensity * 0.3) * (1 + 0.5 * lift),
+      musPad.gain.setTargetAtTime(musPal.bus * (1 - musIntensity * 0.3) *
+        (1 + 0.5 * lift) * (1 + musCalm * sysCALM_MUS),
         nowA, lift > 0.02 ? 0.6 : 1.2);
-      musFilt.frequency.setTargetAtTime(musPal.cut + musIntensity * 780 + lift * 1100,
+      musFilt.frequency.setTargetAtTime(musPal.cut * (1 - musCalm * 0.22) +
+        musIntensity * 780 + lift * 1100,
         nowA, lift > 0.02 ? 0.7 : 1.4);
-      musBassGain.gain.setTargetAtTime(musPal.bass + musIntensity * 0.08 + lift * 0.05, nowA, 1.5);
+      musBassGain.gain.setTargetAtTime(musPal.bass * (1 - musCalm * 0.30) +
+        musIntensity * 0.08 + lift * 0.05, nowA, 1.5);
       // the thickening layer: silent at zero tasks, a shimmer at all of them
       if (musShimGain) musShimGain.gain.setTargetAtTime(0.0001 + musProg * 0.85, nowA, 2.5);
       // ---- THE AURORA'S CHOIR ------------------------------------------

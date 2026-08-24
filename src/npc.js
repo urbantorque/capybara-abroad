@@ -913,6 +913,15 @@ export function createNPCs(game) {
     // is watching you is not a person accusing you of anything specific.
     wary:     ['You again.', 'I am watching you.', 'Mm.', 'I know what you are.',
                'Not this time.', 'I have got my eye on you.', 'Oh, it is back.'],
+    // ---- ...AND ONE FOR SOMEBODY WHO HAS DECIDED YOU ARE FINE (v22) ------
+    // The mirror of `wary`, to the same chapter-neutral standard: no season,
+    // no country, no building, and — the harder rule — nothing that assumes
+    // you did anything. Familiarity in this game is earned by being present
+    // and harmless, so every line here has to be sayable to an animal that has
+    // done nothing whatsoever except stand there for a while.
+    fam:      ['There you are.', 'Back again.', 'Hello, you.', 'Knew you would turn up.',
+               'You are all right, you are.', 'Do not mind you.',
+               'Half expected you.', 'Suppose you live here now.'],
     // ---- AND FOUR MORE, ABOUT THE WEATHER --------------------------------
     // Chapter-neutral to the same standard as the four above: every one of
     // these has to work on a Venetian quay, in a Mong Kok doorway, on an
@@ -982,6 +991,111 @@ export function createNPCs(game) {
   const npcWARY_HEAT  = 0.35;    // over this, npcHeat() counts you as watched
   const npcWARY_BLAME = 7;       // m from an event inside which it was probably you
   const npcWARY_SEE   = 5;       // m of extra notice range at full wariness
+
+  // =======================================================================
+  // ...AND `wary` HAD NO POSITIVE TWIN.
+  //
+  // For two versions a person could remember exactly one thing about you: that
+  // you had done something to them. Every other way of spending time near
+  // somebody — standing there, saying nothing, being harmless for two minutes
+  // — was worth precisely nothing, and a world where the only relationship on
+  // offer is suspicion is not the world this game is about.
+  //
+  // `fam` is the mirror image of `wary` and is built out of exactly the same
+  // three parts, so there is nothing new to learn:
+  //
+  //   IT RISES while you are inside their circle and NOTHING IS HAPPENING —
+  //   which is THE CALM (see systems.js), read once a frame for the whole
+  //   population. Sprinting past somebody does not make you friends.
+  //   IT FALLS the moment `wary` goes up, because being wary of somebody and
+  //   familiar with them at the same time is not a state a person is in.
+  //   IT BUYS ATTENTION AND NOTHING ELSE, exactly like wary: a warmer pool,
+  //   a shorter cooldown, and one line the first time it crosses.
+  //
+  // AND IT IS THE OTHER END OF THE SOFT WHEEK. Wave one gave the animal a
+  // gentle register that had to be earned by settling and that nothing in the
+  // game answered. This is what answers it: a soft wheek at somebody you have
+  // been standing quietly beside is worth four seconds of familiarity, and a
+  // loud one is worth none.
+  //
+  // It denies nothing, gates nothing and cannot be lost by accident. It is
+  // slower to earn than wariness is (npcFAM_T against a single event) and it
+  // fades over a much longer clock, so a chapter you have spent time in is a
+  // chapter whose people know you.
+  const npcFAM_T      = 34;      // s inside somebody's circle, calm, to reach 1
+  const npcFAM_FADE   = 150;     // s from full familiarity back to none
+  const npcFAM_HEAT   = 0.45;    // over this they greet you as somebody they know
+  const npcFAM_WHEEK  = 0.12;    // what one soft wheek in earshot is worth
+  const npcFAM_COOL   = 0.55;    // how far a familiar person's cooldown shortens
+
+  // ---- AND A HUNDRED AND TEN PEOPLE WHO NEVER MOVED A METRE ---------------
+  // The note above (WHAT IS DELIBERATELY NOT HERE) rules out walking, and it
+  // is still right: a local has no nav mesh, no path and no destination, and
+  // giving fifteen chapters one is not a thing this pass may do. But "may not
+  // cross a square" and "may not shift their feet" are not the same sentence,
+  // and the second one is what was actually shipped — every person in fifteen
+  // chapters was welded to a coordinate for the life of the game.
+  //
+  // THE SHUFFLE is the honest amount of movement a fixed point can have, and
+  // it is safe with no navigation at all for one reason: the target is always
+  // within npcLOC_STEP_R of the ANCHOR THE CHAPTER CHOSE. A person can never
+  // leave the square metre they were placed on, so they can never walk into
+  // anything that was not already touching them, and a chapter that put
+  // somebody in a doorway still has somebody in that doorway.
+  //
+  // No legs are drawn: a local's legs are a merged mesh with no joints in it.
+  // What sells it is the bob at step frequency and the lean into the move,
+  // which is what a person shifting their weight actually looks like from the
+  // six metres this game is played at.
+  const npcLOC_STEP_R   = 0.55;  // m from the anchor a person may ever drift
+  const npcLOC_STEP_V   = 0.40;  // m/s. A shuffle, not a walk.
+  const npcLOC_STEP_GAP = 15;    // s between shuffles, jittered hard per person
+  const npcLOC_STEP_BOB = 0.020; // m of step bob while actually moving
+
+  // ---- ...AND NOBODY IN FIFTEEN CHAPTERS EVER SPOKE TO ANYBODY ELSE -------
+  // chatStep — two people turning to each other and having four seconds of
+  // conversation that is not about you — is the best thing the Sydney crowd
+  // does, and it ran in two chapters of seventeen because it is written
+  // against the roster shape that only those two have. The locals are a
+  // different shape (a fixed point with a speech anchor, not a state machine
+  // with a nav target), so this is its twin rather than a rewrite of it.
+  //
+  // THE POOL IS HELD TO THE npcLOC_SAY STANDARD: every line has to work on a
+  // Venetian quay, in a Mong Kok doorway, on an Antarctic jetty and inside a
+  // mountain, which rules out naming a season, a country, a month or a
+  // building. What is left is what two people who see each other every day
+  // actually say to each other, which is almost nothing, and that is the joke.
+  //
+  // ---- AND THE RADIUS IS THIRTEEN METRES, WHICH WAS MEASURED --------------
+  // The first cut was 4.6 m, on the reasoning that a conversation happens at
+  // conversational distance. Then the closest pair of locals in every chapter
+  // was measured, and 4.6 m is a radius at which this feature does not exist:
+  //
+  //   under 4.6 m   Cali 4.20 · Marrakech 2.25 · the Pantanal 2.83 — and
+  //                 nowhere else. THREE chapters of fifteen, one pair each.
+  //   under 13 m    twelve of fifteen.
+  //   never         Reykjavik 17.16 · Manly 18.38 · the Drift 36.16.
+  //
+  // A local is a FIXED POINT — that is the whole of what a local is — so unlike
+  // the Sydney crowd, which walks and therefore forms pairs on its own, this
+  // radius is the entire question of whether anybody in fifteen chapters ever
+  // speaks to anybody. Thirteen metres is a word across a square rather than a
+  // confidence, and the pool above is already written for exactly that: every
+  // line in it is a greeting you can call, not a thing you lean in to say.
+  //
+  // The three it never fires in are the right three. Reykjavik's cast is at
+  // separate stalls down a street, Manly's is spread over a hundred and twenty
+  // metres of beach, and the Drift is a chapter about being the only one there.
+  const npcLOC_CHAT_R   = 13.0;  // m apart — near enough to call across to
+  const npcLOC_CHAT_LOOK= 5.0;   // s the pair go on facing each other
+  const npcLOC_CHAT = {
+    open: ['Morning.', 'You are here early.', 'Still here, then.', 'Any news?',
+           'Busy?', 'How is it looking?', 'Did you see that?', 'All right?',
+           'Same again tomorrow.', 'Long one today.'],
+    back: ['Same as ever.', 'Mm.', 'Ask me later.', 'Do not.', 'Could be worse.',
+           'Not really.', 'Every day.', 'It will keep.', 'Nearly done.',
+           'You said that yesterday.'],
+  };
 
   // =======================================================================
   // ...AND THEY NOTICE THE WEATHER.
@@ -1152,6 +1266,19 @@ export function createNPCs(game) {
       fl: 0, flV: 0,            // the flinch spring
       flYaw: 0,                 // ...and which way to turn while it runs
       rushWas: false,
+      // ---- THE SHUFFLE. `ax/az` is the anchor the chapter chose and is the
+      // only thing that is ever measured against; x/z is where they have got
+      // to, and it may never be more than npcLOC_STEP_R from it.
+      ax: o.x !== undefined ? o.x : (g ? g.position.x : 0),
+      az: o.z !== undefined ? o.z : (g ? g.position.z : 0),
+      tx: o.x !== undefined ? o.x : (g ? g.position.x : 0),
+      tz: o.z !== undefined ? o.z : (g ? g.position.z : 0),
+      stepT: rand(2, npcLOC_STEP_GAP * 1.6), moving: 0, mv: 0,
+      // ---- FAMILIARITY (see the block above `wary`) ----
+      fam: 0, famWas: false,
+      // ---- and who they are talking to, if anybody. `chatT` is how long they
+      // go on facing them for; it beats the watch and loses to the flinch.
+      chatT: 0, chatYaw: 0,
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -1278,21 +1405,43 @@ export function createNPCs(game) {
     rec.gest = 1.5 + line.length * 0.045;   // as long as the bubble, near enough
     rec.anchor.speak(line);
   }
-  function localsSay(kind) {
+  function localsSay(kind, payload) {
     // The wheek reaches everybody in earshot, which is a wider circle than the
     // one that starts a conversation - being shouted at from across a square is
     // exactly the sort of thing that gets a reaction out of a stranger.
     const capy = game.capy;
     if (!capy || !capy.position) return;
     const live = game.biome && game.biome.current;
+    // ---- AND THE SOFT ONE IS A DIFFERENT SENTENCE ------------------------
+    // Wave one gave the animal a gentle register that has to be earned by
+    // settling first, and nothing anywhere in the game answered it: every
+    // listener got the same event with one extra boolean nobody read. This is
+    // the answer. A soft wheek at somebody is worth npcFAM_WHEEK of
+    // familiarity — about eight of them from cold, or one on top of a minute
+    // of standing quietly beside them — and once they are familiar it is
+    // ANSWERED DIFFERENTLY: from the fam pool rather than the wheek pool,
+    // which is the whole of the reward and is exactly the right size for it.
+    const soft = !!(payload && payload.soft);
     let said = 0;
     for (let i = 0; i < locals.length && said < 2; i++) {
       const r = locals[i];
-      if (r.biome !== live || r.cd > 0) continue;
+      if (r.biome !== live) continue;
       const dx = capy.position.x - r.x, dz = capy.position.z - r.z;
       if (dx * dx + dz * dz > (r.near * 1.9) * (r.near * 1.9)) continue;
-      r.cd = r.cool * rand(0.7, 1.3);
-      localLine(r, (kind === 'wheek' && r.wheekLines) ? r.wheekLines : r.lines);
+      // The familiarity lands whether or not they are free to speak: being on
+      // a cooldown is a fact about their mouth and not about their memory.
+      if (soft && kind === 'wheek' && (r.wary || 0) < npcWARY_HEAT) {
+        r.fam = Math.min(1, r.fam + npcFAM_WHEEK);
+      }
+      if (r.cd > 0) continue;
+      // A familiar person answers a soft call warmly. A loud one always gets
+      // the chapter's own written line, so nothing an author wrote is ever
+      // replaced by the chapter-neutral pool.
+      const famAns = soft && kind === 'wheek' && r.fam > npcFAM_HEAT &&
+                     (r.wary || 0) <= npcWARY_HEAT;
+      r.cd = r.cool * rand(0.7, 1.3) * (r.fam > npcFAM_HEAT ? npcFAM_COOL : 1);
+      localLine(r, famAns ? (r.says.fam || npcLOC_SAY.fam)
+                          : (kind === 'wheek' && r.wheekLines) ? r.wheekLines : r.lines);
       said++;
     }
   }
@@ -1522,6 +1671,11 @@ export function createNPCs(game) {
     const rushing = csp > npcLOC_RUSH_V;
     const wxRain = npcWxRain, wxGustS = npcWxGustS, wxGustX = npcWxGustX;
     const wxGustZ = npcWxGustZ, wxMotes = npcWxMotes, wxCold = npcWxCold;
+    // Read ONCE for the whole population, for the same reason the weather is:
+    // it is the same number for all of them and asking systems.js a hundred
+    // and ten times a frame for one float is the cost that only shows up in
+    // the chapter with the most people in it. See THE CALM in systems.js.
+    const calmNow = typeof game.calm === 'function' ? game.calm() : 0;
     for (let i = 0; i < locals.length; i++) {
       const r = locals[i];
       if (r.biome !== live) continue;
@@ -1546,6 +1700,31 @@ export function createNPCs(game) {
         if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
       }
       r.waryWas = nearNow;
+      // ---- FAMILIARITY: what they remember about you being HARMLESS ------
+      // Same shape as wariness and the same arithmetic, pointed the other way.
+      // The rise needs three things at once — you inside their circle, the
+      // world calm, and them not currently wary of you — which is why it takes
+      // most of a minute of genuinely standing about and cannot be farmed by
+      // running laps. The fall is a long slow linear fade, because this is the
+      // half of a memory that ought to outlast the other half.
+      if (near && calmNow > 0.25 && (r.wary || 0) < npcWARY_HEAT) {
+        r.fam += (dt / npcFAM_T) * calmNow;
+        if (r.fam > 1) r.fam = 1;
+      } else if (r.fam > 0) {
+        // Being wary of somebody takes it away faster than time does. It does
+        // not zero it: one startled shout should not erase five minutes.
+        r.fam -= dt / ((r.wary || 0) > npcWARY_HEAT ? npcFAM_FADE * 0.12 : npcFAM_FADE);
+        if (r.fam < 0) r.fam = 0;
+      }
+      // ...and the one line, once, when they first decide you are all right —
+      // on the same rising edge the wary line uses, and it loses to it, since
+      // somebody who is watching you has not decided you are all right.
+      const famNow = near && r.fam > npcFAM_HEAT && (r.wary || 0) <= npcWARY_HEAT;
+      if (famNow && !r.famWas && !nearNow && r.cd <= 0) {
+        const arr = r.says.fam || npcLOC_SAY.fam;
+        if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
+      }
+      r.famWas = famNow;
       // ---- ...and you just went past them at a sprint -------------------
       // A rising edge on "close AND fast", so one pass is one reaction and
       // running circles round somebody is not a machine gun (their own
@@ -1633,6 +1812,47 @@ export function createNPCs(game) {
         if (r.fl > 0.4) { r.fl = 0.4; if (r.flV > 0) r.flV = 0; }
         if (Math.abs(r.fl) < 0.004 && Math.abs(r.flV) < 0.04) { r.fl = 0; r.flV = 0; }
       }
+      // ---- THE SHUFFLE ---------------------------------------------------
+      // Only a person this module BUILT, which is the same gate the umbrella
+      // takes and it is here for a stronger reason: a chapter that handed over
+      // its own Group may have merged that person into a jetty, a stall or a
+      // boat, and sliding it half a metre would take the jetty with it — or,
+      // worse, leave the person standing beside the thing they are part of.
+      if (r.fig) {
+        r.stepT -= dt;
+        if (r.stepT <= 0) {
+          r.stepT = npcLOC_STEP_GAP * rand(0.45, 2.1);
+          // A new spot, measured from the ANCHOR and never from where they
+          // have got to — which is what stops a random walk from wandering off
+          // across the square one step at a time.
+          const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
+          r.tx = r.ax + Math.sin(a) * rr;
+          r.tz = r.az + Math.cos(a) * rr;
+        }
+        const sx = r.tx - r.x, sz = r.tz - r.z;
+        const sd = Math.sqrt(sx * sx + sz * sz);
+        if (sd > 0.012) {
+          const step = Math.min(sd, npcLOC_STEP_V * dt);
+          r.x += sx / sd * step;
+          r.z += sz / sd * step;
+          r.moving = 1;
+          r.group.position.x = r.x;
+          r.group.position.z = r.z;
+          // The speech bubble hangs off a bare point, so it has to be dragged
+          // along by hand or a shuffled person talks from where they used to be.
+          r.anchor.group.position.x = r.x;
+          r.anchor.group.position.z = r.z;
+          // ...and so does the collider, or a person is solid where they were
+          // rather than where they are. It is a static body, so all three of
+          // cannon's position fields have to be written: the solver reads
+          // `position`, and the render interpolation reads the other two.
+          if (r.body) {
+            r.body.position.x = r.x; r.body.position.z = r.z;
+            r.body.previousPosition.x = r.x; r.body.previousPosition.z = r.z;
+            r.body.interpolatedPosition.x = r.x; r.body.interpolatedPosition.z = r.z;
+          }
+        } else r.moving = 0;
+      }
       // ---- they watch you go past --------------------------------------
       if (r.group) {
         // Twice the talking radius: you are noticed a long way before you are
@@ -1641,7 +1861,19 @@ export function createNPCs(game) {
         // ...and while a flinch is running they are looking at whatever just
         // went off, not at you. That is the whole point of turning round.
         const flin = r.fl < -0.02;
-        const want = flin ? r.flYaw : watch ? Math.atan2(dx, dz) : r.face;
+        // FIVE THINGS CAN OWN A HEAD AND THEY ARE STRICTLY RANKED. A bang beats
+        // the person you are talking to; the person you are talking to beats
+        // the capybara — which is the whole tell that a conversation is not
+        // aimed at the player and is the same rule chatStep uses in Sydney;
+        // the capybara beats where you are walking; and where you are walking
+        // beats the direction the chapter put you in.
+        if (r.chatT > 0) r.chatT -= dt;
+        r.mv = damp(r.mv, r.moving, 6, dt);
+        const want = flin ? r.flYaw
+                   : r.chatT > 0 ? r.chatYaw
+                   : watch ? Math.atan2(dx, dz)
+                   : r.moving ? Math.atan2(r.tx - r.x, r.tz - r.z)
+                   : r.face;
         let dyaw = want - r.yaw;
         while (dyaw > Math.PI) dyaw -= 6.283185;
         while (dyaw < -Math.PI) dyaw += 6.283185;
@@ -1669,9 +1901,16 @@ export function createNPCs(game) {
         }
         // ...and the huddle takes a couple of centimetres out of them, which
         // on a figure with no spine is how you draw shoulders coming up.
+        // ...and while they are shuffling there is a second, faster bob on top
+        // of the breathing, at step frequency. It is the whole animation: the
+        // legs are a merged mesh with no joints in them, so weight going up
+        // and down is the only honest way to draw somebody taking a step, and
+        // at the six metres this game is played at it is enough.
         r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB
+                             + r.mv * Math.abs(Math.sin(r.t * 7.4)) * npcLOC_STEP_BOB
                              - f * 0.045 - r.hud * 0.035;
-        r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06;
+        r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06
+                             - r.mv * 0.035;
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
@@ -1728,6 +1967,74 @@ export function createNPCs(game) {
         localLine(r, r.lines);
       }
       r.was = near;
+    }
+  }
+
+  // =======================================================================
+  // TWO LOCALS TALKING TO EACH OTHER.
+  //
+  // The twin of chatStep, written against the locals' shape instead of the
+  // Sydney roster's. It is a separate function rather than a generalisation of
+  // that one because the two shapes genuinely have nothing in common: a Sydney
+  // human is a state machine with a nav target, a speech record and a `state`
+  // that has to be calm; a local is a fixed point with a bubble anchor and a
+  // cooldown. Forcing one function to read both would be four `||`s in the hot
+  // loop for the sake of not having twenty lines twice.
+  //
+  // Same two-countdown structure and the same reason for it (see chatStep):
+  // the SCAN is cheap and frequent, the CONVERSATION is slow, and the reply is
+  // owed from a later frame so that the pair are not both talking at once.
+  // =======================================================================
+  let locChatT = rand(3, 8);
+  let locChatRec = null, locChatWhen = 0;
+  function localsChat(dt) {
+    if (locChatRec) {
+      locChatWhen -= dt;
+      if (locChatWhen <= 0) {
+        const b = locChatRec;
+        locChatRec = null;
+        // ...unless something has happened to them in the meantime, in which
+        // case the question simply hangs, which is the better joke anyway —
+        // the same rule chatStep landed on for the same reason.
+        if (b.biome === (game.biome && game.biome.current) && b.fl > -0.02) {
+          b.cd = b.cool * rand(0.7, 1.2);
+          localLine(b, npcLOC_CHAT.back);
+        }
+      }
+      return;
+    }
+    locChatT -= dt;
+    if (locChatT > 0) return;
+    locChatT = rand(2.5, 5.5);
+    if (locals.length < 2) return;
+    const live = game.biome && game.biome.current;
+    // ONE PROBE FROM A RANDOM START, never an O(n²) sweep: this runs in the
+    // chapter with a hundred and ten people in it and a failed scan has to be
+    // affordable three times a minute.
+    const n = locals.length;
+    const s0 = randInt(0, n - 1);
+    for (let k = 0; k < n; k++) {
+      const a = locals[(s0 + k) % n];
+      if (!a || a.biome !== live || !a.group || a.cd > 0 || a.fl < -0.02) continue;
+      for (let j = 1; j < n; j++) {
+        const b = locals[(s0 + k + j) % n];
+        if (!b || b === a || b.biome !== live || !b.group || b.cd > 0 || b.fl < -0.02) continue;
+        const dx = a.x - b.x, dz = a.z - b.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > npcLOC_CHAT_R * npcLOC_CHAT_R || d2 < 0.04) continue;
+        // They turn to each other, which is most of what sells it, and they go
+        // on facing each other for a few seconds after the words have gone —
+        // a conversation that ends the instant the bubble does reads as two
+        // people being ventriloquised.
+        a.chatYaw = Math.atan2(b.x - a.x, b.z - a.z); a.chatT = npcLOC_CHAT_LOOK;
+        b.chatYaw = Math.atan2(a.x - b.x, a.z - b.z); b.chatT = npcLOC_CHAT_LOOK;
+        a.cd = a.cool * rand(0.9, 1.5);
+        localLine(a, npcLOC_CHAT.open);
+        locChatRec = b;
+        locChatWhen = rand(1.4, 2.3);
+        locChatT = rand(11, 28);     // ...and now the long one, so it is not a chorus
+        return;
+      }
     }
   }
 
@@ -3105,8 +3412,10 @@ export function createNPCs(game) {
 
   game.events.on('capy:wheek', (p) => {
     // The locals are in whatever chapter they were registered in, so they hear
-    // this BEFORE the Sydney gate rather than after it.
-    localsSay('wheek');
+    // this BEFORE the Sydney gate rather than after it. The payload goes with
+    // it because `soft` is what tells them whether they were called to or
+    // shouted at — see localsSay.
+    localsSay('wheek', p);
     if (!biomeLive()) return;              // wheeking in Pasto is Pasto's problem
     const sx = p && p.position ? p.position.x : capyX;
     const sz = p && p.position ? p.position.z : capyZ;
@@ -6457,6 +6766,7 @@ export function createNPCs(game) {
       // that could only happen on one lawn in the world.
       if (paLive()) chatStep(dt, paCast);
       localsStep(dt);
+      localsChat(dt);
       npcExStep(dt);
       updateBubbles(dt);
       return;

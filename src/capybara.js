@@ -444,6 +444,7 @@ let capyIdlePitch = 0;              // ...and the head's own nod, on top of the 
 let capyIdleCrouch = 0;             // m of hunch, folded into the model's bob
 let capyIdleEar = 0;                // 0..1 ears flattened
 let capyIdleChew = 0;               // 0..1 jaw, on top of the wheek's
+let capyChewT = 0;                  // s of real chewing left — see THE GRAZE in props.js
 let capyIdleBreath = 0;             // 0..1 slower, deeper breathing
 let capyBreathPh = 0;               // the breath's own phase, so its RATE may change
 let capyHeadPitch = 0;
@@ -474,7 +475,8 @@ let capyRefuseT = 0;                // throttle on the blown hop
 let capyWhiffCool = 0;              // ...and on the grab that found nothing
 let capyWhiffT = 0;                 // s left of the whiffed reach's head dip
 let capyWhiffPend = false;          // a grab attempt found nothing THIS frame
-let capyStillT = 0;                 // s settled — see capyWHEEK_CALM_T
+let capyStillT = 0;                 // s settled, mouth EMPTY — see capyWHEEK_CALM_T
+let capyRestT  = 0;                 // ...and the same with something in it. See THE CALM.
 let capyWakeT = 0;
 let capyBreathAmt = 0;
 let capyStageTime = 0;
@@ -1348,6 +1350,8 @@ export function createCapybara(game) {
     stamina: 1,                      // 0..1, drawn by systems.js
     slip: 0,                         // 0..1, how little the floor is holding on
     grade: 0,                        // signed gradient underfoot, + is uphill
+    stillT: 0,                       // s settled with an EMPTY mouth (the soft wheek)
+    restT: 0,                        // ...and with anything in it. THE CALM reads this.
 
     // The velocity of the FRAME the animal is currently solving in — a deck, the
     // air, a river. Published because "is the world moving under me, and how
@@ -1438,6 +1442,14 @@ export function createCapybara(game) {
 
   // ears snap on the beat the gardener shouts
   game.events.on('npc:chase', function () { capyEarFlick = 1; capyEarTimer = rand(1.4, 3.0); });
+  // ...and the jaw works when a bite is actually taken out of something. The
+  // event is props.js's — this module owns the model and nothing else does, so
+  // the animation for the game's newest verb lives here and the rule for WHEN
+  // it happens lives over there. See THE GRAZE in props.js.
+  game.events.on('capy:graze', function () {
+    capyChewT = 0.85;
+    capyEarFlick = 1; capyEarTimer = rand(0.8, 1.6);
+  });
   // ---- CROSSING A BORDER CLEARS EVERY LATCH IN THIS MODULE ----------------
   // Every biome is authored in the same coordinates, so a stateful latch that
   // survives travel is a bug waiting to happen somewhere it makes no sense —
@@ -1631,7 +1643,8 @@ export function createCapybara(game) {
     // capybara steps off the ferry mid-shiver, or with its head still turned to
     // a bollard eleven metres astern. capyStillT stays at zero because being at
     // the helm is not settling, and a wheek from the wheel is not a soft one.
-    capyStillT = 0;
+    capyStillT = 0; capyRestT = 0;
+    capy.stillT = 0; capy.restT = 0; // ...and the calm reads the published ones
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
     capyIdleAct = -1; capyIdleT = 0;
@@ -2532,12 +2545,31 @@ export function createCapybara(game) {
     // Not "am I still this frame" but "how long have I been". Every one of
     // these is a way of being busy, and any of them resets the clock, so the
     // soft register can only ever be reached deliberately.
-    if (mag > 0.02 || groundSpeed > 0.35 || !grounded || capySwimming ||
-        capyClinging || carried || capyDiving || capy.heldProp) {
-      capyStillT = 0;
-    } else {
-      capyStillT += dt;
-    }
+    //
+    // ---- ...AND THERE ARE TWO OF THEM, WHICH IS ONE MORE THAN THERE WAS ----
+    // `capyRestT` is the same list with `heldProp` taken out of it, and the
+    // reason it exists is that carrying something is not a way of being busy —
+    // it is a way of standing there. THE CALM (systems.js) and THE GRAZE
+    // (props.js) both want "how long has this animal been doing nothing", and
+    // both were measured against the wrong one: a capybara that had picked up
+    // a sandwich could never reach a settled state at all, so the whole calm
+    // field collapsed the moment you took anything into your mouth and the
+    // graze — whose entire precondition is standing still holding food — could
+    // not fire in any circumstance whatsoever.
+    //
+    // `capyStillT` KEEPS ITS ORIGINAL MEANING TO THE LETTER. It is the soft
+    // wheek's, its list has not changed, and an empty mouth is part of what
+    // that register means. Two names because they are two questions.
+    const capyBusy = mag > 0.02 || groundSpeed > 0.35 || !grounded ||
+                     capySwimming || capyClinging || carried || capyDiving;
+    if (capyBusy || capy.heldProp) capyStillT = 0; else capyStillT += dt;
+    if (capyBusy) capyRestT = 0; else capyRestT += dt;
+    // Published because THE CALM is built on them and systems.js owns that.
+    // How long this animal has been doing nothing is the one input that whole
+    // field has, and re-deriving it over there would be a second copy of the
+    // list above, free to drift from this one. See game.calm() in systems.js.
+    capy.stillT = capyStillT;
+    capy.restT = capyRestT;
 
     if (input.honkPressed) capyWheek();
 
@@ -2965,8 +2997,16 @@ export function createCapybara(game) {
     const jawTarget = capyWheekHold > 0 ? 1 : 0;
     capyJawOpen = damp(capyJawOpen, jawTarget, jawTarget > capyJawOpen ? 30 : 8, dt);
     // ...plus the chew, which is a small working of the jaw ON TOP of the
-    // wheek's, not a second writer of it
-    jawHinge.rotation.x = capyJawOpen * 0.5 + capyIdleChew * 0.16;
+    // wheek's, not a second writer of it — and plus the REAL one, which is a
+    // bite actually being taken out of something (see THE GRAZE in props.js).
+    // Three terms summed rather than three writers of the same value: the idle
+    // chew is a mime and this one is not, and a player holding a sandwich is
+    // entitled to both at once.
+    if (capyChewT > 0) capyChewT -= dt;
+    const chewNow = capyChewT > 0
+      ? (0.5 - 0.5 * Math.cos(capyChewT * Math.PI * 2 * 7)) * clamp(capyChewT / 0.3, 0, 1)
+      : 0;
+    jawHinge.rotation.x = capyJawOpen * 0.5 + capyIdleChew * 0.16 + chewNow * 0.22;
 
     // ears: flick on an idle timer, pinned BACK at speed (negative Rx, because
     // the capybara faces +Z and Rx(+t) tips local +Y toward +Z), and flattened
