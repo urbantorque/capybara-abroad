@@ -2049,6 +2049,317 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE PAYOFF PASS, BATCH ONE (v23 — 25 Aug 2026)
+
+Three jobs: a baseline audit, the mischief economy, and stillness as a verb.
+The theme of the batch is that **two of the three biggest things it found were
+systems that had been written, published and never once asked** — Iceland's
+three water heights and props.js's own gust — and the third was a timer running
+on the wrong clock.
+
+---
+
+### THE MISCHIEF ECONOMY — `npc.js`
+
+`game.state.chaos` has driven the music and the calm field since the day it was
+written and it has never driven one person. A chapter would let you walk off
+with a stallholder's fruit, eat it in front of them and put the crate through a
+window, and the reaction was one line from a pool of nine, from whoever happened
+to be nearest, about nothing in particular.
+
+Three systems, all chapter-neutral, all built out of what the chapters already
+have — people with anchors, props with homes — so no biome file was touched and
+all seventeen got them at once.
+
+**OWNERSHIP.** A prop belongs to whoever stands nearest to **where it lives**
+(`homeX`/`homeZ`), not to where it is now: a prop in the animal's mouth is
+halfway across the square and the person whose it is, is not, so matching on
+home keeps the owner for the whole of the theft, which is the only version of
+this that is funny. Rob it (`capy:grab`) or knock it over at `npcOWN_BANG`
+(6 m/s) and they walk out and get it: `dropOwned()` if you still have it,
+`physRescue` plus a puff if you have put it down. `game.physics.rescue` and
+`game.physics.typeOf` are new, additive exports.
+
+**TWO HARD CEILINGS, AND THEY ARE THE WHOLE SAFETY ARGUMENT** (§THE CATCH-ALL
+STATE). `npcOWN_OUT_T` 10 s walking out, `npcOWN_BACK_T` 14 s walking home, and
+at the second the state is torn down unconditionally and the person is put on a
+course for their own anchor at shuffle speed. There is no branch in which a
+local can be left steering. Plus a LEASH: the prop may never be further than
+`npcOWN_LEASH` (15 m) from the person's anchor or they stop, say so and go back —
+which is what makes this safe to switch on in seventeen chapters at once, because
+nobody can be led away. Measured against a target pinned three metres beyond the
+chaser for ever — the shape that ran the waiter for forty seconds — it ends at
+16 s having gone 10.5 m out, and the person walks back onto their own spot at
+their authored height.
+
+**PRODUCE.** `capy:graze` fires once per bite, carries the prop, and was heard by
+capybara.js for a chew pose and by nobody else. Eat somebody's stock and you get
+a line and a **shoo** — the flinch spring driven at the animal rather than at a
+bang — and then they come for it. Sydney and Pasto are populated by the steering
+cast and not by locals, so they get the same beat through `startle` plus the
+existing `shoo` pool.
+
+**CHAINS.** One reaction line turns every head within `npcCHAIN_R` and exactly
+one of them answers. It cannot ripple: a second look uses `localLine` and not
+`localReactLine`, so it does not arm a third.
+
+**TWO NUMBERS WERE MEASURED RATHER THAN CHOSEN.**
+
+- `npcOWN_R` is **11 m**. The first cut was 5.5 and at that radius five chapters
+  of fifteen had nobody who owned anything. Distance from each prop's home to
+  the nearest local who can walk, closest per chapter: Antarctica 1.8 · Iceland
+  1.9 · Venice 2.1 · Göreme 2.8 · Marrakech 3.6 · Kyoto 3.8 · Manly 4.1 · Quay
+  5.2 · Rio 5.8 · Kowloon 6.2 · **Cali 9.5** — and then nothing until 14.7.
+  **Sơn Đoòng 9.4, the Pantanal 21.3, the Drift 24.0.**
+- `npcCHAIN_R` is **20 m and not the 13 m chat radius**, because hearing somebody
+  and talking to them are different distances. The pair-chat pass measured the
+  closest pair in each chapter: at 13, Reykjavík (17.16), Manly (18.38) and the
+  Drift (36.16) have no pair at all. At 20 the first two come in and the Drift
+  does not, which is correct — its eight people are on separate floating islands
+  and there is no honest radius at which one of them can hear another.
+
+**AND THE STEP TEST HAD TO MOVE.** The blocked-step ray started 0.45 m out —
+clear of the walker's own half-width and nothing else — and a Marrakech
+stallholder chasing a hat 4.4 m away **moved 0.48 m in 18.5 seconds**, because
+their own counter is the first solid thing in front of them and every step read
+as blocked. Most of the people who own anything in this game stand behind the
+thing their stock is on. It starts at 1.20 m now, so a counter is already behind
+them by the time the ray begins and a wall three metres off still stops them.
+
+**ADOPTION: 13 of the 15 locals chapters carry two of the three chains**
+(`qa/pf-mischief.js`). The Drift and Sơn Đoòng do not, and the reason is
+measured, not guessed: their people and their props are 21–24 m apart and the
+Drift's closest pair of people is 36 m. Neither is fixable from `npc.js` — it is
+a chapter-layout matter for the five-pillars passes.
+
+---
+
+### THE GUST BLOWS THINGS ACROSS A SQUARE NOW — `props.js`
+
+v21 left this as the one item that did not land its intent, with the analysis of
+why (a stiction cliff with no band between its sides, because a prop's terminal
+velocity under drag IS the wind speed) and the two mechanisms needed. Both are
+here.
+
+**THE KICK** is a puff, not a force: an impulse a couple of times a second at a
+scattered heading with a vertical component. It arrives all at once, which is
+exactly what continuous drag cannot do, and between puffs ordinary friction
+stops the prop dead.
+
+**THE CAP** stops the kick becoming the cliff: drag may slow anything down at any
+speed, and may not speed anything UP past `physGUST_VMAX` (2.2 m/s) along the
+wind. Only the accelerating component along the wind axis is removed, so a prop
+still gets turned by a gust and never launched, and a thrown frisbee is
+untouched — measured, 9 m/s decays to 0.9 with or without.
+
+**AND THE PUFF WAS MEASURED AGAINST THE CONTACT, NOT AGAINST THE WIND.** The
+first cut was 1.6 m/s and produced 3 cm of net drift in 40 s: jiggle, not travel.
+Single impulses on Manly's sand at friction 0.35, one 0.10 kg prop:
+
+| impulse | distance |
+|---|---|
+| 0.6 m/s | 1 mm |
+| 1.2 m/s | 2 mm |
+| 2.0 m/s | 5 mm |
+| 3.5 m/s | 6 mm |
+| **3.5 m/s + a 1.4 m/s hop** | **0.53 m** |
+| 6.0 m/s | 0.52 m |
+
+**There is a cliff in the IMPULSE too, at about 3.5 m/s and only with a hop, and
+above it one puff is worth half a metre and no more.** So the puff is 4.5 m/s
+with a 1.5 m/s hop at full strength and the ramp is set so only a near-peak gust
+clears the cliff — which is what turbulence actually is.
+
+Measured over 40 s of each chapter's own weather, one dry light prop
+(`qa/pf-gust2.js`):
+
+| chapter | net | path |
+|---|---|---|
+| Manly, 0.10 kg sunglasses | **2.24 m** | 4.94 m |
+| Marrakech, 0.35 kg hat | 0.61 m | 2.53 m |
+| Antarctica, 0.42 kg mug | 0.67 m | 6.76 m |
+| Kyoto · Venice · Göreme · Palawan | **0.00 m** | 0.00 m |
+
+Bounded by `physGUST_ROAM`: 8 m from home, ever. Refused outright for anything
+over `physGUST_LIGHT` (0.6 kg), anything held, owned, planted or frozen, and
+**every souvenir** — seventeen of those are the spine of the journey and none of
+them may blow into the sea.
+
+**A MEASUREMENT TRAP, for whoever retunes this.** Measuring "how far did the
+light props move" over a whole chapter is meaningless: a prop that drifts into
+the surf is carried by `physFlowAt` and `physBUOY_DRIFT`, which are a current and
+not the wind. Manly's dry props moved 1.8 m and its whole light population
+"moved" 29 m in the same run. Filter on `!p.inWater`, and park one prop by hand.
+
+---
+
+### STILLNESS AS A VERB — THE LOAF (`capybara.js`, `systems.js`)
+
+This game rewards being settled — the calm field, the soft wheek, the graze and
+every critter's flee radius all read it — and the animal itself did not do one
+thing differently for it.
+
+```js
+capy.loaf      // 0..1, published. The camera, the score and the critters read it.
+capy.loafAsk   // a biome writes 1 per frame to ASK for it. Cleared every frame.
+```
+
+`capyRestT >= capyLOAF_T` (6.5 s) and it sits down: the model sinks 14.5 cm, the
+nose comes up, the legs fold under — all on the **render** channel, so the
+collider is untouched and sitting cannot change what you are standing on or what
+task you are inside. `capyLOAF_LAM` in, six times faster out. **No new button**:
+the control scheme is settled and this is what the animal does when you stop
+asking it to do anything.
+
+6.5 s is under `sysCALM_FULL` (8.0) on purpose, so the animal sits down a beat
+BEFORE the world goes quiet around it and the sitting reads as the cause of the
+calm rather than as a second symptom of it.
+
+**ON `capyRestT` AND NEVER ON `capyStillT`.** The two lists are one entry apart
+and the entry is `heldProp`. Reading `stillT` would collapse the loaf the moment
+you pick anything up, which is exactly the bug the calm field and the graze each
+shipped with. Measured: with a prop in its mouth, `stillT` 0.0, `restT` 20.7,
+loaf arrives at 4.07 s.
+
+**THREE READERS, which are the three channels a moment in this game has.**
+
+1. **The lens** eases `sysLOAF_DOLLY` (1.15 m) back and `sysLOAF_PITCH` down —
+   measured 7.17 → 7.79 m of reach — multiplied down by the helm, flight and
+   skyward rigs so it never joins a fight over one number.
+2. **The score** gets a wider LEAN rather than a bigger number. `musCalm`
+   saturates at 1 and gets there a beat after the loaf, so adding to it would
+   buy nothing; `sysLOAF_MUS` widens how far the three parameters may go.
+3. **The animals turn round.**
+
+**THE CRITTER REGISTRY INVERTS.** Past `sysCALM_INVERT` (0.72 of loaf) a BOLD
+species stops fleeing and comes over.
+
+```js
+game.addCritter({ biome: 'kyoto', r: 9, bold: 1 })   // bold defaults to 0
+c.appr   // 0..1 published, damped BOTH ways at sysCALM_APPR_L
+c.near   // ...and this is now r * (1 - calm*k*CRIT) * (1 - appr)
+```
+
+**The fleeing half is one line and needs no biome file at all**: every consumer
+of this registry is `if (d < c.near) spook()`, so an animal that has decided to
+come over has a flee radius of nothing and simply stops being startled. The
+approaching half IS the chapter's, because only the chapter knows where its
+animal's feet may go — that is what `appr` is published for.
+
+Adopted per species: **Kyoto's heron 1.0** (it wades off its perch, stops 3.2 m
+short and faces you), **Manly's gulls 0.9**, **Göreme's cats 0.85** (they re-aim
+their NEXT walk rather than being dragged — a cat is never seen to decide, only
+to have arrived — and then flop), **Iceland's sheep 0.7**. Everything else
+defaults to `bold: 0` and is untouched, so no chapter starts walking animals at
+the player because a shared file changed under it.
+
+Measured in Kyoto: flee radius 8.66 → 0.00, `appr` 0 → 1, and the loaf breaks
+0.17 s after a key.
+
+**AND THE LOAF FEEDS THE CALM FIELD**, `Math.max(restT/FULL, loaf)`. Everywhere
+except water the two are the same thing; in water `capySwimming` zeroes `restT`,
+correctly, and the animal can still be sat down because a chapter asked.
+
+---
+
+### THE HOT SPRING — A MARQUEE THAT WAS UNDER THE WATER
+
+Iceland's soak is the loaf's marquee adoption, and certifying it found the
+chapter's quietest and best-loved moment failing silently in the one channel a
+metric never checks.
+
+**ICELAND HAS THREE BODIES OF WATER AT TWO HEIGHTS AND NOTHING ASKED.**
+`iceSurfaceY` has answered for all three since it was written; `capyWaterY` only
+calls `waterHeightAt` when the biome declares `localWater`, and Iceland never
+did. So the capybara floated to `waterLevel` — `iceSEA_Y`, −1.0 — inside a hot
+pool drawn at `iceSPRING_Y`, −0.30.
+
+**Measured mid-soak: the top of the drawn animal at −0.594 against a drawn
+surface at −0.300. The whole capybara was 29 cm under the water for the entire
+seven seconds,** reading as a faint dark smudge under a teal sheet.
+
+One flag. After: model top **+0.128**, 43 cm proud, back and head clear, steam
+coming off it. The swim threshold, the float target, the clamber ceiling and the
+wake rings were all already written as offsets from *wherever the water is*, so
+all four become correct for free; the sea and the lagoon are both −1.0 so nothing
+outside the pool moves.
+
+**AND IT SITS IN IT NOW.** `capySwimming` is on the `capyBusy` list — correctly,
+or the animal would sit down mid-crossing in five chapters — so the loaf could
+never arrive in the one place the game explicitly asks for it. `capy.loafAsk` is
+the answer: asked per frame, cleared per frame, so a chapter that stops asking
+cannot leave the animal sat down. The paddle folds away with the legs and the
+model drop is cut to 30% in water, where buoyancy already owns the height.
+Before the calm-field change: loaf 1.00, calm 0.00, so "the score goes soft" did
+not happen in the one place it was written for. 0.99 now. Task still completes
+at 5.52 s.
+
+---
+
+### THE SAVE RAN ON THE WRONG CLOCK
+
+`sysSAVE_DEBOUNCE` promises 700 ms of REAL time and was aged on the SCALED `dt`,
+so the ticks that arrive with the clock slowed down waited 1/scale times as long
+— and those are every marquee (`sysWOW_SLOW` 0.55) and every chapter close (a
+punch, which is a hitstop). **The biggest moment in a chapter had the latest
+save, which is backwards.** Measured: a plain tick wrote at 718 ms, Kyoto's
+marquee at 1046 ms at a live timeScale of 0.62. After: 713 and 719. main.js
+states this rule for hitstop and slow-motion in its own doctrine block; this was
+the one timer that had not taken it.
+
+---
+
+### WHAT WAS MEASURED, IN A BROWSER, AFTER THE BATCH
+
+`qa/pf-soak.js` closes all seventeen chapters twice — once in ACT ORDER, which is
+the only order in which "every declared act was the paper's header" is a fair
+assertion (the header is *the lowest act with anything still open*, so closing an
+act-3 row early legally hides an act-3 header for ever), and once in reverse.
+199 tasks, 0 issues, 0 console errors both ways, all six act chapters showing all
+their headers ascending, the way-on pseudo-row on the paper at the end of every
+one.
+
+`qa/pf-restore.js` saves and reloads at four hostile moments — mid-act,
+mid-carrier, mid-dive, mid-ceremony — and asserts the hostile state was REACHED
+before it asserts anything about the restore. Both of those assertions were
+earned: `g.condor.summon()` once leaves the bird circling high and the mount
+reads `input.actionPressed` (a rising edge), so a held `input.action` never
+boards it; and Palawan's bay is dry 60 m south of the spawn and swimmable 60 m
+north.
+
+`qa/audit-tasks.mjs` 0/0 over 199. `qa/lines.mjs` 0/0 over 426 conditional lines.
+
+`qa/audit-solid.js` on 14–17 and 1–3: nothing new — everything left is on the
+cry-wolf list (instanced vegetation, the terrain shell, the sky dome) or is
+Manly's flag, which is a 5.5 cm pole you are meant to pick up. The audit now
+prints an identity that survives a reload (geometry type, world position,
+triangle count): `o.id` is a global THREE counter and is different on the next
+load, so a report that names a hit by id names nothing an hour later.
+
+`qa/pf-npchealth.js` audits LOCALS for the first time — fifteen chapters' entire
+population, which `qa/npchealth.js` has never looked at — and does it live-gated.
+0 drift, 0 body desync, 0 off-ground. The cry-wolf in the old audit is confirmed
+and named: the steering records carry their chapter in their **id** and nowhere
+else (`npc<n>`/`ibis<n>` for Sydney, `pasto-<kind><n>` for Pasto), and getting
+that wrong reports all 38 of Sydney "stuck, moved 0.0 m" from anywhere else.
+
+`qa/pf-parent.js` checks an invariant nothing had: `physUpdate` skips any prop
+whose mesh is not parented to the scene, which is written for "an NPC picked it
+up and is driving it" and would silently switch off buoyancy, aero, gust, spill
+and tip for anything parented elsewhere for any other reason. 0 of 224 props
+across 17 chapters.
+
+**AND `qa/fuzz.js` WAS RUNNING AGAINST A TITLE SCREEN.** It assumed something
+else had already booted the page and pressed past the card, and when nothing
+had, all seventeen chapters came back identical — `maxSpeed` 0, the same end
+position to the decimetre, no errors — which reads as seventeen clean passes.
+A suite that cannot fail is worse than no suite. It boots and starts the game
+itself now, and it also asserts the three things this batch added: the loaf is
+finite and in range and is DOWN after eight seconds of random keys, no local is
+steering past `npcOWN_OUT_T + npcOWN_BACK_T`, and no light prop is further than
+`physGUST_ROAM` from its home.
+
+
 ## THE DELIGHT PASS, WAVES THREE AND FOUR (v22 — 24 Aug 2026)
 
 Six items over nine files. **If wave one was about code that had been written and

@@ -1,52 +1,104 @@
 # BATCH 1 — Foundation and comedy (Payoff Pass)
 
-Started 25 Aug 2026. Model: claude-opus-5.
+Ran 25 Aug 2026, on `claude-opus-5` as pinned in `.claude/settings.json`.
+Full technical detail is in **CONTRACT.md § THE PAYOFF PASS, BATCH ONE (v23)**.
+Project memory: `capy3-payoff-batch-one`, `capy3-gust-is-an-impulse`,
+`capy3-mischief-radii`.
 
-## Checklist
+## Checklist — all done
 
 ### Job 1 — baseline audit
-- [ ] (a) fresh-save playthrough soak across 17 chapters; two-direction task approach; save/reload at hostile moments; act sequencing + paper
-- [ ] (a) extend qa/pacing.mjs, qa/audit-tasks.mjs, qa/lines.mjs, qa/fuzz.js
-- [ ] (b) solidity/phasing/NPC health ch14-17 + spot 1-3 (audit-solid.js, npchealth.js), live-biome gated
-- [ ] fixes applied + committed
+- [x] (a) fresh-save journey through all 17 chapters, **twice** — act order and
+      reverse. `qa/pf-soak.js`. 199 tasks, 0 issues, 0 console errors both ways.
+- [x] (a) save/reload at four hostile moments — mid-act, mid-carrier, mid-dive,
+      mid-ceremony. `qa/pf-restore.js`. **Found and fixed the save debounce.**
+- [x] (a) extended `qa/fuzz.js` (it was running against a title screen), and
+      added the three new systems to it. `qa/pacing.mjs`, `qa/audit-tasks.mjs`
+      and `qa/lines.mjs` re-run green and needed no change.
+- [x] (b) solidity, phasing and NPC health on 14–17 plus 1–3. No new solidity
+      bugs. `qa/audit-solid.js` extended with a reload-stable identity;
+      `qa/pf-npchealth.js` is new and audits LOCALS, live-gated.
 
 ### Job 2 — the mischief economy
-- [ ] Ownership: local retrieves taken/knocked prop; HARD CEILING on the state
-- [ ] Produce: grazing someone's produce -> line + shoo
-- [ ] Chains: one witness draws a second look
-- [ ] Wind: gust can blow a light prop across a square (turbulent kick + speed cap)
-- [ ] Adoption: >= 2 authored reaction chains per chapter (17 x 2)
+- [x] Ownership, with two hard ceilings and a leash on the prop
+- [x] Produce — a line and a shoo, in locals chapters and in Sydney/Pasto
+- [x] Chains — one reaction turns every head within 20 m, one answers
+- [x] The wind: the turbulent kick plus the speed cap. **Lands its intent.**
+- [x] Adoption: **13 of 15** locals chapters carry two of the three chains
 
 ### Job 3 — stillness as a verb
-- [ ] auto-loaf on capyRestT (NOT capyStillT)
-- [ ] sit posture, camera eases wider, musCalm swells
-- [ ] critter registry INVERTS past calm threshold, per species
-- [ ] Iceland hot-spring soak marquee adoption
+- [x] Auto-loaf on `capyRestT` (asserted, with a prop in the mouth)
+- [x] Sit posture, camera eases wider, the score leans further
+- [x] Critter registry inverts, per species (`bold`), four species adopted
+- [x] Iceland's hot spring — **the marquee was 29 cm under the water**
 
-### Finish
-- [ ] CONTRACT.md new version section
-- [ ] qa audits for new invariants
-- [ ] project memory
-- [ ] qa/BATCH1.md handover
-- [ ] playwright-cli close-all
-- [ ] chain batch 2 (VERY LAST ACTION)
+## FOUND AND FIXED
 
-## Log
+| what | where | how it was found |
+|---|---|---|
+| **The save debounce ran on the SCALED dt.** 700 ms of promised wall clock became 1046 ms on a marquee (timeScale 0.62) — so the biggest tick in a chapter had the latest save. | `systems.js` | reloading 600 ms after Kyoto's last task lost the whole chapter |
+| **Iceland never set `localWater`.** Three bodies of water at two heights, `waterHeightAt` answering for all three since it was written, and `capyWaterY` never asking. The capybara was **29 cm under the drawn surface for the whole seven-second soak**. | `iceland.js` | certifying the loaf's marquee, from the rendered PNG |
+| **`qa/fuzz.js` never started the game.** All seventeen chapters returned identical results with no errors — seventeen clean passes against a title screen. | `qa/fuzz.js` | the results were byte-identical per chapter |
+| **The blocked-step ray switched retrieval off.** Starting 0.45 m out, a stallholder chasing a hat 4.4 m away moved 0.48 m in 18.5 s, because their own counter is the first solid thing in front of them. | `npc.js` | the ceiling drill reported a state that ran its full clock without moving |
+| **`npcOWN_R` at 5.5 m gave five chapters of fifteen nobody who owned anything.** | `npc.js` | the adoption census |
+| **The loaf did not reach the calm field in water**, so "the score goes soft" did not happen in the one place it was written for (loaf 1.00, calm 0.00). | `systems.js` | measuring the soak |
 
-### Log
+## FOUND AND NOT FIXED — for batches 3 and 4
 
-- **Job 1(a)** — `qa/pf-soak.js`: a two-direction fresh-save journey through all 17
-  chapters (act order and reverse). 199 tasks, 0 issues, 0 console errors both ways.
-  Static audits green: `audit-tasks.mjs` 0/0 over 199, `lines.mjs` 0/0 over 426
-  conditional lines, `pacing.mjs` 1 ordinary task short of band (Kyoto) — unchanged.
-- **Job 1(a)** — `qa/pf-restore.js`: save/reload at mid-act, mid-carrier, mid-dive,
-  mid-ceremony. FOUND AND FIXED: the save debounce aged on the SCALED dt, so a marquee
-  tick wrote at 1046 ms against a spec of 700 (713/719 after). `qa/pf-savelag.js`.
-- **Job 1(b)** — solidity 14-17 + 1-3: no new bugs. Everything left is on the
-  cry-wolf list (instanced vegetation, the terrain shell, the sky dome) or is the
-  Manly flag, which is a 5.5 cm pole you are meant to pick up.
-  `qa/audit-solid.js` now prints an identity that survives a reload.
-- **Job 1(b)** — `qa/pf-npchealth.js`: locals audited for the first time (fifteen
-  chapters' entire population). All live-gated. 0 drift, 0 body desync, 0 sunk after
-  the gate was corrected.
-- **Job 2** — the mischief economy landed. See the commit and CONTRACT v23.
+1. **The Drift and Sơn Đoòng carry one reaction chain, not two.** Measured:
+   their people and their props are 21–24 m apart and the Drift's closest pair
+   of people is 36 m. Not fixable from `npc.js`; it is chapter layout. Both
+   chapters get the five pillars in batch 3 (Drift) and batch 4 (Sơn Đoòng) —
+   moving one prop or one person a few metres closes it.
+2. **Only 6 of 17 chapters have any EDIBLE prop at all** (Sydney 7, Pasto 13,
+   Cali 4, Pantanal 3, Kowloon 2, Quay 1). The graze verb, and the produce
+   reaction that hangs off it, cannot fire in the other eleven. One `edible`
+   flag on an existing `physTYPES` row fixes each — a per-chapter design call,
+   so it belongs in the five-pillars passes.
+3. **The critter inversion is adopted by four species of five registrations.**
+   Kyoto's heron, Manly's gulls, Göreme's cats and Iceland's sheep have `bold`
+   and an approach; Circular Quay's gull registers but has neither. Everything
+   else in the game that flees does not use the registry at all. Cheap wins for
+   pillar 3 in every chapter that has an animal.
+4. **`qa/pacing.mjs` still wants one more ordinary task in Kyoto** to reach the
+   20-minute band at 75 s/task. Unchanged from before this batch, and the brief
+   for batch 2 explicitly says do not add tasks — so this is a note, not a job.
+
+## WHAT BATCH 2 NEEDS TO KNOW
+
+- **The mischief economy and the auto-loaf are both in the tree**, so job 4's
+  pillar 2 has something to certify. `qa/pf-mischief.js` and `qa/pf-loaf.js`
+  are the harnesses; both print an `issues` array and are green.
+- **`capy.loaf` (0..1) and `capy.loafAsk`** are published. A chapter that wants
+  the animal to sit somewhere the rest timer cannot reach writes `loafAsk = 1`
+  every frame. The finale in batch 2 job 1 probably wants this.
+- **`game.physics.rescue(prop)`** and **`game.physics.typeOf(type)`** are new
+  additive exports.
+- **`game.hud.calmAudit()`** now also returns `loaf`, and each critter row
+  carries `bold` and `appr`.
+- **A local may now leave its anchor** while `r.own` is set. Any audit asserting
+  "never more than `npcLOC_STEP_R` from the anchor" has to gate on that.
+- **The picker/journal/ledger were not touched.** Nothing in this batch changes
+  the save format; files written before it restore unchanged.
+
+## HARNESS NOTES THAT COST TIME
+
+- `playwright-cli run-code` scripts cannot `require`/`import` node modules and
+  their return value is not printed. Post results to the `/shot` sink as base64
+  JSON (`fetch('/shot?name=x.json', …)`) and read `qa/x.json.png`.
+- The condor needs **two** `summon()` calls (the first leaves it circling high)
+  and the mount reads `input.actionPressed` — a rising edge. Holding
+  `input.action` never boards it.
+- Palawan's bay is **dry 60 m south** of the spawn and swimmable 60 m north.
+- Prop spawn positions are randomised per load, so any chapter-wide prop census
+  is different every run. Park one prop by hand for a measurement.
+- THREE `object.id` is a global counter and changes on every reload; an audit
+  that names a hit by id names nothing an hour later.
+
+## New qa files
+
+`pf-soak.js` · `pf-restore.js` · `pf-savelag.js` · `pf-probe.js` ·
+`pf-npchealth.js` · `pf-solid1417.js` · `pf-mischief.js` · `pf-own-r.js` ·
+`pf-gust.js` · `pf-gust2.js` · `pf-gust3.js` · `pf-gust4.js` · `pf-parent.js` ·
+`pf-loaf.js` · `pf-loafshot.js` · `pf-loafshot2.js` · `pf-soak-ice.js` ·
+`pf-springshot.js` · `pf-springy.js` · `pf-smoke.js`
