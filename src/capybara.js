@@ -2048,6 +2048,19 @@ export function createCapybara(game) {
       const sky = game.weather.wetness() * capyRAIN_WET;
       if (sky > capyWetLevel) capyWetLevel = sky;
     }
+    // ---- ...AND SO IS STANDING IN SOMETHING THE PLACE IS SPRAYING ---------
+    // The same argument as the rain immediately above, one scale down and one
+    // step more embarrassing: the Botanic Gardens have had a working sprinkler
+    // since v1, its whole job is to soak a TOURIST, and a capybara could stand
+    // in the arc of it indefinitely and come out with a dry coat. The wet fur,
+    // the shake and the drips were all there; nothing local could reach them.
+    //
+    // `soaking(x, z)` is an optional biome hook of exactly the same shape as
+    // groundSlip and surfacePitch — 0..1, absent from every biome that has no
+    // opinion — and it is a FLOOR like the sky's, so it can never dry an animal
+    // that has just climbed out of the harbour.
+    const wetHere = capyAskNum(game, 'soaking', px, pz, 0);
+    if (wetHere > capyWetLevel) capyWetLevel = clamp(wetHere, 0, 1);
     capy.wet = capyWetLevel;
 
     // ---- upright lock + yaw drive, both CRITICALLY DAMPED ------------

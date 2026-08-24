@@ -96,6 +96,11 @@ let cavWormDim = 0;
 
 // the drips, which is the sound and the sight of a cave and there were none
 const cavDRIP_N = 26;
+const cavDRIP_HIT = 1.15;   // m of the column that counts as under it — see soaking()
+const cavSOAK_T   = 4.0;    // s under a drip to get as damp as a drip can make you
+const cavSOAK_MAX = 0.62;   // ...and that is damp, never the 1.0 the river gives
+let   cavSoakT    = 0;
+const cavV3d = new THREE.Vector3();   // nearestDrip's OWN scratch
 let cavDripMesh = null, cavDripData = null;
 let cavRingMesh = null, cavRingMat = null;
 const cavRING_N = 12;
@@ -3912,6 +3917,25 @@ function cavUpdateDrips(game, dt) {
   }
   cavDripMesh.instanceMatrix.needsUpdate = true;
 
+  // ---- ...AND ONE OF THEM CAN LAND ON YOU (v20) --------------------------
+  // Twenty-six drips have been falling out of this roof since the chapter was
+  // built, ringing the floor and ticking, and a capybara could stand directly
+  // underneath one for as long as it liked and stay bone dry. Same argument as
+  // the Botanic Gardens sprinkler and the same optional hook: `soaking(x, z)`.
+  //
+  // It ACCUMULATES rather than snapping to a level, because a drip is not a
+  // sprinkler — about four seconds under one to get properly damp — and it
+  // gives back twice as fast as it takes, so stepping out from under it is
+  // immediately the right move. It never reaches the level a swim gives.
+  let near = 1e9;
+  for (let i = 0; i < cavDRIP_N; i++) {
+    const o = i * 5;
+    const dx = cavDripData[o] - px, dz = cavDripData[o + 1] - pz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < near) near = d2;
+  }
+  cavSoakT = clamp(cavSoakT + (near < cavDRIP_HIT * cavDRIP_HIT ? dt : -dt * 2), 0, cavSOAK_T);
+
   if (cavRingMesh) {
     let anyLive = 0;
     for (let i = 0; i < cavRING_N; i++) {
@@ -4374,6 +4398,37 @@ export function createCave(game) {
     camCeil(x, z) { return cavRoofH(x, z) - 1.8; },
     /** 0..1 — how much natural light is on the animal. THE chapter number. */
     daylight() { return cavDayK; },
+    /**
+     * HOW WET THE DRIPS ARE MAKING YOU, 0..cavSOAK_MAX — capybara.js's optional
+     * `soaking` hook. It ignores (x, z): the accumulator is already a function
+     * of where the animal is standing, computed once a frame in cavUpdateDrips
+     * against all twenty-six columns, and re-deriving it here would be the same
+     * loop twice. See the note there.
+     */
+    soaking() { return cavSoakT / cavSOAK_T * cavSOAK_MAX; },
+    /**
+     * WHERE THE NEAREST DRIP LANDS, or null before the roof is built. Twenty-six
+     * of them have been falling since the chapter was made and nothing could
+     * ask where a single one of them was — the same shape as the Quay's Bridge.
+     * It MOVES, in the sense that which one is nearest changes as you do, so it
+     * is a function and it returns a scratch vector of its own.
+     */
+    nearestDrip() {
+      if (!cavDripData) return null;
+      const cp = cavGame && cavGame.capy && cavGame.capy.position;
+      const px = cp ? cp.x : 0, pz = cp ? cp.z : 0;
+      let best = -1, bd = Infinity;
+      for (let i = 0; i < cavDRIP_N; i++) {
+        const o = i * 5;
+        const dx = cavDripData[o] - px, dz = cavDripData[o + 1] - pz;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < bd) { bd = d2; best = o; }
+      }
+      if (best < 0) return null;
+      cavV3d.set(cavDripData[best], cavTerrain(cavDripData[best], cavDripData[best + 1]),
+                 cavDripData[best + 1]);
+      return cavV3d;
+    },
     seenLight() { return cavSeenLight; },
     echoReady() { return cavEchoCool <= 0; },
 

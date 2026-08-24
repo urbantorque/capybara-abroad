@@ -1860,6 +1860,30 @@ export function chapterDef(n) { return CHAPTERS[n - 1] || CHAPTERS[0]; }
 // belong to a place. The predicates are sysFINDS in systems.js, because every
 // one of them is a question about live world state and that is where the live
 // world state is.
+//
+// AND A FOURTH RULE, FOR THE ONES THAT BELONG TO A PLACE (v20, 24 Aug 2026)
+//
+//   4. A PLACE FIND MAY NOT BE A TASK WITH THE PAPER TAKEN AWAY. The first
+//      twenty were all questions about the moveset or the clock — diving,
+//      climbing, cold, breath, stillness, distance, being watched — which is
+//      why they could be chapter-neutral, and it is also why, after nineteen
+//      versions, nothing in seventeen dense hand-built worlds had ever been
+//      found IN one of them. A player who noticed something in Venice was
+//      shown the identical sentence they had been shown in Iceland.
+//
+//      The test for whether a place find is a find: could a player plausibly
+//      do it without ever knowing it was there? If it needs an objective to
+//      make sense of it, it is a task, and it belongs in TASKS with the other
+//      hundred and ninety-nine.
+//
+// Two things about the fields, both of which have bitten:
+//
+//   - `qa/audit-tasks.mjs` finds a row by matching `id` IMMEDIATELY FOLLOWED BY
+//     `text`. Every field goes AFTER `text` or the row silently stops existing
+//     as far as four of the six checks are concerned.
+//   - a wrong `chapter` does not throw and does not warn at runtime: the sweep
+//     simply never reaches the row. The audit checks the number against
+//     CHAPTERS for exactly that reason.
 // ---------------------------------------------------------------------------
 export const FINDS = [
   // ---- WHAT YOU BROUGHT WITH YOU ----------------------------------------
@@ -1895,6 +1919,108 @@ export const FINDS = [
   { id: 'far-corner',     text: 'Went as far out as this world goes' },
   { id: 'quiet-corner',   text: 'Found the one part of this place with nobody in it' },
   { id: 'long-drop',      text: 'Fell twenty-five metres and walked away from it' },
+
+  // ---- AND THE ONES THAT BELONG TO A PLACE (v20) -------------------------
+  // Two per chapter, thirty-four in all, and every one of them is about a
+  // thing that world had already drawn and had never once asked after. They
+  // are gated by `chapter` — see the note above and the sweep in findTick —
+  // so a question about a gondola is never asked in Antarctica.
+  //
+  // The shape they all share, and it is the fourth rule made concrete: NONE OF
+  // THEM IS A THING TO GO AND DO. Every one is something a player might turn
+  // out to have done — standing still somewhere, being somewhere when
+  // something else happened, going at a thing the long way round, or doing
+  // the opposite of what the chapter's own task list asks for in the same
+  // place. Nine of the thirty-four are literally "you were there and you did
+  // nothing", which is a state this game had never rewarded once.
+
+  // ---- 1, Sydney --------------------------------------------------------
+  // The valve plate is trodden on to soak a TOURIST (`sprinkler`). Nobody had
+  // ever been asked what happens if you stand in it yourself.
+  { id: 'the-sprinkler',  text: 'Stood in the sprinkler until there was not a dry bit left', chapter: 1 },
+  { id: 'the-queue',      text: 'Queued at the ice-cream van like an ordinary customer', chapter: 1 },
+
+  // ---- 2, Pasto ---------------------------------------------------------
+  { id: 'the-rim-walk',   text: 'Walked the crater rim right round to the other side', chapter: 2 },
+  // `carroza` pays out for riding it UP the plaza and stops watching there.
+  { id: 'the-whole-ride', text: 'Stayed on the float for the whole of its circuit', chapter: 2 },
+
+  // ---- 3, Circular Quay -------------------------------------------------
+  { id: 'let-her-sit',    text: 'Stopped her in the middle of the harbour and let her sit', chapter: 3,
+    where: 'Stopped in the middle of the harbour, and let her sit' },
+  // `under-bridge` is sounding the horn beneath it, from the wheelhouse.
+  { id: 'swam-the-bridge', text: 'Swam under the Bridge, which is not what it is for', chapter: 3 },
+
+  // ---- 4, Kyoto ---------------------------------------------------------
+  // The garden's one animal that can DECIDE to leave, and it decides about you.
+  { id: 'the-heron',      text: 'Got close enough to make the heron leave', chapter: 4 },
+  // ...and the exact opposite of `bamboo-dash`, in the same grove.
+  { id: 'still-bamboo',   text: 'Stood still in the bamboo until it was the loudest thing there', chapter: 4 },
+
+  // ---- 5, Cali ----------------------------------------------------------
+  { id: 'floor-after-dark', text: 'Came back down to the dance floor after dark', chapter: 5 },
+  // `chiva-mirador` is the ride up. This is the walk up.
+  { id: 'walked-the-hill', text: 'Walked up to the mirador instead of taking the chiva', chapter: 5 },
+
+  // ---- 6, Rio -----------------------------------------------------------
+  // `selaron-steps` is taking them at speed.
+  { id: 'on-the-steps',   text: 'Sat down on the steps and let the city go past', chapter: 6 },
+  // `o-bonde` crosses the arches along the top.
+  { id: 'under-the-arches', text: 'Stood underneath the arches instead of on top of them', chapter: 6 },
+
+  // ---- 7, Iceland -------------------------------------------------------
+  // It has always answered a wheek and nothing could ever tell that it had.
+  { id: 'the-fox',        text: 'Called an arctic fox over, and it came most of the way', chapter: 7 },
+  { id: 'spring-and-sky', text: 'Sat in the hot spring with the weather coming down on you', chapter: 7 },
+
+  // ---- 8, Marrakech -----------------------------------------------------
+  // `souk-escape` is losing a chase in it. This is being in it for its own sake.
+  { id: 'lost-in-the-souk', text: 'Spent a long time in the souk with nobody chasing you', chapter: 8 },
+  { id: 'dune-at-dusk',   text: 'Was on top of the great dune when the light went', chapter: 8 },
+
+  // ---- 9, the Drift -----------------------------------------------------
+  { id: 'the-orchard',    text: 'Sat down in the orchard and let the seeds go past', chapter: 9 },
+  // `lantern` pays out the instant it lights. Nobody had ever stayed.
+  { id: 'after-the-lantern', text: 'Stayed up at the lantern after you had lit it', chapter: 9 },
+
+  // ---- 10, Venice -------------------------------------------------------
+  // `pigeon-storm` puts every one of them up. This is the other half of it.
+  { id: 'pigeons-back',   text: 'Stood still long enough for the pigeons to come back', chapter: 10 },
+  { id: 'flooded-cafe',   text: 'Sat at a café table with the water over the floor', chapter: 10 },
+
+  // ---- 11, Hong Kong ----------------------------------------------------
+  // `symphony` is being on the roof when the lights come on. These are the two
+  // worst seats in Kowloon for it, and one of them is a joke.
+  { id: 'lit-from-the-water', text: 'Was in the harbour, in the water, when the lights came on', chapter: 11 },
+  { id: 'missed-the-show', text: 'Was in the wet market when the harbour lit up, and missed all of it', chapter: 11,
+    where: 'Missed the whole light show from inside the wet market' },
+
+  // ---- 12, Palawan ------------------------------------------------------
+  // Drawn, collided, lit, and on nobody's list.
+  { id: 'inside-the-wreck', text: 'Went inside the wreck, which nobody ever mentions', chapter: 12 },
+  { id: 'under-the-bangka', text: 'Went under the outrigger and looked up at it', chapter: 12 },
+
+  // ---- 13, Cappadocia ---------------------------------------------------
+  // `sunrise` is being up in a balloon when the sun clears the rim.
+  { id: 'dawn-from-below', text: 'Was down in the town when the sun came up, instead of up in it', chapter: 13 },
+  { id: 'kept-up',        text: 'Kept up with the horses on your own four feet', chapter: 13 },
+
+  // ---- 14, Manly --------------------------------------------------------
+  { id: 'over-the-wall',  text: 'Was in the ocean pool when a wave came over the wall', chapter: 14 },
+  { id: 'round-the-corner', text: 'Went round the corner to the quiet beach', chapter: 14 },
+
+  // ---- 15, the Pantanal -------------------------------------------------
+  { id: 'on-the-sandbar', text: 'Stood on the sandbar in the middle of the river', chapter: 15 },
+  { id: 'dusk-afloat',    text: 'Was still out on the water when the light went', chapter: 15 },
+
+  // ---- 16, Sơn Đoòng ----------------------------------------------------
+  { id: 'nothing-behind', text: 'Went far enough in that there was no daylight behind you', chapter: 16 },
+  { id: 'wet-in-a-mountain', text: 'Stood still under a drip until it had got you', chapter: 16 },
+
+  // ---- 17, the Antarctic Peninsula --------------------------------------
+  { id: 'the-whalers',    text: 'Went into the whaling station that nobody uses any more', chapter: 17 },
+  // ...and the exact opposite of `colony-chorus`, in the middle of the colony.
+  { id: 'ignored',        text: 'Stood about in the middle of the colony and was completely ignored', chapter: 17 },
 ];
 
 /** Every find id, for the audit and the save. */

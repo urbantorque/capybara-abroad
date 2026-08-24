@@ -5542,6 +5542,12 @@ export function createQuay(game) {
     navBlocked(x, z, r) { return quaySolids.blocked(x, z, r, quayGroundY); },
     SPAWN: { x: 4, y: 1.0, z: 26 },
     MANLY: quayMANLY,
+    // The Bridge, as a fixture: the deck's centre, how far it reaches and how
+    // high it sits. It was drawn from quayBRIDGE and never published, so the
+    // one landmark this chapter is named after was invisible to anything that
+    // wanted to ask where it is. Read-only — a caller that writes into it
+    // moves the geometry's source of truth.
+    bridge: quayBRIDGE,
     // The Freshwater. She MOVES — ask, never cache.
     freshwater() { return quayBigPos; },
     freshwaterRange: quayBigRange,

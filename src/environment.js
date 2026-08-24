@@ -56,6 +56,7 @@ let envSprayAng = 0;          // rotor sweep phase, advanced in envSprayStep
 const envSPRINK_SPOTS = [-21.0, 1.2, 2.60, -29.6, -5.0, -0.55];
 const envSPRINK_REACH = 3.25;   // metres of throw
 const envSPRINK_BURST = 12.0;   // seconds the valve stays open after a nudge
+const envSPRINK_WET   = 0.92;   // how wet standing in it gets you — see soaking()
 const envSPRAY_JETS  = 3;       // dashes fanned across the arc
 const envSPRAY_SEGS  = 9;       // dashes along each ballistic jet
 const envSPRAY_FAN   = 0.30;    // radians between adjacent jets
@@ -3016,6 +3017,19 @@ export function createEnvironment(game) {
     // {x, y, z, reach, angle, on, sprays(x, z) -> bool} — the rotor is off until
     // the capybara treads on the valve plate, then runs for envSPRINK_BURST.
     sprinklers: envSprinklers,
+    /**
+     * HOW WET THIS SPOT IS MAKING YOU, 0..1 — capybara.js's optional `soaking`
+     * hook. Only the sprinklers answer it, and only while the valve is open.
+     * Deliberately just under a swim: a rotor at two metres gets you as wet as
+     * you can get standing up, and the harbour still has to be worse.
+     */
+    soaking(x, z) {
+      for (let i = 0; i < envSprinklers.length; i++) {
+        const s = envSprinklers[i];
+        if (s && s.on && s.sprays(x, z)) return envSPRINK_WET;
+      }
+      return 0;
+    },
     buskerSpot: envBUSKER_SPOT,
     // Mr Whippy. `van()` is a live position — she MOVES, so ask, never cache.
     van: function () { return envVanPos; },

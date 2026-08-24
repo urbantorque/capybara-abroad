@@ -1205,6 +1205,10 @@ const kyoHERON_ROUND = 11.0;               // s of circuit
 const kyoHERON_DOWN = 2.6;                 // s of descent
 const kyoHERON_REST = 26.0;                // s before it decides to move anyway
 let kyoHeronGroup = null, kyoHeronWing = null;
+// Its OWN scratch vector, and not one shared with any other accessor: two
+// getters returning the same object hand a caller holding one of them the
+// other one's answer. That exact bug cost time in Göreme — see gorV3b.
+const kyoV3h = new THREE.Vector3();
 let kyoHeronPhase = 0;                     // 0 standing, 1 up, 2 round, 3 down
 let kyoHeronSpooked = 0;                   // 1 if the bonsho is what moved it
 let kyoHeronT = 0;
@@ -3813,6 +3817,21 @@ export function createKyoto(game) {
     toriiCam: kyoToriiCam,
 
     pond: kyoPOND,
+    /**
+     * THE HERON, and whether it is still standing there.
+     *
+     * It MOVES — ask, never cache. `heronStanding()` is phase 0, which is the
+     * only phase in which it is a bird in the shallows rather than a bird on
+     * its way somewhere; it leaves either because you got inside
+     * kyoHERON_NEAR of it or because it has been there kyoHERON_REST and has
+     * had enough of standing. Published so that something can notice the
+     * garden's one decision-making animal deciding: nothing in this module
+     * needed to know, so nothing could ask.
+     */
+    heron() { kyoV3h.set(kyoHeronGroup ? kyoHeronGroup.position.x : 0,
+                         kyoHeronGroup ? kyoHeronGroup.position.y : 0,
+                         kyoHeronGroup ? kyoHeronGroup.position.z : 0); return kyoV3h; },
+    heronStanding() { return !!kyoHeronGroup && kyoHeronPhase === 0; },
     /** The near end of the stepping stones, for the beacon. */
     stones: { x: kyoPAVILION.x - 9 - 5 * 2.6, z: kyoPAVILION.z - 8 + Math.sin(5 * 1.3) * 1.6 },
     zen: kyoZEN,

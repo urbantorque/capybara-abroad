@@ -182,6 +182,56 @@ for (const id of findIdsDecl) {
 // ...and no find may be advertised. If it is on the paper it is a task.
 if (findIdsDecl.some(id => hintIds.has(id))) P('BLOCKER', 'finds', 'a find has a hint row — finds are never pointed at');
 
+// ---- 7d. a find may belong to a place (v20) ------------------------------
+// `chapter: n` means the predicate is only swept in chapter n, so a wrong
+// number does not throw and does not warn — it produces a find that can never
+// be met, in silence, which is the worst failure this table has.
+//
+// NOTE ON THE PARSE ABOVE: findIdsDecl requires `id` immediately followed by
+// `text`. Any field added to a row must therefore go AFTER `text`, or the row
+// stops existing as far as every check in 7c is concerned. This block re-parses
+// each row whole so the two can never disagree about how many rows there are.
+const findRows = [...findsBlock.matchAll(
+  /\{\s*id:\s*'([^']+)'\s*,\s*text:\s*'((?:[^'\\]|\\.)*)'([^}]*)\}/g)].map(m => {
+  const tail = m[3] || '';
+  const ch = /\bchapter:\s*(\d+)/.exec(tail);
+  const wh = /\bwhere:\s*'((?:[^'\\]|\\.)*)'/.exec(tail);
+  return { id: m[1], text: m[2], chapter: ch ? Number(ch[1]) : 0, where: wh ? wh[1] : null };
+});
+if (findRows.length !== findIdsDecl.length) {
+  P('BLOCKER', 'finds', 'row parse disagrees: ' + findRows.length + ' whole rows vs ' +
+    findIdsDecl.length + ' id/text pairs — a field was inserted between id and text');
+}
+const chapMaxN = Math.max(...chapNs.map(c => c.n));
+const findPerChap = Object.create(null);
+for (const r of findRows) {
+  if (!r.chapter) continue;
+  if (!Number.isInteger(r.chapter) || r.chapter < 1 || r.chapter > chapMaxN) {
+    P('BLOCKER', r.id, 'chapter ' + r.chapter + ' is not a chapter (1..' + chapMaxN + ') — swept nowhere');
+    continue;
+  }
+  if (!chapNs.some(c => c.n === r.chapter)) {
+    P('BLOCKER', r.id, 'chapter ' + r.chapter + ' has no CHAPTERS row — swept nowhere');
+    continue;
+  }
+  findPerChap[r.chapter] = (findPerChap[r.chapter] || 0) + 1;
+}
+// A `where` line only earns its place if it differs from the toast.
+for (const r of findRows) {
+  if (r.where !== null && r.where === r.text) {
+    P('WARN', r.id, 'where is identical to text — drop it');
+  }
+}
+// The pass's own progress meter, and the ceiling that keeps a find rare.
+for (const c of chapNs) {
+  const n = findPerChap[c.n] || 0;
+  if (n === 0) P('WARN', 'chapter ' + c.n + ' (' + c.biome + ')', 'no find of its own — nothing here can be found, only completed');
+  else if (n > 3) P('WARN', 'chapter ' + c.n + ' (' + c.biome + ')', n + ' place finds — a find is supposed to be rare');
+}
+console.log('FINDS: ' + findRows.filter(r => !r.chapter).length + ' anywhere, ' +
+            findRows.filter(r => r.chapter).length + ' of a place, over ' +
+            Object.keys(findPerChap).length + ' of ' + chapNs.length + ' chapters');
+
 // ---- 7b. every souvenir has a glyph --------------------------------------
 for (const c of chapNs) {
   if (!new RegExp('\\n  ' + c.biome + ':\\s*\\{\\s*s:').test(systems.slice(systems.indexOf('const sysKEEPS')))) {

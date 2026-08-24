@@ -295,6 +295,39 @@ busy place with nobody in it, the bottom of the deepest water.
 
 And four of them are about being seen, which is the other thing that changed.
 
+## ...and thirty-four of them are about one place each
+
+The twenty above all work in all seventeen worlds, which is the good half of them and
+also the tell: every one is a question about the moveset or about the clock. Nothing in
+them is about *anywhere*. Notice something in Venice and the game showed you the same
+sentence it had shown you in Iceland.
+
+There are thirty-four more now, two per chapter, and every one is about a thing that
+world had already drawn and had never once asked after. None of them is a thing to go
+and do. Nine are literally *you were there and you did nothing* — sixteen seconds
+standing still in the bamboo grove the game otherwise wants you to tear through, twenty
+seconds in the middle of the rookery being comprehensively ignored, a long sit on
+Selarón's steps letting Rio go past. Several are the deliberate opposite of the
+chapter's own task on the same spot: the walk up to the mirador instead of the chiva
+ride, standing underneath the Arcos da Lapa instead of running along the top of them,
+swimming under the Harbour Bridge, which is not what it is for.
+
+And two of them are the worst seats in Kowloon for a light show whose task is the best
+one — being out in the harbour, in the water, when the towers come on; and being inside
+the wet market when it happens and missing the entire thing.
+
+Three things in the world had to become true first, because they were not:
+
+- **The sprinkler in the Botanic Gardens did not make you wet.** It has been there since
+  the first version and its whole job is to soak a *tourist*. You could stand in the arc
+  of it as long as you liked and come out with a dry coat — which is the exact thing the
+  rain code's own comment calls the tell that weather is a decal.
+- **Not one of Sơn Đoòng's twenty-six drips could land on you.** They fall forty metres,
+  they ring the floor, they tick, and they went straight through a capybara.
+- **The heron, the arctic fox and the Harbour Bridge could not be asked where they
+  were.** The fox has answered a wheek and come two thirds of the way toward you since
+  the day it was built, and nothing in the game was able to notice that it had.
+
 ## People remember you now, for about half a minute
 
 For eighteen versions a person's alarm faded to nothing in under a second. You could

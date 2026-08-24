@@ -4281,6 +4281,18 @@ export function createIceland(game) {
     // the humpback. She MOVES — ask, never cache.
     whale() { return iceWhalePos; },
     whaleUp() { return iceWhalePhase >= 1; },
+    /**
+     * THE FOX, and how interested it currently is in you.
+     *
+     * It MOVES — ask, never cache. `foxInterest()` is iceFoxDraw: 0 while it is
+     * walking its own line, rising to about 0.62 while it is crossing open
+     * ground to have a look at you, which it does when it hears a wheek inside
+     * iceFOX_HEAR. It has always answered and nothing has ever been able to
+     * tell that it had. Its own scratch vector — never share one between two
+     * accessors.
+     */
+    fox() { iceV3f.set(iceFoxX, iceTerrain(iceFoxX, iceFoxZ), iceFoxZ); return iceV3f; },
+    foxInterest() { return iceFoxDraw; },
     /** The top of the run. The beacon has to point at the CAIRN, not at the ice:
      *  sending a player straight up a frictionless twenty-degree slope is a joke
      *  that stops being funny the second time. */
@@ -4663,6 +4675,7 @@ let iceFoxYip = 0;
 // sideways across the moraine at two thirds of your speed, feet moving at
 // trot pace, never getting anywhere. A fox has a position and a top speed.
 let iceFoxX = 0, iceFoxZ = 0;         // where it actually is
+const iceV3f = new THREE.Vector3();   // the fox accessor's OWN scratch
 let iceFoxHas = false;                // ...once it has been anywhere at all
 const iceFOX_RUN = 4.2;               // m/s — a trotting fox, and it is quick
 const iceFOX_KEEP = 4.5;              // m it stops short at, which is the joke

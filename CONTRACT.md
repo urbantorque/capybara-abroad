@@ -1516,6 +1516,38 @@ Two more ladders went the same way and for the same reason:
   `carryFrame` — is now a property that either exists or does not, and a biome
   that does not publish it costs a failed lookup.
 
+### `soaking(x, z)` — a biome may get you wet without a swim (v20)
+
+Optional, 0..1, same shape and same ladder as `groundSlip`. capybara.js takes it
+as a **floor** on `capyWetLevel`, exactly as it already takes the sky's, so it
+can never dry an animal that has just climbed out of the harbour and it sits
+below the 1.0 a swim gives.
+
+It exists because of a tell the rain block's own comment had already named and
+nobody had applied twice: *"an animal that walks through a sixty-second downpour
+and comes out with a dry coat is the tell that the weather is a decal."* The
+Botanic Gardens have had a working sprinkler since v1 whose entire job is to
+soak a **tourist**; a capybara could stand in the arc of it indefinitely and
+come out bone dry. Sơn Đoòng has been dropping twenty-six drips out of its roof
+since it was built, ringing the floor and ticking, and not one of them could
+land on you. The wet fur, the shake and the drips all existed and were reachable
+by exactly one route.
+
+Two publishers, and they are deliberately different in kind:
+
+- **environment.js** answers `envSPRINK_WET` (0.92) inside a running sprinkler's
+  **circle**. Not inside the sector: the rotor SWEEPS at 1.35 rad/s, so
+  `sprays(x, z)` is true for a given point in pulses about twice every four and
+  a half seconds. Measured — five seconds stood in the fan with a hold on the
+  sector reported zero, and `wet` decaying at an eighth a second rides the
+  pulses between 0.77 and 0.92 without ever falling out of the band.
+- **cave.js** ACCUMULATES: `cavSoakT` rises while the animal is within
+  `cavDRIP_HIT` (1.15 m) of any of the twenty-six columns and falls at twice the
+  rate off them, so it is about four seconds under a drip to get damp, it never
+  passes `cavSOAK_MAX` (0.62), and stepping out from under it is immediately the
+  right move. It ignores its (x, z) — the accumulator is already a function of
+  where the animal is standing and computed once a frame in `cavUpdateDrips`.
+
 ### `surfacePitch(x, z, y)` — a biome may answer for its own footsteps
 
 The footfall voice was nine chapters of hand-written rectangles in capybara.js.
@@ -1862,6 +1894,77 @@ line and their own colour.
 
 `qa/audit-tasks.mjs` enforces: every row has a predicate, every predicate has a
 row, no find id collides with a task id, and no find has a hint row.
+
+### AND THIRTY-FOUR OF THEM BELONG TO A PLACE (v20 — the delight pass, 24 Aug 2026)
+
+The design above reserved two fields for this in writing — *"`where` is the line
+the ledger prints under the place it happened; `chapter` is 0 for the ones that
+can happen anywhere and a number for the ones that belong to a place"* — and
+neither field appeared on a single one of the twenty rows, nor was either string
+read anywhere in systems.js. **Every find in the game was a question about the
+moveset or the clock**: diving, climbing, cold, breath, stillness, distance
+walked, being watched, highest ground, far corner, long drop. All twenty work
+identically in all seventeen worlds, which is precisely why nothing in
+seventeen dense hand-built places had ever been found *in* one of them.
+
+- **`chapter: n`** means the predicate is swept only in chapter n. Gating in the
+  sweep rather than inside each predicate is what keeps `findTick` cheap: the
+  place finds outnumber the neutral ones two to one, and without it every one
+  would be evaluated four times a second in all seventeen places, asking after
+  a gondola in Antarctica. **A wrong number does not throw and does not warn** —
+  the row is simply never reached — so `qa/audit-tasks.mjs` checks it against
+  `CHAPTERS`, and warns on a chapter with none and on a chapter with over three.
+- **`where`** is an optional ledger line for the rows whose toast does not read
+  right underneath a place name. Two rows carry one.
+- **Any field goes AFTER `text`.** The audit finds a row by matching `id`
+  immediately followed by `text`; a field inserted between them deletes the row
+  from four of the six checks in silence. The audit now re-parses whole rows and
+  blocks if the two counts disagree.
+
+**THE FOURTH RULE, and it is what the other thirty-four are held to: a place
+find may not be a task with the paper taken away.** The test is whether a player
+could plausibly do it without ever knowing it was there. Nine of the thirty-four
+are literally *you were there and you did nothing*, which this game had never
+rewarded once; several more are the deliberate opposite of the chapter's own
+task in the same spot — the still bamboo against `bamboo-dash`, the walk up to
+the mirador against `chiva-mirador`, under the arches against `o-bonde`, the two
+worst seats in Kowloon for a light show whose task is the best one, and being
+ignored in the middle of the rookery whose task is to start something in it.
+
+**A THROW IN A PREDICATE IS NOW REPORTED.** It is still swallowed — one bad row
+may not take the sweep down — but a swallowed find is indistinguishable from a
+find that is merely not met yet, which over fifty-four rows is the failure mode
+this table cannot afford. It writes `game.state.lastError` once per id per
+session, which is the channel the harness already reads. It is never a
+`console.error` and never anything the player sees.
+
+**`game.noticed(id)`** is `taskDone` for the other table: read-only, count with
+no argument. Nothing in src reads it; it exists so a find can be PROVEN to fire.
+
+#### Five things that were drawn and could not be asked about (v20)
+
+All additive, all read-only, and each one existed as geometry for versions
+before anything could find out where it was:
+
+| biome | member | why |
+|---|---|---|
+| `quay` | `bridge` | the one landmark the chapter is named after, built from `quayBRIDGE` and never published |
+| `kyoto` | `heron()`, `heronStanding()` | the garden's only animal that can DECIDE to leave, and nothing could tell when it had |
+| `iceland` | `fox()`, `foxInterest()` | it has answered a wheek inside `iceFOX_HEAR` since it was built and nothing could tell that it had |
+| `cave` | `soaking()`, `nearestDrip()` | twenty-six drips, no way to ask where one lands |
+| `environment` | `soaking(x, z)` | see the hook above |
+
+**Each accessor that returns a point gets its OWN scratch vector** (`kyoV3h`,
+`iceV3f`, `cavV3d`). Two getters sharing one is the Göreme `gorV3b` bug and it
+costs a caller holding one of them the other one's answer.
+
+**AND A PREDICATE MAY NOT ASSUME WHICH KIND OF THING A POINT IS.** The api
+contract is *"a fixture is an object, a thing that moves is a function"* and it
+is kept — but `craterCentre` is a Vector3 constant and `carroza()` is a call,
+and a predicate that guesses wrong does not crash, it **silently never fires**.
+`findPt(v)` in systems.js resolves either. The crater's find was written
+`typeof a.craterCentre !== 'function' -> false` and was unreachable in a way
+that neither the audit nor a soak would ever have shown.
 
 Two of the four families are load-bearing on the other two passes: **what you
 brought** is the moveset arriving where it was never taught (dive, climb, cold

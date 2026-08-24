@@ -8930,7 +8930,11 @@ export function createSystems(game) {
         const f = FINDS[i];
         if (!findDone[f.id] || findWhere[f.id] !== n) continue;
         if (!fl) fl = sysEl('div', 'capyui-ledfind');
-        fl.appendChild(sysEl('span', null, f.text));
+        // `where` over `text` on the rows that carry one: the toast is read
+        // while standing in the place and the ledger line is read underneath
+        // its name, so one sentence cannot always serve both. Only the rows
+        // that need it carry one.
+        fl.appendChild(sysEl('span', null, f.where || f.text));
       }
       if (fl) row.appendChild(fl);
       ledList.appendChild(row);
@@ -10399,6 +10403,7 @@ export function createSystems(game) {
   // thing in the game becomes the most expensive. Once a find is found it is
   // never tested again.
   const findDone = Object.create(null);
+  const findThrew = Object.create(null);    // id -> reported once, see findTick
   const findS = Object.create(null);        // scratch: timers, edges, peaks
   let findT = 0;
   let findChap = -1;                        // the chapter the scratch belongs to
@@ -10457,6 +10462,70 @@ export function createSystems(game) {
   const sysCLIMB_TAUGHT = { 11: 1, 13: 1, 16: 1 };
   // Chapters where the water has no daylight in it worth the name.
   const sysDARK_WATER   = { 7: 1, 11: 1, 16: 1, 17: 1 };
+
+  // =========================================================================
+  // FIVE HELPERS FOR THE PLACE FINDS, AND NONE OF THEM ALLOCATES
+  // =========================================================================
+  // Thirty-four of the fifty-four rows are about one world, and almost all of
+  // them are one of four shapes: you were somewhere for a while, you were
+  // somewhere at the moment something else changed, you were near a thing that
+  // moves, or you were in a named zone. Written once here rather than
+  // thirty-four times below, and every one of them keeps its state in `findS`,
+  // which is wiped on the frame the chapter changes — so nothing can leak from
+  // Venice into Marrakech.
+  //
+  // `findHold` counts in sysFIND_TICK units because that is the only cadence
+  // these are ever called at: the loop below early-returns before reaching any
+  // of them when the tick has not come round.
+  function findApi() { return sysLiveBiomeApi(game); }
+  function findD2(p, o) {
+    if (!p || !o) return Infinity;
+    const dx = p.x - o.x, dz = p.z - o.z;
+    return dx * dx + dz * dz;
+  }
+  /** Seconds a condition has been continuously true. Zero the moment it is not. */
+  function findHold(key, ok) {
+    if (!ok) { findS[key] = 0; return 0; }
+    findS[key] = (findS[key] || 0) + sysFIND_TICK;
+    return findS[key];
+  }
+  /**
+   * A rising or falling edge on a boolean, across ticks. `undefined` is the
+   * FIRST tick and is neither — a find that fired on tick zero because the
+   * previous value was missing would be a free tick on arrival, which is the
+   * failure that `high-point` already had once.
+   */
+  function findEdge(key, v, want) {
+    const was = findS[key];
+    findS[key] = v ? 1 : 0;
+    return want ? (!!v && was === 0) : (!v && was === 1);
+  }
+  function findZone(name, p) {
+    const a = findApi();
+    if (!a || typeof a.inZone !== 'function') return false;
+    try { return !!a.inZone(name, p.x, p.z); } catch (e) { return false; }
+  }
+  /**
+   * A POINT A BIOME PUBLISHED, fixture or mover, resolved either way.
+   *
+   * The api contract is "a fixture is an object, a thing that moves is a
+   * function", and it is kept — but a predicate that guesses the wrong one of
+   * the two does not crash, it silently never fires. Measured: `craterCentre`
+   * is a Vector3 constant and `carroza()` is a call, and the crater's find was
+   * written `typeof a.craterCentre !== 'function' -> false`, which made it
+   * unreachable in a way no audit and no soak would ever have shown.
+   */
+  function findPt(v) {
+    if (v === undefined || v === null) return null;
+    let o = v;
+    if (typeof v === 'function') { try { o = v(); } catch (e) { return null; } }
+    return (o && typeof o.x === 'number' && o.x === o.x &&
+            typeof o.z === 'number' && o.z === o.z) ? o : null;
+  }
+  /** Standing still on your own feet, which nine of the thirty-four ask for. */
+  function findParked(c, speed) {
+    return c.capy.grounded && !c.capy.carriedBy && c.sp < (speed || 0.30);
+  }
 
   const sysFINDS = {
     // ---- what you brought with you --------------------------------------
@@ -10554,6 +10623,374 @@ export function createSystems(game) {
       return findPeople(c.p.x, c.p.z, 55) === 0 && findPeople(c.p.x, c.p.z, 1e4) >= 6;
     },
     'long-drop':     function () { return !!findS.bigDrop; },
+
+    // =====================================================================
+    // AND THE ONES THAT BELONG TO A PLACE
+    // =====================================================================
+    // Gated by `chapter` in the sweep, so none of these is ever evaluated
+    // outside its own world and none of them has to check where it is. They
+    // may assume the live api is their chapter's; they may NOT assume it has
+    // finished building, so every one of them is written to answer false to a
+    // missing hook rather than to throw. A throw here is swallowed and the
+    // find then looks exactly like a find that was never met.
+
+    // ---- 1, Sydney ------------------------------------------------------
+    // capybara.js's `soaking` hook is what makes this true rather than merely
+    // sayable — before it, standing in the arc left the coat bone dry.
+    'the-sprinkler': function (c) {
+      const a = findApi(), s = a && a.sprinklers;
+      if (!s || c.capy.swimming) return false;
+      // WITHIN REACH, NOT INSIDE THE ARC. The rotor SWEEPS — envSprayAng runs
+      // at 1.35 rad/s over a half-angle of 1.05 — so `sprays(x, z)` is true for
+      // a point in pulses, roughly twice every four and a half seconds, and a
+      // continuous hold on it can never be satisfied by anybody. Measured: five
+      // seconds stood in the fan reported zero. The circle is what "stood in
+      // the sprinkler" means; `wet` is what says the arc actually got you, and
+      // it is a floor with an eight-second decay, so it rides the pulses.
+      let inIt = false;
+      for (let i = 0; i < s.length && !inIt; i++) {
+        const k = s[i];
+        if (k && k.on && findD2(c.p, k) < (k.reach || 3.25) * (k.reach || 3.25)) inIt = true;
+      }
+      return findHold('spray', inIt) >= 5 && c.capy.wet > 0.65;
+    },
+    // Four places in the line, because the front of a queue is not the queue.
+    'the-queue':     function (c) {
+      const a = findApi();
+      if (!a || typeof a.vanParked !== 'function' || !a.vanParked()) return false;
+      if (typeof a.vanQueueSpot !== 'function') return false;
+      let near = false;
+      for (let i = 0; i < 4 && !near; i++) {
+        const q = a.vanQueueSpot(i);
+        if (q && findD2(c.p, q) < 1.7 * 1.7) near = true;
+      }
+      return findHold('queue', near && findParked(c, 0.55)) >= 5;
+    },
+
+    // ---- 2, Pasto -------------------------------------------------------
+    // A HALF lap, not a whole one: the rim is walkable the whole way round but
+    // the páramo side of it is a long way from anything, and a find that takes
+    // four minutes of holding one direction is a chore. Signed, so walking ten
+    // metres back and forth for ever accumulates nothing.
+    'the-rim-walk':  function (c) {
+      const a = findApi();
+      if (!a || !c.capy.grounded || c.capy.carriedBy) return false;
+      const cc = findPt(a.craterCentre);
+      if (!cc) return false;
+      // THE RIM IS A RING AND `inZone('crater')` IS THE BOWL INSIDE IT.
+      // Measured: the zone is d <= pastoCRATER_R (11 m) and the floor of it is
+      // pastoCRATER_DEPTH (17.5 m) DOWN, so gating this on the zone asked for a
+      // lap of the rim to be walked from seventeen metres underneath it. The
+      // band is the rim itself, and straying off it forgets the last bearing
+      // (so the gap is not counted) without forgetting the lap.
+      const rdx = c.p.x - cc.x, rdz = c.p.z - cc.z;
+      const rd = Math.sqrt(rdx * rdx + rdz * rdz);
+      if (rd < 8.5 || rd > 17) { findS.rimTh = undefined; return false; }
+      const th = Math.atan2(c.p.z - cc.z, c.p.x - cc.x);
+      const was = findS.rimTh;
+      findS.rimTh = th;
+      if (was === undefined) return false;
+      let d = th - was;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      // A jump of more than a fifth of a turn in a quarter of a second is a
+      // teleport or the crater's own centre moving, not a walk.
+      if (Math.abs(d) > 1.25) return false;
+      findS.rimSum = (findS.rimSum || 0) + d;
+      return Math.abs(findS.rimSum) >= Math.PI;
+    },
+    // `carroza` pays out on the way up and stops watching. The whole circuit is
+    // about sixty metres of float, so this is up and most of the way back.
+    'the-whole-ride': function (c) {
+      const a = findApi();
+      if (!a || typeof a.onCarroza !== 'function') return false;
+      if (!a.onCarroza()) { findS.carRode = 0; findS.carHas = 0; return false; }
+      const cp = findPt(a.carroza);
+      if (!cp) return false;
+      if (!findS.carHas) { findS.carHas = 1; findS.carX = cp.x; findS.carZ = cp.z; return false; }
+      const dx = cp.x - findS.carX, dz = cp.z - findS.carZ;
+      findS.carX = cp.x; findS.carZ = cp.z;
+      findS.carRode = (findS.carRode || 0) + Math.sqrt(dx * dx + dz * dz);
+      return findS.carRode >= 95;
+    },
+
+    // ---- 3, Circular Quay -----------------------------------------------
+    // Stopped, and stopped somewhere that is not either end of the run.
+    'let-her-sit':   function (c) {
+      const a = findApi();
+      if (!c.capy.atHelm || !a || !a.boat) return false;
+      const b = a.boat;
+      if (typeof a.voyageProgress !== 'function') return false;
+      // THE VOYAGE ITSELF, NOT THE ZONES. Two goes at this were wrong. The
+      // first excluded a zone called 'quay' that quayInZone does not answer at
+      // all — a probe over the whole map found it true at no point, so it read
+      // like an exclusion and was a no-op. The second still let the find fire
+      // AT THE BERTH: quayBERTH is at z = 6 and the apron zone starts at z = 16,
+      // so the boat sits tied up OUTSIDE both ends and "the middle of the
+      // harbour" would have been awarded for never having left. Progress along
+      // the run is the thing that was actually meant and it says so.
+      const k = a.voyageProgress();
+      if (!(k > 0.12 && k < 0.88)) return false;
+      return findHold('sit', Math.abs(b.speed || 0) < 0.6) >= 30;
+    },
+    // `under-bridge` is the horn, from the wheelhouse, at eleven metres a second.
+    'swam-the-bridge': function (c) {
+      const a = findApi(), br = a && a.bridge;
+      if (!br || !c.capy.swimming) return false;
+      // The deck's own axis: the span runs across x about (br.x, br.z), yawed.
+      const cs = Math.cos(br.yaw || 0), sn = Math.sin(br.yaw || 0);
+      const dx = c.p.x - br.x, dz = c.p.z - br.z;
+      const along = dx * cs + dz * sn, across = dz * cs - dx * sn;
+      return Math.abs(along) < (br.span || 132) * 0.5 && Math.abs(across) < 9;
+    },
+
+    // ---- 4, Kyoto -------------------------------------------------------
+    // It leaves either because you got inside nine metres of it or because it
+    // has stood there twenty-six seconds; the proximity branch is tested first,
+    // so being close when it goes very nearly always means it was you.
+    'the-heron':     function (c) {
+      const a = findApi();
+      if (!a || typeof a.heronStanding !== 'function') return false;
+      const hp = findPt(a.heron);
+      const near = !!hp && findD2(c.p, hp) < 11 * 11;
+      const left = findEdge('heron', a.heronStanding(), false);
+      return left && near && !(typeof a.bellRinging === 'function' && a.bellRinging());
+    },
+    // The exact opposite of `bamboo-dash`, in the same grove.
+    'still-bamboo':  function (c) {
+      return findHold('bamboo', findZone('bamboo', c.p) && findParked(c, 0.22)) >= 16;
+    },
+
+    // ---- 5, Cali --------------------------------------------------------
+    // NOT THE EDGE. `caliNightT` is not on a clock — it rises with progress
+    // ALONG THE CHIVA'S ROUTE and latches at 1 at the mirador, so the moment
+    // the lamps come on is a moment you are provably somewhere else: on the
+    // roof of a bus, half way up a hill. Measured — night() never left 0 in
+    // ninety seconds of standing on the dance floor. What is actually worth
+    // noticing is coming back DOWN to it afterwards, which nothing asks for.
+    'floor-after-dark': function (c) {
+      const a = findApi();
+      if (!a || typeof a.night !== 'function' || !(a.night() > 0.75)) return false;
+      const on = findZone('dancefloor', c.p) ||
+                 (typeof a.onFloor === 'function' && a.onFloor());
+      return findHold('floor2', on && !c.capy.carriedBy) >= 10;
+    },
+    // `chiva-mirador` is the ride up. This is arriving on your own feet, which
+    // means the chiva has to be somewhere else at the time.
+    'walked-the-hill': function (c) {
+      const a = findApi(), m = a && findPt(a.mirador);
+      if (!m || !c.capy.grounded || c.capy.carriedBy) return false;
+      if (typeof a.onChiva === 'function' && a.onChiva()) return false;
+      return findHold('hill', findD2(c.p, m) < 13 * 13) >= 3;
+    },
+
+    // ---- 6, Rio ---------------------------------------------------------
+    // `selaron-steps` is taking the whole flight inside rioSELARON_PAR.
+    'on-the-steps':  function (c) {
+      const a = findApi(), s = a && findPt(a.selaron);
+      return !!s && findHold('steps', findD2(c.p, s) < 16 * 16 && findParked(c, 0.25)) >= 14;
+    },
+    // `o-bonde` crosses them along the top, on the running board.
+    'under-the-arches': function (c) {
+      const a = findApi(), l = a && findPt(a.lapa);
+      if (!l || !c.capy.grounded) return false;
+      return findHold('arches', findD2(c.p, l) < 20 * 20 && c.p.y < 6) >= 4;
+    },
+
+    // ---- 7, Iceland -----------------------------------------------------
+    // It has answered a wheek inside iceFOX_HEAR since the day it was built and
+    // nothing in the game could tell that it had.
+    'the-fox':       function (c) {
+      const a = findApi();
+      if (!a || typeof a.foxInterest !== 'function') return false;
+      const fp = findPt(a.fox);
+      return !!fp && a.foxInterest() > 0.45 && findD2(c.p, fp) < 17 * 17;
+    },
+    'spring-and-sky': function (c) {
+      const a = findApi();
+      if (!a || typeof a.soak !== 'function') return false;
+      return a.soak() > 0.45 && c.rain > 0.30;
+    },
+
+    // ---- 8, Marrakech ---------------------------------------------------
+    // `souk-escape` is losing a chase in it. This is the souk as a place.
+    'lost-in-the-souk': function (c) {
+      const a = findApi();
+      const chased = !!(a && typeof a.chasing === 'function' && a.chasing());
+      return findHold('souk', findZone('souk', c.p) && !chased) >= 75;
+    },
+    'dune-at-dusk':  function (c) {
+      const a = findApi(), d = a && findPt(a.duneTop);
+      if (!d || typeof a.dusk !== 'function' || !c.capy.grounded) return false;
+      return a.dusk() > 0.45 && findD2(c.p, d) < 15 * 15;
+    },
+
+    // ---- 9, the Drift ---------------------------------------------------
+    'the-orchard':   function (c) {
+      const a = findApi(), o = a && findPt(a.orchard);
+      return !!o && findHold('orch', findD2(c.p, o) < 18 * 18 && findParked(c, 0.30)) >= 18;
+    },
+    // `lantern` pays out on the frame it lights, and nobody had ever stayed.
+    'after-the-lantern': function (c) {
+      const a = findApi(), l = a && findPt(a.lantern);
+      if (!l || typeof a.lit !== 'function' || !a.lit()) return false;
+      return findHold('lant', findD2(c.p, l) < 14 * 14) >= 25;
+    },
+
+    // ---- 10, Venice -----------------------------------------------------
+    // `pigeon-storm` puts every one of them up. This is what happens next, and
+    // it only counts if you were the one who put them up: the latch is armed by
+    // seeing them up and is only spent standing still after they are down.
+    'pigeons-back':  function (c) {
+      const a = findApi();
+      if (!a || typeof a.pigeonsUp !== 'function') return false;
+      if (a.pigeonsUp()) { findS.pigArm = 1; findS.pigCalm = 0; return false; }
+      if (!findS.pigArm) return false;
+      return findHold('pigCalm', findZone('piazza', c.p) && findParked(c, 0.25)) >= 12;
+    },
+    'flooded-cafe':  function (c) {
+      const a = findApi(), cf = a && findPt(a.cafe);
+      if (!cf || typeof a.flooded !== 'function' || !a.flooded()) return false;
+      return findHold('cafe', findD2(c.p, cf) < 7 * 7) >= 4;
+    },
+
+    // ---- 11, Hong Kong --------------------------------------------------
+    // `symphony` is the roof, which is the best seat. These are the two worst.
+    'lit-from-the-water': function (c) {
+      const a = findApi();
+      if (!a || typeof a.show !== 'function' || !(a.show() > 0.35)) return false;
+      return c.capy.swimming && findZone('harbour', c.p);
+    },
+    'missed-the-show': function (c) {
+      const a = findApi();
+      if (!a || typeof a.show !== 'function' || !(a.show() > 0.5)) return false;
+      return findHold('missed', findZone('market', c.p)) >= 6;
+    },
+
+    // ---- 12, Palawan ----------------------------------------------------
+    // Drawn, collided, lit, and on nobody's list.
+    'inside-the-wreck': function (c) {
+      return c.capy.diving && findZone('wreck', c.p);
+    },
+    'under-the-bangka': function (c) {
+      const a = findApi();
+      if (!a || !c.capy.diving) return false;
+      const b = findPt(a.bangka);
+      return !!b && findD2(c.p, b) < 7 * 7;
+    },
+
+    // ---- 13, Cappadocia -------------------------------------------------
+    // `sunrise` is being up in a basket when the sun clears the rim. This is
+    // the view the hundred and sixty pigeons get.
+    // A WINDOW, NOT AN EDGE, and the difference is the whole find. `sunUp()` is
+    // a 0..1 RAMP rather than a flag, so `!!a.sunUp()` went true at 4e-7 — one
+    // tick, at the very bottom of the dawn, and an edge that is missed on the
+    // tick it happens is spent for ever. Measured: it never fired once with the
+    // animal parked in the middle of the town for sixty-three seconds waiting
+    // for it. The sun coming up takes a while, and being underneath it while it
+    // does is what is actually being noticed.
+    'dawn-from-below': function (c) {
+      const a = findApi();
+      if (!a || typeof a.sunUp !== 'function') return false;
+      const k = a.sunUp();
+      if (!(k > 0.02 && k < 0.98) || !c.capy.grounded || c.capy.carriedBy) return false;
+      return findHold('dawn', findZone('town', c.p)) >= 3;
+    },
+    // `the-herd` is riding the lead mare up the valley. This is the same valley
+    // on your own four feet, which a capybara has no business managing.
+    //
+    // It replaced a find about standing in the landing field while a balloon
+    // came down, which MEASURED IMPOSSIBLE: `balloon()` is the one basket at
+    // the launch field, seventy metres from the landing zone, and `altitude()`
+    // read 0 for ninety seconds because it is on the ground until you fly it.
+    'kept-up':       function (c) {
+      const a = findApi();
+      if (!a) return false;
+      if (typeof a.onMare === 'function' && a.onMare()) return false;
+      if (!c.capy.grounded || c.capy.carriedBy) return false;
+      const mp = findPt(a.mare);
+      if (!mp) return false;
+      const running = typeof a.mareRunning !== 'function' || a.mareRunning();
+      return findHold('herd', running && findD2(c.p, mp) < 13 * 13 && c.sp > 2.2) >= 6;
+    },
+
+    // ---- 14, Manly ------------------------------------------------------
+    'over-the-wall': function (c) {
+      const a = findApi();
+      if (!a || typeof a.setNear !== 'function') return false;
+      return a.setNear() > 0.72 && c.capy.swimming && findZone('pool', c.p);
+    },
+    'round-the-corner': function (c) {
+      return findHold('shelly', findZone('shelly', c.p) && !c.capy.carriedBy) >= 6;
+    },
+
+    // ---- 15, the Pantanal -----------------------------------------------
+    'on-the-sandbar': function (c) {
+      return findHold('sand', findZone('sandbar', c.p) && c.capy.grounded &&
+                              !c.capy.swimming && !c.capy.carriedBy) >= 8;
+    },
+    'dusk-afloat':   function (c) {
+      const a = findApi();
+      if (!a || typeof a.dusk !== 'function' || !(a.dusk() > 0.5)) return false;
+      return c.capy.swimming || findZone('baia', c.p) || findZone('river', c.p);
+    },
+
+    // ---- 16, Sơn Đoòng --------------------------------------------------
+    // `daylight()` is the chapter's one number and it is zero a long way before
+    // the far end, so this is genuinely "past the last of it" and not the exit.
+    'nothing-behind': function (c) {
+      const a = findApi(), m = a && findPt(a.mouth);
+      if (!m || typeof a.daylight !== 'function') return false;
+      return a.daylight() < 0.02 && findD2(c.p, m) > 120 * 120;
+    },
+    // The drips have been falling since the chapter was built. Now one of them
+    // is worth standing under.
+    // The cave's `soaking` hook is what makes this a find about the DRIPS and
+    // not about how recently you were in the river. Before it, the only way to
+    // be wet in here was to have swum, and `capyWET_DECAY` is an eighth a
+    // second — so eight seconds of standing still put a freshly-soaked animal
+    // at 0.44 against a 0.45 gate. Measured, and it failed by one hundredth.
+    'wet-in-a-mountain': function (c) {
+      if (c.capy.swimming || c.capy.diving) return false;
+      return c.capy.wet > 0.50 && findHold('drip', findParked(c, 0.25)) >= 6;
+    },
+
+    // ---- 17, the Antarctic Peninsula ------------------------------------
+    'the-whalers':   function (c) {
+      return findHold('whal', findZone('whalers', c.p) && c.capy.grounded &&
+                              !c.capy.carriedBy) >= 8;
+    },
+    // The exact opposite of `colony-chorus`, in the middle of the same colony.
+    // A LOOSER SPEED GATE THAN ANY OF THE OTHER EIGHT DWELLS, and it has to be.
+    // The colony stands on ice: `groundSlip` reads 0.66 there, the idle grip is
+    // off, and any gradient at all starts a slow slide that never ends.
+    // Measured — a capybara parked in the middle of it and left alone for
+    // thirty-five seconds crept half a metre and was doing 1.78 m/s by the end,
+    // still climbing. There is no standing still in Antarctica; twenty seconds
+    // of not going anywhere in particular is what the place actually offers.
+    // DISPLACEMENT, NOT SPEED, and it is the only one of the nine dwells that
+    // has to be. Any speed threshold is unmeetable here: measured, a capybara
+    // parked in the middle of the colony and left alone crept half a metre in
+    // thirty-five seconds and was doing 1.78 m/s by the end and STILL climbing,
+    // because it stands on ice — `groundSlip` reads 0.66, the idle grip is off,
+    // and the smallest gradient starts a slide that never reaches a terminal
+    // speed. Whatever number you pick, twenty seconds of standing there will
+    // eventually cross it. "Did not go anywhere" is the thing actually meant,
+    // and on a slope you are sliding down at half a metre a minute it is true.
+    'ignored':       function (c) {
+      if (!c.capy.grounded || c.capy.carriedBy || c.capy.swimming ||
+          !findZone('colony', c.p)) { findS.ignHas = 0; findS.ignT = 0; return false; }
+      if (!findS.ignHas) {
+        findS.ignHas = 1; findS.ignX = c.p.x; findS.ignZ = c.p.z; findS.ignT = 0;
+        return false;
+      }
+      const dx = c.p.x - findS.ignX, dz = c.p.z - findS.ignZ;
+      if (dx * dx + dz * dz > 5 * 5) {
+        findS.ignX = c.p.x; findS.ignZ = c.p.z; findS.ignT = 0; return false;
+      }
+      findS.ignT = (findS.ignT || 0) + sysFIND_TICK;
+      return findS.ignT >= 20;
+    },
   };
 
   /**
@@ -10637,12 +11074,39 @@ export function createSystems(game) {
     findCtx.rain = wx && typeof wx.drizzle === 'function' ? wx.drizzle() : 0;
     findCtx.cold = mood && typeof mood.cold === 'number' ? mood.cold : 0;
     for (let i = 0; i < FINDS.length; i++) {
-      const id = FINDS[i].id;
+      const row = FINDS[i];
+      const id = row.id;
       if (findDone[id]) continue;
+      // ---- a find may belong to a place (v20) -----------------------------
+      // `chapter` is 0 for the ones that are questions about the moveset or the
+      // clock and can be answered anywhere, and a chapter number for the ones
+      // that are about a thing which only exists in one world. Gating HERE
+      // rather than inside each predicate is what keeps this tick cheap: the
+      // place finds outnumber the neutral ones, and without this line every one
+      // of them would be evaluated four times a second in all seventeen places,
+      // asking after a gondola in Antarctica.
+      if (row.chapter && row.chapter !== n) continue;
       const f = sysFINDS[id];
       if (!f) continue;
       let hit = false;
-      try { hit = !!f(findCtx); } catch (e) { hit = false; }
+      try {
+        hit = !!f(findCtx);
+      } catch (e) {
+        // A THROW IN HERE IS THE ONE FAILURE THIS TABLE CANNOT AFFORD. It is
+        // swallowed — it has to be, or one bad predicate takes the sweep down
+        // with it — and a swallowed find is then INDISTINGUISHABLE from a find
+        // that is simply not met yet. Fifty-four rows, thirty-four of them
+        // asking a biome for something, and the failure mode is silence.
+        //
+        // So it says so, once per id per session, on the channel the harness
+        // already reads back after a soak. It is not a console.error: the
+        // player must never see a find at all.
+        hit = false;
+        if (!findThrew[id]) {
+          findThrew[id] = 1;
+          game.state.lastError = 'find ' + id + ': ' + ((e && e.message) || String(e));
+        }
+      }
       if (hit) foundFind(id);
     }
     findS.redHanded = false;
@@ -12242,6 +12706,17 @@ export function createSystems(game) {
    * a chapter naming a task that has been renamed should go quiet, not crash.
    */
   game.taskDone = function (id) { const r = taskRec[id]; return !!(r && r.done); };
+  /**
+   * HAS THIS ONE BEEN NOTICED. `taskDone` for the other table, and read-only
+   * for the same reason. With no argument it is the count, which is what the
+   * ledger's footer prints.
+   *
+   * It exists because a find that throws inside its predicate is swallowed by
+   * `findTick` and is then INDISTINGUISHABLE from a find that is simply not
+   * met — so without a way to ask, the only proof a place find works is a
+   * toast nobody saw. Nothing in src reads this; the harness does.
+   */
+  game.noticed = function (id) { return id === undefined ? findCount() : !!findDone[id]; };
   /** A measured task hands its number here. See RECORDS in shared.js. */
   game.record = recordValue;
   game.toast = toast;
