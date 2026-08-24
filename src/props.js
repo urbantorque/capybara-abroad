@@ -1279,6 +1279,16 @@ export function createProps(game) {
     update: physUpdate,
     // extras (handy for npc.js / systems.js — additive, nothing depends on them)
     dropOwned: physDropOwned,
+    // Put a prop back where it lives, dead still and asleep, with all three of
+    // cannon's position fields written. npc.js calls it when somebody catches up
+    // with a thing you took off them: it is the one function in this file that
+    // already treats homeX/Y/Z as authoritative, so "they put it back" and "the
+    // world put it back" are the same code path and cannot drift apart.
+    rescue: physRescue,
+    // The prop TYPE table, read-only in practice. qa asks it which props are
+    // edible; guessing that from the type name is how an audit reports a
+    // chapter has no food in it because the food is called `pylsa`.
+    typeOf: function (t) { return physTYPES[t] || null; },
     spill: physSpill,
     dust: physDust3,
     foam: physFoamRing,

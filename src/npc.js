@@ -946,6 +946,14 @@ export function createNPCs(game) {
                'That is nice, actually.', 'It is in my eyes.'],
     chill:    ['Bit sharp.', 'Ooh.', 'Cold one.', 'That went right through me.',
                'Feel that?', 'Brr.'],
+    // ---- ...AND ONE FOR SOMEBODY EATING SOMETHING NEARBY (v23) ----------
+    // Spoken by a bystander rather than by the owner — the owner has their own
+    // pool and comes to take it off you. Held to the same standard: this is
+    // said over a Marrakech orange cart, a Kyoto tea stall, a Hong Kong bakery
+    // and an Antarctic ration crate, so it may not name a food or a country.
+    produce:  ['It is eating that.', 'Is it allowed to do that?',
+               'Well, it is enjoying itself.', 'That was somebody’s.',
+               'Just going to eat it, then.', 'Look at it go.'],
   };
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
@@ -1262,6 +1270,7 @@ export function createNPCs(game) {
       says: {
         startled: o.startled || null, splash: o.splash || null,
         thief: o.thief || null, rush: o.rush || null,
+        produce: o.produce || null, chain: o.chain || null,
       },
       fl: 0, flV: 0,            // the flinch spring
       flYaw: 0,                 // ...and which way to turn while it runs
@@ -1279,6 +1288,12 @@ export function createNPCs(game) {
       // ---- and who they are talking to, if anybody. `chatT` is how long they
       // go on facing them for; it beats the watch and loses to the flinch.
       chatT: 0, chatYaw: 0,
+      // ---- THE MISCHIEF ECONOMY (see localOwnStep) ----
+      // `own` is the prop they have gone to get back and is the ONLY thing that
+      // lets a local leave npcLOC_STEP_R of their anchor. `ownT` is the clock
+      // both ceilings read; `ownCool` is what stops one person spending the
+      // whole chapter chasing you.
+      own: null, ownT: 0, ownBack: false, ownCool: 0, ownSay: 0,
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -1497,11 +1512,304 @@ export function createNPCs(game) {
         const arr = L.says[kind] || npcLOC_SAY[kind];
         if (arr && arr.length) {
           L.cd = L.cool * rand(0.7, 1.3);
-          localLine(L, arr);
+          localReactLine(L, arr);
           said++;
         }
       }
     }
+  }
+
+  // =======================================================================
+  // THE MISCHIEF ECONOMY (v23)
+  //
+  // The aesthetic law of this game is the Untitled Goose Game one: the delight
+  // is not the mischief, it is BEING WITNESSED doing it. `game.state.chaos`
+  // has driven the music and the calm field since the day it was written and
+  // it has never driven one person — so a chapter would let you walk off with
+  // a stallholder's fruit, eat it in front of them and put the empty crate
+  // through a window, and the reaction was one line from a pool of nine and a
+  // flinch, from whoever happened to be standing nearest, about nothing in
+  // particular.
+  //
+  // Three things, all chapter-neutral, all built out of what the chapters
+  // already have (people with anchors, props with homes) so that no biome file
+  // is touched and every chapter gets them at once:
+  //
+  //   OWNERSHIP  a prop belongs to whoever is standing nearest to where it
+  //              LIVES. Rob it or knock it over and they come and get it.
+  //   PRODUCE    eat somebody's food in front of them and you get told.
+  //   CHAINS     one person reacting turns the head of the next one along.
+  //
+  // WHY "WHERE IT LIVES" AND NOT "WHERE IT IS": a prop in the animal's mouth is
+  // halfway across the square, and the person whose it is, is not. `homeX/homeZ`
+  // is the one field that says where a prop belongs, physRescue already treats
+  // it as authoritative, and matching on it means a stolen thing keeps its owner
+  // for the whole of the theft, which is the only version of this that is funny.
+  // =======================================================================
+  // ---- AND THE RADIUS IS ELEVEN METRES, WHICH WAS MEASURED ----------------
+  // The first cut was 5.5 m, on the reasoning that your stock is at arm's
+  // length. Then the distance from every prop's HOME to the nearest local who
+  // can walk was measured in all seventeen chapters, and at 5.5 m the feature
+  // barely exists: five chapters of fifteen have NOBODY who owns anything.
+  // The nearest few, per chapter:
+  //
+  //   Göreme 2.8 · Antarctica 1.8 · Venice 2.1 · Sahara 3.6 · Palawan 3.9
+  //   Kyoto 3.8 · Manly 4.1 · Quay 5.2 · Iceland 1.9 · Kowloon 6.2 · Rio 5.8
+  //   Cali 9.5   — and then nothing until 14.7
+  //   Sơn Đoòng 9.4, the Drift 24.0, the Pantanal 21.3 — chapters where the
+  //   people and the things are simply not in the same part of the world, and
+  //   at NO radius short of absurd does anybody own anything. Those three get
+  //   their reactions from the other two chains; see qa/pf-adoption.js.
+  //
+  // At 11 m every chapter that has stock near people has at least two owned
+  // props, and it is the same order as the 13 m pair-chat radius for the same
+  // reason: this is a market pitch, not a handshake.
+  const npcOWN_R      = 11;    // m from a prop's HOME inside which somebody owns it
+  const npcOWN_V      = 1.25;  // m/s. A purposeful walk — nobody in this game sprints.
+  // ...and the LEASH has to clear the radius, or a person can own a thing they
+  // are not allowed to walk to and the state exists only to time out.
+  const npcOWN_LEASH  = 15;    // m from their own anchor they will ever go. See below.
+  const npcOWN_TAKE   = 1.5;   // m at which they have got it back
+  const npcOWN_MASS   = 12;    // kg — nobody sets off after a thing they could not lift
+  // ---- THE HARD CEILINGS, WHICH ARE THE WHOLE SAFETY ARGUMENT -------------
+  // §THE CATCH-ALL STATE: a steering state with no ceiling is how the waiter
+  // went forty seconds and never once reached a table, and how three farmers
+  // never left their spawn. Retrieval has TWO exits that do not depend on
+  // arriving — a clock on the way out and a clock on the way back — and at the
+  // second one the state is torn down unconditionally and the person is put on
+  // a course for their own anchor at shuffle speed. There is no branch in this
+  // system in which a local can be left steering for ever.
+  const npcOWN_OUT_T  = 10;    // s of walking out, however it goes
+  const npcOWN_BACK_T = 14;    // s of walking home, ditto
+  const npcOWN_COOL   = 20;    // s before the same person will set off again
+  const npcOWN_SAY_T  = 3.2;   // s between the lines they say while following you
+
+  // ---- CHAINS -------------------------------------------------------------
+  // A crowd that all shouts at once is a cutscene and a crowd where one person
+  // shouts and nobody else moves is a diorama. What actually happens in a square
+  // is that somebody says something and the next person along looks over. So a
+  // reaction line arms a one-shot: everybody inside npcCHAIN_R turns to face the
+  // speaker for a moment, and exactly ONE of them — the nearest with a free
+  // mouth — answers. Then it is spent. It cannot ripple, because a second look
+  // does not arm a third.
+  // ---- AND THIS RADIUS IS TWENTY, WHICH IS NOT THE CHAT RADIUS ------------
+  // The obvious number is npcLOC_CHAT_R (13), and it is the wrong one: that is
+  // the radius at which two people have a CONVERSATION, and this is the radius
+  // at which one of them hears the other and looks over, which is further. The
+  // closest pair in each chapter was measured by the pair-chat pass and at 13 m
+  // three chapters have no pair at all — Reykjavík 17.16, Manly 18.38, the
+  // Drift 36.16. At 20 m the first two come in and the Drift does not, which is
+  // correct: its eight people are on separate floating islands and there is no
+  // honest radius at which one of them can hear another.
+  const npcCHAIN_R    = 20;    // m. MEASURED — see the closest-pair table above.
+  const npcCHAIN_WIN  = 1.1;   // s the look is available for after the line
+  const npcCHAIN_LOOK = 2.6;   // s they go on facing whoever said it
+  const npcLOC_CHAIN = ['What?', 'What was that?', 'Did you see that?', 'Hm?',
+                        'What is going on over there?', 'Oh, what now.',
+                        'Something is happening.', 'Everybody all right?'];
+  // What you say when somebody eats your stock in front of you. Chapter-neutral
+  // to the npcLOC_SAY standard — no country, no season, no named food — because
+  // this pool is spoken over a Marrakech orange cart, a Kyoto tea stall, a Hong
+  // Kong bakery and an Antarctic ration crate alike.
+  const npcLOC_PRODUCE = ['Hey — that is stock.', 'You are eating it.',
+                          'That was for sale.', 'Do you mind?',
+                          'Oh, help yourself.', 'That is coming out of somewhere.',
+                          'Not the good ones.', 'I was going to sell that.'];
+  // ...and what they say while trailing you across a square wanting it back.
+  const npcLOC_CHASE = ['That is mine.', 'Give it here.', 'Bring it back.',
+                        'Where are you going with that?', 'Come here.',
+                        'I am not asking twice.', 'That is not yours.'];
+  let locChainFrom = null, locChainT = 0;
+
+  /**
+   * The ground under a point, whichever chapter is live. `paY` is the same
+   * function pinned to Pasto; this is its chapter-neutral twin, and it answers
+   * NaN rather than 0 when the chapter publishes nothing, because a flat zero
+   * in a chapter whose ground is at 14 m would drop somebody through the floor.
+   */
+  function localGroundY(x, z) {
+    const live = game.biome && game.biome.current;
+    const api = live === 'sydney' ? game.env : game[live];
+    if (api && typeof api.terrainHeight === 'function') {
+      try { const y = api.terrainHeight(x, z); if (isFinite(y)) return y; } catch (e) { /* not built */ }
+    }
+    return NaN;
+  }
+
+  /** A reaction line, which also arms the chain. Greetings do not. */
+  function localReactLine(rec, arr) {
+    localLine(rec, arr);
+    locChainFrom = rec; locChainT = npcCHAIN_WIN;
+  }
+
+  /**
+   * WHOSE IS IT? The nearest local, in the live chapter, whose ANCHOR is inside
+   * npcOWN_R of where this prop lives — and who can actually walk, which means
+   * a figure this module built. A chapter that merged its people into a stall
+   * or a boat gets the lines and the flinch and not the walk, for exactly the
+   * reason the shuffle takes the same gate: sliding that person half a metre
+   * would take the jetty with them.
+   */
+  function localOwnerOf(prop) {
+    if (!prop || prop.removed || prop.hidden) return null;
+    if (!(prop.mass > 0) || prop.mass > npcOWN_MASS) return null;
+    // A souvenir is the spine of the journey and may never be taken back.
+    if (prop.keep) return null;
+    const live = game.biome && game.biome.current;
+    if (!live) return null;
+    const hx = prop.homeX, hz = prop.homeZ;
+    if (!(hx === hx && hz === hz)) return null;
+    let best = null, bestD = npcOWN_R * npcOWN_R;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.fig || r.own || r.ownCool > 0) continue;
+      const dx = hx - r.ax, dz = hz - r.az;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD) { bestD = d2; best = r; }
+    }
+    return best;
+  }
+
+  /** Set off after it. Safe to call on anybody; it refuses politely. */
+  function localOwnStart(rec, prop, say) {
+    if (!rec || !prop || rec.own || rec.ownCool > 0 || !rec.fig) return false;
+    rec.own = prop;
+    rec.ownT = 0;
+    rec.ownBack = false;
+    rec.ownSay = 0;
+    rec.stepT = 1e9;                 // the shuffle is off while this runs
+    if (say && rec.cd <= 0) {
+      rec.cd = rec.cool * rand(0.5, 0.9);
+      localReactLine(rec, say);
+    }
+    return true;
+  }
+
+  /** End it, whatever state it is in, and point them home. */
+  function localOwnEnd(rec) {
+    rec.own = null;
+    rec.ownT = 0;
+    rec.ownBack = false;
+    rec.ownCool = npcOWN_COOL * rand(0.8, 1.4);
+    rec.tx = rec.ax; rec.tz = rec.az;
+    rec.stepT = npcLOC_STEP_GAP * rand(0.6, 1.4);
+  }
+
+  /**
+   * A STEP THAT WOULD PUT SOMEBODY INSIDE A WALL IS NOT TAKEN.
+   *
+   * The shuffle never needed this — it cannot leave the square metre the
+   * chapter put the person on — and retrieval can go nine metres, so it does.
+   * Filtered to the STATIC group (physGRP_STATIC is 1), which is walls, ground
+   * and people; the prop being chased is in the dynamic group and is therefore
+   * never the thing that stops them reaching it.
+   *
+   * ---- AND IT STARTS 1.2 m OUT, WHICH IS NOT AN ARBITRARY MARGIN ----------
+   * The first cut started the ray at 0.45 m — clear of the walker's own 0.26 m
+   * half-width, and nothing else. MEASURED in Marrakech: a stallholder set off
+   * after a hat 4.4 m away and moved 0.48 m in 18.5 seconds, because THEIR OWN
+   * COUNTER is the first solid thing in front of them and every step read as
+   * blocked. Most of the people who own anything in this game are standing
+   * behind the thing their stock is on, so a test that refuses to step past
+   * one's own furniture is a test that switches the whole feature off. At 1.2 m
+   * a counter, a crate or a bollard is already behind them by the time the ray
+   * begins and a wall three metres off still stops them, which is the only
+   * thing this needs to do.
+   */
+  const npcOWN_RAY_A = new CANNON.Vec3();
+  const npcOWN_RAY_B = new CANNON.Vec3();
+  const npcOWN_RAY_R = new CANNON.RaycastResult();
+  const npcOWN_RAY_O = { collisionFilterMask: 1, skipBackfaces: true };
+  function localStepBlocked(rec, nx, nz) {
+    if (!game.world || !game.world.raycastClosest) return false;
+    const dx = nx - rec.x, dz = nz - rec.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < 1e-4) return false;
+    const ux = dx / d, uz = dz / d;
+    const y = rec.y + 0.9;
+    npcOWN_RAY_A.set(rec.x + ux * 1.20, y, rec.z + uz * 1.20);
+    npcOWN_RAY_B.set(rec.x + ux * 2.00, y, rec.z + uz * 2.00);
+    npcOWN_RAY_R.reset();
+    try { game.world.raycastClosest(npcOWN_RAY_A, npcOWN_RAY_B, npcOWN_RAY_O, npcOWN_RAY_R); }
+    catch (e) { return false; }
+    return !!npcOWN_RAY_R.hasHit;
+  }
+
+  /** One frame of somebody going to get their thing back. */
+  function localOwnStep(rec, dt) {
+    const p = rec.own;
+    rec.ownT += dt;
+    // ---- the tear-downs, in order of how little they trust the world -------
+    if (!p || p.removed || p.hidden || game.biome.current !== rec.biome) { localOwnEnd(rec); return; }
+    if (rec.ownBack) {
+      // home, or the clock. Either way this ends.
+      const dh = Math.hypot(rec.ax - rec.x, rec.az - rec.z);
+      if (dh < 0.5 || rec.ownT > npcOWN_BACK_T) { localOwnEnd(rec); return; }
+      rec.tx = rec.ax; rec.tz = rec.az;
+      return;
+    }
+    if (rec.ownT > npcOWN_OUT_T) {
+      // THE CEILING. They give up out loud, and they walk back.
+      if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.8, 1.4); localReactLine(rec, rec.says.rush || npcLOC_SAY.rush); }
+      rec.ownBack = true; rec.ownT = 0;
+      rec.tx = rec.ax; rec.tz = rec.az;
+      return;
+    }
+    const b = p.body;
+    if (!b) { localOwnEnd(rec); return; }
+    const px = b.position.x, pz = b.position.z;
+    // ---- THE LEASH. A person does not leave their pitch. -------------------
+    // Measured from the ANCHOR, like everything else about a local, and applied
+    // to the PROP rather than to the walker: if you have carried it further than
+    // this they stop, say so, and go back. It is the one rule that makes this
+    // safe to switch on in seventeen chapters at once — nobody can be led away.
+    if (Math.hypot(px - rec.ax, pz - rec.az) > npcOWN_LEASH) {
+      rec.ownBack = true; rec.ownT = 0;
+      rec.tx = rec.ax; rec.tz = rec.az;
+      return;
+    }
+    // ---- and the thing itself ---------------------------------------------
+    const d = Math.hypot(px - rec.x, pz - rec.z);
+    if (d < npcOWN_TAKE) {
+      if (p.held || p.owner) {
+        // CAUGHT YOU. The existing theft chain already has the verb for this.
+        if (game.physics && typeof game.physics.dropOwned === 'function') game.physics.dropOwned();
+        if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.6, 1.0); localReactLine(rec, npcLOC_CHASE); }
+        rec.flV -= 8;                        // a lunge, on the flinch spring
+        rec.flYaw = Math.atan2(px - rec.x, pz - rec.z);
+        return;                              // ...and they pick it up next frame
+      }
+      // It is loose and they are standing over it. Put it back where it lives.
+      rec.gest = 1.2;
+      if (game.physics && typeof game.physics.rescue === 'function') game.physics.rescue(p);
+      if (game.physics && typeof game.physics.puff === 'function') {
+        game.physics.puff(p.homeX, p.homeY + 0.35, p.homeZ, 3);
+      }
+      if (typeof game.sfx === 'function') game.sfx('rustle', { volume: 0.35 });
+      rec.ownBack = true; rec.ownT = 0;
+      rec.tx = rec.ax; rec.tz = rec.az;
+      return;
+    }
+    // ---- steer ------------------------------------------------------------
+    rec.ownSay -= dt;
+    if (rec.ownSay <= 0 && rec.cd <= 0 && p.held) {
+      rec.ownSay = npcOWN_SAY_T * rand(0.8, 1.5);
+      rec.cd = rec.cool * rand(0.4, 0.8);
+      localReactLine(rec, npcLOC_CHASE);
+    }
+    const ux = (px - rec.x) / d, uz = (pz - rec.z) / d;
+    let nx = rec.x + ux * 1.0, nz = rec.z + uz * 1.0;
+    if (localStepBlocked(rec, nx, nz)) {
+      // one try each way round it, then hold this frame. No path, no memory:
+      // a local has neither and is not getting either here.
+      const s = Math.sin(0.9), c = Math.cos(0.9);
+      const ax2 = ux * c - uz * s, az2 = ux * s + uz * c;
+      const bx2 = ux * c + uz * s, bz2 = -ux * s + uz * c;
+      if (!localStepBlocked(rec, rec.x + ax2, rec.z + az2)) { nx = rec.x + ax2; nz = rec.z + az2; }
+      else if (!localStepBlocked(rec, rec.x + bx2, rec.z + bz2)) { nx = rec.x + bx2; nz = rec.z + bz2; }
+      else { nx = rec.x; nz = rec.z; }
+    }
+    rec.tx = nx; rec.tz = nz;
   }
 
   // ---- WHAT THEY NOTICE ---------------------------------------------------
@@ -1530,6 +1838,51 @@ export function createNPCs(game) {
     const b = pr && pr.body;
     if (!b) return;
     localsReact('thief', b.position.x, b.position.z, 0.5, 6.5);
+    // ...AND WHOEVER IT BELONGS TO COMES AND GETS IT.
+    const own = localOwnerOf(pr);
+    if (own) localOwnStart(own, pr, own.says.thief || npcLOC_SAY.thief);
+  });
+  // ---- ...AND SO DOES KNOCKING IT OVER ------------------------------------
+  // Same owner test, one gate higher than the flinch's: a cup nudged off a
+  // table is a startle, a crate going over at seven metres a second is somebody
+  // walking over to pick it up. The prop is the payload's own `prop` field
+  // where physImpactPayload carries one.
+  const npcOWN_BANG = 6.0;      // m/s — worth getting off your stool for
+  game.events.on('prop:impact', function (p) {
+    if (!p) return;
+    const sp = typeof p.speed === 'number' ? p.speed : 0;
+    if (sp < npcOWN_BANG) return;
+    const pr = p.prop;
+    if (!pr || pr.held) return;
+    const own = localOwnerOf(pr);
+    if (own) localOwnStart(own, pr, own.says.startled || npcLOC_SAY.startled);
+  });
+  // ---- EATING SOMEBODY'S STOCK IN FRONT OF THEM ---------------------------
+  // `capy:graze` fires once per bite and carries the prop, and until now it was
+  // heard by capybara.js (for a chew pose) and by nobody else. A person whose
+  // produce it is gets a line and a shoo — the shoo being the arms-up flinch
+  // this rig already has, pointed at the animal rather than at a bang — and
+  // then they come and take it off you, which is the ownership walk above.
+  game.events.on('capy:graze', function (pr) {
+    if (!pr) return;
+    const own = localOwnerOf(pr);
+    const cp = game.capy && game.capy.position;
+    if (!own) {
+      // Nobody owns it, but somebody may still be standing near enough to have
+      // an opinion, and a bite is a small quiet thing: a narrow circle.
+      if (cp) localsReact('produce', cp.x, cp.z, 0.25, 5.0);
+      return;
+    }
+    // THE SHOO: the flinch spring driven the other way, aimed at the animal.
+    if (cp) own.flYaw = Math.atan2(cp.x - own.x, cp.z - own.z);
+    own.flV -= 12;
+    own.gest = 1.4;
+    if (own.cd <= 0) {
+      own.cd = own.cool * rand(0.5, 0.9);
+      localReactLine(own, own.says.produce || npcLOC_PRODUCE);
+    }
+    own.wary = Math.min(1, (own.wary || 0) + 0.5);
+    localOwnStart(own, pr, null);
   });
 
   // =======================================================================
@@ -1676,6 +2029,40 @@ export function createNPCs(game) {
     // and ten times a frame for one float is the cost that only shows up in
     // the chapter with the most people in it. See THE CALM in systems.js.
     const calmNow = typeof game.calm === 'function' ? game.calm() : 0;
+    // ---- THE CHAIN, spent once per reaction -------------------------------
+    // Resolved BEFORE the per-person loop and consumed inside it, so the answer
+    // is chosen by distance rather than by array order — otherwise the person
+    // who speaks second is whoever happens to sit lower in `locals`, which in a
+    // chapter that registers its cast in build order is always the same person.
+    let chainSrc = null;
+    if (locChainT > 0) {
+      locChainT -= dt;
+      if (locChainFrom && locChainFrom.biome === live) chainSrc = locChainFrom;
+      if (locChainT <= 0) { locChainFrom = null; locChainT = 0; }
+    }
+    let chainBest = null, chainBestD = npcCHAIN_R * npcCHAIN_R;
+    if (chainSrc) {
+      for (let i = 0; i < locals.length; i++) {
+        const r = locals[i];
+        if (r === chainSrc || r.biome !== live || !r.group) continue;
+        const dx = r.x - chainSrc.x, dz = r.z - chainSrc.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > npcCHAIN_R * npcCHAIN_R) continue;
+        // Everybody in earshot LOOKS. It costs two numbers and it is most of
+        // what sells a square reacting to something.
+        r.chatYaw = Math.atan2(chainSrc.x - r.x, chainSrc.z - r.z);
+        r.chatT = npcCHAIN_LOOK;
+        // ...and the nearest one with a free mouth is the one who answers.
+        if (r.cd <= 0 && d2 < chainBestD) { chainBestD = d2; chainBest = r; }
+      }
+      if (chainBest) {
+        chainBest.cd = chainBest.cool * rand(0.9, 1.6);
+        // localLine, NOT localReactLine: a second look may not arm a third, or
+        // one dropped crate walks round a square for ever.
+        localLine(chainBest, chainBest.says.chain || npcLOC_CHAIN);
+      }
+      locChainFrom = null; locChainT = 0;
+    }
     for (let i = 0; i < locals.length; i++) {
       const r = locals[i];
       if (r.biome !== live) continue;
@@ -1819,23 +2206,63 @@ export function createNPCs(game) {
       // boat, and sliding it half a metre would take the jetty with it — or,
       // worse, leave the person standing beside the thing they are part of.
       if (r.fig) {
-        r.stepT -= dt;
-        if (r.stepT <= 0) {
-          r.stepT = npcLOC_STEP_GAP * rand(0.45, 2.1);
-          // A new spot, measured from the ANCHOR and never from where they
-          // have got to — which is what stops a random walk from wandering off
-          // across the square one step at a time.
-          const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
-          r.tx = r.ax + Math.sin(a) * rr;
-          r.tz = r.az + Math.cos(a) * rr;
+        // ---- RETRIEVAL OUTRANKS THE SHUFFLE ---------------------------------
+        // ...and it is the ONLY thing that does. While `own` is set, the target
+        // is the thing they are going to get and not a point inside the square
+        // metre the chapter put them on; the moment it clears, localOwnEnd has
+        // already pointed them back at the anchor and the shuffle takes over
+        // and walks them there. See THE MISCHIEF ECONOMY.
+        if (r.own) {
+          localOwnStep(r, dt);
+        } else {
+          if (r.ownCool > 0) r.ownCool -= dt;
+          r.stepT -= dt;
+          if (r.stepT <= 0) {
+            r.stepT = npcLOC_STEP_GAP * rand(0.45, 2.1);
+            // A new spot, measured from the ANCHOR and never from where they
+            // have got to — which is what stops a random walk from wandering off
+            // across the square one step at a time.
+            const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
+            r.tx = r.ax + Math.sin(a) * rr;
+            r.tz = r.az + Math.cos(a) * rr;
+          }
         }
         const sx = r.tx - r.x, sz = r.tz - r.z;
         const sd = Math.sqrt(sx * sx + sz * sz);
         if (sd > 0.012) {
-          const step = Math.min(sd, npcLOC_STEP_V * dt);
+          const step = Math.min(sd, (r.own ? npcOWN_V : npcLOC_STEP_V) * dt);
           r.x += sx / sd * step;
           r.z += sz / sd * step;
           r.moving = 1;
+          // ---- ...AND THE GROUND COMES WITH THEM, ONCE THEY LEAVE THE SPOT ---
+          // The shuffle never needed this: 0.55 m of ground is level enough
+          // anywhere in this game, and `baseY` is what the chapter measured when
+          // it placed them. Retrieval can go nine metres and Pasto, Rio, Iceland
+          // and Cappadocia are not flat, so a person walking out on the fixed y
+          // would wade into a slope or float off one. Damped, not snapped: the
+          // terrain read is per-chapter and a hard write makes a person twitch
+          // on every seam in the mesh.
+          //
+          // AND IT ONLY APPLIES WHILE THEY ARE AWAY. Inside the shuffle radius
+          // the authority is `baseY` — the height the CHAPTER measured, which
+          // for somebody standing on a jetty, a plinth or a step is not the
+          // terrain at all. So: away, follow the ground; home, come back to
+          // exactly the number the chapter chose.
+          const away = r.own || (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
+                                > npcLOC_STEP_R * npcLOC_STEP_R;
+          if (away || Math.abs(r.y - r.baseY) > 0.004) {
+            let ty = r.baseY;
+            if (away) { const gy = localGroundY(r.x, r.z); if (gy === gy) ty = gy; }
+            r.y = damp(r.y, ty, 7, dt);
+            r.group.position.y = r.y;
+            r.anchor.group.position.y = r.y + 1.35;
+            if (r.body) {
+              const by = r.y + 0.85;
+              r.body.position.y = by;
+              r.body.previousPosition.y = by;
+              r.body.interpolatedPosition.y = by;
+            }
+          }
           r.group.position.x = r.x;
           r.group.position.z = r.z;
           // The speech bubble hangs off a bare point, so it has to be dragged
@@ -3460,6 +3887,33 @@ export function createNPCs(game) {
       if (rec.kind === 'busker') { rec.robbed = true; finish('busker-hat'); pickLine(rec, 'buskRob'); }
       else finish('steal-hat');
     }
+  });
+
+  // ---- EATING IT IN FRONT OF THEM, IN SYDNEY (v23) ------------------------
+  // The mischief economy's produce reaction, in the two chapters that are not
+  // populated by `locals` and therefore never see it. Sydney and Pasto already
+  // have ownership — a prop carries `owner`, and taking it starts a chase, which
+  // is a stronger version of what a local does — so this is the one of the three
+  // that was actually missing here. `startle` is the existing verb: the hop, the
+  // arms, the head snapping round. Nearest ONE person, on the same reasoning as
+  // the praise line: a square that all shouts at once is a cutscene.
+  const npcGRAZE_R = 7.0;
+  game.events.on('capy:graze', () => {
+    if (!biomeLive()) return;
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    const cx = capy.position.x, cz = capy.position.z;
+    let best = null, bd = npcGRAZE_R * npcGRAZE_R;
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r.group || r.state === 'chase' || r.state === 'swim' || r.state === 'plunge') continue;
+      const dx = r.group.position.x - cx, dz = r.group.position.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bd) { bd = d2; best = r; }
+    }
+    if (!best) return;
+    startle(best, cx, cz);
+    pickLine(best, 'shoo');
   });
 
   game.events.on('prop:impact', (p) => {

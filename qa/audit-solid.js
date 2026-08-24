@@ -38,7 +38,16 @@ async page => {
         let nm = o.name || '', q = o.parent, guard = 0
         while (q && guard++ < 6) { if (q.name) nm = nm ? (q.name + '/' + nm) : q.name; q = q.parent }
         const bb2 = gm ? (gm.boundingBox || (gm.computeBoundingBox(), gm.boundingBox)) : null
-        info[o.id] = { name: nm || o.type, inst: !!o.isInstancedMesh, cnt: o.count || 0,
+        // ---- AND SOMETHING THAT SURVIVES A RELOAD ---------------------------
+        // `o.id` is a global THREE counter: it is different on the next load, so
+        // a report that identifies a hit by id names nothing an hour later. The
+        // geometry type, the world position and the triangle count together are
+        // stable, and between them they say which object this is.
+        o.updateWorldMatrix(true, false)
+        const wp = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld)
+        info[o.id] = { name: nm || o.type, geo: (gm && gm.type) || '?',
+          wat: [Math.round(wp.x * 10) / 10, Math.round(wp.y * 10) / 10, Math.round(wp.z * 10) / 10],
+          inst: !!o.isInstancedMesh, cnt: o.count || 0,
           bb: bb2 ? [Math.round(bb2.min.x), Math.round(bb2.min.y), Math.round(bb2.min.z),
                      Math.round(bb2.max.x), Math.round(bb2.max.y), Math.round(bb2.max.z)] : null,
           col: o.material && o.material.color ? '#' + o.material.color.getHexString() : '',
