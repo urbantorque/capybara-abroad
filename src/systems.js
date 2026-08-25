@@ -521,6 +521,28 @@ const sysAMB_UP   = 6;    // m of height jitter, mostly upward: birds and bells
 const sysPHOTO_SAT = 0.06;
 const sysPHOTO_CON = 0.05;
 const sysPHOTO_VIG = 0.10;
+// ---- ...AND A CAMERA IN THE DARK HAS TO OPEN UP ---------------------------
+//
+// THE ONE CHAPTER THAT IS ABOUT DARKNESS PRODUCED A BLACK POSTCARD.
+//
+// Measured in Son Doong at (0, -86), daylight 0.001, with the wheek not lit:
+// the stored 288x180 album thumbnail came back at MEAN LUMA 17.6 of 255, max
+// 69, with 52.3% of its pixels under 16 — a picture of nothing, kept for ever
+// in the album and offered to the title card as a postcard. Taken 0.18 s
+// after a wheek, with the torch still up, the same frame is mean 49.8, max
+// 252, 6.1% black. So the chapter DOES have a picture in it; the shutter just
+// had no relationship to the only light in the room.
+//
+// The three numbers above are a lens, not a filter, and this is the fourth:
+// a LIFT that opens as the scene darkens, which is what a camera does. It is
+// scaled by (1 - sysSceneLit), so it is exactly zero in fifteen chapters and
+// it never touches a frame that already has light in it.
+//
+// The vignette goes the other way for the same reason: +0.10 of vignette is a
+// nice edge on a bright frame and a way of making an already-black one
+// blacker, so it fades out as the lift comes in.
+const sysPHOTO_LIFT = 0.085;
+let sysSceneLit = 1;
 // Reused by the core event handlers: they run on every prop impact in the game
 // and update() may not allocate. `at` is nulled after every use so a stale
 // position can never be inherited by the next caller.
@@ -14046,9 +14068,17 @@ export function createSystems(game) {
     // out-bloom the camera. Damped, so K is a lens opening rather than a cut.
     photoLens = damp(photoLens, photoOn ? 1 : 0, 2.6, game.state.dt || 0.016);
     if (photoLens > 0.002) {
+      const dark = 1 - sysSceneLit;
       pp.saturation += photoLens * sysPHOTO_SAT;
       pp.contrast += photoLens * sysPHOTO_CON;
-      pp.vignette += photoLens * sysPHOTO_VIG;
+      // ...and the edge is only worth having on a frame that has a middle.
+      pp.vignette += photoLens * sysPHOTO_VIG * (1 - dark);
+      if (dark > 0.01) {
+        const li = photoLens * dark * sysPHOTO_LIFT;
+        pp.liftR += li; pp.liftG += li; pp.liftB += li;
+        // opening up flattens everything, so give the contrast back
+        pp.contrast += li * 1.4;
+      }
     }
   }
   let photoLens = 0;
@@ -16312,6 +16342,15 @@ export function createSystems(game) {
     // three all READ that result rather than duplicating any of it, which is
     // the only reason a chapter can add a new event without also having to
     // remember to tell the sky and the lens about it.
+    // ---- HOW MUCH LIGHT IS IN THIS FRAME, 0..1 ------------------------
+    // Read here, where every block above has finished moving the three
+    // lights, for exactly the reason the dome and the grade are read here.
+    // The reference is Sydney at noon (hemi 1.0 + ambient 0.28 + a sun that
+    // carries most of it); underground with the wheek out it is about 0.06.
+    // Only photo mode reads it, and it is the difference between a postcard
+    // and a black JPEG. See sysPHOTO_LIFT.
+    sysSceneLit = clamp((hemi.intensity * 0.55 + amb.intensity * 0.9 +
+                         sun.intensity * 0.35) / 1.30, 0, 1);
     sysDressFrame(dt);
     // ...and the bed the atmosphere is heard over. Immediately after the
     // picture, because it is the other half of the same state: the shower that

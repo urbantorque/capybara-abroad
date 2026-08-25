@@ -41,7 +41,7 @@ Carried in and available to pillars 2 and 3:
 - [x] Project memory (capy3-payoff-batch-three)
 - [x] This file as the handover (below)
 - [x] `playwright-cli close-all`
-- [ ] Chain batch 4 (VERY LAST action)
+- [x] Chain batch 4 — `capy3-batch-4` created, fires 26 Aug 06:26 +10:00. NOTE: the chain DID work this run, unlike batch 1 -> 2. Two gotchas: `notifyOnCompletion` must be **false** from inside a scheduled run (a run session cannot subscribe to its own completion), and the shell clock moved between reading it and using it — read `Get-Date` immediately before the call or `fireAt` is rejected as past.
 
 ## Log
 
