@@ -211,6 +211,9 @@ let manGroper = null;
 let manRideDist = 0, manRideBest = 0, manRideOff = 0, manRideTop = 0;
 let manRipT = -1, manRipDone = false;
 let manTookOff = false, manTakeTop = 0;
+// ...AND THE SAME FOR THE FULL RIDE. See the payout: the condition it tested was
+// true of every qualifying ride, so the ceremony ran on all of them.
+let manAllWayDone = false;
 let manDuckT = 0;
 let manPoolEnd = 0;
 let manSeenSet = false;
@@ -864,9 +867,35 @@ function manNavBlocked(x, z, r) {
 function manSurfacePitch(x, z, y) {
   if (z > manSHOP_Z - 1) return 1.02;                 // the Corso is paving
   if (z > manDUNE_Z + 1) return 1.0;                  // the promenade
+  // ---- ...AND EVERYTHING EAST OF THE POINT WAS ONE SOUND ------------------
+  // `x > manPOINT_X` is 47% of the walkable map — 3,240 cells of 6,854 — and it
+  // returned bare stone for all of it. Two of the chapter's best-drawn places
+  // are in there: SHELLY, which has its own local, its own souvenir and its own
+  // name on the card, and the OCEAN POOL, whose floor is tiled concrete under
+  // half a metre of water and whose deck is worn sandstone with forty years of
+  // feet on it. The headland is genuinely rock; those two are not, and they are
+  // exactly the two places a player goes east to reach.
+  if (manPoolDeck(x, z)) return 1.14;                 // hollow-sounding sandstone deck
+  if (manInPool(x, z)) return 0.88;                   // tiled floor, under water
+  {
+    const sdx = x - manSHELLY.x, sdz = z - manSHELLY.z;
+    // the cove itself is shell grit and coarse sand, not the platform round it
+    if (sdx * sdx + sdz * sdz < manSHELLY.r * manSHELLY.r * 0.55) return 0.80;
+  }
   if (x > manPOINT_X || x < manBEACH_X0) return 1.04; // rock
   if (manBoatCarrying) return 1.22;                   // and the boat is timber
   return 0.72;                                        // sand, which eats a footfall
+}
+
+/** Inside the ocean pool's water box. */
+function manInPool(x, z) {
+  return x > manPOOL.x0 && x < manPOOL.x1 && z > manPOOL.z0 && z < manPOOL.z1;
+}
+/** The walkable coping round it, 2.5 m of it, which is where people actually stand. */
+function manPoolDeck(x, z) {
+  return !manInPool(x, z) &&
+         x > manPOOL.x0 - 3.2 && x < manPOOL.x1 + 3.2 &&
+         z > manPOOL.z0 - 3.2 && z < manPOOL.z1 + 3.2;
 }
 
 // ================================================================== BUILDING ==
@@ -1040,6 +1069,37 @@ function manBuild(game) {
       onTask: { 'sandcastle': ['Straight through it. That is a spike. That is technically a spike.'],
                 'move-flags': ['We are inside the flags now. We have never been inside the flags.'] } });
 
+    // ---- THE OTHER HALF OF THE VOLLEYBALL GAME ------------------------
+    //
+    // NO PAIR-CHAT CAN EVER FIRE IN MANLY. Eight locals, and the closest two
+    // are the surf club at (24, 47) and the volleyball player at (41, 40) —
+    // 18.4 m apart against npcLOC_CHAT_R = 13.0. Every other pair is 24.8 to
+    // 48.0 m. That is not a bug in the placement: a beach IS spread out, and
+    // moving the club local off the clubhouse to satisfy a radius would be
+    // fixing the number rather than the chapter.
+    //
+    // What the chapter already had was a volleyball court with three figures
+    // standing on it and a man beside it saying "We are two down. You do not
+    // happen to play." — a person whose lines are ABOUT the game he is in the
+    // middle of, and no one to be in it with. The figure across the net was
+    // already drawn; it is a local now instead, 8.0 m away, and the two of
+    // them argue about the score. Nothing is added to the world.
+    manLocals.partner = game.addLocal({ biome: 'manly', x: 37.6,
+      y: manTerrain(37.6, manSHORE_Z + 8.8), z: manSHORE_Z + 8.8, near: 7,
+      figure: { shirt: PALETTE.manBoardC, hat: PALETTE.manSand, legs: PALETTE.manFlagYel },
+      lines: ['I am not two down. HE is two down. I am playing fine.',
+              'Wind is straight down the court. Whoever serves into it loses.',
+              'If you get under it, just put it up. Somebody will be there.',
+              { t: 'Ball went out in the gutter. We are not going in after it.', before: 'the-rip' },
+              { t: 'You went out THERE. On purpose. For fun.', after: 'the-rip' }],
+      wheek: ['Right. Yes. You are in.'],
+      praise: ['See, that is what I have been asking for all afternoon.',
+               'And nobody was even looking. Typical.',
+               'Do that again and I will put you on the other side.'],
+      onTask: {
+        'sandcastle': ['Straight through it. He did that last week and blamed the wind.'],
+        'all-the-way': ['We stopped. The whole court stopped. Do you understand that?'] } });
+
     manLocals.ferry = game.addLocal({ biome: 'manly', x: -58, y: manPROM_Y, z: manSHOP_Z - 5.6, near: 7.5,
       figure: { shirt: PALETTE.manShopB, hat: PALETTE.manSand, skin: PALETTE.skin2 },
       lines: ['Ferry every half hour. Rough one today. Sit at the back.',
@@ -1054,6 +1114,17 @@ function manBuild(game) {
       onTask: { 'to-manly': ['Over the hill and there it is. Gets everybody, that.'],
                 'all-the-way': ['The whole ferry saw that. The WHOLE ferry.'],
                 'the-surfboat': ['In the boat. With the crew. Forty minutes from Wynyard.'] } });
+  }
+
+  if (typeof game.addExchange === 'function' && manLocals.volley && manLocals.partner) {
+    game.addExchange({ biome: 'manly', a: manLocals.volley, b: manLocals.partner, gap: 26, lines: [
+      ['That was out.', 'That was not out. That was ON the line.'],
+      ['Six-four.', 'Five-four. And it is my serve.'],
+      ['Are we playing to eleven?', 'We are playing until somebody goes home.'],
+      ['There is a capybara on the court.', 'There is a capybara on the court, yes.'],
+      ['Wind has swung.', 'The wind has not swung. You are just serving badly.'],
+      ['Somebody has taken the ball again.', 'Somebody takes the ball every single day.'],
+    ] });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(manRoot);
@@ -1550,7 +1621,9 @@ function manBuildTown(game, root) {
   // ---- and the two the volleyball local is short of ----------------------
   {
     const vx = 40, vz = manSHORE_Z + 12;
-    manPutFigure(M, vx - 2.4, manTerrain(vx - 2.4, vz - 3.2), vz - 3.2, 0.15, 3, 5);
+    // ONE OF THESE THREE IS A PERSON NOW — see manLocals.partner. A merged
+    // figure and a local would be drawn twice in the same place, so the one
+    // at (vx - 2.4, vz - 3.2) is left out here and addLocal draws it instead.
     manPutFigure(M, vx + 1.9, manTerrain(vx + 1.9, vz + 3.4), vz + 3.4, Math.PI - 0.2, 0, 8);
     manPutFigure(M, vx + 4.4, manTerrain(vx + 4.4, vz + 2.0), vz + 2.0, Math.PI + 0.5, 3, 14);
   }
@@ -3863,7 +3936,7 @@ function manUpdateSurfTasks(game, dt) {
       manPuffSpray(p.x, manWave.y + 0.35, p.z + 0.9, 8, 1.0);
       game.shake(0.16);
       manSfx.volume = 0.55; manSfx.pitch = 0.9;
-      game.sfx('splash', manSfx);
+      game.sfx('splash', placeCue(manSfx, p.x, manWave.y + 0.3, p.z, 70));
       manRideEndT = Math.max(manRideEndT, 2.2);
     }
   } else if (manRideDist > 0) {
@@ -3872,9 +3945,19 @@ function manUpdateSurfTasks(game, dt) {
       // THE RIDE IS OVER. Where did it end?
       const onSand = manTerrain(p.x, p.z) > -0.35 && p.z > manSHORE_Z - 12;
       if (manRideDist > manRideBest) manRideBest = manRideDist;
+      // ---- ONCE, THE WAY manTookOff IS ONCE -----------------------------
+      // `manRideDist >= 34 && onSand` is true of EVERY qualifying ride, so
+      // the chapter’s ceremony ran again on every one of them. Measured over
+      // eight drift runs from the bank: five identical "all the way to the
+      // sand. that is the one." toasts, five forced cheers off a throttle that
+      // exists to protect exactly this cue, and five camera shakes. A marquee
+      // that happens five times is not a marquee. The RECORD still runs every
+      // ride, because a personal best is a thing you beat.
       if (manRideDist >= 34 && onSand) {
-        manTask(game, 'all-the-way');
         game.record('all-the-way', manRideBest);
+        if (!manAllWayDone) {
+        manAllWayDone = true;
+        manTask(game, 'all-the-way');
         // ---- AND THE CHAPTER'S MARQUEE HAS TO LAND ----------------------
         // It ticked a box on the card and made no noise. A fifty-metre ride
         // that ends with the animal sliding up the sand in front of twenty
@@ -3895,8 +3978,14 @@ function manUpdateSurfTasks(game, dt) {
            'I am going to describe it badly and nobody is going to believe me.'],
           ['They will hear that at the Quay.']);
         game.shake(0.30);
+        // AND THE WHOLE CHAPTER WAS MONO. 48 game.sfx calls in the file, none
+        // carrying an `at:` — the largest audio surface in the game and not one
+        // panner in it, against seven positional sites in the Quay. The two cues
+        // of the marquee are the ones it costs most: the wash is AT THE ANIMAL,
+        // and the beach cheering is at the BEACH, which is behind and above you
+        // when you come up the sand.
         manSfx.volume = 0.9; manSfx.pitch = 0.55;
-        game.sfx('splash', manSfx);
+        game.sfx('splash', placeCue(manSfx, p.x, manWave.y + 0.3, p.z, 70));
         // ...AND TWENTY PEOPLE SAW IT. The bathers have been turned to watch
         // the rider all the way in (manBathAim); this is the half-second at
         // the end where the whole beach comes off the ground. `force`,
@@ -3905,9 +3994,26 @@ function manUpdateSurfTasks(game, dt) {
         // owed — see the note on sfxGap.
         manBathCheer = 2.8;
         manSfx.volume = 0.55; manSfx.pitch = 1.15; manSfx.force = true;
-        game.sfx('cheer', manSfx);
+        game.sfx('cheer', placeCue(manSfx, p.x, 1.4, manSHORE_Z + 8, 90));
         manSfx.force = false;
         game.toast('all the way to the sand. that is the one.');
+        // ---- FRAMED, AND THE LENS IS TAKEN BACK BEFORE THE MOMENT -------
+        //
+        // The ride rig releases 0.9 s BEFORE this fires — manRideOff has to
+        // clear before the end is judged — so the chapter’s marquee is shot
+        // from the STANDING rig, not the surfing one. Measured at the payout:
+        // yaw 179.5 degrees (dead astern), 10.9 m out, raised 7.5 m, pitched
+        // 43.4 degrees DOWN, framing() 0.00 — two thirds empty sand, looking
+        // down on the animal’s back, with no sea, no whitewater and none of
+        // the twenty people in it. During the ride itself the rig is giving
+        // 22-30 degrees at 11.2-12.9 m, which is the picture this wants.
+        //
+        // Astern is right — a wave comes in behind you and so does the beach
+        // — so it is the DOWN-ANGLE that is wrong. 0.22 rad puts the lens near
+        // the animal’s own height with the whitewater and the beach behind it.
+        if (typeof game.frameShot === 'function')
+          game.frameShot({ yaw: Math.PI, dist: 13.5, pitch: 0.22, raise: 1.8, hold: 2.6 });
+        }
       } else if (manRideDist >= 12) {
         game.record('all-the-way', manRideBest);
       }
@@ -4145,10 +4251,17 @@ function manUpdateSurfTasks(game, dt) {
     // the one thing a lifeguard on this beach exists to shout
     manCall(game, 'rip', lgX, lgY, lgZ,
             'OI! Not there! Come across, not against it!', 26);
+  } else if (manRideEndT > 2.2) {
+    // ---- THE MARQUEE OUTRANKS THE WEATHER REPORT -----------------------
+    // This sat THIRD, behind 'Set! Outside!', in an else-if chain that is
+    // further gated by a 3.2 s one-voice lock and a 40 s per-key cooldown —
+    // and a big set is exactly what is happening on the frame a big ride
+    // ends, because it is the wave you rode. Measured: two ride bubbles
+    // across five payouts. The lifeguard announcing the surf while the
+    // capybara slides up the sand in front of him is the wrong sentence.
+    manCall(game, 'ride', lgX, lgY, lgZ, 'Did anyone else see that?', 40);
   } else if (manBigNear > 0.66 && p.z < manSHORE_Z + 4) {
     manCall(game, 'set', lgX, lgY, lgZ, 'Set! Outside!', manPERIOD * 9);
-  } else if (manRideEndT > 2.2) {
-    manCall(game, 'ride', lgX, lgY, lgZ, 'Did anyone else see that?', 40);
   } else if (manBoatPhase === 'out' && manBoatT < 1.2 && Math.abs(p.x - manBOAT_HOME.x) < 40) {
     manCall(game, 'boat', -14, manTerrain(-14, 33) + 0.6, 33, 'Boat going out! Heads up!', 70);
   } else if (manGullUp > 0.9 && Math.abs(p.z - manSHOP_Z) < 16) {

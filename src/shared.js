@@ -2512,12 +2512,35 @@ export function grainOwn(m, opts) { return grain(m.clone(), opts); }
 // Mutates and returns the options object, so it wraps an existing call in one
 // line and no allocation is added to a per-frame path.
 // ---------------------------------------------------------------------------
+// AND IT MUST NOT WRITE INTO THE OPTIONS OBJECT IT IS GIVEN.
+//
+// Every one of these chapters fires its cues through ONE shared, mutated
+// options object — `manSfx`, `panSfx`, `sysSpatial` — reused for the life of
+// the page precisely so that a sound in an update loop allocates nothing.
+// Writing `at` into that object would leave it there, and the next forty mono
+// calls that only set volume and pitch would inherit a position from whatever
+// last happened to be placed. That is the shared-cache bug this codebase has
+// already paid for twice (mat() keyed by colour, grain() keyed by uuid), and
+// it would be silent: a gull would simply start coming from a wave.
+//
+// So the fields are COPIED into one dedicated object and the caller’s is left
+// exactly as it was. sfx() reads it synchronously, so one is enough — the same
+// reason `manSfx` itself is one object.
+const sharedPlaced = { volume: 1, pitch: 1, at: { x: 0, y: 0, z: 0 }, near: 0, far: 0,
+                       force: false, ui: false, streak: undefined, wet: undefined };
 export function placeCue(o, x, y, z, far) {
-  const opts = o || {};
-  if (!(x === x && z === z)) return opts;   // NaN in, mono out — never a throw
-  opts.at = { x: x, y: y || 0, z: z };
+  const src = o || {};
+  if (!(x === x && z === z)) return src;   // NaN in, mono out — never a throw
+  const p = sharedPlaced;
+  p.volume = src.volume !== undefined ? src.volume : 1;
+  p.pitch  = src.pitch  !== undefined ? src.pitch  : 1;
+  p.force  = !!src.force;
+  p.ui     = !!src.ui;
+  p.streak = src.streak;
+  p.wet    = src.wet;
+  p.at.x = x; p.at.y = y || 0; p.at.z = z;
   const f = far > 0 ? far : 120;
-  opts.near = f;
-  opts.far = f + 46;
-  return opts;
+  p.near = f;
+  p.far = f + 46;
+  return p;
 }
