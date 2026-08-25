@@ -25,10 +25,10 @@ Carried in and available to pillars 2 and 3:
 
 ## Per-chapter checklist (five pillars)
 
-- [ ] **4 Kyoto** — 1 marquee · 2 cast · 3 ground · 4 toy · 5 route
+- [x] **4 Kyoto** — DONE (afe5326): 67-fire marquee latched, framed, positional, lit, surface ladder, minimap, dango, heron reads the stones
 - [ ] **5 Cali** — 1 · 2 · 3 · 4 · 5
-- [ ] **6 Rio** — 1 · 2 · 3 · 4 · 5
-- [ ] **7 Iceland** — 1 · 2 · 3 · 4 · 5
+- [x] **6 Rio** — DONE (d0ac791): localWater, kiosk gate + ladder, framed/punched/positional, lit, arches zone, icecream, rioClap
+- [x] **7 Iceland** — DONE (93d4109): aurora was BEHIND THE CAMERA, snowcat catchable, moraine footfall, 174 m exchange
 - [ ] **8 Marrakech** — 1 · 2 · 3 · 4 · 5
 - [ ] **9 The Drift** — 1 · 2 · 3 · 4 · 5
 - [ ] **10 Venice** — 1 · 2 · 3 · 4 · 5
