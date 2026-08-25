@@ -2460,10 +2460,27 @@ function iceBuildAurora(root) {
     // rendered as fog. Shorter and further apart leaves DARK SKY BETWEEN THEM,
     // which is the only thing that makes a band of light read as a band.
     const len = 330;
-    const ang = -1.05 + (i / (iceCURTAIN_N - 1)) * 2.1;    // a fan across the north
+    // ...AND THE WHOLE FAN WAS BEHIND THE CAMERA, FOR ALL TWELVE SECONDS.
+    //
+    // Two comments above this one describe fixing the aurora's ELEVATION, twice.
+    // Nobody checked its AZIMUTH. `czz = -cos(ang)*rad` fans the curtains across
+    // -Z; the town, the pier, the sea and the rig's own rest yaw are all +Z, and
+    // the camera parks behind the animal at -Z looking +Z. Measured at the
+    // spring at full ignition: camera forward (0, -0.17, +0.99), and **0 of 984
+    // curtain vertices in front of it** — best dot -0.078. Force-painting every
+    // curtain magenta at opacity 1 with depthTest off still rendered nothing.
+    //
+    // The crane-up, the score swell, the fox, the locals and the toast all fire
+    // correctly around an empty star field. This is the fourth pass over this
+    // chapter and the marquee has never once been on screen.
+    //
+    // Mirrored in z. The yaw sign flips with it: a ribbon is tangential to the
+    // circle, which is rotation.y = -ang at -Z and +ang at +Z. Getting that
+    // wrong turns each curtain edge-on and it disappears a second time.
+    const ang = -1.05 + (i / (iceCURTAIN_N - 1)) * 2.1;    // a fan across the sky the camera faces
     const rad = 360 + (i % 3) * 70;
-    const cxx = Math.sin(ang) * rad, czz = -Math.cos(ang) * rad;
-    const yaw = -ang + rand(-0.2, 0.2);
+    const cxx = Math.sin(ang) * rad, czz = Math.cos(ang) * rad;
+    const yaw = ang + rand(-0.2, 0.2);
     for (let band = 0; band < 2; band++) {
       const y0 = band === 0 ? 46 : 84;
       const h = band === 0 ? 44 : 62;
@@ -3924,7 +3941,23 @@ function iceUpdateSpring(game, dt) {
   // --- the sky ---------------------------------------------------------------
   if (iceAuroraHold > 0) iceAuroraHold -= dt;
   if (iceAuroraArmed && iceAurora < 1) {
-    if (iceAurora <= 0.001) iceAuroraHold = 12;    // the ignition, framed
+    if (iceAurora <= 0.001) {
+      iceAuroraHold = 12;    // the ignition, framed
+      // ---- AND NOW IT IS ACTUALLY FRAMED (v26) --------------------------
+      // `skyward()` has always asked for the pitch and the distance and there
+      // was no way to ask for the BEARING, which is the one that was wrong: the
+      // curtains hang across +Z and the camera could be pointing anywhere.
+      // `yaw` IS THE BEARING FROM THE ANIMAL TO THE CAMERA, not the direction
+      // the camera looks — so PI is the camera behind the animal at -Z looking
+      // out over +Z, which is where the curtains now hang. Writing 0 here put
+      // the rig at +Z facing -Z and measured 0 of 336 curtain vertices in
+      // frame: exactly the bug this whole block exists to fix, reintroduced by
+      // getting a sign wrong. Held for the whole twelve-second rise, and any
+      // camera input from the player still ends it on the spot.
+      if (iceGame && typeof iceGame.frameShot === 'function') {
+        iceGame.frameShot({ yaw: Math.PI, hold: 12 });
+      }
+    }
     iceAurora = clamp(iceAurora + iceAUR_RISE * dt, 0, 1);
     // ---- AND THE SCORE OPENS WITH IT --------------------------------------
     // The tick at the end of this is a `wow` and systems.js pays it out on its
@@ -4326,6 +4359,8 @@ export function createIceland(game) {
     inZone: iceInZone,
     SPAWN: iceSPAWN,
     /** The fourth chapter to declare a moving floor. See iceUpdateSnowcat. */
+    /** Which of the four grounds is under (x, z). The footfall ladder asks. */
+    groundKind: iceGroundKind,
     carryFrame() { return iceCatCarrying ? iceCatCarry : null; },
     /** The snowcat MOVES, and the whole point of it is the lift. Ask; never cache. */
     snowcat() {
@@ -4942,8 +4977,23 @@ const iceCAT_WAIT = 3.0;             // s it sits at the TOP
 // point in the cycle and waits, on average, half a loop — which is the same
 // dead time this thing exists to delete, moved thirty metres down the hill.
 // Capped, so it cannot be parked there for ever by standing next to it.
-const iceCAT_HOLD_R = 15;            // m — "you are clearly coming for it"
-const iceCAT_HOLD_MAX = 14;          // s — the longest it will ever be kept
+// THE RIDE BACK EXISTED AND THE PLAYER COULD NEVER CATCH IT.
+//
+// Iceland is the one chapter that fails route life outright: 110 m of empty
+// between the geothermal field and the top of the moraine, walked again on
+// every attempt because `glacier-run` is a record. The snowcat is the answer to
+// that and its own comment says so. But **every glacier run finishes at
+// x ~ -20** — the ice centre line is -16 — while the cat's track is x = 34, and
+// this hold radius was 15 m. So the machine that exists to save you the climb
+// was 54 m away and already leaving by the time you had walked to it: the toll
+// was the walk PLUS up to 31 s of watching it go.
+//
+// 58 m reaches the runout, and the cap is raised to cover the walk across at a
+// trot. Relocating the track onto the fall line is the real fix and it moves
+// the beacon, the headlights, the ramp meshes and the fox's orbit with it —
+// listed for batch 4 rather than half-done here.
+const iceCAT_HOLD_R = 58;            // m — reaches the glacier runout at x ~ -20
+const iceCAT_HOLD_MAX = 26;          // s — the longest it will ever be kept
 // THE DECK HAS TO BE HOPPABLE, and this is the number the whole thing lives or
 // dies by. The first cut put the standing surface 2.7 m over the moraine, which
 // is a machine you can admire and cannot board: the capybara steps up 0.4 m by
@@ -5436,10 +5486,20 @@ function iceBuild(game) {
           ['Is that an animal on your pier?', 'It has been on my pier for a while.'],
         ] });
       }
-      if (iceLocSpring && iceLocCat) {
-        game.addExchange({ biome: 'iceland', a: iceLocCat, b: iceLocSpring, gap: 40, lines: [
+      // ONE HUNDRED AND SEVENTY-FOUR METRES APART. This exchange paired the
+      // snowcat driver at (35, -170) with the spring keeper at (-30.5, -8.4).
+      // `npcEX_MIN/MAX` are 6 and 26 m and they gate on the PLAYER's distance
+      // to the pair, not on the pair's distance to each other — so it fired
+      // happily and you read exactly one bubble: a reply to nobody, from a man
+      // a hundred and seventy metres over a moraine. The `gap: 40` on it was
+      // the only clue and it is not a check.
+      //
+      // The spring keeper's neighbour is the shepherd — 32 m, both on the flat
+      // ground south of the geothermal field, and the lines are better for it.
+      if (iceLocSpring && iceLocSheep) {
+        game.addExchange({ biome: 'iceland', a: iceLocSheep, b: iceLocSpring, gap: 34, lines: [
           ['Still watching that puddle?', 'It is thirty-eight degrees and it is free.'],
-          ['Anybody up the hill?', 'Nobody goes up the hill. That is why you have a job.'],
+          ['Anybody up the hill?', 'Nobody goes up the hill. That is why he has a job.'],
           ['Sky is due.', 'Sky is due. Sit down for it.'],
         ] });
       }

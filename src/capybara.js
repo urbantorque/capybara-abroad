@@ -914,6 +914,13 @@ function capySurfacePitch(game, env, x, z, y) {
       if (i.inZone('cliff', x, z)) return 1.04;
       if (i.inZone('city', x, z)) return 1.0;
     }
+    // THE MORAINE HAD NO ROW, AND IT IS THE HUNDRED METRES THE PLAYER CLIMBS
+    // MOST OFTEN. `iceGroundKind` has named four grounds since it was written
+    // and this ladder asked for none of them, so loose glacial rubble — the
+    // approach to the glacier, walked again on every run attempt — sounded
+    // exactly like the moss on the lava field. It is the noisiest ground in
+    // the chapter and it was the quietest.
+    if (i && i.groundKind && i.groundKind(x, z) === 'moraine') return 1.12;
     return 0.82;
   }
   if (b.isActive('drift')) {
