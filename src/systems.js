@@ -3135,7 +3135,14 @@ const sysMAP_WORLDS = {
   ] },
   // 'the bridge at Uji' — the deck itself, which is nine metres north of the
   // town mark and is the only bit of it the three wheeks are answered at.
-  kyoto: { x0: -100, x1: 60, z0: -70, z1: 215, pad: 8,
+  // x1 WAS 60, AND THE MARQUEE FINISHED OUTSIDE THE MAP. `kyoMILL` is not the
+  // {x:54, z:148} literal it is declared as — it is reassigned at build time
+  // onto the river's last centreline segment, and the run ends at about
+  // (128.7, 153.3). So the mill, the mill wheel and the two Uji locals at
+  // x 117 and x 100 all sat past the right edge: the "you" dot pinned itself to
+  // the frame for the whole of the chapter's wow. Never bound a map from a
+  // landmark's declared constant when the chapter moves it.
+  kyoto: { x0: -100, x1: 140, z0: -70, z1: 215, pad: 8,
     way: { x: 4, z: 128, t: 'the bridge at Uji' }, marks: [
     { get: 'toriiStart', k: 'star', t: 'the gates' },
     { get: 'pond', k: 'water', t: 'the golden pond' },
@@ -13875,6 +13882,29 @@ export function createSystems(game) {
       // blooming would smear the whole valley.
       const up = clamp(game.goreme.sunUp(), 0, 1) * gorT;
       thr += up * 0.48; bloom -= up * 0.24;
+    }
+    // ---- THE FIVE CHAPTERS WITH NO ROW AT ALL (v26) ----------------------
+    // `qa/channels.mjs` counted them: sydney, pasto and quay (recorded in v25)
+    // and — new — KYOTO and RIO. A chapter with no row here cannot use "lit",
+    // the second of the four channels, for anything: not for its marquee, not
+    // for a set piece, not for the weather. Both weights below have existed as
+    // declared variables since the grade layer was written and nothing has ever
+    // read either of them.
+    //
+    // Kyoto: the river is the one bright thing in a chapter of moss, cedar and
+    // wet slate, and the run down it is the chapter's wow. Scaled by how hard
+    // the water is actually carrying you, so drifting in the shallows is
+    // nothing and the fast line through the boats is the whole lift.
+    if (kyoT > 0.002 && B.isActive('kyoto') && game.kyoto && game.kyoto.runFlow) {
+      const flow = clamp(game.kyoto.runFlow(), 0, 1) * kyoT;
+      bloom += flow * 0.20; sat += flow * 0.06; vig += flow * 0.05;
+    }
+    // Rio: the salute. Four point two seconds of the bateria turned to face
+    // you, which is the loudest thing that happens in the chapter and the thing
+    // the `wow` row is written about.
+    if (rioT > 0.002 && B.isActive('rio') && game.rio && game.rio.salute) {
+      const s = clamp(game.rio.salute(), 0, 1) * rioT;
+      bloom += s * 0.26; thr -= s * 0.08; sat += s * 0.05;
     }
     if (caliT > 0.002 && B.isActive('cali') && game.cali && game.cali.night) {
       const nite = clamp(game.cali.night(), 0, 1) * caliT;

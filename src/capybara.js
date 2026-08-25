@@ -866,12 +866,25 @@ function capySurfacePitch(game, env, x, z, y) {
   }
   if (b.isActive('kyoto')) {
     const k = game.kyoto;
+    // THE SAME BUG THE QUAY HAD, in the chapter directly after it. The ladder
+    // below `gion`/`zen` was `if (z < -40 && z > -140) return 1.0` — an axis
+    // band standing in for the torii path — and Kyoto's zones do not lie along
+    // one axis. Measured: the band is true at (-84, -44), and so is
+    // `inZone('bamboo')`, so **half the bamboo grove (z -78..-40 of -78..-10)
+    // footfalled as granite**; and the whole of Uji — the town at (24, 176),
+    // the mill, the granite spine, the stone gutter — is off the far end of the
+    // band and fell through to 0.82, WHICH IS THE SAND DEFAULT. A chapter with
+    // no beach in it was walking on sand for its entire second half.
+    //
+    // `kyoInZone` has answered 'torii', 'bamboo' and 'uji' the whole time and
+    // the ladder asked for none of them. Ask the chapter where things are.
     if (k && k.inZone) {
       if (k.inZone('gion', x, z)) return 1.0;    // granite setts
       if (k.inZone('zen', x, z)) return 0.86;    // raked gravel — soft, but crunchier
+      if (k.inZone('uji', x, z)) return 1.02;    // the granite spine and its gutter
+      if (k.inZone('bamboo', x, z)) return 0.78; // leaf litter over soft earth
+      if (k.inZone('torii', x, z)) return 1.0;   // gravel over stone steps
     }
-    // the torii path is gravel over stone steps
-    if (z < -40 && z > -140) return 1.0;
     return 0.82;
   }
   if (b.isActive('cali')) {

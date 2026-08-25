@@ -683,6 +683,23 @@ function physBuildArepa(g) {
   physAdd(g, physCylG(0.1, 0.1, 0.025), PALETTE.empanada, 0.05, 0.16, -0.04);
   physAdd(g, physBoxG(0.11, 0.025, 0.06), PALETTE.empanada, -0.09, 0.16, 0.07, 0, 0.6, 0);
 }
+// HANAMI DANGO — three rounds on a skewer, pink, white and matcha green.
+//
+// It exists because KYOTO HAD NOTHING EDIBLE IN IT. Batch 1 built a produce
+// reaction — graze somebody's food and you get a line and a shoo — and the
+// chapter could not reach it, because the reaction is driven off `edible` and
+// Kyoto's ten scattered props were baskets, bins, cones and signs. Six of the
+// eight chapters in this batch had the same hole.
+//
+// It also replaces two `cuencobowl` — a Nariño soup bowl — standing in a
+// Japanese tea town, which is the same wrong-continent mistake the Marrakech
+// scatter list was caught making, in the chapter directly after it.
+function physBuildDango(g) {
+  physAdd(g, physCylG(0.014, 0.012, 0.42), PALETTE.templeWood, 0, 0.05, 0, Math.PI * 0.5, 0, 0);
+  physAdd(g, physSphG(0.062), PALETTE.sakura,      0, 0.062, 0.115);
+  physAdd(g, physSphG(0.062), PALETTE.petalWhite,  0, 0.062, 0);
+  physAdd(g, physSphG(0.062), PALETTE.matchaPale,  0, 0.062, -0.115);
+}
 function physBuildMaiz(g) {
   physAdd(g, physCylG(0.095, 0.085, 0.42), PALETTE.maiz, 0, 0.1, 0, Math.PI * 0.5, 0, 0);
   physAdd(g, physConeG(0.09, 0.15), PALETTE.maiz, 0, 0.1, 0.27, -Math.PI * 0.5, 0, 0);
@@ -798,6 +815,7 @@ const physTYPES = {
   // in Cappadocia and Marrakech — so they carry a density like everything else.
   empanada:   { name: 'empanada',       mass: 0.28, hy: 0.11, shape: ['box', 0.3, 0.11, 0.19],  hold: [0, 0.01, 0.07], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildEmpanada },
   arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, edible: true, grazeSfx: 'rustle', build: physBuildArepa },
+  dango:      { name: 'hanami dango',   mass: 0.16, hy: 0.07, shape: ['box', 0.08, 0.07, 0.24], hold: [0, 0.01, 0.09], spin: 1.7, edible: true, grazeSfx: 'pop',    build: physBuildDango },
   maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, edible: true, grazeSfx: 'tick', build: physBuildMaiz },
   plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, edible: true, grazeSfx: 'rustle', build: physBuildPlantain },
   ruana:      { name: 'ruana',          mass: 1.3,  hy: 0.13, shape: ['box', 0.34, 0.13, 0.27], hold: [0, 0.05, 0.32], spin: 0.45, receive: true, build: physBuildRuana },
@@ -1046,6 +1064,7 @@ const physRHO = {
   cone:      720,    // PVC cone on a rubber base
   handbag:   880,
   arepa:     900,
+  dango:     980,    // three rice-flour rounds on a bamboo skewer; it sinks
   frisbee:   930,    // polyethylene, and it floats by a whisker — as it does
   coffee:    930,    // a full cup floats brim-deep, then fills
   plantain:  970,
@@ -1090,7 +1109,7 @@ const physMAT = {
   bin: 'hollow', esky: 'hollow',
   deckchair: 'timber', sign: 'timber', menu: 'timber', flower: 'ceramic',
   sandwich: 'soft', icecream: 'soft', chips: 'soft', empanada: 'soft', arepa: 'soft',
-  maiz: 'soft', plantain: 'soft', handbag: 'soft',
+  maiz: 'soft', plantain: 'soft', handbag: 'soft', dango: 'soft',
   ticket: 'paper',
   coffee: 'paper',            // a takeaway cup, and it is the joke that it is
   cuencobowl: 'ceramic', mug: 'metal', winebottle: 'glass', sunglasses: 'glass',
@@ -1955,7 +1974,7 @@ const physBIOME_SCATTER = {
   quay:      { x: 4, z: 26, r0: 4, r1: 20,
                props: [['bin', 1], ['cone', 2], ['sign', 1], ['esky', 1], ['basket', 1],
                        ['coffee', 1], ['camera', 1], ['handbag', 1], ['chips', 1]] },
-  kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]] },
+  kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['dango', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]] },
   cali:      { x: 0, z: 24, r0: 5, r1: 26, props: [['empanada', 2], ['arepa', 1], ['plantain', 1], ['sombrero', 1], ['basket', 1], ['bin', 1], ['cone', 2], ['sign', 1]] },
   rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['esky', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]] },
   iceland:   { x: 0, z: 99, r0: 5, r1: 24, props: [['coffee', 2], ['camera', 1], ['handbag', 1], ['basket', 1], ['bin', 2], ['cone', 1], ['sign', 2]] },

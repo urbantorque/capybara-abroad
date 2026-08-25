@@ -1326,8 +1326,16 @@ function kyoUpdateHeron(game, dt) {
       // is the direct test of the inverted registry. See THE LOAF.
       kyoHeronCrit = game.addCritter({ biome: 'kyoto', r: kyoHERON_NEAR, bold: 1 });
     }
-    const near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) <
-                 (kyoHeronCrit ? kyoHeronCrit.near : kyoHERON_NEAR);
+    let near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) <
+               (kyoHeronCrit ? kyoHeronCrit.near : kyoHERON_NEAR);
+    // ---- THE STONES ARE A REASON TO HOLD (v26) --------------------------
+    // A live dry crossing suppresses the PROXIMITY flush and nothing else: the
+    // rest timer above is untouched, exactly as the calm inversion leaves it,
+    // so the bird still goes up on its own clock and the moment can never be
+    // locked out. Falling in flushes it on that frame instead — the splash and
+    // the bark together, which is the joke.
+    if (near && kyoDryCrossing()) near = false;
+    if (kyoDrySpook) { kyoDrySpook = 0; near = true; }
     if (near || kyoHeronT > kyoHERON_REST) {
       kyoHeronPhase = 1; kyoHeronT = 0;
       // A heron's alarm call is a single harsh bark and it is genuinely the
@@ -3259,6 +3267,7 @@ const kyoMILL_STAND = { x: 54, y: 0, z: 148 };
  */
 const kyoRUN_OUT = 1.5;             // s out of the water before the run lapses
 const kyoRUN_END_R = 13;            // m of the mill pond that counts as arrival
+const kyoRUN_MIN = 5;               // s below which a "run" is an accident, not a run
 
 function kyoUpdateRun(game, dt) {
   if (!kyoRX) return;
@@ -3292,7 +3301,22 @@ function kyoUpdateRun(game, dt) {
   }
 
   // --- the clock ---
-  if (kyoRunT < 0) {
+  // THE FINISH HAD NO LATCH, AND THE MARQUEE FIRED SIXTY-SEVEN TIMES.
+  // Measured: thirty seconds of floating in the mill pond produced 67 chimes,
+  // 67 splashes, 67 toasts and 67 calls to game.record(), and `runBest` came
+  // back **0.00 s**. The mill sits at an `nr.s` inside the arming window, so the
+  // frame after the finish set `kyoRunT = -1` the block below armed it back to
+  // 0, and the 13 m circle fired again one frame later on a run 16 ms long.
+  //
+  // -2 IS "LANDED". Only leaving the pond clears it back to -1, which is the
+  // only state the clock may arm from. A one-shot payout needs a state that
+  // means "already paid" — not the same idle value it starts life in.
+  const dxm = p.x - kyoMILL.x, dzm = p.z - kyoMILL.z;
+  const dMill2 = dxm * dxm + dzm * dzm;
+  if (kyoRunT === -2) {
+    // 1.5x the finish radius, so drifting on the rim cannot chatter the latch
+    if (dMill2 > kyoRUN_END_R * kyoRUN_END_R * 2.25) kyoRunT = -1;
+  } else if (kyoRunT < 0) {
     // start it the moment you are in the water and upstream of the mill
     if (wet && nr.s >= kyoRunFromS - 6 && nr.s < kyoRiverLen - 40) {
       kyoRunT = 0;
@@ -3310,10 +3334,22 @@ function kyoUpdateRun(game, dt) {
   }
 
   // --- the finish ---
-  const dxm = p.x - kyoMILL.x, dzm = p.z - kyoMILL.z;
-  if (kyoRunT >= 0 && dxm * dxm + dzm * dzm < kyoRUN_END_R * kyoRUN_END_R) {
+  if (kyoRunT >= 0 && dMill2 < kyoRUN_END_R * kyoRUN_END_R) {
     const t = kyoRunT;
-    kyoRunT = -1;
+    kyoRunT = -2;                                    // landed; see the clock above
+    // ...AND A RUN IS TWO HUNDRED METRES OF RIVER.
+    //
+    // The arming window runs all the way to 40 m short of the end, so paddling
+    // into the water just above the mill armed the clock and the 13 m circle
+    // finished it — measured at **0.4 s**, and that 0.4 was written straight
+    // into `runBest` as the chapter's personal best. A record table that has
+    // once accepted a fraction of a second can never be beaten by anybody
+    // again, and the chapter's own NPC line says the river does it in forty.
+    //
+    // Below the floor NOTHING happens: no tick, no toast, no chime, no record.
+    // The latch above still holds, so it does not chatter either — you simply
+    // have to go and get in further up, which is the task.
+    if (t <= kyoRUN_MIN) return;
     let gates = 0;
     for (let i = 0; kyoGates && i < kyoGates.length; i++) if (kyoGates[i].through) gates++;
     if (!kyoRunDone) {
@@ -3327,7 +3363,27 @@ function kyoUpdateRun(game, dt) {
       game.toast(t.toFixed(1) + ' s' + (gates === 3 ? '  ·  all three boats' : ''));
     }
     if (typeof game.record === 'function') game.record('uji-run', t);
-    if (typeof game.sfx === 'function') { game.sfx('chime', { volume: 1 }); game.sfx('splash', { volume: 0.6 }); }
+    // ---- AUDIBLE. Both of these were mono, and they are the loudest thing in
+    // the chapter: every cue around this payout was mono while all six
+    // stepping-stone notes forty metres away were already positional. The toy
+    // was better mixed than the wow.
+    if (typeof game.sfx === 'function') {
+      game.sfx('chime', { volume: 1, at: kyoMILL });
+      game.sfx('splash', { volume: 0.6, at: p });
+    }
+    // ---- FRAMED (v26). The wheel is the thing this chapter is about, and at
+    // the payout it sat 113 degrees off the view centre: the screenshot is a
+    // sheet of blank water with the wheel clipped into the top-right corner.
+    // The bearing is COMPUTED from the wheel back to the animal rather than
+    // written down, because the wheel is placed on the river's last segment and
+    // moves with the river — kyoMILL itself is reassigned at build time.
+    if (typeof game.frameShot === 'function' && kyoMillWheel) {
+      const wp = kyoMillWheel.position;
+      game.frameShot({
+        yaw: Math.atan2(p.x - wp.x, p.z - wp.z),
+        dist: 17, pitch: 18 * Math.PI / 180, raise: 3.0, hold: 2.6
+      });
+    }
     if (kyoRunBest === 0 || t < kyoRunBest) kyoRunBest = t;
   }
 
@@ -3603,9 +3659,23 @@ function kyoCheckBamboo(game, dt) {
 // chapter already pays you for.
 const kyoDRY_STONES = 6;
 let kyoDryArmed = false, kyoDryDone = false;
+// THE STONES HAD NO READER OUTSIDE THIS BLOCK. `dry-crossing` appeared in the
+// whole repo three times: the task row, its hint, and a comment — no NPC line,
+// no record, no camera, nothing. Six good stones and a rising six-note scale,
+// and the world did not notice you had done it. It is the `vanRiding()` shape.
+//
+// So the reader is the HERON, which stands in that pond, is the boldest animal
+// in the game, and has published `heronStanding()` since it was written under a
+// comment saying nothing in the module needed to know. While a dry attempt is
+// alive the bird HOLDS however close you come; the splash flushes it. Nothing
+// new is drawn and no button is added.
+let kyoDrySpook = 0;
 // Which stones this attempt has touched — cleared with the arming, so a fall
 // in and a fresh start re-plays the scale rather than going silent.
 const kyoDryHit = new Uint8Array(kyoDRY_STONES);
+
+/** Is a dry crossing alive right now? Read by the heron, and published. */
+function kyoDryCrossing() { return kyoDryArmed && !kyoDryDone; }
 
 function kyoStoneAt(i, out) {
   out.x = kyoPAVILION.x - 9 - i * 2.6;
@@ -3623,7 +3693,16 @@ function kyoCheckDry(game) {
   // WET DISARMS IT, and wet is read off capy.wet rather than off the height:
   // the stones stand 30 cm proud of the water and a capybara that clips the
   // edge of one is briefly lower than its own top without having got in.
-  if ((capy.wet || 0) > 0.35) { if (kyoDryArmed) kyoDryHit.fill(0); kyoDryArmed = false; return; }
+  if ((capy.wet || 0) > 0.35) {
+    // ...AND THE HERON GOES UP, which is the whole reason the crossing is worth
+    // doing dry. See kyoDryCrossing() below: while the attempt is alive the
+    // bird holds its ground however close you get, and the splash is what ends
+    // that. The alarm bark is the loudest thing in the garden and now it means
+    // something. Only on the frame the run breaks, never every frame after.
+    if (kyoDryArmed) { kyoDryHit.fill(0); kyoDrySpook = 1; }
+    kyoDryArmed = false;
+    return;
+  }
 
   // ---- EVERY STONE ANSWERS ---------------------------------------------
   // Six stones a hop apart, and the ONLY thing that ever happened was the
@@ -3883,6 +3962,8 @@ export function createKyoto(game) {
                          kyoHeronGroup ? kyoHeronGroup.position.y : 0,
                          kyoHeronGroup ? kyoHeronGroup.position.z : 0); return kyoV3h; },
     heronStanding() { return !!kyoHeronGroup && kyoHeronPhase === 0; },
+    /** True while a dry crossing of the stepping stones is alive. See kyoDrySpook. */
+    dryCrossing: kyoDryCrossing,
     /** The near end of the stepping stones, for the beacon. */
     stones: { x: kyoPAVILION.x - 9 - 5 * 2.6, z: kyoPAVILION.z - 8 + Math.sin(5 * 1.3) * 1.6 },
     zen: kyoZEN,
@@ -3915,6 +3996,16 @@ export function createKyoto(game) {
     /** 0 at the bank, 1 in the thread — for the HUD, and for the camera. */
     riverMid() { return kyoRunFlow; },
     inRiver() { return kyoInRiver; },
+    /**
+     * HOW HARD THE WATER IS CARRYING YOU, 0..1, and zero out of the river.
+     *
+     * Published so the chapter can be LIT. Kyoto is one of five chapters with
+     * no row at all in the event grade layer, so nothing that happens here has
+     * ever changed a bloom, a threshold or a vignette — including the two
+     * hundred metres of river the chapter is named for. It is already computed
+     * every frame for the swim; it simply had no way out of this file.
+     */
+    runFlow() { return kyoRunFlow > 0 ? kyoRunFlow : 0; },
     runTime() { return kyoRunT; },
     runBest() { return kyoRunBest; },
     runLength() { return kyoRiverLen - kyoRunFromS; },
@@ -4157,6 +4248,10 @@ function kyoBuild(game) {
       onTask: { 'zen-ruin': ['…a bold reinterpretation. Yes.',
                              'Right. Well. That is one morning gone.',
                              'You have signed it. With feet.'],
+                // The stones' one human reader. Six stones and a rising scale,
+                // and until now not one person in the chapter noticed.
+                'dry-crossing': ['Six stones. Not one drop. The heron stayed.',
+                                 'I watched the whole thing. So did the bird.'],
                 'lantern-topple': ['That was not the garden. That was eight hundred years.',
                                    'I heard it. The whole valley heard it.'] } });
     // OUTSIDE THE BOWL. kyoBOWL.x + 3 is three metres from the centre of a bowl

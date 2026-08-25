@@ -3827,6 +3827,16 @@ export function createRio(game) {
     built() { return rioBuilt; },
     /** The bonde MOVES, and half its line is fifteen metres up. Ask; never cache. */
     bonde() { return rioBondePos; },
+    /**
+     * THE SALUTE, 0..1 — the bateria turned to face you, for 4.2 seconds.
+     *
+     * This is the chapter's wow and the whole avenue does something at it, and
+     * until now nothing outside this file could tell it was happening. Rio is
+     * one of five chapters with no row in the event grade layer, so the single
+     * brightest moment in the chapter changed no bloom, no threshold and no
+     * vignette. The state was already here; it had no way out.
+     */
+    salute() { return clamp(rioSalute / 4.2, 0, 1); },
     kiosk: { x: rioKIOSK.x, z: rioKIOSK_STAND },
     calcadao: { x: 0, z: (rioPROM_Z + 2.6) * 0.5 },
     terrainHeight: rioTerrain,
