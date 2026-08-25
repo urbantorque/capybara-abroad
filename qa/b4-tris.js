@@ -14,7 +14,7 @@ async page => {
       b.position.set(sp.x, sp.y, sp.z); b.velocity.set(0, 0, 0)
       for (let i = 0; i < 90; i++) g.tick(1 / 60, false)
       let tris = 0, meshes = 0, shadowTris = 0
-      const per = []
+      const per = [], fam = {}
       g.scene.traverse(o => {
         if (!o.isMesh && !o.isInstancedMesh) return
         for (let p = o; p; p = p.parent) if (!p.visible) return
@@ -28,10 +28,17 @@ async page => {
         while (q && guard++ < 4) { if (q.name) nm = q.name + '/' + nm; q = q.parent }
         per.push([nm, Math.round(tot), o.isInstancedMesh ? o.count : 1, Math.round(t),
                   gm.type || '?'])
+        // family = the name with any trailing :cN / index stripped, so a scatter
+        // grid that emits one mesh per cell reports as ONE line and not as forty
+        const key = (o.name || '(unnamed ' + (gm.type || '?') + ' ' + Math.round(t) + ')')
+          .replace(/:c[-0-9]+$/, ':*').replace(/[0-9]+$/, '#')
+        fam[key] = (fam[key] || 0) + tot
       })
       per.sort((a, b2) => b2[1] - a[1])
+      const fams = Object.keys(fam).map(k => [k, Math.round(fam[k])])
+        .sort((a, b2) => b2[1] - a[1]).slice(0, 12)
       return { tris: Math.round(tris), shadowTris: Math.round(shadowTris), meshes,
-               bodies: g.world.bodies.length, top: per.slice(0, 14),
+               bodies: g.world.bodies.length, top: per.slice(0, 14), fams,
                err: g.state.lastError || null }
     }, n)
   }

@@ -2102,6 +2102,23 @@ function quayBuildPines(game, root) {
   root.add(m);
 }
 
+/**
+ * How far a headland is from the water the player actually travels: the berth
+ * on the apron, then the fairway down to Manly. Sampled along the rhumb line
+ * rather than from one point, because a headland abeam the middle of the ride
+ * is close even though it is four hundred metres from the berth.
+ */
+function quayHeadRouteDist(x, z) {
+  let best = 1e9;
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const rx = 0 + t * 118, rz = quayAPRON_Z + t * (-556 - quayAPRON_Z);
+    const d = Math.hypot(x - rx, z - rz);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
 function quayBuildBush(root) {
   const trunk = [], fork = [], crownA = [], crownB = [], scrub = [], rock = [], grassT = [];
   // A headland's own numbers decide its wood: the exposed ocean ones (North
@@ -2112,6 +2129,26 @@ function quayBuildBush(root) {
     const H = quayHEADS[hI];
     if (H.r < 6) continue;
     const exposed = H.z < -330;
+    // ---- AND A HEADLAND ACROSS THE WATER IS A CANOPY, NOT A WOOD ---------
+    // Every one of the thirteen headlands got the same tree: a leaning trunk,
+    // a fork, two crowns, sandstone at every fourth plant and a grass tree at
+    // every sixth. MEASURED, that made this one function 102,000 of the
+    // chapter's 201,000 triangles — and NONE of these headlands is walkable.
+    // The player is on the apron and then on the fairway; the nearest bank is
+    // fifty metres off it and most are two hundred, across open water.
+    //
+    // What survives that distance is the CANOPY LINE and nothing else, so the
+    // count stays exactly where it was — the wood is as thick as it ever was —
+    // and each distant plant loses the parts that cannot resolve: the fork
+    // inside its own crown, the second crown on top of the first, the
+    // half-metre of sandstone at its foot and the grass tree beside it.
+    // Distance is to the FAIRWAY, not to the apron: the ride down the harbour
+    // is most of this chapter and it passes every one of these.
+    // Measured to the NEAR EDGE of the headland, not its centre: North Head
+    // is 130 m from the fairway and 78 m across, so its nose is 52 m away and
+    // it keeps everything. So do both banks of Manly, which is where the ride
+    // lands and where the player walks.
+    const far = quayHeadRouteDist(H.x, H.z) - H.r > 60;
     // 0.085 measured out at 235,000 triangles for the chapter, thirty
     // thousand over the proven-safe ceiling of 205,000. A headland's area goes
     // as r², so North Head alone (r = 78) was carrying three hundred and
@@ -2128,7 +2165,13 @@ function quayBuildBush(root) {
       if (y <= quayWATER_Y + 0.6) continue;
       const s = (exposed ? rand(0.5, 0.9) : rand(0.85, 1.5)) * (1 - u * 0.35);
       const lean = rand(-0.22, 0.22), ry = rand(0, 6.28318);
-      if (!exposed && i % 3 !== 2) {
+      if (!exposed && i % 3 !== 2 && far) {
+        // the distant tree: one trunk, one crown. At two hundred metres the
+        // fork is inside the crown and the second crown is the first one.
+        quayPush9(trunk, x, y + s * 2.2, z, lean * 0.5, ry, 0, s * 0.34, s * 4.4, s * 0.34);
+        quayPush9(crownA, x + lean * s * 2.4, y + s * 4.7, z, 0, ry, 0,
+                  s * 3.1, s * 2.4, s * 3.0);
+      } else if (!exposed && i % 3 !== 2) {
         // the tree: a leaning trunk, one fork, and two crowns of different
         // greens, because a canopy that is one colour is a hedge
         quayPush9(trunk, x, y + s * 1.6, z, lean * 0.5, ry, 0, s * 0.34, s * 3.2, s * 0.34);
@@ -2146,12 +2189,12 @@ function quayBuildBush(root) {
       }
       // sandstone breaking through, and a grass tree beside about a sixth of
       // them: the two things that say this soil is four centimetres deep
-      if (i % 4 === 1) {
+      if (i % 4 === 1 && !far) {
         const rs = rand(0.8, 2.3);
         quayPush9(rock, x + rand(-2.5, 2.5), y + rs * 0.22, z + rand(-2.5, 2.5),
                   rand(-0.2, 0.2), rand(0, 6.28), rand(-0.2, 0.2), rs * 1.5, rs * 0.6, rs * 1.2);
       }
-      if (i % 6 === 3) {
+      if (i % 6 === 3 && !far) {
         const gs = rand(0.6, 1.1);
         quayPush9(grassT, x + rand(-2, 2), y + gs * 0.55, z + rand(-2, 2),
                   0, ry, 0, gs * 1.7, gs * 1.5, gs * 1.7);

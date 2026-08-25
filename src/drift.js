@@ -794,8 +794,22 @@ function driDeck(M, x, z, y, hx, hz, yaw, top, top2, moss, seed) {
  * Callers that hand one merger twice (the wanderers, which are small, move,
  * and are their own mesh anyway) get the old behaviour for free.
  */
-function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN) {
+/**
+ * ...AND A SILHOUETTE MAY NOT PAY A NEAR-FIELD PRICE.
+ *
+ * `det` is the detail term: 1 for the islands you land on, less for the ranks
+ * you only ever see. Every island in this chapter was built with the same torn
+ * lip, the same spike fringe and the same three ribs whether it was the
+ * six-metre pebble under your feet or a far-field island four hundred metres
+ * out — and MEASURED, that made `dri:under` fifty thousand triangles, a
+ * quarter of the chapter, for twenty-six islands nobody can resolve. This
+ * scales the COUNTS only; the shape is untouched, so the lip still goes all
+ * the way round and the crag is still torn rather than conical. At 110 m a lip
+ * plate is under a pixel wide.
+ */
+function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN, det) {
   if (!MN) MN = M;
+  if (!(det > 0)) det = 1;
   const c = driIsleColours(kind);
   const top = c[0], top2 = c[1], rock = c[2], rockDk = c[3];
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -829,10 +843,11 @@ function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN) {
   // fringe of spikes round its shoulder, and a broken keel under the deepest
   // point. All in MN, all silhouette, none of it casting anything.
   {
+    const ribK = Math.max(2, Math.round(4 * det));
     for (let rib = 0; rib < 3; rib++) {
       const a = seed * 0.9 + rib * 2.094;
       const ca = Math.cos(a), sa = Math.sin(a);
-      for (let k = 0; k < 4; k++) {
+      for (let k = 0; k < ribK; k++) {
         const f = 0.82 - k * 0.19;                     // in toward the axis
         const dy = -1.2 - drop * (0.16 + k * 0.21);
         MN.box(x + ca * rad * f, y + dy, z + sa * rad * f,
@@ -840,7 +855,7 @@ function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN) {
                k % 2 ? rockDk : rock, sa * 0.34, a + k * 0.3, -ca * 0.34);
       }
     }
-    const spN = Math.max(7, Math.round(rad * 1.3));
+    const spN = Math.max(det < 1 ? 5 : 7, Math.round(rad * 1.3 * det));
     for (let i = 0; i < spN; i++) {
       const a = i / spN * 6.28318 + seed * 1.3;
       const rr = rad * (0.72 + ((i * 11 + seed) % 5) * 0.055);
@@ -873,7 +888,7 @@ function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN) {
     // most of this chapter, because most of this chapter is a fall) the
     // archipelago was sixteen green rectangles. A torn edge is torn ALL THE
     // WAY ROUND or it is a rectangle with some decoration on it.
-    const lipN = Math.max(16, Math.round((hx + hz) * 1.7));
+    const lipN = Math.max(det < 1 ? 10 : 16, Math.round((hx + hz) * 1.7 * det));
     for (let i = 0; i < lipN; i++) {
       const t = i / lipN * 6.28318 + seed * 0.7;
       const ex = Math.cos(t), ez = Math.sin(t);
@@ -917,7 +932,7 @@ function driAddIsle(M, x, z, y, hx, hz, yaw, kind, drop, tufts, seed, MN) {
     }
   }
   // rim boulders, so the edge is torn rather than sawn
-  const per = Math.max(10, Math.round((hx + hz) * 1.1));
+  const per = Math.max(det < 1 ? 6 : 10, Math.round((hx + hz) * 1.1 * det));
   for (let i = 0; i < per; i++) {
     const t = i / per * 6.28318 + seed;
     const ex = Math.cos(t) * hx * 0.99, ez = Math.sin(t) * hz * 0.99;
@@ -1056,7 +1071,7 @@ function driBuildIslands(game, root) {
     // shadow that lands in the void.
     const deep = s.id.indexOf('deep') === 0 || s.id.indexOf('far') === 0;
     driAddIsle(deep ? MN : M, s.x, s.z, s.y, s.hx, s.hz, s.yaw, s.kind, s.drop, true,
-               i + 1, MN);
+               i + 1, MN, deep ? 0.45 : 1);
     // The collider is six metres deep so nothing can tunnel through a deck at
     // terminal velocity, and its top face is exactly the deck. Nothing else in
     // the biome is allowed to disagree with this box.
@@ -1064,7 +1079,8 @@ function driBuildIslands(game, root) {
   }
   for (let i = 0; i < driFARFIELD.length; i++) {
     const f = driFARFIELD[i];
-    driAddIsle(MN, f.x, f.z, f.y, f.hx, f.hz, i * 0.7, f.kind, f.drop, false, 90 + i, MN);
+    driAddIsle(MN, f.x, f.z, f.y, f.hx, f.hz, i * 0.7, f.kind, f.drop, false, 90 + i, MN,
+               0.28);
   }
   const mesh = new THREE.Mesh(M.build(), driVC());
   mesh.name = 'dri:isles';
@@ -2943,13 +2959,19 @@ function driBuildFarDressing(game, root) {
   // it. The far rank and the third rank are two hundred to four hundred metres
   // out, past everything, and are silhouettes: a static body apiece would be
   // pure broadphase.
-  function dress(x, z, y, hx, hz, yaw, kind, seed, solid) {
+  // `det` again, and for the same reason as driAddIsle: the third rank is two
+  // to four hundred metres out, so its wood is a SKYLINE and not a wood. What
+  // reads at that distance is the crown line, so the crowns stay and the count
+  // comes down; the trunk under a crown 300 m away is a six-sided cylinder
+  // nobody has ever seen.
+  function dress(x, z, y, hx, hz, yaw, kind, seed, solid, det) {
+    if (!(det > 0)) det = 1;
     // one body per island, never one for the whole rank: see driStaticGroup
     const DG = solid ? driStaticGroup(game) : null;
     const c = driIsleColours(kind);
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     const dark = kind === 'bare';
-    const n = dark ? 7 : Math.round(hx * hz * 0.17) + 5;
+    const n = Math.max(4, Math.round((dark ? 7 : Math.round(hx * hz * 0.17) + 5) * det));
     for (let k = 0; k < n; k++) {
       const a = seed * 1.7 + k * 2.399;
       const u = 0.25 + ((k * 13 + seed) % 7) * 0.10;
@@ -2969,11 +2991,14 @@ function driBuildFarDressing(game, root) {
         // and the wood: a trunk, a shoulder and a crown, at four heights, so
         // the top edge of the island is a line that goes up and down
         const s = 1.4 + ((k * 11 + seed) % 6) * 0.55;
-        M.cyl(wx, y + s * 0.75, wz, s * 0.13, s * 1.6, PALETTE.driBark, 0.05, a, 0, 6);
+        M.cyl(wx, y + s * 0.75, wz, s * 0.13, s * 1.6, PALETTE.driBark, 0.05, a, 0,
+              det < 1 ? 4 : 6);
         M.oct(wx, y + s * 1.9, wz, s * 1.5, kind === 'pale' ? PALETTE.driLeafB : PALETTE.driLeafA,
               0, a, 0);
-        M.oct(wx + s * 0.14, y + s * 2.55, wz, s * 0.95,
-              kind === 'pale' ? PALETTE.driLeafA : PALETTE.driLeafB, 0, a + 0.9, 0);
+        if (det >= 1 || k % 2 === 0) {
+          M.oct(wx + s * 0.14, y + s * 2.55, wz, s * 0.95,
+                kind === 'pale' ? PALETTE.driLeafA : PALETTE.driLeafB, 0, a + 0.9, 0);
+        }
       }
     }
     // ---- AND ONE LIGHT, WHICH IS THE WHOLE POINT ------------------------
@@ -3004,7 +3029,7 @@ function driBuildFarDressing(game, root) {
   }
   for (let i = 0; i < driFARFIELD.length; i++) {
     const f = driFARFIELD[i];
-    dress(f.x, f.z, f.y, f.hx, f.hz, i * 0.7, f.kind, 90 + i, false);
+    dress(f.x, f.z, f.y, f.hx, f.hz, i * 0.7, f.kind, 90 + i, false, 0.55);
   }
   const m = new THREE.Mesh(M.build(), driVC());
   m.name = 'dri:fardress';

@@ -404,3 +404,42 @@ the source so the next sweep does not "fix" it.
 
 Ten of seventeen over the 130k gate. Job 1's shadow rule cut pantanal's casting share
 from 98.8% to 65% and left venice (92%) and cave (97%) untouched.
+
+### The reallocation, three chapters (26 Aug)
+
+The method the brief asks for — find the structural offender, keep density where
+the player actually is — applied to the three worst cases where the offender was
+FAR-FIELD detail rather than content:
+
+| chapter | before | after | what moved |
+|---|---|---|---|
+| quay | 201,851 | 157,975 | −43,876 |
+| drift | 206,474 | 185,166 | −21,308 |
+| pantanal | 224,488 | 210,776 | −13,712 |
+
+- **quay** — `quayBuildBush` gave all thirteen headlands the same tree: trunk,
+  fork, two crowns, sandstone every fourth plant, a grass tree every sixth. None
+  of these headlands is walkable; the player is on the apron and then on the
+  fairway. `quayHeadRouteDist` measures each headland's NEAR EDGE against the
+  rhumb line to Manly, and past 60 m a plant loses the fork inside its own crown,
+  the second crown on top of the first, the sandstone at its foot and the grass
+  tree beside it. **The plant count is untouched** — the wood is as thick as it
+  was. Manly's own banks and North Head's nose stay at full detail.
+- **drift** — `driAddIsle` gained a `det` term. Every island got the same torn
+  lip, spike fringe and three ribs whether it was the six-metre pebble under
+  your feet or a far-field island four hundred metres out. Deep/far rank 0.45,
+  far field 0.28; the SHAPE is untouched, only the counts. `dri:under` 50,524 →
+  34,268. Far dressing keeps its crowns and its lamp and loses the six-sided
+  trunk under a crown 300 m away.
+- **pantanal** — 4,249 grass tufts at one uniform density over 56,000 m². The
+  density now follows the causeway and thins going out, which is also what a
+  cattle road actually looks like.
+
+Verified by differential (`git stash push -- src/{quay,drift,pantanal}.js`,
+rebuild, same script, `stash pop`): `qa/J2A-*.png` after vs `qa/J2B-*.png`
+before, from a free camera pointed at the changed geometry —
+`qa/b4-view.js`. Canopy line, island silhouettes, keels, lamps and the near
+campo all read the same.
+
+**Measurement note:** the scatter helpers call unseeded `rand()`, so a chapter
+re-measures ±1,500 triangles run to run. Any gate needs headroom over that.

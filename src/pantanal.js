@@ -2102,7 +2102,21 @@ function panBuildGrass(root) {
       for (let gx = 0; gx < NX; gx++) {
         const sx = X0 + (gx + 0.5) * CELL + rand(-2.6, 2.6);
         const sz = Z0 + (gz + 0.5) * CELL + rand(-2.6, 2.6);
-        const per = randInt(PER_LO, PER_HI + 1);
+        // ---- AND THE FAR CAMPO IS NOT THE VERGE ---------------------------
+        // 4,249 tufts at ten triangles each was 42,860 — nineteen per cent of
+        // the chapter — laid at one uniform density over fifty-six thousand
+        // square metres, and the player is on the causeway or within a few
+        // metres of it for almost all of this chapter. A tuft is a metre wide;
+        // at forty metres it is three pixels and at a hundred it is one.
+        //
+        // So the density follows the ROAD, which is the only line through this
+        // place, and thins going out. It is also what the campo actually looks
+        // like — the verge of a cattle road is rank and the open pasture beyond
+        // it is grazed short — so this buys the picture as well as the budget.
+        // The far campo still has grass in it; it has less.
+        const dRoad = Math.abs(sx - panRoadX(sz));
+        const near = clamp(1 - (dRoad - 30) / 76, 0.34, 1);
+        const per = Math.max(1, Math.round(randInt(PER_LO, PER_HI + 1) * near));
         for (let k = 0; k < per; k++) {
           const x = sx + rand(-3.1, 3.1), z = sz + rand(-3.1, 3.1);
           const h = panBedH(x, z);
