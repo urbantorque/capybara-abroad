@@ -398,6 +398,11 @@ function hkInZone(name, x, z) {
   if (name === 'scaffold') {
     return x > hkSCAF.x - 1 && x < hkSCAF.x + hkSCAF.out + 2.4 && z > hkSCAF.z0 - 1 && z < hkSCAF.z1 + 1;
   }
+  // The big neon, which is a task you stand on. It had no zone, so the footfall
+  // ladder's height fallback called it bamboo.
+  if (name === 'sign') {
+    return Math.abs(x - hkSIGN.x) < 4.2 && Math.abs(z - hkSIGN.z) < 2.6;
+  }
   return false;
 }
 function hkNavBlocked(x, z, r) {
@@ -406,6 +411,11 @@ function hkNavBlocked(x, z, r) {
 }
 function hkSurfacePitch(x, z, y) {
   if (y > hkROOF_Y - 1.5) return 1.14;                 // a concrete roof deck
+  // THE HEIGHT FALLBACK IS A ONE-AXIS GUESS, so ask WHERE first. `y > 8` meant
+  // bamboo, and the neon sign is steel and glass at y 9.2: standing on the sign
+  // — a whole task — rang like a scaffold pole. Everything above eight metres
+  // in this chapter is not lattice.
+  if (hkInZone('sign', x, z)) return 1.36;             // steel angle and glass
   if (y > 8) return 1.30;                              // bamboo, and it rings
   if (hkInZone('pier', x, z)) return 1.24;             // the pontoon's planks
   if (hkInZone('market', x, z)) return 0.96;           // wet tile
@@ -1168,10 +1178,39 @@ function hkBuildScaffold(game, root) {
 
   // ---- the roof you top out onto ------------------------------------------
   // The building's own collider stops at its face, so the deck has to be real.
-  hkStaticBox(game, hkSCAF.x - 8.5, hkROOF_Y - 0.3, (z0 + z1) * 0.5, 19, 0.6, (z1 - z0) + 14);
+  //
+  // ...AND ITS EAST LIP WAS THE THING STOPPING THE CLIMB.
+  //
+  // The deck ran to x -9.5. The animal clings to the scaffold face at x -9.13
+  // and its collider reaches to about -9.53, so on the way up its head caught
+  // the three centimetres of slab overhanging the climbing line: measured, the
+  // climb tops out at **33.36 m and stays there for forty seconds**, against a
+  // deck at 34.2 and a lattice that ends at 34.8. Let go at the stall and the
+  // animal falls thirty-three metres to the street.
+  //
+  // So the roof of the chapter that hands over the CLIMB verb could not be
+  // climbed to. Everything dressed on it — the hut, the pigeon loft, the
+  // aerials, the plastic chair facing the harbour — was unreachable, the
+  // `bamboo-climb` record could never exceed 33.36 m, and the rigger's "roof is
+  // another six decks and the view is the reason" was a promise the chapter
+  // could not keep.
+  //
+  // Pulled back to x -10.4, which is the building's own face (hkFACE is 10.5) —
+  // where a parapet belongs anyway. The scaffold hangs outside the facade, as
+  // scaffolds do, and the top-out shove in capybara.js then lands the animal on
+  // the deck from the lattice's real top.
+  // 18.8, not 19 and not 18.1. The climber's centre sits at x -9.16 and its
+  // west extent at about -9.51, so the old 19 m deck (east edge -9.50) caught
+  // its head by roughly a centimetre — which is all it takes. 18.1 cleared the
+  // column by miles and left the animal topping out 1.24 m out in the street
+  // with nothing under it: measured, it reached 34.39 and then fell 34 m. The
+  // edge belongs just clear of the column, at -9.70, where the top-out shove
+  // in capybara.js carries it the last half metre onto the deck.
+  const ROOF_W = 18.8;
+  hkStaticBox(game, hkSCAF.x - 8.6, hkROOF_Y - 0.3, (z0 + z1) * 0.5, ROOF_W, 0.6, (z1 - z0) + 14);
   const R = hkMerger();
-  const rx = hkSCAF.x - 8.5, rz = (z0 + z1) * 0.5;
-  R.box(rx, hkROOF_Y - 0.15, rz, 19, 0.3, (z1 - z0) + 14, PALETTE.hkConcreteDk);
+  const rx = hkSCAF.x - 8.6, rz = (z0 + z1) * 0.5;
+  R.box(rx, hkROOF_Y - 0.15, rz, ROOF_W, 0.3, (z1 - z0) + 14, PALETTE.hkConcreteDk);
   // ---- A ROOF IS NOT ONE VALUE -------------------------------------------
   // Nineteen by thirty-two metres of a single flat colour, and it is the
   // surface the player stands on for the whole of the chapter's marquee
@@ -3318,6 +3357,17 @@ function hkUpdateShow(game, dt) {
       hkShowDone = true;
       hkTask('symphony');
       hkToast('all of it, from up here, for nothing.');
+      // ---- FRAMED (v26) -------------------------------------------------
+      // The settled rig is already good here — `skyward()` puts 17 of the 18
+      // towers inside NDC — but the player ARRIVES over the parapet facing
+      // -x, off the wall they have just climbed, and the show is behind them.
+      // The bearing is all that is missing: yaw 0 is the camera on the harbour
+      // side looking back over the animal at the skyline, which is at
+      // z = hkSHORE_Z. Short hold; the show runs for another half minute and
+      // the player should be steering it themselves by then.
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: 0, dist: 13, pitch: 6 * Math.PI / 180, raise: 1.2, hold: 3.5 });
+      }
     }
   }
 
@@ -3396,8 +3446,15 @@ function hkUpdateShow(game, dt) {
         // shakes the camera at all.
         hkFinaleDone = true;
         hkLitCount = hkTOWER_N;
-        hkSfx('chime', { volume: 0.45, pitch: 0.5 });
-        hkSfx('chime', { volume: 0.30, pitch: 1.0 });
+        // ...FROM THE FAR SHORE, which is where it is coming from. 0 of 31
+        // hkSfx calls in this file passed a position, so the loudest moment in
+        // the chapter played dead centre while the thing making it was a
+        // hundred and eighty metres across the water. Two cues already
+        // hand-roll a distance falloff with no pan at all — the law v16
+        // replaced.
+        const skyAt = { x: 0, y: 50, z: hkSHORE_Z };
+        hkSfx('chime', { volume: 0.45, pitch: 0.5, at: skyAt });
+        hkSfx('chime', { volume: 0.30, pitch: 1.0, at: skyAt });
         if (typeof game.shake === 'function') game.shake(0.14);
         const cp2 = game.capy && game.capy.position;
         if (cp2 && cp2.y > 20) hkToast('and all of it, at once.');
@@ -4468,7 +4525,12 @@ export function createKowloon(game) {
     // AT THE HOLE, not at the middle of the lattice: the decks are solid
     // either side of z = 0 and this is the shaft that goes all the way up.
     scaffold: { x: hkSCAF.x + hkSCAF.out + 1.2, z: (hkSCAF.z0 + hkSCAF.z1) * 0.5 },
-    roof: { x: hkSCAF.x - 8.5, z: (hkSCAF.z0 + hkSCAF.z1) * 0.5 },
+    // WITH A y ON IT. Without one, hintAt sets hintY to NaN, the beacon drops
+    // onto the pavement inside the tong lau block thirty-four metres below the
+    // thing it is pointing at, and systems.js suppresses the up-arrow glyph —
+    // so the marquee's own hint pointed at a wall. `sign` below has always
+    // carried its height; this one never did.
+    roof: { x: hkSCAF.x - 8.6, y: hkROOF_Y + 0.4, z: (hkSCAF.z0 + hkSCAF.z1) * 0.5 },
     poles: { x: 0, z: hkPOLE_Z[1] },
     sign: hkSIGN,
     pier: { x: 0, z: hkPIER_END - 4 },
