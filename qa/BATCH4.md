@@ -375,3 +375,32 @@ playtesting on a touch device. Left as it is, deliberately, and recorded here.
 a 12px chip on the corner of a 56x35 thumbnail, 11px does not fit in a 12px box, and the
 value is duplicated in full by the chapter name beside it. The exemption is now written in
 the source so the next sweep does not "fix" it.
+
+---
+
+## Job 2 — performance reallocation
+
+### Re-measured 26 Aug, on the post-job-1 build
+
+| chapter | tris | shadow tris |
+|---|---|---|
+| pantanal | 224,488 | 146,716 |
+| goreme | 211,590 | 115,554 |
+| drift | 206,474 | 42,992 |
+| iceland | 202,612 | 96,390 |
+| quay | 201,851 | 79,089 |
+| sahara | 198,004 | 116,740 |
+| venice | 181,814 | 166,776 |
+| antarctic | 180,486 | 77,942 |
+| cave | 157,844 | 153,022 |
+| kowloon | 154,058 | 115,470 |
+| palawan | 129,338 | 101,378 |
+| rio | 125,420 | 113,372 |
+| kyoto | 122,004 | 111,064 |
+| pasto | 104,164 | 68,748 |
+| cali | 93,660 | 88,792 |
+| manly | 85,590 | 81,122 |
+| sydney | 74,960 | 49,784 |
+
+Ten of seventeen over the 130k gate. Job 1's shadow rule cut pantanal's casting share
+from 98.8% to 65% and left venice (92%) and cave (97%) untouched.
