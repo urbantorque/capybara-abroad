@@ -127,6 +127,24 @@ const sysLOOK_LEADMAX= 2.5;
 // live capture: 1.1 put it only ~33% up with dead grass filling the bottom third.
 // 0.6 lands it around 43% up, leaving the world it walks into in the upper two thirds.
 const sysLOOK_RAISE  = 0.6;
+// --- A CHAPTER MAY FRAME ITS OWN MARQUEE — `game.frameShot` (v26) ----------
+// The four channels of "that landed" are framed, lit, audible, acknowledged,
+// and until now FRAMED was the one no biome could opt into: `rig()` can ask for
+// a distance, a pitch and a raise, and there has never been any way at all to
+// ask for a BEARING. So the one silhouette a chapter is about was shown from
+// wherever the player happened to be standing. Measured in Sydney: the podium
+// payout, the most recognisable shape in the game, fires with the rig jammed to
+// 3.05 m at 68.6 degrees looking down at the sails.
+//
+// A shot is a REQUEST with an envelope, not a cutscene. It eases in, holds and
+// eases out; ANY camera input from the player kills it on the spot; and it is
+// multiplied down to nothing by the rigs that own the lens outright (flight,
+// helm) exactly the way `rig()` already is. Nobody loses control of the camera.
+const sysSHOT_IN    = 0.55;   // s, ease in
+const sysSHOT_OUT   = 1.10;   // s, ease out
+const sysSHOT_HOLD  = 2.20;   // s, default hold at full weight
+const sysSHOT_YAW_L = 2.6;    // lambda the bearing is walked round on
+const sysSHOT_KILL  = 3.0;    // how fast a player-cancelled shot lets go
 // --- THE CAMERA STEERS ITSELF ----------------------------------------------
 // Orbiting by hand (Q/R or a right-drag) while ALSO driving with WASD is two
 // jobs, and it is the thing that makes a third-person game feel like work: walk
@@ -12991,6 +13009,7 @@ export function createSystems(game) {
   let stickX = 0, stickZ = 0, stickActive = false;
   let camYaw = 0, camYawTarget = 0, camHandT = 0, camIdleT = 0;
   let camDist = sysCAM_DEF, camDistTarget = sysCAM_DEF;
+  let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
   let camDolly = 0;
   let shakeAmt = 0;
   let camInit = false;
@@ -14534,6 +14553,42 @@ export function createSystems(game) {
   // The three channels at once. Same 0..1 magnitude shake() takes, so a caller
   // moves over by changing four letters and nothing has to be re-tuned.
   game.punch = punch;
+  /**
+   * FRAME THIS MOMENT — the fourth channel of "that landed", at last.
+   *
+   *   game.frameShot({ yaw, dist, pitch, raise, hold, w })
+   *
+   * `yaw` is the bearing FROM the capybara TO the camera in radians, the same
+   * convention `camYaw` and a spawn`s `yaw` already use — so `yaw: 0` puts the
+   * camera to the north of the animal looking south. Everything is optional;
+   * a shot that names only `yaw` keeps the distance and pitch it had.
+   *
+   * THREE THINGS THIS DELIBERATELY IS NOT:
+   *  - It is not a cutscene. The animal keeps walking and every key still works.
+   *  - It is not a command. Touch the mouse, Z, X or the right stick and it is
+   *    gone inside a third of a second: `camHandT` is the same flag the
+   *    self-steering rig yields to, and this yields to it harder.
+   *  - It is not for the helm or a condor. Those rigs own the lens outright and
+   *    the weight is multiplied to nothing under them, exactly as `rig()` is.
+   *
+   * Call it ONCE, at the payout — from a task`s `on` hook or a biome`s own
+   * moment. Calling it every frame just restarts the envelope and it will never
+   * leave the ease-in. Cleared on `biome:enter` the way shake and time are.
+   */
+  game.frameShot = function (o) {
+    if (!o) { shotReq = null; shotAge = 0; return; }
+    shotReq = {
+      yaw:   typeof o.yaw   === "number" && o.yaw === o.yaw ? o.yaw : null,
+      dist:  typeof o.dist  === "number" && o.dist === o.dist ? clamp(o.dist, sysCAM_MIN, sysCAM_MAX) : null,
+      pitch: typeof o.pitch === "number" && o.pitch === o.pitch ? o.pitch : null,
+      raise: typeof o.raise === "number" && o.raise === o.raise ? o.raise : null,
+      hold:  typeof o.hold  === "number" && o.hold  > 0 ? o.hold : sysSHOT_HOLD,
+      w:     typeof o.w     === "number" ? clamp(o.w, 0, 1) : 1
+    };
+    shotAge = 0; shotKill = 0;
+  };
+  /** What the framing layer is doing, 0..1. Nothing in src reads it; the harness does. */
+  game.framing = function () { return shotW; };
   game.sfx = sfx;
   /**
    * HOW SETTLED THE WORLD IS AT A POINT, 0..1. See THE CALM above.
@@ -14826,6 +14881,10 @@ export function createSystems(game) {
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
     backRing.length = 0; backT = 0; backHold = 0; backBusy = 0;
+    // A shot belongs to the moment that asked for it. Crossing a border ends
+    // the moment, and a framing left running into a teleport would fight the
+    // arrival yaw the spawn sets two lines later. Same rule as shake and time.
+    shotReq = null; shotW = 0; shotAge = 0; shotKill = 0;
     const cdef = chapterDef(chapterOf(name));
     const pasto = name === 'pasto';
     bioTarget = pasto ? 1 : 0;
@@ -14926,6 +14985,26 @@ export function createSystems(game) {
       if (keys.KeyX) { camYawTarget -= dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
     }
     if (camHandT > 0) camHandT -= dt;
+    // ---- THE FRAMING ENVELOPE (v26) -----------------------------------
+    // Aged on the RAW clock and not on `dt`. A marquee is the one moment that
+    // is most likely to be under slow motion — `completeTask` pays `slowmo` out
+    // on exactly the `wow` rows a shot belongs to — and a hold that promises
+    // 2.2 s of wall clock must not become 3.5 s because the world went slow.
+    // This is the same rule `sysSAVE_DEBOUNCE` was found breaking in v23.
+    if (shotReq) {
+      const raw = game.state.rawDt || dt;
+      shotAge += raw;
+      // The player touching the camera is the end of it, immediately. camHandT
+      // is set by the mouse, by Z/X and by the right stick, so this is every
+      // way there is to say "I am looking at something else".
+      if (camHandT > 0) shotKill = 1;
+      const inW  = clamp(shotAge / sysSHOT_IN, 0, 1);
+      const outW = 1 - clamp((shotAge - sysSHOT_IN - shotReq.hold) / sysSHOT_OUT, 0, 1);
+      let want = Math.min(inW, outW) * shotReq.w;
+      if (shotKill) want = 0;
+      shotW = shotKill ? damp(shotW, 0, sysSHOT_KILL, raw) : want;
+      if (shotW < 0.002 && (shotKill || outW <= 0)) { shotReq = null; shotW = 0; shotAge = 0; }
+    } else if (shotW !== 0) shotW = 0;
     camYaw = damp(camYaw, camYawTarget, 9, dt);
     camDist = damp(camDist, camDistTarget, 6, dt);
 
@@ -15016,7 +15095,16 @@ export function createSystems(game) {
     // camYaw is the bearing FROM the capybara TO the camera, so behind is + PI.
     let rideYaw = NaN;
     if (inCali && game.cali && typeof game.cali.rideYaw === 'function') rideYaw = game.cali.rideYaw();
-    if (sailing && camHandT <= 0 && capy && capy.group) {
+    // ---- A FRAMED SHOT OWNS THE BEARING, ON FOOT ONLY (v26) -------------
+    // First in the chain, because a shot is the most deliberate thing said
+    // about this camera — but NOT over the helm, a ride or a condor, whose
+    // whole point is that the rig belongs behind the vehicle. Those keep it.
+    // The lambda is scaled by the envelope so the swing eases in with the shot
+    // rather than snapping the instant it is asked for.
+    if (shotW > 0.002 && shotReq && shotReq.yaw !== null && camHandT <= 0 &&
+        !mounted && !sailing && !(rideYaw === rideYaw)) {
+      camYawTarget = sysDampAngle(camYawTarget, shotReq.yaw, sysSHOT_YAW_L * shotW, dt);
+    } else if (sailing && camHandT <= 0 && capy && capy.group) {
       // ...AND THIS BRANCH WAS MISSING THE HALF TURN. Exactly the bug the note
       // below describes, in the one place nobody re-checked when it was fixed
       // for walking: at the wheel `capy.group.rotation.y` is the SHIP'S
@@ -15184,6 +15272,19 @@ export function createSystems(game) {
       camReach = lerp(camReach, rigDist, rigT);
       camPitch = lerp(camPitch, rigPitch, rigT);
       sysLook.y = lerp(sysLook.y, r.y + rigRaise, rigT);
+    }
+    // ---- ...AND THE FRAMING LAYER SITS ON TOP OF ALL OF IT (v26) --------
+    // Applied last for the same reason it is first in the yaw chain, and
+    // weighted down by flight and the helm on the same argument rig() uses.
+    // A shot that named only a yaw leaves both of these null and changes
+    // nothing here, which is the common case: most marquees want a BEARING.
+    if (shotW > 0.002 && shotReq) {
+      const sw = shotW * (1 - Math.max(flyT, sailT));
+      if (sw > 0.002) {
+        if (shotReq.dist  !== null) camReach  = lerp(camReach,  shotReq.dist,  sw);
+        if (shotReq.pitch !== null) camPitch  = lerp(camPitch,  shotReq.pitch, sw);
+        if (shotReq.raise !== null) sysLook.y = lerp(sysLook.y, r.y + shotReq.raise, sw);
+      }
     }
 
     const cp = Math.cos(camPitch), sn = Math.sin(camPitch);
