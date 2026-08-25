@@ -2111,6 +2111,57 @@ the horns, or give the finale its own wider camera. The moment works; it is not 
 should be.
 
 
+## THE FIRST HOUR, AND THE PILLARS OF 1-3 (v25 — 25 Aug 2026)
+
+**A CLUE MAY NOT NAME A VERB THE PLAYER HAS NOT BEEN GIVEN.** Sydney's `cafe-table` read *"climb up
+onto the tabletop"*. The action is a HOP, and CLIMB is a distinct verb this game does not hand over
+until chapter 11 — so chapter one spent a chapter-eleven word on something that is not it, and the
+player who remembers it goes looking for a wall. Before this pass **no clue in any of the 199 tasks
+named Shift or Space at all**. Now both are first named in chapter 1. `qa/verbs.mjs` enforces it.
+
+**AND RE-ORDERING WAS THE WRONG TOOL.** Sydney rows 1-12 are the gardens and forecourt (east),
+13-19 the quay (west), and the café terrace is 39 m west of the spawn: pulling the hop row into the
+first window sends the player across the chapter and back for one keystroke. **The order is good;
+the words were wrong.** Note also that `opera-stage` looks like it needs a hop and does not — the
+podium is a STAIR of 0.17 m treads, which environment.js calls "the largest step the capybara
+reliably walks up". Nothing in Sydney's gardens half requires Space at all.
+
+**A SURFACE LADDER MUST ASK THE CHAPTER WHERE THINGS ARE, NOT GUESS FROM ONE AXIS.**
+`capySurfacePitch`'s quay branch was written as if z grew toward Manly. It does not — the Quay is
+z 0..46, Manly is z = -556 — so `if (z < 16) return 1.22` swallowed the whole far end of the
+chapter (beach, Corso, chip shop all sounding like hollow wharf timber) and the `0.82` sand line
+below it was UNREACHABLE. It is now routed through `quay.inZone`, and **corso is tested before
+manly because the corso rect is inside the manly rect** — measured, (118, -582) answers true to
+both. A wrong footstep pitch is not an error and no audit will ever raise it; only a map will.
+
+**A CRITTER WITH NO `bold` IS NOT A CRITTER THAT NEVER APPROACHES — IT IS A DEAD REGISTRATION.**
+`quay.js` registered its only critter without the field; the registry defaults it to 0, `appr`
+never leaves zero, and the whole v23 inversion is silently absent. Measured after giving the apron
+gull `bold: 0.9`: sitting still takes `appr` 0 -> 0.900 and the flee radius **3.45 m -> 0.16 m**.
+The calm field alone could only reach ~2.8. **Any `addCritter` call with no `bold` should be read
+as a bug until proven deliberate.**
+
+**THE LOUDEST THING IN A CHAPTER IS THE MOST LIKELY TO BE MONO.** Pasto's church bell played
+`sfx('pop')` from nowhere while `pastoBellPos` sat on the line above; chapter 3's arrival at Manly
+— the payout of its wow — fired horn and chime with no `at:` on a hull whose position was in scope.
+In both cases the *quieter* cues nearby were already positional. Positional audio landed in v16 and
+the marquees never got it.
+
+### FOUR THINGS MEASURED IN THIS PASS AND DELIBERATELY LEFT OPEN
+
+1. **The mischief economy is gated on `locals`, and chapters 1 and 2 register none.** `localOwnerOf`
+   scans `locals`; the 20 m chain lives inside `localsStep`, which returns early on an empty list.
+   Sydney gets produce/shoo only via a duplicate that `biomeLive()` hard-codes to sydney, so
+   **Pasto's 13 edible props can start no reaction whatsoever.** The first two hours of the game are
+   the two hours with the least reactive world.
+2. **No chapter can frame its own marquee.** `camYawTarget`/`camDistTarget` are systems.js
+   module-locals with no public setter, so "framed" is not a channel a biome can opt into. Measured
+   in Sydney: walking onto the podium the camera collapses from 7.2 m / 45° to **3.05 m / 68.6°**,
+   which is exactly where `opera-stage` pays out, and recovers a metre later.
+3. **"Lit" is absent in chapters 1 and 2.** Twelve chapters have a row in the event grade layer;
+   Pasto has none, so riding a condor off a live volcano changes no bloom, threshold or vignette.
+4. **`api.vanRiding()` has zero readers repo-wide** — Sydney's one unique verb is a timer and a chime.
+
 ## THE ALBUM (v24 — 25 Aug 2026)
 
 Photo mode has existed since v22 and **every picture it ever took left immediately**: `photoShoot`
