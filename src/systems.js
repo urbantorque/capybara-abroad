@@ -3474,6 +3474,11 @@ function sysBuildCSS() {
   'min-width:12px;height:12px;padding:0 2px;border-radius:2px;',
   'display:flex;align-items:center;justify-content:center;',
   'background:' + sysRgba(PALETTE.stoneDark, 0.84) + ';color:' + paper + ';',
+  // 9px, and it stays 9px: this is the chapter NUMBER inside a 12px chip on
+  // the corner of a 56x35 thumbnail, and 11px does not fit in a 12px box. It is
+  // an index, duplicated in full by the chapter name beside it, so nothing is
+  // only available here. The 11px floor everywhere else is a readability rule
+  // about SENTENCES; a badge is not one. Do not 'fix' this in the next sweep.
   'font-size:9px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}',
 '.capyui-jrname{font-size:clamp(12px,2.5vw,15px);color:' + ink + ';font-weight:700;}',
 '.capyui-jrtally{font-size:clamp(11px,2.1vw,12px);color:' + inkSoft + ';font-weight:700;white-space:nowrap;',

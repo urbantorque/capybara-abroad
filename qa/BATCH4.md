@@ -45,7 +45,7 @@ Batch 4 chains nothing. It must finish with a found-vs-fixed report across all f
 - [x] qa/budget.js, qa/fuzz.js extended, qa/b4-*.js
 - [x] Project memory — capy3-payoff-batch-four
 - [x] This file as the closing report (found vs fixed, all four batches)
-- [ ] `playwright-cli close-all`
+- [x] `playwright-cli close-all`
 - [x] Chain NOTHING — the Payoff Pass ends here, by the brief
 
 ## Log
@@ -361,3 +361,17 @@ row where that was true.
   a `gl.finish()` to find out that the worst chapter uses eleven per cent of a frame.
 - **Project the subject into the frame; do not reason about the bearing.** Göreme's obvious
   −π/2 put the sun dead centre — and therefore behind the player's own basket.
+
+### One more, from the guidelines pass, flagged and NOT acted on
+
+**`index.html:5` sets `maximum-scale=1, user-scalable=no`,** which blocks pinch-zoom and
+is an explicit anti-pattern in the Web Interface Guidelines. It is also a defensible game
+decision: the game binds 21 touch/pointer handlers and pinch would fight its own controls.
+It has a real cost — a low-vision player cannot enlarge the DOM overlay, which is the same
+problem the 11px font floor was raised to address — and it cannot be settled without
+playtesting on a touch device. Left as it is, deliberately, and recorded here.
+
+`src/systems.js:3477` keeps a hard 9px on `.capyui-jrkey`: it is the chapter NUMBER inside
+a 12px chip on the corner of a 56x35 thumbnail, 11px does not fit in a 12px box, and the
+value is duplicated in full by the chapter name beside it. The exemption is now written in
+the source so the next sweep does not "fix" it.
