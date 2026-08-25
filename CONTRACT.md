@@ -2049,6 +2049,74 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE PAYOFF PASS, BATCH THREE — FRAMED (v26 — 26 Aug 2026)
+
+**`game.frameShot(...)` — the fourth channel, which no chapter could ask for until now.**
+
+v16 named four ways a moment can say *that landed*: framed, lit, audible, acknowledged. Three of
+them were reachable from a biome file. **Framed was not.** `rig()` lets the live biome ask for a
+distance, a pitch and a raise, and there has never been any way at all to ask for a **bearing** —
+`camYawTarget` is a systems.js module-local with no setter. So the one silhouette a chapter exists
+for was shown from wherever the player happened to be standing when the row ticked. Measured in
+Sydney in v25: the Opera House podium payout fires with the rig jammed to 3.05 m at 68.6 degrees,
+looking down at the sails from underneath them.
+
+```js
+game.frameShot({ yaw, dist, pitch, raise, hold, w })   // every field optional
+game.framing()                                          // 0..1, for the harness
+```
+
+`yaw` is the bearing FROM the capybara TO the camera, the same convention `camYaw` and a spawn's
+`yaw` already use, so `yaw: 0` puts the camera north of the animal looking south.
+
+**IT IS A REQUEST WITH AN ENVELOPE, NOT A CUTSCENE**, and the three things it deliberately is not
+are the whole design:
+
+- **Not a cutscene.** The animal keeps walking, every key still works, nothing is paused.
+- **Not a command.** Touch the mouse, Z, X or the right stick and it is gone inside a third of a
+  second. `camHandT` is the same flag the self-steering rig yields to; this yields to it harder.
+- **Not for the helm or a condor.** Those rigs own the lens outright and the weight is multiplied
+  to nothing under them — the identical argument `rig()` already makes. Being on a condor beats
+  being framed, and there is no argument to have.
+
+**AGED ON `game.state.rawDt`, NEVER ON THE SCALED `dt`.** A marquee is the single moment most
+likely to be under slow motion — `completeTask` pays `slowmo` out on exactly the `wow` rows a shot
+belongs to — so a hold that promises 2.2 s of wall clock would become 3.5 s at `timeScale` 0.62.
+This is the third timer in this codebase found on the wrong clock; see `sysSAVE_DEBOUNCE` in v23.
+
+Cleared on `biome:enter` the way shake and time are, because a framing left running into a
+teleport fights the arrival yaw the spawn sets two lines later.
+
+Call it ONCE, at the payout. Calling it every frame restarts the envelope and it never leaves the
+ease-in. Measured, `qa/b3-frame.js`, five assertions green: bearing lands 0.2° off the ask;
+`dist: 14` at 26° pitch holds 12.58 m of horizontal reach, exact; the envelope peaks at 1.000 and
+releases to 0.000; a `Z` keypress takes it 1.000 -> 0.011; a `switchTo` takes it to 0; and a
+yaw-only shot moves the distance by 0.47 m.
+
+### THE CHANNELS ARE AUDITED NOW — `qa/channels.mjs`
+
+Three of the four are visible in the source, so they no longer need a browser. Per chapter: exactly
+one `wow` row; a row in the event grade layer (*lit*); a `frameShot` call in the chapter's file
+(*framed*); and **no `addCritter` without `bold`**, which v25 established is not a shy animal but a
+dead registration — `appr` never leaves zero and the whole v23 calm inversion is absent for that
+species.
+
+Two things about how it is written, both paid for:
+
+- **The grade test tokenises; it does not use a `\b` regex.** That is precisely the shape of bug
+  `qa/verbs.mjs` shipped in v24 — the heredoc that wrote the file ate one backslash of each pair,
+  `\b` became a literal backspace, and the audit passed clean against the exact clue it existed to
+  catch. Reproduced once while writing this file, from the same cause.
+- **The critter scan prints how many calls it examined.** "No bare `addCritter`" and "this scan
+  found no `addCritter` at all" are otherwise the same green line. That is the mistake
+  `qa/pf-mischief.js` was caught making at the top of this very batch.
+
+**WHAT IT FOUND AT ITS FIRST RUN.** All 17 chapters have exactly one `wow` row and every
+`addCritter` names `bold`. But **only 5 of 17 chapters register a critter at all** — quay, kyoto,
+iceland, manly, goreme — so batch 1's calm inversion, the payoff of stillness as a verb, has
+nothing to invert in twelve chapters. And **five chapters have no row in the event grade layer**:
+sydney, pasto, quay (known from v25) and **kyoto and rio**, which are new.
+
 ## THE PAYOFF PASS, BATCH TWO — THE LAWN (v24 — 25 Aug 2026)
 
 **Finishing this game was a RECEIPT.** The last tick anywhere scheduled `showEnd`, which paused
