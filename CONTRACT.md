@@ -2049,6 +2049,279 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE PAYOFF PASS, BATCH FOUR — THE STEP THAT ALREADY HAPPENED (v27 — 26 Aug 2026)
+
+The five pillars on chapters 12-17 (Palawan, Cappadocia, Manly, the Pantanal, Sơn Đoòng,
+Antarctica), plus the performance re-measure and the release sweep. Six measurement
+subagents, fixes on the main thread, one commit per chapter. `qa/BATCH4.md` is the
+handover and the found-versus-fixed report for all four batches.
+
+### THE ONE THAT WAS NOT A CHAPTER — a parked capybara slid down every slope in the game
+
+`world.step` runs BEFORE `capybara.js`. So by the time the idle snap (`capyGRIP_SNAP`)
+decides the animal is stationary and writes `vx = vz = 0`, the solver has already given it
+`g·sin(θ)·dt` of down-slope velocity **and integrated that into the position**. Zeroing the
+velocity afterwards erases the evidence and keeps the displacement. Every frame. For ever.
+
+The arithmetic closes to three decimals, which is what turns this from a hypothesis into a
+diagnosis:
+
+| where | slope | predicted `24·s/60` | measured |
+|---|---|---|---|
+| Sơn Đoòng, spawn | 0.055 | 0.0220 m/s | 0.0226 |
+| the doline | 0.0475 | 0.0190 | 0.0190 |
+| (30, −70) | 0.175 | 0.0700 | 0.0674 |
+
+and it is a **fixed-step** quantity, which is the clincher: ticking at 1/120 and 1/240 gives
+the identical 0.0228 m/s, and 1/30 gives 0.0371. A real slide scales with time, not with the
+step.
+
+**It was never one chapter.** Over sixty seconds, no input, `body.velocity` reading exactly
+0.000 and `capy.loaf` at 1.0 the whole way: Manly's beach 13.36 m into the sea, Antarctica's
+spawn 3.12 m, Palawan's beach 3.65 m, Pasto 3.04 m, the cave 1.34 m. **Two previous batches
+looked at four of those and wrote them up as five separate chapter faults.**
+
+**THE RULE: static friction is a POSITION, and it cannot be expressed as a velocity write
+after the integration has already happened.** capybara.js deliberately never assigns a
+position, so the snap now holds an ANCHOR — taken when the animal stops, carried in the
+FLOOR'S frame (`platVX/platVZ`, so a capybara asleep on a moving ferry is pinned to the deck
+and not to the harbour) — and hands back exactly the velocity that returns to it. To first
+order the next step's own creep is cancelled and the net displacement is zero: bounded, not
+linear. `capyPIN_MAX` (0.55 m) is the reach past which the animal has genuinely been moved —
+a teleport, a rescue, a launch, a carrier — and the anchor is re-taken instead.
+
+Measured after: **15 of 17 chapters are now exactly 0.00 m at both `qa/stillness.js` sample
+points.** Antarctica's off-spawn 20-degree glacier still slides and should: its `slip` is
+over the snap's own threshold, and an ice slope that holds you is a wall.
+
+### AND NOBODY WALKS THROUGH THE PLAYER
+
+The other half of the same symptom, and it looked identical from outside. A walker's collider
+is **mass-0 KINEMATIC**, so cannon resolves any overlap between it and the capybara by moving
+**the capybara**. `npcSeparate` was already pushing people out — to `npcSEP_R` = 1.05 m — and
+the two shapes touch at **1.065**: the capybara is three spheres of r 0.34 at z = 0, ±0.34
+(reach 0.68) and a walker box is he (0.18, 0.30, 0.34), xz half-diagonal 0.385. So the
+separation parked every walker exactly on the contact boundary and the solver spent the rest
+of the encounter resolving a hair of penetration.
+
+Measured in Pasto, parked at the spawn with no input for sixty seconds: the animal was
+displaced **4.30 m, 12.29 m and 28.86 m on three runs of the same build** — the spread is the
+parade's phase, not noise — while the nearest body throughout was a walker at 1.83–1.91 m/s
+holding station 0.95–1.07 m away.
+
+`steerTo` cannot fix it: `navBlocked` forwards only to `game.env.navBlocked`, which is
+**static world geometry**, so a walker dodges a building and has never had a term for the
+animal at all. The guarantee is in `npcPlaceBody` instead — the one place any of these bodies
+is written — at `npcBODY_CLEAR` = 1.30 m, and only for bodies carrying `userData.npc`, because
+anything else placed through there may be a floor the animal is standing on and a carrier that
+refused to go under its passenger would drop it.
+
+**No exemption list, deliberately.** A person whose errand IS the player stops when they get
+to them, which is what arriving means; flee, plunge and cornered all move the other way, so
+the clamp is inert for them by construction. Only the INWARD component is removed, so anyone
+can still walk past, around or away at full speed. The DRAWN figure is not moved: the two
+disagree by under a metre for about a second, and the alternative is a person who cannot walk
+down a path the player is standing on.
+
+### A GHOST HAS NO SILHOUETTE — `sysEnableShadows` leaves alone the things that said no
+
+`registerShadowTarget` is the last line of every biome's build and it answered with an
+unconditional `castShadow = true` over every mesh it could reach — so **every
+`castShadow = false` written anywhere in a chapter file was undone about four lines later**.
+Rio noticed and wrote its own repair pass; Göreme copied it; nobody else did, and the two who
+did had to remember to run it *after*.
+
+Measured across the seventeen at spawn, visible meshes only: pantanal 222,730 of 225,526
+casting (98.8%), venice 179,354 of 181,814, cave 156,824 of 158,516, kowloon 151,614 of
+154,058 — **of which 36,144 were transparent**.
+
+Two ways to say no, both already in the codebase:
+
+- **`userData.noShadow`** — an explicit refusal, used by the Drift's island keels and
+  Göreme's headlight wedges since before this existed.
+- **a GHOST MATERIAL** — transparent, `depthWrite === false`, or additive. Nothing you can see
+  through has an honest silhouette to cast, and there is no case in seventeen chapters where
+  one should.
+
+About **145,000 triangles** left the shadow pass across the game with no scene geometry
+removed and nothing lost from any picture. It is a PICTURE fix as much as a cost one: the
+Pantanal's flood sheet is 260 × 232 m of transparent water at y = 0.3 and it was laying a
+hard shadow on everything under it — the same fault as Palawan's water sheet over the reef and
+Rio's eighty metres of surf shadowing the sea it was breaking on.
+
+### `frameShot({ over: true })` — the channel the vehicle chapters could not reach
+
+v26's rule was that a shot is weighted to nothing under the helm, a ride and a condor, and for
+a generic task-completion shot fighting a rig whose whole point is to sit behind the vehicle
+that is right. It also means the channel is **unreachable by exactly the chapters whose
+marquee happens ON the vehicle**, and there are two: Antarctica's `orca-ride` is at the helm
+and Pasto's `condor-ride` is in flight. Measured: the shot Antarctica asks for at its payout
+changed the lens by **0.00**, because `sw = shotW * (1 - sailT)` was zero for all of it.
+
+`over` says the chapter that owns the vehicle is the one asking. It is still not a command:
+`camHandT` — the player's hand on the camera — kills it in a third of a second exactly as
+before, it still expires on its own envelope and it is still cleared on `biome:enter`. It only
+removes the argument about which of two systems in the same file should win, in the one case
+where they are the same author.
+
+### A MARQUEE NOBODY WAS NEAR IS OWED THE LINE, NOT DENIED IT
+
+v26 raised `wow` praise from 15 m to 40. Forty metres is enough for a square and nothing like
+enough for a chapter whose marquee happens out in the world, and this batch measured three:
+Antarctica's `orca-ride` pays out **212.0 m** from the nearest of its six locals, Palawan's
+`the-bloom` is 47.9 m from the nearest of its seven at the reef, and the western half of the
+Pantanal's legal crossing is 41.0 m from both of its witnesses. In all three the chapter had
+**written** the lines — `onTask: { 'orca-ride': [...] }` appears on four Antarctic locals —
+and they were unreachable code.
+
+So the line is HELD (`npcWowOwed`) and delivered by the first person the player comes back
+within earshot of, at the praise radius rather than the wow radius because this one is said to
+your face. One at a time, and it dies at the border. It is also simply better: an empty ocean
+has nobody in it BY DESIGN, and being met on the jetty by someone who already knows is a
+warmer answer than a stranger applauding from the water.
+
+### `placeCue(o, x, y, z, far)` in shared.js — and why it must not mutate
+
+*The loudest cue is the most likely to be mono* has been true in every batch of this pass.
+Batch 4 measured 24 mono calls in Cappadocia, 48 in Manly, 47 in the Pantanal, 35 in Palawan
+and 29 in Antarctica — five whole chapters in which nothing has a direction, including the one
+sound the player is owed. What made it so easy to leave is that every one of those files
+**already computes the source's (x, z)** in order to scale the volume by distance, and then
+throws the position away.
+
+`at:` alone is not the fix: `sfx()` applies its OWN inverse-distance rolloff, so passing a
+position attenuates everything twice and halves the chapter's tuning silently. `placeCue` sets
+`near` to the chapter's own `far`, which makes `audioPlace`'s gain exactly 1.0 everywhere the
+chapter thinks the sound is audible, and leaves PAN as the only thing it contributes; the
+outer `far` clears `sysSFX_FADE` (45 m) so its taper never reaches back inside.
+
+**AND IT COPIES RATHER THAN WRITES.** Every one of these chapters fires its cues through ONE
+shared, mutated options object — `manSfx`, `panSfx`, `sysSpatial` — reused for the life of the
+page precisely so that a sound in an update loop allocates nothing. Writing `at` into that
+object would leave it there, and the next forty mono calls that set only volume and pitch
+would inherit a position from whatever was last placed: a gull would start coming from a wave,
+silently. Same shape as the `mat()`-keyed-by-colour and `grain()`-keyed-by-uuid caches this
+codebase has already paid for twice.
+
+### A CAMERA IN THE DARK HAS TO OPEN UP — `sysPHOTO_LIFT`
+
+The one chapter that is about darkness produced a black postcard. Photo mode had three
+parameters — saturation, contrast and VIGNETTE — and a vignette makes an already-black frame
+blacker. Measured in Sơn Đoòng at (0, −86), daylight 0.001: the stored 288×180 album thumbnail
+came back at **mean luma 17.6 of 255 with 52.3% of its pixels under 16**, kept for ever in the
+album and offered to the title card as a postcard.
+
+The post chain already had a `lift` channel nothing used. `sysSceneLit` is now read once a
+frame where the lighting blocks finish moving the three lights — the same place and for the
+same reason the dome and the grade are read there — and photo mode opens up by
+`(1 - sysSceneLit)`: exactly zero in fifteen chapters, and it never touches a frame that
+already has light in it. The vignette fades out as the lift comes in, and some contrast is
+given back, because opening up flattens. Differential, same spot, same shutter,
+`git stash` on systems.js: **mean 19.0 → 26.4, black pixels 41.7% → 4.9%**.
+
+### A LIGHT SOURCE IS NOT SOMETHING YOU ADD ON TOP OF NOON
+
+Palawan's bloom block only ever ADDED — +0.35 hemi, +0.16 ambient, a 0.14 background lerp — on
+top of a chapter whose identity is a BLEACHED noon (sun 1.16, hemi 1.10). Over white sand at
+3 m, which is where the chapter's own task sends you, the result was a flat whitening of
+something already white: bloom 1.00 against 0.00 from a fixed camera moved the mean RGB
+**+21.8 / +21.7 / +15.9 — the blue channel rose LEAST**, and 97.8% of the frame changed
+without any of it reading as a light. At the drop-off the identical bloom is the whole
+picture, so the effect was only ever legible where the chapter does not put you.
+
+A bioluminescent bloom is legible because **the day goes away**. Sun, sky and ambient come
+down by the same `kb` before the water puts its own cyan back, and the fog goes with them,
+because the water you are IN is the source and lighting the surfaces while the volume between
+them stays noon is half an effect. After, measured underwater on the reef at 2.25 m depth:
+**R −1.96, G +8.68, B +4.28** — red falls, green and blue rise, green hardest, which is what
+`palBloom` (0x63f0d8) actually is.
+
+### THE TRIANGLE GATE DOES NOT PREDICT THE COST (job 2, and it was not done)
+
+Ten of seventeen chapters are over the 130k gate, not the five the brief lists — the count
+grew with real content across batches 1-3 (quay 132,423 → 201,503; kowloon 130,390 → 154,058).
+
+**Frame time cannot show whether that matters.** rAF is pinned to the display, so all
+seventeen read mean 16.67 ms and p95 16.8, with the 99.9th percentile inside a single frame
+everywhere. Rendering each chapter forty times back to back with a `gl.finish()` — the only
+way past vsync — puts **the worst chapter in the game at 1.6–1.9 ms of a 16.67 ms frame,
+about eleven per cent**, stable over three runs.
+
+**And the count does not predict the cost.** Manly is the second SMALLEST chapter and the most
+expensive per triangle at 1.95 ms per 100k; Iceland and Quay are the second and third LARGEST
+and the two cheapest, at 0.43 and 0.45 — a four-to-one spread, with the two cheapest per
+triangle being two of the three largest. What predicts cost is the shadow pass and the
+draw-call/material count: switching the shadow map off is worth 0.70 ms in Manly (42% of its
+whole frame), 0.63 in Kowloon, 0.59 in the Pantanal.
+
+So the reallocation was **deliberately not done**. Warping ten chapters' terrain and foliage
+would risk the one thing this project guards hardest to buy a fraction of a millisecond on a
+budget already 89% unspent, against a metric demonstrably not doing the work.
+`qa/budget.js` runs both gates — the triangle one kept and reported exactly as asked, with
+each chapter's measured cost beside it, and the FAILING one milliseconds — and `qa/BATCH4.md`
+carries the named structural offender in every over-budget chapter as a work list, should the
+gate ever be re-affirmed on evidence.
+
+### THE RELEASE SWEEP — what the interplay fuzz found, and three of them were new
+
+**The graze was deleting props in sixteen of seventeen chapters.** The drain that puts a
+bitten prop back is the ONLY caller of `physUnhide`, and it lived inside `physPastoUpdate`,
+which is gated on `biome.isActive('pasto')` for a good reason of its own. Measured: a Sydney
+sandwich hidden at t = 526.7 s with `hiddenUntil` 560.7 was still hidden ninety seconds later,
+and switching to Pasto un-hid it on frame zero. It takes TASK-CRITICAL props with it — holding
+the Quay's chips and standing still for 5.63 s eats them, and both `qgFindChips` and the hint
+arrow skip a hidden prop, so `seagull-chips` was quietly unwinnable. **A clock is not a place.**
+
+**A relocated keepsake was rescued into mid-air, in 12 of 17 chapters, by up to 3.34 m.**
+`homeY` is a SURFACE — `physRescue` places at `homeY + originY + 0.05` — and the border
+crossing wrote the capybara's spawn, which is a DROP height with the animal's own radius and
+clearance already in it. `physRescue` then slept the body on the frame it placed it, and a
+sleeping body is skipped in the integrator, so the error froze there for ever.
+
+Asking `terrainHeight` instead is wrong in the other direction: five spawns are on a
+STRUCTURE — Venice's quay, the Pantanal's causeway, Antarctica's jetty, Göreme's plaza floor,
+Palawan's jetty — and the terrain function answers for the ground *underneath* a deck.
+**Only the solver knows what is under a point**, so the prop is dropped and LEARNS its home
+from where it comes to rest (`physHomeLearn`). Hover: exactly 0.00 in 14 of 17, worst case
+3.34 m → 1.74 m.
+
+**And two of them were in this batch's own new code**, which is the argument for running the
+fuzz after the fixes rather than before:
+
+- **The idle pin answered any outside position write under `capyPIN_MAX` with `-ex/dt`.** A
+  0.50 m nudge asked for **26.4 m/s** — ten times the walk cap — for one frame, and overshot
+  0.16 m *past* its start, so a shove that should have moved the animal half a metre threw it
+  backwards instead. The creep the pin exists to cancel is 0.02 m/s, so `capyPIN_VMAX` = 3.0
+  leaves it untouched to the last decimal and makes a real nudge a pull rather than a catapult.
+- **`frameShot` clamped `dist` to `sysCAM_MAX`, which is the ceiling on the PLAYER'S ZOOM.**
+  Antarctica's helm plate is authored at 26 m and silently got 16 — the exact frame the shot
+  was written to fix. A marquee is one authored composition held for two seconds, not an
+  interaction: `sysSHOT_DIST_MAX` = 30.
+
+### AND THE UI
+
+- **Escape opened the journal on top of a live viewfinder.** K and P both exit photo mode and
+  Escape did not, which made it the one key that puts a paused card over a HUD still
+  pretending to be a lens. It backs out of the innermost thing first now.
+- **The ledger and album buttons called `jrHide()` BEFORE `ledShow()`/`albShow()`**, and those
+  capture `document.activeElement` to return focus to. Blurring first meant what got captured
+  was BODY: a keyboard player who tabbed four times to the button, pressed Enter and then
+  Escape was returned to nothing at all, with the journal shut behind them.
+- **`inkSoft` was 3.77:1 against the 4.5 required** — and it is the BODY of the card in every
+  chapter, at 9.7 to 12px. The card is opaque, so this was never a fog-chapter problem, it was
+  the whole game. 0.62 → 0.70 alpha is 4.67:1. The coral accent is 2.31:1 and is doing two
+  jobs — an outline, a hover, a rule, a filled button, where contrast against the paper is not
+  the question, and small uppercase TEXT, where it is the only question — so it is split.
+- **33 font-size floors below 11px raised to 11px.** At 390×844 there were 13 distinct strings
+  between 7.9 and 10px. No horizontal overflow at any of the six sizes afterwards.
+- **NPC speech bubbles ran off the screen.** The bubble is positioned by its CENTRE
+  (`translate(-50%,-100%)`) and clamped to ±0.93 in NDC — a limit on the ANCHOR that says
+  nothing about the box hanging off it. Six distinct bubbles in a fourteen-sample soak, the
+  worst losing **132 px of a 399 px bubble at 1920×1080**: a third of a sentence, gone, in the
+  one channel this game has for saying that somebody noticed you. Clamped in pixels now, width
+  and height, measured once per text change rather than per frame.
+
+
 ## THE PAYOFF PASS, BATCH THREE — FRAMED (v26 — 26 Aug 2026)
 
 **`game.frameShot(...)` — the fourth channel, which no chapter could ask for until now.**

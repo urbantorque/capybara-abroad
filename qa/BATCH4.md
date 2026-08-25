@@ -242,3 +242,122 @@ future pass has a work list if the triangle gate is ever re-affirmed:**
 | | 174 penguins at 120 tri, all casting | 20,880 |
 | cave | three single meshes at 28,024 / 16,932 / 12,072 | 57,028 |
 | kowloon | four single meshes at 19,664 / 17,376 / 15,360 / 15,120 | 67,520 |
+
+## Job 3 — the release sweep
+
+**(a) Interplay fuzz.** `qa/fuzz.js` extended with six durable per-chapter checks
+(`keepHover`, `keepRescues`, `stuckHidden`, `roomFor`/`roomRight`, `pinKick`/`pinNet`,
+`calmNow`); probes at `qa/b4fz-1..11.js`. **Seven findings, three of them in code this
+batch had just written**, all fixed — see the commit and CONTRACT §v27. Measured clean and
+said so: photo mode against the dark, the dive, the helm and the ceremony (album 0→6,
+caption live across a crossing); room reverb across six crossings 0.25 s apart (swaps in
+0.8–1.8 s, self-heals in 3.5 s, `roomFor === biome.current` in all 17); `placeCue`'s 12
+call sites, none of which can alias; `frameShot({over:true})` at the helm (0.04 m of lens
+movement without it, 5.92 m and a 307° bearing swing with it); calm collapsing 1.00 → <0.05
+in 0.62 s under a sprint and the distance blend matching the documented `far²` exactly;
+`npcPlaceBody`'s clearance over 7,680 samples; the other keepsake-relocation paths; graze
+against the three other task props.
+
+**(b) UI and accessibility** at all six sizes, over the journal, board, ledger, album,
+photo HUD and title card. Six fixed (Escape over the viewfinder, focus return, `inkSoft`
+and the accent contrast, 33 font-size floors, the speech-bubble clamp). Measured clean:
+role traps (0 `role="listitem"` on a button, 0 nameless buttons, all three dialogs carry
+`role` + `aria-modal` + `aria-label`, focus placed inside on open, Tab correctly swallowed);
+Escape closes every dialog, 18/18; reduced motion (everything opens, closes and shutters,
+the flash correctly skipped); no horizontal overflow at any size on any surface; the
+journal is genuinely scrollable to its footer at 1280x720.
+
+**(c) Full regression.** `pacing.mjs`, `lines.mjs`, `audit-tasks.mjs`, `verbs.mjs`,
+`channels.mjs` — 0 blockers. `audit-solid.js` 0 issues across 17. `audio2.js` no errors,
+music running. `fuzz.js` 0 errors across 17. `journey.js` — 17 picks, 17 board rows, every
+chapter entered through the departures board, gravity restored after the Drift
+(−8.6 → −24), save carries the right chapters, 0 errors. `playthrough.js` fresh-save with
+real keys — task ticked, saved, HUD intact. `pf2-finale2.js` — the finale fires at second
+11 sitting inside the horseshoe and does NOT fire sitting outside it; the ledger reads
+`199 of 199 · 17 of 17 places · 17 kept`; `saved.fin = 1`.
+
+**`qa/channels.mjs`: 8/17 chapters carried all three source-visible channels at the start
+of this batch. 14/17 now.** The three that do not are sydney, pasto and quay — chapters
+1-3, which batch 2's jobs 3 and 4 were meant to cover and never ran.
+
+---
+
+# THE HANDOVER — batch 4 closed, 26 Aug 2026. The Payoff Pass is finished.
+
+## Found versus fixed, all four batches
+
+| batch | scope | headline |
+|---|---|---|
+| 1 | foundation and comedy | the mischief reaction layer, the auto-loaf and the inverted critters |
+| 2 | the ending, the album, ch 1-3 | THE LAWN and THE ALBUM; **jobs 3 and 4 were never run** |
+| 3 | chapters 4-11 | `frameShot` became a channel; 7 of 8 marquees were broken silently |
+| 4 | chapters 12-17, perf, release | the idle snap could not see the physics step; the triangle gate stopped predicting cost |
+
+**Batch 4: 41 defects found, 38 fixed, 3 left open and measured.** Every one of the six
+chapters' marquees was broken in a way no audit could have raised — the fourth batch in a
+row where that was true.
+
+### The five that were not chapter bugs at all
+
+1. **A parked capybara slid down every slope in the game** (`capybara.js`) — the idle snap
+   cannot see the step that already happened. 15 of 17 chapters now measure 0.00 m.
+2. **A walker bulldozed a standing player** (`npc.js`) — the separation radius sat 0.015 m
+   inside the contact radius, and NPC steering has no term for the player at all.
+3. **Every `castShadow = false` in every chapter file was undone four lines later**
+   (`systems.js`) — about 145,000 triangles out of the shadow pass.
+4. **The graze deleted props in 16 of 17 chapters** (`props.js`) — the restock drain lived
+   inside the Pasto-only update, and it could make `seagull-chips` unwinnable.
+5. **A relocated keepsake was rescued into mid-air in 12 of 17 chapters** (`props.js`) —
+   `homeY` is a surface and it was written a drop height.
+
+### Open, measured, and not fixed
+
+1. **`qa/budget.js` reports 10 chapters over the 130k triangle gate and 0 over the cost
+   gate.** The reshape was deliberately not done; the evidence and a per-chapter work list
+   are in the job 2 section above. **Do not act on the triangle number without re-measuring
+   the cost first** — it has been measured three times and it does not predict it.
+2. **Pasto still drifts at spawn+(9,9), intermittently, 0.17 m to 29 m across runs.** Both
+   mechanisms behind it are fixed and the number came down, but it is phase-dependent, and
+   a differential with all non-ground bodies removed still drifted 1.41 m — so something
+   else is left. It is chapter 2 and was outside job 1's scope. `qa/b4-pasto3.js` and
+   `qa/b4-pasto6.js` are the probes.
+3. **A relocated keepsake still hovers in 3 of 17** (Göreme 1.74 m, Palawan 0.69 m, and
+   Sahara re-rescues twice), down from 12 of 17 at up to 3.34 m. `physHomeLearn` only
+   learns on the frame the body SLEEPS, and a prop on a busy plaza may not sleep inside the
+   fuzz's window, so the provisional value is what gets measured. Widening the learn to
+   "at rest" rather than "asleep" is the likely finish.
+
+### Carried forward from batch 3, still open
+
+4. **Kowloon's roof is unreachable** — the climb tops out 0.65 m east of the deck and the
+   scaffold colliders fill the bay. `symphony` is NOT blocked. Do not lower `hkSCAF.top`.
+5. **Only 5 of 17 chapters register a critter**, so batch 1's calm inversion has nothing to
+   invert in twelve. Five of those have no ground animal DRAWN to register — content, not a
+   flag.
+6. **Room tone is keyed per biome, not per space.** Venice and Palawan are its worst cases.
+7. **Iceland's snowcat track is at x = 34 and every glacier run ends at x ≈ −20.**
+
+### And two things this batch measured but did not build
+
+8. **Palawan's `inZone('shaft')` has ZERO callers in all of `src/`** — the hole in the
+   cathedral roof, with god-ray shafts, landing discs, a pearl mound in the light and
+   swiftlets spiralling out of it, and no interaction of any kind. The chapter's obvious
+   second vista, or a find.
+9. **`cave.js`'s `nearestDrip()` and `echoReady()` have no readers repo-wide** — so a
+   chapter whose one verb runs on a 1.05 s cooldown has no tell for when it is back.
+
+## Traps this batch paid for
+
+- **`playwright-cli close-all` closes EVERY session on the machine.** Two concurrent
+  subagents killed the main thread's browser mid-run, twice. Tell subagents not to run it.
+- **Detect the file's newline before patching.** `systems.js`, `palawan.js` and others are
+  CRLF; most biome files are LF. A patch written for `\n` silently finds nothing. And write
+  patches as a `.mjs` in the scratchpad rather than a bash heredoc — a backtick in a comment
+  breaks the shell, which cost three attempts.
+- **`qa/kine.js` is too noisy for a differential** — 760 to 938 teleport events across
+  identical builds. Do not conclude anything from a single pair of runs.
+- **A measurement that cannot vary is not evidence.** Every chapter reads 16.67 ms of frame
+  time because rAF is pinned to the display. It took rendering forty times back to back with
+  a `gl.finish()` to find out that the worst chapter uses eleven per cent of a frame.
+- **Project the subject into the frame; do not reason about the bearing.** Göreme's obvious
+  −π/2 put the sun dead centre — and therefore behind the player's own basket.
