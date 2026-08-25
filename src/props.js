@@ -1976,7 +1976,11 @@ const physBIOME_SCATTER = {
                        ['coffee', 1], ['camera', 1], ['handbag', 1], ['chips', 1]] },
   kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['dango', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]] },
   cali:      { x: 0, z: 24, r0: 5, r1: 26, props: [['empanada', 2], ['arepa', 1], ['plantain', 1], ['sombrero', 1], ['basket', 1], ['bin', 1], ['cone', 2], ['sign', 1]] },
-  rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['esky', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]] },
+  // ...AND ONE OF THEM IS FOOD. Rio had 0 edible props of 10, so batch 1's
+  // produce reaction — graze someone's lunch, earn a line and a shoo — could
+  // not fire in a chapter whose whole beach is people eating. The esky goes:
+  // it is the one thing on the list a person does not carry down and put down.
+  rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['icecream', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]] },
   iceland:   { x: 0, z: 99, r0: 5, r1: 24, props: [['coffee', 2], ['camera', 1], ['handbag', 1], ['basket', 1], ['bin', 2], ['cone', 1], ['sign', 2]] },
   // Was `sombrero, plantain, maiz` — a Nariño hat, a bunch of plantains and a
   // cob of maize, scattered across Jemaa el-Fnaa. The Pasto market's props

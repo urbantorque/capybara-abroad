@@ -771,15 +771,30 @@ function rioBuildBeach(game, root) {
   M.cyl(kx, ky + 1.3, kz, 2.4, 2.6, PALETTE.rioWall1, 0, 0, 0, 8);
   M.cone(kx, ky + 3.1, kz, 3.4, 1.0, PALETTE.rioRoof, 0, 0, 0, 8);
   M.box(kx, ky + 2.05, kz - 2.2, 3.0, 0.12, 0.7, PALETTE.rioWall4);
-  rioStaticBox(game, kx, ky + 1.3, kz, 4.6, 2.6, 4.6, 0);
+  // THE DRUM'S COLLIDER BURIED THE COUNTER IT SERVES.
+  // It was 2.6 high and 4.6 deep, spanning z -8.3..-3.7; the counter sits at
+  // z -8.2 with a half-depth of 0.35, so all but a 0.25 m sliver of the shelf
+  // was inside the drum. A player who did make the climb rested at y 2.60 —
+  // standing inside the cone roof — and not on the counter at all. 2.05 high
+  // leaves the shelf proud; the drawn drum is unchanged, so it still reads as
+  // the wall you are standing beside.
+  rioStaticBox(game, kx, ky + 1.025, kz, 4.6, 2.05, 4.6, 0);
   // THE COUNTER IS A STEP AS WELL AS A SHELF. It was drawn and not collided, so
   // the one place on this beach you could be served at was a picture of a shelf.
   rioStaticBox(game, kx, ky + 2.0, kz - 2.2, 3.0, 0.22, 0.7, 0);
-  // and a crate beside it, because 2.0 m is four hops and 0.7 is one
-  M.box(kx + 2.1, ky + 0.35, kz - 2.0, 1.0, 0.7, 1.0, PALETTE.rioTramWood);
-  M.box(kx + 2.1, ky + 1.05, kz - 2.0, 0.9, 0.7, 0.9, PALETTE.rioTramWood, 0, 0.4);
-  rioStaticBox(game, kx + 2.1, ky + 0.35, kz - 2.0, 1.0, 0.7, 1.0, 0);
-  rioStaticBox(game, kx + 2.1, ky + 1.05, kz - 2.0, 0.9, 0.7, 0.9, 0.4);
+  // ---- AND THE LADDER WAS A COIN FLIP -----------------------------------
+  // Two crates gave rises of 0.70, 0.70 and 0.71 against a measured jump rise
+  // of exactly 0.70 m. One of three scripted run-and-hop climbs made it, and a
+  // standing hop off the top crate peaked at 0.70 and fell back. A step the
+  // same height as the jump is not a step, it is a dice roll. Three crates
+  // now: 0.60, 0.55, 0.50 and 0.46 to the counter, every one comfortably
+  // inside the hop.
+  M.box(kx + 2.1, ky + 0.30, kz - 2.0, 1.00, 0.60, 1.00, PALETTE.rioTramWood);
+  M.box(kx + 2.1, ky + 0.875, kz - 2.0, 0.90, 0.55, 0.90, PALETTE.rioTramWood, 0, 0.4);
+  M.box(kx + 2.1, ky + 1.40, kz - 2.0, 0.80, 0.50, 0.80, PALETTE.rioTramWood, 0, 0.8);
+  rioStaticBox(game, kx + 2.1, ky + 0.30, kz - 2.0, 1.00, 0.60, 1.00, 0);
+  rioStaticBox(game, kx + 2.1, ky + 0.875, kz - 2.0, 0.90, 0.55, 0.90, 0.4);
+  rioStaticBox(game, kx + 2.1, ky + 1.40, kz - 2.0, 0.80, 0.50, 0.80, 0.8);
 
   // ---- AND SOMETHING TO BE SERVED AT --------------------------------------
   // The kiosk was a drum, a cone and a shelf, and there is a task on it. What
@@ -1306,6 +1321,17 @@ function rioUpdateWaves(game, dt) {
       if (game.record) game.record('take-a-wave', rioWaveBest);
       rioTask('take-a-wave');
     }
+    // ---- AND THE ROCK IS WATCHING (v26) --------------------------------
+    // `surfing()` and `riding()` had ZERO readers in the entire repo: no
+    // camera, no line, no grade, no score, nothing. The chapter's signature
+    // verb was a splash and a number — the `vanRiding()` shape exactly.
+    //
+    // The reader is already drawn and already written: `rioClap` puts the
+    // twenty-two people on Arpoador rock up off their heels, and it existed
+    // for one other task. A long ride is the most watchable thing that happens
+    // on this beach and they were sitting through it. Topped up rather than
+    // set, so it holds for the whole ride and falls away on its own.
+    if (rioWaveRide > 12) rioClap = Math.max(rioClap, 2.4);
   } else if (rioWaveRide > 0 || rioWaveFrom < 8e8) {
     // Fall off the back of one and the count goes with it — a ride is one wave.
     if (game.record && rioWaveBest > 4) game.record('take-a-wave', rioWaveBest);
@@ -3199,6 +3225,12 @@ function rioCheckKiosk(game) {
   const p = capy.position;
   const dx = p.x - rioKIOSK.x, dz = p.z - rioKIOSK_STAND;
   if (dx * dx + dz * dz > 3.4 * 3.4) return;
+  // ...AND IT HAS TO BE ON THE COUNTER. The test was a 3.4 m circle in PLAN
+  // with no y in it at all, so standing on the sand beside the kiosk and
+  // pressing E ticked it — measured at y 0.34, one press. The card says "the
+  // crate is the way up, the counter is the shelf", and the crates, the counter
+  // collider and the whole climb existed for a task that never asked.
+  if (p.y < rioTerrain(rioKIOSK.x, rioKIOSK.z) + 1.6) return;
   rioKioskDone = true;
   rioTask('kiosk');
   rioBondeSfx('pop', { volume: 0.7, pitch: 1.2 });
@@ -3267,9 +3299,15 @@ function rioUpdateVolei(game, dt) {
   rioBallBody.wakeUp();
   rioBallBody.velocity.set((tx - b.x) / flight, 5.6 + rand(0, 1.4), (tz - b.z) / flight);
   rioBallBody.angularVelocity.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
+  // A METRONOME, AND A MONO ONE. Measured standing still 14.6 m away for
+  // ninety seconds: 56 thuds, one every 1.6 s, centre channel, forever. The
+  // hand-rolled distance law here is the exact thing v16 replaced — it does not
+  // pan, so the ball is always in the middle of your head. With a bearing on it
+  // the rally is a thing happening over there, which is what it is; and 16 m is
+  // where a ball being kicked stops being your business.
   if (typeof game.sfx === 'function' && cp) {
     const far = Math.hypot(cp.x - b.x, cp.z - b.z);
-    if (far < 34) game.sfx('thud', { volume: clamp(0.30 - far * 0.006, 0.05, 0.30), pitch: 1.5 });
+    if (far < 16) game.sfx('thud', { volume: 0.30, pitch: 1.5, at: { x: b.x, y: b.y, z: b.z } });
   }
 }
 
@@ -3526,7 +3564,10 @@ function rioUpdateSamba(game, dt) {
     rioSambaDone = true;
     rioTask('samba-parade');
     rioBurstSparks(p.x, y + 0.8, p.z, 22, 1.5);
-    if (typeof game.shake === 'function') game.shake(0.22);
+    // punch, not shake: the calçadão already uses it forty lines up, on an
+    // event a fifth the size of this one. Same 0..1 magnitude, four letters.
+    if (typeof game.punch === 'function') game.punch(0.22);
+    else if (typeof game.shake === 'function') game.shake(0.22);
     if (typeof game.toast === 'function') game.toast('the whole bateria just clocked a capybara.');
     // ---- THE SALUTE ------------------------------------------------------
     // The toast has always said the bateria clocked you. Now it does: the
@@ -3537,7 +3578,23 @@ function rioUpdateSamba(game, dt) {
     rioSalute = 4.2;
     rioConfetti = 3.0;
     if (game.music && typeof game.music.swell === 'function') game.music.swell(0.85);
-    if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 1.0, force: true });
+    // THE LOUDEST CUE IN THE CHAPTER WAS THE ONLY MONO ONE. The five
+    // escalation cheers above it, at a fifth the volume, all carry `at:`.
+    if (typeof game.sfx === 'function') {
+      game.sfx('cheer', { volume: 1.0, force: true,
+                          at: { x: rioBateriaX, y: rioTerrain(rioBateriaX, rioAVE_Z) + 1.4, z: rioAVE_Z } });
+    }
+    // ---- FRAMED (v26) ----------------------------------------------------
+    // Measured at the payout: dist 7.2 m, pitch 45.1 degrees — the untouched
+    // chase cam, looking down at grey asphalt and drum lids. The salute the
+    // four lines above just started (the bateria turning, the float 15 m back,
+    // both rakes coming to their feet, the confetti) was entirely outside the
+    // frame. One bearing puts all of it in: the camera east of the column
+    // looking back west down the avenue, low and long.
+    if (typeof game.frameShot === 'function') {
+      game.frameShot({ yaw: Math.PI * 0.5, dist: 16, pitch: 12 * Math.PI / 180,
+                       raise: 1.6, hold: 4.0 });
+    }
   }
 }
 
@@ -3750,7 +3807,13 @@ function rioInZone(name, x, z) {
     const dx = x - rioARPOADOR.x, dz = z - rioARPOADOR.z;
     return dx * dx + dz * dz < rioARPOADOR.r * rioARPOADOR.r;
   }
-  if (name === 'santateresa') return z > 82 && x < 8;
+  // THE ARCHES WERE IN NO ZONE AT ALL. `santateresa` starts at z 82; the
+  // aqueduct runs at z 76 across x -42..38, so **eighty metres of stone
+  // viaduct — the deck the bonde task walks, and the loudest landmark in this
+  // half of the chapter — footfalled as beach sand**. Selarón's flight above
+  // it (z 84..118.7) does land in the zone, which is why nobody noticed.
+  // Widened rather than given a zone of its own: it is the same stone.
+  if (name === 'santateresa') return z > 70 && x < 40;
   return false;
 }
 
@@ -3854,6 +3917,19 @@ export function createRio(game) {
                rioWaveV3.set(rioWAVE_X, rioSEA_Y, b < -1e8 ? rioWAVE_Z0 : b); return rioWaveV3; },
     surfing() { return rioWaveRide > 0; },
     waterHeightAt: rioSurfaceY,
+    // ONE FLAG, AND THE ANIMAL WAS 1.56 m UNDER THE WAVE IT WAS RIDING.
+    //
+    // `capyWaterY` only calls `waterHeightAt` when this is up. Rio publishes a
+    // surface that includes the full `rioWaveLift` and never raised the flag,
+    // so the capybara floated at the flat `rioSEA_Y` while the set rolled
+    // through it: measured at a live crest, surface +0.534 m, animal -1.027.
+    // The chapter's signature verb is riding those waves.
+    //
+    // This is the same bug, in the same field, that batch 1 found in Iceland's
+    // hot spring — where the animal was 29 cm under the water for the whole of
+    // that chapter's best-loved moment. Second time. Any chapter that publishes
+    // waterHeightAt and does not set this should be read as broken.
+    localWater: true,
     inZone: rioInZone,
     SPAWN: rioSPAWN,
 
