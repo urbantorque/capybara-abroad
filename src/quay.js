@@ -3992,7 +3992,14 @@ function quayUpdateApronGulls(game, dt) {
   if (!im) return;
   const capy = game && game.capy && game.capy.position ? game.capy.position : null;
   if (!quayAGCrit && game && typeof game.addCritter === 'function') {
-    quayAGCrit = game.addCritter({ biome: 'quay', r: quayAG_NEAR });
+    // bold 0.9, the same as Manly's gulls, because they are the same birds and
+    // a silver gull on a ferry apron is the least frightened animal in Sydney.
+    // It was registered with NO bold at all, which the registry defaults to 0 —
+    // so `appr` never left zero and the batch-1 inversion (a settled capybara
+    // is approached rather than fled from) was dead for the only critter in the
+    // chapter. Nothing reported it: a radius that never shrinks looks exactly
+    // like a radius that is not supposed to. See THE LOAF and addCritter.
+    quayAGCrit = game.addCritter({ biome: 'quay', r: quayAG_NEAR, bold: 0.9 });
   }
   const agNear = quayAGCrit ? quayAGCrit.near : quayAG_NEAR;
   const agNear2 = agNear * agNear;
@@ -5071,7 +5078,16 @@ function quayCheckVoyage(game, dt) {
         game.record('manly-voyage', Math.max(0, quayRunT - 1.0));
       }
 
-      if (typeof game.sfx === 'function') { game.sfx('horn'); game.sfx('chime', { volume: 0.9 }); }
+      // FROM THE BOAT, not from the middle of the listener's head. The
+      // approach calls seventy lines above already place themselves; the
+      // arrival — the loudest moment in the chapter and the payout of its
+      // wow — did not, on a hull whose position is right here. See THE SOUND
+      // COMES FROM SOMEWHERE in CONTRACT.
+      if (typeof game.sfx === 'function') {
+        const at = { x: quayBoatX, y: 1.4, z: quayBoatZ };
+        game.sfx('horn', { at: at, near: 12, far: 260 });
+        game.sfx('chime', { volume: 0.9, at: at, near: 10, far: 120 });
+      }
       if (typeof game.toast === 'function') game.toast('Manly. all ashore that’s going ashore.');
       // ...AND SOMEBODY TAKES THE LINE.
       // Seventy seconds of open water ended in a line of text. A ferry

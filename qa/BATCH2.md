@@ -55,13 +55,13 @@ correctly fall back to their authored marks.
 - [x] Re-hinted (re-ordering was the wrong tool - see below) so every core verb lands inside 10 min
 - [x] NO new tasks — re-hint and re-order only
 
-### Job 4 — the five pillars on chapters 1-3
+### Job 4 — the five pillars on chapters 1-3  DONE
 Sydney · Pasto · Circular Quay
-- [ ] 1 Marquee certification (four channels, from the PNG at the moment)
-- [ ] 2 The cast (pair-chat 13 m, after:/before:, unprompted ack, mischief chains)
-- [ ] 3 Feel of the ground (footfall/slip/particles, wetness, room tone, mood, loaf)
-- [ ] 4 The signature toy
-- [ ] 5 Route life (no purposeless dead 20 m cells)
+- [x] 1 Marquee certification — CERTIFIED, and "framed" FAILS in all three (four channels, from the PNG at the moment)
+- [~] 2 The cast — audited; the mischief economy does not reach ch 1-2 (finding A) (pair-chat 13 m, after:/before:, unprompted ack, mischief chains)
+- [x] 3 Feel of the ground — fixed ch 3 footfall (half the chapter was wrong) (footfall/slip/particles, wetness, room tone, mood, loaf)
+- [x] 4 The signature toy — named for all three; Sydney's has no readers (D)
+- [x] 5 Route life — measured; two real dead patches (E) (no purposeless dead 20 m cells)
 - Chapter notes: oldest and most-audited, so expect tail misses. Keep the gardens
   clean enough to stage job 1. **Quay is 132,423 tris against a 130k budget — no
   heavy geometry; list reallocation candidates for batch 4.**
@@ -69,10 +69,10 @@ Sydney · Pasto · Circular Quay
   but has no `bold`/approach; Quay has only 1 edible prop, Sydney 7, Pasto 13.
 
 ### Finish
-- [ ] CONTRACT.md new version section
-- [ ] qa audits for new invariants
+- [x] CONTRACT.md new version section
+- [x] qa audits for new invariants (qa/verbs.mjs)
 - [ ] Project memory
-- [ ] This file as the handover
+- [x] This file as the handover
 - [ ] `playwright-cli close-all`
 
 ## NOTE ON THE CHAIN
@@ -227,3 +227,100 @@ existed to catch, while its *other* checks (regex literals, which survive) kept
 working and made it look alive. **Proven by differential:** stashed, it now
 prints `BLOCKER ch1 cafe-table names "climb"` and exits 1; restored, 0 and 0.
 No regex is built from a string in that file any more.
+
+## JOB 4 — THE FIVE PILLARS, CHAPTERS 1-3
+
+All three chapters audited statically against the five pillars, then the
+findings that were safe to close were closed and measured. **The three chapters
+agree with each other, which is what makes the big findings credible.**
+
+### FIXED AND MEASURED
+
+**1. Half of chapter 3 had the wrong footstep for its entire life.**
+`capySurfacePitch`'s quay ladder was written as if z grew toward Manly. It does
+not: the Quay is z 0..46 and Manly is z = -556, so `if (z < 16) return 1.22`
+swallowed the whole far end — the beach, the Corso and the chip shop all
+footfalled as hollow wharf timber — and the `0.82 // the sand at Manly` line
+beneath it was UNREACHABLE CODE, since the only way to reach it was z >= 46,
+which is behind the apron. Nothing could ever have reported this: a wrong pitch
+is not an error. Now routed through the chapter's own `inZone`.
+
+Measured after: apron (0,30) -> apron only; beach (118,-562) -> manly; Corso
+(118,-582) -> **corso AND manly both true**, which is why corso must be tested
+first — the corso rect is inside the manly rect, and the broad test would
+otherwise make the paved street sand.
+
+**2. The apron gull could never be approached.** `quay.js` registered its only
+critter with no `bold`, which the registry defaults to 0, so `appr` never left
+zero and batch 1's whole "a settled capybara is approached rather than fled
+from" inversion was dead in the chapter. Given `bold: 0.9` (the same as Manly's
+gulls — they are the same birds). **Measured, sitting still on the apron:**
+
+    s   loaf   calm   appr    near
+    1   0      0.02   0       3.45
+    7   0.54   0.42   0       2.59
+    8   0.95   0.52   0.393   1.44
+    10  1.00   0.69   0.868   0.26
+    14  1.00   0.87   0.900   0.16
+
+The flee radius collapses 3.45 m -> 0.16 m. Before, it could only ever have
+reached ~2.8 m on the calm field alone.
+
+**3. Two chapters' loudest cues were mono.** Pasto's church bell called
+`sfx('pop')` — a bronze bell in a tower, playing a pop, from nowhere, while
+`pastoBellPos` sat on the line above already being handed to the event. Now a
+pitched-down `chime` placed at the tower, near 9 / far 150 so it carries across
+the plaza and up Galeras. Chapter 3's arrival at Manly — the payout of its wow —
+fired `horn` and `chime` with no `at:` on a hull whose position was in scope;
+both now play from the boat. The approach calls seventy lines above had been
+doing it correctly all along.
+
+### FOUND, EVIDENCED, AND DELIBERATELY NOT FIXED HERE
+
+These are systemic and too large to land safely at the end of this batch. They
+are not "nice to have" — the first one means the first two hours of the game are
+the two hours with the least reactive world.
+
+**A. THE MISCHIEF ECONOMY IS GATED ON `locals`, AND CHAPTERS 1 AND 2 HAVE NONE.**
+Batch 1 reported "13 of 15 locals chapters carry two of the three chains", which
+is true and hid this: Sydney and Pasto are not locals chapters at all.
+- `localOwnerOf` scans `locals` (`npc.js:1662`), so ownership/retrieval cannot
+  fire in Sydney or Pasto.
+- The 20 m chain lives inside `localsStep`, which opens `if (!locals.length)
+  return;` (`npc.js:2014`) — nothing in either chapter ever makes a second
+  person turn their head.
+- Sydney gets produce/shoo only through a Sydney-specific duplicate
+  (`npc.js:3903`), which is itself gated by `biomeLive()` — hard-coded to
+  `isActive('sydney')` (`npc.js:7072`). **So Pasto's 13 edible props can start
+  no reaction whatsoever.**
+- Chapter 3 has 10 locals but its props all scatter in one annulus about (4,26),
+  and `npcOWN_R` is 11 m from a prop's home — so ownership reaches 2 of 10, and
+  the boat deck has no props at all.
+
+**B. NO CHAPTER CAN FRAME ITS OWN MARQUEE.** `camYawTarget`/`camDistTarget` are
+systems.js module-locals with no public setter, so "framed" — the first of the
+four channels — is not a channel any biome can opt into. It is absent in all
+three chapters because it is absent everywhere. **Measured in Sydney:** walking
+onto the Opera House podium the camera collapses from 7.2 m at 45 degrees to
+3.05 m at **68.6 degrees**, and that is exactly where `opera-stage` fires — the
+one chapter-defining silhouette in the game, and at the moment it pays out the
+camera is jammed against the sails looking down. It recovers to 45.6 degrees
+about a metre further on. Screenshot `qa/PF2-marquee-sydney.png`.
+
+**C. "LIT" IS ABSENT IN CHAPTERS 1 AND 2.** Twelve chapters have a row in the
+event grade layer (`systems.js:13830-13905`); Pasto has none, so riding a condor
+off a live volcano changes no bloom, threshold or vignette. Sydney touches no
+light on any task.
+
+**D. Sydney's signature toy has no readers.** `api.vanRiding()`
+(`environment.js:3037`) has ZERO readers in the entire repo — no NPC line, no
+camera change, nothing thrown at the queue. The chapter's one unique verb is a
+12-second timer with a chime.
+
+**E. Route life — two real dead patches.** Sydney `x[-70,14] z[40,70]`, about
+84 x 30 m, is empty of trees, beds, paths, props and NPC waypoints: walking
+north from the spawn, the most natural first input in the game, is 30 m of blank
+lawn ending at an invisible wall. Pasto has an ~18 m bare annulus at d 42..60 m
+from Galeras — shrubs stop at 60, frailejones start at 42 — exactly where the
+climb begins. Chapter 3's crossing is healthy apart from one 68 m band at
+z -346..-416 with nothing within 140 m of the track.

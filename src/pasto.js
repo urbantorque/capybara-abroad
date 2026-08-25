@@ -1585,7 +1585,13 @@ function pastoBellSound() {
   if (t - pastoBellLastRing < 1.1) return;
   pastoBellLastRing = t;
   if (g.events) g.events.emit('pasto:bell', { position: pastoBellPos, strength: 1 });
-  if (g.sfx) g.sfx('pop');
+  // THE LOUDEST OBJECT IN THE CHAPTER WAS ITS QUIETEST CALL SITE: a bronze
+  // bell in a tower rang 'pop', mono, from nowhere — while pastoBellPos sits
+  // on the line above, already being handed to the event. `chime` is what a
+  // bell is, pitched down because this one is big, and it carries: near 9,
+  // far 150, so it is audible across the plaza and up the flank of Galeras,
+  // which is the whole point of ringing it.
+  if (g.sfx) g.sfx('chime', { at: pastoBellPos, volume: 0.95, pitch: 0.55, near: 9, far: 150 });
   if (g.completeTask) g.completeTask('church-bell');
 }
 

@@ -840,11 +840,24 @@ function capySurfacePitch(game, env, x, z, y) {
     return 0.82;
   }
   if (b.isActive('quay')) {
+    // THE OLD LADDER WAS WRITTEN AS IF z GREW TOWARD MANLY. It does not: the
+    // Quay is around z 0..46 and Manly is at z = -556, so `z < 16` swallowed
+    // the entire far end of the chapter and the beach, the Corso and the chip
+    // shop all footfalled as hollow wharf timber. The `0.82` sand line under it
+    // was unreachable code — the only way to reach it was z >= 46, which is
+    // behind the apron. Half a chapter had the wrong footstep for its whole
+    // life and nothing could report it, because a wrong pitch is not an error.
+    // Ask the chapter where things are instead of guessing from one axis.
     const q = game.quay;
-    if (q && q.inZone && q.inZone('deck', x, z)) return 1.24;   // the ferry herself
-    if (z < 16) return 1.22;                                     // the finger wharves
-    if (z > 16 && z < 46) return 1.0;                            // the paved apron
-    return 0.82;                                                 // the sand at Manly
+    if (q && q.inZone) {
+      if (q.inZone('deck', x, z)) return 1.24;    // the ferry herself
+      // corso BEFORE manly: the corso rect is inside the manly rect, so the
+      // broader test would answer first and the paved street would be sand.
+      if (q.inZone('corso', x, z)) return 1.0;    // paved, and roofed both sides
+      if (q.inZone('manly', x, z)) return 0.82;   // the beach around it
+      if (q.inZone('apron', x, z)) return 1.0;    // the paved apron at the Quay
+    }
+    return 1.22;                                  // the finger wharves
   }
   if (b.isActive('pasto')) {
     // the plaza is cobbled; the flanks of Galeras are not
