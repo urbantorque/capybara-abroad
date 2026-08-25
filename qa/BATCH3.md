@@ -81,3 +81,30 @@ v23 records for Kyoto. `nProps` added; the numbers are stable now.
   produce reaction is unreachable in three quarters of this batch. Marrakech is
   a false positive — it has an authored orange-cart chase (`sahara.js:4626`)
   that is richer than the generic chain; the count only sees SCATTERED props.
+
+### The chapter-neutral job, done first (main thread)
+
+**`game.frameShot()` — the fourth channel, at last.** Batch 2 left it open as
+finding B: `camYawTarget`/`camDistTarget` are systems.js module-locals with no
+public setter, so *framed* was not a channel any biome could opt into. `rig()`
+could already ask for a distance, a pitch and a raise; there was no way to ask
+for a **bearing**, which is the one thing a marquee actually needs.
+
+`game.frameShot({ yaw, dist, pitch, raise, hold, w })` — a request with an
+envelope, not a cutscene. Measured (`qa/b3-frame.js`, all five green):
+
+| assertion | measured |
+|---|---|
+| bearing reached | 0.2° off the ask |
+| distance held | 12.58 m horizontal = 14 m at 26° pitch, exact |
+| envelope peak | w = 1.000, releases to 0.000 |
+| a Z keypress kills it | w 1.000 -> 0.011 in half a second |
+| survives a border | no — w = 0 after `switchTo` |
+| yaw-only shot moves the distance | no — 0.47 m |
+
+Aged on `game.state.rawDt`, because a marquee is the one moment most likely to
+be under slow motion (`completeTask` pays `slowmo` out on exactly the `wow` rows
+a shot belongs to) and a 2.2 s hold must not become 3.5 s. That is the same rule
+`sysSAVE_DEBOUNCE` was found breaking in v23.
+
+Chapters opt in per marquee below.
