@@ -206,6 +206,13 @@ let gorDecorData = null;
 let gorChimDone = false, gorDoveDone = false, gorTetherDone = false;
 let gorAboardDone = false, gorWindsDone = false, gorSunDone = false, gorLandDone = false;
 let gorTruck = null, gorTruckX = 20, gorTruckZ = 10, gorTruckYaw = 0;
+// THE TRAILER IS A FLOOR NOW. See gorUpdateTruck and gorTrailerRide.
+let gorTrailerBody = null;             // kinematic, the bed you stand on
+let gorTrailerPX = 0, gorTrailerPZ = 0;   // last frame's bed centre, for the velocity
+let gorTrailerCarry = { x: 0, z: 0 };
+let gorTrailerCarrying = false;
+let gorRideHome = false;               // the crew are driving you back to the square
+let gorRideT = 0, gorRideDone = false;
 // where the chase crew THINK the balloon is going. See gorUpdateTruck.
 let gorChaseX = 20, gorChaseZ = 10;
 let gorToldBurner = false, gorToldLayer = -1, gorToldChimney = false;
@@ -472,6 +479,31 @@ function gorWarp(v, half) {
  * things audible for far too long. Returns 0 when there is nobody to hear it,
  * which is also what stops the sound being made at all.
  */
+/**
+ * GIVE A CUE A BEARING WITHOUT TOUCHING THE LEVEL THE CHAPTER ALREADY TUNED.
+ *
+ * Every gorHeard call site in this file already computes an (x, z) and a
+ * distance falloff — and then throws the position away and fires a MONO sound.
+ * Twenty-four gorSfx calls in the chapter, `at:` on none of them, which is
+ * exactly the "the loudest cue is the most likely to be mono" finding that has
+ * now been true in every batch of this pass. In a chapter whose whole subject
+ * is looking around, a burner roaring somewhere with no bearing is a wasted
+ * channel: the wind is read by turning your head.
+ *
+ * gorHeard keeps owning the VOLUME — it has its own quadratic curve and every
+ * call site is balanced against it, so letting systems.js attenuate as well
+ * would halve everything twice. `near` is therefore set to gorHeard's own
+ * `far`, which makes audioPlace's gain exactly 1.0 everywhere gorHeard is
+ * audible at all, and leaves pan as the only thing it contributes. The outer
+ * `far` clears sysSFX_FADE (45 m) so its taper never reaches back inside.
+ */
+function gorPlace(o, x, y, z, far) {
+  o.at = { x: x, y: y, z: z };
+  o.near = far;
+  o.far = far + 46;
+  return o;
+}
+
 function gorHeard(x, z, near, far) {
   const capy = gorGame && gorGame.capy;
   const p = capy && capy.position;
@@ -2027,12 +2059,16 @@ function gorUpdatePigeons(dt) {
   // both at the volume the distance says, so from the valley floor a mile of
   // rock away it is a rumour rather than an event.
   if (wasOut > 0.35 && out <= 0.35) {
-    const h = gorHeard(gorCLIFF.x + 6, (gorCLIFF.z0 + gorCLIFF.z1) * 0.5, 20, 190);
-    if (h > 0.02) gorSfx('rustle', { volume: 0.42 * h, pitch: 1.15 });
+    const cz = (gorCLIFF.z0 + gorCLIFF.z1) * 0.5;
+    const h = gorHeard(gorCLIFF.x + 6, cz, 20, 190);
+    if (h > 0.02) gorSfx('rustle', gorPlace({ volume: 0.42 * h, pitch: 1.15 },
+                                            gorCLIFF.x + 6, 26, cz, 190));
   }
   if (wasOut > 0.001 && out <= 0.001) {
-    const h = gorHeard(gorCLIFF.x + 6, (gorCLIFF.z0 + gorCLIFF.z1) * 0.5, 20, 150);
-    if (h > 0.02) gorSfx('rustle', { volume: 0.30 * h, pitch: 0.85 });
+    const cz = (gorCLIFF.z0 + gorCLIFF.z1) * 0.5;
+    const h = gorHeard(gorCLIFF.x + 6, cz, 20, 150);
+    if (h > 0.02) gorSfx('rustle', gorPlace({ volume: 0.30 * h, pitch: 0.85 },
+                                            gorCLIFF.x + 6, 26, cz, 150));
   }
   for (let i = 0; i < gorPIGEON_N; i++) {
     const o = i * 10;
@@ -2371,8 +2407,9 @@ function gorUpdateFieldBurners(dt) {
       // whole difference between the crew twenty metres away and the crew at the
       // far end of the field.
       if (h > 0.03) {
-        gorSfx('hiss', { volume: 0.34 * h * rand(0.82, 1.12),
-                         pitch: (1.05 + h * 0.75) * rand(0.90, 1.10) });
+        gorSfx('hiss', gorPlace({ volume: 0.34 * h * rand(0.82, 1.12),
+                                  pitch: (1.05 + h * 0.75) * rand(0.90, 1.10) },
+                                e.x, 3.2, e.z, 130));
       }
     }
     e.was = lit;
@@ -2433,9 +2470,20 @@ function gorUpdateDecor(dt) {
     // and they DRIFT, each in the wind of the layer it happens to be in — which
     // is not decoration, it is the tutorial: twenty-six objects demonstrating
     // the mechanic before the player has touched it.
-    const w = gorWindAt(gorDecorData[o + 2], gorDecorData[o], gorDecorData[o + 1]);
-    gorDecorData[o] += w.x * dt * 0.55;
-    gorDecorData[o + 1] += w.z * dt * 0.55;
+    // THE INSTRUMENT WAS LYING, AND IT IS THE ONLY INSTRUMENT THE CHAPTER HAS.
+    //
+    // `gorWindAt` takes HEIGHT ABOVE GROUND — that is what the player's own
+    // balloon passes it, `gorBalY - groundY`. This passed `gorDecorData[o+2]`,
+    // which is the ascent term only, while the envelope is actually drawn at
+    // `gorTerrain + 6 + that`: six metres low, every frame, on all twenty-six.
+    // The same off-by-the-basket the wisps' own note further down records.
+    // Then it scaled the result by 0.55, so the twenty-six objects whose entire
+    // job is to TEACH the layer speeds before the player has touched a burner
+    // were showing 55% of them. Layers run 2.92 / 3.76 / 3.70 / 3.86 m/s;
+    // reading the wrong layer at a bit over half speed is not a tutorial.
+    const w = gorWindAt(6 + gorDecorData[o + 2], gorDecorData[o], gorDecorData[o + 1]);
+    gorDecorData[o] += w.x * dt;
+    gorDecorData[o + 1] += w.z * dt;
     if (gorDecorData[o] > 110) gorDecorData[o] = -70;
     if (gorDecorData[o] < -76) gorDecorData[o] = 104;
     if (gorDecorData[o + 1] > 60) gorDecorData[o + 1] = -84;
@@ -2515,6 +2563,7 @@ const gorDECOR_BURN = 0.052;               // Hz-ish: about one burn every 19 s
 const gorDECOR_HEAR = 130;
 const gorDECOR_GAP_A = 3.2, gorDECOR_GAP_B = 6.5;
 let gorDecorBestH = 0;                     // loudest burner lit this frame
+let gorDecorBestX = 0, gorDecorBestY = 0, gorDecorBestZ = 0;   // ...and where it is
 let gorDecorSaid = 0;                      // s until the valley may speak again
 // the once-per-morning line about the whole valley lighting up together
 let gorSyncSaid = false;
@@ -2591,7 +2640,17 @@ function gorUpdateDawnLine(dt) {
       //
       // Collected here and fired once at the end of the sweep, loudest wins.
       const h = gorHeard(gorDecorData[o], gorDecorData[o + 1], 24, gorDECOR_HEAR);
-      if (h > gorDecorBestH) gorDecorBestH = h;
+      // ...and REMEMBER WHICH ONE WON, because the whole point of choosing the
+      // nearest burner is lost if the sound it makes then arrives from nowhere.
+      // This is the cue that matters most in the chapter: the wind here is read
+      // by looking at what other balloons are doing, and a roar with no bearing
+      // is a wasted instrument.
+      if (h > gorDecorBestH) {
+        gorDecorBestH = h;
+        gorDecorBestX = gorDecorData[o];
+        gorDecorBestY = gorDecorData[o + 2];
+        gorDecorBestZ = gorDecorData[o + 1];
+      }
     }
     gorDecorLit[i] = on ? 1 : 0;
     gorCol.setRGB(gorDecorBase[b], gorDecorBase[b + 1], gorDecorBase[b + 2]);
@@ -3515,8 +3574,13 @@ function gorUpdateHerd(game, dt) {
       // valley, every 2.4 s, for the whole chapter.
       const h = up ? 1 : gorHeard(b.position.x, b.position.z, 6, 95);
       if (h > 0.02 && game.sfx) {
-        game.sfx('chime', { volume: (up ? 0.34 : 0.30) * h * rand(0.88, 1.1),
-                            pitch: 1.6 * rand(0.94, 1.07) });
+        // ...and it has a BEARING, unless you are the one wearing it. `up` is
+        // the ride: a bell under your own chin has no direction to come from,
+        // so that case stays mono deliberately.
+        const o = { volume: (up ? 0.34 : 0.30) * h * rand(0.88, 1.1),
+                    pitch: 1.6 * rand(0.94, 1.07) };
+        game.sfx('chime', up ? o : gorPlace(o, b.position.x, b.position.y + 1.3,
+                                            b.position.z, 95));
       }
     }
     if (up && game.shake) game.shake(0.016);
@@ -3618,6 +3682,109 @@ function gorBuildTruck(root) {
   root.add(g);
   gorTruck = g;
 }
+
+/**
+ * THE RETURN TOLL THE CHAPTER PROMISES OUT LOUD AND HAS NEVER PAID.
+ *
+ * The chase crew's own payoff line, on the frame the balloon touches the
+ * trailer, is "Right. In the back, both of you, and hold the ropes." — and then
+ * there was nothing to get in. `gorBuildTruck` created a mesh and **zero
+ * physics bodies**: a capybara teleported into the cab was still standing there
+ * three seconds later, and `gorUpdateTruck` never drove anywhere but after the
+ * balloon. Measured, the landing plain reaches z = -104 and the plaza is at
+ * z = +34, so the toll on the chapter's marquee is a walk of up to a hundred
+ * and forty metres back over the tuff, every flight.
+ *
+ * Pillar 5 says every return toll has a ride. This one was already drawn, was
+ * already parked next to you, and already had a man in it telling you to get
+ * in. Nothing is added to the world: one kinematic box on geometry that has
+ * been in the chapter since it was built.
+ *
+ * The bed is `M.box(0, 0.8, 2.4, 2.6, 0.24, 4.2)` in truck-local space, so its
+ * top face is 0.92 above the group's origin and the group sits at terrain+0.05.
+ */
+function gorBuildTrailerBody(game) {
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
+                              material: (game.mats && game.mats.ground) || undefined });
+  // The floor. Half-extents, and the box's TOP is what has to line up with the
+  // drawn bed — so the shape is centred half a thickness below terrain+0.97.
+  b.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.12, 2.1)));
+  // ...and two side rails, at kerb height for the basket's reason: the frame
+  // channel means the animal does not slide relative to the bed at all, so
+  // these only have to stop a hop going over the side.
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.07, 0.3, 2.1)), new CANNON.Vec3(1.23, 0.42, 0));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.07, 0.3, 2.1)), new CANNON.Vec3(-1.23, 0.42, 0));
+  // A KINEMATIC BODY AT REST FALLS ASLEEP AND A SLEEPING BODY IS SKIPPED IN
+  // NARROWPHASE. The Star Ferry paid for this one; the basket's note above says
+  // the same thing.
+  b.allowSleep = false;
+  gorTrailerPX = gorTruckX + Math.sin(gorTruckYaw) * 2.4;
+  gorTrailerPZ = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
+  b.position.set(gorTrailerPX, gorTerrain(gorTrailerPX, gorTrailerPZ) + 0.85, gorTrailerPZ);
+  gorSyncBody(b);
+  game.world.addBody(b);
+  gorTrailerBody = b;
+}
+
+/**
+ * Drive the bed, and answer whether the animal is on it.
+ *
+ * The velocity is differenced against the PREVIOUS TARGET, never against
+ * `b.position` — cannon integrates a kinematic body by its own velocity inside
+ * `world.step`, which runs before this, so `(target - b.position)` is the
+ * distance the last velocity already travelled and deriving the next one from
+ * it makes the sign alternate every frame. The snowcat measured +7, -7, +7 m/s
+ * standing still, and that is the number capybara.js solves the frame against.
+ */
+function gorTrailerRide(game, dt) {
+  if (!gorTrailerBody) return;
+  const inv = dt > 0.0001 ? 1 / dt : 0;
+  const tx = gorTruckX + Math.sin(gorTruckYaw) * 2.4;
+  const tz = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
+  const ty = gorTerrain(tx, tz) + 0.85;
+  gorTrailerBody.velocity.set((tx - gorTrailerPX) * inv, 0, (tz - gorTrailerPZ) * inv);
+  gorTrailerPX = tx; gorTrailerPZ = tz;
+  gorTrailerBody.position.set(tx, ty, tz);
+  gorSyncBody(gorTrailerBody);
+
+  const capy = game.capy;
+  gorTrailerCarrying = false;
+  if (!capy || !capy.position) return;
+  const p = capy.position;
+  // Height plus a radius, the bangka's lesson: an axis-aligned rectangle reads
+  // aboard on a fraction of the frames of a ride nobody ever falls off.
+  const aboard = Math.hypot(p.x - tx, p.z - tz) < 2.4 && p.y > ty && p.y < ty + 2.6;
+  gorTrailerCarrying = aboard;
+  if (aboard) {
+    gorTrailerCarry.x = gorTrailerBody.velocity.x;
+    gorTrailerCarry.z = gorTrailerBody.velocity.z;
+    // ...and once you are in the back after a landing, they take you home. The
+    // crew said they would.
+    if (gorLandDone && !gorRideHome && !gorRideDone) {
+      gorRideHome = true;
+      gorRideT = 0;
+      gorToast('hold the ropes. the crew are taking you back to the square.');
+      gorSfx('pop', { volume: 0.5, pitch: 0.7 });
+    }
+    if (gorRideHome) {
+      gorRideT += dt;
+      // arrived: the square is the one place in the chapter everybody comes
+      // back to, and the tea man has been saying so for the whole flight
+      if (Math.hypot(tx - gorPLAZA.x, tz - (gorPLAZA.z - 9)) < 7 && gorRideT > 3) {
+        gorRideHome = false;
+        gorRideDone = true;
+        gorSaysNow('tea',
+          ['There. Everybody who goes up comes back to this square. Everybody.',
+           'Sit. You have earned the second glass and you are getting it.'],
+          ['Ha. Louder than the landing was.']);
+      }
+    }
+  } else if (gorRideHome && gorRideT > 1.5) {
+    // stepped off half way: they are not going to reverse for you
+    gorRideHome = false;
+  }
+}
+
 /**
  * THE DUST BEHIND THE TRUCK.
  *
@@ -3734,8 +3901,10 @@ function gorUpdateTruck(dt) {
   const w = gorWindAt(gorBalY - gy0, gorBalX, gorBalZ);
   gorChaseX = damp(gorChaseX, clamp(gorBalX + w.x * fall, -66, 78), gorCHASE_LAG, dt);
   gorChaseZ = damp(gorChaseZ, clamp(gorBalZ + w.z * fall, -104, 56), gorCHASE_LAG, dt);
-  const tx = gorChaseX;
-  const tz = gorChaseZ;
+  // ...unless somebody is in the back, in which case they stop chasing and
+  // drive to the square. See gorTrailerRide.
+  const tx = gorRideHome ? gorPLAZA.x : gorChaseX;
+  const tz = gorRideHome ? gorPLAZA.z - 9 : gorChaseZ;
   const dx = tx - gorTruckX, dz = tz - gorTruckZ;
   const d = Math.hypot(dx, dz);
   if (d > 3) {
@@ -4023,15 +4192,51 @@ function gorUpdateBalloon(game, dt) {
     if (alt > gorPeakAlt) gorPeakAlt = alt;
 
     // ---- the sunrise ------------------------------------------------------
-    if (gorSun > 0.12 && gorSun < 0.96 && alt > 55 && !gorSunDone) {
+    // THE ROW SAYS "BE UP THERE WHEN THE SUN CLEARS THE RIM" AND IT USED TO PAY
+    // OUT WITH THE SUN A HUNDRED METRES UNDER THE VALLEY FLOOR.
+    //
+    // gorUpdateSky puts the disc at `lerp(-120, 300, gorSmooth(gorSun))`, so the
+    // old 0.12 gate fired at y = -103. The horizon is gorSun 0.354 and the
+    // ridge the row is named after — 70 m — is gorSun 0.465. Nothing was
+    // visible at the moment the chapter's marquee announced itself; the
+    // screenshot at the payout was the town, in the dark, with no sky in it.
+    //
+    // The window that leaves is gorPhase 0.5235..0.5804, about eleven seconds,
+    // which is fine for anyone already up and cruel to anyone still on the
+    // ground — so the tea man's warning below now comes 0.18 of a cycle out
+    // instead of 0.075. A full-burn climb from the field to 55 m measures 32 s.
+    if (gorSun > 0.465 && gorSun < 0.96 && alt > 55 && !gorSunDone) {
       gorSunDone = true;
       gorTask('sunrise');
+      // FRAMED — batch 3 built game.frameShot and no chapter from 12 to 17 had
+      // ever asked for it. `yaw` is the bearing FROM the animal TO the camera,
+      // and the disc sits at x = +760, so the camera belongs at -X looking back
+      // along the sun's bearing. Measured facing 93 degrees away from its own
+      // subject before this line. Yaw and pitch ONLY: systems.js applies a shot
+      // after the rig, so naming a distance here would throw away the balloon
+      // rig's own 15 m and its 0.62 raise.
+      //
+      // AND THE BEARING WAS MEASURED BY PROJECTING THE SUN DISC INTO THE FRAME,
+      // not reasoned about. At -PI/2 the sun lands at NDC (-0.13, 0.03) — dead
+      // centre, and therefore directly behind the player's own basket and
+      // burner, which is exactly where it stayed in the photograph: a shot with
+      // its subject correctly in the middle of it and the subject occluded.
+      // -1.10 rad puts it at (0.46, -0.29), off the right shoulder and clear of
+      // the envelope, with the balloon on the left of the frame and the valley
+      // under both. The 1.4 m rise buys the envelope's mouth instead of mud.
+      if (typeof game.frameShot === 'function')
+        game.frameShot({ yaw: -1.10, dist: 17, pitch: 0.0, raise: 1.4, hold: 5 });
       gorSaysNow('town',
         ['You were up there for it. That is why anybody lives here.',
          'Every morning of my life. It has not got old and it is not going to.',
          'Now the whole valley goes orange for about four minutes. Watch.'],
         ['Shh. Wait. There — twice, off the rim.']);
-      gorSfx('chime', { volume: 1.0, pitch: 1.5, force: true });
+      // ACKNOWLEDGED, AT THE MOMENT AND NOT AFTERWARDS. gorSaysNow is the
+      // town's line for when you come back down; the marquee itself had nobody
+      // speaking into it. The chief is on the radio and 116 m below.
+      gorCall('chief', 'sunrise', 'There it is. Look east and do not look at anything else.', 999);
+      gorSfx('chime', { volume: 1.0, pitch: 1.5, force: true,
+                        at: { x: gorBalX, y: gorBalY, z: gorBalZ } });
       if (typeof game.shake === 'function') game.shake(0.12);
     }
   }
@@ -4336,9 +4541,16 @@ function gorUpdateVoices(game, dt) {
     gorCall('dovecote', 'birds', 'Eight hundred years and none of them has ever seen one of you.', 70);
   } else if (gorSpook > 2.4 && Math.hypot(p.x - gorHERD_X, p.z - gorHerdZ) < 60) {
     gorCall('horse', 'spook', 'She heard you. Look at her go. She never does that for me.', 70);
-  } else if (!gorSunDone && !gorAboard && gorPhase > gorSUN_P - 0.075 && gorPhase < gorSUN_P) {
+  } else if (!gorSunDone && !gorAboard && gorPhase > gorSUN_P - 0.18 && gorPhase < gorSUN_P) {
     // the one piece of information the chapter withholds and should not: the
-    // sun is minutes away and you are standing on the ground
+    // sun is minutes away and you are standing on the ground.
+    //
+    // AND IT HAS TO ARRIVE IN TIME TO BE ACTED ON. At 0.075 it landed 15.3 s
+    // before gorSUN_P, and the payout gate is a further 10.9 s after that, so
+    // it bought 26 s — against a measured 32 s for a full-burn climb from the
+    // field to the 55 m the row requires, before the run to the balloon. A
+    // warning you cannot beat is not a warning. 0.18 is 37 s, so the whole
+    // thing is 48 s and the tea man is telling the truth.
     gorCall('tea', 'hurry', 'Ten minutes. If you are going up, go up NOW.', 200);
   } else if (gorMouthDone && !gorAboardDone && gorInZone('field', p.x, p.z)) {
     gorCall('crew', 'nudge', 'That one is ours. That one over there is nobody’s.', 90);
@@ -4615,6 +4827,8 @@ export function createGoreme(game) {
       gorAboard = false; gorAboardT = 0; gorEmptyT = 0; gorGroundedT = 0;
       gorCarrying = false; gorCarry.x = 0; gorCarry.z = 0;
       gorTruckX = 20; gorTruckZ = 10; gorTruckYaw = 0;
+      gorTrailerCarrying = false; gorRideHome = false; gorRideT = 0;
+      gorTrailerPX = gorTruckX; gorTrailerPZ = gorTruckZ + 2.4;
       gorChaseX = 20; gorChaseZ = 10;
       gorToldLayer = -1;
       gorSayCool = 0;
@@ -4734,6 +4948,9 @@ export function createGoreme(game) {
       // ...and the bell mare, who is the chapter's other moving floor and was
       // relying on the contact sweep alone. See gorUpdateHerd.
       if (gorMareCarry) return gorCarryM;
+      // ...and the chase truck's trailer, which is the ride home. See
+      // gorTrailerRide.
+      if (gorTrailerCarrying) return gorTrailerCarry;
       return null;
     },
 
@@ -4786,6 +5003,7 @@ export function createGoreme(game) {
       gorUpdateSky();
       gorUpdateBalloon(game, dt);
       gorUpdateTruck(dt);
+      gorTrailerRide(game, dt);
       gorCheckField(game, dt);
       gorUpdateWheek(game, dt);
       gorUpdateHerd(game, dt);
@@ -5061,6 +5279,7 @@ function gorBuild(game) {
   gorBuildTether(game, gorRoot);
   gorBuildField(game, gorRoot);
   gorBuildTruck(gorRoot);
+  gorBuildTrailerBody(game);
   gorBuildDust(gorRoot);
   gorBuildHerd(game, gorRoot);
   gorBuildBalloon(game, gorRoot);
@@ -5260,6 +5479,43 @@ function gorBuild(game) {
       onTask: { 'on-the-trailer': ['First go. Do you know how rare that is? It is rare.'],
                 'three-winds': ['You made me turn round twice. That is a good flight.'],
                 'sunrise': ['Best seat in the province and you were in it.'] } });
+  }
+
+  // ---- AND THREE CONVERSATIONS THAT ARE NOT WITH YOU ----------------------
+  // THE CHAPTER WITH THE MOST PEOPLE IN IT HAD NO PAIR-CHAT AT ALL. Measured:
+  // `addExchange` count for goreme was ZERO, against seven in Marrakech, six in
+  // Iceland and five each in Rio, Kyoto, Kowloon and Cali — in a chapter that
+  // carries eleven horses, five crews, a chase truck and twenty people. Every
+  // voice here was addressed to the capybara, so a square with three pitches
+  // inside fourteen metres of each other stood in silence unless you walked up
+  // and faced somebody. Three pairs already stand inside npcCHAIN_R.
+  if (typeof game.addExchange === 'function') {
+    if (gorLocals.town && gorLocals.tea) {
+      game.addExchange({ biome: 'goreme', a: gorLocals.tea, b: gorLocals.town, lines: [
+        ['Twelve up already.', 'Fourteen. You always miss the two behind the church.'],
+        ['Wind is wrong for the pigeons today.', 'Wind is wrong for you every day.'],
+        ['Is that thing going up as well?', 'It has been in the field since first light.'],
+        ['Nobody has landed on the road yet.', 'Give it an hour.'],
+        ['Second glass?', 'Third. It is a long sunrise.'],
+      ] });
+    }
+    if (gorLocals.town && gorLocals.potter) {
+      game.addExchange({ biome: 'goreme', a: gorLocals.potter, b: gorLocals.town, gap: 34, lines: [
+        ['The kiln is up. Do not lean on anything.', 'I have never leaned on anything of yours.'],
+        ['They break more of them getting them down the steps than I break making them.',
+         'Then stop making them at the top of the steps.'],
+        ['Something has been at the drying rack.', 'Something has been at everything this week.'],
+        ['Whose animal is that?', 'Nobody has come to claim it, so: everybody’s.'],
+      ] });
+    }
+    if (gorLocals.chief && gorLocals.crew) {
+      game.addExchange({ biome: 'goreme', a: gorLocals.crew, b: gorLocals.chief, gap: 30, lines: [
+        ['Fan is at full.', 'Then stand it up. We are losing the light.'],
+        ['How many are we taking?', 'However many are standing in the basket when I let go of the rope.'],
+        ['Layer two is still going the wrong way.', 'Layer two is always going the wrong way. Go higher.'],
+        ['Do we wait for it?', 'We do not wait for anybody. If it wants to come, it will be in the basket.'],
+      ] });
+    }
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(gorRoot);

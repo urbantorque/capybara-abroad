@@ -1,8 +1,19 @@
 async page => {
   const errs = [];
   page.on('pageerror', e => errs.push('PAGEERR ' + e.message.slice(0, 200)));
-  page.on('download', d => { try { d.cancel() } catch (e) {} });
-  await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} });
+  await page.addInitScript(() => {
+    try { localStorage.clear() } catch (e) {}
+    // the shutter hangs the full PNG off an <a download> and clicks it; a
+    // download in this harness kills the browser, and it is not what is under
+    // test — the ALBUM thumbnail is.
+    try {
+      const c0 = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.hasAttribute('download')) { window.__dl = (window.__dl || 0) + 1; return }
+        return c0.apply(this, arguments);
+      };
+    } catch (e) {}
+  });
   await page.reload();
   await page.waitForFunction(() => window.__capy && window.__capy.biome, null, { timeout: 30000 });
   await page.keyboard.press('Digit1');
@@ -58,7 +69,32 @@ async page => {
   };
   await post('b4cav-photoA.jpg', alb.a);
   await post('b4cav-photoB.jpg', alb.b);
-  const out = { errs, setup, at, lensA, w, echoAt, n: alb.n, audit: alb.audit, meta: alb.meta };
+  const lums = await page.evaluate(async () => {
+    let shots = [];
+    try { const o = JSON.parse(localStorage.getItem('capy3.album.v1') || '{}'); shots = o.shots || [] } catch (e) {}
+    const lum = u => new Promise(res => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = im.width; c.height = im.height;
+        const x = c.getContext('2d');
+        x.drawImage(im, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height).data;
+        let s = 0, mx = 0, dark = 0; const n = d.length / 4;
+        for (let i = 0; i < d.length; i += 4) {
+          const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          s += l; if (l > mx) mx = l; if (l < 16) dark++;
+        }
+        res({ w: im.width, h: im.height, mean: +(s / n).toFixed(2), max: +mx.toFixed(0), pctUnder16: +(dark / n * 100).toFixed(1) });
+      };
+      im.onerror = () => res(null);
+      im.src = u;
+    });
+    const r = [];
+    for (const s of shots) r.push(await lum(s.u));
+    return r;
+  });
+  const out = { errs, setup, at, lensA, w, echoAt, n: alb.n, audit: alb.audit, meta: alb.meta, lums };
   await page.evaluate(async o => {
     await fetch('/shot?name=b4cav-2.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o)))) });
   }, out);
