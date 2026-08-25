@@ -2117,6 +2117,104 @@ iceland, manly, goreme — so batch 1's calm inversion, the payoff of stillness 
 nothing to invert in twelve chapters. And **five chapters have no row in the event grade layer**:
 sydney, pasto, quay (known from v25) and **kyoto and rio**, which are new.
 
+### THE EIGHT CHAPTERS — what the five pillars found in 4-11
+
+**THE SHAPE OF THE BATCH: seven of the eight marquee moments were broken, and not one
+of them in a way any audit could raise.** A wrong bearing is not an error. A mono cue is
+not an error. A grade row that does not exist is not an error. Marquee moments in this
+project fail SILENTLY, and this is the fourth pass in a row to say so.
+
+**THE FOUR WORST, in the order a player would feel them:**
+
+1. **ICELAND'S AURORA WAS BEHIND THE CAMERA.** The curtains fan across −Z; the town, the
+   pier, the sea and the rig's own rest yaw are all +Z, and the camera parks behind the
+   animal looking +Z. Measured at full ignition: **0 of 984 curtain vertices in front of
+   the eye**, best dot −0.078. Force-painting every curtain magenta at opacity 1 with
+   `depthTest: false` still rendered nothing. The crane-up, the score swell, the fox, the
+   locals and the toast all fired correctly around an empty star field. **Two comments
+   directly above the line fix this aurora's ELEVATION, twice, and neither pass checked
+   its azimuth.** Mirrored in z (the yaw sign flips with it, or every ribbon turns edge-on
+   and disappears a second time): 330 of 336 in front, worst dot 0.13.
+2. **KYOTO'S MARQUEE FIRED SIXTY-SEVEN TIMES AND RECORDED 0.00 s.** The Uji run's finish
+   set `kyoRunT = -1` — the same value the clock idles at — and the mill sits inside the
+   arming window, so the next frame re-armed it and the 13 m circle fired again on a run
+   16 ms long. Thirty seconds of floating in the mill pond: 67 chimes, 67 splashes, 67
+   toasts, 67 `record()` calls. **A one-shot payout needs a state that means ALREADY PAID,
+   not the value it starts life in.** `-2` is that state and only leaving the pond clears
+   it. And separately, the arming window reaches to 40 m short of the mill, so paddling in
+   just above it completed the chapter's wow in 0.4 s — a run under five seconds now pays
+   nothing at all.
+3. **RIO'S CAPYBARA WAS 1.56 m UNDER THE WAVE IT WAS RIDING.** `localWater` was never set,
+   so `capyWaterY` never called the `waterHeightAt` Rio publishes, and the animal floated
+   at the flat sea level while the set rolled through it. **This is the same bug, in the
+   same field, that batch 1 found in Iceland's hot spring.** Second time.
+   **ANY CHAPTER THAT PUBLISHES `waterHeightAt` AND DOES NOT SET `localWater` IS BROKEN.**
+4. **VENICE'S CAPYBARA SLID INTO THE LAGOON WHILE STANDING PERFECTLY STILL** — 2.76 m of
+   +z in sixty seconds, `body.velocity.z` reading **exactly 0.000** the whole way, and
+   `capy.loaf` at 1.0, so the chapter's answer to stillness was to loaf and slide into the
+   water at once. The collision heightfield sampled every 4 m; the Molo edge is a THREE
+   metre ramp. The triangle under the animal was a 6.6° slope four metres back from the
+   real edge, while `slopeAt` answered 0.003 and nothing applied any anti-slide.
+   **A SAMPLE SPACING HAS TO RESOLVE THE SHARPEST FEATURE IT CARRIES** — the other
+   chapters get away with 5 m because their features are hills.
+
+**AND THE ONE THAT COULD NOT BE FINISHED.** Kowloon's roof — the chapter that hands over
+the CLIMB verb — could not be climbed to. The roof deck ran to x −9.50; the animal clings
+at −9.16 and its west extent is about −9.51, so **roughly one centimetre of overhanging
+slab** stopped the climb at 33.36 m against a deck at 34.2, and held it there for forty
+seconds. The `bamboo-climb` record could never exceed 33.36. Pulling the edge to −9.70
+takes the climb to 34.36 — but the animal then tops out in open air 0.65 m east of the
+deck and cannot move west onto it, because the scaffold's colliders fill the bay to its
+full height and there is no way to step off a lattice sideways. `symphony` is NOT blocked
+(it tests height, and ticks from the cling at 73.7 s), but the hut, the pigeon loft, the
+aerials and the chair on that roof are still unreachable. **Left open for batch 4, with
+the numbers.** Lowering `hkSCAF.top` to 34.5 to start the shove earlier was tried and is
+worse: the peak drops to 34.09.
+
+### THE PATTERNS, which are worth more than the individual fixes
+
+**A SURFACE LADDER MUST ASK THE CHAPTER WHERE THINGS ARE.** v25 found this in the Quay.
+It is in **four** more chapters. Kyoto's `if (z < -40 && z > -140)` stood in for the torii
+path, and Kyoto's zones do not lie along one axis: half the bamboo grove footfalled as
+granite, and **the whole of Uji — the town, the mill, the granite spine — fell off the far
+end of the band into the 0.82 SAND default, in a chapter with no beach in it**. The Drift
+had ONE hard-coded rectangle for a chapter of thirty islands, twenty-nine of which
+answered grass, while `driISLES` has recorded which are stone since the archipelago was
+laid out. Cali covered two of its six surfaces. Venice's `venSurfacePitch` **declared `y`
+and never read it**, so the Rialto's deck four metres above the canal footfalled as the
+canal — in the chapter whose own task is "Take the Rialto at a run" — and its whole dry
+city was one footstep four per cent wide. Kowloon's `y > 8` fallback called the steel neon
+sign bamboo.
+
+**THE LOUDEST CUE IN A CHAPTER IS THE MOST LIKELY TO BE MONO.** v25 found this in Pasto
+and chapter 3. Every chapter in this batch had it. Kyoto: 24 mono cues around the payout
+while all six stepping-stone notes forty metres away were positional — **the toy was
+better mixed than the wow**. Iceland: 0 of 17. Sahara: 0 of 31. The Drift: 0 of 30, in a
+biome whose whole subject is distance across empty air. Cali: 0 of 70 across a two-minute
+ride. Venice: 1 of 27, and its marquee emitted **no sound at all**. Rio's payout cheer was
+the only mono cue in the chapter — the five escalation cheers under it, at a fifth the
+volume, all carried `at:`.
+
+**A `wow` ROW IS PRAISED FROM FORTY METRES, NOT FIFTEEN.** `npcLOC_PRAISE_R` is the right
+distance for stealing a spritz and the wrong one for the moment a chapter is for, which is
+usually staged in the largest open space the chapter has. Measured: San Marco's nearest
+local is 16.5 m from the centre and only **41% of the piazza** is inside the old radius, so
+three locals carried `acqua-alta` lines they could not say from the natural place to stand
+for it.
+
+**AND TWO GAPS THAT ARE NOT FIXABLE FROM A BIOME FILE.** *Only five of seventeen chapters
+register a critter at all* (quay, kyoto, iceland, manly, goreme), so batch 1's calm
+inversion — the payoff of stillness as a verb — has nothing to invert in twelve chapters,
+and Cali, Rio, Venice, Kowloon and Marrakech have no ground animal drawn to register.
+*Room tone is keyed per BIOME, not per space*, so Venice's fifty metres of colonnade down
+each side of the square, and a floor that turns into a hard reflective sheet, never move
+the reverb.
+
+**THE MISCHIEF NUMBERS ARE NOT STABLE BETWEEN RUNS.** The scatter is randomised at build,
+so `ownedProps` varies run to run — Cali measured 3, then 0, then 2 across three runs of
+the same build with no source change between them. **A single run cannot certify
+adoption.** Take the best of three, or seed the scatter.
+
 ## THE PAYOFF PASS, BATCH TWO — THE LAWN (v24 — 25 Aug 2026)
 
 **Finishing this game was a RECEIPT.** The last tick anywhere scheduled `showEnd`, which paused
