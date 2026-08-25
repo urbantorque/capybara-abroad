@@ -622,7 +622,35 @@ function palNavBlocked(x, z, r) {
   // rock", and the sea is most of it.
   return z < palISLE_Z - rr && !palInZone('foot', x, z);
 }
+/**
+ * WHICH WAY TO LOOK AT THE BLOOM FROM.
+ *
+ * Broadside to the animal’s own heading, on whichever side has more water in
+ * it — the bloom is a VOLUME and the shot wants as much of it between the lens
+ * and the animal as the reef allows. `yaw` is the bearing FROM the animal TO
+ * the camera, so this is heading +/- a quarter turn.
+ */
+function palBloomYaw() {
+  const g = palGame;
+  const c = g && g.capy;
+  const h = c && c.group ? c.group.rotation.y : 0;
+  const p = c && c.position;
+  if (!p) return h + Math.PI * 0.5;
+  const L = h + Math.PI * 0.5, R = h - Math.PI * 0.5;
+  // 8 m out on each side: whichever is over deeper water wins
+  const dl = 0 - palTerrain(p.x + Math.sin(L) * 8, p.z + Math.cos(L) * 8);
+  const dr = 0 - palTerrain(p.x + Math.sin(R) * 8, p.z + Math.cos(R) * 8);
+  return dl >= dr ? L : R;
+}
+
 function palSurfacePitch(x, z, y) {
+  // ---- AND THE BOAT IS BAMBOO WHEREVER IT HAPPENS TO BE ------------------
+  // The bamboo row was gated on `inZone('jetty')`, so it covered the jetty and
+  // nothing else — and the bangka, whose deck is the same bamboo and whose ride
+  // is the chapter's FIRST TASK, spends the whole of that ride out over water
+  // and answered 0.86, wet sand. The one place the chapter is sure you will
+  // stand, on the one surface it is proudest of.
+  if (palCarrying) return 1.32;
   if (palInZone('jetty', x, z) && y > 0.6) return 1.32;    // bamboo deck, and it rings
   if (z < palISLE_Z) return 1.06;                          // wet limestone
   if (z > palBEACH_Z) return 0.80;                         // dry sand, and it says nothing
@@ -4077,7 +4105,33 @@ function palUpdateTasks(game, dt) {
          'Every fish in the bay is lit up from underneath. Every one.',
          'Twice a year, maybe. And you turn up on the day.'],
         ['Not now. Look at it.']);
-      palSfx('chime', { volume: 1.0, pitch: 1.35, force: true });
+      // ---- FRAMED, AND FROM THE SIDE ---------------------------------
+      //
+      // Measured at the payout on the reef: the rig is at its rest bearing,
+      // 5.07 m out, and the eye is 1.16 m ABOVE the animal looking DOWN — at
+      // the drop-off it is 27 degrees down. So the surface, the shafts coming
+      // through it and the whole lit water column are out of frame, and the
+      // picture of the one moment the chapter is for is the animal’s back
+      // over sand.
+      //
+      // A CONSTRAINT A FIX HERE HAS TO RESPECT: camFloor is terrain + 0.95
+      // (see the rig below), so on the reef bottom the eye can get only about
+      // 0.19 m under the animal — a low angle is available mid-water and
+      // nowhere else. pitch 0 is therefore the ask, not a negative one, and
+      // the raise carries the frame up into the water instead.
+      //
+      // Side-on rather than astern: what lights up is the whole volume, and a
+      // shot down the animal’s own axis has the least of it in frame.
+      if (typeof game.frameShot === 'function')
+        game.frameShot({ yaw: palBloomYaw(), dist: 9.5, pitch: 0.0, raise: 1.2, hold: 3.2 });
+      // AND THE CHAPTER WAS ENTIRELY MONO — 0 of 35 palSfx calls carried an
+      // `at:`, the payout chime being the loudest of them. Underwater, where
+      // there is nothing to see but the water, a bearing is most of what a
+      // sound is for.
+      const bp = game.capy && game.capy.position;
+      palSfx('chime', bp ? placeCue({ volume: 1.0, pitch: 1.35, force: true },
+                                    bp.x, bp.y, bp.z, 80)
+                         : { volume: 1.0, pitch: 1.35, force: true });
       if (typeof game.shake === 'function') game.shake(0.14);
     }
   }
@@ -4482,7 +4536,17 @@ function palBuild(game) {
                 before: 'the-crack' }],
       wheek: ['Ho! You will bring the whole bay over.',
               { t: 'Do that out there and the whole island answers.', when: palLit }],
-      onTask: { 'outrigger': ['At the front. Standing. On MY boat.'],
+      // ---- AND THE BLOOM, BECAUSE HE IS THE ONLY ONE WHO CAN SEE IT ----
+      // The chapter’s marquee happens under the water and the two people who
+      // hold `the-bloom` lines — the fire and the netman — are 53.9 m and
+      // 47.9 m from the reef, outside npcLOC_WOW_R’s forty. Only 22.5% of the
+      // chapter’s 1,632 divable cells are within 40 m of ANYBODY. The boatman
+      // at 21.9 m and the boy at 29.1 m are the only two ever in range, and
+      // they are on the jetty, which is where you would be standing to watch
+      // somebody come up out of a lit bay.
+      onTask: { 'the-bloom': ['You were under it. Under it. Nobody goes under it.',
+                              'Whole bay from below. I have wanted that for forty years.'],
+                'outrigger': ['At the front. Standing. On MY boat.'],
                 'jetty-jump': ['Off the end. Everybody goes off the end eventually.'],
                 'the-manta': ['You were ON it. It came out of the water and you were ON it.'] } });
     palLocals.fire = game.addLocal({ biome: 'palawan', x: palFIRE.x + 2.5, y: palTerrain(palFIRE.x + 2.5, palFIRE.z),
@@ -4510,7 +4574,7 @@ function palBuild(game) {
 
     // ---- AND FIVE MORE. Four houses on stilts with nobody in them is a model
     // village, and this chapter had the second-emptiest cast in the game.
-    palLocals.netman = game.addLocal({ biome: 'palawan', x: -22, y: palTerrain(-22, 51), z: 51, near: 7,
+    palLocals.netman = game.addLocal({ biome: 'palawan', x: -4.5, y: palTerrain(-4.5, 52), z: 52, near: 7,
       figure: { shirt: PALETTE.palBangkaTrim, skin: PALETTE.skin3, hat: PALETTE.palThatch },
       lines: ['Net has a hole in it. Net always has a hole in it.',
               'Two hundred fish in that bay and every one of them knows me.',
@@ -4548,7 +4612,7 @@ function palBuild(game) {
       praise: ['I saw. I see everything from under here.',
                'That is going round the whole village by morning.'] });
 
-    palLocals.painter = game.addLocal({ biome: 'palawan', x: 38, y: palTerrain(38, 42), z: 42, near: 7,
+    palLocals.painter = game.addLocal({ biome: 'palawan', x: 22, y: palTerrain(22, 49), z: 49, near: 7,
       figure: { shirt: PALETTE.palWeed, skin: PALETTE.skin3, hat: PALETTE.palBamboo },
       lines: ['Scrape her, paint her, scrape her again. Every dry season.',
               'She has been out to the island eleven thousand times.',
@@ -4586,7 +4650,9 @@ function palBuild(game) {
       wheek: ['Go on then. Off the end.',
               { t: 'She has heard that a thousand times. She does not care.',
                 after: 'sea-turtle' }],
-      onTask: { 'jetty-jump': ['You did not even check how deep it was. Respect.'],
+      onTask: { 'the-bloom': ['It went all round you! It went ALL ROUND YOU!',
+                              'Do it again. Go down again. Please.'],
+                'jetty-jump': ['You did not even check how deep it was. Respect.'],
                 'sea-turtle': ['She comes up for air about now. Watch. Right about now.'],
                 'first-dive': ['He went UNDER. Properly under. Did you see how long?'],
                 'cathedral': ['You found the room with the hole? Nobody finds that.'] } });
@@ -4632,6 +4698,16 @@ function palBuild(game) {
           ['I could swim to the island.', 'You could not swim to the end of the jetty.'],
         ] });
       }
+      // ---- TWO OF THE THREE PAIRS COULD NOT SHOW BOTH BUBBLES ----------
+      // npcEX_MAX (26 m) bounds the player’s distance to the NEARER speaker,
+      // not the pair’s distance to each other — so at that limit the far one
+      // can be 52.8 m away and off the screen. Measured: netman to fire 26.8 m,
+      // drying to painter 24.4 m, against a conversational 4.6 m and a legible
+      // 13 m. The boy and the boatman are 9.6 m apart and were always fine.
+      //
+      // Moved rather than re-paired: a man tending a fire and a man mending a
+      // net at the same fire is a truer picture than either of them standing
+      // alone, and the painter works on the boat the washing is strung beside.
       if (palLocals.fire && palLocals.netman) {
         game.addExchange({ biome: 'palawan', a: palLocals.netman, b: palLocals.fire, lines: [
           ['Is it going tonight?', 'It is always going. You just have to wait for it.'],

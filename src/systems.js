@@ -15961,13 +15961,41 @@ export function createSystems(game) {
       if (bloom > 0.01) {
         // for forty seconds the WATER is the light source, and it is the only
         // time in this game that anything but the sun and the neon is
+        //
+        // ...AND A LIGHT SOURCE IS NOT SOMETHING YOU ADD ON TOP OF NOON.
+        //
+        // This block only ever ADDED: +0.35 hemi, +0.16 ambient and a 0.14
+        // lerp of the background, on top of a chapter whose whole identity is
+        // a BLEACHED noon (sun 1.16, hemi 1.10). Over white sand in the
+        // shallows the chapter itself sends you to for the task, the result
+        // was a flat whitening of something already white. Measured from a
+        // fixed camera on the reef at terrain -3.05, bloom 1.00 against bloom
+        // 0.00: mean RGB moved +21.8 / +21.7 / +15.9 — the BLUE CHANNEL ROSE
+        // LEAST, which is the exact opposite of what "the water lights up"
+        // means. 97.8% of pixels changed and none of it read as a light.
+        // At the drop-off, 8.4 m down with dark water round it, the identical
+        // bloom is the whole picture — so the effect was only ever legible
+        // where the chapter does not put you.
+        //
+        // A bioluminescent bloom is legible because THE DAY GOES AWAY. Take
+        // the sun, the sky and the ambient down by the same kb first, then let
+        // the water put its own cyan back: what changes is then the colour of
+        // the light rather than the amount of it, and blue rises hardest.
         const kb = bloom * palT * (0.35 + subT * 0.65);
-        hemi.color.lerp(sysPAL_BLOOM_C, kb * 0.55);
-        hemi.intensity += kb * 0.35;
-        amb.intensity += kb * 0.16;
+        sun.intensity  *= 1 - kb * 0.42;
+        hemi.intensity *= 1 - kb * 0.26;
+        amb.intensity  *= 1 - kb * 0.18;
+        hemi.color.lerp(sysPAL_BLOOM_C, kb * 0.95);
+        hemi.groundColor.lerp(sysPAL_BLOOM_C, kb * 0.88);
+        hemi.intensity += kb * 0.98;
+        amb.intensity += kb * 0.58;
         if (scene.background && scene.background.isColor) {
-          scene.background.lerp(sysPAL_BLOOM_C, kb * 0.14);
+          scene.background.lerp(sysPAL_BLOOM_C, kb * 0.52);
         }
+        // the water you are IN is the source, so the fog it is made of has to
+        // be the colour of it — otherwise the light is on the surfaces and the
+        // volume between them is still noon.
+        if (scene.fog) scene.fog.color.lerp(sysPAL_BLOOM_C, kb * 0.60);
       }
     }
     // ---- CAPPADOCIA: the cold hour, and then the ridge lets go ------------
