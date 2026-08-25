@@ -1485,11 +1485,30 @@ function physDryOut(prop) {
 
 /**
  * A prop has left the world. Put it back exactly where it was scattered, dead
- * still, and let it fall asleep there — never leave a body under the map awake.
+ * still, and let it SETTLE there — never leave a body under the map awake.
+ *
+ * ---- AND IT MUST NOT BE SLEPT IN MID-AIR --------------------------------
+ *
+ * `homeY` is a SURFACE and the placement is `homeY + originY + 0.05`, which is
+ * exact for a prop scattered on open ground and wrong for every prop whose
+ * home is on a STRUCTURE — a deck, a causeway, a jetty, a plaza floor — where
+ * the terrain function answers for the ground underneath rather than for the
+ * thing you are standing on. The old code then called `b.sleep()` on the same
+ * frame, and a sleeping body is skipped in the integrator: whatever the error
+ * was, it was frozen there for ever. Measured across the seventeen, a relocated
+ * keepsake hovered by up to 3.34 m.
+ *
+ * Correcting `homeY` at the source (see physStageKeep) took the worst case to
+ * about a metre; the rest is unknowable from outside, because only the solver
+ * knows what is actually under a point. So: lift it a little, and let it FALL
+ * the last bit. `settled` stays false until the body sleeps on its own, which
+ * is what it means, and the sleep is left to cannon rather than forced — the
+ * body still has `allowSleep` on from physDryOut, so a prop that lands on
+ * something drops off within a second and nothing is left awake under the map.
  */
 function physRescue(prop) {
   const b = prop.body;
-  b.position.set(prop.homeX, prop.homeY + prop.originY + 0.05, prop.homeZ);
+  b.position.set(prop.homeX, prop.homeY + prop.originY + 0.35, prop.homeZ);
   b.velocity.set(0, 0, 0);
   b.angularVelocity.set(0, 0, 0);
   b.force.set(0, 0, 0);
@@ -1500,8 +1519,8 @@ function physRescue(prop) {
   prop.inWater = false;
   prop.spillArmed = false;
   physDryOut(prop);
-  b.sleep();
-  prop.settled = true;
+  b.wakeUp();
+  prop.settled = false;
   physSyncMesh(prop, true);
   if (!prop.solo) physWriteInstance(prop, true);
 }
@@ -3351,7 +3370,37 @@ function physOnBiomeEnter(e) {
       // coordinates of the chapter it was first put down in — so one that went
       // over an edge in Venice was rescued to a point in Sydney's gardens,
       // which in Venice is somewhere in the Bacino.
-      p.homeX = kx; p.homeZ = kz; p.homeY = sp.y;
+      // ...AND `homeY` IS A SURFACE, NOT A BODY CENTRE.
+      //
+      // physRescue puts a prop down at `homeY + originY + 0.05` — it reads
+      // this as the GROUND under the prop. `sp.y` is the capybara’s spawn,
+      // which is a body centre with the animal’s own radius already in it, so
+      // every relocated keepsake was given a home about a metre and a half in
+      // the air. Rescued, it was placed there, immediately slept — physRescue
+      // sleeps a body on purpose, so it never falls — and hung. Measured in 12
+      // of 17 chapters: Goreme 3.34 m above its own resting height, the Drift
+      // 1.65, Kyoto 1.50, six more at 1.45, Antarctica 1.15, the Quay 0.85.
+      // Ask the ground where it is, and only fall back on the spawn where the
+      // chapter publishes no terrain at all.
+      // ...AND NOTHING OUT HERE KNOWS WHAT IS UNDER THAT POINT.
+      //
+      // `sp.y` is the capybara’s spawn: a DROP height with the animal’s own
+      // radius and some clearance already in it, so using it put every
+      // relocated keepsake up to 3.34 m in the air — and physRescue sleeps a
+      // body on the frame it places it, so it hung there. Asking the terrain
+      // instead is closer and still wrong in the other direction: five spawns
+      // are on a STRUCTURE — Venice’s quay, the Pantanal’s causeway,
+      // Antarctica’s jetty, Göreme’s plaza floor, Palawan’s jetty — and
+      // `terrainHeight` answers for the ground underneath a deck, not for the
+      // deck. Measured, that buried them by up to 1.23 m.
+      //
+      // Only the solver knows what is actually under a point. So the prop
+      // FINDS ITS OWN HOME: a provisional value now, and the moment it comes
+      // to rest the height it actually rested at is written back. See
+      // physHomeLearn.
+      const gy = physTerrainAt(kx, kz);
+      p.homeX = kx; p.homeZ = kz; p.homeY = (gy === gy) ? gy : sp.y;
+      p.homeLearn = true;
       physSyncBodyTransform(p.body);
       p.body.wakeUp();
       physSyncMesh(p, true);
@@ -4185,7 +4234,54 @@ function physPastoUpdate(dt) {
 
   physStallTriggers();
   for (let i = 0; i < physCollapsed.length; i++) physStallSync(physCollapsed[i]);
+}
 
+/**
+ * PUT BACK WHAT THE GRAZE TOOK — AND IT ONLY EVER RAN IN PASTO.
+ *
+ * The graze’s whole guarantee is that NOTHING IS EVER DESTROYED: a bitten
+ * prop is hidden, `hiddenUntil` is stamped, and it comes back so that no task
+ * can be starved of the object it needs. This drain is the ONLY caller of
+ * `physUnhide` — and it lived inside `physPastoUpdate`, which is gated on
+ * `biome.isActive('pasto')` for a good reason of its own (the stall triggers
+ * compare against coordinates every biome shares, so running them abroad
+ * collapses invisible stalls in Cali).
+ *
+ * So in SIXTEEN OF SEVENTEEN CHAPTERS a grazed prop was gone for the session.
+ * Measured: a Sydney sandwich hidden at t = 526.7 s with hiddenUntil 560.7 was
+ * still hidden ninety seconds later, and switching to Pasto un-hid it on frame
+ * zero. And it takes TASK-CRITICAL props with it — holding the Quay’s chips
+ * and standing still for 5.63 s eats them, and both `qgFindChips` and the
+ * hint arrow skip a hidden prop, so `seagull-chips` is quietly unwinnable.
+ * Fifteen edible props game-wide.
+ *
+ * A clock is not a place. This runs everywhere, every frame.
+ */
+/**
+ * A STAGED PROP LEARNS WHERE IT ACTUALLY LANDED.
+ *
+ * `homeY` is what physRescue treats as the surface, and outside the solver
+ * there is no way to know whether a point is open ground, a deck, a jetty or
+ * the roof of something. Rather than guess it, the prop is dropped and the
+ * height it comes to rest at becomes its home — once, on the frame it stops
+ * moving. Self-correcting, needs no list of which chapters have decks in them,
+ * and it is the same number a scattered prop would have had.
+ */
+function physHomeLearn(p) {
+  if (!p.homeLearn) return;
+  const b = p.body;
+  if (b.sleepState !== CANNON.Body.SLEEPING) return;
+  p.homeLearn = false;
+  // Only if it settled somewhere sane — a prop that fell out of the world
+  // while learning must not adopt the void as its home.
+  const dx = b.position.x - p.homeX, dz = b.position.z - p.homeZ;
+  if (dx * dx + dz * dz > 36) return;
+  p.homeX = b.position.x; p.homeZ = b.position.z;
+  p.homeY = b.position.y - p.originY;
+}
+
+function physRestockTick() {
+  if (!physHidden.length) return;
   const t = physGame.state ? physGame.state.time : 0;
   for (let i = physHidden.length - 1; i >= 0; i--) {
     const p = physHidden[i];
@@ -4429,6 +4525,7 @@ function physUpdate(dt) {
       if (wg.x * wg.x + wg.z * wg.z > physGUST_WAKE * physGUST_WAKE) b.wakeUp();
     }
     if (b.sleepState === CANNON.Body.SLEEPING) {
+      physHomeLearn(p);              // ...and where it landed IS home now
       p.spillArmed = false;          // a settled cup stops being a time bomb
       // A sleeping body is never synced again, so the frame it drops off must
       // land ON its true rest transform — the last interpolated write was a
@@ -4539,5 +4636,8 @@ function physUpdate(dt) {
   // running this abroad collapses invisible stalls and ticks market-chaos
   // from the middle of Cali.
   if (physPastoBuilt && physGame.biome && physGame.biome.isActive('pasto')) physPastoUpdate(dt);
+  // ...and the restock, which is a CLOCK and belongs to no chapter. See
+  // physRestockTick — it spent its whole life inside the line above.
+  physRestockTick();
   physFlushInstances();
 }

@@ -103,6 +103,16 @@ const sysSKY_RAISE = 2.4;
 const sysSKY_LAMBDA = 0.9;
 const sysCAM_MIN   = 7;
 const sysCAM_MAX   = 16;
+// ---- ...AND A FRAMED SHOT MAY REACH FURTHER THAN THE PLAYER CAN ZOOM -----
+// sysCAM_MAX is the ceiling on the Z/X zoom — an INTERACTIVE limit, chosen so
+// the animal never becomes a dot under a hand on the key. A marquee is not an
+// interaction: it is one authored composition, held for a couple of seconds,
+// and two chapters need to stand further back than a player is allowed to.
+// Measured: Antarctica asks 26 m for its helm plate — the boat on the optical
+// axis with the breach apex 11.5 degrees above it, inside the 27.2 degree
+// half-fov — and silently got 16, which is the frame it was written to fix.
+// Cappadocia asks 17. Everything else in the game asks for 16 or less.
+const sysSHOT_DIST_MAX = 30;
 const sysCAM_DEF   = 9.5;
 // How far back ALONG THE TORII PATH the eye rides. 5.2 m is three gates: near
 // enough to keep the animal large, far enough that the gates read as a tunnel.
@@ -3382,9 +3392,29 @@ function sysBuildCSS() {
   const paper   = sysHex(PALETTE.sail);
   const paper2  = sysHex(PALETTE.sailShade);
   const ink     = sysHex(PALETTE.ibisHead);
-  const inkSoft = sysRgba(PALETTE.ibisHead, 0.62);
+  // ---- WCAG 1.4.3 ON THE PAPER, AND BOTH OF THESE FAILED IT -----------
+  //
+  // The card is opaque, so these are the same numbers in every chapter — it
+  // is not a fog-chapter or a dark-chapter problem, it is the whole game.
+  // Measured against the paper (PALETTE.sail, 0xfaf6ec):
+  //
+  //   inkSoft at 0.62 alpha  ->  3.77:1   against 4.5 required
+  //   inkSoft at 0.70        ->  4.67:1
+  //
+  // and inkSoft is the body of the card: the records, the tallies, the
+  // ledger and album buttons, the footer, the shelf caption, every clue and
+  // every count, all of it at 9.7 to 12px. 0.70 is four hundredths of alpha
+  // and it is the difference between soft and unreadable.
+  const inkSoft = sysRgba(PALETTE.ibisHead, 0.70);
   const inkFaint= sysRgba(PALETTE.ibisHead, 0.28);
+  // ...and the coral is 2.31:1, which is the worst thing on the paper. It is
+  // also the game’s accent and it is doing two jobs: an OUTLINE, a hover, a
+  // rule, a filled button — where contrast against the paper is not the
+  // question — and small uppercase TEXT, where it is the only question.
+  // Splitting them keeps the identity where it is decorative and makes it
+  // readable where it is words. #9e5f53 is the same hue at 68% value: 4.62:1.
   const accent  = sysHex(PALETTE.cloth1);
+  const accentInk = '#9e5f53';
   const tick    = sysHex(PALETTE.leafC);
   const rule    = sysRgba(PALETTE.stoneDark, 0.55);
   const shadow  = sysRgba(PALETTE.screenShadow, 0.16);
@@ -3420,8 +3450,8 @@ function sysBuildCSS() {
   'transform:rotate(-.5deg);max-width:660px;width:100%;max-height:92vh;overflow:auto;',
   'overscroll-behavior:contain;}',
 '.capyui-jrcard h2{font-size:clamp(15px,3vw,21px);color:' + ink + ';font-weight:700;letter-spacing:-.01em;}',
-'.capyui-jrsub{font-size:clamp(9px,2vw,11px);letter-spacing:.3em;text-transform:uppercase;',
-  'color:' + accent + ';font-weight:700;margin-top:3px;}',
+'.capyui-jrsub{font-size:clamp(11px,2vw,11px);letter-spacing:.3em;text-transform:uppercase;',
+  'color:' + accentInk + ';font-weight:700;margin-top:3px;}',
 // A real <button>, so it is reset back to looking like a row of a list.
 '.capyui-jrrow{display:grid;grid-template-columns:46px 1fr auto;gap:3px 10px;align-items:center;',
   'padding:7px 8px;border-radius:4px;margin-top:2px;border:1px solid transparent;',
@@ -3446,21 +3476,21 @@ function sysBuildCSS() {
   'background:' + sysRgba(PALETTE.stoneDark, 0.84) + ';color:' + paper + ';',
   'font-size:9px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}',
 '.capyui-jrname{font-size:clamp(12px,2.5vw,15px);color:' + ink + ';font-weight:700;}',
-'.capyui-jrtally{font-size:clamp(10px,2.1vw,12px);color:' + inkSoft + ';font-weight:700;white-space:nowrap;',
+'.capyui-jrtally{font-size:clamp(11px,2.1vw,12px);color:' + inkSoft + ';font-weight:700;white-space:nowrap;',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-jrsub{font-variant-numeric:tabular-nums;}',
 '.capyui-jrtally.full{color:' + tick + ';}',
-'.capyui-jrrec{grid-column:2 / 4;font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-jrrec{grid-column:2 / 4;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
   'font-style:italic;margin-top:1px;}',
 '.capyui-jrbar{grid-column:1 / 4;height:3px;border-radius:2px;background:' + inkFaint + ';margin-top:5px;}',
 '.capyui-jrbar i{display:block;height:100%;border-radius:2px;background:' + tick + ';}',
-'.capyui-jrfoot{margin-top:12px;font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-jrfoot{margin-top:12px;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
   'font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:center;}',
 /* the controls, folded away under the board. A <details>, so the fold, the
    keyboard, the focus ring and the aria wiring all come for free. */
 '.capyui-jrkeys{margin-top:12px;border-top:1px solid ' + inkFaint + ';padding-top:9px;}',
 '.capyui-jrkeys summary{cursor:pointer;list-style:none;text-align:center;',
-  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
+  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.12em;text-transform:uppercase;border-radius:3px;padding:2px 0;',
   'touch-action:manipulation;}',
 /* The default disclosure triangle is hidden because it does not belong in this
@@ -3542,7 +3572,7 @@ function sysBuildCSS() {
   'text-wrap:balance;',
   'font-weight:700;letter-spacing:-.01em;}',
 '.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
-  'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
+  'text-transform:uppercase;color:' + accentInk + ';font-weight:700;}',
 /* ---------- the ornament ----------
    A hairline rule broken in the middle by the animal the game is about. It is
    doing one job and it is not decoration for its own sake: the masthead had a
@@ -3602,7 +3632,7 @@ function sysBuildCSS() {
 '.capyui-overline{font-size:clamp(9.5px,1.9vw,12px);line-height:1.4;color:' + ink + ';',
   'font-style:italic;max-width:44ch;margin:0 auto 8px;text-wrap:balance;}',
 '.capyui-overrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}',
-'.capyui-overyes,.capyui-overno{font:inherit;font-size:clamp(9px,1.8vw,11px);font-weight:700;',
+'.capyui-overyes,.capyui-overno{font:inherit;font-size:clamp(11px,1.8vw,11px);font-weight:700;',
   'letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:5px 14px 6px;',
   'cursor:pointer;pointer-events:auto;touch-action:manipulation;',
   'transition:transform .16s ease,border-color .16s ease,color .16s ease;}',
@@ -3622,7 +3652,7 @@ function sysBuildCSS() {
   'width:64%;transform:rotate(.4deg);}',
 '.capyui-legend{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;text-align:left;',
   'align-items:start;',
-  'font-size:clamp(10px,2.3vw,13px);color:' + inkSoft + ';margin:0 auto;max-width:360px;}',
+  'font-size:clamp(11px,2.3vw,13px);color:' + inkSoft + ';margin:0 auto;max-width:360px;}',
 '@media (min-width:640px){.capyui-legend{grid-template-columns:auto 1fr auto 1fr;',
   'max-width:520px;gap:4px 14px;}}',
 /* and on a short screen — a 720p laptop is the commonest window this game will
@@ -3635,7 +3665,7 @@ function sysBuildCSS() {
   '.capyui-card h1{font-size:clamp(20px,4.4vw,32px);}',
   '.capyui-rule{margin:clamp(7px,1.4vw,11px) auto;}',
   '.capyui-sub{letter-spacing:.3em;}',
-  '.capyui-legend{gap:2px 12px;font-size:clamp(9px,2vw,11px);}}',
+  '.capyui-legend{gap:2px 12px;font-size:clamp(11px,2vw,11px);}}',
 '.capyui-legend kbd{color:' + ink + ';font-weight:700;white-space:nowrap;',
 'font-family:inherit;font-size:inherit;background:none;border:0;padding:0;}',
 /* .capyui-begin is gone: both pages ended in one line of blinking uppercase,
@@ -3699,7 +3729,7 @@ function sysBuildCSS() {
 /* the extras, folded. Same disclosure furniture as the journal's own fold. */
 '.capyui-more{margin-top:clamp(7px,1.5vw,11px);text-align:center;}',
 '.capyui-more summary{cursor:pointer;list-style:none;display:inline-block;',
-  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
+  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:4px;',
   'touch-action:manipulation;}',
 '.capyui-more summary::-webkit-details-marker{display:none;}',
@@ -3721,7 +3751,7 @@ function sysBuildCSS() {
   'touch-action:manipulation;box-shadow:0 4px 14px ' + shadow2 + ';',
   'transition:transform .16s ease,box-shadow .16s ease,filter .16s ease;}',
 '.capyui-go b{font-size:clamp(13px,2.7vw,17px);font-weight:700;letter-spacing:.01em;}',
-'.capyui-go i{font-style:normal;font-size:clamp(9px,1.9vw,11px);opacity:.82;',
+'.capyui-go i{font-style:normal;font-size:clamp(11px,1.9vw,11px);opacity:.82;',
   'letter-spacing:.08em;text-transform:uppercase;font-weight:700;}',
 '.capyui-go:hover{transform:translateY(-2px);filter:brightness(1.06);',
   'box-shadow:0 7px 18px ' + shadow2 + ';}',
@@ -3739,7 +3769,7 @@ function sysBuildCSS() {
   'padding:4px 12px 4px 8px;border-radius:999px;font:inherit;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
   'background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';',
-  'font-size:clamp(9px,1.9vw,11px);font-weight:700;letter-spacing:.12em;',
+  'font-size:clamp(11px,1.9vw,11px);font-weight:700;letter-spacing:.12em;',
   'text-transform:uppercase;transition:color .16s ease,border-color .16s ease;}',
 '.capyui-back:before{content:"\\2190";margin-right:7px;}',
 '.capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
@@ -3893,7 +3923,7 @@ function sysBuildCSS() {
   'border:1px solid ' + sysRgba(PALETTE.ibisHead, 0.22) + ';',
   'color:' + ink + ';font-weight:700;box-shadow:0 1px 3px ' + shadow + ';',
   'transition:background .16s ease,color .16s ease,border-color .16s ease;',
-  'font-size:clamp(9px,1.9vw,11px);font-variant-numeric:tabular-nums;}',
+  'font-size:clamp(11px,1.9vw,11px);font-variant-numeric:tabular-nums;}',
 '.capyui-pick:hover .capyui-pickkey,.capyui-pick:focus-visible .capyui-pickkey{',
   'background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
 /* ---- HOW FAR THROUGH THIS PLACE YOU ARE, WITHOUT READING A NUMBER --------
@@ -3931,7 +3961,7 @@ function sysBuildCSS() {
   'font-size:clamp(8.5px,1.7vw,10.5px);color:' + accent + ';',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-pickfirst{display:block;margin-top:6px;font-style:normal;font-weight:700;',
-  'font-size:clamp(9px,1.8vw,11px);letter-spacing:.1em;text-transform:uppercase;',
+  'font-size:clamp(11px,1.8vw,11px);letter-spacing:.1em;text-transform:uppercase;',
   'color:' + accent + ';}',
 /* the tally rides the bottom-right corner of the scene, clear of the words */
 '.capyui-picktally{position:absolute;top:6px;right:6px;',
@@ -3983,7 +4013,7 @@ function sysBuildCSS() {
 '.capyui-carryl b{display:block;font-size:clamp(13px,2.6vw,17px);font-weight:700;',
   'color:' + paper + ';line-height:1.15;}',
 '.capyui-carryl i{display:block;margin-top:1px;font-style:normal;',
-  'font-size:clamp(9px,1.8vw,11px);color:' + paper + ';opacity:.82;}',
+  'font-size:clamp(11px,1.8vw,11px);color:' + paper + ';opacity:.82;}',
 '.capyui-carryn{font-size:clamp(12px,2.3vw,15px);font-weight:700;color:' + paper + ';',
   'font-variant-numeric:tabular-nums;white-space:nowrap;}',
 '.capyui-label{margin-top:clamp(9px,1.8vw,14px);font-size:clamp(8.5px,1.7vw,10.5px);',
@@ -4036,7 +4066,7 @@ function sysBuildCSS() {
    is tabular, or a centred line jitters sideways once a second. */
 '.capyui-pcap{position:absolute;left:0;right:0;bottom:0;height:9vh;max-height:88px;',
   'display:flex;align-items:center;justify-content:center;gap:14px;overflow:hidden;',
-  'color:' + sysHex(PALETTE.sail) + ';font-size:clamp(9px,1.9vw,12px);',
+  'color:' + sysHex(PALETTE.sail) + ';font-size:clamp(11px,1.9vw,12px);',
   'letter-spacing:.22em;text-transform:uppercase;font-weight:700;',
   'text-align:center;',
   'padding-left:calc(18px + env(safe-area-inset-left,0px));',
@@ -4050,7 +4080,7 @@ function sysBuildCSS() {
 '.capyui-phint{position:absolute;left:0;right:0;top:0;height:9vh;max-height:88px;',
   'display:flex;align-items:center;justify-content:center;text-align:center;',
   'padding:env(safe-area-inset-top,0px) 14px 0;',
-  'color:' + sysRgba(PALETTE.sail, 0.55) + ';font-size:clamp(8px,1.6vw,10px);',
+  'color:' + sysRgba(PALETTE.sail, 0.55) + ';font-size:clamp(11px,1.6vw,11px);',
   'letter-spacing:.24em;text-transform:uppercase;}',
 /* the shutter. One white sheet, one frame long, on its own layer above the
    frame so it flashes the PICTURE and not the furniture.
@@ -4085,7 +4115,7 @@ function sysBuildCSS() {
 '@keyframes capyui-stamp{0%{transform:rotate(-1.7deg) scale(1)}',
   '18%{transform:rotate(-.4deg) scale(1.075)}',
   '46%{transform:rotate(-2.3deg) scale(.986)}100%{transform:rotate(-1.7deg) scale(1)}}',
-'.capyui-todo h2{font-size:clamp(10px,1.7vw,12px);letter-spacing:.3em;text-transform:uppercase;',
+'.capyui-todo h2{font-size:clamp(11px,1.7vw,12px);letter-spacing:.3em;text-transform:uppercase;',
   'color:' + accent + ';font-weight:700;margin:4px 0 7px;}',
 /* Five rows at the very most (see sysTODO_WINDOW), so the card is small enough
    to never need a scrollbar and never reach the touch stick. No max-height, no
@@ -4142,7 +4172,7 @@ function sysBuildCSS() {
   '100%{transform:translate(-50%,-50%) scale(1) rotate(-8deg)}}',
 '@keyframes capyui-strike{0%{transform:scaleX(0) rotate(-1.1deg)}',
   '100%{transform:scaleX(1) rotate(-1.1deg)}}',
-'.capyui-count{margin-top:8px;font-size:clamp(9px,1.4vw,11px);letter-spacing:.16em;',
+'.capyui-count{margin-top:8px;font-size:clamp(11px,1.4vw,11px);letter-spacing:.16em;',
   'color:' + inkSoft + ';text-transform:uppercase;}',
 /* ---------- the hint on the top row ---------- */
 /* A bearing and a distance for whatever is next, plus one line naming the verb.
@@ -4192,7 +4222,7 @@ function sysBuildCSS() {
   'width:max-content;max-width:min(86vw,520px);box-shadow:0 14px 30px ' + shadow + ';',
   'opacity:0;transition:opacity .45s ease,transform .45s cubic-bezier(.2,1.3,.4,1);}',
 '.capyui-moment.show{opacity:1;transform:translate(-50%,0) rotate(-.7deg);}',
-'.capyui-momentkick{font-size:clamp(9px,2vw,12px);letter-spacing:.3em;font-weight:700;',
+'.capyui-momentkick{font-size:clamp(11px,2vw,12px);letter-spacing:.3em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
 '.capyui-momentrule{height:2px;width:min(22vw,110px);border-radius:2px;background:' + rule + ';',
   'margin:5px auto 6px;transform:rotate(.6deg);}',
@@ -4224,13 +4254,13 @@ function sysBuildCSS() {
 '@media (hover:hover){.capyui-slot.have:hover{transform:translateY(-2px);}}',
 '.capyui-slot:focus{outline:none;}',
 '.capyui-slot:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
-'.capyui-shelfcap{text-align:center;font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-shelfcap{text-align:center;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
   'font-style:italic;min-height:1.3em;margin-bottom:2px;}',
 /* the way into the ledger, sat between the board and the controls. Styled off
    the controls' own summary so the card has two of one thing, not one of two. */
 '.capyui-jrled{display:block;width:100%;margin-top:12px;border:1px solid ' + rule + ';',
   'border-radius:3px;padding:5px 0;background:none;font:inherit;cursor:pointer;',
-  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
+  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.12em;text-transform:uppercase;touch-action:manipulation;',
   '-webkit-tap-highlight-color:transparent;}',
 '@media (hover:hover){.capyui-jrled:hover{background:' + veil2 + ';color:' + ink + ';}}',
@@ -4249,7 +4279,7 @@ function sysBuildCSS() {
 '.capyui-keep.show{opacity:1;transform:translate(-50%,-50%) rotate(-1.1deg) scale(1);}',
 '.capyui-keepart{width:78px;height:78px;margin:0 auto 9px;display:block;}',
 '.capyui-keepart svg{display:block;width:100%;height:100%;}',
-'.capyui-keepkick{font-size:clamp(8px,1.7vw,10px);letter-spacing:.34em;text-transform:uppercase;',
+'.capyui-keepkick{font-size:clamp(11px,1.7vw,11px);letter-spacing:.34em;text-transform:uppercase;',
   'color:' + accent + ';font-weight:700;}',
 '.capyui-keeprule{height:2px;background:' + rule + ';border-radius:2px;margin:6px auto;width:44px;}',
 '.capyui-keeptext{font-size:clamp(13px,2.9vw,18px);color:' + ink + ';font-weight:700;}',
@@ -4275,7 +4305,7 @@ function sysBuildCSS() {
    an engine that ignores it rather than collapsing it to nothing. */
 '@supports not (aspect-ratio:1/1){.capyui-doneart{height:clamp(90px,26vw,170px);}}',
 '.capyui-doneart svg{display:block;width:100%;height:100%;}',
-'.capyui-donekick{margin-top:10px;font-size:clamp(8px,1.7vw,10px);letter-spacing:.34em;',
+'.capyui-donekick{margin-top:10px;font-size:clamp(11px,1.7vw,11px);letter-spacing:.34em;',
   'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
 '.capyui-donename{font-size:clamp(19px,4.6vw,32px);color:' + ink + ';font-weight:700;',
   'letter-spacing:.05em;line-height:1.06;margin-top:3px;text-wrap:balance;}',
@@ -4306,7 +4336,7 @@ function sysBuildCSS() {
 '.capyui-led.show{opacity:1;pointer-events:auto;}',
 '.capyui-led h2{font-size:clamp(20px,5.4vw,42px);color:' + ink + ';letter-spacing:.05em;',
   'font-weight:700;transform:rotate(-1.2deg);text-align:center;text-wrap:balance;}',
-'.capyui-ledsub{font-size:clamp(10px,2.1vw,13px);color:' + accent + ';font-weight:700;',
+'.capyui-ledsub{font-size:clamp(11px,2.1vw,13px);color:' + accent + ';font-weight:700;',
   'letter-spacing:.2em;text-transform:uppercase;text-align:center;margin-top:5px;',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-ledlist{width:100%;max-width:620px;margin-top:clamp(10px,2.4vw,18px);',
@@ -4341,7 +4371,7 @@ function sysBuildCSS() {
 '.capyui-albshot:nth-child(even){transform:rotate(.8deg);}',
 '.capyui-albshot img{display:block;width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;',
   'border-radius:2px;background:' + paper2 + ';}',
-'.capyui-albshot figcaption{font-size:clamp(8px,1.5vw,10px);color:' + accent + ';',
+'.capyui-albshot figcaption{font-size:clamp(11px,1.5vw,11px);color:' + accentInk + ';',
   'font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px;',
   'text-align:center;font-variant-numeric:tabular-nums;}',
 '.capyui-albnone{grid-column:1/-1;text-align:center;color:' + ink + ';opacity:.75;',
@@ -4358,12 +4388,12 @@ function sysBuildCSS() {
   'overflow:hidden;border:1px solid ' + rule + ';}',
 '.capyui-ledmark svg{display:block;width:100%;height:100%;}',
 '.capyui-ledname{font-size:clamp(12px,2.5vw,15px);color:' + ink + ';font-weight:700;}',
-'.capyui-ledtime{font-size:clamp(10px,2vw,12px);color:' + inkSoft + ';font-weight:700;',
+'.capyui-ledtime{font-size:clamp(11px,2vw,12px);color:' + inkSoft + ';font-weight:700;',
   'white-space:nowrap;font-variant-numeric:tabular-nums;}',
 /* min-width:0 on both, or a long chain of records — Venice holds three — makes
    the flex row refuse to shrink and pushes the tally off the card. */
 '.capyui-ledline{grid-column:2 / 4;display:flex;align-items:center;gap:6px;min-width:0;',
-  'font-size:clamp(9px,1.9vw,11px);color:' + inkSoft + ';font-style:italic;',
+  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-style:italic;',
   'white-space:pre-line;line-height:1.35;}',
 '.capyui-ledline span{min-width:0;overflow-wrap:anywhere;}',
 '.capyui-ledname{overflow-wrap:anywhere;}',
@@ -4371,16 +4401,16 @@ function sysBuildCSS() {
    a record is how well you did what you were asked, a find is a thing nobody
    asked about at all. The bullet is drawn rather than typed so it lines up. */
 '.capyui-ledfind{grid-column:2 / 4;margin-top:2px;display:flex;flex-direction:column;gap:1px;',
-  'font-size:clamp(9px,1.85vw,11px);color:' + accent + ';min-width:0;}',
+  'font-size:clamp(11px,1.85vw,11px);color:' + accent + ';min-width:0;}',
 '.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
 '.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
   'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
 '.capyui-ledkeep{flex:0 0 auto;width:19px;height:19px;display:block;}',
 '.capyui-ledkeep svg{display:block;width:100%;height:100%;}',
 '.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
-  'font-size:clamp(10px,2.1vw,13px);color:' + ink + ';font-weight:700;',
+  'font-size:clamp(11px,2.1vw,13px);color:' + ink + ';font-weight:700;',
   'font-variant-numeric:tabular-nums;}',
-'.capyui-ledhint{margin-top:8px;text-align:center;font-size:clamp(10px,2.1vw,12px);',
+'.capyui-ledhint{margin-top:8px;text-align:center;font-size:clamp(11px,2.1vw,12px);',
   'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;',
   'animation:capyui-blink 2s ease-in-out infinite;}',
 
@@ -4401,7 +4431,7 @@ function sysBuildCSS() {
 '@supports not (aspect-ratio:1/1){.capyui-fade.trip .capyui-fademark{',
   'height:min(36vh,325px);}}',
 '.capyui-fademark svg{display:block;width:100%;height:100%;}',
-'.capyui-fade.trip .capyui-fadename{display:block;font-size:clamp(10px,2.2vw,13px);',
+'.capyui-fade.trip .capyui-fadename{display:block;font-size:clamp(11px,2.2vw,13px);',
   'letter-spacing:.4em;text-transform:uppercase;font-weight:700;text-align:center;',
   'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';}',
 '.capyui-place{position:absolute;left:0;right:0;top:31%;z-index:58;display:flex;',
@@ -4411,7 +4441,7 @@ function sysBuildCSS() {
 '.capyui-place.show{opacity:1;transform:translateY(0);}',
 '.capyui-place h2{font-size:clamp(24px,7.4vw,60px);color:' + ink + ';font-weight:700;',
   'letter-spacing:.09em;line-height:1.02;transform:rotate(-1.2deg);}',
-'.capyui-placesub{font-size:clamp(10px,2.4vw,14px);letter-spacing:.34em;font-weight:700;',
+'.capyui-placesub{font-size:clamp(11px,2.4vw,14px);letter-spacing:.34em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
 '.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:2px;background:' + rule + ';',
   'transform:rotate(.5deg);margin:2px 0;}',
@@ -4513,7 +4543,7 @@ function sysBuildCSS() {
   'transform:translateX(-50%) rotate(-.5deg);display:flex;align-items:center;gap:10px;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;padding:6px 15px;',
   'box-shadow:0 6px 14px ' + shadow + ';color:' + ink + ';font-weight:700;white-space:nowrap;',
-  'font-size:clamp(10px,2vw,13px);opacity:0;pointer-events:none;transition:opacity .4s ease;}',
+  'font-size:clamp(11px,2vw,13px);opacity:0;pointer-events:none;transition:opacity .4s ease;}',
 '.capyui-home.show{opacity:1;}',
 '.capyui-dots{display:flex;gap:5px;}',
 '.capyui-dots i{width:8px;height:8px;border-radius:50%;border:1.6px solid ' + inkFaint + ';',
@@ -10445,8 +10475,18 @@ export function createSystems(game) {
   jrLedBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
   jrLedBtn.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
+    // ---- ORDER MATTERS, AND IT LOST THE KEYBOARD PLAYER THEIR PLACE ----
+    // ledShow() captures document.activeElement into ledReturnFocus so that
+    // closing the ledger puts focus back on the control that opened it. This
+    // called jrHide() FIRST, which blurs — so what got captured was BODY, and
+    // a keyboard player who tabbed four times to reach this button, pressed
+    // Enter and then Escape was returned to nothing at all, with the journal
+    // shut behind them. Measured: activeElement BODY, jr closed, in every run.
+    // Remember it here, where the button is still focused.
+    const from = document.activeElement;
     jrHide();
     ledShow(false);
+    if (from && from !== document.body) ledReturnFocus = from;
   });
   jrCard.appendChild(jrLedBtn);
   // ...and the album beside it. The journal answers "where have I been"; the
@@ -10466,8 +10506,11 @@ export function createSystems(game) {
   jrAlbBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
   jrAlbBtn.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
+    // Same as the ledger button above, and for the same reason.
+    const from = document.activeElement;
     jrHide();
     albShow();
+    if (from && from !== document.body) albReturnFocus = from;
   });
   jrCard.appendChild(jrAlbBtn);
   jrCard.appendChild(jrKeys);
@@ -13408,7 +13451,20 @@ export function createSystems(game) {
     // at all unless the board was already open — so the one key a player reaches
     // for when the doorbell goes left the capybara stood in traffic. It opens
     // the same card, which already pauses, and Escape then closes it again.
-    if (started && c === 'Escape') { e.preventDefault(); jrShow(false); return; }
+    if (started && c === 'Escape') {
+      e.preventDefault();
+      // ---- AND IT PUTS THE CAMERA AWAY FIRST ---------------------------
+      // Escape opened the journal ON TOP OF A LIVE VIEWFINDER: measured,
+      // photo mode was still on after Escape in 2 of 2 runs, and one of them
+      // ended with the journal open AND the camera up. K and P both exit
+      // photo mode and Escape did not, which makes it the one key that puts
+      // a paused card over a HUD that is still pretending to be a lens.
+      // Escape is the key a player reaches for when the doorbell goes: it
+      // should back out of the innermost thing first.
+      if (photoOn) { photoSet(false); return; }
+      jrShow(false);
+      return;
+    }
     // THE BOARD RUNS OUT OF DIGITS AT NINE AND THE GAME DOES NOT.
     // This was `c >= 'Digit1' && c <= 'Digit9'`, which is exactly the rung the
     // title card's picker already had to fix: a keyboard has ten digits and
@@ -14689,7 +14745,7 @@ export function createSystems(game) {
     if (!o) { shotReq = null; shotAge = 0; return; }
     shotReq = {
       yaw:   typeof o.yaw   === "number" && o.yaw === o.yaw ? o.yaw : null,
-      dist:  typeof o.dist  === "number" && o.dist === o.dist ? clamp(o.dist, sysCAM_MIN, sysCAM_MAX) : null,
+      dist:  typeof o.dist  === "number" && o.dist === o.dist ? clamp(o.dist, sysCAM_MIN, sysSHOT_DIST_MAX) : null,
       pitch: typeof o.pitch === "number" && o.pitch === o.pitch ? o.pitch : null,
       raise: typeof o.raise === "number" && o.raise === o.raise ? o.raise : null,
       hold:  typeof o.hold  === "number" && o.hold  > 0 ? o.hold : sysSHOT_HOLD,

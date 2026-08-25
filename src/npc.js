@@ -819,6 +819,16 @@ export function createNPCs(game) {
     slot.ox = 0;
     slot.life = 1.7 + text.length * 0.05;
     slot.txt.textContent = text;
+    // ---- AND MEASURE IT, ONCE, HERE ------------------------------------
+    // The size is needed every frame to keep the box on screen, and
+    // offsetWidth is a layout read: doing it in the update loop would force
+    // a reflow per bubble per frame. It only changes when the text does, and
+    // this is the one place the text changes. The element has to be
+    // displayed for the read to be honest — a display:none box measures 0 —
+    // so a slot that has not been shown yet is measured on its first frame
+    // instead (bw === 0 falls back to a sane guess there).
+    slot.bw = 0; slot.bh = 0;
+    if (slot.shown) { slot.bw = slot.el.offsetWidth; slot.bh = slot.el.offsetHeight; }
   }
 
   // =========================================================================
@@ -6704,9 +6714,27 @@ export function createNPCs(game) {
         b.ox = damp(b.ox, want, 10, dt);
         // legible up close, still readable across the lawn
         const sc = clamp(14 / Math.max(dist, 1) + 0.52, 0.78, 1.22);
-        const nx = clamp(npcV1.x + b.ox, -0.93, 0.93);
+        // ---- THE CLAMP HAD NO WIDTH TERM, SO THE BOX RAN OFF THE SCREEN --
+        //
+        // The bubble is positioned by its CENTRE (translate(-50%,-100%)) and
+        // clamped to +/-0.93 in NDC, which is a limit on the anchor and says
+        // nothing about the box hanging off it. Measured across a fourteen-
+        // sample soak: six distinct bubbles ran off the LEFT edge, the worst
+        // by 132 px of a 399 px bubble at 1920x1080 — a third of a sentence,
+        // gone, in the one channel this game uses to say that somebody
+        // noticed you.
+        //
+        // Half the box in NDC is (width * scale) / innerWidth, because NDC x
+        // spans 2 across innerWidth px and the half-width is width/2. Same
+        // for the height, which matters because the box is drawn ENTIRELY
+        // above its anchor.
+        if (!b.bw && b.shown) { b.bw = b.el.offsetWidth; b.bh = b.el.offsetHeight; }
+        const halfX = b.bw ? (b.bw * sc) / Math.max(1, innerWidth) : 0.16;
+        const fullY = b.bh ? (b.bh * sc * 2) / Math.max(1, innerHeight) : 0.14;
+        const limX = clamp(1 - halfX - 0.012, 0.05, 0.93);
+        const nx = clamp(npcV1.x + b.ox, -limX, limX);
         // the bubble is drawn ABOVE this point, so leave headroom at the top
-        const ny = clamp(npcV1.y, -0.80, 0.82);
+        const ny = clamp(npcV1.y, -0.80, Math.min(0.82, 1 - fullY - 0.012));
         b.el.style.left = ((nx * 0.5 + 0.5) * 100) + '%';
         b.el.style.top = ((-ny * 0.5 + 0.5) * 100) + '%';
         b.el.style.transform = 'translate(-50%,-100%) scale(' + sc.toFixed(3) + ')';

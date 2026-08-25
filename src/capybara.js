@@ -34,6 +34,14 @@ const capyGRIP_SNAP = 0.9;          // m/s below which idle motion is simply ove
 // animal has genuinely been moved — a teleport, a rescue, a launch, a carrier
 // picking it up — and the anchor is re-taken rather than dragged back to.
 const capyPIN_MAX = 0.55;           // m
+// ...AND HOW FAST IT IS ALLOWED TO PULL. The correction is a velocity, and a
+// velocity derived from a distance over one frame is enormous: a 0.50 m nudge
+// from outside asked for 26.4 m/s, ten times the walk cap, and overshot the
+// anchor by 0.16 m — so a shove that should have moved the animal half a metre
+// instead threw it backwards. The creep this exists to cancel is 0.02 m/s, so
+// a ceiling three times the walk speed is a hundred times more than the job
+// needs and still restores a genuine nudge smoothly, over a few frames.
+const capyPIN_VMAX = 3.0;           // m/s
 // --- SLIP: WHEN THE GROUND STOPS HOLDING YOU (chapter 7) --------------------
 // Everything above is written for ground that grips. A glacier does not, and a
 // dune face only half does, so a biome may publish groundSlip(x, z) -> 0..1 and
@@ -2357,7 +2365,20 @@ export function createCapybara(game) {
           if (ex * ex + ez * ez > capyPIN_MAX * capyPIN_MAX) {
             capyPinX = body.position.x; capyPinZ = body.position.z;
           } else if (dt > 1e-4) {
-            vx = -ex / dt; vz = -ez / dt;
+            // ---- AND IT IS A PULL, NOT A CATAPULT ------------------------
+            // -ex/dt is exact for the creep, which is a fraction of a
+            // millimetre a frame, and it is violent for anything else: this
+            // branch also catches every position write from OUTSIDE under
+            // capyPIN_MAX — a rescue nudge, a solver push, a prop landing on
+            // the animal — and answered a 0.50 m displacement with 26.4 m/s
+            // for one frame, which overshot by 0.16 m and read as being
+            // thrown. Capped, it restores over a handful of frames instead,
+            // and the creep is so far under the cap that its own correction
+            // is unchanged to the last decimal.
+            let cvx = -ex / dt, cvz = -ez / dt;
+            const cs = Math.sqrt(cvx * cvx + cvz * cvz);
+            if (cs > capyPIN_VMAX) { const k = capyPIN_VMAX / cs; cvx *= k; cvz *= k; }
+            vx = cvx; vz = cvz;
           }
         } else {
           capyPinOn = true;

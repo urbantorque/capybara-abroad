@@ -87,8 +87,90 @@ async page => {
         roamMax = Math.max(roamMax, Math.hypot(pr.body.position.x - pr.homeX,
                                                pr.body.position.z - pr.homeZ));
       }
+      // ---- ...AND THE FIVE THINGS BATCH FOUR ADDED (v27) -----------------
+      // All five are per-frame or per-crossing machinery that exists in every
+      // chapter, which is why they belong in the per-chapter sweep and not in
+      // a probe of their own. Each is asserted on its SETUP as well as on its
+      // result — a keepsake that was never made and a prop that was never
+      // hidden both read as a pass otherwise.
+      //
+      //   THE KEEPSAKE RESCUE  a souvenir flung out of the world must come
+      //                        back ON THE GROUND. `homeY` is a SURFACE
+      //                        everywhere physRescue reads it, and the border
+      //                        crossing writes the capybara's spawn body-centre
+      //                        into it — so the rescue leaves the souvenir
+      //                        hanging at hip height, ASLEEP, and it never
+      //                        falls. Measured by comparing where it lies after
+      //                        the crossing with where the rescue puts it.
+      //   THE HIDDEN QUEUE     physHide parks a prop off-map on a timer and
+      //                        physUnhide brings it back. Anything whose
+      //                        `hiddenUntil` is in the past and is still hidden
+      //                        is a prop the world has lost — which is every
+      //                        grazed prop outside Pasto.
+      //   THE ROOM             the convolver must end up in the chapter you are
+      //                        actually standing in.
+      //   THE PIN              capybara.js pins an idle animal to a point. A
+      //                        position written from outside under capyPIN_MAX
+      //                        is answered with -ex/dt, and that number is not
+      //                        bounded by anything the walk cap can see.
+      //   CALM UNDER A CHASE   the calm field is suppressed by `chaos` and by
+      //                        nothing else, so it goes on accruing through a
+      //                        chase. Reported, not asserted: it is a design
+      //                        reading, and the number is the argument.
+      let keepHover = 'no keepsake', keepRescues = 0;
+      if (g.physics && typeof g.physics.spawnKeep === 'function') {
+        const kp = g.physics.keepOut('sydney') || g.physics.spawnKeep('sydney', 0, 0);
+        if (kp) {
+          for (let i = 0; i < 90; i++) g.tick(1 / 60, false);
+          const restY = kp.body.position.y;
+          kp.body.wakeUp();
+          kp.body.position.set(950, 12, 950);           // outside physESCAPE_R2
+          kp.body.velocity.set(0, 0, 0);
+          kp.body.angularVelocity.set(0, 0, 0);
+          kp.body.previousPosition.copy(kp.body.position);
+          kp.body.interpolatedPosition.copy(kp.body.position);
+          let lx = 950, ly = 12, lz = 950;
+          for (let i = 0; i < 210; i++) {
+            g.tick(1 / 60, false);
+            const b = kp.body.position;
+            if (Math.hypot(b.x - lx, b.y - ly, b.z - lz) > 3) keepRescues++;
+            lx = b.x; ly = b.y; lz = b.z;
+          }
+          keepHover = +(kp.body.position.y - restY).toFixed(2);
+        }
+      }
+      let stuckHidden = 0, hiddenNow = 0;
+      const tNow = g.state.time;
+      for (const pr of g.props) {
+        if (!pr.hidden) continue;
+        hiddenNow++;
+        if (pr.hiddenUntil !== undefined && pr.hiddenUntil < tNow) stuckHidden++;
+      }
+      const room = (g.hud && g.hud.roomAudit) ? g.hud.roomAudit() : null;
+      // A position written from outside, smaller than capyPIN_MAX, on an idle
+      // animal. Anything but a couple of centimetres back is the pin firing.
+      let pinKick = 0, pinNet = 0;
+      {
+        const cbp = g.capy.body;
+        cbp.velocity.set(0, 0, 0);
+        for (let i = 0; i < 180; i++) g.tick(1 / 60, false);   // arm the pin
+        const px = cbp.position.x, pz = cbp.position.z;
+        cbp.position.x = px + 0.5;
+        cbp.previousPosition.copy(cbp.position);
+        cbp.interpolatedPosition.copy(cbp.position);
+        g.tick(1 / 60, false);
+        pinKick = +Math.hypot(cbp.velocity.x, cbp.velocity.z).toFixed(1);
+        for (let i = 0; i < 90; i++) g.tick(1 / 60, false);
+        pinNet = +(cbp.position.x - px).toFixed(2);           // 0.50 is "kept"
+      }
+      const calmNow = (g.hud && g.hud.calmAudit) ? +g.hud.calmAudit().calm.toFixed(2) : 'n/a';
       console.error = oe;
       return {
+        keepHover, keepRescues,
+        hiddenNow, stuckHidden,
+        roomFor: room ? room.biome : 'n/a', roomWet: room ? +room.wet.toFixed(3) : 'n/a',
+        roomRight: room ? room.biome === name : 'n/a',
+        pinKick, pinNet, calmNow,
         loaf: (loaf === loaf) ? +loaf.toFixed(2) : 'NaN',
         loafSane: loaf === loaf && loaf >= 0 && loaf <= 1,
         chasing: ownN, ownTMax: +ownMax.toFixed(1), localDrift: +ownDrift.toFixed(2),
