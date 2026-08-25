@@ -317,6 +317,8 @@ let antSprayMesh = null, antSprayData = null;
 let antSprayT = 0;
 // the breach: once, at the top of the ride, and it is the marquee's marquee
 let antBreachT = -1, antBreachIdx = 0, antBreachDone = false;
+// A ONE-SHOT PAYOUT NEEDS A STATE MEANING ALREADY PAID. See antPodRide.
+let antRideDone = false;
 // the wave off a calving face, which lifts the boat
 let antCalveWave = 0, antCalveWaveX = 0, antCalveWaveZ = 0, antCalveLift = 0;
 
@@ -777,11 +779,36 @@ function antGroundSlip(x, z) {
   return antSLIP_ROCK;
 }
 
+/**
+ * ...AND THE LADDER HAS TO NAME EVERY GROUND THE SLIP TABLE NAMES.
+ *
+ * `antGroundSlip` above names six surfaces — rock 0, snow .18, jetty .34, floe
+ * .48, penguin highway .66, blue ice .93 — and this named five. The two it left
+ * out are the two the chapter is proudest of.
+ *
+ * The HIGHWAY is the fastest ground in the game (measured 8.8 m/s) and it runs
+ * from the colony down to the water, crossing the 6.5 m snow line on the way —
+ * so the footfall of a run down a single continuous path CHANGED HALFWAY DOWN
+ * ITSELF, from 0.90 snow to 1.0 rock, for no reason a player could see. A
+ * highway is polished by ten thousand birds a day: it is glassier than the snow
+ * beside it, not the same as bare rock.
+ *
+ * The BLUE TONGUE shared 1.06 with the whole snow-covered glacier, which is the
+ * one surface in the chapter whose entire character is that it is different
+ * from the snow around it.
+ */
 function antSurfacePitch(x, z, y) {
   if (antInZone('deck', x, z) && y > antWATER - 0.2) return 1.30;   // an aluminium hull
   if (antInZone('jetty', x, z)) return 1.26;                        // hollow timber
   if (antFloeAt(x, z) >= 0) return 1.12;                            // sea ice is drummy
-  if (antGlacierH(x, z) > antWATER) return 1.06;
+  if (antGlacierH(x, z) > antWATER) {
+    // the blue tongue, on the same test antGroundSlip uses so the two tables
+    // can never disagree about where it is
+    if (x <= antBLUE.xIn && z >= antBLUE.z0 - 16 && z <= antBLUE.z1 + 16) return 1.34;
+    return 1.06;
+  }
+  const hd = antHighwayD(x, z);
+  if (hd >= 0 && hd < antHIGH_W * 1.5) return 1.22;                 // polished guano ice
   if (antTerrain(x, z) > 6.5) return 0.90;                          // snow
   return 1.0;                                                       // rock
 }
@@ -2205,7 +2232,12 @@ function antBuildPod(root) {
   for (let i = 0; i < antPOD_N; i++) {
     antPodOffX[i] = off[i * 2];
     antPodOffZ[i] = off[i * 2 + 1];
-    antPodPh[i] = i * 1.04;
+    // ...AND THEY DO NOT ALL DO IT AT ONCE. `i * 1.04` is a phase in CYCLES,
+    // not radians, so six animals got fractions 0, .04, .08, .12, .16 and .20 —
+    // all six peaks inside 0.44 s of a 2.2 s cycle instead of 1.83 s apart, and
+    // a photograph of the escort had all six in an identical pose. Same family
+    // as the colony chorus's flashbulb. Spread them across the whole cycle.
+    antPodPh[i] = i / antPOD_N;
     const bull = i === 4;
     const calf = i === 5;
     const s = bull ? 1.28 : calf ? 0.62 : 1.0;
@@ -3190,7 +3222,7 @@ function antBuildLocals(game) {
     const h = antLandOnly(x, z);
     if (deck === undefined && h < antWATER + 0.2) {
       console.warn('[antarctic] local at', x, z, 'is in the water (' + h.toFixed(2) + ') - skipped');
-      return;
+      return null;
     }
     o.biome = 'antarctic';
     o.x = x; o.z = z;
@@ -3295,7 +3327,7 @@ function antBuildLocals(game) {
                         'Where. Where is it going. There is nowhere to go.',
                         'That is how the doctor got the doctor’s knee.'];
 
-  put(antHUTS.x - 3.4, antHUTS.z + 4.2, {
+  const antLocBoss = put(antHUTS.x - 3.4, antHUTS.z + 4.2, {
     near: 8, face: 0.4, kit: 'clipboard',
     figure: { shirt: PALETTE.antHull, legs: PALETTE.antHutRoof, hat: PALETTE.antHutRed },
     lines: ['You are the first new face since March. Do not take that as praise.',
@@ -3467,7 +3499,7 @@ function antBuildLocals(game) {
   });
   // 6 — and the one behind the bar, because a bar with nobody behind it is a
   //     plank on two drums
-  put(antHUTS.x + 0.4, antHUTS.z - 6.1, {
+  const antLocBar = put(antHUTS.x + 0.4, antHUTS.z - 6.1, {
     near: 7, face: 0.05, kit: 'mug',
     figure: { shirt: PALETTE.antHutRed, legs: PALETTE.antTimber },
     lines: ['We open at six. It is always six somewhere. It is six.',
@@ -3505,6 +3537,24 @@ function antBuildLocals(game) {
             'Oh, we are looting now. Fine.'],
     rush: ANT_RUSH,
   });
+
+  // ---- AND THE ONLY TWO PEOPLE FOR ELEVEN HUNDRED KILOMETRES TALK TO EACH
+  // ---- OTHER, WHICH UNTIL NOW THEY DID NOT ------------------------------
+  // Zero `addExchange` rows in the whole chapter, against four in Venice and
+  // five in Kowloon — in the one place in the game where the joke is that
+  // there is nobody else. The base commander and the person behind the bar
+  // stand 10.98 m apart at the huts, inside the 13 m chat radius, and have
+  // spent nine months with only each other.
+  if (typeof game.addExchange === 'function' && antLocBoss && antLocBar) {
+    game.addExchange({ biome: 'antarctic', a: antLocBar, b: antLocBoss, gap: 30, lines: [
+      ['Someone has signed in as a rodent.', 'Someone has signed in as a rodent, yes.'],
+      ['Wind is dropping.', 'The wind is not dropping. The wind has never dropped.'],
+      ['Are we counting it in the census?', 'We are counting everything. That is the census.'],
+      ['Two hundred and eleven days.', 'Two hundred and twelve. You always miss one.'],
+      ['The boat has gone out again.', 'Good. Somebody should be using her.'],
+      ['Do you want the last of the coffee?', 'I want the FIRST of the next coffee.'],
+    ] });
+  }
 }
 
 // ============================================================== THE PASSAGE ==
@@ -3991,10 +4041,37 @@ function antUpdateFloes(game, dt) {
  * chapter, so it runs on the centre AND on every animal.
  */
 const antDeep = { x: 0, z: 0 };
+/**
+ * PUSH A POINT OUT INTO WATER DEEP ENOUGH FOR SIX TONNES OF ANIMAL.
+ *
+ * AND A FLOE IS NOT LAND. This walked the LAND height field only, so it happily
+ * declared a spot clear that had a two-hundred-tonne pan of sea ice sitting on
+ * it — and the escort, whose formation is fixed relative to the boat, drove
+ * straight through the pack. Photographed at the marquee (`qa/b4ant-payout.png`)
+ * there were two orcas drawn ON TOP of a pan and a third clipping its edge, in
+ * frame, at the tick.
+ *
+ * The floes are the one thing in this chapter that MOVE — they are on the drift
+ * — so this cannot be baked; it has to be asked every frame, which is what
+ * `antFloeAt` is for and why it is cheap.
+ */
 function antToDeep(px, pz) {
   antDeep.x = px; antDeep.z = pz;
-  for (let k = 0; k < 3; k++) {
-    if (antLandOnly(antDeep.x, antDeep.z) < antWATER - 3.5) return antDeep;
+  for (let k = 0; k < 4; k++) {
+    const shallow = antLandOnly(antDeep.x, antDeep.z) >= antWATER - 3.5;
+    const fi = antFloeAt(antDeep.x, antDeep.z);
+    if (!shallow && fi < 0) return antDeep;
+    if (fi >= 0) {
+      // Straight out of the pan, along the line from its centre. A floe is a
+      // disc, so there is no gradient to follow and nothing to be clever with.
+      let dx = antDeep.x - antFloeX[fi], dz = antDeep.z - antFloeZ[fi];
+      let m = Math.sqrt(dx * dx + dz * dz);
+      if (m < 1e-4) { dx = 1; dz = 0; m = 1; }
+      const out = antFloeR[fi] + 3.5;
+      antDeep.x = antFloeX[fi] + (dx / m) * out;
+      antDeep.z = antFloeZ[fi] + (dz / m) * out;
+      continue;
+    }
     const e = 6;
     const gx = antLandOnly(antDeep.x + e, antDeep.z) - antLandOnly(antDeep.x - e, antDeep.z);
     const gz = antLandOnly(antDeep.x, antDeep.z + e) - antLandOnly(antDeep.x, antDeep.z - e);
@@ -4020,7 +4097,9 @@ function antPodSummon() {
   antPodState = 'coming';
   antPodStateT = 0;
   antToast('something out there heard that.');
-  antSfx('gull', { volume: 0.22, pitch: 0.30 });
+  // AND IT COMES FROM SOMEWHERE. The whole line is "something out there heard
+  // that" — a cue whose entire content is a BEARING, fired in mono.
+  antSfx('gull', placeCue({ volume: 0.22, pitch: 0.30 }, antPodCX, antWATER, antPodCZ, 260));
   return true;
 }
 
@@ -4075,7 +4154,8 @@ function antUpdatePod(game, dt) {
         antSeenPod = true;
         antToast('they have formed up on you. do not slow down.');
       }
-      antSfx('splash', { volume: 0.5, pitch: 0.5 });
+      antSfx('splash', placeCue({ volume: 0.5, pitch: 0.5 },
+                                antPodCX, antWATER, antPodCZ, 150));
     }
     if (antPodStateT > 26) antPodState = 'patrol';    // they gave up on you
   } else {
@@ -4089,9 +4169,38 @@ function antUpdatePod(game, dt) {
     if (sp > 5.5 && antHelmOn) {
       antPodRide += dt;
       if (antPodRide > antPodBest) antPodBest = antPodRide;
-      if (antPodRide >= antPOD_RIDE) {
+      // ---- ONCE. `antPodRide >= antPOD_RIDE` IS A CONDITION, NOT AN EVENT --
+      //
+      // It stayed true for every frame of the rest of the ride, so the
+      // chapter's marquee called record() and completeTask() on EVERY ONE OF
+      // THEM. Measured over a single hold: 208 record() calls with the value
+      // climbing 9.03 → 9.05 → 9.08 …, and because game.record() toasts and
+      // chimes whenever the number improves, TWENTY-NINE live "personal best"
+      // cards stacked over the animal's head through the whole of the one
+      // moment the chapter is for. Exactly Kyoto's bug in batch 3 and the
+      // Göreme cowbird's before it, and the same fix every time: a flag whose
+      // meaning is ALREADY PAID, distinct from the value the clock idles at.
+      //
+      // The record still gets the best of the ride, because antPodBest is
+      // banked above and flushed when the ride ends — see antPodEndRide.
+      if (antPodRide >= antPOD_RIDE && !antRideDone) {
+        antRideDone = true;
         antRecord('orca-ride', antPodBest);
         antTask('orca-ride');
+        // FRAMED — chapters 12-17 asked for a shot in none of their marquees.
+        // Measured at the tick: the camera sits dead astern (yaw = heading +
+        // 180.0 deg, held to a tenth of a degree for the whole ride), 22.05 m
+        // back, pitched 25.5 degrees DOWN with a 10.54 m raise — a helicopter
+        // plate of the boat's own wake. `yaw` is the bearing FROM the animal TO
+        // the camera, so astern is what we keep; what has to change is the
+        // DOWN-ANGLE, because the pod is level with the sea and the breach apex
+        // is staged 5.3 m above it.
+        // `over`, because this marquee happens AT THE HELM and a shot is
+        // weighted to nothing under the helm rig by default — measured, the
+        // first version of this line changed the lens by 0.00. See frameShot.
+        if (typeof game.frameShot === 'function')
+          game.frameShot({ yaw: antBoatYaw + Math.PI, dist: 26, pitch: 0.24,
+                           raise: 6.5, hold: 3.2, over: true });
       }
       // ---- THE BREACH, ONCE ----------------------------------------------
       //
@@ -4106,7 +4215,9 @@ function antUpdatePod(game, dt) {
         antBreachDone = true;
         antBreachT = 0;
         antBreachIdx = 4;                                   // the bull
-        antSfx('splash', { volume: 0.62, pitch: 0.36, force: true });
+        antSfx('splash', placeCue({ volume: 0.62, pitch: 0.36, force: true },
+                                  antPodX[antBreachIdx] || antPodCX, antWATER,
+                                  antPodZ[antBreachIdx] || antPodCZ, 150));
         if (typeof game.shake === 'function') game.shake(0.10);
         antToast('all of it. out of the water. all of it.');
         if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
@@ -4121,7 +4232,9 @@ function antUpdatePod(game, dt) {
         antSpyT = 0;
         antSpyTold = false;
         antSpyIdx = 1;
-        antSfx('splash', { volume: 0.55, pitch: 0.42 });
+        antSfx('splash', placeCue({ volume: 0.55, pitch: 0.42 },
+                                  antPodX[antSpyIdx] || antPodCX, antWATER,
+                                  antPodZ[antSpyIdx] || antPodCZ, 150));
       }
     } else {
       antSlowT = 0;
@@ -4210,7 +4323,8 @@ function antUpdatePod(game, dt) {
       antPodX[i] = damp(antPodX[i], antBoatX + 11 * sn - 7 * cs, 2.4, dt);
       antPodZ[i] = damp(antPodZ[i], antBoatZ + 11 * cs + 7 * sn, 2.4, dt);
       if (u > 0.93 && u - dt / 2.6 <= 0.93) {
-        antSfx('splash', { volume: 0.7, pitch: 0.30, force: true });
+        antSfx('splash', placeCue({ volume: 0.7, pitch: 0.30, force: true },
+                                  antPodX[i], antWATER, antPodZ[i], 150));
         for (let k = 0; k < 6; k++) {
           antSpray(antPodX[i] + rand(-3, 3), antWATER + 0.6, antPodZ[i] + rand(-3, 3),
                    rand(-5, 5), rand(4, 9), rand(-5, 5));
@@ -4457,7 +4571,8 @@ function antUpdatePenguins(game, dt) {
           antToldPeng = true;
           antToast('they do this. nobody knows why they do this.');
         }
-        antSfx('splash', { volume: 0.26, pitch: 1.5 });
+        antSfx('splash', placeCue({ volume: 0.26, pitch: 1.5 },
+                                  antBoatX, antWATER, antBoatZ, 120));
       }
     }
     const esc = clamp(antPengEsc > 1 ? 1 : antPengEsc, 0, 1);
@@ -5330,7 +5445,7 @@ export function createAntarctic(game) {
       // ticked (that is systems.js's business); the SHOW replays, for the same
       // reason the tender is alongside and stopped again — a second visit that
       // is scenery is the bug chapter 3 shipped with.
-      antBreachT = -1; antBreachDone = false;
+      antBreachT = -1; antBreachDone = false; antRideDone = false;
       antSprayT = 0;
       if (antSprayData) for (let i = 0; i < antSPRAY_N; i++) antSprayData[i * 7 + 6] = 1e9;
       if (antCalveBits) antCalveBits.visible = false;

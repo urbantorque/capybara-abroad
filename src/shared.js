@@ -2483,3 +2483,41 @@ export function grain(m, opts) {
 // hook still attached. Same guarantee, opposite order.
 // ---------------------------------------------------------------------------
 export function grainOwn(m, opts) { return grain(m.clone(), opts); }
+
+// ---------------------------------------------------------------------------
+// GIVE A CUE A BEARING WITHOUT TOUCHING THE LEVEL A CHAPTER ALREADY TUNED.
+//
+// THE SAME FINDING IN EVERY BATCH OF THE PAYOFF PASS, AND IT IS ALWAYS THE
+// LOUDEST SOUND IN THE CHAPTER. Batch 3 found 31 mono cues in Marrakech and a
+// silent marquee in Venice; batch 4 measured 24 mono calls in Cappadocia, 48 in
+// Manly, 47 in the Pantanal, 35 in Palawan and 29 in Antarctica — five whole
+// chapters in which nothing at all has a direction, including the one sound the
+// player is owed. What made it so easy to leave was that every one of these
+// files ALREADY computes the source's (x, z) in order to scale the volume by
+// distance, and then throws the position away.
+//
+// `at:` in systems.js's sfx() would give it a pan, but it also applies its OWN
+// inverse-distance rolloff — so passing the position alone attenuates
+// everything twice and the chapter's tuning is silently halved. The chapter's
+// own `heard` helper has a curve its call sites are balanced against, and it
+// should keep owning the volume.
+//
+// So: `near` is set to the chapter's own `far`, which makes audioPlace's gain
+// exactly 1.0 everywhere the chapter thinks the sound is audible, and leaves
+// PAN as the only thing it contributes. The outer `far` clears sysSFX_FADE
+// (45 m) so its taper never reaches back inside the audible range.
+//
+//     sfx('bell', placeCue({ volume: 0.3 * h, pitch: 1.6 }, x, y, z, 95))
+//
+// Mutates and returns the options object, so it wraps an existing call in one
+// line and no allocation is added to a per-frame path.
+// ---------------------------------------------------------------------------
+export function placeCue(o, x, y, z, far) {
+  const opts = o || {};
+  if (!(x === x && z === z)) return opts;   // NaN in, mono out — never a throw
+  opts.at = { x: x, y: y || 0, z: z };
+  const f = far > 0 ? far : 120;
+  opts.near = f;
+  opts.far = f + 46;
+  return opts;
+}

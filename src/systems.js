@@ -14621,7 +14621,26 @@ export function createSystems(game) {
       pitch: typeof o.pitch === "number" && o.pitch === o.pitch ? o.pitch : null,
       raise: typeof o.raise === "number" && o.raise === o.raise ? o.raise : null,
       hold:  typeof o.hold  === "number" && o.hold  > 0 ? o.hold : sysSHOT_HOLD,
-      w:     typeof o.w     === "number" ? clamp(o.w, 0, 1) : 1
+      w:     typeof o.w     === "number" ? clamp(o.w, 0, 1) : 1,
+      // ---- `over`: THIS SHOT IS THE VEHICLE'S OWN MOMENT (v27) -----------
+      //
+      // The rule above — a shot is weighted to nothing under the helm, a ride
+      // and a condor — was written against a generic task-completion shot
+      // fighting a rig whose whole point is to sit behind the vehicle, and for
+      // that it is right. But it also means the channel is UNREACHABLE by
+      // exactly the chapters whose marquee happens ON the vehicle, and there
+      // are two of them: Antarctica's `orca-ride` is at the helm and Pasto's
+      // `condor-ride` is in flight. Measured: the shot Antarctica asks for at
+      // the payout changed the lens by nothing at all, because `sw = shotW *
+      // (1 - sailT)` was 0.000 for the whole of it.
+      //
+      // `over` says the CHAPTER THAT OWNS THE VEHICLE is the one asking. It is
+      // still not a command: `camHandT` — the player's hand on the camera —
+      // kills it in a third of a second exactly as before, and it still expires
+      // on its own envelope and on `biome:enter`. It only removes the argument
+      // about which of two systems in the same file should win, in the one case
+      // where they are the same author.
+      over:  !!o.over
     };
     shotAge = 0; shotKill = 0;
   };
@@ -15140,7 +15159,7 @@ export function createSystems(game) {
     // The lambda is scaled by the envelope so the swing eases in with the shot
     // rather than snapping the instant it is asked for.
     if (shotW > 0.002 && shotReq && shotReq.yaw !== null && camHandT <= 0 &&
-        !mounted && !sailing && !(rideYaw === rideYaw)) {
+        (shotReq.over || (!mounted && !sailing && !(rideYaw === rideYaw)))) {
       camYawTarget = sysDampAngle(camYawTarget, shotReq.yaw, sysSHOT_YAW_L * shotW, dt);
     } else if (sailing && camHandT <= 0 && capy && capy.group) {
       // ...AND THIS BRANCH WAS MISSING THE HALF TURN. Exactly the bug the note
@@ -15317,7 +15336,9 @@ export function createSystems(game) {
     // A shot that named only a yaw leaves both of these null and changes
     // nothing here, which is the common case: most marquees want a BEARING.
     if (shotW > 0.002 && shotReq) {
-      const sw = shotW * (1 - Math.max(flyT, sailT));
+      // ...unless the chapter that owns the vehicle is the one asking. See
+      // `over` in game.frameShot.
+      const sw = shotReq.over ? shotW : shotW * (1 - Math.max(flyT, sailT));
       if (sw > 0.002) {
         if (shotReq.dist  !== null) camReach  = lerp(camReach,  shotReq.dist,  sw);
         if (shotReq.pitch !== null) camPitch  = lerp(camPitch,  shotReq.pitch, sw);

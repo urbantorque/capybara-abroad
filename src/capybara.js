@@ -29,6 +29,11 @@ const capySTOP_LAMBDA = 14;
 // and capyShove is applied after it, so a rolling bin still knocks you about.
 const capyGRIP_LAMBDA = 60;         // idle, grounded: how hard the feet hold
 const capyGRIP_SNAP = 0.9;          // m/s below which idle motion is simply over
+// ---- THE ANCHOR THE SNAP NEEDED, AND HOW FAR IT IS ALLOWED TO REACH -------
+// See THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED, below. Past this the
+// animal has genuinely been moved — a teleport, a rescue, a launch, a carrier
+// picking it up — and the anchor is re-taken rather than dragged back to.
+const capyPIN_MAX = 0.55;           // m
 // --- SLIP: WHEN THE GROUND STOPS HOLDING YOU (chapter 7) --------------------
 // Everything above is written for ground that grips. A glacier does not, and a
 // dune face only half does, so a biome may publish groundSlip(x, z) -> 0..1 and
@@ -492,6 +497,10 @@ let capyWakeT = 0;
 let capyBreathAmt = 0;
 let capyStageTime = 0;
 let capyPlatVX = 0, capyPlatVZ = 0, capyPlatT = 0;   // the frame the floor is moving in
+// WHERE THE ANIMAL WAS WHEN IT STOPPED. See THE SNAP CANNOT SEE THE STEP THAT
+// ALREADY HAPPENED — this is the anchor the idle snap holds against, and it is
+// carried in the floor's frame, not the world's.
+let capyPinOn = false, capyPinX = 0, capyPinZ = 0;
 let capyLaunchT = 0;                                 // s left of "you are not standing on anything"
 // ---- STAMINA -------------------------------------------------------------
 // A capybara is a sprinter with a rodent's lungs, not a horse. Ten seconds flat
@@ -2303,7 +2312,60 @@ export function createCapybara(game) {
         : capyGRIP_LAMBDA;
       vx = damp(vx, 0, grip, dt);
       vz = damp(vz, 0, grip, dt);
-      if (slip < 0.35 && vx * vx + vz * vz < capyGRIP_SNAP * capyGRIP_SNAP) { vx = 0; vz = 0; }
+      if (slip < 0.35 && vx * vx + vz * vz < capyGRIP_SNAP * capyGRIP_SNAP) {
+        vx = 0; vz = 0;
+        // ---- THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED ----------
+        //
+        // THIS IS WHY A PARKED CAPYBARA SLIDES DOWN EVERY SLOPE IN THE GAME.
+        //
+        // world.step runs BEFORE this module, so by the time the snap decides
+        // the animal is stationary the solver has already given it
+        // g*sin(theta)*dt of down-slope velocity AND INTEGRATED THAT INTO THE
+        // POSITION. Setting the velocity to zero afterwards erases the evidence
+        // and keeps the displacement. Every frame. For ever.
+        //
+        // MEASURED, and the arithmetic closes to three decimals — this is not
+        // a hypothesis:
+        //   Son Doong spawn, heightfield slope 0.055 (and the analytic slopeAt
+        //     agrees, so unlike Venice the collision floor is not lying):
+        //     predicted 24*0.055/60 = 0.0220 m/s, measured 0.0226
+        //   the doline, 0.0475:  predicted 0.0190, measured 0.0190
+        //   (30, -70), 0.175:    predicted 0.0700, measured 0.0674
+        // and it is a FIXED-STEP quantity, which is the clincher: ticking at
+        // 1/120 and 1/240 gives the identical 0.0228 m/s, and 1/30 gives
+        // 0.0371. A real slide would scale with time, not with the step.
+        //
+        // It is not one chapter. Over sixty seconds, no input, velocity reading
+        // exactly 0.000 and the loaf at 1.0 the whole way: Manly beach 13.36 m
+        // into the sea, Antarctica spawn 3.12 m, Palawan beach 3.65 m, Pasto
+        // 3.04 m, the cave 1.34 m. Two previous batches looked at four of those
+        // and wrote them up as five separate chapter faults.
+        //
+        // The fix has to be a POSITION, because static friction IS a position
+        // and this module deliberately never assigns one. So it is expressed
+        // the only other way: remember where the animal was when it stopped,
+        // and hand back exactly the velocity that returns it. To first order
+        // the next step’s own creep is cancelled by the correction and the net
+        // displacement is zero — bounded, not linear.
+        //
+        // The anchor RIDES THE FLOOR: platVX/platVZ is the frame the animal is
+        // standing in, so a capybara asleep on a moving ferry is pinned to the
+        // deck and not to the harbour.
+        if (capyPinOn) {
+          capyPinX += platVX * dt; capyPinZ += platVZ * dt;
+          const ex = body.position.x - capyPinX, ez = body.position.z - capyPinZ;
+          if (ex * ex + ez * ez > capyPIN_MAX * capyPIN_MAX) {
+            capyPinX = body.position.x; capyPinZ = body.position.z;
+          } else if (dt > 1e-4) {
+            vx = -ex / dt; vz = -ez / dt;
+          }
+        } else {
+          capyPinOn = true;
+          capyPinX = body.position.x; capyPinZ = body.position.z;
+        }
+      } else {
+        capyPinOn = false;
+      }
     } else if (!capySwimming) {
       // airborne: keep the old gentle bleed so a fall still carries its arc
       vx = damp(vx, 0, capySTOP_LAMBDA * 0.15, dt);

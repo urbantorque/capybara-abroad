@@ -73,8 +73,48 @@ function npcDwell(rec, t, a, b) {
  * interpolatedPosition; if we move a body by hand without refreshing those the
  * renderer lerps out of a stale origin and the object smears across the park.
  */
+// WHERE THE ANIMAL IS, AT MODULE SCOPE, so npcPlaceBody can refuse to put a
+// person inside it. Written once a frame by refreshCapy.
+let npcCapyX = 0, npcCapyZ = 0, npcCapyOk = false;
+// The distance between centres at which a walker box and the capybara capsule
+// stop touching, plus a margin. See npcWALK_CLEAR, which is the same number.
+const npcBODY_CLEAR = 1.30;
+
+/**
+ * PLACE A HAND-DRIVEN BODY — AND NEVER INSIDE THE PLAYER.
+ *
+ * This is the ONE place any of these bodies is written, which is why the
+ * guarantee belongs here rather than in the four places that decide where
+ * somebody wants to be. A walker’s collider is mass-0 KINEMATIC, so cannon
+ * resolves any overlap between it and the capybara by moving the CAPYBARA:
+ * steering, separation and the step clamp can all be doing the right thing
+ * and a single frame of penetration still shoves the player. Measured in
+ * Pasto, parked with no input for sixty seconds, the animal was carried
+ * between 0.7 m and 28.9 m depending on the parade’s phase.
+ *
+ * Only bodies that carry `userData.npc` are held off. Anything else placed
+ * through here may legitimately be a floor the animal is standing on, and a
+ * carrier that refused to go under its passenger would drop it.
+ *
+ * The DRAWN figure is not moved — a walker may still visually brush past. The
+ * two disagree by under a metre at the worst moment of an encounter that lasts
+ * about a second, and the alternative is a person who cannot walk down a path
+ * the player is standing on.
+ */
 function npcPlaceBody(b, x, y, z) {
   if (!b) return;
+  if (npcCapyOk && b.userData && b.userData.npc) {
+    const dx = x - npcCapyX, dz = z - npcCapyZ;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < npcBODY_CLEAR) {
+      if (d > 1e-4) {
+        x = npcCapyX + (dx / d) * npcBODY_CLEAR;
+        z = npcCapyZ + (dz / d) * npcBODY_CLEAR;
+      } else {
+        x = npcCapyX + npcBODY_CLEAR; z = npcCapyZ;
+      }
+    }
+  }
   b.position.set(x, y, z);
   b.previousPosition.copy(b.position);
   b.interpolatedPosition.copy(b.position);
@@ -354,6 +394,16 @@ const npcBOUND_X0 = -66, npcBOUND_X1 = 66, npcBOUND_Z0 = -6.5, npcBOUND_Z1 = 66;
 // 0.26 x 0.22. 1.05 is the combined *visual* radius: inside it the two meshes
 // are interpenetrating on screen even though cannon is happy.
 const npcSEP_R = 1.05;
+// ---- ...AND HOW FAR A WALKER HAS TO STAY OFF, WHICH IS FURTHER -----------
+// npcSEP_R is where the SHOVE settles somebody, and it is very slightly inside
+// the distance at which the two colliders actually touch: the capybara is three
+// spheres of r 0.34 at z = 0, +/-0.34, so its reach is 0.68, and a walker box
+// is he (0.18, 0.30, 0.34), whose xz half-diagonal is 0.385. Worst case that is
+// 1.065 between centres — just OUTSIDE npcSEP_R. So the separation parked every
+// walker exactly on the contact boundary and cannon spent the rest of the
+// encounter resolving a hair of penetration, which for a mass-0 kinematic body
+// against a dynamic one means moving the ANIMAL. See moveRec.
+const npcWALK_CLEAR = 1.30;   // m between centres, with the margin the shapes need
 const npcSEP_LAMBDA = 14;     // damping on the shove — never a teleport
 const npcSEP_VMAX = 2.6;      // m/s cap on how fast anyone can be pushed
 const npcSEP_PROBE = 0.34;    // nav radius used when testing where to push them
@@ -1920,6 +1970,27 @@ export function createNPCs(game) {
   // square, and it is the difference between a set piece being witnessed and a
   // set piece being a toast.
   const npcLOC_WOW_R = 40;
+  // ---- ...AND A MARQUEE NOBODY WAS NEAR IS OWED THE LINE, NOT DENIED IT ----
+  //
+  // Forty metres is enough for a square. It is nothing like enough for a
+  // chapter whose marquee happens out in the world, and this batch measured
+  // three of them: Antarctica's `orca-ride` pays out 212.0 m from the nearest
+  // of its six locals, Palawan's `the-bloom` is 47.9 m from the nearest of its
+  // seven from the reef and 40.4 m from the drop-off, and the western half of
+  // the Pantanal's legal crossing is 41.0 m from both of its witnesses. In all
+  // three the chapter had WRITTEN the lines — `onTask: { 'orca-ride': [...] }`
+  // appears on four Antarctic locals — and they were unreachable code.
+  //
+  // Nobody in range does not mean nobody hears about it. The line is held, and
+  // the first person the player comes back within range of says it. That is
+  // also just better than the immediate version: an empty ocean has nobody in
+  // it BY DESIGN, and being met on the jetty by someone who already knows is a
+  // warmer answer than a stranger applauding from the water.
+  //
+  // One at a time, and it dies at the border — a held line delivered in the
+  // next chapter would be nonsense.
+  let npcWowOwed = null, npcWowOwedBiome = null, npcWowOwedT = 0;
+  const npcWOW_OWED_TTL = 600;   // s of gameplay; effectively "this visit"
   const npcWowIds = {};
   for (let i = 0; i < TASKS.length; i++) if (TASKS[i].wow) npcWowIds[TASKS[i].id] = 1;
   game.events.on('task:complete', function (e) {
@@ -1937,7 +2008,11 @@ export function createNPCs(game) {
       const d2 = dx * dx + dz * dz;
       if (d2 < bd) { bd = d2; best = L; }
     }
-    if (!best) return;
+    if (!best) {
+      // Held. See npcWowOwed.
+      if (npcWowIds[id]) { npcWowOwed = id; npcWowOwedBiome = live; npcWowOwedT = 0; }
+      return;
+    }
     // A person with something specific to say about THIS says it; otherwise the
     // general opinion. `arrive` rows are excluded by the chapter naming them —
     // being congratulated for turning up is the one line that would be silly.
@@ -2042,6 +2117,36 @@ export function createNPCs(game) {
     // and ten times a frame for one float is the cost that only shows up in
     // the chapter with the most people in it. See THE CALM in systems.js.
     const calmNow = typeof game.calm === 'function' ? game.calm() : 0;
+    // ---- THE MARQUEE LINE NOBODY WAS THERE TO SAY ------------------------
+    // Delivered by the first person the player comes back within earshot of,
+    // at the PRAISE radius rather than the wow radius: this one is said to your
+    // face. See npcWowOwed at task:complete.
+    if (npcWowOwed) {
+      if (npcWowOwedBiome !== live) { npcWowOwed = null; npcWowOwedBiome = null; }
+      else {
+        npcWowOwedT += dt;
+        if (npcWowOwedT > npcWOW_OWED_TTL) { npcWowOwed = null; npcWowOwedBiome = null; }
+        else {
+          let owedBest = null, owedD = npcLOC_PRAISE_R * npcLOC_PRAISE_R;
+          for (let i = 0; i < locals.length; i++) {
+            const L = locals[i];
+            if (L.biome !== live || L.cd > 0 || !L.group) continue;
+            const dx = cx - L.x, dz = cz - L.z;
+            const d2 = dx * dx + dz * dz;
+            if (d2 < owedD) { owedD = d2; owedBest = L; }
+          }
+          if (owedBest) {
+            const arr = (owedBest.onTask && owedBest.onTask[npcWowOwed]) ||
+                        owedBest.praise || npcLOC_PRAISE;
+            owedBest.cd = owedBest.cool * rand(0.9, 1.5);
+            owedBest.flV -= 5.5;
+            owedBest.flYaw = Math.atan2(cx - owedBest.x, cz - owedBest.z);
+            localLine(owedBest, arr);
+            npcWowOwed = null; npcWowOwedBiome = null;
+          }
+        }
+      }
+    }
     // ---- THE CHAIN, spent once per reaction -------------------------------
     // Resolved BEFORE the per-person loop and consumed inside it, so the answer
     // is chosen by distance rather than by array order — otherwise the person
@@ -3250,6 +3355,49 @@ export function createNPCs(game) {
         else if (!navBlocked(rec.group.position.x, nz, npcMOVE_R)) nx = rec.group.position.x;
         else { nx = rec.group.position.x; nz = rec.group.position.z; }
       }
+      // ---- AND NOBODY WALKS THROUGH THE PLAYER --------------------------
+      //
+      // npcSeparate runs immediately above this and pushes an NPC OUT of the
+      // capybara — and then this stepped them straight back in, every frame,
+      // because a route is a route. The separation is damped and speed-capped
+      // (it is meant to read as a shove, not a teleport) so it never wins that
+      // argument outright; what actually settled it was cannon, in world.step,
+      // where a mass-0 KINEMATIC box always beats a dynamic one.
+      //
+      // MEASURED, Pasto, parked at the spawn with no input for sixty seconds:
+      // the animal was displaced 4.30 m, 12.29 m and 28.86 m on three runs of
+      // the same build — the spread is the parade phase, not noise — while the
+      // nearest body the whole time was a walker at 1.83-1.91 m/s holding
+      // station 0.95-1.07 m away. body.velocity read 0.000 at the moment of
+      // several of the steps and capy.loaf sat at 0.99, so it looked exactly
+      // like a ground slide and was written up as one by the previous batch.
+      // It is not the ground. It is a person walking into you.
+      //
+      // steerTo cannot fix it: navBlocked forwards only to env.navBlocked,
+      // which is STATIC WORLD GEOMETRY, so a walker dodges a building and has
+      // never had a term for the animal at all.
+      //
+      // No exemption list, deliberately. A person whose errand IS the player
+      // stops when they get to them, which is what arriving means — and flee,
+      // plunge and cornered all move the other way, so the clamp is inert for
+      // them by construction. Only the INWARD component is removed, so anyone
+      // can still walk past, around, or away at full speed.
+      if (capyOk && rec.carryT < 0) {
+        const rx = nx - capyX, rz = nz - capyZ;
+        const rd = Math.sqrt(rx * rx + rz * rz);
+        if (rd < npcWALK_CLEAR && rd > 1e-4) {
+          const ox = rec.group.position.x - capyX, oz = rec.group.position.z - capyZ;
+          const od = Math.sqrt(ox * ox + oz * oz);
+          if (rd < od) {                       // closing, not already inside and leaving
+            const ux = ox / (od || 1), uz = oz / (od || 1);
+            let sx = nx - rec.group.position.x, sz = nz - rec.group.position.z;
+            const inward = sx * ux + sz * uz;  // negative = toward the animal
+            if (inward < 0) { sx -= ux * inward; sz -= uz * inward; }
+            nx = rec.group.position.x + sx;
+            nz = rec.group.position.z + sz;
+          }
+        }
+      }
       rec.group.position.x = nx;
       rec.group.position.z = nz;
       const want = Math.atan2(rec.moveX, rec.moveZ);
@@ -3330,8 +3478,9 @@ export function createNPCs(game) {
   let capyVX = 0, capyVZ = 0, capySpdH = 0;
   function refreshCapy() {
     const c = game.capy;
-    if (!c || !c.position) { capyOk = false; return; }
+    if (!c || !c.position) { capyOk = false; npcCapyOk = false; return; }
     capyX = c.position.x; capyZ = c.position.z;
+    npcCapyX = capyX; npcCapyZ = capyZ; npcCapyOk = true;
     capySpd = c.velocity ? c.velocity.length() : 0;
     capyVX = c.velocity ? c.velocity.x : 0;
     capyVZ = c.velocity ? c.velocity.z : 0;
