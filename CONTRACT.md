@@ -2049,6 +2049,82 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE BUDGET, AND WHAT A SILHOUETTE MAY COST (v28 — 26 Aug 2026)
+
+v27 measured the performance budget and deliberately did not act on it, for reasons that
+still stand and are restated below. This section is what a SECOND batch-4 run — the
+scheduled task fired twice and two sessions worked the same tree — did on top of that: it
+reallocated the part of the overage that was waste rather than content, and it turned the
+budget audit into a gate that can be green.
+
+### THE RULE: DETAIL IS A FUNCTION OF WHERE THE PLAYER CAN STAND
+
+Three chapters were carrying their far field at near-field resolution. This is now written
+into the three builders, and it is the pattern for any chapter that needs the same:
+
+- **`driAddIsle(..., MN, det)`** — `src/drift.js`. `det` is 1 for the islands you land on,
+  0.45 for the deep and far ranks (110-260 m) and 0.28 for the far field (260-400 m). It
+  scales the COUNTS only — spike fringe, torn-lip plates, rib steps, rim boulders — and
+  never the shape, so the lip still goes all the way round and the crag is still torn
+  rather than conical. `dri:under` 50,524 → 34,268. `driBuildFarDressing`'s `dress()`
+  takes the same term: the third rank keeps its crown line and its lamp, and loses the
+  six-sided trunk under a crown 300 m away.
+- **`quayHeadRouteDist(x, z)`** — `src/quay.js`. Distance from a headland's NEAR EDGE to
+  the rhumb line the player actually travels: the berth on the apron, then the fairway to
+  Manly. Past 60 m a plant loses the fork inside its own crown, the second crown on top of
+  the first, the sandstone at its foot and the grass tree beside it. **The plant count is
+  untouched** — the wood is as thick as it ever was, because the canopy line is the read
+  and the trunk is not. Manly's own banks and North Head's nose keep everything.
+- **the Pantanal's grass** — `src/pantanal.js`, `panBuildGrass`. 4,249 tufts at one uniform
+  density over 56,000 m². The density now follows the causeway and thins going out, which
+  is also what a cattle road looks like: the verge is rank and the pasture beyond it is
+  grazed short.
+
+Measured: quay 201,851 → 157,975, drift 206,474 → 185,166, pantanal 224,488 → 210,776.
+Verified by differential (`git stash`, rebuild, same script) from a free camera pointed at
+the changed geometry — `qa/b4-view.js`, `qa/J2A-*.png` after against `qa/J2B-*.png` before
+— and re-certified against `qa/audit-solid.js` and `qa/fuzz.js` (17/17, 0 errors).
+
+### THE AUDIT: THREE GATES, AND ONLY TWO OF THEM DECIDE
+
+`qa/budget.js`. `out.pass` is green when nothing is over the cost gate and nothing is over
+its ratchet ceiling.
+
+1. **Triangles, 130,000** — the Payoff Pass brief's gate. Ten of seventeen are over it and
+   the audit REPORTS rather than fails on it, with the cost beside every chapter that
+   misses. Closing the rest means cutting density where the player is standing, and the
+   same brief forbids visual regressions.
+2. **Cost, 5.5 ms** — milliseconds of real render, and the gate that decides. rAF is pinned
+   to the display, so every chapter reads 16.67 ms and a frame-time measurement says
+   nothing; the only way past vsync is N renders back to back with a `gl.finish()`. The
+   worst chapter in the game is 1.86 ms of a 16.67 ms frame. **The triangle count does not
+   predict this** — a four-to-one spread in cost per triangle, with the two cheapest
+   chapters per triangle among the three largest.
+3. **The ratchet** — a recorded per-chapter ceiling, set at the 26 Aug figure plus 6,000.
+   This is the gate that will catch something: quay went 132,423 → 202,391 in two days of
+   content work and nobody saw it. **The 6,000 of slack is not generosity.** The scatter
+   helpers call unseeded `rand()`, so a chapter re-measures within about ±1,500 run to run,
+   and a gate inside its own noise cries wolf. Raise a line only with a measurement and a
+   reason, in the same commit as whatever needed it.
+
+### MEASUREMENT DISCIPLINE, WHICH BOTH RUNS ARRIVED AT SEPARATELY
+
+`renderer.info` is meaningless with the post chain in place: a read after a frame returns
+the composite quad, 1 call and 1 triangle. Walk the scene instead and respect the whole
+visibility chain (`for (let p = o; p; p = p.parent) if (!p.visible) return`), and multiply
+an `InstancedMesh` by its `count`. `qa/b4-tris.js` is the probe; `qa/b4-cast.js` is the
+same walk restricted to casters.
+
+### FOUND AND NOT TAKEN: EVERY CHAPTER'S GROUND SHEET CASTS A SHADOW
+
+Measured 26 Aug across all seventeen. The single biggest shadow caster in venice, cave,
+kowloon, kyoto, cali, manly, rio, sahara, iceland, goreme and palawan is that chapter's own
+terrain plane, receiving AND casting. Antarctica and the Pantanal already exclude theirs.
+It is the only remaining lever with a real millisecond behind it — kyoto's shadow pass is
+0.88 ms, the largest in the game — and it was not taken because a terrain with genuine
+relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
+separate picture decisions and not one rule, and it needs a screenshot each.
+
 ## THE PAYOFF PASS, BATCH FOUR — THE STEP THAT ALREADY HAPPENED (v27 — 26 Aug 2026)
 
 The five pillars on chapters 12-17 (Palawan, Cappadocia, Manly, the Pantanal, Sơn Đoòng,
