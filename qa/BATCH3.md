@@ -40,7 +40,7 @@ Carried in and available to pillars 2 and 3:
 - [x] qa audits for new invariants (qa/channels.mjs, qa/stillness.js, qa/b3-frame.js)
 - [x] Project memory (capy3-payoff-batch-three)
 - [x] This file as the handover (below)
-- [ ] `playwright-cli close-all`
+- [x] `playwright-cli close-all`
 - [ ] Chain batch 4 (VERY LAST action)
 
 ## Log
