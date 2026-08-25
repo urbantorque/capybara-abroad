@@ -152,5 +152,6 @@ critters: ${critCalls} addCritter calls examined in ${critChapters} of 17 chapte
 if (warns.length) { console.log('\nWARN — a channel a chapter does not have:'); for (const w of warns) console.log('  ~ ' + pad(w)); }
 if (fails.length) { console.log('\nFAIL:'); for (const f of fails) console.log('  x ' + pad(f)); }
 if (!fails.length && !warns.length) console.log('\nchannels: all 17 chapters have one wow row, a grade row, a frameShot and no bare addCritter.');
-console.log(`\n${17 - new Set([...fails, ...warns].map(s => s.split(':')[0])).size}/17 chapters clean · ${fails.length} fail · ${warns.length} warn`);
+const dirty = new Set([...fails, ...warns].map(s => (/^ch (\d+)/.exec(s) || [, '?'])[1]));
+console.log(`\n${17 - dirty.size}/17 chapters carry all three source-visible channels · ${fails.length} fail · ${warns.length} warn`);
 process.exit(fails.length ? 1 : 0);
