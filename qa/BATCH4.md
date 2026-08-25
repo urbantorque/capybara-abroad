@@ -443,3 +443,35 @@ campo all read the same.
 
 **Measurement note:** the scatter helpers call unseeded `rand()`, so a chapter
 re-measures ±1,500 triangles run to run. Any gate needs headroom over that.
+
+### Job 2 closed
+
+`qa/budget.js` is the audit, and it has three gates (`qa/BUDGET.md` carries the
+reasoning): the 130k line from the brief, reported with the cost beside every
+chapter that misses it; a 5.5 ms COST gate, which nothing is within a factor of
+three of; and a RATCHET, a recorded per-chapter ceiling that nothing may grow
+past. `out.pass` is green on cost and ratchet today.
+
+**Ten of seventeen are still over 130k and that is a deliberate stop.** The
+far-field waste is gone — 79k of it, verified by differential — and the rest is
+density where the player is standing. The brief that set the line also forbids
+visual regressions and calls this headroom rather than a crisis, and the worst
+chapter in the game renders in 1.86 ms of a 16.67 ms frame. `qa/BUDGET.md` ranks
+what is left, biggest first, with the reason each one was not taken.
+
+**Found while measuring, not fixed:** the single biggest shadow caster in eleven
+chapters is that chapter's own ground sheet, receiving and casting. Antarctica
+and the Pantanal already exclude theirs. It is the only remaining lever with a
+real millisecond behind it (kyoto's shadow pass is 0.88 ms) and it is eleven
+picture decisions, not one rule — a terrain with 91 m of relief casts shadows a
+player can see. `qa/b4-cast.js` is the probe.
+
+**Housekeeping:** `src/monaco.js`, an unfinished and unreferenced chapter-18
+draft, appeared in the working tree at 08:22 while this batch was running —
+another session is live in this directory. It was swept into one commit by
+`git add -A` and un-tracked again immediately; the file on disk is untouched.
+Every commit after that uses explicit paths.
+
+---
+
+## Job 3 — the release sweep
