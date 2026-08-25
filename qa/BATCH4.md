@@ -148,3 +148,19 @@ when the ground is flat AND when the chapter publishes no `slopeAt` at all — `
 `biome.api()` returns **no keys whatsoever**, so its "on ground its own slopeAt calls flat"
 line was measuring nothing. Same false-equivalence as batch 3's `pf-mischief.js`
 `ownedProps` bug. To be fixed with the rest.
+
+### Job 1 closed — the six chapters
+
+| ch | commit | headline |
+|---|---|---|
+| 13 Cappadocia | `59c1080` | the marquee paid out with the sun 103 m under the valley floor |
+| 17 Antarctica | `7eba995` | the payout fired 208 times and stacked 29 cards through its own marquee |
+| 15 The Pantanal | `fec13b7` | 98.8% of the chapter cast a shadow; the marquee is a LINE shot from astern |
+| 14 Manly | `e2c9a93` | the ceremony ran on every qualifying ride; no pair-chat was possible |
+| 12 Palawan | `8db31c7` | the bloom only ADDED light, so blue rose LEAST when the water lit up |
+| 16 Son Doong | `(this)` | photo mode in the dark kept a thumbnail 41.7% crushed to black |
+
+**Chapter-neutral, and the biggest single finding of the batch:** the idle snap
+could not see the physics step that had already happened, so a parked capybara
+crept down every slope in the game. 15 of 17 chapters now measure exactly zero
+displacement at both stillness sample points.
