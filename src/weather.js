@@ -673,7 +673,24 @@ export function createWeather(game) {
     return clamp(shine() * row.slipK, 0, wxSLIP_MAX);
   }
   function mood() { return row; }
-  function label() { return row.label; }
+  // A CAPTION THAT DOES NOT KNOW THE SUN HAS GONE DOWN. `label()` has exactly
+  // one reader — the photo caption — and Cali's row says 'Valley Warm'. But
+  // Cali's whole second half is at night: `caliNightT` climbs to 1.0 on the
+  // chiva ride, the sky dome, the grade, the fog, the city lights and a find
+  // all read it, and a photograph taken from the mirador at midnight was
+  // captioned Valley Warm. The mood rows are a table of WEATHER; night is the
+  // one thing about a sky that a fixed string cannot carry, so the live biome
+  // is asked whether it has gone dark before the row is trusted.
+  function label() {
+    try {
+      const b = game && game.biome;
+      if (b && b.isActive('cali') && game.cali && typeof game.cali.night === 'function') {
+        const n = game.cali.night();
+        if (typeof n === 'number' && n > 0.55) return 'Valley Night';
+      }
+    } catch (e) { /* a caption is never worth a throw */ }
+    return row.label;
+  }
   function lock() { return row.lock; }
 
   /** The deltas systems.js lays over the atmosphere it has already computed.

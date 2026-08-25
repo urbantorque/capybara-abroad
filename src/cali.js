@@ -2179,8 +2179,30 @@ function caliStepChiva(game, dt) {
       caliVistaT = 0;
       caliTask('chiva-mirador');
       caliBurstSparks(caliChivaX, caliChivaY + 4.4, caliChivaZ, 18, 1.4);
-      if (typeof game.shake === 'function') game.shake(0.12);
-      if (typeof game.sfx === 'function') { game.sfx('chime', { volume: 1 }); game.sfx('strum'); }
+      if (typeof game.punch === 'function') game.punch(0.12);
+      else if (typeof game.shake === 'function') game.shake(0.12);
+      // THE WHOLE RIDE IS MONO: 0 of 70 sfx calls across the 121 s up the hill
+      // pass a position, and these two are the loudest of them. `musSource()`
+      // in this file already proves the chapter knows how to place audio.
+      if (typeof game.sfx === 'function') {
+        const at = { x: caliMIRADOR.x, y: caliMIR_DECK + 1.2, z: caliMIRADOR.z };
+        game.sfx('chime', { volume: 1, at: at });
+        game.sfx('strum', { at: at });
+      }
+      // ---- FRAMED (v26) --------------------------------------------------
+      // The payout is a view, and the view was 128 degrees behind the camera.
+      // Measured at the arrival frame: yaw -45.5, pitch -41.3 (looking DOWN),
+      // dist 10.6 — while the thing the chapter has spent two minutes climbing
+      // toward, the city-light field, lies at yaw +82.6. `skyward()` already
+      // asks for the pitch and the distance and is honoured; the bearing was
+      // the one number nothing could set.
+      //
+      // Seven seconds, which is the length of the existing vista beat before
+      // its five-second ease.
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: 82 * Math.PI / 180, dist: 15,
+                         pitch: 6 * Math.PI / 180, raise: 2.2, hold: 7.0 });
+      }
       if (typeof game.toast === 'function') {
         game.toast('two and a half million people, and every one of them is down there');
       }
@@ -3780,6 +3802,16 @@ function caliInZone(name, x, z) {
     return x > caliCANE.x0 && x < caliCANE.x1 && z > caliCANE.z0 && z < caliCANE.z1;
   }
   if (name === 'river') return Math.abs(z - caliRIVER_Z) < caliRIVER_HZ + 4;
+  // The mirador's own deck — a timber terrace 17.72 m up a hill, and the place
+  // the chapter's marquee is paid out on. It had no zone, so it footfalled as
+  // the 0.82 soil default along with the road and the paseo: the ladder covered
+  // two of this chapter's six surfaces.
+  if (name === 'terrace') {
+    const dx = x - caliMIRADOR.x, dz = z - caliMIRADOR.z;
+    const c = Math.cos(caliMIR_YAW), s = Math.sin(caliMIR_YAW);
+    const lx = dx * c + dz * s, lz = -dx * s + dz * c;
+    return lx > -caliMIR_HX - 1 && lx < caliMIR_HX + 1 && lz > -caliMIR_HZ - 1 && lz < caliMIR_HZ + 1;
+  }
   return false;
 }
 

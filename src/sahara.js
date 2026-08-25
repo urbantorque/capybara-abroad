@@ -98,7 +98,14 @@ const sahCATCH_HOLD = 0.45;         // s inside the catch radius
 // place being faster is worth least. Now it is: nobody can see you, and nobody
 // is breathing down your neck.
 const sahLOSE_NEAR = 8;             // m — closer than this, hidden or not
-const sahLOSE_TIME = 3.0;           // s of it, and you are gone
+// 3.0 WAS UNWINNABLE, AND THE REASON IS STAMINA. A scripted escape opened a
+// 31 m gap deep in the souk and was still caught at 0.5 m: the run blows at
+// 10.0 s and drops the animal to 7.4 m/s — above the pursuers' 5.9 — but three
+// unbroken seconds out of sight is longer than any corner in the souk buys you
+// once you are walking. Two seconds is one corner, which is what the chase is
+// about. The pursuers' speed is deliberately NOT the thing lowered: chasing the
+// last SEEN position is the good part of this set piece.
+const sahLOSE_TIME = 2.0;           // s of it, and you are gone
 const sahSIGHT = 34;                // m — how far a trader can pick you out at all
 const sahCHASE_REARM = 7.0;         // s before they will rise to it again
 
@@ -4581,8 +4588,26 @@ function sahUpdateSurf(game, dt) {
     if (typeof game.record === 'function') game.record('dune-surf', sahSurfBest);
 
     sahToast('a hundred metres of sand at ' + sahSurfBest.toFixed(0) + ' metres a second.');
-    sahSfx('cheer', { volume: 0.85, force: true });
-    if (typeof game.shake === 'function') game.shake(0.18);
+    // 31 sfx sites in this file and NOT ONE passes a position. This is the
+    // loudest of them, and the people cheering are the camp at the foot of the
+    // dune, which is a place.
+    sahSfx('cheer', { volume: 0.85, force: true,
+                      at: { x: sahCAMP.x, y: sahTerrain(sahCAMP.x, sahCAMP.z) + 1.4, z: sahCAMP.z } });
+    if (typeof game.punch === 'function') game.punch(0.18);
+    else if (typeof game.shake === 'function') game.shake(0.18);
+    // ---- FRAMED (v26) -----------------------------------------------------
+    // The payout frame was empty sand: measured at t 8.03 s the rig sat 8.5 m
+    // back and 9.6 m up — a 48-degree downward look at the runout — and the
+    // rendered PNG contains no dune, no horizon, no camp and no sky. A hundred
+    // metres of descent, and at the bottom of it the chapter shows you the
+    // ground you are standing on.
+    //
+    // West of the animal looking back east up the fall line, low, so the
+    // forty-four metre face you have just come down is the whole frame.
+    if (typeof game.frameShot === 'function') {
+      game.frameShot({ yaw: -Math.PI * 0.5, dist: 16, pitch: 8 * Math.PI / 180,
+                       raise: 2.4, hold: 3.5 });
+    }
     // ---- AND THE RUN OUT ---------------------------------------------------
     // A hundred metres of sand and it ended on a toast. Whatever speed the
     // animal arrives at goes into the sand: a fan of spray thrown forward and

@@ -1996,7 +1996,23 @@ const physBIOME_SCATTER = {
   // whole premise is that the ground came off and took a household with it, and
   // that household is drawn all over the chapter (a hearth, a jetty, a drying
   // rack, three offering bowls) — so its loose props are the same household's.
-  drift:     { x: 2, z: 42, r0: 5, r1: 20, props: [['basket', 3], ['cuencobowl', 2], ['mug', 2], ['winebottle', 1], ['esky', 1]] },
+  // ...AND THEY BELONGED TO NOBODY, WHICH IS THE ONE OUTRIGHT MISCHIEF
+  // FAILURE IN THE GAME. Ownership is by where a prop LIVES, inside npcOWN_R =
+  // 11 m of its home. This annulus is centred at (2, 42) and the only walker on
+  // the Shelf is the jetty traveller at (26.4, 32.8) — measured, nearest
+  // home-to-walker 13.7 m, mean 26.8, and **0 of 9 props owned, 0 owners, 0 of
+  // 3 chains**. The Drift's witness chain is deliberately absent (one voice per
+  // island and forty metres of sky between them) and stays absent, so ownership
+  // is the only chain it can have.
+  //
+  // Re-centred on the traveller: 51% of valid spots now land inside 11 m,
+  // against 5%. The croft and lamp at (-13, 33) were the other candidate and
+  // give 0% — the west end of the Shelf has no walker on it at all.
+  //
+  // The esky goes for the hat: 7 of the 9 props were too heavy for the
+  // chapter's own gale (measured, cuencobowl 0.8 kg drifts 4 cm in 40 s; the
+  // esky never moves), and this is the chapter the wind comedy lives in.
+  drift:     { x: 17, z: 33, r0: 2, r1: 7, props: [['basket', 3], ['cuencobowl', 1], ['mug', 2], ['winebottle', 1], ['hat', 1], ['thong', 1]] },
   venice:    { x: -4, z: 13, r0: 4, r1: 22, props: [['winebottle', 2], ['menu', 1], ['coffee', 1], ['camera', 1], ['handbag', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['basket', 1]] },
   kowloon:   { x: 0, z: 34, r0: 4, r1: 22, props: [['chips', 2], ['coffee', 1], ['sign', 2], ['cone', 2], ['bin', 2], ['basket', 1], ['camera', 1]] },
   // ...and no TRAFFIC CONE. There is no road within forty kilometres of that

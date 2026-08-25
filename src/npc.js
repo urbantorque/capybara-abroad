@@ -1910,13 +1910,26 @@ export function createNPCs(game) {
                          'I am going to tell people about this.',
                          'That is going to be somebody’s problem.'];
   const npcLOC_PRAISE_R = 15;    // m. Further than a conversation, nearer than a shout.
+  // ...BUT A MARQUEE IS SHOUTED ABOUT. 15 m is the right distance for stealing
+  // a spritz. It is the wrong distance for the one moment a chapter is for,
+  // which is usually staged in the largest open space the chapter has: measured
+  // in Venice, the nearest local to the centre of San Marco is 16.5 m and only
+  // 41% of the piazza is within 15 m of anybody, so the three locals who were
+  // written `onTask: 'acqua-alta'` lines could not fire them from the natural
+  // place to stand for it. A `wow` row gets forty metres — still inside the
+  // square, and it is the difference between a set piece being witnessed and a
+  // set piece being a toast.
+  const npcLOC_WOW_R = 40;
+  const npcWowIds = {};
+  for (let i = 0; i < TASKS.length; i++) if (TASKS[i].wow) npcWowIds[TASKS[i].id] = 1;
   game.events.on('task:complete', function (e) {
     const id = e && e.id;
     const capy = game.capy;
     const cp = capy && capy.position;
     const live = game.biome && game.biome.current;
     if (!cp || !live || !locals.length) return;
-    let best = null, bd = npcLOC_PRAISE_R * npcLOC_PRAISE_R;
+    const R = npcWowIds[id] ? npcLOC_WOW_R : npcLOC_PRAISE_R;
+    let best = null, bd = R * R;
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
       if (L.biome !== live || L.cd > 0) continue;

@@ -4777,9 +4777,27 @@ function driUpdateLantern(game, dt) {
       driLitT = 12;
       driTask('lantern');
       driToast('there. now the whole sky knows where you are.');
-      driSfx('chime', { volume: 1.0, pitch: 0.62 });
-      driSfx('organ', { volume: 0.5 });
+      // THE TWO LOUDEST CUES IN THE CHAPTER, AND BOTH WERE MONO. 0 of 30
+      // driSfx calls in this file passed a position, in a biome whose whole
+      // subject is distance across empty air.
+      driSfx('chime', { volume: 1.0, pitch: 0.62, at: driLANTERN });
+      driSfx('organ', { volume: 0.5, at: driLANTERN });
       if (typeof game.shake === 'function') game.shake(0.12);
+      // ---- FRAMED (v26) ---------------------------------------------------
+      // The payout frame was a blown-out white wall of paper: the camera sat
+      // 8.0 m from a nine-metre lantern at 61.9 degrees of pitch, so the shot
+      // was seventy per cent lit paper with no sky, no archipelago and not even
+      // the keeper standing 2.4 m away. The lantern is the last thing in the
+      // chapter and it is the only thing you cannot see at it.
+      //
+      // Backed off to 36 m and dropped to ten degrees, looking back down the
+      // arrival route over the plinth. Held seven seconds — long enough for the
+      // beacon front to reach the Shelf 220 m behind you and for the skein,
+      // called six seconds out on the line above, to actually arrive.
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: 168 * Math.PI / 180, dist: 16,
+                         pitch: 10 * Math.PI / 180, raise: 4.5, hold: 7.0 });
+      }
       // AND THE SKY COMES OVER TO LOOK. The crossing runs on a ninety-six
       // second gap of its own, so on most playthroughs the last thing in the
       // chapter happened in an empty sky. Lighting the lantern starts one now,
@@ -5434,6 +5452,14 @@ export function createDrift(game) {
   const api = {
     built() { return driBuilt; },
     terrainHeight: driTerrain,
+    /**
+     * WHAT THE ISLAND UNDER (x, z) IS MADE OF — green, bare or pale, or null
+     * over open air. The footfall ladder in capybara.js had one hard-coded
+     * rectangle for the jetty and gave the other twenty-nine islands grass;
+     * the kinds have been in driISLES since the archipelago was laid out and
+     * nothing outside this file could read them.
+     */
+    islandKind(x, z) { const s2 = driIslandAt(x, z); return s2 ? ((s2.def || s2).kind || null) : null; },
     slopeAt: driSlope,
     waterLevel: driCLOUD_Y,
     isOverWater: driIsOverWater,

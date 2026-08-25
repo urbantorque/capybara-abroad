@@ -818,8 +818,25 @@ function venNavBlocked(x, z, r) {
  *  of a step wherever the tide is actually over the paving. */
 function venSurfacePitch(x, z, y) {
   if (venBoardOut > 0.5 && venOnBoards) return 1.26;
-  if (venIsOverWater(x, z)) return 1.12;
-  if (venInZone('square', x, z)) return 1.02;
+  // `y` WAS DECLARED AND NEVER READ, so anything BUILT over water sounded like
+  // the water. The Rialto's deck is four metres up — measured, y 5.55 — and it
+  // footfalled at 1.12, the wet-canal pitch, in the chapter whose own task is
+  // "Take the Rialto at a run". The gondola prow and the traghetto deck the
+  // same. Sydney's ladder has used a height test for the podium since it was
+  // written; this is that test.
+  const over = venIsOverWater(x, z);
+  if (over && y < venWaterHeightAt(x, z) + 0.5) return 1.12;
+  // ---- AND THE WHOLE DRY CITY WAS ONE FOOTSTEP ---------------------------
+  // Measured across the molo, the calli, a campo, the fondamenta, the café and
+  // the arcades: every one of them 0.98, with the square at 1.02. Four per cent
+  // across a chapter, against Sydney's 0.82..1.22 — and the 1.26 duckboard
+  // branch above is gated on the capy's own latch, so nothing else could ever
+  // reach it. The zones have existed the whole time.
+  if (venInZone('square', x, z)) return 1.06;    // trachyte, laid in bands
+  if (venInZone('calli', x, z)) return 1.16;     // hard, narrow, and it echoes
+  if (venInZone('campo', x, z)) return 1.02;
+  if (venInZone('molo', x, z)) return 0.94;      // worn Istrian, close to water
+  if (venInZone('cafe', x, z)) return 0.78;      // boards and matting
   return 0.98;
 }
 
@@ -3597,8 +3614,30 @@ function venBuildGround() {
  *  at all and it is nearly invisible from the capybara, which holds itself up on
  *  its own analytic backstop. See CONTRACT.md. */
 function venBuildGroundBody(game) {
-  const X0 = -200, Z0 = -100, EL = 4;
-  const NX = 70, NZ = 57;
+  // EL WAS 4, AND A CAPYBARA STANDING PERFECTLY STILL SLID INTO THE LAGOON.
+  //
+  // Measured at the spawn (-4, 13): 2.76 m of +z in sixty seconds with
+  // `body.velocity.z` reading exactly 0.000 the whole time, and 0.046 m every
+  // second, dead steady. Sydney, Kyoto and Rio drift 0.00 m over the same test.
+  // It carries the animal down the ramp into the water, and `capy.loaf` stays
+  // at 1.0 the whole way — so the chapter's answer to standing still was to
+  // loaf and slide into the lagoon at the same time.
+  //
+  // THE ANALYTIC TERRAIN AND THE COLLISION SURFACE DISAGREED. venTerrain is
+  // flat at 1.00 from z 10 to z 15 and then falls off the Molo — 0.98, 0.54,
+  // -0.28, -1.36 over three metres. Sampled every four metres, the nearest
+  // knots either side of the animal are z 12 (1.00) and z 16 (0.54), so the
+  // heightfield triangle it actually stands on is a 6.6-degree ramp four metres
+  // BACK from where the real edge is. `slopeAt` answers 0.003 — flat — so
+  // nothing applies any anti-slide, and Venice's wet paving (slipK 0.40) does
+  // the rest. This is the Antarctic creep, from the opposite cause: judge
+  // stillness by DISPLACEMENT, never by velocity, which read zero throughout.
+  //
+  // A SAMPLE SPACING HAS TO RESOLVE THE SHARPEST FEATURE IT CARRIES. Venice's
+  // is a three-metre quay edge; the other chapters are hills, which is why 5 m
+  // is fine for them and 4 m was not for this one.
+  const X0 = -200, Z0 = -100, EL = 2;
+  const NX = 140, NZ = 114;
   const Z1 = Z0 + NZ * EL;
   const data = [];
   for (let i = 0; i <= NX; i++) {
@@ -4820,6 +4859,26 @@ function venUpdateTide(game, dt) {
       venFloodWin = 0;
       venTask('acqua-alta');
       venToast('the whole square, in about ninety seconds. nobody is surprised but you.');
+      // ---- THE MARQUEE MADE NO SOUND AT ALL --------------------------------
+      // A toast and a completeTask, and nothing else: no cue, no punch, no
+      // camera. The whole of San Marco going under, and the game's response was
+      // a line of text. The chapter is mono besides — 1 of 27 venSfx calls
+      // passes a position — so this one is placed on the water itself.
+      const at = { x: p.x, y: venWaterHeightAt(p.x, p.z), z: p.z };
+      venSfx('splash', { volume: 0.8, pitch: 0.7, at: at });
+      if (typeof game.punch === 'function') game.punch(0.16);
+      // ---- FRAMED (v26) ----------------------------------------------------
+      // Measured mid-piazza at tide 0.62: ninety per cent pavement and one
+      // stray plank. The Basilica, the Campanile and the two columns were all
+      // out of frame — in the one chapter where the ground turning into a
+      // mirror is the entire point, and the mirror had nothing to reflect.
+      //
+      // The camera goes south of the animal so the shot looks north up the
+      // piazza at the Basilica, with the Campanile in the right third.
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: Math.atan2(p.x - venBASILICA.x, p.z - venBASILICA.z),
+                         dist: 16, pitch: 14 * Math.PI / 180, raise: 3.5, hold: 3.6 });
+      }
     }
   }
 }

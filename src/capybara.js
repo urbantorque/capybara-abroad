@@ -888,9 +888,18 @@ function capySurfacePitch(game, env, x, z, y) {
     return 0.82;
   }
   if (b.isActive('cali')) {
+    // TWO OF THIS CHAPTER'S SIX SURFACES. Measured, `inZone` answered nothing
+    // at the spawn, the mirador, the lulada stand, the Gato and the Cristo, so
+    // the chiva road, the mirador's timber deck and the whole paseo all
+    // footfalled as the 0.82 soil default — and the chapter publishes 'cane'
+    // and 'river' zones that the ladder never asked for either.
     const c = game.cali;
-    if (c && c.inZone && c.inZone('dancefloor', x, z)) return 1.24;  // a sprung board floor
-    if (c && c.inZone && c.inZone('street', x, z)) return 1.0;
+    if (c && c.inZone) {
+      if (c.inZone('dancefloor', x, z)) return 1.24;   // a sprung board floor
+      if (c.inZone('terrace', x, z)) return 1.20;      // the mirador's planks
+      if (c.inZone('street', x, z)) return 1.0;
+      if (c.inZone('cane', x, z)) return 0.72;         // trash and soft earth
+    }
     return 0.82;
   }
   if (b.isActive('rio')) {
@@ -924,8 +933,19 @@ function capySurfacePitch(game, env, x, z, y) {
     return 0.82;
   }
   if (b.isActive('drift')) {
-    // grass over a metre of floating rock, and a jetty of very old planks
-    if (x > 14 && x < 32 && z > 32 && z < 36) return 1.26;
+    // ONE HARD-CODED RECTANGLE FOR A CHAPTER OF THIRTY ISLANDS. The rect is
+    // the jetty; everything else answered 0.80 grass — including the anvil,
+    // the arch and two shoals, which are `kind: 'bare'` stone, and the orchard,
+    // the crown and a pebble that are `kind: 'pale'`. So twenty-nine islands
+    // out of thirty had the wrong footfall, and the table saying which was
+    // which has been in drift.js since the archipelago was laid out.
+    if (x > 14 && x < 32 && z > 32 && z < 36) return 1.26;   // the jetty planks
+    const d = game.drift;
+    if (d && typeof d.islandKind === 'function') {
+      const k = d.islandKind(x, z);
+      if (k === 'bare') return 1.04;      // dry stone with nothing on it
+      if (k === 'pale') return 0.86;      // the crumbly pale rock
+    }
     return 0.80;
   }
   if (b.isActive('sahara')) {

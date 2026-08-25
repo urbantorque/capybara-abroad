@@ -13913,6 +13913,14 @@ export function createSystems(game) {
     if (sahT > 0.002) {
       thr -= duskT * sahT * 0.50; bloom += duskT * sahT * 0.26;
       sat -= stormT * sahT * 0.22; vig += stormT * sahT * 0.16;
+      // ...AND THE CHAPTER'S OWN MARQUEE MOVED NONE OF IT. The row above keys
+      // only on dusk and the storm, both of which are weather; bloom measured
+      // 0.380 before the dune-surf payout, 0.380 at it and 0.380 for the second
+      // after. A hundred metres of white sand at eighteen metres a second is
+      // the brightest thing that happens in this chapter.
+      if (B.isActive('sahara') && game.sahara && game.sahara.surfing && game.sahara.surfing()) {
+        bloom += sahT * 0.20; sat += sahT * 0.05;
+      }
     }
     if (venT > 0.002 && B.isActive('venice') && game.venice) {
       // a flooded piazza is a mirror, and a mirror is a light
