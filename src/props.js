@@ -2028,8 +2028,26 @@ const physBIOME_SCATTER = {
   // square at ten past five has tea glasses, clay from Avanos and baskets on it.
   goreme:    { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 3], ['mug', 2], ['hat', 1], ['cone', 1], ['sign', 1], ['bin', 1]] },
   manly:     { x: 0, z: 46, r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['frisbee', 1], ['hat', 1], ['sunglasses', 1], ['deckchair', 1], ['bin', 1]] },
-  pantanal:  { x: 0, z: 62, r0: 5, r1: 24, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]] },
-  cave:      { x: 0, z: 62, r0: 5, r1: 22, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
+  // ---- THE DRIFT’S FAILURE, TWICE MORE, AND FOUND THE SAME WAY --------
+  //
+  // Ownership is by where a prop LIVES: npcOWN_R = 11 m from its home. Both of
+  // these annuli were centred on the SPAWN, which in a chapter whose people
+  // are somewhere else is a guarantee that nothing is owned by anybody.
+  //
+  // PANTANAL, measured: 0 of 9 props owned, 0 owners. Nearest walker to each
+  // prop home 24.4 / 29.4 / 31.4 / 33.4 / 38.0 / 48.3 / 48.8 / 50.2 / 53.8 m.
+  // The only walkers in the chapter are the fazenda three, and the fazenda is
+  // where a basket of maize, an esky and a bin belong anyway — a spawn on open
+  // campo is not a household.
+  //
+  // SON DOONG, measured: 8 movable props all landed at z in [45, 82], the
+  // nearest local is at (12, 33), and the closest prop-to-person distance was
+  // 15.0 m — over the radius, so 0 owned. The people down here are the SURVEY
+  // CAMPS, which is also the only place in a cave where anybody’s belongings
+  // would be: a bin, a sign, a camera and an esky are expedition kit, and they
+  // are meant to be somebody’s.
+  pantanal:  { x: 30, z: 77, r0: 3, r1: 13, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]] },
+  cave:      { x: 20, z: -41, r0: 3, r1: 13, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
   antarctic: { x: 0, z: 52, r0: 5, r1: 24, props: [['esky', 1], ['bin', 1], ['sign', 2], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]] },
 };
 const physBiomeScattered = {};   // biome name -> true, so re-entry never doubles up

@@ -2987,9 +2987,51 @@ function sysEl(tag, cls, text) {
   if (text != null) e.textContent = text;
   return e;
 }
+/**
+ * TURN CASTING ON FOR A SUBTREE — AND LEAVE ALONE THE THINGS THAT SAID NO.
+ *
+ * This used to be an unconditional `n.castShadow = true` over every mesh it
+ * could reach, and a biome calls it on its own root as the very last thing its
+ * build does. So EVERY `castShadow = false` written anywhere in a chapter file
+ * was silently undone about four lines later. Rio noticed and wrote its own
+ * repair pass; Göreme copied it; nobody else did, and the two who did had to
+ * remember to run it AFTER this.
+ *
+ * What it costs is not abstract. Measured across the seventeen chapters at
+ * spawn, visible meshes only:
+ *   pantanal  222,730 of 225,526 triangles casting — 98.8%
+ *   venice    179,354 of 181,814 — 98.6%
+ *   cave      156,824 of 158,516 — 98.9%
+ *   kowloon   151,614 of 154,058 — 98.4%, of which 36,144 are TRANSPARENT
+ * and the shadow pass is the most expensive thing this renderer does. In the
+ * Pantanal the four meshes that must not cast are 73,322 triangles — a third
+ * of the shadow budget — and two of them (the grass tufts and the hyacinth)
+ * had `castShadow = false` on the line that made them.
+ *
+ * It is also a PICTURE bug, not only a cost. A transparent sheet casts as if
+ * it were solid: the Pantanal’s flood water is 260 x 232 m at y = 0.3 and it
+ * was laying a hard shadow on everything under it, which is the same fault as
+ * Palawan’s water sheet shadowing the whole reef and Rio’s eighty metres of
+ * surf shadowing the sea it was breaking on.
+ *
+ * TWO WAYS TO SAY NO, and both of them are things the codebase already had:
+ *   `userData.noShadow` — an explicit refusal, used by the Drift’s island
+ *     keels and Göreme’s headlight wedges since before this existed.
+ *   a GHOST MATERIAL — transparent, depthWrite off, or additive. Nothing you
+ *     can see through has an honest silhouette to cast, and there is no case
+ *     in seventeen chapters where one should.
+ *
+ * Everything else is turned on exactly as before, so a chapter that never
+ * thought about this is unchanged to the triangle.
+ */
 function sysEnableShadows(o3d) {
   o3d.traverse(function (n) {
-    if (n.isMesh) n.castShadow = true;
+    if (!n.isMesh && !n.isInstancedMesh) return;
+    if (n.userData && n.userData.noShadow) return;
+    const m = Array.isArray(n.material) ? n.material[0] : n.material;
+    if (m && (m.transparent || m.depthWrite === false ||
+              m.blending === THREE.AdditiveBlending)) return;
+    n.castShadow = true;
   });
 }
 // A JOURNEY IS HOURS LONG AND THIS ONLY EVER COUNTED MINUTES. Seventeen

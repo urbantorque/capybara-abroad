@@ -639,6 +639,17 @@ function panSurfacePitch(x, z, y) {
   }
   if (panOnRoad(x, z) > 0.2) return 0.94;      // packed dirt
   if (panAntCarrying) return 0.78;
+  // ---- ...AND THREE OF THE CHAPTER'S OWN NAMED GROUNDS FELL THROUGH -------
+  // A surface ladder must ask the chapter where things are (v25, the Quay) and
+  // this one asked about two of six. Measured with api.surfacePitch: the
+  // SANDBAR — which is the ground the caiman-nap task happens on, and the only
+  // bright thing in the chapter from a hundred metres — read 0.68 wet grass,
+  // as did the CAMALOTE MATS, which are the ground the camalote task happens
+  // on, and the FAZENDA YARD, which is swept dirt with three people standing
+  // on it. Every one of those already has a test written for something else.
+  if (panInZone('sandbar', x, z)) return 1.05;   // dry river sand
+  if (panMatAtXZ(x, z)) return 0.60;             // a raft of vegetation, over water
+  if (panInZone('fazenda', x, z)) return 0.90;   // swept, packed, walked on daily
   return 0.68;                                  // wet grass, which eats a footfall
 }
 
@@ -734,7 +745,7 @@ function panBuild(game) {
                 'gather': ['They have gone with you. Just like that. Just like that!'],
                 'tamandua': ['On the tamandua. It has not noticed. It never notices.'],
                 'missing-plank': ['You went over the gap. The truck still cannot.'] } });
-    put('cattleman', panCROSS.x + 5, panCROSS.z0 + 6, {
+    put('cattleman', panCROSS.x + 1, panCROSS.z0 + 6, {
       face: 0.2,
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       lines: ['They go over here. Same place every evening.',
@@ -939,6 +950,10 @@ function panBuildGround(game, root) {
   g.computeVertexNormals();
   const m = new THREE.Mesh(g, panVCG());
   m.receiveShadow = true;
+  // THE FLOOR DOES NOT CAST. 13,904 triangles of terrain in the shadow map,
+  // producing a shadow of the ground ON the ground: nothing but acne along
+  // every slope in the chapter. Receiving is all it ever needed to do.
+  m.userData.noShadow = true;
   m.frustumCulled = false;
   root.add(m);
 }
@@ -1579,6 +1594,7 @@ function panBuildLilies(root) {
     const wm = new THREE.Mesh(W.build(), panVC());
     wm.receiveShadow = true;
     wm.castShadow = false;
+    wm.userData.noShadow = true;   // floating litter, lying on the water it sits on
     wm.renderOrder = 1;
     root.add(wm);
   }
@@ -2075,7 +2091,11 @@ function panBuildGrass(root) {
   const N = NX * NZ * PER_HI;           // the pool. n is what is used.
   const mesh = new THREE.InstancedMesh(M.build(), panVCL(), N + 220);
   mesh.frustumCulled = false;
+  // 42,860 triangles of grass, and this line was undone four lines after the
+  // build finished. See sysEnableShadows — noShadow is how a mesh says it means
+  // it. A tuft's shadow is its own shadow acne and nothing else.
   mesh.castShadow = false;
+  mesh.userData.noShadow = true;
   let n = 0;
   {
     for (let gz = 0; gz < NZ; gz++) {
@@ -3852,6 +3872,19 @@ function panUpdateCattle(game, dt) {
     if (c.look > 0) {
       c.look -= dt;
       c.yaw = dampAngle(c.yaw, Math.atan2(c.lx - c.x, c.lz - c.z), 2.6, dt);
+    } else if (panFollowing >= 3 && !c.pen) {
+      // ...AND A LINE OF NINE CAPYBARAS IS SOMETHING TO LOOK AT. Same argument
+      // as the jacares above: the herd is the chapter's toy and nothing in the
+      // world had ever noticed it. Only the loose cattle — the eleven in the
+      // corral have a fence and a peão between them and the campo — and only
+      // the leader is tracked, because seventeen cows swinging their heads
+      // along a moving column one animal at a time is a wave, and a wave is
+      // what a herd going past actually looks like from a pasture.
+      const hd = Math.hypot(c.x - panHerd[0].x, c.z - panHerd[0].z);
+      if (hd < 22 && panHerd[0].st === 'follow') {
+        c.look = rand(1.6, 3.2);
+        c.lx = panHerd[0].x; c.lz = panHerd[0].z;
+      }
     }
     const y = panBedH(c.x, c.z);
     const bob = c.moving ? Math.abs(Math.sin(panTime * 4 + c.ph)) * 0.045
@@ -3897,6 +3930,27 @@ function panUpdateCaimans(game, dt) {
       // impossible — that task is on the eight on the sandbar, and they only
       // go if you come at them across open sand rather than off the water.
       if (dx * dx + dz * dz < 18 && p.y < c.y0 + 0.6) c.slide = rand(3.4, 5.0);
+      // ---- AND NINE OF THEM GO PAST AND NOTHING HAPPENS --------------------
+      //
+      // The chapter's signature toy is the LINE — a herd recruited one animal
+      // at a time and led across a river — and `panHerd` was read by exactly
+      // three things: the herd's own updater, the wheek, and the task check.
+      // Nothing in the world knew the line existed. Fourteen jacares, seventeen
+      // nelore, five otters and thirteen egrets all already carry a reaction
+      // driven by an (x, z) the player supplies, and a column of nine capybaras
+      // filing past two metres away fired none of them.
+      //
+      // Tighter than the player's radius and deliberately: a jacare that has
+      // already let one capybara past is not going to bolt at the fourth. It
+      // takes a near miss, which is what walking your herd THROUGH them is.
+      if (c.slide <= 0 && panFollowing > 0) {
+        for (let k = 0; k < panHERD_N; k++) {
+          const r = panHerd[k];
+          if (r.st !== 'follow') continue;
+          const hx = c.x - r.x, hz = c.z - r.z;
+          if (hx * hx + hz * hz < 7.3) { c.slide = rand(2.8, 4.4); break; }
+        }
+      }
     }
     let y = c.y0, pitch = 0, roll = 0;
     if (c.slide > 0) {
@@ -4348,11 +4402,32 @@ function panUpdateTasks(game, dt) {
       const r = panHerd[i];
       if (r.st !== 'follow') continue;
       panRipple(r.x, r.z, 0.75);
+      // ...AND EACH SHAKE COMES FROM THE ANIMAL THAT SHOOK. Nine capybaras
+      // spread up to 26 m back along the bank, and all nine splashes arrived
+      // from the same point, which is nowhere. `panSfx` is a shared options
+      // object, so placeCue writes into the same one and nothing is allocated
+      // in a loop that runs every crossing.
       panSfx.volume = rand(0.14, 0.26); panSfx.pitch = rand(0.8, 1.2);
-      game.sfx('splash', panSfx);
+      game.sfx('splash', placeCue(panSfx, r.x, panWATER, r.z, 60));
     }
     panShakeT = 2.4;
     game.shake(0.22);
+    // ---- FRAMED. THE MARQUEE IS A LINE, AND IT WAS SHOT DOWN A BACK ----
+    //
+    // Measured at task:complete on a real keyboard crossing: the rig sits
+    // dead astern (yaw -3.7 degrees), 8.12 m out, raised 7.50 m and pitched
+    // 42.7 degrees DOWN — a top-down plate of mud and the animal’s back,
+    // with ONE of five followers in the frame. Follower n trails
+    // panFOLLOW_GAP * (n + 1), which is 15.6 m at five and 26.0 m at nine, so
+    // the one thing this moment is about is a LINE, and a line has to be shot
+    // from the side.
+    //
+    // The flow is +x (see panFlowAt), so a bearing of +1.90 rad puts the lens
+    // downstream and broadside, near the waterline rather than over it, with
+    // the whole herd across the frame. Held 4.2 s to cover panShakeT’s 2.4
+    // and the settle after it.
+    if (typeof game.frameShot === 'function')
+      game.frameShot({ yaw: 1.90, dist: 16, pitch: 0.12, raise: 1.9, hold: 4.2 });
     // ---- AND THE TWO PEOPLE WHO WATCHED IT HAPPEN ---------------------
     // The chapter's wow, and until now the cattleman standing at the crossing
     // — whose entire reason for existing is that he watches this happen every
@@ -4370,7 +4445,7 @@ function panUpdateTasks(game, dt) {
        'Capybara, one, leading. I do not have a column for leading.'],
       ['Quietly. It is nearly dark and everything is settling.']);
     panSfx.volume = 0.42; panSfx.pitch = rand(1.0, 1.2);
-    game.sfx('wheek', panSfx);
+    game.sfx('wheek', placeCue(panSfx, p.x, panWATER + 0.4, p.z, 70));
     panCrossT = 0; panCrossN = 0;
   } else if (!inRiver && p.z > panRIVER.z1 + 4) {
     panCrossT = 0; panCrossN = 0;
