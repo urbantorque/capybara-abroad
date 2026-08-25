@@ -78,7 +78,13 @@ async page => {
         }
       }
       const A = owners.size >= 1, B = edible >= 1 && L.length >= 1, C = pairsNear >= 1
-      return { locals: L.length, walkers: walkers.length, ownedProps: pairs.length,
+      // nProps IS NOT COSMETIC. Without it, "0 owned props" and "this chapter's
+      // props had not been scattered when I looked" are the same number, and on
+      // 25 Aug 2026 they were: Kyoto read 0/0 here and 3 owners at 3.8 m when
+      // measured on its own. An adoption count with no population count behind
+      // it cannot tell adoption from an empty room.
+      return { locals: L.length, walkers: walkers.length, nProps: props.length,
+               ownedProps: pairs.length,
                owners: owners.size, edible, pairsNear,
                chains: (A ? 1 : 0) + (B ? 1 : 0) + (C ? 1 : 0),
                A, B, C, sample: pairs.slice(0, 5) }
