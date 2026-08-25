@@ -114,3 +114,37 @@ Structural offenders already visible from the top-14 per chapter:
   1,400 + 950 twelve-tri boxes.
 - **venice / cave / kowloon / kyoto / cali / manly / rio** — 97-99% of every triangle
   casts a shadow, so the shadow pass re-renders essentially the whole chapter.
+
+### Chapter-neutral finding, found while re-running batch 3's stillness audit
+
+**NPC STEERING HAS NO TERM FOR THE PLAYER, SO A WALKER BULLDOZES A PARKED CAPYBARA.**
+This is what batch 3 handed forward as "Pasto drifts 28.32 m on ground its own `slopeAt`
+calls flat". It is not the ground.
+
+Measured (`qa/b4-pasto.js` … `qa/b4-pasto4.js`), Pasto at spawn+(9,9), no input, 60 s:
+
+- The animal is displaced **4.30 m, 12.29 m and 28.86 m on three runs of the same build** —
+  the spread is the parade's phase, not noise in the physics.
+- Throughout, the nearest body is a **kinematic (type 4, mass 0) box, halfExtents
+  0.18 x 0.30 x 0.34, `userData.npc`, moving at 1.83–1.91 m/s**, holding station
+  0.95–1.07 m away. Nineteen kinematic bodies in the chapter; two of them run this route.
+- `capy.frame` is **null** the whole time — the animal is not being CARRIED through the
+  reference-frame channel, it is being shoved by narrowphase, which is the channel
+  `capy3-external-forces-on-the-capybara` says a body must never be moved through.
+- `body.velocity` reads 0.000 at the moment of several of the steps, so a velocity-based
+  stillness test cannot see this at all. Displacement can. `capy.loaf` sat at 0.99.
+
+Cause: `npc.js:2578 navBlocked()` forwards only to `game.env.navBlocked` — **static world
+geometry**. `steerTo` (npc.js:3175) probes 1.4 m ahead against that and dodges through
+`npcAVOID_TRIES`, so a walker steers around a building and walks straight through the
+player. The collider is `collisionFilterMask: -1`, so it wins.
+
+Not Pasto-specific: any NPC route that crosses where the player is standing does this.
+Fix belongs in `npc.js`, gated OFF for the states that are supposed to reach the player
+(chase / flee / cornered / praise / chat), reusing the existing dodge machinery.
+
+**And the audit that found it under-reports.** `qa/stillness.js` prints `slopeAt 0` both
+when the ground is flat AND when the chapter publishes no `slopeAt` at all — `pasto`'s
+`biome.api()` returns **no keys whatsoever**, so its "on ground its own slopeAt calls flat"
+line was measuring nothing. Same false-equivalence as batch 3's `pf-mischief.js`
+`ownedProps` bug. To be fixed with the rest.
