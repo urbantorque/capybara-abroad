@@ -532,9 +532,23 @@ function cavInZone(name, x, z) {
 }
 function cavNavBlocked(x, z, r) { return cavIsOverWater(x, z); }
 /** < 0.9 soft, ~1.0 stone, > 1.15 hollow timber. It is a cave: it is stone. */
+/**
+ * FOUR ROWS FOR TWO HUNDRED AND FIFTY METRES OF CAVE, AND NINE LANDMARKS.
+ *
+ * A surface ladder must ask the chapter where things are (v25, the Quay), and
+ * this asked about two places. Everything else — the river gravel, the guano
+ * floor under the roost, the pearl rimstone, the phytokarst fins in the slot —
+ * fell through to 1.0, bare rock, in the chapter whose whole subject is what
+ * the ground sounds like when you cannot see it. Every zone below is one the
+ * chapter already publishes.
+ */
 function cavSurfacePitch(x, z, y) {
   if (z > cavMOUTH_Z) return 0.82;                   // leaf litter, outside
   if (cavInZone('doline', x, z)) return 0.86;        // and under the hole
+  if (cavInZone('river', x, z)) return 0.92;         // wet gravel, and it grinds
+  if (cavInZone('roost', x, z)) return 0.70;         // guano, deep and soft
+  if (cavInZone('pearls', x, z)) return 1.18;        // rimstone, and it is hollow
+  if (cavInZone('phyto', x, z)) return 1.12;         // phytokarst, sharp and dry
   if (Math.abs(z - cavWALL.z) < 16) return 1.08;     // calcite rings
   return 1.0;
 }
@@ -2914,7 +2928,7 @@ function cavBuildCamp(game, root) {
     const h = cavTerrain(x, z);
     if (cavIsOverWater(x, z)) {
       console.warn('[cave] local at', x, z, 'is in the river (' + h.toFixed(2) + ') - skipped');
-      return;
+      return null;
     }
     o.biome = 'cave'; o.x = x; o.z = z; o.y = h;
     if (o.near === undefined) o.near = 9;
@@ -3050,7 +3064,7 @@ function cavBuildCamp(game, root) {
                          'Slow. Slow is fast in here.'];
 
   // 1 & 2 — the camp, under the hole
-  put(cx + 3.4, cz + 4.0, {
+  const cavLocCamp = put(cx + 3.4, cz + 4.0, {
     face: 2.4, kit: 'survey',
     figure: { shirt: PALETTE.cavTentB, hat: PALETTE.cavTent, legs: PALETTE.cavRockDk },
     lines: ['Second camp. We are two days in and one day out.',
@@ -3086,7 +3100,7 @@ function cavBuildCamp(game, root) {
              'Right. Yes. That is new.'],
     startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
-  put(cx - 1.4, cz - 5.4, {
+  const cavLocMap = put(cx - 1.4, cz - 5.4, {
     face: 1.0, kit: 'pot',
     figure: { shirt: PALETTE.cavJungleLt, legs: PALETTE.cavRockWarm, hat: PALETTE.cavRope },
     lines: ['Boil it. Everything. Even in here. Especially in here.',
@@ -3268,6 +3282,23 @@ function cavBuildCamp(game, root) {
              'Do that outside. It is better outside.'],
     startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
+
+  // ---- AND THE TWO IN THE CAMP TALK TO EACH OTHER --------------------
+  // NO PAIR-CHAT ANYWHERE IN CHAPTER 16: `addExchange` occurs zero times in
+  // this file, against seven in Marrakech and five each in Iceland, Rio,
+  // Kyoto, Kowloon, Cappadocia and Cali. Seven people down here and not one
+  // of them had ever spoken to another. These two share a tent under the
+  // hole and have been underground for two days.
+  if (typeof game.addExchange === 'function' && cavLocCamp && cavLocMap) {
+    game.addExchange({ biome: 'cave', a: cavLocMap, b: cavLocCamp, gap: 32, lines: [
+      ['Is that on the survey?', 'Nothing is on the survey. That is why we are here.'],
+      ['What is the ceiling here?', 'Two hundred. Give or take a hundred.'],
+      ['Something went past the tent.', 'Something goes past the tent every night.'],
+      ['Battery?', 'Forty per cent. Do not ask again until tomorrow.'],
+      ['I can hear the river from here.', 'You can hear the river from everywhere.'],
+      ['Day two.', 'Day two of eight. Do not do that.'],
+    ] });
+  }
 }
 
 function cavBuildRiver(root) {
@@ -4212,6 +4243,25 @@ function cavUpdateTasks(game, dt) {
     if (!cavSeenLight) {
       cavSeenLight = true;
       game.toast('there is a forest in here.');
+      // ---- FRAMED, AND THE BEARING IS THE ONLY ONE THAT SURVIVES ------
+      //
+      // Two runs of the identical approach to this spot settled the camera at
+      // yaw 0.0 and yaw 179.7 — OPPOSITE SIDES of the animal, from the same
+      // walk — so the chapter’s marquee had no bearing at all, only whichever
+      // way the rig happened to be pointing when you arrived.
+      //
+      // AND THE HOLE ITSELF CANNOT BE IN THE SHOT. It sits 61 to 86 degrees
+      // above the stand point, and the lens is 48 degrees wide: the one frame
+      // that contained the hole needed a look pitch of +65.7 and had no
+      // capybara in it. What can be in the shot is the LIT FLOOR — a hundred
+      // and fifty metres of forest growing under a hole in a mountain, with
+      // the animal standing in the one patch of daylight for a mile.
+      //
+      // yaw 0 is the approach axis, and it is the only bearing that keeps its
+      // length: asking for 0.55 rad collapsed the boom from 16 m to 3.3 m
+      // against the doline wood.
+      if (typeof game.frameShot === 'function')
+        game.frameShot({ yaw: 0, dist: 16, pitch: 0.02, raise: 3, hold: 3.2 });
     }
     cavTask(game, 'the-doline');
     // the score holds up for the whole time you are standing in it, the way
