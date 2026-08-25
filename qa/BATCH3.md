@@ -26,20 +26,20 @@ Carried in and available to pillars 2 and 3:
 ## Per-chapter checklist (five pillars)
 
 - [x] **4 Kyoto** — DONE (afe5326): 67-fire marquee latched, framed, positional, lit, surface ladder, minimap, dango, heron reads the stones
-- [ ] **5 Cali** — 1 · 2 · 3 · 4 · 5
+- [x] **5 Cali** — DONE (b71bd6f): marquee framed 128 deg off, mono ride, 2-of-6 surfaces, night caption
 - [x] **6 Rio** — DONE (d0ac791): localWater, kiosk gate + ladder, framed/punched/positional, lit, arches zone, icecream, rioClap
 - [x] **7 Iceland** — DONE (93d4109): aurora was BEHIND THE CAMERA, snowcat catchable, moraine footfall, 174 m exchange
-- [ ] **8 Marrakech** — 1 · 2 · 3 · 4 · 5
-- [ ] **9 The Drift** — 1 · 2 · 3 · 4 · 5
-- [ ] **10 Venice** — 1 · 2 · 3 · 4 · 5
-- [ ] **11 Hong Kong** — 1 · 2 · 3 · 4 · 5
+- [x] **8 Marrakech** — DONE (b71bd6f): empty-sand payout framed, surf lights the grade, 31 mono cues, souk-escape winnable
+- [x] **9 The Drift** — DONE (b71bd6f): ownership 0 -> 6 props, thirty islands got a footfall, the paper wall reframed
+- [x] **10 Venice** — DONE (b71bd6f): the idle slide into the lagoon, the Rialto sounded like the canal, a silent marquee
+- [x] **11 Hong Kong** — DONE (d60157a): the climb reaches 34.36 (was 33.36); the roof LANDING is still open, see the handover
 
 ## Finish
 
-- [ ] CONTRACT.md new version section
-- [ ] qa audits for new invariants
-- [ ] Project memory
-- [ ] This file as the handover
+- [x] CONTRACT.md new version section (v26, two parts)
+- [x] qa audits for new invariants (qa/channels.mjs, qa/stillness.js, qa/b3-frame.js)
+- [x] Project memory (capy3-payoff-batch-three)
+- [x] This file as the handover (below)
 - [ ] `playwright-cli close-all`
 - [ ] Chain batch 4 (VERY LAST action)
 
@@ -108,3 +108,89 @@ a shot belongs to) and a 2.2 s hold must not become 3.5 s. That is the same rule
 `sysSAVE_DEBOUNCE` was found breaking in v23.
 
 Chapters opt in per marquee below.
+
+---
+
+# THE HANDOVER — batch 3 closed, 26 Aug 2026
+
+All eight chapters done. `CONTRACT.md` §v26 has the full account; this is what batch 4
+needs to know.
+
+## What landed
+
+| commit | what |
+|---|---|
+| `2b2fb26` | `game.frameShot()` — *framed* became a channel a chapter can opt into |
+| `52fd1ba` | `qa/channels.mjs` — three of the four channels, audited with no browser |
+| `afe5326` | **4 Kyoto** — the 67-fire marquee, the sand default under Uji, the heron |
+| `d0ac791` | **6 Rio** — `localWater`, the kiosk gate and its coin-flip ladder |
+| `93d4109` | **7 Iceland** — the aurora was behind the camera |
+| `d60157a` | **11 Hong Kong** — the roof deck's lip stopped the climb |
+| `b71bd6f` | **5 Cali · 8 Marrakech · 9 the Drift · 10 Venice** |
+| `(qa)` | `qa/stillness.js` — displacement, not velocity, in 17 chapters |
+
+The last four share edits in `capybara.js`, `props.js`, `systems.js` and `npc.js`, so they
+landed together rather than leaving the tree half-changed between commits.
+
+## Open, measured, and handed to batch 4
+
+1. **KOWLOON'S ROOF IS STILL UNREACHABLE.** The climb now gets to **34.36 m** (was 33.36,
+   stuck for forty seconds) but the animal tops out in open air **0.65 m east of the deck
+   edge** and cannot move west onto it: the scaffold's colliders fill the bay to its full
+   height and there is no way to step off a lattice sideways. `symphony` is NOT blocked —
+   it tests height and ticks from the cling at 73.7 s — but the hut, the pigeon loft, the
+   aerials and the chair up there are dressed for nobody. **Do not** lower `hkSCAF.top` to
+   start the shove earlier; tried, and the peak drops to 34.09.
+2. **`qa/stillness.js` FLAGS THREE CHAPTERS OUTSIDE THIS BATCH.** Pasto drifts 2.71 m at
+   its spawn and **28.32 m at spawn+(9,9)**, both on ground `pastoSlope` calls flat — so
+   either the ground moves or `slopeAt` lies, and both are worth knowing. Cave drifts
+   1.33 m on a 3° floor. The Drift's 4.39 m at spawn+(9,9) may be a fall off the Shelf
+   rather than a slide; the audit prints `fell` so you can tell.
+3. **ICELAND'S RIDE BACK IS IN THE WRONG PLACE.** The hold radius is now 58 m and the cap
+   26 s, so the snowcat is still there when you arrive — but **every glacier run finishes
+   at x ≈ −20 and the cat's track is x = 34**, so the toll is still a 54 m cross-moraine
+   walk. Relocating the track onto the fall line moves the beacon, the headlights, the
+   packed-snow ramp meshes and the fox's orbit centre with it (they all derive from
+   `iceCAT_X`), which is why it was not done here.
+4. **ONLY 5 OF 17 CHAPTERS REGISTER A CRITTER** — quay, kyoto, iceland, manly, goreme. So
+   batch 1's calm inversion, the payoff of stillness as a verb, has nothing to invert in
+   twelve chapters. Cali, Rio, Venice, Kowloon and Marrakech have **no ground animal
+   drawn** to register, so this needs content, not a flag. `qa/channels.mjs` prints the
+   count every run.
+5. **ROOM TONE IS KEYED PER BIOME, NOT PER SPACE** (`sysROOMS`, systems.js ~5839). Venice
+   has fifty metres of colonnade down each side of the square and a floor that turns into
+   a hard reflective sheet, and the reverb never moves. Global; Venice is where it costs
+   most.
+6. **FIVE CHAPTERS STILL HAVE NO ROW IN THE EVENT GRADE LAYER** — sydney, pasto and quay
+   (recorded in v25), and now goreme and cave carry theirs, so run `qa/channels.mjs` for
+   the live list. Kyoto and Rio were fixed here.
+7. **THE DRIFT AND SƠN ĐOÒNG CARRY ONE MISCHIEF CHAIN, NOT TWO**, and correctly so — both
+   are written around one voice per place with forty metres between them. The Drift's
+   ownership chain works now (0 owned → 6). Its witness chain must stay absent.
+8. **PERFORMANCE.** Nothing in this batch added net geometry to the Drift (201,886) or
+   Kowloon (130,390). Rio gained one crate and Kyoto gained two dango, neither of which is
+   on the over-budget list. Venice's collision heightfield went from 4,118 samples to
+   16,215 — that is collision data, not triangles, but it is worth a line in job 2's
+   measurement.
+
+## Traps this batch paid for
+
+- **`yaw` is the bearing FROM the animal TO the camera**, not the direction it looks.
+  Writing 0 where π belonged put 0 of 336 aurora vertices in frame — the exact bug being
+  fixed, reintroduced by a sign.
+- **A one-shot payout needs a state meaning ALREADY PAID**, not the value its clock idles
+  at. Kyoto's `-1` meant both.
+- **The mischief adoption counts are not stable between runs.** The scatter is randomised
+  at build: Cali measured 3, then 0, then 2 owned across three runs of the same build with
+  no source change. Take the best of three or seed the scatter — a single run cannot
+  certify adoption, in either direction.
+- **A probe that measures nothing looks exactly like a probe that passes.** The first
+  Kyoto latch probe returned 0 payouts because it never armed the run. Assert on the
+  SETUP, not only on the result.
+- **Writing patch scripts through Bash heredocs cost real time here** — a heredoc ate one
+  backslash of each pair and turned `\b` into a literal backspace, which is v24's own
+  `qa/verbs.mjs` bug reproduced while writing the audit that exists to catch that class.
+  Use the Edit tool, or Write the script and then run it. Note `src/systems.js` is CRLF
+  and most biome files are LF.
+- **`playwright-cli screenshot` does not take a path argument.** It writes into
+  `.playwright-cli/` and prints the name; copy it out afterwards.
