@@ -49,11 +49,11 @@ shows 3 figures whose images DECODE at 288x180; Escape closes and unpauses;
 `lastError` null. Title card: 1 of 17 tiles carries the photo, the other 16
 correctly fall back to their authored marks.
 
-### Job 3 — the first hour
-- [ ] Measure fresh-save Sydney: time to each verb, hint cadence, first find,
+### Job 3 — the first hour  DONE
+- [x] Measure fresh-save Sydney: time to each verb, hint cadence, first find,
       first travel unlock, first ceremony
-- [ ] Re-sequence hints and surfacing so every core verb lands inside 10 min
-- [ ] NO new tasks — re-hint and re-order only
+- [x] Re-hinted (re-ordering was the wrong tool - see below) so every core verb lands inside 10 min
+- [x] NO new tasks — re-hint and re-order only
 
 ### Job 4 — the five pillars on chapters 1-3
 Sydney · Pasto · Circular Quay
@@ -174,3 +174,56 @@ title card in ONE session. This is a sibling of harness traps 8 and 10 in
 `qa/PF2-lawn2.png` (the seventeen staged) · `qa/PF2-approach.png` (loafing among
 them) · `qa/PF2-album.png` (the album card) · `qa/PF2-picker.png` (the title
 picker, Sydney's tile carrying the player's own photograph).
+
+## JOB 3 — THE FIRST HOUR
+
+**MEASURED, on a fresh save, live.** The opening window is four rows —
+`wheek` / `steal-hat` / `coffee-spill` / `picnic-thief` — and only the pinned
+row shows a clue. So a new player is told **Q** explicitly, **E** and a "run"
+obliquely, and nothing else. The in-game legend does list all six core verbs,
+but the paper never said two of them out loud.
+
+**THE DEFECT: SYDNEY SPENT THE WORD "CLIMB" TEN CHAPTERS EARLY.** `cafe-table`'s
+clue read *"climb up onto the tabletop"*. The action is a HOP, and CLIMB is a
+real, distinct verb this game does not hand over until chapter 11 — capybara.js
+says so in its own comment. A player who remembers that word goes looking for a
+wall. Now *"hop up onto the tabletop with Space"*.
+
+Also `coffee-spill` said *"barge them at a run"* and never named the key. Now
+*"hold Shift and barge them"*, matching the voice of the clues that already name
+keys (`press Q, anywhere`, `grab it off their head with E`, `hold E on the soil`).
+
+**Measured before and after with `qa/verbs.mjs`:** before, **no clue in any of
+the 199 tasks named Shift or Space at all**. After, both are first named in
+chapter 1.
+
+**RE-ORDERING WAS THE WRONG TOOL, and this is the finding worth keeping.** The
+brief asked for every core verb inside ten minutes, and the obvious move is to
+pull the hop row forward. It is wrong: Sydney's rows 1-12 are the gardens and
+the forecourt (east, x 14..62), rows 13-19 are the quay (west, x -46..-14), and
+the café terrace is 39 m west of the spawn. Moving `cafe-table` into the first
+window sends the player across the chapter and back for a keystroke, breaking
+the east-then-west shape the order already has. **The order is good; the words
+were wrong.**
+
+**AND ONE THING THAT CANNOT BE FIXED UNDER THIS BRIEF — reported, not hidden.**
+Nothing in Sydney's gardens half requires a hop at all. `opera-stage` looks like
+it should, and does not: the podium is a STAIR whose treads are 0.17 m, which
+environment.js calls "the largest step the capybara reliably walks up". So Space
+is genuinely not exercised until row 13, about sixteen minutes in at 75 s/task.
+Closing that needs either a new task or something hoppable in the gardens — both
+are "add a task", which this brief forbids. **It belongs in a later pass.**
+
+## NEW AUDIT — `qa/verbs.mjs`
+
+A clue may not name a verb the player has not been given yet, and every
+advertised key should be named by some clue. Static, no browser, sub-second.
+
+**It was false-green when first written and the reason generalises.** The
+blocker test was `new RegExp('\b' + verb + ...)`. The heredoc that wrote the
+file ate one backslash of each pair, so the pattern became a literal backspace
+character and matched nothing — the audit passed clean against the very clue it
+existed to catch, while its *other* checks (regex literals, which survive) kept
+working and made it look alive. **Proven by differential:** stashed, it now
+prints `BLOCKER ch1 cafe-table names "climb"` and exits 1; restored, 0 and 0.
+No regex is built from a string in that file any more.
