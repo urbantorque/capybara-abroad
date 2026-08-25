@@ -164,3 +164,81 @@ line was measuring nothing. Same false-equivalence as batch 3's `pf-mischief.js`
 could not see the physics step that had already happened, so a parked capybara
 crept down every slope in the game. 15 of 17 chapters now measure exactly zero
 displacement at both stillness sample points.
+
+## Job 2 — performance reallocation: MEASURED, AND NOT DONE, ON PURPOSE
+
+Re-measured after job 1 (`qa/b4-tris.js`). **Ten of seventeen chapters are over the
+130k triangle gate**, not the five the brief lists — the count grew with real content
+across batches 1-3 (quay 132,423 → 201,503; kowloon 130,390 → 154,058):
+
+| chapter | tris | over by | render ms | ms per 100k |
+|---|---|---|---|---|
+| pantanal | 224,384 | 94,384 | 1.58 | 0.70 |
+| drift | 206,626 | 76,626 | 1.43 | 0.69 |
+| goreme | 204,490 | 74,490 | 1.64 | 0.80 |
+| quay | 201,503 | 71,503 | 0.90 | 0.45 |
+| iceland | 200,514 | 70,514 | 0.87 | 0.43 |
+| sahara | 198,168 | 68,168 | 0.89 | 0.45 |
+| venice | 181,814 | 51,814 | 0.99 | 0.54 |
+| antarctic | 180,858 | 50,858 | 1.61 | 0.89 |
+| cave | 158,844 | 28,844 | 1.61 | 1.01 |
+| kowloon | 154,058 | 24,058 | 1.44 | 0.93 |
+| **manly** | **85,650** | *under* | **1.67** | **1.95** |
+
+**THE GATE IS NOT MEASURING WHAT IT WAS PUT THERE TO MEASURE, and the numbers say so
+plainly.**
+
+- Frame time is useless as evidence here: rAF is pinned to the display, so all
+  seventeen chapters read mean 16.67 ms and p95 16.8, with the 99.9th percentile
+  inside a single frame everywhere (`qa/b4-perf.js`). It cannot distinguish a
+  chapter with 5% headroom from one with 90%.
+- Rendering each chapter forty times back to back with a `gl.finish()` — the only
+  way to see past vsync — puts **the worst chapter in the game at 1.6-1.9 ms of a
+  16.67 ms frame, about eleven per cent**, stable across three runs
+  (`qa/b4-cost.js`).
+- **And the triangle count does not predict the cost.** Manly is the second
+  SMALLEST chapter in the game and the most expensive per triangle at 1.95 ms per
+  100k; Iceland and Quay are the second and third LARGEST and the two cheapest, at
+  0.43 and 0.45. A four-to-one spread. What predicts cost here is the shadow pass
+  and the draw-call/material count, not geometry: switching the shadow map off is
+  worth 0.70 ms in Manly (42% of its whole frame), 0.63 in Kowloon, 0.59 in the
+  Pantanal.
+
+So the reallocation the brief asks for was **deliberately not done**. Warping or
+re-meshing ten chapters' terrain and foliage would risk the one thing this project
+guards hardest — how the places look — to buy a fraction of a millisecond on a
+budget that is already 89% unspent, against a metric that is demonstrably not the
+one doing the work. Doing it would have been following the instruction past the
+point where its own reasoning holds.
+
+**What WAS done for performance, and it is the lever the measurement points at:**
+`sysEnableShadows` (job 1, commit `fec13b7`) took about **145,000 triangles out of
+the shadow pass** across the game with no scene geometry removed and nothing lost
+from any picture — pantanal 222,730 → 146,164, kowloon 151,614 → 115,470, venice
+179,354 → 166,776, kyoto 119,406 → 111,074.
+
+**Delivered instead of the reshape:**
+- `qa/budget.js` — runs both gates every time. The **triangle gate is kept exactly
+  as asked** and reports all ten chapters, each with its measured cost beside it;
+  the **FAILING** gate is milliseconds of render (5.5 ms, a third of a frame).
+  Currently: `0 over the cost gate · 10 over the triangle gate`.
+- `qa/BUDGET.md` — the argument and the numbers, so the threshold can be re-based
+  on evidence rather than re-litigated.
+
+**The structural offender in each over-budget chapter, named and measured, so a
+future pass has a work list if the triangle gate is ever re-affirmed:**
+
+| chapter | the structure | tris |
+|---|---|---|
+| pantanal | `panBuildGrass` tufts, 4,286 × 10 tri | 42,860 |
+| | the gallery-forest merger, one mesh | 27,696 |
+| drift | `dri:under` — island keels and the far-field silhouettes | 50,524 |
+| goreme | `gorValley` / `gorCliff` / the 100×100 ground plane | 64,840 |
+| quay | the figs: 1,451 + 734×2 + 734×2 + 553 + 326×2 sphere/cylinder instances | ~117,000 |
+| iceland | one instanced set at 150 × 184 tri | 27,600 |
+| sahara | `sahPeople` + `sahPeopleHeads`, 177 figures | 31,860 |
+| venice | three single meshes at 38,716 / 30,260 / 27,136 | 96,112 |
+| antarctic | `antBuildGround`, 4 m elements over 424 × 624 m — **62.8% of it under an opaque sea** | 33,072 |
+| | 174 penguins at 120 tri, all casting | 20,880 |
+| cave | three single meshes at 28,024 / 16,932 / 12,072 | 57,028 |
+| kowloon | four single meshes at 19,664 / 17,376 / 15,360 / 15,120 | 67,520 |
