@@ -71,9 +71,9 @@ Sydney · Pasto · Circular Quay
 ### Finish
 - [x] CONTRACT.md new version section
 - [x] qa audits for new invariants (qa/verbs.mjs)
-- [ ] Project memory
+- [x] Project memory (capy3-payoff-batch-two)
 - [x] This file as the handover
-- [ ] `playwright-cli close-all`
+- [x] `playwright-cli close-all`
 
 ## NOTE ON THE CHAIN
 
