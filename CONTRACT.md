@@ -2090,9 +2090,12 @@ order the next step's own creep is cancelled and the net displacement is zero: b
 linear. `capyPIN_MAX` (0.55 m) is the reach past which the animal has genuinely been moved —
 a teleport, a rescue, a launch, a carrier — and the anchor is re-taken instead.
 
-Measured after: **15 of 17 chapters are now exactly 0.00 m at both `qa/stillness.js` sample
-points.** Antarctica's off-spawn 20-degree glacier still slides and should: its `slip` is
-over the snap's own threshold, and an ice slope that holds you is a wall.
+Measured after: **14 of 17 chapters are now exactly 0.00 m at both `qa/stillness.js` sample
+points.** The three that are not: Antarctica's off-spawn 20-degree glacier, which still
+slides and should — its `slip` is over the snap's own threshold, and an ice slope that holds
+you is a wall; the Drift's off-spawn point, which is a 24.95 m FALL off the Shelf and not a
+slide at all, and the audit prints `fell` so you can tell; and Pasto, which is left open —
+see the handover.
 
 ### AND NOBODY WALKS THROUGH THE PLAYER
 

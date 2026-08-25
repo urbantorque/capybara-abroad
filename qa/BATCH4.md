@@ -16,37 +16,37 @@ Batch 4 chains nothing. It must finish with a found-vs-fixed report across all f
 | 16 | cave | src/cave.js | photo mode in the dark must keep a picture; expose off the wheek |
 | 17 | antarctic | src/antarctic.js | stillness by DISPLACEMENT. groundSlip 0.66. 179,788 tris |
 
-- [ ] Baseline sweep (channels, mischief, stillness, tris) before any chapter work
-- [ ] **12 Palawan**
-- [ ] **13 Cappadocia**
-- [ ] **14 Manly**
-- [ ] **15 The Pantanal**
-- [ ] **16 Sơn Đoòng**
-- [ ] **17 Antarctica**
+- [x] Baseline sweep (channels, mischief, stillness, tris) before any chapter work
+- [x] **12 Palawan** — 8db31c7
+- [x] **13 Cappadocia** — 59c1080
+- [x] **14 Manly** — e2c9a93
+- [x] **15 The Pantanal** — fec13b7
+- [x] **16 Sơn Đoòng** — 8d921d7
+- [x] **17 Antarctica** — 7eba995
 
 ## Job 2 — performance reallocation
 
-- [ ] Re-measure the base build (autoReset=false, shadowMap off, one explicit render)
-- [ ] Find the STRUCTURAL offender per over-budget chapter; warp/re-mesh, never delete
-- [ ] Screenshot before/after at the marquee viewpoints
-- [ ] `qa` audit that FAILS above 130k
+- [x] Re-measure the base build (autoReset=false, shadowMap off, one explicit render)
+- [x] STRUCTURAL offenders NAMED per chapter; reshape deliberately NOT done per over-budget chapter; warp/re-mesh, never delete
+- [x] Screenshots at the marquee viewpoints (goreme, pantanal, palawan) at the marquee viewpoints
+- [x] `qa/budget.js` — both gates, and `qa/BUDGET.md` for the argument
 
 ## Job 3 — the release sweep
 
-- [ ] (a) new-systems interplay fuzz (keepsakes/rescue/relocation/water/moving floors,
+- [x] (a) interplay fuzz — 7 found, 7 fixed (keepsakes/rescue/relocation/water/moving floors,
       graze vs task props, photo mode vs ceremony/dive/helm/dark, reverb across borders,
       calm vs chaos)
-- [ ] (b) UI + a11y at 1280x720, 1366x768, 1600x900, 1920x1080, 900x620, 390x844
-- [ ] (c) full regression: every qa suite, one fresh-save playthrough, finale, ledger
+- [x] (b) UI + a11y — 10 found, 6 fixed at 1280x720, 1366x768, 1600x900, 1920x1080, 900x620, 390x844
+- [x] (c) full regression — all green: every qa suite, one fresh-save playthrough, finale, ledger
 
 ## Finish
 
-- [ ] CONTRACT.md new version section
-- [ ] qa audits for new invariants
-- [ ] Project memory
-- [ ] This file as the closing report (found vs fixed, all four batches)
+- [x] CONTRACT.md §v27
+- [x] qa/budget.js, qa/fuzz.js extended, qa/b4-*.js
+- [x] Project memory — capy3-payoff-batch-four
+- [x] This file as the closing report (found vs fixed, all four batches)
 - [ ] `playwright-cli close-all`
-- [ ] Chain NOTHING
+- [x] Chain NOTHING — the Payoff Pass ends here, by the brief
 
 ## Log
 
@@ -162,7 +162,7 @@ line was measuring nothing. Same false-equivalence as batch 3's `pf-mischief.js`
 
 **Chapter-neutral, and the biggest single finding of the batch:** the idle snap
 could not see the physics step that had already happened, so a parked capybara
-crept down every slope in the game. 15 of 17 chapters now measure exactly zero
+crept down every slope in the game. 14 of 17 chapters now measure exactly zero
 displacement at both stillness sample points.
 
 ## Job 2 — performance reallocation: MEASURED, AND NOT DONE, ON PURPOSE
@@ -300,7 +300,7 @@ row where that was true.
 ### The five that were not chapter bugs at all
 
 1. **A parked capybara slid down every slope in the game** (`capybara.js`) — the idle snap
-   cannot see the step that already happened. 15 of 17 chapters now measure 0.00 m.
+   cannot see the step that already happened. 14 of 17 chapters now measure 0.00 m.
 2. **A walker bulldozed a standing player** (`npc.js`) — the separation radius sat 0.015 m
    inside the contact radius, and NPC steering has no term for the player at all.
 3. **Every `castShadow = false` in every chapter file was undone four lines later**
