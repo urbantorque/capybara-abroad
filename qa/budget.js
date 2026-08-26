@@ -38,6 +38,20 @@ async page => {
   // Göreme is the busiest chapter in the game and its spread is nearly seven
   // times the global figure, so its old 214,000 line sat INSIDE its own noise
   // and tripped at random — which it did, by 630, on the run that found this.
+  //
+  // AND MEASURE THE SPREAD WITH THIS SCRIPT, NOT A SIDE PROBE. The four-load
+  // sample above was taken with a shorter settle than the gate itself uses, and
+  // it under-read Hanoi by nine thousand triangles: 236-239k on the probe
+  // against 241-245.5k here, because more of the chapter's transient content —
+  // bikes, crowd, particles — exists by the time this script counts. The
+  // ceiling set from it tripped on the very next run, by 546, with no geometry
+  // added. Under this script, over four runs:
+  //
+  //     goreme 201,146-213,798 (12,652)  ·  hanoi 241,494-245,546 (4,052)
+  //     ·  monaco 135,283-135,431 (148)
+  //
+  // A ratchet is a promise about a measurement, so it has to be sized by the
+  // thing that will do the measuring.
   const CEIL = {
     pantanal: 217000, goreme: 222000, iceland: 205000, sahara: 205000,
     drift: 191000, venice: 188000, antarctic: 188000, quay: 165000,
@@ -45,7 +59,7 @@ async page => {
     kyoto: 128000, pasto: 110000, cali: 100000, manly: 92000, sydney: 87000,
     // Chapters 18 and 19, recorded here for the first time — they shipped
     // after the Payoff Pass closed and no gate in qa/ could see them.
-    monaco: 141000, hanoi: 245000,
+    monaco: 141000, hanoi: 252000,
   }
   const ALL = ['sydney','pasto','quay','kyoto','cali','rio','iceland','sahara','drift',
                'venice','kowloon','palawan','goreme','manly','pantanal','cave','antarctic',

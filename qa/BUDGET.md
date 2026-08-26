@@ -1,5 +1,29 @@
 # The performance budget, measured three ways
 
+> **Updated 26 Aug 2026 by the closeout run.** Chapters 18 and 19 are in the
+> tables now — they shipped after the Payoff Pass closed and `budget.js` was
+> hard-coded to seventeen, so neither had a ratchet ceiling and both passed it
+> SILENTLY: `if (c && r.tris > c)` reads "no ceiling recorded" as "within its
+> ceiling". **Hanoi is the largest chapter in the game at ~245,000 triangles**,
+> half again over the Pantanal, which batch 4 called the worst offender.
+>
+> Two things about the instrument changed as well, and both matter more than the
+> numbers:
+>
+> - **The cost gate can be contaminated, and now says so.** Single-mean readings
+>   swung 1.68 to 5.31 ms for the same chapter minutes apart on a loaded
+>   machine, and iceland measured SLOWER with the shadow pass off — which is
+>   impossible. It is the minimum of five repeats now (noise only ever adds
+>   time), with that impossibility as an explicit self-check; a contaminated run
+>   reports `COST GATE UNUSABLE` and is forbidden from failing anything.
+> - **The ratchet's slack must be measured by the script that enforces it.** The
+>   ±1,500 the table was first sized against came from re-entering chapters
+>   inside one session, which is the same build; the scatter randomises at page
+>   LOAD. Göreme spreads 12,652 across loads and tripped its old line by 630. A
+>   side probe with a shorter settle then under-read Hanoi by nine thousand, and
+>   the ceiling set from it tripped by 546 on the next run with nothing added.
+>   Sized from four runs of `budget.js` itself now.
+
     node server.mjs                        # PORT=5188
     playwright-cli -s=X open http://localhost:5188/
     playwright-cli -s=X run-code --filename=qa/budget.js
