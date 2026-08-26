@@ -244,6 +244,31 @@ const liftN = (systems.match(/\n    lift:\s*\{/g) || []).length;
 const palN = (systems.match(/\n  \{ chords: sysMUS_CHORDS/g) || []).length;
 if (liftN !== palN) P('WARN', 'music', 'lift rows ' + liftN + ' != palettes ' + palN);
 
+// ---- 8. THE FINALE FIXTURE IS NOT ALLOWED TO GO STALE -------------------
+// `qa/all-task-ids.json` is the save every finale script writes to reach the
+// ending — pf2-finale.js, pf2-finale2.js and pf2-finshot.js all fetch it and
+// none of them checks it. When chapters 18 and 19 shipped it stayed at 199 of
+// 229 ids, so `sysFinaleAll()` was false for a fortnight and every one of
+// those scripts was quietly exercising a finale THAT CANNOT TRIGGER: the lawn
+// stages nothing, the ledger never opens, and the run still reports whatever
+// it happened to measure. Found by the closeout, from `keeps: 0`.
+//
+// Regenerate with the one-liner in qa/CLOSEOUT.md, in the same commit as any
+// task table change.
+try {
+  const fixture = JSON.parse(readFileSync('qa/all-task-ids.json', 'utf8'));
+  const ids = tasks.map(t => t.id);
+  const missing = ids.filter(i => !fixture.includes(i));
+  const extra = fixture.filter(i => !ids.includes(i));
+  if (missing.length) P('BLOCKER', 'all-task-ids', missing.length +
+      ' task ids missing from qa/all-task-ids.json (' + missing.slice(0, 4).join(', ') +
+      (missing.length > 4 ? ', …' : '') + ') — every finale script is testing an ending that cannot fire');
+  if (extra.length) P('WARN', 'all-task-ids', extra.length +
+      ' ids in qa/all-task-ids.json that no task has any more (' + extra.slice(0, 4).join(', ') + ')');
+} catch (e) {
+  P('BLOCKER', 'all-task-ids', 'qa/all-task-ids.json is missing or unreadable — ' + e.message);
+}
+
 // ---- report --------------------------------------------------------------
 console.log('');
 const blockers = problems.filter(p => p.sev === 'BLOCKER');

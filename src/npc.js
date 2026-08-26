@@ -1766,6 +1766,93 @@ export function createNPCs(game) {
     rec.lookX = rec.witX; rec.lookZ = rec.witZ;
   }
 
+  // ---- THE GATHERING, for the ending on the lawn (v30) --------------------
+  // The lawn is at (30, 26) with the horseshoe at r = 2.6 — see sysFIN_* in
+  // systems.js. These mirror it rather than import it, the same way this module
+  // already mirrors Pasto's world layout, and the ring here is wider than the
+  // souvenirs' so nobody stands on the ending.
+  const sysFIN_LAWN_X = 30, sysFIN_LAWN_Z = 26;
+  const npcGATHER_R    = 5.4;    // m, where they stand: outside the horseshoe
+  const npcGATHER_N    = 5;      // A SMALL cast. See the note in npcGather.
+  const npcGATHER_CEIL = 30;     // s. The ceiling. Never remove this.
+  const npcGATHER_SPD  = 1.2;    // m/s, an unhurried walk over to look
+  // HOW FAR AWAY SOMEBODY MAY BE RECRUITED FROM, DERIVED rather than chosen, so
+  // it cannot disagree with the ceiling. The first version recruited nearest-
+  // first with no cap and MEASURED THE CONSEQUENCE: Sydney's cast is spread
+  // over a whole park, so the five nearest were 10, 16, 17, 19 and 28 m out;
+  // four of them were still walking when the 14 s ceiling stopped them and
+  // stood them in the middle of the lawn's approach, and the 28 m one never
+  // moved at all. A gathering nobody reaches is worse than no gathering.
+  // 0.7 is the dodging allowance — steerTo goes round things.
+  //
+  // AND THE CEILING IS 30 s, NOT 14, BECAUSE OF WHAT THAT COSTS AT THE OTHER
+  // END. At 14 s the reachable radius is 11.8 m, and measured against Sydney's
+  // actual cast — spread over a whole park at 10, 16, 17, 19 and 28 m from the
+  // lawn — that recruited exactly ONE person. Thirty seconds is not a delay the
+  // player waits through: the ending is reached by sitting down and loafing,
+  // the loaf takes about ten seconds to reach 1.0, and people drifting in over
+  // the half minute either side of that is the picture, not a wait.
+  const npcGATHER_MAX_D = npcGATHER_CEIL * npcGATHER_SPD * 0.7;
+  let npcGathered = false;
+  /**
+   * Bring a few people over to look at what you brought back.
+   *
+   * FIVE, NOT FIFTEEN. The whole lawn is sixteen metres square and the moment
+   * is the animal sitting down among seventeen small objects; a crowd turns an
+   * ending into a ceremony and puts bodies between the shoulder camera and the
+   * capybara, which is the exact composition fault the closed ring was changed
+   * to a horseshoe to fix. Five reads as "some people wandered over".
+   *
+   * Nearest-first, so the people who come are the ones who were already in the
+   * gardens rather than a delegation teleporting in from the quay.
+   */
+  function npcGather() {
+    if (npcGathered) return 0;
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney') return 0;
+    const pool = [];
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || !r.group || !r.group.visible) continue;
+      // The terrace is a set with its own furniture in it and the waiter has a
+      // circuit; pulling either onto the lawn leaves a laid table nobody is at.
+      if (r.kind === 'patron' || r.kind === 'waiter') continue;
+      if (r.carryT >= 0) continue;
+      const dx = r.group.position.x - sysFIN_LAWN_X, dz = r.group.position.z - sysFIN_LAWN_Z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > npcGATHER_MAX_D * npcGATHER_MAX_D) continue;   // they could not get here in time
+      pool.push({ r: r, d2: d2 });
+    }
+    pool.sort(function (a, b) { return a.d2 - b.d2; });
+    const n = Math.min(npcGATHER_N, pool.length);
+    for (let i = 0; i < n; i++) {
+      const r = pool[i].r;
+      // Spread over the mouth-facing three quarters so nobody stands directly
+      // behind the souvenirs from the approach, and jitter the radius so five
+      // people are not a firing squad.
+      let a = (i / n) * Math.PI * 1.5 + Math.PI * 0.25;
+      const rad = npcGATHER_R + rand(-0.5, 0.8);
+      // A SLOT IN A FLOWER BED CAN NEVER BE ARRIVED AT, and the first version
+      // put one there — measured, `navBlocked` true at (29, 20), so that person
+      // walked at a point they could not stand on until the ceiling stopped
+      // them. Rotate round the ring until the ground is clear; the ring is 5.4 m
+      // on a bed-free 16 m lawn, so a free bearing always exists.
+      let gx = 0, gz = 0;
+      for (let k = 0; k < 8; k++) {
+        gx = sysFIN_LAWN_X + Math.cos(a) * rad;
+        gz = sysFIN_LAWN_Z + Math.sin(a) * rad;
+        if (!navBlocked(gx, gz, 0.45)) break;
+        a += Math.PI * 2 / 9;
+      }
+      r.gathX = gx; r.gathZ = gz;
+      setState(r, 'gather');
+    }
+    npcGathered = n > 0;
+    try { game.state.gathered = n; } catch (e) { /* optional */ }
+    return n;
+  }
+  game.events.on('finale:staged', npcGather);
+
   function npcWitnessChain(src) {
     if (!src || !src.group) return 0;
     // The live-biome gate is not optional: every chapter shares one coordinate
@@ -3723,6 +3810,11 @@ export function createNPCs(game) {
     if (st === 'chase' || st === 'flee' || st === 'photo' || st === 'startled' ||
         st === 'fluster' || st === 'cornered' || st === 'plunge' || st === 'swim' ||
         st === 'shoo' || st === 'queue' || rec.carryT >= 0 || rec.dejected > 0) return;
+    // 'gather' is the ending, and nothing routine may re-task somebody standing
+    // in it. It is NOT in the list above on purpose: that list is the one a
+    // startle can still break — being frightened out of the gathering is
+    // correct, and they walk back through 'gather' again when it passes.
+    if (st === 'gather') return;
 
     // --- terrace cast: their whole world is one table or four ---------------
     if (rec.kind === 'patron') {
@@ -4708,6 +4800,37 @@ export function createNPCs(game) {
         }
         if (rec.stateT > 1.6 && rec.stateT < 1.6 + dt) pickLine(rec, 'shoo');
         if (rec.stateT > 3.2 && !capyOnTable(rec.tableX, rec.tableZ)) setState(rec, 'resit');
+        break;
+      }
+      // ---- THE LAWN: somebody came to see it (v30) -----------------------
+      //
+      // The finale stages seventeen souvenirs on the picnic lawn and, until
+      // now, nobody came. The brief for it asked for "a small cast gathered
+      // from systems that already exist" and batch 2 could not do it, for a
+      // reason it wrote down precisely: Sydney registers zero `game.locals`,
+      // so there was no cast to gather — its people are this module's own
+      // `humans`, and gathering them needed a state here.
+      //
+      // The shape is the terrace's `resit`, which is the right precedent: a
+      // slot assigned ONCE, an arrival test, a hard ceiling, and then damp the
+      // yaw and stop. `npcGatherSlot` is written when they are recruited and
+      // never recomputed, because a slot that moves is a person who never
+      // arrives.
+      //
+      // THE CEILING IS NOT OPTIONAL. A steering state without one is how the
+      // waiter went forty seconds and never reached a table, and this one
+      // steers across a whole park to a point it may not be able to reach.
+      // Past it they stand where they are and face the lawn anyway — which
+      // reads as somebody who stopped to watch from further back, so the
+      // failure mode is a picture rather than a bug.
+      case 'gather': {
+        const d = steerTo(rec, rec.gathX, rec.gathZ, dt);
+        spd = npcGATHER_SPD;
+        rec.lookX = sysFIN_LAWN_X; rec.lookZ = sysFIN_LAWN_Z;
+        if (d < 0.45 || rec.stateT > npcGATHER_CEIL) {
+          spd = 0;
+          rec.tgtLean = 0.04;      // the smallest lean-in this rig has
+        }
         break;
       }
       case 'resit': {
@@ -6687,6 +6810,15 @@ export function createNPCs(game) {
   // ================================================================== events
   game.events.on('biome:enter', (p) => {
     parkBubbles();
+    // The ending is STAGED EVERY TIME and closed once — props.js huddles all
+    // seventeen souvenirs at the next chapter's spawn on the way out, so
+    // sysFinaleStage runs again on every return and this must be able to
+    // answer it again. A latch that never clears would mean the lawn had a
+    // crowd the first time you came home and nobody ever after.
+    npcGathered = false;
+    for (let i = 0; i < humans.length; i++) {
+      if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
+    }
     // A carry frozen by a mid-carry departure must not resume on re-entry:
     // the first stepHuman frame would teleport the capybara from the spawn
     // point straight back into the gardener's hands across the map.

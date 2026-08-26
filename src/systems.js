@@ -13763,6 +13763,14 @@ export function createSystems(game) {
       } catch (e) { /* one souvenir is not worth the ending */ }
     }
     sysFinStaged = true;
+    // ...AND SOMEBODY CAME TO SEE IT. The brief for this ending asked for "a
+    // small cast gathered from systems that already exist" and batch 2 marked
+    // it PARTIAL, because Sydney registers zero `game.locals` and there was
+    // nothing here to gather. npc.js owns its own cast and now answers this.
+    // An event rather than a call: the finale should not know what a `humans`
+    // array is, and a chapter with nobody in it simply does not answer.
+    try { game.events.emit('finale:staged', { x: sysFIN_X, z: sysFIN_Z, r: sysFIN_R }); }
+    catch (e) { /* nobody coming is not worth the ending either */ }
   }
 
   /**

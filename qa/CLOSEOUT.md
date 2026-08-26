@@ -175,3 +175,57 @@ one, for the reason that pool is neutral in the first place.
 ceiling on two casts that already carry fourteen states of their own, and the value is
 lower than its regression risk on the two most-played chapters in the game. Recorded as
 open rather than faked. The other two chains are live in both.
+
+### A1 — the finale gathers a cast (done)
+
+Batch 2 built THE LAWN and marked "gather a cast" **PARTIAL**, for a reason it stated
+exactly: Sydney registers zero `game.locals`, so there was no cast to gather — its people
+are npc.js's own `humans`, and gathering them needed a state in that module.
+
+Built as `gather`, on the terrace's `resit` idiom as batch 2 proposed: a slot assigned
+once, an arrival test, a hard ceiling, then damp and stop. `sysFinaleStage` emits
+`finale:staged`; npc.js answers. The finale does not learn what a `humans` array is, and a
+chapter with nobody in it simply does not answer.
+
+**Three faults, all found by measuring the walk rather than by reading the code:**
+
+| | measured |
+|---|---|
+| the ceiling cut them off mid-walk | 4 of 5 recruits stopped at 6–9 m from their slots |
+| one recruit never moved at all | 28.19 m → 28.08 m over 16 s: jitter, not walking |
+| one slot was inside a flower bed | `navBlocked(29, 20)` **true** — a point nobody can stand on |
+
+The first two are one fault: **the recruit radius and the ceiling did not know about each
+other.** Sydney's cast is spread over a whole park — the five nearest to the lawn are 10,
+16, 17, 19 and 28 m away — and at 14 s the reachable radius is 11.8 m. `npcGATHER_MAX_D`
+is derived from the ceiling and the walk speed now, so it cannot disagree with it; the
+ceiling is 30 s, which is not a wait, because the ending is reached by sitting down and
+the loaf takes about ten seconds on its own. A blocked slot rotates round the ring until
+the ground is clear.
+
+**After:** 3 recruited, 3 slots clear, all three arrive — at 7 s, 9 s and 12 s — and hold
+at 0.24–0.26 m. `qa/CO-lawn-cast.png`: the animal loafed in the middle of the horseshoe,
+nineteen souvenirs round it, a gardener and a tourist standing either side watching.
+
+### AND THE FINALE COULD NOT BE REACHED BY ANY OF ITS OWN TESTS
+
+`keeps: 0` on the first run. **`qa/all-task-ids.json` was stale at 199 of 229 ids** — every
+id from chapters 18 and 19 was missing — and `pf2-finale.js`, `pf2-finale2.js` and
+`pf2-finshot.js` all write it into the save to reach the ending. So `sysFinaleAll()` had
+been false since 18 and 19 shipped, and all three scripts were exercising **an ending that
+cannot fire**, reporting whatever they happened to measure instead. Batch 4's regression
+line — "the finale fires at second 11... 199 of 199 · 17 of 17 places · 17 kept" — was true
+when it was written and has not been true since.
+
+Regenerated, and `qa/audit-tasks.mjs` now BLOCKS on any drift between the fixture and the
+task table. Proved by differential: truncated to 199 it prints
+`BLOCKER 30 task ids missing … every finale script is testing an ending that cannot fire`
+and exits 1; restored, 0 and 0. Regenerate with:
+
+    node -e "const fs=require('fs'),s=fs.readFileSync('src/shared.js','utf8'),i=s.indexOf('export const TASKS'),b=s.slice(i,s.indexOf('\n];',i));fs.writeFileSync('qa/all-task-ids.json',JSON.stringify([...b.matchAll(/\bid:\s*'([^']+)'/g)].map(m=>m[1])))"
+
+**Harness trap, paid for again and worth adding to the list:** `page.addInitScript(() =>
+localStorage.clear())` persists on the BROWSER CONTEXT, not just the script that installed
+it — so every later `run-code` in the same session silently wipes the save too. Three runs
+reported an empty journey against a save system that was working, which is memory trap 10
+one level further out. A write-then-reload test needs its own session.
