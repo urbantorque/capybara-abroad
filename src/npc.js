@@ -319,6 +319,16 @@ const npcLINES = {
               'Another day, chigüiro.'],
   paFarm:    ['Out of the drying beds!', 'Not the café — NOT THE CAFÉ!',
               'That is a year of work you are standing on!', '¡Fuera! Get off!'],
+  // EATING THE STOCK, in this chapter's voice. Pasto has THIRTEEN edible props
+  // — more than any other chapter in the game, Sydney's seven included — and
+  // until v30 not one of them could start a reaction, because the produce chain
+  // lives on `locals` and this chapter has none. Its own pools are used rather
+  // than the chapter-neutral npcLOC_PRODUCE for the reason that pool is neutral
+  // in the first place: it is spoken over a Kyoto tea stall and an Antarctic
+  // ration crate alike, and this is a market in Nariño with a named cast in it.
+  paProduce: ['That is for selling, not for eating.', 'Ay — that was the good one.',
+              'You are eating my morning.', '¿Y quién paga? Not you.',
+              'That is stock, chigüiro.', 'Every week the same animal.'],
   paChurch:  ['God preserve us.', 'Buenas.', 'Mass is at six.',
               'The courtyard is lovely at this hour.'],
   paScandal: ['THE BELL!', 'Who is ringing at this hour?!', 'That is sacrilege!',
@@ -1700,6 +1710,121 @@ export function createNPCs(game) {
   function localReactLine(rec, arr) {
     localLine(rec, arr);
     locChainFrom = rec; locChainT = npcCHAIN_WIN;
+  }
+
+  // ---- THE CHAIN, FOR THE TWO CHAPTERS THAT HAVE NO `locals` (v30) --------
+  //
+  // Batch 1 reported "13 of 15 locals chapters carry two of the three chains",
+  // which was true and hid this: SYDNEY AND PASTO ARE NOT LOCALS CHAPTERS AT
+  // ALL. They are the two oldest, they predate addLocal, and their casts are
+  // this module's own `humans` and `paCast`. So every gate in the reaction
+  // layer — `localOwnerOf` scanning `locals`, and `localsStep` opening with
+  // `if (!locals.length) return` — is closed in exactly the first two hours of
+  // the game. Batch 2 measured it and called it finding A: the opening of this
+  // game is the stretch with the least reactive world in it.
+  //
+  // This is the WITNESS chain, which is the one that matters most and the one
+  // that ports cleanly. The other two do not port for real reasons and are
+  // recorded rather than faked: ownership needs a steering state with a hard
+  // ceiling on a cast that already has fourteen of its own, and produce needs
+  // an edible in the chapter (Pasto has thirteen; Sydney's seven are already
+  // served by its own duplicate at npcSydneyProduce).
+  //
+  // It works because BOTH casts come out of the same `buildHuman`, so a Pasto
+  // farmer and a Sydney commuter are the same record shape: `lookX`/`lookZ` to
+  // turn a head, `speak()` for a bubble, `talkCd` so nobody is interrupted.
+  // Nothing new is built and nobody's state machine is touched — a witness
+  // LOOKS and at most one of them says something, which is most of what sells
+  // a square noticing you.
+  const npcWIT_LOOK = 2.6;      // s a witness goes on facing what it heard
+  // One pool per chapter, because these two chapters HAVE voices — every other
+  // line in Pasto is in its own register and a witness answering in Sydney's
+  // would be the only flat sentence in the plaza.
+  const npcWIT_CHAIN = ['What?', 'What was that?', 'Did you see that?', 'Hm?',
+                        'What is going on over there?', 'Oh, what now.',
+                        'Something is happening.', 'Everybody all right?'];
+  const npcWIT_CHAIN_PA = ['¿Qué pasó?', 'What was that, pues?', 'Ay, what now.',
+                           '¿Otra vez?', 'Somebody look at that.',
+                           'That animal again.', 'What is he doing now?'];
+  /**
+   * HOLD THE LOOK. Called at the end of each cast's step, after every state
+   * has had its say, so the head stays turned for npcWIT_LOOK seconds while
+   * the person carries on doing whatever they were doing. A witness that keeps
+   * walking and keeps its head turned is the whole picture; one that snaps
+   * back on the next frame is nothing.
+   *
+   * Deliberately NOT a state. A state would need a ceiling, an exit and a
+   * think-cursor slot, and it would stop the person queueing or sweeping — the
+   * catch-all-state rule says a steering state without a ceiling is how the
+   * waiter went forty seconds and never reached a table, and the cheapest way
+   * to obey that rule is not to add a state.
+   */
+  function npcWitnessHold(rec, dt) {
+    if (!(rec.witT > 0)) return;
+    rec.witT -= dt;
+    if (rec.witT <= 0) { rec.witT = 0; return; }
+    rec.lookX = rec.witX; rec.lookZ = rec.witZ;
+  }
+
+  function npcWitnessChain(src) {
+    if (!src || !src.group) return 0;
+    // The live-biome gate is not optional: every chapter shares one coordinate
+    // space, so a Sydney commuter standing at (12, 30) is at (12, 30) in
+    // Pasto too and would answer a chain fired three chapters away.
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney' && live !== 'pasto') return 0;
+    const cast = live === 'sydney' ? humans : paHumans;
+    const sx = src.group.position.x, sz = src.group.position.z;
+    let best = null, bestD = npcCHAIN_R * npcCHAIN_R, n = 0;
+    for (let i = 0; i < cast.length; i++) {
+      const r = cast[i];
+      if (!r || r === src || !r.group || !r.group.visible) continue;
+      // Somebody already running, swimming or climbing out of the harbour has
+      // a more pressing engagement than your sandwich.
+      if (r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
+      const dx = r.group.position.x - sx, dz = r.group.position.z - sz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > npcCHAIN_R * npcCHAIN_R) continue;
+      // NOT `gawpT`. The obvious way to hold the look open is that timer, and
+      // it is exactly wrong: in Pasto `gawpT` COUNTS UP and paStepHuman LEAVES
+      // the gawp when it passes 1.8, so writing 2.6 into it ends the look
+      // instead of extending it. Same family as the catch-all state that reset
+      // the timer it was waiting on.
+      //
+      // AND A BARE lookX WRITE IS WORTH NOTHING EITHER, which is what the first
+      // version of this did. Measured: 9 of 16 people in Sydney and 5 of 13 in
+      // Pasto were pointed at the reaction on the frame it happened, and 2 and
+      // ZERO were a fifth of a second later — twenty-odd sites inside the two
+      // state machines write lookX every frame, so a witness look loses to
+      // whatever the person was already doing before anybody can see it.
+      // `witT` is the hold, re-asserted after the state machine has run.
+      r.lookX = sx; r.lookZ = sz;
+      r.witX = sx; r.witZ = sz; r.witT = npcWIT_LOOK;
+      n++;
+      if ((r.talkCd || 0) <= 0 && d2 < bestD) { bestD = d2; best = r; }
+    }
+    // ...and exactly ONE of them answers. Two people saying "what was that?" in
+    // unison is a chorus, not a square.
+    if (best) {
+      best.talkCd = rand(9, 20);
+      const arr = live === 'pasto' ? npcWIT_CHAIN_PA : npcWIT_CHAIN;
+      best.speak(arr[randInt(0, arr.length - 1)]);
+    }
+    // A HARNESS HOOK, because this chain is invisible from outside otherwise.
+    // A witness LOOKS, and a look is two numbers that the person's own step
+    // function is entitled to overwrite a frame later — so "did the chain
+    // fire" and "is anybody still facing the right way" are different
+    // questions, and only the first one is about this code. Counting it here
+    // is what stops a green run meaning nothing, which is the mistake
+    // pf-mischief.js's ownedProps and stillness.js's slopeAt both made.
+    try {
+      const st = game.state;
+      st.witLast = n;
+      st.witCalls = (st.witCalls || 0) + 1;
+      st.witSpoke = (st.witSpoke || 0) + (best ? 1 : 0);
+      st.witSrcX = sx; st.witSrcZ = sz;
+    } catch (e) { /* optional */ }
+    return n;
   }
 
   /**
@@ -3864,6 +3989,9 @@ export function createNPCs(game) {
     rec.headYaw = clamp(npcWrapAngle(
       Math.atan2(sx - rec.group.position.x, sz - rec.group.position.z) - rec.yaw), -1.15, 1.15);
     emit('npc:startled', rec);
+    // ...and everybody near enough to hear it looks over. This is the third
+    // mischief chain, reaching the two chapters that have no `locals`.
+    npcWitnessChain(rec);
     if (Math.random() < 0.45) pickLine(rec, 'startle');
   }
 
@@ -3932,6 +4060,9 @@ export function createNPCs(game) {
     // is the contract event systems.js already turns into chaos + chase music.
     // The splash sfx and the shake wait for the waterline, in case 'plunge'.
     emit('npc:startled', rec);
+    // ...and everybody near enough to hear it looks over. This is the third
+    // mischief chain, reaching the two chapters that have no `locals`.
+    npcWitnessChain(rec);
     try { game.toast('Man overboard.'); } catch (e) { /* optional */ }
   }
 
@@ -3949,6 +4080,9 @@ export function createNPCs(game) {
     pickLine(rec, 'standUp');
     sfx('gasp');
     emit('npc:startled', rec);
+    // ...and everybody near enough to hear it looks over. This is the third
+    // mischief chain, reaching the two chapters that have no `locals`.
+    npcWitnessChain(rec);
     finish('cafe-table');
     try { game.shake(0.12); } catch (e) { /* optional */ }
   }
@@ -4070,22 +4204,36 @@ export function createNPCs(game) {
   // arms, the head snapping round. Nearest ONE person, on the same reasoning as
   // the praise line: a square that all shouts at once is a cutscene.
   const npcGRAZE_R = 7.0;
+  // ---- ...AND THE SAME IN PASTO (v30) -----------------------------------
+  // This handler was gated on `biomeLive()`, which is hard-coded to
+  // isActive('sydney'), so eating produce in front of somebody got a line in
+  // chapter 1 and silence in chapter 2 — a chapter with THIRTEEN edible props,
+  // the most in the game. Both casts come out of `buildHuman`, so `startle` and
+  // `pickLine` work on either; the only per-chapter parts are which array to
+  // sweep and which pool to speak from.
   game.events.on('capy:graze', () => {
-    if (!biomeLive()) return;
+    const live = game.biome && game.biome.current;
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (!cast) return;
     const capy = game.capy;
     if (!capy || !capy.position) return;
     const cx = capy.position.x, cz = capy.position.z;
     let best = null, bd = npcGRAZE_R * npcGRAZE_R;
-    for (let i = 0; i < humans.length; i++) {
-      const r = humans[i];
-      if (!r.group || r.state === 'chase' || r.state === 'swim' || r.state === 'plunge') continue;
+    for (let i = 0; i < cast.length; i++) {
+      const r = cast[i];
+      if (!r.group || !r.group.visible) continue;
+      if (r.state === 'chase' || r.state === 'swim' || r.state === 'plunge') continue;
       const dx = r.group.position.x - cx, dz = r.group.position.z - cz;
       const d2 = dx * dx + dz * dz;
       if (d2 < bd) { bd = d2; best = r; }
     }
     if (!best) return;
     startle(best, cx, cz);
-    pickLine(best, 'shoo');
+    pickLine(best, live === 'pasto' ? 'paProduce' : 'shoo');
+    // A shoo is a reaction, and a reaction is worth more if somebody else sees
+    // it. `startle` does not emit 'npc:startled' — only flee, plunge and
+    // standUp do — so the chain is armed here explicitly.
+    npcWitnessChain(best);
   });
 
   game.events.on('prop:impact', (p) => {
@@ -4827,6 +4975,7 @@ export function createNPCs(game) {
       rec.tgtArmL = -2.2; rec.tgtArmR = -2.4;
     }
 
+    npcWitnessHold(rec, dt);
     npcSeparate(rec, dt);
     moveRec(rec, dt, spd);
     animHuman(rec, dt);
@@ -5999,6 +6148,7 @@ export function createNPCs(game) {
     }
     rec.lookUp = damp(rec.lookUp, up, 9, dt);
 
+    npcWitnessHold(rec, dt);
     paSeparate(rec, dt);
     paMove(rec, dt, spd);
     animHuman(rec, dt);

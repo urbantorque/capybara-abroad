@@ -131,3 +131,47 @@ caldera against a 70 m falloff. Tracked over two minutes the unsteered bird neve
 within 95.4 m. A row written for a marquee, dark for the whole marquee. The ride is the
 floor now (0.45) and the cone is the rest; `thermal-peak` and `crater-drop` both take the
 player there, so the top of the range is reachable and earned.
+
+### A2 — the mischief economy reaches chapters 1 and 2 (partly; done and bounded)
+
+Batch 1 reported "13 of 15 locals chapters carry two of the three chains", which was true
+and hid this: **Sydney and Pasto are not locals chapters at all.** They are the two oldest,
+they predate `addLocal`, and their casts are npc.js's own `humans` and `paCast`. So every
+gate in the reaction layer is shut in exactly the first two hours of the game —
+`localOwnerOf` scans `locals`, `localsStep` opens `if (!locals.length) return`, and the
+Sydney produce duplicate is gated by `biomeLive()`, hard-coded to `isActive('sydney')`.
+
+**What made this tractable:** `paBuildLocal` calls the same `buildHuman` Sydney uses, so a
+Pasto farmer and a Sydney commuter are the same record shape. Nothing new was built.
+
+**Landed — the witness chain, in both chapters.** Differential, `git stash push -- src/npc.js`:
+
+| | chain calls | people who looked | still facing at 0.2 s | at 1.7 s |
+|---|---|---|---|---|
+| sydney, before | **0** | — | — | — |
+| sydney, after | 2 | 25 | **9** | **9** |
+| pasto, before | **0** | — | — | — |
+| pasto, after | 2 | 4 | **4** | **4** |
+
+**Landed — produce in Pasto.** The graze handler now picks the live chapter's cast. Pasto
+has THIRTEEN edible props, more than any chapter in the game including Sydney's seven, and
+not one of them could start a reaction. Its own `paProduce` pool, not the chapter-neutral
+one, for the reason that pool is neutral in the first place.
+
+**TWO TRAPS, AND THE SECOND IS THE ONE WORTH KEEPING.**
+
+1. **`gawpT` counts UP.** The obvious way to hold a look open is that timer, and in Pasto
+   `paStepHuman` LEAVES the gawp when it passes 1.8 — so writing 2.6 into it *ends* the
+   look. Same family as the catch-all state that reset the timer it was waiting on.
+2. **A bare `lookX` write is worth nothing.** The first version set `lookX`/`lookZ` and
+   measured beautifully on the frame it fired — 9 of 16 in Sydney, 5 of 13 in Pasto —
+   and **2 and ZERO a fifth of a second later.** Twenty-odd sites inside the two state
+   machines write `lookX` every frame, so the witness look loses to whatever the person
+   was already doing before a player could see it. It needs `witT`, re-asserted AFTER the
+   state machine has run. Deliberately not a state: a state needs a ceiling and an exit,
+   and the cheapest way to obey the catch-all-state rule is not to add one.
+
+**Not done, and why.** Ownership does not port. It needs a steering state with a hard
+ceiling on two casts that already carry fourteen states of their own, and the value is
+lower than its regression risk on the two most-played chapters in the game. Recorded as
+open rather than faked. The other two chains are live in both.
