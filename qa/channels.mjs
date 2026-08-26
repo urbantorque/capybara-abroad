@@ -46,7 +46,14 @@ const CH = {
   15: ['pantanal', 'src/pantanal.js'],
   16: ['cave',     'src/cave.js'],
   17: ['antarctic','src/antarctic.js'],
+  18: ['monaco',   'src/monaco.js'],
+  19: ['hanoi',    'src/hanoi.js'],
 };
+// DERIVED, never spelled. Chapters 18 and 19 landed after the Payoff Pass
+// closed, and every browser audit in qa/ carried a hard-coded 17 — so for the
+// fortnight after they shipped, the two newest chapters were the two that
+// nothing checked, and each audit still printed a confident "17/17".
+const N = Object.keys(CH).length;
 
 // A chapter's short weight in the grade layer is an abbreviation — sahT, gorT,
 // caliT, iceT — so the test is "a `<something>T` token whose stem is a prefix of
@@ -148,10 +155,10 @@ for (const n of Object.keys(CH).map(Number)) {
 // ---- report ----------------------------------------------------------------
 const pad = s => s;
 console.log(`
-critters: ${critCalls} addCritter calls examined in ${critChapters} of 17 chapters — the other ${17 - critChapters} register no animal, so batch 1's calm inversion has nothing to invert there.`);
+critters: ${critCalls} addCritter calls examined in ${critChapters} of ${N} chapters — the other ${N - critChapters} register no animal, so batch 1's calm inversion has nothing to invert there.`);
 if (warns.length) { console.log('\nWARN — a channel a chapter does not have:'); for (const w of warns) console.log('  ~ ' + pad(w)); }
 if (fails.length) { console.log('\nFAIL:'); for (const f of fails) console.log('  x ' + pad(f)); }
-if (!fails.length && !warns.length) console.log('\nchannels: all 17 chapters have one wow row, a grade row, a frameShot and no bare addCritter.');
+if (!fails.length && !warns.length) console.log(`\nchannels: all ${N} chapters have one wow row, a grade row, a frameShot and no bare addCritter.`);
 const dirty = new Set([...fails, ...warns].map(s => (/^ch (\d+)/.exec(s) || [, '?'])[1]));
-console.log(`\n${17 - dirty.size}/17 chapters carry all three source-visible channels · ${fails.length} fail · ${warns.length} warn`);
+console.log(`\n${N - dirty.size}/${N} chapters carry all three source-visible channels · ${fails.length} fail · ${warns.length} warn`);
 process.exit(fails.length ? 1 : 0);

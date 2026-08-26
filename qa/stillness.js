@@ -39,7 +39,7 @@ async page => {
     const SECONDS = 60;
     const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                    'drift', 'venice', 'kowloon', 'palawan', 'goreme', 'manly', 'pantanal',
-                   'cave', 'antarctic'];
+                   'cave', 'antarctic', 'monaco', 'hanoi'];
     function park(name, dx, dz) {
       g.biome.switchTo(name);
       const sp = g.biome.spawnOf(name), b = g.capy.body;

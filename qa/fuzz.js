@@ -11,7 +11,7 @@ async page => {
   await page.waitForTimeout(3000);
   const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
                  'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
-                 'manly', 'pantanal', 'cave', 'antarctic'];
+                 'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
   const res = {};
   for (const n of names) {
     res[n] = await page.evaluate(async (name) => {
