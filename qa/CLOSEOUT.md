@@ -87,3 +87,47 @@ tripped by 630 on the run that found this. Raised to 222,000 with the measuremen
 beside it; the slack is per chapter now, not one global figure.
 
 `qa/budget.js` is green: `PASS · 12 of 19 over the 130k brief gate · 0 fail · 0 noCeil`.
+
+### A3 — the two channels chapters 1-3 never had, and 18-19 shipped without (done)
+
+**FRAMED.** Batch 2 measured Sydney's failure precisely and could not fix it; batch 3 built
+the tool and did not come back. Measured on the podium, before and after, by projecting the
+shell mesh's own vertices into the frame:
+
+| | dist | pitch | sails in frame |
+|---|---|---|---|
+| the rig, at the payout | 2.97 m | 50.6° | **0 of 714** |
+| with `env.operaShot()` | 17.25 m | 16.2° | **714 of 714** |
+
+`qa/CO-opera-framed.png` is the moment. The first attempt at 21 m held all 714 too and left
+a third of the frame as empty sky — **a projection test says the subject is present, it does
+not say the shot is good**, and only the PNG separated those.
+
+Chapters 2 and 3 got theirs with `over: true`. v27 built that flag and named the two
+chapters it was for in its own comment — "Antarctica's `orca-ride` is at the helm and
+Pasto's `condor-ride` is in flight" — then wired Antarctica and stopped. Half the cases the
+flag exists for still could not reach the channel.
+
+**LIT.** Five of nineteen chapters had no row in the event grade layer. The reason was
+structural, and it is why three passes in a row wrote the finding down instead of closing
+it: `sysAirT` carries six chapters and the other thirteen weights are hand-declared
+scalars, so *using* the second channel meant first adding a damped weight in three separate
+places. `sysChapT` is that table over all of `CHAPTERS`. No chapter has to again.
+
+Measured, all five, before and during:
+
+| ch | signal | before | during |
+|---|---|---|---|
+| 1 sydney | `stageGlow` 0 → 1 | bloom 0.220 · vig 0.140 · rad 1.150 | **0.380 · 0.090 · 1.160** |
+| 2 pasto | `craterGlow` 0 → 0.45 → 0.67 | bloom 0.220 | **0.328** flying · **0.381** over the cone |
+| 3 quay | `wake` 0 → 1 | bloom 0.340 · rad 1.150 | **0.480 · 1.330** |
+| 18 monaco | `tunnel` 0 → 0.753 | bloom 0.460 · thr 0.620 · vig 0.300 | **0.656 · 0.304 · 0.451** |
+| 19 hanoi | `trainGlow` 0 → 0.997 | bloom 0.220 | **0.519** at the peak |
+
+**AND PASTO'S ROW WAS WRONG FIRST, IN EXACTLY THE WAY THE FINDING IT CLOSES WAS WRONG.**
+Keyed on crater proximity alone it measured **0.000 across a whole ride**: the marquee is
+`condor-ride`, which fires at the LAUNCH, and the launch is at the spawn — 104 m from the
+caldera against a 70 m falloff. Tracked over two minutes the unsteered bird never came
+within 95.4 m. A row written for a marquee, dark for the whole marquee. The ride is the
+floor now (0.45) and the cone is the rest; `thermal-peak` and `crater-drop` both take the
+player there, so the top of the range is reachable and earned.

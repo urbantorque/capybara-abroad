@@ -2666,15 +2666,23 @@ export function createPasto(game) {
      * the bluntest terms available: "riding a condor off a live volcano changes
      * no bloom, threshold or vignette".
      *
-     * Gated on being MOUNTED, because that is the only way to be over the
-     * caldera and the whole point is the marquee.
+     * Gated on being MOUNTED, and THE RIDE IS THE FLOOR, not the crater.
      *
-     * The falloff is the MOUNTAIN's radius, not the crater's. pastoCRATER_R is
-     * 11 m — the bowl itself — and a condor on a thermal circles the cone at
-     * tens of metres out, so keying on the bowl would give a row that is zero
-     * for the whole ride and 1 for a second or two if you happen to pass over
-     * the exact middle. Squared, so the valley floor stays ungraded and the
-     * lift belongs to the cone.
+     * The first version of this keyed on crater proximity alone and MEASURED
+     * ZERO ACROSS A WHOLE RIDE. The marquee is `condor-ride`, which fires at
+     * the launch — and the launch is at the spawn, 104 m from the caldera,
+     * against a 70 m falloff. Tracked over two minutes of flight the unsteered
+     * bird never came closer than 95.4 m. So a row keyed on the crater is a row
+     * that is dark for the exact moment it was written for: v25's finding
+     * reproduced inside its own fix, which is the shape this project keeps
+     * paying for and the reason a row gets measured before it is believed.
+     *
+     * So: 0.45 for being on the bird at all, which is the marquee and is
+     * guaranteed, and the rest for closing on the cone — `thermal-peak` and
+     * `crater-drop` both take the player there deliberately, so the top of the
+     * range is reachable and earned. The falloff is the MOUNTAIN's radius, not
+     * pastoCRATER_R: the bowl is 11 m across and a condor on a thermal circles
+     * the cone tens of metres out.
      */
     craterGlow: function () {
       const c = game.condor;
@@ -2683,7 +2691,7 @@ export function createPasto(game) {
       const dx = p.x - pastoGAL_X, dz = p.z - pastoGAL_Z;
       const d = Math.sqrt(dx * dx + dz * dz);
       const k = Math.max(0, 1 - d / pastoGAL_R);
-      return k * k;
+      return 0.45 + 0.55 * k * k;
     },
     condorShot: function () {
       if (typeof game.frameShot !== 'function' || !game.capy) return false;
