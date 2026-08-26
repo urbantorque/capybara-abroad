@@ -258,3 +258,38 @@ runtime on a cleared save, not just parsed:
 | hanoi | `cross-the-road` | the pho seller swaps *"You do not cross by waiting"* → *"You walked straight through it. Like somebody who lives here."* |
 
 `qa/lines.mjs`: **477 conditional lines over 17 casts, 0 blockers** (was 428 over 15).
+
+### A6 — Pasto's drift: half of it named and fixed, half still open
+
+Batch 4 diagnosed this exactly and prescribed the fix, then built something else:
+*"`navBlocked()` forwards only to `game.env.navBlocked` — static world geometry… so a
+walker steers around a building and walks straight through the player. Fix belongs in
+`npc.js`, gated OFF for the states that are supposed to reach the player."* It fixed the
+separation radius instead, which made the shove smaller without removing it.
+
+**Measured, parked at spawn+(9,9) with no input:** every displacement over 0.06 m in a
+frame happened while a **kinematic (type 4, mass 0) `userData.npc` body doing 1.9 m/s**
+was 1.3–1.7 m away, and the animal's own speed spiked to **3.04 m/s**. `capy.frame` was
+`null` throughout — not the carry channel, a shove.
+
+Built: `npcBlockedFor`, one squared distance per steering probe, gated off for
+chase/flee/cornered/praise/chat/shoo/carry/photo/own/retrieve — a chase that dodges the
+thing it is chasing is worse than a shove. Threaded through `steerTo` and `paRefuse`.
+**After: 0 shoves in three consecutive 60 s runs.**
+
+**AND IT DOES NOT CLOSE THE DRIFT, WHICH IS THE POINT WORTH RECORDING.** Differential,
+three runs each way:
+
+| | drift | shoves |
+|---|---|---|
+| without | 9.71 · 7.97 · 7.99 m | 0 · 0 · 0 |
+| with | 7.97 · 8.11 · 7.97 m | 0 · 0 · 0 |
+
+The shove is real and is now gone, and it was never the dominant term — one earlier run
+with **14 shoves drifted 1.22 m**. What is left is a steady straight slide of about 8 m in
+60 s, and it is **not the ground**: sampled along the path, `gradX`, `gradZ` and `slopeAt`
+all read **0.0000**. The body holds *exact* velocities — `vz = -3.000` for five seconds,
+then `vx = -0.368` for five more — while its position barely changes. A held exact value
+is a **bare velocity write**, which `capy3-external-forces-on-the-capybara` says is the one
+channel a body must never be moved through. That is the next thread to pull, and it is a
+different bug from the one batch 4 named.

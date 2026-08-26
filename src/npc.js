@@ -2908,6 +2908,38 @@ export function createNPCs(game) {
     try { return !!e.navBlocked(x, z, r); } catch (err) { return false; }
   }
 
+  // ---- ...AND THE PLAYER IS A THING TO WALK ROUND (v30) -------------------
+  //
+  // `navBlocked` is STATIC WORLD GEOMETRY and nothing else, so for the whole
+  // life of this module a walker steered neatly around a building and then went
+  // straight through the capybara. The collider is `collisionFilterMask: -1`
+  // and the walker is kinematic with mass 0, so the narrowphase resolves it
+  // entirely into the animal: measured in Pasto, parked with no input, a
+  // passing local at 1.9 m/s put the player's own speed to 3.04 m/s and moved
+  // it — and `capy.frame` was null throughout, so this is not the carry
+  // channel, it is a shove. That is the mechanism behind "Pasto drifts at
+  // spawn+(9,9)", which batch 4 diagnosed exactly, prescribed this fix for, and
+  // did not build; it fixed the separation radius instead, which made the shove
+  // smaller without removing it.
+  //
+  // GATED OFF FOR THE STATES THAT ARE MEANT TO REACH THE PLAYER. A chase that
+  // dodges the thing it is chasing is worse than a shove, and so is a shoo, a
+  // retrieval or a conversation.
+  const npcPLAYER_R = 0.62;   // m. The animal's own footprint plus a little.
+  const npcREACH_ST = { chase: 1, flee: 1, cornered: 1, praise: 1, chat: 1,
+                        shoo: 1, carry: 1, photo: 1, own: 1, retrieve: 1 };
+  function npcBlockedFor(rec, x, z, r) {
+    if (navBlocked(x, z, r)) return true;
+    if (!rec || npcREACH_ST[rec.state] || rec.carryT >= 0) return false;
+    const capy = game.capy;
+    if (!capy || !capy.position) return false;
+    // Only while the animal is ACTUALLY IN THE WAY of this probe, which is what
+    // makes this cheap: one squared distance per probe, no allocation.
+    const dx = capy.position.x - x, dz = capy.position.z - z;
+    const rr = r + npcPLAYER_R;
+    return dx * dx + dz * dz < rr * rr;
+  }
+
   // ================================================================ building
   const humans = [];
   const ibises = [];
@@ -3519,11 +3551,13 @@ export function createNPCs(game) {
     if (rec.avoidT <= 0) {
       rec.avoidAng = 0;
       rec.avoidStuck = false;
-      if (navBlocked(px + dx * 1.4, pz + dz * 1.4, 0.45)) {
+      // npcBlockedFor, not navBlocked: the capybara is an obstacle to anybody
+      // not in a state whose whole point is to reach it. See npcBlockedFor.
+      if (npcBlockedFor(rec, px + dx * 1.4, pz + dz * 1.4, 0.45)) {
         let found = false;
         for (let i = 0; i < npcAVOID_TRIES.length; i++) {
           const a = Math.atan2(dx, dz) + npcAVOID_TRIES[i];
-          if (!navBlocked(px + Math.sin(a) * 1.4, pz + Math.cos(a) * 1.4, 0.45)) {
+          if (!npcBlockedFor(rec, px + Math.sin(a) * 1.4, pz + Math.cos(a) * 1.4, 0.45)) {
             rec.avoidAng = npcAVOID_TRIES[i];
             found = true;
             break;
@@ -5445,9 +5479,17 @@ export function createNPCs(game) {
   }
   function paSay(rec, key) { if (key && rec.speak) pickLine(rec, key); }
 
-  /** Blocked, or too steep to be worth the dignity. */
-  function paRefuse(px, pz, dx, dz) {
+  /**
+   * Blocked, too steep to be worth the dignity, or THE ANIMAL IS THERE.
+   *
+   * `rec` is threaded through for the state gate alone — see npcBlockedFor.
+   * Pasto is where this was measured, because Pasto is where it shows: two of
+   * its nineteen kinematic bodies run a route across the plaza, and a parked
+   * capybara on that route was shoved to 3.04 m/s by a walker doing 1.9.
+   */
+  function paRefuse(rec, px, pz, dx, dz) {
     const ax = px + dx * npcPA_PROBE, az = pz + dz * npcPA_PROBE;
+    if (npcBlockedFor(rec, ax, az, 0.45)) return true;
     if (paNav(ax, az, 0.45)) return true;
     return paSlopeAlong(px, pz, dx, dz) > npcPA_SLOPE_MAX;
   }
@@ -5524,13 +5566,13 @@ export function createNPCs(game) {
     if (rec.avoidT <= 0) {
       rec.avoidAng = 0;
       rec.avoidStuck = false;
-      if (paRefuse(px, pz, dx, dz)) {
+      if (paRefuse(rec, px, pz, dx, dz)) {
         let found = false;
         const side = rec.avoidSide < 0 ? -1 : 1;
         for (let i = 0; i < npcAVOID_TRIES.length; i++) {
           const off = npcAVOID_TRIES[i] * side;
           const a = Math.atan2(dx, dz) + off;
-          if (!paRefuse(px, pz, Math.sin(a), Math.cos(a))) {
+          if (!paRefuse(rec, px, pz, Math.sin(a), Math.cos(a))) {
             rec.avoidAng = off;
             found = true;
             break;
@@ -5541,7 +5583,7 @@ export function createNPCs(game) {
         // to — a step he can actually take beats a step he keeps refusing.
         if (!found) {
           const a = Math.atan2(dx, dz) + side * 1.5708;
-          if (!paRefuse(px, pz, Math.sin(a), Math.cos(a))) { rec.avoidAng = side * 1.5708; found = true; }
+          if (!paRefuse(rec, px, pz, Math.sin(a), Math.cos(a))) { rec.avoidAng = side * 1.5708; found = true; }
         }
         rec.avoidStuck = !found;
         rec.avoidT = Math.min(0.45, 1.2 / Math.max(rec.speed, 0.5));
