@@ -41,6 +41,9 @@ let envCloudData = null;
 let envTime = 0;
 let envRippleT = 0;
 let envAsleep = false;   // true once Sydney's update has parked itself for Pasto
+// 0..1, how long the animal has been on the Opera House podium. The grade layer
+// reads it through api.stageGlow(). Zeroed on the way out — see envUpdate.
+let envStageT = 0;
 
 // ---- Circular Quay (chapter 1) -----------------------------------------------
 const envCafeTables = [];     // {x, z, top} — climbable café tables
@@ -2927,9 +2930,21 @@ export function createEnvironment(game) {
       envAsleep = true;
       if (envFerryBody) { envFerryBody.velocity.setZero(); envFerryBody.angularVelocity.setZero(); }
       if (envVanBody) { envVanBody.velocity.setZero(); envVanBody.angularVelocity.setZero(); }
+      // The stage weight must fall to zero on the way OUT, not hold whatever it
+      // was when the player left. Every biome shares one coordinate space, so
+      // the podium rectangle exists as bare ground in all seventeen of the
+      // others and a held weight would light somebody else's chapter — the
+      // same trap `opera-stage` itself is gated against in systems.js.
+      envStageT = 0;
       return;
     }
     envAsleep = false;
+    {
+      const capy = game.capy;
+      const on = !!(capy && capy.position && envInZone('operaStage', capy.position.x, capy.position.z) &&
+                    capy.position.y > 0.9);
+      envStageT += (( on ? 1 : 0) - envStageT) * (1 - Math.exp(-2.4 * dt));
+    }
     envTime += dt;
     envFerryStep(game, dt);
     envVanStep(game, dt);
@@ -3041,6 +3056,55 @@ export function createEnvironment(game) {
     // watch the van drive off. envVAN_DWELL is the whole stop.
     vanDwellLeft: function () { return envVanDwell; },
     kioskSpot: envKIOSK_SPOT,
+    /**
+     * 0..1 — HOW MUCH OF THE STAGE YOU ARE STANDING ON, for the event grade
+     * layer. Chapter 1 has never had a row in it: `lit` was not a channel the
+     * first chapter of the game could use, and v25 wrote that down and moved on
+     * because using it meant first adding a damped weight in three places.
+     *
+     * The sails are the brightest object in the chapter — warm cream, sunlit,
+     * and the only large pale mass in a park — so standing between them is
+     * genuinely a change in the light, not a decoration invented for a row.
+     * Damped here rather than in the grade so the chapter owns the shape of its
+     * own signal; the grade only decides what to do with it.
+     */
+    stageGlow: function () { return envStageT; },
+    /**
+     * FRAME THE PODIUM PAYOUT — the fourth channel, for the one silhouette
+     * this whole game is most recognisable by.
+     *
+     * Batch 2 measured what `opera-stage` actually looked like when it fired:
+     * walking onto the podium collapses the rig from 7.2 m at 45 degrees to
+     * 3.05 m at 68.6 degrees, so the moment the task pays out the camera is
+     * jammed against the shells looking DOWN at them, and it recovers to 45.6
+     * about a metre further on. It recorded that as finding B and could not
+     * close it, because `frameShot` did not exist until batch 3 built it. This
+     * is that finding, closed.
+     *
+     * The bearing is COMPUTED from the two shell clusters, not written as a
+     * literal. Both v26's aurora (0 of 336 vertices in frame, from writing 0
+     * where pi belonged) and v27's Göreme sunrise (the obvious -pi/2 put the
+     * sun behind the player's own basket) were sign errors in a hand-reasoned
+     * bearing, and both were found from a projection test rather than from the
+     * code. `yaw` is the bearing FROM the animal TO the camera, so putting the
+     * camera on the OPPOSITE side of the animal from the shells is what leaves
+     * the shells standing behind it.
+     */
+    operaShot: function () {
+      if (typeof game.frameShot !== 'function' || !game.capy) return false;
+      const p = game.capy.position;
+      // The visual mass of the building: the midpoint of the two clusters'
+      // seaward halves, taken off the envAddVault calls above.
+      const sx = 0, sz = -5.2;
+      game.frameShot({
+        yaw: Math.atan2(p.x - sx, p.z - sz),
+        // 21 m and a low pitch: the tallest tip is 11.6 m and the podium mass
+        // is 3.0 deep, so anything nearer or steeper cuts the sails off at the
+        // top — which is precisely what the un-framed rig was doing.
+        dist: 17, pitch: 13 * Math.PI / 180, raise: 2.8, hold: 3.0
+      });
+      return true;
+    },
     update: envUpdate,
   };
   game.env = api;

@@ -2,8 +2,25 @@
 
 Started 25 Aug 2026, on `claude-opus-5`. Brief: `qa/PAYOFF-PROMPTS.md` § BATCH 3.
 Predecessor: `qa/BATCH2.md` — jobs 1-2 landed (THE LAWN, THE ALBUM, CONTRACT v24).
-**Batch 2 jobs 3 (the first hour) and 4 (pillars on ch 1-3) were NOT done** and its
-handover/chaining steps were never run. Noted here; not in batch 3's scope.
+~~**Batch 2 jobs 3 (the first hour) and 4 (pillars on ch 1-3) were NOT done** and its
+handover/chaining steps were never run.~~
+
+> **CORRECTED 26 Aug 2026 by the closeout run. This was wrong, and it propagated.**
+> Batch 2's jobs 3 and 4 both ran and both landed: `4c19859` "the first hour: Sydney spent
+> 'climb' ten chapters early" at 25 Aug 23:39, and `478e69b` "pillars 1-3: half of chapter
+> three had the wrong footstep" at 23:51, with `bc73651` ticking the last two checklist
+> rows at 23:56. Batch 3 read `qa/BATCH2.md` BEFORE those commits landed — the two runs
+> overlapped in the same tree — and recorded the file's state as a fact about the work.
+> Batch 4 then copied the claim forward into its own closing report without re-checking.
+>
+> **The lesson is the one `capy3-two-runs-one-tree` already carries, sharpened:** a
+> handover file is written LAST, so it is the one artefact that is guaranteed stale while
+> a run is live. `git log` is the record; the handover is a summary of it. A run that
+> wants to know whether something was done must ask the history, not the note.
+>
+> What was genuinely still open after batch 2 — and remained open until this closeout —
+> is narrower: chapters 1-3 carry neither `framed` nor `lit` (batch 2's own findings B and
+> C), and its two `[~]` rows were never closed. That is real, and it is fixed below.
 
 Carried in and available to pillars 2 and 3:
 - mischief reaction layer (npc.js `r.own`, produce, chains) — harness `qa/pf-mischief.js`

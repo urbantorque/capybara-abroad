@@ -5114,6 +5114,23 @@ function quayCheckVoyage(game, dt) {
     if (!quayVoyaged && quayArrivalT > 1.0) {
       quayVoyaged = true;
       quayTask('manly-voyage');
+
+      // FRAME THE ARRIVAL — the fourth channel, on the payout of this
+      // chapter's wow. `over: true` for the same reason Antarctica's helm shot
+      // needs it: this marquee happens ON a vehicle whose rig owns the lens, so
+      // without it the weight is multiplied to nothing and the shot changes
+      // the picture by zero. Batch 2 had no way to ask for a bearing at all;
+      // batch 3 built one and did not come back for chapters 1-3.
+      //
+      // Astern and low, looking up the boat's own line at the beach: the
+      // bearing is the hull's heading turned round, so the camera sits behind
+      // the transom with Manly filling the frame ahead. Computed off
+      // quayBoatYaw rather than written down, because the boat can come
+      // alongside on any heading the player chose.
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: quayBoatYaw + Math.PI, dist: 24, pitch: 0.16,
+                         raise: 4.2, hold: 3.2, over: true });
+      }
       // Measured end to end, minus the second she has to sit still to count as
       // alongside — so the number is the passage and not the paperwork. An
       // ordinary run up the harbour is about 71 s.
@@ -5612,6 +5629,23 @@ export function createQuay(game) {
 
   const api = {
     built() { return quayBuilt; },
+    /**
+     * 0..1 — HOW HARD SHE IS DRIVING, for the event grade layer. Chapter 3 has
+     * never had a row in it either (v25's finding C covered all three of
+     * chapters 1-3), so nothing that happens on this harbour has ever moved
+     * bloom, threshold or vignette.
+     *
+     * The signal is the boat's speed, because the white water she throws is the
+     * brightest thing in the chapter and the only one that varies: the harbour
+     * is a flat blue-grey and the wake is the exception. That makes this a row
+     * about the marquee — `manly-voyage` is a passage, and a passage is speed —
+     * without needing a flag that only the payout sets.
+     */
+    wake() {
+      if (!quayHelmOn) return 0;
+      const k = Math.min(1, Math.abs(quayBoatSpeed) / quayBOAT_VMAX);
+      return k * k;
+    },
     // ---- AND WHERE IT STOPS -----------------------------------------------
     // MEASURED, the same way Sydney's was: put the animal at z = 200 or at
     // x = 400 and it neither falls nor is put back — quayGroundY answers zero

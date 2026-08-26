@@ -2640,6 +2640,63 @@ export function createPasto(game) {
   // terrain and zones while Sydney is still live.
   const api = {
     built() { return pastoBuilt; },
+    /**
+     * FRAME THE LAUNCH — chapter 2's marquee, GALERAS.
+     *
+     * v27 built `over: true` for exactly two chapters, naming both in its own
+     * comment: "Antarctica's `orca-ride` is at the helm and Pasto's
+     * `condor-ride` is in flight". It then wired Antarctica and left this one.
+     * So the flag whose whole reason for existing was that a marquee ON a
+     * vehicle cannot reach the framed channel was, in half the cases it was
+     * written for, still not reaching it.
+     *
+     * Without `over` the weight is `shotW * (1 - flyT)`, and flyT goes to 1 the
+     * instant the constraint is made — the shot would be multiplied to nothing
+     * inside its own ease-in, which is what Antarctica measured as "changed the
+     * lens by 0.00".
+     *
+     * The bearing puts the camera on the far side of the animal from the
+     * crater, so the mountain it has just been thrown off fills the frame
+     * behind it. Computed, never written as a literal — see environment.js's
+     * operaShot for why that rule exists.
+     */
+    /**
+     * 0..1 — HOW MUCH OF THE CRATER IS UNDER YOU, for the event grade layer.
+     * Chapter 2 has never had a row in it, which v25 recorded as finding C in
+     * the bluntest terms available: "riding a condor off a live volcano changes
+     * no bloom, threshold or vignette".
+     *
+     * Gated on being MOUNTED, because that is the only way to be over the
+     * caldera and the whole point is the marquee.
+     *
+     * The falloff is the MOUNTAIN's radius, not the crater's. pastoCRATER_R is
+     * 11 m — the bowl itself — and a condor on a thermal circles the cone at
+     * tens of metres out, so keying on the bowl would give a row that is zero
+     * for the whole ride and 1 for a second or two if you happen to pass over
+     * the exact middle. Squared, so the valley floor stays ungraded and the
+     * lift belongs to the cone.
+     */
+    craterGlow: function () {
+      const c = game.condor;
+      if (!c || !c.mounted || !game.capy) return 0;
+      const p = game.capy.position;
+      const dx = p.x - pastoGAL_X, dz = p.z - pastoGAL_Z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const k = Math.max(0, 1 - d / pastoGAL_R);
+      return k * k;
+    },
+    condorShot: function () {
+      if (typeof game.frameShot !== 'function' || !game.capy) return false;
+      const p = game.capy.position;
+      game.frameShot({
+        yaw: Math.atan2(p.x - pastoGAL_X, p.z - pastoGAL_Z),
+        // Wide and flat: the cone is 62 m of relief and the launch is already
+        // climbing, so a close shot is a picture of a capybara and a shot
+        // looking down is a picture of the ground it just left.
+        dist: 30, pitch: 12 * Math.PI / 180, raise: 5.0, hold: 3.4, over: true
+      });
+      return true;
+    },
     terrainHeight: pastoHeight,
     // ---- WHERE THERE IS ACTUALLY A FLOOR (v20) ----------------------------
     // pastoHeight is an ANALYTIC law and answers for every point in the plane;

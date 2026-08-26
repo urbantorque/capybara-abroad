@@ -2920,6 +2920,29 @@ export function createHanoi(game) {
     folded() { return hanFoldK; },
     /** Is there a train in the alley right now, and how far along. */
     trainOut() { return hanTrainS >= 0; },
+    /**
+     * 0..1 — HOW MUCH OF THE LIGHT IN THIS ALLEY IS THE TRAIN'S, for the event
+     * grade layer. Chapter 19 shipped with no row in it at all, so `lit` — the
+     * second of the four channels — was not something this chapter could use
+     * for anything, least of all for `the-train`, which is its wow.
+     *
+     * A boolean will not do here. The moment is an approach: a lamp at the far
+     * end of a 96 m alley is a point, and the same lamp at four metres is the
+     * only thing in the frame. So this is the train's NEARNESS, not its
+     * presence, squared to keep the whole first half of the run quiet, and
+     * gated on the player actually being in the alley — the grade is about what
+     * the player can see, and from the lake this is somebody else's train.
+     */
+    trainGlow() {
+      if (hanTrainS < 0) return 0;
+      const capy = hanGame && hanGame.capy; if (!capy) return 0;
+      const p = capy.position;
+      if (Math.abs(p.z - hanTRAIN.z) > 9) return 0;
+      const tx = hanTRAIN.x0 + hanTrainS;
+      const d = Math.abs(p.x - tx);
+      const k = 1 - Math.min(1, d / 34);
+      return k * k;
+    },
     /** How many of them have had to go round you on this crossing. */
     swerved() { return Math.round(hanSwerved); },
     /** The crossing state machine, for the harness: [lane, ok, from, dither]. */

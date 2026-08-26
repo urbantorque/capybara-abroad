@@ -278,7 +278,11 @@ real keys — task ticked, saved, HUD intact. `pf2-finale2.js` — the finale fi
 
 **`qa/channels.mjs`: 8/17 chapters carried all three source-visible channels at the start
 of this batch. 14/17 now.** The three that do not are sydney, pasto and quay — chapters
-1-3, which batch 2's jobs 3 and 4 were meant to cover and never ran.
+1-3, which batch 2's jobs 3 and 4 were meant to cover. ~~and never ran~~ — **corrected
+26 Aug by the closeout run: they DID run** (`4c19859`, `478e69b`, `bc73651`, 25 Aug
+23:39-23:56). Batch 2 job 4 found this exact gap itself and recorded it as its findings B
+and C; `frameShot` did not exist yet when it did. The gap is real, the reason given for it
+was not. Closed in the closeout — see `qa/CLOSEOUT.md`.
 
 ---
 
@@ -413,7 +417,7 @@ Every commit after that uses explicit paths.
 | batch | scope | headline |
 |---|---|---|
 | 1 | foundation and comedy | the mischief reaction layer, the auto-loaf and the inverted critters |
-| 2 | the ending, the album, ch 1-3 | THE LAWN and THE ALBUM; **jobs 3 and 4 were never run** |
+| 2 | the ending, the album, ch 1-3 | THE LAWN and THE ALBUM; jobs 3 and 4 ran too — see the correction at line 281 |
 | 3 | chapters 4-11 | `frameShot` became a channel; 7 of 8 marquees were broken silently |
 | 4 | chapters 12-17, perf, release | the idle snap could not see the physics step; the triangle gate stopped predicting cost |
 

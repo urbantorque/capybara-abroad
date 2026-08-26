@@ -915,6 +915,22 @@ const sysAIR_KEYS = Object.keys(sysAIR);
 const sysAirT = {};
 for (let i = 0; i < sysAIR_KEYS.length; i++) sysAirT[sysAIR_KEYS[i]] = 0;
 
+// --- EVERY CHAPTER HAS A WEIGHT, WHETHER OR NOT IT HAS AN AIR ROW ----------
+// `sysAirT` only carries the six chapters with a `sysAIR` row, and the other
+// thirteen weights are hand-declared scalars — kyoT, caliT, rioT and so on.
+// That is why sydney, pasto and quay never got a row in the event grade layer:
+// using "lit" at all meant first adding a scalar in three separate places, and
+// three passes in a row looked at that and wrote the finding down instead.
+//
+// This is the same trick sysAirT plays, over ALL of CHAPTERS, so the answer to
+// "can this chapter use the lit channel" is yes for every chapter that exists
+// and for every chapter that ever will. Damped on the same 2.0 lambda as its
+// thirteen hand-written siblings, so a row written against it behaves
+// identically to a row written against theirs.
+const sysCHAP_KEYS = CHAPTERS.map(c => c.biome);
+const sysChapT = {};
+for (let i = 0; i < sysCHAP_KEYS.length; i++) sysChapT[sysCHAP_KEYS[i]] = 0;
+
 const sysSKY_R      = 200;    // arbitrary: it rides the lens and ignores depth
 const sysSKY_LAMBDA2 = 2.2;   // the zenith cross-fades at the fog's own rate
 const sysSkyTopC    = new THREE.Color(PALETTE.skyTop);
@@ -10927,6 +10943,9 @@ export function createSystems(game) {
   let doneCount = 0;
   let taskStreak = 0, taskStreakAt = -1e9;
   let stageT = 0;
+  // Latches the podium's frameShot to the EDGE of standing there. See the
+  // opera-stage block: a shot re-requested every frame never leaves its ease-in.
+  let stageShot = false;
   let ended = false;
   let startMs = 0;
 
@@ -14835,6 +14854,49 @@ export function createSystems(game) {
       const s = clamp(game.rio.salute(), 0, 1) * rioT;
       bloom += s * 0.26; thr -= s * 0.08; sat += s * 0.05;
     }
+    // ---- AND THE FIVE THAT STILL HAD NO ROW (closeout, v30) --------------
+    // v26 closed Kyoto and Rio and left sydney, pasto and quay open for the
+    // third version running. Chapters 18 and 19 then shipped straight into the
+    // same hole, and no audit could see them because every one in qa/ was
+    // hard-coded to seventeen chapters. Five of nineteen, all closed here,
+    // against `sysChapT` so that no chapter ever again has to add a damped
+    // scalar in three places before it can use the second channel.
+    //
+    // Sydney: the sails. They are the largest pale mass in a park full of
+    // green, and standing between them on the podium is the chapter's wow.
+    if (sysChapT.sydney > 0.002 && B.isActive('sydney') && game.env && game.env.stageGlow) {
+      const st = clamp(game.env.stageGlow(), 0, 1) * sysChapT.sydney;
+      bloom += st * 0.18; rad += st * 0.16; vig -= st * 0.05;
+    }
+    // Pasto: v25's finding C, in its own words — "riding a condor off a live
+    // volcano changes no bloom, threshold or vignette". It does now.
+    if (sysChapT.pasto > 0.002 && B.isActive('pasto') && game.pasto && game.pasto.craterGlow) {
+      const cg = clamp(game.pasto.craterGlow(), 0, 1) * sysChapT.pasto;
+      bloom += cg * 0.24; sat += cg * 0.07; vig += cg * 0.08;
+    }
+    // Quay: the wake. A flat blue-grey harbour and one white thing moving on it.
+    if (sysChapT.quay > 0.002 && B.isActive('quay') && game.quay && game.quay.wake) {
+      const wk = clamp(game.quay.wake(), 0, 1) * sysChapT.quay;
+      bloom += wk * 0.14; rad += wk * 0.18;
+    }
+    // Monte Carlo: THE TUNNEL, which is the one marquee in this game that is
+    // already a lighting event before anybody grades it — the bore closes over
+    // the car, the daylight goes, and it comes back all at once at the far end.
+    // A chapter whose wow is `the-tunnel` having no row in the light layer was
+    // the single clearest miss the closeout found.
+    if (sysChapT.monaco > 0.002 && B.isActive('monaco') && game.monaco && game.monaco.tunnel) {
+      const tn = clamp(game.monaco.tunnel(), 0, 1) * sysChapT.monaco;
+      // Threshold DOWN so the strip lights are the only things blooming, and
+      // the corners close: the same construction the cave uses, because it is
+      // the same situation — a lit interior inside a bright chapter.
+      thr -= tn * 0.42; bloom += tn * 0.26; vig += tn * 0.20; sat -= tn * 0.12;
+    }
+    // Hanoi: the lamp coming up the alley. Keyed on the train's NEARNESS, so
+    // the row is the approach rather than the arrival — see hanoi.trainGlow.
+    if (sysChapT.hanoi > 0.002 && B.isActive('hanoi') && game.hanoi && game.hanoi.trainGlow) {
+      const tg = clamp(game.hanoi.trainGlow(), 0, 1) * sysChapT.hanoi;
+      thr -= tg * 0.30; bloom += tg * 0.30; vig += tg * 0.14;
+    }
     if (caliT > 0.002 && B.isActive('cali') && game.cali && game.cali.night) {
       const nite = clamp(game.cali.night(), 0, 1) * caliT;
       thr -= nite * 0.52; bloom += nite * 0.34; vig += nite * 0.10;
@@ -14987,6 +15049,7 @@ export function createSystems(game) {
     // ...and the table-driven ones, which need no rung of their own here and
     // will still be primed correctly when the twentieth chapter arrives.
     if (sysAirT[name] !== undefined) sysAirT[name] = 1;
+    if (sysChapT[name] !== undefined) sysChapT[name] = 1;
   }
   let stormT = 0;                 // 0..1, mirrors game.sahara.storm()
   let duskT = 0;                  // 0..1, and it never comes back down
@@ -16049,8 +16112,16 @@ export function createSystems(game) {
     if (started && game.biome.isActive('sydney') && envApi && typeof envApi.inZone === 'function' && capy && capy.position) {
       if (envApi.inZone('operaStage', p.x, p.z) && p.y > 0.9) {
         stageT += dt;
-        if (stageT > 1.5) completeTask('opera-stage');
-      } else stageT = 0;
+        if (stageT > 1.5) {
+          // ONCE, on the edge. completeTask is idempotent but frameShot is not:
+          // calling it every frame restarts the envelope and the shot never
+          // leaves its own ease-in, which is the documented way to ask for a
+          // camera move and get nothing. `stageShot` latches until the animal
+          // steps off.
+          if (!stageShot) { stageShot = true; if (envApi.operaShot) envApi.operaShot(); }
+          completeTask('opera-stage');
+        }
+      } else { stageT = 0; stageShot = false; }
     }
 
     // ---- ground rig <-> flight rig -----------------------------------------
@@ -16659,6 +16730,10 @@ export function createSystems(game) {
     for (let ai = 0; ai < sysAIR_KEYS.length; ai++) {
       const nm = sysAIR_KEYS[ai];
       sysAirT[nm] = damp(sysAirT[nm], game.biome && game.biome.isActive(nm) ? 1 : 0, 2.0, dt);
+    }
+    for (let ci = 0; ci < sysCHAP_KEYS.length; ci++) {
+      const nm = sysCHAP_KEYS[ci];
+      sysChapT[nm] = damp(sysChapT[nm], game.biome && game.biome.isActive(nm) ? 1 : 0, 2.0, dt);
     }
     // THE SECOND SKY IS NOT A BIOME FLAG, IT IS A CAMERA FLAG. palawan.js has
     // already smoothed it against the LENS rather than the animal, because the

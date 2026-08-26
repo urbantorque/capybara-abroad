@@ -1015,6 +1015,10 @@ function condorMount() {
   if (!condorRodeOnce) {
     condorRodeOnce = true;
     if (typeof game.completeTask === 'function') game.completeTask('condor-ride');
+    // The chapter frames its own marquee; the bearing is Pasto's to know, not
+    // this module's. Once, on the first ride — the shot is the payout, and a
+    // second launch is transport.
+    if (game.pasto && typeof game.pasto.condorShot === 'function') game.pasto.condorShot();
   }
   if (typeof game.toast === 'function') game.toast('hold on');
   return true;
