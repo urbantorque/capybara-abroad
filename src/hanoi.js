@@ -2607,9 +2607,17 @@ function hanBuildLocals(game) {
 
   hanLocPho = put(12, 14, {
     figure: { shirt: PALETTE.hanWash1, hat: PALETTE.hanConical }, face: -2.2, near: 8,
+    // ---- AND WHAT THEY SAY CHANGES (v30) -------------------------------
+    // Chapter 19 shipped with no conditional line in it at all. `onTask`
+    // fires once and is gone, so the woman who watched you put your whole
+    // face in her pho greeted you afterwards exactly as she had before.
     lines: ['Sit. There is a stool. There is always a stool.',
             'You are in the way of the bikes. Everybody is in the way of the bikes.',
-            'It is beef. It is always beef before eleven.'],
+            'It is beef. It is always beef before eleven.',
+            { t: 'You do not cross by waiting. Nobody has ever crossed by waiting.', before: 'cross-the-road' },
+            { t: 'You walked straight through it. Like somebody who lives here.', after: 'cross-the-road' },
+            { t: 'It is too hot. Everybody says that and everybody burns their mouth.', before: 'pho-raid' },
+            { t: 'The whole face. I have seen a lot and I have not seen the whole face.', after: 'pho-raid' }],
     wheek: ['Yes. Very good. Sit down.'],
     onTask: { 'cross-the-road': ['You did not stop. Good.'] },
   });
@@ -2617,7 +2625,10 @@ function hanBuildLocals(game) {
     figure: { shirt: PALETTE.hanWash3 }, face: -0.7, near: 9,
     lines: ['Four thousand a glass. It has been four thousand since 1994.',
             'Do not knock the stools over. Everybody knocks the stools over.',
-            'That corner has been like this since my grandmother.'],
+            'That corner has been like this since my grandmother.',
+            { t: 'Ninety-six stools. I count them at close. Do not.', before: 'the-stools' },
+            { t: 'Ninety-six. I counted. You owe me an evening.', after: 'the-stools' },
+            { t: 'You have been on a scooter. Somebody is missing a scooter.', after: 'ride-the-flow' }],
     wheek: ['Mot hai ba, YO.'],
     onTask: { 'the-stools': ['I said do not. Nobody has ever not.'] },
   });
@@ -2625,7 +2636,11 @@ function hanBuildLocals(game) {
     figure: { shirt: PALETTE.hanWash2, hat: PALETTE.hanConical }, face: 3.0, near: 10,
     lines: ['Twice a day. You get used to it. You do not get used to it.',
             'When the horn goes, get in a doorway. Any doorway.',
-            'Forty-five centimetres. I have measured it. Twice.'],
+            'Forty-five centimetres. I have measured it. Twice.',
+            { t: 'When it comes, the whole street folds up. Watch the awnings.', before: 'fold-the-street' },
+            { t: 'You saw it fold. Everybody should see it fold once.', after: 'fold-the-street' },
+            { t: 'The old bridge still walks. It does not drive any more.', before: 'long-bien' },
+            { t: 'You walked out on the old bridge. That is the whole century, that walk.', after: 'long-bien' }],
     wheek: ['Not now. In a minute you will want to be quiet.'],
     onTask: { 'the-train': ['I saw where you were standing. Do not do it again.'] },
   });
@@ -2633,21 +2648,30 @@ function hanBuildLocals(game) {
     figure: { shirt: PALETTE.hanWash4, hat: PALETTE.hanConical }, face: 0.4, near: 8,
     lines: ['Lotus in the morning, chrysanthemum after. Nothing after four.',
             'The whole shop is on the bicycle. It has to be.',
-            'Do not lean on it. Please do not lean on it.'],
+            'Do not lean on it. Please do not lean on it.',
+            { t: 'It is balanced. It took me eleven years to learn how balanced.', before: 'flower-bike' },
+            { t: 'You unloaded it. I did not ask you to unload it.', after: 'flower-bike' },
+            { t: 'There is coffee on a balcony somewhere that is not where it was.', after: 'egg-coffee' }],
     wheek: ['Everything on that bicycle is somebody’s Tuesday.'],
   });
   hanLocBarber = put(hanBARBER.x + 2.6, hanBARBER.z + 1.2, {
     figure: { shirt: PALETTE.hanShirtW }, face: -1.6, near: 7,
     lines: ['Sit. Twenty minutes. You will look completely different.',
             'The mirror has been on that tree for thirty-one years.',
-            'I do not do animals. I have never been asked.'],
+            'I do not do animals. I have never been asked.',
+            { t: 'Look in it. Everybody looks in it. That is what it is for.', before: 'barber' },
+            { t: 'You looked. Thirty-one years and that is the first time it has done THAT.', after: 'barber' }],
     wheek: ['You do not need a haircut. You need a WASH.'],
   });
   hanLocPuppet = put(hanPUPPET.x - 7, hanPUPPET.z + 2.8, {
     figure: { shirt: PALETTE.hanWash1 }, face: -0.2, near: 9,
     lines: ['They are standing in the water. The people are standing in the water.',
             'Eleven hundred years. Nobody knows who started it.',
-            'You may look. You may not get in.'],
+            'You may look. You may not get in.',
+            { t: 'The red bridge is that way. Everybody photographs the red bridge.', before: 'the-huc' },
+            { t: 'You crossed the Huc. Now you have to come back over it.', after: 'the-huc' },
+            { t: 'The tower is on the island. There is no boat.', before: 'turtle-tower' },
+            { t: 'You got out to the tower. There is no boat. I am not asking.', after: 'turtle-tower' }],
     wheek: ['The dragon does that too. It is not as good at it.'],
     onTask: { 'water-puppets': ['I did say.'] },
   });
@@ -2655,7 +2679,10 @@ function hanBuildLocals(game) {
     figure: { shirt: PALETTE.hanWash3, hat: PALETTE.hanConical }, face: -1.5708, near: 9,
     lines: ['Everything here was alive at six. Some of it still is.',
             'Herbs at the front, fish at the back. Follow your nose.',
-            'You are the largest thing in this market and you are not for sale.'],
+            'You are the largest thing in this market and you are not for sale.',
+            { t: 'They play da cau by the lake. You will not get in the circle.', before: 'shuttlecock' },
+            { t: 'They let you in the circle. They do not let ME in the circle.', after: 'shuttlecock' },
+            { t: 'The whole market heard about the train alley. The whole market.', after: 'the-train' }],
     wheek: ['Yes yes. Everybody has an opinion.'],
   });
 

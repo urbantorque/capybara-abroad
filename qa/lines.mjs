@@ -37,8 +37,15 @@ const FILE_CHAPTER = {
   'quay.js': 3, 'kyoto.js': 4, 'cali.js': 5, 'rio.js': 6, 'iceland.js': 7,
   'sahara.js': 8, 'drift.js': 9, 'venice.js': 10, 'kowloon.js': 11,
   'palawan.js': 12, 'goreme.js': 13, 'manly.js': 14, 'pantanal.js': 15,
-  'cave.js': 16, 'antarctic.js': 17,
+  'cave.js': 16, 'antarctic.js': 17, 'monaco.js': 18, 'hanoi.js': 19,
 };
+// A CHAPTER WITH NO CONDITIONAL LINE AT ALL IS A FINDING, NOT A PASS. This
+// audit checks that every `after:`/`before:` names a real task in the right
+// chapter, and for eighteen months the way to score zero on it was to have no
+// such lines — which is exactly what chapters 18 and 19 shipped with, while
+// they were also missing from the table above and so were not read at all.
+// Green has to mean the people react to what you have done.
+const MIN_CONDITIONAL = 6;
 
 let bad = 0, warn = 0, total = 0;
 const perFile = [];
@@ -69,14 +76,25 @@ for (const f of readdirSync(SRC).sort()) {
 
 console.log('\nconditional lines: ' + total);
 console.log(perFile.join(' · '));
-// The five that had none. Named so that a regression is visible rather than
-// merely absent — this is the list the Delight Pass wave three closed.
-const CLOSED = ['quay.js', 'goreme.js', 'manly.js', 'pantanal.js'];
-for (const f of CLOSED) {
-  const src = readFileSync(join(SRC, f), 'utf8');
-  if (!/\bafter:\s*'/.test(src)) {
-    console.log('BLOCKER  ' + f + ' has no conditional lines at all again');
+// EVERY chapter with its own cast, not a hand-kept list of the ones that were
+// once fixed. The old list named four — the ones the Delight Pass wave three
+// closed — which is why chapters 18 and 19 could ship with none and score a
+// clean run: they were not on the list, and they were not in FILE_CHAPTER
+// either, so nothing looked at them at all.
+const perFileN = new Map(perFile.map(s => {
+  const i = s.lastIndexOf(' ');
+  return [s.slice(0, i) + '.js', Number(s.slice(i + 1))];
+}));
+for (const f of Object.keys(FILE_CHAPTER)) {
+  const n = perFileN.get(f) || 0;
+  if (n === 0) {
+    console.log('BLOCKER  ' + f + ' (ch' + FILE_CHAPTER[f] +
+                ') has NO conditional lines — nobody there reacts to what you have done');
     bad++;
+  } else if (n < MIN_CONDITIONAL) {
+    console.log('WARN     ' + f + ' (ch' + FILE_CHAPTER[f] + ') has only ' + n +
+                ' conditional lines, under the ' + MIN_CONDITIONAL + ' floor');
+    warn++;
   }
 }
 console.log('\n' + bad + ' blockers, ' + warn + ' warnings');

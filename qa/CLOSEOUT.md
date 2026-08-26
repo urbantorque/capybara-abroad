@@ -229,3 +229,32 @@ localStorage.clear())` persists on the BROWSER CONTEXT, not just the script that
 it — so every later `run-code` in the same session silently wipes the save too. Three runs
 reported an empty journey against a save system that was working, which is memory trap 10
 one level further out. A write-then-reload test needs its own session.
+
+## Job 2 — the five pillars on chapters 18 and 19
+
+### Pillar 2, the cast — NOBODY IN EITHER CHAPTER REACTED TO ANYTHING YOU HAD DONE
+
+Both chapters ship a good cast: 8 people in Monte Carlo and 7 in Hanoi, each with idle
+lines, wheek answers, an `onTask` reaction and a two-hander `addExchange`. What neither had
+was a single `after:` or `before:` line — **0 and 0**, against 15 to 42 in every other
+chapter with its own cast.
+
+`onTask` fires once, at the moment, and is gone. So the doorman who watched you walk out of
+the casino eleven chips up greeted you next morning exactly as he had the first time, and
+the woman whose pho you put your whole face in had nothing to say about it ever again.
+
+**And `qa/lines.mjs` could not see it, twice over.** Its `FILE_CHAPTER` table stopped at 17,
+so neither file was read at all; and its regression list named four specific files — the
+ones the Delight Pass once fixed — so "this chapter has no conditional lines" was not a
+condition it tested for anywhere. Both corrected: the table goes to 19, and **every** chapter
+with a cast must now carry conditional lines, with a floor of 6.
+
+Added 26 to Monte Carlo and 23 to Hanoi, in each character's own register. Verified at
+runtime on a cleared save, not just parsed:
+
+| | completing | measured |
+|---|---|---|
+| monaco | `high-dive` | the deckhand swaps *"Nobody has ever actually gone off it"* → *"You went off it. From the TOP deck. I have to write that up."*; the man on the quay gains *"Something came off the top deck this morning."* |
+| hanoi | `cross-the-road` | the pho seller swaps *"You do not cross by waiting"* → *"You walked straight through it. Like somebody who lives here."* |
+
+`qa/lines.mjs`: **477 conditional lines over 17 casts, 0 blockers** (was 428 over 15).

@@ -3615,10 +3615,23 @@ function monBuildLocals(game) {
   monLocDoor = put(monSTEPS.x - 3.4, monSTEPS.z + 3.0, {
     figure: { shirt: PALETTE.monTux, legs: PALETTE.monTux, hat: PALETTE.monTux },
     face: Math.PI, near: 9,
+    // ---- AND WHAT HE SAYS CHANGES (v30) --------------------------------
+    // Chapter 18 shipped with no conditional line anywhere in it: `onTask`
+    // fires once at the moment and is gone, so a doorman who has watched you
+    // walk out of that building eleven chips up greeted you next morning
+    // exactly as he greeted you the first time. `after:`/`before:` is the
+    // channel that makes a place remember, and every other chapter with a cast
+    // has between fifteen and forty-two of them.
     lines: ['Good evening. The jacket is not, strictly, required.',
             'You are on the list. I have not checked the list.',
             'Mind the step. Everybody minds the step.',
-            'They are two thousand a night, the rooms. You have not asked.'],
+            'They are two thousand a night, the rooms. You have not asked.',
+            { t: 'You will want a jacket. I am not saying you will need one.', before: 'black-tie' },
+            { t: 'The jacket suits you. I shall not ask whose it is.', after: 'black-tie' },
+            { t: 'The door is that way. I am the door.', before: 'pass-the-door' },
+            { t: 'You know the way in now. I would rather you used it.', after: 'pass-the-door' },
+            { t: 'They are still counting, inside. Twice.', after: 'chip-stack' },
+            { t: 'I have been asked to describe you. I said: a gentleman.', after: 'the-tunnel' }],
     wheek: ['Indeed.', 'Quite.', 'A very good evening to you also.'],
     onTask: { 'the-tunnel': ['I felt that from here.'],
               'chip-stack': ['The gentlemen inside are talking about you.'] },
@@ -3627,13 +3640,20 @@ function monBuildLocals(game) {
     figure: { shirt: PALETTE.monCrowdC }, face: Math.PI - 0.4, near: 8,
     lines: ['Someone has parked something enormous on the pavement again.',
             'I have been here eleven years. You are the fourth.',
-            'The fourth ANIMAL. The others were a peacock and two dogs.'],
+            'The fourth ANIMAL. The others were a peacock and two dogs.',
+            { t: 'The Palace is up the hill. You will not get up there.', before: 'the-rock' },
+            { t: 'You got up the Rock. Nobody walks up the Rock.', after: 'the-rock' },
+            { t: 'They say one of the guards moved. They never move.', after: 'palace-guard' }],
   });
   monLocQuay = put(-58, -30, {
     figure: { shirt: PALETTE.monCrowdD, hat: PALETTE.monCrowdE }, face: 1.2, near: 8,
     lines: ['Nothing in this water since Tuesday.',
             'They put a boat in there once. Cost more than the country.',
-            'Everybody looks up the hill. Nobody looks down here.'],
+            'Everybody looks up the hill. Nobody looks down here.',
+            { t: 'That big white one is not going anywhere. Nobody is aboard.', before: 'superyacht' },
+            { t: 'You were on it. I watched you get on it.', after: 'superyacht' },
+            { t: 'Something came off the top deck this morning. Big splash.', after: 'high-dive' },
+            { t: 'There is a barrier in my water now. That is new.', after: 'chicane' }],
     wheek: ['You will scare what is left of them.'],
   });
   monLocDeck = put(monYACHT.x - 2.4, monYACHT.z - 14, {
@@ -3642,14 +3662,21 @@ function monBuildLocals(game) {
   if (monLocDeck) {
     monLocDeck.lines = ['The owner is in Gstaad. The owner is always in Gstaad.',
                         'You may go up. Everybody goes up.',
-                        'That is nine metres to the water. People do ask.'];
+                        'That is nine metres to the water. People do ask.',
+                        { t: 'Nobody has ever actually gone off it. People ask, and then they look.', before: 'high-dive' },
+                        { t: 'You went off it. From the TOP deck. I have to write that up.', after: 'high-dive' },
+                        { t: 'You are dressed better than the owner now.', after: 'black-tie' }];
     monLocDeck.wheekLines = ['I shall put you down as a guest.'];
   }
   monLocMarshal = put(168, 44, {
     figure: { shirt: PALETTE.monMarshal, hat: PALETTE.monMarshalHat }, face: -1.9, near: 10,
     lines: ['They come through here at about thirty. You can outrun that.',
             'Slowest corner on the calendar. Do not tell them I said so.',
-            'If you are going to do it, do it on the inside.'],
+            'If you are going to do it, do it on the inside.',
+            { t: 'You want the hairpin. Everything else here is too fast.', before: 'the-hairpin' },
+            { t: 'You rode the hairpin. On the ROOF. I am still not writing it down.', after: 'the-hairpin' },
+            { t: 'The tunnel is the loud one. Mind your ears.', before: 'the-tunnel' },
+            { t: 'They heard that tunnel in Nice.', after: 'the-tunnel' }],
     wheek: ['Yellow flag. That is you, that is.'],
     onTask: { 'the-hairpin': ['I saw that. I am not writing it down.'] },
   });
@@ -3657,14 +3684,20 @@ function monBuildLocals(game) {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: -1.5708, near: 8,
     lines: ['Change, sir? Madam? I shall guess.',
             'The wheel does not stop. It has not stopped since nineteen-ten.',
-            'Green pays eight. Green does not happen.'],
+            'Green pays eight. Green does not happen.',
+            { t: 'You will want to be ten up before you try to leave.', before: 'chip-stack' },
+            { t: 'Ten up, and out of the door. I have worked here nine years.', after: 'chip-stack' },
+            { t: 'Somebody has watered the carpet with a very good year.', after: 'champagne' }],
     wheek: ['Please.'],
     onTask: { 'chip-stack': ['You are up. Now walk out. Nobody ever walks out.'] },
   }, monFLOOR_Y);
   monLocCroup = put(monWHEEL.x - 3.4, monWHEEL.z - 1.2, {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: 1.4, near: 8,
     lines: ['Rien ne va plus.', 'Faites vos jeux. Or do not. It is all the same to me.',
-            'Something has to go IN it. That is how it works.'],
+            'Something has to go IN it. That is how it works.',
+            { t: 'The wheel is for the ball. I mention it in case.', before: 'the-wheel' },
+            { t: 'You have been IN the wheel. I have nothing for that.', after: 'the-wheel' },
+            { t: 'The piano is not usually part of the evening.', after: 'piano-solo' }],
     wheek: ['Rien ne va plus.'],
     onTask: { 'the-wheel': ['That is not what it is for.'] },
   }, monFLOOR_Y);
