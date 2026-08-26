@@ -1314,6 +1314,16 @@ function rioUpdateWaves(game, dt) {
     if (rioWaveFrom > 8e8) rioWaveFrom = cp.z;
     rioWaveRide = Math.max(0, cp.z - rioWaveFrom);
     if (rioWaveRide > rioWaveBest) rioWaveBest = rioWaveRide;
+    // THIS ride, not the session's best: a wave is one attempt and the metres
+    // under you now are what you are watching. (v32)
+    //
+    // THE TWO-METRE FLOOR IS NOT A NICETY. `on` above is true of any water with
+    // a flow over 2.5 m/s in it, which on this beach is most of the shore break
+    // — so without the floor the line was up on 187 of 605 samples of ordinary
+    // play, measured over sixty seconds of wandering. Bobbing about in the
+    // white water is not taking a wave; being carried two metres is the
+    // cheapest thing that is.
+    if (game.recordLive && rioWaveRide > 2) game.recordLive('take-a-wave', rioWaveRide);
     if (rioWaveSurf <= 0 && game.sfx) game.sfx('splash', { volume: 0.55, pitch: 1.25 });
     rioWaveSurf = 0.55;
     if (!rioWaveDone && rioWaveRide >= rioWAVE_RIDE) {
@@ -3489,7 +3499,13 @@ function rioUpdateSamba(game, dt) {
   rioFlash = damp(rioFlash, 0, 6, dt);
   rioWrongFlash = damp(rioWrongFlash, 0, 5, dt);
 
-  if (!rioInColumn || rioSambaDone) return;
+  // ---- THE COLUMN DOES NOT CLOSE WHEN THE TICK LANDS (v32) ----------------
+  // Same shape as the Cali floor, same fix: `|| rioSambaDone` here froze
+  // `samba-parade` at whatever run first hit the target, so the chapter's one
+  // chaseable number could never move again. The TASK happens once; the
+  // counting does not stop.
+  if (!rioInColumn) { if (game.recordEnd) game.recordEnd('samba-parade'); return; }
+  if (game.recordLive) game.recordLive('samba-parade', rioCombo);
 
   // --- did the player just DO something? ---
   const yaw = capy.group ? capy.group.rotation.y : 0;
@@ -3560,7 +3576,7 @@ function rioUpdateSamba(game, dt) {
     }
   }
   if (rioCombo === 3 && typeof game.toast === 'function') game.toast('isso!');
-  if (rioCombo >= rioSAMBA_TARGET) {
+  if (rioCombo >= rioSAMBA_TARGET && !rioSambaDone) {
     rioSambaDone = true;
     rioTask('samba-parade');
     rioBurstSparks(p.x, y + 0.8, p.z, 22, 1.5);
@@ -3633,7 +3649,15 @@ function rioUpdateTasks(game, dt) {
   }
 
   // --- Selaron's steps, against the clock ------------------------------------
-  if (!rioSelaronDone) {
+  // ---- THE FLIGHT DOES NOT CLOSE WHEN THE TICK LANDS (v32) -----------------
+  // This whole block used to be gated on `!rioSelaronDone`, which is the third
+  // instance in this pass of the same mistake (the Cali floor and the samba
+  // column were the other two): the clock stopped for ever the first time the
+  // par was beaten, so `selaron-steps` — a `better: 'lower'` record, and one of
+  // the twenty runs a player is meant to come back for — could never be
+  // improved. Now the clock always runs; only the TICK and the "too slow" line
+  // are once-only, because only they are about the task.
+  {
     const foot = rioSelaronFoot(), head = rioSelaronHead();
     const df = (p.x - foot.x) * (p.x - foot.x) + (p.z - foot.z) * (p.z - foot.z);
     const dh = (p.x - head.x) * (p.x - head.x) + (p.z - head.z) * (p.z - head.z);
@@ -3652,6 +3676,8 @@ function rioUpdateTasks(game, dt) {
       } else rioSelaronT = 0;              // re-entering the bottom restarts the clock
     } else if (rioSelaronT >= 0) {
       rioSelaronT += dt;
+      // the clock, on the paper, while you are on the flight (v32)
+      if (game.recordLive) game.recordLive('selaron-steps', rioSelaronT);
       // ---- AND THE TILES COME OFF UNDER YOU -------------------------------
       // The flight is timed and there was no feedback at all between the "go"
       // and the verdict eight and a half seconds later — the one task in the
@@ -3664,15 +3690,21 @@ function rioUpdateTasks(game, dt) {
         rioBurstSparks(p.x + rand(-0.5, 0.5), rioTerrain(p.x, p.z) + 0.25, p.z - 0.6, 1, 0.45);
       }
       if (dh < 6 * 6) {
-        if (rioSelaronT <= rioSELARON_PAR) {
+        const t = rioSelaronT;
+        rioSelaronT = -1;                  // the top is the end of the attempt
+        if (rioSelaronDone) {
+          // Been here before: no tick, no instruction, just the number. The
+          // "personal best" toast is recordValue's to say, and only if it is.
+          if (typeof game.record === 'function') game.record('selaron-steps', t);
+          if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.55, pitch: 1.2 });
+        } else if (t <= rioSELARON_PAR) {
           rioSelaronDone = true;
           rioTask('selaron-steps');
-          if (typeof game.record === 'function') game.record('selaron-steps', rioSelaronT);
+          if (typeof game.record === 'function') game.record('selaron-steps', t);
           rioBurstSparks(p.x, rioTerrain(p.x, p.z) + 1.0, p.z, 14, 1.2);
-          if (typeof game.toast === 'function') game.toast('twenty years of tiling, taken in ' + rioSelaronT.toFixed(1) + ' seconds');
+          if (typeof game.toast === 'function') game.toast('twenty years of tiling, taken in ' + t.toFixed(1) + ' seconds');
           if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.9 });
         } else {
-          rioSelaronT = -1;
           if (typeof game.toast === 'function') game.toast('too slow. go back down and run it.');
         }
       } else if (rioSelaronT > rioSELARON_PAR * 2.2) {

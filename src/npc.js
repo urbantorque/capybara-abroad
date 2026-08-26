@@ -1364,6 +1364,12 @@ export function createNPCs(game) {
       // both ceilings read; `ownCool` is what stops one person spending the
       // whole chapter chasing you.
       own: null, ownT: 0, ownBack: false, ownCool: 0, ownSay: 0,
+      // ---- HEAT (see the block below the chains) ----
+      // `gd` is where their stock is, re-read on `gdT`; `grd` is how far the
+      // guard pose has come up. `watching` is not read by anything in here —
+      // it is published for the soak, because "is anybody looking" measured off
+      // a drawn yaw catches somebody who happens to be pointed the right way.
+      gd: null, gdT: 0, grd: 0, watching: 0,
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -1544,7 +1550,13 @@ export function createNPCs(game) {
     if (!locals.length) return;
     const live = game.biome && game.biome.current;
     if (!live) return;
-    const r = radius > 0 ? radius : npcLOC_REACT_R;
+    // ---- 2a: A HOT SQUARE TURNS ROUND FROM FURTHER AWAY (v33) ------------
+    // The same npcHEAT_LOOK stretch the chain takes, on the circle that decides
+    // who flinches and who has a line about it. It buys attention and only
+    // attention: nobody who was not going to react now denies anything, they
+    // were simply out of earshot a moment ago and are not now.
+    const r = (radius > 0 ? radius : npcLOC_REACT_R)
+              * (1 + npcHeatAt(x, z) * (npcHEAT_LOOK - 1));
     const r2 = r * r;
     const s = clamp(strength === undefined ? 1 : strength, 0, 1);
     // ---- WAS THIS YOU? (v19) ---------------------------------------------
@@ -1587,6 +1599,16 @@ export function createNPCs(game) {
         }
       }
     }
+    // ---- ...AND THE PLACE REMEMBERS IT, NOT ONLY THE PEOPLE (v33) --------
+    // AFTER the loop, and not before it: the loop is what makes the witnesses
+    // wary, and npcHeatBump's input is the count of people near here who are
+    // now watching for you. Bumped before the loop, the first incident in a
+    // square would be worth nothing.
+    //
+    // `mine` is the same gate the wariness write takes. A chapter announcing
+    // its own bang — a crate off a barrow, a gate, a wave — may not make the
+    // square cross with the animal that was nowhere near it.
+    if (mine) npcHeatBump(x, z, 'react:' + kind);
   }
 
   // =======================================================================
@@ -1691,6 +1713,286 @@ export function createNPCs(game) {
                         'I am not asking twice.', 'That is not yours.'];
   let locChainFrom = null, locChainT = 0;
 
+  // =======================================================================
+  // ...AND NEITHER `wary` NOR `fam` IS ABOUT THE PLACE (v33).
+  //
+  // Both of them are a memory held by ONE PERSON. Above them there is nothing
+  // at all: measured 26 Aug, one wheek moves `state.chaos` 0 → 0.21 and it is
+  // back to 0.07 in 8.7 s, and the only two readers of chaos in the repo are a
+  // music-layer gain and the calm counter. So a square you have been
+  // tormenting for four minutes is exactly as easy to walk into as one you
+  // have never visited, and that is why hour six plays like hour one: the list
+  // gets shorter and the world never changes its mind.
+  //
+  // The genre this is styled after runs on one loop — approach, get seen, be
+  // driven off, come back another way. The first half is built here and built
+  // well (npcHeat, the witness chain, the wary lines, the 26-second memory).
+  // HEAT is the second half, and it is an ACCUMULATOR SITTING ON TOP of the
+  // wariness that already exists rather than a replacement for it. Its input
+  // is `npcHeat(x, z, r)`, which already answers "how many people near here
+  // are watching FOR you". Nothing new is measured.
+  //
+  // WHAT IT BUYS IS ATTENTION AND NOTHING ELSE, exactly like `wary` — more
+  // heads turning, turning further out, sooner, in a higher register, and a
+  // stallholder standing in front of their own stock. Nothing is denied,
+  // nothing is lost and no task is made harder; the differential in
+  // qa/b7-tasks.js exists to prove that rather than to assert it.
+  //
+  // ---- A FIELD, NOT ONE NUMBER, AND THE DIAMETERS SAY SO ------------------
+  // A single number per chapter would mean robbing the market makes the far
+  // side of the plaza harder. The people-span of all nineteen was measured for
+  // this decision (qa/b7-diam.js, chapter list derived from CHAPTERS):
+  //
+  //   Palawan 90 · Kowloon 93 · Venice 110 · Sydney 112 · Pasto 117 · Hanoi 148
+  //   Manly 161 · Rio 169 · Göreme 172 · Sơn Đoòng 193 · Cali 203 · Antarctica 237
+  //   the Drift 241 · Monte Carlo 302 · Marrakech 308 · Iceland 310 · Kyoto 348
+  //   ...and THE QUAY at 638.
+  //
+  // The median is 169 m and only two chapters are under a hundred. One number
+  // is a lie in seventeen of the nineteen, so heat is a FIELD: at most
+  // npcHEAT_SITES points, each with a strength and a decay, and a linear
+  // falloff around each.
+  //
+  // ---- AND THE RADIUS AND THE RANGE ARE DERIVED FROM EACH OTHER -----------
+  // Trap 3 of this batch: the finale's gather chose a ceiling and a radius
+  // separately and put four of five people out of reach. So neither of these
+  // two numbers is chosen on its own.
+  //
+  //   FLOOR    a site may not be smaller than the crowd that made it, and it
+  //            may not be smaller than the range that crowd will look at when
+  //            it is hot — or a witness stands outside the heat its own
+  //            witnessing created. That is npcCHAIN_R (20 m, measured: the
+  //            distance at which one person in a square hears another) times
+  //            the largest range multiplier heat can buy. 20 × 1.6 = 32.
+  //   CEILING  half the smallest chapter's people-span, or the field collapses
+  //            back into the single number it exists to avoid. Palawan is
+  //            90 m across, so 45.
+  //
+  // 32 sits on the floor and clears the ceiling, and if npcHEAT_LOOK ever
+  // moves, the radius moves with it.
+  const npcHEAT_LOOK  = 1.6;   // × the look range at full heat — SETS the radius
+  const npcHEAT_R     = npcCHAIN_R * npcHEAT_LOOK;      // 32 m. Derived. See above.
+  const npcHEAT_MERGE = npcHEAT_R * 0.5;                // two incidents this close are one place
+  const npcHEAT_SITES = 6;     // …and this many places may be hot at once
+  // HOW LONG A PLACE STAYS CROSS. Linear, like `wary`, and for the same reason:
+  // a memory that fades exponentially never quite goes. 90 s is 3.5× the
+  // 26-second personal clock, which is the entire point — the individuals have
+  // forgotten and the square has not.
+  const npcHEAT_T     = 90;
+  // WHAT ONE INCIDENT IS WORTH, and the first cut of this got it wrong in a
+  // way that only showed up outside Sydney. It was `STEP × clamp(w/SAT, .34, 1)`
+  // — proportional to the witness count with a floor — and it means one witness
+  // is worth 0.116, which against a 90-second linear decay is GONE IN TEN
+  // SECONDS. Measured: Hong Kong and Cappadocia rose to 0.11 and 0.22 and were
+  // back at zero before the next approach, three robberies running.
+  //
+  // One witness is not a third of an incident. It is an incident, seen. So the
+  // step is mostly flat and the witness count is the top four tenths of it:
+  // w=1 → 0.24, w=2 → 0.32, w≥3 → 0.40. That matters because the chapters
+  // where this was dead are the ones with six to ten people spread over a
+  // hundred and fifty metres, and one or two witnesses is the NORMAL case
+  // there rather than the poor one.
+  // ---- AND AN INCIDENT IS NOT A FRAME (v33) ------------------------------
+  // Measured under real keys, from a cleared save, in Sydney: four seconds of
+  // walking about and ONE WHEEK took the field from 0 to 1 and pinned it
+  // there, with twenty-six bumps logged. The reason is that the witness chain
+  // arms on every startle and a wheek in a thirty-eight-person park startles
+  // most of it, so the accumulator counted one event thirty-eight times.
+  //
+  // A place may only be bumped once every npcHEAT_GAP seconds. Ten people
+  // turning round at once is ONE thing that happened, and the escalation this
+  // batch exists to build has no headroom at all in the chapter where the
+  // player spends their first hour unless that is true. It is per SITE and not
+  // global: robbing two ends of a market inside four seconds is two incidents.
+  const npcHEAT_GAP   = 4.0;
+  const npcHEAT_STEP  = 0.40;  // …at full witness. Three robberies saturate.
+  const npcHEAT_BASE  = 0.60;  // …and the fraction of it one witness alone is worth
+  const npcHEAT_SAT   = 3;     // witnesses at which one incident is worth the full step
+  // …and what heat is allowed to change, all of it attention:
+  const npcHEAT_SOON  = 0.60;  // how far it lowers the bar to the wary register (2e)
+  const npcHEAT_AGAIN = 0.45;  // how far it shortens the notice cooldown (2a)
+  const npcHEAT_GUARD = 0.30;  // heat below this and nobody bothers standing up (2b)
+  const npcHEAT_GD_R  = 1.60;  // m of stock a guard may NEVER stand inside. See below.
+  const npcHEAT_GD_ARM = 0.55; // rad the arms come forward over the stock (2c)
+  const npcHEAT_GD_T  = 5.0;   // s between re-reads of where somebody's stock is
+
+  // The sites. `biome` is not optional: every chapter shares one coordinate
+  // space, so an ungated field would make Marrakech hot because Sydney was.
+  const npcHeatSites = [];
+  // THE DIFFERENTIAL LEVER, and it is a test hook rather than a feature.
+  // "Zero tasks made harder" is only provable by running the same task sweep
+  // twice with nothing else different, so `game.forceHeat(1)` and
+  // `game.forceHeat(0)` pin the field and `game.forceHeat(-1)` releases it.
+  let npcHeatForce = -1;
+
+  /**
+   * A place cools in REAL time, not in chapter time — you cannot wait somewhere
+   * else and come back to a square that is exactly as you left it. Called once
+   * at the top of update(), above the biome gate, for that reason.
+   */
+  function npcHeatDecay(dt) {
+    for (let i = npcHeatSites.length - 1; i >= 0; i--) {
+      const s = npcHeatSites[i];
+      if (s.t > 0) s.t -= dt;      // the incident gap. See npcHEAT_GAP.
+      s.h -= dt / npcHEAT_T;
+      if (s.h <= 0) npcHeatSites.splice(i, 1);
+    }
+  }
+
+  /**
+   * SOMEBODY SAW THAT. Raises the field at (x, z) by an amount derived from the
+   * existing witness count — mischief nobody saw is worth exactly nothing,
+   * which is what keeps the finds (the one place in this game with teeth, and
+   * the place `not-a-soul` and `most-wanted` live) precisely as they were.
+   */
+  function npcHeatBump(x, z, src) {
+    const live = game.biome && game.biome.current;
+    if (!live) return 0;
+    const w = npcHeat(x, z, npcHEAT_R);
+    // NAMED, NOT JUST COUNTED. A soak that reports "the field went up" cannot
+    // say which of the four paths did it, and the first cut of qa/b7-heat.js
+    // reported a field saturating in Sydney and dead flat in four other
+    // chapters with no way to tell whether that was the chapter, the event or
+    // the probe. The tally is two object writes on an event, not per frame.
+    try {
+      const t = game.state.heatLog || (game.state.heatLog = {});
+      const k = (src || '?') + (w > 0 ? '' : ':unseen');
+      t[k] = (t[k] || 0) + 1;
+    } catch (e) { /* optional */ }
+    if (w <= 0) return 0;
+    const add = npcHEAT_STEP * (npcHEAT_BASE + (1 - npcHEAT_BASE) *
+                clamp((w - 1) / (npcHEAT_SAT - 1), 0, 1));
+    let best = null, bestD = npcHEAT_MERGE * npcHEAT_MERGE, weak = null;
+    for (let i = 0; i < npcHeatSites.length; i++) {
+      const s = npcHeatSites[i];
+      if (!weak || s.h < weak.h) weak = s;
+      if (s.biome !== live) continue;
+      const dx = s.x - x, dz = s.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD) { bestD = d2; best = s; }
+    }
+    if (best) {
+      // …once every npcHEAT_GAP. The tally above still records the call, so a
+      // suppressed bump is visible in the log rather than silent.
+      if (best.t > 0) return 0;
+      best.t = npcHEAT_GAP;
+      // The site follows the trouble, weighted by what the new incident is
+      // worth — otherwise a stall robbed three times keeps a hot spot at the
+      // place the FIRST robbery happened and drifts away from itself.
+      const f = add / (best.h + add);
+      best.x += (x - best.x) * f;
+      best.z += (z - best.z) * f;
+      best.h = Math.min(1, best.h + add);
+    } else if (npcHeatSites.length < npcHEAT_SITES) {
+      npcHeatSites.push({ biome: live, x: x, z: z, h: Math.min(1, add), t: npcHEAT_GAP });
+    } else if (weak && weak.h < add) {
+      // Full, and nothing near. The weakest place in the world gives way, and
+      // only to something hotter than it — never the other way round, or a
+      // single bang in a new corner erases four minutes of a market.
+      weak.biome = live; weak.x = x; weak.z = z; weak.h = Math.min(1, add); weak.t = npcHEAT_GAP;
+    }
+    return add;
+  }
+
+  /**
+   * HOW HOT IS IT HERE, 0..1. Summed and clamped rather than maxed: two
+   * incidents a stall apart make one hot place, which is what they are.
+   */
+  function npcHeatAt(x, z) {
+    if (npcHeatForce >= 0) return npcHeatForce;
+    const live = game.biome && game.biome.current;
+    if (!live) return 0;
+    let h = 0;
+    for (let i = 0; i < npcHeatSites.length; i++) {
+      const s = npcHeatSites[i];
+      if (s.biome !== live) continue;
+      const dx = s.x - x, dz = s.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= npcHEAT_R * npcHEAT_R) continue;
+      h += s.h * (1 - Math.sqrt(d2) / npcHEAT_R);
+    }
+    return h > 1 ? 1 : h;
+  }
+
+  /**
+   * WHERE SOMEBODY'S STOCK IS, as one point, re-read every npcHEAT_GD_T seconds
+   * rather than every frame — the answer only moves when a chapter rebuilds.
+   * Null when they own nothing, which is most people in most chapters.
+   */
+  function npcGuardSpot(r) {
+    if (r.gdT > 0) return r.gd;
+    r.gdT = npcHEAT_GD_T * rand(0.8, 1.4);
+    const arr = game.props;
+    r.gd = null;
+    if (!arr) return null;
+    const live = game.biome && game.biome.current;
+    let sx = 0, sz = 0, n = 0, near = 1e9;
+    for (let i = 0; i < arr.length; i++) {
+      const p = arr[i];
+      if (!p || (p.biome && p.biome !== live)) continue;
+      if (typeof p.homeX !== 'number' || !isFinite(p.homeX)) continue;
+      const dx = p.homeX - r.ax, dz = p.homeZ - r.az;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > npcOWN_R * npcOWN_R) continue;
+      sx += p.homeX; sz += p.homeZ; n++;
+      if (d2 < near) near = d2;
+    }
+    if (!n) return null;
+    r.gd = { x: sx / n, z: sz / n, near: Math.sqrt(near) };
+    return r.gd;
+  }
+
+  /**
+   * 2b — A STALLHOLDER STANDS IN FRONT OF THEIR OWN STALL.
+   *
+   * The shuffle is the honest amount of movement a fixed point has, and this
+   * points it instead of randomising it. It is inside the SAME npcLOC_STEP_R
+   * envelope, so a person still cannot leave the square metre the chapter put
+   * them on and still cannot walk into anything that was not already touching
+   * them.
+   *
+   * AND IT KEEPS ITS DISTANCE FROM THE STOCK. A local carries a static body,
+   * so a bias that walked somebody onto their own crates would be a collider
+   * placed between the player and a thing the player may have to pick up —
+   * which is the one thing this whole batch may not do. npcHEAT_GD_R is the
+   * skirt: the guard steps out toward their stall and stops well short of it,
+   * and if their anchor is already inside the skirt they do not move at all.
+   */
+  function npcHeatGuard(r, h) {
+    if (h < npcHEAT_GUARD) return;
+    const gd = npcGuardSpot(r);
+    if (!gd) return;
+    const dx = gd.x - r.ax, dz = gd.z - r.az;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    // Already at their stall, or the nearest crate is inside the skirt: there
+    // is nowhere to step to that is not on top of the stock.
+    if (d < npcHEAT_GD_R + npcLOC_STEP_R || gd.near < npcHEAT_GD_R) return;
+    const step = npcLOC_STEP_R * h;
+    const tx = r.ax + dx / d * step, tz = r.az + dz / d * step;
+    if (navBlocked(tx, tz, npcSEP_PROBE)) return;
+    // ---- AND THE SKIRT IS ROUND EVERY PROP, NOT ROUND THEIR OWN ----------
+    // Measured, and it is why this test is here rather than only on the
+    // centroid: keeping clear of your OWN stock says nothing about the crate
+    // that happens to lie along the step. With the centroid test alone, the
+    // nearest prop-home-to-person distance fell in eleven chapters of
+    // nineteen — Kyoto 2.80 → 1.74, Cappadocia 2.00 → 1.48, Hanoi 1.40 → 1.08,
+    // Antarctica 0.50 → 0.33 — which is a static collider systematically
+    // closing on things the player has to pick up. Small, and exactly the
+    // wrong direction.
+    const arr = game.props;
+    if (arr) {
+      const liveB = game.biome && game.biome.current;
+      for (let i = 0; i < arr.length; i++) {
+        const p = arr[i];
+        if (!p || (p.biome && p.biome !== liveB)) continue;
+        if (typeof p.homeX !== 'number' || !isFinite(p.homeX)) continue;
+        const px = p.homeX - tx, pz = p.homeZ - tz;
+        if (px * px + pz * pz < npcHEAT_GD_R * npcHEAT_GD_R) return;
+      }
+    }
+    r.tx = tx; r.tz = tz;
+  }
+
   /**
    * The ground under a point, whichever chapter is live. `paY` is the same
    * function pinned to Pasto; this is its chapter-neutral twin, and it answers
@@ -1737,6 +2039,11 @@ export function createNPCs(game) {
   // LOOKS and at most one of them says something, which is most of what sells
   // a square noticing you.
   const npcWIT_LOOK = 2.6;      // s a witness goes on facing what it heard
+  // The states in which one of the two old casts has its head ON the animal —
+  // Sydney's on the left, Pasto's on the right. Published only; see the note
+  // in npcWitnessHold. `chase` and `flee` are deliberately absent.
+  const npcWATCH_ST = { lookAt: 1, shoo: 1, startled: 1, cornered: 1,
+                        gawp: 1, point: 1, scold: 1, scandal: 1 };
   // One pool per chapter, because these two chapters HAVE voices — every other
   // line in Pasto is in its own register and a witness answering in Sydney's
   // would be the only flat sentence in the plaza.
@@ -1760,6 +2067,21 @@ export function createNPCs(game) {
    * to obey that rule is not to add a state.
    */
   function npcWitnessHold(rec, dt) {
+    // PUBLISHED FOR THE SOAK, and read by nothing in here. The escalation
+    // measurement is "how many people are pointed at the animal", and inferring
+    // that from a drawn yaw counts everybody who happens to be facing the right
+    // way — 75 m of Sydney park, measured, in the first cut of qa/b7-heat.js.
+    // These are the states in which a person's head is ON the capybara.
+    // NOT `chase` and NOT `flee`. Somebody running is not somebody watching,
+    // and including them put three Sydneysiders on the far side of the park
+    // into a count that was supposed to be about how close you can get.
+    //
+    // AND THE TWO CASTS DO NOT SHARE A VOCABULARY. Sydney looks at you in
+    // `lookAt`; Pasto has no such state — it looks at you in `gawp`, `point`
+    // and `scold`. The first cut listed Sydney's names only and reported a
+    // flat zero for the whole of chapter 2, in every row of every run, which
+    // reads exactly like a crowd that does not react and is not one.
+    rec.watching = (rec.witT > 0 || npcWATCH_ST[rec.state]) ? 1 : 0;
     if (!(rec.witT > 0)) return;
     rec.witT -= dt;
     if (rec.witT <= 0) { rec.witT = 0; return; }
@@ -1853,6 +2175,50 @@ export function createNPCs(game) {
   }
   game.events.on('finale:staged', npcGather);
 
+  /**
+   * ARM THE CHAIN FROM WHOEVER IS NEAREST TO (x, z), in the two chapters that
+   * have no `locals`. npcWitnessChain takes a PERSON, because a look has to
+   * come from somebody — so an event that carries a place and not a person had
+   * no way in, and `capy:grab` is exactly that event.
+   *
+   * MEASURED, and it is job 3a: robbing somebody in Pasto raised nothing at
+   * all. The graze handler is the only thing that arms this chain outside
+   * Sydney's own startles, and it only fires once the animal has taken a BITE
+   * — so the theft itself, in the chapter with the most edible props in the
+   * game, was witnessed by nobody. `capy:grab` is the robbery.
+   *
+   * Pure attention, deliberately: a chain turns heads and lets exactly one
+   * person speak. Nothing here starts a chase, and the ownership chase Sydney
+   * already has on `prop.owner` is untouched and still outranks it.
+   */
+  function npcCastWitnessAt(x, z, r) {
+    const live = game.biome && game.biome.current;
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (!cast) return 0;
+    let best = null, bd = r * r;
+    for (let i = 0; i < cast.length; i++) {
+      const rec = cast[i];
+      if (!rec || !rec.group || !rec.group.visible) continue;
+      if (rec.state === 'flee' || rec.state === 'plunge' || rec.state === 'swim') continue;
+      const dx = rec.group.position.x - x, dz = rec.group.position.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bd) { bd = d2; best = rec; }
+    }
+    if (!best) return 0;
+    // They have seen it, which is the thing npcHeat counts. `alarm` and not
+    // `wary`: alarm is the channel these two casts use and stepHuman derives
+    // the memory from it a frame later, which is the existing design.
+    best.alarm = Math.max(best.alarm || 0, 0.75);
+    // At the THING, and not via lookAtCapy: `capyX`/`capyZ` are refreshed by
+    // refreshCapy(), which sits BELOW the biome gate in update() and therefore
+    // never runs in Pasto — so a look through that helper would point Pasto's
+    // people at wherever the animal last stood in Sydney. Same shared-space
+    // family as the npcHeat leak this batch fixed one screen up.
+    best.lookX = x; best.lookZ = z;
+    best.witX = x; best.witZ = z; best.witT = npcWIT_LOOK;
+    return npcWitnessChain(best);
+  }
+
   function npcWitnessChain(src) {
     if (!src || !src.group) return 0;
     // The live-biome gate is not optional: every chapter shares one coordinate
@@ -1862,7 +2228,16 @@ export function createNPCs(game) {
     if (live !== 'sydney' && live !== 'pasto') return 0;
     const cast = live === 'sydney' ? humans : paHumans;
     const sx = src.group.position.x, sz = src.group.position.z;
-    let best = null, bestD = npcCHAIN_R * npcCHAIN_R, n = 0;
+    // ---- 2a: MORE HEADS, AND FROM FURTHER OUT, WHERE IT IS HOT (v33) -----
+    // The chain radius is the measured distance at which one person in a
+    // square hears another, and heat is allowed to stretch it by npcHEAT_LOOK
+    // — which is the same multiplier the radius of the field itself is derived
+    // from, so a witness can never be recruited from outside the heat its own
+    // witnessing creates. That is trap 3 of this batch, obeyed by construction
+    // rather than by checking afterwards.
+    const chainR = npcCHAIN_R * (1 + npcHeatAt(sx, sz) * (npcHEAT_LOOK - 1));
+    const chainR2 = chainR * chainR;
+    let best = null, bestD = chainR2, n = 0;
     for (let i = 0; i < cast.length; i++) {
       const r = cast[i];
       if (!r || r === src || !r.group || !r.group.visible) continue;
@@ -1871,7 +2246,7 @@ export function createNPCs(game) {
       if (r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
       const dx = r.group.position.x - sx, dz = r.group.position.z - sz;
       const d2 = dx * dx + dz * dz;
-      if (d2 > npcCHAIN_R * npcCHAIN_R) continue;
+      if (d2 > chainR2) continue;
       // NOT `gawpT`. The obvious way to hold the look open is that timer, and
       // it is exactly wrong: in Pasto `gawpT` COUNTS UP and paStepHuman LEAVES
       // the gawp when it passes 1.8, so writing 2.6 into it ends the look
@@ -1910,7 +2285,12 @@ export function createNPCs(game) {
       st.witCalls = (st.witCalls || 0) + 1;
       st.witSpoke = (st.witSpoke || 0) + (best ? 1 : 0);
       st.witSrcX = sx; st.witSrcZ = sz;
+      st.witR = +chainR.toFixed(2);
     } catch (e) { /* optional */ }
+    // ...and this is where the two chapters with no `locals` raise the field.
+    // Gated on n: a chain nobody was near is not a witnessed anything, which
+    // is the same rule npcHeatBump applies to itself one layer down.
+    if (n > 0) npcHeatBump(sx, sz, 'witness');
     return n;
   }
 
@@ -2109,10 +2489,27 @@ export function createNPCs(game) {
     const pr = e && e.prop;
     const b = pr && pr.body;
     if (!b) return;
-    localsReact('thief', b.position.x, b.position.z, 0.5, 6.5);
+    // ---- 0.5 WAS TOO SOFT TO BE WITNESSED, AND IT WAS MEASURED (v33) -----
+    // `kick` is strength × (0.35…1.0 by nearness), and `npcWARY_HEAT` — the
+    // bar above which somebody counts as watching FOR you — is 0.35. At
+    // strength 0.5, only a person inside 2.9 m of a 6.5 m circle clears it, so
+    // being robbed at four metres left the victim at 0.26: reacting, flinching,
+    // saying so, and not counted as a witness by anything. Which meant the
+    // accumulator this batch is about could not see a robbery at all in most
+    // chapters — Hong Kong and Cappadocia both, measured.
+    //
+    // 0.8 puts the whole of the near half of the circle over the bar and
+    // leaves the rim under it, which is the right shape: you were nearly out
+    // of their world. It also costs a slightly bigger flinch (9.6 against 7.4
+    // at four metres) and that is correct — a splash is not a theft.
+    localsReact('thief', b.position.x, b.position.z, 0.8, 6.5);
     // ...AND WHOEVER IT BELONGS TO COMES AND GETS IT.
     const own = localOwnerOf(pr);
     if (own) localOwnStart(own, pr, own.says.thief || npcLOC_SAY.thief);
+    // ...and the two chapters with no `locals` get the same event through the
+    // witness chain, which is the one of the three chains that ports (v33).
+    // The radius is the produce one: this is 'that happened right here'.
+    npcCastWitnessAt(b.position.x, b.position.z, npcGRAZE_R);
   });
   // ---- ...AND SO DOES KNOCKING IT OVER ------------------------------------
   // Same owner test, one gate higher than the flinch's: a cup nudged off a
@@ -2154,6 +2551,9 @@ export function createNPCs(game) {
       localReactLine(own, own.says.produce || npcLOC_PRODUCE);
     }
     own.wary = Math.min(1, (own.wary || 0) + 0.5);
+    // Eating somebody's stock in front of them is the most witnessed thing in
+    // the game and it is the one mischief path that never reaches localsReact.
+    if (cp) npcHeatBump(cp.x, cp.z, 'graze:owner');
     localOwnStart(own, pr, null);
   });
 
@@ -2418,10 +2818,22 @@ export function createNPCs(game) {
       // makes a local turn and track the animal, so this is the whole effect —
       // do something and the circle of people paying attention to you widens
       // for half a minute, and then it does not.
+      // ---- ...AND SO DOES THE PLACE THEY ARE STANDING IN (v33) ----------
+      // One read per person per frame, reused by the watch radius, the wary
+      // register and the guard below. It is a sweep of at most npcHEAT_SITES
+      // points, which is why the field is a handful of sites and not a grid.
+      if (r.gdT > 0) r.gdT -= dt;
+      const hHere = npcHeatAt(r.x, r.z);
       const nearR = r.near * (1 + (r.wary || 0) * (npcWARY_NEAR - 1));
       const near = d2 < nearR * nearR;
       // ...and they have a line for it, once, when you come back into range.
-      const nearNow = near && (r.wary || 0) > npcWARY_HEAT;
+      // ---- 2e: AND THE HIGHER REGISTER COMES SOONER WHERE IT IS HOT ------
+      // `npcWARY_HEAT` is the bar between "there is an animal" and "it is that
+      // animal again", and in a square that has had four minutes of you it is
+      // a lower bar. It is still the SAME line from the SAME pool — heat does
+      // not add a register, it reaches the one that was already written.
+      const waryBar = npcWARY_HEAT * (1 - hHere * npcHEAT_SOON);
+      const nearNow = near && (r.wary || 0) > waryBar;
       if (nearNow && !r.waryWas && r.cd <= 0) {
         const arr = r.says.wary || npcLOC_SAY.wary;
         if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
@@ -2565,6 +2977,11 @@ export function createNPCs(game) {
             const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
             r.tx = r.ax + Math.sin(a) * rr;
             r.tz = r.az + Math.cos(a) * rr;
+            // ---- 2b: …UNLESS THEY HAVE SOMETHING TO STAND IN FRONT OF ----
+            // Points the shuffle instead of replacing it, inside the same
+            // envelope, and refuses to close on the stock itself. See
+            // npcHeatGuard.
+            npcHeatGuard(r, hHere);
           }
         }
         const sx = r.tx - r.x, sz = r.tz - r.z;
@@ -2624,7 +3041,16 @@ export function createNPCs(game) {
       if (r.group) {
         // Twice the talking radius: you are noticed a long way before you are
         // spoken to, which is how being looked at actually works.
-        const watch = d2 < (r.near * 2) * (r.near * 2) && d2 > 0.25;
+        // ---- 2a: AND FURTHER STILL WHERE THE PLACE IS HOT (v33) ----------
+        // This is the head-turn, and it was the ONE radius in the reaction
+        // layer that `wary` never touched — a person who remembered you
+        // watched you from further out only in the sense that they had a line
+        // about it. Heat is what actually widens the circle of faces pointed
+        // at the animal, which is the whole of 2a and is worth nothing unless
+        // it is this number.
+        const watchR = r.near * 2 * (1 + hHere * (npcHEAT_LOOK - 1));
+        const watch = d2 < watchR * watchR && d2 > 0.25;
+        r.watching = watch ? 1 : 0;
         // ...and while a flinch is running they are looking at whatever just
         // went off, not at you. That is the whole point of turning round.
         const flin = r.fl < -0.02;
@@ -2705,7 +3131,15 @@ export function createNPCs(game) {
           if (r.gest > 0) r.gest -= dt;
           const sway = Math.sin(r.t * 0.83) * 0.07;
           const talk = r.gest > 0 ? 0.5 + Math.sin(r.t * 7.5) * 0.22 : 0;
-          const guard = f * npcLOC_FL_ARM;
+          // ---- 2c: HANDS OVER THE STOCK (v33) ------------------------------
+          // The npc.js half of "a door pulled to, a tray moved back": the
+          // person whose stock it is puts their hands over it while the square
+          // is hot. It rides the SAME two lines as the flinch's guard, so a
+          // startled guard is both and neither fights the other, and it damps
+          // in and out rather than latching — a pose that snaps is a glitch.
+          // A quarter of the flinch's throw: this is a posture, not a recoil.
+          r.grd = damp(r.grd, (hHere >= npcHEAT_GUARD && npcGuardSpot(r)) ? hHere : 0, 1.6, dt);
+          const guard = f * npcLOC_FL_ARM + r.grd * npcHEAT_GD_ARM;
           const armL = f > 0.02 ? 22 : 4, armR = f > 0.02 ? 22 : 8;
           // THE ARM THAT IS HOLDING THE UMBRELLA CANNOT ALSO BE SWAYING. It
           // goes up and it stays there; the talking gesture is suppressed on
@@ -3936,11 +4370,20 @@ export function createNPCs(game) {
       // mechanical consequence of wariness in this crowd. Nothing here decides
       // whether anything can be taken, only how soon you are looked at.
       const wary = rec.wary || 0;
-      const hot = wary > npcWARY_HEAT;
-      if (d < 9 + wary * npcWARY_SEE && vis > 0.28 && rec.kind !== 'jogger' &&
+      // ---- ...AND THE PLACE REMEMBERS TOO (v33) --------------------------
+      // The same three levers heat pulls on a local, on the cast that has no
+      // `locals` — job 3a. All three are attention: how far out they notice
+      // you (2a), how soon they may notice you again (2a), and which of the two
+      // written registers they answer in (2e). Nothing here decides whether
+      // anything can be taken; this is the same sentence the wariness block
+      // above it makes, one layer out.
+      const hHere = npcHeatAt(rec.group.position.x, rec.group.position.z);
+      const hot = wary > npcWARY_HEAT * (1 - hHere * npcHEAT_SOON);
+      if (d < (9 + wary * npcWARY_SEE) * (1 + hHere * (npcHEAT_LOOK - 1)) &&
+          vis > 0.28 && rec.kind !== 'jogger' &&
           st !== 'lookAt' && rec.noticeCd <= 0) {
         setState(rec, 'lookAt');
-        rec.noticeCd = hot ? 1.4 : 3.0;
+        rec.noticeCd = (hot ? 1.4 : 3.0) * (1 - hHere * npcHEAT_AGAIN);
         lookAtCapy(rec);
         if (rec.talkCd <= 0 && Math.random() < 0.6) {
           rec.talkCd = rand(8, 20);
@@ -5434,7 +5877,22 @@ export function createNPCs(game) {
     const dx = capyX - rec.group.position.x, dz = capyZ - rec.group.position.z;
     return Math.sqrt(dx * dx + dz * dz);
   }
-  function paLookCapy(rec) { rec.lookX = capyX; rec.lookZ = capyZ; }
+  /**
+   * PASTO LOOKS AT THE ANIMAL — and a bare lookX write is worth nothing, which
+   * is the trap this batch names and the closeout already paid for once:
+   * twenty-odd sites inside these two state machines write lookX every frame,
+   * so a notice loses to whatever the person was already doing before anybody
+   * can see it. The hold is the same witT the witness chain uses, re-asserted
+   * AFTER the state machine has run, and it is deliberately not a state.
+   *
+   * It is also the only reason chapter 2 shows up in an attention count at
+   * all: `watching` is published from witT and from the states in which a
+   * head is on the animal, and Pasto notices you WITHOUT changing state.
+   */
+  function paLookCapy(rec) {
+    rec.lookX = capyX; rec.lookZ = capyZ;
+    rec.witX = capyX; rec.witZ = capyZ; rec.witT = npcWIT_LOOK;
+  }
 
   // ------------------------------------------------------------------ condor
   function paReadCondor() {
@@ -5967,8 +6425,16 @@ export function createNPCs(game) {
           paStartChase(rec);
           return;
         }
-        if (st === 'stall' && d < 12 && rec.noticeCd <= 0 && paSeeCapy(rec) > 0.30) {
-          rec.noticeCd = rand(6, 12);
+        // ---- 2a, IN PASTO (v33) ------------------------------------------
+        // The NOTICE branch and not the chase branch above it. `alertR` is
+        // what starts a chase, and a chase that begins from further out is a
+        // chase that can put itself between the player and a task — which is
+        // the one thing heat may not do. This branch turns a head and says a
+        // line, and that is all heat is allowed to buy.
+        const hHere = npcHeatAt(rec.group.position.x, rec.group.position.z);
+        if (st === 'stall' && d < 12 * (1 + hHere * (npcHEAT_LOOK - 1)) &&
+            rec.noticeCd <= 0 && paSeeCapy(rec) > 0.30) {
+          rec.noticeCd = rand(6, 12) * (1 - hHere * npcHEAT_AGAIN);
           paLookCapy(rec);
           if (rec.talkCd <= 0) { rec.talkCd = rand(9, 20); paSay(rec, 'paNotice'); }
         }
@@ -6028,8 +6494,11 @@ export function createNPCs(game) {
 
     if (rec.kind === 'churchgoer') {
       if (st === 'scandal') return;
-      if (capyOk && rec.noticeCd <= 0 && paDistToCapy(rec) < 8 && paSeeCapy(rec) > 0.30) {
-        rec.noticeCd = rand(8, 16);
+      // ---- 2a, and the churchgoer's half of it (v33). See the vendor above.
+      const hHere = npcHeatAt(rec.group.position.x, rec.group.position.z);
+      if (capyOk && rec.noticeCd <= 0 &&
+          paDistToCapy(rec) < 8 * (1 + hHere * (npcHEAT_LOOK - 1)) && paSeeCapy(rec) > 0.30) {
+        rec.noticeCd = rand(8, 16) * (1 - hHere * npcHEAT_AGAIN);
         paLookCapy(rec);
         if (rec.talkCd <= 0) { rec.talkCd = rand(10, 24); paSay(rec, 'paChurch'); }
       }
@@ -7719,6 +8188,20 @@ export function createNPCs(game) {
   function update(dt) {
     if (dt > 0.08) dt = 0.08;
     npcWxRead();
+    // ---- THE PLACE COOLS IN REAL TIME (v33) -------------------------------
+    // Above the biome gate on purpose: a square you left in a temper is not
+    // waiting for you exactly as you left it three chapters later. And the two
+    // published numbers are the only way the curve is visible from outside —
+    // the same reason `witLast` exists a few hundred lines up.
+    npcHeatDecay(dt);
+    try {
+      const cp = game.capy && game.capy.body && game.capy.body.position;
+      game.state.heat = cp ? npcHeatAt(cp.x, cp.z) : 0;
+      const liveB = game.biome && game.biome.current;
+      let hn = 0;
+      for (let i = 0; i < npcHeatSites.length; i++) if (npcHeatSites[i].biome === liveB) hn++;
+      game.state.heatN = hn;
+    } catch (e) { /* optional */ }
 
     // --- biome gate ------------------------------------------------------
     // In Pasto every Sydneysider is detached from the scene and the physics
@@ -7791,13 +8274,48 @@ export function createNPCs(game) {
     const r = radius > 0 ? radius : 14;
     const r2 = r * r;
     let n = 0;
-    for (let i = 0; i < humans.length; i++) {
-      const h = humans[i];
-      if (!h || (h.wary || 0) <= npcWARY_HEAT || !h.group) continue;
-      const dx = h.group.position.x - x, dz = h.group.position.z - z;
-      if (dx * dx + dz * dz < r2) n++;
-    }
     const live = game.biome && game.biome.current;
+    // ---- AND IT REACHED ONE OF THE TWO OLD CASTS, IN ALL NINETEEN PLACES ---
+    //
+    // This loop had no biome gate on it and did not mention `paHumans` at all,
+    // which is both halves of the same mistake and both were measured:
+    //
+    //   THE LEAK   `stepHuman` — the only thing that decays `rec.wary` — runs
+    //              only while Sydney is attached, so a Sydneysider you startled
+    //              on your way out of chapter 1 is frozen wary FOR THE REST OF
+    //              THE SESSION, standing at a coordinate that exists in every
+    //              other chapter too. `most-wanted` (heat ≥ 5 within 20 m) and
+    //              `not-a-soul` (heat === 0) are the two finds that read this,
+    //              and in seventeen chapters both were answering questions
+    //              about a park in Sydney.
+    //   THE GAP    Pasto's thirteen people are in `paHumans`, which nothing
+    //              here ever swept — so chapter 2, the chapter with the most
+    //              edible props in the game, could not raise heat at all.
+    //
+    // Both casts come out of the same `buildHuman`, so one gated sweep over
+    // whichever of them is live is the whole fix. See BATCH7 job 3a.
+    // ---- AND IT IS ONE FRAME BEHIND ITSELF IN BOTH OF THEM ----------------
+    // A local's `wary` is written INLINE by localsReact, on the frame of the
+    // event. These two casts do not have one: `wary` is DERIVED from `alarm`
+    // inside stepHuman, on the next tick — which is a good design (six call
+    // sites raise alarm and none of them had to learn a new word) and it means
+    // that anything asking "who is watching for me" at the instant of an event
+    // reads a crowd that has not felt it yet. Measured: two Sydneysiders at
+    // wary 0.64 three metres from the stall, and npcHeat answering 0 on the
+    // frame the robbery happened, three times running. `alarm` is what they
+    // feel right now and `wary` is what they remember; watching for you is
+    // either, so the answer is the larger.
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (cast) {
+      for (let i = 0; i < cast.length; i++) {
+        const h = cast[i];
+        if (!h || !h.group) continue;
+        const w = Math.max(h.wary || 0, h.alarm || 0);
+        if (w <= npcWARY_HEAT) continue;
+        const dx = h.group.position.x - x, dz = h.group.position.z - z;
+        if (dx * dx + dz * dz < r2) n++;
+      }
+    }
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
       if (!L || L.biome !== live || (L.wary || 0) <= npcWARY_HEAT) continue;
@@ -7809,6 +8327,12 @@ export function createNPCs(game) {
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
            addLocal: addLocal, addExchange: addExchange, say: sayAt, heat: npcHeat,
+           // ---- THE PLACE, rather than the person (v33) ----
+           // `placeHeat` is what the music and the finds read; `forceHeat` is
+           // the differential lever and is a test hook, not a feature.
+           placeHeat: npcHeatAt,
+           forceHeat: function (v) { npcHeatForce = (typeof v === 'number') ? v : -1; },
+           heatSites: npcHeatSites,
            // The register itself, for the audit that walks the capybara up to
            // every person in the game and checks somebody answers. Twenty-six
            // of them across twelve chapters is exactly the sort of list that

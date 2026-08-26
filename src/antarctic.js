@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 17 — THE ANTARCTIC PENINSULA
@@ -473,6 +473,11 @@ function antSfx(name, opts) {
 function antRecord(id, v) {
   const g = antGame;
   if (g && typeof g.record === 'function') g.record(id, v);
+}
+/** The same thing while it is still happening — see recordLive in systems.js. */
+function antLive(id, v) {
+  const g = antGame;
+  if (g && typeof g.recordLive === 'function') g.recordLive(id, v);
 }
 
 // ================================================================= TERRAIN ==
@@ -4169,6 +4174,8 @@ function antUpdatePod(game, dt) {
     if (sp > 5.5 && antHelmOn) {
       antPodRide += dt;
       if (antPodRide > antPodBest) antPodBest = antPodRide;
+      // this hold, on the paper, while it lasts (v32)
+      antLive('orca-ride', antPodRide);
       // ---- ONCE. `antPodRide >= antPOD_RIDE` IS A CONDITION, NOT AN EVENT --
       //
       // It stayed true for every frame of the rest of the ride, so the
@@ -5246,6 +5253,8 @@ function antUpdateTasks(game, dt) {
     antHighOff += dt;
     if (antHighOff > 2.5) { antHighT = -1; antHighFrom = false; }
   }
+  // the clock, on the paper, while you are on their road (v32)
+  if (antHighT >= 0) antLive('penguin-highway', antHighT);
   if (antHighFrom && antHighT >= 0 && p.z < 50 && p.x > -14 && p.x < 32) {
     antRecord('penguin-highway', antHighT);
     antTask('penguin-highway');
@@ -5259,6 +5268,8 @@ function antUpdateTasks(game, dt) {
     if (antBlueT < 0) { antBlueT = 0; antBlueTop = 0; }
     antBlueT += dt;
     if (sp > antBlueTop) antBlueTop = sp;
+    // the run's own top speed, on the paper, while the hill has you (v32)
+    antLive('blue-ice', antBlueTop);
   } else if (antBlueT >= 0) {
     // off the blue: hold the run open across the runout rather than
     // throwing it away on the frame the friction changes

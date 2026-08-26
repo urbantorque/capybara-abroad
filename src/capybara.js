@@ -634,18 +634,147 @@ function capySlipAt(game, x, z) {
  * capybara climb a rectangle of nothing.
  */
 const capyClimbOut = { nx: 0, nz: 0, top: Infinity };
-function capyClimbAt(game, x, y, z) {
+function capyClimbAt(game, x, y, z, force) {
   const api = capyBiomeApi(game);
-  if (!api || typeof api.climbHold !== 'function') return null;
-  const h = api.climbHold(x, y, z);
-  if (!h) return null;
-  const nx = h.nx, nz = h.nz;
-  if (typeof nx !== 'number' || nx !== nx || typeof nz !== 'number' || nz !== nz) return null;
-  const m = Math.sqrt(nx * nx + nz * nz);
+  if (api && typeof api.climbHold === 'function') {
+    const h = api.climbHold(x, y, z);
+    if (!h) return null;
+    const nx = h.nx, nz = h.nz;
+    if (typeof nx !== 'number' || nx !== nx || typeof nz !== 'number' || nz !== nz) return null;
+    const m = Math.sqrt(nx * nx + nz * nz);
+    if (m < 1e-4) return null;
+    capyClimbOut.nx = nx / m;
+    capyClimbOut.nz = nz / m;
+    capyClimbOut.top = (typeof h.top === 'number' && h.top === h.top) ? h.top : Infinity;
+    return capyClimbOut;
+  }
+  // ---- A WALL IS A WALL, IN EVERY CHAPTER (v31) -------------------------
+  // Reached ONLY on a property miss — a biome that publishes climbHold and
+  // answers null has answered, and its no is final. So the three chapters that
+  // authored a lattice keep exactly the lattice they authored, to the decimal,
+  // and the other sixteen stop having no answer at all.
+  //
+  // This is the same move the dive was given in v19 and the reason it was
+  // worth making: the climb shipped in chapter 11, was published by three
+  // chapters, and `sysCLIMB_TAUGHT` names those same three — so the find
+  // `brought-climb`, which exists to celebrate a verb TRAVELLING, was
+  // unreachable by construction. Measured: 1,835 m² of climbable ground plan
+  // in a game with 1,500,259 m² of it. Nought point one two per cent.
+  return capyClimbProbe(game, x, y, z, force);
+}
+
+// ---- ...AND THE GENERIC HOLD IS ONE RAY AGAINST THE STATIC WORLD --------
+// Cast horizontally out of the chest in the direction the animal is facing.
+// A near-vertical face within reach is something to hang on to; the surface
+// normal, flattened, is the hold's own normal, which is the whole of the
+// contract `climbHold` already has.
+//
+// WHAT IT DELIBERATELY WILL NOT GRAB, and every one of these is load-bearing:
+//
+//   * ANYTHING WITH MASS. A bin, a crate, a deckchair. A capybara hanging off
+//     a prop it could otherwise pick up is worse than no climb at all.
+//   * ANYTHING THAT IS NOT STATIC. Kinematic means a ferry hull, a tram, a
+//     floe, a gondola or a balloon basket — twelve of them across the game.
+//     They are floors and carriers and they have a channel for that already
+//     (carryFrame); a climb would fight it.
+//   * PEOPLE. `userData.npc` is a walker and `userData.local` is a
+//     stallholder, and both are mass-0 boxes that would otherwise read as a
+//     perfectly good half-metre wall.
+//   * THE CAPYBARA ITSELF, and whatever is carrying it. The ray starts inside
+//     the animal's own three spheres.
+//   * HEIGHTFIELDS AND PLANES. Terrain is not a building, its AABB is the
+//     whole chapter, and this is the same ignore list sysCamClear keeps for
+//     the same reason.
+const capySHAPE_HEIGHTFIELD = (CANNON.Shape && CANNON.Shape.types &&
+                               CANNON.Shape.types.HEIGHTFIELD) || 32;
+const capySHAPE_PLANE = (CANNON.Shape && CANNON.Shape.types &&
+                         CANNON.Shape.types.PLANE) || 2;
+const capyCLIMB_REACH  = 1.15;   // m from the body centre a paw can find a face
+const capyCLIMB_CHEST  = 0.10;   // m above the body centre the ray goes out at
+const capyCLIMB_FLAT   = 0.40;   // |ny| above this is a roof or a ramp, not a wall
+const capyCLIMB_HEAD   = 1.05;   // where the second ray looks for more wall
+const capyCLIMB_TOPOUT = 0.55;   // ...and how far above the chest the top then is
+const capyClimbFrom = new CANNON.Vec3();
+const capyClimbTo = new CANNON.Vec3();
+const capyClimbOpts = { skipBackfaces: true };
+let capyClimbSelf = null, capyClimbCarry = null;
+let capyClimbBest = 0, capyClimbNX = 0, capyClimbNY = 0, capyClimbNZ = 0;
+let capyClimbTop = Infinity, capyClimbGot = false;
+function capyClimbRayHit(res) {
+  if (!res.hasHit) return;
+  const b = res.body;
+  if (!b || b.mass > 0 || b.isTrigger) return;
+  if (b.type !== undefined && CANNON.Body && b.type !== CANNON.Body.STATIC) return;
+  if (b === capyClimbSelf || b === capyClimbCarry) return;
+  if (b.userData && (b.userData.npc || b.userData.local)) return;
+  const t = res.shape && res.shape.type;
+  if (t === capySHAPE_HEIGHTFIELD || t === capySHAPE_PLANE) return;
+  if (!(res.distance < capyClimbBest)) return;
+  const n = res.hitNormalWorld;
+  capyClimbBest = res.distance;
+  capyClimbNX = n.x; capyClimbNY = n.y; capyClimbNZ = n.z;
+  // THE TOP COMES OFF THE HIT BODY, never off a global and never off Infinity.
+  // `capyClimbAt` used to default `top` to Infinity when a biome did not say,
+  // which for an authored lattice is fine — the lattice ends where the biome
+  // says it ends. For a ray it is "this wall has no top", and a wall with no
+  // top is climbed for ever, straight up past the parapet into the sky.
+  capyClimbTop = (b.aabb && b.aabb.upperBound &&
+                  b.aabb.upperBound.y < Infinity) ? b.aabb.upperBound.y : Infinity;
+  capyClimbGot = true;
+}
+/** One horizontal ray at height `h`. Fills the capyClimb* statics. */
+function capyClimbCast(game, x, y, z, ux, uz, h) {
+  const w = game.world;
+  if (!w || typeof w.raycastAll !== 'function') return false;
+  capyClimbBest = Infinity; capyClimbGot = false;
+  capyClimbFrom.set(x, y + h, z);
+  capyClimbTo.set(x + ux * capyCLIMB_REACH, y + h, z + uz * capyCLIMB_REACH);
+  try { w.raycastAll(capyClimbFrom, capyClimbTo, capyClimbOpts, capyClimbRayHit); }
+  catch (e) { return false; }
+  return capyClimbGot;
+}
+function capyClimbProbe(game, x, y, z, force) {
+  // ---- ASKED FOR, OR NOT ASKED AT ALL ---------------------------------
+  // The authored hooks are arithmetic and cost nothing to call every frame.
+  // This is two raycasts against every static body in the chapter, so it runs
+  // only when the grab key is actually down — which is the only state in which
+  // the answer can be used, because `wantCling` requires it two lines below
+  // the call site. `force` is for the harness, which has no keyboard.
+  if (!force && !(game.input && game.input.action)) return null;
+  // ---- AND YOU MAY NOT HANG OFF SOMETHING FROM UNDER THE GROUND ---------
+  // Clinging overrides the floor solve outright — `body.velocity.y` is
+  // ASSIGNED in the climb, not added to — so a hold offered below the terrain
+  // surface holds the animal inside the hill indefinitely. Measured in Monte
+  // Carlo, whose buildings are cut into the rock: a face whose collider starts
+  // at y 27 under ground that is at y 28, and the whole frame was the brown
+  // inside of the hillside. Two decimetres of slack, because a heightfield
+  // triangle under a wall is not exact.
+  const gy = capyGroundY(game, x, z);
+  if (gy === gy && y < gy - 0.2) return null;
+  const capy = game.capy;
+  capyClimbSelf = (capy && capy.body) || null;
+  const carrier = capy && capy.carriedBy;
+  capyClimbCarry = (carrier && (carrier.body || carrier)) || null;
+  const ux = Math.sin(capyYaw), uz = Math.cos(capyYaw);   // the way it is facing
+  if (!capyClimbCast(game, x, y, z, ux, uz, capyCLIMB_CHEST)) return null;
+  const ny = capyClimbNY;
+  if (ny > capyCLIMB_FLAT || ny < -capyCLIMB_FLAT) return null;   // a roof or a ramp
+  // Read off BEFORE the second cast, which reuses the same statics.
+  const hx = capyClimbNX, hz = capyClimbNZ;
+  const m = Math.sqrt(hx * hx + hz * hz);
   if (m < 1e-4) return null;
-  capyClimbOut.nx = nx / m;
-  capyClimbOut.nz = nz / m;
-  capyClimbOut.top = (typeof h.top === 'number' && h.top === h.top) ? h.top : Infinity;
+  let top = capyClimbTop;
+  // ---- AND WHERE THE WALL ENDS IS MEASURED AT THE WALL --------------------
+  // An AABB is the whole BODY, and several chapters merge a street into one.
+  // So the top is confirmed by a second ray a metre higher: no wall up there
+  // means the parapet is right here, whatever the box says, and the top-out
+  // shove in the solve fires within the metre it was written for.
+  if (!capyClimbCast(game, x, y, z, ux, uz, capyCLIMB_HEAD)) {
+    top = Math.min(top, y + capyCLIMB_TOPOUT);
+  }
+  capyClimbOut.nx = hx / m;
+  capyClimbOut.nz = hz / m;
+  capyClimbOut.top = top;
   return capyClimbOut;
 }
 
@@ -1466,6 +1595,25 @@ export function createCapybara(game) {
      * Sets the render yaw and the body's, so the first frame is already right
      * and there is nothing to spring out of.
      */
+    /**
+     * WHAT THE ANIMAL WOULD FIND TO HANG ON TO AT A POINT, or null.
+     *
+     * Nothing in src calls this; the harness does. A biome's `climbHold` can be
+     * probed on a grid from outside because it is arithmetic, and the generic
+     * fallback cannot — it is two rays out of the chest in the direction the
+     * animal happens to be FACING, which a grid does not have. Without this
+     * there is no way to measure the climbable ground plan of the sixteen
+     * chapters that have just been given one, and an unmeasurable change is
+     * one nobody may claim. `force` bypasses the grab-key gate, which a probe
+     * with no keyboard could never satisfy.
+     */
+    climbAt(x, y, z, yaw) {
+      const was = capyYaw;
+      if (typeof yaw === 'number' && yaw === yaw) capyYaw = yaw;
+      const h = capyClimbAt(game, x, y, z, true);
+      capyYaw = was;
+      return h ? { nx: h.nx, nz: h.nz, top: h.top } : null;
+    },
     face(yaw) {
       if (typeof yaw !== 'number' || yaw !== yaw) return;
       capyYaw = yaw; capyPrevYaw = yaw; capyBodyYaw = yaw; capyYawRate = 0;

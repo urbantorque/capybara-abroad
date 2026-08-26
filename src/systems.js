@@ -126,10 +126,62 @@ const sysTORII_BACK = 5.2;
 const sysCAM_FLOOR = 1.7;
 // ---- THE BOOM STOPS AT THE FIRST WALL. See sysCamClear --------------------
 const sysCAM_CLEAR_MIN = 1.9;   // m — the shortest the boom may ever be cut to
-const sysCAM_CLEAR_PAD = 0.45;  // m of daylight kept between the lens and the wall
+// ---- ...AND THE PAD HAS TO CLEAR THE NEAR PLANE (v33) -------------------
+// It was 0.45, and `camera.near` is 0.5. So every time this feature fired —
+// which is exactly the moment it exists for, the eye backed off a wall — the
+// near plane was left FIVE CENTIMETRES INSIDE the wall it had just backed off
+// from, and the frame was the featureless inside of a building. Measured on
+// the Monte Carlo climb: boom cut to 0.15, eye 3.79 m from the animal, the
+// whole picture one flat brown rectangle.
+//
+// Not a relaxation of sysCAM_CLEAR_MIN, which is what stops the lens ending up
+// inside Galeras and is untouched: this is the pad getting BIGGER, so the boom
+// is cut slightly harder and the near plane ends up 20 cm clear of the wall
+// instead of 5 cm inside it.
+const sysCAM_CLEAR_PAD = 0.70;  // m of daylight kept between the lens and the wall
 const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
 // Subtle speed dolly — the camera eases out at a run so running reads as fast.
+// `camDolly` is 0..1 (the damped fraction of the run speed) and these two are
+// what it buys: a metre and a bit of boom, and THIRTEEN DEGREES OF PITCH.
+//
+// ---- WHY THE PITCH HALF HAD TO BE ADDED (v33) ---------------------------
+// The dolly shipped as distance alone, and distance alone very nearly does not
+// flatten the shot at all: the boom angle is fixed, so a longer boom puts the
+// eye higher in exactly the proportion it puts it further back. Measured, in
+// Sydney, at a full run: 34.6 degrees of view pitch against a 27.5 degree
+// half-FOV — the horizon still seven degrees above the top edge. Pushing the
+// DISTANCE further makes that marginally WORSE (13.5 m of boom reads 36.1).
+// What flattened it was always the look-lead, which is horizontal, and there
+// is only so much of that to be had before the animal leaves the frame.
+//
+// So the dolly lowers the boom as well as lengthening it. Thirteen degrees at
+// a full run takes the boom from 41 to 28 and the view from 34.6 to 24.4,
+// which is two and a half degrees of sky at a sprint in a chapter with no
+// relief — and it costs nothing at a waddle, because it is on the same 0..1
+// scalar and that scalar is zero when the animal is standing still.
 const sysCAM_DOLLY   = 1.2;
+const sysCAM_DOLLY_P = 18 * Math.PI / 180;
+// ---- ...AND THE PLAYER MAY ASK TO LOOK UP (v33) -------------------------
+// `skyward()` has existed since chapter 7 and five chapters publish it: the rig
+// has always known how to raise the eye and there has never been a way to ASK
+// it. Measured across all nineteen chapters, before this: the horizon is
+// 18.8 degrees above the top edge at a standstill in eighteen of them, so the
+// sky dome, the grade, the aurora, a kilometre of tower lights and a hundred
+// and fifty balloons over the Goreme ridge are only ever seen inside an
+// authored marquee, twice a chapter, for about two seconds each.
+//
+// Held V — the fourth key of the camera row, after Z, X and C. It drives the
+// SAME skyward channel a biome uses rather than a second rig of its own: at
+// 0.7 of that blend the pitch eases to 20 degrees, the boom lengthens from 9.5
+// to about 12, and the look target rises 1.9 m so the animal stays in frame.
+// Not the whole way to 1.0, which is the crane's 11 degrees and is a shot
+// rather than a way to stand and look at something.
+const sysEYE_RAISE_W = 0.70;
+// ...and it blends at the PLAYER'S rate, not the crane's. sysSKY_LAMBDA is 0.9
+// — three seconds — which is right for a chapter easing the lens up at an
+// aurora and completely wrong for a key: a verb that takes three seconds to
+// answer and three more to let go reads as broken.
+const sysEYE_LAMBDA  = 2.6;
 const sysRUN_SPEED   = 7.4;   // capybara top ground speed
 const sysLOOK_LEAD   = 0.30;  // seconds of velocity to lead the look target by
 const sysLOOK_LEADMAX= 2.5;
@@ -152,6 +204,30 @@ const sysLOOK_RAISE  = 0.6;
 // helm) exactly the way `rig()` already is. Nobody loses control of the camera.
 const sysSHOT_IN    = 0.55;   // s, ease in
 const sysSHOT_OUT   = 1.10;   // s, ease out
+// ---- THE ARRIVAL IS A SHOT (v32) -------------------------------------------
+// How long the arrival framing holds. 0.55 in + 1.95 + 1.10 out = 3.60 s, which
+// is sysFADE_CARD to the millisecond: the place card is holding the screen for
+// exactly that long anyway, so the shot underneath it is free and it is over on
+// the frame the card leaves. A shot must never outlive what it is of — Monte
+// Carlo's tunnel marquee was cut 3.4 → 1.9 s for exactly that — and the thing
+// an arrival is of is the whole chapter, which does not move.
+const sysARRIVE_HOLD = 1.95;
+// ---- ...AND IT IS NOT THE WALKING-ABOUT LENS ------------------------------
+// The gameplay rig sits at sysCAM_PITCH — 41 degrees down — because that is
+// the angle you steer a rodent through a flowerbed at. It is the wrong lens for
+// a landmark: at 41 down and a 24 degree half-FOV the horizon is seventeen
+// degrees above the top edge, so the Opera House at 38 m, the Koutoubia at 52
+// and Galeras at 104 are ALL out of frame, and the first picture of nineteen
+// chapters is a patch of ground. Measured, on nineteen arrival PNGs, before
+// these two numbers existed.
+//
+// 16 degrees puts the horizon eight degrees INSIDE the top edge and a two-metre
+// raise on the look point carries the middle of the frame off the animal's back
+// and onto whatever the spawn is pointed at. A spawn may override either.
+// Neither touches ordinary play: the shot is over in 3.6 s and the rig it eases
+// back to is untouched.
+const sysARRIVE_PITCH = 0.28;   // rad, ~16 deg down
+const sysARRIVE_RAISE = 2.0;    // m the look point rides above the animal
 const sysSHOT_HOLD  = 2.20;   // s, default hold at full weight
 const sysSHOT_YAW_L = 2.6;    // lambda the bearing is walked round on
 const sysSHOT_KILL  = 3.0;    // how fast a player-cancelled shot lets go
@@ -213,7 +289,13 @@ const sysFLY_CLEAR   = 2;
 const sysFOV_BASE    = 48;
 const sysFOV_MIN     = 41;
 const sysFOV_MAX     = 61;
-const sysFOV_SPEED   = 7.0;    // degrees added at the reference speed
+// RAISED FROM 7.0 (v33). The half-FOV is the other half of "is the horizon in
+// frame": pitch − halfFOV is the angle of the horizon above the top edge, and
+// widening the lens is the move batch 5's own brief names for when flattening
+// the rig further would start putting the eye into the terrain. Nine degrees
+// puts the lens at 57 at a full run, four under the sysFOV_MAX ceiling that is
+// there to stop the low-poly silhouettes distorting.
+const sysFOV_SPEED   = 9.0;    // degrees added at the reference speed
 const sysFOV_REF     = 7.4;    // m/s — the capybara flat out on the ground
 const sysFOV_REF_AIR = 26;     // m/s — ...and roughly a condor on a glide
 const sysFOV_LAMBDA  = 2.0;    // how lazily the speed term follows. Slow on purpose.
@@ -1445,6 +1527,18 @@ const sysTASK_STREAK = 6.0;    // seconds
 // numbers, and every one that has been found is skipped for ever.
 const sysFIND_TICK = 0.25;
 
+// --- THE LIVE RECORD LINE (v32) ---------------------------------------------
+// How long the line survives without the chapter saying the attempt is still
+// open. `recordLive(id, value)` is meant to be called on the frame the attempt
+// opens and on every frame after it while the number is still moving — it is
+// always sitting in the same block that increments the timer — so a chapter
+// that forgets `recordEnd()` still drops the line by itself. THAT IS THE WHOLE
+// GUARANTEE THE LINE IS NOT FURNITURE: with a watchdog, "no attempt open" is
+// the resting state of the mechanism rather than a promise nineteen chapters
+// have to keep. Long enough that a frame hitch or a `wow`'s slow motion can
+// never blink it.
+const sysREC_STALE = 1.6;      // s since the last recordLive() before it closes
+
 // ---------------------------------------------------------------------------
 // THE JOURNEY — save, records, and the departures board.
 //
@@ -2611,6 +2705,10 @@ const sysLEGEND = [
 ];
 const sysLEGEND_MORE = [
   ['Z  /  X  ·  C', 'turn the camera  ·  recentre it'],
+  // The fourth key of the camera row, and it goes in the FOLD by the same rule
+  // as the other three: it is furniture, not a verb the capybara has, and
+  // nothing about it is needed to play. See sysEYE_RAISE_W.
+  ['V (held)', 'raise the eye  ·  look at the sky'],
   ['F  ·  Shift+F', 'aim at another task'],
   ['R (held)', 'put me back'],
   ['Tab  ·  Esc', 'the journal  ·  close'],
@@ -4474,6 +4572,19 @@ function sysBuildCSS() {
   '100%{transform:scaleX(1) rotate(-1.1deg)}}',
 '.capyui-count{margin-top:8px;font-size:clamp(11px,1.4vw,11px);letter-spacing:.16em;',
   'color:' + inkSoft + ';text-transform:uppercase;}',
+/* ---------- the record you are setting, while you are setting it (v32) ------ */
+/* Under the tally, on the same paper, and `display:none` unless an attempt is
+   actually open — see recordLive. Two lines, because they are two different
+   things: what the clock says NOW, and the number that has to be beaten. The
+   numbers are tabular so the live one does not jitter the card's width as it
+   climbs through a digit. */
+'.capyui-rec{display:none;margin-top:7px;padding-top:6px;',
+  'border-top:1px dashed ' + paper2 + ';font-variant-numeric:tabular-nums;}',
+'.capyui-rec.on{display:block;}',
+'.capyui-recnow{display:block;font-size:clamp(10px,1.55vw,12.5px);line-height:1.25;',
+  'color:' + accent + ';font-weight:700;}',
+'.capyui-recbest{display:block;font-size:clamp(8.5px,1.35vw,10.5px);line-height:1.3;',
+  'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;}',
 /* ---------- the hint on the top row ---------- */
 /* A bearing and a distance for whatever is next, plus one line naming the verb.
    Only ever on the first open row, so the card stays a to-do list and not a HUD. */
@@ -6255,6 +6366,9 @@ export function createSystems(game) {
   let musChordAt = 0, musPluckAt = 0, musIdx = 0, musChordStart = 0;
   let musMuted = false, musLevel = 1;
   let musIntensity = 0, musChaseT = 0, musApplyT = 0;
+  // What a hot place is worth to the mix. See the note at the musWant line.
+  const sysHEAT_HOLD = 0.70;   // how far full heat slows the chase tail: 2.5 s → 8.3
+  const sysHEAT_MUS  = 0.25;   // …and the floor it puts under the intensity
   // The other end of the same stick. musIntensity is written from chaos and
   // opens the mix; musCalm is written from the calm field and closes it. They
   // are separate numbers rather than one signed one because they are not
@@ -9867,6 +9981,17 @@ export function createSystems(game) {
   todoEl.appendChild(clueEl);
   const countEl = sysEl('div', 'capyui-count', '');
   todoEl.appendChild(countEl);
+  // ---- AND THE NUMBER YOU ARE CHASING WHILE YOU CHASE IT (v32) ------------
+  // Inside the card rather than beside it: it belongs to the same sheet of
+  // paper as the thing you are doing, it inherits the card's fade, its rotate
+  // and `#hud.bare`, and it costs no new position to keep honest at any
+  // viewport. Empty and `display:none` at rest — see recPaint.
+  const recEl = sysEl('div', 'capyui-rec');
+  const recNowEl = sysEl('span', 'capyui-recnow', '');
+  const recBestEl = sysEl('span', 'capyui-recbest', '');
+  recEl.appendChild(recNowEl);
+  recEl.appendChild(recBestEl);
+  todoEl.appendChild(recEl);
   hudRoot.appendChild(todoEl);
 
   // --- toasts ---
@@ -12705,6 +12830,102 @@ export function createSystems(game) {
   }
 
   // =========================================================================
+  // THE RECORD YOU CANNOT SEE WHILE YOU ARE SETTING IT (v32)
+  //
+  // `recordValue` above speaks ONLY after a run and ONLY if it beat something,
+  // so a player attempting one of the twenty measured tasks is running against
+  // an invisible target: there is nothing on the screen saying what to beat,
+  // and a first attempt is told nothing at all. That is a switch you flip once.
+  // The same run with `best 12.4 s` on the paper beside a clock counting up is
+  // a loop, and records are the only reason to re-enter a finished chapter, so
+  // this is the whole of the game's replay surface.
+  //
+  // ONE CHANNEL, TWO VERBS, exactly like every other cross-module thing here:
+  //
+  //   game.recordLive(id, value)   the attempt is open and stands at `value`
+  //   game.recordEnd(id)           it has closed, or been abandoned
+  //
+  // `value` is optional on the opening call — a chapter that has not started
+  // counting yet gets the standing best alone, which is the target — and after
+  // that it is meant to be handed over EVERY FRAME, out of the same block that
+  // is already incrementing the timer it eventually gives to `game.record`.
+  //
+  // THREE THINGS THIS DELIBERATELY IS NOT:
+  //  - It does not gate, deny or fail anything, and it cannot: it writes two
+  //    strings into a div. `recordValue`'s contract is untouched — file it, say
+  //    so if it is a best, and nothing else.
+  //  - It is not a permanent piece of HUD. With no attempt open the element is
+  //    `display:none` and empty, and it closes ITSELF after sysREC_STALE, so a
+  //    chapter that forgets `recordEnd` cannot leave furniture on the screen.
+  //  - It does not make a first attempt announce itself at the end. That
+  //    silence is deliberate and stays. The live readout is what a first
+  //    attempt gets instead, and it is better.
+  let recLiveId = '';         // the open attempt, '' for none
+  let recLiveVal = NaN;       // the figure so far, NaN until a caller hands one over
+  let recLiveSince = 0;       // s since the last recordLive() — see sysREC_STALE
+  let recShown = false;       // is the element up
+  let recPaintedId = '';      // what the two strings were last built FROM
+  let recPaintedQ = NaN;      // ...and at what rounded value
+
+  /** THE ATTEMPT IS OPEN, AND IT STANDS HERE. Call it every frame. */
+  function recordLive(id, value) {
+    if (!RECORDS[id]) return false;
+    if (id !== recLiveId) { recLiveId = id; recLiveVal = NaN; }
+    recLiveSince = 0;
+    if (typeof value === 'number' && value === value) recLiveVal = value;
+    return true;
+  }
+  /**
+   * IT IS OVER. With an id, only that attempt is closed — so a chapter running
+   * two measured things cannot switch off the other one's line by tidying up
+   * after its own.
+   */
+  function recordEnd(id) {
+    if (!recLiveId) return false;
+    if (id !== undefined && id !== recLiveId) return false;
+    recLiveId = ''; recLiveVal = NaN; recLiveSince = 0;
+    recPaint();
+    return true;
+  }
+  function recPaint() {
+    const def = recLiveId ? RECORDS[recLiveId] : null;
+    if (!def) {
+      if (recShown) {
+        recShown = false;
+        recEl.classList.remove('on');
+        recNowEl.textContent = ''; recBestEl.textContent = '';
+        recPaintedId = ''; recPaintedQ = NaN;
+      }
+      return;
+    }
+    // Rebuilt only when the number a player can actually READ has changed —
+    // a value at dp = 1 moving from 3.41 to 3.42 is the same line, and this
+    // runs on every frame of every attempt in the game.
+    const live = recLiveVal === recLiveVal;
+    const q = live ? Math.round(recLiveVal * Math.pow(10, def.dp)) : NaN;
+    if (recLiveId === recPaintedId && (q === recPaintedQ || (!live && recPaintedQ !== recPaintedQ))) return;
+    recPaintedId = recLiveId; recPaintedQ = q;
+    const best = jrRecs[recLiveId];
+    // Not counting yet: the standing best IS the line, formatted by the one
+    // function in this file that formats a record. Nothing new to format.
+    recNowEl.textContent = live
+      ? def.label + ' ' + recLiveVal.toFixed(def.dp) + def.unit
+      : (recText(recLiveId) || def.label);
+    recBestEl.textContent = best === undefined
+      ? (live ? 'no best yet' : '')
+      : (live ? 'best  ' + best.toFixed(def.dp) + def.unit : 'to beat');
+    if (!recShown) { recShown = true; recEl.classList.add('on'); }
+  }
+  /** The watchdog and the paint, once a frame. Raw dt: this is wall clock. */
+  function recLiveTick(dt) {
+    if (recLiveId) {
+      recLiveSince += dt;
+      if (recLiveSince > sysREC_STALE) { recLiveId = ''; recLiveVal = NaN; }
+    }
+    recPaint();
+  }
+
+  // =========================================================================
   // THE FINDS — the things nobody tells you about
   // =========================================================================
   // See FINDS in shared.js for what one is and the three rules they all keep.
@@ -12749,6 +12970,17 @@ export function createSystems(game) {
   function findHeat(x, z, r) {
     return typeof game.npcHeat === 'function' ? game.npcHeat(x, z, r) : 0;
   }
+  /**
+   * HOW CROSS THIS PLACE IS, 0..1 — the accumulator npc.js keeps on top of the
+   * per-person wariness (v33). Zero before npc.js is wired and zero in a
+   * chapter nothing has happened in, which is the right answer both times.
+   */
+  function sysPlaceHeat(x, z) {
+    if (typeof game.placeHeat !== 'function') return 0;
+    const p = (x === undefined) ? (game.capy && game.capy.body && game.capy.body.position) : null;
+    if (x === undefined) { if (!p) return 0; return game.placeHeat(p.x, p.z); }
+    return game.placeHeat(x, z);
+  }
   /** The highest ground in the live chapter, sampled once and remembered. */
   function findPeak(name) {
     if (findS.peakOf === name) return findS.peak;
@@ -12772,6 +13004,19 @@ export function createSystems(game) {
   // whole point of the find — and of making the verb a property of the world
   // rather than of a chapter in the first place. See capyCanDive.
   const sysDIVE_TAUGHT  = { 12: 1, 14: 1, 16: 1 };
+  // ---- AND THIS TABLE ONLY STARTED MEANING SOMETHING IN v31 -------------
+  // It is unchanged, and that is the point. Hong Kong, Cappadocia and Son
+  // Doong are the three chapters that TEACH the climb and they still are.
+  // What changed is the other set: until v31 these were also the only three
+  // chapters in which `capy.climbing` could ever be true, because that flag
+  // requires `capyClimbAt` to have found a hold and only these three published
+  // `climbHold`. The two sets were identical, so `brought-climb` —
+  // "climbed something in a place that never mentioned climbing" — could not
+  // fire in any chapter, ever. It was content written to celebrate a moveset
+  // travelling, made unreachable by the moveset not travelling.
+  //
+  // Sixteen chapters answer now, through the generic fallback in
+  // capyClimbAt, and this table is what keeps the find worth having.
   const sysCLIMB_TAUGHT = { 11: 1, 13: 1, 16: 1 };
   // Chapters where the water has no daylight in it worth the name.
   const sysDARK_WATER   = { 7: 1, 11: 1, 16: 1, 17: 1 };
@@ -13960,7 +14205,8 @@ export function createSystems(game) {
   let camYaw = 0, camYawTarget = 0, camHandT = 0, camIdleT = 0;
   let camDist = sysCAM_DEF, camDistTarget = sysCAM_DEF;
   let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
-  let camDolly = 0;
+  let camDolly = 0;             // 0..1 of the run speed, damped. See sysCAM_DOLLY_P.
+  let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
   let shakeAmt = 0;
   let camInit = false;
   // flight rig: blend 0..1, the heading the rig is chasing, and its damped follow
@@ -14126,6 +14372,14 @@ export function createSystems(game) {
       // LAWN can be reached through. A restored file with all seventeen done
       // that opens straight into Sydney comes in exactly here.
       sysFinaleCheck();
+      // ...and it is the one chapter that is never TRAVELLED to, so it is the
+      // one chapter whose arrival shot cannot come from biomeGo. Chapter 1 is
+      // also the arrival more players see than any other. Same call, same
+      // spawn record, same composed first frame. (v32)
+      if (!restore) {
+        const bm = game.biome;
+        teleportCapy(bm && typeof bm.spawnOf === 'function' ? bm.spawnOf('sydney') : null, true);
+      }
     }
 
     // The card is thrown away here, and its one listener on `window` has to go
@@ -15070,7 +15324,16 @@ export function createSystems(game) {
   // position, the previous-step position and the interpolated position (or the
   // renderer lerps from wherever it used to be and the capybara smears across the
   // whole map), plus every scrap of accumulated momentum.
-  function teleportCapy(sp) {
+  /**
+   * PUT THE ANIMAL DOWN THERE.
+   *
+   * `arrive` means this is a chapter opening rather than a tidy-up: it is what
+   * separates walking into Venice from the stuck-rescue putting you back on the
+   * road four seconds ago. Only an arrival composes a shot — a rescue that
+   * pinned the lens for two seconds would be taking the camera away from a
+   * player who has just been stuck.
+   */
+  function teleportCapy(sp, arrive) {
     const capy = game.capy;
     const b = capy && capy.body;
     if (!b || !sp) return;
@@ -15121,8 +15384,40 @@ export function createSystems(game) {
                   sysAnchor.z + Math.cos(camYaw) * cpp * camDist);
     camera.position.copy(sysCamPos);
     camDolly = 0;
+    // ...and the eye comes back down across a hemisphere. An arrival is a shot
+    // and it is the chapter's to compose, not the last chapter's key press.
+    skyEyeT = 0;
     shakeAmt = 0;
     sunFollow(sp.x, sp.y, sp.z);
+
+    // ---- AND THE FIRST FRAME IS COMPOSED (v32) ----------------------------
+    //
+    // `frameShot` was built so a chapter can compose its own marquee, and it is
+    // used well — but a marquee is a moment somewhere in the middle and roughly
+    // no player will see every one. THE ARRIVAL IS THE ONLY SHOT THAT IS
+    // GUARANTEED: every player of a chapter sees its first frame. Setting
+    // `camYaw` above points the lens; it does not HOLD it, and the rig starts
+    // easing, dollying and looking ahead on the very next frame while the
+    // animal is still settling onto its spawn. This pins the composition for
+    // the length of the place card and then hands the lens back.
+    //
+    // Everything except the bearing is optional, and most spawns say nothing
+    // else: SOMETIMES THE REQUEST IS A BEARING ALONE — Hanoi's train marquee
+    // proved that any distance or raise written into an alley is a number the
+    // world refuses (11 m asked, 1.4 delivered), and the rig's own occlusion
+    // ray solves it better than a constant can. A spawn only names `dist`,
+    // `pitch` or `raise` where the shot genuinely needs to be wider or higher
+    // than standing height — see MONACO_SPAWN.
+    if (arrive && typeof sp.yaw === 'number' && sp.yaw === sp.yaw &&
+        typeof game.frameShot === 'function') {
+      game.frameShot({
+        yaw: sp.yaw,
+        dist:  typeof sp.dist  === 'number' ? sp.dist  : undefined,
+        pitch: typeof sp.pitch === 'number' ? sp.pitch : sysARRIVE_PITCH,
+        raise: typeof sp.raise === 'number' ? sp.raise : sysARRIVE_RAISE,
+        hold: sysARRIVE_HOLD,
+      });
+    }
   }
 
   /**
@@ -15256,7 +15551,7 @@ export function createSystems(game) {
       try { game.physics.release(null); } catch (e) {}
     }
     if (!bio.switchTo(name)) return false;
-    teleportCapy(typeof bio.spawnOf === 'function' ? bio.spawnOf(name) : bio.SYDNEY_SPAWN);
+    teleportCapy(typeof bio.spawnOf === 'function' ? bio.spawnOf(name) : bio.SYDNEY_SPAWN, true);
     return true;
   }
 
@@ -15369,6 +15664,14 @@ export function createSystems(game) {
   const sysCamFrom = new CANNON.Vec3();
   const sysCamTo = new CANNON.Vec3();
   let camClearF = 1;
+  // ---- ONE READOUT FOR THE INSTRUMENTS, AND IT CHANGES NOTHING (v33) -----
+  // `camClearF` is the only number in this file that says how often the boom is
+  // being cut, and it has never left the closure — so "is the occlusion ray
+  // fighting the terrain in this chapter" was a question no audit could ask.
+  // Batch 5 has to answer it nineteen times, before and after moving the pitch.
+  // Published as one pre-allocated object written once a frame: nothing reads
+  // it inside the game, and nothing here may ever read it back.
+  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0 };
   // The callback, the running best and the three things it has to skip all live
   // out here rather than in a closure built per frame — this file's whole
   // premise is that update() allocates nothing.
@@ -15594,6 +15897,13 @@ export function createSystems(game) {
   game.noticed = function (id) { return id === undefined ? findCount() : !!findDone[id]; };
   /** A measured task hands its number here. See RECORDS in shared.js. */
   game.record = recordValue;
+  /**
+   * ...AND SAYS SO WHILE IT IS STILL HAPPENING. `recordLive(id, value)` every
+   * frame the attempt is open, `recordEnd(id)` when it lands or is abandoned.
+   * Neither gates anything and neither can fail a task. See recPaint.
+   */
+  game.recordLive = recordLive;
+  game.recordEnd = recordEnd;
   game.toast = toast;
   game.shake = shake;
   // The three channels at once. Same 0..1 magnitude shake() takes, so a caller
@@ -15654,6 +15964,8 @@ export function createSystems(game) {
   };
   /** What the framing layer is doing, 0..1. Nothing in src reads it; the harness does. */
   game.framing = function () { return shotW; };
+  /** The camera rig's own numbers, one frame old. See sysCamInfo. */
+  game.camInfo = sysCamInfo;
   game.sfx = sfx;
   /**
    * HOW SETTLED THE WORLD IS AT A POINT, 0..1. See THE CALM above.
@@ -15950,6 +16262,11 @@ export function createSystems(game) {
     // the moment, and a framing left running into a teleport would fight the
     // arrival yaw the spawn sets two lines later. Same rule as shake and time.
     shotReq = null; shotW = 0; shotAge = 0; shotKill = 0;
+    // An attempt belongs to the world it was started in, for the same reason
+    // the breadcrumbs do. Crossing a border abandons it whatever the chapter
+    // being left behind thinks — it is not going to get another frame in which
+    // to say so.
+    recordEnd();
     const cdef = chapterDef(chapterOf(name));
     const pasto = name === 'pasto';
     bioTarget = pasto ? 1 : 0;
@@ -16255,9 +16572,11 @@ export function createSystems(game) {
                                                 sysSAIL_RAISE, sailT), sysFLY_RAISE, flyT), 4, dt);
     sysLook.z = damp(sysLook.z, lz, lookL, dt);
 
-    // Speed dolly: in close at a waddle, eased out ~1.2 units at a full run. In
+    // Speed dolly: in close at a waddle, eased out and DOWN at a full run. In
     // flight the dolly is irrelevant — the rig is already 24 m back.
-    camDolly = damp(camDolly, clamp(sp / sysRUN_SPEED, 0, 1) * sysCAM_DOLLY, 2.4, dt);
+    // Kept as the 0..1 fraction rather than as metres, because it now buys two
+    // things and they are in different units. See sysCAM_DOLLY_P.
+    camDolly = damp(camDolly, clamp(sp / sysRUN_SPEED, 0, 1), 2.4, dt);
     // ---- the crane-up ----------------------------------------------------
     // Asked for by the live biome and by nobody else. It is deliberately NOT
     // blended against the flight rig or the helm: being on a condor or at a
@@ -16275,9 +16594,30 @@ export function createSystems(game) {
       const sw = skyApi.skyward();
       if (typeof sw === 'number' && sw === sw) skyWant = clamp(sw, 0, 1);
     }
-    skyT = damp(skyT, (flyT > 0.1 || sailT > 0.1) ? 0 : skyWant, sysSKY_LAMBDA, dt);
-    let camReach = lerp(lerp(lerp(camDist + camDolly, sysSKY_DIST, skyT), sysSAIL_DIST, sailT), sysFLY_DIST, flyT);
-    let camPitch = lerp(lerp(lerp(sysCAM_PITCH, sysSKY_PITCH, skyT), sysSAIL_PITCH, sailT), sysFLY_PITCH, flyT);
+    // ---- ...AND SO MAY THE PLAYER, ON THE SAME CHANNEL (v33) -------------
+    // Deliberately not a second rig. The crane already knows how to raise the
+    // eye without losing the animal — pitch, distance and look-raise move
+    // together — and a second path to the same picture is two things fighting
+    // over one pitch, which is the mistake every comment in this block warns
+    // about. So the key is simply another voice asking for skyward, and the
+    // louder of the two wins.
+    //
+    // It borrows the crane's whole geometry and stops at 0.7 of it, which is
+    // 20 degrees. It also borrows nothing of its TIMING: while the player's
+    // hand is on the key, and while the blend is still coming back afterwards,
+    // this runs at sysEYE_LAMBDA. A biome asking on its own still gets its
+    // three-second ease.
+    const eyeAsk = (started && !!keys.KeyV) ? sysEYE_RAISE_W : 0;
+    const eyeLive = eyeAsk > 0 || skyEyeT > 0.002;
+    skyEyeT = damp(skyEyeT, eyeAsk, sysEYE_LAMBDA, dt);
+    if (skyEyeT > skyWant) skyWant = skyEyeT;
+    // The gate is the crane's own and is not relaxed: at the helm or on a
+    // condor the lens is already somebody else's, and the eye-raise is one more
+    // thing that may not join that argument.
+    skyT = damp(skyT, (flyT > 0.1 || sailT > 0.1) ? 0 : skyWant,
+                eyeLive ? sysEYE_LAMBDA : sysSKY_LAMBDA, dt);
+    let camReach = lerp(lerp(lerp(camDist + camDolly * sysCAM_DOLLY, sysSKY_DIST, skyT), sysSAIL_DIST, sailT), sysFLY_DIST, flyT);
+    let camPitch = lerp(lerp(lerp(sysCAM_PITCH - camDolly * sysCAM_DOLLY_P, sysSKY_PITCH, skyT), sysSAIL_PITCH, sailT), sysFLY_PITCH, flyT);
     // ---- ...AND IT EASES BACK WHEN THE ANIMAL SITS DOWN (v23) ------------
     // Small — a metre and two degrees — and it is a metre the player did not
     // ask for, so it has to be small. What it buys is that the moment the
@@ -16365,9 +16705,21 @@ export function createSystems(game) {
     const cp = Math.cos(camPitch), sn = Math.sin(camPitch);
     const ox = Math.sin(useYaw) * cp, oz = Math.cos(useYaw) * cp;
     let t = 1;
-    // The Opera House keep-out is Sydney geometry. In Pasto those coordinates are
-    // open valley and the pull-in would fire for no reason at all.
-    if (!inPasto) {
+    // ---- THE OPERA HOUSE KEEP-OUT IS SYDNEY GEOMETRY (v33) ---------------
+    // And it now says so. This was `!inPasto`, written when there were two
+    // chapters and never revisited, so `sysOPERA_VAULTS` — eleven ellipses
+    // between x −11 and x +11, z −9 and z +2, which is the Bennelong Point
+    // podium and NOTHING ELSE — has been live in seventeen other worlds. Rio's
+    // spawn is the world origin. Measured with the eye-raise held, the pull-in
+    // fires against nothing at all and lifts the lens; the same volume sits
+    // over the Piazzetta, the Corso, the Erg and the middle of Jemaa el-Fnaa.
+    //
+    // Named for the chapter it belongs to, not for the one chapter it was
+    // known to be wrong in: that is the difference between a gate and a patch,
+    // and it is the same correction sysLiveBiomeApi made for every other hook
+    // in this file.
+    const inSyd = !!(game.biome && game.biome.isActive('sydney'));
+    if (inSyd) {
       for (let i = 0; i < 6; i++) {
         const d = camReach * t;
         const x = sysAnchor.x + ox * d;
@@ -16430,6 +16782,7 @@ export function createSystems(game) {
       camFloorY = Math.min(sysCAM_FLOOR,
                            sysGroundY(sysDesired.x, sysDesired.z) + sysDIVE_CAM_CLEAR);
     }
+    sysCamInfo.floor = sysDesired.y < camFloorY ? camFloorY - sysDesired.y : 0;
     if (sysDesired.y < camFloorY) sysDesired.y = camFloorY;
     // Last resort: the pull-in still lands inside a shell (the vaults are
     // DoubleSide and would fill the screen). Tuck in closer AND rise — but only
@@ -16437,7 +16790,8 @@ export function createSystems(game) {
     // sysOPERA_RISE_MAX above the anchor. The old code teleported the eye to a
     // fixed y = 20 whatever was going on below it, which turned the capybara
     // into a speck for as long as the player stayed near the building.
-    if (!inPasto) {
+    // Sydney only, for the reason given at the first half of this pair.
+    if (inSyd) {
       const clear = sysOperaClear(sysDesired.x, sysDesired.y, sysDesired.z);
       if (clear > 0) {
         const rise = Math.min(clear + 1.4, sysAnchor.y + sysOPERA_RISE_MAX);
@@ -16461,8 +16815,9 @@ export function createSystems(game) {
       // ground, the eye sits just under the surface and looks down, which is a
       // picture; two metres over the bank is not one.
       if (gy > diveCeil) gy = diveCeil;
-      if (sysDesired.y < gy) sysDesired.y = gy;
-    }
+      if (sysDesired.y < gy) { sysCamInfo.lift = gy - sysDesired.y; sysDesired.y = gy; }
+      else sysCamInfo.lift = 0;
+    } else sysCamInfo.lift = 0;
     // The torii tunnel gets a RAIL rather than a boom. Forty-four gates 4 m tall
     // and 1.4 m apart on a curving climb is a corridor, and a straight line back
     // from the animal leaves it sideways into a leg — measured: the capybara was
@@ -16530,6 +16885,10 @@ export function createSystems(game) {
                        sysAnchor.z + (sysDesired.z - sysAnchor.z) * camClearF);
       }
     }
+    // The readout. See sysCamInfo — written, never read.
+    sysCamInfo.reach = camReach; sysCamInfo.dist = dd; sysCamInfo.clear = camClearF;
+    sysCamInfo.pitch = camPitch; sysCamInfo.sky = skyT; sysCamInfo.rig = rigT;
+    sysCamInfo.shot = shotW;
 
     // The spring is tracked separately from camera.position so the shake offset
     // is never fed back into the smoothing (that is what made shake "swim").
@@ -16561,8 +16920,15 @@ export function createSystems(game) {
     if (relief) {
       let gy2 = sysGroundY(camera.position.x, camera.position.z) + sysFLY_CLEAR;
       if (gy2 > diveCeil) gy2 = diveCeil;      // and here too, for the same reason
-      if (camera.position.y < gy2) camera.position.y = gy2;
-    }
+      // Instrumented separately from the first clamp: this is the one that
+      // actually fires in ordinary play, because the spring LAGS the desired
+      // point and this clamp sees where the eye really is. Batch 5 spent three
+      // measurement passes reading the first one, finding it at zero, and
+      // concluding the steep frames on the paramo and the ice shelf were the
+      // rig. They are this. See sysCamInfo.
+      if (camera.position.y < gy2) { sysCamInfo.lift2 = gy2 - camera.position.y; camera.position.y = gy2; }
+      else sysCamInfo.lift2 = 0;
+    } else sysCamInfo.lift2 = 0;
     // ---- THE LENS BREATHES ------------------------------------------------
     // Three terms onto sysFOV_BASE, all render-only. See the sysFOV_* block.
     // The reference speed follows whichever rig is live, so a full-tilt waddle
@@ -16638,6 +17004,10 @@ export function createSystems(game) {
     // cannot change usefully faster than four times a second. Raw dt, not the
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
+    // The live record line, on the same raw clock and for a third version of
+    // the same reason: an attempt does not stop being open because a `wow` put
+    // the world at 0.45x, and sysREC_STALE is a wall-clock promise.
+    recLiveTick(game.state.rawDt || dt);
     // Raw dt for the same reason the finds use it: sitting down among the
     // seventeen should not take longer because something else slowed time.
     sysFinaleStep(game.state.rawDt || dt);
@@ -18103,8 +18473,21 @@ export function createSystems(game) {
     }
 
     // ---- music intensity: a shift in mood on a chase, never a stinger ----
-    if (musChaseT > 0) musChaseT -= dt;
-    const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0), 0, 1);
+    // ---- 2d: AND IT SUSTAINS WHERE THE PLACE IS HOT, RATHER THAN SPIKING --
+    // `chaos` is a SPIKE — one wheek takes it to 0.21 and it is back to 0.07
+    // in 8.7 s — and until v31 it and a 2.5-second chase tail were the entire
+    // input to this mix. So the chase layer said "something just happened"
+    // and could not say "this is a square that has had enough of you".
+    //
+    // Heat does BOTH halves of the word sustain: it slows the tail down (at
+    // full heat 2.5 s of chase reads as 8.3) and it puts a floor under the
+    // intensity so the layer does not fall back to nothing between incidents.
+    // It cannot reach the top on its own — sysHEAT_MUS is a quarter — because
+    // a hot square is a mood and a chase is still an event.
+    const musHeat = sysPlaceHeat();
+    if (musChaseT > 0) musChaseT -= dt * (1 - musHeat * sysHEAT_HOLD);
+    const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0)
+                          + musHeat * sysHEAT_MUS, 0, 1);
     musIntensity = damp(musIntensity, musWant, musChaseT > 0 ? 0.9 : 0.35, dt);
     musApplyT += dt;
     if (musApplyT > 0.3 && musPad && ac.state === 'running') {

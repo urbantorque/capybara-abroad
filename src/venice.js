@@ -4916,6 +4916,8 @@ function venUpdateTasks(game, dt) {
       if (bt < 0.14 || bt > 0.86) { venBoardRunT = 0; venBoardFrom = bt < 0.5 ? 0 : 1; }
     } else {
       venBoardRunT += dt;
+      // the clock, on the paper, while you are on the planks (v32)
+      if (game.recordLive) game.recordLive('passerelle', venBoardRunT);
       const reached = venBoardFrom === 0 ? bt > 0.93 : bt < 0.07;
       if (reached) {
         if (!venBoardDone) {

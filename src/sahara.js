@@ -1983,6 +1983,10 @@ function sahUpdateChase(game, dt) {
   }
 
   sahChaseT += dt;
+  // ...and the clock is on the paper while they are behind you (v32). This one
+  // is `better: 'lower'`, so the live figure climbing toward the standing best
+  // is a pressure gauge rather than a score — which is what a chase is.
+  if (game.recordLive) game.recordLive('souk-escape', sahChaseT);
   // the beat before it starts: they are looking at you, and they have not moved
   if (sahChaseDelay > 0) {
     sahChaseDelay -= dt;
@@ -4527,6 +4531,9 @@ function sahUpdateSurf(game, dt) {
   const sp = capy.velocity ? Math.hypot(capy.velocity.x, capy.velocity.z) : 0;
   // Attempt-local, like the glacier run: sample only while armed, reset on arm.
   if (sahSurfT >= 0 && sp > sahSurfBest) sahSurfBest = sp;
+  // ...and on the paper while the slipface is moving (v32). The run's own best
+  // so far, which is the quantity the record holds — see the glacier.
+  if (sahSurfT >= 0 && game.recordLive) game.recordLive('dune-surf', sahSurfBest);
 
   if (sahSurfT < 0) {
     // Arm only on the slip face itself, like the glacier gates on onIce: the

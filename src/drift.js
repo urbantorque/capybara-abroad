@@ -4372,6 +4372,10 @@ function driUpdateSeeds(game, dt) {
     driSeedRide += Math.hypot(cp.x - driSeedLastX, cp.z - driSeedLastZ);
     driSeedLastX = cp.x; driSeedLastZ = cp.z;
     if (driSeedRide > driSeedBest) driSeedBest = driSeedRide;
+    // THIS crossing, on the paper, while you are hanging off the seed (v32) —
+    // the path length so far, which is the quantity driSeedBest takes its
+    // maximum of and therefore the quantity the record holds.
+    if (game.recordLive) game.recordLive('driftseed', driSeedRide);
     if (!driSeedDone && driSeedRide >= driSEED_RIDE) {
       driSeedDone = true;
       if (game.record) game.record('driftseed', driSeedBest);

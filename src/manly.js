@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -3918,6 +3918,19 @@ function manUpdateSurfTasks(game, dt) {
     manRideDist += Math.max(0, capy.velocity.z) * dt;
     if (speed > manRideTop) manRideTop = speed;
     if (speed > manTakeTop) manTakeTop = speed;
+    // ---- WHICH OF THE TWO NUMBERS A RIDE IS ABOUT (v32) ------------------
+    // A ride carries two records and the paper shows one attempt at a time, so
+    // it shows the one still open: until the take-off has been made it is the
+    // speed, and after that a ride is a distance and nothing else. Both are
+    // filed by game.record exactly as before — this only chooses what to WATCH.
+    // ...and the same two-metre floor Rio's wave has, for the same measured
+    // reason: `riding` is true of any swim in the shore break, so without it
+    // the line was up on 310 of 605 samples of ordinary play. A ride starts
+    // when the water has actually taken you somewhere.
+    if (game.recordLive && manRideDist > 2) {
+      if (!manTookOff) game.recordLive('take-off', manTakeTop);
+      else game.recordLive('all-the-way', manRideDist);
+    }
     // THE MINI. Not standing up — a capybara does not stand up. The moment is
     // the second and a half where the water stops going past you and starts
     // taking you with it, and four and a half metres a second is a speed the
@@ -4026,6 +4039,10 @@ function manUpdateSurfTasks(game, dt) {
   if (inRip && manRipT < 0 && p.z > -12) { manRipT = 0; }
   else if (manRipT >= 0) {
     manRipT += dt;
+    // the clock, on the paper, while the rip has hold of you (v32). It is the
+    // only live line in this chapter that can be up at the same time as the
+    // ride's — and it cannot, because the rip runs out and the ride runs in.
+    if (game.recordLive) game.recordLive('the-rip', manRipT);
     if (p.z < manBankZ(p.x) - 6) {
       if (!manRipDone) {
         manRipDone = true;

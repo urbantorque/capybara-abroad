@@ -2089,6 +2089,9 @@ function pastoUpdateCarroza(game, dt) {
   if (aboard && pastoCarDwell <= 0) {
     pastoCarRideT += dt;
     pastoCarRideM += pastoCAR_SPEED * dt;
+    // the metres, on the paper, while the float is carrying you (v32). Six is
+    // the record's own floor six lines down.
+    if (game.recordLive && pastoCarRideM > 6) game.recordLive('carroza', pastoCarRideM);
     if (!pastoCarRode && pastoCarRideT >= pastoCAR_RIDE) {
       pastoCarRode = true;
       if (game.completeTask) game.completeTask('carroza');

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -3969,6 +3969,13 @@ function palUpdateTasks(game, dt) {
   if (palDiveDone && typeof game.record === 'function' && palDeepest > 1.5) {
     game.record('first-dive', palDeepest);
   }
+  // ---- HOW FAR DOWN YOU ARE, WHILE YOU ARE DOWN THERE (v32) ---------------
+  // The live figure is THIS dive's depth, not the session's deepest: a readout
+  // that stuck at the best of the afternoon would say nothing about the dive
+  // you are on. Below the turtle and the cathedral in this function on purpose
+  // — both of those are more specific attempts and both are allowed to take
+  // the line off this one while they are open.
+  if (under && game.recordLive) game.recordLive('first-dive', depth);
 
   // ---- the crack ----------------------------------------------------------
   if (!palToldCrack && !palCrackDone && palInZone('crack', p.x, p.z)) {
@@ -4028,6 +4035,8 @@ function palUpdateTasks(game, dt) {
     if (typeof game.record === 'function' && palTurtleWith > 1.5) {
       game.record('sea-turtle', palTurtleWith);
     }
+    // ...and it is on the paper for the whole of the swim, not just at the end
+    if (game.recordLive) game.recordLive('sea-turtle', palTurtleWith);
     // ---- AND THE CHAPTER SAYS WHAT IT WANTS ------------------------------
     // Six seconds is not long, but a bar with no face on it is a bar nobody
     // knows they are filling. One line, once, at the halfway mark, and then
@@ -4079,6 +4088,9 @@ function palUpdateTasks(game, dt) {
       if (typeof game.record === 'function' && palBreathIn > 2) {
         game.record('cathedral', palBreathIn);
       }
+      // the breath, on the paper, while you are holding it (v32). Last of the
+      // three in this function, so in here it is what the line says.
+      if (game.recordLive) game.recordLive('cathedral', palBreathIn);
     } else palBreathIn = 0;
     if (!palToldBreath && under && palBreathIn > 3) {
       palToldBreath = true;

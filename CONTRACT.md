@@ -44,7 +44,10 @@ game = {
   clock,
   events,        // { on(name, fn), off(name, fn), emit(name, payload) }
   input,         // written by systems.js, read by capybara.js — see below
-  state,         // { time, dt, paused, started, score, chaos }
+  state,         // { time, dt, paused, started, score, chaos, heat, heatN }
+  npcHeat(x, z, r),        // people near a point watching FOR you — npc.js, live-gated
+  placeHeat(x, z),         // how cross the PLACE is, 0..1 — the v33 accumulator
+  forceHeat(v),            // TEST HOOK: pin the field (-1 releases). Never a verb.
   mats,          // cannon contact materials: { ground, prop, capy, npc }
   props: [],     // interactive prop records — populated by props.js
   npcs:  [],     // npc records — populated by npc.js
@@ -1996,7 +1999,11 @@ a shutter fell over on the far side of it. It decays **linearly** over
 fails, nothing is lost. The stakes live in the finds instead, where four rows
 were written knowing wariness exists — which is why the old content could not be
 destabilised by it. `game.npcHeat(x, z, r)` answers how many people near a point
-are currently watching for you, both crowds in one number.
+are currently watching for you, both crowds in one number — **gated on the live
+chapter, and reading `max(wary, alarm)` for the two old casts, since v33; before
+that it swept a frozen Sydney in seventeen chapters and never swept Pasto.**
+`game.placeHeat(x, z)` is the accumulator that sits on top of it — see BATCH
+SEVEN below.
 
 Measured: three wheeks beside the Botanic Gardens crowd took the maximum from
 0.00 to 0.95 with five people watching; twenty seconds later the heat was 0.
@@ -2047,6 +2054,380 @@ where there is no floor and no contact to have.
    three axes; the cradle rode perfectly for thirty metres, entered the tower over the last two,
    and the solver resolved the overlap by ejecting its passenger. Same family as the herd running
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
+
+
+## THE LIFT PASS, BATCH SEVEN — THE PLACE REMEMBERS (v33 — 27 Aug 2026)
+
+The genre this game is styled after runs on one loop: approach, get seen, be driven off, come
+back another way. **The first half was built and built well** — `npcHeat`, the witness chain,
+the wary lines, a twenty-six second memory per person, 477 conditional lines over 17 casts.
+The second half did not exist. There was no state above the individual, so a square you had
+been tormenting for four minutes was exactly as easy to walk into as one you had never
+visited, and that is why hour six played like hour one: the list got shorter and the world
+never changed its mind.
+
+`state.chaos` is not that state and never was — one wheek takes it to 0.21 and it is back to
+0.07 in 8.7 s, and its only two readers in the repo are a music-layer gain and the calm
+counter.
+
+### HEAT IS AN ACCUMULATOR ON TOP OF WARINESS, AND IT IS A FIELD
+
+`npc.js` owns it; `game.placeHeat(x, z)` publishes it; `game.state.heat` and `.heatN` are the
+live figures. Its input is the existing `npcHeat(x, z, r)` — "how many people near here are
+watching FOR you" — so nothing new is measured and **mischief nobody saw is worth nothing**,
+which keeps the finds exactly as they were.
+
+**A field and not one number, and the diameters decided it.** The people-span of all nineteen
+chapters was measured for this decision (`qa/b7-diam.js`, chapter list derived from `CHAPTERS`):
+median **169 m**, from Palawan's 90 to the Quay's 638, and only two under a hundred. A single
+number per chapter would mean robbing the market makes the far side of the plaza harder, and
+that is wrong in seventeen of the nineteen.
+
+**The radius and the range are derived from each other**, which is trap 3 of the closeout
+obeyed by construction rather than checked afterwards:
+
+    npcHEAT_R = npcCHAIN_R × npcHEAT_LOOK = 20 × 1.6 = 32 m
+
+The floor is the chain radius — the measured distance at which one person in a square hears
+another — times the largest range multiplier heat can buy, so **a witness can never be
+recruited from outside the heat its own witnessing creates**. The ceiling is half the smallest
+chapter's people-span (Palawan 90 → 45). If `npcHEAT_LOOK` moves, the radius moves with it.
+
+Six sites per chapter, merge at R/2, **90 s linear decay** — 3.5× the 26-second personal clock,
+because the point of it is that the individuals have forgotten and the square has not. Decayed
+above the biome gate: a place cools in real time, not in chapter time.
+
+### WHAT IT MAY BUY, AND THE LIST IS CLOSED
+
+**Attention, and nothing else.** Nothing is denied, nothing lost, no task made harder — the
+same sentence the wariness block has made since v19, one layer out. There are eight readers of
+the field and they are: two look radii (`localsReact`'s circle and the chain's), the locals'
+head-turn radius, the two old casts' notice radius, the wary/laugh register threshold, the
+notice cooldown, a 0.55 m shuffle bias, an arm rotation, and a music gain. **None of them is a
+gate**, and the one that can obstruct anything — the guard shuffle — is the one with a proof:
+
+- max drift from a chapter-given anchor is **0.54 m hot and 0.54 m cold**, both at
+  `npcLOC_STEP_R`. Heat POINTS the shuffle; it does not lengthen it.
+- **0 of 19 chapters** move anybody more than `npcLOC_STEP_R` toward a prop, hot or cold.
+- the guard refuses any target within `npcHEAT_GD_R` (1.6 m) of **any** prop home in the live
+  chapter, not merely of its own stock. The centroid-only version measured a systematic
+  closing in eleven chapters of nineteen.
+
+### FOUR RULES THIS COST
+
+1. **AN INCIDENT IS NOT A FRAME.** The witness chain arms on every startle and a wheek in a
+   thirty-eight-person park startles most of it, so four seconds of ordinary play took the
+   field from 0 to 1 with twenty-six bumps logged. A site may be bumped once every
+   `npcHEAT_GAP`. Ten people turning round at once is one thing that happened.
+2. **ONE WITNESS IS AN INCIDENT, SEEN — NOT A THIRD OF ONE.** A step proportional to the
+   witness count made a single witness worth 0.116, gone in ten seconds against a 90 s decay,
+   in exactly the chapters with six to ten people over a hundred and fifty metres where one
+   witness is the normal case. The step is mostly flat; the count is its top four tenths.
+3. **`wary` IS ONE FRAME BEHIND ITSELF IN SYDNEY AND PASTO.** A local's is written inline by
+   `localsReact`; those two derive it from `alarm` inside `stepHuman` on the NEXT tick. Anything
+   that asks who is watching at the instant of an event must read `max(wary, alarm)` — measured,
+   two people at wary 0.64 three metres away and `npcHeat` answering 0 on the frame.
+4. **AND `npcHeat` HAD NO LIVE-BIOME GATE.** `stepHuman` runs only while Sydney is attached, so
+   a Sydneysider startled on the way out of chapter 1 is frozen wary for the session, at a
+   coordinate that exists in every other chapter. `most-wanted` and `not-a-soul` — the two finds
+   that read it — were answering questions about a park in Sydney in seventeen chapters. And it
+   never swept `paHumans`, so chapter 2 could not raise heat at all.
+
+### THE MUSIC (systems.js)
+
+`chaos` is a spike and a 2.5 s chase tail was the rest of the input, so the layer could say
+"something just happened" and could not say "this is a square that has had enough of you".
+Heat does both halves of *sustain*: `sysHEAT_HOLD` slows the chase tail (2.5 s reads as 8.3 at
+full heat) and `sysHEAT_MUS` puts a quarter-height floor under the intensity. It cannot reach
+the top on its own, because a hot square is a mood and a chase is still an event.
+
+### `forceHeat` IS A TEST HOOK AND NOT A VERB
+
+`game.forceHeat(1)` / `(0)` pins the field and `(-1)` releases it. "Zero tasks made harder" is
+only provable by running the same sweep twice with nothing else different, and this is cleaner
+than a stash because there is nothing else that could have moved between the halves.
+
+## THE LIFT PASS, BATCH SIX — THE NUMBER AND THE FIRST FRAME (v32 — 27 Aug 2026)
+
+Two shallow sweeps across all nineteen chapters. Neither invents a system; both take something
+the game already had and make it visible at the one moment it is worth seeing.
+
+**The through-line is that both were already written and both spoke too late.** `recordValue`
+has filed 53 numbers since v18 and says nothing until the run is over. `frameShot` has been
+able to compose a shot since v26 and no chapter had ever asked it for the one shot every
+player is guaranteed to see. Neither of these is a repair; both are the same move — take a
+thing that exists and point it at the moment it is for.
+
+### 1. THE RECORD YOU CANNOT SEE WHILE YOU ARE SETTING IT
+
+`game.recordLive(id, value)` / `game.recordEnd(id)` — one channel, two verbs, on the pattern
+every other cross-module thing here uses. It writes two strings into a div under the tally on
+the to-do card and it does **nothing else**: it cannot gate, deny or fail anything, and
+`recordValue`'s contract is untouched.
+
+- **It is meant to be called EVERY FRAME the attempt is open**, out of the same block that is
+  already incrementing the timer the biome eventually hands to `game.record`. That is what
+  makes the watchdog possible, and the watchdog is what makes the whole thing safe: a chapter
+  that forgets `recordEnd` still drops the line `sysREC_STALE` (1.6 s) later, so **"no attempt
+  open" is the resting state of the mechanism rather than a promise nineteen chapters have to
+  keep**. Crossing a border ends any open attempt outright, the way shake and time do.
+- **`recText` does the formatting and nothing new was written.** With no figure yet the line
+  IS `recText(id)` — the standing best, which is the target. With a figure it is the label,
+  the live value and the unit on the first line and `best NN unit` on the second.
+- **A first attempt still says nothing at the end.** That silence is deliberate and stays. The
+  live readout is what a first attempt gets instead.
+- **`sysREC_STALE` is wall clock**, on `rawDt`, for the same reason the finds are: an attempt
+  does not stop being open because a `wow` put the world at 0.45x.
+
+**Wired in 31 places across 19 of 19 chapters.** Measured, sixty seconds of ordinary play in
+each of the nineteen at ten samples a second: **17 of 19 show the line for 0 of 605 frames**.
+
+**A RIDE NEEDS A FLOOR, AND THE FLOOR IS THE RECORD'S OWN.** Rio's wave and Manly's surf ride
+are `on` for any swim in the shore break, so the line was up for 187 and 310 of 605 samples of
+wandering — a permanent counter on two beaches. Both now ask for two metres of ride before
+they say anything, which is the cheapest thing that is a ride; on the sand, in the same sixty
+seconds, both read **0 of 603**. Every other wired ride borrows its floor from the number the
+record itself refuses below (8 m for the van, 6 m for the float, 12 m for the balloon and for
+Hanoi's scooter, 8 m for Monte Carlo's roof).
+
+**AND SOMETHING THAT HAPPENS TO YOU IS NOT AN ATTEMPT.** The Pantanal cowbird lands on its own
+and rides for up to seventy seconds; it was on the brief's list of measured runs and it is the
+one that does not belong there. 60 of 60 samples standing still, 562 of 605 even gated on the
+animal moving. It has no live line. The line belongs to things a player GOES AND DOES.
+
+### 2. THE DONE-FLAG THAT FREEZES A RECORD — SIX OF THEM, ONE SHAPE
+
+Wiring the live line meant reading every measured run, and six of them turned out to stop
+counting the moment their task was ticked:
+
+| | record | what the gate was |
+|---|---|---|
+| Cali | `salsa-dance` | `if (!caliOnFloor \|\| caliDanceDone) return` |
+| Rio | `samba-parade` | `if (!rioInColumn \|\| rioSambaDone) return` |
+| Rio | `selaron-steps` | `if (!rioSelaronDone) { …the whole flight… }` |
+| Cali | `cart-run` | `if (!caliCartDone && aboard) game.record(…)` |
+| Monte Carlo | `the-floor` | `if (!monFloorDone) { …the whole crossing… }` |
+| Circular Quay | `manly-voyage` | (per visit only — correct, and left alone) |
+
+Five were fixed and the rule is the same every time: **the TASK happens once; the counting does
+not stop.** A record that cannot be beaten is not a record, and these are the only reason to
+re-enter a finished chapter. Iceland's glacier and Venice's passerelle already had the right
+shape and are what the five were made to look like.
+
+### 3. THE ARRIVAL IS A SHOT, AND NOW IT IS FRAMED
+
+`yaw` is set on **19 of 19** spawns. Each one is `atan2(-(tx - sx), -(tz - sz))` from the spawn
+to the thing that chapter's own paragraph in `main.js` names.
+
+`teleportCapy(sp, arrive)` gained a second argument and composes the frame:
+`frameShot({ yaw, pitch, raise, hold: sysARRIVE_HOLD })`. `arrive` is what separates walking
+into Venice from the stuck-rescue putting you back on the road — a rescue that pinned the lens
+for two seconds would be taking the camera away from a player who has just been stuck.
+
+- **0.55 in + 1.95 hold + 1.10 out = 3.60 s = `sysFADE_CARD` to the millisecond.** The place
+  card is holding the screen for exactly that long anyway, so the shot underneath it is free
+  and it is over on the frame the card leaves.
+- **`sysARRIVE_PITCH` 0.28 rad and `sysARRIVE_RAISE` 2.0 m — the arrival is not the
+  walking-about lens.** At `sysCAM_PITCH` (41 degrees) against a 24 degree half-FOV the horizon
+  is seventeen degrees above the top edge, so the Opera House at 38 m, the Koutoubia at 52 and
+  Galeras at 104 were ALL out of frame and the first picture of nineteen chapters was a patch
+  of ground. Measured, on nineteen PNGs, before these two numbers existed. Neither touches
+  ordinary play: the shot is over in 3.6 s and the rig it hands back to is untouched.
+- **A spawn may name `dist`, `pitch` or `raise`** and two do. Most name a bearing alone,
+  because most should: Hanoi's train marquee proved that a distance written into an alley is a
+  number the world refuses, and the rig's own occlusion ray solves it better than a constant.
+
+### 4. FOUR MODULES USED `placeCue` AND NONE OF THEM IMPORTED IT
+
+`manly.js` (3 call sites), `antarctic.js` (6), `palawan.js` (1) and `pantanal.js` (2) call
+`placeCue` and none had it on its import line. `build.mjs` concatenates every module
+into one scope, so the shipped `dist` build resolves it and this has never been visible there;
+the unbundled path `index.html` serves is a **ReferenceError inside a biome update**, which is
+the failure mode `capy3-module-drop-failure` is about. Found by a soak, not by reading: chapter
+14's take-off mini threw on the frame it paid out.
+
+**The rule this is a reminder of:** a name from `shared.js` is only in scope in `dist`. If a
+module uses it, the module imports it.
+
+## THE LIFT PASS, BATCH FIVE — THE LENS AND THE WALL (v31 — 26 Aug 2026)
+
+Two things stopped travelling and one instrument had stopped counting. This section is the
+first batch of the Lift Pass: `qa/route.js` derives its chapter list, the player can raise
+the eye, and the climb has left Hong Kong.
+
+**The through-line is that both features already existed and neither could be reached.**
+`skyward()` had been in the rig since chapter 7 and five chapters published it — the camera
+has always known how to look up and there was no way to ask it. `climbHold` had been in the
+controller since chapter 11 and three chapters published it — and `sysCLIMB_TAUGHT` named
+those same three, so the find that exists to celebrate the climb travelling could not fire in
+any chapter, ever. Neither of these is a repair. Both are the dive's move, again: one flag
+from the biome, the solve stays in the shared module, and the chapters that already answered
+are untouched to the decimal.
+
+### 1. A CHAPTER LIST IN AN AUDIT IS A BUG WAITING FOR A CHAPTER
+
+`qa/route.js` — the one audit that measures scenery density along each chapter's own route —
+carried a hard-coded list of **eight** for the whole of the Payoff Pass. Eleven chapters were
+not measured and it printed a confident table every time.
+
+`run-code` has no `require` and no `import`, so the derivation happens in the page:
+`index.html` serves `src/shared.js` unbundled and the probe parses `CHAPTERS` out of it. It
+**throws** on a miss rather than falling back to a spelled list. A silent fallback is how a
+stale audit stops failing and starts inventing.
+
+The first run over nineteen found the second half of the same defect: `game.sydney` does not
+exist — chapter one's api is `game.env`, the resolution `sysLiveBiomeApi` has always done —
+so the derived list threw on its own first chapter. With eight names spelled out, that could
+never come up.
+
+### 2. THE HORIZON WAS NOT IN THE FRAME, IN ANY STATE OF ORDINARY PLAY
+
+Measured, all nineteen, real keys and a real clock. The number is `pitch − halfFOV`: the angle
+of the horizon **above the top edge** of the screen.
+
+| | before | after |
+|---|---|---|
+| standstill | 42.8 / 24.0 = **+18.8** | unchanged, deliberately |
+| standstill, eye raised | +18.8 (the key did nothing) | 16.6 / 24.0 = **−7.4** |
+| full run | 34.6 / 27.5 = **+7.2** | 20.2 / 28.4 = **−8.3** |
+| horizon in frame at a run | **0 of 19** | **15 of 19** |
+| horizon in frame at rest, eye raised | **0 of 19** | **19 of 19** |
+
+Three changes, and the first is the one that matters:
+
+- **`sysEYE_RAISE_W` — held V raises the eye, on the crane's own channel.** Not a second rig.
+  The key is another voice asking for `skyward` and the louder of the two wins; it borrows the
+  crane's whole geometry and stops at 0.7 of it, which is 20 degrees of pitch, twelve metres of
+  boom and a look target 1.9 m up so the animal stays in frame. It borrows none of the crane's
+  timing: `sysSKY_LAMBDA` is three seconds, which is right for a chapter easing the lens up at
+  an aurora and useless for a key, so while the player's hand is on it the blend runs at
+  `sysEYE_LAMBDA`. Gated by flight and the helm exactly as the crane is.
+- **`sysCAM_DOLLY_P` — the speed dolly lowers the boom as well as lengthening it.** The dolly
+  shipped as distance alone and distance alone very nearly does not flatten the shot: the boom
+  angle is fixed, so a longer boom puts the eye higher in the same proportion it puts it
+  further back. Measured: pushing the distance from 10.7 m to 13.5 m moved the view pitch from
+  34.6 to 36.1 — the **wrong way**. What had always flattened it was the look-lead, which is
+  horizontal. So `camDolly` is now the 0..1 fraction it always was internally, and it buys a
+  metre of boom and eighteen degrees of pitch.
+- **`sysFOV_SPEED` 7.0 → 9.0.** The other half of `pitch − halfFOV`. The brief's own
+  prescription for when flattening further would start putting the eye in the terrain.
+
+**The trap, counted.** Raising the eye lowers it relative to the animal and `sysCamClear`
+starts cutting the boom. `game.camInfo` was added for this — one pre-allocated object written
+once a frame and read by nothing in src — because `camClearF` had never left its closure and
+"is the occlusion ray fighting the terrain in this chapter" was a question no audit could ask.
+Boom-cut frequency over all nineteen, before **8.6%** of frames and after **6.3–12.6%** across
+passes: inside its own run-to-run noise, and not materially worse anywhere.
+
+**Two things the instrument caught before the rig did**, and both were the instrument:
+
+- A four-direction key sweep that held W for three seconds before looking measured **Pasto at
+  55.8 degrees at a full run** — steeper than a standstill. The animal was half way down the
+  paramo. Frames are now filtered to grounded, level (`|vy| < 0.5`) and outside a marquee, and
+  the legs are short: reset to spawn, hold, look at 2.0 s.
+- Looking at 1.1 s instead reported Cali and Sahara at +5 on one pass and −5 on the next.
+  `camDolly` damps at lambda 2.4 and at 1.1 s is two thirds of the way there.
+
+**And one real bug the lens work turned up.** `sysCAM_CLEAR_PAD` was **0.45** and `camera.near`
+is **0.5**. Every time the occlusion ray fired — which is the exact moment the feature exists
+for — the eye was placed five centimetres too close and the near plane was left *inside* the
+wall it had just backed off from. Measured on the Monte Carlo climb: boom cut to 0.15, and the
+whole frame one flat brown rectangle. The pad is 0.70. This is not a relaxation of
+`sysCAM_CLEAR_MIN`, which is what keeps the lens out of Galeras and is untouched.
+
+### 3. SYDNEY'S OPERA HOUSE WAS KEEPING THE CAMERA OUT OF EIGHTEEN OTHER WORLDS
+
+`sysInOpera`/`sysOperaClear` were gated on `!inPasto` — written when there were two chapters
+and never revisited. `sysOPERA_VAULTS` is eleven ellipses between x −11 and x +11, z −9 and
+z +2: the Bennelong Point podium and nothing else. That volume has been live in seventeen
+other worlds, and **Rio's spawn is the world origin**. The Quay's own Opera House is at x 78
+and was never the one being tested.
+
+Gated on `isActive('sydney')` now. Named for the chapter it belongs to, not for the one
+chapter it was known to be wrong in — that is the difference between a gate and a patch.
+
+### 4. THE CLIMB HAS LEFT HONG KONG
+
+`capyClimbAt` gets a generic fallback, reached **only on a property miss**: a biome that
+publishes `climbHold` and answers null has answered, and its no is final. Two horizontal
+raycasts out of the chest in the direction the animal is facing; a near-vertical static face
+within 1.15 m is something to hang on to, and the surface normal flattened is the hold's
+normal, which is the whole of the contract `climbHold` already had.
+
+| | before | after |
+|---|---|---|
+| chapters with any climbable ground plan | **3 of 19** | **19 of 19** |
+| Hong Kong / Cappadocia / Son Doong, 1 m grid | 150 / 528 / 1,157 m² | **150 / 528 / 1,157 m²** |
+| `brought-climb` | unreachable by construction | fires |
+
+**What it will not grab, and every one is load-bearing.** Anything with mass — a bin you could
+otherwise pick up. Anything not `STATIC` — kinematic means a ferry hull, a tram, a floe, a
+gondola, a balloon basket, and those are carriers with a channel of their own. `userData.npc`
+and `userData.local` — both are mass-0 boxes that read as a perfectly good half-metre wall, and
+a capybara clinging to a stallholder is worse than no climb at all. The capybara's own three
+spheres and whatever is carrying it. Heightfields and planes: terrain is not a building and its
+AABB is the whole chapter. This is `sysCamClear`'s ignore list, for the same reasons.
+
+**A wall with no top is climbed for ever.** `capyClimbAt` defaulted `top` to `Infinity`, which
+for an authored lattice is fine — the biome says where it ends. For a ray it is a licence to
+climb past the parapet into the sky. The top comes off the hit body's AABB, and because several
+chapters merge a street into one body, it is then **confirmed at the wall**: a second ray a
+metre higher, and no wall up there means the parapet is here whatever the box says.
+
+**And you may not hang off something from under the ground.** The climb assigns
+`body.velocity.y` rather than adding to it, so a hold offered below the terrain surface holds
+the animal inside the hill indefinitely. Measured in Monte Carlo, whose buildings are cut into
+the rock: a collider starting at y 27 under ground at y 28, and the frame was the brown inside
+of the hillside. Refused, with two decimetres of slack for the heightfield triangle.
+
+**It costs nothing when nobody is asking.** The authored hooks are arithmetic; this is two
+raycasts against every static body in the chapter, so it runs only while the grab key is down —
+which is the only state in which the answer can be used, because `wantCling` requires it two
+lines below the call site.
+
+`sysCLIMB_TAUGHT` is **unchanged**, and that is the point. Hong Kong, Cappadocia and Son Doong
+still teach the verb. What changed is the other set.
+
+### 5. THREE INSTRUMENTS THAT CANNOT SETTLE WHAT THEY LOOK LIKE THEY SETTLE
+
+Recorded because a green run from an instrument nobody has checked is worth less than no run.
+
+- **`qa/stillness.js` gained a row and it was not this batch.** Pasto drifts 2.5 m from its
+  spawn with no input. With all four changes reverted and the same script, it drifts **7.83 m**;
+  the batch-5 baseline caught it at 0.48. It is weather-dependent (`wet` 0.17 vs 0.26 across
+  runs, and rain adds slip), pre-existing, and it straddles the 1.0 m limit. **Open finding, not
+  a regression.**
+- **`qa/audit-solid.js` is not a ratchet in the animated chapters.** Back to back on one build
+  with nothing changed between them: kyoto 33→36, cali 44→47, goreme 46→44, antarctic 3→2. Its
+  mesh list is `scene.traverse` filtered on `.visible`, and chapters toggle visibility on time
+  of day — Cali's dusk lights, Kyoto's heron, Kyoto's matcha heap. The quiet chapters are
+  stable and stayed stable. No mechanism exists by which this batch could add a walk-through: it
+  adds no mesh and no collider.
+- **`qa/b5-climb.js`'s survey is not repeatable to the cell.** Its body list is rebuilt per run
+  and the world does not always have the same number of bodies in it (cave 145 vs 146). The
+  1 m authored grid, which is pure arithmetic, is exact — and that is the one the trap-3 test
+  uses.
+
+### 6. WHAT MOVED
+
+`src/systems.js`
+- `sysEYE_RAISE_W` 0.70, `sysEYE_LAMBDA` 2.6 — held V, on the `skyward` channel.
+- `sysCAM_DOLLY_P` 18° — the speed dolly lowers the boom. `camDolly` is now 0..1.
+- `sysFOV_SPEED` 7.0 → 9.0.
+- `sysCAM_CLEAR_PAD` 0.45 → 0.70 — it has to clear `camera.near`.
+- The Opera keep-out is gated on `isActive('sydney')`, both halves of the pair.
+- `game.camInfo` — reach, dist, clear, pitch, sky, rig, shot, lift, lift2, floor. Written once
+  a frame, read by nothing in src.
+- One row in `sysLEGEND_MORE`.
+
+`src/capybara.js`
+- `capyClimbProbe` — the generic hold, in `capyClimbAt` and nowhere else.
+- `capy.climbAt(x, y, z, yaw)` — QA only. A biome's `climbHold` can be probed on a grid
+  because it is arithmetic; the fallback cannot, because it needs a facing. Without it the
+  change is unmeasurable, and an unmeasurable change is one nobody may claim.
+
+`qa/route.js` derives its chapter list. New: `qa/b5-cam.js`, `qa/b5-camrep.mjs`,
+`qa/b5-climb.js`, `qa/b5-brought.js`, `qa/b5-climbshot.js`, `qa/b5-shots.js`.
 
 
 ## THE CLOSEOUT — WHAT AN AUDIT IS FOR (v30 — 26 Aug 2026)

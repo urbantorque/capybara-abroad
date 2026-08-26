@@ -4227,6 +4227,8 @@ function cavUpdateTasks(game, dt) {
   if (capy.climbing && cavInZone('wall', p.x, p.z)) {
     if (cavWallT < 0) cavWallT = 0;
     cavWallT += dt;
+    // the clock, on the paper, while you are on the wall (v32)
+    if (game.recordLive) game.recordLive('great-wall', cavWallT);
   }
   // TOPPED OUT means ABOVE THE WALL, not past it: the rimstone pools you land
   // in are on the crest, at z = wall.z − 1, so a test for "beyond" never fired.

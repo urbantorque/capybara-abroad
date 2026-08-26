@@ -3333,6 +3333,14 @@ function kyoUpdateRun(game, dt) {
     }
   }
 
+  // --- the clock, on the paper (v32) ---
+  // `kyoRunT >= 0` is the whole definition of "an attempt is open" and it is
+  // already maintained above, so this is two lines and no new state. Every
+  // other way out of the run — the mill, the bank, the border — leaves the
+  // clock negative on the next frame and closes the line here.
+  if (kyoRunT >= 0) { if (game.recordLive) game.recordLive('uji-run', kyoRunT); }
+  else if (game.recordEnd) game.recordEnd('uji-run');
+
   // --- the finish ---
   if (kyoRunT >= 0 && dMill2 < kyoRUN_END_R * kyoRUN_END_R) {
     const t = kyoRunT;

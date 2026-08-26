@@ -14,7 +14,22 @@ async page => {
     await page.waitForTimeout(1200);
     await page.evaluate(() => {
       const g = window.__capy;
-      const list = g.npcs.slice();
+      // ---- THE LIVE CAST, AND NOT BOTH OF THEM (v33) ---------------------
+      // `game.npcs` holds Sydney's thirty-eight AND Pasto's twenty-three at
+      // once, for the life of the session, and only the live one is stepped —
+      // so an ungated capture watches a detached crowd stand perfectly still
+      // and reports every one of them as a stuck NPC. Measured: 38 "stuck" in
+      // the Quay, which has no npc.js cast at all, and 38 of Pasto's 56 rows
+      // were Sydneysiders. Exactly the invented-finding failure of rule 3, in
+      // the detector the catch-all-state bug was found with.
+      //
+      // The two casts are separated by `kind`, which is the only marker they
+      // carry, and the Quay's people are `locals` — a different register this
+      // detector does not cover and never did.
+      const PA = { vendor: 1, abuela: 1, farmer: 1, churchgoer: 1, llama: 1, streetdog: 1 };
+      const live = g.biome.current;
+      const list = g.npcs.filter(r => r && r.group &&
+        (live === 'pasto' ? !!PA[r.kind] : live === 'sydney' ? !PA[r.kind] : false));
       window.__nhTimer = setInterval(() => {
         const N = window.__nh;
         const gy = (x, z) => {

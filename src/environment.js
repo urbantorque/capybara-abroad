@@ -1141,6 +1141,10 @@ function envVanStep(game, dt) {
   if (riding && envVanDwell <= 0) {
     envVanRideT += dt;
     envVanRideM += envVAN_SPEED * dt;
+    // the metres, on the paper, while you are on the roof (v32). Eight is the
+    // record's own floor four lines down — stepping on at a terminus and off
+    // again is not a ride, and the line agrees with the record about that.
+    if (game.recordLive && envVanRideM > 8) game.recordLive('whippy-run', envVanRideM);
     if (!envVanRode && envVanRideT >= envVAN_RIDE) {
       envVanRode = true;
       game.completeTask('whippy-run');

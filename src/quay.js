@@ -4982,7 +4982,16 @@ function quayBridgeEcho(game) {
 
 /** The three things worth turning the wheel for, and the arrival. */
 function quayCheckVoyage(game, dt) {
-  if (quayRunT >= 0 && !quayVoyaged) quayRunT += dt;
+  if (quayRunT >= 0 && !quayVoyaged) {
+    quayRunT += dt;
+    // ---- THE PASSAGE, ON THE PAPER, WHILE IT IS BEING MADE (v32) ----------
+    // The same quantity the record takes, not the raw clock: `quayArrivalT` is
+    // the second she has to sit still to count as alongside and it is
+    // subtracted at the finish, so subtracting it here too means the figure the
+    // player watches is the figure they end up with rather than one a second
+    // adrift of it.
+    if (game.recordLive) game.recordLive('manly-voyage', Math.max(0, quayRunT - quayArrivalT));
+  }
 
   if (!quayCastOff && quayHelmOn && quayBoatZ < quayAPRON_Z - 26) {
     quayCastOff = true;

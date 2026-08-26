@@ -1,0 +1,247 @@
+{
+ "triBudget": 130000,
+ "msBudget": 5.5,
+ "ceilings": {
+  "pantanal": 217000,
+  "goreme": 222000,
+  "iceland": 205000,
+  "sahara": 205000,
+  "drift": 191000,
+  "venice": 188000,
+  "antarctic": 188000,
+  "quay": 165000,
+  "cave": 166000,
+  "kowloon": 160000,
+  "palawan": 136000,
+  "rio": 134000,
+  "kyoto": 128000,
+  "pasto": 110000,
+  "cali": 100000,
+  "manly": 92000,
+  "sydney": 87000,
+  "monaco": 141000,
+  "hanoi": 252000
+ },
+ "rows": [
+  {
+   "n": "kowloon",
+   "tris": 154058,
+   "shadowTris": 115470,
+   "meshes": 256,
+   "ms": 4.17,
+   "msNoShadow": 2.8,
+   "shadowMs": 1.37,
+   "noisy": false
+  },
+  {
+   "n": "hanoi",
+   "tris": 235942,
+   "shadowTris": 178508,
+   "meshes": 278,
+   "ms": 4.04,
+   "msNoShadow": 3.41,
+   "shadowMs": 0.63,
+   "noisy": false
+  },
+  {
+   "n": "goreme",
+   "tris": 202894,
+   "shadowTris": 113454,
+   "meshes": 323,
+   "ms": 4.01,
+   "msNoShadow": 3.16,
+   "shadowMs": 0.85,
+   "noisy": false
+  },
+  {
+   "n": "antarctic",
+   "tris": 181674,
+   "shadowTris": 77978,
+   "meshes": 168,
+   "ms": 4,
+   "msNoShadow": 3.12,
+   "shadowMs": 0.88,
+   "noisy": false
+  },
+  {
+   "n": "manly",
+   "tris": 85578,
+   "shadowTris": 81110,
+   "meshes": 179,
+   "ms": 3.77,
+   "msNoShadow": 2.66,
+   "shadowMs": 1.11,
+   "noisy": false
+  },
+  {
+   "n": "monaco",
+   "tris": 135337,
+   "shadowTris": 59952,
+   "meshes": 263,
+   "ms": 3.67,
+   "msNoShadow": 3.08,
+   "shadowMs": 0.6,
+   "noisy": false
+  },
+  {
+   "n": "drift",
+   "tris": 184974,
+   "shadowTris": 42896,
+   "meshes": 219,
+   "ms": 3.62,
+   "msNoShadow": 2.73,
+   "shadowMs": 0.89,
+   "noisy": false
+  },
+  {
+   "n": "pantanal",
+   "tris": 208822,
+   "shadowTris": 147040,
+   "meshes": 151,
+   "ms": 3.62,
+   "msNoShadow": 2.99,
+   "shadowMs": 0.62,
+   "noisy": false
+  },
+  {
+   "n": "palawan",
+   "tris": 129338,
+   "shadowTris": 101378,
+   "meshes": 187,
+   "ms": 3.56,
+   "msNoShadow": 2.69,
+   "shadowMs": 0.88,
+   "noisy": false
+  },
+  {
+   "n": "cave",
+   "tris": 160588,
+   "shadowTris": 155766,
+   "meshes": 184,
+   "ms": 3.44,
+   "msNoShadow": 3.1,
+   "shadowMs": 0.35,
+   "noisy": false
+  },
+  {
+   "n": "sahara",
+   "tris": 196496,
+   "shadowTris": 115804,
+   "meshes": 332,
+   "ms": 3.28,
+   "msNoShadow": 2.16,
+   "shadowMs": 1.12,
+   "noisy": false
+  },
+  {
+   "n": "quay",
+   "tris": 158615,
+   "shadowTris": 79137,
+   "meshes": 252,
+   "ms": 2.93,
+   "msNoShadow": 1.66,
+   "shadowMs": 1.26,
+   "noisy": false
+  },
+  {
+   "n": "venice",
+   "tris": 181814,
+   "shadowTris": 166776,
+   "meshes": 180,
+   "ms": 2.81,
+   "msNoShadow": 2.34,
+   "shadowMs": 0.47,
+   "noisy": false
+  },
+  {
+   "n": "kyoto",
+   "tris": 122006,
+   "shadowTris": 111066,
+   "meshes": 251,
+   "ms": 2.69,
+   "msNoShadow": 1.67,
+   "shadowMs": 1.02,
+   "noisy": false
+  },
+  {
+   "n": "cali",
+   "tris": 93516,
+   "shadowTris": 88648,
+   "meshes": 204,
+   "ms": 2.56,
+   "msNoShadow": 1.84,
+   "shadowMs": 0.72,
+   "noisy": false
+  },
+  {
+   "n": "rio",
+   "tris": 126860,
+   "shadowTris": 114812,
+   "meshes": 166,
+   "ms": 2.36,
+   "msNoShadow": 1.69,
+   "shadowMs": 0.67,
+   "noisy": false
+  },
+  {
+   "n": "iceland",
+   "tris": 200860,
+   "shadowTris": 96362,
+   "meshes": 262,
+   "ms": 2.33,
+   "msNoShadow": 1.88,
+   "shadowMs": 0.46,
+   "noisy": false
+  },
+  {
+   "n": "sydney",
+   "tris": 74960,
+   "shadowTris": 49784,
+   "meshes": 151,
+   "ms": 1.85,
+   "msNoShadow": 1.44,
+   "shadowMs": 0.41,
+   "noisy": false
+  },
+  {
+   "n": "pasto",
+   "tris": 104164,
+   "shadowTris": 68748,
+   "meshes": 97,
+   "ms": 1.37,
+   "msNoShadow": 1,
+   "shadowMs": 0.37,
+   "noisy": false
+  }
+ ],
+ "fail": [],
+ "overTri": [
+  "quay: 158615, over the 130000 brief gate by 28615 — renders in 2.93 ms (1.85 ms per 100k)",
+  "iceland: 200860, over the 130000 brief gate by 70860 — renders in 2.33 ms (1.16 ms per 100k)",
+  "sahara: 196496, over the 130000 brief gate by 66496 — renders in 3.28 ms (1.67 ms per 100k)",
+  "drift: 184974, over the 130000 brief gate by 54974 — renders in 3.62 ms (1.96 ms per 100k)",
+  "venice: 181814, over the 130000 brief gate by 51814 — renders in 2.81 ms (1.55 ms per 100k)",
+  "kowloon: 154058, over the 130000 brief gate by 24058 — renders in 4.17 ms (2.71 ms per 100k)",
+  "goreme: 202894, over the 130000 brief gate by 72894 — renders in 4.01 ms (1.98 ms per 100k)",
+  "pantanal: 208822, over the 130000 brief gate by 78822 — renders in 3.62 ms (1.73 ms per 100k)",
+  "cave: 160588, over the 130000 brief gate by 30588 — renders in 3.44 ms (2.14 ms per 100k)",
+  "antarctic: 181674, over the 130000 brief gate by 51674 — renders in 4 ms (2.20 ms per 100k)",
+  "monaco: 135337, over the 130000 brief gate by 5337 — renders in 3.67 ms (2.71 ms per 100k)",
+  "hanoi: 235942, over the 130000 brief gate by 105942 — renders in 4.04 ms (1.71 ms per 100k)"
+ ],
+ "noCeil": [],
+ "noisy": [],
+ "worst": {
+  "n": "kowloon",
+  "tris": 154058,
+  "shadowTris": 115470,
+  "meshes": 256,
+  "ms": 4.17,
+  "msNoShadow": 2.8,
+  "shadowMs": 1.37,
+  "noisy": false
+ },
+ "pass": true,
+ "costUsable": true,
+ "summary": "PASS · 12 of 19 over the 130k brief gate · worst chapter kowloon at 4.17 ms of a 16.67 ms frame"
+}

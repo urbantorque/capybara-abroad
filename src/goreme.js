@@ -4190,6 +4190,10 @@ function gorUpdateBalloon(game, dt) {
     // marquee. Exactly the cowbird bug in the Pantanal, and the fix is the
     // same: bank the peak here, report it ONCE when the flight is over.
     if (alt > gorPeakAlt) gorPeakAlt = alt;
+    // how high this flight has got, on the paper, while it is still going up
+    // (v32). Twelve is the record's own floor — see gorFlightEnd — so a hop off
+    // a chimney does not put a number on the card.
+    if (game.recordLive && gorPeakAlt > 12) game.recordLive('three-winds', gorPeakAlt);
 
     // ---- the sunrise ------------------------------------------------------
     // THE ROW SAYS "BE UP THERE WHEN THE SUN CLEARS THE RIM" AND IT USED TO PAY

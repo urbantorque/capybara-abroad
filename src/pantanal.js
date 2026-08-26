@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 15 — THE PANTANAL. WHERE YOU ARE, AS IT HAPPENS, FROM.
@@ -3740,6 +3740,18 @@ function panUpdateCowbird(game, dt) {
     if (t >= 1) { panCowState = 'ride'; panCowT = 0; panCowRide = 0; }
   } else {
     panCowRide += dt;
+    // ---- AND THIS ONE DELIBERATELY GETS NO LIVE LINE (v32) ----------------
+    // `cowbird` is on the brief's list of measured runs and it is the one that
+    // does not belong there, which only the measurement showed. It is not an
+    // attempt a player OPENS: the bird lands on its own within a couple of
+    // seconds of the spawn and stays for up to seventy, so a plain
+    // `recordLive` here was up on 60 samples out of 60 standing still, and
+    // gating it on the animal moving — 'carried it for' does mean carrying —
+    // only took it to 562 out of 605 over sixty seconds of ordinary walking.
+    // Both of those are a permanent counter on the paper, which is exactly the
+    // furniture this channel must never become. The line belongs to things you
+    // GO AND DO; the bird is something that happens to you. The record itself
+    // is untouched and still files at the end of the ride, as it always did.
     const yaw = capy.group ? capy.group.rotation.y : 0;
     // ---- AND IT IS DOING SOMETHING UP THERE ------------------------------
     // Twenty seconds is a long time to look at a bird standing perfectly still
@@ -4392,6 +4404,10 @@ function panUpdateTasks(game, dt) {
     }
     panCrossT += dt;
     panCrossN = Math.max(panCrossN, panFollowing);
+    // how many are behind you, on the paper, in the middle of the water (v32).
+    // `panCrossN` is the high-water mark and it is what gets filed, so the
+    // figure the player watches is the figure the record will take.
+    if (game.recordLive) game.recordLive('the-crossing', panCrossN);
     // the score lifts for the whole width of it, not for the tick at the end
     if (game.music && typeof game.music.swell === 'function') game.music.swell(0.85);
   }

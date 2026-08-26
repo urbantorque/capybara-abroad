@@ -2668,6 +2668,12 @@ function monUpdateRide(game, dt) {
   }
   if (monRider < 0) { monFrame.x = 0; monFrame.z = 0; return; }
   monRideT += dt;
+  // ---- THE LAP, ON THE PAPER, WHILE YOU ARE ON THE ROOF (v32) ------------
+  // The metres, not the tunnel's speed: a ride carries two records and the
+  // paper shows one attempt at a time, so it shows the one that is still
+  // accumulating. The eight-metre floor is the same one the record has two
+  // lines up — being brushed by a car is not riding one.
+  if (game.recordLive && monRideDist > 8) game.recordLive('the-hairpin', monRideDist);
   monRideDist += monCarV[monRider] * dt;
   const b = monCarBody[monRider];
   monFrame.x = b.velocity.x;
@@ -3880,20 +3886,32 @@ function monUpdateTasks(game, dt) {
   // player can see failing it.
   const atDoor = Math.abs(p.x - monDOOR.x) < 3.4 && Math.abs(p.z - monDOOR.z) < 3.0 &&
                  p.y > monFLOOR_Y - 2;
-  if (!monFloorDone) {
+  // ---- THE ROOM DOES NOT CLOSE WHEN THE TICK LANDS (v32) ------------------
+  // `if (!monFloorDone)` round the whole block is the sixth instance in this
+  // pass of the same mistake — the Cali floor, the samba column, Selarón's
+  // steps, the Quay's passage and the fruit barrow were the others — and it is
+  // the worst of them, because `the-floor` is `better: 'lower'` and this is the
+  // only timed thing in the chapter. The clock stopped for ever on the first
+  // crossing that landed, so the number could never be improved. The TICK
+  // happens once; the room can be crossed all night.
+  {
     if (monFloorRun < 0 && atDoor && monSeen < 0.05) monFloorRun = 0;
     else if (monFloorRun >= 0) {
       monFloorRun += dt;
+      // the clock, on the paper, while you are on the floor
+      if (game.recordLive) game.recordLive('the-floor', monFloorRun);
       if (monSeen > monEYE_WARN || !monInside) monFloorRun = -1;
       else {
         const dx = p.x - monWHEEL.x, dz = p.z - monWHEEL.z;
         if (dx * dx + dz * dz < 4.6 * 4.6) {
-          monFloorDone = true;
-          monFloorBest = monFloorRun;
+          if (monFloorBest <= 0 || monFloorRun < monFloorBest) monFloorBest = monFloorRun;
           monRecord('the-floor', monFloorRun);
-          monTask('the-floor');
-          if (typeof game.punch === 'function') game.punch(0.30);
-          monToast('across a room with five people in it. nobody looked up once.');
+          if (!monFloorDone) {
+            monFloorDone = true;
+            monTask('the-floor');
+            if (typeof game.punch === 'function') game.punch(0.30);
+            monToast('across a room with five people in it. nobody looked up once.');
+          }
           monFloorRun = -1;
         }
       }

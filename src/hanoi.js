@@ -1664,6 +1664,10 @@ function hanUpdateRide(game, dt) {
   hanRideT += dt;
   const o = hanRider * hanBIKE_STRIDE;
   hanRideDist += hanBikeData[o + 5] * dt;
+  // the metres through the quarter, on the paper, while you are on the bike
+  // (v32). Twelve is the record's own floor two branches up — a scooter you
+  // were on for half a second is not a ride.
+  if (game.recordLive && hanRideDist > 12) game.recordLive('ride-the-flow', hanRideDist);
   hanBikeAt(hanRider, hanV3b);
   hanLaneAtS(hanBikeData[o] | 0, hanBikeData[o + 1], hanTmp2);
   const dir = hanBikeData[o + 2];

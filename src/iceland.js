@@ -3862,6 +3862,10 @@ function iceUpdateSpring(game, dt) {
       iceToast('nothing to do here. that is the instruction.');
     }
     iceSoak += dt;
+    // The clock is on the paper while it runs (v32). This is the one record in
+    // the game whose live figure is the reward itself: sitting still with a
+    // number climbing beside a number you have to pass is the entire mechanic.
+    if (game.recordLive) game.recordLive('hot-spring', iceSoak);
     // ---- AND IT ACTUALLY SITS IN IT NOW (v23) ---------------------------
     // THE MARQUEE ADOPTION OF THE LOAF. This is the one task in the game whose
     // whole content is being still, and until now "being still" was a number
@@ -4003,6 +4007,12 @@ function iceUpdateSlide(game, dt) {
   // live, or a sprint round Reykjavik an hour earlier is what the toast and
   // the record report. game.record() keeps the all-time best across attempts.
   if (iceSlideT >= 0 && sp > iceSlideBest) iceSlideBest = sp;
+  // ...and it is on the paper while the run is happening (v32). The figure is
+  // the run's own top speed so far, which is the number the record holds, not
+  // the instantaneous one — a readout that fell back to 3 m/s every time you
+  // scrubbed off speed in a turn would be reporting the wrong quantity.
+  if (iceSlideT >= 0) { if (game.recordLive) game.recordLive('glacier-run', iceSlideBest); }
+  else if (game.recordEnd) game.recordEnd('glacier-run');
 
   // NOT `if (iceSlideDone) return`. The tick fires once; the RUN is repeatable,
   // and the whole reason the snowcat exists is that people come back and do it

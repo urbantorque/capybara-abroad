@@ -242,10 +242,26 @@ function mainMakeBiomes(game) {
 
   const biome = {
     current: 'sydney',
-    PASTO_SPAWN: { x: 0, y: 1.4, z: 26 },
-    SYDNEY_SPAWN: { x: 0, y: 1.2, z: 22 },
+    // ---- AND THE ARRIVAL IS A SHOT (v32) ---------------------------------
+    // Every `yaw` below is `atan2(-(tx - sx), -(tz - sz))` from the spawn to
+    // the thing the paragraph beside it names — the camera sits at that bearing
+    // and the view runs the other way, so the named thing is dead centre. The
+    // fourteen that had none used to open on whatever the last chapter had been
+    // looking at. See teleportCapy: the same bearing is handed to frameShot and
+    // HELD for the length of the place card, because setting camYaw points the
+    // lens and does not stop the rig easing off it on the next frame.
+    //
+    // Pasto: on the road above the town, with Galeras across the valley. The
+    // volcano is 104 m out and 62 m tall and it is the whole chapter; it was
+    // behind the player's left shoulder.
+    PASTO_SPAWN: { x: 0, y: 1.4, z: 26, yaw: 0.3948 },
+    // Sydney: on the lawn above the forecourt, looking down it at the shells.
+    // The figs were planted to frame this and nothing ever pointed at it.
+    SYDNEY_SPAWN: { x: 0, y: 1.2, z: 22, yaw: 0 },
     // Circular Quay: on the apron, one wharf east of the berth, facing the water.
-    QUAY_SPAWN: { x: 4, y: 1.0, z: 26 },
+    // Down the harbour: the ferry on her berth in the near field and the bridge
+    // eighty metres out on the bow.
+    QUAY_SPAWN: { x: 4, y: 1.0, z: 26, yaw: -0.0950 },
     // ---- AND WHICH WAY YOU ARE POINTING WHEN YOU LAND --------------------
     // `yaw` is the direction the CAMERA sits in relative to the animal (the
     // same convention systems.js's camYaw uses), so `yaw: 0` puts the eye to
@@ -272,54 +288,100 @@ function mainMakeBiomes(game) {
     RIO_SPAWN: { x: 0, y: 1.4, z: 0, yaw: 0 },
     // Iceland: on Laugavegur in the middle of Reykjavik, the church up the hill
     // behind you and the hot dog stand four steps away.
-    ICELAND_SPAWN: { x: 0, y: 1.4, z: 99 },
+    // Facing east along Laugavegur with the stand eight metres up the street
+    // and the old harbour beyond it — the church stays behind, which is what the
+    // line above asks for and what no heading had ever delivered.
+    ICELAND_SPAWN: { x: 0, y: 1.4, z: 99, yaw: -1.5708 },
     // Marrakech: in the middle of Jemaa el-Fnaa, facing the Koutoubia, with the
     // orange cart within arm's reach and the souk over your shoulder.
-    SAHARA_SPAWN: { x: 0, y: 1.4, z: 8 },
+    // Due west across the square at the minaret, 52 m out and 38 m tall; the
+    // cart is a step behind the right shoulder and the souk behind the left.
+    // `raise` because the minaret is 38 m tall at 52 m out: at the arrival
+    // pitch alone the frame stopped at its first storey. See sysARRIVE_RAISE.
+    SAHARA_SPAWN: { x: 0, y: 1.4, z: 8, yaw: 1.4940, raise: 3.5 },
     // The Drift: on the Shelf, in the mist, a few metres back from the broken
     // jetty. Deliberately not ON the jetty — the first thing this chapter wants
     // is for you to look at where the planks stop, and you cannot look at that
     // from on top of it.
-    DRIFT_SPAWN: { x: 2, y: 31.6, z: 42 },
+    // ...so the heading is AT the broken end, 27 m away, with the void past it.
+    DRIFT_SPAWN: { x: 2, y: 31.6, z: 42, yaw: -1.2723 },
     // Venice: on the Piazzetta between the two columns, the Bacino behind you
     // and the whole square in front. You are looking down the length of the one
     // thing this chapter is going to take away from you.
-    VENICE_SPAWN: { x: -4, y: 1.4, z: 13 },
+    // Down the length of it: the Basilica closes the far end at 83 m and the
+    // Campanile stands 22 degrees off the centre line, just inside the frame.
+    VENICE_SPAWN: { x: -4, y: 1.4, z: 13, yaw: 0 },
     // Kowloon: on the pavement in Mong Kok, under the signs, with the bakery
     // three steps away and the scaffold halfway up the block.
-    KOWLOON_SPAWN: { x: 0, y: 1.4, z: 34 },
+    // Down the block, under the signs, with the big one 41 m out over the road.
+    KOWLOON_SPAWN: { x: 0, y: 1.4, z: 34, yaw: -0.0876 },
     // Palawan: high on the dry sand, with the whole bay in front of you and the
     // island on the horizon. Deliberately NOT in the water — the first thing
     // this chapter wants is for you to look at how far down you can see.
-    PALAWAN_SPAWN: { x: 0, y: 2.6, z: 46 },
+    // ...so the heading is out over the bay, with the island a few degrees off
+    // the starboard bow rather than behind the shoulder.
+    PALAWAN_SPAWN: { x: 0, y: 2.6, z: 46, yaw: -0.1218 },
     // Cappadocia: at the bottom of the town, facing the valley, at ten past
     // five in the morning. The launch field is the next thing south and the
     // first envelope is already up on its side.
-    GOREME_SPAWN: { x: 0, y: 8.4, z: 34 },
+    // Due south down the valley at the launch field, 30 m out.
+    GOREME_SPAWN: { x: 0, y: 8.4, z: 34, yaw: 0 },
     // Manly: on the promenade at the top of the beach, under the pines, with
     // the whole surf zone laid out in front of you like a cross-section. The
     // first thing this chapter wants is for you to LOOK at the water and see
     // that it is doing something, and you cannot do that from in it.
-    MANLY_SPAWN: { x: 0, y: 3.4, z: 46 },
+    // ...so the heading is straight out to sea, square to the sets, with the
+    // bommie six degrees off the bow.
+    MANLY_SPAWN: { x: 0, y: 3.4, z: 46, yaw: -0.1127 },
     // The Pantanal: on the Transpantaneira where it comes down off the high
     // ground, with the flood on both sides and four of your own kind standing
     // in it forty metres away, entirely unbothered.
-    PANTANAL_SPAWN: { x: 0, y: 3.0, z: 62 },
+    // Straight down the road, which is the only line from which the flood is
+    // on BOTH sides of the frame.
+    PANTANAL_SPAWN: { x: 0, y: 3.0, z: 62, yaw: 0 },
     // Sơn Đoòng: outside, in the daylight, at the mouth. Deliberately NOT in
     // the dark — the chapter's argument only works if you walk into it.
-    CAVE_SPAWN: { x: 0, y: 4.0, z: 62 },
+    // ...so the heading is at the mouth, from outside it.
+    CAVE_SPAWN: { x: 0, y: 4.0, z: 62, yaw: 0 },
     // Antarctica: on the rock above the station, looking down the hill at
     // three red huts, a jetty and one orange boat. Deliberately at the TOP:
     // the first thing this chapter wants is for you to see that there is a
     // boat, and that everything else is a very long way past it.
-    ANTARCTIC_SPAWN: { x: 0, y: 7.1, z: 52 },
+    // ...so the heading is down the hill at the jetty and the boat on her
+    // berth, 30 m below and out. The three huts are off the frame to starboard:
+    // the paragraph asks for both and the geometry cannot give both, and the
+    // BOAT is the sentence the chapter is built on.
+    ANTARCTIC_SPAWN: { x: 0, y: 7.1, z: 52, yaw: -0.1194 },
     // Monte Carlo: on the west quay at the bottom, looking east across the
     // basin at a hundred and thirty feet of somebody else's money, with the
     // terrace and the Casino lit up above it. Deliberately at the BOTTOM and
     // deliberately facing ACROSS rather than up: the whole shape of this
     // chapter is a climb, and a player put down on the terrace would never
     // find out that the terrace is up.
-    MONACO_SPAWN: { x: 30, y: 3.9, z: -80, yaw: 3.14159 },
+    // ---- ...AND IT IS AT HER, NOT PAST HER (v32) -------------------------
+    // The heading is unchanged — pi, "facing ACROSS" — and the spawn has slid
+    // twenty metres WEST along the same quay so that heading points at the
+    // yacht instead of thirty metres to one side of her. monYACHT is at
+    // (10, -59): from x = 10 she is dead ahead, 21 m out, and the gangway task
+    // that used to be 22 m away is 9. Measured before: the yacht was a sliver
+    // of rail along the right edge and a palm frond filled the left half.
+    //
+    // THE BOOM HAS TO RUN DOWN A GAP IN THE PALMS. monBuildPalms lays ten of
+    // them along z = -84.5 from x = -40 to x = 42, so the gaps are at x =
+    // 10.15, 19.25, 28.35 — and the camera swings SOUTH of the animal for any
+    // bearing that looks north across the basin. At the old spawn the boom
+    // parked inside the crown at x = 32.9 whatever the bearing; from x = 10 it
+    // runs down a gap and the nearest crowns are at the frame's edges. That is
+    // what `dist` and `pitch` are doing here: standing the lens far enough back
+    // down the gap that the whole of her is in the shot.
+    //
+    // THE CASINO CANNOT BE IN THIS FRAME AND THE PARAGRAPH ABOVE IS WRONG
+    // ABOUT IT. From this quay the yacht bears 3.14 and monCASINO at (118, 119)
+    // bears -2.66, which is 62 degrees apart against a 48 degree lens. There is
+    // no spawn on the quay from which both are legible; the geography the
+    // paragraph describes — a Casino standing above the yacht — is not the
+    // geography this world was built with. See the batch 6 log.
+    MONACO_SPAWN: { x: 10, y: 3.9, z: -80, yaw: 3.14159, dist: 13, pitch: 0.34, raise: 4.4 },
     // Hanoi: on the west walk of Hoan Kiem, inside the ring road, facing
     // north-east across the water at the tower and the red bridge. Inside is
     // the only quiet place in the chapter, and the whole of the noise is
@@ -833,6 +895,12 @@ function mainBoot() {
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.
     game.npcHeat = npcs.heat;
+    // ...and how cross the PLACE is, which is the accumulator sitting on top
+    // of that (v33). `forceHeat` is the differential lever the task sweep uses
+    // to prove nothing was made harder; it is a test hook, not a verb.
+    game.placeHeat = npcs.placeHeat;
+    game.forceHeat = npcs.forceHeat;
+    game.heatSites = npcs.heatSites;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

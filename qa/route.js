@@ -4,7 +4,37 @@ async page => {
   await page.mouse.click(640, 400);
   await page.waitForTimeout(3000);
   const out = {};
-  for (const name of ['monaco','hanoi','kyoto','goreme','venice','manly','quay','sahara']) {
+  // ---- THE CHAPTER LIST IS DERIVED, NEVER SPELLED -------------------------
+  // This probe carried a hard-coded list of EIGHT for the whole of the Payoff
+  // Pass, in the one audit that measures scenery density — so the eleven
+  // chapters it did not name were the eleven nothing measured, and it printed a
+  // confident table every time. The same defect qa/channels.mjs was fixed for.
+  //
+  // `run-code` has no require and no import, so the derivation happens IN THE
+  // PAGE: index.html serves src/shared.js unbundled and CHAPTERS is the one
+  // table. It THROWS on a miss rather than falling back to a spelled list — a
+  // silent fallback is how a stale audit stops failing and starts inventing.
+  const NAMES = await page.evaluate(async () => {
+    const src = await (await fetch('/src/shared.js', { cache: 'no-store' })).text();
+    const i = src.indexOf('export const CHAPTERS = [');
+    if (i < 0) throw new Error('route: CHAPTERS not found in src/shared.js — this audit has gone stale');
+    const j = src.indexOf('\n];', i);
+    if (j < 0) throw new Error('route: CHAPTERS has no end — this audit has gone stale');
+    const keys = [];
+    for (const m of src.slice(i, j).matchAll(/\bbiome:\s*'([a-z]+)'/g)) keys.push(m[1]);
+    if (keys.length < 2) throw new Error('route: derived ' + keys.length + ' chapters — the parse is wrong');
+    // ...and every derived key must be a place this build actually has, or the
+    // table is a list of names rather than a list of chapters. Asked of the
+    // spawn TABLE and not of spawnOf(), which falls back to Sydney for an
+    // unknown name and can therefore never say no.
+    const g = window.__capy;
+    for (const k of keys) {
+      if (!g.biome[k.toUpperCase() + '_SPAWN']) throw new Error('route: no spawn for "' + k + '"');
+    }
+    return keys;
+  });
+  out._chapters = NAMES.length;
+  for (const name of NAMES) {
     out[name] = await page.evaluate(async (n) => {
       const g = window.__capy, THREE = g.THREE;
       g.biome.switchTo(n);
@@ -43,7 +73,11 @@ async page => {
         } catch (e) {}
       });
       // walk the main route: spawn -> each landmark the chapter publishes
-      const a = g[n];
+      // SYDNEY'S API IS `game.env`, not `game.sydney` — the same resolution
+      // sysLiveBiomeApi does. With a spelled list of eight this never came up;
+      // with a derived nineteen it is chapter one, and a probe that throws on
+      // its first chapter measures nothing at all.
+      const a = (n === 'sydney' ? g.env : g[n]) || {};
       const marks = [];
       for (const k of Object.keys(a)) {
         const val = a[k];

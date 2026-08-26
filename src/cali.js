@@ -1538,6 +1538,10 @@ function caliUpdateCart(game, dt) {
     caliCartV = clamp(caliCartV + acc * dt, 0, caliCART_VMAX);
     caliCartS -= caliCartV * dt;
     if (caliCartV > caliCartTopV) caliCartTopV = caliCartV;
+    // the run's own top speed, on the paper, while the barrow is moving — and
+    // only if you are ON it, because a barrow that went without you is a joke
+    // and not an attempt (v32)
+    if (aboard && game.recordLive) game.recordLive('cart-run', caliCartTopV);
     if (caliCartS <= 0.5) { caliCartS = 0.5; caliCartV = 0; }
     // rolled to a stop on the flat, or ran out of road
     // She has stopped. Either she made it down — or she never really got going,
@@ -1564,9 +1568,16 @@ function caliUpdateCart(game, dt) {
       // tick either way; what comes back is the OBJECT.
       if (caliCartTopV <= 4) { caliCartTopV = 0; caliCartBack = caliCART_BACK; return; }
       if (game.sfx) game.sfx('thud', { volume: 0.5, pitch: 0.8 });
+      // ---- THE RUN IS FILED EVERY TIME, THE TICK ONLY ONCE (v32) --------
+      // `!caliCartDone && aboard` meant the barrow's top speed was banked on
+      // the first successful run and never again, so `cart-run` — a
+      // `better: 'higher'` record on the one gravity ride in the chapter —
+      // could not be improved by pushing the barrow back up and taking a
+      // straighter line, which is the entire replay loop the push-back-up
+      // above exists to enable.
+      if (aboard && game.record) game.record('cart-run', caliCartTopV);
       if (!caliCartDone && aboard) {
         caliCartDone = true;
-        if (game.record) game.record('cart-run', caliCartTopV);
         caliTask('cart-run');
         // AND THE RUN HAD NO NUMBER ON IT. A gravity ride whose whole content
         // is how fast it got is worth saying out loud.
@@ -3604,7 +3615,18 @@ function caliUpdateDance(game, dt) {
     caliLampMesh.material.opacity = clamp(0.45 + Math.max(0, beatPhase) * 0.5, 0, 1);
   }
 
-  if (!caliOnFloor || caliDanceDone) return;
+  // ---- THE FLOOR DOES NOT CLOSE WHEN THE TICK LANDS (v32) -----------------
+  // This used to be `if (!caliOnFloor || caliDanceDone) return`, which stopped
+  // the scoring dead the moment the task was ticked — so `salsa-dance`, one of
+  // the twenty measured runs and the only number in this chapter worth coming
+  // back for, could never be improved on after the first eight-step run that
+  // set it. A record that cannot be beaten is not a record. Now the floor keeps
+  // counting for ever and it is only the TASK that happens once, which is what
+  // `caliDanceDone` was always for.
+  if (!caliOnFloor) { if (game.recordEnd) game.recordEnd('salsa-dance'); return; }
+  // ...and the number is on the paper while it is being set. The current run,
+  // against the standing best — see recordLive in systems.js.
+  if (game.recordLive) game.recordLive('salsa-dance', caliCombo);
 
   // --- did the player just DO something? ---
   const yaw = capy.group ? capy.group.rotation.y : 0;
@@ -3655,7 +3677,7 @@ function caliUpdateDance(game, dt) {
       caliDanceCheer = Math.max(caliDanceCheer, 0.30 + k * 0.09);
     }
     if (caliCombo === 4 && typeof game.toast === 'function') game.toast('¡eso!');
-    if (caliCombo >= caliDANCE_TARGET) {
+    if (caliCombo >= caliDANCE_TARGET && !caliDanceDone) {
       caliDanceDone = true;
       // AND THE FLOOR ANSWERS. Ten people have been dancing three metres away
       // the whole time; the moment the capybara gets eight in a row they all

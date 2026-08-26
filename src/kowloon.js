@@ -4362,6 +4362,8 @@ function hkUpdateTasks(game, dt) {
       if (Math.abs(p.x) > hkFACE - 4.5) { hkPoleT = 0; hkPoleFrom = Math.sign(p.x); }
     } else {
       hkPoleT += dt;
+      // the clock, on the paper, while you are over the street (v32)
+      if (game.recordLive) game.recordLive('laundry-pole', hkPoleT);
       if (Math.sign(p.x) === -hkPoleFrom && Math.abs(p.x) > hkFACE - 4.5) {
         if (!hkPoleDone) {
           hkPoleDone = true;
