@@ -4350,11 +4350,34 @@ function physPastoUpdate(dt) {
  * moving. Self-correcting, needs no list of which chapters have decks in them,
  * and it is the same number a scattered prop would have had.
  */
-function physHomeLearn(p) {
+// AT REST, NOT ASLEEP. Learning only on the frame the body SLEEPS is correct
+// and insufficient: a prop on a busy plaza is nudged by passing feet and by its
+// own neighbours often enough that cannon never lets it doze, so `homeLearn`
+// stays armed and the PROVISIONAL height — physTerrainAt, which answers for the
+// ground under a deck rather than for the deck — is what a rescue uses.
+// Measured by batch 4 as a keepsake left hovering in 3 of 17 chapters, Göreme
+// 1.74 m and Palawan 0.69 m, both of them plazas with crews walking over them.
+//
+// So: sleeping still learns immediately, and a body that merely holds still for
+// physHOME_REST seconds learns too. The thresholds are deliberately well under
+// cannon's own sleepSpeedLimit — this has to catch the props that will NEVER
+// reach it.
+const physHOME_V    = 0.14;   // m/s, and the same number for rad/s
+const physHOME_REST = 0.45;   // s held below it before the height is believed
+function physHomeLearn(p, dt) {
   if (!p.homeLearn) return;
   const b = p.body;
-  if (b.sleepState !== CANNON.Body.SLEEPING) return;
+  if (b.sleepState !== CANNON.Body.SLEEPING) {
+    if (!(dt > 0)) return;                     // the sleep path calls without one
+    const v = b.velocity, w = b.angularVelocity;
+    const still = (v.x * v.x + v.y * v.y + v.z * v.z) < physHOME_V * physHOME_V &&
+                  (w.x * w.x + w.y * w.y + w.z * w.z) < physHOME_V * physHOME_V;
+    if (!still) { p.homeRestT = 0; return; }
+    p.homeRestT = (p.homeRestT || 0) + dt;
+    if (p.homeRestT < physHOME_REST) return;
+  }
   p.homeLearn = false;
+  p.homeRestT = 0;
   // Only if it settled somewhere sane — a prop that fell out of the world
   // while learning must not adopt the void as its home.
   const dx = b.position.x - p.homeX, dz = b.position.z - p.homeZ;
@@ -4607,6 +4630,11 @@ function physUpdate(dt) {
       const wg = physWindNow();
       if (wg.x * wg.x + wg.z * wg.z > physGUST_WAKE * physGUST_WAKE) b.wakeUp();
     }
+    // AT REST counts, not only asleep — a prop on a busy plaza may never doze.
+    // Called every frame while `homeLearn` is armed; it costs one squared-length
+    // test on the props that are still looking for their home and nothing at all
+    // on the rest, because it returns on the flag first.
+    if (p.homeLearn && b.sleepState !== CANNON.Body.SLEEPING) physHomeLearn(p, dt);
     if (b.sleepState === CANNON.Body.SLEEPING) {
       physHomeLearn(p);              // ...and where it landed IS home now
       p.spillArmed = false;          // a settled cup stops being a time bomb

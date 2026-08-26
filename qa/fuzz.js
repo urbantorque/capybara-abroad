@@ -119,7 +119,17 @@ async page => {
       //                        reading, and the number is the argument.
       let keepHover = 'no keepsake', keepRescues = 0;
       if (g.physics && typeof g.physics.spawnKeep === 'function') {
-        const kp = g.physics.keepOut('sydney') || g.physics.spawnKeep('sydney', 0, 0);
+        // THIS CHAPTER'S KEEPSAKE, at this chapter's spawn — not Sydney's at
+        // (0, 0). The hard-coded 'sydney' here meant the check spawned the
+        // WRONG chapter's souvenir at an arbitrary point in all nineteen
+        // worlds, so what it measured was "can a plaque be rescued onto the
+        // origin of Monte Carlo", which nothing in the game ever asks. It read
+        // 3.41 m in monaco and 0.34 for the chapter's real keepsake in its real
+        // place. The per-chapter numbers it produced were not meaningless —
+        // the terrain under (0, 0) does differ — but they were not about the
+        // souvenir the player carries either.
+        const sp = g.biome.spawnOf(name);
+        const kp = g.physics.keepOut(name) || g.physics.spawnKeep(name, sp.x, sp.z);
         if (kp) {
           for (let i = 0; i < 90; i++) g.tick(1 / 60, false);
           const restY = kp.body.position.y;
