@@ -820,10 +820,23 @@ function monGroundSlip(x, z) {
  * hollow timber. Monaco is stone with two exceptions and both of them matter:
  * the pontoons are timber over water and the atrium is a drum.
  */
+// THE LADDER, four rungs for twelve zones before v30. A principality with a
+// medieval rock, a marble atrium, a flight of granite steps and a harbour
+// pontoon in it answered "carpet, pontoon, road, or the same pavement
+// everywhere else". Narrow tests first — the quay ladder in chapter 3 was found
+// returning wharf timber for the whole of Manly because a broad test sat above
+// a narrow one.
 function monSurfacePitch(x, z, y) {
+  // The salon is carpet over board; the atrium is marble and rings.
+  if (monInRect(monZ.atrium, x, z)) return 1.34;
   if (monInCasino(x, z)) return 1.22;
   if (monOnPontoon(x, z)) return 1.30;
+  // The steps: granite, and the one place in this chapter everybody stands.
+  if (monInRect(monZ.steps, x, z)) return 1.14;
   if (monRoad(x, z) < monTRACK_HALF + 0.4) return 0.96;
+  // The Rock and the palace square: worn stone, eight hundred years of it.
+  if (monInRect(monZ.palace, x, z)) return 1.08;
+  if (monInRect(monZ.rock, x, z)) return 0.88;
   return 1.04;
 }
 
@@ -2867,6 +2880,45 @@ function monBuildLamps(root) {
     monTrackAt(monTrackLen[1] + i * 12, monTrackTmp);
     monLamp(monTrackTmp.x + Math.cos(monTrackTmp.yaw) * 8,
             monTrackTmp.z - Math.sin(monTrackTmp.yaw) * 8);
+  }
+
+  // ---- AND THE CLIMB ITSELF, WHICH HAD NOTHING ON IT (v30) --------------
+  //
+  // Route life, measured against five other chapters with the same probe:
+  // dead 20 m cells per landmark leg, over walkable unblocked ground with the
+  // harbour and the buildings excluded —
+  //
+  //     monaco 14  ·  kyoto 6  ·  hanoi 1  ·  goreme 0  ·  venice 0  ·  manly 0
+  //
+  // The worst of the six, and they were not scattered: they clustered on the
+  // legs to `casino`, `door` and `wheel`, which are all the same walk — the
+  // climb from the port up to the casino, and the one leg every player makes
+  // because it is how act one becomes act two. Sample cells (50,-41), (59,-22),
+  // (98,55), (108,75): dry, unblocked, y 2.6 to 28, nothing within twelve
+  // metres.
+  //
+  // Lamps, because they are already instanced — one more instance is about
+  // forty triangles and the chapter has 8k of headroom under its ratchet — and
+  // because a lit road at dusk is what that hill actually has on it. No new
+  // mesh, no new material, no new draw call.
+  //
+  // DIFFERENTIAL: 14 dead cells without this block, 12 with it. Modest, and
+  // said plainly rather than rounded up — closing the rest needs content on
+  // that hillside, which is a design decision about somebody else's chapter
+  // and not a thing to slip into a closeout.
+  //
+  // AND THE FIRST NUMBERS THIS COMMENT CARRIED WERE WRONG, which is worth more
+  // than the fix. The probe took an InstancedMesh's BOUNDING-BOX CENTRE as one
+  // object, so every scattered lamp, palm, bollard and tree in the game — 90%
+  // of what any chapter draws; Monte Carlo is 253 plain meshes and 2,780 things
+  // — was counted once, in the middle, and was invisible everywhere else. It
+  // read 48 dead cells here, and adding these fifteen lamps along the exact
+  // line it was complaining about moved the number UP to 53. A detector that
+  // gets worse when you fix what it points at is not measuring what it says.
+  for (let i = 0; i < 15; i++) {
+    const t = i / 14;
+    const cx = lerp(46, 112, t), cz = lerp(-46, 84, t);
+    monLamp(cx + (i % 2 ? 5.2 : -5.2), cz);
   }
 
   const n = monLAMPS.length / 2;

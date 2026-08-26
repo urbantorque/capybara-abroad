@@ -560,9 +560,31 @@ function hanGroundSlip(x, z) {
   return hanSLIP_KERB;
 }
 /** < 0.9 soft ground, ~1.0 stone, > 1.15 hollow timber. */
+// THE LADDER, which was three rungs for eleven zones (v30).
+//
+// A chapter's ground is one of the few things the player hears every single
+// second, and this one answered "asphalt, ballast, or the same tile everywhere
+// else" for a city that has a timber bridge, an iron one, a wet market floor
+// and a lake shore in it. Three of eleven is the same shortfall batch 3 found
+// in Cali at two of six.
+//
+// ORDER MATTERS AND THE NARROW TESTS COME FIRST — the quay ladder in chapter 3
+// was found returning wharf timber for the whole of Manly because a broad test
+// sat above a narrow one. Every rect below is checked before the fallbacks.
 function hanSurfacePitch(x, z) {
+  // The Huc: lacquered timber over water, and the most hollow thing here.
+  if (x <= hanHUC.x0 + 2 && x >= hanHUC.x1 - 2 &&
+      Math.abs(z - (hanHUC.z0 + hanHUC.z1) * 0.5) < 3) return 1.30;
+  // Long Bien: a hundred and twenty years of riveted steel deck.
+  if (hanInRect(hanZ.bridge, x, z)) return 1.22;
+  // The market: wet boards, cardboard and leaf. The deadest floor in the city.
+  if (hanInRect(hanZ.market, x, z)) return 0.86;
+  // The bia hoi corner: spilt beer on tile, and ninety-six plastic stools.
+  if (hanInRect(hanZ.bia, x, z)) return 1.12;
   if (hanLaneAt(x, z) < hanLaneW + 0.4) return 0.94;
   if (Math.abs(z - hanTRAIN.z) < hanTRAIN.half && x > hanTRAIN.x0 && x < hanTRAIN.x1) return 1.10;
+  // The dyke path round the lake: packed earth, not pavement.
+  if (hanInRect(hanZ.dyke, x, z)) return 0.90;
   return 1.02;
 }
 
