@@ -331,3 +331,43 @@ that hillside, which is a design decision about somebody else's chapter.
 | **A10** Kowloon's roof | Unchanged. `symphony` is not blocked. Do not lower `hkSCAF.top`. |
 | **A11** Palawan's `inZone('shaft')`, cave's `nearestDrip`/`echoReady` | Still no readers repo-wide. |
 | **A12** the 130k gate · ground-sheet shadows · `user-scalable=no` | Deliberately declined in v27-v28 and **restated, not re-argued**. 12 of 19 are over the triangle gate; the cost gate is green and now knows when it cannot be trusted; the ratchet is the gate that catches things and it caught two this run. |
+
+### AND ONE THE AUDIT NEARLY GOT BACKWARDS
+
+`qa/journey.js` reported **`picks 17 · boardRows 17`** against a nineteen-chapter game,
+which reads exactly like Monte Carlo and Hanoi being unreachable — the worst possible
+defect in a chapter, and one worth stopping everything for.
+
+**It was the audit.** The script had no reload, so it measured whatever the previous
+`run-code` had left on the page (harness trap 6), and its unlock loop and traversal list
+were both hard-coded to the eleven chapters that existed when it was written. Measured on a
+true fresh save with a clear-once-reload-once preamble: **19 picker tiles, 19 board rows.**
+The game was fine.
+
+That is the more dangerous way round, and it is the last word on this pass: a stale audit
+does not merely fail to find things, **it invents them**, and the invented ones cost most
+because they look urgent. Fixed: `journey.js` clears and reloads first and walks all
+nineteen — 19 entered through the departures board, gravity restored after the Drift, 0
+errors.
+
+## Job 3 — the close
+
+| suite | result |
+|---|---|
+| `qa/audit-tasks.mjs` | 0 blockers, 0 warnings · 229 tasks · 19 chapters · **now blocks on a stale finale fixture** |
+| `qa/lines.mjs` | 0 blockers · **477** conditional lines over 17 casts (was 428 over 15) |
+| `qa/verbs.mjs` | 0 blockers · Q/E/Shift/Space all first named in ch 1 |
+| `qa/pacing.mjs` | every chapter in band at 75 s a task |
+| `qa/channels.mjs` | **19/19** carry all three source-visible channels · 0 fail · 0 warn |
+| `qa/budget.js` | **PASS** · 0 fail · 0 noCeil · 0 noisy · 12 of 19 over the 130k brief gate |
+| `qa/fuzz.js` | 19 chapters · **0 errors** · no keepsake hover over 0.5 m anywhere |
+| `qa/stillness.js` | 19 chapters · only the two known: pasto, and drift's fall off the Shelf |
+| `qa/audit-solid.js` | 19 chapters · monaco 15 of 2,958 samples (a water plane and a sky sphere — the cry-wolf categories), hanoi **0** |
+| `qa/journey.js` | 19 picks · 19 board rows · **19 chapters entered** · 0 errors |
+| `qa/route.js` | new · monaco 12 · kyoto 6 · hanoi 1 · goreme 0 · venice 0 · manly 0 |
+
+**Audits extended from 17 chapters to 19:** `channels.mjs` (and its count is derived now),
+`budget.js`, `stillness.js`, `fuzz.js`, `lines.mjs`, `audit-solid.js`, `journey.js`.
+**Audits given a check they did not have:** the stale-fixture blocker in `audit-tasks.mjs`,
+the no-ceiling report and contaminated-cost self-check in `budget.js`, the
+has-no-conditional-lines blocker in `lines.mjs`.

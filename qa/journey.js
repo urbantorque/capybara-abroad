@@ -1,4 +1,13 @@
 async page => {
+  // START FROM A KNOWN PAGE. This audit had no reload, so it measured whatever
+  // the previous run-code left behind -- harness trap 6. It reported
+  // "picks 17 / boardRows 17" against a nineteen-chapter game and read exactly
+  // like Monte Carlo and Hanoi being unreachable. Measured properly, on a true
+  // fresh save: the title picker offers 19 tiles and the board 19 rows. The
+  // audit was dirty, the game was fine, which is the more dangerous way round.
+  await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
+  await page.reload();
+  await page.evaluate(() => new Promise(r => setTimeout(r, 5200)));
   const out = await page.evaluate(async () => {
     const errs = [];
     const oldErr = console.error;
@@ -29,11 +38,20 @@ async page => {
     // --- travel to every chapter through the DEPARTURES BOARD ------------
     // Not biomeGo: the board is the only way a player gets anywhere, and it is
     // the thing that has to survive eleven chapters.
+    // EVERY CHAPTER, from the task table, not a hand-kept list of eleven.
+    // The old list stopped at kowloon, so this audit reported 'boardRows 17'
+    // against a nineteen-chapter game and read like the two newest chapters
+    // were unreachable. They are not: measured with a full save, the title
+    // picker offers 19 tiles and the departures board 19 rows. The audit was
+    // stale, the game was fine -- which is the more dangerous way round, and
+    // the reason a count in a test should be derived too.
+    const ALL_TO = ['pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
+                    'drift', 'venice', 'kowloon', 'palawan', 'goreme', 'manly',
+                    'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
     const CH = [];
-    for (let i = 0; i < 11; i++) CH.push(i + 1);
+    for (let i = 0; i < ALL_TO.length + 1; i++) CH.push(i + 1);
     // unlock everything so the board offers every line
-    for (let n = 1; n <= 11; n++) g.completeTask('to-' + ['', '', 'pasto', 'quay', 'kyoto', 'cali',
-      'rio', 'iceland', 'sahara', 'drift', 'venice', 'kowloon'][n] || '', true);
+    for (const nm of ALL_TO) g.completeTask('to-' + nm, true);
 
     // open the board and count the rows
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', bubbles: true }));
@@ -44,8 +62,10 @@ async page => {
     await sleep(300);
 
     // --- a soak through every biome, watching for a throw ---------------
+    // All nineteen, not the eleven that existed when this was written.
     const names = ['sydney', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland',
-                   'sahara', 'drift', 'venice', 'kowloon'];
+                   'sahara', 'drift', 'venice', 'kowloon', 'palawan', 'goreme',
+                   'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi'];
     for (const n of names) {
       g.biome.switchTo(n);
       const sp = g.biome.spawnOf(n);
