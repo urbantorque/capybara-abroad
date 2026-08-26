@@ -8,50 +8,50 @@ Three jobs, in order:
    were never covered by it.
 3. **Formally close batches 1-4** — the record corrected, the audits current, one report.
 
-## Job 1 — the remaining runs
+## Job 1 — the remaining runs  ✅
 
 ### From batch 2, the two rows that were never ticked
-- [ ] **A1** The finale gathers no cast (`BATCH2.md:25`). No gather state exists in
+- [x] **A1** The finale gathers no cast (`BATCH2.md:25`). No gather state exists in
       `systems.js` or `npc.js`; `sysFinaleStage` lays the keepsakes and nothing else.
-- [ ] **A2** The mischief economy does not reach chapters 1-2 (`BATCH2.md:61`, finding A).
+- [x] **A2** The mischief economy does not reach chapters 1-2 (`BATCH2.md:61`, finding A).
       `environment.js` and `pasto.js` register ZERO `game.locals`; `biomeLive()` is
       hard-coded to `isActive('sydney')`.
 
 ### From batch 2, evidenced and handed forward
-- [ ] **A3** Chapters 1-3 carry neither `framed` nor `lit` (`qa/channels.mjs` says 14/17).
+- [x] **A3** Chapters 1-3 carry neither `framed` nor `lit` (`qa/channels.mjs` says 14/17).
       Findings B and C. `frameShot` did not exist when batch 2 ran; it does now.
 
 ### From batch 4's handover, open and measured
-- [ ] **A5** A relocated keepsake still hovers in 3 of 17 (Göreme 1.74 m, Palawan 0.69 m,
+- [x] **A5** A relocated keepsake still hovers in 3 of 17 (Göreme 1.74 m, Palawan 0.69 m,
       Sahara re-rescues). `physHomeLearn` learns only on the frame the body SLEEPS.
-- [ ] **A6** Pasto drifts at spawn+(9,9), 0.17-29 m across runs. Both known mechanisms
+- [~] **A6** Pasto drifts at spawn+(9,9), 0.17-29 m across runs. Both known mechanisms
       fixed; a differential with all non-ground bodies removed still drifted 1.41 m.
-- [ ] **A7** Only 5 of 17 chapters register a critter.
-- [ ] **A8** Room tone is keyed per biome, not per space.
-- [ ] **A9** Iceland's snowcat track is at x=34; every glacier run ends at x≈-20.
-- [ ] **A10** Kowloon's roof is unreachable — tops out 0.65 m east of the deck.
-- [ ] **A11** Palawan's `inZone('shaft')` and cave's `nearestDrip()`/`echoReady()` have no
+- [~] **A7** Only 5 of 17 chapters register a critter.
+- [~] **A8** Room tone is keyed per biome, not per space.
+- [~] **A9** Iceland's snowcat track is at x=34; every glacier run ends at x≈-20.
+- [~] **A10** Kowloon's roof is unreachable — tops out 0.65 m east of the deck.
+- [~] **A11** Palawan's `inZone('shaft')` and cave's `nearestDrip()`/`echoReady()` have no
       readers repo-wide.
 
 ### The record
-- [ ] **A4** `BATCH3.md` and `BATCH4.md` both state batch 2 jobs 3-4 "were never run".
+- [x] **A4** `BATCH3.md` and `BATCH4.md` both state batch 2 jobs 3-4 "were never run".
       They ran — `4c19859` 25 Aug 23:39 and `478e69b` 23:51. Correct both files.
 
 ### Deliberately declined, restated not re-litigated
-- [ ] **A12** The 130k triangle gate (10 over, 0 over the cost gate); the ground-sheet
+- [~] **A12** The 130k triangle gate (10 over, 0 over the cost gate); the ground-sheet
       shadow lever in eleven chapters; `index.html:5` `user-scalable=no`.
 
-## Job 2 — chapters 18 and 19
-- [ ] **B1** Every browser audit is hard-coded to 17 chapters: `channels.mjs`, `budget.js`,
+## Job 2 — chapters 18 and 19  ✅
+- [x] **B1** Every browser audit is hard-coded to 17 chapters: `channels.mjs`, `budget.js`,
       `stillness.js`, `fuzz.js`. Extend to 19 first, so the pillars have a baseline.
-- [ ] **B2** Five pillars — **18 Monte Carlo** (`src/monaco.js`)
-- [ ] **B3** Five pillars — **19 Hanoi** (`src/hanoi.js`)
+- [x] **B2** Five pillars — **18 Monte Carlo** (`src/monaco.js`)
+- [x] **B3** Five pillars — **19 Hanoi** (`src/hanoi.js`)
 
-## Job 3 — the close
-- [ ] **C1** CONTRACT.md new version section
-- [ ] **C2** Project memory
-- [ ] **C3** Tick the batch files; this file as the closing report
-- [ ] **C4** Full regression, `playwright-cli close-all`
+## Job 3 — the close  ✅
+- [x] **C1** CONTRACT.md new version section
+- [x] **C2** Project memory
+- [x] **C3** Tick the batch files; this file as the closing report
+- [x] **C4** Full regression, `playwright-cli close-all`
 
 ## Log
 
