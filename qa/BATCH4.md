@@ -450,12 +450,19 @@ row where that was true.
    line is density where the player is standing. `qa/BUDGET.md` ranks it, and the audit now
    carries a RATCHET — a recorded per-chapter ceiling — which is the gate that would have
    caught quay going 132,423 → 202,391 in two days.
-2. **Pasto still drifts at spawn+(9,9), intermittently, 0.17 m to 29 m across runs.** Both
+2. **Pasto still drifts at spawn+(9,9)** — PARTLY closed 26 Aug (`qa/CLOSEOUT.md` § A6): the
+   walker-shove half is fixed (npcBlockedFor; 0 shoves in three runs), and measured NOT to
+   be the cause — the residual is a steady 8 m slide with the body holding exact
+   velocities, which is a bare velocity write and a different bug. Original text:
+   **intermittently, 0.17 m to 29 m across runs.** Both
    mechanisms behind it are fixed and the number came down, but it is phase-dependent, and
    a differential with all non-ground bodies removed still drifted 1.41 m — so something
    else is left. It is chapter 2 and was outside job 1's scope. `qa/b4-pasto3.js` and
    `qa/b4-pasto6.js` are the probes.
-3. **A relocated keepsake still hovers in 3 of 17** (Göreme 1.74 m, Palawan 0.69 m, and
+3. ~~**A relocated keepsake still hovers in 3 of 17**~~ — **CLOSED 26 Aug by the closeout**
+   (`qa/CLOSEOUT.md`): `physHomeLearn` learns at REST, not only asleep. 19 of 19 now within
+   +/-0.13 m. The harness was also reading the wrong prop — `keepOut('sydney')` in every
+   chapter. Original text: **A relocated keepsake still hovers in 3 of 17** (Göreme 1.74 m, Palawan 0.69 m, and
    Sahara re-rescues twice), down from 12 of 17 at up to 3.34 m. `physHomeLearn` only
    learns on the frame the body SLEEPS, and a prop on a busy plaza may not sleep inside the
    fuzz's window, so the provisional value is what gets measured. Widening the learn to

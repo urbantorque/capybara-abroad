@@ -2049,6 +2049,167 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE CLOSEOUT — WHAT AN AUDIT IS FOR (v30 — 26 Aug 2026)
+
+The Payoff Pass closed at v27 with a found-versus-fixed report, and then chapters 18 and
+19 shipped. This section is the pass that finished it: the items batches 1-4 left open,
+the five pillars on the two chapters that arrived after the pass, and the formal close.
+
+**Its through-line is not a feature. It is that ten of the findings below were invisible
+to an audit that was reporting green**, and that a green run from an instrument nobody has
+checked is worth less than no run at all — because it is believed.
+
+### THE SEVENTEEN-CHAPTER BLIND SPOT
+
+Every browser audit in `qa/` carried a hard-coded 17: `channels.mjs`, `budget.js`,
+`stillness.js`, `fuzz.js`, and `lines.mjs`'s `FILE_CHAPTER` table. So for the fortnight
+after Monte Carlo and Hanoi shipped they were the two chapters nothing checked, and each
+audit went on printing a confident `17/17`. What it hid:
+
+- Neither chapter had a row in the event grade layer — `lit` was not a channel either of
+  them had. Nor did sydney, pasto or quay, for the third version running.
+- Neither had a ratchet ceiling, and `budget.js` passed them SILENTLY: `if (c && r.tris >
+  c)` reads "no ceiling recorded" as "within its ceiling". **Hanoi is the largest chapter
+  in the game at ~245,000 triangles**, half again over the Pantanal.
+- Neither had a single `after:`/`before:` line — nobody in either chapter reacted to
+  anything the player had done — and `lines.mjs` could not see it twice over: the file was
+  not in its table, and its regression list named four specific files, so "this chapter has
+  none at all" was not a condition it tested anywhere.
+
+`channels.mjs` derives the count from its own table now. The rule is that a chapter list in
+an audit is a bug waiting for a chapter.
+
+### AN INSTRUMENT HAS TO BE CHECKED BEFORE ITS OUTPUT IS
+
+Four measurements in this pass were wrong in ways that produced confident numbers:
+
+1. **The cost gate reported FAIL from machine load.** Single-mean readings swung 1.68 to
+   5.31 ms for the same chapter minutes apart, and iceland measured SLOWER with the shadow
+   pass off — which is impossible. Now the minimum of five repeats (noise only ever ADDS
+   time, so the minimum is the robust estimator), with that impossibility as an explicit
+   self-check; a contaminated run reports COST GATE UNUSABLE and may not fail anything.
+2. **The ratchet's slack was measured on the wrong axis, then with the wrong script.** The
+   scatter randomises at page LOAD, not on `switchTo`, so re-entry inside a session is the
+   same build: Göreme spreads 12,652 across loads against a ±1,500 global figure, and
+   tripped its line by 630. A side probe with a shorter settle then under-read Hanoi by
+   nine thousand and its new ceiling tripped by 546 with nothing added. **A ratchet is a
+   promise about a measurement, so it must be sized by the thing that will do the
+   measuring.**
+3. **The keepsake-hover check tested the wrong prop.** `fuzz.js` read `keepOut('sydney')`
+   in all nineteen chapters, so what it measured was whether a Sydney plaque could be
+   rescued onto the origin of Monte Carlo. It reported 3.41 m there; the chapter's own
+   keepsake in its own place was 0.34.
+4. **The route-life probe could not see scenery.** It took an InstancedMesh's
+   BOUNDING-BOX CENTRE as one object, so every scattered lamp, palm, bollard and tree —
+   90% of what a chapter draws; Monte Carlo is 253 plain meshes and 2,780 things — was
+   counted once, in the middle. It read 48 dead cells in Monte Carlo, and adding fifteen
+   lamps along the exact line it complained about moved the number **UP** to 53. A detector
+   that gets worse when you fix what it points at is not measuring what it says.
+
+### THE FINALE COULD NOT BE REACHED BY ANY OF ITS OWN TESTS
+
+`qa/all-task-ids.json` is the save `pf2-finale.js`, `pf2-finale2.js` and `pf2-finshot.js`
+all write to reach the ending, and none of them checks it. It stayed at 199 of 229 ids when
+18 and 19 shipped, so `sysFinaleAll()` has been false ever since and all three scripts were
+exercising **an ending that cannot fire** — the lawn stages nothing, the ledger never
+opens, and the run reports whatever it happened to measure. Found from `keeps: 0`.
+
+`qa/audit-tasks.mjs` now BLOCKS on any drift between that fixture and the task table.
+
+### THE TWO CHANNELS CHAPTERS 1-3 NEVER HAD
+
+`framed` and `lit`, both left open by batch 2 as its findings B and C, both closable only
+after batch 3 built `frameShot` and never revisited. Measured on Sydney's podium, by
+projecting the shell mesh's own vertices into the frame:
+
+    the rig, at the payout   dist 2.97 m   pitch 50.6   sails in frame    0 of 714
+    with env.operaShot()     dist 17.25 m  pitch 16.2   sails in frame  714 of 714
+
+Chapters 2 and 3 got theirs with `over: true` — the flag v27 built while naming the two
+chapters it was for, *"Antarctica's orca-ride is at the helm and Pasto's condor-ride is in
+flight"*, before wiring Antarctica and stopping.
+
+`lit` was structural, and that is why three passes wrote the finding down instead of
+closing it: `sysAirT` carries six chapters and the other thirteen weights are hand-declared
+scalars, so using the second channel meant adding a damped weight in three separate places
+first. **`sysChapT` is that table over all of CHAPTERS.** No chapter has to again.
+
+### A ROW GETS MEASURED BEFORE IT IS BELIEVED
+
+Pasto's new grade row keyed on crater proximity and measured **0.000 across an entire
+ride**: the marquee is `condor-ride`, which fires at the LAUNCH, and the launch is at the
+spawn — 104 m from the caldera against a 70 m falloff. Tracked over two minutes the
+unsteered bird never came within 95.4 m. v25's own finding, reproduced inside its fix.
+
+Hanoi's `trainGlow` read 0.00 at the exact moment its marquee paid out, because it derived
+the train's position as `x0 + s` when the train runs from `x1 + 60` downward. **A row keyed
+on a position must take that position from whatever moves the thing.**
+
+### CHAPTER 19'S MARQUEE FIRED WITH THE TRAIN NINE HUNDRED METRES UNDERGROUND
+
+`the-train` paid out in the DESPAWN branch, which runs when the train has cleared the alley
+and ninety metres more. The card, the music swell and the camera shot fired **17.7 s after
+the train passed the player**, and three lines above them the same branch had set
+`hanTrainG.visible = false` and put the body at y = -900. At the payout frame: body y -900,
+`trainGlow()` 0.00 for the whole fourteen seconds before it.
+
+The payout moves into the pass. The RECORD still files at despawn — it is the closest
+approach over the whole pass, and **the moment is not the same thing as the score**.
+
+Two more, both found from the PNG and invisible to every number: the bearing was a
+hard-coded `1.5708`, across the tracks, and any z term at all points the lens at a wall —
+the frame was a flat beige wall with the wow card over it while the train was present,
+visible and 82% inside the frustum. And **no distance or raise survives that alley**: 11 m
+asked, 1.4 delivered; 6.4 m of raise asked, 2.7 delivered. It is the occlusion ray and it
+is right — the alley is walled and roofed, and a lens that backs off cannot see the animal.
+So the request is a BEARING ALONE. **The framed channel is not fully available in Train
+Street, and the reason is the chapter working exactly as designed.**
+
+### THE FIRST TWO HOURS GET A WORLD THAT REACTS
+
+Batch 1's *"13 of 15 locals chapters carry two of the three chains"* was true and hid that
+**Sydney and Pasto are not locals chapters at all** — they predate `addLocal` and their
+casts are npc.js's own `humans` and `paCast`, so every gate in the reaction layer is shut
+in the opening of the game. Both casts come out of the same `buildHuman`, so the witness
+chain and the produce reaction port without building anything new.
+
+Two traps paid for, and the second generalises:
+
+- **`gawpT` counts UP.** The obvious way to hold a look open is that timer, and
+  `paStepHuman` LEAVES the gawp past 1.8 — so writing 2.6 into it *ends* the look.
+- **A bare `lookX` write is worth nothing.** It measured 9 of 16 people in Sydney and 5 of
+  13 in Pasto facing the reaction on the frame it fired, and **2 and ZERO a fifth of a
+  second later**: twenty-odd sites inside the two state machines write `lookX` every frame.
+  The hold has to be re-asserted AFTER the state machine has run, and is deliberately not a
+  state of its own — the cheapest way to obey the catch-all-state rule is not to add one.
+
+### THE ENDING GATHERS A CAST
+
+Batch 2 built THE LAWN and marked "gather a cast" PARTIAL because Sydney registers zero
+`game.locals`. Built now as a `gather` state on the terrace's `resit` idiom — slot assigned
+once, arrival test, hard ceiling, damp and stop — with `sysFinaleStage` emitting
+`finale:staged` and npc.js answering, so the finale never learns what a `humans` array is.
+
+Three faults, all found by tracking the walk rather than reading the code: the recruit
+radius and the ceiling did not know about each other (Sydney's cast is spread over a park —
+the five nearest the lawn are 10, 16, 17, 19 and 28 m out — and at 14 s only 11.8 m is
+reachable, so four of five were stopped mid-walk and one never moved at all); and one slot
+landed inside a flower bed, a point nobody can stand on. `npcGATHER_MAX_D` is derived from
+the ceiling and the walk speed now, and a blocked slot rotates round the ring.
+
+### AND A WALKER WALKS ROUND THE PLAYER
+
+`navBlocked` was static world geometry and nothing else, so a walker steered neatly around
+a building and went straight through the capybara — measured at 3.04 m/s of imparted speed
+with `capy.frame` null, which makes it a shove and not a carry. `npcBlockedFor` adds the
+player at one squared distance per probe, gated off for the ten states whose whole point is
+to reach it. **It does not close Pasto's drift**, and saying so is the finding: three runs
+each way measured 7.97-9.71 m with and without, and an earlier run with fourteen shoves
+drifted 1.22 m. What is left is a steady 8 m slide on ground whose gradient samples 0.0000,
+with the body holding exact velocities — `vz = -3.000`, then `vx = -0.368` — while barely
+moving. A held exact value is a bare velocity write.
+
+
 ## THE BUDGET, AND WHAT A SILHOUETTE MAY COST (v28 — 26 Aug 2026)
 
 v27 measured the performance budget and deliberately did not act on it, for reasons that

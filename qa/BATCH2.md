@@ -22,7 +22,9 @@ Predecessor: `qa/BATCH1.md` (complete, all green, CONTRACT v23).
       `doneCount >= TASKS.length` scheduling in systems.js
 - [x] Stage the seventeen keepsakes in the Botanic Gardens (via `stageKeep`,
       new — `spawnKeep` is idempotent and therefore cannot arrange anything)
-- [~] Gather a cast — PARTIAL. The loaf and the calm field carry the moment.
+- [x] Gather a cast — **CLOSED 26 Aug by the closeout run** (`qa/CLOSEOUT.md` § A1).
+      Built as npc.js's `gather` state on the `resit` idiom, exactly as sketched below;
+      3 people arrive at 7, 9 and 12 s and hold. ~~PARTIAL. The loaf and the calm field carry the moment.~~
       **Sydney registers ZERO `game.locals` and zero critters**: it uses
       npc.js's older `humans[]`/`stepHuman` cast instead. A gathering therefore
       needs a new npc.js state with a `thinkHuman` early-return, on the terrace
@@ -58,7 +60,11 @@ correctly fall back to their authored marks.
 ### Job 4 — the five pillars on chapters 1-3  DONE
 Sydney · Pasto · Circular Quay
 - [x] 1 Marquee certification — CERTIFIED, and "framed" FAILS in all three (four channels, from the PNG at the moment)
-- [~] 2 The cast — audited; the mischief economy does not reach ch 1-2 (finding A) (pair-chat 13 m, after:/before:, unprompted ack, mischief chains)
+- [x] 2 The cast — **CLOSED 26 Aug by the closeout run** (`qa/CLOSEOUT.md` § A2): the
+      witness chain and the produce reaction now reach both chapters, measured by
+      differential (0 -> 2 chain calls, 9 and 4 people facing the reaction). Ownership
+      does not port and is recorded as open, not faked. ~~the mischief economy does not
+      reach ch 1-2 (finding A)~~
 - [x] 3 Feel of the ground — fixed ch 3 footfall (half the chapter was wrong) (footfall/slip/particles, wetness, room tone, mood, loaf)
 - [x] 4 The signature toy — named for all three; Sydney's has no readers (D)
 - [x] 5 Route life — measured; two real dead patches (E) (no purposeless dead 20 m cells)

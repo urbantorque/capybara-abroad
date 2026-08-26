@@ -1,7 +1,7 @@
 async page => {
   await page.mouse.click(400, 400)
   await page.waitForTimeout(2000)
-  const names = ['sydney','quay','pasto','kyoto','cali','rio','iceland','sahara','drift','venice','kowloon','palawan','goreme','manly','pantanal','cave','antarctic']
+  const names = ['sydney','quay','pasto','kyoto','cali','rio','iceland','sahara','drift','venice','kowloon','palawan','goreme','manly','pantanal','cave','antarctic','monaco','hanoi']
   const out = {}
   for (const n of names) {
     await page.evaluate((name) => {
@@ -20,7 +20,12 @@ async page => {
         sahara:[-90,350,-110,100], drift:[-110,110,-180,60], venice:[-160,60,-80,60],
         kowloon:[-60,60,-170,70], palawan:[-80,80,-145,70], goreme:[-90,110,-120,70],
         rio:[-110,120,-70,100], manly:[-110,120,-90,90], pantanal:[-130,130,-130,110],
-        cave:[-80,80,-200,80], antarctic:[-212,212,-500,122]
+        cave:[-80,80,-200,80], antarctic:[-212,212,-500,122],
+        // Chapters 18 and 19, added by the closeout. Derived from the world
+        // positions of everything each chapter actually draws, then rounded
+        // out — neither publishes bounds(), and this audit is the last one in
+        // qa/ that was still hard-coded to seventeen.
+        monaco:[-145,180,-115,140], hanoi:[-135,80,-105,215]
       }[name]
       const api = g[name] || (name === 'sydney' ? g.env : null)
       const water = api && typeof api.isOverWater === 'function' ? api.isOverWater.bind(api) : null
