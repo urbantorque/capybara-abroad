@@ -293,3 +293,41 @@ then `vx = -0.368` for five more — while its position barely changes. A held e
 is a **bare velocity write**, which `capy3-external-forces-on-the-capybara` says is the one
 channel a body must never be moved through. That is the next thread to pull, and it is a
 different bug from the one batch 4 named.
+
+### Pillars 1, 3, 4 and 5 on chapters 18 and 19
+
+**Pillar 1, the marquee.** Monte Carlo's `the-tunnel` was certified from the PNG and the
+projection: the bore's own 253 vertices are 100% in frame from 0.3 s to 1.5 s. It was
+0.6-1.5 s before — at `raise: 1.0` the lens sits level with the car roof and the first six
+tenths are the back of a car — and the hold was cut 3.4 s → 1.9 s because past 1.5 s the
+car has outrun the shot and the marquee was lingering on an empty road. **A shot that
+outlives its subject ends on nothing.** Hanoi's is the big find, above.
+
+**Pillar 3, feel of the ground.** The ladders were **three rungs for eleven zones** in
+Hanoi and four for twelve in Monte Carlo — a city with a lacquered timber bridge, a
+riveted steel one, a wet market floor and a lake path answered "asphalt, ballast, or the
+same tile everywhere else". Six distinct pitches each now, narrow tests above broad ones
+because chapter 3's ladder was found returning wharf timber for the whole of Manly.
+Stillness: **both chapters clean**, 0 issues.
+
+**Pillar 4, the signature toy.** No finding. Monte Carlo has the roulette wheel — the only
+carrier in the game that is furniture — and the roof of a moving car; Hanoi has the scooter
+and two hundred and forty engines as a medium. Both are already deep.
+
+**Pillar 5, route life.** Measured against four chapters that passed it, after the probe
+was fixed: **monaco 14 · kyoto 6 · hanoi 1 · goreme 0 · venice 0 · manly 0**. Monte Carlo
+is genuinely the thinnest and the dead cells all sit on one walk — the climb from the port
+to the casino, which is how act one becomes act two. Fifteen instanced lamps close it to
+12 by differential. Said plainly rather than rounded up: closing the rest needs content on
+that hillside, which is a design decision about somebody else's chapter.
+
+### A7-A12 — the rest of batch 4's open list, re-measured not re-litigated
+
+| | state |
+|---|---|
+| **A7** critters | **5 of 19** now, not 5 of 17. Neither new chapter has a ground animal drawn to register, so this stays content and not a flag — unchanged in kind. |
+| **A8** room tone per biome | Unchanged. Global; Venice and Palawan remain its worst cases. |
+| **A9** Iceland's snowcat at x=34 | Unchanged. Moving the track moves the beacon, the headlights, the ramp meshes and the fox's orbit centre, all derived from `iceCAT_X`. |
+| **A10** Kowloon's roof | Unchanged. `symphony` is not blocked. Do not lower `hkSCAF.top`. |
+| **A11** Palawan's `inZone('shaft')`, cave's `nearestDrip`/`echoReady` | Still no readers repo-wide. |
+| **A12** the 130k gate · ground-sheet shadows · `user-scalable=no` | Deliberately declined in v27-v28 and **restated, not re-argued**. 12 of 19 are over the triangle gate; the cost gate is green and now knows when it cannot be trusted; the ratchet is the gate that catches things and it caught two this run. |
