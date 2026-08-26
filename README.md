@@ -1,6 +1,6 @@
-# Untitled Capybara Game — sixteen places, one rodent
+# Untitled Capybara Game — nineteen places, one rodent
 
-A physics sandbox where a mischievous capybara terrorises sixteen places: the Royal Botanic
+A physics sandbox where a mischievous capybara terrorises nineteen places: the Royal Botanic
 Gardens and the Opera House forecourt in Sydney; Sydney Harbour from Circular Quay out to
 Manly, which you cross by DRIVING A FERRY; the plaza, market and Galeras volcano of Pasto,
 Nariño; the torii, temples and matcha terraces of Kyoto and Uji; the river, the painted street
@@ -10,7 +10,7 @@ the souk and the great dune of Marrakech and the Erg; **the Drift**, which is no
 at all; Piazza San Marco and the Grand Canal in Venice, **with the tide coming in**; and a
 neon street in Mong Kok with a bamboo scaffold up the side of it; a bay in **Palawan** whose
 interesting half is **underneath the water**; and a valley of fairy chimneys in **Cappadocia**
-at ten past five in the morning, where the only vehicle has no steering; **Manly**, on the ocean side of the peninsula, where the sea has a shape and it is moving; the flooded campo of the **Pantanal**, which is the one place in this game the animal is actually from; and **Sơn Đoòng**, the largest cave passage on earth, where the only light is the one you make; and the **Antarctic Peninsula**, where the land is four rocks eleven hundred metres apart, the sea has broken ice in it, and the only sensible way to get anywhere is a small orange boat with an outboard on the back. Built with Three.js + cannon-es, styled after *Untitled Goose Game*: flat-shaded
+at ten past five in the morning, where the only vehicle has no steering; **Manly**, on the ocean side of the peninsula, where the sea has a shape and it is moving; the flooded campo of the **Pantanal**, which is the one place in this game the animal is actually from; and **Sơn Đoòng**, the largest cave passage on earth, where the only light is the one you make; and the **Antarctic Peninsula**, where the land is four rocks eleven hundred metres apart, the sea has broken ice in it, and the only sensible way to get anywhere is a small orange boat with an outboard on the back; **Monte Carlo** at blue hour, where the Casino has an inside, five people are paid to look at the room, and the Grand Prix circuit runs past the front steps; and **Hanoi** at ten in the morning, where the road is a continuous river of two hundred and forty motorbikes and you cross it by not stopping. Built with Three.js + cannon-es, styled after *Untitled Goose Game*: flat-shaded
 low-poly, high-key pastel palette, slapstick physics.
 
 In Pasto you can whistle down an Andean condor, grab its talons, and ride thermals off the
@@ -1125,6 +1125,79 @@ key events:
 - **The smoke plume and thermal motes rendered as dark floating rocks.** Both passed
   `vertexColors: true` on geometry with no colour attribute; WebGL supplies (0,0,0), so every
   puff was multiplied to black.
+
+
+## Monte Carlo, where somebody minds
+
+Chapter eighteen is the first place in this game that is ever CLOSED to you.
+
+Seventeen chapters are a sandbox with a list on it: everything in them can be done in any
+order, from anywhere, with anybody watching. That is the right rule for a public garden and
+it is the wrong rule for the one building on earth whose entire business model is a man on a
+door deciding whether you come in. So the Casino de Monte-Carlo has an inside — the only
+building in this game that does — and five croupiers who sweep it, and their cones of
+attention are real translucent wedges on the marble that go red as they fill. At full you are
+picked up under the forelegs and put back on the steps.
+
+**The whole penalty is ten seconds and whatever was in your mouth.** Nothing becomes
+impossible, nothing is lost, and you may walk straight back in — the chapter is about dignity,
+not about failure. And it is built entirely out of verbs you already have: sitting down halves
+the range at which a cone finds you, running raises it by half again, and carrying something
+raises it a little. There is no meter, because this game has never had one.
+
+There is also an economy, which is a first: a mother-of-pearl plaque is a real prop you can
+carry in your mouth, the roulette wheel is a real turning disc you can also stand on, and
+dropping a plaque into a moving wheel pays what the pocket says. Red two, black one, and green
+pays eight and the whole salon stops talking. Nothing is ever lost — the two seconds of
+watching is the pleasure, not the arithmetic.
+
+And the Grand Prix runs on the streets, so the streets are the circuit. Three cars lap
+Sainte-Dévote, the climb to the Casino, Mirabeau and the Fairmont hairpin on their own clock
+whether anybody is watching or not. The hairpin is the only place on the lap they are doing
+under six metres a second, which is the only place a capybara can get into the cockpit of one —
+and a hundred and eleven metres later the world closes over for four and a half seconds of
+tunnel and then hands you the entire lit harbour at once. That is the marquee, and like the
+condor and the herd it is a thing you do by not doing anything: you are not being clever, you
+are being carried by something very much larger than you at ninety-five kilometres an hour.
+
+The score is the fifth band in this game and the first that is a piece of fiction. Nothing is
+actually playing in Monaco. What is playing in Monaco is what you have in your head the moment
+you see a casino, a dinner jacket and a silver car — E minor with a major ninth on it, a
+tremolo-picked guitar through a very hard spring, a walking upright, brushes and a ride, and a
+brass section that plays four notes about once every eight bars and is the loudest thing in the
+principality when it does.
+
+## Hanoi, where the road is not going to stop
+
+Chapter nineteen has a third thing in it that eighteen chapters do not: a floor you walk on, an
+obstacle you go round, and **two hundred and forty motorbikes**.
+
+You cross a road in Hanoi by walking into it at a steady pace. Not by waiting for a gap — there
+is no gap, there has never been a gap, and anybody who waits for one is still on that kerb at
+the end of the chapter. You step off, you hold your line, and two hundred people you will never
+meet go round you. Every rider on the map can see the animal and swings out and lifts off for
+it; what decides whether that works is your own speed and heading, because a rider commits to a
+line about a second and a half ahead and that is only where you are going to be if you keep
+going. The record for the crossing is not a time. It is **how many of them had to go round you**.
+
+Stop dead in the middle of it and nobody hits you. They JAM — everybody brakes, nobody says
+anything, and half a minute later there are forty of them stopped in a fan around one
+capybara, which is what really happens and is much funnier than a shove. It is also how you get
+on one, because a stopped scooter is a thing you can hop into. And while you are in the AIR
+nobody is looking up: any rider inside seven metres stops avoiding and lines up under you
+instead. Hop into the traffic. That is the verb.
+
+Then there is Train Street. A metre-gauge railway runs down an alley with a hundred people
+living in it, and twice in the chapter a horn sounds up the line and **the entire street folds
+itself away** — awnings in, stools in, tables in, everybody flat against their own front door —
+and eleven seconds later a train comes through at eleven metres a second with forty-five
+centimetres to spare. Being in it is the marquee, and it is deliberately a thing you do by NOT
+MOVING, which is the exact opposite of the chapter's other two.
+
+And in the middle of all of it there is Hoàn Kiếm: eighty metres of still green water with a
+tower on an island in it and a red bridge over one corner. Everything quiet in this chapter is
+inside the ring road and everything loud is outside it, which is a whole city's worth of design
+done by a lake.
 
 ## Antarctica, and you are not walking anywhere
 

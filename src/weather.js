@@ -371,6 +371,36 @@ const wxMOOD = {
     bed: { rain: 0, wind: 0.94, chirp: 0.00, drip: 0.06, rustle: 0.04, thunder: 0 },
     slipK: 0.12, cold: 1.00,
   },
+  // ---- Chapter 18. Twenty past eight on a warm evening in May, on a coast
+  // that gets three hundred days of this a year. Almost nothing happens in
+  // this air and that is the row: the calmest gust in the game after the
+  // cave's, no rain worth the name, and the one thing it does have is the
+  // faint salt haze a Mediterranean evening genuinely has in it. `dusk`,
+  // because the whole chapter is lit by things somebody switched on.
+  monaco: {
+    label: 'Blue Hour', lock: 'dusk', wet: 0.10,
+    rain: { odds: 0.06, peak: 0.22, hold: 26, gap: 190 },
+    cloudK: 0.20, pulseK: 0.022,
+    gust: { base: 1.4, swing: 1.1, hz: 0.052 }, dir: 2.05,
+    motes: wxMotes('spray', 0.55),
+    bed: { rain: 0.18, wind: 0.34, chirp: 0.10, drip: 0.08, rustle: 0.30, thunder: 0.05 },
+    slipK: 0.10, cold: 0.06,
+  },
+  // ---- Chapter 19. Ten in the morning in October: twenty-nine degrees,
+  // eighty per cent humidity and a sky that is white rather than blue. The
+  // WETTEST row in the game that is not raining — a tropical morning is damp
+  // before anything falls on it — and the shower odds are the highest of any
+  // chapter, because in Hanoi in October it rains twice a day for ten minutes
+  // and then it is twenty-nine degrees again.
+  hanoi: {
+    label: 'Wet Season Morning', lock: 'overcast', wet: 0.34,
+    rain: { odds: 0.58, peak: 0.78, hold: 36, gap: 74 },
+    cloudK: 0.60, pulseK: 0.034,
+    gust: { base: 1.1, swing: 0.9, hz: 0.040 }, dir: 1.10,
+    motes: wxMotes('mote', 0.85),
+    bed: { rain: 0.74, wind: 0.20, chirp: 0.30, drip: 0.52, rustle: 0.34, thunder: 0.40 },
+    slipK: 0.34, cold: 0.00,
+  },
 };
 
 // ===========================================================================

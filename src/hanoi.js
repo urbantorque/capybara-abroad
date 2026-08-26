@@ -1,0 +1,3074 @@
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
+
+// ===========================================================================
+// CHAPTER 19 — HANOI
+//
+// The nineteenth place, and the first one where the GROUND IS MOVING and it is
+// not water, wind, ice or a deck. It is two hundred and forty scooters.
+//
+// Every chapter in this game has an obstacle you go round and a floor you walk
+// on. This one has a THIRD THING, which is the single most famous fact about
+// the city and which nothing in eighteen chapters resembles: a continuous,
+// unbroken, unstopping river of motorbikes that you cross by WALKING INTO IT
+// AT A STEADY PACE. Not by waiting for a gap — there is no gap, there has
+// never been a gap, and a player who waits for one will still be standing on
+// that kerb at the end of the chapter. You step off, you hold your line, and
+// two hundred people you will never meet go round you.
+//
+// THREE THINGS MAKE THIS CHAPTER AND NOT ONE:
+//
+//  1. THE FLOW. `hanLaneAt(x, z)` is a distance field over four street
+//     centrelines, and every scooter on the map is a parameter along one of
+//     them. Each one can SEE the capybara: inside `hanSEE` it swings its
+//     lateral offset away and lifts off. What decides whether that works is
+//     the animal's own speed and heading — hold both and the river parts; stop
+//     dead, or turn back, and the nearest rider is already committed to where
+//     you were going to be, and you get a horn, a shove and a wobble. It is
+//     never damage. Nobody in this game has ever taken damage. It is the
+//     indignity of being the one thing on that street that could not commit.
+//
+//  2. TRAIN STREET. A metre-gauge line runs down an alley a metre and a half
+//     wider than the train, with a hundred people living in it. Twice in the
+//     chapter a horn sounds up the line and the ENTIRE STREET FOLDS ITSELF
+//     AWAY — awnings in, stools in, tables in, everybody flat against their own
+//     front door — and eleven seconds later a train comes through at eleven
+//     metres a second with forty-five centimetres to spare. Standing in it is
+//     the marquee, and it is deliberately a thing you do by NOT MOVING, which
+//     is the opposite of the chapter's other two.
+//
+//  3. THE LAKE. Hoan Kiem is the hole in the middle of the noise: eighty
+//     metres of still green water with a tower on an island in it, a red
+//     bridge, and a ring road round the outside that never stops. Every quiet
+//     thing in this chapter is inside that ring and everything loud is outside
+//     it, which is a whole city's worth of design done by a lake.
+//
+// Everything here is prefixed `han` (contract: the bundler flattens every
+// module into one scope).
+// ===========================================================================
+
+// --------------------------------------------------------------- geography --
+// Hanoi is FLAT, which after eighteen chapters of heightfields is worth saying
+// out loud: this terrain has three features in it and two of them are holes.
+const hanWATER  = -0.5;           // the lake, and it does not move much either
+const hanGROUND = 1.2;            // ...and the street, which is nearly all of it
+
+// Hoan Kiem. An ellipse, and the whole chapter is arranged round it.
+const hanLAKE   = { cx: 0, cz: -58, rx: 58, rz: 38, bed: -2.6 };
+const hanTOWER  = { x: -8, z: -58 };          // Thap Rua, on its own islet
+// ...AND NGOC SON IS ON THE SHORE SIDE, WHICH IS THE ONLY PLACE IT CAN BE.
+// The first version put the islet at (34, -50) and ran the red bridge from
+// (18, -34) — both of which are two-thirds of the way into an ellipse 116 m
+// across, so the whole of the Huc, gate and all, stood in open water and the
+// task was "walk out onto a bridge that starts in a lake". The east shore at
+// z = -46 is at x = 55; that is where a bridge to an island has to begin.
+const hanNGOC   = { x: 26, z: -46 };          // Ngoc Son, on the other one
+const hanHUC    = { x0: 55, z0: -44, x1: 39, z1: -46 };   // the red bridge
+
+// The Red River, and the dyke that keeps it out of the city. The dyke is the
+// only ground in the chapter that is not at 1.2 m, and it is there because the
+// old bridge has to start somewhere.
+const hanRIVER_Z = 190;
+const hanDYKE   = { cz: 168, h: 5.0, halfz: 10 };
+const hanBRIDGE = { x: 44, z0: 168, z1: 250 };
+
+// The Old Quarter: everything north of the lake, and it is a grid.
+const hanOQ     = { x0: -96, x1: 96, z0: -18, z1: 130 };
+
+// Train Street, and it runs east-west across the west side of the quarter.
+// ...AND THE ALLEY IS SIX AND A HALF METRES WIDE, NOT FOUR AND THREE
+// QUARTERS. The real one is about four; at that width the chapter is
+// unplayable, because a third-person camera twelve metres behind the animal
+// at thirty-five degrees is inside somebody’s first floor and the marquee
+// happens off screen. Three metres two either side of the rail leaves the
+// TRAIN’S own clearance untouched — it is 1.45 m wide and hanTRAIN_GAP is
+// still the number the chapter is about — and gives the lens somewhere to be.
+const hanTRAIN  = { z: 46, x0: -130, x1: -34, gauge: 1.0, half: 3.2 };
+const hanTRAIN_Y = hanGROUND + 0.28;
+
+// The bia hoi corner, the market, the puppet theatre and the barber.
+const hanBIA    = { x: 62, z: 18 };
+const hanMARKET = { x: -54, z: 88 };
+const hanPUPPET = { x: 44, z: -22 };
+const hanBARBER = { x: -30, z: 8 };
+const hanCAU    = { x: -18, z: -96 };         // the shuttlecock circle, lakeside
+
+const hanSEA_X0 = -230, hanSEA_X1 = 230, hanSEA_Z0 = -200, hanSEA_Z1 = 270;
+
+// ------------------------------------------------------------- the traffic --
+// FOUR CENTRELINES, and every scooter in the chapter is a distance along one
+// of them. Same machinery as the Monte Carlo circuit and the chiva road: one
+// polyline is the tarmac, the kerbs, the buildings' setback, the pedestrian
+// crossing test and the riders' rails, so none of the five can disagree.
+const hanLANES = [
+  // 0 — Hang Ngang / Hang Dao. North out of the lake, the busiest street.
+  { closed: false, w: 5.2, pts: [[0, -22], [0, 8], [2, 44], [0, 82], [-2, 122]] },
+  // 1 — the east-west artery across the middle of the quarter
+  { closed: false, w: 5.2, pts: [[-98, 32], [-40, 28], [10, 30], [58, 26], [104, 30]] },
+  // 2 — the ring round the lake, and it never stops
+  { closed: true, w: 4.6, pts: [[0, -12], [34, -18], [58, -38], [62, -60], [52, -84],
+                                [24, -100], [-14, -102], [-46, -90], [-62, -66],
+                                [-58, -40], [-36, -20]] },
+  // 3 — the north street, past the market
+  { closed: false, w: 4.6, pts: [[-100, 84], [-52, 80], [4, 86], [56, 82], [102, 86]] },
+];
+const hanLANE_SHLD = 3.4;         // the pavement the terrain blends over
+const hanBIKE_N    = 240;         // ...and how many of them there are
+const hanBIKE_V    = [5.4, 9.6];  // m/s. Fifteen to thirty-five kilometres an hour.
+const hanSEE       = 15.0;        // m ahead a rider can see you
+const hanSWERVE    = 3.4;         // m of lateral offset they will give you
+const hanCLIP      = 1.35;        // ...and how close is a clip
+const hanHOLD_V    = 0.85;        // m/s under which you have stopped committing
+const hanTURN_MAX  = 1.9;         // rad of heading change that counts as a dither
+
+// ------------------------------------------------------------- train street --
+const hanTRAIN_V    = 11.0;       // m/s through the alley
+const hanTRAIN_GAP  = 0.45;       // m of daylight either side of it
+const hanTRAIN_WARN = 11.0;       // s between the horn and the train
+const hanTRAIN_GAP2 = 96;         // s between one and the next
+const hanTRAIN_LEN  = 4;          // carriages
+
+// ------------------------------------------------------------------ scratch --
+const hanV3  = new THREE.Vector3();
+const hanV3b = new THREE.Vector3();
+const hanV3c = new THREE.Vector3();
+const hanV3d = new THREE.Vector3();
+const hanQ   = new THREE.Quaternion();
+const hanE   = new THREE.Euler();
+const hanSc  = new THREE.Vector3();
+const hanM   = new THREE.Matrix4();
+const hanCol = new THREE.Color();
+const hanFrame = { x: 0, z: 0 };
+const hanOpt = {};                // see placeCue: copied, never written into
+
+// ---------------------------------------------------------------- module ----
+let hanGame = null;
+let hanBuilt = false;
+let hanRoot = null;
+let hanTime = 0;
+
+// the lake
+let hanLakeMesh = null, hanLakeAttr = null;
+
+// the flow
+const hanBikeMeshes = [];         // one per body colour — see the note above
+const hanBikeGroups = [];         // ...and which bikes are in each
+let hanBikeN = 0;
+let hanBikeData = null;           // lane, s, dir, off, offWant, v, vWant, colour, phase
+// ...and slot 9 is "this one is currently going round the capybara", which is
+// what makes the record a COUNT OF PEOPLE rather than an integral of time.
+// Measured with the time integral: a clean four-second crossing of the busiest
+// street in the chapter scored ONE, because the accumulator only ran while a
+// rider was inside a nine-metre window and at this density that is about a
+// second and a half of the whole crossing. Counting the rising edge instead
+// gives eleven to nineteen, which is both the truth and the joke.
+const hanBIKE_STRIDE = 10;
+let hanSwerved = 0;               // how many have had to go round you, this crossing
+let hanSwervedBest = 0;
+let hanBumpT = 0;
+let hanHornT = 0;
+let hanCrossFrom = 0;             // which side of the lane the crossing started on
+let hanCrossLane = -1;
+let hanCrossOk = false;
+let hanCrossDone = false;
+let hanYawWas = 0, hanDither = 0;
+let hanRider = -1;                // which scooter is carrying the animal
+let hanRideT = 0, hanRideDist = 0, hanRideBest = 0, hanRideDone = false;
+let hanRideGrace = 0;
+
+// train street
+let hanTrainG = null, hanTrainBody = null;
+let hanTrainS = -1;               // metres along the alley, or -1 when it is away
+let hanTrainT = hanTRAIN_GAP2 * 0.35;
+let hanFoldK = 0;                 // 0 open, 1 everything folded away
+let hanTrainNear = 99;            // closest the animal has been to it, this pass
+let hanTrainBest = 99;
+let hanTrainDone = false, hanFoldDone = false;
+let hanTrainCount = 0;
+const hanFolders = [];            // {mesh, x, z, ox, oz, oy, kind}
+let hanTrainWarned = false;
+
+// the lake set
+let hanTowerG = null, hanHucG = null;
+let hanPuppetG = null;
+const hanPuppets = [];
+let hanCauN = 5, hanCauT = 0, hanCauDone = false;
+const hanCauFolk = [];
+let hanShuttle = null, hanShuttleT = 0;
+
+// the stools
+let hanStoolMesh = null, hanStoolData = null;
+let hanStoolDown = 0, hanStoolBest = 0, hanStoolDone = false;
+const hanSTOOL_N = 96;
+
+// props and people
+let hanPhoProp = null, hanPhoGone = false;
+let hanCoffeeProp = null, hanCoffeeGone = false;
+let hanFlowerBike = null, hanFlowerDone = false;
+const hanFlowerProps = [];
+let hanMirror = null, hanMirrorDone = false;
+let hanLocPho = null, hanLocBia = null, hanLocRail = null, hanLocFlower = null;
+let hanLocBarber = null, hanLocPuppet = null, hanLocMarket = null;
+
+// instanced fields
+let hanWinMesh = null;
+let hanSignMesh = null;
+let hanCableMesh = null;
+const hanFolkMeshes = [];
+const hanFolkGroups = [];
+let hanFolkData = null;
+const hanFOLK_N = 70;
+let hanLanternMesh = null;
+
+// bookkeeping
+let hanArrived = false;
+let hanToldFlow = false, hanToldTrain = false, hanToldLake = false;
+let hanAmbT = 0;
+let hanBridgeDone = false, hanHucDone = false, hanTowerDone = false;
+let hanPuppetDone = false;
+let hanQuietT = 0, hanRiverT = 0;
+
+// ---------------------------------------------------------------- helpers ---
+function hanXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
+  hanE.set(rx, ry, rz, 'YXZ');
+  hanQ.setFromEuler(hanE);
+  hanV3.set(px, py, pz);
+  hanSc.set(sx, sy, sz);
+  hanM.compose(hanV3, hanQ, hanSc);
+  return hanM;
+}
+
+const hanG = { box: null, cyl4: null, cyl6: null, cyl8: null, cyl12: null,
+               cone4: null, cone6: null, sph6: null, sph8: null };
+function hanInitGeos() {
+  if (hanG.box) return;
+  hanG.box = new THREE.BoxGeometry(1, 1, 1);
+  hanG.cyl4 = new THREE.CylinderGeometry(0.5, 0.5, 1, 4);
+  hanG.cyl6 = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
+  hanG.cyl8 = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+  hanG.cyl12 = new THREE.CylinderGeometry(0.5, 0.5, 1, 12);
+  hanG.cone4 = new THREE.ConeGeometry(0.5, 1, 4);
+  hanG.cone6 = new THREE.ConeGeometry(0.5, 1, 6);
+  hanG.sph6 = new THREE.SphereGeometry(0.5, 6, 4);
+  hanG.sph8 = new THREE.SphereGeometry(0.5, 8, 6);
+}
+
+/**
+ * CONTRACT: box() takes FULL extents; CANNON.Box takes HALF.
+ *
+ * AND ROTATIONS ARE +yaw. A box turned about Y by theta sends its local +z to
+ * (sin theta, cos theta), which is the convention every heading in this file is
+ * in — so a kerb, a rail or a shopfront laid along a street takes the heading
+ * UNCHANGED. Chapter 18 negated it and put a hundred metres of crash barrier
+ * across the road like a cattle grid.
+ */
+function hanMerger() {
+  const pos = [], nor = [], col = [], idx = [];
+  const M = {
+    n: 0,
+    add(geo, m4, color) {
+      const g = geo.clone();
+      g.applyMatrix4(m4);
+      const p = g.attributes.position.array;
+      const nm = g.attributes.normal.array;
+      hanCol.set(color);
+      const start = M.n;
+      for (let i = 0; i < p.length; i += 3) {
+        pos.push(p[i], p[i + 1], p[i + 2]);
+        nor.push(nm[i], nm[i + 1], nm[i + 2]);
+        col.push(hanCol.r, hanCol.g, hanCol.b);
+      }
+      const vc = p.length / 3;
+      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
+      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
+      M.n += vc;
+      g.dispose();
+      return M;
+    },
+    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
+      return M.add(hanG.box, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
+    },
+    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
+      const g = seg === 4 ? hanG.cyl4 : seg === 8 ? hanG.cyl8 : seg === 12 ? hanG.cyl12 : hanG.cyl6;
+      return M.add(g, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
+    },
+    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
+      const g = seg === 4 ? hanG.cone4 : hanG.cone6;
+      return M.add(g, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
+    },
+    sph(cx, cy, cz, sx, sy, sz, color, seg) {
+      return M.add(seg === 8 ? hanG.sph8 : hanG.sph6,
+                   hanXform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
+    },
+    quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color) {
+      hanCol.set(color);
+      const s = M.n;
+      const v = [ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz];
+      for (let i = 0; i < 12; i += 3) {
+        pos.push(v[i], v[i + 1], v[i + 2]);
+        nor.push(0, 1, 0);
+        col.push(hanCol.r, hanCol.g, hanCol.b);
+      }
+      idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
+      M.n += 4;
+      return M;
+    },
+    build() {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      g.computeBoundingSphere();
+      return g;
+    },
+  };
+  return M;
+}
+
+function hanVC() {
+  return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.24, amount: 0.09, warp: 0.7 });
+}
+function hanVCF() {
+  return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });
+}
+function hanGlow(color, intensity) {
+  return mat(color, { emissive: color, emissiveIntensity: intensity === undefined ? 1 : intensity });
+}
+
+function hanSyncBody(b) {
+  b.previousPosition.copy(b.position);
+  b.interpolatedPosition.copy(b.position);
+  b.previousQuaternion.copy(b.quaternion);
+  b.interpolatedQuaternion.copy(b.quaternion);
+}
+function hanPoolBody(game) {
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC,
+                              material: (game.mats && game.mats.ground) || undefined });
+  b.allowSleep = true;
+  return b;
+}
+function hanPoolBox(b, x, y, z, sx, sy, sz, ry) {
+  const q = new CANNON.Quaternion();
+  if (ry) q.setFromEuler(0, ry, 0);
+  b.addShape(new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5)), new CANNON.Vec3(x, y, z), q);
+  return b;
+}
+function hanPoolDone(game, b) {
+  if (!b.shapes.length) return null;
+  hanSyncBody(b);
+  game.world.addBody(b);
+  return b;
+}
+function hanStaticBox(game, x, y, z, sx, sy, sz, ry) {
+  const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+  b.addShape(new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5)));
+  b.position.set(x, y, z);
+  if (ry) b.quaternion.setFromEuler(0, ry, 0);
+  hanSyncBody(b);
+  game.world.addBody(b);
+  return b;
+}
+function hanSmooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+function hanTask(id) {
+  const g = hanGame;
+  if (g && typeof g.completeTask === 'function') g.completeTask(id);
+}
+function hanToast(s) {
+  const g = hanGame;
+  if (g && typeof g.toast === 'function') g.toast(s);
+}
+function hanSfx(name, opts) {
+  const g = hanGame;
+  if (g && typeof g.sfx === 'function') g.sfx(name, opts);
+}
+/** See placeCue in shared.js — it copies rather than writes, for a reason. */
+function hanCue(name, x, y, z, volume, pitch, far) {
+  const g = hanGame;
+  if (!g || typeof g.sfx !== 'function') return;
+  hanOpt.volume = volume;
+  if (pitch !== undefined) hanOpt.pitch = pitch; else delete hanOpt.pitch;
+  g.sfx(name, placeCue(hanOpt, x, y, z, far === undefined ? 150 : far));
+}
+function hanRecord(id, v) {
+  const g = hanGame;
+  if (g && typeof g.record === 'function') g.record(id, v);
+}
+
+// ------------------------------------------------------------- centrelines --
+let hanSegT = 0;
+function hanSegD(x, z, ax, az, bx, bz) {
+  const ex = bx - ax, ez = bz - az;
+  const L2 = ex * ex + ez * ez;
+  let t = L2 > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / L2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const px = ax + ex * t, pz = az + ez * t;
+  hanSegT = t;
+  return Math.hypot(x - px, z - pz);
+}
+
+// cumulative arc length per lane, so a rider is driven in METRES
+const hanLaneLen = [];
+const hanLaneTotal = [];
+function hanInitLanes() {
+  if (hanLaneLen.length) return;
+  for (let L = 0; L < hanLANES.length; L++) {
+    const lane = hanLANES[L];
+    const cum = [];
+    let s = 0;
+    const n = lane.closed ? lane.pts.length : lane.pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      cum.push(s);
+      const a = lane.pts[i], b = lane.pts[(i + 1) % lane.pts.length];
+      s += Math.hypot(b[0] - a[0], b[1] - a[1]);
+    }
+    cum.push(s);
+    hanLaneLen.push(cum);
+    hanLaneTotal.push(s);
+  }
+}
+
+/** Where lane L is at `s` metres. Writes x, z, yaw into `out`. */
+function hanLaneAtS(L, s, out) {
+  hanInitLanes();
+  const lane = hanLANES[L];
+  const cum = hanLaneLen[L], total = hanLaneTotal[L];
+  let d = s;
+  if (lane.closed) { d %= total; if (d < 0) d += total; }
+  else d = clamp(d, 0, total - 0.001);
+  let i = 0;
+  for (let k = 0; k < cum.length - 1; k++) if (d >= cum[k]) i = k;
+  const a = lane.pts[i], b = lane.pts[(i + 1) % lane.pts.length];
+  const seg = cum[i + 1] - cum[i];
+  const t = seg > 1e-6 ? (d - cum[i]) / seg : 0;
+  out.x = a[0] + (b[0] - a[0]) * t;
+  out.z = a[1] + (b[1] - a[1]) * t;
+  out.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+  return out;
+}
+const hanTmp = { x: 0, z: 0, yaw: 0 };
+const hanTmp2 = { x: 0, z: 0, yaw: 0 };
+
+/**
+ * WHICH STREET AM I IN, AND WHICH WAY IS IT GOING.
+ *
+ * The one question this chapter asks more than any other. Cached on (x, z)
+ * because the terrain build asks it a hundred thousand times and the crossing
+ * test, the scooters, the buildings and the pavements all ask it again every
+ * frame about the same point.
+ */
+let hanLaneD = 0, hanLaneI = -1, hanLaneS = 0, hanLaneYaw = 0, hanLaneW = 5.2;
+let hanLaneCx = 1e9, hanLaneCz = 1e9;
+function hanLaneAt(x, z) {
+  if (x === hanLaneCx && z === hanLaneCz) return hanLaneD;
+  hanLaneCx = x; hanLaneCz = z;
+  hanInitLanes();
+  let best = 1e9, bi = -1, bs = 0, byaw = 0, bw = 5.2;
+  for (let L = 0; L < hanLANES.length; L++) {
+    const lane = hanLANES[L];
+    const n = lane.closed ? lane.pts.length : lane.pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = lane.pts[i], b = lane.pts[(i + 1) % lane.pts.length];
+      const d = hanSegD(x, z, a[0], a[1], b[0], b[1]);
+      if (d < best) {
+        best = d; bi = L;
+        bs = hanLaneLen[L][i] + (hanLaneLen[L][i + 1] - hanLaneLen[L][i]) * hanSegT;
+        byaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+        bw = lane.w;
+      }
+    }
+  }
+  hanLaneD = best; hanLaneI = bi; hanLaneS = bs; hanLaneYaw = byaw; hanLaneW = bw;
+  return best;
+}
+
+// ---------------------------------------------------------------- terrain ---
+/**
+ * THE GROUND, AND IT IS ONE NUMBER WITH TWO HOLES IN IT.
+ *
+ * After eighteen chapters of volcanoes, glaciers, karst and terraces this one
+ * is genuinely flat, and that is not laziness — it is the reason the traffic
+ * reads. A river of two hundred and forty moving things only works if the
+ * player can see the whole of it at once, and a hill is the one thing that
+ * takes that away.
+ */
+function hanTerrain(x, z) {
+  // the Red River, past the dyke
+  if (z > hanDYKE.cz) {
+    const t = clamp((z - hanDYKE.cz) / 26, 0, 1);
+    const dyk = hanDYKE.h * (1 - Math.abs(z - hanDYKE.cz) / hanDYKE.halfz);
+    let h = lerp(hanGROUND, -3.4, hanSmooth(t));
+    if (dyk > 0) h = Math.max(h, hanGROUND + dyk);
+    return h;
+  }
+  let h = hanGROUND;
+  // ...and the dyke's inner face
+  if (z > hanDYKE.cz - hanDYKE.halfz) {
+    const dyk = hanDYKE.h * (1 - Math.abs(z - hanDYKE.cz) / hanDYKE.halfz);
+    if (dyk > 0) h = hanGROUND + dyk;
+  }
+  // the lake
+  const dx = (x - hanLAKE.cx) / hanLAKE.rx, dz = (z - hanLAKE.cz) / hanLAKE.rz;
+  const r = Math.sqrt(dx * dx + dz * dz);
+  if (r < 1) {
+    // ...with the two islets standing out of it
+    const k = hanSmooth(clamp((1 - r) / 0.10, 0, 1));
+    h = h + (hanLAKE.bed - h) * k;
+    // FLAT ON TOP AND STEEP AT THE EDGE. As a plain cone these two islets had
+    // no walkable surface at all: the height only reached the task's gate
+    // within about a metre and a half of the exact centre, which is inside the
+    // tower, so "get out to the tower" could not be completed by getting out
+    // to the tower.
+    const d1 = Math.hypot(x - hanTOWER.x, z - hanTOWER.z);
+    const t1 = 1 - Math.max(0, d1 - 5.5) / 2.6;
+    if (t1 > 0) h = Math.max(h, lerp(hanLAKE.bed, hanGROUND + 0.5, hanSmooth(t1)));
+    const d2 = Math.hypot(x - hanNGOC.x, z - hanNGOC.z);
+    const t2 = 1 - Math.max(0, d2 - 10.5) / 3.0;
+    if (t2 > 0) h = Math.max(h, lerp(hanLAKE.bed, hanGROUND + 0.4, hanSmooth(t2)));
+  }
+  return h;
+}
+function hanSlope(x, z) {
+  const e = 1.6;
+  const hx = hanTerrain(x + e, z) - hanTerrain(x - e, z);
+  const hz = hanTerrain(x, z + e) - hanTerrain(x, z - e);
+  return Math.hypot(hx, hz) / (2 * e);
+}
+function hanIsOverWater(x, z) { return hanTerrain(x, z) < hanWATER - 0.05; }
+function hanWaterHeightAt(x, z) {
+  return hanWATER + Math.sin(hanTime * 0.8 + x * 0.10 + z * 0.07) * 0.025;
+}
+
+// ------------------------------------------------------------------- slip ---
+// Nothing in Hanoi is slippery in the Iceland sense. What IS true is that
+// pavements here are used for everything except walking, roads are hot smooth
+// asphalt, and the lake steps are green.
+const hanSLIP_ROAD  = 0.02;
+const hanSLIP_KERB  = 0.00;
+const hanSLIP_STEPS = 0.22;       // the algae on the lake steps
+function hanGroundSlip(x, z) {
+  const d = hanLaneAt(x, z);
+  if (d < hanLaneW + 0.4) return hanSLIP_ROAD;
+  const dx = (x - hanLAKE.cx) / (hanLAKE.rx + 3), dz = (z - hanLAKE.cz) / (hanLAKE.rz + 3);
+  if (Math.sqrt(dx * dx + dz * dz) < 1.06) return hanSLIP_STEPS;
+  return hanSLIP_KERB;
+}
+/** < 0.9 soft ground, ~1.0 stone, > 1.15 hollow timber. */
+function hanSurfacePitch(x, z) {
+  if (hanLaneAt(x, z) < hanLaneW + 0.4) return 0.94;
+  if (Math.abs(z - hanTRAIN.z) < hanTRAIN.half && x > hanTRAIN.x0 && x < hanTRAIN.x1) return 1.10;
+  return 1.02;
+}
+
+// ------------------------------------------------------------------ zones ---
+const hanZ = {
+  lake:    { x0: -62, x1: 62, z0: -100, z1: -16 },
+  quarter: { x0: hanOQ.x0, x1: hanOQ.x1, z0: hanOQ.z0, z1: hanOQ.z1 },
+  rails:   { x0: hanTRAIN.x0, x1: hanTRAIN.x1, z0: hanTRAIN.z - hanTRAIN.half,
+             z1: hanTRAIN.z + hanTRAIN.half },
+  alley:   { x0: hanTRAIN.x0 - 4, x1: hanTRAIN.x1 + 4, z0: hanTRAIN.z - 6, z1: hanTRAIN.z + 6 },
+  bia:     { x0: hanBIA.x - 16, x1: hanBIA.x + 16, z0: hanBIA.z - 14, z1: hanBIA.z + 14 },
+  market:  { x0: hanMARKET.x - 20, x1: hanMARKET.x + 20, z0: hanMARKET.z - 14, z1: hanMARKET.z + 14 },
+  bridge:  { x0: hanBRIDGE.x - 10, x1: hanBRIDGE.x + 10, z0: hanBRIDGE.z0, z1: hanBRIDGE.z1 },
+  dyke:    { x0: -140, x1: 140, z0: hanDYKE.cz - 14, z1: hanDYKE.cz + 14 },
+  ngoc:    { x0: hanNGOC.x - 13, x1: hanNGOC.x + 13, z0: hanNGOC.z - 13, z1: hanNGOC.z + 13 },
+  puppet:  { x0: hanPUPPET.x - 12, x1: hanPUPPET.x + 12, z0: hanPUPPET.z - 10, z1: hanPUPPET.z + 10 },
+};
+function hanInRect(r, x, z) { return x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1; }
+function hanInZone(name, x, z) {
+  if (name === 'traffic') return hanLaneAt(x, z) < hanLaneW;
+  if (name === 'tower') return Math.hypot(x - hanTOWER.x, z - hanTOWER.z) < 8;
+  const r = hanZ[name];
+  return r ? hanInRect(r, x, z) : false;
+}
+function hanRandomPointIn(name) {
+  const r = hanZ[name];
+  if (!r) return { x: 0, z: 0 };
+  for (let i = 0; i < 24; i++) {
+    const x = rand(r.x0, r.x1), z = rand(r.z0, r.z1);
+    if (hanTerrain(x, z) > hanWATER + 0.2) return { x: x, z: z };
+  }
+  return { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 };
+}
+
+// -------------------------------------------------------------- navBlocked --
+const hanBLOCK = [];
+function hanBlock(x, z, r) { hanBLOCK.push({ x: x, z: z, r: r }); }
+function hanNavBlocked(x, z, radius) {
+  const r = radius || 0.5;
+  if (hanTerrain(x, z) < hanWATER + 0.15) return true;
+  for (let i = 0; i < hanBLOCK.length; i++) {
+    const b = hanBLOCK[i];
+    const dx = x - b.x, dz = z - b.z;
+    if (dx * dx + dz * dz < (b.r + r) * (b.r + r)) return true;
+  }
+  return false;
+}
+
+// ============================================================= THE GROUND ====
+/**
+ * ONE MESH, AND ALMOST ALL OF IT IS ONE HEIGHT.
+ *
+ * Sampled at 4 m, which is finer than a flat plain needs and exactly what the
+ * lake's rim and the dyke's crest do need. Vertex colour carries the whole
+ * read: hot pale concrete over most of it, asphalt down every centreline, the
+ * green of the lake bed where there is water over it, and the red mud of the
+ * river past the dyke.
+ */
+function hanBuildGround(game, root) {
+  // FIVE METRES, NOT FOUR. This terrain has three features in it and two of
+  // them are holes; the road surface is a mesh of its own, so the grid only
+  // has to resolve the lake's rim and the dyke's crest, and both of those are
+  // twenty metres wide. Ten thousand triangles for nothing.
+  const X0 = hanSEA_X0, X1 = hanSEA_X1, Z0 = hanSEA_Z0, Z1 = hanSEA_Z1, EL = 5;
+  const NX = Math.round((X1 - X0) / EL), NZ = Math.round((Z1 - Z0) / EL);
+  const g = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, NX, NZ);
+  g.rotateX(-Math.PI / 2);
+  g.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
+  const p = g.attributes.position.array;
+  const col = new Float32Array(p.length);
+  const c = new THREE.Color();
+  const conc = new THREE.Color(PALETTE.hanConcrete);
+  const concDk = new THREE.Color(PALETTE.hanConcreteDk);
+  const road = new THREE.Color(PALETTE.hanAsphalt);
+  const bed = new THREE.Color(PALETTE.hanLakeBed);
+  const mud = new THREE.Color(PALETTE.hanMud);
+  const dust = new THREE.Color(PALETTE.hanDust);
+  for (let i = 0; i < p.length; i += 3) {
+    const x = p[i], z = p[i + 2];
+    const h = hanTerrain(x, z);
+    p[i + 1] = h;
+    if (h < hanWATER && z < hanDYKE.cz) {
+      c.copy(bed);
+    } else if (z > hanDYKE.cz + 6) {
+      c.copy(mud);
+    } else {
+      c.copy(conc).lerp(concDk, clamp(hanSlope(x, z) * 3.0, 0, 1) * 0.8);
+      c.lerp(dust, 0.20 + 0.25 * Math.abs(Math.sin(x * 0.07) * Math.cos(z * 0.05)));
+      const d = hanLaneAt(x, z);
+      if (d < hanLaneW + 1.2) c.lerp(road, clamp(1 - (d - hanLaneW) / 1.2, 0, 1));
+    }
+    col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, hanVC());
+  m.receiveShadow = true; m.castShadow = false;
+  m.frustumCulled = false;
+  root.add(m);
+}
+
+function hanBuildGroundBody(game) {
+  const EL = 5, X0 = hanSEA_X0, Z0 = hanSEA_Z0;
+  const NX = Math.round((hanSEA_X1 - X0) / EL), NZ = Math.round((hanSEA_Z1 - Z0) / EL);
+  const Z1 = Z0 + NZ * EL;
+  const data = [];
+  for (let i = 0; i <= NX; i++) {
+    const row = [];
+    for (let j = 0; j <= NZ; j++) row.push(hanTerrain(X0 + i * EL, Z1 - j * EL));
+    data.push(row);
+  }
+  const hf = new CANNON.Heightfield(data, { elementSize: EL });
+  const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+  b.addShape(hf);
+  b.position.set(X0, 0, Z1);
+  b.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  hanSyncBody(b);
+  game.world.addBody(b);
+}
+
+// ============================================================== THE LAKE =====
+/**
+ * EIGHTY METRES OF STILL GREEN WATER, and the whole chapter is arranged round
+ * the fact that it is quiet.
+ *
+ * It is not blue and it must not be. Hoan Kiem is a jade-green shallow lake
+ * with three metres of visibility and a great deal of algae in it, and drawing
+ * it as harbour water would make the one calm place in this chapter look like
+ * a swimming pool. The colour ramp goes green to a deeper green, never toward
+ * a blue at all, which is the single thing that makes it read as fresh water.
+ */
+function hanBuildLake(root) {
+  const g = new THREE.CircleGeometry(1, 46);
+  g.rotateX(-Math.PI / 2);
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  const c = new THREE.Color();
+  const lt = new THREE.Color(PALETTE.hanLake);
+  const dp = new THREE.Color(PALETTE.hanLakeDeep);
+  for (let i = 0; i < pos.count; i++) {
+    // the unit circle is scaled into the ellipse HERE rather than by a
+    // matrix, so the shore is where the terrain's own cut is and the two can
+    // never be one metre out
+    const u = pos.getX(i), v = pos.getZ(i);
+    const r = Math.min(1, Math.hypot(u, v));
+    pos.setX(i, u * hanLAKE.rx + hanLAKE.cx);
+    pos.setZ(i, v * hanLAKE.rz + hanLAKE.cz);
+    pos.setY(i, hanWATER);
+    // deep in the middle, pale at the edge, and NEVER toward a blue: three
+    // metres of visibility and a great deal of algae is what makes fresh water
+    // read as fresh water instead of as a swimming pool.
+    c.copy(dp).lerp(lt, hanSmooth(r));
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  pos.needsUpdate = true;
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
+                                    { scale: 0.05, amount: 0.05, warp: 1.1 }));
+  m.receiveShadow = true; m.castShadow = false;
+  m.frustumCulled = false;
+  hanLakeMesh = m;
+  hanLakeAttr = pos;
+  root.add(m);
+
+  // ...and the Red River, past the dyke, which is a different colour entirely
+  const rg = new THREE.PlaneGeometry(460, 150, 1, 1);
+  rg.rotateX(-Math.PI / 2);
+  rg.translate(0, hanWATER - 0.6, hanDYKE.cz + 92);
+  const rm = new THREE.Mesh(rg, grain(mat(PALETTE.hanRiver), { scale: 0.04, amount: 0.06 }));
+  rm.receiveShadow = true; rm.castShadow = false;
+  rm.frustumCulled = false;
+  root.add(rm);
+}
+
+function hanUpdateLake(dt) {
+  if (!hanLakeAttr) return;
+  const a = hanLakeAttr;
+  for (let i = 0; i < a.count; i++) {
+    const x = a.getX(i), z = a.getZ(i);
+    a.setY(i, hanWATER + Math.sin(hanTime * 0.8 + x * 0.10 + z * 0.07) * 0.025);
+  }
+  a.needsUpdate = true;
+}
+
+// ============================================================ THE STREETS ====
+/**
+ * THE ASPHALT, THE KERBS AND THE PAINT.
+ *
+ * Generated by walking the four centrelines, exactly as chapter 18's circuit
+ * is. What is different is what a Hanoi street HAS on it: no lane markings
+ * worth the name, a kerb you can barely see, and a pavement that is not a
+ * pavement — it is a car park, a kitchen, a barber's shop and somebody's front
+ * room, which is why crossing the road here is done in the road.
+ */
+function hanBuildStreets(game, root) {
+  hanInitLanes();
+  const K = hanMerger();
+  const KB = hanMerger();
+  const body = hanPoolBody(game);
+  for (let L = 0; L < hanLANES.length; L++) {
+    const lane = hanLANES[L];
+    const total = hanLaneTotal[L];
+    const HALF = lane.w + 0.5;
+    const n = Math.ceil(total / 3.0);
+    let px = 0, pz = 0, pnx = 0, pnz = 0, have = false;
+    for (let i = 0; i <= n; i++) {
+      const s = (i / n) * total;
+      hanLaneAtS(L, s, hanTmp);
+      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const x = hanTmp.x, z = hanTmp.z;
+      if (have) {
+        const y = hanGROUND + 0.04;
+        K.quad(px - pnx * HALF, y, pz - pnz * HALF,
+               px + pnx * HALF, y, pz + pnz * HALF,
+               x + nx * HALF, y, z + nz * HALF,
+               x - nx * HALF, y, z - nz * HALF, PALETTE.hanAsphalt);
+      }
+      // the kerb, both sides, and it is fifteen centimetres of nothing
+      for (let sd = -1; sd <= 1; sd += 2) {
+        KB.box(x + nx * (HALF + 0.35) * sd, hanGROUND + 0.09, z + nz * (HALF + 0.35) * sd,
+               0.7, 0.30, 3.1, PALETTE.hanKerb, 0, hanTmp.yaw, 0);
+      }
+      px = x; pz = z; pnx = nx; pnz = nz; have = true;
+    }
+  }
+  const m = new THREE.Mesh(K.build(), hanVC());
+  m.receiveShadow = true; m.castShadow = false;
+  root.add(m);
+  const mb = new THREE.Mesh(KB.build(), hanVC());
+  mb.receiveShadow = true; mb.castShadow = false;
+  root.add(mb);
+  hanPoolDone(game, body);
+}
+
+// ============================================================ THE QUARTER ====
+/**
+ * THE TUBE HOUSES, and the reason this city looks like nowhere else.
+ *
+ * A nha ong is three and a half metres wide, twenty deep and five storeys
+ * high, because for two hundred years the tax was on the FRONTAGE. So a street
+ * here is a row of things that are all the same width and none of the same
+ * height, painted mustard, ochre and a green that has been in the sun for
+ * forty years, with a shop open to the pavement on the ground floor and
+ * somebody's washing on every balcony above it.
+ *
+ * That is four rules and they generate the whole city: same width, random
+ * height, three colours, and a shop at the bottom. Everything else here is the
+ * cables.
+ */
+const hanHOUSE_W = 3.6;
+const hanWinPos = [];
+const hanSignPos = [];
+function hanWindowAt(x, y, z, yaw, w, h) { hanWinPos.push(x, y, z, yaw, w, h); }
+
+function hanHouse(K, x, z, yaw, h, style, deep) {
+  const d = deep === undefined ? 11 : deep;
+  const body = style === 0 ? PALETTE.hanMustard : style === 1 ? PALETTE.hanOchre
+             : style === 2 ? PALETTE.hanJade : style === 3 ? PALETTE.hanPeach
+             : PALETTE.hanPlaster;
+  const cs = Math.sin(yaw), cc = Math.cos(yaw);
+  K.box(x, hanGROUND + h * 0.5, z, hanHOUSE_W, h, d, body, 0, yaw, 0);
+  // the shopfront: the ground floor is OPEN, which is the other half of why a
+  // pavement here is not a pavement
+  K.box(x, hanGROUND + 1.7, z - (d * 0.5 - 0.1) * cc, hanHOUSE_W - 0.3, 3.4, 0.4,
+        PALETTE.hanShopDk, 0, yaw, 0);
+  K.box(x - (d * 0.5) * cs, hanGROUND + 1.7, z - (d * 0.5) * cc, hanHOUSE_W, 0.35, 0.5,
+        PALETTE.hanTrim, 0, yaw, 0);
+  // the awning over it, in a blue tarpaulin, and there is one on every shop
+  // ...and it alternates on a RANDOM draw rather than on the integer part of
+  // x. Houses are 3.72 m apart, so (x | 0) % 3 produced runs of eight and nine
+  // identical awnings and the street had a thirty-metre red roof on it.
+  K.box(x - (d * 0.5 + 0.9) * cs, hanGROUND + 3.2, z - (d * 0.5 + 0.9) * cc,
+        hanHOUSE_W - 0.15, 0.10, 2.2,
+        Math.random() < 0.55 ? PALETTE.hanTarp : PALETTE.hanTarpRed, -0.13, yaw, 0);
+  // the cornice, the parapet and the water tank
+  K.box(x, hanGROUND + h + 0.22, z, hanHOUSE_W + 0.5, 0.44, d + 0.5, PALETTE.hanTrim, 0, yaw, 0);
+  K.box(x, hanGROUND + h + 0.75, z, hanHOUSE_W + 0.2, 0.62, d * 0.9, body, 0, yaw, 0);
+  K.cyl(x + 0.7, hanGROUND + h + 1.6, z + 1.2, 0.42, 1.1, PALETTE.hanTank, 0, 0, 0, 8);
+  // the balconies. One per floor above the shop, each with something on it.
+  const floors = Math.max(1, Math.floor((h - 4.2) / 3.1));
+  for (let f = 0; f < floors; f++) {
+    const fy = hanGROUND + 4.4 + f * 3.1;
+    const bz = z - (d * 0.5 + 0.42) * cc, bx = x - (d * 0.5 + 0.42) * cs;
+    K.box(bx, fy - 0.06, bz, hanHOUSE_W - 0.2, 0.12, 0.9, PALETTE.hanTrim, 0, yaw, 0);
+    K.box(bx - 0.42 * cs, fy + 0.42, bz - 0.42 * cc, hanHOUSE_W - 0.2, 0.85, 0.08,
+          PALETTE.hanRail, 0, yaw, 0);
+    // THREE BALUSTERS, NOT FIVE. Measured: at five, four hundred houses with
+    // four floors each spent fifty-seven thousand triangles on twelve-triangle
+    // sticks nobody can resolve past eight metres, which was a fifth of the
+    // whole chapter.
+    for (let r = 0; r < 3; r++) {
+      K.box(bx - 0.42 * cs + (r - 1) * 1.0 * cc, fy + 0.42, bz - 0.42 * cc - (r - 1) * 1.0 * -cs,
+            0.06, 0.85, 0.06, PALETTE.hanRail, 0, yaw, 0);
+    }
+    // washing, which is the one thing that makes a facade look inhabited
+    if (Math.random() < 0.75) {
+      const col = [PALETTE.hanWash1, PALETTE.hanWash2, PALETTE.hanWash3, PALETTE.hanWash4];
+      for (let w = 0; w < 3; w++) {
+        if (Math.random() < 0.35) continue;
+        K.box(bx - 0.62 * cs + (w - 1) * 0.9 * cc, fy + 0.55, bz - 0.62 * cc + (w - 1) * 0.9 * cs,
+              0.62, 0.9, 0.03, col[randInt(0, 3)], 0, yaw, 0);
+      }
+    }
+    hanWindowAt(x - (d * 0.5 + 0.06) * cs, fy + 1.5, z - (d * 0.5 + 0.06) * cc, yaw + Math.PI, 1.5, 1.9);
+    // the shutters either side of it, which are always green
+    for (let sd = -1; sd <= 1; sd += 2) {
+      K.box(x - (d * 0.5 + 0.10) * cs + sd * 1.05 * cc, fy + 1.5, z - (d * 0.5 + 0.10) * cc - sd * 1.05 * -cs,
+            0.5, 1.9, 0.08, PALETTE.hanShutter, 0, yaw, 0);
+    }
+  }
+  // the sign. Vertical, painted, and there are thousands of them.
+  if (Math.random() < 0.55) {
+    hanSignPos.push(x - (d * 0.5 + 0.55) * cs, hanGROUND + 4.0, z - (d * 0.5 + 0.55) * cc,
+                    yaw, rand(0.55, 0.85), rand(1.6, 2.8));
+  }
+  hanBlock(x, z, Math.max(hanHOUSE_W, d) * 0.42);
+}
+
+/**
+ * A TERRACE OF THEM DOWN ONE SIDE OF A STREET.
+ *
+ * `off` is which side (the sign of the lane normal) and `set` is how far back
+ * from the centreline the FRONTS stand — so the pavement's width is one number
+ * and the whole quarter can be widened or narrowed from here.
+ */
+// THE PLACES A TERRACE MAY NOT STAND IN, and they are not decoration: a
+// junction, a market and a corner with a hundred stools on it are HOLES in the
+// frontage, and a generator that lays houses along a centreline has no idea
+// that the next centreline crosses it.
+//
+// Measured before this: lane 0's terrace was placed twelve metres either side
+// of a street that crosses lane 1 at right angles, so eight houses stood IN
+// the east-west road. navBlocked said X for the whole width of it, the
+// crossing task was unreachable, and the bia hoi corner — the chapter's second
+// mini — was inside a building.
+const hanKEEPOUT = [];
+function hanKeepOut(x, z, r) { hanKEEPOUT.push({ x: x, z: z, r: r }); }
+function hanTerraceOk(x, z) {
+  // ...at least seven metres from any centreline. Its OWN lane is 8.4 away by
+  // construction, so this can only ever be triggered by a different street.
+  if (hanLaneAt(x, z) < 7.0) return false;
+  for (let i = 0; i < hanKEEPOUT.length; i++) {
+    const k = hanKEEPOUT[i];
+    const dx = x - k.x, dz = z - k.z;
+    if (dx * dx + dz * dz < k.r * k.r) return false;
+  }
+  return true;
+}
+
+function hanTerrace(K, L, s0, s1, off, set, body, game) {
+  hanInitLanes();
+  const step = hanHOUSE_W + 0.12;
+  for (let s = s0; s < s1; s += step) {
+    hanLaneAtS(L, s, hanTmp);
+    const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+    const d = rand(9, 13);
+    const h = rand(9, 19);
+    const bx = hanTmp.x + nx * (set + d * 0.5) * off;
+    const bz = hanTmp.z + nz * (set + d * 0.5) * off;
+    if (hanTerrain(bx, bz) < hanWATER + 0.3) continue;
+    // THREE POINTS, not one: the shopfront, the middle and the back wall. A
+    // twelve-metre-deep house whose centre is clear can still have its back
+    // half standing in the next street.
+    if (!hanTerraceOk(bx, bz)) continue;
+    if (!hanTerraceOk(hanTmp.x + nx * set * off, hanTmp.z + nz * set * off)) continue;
+    if (!hanTerraceOk(hanTmp.x + nx * (set + d) * off, hanTmp.z + nz * (set + d) * off)) continue;
+    // the house faces the road, so its -z looks at the centreline
+    const yaw = hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2);
+    hanHouse(K, bx, bz, yaw, h, randInt(0, 4), d);
+    hanPoolBox(body, bx, hanGROUND + h * 0.5 + 1, bz, hanHOUSE_W, h + 2, d, yaw);
+  }
+}
+
+function hanBuildQuarter(game, root) {
+  const K = hanMerger();
+  const body = hanPoolBody(game);
+  hanInitLanes();
+  // the five holes in the frontage, and every one of them is somewhere the
+  // chapter puts a task
+  hanKeepOut(hanBIA.x, hanBIA.z, 19);
+  hanKeepOut(hanMARKET.x, hanMARKET.z, 26);
+  hanKeepOut(hanBARBER.x, hanBARBER.z, 13);
+  hanKeepOut(hanPUPPET.x, hanPUPPET.z, 22);
+  hanKeepOut(-8, -4, 12);
+  hanKeepOut(hanTRAIN.x1 + 6, hanTRAIN.z, 16);
+  // both sides of the two big streets, and the outside of the ring
+  hanTerrace(K, 0, 26, hanLaneTotal[0] - 4, 1, 8.4, body, game);
+  hanTerrace(K, 0, 26, hanLaneTotal[0] - 4, -1, 8.4, body, game);
+  hanTerrace(K, 1, 4, 74, 1, 8.4, body, game);
+  hanTerrace(K, 1, 4, 74, -1, 8.4, body, game);
+  hanTerrace(K, 1, 108, hanLaneTotal[1] - 4, 1, 8.4, body, game);
+  hanTerrace(K, 1, 108, hanLaneTotal[1] - 4, -1, 8.4, body, game);
+  hanTerrace(K, 3, 4, 78, 1, 8.0, body, game);
+  hanTerrace(K, 3, 116, hanLaneTotal[3] - 4, -1, 8.0, body, game);
+  // ...and the outer side of the lake ring, which is the one continuous
+  // frontage in the chapter and the reason the lake feels enclosed
+  hanTerrace(K, 2, 0, hanLaneTotal[2], 1, 8.6, body, game);
+
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+  hanPoolDone(game, body);
+  hanBuildBackdrop(game, root);
+}
+
+/**
+ * THE BLOCK BEHIND THE STREET, and without it the Old Quarter is four rows of
+ * houses on an empty plain.
+ *
+ * The terraces are generated along the four centrelines, which is right and
+ * which means the map has buildings exactly where the roads are and nowhere
+ * else. What is actually behind a Hanoi frontage is another two hundred metres
+ * of exactly the same thing down alleys a metre wide, so: one instanced box
+ * per building, filling the quarter rectangle wherever a terrace has not
+ * already put something, in the same five colours. One draw call, one pooled
+ * body, and from the street it is a wall of roofs behind the roofs.
+ */
+const hanBACK_N = 260;
+let hanBackMesh = null;
+function hanBuildBackdrop(game, root) {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const m = new THREE.InstancedMesh(geo, grain(mat(0xffffff), { scale: 0.08, amount: 0.055 }),
+                                    hanBACK_N);
+  m.castShadow = true; m.receiveShadow = true;
+  m.frustumCulled = false;
+  const body = hanPoolBody(game);
+  const col = new Float32Array(hanBACK_N * 3);
+  const pal = [PALETTE.hanMustard, PALETTE.hanOchre, PALETTE.hanJade,
+               PALETTE.hanPeach, PALETTE.hanPlaster];
+  let n = 0;
+  for (let g = 0; g < 4000 && n < hanBACK_N; g++) {
+    const x = rand(hanOQ.x0 - 34, hanOQ.x1 + 34);
+    const z = rand(hanOQ.z0 - 6, hanOQ.z1 + 26);
+    // not on a street, not on the railway, not in the lake, and not on top of
+    // anything a terrace or a set piece has already claimed
+    if (hanLaneAt(x, z) < 16) continue;
+    if (Math.abs(z - hanTRAIN.z) < 18 && x > hanTRAIN.x0 - 6 && x < hanTRAIN.x1 + 6) continue;
+    if (hanTerrain(x, z) < hanWATER + 0.4) continue;
+    if (hanNavBlocked(x, z, 7)) continue;
+    if (!hanTerraceOk(x, z)) continue;
+    const w = rand(7, 13), d = rand(7, 13), h = rand(8, 21);
+    hanE.set(0, rand(0, 6.28), 0, 'YXZ');
+    hanM.compose(hanV3.set(x, hanGROUND + h * 0.5, z), hanQ.setFromEuler(hanE),
+                 hanSc.set(w, h, d));
+    m.setMatrixAt(n, hanM);
+    hanCol.set(pal[randInt(0, pal.length - 1)]);
+    col[n * 3] = hanCol.r; col[n * 3 + 1] = hanCol.g; col[n * 3 + 2] = hanCol.b;
+    hanPoolBox(body, x, hanGROUND + h * 0.5, z, w, h, d, hanE.y);
+    hanBlock(x, z, Math.max(w, d) * 0.45);
+    n++;
+  }
+  m.count = n;
+  m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
+  m.instanceMatrix.needsUpdate = true;
+  hanBackMesh = m;
+  root.add(m);
+  hanPoolDone(game, body);
+}
+
+/** Every lit interior and every shop light, in one instanced draw. */
+function hanBuildWindows(root) {
+  const n = hanWinPos.length / 6;
+  if (!n) return;
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const m = new THREE.InstancedMesh(geo, hanGlow(PALETTE.hanWindow, 0.34), n);
+  m.castShadow = false; m.receiveShadow = false;
+  m.frustumCulled = false;
+  m.userData.noShadow = true;
+  const col = new Float32Array(n * 3);
+  const glass = new THREE.Color(PALETTE.hanGlass);
+  const lit = new THREE.Color(PALETTE.hanWindow);
+  for (let i = 0; i < n; i++) {
+    hanM.compose(hanV3.set(hanWinPos[i * 6], hanWinPos[i * 6 + 1], hanWinPos[i * 6 + 2]),
+                 hanQ.setFromEuler(hanE.set(0, hanWinPos[i * 6 + 3], 0, 'YXZ')),
+                 hanSc.set(hanWinPos[i * 6 + 4], hanWinPos[i * 6 + 5], 1));
+    m.setMatrixAt(i, hanM);
+    // IT IS THE MORNING, so most of them are dark glass and a few are on. The
+    // opposite of chapter 18, and deliberately: two chapters in a row whose
+    // skyline is a wall of lit rectangles would be one chapter twice.
+    hanCol.copy(Math.random() < 0.22 ? lit : glass);
+    const k = 0.8 + Math.random() * 0.4;
+    col[i * 3] = hanCol.r * k; col[i * 3 + 1] = hanCol.g * k; col[i * 3 + 2] = hanCol.b * k;
+  }
+  m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
+  m.instanceMatrix.needsUpdate = true;
+  hanWinMesh = m;
+  root.add(m);
+}
+
+/** The signs. Vertical, painted, hung off every shopfront in the quarter. */
+function hanBuildSigns(root) {
+  const n = hanSignPos.length / 6;
+  if (!n) return;
+  // A PLAIN material. hanVCF asks for vertexColors and a BoxGeometry has no
+  // colour attribute, so every sign in the quarter rendered BLACK.
+  const geo = new THREE.BoxGeometry(1, 1, 0.06);
+  const m = new THREE.InstancedMesh(geo, grain(mat(0xffffff), { scale: 0.08, amount: 0.05 }), n);
+  m.castShadow = false; m.receiveShadow = false;
+  m.frustumCulled = false;
+  const col = new Float32Array(n * 3);
+  const pal = [PALETTE.hanSign1, PALETTE.hanSign2, PALETTE.hanSign3, PALETTE.hanSign4];
+  for (let i = 0; i < n; i++) {
+    hanM.compose(hanV3.set(hanSignPos[i * 6], hanSignPos[i * 6 + 1], hanSignPos[i * 6 + 2]),
+                 hanQ.setFromEuler(hanE.set(0, hanSignPos[i * 6 + 3], 0, 'YXZ')),
+                 hanSc.set(hanSignPos[i * 6 + 4], hanSignPos[i * 6 + 5], 1));
+    m.setMatrixAt(i, hanM);
+    hanCol.set(pal[randInt(0, pal.length - 1)]);
+    col[i * 3] = hanCol.r; col[i * 3 + 1] = hanCol.g; col[i * 3 + 2] = hanCol.b;
+  }
+  m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
+  m.instanceMatrix.needsUpdate = true;
+  hanSignMesh = m;
+  root.add(m);
+}
+
+/**
+ * THE CABLES, and they are as much of this city's silhouette as the houses.
+ *
+ * A pole every twenty-two metres down both sides of every street, and between
+ * each pair a BALL of them — nine or ten sagging lines drawn as thin boxes
+ * pitched to their own sag. Nothing else in eighteen chapters looks like this
+ * and it costs one merged mesh.
+ */
+function hanBuildCables(game, root) {
+  const K = hanMerger();
+  const body = hanPoolBody(game);
+  hanInitLanes();
+  for (let L = 0; L < hanLANES.length; L++) {
+    const total = hanLaneTotal[L];
+    const HALF = hanLANES[L].w + 1.9;
+    for (let sd = -1; sd <= 1; sd += 2) {
+      let prev = null;
+      for (let s = 0; s <= total; s += 22) {
+        hanLaneAtS(L, s, hanTmp);
+        const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+        const x = hanTmp.x + nx * HALF * sd, z = hanTmp.z + nz * HALF * sd;
+        if (hanTerrain(x, z) < hanWATER + 0.3) { prev = null; continue; }
+        K.cyl(x, hanGROUND + 4.2, z, 0.13, 8.4, PALETTE.hanPole, 0, 0, 0, 6);
+        K.box(x, hanGROUND + 7.6, z, 1.5, 0.10, 0.10, PALETTE.hanPole, 0, hanTmp.yaw + 1.5708, 0);
+        K.box(x, hanGROUND + 6.9, z, 1.1, 0.10, 0.10, PALETTE.hanPole, 0, hanTmp.yaw + 1.5708, 0);
+        hanPoolBox(body, x, hanGROUND + 2.0, z, 0.4, 4.0, 0.4);
+        hanBlock(x, z, 0.4);
+        if (prev) {
+          const L2 = Math.hypot(x - prev[0], z - prev[1]);
+          const yaw = Math.atan2(x - prev[0], z - prev[1]);
+          const mx = (x + prev[0]) / 2, mz = (z + prev[1]) / 2;
+          for (let c = 0; c < 7; c++) {
+            const sag = 0.35 + c * 0.11;
+            const yy = hanGROUND + 7.4 - c * 0.16;
+            // three segments, so the sag reads as a sag and not as a straight
+            for (let k = 0; k < 3; k++) {
+              const t0 = k / 3, t1 = (k + 1) / 3;
+              const y0 = yy - sag * 4 * t0 * (1 - t0);
+              const y1 = yy - sag * 4 * t1 * (1 - t1);
+              const sx = lerp(prev[0], x, (t0 + t1) / 2);
+              const sz = lerp(prev[1], z, (t0 + t1) / 2);
+              K.box(sx + (c - 4) * 0.09 * Math.cos(yaw), (y0 + y1) / 2,
+                    sz - (c - 4) * 0.09 * Math.sin(yaw),
+                    0.035, 0.035, L2 / 3 + 0.1, PALETTE.hanCable,
+                    Math.atan2(y1 - y0, L2 / 3), yaw, 0);
+            }
+          }
+        }
+        prev = [x, z];
+      }
+    }
+  }
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  // AND IT DOES NOT CAST. Two thousand three-centimetre wires over every
+  // street in the quarter put a black hatch across the whole road surface: a
+  // shadow map cannot resolve a 3 cm wire, so what it draws is a smear, and
+  // the tarmac came out looking like a cattle grid. Cables read perfectly
+  // well as a silhouette against the sky, which is the only place anybody
+  // ever looks at them.
+  m.castShadow = false; m.receiveShadow = false;
+  root.add(m);
+  hanPoolDone(game, body);
+}
+
+// ============================================================== THE FLOW =====
+/**
+ * TWO HUNDRED AND FORTY SCOOTERS, IN ONE DRAW CALL, EACH OF WHICH CAN SEE YOU.
+ *
+ * The record per rider is nine floats and there is no object anywhere:
+ *
+ *   0 lane   1 s (metres along it)   2 dir (+1/-1)   3 off (lateral, live)
+ *   4 offWant   5 v (live)   6 vWant   7 colour index   8 phase
+ *
+ * `off` is the whole mechanic. A rider rides at ±1.6 m of the centreline and
+ * damps toward `offWant`; every frame, any rider whose next `hanSEE` metres
+ * would take it within `hanSWERVE` of the capybara sets `offWant` to the far
+ * side and `vWant` down. Two hundred and forty of those, damped, IS a river
+ * parting — and the whole of it is arithmetic on a Float32Array.
+ *
+ * WHAT DECIDES WHETHER IT WORKS IS YOU. A rider commits to a line about a
+ * second and a half ahead, which is what `hanSEE` at nine metres a second is;
+ * so it swerves round where you ARE GOING, not round where you are. Keep going
+ * and that is the same place. Stop, or turn back, and it is not, and the
+ * nearest one is already there.
+ */
+const hanBIKE_COL = ['hanBike1', 'hanBike2', 'hanBike3', 'hanBike4', 'hanBike5', 'hanBike6'];
+
+const hanRIDER_COL = ['hanWash1', 'hanWash2', 'hanWash3', 'hanCrowdC', 'hanShirtW', 'hanCrowdE'];
+function hanBikeGeo(bodyCol, riderCol, helmCol) {
+  const K = hanMerger();
+  // the machine: a step-through, because that is what ninety per cent of them
+  // are, with a rider on it and a box on the back
+  // SIX SEGMENTS AND A SIX-BY-FOUR SPHERE. There are two hundred and forty of
+  // these and the difference between a ten-segment wheel and a six-segment one
+  // is invisible at any distance a scooter is ever seen from in this chapter
+  // and is thirty-two thousand triangles.
+  K.cyl(0, 0.30, 0.62, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 6);
+  K.cyl(0, 0.30, -0.60, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 6);
+  K.box(0, 0.40, 0, 0.26, 0.26, 1.30, bodyCol);
+  K.box(0, 0.62, -0.34, 0.34, 0.20, 0.62, PALETTE.hanSeat);
+  K.box(0, 0.60, 0.30, 0.30, 0.34, 0.34, bodyCol);
+  K.box(0, 0.88, 0.46, 0.62, 0.06, 0.08, PALETTE.hanChrome);        // the bars
+  K.cyl(0, 0.74, 0.52, 0.07, 0.44, PALETTE.hanChrome, 0.35, 0, 0, 4);
+  K.box(0, 0.94, 0.56, 0.16, 0.12, 0.10, PALETTE.hanLampGlass);
+  K.box(0, 0.78, -0.78, 0.44, 0.36, 0.34, PALETTE.hanCrate);        // the box on the back
+  // ...and the rider
+  K.box(0, 1.00, -0.22, 0.38, 0.66, 0.30, riderCol, -0.16, 0, 0);
+  K.box(0, 1.42, -0.14, 0.20, 0.24, 0.20, PALETTE.hanSkin);
+  K.sph(0, 1.60, -0.10, 0.20, 0.21, 0.21, helmCol, 6);
+  K.box(0, 1.58, 0.07, 0.24, 0.10, 0.06, PALETTE.hanVisor);
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(s * 0.21, 1.10, 0.14, 0.11, 0.11, 0.58, riderCol, -0.62, 0, 0);
+    K.box(s * 0.15, 0.60, -0.10, 0.14, 0.34, 0.16, PALETTE.hanRiderLeg, 0.5, 0, 0);
+    K.box(s * 0.15, 0.36, 0.18, 0.14, 0.36, 0.14, PALETTE.hanRiderLeg, 0.25, 0, 0);
+  }
+  return K.build();
+}
+
+function hanBuildBikes(game, root) {
+  hanInitLanes();
+  hanBikeData = new Float32Array(hanBIKE_N * hanBIKE_STRIDE);
+  // spread over the four lanes in proportion to how long they are, so a street
+  // twice the length of another has twice the traffic on it and none of them
+  // is a queue
+  let tot = 0;
+  for (let L = 0; L < hanLANES.length; L++) tot += hanLaneTotal[L];
+  let n = 0;
+  for (let L = 0; L < hanLANES.length && n < hanBIKE_N; L++) {
+    const want = L === hanLANES.length - 1 ? hanBIKE_N - n
+               : Math.round(hanBIKE_N * hanLaneTotal[L] / tot);
+    for (let i = 0; i < want && n < hanBIKE_N; i++) {
+      const o = n * hanBIKE_STRIDE;
+      hanBikeData[o] = L;
+      hanBikeData[o + 1] = rand(0, hanLaneTotal[L]);
+      hanBikeData[o + 2] = (i & 1) ? 1 : -1;
+      const side = hanBikeData[o + 2] > 0 ? 1 : -1;
+      hanBikeData[o + 3] = side * rand(0.8, 2.6);
+      hanBikeData[o + 4] = hanBikeData[o + 3];
+      hanBikeData[o + 5] = rand(hanBIKE_V[0], hanBIKE_V[1]);
+      hanBikeData[o + 6] = hanBikeData[o + 5];
+      hanBikeData[o + 7] = randInt(0, hanBIKE_COL.length - 1);
+      hanBikeData[o + 8] = rand(0, 6.28);
+      hanBikeData[o + 9] = 0;
+      n++;
+    }
+  }
+  hanBikeN = n;
+  // ...and now one mesh per body colour. See the note above: instanceColor
+  // would have tinted the tyres, the helmet and the rider's face as well.
+  for (let c = 0; c < hanBIKE_COL.length; c++) {
+    const idx = [];
+    for (let i = 0; i < n; i++) if ((hanBikeData[i * hanBIKE_STRIDE + 7] | 0) === c) idx.push(i);
+    hanBikeGroups.push(idx);
+    const mm = new THREE.InstancedMesh(
+      hanBikeGeo(PALETTE[hanBIKE_COL[c]], PALETTE[hanRIDER_COL[c]],
+                 c % 2 ? PALETTE.hanHelmet : PALETTE.hanCrowdLeg),
+      hanVCF(), Math.max(1, idx.length));
+    mm.count = idx.length;
+    mm.castShadow = true; mm.receiveShadow = false;
+    mm.frustumCulled = false;
+    hanBikeMeshes.push(mm);
+    root.add(mm);
+  }
+  hanSyncBikes();
+}
+
+function hanSyncBikes() {
+  if (!hanBikeMeshes.length) return;
+  for (let c = 0; c < hanBikeMeshes.length; c++) {
+    const idx = hanBikeGroups[c], mm = hanBikeMeshes[c];
+    for (let k = 0; k < idx.length; k++) {
+      const o = idx[k] * hanBIKE_STRIDE;
+      const L = hanBikeData[o] | 0;
+      hanLaneAtS(L, hanBikeData[o + 1], hanTmp);
+      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const dir = hanBikeData[o + 2];
+      const yaw = dir > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI;
+      const off = hanBikeData[o + 3];
+      const lean = clamp((hanBikeData[o + 4] - off) * 0.28, -0.22, 0.22);
+      hanE.set(0, yaw, lean * dir, 'YXZ');
+      hanM.compose(hanV3.set(hanTmp.x + nx * off, hanGROUND + 0.04, hanTmp.z + nz * off),
+                   hanQ.setFromEuler(hanE), hanSc.set(1, 1, 1));
+      mm.setMatrixAt(k, hanM);
+    }
+    mm.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/** Where rider `i` is right now. Its own scratch vector — see the api note. */
+function hanBikeAt(i, out) {
+  const o = i * hanBIKE_STRIDE;
+  const L = hanBikeData[o] | 0;
+  hanLaneAtS(L, hanBikeData[o + 1], hanTmp2);
+  const nx = Math.cos(hanTmp2.yaw), nz = -Math.sin(hanTmp2.yaw);
+  out.set(hanTmp2.x + nx * hanBikeData[o + 3], hanGROUND + 0.9,
+          hanTmp2.z + nz * hanBikeData[o + 3]);
+  return out;
+}
+
+function hanUpdateBikes(game, dt) {
+  if (!hanBikeN || dt <= 0) return;
+  const capy = game.capy;
+  const p = capy && capy.position;
+  const sp = capy && capy.velocity
+    ? Math.hypot(capy.velocity.x, capy.velocity.z) : 0;
+  // ---- THE ANIMAL'S OWN COMMITMENT --------------------------------------
+  // Two numbers, and they are what the whole mechanic reads. `committed` is
+  // "you are going somewhere at a walk or better"; `hanDither` is how much you
+  // have changed your mind in the last second and a half, decayed, which is
+  // the thing a rider a second and a half ahead of you cannot allow for.
+  let committed = false;
+  if (p && sp > 0.05) {
+    const yaw = Math.atan2(capy.velocity.x, capy.velocity.z);
+    let d = yaw - hanYawWas;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    hanYawWas = yaw;
+    hanDither = clamp(hanDither + Math.abs(d) - dt * 0.9, 0, 4);
+    committed = sp > hanHOLD_V && hanDither < hanTURN_MAX;
+  } else {
+    hanDither = clamp(hanDither - dt * 0.9, 0, 4);
+  }
+  // ---- AND A CAPYBARA IN THE AIR IS NOT SOMETHING ANYBODY PLANNED FOR ----
+  //
+  // This is the line that makes the chapter's first mini possible at all. The
+  // flow PARTS for you — that is the whole mechanic, and it works — which
+  // means that on the ground you can never get within three and a half metres
+  // of a machine, and "get on a scooter" is unreachable. Measured: sixty-six
+  // seconds standing in the middle of the busiest street in the chapter and
+  // the nearest rider never came inside 2.2 m once.
+  //
+  // A rider commits to a line about a second and a half ahead, on the ground
+  // the animal is on. It has not allowed for the animal being a metre and a
+  // half above that ground, and it cannot: so while you are AIRBORNE, anything
+  // inside seven metres carries straight on, and where it carries on to is a
+  // footwell. Hop into the traffic. That is the verb.
+  const airborne = !!(capy && !capy.grounded && p && p.y > hanGROUND + 0.55);
+
+  let clipped = -1;
+  for (let i = 0; i < hanBikeN; i++) {
+    const o = i * hanBIKE_STRIDE;
+    const L = hanBikeData[o] | 0;
+    const dir = hanBikeData[o + 2];
+    // ---- do I need to go round anything ---------------------------------
+    let want = dir > 0 ? Math.abs(hanBikeData[o + 4]) : -Math.abs(hanBikeData[o + 4]);
+    let vWant = hanBikeData[o + 6];
+    if (p && i !== hanRider) {
+      hanBikeAt(i, hanV3b);
+      const dx = p.x - hanV3b.x, dz = p.z - hanV3b.z;
+      const dd = Math.hypot(dx, dz);
+      if (dd < hanSEE) {
+        hanLaneAtS(L, hanBikeData[o + 1], hanTmp2);
+        const fx = Math.sin(hanTmp2.yaw) * dir, fz = Math.cos(hanTmp2.yaw) * dir;
+        const ahead = dx * fx + dz * fz;
+        const side = dx * Math.cos(hanTmp2.yaw) + dz * -Math.sin(hanTmp2.yaw);
+        // ---- AND IF YOU ARE IN THE AIR, THEY DRIVE STRAIGHT UNDER YOU ----
+        //
+        // This is the line that makes the chapter's first mini possible at
+        // all. The flow PARTS for you on the ground — that is the whole
+        // mechanic and it works — which means you can never get within three
+        // and a half metres of a machine and "get on a scooter" is an
+        // unreachable task. Measured: sixty-six seconds standing in the
+        // middle of the busiest street in the chapter and the nearest rider
+        // never came inside 2.2 m once.
+        //
+        // A rider commits to a line about a second and a half ahead, on the
+        // GROUND the animal is on. It has not allowed for the animal being a
+        // metre and a half above that ground, and it cannot — so it aims at
+        // the gap where you were, holds its speed, and the gap where you were
+        // is where you are coming down. Hop into the traffic. That is the
+        // verb, and the reason it works is that nobody is looking up.
+        if (airborne && dd < 7 && ahead > -0.6 && ahead < 7) {
+          want = clamp(side, -4.2, 4.2);
+          vWant = hanBikeData[o + 6];
+          hanBikeData[o + 3] = damp(hanBikeData[o + 3], want, 7.0, dt);
+          hanBikeData[o + 5] = damp(hanBikeData[o + 5], vWant, 3.0, dt);
+          hanBikeData[o + 1] += hanBikeData[o + 5] * dir * dt;
+          const tot0 = hanLaneTotal[L];
+          if (hanLANES[L].closed) hanBikeData[o + 1] = ((hanBikeData[o + 1] % tot0) + tot0) % tot0;
+          else if (hanBikeData[o + 1] > tot0 || hanBikeData[o + 1] < 0) {
+            hanBikeData[o + 1] = hanBikeData[o + 1] > tot0 ? 0 : tot0;
+          }
+          continue;
+        }
+        if (ahead > -1.2 && Math.abs(side - hanBikeData[o + 3]) < hanSWERVE) {
+          // go round the side there is more room on
+          const away = side > hanBikeData[o + 3] ? -1 : 1;
+          want = clamp(hanBikeData[o + 3] + away * hanSWERVE, -4.2, 4.2);
+          // ONE PER RIDER, on the rising edge. See hanBIKE_STRIDE.
+          if (ahead > 0 && ahead < 12 && hanBikeData[o + 9] < 0.5) {
+            hanBikeData[o + 9] = 1; hanSwerved++;
+          }
+          // ---- AND IF THEY CANNOT GET ROUND, THEY STOP -------------------
+          //
+          // This is the half of the mechanic that took four attempts to get
+          // right, and the two wrong answers are worth writing down.
+          //
+          // The first was that a rider who could not clear you CLIPPED you: a
+          // shove and a horn. It is the obvious reading of "do not stop" and
+          // it is wrong twice over — it made standing still cost twelve metres
+          // of being pushed down the street, which is a punishment rather than
+          // a joke, and it made the chapter's own first mini UNREACHABLE,
+          // because a flow that parts for you at three and a half metres and
+          // shoves you when it cannot is a flow you can never touch. Measured:
+          // sixty-six seconds in the middle of the busiest street and the
+          // nearest machine never came inside 2.08 m.
+          //
+          // The second was to let them through you. No.
+          //
+          // What a Hanoi street actually does to somebody who plants
+          // themselves in the middle of it is JAM. Everybody brakes, nobody
+          // says anything, and thirty seconds later there are forty of them
+          // stopped in a fan round one capybara. That is funnier than a shove,
+          // it is what really happens, and it is what makes the mini possible:
+          // a stopped scooter is a thing you can hop into.
+          const brake = Math.max(0, ahead - 1.5) * 1.6;
+          if (ahead > -0.4 && ahead < 6 && Math.abs(side - want) < 1.9) {
+            vWant = Math.min(vWant, brake);
+          } else if (ahead > -0.4 && ahead < 5) {
+            vWant = lerp(hanBikeData[o + 6] * 0.34, hanBikeData[o + 6], clamp(ahead / 5, 0, 1));
+          }
+          // ...and the clip is reserved for CHANGING YOUR MIND, which is the
+          // one thing a rider a second and a half behind you cannot allow for.
+          // Merely being slow is not it; turning round in the road is.
+          if (hanDither > hanTURN_MAX && dd < 2.4 && ahead > -0.6 && ahead < 3.4) clipped = i;
+        } else if (dd > hanSWERVE + 4) hanBikeData[o + 9] = 0;
+      } else hanBikeData[o + 9] = 0;
+    }
+    hanBikeData[o + 3] = damp(hanBikeData[o + 3], want, 3.4, dt);
+    hanBikeData[o + 5] = damp(hanBikeData[o + 5], vWant, 2.2, dt);
+    // ---- and along the street --------------------------------------------
+    hanBikeData[o + 1] += hanBikeData[o + 5] * dir * dt;
+    const total = hanLaneTotal[L];
+    if (hanLANES[L].closed) {
+      hanBikeData[o + 1] = ((hanBikeData[o + 1] % total) + total) % total;
+    } else if (hanBikeData[o + 1] > total || hanBikeData[o + 1] < 0) {
+      // off the end of an open street: come back on at the other end, which is
+      // the whole of this chapter's traffic management
+      hanBikeData[o + 1] = hanBikeData[o + 1] > total ? 0 : total;
+    }
+  }
+  hanSyncBikes();
+
+  // ---- the clip ---------------------------------------------------------
+  if (clipped >= 0 && hanBumpT <= 0 && p && capy && hanRider < 0) {
+    hanBumpT = 1.6;
+    hanBikeAt(clipped, hanV3b);
+    const dx = p.x - hanV3b.x, dz = p.z - hanV3b.z;
+    const d = Math.hypot(dx, dz) || 1;
+    if (typeof capy.shove === 'function') capy.shove(dx / d * 3.4, dz / d * 3.4);
+    if (typeof game.punch === 'function') game.punch(0.20);
+    hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, 0.5, 2.6);
+    hanSwerved = 0;
+    hanCrossLane = -1;
+    if (!hanToldFlow) {
+      hanToldFlow = true;
+      hanToast('do not stop. nobody here has ever stopped.');
+    }
+  }
+  if (hanBumpT > 0) hanBumpT -= dt;
+
+  // ---- the horns, which are punctuation and not a warning ---------------
+  hanHornT -= dt;
+  if (hanHornT <= 0 && p) {
+    hanHornT = rand(0.5, 2.1);
+    let bi = -1, bd = 1e9;
+    for (let i = 0; i < hanBikeN; i += 7) {
+      hanBikeAt(i, hanV3b);
+      const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi >= 0 && bd < 60) {
+      hanBikeAt(bi, hanV3b);
+      hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.26 - bd * 0.003, 0.05, 0.26),
+             rand(2.1, 3.2), 90);
+    }
+  }
+}
+
+/**
+ * THE CROSSING, and it is the one task in this game that is failed by
+ * HESITATING rather than by getting anything wrong.
+ *
+ * It starts when you step off a kerb into a lane and it ends when you reach the
+ * far kerb. It is thrown away by stopping, by turning round, or by being
+ * clipped — all three of which are the same thing said three ways. What is
+ * recorded is not the time: it is HOW MANY OF THEM HAD TO GO ROUND YOU, which
+ * is the funnier number and the one that actually measures the crossing.
+ */
+function hanUpdateCrossing(game, dt) {
+  const capy = game.capy;
+  if (!capy || !capy.position) return;
+  const p = capy.position;
+  const d = hanLaneAt(p.x, p.z);
+  const w = hanLaneW;
+  const inLane = d < w + 0.6 && capy.grounded && !capy.carriedBy && hanRider < 0;
+  // which side of the centreline are we on
+  const nx = Math.cos(hanLaneYaw), nz = -Math.sin(hanLaneYaw);
+  hanLaneAtS(hanLaneI, hanLaneS, hanTmp2);
+  const side = (p.x - hanTmp2.x) * nx + (p.z - hanTmp2.z) * nz > 0 ? 1 : -1;
+  const sp = Math.hypot(capy.velocity.x, capy.velocity.z);
+
+  if (hanCrossLane < 0) {
+    if (inLane && sp > hanHOLD_V) {
+      hanCrossLane = hanLaneI; hanCrossFrom = side; hanSwerved = 0; hanCrossOk = true;
+      // ...AND THE DITHER STARTS AT ZERO. It is an accumulator over the last
+      // second and a half of heading changes, and TURNING TO FACE THE ROAD is
+      // a heading change: measured, every crossing began with hanDither at
+      // about 2.0 — over the limit — so hanCrossOk was set false on the frame
+      // after the run started and not one crossing in the chapter could ever
+      // have been completed. The question is whether you change your mind
+      // DURING the crossing.
+      hanDither = 0;
+      if (hanBikeData) for (let i = 0; i < hanBikeN; i++) hanBikeData[i * hanBIKE_STRIDE + 9] = 0;
+    }
+    return;
+  }
+  if (hanLaneI !== hanCrossLane) { hanCrossLane = -1; return; }
+  if (sp < hanHOLD_V * 0.6 || hanDither > hanTURN_MAX) hanCrossOk = false;
+  // THE FAR KERB, and it is w + 1.8 rather than w + 3.0. Measured: a clean
+  // crossing of the widest street in the chapter ends about seven and a half
+  // metres from the centreline, because that is where the pavement is, and at
+  // a three-metre margin the run never terminated at all.
+  if (d > w + 1.8) {
+    // out the other side
+    if (hanCrossOk && side !== hanCrossFrom) {
+      const n = Math.round(hanSwerved);
+      if (n > hanSwervedBest) { hanSwervedBest = n; hanRecord('cross-the-road', n); }
+      if (!hanCrossDone) {
+        hanCrossDone = true;
+        hanTask('cross-the-road');
+        if (typeof game.punch === 'function') game.punch(0.22);
+        hanToast('not one of them stopped. that is how it is done.');
+      }
+    }
+    hanCrossLane = -1;
+  }
+}
+
+/**
+ * GETTING ON ONE — the chapter's first mini, and the fourteenth thing in this
+ * game that carries the animal.
+ *
+ * A scooter is not a kinematic BODY here and deliberately so: there are two
+ * hundred and forty of them and giving every one a cannon box would put two
+ * hundred and forty shapes in the broadphase for a mechanic that involves
+ * exactly one of them at a time. Instead ONE body follows whichever rider the
+ * animal is closest to when it lands, which is the same trick the manta in
+ * Palawan uses and is invisible from outside.
+ */
+let hanRideBody = null;
+function hanBuildRideBody(game) {
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
+                              material: (game.mats && game.mats.prop) || undefined });
+  b.allowSleep = false;
+  // the footwell: a floor and a wall at each end, so it is a TRAY. Chapter 18
+  // measured what a flat deck does to a passenger at speed and it is not this.
+  // A LITTLE BIGGER THAN THE THING IT IS DRAWN AS, and on purpose. The
+  // footwell of a Honda Wave is genuinely about sixty centimetres square and a
+  // capybara is 1.1 m long; a tray built to the drawing held a passenger for
+  // twenty-seven frames. This one is 0.86 by 1.6 inside, which from the
+  // outside is invisible — the mesh has not changed — and from the inside is
+  // the difference between a mini and a bug.
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.43, 0.09, 0.80)), new CANNON.Vec3(0, 0.50, 0.02));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.43, 0.34, 0.10)), new CANNON.Vec3(0, 0.88, 0.78));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.43, 0.34, 0.10)), new CANNON.Vec3(0, 0.88, -0.80));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.10, 0.34, 0.80)), new CANNON.Vec3(-0.45, 0.88, 0.02));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.10, 0.34, 0.80)), new CANNON.Vec3(0.45, 0.88, 0.02));
+  b.position.set(0, -900, 0);
+  hanSyncBody(b);
+  game.world.addBody(b);
+  hanRideBody = b;
+}
+
+let hanRideTX = 0, hanRideTZ = 0, hanRideYaw = 0, hanRideHave = false;
+let hanRidePark = -1;             // which machine the tray is parked under
+function hanUpdateRide(game, dt) {
+  if (!hanRideBody || !hanBikeN || dt <= 0) return;
+  const capy = game.capy;
+  const p = capy && capy.position;
+  if (!p) return;
+  // which rider is nearest, and is the animal on it
+  let bi = -1, bd = 1e9;
+  for (let i = 0; i < hanBikeN; i++) {
+    hanBikeAt(i, hanV3b);
+    const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
+    if (d < bd) { bd = d; bi = i; }
+  }
+  // ---- AM I *IN* ONE, AND THE HEIGHT IS THE WHOLE TEST ------------------
+  //
+  // The footwell floor is at 0.59 over the road, so an animal standing in it
+  // has its centre at about 2.05 and an animal standing on the ROAD beside it
+  // has its centre at 1.70. The first version of this took anything above
+  // hanGROUND + 0.30, which is 1.50 — so simply walking past a scooter counted
+  // as riding it.
+  const on = (bd < 1.6 && p.y > hanGROUND + 0.85 && p.y < hanGROUND + 2.6) ? bi : -1;
+  // ...and whether there is anything to land ON. See below.
+  const overIt = bd < 3.2 && p.y > hanGROUND + 0.75;
+  if (on < 0 && hanRider >= 0) {
+    hanRideGrace += dt;
+    if (hanRideGrace > 0.55) {
+      if (hanRideDist > 12) {
+        if (hanRideDist > hanRideBest) { hanRideBest = hanRideDist; hanRecord('ride-the-flow', hanRideDist); }
+      }
+      hanRider = -1; hanRideT = 0; hanRideDist = 0; hanRidePark = -1;
+      hanRideBody.position.set(0, -900, 0);
+      hanRideBody.velocity.setZero();
+      hanSyncBody(hanRideBody);
+      hanRideHave = false;
+      hanFrame.x = 0; hanFrame.z = 0;
+    }
+    return;
+  }
+  hanRideGrace = 0;
+  if (on >= 0 && hanRider < 0) {
+    hanRider = on;
+    hanRideT = 0; hanRideDist = 0;
+    hanToast('hold on to something.');
+    hanCue('thud', p.x, p.y, p.z, 0.30, 1.5);
+  }
+  if (hanRider < 0) {
+    // ---- THE TRAY ONLY EXISTS WHEN THERE IS SOMETHING TO LAND ON --------
+    //
+    // It has to exist BEFORE you land on it — a mechanic you can only start by
+    // landing on a thing that is not there until you land is not a mechanic —
+    // but it may not exist the rest of the time, and the first version of this
+    // parked it under the nearest scooter permanently. That is a kinematic
+    // box with four walls doing nine metres a second welded to whichever bike
+    // happens to be closest, and it spends the whole chapter ramming the
+    // player down the street. Measured: a crossing that should have taken four
+    // seconds ended thirty-nine metres from the target, sideways.
+    //
+    // So it is armed only while the animal is genuinely ABOVE a machine —
+    // which, given a hop peaks at 1.37 m of rise, means exactly the moment it
+    // is being aimed at.
+    if (overIt) {
+      // ...AND IF IT IS A DIFFERENT MACHINE FROM LAST FRAME, IT TELEPORTS.
+      // hanPlaceRideBody drives the tray by VELOCITY against its previous
+      // target, which is right for following one scooter and catastrophic for
+      // hopping between two: the delta is then eight metres in a sixtieth of a
+      // second, the body reports ninety-nine metres a second — over main.js's
+      // own sanity cap — and it would fire a capybara across the district.
+      // Measured in a ninety-second random-input soak.
+      if (hanRidePark !== bi) { hanRideHave = false; hanRidePark = bi; }
+      hanBikeAt(bi, hanV3b);
+      hanLaneAtS(hanBikeData[bi * hanBIKE_STRIDE] | 0,
+                 hanBikeData[bi * hanBIKE_STRIDE + 1], hanTmp2);
+      const dir = hanBikeData[bi * hanBIKE_STRIDE + 2];
+      const yaw = dir > 0 ? hanTmp2.yaw : hanTmp2.yaw + Math.PI;
+      hanPlaceRideBody(hanV3b.x, hanV3b.z, yaw, dt);
+    } else if (hanRideHave) {
+      hanRidePark = -1;
+      hanRideBody.position.set(0, -900, 0);
+      hanRideBody.velocity.setZero();
+      hanRideBody.angularVelocity.setZero();
+      hanSyncBody(hanRideBody);
+      hanRideHave = false;
+    }
+    return;
+  }
+  hanRideT += dt;
+  const o = hanRider * hanBIKE_STRIDE;
+  hanRideDist += hanBikeData[o + 5] * dt;
+  hanBikeAt(hanRider, hanV3b);
+  hanLaneAtS(hanBikeData[o] | 0, hanBikeData[o + 1], hanTmp2);
+  const dir = hanBikeData[o + 2];
+  const yaw = dir > 0 ? hanTmp2.yaw : hanTmp2.yaw + Math.PI;
+  hanPlaceRideBody(hanV3b.x, hanV3b.z, yaw, dt);
+  hanFrame.x = hanRideBody.velocity.x;
+  hanFrame.z = hanRideBody.velocity.z;
+  if (hanRideT > 6 && !hanRideDone) {
+    hanRideDone = true;
+    hanTask('ride-the-flow');
+    if (typeof game.punch === 'function') game.punch(0.26);
+  }
+}
+/** Rule 2 and rule 3 for a carrier: velocity, against the PREVIOUS TARGET. */
+function hanPlaceRideBody(tx, tz, yaw, dt) {
+  const b = hanRideBody;
+  if (!hanRideHave) {
+    b.position.set(tx, hanGROUND, tz);
+    b.quaternion.setFromEuler(0, yaw, 0);
+    b.velocity.setZero(); b.angularVelocity.setZero();
+    hanSyncBody(b);
+    hanRideTX = tx; hanRideTZ = tz; hanRideYaw = yaw; hanRideHave = true;
+    return;
+  }
+  b.velocity.set((tx - hanRideTX) / dt, 0, (tz - hanRideTZ) / dt);
+  let dy = yaw - hanRideYaw;
+  while (dy > Math.PI) dy -= Math.PI * 2;
+  while (dy < -Math.PI) dy += Math.PI * 2;
+  b.angularVelocity.set(0, dy / dt, 0);
+  hanRideTX = tx; hanRideTZ = tz; hanRideYaw = yaw;
+}
+
+// =========================================================== TRAIN STREET ====
+/**
+ * AN ALLEY FOUR AND A HALF METRES WIDE WITH A RAILWAY DOWN THE MIDDLE OF IT.
+ *
+ * The houses stand 2.35 m from the centre of the track and the train is 1.45 m
+ * to each side of it, so there is forty-five centimetres of daylight and a
+ * hundred people live in it. Everything about how this is built comes off that
+ * one number.
+ *
+ * THE FOLD is the half that makes it a set piece rather than a hazard. Every
+ * awning, stool, table, crate and drying rack in the alley is registered in
+ * `hanFolders` with an OPEN transform and a FOLDED one, and `hanFoldK` — driven
+ * by the clock, not by the player — lerps every one of them between the two
+ * over about four seconds. So the street does not get out of the way at the
+ * last second: it starts getting out of the way when the horn goes, eleven
+ * seconds out, and by the time you can hear the train there is nothing left in
+ * the alley but you.
+ */
+function hanFolder(mesh, ox, oy, oz, fx, fy, fz, fr) {
+  hanFolders.push({ m: mesh, ox: ox, oy: oy, oz: oz, fx: fx, fy: fy, fz: fz, fr: fr || 0 });
+}
+
+function hanBuildTrainStreet(game, root) {
+  const K = hanMerger();
+  const body = hanPoolBody(game);
+  const z = hanTRAIN.z, half = hanTRAIN.half;
+  const x0 = hanTRAIN.x0, x1 = hanTRAIN.x1;
+
+  // ---- the ballast and the track ---------------------------------------
+  K.box((x0 + x1) / 2, hanGROUND - 0.02, z, x1 - x0, 0.24, 4.0, PALETTE.hanBallast);
+  for (let x = x0; x < x1; x += 0.62) {
+    K.box(x, hanGROUND + 0.10, z, 0.28, 0.16, 2.4, PALETTE.hanSleeper);
+  }
+  for (let s = -1; s <= 1; s += 2) {
+    K.box((x0 + x1) / 2, hanGROUND + 0.22, z + s * hanTRAIN.gauge * 0.5,
+          x1 - x0, 0.14, 0.12, PALETTE.hanRail2);
+  }
+
+  // ---- the houses, both sides, right up against it ----------------------
+  for (let side = -1; side <= 1; side += 2) {
+    for (let x = x0 + 2; x < x1 - 2; x += hanHOUSE_W + 0.1) {
+      const d = rand(8, 12);
+      const h = rand(6.5, 13);
+      const bz = z + side * (half + d * 0.5);
+      const yaw = side > 0 ? 0 : Math.PI;
+      hanHouse(K, x, bz, yaw, h, randInt(0, 4), d);
+      hanPoolBox(body, x, hanGROUND + h * 0.5 + 1, bz, hanHOUSE_W, h + 2, d, yaw);
+      // ---- and everything the street keeps in front of its own door -----
+      // A stool, a table, a rack or a crate, at 2.05 m from the centreline —
+      // which is INSIDE the train's envelope by sixty centimetres, which is
+      // why it all has to move.
+      const kind = randInt(0, 3);
+      const S = hanMerger();
+      const px = x + rand(-1.0, 1.0);
+      const oz = z + side * rand(1.75, 2.15);
+      if (kind === 0) {          // a low plastic table and two stools
+        S.box(0, 0.24, 0, 0.62, 0.06, 0.62, PALETTE.hanStoolA);
+        for (let l = 0; l < 4; l++) {
+          S.box((l & 1 ? 0.26 : -0.26), 0.11, (l & 2 ? 0.26 : -0.26), 0.05, 0.22, 0.05, PALETTE.hanStoolA);
+        }
+        S.box(0.5, 0.16, 0.2, 0.30, 0.05, 0.30, PALETTE.hanStoolB);
+        S.box(-0.5, 0.16, -0.2, 0.30, 0.05, 0.30, PALETTE.hanStoolB);
+      } else if (kind === 1) {   // a drying rack
+        S.cyl(-0.5, 0.5, 0, 0.04, 1.0, PALETTE.hanPole, 0, 0, 0, 4);
+        S.cyl(0.5, 0.5, 0, 0.04, 1.0, PALETTE.hanPole, 0, 0, 0, 4);
+        S.box(0, 0.98, 0, 1.1, 0.04, 0.04, PALETTE.hanPole);
+        S.box(-0.28, 0.66, 0, 0.34, 0.62, 0.03, PALETTE.hanWash1);
+        S.box(0.20, 0.70, 0, 0.34, 0.54, 0.03, PALETTE.hanWash3);
+      } else if (kind === 2) {   // crates of something
+        S.box(0, 0.18, 0, 0.52, 0.36, 0.42, PALETTE.hanCrate);
+        S.box(0.1, 0.52, 0.05, 0.46, 0.32, 0.38, PALETTE.hanCrate2);
+      } else {                   // a motorbike, parked, obviously
+        S.cyl(0, 0.26, 0.5, 0.26, 0.10, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+        S.cyl(0, 0.26, -0.5, 0.26, 0.10, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+        S.box(0, 0.38, 0, 0.24, 0.24, 1.10, PALETTE[hanBIKE_COL[randInt(0, 5)]]);
+        S.box(0, 0.58, -0.28, 0.30, 0.18, 0.54, PALETTE.hanSeat);
+        S.box(0, 0.82, 0.38, 0.54, 0.05, 0.07, PALETTE.hanChrome);
+      }
+      const sm = new THREE.Mesh(S.build(), hanVCF());
+      sm.castShadow = true;
+      sm.position.set(px, hanGROUND, oz);
+      sm.rotation.y = rand(-0.4, 0.4);
+      root.add(sm);
+      // folded: back against the wall and turned side-on
+      hanFolder(sm, px, hanGROUND, oz,
+                px, hanGROUND, z + side * (half + 1.15), sm.rotation.y + side * 0.9);
+      // ...and the awning over the door, which goes UP rather than back
+      const A = hanMerger();
+      A.box(0, 0, 0, hanHOUSE_W + 0.1, 0.08, 1.9, side > 0 ? PALETTE.hanTarp : PALETTE.hanTarpRed);
+      const am = new THREE.Mesh(A.build(), hanVCF());
+      am.castShadow = true;
+      am.position.set(x, hanGROUND + 2.9, z + side * (half + 0.55));
+      am.rotation.x = side * 0.16;
+      root.add(am);
+      hanFolder(am, x, hanGROUND + 2.9, z + side * (half + 0.55),
+                x, hanGROUND + 3.5, z + side * (half + 1.5), 0);
+    }
+  }
+
+  // ---- the two crossing gates, which are the alley's own way in ---------
+  for (let s = 0; s < 2; s++) {
+    const gx = s ? x1 + 1.5 : x0 - 1.5;
+    K.cyl(gx, hanGROUND + 1.3, z + 3.4, 0.11, 2.6, PALETTE.hanGate, 0, 0, 0, 6);
+    K.cyl(gx, hanGROUND + 1.3, z - 3.4, 0.11, 2.6, PALETTE.hanGate, 0, 0, 0, 6);
+    K.box(gx, hanGROUND + 2.5, z, 0.16, 0.7, 7.2, PALETTE.hanGate);
+    K.box(gx, hanGROUND + 2.5, z, 0.20, 0.55, 1.0, PALETTE.hanGateRed);
+    K.box(gx, hanGROUND + 2.5, z + 2.4, 0.20, 0.55, 1.0, PALETTE.hanGateRed);
+    K.box(gx, hanGROUND + 2.5, z - 2.4, 0.20, 0.55, 1.0, PALETTE.hanGateRed);
+  }
+
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+  hanPoolDone(game, body);
+
+  hanBuildTrain(game, root);
+}
+
+/**
+ * THE TRAIN. Four carriages and a locomotive, and it is a KINEMATIC CARRIER
+ * that nobody is ever going to ride — which is the only one in this game.
+ *
+ * It is a body rather than a mesh because the rule this chapter is built on is
+ * that a solid thing is solid: an animal standing on the rails when it comes
+ * through is SHOVED ALONG THE ALLEY, at eleven metres a second, which is
+ * exactly what would happen and is very funny. It is not damage. It has never
+ * been damage.
+ */
+function hanBuildTrain(game, root) {
+  const K = hanMerger();
+  const H = 3.4, W = 2.9;
+  // the loco
+  K.box(0, H * 0.5, 0, W, H, 12, PALETTE.hanLoco);
+  K.box(0, H + 0.22, 0, W + 0.2, 0.44, 12.2, PALETTE.hanLocoDk);
+  K.box(0, 1.1, 6.3, W - 0.4, 1.6, 0.6, PALETTE.hanLocoRed);
+  K.box(0, 2.4, 5.6, W - 0.6, 1.1, 0.4, PALETTE.hanGlass);
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(s * (W * 0.5 + 0.02), 2.1, 0, 0.10, 1.0, 10, PALETTE.hanGlass);
+    K.cyl(s * 0.95, 0.42, 4.2, 0.42, 0.24, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+    K.cyl(s * 0.95, 0.42, -4.2, 0.42, 0.24, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+  }
+  K.cyl(0, 1.1, 6.6, 0.24, 0.30, PALETTE.hanLampGlass, Math.PI / 2, 0, 0, 8);
+  // the carriages
+  for (let c = 1; c <= hanTRAIN_LEN; c++) {
+    const cz = -13.6 * c;
+    K.box(0, H * 0.5, cz, W, H, 12.4, c % 2 ? PALETTE.hanCar1 : PALETTE.hanCar2);
+    K.box(0, H + 0.22, cz, W + 0.2, 0.44, 12.6, PALETTE.hanLocoDk);
+    K.box(0, 0.5, cz, W + 0.1, 0.5, 12.6, PALETTE.hanLocoDk);
+    for (let s = -1; s <= 1; s += 2) {
+      for (let w = 0; w < 5; w++) {
+        K.box(s * (W * 0.5 + 0.03), 2.2, cz - 4.4 + w * 2.2, 0.08, 1.1, 1.5, PALETTE.hanGlass);
+      }
+      K.cyl(s * 0.95, 0.42, cz + 4.4, 0.42, 0.24, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+      K.cyl(s * 0.95, 0.42, cz - 4.4, 0.42, 0.24, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+    }
+    K.box(0, 1.7, cz + 6.4, 0.4, 0.5, 1.4, PALETTE.hanLocoDk);
+  }
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  g.visible = false;
+  hanTrainG = g;
+  root.add(g);
+
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
+                              material: (game.mats && game.mats.prop) || undefined });
+  b.allowSleep = false;
+  b.addShape(new CANNON.Box(new CANNON.Vec3(1.45, 1.7, 6.2)), new CANNON.Vec3(0, 1.7, 0));
+  for (let c = 1; c <= hanTRAIN_LEN; c++) {
+    b.addShape(new CANNON.Box(new CANNON.Vec3(1.45, 1.7, 6.3)),
+               new CANNON.Vec3(0, 1.7, -13.6 * c));
+  }
+  b.position.set(0, -900, 0);
+  hanSyncBody(b);
+  game.world.addBody(b);
+  hanTrainBody = b;
+}
+
+/** How far the train has come along the alley, and everything that follows. */
+let hanTrainTX = 0, hanTrainHave = false;
+function hanUpdateTrain(game, dt) {
+  const capy = game.capy;
+  const p = capy && capy.position;
+  const inAlley = p ? hanInRect(hanZ.alley, p.x, p.z) : false;
+
+  if (hanTrainS < 0) {
+    hanTrainT -= dt;
+    // the horn, eleven seconds out, and the street starts folding on it
+    if (hanTrainT <= hanTRAIN_WARN && !hanTrainWarned) {
+      hanTrainWarned = true;
+      hanCue('whistle', hanTRAIN.x1 + 40, hanGROUND + 3, hanTRAIN.z, 0.55, 0.55, 220);
+      if (inAlley) {
+        hanToast('that is the horn. it is eleven seconds away. stay where you are.');
+      } else if (!hanToldTrain) {
+        hanToldTrain = true;
+        hanToast('something has just sounded a horn over on the west side.');
+      }
+    }
+    if (hanTrainT <= 0) {
+      hanTrainS = 0;
+      hanTrainNear = 99;
+      hanTrainCount++;
+      hanTrainG.visible = true;
+      hanTrainHave = false;
+      hanCue('whistle', hanTRAIN.x1 + 20, hanGROUND + 3, hanTRAIN.z, 0.7, 0.5, 220);
+    }
+  } else {
+    hanTrainS += hanTRAIN_V * dt;
+    // it comes in from the east and runs out of the west end
+    const x = hanTRAIN.x1 + 60 - hanTrainS;
+    hanTrainG.position.set(x, hanGROUND, hanTRAIN.z);
+    hanTrainG.rotation.y = -Math.PI / 2;
+    const b = hanTrainBody;
+    if (!hanTrainHave) {
+      b.position.set(x, hanGROUND, hanTRAIN.z);
+      b.quaternion.setFromEuler(0, -Math.PI / 2, 0);
+      b.velocity.setZero();
+      hanSyncBody(b);
+      hanTrainTX = x; hanTrainHave = true;
+    } else {
+      b.velocity.set((x - hanTrainTX) / dt, 0, 0);
+      hanTrainTX = x;
+    }
+    // how close it has come to the animal, this pass
+    if (p && inAlley) {
+      // the nose-to-tail extent, so a carriage counts as much as the loco
+      const back = x + 13.6 * hanTRAIN_LEN + 7;
+      const along = clamp(p.x, x - 7, back);
+      const d = Math.max(0, Math.hypot(p.x - along, p.z - hanTRAIN.z) - 1.45);
+      if (d < hanTrainNear) hanTrainNear = d;
+    }
+    if (hanTrainS > 60 + (hanTRAIN.x1 - hanTRAIN.x0) + 13.6 * hanTRAIN_LEN + 90) {
+      // gone. Score whatever happened, and stand the street back up.
+      hanTrainS = -1;
+      hanTrainT = hanTRAIN_GAP2;
+      hanTrainWarned = false;
+      hanTrainG.visible = false;
+      hanTrainBody.position.set(0, -900, 0);
+      hanTrainBody.velocity.setZero();
+      hanSyncBody(hanTrainBody);
+      if (hanTrainNear < 90) {
+        if (hanTrainNear < hanTrainBest) {
+          hanTrainBest = hanTrainNear;
+          hanRecord('the-train', hanTrainNear);
+        }
+        if (!hanTrainDone && hanTrainNear < 2.6) {
+          hanTrainDone = true;
+          hanTask('the-train');
+          if (typeof game.frameShot === 'function') {
+            game.frameShot({ yaw: 1.5708, dist: 15, pitch: 0.10, raise: 0.6, hold: 3.2 });
+          }
+          if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+        }
+      }
+    }
+  }
+
+  // ---- THE FOLD --------------------------------------------------------
+  // Driven by the clock and NOT by the player: a street that folds up because
+  // you walked into it is a street reacting to you, and the entire point of
+  // this one is that it is not.
+  const want = (hanTrainS >= 0) ? 1 : (hanTrainT <= hanTRAIN_WARN ? 1 : 0);
+  const was = hanFoldK;
+  hanFoldK = damp(hanFoldK, want, 1.4, dt);
+  if (was < 0.5 && hanFoldK >= 0.5 && inAlley && !hanFoldDone) {
+    hanFoldDone = true;
+    hanTask('fold-the-street');
+    hanToast('every table on this street has just gone indoors.');
+  }
+  for (let i = 0; i < hanFolders.length; i++) {
+    const f = hanFolders[i];
+    f.m.position.set(lerp(f.ox, f.fx, hanFoldK), lerp(f.oy, f.fy, hanFoldK),
+                     lerp(f.oz, f.fz, hanFoldK));
+    if (f.fr) f.m.rotation.y = lerp(f.m.rotation.y, f.fr, Math.min(1, dt * 3));
+  }
+  // ...and the shake, because eleven metres a second of train a metre away is
+  // not a quiet thing
+  if (hanTrainS >= 0 && p && inAlley) {
+    const d = Math.abs(p.x - (hanTRAIN.x1 + 60 - hanTrainS));
+    if (d < 30 && typeof game.shake === 'function') game.shake(0.10 * (1 - d / 30));
+    if (Math.random() < dt * 9) {
+      hanCue('thud', hanTRAIN.x1 + 60 - hanTrainS, hanGROUND + 1, hanTRAIN.z,
+             rand(0.16, 0.30), rand(0.35, 0.55), 140);
+    }
+  }
+}
+
+// ============================================================== THE LAKE SET =
+/**
+ * THE TOWER, THE RED BRIDGE, THE TEMPLE AND THE PUPPETS.
+ *
+ * Everything inside the ring road, which is everything in this chapter that is
+ * not moving. It is deliberately the only part of the map with straight lines
+ * and symmetry in it.
+ */
+function hanBuildLakeSet(game, root) {
+  const K = hanMerger();
+  const body = hanPoolBody(game);
+
+  // ---- Thap Rua. Three storeys of nineteenth-century folly on an islet.
+  const tx = hanTOWER.x, tz = hanTOWER.z;
+  K.cyl(tx, hanGROUND + 0.2, tz, 6.4, 1.2, PALETTE.hanIslet, 0, 0, 0, 12);
+  K.box(tx, hanGROUND + 1.6, tz, 6.0, 1.4, 5.0, PALETTE.hanTowerSt);
+  K.box(tx, hanGROUND + 3.6, tz, 5.0, 2.6, 4.0, PALETTE.hanTowerSt);
+  K.box(tx, hanGROUND + 5.1, tz, 5.6, 0.4, 4.6, PALETTE.hanTowerDk);
+  K.box(tx, hanGROUND + 6.6, tz, 3.8, 2.6, 3.0, PALETTE.hanTowerSt);
+  K.box(tx, hanGROUND + 8.1, tz, 4.4, 0.4, 3.6, PALETTE.hanTowerDk);
+  K.box(tx, hanGROUND + 9.4, tz, 2.6, 2.2, 2.2, PALETTE.hanTowerSt);
+  K.cone(tx, hanGROUND + 11.4, tz, 2.2, 1.8, PALETTE.hanTowerDk, 0, 0.78, 0, 4);
+  K.cyl(tx, hanGROUND + 12.6, tz, 0.16, 0.9, PALETTE.hanTowerDk, 0, 0, 0, 6);
+  for (let f = 0; f < 3; f++) {
+    const fy = hanGROUND + 2.6 + f * 3.0;
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(tx + s * 1.4, fy, tz + 2.1 - f * 0.5, 0.7, 1.5, 0.14, PALETTE.hanTowerArch);
+      K.box(tx + s * 1.4, fy, tz - 2.1 + f * 0.5, 0.7, 1.5, 0.14, PALETTE.hanTowerArch);
+    }
+  }
+  // THE TOWER IS NOT THE ISLET. At six by five the collider covered the whole
+  // top of the island and there was nowhere to stand on it.
+  hanPoolBox(body, tx, hanGROUND + 5, tz, 4.6, 12, 3.8);
+  hanBlock(tx, tz, 3.4);
+
+  // ---- Ngoc Son, on the other islet, and the gate in front of it
+  const nx = hanNGOC.x, nz = hanNGOC.z;
+  K.cyl(nx, hanGROUND + 0.2, nz, 12.0, 1.2, PALETTE.hanIslet, 0, 0, 0, 12);
+  K.box(nx, hanGROUND + 2.2, nz, 11, 4.0, 8.0, PALETTE.hanTempleW);
+  K.box(nx, hanGROUND + 4.6, nz, 12.4, 0.8, 9.4, PALETTE.hanTempleR);
+  K.box(nx, hanGROUND + 5.4, nz, 10.0, 0.9, 7.6, PALETTE.hanTempleR);
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(nx + s * 6.4, hanGROUND + 5.4, nz, 1.8, 0.5, 9.0, PALETTE.hanTempleR, 0, 0, s * 0.5);
+  }
+  K.box(nx, hanGROUND + 2.0, nz - 4.2, 2.4, 3.6, 0.3, PALETTE.hanTempleDoor);
+  for (let i = 0; i < 6; i++) {
+    K.cyl(nx - 4.5 + i * 1.8, hanGROUND + 2.2, nz - 4.4, 0.24, 4.0, PALETTE.hanTempleCol, 0, 0, 0, 8);
+  }
+  hanPoolBox(body, nx, hanGROUND + 2.4, nz, 11, 5, 8.0);
+  hanBlock(nx, nz, 8);
+  // the banyan, which is the other thing on that island
+  K.cyl(nx - 7, hanGROUND + 2.2, nz + 5, 0.7, 4.4, PALETTE.hanTrunk, 0, 0, 0, 8);
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9;
+    K.sph(nx - 7 + Math.cos(a) * 2.4, hanGROUND + 5.6 + Math.sin(a * 2) * 0.9,
+          nz + 5 + Math.sin(a) * 2.4, 2.1, 1.5, 2.1, i % 2 ? PALETTE.hanLeaf : PALETTE.hanLeafDk, 6);
+  }
+
+  // ---- The Huc bridge. Red, timber, and it is the picture of this city.
+  const bx0 = hanHUC.x0, bz0 = hanHUC.z0, bx1 = hanHUC.x1, bz1 = hanHUC.z1;
+  const blen = Math.hypot(bx1 - bx0, bz1 - bz0);
+  const byaw = Math.atan2(bx1 - bx0, bz1 - bz0);
+  const N = 18;
+  const bg = new THREE.Group();
+  const BK = hanMerger();
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const x = lerp(bx0, bx1, t), z = lerp(bz0, bz1, t);
+    // an arch: it rises a metre and a quarter in the middle, which is what
+    // makes a bridge a bridge rather than a plank
+    const y = hanGROUND + 0.55 + Math.sin(t * Math.PI) * 1.25;
+    BK.box(x, y, z, 3.0, 0.20, blen / N + 0.2, PALETTE.hanHucDeck, 0, byaw, 0);
+    for (let s = -1; s <= 1; s += 2) {
+      BK.box(x + Math.cos(byaw) * 1.45 * s, y + 0.62, z - Math.sin(byaw) * 1.45 * s,
+             0.14, 1.05, blen / N + 0.2, PALETTE.hanHuc, 0, byaw, 0);
+      // AND THE RAILING IS SOLID. A three-metre arched deck over eighty
+      // metres of lake with a balustrade that was drawn and not collided is a
+      // plank: measured, every attempt to cross it ended underneath it.
+      hanPoolBox(body, x + Math.cos(byaw) * 1.55 * s, y + 0.75, z - Math.sin(byaw) * 1.55 * s,
+                 0.40, 1.5, blen / N + 0.3, byaw);
+      if (i % 3 === 0) {
+        BK.cyl(x + Math.cos(byaw) * 1.45 * s, y + 0.55, z - Math.sin(byaw) * 1.45 * s,
+               0.12, 1.3, PALETTE.hanHucDk, 0, 0, 0, 6);
+      }
+    }
+    if (i % 3 === 0) {
+      BK.cyl(x, y - 1.4, z, 0.16, 2.6, PALETTE.hanHucDk, 0, 0, 0, 6);
+    }
+    hanPoolBox(body, x, y - 0.35, z, 3.2, 0.7, blen / N + 0.3, byaw);
+  }
+  // the gate at the near end, which is where everybody stops for a photograph
+  BK.cyl(bx0 - 1.7, hanGROUND + 2.4, bz0 + 0.4, 0.28, 4.8, PALETTE.hanHucDk, 0, 0, 0, 8);
+  BK.cyl(bx0 + 1.7, hanGROUND + 2.4, bz0 - 0.4, 0.28, 4.8, PALETTE.hanHucDk, 0, 0, 0, 8);
+  BK.box(bx0, hanGROUND + 4.9, bz0, 5.0, 0.5, 1.0, PALETTE.hanHuc, 0, byaw, 0);
+  BK.box(bx0, hanGROUND + 5.5, bz0, 4.2, 0.6, 1.4, PALETTE.hanTempleR, 0, byaw, 0);
+  const bm = new THREE.Mesh(BK.build(), hanVCF());
+  bm.castShadow = true; bm.receiveShadow = true;
+  bg.add(bm);
+  hanHucG = bg;
+  root.add(bg);
+
+  // ---- the water puppet theatre, and the pool in front of it
+  const px = hanPUPPET.x, pz = hanPUPPET.z;
+  K.box(px, hanGROUND + 3.0, pz + 7, 18, 6.0, 8, PALETTE.hanTempleW);
+  K.box(px, hanGROUND + 6.4, pz + 7, 19.6, 0.9, 9.4, PALETTE.hanTempleR);
+  K.box(px, hanGROUND + 2.2, pz + 2.6, 12, 4.4, 0.4, PALETTE.hanCurtain);
+  hanPoolBox(body, px, hanGROUND + 3.2, pz + 7.4, 18, 7, 8);
+  hanBlock(px, pz + 7, 9);
+  // the pool: a shallow tank of green water with the puppets standing in it
+  K.box(px, hanGROUND - 0.28, pz - 1.4, 15, 0.72, 8.4, PALETTE.hanPoolWall);
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(14.2, 7.6).rotateX(-Math.PI / 2),
+                              grain(mat(PALETTE.hanLake), { scale: 0.06, amount: 0.05 }));
+  pool.position.set(px, hanGROUND + 0.02, pz - 1.4);
+  pool.receiveShadow = true; pool.castShadow = false;
+  root.add(pool);
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(px + s * 7.4, hanGROUND + 0.20, pz - 1.4, 0.5, 0.40, 8.4, PALETTE.hanPoolWall);
+    hanPoolBox(body, px + s * 7.4, hanGROUND + 0.20, pz - 1.4, 0.6, 0.40, 8.4);
+  }
+  // ...and the near wall is a STEP. At 0.68 it was a kerb the animal stopped
+  // dead at six metres short of the pool, which is where the task is.
+  K.box(px, hanGROUND + 0.20, pz - 5.6, 15, 0.40, 0.5, PALETTE.hanPoolWall);
+  hanPoolBox(body, px, hanGROUND + 0.20, pz - 5.6, 15, 0.40, 0.6);
+  // ...and the puppets themselves: lacquered, waist-deep, and they turn
+  const PP = [[-4.5, 0], [-2.2, 1.4], [0.3, -0.6], [2.6, 1.1], [4.8, -0.2], [1.4, 2.4]];
+  for (let i = 0; i < PP.length; i++) {
+    const P = hanMerger();
+    const col = i % 3 === 0 ? PALETTE.hanPup1 : i % 3 === 1 ? PALETTE.hanPup2 : PALETTE.hanPup3;
+    P.cyl(0, 0.34, 0, 0.22, 0.68, col, 0, 0, 0, 8);
+    P.box(0, 0.80, 0, 0.44, 0.30, 0.34, col);
+    P.sph(0, 1.06, 0, 0.19, 0.21, 0.19, PALETTE.hanPupFace, 8);
+    P.cone(0, 1.32, 0, 0.24, 0.34, PALETTE.hanPupHat, 0, 0, 0, 6);
+    for (let s = -1; s <= 1; s += 2) {
+      P.box(s * 0.30, 0.86, 0.10, 0.11, 0.30, 0.11, col, -0.6, 0, 0);
+    }
+    const pm = new THREE.Mesh(P.build(), hanVCF());
+    pm.castShadow = true;
+    pm.position.set(px + PP[i][0], hanGROUND - 0.05, pz - 1.4 + PP[i][1]);
+    root.add(pm);
+    hanPuppets.push({ m: pm, x: px + PP[i][0], z: pz - 1.4 + PP[i][1], ph: rand(0, 6.28) });
+  }
+
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+  hanPoolDone(game, body);
+}
+
+function hanUpdatePuppets(game, dt) {
+  for (let i = 0; i < hanPuppets.length; i++) {
+    const p = hanPuppets[i];
+    const t = hanTime * 1.1 + p.ph;
+    p.m.position.x = p.x + Math.sin(t) * 0.55;
+    p.m.position.z = p.z + Math.sin(t * 0.7 + 1.2) * 0.42;
+    p.m.position.y = hanGROUND - 0.05 + Math.abs(Math.sin(t * 2.2)) * 0.09;
+    p.m.rotation.y = Math.sin(t * 0.9) * 0.9;
+  }
+  const capy = game.capy;
+  if (!hanPuppetDone && capy && capy.position) {
+    const q = capy.position;
+    if (hanInRect(hanZ.puppet, q.x, q.z) && q.y < hanGROUND + 1.4 &&
+        Math.abs(q.z - (hanPUPPET.z - 1.4)) < 5.6 && Math.abs(q.x - hanPUPPET.x) < 8) {
+      hanPuppetDone = true;
+      hanTask('water-puppets');
+      if (typeof game.punch === 'function') game.punch(0.20);
+      hanToast('eleven hundred years of this, and nobody has ever been IN it.');
+    }
+  }
+}
+
+// ============================================================== THE STOOLS ===
+/**
+ * NINETY-SIX PLASTIC STOOLS, TWENTY CENTIMETRES HIGH, ON A CORNER.
+ *
+ * Bia hoi is drunk sitting on a stool the size of a saucepan on a pavement at a
+ * junction, and there are about a hundred of them out at any one time. They are
+ * one instanced mesh with a per-stool velocity, and they are knocked over by
+ * BEING RUN THROUGH: no bodies, because ninety-six dynamic props for a gag is
+ * how you lose a frame, and a ballistic arc off a floor at kerb height is
+ * indistinguishable at this size. Same argument as chapter 18's champagne.
+ *
+ * The record is the most you have had down AT ONCE, which is the only honest
+ * measure of a run through a bia hoi corner: they stand back up after eight
+ * seconds, so a hundred one at a time is not the same thing at all.
+ */
+function hanBuildStools(game, root) {
+  const K = hanMerger();
+  // WHITE, deliberately: a stool is one colour of plastic all through, so the
+  // instance colour is allowed to BE the colour. See the note at the top of
+  // hanBikeGeo for the rule.
+  K.box(0, 0.19, 0, 0.30, 0.035, 0.30, 0xffffff);
+  for (let l = 0; l < 4; l++) {
+    K.box((l & 1 ? 0.115 : -0.115), 0.095, (l & 2 ? 0.115 : -0.115), 0.032, 0.19, 0.032, 0xffffff);
+  }
+  K.box(0, 0.10, 0.13, 0.26, 0.028, 0.028, 0xffffff);
+  K.box(0, 0.10, -0.13, 0.26, 0.028, 0.028, 0xffffff);
+  const geo = K.build();
+  const m = new THREE.InstancedMesh(geo, hanVCF(), hanSTOOL_N);
+  m.castShadow = true; m.receiveShadow = false;
+  m.frustumCulled = false;
+  hanStoolData = new Float32Array(hanSTOOL_N * 8);   // x z downT vx vz spin roll colour
+  const col = new Float32Array(hanSTOOL_N * 3);
+  const pal = [PALETTE.hanStoolA, PALETTE.hanStoolB, PALETTE.hanStoolC, PALETTE.hanStoolD];
+  for (let i = 0; i < hanSTOOL_N; i++) {
+    // clustered in eights round little tables, which is how they are used
+    const g = Math.floor(i / 6);
+    const a = (g * 2.4) % 6.283;
+    const gr = 3.2 + (g % 5) * 2.6;
+    const gx = hanBIA.x + Math.cos(a) * gr, gz = hanBIA.z + Math.sin(a) * gr;
+    const b = (i % 6) * 1.05;
+    hanStoolData[i * 8] = gx + Math.cos(b) * rand(0.5, 1.1);
+    hanStoolData[i * 8 + 1] = gz + Math.sin(b) * rand(0.5, 1.1);
+    hanStoolData[i * 8 + 2] = 0;
+    hanCol.set(pal[randInt(0, pal.length - 1)]);
+    col[i * 3] = hanCol.r; col[i * 3 + 1] = hanCol.g; col[i * 3 + 2] = hanCol.b;
+  }
+  m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
+  hanStoolMesh = m;
+  root.add(m);
+  hanSyncStools();
+  hanBlock(hanBIA.x, hanBIA.z, 3);
+
+  // ...and the little tables they are round, and the keg, and the crates
+  const T = hanMerger();
+  for (let g = 0; g < 16; g++) {
+    const a = (g * 2.4) % 6.283;
+    const gr = 3.2 + (g % 5) * 2.6;
+    const gx = hanBIA.x + Math.cos(a) * gr, gz = hanBIA.z + Math.sin(a) * gr;
+    T.cyl(gx, hanGROUND + 0.30, gz, 0.44, 0.06, PALETTE.hanTableTop, 0, 0, 0, 8);
+    T.cyl(gx, hanGROUND + 0.15, gz, 0.06, 0.30, PALETTE.hanTableLeg, 0, 0, 0, 4);
+    for (let s = 0; s < 4; s++) {
+      T.cyl(gx + Math.cos(s * 1.57) * 0.15, hanGROUND + 0.34, gz + Math.sin(s * 1.57) * 0.15,
+            0.055, 0.13, PALETTE.hanBeer, 0, 0, 0, 6);
+    }
+  }
+  T.cyl(hanBIA.x - 3.5, hanGROUND + 0.42, hanBIA.z - 3.5, 0.42, 0.84, PALETTE.hanKeg, 0, 0, 0, 10);
+  T.cyl(hanBIA.x - 3.5, hanGROUND + 0.86, hanBIA.z - 3.5, 0.44, 0.06, PALETTE.hanChrome, 0, 0, 0, 10);
+  for (let c = 0; c < 5; c++) {
+    T.box(hanBIA.x + 5 + (c % 2) * 0.55, hanGROUND + 0.16 + Math.floor(c / 2) * 0.32,
+          hanBIA.z - 5, 0.5, 0.3, 0.36, PALETTE.hanCrate2);
+  }
+  const tm = new THREE.Mesh(T.build(), hanVCF());
+  tm.castShadow = true;
+  root.add(tm);
+}
+function hanSyncStools() {
+  if (!hanStoolMesh) return;
+  for (let i = 0; i < hanSTOOL_N; i++) {
+    const o = i * 8;
+    const down = hanStoolData[o + 2] > 0 ? 1 : 0;
+    hanE.set(down ? hanStoolData[o + 6] : 0, hanStoolData[o + 5], down ? hanStoolData[o + 6] * 0.6 : 0, 'YXZ');
+    hanM.compose(hanV3.set(hanStoolData[o], hanGROUND + (down ? 0.10 : 0), hanStoolData[o + 1]),
+                 hanQ.setFromEuler(hanE), hanSc.set(1, 1, 1));
+    hanStoolMesh.setMatrixAt(i, hanM);
+  }
+  hanStoolMesh.instanceMatrix.needsUpdate = true;
+}
+function hanUpdateStools(game, dt) {
+  if (!hanStoolMesh) return;
+  const capy = game.capy;
+  const p = capy && capy.position;
+  const sp = capy && capy.velocity ? Math.hypot(capy.velocity.x, capy.velocity.z) : 0;
+  let down = 0, moved = false;
+  for (let i = 0; i < hanSTOOL_N; i++) {
+    const o = i * 8;
+    if (hanStoolData[o + 2] > 0) {
+      down++;
+      hanStoolData[o + 2] -= dt;
+      // it slides for a moment and then it is just a stool lying on a pavement
+      hanStoolData[o] += hanStoolData[o + 3] * dt;
+      hanStoolData[o + 1] += hanStoolData[o + 4] * dt;
+      hanStoolData[o + 3] *= (1 - dt * 4.5);
+      hanStoolData[o + 4] *= (1 - dt * 4.5);
+      hanStoolData[o + 6] = damp(hanStoolData[o + 6], 1.45, 6, dt);
+      moved = true;
+      if (hanStoolData[o + 2] <= 0) { hanStoolData[o + 6] = 0; moved = true; }
+      continue;
+    }
+    if (!p || sp < 1.4) continue;
+    const dx = hanStoolData[o] - p.x, dz = hanStoolData[o + 1] - p.z;
+    if (dx * dx + dz * dz > 0.9 * 0.9) continue;
+    if (p.y > hanGROUND + 1.4) continue;
+    const d = Math.hypot(dx, dz) || 1;
+    hanStoolData[o + 2] = 8.0;
+    hanStoolData[o + 3] = dx / d * sp * 0.55 + capy.velocity.x * 0.30;
+    hanStoolData[o + 4] = dz / d * sp * 0.55 + capy.velocity.z * 0.30;
+    hanStoolData[o + 5] = rand(0, 6.28);
+    hanStoolData[o + 6] = 0.2;
+    down++;
+    moved = true;
+    hanCue('pop', hanStoolData[o], hanGROUND + 0.2, hanStoolData[o + 1], 0.24, rand(2.4, 3.4));
+  }
+  if (moved) hanSyncStools();
+  hanStoolDown = down;
+  if (down > hanStoolBest) {
+    hanStoolBest = down;
+    hanRecord('the-stools', down);
+    if (down >= 14 && !hanStoolDone) {
+      hanStoolDone = true;
+      hanTask('the-stools');
+      if (typeof game.punch === 'function') game.punch(0.32);
+      hanToast('nobody has stood up. they are still holding the glasses.');
+    }
+  }
+}
+
+// ============================================== THE MARKET, THE BRIDGE, THE ==
+// ============================================== SHUTTLECOCK AND THE BARBER ===
+function hanBuildOddments(game, root) {
+  const K = hanMerger();
+  const body = hanPoolBody(game);
+
+  // ---- the wet market: forty stalls under one long awning ---------------
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 10; c++) {
+      const sx = hanMARKET.x - 17 + c * 3.8, sz = hanMARKET.z - 9 + r * 6.0;
+      K.box(sx, hanGROUND + 0.42, sz, 2.4, 0.10, 1.4, PALETTE.hanStallTop);
+      for (let l = 0; l < 4; l++) {
+        K.box(sx + (l & 1 ? 1.0 : -1.0), hanGROUND + 0.21, sz + (l & 2 ? 0.55 : -0.55),
+              0.09, 0.42, 0.09, PALETTE.hanStallLeg);
+      }
+      // ...and what is on it, which is what a wet market is
+      const what = (r * 10 + c) % 5;
+      const col = what === 0 ? PALETTE.hanHerb : what === 1 ? PALETTE.hanChilli
+                : what === 2 ? PALETTE.hanFish : what === 3 ? PALETTE.hanFruit
+                : PALETTE.hanRice;
+      for (let k = 0; k < 5; k++) {
+        K.sph(sx - 0.9 + k * 0.45, hanGROUND + 0.55, sz + rand(-0.4, 0.4),
+              0.20, 0.13, 0.20, col, 6);
+      }
+      hanPoolBox(body, sx, hanGROUND + 0.3, sz, 2.4, 0.6, 1.4);
+      hanBlock(sx, sz, 1.3);
+    }
+    // the awning over the row, on poles
+    K.box(hanMARKET.x, hanGROUND + 2.5, hanMARKET.z - 9 + r * 6.0, 40, 0.09, 3.2,
+          r % 2 ? PALETTE.hanTarp : PALETTE.hanTarpRed);
+    for (let c = 0; c < 6; c++) {
+      K.cyl(hanMARKET.x - 18 + c * 7.2, hanGROUND + 1.25, hanMARKET.z - 9 + r * 6.0,
+            0.06, 2.5, PALETTE.hanPole, 0, 0, 0, 4);
+    }
+  }
+
+  // ---- Long Bien: a hundred years of French lattice over the Red River ---
+  const bx = hanBRIDGE.x;
+  for (let z = hanBRIDGE.z0; z < hanBRIDGE.z1; z += 8) {
+    const t = (z - hanBRIDGE.z0) / (hanBRIDGE.z1 - hanBRIDGE.z0);
+    const y = hanGROUND + hanDYKE.h - t * 1.5;
+    K.box(bx, y, z, 9.0, 0.34, 8.2, PALETTE.hanDeck);
+    hanPoolBox(body, bx, y - 0.4, z, 9.2, 0.9, 8.2);
+    // ...AND A PARAPET, WHICH IS NOT DECORATION. A nine-metre deck twenty-six
+    // metres above the Red River with nothing down either side of it is a
+    // walkway you fall off, and the chapter's way OUT is at the far end of it.
+    // Measured without them: every attempt to reach the head of the bridge
+    // ended in the water.
+    for (let sd = -1; sd <= 1; sd += 2) {
+      K.box(bx + sd * 4.3, y + 0.62, z, 0.30, 1.06, 8.2, PALETTE.hanSteel);
+      hanPoolBox(body, bx + sd * 4.55, y + 0.70, z, 0.45, 1.5, 8.2);
+    }
+    // the lattice: a truss that rises and falls, which is the whole silhouette
+    const rise = 3.2 + Math.abs(Math.sin(t * Math.PI * 3.2)) * 5.4;
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(bx + s * 4.4, y + rise * 0.5, z, 0.22, rise, 0.30, PALETTE.hanSteel);
+      K.box(bx + s * 4.4, y + rise, z, 0.26, 0.30, 8.2, PALETTE.hanSteel);
+      K.box(bx + s * 4.4, y + rise * 0.5, z, 0.16, 0.20, rise * 2.3, PALETTE.hanSteel,
+            0.9, 0, 0);
+      K.box(bx + s * 4.4, y + rise * 0.5, z, 0.16, 0.20, rise * 2.3, PALETTE.hanSteel,
+            -0.9, 0, 0);
+    }
+    if (((z - hanBRIDGE.z0) / 8) % 3 === 0) {
+      for (let s = -1; s <= 1; s += 2) {
+        K.cyl(bx + s * 4.4, y - 4, z, 0.5, 8, PALETTE.hanPier, 0, 0, 0, 8);
+      }
+    }
+  }
+  hanBlock(bx, (hanBRIDGE.z0 + hanBRIDGE.z1) / 2, 6);
+
+  // ---- the barber, on a wall, with a mirror nailed to a tree ------------
+  K.cyl(hanBARBER.x, hanGROUND + 2.6, hanBARBER.z, 0.42, 5.2, PALETTE.hanTrunk, 0, 0, 0, 8);
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.05;
+    K.sph(hanBARBER.x + Math.cos(a) * 2.0, hanGROUND + 5.8 + Math.sin(a * 2) * 0.7,
+          hanBARBER.z + Math.sin(a) * 2.0, 1.9, 1.3, 1.9,
+          i % 2 ? PALETTE.hanLeaf : PALETTE.hanLeafDk, 6);
+  }
+  K.box(hanBARBER.x + 0.5, hanGROUND + 1.55, hanBARBER.z, 0.06, 0.90, 0.62, PALETTE.hanMirrorFrame);
+  K.box(hanBARBER.x + 0.54, hanGROUND + 1.55, hanBARBER.z, 0.03, 0.78, 0.52, PALETTE.hanMirror);
+  K.box(hanBARBER.x + 1.6, hanGROUND + 0.44, hanBARBER.z, 0.5, 0.10, 0.5, PALETTE.hanChair);
+  K.box(hanBARBER.x + 1.85, hanGROUND + 0.75, hanBARBER.z, 0.10, 0.62, 0.5, PALETTE.hanChair);
+  hanPoolBox(body, hanBARBER.x, hanGROUND + 2, hanBARBER.z, 0.9, 4, 0.9);
+  hanBlock(hanBARBER.x, hanBARBER.z, 1.2);
+
+  // ---- the flower bicycle. Somebody's whole shop on two wheels. ---------
+  const F = hanMerger();
+  F.cyl(0, 0.34, 0.58, 0.34, 0.06, PALETTE.hanTyre, 0, 0, Math.PI / 2, 10);
+  F.cyl(0, 0.34, -0.58, 0.34, 0.06, PALETTE.hanTyre, 0, 0, Math.PI / 2, 10);
+  F.box(0, 0.52, 0, 0.07, 0.07, 1.20, PALETTE.hanBikeBody);
+  F.box(0, 0.72, -0.30, 0.07, 0.45, 0.07, PALETTE.hanBikeBody, 0.25, 0, 0);
+  F.box(0, 0.86, 0.42, 0.07, 0.62, 0.07, PALETTE.hanBikeBody, -0.2, 0, 0);
+  F.box(0, 1.10, 0.44, 0.50, 0.05, 0.06, PALETTE.hanChrome);
+  F.box(0, 0.96, -0.28, 0.22, 0.07, 0.34, PALETTE.hanSeat);
+  // the load: two panniers and a tower of it over the back wheel
+  const fcol = [PALETTE.hanFlow1, PALETTE.hanFlow2, PALETTE.hanFlow3, PALETTE.hanFlow4];
+  for (let i = 0; i < 26; i++) {
+    const a = i * 0.9, rr = 0.30 + (i % 4) * 0.13;
+    F.sph(Math.cos(a) * rr, 1.10 + (i % 7) * 0.10, -0.55 + Math.sin(a) * rr * 0.7,
+          0.17, 0.15, 0.17, fcol[i % 4], 6);
+  }
+  F.box(0, 0.62, -0.58, 0.78, 0.42, 0.44, PALETTE.hanBasket);
+  const fm = new THREE.Mesh(F.build(), hanVCF());
+  fm.castShadow = true;
+  fm.position.set(-8, hanGROUND, -4);
+  fm.rotation.y = 0.9;
+  hanFlowerBike = fm;
+  root.add(fm);
+  hanBlock(-8, -4, 1.0);
+
+  // ---- the shuttlecock circle, on the lake's west walk ------------------
+  for (let i = 0; i < hanCauN; i++) {
+    const a = i * (6.283 / hanCauN);
+    const P = hanMerger();
+    P.box(0, 0.42, 0, 0.34, 0.84, 0.24, PALETTE.hanCauLeg);
+    P.box(0, 1.10, 0, 0.42, 0.56, 0.28, i % 2 ? PALETTE.hanWash1 : PALETTE.hanWash3);
+    P.box(0, 1.46, 0, 0.20, 0.18, 0.20, PALETTE.hanSkin);
+    P.sph(0, 1.64, 0, 0.19, 0.20, 0.19, PALETTE.hanSkin, 8);
+    P.sph(0, 1.71, -0.02, 0.20, 0.15, 0.20, PALETTE.hanHair, 6);
+    for (let s = -1; s <= 1; s += 2) P.box(s * 0.28, 1.06, 0, 0.11, 0.54, 0.16, PALETTE.hanSkin);
+    const pm = new THREE.Mesh(P.build(), hanVCF());
+    pm.castShadow = true;
+    pm.position.set(hanCAU.x + Math.cos(a) * 3.4, hanGROUND, hanCAU.z + Math.sin(a) * 3.4);
+    pm.rotation.y = a + Math.PI;
+    root.add(pm);
+    hanCauFolk.push({ m: pm, a: a, ph: rand(0, 6.28) });
+  }
+  const S = hanMerger();
+  S.cyl(0, 0.02, 0, 0.055, 0.05, PALETTE.hanCauBase, 0, 0, 0, 8);
+  for (let i = 0; i < 4; i++) {
+    S.box(0, 0.10, 0, 0.02, 0.18, 0.09, PALETTE.hanCauFeather, 0.2, i * 0.78, 0);
+  }
+  const sm = new THREE.Mesh(S.build(), hanVCF());
+  sm.castShadow = false;
+  sm.position.set(hanCAU.x, hanGROUND + 1.4, hanCAU.z);
+  hanShuttle = sm;
+  root.add(sm);
+  hanBlock(hanCAU.x, hanCAU.z, 2.6);
+
+  const m = new THREE.Mesh(K.build(), hanVCF());
+  m.castShadow = true; m.receiveShadow = true;
+  root.add(m);
+  hanPoolDone(game, body);
+}
+
+/**
+ * THE SHUTTLECOCK. Five people in a ring keeping one thing in the air, and it
+ * is the only thing on this map that is neither traffic nor still.
+ *
+ * Da cau is played with the FEET, so the ball never goes above about three
+ * metres and the whole circle rotates on it. Standing in the middle of them is
+ * the task, and what happens then is that they keep playing THROUGH you, which
+ * is the joke: the rally does not stop for a capybara.
+ */
+function hanUpdateCau(game, dt) {
+  if (!hanShuttle) return;
+  hanCauT += dt;
+  const leg = 1.35;
+  const k = (hanCauT % leg) / leg;
+  const from = Math.floor(hanCauT / leg) % hanCauN;
+  const to = (from + 1 + (Math.floor(hanCauT / leg / hanCauN) % 2)) % hanCauN;
+  const a0 = from * (6.283 / hanCauN), a1 = to * (6.283 / hanCauN);
+  const x0 = hanCAU.x + Math.cos(a0) * 3.0, z0 = hanCAU.z + Math.sin(a0) * 3.0;
+  const x1 = hanCAU.x + Math.cos(a1) * 3.0, z1 = hanCAU.z + Math.sin(a1) * 3.0;
+  hanShuttle.position.set(lerp(x0, x1, k), hanGROUND + 0.55 + Math.sin(k * Math.PI) * 2.1,
+                          lerp(z0, z1, k));
+  hanShuttle.rotation.set(Math.sin(hanCauT * 6) * 0.4, hanCauT * 3, 0);
+  for (let i = 0; i < hanCauFolk.length; i++) {
+    const f = hanCauFolk[i];
+    const kick = (i === from && k < 0.18) ? 1 - k / 0.18 : 0;
+    f.m.position.y = hanGROUND + kick * 0.16;
+    f.m.rotation.y = f.a + Math.PI + Math.sin(hanTime * 1.4 + f.ph) * 0.18 - kick * 0.4;
+  }
+  if (k < dt * 2 && hanGame) {
+    hanCue('tick', hanShuttle.position.x, hanShuttle.position.y, hanShuttle.position.z,
+           0.16, rand(2.6, 3.4), 60);
+  }
+  const capy = game.capy;
+  if (!hanCauDone && capy && capy.position) {
+    const p = capy.position;
+    if (Math.hypot(p.x - hanCAU.x, p.z - hanCAU.z) < 2.6 && capy.grounded) {
+      hanQuietT += dt;
+      if (hanQuietT > 4.5) {
+        hanCauDone = true;
+        hanTask('shuttlecock');
+        if (typeof game.punch === 'function') game.punch(0.20);
+        hanToast('nobody has dropped it. nobody has mentioned you either.');
+      }
+    } else hanQuietT = 0;
+  }
+}
+
+// ============================================================== THE PEOPLE ===
+/**
+ * SIXTY-FOUR OF THEM ON THE PAVEMENTS, plus the eight who talk.
+ *
+ * The instanced crowd does one thing that no other crowd in this game does: it
+ * SITS. Half of them are on a stool at eighteen centimetres, facing a wall,
+ * eating; the rest are walking, and the walkers are the only ones that move.
+ * That ratio is the whole of what a Hanoi pavement looks like and it costs one
+ * draw call.
+ */
+const hanFOLK_COL = ['hanCrowdA', 'hanCrowdB', 'hanCrowdC', 'hanCrowdD', 'hanCrowdE'];
+function hanFolkGeo(shirt, hat) {
+  const K = hanMerger();
+  K.box(0, 0.40, 0, 0.32, 0.80, 0.22, PALETTE.hanCrowdLeg);
+  K.box(0, 1.06, 0, 0.42, 0.54, 0.26, shirt);
+  K.box(0, 1.40, 0, 0.19, 0.18, 0.19, PALETTE.hanSkin);
+  K.sph(0, 1.57, 0, 0.18, 0.19, 0.18, PALETTE.hanSkin, 6);
+  K.sph(0, 1.64, -0.02, 0.19, 0.14, 0.19, PALETTE.hanHair, 6);
+  for (let s = -1; s <= 1; s += 2) K.box(s * 0.27, 1.02, 0, 0.10, 0.50, 0.14, shirt);
+  // ...and the non la, which about a third of them are wearing
+  if (hat) K.cone(0, 1.76, 0, 0.34, 0.26, PALETTE.hanConical, 0, 0, 0, 8);
+  return K.build();
+}
+function hanBuildFolk(root) {
+  hanInitLanes();
+  hanFolkData = new Float32Array(hanFOLK_N * 6);   // lane s dir speed sit phase
+  for (let i = 0; i < hanFOLK_N; i++) {
+    const L = randInt(0, hanLANES.length - 1);
+    hanFolkData[i * 6] = L;
+    hanFolkData[i * 6 + 1] = rand(0, hanLaneTotal[L]);
+    hanFolkData[i * 6 + 2] = (i & 1) ? 1 : -1;
+    hanFolkData[i * 6 + 3] = rand(0.8, 1.5);
+    hanFolkData[i * 6 + 4] = Math.random() < 0.5 ? 1 : 0;
+    hanFolkData[i * 6 + 5] = rand(0, 6.28);
+  }
+  // ten variants: five shirts, with and without the hat. See the note at the
+  // top of this block for why this is not one mesh with an instanceColor.
+  for (let v = 0; v < 10; v++) {
+    const idx = [];
+    for (let i = 0; i < hanFOLK_N; i++) if (i % 10 === v) idx.push(i);
+    hanFolkGroups.push(idx);
+    const mm = new THREE.InstancedMesh(hanFolkGeo(PALETTE[hanFOLK_COL[v % 5]], v >= 5),
+                                       hanVCF(), Math.max(1, idx.length));
+    mm.count = idx.length;
+    mm.castShadow = true; mm.receiveShadow = false;
+    mm.frustumCulled = false;
+    hanFolkMeshes.push(mm);
+    root.add(mm);
+  }
+  hanUpdateFolk(0);
+}
+function hanUpdateFolk(dt) {
+  if (!hanFolkMeshes.length) return;
+  for (let v = 0; v < hanFolkMeshes.length; v++) {
+   const idx = hanFolkGroups[v], mm = hanFolkMeshes[v];
+   for (let k = 0; k < idx.length; k++) {
+    const i = idx[k];
+    const o = i * 6;
+    const L = hanFolkData[o] | 0;
+    const sit = hanFolkData[o + 4] > 0.5;
+    if (!sit) {
+      hanFolkData[o + 1] += hanFolkData[o + 3] * hanFolkData[o + 2] * dt;
+      const total = hanLaneTotal[L];
+      if (hanLANES[L].closed) hanFolkData[o + 1] = ((hanFolkData[o + 1] % total) + total) % total;
+      else if (hanFolkData[o + 1] > total || hanFolkData[o + 1] < 0) hanFolkData[o + 2] *= -1;
+    }
+    hanLaneAtS(L, hanFolkData[o + 1], hanTmp);
+    const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+    // ON THE PAVEMENT, and the sitters are further out and facing the wall
+    const off = (i & 2 ? 1 : -1) * (hanLANES[L].w + (sit ? 2.9 : 1.7));
+    const yaw = sit ? (hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2))
+                    : (hanFolkData[o + 2] > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI);
+    const bob = sit ? 0 : Math.abs(Math.sin(hanTime * 3.4 + hanFolkData[o + 5])) * 0.045;
+    hanE.set(0, yaw, 0, 'YXZ');
+    hanM.compose(hanV3.set(hanTmp.x + nx * off, hanGROUND + bob - (sit ? 0.52 : 0),
+                           hanTmp.z + nz * off),
+                 hanQ.setFromEuler(hanE), hanSc.set(1, sit ? 0.66 : 1, 1));
+    mm.setMatrixAt(k, hanM);
+   }
+   mm.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/** The lanterns, over the lake walk and the puppet theatre. */
+function hanBuildLanterns(root) {
+  const K = hanMerger();
+  K.cyl(0, 0, 0, 0.17, 0.30, PALETTE.hanLantern, 0, 0, 0, 8);
+  K.cyl(0, 0.17, 0, 0.07, 0.08, PALETTE.hanLanternDk, 0, 0, 0, 6);
+  K.cyl(0, -0.17, 0, 0.06, 0.08, PALETTE.hanLanternDk, 0, 0, 0, 6);
+  K.box(0, 0.30, 0, 0.03, 0.28, 0.03, PALETTE.hanLanternDk);
+  // IT IS TEN IN THE MORNING. At 0.35 of emissive under a white sky these
+  // came out as pink barrels a metre across, which is what an emissive term
+  // does when there is nothing for it to be brighter THAN. A lantern in
+  // daylight is a red paper object, and that is all it is.
+  const m = new THREE.InstancedMesh(K.build(),
+    grain(mat(0xffffff, { vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.10 }),
+          { amount: 0 }), 60);
+  m.castShadow = false; m.receiveShadow = false;
+  m.frustumCulled = false;
+  m.userData.noShadow = true;
+  let n = 0;
+  for (let i = 0; i < 36 && n < 60; i++) {
+    const a = i / 36 * 6.283;
+    const x = hanLAKE.cx + Math.cos(a) * (hanLAKE.rx + 5), z = hanLAKE.cz + Math.sin(a) * (hanLAKE.rz + 5);
+    if (hanTerrain(x, z) < hanWATER + 0.3) continue;
+    hanM.compose(hanV3.set(x, hanGROUND + 3.2, z), hanQ.identity(), hanSc.set(1, 1, 1));
+    m.setMatrixAt(n++, hanM);
+  }
+  for (let i = 0; i < 12 && n < 60; i++) {
+    hanM.compose(hanV3.set(hanPUPPET.x - 8 + i * 1.5, hanGROUND + 3.6, hanPUPPET.z + 2.4),
+                 hanQ.identity(), hanSc.set(1, 1, 1));
+    m.setMatrixAt(n++, hanM);
+  }
+  for (let i = 0; i < 12 && n < 60; i++) {
+    hanM.compose(hanV3.set(hanHUC.x0 - 2 + i * 1.4, hanGROUND + 4.2, hanHUC.z0 + 1.2),
+                 hanQ.identity(), hanSc.set(1, 1, 1));
+    m.setMatrixAt(n++, hanM);
+  }
+  m.count = n;
+  m.instanceMatrix.needsUpdate = true;
+  hanLanternMesh = m;
+  root.add(m);
+}
+
+// ================================================================ LOCALS =====
+/**
+ * SEVEN PEOPLE, AND EVERY ONE OF THEM IS SITTING DOWN.
+ *
+ * That is the chapter's line on itself. In eighteen places the locals have
+ * stood on a jetty, a quay, a plaza or a beach and looked at the animal; here
+ * the entire population is on an eighteen-centimetre stool facing a wall with a
+ * bowl in their hands, and a capybara is the fourth strangest thing to come
+ * down that pavement this morning.
+ *
+ * Every anchor is probed against terrainHeight rather than guessed.
+ */
+function hanBuildLocals(game) {
+  if (typeof game.addLocal !== 'function') return;
+  const put = function (x, z, o) {
+    const h = hanTerrain(x, z);
+    if (h < hanWATER + 0.3) {
+      console.warn('[hanoi] local at', x, z, 'is in the lake (' + h.toFixed(2) + ') - skipped');
+      return null;
+    }
+    o.biome = 'hanoi';
+    o.x = x; o.z = z; o.y = h;
+    return game.addLocal(o);
+  };
+
+  hanLocPho = put(12, 14, {
+    figure: { shirt: PALETTE.hanWash1, hat: PALETTE.hanConical }, face: -2.2, near: 8,
+    lines: ['Sit. There is a stool. There is always a stool.',
+            'You are in the way of the bikes. Everybody is in the way of the bikes.',
+            'It is beef. It is always beef before eleven.'],
+    wheek: ['Yes. Very good. Sit down.'],
+    onTask: { 'cross-the-road': ['You did not stop. Good.'] },
+  });
+  hanLocBia = put(hanBIA.x - 4.5, hanBIA.z + 3.5, {
+    figure: { shirt: PALETTE.hanWash3 }, face: -0.7, near: 9,
+    lines: ['Four thousand a glass. It has been four thousand since 1994.',
+            'Do not knock the stools over. Everybody knocks the stools over.',
+            'That corner has been like this since my grandmother.'],
+    wheek: ['Mot hai ba, YO.'],
+    onTask: { 'the-stools': ['I said do not. Nobody has ever not.'] },
+  });
+  hanLocRail = put(hanTRAIN.x1 - 12, hanTRAIN.z + 3.6, {
+    figure: { shirt: PALETTE.hanWash2, hat: PALETTE.hanConical }, face: 3.0, near: 10,
+    lines: ['Twice a day. You get used to it. You do not get used to it.',
+            'When the horn goes, get in a doorway. Any doorway.',
+            'Forty-five centimetres. I have measured it. Twice.'],
+    wheek: ['Not now. In a minute you will want to be quiet.'],
+    onTask: { 'the-train': ['I saw where you were standing. Do not do it again.'] },
+  });
+  hanLocFlower = put(-8, -7.5, {
+    figure: { shirt: PALETTE.hanWash4, hat: PALETTE.hanConical }, face: 0.4, near: 8,
+    lines: ['Lotus in the morning, chrysanthemum after. Nothing after four.',
+            'The whole shop is on the bicycle. It has to be.',
+            'Do not lean on it. Please do not lean on it.'],
+    wheek: ['Everything on that bicycle is somebody’s Tuesday.'],
+  });
+  hanLocBarber = put(hanBARBER.x + 2.6, hanBARBER.z + 1.2, {
+    figure: { shirt: PALETTE.hanShirtW }, face: -1.6, near: 7,
+    lines: ['Sit. Twenty minutes. You will look completely different.',
+            'The mirror has been on that tree for thirty-one years.',
+            'I do not do animals. I have never been asked.'],
+    wheek: ['You do not need a haircut. You need a WASH.'],
+  });
+  hanLocPuppet = put(hanPUPPET.x - 7, hanPUPPET.z + 2.8, {
+    figure: { shirt: PALETTE.hanWash1 }, face: -0.2, near: 9,
+    lines: ['They are standing in the water. The people are standing in the water.',
+            'Eleven hundred years. Nobody knows who started it.',
+            'You may look. You may not get in.'],
+    wheek: ['The dragon does that too. It is not as good at it.'],
+    onTask: { 'water-puppets': ['I did say.'] },
+  });
+  hanLocMarket = put(hanMARKET.x + 19, hanMARKET.z - 2, {
+    figure: { shirt: PALETTE.hanWash3, hat: PALETTE.hanConical }, face: -1.5708, near: 9,
+    lines: ['Everything here was alive at six. Some of it still is.',
+            'Herbs at the front, fish at the back. Follow your nose.',
+            'You are the largest thing in this market and you are not for sale.'],
+    wheek: ['Yes yes. Everybody has an opinion.'],
+  });
+
+  if (typeof game.addExchange === 'function' && hanLocPho && hanLocBia) {
+    game.addExchange({ biome: 'hanoi', a: hanLocPho, b: hanLocBia, gap: 28, lines: [
+      ['There is a very large rodent on the pavement.', 'There is a very large rodent on every pavement.'],
+      ['It crossed the road.', 'Standing still?'],
+      ['Walking. It just walked.', 'Then it is not a tourist.'],
+      ['Somebody should tell the trains.', 'Somebody should tell the trains a lot of things.'],
+      ['Four thousand.', 'It is always four thousand.'],
+    ] });
+  }
+}
+
+/** The wheek. It does one thing here, and it is not being polite. */
+function hanWheek(game) {
+  const capy = game.capy;
+  if (!capy || !capy.position) return;
+  const p = capy.position;
+  // in the traffic it is a HORN, and horns are answered
+  if (hanLaneAt(p.x, p.z) < hanLaneW + 2 && hanBikeN) {
+    let n = 0;
+    for (let i = 0; i < hanBikeN; i += 3) {
+      hanBikeAt(i, hanV3b);
+      const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
+      if (d < 34) {
+        n++;
+        hanCue('bark', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.28 - d * 0.006, 0.05, 0.28),
+               rand(1.9, 3.3), 80);
+      }
+      if (n > 9) break;
+    }
+    if (n > 3 && !hanToldFlow) {
+      hanToldFlow = true;
+      hanToast('everybody answered. that is what a horn is FOR here.');
+    }
+  }
+  // ...and in the alley, ten seconds before a train, it is a very bad idea
+  if (hanTrainS >= 0 && hanInRect(hanZ.alley, p.x, p.z)) {
+    hanToast('nobody can hear you. there is a train.');
+  }
+}
+
+// ================================================================ TASKS ======
+function hanUpdateTasks(game, dt) {
+  const capy = game.capy;
+  if (!capy || !capy.position) return;
+  const p = capy.position;
+
+  if (!hanArrived) {
+    hanArrived = true;
+    if (game.biome && game.biome.current === 'hanoi') hanTask('to-hanoi');
+  }
+
+  // ---- the red bridge ---------------------------------------------------
+  if (!hanHucDone) {
+    const bx = (hanHUC.x0 + hanHUC.x1) / 2, bz = (hanHUC.z0 + hanHUC.z1) / 2;
+    if (Math.hypot(p.x - bx, p.z - bz) < 5 && p.y > hanGROUND + 1.1) {
+      hanHucDone = true;
+      hanTask('the-huc');
+      hanToast('the bridge of the morning sunlight, and it is a hundred and thirty years old.');
+    }
+  }
+  // ---- the tower on the islet ------------------------------------------
+  if (!hanTowerDone && Math.hypot(p.x - hanTOWER.x, p.z - hanTOWER.z) < 7.5 &&
+      p.y > hanGROUND && capy.grounded) {
+    hanTowerDone = true;
+    hanTask('turtle-tower');
+    if (typeof game.punch === 'function') game.punch(0.24);
+    hanToast('there is supposed to be a turtle under there. there was, until 2016.');
+  }
+  // ---- the old bridge ---------------------------------------------------
+  if (!hanBridgeDone && hanInRect(hanZ.bridge, p.x, p.z) && p.z > hanBRIDGE.z0 + 24 &&
+      p.y > hanGROUND + 4) {
+    hanBridgeDone = true;
+    hanTask('long-bien');
+    hanToast('nineteen hundred and two, and it is still the only way across on foot.');
+  }
+  // ---- the barber's mirror ---------------------------------------------
+  if (!hanMirrorDone && Math.hypot(p.x - (hanBARBER.x + 1.2), p.z - hanBARBER.z) < 3.0 &&
+      p.y < hanGROUND + 2.6) {
+    hanMirrorDone = true;
+    hanTask('barber');
+    hanSfx('pop', { volume: 0.4, pitch: 1.6 });
+    hanToast('it has been looked into by thirty-one years of Hanoi and never by that.');
+  }
+  // ---- the flower bicycle ----------------------------------------------
+  if (!hanFlowerDone && hanFlowerBike) {
+    for (let i = 0; i < hanFlowerProps.length; i++) {
+      if (hanFlowerProps[i] && hanFlowerProps[i].held) {
+        hanFlowerDone = true;
+        hanTask('flower-bike');
+        hanToast('that was somebody’s whole Tuesday.');
+        break;
+      }
+    }
+  }
+  // ---- the pho and the egg coffee --------------------------------------
+  if (hanPhoProp && !hanPhoGone && hanPhoProp.held) {
+    hanPhoGone = true;
+    hanTask('pho-raid');
+    hanSfx('splash', { volume: 0.4, pitch: 1.5 });
+    hanToast('it is a big bowl. you are a big rodent. it works out.');
+  }
+  if (hanCoffeeProp && !hanCoffeeGone && hanCoffeeProp.held) {
+    hanCoffeeGone = true;
+    hanTask('egg-coffee');
+    hanToast('there is an egg in it. that is not a mistake.');
+  }
+  // ---- the first thing the chapter says about itself --------------------
+  if (!hanToldLake && Math.hypot(p.x - hanLAKE.cx, p.z - hanLAKE.cz) <
+      Math.max(hanLAKE.rx, hanLAKE.rz) + 8 && hanTime > 3) {
+    hanToldLake = true;
+    hanToast('inside the ring road it is quiet. that is the only rule this city has.');
+  }
+}
+
+// ============================================================== AMBIENCE =====
+/**
+ * WHAT THIS PLACE SOUNDS LIKE, and it is the loudest bed in the game.
+ *
+ * Two hundred and forty two-stroke engines, a horn about once a second
+ * somewhere, and about four hundred people talking. The horns come out of
+ * hanUpdateBikes, positioned; this is everything else, and it changes in three
+ * places: on the lake walk it drops away to birds and a shuttlecock, in the
+ * alley it is nearly silent until it very much is not, and in the market it is
+ * all voices.
+ */
+function hanUpdateAmbience(game, dt) {
+  hanAmbT -= dt;
+  const capy = game.capy;
+  const p = capy && capy.position;
+  if (!p) return;
+  // the engines. Always, from wherever the nearest few are: this is the bed.
+  if (hanBikeN && Math.random() < dt * 7) {
+    const i = randInt(0, hanBikeN - 1);
+    hanBikeAt(i, hanV3b);
+    const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
+    if (d < 70) {
+      hanCue('hiss', hanV3b.x, hanV3b.y, hanV3b.z, clamp(0.16 - d * 0.0018, 0.02, 0.16),
+             rand(0.7, 1.4), 90);
+    }
+  }
+  if (hanAmbT > 0) return;
+  const onLake = Math.hypot(p.x - hanLAKE.cx, p.z - hanLAKE.cz) <
+                 Math.max(hanLAKE.rx, hanLAKE.rz) + 6;
+  const inAlley = hanInRect(hanZ.alley, p.x, p.z);
+  const inMkt = hanInRect(hanZ.market, p.x, p.z);
+  const r = Math.random();
+  if (inAlley && hanTrainS < 0) {
+    // the quietest place in the chapter, and it is nine metres from the loudest
+    if (r < 0.4) hanCue('tick', p.x + rand(-8, 8), p.y + 2, p.z + rand(-4, 4), rand(0.05, 0.10), rand(1.8, 2.6));
+    else if (r < 0.75) hanCue('rustle', p.x + rand(-9, 9), p.y, p.z + rand(-4, 4), rand(0.05, 0.10), rand(1.1, 1.6));
+    else hanCue('pop', p.x + rand(-10, 10), p.y, p.z + rand(-4, 4), rand(0.04, 0.09), rand(1.4, 2.2));
+    hanAmbT = rand(2.2, 5.5);
+  } else if (onLake) {
+    if (r < 0.34) hanCue('gull', p.x + rand(-24, 24), p.y + 8, p.z + rand(-24, 24), rand(0.05, 0.10), rand(1.9, 2.6));
+    else if (r < 0.62) hanCue('rustle', p.x + rand(-14, 14), p.y + 3, p.z + rand(-14, 14), rand(0.05, 0.11), rand(0.9, 1.4));
+    else if (r < 0.84) hanCue('splash', hanLAKE.cx + rand(-30, 30), hanWATER, hanLAKE.cz + rand(-20, 20), rand(0.04, 0.09), rand(0.9, 1.4));
+    else hanCue('chime', hanNGOC.x, hanGROUND + 5, hanNGOC.z, rand(0.05, 0.10), rand(0.8, 1.1));
+    hanAmbT = rand(3, 8);
+  } else if (inMkt) {
+    if (r < 0.5) hanCue('bark', p.x + rand(-16, 16), p.y + 1, p.z + rand(-10, 10), rand(0.06, 0.12), rand(1.2, 1.9));
+    else if (r < 0.8) hanCue('rustle', p.x + rand(-14, 14), p.y, p.z + rand(-9, 9), rand(0.06, 0.12), rand(1.0, 1.5));
+    else hanCue('pop', p.x + rand(-12, 12), p.y, p.z + rand(-9, 9), rand(0.05, 0.10), rand(1.6, 2.4));
+    hanAmbT = rand(1.4, 3.6);
+  } else {
+    if (r < 0.30) hanCue('bark', p.x + rand(-20, 20), p.y + 1, p.z + rand(-20, 20), rand(0.05, 0.11), rand(1.3, 2.1));
+    else if (r < 0.56) hanCue('tick', p.x + rand(-16, 16), p.y + 3, p.z + rand(-16, 16), rand(0.04, 0.09), rand(2.0, 3.0));
+    else if (r < 0.80) hanCue('rustle', p.x + rand(-16, 16), p.y, p.z + rand(-16, 16), rand(0.05, 0.10), rand(1.0, 1.6));
+    else hanCue('pop', p.x + rand(-18, 18), p.y, p.z + rand(-18, 18), rand(0.05, 0.10), rand(1.5, 2.3));
+    hanAmbT = rand(1.6, 4.2);
+  }
+}
+
+// ============================================================== THE BUILD ====
+// THE SPAWN. On the south-west walk of Hoan Kiem, five metres off the ring
+// road, facing north-east across the water at the tower.
+//
+// It has BOTH halves of the chapter in one frame and that is why it is here:
+// eighty metres of still green water in front of you, and the traffic going
+// past your shoulder. The first version of it was at (-44, -74), which is
+// inside the lake — swept for, this time, against terrainHeight, navBlocked
+// and the traffic test rather than picked off the map, which is what chapter
+// 18 learned the hard way after four spawns inside four different objects.
+const hanSPAWN = { x: -60, y: 2.4, z: -78 };
+const hanSPAWN_YAW = -1.94;
+
+let hanSpawned = false;
+
+function hanBuild(game) {
+  if (hanBuilt) return;
+  hanBuilt = true;
+  hanInitGeos();
+  hanInitLanes();
+
+  hanRoot = new THREE.Group();
+  hanRoot.name = 'hanoi';
+  game.scene.add(hanRoot);
+
+  hanBuildGround(game, hanRoot);
+  hanBuildGroundBody(game);
+  hanBuildLake(hanRoot);
+  hanBuildStreets(game, hanRoot);
+  hanBuildQuarter(game, hanRoot);
+  hanBuildTrainStreet(game, hanRoot);
+  hanBuildLakeSet(game, hanRoot);
+  hanBuildOddments(game, hanRoot);
+  hanBuildStools(game, hanRoot);
+  hanBuildCables(game, hanRoot);
+  hanBuildBikes(game, hanRoot);
+  hanBuildRideBody(game);
+  hanBuildFolk(hanRoot);
+  hanBuildLanterns(hanRoot);
+  // LAST, because everything above may have asked for a lit window or a sign
+  // and these are the two draw calls all of them land in.
+  hanBuildWindows(hanRoot);
+  hanBuildSigns(hanRoot);
+  hanBuildLocals(game);
+
+  if (typeof game.registerShadowTarget === 'function' && hanTrainG) {
+    game.registerShadowTarget(hanTrainG);
+  }
+}
+
+// ============================================================== CREATE =======
+export function createHanoi(game) {
+  hanGame = game;
+
+  game.events.on('capy:wheek', function () { hanWheek(game); });
+
+  const api = {
+    built() { return hanBuilt; },
+    terrainHeight: hanTerrain,
+    slopeAt: hanSlope,
+    waterLevel: hanWATER,
+    isOverWater: hanIsOverWater,
+    waterHeightAt: hanWaterHeightAt,
+    groundSlip: hanGroundSlip,
+    surfacePitch: hanSurfacePitch,
+    inZone: hanInZone,
+    navBlocked: hanNavBlocked,
+    randomPointIn: hanRandomPointIn,
+    SPAWN: hanSPAWN,
+    /**
+     * THREE METRES OF GREEN WATER WITH A TOWER IN THE MIDDLE OF IT, and you
+     * can go under it. It is the shallowest divable water in the game and
+     * that is exactly right: you can see the bottom of Hoan Kiem from the
+     * bank, which is most of why anybody stands on the bank.
+     */
+    canDive: true,
+    /**
+     * A DECLARED FRAME while the animal is on a scooter. Horizontal only —
+     * NOTHING here assigns the passenger's vertical, because the floor of a
+     * footwell does not rise and a declared frame plus an assigned velocity is
+     * the Volo bug written down in CONTRACT.md.
+     */
+    carryFrame() { return hanRider >= 0 ? hanFrame : null; },
+
+    // ---- what the rest of the game asks about this chapter ---------------
+    /** 0..1 — how far the street has folded itself away. 1 is a train coming. */
+    folded() { return hanFoldK; },
+    /** Is there a train in the alley right now, and how far along. */
+    trainOut() { return hanTrainS >= 0; },
+    /** How many of them have had to go round you on this crossing. */
+    swerved() { return Math.round(hanSwerved); },
+    /** The crossing state machine, for the harness: [lane, ok, from, dither]. */
+    crossState() { return [hanCrossLane, hanCrossOk ? 1 : 0, hanCrossFrom, +hanDither.toFixed(2)]; },
+    /** Which scooter is carrying you, or -1. */
+    riding() { return hanRider; },
+    /** How many stools are down right now. */
+    stools() { return hanStoolDown; },
+    /** 0..1 — how much you are in the traffic. The harness and the score read it. */
+    inTraffic() {
+      const capy = hanGame && hanGame.capy;
+      if (!capy || !capy.position) return 0;
+      const d = hanLaneAt(capy.position.x, capy.position.z);
+      return clamp(1 - (d - hanLaneW) / 4, 0, 1);
+    },
+
+    // ---- landmarks. A fixture is an object, a thing that moves is a call. --
+    lake: { x: hanLAKE.cx, z: hanLAKE.cz + 18 },
+    tower: { x: hanTOWER.x, z: hanTOWER.z },
+    ngoc: { x: hanNGOC.x, z: hanNGOC.z },
+    huc: { x: (hanHUC.x0 + hanHUC.x1) / 2, z: (hanHUC.z0 + hanHUC.z1) / 2 },
+    puppet: { x: hanPUPPET.x, z: hanPUPPET.z - 3 },
+    bia: { x: hanBIA.x, z: hanBIA.z },
+    market: { x: hanMARKET.x, z: hanMARKET.z },
+    barber: { x: hanBARBER.x + 1.6, z: hanBARBER.z },
+    rails: { x: (hanTRAIN.x0 + hanTRAIN.x1) / 2, z: hanTRAIN.z },
+    bridge: { x: hanBRIDGE.x, z: hanBRIDGE.z0 + 30 },
+    cau: { x: hanCAU.x, z: hanCAU.z },
+    flowers: { x: -8, z: -4 },
+    /** These MOVE — ask, never cache. Each gets its OWN scratch vector. */
+    crossing() {
+      // the nearest point on the nearest lane, which is where a crossing starts
+      const capy = hanGame && hanGame.capy;
+      const px = capy && capy.position ? capy.position.x : 0;
+      const pz = capy && capy.position ? capy.position.z : 0;
+      hanLaneAt(px, pz);
+      hanLaneAtS(hanLaneI, hanLaneS, hanTmp2);
+      hanV3c.set(hanTmp2.x, hanGROUND, hanTmp2.z);
+      return hanV3c;
+    },
+    bike() {
+      const capy = hanGame && hanGame.capy;
+      if (!hanBikeN || !capy || !capy.position) return api.crossing();
+      let bi = 0, bd = 1e18;
+      for (let i = 0; i < hanBikeN; i++) {
+        hanBikeAt(i, hanV3b);
+        const d = Math.hypot(hanV3b.x - capy.position.x, hanV3b.z - capy.position.z);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      hanBikeAt(bi, hanV3d);
+      return hanV3d;
+    },
+    pho() {
+      if (!hanPhoProp || hanPhoGone) return api.bia;
+      hanV3.set(hanPhoProp.body.position.x, hanPhoProp.body.position.y, hanPhoProp.body.position.z);
+      return hanV3;
+    },
+
+    update(dt) {
+      if (!hanBuilt) return;
+      if (!game.biome.isActive('hanoi')) return;
+      hanTime += dt;
+      // the props are staged on the first LIVE frame: props.js may not exist
+      // when a lazily-built chapter is built.
+      if (!hanSpawned && game.physics && typeof game.physics.spawnProp === 'function') {
+        hanSpawned = true;
+        if (!hanPhoProp && !hanPhoGone) {
+          hanPhoProp = game.physics.spawnProp('phobowl', 11.2, 15.4, hanGROUND + 0.55);
+        }
+        if (!hanCoffeeProp && !hanCoffeeGone) {
+          // ...on a first-floor balcony, which is the whole task
+          hanCoffeeProp = game.physics.spawnProp('coffee', 6.2, 21.0, hanGROUND + 5.2);
+        }
+        if (!hanFlowerProps.length) {
+          for (let i = 0; i < 3; i++) {
+            const pr = game.physics.spawnProp('flowers', -8 + rand(-0.6, 0.6),
+                                              -4 + rand(-0.6, 0.6), hanGROUND + 1.5);
+            if (pr) hanFlowerProps.push(pr);
+          }
+        }
+      }
+      hanUpdateLake(dt);
+      hanUpdateBikes(game, dt);
+      hanUpdateRide(game, dt);
+      hanUpdateCrossing(game, dt);
+      hanUpdateTrain(game, dt);
+      hanUpdateStools(game, dt);
+      hanUpdatePuppets(game, dt);
+      hanUpdateCau(game, dt);
+      hanUpdateFolk(dt);
+      hanUpdateTasks(game, dt);
+      hanUpdateAmbience(game, dt);
+    },
+  };
+
+  game.biome.register('hanoi', {
+    ensureBuilt() { hanBuild(game); },
+    onEnter() {
+      // A fresh arrival is a fresh morning. Everything STAGED replays; the
+      // checklist is systems.js's business and stays ticked.
+      hanTime = 0;
+      hanSwerved = 0; hanBumpT = 0; hanHornT = 0;
+      if (hanBikeData) for (let i = 0; i < hanBikeN; i++) hanBikeData[i * hanBIKE_STRIDE + 9] = 0;
+      hanCrossLane = -1; hanCrossOk = false; hanDither = 0;
+      hanRider = -1; hanRideT = 0; hanRideDist = 0; hanRideGrace = 0; hanRideHave = false;
+      hanFrame.x = 0; hanFrame.z = 0;
+      if (hanRideBody) {
+        hanRideBody.position.set(0, -900, 0);
+        hanRideBody.velocity.setZero();
+        hanSyncBody(hanRideBody);
+      }
+      // THE TRAIN IS AWAY AGAIN, and its clock is reset to a third of the gap
+      // — near enough that a player who walks straight to the alley is not
+      // waiting ninety-six seconds, far enough that it is not there already.
+      hanTrainS = -1;
+      hanTrainT = hanTRAIN_GAP2 * 0.30;
+      hanTrainWarned = false; hanTrainNear = 99; hanTrainHave = false;
+      hanFoldK = 0;
+      if (hanTrainG) hanTrainG.visible = false;
+      if (hanTrainBody) {
+        hanTrainBody.position.set(0, -900, 0);
+        hanTrainBody.velocity.setZero();
+        hanSyncBody(hanTrainBody);
+      }
+      // ...and every stool is standing up again, for the same reason the
+      // champagne is stacked again in chapter 18: the tick on the list stays
+      // ticked and the SHOW replays.
+      if (hanStoolData) {
+        for (let i = 0; i < hanSTOOL_N; i++) {
+          hanStoolData[i * 8 + 2] = 0;
+          hanStoolData[i * 8 + 3] = 0; hanStoolData[i * 8 + 4] = 0;
+          hanStoolData[i * 8 + 6] = 0;
+        }
+        hanStoolDown = 0;
+        hanSyncStools();
+      }
+      hanArrived = false;
+      hanToldFlow = false; hanToldTrain = false; hanToldLake = false;
+      hanAmbT = 0; hanQuietT = 0; hanRiverT = 0;
+      hanSpawned = false;
+    },
+    onExit() {
+      hanRider = -1;
+      hanFrame.x = 0; hanFrame.z = 0;
+      if (hanRideBody) hanRideBody.velocity.setZero();
+      if (hanTrainBody) hanTrainBody.velocity.setZero();
+    },
+  });
+
+  game.hanoi = api;
+  return api;
+}

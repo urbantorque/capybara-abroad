@@ -1067,6 +1067,286 @@ export const PALETTE = {
   antBone:      0xd7ceb9,      // what the whalers left, and it is still there
   antWindow:    0xffd79a,
 
+  // ---- chapter 18: Monte Carlo --------------------------------------------
+  // THE ONLY CHAPTER SET AT BLUE HOUR, and the palette is built round the one
+  // fact that makes that hour worth drawing: the sky is still bright and it has
+  // gone COLD, while everything anybody switched on is warm. So there are two
+  // families here and almost nothing in between — a cool blue-grey sea, cool
+  // limestone, cool tarmac; and against them gilt, sodium, lamplight and the
+  // hundred and forty lit windows of a town on a hillside. Nothing is
+  // saturated: a principality at dusk is a pastel, and the loudest thing in the
+  // chapter is a red-and-white kerb.
+  monSea:        0x33648a,      // the Mediterranean with the light off it
+  monSeaDeep:    0x1d4568,
+  monSeaLt:      0x4a7fa4,
+  monBasin:      0x2a4f6d,      // ...and the basin, which holds the town instead
+  monBed:        0x7d8b8e,      // six metres down, and you can see it
+  monFoam:       0xe4eef2,
+  monQuay:       0xc4b9a2,
+  monQuayDk:     0xa2977f,
+  monConcrete:   0xb0aa9c,      // the tunnel, and it is the only brutal thing here
+  monConcreteDk: 0x8b8578,
+  monStone:      0xe8dcc0,      // belle-epoque limestone
+  monStoneDk:    0xd0c3a3,
+  monStoneSh:    0xa8987a,
+  monOchre:      0xdfbd85,      // ...and the two other colours a Ligurian street is
+  monRose:       0xdcae9a,
+  monRoof:       0xb5674a,      // terracotta
+  monRoofDk:     0x8e4c34,
+  monCopper:     0x74ab97,      // the Casino's oxidised cupolas
+  monCopperLt:   0x93c5b1,
+  monGold:       0xdcb264,      // and the gilt on everything else
+  monGoldDk:     0xb08a3f,
+  monMarble:     0xf6ecd2,      // warmed off the true cream: under a hemisphere
+                                //   the colour of the sky at twenty past eight,
+                                //   an honest 0xf1ead9 renders blue-grey and a
+                                //   room lit by six chandeliers looks like a
+                                //   car park
+  monMarbleDk:   0xdcc9a4,
+  monCeil:       0xecd9b4,
+  monCarpet:     0x8f3a3a,      // the one straight line in the building
+  monCarpetDk:   0x6d2a2c,
+  monChairR:     0x7e3a3c,
+  monBaize:      0x3c7355,      // the table
+  monBaizeDk:    0x2b5741,
+  monBrass:      0xc9a457,
+  monPaint:      0x7c6a52,      // whatever is in the frames. Nobody looks.
+  monPiano:      0x2b2a2e,
+  monPianoDk:    0x1d1c1f,
+  monKeyW:       0xf4efe2,
+  monKeyB:       0x232227,
+  monWheelWood:  0x6b4630,
+  monWheelRim:   0x8a5c3c,
+  monWheelGrn:   0x2f7a4a,      // the zero, and it happens once in thirty-seven
+  monWheelHub:   0xbfc3c8,
+  monBall:       0xf2eee2,
+  monChipR:      0xb04a44,
+  monChipK:      0x33343a,
+  monChipW:      0xefe7d4,      // ...and the plaque, which is the one you carry
+  monPotTerra:   0xb9714d,
+  monSoil:       0x6b5744,
+  monPalm:       0x5b8a5c,
+  monPalmDk:     0x466d49,
+  monHedge:      0x5d7a52,
+  monCypress:    0x445f46,
+  monBougain:    0xb4809a,      // the one flowering thing in the principality, and it
+                                //   is knocked back off the true magenta: bougainvillea
+                                //   at full chroma is the only saturated thing in the
+                                //   palette and it reads as a plastic tray from the road
+  monTrunk:      0x8a6a4a,
+  monTarmac:     0x45464e,      // the circuit
+  monTarmacLt:   0x5b5c65,
+  monKerbR:      0xbb4a41,      // ...and its kerbs, which are the loudest thing here
+  monKerbW:      0xeee8da,
+  monArmco:      0xb2b8bd,
+  monArmcoDk:    0x83898e,
+  monFence:      0x9aa29c,
+  monStandTier:  0xb6ab95,
+  monStandSeat:  0x5f7f9c,
+  monSodium:     0xffc478,      // the tunnel lights, and they are the whole marquee
+  monCarSilver:  0xcdd2d8,      // the car. Of course it is silver.
+  monCarDk:      0x808791,
+  monCarStripe:  0x8d97a2,
+  monCarRed:     0xb2453f,
+  monCarRedDk:   0x82302c,
+  monCarBlue:    0x3b5f88,
+  monCarBlueDk:  0x2a4562,
+  monCarGlass:   0x33404e,
+  monTyre:       0x2b2b30,
+  monWheelHubDk: 0x8d9298,
+  monHeadlamp:   0xfff0c4,
+  monTailLamp:   0xd6483f,
+  monHull:       0xf2efe6,      // a hundred and thirty feet of somebody else's money
+  monHullDk:     0xd6d0c2,
+  monTeak:       0xb08a55,
+  monTeakDk:     0x8a6a3f,
+  monMast:       0x9aa0a4,
+  monEnsign:     0xc4514a,
+  monCloth:      0xece5d6,
+  monFlute:      0xdfe8ea,
+  monAwning:     0xe2e7e6,
+  monAwningRed:  0xb0574f,
+  monTux:        0x282a33,      // and what everybody here is wearing
+  monShirt:      0xf5f2ea,
+  monSkin:       0xd8ac86,
+  monHair:       0x4a3a2e,
+  monGuard:      0xeeece4,      // the carabinier, in summer whites
+  monGuardTrim:  0x333b52,
+  monGuardBox:   0xdfd8c6,
+  monClock:      0xf0e6cd,
+  monMarshal:    0xdc9a3e,
+  monMarshalHat: 0xc07f2c,
+  monCrowdA:     0x6f7d8c,
+  monCrowdB:     0x8f6f74,
+  monCrowdC:     0x5f7a6a,
+  monCrowdD:     0x9a8a6a,
+  monCrowdE:     0x7a6f8c,
+  monLamp:       0xffdca4,
+  monLampWarm:   0xffc781,
+  monLampPost:   0x4a4f52,
+  monLampGrn:    0x8ce0a8,
+  monLampRed:    0xf08a80,
+  monWindow:     0xffe0ad,
+  monWindowCool: 0xbcd8ec,      // ...and the fifth of them with a television on
+  monPool:       0x6fa8bd,
+  monRock:       0x9a907c,      // Le Rocher
+  monRockDk:     0x736a58,
+  monSkyTop:     0x2f4d78,      // twenty past eight, and it has just gone
+  monSkyLow:     0xdba97e,
+  monHaze:       0x6a7ea0,
+  monSun:        0xffd0a2,
+
+  // ---- chapter 19: Hanoi ---------------------------------------------------
+  // TEN IN THE MORNING IN OCTOBER, twenty-nine degrees and eighty per cent
+  // humidity, and the palette is the exact opposite of chapter 18's on purpose:
+  // that one is a cold sky with warm lights in it and this one is a HOT WHITE
+  // sky with nothing switched on at all. Every colour here has had forty years
+  // of that sun on it — the mustard, the ochre and the jade are the three
+  // colours French colonial plaster fades to and they are on ninety per cent of
+  // the buildings — and against them there are exactly four saturated things: a
+  // red bridge, a blue tarpaulin, the plastic stools, and two hundred and forty
+  // motorbikes, none of which is the same colour as any other.
+  hanConcrete:   0xd8cfba,      // pavement, and there is a great deal of it
+  hanConcreteDk: 0xb6ad99,
+  hanDust:       0xc7b99c,
+  hanAsphalt:    0x5a5750,      // hot smooth road with no markings on it
+  hanKerb:       0xbfb6a2,
+  hanMud:        0xa07c56,      // the Red River is called that for a reason
+  hanRiver:      0x9c7550,
+  hanLake:       0x4f8168,      // Hoan Kiem, and it is GREEN. Not grey-green:
+                                //   at 0x6f8f66 the whole lake read as a lawn
+                                //   from any camera above about twenty metres,
+                                //   which is most of them.
+  hanLakeDeep:   0x2f5b4a,
+  hanLakeBed:    0x4a5a3e,
+  hanIslet:      0x9a9078,
+
+  // ---- the tube houses, and their three faded colours ---------------------
+  hanMustard:    0xdcbf72,
+  hanOchre:      0xd39a5f,
+  hanJade:       0x9fb79a,
+  hanPeach:      0xdfb098,
+  hanPlaster:    0xe3dac4,
+  hanTrim:       0xf0e9d6,
+  hanShutter:    0x5d7a56,      // and the shutters are always this green
+  hanShopDk:     0x4a4238,      // the open shopfront, which is a hole
+  hanTank:       0xb0b6b8,      // the water tank on every roof in the city
+  hanRail:       0x8b8578,
+  hanGlass:      0x8ca3a6,
+  hanWindow:     0xffe6b4,
+  hanWash1:      0xd7566a,      // somebody's washing, on every balcony
+  hanWash2:      0x4f7fa8,
+  hanWash3:      0xe0c04e,
+  hanWash4:      0xefe6d8,
+  hanTarp:       0x3f7fa6,      // the blue tarpaulin, and it is EVERYWHERE
+  hanTarpRed:    0xb84a3c,
+  hanSign1:      0xc23f34,      // the vertical painted signs
+  hanSign2:      0x2f6fa0,
+  hanSign3:      0xdaa520,
+  hanSign4:      0xe6e0cf,
+  hanPole:       0x8a8b84,
+  hanCable:      0x2e2c2a,      // ...and the ball of them between every pair
+
+  // ---- the traffic ---------------------------------------------------------
+  hanBike1:      0xd94f3d,
+  hanBike2:      0x3f6fa8,
+  hanBike3:      0xe0d9c8,
+  hanBike4:      0x4d8560,
+  hanBike5:      0xe6b23a,
+  hanBike6:      0x6a5f7c,
+  hanBikeBody:   0x9aa0a4,
+  hanSeat:       0x2f2c2a,
+  hanTyre:       0x2a2a2c,
+  hanChrome:     0xc8ccd0,
+  hanLampGlass:  0xfff2cc,
+  hanCrate:      0xb7855a,
+  hanCrate2:     0x4f7fa8,
+  hanRider:      0xd6d2c6,
+  hanRiderLeg:   0x3c4553,
+  hanHelmet:     0xe8e4d8,
+  hanVisor:      0x3a4650,
+  hanSkin:       0xdcae86,
+  hanHair:       0x2b2320,
+  hanConical:    0xe4d29a,      // the non la, and a third of them are in one
+
+  // ---- train street --------------------------------------------------------
+  hanBallast:    0x8e8577,
+  hanSleeper:    0x6b5b48,
+  hanRail2:      0x9a8f80,
+  hanGate:       0xd9d3c4,
+  hanGateRed:    0xc0392b,
+  hanLoco:       0x4a6b8a,      // a Vietnamese Railways loco is blue and cream
+  hanLocoDk:     0x33475c,
+  hanLocoRed:    0xb03a2e,
+  hanCar1:       0x54718c,
+  hanCar2:       0x6d8299,
+
+  // ---- the lake set --------------------------------------------------------
+  hanTowerSt:    0xcfc3a8,      // Thap Rua, which is limestone and moss
+  hanTowerDk:    0x9a9078,
+  hanTowerArch:  0x6a6152,
+  hanTempleW:    0xe8d9b4,
+  hanTempleR:    0x9c4a35,
+  hanTempleCol:  0xa8402f,
+  hanTempleDoor: 0x6d3a24,
+  hanHuc:        0xc4392c,      // the Huc bridge, and it is the ONE red here
+  hanHucDeck:    0xa8382c,
+  hanHucDk:      0x8a2c22,
+  hanCurtain:    0xa83a30,
+  hanPoolWall:   0xbdb3a0,
+  hanPup1:       0xc4452f,      // the water puppets, and they are lacquered
+  hanPup2:       0x2f6f8a,
+  hanPup3:       0xd9a63a,
+  hanPupFace:    0xf0dcbc,
+  hanPupHat:     0x8a6a3a,
+  hanLantern:    0xd9584a,
+  hanLanternDk:  0x8a2f28,
+  hanLeaf:       0x5f8451,
+  hanLeafDk:     0x466439,
+  hanTrunk:      0x7a6247,
+
+  // ---- the bia hoi corner, the market and the rest -------------------------
+  hanStoolA:     0xd94f3d,      // and there are ninety-six of them
+  hanStoolB:     0x3f7fa6,
+  hanStoolC:     0x4d8560,
+  hanStoolD:     0xe6b23a,
+  hanTableTop:   0xdcd4c2,
+  hanTableLeg:   0x9aa0a4,
+  hanBeer:       0xe8c96a,
+  hanKeg:        0xb0b6b8,
+  hanStallTop:   0xc8bda6,
+  hanStallLeg:   0x8f8878,
+  hanHerb:       0x6f9450,
+  hanChilli:     0xc0392b,
+  hanFish:       0xb8c0c4,
+  hanFruit:      0xe0a03a,
+  hanRice:       0xefe6cf,
+  hanBasket:     0xc0a068,
+  hanChair:      0xb85a3a,
+  hanMirror:     0xa8bcc0,
+  hanMirrorFrame:0x6b5b48,
+  hanFlow1:      0xe0778f,      // the flower bicycle
+  hanFlow2:      0xefe0c4,
+  hanFlow3:      0xd9b23a,
+  hanFlow4:      0xa8598a,
+  hanCauLeg:     0x3c4553,      // the shuttlecock circle
+  hanCauBase:    0xd9584a,
+  hanCauFeather: 0xefe6d8,
+  hanShirtW:     0xf0ece0,
+  hanCrowdA:     0xc85f4a,
+  hanCrowdB:     0x4f7fa8,
+  hanCrowdC:     0x6f8f56,
+  hanCrowdD:     0xd9b23a,
+  hanCrowdE:     0xa07898,
+  hanCrowdLeg:   0x40474f,
+  hanDeck:       0x8a7d68,      // Long Bien
+  hanSteel:      0x7d8188,
+  hanPier:       0x9a9284,
+  hanSkyTop:     0x9dbcd0,      // ten in the morning, and it is a HAZE
+  hanSkyLow:     0xe4dcc8,
+  hanHaze:       0xcfc7b2,
+  hanSun:        0xfff0d2,
+
   // ---- THE MICRO-ENVIRONMENT (weather.js owns; see GLOBAL ENVIRONMENT) -----
   // Every colour the micro-atmosphere can put ON TOP of a biome. None of them
   // replaces a biome's own palette: they are what a drizzle, a cloud shadow or
@@ -1666,6 +1946,66 @@ export const TASKS = [
   { id: 'floe-drift',      text: 'Ride a floe down the channel',          chapter: 17, act: 2,
     mini: 'THE FLOE' },
   { id: 'orca-ride',       text: 'Run with the pod',                      chapter: 17, act: 3, wow: 'THE PENINSULA' },
+
+  // ---- Chapter 18: Monte Carlo -------------------------------------------
+  // A HEIST, IN THREE MOVEMENTS, and the acts are geography: the water, the
+  // building, and the road. It is the first list in this game with a THRESHOLD
+  // on it (ten up at the wheel) and the first with a row you can be thrown out
+  // of the middle of — and neither of them can lock anything, because the
+  // penalty for being caught is ten seconds and the stack only ever goes up.
+  { id: 'to-monaco',    text: 'Turn up in Monte Carlo',                 chapter: 18 },
+  { id: 'superyacht',   text: 'Board a boat nobody invited you onto',   chapter: 18 },
+  { id: 'black-tie',    text: 'Acquire a dinner jacket',                chapter: 18 },
+  { id: 'high-dive',    text: 'Go off the top deck into the harbour',   chapter: 18 },
+  { id: 'the-rock',     text: 'Get up onto the Rock',                   chapter: 18 },
+  { id: 'palace-guard', text: 'Make the palace guard break',            chapter: 18 },
+  // Act two. The one building in this game with an inside, and the only room
+  // in it where anybody minds that you are there.
+  { id: 'pass-the-door',text: 'Get past the man on the door',           chapter: 18, act: 2 },
+  { id: 'the-floor',    text: 'Cross the floor without being seen',     chapter: 18, act: 2 },
+  { id: 'chip-stack',   text: 'Leave the table ten up',                 chapter: 18, act: 2 },
+  { id: 'champagne',    text: 'Redistribute the champagne',             chapter: 18, act: 2 },
+  { id: 'piano-solo',   text: 'Give the salon a piano solo',            chapter: 18, act: 2 },
+  // The first mini, and the only carrier in the game that is furniture.
+  { id: 'the-wheel',    text: 'Ride the roulette wheel',                chapter: 18, act: 2,
+    mini: 'ROUGE ET NOIR' },
+  // Act three. Everything here happens on the roof of somebody else's car.
+  { id: 'chicane',      text: 'Put the chicane in the harbour',         chapter: 18, act: 3 },
+  // The second mini: the slowest corner in motor racing, which is the only
+  // reason a capybara can get onto a moving car at all.
+  { id: 'the-hairpin',  text: 'Take the Fairmont hairpin on the roof',  chapter: 18, act: 3,
+    mini: 'LE GRAND VIRAGE' },
+  { id: 'the-tunnel',   text: 'Go through the tunnel on the roof',      chapter: 18, act: 3,
+    wow: 'MONTE CARLO' },
+
+  // ---- Chapter 19: Hanoi --------------------------------------------------
+  // THE THIRTY-SIX STREETS, THE LAKE, AND THE LINE — and the three acts are
+  // three VOLUMES: a river of two hundred and forty engines, then the one
+  // quiet place in the city, then an alley that goes completely silent eleven
+  // seconds before it is not silent at all.
+  { id: 'to-hanoi',     text: 'Turn up in Hanoi',                       chapter: 19 },
+  { id: 'cross-the-road', text: 'Cross the road without stopping',      chapter: 19 },
+  { id: 'pho-raid',     text: 'Get your whole face in a bowl of pho',   chapter: 19 },
+  { id: 'flower-bike',  text: 'Unload a flower bicycle',                chapter: 19 },
+  { id: 'barber',       text: 'Look into the pavement barber’s mirror', chapter: 19 },
+  // The first mini, and the fourteenth thing in this game that carries you.
+  { id: 'ride-the-flow', text: 'Get on a scooter and stay on it',       chapter: 19,
+    mini: 'HANG NGANG' },
+  // The second mini. Ninety-six of them, twenty centimetres high.
+  { id: 'the-stools',   text: 'Bring down the whole terrace',           chapter: 19,
+    mini: 'BIA HOI' },
+  // Act two: everything inside the ring road, which is where it is quiet.
+  { id: 'the-huc',      text: 'Cross the red bridge',                   chapter: 19, act: 2 },
+  { id: 'turtle-tower', text: 'Get out to the tower on the island',     chapter: 19, act: 2 },
+  { id: 'shuttlecock',  text: 'Stand in the middle of the da cau',      chapter: 19, act: 2 },
+  { id: 'water-puppets',text: 'Get in among the water puppets',         chapter: 19, act: 2 },
+  { id: 'egg-coffee',   text: 'Take an egg coffee off a balcony',       chapter: 19, act: 2 },
+  // Act three: the line, and the only thing in this chapter you do by not
+  // moving at all.
+  { id: 'fold-the-street', text: 'Be there when the street folds up',   chapter: 19, act: 3 },
+  { id: 'long-bien',    text: 'Walk out onto the old bridge',           chapter: 19, act: 3 },
+  { id: 'the-train',    text: 'Be in the alley when it comes through',  chapter: 19, act: 3,
+    wow: 'TRAIN STREET' },
 ];
 
 
@@ -1809,6 +2149,26 @@ export const CHAPTERS = [
       { kick: 'THE STATION', line: 'too cold to walk. take the boat.' },
       { kick: 'THE ICE', line: 'four rocks, eleven hundred metres apart.' },
       { kick: 'THE PACK', line: 'there is something under the boat.' },
+    ] },
+  { n: 18, biome: 'monaco', name: 'Monte Carlo',   sub: 'and somebody in there is going to mind',
+    arrive: 'to-monaco', far: 1800, tall: true, pal: 19,
+    hint: 'the first place that minds you being here', open: 'it is twenty past eight. everything is switched on.',
+    way: 'the steps of the Casino',
+    keep: 'a mother-of-pearl plaque', win: 3,
+    acts: [
+      { kick: 'THE PORT', line: 'it is twenty past eight. everything is switched on.' },
+      { kick: 'THE ROOMS', line: 'five people in there are paid to look at the room.' },
+      { kick: 'THE CIRCUIT', line: 'the white lines are not decoration.' },
+    ] },
+  { n: 19, biome: 'hanoi', name: 'Hanoi',          sub: 'and the road is not going to stop for you',
+    arrive: 'to-hanoi', far: 1100, tall: false, pal: 20,
+    hint: 'the road is not going to stop',            open: 'do not wait for a gap. there is no gap.',
+    way: 'the head of the Long Bien bridge',
+    keep: 'a plastic stool, slightly cracked', win: 3,
+    acts: [
+      { kick: 'THE THIRTY-SIX STREETS', line: 'do not wait for a gap. there is no gap.' },
+      { kick: 'INSIDE THE RING', line: 'it is quiet in here. that is the whole rule.' },
+      { kick: 'THE LINE', line: 'when the horn goes, get in a doorway.' },
     ] },
 ];
 export function chapterOf(biome) {
@@ -2021,6 +2381,27 @@ export const FINDS = [
   { id: 'the-whalers',    text: 'Went into the whaling station that nobody uses any more', chapter: 17 },
   // ...and the exact opposite of `colony-chorus`, in the middle of the colony.
   { id: 'ignored',        text: 'Stood about in the middle of the colony and was completely ignored', chapter: 17 },
+
+  // ---- 18, Monte Carlo --------------------------------------------------
+  // The tunnel is the chapter's marquee and it is a ride. This is the same
+  // hundred and eleven metres done the only other way there is, which is the
+  // deliberate-opposite shape half the place finds already have.
+  { id: 'over-the-tunnel', text: 'Went over the top of the tunnel instead of through it', chapter: 18 },
+  // ...and the Rock, at the far end of a chapter that is entirely about the
+  // other end. Nothing is happening up there and that is what it is for.
+  { id: 'nothing-up-here', text: 'Sat down on the Rock with the whole principality going on below you', chapter: 18,
+    where: 'Sat on the Rock while everything happened somewhere else' },
+
+  // ---- 19, Hanoi --------------------------------------------------------
+  // The chapter's first act is about never stopping. This is the exact
+  // opposite done in the exact same place, and it is the thing a player is
+  // most likely to have done BY ACCIDENT the first time they stepped off a
+  // kerb: froze, and found out that it works anyway.
+  { id: 'stood-in-the-river', text: 'Stood perfectly still in the traffic and let all of it go round you', chapter: 19 },
+  // ...and the one street in the Old Quarter with nothing coming down it,
+  // which is a railway.
+  { id: 'quiet-alley',    text: 'Found the one street in this city with nothing coming down it', chapter: 19,
+    where: 'Found the quietest street in Hanoi, which is a railway' },
 ];
 
 /** Every find id, for the audit and the save. */
@@ -2098,6 +2479,22 @@ export const RECORDS = {
   'penguin-highway': { label: 'the hill in', unit: ' s', better: 'lower', dp: 1 },
   'blue-ice':        { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
   'floe-drift':      { label: 'carried', unit: ' m', better: 'higher', dp: 0 },
+  // Chapter 18. Four numbers, and three of them are the reason to come back:
+  // a stack is a thing you can be better at, a crossing is a thing you can be
+  // quieter at, and a tunnel is a thing you can be faster through. The fourth
+  // is nine and a half metres of yacht and is simply funny.
+  'chip-stack':      { label: 'left the table', unit: ' up', better: 'higher', dp: 0 },
+  'the-floor':       { label: 'across in', unit: ' s', better: 'lower', dp: 1 },
+  'the-tunnel':      { label: 'through it at', unit: ' m/s', better: 'higher', dp: 1 },
+  'the-hairpin':     { label: 'rode', unit: ' m of the lap', better: 'higher', dp: 0 },
+  'high-dive':       { label: 'went in from', unit: ' m up', better: 'higher', dp: 1 },
+  // Chapter 19, and the first of these is the best question in the game: not
+  // how fast you crossed, not how far — HOW MANY OF THEM HAD TO GO ROUND YOU.
+  // It is the only number here that measures a crossing rather than a walk.
+  'cross-the-road':  { label: 'made', unit: ' of them go round you', better: 'higher', dp: 0 },
+  'ride-the-flow':   { label: 'carried', unit: ' m through the quarter', better: 'higher', dp: 0 },
+  'the-stools':      { label: 'had', unit: ' down at once', better: 'higher', dp: 0 },
+  'the-train':       { label: 'stood your ground within', unit: ' m of it', better: 'lower', dp: 2 },
 };
 
 

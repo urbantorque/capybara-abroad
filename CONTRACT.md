@@ -2125,6 +2125,244 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## CHAPTERS 18 AND 19 — MONTE CARLO AND HANOI (v29 — 26 Aug 2026)
+
+Two places, and they were built together on purpose: they are the two ends of
+the same argument about what a CITY is. Monte Carlo is the smallest city on
+earth at blue hour with everything switched on and five people paid to look at
+you; Hanoi is ten in the morning, twenty-nine degrees, and two hundred and
+forty motorbikes that are not going to stop. One is a locked door and one is a
+river. Neither of them is a landscape with tasks in it, which is what the
+previous seventeen have in common.
+
+### CHAPTER 18 — MONTE CARLO (`monaco`)
+
+**THE EYE — the first thing in this game that is ever denied.** Five croupiers
+sweep the Casino floor on their own phases; `monSeen` fills inside a cone and
+drains fast outside one, and at 1.0 you are picked up under the forelegs and
+put back on the steps.
+
+The whole penalty is **ten seconds and whatever was in your mouth**, and that
+is not a compromise, it is the rule the other seventeen chapters keep. Nothing
+becomes impossible, nothing is lost, you may walk straight back in, and no task
+in the chapter is gated on not being seen — `the-floor` is a run you can
+re-attempt for ever and its record is a time.
+
+**It is built out of verbs the player already has, and that is why it needed no
+tutorial.** THE LOAF — sitting still, which this game had rewarded exactly once
+before — halves the range at which a cone finds you (`monEYE_LOAF`). RUNNING
+raises it by half again. Carrying something raises it a little. There is no
+meter: the cones are real wedges on the floor and they go red as they fill,
+because this game has never had a HUD element and was not going to grow one.
+
+Four numbers were measured rather than chosen:
+
+| | |
+|---|---|
+| `monEYE_FILL` 0.86 / `monEYE_DRAIN` 0.58 | at 0.60/0.95, thirty seconds of pacing across the atrium **at a run** peaked at 0.46 and never once ejected anybody. A sweep at 0.7 rad/s holds a point for about 1.3 s; a fill that cannot reach 1.0 in a pass and a half is a mechanic that is switched off and looks exactly like one that is working. |
+| the croupiers are **not** in `monCOVER` | `monBlockedSight` casts FROM the watcher's own position, so a cover circle centred on the ray's origin is a ray blocked at t = 0. With one, the room could not see anything, ever. |
+| `monCAR_VMIN` 5.4 | the hairpin is the one place on the lap a capybara can board a car, so it is the one number the third act needs. A capybara runs at about seven. |
+| the corner law's constant, 3.4 → 2.8 | `v = C/sqrt(k)` is a constant-lateral-acceleration law and C² IS that acceleration. At 3.4 the corners peaked at 1.2 g and no amount of friction holds a passenger through that. |
+
+**THE STACK.** The only economy in the game. A plaque is a real prop, the
+roulette wheel is a real kinematic disc, and dropping a plaque into a turning
+wheel pays what the pocket says — red two, black one, green eight. **Nothing is
+ever lost**: a gamble with a downside would be the first thing in eighteen
+chapters that could take something off a player, and the pleasure is the two
+seconds of watching, not the arithmetic. What it buys is the first number in
+this game that goes UP because you did something, and the first task that is a
+threshold rather than a switch.
+
+**THE CIRCUIT.** Three cars lap the streets on their own clock. It is the
+fifteenth thing in this game that carries the animal and the first that does 26
+m/s, so it DECLARES its frame (`carryFrame`) rather than leaving the animal to
+the contact sweep, and it keeps all five carrier rules. Two things about it are
+worth writing down:
+
+- **The car is open-topped, and that was a gameplay decision.** The first build
+  was a fastback with a roof at 1.44 m; `capyJUMP_V` peaks at about 1.2 m of
+  rise, so the hop that boards it missed by twenty centimetres every time.
+  Splitting the collider into a deck and a cabin made the boot 55 cm long, the
+  animal landed on the cabin instead, and the solver posted it off the side
+  inside eighty-four frames. An open car is ONE BOX at 95 cm with **four rails
+  round the cockpit** — a hop a capybara can make, a well it cannot fall out
+  of, and a better picture.
+- **A one-frame gap is not getting off** (`monRIDE_GRACE`). The rider test is a
+  box in the car's own frame; at 26 m/s a corner puts the animal outside it for
+  a frame with the contact perfectly sound. Without the latch the tunnel's
+  entry mark was thrown away and re-taken every five to ten frames all the way
+  through the bore and the marquee could not be earned at all.
+
+**AND THE TUNNEL IS A CUTTING WITH A LID ON.** The terrain conforms to the
+circuit (the chiva-road pattern), so the one leg that is roofed gets a much
+wider shoulder — eleven metres against three and a half — because a 20 m cut
+with 5:1 walls is a slot canyon and a five-metre heightfield turns 5:1 walls
+into a staircase. The lid is collided ON TOP: walking over your own tunnel is
+one of the chapter's two place finds.
+
+**ROTATIONS ARE +yaw AND NOT −yaw.** A box turned about Y by θ sends its local
++z to (sin θ, cos θ), which is the convention every heading in this codebase
+already uses. Negating it mirrors the piece about the z axis: on a straight it
+looks like nothing at all and on the west quay it produced a hundred metres of
+crash barrier lying across the road like a cattle grid.
+
+**FOUR SPAWNS INSIDE FOUR DIFFERENT OBJECTS.** (-62,−46) was eight metres
+behind the circuit's own barrier; (−20,−6) was inside the palm row; (−26, 8)
+was inside a building; (0,−84) put the CAMERA inside a palm. The fifth was
+found by SWEEPING the quay against `navBlocked` at 3.2 m, against a road-distance
+test, and against a clear camera arm at the spawn's own yaw — which is what a
+chapter with 153 lamps, 54 palms and 34 bollards on it requires. **A spawn is
+not a coordinate you pick off a map.**
+
+### CHAPTER 19 — HANOI (`hanoi`)
+
+**THE FLOW.** Two hundred and forty scooters over four street centrelines,
+nine floats each, no object anywhere. Every rider can see the capybara: inside
+`hanSEE` it swings its lateral offset away and lifts off, and two hundred and
+forty of those, damped, IS a river parting.
+
+**What decides whether it works is you.** A rider commits to a line about a
+second and a half ahead. Hold your speed and your heading and that is the same
+place you will be. Change your mind — `hanDither` is the accumulated heading
+change over the last second and a half — and it is not.
+
+Four attempts at what happens then, and the two wrong ones are the useful part:
+
+1. **A clip: a shove and a horn.** It is the obvious reading of "do not stop"
+   and it is wrong twice over. It made standing still cost twelve metres of
+   being pushed down the street, which is a punishment rather than a joke; and
+   it made the chapter's own first mini UNREACHABLE, because a flow that parts
+   at 3.4 m and shoves you when it cannot is a flow you can never touch.
+   Measured: sixty-six seconds in the middle of the busiest street and the
+   nearest machine never came inside 2.08 m.
+2. **Letting them through you.** No.
+3. **They JAM.** What a Hanoi street actually does to somebody who plants
+   themselves in it is stop. Everybody brakes, nobody says anything, and
+   thirty seconds later there are forty of them in a fan round one capybara.
+   It is funnier, it is true, and it is what makes the mini possible — a
+   stopped scooter is a thing you can hop into.
+4. **And the clip is reserved for changing your mind**, which is the one thing
+   a rider a second and a half behind you cannot allow for.
+
+**AND NOBODY IS LOOKING UP.** While the animal is AIRBORNE, any rider inside
+seven metres stops avoiding and lines up under it instead. That single line is
+what makes `ride-the-flow` reachable at all, and it is the chapter's verb: you
+do not walk up to a scooter, you hop into the traffic.
+
+**THE RECORD IS A COUNT OF PEOPLE, NOT AN INTEGRAL OF TIME.** `cross-the-road`
+reports HOW MANY OF THEM HAD TO GO ROUND YOU. As a time integral a clean
+four-second crossing of the busiest street scored **one**, because the
+accumulator only ran while a rider was inside a nine-metre window. On the
+rising edge, one per rider, it scores forty-four, which is both the truth and
+the joke.
+
+**TRAIN STREET.** A metre-gauge line down an alley with a hundred people living
+in it. Twice in the chapter a horn sounds and `hanFoldK` — driven by the CLOCK
+and never by the player, because a street that folds because you walked into it
+is a street reacting to you and the whole point of this one is that it is not —
+lerps every awning, stool, table, crate and drying rack in the alley from its
+open transform to its folded one over about four seconds. Eleven seconds later
+a train comes through at 11 m/s. **The marquee is a thing you do by not moving**,
+which is the opposite of the chapter's other two.
+
+The alley is 6.4 m wide and not the real 4. At four, a third-person camera
+twelve metres behind the animal at 35° is inside somebody's first floor and the
+marquee happens off screen. The TRAIN'S clearance (`hanTRAIN_GAP`, 45 cm) is
+untouched, because that is the number the chapter is about.
+
+### AND FOUR THINGS BOTH CHAPTERS PAID FOR
+
+**1. `InstancedMesh.instanceColor` multiplies EVERYTHING.** It is applied per
+instance and not per part, so a merged scooter whose tyres, helmet, skin and
+crate carry their own vertex colours came out as two hundred and forty entirely
+monochrome scooters, one of them yellow including the rider's face. And a plain
+`BoxGeometry` handed to a material with `vertexColors: true` has no colour
+attribute at all and renders **black** — every shop sign in the Old Quarter was
+a black slab. Two rules cover every instanced mesh in both files:
+
+- one colour all through (a stool, a sign, a backdrop block) → the geometry is
+  WHITE, or plain with a plain material, and `instanceColor` supplies it;
+- many colours, one of which varies (bodywork, a shirt) → **one mesh per
+  variant** with the colour baked into the merge, and no `instanceColor`.
+
+**2. AN ELLIPTICAL PAD CANNOT HAVE A GENTLE SIDE.** Le Rocher's rim went from
+22 m to 58 m in ten metres of ground — a grade of 1.79, sixty degrees — so the
+one way onto the one place in the chapter with one way onto it was a wall.
+Widening the pad does not fix it: the rim is a smoothstep and most of it is
+spent below the height the neighbouring pad has already reached, so at a
+46-metre soft the worst grade is still 0.69. **The ramp is a ROAD** — a second
+centreline with the terrain blended toward it — and it is 24%.
+
+**3. A GENERATOR THAT LAYS BUILDINGS ALONG A CENTRELINE DOES NOT KNOW THE NEXT
+CENTRELINE CROSSES IT.** Eight of Hanoi's tube houses stood in the middle of the
+east-west road, `navBlocked` said X for the whole width of it, `cross-the-road`
+was unreachable and the bia hoi corner — the chapter's second mini — was inside
+a building. `hanTerraceOk` tests THREE points per house (shopfront, middle,
+back wall) against every lane and against a list of keep-outs, because a
+twelve-metre-deep house whose centre is clear can still have its back half in
+the next street.
+
+**4. A RAILING THAT IS DRAWN AND NOT COLLIDED IS NOT A RAILING.** The Huc
+bridge is a 3 m arched deck over eighty metres of lake and Long Bien is a 9 m
+deck twenty-six metres over a river; both had balustrades in the merge and
+nothing in the solver, and every crossing of either ended in the water. Both
+now carry parapet colliders, and the chapter's way out is at the far end of one
+of them.
+
+### THE TWO SCORES
+
+Nineteen and twenty in `sysMUS_PAL`, appended after the title card at eighteen,
+so not one of the first eighteen chapters' `pal` numbers moved.
+
+**Monte Carlo is the fifth BAND in that table and the first that is a piece of
+fiction.** Salsa, samba, gnawa and the Kowloon synth are the music that is
+actually playing in those four places. Nothing is playing in Monaco; what is
+playing in Monaco is what a player has in their head the moment they see a
+casino, a dinner jacket and a silver car, and pretending otherwise would be the
+one joke the chapter is for. E minor with a major ninth and no third in the
+bass, a tremolo-picked guitar through a very hard reverb send, a walking
+upright, brushes and a ride — and a brass section that plays four notes once
+every eight bars and is the loudest thing in the chapter when it does.
+Everything else in the arrangement is turned down so that there is somewhere
+for the horns to arrive FROM.
+
+**Hanoi is the sparsest palette here after Kyoto's**, and for the opposite
+reason to every other quiet chapter: the place is the loudest in the game, so
+the score gets out of the way completely. A drone, a pentatonic five notes wide
+with no semitone in it anywhere, and a dan bau — one string, no frets — playing
+about one note every three seconds. Everything that makes that instrument
+recognisable is a PITCH GESTURE and not a timbre: approached from below, bent
+while it sounds, and a deep slow vibrato on the tail, which is six frequency
+ramps and a sine.
+
+### MEASURED, AFTER BOTH (26 Aug 2026)
+
+| | monaco | hanoi |
+|---|---|---|
+| triangles | **126,665** | **230,790** |
+| draw calls | 66 | 80 |
+| shadow-casting triangles | 54,992 | 176,064 |
+| bodies in the world | 41 | 40 |
+| worst body speed, 90 s random-input soak | 30.4 m/s | 28.7 m/s |
+| NaN / thrown errors in that soak | 0 | 0 |
+
+Hanoi is the largest chapter in the game and it is a city of four hundred
+frontages; the gate was re-affirmed in batch 4 as **not predictive of cost**
+(quay is 201,503 and is one of the two cheapest per triangle in the game), and
+what was actually spent here was measured and cut where it was free: three
+balusters per balcony rather than five (57,000 triangles of twelve-triangle
+sticks nobody can resolve past eight metres), six-segment wheels rather than
+ten on two hundred and forty machines, and a five-metre terrain grid on a
+terrain with three features in it. 262,436 → 230,790, with nothing visible
+changed.
+
+**AND THE CABLES DO NOT CAST.** Two thousand three-centimetre wires over every
+street in the quarter put a black hatch across the whole road surface, because
+a shadow map cannot resolve a 3 cm wire and what it draws instead is a smear.
+They read perfectly well as a silhouette against the sky, which is the only
+place anybody ever looks at them.
+
+
 ## THE PAYOFF PASS, BATCH FOUR — THE STEP THAT ALREADY HAPPENED (v27 — 26 Aug 2026)
 
 The five pillars on chapters 12-17 (Palawan, Cappadocia, Manly, the Pantanal, Sơn Đoòng,

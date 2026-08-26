@@ -22,6 +22,8 @@ import { createManly } from './manly.js';
 import { createPantanal } from './pantanal.js';
 import { createCave } from './cave.js';
 import { createAntarctic } from './antarctic.js';
+import { createMonaco } from './monaco.js';
+import { createHanoi } from './hanoi.js';
 import { createWeather } from './weather.js';
 import { createCondor } from './condor.js';
 
@@ -311,6 +313,19 @@ function mainMakeBiomes(game) {
     // the first thing this chapter wants is for you to see that there is a
     // boat, and that everything else is a very long way past it.
     ANTARCTIC_SPAWN: { x: 0, y: 7.1, z: 52 },
+    // Monte Carlo: on the west quay at the bottom, looking east across the
+    // basin at a hundred and thirty feet of somebody else's money, with the
+    // terrace and the Casino lit up above it. Deliberately at the BOTTOM and
+    // deliberately facing ACROSS rather than up: the whole shape of this
+    // chapter is a climb, and a player put down on the terrace would never
+    // find out that the terrace is up.
+    MONACO_SPAWN: { x: 30, y: 3.9, z: -80, yaw: 3.14159 },
+    // Hanoi: on the west walk of Hoan Kiem, inside the ring road, facing
+    // north-east across the water at the tower and the red bridge. Inside is
+    // the only quiet place in the chapter, and the whole of the noise is
+    // audible from it — which is the sentence the whole chapter is about, said
+    // before anything has happened.
+    HANOI_SPAWN: { x: -60, y: 2.4, z: -78, yaw: -1.94 },
 
     /**
      * WHERE A BIOME PUTS YOU DOWN. systems.js used to carry a nine-rung
@@ -716,7 +731,7 @@ function mainBoot() {
     pasto: null, quay: null, kyoto: null, cali: null, rio: null,
     iceland: null, sahara: null, drift: null, venice: null, kowloon: null,
     palawan: null, goreme: null, manly: null, pantanal: null, cave: null,
-    antarctic: null,
+    antarctic: null, monaco: null, hanoi: null,
     // THE GLOBAL ENVIRONMENT. Biome-neutral and always resident, like the
     // capybara and the systems: the micro-weather is a property of wherever
     // you are standing, not a thing any one chapter owns. See weather.js.
@@ -797,6 +812,8 @@ function mainBoot() {
   const pantanal = mainSafe('pantanal',   () => createPantanal(game));
   const cave    = mainSafe('cave',        () => createCave(game));
   const antarctic = mainSafe('antarctic', () => createAntarctic(game));
+  const monaco  = mainSafe('monaco',      () => createMonaco(game));
+  const hanoi   = mainSafe('hanoi',       () => createHanoi(game));
   // Deliberately NOT captured into a biome: its two instanced fields are one
   // set of buffers that every chapter borrows, so they must survive a
   // hemisphere change rather than being detached with the place that was live
@@ -826,11 +843,11 @@ function mainBoot() {
   // the gust and the light deltas it computes are read the same frame by the
   // controller's grip, the locals' umbrellas and the atmosphere pass.
   const all = [env, pasto, quay, kyoto, cali, rio, iceland, sahara, drift, venice, kowloon,
-               palawan, goreme, manly, pantanal, cave, antarctic, weather,
+               palawan, goreme, manly, pantanal, cave, antarctic, monaco, hanoi, weather,
                props, capy, condor, npcs, systems];
   const updaterNames = ['environment', 'pasto', 'quay', 'kyoto', 'cali', 'rio', 'iceland', 'sahara',
                         'drift', 'venice', 'kowloon', 'palawan', 'goreme',
-                        'manly', 'pantanal', 'cave', 'antarctic', 'weather',
+                        'manly', 'pantanal', 'cave', 'antarctic', 'monaco', 'hanoi', 'weather',
                         'props', 'capybara', 'condor', 'npc', 'systems'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');

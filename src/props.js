@@ -740,6 +740,43 @@ function physBuildMug(g) {
   physAdd(g, physBoxG(0.075, 0.045, 0.045), PALETTE.cloth6, 0.155, 0.245, 0);
   physAdd(g, physBoxG(0.075, 0.045, 0.045), PALETTE.cloth6, 0.155, 0.095, 0);
 }
+/** Breakfast. Beef before eleven, chicken after, and never the other way. */
+function physBuildPhobowl(g) {
+  physAdd(g, physCylG(0.30, 0.19, 0.16, 12), PALETTE.hanTempleW, 0, 0.08, 0);
+  physAdd(g, physCylG(0.27, 0.27, 0.03, 12), PALETTE.hanFruit, 0, 0.145, 0);
+  physAdd(g, physCylG(0.20, 0.20, 0.02, 10), PALETTE.hanRice, 0, 0.155, 0);
+  physAdd(g, physBoxG(0.10, 0.02, 0.10), PALETTE.hanHerb, 0.06, 0.17, -0.04);
+  physAdd(g, physBoxG(0.07, 0.02, 0.07), PALETTE.hanChilli, -0.07, 0.17, 0.05);
+  physAdd(g, physBoxG(0.02, 0.02, 0.34), PALETTE.hanTrunk, 0.05, 0.19, 0.02, 0, 0.5, 0.18);
+  physAdd(g, physBoxG(0.02, 0.02, 0.34), PALETTE.hanTrunk, 0.09, 0.19, 0.02, 0, 0.5, 0.18);
+}
+/** Somebody's whole Tuesday, off the back of a bicycle. */
+function physBuildFlowers(g) {
+  physAdd(g, physCylG(0.05, 0.07, 0.26, 6), PALETTE.hanLeafDk, 0, 0.13, 0);
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9;
+    physAdd(g, physSphG(0.09), i % 2 ? PALETTE.hanFlow1 : PALETTE.hanFlow4,
+            Math.cos(a) * 0.11, 0.30 + (i % 3) * 0.05, Math.sin(a) * 0.11);
+  }
+  physAdd(g, physBoxG(0.20, 0.02, 0.09), PALETTE.hanLeaf, 0.08, 0.22, 0.06, 0, 0.6, 0.3);
+  physAdd(g, physBoxG(0.20, 0.02, 0.09), PALETTE.hanLeaf, -0.08, 0.24, -0.05, 0, -0.7, -0.3);
+}
+/** A mother-of-pearl casino plaque. Flat, edged, and worth a house. */
+function physBuildPlaque(g) {
+  physAdd(g, physBoxG(0.26, 0.028, 0.15), PALETTE.monChipW, 0, 0.014, 0);
+  physAdd(g, physBoxG(0.27, 0.010, 0.16), PALETTE.monGold, 0, 0.029, 0);
+  physAdd(g, physBoxG(0.10, 0.012, 0.062), PALETTE.monChipR, 0, 0.035, 0);
+  physAdd(g, physBoxG(0.052, 0.014, 0.030), PALETTE.monGoldDk, 0, 0.040, 0);
+}
+/** Somebody left it over the back of a lounger. It is a little long in the leg. */
+function physBuildDinnerjacket(g) {
+  physAdd(g, physBoxG(0.34, 0.10, 0.26), PALETTE.monTux, 0, 0.05, 0);
+  physAdd(g, physBoxG(0.12, 0.055, 0.24), PALETTE.monShirt, 0, 0.105, 0.01);
+  physAdd(g, physBoxG(0.36, 0.045, 0.10), PALETTE.monTux, 0, 0.115, -0.09, 0.22, 0, 0);
+  physAdd(g, physBoxG(0.09, 0.035, 0.09), PALETTE.monTux, -0.14, 0.115, 0.06, 0, 0.4, 0);
+  physAdd(g, physBoxG(0.09, 0.035, 0.09), PALETTE.monTux, 0.14, 0.115, 0.06, 0, -0.4, 0);
+  physAdd(g, physBoxG(0.055, 0.020, 0.030), PALETTE.monTux, 0, 0.14, 0.09);
+}
 function physBuildCoffeesack(g) {
   physAdd(g, physCylG(0.3, 0.34, 0.5), PALETTE.potatoSack, 0, 0.25, 0);
   const top = physAdd(g, physSphG(0.3), PALETTE.potatoSack, 0, 0.5, 0);
@@ -824,6 +861,21 @@ const physTYPES = {
   // ---- Antarctica (chapter 17) ----
   mug:        { name: 'enamel mug',     mass: 0.42, hy: 0.16, shape: ['box', 0.2, 0.16, 0.17], hold: [0, 0.02, 0.09], spin: 1.3, build: physBuildMug },
   sombrero:   { name: 'Nariño hat',     mass: 0.4,  hy: 0.16, shape: ['box', 0.46, 0.16, 0.46], hold: [0, 0.04, 0.1],  spin: 1.7, build: physBuildSombrero },
+
+  // ---- Monte Carlo (chapter 18) ----
+  // The plaque is the only prop in the game with an ECONOMY behind it: it is
+  // carried to the wheel and consumed there for what the pocket says. Light,
+  // flat, and it slides — which is most of the joke, because a plaque nudged
+  // across a marble floor goes a very long way.
+  plaque:     { name: 'a plaque',       mass: 0.06, hy: 0.03, shape: ['box', 0.26, 0.03, 0.15], hold: [0, 0.0, 0.06],  spin: 2.4, build: physBuildPlaque },
+  dinnerjacket: { name: 'dinner jacket',mass: 1.1,  hy: 0.13, shape: ['box', 0.36, 0.13, 0.28], hold: [0, 0.05, 0.30], spin: 0.5, receive: true, build: physBuildDinnerjacket },
+
+  // ---- Hanoi (chapter 19) ----
+  // A bowl of pho is the largest edible thing in the game and it is meant to
+  // be: the task is to get a whole FACE in it.
+  phobowl:    { name: 'bowl of pho',    mass: 0.9,  hy: 0.14, shape: ['box', 0.30, 0.14, 0.30], hold: [0, 0.02, 0.11], spin: 1.0, edible: true, grazeSfx: 'splash', build: physBuildPhobowl },
+  // ...and a bunch of lotus off the back of somebody's bicycle.
+  flowers:    { name: 'bunch of lotus', mass: 0.35, hy: 0.20, shape: ['box', 0.24, 0.20, 0.24], hold: [0, 0.04, 0.14], spin: 1.4, build: physBuildFlowers },
 };
 
 // ===========================================================================
@@ -980,6 +1032,22 @@ const physKEEPS = {
     ['b', 0.030, 0.012, 0.088, 0.046, 0.024, 0.030, 'antHutRed'],
     ['b', 0.052, 0.012, 0.030, 0.033, 0.024, -0.014, 'antHutRed'],
     ['c', 0.014, 0.014, 0.012, -0.048, 0.024, 0.038, 'antIce'] ] },
+  /* they are made of nacre, they are worth a house, and nobody counts them */
+  monaco: { name: 'a mother-of-pearl plaque', mass: 0.07, parts: [
+    ['b', 0.13, 0.014, 0.075, 0, 0.007, 0, 'monChipW'],
+    ['b', 0.135, 0.005, 0.080, 0, 0.015, 0, 'monGold'],
+    ['b', 0.050, 0.006, 0.031, 0, 0.019, 0, 'monChipR'],
+    ['b', 0.026, 0.007, 0.015, 0, 0.022, 0, 'monGoldDk'],
+    ['c', 0.010, 0.010, 0.006, 0.048, 0.020, 0.026, 'monBrass'] ] },
+  /* four thousand dong a glass, twenty centimetres off the pavement, and the
+     back left leg has gone at some point and been sat on anyway */
+  hanoi: { name: 'a cracked plastic stool', mass: 0.10, parts: [
+    ['b', 0.15, 0.018, 0.15, 0, 0.095, 0, 'hanStoolA'],
+    ['b', 0.016, 0.095, 0.016, 0.058, 0.048, 0.058, 'hanStoolA'],
+    ['b', 0.016, 0.095, 0.016, -0.058, 0.048, 0.058, 'hanStoolA'],
+    ['b', 0.016, 0.095, 0.016, 0.058, 0.048, -0.058, 'hanStoolA'],
+    ['b', 0.016, 0.080, 0.016, -0.058, 0.040, -0.058, 'hanStoolB', 0, 0, 0.18],
+    ['b', 0.13, 0.014, 0.014, 0, 0.050, 0.062, 'hanStoolA'] ] },
 };
 
 /** The one builder the seventeen share. See the note on physKEEPS. */
@@ -1042,6 +1110,10 @@ function physVolume(def) {
 const physFLUID_RHO = 1000;      // kg/m³, fresh water; the sea is 1025 and it does not matter here
 const physRHO = {
   ball:       12,    // a skin around air
+  flowers:    260,   // stems, air and seven lotus heads
+  phobowl:    980,   // a litre of broth in a ceramic bowl. It goes straight down.
+  dinnerjacket: 250,  // dry wool, loosely folded
+  plaque:     1250,  // nacre and resin. It sinks, and it is worth a house.
   hat:        70,    // straw, open crown
   sombrero:   90,
   bin:        90,    // sealed HDPE, empty
@@ -2068,6 +2140,17 @@ const physBIOME_SCATTER = {
   pantanal:  { x: 30, z: 77, r0: 3, r1: 13, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]] },
   cave:      { x: 20, z: -41, r0: 3, r1: 13, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
   antarctic: { x: 0, z: 52, r0: 5, r1: 24, props: [['esky', 1], ['bin', 1], ['sign', 2], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]] },
+  // The quay under the Rocher, which is where the chapter puts you down and
+  // the one place in Monaco anybody leaves anything lying about. Centred on
+  // the FISHERMAN and not on the spawn: ownership is by where a prop lives
+  // (npcOWN_R = 11 m from its home) and an annulus round an empty quay is a
+  // guarantee that nothing belongs to anybody. See THE DRIFT'S FAILURE above.
+  monaco: { x: -58, z: -30, r0: 4, r1: 15, props: [['bin', 1], ['sign', 1], ['cone', 2], ['esky', 1], ['basket', 1], ['winebottle', 2], ['camera', 1], ['sunglasses', 1]] },
+  // The bia hoi corner, because that is where anybody in this chapter would
+  // put anything down. Centred on the corner and NOT on the spawn: the spawn
+  // is a lake walk with nobody's belongings on it, and an annulus round an
+  // empty walk is a guarantee that nothing is owned by anybody.
+  hanoi: { x: 62, z: 18, r0: 4, r1: 15, props: [['basket', 2], ['bin', 1], ['esky', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 2], ['camera', 1]] },
 };
 const physBiomeScattered = {};   // biome name -> true, so re-entry never doubles up
 

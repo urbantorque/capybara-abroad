@@ -504,6 +504,16 @@ const sysROOMS = {
   cave:      { size: 5.5, decay: 1.6, wet: 0.42 },
   // Ice is hard and the air is thin. Bright and long and not very loud.
   antarctic: { size: 2.2, decay: 2.0, wet: 0.09 },
+  // Two rooms in one chapter, and this is the OUTSIDE one: a harbour with a
+  // town round three sides of it and a cliff behind that. Long, and wet for a
+  // street, because every surface within two hundred metres is stone.
+  monaco:    { size: 2.5, decay: 2.5, wet: 0.19 },
+  // A street four and a half metres wide with six-storey walls both sides and
+  // a hundred and fifty engines in it. Short, hard and the LOUDEST send after
+  // the cave's — a Hanoi alley is the most reverberant outdoor space in the
+  // game and it is also the most crowded, which is what makes it a wall of
+  // noise rather than an echo.
+  hanoi:     { size: 1.4, decay: 4.4, wet: 0.24 },
 };
 
 // --- AND THE AMBIENCE HAS TO COME FROM SOMEWHERE -----------------------------
@@ -789,6 +799,12 @@ const sysSKY_TOP = {
   // no dust and no water vapour in that air, so the gradient is short and
   // the sky is a colour nobody who has not been there believes.
   antarctic: PALETTE.antSkyTop,
+  // Twenty past eight, and the zenith has gone properly blue while the west is
+  // still orange. The shortest, hardest gradient of any sky in the game.
+  monaco:  PALETTE.monSkyTop,
+  // Ten in the morning in October: a white sky with a blue only at the very
+  // top of it, which is what eighty per cent humidity does to a zenith.
+  hanoi:   PALETTE.hanSkyTop,
 };
 // ===========================================================================
 // THE AIR, AS A TABLE (v14).
@@ -859,6 +875,33 @@ const sysAIR = {
     bg: PALETTE.antSkyLow, bgK: 0.80,
     sun: PALETTE.antSun, sunK: 1.06,
     hemi: PALETTE.antSkyTop, gnd: PALETTE.antIceLt, hemiK: 1.24, amb: 0.36,
+  },
+  // Blue hour on a coast. The sun is BELOW the horizon, so the directional is
+  // low and warm and worth almost nothing; the hemisphere is doing the work and
+  // it is cold; and the ambient is high, because at this hour a town is lit
+  // from a hundred and forty directions at once. The far plane is long — you
+  // can see Italy from that terrace — and the haze is a warm one, because what
+  // is left of the sun is in it.
+  // The one chapter in the game whose air you can SEE. Twenty-nine degrees and
+  // eighty per cent humidity: the fog is close, warm and pale, the sun is
+  // through it rather than in front of it, and the ambient is the highest here
+  // of anywhere because on a morning like that the light comes from the whole
+  // sky at once and nothing casts a hard shadow. The far plane is SHORT on
+  // purpose — you cannot see the far side of this city and you are not meant
+  // to, which is also what makes two hundred and forty scooters affordable.
+  hanoi: {
+    fogN: 85, fogF: 1050,
+    haze: PALETTE.hanHaze, hazeK: 1.0,
+    bg: PALETTE.hanSkyLow, bgK: 0.94,
+    sun: PALETTE.hanSun, sunK: 0.74,
+    hemi: PALETTE.hanSkyTop, gnd: PALETTE.hanConcrete, hemiK: 1.16, amb: 0.50,
+  },
+  monaco: {
+    fogN: 90, fogF: 1500,
+    haze: PALETTE.monHaze, hazeK: 0.86,
+    bg: PALETTE.monSkyLow, bgK: 0.62,
+    sun: PALETTE.monSun, sunK: 0.46,
+    hemi: PALETTE.monSkyTop, gnd: PALETTE.monQuayDk, hemiK: 0.86, amb: 0.46,
   },
   cave: {
     fogN: 10, fogF: 165,
@@ -971,6 +1014,25 @@ const sysGRADES = {
   // them up makes a postcard of a place that is not one, and the tint goes
   // very slightly blue, which is what snow in shadow actually does.
   antarctic: sysGrade(0.34, 1.10, 1.20, 0.16, 0.94, 0.16, 0.64, 0.994, 1.000, 1.012),
+  // Monte Carlo, and it is the bloom chapter. Everything that reads in this
+  // picture is something somebody switched on — a hundred and forty windows, a
+  // hundred lamps, six chandeliers, a tunnel full of sodium and four
+  // headlights — against a sky that has gone. So the threshold is LOW, which
+  // in any daylight chapter would be a disaster and here means exactly the
+  // lights bloom and nothing else can; the saturation is up, because dusk is
+  // the one hour that genuinely is more colourful than noon; and the tint
+  // splits, warm in the highlights and blue in the shadows, which is what blue
+  // hour IS and is the only reason to set a chapter in it.
+  monaco:    sysGrade(0.46, 0.62, 1.16, 0.26, 1.14, 0.30, 0.50, 1.014, 1.000, 1.020),
+  // Hanoi, and it is the exact opposite of the chapter before it. A white sky
+  // means a HIGH threshold — nothing here is supposed to bloom, because
+  // nothing here is switched on — and a low saturation, because a hot hazy
+  // morning washes colour out and the only saturated things in the frame are a
+  // red bridge, a blue tarpaulin and two hundred and forty motorbikes, which
+  // read all the better for everything round them being dust. The vignette is
+  // the lightest in the game: this chapter is about being able to see the
+  // whole street.
+  hanoi:     sysGrade(0.22, 0.90, 0.92, 0.12, 1.02, 0.22, 0.74, 1.008, 1.002, 0.996),
 };
 const sysGRADE_LAMBDA = 2.2;
 const sysGradeCur = sysGrade(0.20, 1.00, 1.00, 0.10, 1.05, 0.20, 0.58, 1, 1, 1);
@@ -1244,6 +1306,13 @@ const sysSUB = {
   pantanal:  { near: 3, far: 22, c: 'panWater',    deep: 'panWaterDeep' },
   cave:      { near: 4, far: 30, c: 'cavWater',    deep: 'cavRockDk' },
   antarctic: { near: 5, far: 52, c: 'antSeaLt',    deep: 'antSeaDeep' },
+  // Six and a half metres of very clear water with the whole town's lights on
+  // the underside of it. Short, because it is a dock and not an ocean.
+  monaco:    { near: 3, far: 30, c: 'monBasin',    deep: 'monSeaDeep' },
+  // Three metres of green fresh water with a great deal of algae in it. The
+  // shortest far in the game after Venice's canals, and the only one that is
+  // not on the blue side of anything.
+  hanoi:     { near: 2, far: 14, c: 'hanLake',     deep: 'hanLakeBed' },
 };
 // Resolved once, on demand — a THREE.Color per row rather than per frame.
 const sysSubCache = Object.create(null);
@@ -2024,6 +2093,83 @@ const sysMUS_CHORDS18 = [
 const sysMUS_ROOTS18 = [19, 21, 17, 19];
 const sysMUS_NEXT18  = [[1, 2], [3], [0], [0, 1]];
 
+// 18 - MONTE CARLO, and it is the fifth BAND in this table and the first one
+// that is a piece of fiction rather than a place.
+//
+// The other four — salsa, samba, gnawa, the eighties synth — are the music
+// that is actually playing in Cali, Rio, Marrakech and Mong Kok. Nothing is
+// actually playing in Monaco. What is playing in Monaco is what a player has
+// in their head the moment they see a casino, a dinner jacket and a silver
+// car, and pretending otherwise would be the one joke this chapter is for.
+//
+// So: E minor with a MAJOR NINTH sitting on top of it and no third anywhere
+// near the bass, which is the single most identifiable five-note stack in
+// twentieth-century film music; a tremolo-picked guitar through a spring; a
+// walking upright; brushes and a ride; and a brass section that plays four
+// notes about once every eight bars and is the loudest thing in the chapter
+// when it does. Everything else in this palette is turned down so that when
+// the horns come in there is somewhere for them to come in FROM.
+const sysMUS_CHORDS19 = [
+  [52, 59, 62, 66, 71],   // E B D F# B   — the chord. No third, major ninth.
+  [52, 59, 62, 67, 71],   // E B D G B    — the vamp it sits over
+  [53, 60, 63, 68, 72],   // F C Eb Ab C  — a semitone up, which is the sting
+  [50, 57, 60, 65, 69],   // D A C F A    — and the flat seven it falls through
+];
+const sysMUS_ROOTS19 = [28, 28, 29, 26];
+const sysMUS_NEXT19  = [[1, 1, 1], [1, 0, 3], [1], [1, 0]];
+const sysMUS_BOND_16 = 0.1136;                    // 132 bpm: a sixteenth
+const sysMUS_BOND_BAR = 16;                       // sixteenths in a 4/4 bar
+// THE RIFF. Semitones off the root, on the sixteenth grid, twice a bar. Six
+// notes: the tonic twice, up a tone, up a semitone, back down, home. It is the
+// only figure in this table that repeats inside its own bar, which is what
+// makes it a vamp rather than a melody.
+const sysMUS_BOND_RIFF = [
+  { t: 0, d: 0, v: 1.00, trem: 3 }, { t: 3, d: 0, v: 0.66, trem: 1 },
+  { t: 4, d: 2, v: 0.80, trem: 1 }, { t: 6, d: 3, v: 0.95, trem: 2 },
+  { t: 9, d: 2, v: 0.68, trem: 1 }, { t: 11, d: 0, v: 0.82, trem: 2 },
+];
+// the upright, walking. Root, fifth, octave, and the chromatic approach that
+// is the whole reason a jazz bass line sounds like a jazz bass line.
+const sysMUS_BOND_BASS = [
+  { t: 0, d: 0, v: 1.00 }, { t: 4, d: 7, v: 0.72 },
+  { t: 8, d: 12, v: 0.86 }, { t: 12, d: 8, v: 0.70 },
+];
+// the ride: quarters, with the swung skip on two and four. This is the pulse.
+const sysMUS_BOND_RIDE = [
+  { t: 0, v: 0.90 }, { t: 4, v: 0.62 }, { t: 7, v: 0.44 },
+  { t: 8, v: 0.80 }, { t: 12, v: 0.62 }, { t: 15, v: 0.44 },
+];
+// the brass answer. Four notes down a chromatic ladder, and it happens about
+// once every eight bars, and it is the reason the rest of this is quiet.
+const sysMUS_BOND_HORN = [
+  { t: 0, o: 12, v: 1.00 }, { t: 3, o: 11, v: 0.86 },
+  { t: 6, o: 10, v: 0.92 }, { t: 10, o: 7, v: 1.00 },
+];
+// ...and how much of the section is playing. Written against the WORLD, like
+// the sandstorm and the light show: musBondHeat is how much is going on.
+let musBondHeat = 0;
+
+// 19 - HANOI, and it is the sparsest palette in the game after Kyoto's.
+//
+// The chapter is the loudest place in the game — two hundred and forty engines
+// and a horn a second — so the SCORE gets out of the way completely. A drone,
+// a pentatonic five notes wide, and one instrument playing about one note
+// every three seconds. Anything busier would be competing with the traffic,
+// and the traffic wins.
+//
+// The mode is the Vietnamese pentatonic (do re fa sol la), which has no
+// semitone in it anywhere and is therefore the one scale that cannot sound
+// tense. That is the point: inside the ring road it is calm, and this palette
+// is what the lake sounds like rather than what the street does.
+const sysMUS_CHORDS20 = [
+  [48, 55, 60, 65, 67],   // C G C F G
+  [50, 57, 62, 65, 69],   // D A D F A
+  [46, 53, 58, 65, 67],   // Bb F Bb F G
+  [48, 55, 62, 67, 70],   // C G D G Bb
+];
+const sysMUS_ROOTS20 = [36, 38, 34, 36];
+const sysMUS_NEXT20  = [[1, 0, 3], [0, 2], [0], [0, 1]];
+
 // ---------------------------------------------------------------------------
 // THE TITLE. The one palette in this table that is not a place.
 //
@@ -2300,6 +2446,39 @@ const sysMUS_PAL = [
     // one is ever fired from here it should be the gardens' plain ascent,
     // because that is what this palette is a quieter version of.
     lift: { shape: 'up', n: 9, gap: 0.115, oct: 0, vel: 1.00 } },
+  // 19 - MONTE CARLO. See sysMUS_CHORDS19. The pad is nearly off, because the
+  // guitar IS the sustained harmony of this idiom, and the plucks are gone
+  // entirely, which is what every other band row in this table does. Two bars
+  // a chord at 132 in 4/4 is 3.64 s.
+  { chords: sysMUS_CHORDS19, roots: sysMUS_ROOTS19, next: sysMUS_NEXT19,
+    dwellA: 3.636, dwellB: 3.636, pluckA: 99, pluckB: 99, cut: 1080, bus: 0.055, bass: 0.09,
+    lead: 'none', xfade: 0.75, rhythm: null, band: 'bond',
+    sixteenth: sysMUS_BOND_16, barSixteenths: sysMUS_BOND_BAR,
+    // A hundred and eleven metres of concrete at twenty-six metres a second,
+    // and then the whole port at once. 'swell' — the gaps CLOSE UP as it
+    // climbs — because this is the second ride in the game that is still
+    // accelerating when it puts you down, and because the one thing a chase
+    // cue must never do is relax. Twelve notes on the guitar, on the
+    // sixteenth grid the riff is already keeping, so the flourish lands
+    // inside the band rather than over the top of it; and then the horns,
+    // which are the only voice here that has been saving itself for this.
+    lift: { inst: 'twang', shape: 'swell', n: 12, gap: sysMUS_BOND_16 * 2, oct: 0,
+            vel: 1.10, up: 0.9, dn: 7.5 } },
+  // 20 - HANOI. The sparsest palette here after Kyoto's, and the only one with
+  // a monochord on it. See sysMUS_CHORDS20 for why it is this quiet.
+  { chords: sysMUS_CHORDS20, roots: sysMUS_ROOTS20, next: sysMUS_NEXT20,
+    dwellA: 9.0, dwellB: 15.0, pluckA: 2.4, pluckB: 5.6, cut: 640, bus: 0.135, bass: 0.26,
+    lead: 'danbau', xfade: 4.4, rhythm: null, tranh: true,
+    // A train, forty-five centimetres away, at eleven metres a second, while
+    // you stand still. 'arch' — up and back down — because the whole of that
+    // moment is a thing ARRIVING and then being gone, and a figure that climbs
+    // and stays climbed would be describing the wrong half of it. Six notes on
+    // the dan bau at four hundred and twenty milliseconds is by a distance the
+    // slowest lift in the game after Iceland's, and it has to be: the bend on
+    // that instrument takes a third of a second before the note is even at
+    // pitch, so anything faster is a sine wave.
+    lift: { inst: 'danbau', shape: 'arch', n: 6, gap: 0.42, oct: 0, vel: 1.05,
+            up: 2.4, dn: 11.0 } },
 ];
 // The Circular Quay palette (A lydian) got the PLACE trigger it wanted: biome
 // entry selects it, and stepping off the wheel returns to it from the passage
@@ -2802,6 +2981,55 @@ const sysMARKS = {
     ['r', 22, 33, 18, 3, 'antOrca'],
     ['r', 24, 34.6, 9, 1.2, 'antOrcaSaddle'],
     ['p', '44,38 52,34 60,38 52,36', 'antHull'] ] },
+  /* THE ONLY TILE ON THE SHELF THAT IS LIT FROM INSIDE, and it has to be:
+     every other chapter can be drawn as a landscape and this one is a hundred
+     and forty rectangles of warm light against a sky that has gone. So: a
+     cold sky, a black cliff, a wall of windows, the basin with the town in
+     it, and one silver thing in the bottom corner going somewhere. */
+  monaco: { tint: 'monBasin', s: [
+    ['r', 0, 0, 64, 40, 'monSkyTop'],
+    ['p', '0,9 64,5 64,15 0,18', 'monSkyLow'],
+    ['p', '0,13 14,4 30,9 46,2 64,8 64,19 0,20', 'monRockDk'],
+    ['r', 0, 18, 64, 8, 'monStoneDk'],
+    ['p', '38,18 46,12 54,18', 'monStone'],
+    ['c', 44, 13, 2.4, 'monCopper'],
+    ['r', 3, 20, 2, 2.6, 'monWindow'], ['r', 8, 20, 2, 2.6, 'monWindow'],
+    ['r', 14, 21, 2, 2.4, 'monWindowCool'], ['r', 20, 20, 2, 2.6, 'monWindow'],
+    ['r', 27, 21, 2, 2.4, 'monWindow'], ['r', 40, 20, 2, 2.6, 'monWindow'],
+    ['r', 48, 20, 2, 2.6, 'monWindow'], ['r', 56, 21, 2, 2.4, 'monWindowCool'],
+    ['r', 0, 25, 64, 8, 'monBasin'],
+    ['r', 0, 30, 64, 10, 'monSeaDeep'],
+    ['r', 0, 24, 64, 1.4, 'monQuayDk'],
+    ['p', '34,37 39,33 51,33 56,37', 'monCarSilver'],
+    ['r', 34, 36, 22, 1.6, 'monCarDk'],
+    ['c', 39, 38, 1.5, 'monTyre'], ['c', 51, 38, 1.5, 'monTyre'],
+    ['c', 56.5, 35.4, 1.1, 'monHeadlamp'] ] },
+  /* THE ONLY TILE ON THE SHELF WITH A CROWD ON IT, and it has to be: every
+     other way of drawing Hanoi at 64 x 40 is a wall of mustard plaster, and
+     the thing you actually remember about that city is that the road is full.
+     So: a white sky, a row of tube houses, a ball of cable, and eleven
+     motorbikes coming straight at you. */
+  hanoi: { tint: 'hanAsphalt', s: [
+    ['r', 0, 0, 64, 40, 'hanSkyLow'],
+    ['r', 0, 0, 64, 8, 'hanSkyTop'],
+    ['r', 0, 6, 9, 20, 'hanMustard'], ['r', 9, 4, 8, 22, 'hanOchre'],
+    ['r', 17, 7, 9, 19, 'hanJade'], ['r', 26, 3, 8, 23, 'hanPeach'],
+    ['r', 34, 6, 9, 20, 'hanMustard'], ['r', 43, 5, 8, 21, 'hanOchre'],
+    ['r', 51, 8, 8, 18, 'hanPlaster'], ['r', 59, 5, 5, 21, 'hanJade'],
+    ['r', 0, 25, 64, 1.6, 'hanTarp'],
+    ['r', 2, 12, 2, 3, 'hanGlass'], ['r', 11, 11, 2, 3, 'hanGlass'],
+    ['r', 20, 13, 2, 3, 'hanWindow'], ['r', 29, 10, 2, 3, 'hanGlass'],
+    ['r', 37, 12, 2, 3, 'hanGlass'], ['r', 46, 11, 2, 3, 'hanWindow'],
+    ['r', 0, 8.5, 64, 0.7, 'hanCable'], ['r', 0, 10.2, 64, 0.5, 'hanCable'],
+    ['r', 0, 11.6, 64, 0.4, 'hanCable'],
+    ['r', 0, 27, 64, 13, 'hanAsphalt'],
+    ['c', 7, 32, 2.6, 'hanBike1'], ['c', 17, 30, 2.4, 'hanBike2'],
+    ['c', 27, 34, 2.8, 'hanBike4'], ['c', 37, 31, 2.5, 'hanBike5'],
+    ['c', 47, 35, 2.7, 'hanBike6'], ['c', 57, 32, 2.4, 'hanBike3'],
+    ['c', 12, 37, 2.5, 'hanBike5'], ['c', 32, 38, 2.6, 'hanBike2'],
+    ['c', 52, 38, 2.4, 'hanBike1'],
+    ['c', 7, 29.6, 1.3, 'hanHelmet'], ['c', 27, 31.6, 1.3, 'hanConical'],
+    ['c', 47, 32.6, 1.3, 'hanHelmet'] ] },
 };
 const sysMARK_NS = 'http://www.w3.org/2000/svg';
 
@@ -2940,6 +3168,21 @@ const sysKEEPS = {
     ['r', 6, 8, 17, 3, 'foam'],
     ['p', '22,13 28,13 28,23 22,23 22,21 25.5,21 25.5,15 22,15', 'antHutRed'],
     ['c', 9.5, 12.5, 1.6, 'antIce'] ] },
+  /* nacre, gilt, and a number nobody in the building says out loud */
+  monaco: { s: [
+    ['r', 3, 9, 26, 14, 'monGold'],
+    ['r', 4.4, 10.4, 23.2, 11.2, 'monChipW'],
+    ['r', 10, 13, 12, 6, 'monChipR'],
+    ['r', 13.4, 15, 5.2, 2, 'monGoldDk'],
+    ['c', 7, 12, 1.1, 'monGoldDk'], ['c', 25, 20, 1.1, 'monGoldDk'] ] },
+  /* twenty centimetres high, four thousand dong a glass, and everybody in the
+     country has sat on one of these this week */
+  hanoi: { s: [
+    ['r', 6, 12, 20, 2.6, 'hanStoolA'],
+    ['r', 8, 14.6, 2.2, 10, 'hanStoolA'], ['r', 21.8, 14.6, 2.2, 10, 'hanStoolA'],
+    ['r', 8, 18, 16, 1.6, 'hanStoolA'],
+    ['r', 6, 11, 20, 1.2, 'hanStoolB'],
+    ['r', 13, 22, 6, 1.8, 'hanStoolD'] ] },
 };
 
 /** One shape list as an <svg>. Shared by the place marks and the souvenirs. */
@@ -3385,6 +3628,42 @@ const sysMAP_WORLDS = {
     { get: 'berg', k: 'peak', t: 'the big berg' },
     { get: 'boat', k: 'boat', t: 'the tender' },
     { get: 'pod', k: 'star', t: 'the pod' },
+  ] },
+  // Monte Carlo. Two hundred metres of principality and a circuit that goes
+  // round three sides of it, so the useful thing on this chart is not where
+  // anything IS — you can see all of it from the terrace — it is where the
+  // CAR is, which is the one mark on it that moves.
+  monaco: { x0: -230, x1: 250, z0: -140, z1: 200, pad: 10,
+    way: { get: 'casino', t: 'the steps of the Casino' },
+    pal: { lo: PALETTE.monQuayDk, mid: PALETTE.monStone, hi: PALETTE.monRock,
+           wat: PALETTE.monSeaLt, dp: PALETTE.monSeaDeep }, marks: [
+    { get: 'casino', k: 'star', t: 'the Casino' },
+    { get: 'wheel', k: 'dot', t: 'the wheel' },
+    { get: 'square', k: 'dot', t: 'the square' },
+    { get: 'yacht', k: 'boat', t: 'the yacht' },
+    { get: 'palace', k: 'peak', t: 'the Palace' },
+    { get: 'hairpin', k: 'peak', t: 'the hairpin' },
+    { get: 'tunnelMouth', k: 'faint', t: 'the tunnel' },
+    { get: 'grandstand', k: 'faint', t: 'the stand' },
+    { get: 'car', k: 'boat', t: 'the car' },
+  ] },
+  // Hanoi. The one chart in the game whose most useful feature is a HOLE: the
+  // lake is the thing you navigate by, because every street in that quarter
+  // looks exactly like every other street in that quarter, which is true and
+  // is the reason the lake is the middle of the city.
+  hanoi: { x0: -140, x1: 140, z0: -130, z1: 200, pad: 10,
+    way: { get: 'bridge', t: 'the head of the old bridge' },
+    pal: { lo: PALETTE.hanConcreteDk, mid: PALETTE.hanConcrete, hi: PALETTE.hanDust,
+           wat: PALETTE.hanLake, dp: PALETTE.hanLakeDeep }, marks: [
+    { get: 'lake', k: 'water', t: 'Hoan Kiem' },
+    { get: 'tower', k: 'star', t: 'the tower' },
+    { get: 'huc', k: 'dot', t: 'the red bridge' },
+    { get: 'puppet', k: 'dot', t: 'the puppets' },
+    { get: 'bia', k: 'dot', t: 'the bia hoi' },
+    { get: 'market', k: 'faint', t: 'the market' },
+    { get: 'rails', k: 'peak', t: 'the line' },
+    { get: 'bridge', k: 'boat', t: 'Long Bien' },
+    { get: 'bike', k: 'faint', t: 'the traffic' },
   ] },
 };
 
@@ -5978,7 +6257,8 @@ export function createSystems(game) {
   // pluck scheduler needs (by reference — a chapter change swaps the palette out
   // from under the indices, so indices alone would point at the wrong chords).
   let musPal = sysMUS_PAL[0];
-  let musShakuAt = 0, musBuoyAt = 0;   // the two slow voices keep their own clocks
+  let musShakuAt = 0, musBuoyAt = 0;   // the slow voices keep their own clocks
+  let musTranhAt = 0, musLoanAt = 0;   // ...and so do chapter 19's two
   let musCurChord = null, musPrevChord = null;
   let musShimGain = null, musShimV = null, musProg = 0;
   // The choir. Real pad voices through a formant pair rather than the main
@@ -6158,6 +6438,9 @@ export function createSystems(game) {
       case 'glass':  musGlass(when, midi, pan, vel); return;
       case 'quena':  musQuena(when, midi, vel); return;
       case 'violin': musViolin(when, midi, vel, gap * 1.6); return;
+      case 'twang':  musTwang(when, midi, pan, vel, 2); return;
+      case 'danbau': musDanBau(when, midi, vel); return;
+      case 'horn':   musBondHorn(when, midi, vel); return;
       default:       musPluck(when, midi, pan, vel); return;
     }
   }
@@ -7557,6 +7840,364 @@ export function createSystems(game) {
   }
 
   /**
+   * THE GUITAR, and it is one instrument doing three jobs: the riff, the sting
+   * and the marquee's own figure.
+   *
+   * Two things make it read as THAT guitar and neither of them is the waveform.
+   * The first is TREMOLO PICKING — a note is not one attack, it is three or
+   * four inside a sixteenth, which is why `trem` is an argument and not a
+   * constant. The second is the SPRING: a hard, bright, slightly metallic tail
+   * that is longer than the note it came from, which here is the shared reverb
+   * send driven much harder than anything else in this file drives it.
+   */
+  function musTwang(when, midi, panv, vel, trem) {
+    const hz = sysMidiHz(midi);
+    const n = trem === undefined ? 1 : Math.max(1, trem);
+    const step = 0.032;
+    const out = ac.createGain();
+    out.gain.value = 1;
+    let tail = out;
+    if (ac.createStereoPanner) {
+      const pan = ac.createStereoPanner();
+      pan.pan.value = clamp(panv === undefined ? 0 : panv, -1, 1);
+      out.connect(pan); tail = pan;
+    }
+    tail.connect(musPluckDry);
+    // driven hard into the room: a surf guitar with no spring on it is a banjo
+    const wet = ac.createGain();
+    wet.gain.value = 1.7;
+    tail.connect(wet); wet.connect(musSend);
+
+    for (let i = 0; i < n; i++) {
+      const t = when + i * step;
+      const dur = i === n - 1 ? 0.62 : step * 1.4;
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz;
+      const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = hz * 2.001;
+      // the vibrato arm, and it only bends the note that is left ringing
+      if (i === n - 1) {
+        o.frequency.setValueAtTime(hz, t + 0.18);
+        o.frequency.linearRampToValueAtTime(hz * 1.012, t + 0.30);
+        o.frequency.linearRampToValueAtTime(hz * 0.994, t + 0.44);
+        o.frequency.linearRampToValueAtTime(hz, t + 0.58);
+      }
+      const bp = ac.createBiquadFilter();
+      bp.type = 'lowpass'; bp.Q.value = 3.2;
+      bp.frequency.setValueAtTime(hz * 9, t);
+      bp.frequency.exponentialRampToValueAtTime(Math.max(400, hz * 2.4), t + dur * 0.8);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vel * 0.052 * (i === n - 1 ? 1 : 0.72), t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const g2 = ac.createGain(); g2.gain.value = 0.26;
+      o.connect(bp); o2.connect(g2); g2.connect(bp); bp.connect(g); g.connect(out);
+      o.start(t); o2.start(t);
+      o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
+  }
+
+  /**
+   * THE UPRIGHT. A big soft sine with a triangle over it, a very fast decay on
+   * the top and a slow one underneath — which is what a double bass is — plus
+   * two milliseconds of finger noise, which is what makes it a PLAYED
+   * instrument rather than a synthesiser playing low notes.
+   */
+  function musUpright(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = hz;
+    const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = hz * 2.004;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 1.1;
+    lp.frequency.setValueAtTime(hz * 7, when);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(90, hz * 1.7), when + 0.16);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vel * 0.086, when + 0.010);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.52);
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0.0001, when);
+    g2.gain.exponentialRampToValueAtTime(vel * 0.020, when + 0.006);
+    g2.gain.exponentialRampToValueAtTime(0.0001, when + 0.10);
+    o.connect(lp); lp.connect(g); o2.connect(g2);
+    g.connect(musPluckDry); g2.connect(musPluckDry);
+    o.start(when); o2.start(when);
+    o.stop(when + 0.6); o2.stop(when + 0.15);
+    // the finger on the string
+    const ns = noiseSrc();
+    const hp = ac.createBiquadFilter(); hp.type = 'bandpass';
+    hp.frequency.value = 1800; hp.Q.value = 0.8;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, when);
+    ng.gain.exponentialRampToValueAtTime(vel * 0.010, when + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.030);
+    ns.connect(hp); hp.connect(ng); ng.connect(musPluckDry);
+    ns.start(when); ns.stop(when + 0.05);
+  }
+
+  /** The ride cymbal. One ping, and the whole pulse of the chapter is on it. */
+  function musRide(when, vel) {
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'highpass'; bp.frequency.value = 6200;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vel * 0.013, when + 0.002);
+    g.gain.exponentialRampToValueAtTime(vel * 0.0035, when + 0.09);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.62);
+    ns.connect(bp); bp.connect(g); g.connect(musDrum); g.connect(musSend);
+    ns.start(when); ns.stop(when + 0.7);
+    // the bell, which is what makes it a ride and not a hi-hat
+    const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = 3140;
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, when);
+    og.gain.exponentialRampToValueAtTime(vel * 0.0026, when + 0.002);
+    og.gain.exponentialRampToValueAtTime(0.0001, when + 0.18);
+    o.connect(og); og.connect(musDrum);
+    o.start(when); o.stop(when + 0.2);
+  }
+
+  /** Brushes. A swirl rather than a hit — the only percussion here with no edge. */
+  function musBrush(when, vel, sweep) {
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = sweep ? 1400 : 2600; bp.Q.value = sweep ? 0.6 : 1.4;
+    const g = ac.createGain();
+    const d = sweep ? 0.20 : 0.055;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.linearRampToValueAtTime(vel * (sweep ? 0.010 : 0.016), when + (sweep ? 0.10 : 0.004));
+    g.gain.exponentialRampToValueAtTime(0.0001, when + d);
+    ns.connect(bp); bp.connect(g); g.connect(musDrum); g.connect(musSend);
+    ns.start(when); ns.stop(when + d + 0.04);
+  }
+
+  /**
+   * THE HORNS, and this is the loudest thing in the chapter.
+   *
+   * Four sawtooths a beat apart with a hard front on them and no vibrato at
+   * all, through a filter that opens as the note lands. It is deliberately
+   * RARE — once every eight bars at rest, and every four when something is
+   * happening — because the whole of this palette's arrangement exists so
+   * that there is somewhere for it to arrive from.
+   */
+  function musBondHorn(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const dur = 0.42;
+    for (let k = 0; k < 3; k++) {
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = hz * (k === 0 ? 1 : k === 1 ? 1.006 : 0.994);
+      // the lip, and it is two hundredths of a second of being flat
+      o.frequency.setValueAtTime(hz * 0.982, when);
+      o.frequency.linearRampToValueAtTime(hz, when + 0.028);
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 1.6;
+      lp.frequency.setValueAtTime(hz * 2.2, when);
+      lp.frequency.exponentialRampToValueAtTime(hz * 7.5, when + 0.05);
+      lp.frequency.exponentialRampToValueAtTime(Math.max(500, hz * 3.0), when + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(vel * 0.030 * (k === 0 ? 1 : 0.55), when + 0.022);
+      g.gain.setValueAtTime(vel * 0.026 * (k === 0 ? 1 : 0.55), when + dur * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      let tail = g;
+      if (ac.createStereoPanner) {
+        const pan = ac.createStereoPanner();
+        pan.pan.value = (k - 1) * 0.42;
+        g.connect(pan); tail = pan;
+      }
+      o.connect(lp); lp.connect(g);
+      tail.connect(musPluckDry); tail.connect(musSend);
+      o.start(when); o.stop(when + dur + 0.06);
+    }
+  }
+
+  /**
+   * ONE BAR OF IT. Sixteen sixteenths, and the arrangement is written against
+   * `musBondHeat` — how much is going on in the world — exactly the way the
+   * gnawa cell is written against the sandstorm and the Kowloon bar against
+   * the light show. At rest it is a guitar, a bass and a ride; at full heat the
+   * brushes double, the horns come every fourth bar instead of every eighth,
+   * and the riff picks harder.
+   */
+  function musBondBar(t0, bar) {
+    const chord = (t0 < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
+    if (!chord) return;
+    const S = sysMUS_BOND_16;
+    const heat = musBondHeat;
+    const lvl = (0.72 + musIntensity * 0.30) * (0.80 + heat * 0.34);
+    const root = musPal.roots[musIdx];
+
+    // --- the riff, twice a bar, on the guitar
+    for (let half = 0; half < 2; half++) {
+      for (let i = 0; i < sysMUS_BOND_RIFF.length; i++) {
+        const r = sysMUS_BOND_RIFF[i];
+        const t = t0 + (half * 8 + r.t * 0.5) * S * 2;
+        musTwang(t, root + 24 + r.d, ((i % 3) - 1) * 0.22, r.v * lvl * 0.95,
+                 heat > 0.5 ? r.trem + 1 : r.trem);
+      }
+    }
+    // --- the upright
+    for (let i = 0; i < sysMUS_BOND_BASS.length; i++) {
+      const b = sysMUS_BOND_BASS[i];
+      musUpright(t0 + b.t * S, root + b.d, b.v * lvl);
+      // the chromatic approach into the next bar, which is the whole feel
+      if (b.t === 12 && Math.random() < 0.55 + heat * 0.3) {
+        musUpright(t0 + 14 * S, root + 11, 0.52 * lvl);
+      }
+    }
+    // --- the ride, and the brushes under it
+    for (let i = 0; i < sysMUS_BOND_RIDE.length; i++) {
+      const r = sysMUS_BOND_RIDE[i];
+      musRide(t0 + r.t * S, r.v * lvl);
+    }
+    musBrush(t0 + 4 * S, 0.9 * lvl, false);
+    musBrush(t0 + 12 * S, 0.9 * lvl, false);
+    musBrush(t0, 0.7 * lvl, true);
+    if (heat > 0.45) { musBrush(t0 + 8 * S, 0.6 * lvl, true); musBrush(t0 + 6 * S, 0.5 * lvl, false); }
+    // --- and the horns, which are the reason for all of the above
+    const every = heat > 0.5 ? 4 : 8;
+    if (bar % every === every - 1) {
+      for (let i = 0; i < sysMUS_BOND_HORN.length; i++) {
+        const h = sysMUS_BOND_HORN[i];
+        musBondHorn(t0 + (8 + h.t) * S, root + 24 + h.o, h.v * lvl * 1.05);
+      }
+    }
+    // --- the sting: the whole chord, once, when the harmony reaches it
+    if (musIdx === 0 && bar % 2 === 0) {
+      for (let i = 0; i < chord.length; i++) {
+        musTwang(t0 + 8 * S + i * 0.012, musFold(chord[i], 55, 84), (i - 2) * 0.28,
+                 0.52 * lvl, 1);
+      }
+    }
+  }
+
+  /**
+   * THE DAN BAU, and it is the one instrument in this table that is a single
+   * string with no frets on it at all.
+   *
+   * Everything that makes it recognisable is a PITCH GESTURE and not a
+   * timbre: the note is approached from below, it is bent while it sounds by a
+   * lever the player is holding in their other hand, and it has a very deep
+   * slow vibrato on the tail. So the oscillator here is close to a sine — the
+   * real thing is played entirely in harmonics and is nearly one — and all the
+   * work is in six frequency ramps.
+   *
+   * It also gets the most reverb of any voice in this file, because a dan bau
+   * is quiet enough that it has been amplified since the 1950s and nobody has
+   * ever amplified one without putting a great deal of room on it.
+   */
+  function musDanBau(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const rel = rand(2.0, 3.2);
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = hz * 0.90;
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2.01;
+    // approached from below, then bent, then a slow vibrato on the tail
+    o.frequency.setValueAtTime(hz * 0.90, when);
+    o.frequency.linearRampToValueAtTime(hz, when + 0.13);
+    const up = Math.random() < 0.6;
+    o.frequency.linearRampToValueAtTime(hz * (up ? 1.062 : 0.945), when + 0.44);
+    o.frequency.linearRampToValueAtTime(hz, when + 0.78);
+    for (let v = 0; v < 4; v++) {
+      o.frequency.linearRampToValueAtTime(hz * (v & 1 ? 1.018 : 0.984), when + 0.95 + v * 0.22);
+    }
+    o.frequency.linearRampToValueAtTime(hz, when + 1.9);
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(hz * 6, when);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(300, hz * 2.2), when + rel * 0.7);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vel * 0.052, when + 0.020);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rel);
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0.0001, when);
+    g2.gain.exponentialRampToValueAtTime(vel * 0.012, when + 0.015);
+    g2.gain.exponentialRampToValueAtTime(0.0001, when + rel * 0.45);
+    o.connect(lp); lp.connect(g); o2.connect(g2);
+    const wet = ac.createGain(); wet.gain.value = 1.9;
+    g.connect(musPluckDry); g.connect(wet); wet.connect(musSend);
+    g2.connect(musPluckDry); g2.connect(musSend);
+    o.start(when); o2.start(when);
+    o.stop(when + rel + 0.1); o2.stop(when + rel + 0.1);
+  }
+
+  /**
+   * THE DAN TRANH — sixteen steel strings over movable bridges, pentatonic,
+   * and played in RUNS rather than in notes.
+   *
+   * Like the violin in the baroque palette, one note of this sounds like
+   * somebody testing an instrument. What it does is a nhan — a fast ornamented
+   * run down or up the pentatonic — so this plays four to seven of them, and
+   * the LAST one gets the left-hand press that bends it up a tone after it has
+   * already sounded, which is the ornament the whole instrument is about.
+   */
+  const sysMUS_TRANH_P = [0, 2, 5, 7, 9];
+  function musDanTranhNote(when, midi, vel, bend) {
+    const hz = sysMidiHz(midi);
+    const rel = rand(0.9, 1.8);
+    const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = hz;
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2.98;
+    if (bend) {
+      o.frequency.setValueAtTime(hz, when + 0.14);
+      o.frequency.linearRampToValueAtTime(hz * 1.122, when + 0.32);
+      o.frequency.linearRampToValueAtTime(hz * 1.06, when + 0.55);
+    }
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.9;
+    lp.frequency.setValueAtTime(hz * 9, when);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(400, hz * 2.4), when + rel * 0.8);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vel * 0.030, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rel);
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0.0001, when);
+    g2.gain.exponentialRampToValueAtTime(vel * 0.008, when + 0.004);
+    g2.gain.exponentialRampToValueAtTime(0.0001, when + rel * 0.3);
+    o.connect(lp); lp.connect(g); o2.connect(g2);
+    g.connect(musPluckDry); g.connect(musSend);
+    g2.connect(musPluckDry); g2.connect(musSend);
+    o.start(when); o2.start(when);
+    o.stop(when + rel + 0.1); o2.stop(when + rel + 0.1);
+  }
+  /** One run. The gesture, not the note. */
+  function musDanTranh(when, root, vel) {
+    const n = randInt(4, 7);
+    const dir = Math.random() < 0.55 ? -1 : 1;
+    let step = randInt(0, 4);
+    let oct = randInt(1, 2);
+    let t = when;
+    for (let i = 0; i < n; i++) {
+      const midi = musFold(root + 12 * oct + sysMUS_TRANH_P[((step % 5) + 5) % 5], 62, 88);
+      musDanTranhNote(t, midi, vel * (i === 0 ? 1.15 : 1 - i * 0.06), i === n - 1);
+      t += (i === n - 1 ? 0.42 : rand(0.075, 0.115));
+      step += dir;
+      if (step > 4) { step -= 5; oct++; }
+      if (step < 0) { step += 5; oct--; }
+      oct = clamp(oct, 0, 3);
+    }
+  }
+
+  /** SONG LOAN — a wooden clapper worked with one foot. Two centimetres of it. */
+  function musSongLoan(when, vel) {
+    const o = ac.createOscillator(); o.type = 'square';
+    o.frequency.setValueAtTime(1280, when);
+    o.frequency.exponentialRampToValueAtTime(620, when + 0.020);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vel * 0.020, when + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.055);
+    o.connect(g); g.connect(musDrum); g.connect(musSend);
+    o.start(when); o.stop(when + 0.07);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 2400; bp.Q.value = 1.6;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, when);
+    ng.gain.exponentialRampToValueAtTime(vel * 0.012, when + 0.001);
+    ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.030);
+    ns.connect(bp); bp.connect(ng); ng.connect(musDrum);
+    ns.start(when); ns.stop(when + 0.05);
+  }
+
+  /**
    * ONE BAR OF CONTINUO — a cello walking in crotchets and a harpsichord filling
    * the gaps between them. `musVenTide` (0..1, from venice.js) is the one live
    * input: as the water comes up the harpsichord thins out and an organ pedal
@@ -7753,6 +8394,12 @@ export function createSystems(game) {
                         sysMUS_BAR_Q * (k === n - 1 ? 2.2 : 1.05));
               idx += dir;
             }
+          } else if (lead === 'danbau') {
+            // ONE NOTE, and it is a gesture. The dan bau is bent into, bent
+            // while it sounds and bent again on the tail; anything that plays
+            // it in a hurry is playing a sine wave.
+            musDanBau(musPluckAt, musFold(ch[randInt(0, ch.length - 1)] + 12, 60, 80),
+                      rand(0.030, 0.060) * (0.8 + musIntensity * 0.4));
           } else if (lead === 'mallet') {
             musMallet(musPluckAt, Math.min(88, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2)),
               pan, v * 1.2);
@@ -7785,6 +8432,25 @@ export function createSystems(game) {
           }
           musShakuAt = t + rand(9, 19);
         } else musShakuAt += 6;
+      }
+    }
+    if (musPal.tranh) {
+      // A RUN, A LONG WAY APART. Same argument as the shakuhachi in Kyoto: the
+      // gap is doing as much work as the notes, so it gets its own clock
+      // rather than riding the pluck's.
+      if (musTranhAt < now) musTranhAt = now + rand(3, 8);
+      guard = 0;
+      while (musTranhAt < horizon && guard++ < 3) {
+        musDanTranh(musTranhAt, musPal.roots[musIdx],
+                    rand(0.55, 0.95) * (0.85 + musIntensity * 0.3));
+        musTranhAt += rand(7, 16);
+      }
+      // ...and the clapper, which is the only pulse this palette has
+      if (musLoanAt < now) musLoanAt = now + 0.4;
+      guard = 0;
+      while (musLoanAt < horizon && guard++ < 12) {
+        musSongLoan(musLoanAt, 0.55 + musIntensity * 0.35);
+        musLoanAt += 1.10;
       }
     }
     if (musPal.buoy) {
@@ -7874,6 +8540,26 @@ export function createSystems(game) {
       }
       // A CROTCHET, not a bar. kowloon.js lights one tower per game.music
       // .beats(), so this number is literally the speed of the marquee moment.
+      musBeatLen = barLen / 4;
+      return;
+    }
+    if (musPal.band === 'bond') {
+      const barLen = sysMUS_BOND_BAR * sysMUS_BOND_16;
+      if (musBarAt < now) {
+        musBarAt = now + 0.08;
+        musBarAnchor = musBarAt;
+        musBarIndex = 0;
+        musChordAt = musBarAt;         // two bars a chord, changing on a downbeat
+      }
+      guard = 0;
+      while (musBarAt < now + sysMUS_RHY_LOOK && guard++ < 4) {
+        musBondBar(musBarAt, musBarIndex);
+        musBarAt += barLen;
+        musBarIndex++;
+      }
+      // A CROTCHET. monaco.js does not score anything on the beat, but the
+      // dance floor in Cali and the towers in Kowloon both do and a band that
+      // reports a bar where the others report a beat is a rung out of line.
       musBeatLen = barLen / 4;
       return;
     }
@@ -11464,6 +12150,70 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.antarctic && game.antarctic.nearestFloe()); } },
     'orca-ride':      { clue: 'wheek from the tiller, then hold your speed',
                     where: function () { return hintObj(game.antarctic && game.antarctic.pod()); } },
+
+    // ---- chapter 18 ----
+    'to-monaco':      { clue: 'somewhere that will mind you being there',
+                    where: function () { return null; } },
+    'superyacht':     { clue: 'the gangway is off the back of her, onto the quay',
+                    where: function () { return hintObj(game.monaco && game.monaco.yacht); } },
+    'black-tie':      { clue: 'over the back of a lounger on the top deck',
+                    where: function () { return hintObj(game.monaco && game.monaco.tux()); } },
+    'high-dive':      { clue: 'get to the sun deck first. it is nine metres.',
+                    where: function () { return hintObj(game.monaco && game.monaco.sunDeck); } },
+    'the-rock':       { clue: 'the ramp off the west quay. it is the only way up.',
+                    where: function () { return hintObj(game.monaco && game.monaco.palace); } },
+    'palace-guard':   { clue: 'wheek at him. keep wheeking at him.',
+                    where: function () { return hintObj(game.monaco && game.monaco.guard()); } },
+    'pass-the-door':  { clue: 'up the steps and straight in. nobody stops you ONCE.',
+                    where: function () { return hintObj(game.monaco && game.monaco.door); } },
+    'the-floor':      { clue: 'the wedges on the floor are what they can see. sit down to shrink them.',
+                    where: function () { return hintObj(game.monaco && game.monaco.wheel); } },
+    'chip-stack':     { clue: 'a plaque off a table, and drop it in the wheel',
+                    where: function () { return hintObj(game.monaco && game.monaco.plaque()); } },
+    'champagne':      { clue: 'run at it. it is fifty-five glasses.',
+                    where: function () { return hintObj(game.monaco && game.monaco.tower); } },
+    'piano-solo':     { clue: 'walk the length of the keys without stopping',
+                    where: function () { return hintObj(game.monaco && game.monaco.piano); } },
+    'the-wheel':      { clue: 'it never stops. get on it anyway.',
+                    where: function () { return hintObj(game.monaco && game.monaco.wheel); } },
+    'chicane':        { clue: 'the harbour is nine metres that way. shove.',
+                    where: function () { return hintObj(game.monaco && game.monaco.chicane()); } },
+    'the-hairpin':    { clue: 'they are down to four metres a second there. get on the roof.',
+                    where: function () { return hintObj(game.monaco && game.monaco.hairpin); } },
+    'the-tunnel':     { clue: 'stay on the roof. do nothing. that is the whole thing.',
+                    where: function () { return hintObj(game.monaco && game.monaco.tunnelMouth); } },
+
+    // ---- chapter 19 ----
+    'to-hanoi':       { clue: 'somewhere with no gap in it at all',
+                    where: function () { return null; } },
+    'cross-the-road': { clue: 'walk. do not run, do not stop, do not change your mind.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.crossing()); } },
+    'pho-raid':       { clue: 'the bowls are on the little tables on the pavement',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.pho()); } },
+    'flower-bike':    { clue: 'the whole shop is on the back of one bicycle',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.flowers); } },
+    'barber':         { clue: 'there is a mirror nailed to a tree',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.barber); } },
+    'ride-the-flow':  { clue: 'the footwell. hop into the footwell.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.bike()); } },
+    'the-stools':     { clue: 'run through the middle of them. all of them.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.bia); } },
+    'the-huc':        { clue: 'the red one, on the east side of the lake',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.huc); } },
+    'turtle-tower':   { clue: 'it is on an island. you are a semi-aquatic rodent.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.tower); } },
+    'shuttlecock':    { clue: 'stand in the middle of the ring and do not move',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.cau); } },
+    'water-puppets':  { clue: 'get in the pool. that is where the show is.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.puppet); } },
+    'egg-coffee':     { clue: 'first floor, on a balcony rail near the bia hoi',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.bia); } },
+    'fold-the-street': { clue: 'be in the alley when the horn goes',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
+    'long-bien':      { clue: 'over the dyke, and then keep going',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.bridge); } },
+    'the-train':      { clue: 'stand still. that is all of it. stand still.',
+                    where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
   };
   function hintHoldingBall() { return hintHolding('ball') ? 'carry it into the harbour' : 'grab the ball with E'; }
 
@@ -12534,6 +13284,60 @@ export function createSystems(game) {
       }
       findS.ignT = (findS.ignT || 0) + sysFIND_TICK;
       return findS.ignT >= 20;
+    },
+
+    // ---- 18, Monte Carlo -------------------------------------------------
+    // The chapter's marquee is a hundred and eleven metres of tunnel at
+    // twenty-six metres a second. This is the same hundred and eleven metres
+    // done the only other way there is, on your own feet, over the top of it —
+    // the roof was collided so that it could be walked on and nothing has ever
+    // pointed at it.
+    'over-the-tunnel': function (c) {
+      const a = findApi();
+      if (!a || typeof a.inZone !== 'function') return false;
+      if (!c.capy.grounded || c.capy.carriedBy) return false;
+      // ON the lid rather than IN the bore: the roof's own deck sits at the
+      // road plus six and a half metres, and the tunnel test is a plan test.
+      if (!a.inZone('tunnel', c.p.x, c.p.z)) { findS.otT = 0; return false; }
+      const road = typeof a.terrainHeight === 'function' ? a.terrainHeight(c.p.x, c.p.z) : 0;
+      if (c.p.y < road + 4.5) { findS.otT = 0; return false; }
+      findS.otT = (findS.otT || 0) + sysFIND_TICK;
+      return findS.otT >= 4;
+    },
+    // ...and the Rock, which is the far end of a chapter that is entirely
+    // about the other end. Nothing is happening up there. That is what it is
+    // for, and it is the ninth of the thirty-six place finds whose whole
+    // content is that you were somewhere and did not do anything.
+    'nothing-up-here': function (c) {
+      if (!findZone('palace', c.p) || !findParked(c, 0.30)) { findS.nuT = 0; return false; }
+      findS.nuT = (findS.nuT || 0) + sysFIND_TICK;
+      return findS.nuT >= 14 && (c.capy.loaf || 0) > 0.5;
+    },
+
+    // ---- 19, Hanoi -------------------------------------------------------
+    // The chapter's whole first act is about never stopping. This is the
+    // opposite, in the same place, and it is the thing a player is most likely
+    // to have done BY ACCIDENT the first time they stepped off a kerb: froze,
+    // and found out that it works anyway.
+    'stood-in-the-river': function (c) {
+      const a = findApi();
+      if (!a || typeof a.inZone !== 'function') { findS.sirT = 0; return false; }
+      if (!a.inZone('traffic', c.p.x, c.p.z) || !findParked(c, 0.22) ||
+          (typeof a.riding === 'function' && a.riding() >= 0)) { findS.sirT = 0; return false; }
+      findS.sirT = (findS.sirT || 0) + sysFIND_TICK;
+      return findS.sirT >= 12;
+    },
+    // ...and the one street in the Old Quarter with nothing coming down it. It
+    // is a railway, which is the joke, and it is only quiet while the train is
+    // somewhere else.
+    'quiet-alley':    function (c) {
+      const a = findApi();
+      if (!a || typeof a.inZone !== 'function') { findS.qaT = 0; return false; }
+      if (!a.inZone('rails', c.p.x, c.p.z) ||
+          (typeof a.trainOut === 'function' && a.trainOut()) ||
+          !c.capy.grounded) { findS.qaT = 0; return false; }
+      findS.qaT = (findS.qaT || 0) + sysFIND_TICK;
+      return findS.qaT >= 8;
     },
   };
 
@@ -16601,10 +17405,28 @@ export function createSystems(game) {
     const inAnt = !!(game.biome && game.biome.isActive('antarctic'));
     const atAnt = !!(inAnt && game.antarctic && !game.state.sailing &&
                      game.antarctic.inZone('jetty', p.x, p.z) && game.antarctic.seenPod());
+    // Monte Carlo's is the top of the Casino steps, once you have been
+    // inside. It is the one door in the chapter, it is where you get thrown
+    // out to, and it is the last thing anybody in that principality does at
+    // the end of an evening — the same construction as the fire at the desert
+    // camp and the lit lantern in the Drift, with the mildest gate any of
+    // them has: not the marquee, just the threshold.
+    const inMon = !!(game.biome && game.biome.isActive('monaco'));
+    const atMon = !!(inMon && game.monaco && game.monaco.beenIn() &&
+                     game.monaco.inZone('steps', p.x, p.z));
+    // Hanoi's is the head of the Long Bien bridge. Everything has left that
+    // city over that bridge since nineteen hundred and two — it is still the
+    // only way across the river on foot — and it is UNGATED, like the
+    // Pantanal's, because a chapter whose first lesson is "do not wait" should
+    // not then make you wait for a door.
+    const inHan = !!(game.biome && game.biome.isActive('hanoi'));
+    const atHan = !!(inHan && game.hanoi && game.hanoi.inZone('bridge', p.x, p.z) &&
+                     p.z > 190);
     const homeOk = !!(started && !transBusy && !mounted && capy &&
                       ((inPasto && p.y < groundY + sysHOME_STAND && homeZone(p.x, p.z)) ||
                        atManly || atUji || atCali || atRio || atIce || atSah || atDri ||
-                       atVen || atHk || atPal || atGor || atMan || atPan || atCav || atAnt));
+                       atVen || atHk || atPal || atGor || atMan || atPan || atCav || atAnt ||
+                       atMon || atHan));
     if (homeOk) {
       if (homeT > 0) { homeT -= dt; if (homeT <= 0) homeSet(0); }
       if (!homeHinted) {
@@ -16624,6 +17446,8 @@ export function createSystems(game) {
             : atPan ? 'this road goes north for a hundred and forty kilometres.'
             : atCav ? 'there is a way on through there, and it is the only one.'
             : atAnt ? 'the ship that dropped you here comes back past at eight.'
+            : atMon ? 'somebody on these steps can get anybody anywhere. that is the point of them.'
+            : atHan ? 'everything has left this city over this bridge since nineteen hundred and two.'
             : 'the wind here goes south.');
       }
       if (input.whistlePressed) {
@@ -17072,6 +17896,34 @@ export function createSystems(game) {
               sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(1.6, 2.1) });
               ambTimer = rand(16, 34);
             }
+          } else if (bio === 'hanoi') {
+            // SAME ARGUMENT AS MONTE CARLO'S ROW, and more so: hanoi.js runs a
+            // full positional bed that switches between four rooms — the
+            // street, the lake, the market and the alley — and adds an engine
+            // note from wherever the nearest of two hundred and forty bikes
+            // actually is. What this ladder must not do is lay a second, mono,
+            // unswitched layer over it. It gets one thing: the CITY, a long way
+            // off, which is the one sound the biome cannot own because it has
+            // no position.
+            const rr = Math.random();
+            if (rr < 0.5) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
+            else if (rr < 0.82) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
+            else sysAmb('tick', { volume: rand(0.03, 0.05), pitch: rand(2.2, 3.0) });
+            ambTimer = rand(5, 13);
+          } else if (bio === 'monaco') {
+            // THE ONE CHAPTER WHOSE OWN FILE ALREADY RUNS A FULL POSITIONAL
+            // BED. monaco.js fires the cars, the water, the halyards, the
+            // gulls and the room tone of the salon from where each of them
+            // actually is, and it switches beds at the front door — so what
+            // this ladder must NOT do here is add a second, mono, unswitched
+            // layer on top of it. It gets the one thing the biome cannot
+            // reasonably own, which is the town: a very long way off, very
+            // occasionally, and quieter than anything else in this ladder.
+            const rr = Math.random();
+            if (rr < 0.45) sysAmb('tick', { volume: rand(0.03, 0.06), pitch: rand(2.0, 2.8) });
+            else if (rr < 0.78) sysAmb('pop', { volume: rand(0.03, 0.06), pitch: rand(1.3, 1.9) });
+            else sysAmb('bark', { volume: rand(0.03, 0.05), pitch: rand(1.6, 2.2) });
+            ambTimer = rand(9, 22);
           } else if (bio === 'cave') {
             // AND THE OPPOSITE, WHICH IS THE POINT OF IT. Four sounds, all of
             // them small, all of them a very long way apart: water on stone, a
