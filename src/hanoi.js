@@ -127,6 +127,10 @@ const hanTRAIN_V    = 11.0;       // m/s through the alley
 const hanTRAIN_GAP  = 0.45;       // m of daylight either side of it
 const hanTRAIN_WARN = 11.0;       // s between the horn and the train
 const hanTRAIN_GAP2 = 96;         // s between one and the next
+// How close counts as "in the alley when it comes through". One number, read by
+// the in-pass payout and by the despawn safety net, so the moment and the
+// fallback can never disagree about what earned it.
+const hanTRAIN_WOW  = 2.6;        // m of clearance, after the 1.45 m hull
 const hanTRAIN_LEN  = 4;          // carriages
 
 // ------------------------------------------------------------------ scratch --
@@ -1901,6 +1905,94 @@ function hanUpdateTrain(game, dt) {
       const along = clamp(p.x, x - 7, back);
       const d = Math.max(0, Math.hypot(p.x - along, p.z - hanTRAIN.z) - 1.45);
       if (d < hanTrainNear) hanTrainNear = d;
+      // ---- THE MARQUEE PAYS OUT HERE, WHILE THE TRAIN IS ON TOP OF YOU ----
+      //
+      // It used to pay out in the despawn branch below, and that branch runs
+      // when `hanTrainS` has passed 300 m — sixty metres of run-in, the
+      // ninety-six metre alley, four carriages and then NINETY MORE METRES of
+      // clearance. Measured: the card, the music swell and the camera shot all
+      // fired 17.7 s after the train passed the player, at which point three
+      // lines above them had already set `hanTrainG.visible = false` and put
+      // the body at y = -900.
+      //
+      // So chapter 19's wow — "Be in the alley when it comes through" — showed
+      // its card and asked for its camera with the train INVISIBLE AND NINE
+      // HUNDRED METRES UNDERGROUND, pointing at an empty alley. Measured at the
+      // payout frame: body y -900, and `trainGlow()` 0.00 for the whole
+      // fourteen seconds before it.
+      //
+      // The RECORD still files at despawn — it is the closest approach over the
+      // whole pass, and that is not known until the pass is over. The moment is
+      // not the same thing as the score.
+      if (!hanTrainDone && d < hanTRAIN_WOW) {
+        hanTrainDone = true;
+        hanTask('the-train');
+        if (typeof game.frameShot === 'function') {
+          // ALONG THE ALLEY, AND ONLY ALONG IT.
+          //
+          // The literal 1.5708 that was here was across the tracks, and so was
+          // the computed bearing that first replaced it: `atan2(p.x - along,
+          // p.z - z)` has a z term, and any z term at all points the lens at a
+          // wall. THIS ALLEY IS hanTRAIN_GAP WIDE — forty-five centimetres of
+          // daylight either side of a train — and it is the one thing the
+          // chapter is about. Asking for thirteen metres of distance on a
+          // diagonal put the camera INSIDE the building: the marquee frame was
+          // a flat beige wall with the card over it, no train and no capybara.
+          // Found from the PNG. Nothing in the numbers said so — the train was
+          // present, visible and 82% inside the frustum at the time.
+          //
+          // So: the sign of x only. The alley is ninety-six metres long and
+          // three wide, and a shot down its length is the only shot it has.
+          // `x` is the nose in this scope — the local the mesh is driven from,
+          // a few lines above. Not `nose`, which is the api getter's name for
+          // the same quantity and is not in scope here; that would have been
+          // `undefined`, atan2(NaN, 0), and a shot silently discarded by
+          // frameShot's own NaN guard.
+          const away = p.x < x ? -1 : 1;
+          // A BEARING AND NOTHING ELSE, because this alley will not give a
+          // distance to anybody. Measured at the payout with `dist: 11`
+          // requested: the camera sat 1.4 m from the animal. The rig's own
+          // wall-avoidance collapses it — the alley is three metres of open air
+          // between two terraces and there is nowhere for a lens to stand — so
+          // every dist/pitch/raise this shot asked for was overridden and the
+          // frame was the inside of a house with the wow card over it.
+          //
+          // frameShot is documented to take a yaw alone and keep the distance
+          // and pitch it had, and that is the only request this geometry can
+          // honour: the camera stays wherever the alley has let it be and TURNS
+          // to look down the line at the train. Which is also the right picture
+          // — the chapter is about forty-five centimetres of clearance, and a
+          // wide establishing shot would be a lie about the place.
+          //
+          // A raise was tried too and is NOT honoured either: 6.4 m asked,
+          // 2.7 m delivered. The mechanism is the occlusion ray in systems.js,
+          // and it is RIGHT — the alley is walled on both sides and roofed by
+          // overhanging terraces, so a lens that backs off or climbs is a lens
+          // that cannot see the animal. The framed channel is not fully
+          // available in Train Street and the reason is the chapter working
+          // exactly as designed. A bearing is the whole of what it can give,
+          // and the bearing is worth having: it turns the lens onto the train
+          // instead of leaving it wherever the player last dragged it.
+          //
+          // A raise was tried too and is NOT honoured either: 6.4 m requested,
+          // 2.7 m delivered. The mechanism is the occlusion ray in systems.js,
+          // and it is right — the alley is walled on both sides and roofed by
+          // overhanging terraces, so a lens that backs off or climbs is a lens
+          // that cannot see the animal. The framed channel is simply not
+          // available in Train Street, and the reason is the chapter working
+          // exactly as designed. A bearing is the whole of what it can give.
+          //
+          // A raise was tried too and is NOT honoured either: 6.4 m requested,
+          // 2.7 m delivered. The mechanism is the occlusion ray in systems.js,
+          // and it is right — the alley is walled on both sides and roofed by
+          // overhanging terraces, so a lens that backs off or climbs is a lens
+          // that cannot see the animal. The framed channel is simply not
+          // available in Train Street, and the reason is the chapter working
+          // exactly as designed. A bearing is the whole of what it can give.
+          game.frameShot({ yaw: Math.atan2(away, 0), hold: 2.6 });
+        }
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+      }
     }
     if (hanTrainS > 60 + (hanTRAIN.x1 - hanTRAIN.x0) + 13.6 * hanTRAIN_LEN + 90) {
       // gone. Score whatever happened, and stand the street back up.
@@ -1916,13 +2008,16 @@ function hanUpdateTrain(game, dt) {
           hanTrainBest = hanTrainNear;
           hanRecord('the-train', hanTrainNear);
         }
-        if (!hanTrainDone && hanTrainNear < 2.6) {
+        // The task, the shot and the swell have MOVED UP into the pass itself —
+        // see THE MARQUEE PAYS OUT HERE above. This branch keeps only the
+        // record, which is a property of the whole pass rather than of a
+        // moment. A safety net stays: if the closest approach qualified and the
+        // in-pass test somehow did not fire (a frame skipped over the
+        // threshold at 11 m/s), the task still ticks — silently, with no card
+        // pointed at an empty alley.
+        if (!hanTrainDone && hanTrainNear < hanTRAIN_WOW) {
           hanTrainDone = true;
           hanTask('the-train');
-          if (typeof game.frameShot === 'function') {
-            game.frameShot({ yaw: 1.5708, dist: 15, pitch: 0.10, raise: 0.6, hold: 3.2 });
-          }
-          if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
         }
       }
     }
@@ -2965,8 +3060,16 @@ export function createHanoi(game) {
       const capy = hanGame && hanGame.capy; if (!capy) return 0;
       const p = capy.position;
       if (Math.abs(p.z - hanTRAIN.z) > 9) return 0;
-      const tx = hanTRAIN.x0 + hanTrainS;
-      const d = Math.abs(p.x - tx);
+      // THE SAME EXPRESSION hanStepTrain DRIVES THE MESH WITH, not a
+      // re-derivation. The first version of this row read `x0 + hanTrainS` —
+      // the train runs the other way, from `x1 + 60` DOWNWARD — so it put the
+      // lamp at the wrong end of the alley and measured 0.00 at the exact
+      // moment the marquee paid out. A grade row keyed on a position must take
+      // that position from whatever moves the thing.
+      const nose = hanTRAIN.x1 + 60 - hanTrainS;
+      const back = nose + 13.6 * hanTRAIN_LEN + 7;
+      const along = clamp(p.x, nose - 7, back);
+      const d = Math.abs(p.x - along);
       const k = 1 - Math.min(1, d / 34);
       return k * k;
     },

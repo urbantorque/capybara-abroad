@@ -3544,8 +3544,23 @@ function monUpdateTunnel(game, dt) {
         // car is the one asking, which is the only way this channel is reachable
         // from a marquee that happens ON a vehicle — see frameShot in systems.js.
         if (typeof game.frameShot === 'function') {
-          game.frameShot({ yaw: monCarYaw[monRider] + Math.PI, dist: 22, pitch: 0.14,
-                           raise: 1.0, hold: 3.4, over: true });
+          // RAISE 3.6, NOT 1.0 — measured, by projecting the bore's own 253
+          // vertices into the frame through the whole envelope. At raise 1.0
+          // the lens sits level with the car's roof and the first six tenths
+          // of the shot are the back of a car with 0% of the tunnel visible;
+          // it only appears once the trail has dragged the camera out to 15 m
+          // on its own, and it is gone again by 1.8 s as the car pulls away.
+          // A 3.4 s hold with 0.9 s of subject in it. Lifting the lens clears
+          // the car and puts the bore in frame from the first frame instead:
+          // 100% of it from 0.3 s to 1.5 s.
+          //
+          // AND THE HOLD IS 1.9 s, NOT 3.4. Past 1.5 s the car has outrun the
+          // shot -- the trail is at 28 m and the tunnel has left the frame
+          // entirely -- so the last half of a 3.4 s hold was the marquee
+          // lingering on an empty road. A shot that outlives its subject is a
+          // shot that ends on nothing.
+          game.frameShot({ yaw: monCarYaw[monRider] + Math.PI, dist: 22, pitch: 0.20,
+                           raise: 3.6, hold: 1.9, over: true });
         }
         if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
       }
