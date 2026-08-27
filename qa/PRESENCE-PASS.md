@@ -104,12 +104,20 @@ that reads as "sitting in the world" rather than "drawn on top of it".
 3.4 m/s swinging 1.6 at 0.070 Hz on a bearing of 1.90 rad; Kyoto a still 1.1;
 Pasto 2.6 swinging 1.9). It is damped, it gusts, it has a direction.
 
-Consumers of `api.wind()`, across all 27 modules:
+There are two wind channels and it is worth being exact about which, because
+`CONTRACT.md` insists they are not the same thing. The biome's own `wind()` —
+the Drift's moving air — has two consumers:
 
     src/capybara.js:845     the drift's air frame
     src/props.js:2900       the shove on a loose prop
 
-**Two.** Nothing in the *picture* reads it. A grep across every module for
+And weather's `gust()`, the vector that carries `wxMOOD`'s nineteen rows, has
+two of its own:
+
+    src/npc.js:1238         an NPC's reaction to a gust
+    src/props.js:2911       the shove, again
+
+**Four readers across two channels, and not one of them is the picture.** A grep across every module for
 foliage, canopy, frond, banner, awning, laundry, bunting, sail, tarp or flag
 motion — any per-frame rotation, any vertex displacement, any sway — returns
 **nothing at all**. There is no vertex animation anywhere in the game.
