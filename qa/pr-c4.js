@@ -1,5 +1,5 @@
 async page => {
-  const KEYS=[['Digit1','sydney'],['Digit0','venice'],['Minus','kowloon']];
+  const KEYS=[['Period','monaco']];
   for(let i=0;i<KEYS.length;i++){
     await page.reload(); await page.waitForTimeout(4500);
     await page.keyboard.press(KEYS[i][0]); await page.waitForTimeout(7000);
