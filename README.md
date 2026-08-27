@@ -17,6 +17,16 @@ In Pasto you can whistle down an Andean condor, grab its talons, and ride therma
 volcano. The flight is real aerodynamics — lift proportional to airspeed squared, banking to
 turn, thermals as a rising airmass. Nothing is on rails.
 
+And it is not only in Pasto any more. For nineteen chapters the best-simulated thing in the
+game could happen in exactly one of them — not because the flight knew where it was, but
+because the plumbing did: every terrain sample and every thermal went to Pasto by name. A
+chapter hosts a flier now by publishing one thing, its rising air, and **Rio is the second**.
+Nine frigatebirds have hung over that bay since the chapter was built, drawn and unreachable;
+now you can wheek one down onto the sand at Copacabana and let it take you up the sunward face
+of Pão de Açúcar on the sea breeze, which is exactly what a fragata spends its afternoon doing.
+It is the same bird in the same air with the same six controls, and it is black with a scarlet
+throat instead of an Andean condor's white ruff, because the plumage belongs to the chapter.
+
 On the harbour you take the wheel of a small timber ferry and take her to Manly: throttle on one
 stick, rudder on the other, rudder authority that only exists while she has way on, and seventy
 seconds of open water with the Bridge, a regatta, a dolphin escort and two headlands in it. The

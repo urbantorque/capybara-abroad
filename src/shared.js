@@ -1624,6 +1624,19 @@ export const TASKS = [
   // and then nothing ran on it and nothing could stand on it.
   { id: 'o-bonde',       text: 'Cross the arches on the running board',          chapter: 6,
     mini: 'O BONDE' },
+  // ---- THE SECOND FLIER, AND IT IS DELIBERATELY NOT A THIRD SET PIECE -----
+  // condor.js stopped belonging to Pasto (see condorHost) and Rio is the second
+  // chapter to host it: eighty-four metres of Corcovado for the air to rise off
+  // and nine frigatebirds already drawn over the bay, which nothing could reach.
+  //
+  // Two ordinary lines and no `mini`, on purpose. Rio already carries the wow
+  // (samba-parade) and TWO minis — it was one of the four chapters the pacing
+  // audit measured shortest, so it got a second — and the middle-rung rule says
+  // no chapter has two of the same KIND of moment in it. A third elevated
+  // moment here would take from the three that are already earned. The flight
+  // is its own reward; it does not need a banner to say so.
+  { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6 },
+  { id: 'fragata-ride',  text: 'Ride the sea breeze up the Sugarloaf',           chapter: 6 },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
   // The first chapter that happens at NIGHT, and the first one whose centrepiece

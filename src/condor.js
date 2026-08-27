@@ -19,7 +19,7 @@ import { PALETTE, mat, rand, clamp, damp, lerp } from './shared.js';
 //   SIDE   = quadratic + linear along -span, capped at 0.30 g         no sideslip
 //   PLUNGE = a damper through the wing plane, capped at 0.15 g        never carries the bird
 //   TORQUE toward a commanded bank + pitch, plus a weathervane yaw     never a quaternion write
-//   THERMAL columns from game.pasto.thermals                          the ONLY net climb
+//   THERMAL columns from the live HOST's thermals                     the ONLY net climb
 // Banking tilts the lift vector; the tilted lift curves the velocity; the
 // weathervane drags the nose around after it. That is the whole turn.
 //
@@ -549,9 +549,26 @@ export function createCondor(game) {
     game.world.addEventListener('preStep', condorGuardPreStep);
   }
 
-  game.events.on('biome:enter', function (e) {
-    if (!e || e.name !== 'pasto') condorDespawn(true);
-    else if (condorState === 'gone') condorDetachBody();
+  // ---- AND THE LAST NAMED REFERENCE, WHICH A GREP FOR `game.pasto` MISSES --
+  // This read `e.name !== 'pasto'`, so the bird went away on entering anywhere
+  // that was not Pasto — which, with one host, is the same thing as "a bird
+  // belongs to the chapter that summoned it".
+  //
+  // THE OBVIOUS TRANSLATION IS WRONG, AND IT WAS MEASURED WRONG. Rewriting it
+  // as `if (!condorHost()) condorDespawn()` keeps the bird alive across a
+  // border between TWO hosts: flying Rio's fragata, stepping through the
+  // departures board into Pasto, and arriving with a black bird with a scarlet
+  // throat circling Galeras — carrying Rio's plumage, hunting thermals that are
+  // two chapters away, inside a fence that has moved. It also swallowed the
+  // arrival whistle, because a bird already in `circling` takes the
+  // second-whistle branch and returns before the summon can tick anything.
+  //
+  // A bird belongs to the chapter it was called in. It goes away at EVERY
+  // border, exactly as it always did; the host only decides whether a new one
+  // can be called on the other side.
+  game.events.on('biome:enter', function () {
+    condorDespawn(true);
+    if (condorHost() && condorState === 'gone') condorDetachBody();
   });
 
   return api;
@@ -665,13 +682,79 @@ function condorPart(parts) {
   return m;
 }
 
-function condorBuildMesh(root) {
-  const DARK = PALETTE.condorWing;
-  const BODY = PALETTE.condorBody;
-  const RUFF = PALETTE.condorRuff;
-  const SKIN = PALETTE.condorHead;
-  const BEAK = PALETTE.condorBeak;
-  const COMB = PALETTE.condorComb;
+// ---- PLUMAGE, AND IT BELONGS TO THE HOST ----------------------------------
+// Six colours, which is the whole difference between an Andean condor and a
+// magnificent frigatebird as far as this mesh is concerned: the silhouette of a
+// big soaring bird is the same bird everywhere, and it is the plumage that says
+// which one. A host publishes `flier: { plume: {...} }` and gets its own; a host
+// that does not publish one gets the condor, which is what Pasto does by saying
+// nothing at all.
+//
+// Deliberately NOT in PALETTE. shared.js's palette is the game's, and a bird
+// that belongs to one chapter belongs in that chapter's file next to everything
+// else about it — the same rule the grade rows and the ambience rows keep.
+const condorPLUME_CONDOR = {
+  wing: PALETTE.condorWing, body: PALETTE.condorBody, ruff: PALETTE.condorRuff,
+  skin: PALETTE.condorHead, beak: PALETTE.condorBeak, comb: PALETTE.condorComb,
+};
+let condorPlumeNow = null;      // what is actually baked into the mesh right now
+
+/** The live host's plumage, or the condor's. */
+function condorPlumeOf(host) {
+  const f = host && host.flier;
+  const p = f && f.plume;
+  if (!p) return condorPLUME_CONDOR;
+  return {
+    wing: p.wing === undefined ? condorPLUME_CONDOR.wing : p.wing,
+    body: p.body === undefined ? condorPLUME_CONDOR.body : p.body,
+    ruff: p.ruff === undefined ? condorPLUME_CONDOR.ruff : p.ruff,
+    skin: p.skin === undefined ? condorPLUME_CONDOR.skin : p.skin,
+    beak: p.beak === undefined ? condorPLUME_CONDOR.beak : p.beak,
+    comb: p.comb === undefined ? condorPLUME_CONDOR.comb : p.comb,
+  };
+}
+
+/**
+ * RE-PLUME FOR THE LIVE HOST. Called from the summon and from nowhere else:
+ * it is the one moment the bird is guaranteed not to be on screen, and it
+ * happens about once a chapter rather than once a frame.
+ *
+ * The colours are baked into a MERGED geometry with vertexColors, so this is a
+ * rebuild rather than a material write — and the rebuild is safe because the
+ * only state condorBuildMesh owns is the wing rig and three pivots, all of
+ * which are cleared here. Anything holding a reference to condorGroup (the
+ * scene graph, condorApi.group) keeps it: the group survives, its children do
+ * not.
+ */
+function condorRePlume() {
+  if (!condorGroup) return;
+  const want = condorPlumeOf(condorHost());
+  if (condorPlumeNow &&
+      condorPlumeNow.wing === want.wing && condorPlumeNow.body === want.body &&
+      condorPlumeNow.ruff === want.ruff && condorPlumeNow.skin === want.skin &&
+      condorPlumeNow.beak === want.beak && condorPlumeNow.comb === want.comb) return;
+  for (let i = condorGroup.children.length - 1; i >= 0; i--) {
+    const c = condorGroup.children[i];
+    condorGroup.remove(c);
+    c.traverse(function (o) {
+      if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+      if (o.material && o.material.dispose) o.material.dispose();
+    });
+  }
+  condorWings.length = 0;
+  condorHeadPivot = null; condorTailPivot = null; condorTailFan = null;
+  condorBuildMesh(condorGroup, want);
+}
+
+function condorBuildMesh(root, plume) {
+  const P = plume || condorPLUME_CONDOR;
+  condorPlumeNow = P;
+  const DARK = P.wing;
+  const BODY = P.body;
+  const RUFF = P.ruff;
+  const SKIN = P.skin;
+  const BEAK = P.beak;
+  const COMB = P.comb;
 
   // --- BODY: short and deep, all of it forward of the wing root. The old torso
   //     was 1.30 m of box plus a 0.36 m rump aft of the shoulders, which is what
@@ -793,7 +876,9 @@ function condorBuildMesh(root) {
 function condorSummon() {
   const game = condorGame;
   if (!game || !condorBody) return false;
-  if (!game.biome || !game.biome.isActive('pasto')) return false;
+  if (!condorHost()) return false;
+  // The one moment the bird is guaranteed to be off screen. See condorRePlume.
+  condorRePlume();
 
   // ---- THE SECOND WHISTLE IS A LESSON, AND A LESSON IS TAUGHT ONCE -------
   //
@@ -813,8 +898,14 @@ function condorSummon() {
   // straight down to the talons. Nothing else changes: same states, same
   // spiral, same bored timer, same everything for a player who has not yet
   // worked out what the whistle is for.
-  if (!condorRodeOnce && typeof game.taskDone === 'function' &&
-      game.taskDone('condor-ride')) condorRodeOnce = true;
+  // ...and the id is the HOST's, not Pasto's. Left as the literal it used to be,
+  // a player who learned the lesson in Rio arrived in Pasto and was taught it
+  // again, while a Pasto rider got the shortcut in Rio — the lesson leaking one
+  // way only, which is worse than it not leaking at all.
+  if (!condorRodeOnce && typeof game.taskDone === 'function') {
+    const rideId = condorTaskId('ride');
+    if (rideId && game.taskDone(rideId)) condorRodeOnce = true;
+  }
 
   // whistling again while it circles brings it down into actual reach
   if (condorState === 'circling') {
@@ -873,10 +964,16 @@ function condorSummon() {
   condorBoredT = 0;
 
   if (typeof game.sfx === 'function') game.sfx('whistle');
-  if (!condorSummonedOnce) {
-    condorSummonedOnce = true;
-    if (typeof game.completeTask === 'function') game.completeTask('whistle-condor');
-  }
+  // ---- ...AND THE TASK IT TICKS BELONGS TO THE HOST -----------------------
+  // `condorSummonedOnce` is a MODULE latch and it stayed one, because what it
+  // records is that the player has done this before. What it must not do is
+  // gate the tick: with a second host, a player who called a condor in Pasto
+  // and then a fragata in Rio would find Rio's line never ticked, because the
+  // latch was already spent in another chapter. completeTask is idempotent —
+  // it returns false on an id already done — so the call is simply made every
+  // time and the latch is left to mean the one thing it means.
+  condorSummonedOnce = true;
+  if (typeof game.completeTask === 'function') game.completeTask(condorTaskId('summon'));
   if (typeof game.toast === 'function') game.toast('something enormous turns overhead');
   return true;
 }
@@ -1038,13 +1135,22 @@ function condorMount() {
 
   if (typeof game.sfx === 'function') { game.sfx('gull', { pitch: 0.6 }); game.sfx('gasp'); }
   if (typeof game.shake === 'function') game.shake(0.3);
-  if (!condorRodeOnce) {
-    condorRodeOnce = true;
-    if (typeof game.completeTask === 'function') game.completeTask('condor-ride');
-    // The chapter frames its own marquee; the bearing is Pasto's to know, not
-    // this module's. Once, on the first ride — the shot is the payout, and a
-    // second launch is transport.
-    if (game.pasto && typeof game.pasto.condorShot === 'function') game.pasto.condorShot();
+  // Same rule as the summon above: the latch is "you have done this before" and
+  // is global on purpose — it is what arms the low orbit, and the lesson is
+  // learned once for the whole game. The TICK is the host's, and it is fired
+  // every ride, because a ride in Pasto must not tick, or swallow, a ride in
+  // Rio.
+  condorRodeOnce = true;
+  const first = (typeof game.completeTask === 'function') &&
+                game.completeTask(condorTaskId('ride'));
+  // ...AND THE MARQUEE FIRES ON THE FIRST RIDE IN *THIS* CHAPTER, which is
+  // exactly what completeTask's return value already says: true only when the
+  // id went from open to done. Keyed off condorRodeOnce instead, a player who
+  // rode in Pasto would arrive in Rio and get the tick with no shot under it —
+  // the chapter's own payout, silently spent two chapters earlier.
+  if (first) {
+    const shotHost = condorHost();
+    if (shotHost && typeof shotHost.condorShot === 'function') shotHost.condorShot();
   }
   if (typeof game.toast === 'function') game.toast('hold on');
   return true;
@@ -1056,6 +1162,14 @@ function condorRelease(silent) {
   if (!condorConstraint) return false;
   try { game.world.removeConstraint(condorConstraint); } catch (e) { /* already gone */ }
   condorConstraint = null;
+  // ---- THE FLIGHT IS OVER, SO THE NUMBER IS FINAL. See condorCheckPeak ----
+  // One file per flight, with the height the air actually got you to. The
+  // running figure was on the paper the whole way up through recordLive; this
+  // is the only place a 'personal best' card may come from.
+  if (condorBestAGL > 0 && typeof game.record === 'function') {
+    game.record('thermal-peak', condorBestAGL);
+  }
+  if (typeof game.recordEnd === 'function') game.recordEnd();
 
   const capy = game && game.capy;
   if (capy && capy.body) {
@@ -1199,7 +1313,7 @@ function condorUpdate(dt) {
   if (dt > 0.05) dt = 0.05;
 
   // ---- biome early-out ------------------------------------------------------
-  if (!game.biome || !game.biome.isActive('pasto')) {
+  if (!condorHost()) {
     // Fires once on the way out, never every Sydney frame — this module must not
     // be writing another module's render root while it is not even live.
     if (condorState !== 'gone' || condorLaunchGrace > 0 || condorSettleT > 0) {
@@ -1903,10 +2017,9 @@ function condorUpdate(dt) {
 }
 
 // ---------------------------------------------------------------------------
-/** Updraft speed of the airmass at the condor, m/s. Guarded for a missing pasto. */
+/** Updraft speed of the airmass at the bird, m/s. Guarded for a missing host. */
 function condorThermalUpdraft() {
-  const pasto = condorGame.pasto;
-  let cols = pasto && pasto.thermals;
+  let cols = condorHostThermals(condorHost());
   if (!cols || !cols.length) cols = condorFallbackThermals;
   const px = condorBody.position.x, py = condorBody.position.y, pz = condorBody.position.z;
   let w = 0;
@@ -2253,7 +2366,8 @@ function condorFlightFeedback(dt, airspeed, speed) {
 /** The lowest point of the crater rim ring, measured off the terrain once. */
 function condorCraterRimY() {
   if (condorRimY > 0) return condorRimY;
-  const c = condorGame.pasto && condorGame.pasto.craterCentre;
+  const host = condorHost();
+  const c = host && host.craterCentre;
   if (!c) return 0;
   let lo = Infinity;
   for (let i = 0; i < 16; i++) {
@@ -2269,27 +2383,46 @@ function condorCheckPeak() {
   // LATCHED. This had no latch at all: MEASURED, 180+ completions in a single
   // 10 s run, one per frame, every one of them re-emitting the event.
   const game = condorGame;
-  const pasto = game.pasto;
+  const host = condorHost();
   const capy = game.capy;
-  if (!pasto || !pasto.craterCentre || !capy || !capy.body) return;
+  if (!host || !capy || !capy.body) return;
   // ---- how high the bird got you, which is the whole point of a thermal ----
   // Kept whether or not the rim task is still open, and measured only while the
   // capybara is actually HANGING OFF THE TALONS: the number has to mean "the
   // air carried me here", so a hop off a clifftop or a walk up the moraine road
   // must not enter into it. Height above the ground under the animal, not above
   // sea level, or the record would simply be a map of where the mountain is.
+  //
+  // AND IT IS MEASURED FOR ANY HOST, WHICH IS WHY THIS FUNCTION NO LONGER
+  // RETURNS EARLY ON A MISSING CRATER. It used to bail on `!pasto.craterCentre`
+  // before it got here, so the moment a second chapter hosted a flier the
+  // height record would simply never have filed — a chapter-neutral number lost
+  // to a guard belonging to one chapter's joke. The rim task below keeps the
+  // guard, because the rim task IS the joke.
+  // ---- AND IT IS FILED WHEN THE FLIGHT ENDS, NOT WHILE IT IS CLIMBING -----
+  // `game.record` TOASTS whenever the new value beats the saved one, so filing
+  // on every improvement means filing on every few centimetres of climb. Seen
+  // in the frame of Rio's first flight: FOUR stacked 'personal best · carried
+  // up to 9 m' cards over the beach, all reading the same rounded number,
+  // because the metre they share was crossed five times on the way up.
+  //
+  // It needs a climbing flight to show, which is why one chapter of thermals
+  // never surfaced it and two did. `recordLive` — built for exactly this, a
+  // number that moves while you are earning it — carries the running figure on
+  // the paper, and the record itself is filed once, by condorRelease, when
+  // there is a final answer to file.
   if (condorState === 'carrying' && capy.body.position.y === capy.body.position.y) {
-    const g = (pasto && typeof pasto.terrainHeight === 'function')
-      ? pasto.terrainHeight(capy.body.position.x, capy.body.position.z) : 0;
+    const g = condorTerrain(capy.body.position.x, capy.body.position.z);
     const agl = capy.body.position.y - g;
     if (agl > condorBestAGL) {
       condorBestAGL = agl;
-      if (typeof game.record === 'function') game.record('thermal-peak', agl);
+      if (typeof game.recordLive === 'function') game.recordLive('thermal-peak', agl);
     }
   }
   if (condorPeakDone) return;
+  if (!host.craterCentre) return;
 
-  const c = pasto.craterCentre;
+  const c = host.craterCentre;
   const dx = capy.body.position.x - c.x, dz = capy.body.position.z - c.z;
   if (dx * dx + dz * dz > 225) return;               // 15 m
   // ABOVE THE RIM — and craterCentre.y is the crater FLOOR, not the rim. The old
@@ -2298,7 +2431,8 @@ function condorCheckPeak() {
   // rim is measured off the terrain instead.
   if (capy.body.position.y < condorCraterRimY() + condorPEAK_MARGIN) return;
   condorPeakDone = true;
-  if (typeof game.completeTask === 'function') game.completeTask('thermal-peak');
+  const peakId = condorTaskId('peak');
+  if (peakId && typeof game.completeTask === 'function') game.completeTask(peakId);
 }
 
 /** Metres between the hanging PASSENGER and the terrain — now, and along the
@@ -2323,16 +2457,85 @@ function condorClearance(vel) {
 }
 
 // ---------------------------------------------------------------------------
+// THE HOST — and it is the sixth time this codebase has replaced a list of
+// biome names with the question the list was standing in for.
+//
+// This module's own header has always said it is biome-neutral, and the FLIGHT
+// LAW is: lift, induced drag, the G-limited elevator and the weathervane yaw do
+// not know where they are. The PLUMBING was not. Every terrain sample, every
+// fence test, the updraft and both of the early-outs went to `game.pasto` by
+// name, so the best-simulated thing in the game could only ever happen in one
+// chapter of nineteen — which is exactly the shape the dive was in before v19,
+// the climb before v31, and slip, wind and localWater before them.
+//
+// So a chapter hosts a flier by publishing ONE thing: `thermals`. That is the
+// right flag rather than a bare boolean because it is also the only part of the
+// contract a chapter cannot fake — bounds and terrain nearly everybody already
+// has, and a chapter with no rising air has nowhere for a soaring bird to go.
+// Everything else is optional and degrades:
+//
+//   thermals       REQUIRED. The columns. No thermals, no host, no bird.
+//   terrainHeight  ground under the bird. Missing -> sea level, and it flies.
+//   bounds()       the fence. Missing -> condorFENCE_FALLBACK, as before.
+//   condorShot()   the chapter frames its own launch. Missing -> the rig's own.
+//   craterCentre() Pasto's joke, and Pasto's alone. Missing -> no rim task.
+//   flier          appearance and voice. Missing -> the Andean condor.
+//
+// Pasto is untouched by all of this: it published `thermals` before this comment
+// existed, so it answers the new question exactly as it answered the old one.
+function condorHost() {
+  const game = condorGame;
+  if (!game || !game.biome) return null;
+  const api = game[game.biome.current];
+  if (!api) return null;
+  const t = api.thermals;
+  // An array OR a getter, because pasto publishes the live array and a chapter
+  // whose columns move with the sun will want to compute them.
+  if (typeof t === 'function' || (t && t.length !== undefined)) return api;
+  return null;
+}
+
 /**
- * WHERE THERE IS GROUND TO LAND ON. pasto.bounds(), inset by condorFENCE_PAD so
- * the bird turns round before the passenger's shadow leaves the world rather
- * than after. Falls back to the old symmetric square if the chapter has not
- * published one, so this file still works against a pasto.js that predates it.
+ * WHICH LINE ON THE PAPER THIS HOST'S BIRD TICKS.
+ *
+ * Pasto's three ids were written into this file as string literals, which is
+ * fine while one chapter has a bird and wrong the moment two do. A host names
+ * its own through `flier.tasks`; anything it does not name falls back to
+ * Pasto's, so Pasto — which names nothing — is unchanged.
+ *
+ * `peak` is deliberately allowed to be absent rather than defaulted per host:
+ * "ride a thermal to the crater rim" is a question about a crater, and a host
+ * without one should tick nothing rather than tick Pasto's line from Rio.
+ */
+const condorTASK_FALLBACK = { summon: 'whistle-condor', ride: 'condor-ride', peak: 'thermal-peak' };
+function condorTaskId(which) {
+  const host = condorHost();
+  const t = host && host.flier && host.flier.tasks;
+  const id = t && t[which];
+  if (typeof id === 'string' && id) return id;
+  if (which === 'peak' && t) return null;      // a host with tasks but no peak has no peak
+  return condorTASK_FALLBACK[which];
+}
+
+/** The live host's thermal columns, or null. */
+function condorHostThermals(host) {
+  if (!host) return null;
+  const t = host.thermals;
+  if (typeof t === 'function') { try { return t(); } catch (e) { return null; } }
+  return t;
+}
+
+/**
+ * WHERE THERE IS GROUND TO LAND ON. The host's bounds(), inset by
+ * condorFENCE_PAD so the bird turns round before the passenger's shadow leaves
+ * the world rather than after. Falls back to the old symmetric square if the
+ * chapter has not published one, so this file still works against a host that
+ * predates it.
  */
 function condorBounds() {
-  const pasto = condorGame && condorGame.pasto;
-  if (pasto && typeof pasto.bounds === 'function') {
-    const b = pasto.bounds();
+  const host = condorHost();
+  if (host && typeof host.bounds === 'function') {
+    const b = host.bounds();
     if (b && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) return b;
   }
   return condorFENCE_FALLBACK;
@@ -2375,9 +2578,9 @@ function condorOverGround(x, z) {
 }
 
 function condorTerrain(x, z) {
-  const pasto = condorGame.pasto;
-  if (pasto && typeof pasto.terrainHeight === 'function') {
-    const h = pasto.terrainHeight(x, z);
+  const host = condorHost();
+  if (host && typeof host.terrainHeight === 'function') {
+    const h = host.terrainHeight(x, z);
     return (typeof h === 'number' && isFinite(h)) ? h : 0;
   }
   return 0;

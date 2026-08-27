@@ -46,8 +46,55 @@
 > whose bird is already on its way down, and three dead constants went out of `capybara.js`
 > (`capyUP_KP`, `capyTUG_RADIUS`, `capyTUG_EFFORT` — zero references repo-wide).
 >
-> **Still open: nothing but row 5b, the second flier**, which the page itself calls content
-> rather than code.
+> **Row 5b — the second flier — has LANDED, and the page was half right about it.** It is
+> mostly content, but only *after* the plumbing stops naming one chapter. `condor.js` called
+> itself biome-neutral in its own header and was: the flight law does not know where it is.
+> The plumbing did — every terrain sample, the fence, the updraft, both early-outs, the marquee
+> and all three task ids went to `game.pasto` by name. It asks `condorHost()` now, and a
+> chapter hosts a flier by publishing `thermals`. Sixth time this codebase has replaced a list
+> of biome names with the question the list was standing in for.
+>
+> **Rio is the second host, and the bird was already in the sky.** Nine frigatebirds have been
+> drawn over that bay since the chapter shipped — `rioBuildBirds`, whose own comment opens *"A
+> FRIGATEBIRD IN PLAN IS A LETTER W"* — and nothing could reach them. Four thermal columns off
+> the sunward faces of Pao de Acucar, Morro da Urca and the Corcovado massif, a fence, a launch
+> shot, and two lines on the paper: **call down a fragata**, and **ride the sea breeze up the
+> Sugarloaf**.
+>
+> Measured: first whistle brings it circling, second brings the talons into reach in **2.2 s**,
+> boarded, carried to **41 m**. Pasto is unchanged — same 200 m ceiling over four 45 s runs,
+> identical thermals, bounds and terrain. Picture in `qa/FL-rio-fragata.png`.
+>
+> **Four things measured wrong first**, and the last two are the ones worth keeping:
+>
+>   1. **The obvious translation of the despawn line was wrong.** `e.name !== 'pasto'` became
+>      `if (!condorHost())` — which keeps the bird alive across a border between TWO hosts. Fly
+>      Rio's fragata into Pasto and a black bird with a scarlet throat circles Galeras, hunting
+>      thermals two chapters away inside a fence that has moved. A bird belongs to the chapter
+>      it was called in; it goes at every border, and the host only decides whether a new one
+>      can be called on the far side.
+>   2. **A module latch must not gate a chapter's tick.** `condorRodeOnce` and
+>      `condorSummonedOnce` guarded `completeTask`, so a player who rode in Pasto would find
+>      Rio's line never ticked. The latches mean "you have done this before" — which is global
+>      and right, it is what arms the low orbit — and the tick is the host's. The marquee now
+>      keys off `completeTask`'s return value, which is true only on a genuine first
+>      completion, so each chapter gets its own payout.
+>   3. **`condorCheckPeak` bailed on a missing crater** before it reached the height record —
+>      a chapter-neutral number lost to a guard belonging to one chapter's joke.
+>   4. **The height record toasted every few centimetres of climb.** Four stacked *personal
+>      best · carried up to 9 m* cards over Copacabana, all the same rounded number, because
+>      `game.record` fires a card whenever it beats the saved value. It needs a climbing
+>      flight to show, which is why one chapter of thermals never surfaced it and two did.
+>      It uses `recordLive` on the way up and files once, on release — the channel batch 6
+>      built for exactly this.
+>
+> **Row 5b's other half is deliberately not done.** Rio gets two ordinary lines and no `mini`.
+> The chapter already carries the wow (`samba-parade`) and two minis — it was one of the four
+> the pacing audit measured shortest — and the middle-rung rule is that no chapter has two of
+> the same KIND of moment. A third elevated moment here would take from the three already
+> earned. The flight is its own reward.
+>
+> **Nothing is open. The Movement Pass is closed.**
 
 > Every number below came off one of the five new probes in `qa/`, all of which are re-runnable:
 >
@@ -321,7 +368,10 @@ free, and would guarantee the two that exist feel like the same hands.
 | 2 | static impacts are silent | **measured 12/12** | ~20 lines, one file | all 19 | **landed** |
 | 3 | the climb is three set pieces, the wind is one | ~~measured surface areas~~ — **the instrument asked the wrong question** | — | — | **WITHDRAWN** |
 | 4 | momentum buys nothing | design, built on row 1 | one file each | all 19 | **landed** |
-| 5 | one mount, two helms, nineteen chapters | measured flight + census | approach: small · a second flier: content | the shape of the journey | approach **landed** · helm **declined** · flier open |
+| 5 | one mount, two helms, nineteen chapters | measured flight + census | approach: small · a second flier: content | the shape of the journey | approach **landed** · helm **declined** · flier **landed** |
+
+**Every row is closed.** Three landed, one landed in part with the rest declined on a
+measurement, one withdrawn as wrong. The pass is finished.
 
 Rows 1 and 2 are small, safe, root-caused and land everywhere. **Do those two first, together,
 and re-measure the stop trace and the bonk log before anything else on this page is designed.**

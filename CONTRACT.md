@@ -2056,6 +2056,62 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE MOVEMENT PASS, ROW 5b — THE SECOND FLIER (v35 — 28 Aug 2026)
+
+The last open row of `qa/MOVEMENT-PASS.md`, and the sixth time this codebase has replaced a
+list of biome names with the question the list was standing in for. Full log in that file.
+
+**A CHAPTER HOSTS A FLIER BY PUBLISHING `thermals`.** `condor.js` has called itself
+biome-neutral in its own header since it was written, and the flight law is — lift with the
+square of airspeed, induced drag, a G-limited elevator, a weathervane yaw. The plumbing was
+not: every terrain sample, the fence, the updraft, both early-outs, the marquee shot and all
+three task ids went to `game.pasto` **by name**. `condorHost()` resolves the live biome
+instead. The contract, in full:
+
+| | |
+|---|---|
+| `thermals` | **REQUIRED.** Array or getter. No thermals, no host, no bird. |
+| `terrainHeight` | ground under the bird. Missing → sea level |
+| `bounds()` | the fence. Missing → `condorFENCE_FALLBACK` |
+| `condorShot()` | the chapter frames its own launch. Missing → the rig's own |
+| `craterCentre()` | Pasto's joke, and Pasto's alone. Missing → no rim task |
+| `flier` | `{ name, plume, tasks }` — appearance and which lines it ticks |
+
+Strengths are in **pasto.js's units** — the updraft acceleration, mapped through
+`condorTHERMAL_ACC_PER_MS`. A second host inventing its own scale is how two chapters end up
+with the same bird flying differently.
+
+**PLUMAGE BELONGS TO THE HOST AND IS SIX COLOURS.** The silhouette of a big soaring bird is the
+same bird everywhere; the plumage says which one. Baked into a merged geometry with
+`vertexColors`, so it is a rebuild rather than a material write — `condorRePlume()`, called from
+the summon, which is the one moment the bird is guaranteed to be off screen. The only state
+`condorBuildMesh` owns is the wing rig and three pivots, all cleared there. Not in `PALETTE`: a
+bird belonging to one chapter belongs in that chapter's file, like the grade and ambience rows.
+
+**A BIRD BELONGS TO THE CHAPTER IT WAS CALLED IN.** The despawn line read `e.name !== 'pasto'`,
+and the obvious translation — `if (!condorHost()) condorDespawn()` — is wrong: it keeps the
+bird alive across a border between two hosts. Despawn at **every** border; the host only
+decides whether a new one can be called on the far side.
+
+**A MODULE LATCH MAY NOT GATE A CHAPTER'S TICK.** `condorRodeOnce` / `condorSummonedOnce` mean
+"the player has done this before" — global, and what arms the low orbit. The tick is the
+host's, fired every time, because `completeTask` is idempotent. The marquee keys off
+`completeTask`'s **return value**, true only on a genuine first completion, so each host gets
+its own payout.
+
+**A RECORD IS FILED WHEN THE ATTEMPT ENDS.** `game.record` shows a card whenever it beats the
+saved value, so filing on every improvement files every few centimetres of climb — measured as
+four stacked *personal best · carried up to 9 m* cards over Copacabana. `recordLive` on the way
+up, `record` once on release. It needs a climbing flight to show, which is why one chapter of
+thermals never surfaced it and two did.
+
+**Chapter 6 hosts the second.** Four columns off the sunward faces of Pão de Açúcar, Morro da
+Urca and the Corcovado massif; a fence at ±150 / −120..130; two ordinary tasks and
+deliberately no `mini` — Rio already carries the wow and two minis, and no chapter has two of
+the same kind of moment. Pasto unchanged: same 200 m ceiling over four 45 s runs, identical
+thermals, bounds and terrain. 231 tasks, 19 chapters, `qa/fuzz.js` 19/19 with 0 errors.
+
+
 ## THE LIFT PASS, BATCH EIGHT — THE INDEPENDENT LIST (v34 — 27 Aug 2026)
 
 Nine per-chapter rows that contend with nothing, plus one restatement. Six fixed, four

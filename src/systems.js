@@ -12030,6 +12030,23 @@ export function createSystems(game) {
                       return 'the terminus is at the foot of the ramp. the step is the seat.';
                     },
                     where: function () { return hintObj(game.rio && game.rio.bonde()); } },
+    // The second flier. Same two verbs as Pasto's condor and deliberately the
+    // same words for them — the whole argument for a verb coming back is that
+    // the player already knows what to do, and a clue that re-teaches it in new
+    // language would be saying this is a different thing. It is not.
+    'fragata':        { clue: 'wheek out on the sand — press Q', where: function () { return null; } },
+    'fragata-ride':   { clue: function () {
+                      const c = game.condor;
+                      if (c && c.active) return 'wheek again, then press E under it';
+                      return 'call one down first. they hang over the loaf all afternoon.';
+                    },
+                    where: function () {
+                      const c = game.condor;
+                      if (c && c.active) return hintObj(c.group);
+                      // Before there is a bird, point at the air it lives in:
+                      // the sunward face of the loaf, which is also the lift.
+                      return hintObj(game.rio && game.rio.sugarloaf);
+                    } },
 
     'volo':           { clue: function () {
                       const v = game.venice;
