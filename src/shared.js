@@ -2359,6 +2359,12 @@ export const FINDS = [
   // Drawn, collided, lit, and on nobody's list.
   { id: 'inside-the-wreck', text: 'Went inside the wreck, which nobody ever mentions', chapter: 12 },
   { id: 'under-the-bangka', text: 'Went under the outrigger and looked up at it', chapter: 12 },
+  // `cathedral` pays out for FINDING the room with the hole in the roof. The
+  // bar of daylight that comes through it was drawn, was published as a zone,
+  // and for eleven versions nothing in the game ever asked about it — and it is
+  // the picture the whole chapter resolves into.
+  { id: 'in-the-shaft',   text: 'Went down and stood in the one bar of daylight that reaches the floor', chapter: 12,
+    where: 'Stood on the sand in the shaft of light, under the hole in the roof' },
 
   // ---- 13, Cappadocia ---------------------------------------------------
   // `sunrise` is being up in a balloon when the sun clears the rim.
@@ -2376,6 +2382,10 @@ export const FINDS = [
   // ---- 16, Sơn Đoòng ----------------------------------------------------
   { id: 'nothing-behind', text: 'Went far enough in that there was no daylight behind you', chapter: 16 },
   { id: 'wet-in-a-mountain', text: 'Stood still under a drip until it had got you', chapter: 16 },
+  // `first-echo` pays out on the frame the noise leaves you. This is the other
+  // second of it, and it is the only thing in the chapter that reads
+  // `echoReady()` — a published hook with no caller until now.
+  { id: 'let-it-return',  text: 'Called into the dark and held still until the whole of it came back', chapter: 16 },
 
   // ---- 17, the Antarctic Peninsula --------------------------------------
   { id: 'the-whalers',    text: 'Went into the whaling station that nobody uses any more', chapter: 17 },

@@ -213,6 +213,13 @@ let venPigeonUp = 0, venPigeonPeak = 0, venPigeonHold = 0;
 // flock. See the note at the bottom of venUpdatePigeons.
 const venPIGEON_RUNGS = [18, 45, 90, 140];
 let venPigeonRung = 0;
+// ---- AND THEY ARE IN THE REGISTRY (v33) ------------------------------------
+// Five of nineteen chapters registered an animal that is frightened of you, and
+// the square with the most famous pigeons in Europe in it was not one of them.
+// `pigeons-back` — "stood still long enough for the pigeons to come back" — was
+// already the reward for holding still, and the flush radius it plays against
+// was a constant that could not hear it. See THE CALM in systems.js.
+let venPigeonCrit = null;
 let venClatter = 0, venClatterN = 0, venClatterV = 0;
 // the centre of the wheel, when the square is under and the flock is up. It
 // drifts down the length of the Piazza on its own slow clock, which is what
@@ -2737,6 +2744,11 @@ function venPigeonScare(x, z, r, force) {
 
 function venUpdatePigeons(game, dt) {
   if (!venPigeonMesh) return;
+  if (!venPigeonCrit && typeof game.addCritter === 'function') {
+    // bold 0.85: a St Mark's pigeon is very nearly as bold as a heron and much
+    // less dignified about it.
+    venPigeonCrit = game.addCritter({ biome: 'venice', r: venPIGEON_R, bold: 0.85 });
+  }
   venFlockX = -4 + Math.sin(venTime * 0.11) * 5.0;
   venFlockZ = -34 + Math.sin(venTime * 0.073 + 1.1) * 12.0;
   const wasUp = venPigeonUp;
@@ -2753,8 +2765,9 @@ function venUpdatePigeons(game, dt) {
     const gy = venTerrain(x, z);
     // a flooded square has no pigeons standing in it, which is also true
     const wet = venWaterY > gy + 0.05;
+    const pr = venPigeonCrit ? venPigeonCrit.near : venPIGEON_R;
     if (air <= 0 && (wet || (scare && p &&
-        (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z) < venPIGEON_R * venPIGEON_R))) {
+        (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z) < pr * pr))) {
       air = 1;
       vy = rand(4.2, 6.4);
       const dx = p ? x - p.x : 1, dz = p ? z - p.z : 0;

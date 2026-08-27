@@ -1957,6 +1957,7 @@ let pastoCarRideM = 0;        // metres of plaza covered on this one ride
 let pastoCarRideT = 0;
 let pastoCarRode = false;
 let pastoCarCheerT = 0;
+let pastoCarWaiting = false;  // held for a capybara standing in the lane
 const pastoCarPos = new THREE.Vector3();
 const pastoCarTmp = new THREE.Vector3();
 
@@ -2031,7 +2032,7 @@ function pastoBuildCarroza(game, root) {
   b.addShape(new CANNON.Box(new CANNON.Vec3(0.62, 0.09, 0.46)),
              new CANNON.Vec3(0, pastoCAR_HITCH, -HZ - 0.42));
   b.allowSleep = false;
-  pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL;
+  pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL; pastoCarWaiting = false;
   pastoCarPZ = pastoCAR_Z0; pastoCarRideT = 0; pastoCarRideM = 0; pastoCarRode = false;
   b.position.set(pastoCAR_X, 0, pastoCAR_Z0);
   b.previousPosition.copy(b.position);
@@ -2052,12 +2053,50 @@ function pastoCarAboard(p) {
          pastoCarTmp.y > pastoCAR_DECK - 0.45 && pastoCarTmp.y < pastoCAR_DECK + 2.2;
 }
 
+/**
+ * True when the animal is standing ON THE COBBLES in front of the float.
+ *
+ * A PROCESSION STOPS FOR A CAPYBARA, and this is the line that makes it.
+ * The deck is a 3.24 × 6.60 m kinematic slab that stands ON the ground — the
+ * lower box runs from y 0 to y 1.55 — so an animal in the lane is not brushed
+ * aside by it, it is BULLDOZED, and cannon will resolve a kinematic body
+ * against a dynamic one no other way. Measured parked at spawn+(9,9), which is
+ * x 9.0 and therefore 0.12 m inside the near edge at x 8.88: the float carried
+ * the animal 8.0 m up the plaza in 60 s, in silence, while the player was still
+ * reading the arrival card. That is the whole of the "Pasto drifts at spawn"
+ * finding, and it was never a velocity write — the writer was cannon's own
+ * integrator, answering a contact.
+ *
+ * Being ABOARD is not being in the way: the deck is 1.55 m up, riding it is the
+ * chapter's mini, and a float that stopped for its own passenger would gate it.
+ */
+function pastoCarBlocked(capy) {
+  const b = pastoCarBody;
+  if (!b || !capy || !capy.position) return false;
+  const p = capy.position;
+  if (pastoCarAboard(p)) return false;
+  if (p.y - b.position.y > pastoCAR_DECK - 0.45) return false;   // up on the deck
+  if (Math.abs(p.x - b.position.x) > pastoCAR_HX + 0.55) return false;
+  // Signed along the way she is going. The rear bound is the slab's own back
+  // face and not zero, because the animal can be standing INSIDE the footprint
+  // — parked there, or dropped there by the last shove — and "in front of the
+  // centre" would wave that case straight through. It is deliberately not the
+  // hitch at −3.72: that is the way aboard, and she must keep rolling while you
+  // climb it.
+  const ahead = (p.z - b.position.z) * pastoCarDir;              // metres in front
+  return ahead > -pastoCAR_HZ && ahead < pastoCAR_HZ + 1.25;
+}
+
 function pastoUpdateCarroza(game, dt) {
   const b = pastoCarBody;
   if (!b || dt <= 0) { if (b) b.velocity.setZero(); return; }
+  // She waits rather than shoves. Nothing downstream needs her to be rolling
+  // except the ride itself, and the ride is measured from the deck, so a player
+  // who plants themselves in the lane stalls a parade and gates nothing.
+  pastoCarWaiting = pastoCarBlocked(game.capy);
   if (pastoCarDwell > 0) {
     pastoCarDwell -= dt;
-  } else {
+  } else if (!pastoCarWaiting) {
     pastoCarZ += pastoCAR_SPEED * dt * pastoCarDir;
     if (pastoCarZ >= pastoCAR_Z1) { pastoCarZ = pastoCAR_Z1; pastoCarDir = -1; pastoCarDwell = pastoCAR_DWELL; }
     else if (pastoCarZ <= pastoCAR_Z0) { pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL; }
@@ -2070,7 +2109,7 @@ function pastoUpdateCarroza(game, dt) {
   pastoCarGroup.position.copy(b.interpolatedPosition);
   pastoCarPos.copy(pastoCarGroup.position);
   if (pastoCarFigure) {
-    pastoCarFigure.rotation.y += dt * (pastoCarDwell > 0 ? 0.22 : 0.85);
+    pastoCarFigure.rotation.y += dt * (pastoCarDwell > 0 || pastoCarWaiting ? 0.22 : 0.85);
     pastoCarFigure.position.y = pastoCAR_DECK + Math.sin(pastoCarZ * 1.9) * 0.045;
   }
 

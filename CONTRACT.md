@@ -2056,6 +2056,117 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE LIFT PASS, BATCH EIGHT — THE INDEPENDENT LIST (v34 — 27 Aug 2026)
+
+Nine per-chapter rows that contend with nothing, plus one restatement. Six fixed, four
+restated with a current measurement. The Lift Pass ends here. Full log: `qa/BATCH8.md`.
+
+### A PROCESSION STOPS FOR A CAPYBARA (pasto)
+
+**The oldest open finding in the game was a kinematic slab, and it was never a velocity write.**
+Three passes hunted a bare `body.velocity` write in Pasto because a parked animal drifted 8 m in
+60 s while holding *exact* velocities. Instrumented properly — a `Proxy` on `capy.body.velocity`
+tallying every setter by stack trace — there are exactly three writers and all three are
+`capybara.js`. A `Proxy` on `body.position` named it in one run: **every millimetre came from
+`world.step` at `main.js:993`**, cannon's integrator answering a contact with `pastoCarBody`.
+
+The Carnaval float's collider is 3.24 × 6.60 m, stands **on** the cobbles (y 0…1.55) and runs
+the x = 10.5 line. Spawn+(9,9) is x 9.0, which is **0.12 m inside its near edge**. It drove
+through the animal at 2.15 m/s and pushed it the length of the plaza in silence.
+
+And the "exact −3.000" everybody read as a bare write was `capyPIN_VMAX` — the anti-creep pin
+saturating against a push it could not beat. **The tell was the fix fighting the bug.**
+
+1. **A KINEMATIC BODY DOES NOT NEGOTIATE, SO THE YIELD HAS TO BE UPSTREAM OF THE CONTACT.**
+   `pastoCarBlocked()` holds the float while the animal is in the lane. Being ABOARD is not
+   being in the way — the deck is 1.55 m up and riding it is the chapter's mini.
+2. **THE REAR BOUND OF A "SOMETHING IN FRONT OF ME" TEST IS THE BODY'S OWN BACK FACE, NOT ZERO.**
+   `ahead > 0` waves through the case where the animal is standing *inside* the footprint,
+   which is exactly the case the first cut of this fix leaked at 30 m. `ahead > −HZ`.
+3. **AND NOT AS FAR BACK AS THE BOARDING POINT.** The hitch is at −3.72 and is the way aboard;
+   she must keep rolling while you climb it.
+
+Differential, four float phases, 60 s parked, no input: **9.18 · 28.76 · 7.63 · 7.98 m without;
+0.24 · 0.42 · 1.78 · 0.61 m with.** `qa/stillness.js` no longer lists Pasto at all.
+
+**The residual is not a defect.** At the actual spawn the animal still moves ~0.2 m per 10 s,
+one writer, every 2.6 s: `paShoveCapy(rec, 78, 46)` from `paStepHuman` — the abuela, chasing,
+connecting with the broom, through `applyImpulse`. `npcBlockedFor` gates chase out on purpose.
+
+### A LADDER HOLE THAT CLOSES BECOMES A LID (kowloon)
+
+`HOLE = (b === nBay) ? 0 : 2.2` stopped a player topping out over an open shaft and made the
+topmost scaffold deck a continuous plank at y 34.68…34.92 **directly over the climbing face**.
+Measured: the climb line is x −9.07, the head meets the underside at 34.68, the climb tops out
+at 34.365, and the roof deck's edge is 0.63 m west with nothing in between. That is the whole
+of "the roof is 0.65 m out of reach" — **a height, not a distance**, and `hkSCAF.top` (34.8) is
+innocent of it.
+
+**The hole moves rather than closing.** The top deck is two planks with a 1.30 m slot between
+them **along the outer face, where a climber actually arrives**, instead of a hole across the
+middle where the beacon points. climbPeak 34.36 → **34.85**; tops out at 13.2 s; four seconds
+after letting go it is standing at y 35.06 instead of falling 34 m.
+
+**RULE: a deck over a climbable face is a ceiling. Check the climb line against every collider
+above it, not just the ones beside it.**
+
+### A POOL OF LIGHT IS ROUND *AND* IT IS THE SIZE OF ITS SIGN (kowloon)
+
+The comment warning against a rug was right; the arithmetic under it was not.
+`rr = (w + h) × 0.42` drawn at `rr × u × 1.5` is an outer **radius** of `(w + h) × 0.63` — nine
+metres across for an ordinary sign, sixty of them, overlapping. Now `× 0.25`: **a sixth of the
+area**, one pool about as wide as its own sign. Judged from the arrival PNG, not the number.
+
+### A PUBLISHED API WITH NO READER IS A DECISION NOBODY MADE
+
+Three of them, all now read, all proved firing live:
+
+| api | reader |
+|---|---|
+| `palawan.inZone('shaft')` | **`in-the-shaft`**, a new chapter-12 place find — down on the sand, in the beam, five seconds |
+| `cave.nearestDrip()` | **`wet-in-a-mountain`**, which now requires you to be within 2.4 m of one. It used to mean "wet, and still, anywhere in the mountain" — which the river satisfies too |
+| `cave.echoReady()` | **`let-it-return`**, a new chapter-16 place find — the cool-down running *is* the echo still out |
+
+FINDS 58 → **60**. `qa/audit-tasks.mjs`: 0 blockers, 0 warnings, 19 of 19 chapters.
+
+### THE ROUTE-DENSITY PROBE MEASURES PLACEMENT STYLE, NOT DENSITY
+
+Re-run over nineteen: Monte Carlo 11 → 9, Kyoto 10 → 7, everything else 0–4, with nothing done
+to any of them. Then the cells were photographed, and **the number does not mean what it says**:
+Kyoto's dead cells put the camera *inside a Gion machiya* with the wall two metres away.
+`route.js` locates a mesh at its **bounding-box centre**, so a chapter of large merged surfaces
+reads as empty from a metre away and a chapter of 13,458 scattered instances scores zero.
+Monte Carlo's are a straight line over the headland, which is not a walk.
+
+**Nothing padded** — and Manly's 617 objects, the same measure's other alarm, is the same fact:
+photographed from three cameras, Manly has the crescent, the pines, the Corso, the ocean pool,
+both headlands and a full beach, and 30.5% of its plan is water. Decision recorded: leave it.
+
+**RULE: before spending work on a ranking, check that the instrument ranks what it names.**
+
+### ONE MORE ANIMAL IN THE REGISTRY (venice)
+
+Venice's pigeons now call `addCritter({ biome: 'venice', r: venPIGEON_R, bold: 0.85 })` and the
+flush reads `.near`. The square with the most famous pigeons in Europe in it had a flush radius
+that could not hear the player being still, in a chapter whose `pigeons-back` find is about
+exactly that. 6 of 19 chapters register a critter now. The other thirteen were checked one at a
+time: Antarctica's penguins *deliberately* ignore you (`ignored` is a find), the Pantanal's
+egrets are a timed marquee flush, and the remaining eleven have no ground animal with a
+proximity radius — content to author, not a flag to clear.
+
+### RESTATED, NOT RE-LITIGATED
+
+- **Iceland's snowcat stays at x 34.** Measured, not asserted: the moraine is the flat shelf at
+  x ≥ 26 and everything at x ≤ 22 is glacier ice at slip 1.0, so the track can move six metres
+  of a fifty-four metre walk before it hangs over the ice. And it is a walk, not a miss —
+  `iceCAT_HOLD_R` 58 / `iceCAT_HOLD_MAX` 26 reach the runout, and with the animal parked at
+  (−20, −86) the machine **held at the bottom for 26.4 s**.
+- **Room tone is still keyed per biome, not per space.** Declined a third time. Venice and
+  Palawan remain its worst cases. Unchanged from v27.
+
+`qa/fuzz.js`: 19 chapters, 0 errors, 0 NaN, 0 void falls.
+
+
 ## THE LIFT PASS, BATCH SEVEN — THE PLACE REMEMBERS (v33 — 27 Aug 2026)
 
 The genre this game is styled after runs on one loop: approach, get seen, be driven off, come

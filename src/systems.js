@@ -13436,6 +13436,13 @@ export function createSystems(game) {
       const b = findPt(a.bangka);
       return !!b && findD2(c.p, b) < 7 * 7;
     },
+    // THE READER `inZone('shaft')` NEVER HAD. The cathedral floor is at -8.5,
+    // so the shaft is a thing you go DOWN into, not a thing you stand in — and
+    // holding still in it for five seconds is the only way to look at it.
+    'in-the-shaft':   function (c) {
+      return findHold('shaft', c.capy.diving && findZone('shaft', c.p) &&
+                               c.sp < 0.60) >= 5;
+    },
 
     // ---- 13, Cappadocia -------------------------------------------------
     // `sunrise` is being up in a basket when the sun clears the rim. This is
@@ -13508,9 +13515,29 @@ export function createSystems(game) {
     // be wet in here was to have swum, and `capyWET_DECAY` is an eighth a
     // second — so eight seconds of standing still put a freshly-soaked animal
     // at 0.44 against a 0.45 gate. Measured, and it failed by one hundredth.
+    // ...and `nearestDrip()` is now what makes it literal. Twenty-six columns
+    // ring the floor and nothing had ever asked which one you were under, so
+    // the find read "wet, and standing still, anywhere in the mountain" — which
+    // the river also satisfies for a minute after you climb out of it.
     'wet-in-a-mountain': function (c) {
       if (c.capy.swimming || c.capy.diving) return false;
-      return c.capy.wet > 0.50 && findHold('drip', findParked(c, 0.25)) >= 6;
+      const a = findApi();
+      const d = a && typeof a.nearestDrip === 'function' ? findPt(a.nearestDrip) : null;
+      return c.capy.wet > 0.50 &&
+             findHold('drip', findParked(c, 0.25) &&
+                              !!d && findD2(c.p, d) < 2.4 * 2.4) >= 6;
+    },
+    // THE READER `echoReady()` NEVER HAD. `first-echo` fires on the frame the
+    // noise leaves; the cool-down running IS the echo still out, and coming off
+    // it without having moved is having listened to the whole of it.
+    'let-it-return':  function (c) {
+      const a = findApi();
+      if (!a || typeof a.echoReady !== 'function') return false;
+      let out = false;
+      try { out = !a.echoReady(); } catch (e) { return false; }
+      const held = findS.echoHold || 0;              // what it was worth LAST tick
+      findS.echoHold = out && findParked(c, 0.25) ? held + sysFIND_TICK : 0;
+      return findEdge('echoR', out, false) && held >= 0.5;
     },
 
     // ---- 17, the Antarctic Peninsula ------------------------------------

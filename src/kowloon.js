@@ -1128,6 +1128,32 @@ function hkBuildScaffold(game, root) {
     // points at exactly that midpoint. A player who climbs where the game
     // points topped out over an open hole at 34.8 m.
     const HOLE = (b === nBay) ? 0 : 2.2;
+    if (b === nBay) {
+      // ---- AND CLOSING THE TOP HOLE PUT A LID ON THE CLIMB ------------------
+      // The note above is right that the topmost deck cannot be a shaft with no
+      // lid — and closing it made this deck a continuous 3.4 m plank from
+      // x −10.75 to −7.35 at y 34.68…34.92, which is directly over the face the
+      // chapter's own climb goes up. Measured: the animal ascends at x −9.07,
+      // its head meets the deck's underside at 34.68, the climb tops out at
+      // 34.365 and it is then holding on 0.63 m east of the roof's edge with
+      // nothing under it. That is the whole of "the roof is 0.65 m out of
+      // reach", and it is a HEIGHT, not a distance — hkSCAF.top is innocent and
+      // stays at 34.8.
+      //
+      // So the hole moves rather than closing: the ladder hole is cut along the
+      // OUTER FACE, where a climber actually arrives, instead of across the
+      // middle where the beacon points. The deck is two planks — the inner one
+      // is the landing (its top at 34.92 is 0.72 m over the roof, a step down),
+      // the outer one is the handrail side — and the 1.30 m slot between them
+      // is what the animal comes up through.
+      const decks = [[-10.25, 1.00], [-7.90, 1.10]];
+      for (let k = 0; k < decks.length; k++) {
+        const cx = decks[k][0], w = decks[k][1];
+        const zm = (z0 + z1) * 0.5, zd = (z1 - z0) - 0.4;
+        M.box(cx, y + 0.06, zm, w, 0.12, zd, PALETTE.hkLaundry);
+        hkStaticBox(game, cx, y, zm, w, 0.24, zd);
+      }
+    } else
     for (let h = -1; h <= 1; h += 2) {
       const za = h < 0 ? z0 + 0.2 : zc + HOLE;
       const zb = h < 0 ? zc - HOLE : z1 - 0.2;
@@ -1543,13 +1569,23 @@ function hkBuildNeon(game, root) {
     // metres, which includes the roof the chapter sends you to. Four rings of
     // a sixteen-sided cylinder each, dimming outward: the falloff is a curve
     // and the shape is a shape a light actually makes.
+    // ...AND THE SIZE, WHICH THE ROUNDING DID NOT FIX.
+    // The note above says "roughly the size of the sign" and the arithmetic
+    // under it said something else: rr = (w + h) x 0.42 drawn at rr x u x 1.5
+    // is an outer RADIUS of (w + h) x 0.63 — about nine metres across for an
+    // ordinary sign and fifteen for a big one, sixty of them, overlapping. From
+    // the arrival camera the footpath was a quilt of translucent discs with the
+    // tarmac showing through in the gaps: the rug the comment was written to
+    // prevent, in a rounder shape. The outer radius is now (w + h) x 0.25 — one
+    // pool about as wide as its own sign, which is what was meant — and that is
+    // a sixth of the area per sign, so they stop merging into one another.
     for (let k = 0; k < glows.length / 5; k++) {
       const o = k * 5;
       const rr = (glows[o + 2] + glows[o + 3]) * 0.42;
       for (let r2 = 3; r2 >= 0; r2--) {
         const u = (r2 + 1) / 4;
         c.set(hkNEON_COLS[glows[o + 4]]).multiplyScalar((1 - u) * (1 - u) * 0.9 + 0.10);
-        G.cyl(glows[o], 0.004 - r2 * 0.002, glows[o + 1], rr * u * 1.5, 0.02,
+        G.cyl(glows[o], 0.004 - r2 * 0.002, glows[o + 1], rr * u * 0.60, 0.02,
               '#' + c.getHexString(), 0, 0, 0, 16);
       }
     }
