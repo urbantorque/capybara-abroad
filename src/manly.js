@@ -103,7 +103,6 @@ const manPERIOD = 8.4;               // seconds between crests
 const manWAVELEN = 66;               // metres between crests
 // The deep-water speed, which is the FASTEST the swell ever goes: by the time
 // it reaches the bank it is doing half of this. See the phase table below.
-const manCELERITY = manWAVELEN / manPERIOD;      // 7.86 m/s offshore
 const manA0 = 1.50;                  // offshore amplitude, in deep water
 const manDEEP = 9.5;                 // the depth manA0 is quoted at
 // Nine crests, and the shape of them is the chapter's clock. Five clear 0.70,
@@ -183,7 +182,7 @@ let manBoatGroup = null, manBoatBody = null;
 let manBoatT = 0, manBoatPhase = 'beached';
 const manBoatTarget = { x: manBOAT_HOME.x, y: 0.55, z: manBOAT_HOME.z };
 const manBoatPrev = { x: manBOAT_HOME.x, y: 0.55, z: manBOAT_HOME.z };
-let manBoatCarrying = false, manBoatRideT = -1, manBoatOut = false;
+let manBoatCarrying = false, manBoatOut = false;
 // the sweep calls it three seconds before they go. See manUpdateBoat.
 let manBoatCalled = false;
 let manBoatStroke = 0;

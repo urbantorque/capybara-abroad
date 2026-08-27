@@ -45,7 +45,6 @@ const sysAimB      = new THREE.Vector3();   // hint arrow: target, in NDC
 const sysSUN_DIR      = new THREE.Vector3(-0.62, 0.66, 0.42).normalize();
 // ...drifting to golden hour as the list gets ticked: lower, further west, so every
 // shadow in the harbour stretches out east and warms up.
-const sysSUN_DIR2     = new THREE.Vector3(-0.88, 0.31, 0.25).normalize();
 // Pasto is 1.2 degrees north of the equator at 2 527 m. Sydney's 41-degree
 // afternoon sun is simply the wrong star for it: measured live, the 20.7 m church
 // tower threw a 23 m hard-edged slab clean across the Plaza de Nariño and read as

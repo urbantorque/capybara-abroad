@@ -76,7 +76,6 @@ const monWATER   = -0.6;          // the Mediterranean, and it does not move muc
 // metres behind the lens, the circuit, so the first thing that happens is a
 // car going past at ninety.
 const monSPAWN     = { x: 30, y: 3.9, z: -80 };
-const monSPAWN_YAW = 3.14159;     // ...looking due north up the harbour
 
 // Port Hercule. A rectangle of still water with the town on three sides of it
 // and one channel out to the sea. Everything on the water is inside this.
@@ -341,13 +340,10 @@ let monFloorBest = 0;
 let monFloorDone = false;
 let monInside = false;            // is the animal on the gaming floor right now
 let monEverIn = false;
-let monPassDone = false;
-let monEyeTick = 0;
 
 // the stack
 let monStack = 0;
 let monStackBest = 0;
-let monBrokeT = 0;                // seconds spent at the table with nothing left
 let monStackDone = false;
 const monPlaqueProps = [];        // live plaque props on the floor
 let monPlaqueT = 0;
@@ -361,21 +357,19 @@ let monEverWon = false;
 let monYachtG = null;
 let monDiveBest = 0, monDiveDone = false;
 let monTuxProp = null, monTuxGone = false;
-let monAboard = false, monAboardT = 0, monAboardDone = false;
+let monAboardT = 0, monAboardDone = false;
 
 // the salon
 let monPianoG = null;
 const monPianoKey = [];           // {x, z, mesh, y0, v, hit}
 let monPianoRun = 0, monPianoLast = -1, monPianoT = 0, monPianoDone = false;
 let monToweG = null, monToweT = -1, monToweDone = false;
-const monToweBits = [];
 
 // the palace
 let monGuardG = null, monGuardBreak = 0, monGuardDone = false;
 
 // the chicane
 let monChicaneDone = false;
-const monChicaneBlk = [];
 
 // instanced fields
 let monWinMesh = null;            // the lit windows of the whole town
@@ -386,11 +380,9 @@ let monLampMesh = null;           // ...and a hundred and fifty-three street lam
 const monWatchN = 46;             // the crowd on the fence, and in the stand
 let monWatchMesh = null;
 let monWatchPh = null;
-let monWakeMesh = null;
-let monWakeData = null;
 
 // people
-let monLocDoor = null, monLocPit = null, monLocQuay = null;
+let monLocDoor = null, monLocQuay = null;
 let monLocDeck = null, monLocCroup = null, monLocMarshal = null, monLocBar = null;
 
 // the chapter's own bookkeeping
@@ -580,10 +572,6 @@ function monCue(name, x, y, z, volume, pitch, far) {
 function monRecord(id, v) {
   const g = monGame;
   if (g && typeof g.record === 'function') g.record(id, v);
-}
-function monTaskDone(id) {
-  const g = monGame;
-  return !!(g && typeof g.taskDone === 'function' && g.taskDone(id));
 }
 
 // ---------------------------------------------------------------- terrain ---
@@ -783,10 +771,6 @@ function monCutK(x, z, r) {
   return monSmooth(clamp(inn / 4.0, 0, 1));
 }
 /** Land only — the terrain with the sea taken out. Used to place people. */
-function monLandOnly(x, z) {
-  const h = monTerrain(x, z);
-  return h;
-}
 
 function monSlope(x, z) {
   const e = 1.6;
@@ -812,6 +796,16 @@ const monSLIP_MARB  = 0.30;       // the atrium, and it is polished every night
 function monGroundSlip(x, z) {
   if (monInCasino(x, z)) return monSLIP_MARB;
   if (monRoad(x, z) < monTRACK_HALF + 0.6) return monSLIP_ROAD;
+  // THE PONTOONS, AND THE RUNG THAT COULD NOT BE REACHED. monSLIP_DECK was
+  // declared with the other four and no branch ever returned it, so varnished
+  // teak over water graded as ordinary pavement — a quarter of the intended
+  // slide. The tell was that monSurfacePitch() below ALREADY calls
+  // monOnPontoon() to give these boards hollow-timber footsteps: the decks
+  // sounded like wet wood and gripped like a dry street.
+  // NARROW BEFORE BROAD. This has to sit above monOnQuay(), which is the
+  // larger region the pontoons stand in — the same ordering rule the note on
+  // monSurfacePitch records from the Manly wharf bug.
+  if (monOnPontoon(x, z)) return monSLIP_DECK;
   if (monOnQuay(x, z)) return monSLIP_QUAY;
   return monSLIP_STONE;
 }
@@ -908,10 +902,6 @@ function monTunnelK2(x, z) {
 function monUnderTunnel(x, z) { return monTunnelK2(x, z) > 0.5; }
 
 /** How far it is from one tunnel mouth to the other. */
-function monTunnelLen() {
-  monInitTrack();
-  return monTrackLen[monTUNNEL_B] - monTrackLen[monTUNNEL_A];
-}
 
 // -------------------------------------------------------------- navBlocked --
 // Static obstacles, for steering. Deliberately COARSE — it is asked by people
@@ -1082,7 +1072,20 @@ function monUpdateSea(dt) {
     }
   }
   monSeaAttr.needsUpdate = true;
-  monSeaMesh.geometry.computeVertexNormals();
+  // NO computeVertexNormals() HERE, AND THAT IS THE WHOLE POINT.
+  // This sheet is 6,083 vertices and 11,856 triangles, and the material it
+  // wears comes from mat(), which sets flatShading: true. With FLAT_SHADED
+  // three derives the normal in the FRAGMENT shader from screen-space
+  // derivatives and never reads the normal attribute at all — so recomputing
+  // it every frame cost between 0.9 ms (fresh page) and 3.1 ms (all nineteen
+  // chapters resident) to produce a buffer the GPU throws away. Measured by
+  // ablation it was ~40% of this chapter's entire per-frame cost, and Monaco
+  // was already the heaviest update() in the game.
+  // Chapter 14 wrote this down first — see the note beside venWaterMat in
+  // venice.js, which subdivides and animates a sea for nearly nothing for
+  // exactly this reason. If a SMOOTH-shaded sea is ever wanted here, the two
+  // sine terms above have closed-form derivatives: write the normal
+  // analytically in the same loop rather than re-deriving it from triangles.
 }
 
 /** The live waterline at a point. The basin is flat; outside the mole it is not. */
@@ -1223,7 +1226,6 @@ function monBuildHarbour(game, root) {
  * and every one gets a collider, because the walk-through-buildings audit is a
  * thing this project has already run five times.
  */
-const monWinM4 = new THREE.Matrix4();
 const monWinPos = [];             // x, y, z, yaw, w, h  per lit pane
 function monWindowAt(x, y, z, yaw, w, h, odds) {
   if (Math.random() > (odds === undefined ? 0.62 : odds)) return;
@@ -3641,7 +3643,6 @@ function monUpdateTunnel(game, dt) {
 // ============================================================= THE CHICANE ===
 // Five cones out of the Nouvelle Chicane, and the harbour is nine metres away.
 const monChicaneProps = [];
-let monChicaneT = 0;
 function monSpawnChicane(game) {
   if (!game.physics || typeof game.physics.spawnProp !== 'function') return;
   monInitTrack();
@@ -3816,7 +3817,6 @@ function monWheek(game) {
 // ============================================================ THE ARRIVAL ====
 let monDiveTop = 0;
 let monRockT = 0, monRockDone = false;
-let monTuxWanted = false;
 let monSpawned = false;
 
 function monBuild(game) {

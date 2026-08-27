@@ -113,7 +113,6 @@ const hkSHOW_ROOF = 26;
 // Mong Kok is busy; it is not roofed. Fewer, smaller, and stratified along the
 // street rather than scattered, so no two land on top of each other.
 const hkSIGN_N = 60;
-const hkAC_N = 90;
 
 // ---------------------------------------------------------------- scratch ---
 const hkV3 = new THREE.Vector3();
@@ -123,7 +122,6 @@ const hkEu = new THREE.Euler();
 const hkSc = new THREE.Vector3();
 const hkM  = new THREE.Matrix4();
 const hkCol = new THREE.Color();
-const hkCol2 = new THREE.Color();
 const hkHold = { nx: 0, nz: 0, top: 0 };
 function hkPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 
@@ -1767,7 +1765,7 @@ function hkUpdateWetRoad(game) {
  * Drift's gap posts).
  */
 const hkDPD = { x: 7.6, z: -24 };
-let hkWokMat = null, hkSteamMesh = null, hkFlameMesh = null, hkFlameMat = null;
+let hkSteamMesh = null, hkFlameMesh = null, hkFlameMat = null;
 const hkSTEAM_N = 22;
 const hkSteamData = new Float32Array(hkSTEAM_N * 4);   // x, y, z, scale
 

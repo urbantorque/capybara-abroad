@@ -37,7 +37,6 @@ import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex }
 const caliRIVER_Z = 0;              // the Río Cali runs east-west
 const caliRIVER_HZ = 9;             // half-width of the channel
 const caliRIVER_Y = -1.5;           // water surface (the channel is cut below 0)
-const caliBANK_Z = 14;              // the south bank walk
 const caliGATO = { x: -34, z: -14 };
 const caliERMITA = { x: 30, z: -20 };
 const caliBRIDGE_X = -6;
@@ -96,7 +95,6 @@ const caliCHIVA_V_HILL = 4.4;       // m/s at 10% and worse; a chiva climbs in f
 const caliCHIVA_ACC = 2.6;          // m/s^2 the engine can add or take away
 const caliCHIVA_STOP_T = 5.0;       // s stood at a stop, collecting
 const caliCHIVA_PULL_T = 1.3;       // s on the roof before she pulls away
-const caliCHIVA_ARRIVE_R = 6;       // m from the mirador at which she is "in"
 const caliCHIVA_L = 9.5, caliCHIVA_W = 2.9;
 const caliROOF_TOP = 3.70;          // top of the roof collider, in chiva-local metres
 // Wire height above the ROAD, not above the bus: the bus pitches on the grades,

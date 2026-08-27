@@ -213,7 +213,7 @@ const icePuffinData = new Float32Array(icePUFFIN_N * 8); // x,y,z,yaw,vx,vy,vz,s
 const icePuffinHome = new Float32Array(icePUFFIN_N * 8);
 let iceSettle = 0;                    // s until they are all back on the rock
 let iceGeyCol = null, iceGeyDome = null;
-let icePylsaGroup = null, icePylsaGone = false;
+let icePylsaGroup = null;
 let iceBergGroup = null, iceBergBody = null;
 const iceChimneys = [];              // x, y, z of every chimney with a fire in it
 let iceVents = null;                 // x, y, z, r of every fumarole and mud pool
@@ -245,7 +245,6 @@ let iceGeyRiding = false, iceGeyPeak = 0;
 let iceAurLastApplied = -1;
 const iceAurGreen = new THREE.Color(PALETTE.iceAurora2);
 const iceAurBase = new THREE.Color(0xffffff);
-const iceAurSpring = new THREE.Color(PALETTE.iceGeoBlue);
 
 // ============================================================== helpers ======
 function iceXform(px, py, pz, rx, ry, rz, sx, sy, sz) {

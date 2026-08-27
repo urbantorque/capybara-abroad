@@ -118,7 +118,7 @@ let rioBateriaBody = null, rioFloatBody = null, rioBateriaPX = 0;
 let rioFloatGroup = null;
 let rioCabinGroup = null, rioCabinBody = null, rioCabinT = 0, rioCabinDir = 1;
 let rioCabinPX = 0, rioCabinPY = 0, rioCabinPZ = 0;
-let rioGloboGroup = null, rioGloboGone = false;
+let rioGloboGroup = null;
 // The yaw he stands at, so a re-entry can put him back — see rioBuildGlobo and
 // the onEnter note about one-shot objects.
 const rioGloboYaw = -2.2;

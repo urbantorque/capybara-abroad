@@ -2920,8 +2920,18 @@ which is the opposite of the chapter's other two.
 
 The alley is 6.4 m wide and not the real 4. At four, a third-person camera
 twelve metres behind the animal at 35° is inside somebody's first floor and the
-marquee happens off screen. The TRAIN'S clearance (`hanTRAIN_GAP`, 45 cm) is
-untouched, because that is the number the chapter is about.
+marquee happens off screen.
+
+This paragraph used to end by claiming the train's own clearance was *untouched*
+at 45 cm, "because that is the number the chapter is about". That was true of the
+real Hanoi and has never been true of the shipped chapter. Widening the alley
+widened the clearance with it: the hull is 1.45 m in a 6.4 m street, which leaves
+about 2.6 m either side, and **2.6 m is the number the chapter actually pays out
+on** — see `hanTRAIN_WOW` in hanoi.js, which is what the in-pass payout and the
+despawn safety net both read. The 45 cm constant was a leftover from before the
+widening, was read by no line of code, and has been deleted. If the tight
+clearance is ever wanted back, it is the alley's `half` that has to come in, and
+the camera problem above comes back with it.
 
 ### AND FOUR THINGS BOTH CHAPTERS PAID FOR
 

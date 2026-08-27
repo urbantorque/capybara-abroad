@@ -121,7 +121,6 @@ const gorDECOR_N = 26;               // the other balloons
 const gorCYCLE = 156;                // s — one dawn, on a loop
 const gorLAUNCH_P = 0.240;           // the field starts sending them up
 const gorSUN_P = 0.470;              // and the sun clears the ridge
-const gorDAY_P = 0.760;
 
 const gorCHIM_N = 74;
 // WHERE THE CHIMNEYS ACTUALLY WENT. They are placed by a seeded random walk

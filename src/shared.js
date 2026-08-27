@@ -2415,11 +2415,6 @@ export const FINDS = [
 ];
 
 /** Every find id, for the audit and the save. */
-export function findIds() {
-  const out = [];
-  for (let i = 0; i < FINDS.length; i++) out.push(FINDS[i].id);
-  return out;
-}
 
 export const RECORDS = {
   'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },

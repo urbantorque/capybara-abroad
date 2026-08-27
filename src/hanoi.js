@@ -69,7 +69,6 @@ const hanHUC    = { x0: 55, z0: -44, x1: 39, z1: -46 };   // the red bridge
 // The Red River, and the dyke that keeps it out of the city. The dyke is the
 // only ground in the chapter that is not at 1.2 m, and it is there because the
 // old bridge has to start somewhere.
-const hanRIVER_Z = 190;
 const hanDYKE   = { cz: 168, h: 5.0, halfz: 10 };
 const hanBRIDGE = { x: 44, z0: 168, z1: 250 };
 
@@ -81,11 +80,15 @@ const hanOQ     = { x0: -96, x1: 96, z0: -18, z1: 130 };
 // QUARTERS. The real one is about four; at that width the chapter is
 // unplayable, because a third-person camera twelve metres behind the animal
 // at thirty-five degrees is inside somebody’s first floor and the marquee
-// happens off screen. Three metres two either side of the rail leaves the
-// TRAIN’S own clearance untouched — it is 1.45 m wide and hanTRAIN_GAP is
-// still the number the chapter is about — and gives the lens somewhere to be.
+// happens off screen. Three metres two either side of the rail gives the lens
+// somewhere to be.
+// This used to claim the TRAIN'S own clearance was left untouched at 45 cm.
+// It is not: widening the alley widened the clearance with it. The hull is
+// 1.45 m in a 6.4 m street, which leaves about 2.6 m either side, and 2.6 m —
+// hanTRAIN_WOW, below — is what the in-pass payout and the despawn net both
+// actually read. The 45 cm constant was a leftover from before the widening,
+// was read by no line of code, and has been removed.
 const hanTRAIN  = { z: 46, x0: -130, x1: -34, gauge: 1.0, half: 3.2 };
-const hanTRAIN_Y = hanGROUND + 0.28;
 
 // The bia hoi corner, the market, the puppet theatre and the barber.
 const hanBIA    = { x: 62, z: 18 };
@@ -113,18 +116,15 @@ const hanLANES = [
   // 3 — the north street, past the market
   { closed: false, w: 4.6, pts: [[-100, 84], [-52, 80], [4, 86], [56, 82], [102, 86]] },
 ];
-const hanLANE_SHLD = 3.4;         // the pavement the terrain blends over
 const hanBIKE_N    = 240;         // ...and how many of them there are
 const hanBIKE_V    = [5.4, 9.6];  // m/s. Fifteen to thirty-five kilometres an hour.
 const hanSEE       = 15.0;        // m ahead a rider can see you
 const hanSWERVE    = 3.4;         // m of lateral offset they will give you
-const hanCLIP      = 1.35;        // ...and how close is a clip
 const hanHOLD_V    = 0.85;        // m/s under which you have stopped committing
 const hanTURN_MAX  = 1.9;         // rad of heading change that counts as a dither
 
 // ------------------------------------------------------------- train street --
 const hanTRAIN_V    = 11.0;       // m/s through the alley
-const hanTRAIN_GAP  = 0.45;       // m of daylight either side of it
 const hanTRAIN_WARN = 11.0;       // s between the horn and the train
 const hanTRAIN_GAP2 = 96;         // s between one and the next
 // How close counts as "in the alley when it comes through". One number, read by
@@ -194,12 +194,11 @@ const hanFolders = [];            // {mesh, x, z, ox, oz, oy, kind}
 let hanTrainWarned = false;
 
 // the lake set
-let hanTowerG = null, hanHucG = null;
-let hanPuppetG = null;
+let hanHucG = null;
 const hanPuppets = [];
 let hanCauN = 5, hanCauT = 0, hanCauDone = false;
 const hanCauFolk = [];
-let hanShuttle = null, hanShuttleT = 0;
+let hanShuttle = null;
 
 // the stools
 let hanStoolMesh = null, hanStoolData = null;
@@ -218,7 +217,6 @@ let hanLocBarber = null, hanLocPuppet = null, hanLocMarket = null;
 // instanced fields
 let hanWinMesh = null;
 let hanSignMesh = null;
-let hanCableMesh = null;
 const hanFolkMeshes = [];
 const hanFolkGroups = [];
 let hanFolkData = null;
@@ -362,15 +360,6 @@ function hanPoolBox(b, x, y, z, sx, sy, sz, ry) {
 }
 function hanPoolDone(game, b) {
   if (!b.shapes.length) return null;
-  hanSyncBody(b);
-  game.world.addBody(b);
-  return b;
-}
-function hanStaticBox(game, x, y, z, sx, sy, sz, ry) {
-  const b = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
-  b.addShape(new CANNON.Box(new CANNON.Vec3(sx * 0.5, sy * 0.5, sz * 0.5)));
-  b.position.set(x, y, z);
-  if (ry) b.quaternion.setFromEuler(0, ry, 0);
   hanSyncBody(b);
   game.world.addBody(b);
   return b;
@@ -1959,9 +1948,10 @@ function hanUpdateTrain(game, dt) {
           // The literal 1.5708 that was here was across the tracks, and so was
           // the computed bearing that first replaced it: `atan2(p.x - along,
           // p.z - z)` has a z term, and any z term at all points the lens at a
-          // wall. THIS ALLEY IS hanTRAIN_GAP WIDE — forty-five centimetres of
-          // daylight either side of a train — and it is the one thing the
-          // chapter is about. Asking for thirteen metres of distance on a
+          // wall. THIS ALLEY IS 6.4 m WIDE with a 1.45 m train down the middle
+          // of it — about 2.6 m of daylight either side, which is hanTRAIN_WOW
+          // and is the one thing the chapter is about. Asking for thirteen
+          // metres of distance on a
           // diagonal put the camera INSIDE the building: the marquee frame was
           // a flat beige wall with the card over it, no train and no capybara.
           // Found from the PNG. Nothing in the numbers said so — the train was
@@ -2990,7 +2980,6 @@ function hanUpdateAmbience(game, dt) {
 // and the traffic test rather than picked off the map, which is what chapter
 // 18 learned the hard way after four spawns inside four different objects.
 const hanSPAWN = { x: -60, y: 2.4, z: -78 };
-const hanSPAWN_YAW = -1.94;
 
 let hanSpawned = false;
 

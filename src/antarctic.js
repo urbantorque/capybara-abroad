@@ -151,7 +151,6 @@ const antE = new THREE.Euler();
 const antSc = new THREE.Vector3();
 const antM = new THREE.Matrix4();
 const antCol = new THREE.Color();
-const antFrame = { x: 0, z: 0 };
 
 // ---------------------------------------------------------------- module ----
 let antGame = null;

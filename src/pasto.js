@@ -230,7 +230,6 @@ const pastoColRockD  = new THREE.Color(PALETTE.volcanoDark);
 const pastoColAsh    = new THREE.Color(PALETTE.volcanoAsh);
 const pastoColSnow   = new THREE.Color(PALETTE.volcanoSnow);
 const pastoColGlow   = new THREE.Color(PALETTE.craterGlow);
-const pastoColPeak   = new THREE.Color(PALETTE.peakFar);
 const pastoColSmoke  = new THREE.Color(PALETTE.smoke);
 const pastoColFogPale = new THREE.Color(PALETTE.andesFog);
 const pastoColMoteLo = new THREE.Color(PALETTE.andesSun);

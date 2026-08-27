@@ -181,7 +181,6 @@ const venBOARD_W = 3.0;
 const venPIGEON_N = 180;
 const venPIGEON_R = 5.2;            // how close before a pigeon has had enough
 const venGOND_SPEED = 0.0125;       // fraction of the canal per second
-const venSTAR_N = 0;
 
 // ---------------------------------------------------------------- scratch ---
 const venV3 = new THREE.Vector3();
@@ -240,7 +239,7 @@ let venWasFlooded = false;
 // piece and a coin toss.
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
-let venBoardRunT = -1, venBoardRunBest = 0, venBoardFrom = 0, venBoardOff = 0;
+let venBoardRunT = -1, venBoardFrom = 0, venBoardOff = 0;
 let venOnBoards = false, venBoardIdx = -1;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
 let venGondDone = false, venRialtoDone = false, venFloodDone = false, venSwimDone = false;
@@ -1684,7 +1683,6 @@ function venBuildSquares(game, root) {
  * the city, and it costs one lerp. The bell they hit is the loudest thing in
  * the chapter that is not the siren, and every pigeon in the square goes up.
  */
-let venOroGroup = null;
 let venOroHandH = null, venOroHandM = null;
 let venOroMoorA = null, venOroMoorB = null;
 let venOroStrike = -1;              // s into a strike, -1 between
