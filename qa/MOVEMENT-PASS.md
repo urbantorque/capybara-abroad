@@ -12,11 +12,42 @@
 > | **2** static impacts are silent | **landed** — the collide listener returned on `other.mass < 0.8` before looking at anything, so every collision with the world itself was discarded. Static branch added: punch, spatialised thud, squash, and a bounce through `capyShove` | three gates keep it off the floor — normal mostly horizontal, closing speed along that normal, and a throttle for the three-sphere compound |
 > | **4** momentum buys nothing | **landed** — the run-up, gated on speed over the floor rather than on the run key, applied along the travel and not along the nose | apex and airtime unchanged to the centimetre (1.37 m, 0.717 s) — the trade is purely horizontal, because eighteen chapters of geometry are sized against that height |
 >
-> Rows **3** and **5** are still open. Row 3 is `qa/BATCH5.md`'s job 3. Row 5 is unscheduled.
+> | **3** the climb is three set pieces, the wind is one | **WITHDRAWN — both halves were wrong** | see below |
+> | **5** one mount, two helms | **approach landed** · helm **measured and declined** · second flier open | 9 s and two whistles to the first ride, **6 s and one** every ride after |
+>
+> **Row 3 was wrong twice over, and the first way is a lesson about the instrument.**
+> `qa/mv-verbs.js` asked each biome for `api.climbHold` and reported "climb: 0.0%" in sixteen
+> chapters. That is **hook publication, not the verb**: `capyClimbProbe` has given every chapter
+> a generic ray-cast wall climb since v31, and it lives in `capyClimbAt` where no biome can be
+> asked about it. Driven through the real path, `qa/mv-climb.js` goes **4.84 m up a Kyoto wall**
+> in a chapter that publishes nothing. Independently re-measured here: **Venice climbs on three
+> of four approach bearings, up to 2.73 m.** The reach is uneven — Sydney climbs 1 of its 8
+> tallest walls, Venice 3 of 4 — but that is chapter content, not a missing verb.
+>
+> The wind half was worse: it proposed putting the ambient gust on `wind()`, and `capyWindAt`'s
+> own note already explains why that is a serious bug. `wind()` is the air **as a reference
+> frame**, added to `platVX/platVZ` beside a ferry deck and a balloon basket. A five-metre
+> ambient breeze on that channel slides a capybara across Jemaa el-Fnaa with nobody touching a
+> key, and in Cappadocia it fights the one system that chapter *is*.
+>
+> **Row 5's helm half is declined, and the measurement is why.** The two helms are already the
+> same hands. The authority law is identical in form and in wording in both files —
+> `clamp(|speed| / K, 0, 1)` under the comment *"lateral: rudder authority is bought with
+> way"* — with K = 5.5 for the ferry and 5.0 for the zodiac. Only the vessel constants differ,
+> and they differ *correctly*: VMAX 10.4 vs 12.6, ACC 3.4 vs 3.8, TURN 0.52 vs 0.62, because
+> one is thirty-four metres of timber and the other is a small orange boat, and the zodiac
+> additionally carries ice terms the ferry has no use for. The stated benefit — *"would
+> guarantee the two that exist feel like the same hands"* — is already true, so what is left is
+> making a third boat cheap, and **there is no third boat.** Unifying two working,
+> marquee-critical vehicles for a caller that does not exist is speculative generality on the
+> best moment in two chapters. Revisit it when a third boat is actually being built.
 >
 > Also landed alongside: the second-whistle toast in `condor.js` no longer fires at a player
 > whose bird is already on its way down, and three dead constants went out of `capybara.js`
 > (`capyUP_KP`, `capyTUG_RADIUS`, `capyTUG_EFFORT` — zero references repo-wide).
+>
+> **Still open: nothing but row 5b, the second flier**, which the page itself calls content
+> rather than code.
 
 > Every number below came off one of the five new probes in `qa/`, all of which are re-runnable:
 >
@@ -145,6 +176,11 @@ event in this game and it is currently the only one with no answer.
 
 ## 3 · THE VERB SURFACE IS BACK-LOADED, AND THE TWO NEWEST VERBS ARE ROUNDING ERRORS
 
+> **WITHDRAWN. Both halves of this row were wrong — see the correction at the top of this
+> page.** The table below reports hook publication, not verb availability: every chapter has
+> had a generic wall climb since v31. Kept unedited because the reasoning it prompted is what
+> found that out.
+
 `qa/mv-verbs.js` samples a 200 m × 200 m grid (41 × 41) about each spawn and asks the live
 biome's own hooks what is available there. Percentages are of sampled cells.
 
@@ -235,6 +271,11 @@ would just read as the controller sticking.
 
 ## 5 · THE BEST-PILOTED THING IN THE GAME IS USED ONCE, AND COSTS TEN SECONDS TO GET AT
 
+> **The approach fix has LANDED and the shared helm is DECLINED — see the correction at the
+> top of this page.** First ride 9 s and two whistles; every ride after, 6 s and one. The two
+> helms already share their authority law verbatim; only the vessel constants differ, and they
+> differ correctly.
+
 Nineteen chapters contain **two genuinely piloted vehicles** — the Circular Quay ferry
 (throttle + rudder, chapter 3) and the Antarctic zodiac (chapter 17) — plus **one mount** (the
 condor, chapter 2) and **one half-vehicle** (the Göreme balloon, chapter 13, vertical only).
@@ -278,9 +319,9 @@ free, and would guarantee the two that exist feel like the same hands.
 |---|---|---|---|---|---|
 | 1 | the sprint has no stopping distance | **measured, root-caused** | one branch, one file | all 19 | **landed** |
 | 2 | static impacts are silent | **measured 12/12** | ~20 lines, one file | all 19 | **landed** |
-| 3 | the climb is three set pieces, the wind is one | **measured surface areas** | a shared helper + opt-ins | 16 chapters that have none | open — `qa/BATCH5.md` job 3 |
+| 3 | the climb is three set pieces, the wind is one | ~~measured surface areas~~ — **the instrument asked the wrong question** | — | — | **WITHDRAWN** |
 | 4 | momentum buys nothing | design, built on row 1 | one file each | all 19 | **landed** |
-| 5 | one mount, two helms, nineteen chapters | measured flight + census | approach: small · a second flier: content | the shape of the journey | open, unscheduled |
+| 5 | one mount, two helms, nineteen chapters | measured flight + census | approach: small · a second flier: content | the shape of the journey | approach **landed** · helm **declined** · flier open |
 
 Rows 1 and 2 are small, safe, root-caused and land everywhere. **Do those two first, together,
 and re-measure the stop trace and the bonk log before anything else on this page is designed.**
