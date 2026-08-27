@@ -4,7 +4,8 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick } from './shared.js';
+         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
+         rimTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -746,6 +747,46 @@ const sysDAY_GND_B   = new THREE.Color(PALETTE.cloth8);     // warm bounce = war
 const sysDAY_FOG_A   = new THREE.Color(PALETTE.fog);
 const sysDAY_FOG_B   = new THREE.Color(PALETTE.towel);
 const sysColA        = new THREE.Color();
+const sysColR        = new THREE.Color();   // the rim's, and it is not the fill's
+const sysRIM_WHITE   = new THREE.Color(1, 1, 1);
+
+// ---------------------------------------------------------------------------
+// HOW HARD THE RIM IS, PER CHAPTER — and it is one number, not a table of them.
+//
+// See the rim block in shared.js for what it does and why it is in mat(). What
+// belongs HERE is the only thing that is genuinely per-place: how much of it.
+//
+// The term behaves OPPOSITELY in a bright chapter and a dark one, and a single
+// figure tuned in either is wrong in the other. A rim against a Palawan beach at
+// 226/255 is invisible — there is no headroom above the sand for it to be seen
+// in — while the same figure against a Mong Kok carriageway at 34/255 is a halo
+// with a hole in the middle. So the bright chapters get a whisper and the three
+// dark ones get real light: Son Doong, where the only illumination is the
+// animal's own, Mong Kok, and Monte Carlo after eight in the evening.
+//
+// Anything not named takes the default, which is the daylight number.
+// ...AND EVERY FIGURE HERE IS HALF WHAT THE FIRST PASS HAD. Photographed on
+// Mong Kok at 0.22 the animal came back wearing a pale pink band round its
+// rump with a hard inner edge — an outline, reached from the bright side.
+// The useful range turned out to be far narrower than expected: about 0.03
+// under an Antarctic albedo and about 0.10 in a cave, and past that it stops
+// being light and starts being a sticker.
+// ...AND THE BRIGHT CHAPTERS WANT MORE OF IT, NOT LESS, WHICH IS THE OPPOSITE
+// OF WHAT WAS EXPECTED. The prediction reasoned about the GROUND: a rim against
+// a bright floor is invisible and against a dark one is a halo. What the rim is
+// actually on is the ANIMAL, and what makes it visible is its contrast against
+// the animal's own interior. In Mong Kok the capybara is lit to about a quarter
+// and 0.085 is a third again on top; on a Sydney lawn at noon the same animal is
+// lit to well over twice that, so the same figure is half the lift and reads as
+// nothing. The number that produces the same APPARENT rim is therefore larger
+// where the light is stronger. Photographed both ways to settle it.
+const sysRIM_DEF = 0.075;
+const sysRIM = {
+  sydney: 0.075, pasto: 0.080, quay: 0.075, kyoto: 0.085, cali: 0.095,
+  rio: 0.075, iceland: 0.090, sahara: 0.070, drift: 0.085, venice: 0.055,
+  kowloon: 0.085, palawan: 0.048, goreme: 0.075, manly: 0.062, pantanal: 0.085,
+  cave: 0.100, antarctic: 0.040, monaco: 0.090, hanoi: 0.085,
+};
 const sysDAY_SUN_MIX = 0.62;   // how far the sun colour is allowed to travel
 const sysDAY_SKY_MIX = 0.30;
 const sysDAY_GND_MIX = 0.52;
@@ -15047,6 +15088,33 @@ export function createSystems(game) {
     } else {
       wetTick(0, null);
     }
+
+    // ---- the rim ----------------------------------------------------------
+    // Same deal as the wet ground and for the same reason: one float and one
+    // colour, and every Lambert in the live chapter separates from what is
+    // behind it. The COLOUR is the hemisphere's, taken here so that the aurora,
+    // the Symphony of Lights, the sun clearing the ridge over Goreme and going
+    // under the water in Palawan all move it without knowing this exists.
+    //
+    // ...but at FULL CHROMA, which is the one thing it does not take from the
+    // fill. hemi.color at half past eleven at night in Reykjavik is a very dark
+    // blue, and multiplying a rim by it produces a rim you cannot see in exactly
+    // the chapters the rim is most for. Normalising the brightest channel to 1
+    // keeps the sky's HUE — which is the whole argument for tinting it at all —
+    // and leaves the level to sysRIM, where it is a number somebody chose.
+    sysColR.copy(hemi.color);
+    {
+      const rmx = Math.max(sysColR.r, Math.max(sysColR.g, sysColR.b));
+      if (rmx > 0.001) sysColR.multiplyScalar(1 / rmx);
+      else sysColR.setRGB(1, 1, 1);
+      // ...AND THEN BACK OFF THE CHROMA. Normalising alone hands the rim the
+      // hemisphere's saturation at full strength, and Mong Kok's hemisphere is
+      // a neon magenta: photographed, the animal came out edged in pink. Two
+      // fifths of the way to white keeps the hue — which is the entire argument
+      // for tinting it — and stops the sky choosing the animal's colour.
+      sysColR.lerp(sysRIM_WHITE, 0.40);
+    }
+    rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
 
     // ---- the dome ---------------------------------------------------------
     if (sysSkyMesh && sysSkyMesh.visible) {

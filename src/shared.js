@@ -1376,15 +1376,146 @@ export const PALETTE = {
 // MeshLambertMaterial directly — go through this so the cache stays effective.
 // mat(0xff0000) / mat(PALETTE.grass, { side: THREE.DoubleSide, transparent: true, opacity: .8 })
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// THE RIM, AND WHY IT LIVES IN THE MATERIAL FACTORY RATHER THAN ANYWHERE ELSE.
+//
+// Audited across all 28 modules: there is no rim term, no fresnel, no ambient
+// occlusion and no contact shadow anywhere in this game. The ONLY grazing-angle
+// term in the codebase is grain()'s wet sheen, and that is gated on uGrainWet,
+// so it exists only when it is raining. A capybara standing on a lawn is a flat
+// brown silhouette against a flat green one with nothing at all separating them,
+// and that absence is most of why the art style reads as unfinished rather than
+// as deliberate. A sky-tinted rim is the single strongest polished-low-poly cue
+// there is.
+//
+// It goes HERE because mat() is the one factory every Lambert in the game comes
+// through — the animal, the props, the people, the buildings and the ground —
+// and because the strength wants to be ONE number per biome rather than a
+// hundred per chapter. So the hook is attached once, the numbers come off two
+// shared uniforms, and turning it on for a chapter is a single float write.
+//
+// FOUR THINGS MAKE IT LIGHT RATHER THAN AN OUTLINE, and each of them was needed:
+//
+//  1. IT IS THE SKY'S COLOUR, not white. A white edge is a video-game outline;
+//     an edge in the colour of the hemisphere the object is standing under reads
+//     as light wrapping round it. It is the same argument the wet sheen and the
+//     sky dome's horizon are already built on, and it means neon over Mong Kok
+//     and flat grey over Kyoto for free.
+//  2. IT DIES WITH DISTANCE. A fresnel on a ground plane is strongest where the
+//     view is most grazing, which is the HORIZON — so with no distance term the
+//     whole far half of every chapter lifts into a haze. Fading it out by forty
+//     metres leaves it doing the one job it is for: separating things near the
+//     lens from what is behind them.
+//  3. IT USES gl_FrontFacing. The sky dome is drawn from the inside; taking the
+//     object normal without flipping it makes dot(N, V) negative everywhere on
+//     the dome, the clamp turns that into a full-strength rim, and the entire
+//     sky washes out.
+//  4. IT IS NOT ON TRANSPARENT OR EMISSIVE MATERIALS. A glow quad and a sheet of
+//     water are exactly the surfaces whose silhouettes are meant to be soft, and
+//     a rim on an additive sheet is added light on top of added light.
+//
+// CONTRACT: no black outlines. This is that in reverse and it breaks the same
+// rule if it is pushed. If the edge reads as an edge instead of as light, it is
+// too strong.
+const _rimK = { value: 0 };
+const _rimC = { value: new THREE.Color(1, 1, 1) };
+// The two numbers live inside the shader below rather than as constants read
+// into it: 42 metres is where the term is gone entirely, and the exponent is
+// how tight to the silhouette it stays. Both are tuned against a photograph and
+// neither is worth a uniform.
+//
+// 2.5 AND NOT 4. Photographed on Mong Kok at the fourth power, the rump came
+// back with a pale band round it that had a hard inner boundary — an OUTLINE,
+// which is the one thing CONTRACT.md forbids, arrived at from the bright side
+// instead of the dark one. A tight exponent puts all of the light in the last
+// few degrees before the silhouette, and a narrow bright strip against a body
+// is a line drawn on it. A softer one spreads the same energy up the flank,
+// which is what light wrapping round a thing actually looks like — and it costs
+// nothing on the ground, because the distance fade has already taken care of
+// the only place a low exponent would have shown.
+/**
+ * How hard the rim is in the live chapter, and the colour of the sky doing it.
+ * systems.js calls this once per frame, from the hemisphere, for the same reason
+ * wetTick() takes its colour from there: a rim is bounce light and bounce light
+ * is the sky, so every event that already moves the atmosphere moves this too
+ * and no second table has to be kept in step.
+ */
+export function rimTick(k, color) {
+  _rimK.value = k > 0 ? (k < 2 ? k : 2) : 0;
+  if (color) _rimC.value.copy(color);
+}
+/**
+ * The declarations and the term, shared by mat()'s hook and grain()'s.
+ *
+ * Written as template literals rather than as joined arrays of quoted lines:
+ * this is GLSL, it has no numbers to interpolate, and a shader you can read is
+ * a shader whose brace you can count.
+ */
+const _RIM_VS_COMMON = `#include <common>
+varying vec3 vRimW;
+varying vec3 vRimN;`;
+const _RIM_VS_BEGIN = `#include <begin_vertex>
+vRimW = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vRimN = normalize(mat3(modelMatrix) * objectNormal);`;
+const _RIM_FS_COMMON = `#include <common>
+varying vec3 vRimW;
+varying vec3 vRimN;
+uniform float uRimK;
+uniform vec3 uRimC;`;
+// ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
+// make the rim take the object's own colour and its own lighting, which is a
+// brighter version of the thing rather than light on it. Added at the end it is
+// light, it is the sky's colour, and it survives the object standing in shadow
+// — which is exactly where a thing most needs separating from what is behind it.
+const _RIM_FS_OUT = `{
+  if (uRimK > 0.0005) {
+    vec3 rN = normalize(vRimN);
+    if (!gl_FrontFacing) rN = -rN;
+    vec3 rD = cameraPosition - vRimW;
+    float rL = length(rD);
+    float rf = pow(1.0 - clamp(dot(rN, rD / max(rL, 0.0001)), 0.0, 1.0), 2.5);
+    rf *= clamp(1.0 - rL / 42.0, 0.0, 1.0);
+    outgoingLight += rf * uRimK * uRimC;
+  }
+}
+#include <opaque_fragment>`;
+function _rimInject(shader) {
+  shader.uniforms.uRimK = _rimK;
+  shader.uniforms.uRimC = _rimC;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', _RIM_VS_COMMON)
+    .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', _RIM_FS_COMMON)
+    .replace('#include <opaque_fragment>', _RIM_FS_OUT);
+}
+/** True where a rim would be wrong on principle rather than merely subtle. */
+function _rimWants(opts) {
+  if (!opts) return true;
+  if (opts.transparent) return false;
+  if (opts.emissive !== undefined) return false;
+  if (opts.blending !== undefined && opts.blending !== THREE.NormalBlending) return false;
+  if (opts.depthWrite === false) return false;
+  return true;
+}
+
 const _matCache = new Map();
 export function mat(color, opts) {
   const key = color + '|' + (opts ? JSON.stringify(opts) : '');
   let m = _matCache.get(key);
   if (m) return m;
   m = new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: true }, opts || {}));
+  if (_rimWants(opts)) {
+    m.onBeforeCompile = _rimInject;
+    // Every rimmed material injects the SAME source, so they must all report the
+    // same key or three compiles one program per material instead of sharing
+    // across the hundreds of them that differ only in a colour uniform.
+    m.customProgramCacheKey = _rimKey;
+  }
   _matCache.set(key, m);
   return m;
 }
+function _rimKey() { return 'rim1'; }
 
 // ---------------------------------------------------------------------------
 // Task list — the goose-game checklist. IDs are contract-locked.
@@ -2805,6 +2936,15 @@ export function grain(m, opts) {
   if (hit) return hit;
 
   const g = m.clone();
+  // ...AND THE CLONE DROPS THE RIM WITH IT. Material.copy() does not carry
+  // onBeforeCompile — that is the whole of the grainOwn() bug, one function
+  // down — so every grained surface in the game would have been the only
+  // thing in it without a rim. grain() re-injects it at the bottom of its own
+  // hook, and it asks the SOURCE material whether a rim belongs there at all:
+  // a sea and a glow quad are not things you put an edge on.
+  const rimHere = !wetOnly && spark <= 0 && !m.transparent &&
+                  m.blending === THREE.NormalBlending && m.depthWrite !== false &&
+                  !(m.emissive && (m.emissive.r > 0.001 || m.emissive.g > 0.001 || m.emissive.b > 0.001));
   const sc = new THREE.Color(sparkCol);
   // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
   // existing and only marker for "this material is a sea", and darkening a sea
@@ -2943,11 +3083,17 @@ export function grain(m, opts) {
         ].join('\n') : '',
         '}',
       ].join('\n'));
+    // LAST, and it has to BE last: _rimInject anchors on '#include <common>'
+    // and on '#include <opaque_fragment>', and grain's own replacements above
+    // keep the '#include <common>' text at the head of what they substitute —
+    // so running it here finds both anchors, and running it first would leave
+    // grain with nothing left to match.
+    if (rimHere) _rimInject(shader);
   };
   // Without this three shares one compiled program between the grained and the
   // ungrained variant of the same material config, and which one you get
   // depends on draw order.
-  g.customProgramCacheKey = function () { return 'grain' + key; };
+  g.customProgramCacheKey = function () { return 'grain' + key + (rimHere ? '|r' : ''); };
   g.needsUpdate = true;
   _grainCache.set(key, g);
   return g;
