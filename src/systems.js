@@ -6212,6 +6212,739 @@ export function createSystems(game) {
     ns2.start(t); ns2.stop(t + 2.1);
   }
 
+
+  // =========================================================================
+  // THE PLACE, AND WHAT IT SOUNDS LIKE
+  //
+  // The SCORE in this game is researched per place — son clave in absolute
+  // eighths, a surdo on the two, a 12/8 gnawa cell, baroque descending fifths,
+  // the yu mode for Hong Kong, dorian for Iceland, and seven bespoke ethnic
+  // voices. The AMBIENCE was not. The ladder in sysDressFrame branches
+  // correctly per biome and then draws from THIRTEEN generic tokens —
+  //
+  //     bark cheer chime gull hiss horn pop rustle splash strum thud tick whistle
+  //
+  // — separated only by a pitch and a volume. So Kyoto was `chime` at 0.5,
+  // Marrakech was `hiss` and `bark`, and nineteen cultures shared one bag of
+  // thirteen sounds with a knob on it.
+  //
+  // That is worth fixing before almost anything else in the sound, because
+  // ambience is POSITIONAL and CONSTANT: the player hears far more of it than
+  // of any melodic figure in the score. The structure was already right. This
+  // is purely a vocabulary problem, and what follows is the vocabulary.
+  //
+  // THREE RULES, and they matter more than the list:
+  //   - Everything goes out through sysAmb(), never sfx() — that is what puts
+  //     the event in the world and gives it a bearing. A mono cue is the
+  //     finding that has come out of every audio pass this repo has had.
+  //   - NOTHING HERE IS A STINGER. These are things you overhear. The existing
+  //     range is 0.03..0.26 and none of them leaves it.
+  //   - NOTHING HERE MAY BECOME AN IRRITATION. A sound heard two hundred times
+  //     in one chapter has to survive being heard two hundred times, so every
+  //     one of these varies its own pitch, its own count and its own spacing
+  //     internally, on top of whatever the ladder rolls. That is the single
+  //     way this batch could make the game actively worse.
+  //
+  // The per-chapter convolver rooms already exist and already work, so these
+  // land in the right acoustic space for nothing. No reverb is added here.
+  // =========================================================================
+
+  /** Anything that is not a positive number means "the default, please". */
+  function sfxArg(v, d) { return v > 0 ? v : d; }
+
+  // ---- KYOTO --------------------------------------------------------------
+  /**
+   * HIGURASHI. Tanna japonensis, the evening cicada, and the single most
+   * evocative sound in Japan — it is what late summer means there in the way a
+   * cuckoo means spring in England. It is NOT the rasp of a Sydney cicada: it
+   * is a clear ringing tone around three and a half kilohertz, pulsed at a rate
+   * that starts fast and slows as the phrase falls away, which is where the
+   * onomatopoeia kana-kana-kana comes from. Built as a carrier with a hard
+   * amplitude modulation whose rate and pitch both descend together.
+   */
+  function sfxHigurashi(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.10) * pitch;
+    const dur = rand(2.1, 3.4);
+    const f0 = 3350 * v;
+    const o = ac.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.80, t + dur);
+    // the second partial is what makes it ring rather than whistle
+    const o2 = ac.createOscillator(); o2.type = 'sine';
+    o2.frequency.setValueAtTime(f0 * 1.51, t);
+    o2.frequency.exponentialRampToValueAtTime(f0 * 1.51 * 0.80, t + dur);
+    const mix = ac.createGain(); mix.gain.value = 1;
+    const sub = ac.createGain(); sub.gain.value = 0.42;
+    o.connect(mix); o2.connect(sub); sub.connect(mix);
+    // THE PULSE. A square LFO through a gain node IS the kana-kana; its rate
+    // falling from about thirty a second to about eighteen is the whole shape
+    // of the phrase and is why it reads as an animal running down rather than
+    // as a tone.
+    const amGate = ac.createGain(); amGate.gain.value = 0.0;
+    const lfo = ac.createOscillator(); lfo.type = 'square';
+    lfo.frequency.setValueAtTime(rand(28, 34), t);
+    lfo.frequency.exponentialRampToValueAtTime(rand(15, 20), t + dur);
+    const lg = ac.createGain(); lg.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(amGate.gain);
+    const bias = ac.createConstantSource(); bias.offset.value = 0.5;
+    bias.connect(amGate.gain);
+    const outg = ac.createGain();
+    const gg = outg.gain;
+    const pk = 0.13 * vol;
+    gg.setValueAtTime(0.0001, t);
+    gg.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.28);
+    gg.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.7), t + dur * 0.7);
+    gg.exponentialRampToValueAtTime(0.0001, t + dur);
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = f0; bp.Q.value = 2.2;
+    mix.connect(amGate); amGate.connect(bp); bp.connect(outg); outg.connect(acMaster);
+    o.start(t); o2.start(t); lfo.start(t); bias.start(t);
+    const stop = t + dur + 0.08;
+    o.stop(stop); o2.stop(stop); lfo.stop(stop); bias.stop(stop);
+  }
+
+  /**
+   * SHISHI-ODOSHI. The bamboo tube in a temple garden that fills with water,
+   * tips, empties and falls back onto its stone — and the reason it is there at
+   * all is the CLACK, which was meant to startle deer. It is a hollow woody
+   * knock with almost no sustain: a short pitched body around two hundred hertz
+   * with a real transient on the front, and the trickle of the tube emptying
+   * just before it.
+   */
+  function sfxShishi(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.14) * pitch;
+    // the tube emptying — a quarter of a second of thin water, and then nothing
+    const ns = noiseSrc();
+    const bpw = ac.createBiquadFilter(); bpw.type = 'bandpass';
+    bpw.frequency.value = 2600 * v; bpw.Q.value = 1.1;
+    const gw = ac.createGain();
+    env(gw, t, 0.045 * vol, 0.05, 0.22);
+    ns.connect(bpw); bpw.connect(gw); gw.connect(acMaster);
+    ns.start(t); ns.stop(t + 0.34);
+    // ...and the tube coming down on the stone
+    const st = t + rand(0.30, 0.40);
+    for (let i = 0; i < 2; i++) {
+      // Two partials, and the upper one is NOT harmonic: a length of green
+      // bamboo is a tube closed at one end and it does not ring in octaves.
+      const hz = (i ? 452 : 196) * v;
+      const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle';
+      o.frequency.setValueAtTime(hz, st);
+      o.frequency.exponentialRampToValueAtTime(hz * 0.94, st + 0.12);
+      const g = ac.createGain();
+      env(g, st, (i ? 0.075 : 0.19) * vol, 0.003, i ? 0.09 : 0.17);
+      o.connect(g); g.connect(acMaster);
+      o.start(st); o.stop(st + 0.30);
+    }
+    const ck = noiseSrc();
+    const bpc = ac.createBiquadFilter(); bpc.type = 'bandpass';
+    bpc.frequency.value = 1500 * v; bpc.Q.value = 0.9;
+    const gc = ac.createGain();
+    env(gc, st, 0.11 * vol, 0.002, 0.045);
+    ck.connect(bpc); bpc.connect(gc); gc.connect(acMaster);
+    ck.start(st); ck.stop(st + 0.09);
+  }
+
+  /**
+   * THE BONSHO, HEARD FROM THE OTHER END OF THE VALLEY.
+   *
+   * Not the one the player rings — that is the organ voice an octave and a half
+   * down, felt before it is heard, and nothing here touches it. This is a temple
+   * bell a kilometre off, which is a completely different sound: no transient to
+   * speak of, a slow swell as the front arrives, a fundamental with two
+   * INHARMONIC partials over it, and a decay measured in tens of seconds rather
+   * than in tenths. Ten is as far as this goes, which is already six times
+   * longer than anything else in the table.
+   */
+  function sfxBonsho(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.95, 1.06) * pitch;
+    const f0 = 88 * v;
+    // 1, 2.61, 4.13 — a struck bronze barrel, not a harmonic series. The two
+    // upper partials die a great deal faster, which is what makes a bell
+    // DARKEN as it rings out instead of merely getting quieter.
+    const parts = [[1.00, 0.20, 9.5], [2.61, 0.085, 3.4], [4.13, 0.045, 1.6]];
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.value = f0 * p[0] * rand(0.998, 1.002);
+      const g = ac.createGain();
+      const pk = p[1] * vol;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + 0.09 + i * 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + p[2]);
+      o.connect(g); g.connect(acMaster);
+      o.start(t); o.stop(t + p[2] + 0.1);
+    }
+    // the beat. Two bells are never quite one bell, and a real bonsho warbles.
+    const b = ac.createOscillator(); b.type = 'sine';
+    b.frequency.value = f0 * 1.006;
+    const bg = ac.createGain();
+    bg.gain.setValueAtTime(0.0001, t);
+    bg.gain.exponentialRampToValueAtTime(Math.max(0.0004, 0.09 * vol), t + 0.12);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + 8.0);
+    b.connect(bg); bg.connect(acMaster);
+    b.start(t); b.stop(t + 8.1);
+  }
+
+  // ---- MARRAKECH ----------------------------------------------------------
+  /**
+   * THE MUEZZIN, FROM A MINARET YOU CANNOT SEE.
+   *
+   * The call to prayer over a medina is not a melody you can hear the notes of
+   * — it is a voice, a long way off, bent through a horn speaker and half a
+   * kilometre of warm air, and what survives that trip is the FORMANTS and the
+   * melisma. So: a sawtooth larynx through two bandpass formants at seven
+   * hundred and eleven-fifty, sliding between degrees of the same hijaz the
+   * chapter's own row is built on, with a vibrato that fades IN over each note
+   * the way a trained voice does.
+   */
+  function sfxMuezzin(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.08) * pitch;
+    // hijaz on D, which is the row Cappadocia and Marrakech share: 1 b2 3 4 5
+    const deg = [0, 1, 4, 5, 7];
+    const notes = randInt(3, 5);
+    let st = t;
+    let d = randInt(1, 3);
+    for (let i = 0; i < notes; i++) {
+      const dur = rand(0.5, 1.15);
+      d = clamp(d + randInt(-1, 1), 0, deg.length - 1);
+      const hz = sysMidiHz(50 + deg[d]) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * rand(0.94, 0.98), st);
+      o.frequency.exponentialRampToValueAtTime(hz, st + rand(0.06, 0.14));
+      // the fall away at the end of a phrase
+      if (i === notes - 1) o.frequency.exponentialRampToValueAtTime(hz * 0.88, st + dur);
+      const vib = ac.createOscillator(); vib.type = 'sine';
+      vib.frequency.value = rand(5.0, 6.4);
+      const vg = ac.createGain();
+      vg.gain.setValueAtTime(0.0001, st);
+      vg.gain.exponentialRampToValueAtTime(hz * 0.022, st + dur * 0.7);
+      vib.connect(vg); vg.connect(o.frequency);
+      const f1 = ac.createBiquadFilter(); f1.type = 'bandpass';
+      f1.frequency.value = 700; f1.Q.value = 5.5;
+      const f2 = ac.createBiquadFilter(); f2.type = 'bandpass';
+      f2.frequency.value = 1150; f2.Q.value = 7.0;
+      const g2 = ac.createGain(); g2.gain.value = 0.7;
+      const g = ac.createGain();
+      const pk = 0.16 * vol * (i === 0 ? 0.8 : 1);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.10);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.8), st + dur * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur + 0.12);
+      o.connect(f1); f1.connect(g);
+      o.connect(f2); f2.connect(g2); g2.connect(g);
+      g.connect(acMaster);
+      o.start(st); vib.start(st);
+      o.stop(st + dur + 0.16); vib.stop(st + dur + 0.16);
+      st += dur + rand(0.02, 0.18);
+    }
+  }
+
+  /**
+   * A DARBUKA IN ANOTHER SQUARE. Two strokes and nothing else: the DOUM in the
+   * middle of the skin, which is a pitched thump that bends down, and the TEK on
+   * the rim, which is almost all noise. Half a dozen of them in a loose cell,
+   * because what carries across a medina at night is a rhythm and not a drum.
+   */
+  function sfxDarbuka(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const step = rand(0.155, 0.215);
+    // a 12/8 gnawa-ish cell, and the holes in it are the point
+    const cell = [1, 0, 2, 1, 0, 2, 2, 0, 1, 2, 0, 0];
+    const off = randInt(0, 11);
+    for (let i = 0; i < 12; i++) {
+      const hit = cell[(i + off) % 12];
+      if (!hit) continue;
+      const st = t + i * step + rand(-0.008, 0.008);
+      if (hit === 1) {
+        const hz = 96 * v;
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(hz * 1.9, st);
+        o.frequency.exponentialRampToValueAtTime(hz, st + 0.045);
+        const g = ac.createGain();
+        env(g, st, 0.20 * vol, 0.004, 0.16);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + 0.24);
+      } else {
+        const ns = noiseSrc();
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = rand(2600, 3600) * v; bp.Q.value = 1.4;
+        const g = ac.createGain();
+        env(g, st, 0.075 * vol, 0.002, 0.05);
+        ns.connect(bp); bp.connect(g); g.connect(acMaster);
+        ns.start(st); ns.stop(st + 0.09);
+      }
+    }
+  }
+
+  /**
+   * A CART ON STONE. Iron rim, no bearings, cobbles: a continuous low rumble
+   * with a periodic knock in it at wheel rate, which is what says WHEEL rather
+   * than traffic. It comes past — the level swells and falls — because a cart
+   * standing still makes no sound at all.
+   */
+  function sfxCart(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.2) * pitch;
+    const dur = rand(2.2, 3.6);
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 900 * v; lp.Q.value = 0.7;
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 110;
+    const g = ac.createGain();
+    const pk = 0.12 * vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.42);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(lp); lp.connect(hp); hp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.1);
+    // the knock, once a revolution, and it slows very slightly as it goes past
+    const rate = rand(4.6, 6.4);
+    const n = Math.floor(dur * rate);
+    for (let i = 0; i < n; i++) {
+      const u = i / Math.max(1, n - 1);
+      const st = t + i / rate * (1 + u * 0.09) + rand(-0.01, 0.01);
+      const o = ac.createOscillator(); o.type = 'triangle';
+      o.frequency.value = rand(150, 240) * v;
+      const gk = ac.createGain();
+      const near = Math.sin(u * Math.PI);
+      env(gk, st, 0.055 * vol * near, 0.003, 0.05);
+      o.connect(gk); gk.connect(acMaster);
+      o.start(st); o.stop(st + 0.09);
+    }
+  }
+
+  // ---- HONG KONG ----------------------------------------------------------
+  /**
+   * MAHJONG. Not the game — the WASHING of the tiles, which is a hundred and
+   * forty-four melamine bricks being shoved round a table by four people at
+   * once, and which is audible from the street through an open window at any
+   * hour in this city. Dense, bright, irregular, completely unpitched at the top
+   * with a small hollow body underneath about half the time.
+   */
+  function sfxMahjong(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const n = randInt(9, 16);
+    const span = rand(0.5, 0.95);
+    for (let i = 0; i < n; i++) {
+      const st = t + Math.random() * span;
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = rand(2200, 4200) * v; bp.Q.value = rand(2.0, 4.5);
+      const g = ac.createGain();
+      env(g, st, rand(0.05, 0.10) * vol, 0.001, rand(0.018, 0.04));
+      ns.connect(bp); bp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.07);
+      if (Math.random() < 0.5) {
+        const o = ac.createOscillator(); o.type = 'triangle';
+        o.frequency.value = rand(520, 900) * v;
+        const g2 = ac.createGain();
+        env(g2, st, rand(0.02, 0.045) * vol, 0.002, 0.035);
+        o.connect(g2); g2.connect(acMaster);
+        o.start(st); o.stop(st + 0.06);
+      }
+    }
+  }
+
+  /**
+   * A CLEAVER ON A BLOCK. A wet market at six in the morning, and it is the
+   * loudest repeating sound in one: a very hard broadband transient, a low
+   * wooden thump from the end-grain block, and a short bright ring off the
+   * blade. Three or four of them, evenly spaced, because somebody is portioning
+   * something rather than hitting it once.
+   */
+  function sfxCleaver(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.88, 1.16) * pitch;
+    const n = randInt(2, 4);
+    const step = rand(0.30, 0.46);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * step + rand(-0.02, 0.02);
+      const ns = noiseSrc();
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400 * v;
+      const g = ac.createGain();
+      env(g, st, 0.11 * vol, 0.001, 0.035);
+      ns.connect(hp); hp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.06);
+      // the block, which is the half that carries down the street
+      const o = ac.createOscillator(); o.type = 'triangle';
+      const hz = rand(120, 168) * v;
+      o.frequency.setValueAtTime(hz * 1.5, st);
+      o.frequency.exponentialRampToValueAtTime(hz, st + 0.03);
+      const g2 = ac.createGain();
+      env(g2, st, 0.17 * vol, 0.003, 0.13);
+      o.connect(g2); g2.connect(acMaster);
+      o.start(st); o.stop(st + 0.2);
+      // the blade, ringing very briefly, on the harder strokes
+      if (Math.random() < 0.55) {
+        const b = ac.createOscillator(); b.type = 'sine';
+        b.frequency.value = rand(2400, 3400) * v;
+        const g3 = ac.createGain();
+        env(g3, st, 0.035 * vol, 0.002, 0.10);
+        b.connect(g3); g3.connect(acMaster);
+        b.start(st); b.stop(st + 0.16);
+      }
+    }
+  }
+
+  /**
+   * THE DING-DING. The Hong Kong tram is named after this and nothing else: two
+   * strikes on a small foot-operated gong, bright, close together, with an
+   * inharmonic partial a minor tenth up that gives it its clank. Occasionally
+   * three, when somebody is not getting out of the way.
+   */
+  function sfxTram(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.93, 1.10) * pitch;
+    const n = Math.random() < 0.25 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(0.19, 0.27);
+      const f0 = 1080 * v;
+      const parts = [[1.00, 0.13, 0.55], [2.38, 0.055, 0.28], [3.61, 0.028, 0.16]];
+      for (let k = 0; k < parts.length; k++) {
+        const p = parts[k];
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = f0 * p[0] * rand(0.995, 1.005);
+        const g = ac.createGain();
+        env(g, st, p[1] * vol * (1 - i * 0.14), 0.002, p[2]);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + p[2] + 0.06);
+      }
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 4200 * v; bp.Q.value = 1.6;
+      const gn = ac.createGain();
+      env(gn, st, 0.03 * vol, 0.001, 0.02);
+      ns.connect(bp); bp.connect(gn); gn.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.04);
+    }
+  }
+
+  // ---- VENICE -------------------------------------------------------------
+  /**
+   * A HUNDRED PIGEONS DECIDING AT ONCE. In San Marco this happens every few
+   * minutes and it is the loudest thing in the square. It is not a bird CALL at
+   * all — it is WING CLAPS: dozens of uncorrelated broadband slaps whose rate
+   * peaks a third of a second in and then thins out as the flock gets away, with
+   * one coo left behind from whichever bird could not be bothered.
+   */
+  function sfxPigeons(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const dur = rand(1.1, 1.8);
+    const n = randInt(26, 46);
+    for (let i = 0; i < n; i++) {
+      // clustered early: the flock goes up together and lands apart
+      const u = Math.pow(Math.random(), 0.55);
+      const st = t + u * dur;
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = rand(700, 1900) * v; bp.Q.value = rand(0.7, 1.6);
+      const g = ac.createGain();
+      env(g, st, rand(0.030, 0.062) * vol * (1 - u * 0.55), 0.004, rand(0.03, 0.07));
+      ns.connect(bp); bp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.11);
+    }
+    if (Math.random() < 0.45) {
+      const st = t + dur * rand(0.75, 1.05);
+      const o = ac.createOscillator(); o.type = 'sine';
+      const hz = rand(300, 380) * v;
+      o.frequency.setValueAtTime(hz, st);
+      o.frequency.exponentialRampToValueAtTime(hz * 0.86, st + 0.30);
+      const lfo = ac.createOscillator(); lfo.type = 'sine';
+      lfo.frequency.value = 11;
+      const lg = ac.createGain(); lg.gain.value = hz * 0.03;
+      lfo.connect(lg); lg.connect(o.frequency);
+      const g = ac.createGain();
+      env(g, st, 0.055 * vol, 0.06, 0.34);
+      o.connect(g); g.connect(acMaster);
+      o.start(st); lfo.start(st);
+      o.stop(st + 0.45); lfo.stop(st + 0.45);
+    }
+  }
+
+  /**
+   * WATER AGAINST A FONDAMENTA. Not a splash — a splash is something ENTERING
+   * water, and this is water arriving at a wall. A low broadband swell with a
+   * slap on the front of it and a long suck off the stone afterwards, two or
+   * three times, about a second and a half apart, which is the period of the
+   * wash from a vaporetto that went past twenty seconds ago.
+   */
+  function sfxLap(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.2) * pitch;
+    const n = randInt(2, 4);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(1.25, 1.75);
+      const k = 1 - i * 0.18;
+      const ns = noiseSrc();
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(1500 * v, st);
+      lp.frequency.exponentialRampToValueAtTime(420 * v, st + 0.55);
+      lp.Q.value = 0.6;
+      const g = ac.createGain();
+      const pk = 0.13 * vol * k;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.05);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.30), st + 0.30);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.85);
+      ns.connect(lp); lp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.95);
+      const ns2 = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 3000 * v; bp.Q.value = 0.8;
+      const g2 = ac.createGain();
+      env(g2, st + 0.36, 0.035 * vol * k, 0.12, 0.34);
+      ns2.connect(bp); bp.connect(g2); g2.connect(acMaster);
+      ns2.start(st + 0.36); ns2.stop(st + 0.86);
+    }
+  }
+
+  /**
+   * A CAMPANILE, ACROSS WATER. A swung bronze bell, which is a different animal
+   * from a struck Japanese one: brighter, a real strike transient, a proper hum
+   * tone an octave under the prime, and a decay of four seconds rather than ten.
+   * It strikes the hour, so it comes in twos and threes with a wide gap.
+   */
+  function sfxCampanile(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.97, 1.04) * pitch;
+    const n = randInt(2, 4);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(1.5, 2.1);
+      const f0 = 214 * v;
+      // hum, prime, tierce, quint, nominal — the five a founder actually tunes
+      const parts = [[0.50, 0.075, 4.4], [1.00, 0.115, 3.2],
+                     [1.19, 0.055, 2.0], [1.50, 0.035, 1.4], [2.00, 0.045, 1.1]];
+      for (let k = 0; k < parts.length; k++) {
+        const p = parts[k];
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = f0 * p[0] * rand(0.997, 1.003);
+        const g = ac.createGain();
+        env(g, st, p[1] * vol, 0.006, p[2]);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + p[2] + 0.1);
+      }
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 2600 * v; bp.Q.value = 1.2;
+      const gn = ac.createGain();
+      env(gn, st, 0.025 * vol, 0.002, 0.05);
+      ns.connect(bp); bp.connect(gn); gn.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.08);
+    }
+  }
+
+  // ---- HANOI --------------------------------------------------------------
+  /**
+   * A VENDOR'S CRY. Every one of them has their own, it is two or three
+   * syllables long, it is the same every time, and it is pitched high so that it
+   * carries over engines. Vietnamese is tonal, so the CONTOUR is the word: each
+   * syllable gets its own glide rather than one arc across the phrase, and that
+   * is the whole difference between this and the muezzin above.
+   */
+  function sfxVendor(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.90, 1.14) * pitch;
+    const syll = randInt(2, 4);
+    // per syllable: start ratio, end ratio — a rise, a fall, a dip, a level
+    const shapes = [[1.0, 1.18], [1.12, 0.86], [1.0, 0.88], [1.0, 1.0], [0.92, 1.26]];
+    let st = t;
+    for (let i = 0; i < syll; i++) {
+      const sh = shapes[randInt(0, shapes.length - 1)];
+      const dur = rand(0.22, 0.42);
+      const hz = rand(330, 430) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * sh[0], st);
+      o.frequency.exponentialRampToValueAtTime(hz * sh[1], st + dur);
+      const f1 = ac.createBiquadFilter(); f1.type = 'bandpass';
+      f1.frequency.value = rand(620, 820); f1.Q.value = 6.0;
+      const f2 = ac.createBiquadFilter(); f2.type = 'bandpass';
+      f2.frequency.value = rand(1500, 2200); f2.Q.value = 8.0;
+      const g2 = ac.createGain(); g2.gain.value = 0.55;
+      const g = ac.createGain();
+      const pk = 0.135 * vol * (i === syll - 1 ? 1.15 : 1);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.045);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.7), st + dur * 0.75);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur + 0.06);
+      o.connect(f1); f1.connect(g);
+      o.connect(f2); f2.connect(g2); g2.connect(g);
+      g.connect(acMaster);
+      o.start(st); o.stop(st + dur + 0.10);
+      st += dur + rand(0.03, 0.12);
+    }
+  }
+
+  /**
+   * A BOWL AND A PAIR OF CHOPSTICKS. Thin porcelain, so the ring is high, short
+   * and slightly detuned against itself; the sticks are bamboo, so they are a
+   * dry tick with no pitch at all. Six or eight of them in a hurry, because
+   * whoever it is has forty bowls to do.
+   */
+  function sfxBowls(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const n = randInt(5, 9);
+    let st = t;
+    for (let i = 0; i < n; i++) {
+      st += rand(0.07, 0.19);
+      const at = st + rand(-0.015, 0.015);
+      if (Math.random() < 0.62) {
+        const hz = rand(1500, 2600) * v;
+        for (let k = 0; k < 2; k++) {
+          const o = ac.createOscillator(); o.type = 'sine';
+          o.frequency.value = hz * (k ? rand(1.004, 1.012) : 1);
+          const g = ac.createGain();
+          env(g, at, (k ? 0.03 : 0.06) * vol, 0.001, rand(0.10, 0.22));
+          o.connect(g); g.connect(acMaster);
+          o.start(at); o.stop(at + 0.3);
+        }
+      } else {
+        const ns = noiseSrc();
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = rand(900, 1800) * v; bp.Q.value = 2.4;
+        const g = ac.createGain();
+        env(g, at, rand(0.03, 0.055) * vol, 0.001, 0.022);
+        ns.connect(bp); bp.connect(g); g.connect(acMaster);
+        ns.start(at); ns.stop(at + 0.05);
+      }
+    }
+  }
+
+  // ---- SYDNEY -------------------------------------------------------------
+  /**
+   * A CICADA CHORUS, and it is nothing like the Kyoto one. An Australian
+   * greengrocer is a RASP, not a ring: a broadband band up around seven
+   * kilohertz, hard-modulated at a rate too fast to count, that swells for a
+   * couple of seconds, holds, and drops away when whatever startled them turns
+   * out to be nothing. It is the loudest insect on earth and on a summer
+   * afternoon in the Botanic Gardens it is the loudest thing there.
+   */
+  function sfxCicada(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.18) * pitch;
+    const dur = rand(2.6, 4.6);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(6200 * v, t);
+    bp.frequency.linearRampToValueAtTime(7400 * v, t + dur * 0.5);
+    bp.frequency.linearRampToValueAtTime(6000 * v, t + dur);
+    bp.Q.value = 2.6;
+    // the rasp. A hundred and forty a second is fast enough that the ear reads
+    // it as timbre rather than as a rhythm, which is exactly what it is.
+    const amGate = ac.createGain(); amGate.gain.value = 0.5;
+    const lfo = ac.createOscillator(); lfo.type = 'sawtooth';
+    lfo.frequency.setValueAtTime(rand(120, 155), t);
+    lfo.frequency.linearRampToValueAtTime(rand(100, 130), t + dur);
+    const lg = ac.createGain(); lg.gain.value = 0.45;
+    lfo.connect(lg); lg.connect(amGate.gain);
+    const g = ac.createGain();
+    const pk = 0.085 * vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.85), t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(bp); bp.connect(amGate); amGate.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.1);
+    lfo.start(t); lfo.stop(t + dur + 0.1);
+  }
+
+  /**
+   * THE MAGPIE CAROL, which is the sound of an Australian morning, and this goes
+   * for the two things that actually identify it rather than for the tune.
+   * First, it is FLUTY — almost a pure tone, with the second partial well down.
+   * Second, a magpie has two independently controlled halves to its syrinx and
+   * sings with BOTH AT ONCE, so a carol is two voices that are not doing the
+   * same thing; that is where the gurgle comes from and it is why one
+   * oscillator can never sound like this.
+   */
+  function sfxMagpie(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.10) * pitch;
+    const phr = randInt(4, 7);
+    let st = t;
+    for (let i = 0; i < phr; i++) {
+      const dur = rand(0.12, 0.30);
+      for (let k = 0; k < 2; k++) {
+        const base = (k ? rand(760, 1150) : rand(520, 780)) * v;
+        const to = base * rand(0.78, 1.32);
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(base, st);
+        o.frequency.exponentialRampToValueAtTime(to, st + dur * rand(0.5, 0.9));
+        o.frequency.exponentialRampToValueAtTime(to * rand(0.92, 1.08), st + dur);
+        const h = ac.createOscillator(); h.type = 'sine';
+        h.frequency.setValueAtTime(base * 2, st);
+        h.frequency.exponentialRampToValueAtTime(to * 2, st + dur);
+        const hg = ac.createGain(); hg.gain.value = 0.16;
+        const g = ac.createGain();
+        env(g, st, (k ? 0.075 : 0.10) * vol, 0.012, dur);
+        o.connect(g); h.connect(hg); hg.connect(g); g.connect(acMaster);
+        o.start(st); h.start(st);
+        o.stop(st + dur + 0.06); h.stop(st + dur + 0.06);
+      }
+      st += dur + rand(0.01, 0.09);
+    }
+  }
+
+  /**
+   * RAINBOW LORIKEETS GOING PAST. There is no melody in this and no attempt at
+   * one: six or ten harsh, bright, very short screeches from several birds at
+   * once, all talking over each other, and it is over in a second. What makes it
+   * a lorikeet rather than a gull is that every note is SHORT and every note is
+   * up at two kilohertz with nothing underneath it.
+   */
+  function sfxLorikeet(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.16) * pitch;
+    const n = randInt(5, 10);
+    const span = rand(0.55, 1.05);
+    for (let i = 0; i < n; i++) {
+      const st = t + Math.random() * span;
+      const dur = rand(0.055, 0.12);
+      const hz = rand(1750, 2700) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * rand(0.86, 0.98), st);
+      o.frequency.exponentialRampToValueAtTime(hz * rand(1.05, 1.30), st + dur * 0.4);
+      o.frequency.exponentialRampToValueAtTime(hz * rand(0.72, 0.94), st + dur);
+      const o2 = ac.createOscillator(); o2.type = 'square';
+      o2.frequency.value = hz * 1.5;
+      o2.detune.value = rand(20, 60);
+      const sub = ac.createGain(); sub.gain.value = 0.22;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = hz * 1.15; bp.Q.value = 2.4;
+      const hpf = ac.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 900;
+      const g = ac.createGain();
+      env(g, st, rand(0.045, 0.085) * vol, 0.006, dur);
+      o.connect(bp); o2.connect(sub); sub.connect(bp);
+      bp.connect(hpf); hpf.connect(g); g.connect(acMaster);
+      o.start(st); o2.start(st);
+      o.stop(st + dur + 0.05); o2.stop(st + dur + 0.05);
+    }
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -9061,6 +9794,15 @@ export function createSystems(game) {
     thunder: sfxThunder, drip: sfxDrip,
     // What a hard thing sounds like. See physVOICE in props.js for who asks.
     clink: sfxClink,
+    // ---- THE PLACE, AND WHAT IT SOUNDS LIKE ----------------------------
+    // Seventeen voices for six chapters, replacing a pitch-shifted 'chime'
+    // and a pitch-shifted 'hiss'. See the block above sfxHigurashi.
+    higurashi: sfxHigurashi, shishi: sfxShishi, bonsho: sfxBonsho,
+    muezzin: sfxMuezzin, darbuka: sfxDarbuka, cart: sfxCart,
+    mahjong: sfxMahjong, cleaver: sfxCleaver, tram: sfxTram,
+    pigeons: sfxPigeons, lap: sfxLap, campanile: sfxCampanile,
+    vendor: sfxVendor, bowls: sfxBowls,
+    cicada: sfxCicada, magpie: sfxMagpie, lorikeet: sfxLorikeet,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -9077,6 +9819,19 @@ export function createSystems(game) {
     // of the impact channel, so a tumbling stack of bowls has to be allowed to
     // sound like a tumbling stack of bowls.
     clink: 0.05,
+    // ---- and the place's own voices -------------------------------------
+    // These gaps are LONG, and deliberately much longer than the ambience
+    // ladder's own timer ever asks for. They are not a throttle against a
+    // machine-gun, they are a second fence against the one way this batch can
+    // make the game worse: a characterful sound is exactly the kind that stops
+    // being characterful the two hundredth time. Every one of them is at least
+    // as long as the voice itself, so two can never overlap into a chorus.
+    higurashi: 3.5, shishi: 2.0, bonsho: 12.0,
+    muezzin: 9.0, darbuka: 3.0, cart: 4.0,
+    mahjong: 2.0, cleaver: 2.5, tram: 2.5,
+    pigeons: 3.0, lap: 4.5, campanile: 9.0,
+    vendor: 2.5, bowls: 2.0,
+    cicada: 5.0, magpie: 3.0, lorikeet: 2.5,
   };
 
   function sfx(name, opts) {
@@ -18137,10 +18892,24 @@ export function createSystems(game) {
               else if (r < 0.86) sysAmb('splash', { volume: rand(0.06, 0.12), pitch: rand(0.7, 1.0) });
               else sysAmb('gull', { volume: rand(0.04, 0.08), pitch: rand(0.42, 0.56) });
               ambTimer = rand(4, 9);
-            } else if (r < 0.42) {
-              sysAmb('chime', { volume: rand(0.12, 0.22), pitch: rand(0.44, 0.58) });
-              ambTimer = rand(16, 34);
-            } else if (r < 0.72) {
+            } else if (r < 0.30) {
+              // THE BELL IS NOW A BELL. This was 'chime' — the four-note
+              // triangle arpeggio Sydney's tick is built from — pitched down to
+              // a half, which is a xylophone in a temple garden. sfxBonsho is a
+              // struck bronze barrel with two inharmonic partials and a
+              // ten-second decay, and it is a different object.
+              sysAmb('bonsho', { volume: rand(0.10, 0.19), pitch: rand(0.92, 1.06) });
+              ambTimer = rand(22, 44);
+            } else if (r < 0.52) {
+              // ...and the evening cicada, which is what summer MEANS there.
+              sysAmb('higurashi', { volume: rand(0.07, 0.14), pitch: rand(0.90, 1.12) });
+              ambTimer = rand(7, 16);
+            } else if (r < 0.68) {
+              // the sozu in the garden, tipping. Very occasionally, because a
+              // shishi-odoshi that goes off every six seconds is a metronome.
+              sysAmb('shishi', { volume: rand(0.08, 0.15), pitch: rand(0.88, 1.16) });
+              ambTimer = rand(17, 33);
+            } else if (r < 0.86) {
               sysAmb('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
               ambTimer = rand(9, 19);
             } else {
@@ -18249,17 +19018,29 @@ export function createSystems(game) {
             const tide = ve ? ve.tide() : 0;
             const r = Math.random();
             if (tide > 0.5) {
-              sysAmb('splash', { volume: rand(0.08, 0.16), pitch: rand(0.5, 0.75) });
-              ambTimer = rand(3.5, 8);
-            } else if (r < 0.4) {
-              sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.7, 1.0) });
-              ambTimer = rand(6, 13);
-            } else if (r < 0.75) {
+              // In the acqua alta it is nothing but water, and now it is the
+              // RIGHT water: a lap is the sea arriving at a wall and a splash is
+              // something falling into it. They are not the same event, and the
+              // whole square was using the second one for the first.
+              sysAmb('lap', { volume: rand(0.09, 0.17), pitch: rand(0.7, 1.05) });
+              ambTimer = rand(4.5, 9);
+            } else if (r < 0.30) {
+              sysAmb('lap', { volume: rand(0.06, 0.12), pitch: rand(0.8, 1.2) });
+              ambTimer = rand(7, 15);
+            } else if (r < 0.52) {
+              // A HUNDRED OF THEM AT ONCE, which is what San Marco does every
+              // few minutes and is the loudest thing in the square. The gull
+              // stays too — Venice has both and they sound nothing alike.
+              sysAmb('pigeons', { volume: rand(0.07, 0.14), pitch: rand(0.9, 1.15) });
+              ambTimer = rand(9, 20);
+            } else if (r < 0.76) {
               sysAmb('gull', { volume: rand(0.09, 0.16), pitch: rand(1.0, 1.35) });
               ambTimer = rand(7, 16);
             } else {
-              sysAmb('chime', { volume: rand(0.10, 0.18), pitch: rand(0.5, 0.66) });
-              ambTimer = rand(14, 30);
+              // ...and a campanile is a SWUNG bell: a hum tone, a real strike
+              // and four seconds. It was a pitched-down triangle arpeggio.
+              sysAmb('campanile', { volume: rand(0.08, 0.15), pitch: rand(0.95, 1.06) });
+              ambTimer = rand(26, 52);
             }
           } else if (bio === 'kowloon') {
             // The densest soundscape in the game, and it should be: a horn, a
@@ -18274,11 +19055,20 @@ export function createSystems(game) {
               else sysAmb('chime', { volume: rand(0.05, 0.10), pitch: rand(1.5, 2.0) });
               ambTimer = rand(5, 11);
             } else {
+              // FOUR OF THE SEVEN ARE NEW, and they are the four things a Hong
+              // Kong street actually sounds like at this hour: a mahjong table
+              // through an open window, a cleaver on a block in the wet market,
+              // the ding-ding the tram is named after, and the aircon dripping
+              // on you — which is the single most universal experience of Mong
+              // Kok and was already in the table as 'drip', unused here.
               const r = Math.random();
-              if (r < 0.42) sysAmb('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
-              else if (r < 0.68) sysAmb('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
-              else if (r < 0.86) sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
-              else sysAmb('pop', { volume: rand(0.05, 0.09), pitch: rand(0.6, 0.9) });
+              if (r < 0.20) sysAmb('mahjong', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.18) });
+              else if (r < 0.34) sysAmb('cleaver', { volume: rand(0.06, 0.11), pitch: rand(0.85, 1.15) });
+              else if (r < 0.46) sysAmb('tram', { volume: rand(0.06, 0.12), pitch: rand(0.92, 1.12) });
+              else if (r < 0.58) sysAmb('drip', { volume: rand(0.05, 0.10), pitch: rand(1.3, 2.0) });
+              else if (r < 0.74) sysAmb('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
+              else if (r < 0.88) sysAmb('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
+              else sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
               ambTimer = rand(3.5, 8);
             }
           } else if (bio === 'palawan') {
@@ -18372,11 +19162,33 @@ export function createSystems(game) {
               sysAmb('hiss', { volume: rand(0.06, 0.13), pitch: rand(0.5, 0.8) });
               ambTimer = rand(9, 20);
             } else {
+              // THE MEDINA HAD A CAR HORN, A FOOTBALL CROWD AND A GUITAR IN IT.
+              // All three are real sounds and none of them is Marrakech. The
+              // three that are: the call to prayer from a minaret you cannot
+              // see, a hand drum in a square that is not this one, and an
+              // iron-rimmed cart on stone — which is the sound of the one city
+              // in this game where nothing has an engine.
               const r = Math.random();
-              if (r < 0.4) sysAmb('horn', { volume: rand(0.07, 0.13), pitch: rand(1.7, 2.3) });
-              else if (r < 0.7) sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
-              else sysAmb('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
-              ambTimer = rand(5, 12);
+              if (r < 0.16) {
+                // ONCE IN A WHILE AND NEVER TWICE RUNNING. It is a minute and a
+                // half long in life and about three seconds here, and it is the
+                // most recognisable sound in the chapter — which is exactly why
+                // it carries the longest gap in the whole ladder.
+                sysAmb('muezzin', { volume: rand(0.09, 0.16), pitch: rand(0.94, 1.08) });
+                ambTimer = rand(48, 95);
+              } else if (r < 0.44) {
+                sysAmb('darbuka', { volume: rand(0.07, 0.13), pitch: rand(0.85, 1.20) });
+                ambTimer = rand(11, 24);
+              } else if (r < 0.68) {
+                sysAmb('cart', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.25) });
+                ambTimer = rand(9, 19);
+              } else if (r < 0.86) {
+                sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
+                ambTimer = rand(7, 15);
+              } else {
+                sysAmb('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
+                ambTimer = rand(8, 17);
+              }
             }
           } else if (bio === 'manly') {
             // A surf beach is the loudest quiet place there is, and the thing
@@ -18469,9 +19281,17 @@ export function createSystems(game) {
             // unswitched layer over it. It gets one thing: the CITY, a long way
             // off, which is the one sound the biome cannot own because it has
             // no position.
+            // ...and the two things that ARE the Old Quarter and that no
+            // positional bed can own, because whoever is making them is never
+            // where you are: somebody selling something, and forty bowls being
+            // washed in a doorway. Both sit at the same very low level as the
+            // rest of this rung — hanoi.js owns the loud half and this must not
+            // compete with it.
             const rr = Math.random();
-            if (rr < 0.5) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
-            else if (rr < 0.82) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
+            if (rr < 0.26) sysAmb('vendor', { volume: rand(0.04, 0.08), pitch: rand(0.9, 1.14) });
+            else if (rr < 0.46) sysAmb('bowls', { volume: rand(0.035, 0.07), pitch: rand(0.9, 1.15) });
+            else if (rr < 0.70) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
+            else if (rr < 0.88) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
             else sysAmb('tick', { volume: rand(0.03, 0.05), pitch: rand(2.2, 3.0) });
             ambTimer = rand(5, 13);
           } else if (bio === 'monaco') {
@@ -18509,8 +19329,36 @@ export function createSystems(game) {
             // bug, and it could only ever fire in Sydney and Quay because every
             // other biome above already goes through the dispatcher. The defaults
             // it fills in (volume 1, pitch 1) are exactly what the bare call meant.
-            sysAmb('gull');
-            ambTimer = rand(8, 20);
+            // SYDNEY FELL THROUGH THE WHOLE LADDER TO ONE SILVER GULL.
+            //
+            // Chapter one, the first thing anybody hears, and its entire
+            // soundscape was the fallback at the bottom of this ladder: a gull,
+            // every eight to twenty seconds, in the Botanic Gardens, four
+            // hundred metres from the water. It is a real Sydney sound and it is
+            // ONE, and the three that belong over that lawn on a summer
+            // afternoon are a cicada chorus, a magpie carolling and a dozen
+            // lorikeets going over — which between them are more of what that
+            // place sounds like than anything else that could be put there.
+            //
+            // The gull stays in the roll, because it was never wrong. It is now
+            // a fifth of the bed instead of all of it.
+            const sr = Math.random();
+            if (sr < 0.30) {
+              sysAmb('cicada', { volume: rand(0.07, 0.14), pitch: rand(0.85, 1.18) });
+              ambTimer = rand(9, 22);
+            } else if (sr < 0.54) {
+              sysAmb('magpie', { volume: rand(0.07, 0.13), pitch: rand(0.94, 1.10) });
+              ambTimer = rand(11, 24);
+            } else if (sr < 0.74) {
+              sysAmb('lorikeet', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.16) });
+              ambTimer = rand(10, 21);
+            } else if (sr < 0.90) {
+              sysAmb('gull', { volume: rand(0.07, 0.13), pitch: rand(1.0, 1.4) });
+              ambTimer = rand(10, 22);
+            } else {
+              sysAmb('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.8, 1.2) });
+              ambTimer = rand(12, 26);
+            }
           }
         }
       }
