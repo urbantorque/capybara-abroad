@@ -486,7 +486,15 @@ function monMerger() {
 }
 
 function monVC() {
-  return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.26, amount: 0.085, warp: 0.6 });
+  return grain(mat(0xffffff, { vertexColors: true }),
+               { scale: 0.26, amount: 0.085, warp: 0.6, near: 0.30, nearScale: 12 });
+}
+/** THE GROUND, AND ONLY THE GROUND. monVC() is on the walls and the window
+ *  boxes too, so it cannot carry a ground-strength near octave; this can.
+ *  Ground is horizontal, so it also wants no vertical shear in the sample. */
+function monVCG() {
+  return grain(mat(0xffffff, { vertexColors: true }),
+               { scale: 0.26, amount: 0.085, warp: 0, near: 0.58, nearScale: 13 });
 }
 /** Stone and plaster take a finer grain than rock: at 0.26 a wall reads as brick. */
 function monVCF() {
@@ -982,7 +990,7 @@ function monBuildGround(game, root) {
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
-  const m = new THREE.Mesh(g, monVC());
+  const m = new THREE.Mesh(g, monVCG());
   m.receiveShadow = true;
   m.castShadow = false;
   m.frustumCulled = false;
@@ -3819,6 +3827,100 @@ let monDiveTop = 0;
 let monRockT = 0, monRockDone = false;
 let monSpawned = false;
 
+// ============================================================== SCATTER ======
+/**
+ * MONTE CARLO HAD NOTHING ON THE FLOOR AT ALL.
+ *
+ * Counted across the chapters: the Pantanal puts down twenty-five separate
+ * scatters and Circular Quay sixteen; Monte Carlo and Hanoi have ZERO between
+ * them, on the two chapters that are almost entirely paving. The near octave in
+ * grain() breaks the value up, but a shader term cannot cast a shadow and cannot
+ * be walked past — what says "this is a real surface" at four metres is a small
+ * object lying on it with a shadow under it.
+ *
+ * THREE THINGS, and the split is what makes it read as a place rather than as
+ * litter. It is April and the quay is lined with planes: LEAVES on the flats,
+ * chips of pale limestone GRIT where the paving meets the rock, and MAQUIS tufts
+ * on the hillside above the town, which is the one part of this chapter that is
+ * not swept every morning.
+ *
+ * The layout rules are the Pantanal's, and they were paid for there:
+ *   - a JITTERED GRID, not a scatter, so nothing piles up in one corner and
+ *     nothing starves;
+ *   - the budget is spent PER CELL, never as a global `break` on a spatial
+ *     sweep — that truncates the map geographically and silently;
+ *   - noShadow on the flat pieces. A two-centimetre leaf's shadow is its own
+ *     shadow acne and nothing else. The tufts DO cast, because a tuft is the
+ *     thing whose shadow is the point.
+ */
+function monBuildScatter(root) {
+  // TWO TRIANGLES A PIECE, WHICH IS WHY THERE CAN BE THOUSANDS OF THEM. The
+  // first build laid boxes on an eight-metre grid: twelve triangles each and one
+  // piece per twenty-five square metres, which photographed as a swept quay with
+  // four bits of rubbish on it. A leaf lying flat is a QUAD — it has no sides
+  // anybody can see from a lens six metres up — so the same triangle count buys
+  // six times the density, and density is the entire point.
+  const leafGeo = new THREE.PlaneGeometry(1, 1);
+  leafGeo.rotateX(-Math.PI / 2);
+  // Bounded to where the chapter is actually played. The terrain runs to 270 m
+  // in x and the quay ends at about 110: scattering the whole heightfield is
+  // twenty thousand quads nobody will ever stand within sixty metres of.
+  const X0 = -100, X1 = 100, Z0 = -120, Z1 = 110, CELL = 3.0;
+  const NX = Math.ceil((X1 - X0) / CELL), NZ = Math.ceil((Z1 - Z0) / CELL);
+  const leaves = [], dead = [], grit = [], tufts = [];
+  for (let gz = 0; gz < NZ; gz++) {
+    for (let gx = 0; gx < NX; gx++) {
+      const per = 2 + ((gx * 7 + gz * 13) % 3);
+      for (let k = 0; k < per; k++) {
+        const x = X0 + (gx + rand(0.05, 0.95)) * CELL;
+        const z = Z0 + (gz + rand(0.05, 0.95)) * CELL;
+        const h = monTerrain(x, z);
+        if (h < monWATER + 0.35) continue;                  // the harbour
+        if (h > 96) continue;                               // above the town, out of shot
+        // Clear of the circuit AND of its shoulder: the tarmac is a mesh of its
+        // own laid over the terrain, so anything placed on the analytic height
+        // in there is under the road rather than on it.
+        if (monRoad(x, z) < monTRACK_HALF + monTRACK_SHLD) continue;
+        if (h > 30 && z > 78) {
+          const s2 = rand(0.55, 1.15);
+          tufts.push(x, h + s2 * 0.4, z, 0, rand(0, 6.283), 0, s2 * 0.8, s2, s2 * 0.8);
+        } else if (monRoad(x, z) < monTRACK_HALF + 14) {
+          const w = rand(0.15, 0.30);
+          grit.push(x, h + 0.05, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.6, 1.0));
+        } else {
+          const w = rand(0.24, 0.44);
+          (k & 1 ? leaves : dead).push(x, h + 0.05, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.5, 0.8));
+        }
+      }
+    }
+  }
+  const put = (list, geo, color, cast) => {
+    const n = list.length / 9;
+    if (n < 1) return 0;
+    const im = new THREE.InstancedMesh(geo, mat(color), n);
+    for (let i2 = 0; i2 < n; i2++) {
+      const o = i2 * 9;
+      im.setMatrixAt(i2, monXform(list[o], list[o + 1], list[o + 2], list[o + 3], list[o + 4],
+                                  list[o + 5], list[o + 6], list[o + 7], list[o + 8]));
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    im.castShadow = !!cast;
+    im.receiveShadow = false;
+    if (!cast) im.userData.noShadow = true;
+    root.add(im);
+    return n;
+  };
+  // TWO leaf colours, because one is a stain and two are leaves. A plane
+  // sheds pale and it sheds rust, and against a quay at monQuay the pale one
+  // alone was invisible from the standard rig — photographed, the first pass
+  // read as a swept apron with four specks on it.
+  put(leaves, leafGeo, PALETTE.monQuayDk, false);
+  put(dead, leafGeo, PALETTE.monRoofDk, false);
+  put(grit, leafGeo, PALETTE.monConcreteDk, false);
+  put(tufts, monG.cone4, PALETTE.monHedge, true);
+}
+
 function monBuild(game) {
   if (monBuilt) return;
   monBuilt = true;
@@ -3831,6 +3933,7 @@ function monBuild(game) {
 
   monBuildGround(game, monRoot);
   monBuildGroundBody(game);
+  monBuildScatter(monRoot);
   monBuildSea(monRoot);
   monBuildHarbour(game, monRoot);
   monBuildTown(game, monRoot);

@@ -339,13 +339,13 @@ function sahMerger() {
  */
 function sahVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.4, amount: 0.09, warp: 0.55 });
+               { scale: 0.4, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 9 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function sahVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.15, warp: 0 });
+               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearScale: 8 });
 }
 function sahPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function sahInstance(root, geo, color, list, cast, recv, opts) {

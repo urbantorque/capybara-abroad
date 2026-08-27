@@ -1,0 +1,102 @@
+[
+ {
+  "want": "sydney",
+  "biome": "sydney",
+  "bands": [
+   {
+    "band": "near",
+    "meanL": 162.2,
+    "sd": 10.78,
+    "nudgeRMS": 8.294,
+    "ratio": 0.77
+   },
+   {
+    "band": "far",
+    "meanL": 156,
+    "sd": 16.11,
+    "nudgeRMS": 9.515,
+    "ratio": 0.591
+   }
+  ]
+ },
+ {
+  "want": "kyoto",
+  "biome": "kyoto",
+  "bands": [
+   {
+    "band": "near",
+    "meanL": 123.3,
+    "sd": 24.05,
+    "nudgeRMS": 5.195,
+    "ratio": 0.216
+   },
+   {
+    "band": "far",
+    "meanL": 118.5,
+    "sd": 26.06,
+    "nudgeRMS": 3.575,
+    "ratio": 0.137
+   }
+  ]
+ },
+ {
+  "want": "venice",
+  "biome": "venice",
+  "bands": [
+   {
+    "band": "near",
+    "meanL": 188,
+    "sd": 10.17,
+    "nudgeRMS": 4.676,
+    "ratio": 0.46
+   },
+   {
+    "band": "far",
+    "meanL": 169.3,
+    "sd": 17.78,
+    "nudgeRMS": 8.244,
+    "ratio": 0.464
+   }
+  ]
+ },
+ {
+  "want": "palawan",
+  "biome": "palawan",
+  "bands": [
+   {
+    "band": "near",
+    "meanL": 226,
+    "sd": 7.26,
+    "nudgeRMS": 5.601,
+    "ratio": 0.771
+   },
+   {
+    "band": "far",
+    "meanL": 216.1,
+    "sd": 35.07,
+    "nudgeRMS": 14.588,
+    "ratio": 0.416
+   }
+  ]
+ },
+ {
+  "want": "monaco",
+  "biome": "monaco",
+  "bands": [
+   {
+    "band": "near",
+    "meanL": 107.2,
+    "sd": 17.68,
+    "nudgeRMS": 9.579,
+    "ratio": 0.542
+   },
+   {
+    "band": "far",
+    "meanL": 85.9,
+    "sd": 18.74,
+    "nudgeRMS": 9.753,
+    "ratio": 0.52
+   }
+  ]
+ }
+]

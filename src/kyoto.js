@@ -242,13 +242,13 @@ function kyoMerger() {
  */
 function kyoVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.085, warp: 0.55 });
+               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.34, nearScale: 8 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function kyoVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7 });
 }
 function kyoPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function kyoInstance(root, geo, color, list, cast, recv) {

@@ -1895,12 +1895,12 @@ export function createEnvironment(game) {
    * looking at.
    */
   const matVC   = grain(mat(envVC_BASE, { vertexColors: true }),
-                        { scale: 0.45, amount: 0.085, warp: 0.55 });
+                        { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.32, nearScale: 8 });
   // The lawn and the sand run to a hundred and sixty metres and Sydney is the
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
   const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
-                         { scale: 0.68, amount: 0.17, warp: 0 });
+                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, nearScale: 8 });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.

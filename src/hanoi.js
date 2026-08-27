@@ -331,7 +331,15 @@ function hanMerger() {
 }
 
 function hanVC() {
-  return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.24, amount: 0.09, warp: 0.7 });
+  return grain(mat(0xffffff, { vertexColors: true }),
+               { scale: 0.24, amount: 0.09, warp: 0.7, near: 0.30, nearScale: 13 });
+}
+/** THE GROUND, AND ONLY THE GROUND — hanVC() is on the tube houses as well,
+ *  and a near octave scaled for wet concrete reads as damp on a shopfront.
+ *  Flat, because the ground is horizontal and wants no vertical shear. */
+function hanVCG() {
+  return grain(mat(0xffffff, { vertexColors: true }),
+               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearScale: 14 });
 }
 function hanVCF() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });
@@ -669,7 +677,7 @@ function hanBuildGround(game, root) {
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
-  const m = new THREE.Mesh(g, hanVC());
+  const m = new THREE.Mesh(g, hanVCG());
   m.receiveShadow = true; m.castShadow = false;
   m.frustumCulled = false;
   root.add(m);
@@ -2983,6 +2991,115 @@ const hanSPAWN = { x: -60, y: 2.4, z: -78 };
 
 let hanSpawned = false;
 
+// ============================================================== SCATTER ======
+/**
+ * THE BUSIEST STREET IN THE GAME HAD NOTHING LYING ON IT.
+ *
+ * Counted across the chapters, the Pantanal puts down twenty-five separate
+ * scatters and Circular Quay sixteen; Hanoi and Monte Carlo had ZERO. On this
+ * chapter that is the most conspicuous of the two, because the Old Quarter is
+ * the one place in the game whose whole character is CLUTTER — and every last
+ * piece of it was above ankle height.
+ *
+ * Three things, and they are sorted by where the city puts them:
+ *   - LEAF LITTER and scraps of packaging on the pavement, which is swept into
+ *     the gutter and never further;
+ *   - GRIT on the carriageway, which is the surface with the near-field grain on
+ *     it and nothing else;
+ *   - WEED at the kerb line and on the dyke, which is the only unswept ground
+ *     in the chapter.
+ *
+ * Quads, not boxes: a leaf lying flat has no side anybody can see from six
+ * metres up, so two triangles buys what twelve would. The layout is the
+ * Pantanal's jittered grid with a PER-CELL budget — never a global cap tested
+ * inside a spatial sweep, which truncates the map geographically and in silence.
+ */
+function hanBuildScatter(root) {
+  const flat = new THREE.PlaneGeometry(1, 1);
+  flat.rotateX(-Math.PI / 2);
+  // Two crossed quads, seen from both sides: four triangles that read as a
+  // tuft from any heading. A cone4 at this size is a pyramid — see the note on
+  // the first pass in qa/POLISH-PASS.md.
+  const bladeGeo = (() => {
+    const a = new THREE.PlaneGeometry(1, 1);
+    a.translate(0, 0.5, 0);
+    const b = a.clone();
+    b.rotateY(Math.PI / 2);
+    const g2 = new THREE.BufferGeometry();
+    const pa = a.attributes.position.array, pb = b.attributes.position.array;
+    const na = a.attributes.normal.array, nb = b.attributes.normal.array;
+    const P = new Float32Array(pa.length + pb.length);
+    P.set(pa, 0); P.set(pb, pa.length);
+    const N = new Float32Array(na.length + nb.length);
+    N.set(na, 0); N.set(nb, na.length);
+    g2.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    g2.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    const ia = a.index.array, n0 = pa.length / 3;
+    const I = [];
+    for (let i = 0; i < ia.length; i++) I.push(ia[i]);
+    for (let i = 0; i < ia.length; i++) I.push(n0 + ia[i]);
+    g2.setIndex(I);
+    a.dispose(); b.dispose();
+    return g2;
+  })();
+  const X0 = -90, X1 = 90, Z0 = -90, Z1 = 185, CELL = 3.4;
+  const NX = Math.ceil((X1 - X0) / CELL), NZ = Math.ceil((Z1 - Z0) / CELL);
+  const leaf = [], scrap = [], grit = [], weed = [];
+  for (let gz = 0; gz < NZ; gz++) {
+    for (let gx = 0; gx < NX; gx++) {
+      const per = 1 + ((gx * 5 + gz * 11) % 3);
+      for (let k = 0; k < per; k++) {
+        const x = X0 + (gx + rand(0.05, 0.95)) * CELL;
+        const z = Z0 + (gz + rand(0.05, 0.95)) * CELL;
+        const h = hanTerrain(x, z);
+        if (h < hanWATER + 0.3) continue;                 // Hoan Kiem and the river
+        const d = hanLaneAt(x, z);
+        const w0 = hanLaneW;
+        if (d < w0 - 0.6) {
+          // the carriageway. Grit only, and not much of it.
+          if (k & 1) continue;
+          const w = rand(0.10, 0.20);
+          grit.push(x, h + 0.05, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.6, 1.0));
+        } else if (d < w0 + 1.6) {
+          // the kerb line, which is where everything the city sweeps ends up
+          const s2 = rand(0.20, 0.42);
+          if (k % 3 === 0) weed.push(x, h, z, 0, rand(0, 6.283), 0, s2 * 0.9, s2, s2 * 0.9);
+          else {
+            const w = rand(0.16, 0.30);
+            leaf.push(x, h + 0.05, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.5, 0.8));
+          }
+        } else {
+          // ONE SCRAP IN FIVE, and the rest is leaf. The first pass split it
+          // evenly and put a near-white quad on every second cell: the Old
+          // Quarter photographed as the morning after a wedding.
+          const w = rand(0.15, 0.30);
+          (k % 5 === 0 ? scrap : leaf).push(x, h + 0.05, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.5, 0.85));
+        }
+      }
+    }
+  }
+  const put = (list, geo, color, cast) => {
+    const n = list.length / 9;
+    if (n < 1) return;
+    const im = new THREE.InstancedMesh(geo, mat(color, geo === bladeGeo ? { side: THREE.DoubleSide } : undefined), n);
+    for (let i = 0; i < n; i++) {
+      const o = i * 9;
+      im.setMatrixAt(i, hanXform(list[o], list[o + 1], list[o + 2], list[o + 3], list[o + 4],
+                                 list[o + 5], list[o + 6], list[o + 7], list[o + 8]));
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    im.castShadow = !!cast;
+    im.receiveShadow = false;
+    if (!cast) im.userData.noShadow = true;
+    root.add(im);
+  };
+  put(leaf, flat, PALETTE.hanMud, false);
+  put(scrap, flat, PALETTE.hanTrim, false);
+  put(grit, flat, PALETTE.hanConcreteDk, false);
+  put(weed, bladeGeo, PALETTE.hanShutter, false);
+}
+
 function hanBuild(game) {
   if (hanBuilt) return;
   hanBuilt = true;
@@ -2995,6 +3112,7 @@ function hanBuild(game) {
 
   hanBuildGround(game, hanRoot);
   hanBuildGroundBody(game);
+  hanBuildScatter(hanRoot);
   hanBuildLake(hanRoot);
   hanBuildStreets(game, hanRoot);
   hanBuildQuarter(game, hanRoot);

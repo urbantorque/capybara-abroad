@@ -299,7 +299,7 @@ function hkMerger() {
  */
 function hkVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.085, warp: 0.6 });
+               { scale: 0.5, amount: 0.085, warp: 0.6, near: 0.34, nearScale: 6 });
 }
 /**
  * ANYTHING IN THIS CHAPTER THAT IS A LIGHT IS BUILT WITH THIS.

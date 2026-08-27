@@ -2719,6 +2719,49 @@ export function grain(m, opts) {
   const scale = o.scale === undefined ? 0.7 : o.scale;
   const amount = o.amount === undefined ? 0.12 : o.amount;
   const warp = o.warp === undefined ? 0.35 : o.warp;
+  // ---------------------------------------------------------------------
+  // NEAR — THE OCTAVE THE FIELD WAS MISSING, AND THE FADE THAT LETS IT EXIST.
+  //
+  // Measured (qa/vis-flat2.js, bottom third / centre 60%): the ground is 40-55%
+  // of every frame and in most chapters it is one value. Palawan's sand came
+  // back at SD 2.05 over five distinct 5-bit colours; Sydney's lawn at 4.30 over
+  // thirteen. Rio measured 51 for one reason only — it has a GRAPHIC on the
+  // floor. Nothing else about its renderer differs.
+  //
+  // grain() was not wrong, it was an octave and a half too low to see. `scale`
+  // 0.5-0.72 puts the coarse term at a metre and a half and the fine one at half
+  // a metre; the gameplay band of the frame is ground three to six metres from
+  // the lens, where half a metre is a third of the screen height. There was
+  // nothing in the field at the size of a tuft, a paving joint or a ripple in
+  // sand.
+  //
+  // WHY IT COULD NOT SIMPLY BE TURNED UP, and this is the whole reason the fade
+  // is the enabling change rather than a nicety: the base grain has NO distance
+  // term. Raise its frequency and the far half of a hundred-and-sixty-metre lawn
+  // is sampled far under Nyquist, so it stops being noise and becomes crawl —
+  // it boils as the camera moves. `sparkle` solved exactly this, for exactly
+  // this reason, with `fwidth`; this is the same solution one field over.
+  //
+  //   near       peak-to-peak fraction of the diffuse, 0 (off) .. ~0.4
+  //   nearScale  multiplier ON TOP of `scale`, so a chapter that already knows
+  //              how big its ground features are gets the near octave in
+  //              proportion for free
+  //
+  // DEFAULTS TO ZERO. Every existing call site keeps the picture it was tuned
+  // against until it opts in, one at a time.
+  //
+  // The fade goes to nothing at a footprint of half a cell, which IS Nyquist for
+  // a smoothstep-interpolated value noise: one cycle per cell needs two pixels
+  // per cycle, so one pixel may cover at most half a cell before what is drawn
+  // stops being the field and starts being an alias of it. Hence * 2.0 and not
+  // the sparkle's 0.60 — a sparkle is a thresholded speck and dies honestly much
+  // later.
+  //
+  // And it is sampled in a ROTATED frame. Value noise sits on a square lattice;
+  // stacked on the base octave at the same orientation the two agree along the
+  // axes and the eye finds the grid. Half a radian is enough that it never does.
+  const near = o.near === undefined ? 0 : o.near;
+  const nearScale = o.nearScale === undefined ? 6 : o.nearScale;
   // SPARKLE — the second half of this helper, and it is only ever for water.
   //
   // Lambert has no specular term, so every water surface in this game is a flat
@@ -2755,7 +2798,7 @@ export function grain(m, opts) {
   const sparkCut = o.sparkleCut === undefined ? 0.52 : o.sparkleCut;
   const sparkBand = o.sparkleBand === undefined ? 0.11 : o.sparkleBand;
   const sparkCol = o.sparkleColor === undefined ? 0xffffff : o.sparkleColor;
-  const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' +
+  const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' + near + '|' + nearScale + '|' +
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
               '|' + (wetOnly ? 'w' : '');
   const hit = _grainCache.get(key);
@@ -2812,7 +2855,46 @@ export function grain(m, opts) {
         wetOnly ? '' : '  vec2 gq = vec2(vGrainW.x + vGrainW.y * ' + (0.71 * warp).toFixed(4) + ',',
         wetOnly ? '' : '                 vGrainW.z + vGrainW.y * ' + (0.43 * warp).toFixed(4) + ') * ' + scale.toFixed(4) + ';',
         wetOnly ? '' : '  float gn = grNoise(gq) * 0.64 + grNoise(gq * 2.83 + 19.31) * 0.36 - 0.5;',
-        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) + ';',
+        // ---- THE NEAR-FIELD OCTAVE ------------------------------------
+        // One more octave, six-ish times finer, in a frame rotated half a
+        // radian so it never lines up with the lattice underneath it, and
+        // faded out on its own screen-space footprint so the far ground is
+        // exactly as smooth as it was before this existed. See the note on
+        // `near` above for why the fade is the enabling half.
+        // AND IT HAS TO BE TWO OCTAVES, WHICH THE FIRST BUILD LEARNED THE HARD
+        // WAY. One octave of value noise at an amplitude big enough to measure
+        // does not read as ground, it reads as SQUARES: smoothstep has zero
+        // derivative at the cell boundary, so every cell of the lattice shows
+        // its own edge and a lawn comes out looking quilted. Photographed at
+        // near 0.36 the Botanic Gardens were unmistakably a grid. A second
+        // octave at 2.17x, in a frame rotated another radian, has no shared
+        // boundary anywhere with the first, and the quilt goes.
+        (wetOnly || near <= 0) ? '' : '  vec2 gnq = vec2(gq.x * 0.8776 - gq.y * 0.4794,',
+        (wetOnly || near <= 0) ? '' : '                  gq.x * 0.4794 + gq.y * 0.8776) * ' + nearScale.toFixed(4) + ' + 41.7;',
+        // ...AND THE LATTICE STILL SHOWED, so the sample is DOMAIN-WARPED by
+        // the octave underneath it before either one is taken. `gn` is already
+        // computed and its wavelength is a metre and a half, so pushing the
+        // near coordinate around by a cell and a half of it bends the whole
+        // near lattice into slow curves — for two multiplies and no extra hash.
+        // Photographed on the Piazzetta at near 0.62 the flagstones were a
+        // visible diagonal grid; warped, the same number reads as worn stone.
+        // It also has to happen BEFORE fwidth is taken, or the footprint fade
+        // is measuring a field that is not the one being drawn.
+        (wetOnly || near <= 0) ? '' : '  gnq += gn * 3.0;',
+        (wetOnly || near <= 0) ? '' : '  vec2 gnq2 = vec2(gnq.x * 0.5403 - gnq.y * 0.8415,',
+        (wetOnly || near <= 0) ? '' : '                   gnq.x * 0.8415 + gnq.y * 0.5403) * 2.17 + 11.3;',
+        // Each octave fades on ITS OWN footprint. Sharing the coarse one's
+        // fade would leave the fine one alive a full octave past Nyquist,
+        // which is precisely the crawl this whole term exists to avoid.
+        (wetOnly || near <= 0) ? '' : '  float nfw = max(fwidth(gnq.x), fwidth(gnq.y));',
+        (wetOnly || near <= 0) ? '' : '  float gnr = ((grNoise(gnq) - 0.5) * 0.62 * clamp(1.0 - nfw * 2.00, 0.0, 1.0)',
+        (wetOnly || near <= 0) ? '' : '             + (grNoise(gnq2) - 0.5) * 0.38 * clamp(1.0 - nfw * 4.34, 0.0, 1.0))',
+        (wetOnly || near <= 0) ? '' : '             * ' + near.toFixed(4) + ';',
+        // ONE multiply, not two: a second `*=` on the same channel compounds,
+        // so a chapter that tuned `amount` against the picture would quietly
+        // get a different number back the day it opted into `near`.
+        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) +
+                       ((!wetOnly && near > 0) ? ' + gnr' : '') + ';',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what

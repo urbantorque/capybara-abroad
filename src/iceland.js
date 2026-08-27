@@ -379,13 +379,13 @@ function iceMerger() {
  */
 function iceVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.075, warp: 0.55 });
+               { scale: 0.42, amount: 0.075, warp: 0.55, near: 0.34, nearScale: 8 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function iceVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.12, warp: 0 });
+               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7 });
 }
 function icePush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function iceInstance(root, geo, color, list, cast, recv, twoSided) {
