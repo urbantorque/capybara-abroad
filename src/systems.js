@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick, contactSlots, contactTick } from './shared.js';
+         rimTick, contactSlots, contactTick, swayTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -16344,6 +16344,19 @@ export function createSystems(game) {
     // this is the entire per-frame cost of contact on every grained surface in
     // the world, not a cost per material.
     sysContactFrame(dt);
+    // ---- the wind, in the picture -----------------------------------------
+    // One float, one clock and one unit vector, and every swaying material in
+    // the live chapter leans. The vector is weather.js's gust() UNCHANGED — it
+    // already carries the biome's base wind, its bearing and its gusting, so
+    // the thing the player sees and the thing that shoves a bin are one number
+    // and cannot drift apart.
+    //
+    // FROZEN UNDER prefers-reduced-motion, exactly as the sparkle is, and by
+    // holding the CLOCK rather than the strength: a world stopped mid-gust
+    // still leans the way the wind is blowing, where one stopped at zero
+    // strength snaps upright the moment the setting is read.
+    swayTick(sysCalmMotion ? 7.5 : game.state.time,
+             game.weather ? game.weather.gust() : null);
     const B = game.biome;
     const name = (B && B.current) || 'sydney';
 

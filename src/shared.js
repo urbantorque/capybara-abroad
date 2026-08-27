@@ -2933,6 +2933,191 @@ export function contactTick(list, n) {
   _contactOn.value = live > 0 ? 1 : 0;
 }
 
+// ---------------------------------------------------------------------------
+// SWAY — NINETEEN WORLDS OF PALMS AND CLOTH, AND NOT ONE OF THEM MOVED.
+//
+// `wxMOOD` in weather.js is nineteen hand-set rows of real wind — a base speed,
+// a gust swing, a frequency and a bearing. Sydney is 3.4 m/s swinging 1.6 at
+// 0.070 Hz on a bearing of 1.90 rad; Kyoto is a still 1.1; Pasto is 2.6 swinging
+// 1.9. It is damped, it gusts, it has a direction, and `gust()` hands it out as
+// a live vector.
+//
+// It had exactly two readers — the shove on a loose prop (props.js) and an NPC's
+// reaction (npc.js) — and a grep across all twenty-seven modules for foliage,
+// canopy, frond, banner, awning, laundry, sail, tarp or flag motion returned
+// NOTHING. There was no vertex animation anywhere in this game. The player
+// could feel a gust push a bin and could not see the world it was blowing
+// through.
+//
+// THE ONE DECISION THIS HELPER IS BUILT AROUND, and the batch that specified it
+// was right to demand it up front: MOST CHAPTER GEOMETRY IS MERGED, so "how far
+// is this vertex above the object's own base" is unanswerable — the base is the
+// merged root, and a canopy twelve metres up would sway like twelve metres of
+// rope. Three answers were available and only one of them is cheap:
+//
+//   NOT a per-vertex base attribute — that means touching every merger in the
+//   game, and the mergers are the most load-bearing code in the chapters.
+//   NOT "only unmerged meshes" — that is most of the foliage excluded.
+//   BUT a WINDOW on a local axis, `lo`..`hi`, declared by the call site, which
+//   already knows how tall its own palms are. On an InstancedMesh the window is
+//   in the instance's OWN frame, which is why instanced foliage — Palawan's
+//   ninety palms, Marrakech's dates — is the cleanest possible target: each
+//   frond arrives in its own coordinates with its base at the origin.
+//
+// AND THE DIRECTION IS A WORLD DIRECTION, PUSHED THROUGH THE TRANSPOSE.
+// `transformed` is local and pre-instancing, so displacing it by a world vector
+// would have every frond of a radiating crown bend a different way. GLSL ES has
+// no inverse(), but the rotation part of a model matrix is orthonormal and its
+// inverse IS its transpose — and `v * M` in GLSL is exactly `transpose(M) * v`.
+// So one multiply puts the world wind into local space. Where the instance
+// matrix also carries scale the transpose is off by that scale, which comes out
+// as a bigger frond swinging further: wrong in theory and right in the picture.
+const _swayT = { value: 0 };
+const _swayD = { value: new THREE.Vector2(0, 1) };  // unit, world x/z
+const _swayK = { value: 0 };                        // 0 (still) .. ~1.4 (gusting)
+// The wind speed that counts as a full-strength sway. Chosen against the table
+// rather than by eye: at 3.5 the still chapters (Kyoto 1.1, Son Doong 0.6) come
+// out near a third and the open ones (Sydney 3.4, Manly, Antarctica) near one,
+// which is the ordering wxMOOD already asserts.
+const _swayREF = 3.5;
+/**
+ * The wind, once per frame, for every swaying material in the game.
+ *
+ * `g` is weather.js's `gust()` — a VECTOR in m/s that already carries the
+ * biome's base wind, its bearing and its gusting, damped. Passing the vector
+ * rather than a speed and an angle is deliberate: the direction and the
+ * strength must never be able to disagree about which frame they are in.
+ */
+export function swayTick(t, g) {
+  _swayT.value = t;
+  const gx = g ? g.x : 0, gz = g ? g.z : 0;
+  const m = Math.sqrt(gx * gx + gz * gz);
+  if (m > 0.0001) _swayD.value.set(gx / m, gz / m);
+  const k = m / _swayREF;
+  _swayK.value = k > 0 ? (k < 1.4 ? k : 1.4) : 0;
+}
+
+const _swayCache = new Map();
+function _swayInject(shader, amount, axis, lo, hi, stiff, hz) {
+  shader.uniforms.uSwayT = _swayT;
+  shader.uniforms.uSwayD = _swayD;
+  shader.uniforms.uSwayK = _swayK;
+  const span = (hi - lo) > 0.0001 ? (hi - lo) : 0.0001;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>',
+             '#include <common>\nuniform float uSwayT;\nuniform vec2 uSwayD;\nuniform float uSwayK;')
+    .replace('#include <begin_vertex>', [
+      '#include <begin_vertex>',
+      '{',
+      // The ramp, on the call site's own axis and window. pow() rather than a
+      // linear ramp because a frond is not a rope: the base of anything that
+      // sways is stiffer than its tip, and the exponent is the only knob that
+      // tells a palm from a banner.
+      '  float swR = clamp((transformed.' + axis + ' - ' + lo.toFixed(4) + ') * ' +
+                    (1 / span).toFixed(6) + ', 0.0, 1.0);',
+      '  swR = pow(swR, ' + stiff.toFixed(3) + ');',
+      // THE PHASE, AND IT HAS TO COME FROM SOMEWHERE THAT DOES NOT MOVE WITH
+      // THE CAMERA. On an instanced mesh it is the instance's own origin, so a
+      // crown of nine fronds moves as one tree and the tree next to it does
+      // not; on a merged mesh there is only one origin, so it falls back to the
+      // vertex's own world position and the sway travels across the surface —
+      // which is what a gust crossing a row of awnings actually looks like.
+      '  vec4 swO = vec4(0.0, 0.0, 0.0, 1.0);',
+      '  #ifdef USE_INSTANCING',
+      '    swO = instanceMatrix * swO;',
+      '  #else',
+      '    swO = vec4(transformed, 1.0);',
+      '  #endif',
+      '  swO = modelMatrix * swO;',
+      '  float swP = swO.x * 0.31 + swO.z * 0.27;',
+      // TWO FREQUENCIES, NOT ONE. A single sine is a metronome and a whole
+      // street of awnings breathing on it reads as one organism. The slow term
+      // is the lean into the gust; the fast one, at a quarter of the weight and
+      // an incommensurate ratio, is the flutter that stops it looping visibly.
+      '  float swA = sin(uSwayT * ' + (0.90 * hz).toFixed(4) + ' + swP) * 0.74',
+      '            + sin(uSwayT * ' + (2.73 * hz).toFixed(4) + ' + swP * 1.7 + 1.3) * 0.26;',
+      '  float swM = swR * ' + amount.toFixed(4) + ' * uSwayK * swA;',
+      // ...and back into local space through the transpose. See the note above.
+      '  mat3 swB = mat3(modelMatrix);',
+      '  #ifdef USE_INSTANCING',
+      '    swB = swB * mat3(instanceMatrix);',
+      '  #endif',
+      '  transformed += vec3(uSwayD.x, 0.0, uSwayD.y) * swB * swM;',
+      '}',
+    ].join('\n'));
+}
+/**
+ * A swaying clone of `m`. Returns a CLONE for grain()'s reason: mat() hands back
+ * a shared cached material and compiling a hook onto it would sway every mesh in
+ * the game that happens to share a hex.
+ *
+ *   amount  metres of travel at the tip at a full gust, 0 (off, THE DEFAULT)
+ *   axis    'x' | 'y' | 'z' — which LOCAL axis the ramp runs along. 'z' for
+ *           Palawan's fronds, whose own frame runs 0 (base) to 1 (tip) in z.
+ *   lo, hi  the window on that axis, in the mesh's own units
+ *   stiff   the exponent on the ramp: 1 a rope, 3 a trunk
+ *   hz      frequency multiplier, for something lighter or heavier than a leaf
+ */
+export function sway(m, opts) {
+  const o = opts || {};
+  const amount = o.amount === undefined ? 0 : o.amount;
+  if (!(amount > 0)) return m;
+  const axis = o.axis === 'x' ? 'x' : (o.axis === 'z' ? 'z' : 'y');
+  const lo = o.lo === undefined ? 0 : o.lo;
+  const hi = o.hi === undefined ? 1 : o.hi;
+  const stiff = o.stiff === undefined ? 1.6 : o.stiff;
+  const hz = o.hz === undefined ? 1 : o.hz;
+  const key = m.uuid + '|' + amount + '|' + axis + '|' + lo + '|' + hi + '|' + stiff + '|' + hz;
+  const hit = _swayCache.get(key);
+  if (hit) return hit;
+  const g = m.clone();
+  const prev = m.onBeforeCompile;
+  // The clone drops onBeforeCompile — that is grainOwn()'s bug, and a swaying
+  // rimmed material would silently lose its rim the way five seas once lost
+  // their glitter. Whatever the source had runs first, then the sway.
+  const hadHook = typeof prev === 'function' && m.hasOwnProperty('onBeforeCompile');
+  const prevKey = m.customProgramCacheKey;
+  g.onBeforeCompile = function (shader) {
+    if (hadHook) prev.call(this, shader);
+    _swayInject(shader, amount, axis, lo, hi, stiff, hz);
+  };
+  g.customProgramCacheKey = function () {
+    return 'sway' + key + (prevKey ? '|' + prevKey.call(this) : '');
+  };
+  g.needsUpdate = true;
+  _swayCache.set(key, g);
+  return g;
+}
+/**
+ * Make one mesh sway — material AND shadow.
+ *
+ * THE HALF THAT WOULD OTHERWISE BE FORGOTTEN. The shadow pass compiles its own
+ * program from its own material, so a mesh that sways in the colour pass and
+ * not in the depth pass has a shadow that walks away from it — and it is
+ * exactly the kind of thing that survives review because the shadow is the last
+ * place anybody looks. Doing both in one call is the only way it cannot be
+ * half-done.
+ */
+export function swayMesh(mesh, opts) {
+  if (!mesh || !mesh.material) return mesh;
+  const o = opts || {};
+  if (!(o.amount > 0)) return mesh;
+  mesh.material = sway(mesh.material, o);
+  if (mesh.castShadow) {
+    const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    const amount = o.amount;
+    const axis = o.axis === 'x' ? 'x' : (o.axis === 'z' ? 'z' : 'y');
+    const lo = o.lo === undefined ? 0 : o.lo;
+    const hi = o.hi === undefined ? 1 : o.hi;
+    const stiff = o.stiff === undefined ? 1.6 : o.stiff;
+    const hz = o.hz === undefined ? 1 : o.hz;
+    d.onBeforeCompile = function (shader) { _swayInject(shader, amount, axis, lo, hi, stiff, hz); };
+    d.customProgramCacheKey = function () { return 'swayD' + amount + axis + lo + hi + stiff + hz; };
+    mesh.customDepthMaterial = d;
+  }
+  return mesh;
+}
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};

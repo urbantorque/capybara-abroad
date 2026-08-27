@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -2276,7 +2276,18 @@ function sahBuildPalmeraie(game, root) {
   // without any of the noise.
   const fm2 = sahInstance(root, sahG.quad, PALETTE.sahPalm, fronds, false, false,
                           { side: THREE.DoubleSide });
-  if (fm2) { fm2.name = 'sahFronds'; fm2.userData.noShadow = true; }
+  if (fm2) {
+    fm2.name = 'sahFronds'; fm2.userData.noShadow = true;
+    // AND THEY MOVE. sahG.quad is a unit plane laid flat, scaled so x is the
+    // frond's LENGTH and z its width, and the segments are placed radiating
+    // outward — so +x is the tip and the window is the whole quad.
+    //
+    // These do not cast (see the starfish note above), which means swayMesh
+    // builds no depth material for them and there is no shadow to come adrift.
+    // That is the one place in this pass where an earlier decision made a later
+    // one free.
+    swayMesh(fm2, { amount: 0.14, axis: 'x', lo: -0.5, hi: 0.5, stiff: 1.8, hz: 1.2 });
+  }
 }
 
 // ================================================================ THE ERG ===

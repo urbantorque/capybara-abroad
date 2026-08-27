@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -2702,7 +2702,14 @@ function rioBuildFlora(root) {
     rioPush9(trunk, tipX, tipY - 0.45, z, 0, 0, 0, 0.62, 0.5, 0.62);
   }
   rioInstance(root, rioG.cyl6, PALETTE.rioPalmTrunk, trunk, true, false);
-  rioInstance(root, rioG.blade, PALETTE.rioPalm, frond, true, false);
+  // AND THE FRONDS MOVE. See sway() in shared.js: rioG.blade is a box tapered
+  // toward +x, so +x IS the tip and the window is the whole of it. Each frond
+  // is two segments laid end to end and each carries its own phase from its own
+  // world position, so a frond ripples from the crown outwards rather than
+  // translating in one piece — which is what a coconut frond does in the
+  // onshore breeze this chapter is set in.
+  swayMesh(rioInstance(root, rioG.blade, PALETTE.rioPalm, frond, true, false),
+           { amount: 0.16, axis: 'x', lo: -0.5, hi: 0.5, stiff: 1.8, hz: 1.1 });
 
   // forest on the hills — cones, instanced, only where the ground is high
   const tree = [];

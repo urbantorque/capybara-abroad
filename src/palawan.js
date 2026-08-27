@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -1177,6 +1177,21 @@ function palBuildBeach(game, root) {
   }
   fronds.instanceMatrix.needsUpdate = true; fronds.computeBoundingSphere();
   fronds.castShadow = true;
+  // ---- AND THEY MOVE ---------------------------------------------------
+  // See sway() in shared.js. This is the cleanest sway target in the game and
+  // it is worth saying why: an InstancedMesh hands the shader each frond in the
+  // frond's OWN frame, so the ramp needs no merged-origin guesswork — palG.vee
+  // runs z = 0 at the base to z = 1 at the tip, which IS the window.
+  //
+  // stiff 2.2 because a coconut frond is a stiff rib that whips at the last
+  // third, not a rope; 0.22 m at the tip because the frond is about 2.5 m long
+  // and a tenth of its own length is what a real one does in a sea breeze.
+  // The crown's phase comes from the INSTANCE origin, so all nine fronds of one
+  // palm move together and the palm beside it is on its own beat.
+  //
+  // swayMesh(), not sway(): these cast onto the sand, and a shadow that does
+  // not sway with the thing casting it walks away from it.
+  swayMesh(fronds, { amount: 0.22, axis: 'z', lo: 0.10, hi: 1.0, stiff: 2.2, hz: 1.15 });
   root.add(fronds);
   palPalmMesh = fronds;
 }
