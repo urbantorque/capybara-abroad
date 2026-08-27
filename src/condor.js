@@ -795,6 +795,27 @@ function condorSummon() {
   if (!game || !condorBody) return false;
   if (!game.biome || !game.biome.isActive('pasto')) return false;
 
+  // ---- THE SECOND WHISTLE IS A LESSON, AND A LESSON IS TAUGHT ONCE -------
+  //
+  // Measured from a cold summon (qa/mv-condor.js): four seconds of inbound
+  // spiral, then the bird circles at fourteen metres and WAITS, and it takes a
+  // second whistle plus about two and a half seconds of descent before the
+  // talons are in reach — a shade over ten seconds of standing still in front
+  // of the best two minutes in the chapter.
+  //
+  // That is exactly right the first time. The toast on the transition says
+  // 'whistle again to bring it down', and the player has to learn that the
+  // whistle is a conversation rather than a button; the chapter is built on it.
+  //
+  // It is a tax every time after that. So once the bird has actually been
+  // RIDDEN — this session, or on the file, which is what makes it survive a
+  // reload — a summon arms the low orbit from the start and the bird spirals
+  // straight down to the talons. Nothing else changes: same states, same
+  // spiral, same bored timer, same everything for a player who has not yet
+  // worked out what the whistle is for.
+  if (!condorRodeOnce && typeof game.taskDone === 'function' &&
+      game.taskDone('condor-ride')) condorRodeOnce = true;
+
   // whistling again while it circles brings it down into actual reach
   if (condorState === 'circling') {
     if (typeof game.sfx === 'function') game.sfx('whistle');
@@ -819,9 +840,14 @@ function condorSummon() {
   condorSpawnY = cy + 56;
   condorOrbitR = condorSpawnR;
   condorOrbitY = condorSpawnY - cy;
-  condorLowered = false;
-  condorOrbitYTarget = condorORBIT_HIGH_Y;
-  condorOrbitRTarget = condorORBIT_HIGH_R;
+  // ...and this is where the lesson is skipped. See the note at the top of this
+  // function. The inbound spiral is untouched — it still eases to the HIGH
+  // orbit over its four seconds, because that spiral is the arrival and it is
+  // the best thing the bird does — but the moment it reaches the circle it is
+  // already heading for the talon height rather than waiting to be asked.
+  condorLowered = condorRodeOnce;
+  condorOrbitYTarget = condorRodeOnce ? condorORBIT_LOW_Y : condorORBIT_HIGH_Y;
+  condorOrbitRTarget = condorRodeOnce ? condorORBIT_LOW_R : condorORBIT_HIGH_R;
 
   // teleport-in: the interpolation history MUST be rewritten with it
   condorBody.position.set(cx + Math.cos(condorOrbitAng) * condorSpawnR, condorSpawnY,
@@ -1278,7 +1304,12 @@ function condorUpdate(dt) {
         condorSetState('circling');
         condorBoredT = 0;
         if (typeof game.sfx === 'function') game.sfx('gull', { pitch: 0.62, volume: 1 });
-        if (typeof game.toast === 'function') game.toast('whistle again to bring it down');
+        // The line only helps somebody who does not know it yet. See THE SECOND
+        // WHISTLE IS A LESSON in condorSummon — a bird that is already on its
+        // way down would be telling the player to do a thing that is happening.
+        if (!condorLowered && typeof game.toast === 'function') {
+          game.toast('whistle again to bring it down');
+        }
       }
     } else if (condorState === 'circling') {
       condorOrbitR = damp(condorOrbitR, condorOrbitRTarget, 1.4, dt);

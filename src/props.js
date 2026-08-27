@@ -17,6 +17,15 @@ const physNEUTRAL = new THREE.Color(1, 1, 1).getHex();
 
 const physIMPACT_MIN = 2.5;      // m/s before a bonk is worth reporting
 const physSPILL_MIN = 3.0;       // m/s before a hot drink gives up
+// --- THE BARGE. See the second branch of physOnCollide ----------------------
+// physBARGE_MIN sits above the closing speed a walk can produce, so a
+// considered approach still only pushes and only a RUN barges. physBARGE_DV is
+// the ceiling on the VELOCITY granted (the impulse is multiplied by the prop's
+// own mass), so nothing on the street is ever launched, however heavy or light.
+const physBARGE_MIN = 3.2;       // m/s along the normal before it is a barge
+const physBARGE_K   = 0.42;      // m/s of prop, per m/s of closing speed over the floor
+const physBARGE_DV  = 1.9;       // m/s — the hard ceiling on what a barge grants
+const physBARGE_UP  = 0.34;      // of that, upward, so a tall prop goes over
 const physTIP_COS = 0.5;         // cos(60°) — bin considered toppled
 const physHOLD_LAMBDA = 26;      // mouth snap ~0.12s
 const physDUST_MAX = 30;
@@ -2497,6 +2506,41 @@ function physOnCollide(prop, e) {
     // so the impulse always sends the bin away from the capybara.
     const away = (c.bi === prop.body) ? -1 : 1;
     physCV1.set(c.ni.x * away * push, 0.3 * push, c.ni.z * away * push);
+    prop.body.wakeUp();
+    prop.body.applyImpulse(physCV1, physCV2);
+  } else if (!prop.tipped && speed > physBARGE_MIN &&
+             physGame.capy && e.body === physGame.capy.body && c.ni) {
+    // ---- ...AND SO IS EVERYTHING ELSE ON THE STREET ---------------------
+    //
+    // THE BARGE. The branch above has been the only thing in this game that
+    // knew the difference between walking into something and RUNNING into it,
+    // and it knew it about one prop type out of thirty-eight. Every other prop
+    // was moved by the solver alone, which — with a frictionless capy contact
+    // and a low, wide animal — mostly means it slides a hand's width and stops.
+    //
+    // This is that idea generalised, and the one thing it must not do is turn
+    // the street into a bowling alley. So:
+    //
+    //   the impulse is SCALED BY THE PROP'S OWN MASS, which makes it a change
+    //   in VELOCITY rather than a change in momentum: a straw hat and a market
+    //   crate get the same metres per second out of the same barge, and neither
+    //   of them gets launched;
+    //
+    //   the velocity it grants is capped at physBARGE_DV, which is under half a
+    //   walk. It is a shove, not a punt;
+    //
+    //   it only fires above physBARGE_MIN, which is above the closing speed a
+    //   walk produces — a considered approach still just pushes;
+    //
+    //   and it goes through physCV2, the same off-centre lever the bin uses, so
+    //   a tall prop tips and a low one skids, which is what those shapes do.
+    //
+    // A stall you have to RUN AT is a different verb from a stall you walk into
+    // and push, and this is the whole of it.
+    const m = prop.body.mass > 0 ? prop.body.mass : 1;
+    const dv = clamp((speed - physBARGE_MIN) * physBARGE_K, 0, physBARGE_DV) * m;
+    const away = (c.bi === prop.body) ? -1 : 1;
+    physCV1.set(c.ni.x * away * dv, physBARGE_UP * dv, c.ni.z * away * dv);
     prop.body.wakeUp();
     prop.body.applyImpulse(physCV1, physCV2);
   }
