@@ -2844,6 +2844,95 @@ const _wetDARK  = 0.26;   // fraction of the diffuse a fully wet surface loses
 const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
 const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
 
+// ---------------------------------------------------------------------------
+// CONTACT — THE OTHER HALF OF THE RIM, AND THE REASON NOTHING IN THIS GAME
+// LOOKED LIKE IT WAS RESTING ON ANYTHING.
+//
+// The rim (see _rimInject above) separates a silhouette from the BACKGROUND.
+// Photographed, that worked. What it cannot do — and what six of six frames in
+// qa/PRESENCE-PASS.md show — is separate a thing from the FLOOR: the capybara
+// casts a soft offset sun shadow and has no darkening at all under its feet,
+// and the bench legs, the bollards and the tree trunks all meet the ground on a
+// clean seam. Everything floats.
+//
+// THE THREE THINGS THIS IS DELIBERATELY NOT:
+//
+//   Not SSAO. No second render target, no depth prepass, no normal buffer. The
+//   composite pass is doing enough work and this is a flat-shaded low-poly game.
+//
+//   Not decals. Alpha-blended dark quads bring z-fighting on a heightfield and
+//   transparency sorting against the weather motes — and Sydney already has
+//   flat lilac jacaranda decals on the lawn, which are the worst-looking thing
+//   in qa/na-sydney.png. A second family of flat blobs is not the answer.
+//
+//   Not per-object. A term on the object darkens the OBJECT; what has to darken
+//   is the surface the object is standing on, which belongs to a different mesh
+//   and usually to a different module.
+//
+// So it is a term in the fragment shader of the surfaces that already take
+// grain(), fed a fixed-size uniform pool of the nearest contact points. No
+// extra draw calls, no sorting, no z-fighting, correct on a heightfield, and it
+// composites with the grain rather than on top of it.
+//
+// TWELVE SLOTS, and the number is a compile-time literal because a GLSL ES 1.0
+// array size and loop bound have to be. It is a shared uniform block, so twelve
+// contact patches on every grained surface in the live chapter cost twelve
+// vec4 writes per frame in total, not per material — the same deal grainTick()
+// and rimTick() already get.
+const _CONTACT_N = 12;
+// xyz = the world position of the contact centre, at the object's BASE, not its
+// origin. w = the radius of its footprint.
+const _contactP = { value: [] };
+// 0..1, and it is faded rather than switched: a patch that pops on as the
+// distance ranking changes reads as a bug, and it is the first thing that gets
+// skipped under time pressure. systems.js owns the ramp.
+const _contactK = { value: [] };
+// One float so an empty pool costs a coherent branch and not twelve iterations.
+const _contactOn = { value: 0 };
+for (let i = 0; i < _CONTACT_N; i++) {
+  _contactP.value.push(new THREE.Vector4(0, -9999, 0, 1));
+  _contactK.value.push(0);
+}
+// The deepest a fully-weighted patch is allowed to take the diffuse. This is
+// contact, not drama: past about a third the ring stops reading as the absence
+// of bounce light and starts reading as paint, which is the failure mode of
+// every decal-based version of this effect.
+const _contactMAX = 0.32;
+// Absolute metres, NOT a multiple of the radius. A prop on a balcony must not
+// darken the street six metres below it, and expressing that gate in radii
+// makes the cut-off depend on how big the prop is — so a market stall on a
+// terrace would reach further down than a bin on one. The gate closes a metre
+// below the object's base whatever the object is.
+const _contactRISE0 = 0.25;
+const _contactRISE1 = 1.00;
+/** How many slots the pool has. systems.js ranks into this many. */
+export function contactSlots() { return _CONTACT_N; }
+/**
+ * Write the pool. systems.js calls this once per frame with at most
+ * contactSlots() entries, already ranked and already faded:
+ *
+ *     list[i] = { x, y, z, r, k }
+ *
+ * Slots beyond `n` are zeroed, so a contributor that leaves the pool cannot
+ * leave a dark patch behind — which it would, silently, if this only ever wrote
+ * the slots it was given.
+ */
+export function contactTick(list, n) {
+  const P = _contactP.value, K = _contactK.value;
+  let live = 0;
+  for (let i = 0; i < _CONTACT_N; i++) {
+    if (i < n) {
+      const e = list[i];
+      P[i].set(e.x, e.y, e.z, e.r > 0.06 ? e.r : 0.06);
+      K[i] = e.k > 0 ? (e.k < 1 ? e.k : 1) : 0;
+      if (K[i] > 0.002) live++;
+    } else {
+      K[i] = 0;
+    }
+  }
+  _contactOn.value = live > 0 ? 1 : 0;
+}
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};
@@ -2929,9 +3018,19 @@ export function grain(m, opts) {
   const sparkCut = o.sparkleCut === undefined ? 0.52 : o.sparkleCut;
   const sparkBand = o.sparkleBand === undefined ? 0.11 : o.sparkleBand;
   const sparkCol = o.sparkleColor === undefined ? 0xffffff : o.sparkleColor;
+  // CONTACT — see the block above _grainCache. Off unless a call site asks, so
+  // every surface in the game keeps the picture it was tuned against until it
+  // opts in, one at a time.
+  //
+  // NEVER ON WATER, and never on the wet-only build. A sea does not have things
+  // resting on it — the capybara swims IN it — and `spark > 0` is this helper's
+  // existing and only marker for "this material is a sea", exactly as the wet
+  // term already uses it. The wet-only build is props.js's one shared material
+  // and its whole invariant is "the wet gate and nothing else".
+  const cont = (wetOnly || spark > 0 || o.contact === undefined) ? 0 : o.contact;
   const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' + near + '|' + nearScale + '|' +
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
-              '|' + (wetOnly ? 'w' : '');
+              '|' + cont + '|' + (wetOnly ? 'w' : '');
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -2957,6 +3056,11 @@ export function grain(m, opts) {
       shader.uniforms.uGrainWet = _grainWet;
       shader.uniforms.uGrainWetC = _grainWetC;
     }
+    if (cont > 0) {
+      shader.uniforms.uCtcP = _contactP;
+      shader.uniforms.uCtcK = _contactK;
+      shader.uniforms.uCtcOn = _contactOn;
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
                '#include <common>\nvarying vec3 vGrainW;' +
@@ -2977,6 +3081,9 @@ export function grain(m, opts) {
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
         spark > 0 ? 'uniform float uGrainT;' : '',
+        cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
+        cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
+        cont > 0 ? 'uniform float uCtcOn;' : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
         wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
@@ -3080,6 +3187,50 @@ export function grain(m, opts) {
           '  sp *= smoothstep(0.24, 0.60, grNoise(vGrainW.xz * 0.055 + uGrainT * 0.021));',
           '  diffuseColor.rgb += sp * ' + spark.toFixed(4) +
             ' * vec3(' + sc.r.toFixed(4) + ', ' + sc.g.toFixed(4) + ', ' + sc.b.toFixed(4) + ');',
+        ].join('\n') : '',
+        cont > 0 ? [
+          // ---- CONTACT ---------------------------------------------------
+          // LAST IN THE BLOCK, AND THAT IS THE ONE ORDERING DECISION HERE.
+          // It multiplies AFTER the wet sheen has been added, so a contact ring
+          // on wet asphalt attenuates the highlight as well as the diffuse —
+          // which is what occlusion does, and what a ring drawn before the
+          // sheen would fail to do in exactly the chapter (Mong Kok in the
+          // rain) where it is most visible.
+          //
+          // AND IT MULTIPLIES diffuseColor, NOT outgoingLight. The rim is ADDED
+          // to outgoing light on purpose: a rim is light. This is the opposite
+          // — it is light that never arrived — so it belongs on the albedo,
+          // where the sun's own shading then acts on it. Added to outgoing
+          // light instead, a patch would survive into shadow at full strength
+          // and read as paint on the floor.
+          '  if (uCtcOn > 0.5) {',
+          '    float cOcc = 0.0;',
+          '    for (int ci = 0; ci < ' + _CONTACT_N + '; ci++) {',
+          '      vec4 cp = uCtcP[ci];',
+          '      float cr = cp.w;',
+          '      float cd = length(vGrainW.xz - cp.xz);',
+          // A FLAT CORE OUT TO 0.45 OF THE FOOTPRINT, then a smooth fall to
+          // nothing at the rim — and the 0.45 is the second half of the lesson
+          // sysCTC_SPREAD carries. The patch is 1.9x the object's half-width,
+          // so the object's own silhouette ends at roughly 0.53 of the radius:
+          // everything inside that is hidden underneath the thing and every
+          // bit of strength spent there is spent where nobody can see it. A
+          // core that runs out to just short of the silhouette puts nearly the
+          // whole term in the ring that actually reads. At 0.18 the visible
+          // edge got 61 % of the strength; at 0.45 it gets 94 %.
+          '      float cf = 1.0 - smoothstep(cr * 0.45, cr, cd);',
+          // THE VERTICAL GATE, IN ABSOLUTE METRES. See _contactRISE0/1: a gate
+          // expressed in radii would let a market stall on a terrace reach
+          // further down than a bin on the same terrace, which is nonsense.
+          '      cf *= 1.0 - smoothstep(' + _contactRISE0.toFixed(3) + ', ' +
+                                           _contactRISE1.toFixed(3) + ', abs(vGrainW.y - cp.y));',
+          // MAX, NOT SUM. Two tourists standing together are two patches, not a
+          // hole in the pavement, and a sum is how every naive version of this
+          // ends up with black wherever a crowd forms.
+          '      cOcc = max(cOcc, cf * uCtcK[ci]);',
+          '    }',
+          '    diffuseColor.rgb *= 1.0 - cOcc * ' + (cont * _contactMAX).toFixed(4) + ';',
+          '  }',
         ].join('\n') : '',
         '}',
       ].join('\n'));

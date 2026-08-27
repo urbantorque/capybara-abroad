@@ -352,7 +352,7 @@ function gorMerger() {
  */
 function gorVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.09, warp: 0.55, near: 0.38, nearScale: 6 });
+               { scale: 0.42, amount: 0.09, warp: 0.55, near: 0.38, nearScale: 6, contact: 1 });
 }
 /**
  * THE SAME THING, BUT NOBODY ELSE HAS IT.

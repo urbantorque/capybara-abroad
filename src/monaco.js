@@ -487,14 +487,14 @@ function monMerger() {
 
 function monVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.26, amount: 0.085, warp: 0.6, near: 0.30, nearScale: 12 });
+               { scale: 0.26, amount: 0.085, warp: 0.6, near: 0.30, nearScale: 12, contact: 1 });
 }
 /** THE GROUND, AND ONLY THE GROUND. monVC() is on the walls and the window
  *  boxes too, so it cannot carry a ground-strength near octave; this can.
  *  Ground is horizontal, so it also wants no vertical shear in the sample. */
 function monVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.26, amount: 0.085, warp: 0, near: 0.58, nearScale: 13 });
+               { scale: 0.26, amount: 0.085, warp: 0, near: 0.58, nearScale: 13, contact: 1 });
 }
 /** Stone and plaster take a finer grain than rock: at 0.26 a wall reads as brick. */
 function monVCF() {

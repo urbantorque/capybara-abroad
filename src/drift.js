@@ -423,7 +423,7 @@ function driMerger() {
  */
 function driVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.3, amount: 0.07, warp: 0.5, near: 0.30, nearScale: 9 });
+               { scale: 0.3, amount: 0.07, warp: 0.5, near: 0.30, nearScale: 9, contact: 1 });
 }
 function driPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function driInstance(root, geo, material, list, cast, recv) {

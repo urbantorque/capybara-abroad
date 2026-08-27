@@ -322,11 +322,11 @@ function panMerger() {
 
 function panVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.09, warp: 0.5, near: 0.32, nearScale: 8 });
+               { scale: 0.5, amount: 0.09, warp: 0.5, near: 0.32, nearScale: 8, contact: 1 });
 }
 function panVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9 });
+               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1 });
 }
 /** THE LEAF MATERIAL: the same grain, seen from both sides. Everything built
  *  out of `M.quad` needs this and nothing else may use it, or half the

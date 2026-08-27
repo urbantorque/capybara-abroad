@@ -419,7 +419,7 @@ function antGlow(color, intensity) {
 }
 function antVCI() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34 });
+               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34, contact: 1 });
 }
 
 function antSyncBody(b) {

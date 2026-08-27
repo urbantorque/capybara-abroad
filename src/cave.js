@@ -320,11 +320,11 @@ function cavMerger() {
 
 function cavVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.32, amount: 0.14, warp: 0.6, near: 0.34, nearScale: 10 });
+               { scale: 0.32, amount: 0.14, warp: 0.6, near: 0.34, nearScale: 10, contact: 1 });
 }
 function cavVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.28, amount: 0.22, warp: 0.25, near: 0.70, nearScale: 11 });
+               { scale: 0.28, amount: 0.22, warp: 0.25, near: 0.70, nearScale: 11, contact: 1 });
 }
 /**
  * ANYTHING IN HERE THAT GIVES OFF LIGHT IS BUILT WITH THIS.

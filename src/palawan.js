@@ -337,13 +337,13 @@ function palMerger() {
  */
 function palVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.28, nearScale: 9 });
+               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.28, nearScale: 9, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function palVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9 });
+               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1 });
 }
 
 /**

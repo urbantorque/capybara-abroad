@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick } from './shared.js';
+         rimTick, contactSlots, contactTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -41,6 +41,53 @@ const sysLightOff  = new THREE.Vector3();
 const sysWorldUp   = new THREE.Vector3(0, 1, 0);
 const sysAimA      = new THREE.Vector3();   // hint arrow: capybara, in NDC
 const sysAimB      = new THREE.Vector3();   // hint arrow: target, in NDC
+
+// ---------------------------------------------------------------------------
+// THE CONTACT POOL — see the CONTACT block in shared.js for what it feeds and
+// why it exists at all. This end owns the ranking and the fade; that end owns
+// the shader and the uniforms.
+//
+// It is written as a NEAREST-N POOL rather than as "one patch per object"
+// because the array size in the shader is a compile-time literal and must stay
+// constant for the life of the program — the moment it varies, three recompiles
+// every grained material in the chapter and the frame hitches. The pool is the
+// shape the point-light work will want next, and it is deliberately the same
+// shape so that it can be lifted rather than re-derived.
+const sysCTC_FAR    = 26;    // m from the camera past which a thing cannot claim a slot.
+                             // The shader's own radial falloff kills a patch long
+                             // before this; the cull is here so the RANKING does not
+                             // spend its slots on things nobody can see.
+const sysCTC_HYST   = 4;     // m of hysteresis on that cull. Without it an object
+                             // sitting exactly at the boundary claims and releases a
+                             // slot on alternate frames and the patch flickers.
+const sysCTC_LAMBDA = 7.0;   // the fade in and out, ~0.15 s of travel. Slower and a
+                             // patch visibly lags the thing that casts it; faster and
+                             // the hand-over between slots pops, which is the one
+                             // failure this whole mechanism exists to avoid.
+// FOOTPRINT RADIUS AS A MULTIPLE OF THE OBJECT'S OWN HALF-WIDTH, and the first
+// build had this at 0.95 — "contact is a little wider than the thing" — which
+// measured as very nearly nothing. A/B against an identical frame with the pool
+// emptied (qa/pr-c3.js): 0.74 % of the lower frame touched, mean darkening 6 of
+// 255, and the capybara's own patch contributed NOTHING to it.
+//
+// The reason is obvious in hindsight and invisible in a screenshot: THE DARKEST
+// PART OF A CONTACT PATCH IS UNDERNEATH THE OBJECT, WHERE NOBODY CAN SEE IT.
+// What actually reads is the ring OUTSIDE the silhouette, so a patch the width
+// of the thing is a patch the player never sees. At 0.95 the capybara's whole
+// patch fell inside its own outline and the term did not exist.
+const sysCTC_SPREAD = 1.90;
+const sysCTC_RMIN   = 0.30;
+const sysCTC_RMAX   = 3.20;  // a market stall, not a building. Anything wider than
+                             // this is scenery and has a real shadow doing the work.
+const sysCtcBox     = new THREE.Box3();
+const sysCtcV       = new THREE.Vector3();
+// Measured once per object and kept: setFromObject traverses, and doing that for
+// every prop and every NPC every frame is the one way this becomes expensive.
+const sysCtcSize    = new WeakMap();   // Object3D -> { r, dy }
+// The live slots. Fixed length, allocated once, never resized — see above.
+const sysCtcSlots   = [];              // { obj, k, x, y, z, r }
+const sysCtcWant    = [];              // scratch: this frame's ranking
+const sysCtcOut     = [];              // scratch: what goes to the shader
 
 // Mid-afternoon sun, high and from the north-west over the harbour...
 const sysSUN_DIR      = new THREE.Vector3(-0.62, 0.66, 0.42).normalize();
@@ -5213,6 +5260,179 @@ export function createSystems(game) {
   function registerShadowTarget(o3d) {
     if (!o3d) return;
     if (o3d.isObject3D) sysEnableShadows(o3d);
+  }
+
+  // =========================================================================
+  // 1c-bis. THE CONTACT POOL. See the CONTACT block in shared.js for the
+  // finding and the shader; this is the ranking and the fade.
+  //
+  // Fed from the three registries that already exist — the capybara, game.props
+  // and game.npcs — rather than from a new opt-in registry, because a system
+  // that requires nineteen chapters to remember to call it is a system that
+  // ends up called by three of them.
+  // =========================================================================
+
+  /**
+   * The footprint radius, and how far the object's base sits below its origin.
+   *
+   * Measured ONCE per object and kept. `Box3.setFromObject` traverses the whole
+   * subtree, and doing that for every prop and every NPC on every frame is the
+   * one way this subsystem becomes expensive rather than free.
+   *
+   * A geometry that is not built yet measures empty; that case is deliberately
+   * NOT cached, so a lazily-built prop gets measured properly the frame it
+   * appears instead of being stuck at the fallback for the rest of the session.
+   */
+  function sysCtcMeasure(o) {
+    const hit = sysCtcSize.get(o);
+    if (hit) return hit;
+    sysCtcBox.makeEmpty();
+    sysCtcBox.setFromObject(o);
+    if (sysCtcBox.isEmpty() || !isFinite(sysCtcBox.min.x)) return null;
+    const sx = sysCtcBox.max.x - sysCtcBox.min.x;
+    const sz = sysCtcBox.max.z - sysCtcBox.min.z;
+    // THE FOOTPRINT, NOT THE BOUNDING SPHERE. A lamp post is three metres tall
+    // and stands on a disc the width of its own base; a sphere would give it a
+    // three-metre patch and the pavement would go dark for half a street.
+    const m = {
+      r: clamp(0.5 * Math.max(sx, sz) * sysCTC_SPREAD, sysCTC_RMIN, sysCTC_RMAX),
+      dy: o.getWorldPosition(sysCtcV).y - sysCtcBox.min.y,
+    };
+    sysCtcSize.set(o, m);
+    return m;
+  }
+
+  /** True while `o` still owns a slot — including one that is fading out. */
+  function sysCtcHolds(o) {
+    for (let s = 0; s < sysCtcSlots.length; s++) if (sysCtcSlots[s].obj === o) return true;
+    return false;
+  }
+
+  // The candidate entries are recycled, not allocated: this runs inside
+  // update() and the file's rule is zero allocations there. The array grows
+  // once to whatever a busy chapter needs and then never again.
+  const sysCtcCand = [];
+  let sysCtcCandN = 0;
+  function sysCtcOffer(o) {
+    if (!o || !o.visible) return;
+    const m = sysCtcMeasure(o);
+    if (!m) return;
+    o.getWorldPosition(sysCtcV);
+    const dx = sysCtcV.x - camera.position.x;
+    const dy = sysCtcV.y - camera.position.y;
+    const dz = sysCtcV.z - camera.position.z;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    // HYSTERESIS ON THE CULL, and it is not a nicety: an object sitting exactly
+    // at the boundary would claim a slot on one frame and release it on the
+    // next, for ever, and the patch under it would strobe.
+    const far = sysCtcHolds(o) ? sysCTC_FAR + sysCTC_HYST : sysCTC_FAR;
+    if (d2 > far * far) return;
+    let e = sysCtcCand[sysCtcCandN];
+    if (!e) { e = { obj: null, d2: 0, x: 0, y: 0, z: 0, r: 1, taken: false }; sysCtcCand[sysCtcCandN] = e; }
+    sysCtcCandN++;
+    e.obj = o; e.d2 = d2; e.taken = false;
+    e.x = sysCtcV.x; e.z = sysCtcV.z;
+    // The BASE, not the origin. A contact patch belongs where the thing meets
+    // the ground, and the shader's vertical gate is measured from it.
+    e.y = sysCtcV.y - m.dy;
+    e.r = m.r;
+    sysCtcWant.push(e);
+  }
+
+  function sysCtcRank(a, b) { return a.d2 - b.d2; }
+
+  function sysContactFrame(dt) {
+    // THE A/B SWITCH, AND IT IS NOT A LUXURY. This effect is a few per cent of
+    // a diffuse under things that are ALSO casting real sun shadows, so a
+    // screenshot cannot tell you whether it is working — the first attempt to
+    // measure it read the cast shadow and called it contact. Nothing sets this
+    // in play; `qa/pr-*.js` set it to take the other half of a pair.
+    if (game.state.noContact) { contactTick(sysCtcOut, 0); return; }
+    const N = contactSlots();
+    if (sysCtcSlots.length === 0) {
+      for (let i = 0; i < N; i++) {
+        sysCtcSlots.push({ obj: null, k: 0, x: 0, y: -9999, z: 0, r: 1 });
+      }
+    }
+
+    // ---- gather -----------------------------------------------------------
+    sysCtcWant.length = 0;
+    sysCtcCandN = 0;
+    const capy = game.capy;
+    if (capy && capy.group) sysCtcOffer(capy.group);
+    const props = game.props;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i];
+      // A held prop is at mouth height and its patch would sit under the
+      // animal's own; a spilled one has already stopped being an object.
+      if (p && p.mesh && !p.held) sysCtcOffer(p.mesh);
+    }
+    const npcs = game.npcs;
+    for (let i = 0; i < npcs.length; i++) {
+      const n = npcs[i];
+      if (n && n.group) sysCtcOffer(n.group);
+    }
+    sysCtcWant.sort(sysCtcRank);
+    if (sysCtcWant.length > N) sysCtcWant.length = N;
+
+    // ---- hold, and fade what is leaving -----------------------------------
+    for (let s = 0; s < N; s++) {
+      const sl = sysCtcSlots[s];
+      let keep = null;
+      if (sl.obj) {
+        for (let i = 0; i < sysCtcWant.length; i++) {
+          if (sysCtcWant[i].obj === sl.obj) { keep = sysCtcWant[i]; keep.taken = true; break; }
+        }
+      }
+      if (keep) {
+        sl.x = keep.x; sl.y = keep.y; sl.z = keep.z; sl.r = keep.r;
+        sl.k = damp(sl.k, 1, sysCTC_LAMBDA, dt);
+      } else {
+        sl.k = damp(sl.k, 0, sysCTC_LAMBDA, dt);
+        // A slot is not free until it is actually dark, or the hand-over IS
+        // the pop this fade exists to prevent.
+        if (sl.k < 0.004) { sl.k = 0; sl.obj = null; }
+      }
+    }
+
+    // ---- and let what is arriving into whatever is free --------------------
+    for (let i = 0; i < sysCtcWant.length; i++) {
+      const w = sysCtcWant[i];
+      if (w.taken) continue;
+      for (let s = 0; s < N; s++) {
+        const sl = sysCtcSlots[s];
+        if (sl.obj === null) {
+          sl.obj = w.obj; sl.x = w.x; sl.y = w.y; sl.z = w.z; sl.r = w.r; sl.k = 0;
+          break;
+        }
+      }
+    }
+
+    // ---- write it out ------------------------------------------------------
+    let n = 0;
+    for (let s = 0; s < N; s++) {
+      const sl = sysCtcSlots[s];
+      if (sl.k <= 0.002) continue;
+      let e = sysCtcOut[n];
+      if (!e) { e = { x: 0, y: 0, z: 0, r: 1, k: 0 }; sysCtcOut[n] = e; }
+      e.x = sl.x; e.y = sl.y; e.z = sl.z; e.r = sl.r; e.k = sl.k;
+      n++;
+    }
+    contactTick(sysCtcOut, n);
+  }
+
+  /**
+   * Drop every slot at once. A biome swap replaces the whole cast, and a patch
+   * left over from the chapter you just left would fade out over Venice from a
+   * position in Sydney — which is the shared-space leak this repo has paid for
+   * more than once. Called from the same place the grade is switched.
+   */
+  function sysContactClear() {
+    for (let s = 0; s < sysCtcSlots.length; s++) {
+      const sl = sysCtcSlots[s];
+      sl.obj = null; sl.k = 0; sl.y = -9999;
+    }
+    contactTick(sysCtcOut, 0);
   }
 
   // =========================================================================
@@ -16119,6 +16339,11 @@ export function createSystems(game) {
     // sparkle is a decorative loop that never stops and never asks; the specks
     // stay where they are and the water still reads as water.
     grainTick(sysCalmMotion ? 12.5 : game.state.time);
+    // ...and twelve vec4s, and everything in the live chapter stops floating.
+    // Same deal as the sparkle clock: the pool is a shared uniform block, so
+    // this is the entire per-frame cost of contact on every grained surface in
+    // the world, not a cost per material.
+    sysContactFrame(dt);
     const B = game.biome;
     const name = (B && B.current) || 'sydney';
 
@@ -16447,6 +16672,7 @@ export function createSystems(game) {
    * afternoon, and a damped dome opens it on a second of Sydney's blue.
    */
   function sysDressPrime(name) {
+    sysContactClear();
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
     for (let i = 0; i < sysGRADE_KEYS.length; i++) {
       const key = sysGRADE_KEYS[i];
@@ -17448,6 +17674,10 @@ export function createSystems(game) {
     // the fog and the shadow frustum are. Both cross-fade; only the dome's
     // OWNERSHIP is a hard swap, because two domes cannot both be the sky.
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
+    // The whole cast has just been replaced. A patch left holding a slot would
+    // fade out over the Piazzetta from a position in the Botanic Gardens —
+    // the shared-space leak this repo has paid for more than once.
+    sysContactClear();
     sysSkyTopWant.set(sysSKY_TOP[name] || PALETTE.skyTop);
     if (sysSkyMesh) sysSkyMesh.visible = !sysSKY_OWN[name];
     // The list and the score both belong to the place, not to a progress

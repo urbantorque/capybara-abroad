@@ -332,14 +332,14 @@ function hanMerger() {
 
 function hanVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.24, amount: 0.09, warp: 0.7, near: 0.30, nearScale: 13 });
+               { scale: 0.24, amount: 0.09, warp: 0.7, near: 0.30, nearScale: 13, contact: 1 });
 }
 /** THE GROUND, AND ONLY THE GROUND — hanVC() is on the tube houses as well,
  *  and a near octave scaled for wet concrete reads as damp on a shopfront.
  *  Flat, because the ground is horizontal and wants no vertical shear. */
 function hanVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearScale: 14 });
+               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearScale: 14, contact: 1 });
 }
 function hanVCF() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });
