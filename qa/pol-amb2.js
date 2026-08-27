@@ -5,7 +5,7 @@ async page => {
   // instrument, longer window, and STANDING STILL: Kyoto's rung is positional
   // and the walking sweep spent most of it in the grove and on the river, which
   // are the two branches that do not contain the cicada.
-  const CH = [['Digit4', 'kyoto'], ['Digit0', 'venice'], ['Digit1', 'sydney']];
+  const CH = [['Digit4', 'kyoto']];
   const out = [];
   for (const [key, name] of CH) {
     await page.reload();
@@ -27,8 +27,16 @@ async page => {
     await page.waitForTimeout(5000);
     await page.keyboard.press(key);
     await page.waitForTimeout(6000);
+    // ...AND WALK OUT OF THE RIVER FIRST. Kyoto's rung is positional and the
+    // spawn sits inside its onRiver band, whose branch contains no cicada at
+    // all: two windows came back with a full tally and no higurashi in it,
+    // which was a fact about where the animal was standing.
+    await page.keyboard.down('KeyS');
+    await page.waitForTimeout(6000);
+    await page.keyboard.up('KeyS');
+    await page.waitForTimeout(1500);
     await page.evaluate(() => { window.__tally = {}; });
-    for (let i = 0; i < 15; i++) await page.waitForTimeout(10000);
+    for (let i = 0; i < 20; i++) await page.waitForTimeout(10000);
     const r = await page.evaluate((want) => {
       const g = window.__capy;
       return { want, biome: g.biome && g.biome.current,

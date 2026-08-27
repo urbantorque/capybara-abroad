@@ -2519,7 +2519,17 @@ const sysMUS_PAL = [
   // it must not sound like is a jingle over a postcard.
   { chords: sysMUS_CHORDS13, roots: sysMUS_ROOTS13, next: sysMUS_NEXT13,
     dwellA: 7.5, dwellB: 13.0, pluckA: 2.6, pluckB: 6.2, cut: 1180, bus: 0.135, bass: 0.195,
-    lead: 'mallet', xfade: 4.6, rhythm: null,
+    // A KULINTANG, NOT SYDNEY'S MALLETS. A row of bossed bronze gongs, which is
+    // the melodic instrument of the Sulu Sea — the water this chapter is in —
+    // and the row's lydian voicing and 1180 cut were written for something
+    // bright and struck, which this is and a felt mallet on a wooden bar is not.
+    //
+    // THE LIFT STAYS ON GLASS. Every other row in this correction had its lift
+    // playing the SAME borrowed voice as its lead, so both moved together; this
+    // one does not. Palawan's lift is deliberately not the palette's own
+    // instrument — see the note under it — and that argument has nothing to do
+    // with the one being fixed here.
+    lead: 'kulintang', xfade: 4.6, rhythm: null,
     // Being under when the water lights up. Glass rather than the palette's own
     // mallet, and quiet: bioluminescence does not announce itself, it is ALREADY
     // THERE when you notice it. Eighteen notes is the densest figure in the game
@@ -2532,14 +2542,19 @@ const sysMUS_PAL = [
   // with a flute over it. It is a chapter about waiting for something.
   { chords: sysMUS_CHORDS14, roots: sysMUS_ROOTS14, next: sysMUS_NEXT14,
     dwellA: 10.0, dwellB: 17.0, pluckA: 3.6, pluckB: 8.0, cut: 720, bus: 0.115, bass: 0.185,
-    lead: 'quena', xfade: 5.2, rhythm: null,
+    // A NEY, NOT A QUENA. Same hijaz, same D, same cut at 720 — which was
+    // already written for a flute with almost no upper partials, and had been
+    // pointed at an Andean one since the row was authored. The bendir is the
+    // other half of the correction: a frame drum with a gut snare, sparse
+    // enough that it never becomes a pulse.
+    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true,
     // The sun clearing the rim. Six flute notes, opening out — the same 'soar'
     // as the condor, two hundred degrees of longitude and eleven chapters away,
     // and deliberately so: those are the only two moments in this game that are
     // a slow rise in silence with no ground under them. goreme.js holds the
     // swell across the whole climb, so like Iceland's this is a melody, not a
     // punctuation mark.
-    lift: { inst: 'quena', shape: 'soar', n: 6, gap: 0.34, oct: 0, vel: 1.05,
+    lift: { inst: 'ney', shape: 'soar', n: 6, gap: 0.34, oct: 0, vel: 1.05,
             up: 2.8, dn: 12.0 } },
   // 14 — Manly. Sydney's mallets, a tone down and moving twice as often. The
   // buoy bell from the quay palette comes back, because it is the same water
@@ -2557,12 +2572,16 @@ const sysMUS_PAL = [
   // 15 — The Pantanal. The warmest thing here, and the only bowed one.
   { chords: sysMUS_CHORDS16, roots: sysMUS_ROOTS16, next: sysMUS_NEXT16,
     dwellA: 9.5, dwellB: 15.5, pluckA: 2.8, pluckB: 6.8, cut: 820, bus: 0.155, bass: 0.30,
-    lead: 'violin', xfade: 5.0, rhythm: null,
+    // A VIOLA CAIPIRA, NOT A VIOLIN. Ten steel strings in five courses,
+    // PLUCKED — which is the whole of the error being corrected — and the row's
+    // major sevenths, its 820 cut and its five-second crossfade were all asking
+    // for something warm and sustained rather than for something bowed.
+    lead: 'caipira', xfade: 5.0, rhythm: null,
     // The whole herd going over at sundown. Seven notes opening out on the
     // bowed voice — the 'soar' shape again, and deliberately: this and the
     // condor are the two moments in the game where the animal is not doing
     // anything clever, it is just being carried along by something bigger.
-    lift: { inst: 'violin', shape: 'soar', n: 7, gap: 0.30, oct: 0, vel: 0.98,
+    lift: { inst: 'caipira', shape: 'soar', n: 7, gap: 0.30, oct: 0, vel: 0.98,
             up: 3.0, dn: 13.0 } },
   // 16 — Sơn Đoòng. The lowest, slowest, wettest palette in the game.
   { chords: sysMUS_CHORDS17, roots: sysMUS_ROOTS17, next: sysMUS_NEXT17,
@@ -7162,6 +7181,7 @@ export function createSystems(game) {
   let musPal = sysMUS_PAL[0];
   let musShakuAt = 0, musBuoyAt = 0;   // the slow voices keep their own clocks
   let musTranhAt = 0, musLoanAt = 0;   // ...and so do chapter 19's two
+  let musBendirAt = 0;                 // ...and Cappadocia's frame drum
   let musCurChord = null, musPrevChord = null;
   let musShimGain = null, musShimV = null, musProg = 0;
   // The choir. Real pad voices through a formant pair rather than the main
@@ -7340,6 +7360,11 @@ export function createSystems(game) {
       case 'bow':    musBow(when, midi, pan, vel); return;
       case 'glass':  musGlass(when, midi, pan, vel); return;
       case 'quena':  musQuena(when, midi, vel); return;
+      // The ney is blown as a single line like the quena, so it has no pan
+      // either. The caipira and the kulintang both take one.
+      case 'ney':    musNey(when, midi, vel); return;
+      case 'caipira': musCaipira(when, midi, pan, vel); return;
+      case 'kulintang': musKulintang(when, midi, pan, vel); return;
       case 'violin': musViolin(when, midi, vel, gap * 1.6); return;
       case 'twang':  musTwang(when, midi, pan, vel, 2); return;
       case 'danbau': musDanBau(when, midi, vel); return;
@@ -8071,6 +8096,236 @@ export function createSystems(game) {
    * noise at the blowing frequency that comes in with the note and leaves before
    * it does. The vibrato arrives late, the way a player's does.
    */
+
+  // =========================================================================
+  // THREE CHAPTERS WERE PLAYING RESEARCHED HARMONY ON A BORROWED TIMBRE.
+  //
+  //   Cappadocia   hijaz on D, correct — on the `quena`, the Andean flute
+  //                from chapter 2
+  //   the Pantanal major sevenths, correct — on `violin`, Venice's baroque
+  //                bowed voice
+  //   Palawan      lydian, correct — on `mallet`, Sydney's felt mallets
+  //
+  // Two of the three are conceded in the source comments already. Nothing about
+  // the harmony in those rows is wrong and nothing about it is touched here:
+  // the chords, the roots, the next-tables, the dwells and the filters stay
+  // exactly as they are. What changes is what plays them.
+  //
+  // AND THREE THINGS DELIBERATELY DO NOT CHANGE. Sydney, Circular Quay and
+  // Manly share mallets because it is one city and the score says so on
+  // purpose. The Drift, Son Doong and Antarctica are placeless BY DESIGN —
+  // quartal stacks and open fifths with no thirds, chosen so the harmony
+  // refuses to tell you how to feel about somewhere — so they get no
+  // instrument and never will.
+  // =========================================================================
+
+  /**
+   * THE NEY. An end-blown rim flute, and the oldest instrument still in use.
+   *
+   * Everything that makes it not a quena is in the BREATH. A quena's noise
+   * component sits at half the note's level and reads as an artefact of playing;
+   * a ney's is most of the sound and reads as the point of it — you are meant to
+   * hear the player. So the noise runs above the tone here rather than under it,
+   * it is wide rather than tuned, and it STARTS FIRST: a ney speaks late and
+   * uncertainly, over about a fifth of a second, where the quena is there in
+   * seventy milliseconds.
+   *
+   * The tone itself is almost a pure sine with a second partial at a third of
+   * what the quena carries, which is why Cappadocia's row already sits at a
+   * filter cutoff of 720 and has done since it was written for a flute it did
+   * not have. The scoop up into the note is the other tell: the pitch arrives
+   * from underneath, because an embouchure against a bare rim has to find it.
+   */
+  function musNey(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const atk = rand(0.16, 0.30);
+    const dur = rand(1.1, 2.2);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel), when + atk);
+    g.gain.setValueAtTime(Math.max(0.0006, vel), when + dur * 0.66);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    const o = ac.createOscillator(); o.type = 'sine';
+    // finding the note from underneath
+    o.frequency.setValueAtTime(hz * rand(0.955, 0.985), when);
+    o.frequency.exponentialRampToValueAtTime(hz, when + atk * 0.8);
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2;
+    const g2 = ac.createGain(); g2.gain.value = 0.075;
+    // A SLOWER, WIDER VIBRATO than the quena's, arriving later. It is a breath
+    // vibrato from the diaphragm rather than a finger one, and it is the second
+    // thing anybody would name about this instrument.
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = rand(3.6, 4.8);
+    const lg = ac.createGain();
+    lg.gain.setValueAtTime(0.0001, when);
+    lg.gain.linearRampToValueAtTime(hz * 0.016, when + dur * 0.6);
+    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+    o.connect(g); o2.connect(g2); g2.connect(g);
+    // THE BREATH, and it is the instrument. Above the tone, not under it, and
+    // it leads the note in — the air is moving before the pipe speaks.
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = hz * 1.6; bp.Q.value = 0.55;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = hz * 0.8;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, when);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel * 1.35), when + atk * 0.45);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel * 0.55), when + dur * 0.7);
+    ng.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    ns.connect(bp); bp.connect(hp); hp.connect(ng);
+    ng.connect(musPluckDry); ng.connect(musSend);
+    ns.start(when); ns.stop(when + dur + 0.1);
+    g.connect(musPluckDry); g.connect(musSend);
+    o.start(when); o2.start(when); lfo.start(when);
+    const stop = when + dur + 0.08;
+    o.stop(stop); o2.stop(stop); lfo.stop(stop);
+  }
+
+  /**
+   * THE BENDIR. A frame drum about half a metre across with a gut snare laid
+   * against the inside of the head, which is the whole of its character: every
+   * stroke is a low tuned thump followed immediately by a short dry buzz. Two
+   * strokes, a dum in the middle and a tak on the rim, and it is SPARSE — this
+   * chapter is about waiting for something and a drum that keeps time would
+   * take that away.
+   */
+  function musBendir(when, vel) {
+    const hz = rand(72, 88);
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(hz * 2.1, when);
+    o.frequency.exponentialRampToValueAtTime(hz, when + 0.06);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel), when + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.28, 0.45));
+    o.connect(g); g.connect(musPluckDry); g.connect(musSend);
+    o.start(when); o.stop(when + 0.6);
+    // the snare against the head — short, dry, and the reason it is a bendir
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = rand(1500, 2400); bp.Q.value = 0.9;
+    const ng = ac.createGain();
+    env(ng, when + 0.004, vel * 0.45, 0.004, rand(0.06, 0.13));
+    ns.connect(bp); bp.connect(ng); ng.connect(musPluckDry); ng.connect(musSend);
+    ns.start(when); ns.stop(when + 0.3);
+  }
+
+  /**
+   * THE VIOLA CAIPIRA. A ten-string steel guitar in five COURSES, and the
+   * courses are the instrument: the top three are unisons and the bottom two are
+   * octaves, so a single note is never a single string. That is where its whole
+   * chorused warmth comes from, and it is why the Pantanal's row asked for
+   * something warm and sustained and got a baroque violin instead.
+   *
+   * Plucked, not bowed, which is the error being corrected. Three voices per
+   * note — two unisons a few cents apart and one an octave up at a third of the
+   * level — a bright steel transient on the front, and a filter that closes
+   * slowly over a decay long enough to still be there under the next note.
+   */
+  function musCaipira(when, midi, panv, vel) {
+    const hz = sysMidiHz(midi);
+    const dur = rand(1.9, 3.2);
+    const out = ac.createGain(); out.gain.value = 1;
+    let tail = out;
+    if (ac.createStereoPanner) {
+      const pan = ac.createStereoPanner();
+      pan.pan.value = clamp(panv === undefined ? 0 : panv, -1, 1);
+      out.connect(pan); tail = pan;
+    }
+    tail.connect(musPluckDry); tail.connect(musSend);
+    // the course. Cents, not semitones: two strings tuned by hand are never
+    // quite one string, and the beat between them IS the sound.
+    const strings = [[1.0, 1.0], [rand(1.0035, 1.0075), 0.85], [2.0, 0.32]];
+    for (let i = 0; i < strings.length; i++) {
+      const s = strings[i];
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = hz * s[0];
+      const o2 = ac.createOscillator(); o2.type = 'triangle';
+      o2.frequency.value = hz * s[0] * 2.002;
+      const g2 = ac.createGain(); g2.gain.value = 0.3;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 1.6;
+      lp.frequency.setValueAtTime(Math.min(9000, hz * 11), when + i * 0.006);
+      lp.frequency.exponentialRampToValueAtTime(Math.max(380, hz * 2.2), when + dur * 0.7);
+      const g = ac.createGain();
+      const st = when + i * 0.006;        // a plectrum crosses the course
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel * s[1]), st + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+      o.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g); g.connect(out);
+      o.start(st); o2.start(st);
+      o.stop(st + dur + 0.06); o2.stop(st + dur + 0.06);
+    }
+    // steel under a nail, and it is the front of the note
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = Math.min(9000, hz * 7); bp.Q.value = 0.8;
+    const ng = ac.createGain();
+    env(ng, when, vel * 0.55, 0.002, 0.035);
+    ns.connect(bp); bp.connect(ng); ng.connect(out);
+    ns.start(when); ns.stop(when + 0.09);
+  }
+
+  /**
+   * THE KULINTANG. A row of eight bossed gongs lying on a rack, struck with a
+   * padded stick — the melodic instrument of the southern Philippines and of the
+   * Sulu Sea, which is the water Palawan sits in.
+   *
+   * It is a GONG and not a bar, and the difference is that its partials are
+   * inharmonic: musBuoy's ratios rather than musMallet's near-harmonic ones. The
+   * envelope is the mallet's, because a boss struck through felt speaks in four
+   * milliseconds and is gone in a second and a half. What has to be added on top
+   * of both is the SHIMMER — a bronze boss has a wash of very high, very short
+   * partials that a marimba bar simply does not, and without it this is a
+   * detuned xylophone.
+   */
+  function musKulintang(when, midi, panv, vel) {
+    const hz = sysMidiHz(midi);
+    const rel = rand(1.0, 1.9);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel), when + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rel);
+    // inharmonic, and the upper ones die first — which is what makes a struck
+    // bronze thing DARKEN rather than merely fade
+    const parts = [[1, 1], [2.41, 0.42], [3.86, 0.18], [5.9, 0.07]];
+    const oscs = [];
+    for (let i = 0; i < parts.length; i++) {
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.value = hz * parts[i][0] * rand(0.996, 1.004);
+      const pg = ac.createGain();
+      pg.gain.setValueAtTime(parts[i][1], when);
+      // each partial on its own clock: the fourth is gone in a fifth of the time
+      pg.gain.exponentialRampToValueAtTime(0.0001, when + rel * (1 - i * 0.22));
+      o.connect(pg); pg.connect(g);
+      oscs.push(o);
+    }
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = Math.min(9000, hz * 10);
+    g.connect(lp);
+    let tail = lp;
+    if (ac.createStereoPanner) {
+      const pan = ac.createStereoPanner(); pan.pan.value = panv;
+      lp.connect(pan); tail = pan;
+    }
+    tail.connect(musPluckDry); tail.connect(musSend);
+    for (let i = 0; i < oscs.length; i++) { oscs[i].start(when); oscs[i].stop(when + rel + 0.1); }
+    // the shimmer off the boss
+    const ns = noiseSrc();
+    const bpS = ac.createBiquadFilter();
+    bpS.type = 'bandpass'; bpS.frequency.value = Math.min(9500, hz * 8.5); bpS.Q.value = 1.6;
+    const ng = ac.createGain();
+    env(ng, when, vel * 0.30, 0.003, rand(0.12, 0.26));
+    ns.connect(bpS); bpS.connect(ng);
+    let stail = ng;
+    if (ac.createStereoPanner) {
+      const pan2 = ac.createStereoPanner(); pan2.pan.value = panv;
+      ng.connect(pan2); stail = pan2;
+    }
+    stail.connect(musPluckDry); stail.connect(musSend);
+    ns.start(when); ns.stop(when + 0.4);
+  }
+
   function musQuena(when, midi, vel) {
     const hz = sysMidiHz(midi);
     const dur = rand(0.55, 1.15);
@@ -9263,6 +9518,35 @@ export function createSystems(game) {
           if (lead === 'quena') {
             musQuena(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
               rand(0.030, 0.058) * (0.8 + musIntensity * 0.4));
+          } else if (lead === 'ney') {
+            // THE SAME REGISTER AND THE SAME CHORD TONE AS THE QUENA IT
+            // REPLACES. A ney is a longer pipe and does sit lower in life, but
+            // the row's chords, roots and filter were tuned against these
+            // pitches and none of that is what was wrong. Only the velocity
+            // moves, and downward: this voice carries a great deal more breath
+            // per unit of tone, so the same number is louder.
+            musNey(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
+              rand(0.024, 0.046) * (0.8 + musIntensity * 0.4));
+          } else if (lead === 'caipira') {
+            // A PONTEIO, NOT A NOTE — and it keeps the violin's argument, which
+            // was right: one note in a warm sustained idiom sounds like
+            // somebody testing an instrument. Three or four steps through the
+            // chord in one direction, at the same quaver the row already used.
+            const cdir = Math.random() < 0.55 ? 1 : -1;
+            let cidx = randInt(0, ch.length - 1);
+            const cn = randInt(3, 4);
+            for (let k = 0; k < cn; k++) {
+              const m = musFold(ch[((cidx % ch.length) + ch.length) % ch.length] + 12, 55, 79);
+              musCaipira(musPluckAt + k * sysMUS_BAR_Q * 1.15, m, pan * 0.7,
+                         rand(0.026, 0.046) * (0.85 + musIntensity * 0.3) * (k === 0 ? 1.15 : 1));
+              cidx += cdir;
+            }
+          } else if (lead === 'kulintang') {
+            // Same register and same octave choice the mallet had, because the
+            // row's lydian voicing was written for it. A gong carries further
+            // than felt on wood, so the velocity comes down rather than up.
+            musKulintang(musPluckAt, Math.min(88, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2)),
+              pan, v * 0.95);
           } else if (lead === 'koto') {
             // A koto sits LOW compared with the pluck it replaces — the open
             // strings of a standard hirajoshi tuning run from about D3 — and the
@@ -9354,6 +9638,24 @@ export function createSystems(game) {
       while (musLoanAt < horizon && guard++ < 12) {
         musSongLoan(musLoanAt, 0.55 + musIntensity * 0.35);
         musLoanAt += 1.10;
+      }
+    }
+    if (musPal.bendir) {
+      // SPARSE, and that is the whole specification. Cappadocia's row is the
+      // quietest palette in the game and the chapter is about waiting for
+      // something; a frame drum keeping time would answer the question the
+      // chapter is asking. Two or three strokes, then eleven to twenty-four
+      // seconds of nothing. Its own clock, same as the shakuhachi's and the
+      // dan tranh's, and for the same reason.
+      if (musBendirAt < now) musBendirAt = now + rand(4, 11);
+      guard = 0;
+      while (musBendirAt < horizon && guard++ < 4) {
+        const bn = randInt(2, 3);
+        for (let k = 0; k < bn; k++) {
+          musBendir(musBendirAt + k * rand(0.42, 0.68),
+                    rand(0.030, 0.052) * (0.8 + musIntensity * 0.35) * (k ? 0.7 : 1));
+        }
+        musBendirAt += rand(11, 24);
       }
     }
     if (musPal.buoy) {
