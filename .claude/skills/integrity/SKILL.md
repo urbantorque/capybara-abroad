@@ -695,3 +695,166 @@ distribution and the marquee, so it is not a block 9 change.
     -sin(yaw)` renders every documented arrival backwards — it is how Hanoi's
     composed opening first read as an empty plain, and it nearly cost an hour
     of work on a chapter whose spawn was already right.
+
+### BLOCK 10, 29 Aug. MONTE CARLO WAS NEVER THIN. ITS GROUND WAS ON THE WRONG LATTICE.
+
+Measured with block 8's corrected ring counter (`qa/b10-ring.js`) before
+anything was touched:
+
+```
+cave     14/31/30/14
+drift   100/100/ - /100   (2 land cells of 27 - the rest is cloud)
+monaco  100/100/100/ 93
+```
+
+**MONTE CARLO — "the real one of the three", 29/20/18/3 on the card — IS
+100/100/100/93.** The ring metric lying for the sixth time in this pass and the
+third block running. The frames agree: `qa/b10-monaco-r45-1-before.png` is a
+grandstand, a superyacht and the quays; `qa/b10-monaco-r70-2-before.png` is the
+terrace, the tunnel mouth and the town with its windows lit. **Not one prop was
+added to any of the three chapters** and the card's acceptance was already met
+by a factor of three before the block started.
+
+**SO THE BLOCK DID THE OTHER HALF OF ITS OWN ACCEPTANCE — "GROUND block 3 must
+be verified" — AND IT DOES NOT VERIFY.**
+
+```
+                                    SPAN, not element size
+monBuildGround   z = -330..220 = 550 m, EL 4, so PlaneGeometry steps 3.98551
+monBuildGroundBody                        heightfield steps exactly 4.00000
+```
+
+The two lattices agree at z = -330 and are **two metres apart by the north
+end**; on the west flank at slope 1.0-2.5 that is one to two and a half metres
+of height. Block 3 matched the element SIZE and could not move the number,
+because the size was never the whole of it. Son Doong had it twice: floor drawn
+at EL 3 over spans of 140 and 278 (neither divisible by 3 — 2.9787 and 2.9892)
+and its collider built at EL 4. Three lattices, no two the same surface.
+
+```
+qa/b3-ground.js, collider vs drawn ground     before -> after
+monaco   mean|e|                               0.110 -> 0.057
+         % over 15 cm                           17.2 -> 10.8
+         % over 50 cm                            5.4 ->  2.9
+cave     mean|e|                               0.032 -> 0.007
+         % over 15 cm                            5.4 ->  0.5
+         % over 50 cm                            1.0 ->  0.3
+cave heightfield nodes                         2 520 -> 4 512
+ms/tick median      monaco 0.7   cave 0.5   Sydney 0.7 (in-session control)
+```
+
+Monte Carlo is no longer the worst chapter — **Rio is, at 11.4%** — and Son
+Doong is now the second best. Against the ground sheet by object identity
+rather than "nearest drawn surface", Monaco goes 21.6% -> 13.0% over 15 cm, and
+**on walkable ground (slope under 0.75) it is 7.2% and 1.8%**. The residue is
+the Rock's west face, where a 4 m cell rises 4 m and `PlaneGeometry` and
+`CANNON.Heightfield` split the quad on opposite diagonals — not fixable by
+matching a lattice, and nothing stands on it.
+
+**THE SAME DEFECT IS PROBABLY IN FIVE MORE CHAPTERS AND WAS NOT FIXED HERE.**
+Read off the sources, mesh span vs collider lattice: `cali` collider NZ 78 x 5
+= 390 over a 370 m mesh; `antarctic` mesh EL 4, collider EL 5, and the collider
+1 m proud on both axes; `manly` EL 2.5 over a 272 m span = 108.8; `pantanal`
+mesh EL 3, one collider strip at EL 4; `rio` and `iceland` divide exactly and
+are clean, so their 11.4% and 9.8% are something else. Those chapters belong to
+blocks 2 and 3 and this block did not touch them.
+
+**THE DRIFT: A WRITTEN VERDICT AND NO CODE, WHICH IS THE RIGHT ANSWER.**
+Measured three ways, and the source's own note is half wrong in a way that
+matters:
+
+- the THIRD rank (`driFARFIELD`, 260-400 m out) has no geography — `islandKind`
+  is null and `terrainHeight` answers the cloud at -0.5, at all four probed;
+- the FAR rank (`farA`..`farH`, 172-200 m) **is** in `driISLES` and does answer:
+  farA at (-178, -18) reports kind `green` and a floor at 26 m. The comment
+  above `driFARFIELD` claims the far rank is not in driISLES; it is describing
+  the third rank only;
+- it does not matter. Sprint at 7.4 m/s off the edge, hop, spend the one puff:
+  **measured horizontal reach 9.6-18.8 m from three launch islands, against an
+  89 m gap from deepA to farA.** A factor of five, with no wind assist counted.
+
+So the 27 `audit-solid` hits on `dri:fardress` are a false positive of the same
+family as Pantanal's 2 627 marsh tussocks in block 6.
+
+**AND SON DOONG IS NOT DRAWN TO 72 m.** That is `rev-edge2` walking eight radial
+bearings out of a passage 90 m wide, so six stop at a wall. Along its own axis
+the chapter is drawn continuously from z = 88 to at least z = -200 — **290 m,
+the longest in the game rather than the shortest**. The walls hold: shoved east
+at 7 m/s for four seconds from seven stations down the passage, the animal stops
+between 4.9 and 27 m off the centreline every time. It cannot reach the dead
+ground inside the law's domain, which is why it needs no `bounds()` of its own.
+
+21. **A CHAPTER SHAPED LIKE A CORRIDOR CANNOT BE MEASURED ON RADIAL BEARINGS.**
+    Son Doong spent this whole pass on the card as "the shortest world in the
+    game" because the instrument walks outward in eight directions from the
+    spawn and six of them are into rock at 40 m. Measure a corridor along its
+    axis.
+22. **MATCHING AN ELEMENT SIZE IS NOT MATCHING A LATTICE.** A mesh built as
+    `PlaneGeometry(X1 - X0, ..., round((X1 - X0) / EL))` steps
+    `(X1 - X0) / round((X1 - X0) / EL)`, which is EL only when the span
+    divides. Six of the nineteen chapters do not. Build the plane over
+    `NX * EL` and translate from the corner.
+
+---
+
+## THE PASS, CLOSED. 29 Aug 2026.
+
+Reprinted from the raw JSON after all ten blocks — `node qa/rev-summary.mjs`:
+
+```
+  #  chapter    | bnd slp slip | drawn resc | slope burial | law vs | foot gap (m)      | walk | scenery %
+   1 sydney     |  Y   .   .  |   136  8/8 |     0     0  |     -  |  0.218  1.31   0  |    0 |  43/  0/  0/  3
+   2 pasto      |  Y   Y   .  |   184  8/8 |  59.8  52.6  |   2.4  | -0.080  0.00   0  |   58 | 100/  0/  0/  0
+   3 quay       |  Y   .   .  |   224  4/8 |   2.3   2.3  |  24.7  |  0.003  0.25   0  |    3 |  57/ 40/  5/  0
+   4 kyoto      |  .   Y   .  |   224  8/8 |  10.1   1.8  |   4.7  | -0.022  0.02   0  |   31 | 100/ 80/ 36/ 17
+   5 cali       |  .   Y   .  |   240  8/8 |  31.8  23.3  |  18.1  |  0.016  0.16   0  |   42 |  86/ 47/ 23/  0
+   6 rio        |  Y   Y   .  |   208  8/8 |  53.8  30.4  |  23.8  | -0.026  0.03   4  |   21 |  43/ 27/ 18/ 13
+   7 iceland    |  .   Y   Y  |   328  8/8 |   5.8   1.8  |  13.1  |  0.057  0.58   3  |    1 | 100/100/ 36/ 27
+   8 sahara     |  .   Y   Y  |   176  8/8 |     0     0  |   2.5  |  0.000  0.00   0  |   32 | 100/ 53/ 50/ 33
+   9 drift      |  .   Y   .  |     -  8/8 |     0     0  |  17.4  |  0.010  0.01   0  |   27 |  29/  7/  0/  3
+  10 venice     |  .   Y   .  |   120  8/8 |   9.3   9.0  |  11.5  | -0.031  0.00   2  |    2 |  71/ 47/ 41/ 17
+  11 kowloon    |  .   Y   .  |    96  8/8 |     0     0  |   8.0  | -0.011  0.00   5  |    2 | 100/ 60/ 27/  7
+  12 palawan    |  .   Y   .  |   120  8/8 |   0.2     0  |   1.6  |  0.014  0.05   0  |    4 |  57/ 27/ 32/ 17
+  13 goreme     |  .   Y   .  |   200  8/8 |   8.5   1.7  |   9.8  | -0.008  0.08   3  |   47 |  43/ 27/  0/ 13
+  14 manly      |  .   Y   .  |     -  8/8 |  25.4  14.3  |  27.5  |  0.237  1.92   0  |    1 | 100/100/ 32/  3
+  15 pantanal   |  .   Y   .  |   136  8/8 |   1.2   1.1  |   8.0  |  0.007  0.14   0  |    6 |   0/ 27/ 18/  3
+  16 cave       |  .   Y   .  |    72  8/8 |   8.2   6.6  |  21.4  |  0.256  2.24   0  |    3 |  14/  7/  0/ 13
+  17 antarctic  |  .   Y   Y  |   216  7/8 |  74.5  15.9  |  15.3  |  0.023  0.13   0  |    1 | 100/ 47/  9/  0
+  18 monaco     |  .   Y   Y  |   368  8/8 |  44.1  36.5  |  43.1  |  0.123  0.71   0  |   13 |  29/ 20/ 18/  3
+  19 hanoi      |  Y   Y   Y  |   176  8/8 |     0     0  |   8.8  | -0.033  0.00   0  |    0 |   0/ 27/ 18/ 23
+```
+
+**READ THAT TABLE WITH THE COLUMN NOTES BELOW OR IT WILL MISLEAD YOU AGAIN.**
+Five of its nine columns were shown during this pass to measure something other
+than the thing they are named after, and every one of them cost real time before
+it was caught.
+
+| column | trust it? | what to use instead |
+|---|---|---|
+| `bnd` | **no** | It asks whether the CHAPTER publishes `bounds()`, and only five do. Block 1 gave all nineteen one from `biome.boundsOf()`; the honest column is `resc`. |
+| `resc` | **yes** | 8/8 in seventeen of nineteen, against 4 of 19 at the start of the pass. Quay 4/8 and Antarctica 7/8 are the whole remaining backlog. |
+| `drawn to` | **no for corridors** | Radial. Son Doong's 72 is six bearings into a wall; measured along its axis the chapter is 290 m. |
+| `slope burial` | **no** | It is `terrainHeight` roughness and never touches the model. Block 4: `qa/b4-pose.js`. |
+| `law vs mesh` | **no** | It compares the law against the highest drawn surface, which over a town is a roof — that is Monaco's 43.1 against `b3-ground`'s 10.8. Block 3: `qa/b3-ground.js`. |
+| `foot gap` | **not run to run** | Drifts in at least Sydney and Son Doong: Sydney read 0.02 and 1.31 on two runs of identical code, Son Doong 0.021 to 0.321 over four. Indicative only. |
+| `void` | **yes** | Rio 4, Kowloon 5, Goreme 3, Iceland 3, Venice 2 are real and unfixed; they are all chapters this pass did not open. |
+| `walk thru` | **by identity only** | The total drifts. Pasto's 58 and Goreme's 47 are the real backlog. |
+| `scenery` | **no** | Mesh-only, so it cannot see an `InstancedMesh`. Blocks 7-10: `qa/b7-ring.js` / `b8-ring.js` / `b9-ring.js` / `b10-ring.js`. It read Sydney 29, Pasto 0, Hanoi 36 and Monte Carlo 20 for rings that are 82, 80, 100 and 100. |
+
+**WHAT THE PASS ACTUALLY MOVED.** Every chapter has an edge and 17 of 19 are
+rescued on all eight bearings. Pasto's collider samples its own mesh (30.7% to
+3.1%). The animal is pitched to the ground in every chapter (four-foot spread
+0.40 to 0.03 typical). Goreme, Monte Carlo and Marrakech's landforms are the
+size of the things they are drawn as. 3 761 people are solid instead of 556.
+Sydney has an east garden and a boundary; Hanoi has a frontage round its lake, a
+surround, litter and a `bounds()`; Monte Carlo and Son Doong stand on the ground
+they are drawn on.
+
+**WHAT DID NOT MOVE, AND WHY.** Cali, Rio and Kyoto's landform colliders (18
+walk-through hits) — block 6 ran out of time on its second half and stopped at
+the boundary. Pasto's 58 and Goreme's 47 walk-through hits are meshes, not
+landforms, and need a different kind of work. The lattice defect above in five
+more chapters. Quay's 4/8 rescue and Antarctica's 7/8. Rio's 11.4% and
+Iceland's 9.8% on `b3-ground`, whose lattices divide exactly, so the cause is
+something this pass never diagnosed. Cali's -3.11 m and Kowloon's -8.70 m signed
+means: a small minority of points a very long way off, still not diagnosed.

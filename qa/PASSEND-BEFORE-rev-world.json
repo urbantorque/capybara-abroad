@@ -1,0 +1,1518 @@
+{
+ "chapters": [
+  "sydney",
+  "pasto",
+  "quay",
+  "kyoto",
+  "cali",
+  "rio",
+  "iceland",
+  "sahara",
+  "drift",
+  "venice",
+  "kowloon",
+  "palawan",
+  "goreme",
+  "manly",
+  "pantanal",
+  "cave",
+  "antarctic",
+  "monaco",
+  "hanoi"
+ ],
+ "rows": [
+  {
+   "biome": "sydney",
+   "live": "sydney",
+   "ok": true,
+   "bounds": {
+    "x0": -142,
+    "x1": 142,
+    "z0": -152,
+    "z1": 96
+   },
+   "hasTerrain": false,
+   "hasSlope": false,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 512,
+   "waterPts": 644,
+   "noPhys": 335,
+   "noPhysPct": 65.4,
+   "deadPts": [
+    [
+     -138,
+     -10,
+     0
+    ],
+    [
+     -138,
+     -2,
+     0
+    ],
+    [
+     -138,
+     5,
+     0
+    ],
+    [
+     -138,
+     12,
+     0
+    ],
+    [
+     -138,
+     19,
+     0
+    ],
+    [
+     -138,
+     27,
+     0
+    ],
+    [
+     -138,
+     34,
+     0
+    ],
+    [
+     -138,
+     41,
+     0
+    ],
+    [
+     -138,
+     49,
+     0
+    ],
+    [
+     -138,
+     56,
+     0
+    ],
+    [
+     -138,
+     63,
+     0
+    ],
+    [
+     -138,
+     70,
+     0
+    ],
+    [
+     -138,
+     78,
+     0
+    ],
+    [
+     -138,
+     85,
+     0
+    ]
+   ],
+   "burMean": 0,
+   "burMax": 0,
+   "burMaxAt": null,
+   "bur10pct": 0,
+   "bur20pct": 0,
+   "areaM2": 70432,
+   "deadM2": 20411,
+   "bodies": 139
+  },
+  {
+   "biome": "pasto",
+   "live": "pasto",
+   "ok": true,
+   "bounds": {
+    "x0": -132,
+    "x1": 132,
+    "z0": -130,
+    "z1": 134
+   },
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": false,
+   "hasSlip": false,
+   "landPts": 1156,
+   "waterPts": 0,
+   "noPhys": 5,
+   "noPhysPct": 0.4,
+   "deadPts": [
+    [
+     -113,
+     21,
+     -0.7
+    ],
+    [
+     -97,
+     -95,
+     1.2
+    ],
+    [
+     -19,
+     115,
+     -3.3
+    ],
+    [
+     19,
+     -111,
+     0.8
+    ],
+    [
+     50,
+     52,
+     -0.6
+    ]
+   ],
+   "burMean": 0.258,
+   "burMax": 2.69,
+   "burMaxAt": [
+    -35,
+    -64
+   ],
+   "bur10pct": 57.1,
+   "bur20pct": 49.3,
+   "areaM2": 69696,
+   "deadM2": 301,
+   "bodies": 79
+  },
+  {
+   "biome": "quay",
+   "live": "quay",
+   "ok": true,
+   "bounds": {
+    "x0": -420,
+    "x1": 460,
+    "z0": -760,
+    "z1": 120
+   },
+   "hasTerrain": true,
+   "hasSlope": false,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 178,
+   "waterPts": 978,
+   "noPhys": 0,
+   "noPhysPct": 0,
+   "deadPts": [],
+   "burMean": 0.036,
+   "burMax": 3.96,
+   "burMaxAt": [
+    240,
+    -514
+   ],
+   "bur10pct": 2.3,
+   "bur20pct": 2.3,
+   "areaM2": 774400,
+   "deadM2": 0,
+   "bodies": 75
+  },
+  {
+   "biome": "kyoto",
+   "live": "kyoto",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 1022,
+   "waterPts": 134,
+   "noPhys": 0,
+   "noPhysPct": 0,
+   "deadPts": [],
+   "burMean": 0.026,
+   "burMax": 0.64,
+   "burMaxAt": [
+    -65,
+    109
+   ],
+   "bur10pct": 10.1,
+   "bur20pct": 1.8,
+   "areaM2": 90000,
+   "deadM2": 0,
+   "bodies": 192
+  },
+  {
+   "biome": "cali",
+   "live": "cali",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 1118,
+   "waterPts": 38,
+   "noPhys": 0,
+   "noPhysPct": 0,
+   "deadPts": [],
+   "burMean": 0.083,
+   "burMax": 1.07,
+   "burMaxAt": [
+    -91,
+    -50
+   ],
+   "bur10pct": 31.8,
+   "bur20pct": 23.3,
+   "areaM2": 90000,
+   "deadM2": 0,
+   "bodies": 134
+  },
+  {
+   "biome": "rio",
+   "live": "rio",
+   "ok": true,
+   "bounds": {
+    "x0": -150,
+    "x1": 150,
+    "z0": -120,
+    "z1": 130
+   },
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 743,
+   "waterPts": 413,
+   "noPhys": 12,
+   "noPhysPct": 1.6,
+   "deadPts": [
+    [
+     -84,
+     68,
+     73.3
+    ],
+    [
+     -75,
+     1,
+     0
+    ],
+    [
+     -75,
+     31,
+     1.5
+    ],
+    [
+     -75,
+     38,
+     2.1
+    ],
+    [
+     -75,
+     53,
+     3.4
+    ],
+    [
+     -75,
+     68,
+     62.5
+    ],
+    [
+     -75,
+     82,
+     69.4
+    ],
+    [
+     -75,
+     112,
+     51.8
+    ],
+    [
+     -75,
+     119,
+     44.2
+    ],
+    [
+     -66,
+     68,
+     48.4
+    ],
+    [
+     -57,
+     68,
+     33.2
+    ],
+    [
+     -49,
+     68,
+     19
+    ]
+   ],
+   "burMean": 0.226,
+   "burMax": 1.6,
+   "burMaxAt": [
+    84,
+    -28
+   ],
+   "bur10pct": 53.8,
+   "bur20pct": 30.4,
+   "areaM2": 75000,
+   "deadM2": 779,
+   "bodies": 78
+  },
+  {
+   "biome": "iceland",
+   "live": "iceland",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": true,
+   "landPts": 670,
+   "waterPts": 486,
+   "noPhys": 2,
+   "noPhysPct": 0.3,
+   "deadPts": [
+    [
+     -75,
+     -47,
+     0
+    ],
+    [
+     -75,
+     -38,
+     0
+    ]
+   ],
+   "burMean": 0.029,
+   "burMax": 1.22,
+   "burMaxAt": [
+    75,
+    95
+   ],
+   "bur10pct": 5.8,
+   "bur20pct": 1.8,
+   "areaM2": 90000,
+   "deadM2": 156,
+   "bodies": 48
+  },
+  {
+   "biome": "sahara",
+   "live": "sahara",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": true,
+   "landPts": 1156,
+   "waterPts": 0,
+   "noPhys": 164,
+   "noPhysPct": 14.2,
+   "deadPts": [
+    [
+     -146,
+     -138,
+     0
+    ],
+    [
+     -146,
+     -129,
+     0
+    ],
+    [
+     -146,
+     -120,
+     0
+    ],
+    [
+     -146,
+     -111,
+     0
+    ],
+    [
+     -146,
+     -102,
+     0
+    ],
+    [
+     -146,
+     -93,
+     0
+    ],
+    [
+     -146,
+     -85,
+     0
+    ],
+    [
+     -146,
+     -76,
+     0
+    ],
+    [
+     -146,
+     -67,
+     0
+    ],
+    [
+     -146,
+     -58,
+     0
+    ],
+    [
+     -146,
+     -49,
+     0
+    ],
+    [
+     -146,
+     -41,
+     0
+    ],
+    [
+     -146,
+     -32,
+     0
+    ],
+    [
+     -146,
+     -23,
+     0
+    ]
+   ],
+   "burMean": 0,
+   "burMax": 0,
+   "burMaxAt": null,
+   "bur10pct": 0,
+   "bur20pct": 0,
+   "areaM2": 90000,
+   "deadM2": 12768,
+   "bodies": 67
+  },
+  {
+   "biome": "drift",
+   "live": "drift",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 57,
+   "waterPts": 1099,
+   "noPhys": 8,
+   "noPhysPct": 14,
+   "deadPts": [
+    [
+     -99,
+     38,
+     34
+    ],
+    [
+     -55,
+     117,
+     40
+    ],
+    [
+     -47,
+     -86,
+     76
+    ],
+    [
+     -29,
+     -42,
+     41.5
+    ],
+    [
+     6,
+     -95,
+     84
+    ],
+    [
+     77,
+     99,
+     22
+    ],
+    [
+     95,
+     11,
+     32.5
+    ],
+    [
+     103,
+     -77,
+     47
+    ]
+   ],
+   "burMean": 0,
+   "burMax": 0,
+   "burMaxAt": null,
+   "bur10pct": 0,
+   "bur20pct": 0,
+   "areaM2": 90000,
+   "deadM2": 623,
+   "bodies": 90
+  },
+  {
+   "biome": "venice",
+   "live": "venice",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 578,
+   "waterPts": 578,
+   "noPhys": 234,
+   "noPhysPct": 40.5,
+   "deadPts": [
+    [
+     -150,
+     -133,
+     1.3
+    ],
+    [
+     -150,
+     -124,
+     1.3
+    ],
+    [
+     -150,
+     -115,
+     1.3
+    ],
+    [
+     -150,
+     -106,
+     1.3
+    ],
+    [
+     -141,
+     -133,
+     1.3
+    ],
+    [
+     -141,
+     -124,
+     1.3
+    ],
+    [
+     -141,
+     -115,
+     1.3
+    ],
+    [
+     -141,
+     -106,
+     1.3
+    ],
+    [
+     -132,
+     -133,
+     1.3
+    ],
+    [
+     -132,
+     -124,
+     1.3
+    ],
+    [
+     -132,
+     -115,
+     1.3
+    ],
+    [
+     -132,
+     -106,
+     1.3
+    ],
+    [
+     -123,
+     -133,
+     1.3
+    ],
+    [
+     -123,
+     -124,
+     1.3
+    ]
+   ],
+   "burMean": 0.043,
+   "burMax": 1.58,
+   "burMaxAt": [
+    -61,
+    9
+   ],
+   "bur10pct": 9.3,
+   "bur20pct": 9,
+   "areaM2": 90000,
+   "deadM2": 18218,
+   "bodies": 190
+  },
+  {
+   "biome": "kowloon",
+   "live": "kowloon",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 954,
+   "waterPts": 202,
+   "noPhys": 238,
+   "noPhysPct": 24.9,
+   "deadPts": [
+    [
+     -146,
+     127,
+     0
+    ],
+    [
+     -146,
+     135,
+     0
+    ],
+    [
+     -146,
+     144,
+     0
+    ],
+    [
+     -146,
+     153,
+     0
+    ],
+    [
+     -146,
+     162,
+     0
+    ],
+    [
+     -146,
+     171,
+     0
+    ],
+    [
+     -146,
+     180,
+     0
+    ],
+    [
+     -137,
+     127,
+     0
+    ],
+    [
+     -137,
+     135,
+     0
+    ],
+    [
+     -137,
+     144,
+     0
+    ],
+    [
+     -137,
+     153,
+     0
+    ],
+    [
+     -137,
+     162,
+     0
+    ],
+    [
+     -137,
+     171,
+     0
+    ],
+    [
+     -137,
+     180,
+     0
+    ]
+   ],
+   "burMean": 0,
+   "burMax": 0,
+   "burMaxAt": null,
+   "bur10pct": 0,
+   "bur20pct": 0,
+   "areaM2": 90000,
+   "deadM2": 18529,
+   "bodies": 93
+  },
+  {
+   "biome": "palawan",
+   "live": "palawan",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 663,
+   "waterPts": 493,
+   "noPhys": 238,
+   "noPhysPct": 35.9,
+   "deadPts": [
+    [
+     -146,
+     139,
+     2.8
+    ],
+    [
+     -146,
+     147,
+     2.7
+    ],
+    [
+     -146,
+     156,
+     2.8
+    ],
+    [
+     -146,
+     165,
+     2.9
+    ],
+    [
+     -146,
+     174,
+     3
+    ],
+    [
+     -146,
+     183,
+     3
+    ],
+    [
+     -146,
+     192,
+     2.9
+    ],
+    [
+     -137,
+     139,
+     2.6
+    ],
+    [
+     -137,
+     147,
+     2.7
+    ],
+    [
+     -137,
+     156,
+     2.9
+    ],
+    [
+     -137,
+     165,
+     2.9
+    ],
+    [
+     -137,
+     174,
+     2.8
+    ],
+    [
+     -137,
+     183,
+     2.6
+    ],
+    [
+     -137,
+     192,
+     2.6
+    ]
+   ],
+   "burMean": 0.021,
+   "burMax": 0.19,
+   "burMaxAt": [
+    22,
+    -38
+   ],
+   "bur10pct": 0.2,
+   "bur20pct": 0,
+   "areaM2": 90000,
+   "deadM2": 18529,
+   "bodies": 87
+  },
+  {
+   "biome": "goreme",
+   "live": "goreme",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 1156,
+   "waterPts": 0,
+   "noPhys": 227,
+   "noPhysPct": 19.6,
+   "deadPts": [
+    [
+     -146,
+     135,
+     5
+    ],
+    [
+     -146,
+     144,
+     4.3
+    ],
+    [
+     -146,
+     153,
+     3.6
+    ],
+    [
+     -146,
+     162,
+     3.3
+    ],
+    [
+     -146,
+     171,
+     3.4
+    ],
+    [
+     -146,
+     180,
+     3.8
+    ],
+    [
+     -137,
+     135,
+     3.9
+    ],
+    [
+     -137,
+     144,
+     3.2
+    ],
+    [
+     -137,
+     153,
+     2.9
+    ],
+    [
+     -137,
+     162,
+     3
+    ],
+    [
+     -137,
+     171,
+     3.3
+    ],
+    [
+     -137,
+     180,
+     3.6
+    ],
+    [
+     -128,
+     135,
+     2.9
+    ],
+    [
+     -128,
+     144,
+     2.6
+    ]
+   ],
+   "burMean": 0.048,
+   "burMax": 0.23,
+   "burMaxAt": [
+    93,
+    -112
+   ],
+   "bur10pct": 8.5,
+   "bur20pct": 1.7,
+   "areaM2": 90000,
+   "deadM2": 17673,
+   "bodies": 111
+  },
+  {
+   "biome": "manly",
+   "live": "manly",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 942,
+   "waterPts": 214,
+   "noPhys": 443,
+   "noPhysPct": 47,
+   "deadPts": [
+    [
+     -146,
+     -100,
+     26.6
+    ],
+    [
+     -146,
+     -91,
+     26.6
+    ],
+    [
+     -146,
+     -82,
+     26.6
+    ],
+    [
+     -146,
+     -73,
+     26.6
+    ],
+    [
+     -146,
+     -64,
+     26.6
+    ],
+    [
+     -146,
+     -55,
+     26.6
+    ],
+    [
+     -146,
+     -47,
+     26.6
+    ],
+    [
+     -146,
+     -38,
+     26.6
+    ],
+    [
+     -146,
+     -29,
+     26.6
+    ],
+    [
+     -146,
+     -20,
+     26.6
+    ],
+    [
+     -146,
+     -11,
+     26.6
+    ],
+    [
+     -146,
+     -3,
+     26.6
+    ],
+    [
+     -146,
+     6,
+     26.6
+    ],
+    [
+     -146,
+     15,
+     26.6
+    ]
+   ],
+   "burMean": 0.101,
+   "burMax": 0.48,
+   "burMaxAt": [
+    101,
+    -100
+   ],
+   "bur10pct": 36.2,
+   "bur20pct": 20.5,
+   "areaM2": 90000,
+   "deadM2": 34490,
+   "bodies": 106
+  },
+  {
+   "biome": "pantanal",
+   "live": "pantanal",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 856,
+   "waterPts": 300,
+   "noPhys": 389,
+   "noPhysPct": 45.4,
+   "deadPts": [
+    [
+     -146,
+     -48,
+     0.1
+    ],
+    [
+     -146,
+     -22,
+     0.2
+    ],
+    [
+     -146,
+     -13,
+     0.4
+    ],
+    [
+     -146,
+     -4,
+     0.5
+    ],
+    [
+     -146,
+     5,
+     0.6
+    ],
+    [
+     -146,
+     13,
+     0.7
+    ],
+    [
+     -146,
+     22,
+     0.7
+    ],
+    [
+     -146,
+     31,
+     0.7
+    ],
+    [
+     -146,
+     40,
+     0.7
+    ],
+    [
+     -146,
+     49,
+     0.7
+    ],
+    [
+     -146,
+     58,
+     0.6
+    ],
+    [
+     -146,
+     66,
+     0.5
+    ],
+    [
+     -146,
+     75,
+     0.5
+    ],
+    [
+     -146,
+     84,
+     0.5
+    ]
+   ],
+   "burMean": 0.023,
+   "burMax": 2.86,
+   "burMaxAt": [
+    -57,
+    13
+   ],
+   "bur10pct": 1.3,
+   "bur20pct": 1.2,
+   "areaM2": 90000,
+   "deadM2": 30285,
+   "bodies": 99
+  },
+  {
+   "biome": "cave",
+   "live": "cave",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": false,
+   "landPts": 1099,
+   "waterPts": 57,
+   "noPhys": 841,
+   "noPhysPct": 76.5,
+   "deadPts": [
+    [
+     -146,
+     -75,
+     -7.5
+    ],
+    [
+     -146,
+     -66,
+     -7
+    ],
+    [
+     -146,
+     -57,
+     -6.4
+    ],
+    [
+     -146,
+     -48,
+     -5.8
+    ],
+    [
+     -146,
+     -39,
+     -5.1
+    ],
+    [
+     -146,
+     -31,
+     -4.5
+    ],
+    [
+     -146,
+     -22,
+     -4.2
+    ],
+    [
+     -146,
+     -13,
+     -4
+    ],
+    [
+     -146,
+     -4,
+     -4
+    ],
+    [
+     -146,
+     5,
+     -4.2
+    ],
+    [
+     -146,
+     13,
+     -4.6
+    ],
+    [
+     -146,
+     22,
+     -4.9
+    ],
+    [
+     -146,
+     31,
+     -5.1
+    ],
+    [
+     -146,
+     40,
+     -1.6
+    ]
+   ],
+   "burMean": 0.032,
+   "burMax": 0.44,
+   "burMaxAt": [
+    -4,
+    40
+   ],
+   "bur10pct": 5.3,
+   "bur20pct": 3.7,
+   "areaM2": 90000,
+   "deadM2": 65476,
+   "bodies": 197
+  },
+  {
+   "biome": "antarctic",
+   "live": "antarctic",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": true,
+   "landPts": 419,
+   "waterPts": 737,
+   "noPhys": 41,
+   "noPhysPct": 9.8,
+   "deadPts": [
+    [
+     -66,
+     127,
+     -0.1
+    ],
+    [
+     -57,
+     127,
+     2.5
+    ],
+    [
+     -57,
+     136,
+     -0.1
+    ],
+    [
+     -49,
+     127,
+     4.3
+    ],
+    [
+     -49,
+     136,
+     2.2
+    ],
+    [
+     -40,
+     127,
+     6.1
+    ],
+    [
+     -40,
+     145,
+     0.9
+    ],
+    [
+     -31,
+     -23,
+     -0.3
+    ],
+    [
+     -31,
+     127,
+     7.7
+    ],
+    [
+     -31,
+     136,
+     5
+    ],
+    [
+     -31,
+     145,
+     2.2
+    ],
+    [
+     -22,
+     -23,
+     -0.3
+    ],
+    [
+     -13,
+     127,
+     10
+    ],
+    [
+     -13,
+     136,
+     6.8
+    ]
+   ],
+   "burMean": 0.199,
+   "burMax": 7.56,
+   "burMaxAt": [
+    -31,
+    -23
+   ],
+   "bur10pct": 74.5,
+   "bur20pct": 16.2,
+   "areaM2": 90000,
+   "deadM2": 3192,
+   "bodies": 123
+  },
+  {
+   "biome": "monaco",
+   "live": "monaco",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": true,
+   "landPts": 587,
+   "waterPts": 569,
+   "noPhys": 19,
+   "noPhysPct": 3.2,
+   "deadPts": [
+    [
+     -65,
+     -14,
+     2.9
+    ],
+    [
+     -65,
+     4,
+     7.5
+    ],
+    [
+     -65,
+     57,
+     12.2
+    ],
+    [
+     -39,
+     -5,
+     2.6
+    ],
+    [
+     -30,
+     -5,
+     2.6
+    ],
+    [
+     -21,
+     -5,
+     2.6
+    ],
+    [
+     -12,
+     -5,
+     2.6
+    ],
+    [
+     -3,
+     -5,
+     2.6
+    ],
+    [
+     6,
+     -5,
+     2.6
+    ],
+    [
+     14,
+     -5,
+     2.6
+    ],
+    [
+     23,
+     -5,
+     2.6
+    ],
+    [
+     32,
+     -5,
+     2.6
+    ],
+    [
+     41,
+     -5,
+     2.6
+    ],
+    [
+     50,
+     -5,
+     2.6
+    ]
+   ],
+   "burMean": 0.252,
+   "burMax": 3.25,
+   "burMaxAt": [
+    147,
+    21
+   ],
+   "bur10pct": 44.1,
+   "bur20pct": 36.5,
+   "areaM2": 90000,
+   "deadM2": 1479,
+   "bodies": 54
+  },
+  {
+   "biome": "hanoi",
+   "live": "hanoi",
+   "ok": true,
+   "bounds": null,
+   "hasTerrain": true,
+   "hasSlope": true,
+   "hasWater": true,
+   "hasSlip": true,
+   "landPts": 1086,
+   "waterPts": 70,
+   "noPhys": 136,
+   "noPhysPct": 12.5,
+   "deadPts": [
+    [
+     -206,
+     -224,
+     1.2
+    ],
+    [
+     -206,
+     -215,
+     1.2
+    ],
+    [
+     -206,
+     -206,
+     1.2
+    ],
+    [
+     -206,
+     -197,
+     1.2
+    ],
+    [
+     -197,
+     -224,
+     1.2
+    ],
+    [
+     -197,
+     -215,
+     1.2
+    ],
+    [
+     -197,
+     -206,
+     1.2
+    ],
+    [
+     -197,
+     -197,
+     1.2
+    ],
+    [
+     -188,
+     -224,
+     1.2
+    ],
+    [
+     -188,
+     -215,
+     1.2
+    ],
+    [
+     -188,
+     -206,
+     1.2
+    ],
+    [
+     -188,
+     -197,
+     1.2
+    ],
+    [
+     -179,
+     -224,
+     1.2
+    ],
+    [
+     -179,
+     -215,
+     1.2
+    ]
+   ],
+   "burMean": 0.005,
+   "burMax": 0.78,
+   "burMaxAt": [
+    33,
+    -56
+   ],
+   "bur10pct": 1.1,
+   "bur20pct": 1,
+   "areaM2": 90000,
+   "deadM2": 10588,
+   "bodies": 41
+  }
+ ]
+}

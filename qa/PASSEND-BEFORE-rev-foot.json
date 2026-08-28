@@ -1,0 +1,2162 @@
+{
+ "started": true,
+ "rows": [
+  {
+   "biome": "sydney",
+   "live": "sydney",
+   "pts": [
+    {
+     "x": 28,
+     "z": 22,
+     "gap": -0.07,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.07
+    },
+    {
+     "x": 25,
+     "z": 37,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 14,
+     "z": 46,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 0,
+     "z": 50,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": -14,
+     "z": 46,
+     "gap": 0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -24,
+     "z": 36,
+     "gap": 0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -28,
+     "z": 22,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 8,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": -14,
+     "z": -2,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": -1,
+     "z": -6,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": -1.2
+    },
+    {
+     "x": 14,
+     "z": -2,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 24,
+     "z": 8,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 62,
+     "z": 22,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 54,
+     "z": 53,
+     "gap": -0.07,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.07
+    },
+    {
+     "x": 0,
+     "z": 22,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 0,
+     "z": 22,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": -0.015,
+   "maxFloat": 0.02,
+   "maxSink": -0.08,
+   "nBad": 0
+  },
+  {
+   "biome": "pasto",
+   "live": "pasto",
+   "pts": [
+    {
+     "x": 28,
+     "z": 26,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 40,
+     "gap": -0.26,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.26
+    },
+    {
+     "x": 14,
+     "z": 53,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": 0,
+     "z": 54,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": -14,
+     "z": 53,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": -24,
+     "z": 40,
+     "gap": -0.26,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.26
+    },
+    {
+     "x": -28,
+     "z": 26,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 12,
+     "gap": -0.26,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.26
+    },
+    {
+     "x": -14,
+     "z": 2,
+     "gap": 0.05,
+     "slopeDeg": 2,
+     "terrVsMesh": 0.06
+    },
+    {
+     "x": 0,
+     "z": -2,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 2,
+     "gap": -0.03,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.03
+    },
+    {
+     "x": 24,
+     "z": 12,
+     "gap": -0.26,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.26
+    },
+    {
+     "x": 62,
+     "z": 26,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 54,
+     "z": 57,
+     "gap": 0.01,
+     "slopeDeg": 2,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 31,
+     "z": 80,
+     "gap": -0.03,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": 0,
+     "z": 88,
+     "gap": 0.01,
+     "slopeDeg": 4,
+     "terrVsMesh": 0.01
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": -0.079,
+   "maxFloat": 0.05,
+   "maxSink": -0.26,
+   "nBad": 4
+  },
+  {
+   "biome": "quay",
+   "live": "quay",
+   "pts": [
+    {
+     "x": 32,
+     "z": 26,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 28,
+     "z": 40,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 18,
+     "z": 50,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 4,
+     "z": 54,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -10,
+     "z": 50,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -20,
+     "z": 40,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 26,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 4,
+     "z": -2,
+     "gap": -0.06,
+     "slopeDeg": 11,
+     "terrVsMesh": -0.07
+    },
+    {
+     "x": 28,
+     "z": 12,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 66,
+     "z": 26,
+     "gap": 0.25,
+     "slopeDeg": 15,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 58,
+     "z": 57,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -50,
+     "z": 57,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -58,
+     "z": 26,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 58,
+     "z": -5,
+     "gap": -0.12,
+     "slopeDeg": 52,
+     "terrVsMesh": -0.12
+    }
+   ],
+   "nVoid": 0,
+   "n": 14,
+   "meanGap": 0.003,
+   "maxFloat": 0.25,
+   "maxSink": -0.12,
+   "nBad": 1
+  },
+  {
+   "biome": "kyoto",
+   "live": "kyoto",
+   "pts": [
+    {
+     "x": 12,
+     "z": 52,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.13
+    },
+    {
+     "x": 8,
+     "z": 66,
+     "gap": -0.04,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -2,
+     "z": 76,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -16,
+     "z": 80,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -30,
+     "z": 76,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -40,
+     "z": 66,
+     "gap": -0.04,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -44,
+     "z": 52,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.13
+    },
+    {
+     "x": -40,
+     "z": 38,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -30,
+     "z": 28,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -16,
+     "z": 24,
+     "gap": -0.3,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.32
+    },
+    {
+     "x": -2,
+     "z": 28,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 8,
+     "z": 38,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 46,
+     "z": 52,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.13
+    },
+    {
+     "x": 38,
+     "z": 83,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 15,
+     "z": 106,
+     "gap": 0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -16,
+     "z": 114,
+     "gap": 0.02,
+     "slopeDeg": 7,
+     "terrVsMesh": -0.06
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": -0.022,
+   "maxFloat": 0.02,
+   "maxSink": -0.3,
+   "nBad": 1
+  },
+  {
+   "biome": "cali",
+   "live": "cali",
+   "pts": [
+    {
+     "x": 12,
+     "z": -19,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -2,
+     "z": 5,
+     "gap": 0.04,
+     "slopeDeg": 8,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -44,
+     "z": -19,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -41,
+     "z": -33,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -31,
+     "z": -44,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -17,
+     "z": -47,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -2,
+     "z": -44,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 8,
+     "z": -34,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 46,
+     "z": -19,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 37,
+     "z": 11,
+     "gap": 0.01,
+     "slopeDeg": 31,
+     "terrVsMesh": -1.78
+    },
+    {
+     "x": 15,
+     "z": 34,
+     "gap": -0.06,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.16
+    },
+    {
+     "x": -16,
+     "z": 43,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.2
+    },
+    {
+     "x": -47,
+     "z": 34,
+     "gap": -0.06,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.16
+    },
+    {
+     "x": -70,
+     "z": 11,
+     "gap": 0.01,
+     "slopeDeg": 31,
+     "terrVsMesh": -1.78
+    },
+    {
+     "x": -78,
+     "z": -19,
+     "gap": 0.15,
+     "slopeDeg": 24,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -68,
+     "z": -50,
+     "gap": 0.15,
+     "slopeDeg": 31,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": 0.015,
+   "maxFloat": 0.15,
+   "maxSink": -0.06,
+   "nBad": 2
+  },
+  {
+   "biome": "rio",
+   "live": "rio",
+   "pts": [
+    {
+     "x": 28,
+     "z": 0,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 25,
+     "z": 14,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 14,
+     "z": 24,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": 0,
+     "z": 28,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 24,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": -26,
+     "z": 14,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -28,
+     "z": 0,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": -24,
+     "z": -14,
+     "gap": -0.24,
+     "slopeDeg": 7,
+     "terrVsMesh": -0.28
+    },
+    {
+     "x": 24,
+     "z": -14,
+     "gap": 0.03,
+     "slopeDeg": 7,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 62,
+     "z": 0,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 54,
+     "z": 31,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 31,
+     "z": 54,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -31,
+     "z": 54,
+     "gap": -0.05,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.05
+    },
+    {
+     "x": -53,
+     "z": 31,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -62,
+     "z": 0,
+     "gap": -0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.02
+    }
+   ],
+   "nVoid": 4,
+   "n": 12,
+   "meanGap": -0.048,
+   "maxFloat": 0.03,
+   "maxSink": -0.24,
+   "nBad": 1
+  },
+  {
+   "biome": "iceland",
+   "live": "iceland",
+   "pts": [
+    {
+     "x": 28,
+     "z": 99,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": 24,
+     "z": 113,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 123,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 127,
+     "gap": 0.1,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.78
+    },
+    {
+     "x": -14,
+     "z": 123,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 115,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": 99,
+     "gap": -0.08,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.08
+    },
+    {
+     "x": -23,
+     "z": 87,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -14,
+     "z": 75,
+     "gap": 0.14,
+     "slopeDeg": 22,
+     "terrVsMesh": 0.04
+    },
+    {
+     "x": 0,
+     "z": 71,
+     "gap": -0.2,
+     "slopeDeg": 20,
+     "terrVsMesh": -0.26
+    },
+    {
+     "x": 14,
+     "z": 75,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 24,
+     "z": 85,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 67,
+     "z": 94,
+     "gap": 0.28,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.43
+    },
+    {
+     "x": 53,
+     "z": 133,
+     "gap": 0.58,
+     "slopeDeg": 0,
+     "terrVsMesh": 1.22
+    },
+    {
+     "x": -54,
+     "z": 130,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -62,
+     "z": 99,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 2,
+   "n": 14,
+   "meanGap": 0.053,
+   "maxFloat": 0.58,
+   "maxSink": -0.2,
+   "nBad": 4
+  },
+  {
+   "biome": "sahara",
+   "live": "sahara",
+   "pts": [
+    {
+     "x": 28,
+     "z": 8,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 22,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 32,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 36,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 32,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 22,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": 8,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": -6,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": -16,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": -20,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": -16,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": -6,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 62,
+     "z": 8,
+     "gap": -0.03,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.03
+    },
+    {
+     "x": 54,
+     "z": 39,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 31,
+     "z": 62,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 70,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": -0.002,
+   "maxFloat": 0,
+   "maxSink": -0.03,
+   "nBad": 0
+  },
+  {
+   "biome": "drift",
+   "live": "drift",
+   "pts": [
+    {
+     "x": -12,
+     "z": 18,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 16,
+     "z": 18,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": -28,
+     "z": -12,
+     "gap": 0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0.01
+    }
+   ],
+   "nVoid": 0,
+   "n": 3,
+   "meanGap": 0.01,
+   "maxFloat": 0.01,
+   "maxSink": 0.01,
+   "nBad": 0
+  },
+  {
+   "biome": "venice",
+   "live": "venice",
+   "pts": [
+    {
+     "x": 24,
+     "z": 13,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -32,
+     "z": 13,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": -1,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -18,
+     "z": -11,
+     "gap": -0.06,
+     "slopeDeg": 23,
+     "terrVsMesh": -0.07
+    },
+    {
+     "x": -4,
+     "z": -15,
+     "gap": -0.21,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.21
+    },
+    {
+     "x": 10,
+     "z": -11,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 20,
+     "z": -1,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 58,
+     "z": 13,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -66,
+     "z": 13,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -35,
+     "z": -41,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -4,
+     "z": -49,
+     "gap": -0.07,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.97
+    },
+    {
+     "x": 27,
+     "z": -41,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 50,
+     "z": -18,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 2,
+   "n": 11,
+   "meanGap": -0.031,
+   "maxFloat": 0,
+   "maxSink": -0.21,
+   "nBad": 1
+  },
+  {
+   "biome": "kowloon",
+   "live": "kowloon",
+   "pts": [
+    {
+     "x": 29,
+     "z": 34,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 48,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 14,
+     "z": 58,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 0,
+     "z": 61,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": -14,
+     "z": 58,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -24,
+     "z": 49,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -29,
+     "z": 34,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 20,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -14,
+     "z": 10,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 0,
+     "z": 6,
+     "gap": -0.06,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.05
+    },
+    {
+     "x": 14,
+     "z": 10,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 20,
+     "gap": -0.04,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": 62,
+     "z": 34,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 54,
+     "z": 65,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 31,
+     "z": 88,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 96,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 5,
+   "n": 11,
+   "meanGap": -0.011,
+   "maxFloat": 0,
+   "maxSink": -0.06,
+   "nBad": 0
+  },
+  {
+   "biome": "palawan",
+   "live": "palawan",
+   "pts": [
+    {
+     "x": 28,
+     "z": 46,
+     "gap": 0.05,
+     "slopeDeg": 9,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 60,
+     "gap": 0.02,
+     "slopeDeg": 2,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 70,
+     "gap": -0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 0,
+     "z": 74,
+     "gap": -0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 70,
+     "gap": -0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": -24,
+     "z": 60,
+     "gap": -0.03,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": 46,
+     "gap": 0.04,
+     "slopeDeg": 8,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 32,
+     "gap": 0.05,
+     "slopeDeg": 5,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 24,
+     "z": 32,
+     "gap": 0.02,
+     "slopeDeg": 6,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 62,
+     "z": 46,
+     "gap": 0.02,
+     "slopeDeg": 8,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 54,
+     "z": 77,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 31,
+     "z": 100,
+     "gap": 0.02,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 108,
+     "gap": 0.02,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -31,
+     "z": 100,
+     "gap": 0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": -54,
+     "z": 77,
+     "gap": 0,
+     "slopeDeg": 4,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -62,
+     "z": 46,
+     "gap": 0.03,
+     "slopeDeg": 9,
+     "terrVsMesh": -0.01
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": 0.014,
+   "maxFloat": 0.05,
+   "maxSink": -0.03,
+   "nBad": 0
+  },
+  {
+   "biome": "goreme",
+   "live": "goreme",
+   "pts": [
+    {
+     "x": 28,
+     "z": 33,
+     "gap": 0.08,
+     "slopeDeg": 14,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 48,
+     "gap": -0.01,
+     "slopeDeg": 6,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": 13,
+     "z": 57,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": -0.3,
+     "slopeDeg": 5,
+     "terrVsMesh": -0.3
+    },
+    {
+     "x": -13,
+     "z": 59,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": -24,
+     "z": 48,
+     "gap": -0.04,
+     "slopeDeg": 5,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -28,
+     "z": 34,
+     "gap": 0.08,
+     "slopeDeg": 15,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 20,
+     "gap": 0.01,
+     "slopeDeg": 5,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": -14,
+     "z": 10,
+     "gap": -0.03,
+     "slopeDeg": 2,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 0,
+     "z": 6,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 10,
+     "gap": -0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 20,
+     "gap": 0.03,
+     "slopeDeg": 4,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 62,
+     "z": 34,
+     "gap": 0.05,
+     "slopeDeg": 11,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 54,
+     "z": 65,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 31,
+     "z": 88,
+     "gap": 0.03,
+     "slopeDeg": 2,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 96,
+     "gap": 0.01,
+     "slopeDeg": 5,
+     "terrVsMesh": 0.01
+    }
+   ],
+   "nVoid": 3,
+   "n": 13,
+   "meanGap": -0.008,
+   "maxFloat": 0.08,
+   "maxSink": -0.3,
+   "nBad": 1
+  },
+  {
+   "biome": "manly",
+   "live": "manly",
+   "pts": [
+    {
+     "x": 28,
+     "z": 46,
+     "gap": 1.92,
+     "slopeDeg": 0,
+     "terrVsMesh": 2.6
+    },
+    {
+     "x": 24,
+     "z": 60,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 70,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 74,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 70,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -25,
+     "z": 60,
+     "gap": 1.92,
+     "slopeDeg": 0,
+     "terrVsMesh": 2.6
+    },
+    {
+     "x": -28,
+     "z": 46,
+     "gap": -0.05,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.05
+    },
+    {
+     "x": -24,
+     "z": 32,
+     "gap": 0.04,
+     "slopeDeg": 9,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 20,
+     "gap": 0.05,
+     "slopeDeg": 4,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 32,
+     "gap": 0.04,
+     "slopeDeg": 9,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 62,
+     "z": 46,
+     "gap": 0.03,
+     "slopeDeg": 7,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 52,
+     "z": 77,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 31,
+     "z": 100,
+     "gap": 0,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 108,
+     "gap": -0.16,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -31,
+     "z": 100,
+     "gap": 0,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -54,
+     "z": 77,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": 0.237,
+   "maxFloat": 1.92,
+   "maxSink": -0.16,
+   "nBad": 3
+  },
+  {
+   "biome": "pantanal",
+   "live": "pantanal",
+   "pts": [
+    {
+     "x": 28,
+     "z": 62,
+     "gap": 0.05,
+     "slopeDeg": 8,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 24,
+     "z": 76,
+     "gap": 0.02,
+     "slopeDeg": 9,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 14,
+     "z": 86,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 90,
+     "gap": -0.04,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": -14,
+     "z": 86,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 76,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": 62,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 48,
+     "gap": 0.02,
+     "slopeDeg": 10,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -14,
+     "z": 38,
+     "gap": -0.01,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 34,
+     "gap": -0.04,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": 14,
+     "z": 38,
+     "gap": 0.09,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 24,
+     "z": 48,
+     "gap": 0.05,
+     "slopeDeg": 10,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 62,
+     "z": 62,
+     "gap": 0,
+     "slopeDeg": 1,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 54,
+     "z": 93,
+     "gap": 0.14,
+     "slopeDeg": 12,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": -0.01,
+     "slopeDeg": 0,
+     "terrVsMesh": -0.01
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": 0.016,
+   "maxFloat": 0.14,
+   "maxSink": -0.04,
+   "nBad": 1
+  },
+  {
+   "biome": "cave",
+   "live": "cave",
+   "pts": [
+    {
+     "x": 23,
+     "z": 63,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 76,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 14,
+     "z": 86,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 90,
+     "gap": 0,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -14,
+     "z": 86,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 76,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -28,
+     "z": 62,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -24,
+     "z": 48,
+     "gap": -0.04,
+     "slopeDeg": 11,
+     "terrVsMesh": 0.08
+    },
+    {
+     "x": 0,
+     "z": 34,
+     "gap": -0.01,
+     "slopeDeg": 27,
+     "terrVsMesh": 0.09
+    },
+    {
+     "x": 14,
+     "z": 38,
+     "gap": 0.13,
+     "slopeDeg": 27,
+     "terrVsMesh": -0.02
+    },
+    {
+     "x": 24,
+     "z": 43,
+     "gap": 0.14,
+     "slopeDeg": 26,
+     "terrVsMesh": 0.03
+    },
+    {
+     "x": 64,
+     "z": 70,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 54,
+     "z": 93,
+     "gap": null,
+     "nothingUnder": true
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 0,
+     "z": 62,
+     "gap": 0.01,
+     "slopeDeg": 3,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 1,
+   "n": 15,
+   "meanGap": 0.021,
+   "maxFloat": 0.14,
+   "maxSink": -0.04,
+   "nBad": 2
+  },
+  {
+   "biome": "antarctic",
+   "live": "antarctic",
+   "pts": [
+    {
+     "x": 28,
+     "z": 52,
+     "gap": 0.12,
+     "slopeDeg": 19,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 26,
+     "z": 63,
+     "gap": 0.11,
+     "slopeDeg": 20,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 20,
+     "z": 70,
+     "gap": 0.06,
+     "slopeDeg": 17,
+     "terrVsMesh": -0.13
+    },
+    {
+     "x": 0,
+     "z": 75,
+     "gap": 0.1,
+     "slopeDeg": 19,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": -16,
+     "z": 72,
+     "gap": 0.11,
+     "slopeDeg": 19,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": -26,
+     "z": 63,
+     "gap": 0.13,
+     "slopeDeg": 20,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -28,
+     "z": 53,
+     "gap": 0.11,
+     "slopeDeg": 19,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 24,
+     "z": 38,
+     "gap": 0.4,
+     "slopeDeg": 22,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 54,
+     "z": 83,
+     "gap": 0.04,
+     "slopeDeg": 16,
+     "terrVsMesh": 0.01
+    },
+    {
+     "x": 35,
+     "z": 108,
+     "gap": 0.07,
+     "slopeDeg": 16,
+     "terrVsMesh": 0.04
+    },
+    {
+     "x": 0,
+     "z": 117,
+     "gap": -0.21,
+     "slopeDeg": 19,
+     "terrVsMesh": -0.64
+    },
+    {
+     "x": -34,
+     "z": 108,
+     "gap": 0.04,
+     "slopeDeg": 16,
+     "terrVsMesh": 0.02
+    },
+    {
+     "x": -54,
+     "z": 83,
+     "gap": 0.05,
+     "slopeDeg": 16,
+     "terrVsMesh": 0.02
+    }
+   ],
+   "nVoid": 0,
+   "n": 13,
+   "meanGap": 0.087,
+   "maxFloat": 0.4,
+   "maxSink": -0.21,
+   "nBad": 3
+  },
+  {
+   "biome": "monaco",
+   "live": "monaco",
+   "pts": [
+    {
+     "x": 38,
+     "z": -80,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -18,
+     "z": -80,
+     "gap": -0.04,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.04
+    },
+    {
+     "x": -14,
+     "z": -94,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -4,
+     "z": -104,
+     "gap": -0.05,
+     "slopeDeg": 0,
+     "terrVsMesh": -1.05
+    },
+    {
+     "x": 24,
+     "z": -104,
+     "gap": -0.05,
+     "slopeDeg": 0,
+     "terrVsMesh": -1.05
+    },
+    {
+     "x": 34,
+     "z": -94,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 72,
+     "z": -80,
+     "gap": 0.31,
+     "slopeDeg": 3,
+     "terrVsMesh": 0.34
+    },
+    {
+     "x": 64,
+     "z": -49,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": 41,
+     "z": -26,
+     "gap": 0.69,
+     "slopeDeg": 66,
+     "terrVsMesh": 0.84
+    },
+    {
+     "x": -44,
+     "z": -49,
+     "gap": 0.02,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.06
+    },
+    {
+     "x": -52,
+     "z": -80,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 0,
+   "n": 11,
+   "meanGap": 0.08,
+   "maxFloat": 0.69,
+   "maxSink": -0.05,
+   "nBad": 2
+  },
+  {
+   "biome": "hanoi",
+   "live": "hanoi",
+   "pts": [
+    {
+     "x": -61,
+     "z": -45,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -74,
+     "z": -54,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -84,
+     "z": -64,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -88,
+     "z": -78,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -84,
+     "z": -92,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -74,
+     "z": -102,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -60,
+     "z": -106,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -46,
+     "z": -102,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -40,
+     "z": -91,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -29,
+     "z": -24,
+     "gap": -0.25,
+     "slopeDeg": 1,
+     "terrVsMesh": -0.24
+    },
+    {
+     "x": -60,
+     "z": -16,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -92,
+     "z": -24,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -114,
+     "z": -47,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -122,
+     "z": -78,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -114,
+     "z": -109,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    },
+    {
+     "x": -91,
+     "z": -132,
+     "gap": 0,
+     "slopeDeg": 0,
+     "terrVsMesh": 0
+    }
+   ],
+   "nVoid": 0,
+   "n": 16,
+   "meanGap": -0.016,
+   "maxFloat": 0,
+   "maxSink": -0.25,
+   "nBad": 1
+  }
+ ]
+}
