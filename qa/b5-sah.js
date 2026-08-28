@@ -7,10 +7,10 @@ async page => {
   const out = await page.evaluate(async () => {
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     const g = window.__capy, THREE = g.THREE, CANNON = g.CANNON;
-    if (g.biome.current !== 'monaco') { g.biome.switchTo('monaco'); await sleep(1200); }
+    if (g.biome.current !== 'sahara') { g.biome.switchTo('sahara'); await sleep(1200); }
     for (let i = 0; i < 25; i++) g.tick(1 / 60, false);
     const r = { live: g.biome.current, bodies: [], probes: [] };
-    const api = g.monaco;
+    const api = g.sahara;
     const th = (x, z) => { const v = api.terrainHeight(x, z); return (typeof v === 'number' && v === v) ? v : 0; };
 
     // every static body, with its shape count and AABB
@@ -40,8 +40,7 @@ async page => {
     const from = new CANNON.Vec3(), to = new CANNON.Vec3();
     const rr = new CANNON.RaycastResult();
 
-    const PTS = [[-145,-25],[-140,-55],[-140,-25],[-140,-20],[-135,-35],
-                 [-135,-15],[-130,-50],[-130,-35],[-120,5],[-110,-20],[-145,-30],[-145,-15]];
+    const PTS = [[245,-35],[255,-35],[265,-35],[280,-35],[250,55],[260,55],[270,55],[275,55],[-25,5],[-20,5],[-5,20],[5,20],[20,5],[25,5],[-70,40],[-45,25],[-45,40],[-40,40],[240,90],[245,85],[255,85],[195,30]];
     for (const [x, z] of PTS) {
       const y = th(x, z) + 0.55;
       const row = { at: [x, z], y: +y.toFixed(2), hits: [] };
@@ -70,7 +69,7 @@ async page => {
     return r;
   });
   await page.evaluate(async (o) => {
-    await fetch('/shot?name=b5-mon.json', {
+    await fetch('/shot?name=b5-sah.json', {
       method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))),
     });
   }, out);

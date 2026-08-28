@@ -389,3 +389,74 @@ something wants the same treatment.
     cannot stand on and is block 5's subject, not block 4's. Band the gradient
     to walkable — 0.20 to 0.75, i.e. 11° to 37° — and reject any site the animal
     slides more than 6 m from.
+
+### BLOCK 5, 28 Aug. THE COLLIDERS ALL EXISTED. THEY WERE THE WRONG SIZE.
+
+Not one of the three chapters was missing a landform body. Göreme's ridge is
+eighty pooled boxes, its cliff is six, its chimneys have had four bodies since
+the solidity pass; Monte Carlo's Rock has five; Marrakech's food stalls have one
+each. Every walk-through hit in all three was a collider that stopped short of
+the mesh it belonged to:
+
+```
+goreme  gorRidge   drawn as cones of base radius 20-31, made solid as boxes
+                   26 and 34 wide - 18 to 23 m of skirt with nothing behind it
+        gorCliff   ribs drawn to faceX, batter tapers proud to faceX + 2.6,
+                   cornice overhanging to faceX + 1.2, box east face at -0.2
+        chimneys   cones of radius rb, boxes 1.55 rb across = 0.775 rb at the
+                   cardinals, so a fifth of every waist
+monaco  the Rock   nine arcade columns, sixteen 11 m cypresses and the whole
+                   seaward parapet of the ramp, none of them bodied at all
+sahara  stalls     box at y 1.1 +- 0.5, so it began 60 cm off the ground
+```
+
+```
+audit-solid hits          before -> after      target
+goreme                       41 -> 17          under 12: NOT MET
+monaco                       14 ->  0          under  3: met
+sahara                       30 -> 27          under  6: NOT MET
+```
+
+**gorRidge and gorCliff are absent from the hit list**, which is the identity
+test the card asks for. **gorValley is not** — 3 hits remain. Göreme's residue is
+the TOWN mesh (5) and the balloon FIELD mesh (6), neither of which is a landform.
+Sahara's residue is 11 hits on its own dune sheet and erg mesh, which is the
+terrain law disagreeing with the drawn sand and NOT a missing collider — that is
+block 3's and block 8's business, and it is why "under 6" was never reachable
+here.
+
+**THE ACCEPTANCE TEST THE CARD ASKS FOR IS A NUMBER, NOT A SCREENSHOT.**
+"Nothing new blocks a path that used to be walkable" is measurable and
+`qa/b5-rock.js` measures it: sample the walkable ground, ask whether the
+capybara's own collider (three spheres of r 0.34 at ground + 0.34) overlaps a
+static box, and for every point that does, raycast down and ask whether anything
+is DRAWN above it. Ground blocked under drawn rock was always rock; ground
+blocked under nothing is what this block cost.
+
+```
+blocked sample points of 2116     before -> after     of which under NOTHING
+goreme                             298 -> 405              6 -> 27
+monaco                             102 -> 104              2 ->  4
+sahara                             102 ->  97             14 -> 14
+```
+
+So Göreme gained 107 points of honest rock and 21 points of over-block — one per
+cent of the chapter, on the diagonals of the ridge skirt.
+
+**Two more traps, and the second one wasted half an hour:**
+
+13. **`audit-solid.js` cannot see a collider whose bottom is above
+    `terrain + 0.55`.** It casts one horizontal ray at that height. Marrakech's
+    food stalls read as six walk-through hits with a perfectly good box on
+    them, because the box spanned y 0.6 to 1.6 and the ray went underneath it.
+    The capybara's collider tops out at 0.68 so it *did* catch the counter —
+    the audit is stricter than the game here, and a hit at exactly chest height
+    is worth checking against the body list before writing any code.
+14. **A union of two boxes at 45° is NOT an inscribed octagon.** cannon unions
+    the shapes on a body, so two rotated squares of half-width 0.93 r reach
+    exactly as far as one — 1.31 r on the diagonal — and only fill in more of
+    the annulus between. Tried on the chimneys and the ridge skirt; it moved no
+    hit and took Göreme from 19.75% to 20.72% occupied, so it was removed again.
+    An inscribed octagon needs an INTERSECTION, which a rigid body cannot
+    express. The honest shape for a cone is `CANNON.Cylinder`, and nothing in
+    this repo uses one yet.

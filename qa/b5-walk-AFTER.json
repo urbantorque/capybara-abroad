@@ -1,0 +1,28 @@
+{
+ "rows": [
+  {
+   "biome": "goreme",
+   "live": "goreme",
+   "boxes": 420,
+   "land": 8100,
+   "occupied": 1600,
+   "occPct": 19.75
+  },
+  {
+   "biome": "monaco",
+   "live": "monaco",
+   "boxes": 392,
+   "land": 3802,
+   "occupied": 423,
+   "occPct": 11.13
+  },
+  {
+   "biome": "sahara",
+   "live": "sahara",
+   "boxes": 585,
+   "land": 8100,
+   "occupied": 302,
+   "occPct": 3.73
+  }
+ ]
+}

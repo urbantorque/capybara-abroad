@@ -1083,7 +1083,13 @@ function sahBuildSquare(game, root) {
       M.cyl(x - 0.9 + k * 0.6, 1.24, z + 0.55, 0.07, 0.16, PALETTE.sahTileGreen, 0, 0, 0, 6);
     }
     M.box(x + 1.3, 1.30, z + 0.4, 0.34, 0.26, 0.34, PALETTE.sahDye3);
-    stallGrp.add(x, 1.1, z, 3.4, 1.0, 2.4);
+    // THE BOX STARTED SIXTY CENTIMETRES OFF THE GROUND. 1.1 +/- 0.5 is y
+    // 0.6 to 1.6, so the trestle a stall stands on had nothing behind it and
+    // the audit's chest ray at terrain + 0.55 passed five centimetres UNDER the
+    // whole thing — which is why six of Marrakech's walk-through hits are on
+    // the square and why the capybara, whose collider tops out at 0.68, only
+    // just caught the underside of the counter. A stall reaches the floor.
+    stallGrp.add(x, 1.15, z, 3.4, 2.3, 2.4);
     // the man behind it, and the two people eating at it
     sahAddPerson(x - Math.cos(a) * 1.4, 0, z - Math.sin(a) * 1.4,
                  Math.atan2(Math.cos(a), Math.sin(a)), sahPPL_STAND);

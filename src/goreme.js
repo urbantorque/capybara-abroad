@@ -787,6 +787,11 @@ function gorBuildValley(game, root) {
       const bx = cx + Math.sin(fa) * fr, bz = cz + Math.cos(fa) * fr;
       M.sph(bx, gorTerrain(bx, bz) + cr * 0.42, bz, cr, cr * 0.62, cr * 0.88,
             PALETTE.gorBasaltDk, 8);
+      // ...and the boulder that explains the other seventy-nine is a metre and
+      // a half of basalt lying in the grass at exactly chest height, and it had
+      // nothing behind it. It goes in the valley's own pooled body.
+      gorPoolBox(pool(bz), bx, gorTerrain(bx, bz) + cr * 0.42, bz,
+                 cr * 1.7, cr * 1.24, cr * 1.7);
     } else {
       // THE CAP. Wider than the shaft, dark, and sitting slightly off centre,
       // because a perfectly centred one looks like a hat and a real one looks
@@ -809,7 +814,7 @@ function gorBuildValley(game, root) {
                 rnd() < 0.5 ? PALETTE.gorTuff : PALETTE.gorTuffPale, rnd() * 3);
         const scr = srt * (1.5 + rnd() * 0.4);
         M.sph(sx2, sg + sh + scr * 0.35, sz2, scr, scr * 0.7, scr * 0.9, PALETTE.gorBasalt);
-          gorPoolBox(pool(sz2), sx2, sg + sh * 0.5, sz2, srb * 1.5, sh, srb * 1.5);
+        gorPoolBox(pool(sz2), sx2, sg + sh * 0.5, sz2, srb * 1.86, sh, srb * 1.86);
       }
     }
     // a shadow skirt at the foot, which is what sells the height
@@ -848,7 +853,18 @@ function gorBuildValley(game, root) {
                2.0, 1.6, PALETTE.gorRoad, -a);
       }
       gorClimbers.push({ x: cx, z: cz, base: g, top: g + h + 0.9, rb: rb, rt: rt });
-      gorStaticBox(game, cx, g + h * 0.5, cz, rb * 1.55, h, rb * 1.55);
+      // ONE BOX, WIDENED TO THE CONE. It was 1.55 rb across, i.e. 0.775 rb
+      // from the centre at the cardinals against a drawn cone of rb, so a fifth
+      // of every chimney's waist was rock with nothing behind it.
+      //
+      // A SECOND BOX AT 45 DEGREES DOES NOT HELP AND THAT WAS TRIED FIRST.
+      // cannon UNIONS the shapes on a body, so two rotated squares reach just
+      // as far as one — 1.31 rb on the diagonal — and merely fill in more of
+      // the annulus between. Measured, it took Goreme from 19.75 to 20.72 per
+      // cent occupied and moved no hit. An inscribed octagon needs an
+      // INTERSECTION, which a rigid body cannot express; the honest shape here
+      // is CANNON.Cylinder and it is logged rather than swapped in blind.
+      gorStaticBox(game, cx, g + h * 0.5, cz, rb * 1.86, h, rb * 1.86);
       // a landing on top, so topping out puts you ON something
       gorStaticBox(game, cx, g + h + 0.35, cz, rt * 3.0, 0.7, rt * 3.0);
     } else {
@@ -861,7 +877,7 @@ function gorBuildValley(game, root) {
       // 74 shapes on a sleeping broadphase is nothing; a walk-through fairy
       // chimney in the chapter ABOUT fairy chimneys is not. They share four
       // bodies — see gorPoolBody.
-      gorPoolBox(pool(cz), cx, g + h * 0.5, cz, rb * 1.5, h, rb * 1.5);
+      gorPoolBox(pool(cz), cx, g + h * 0.5, cz, rb * 1.86, h, rb * 1.86);
     }
     gorCHIM_POS.push(cx, cz, rb);
   }
@@ -1926,10 +1942,16 @@ function gorBuildCliff(game, root) {
   // line four metres in front of the rock — which is what put gorInZone('cliff')
   // seven metres away from anywhere a capybara could actually stand, and needed
   // a +18 fudge to work at all.
+  // AND IT STOPS 2.6 m BEHIND THE ROCK. The ribs are drawn from faceX - 20 to
+  // faceX, the batter tapers stand proud of that to faceX + 2.6, and the
+  // cornice caps overhang to faceX + 1.2 — while the box's east face was at
+  // faceX - 0.2. Everything in front of that line was rock you walked into and
+  // through, which was ten of Goreme's forty-one hits along x -70 to -75. The
+  // west face is left where it was; it is inside the hill either way.
   for (let z = C.z0 - 4; z < C.z1 + 4; z += 8) {
     const g = gorTerrain(C.x, z);
-    gorStaticBox(game, faceX(z + 4) - 11.2, g + C.top * 0.5 + 4, z + 4,
-                 22, C.top + 22, 8.4);
+    gorStaticBox(game, faceX(z + 4) - 9.8, g + C.top * 0.5 + 4, z + 4,
+                 24.8, C.top + 22, 8.4);
   }
 
   const mesh = new THREE.Mesh(M.build(), gorVC());
@@ -5203,14 +5225,34 @@ function gorBuild(game) {
     for (let z = -180; z < 140; z += 8) {
       const h = crest(z) + rnd() * 5;
       const x = gorRIDGE_X + rnd() * 9;
-      N.taper(x, h * 0.44, z, 22 + rnd() * 9, 5 + rnd() * 6, h * 0.88,
+      // THE SIZES ARE HOISTED SO THE BOX AND THE CONE ARE THE SAME THING.
+      // They were not: the shoulder was drawn as a cone of base radius 20–28
+      // and made solid as a box 26 wide, so between eighteen and twenty-three
+      // metres of its western skirt was rock you walked through. Measured, that
+      // was ten of Goreme's forty-one walk-through hits, all of them in the
+      // band x 75–85 where the toe of the range comes down. The rule the
+      // extents section of ../SKILL.md gives for rand() applies to a taper's
+      // radius exactly as it does to a box's width.
+      const spRb = 22 + rnd() * 9, spRt = 5 + rnd() * 6;
+      N.taper(x, h * 0.44, z, spRb, spRt, h * 0.88,
               PALETTE.gorTuffShadow, rnd() * 3);
       // a shoulder in front of it, lower and warmer, which is the only thing
       // that gives a fully backlit range any modelling at all
-      N.taper(x - 17 - rnd() * 6, h * 0.30, z + rnd() * 5,
-              20 + rnd() * 8, 8 + rnd() * 5, h * 0.60, PALETTE.gorTuffDk, rnd() * 3);
+      const shX = x - 17 - rnd() * 6, shZ = z + rnd() * 5;
+      const shRb = 20 + rnd() * 8, shRt = 8 + rnd() * 5, shH = h * 0.60;
+      N.taper(shX, h * 0.30, shZ, shRb, shRt, shH, PALETTE.gorTuffDk, rnd() * 3);
+      // TWO BOXES PER CONE, not one, and the WIDE one is the LOW one. A cone is
+      // nearly its full base radius for the first few metres and a fraction of
+      // it at the top, so a single box either leaves the skirt hollow — which
+      // is the bug — or, if it is widened to the base, hangs a sixty-metre
+      // invisible wall over the range at the height the BALLOONS fly. The tall
+      // narrow boxes are exactly as they shipped; only the skirt is new.
       gorPoolBox(ridgeBody, x - 3, h * 0.44, z, 34, h, 9);
       gorPoolBox(ridgeBody, x - 20, h * 0.30, z, 26, h * 0.6, 9);
+      // ...and the skirt is ONE box per cone, 1.86 rb across. See the chimney
+      // note in gorBuildValley for why the 45-degree twin was removed again.
+      gorPoolBox(ridgeBody, x, 3.4, z, spRb * 1.86, 7.0, spRb * 1.86);
+      gorPoolBox(ridgeBody, shX, 3.4, shZ, shRb * 1.86, 7.0, shRb * 1.86);
       // THE RIM RUNS ON ITS OWN LINE, NOT ON THE SPURS'.
       // Each spur is thrown up to nine metres east or west so the range has a
       // plan as well as a profile — but the light along the brink is ONE line,

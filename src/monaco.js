@@ -1422,6 +1422,11 @@ function monBuildRock(game, root) {
   for (let i = 0; i < 9; i++) {
     const ax = px - 18 + i * 4.5;
     K.cyl(ax, py + 3.2, pz - 10.6, 0.44, 6.4, PALETTE.monStone, 0, 0, 0, 8);
+    // NINE COLUMNS AND NOT ONE OF THEM WAS SOLID. The arcade is the bit
+    // everybody photographs and it is also the front of the Palace: measured,
+    // four of Monte Carlo's ten landform hits are rays passing straight between
+    // these at chest height. They go in the Rock's own pooled body.
+    monPoolBox(body, ax, py + 3.2, pz - 10.6, 0.88, 6.4, 0.88);
     K.box(ax, py + 6.6, pz - 10.6, 4.4, 0.7, 1.2, PALETTE.monStoneDk);
     monWindowAt(px - 18 + i * 4.5, py + 8.6, pz - 9.8, Math.PI, 1.2, 2.0, 0.5);
   }
@@ -1469,6 +1474,12 @@ function monBuildRock(game, root) {
       // the parapet, on the seaward side only, which is which side the Rock is
       K.box(rx - 3.9 * Math.cos(yaw), ry + 0.62, rz + 3.9 * Math.sin(yaw),
             0.7, 1.1, 2.3, PALETTE.monStoneDk, 0, yaw, 0);
+      // AND THE PARAPET IS THE ONE PIECE HERE THAT IS NOT THE GROUND. The
+      // paving needs no collider because the ramp under it IS the terrain — but
+      // a wall on the seaward side of a twenty-four per cent stair exists
+      // precisely to stop you going over the edge, and it did not.
+      monPoolBox(body, rx - 3.9 * Math.cos(yaw), ry + 0.62, rz + 3.9 * Math.sin(yaw),
+                 0.7, 1.1, 2.4, yaw);
       if (i % 5 === 0) monLamp(rx + 3.4 * Math.cos(yaw), rz - 3.4 * Math.sin(yaw));
     }
   }
@@ -1481,6 +1492,12 @@ function monBuildRock(game, root) {
     if (cy < py - 6) continue;
     K.cyl(cxx, cy + 1.0, czz, 0.32, 2.0, PALETTE.monTrunk, 0, 0, 0, 6);
     K.cone(cxx, cy + 6.0, czz, 1.35, 10.0, PALETTE.monCypress, 0, 0, 0, 6);
+    // ...and monBlock is the NAVIGATION grid, which keeps people and cars off
+    // them and has never once stopped the capybara. Sixteen eleven-metre
+    // cypresses standing along the brink of the Rock, and you walked through
+    // every one of them. Narrower than the cone, so the avenue still reads as
+    // walkable between the trunks.
+    monPoolBox(body, cxx, cy + 5.5, czz, 1.5, 11.0, 1.5);
     monBlock(cxx, czz, 1.1);
   }
 
