@@ -1,0 +1,148 @@
+{
+ "rows": [
+  {
+   "biome": "pasto",
+   "live": "pasto",
+   "deg": 30.9,
+   "pitch": {
+    "mean": 0.019,
+    "max": 0.26
+   },
+   "roll": {
+    "mean": 0.8,
+    "max": 11.85
+   },
+   "pitchRange": 0.043,
+   "rollRange": 0.332,
+   "lastError": null
+  },
+  {
+   "biome": "antarctic",
+   "live": "antarctic",
+   "deg": 25.9,
+   "pitch": {
+    "mean": 0.039,
+    "max": 0.25
+   },
+   "roll": {
+    "mean": 0.607,
+    "max": 17.35
+   },
+   "pitchRange": 0.027,
+   "rollRange": 0.336,
+   "lastError": null
+  },
+  {
+   "biome": "rio",
+   "live": "rio",
+   "deg": 29.9,
+   "pitch": {
+    "mean": 0.031,
+    "max": 0.54
+   },
+   "roll": {
+    "mean": 0.602,
+    "max": 17.71
+   },
+   "pitchRange": 0.054,
+   "rollRange": 0.335,
+   "lastError": null
+  },
+  {
+   "biome": "monaco",
+   "live": "monaco",
+   "deg": 29.2,
+   "pitch": {
+    "mean": 0.051,
+    "max": 0.72
+   },
+   "roll": {
+    "mean": 0.125,
+    "max": 6.28
+   },
+   "pitchRange": 0.042,
+   "rollRange": 0.051,
+   "lastError": null
+  },
+  {
+   "biome": "cali",
+   "live": "cali",
+   "deg": 30.9,
+   "pitch": {
+    "mean": 0.011,
+    "max": 0.25
+   },
+   "roll": {
+    "mean": 0.369,
+    "max": 11.13
+   },
+   "pitchRange": 0.037,
+   "rollRange": 0.328,
+   "lastError": null
+  },
+  {
+   "biome": "goreme",
+   "live": "goreme",
+   "deg": 23.2,
+   "pitch": {
+    "mean": 1.056,
+    "max": 10.57
+   },
+   "roll": {
+    "mean": 0.336,
+    "max": 4.71
+   },
+   "pitchRange": 0.331,
+   "rollRange": 0.204,
+   "lastError": null
+  },
+  {
+   "biome": "venice",
+   "live": "venice",
+   "deg": 15.3,
+   "pitch": {
+    "mean": 0.048,
+    "max": 0.53
+   },
+   "roll": {
+    "mean": 0.565,
+    "max": 17.83
+   },
+   "pitchRange": 0.057,
+   "rollRange": 0.286,
+   "lastError": null
+  },
+  {
+   "biome": "hanoi",
+   "live": "hanoi",
+   "deg": 26.6,
+   "pitch": {
+    "mean": 0.027,
+    "max": 0.28
+   },
+   "roll": {
+    "mean": 0.545,
+    "max": 13.81
+   },
+   "pitchRange": 0.051,
+   "rollRange": 0.322,
+   "lastError": null
+  },
+  {
+   "biome": "sydney",
+   "live": "sydney",
+   "deg": 0,
+   "pitch": {
+    "mean": 0.03,
+    "max": 0.58
+   },
+   "roll": {
+    "mean": 0.525,
+    "max": 13.73
+   },
+   "pitchRange": 0.054,
+   "rollRange": 0.285,
+   "lastError": null
+  }
+ ]
+}

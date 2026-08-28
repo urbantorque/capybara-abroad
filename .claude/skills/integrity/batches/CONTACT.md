@@ -81,7 +81,31 @@ cali                                                     31.8     23.3
    drawn in all nineteen chapters at once, and it is the only change here that
    could be *disliked* rather than merely wrong.
 
-## Acceptance
+## DONE, 28 Aug 2026 — and three things on this card were wrong
+
+Corrected in `../SKILL.md`; read that section before block 5.
+
+1. **The direction is backwards.** The animal FLOATS on a slope, it does not
+   sink — the sphere chain rests on the uphill sphere, so the body centre sits
+   high and the downhill feet hang. The lift term therefore DROPS the model.
+   Only Pasto genuinely sinks, and that is block 3's drawn-above-collider
+   finding, not the pose.
+2. **`pose>10/>20` is a terrain-roughness column**, computed from
+   `terrainHeight` alone with no reference to the model. Nothing in
+   `capybara.js` can move it, so the second acceptance below is unachievable by
+   construction. `qa/b4-pose.js` — the four drawn feet against the drawn ground
+   — replaces it.
+3. **A central difference is the wrong gradient estimator for a pose.** At a
+   break of slope it averages the two sides and tips the animal into a drop it
+   is standing on the lip of. See `capyPoseFit`.
+
+Result: four-foot spread on sites where the law and the drawn ground agree,
+0.40–0.44 m down to 0.02–0.05 m in seven chapters; Hanoi 0.396 → 0.105 and
+Venice 0.053 → 0.065, both limited by law/mesh disagreement rather than by the
+pose. Jitter measured as the second difference of the drawn rotation and held
+inside the shipped turn roll's own noise. Flat chapters identical to 3 mrad.
+
+## Acceptance as it was written
 
 - The 26.1° Pasto hillside reads **under 8 cm** of nose/tail error, from 27.
 - `qa/rev-world.js` `pose>20` column: **under 10% in all nineteen**, from a

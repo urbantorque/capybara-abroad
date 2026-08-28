@@ -331,3 +331,61 @@ from the seen one.
 
 Report honestly. If you stopped early, say at which block boundary and why;
 scaling this down is the user's call, not yours.
+
+### AND THE `pose>10 / >20` COLUMN IS NOT A MODEL METRIC EITHER. BLOCK 4, 28 Aug.
+
+It is `bur10pct` / `bur20pct` in `qa/rev-world.js`, and it is computed entirely
+from `terrainHeight`: the largest height difference between a sample and its
+neighbours at ±0.45 m in x and z. **It never touches the capybara.** It is a
+measure of how rough the ground is, and nothing in `capybara.js` can move it —
+block 4's stated acceptance of "under 10% in all nineteen" was unachievable by
+construction. That is a third instrument in this pass that measured something
+other than the thing named on the card.
+
+**The honest pose metric is `qa/b4-pose.js`: the four DRAWN feet against the
+DRAWN ground, after settling on real walkable slope.** It reports the spread
+between the highest and lowest foot, which is zero on any pose that fits the
+hill and is the slope's own rise across the animal on one that does not.
+
+It also splits its sites by whether the terrain LAW and the drawn ground agree
+within 15 cm at that point (`sprAgree` vs `sprMean`). They must be split: where
+they disagree the animal is posed against one surface and photographed against
+another, and no pose can be right there. That residue is block 3's and block 8's
+business, not block 4's.
+
+```
+four-foot spread on agreeing sites, m — capyPOSE_TERRAIN 0 -> 1
+antarctic 0.443 -> 0.020    cali    0.402 -> 0.024    rio    0.421 -> 0.045
+monaco    0.411 -> 0.087    pasto   0.402 -> 0.035    manly  0.246 -> 0.013
+hanoi     0.396 -> 0.105    goreme  0.221 -> 0.046    venice 0.053 -> 0.065
+iceland   0.390 -> n/a (7 of 10 sites slide away on the ice; unmeasurable here)
+kowloon, quay: no walkable slope at all, so the pose never fires
+```
+
+**THE DIRECTION ON THE CARD IS BACKWARDS.** The collider is a chain of three
+spheres and on a slope it rests on the UPHILL one, so the animal FLOATS: mean
+gap +0.28 m in Monte Carlo, +0.27 in Rio, +0.21 in Antarctica. It reads as
+sinking because the downhill feet hang in the air while the uphill end is buried.
+The only chapter that genuinely sinks is Pasto, and that is block 3's unfixed
+drawn-above-collider finding, not the pose.
+
+**A CENTRAL DIFFERENCE IS THE WRONG ESTIMATOR FOR A POSE.** At a break of slope
+it averages the two sides. Monte Carlo at (−11.8, −105.6): the law is dead flat
+for 1.2 m one way and falls 1.38 m in 1.2 m the other, and a central difference
+called that 33° and tipped the animal backwards off a terrace it was standing on
+top of — 32° of pitch AND 32° of roll on level ground. `capyPoseFit` replaces it
+with the supporting line of the three samples, which is what a rigid body
+actually rests on. Any future code that reads a gradient to pose or place
+something wants the same treatment.
+
+**And two more harness traps, both of which produced confident wrong numbers:**
+
+11. **A downward ray from 0.6 m above the animal's foot starts INSIDE its
+    barrel.** Every chapter read a flat −0.51 m of "sink" — the capybara's own
+    back. Set `capy.group.visible = false` around the ray. This is trap 2's
+    twin and it is not the same fix.
+12. **Choosing slope sites by steepness alone puts every sample on a cliff.**
+    The first run measured nine chapters at 55–58°, which is ground the animal
+    cannot stand on and is block 5's subject, not block 4's. Band the gradient
+    to walkable — 0.20 to 0.75, i.e. 11° to 37° — and reject any site the animal
+    slides more than 6 m from.

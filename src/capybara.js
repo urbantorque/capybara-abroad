@@ -394,6 +394,99 @@ const capyGRADE_MIN  = 0.42;        // a steep climb is slow, never a wall
 const capyGRADE_MAX  = 1.16;        // and a gentle descent is a little free
 let capyGrade = 0;                  // signed grade under the feet, published
 
+// ---- THE ANIMAL ON THE HILL ------------------------------------------------
+// Seventeen chapters publish a terrain law and until now the ONLY thing that
+// read it for the model was the walking speed above. rotation.x was a speed
+// lean, rotation.z was a turn roll, and neither had ever heard of the ground:
+// the animal was held rigidly horizontal at a fixed height above its body
+// centre while the hill under its nose and its tail went their own ways.
+//
+// Measured, before this existed, with the four drawn feet against the drawn
+// ground on walkable slopes (qa/b4-pose.js): 45 cm between the highest and the
+// lowest foot in Pasto, 41 in Antarctica, 40 in Monte Carlo.
+//
+// THE DIRECTION IS THE OPPOSITE OF THE ONE THAT WAS REPORTED. The collider is
+// a chain of three spheres and on a slope it rests on the UPHILL one, so the
+// body centre sits high and the animal FLOATS — mean +0.28 m in Monte Carlo,
+// +0.27 in Rio. It reads as sinking because the downhill feet hang in the air
+// while the uphill end is buried in the hillside. Pasto is the one chapter
+// that genuinely sinks, and that is not this: its drawn ground sits above its
+// collider (see block 3, and pastoBuildTerrainMesh).
+//
+// SET capyPOSE_TERRAIN TO 0 TO TURN THE WHOLE THING OFF. This is the one
+// change in the integrity pass that alters how the animal is DRAWN in all
+// nineteen chapters at once, so it is the one that gets a switch.
+const capyPOSE_TERRAIN = 1;         // 0 disables pitch, roll and lift together
+const capyPOSE_LOOK  = 0.45;        // m fore and aft the ground is read over
+const capyPOSE_WIDE  = 0.30;        // m to either side
+const capyPOSE_MAX   = 0.62;        // rad, ~35 deg — a cliff edge is not a pose
+const capyPOSE_LIFT  = 0.45;        // m, the most the model may be dropped
+const capyPOSE_RAISE = 0.12;        // ...and the most it may be raised to bridge
+const capyPOSE_LAMBDA = 5;          // near the rate the idle channels damp at
+// How far the body may sit from where the terrain law predicts before the pose
+// stops believing it is standing on terrain at all. Standing on a crate, a
+// raft, a roof or a boulder puts the body a long way above the law, and a pose
+// driven by the hill UNDER the roof would tilt the animal on a flat surface.
+// Faded rather than switched, because a hard gate on a faceted world flickers.
+const capyPOSE_TRUST = 0.25;        // m of disagreement that still reads as 1
+const capyPOSE_DOUBT = 0.60;        // ...and where it has faded to nothing
+// The trust gets a filter of its OWN, and slower than the pose it scales. Its
+// input is the body's height above the law, which carries every millimetre of
+// contact noise the solver leaves behind; ungated, that noise multiplied the
+// whole pose on and off and the animal twitched. MEASURED, before this line
+// existed: Goreme's roll went from 0.34 to 11.4 milliradians per frame squared
+// with spikes at 78, and Cali's pitch spiked at 75.
+const capyPOSE_TRUST_LAMBDA = 4;
+let capyPosePitch = 0;              // rad, terrain pitch, damped
+let capyPoseRoll  = 0;              // rad, terrain roll, damped
+let capyPoseLift  = 0;              // m, model-only drop onto the hillside
+let capyPoseTrust = 0;              // 0..1, damped
+// The last gradient the law gave a straight answer for, HELD. A frame off the
+// ground, a frame inside a doorway, a frame where a sample lands off the edge
+// of the world: zeroing the gradient on any of those makes the target snap to
+// level and back, which is the same twitch by another route. The gate is the
+// trust, and the trust fades.
+let capyPoseGF = 0, capyPoseGX = 0, capyPoseRise = 0;
+let capyPoseSupY = 0;               // out-param of capyPoseFit, see below
+
+/**
+ * THE SLOPE A STIFF ANIMAL ACTUALLY TAKES ACROSS THREE HEIGHTS.
+ *
+ * A central difference is the obvious estimator and it is wrong at a break of
+ * slope, which is most of what a built chapter is made of. Monte Carlo, at the
+ * lip of a terrace: the law is dead flat for 1.2 m ahead and falls 1.38 m in
+ * 1.2 m behind. The central difference calls that a 33 degree slope and tips
+ * the animal backwards into a drop it is standing at the top of — measured, it
+ * came out at 32 degrees of pitch AND 32 of roll on ground that is level.
+ *
+ * A rigid body does not average the ground. It rests on the UPPER CONVEX HULL
+ * of the profile under its footprint, so with three samples the answer is the
+ * supporting line: the lowest straight line through the middle sample or the
+ * two outer ones that still lies above all three.
+ *
+ *   convex here (a crest, a lip) — it rests on the MIDDLE sample, and the
+ *     slope is whichever of the two half-slopes is nearest level, or level if
+ *     they straddle it. A symmetric crest comes out level, which is right; the
+ *     Monte Carlo lip comes out at 0.004, which is also right.
+ *   concave here (a dip, a gutter) — it BRIDGES, resting on the two outer
+ *     samples, and both the slope and the height come from them.
+ *
+ * Writes the supporting line's height at the centre to capyPoseSupY, because
+ * two return values and no allocation is worth one module-scope scratch.
+ */
+function capyPoseFit(hB, h0, hF, L) {
+  const sB = (h0 - hB) / L, sF = (hF - h0) / L;
+  if (sB > sF) {
+    capyPoseSupY = h0;
+    return sF > 0 ? sF : (sB < 0 ? sB : 0);
+  }
+  capyPoseSupY = (hB + hF) * 0.5;
+  return (sB + sF) * 0.5;
+}
+let capyLean = 0;                   // the SPEED lean, kept on its own variable
+                                    // so the terrain pitch can be added beside
+                                    // it rather than damped into it
+
 
 const capyMouthLocal = new THREE.Vector3();
 const capyPosition = new THREE.Vector3(capySPAWN.x, capySPAWN.y, capySPAWN.z);
@@ -1933,6 +2026,11 @@ export function createCapybara(game) {
     capyModel.position.y = damp(capyModel.position.y, -capyFOOT_Y + 0.16, 8, dt);
     capyModel.rotation.x = damp(capyModel.rotation.x, -0.42, 8, dt);
     capyModel.rotation.z = damp(capyModel.rotation.z, 0, 8, dt);
+    // The helm owns the pose outright and returns before the terrain pose is
+    // ever computed. Hold the hill channels AT what this branch is drawing, so
+    // stepping off the wheel resumes from the rear rather than snapping to it.
+    capyLean = capyModel.rotation.x;
+    capyPosePitch = 0; capyPoseRoll = 0; capyPoseLift = 0; capyPoseTrust = 0;
     for (let i = 0; i < 4; i++) {
       const target = i < 2 ? 1.05 + Math.sin(t * 2.2 + i) * 0.05 : -0.10;
       legs[i].rotation.x = damp(legs[i].rotation.x, target, 9, dt);
@@ -3506,16 +3604,98 @@ export function createCapybara(game) {
     // ...and less of it in the water, where buoyancy already owns the height
     // and a full 14.5 cm would put the animal's eyes under the surface.
     capyModel.position.y -= capyLoaf * capyLOAF_DROP * (capySwimming ? 0.30 : 1);
+
+    // ---- THE HILL, READ AND WORN (see capyPOSE_TERRAIN) -------------------
+    // Four extra samples of the terrain law per frame — the same law the walk
+    // speed already reads, which is analytic and smooth, so unlike a probe of
+    // the faceted COLLIDER this cannot twitch at every triangle edge.
+    //
+    // Everything here is ADDED to the speed lean and the turn roll rather than
+    // replacing them. Both of those are tuned and shipped; this is a third
+    // term beside them, and it is the reason capyLean exists.
+    //
+    // The loaf is deliberately NOT gated off, against the note on the card: a
+    // capybara that sits down on a hillside and snaps level is the bug in a
+    // costume, and since the loaf pitch is a constant added on the same
+    // channel there are no two writers here to fight.
+    let poseTrustT = 0;
+    const poseOwn = capyPOSE_TERRAIN > 0 && grounded && !capySwimming &&
+                    !capyDiving && !capyClinging && !carried && !capy.atHelm;
+    if (poseOwn) {
+      const poseApi = capyBiomeApi(game);
+      if (poseApi && typeof poseApi.terrainHeight === 'function') {
+        // forward is local +z, which under the root's yaw is (sin, cos); the
+        // model's local +x — the side rotation.z lifts — is (cos, -sin).
+        const fs = Math.sin(capyYaw), fc = Math.cos(capyYaw);
+        const ppx = capyRenderPos.x, ppz = capyRenderPos.z;
+        const h0 = capyGroundY(game, ppx, ppz);
+        const hF = capyGroundY(game, ppx + fs * capyPOSE_LOOK, ppz + fc * capyPOSE_LOOK);
+        const hB = capyGroundY(game, ppx - fs * capyPOSE_LOOK, ppz - fc * capyPOSE_LOOK);
+        const hP = capyGroundY(game, ppx + fc * capyPOSE_WIDE, ppz - fs * capyPOSE_WIDE);
+        const hN = capyGroundY(game, ppx - fc * capyPOSE_WIDE, ppz + fs * capyPOSE_WIDE);
+        if (h0 === h0 && hF === hF && hB === hB && hP === hP && hN === hN) {
+          let gF = capyPoseFit(hB, h0, hF, capyPOSE_LOOK);   // + is uphill ahead
+          const supF = capyPoseSupY;
+          let gX = capyPoseFit(hN, h0, hP, capyPOSE_WIDE);   // + is uphill to +x
+          const sup = Math.max(supF, capyPoseSupY);
+          // Clamped as a PAIR. Clamping each axis to capyPOSE_MAX on its own
+          // lets the two together reach 1.41x it, and tips the direction of the
+          // tilt away from the fall line as it does so.
+          let gM = Math.sqrt(gF * gF + gX * gX);
+          const gLim = Math.tan(capyPOSE_MAX);
+          if (gM > gLim) { const k = gLim / gM; gF *= k; gX *= k; gM = gLim; }
+          // THE DROP, and why it is arithmetic rather than a measurement.
+          // The collider is three spheres in a line and on a slope it rests on
+          // the uphill one, which lifts the body centre by the rise across half
+          // the chain plus what a sphere gains on a tilted plane. Predicting
+          // that from the GRADIENT rather than reading it off the body means a
+          // crate, a raft or a rooftop cannot feed the drop a number that has
+          // nothing to do with the hill.
+          // ...plus wherever the supporting line sits above the sample under
+          // the belly, which is how the animal bridges a gutter instead of
+          // dropping a leg into it.
+          const rise = capyFOOT_Y * Math.abs(gF) + capyFOOT_Y * (Math.sqrt(1 + gM * gM) - 1);
+          // ...and the same prediction is the trust test. If the body is not
+          // where standing on this hill would put it, the animal is standing on
+          // something else and the hill is not its pose. Faded, not switched:
+          // a hard gate over a faceted world flickers, and a flickering target
+          // on a damped channel is a wobble.
+          const off = Math.abs((capyRenderPos.y - capyFOOT_Y - h0) - rise);
+          poseTrustT = off <= capyPOSE_TRUST ? 1
+            : off >= capyPOSE_DOUBT ? 0
+            : (capyPOSE_DOUBT - off) / (capyPOSE_DOUBT - capyPOSE_TRUST);
+          capyPoseGF = gF; capyPoseGX = gX;
+          // Where the underside WANTS to be, relative to where the collider is
+          // holding it: down onto the hillside by the rise, and back up by
+          // however far the supporting line clears the sample under the belly.
+          capyPoseRise = clamp((sup - h0) - rise, -capyPOSE_LIFT, capyPOSE_RAISE);
+        }
+      }
+    }
+    capyPoseTrust = damp(capyPoseTrust, poseTrustT, capyPOSE_TRUST_LAMBDA, dt);
+    capyPosePitch = damp(capyPosePitch,
+      clamp(-Math.atan(capyPoseGF), -capyPOSE_MAX, capyPOSE_MAX) * capyPoseTrust,
+      capyPOSE_LAMBDA, dt);
+    capyPoseRoll = damp(capyPoseRoll,
+      clamp(Math.atan(capyPoseGX), -capyPOSE_MAX, capyPOSE_MAX) * capyPoseTrust,
+      capyPOSE_LAMBDA, dt);
+    capyPoseLift = damp(capyPoseLift, capyPoseRise * capyPoseTrust, capyPOSE_LAMBDA, dt);
+    capyModel.position.y += capyPoseLift;
+
     capyModel.rotation.z = (carried
       ? Math.sin(capyLegPhase * 0.5) * 0.12
-      : clamp(capyYawRate * 0.075, -0.34, 0.34) * (running ? 1.35 : 1)) + capyIdleRoll;
+      : clamp(capyYawRate * 0.075, -0.34, 0.34) * (running ? 1.35 : 1)) + capyIdleRoll + capyPoseRoll;
     // Nose down on the way down, nose up on the way back — read off the actual
     // vertical velocity rather than off the key, so a dive that has hit the
     // bottom and levelled out LOOKS level.
     const leanTarget = capyDiving || (capySwimming && capy.depth > 0.6)
                        ? clamp(-body.velocity.y * 0.16, -0.42, 0.42)
                        : capySwimming ? -0.05 : gaitSpeed * (running ? 0.030 : 0.013);
-    capyModel.rotation.x = damp(capyModel.rotation.x, lerp(leanTarget, capyLOAF_PITCH, capyLoaf), 8, dt);
+    // The speed lean damps on its OWN variable. Damping capyModel.rotation.x
+    // toward the lean while the terrain pitch is also written into it would
+    // feed the hill back into its own filter every frame.
+    capyLean = damp(capyLean, lerp(leanTarget, capyLOAF_PITCH, capyLoaf), 8, dt);
+    capyModel.rotation.x = capyLean + capyPosePitch;
     const sqY = 1 + capyPop * 0.38;
     const sqXZ = 1 - capyPop * 0.19;
     capySquash.scale.set(sqXZ, sqY, sqXZ);

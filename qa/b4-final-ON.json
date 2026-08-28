@@ -1,0 +1,43 @@
+{
+ "started": true,
+ "soak": {
+  "pasto": {
+   "lastError": null,
+   "restY": 0.34,
+   "bodies": 79,
+   "biome": "pasto"
+  },
+  "monaco": {
+   "lastError": null,
+   "restY": -0.54,
+   "bodies": 54,
+   "biome": "monaco"
+  }
+ },
+ "flat": {
+  "sydney": {
+   "biome": "sydney",
+   "maxRotX": 0.054,
+   "maxRotZ": 0.024,
+   "maxDy": 0.051
+  },
+  "kowloon": {
+   "biome": "kowloon",
+   "maxRotX": 0.054,
+   "maxRotZ": 0.215,
+   "maxDy": 0.052
+  },
+  "quay": {
+   "biome": "quay",
+   "maxRotX": 0.054,
+   "maxRotZ": 0.025,
+   "maxDy": 0.051
+  },
+  "hanoi": {
+   "biome": "hanoi",
+   "maxRotX": 0.054,
+   "maxRotZ": 0.028,
+   "maxDy": 0.051
+  }
+ }
+}
