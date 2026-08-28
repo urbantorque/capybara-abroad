@@ -143,9 +143,24 @@ the coffee terraces that `pastoCoffee` already builds 260 of.
 Most of this is **redistributing what exists** rather than authoring new
 geometry, which is what makes it a 2–3 h block rather than a day.
 
-**Pasto's `terrainHeight` is 21.3% out** against the drawn mesh. GROUND block 3
-should have fixed it; verify that first, because everything placed here is
-placed by that law.
+**AND PASTO CARRIES THE ONE THING BLOCK 3 COULD NOT FIX.** Its drawn ground and
+its collider are more than 15 cm apart on 30.7% of the chapter and more than
+50 cm apart on 13.9% — the drawn ground sitting a mean 7.9 cm ABOVE what the
+animal stands on, which is a capybara visibly sunk into Galeras.
+
+The cause is measured and it is by construction: `pastoBuildTerrainMesh` draws
+44×44 quads over 260 m — 5.9 m facets, deliberately, "big, blunt facets you can
+count" — and then WARPS them through `pastoWarpRaw`, so the drawn vertices are
+not on a regular lattice at all. The collider samples the smooth analytic law on
+a 4 m grid. No uniform grid can match a warped mesh: block 3 tried 2 m and the
+disagreement went UP, 30.7% → 34.5%.
+
+**The fix is to build the heightfield FROM the mesh vertices** rather than from
+`pastoTerrain` — sample the warped, faceted surface the player is actually
+looking at. It is a contained change to `pastoHeightfieldStrip` and it wants
+doing before any scenery is placed here, because scenery placed by the law lands
+on the law's surface and not on the one you can see. Budget an hour of this
+block for it, or run it as a 3b.
 
 ## Acceptance
 

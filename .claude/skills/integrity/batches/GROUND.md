@@ -196,15 +196,26 @@ converts a silent float into a rescue. Then move Son Doong to block 3 and say so
 
 The next tier of `terrainHeight`-vs-mesh disagreement:
 
+**Corrected 28 Aug (block 2). The old table on this card was measured with the
+broken `drawnY` ceiling and is not what to work from:**
+
 ```
-chapter      % of samples out by >15 cm    worst float
-monaco                37.0                   +0.69 m
-pasto                 21.3                   −0.26 m
-antarctic             16.4                   +0.83 m
-rio                   15.8                     —
-drift                 15.4                   +0.01 m
-cali                  13.2                   +0.15 m
+chapter      % out by >15 cm   was (broken)   note
+monaco             40.9            37.0       worst, and by a wide margin
+manly              25.5            37.8       the promenade - see below
+quay               24.7             2.8       NEW - the old probe hid this
+rio                23.5            15.8       NEW tier
+cali               19.6            13.2
+antarctic          19.3            16.4
+pasto              19.2            21.3
+                        ---- below the line ----
+cave 14.3*  iceland 13.4  venice 11.5  goreme 11.3  pantanal 11.0
+drift 9.5   kowloon 8.0   kyoto 5.1    hanoi 4.6    sahara 2.2   palawan 1.6
+                                                          * after block 2
 ```
+
+**The Drift drops out of this block** — 15.4 was instrument, it is 9.5 and it is
+an air biome with 21 valid samples. Quay and Rio take its place.
 
 Monte Carlo also showed a **14.9 m disagreement** measured at (10, −80):
 `terrainHeight` returned −12.34 where the drawn ground is at +2.60. That is

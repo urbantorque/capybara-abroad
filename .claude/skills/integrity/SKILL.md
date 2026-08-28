@@ -186,6 +186,41 @@ Quay and Rio are new entrants that the old instrument was hiding; Manly does
 NOT drop out, but for a different reason than the one on the card (see block 2).
 Monte Carlo is still the worst and by a wide margin.
 
+### AND `law15` IS STILL NOT A TERRAIN METRIC. BLOCK 3, 28 Aug.
+
+Corrected, it compares the law against **the highest drawn surface**, which over
+a town is a roof. Quay went 2.8 → 24.7 not because its terrain is wrong but
+because it has an arcade, a terminal and a CBD. `law15` measures *buildings*.
+
+**The honest terrain metric is `qa/b3-ground.js`: the heightfield collider
+against the nearest drawn surface to it.** If the drawn ground and the collider
+are the same surface it reads ~0 whatever is built on top, and it is
+DETERMINISTIC — two consecutive runs gave identical figures to three decimals.
+Use this one for terrain work, not `law15`.
+
+```
+collider vs drawn ground, mean|e| m / % >15 cm / % >50 cm
+pasto    0.202  30.7  13.9   <- worst, and it is by construction; see block 3
+monaco   0.110  17.2   5.4   <- after block 3 (was 18.6 / 6.1)
+rio      0.100  11.4   4.1
+iceland  0.106   9.6   3.1
+manly    0.034   6.8   0.2      cave 0.032 5.4 1.0      antarctic 0.031 4.5 0.0
+venice   0.021   3.2   0.3      kyoto 0.013 1.8 0.2     sahara 0.014 0.7 0.0
+goreme   0.088   1.2   0.7      pantanal 0.011 0.8      palawan 0.010 0.0
+hanoi    0.001   0.4   0.0
+cali    -3.112 signed, kowloon -8.703 signed: MEDIAN is fine, a small minority
+        of points sit a very long way off. Not diagnosed. Worth a look.
+```
+
+**And `props.js` is contaminated by a long session.** Run late in a page that
+has switched through all nineteen chapters it reported 260 props in Sydney and
+twelve bad ones, the same prop appearing in two chapters at identical
+coordinates. On a fresh page: 49, none bad. Open a new browser before it.
+
+**`b3-perf.js` does not hold a line either.** Sydney's median went 0.8 → 1.7
+ms/tick between two runs with nothing touching Sydney. Do not compare frame time
+across browser sessions.
+
 **And `rev-foot.js` does not hold a line in Son Doong.** Four runs of identical
 code: mean gap 0.021 / 0.025 / 0.068 / 0.321, worst float 0.14 / 0.19 / 0.67 /
 2.24, on n = 15. Manly over the same four runs is 0.237–0.249 and stable. Treat

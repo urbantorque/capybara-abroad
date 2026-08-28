@@ -530,6 +530,27 @@ function pastoBuildFarPeaks() {
 // that go round it. Everything is snapped to a common 4 m lattice anchored on
 // the shelf edges, so neighbouring strips share their boundary sample lines
 // exactly and the seams are watertight.
+// ---- 4.0, AND MAKING IT FINER MADE THINGS WORSE (integrity 3) --------------
+// MEASURED: the drawn ground sits a mean +7.9 cm ABOVE this collider, more than
+// 15 cm away on 30.7% of the chapter and more than 50 cm on 13.9%. The animal
+// stands on the collider and the player looks at the mesh, so that is a
+// capybara visibly sunk into Galeras — and it is NOT the flat-pose problem
+// block 4 fixes. Both are real and they are different.
+//
+// The obvious fix is a finer grid, on the theory that a heightfield is a chord
+// and chord sag goes as the square of its length. It was tried at 2.0 and the
+// disagreement went UP, 30.7% -> 34.5% and 13.9% -> 17.8%.
+//
+// The reason is in pastoBuildTerrainMesh: the drawn terrain is 44x44 quads over
+// 260 m — 5.9 m facets, deliberately, "big, blunt facets you can count" — and
+// it is then WARPED by pastoWarpRaw, so its vertices are not on a regular
+// lattice at all. The old 4 m collider happened to sit near that surface; a
+// 2 m one tracks the smooth analytic law instead and pulls AWAY from the
+// picture. No uniform grid can match a warped mesh.
+//
+// So this stays at 4.0 and the real fix is to build the collider FROM the mesh
+// vertices rather than from the law. That is a different piece of work and it
+// is logged in the block 3 notes rather than half-done here.
 const pastoHF_ES = 4.0;
 const pastoSHELF_X = 36;      // = -36 + 18*4
 const pastoSHELF_Z0 = 6;      // inside the flat rect (z >= 4), on the lattice

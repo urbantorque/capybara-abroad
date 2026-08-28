@@ -998,7 +998,21 @@ function monBuildGround(game, root) {
 }
 
 function monBuildGroundBody(game) {
-  const EL = 5, X0 = monSEA_X0, Z0 = monSEA_Z0;
+  // ---- THE SAME LATTICE THE GROUND IS DRAWN ON (integrity 3) -------------
+  // This was 5 while monBuildGround draws the ground mesh at EL = 4, over the
+  // same rectangle. Two different lattices sampling the same analytic law give
+  // two different piecewise-linear surfaces, and the gap between them is what
+  // the player sees: the drawn ground sat more than 15 cm from the collider on
+  // 18.6% of the chapter and more than 50 cm on 6.1% — the animal sunk into
+  // the hill it is standing on.
+  //
+  // Going FINER is not the fix and it was tried: at 2.5 the collider tracks the
+  // smooth law better than the 4 m mesh does, so it only got from 18.6 to 17.4
+  // and cost 29% of the chapter's p90 tick. Matching the mesh's own lattice
+  // makes the two the same surface, and costs 1.56x the vertices rather than 4x.
+  //
+  // If monBuildGround's EL ever changes, THIS MUST CHANGE WITH IT.
+  const EL = 4, X0 = monSEA_X0, Z0 = monSEA_Z0;
   const NX = Math.round((monSEA_X1 - X0) / EL), NZ = Math.round((monSEA_Z1 - Z0) / EL);
   const Z1 = Z0 + NZ * EL;
   const data = [];
