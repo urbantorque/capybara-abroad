@@ -1,0 +1,26 @@
+{
+ "sydney": {
+  "npcs": 38,
+  "stuck": [
+   "busker#npc16 held one state 35s moved 11.1m",
+   "patron#npc18 always seated moved 0.0m",
+   "patron#npc19 always seated moved 0.0m",
+   "patron#npc20 always seated moved 0.0m",
+   "patron#npc21 always seated moved 0.0m"
+  ],
+  "off": []
+ },
+ "quay": {
+  "npcs": 0,
+  "stuck": [],
+  "off": []
+ },
+ "pasto": {
+  "npcs": 18,
+  "stuck": [
+   "abuela#pasto-abuela4 held one state 38s moved 19.2m",
+   "abuela#pasto-abuela5 always patrol moved 0.0m"
+  ],
+  "off": []
+ }
+}

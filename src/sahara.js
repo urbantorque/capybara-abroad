@@ -1598,6 +1598,7 @@ const sahFID_SIT   = 0.30;              // ...and a seated rock is smaller
 const sahFID_L     = 2.6;               // damping: a fidget takes about 0.4 s
 const sahPPL_STRIDE = 14;
 let sahPplBody = null, sahPplHead = null, sahPplN = 0;
+const sahPplBodies = [];        // one static box per instanced person
 // x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height,
 // fidget clock, fidget now, fidget target, step distance this frame, gait phase
 const sahPplData = new Float32Array(sahPPL_MAX * sahPPL_STRIDE);
@@ -1742,6 +1743,56 @@ function sahMovePerson(i, x, y, z, yaw) {
   // only writer and it already has both positions in hand.
   sahPplData[o + 12] = Math.hypot(x - sahPplData[o], z - sahPplData[o + 2]);
   sahPplData[o] = x; sahPplData[o + 1] = y; sahPplData[o + 2] = z; sahPplData[o + 3] = yaw;
+  // ...and the body goes with them. All three of cannon's position fields, or
+  // the cameleer is solid where he was standing a second ago — the same rule
+  // localsStep follows for the registered people, for the same reason.
+  const pb = sahPplBodies[i];
+  if (pb) {
+    pb.position.set(x, y + 0.85, z);
+    pb.previousPosition.copy(pb.position);
+    pb.interpolatedPosition.copy(pb.position);
+    pb.aabbNeedsUpdate = true;
+  }
+}
+
+/**
+ * A BODY FOR EVERY PERSON IN THE SQUARE.
+ *
+ * `addLocal` in npc.js gives every REGISTERED person a static box and keeps it
+ * where they are. Instanced background crowds are a different population and
+ * they had nothing: measured with a chest-height ray through each instance,
+ * Marrakech's hundred and seventy figures were 21 per cent solid, and the six
+ * of them that were solid only happened to be standing next to a stall.
+ *
+ * The same box as a local — (0.26, 0.85, 0.24) on game.mats.npc — so a person
+ * is a person whichever rig drew them. Called once, at the end of the build,
+ * because sahAddPerson is invoked from a dozen builders and the roster is not
+ * complete until all of them have run.
+ *
+ * ONE BODY EACH, not one pooled body with a hundred and seventy shapes, and
+ * that is not laziness: three of these people TRAVEL — sahMovePerson carries
+ * the caravan's cameleers across the erg — and a compound body cannot move one
+ * of its shapes. A body that is solid where somebody used to be standing is a
+ * worse bug than one that is not solid at all.
+ */
+function sahBuildPeopleBodies(game) {
+  if (!sahPplBody || sahPplN < 1) return;
+  sahPplBodies.length = 0;
+  for (let i = 0; i < sahPplN; i++) {
+    const o = i * sahPPL_STRIDE;
+    const b = new CANNON.Body({
+      mass: 0, type: CANNON.Body.STATIC,
+      material: (game.mats && game.mats.npc) || undefined,
+    });
+    b.addShape(new CANNON.Box(new CANNON.Vec3(0.26, 0.85, 0.24)));
+    b.position.set(sahPplData[o], sahPplData[o + 1] + 0.85, sahPplData[o + 2]);
+    b.previousPosition.copy(b.position);
+    b.interpolatedPosition.copy(b.position);
+    b.allowSleep = true;
+    sahSyncBody(b);
+    game.world.addBody(b);
+    sahPplBodies[i] = b;
+  }
 }
 
 function sahUpdatePeople(dt) {
@@ -4985,6 +5036,9 @@ function sahBuild(game) {
   sahBuildSmoke(sahRoot);
   sahBuildStormWall(sahRoot);
   sahBuildStars(sahRoot);
+  // LAST, because sahAddPerson is called from a dozen builders above and the
+  // roster is not complete until every one of them has run.
+  sahBuildPeopleBodies(game);
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,

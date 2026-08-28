@@ -460,3 +460,46 @@ cent of the chapter, on the diagonals of the ridge skirt.
     An inscribed octagon needs an INTERSECTION, which a rigid body cannot
     express. The honest shape for a cone is `CANNON.Cylinder`, and nothing in
     this repo uses one yet.
+
+### BLOCK 6, 28 Aug. PART TWO ONLY. THE ENUMERATION IS IN `qa/CROWDS.md`.
+
+**Part one — Cali, Rio and Kyoto's landforms — was NOT done.** The block ran
+over on part two and stopped at the boundary rather than half-doing both. Those
+18 hits are still there and block 5's finding almost certainly applies to them:
+the colliders exist and are too small.
+
+**The trap the card warns about is real and it is worse than stated.**
+`qa/rev-people.js` finds crowds with a regex over the mesh NAME, and **exactly
+one crowd in the game matches it.** Every other chapter builds its crowd from a
+merged geometry and never names the mesh, so "Sahara's crowd is 16% solid" was
+not a Sahara finding — it was the only crowd the instrument could see.
+
+`qa/b6-crowds.js` classifies by INSTANCE DIMENSION instead and finds **3761
+person-shaped instances across nineteen chapters**. `qa/CROWDS.md` is the
+enumeration, with the false positives (Pantanal's 2627 marsh tussocks, Sahara's
+88 wool bales, Iceland's snow drifts) listed so nobody spends an hour on them.
+
+```
+crowd solidity, chest ray      before -> after
+sahara  sahPeople  x170          21% -> 100%
+rio     rioPeople  x306           3% ->  94%
+kowloon walkers    x80            3% -> 100%
+six chapters, 244 people                 not done, listed in qa/CROWDS.md
+```
+
+**Pooled or one-each is a real choice and it has a rule.** One pooled body with
+a shape per person is right when nothing moves after placement — Rio, three
+hundred and six shapes on one broadphase entry. One body each is REQUIRED the
+moment anybody moves, because a compound body cannot move one of its shapes:
+Marrakech has three cameleers who travel and Kowloon's eighty all walk.
+
+**The body budget is not the constraint.** A distance gate was written for
+Kowloon first, assuming eighty moving static bodies would cost broadphase time.
+Measured, it costs nothing — 0.6 ms/tick median either way — so the gate was
+removed. Sydney, untouched, held at 0.7/1.1 in the same run, which is the only
+thing that makes a frame-time before/after readable at all (see `b3-perf.js`).
+
+15. **A distance-gated collider cannot pass a solidity audit.** The gated
+    Kowloon read 13% and was working exactly as written — the probe samples all
+    eighty wherever they are, and only the near ones were solid. If a gate is
+    genuinely needed, the audit has to gate with it or the number is a lie.

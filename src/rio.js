@@ -2380,6 +2380,9 @@ function rioBuildPeople(root) {
 
   rioPplBody = new THREE.InstancedMesh(bodyGeo, rioVC(), rioPPL_MAX);
   rioPplHead = new THREE.InstancedMesh(headGeo, rioVC(), rioPPL_MAX);
+  // NAMED, because qa/b6-crowds.js found every crowd in the game by measuring
+  // its instances and every one of them except Marrakech's was '(unnamed)'.
+  rioPplBody.name = 'rioPeople'; rioPplHead.name = 'rioPeopleHeads';
   rioPplBodyCol = new Float32Array(rioPPL_MAX * 3);
   rioPplHeadCol = new Float32Array(rioPPL_MAX * 3);
   rioPplBody.instanceColor = new THREE.InstancedBufferAttribute(rioPplBodyCol, 3);
@@ -2394,6 +2397,40 @@ function rioBuildPeople(root) {
   rioPplHead.count = 0;
   root.add(rioPplBody);
   root.add(rioPplHead);
+}
+
+/**
+ * A BODY FOR EVERY PERSON ON THE BEACH AND IN THE PARADE.
+ *
+ * Three hundred and six instanced figures, measured at 3 per cent solid with a
+ * chest-height ray. `addLocal` bodies the registered people and always has;
+ * this population was drawn and nothing else.
+ *
+ * ONE POOLED BODY, unlike Marrakech's, and the difference is the whole reason
+ * the choice is worth a comment: nothing in Rio moves after it is placed —
+ * `rioPplData[o]` is written in `rioAddPerson` and nowhere else — so three
+ * hundred shapes can share one broadphase entry. Marrakech has three cameleers
+ * who travel, and a compound body cannot move one of its shapes.
+ *
+ * The box is npc.js's, (0.26, 0.85, 0.24) on game.mats.npc, so a person feels
+ * the same whichever rig drew them. It does NOT go through rioStaticGroup,
+ * because that also registers with `rioSolids` and a crowd is not a wall the
+ * navigation grid should route around.
+ */
+function rioBuildPeopleBodies(game) {
+  if (!rioPplBody || rioPplN < 1) return;
+  const b = new CANNON.Body({
+    mass: 0, type: CANNON.Body.STATIC,
+    material: (game.mats && game.mats.npc) || undefined,
+  });
+  for (let i = 0; i < rioPplN; i++) {
+    const o = i * 7;
+    b.addShape(new CANNON.Box(new CANNON.Vec3(0.26, 0.85, 0.24)),
+               new CANNON.Vec3(rioPplData[o], rioPplData[o + 1] + 0.85, rioPplData[o + 2]));
+  }
+  b.allowSleep = true;
+  rioSyncBody(b);
+  game.world.addBody(b);
 }
 
 function rioAddPerson(x, y, z, yaw, kind) {
@@ -3868,6 +3905,8 @@ export function createRio(game) {
       // Put the column somewhere the player can see it coming rather than
       // wherever it happened to be when they left.
       rioBateriaX = rioAVE_X0 + 20;
+
+  rioBuildPeopleBodies(game);
       rioBateriaPX = rioBateriaX;
       rioParadeHold = 0;
       rioBondeRideT = 0; rioBondePassed = false; rioBondeTold = false;

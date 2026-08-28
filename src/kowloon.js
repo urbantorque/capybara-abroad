@@ -2466,7 +2466,8 @@ function hkBuildMarket(game, root) {
  */
 const hkCROWD_N = 80;
 let hkCrowd = null;
-const hkCrowdData = new Float32Array(hkCROWD_N * 6);   // x, z, dir, speed, phase, kind
+const hkCrowdData = new Float32Array(hkCROWD_N * 6);
+const hkCrowdBodies = [];              // one static box per walker, see hkUpdateCrowd
 
 function hkCrowdGeo(parts) { const M = hkMerger(); parts(M); return M.build(); }
 function hkBuildCrowd(game, root) {
@@ -2509,6 +2510,8 @@ function hkBuildCrowd(game, root) {
     root.add(m);
     return m;
   };
+  // NAMED. qa/b6-crowds.js finds every crowd in the game by measuring its
+  // instances, because a name-matched search finds Marrakech's and nothing else.
   hkCrowd = { a: mk(limb(1)), b: mk(limb(-1)), body: mk(gBody), head: mk(gHead),
               brolly: mk(gBrolly), bag: mk(gBag) };
   let seed = 60318;
@@ -2542,6 +2545,22 @@ function hkBuildCrowd(game, root) {
   }
   for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag']) {
     hkCrowd[k].instanceColor.needsUpdate = true;
+  }
+  // ---- ONE BOX EACH, not one pooled body with eighty shapes: these people
+  // WALK, and a compound body cannot move one of its shapes. hkUpdateCrowd
+  // carries each box along with its walker.
+  hkCrowdBodies.length = 0;
+  for (let i = 0; i < hkCROWD_N; i++) {
+    const b = new CANNON.Body({
+      mass: 0, type: CANNON.Body.STATIC,
+      material: (game.mats && game.mats.npc) || undefined,
+    });
+    b.addShape(new CANNON.Box(new CANNON.Vec3(0.26, 0.85, 0.24)));
+    b.position.set(hkCrowdData[i * 6], 0.99, hkCrowdData[i * 6 + 1]);
+    b.allowSleep = false;
+    hkSyncBody(b);
+    game.world.addBody(b);
+    hkCrowdBodies[i] = b;
   }
 }
 // what a Hong Kong carrier bag is: white plastic, a supermarket red, and the
@@ -2611,6 +2630,28 @@ function hkUpdateCrowd(game, dt) {
     if (z > hkST_Z1 - 1) z = hkST_Z0 + 1;
     if (z < hkST_Z0 + 1) z = hkST_Z1 - 1;
     hkCrowdData[o + 1] = z;
+    // ---- AND THEY HAVE WEIGHT NOW ----------------------------------------
+    // Eighty people walking down a six-metre street and you went through all
+    // of them: measured at 3 per cent solid, and the 3 per cent was somebody
+    // happening to stand against a shopfront. npc.js box, npc material, so a
+    // person on Shanghai Street feels the same as a person you can talk to.
+    //
+    // ALL THREE OF CANNON POSITION FIELDS, which is the rule localsStep
+    // follows for the registered people: a body moved by hand that carries a
+    // stale previousPosition is solid where the walker was a frame ago, and
+    // eighty of those makes the pavement a minefield.
+    //
+    // A distance gate was written here first, on the assumption that moving
+    // eighty static bodies a frame would cost broadphase time. Measured, it
+    // costs nothing: 0.6 ms per tick median either way, so the gate was one
+    // more thing to be wrong and it is gone.
+    const cb = hkCrowdBodies[i];
+    if (cb) {
+      cb.position.set(x, 0.99, z);
+      cb.previousPosition.copy(cb.position);
+      cb.interpolatedPosition.copy(cb.position);
+      cb.aabbNeedsUpdate = true;
+    }
     let ph = hkCrowdData[o + 4] + move * 3.4;
     hkCrowdData[o + 4] = ph;
     let yaw = dir > 0 ? 0 : Math.PI;
