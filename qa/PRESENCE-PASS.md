@@ -302,3 +302,79 @@ result rather than by writing the code.
 
 Full phase text — the finding behind each, the work, and its acceptance test —
 is in `.claude/skills/presence/batches/ONE.md` and `TWO.md`.
+
+---
+
+# ADDENDUM — WHAT BATCH TWO FOUND, 28 Aug 2026
+
+Batch TWO was run under an explicit brief: safe, low risk, and no performance
+cost. It was reordered by risk rather than by the numbering above, and two of
+its three phases were **retired by measurement rather than shipped**. Both
+retirements are findings, and both are worth more than the change would have
+been.
+
+## P3 (light) shipped, and not as point lights
+
+See the commit. The mechanism is a nearest-N spill term in the rim's existing
+injection, fed by emitters discovered from the scene. Hong Kong's floor went
+**34.8 → 58.8**, Monte Carlo's **102.8 → 120.3**, clipping stayed 0.00 %, and
+the cost is **+0.044 ms** in Hong Kong and **+0.311 ms** in Monte Carlo.
+
+## P5 is retired: THE CAMERA NEVER LOOKS AT THE SKY
+
+The premise — "in every chapter the sun is an inference from the shadows rather
+than a thing in the picture" — is true, and the fix does not work, because at
+the gameplay camera **there is no sky in the frame at all.** Measured by
+unprojecting the frame edges (`qa/pt-cam.js`):
+
+| chapter | top edge | centre | bottom edge | sun elevation | sun in frame |
+|---|---|---|---|---|---|
+| Sydney | **−20.3°** | −44.3° | −68.3° | +41.4° | **no** |
+| Rio | **−20.1°** | −44.1° | −68.1° | +41.4° | **no** |
+| Palawan | **−20.0°** | −44.1° | −68.1° | +61.1° | **no** |
+
+The top edge of the frame points twenty degrees BELOW the horizon. The sun sits
+forty to sixty degrees above it — sixty to eighty degrees outside the frame. A
+sun disc or glow painted on the dome is unreachable by the player's eye.
+
+It was built, gated, measured and reverted: A/B against an identical frame with
+the glow zeroed moved the mean by **0.0 of 255 in all five chapters tested**.
+
+Two consequences for anyone reading this document later:
+
+- **Do not spend on the sky dome.** Two colours on a `t^0.62` ramp is the right
+  amount of investment for something nobody can see. The dome's own comment
+  about spending its gradient "in the first fifteen degrees" is, if anything,
+  still too generous.
+- **The "sky band" in the tables above is mis-named.** A band at the top of the
+  frame is not sky; it is distant ground, water and buildings, all of it below
+  the horizon. The numbers are real, the label was wrong.
+
+Zoomed fully out the camera does raise and some sky enters, and Rio's sun lands
+at NDC (1.09, −0.53) — just outside the right edge. So a player who orbits hard
+could bring the sun near frame. That is not enough to pay for it.
+
+## P4 is not done, and here is the archaeology so the next run is cheaper
+
+The floor-graphic phase was attempted and stopped. Every one of the four targets
+turned out not to be what the audit assumed:
+
+- **Venice.** The Istrian rib grid ALREADY spans both squares — `venBuildSquares`
+  draws six long ribs from z −55 to +9 and fourteen cross ribs from −53 to +7,
+  and the Piazzetta is z −14..10. Photographed (`qa/pt-wide-venice.png`) the grid
+  reads beautifully on the Piazza and vanishes on the Piazzetta, so this is a
+  **contrast problem in the near field, not missing geometry**. The ground datum
+  is y = 0 across both squares (`terrainHeight`, measured), and the ribs sit at
+  y = 0.03, so they are not buried. Suspect the near-field wash — Venice's grade
+  threshold is 1.06 and the near ground is the brightest thing in frame.
+- **Cali.** The apron IS the terrain mesh, flat at exactly y = 0, spanning at
+  least x −30..10, z −32..−15, and `cali.terrainHeight` is authoritative there
+  (raycast-verified, `qa/pt-cali2.js`). So a graphic CAN be placed here safely.
+  What stopped it: the paved apron and a green lawn share one mesh and one
+  colour rule, and a joint grid drawn across the rectangle would run over the
+  grass. It needs a paved-area predicate, which the chapter does not expose.
+- **Palawan and Sydney** were never reached.
+
+A generalised `groundGrid()` helper was written for this and **deleted rather
+than shipped**, because a published system with no call sites is a failure this
+repo has already paid for.
