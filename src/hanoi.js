@@ -99,6 +99,30 @@ const hanCAU    = { x: -18, z: -96 };         // the shuttlecock circle, lakesid
 
 const hanSEA_X0 = -230, hanSEA_X1 = 230, hanSEA_Z0 = -200, hanSEA_Z1 = 270;
 
+/**
+ * WHERE THE CITY STOPS — see api.bounds() (integrity 9).
+ *
+ * The ground mesh and its heightfield are the full hanSEA rectangle, 460 m by
+ * 470, because a city needs a horizon and the dyke needs somewhere to be. The
+ * BUILT city is about a third of that, so `biome.boundsOf()` — which is the
+ * union of the colliders, and the heightfield is one of them — put the edge of
+ * the world at x = ±230. Measured before this: from the spawn at (-60, -78) a
+ * player heading west walks a hundred and seventy metres of empty concrete
+ * before anything notices.
+ *
+ * Two rectangles rather than one, for the same reason Sydney needs two: the
+ * Chuong Duong bridge runs north off the dyke to z = 250 and a single box
+ * containing it would hand back sixty metres of river either side of it.
+ *
+ * The first rectangle is drawn from the things in it, not chosen: the surround
+ * band reaches x = ±148 and z = -152, the Old Quarter backdrop z = 156, and
+ * the dyke crest is x = ±140 at z = 182.
+ */
+const hanBOUNDS = { rects: [
+  { x0: -155, x1: 155, z0: -158, z1: 186 },      // the city, the lake, the dyke
+  { x0: 30, x1: 58, z0: 180, z1: 256 },          // ...and the bridge over the river
+] };
+
 // ------------------------------------------------------------- the traffic --
 // FOUR CENTRELINES, and every scooter in the chapter is a distance along one
 // of them. Same machinery as the Monte Carlo circuit and the chiva road: one
@@ -953,6 +977,13 @@ function hanTerrace(K, L, s0, s1, off, set, body, game) {
     const yaw = hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2);
     hanHouse(K, bx, bz, yaw, h, randInt(0, 4), d);
     hanPoolBox(body, bx, hanGROUND + h * 0.5 + 1, bz, hanHOUSE_W, h + 2, d, yaw);
+    // ...AND A HOUSE IS AN OBSTACLE (integrity 9). Every terrace in the chapter
+    // was bodied and none of them was ever registered with hanNavBlocked, so
+    // the backdrop, the stools, the oddments and the locals were all placed as
+    // if the frontage were not there. It did not show while the ring's frontage
+    // was being silently discarded into the lake; the moment that came back it
+    // was one instanced block per house, standing inside it.
+    hanBlock(bx, bz, Math.max(hanHOUSE_W, d) * 0.45);
   }
 }
 
@@ -968,6 +999,15 @@ function hanBuildQuarter(game, root) {
   hanKeepOut(hanPUPPET.x, hanPUPPET.z, 22);
   hanKeepOut(-8, -4, 12);
   hanKeepOut(hanTRAIN.x1 + 6, hanTRAIN.z, 16);
+  // ...and a sixth, at the spawn (integrity 9). The arrival puts the lens
+  // twelve metres out on the bearing in HANOI_SPAWN.yaw, which is west-south-
+  // west, which is the ring's outer side — so the moment that frontage came
+  // back the chapter opened with the camera inside a shophouse, looking at the
+  // lake through the gap between two of them. The rig's occlusion ray would
+  // have hauled the boom in to a metre and a half; that is a bug being masked,
+  // not a shot. The corner of Hoan Kiem the player lands on is a junction in
+  // life, so: fifteen metres of open pavement, and the terrace resumes.
+  hanKeepOut(hanSPAWN.x, hanSPAWN.z, 15);
   // both sides of the two big streets, and the outside of the ring
   hanTerrace(K, 0, 26, hanLaneTotal[0] - 4, 1, 8.4, body, game);
   hanTerrace(K, 0, 26, hanLaneTotal[0] - 4, -1, 8.4, body, game);
@@ -978,8 +1018,26 @@ function hanBuildQuarter(game, root) {
   hanTerrace(K, 3, 4, 78, 1, 8.0, body, game);
   hanTerrace(K, 3, 116, hanLaneTotal[3] - 4, -1, 8.0, body, game);
   // ...and the outer side of the lake ring, which is the one continuous
-  // frontage in the chapter and the reason the lake feels enclosed
-  hanTerrace(K, 2, 0, hanLaneTotal[2], 1, 8.6, body, game);
+  // frontage in the chapter and the reason the lake feels enclosed.
+  //
+  // OFF = -1, NOT +1 (integrity 9). hanTerrace's normal is (cos yaw, -sin yaw)
+  // with yaw = atan2(dx, dz), which is (dz, -dx) — and this polyline is wound
+  // so that points INTO the lake at every one of its eleven segments. So the
+  // whole of the "one continuous frontage" was laid in the water, where
+  // hanTerrace's own `hanTerrain < hanWATER + 0.3` test then threw almost all
+  // of it away in silence. Measured before this: twenty-four stations round the
+  // ring, sampled at 10, 16 and 24 m outside it, and twenty-one of them read
+  // bare ground at 1.2 m. The lake was enclosed by nothing at all, which is
+  // most of why the spawn at (-60, -78) had an empty plain at its back.
+  hanTerrace(K, 2, 0, hanLaneTotal[2], -1, 8.6, body, game);
+  // ...AND A SECOND ROW ON THE ARC THE PLAYER LANDS ON. The ring is 340 m
+  // round; s = 196..304 is its west and south-west, which is the whole of the
+  // spawn's outlook. One frontage plus a backdrop is enough where the backdrop
+  // is only ever seen over a roof, but here it is walked up to, so this is the
+  // far side of the boulevard: real houses with shutters, awnings and lit
+  // windows, facing back at the road, rather than the blank side of an
+  // instanced box. Twenty-nine of them, about nine thousand triangles.
+  hanTerrace(K, 2, 196, 304, -1, 34, body, game);
 
   const m = new THREE.Mesh(K.build(), hanVCF());
   m.castShadow = true; m.receiveShadow = true;
@@ -1000,7 +1058,41 @@ function hanBuildQuarter(game, root) {
  * already put something, in the same five colours. One draw call, one pooled
  * body, and from the street it is a wall of roofs behind the roofs.
  */
-const hanBACK_N = 260;
+/**
+ * ...AND THE BLOCK WENT ROUND THREE SIDES OF THE LAKE AND NOT THE FOURTH
+ * (integrity 9).
+ *
+ * The rectangle below used to be hanOQ alone, which is the Old Quarter, which
+ * is everything NORTH of z = -24. South, west and east of Hoan Kiem there was
+ * the ring road's own frontage — one building deep, and correct — and behind
+ * it a pale concrete plain to the horizon. The spawn is at (-60, -78), on the
+ * lake's south-west shore, so this was the near half of the first frame of the
+ * chapter: thirty metres west of where the player lands, the world is empty
+ * out to x = -230. `qa/b9-hanoi-w30-before.png`.
+ *
+ * Two regions, then, sampled independently so the surround cannot be starved
+ * by a lucky run of rejections in the quarter. The surround is deliberately
+ * NOT more Old Quarter: south of Hoan Kiem is the French Quarter, so its boxes
+ * are wider, lower and further apart, and the ring's frontage stays the only
+ * dense thing in the frame.
+ */
+const hanBACK_REGIONS = [
+  // the Old Quarter, exactly as it was
+  { x0: hanOQ.x0 - 34, x1: hanOQ.x1 + 34, z0: hanOQ.z0 - 6, z1: hanOQ.z1 + 26,
+    n: 260, w: [7, 13], h: [8, 21], clear: 7 },
+  // the surround: everything outside the lake ring, on the other three sides
+  // ...and it keeps THIRTY metres off a centreline, not sixteen. Sixteen is
+  // right behind a frontage, where the block is only ever seen over a roof;
+  // out here it is walked up to, and an eight-metre blank wall a stride from
+  // the animal's nose is the one thing worse than the plain it replaced. At
+  // thirty it is the far side of the boulevard that runs outside the ring, it
+  // reads as the next quarter, and — being bodied — it is a wall you can see
+  // over rather than a sentence, which is what block 7 learned on Sydney's
+  // north lawn.
+  { x0: -148, x1: 148, z0: -152, z1: -18, n: 220, w: [7, 11], h: [7, 17], clear: 3,
+    grid: 11.5, street: 3, laneMin: 46 },
+];
+const hanBACK_N = 460;
 let hanBackMesh = null;
 function hanBuildBackdrop(game, root) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -1013,18 +1105,17 @@ function hanBuildBackdrop(game, root) {
   const pal = [PALETTE.hanMustard, PALETTE.hanOchre, PALETTE.hanJade,
                PALETTE.hanPeach, PALETTE.hanPlaster];
   let n = 0;
-  for (let g = 0; g < 4000 && n < hanBACK_N; g++) {
-    const x = rand(hanOQ.x0 - 34, hanOQ.x1 + 34);
-    const z = rand(hanOQ.z0 - 6, hanOQ.z1 + 26);
+  // one placement, wherever the point came from
+  function put(x, z, R, ry) {
     // not on a street, not on the railway, not in the lake, and not on top of
     // anything a terrace or a set piece has already claimed
-    if (hanLaneAt(x, z) < 16) continue;
-    if (Math.abs(z - hanTRAIN.z) < 18 && x > hanTRAIN.x0 - 6 && x < hanTRAIN.x1 + 6) continue;
-    if (hanTerrain(x, z) < hanWATER + 0.4) continue;
-    if (hanNavBlocked(x, z, 7)) continue;
-    if (!hanTerraceOk(x, z)) continue;
-    const w = rand(7, 13), d = rand(7, 13), h = rand(8, 21);
-    hanE.set(0, rand(0, 6.28), 0, 'YXZ');
+    if (hanLaneAt(x, z) < (R.laneMin || 16)) return false;
+    if (Math.abs(z - hanTRAIN.z) < 18 && x > hanTRAIN.x0 - 6 && x < hanTRAIN.x1 + 6) return false;
+    if (hanTerrain(x, z) < hanWATER + 0.4) return false;
+    if (hanNavBlocked(x, z, R.clear)) return false;
+    if (!hanTerraceOk(x, z)) return false;
+    const w = rand(R.w[0], R.w[1]), d = rand(R.w[0], R.w[1]), h = rand(R.h[0], R.h[1]);
+    hanE.set(0, ry, 0, 'YXZ');
     hanM.compose(hanV3.set(x, hanGROUND + h * 0.5, z), hanQ.setFromEuler(hanE),
                  hanSc.set(w, h, d));
     m.setMatrixAt(n, hanM);
@@ -1033,6 +1124,33 @@ function hanBuildBackdrop(game, root) {
     hanPoolBox(body, x, hanGROUND + h * 0.5, z, w, h, d, hanE.y);
     hanBlock(x, z, Math.max(w, d) * 0.45);
     n++;
+    return true;
+  }
+  for (let ri = 0; ri < hanBACK_REGIONS.length; ri++) {
+    const R = hanBACK_REGIONS[ri];
+    const stop = Math.min(hanBACK_N, n + R.n);
+    if (!R.grid) {
+      // ...behind a frontage, where nothing is ever seen end-on, rejection
+      // sampling at any rotation is exactly right.
+      for (let g = 0; g < 6000 && n < stop; g++) put(rand(R.x0, R.x1), rand(R.z0, R.z1), R, rand(0, 6.28));
+      continue;
+    }
+    // ...BUT THE SURROUND IS WALKED THROUGH, AND SCATTER IS NOT A CITY.
+    // A first cut sampled this region the same way and read, from the ground,
+    // as boxes dropped on a plain: no two of them lined up, so there was
+    // nothing to walk ALONG. A jittered lattice with a gap every fourth row
+    // makes blocks and the spaces between them into streets, which is what is
+    // actually south of Hoan Kiem.
+    const p = R.grid;
+    const nx = Math.floor((R.x1 - R.x0) / p), nz = Math.floor((R.z1 - R.z0) / p);
+    for (let i = 0; i <= nx && n < stop; i++) {
+      if (R.street && i % R.street === R.street - 1) continue;
+      for (let k = 0; k <= nz && n < stop; k++) {
+        if (R.street && k % R.street === R.street - 1) continue;
+        put(R.x0 + p * (i + 0.5) + rand(-1.6, 1.6),
+            R.z0 + p * (k + 0.5) + rand(-1.6, 1.6), R, rand(-0.09, 0.09));
+      }
+    }
   }
   m.count = n;
   m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
@@ -3042,7 +3160,12 @@ function hanBuildScatter(root) {
     a.dispose(); b.dispose();
     return g2;
   })();
-  const X0 = -90, X1 = 90, Z0 = -90, Z1 = 185, CELL = 3.4;
+  // ...AND THE LITTER STOPPED WHERE THE CITY USED TO (integrity 9). This
+  // rectangle was the Old Quarter's, so the pavement south and west of Hoan
+  // Kiem — which is where the chapter puts the player down — had not one leaf,
+  // one weed or one scrap of grit on it. That is most of what made the walk out
+  // of the spawn read as a sheet rather than as a street.
+  const X0 = -124, X1 = 124, Z0 = -128, Z1 = 185, CELL = 3.4;
   const NX = Math.ceil((X1 - X0) / CELL), NZ = Math.ceil((Z1 - Z0) / CELL);
   const leaf = [], scrap = [], grit = [], weed = [];
   for (let gz = 0; gz < NZ; gz++) {
@@ -3154,6 +3277,7 @@ export function createHanoi(game) {
     inZone: hanInZone,
     navBlocked: hanNavBlocked,
     randomPointIn: hanRandomPointIn,
+    bounds() { return hanBOUNDS; },
     SPAWN: hanSPAWN,
     /**
      * THREE METRES OF GREEN WATER WITH A TOWER IN THE MIDDLE OF IT, and you
