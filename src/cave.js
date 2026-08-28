@@ -66,6 +66,9 @@ const cavPEARLS = { x: 22, z: -132 };
 // and where the animal is already walking on its way down from the Hand.
 const cavPHYTO = { x: 15, z: -28 };
 const cavEXIT_Z = -168;
+// WHERE cavTerrain STOPS ANSWERING. See the domain note at the top of it.
+const cavDOM_X0 = -110, cavDOM_X1 = 110;
+const cavDOM_Z0 = -252, cavDOM_Z1 = 97;
 const cavWALL = { z: -104, top: 13.5, foot: -10.5 };
 const cavRIVER_X = -20;
 const cavRIVER_W = 15;
@@ -405,6 +408,21 @@ function cavSmooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
  * you can stand on either side of it.
  */
 function cavTerrain(x, z) {
+  // ---- A LAW HAS A DOMAIN (integrity 2, and the same bug as Manly) --------
+  // This one had NO x term in its domain at all: every branch is a curve in z,
+  // so the law described a floor for the entire infinite plane either side of
+  // a passage that is 214 m wide. Past cavMOUTH_Z it also climbed a jungle
+  // slope to 7 m and held it northward for ever, and past cavEXIT_Z it held
+  // cavWALL.top - 6.5 southward for ever.
+  //
+  // Measured before this: 4 of 16 settle points within 62 m of the spawn had
+  // NOTHING drawn beneath them, and the chapter's drawn world is the shortest
+  // in the game at 72 m. A cave is an interior; a law that answers outside it
+  // is describing rock that is not there.
+  //
+  // Rectangle from biome.boundsOf(): x -107..107, z -249..94, plus three.
+  // NaN is the designed reply — see the longer note in manly.js.
+  if (x < cavDOM_X0 || x > cavDOM_X1 || z < cavDOM_Z0 || z > cavDOM_Z1) return NaN;
   let h;
   if (z > cavMOUTH_Z) {
     // outside: jungle floor, sloping gently down to the hole in the cliff

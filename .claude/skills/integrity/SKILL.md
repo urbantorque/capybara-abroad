@@ -161,6 +161,38 @@ Blocks compare against this. `rev-summary.mjs` reprints it from the raw JSON.
  19  hanoi      |  .  |  176  0/8  |  1.1   1.0  |  4.3  | 0.05   1  |    0  |   0/ 27/ 18/ 23
 ```
 
+### THE `law15` COLUMN ABOVE IS WRONG. CORRECTED 28 Aug, block 2.
+
+`rev-terr.js` took "the highest visible hit at or **below** `h + 1.0`" as the
+drawn ground. Wherever the mesh sat above the law the mesh was rejected and the
+ray fell through to whatever was underneath — a seabed, a lower terrace, the
+ground under a building — and the error read as a large POSITIVE. That is most
+of what made **Manly look like a mean +1.29 m outlier: corrected, its mean
+signed error is +0.016 m.** The probe is fixed; it now takes the highest
+visible surface, skips water (seabed vs sea surface is not an error) and skips
+samples outside the chapter's own bounds.
+
+**Block 3 must use these numbers, not the ones in the table above:**
+
+```
+monaco 40.9   quay 24.7   rio 23.5   cali 19.6   antarctic 19.3   pasto 19.2
+manly 25.5*   cave 14.3*  iceland 13.4   venice 11.5   pantanal 11.0
+goreme 11.3   drift 9.5   kowloon 8.0   kyoto 5.1   hanoi 4.6   sahara 2.2
+                                                     palawan 1.6
+* after block 2
+```
+
+Quay and Rio are new entrants that the old instrument was hiding; Manly does
+NOT drop out, but for a different reason than the one on the card (see block 2).
+Monte Carlo is still the worst and by a wide margin.
+
+**And `rev-foot.js` does not hold a line in Son Doong.** Four runs of identical
+code: mean gap 0.021 / 0.025 / 0.068 / 0.321, worst float 0.14 / 0.19 / 0.67 /
+2.24, on n = 15. Manly over the same four runs is 0.237–0.249 and stable. Treat
+any single cave foot number as indicative only; the chapter's settle points land
+on boulders and the doline lip and it matters where. Same family as
+`audit-solid.js`.
+
 `bnd` publishes `bounds()` · `resc` bearings rescued of 8 · `pose>10/>20` % of
 walkable ground where the flat-drawn nose or tail is that far off · `law15` % of
 samples where `terrainHeight` is out by >15 cm · `float` worst float in m ·

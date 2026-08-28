@@ -210,6 +210,22 @@ Monte Carlo also showed a **14.9 m disagreement** measured at (10, −80):
 `terrainHeight` returned −12.34 where the drawn ground is at +2.60. That is
 almost certainly the law answering over the harbour when it should not.
 
+## WHAT BLOCK 2 LEFT HERE
+
+Two things, both measured:
+
+1. **Manly's promenade floats the animal 1.92 m.** At (28, 46) and (−25, 60) —
+   the promenade band, z 41…82 — `manTerrain` returns `manPROM_Y` (2.6) across
+   the whole x range, but the deck is only DRAWN where the Corso is. Off the
+   Corso the animal rides the analytic floor with the beach 2.6 m below it.
+   It is the same family as the domain bug block 2 fixed — the law describing
+   more than is built — but it is inside the world, so it is chapter geometry
+   and it is this block's. Manly is 25.5% on the corrected instrument and this
+   is most of it.
+2. **The corrected `law15` ordering is in `../SKILL.md`, not the table.**
+   Monte Carlo 40.9 is worst by a wide margin; Quay 24.7 and Rio 23.5 are new
+   entrants the old instrument was hiding.
+
 ## The 45-minute hypothesis test — do this first
 
 **The hypothesis: the analytic law is smooth and the drawn mesh is faceted, so

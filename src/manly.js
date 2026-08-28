@@ -70,6 +70,17 @@ const manSHORE_Z = 24;               // where the still waterline meets the sand
 const manDUNE_Z = 34;                // top of the beach
 const manPROM_Z = 41;                // the promenade
 const manPROM_Y = 2.6;
+// WHERE manTerrain STOPS ANSWERING. See the domain note at the top of it.
+// The extent of the chapter's own colliders (biome.boundsOf: x -132..143,
+// z -112..105) plus three metres, so the real edge of the world is never NaN.
+const manDOM_X0 = -135, manDOM_X1 = 146;
+// ...except in +z, where it is the DRAWN edge and not the collider box. The
+// heightfield's last row is z = 100 and the drawn world ends there on every x
+// measured; the collider box runs to 105 only because a static box overhangs.
+// At z = 108 the profile answers manPROM_Y + 1.56 over nothing at all, which
+// measured as the single worst float in the game (+4.00 m). 102 is the last
+// row plus half an element.
+const manDOM_Z0 = -115, manDOM_Z1 = 102;
 const manSHOP_Z = 54;                // the shopfronts start
 const manBEACH_X0 = -62;             // the beach between the two headlands
 const manBEACH_X1 = 56;
@@ -410,6 +421,30 @@ function manSmooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
  * bank, and then away.
  */
 function manTerrain(x, z) {
+  // ---- A LAW HAS A DOMAIN, AND THIS ONE HAD NONE (integrity 2) -----------
+  // Every branch below is a PROFILE — a curve in z, or a distance falloff —
+  // and not one of them stopped. manHeadH ends with
+  // `if (z > 30) h = Math.max(h, manPROM_Y)`, so for any x west of the beach
+  // and any z past 30 it returned 2.6 m FOR EVER; manProfile climbs to
+  // manPROM_Y + 3.4 past z = 82 and holds that to infinity.
+  //
+  // Measured: the drawn world ends at z = 100 on every x tested, and at
+  // (-70, 110) the law returned exactly 2.60 with NOTHING drawn underneath.
+  // The animal settled on capybara.js's soft floor and stood in an empty beige
+  // void with no shadow (qa/rev-manly-float.png). That is what "terrainHeight
+  // is out by a mean +1.29 m" turned out to mean — not a mis-shaped hill, a
+  // law with no edge.
+  //
+  // NaN is the designed answer: capyAskNum() drops a non-finite reply and
+  // falls back, and the hint arrow, the local anchors, prop placement and the
+  // stuck-rescue all read this same function. Since integrity 1 the player is
+  // also rescued out here, so this is the second line of that defence rather
+  // than the only one.
+  //
+  // The rectangle is the extent of the chapter's own colliders, measured with
+  // biome.boundsOf(): x -132..143, z -112..105, opened out by three metres so
+  // that a legitimate edge of the world is never NaN.
+  if (x < manDOM_X0 || x > manDOM_X1 || z < manDOM_Z0 || z > manDOM_Z1) return NaN;
   // ---- the point, and everything east of the beach -----------------------
   if (x > manPOINT_X - 2) {
     let h = manPointH(x, z);
