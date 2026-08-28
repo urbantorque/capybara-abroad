@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick, contactSlots, contactTick, swayTick } from './shared.js';
+         rimTick, contactSlots, contactTick, swayTick, spillSlots, spillTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -88,6 +88,53 @@ const sysCtcSize    = new WeakMap();   // Object3D -> { r, dy }
 const sysCtcSlots   = [];              // { obj, k, x, y, z, r }
 const sysCtcWant    = [];              // scratch: this frame's ranking
 const sysCtcOut     = [];              // scratch: what goes to the shader
+
+// ---------------------------------------------------------------------------
+// THE SPILL POOL. See the SPILL block in shared.js for the finding and the
+// shader. This end finds the emitters, clusters them, ranks them and fades
+// them; that end adds the light.
+//
+// THE EMITTERS ARE DISCOVERED, NOT AUTHORED, and that is the decision that
+// makes this affordable. The alternative was three chapters hand-placing sign
+// clusters, which is per-place archaeology in three of the largest files in the
+// repo — and it would have covered exactly those three for ever. Every glowing
+// thing in this game is already an `emissive` material, so the scene already
+// knows where the lights are; it simply had nobody asking.
+const sysSPL_LUM    = 0.10;  // emissive luminance below which a thing is a detail,
+                             // not a light. Iceland's dimmest shopfront is 0.14.
+const sysSPL_MINY   = 1.00;  // metres. A LIGHT THAT SPILLS IS A LIGHT ABOVE THE
+                             // FLOOR. This one line is doing real work: it drops
+                             // the ground-level glow decals — Kowloon's wet-road
+                             // reflection discs are emissive quads lying at y = 0
+                             // — which would otherwise each register as a lamp
+                             // sitting in the road, lighting the road they are a
+                             // picture of.
+const sysSPL_CLUS   = 7.0;   // m. One light per sign CLUSTER, not per sign.
+const sysSPL_MAXC   = 24;    // clusters kept; the pool picks the nearest 8 of them
+const sysSPL_FAR    = 40;    // m from the camera past which a cluster cannot claim
+const sysSPL_HYST   = 6;     // ...with hysteresis, for sysCTC_HYST's reason
+const sysSPL_LAMBDA = 3.2;   // the fade. SLOWER than contact's: a patch of shade
+                             // may snap to a foot, but a light coming up is the
+                             // most obvious pop there is.
+const sysSPL_K      = 0.46;  // the brightest a cluster may burn. Measured, not
+                             // chosen — see the note at sysSpillScan.
+const sysSPL_REACH0 = 14.0;  // m, the reach of a single lamp...
+const sysSPL_REACH1 = 26.0;  // ...and of the biggest cluster in the game.
+                             // MEASURED, and the first pair (8 and 17) was too
+                             // short by half. Mong Kok's nearest sign cluster is
+                             // 10.5 m from the animal and six metres UP, and a
+                             // shopfront sign lights the whole width of a street:
+                             // at a reach of 8 m its light stopped in the air
+                             // above the kerb and the road under it moved by five
+                             // levels of 255, which is not visible and was not
+                             // worth the instruction.
+const sysSplFound   = [];    // { x, y, z, r, cr, cg, cb } — rebuilt on biome swap
+const sysSplSlots   = [];    // { src, k }
+const sysSplWant    = [];
+const sysSplOut     = [];
+const sysSplM4      = new THREE.Matrix4();
+const sysSplV       = new THREE.Vector3();
+const sysSplC       = new THREE.Color();
 
 // Mid-afternoon sun, high and from the north-west over the harbour...
 const sysSUN_DIR      = new THREE.Vector3(-0.62, 0.66, 0.42).normalize();
@@ -5433,6 +5480,191 @@ export function createSystems(game) {
       sl.obj = null; sl.k = 0; sl.y = -9999;
     }
     contactTick(sysCtcOut, 0);
+  }
+
+  // =========================================================================
+  // 1c-ter. THE SPILL POOL. See the SPILL block in shared.js.
+  // =========================================================================
+
+  /**
+   * Walk the live chapter and find every emitter in it.
+   *
+   * Run ONCE per biome attach, never per frame — it traverses the whole scene
+   * and reads instance matrices, which is a build-time cost and nothing like a
+   * frame-time one. Detached biomes have `visible = false` on their roots, so
+   * scoping to the live chapter needs no biome argument at all: three's
+   * traverse already skips what is not being drawn.
+   *
+   * SIGNS ARE INSTANCED, so `getWorldPosition` on the mesh returns the chapter
+   * root and every sign in Mong Kok clusters at the origin. Measured that way
+   * first, and it produced one enormous lamp under the road. The positions have
+   * to come out of the instance matrices.
+   *
+   * sysSPL_K was measured rather than chosen: at 0.9 the street under a sign
+   * blew past the chapter's bloom threshold and Mong Kok grew a white puddle;
+   * at 0.2 the ground moved by less than two levels of 255 and there was no
+   * point having done it. 0.46 lifts Hong Kong's floor from 34 to the low
+   * fifties near a cluster and leaves the grade alone.
+   */
+  let sysSplRescan = 2;
+  function sysSpillScan() {
+    sysSplFound.length = 0;
+    const cand = [];
+    scene.traverse(function (o) {
+      if (!o.isMesh || !o.visible) return;
+      const m = o.material;
+      if (!m || !m.emissive) return;
+      const ei = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
+      const lum = (0.2126 * m.emissive.r + 0.7152 * m.emissive.g + 0.0722 * m.emissive.b) * ei;
+      if (lum < sysSPL_LUM) return;
+      if (o.isInstancedMesh) {
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, sysSplM4);
+          sysSplV.setFromMatrixPosition(sysSplM4);
+          o.localToWorld(sysSplV);
+          if (sysSplV.y < sysSPL_MINY) continue;
+          cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
+                      r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
+        }
+      } else {
+        o.getWorldPosition(sysSplV);
+        if (sysSplV.y < sysSPL_MINY) return;
+        cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
+                    r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
+      }
+    });
+    if (!cand.length) return;
+    // Brightest first, then absorb everything within sysSPL_CLUS of it. Greedy
+    // and O(n^2) on a few hundred candidates, once per chapter attach.
+    cand.sort(function (a, b) { return b.l - a.l; });
+    for (let i = 0; i < cand.length && sysSplFound.length < sysSPL_MAXC; i++) {
+      if (cand[i].used) continue;
+      let sx = 0, sy = 0, sz = 0, sr = 0, sg = 0, sb = 0, w = 0, n = 0, spread = 0;
+      for (let j = i; j < cand.length; j++) {
+        const c = cand[j];
+        if (c.used) continue;
+        const dx = c.x - cand[i].x, dy = c.y - cand[i].y, dz = c.z - cand[i].z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > sysSPL_CLUS * sysSPL_CLUS) continue;
+        c.used = true; n++;
+        if (d2 > spread) spread = d2;
+        sx += c.x * c.l; sy += c.y * c.l; sz += c.z * c.l;
+        sr += c.r * c.l; sg += c.g * c.l; sb += c.b * c.l; w += c.l;
+      }
+      if (w <= 0) continue;
+      // THE COLOUR IS NORMALISED AND THE STRENGTH IS SEPARATE. A dim red sign
+      // and a bright red sign are the same colour of light; what differs is how
+      // much. Multiplying the emissive straight in makes every dim thing a
+      // muddy brown light instead of a faint red one.
+      sysSplC.setRGB(sr / w, sg / w, sb / w);
+      const mx = Math.max(sysSplC.r, Math.max(sysSplC.g, sysSplC.b));
+      if (mx > 0.001) sysSplC.multiplyScalar(1 / mx);
+      // Bigger clusters reach further and burn a little harder, but both are
+      // capped: this is a sign, not the sun.
+      const big = clamp(Math.sqrt(spread) / sysSPL_CLUS, 0, 1);
+      const k = sysSPL_K * clamp(0.55 + 0.45 * clamp(w / 2.2, 0, 1), 0, 1);
+      sysSplFound.push({
+        x: sx / w, y: sy / w, z: sz / w,
+        r: lerp(sysSPL_REACH0, sysSPL_REACH1, big),
+        cr: sysSplC.r * k, cg: sysSplC.g * k, cb: sysSplC.b * k,
+      });
+    }
+  }
+
+  function sysSplRank(a, b) { return a.d2 - b.d2; }
+
+  function sysSpillFrame(dt) {
+    const N = spillSlots();
+    if (sysSplSlots.length === 0) {
+      for (let i = 0; i < N; i++) sysSplSlots.push({ src: null, k: 0 });
+    }
+    // THE A/B SWITCH, AND IT CUTS RATHER THAN FADES. The first version faded,
+    // which is right for the world and useless as an instrument: every probe in
+    // this repo reads its two frames at dt = 0 so nothing else can move between
+    // them, and at dt = 0 a damped fade does not fade. Both arms came back
+    // pixel-identical and the whole effect measured as doing nothing. Nothing
+    // in play sets this.
+    if (game.state.noSpill) {
+      for (let s = 0; s < N; s++) { sysSplSlots[s].src = null; sysSplSlots[s].k = 0; }
+      spillTick(sysSplOut, 0);
+      return;
+    }
+    if (!sysSplFound.length) {
+      // An empty chapter DOES fade, because that is a light going out rather
+      // than an instrument being read.
+      let any = 0;
+      for (let s = 0; s < N; s++) {
+        const sl = sysSplSlots[s];
+        if (!sl.src) continue;
+        sl.k = damp(sl.k, 0, sysSPL_LAMBDA, dt);
+        if (sl.k < 0.004) { sl.k = 0; sl.src = null; } else any++;
+      }
+      if (!any) { spillTick(sysSplOut, 0); return; }
+    }
+
+    // ---- rank what is near enough to matter --------------------------------
+    sysSplWant.length = 0;
+    if (!game.state.noSpill) {
+      for (let i = 0; i < sysSplFound.length; i++) {
+        const f = sysSplFound[i];
+        const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        let held = false;
+        for (let s = 0; s < N; s++) if (sysSplSlots[s].src === f) { held = true; break; }
+        const far = held ? sysSPL_FAR + sysSPL_HYST : sysSPL_FAR;
+        if (d2 > far * far) continue;
+        f.d2 = d2;
+        sysSplWant.push(f);
+      }
+      sysSplWant.sort(sysSplRank);
+      if (sysSplWant.length > N) sysSplWant.length = N;
+    }
+
+    // ---- hold, fade, and hand over -----------------------------------------
+    for (let s = 0; s < N; s++) {
+      const sl = sysSplSlots[s];
+      let keep = false;
+      if (sl.src) {
+        for (let i = 0; i < sysSplWant.length; i++) {
+          if (sysSplWant[i] === sl.src) { keep = true; sysSplWant[i].taken = true; break; }
+        }
+      }
+      if (keep) sl.k = damp(sl.k, 1, sysSPL_LAMBDA, dt);
+      else {
+        sl.k = damp(sl.k, 0, sysSPL_LAMBDA, dt);
+        if (sl.k < 0.004) { sl.k = 0; sl.src = null; }
+      }
+    }
+    for (let i = 0; i < sysSplWant.length; i++) {
+      const w2 = sysSplWant[i];
+      if (w2.taken) { w2.taken = false; continue; }
+      for (let s = 0; s < N; s++) {
+        if (sysSplSlots[s].src === null) { sysSplSlots[s].src = w2; sysSplSlots[s].k = 0; break; }
+      }
+    }
+
+    // ---- write it out ------------------------------------------------------
+    let n = 0;
+    for (let s = 0; s < N; s++) {
+      const sl = sysSplSlots[s];
+      if (!sl.src || sl.k <= 0.002) continue;
+      let e = sysSplOut[n];
+      if (!e) { e = { x: 0, y: 0, z: 0, r: 1, cr: 0, cg: 0, cb: 0 }; sysSplOut[n] = e; }
+      e.x = sl.src.x; e.y = sl.src.y; e.z = sl.src.z; e.r = sl.src.r;
+      e.cr = sl.src.cr * sl.k; e.cg = sl.src.cg * sl.k; e.cb = sl.src.cb * sl.k;
+      n++;
+    }
+    spillTick(sysSplOut, n);
+  }
+
+  /** A biome swap replaces every light in the world. Same argument as
+   *  sysContactClear, and the rescan is deferred to the next frame so it runs
+   *  after the incoming chapter has finished making itself visible. */
+  function sysSpillClear() {
+    for (let s = 0; s < sysSplSlots.length; s++) { sysSplSlots[s].src = null; sysSplSlots[s].k = 0; }
+    sysSplFound.length = 0;
+    sysSplRescan = 2;
+    spillTick(sysSplOut, 0);
   }
 
   // =========================================================================
@@ -16344,6 +16576,13 @@ export function createSystems(game) {
     // this is the entire per-frame cost of contact on every grained surface in
     // the world, not a cost per material.
     sysContactFrame(dt);
+    // ---- and the light that lands on something ----------------------------
+    // The rescan is DEFERRED a couple of frames past the swap: a chapter is
+    // still making its roots visible on the frame the grade is switched, and a
+    // scan run there finds an empty world and leaves the neon chapter dark
+    // until the next swap. Two frames costs nothing and cannot race.
+    if (sysSplRescan > 0 && --sysSplRescan === 0) sysSpillScan();
+    sysSpillFrame(dt);
     // ---- the wind, in the picture -----------------------------------------
     // One float, one clock and one unit vector, and every swaying material in
     // the live chapter leans. The vector is weather.js's gust() UNCHANGED — it
@@ -16686,6 +16925,7 @@ export function createSystems(game) {
    */
   function sysDressPrime(name) {
     sysContactClear();
+    sysSpillClear();
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
     for (let i = 0; i < sysGRADE_KEYS.length; i++) {
       const key = sysGRADE_KEYS[i];
@@ -17691,6 +17931,7 @@ export function createSystems(game) {
     // fade out over the Piazzetta from a position in the Botanic Gardens —
     // the shared-space leak this repo has paid for more than once.
     sysContactClear();
+    sysSpillClear();
     sysSkyTopWant.set(sysSKY_TOP[name] || PALETTE.skyTop);
     if (sysSkyMesh) sysSkyMesh.visible = !sysSKY_OWN[name];
     // The list and the score both belong to the place, not to a progress

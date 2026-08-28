@@ -1457,31 +1457,139 @@ varying vec3 vRimN;`;
 const _RIM_VS_BEGIN = `#include <begin_vertex>
 vRimW = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vRimN = normalize(mat3(modelMatrix) * objectNormal);`;
+// ---------------------------------------------------------------------------
+// SPILL — AND IT IS DELIBERATELY NOT A PointLight.
+//
+// Measured (qa/PRESENCE-PASS.md): eight of nine sampled chapters have ZERO
+// point lights, and Hong Kong's ground reads a mean luminance of 34.1/255 with
+// a sign blazing beside the animal. Monte Carlo's lamp burns white-hot over
+// pavement no brighter than pavement fifteen metres away. The composite pass's
+// own opening comment says the problem it exists to solve is that a light which
+// does not spill is a sticker: it fixed the lens, and the lights still do not
+// spill onto the floor.
+//
+// The obvious fix is a pool of THREE.PointLights, and it is the wrong one HERE.
+// Every light three knows about changes NUM_POINT_LIGHTS, which recompiles
+// every material in the chapter, and then costs a full lambert-plus-specular
+// evaluation per light per fragment on all of them — for an effect that is
+// wanted on the floor and on the animal and nowhere else.
+//
+// This is the same shape as the contact pool one field over: a fixed-size
+// uniform block of the nearest N emitters, and a term that ADDS. Eight slots,
+// a compile-time literal, one branch when the chapter has no emitters, no
+// recompiles ever, no shadow lookups, no specular.
+//
+// IT LIVES IN THE RIM'S INJECTION, and that is the point. The rim already
+// compiles into essentially every material in the game through mat(), it
+// already carries the world position and the world normal as varyings, and it
+// already sits at <opaque_fragment> where `outgoingLight` is. So the spill
+// reaches the ground, the walls, the stalls AND THE CAPYBARA — which no term
+// living in grain() could, because the animal's fur is not a grained material.
+const _SPILL_N = 8;
+const _spillP = { value: [] };   // xyz world position of the cluster, w = its reach
+const _spillC = { value: [] };   // colour premultiplied by strength
+const _spillOn = { value: 0 };
+// HOW MANY SLOTS ARE ACTUALLY LIVE. The loop bound has to be a literal, but a
+// break against a uniform is free and it is most of the cost: a chapter with
+// two sign clusters in range was paying for eight, on every fragment of every
+// object, and the two-thirds it was throwing away is the two-thirds this
+// recovers.
+const _spillN = { value: 0 };
+for (let i = 0; i < _SPILL_N; i++) {
+  _spillP.value.push(new THREE.Vector4(0, -9999, 0, 1));
+  _spillC.value.push(new THREE.Vector3(0, 0, 0));
+}
+// A wall facing away from a sign is not pitch black — a lit street is full of
+// bounce, and a pure lambert term on a fake light reads as a hard edge running
+// down every column. A third of the light arrives regardless of facing.
+const _spillWRAP = 0.34;
+/** How many slots the pool has. systems.js ranks into this many. */
+export function spillSlots() { return _SPILL_N; }
+/**
+ * Write the pool. systems.js calls this once per frame with at most
+ * spillSlots() entries, already ranked and already faded:
+ *
+ *     list[i] = { x, y, z, r, cr, cg, cb }   // colour already scaled by strength
+ *
+ * Slots past `n` are zeroed for contactTick()'s reason: a source that leaves
+ * the pool must not leave a lit patch behind.
+ */
+export function spillTick(list, n) {
+  const P = _spillP.value, C = _spillC.value;
+  let live = 0;
+  for (let i = 0; i < _SPILL_N; i++) {
+    if (i < n) {
+      const e = list[i];
+      P[i].set(e.x, e.y, e.z, e.r > 0.5 ? e.r : 0.5);
+      C[i].set(e.cr, e.cg, e.cb);
+      if (e.cr + e.cg + e.cb > 0.002) live++;
+    } else {
+      C[i].set(0, 0, 0);
+    }
+  }
+  _spillOn.value = live > 0 ? 1 : 0;
+  // systems.js packs the live slots to the front, so this is a bound and not
+  // merely a count — see the break in the loop.
+  _spillN.value = n < _SPILL_N ? n : _SPILL_N;
+}
+
 const _RIM_FS_COMMON = `#include <common>
 varying vec3 vRimW;
 varying vec3 vRimN;
 uniform float uRimK;
-uniform vec3 uRimC;`;
+uniform vec3 uRimC;
+uniform vec4 uSpillP[${_SPILL_N}];
+uniform vec3 uSpillC[${_SPILL_N}];
+uniform float uSpillOn;
+uniform float uSpillN;`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
 // brighter version of the thing rather than light on it. Added at the end it is
 // light, it is the sky's colour, and it survives the object standing in shadow
 // — which is exactly where a thing most needs separating from what is behind it.
 const _RIM_FS_OUT = `{
+  vec3 rN = normalize(vRimN);
+  if (!gl_FrontFacing) rN = -rN;
   if (uRimK > 0.0005) {
-    vec3 rN = normalize(vRimN);
-    if (!gl_FrontFacing) rN = -rN;
     vec3 rD = cameraPosition - vRimW;
     float rL = length(rD);
     float rf = pow(1.0 - clamp(dot(rN, rD / max(rL, 0.0001)), 0.0, 1.0), 2.5);
     rf *= clamp(1.0 - rL / 42.0, 0.0, 1.0);
     outgoingLight += rf * uRimK * uRimC;
   }
+  // ---- THE SPILL. See the block above _RIM_FS_COMMON. ----------------------
+  // One coherent branch in the sixteen chapters that register no emitters, so
+  // they pay for this exactly nothing.
+  if (uSpillOn > 0.5) {
+    vec3 sAcc = vec3(0.0);
+    for (int si = 0; si < ${_SPILL_N}; si++) {
+      if (float(si) >= uSpillN) break;
+      vec3 sD = uSpillP[si].xyz - vRimW;
+      float sL = length(sD);
+      // Reach, not inverse-square. A physical falloff on a fake light either
+      // blows out at the source or dies before it reaches the floor, and the
+      // thing being modelled here is a SIGN CLUSTER several metres across
+      // rather than a point. A smooth ramp to nothing at the stated reach is
+      // also what lets a source leave the pool without a visible edge.
+      float sAt = 1.0 - smoothstep(uSpillP[si].w * 0.12, uSpillP[si].w, sL);
+      float sNd = max(dot(rN, sD / max(sL, 0.0001)), 0.0);
+      sAcc += uSpillC[si] * sAt * (${_spillWRAP.toFixed(2)} + ${(1 - _spillWRAP).toFixed(2)} * sNd);
+    }
+    // MULTIPLIED BY THE ALBEDO, which is the whole difference between light and
+    // paint: a magenta sign over grey asphalt makes a grey street slightly
+    // magenta, and over a red awning it makes the awning glow. Added flat it
+    // would wash every surface to the same colour and read as fog.
+    outgoingLight += sAcc * diffuseColor.rgb;
+  }
 }
 #include <opaque_fragment>`;
 function _rimInject(shader) {
   shader.uniforms.uRimK = _rimK;
   shader.uniforms.uRimC = _rimC;
+  shader.uniforms.uSpillP = _spillP;
+  shader.uniforms.uSpillC = _spillC;
+  shader.uniforms.uSpillOn = _spillOn;
+  shader.uniforms.uSpillN = _spillN;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', _RIM_VS_COMMON)
     .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
@@ -1515,7 +1623,7 @@ export function mat(color, opts) {
   _matCache.set(key, m);
   return m;
 }
-function _rimKey() { return 'rim1'; }
+function _rimKey() { return 'rim2'; }
 
 // ---------------------------------------------------------------------------
 // Task list — the goose-game checklist. IDs are contract-locked.
