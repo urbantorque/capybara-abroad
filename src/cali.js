@@ -37,7 +37,6 @@ import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex }
 const caliRIVER_Z = 0;              // the Río Cali runs east-west
 const caliRIVER_HZ = 9;             // half-width of the channel
 const caliRIVER_Y = -1.5;           // water surface (the channel is cut below 0)
-const caliBANK_Z = 14;              // the south bank walk
 const caliGATO = { x: -34, z: -14 };
 const caliERMITA = { x: 30, z: -20 };
 const caliBRIDGE_X = -6;
@@ -96,7 +95,6 @@ const caliCHIVA_V_HILL = 4.4;       // m/s at 10% and worse; a chiva climbs in f
 const caliCHIVA_ACC = 2.6;          // m/s^2 the engine can add or take away
 const caliCHIVA_STOP_T = 5.0;       // s stood at a stop, collecting
 const caliCHIVA_PULL_T = 1.3;       // s on the roof before she pulls away
-const caliCHIVA_ARRIVE_R = 6;       // m from the mirador at which she is "in"
 const caliCHIVA_L = 9.5, caliCHIVA_W = 2.9;
 const caliROOF_TOP = 3.70;          // top of the roof collider, in chiva-local metres
 // Wire height above the ROAD, not above the bus: the bus pitches on the grades,
@@ -288,13 +286,13 @@ function caliMerger() {
  */
 function caliVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.55 });
+               { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.32, nearScale: 8, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function caliVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7, contact: 1 });
 }
 function caliPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function caliInstance(root, geo, color, list, cast, recv) {
@@ -4045,6 +4043,131 @@ export function createCali(game) {
   return api;
 }
 
+// ============================================================== SCATTER ======
+/**
+ * CALI HAD ONE SCATTER IN THE WHOLE CHAPTER.
+ *
+ * Counted across the game: the Pantanal lays down twenty-five and Circular Quay
+ * sixteen; this chapter had one, and it is a chapter whose two best shots — the
+ * painted street of San Antonio and the ground in front of the Ermita — are both
+ * of a floor. The near-field octave in grain() breaks the value up, but a shader
+ * term casts no shadow and passes under nothing: what says "real surface" at four
+ * metres is a small object lying on it.
+ *
+ * It is seven in the evening in the Valle del Cauca and everything on the ground
+ * here comes off a tree: samán and mango leaves on the paving, dry grass at the
+ * verge, and — because this is the chapter with a dance in it — a few scraps of
+ * paper that have been on the street since whatever happened last night.
+ *
+ * Quads, not boxes; a jittered grid, not a scatter; a PER-CELL budget rather
+ * than a global cap tested inside the sweep. All three rules are the Pantanal's
+ * and all three were paid for there.
+ */
+/**
+ * A TUFT IS THE ONE PIECE THAT STANDS UP, so it is the one that has to be sure
+ * it is on soil. A leaf lying at five centimetres over a slab is a leaf on the
+ * slab; a half-metre blade in the same place is a blade growing THROUGH the
+ * paving, and photographed off the first pass that is exactly what the promenade
+ * had — three of them coming up out of grey stone beside the lawn.
+ *
+ * This is the ground mesh's own colour rule read back: caliBuildGroundMesh
+ * paints earth inside the river band and ridge above eight metres, and grass
+ * everywhere else. The promenade and the road are DRAWN OVER that grass rather
+ * than cut into it, so the band is widened to clear both of them.
+ */
+function caliTuftHere(x, z, h) {
+  if (h > 8) return false;                                  // the ridge to Cristo Rey
+  if (Math.abs(z - caliRIVER_Z) < caliRIVER_HZ + 16) return false;  // channel, walk, road
+  if (caliInZone('street', x, z) || caliInZone('dancefloor', x, z)) return false;
+  if (caliInZone('terrace', x, z) || caliInZone('cane', x, z)) return false;
+  return true;
+}
+
+function caliBuildScatter(root) {
+  const flat = new THREE.PlaneGeometry(1, 1);
+  flat.rotateX(-Math.PI / 2);
+  // Two crossed quads, seen from both sides: four triangles that read as a
+  // tuft from any heading. A cone4 at this size is a pyramid — see the note on
+  // the first pass in qa/POLISH-PASS.md.
+  const bladeGeo = (() => {
+    const a = new THREE.PlaneGeometry(1, 1);
+    a.translate(0, 0.5, 0);
+    const b = a.clone();
+    b.rotateY(Math.PI / 2);
+    const g2 = new THREE.BufferGeometry();
+    const pa = a.attributes.position.array, pb = b.attributes.position.array;
+    const na = a.attributes.normal.array, nb = b.attributes.normal.array;
+    const P = new Float32Array(pa.length + pb.length);
+    P.set(pa, 0); P.set(pb, pa.length);
+    const N = new Float32Array(na.length + nb.length);
+    N.set(na, 0); N.set(nb, na.length);
+    g2.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    g2.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    const ia = a.index.array, n0 = pa.length / 3;
+    const I = [];
+    for (let i = 0; i < ia.length; i++) I.push(ia[i]);
+    for (let i = 0; i < ia.length; i++) I.push(n0 + ia[i]);
+    g2.setIndex(I);
+    a.dispose(); b.dispose();
+    return g2;
+  })();
+  const X0 = -90, X1 = 90, Z0 = -70, Z1 = 80, CELL = 3.2;
+  const NX = Math.ceil((X1 - X0) / CELL), NZ = Math.ceil((Z1 - Z0) / CELL);
+  const leaf = [], dry = [], paper = [], tuft = [];
+  for (let gz = 0; gz < NZ; gz++) {
+    for (let gx = 0; gx < NX; gx++) {
+      const per = 2 + ((gx * 5 + gz * 9) % 3);
+      for (let k = 0; k < per; k++) {
+        const x = X0 + (gx + rand(0.05, 0.95)) * CELL;
+        const z = Z0 + (gz + rand(0.05, 0.95)) * CELL;
+        if (caliIsOverWater(x, z)) continue;
+        const h = caliTerrain(x, z);
+        // The street of San Antonio is its own slab at +0.16 over the terrain,
+        // and the road ribbon is laid over it too; anything placed on the
+        // analytic height inside either is UNDER the surface it belongs on.
+        const onStreet = Math.abs(z - caliSTREET_Z) < caliSTREET_HZ;
+        const y = (onStreet ? h + caliSTREET_TOP : h) + 0.05;
+        if (onStreet) {
+          // Paper is RARE. One scrap in six on the street and none off it: a
+          // dozen of them says last night, and a field of them says the bins
+          // were tipped over.
+          const w = rand(0.13, 0.26);
+          (k % 6 === 0 ? paper : leaf).push(x, y, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.5, 0.8));
+        } else if (k % 5 === 0 && caliTuftHere(x, z, h)) {
+          const s2 = rand(0.22, 0.48);
+          tuft.push(x, h, z, 0, rand(0, 6.283), 0, s2 * 0.9, s2, s2 * 0.9);
+        } else {
+          const w = rand(0.14, 0.30);
+          (k & 1 ? leaf : dry).push(x, y, z, 0, rand(0, 6.283), 0, w, 1, w * rand(0.5, 0.85));
+        }
+      }
+    }
+  }
+  const put = (list, geo, color, cast) => {
+    const n = list.length / 9;
+    if (n < 1) return;
+    const im = new THREE.InstancedMesh(geo, mat(color, geo === bladeGeo ? { side: THREE.DoubleSide } : undefined), n);
+    for (let i = 0; i < n; i++) {
+      const o = i * 9;
+      im.setMatrixAt(i, caliXform(list[o], list[o + 1], list[o + 2], list[o + 3], list[o + 4],
+                                  list[o + 5], list[o + 6], list[o + 7], list[o + 8]));
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    im.castShadow = !!cast;
+    im.receiveShadow = false;
+    if (!cast) im.userData.noShadow = true;
+    root.add(im);
+  };
+  // caliMango is a DARK GREEN and on pale paving a field of it reads as
+  // confetti rather than as leaf litter. What falls off a samán and lies on a
+  // Cali pavement at seven in the evening is dry and the colour of the earth.
+  put(leaf, flat, PALETTE.caliEarth, false);
+  put(dry, flat, PALETTE.caliGrassDry, false);
+  put(paper, flat, PALETTE.caliWall4, false);
+  put(tuft, bladeGeo, PALETTE.caliGrass, false);
+}
+
 function caliBuild(game) {
   if (caliBuilt) return;
   caliBuilt = true;
@@ -4061,6 +4184,7 @@ function caliBuild(game) {
 
   caliRoot.add(caliBuildGroundMesh());
   caliBuildGroundBody(game);
+  caliBuildScatter(caliRoot);
   caliRoot.add(caliBuildRiver());
   caliBuildDrift(caliRoot);
   caliBuildRoad(caliRoot);

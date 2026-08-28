@@ -175,7 +175,6 @@ const quayBOAT_ACC    = 3.4;         // m/s^2 the engine can add
 const quayBOAT_DRAG   = 0.55;        // 1/s of coast-down with the throttle shut
 const quayBOAT_TURN   = 0.52;        // rad/s at full rudder AND full speed (~22 m radius)
 const quayBOAT_RUDDER = 2.4;         // 1/s the rudder itself swings over
-const quayBOAT_LEEWAY = 3.1;         // 1/s the hull's track chases its heading
 const quayBOAT_HX     = 2.35;        // half beam
 const quayBOAT_HZ     = 6.40;        // half length
 const quayHELM_R      = 2.6;         // how close you must stand to take the wheel
@@ -184,7 +183,6 @@ const quayGANG_OUT    = 0.55;        // how far the boarding platform stands pro
 
 // ------------------------------------------------------------------ scratch --
 const quayV3 = new THREE.Vector3();
-const quayV3b = new THREE.Vector3();
 const quayQ = new THREE.Quaternion();
 const quayEu = new THREE.Euler();
 const quaySc = new THREE.Vector3();
@@ -193,7 +191,6 @@ const quayCol = new THREE.Color();
 
 // ---------------------------------------------------------------- module ----
 let quayGame = null;
-let quayApi = null;
 let quayBuilt = false;
 let quayRoot = null;
 let quayTime = 0;
@@ -385,7 +382,7 @@ function quayMerger() {
  */
 function quayVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.5 });
+               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1 });
 }
 
 function quayInstance(root, geo, color, list, cast, recv) {

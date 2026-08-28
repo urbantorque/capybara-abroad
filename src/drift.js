@@ -289,9 +289,9 @@ let driColPeak = 0, driColIdx = -1, driColFoot = 0;
 let driFliesAwake = 0;
 let driLit = false, driLitT = 0, driGlow = 0;
 let driPuffDone = false, driFlyDone = false, driDiveDone = false;
-let driColDone = false, driRideDone = false, driGapDone = false, driLanternDone = false;
+let driColDone = false, driRideDone = false, driGapDone = false;
 let driHintPuff = false, driHintWind = false, driHintFlies = false;
-let driLastGlow = -1, driLastTint = -1;
+let driLastGlow = -1;
 
 // ============================================================== primitives ==
 function driXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
@@ -423,7 +423,7 @@ function driMerger() {
  */
 function driVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.3, amount: 0.07, warp: 0.5 });
+               { scale: 0.3, amount: 0.07, warp: 0.5, near: 0.30, nearScale: 9, contact: 1 });
 }
 function driPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function driInstance(root, geo, material, list, cast, recv) {
@@ -4107,7 +4107,7 @@ function driCheckHand(game) {
  */
 const driRING_N = 14;
 let driRingMesh = null, driRingMat = null;
-let driRingT = -1, driRingX = 0, driRingY = 0, driRingZ = 0, driRingYaw = 0;
+let driRingT = -1, driRingX = 0, driRingY = 0, driRingZ = 0;
 const driRingData = new Float32Array(driRING_N * 3);   // bearing, radius, size
 
 function driBuildPuffRing(root) {

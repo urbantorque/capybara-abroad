@@ -181,7 +181,6 @@ const venBOARD_W = 3.0;
 const venPIGEON_N = 180;
 const venPIGEON_R = 5.2;            // how close before a pigeon has had enough
 const venGOND_SPEED = 0.0125;       // fraction of the canal per second
-const venSTAR_N = 0;
 
 // ---------------------------------------------------------------- scratch ---
 const venV3 = new THREE.Vector3();
@@ -240,7 +239,7 @@ let venWasFlooded = false;
 // piece and a coin toss.
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
-let venBoardRunT = -1, venBoardRunBest = 0, venBoardFrom = 0, venBoardOff = 0;
+let venBoardRunT = -1, venBoardFrom = 0, venBoardOff = 0;
 let venOnBoards = false, venBoardIdx = -1;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
 let venGondDone = false, venRialtoDone = false, venFloodDone = false, venSwimDone = false;
@@ -479,14 +478,14 @@ function venWet(g) {
 let venWallMat = null, venGroundMat = null;
 function venVC() {
   if (!venWallMat) venWallMat = venWet(grainOwn(mat(0xffffff, { vertexColors: true }),
-    { scale: 0.45, amount: 0.09, warp: 0.55 }));
+    { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 8, contact: 1 }));
   return venWallMat;
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function venVCG() {
   if (!venGroundMat) venGroundMat = venWet(grainOwn(mat(0xffffff, { vertexColors: true }),
-    { scale: 0.72, amount: 0.14, warp: 0 }));
+    { scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1 }));
   return venGroundMat;
 }
 function venPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
@@ -1684,7 +1683,6 @@ function venBuildSquares(game, root) {
  * the city, and it costs one lerp. The bell they hit is the loudest thing in
  * the chapter that is not the siren, and every pigeon in the square goes up.
  */
-let venOroGroup = null;
 let venOroHandH = null, venOroHandM = null;
 let venOroMoorA = null, venOroMoorB = null;
 let venOroStrike = -1;              // s into a strike, -1 between

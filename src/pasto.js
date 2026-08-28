@@ -230,7 +230,6 @@ const pastoColRockD  = new THREE.Color(PALETTE.volcanoDark);
 const pastoColAsh    = new THREE.Color(PALETTE.volcanoAsh);
 const pastoColSnow   = new THREE.Color(PALETTE.volcanoSnow);
 const pastoColGlow   = new THREE.Color(PALETTE.craterGlow);
-const pastoColPeak   = new THREE.Color(PALETTE.peakFar);
 const pastoColSmoke  = new THREE.Color(PALETTE.smoke);
 const pastoColFogPale = new THREE.Color(PALETTE.andesFog);
 const pastoColMoteLo = new THREE.Color(PALETTE.andesSun);
@@ -447,7 +446,7 @@ function pastoBuildTerrainMesh() {
    * looking at.
    */
   const mesh = new THREE.Mesh(geo, grain(mat(PALETTE.volcanoSnow, { vertexColors: true }),
-                                         { scale: 0.48, amount: 0.15, warp: 0 }));
+                                         { scale: 0.48, amount: 0.15, warp: 0, near: 0.52, nearScale: 8, contact: 1 }));
   mesh.name = 'pastoLandscape';
   mesh.receiveShadow = true;
   mesh.castShadow = false;                            // 260 m of caster would eat the 2048 map

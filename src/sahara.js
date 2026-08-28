@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -158,7 +158,6 @@ const sahPurMiss = new Uint8Array(sahPURSUER_N);
 let sahMissN = 0;
 const sahPUR_MISS_R = 4.2;     // m of "and he did not look"
 let sahCamelMesh = null, sahCamelLegs = null;
-const sahCamelData = new Float32Array(sahCARAVAN_N * 4);  // t, x, z, yaw
 // The three people travelling with the caravan, by index into sahPplData.
 const sahCarPeople = [];
 let sahCaravanBody = null, sahCarPX = 0, sahCarPY = 0, sahCarPZ = 0;
@@ -340,13 +339,13 @@ function sahMerger() {
  */
 function sahVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.4, amount: 0.09, warp: 0.55 });
+               { scale: 0.4, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 9, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function sahVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.15, warp: 0 });
+               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearScale: 8, contact: 1 });
 }
 function sahPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function sahInstance(root, geo, color, list, cast, recv, opts) {
@@ -2277,7 +2276,18 @@ function sahBuildPalmeraie(game, root) {
   // without any of the noise.
   const fm2 = sahInstance(root, sahG.quad, PALETTE.sahPalm, fronds, false, false,
                           { side: THREE.DoubleSide });
-  if (fm2) { fm2.name = 'sahFronds'; fm2.userData.noShadow = true; }
+  if (fm2) {
+    fm2.name = 'sahFronds'; fm2.userData.noShadow = true;
+    // AND THEY MOVE. sahG.quad is a unit plane laid flat, scaled so x is the
+    // frond's LENGTH and z its width, and the segments are placed radiating
+    // outward — so +x is the tip and the window is the whole quad.
+    //
+    // These do not cast (see the starfish note above), which means swayMesh
+    // builds no depth material for them and there is no shadow to come adrift.
+    // That is the one place in this pass where an earlier decision made a later
+    // one free.
+    swayMesh(fm2, { amount: 0.14, axis: 'x', lo: -0.5, hi: 0.5, stiff: 1.8, hz: 1.2 });
+  }
 }
 
 // ================================================================ THE ERG ===
@@ -2504,7 +2514,7 @@ function sahBuildTrades(game, root) {
  *   THE DRYING RACKS AND THE FALLEN FRONDS, because a palm grove floor is
  *     ankle deep in what the palms have dropped.
  */
-const sahPALM_X0 = 96, sahPALM_X1 = 156, sahPALM_Z0 = -34, sahPALM_Z1 = 34;
+const sahPALM_X0 = 96, sahPALM_Z0 = -34;
 
 function sahBuildSeguia(game, root) {
   const M = sahMerger();

@@ -48,7 +48,6 @@ let envStageT = 0;
 // ---- Circular Quay (chapter 1) -----------------------------------------------
 const envCafeTables = [];     // {x, z, top} — climbable café tables
 const envPerches = [];        // {x, y, z} — bollard tops, rails, lamp caps, for gulls
-const envPrizeSpots = [];     // {x, z} — exact planting points inside the prize bed
 const envSprinklers = [];     // published records, see envMakeSprinkler
 let envSprayMesh = null;      // one InstancedMesh, the fan of water dashes
 let envSprayAng = 0;          // rotor sweep phase, advanced in envSprayStep
@@ -69,7 +68,6 @@ const envSPRAY_LIFT  = 0.62;    // apex of the arc above the nozzle
 let envFerry = null;          // published record
 let envFerryGroup = null;
 let envFerryBody = null;
-let envFerryPlank = null;
 let envFerryLeg = 0;          // index of the node we are travelling TOWARD
 let envFerryT = 0;            // seconds into the current leg
 let envFerryPX = 0, envFerryPZ = 0;   // previous TARGET — see envUpdateFerry
@@ -1897,12 +1895,12 @@ export function createEnvironment(game) {
    * looking at.
    */
   const matVC   = grain(mat(envVC_BASE, { vertexColors: true }),
-                        { scale: 0.45, amount: 0.085, warp: 0.55 });
+                        { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.32, nearScale: 8, contact: 1 });
   // The lawn and the sand run to a hundred and sixty metres and Sydney is the
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
   const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
-                         { scale: 0.68, amount: 0.17, warp: 0 });
+                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, nearScale: 8, contact: 1 });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.

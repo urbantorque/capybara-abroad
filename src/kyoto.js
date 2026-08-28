@@ -65,7 +65,6 @@ const kyoTORII_CAM_CEIL = 3.3;// but never closer than 0.7 m to the gate over th
 const kyoTORII_CAM_MIN = 1.2; // ...and never in the path either, going downhill
 const kyoTORII_CAM_DROP = 1.5;// how far the rail may fall below the animal before it stops
 const kyoTORII_CAM_R = 4.6;   // corridor half-width the rail applies inside of
-const kyoTORII_CAM_BACK = 5.2;// metres back ALONG THE PATH, not along the boom
 function kyoBuildToriiPath() {
   if (kyoTORII.length) return;
   for (let i = 0; i < kyoTORII_N; i++) {
@@ -243,13 +242,13 @@ function kyoMerger() {
  */
 function kyoVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.085, warp: 0.55 });
+               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.34, nearScale: 8, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function kyoVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7, contact: 1 });
 }
 function kyoPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function kyoInstance(root, geo, color, list, cast, recv) {
@@ -2523,7 +2522,6 @@ const kyoRIVER_PATH = [
   [166, 146], [154, 160], [134, 156], [126, 152],
 ];
 // Where the run is judged from: the bridge. Index into the path above.
-const kyoRUN_FROM = 4;
 const kyoRIVER_STEP = 2.5;          // m between resampled centreline points
 const kyoRIVER_SMOOTH = 3;
 // Half-width, keyed to fraction of the whole channel. A river narrows and speeds

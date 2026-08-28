@@ -22,12 +22,7 @@ const npcColor = new THREE.Color();
 const npcUpY = new THREE.Vector3(0, 1, 0);   // the lead's own axis, for the swing
 // Circular Quay scratch — still zero allocation inside update().
 const npcV3 = new THREE.Vector3();
-const npcV4 = new THREE.Vector3();
-const npcQ2 = new THREE.Quaternion();
-const npcM2 = new THREE.Matrix4();
-const npcS1 = new THREE.Vector3(1, 1, 1);
 const npcCV1 = new CANNON.Vec3();
-const npcUP = new THREE.Vector3(0, 1, 0);
 // Pasto scratch — used only by paOffCamera, so it never aliases npcV3.
 const npcPAv1 = new THREE.Vector3();
 
@@ -443,12 +438,9 @@ const npcPANTS = [PALETTE.denim, PALETTE.khaki, PALETTE.cloth6, PALETTE.stoneDar
 // so they steer with the existing nav + personal-space shove and cost nothing.
 // ===========================================================================
 const npcQUAY_KINDS = { busker: 1, patron: 1, waiter: 1, owner: 1, queue: 1, commuter: 1 };
-const npcFOOD = { sandwich: 1, icecream: 1, chips: 1, coffee: 1, basket: 1 };
-const npcDOG_NAME = 'Murray';
 const npcGULL_N = 8;
 const npcSEAT_CROUCH = -0.12;    // hips 0.62 -> 0.50: chair height
 const npcSEAT_LEG = -0.72;       // thighs swung forward under the table
-const npcQUAY_ZMIN = -22;        // quay folk may walk out along the ferry wharf
 
 // Fallback fixtures, used only until environment.js publishes the real ones.
 const npcFB_BUSKER = { x: -25.0, z: 2.0 };

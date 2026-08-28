@@ -29,6 +29,40 @@ const capySTOP_LAMBDA = 14;
 // and capyShove is applied after it, so a rolling bin still knocks you about.
 const capyGRIP_LAMBDA = 60;         // idle, grounded: how hard the feet hold
 const capyGRIP_SNAP = 0.9;          // m/s below which idle motion is simply over
+// ...AND capyGRIP_SNAP IS ALSO THE BAND EDGE. Above it the damper is
+// capySTOP_LAMBDA and the animal has a stopping distance; below it, it is the
+// static friction the two constants above describe. See the note in the
+// grounded branch of capyUpdate — the split is what makes a sprint a
+// commitment, and it cannot reach a slope, because the stiff band settles at
+// a/60 and no gravity in this game can put a parked animal past 0.9 m/s.
+const capySKID_V = 5.2;             // m/s above which letting go LOOKS like a skid
+// --- RUNNING INTO SOMETHING THAT DOES NOT MOVE ------------------------------
+// See the static branch of the collide listener. capyBONK_NY keeps the floor
+// out of it (a landing has its own thud, further down this file); and the gap
+// is a throttle, because a compound of three spheres against one flat face
+// produces several contact points on the same frame.
+//
+// AND THE THRESHOLD IS SET BY HOW OFTEN IT FIRES, NOT BY HOW HARD IT LOOKS.
+// The first cut was 2.6 m/s and 0.22 s, and it measured as a rattle. Forty-five
+// seconds of driving the animal round each chapter — sprinting, turning about
+// once a second, standing still a quarter of the time (qa/mv-noise.js) — put
+// Circular Quay at 23 bonks and Hong Kong at 18, which on a small deck and a
+// narrow street is one every two seconds. A wall bonk that fires every two
+// seconds is not a bonk, it is a wall texture.
+//
+// At 3.9 m/s the normal component of a WALK into a face is under the line at
+// any angle, so only a run arrives; the same soak then lands the noisiest
+// chapter at a bonk every five seconds and the median chapter at one every
+// twelve, which is what "you ran into that" should cost.
+const capyBONK_V   = 3.9;           // m/s along the contact normal
+const capyBONK_NY  = 0.45;          // |n.y| above this is a floor or a ramp
+const capyBONK_GAP = 0.40;          // s between bonks
+// --- THE RUN-UP. See the hop, and read the note there before touching either.
+// The floor is a shade over the walk (4.2), so a walking hop is untouched and
+// only a genuine run leaps; the push ramps in over the 1.6 m/s above it rather
+// than switching on, so there is no step in the arc at the boundary.
+const capyLEAP_V    = 4.6;          // m/s over the floor before a hop is a leap
+const capyLEAP_PUSH = 3.2;          // m/s of forward shove at a full run
 // ---- THE ANCHOR THE SNAP NEEDED, AND HOW FAR IT IS ALLOWED TO REACH -------
 // See THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED, below. Past this the
 // animal has genuinely been moved — a teleport, a rescue, a launch, a carrier
@@ -191,7 +225,6 @@ const capyVOID_Y = -3;              // below this we genuinely fell out of the w
 const capyREST_BAND = 0.06;         // m above rest height that still counts as ON the ground
 const capyHOP_KILL = 1.2;           // m/s of upward contact push-out we refuse to keep
 const capyYAW_KP = 18;              // first-order (=> non-ringing) yaw drive gain
-const capyUP_KP = 12;               // upright restoring drive gain
 const capySPEED_LAMBDA = 11;        // gait speed smoothing — legs must not stutter
 const capyRENDER_Y_LAMBDA = 26;     // presentation-only vertical filter, at rest
 // The predict-and-correct render filter. lambda is the rate the CORRECTION
@@ -202,8 +235,6 @@ const capyRENDER_LAMBDA = 24;
 const capyRENDER_SNAP2 = 1.6 * 1.6;  // m^2 of prediction error that means "teleport"
 const capyDESYNC2 = 2.25;           // (1.5 m)^2 — someone teleported the body
 // --- Circular Quay verbs -------------------------------------------------------
-const capyTUG_RADIUS = 1.95;        // bite-and-pull reach (grab reach is 1.6)
-const capyTUG_EFFORT = 0.85;        // default seconds of strain before it gives
 const capyPLAT_MIN_MASS = 4;        // lighter dynamic bodies are not platforms
 // --- KEEPING THE FRAME WHEN YOUR FEET LEAVE IT ------------------------------
 // This used to be one number — 0.18 s — and its only stated job was to survive a
@@ -509,6 +540,10 @@ let capyPlatVX = 0, capyPlatVZ = 0, capyPlatT = 0;   // the frame the floor is m
 // ALREADY HAPPENED — this is the anchor the idle snap holds against, and it is
 // carried in the floor's frame, not the world's.
 let capyPinOn = false, capyPinX = 0, capyPinZ = 0;
+// Armed by the stick, spent by the skid — so one release is one skid, however
+// many frames the slide takes. See capySKID_V.
+let capySkidArm = false;
+let capyBonkAt = -9;                // game time of the last wall bonk
 let capyLaunchT = 0;                                 // s left of "you are not standing on anything"
 // ---- STAMINA -------------------------------------------------------------
 // A capybara is a sprinter with a rodent's lungs, not a horse. Ten seconds flat
@@ -1531,9 +1566,68 @@ export function createCapybara(game) {
   // heavy props actually shove the capybara around — decaying velocity channel
   body.addEventListener('collide', function (e) {
     const other = e.body;
-    if (!other || other.mass < 0.8) return;
+    if (!other) return;
     const c = e.contact;
     if (!c) return;
+    // ---- AND THE OTHER HALF OF THE WORLD, WHICH DOES NOT MOVE -------------
+    //
+    // This listener returned on `other.mass < 0.8` before anything else, and a
+    // static collider is mass 0 — so EVERY collision with the world itself was
+    // discarded before it was looked at. A wall, a kerb, a parked bus, a torii
+    // leg, a scaffold pole: the listener was only ever a channel for things
+    // hitting YOU.
+    //
+    // Measured with qa/mv-bonk.js — sixteen bearings out of each spawn, every
+    // run whose speed collapses with the stick still hard over. Twelve impacts
+    // across Sydney, Kyoto, Venice, Hong Kong and Monte Carlo, nine of them
+    // losing more than two thirds of their speed (Kyoto: 7.43 -> 0.28 m/s in
+    // one bearing). Zero punch(), zero shake(), no impact sound in any of the
+    // twelve. The only thing the game said was footsteps.
+    //
+    // Loose props were always fine — physOnCollide stamps a material voice and
+    // emits 'prop:impact', which systems.js turns into a spatialised thud plus
+    // a speed-scaled punch. This is the static half being wired into the same
+    // idea, and the three gates are what keep it from firing on the floor:
+    //
+    //   the normal must be MOSTLY HORIZONTAL. Every footfall and every landing
+    //   is a static contact too, and a landing already has its own thud and its
+    //   own punch further down this file. capyBONK_NY is the same 0.4-ish line
+    //   the grounded test uses, read the other way round.
+    //
+    //   the closing speed ALONG THAT NORMAL must be real. Sliding along a wall
+    //   is a large tangential speed and a tiny normal one, so a graze is
+    //   naturally silent and only an arrival counts.
+    //
+    //   and it is THROTTLED, because a compound of three spheres against a flat
+    //   collider produces several contact points on the same frame.
+    if (other.mass === 0) {
+      const nv = Math.abs(c.getImpactVelocityAlongNormal());
+      if (nv < capyBONK_V) return;
+      if (Math.abs(c.ni.y) > capyBONK_NY) return;
+      const now = game.state.time;
+      if (now - capyBonkAt < capyBONK_GAP) return;
+      if (capySwimming || capyClinging || capy.carriedBy || capy.atHelm) return;
+      capyBonkAt = now;
+      // the same curve prop:impact uses, so a wall and a bin are one language
+      capyPunch(game, clamp((nv - capyBONK_V) * 0.032, 0.03, 0.20));
+      capySfxAt.volume = clamp(nv * 0.11, 0.22, 0.85);
+      capySfxAt.pitch = clamp(1.20 - nv * 0.035, 0.68, 1.20);
+      capySfxAt.at = capyPosition;
+      game.sfx('thud', capySfxAt);
+      capySfxAt.at = null;
+      // squash, and a short bounce back off the face so the animal arrives
+      // rather than grinding. Through capyShove, which is the one channel an
+      // outside force may use — see THE THREE WAYS TO MOVE THE CAPYBARA.
+      if (capyPop > -0.26) capyPop = -0.26;
+      if (capyPopVel > -3.5) capyPopVel = -3.5;
+      const bs = clamp(nv * 0.16, 0.5, 2.2);
+      const bsign = (body === c.bi) ? 1 : -1;
+      capyShove.x += c.ni.x * bs * bsign;
+      capyShove.z += c.ni.z * bs * bsign;
+      capyEarFlick = 1;
+      return;
+    }
+    if (other.mass < 0.8) return;
     const v = c.getImpactVelocityAlongNormal();
     if (Math.abs(v) < 2.0) return;
     const n = c.ni;
@@ -2268,6 +2362,43 @@ export function createCapybara(game) {
       capyEatBuf(input, 'clearJumpBuf');       // spent — one press, one hop
       const v0 = capySwimming ? capySWIM_HOP : capyJUMP_V;
       if (body.velocity.y < v0) body.velocity.y = v0;
+      // ---- THE RUN-UP (v34) ------------------------------------------------
+      // A hop carries whatever horizontal speed it already had, so a sprinting
+      // hop travels 5.3 m against a walk's 3.0 — but the APEX and the AIRTIME
+      // were identical, measured at 1.37 m and 0.717 s in eighteen of nineteen
+      // chapters. So the run-up bought range only in proportion to the speed,
+      // and never bought a gap.
+      //
+      // THE ONE THING THIS MAY NOT DO IS CHANGE THE HEIGHT. Eighteen chapters
+      // of geometry are sized against that 1.37 m and a flatter arc would make
+      // a ledge somewhere unreachable, which is the worst class of regression
+      // this game can have. So the trade is not height-for-reach: it is purely
+      // additive and purely horizontal, and the apex and the airtime come out
+      // of qa/mv-feel.js unchanged to the last centimetre.
+      //
+      // Through capyShove and not through the velocity, for the reason the note
+      // on external forces gives: a bare write is deleted by the speed cap on
+      // the very next frame, and shove is added AFTER the solve and widens the
+      // cap by its own magnitude. It is the same channel the Drift's puff uses.
+      //
+      // Gated on the speed the animal ACTUALLY HAS over the floor, not on the
+      // run key: a capybara shoved off a roof at nine metres a second has a
+      // run-up whatever its fingers are doing, and one holding shift against a
+      // wall has not. Measured in the platform's frame, so a hop taken while
+      // standing still on a moving ferry deck is a standing hop.
+      //
+      // ...and it goes along the TRAVEL, not along the nose. They are the same
+      // thing in a straight line and they are not the same thing coming out of
+      // a turn, and the leap belongs to the momentum.
+      if (!capySwimming) {
+        const lvx = body.velocity.x - platVX, lvz = body.velocity.z - platVZ;
+        const lsp = Math.sqrt(lvx * lvx + lvz * lvz);
+        if (lsp > capyLEAP_V) {
+          const k = capyLEAP_PUSH * clamp((lsp - capyLEAP_V) / 1.6, 0, 1) / lsp;
+          capyShove.x += lvx * k;
+          capyShove.z += lvz * k;
+        }
+      }
       if (!capySwimming) {
         capyStam -= capySTAM_HOP;
         if (capyStam < 0) capyStam = 0;
@@ -2425,6 +2556,7 @@ export function createCapybara(game) {
     let vx = body.velocity.x - platVX, vz = body.velocity.z - platVZ;
 
     if (mag > 0.02) {
+      capySkidArm = true;                // the stick is down; a release can skid
       // Facing-gated acceleration: lean into a turn rather than drive straight
       // out of it. The floors used to be 0.45 of top speed and 0.30 of the accel,
       // which meant any turn past 90 degrees dumped 55% of the speed and then
@@ -2466,8 +2598,58 @@ export function createCapybara(game) {
       const grip = slip > 0.001
         ? 1 / lerp(1 / capyGRIP_LAMBDA, 1 / capyGRIP_ICE, slip)
         : capyGRIP_LAMBDA;
-      vx = damp(vx, 0, grip, dt);
-      vz = damp(vz, 0, grip, dt);
+      // ---- ...AND THERE ARE TWO BANDS, WHICH IS WHAT THE NOTE AT THE TOP OF
+      //      THIS FILE HAS ALWAYS SAID AND WHAT THE CODE NEVER DID ----------
+      //
+      // capyGRIP_LAMBDA is commented `idle, grounded` and it was running at
+      // EVERY speed, so the number that exists to hold a parked capybara on the
+      // flank of Galeras was also the number that stopped a sprint. Measured,
+      // Sydney, full sprint, stick released:
+      //
+      //     frame 1   v 2.72 m/s   travelled 0.123 m
+      //     frame 2   v 1.00 m/s   travelled 0.169 m
+      //     frame 3   v 0.00 m/s   travelled 0.185 m
+      //
+      // 7.4 m/s to a dead stop in three frames and eighteen centimetres — a
+      // sixth of the animal's own body length, at about fifteen gravities. The
+      // capySTOP_LAMBDA at the top of the file, the one NAMED for this, was
+      // referenced nowhere on the ground path: its only two uses in this file
+      // are the airborne bleed at capySTOP_LAMBDA * 0.15.
+      //
+      // So: above walking pace this is a DECELERATION and below it it is static
+      // friction, which is the design the comment describes. It is a `min`, not
+      // a lerp, for two reasons — it can only ever SOFTEN the damper, so no
+      // surface gets grippier than it was; and on ice `grip` is already well
+      // under capySTOP_LAMBDA, so the slide is untouched to the last decimal.
+      //
+      // THE BAND EDGE IS PROVABLY SAFE ON A SLOPE, which is the whole worry.
+      // The stiff band settles at v = a/60, so for gravity alone to carry a
+      // parked animal out of it and into the soft band it would need a
+      // downhill acceleration of 54 m/s^2. The gravity in this game is 24, so
+      // it cannot happen on any slope, at any angle, anywhere. Galeras still
+      // holds, and so does the anti-creep pin below, which only ever runs
+      // inside the snap.
+      const sp2now = vx * vx + vz * vz;
+      const brake = sp2now > capyGRIP_SNAP * capyGRIP_SNAP
+        ? Math.min(grip, capySTOP_LAMBDA) : grip;
+      // ---- ...AND A SKID IS A THING YOU CAN SEE ---------------------------
+      // One-shot, on the frame the player lets go of a genuine run, and it uses
+      // the two channels this file already has rather than inventing a third:
+      // a small negative pop (the animal digging its heels in) and one puff of
+      // the same dust a hard landing kicks up. Gated on capySKID_V so a walk
+      // never does it, and on capySkidArm so it fires once per stop rather than
+      // every frame of the slide.
+      if (capySkidArm && slip < 0.35 && sp2now > capySKID_V * capySKID_V) {
+        capySkidArm = false;
+        if (capyPop > -0.14) capyPop = -0.14;
+        if (capyPopVel > -2.4) capyPopVel = -2.4;
+        capyDigPayload.position = capyPosition;
+        game.events.emit('capy:land', capyDigPayload);
+        capySfxOpts.volume = 0.30; capySfxOpts.pitch = 1.5;
+        game.sfx('rustle', capySfxOpts);
+      }
+      vx = damp(vx, 0, brake, dt);
+      vz = damp(vz, 0, brake, dt);
       if (slip < 0.35 && vx * vx + vz * vz < capyGRIP_SNAP * capyGRIP_SNAP) {
         vx = 0; vz = 0;
         // ---- THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED ----------

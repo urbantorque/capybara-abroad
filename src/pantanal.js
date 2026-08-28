@@ -107,7 +107,7 @@ const panMAT_N = 11;
 const panMAT_SOLID = 0.14;
 let panMatMesh = null;
 const panMats = [];                   // {x,z,r,y,load,body,idx}
-let panMatRun = 0, panMatLast = -1, panMatSwam = false;
+let panMatRun = 0, panMatLast = -1;
 
 // the termite mounds, flat: x, z, r. Written by panBuildForest, read by the
 // anteater — because an anteater walking PAST ninety termite mounds without
@@ -118,7 +118,6 @@ const panCaranda = [];
 
 // the anteater
 let panAnt = null, panAntBody = null;
-let panAntSnout = null, panAntTail = null;
 let panAntT = 0, panAntCarrying = false, panAntRide = 0;
 let panAntDig = 0, panAntDigAt = -1, panAntDigCool = 8;
 const panAntTarget = { x: 0, y: 0, z: 0 };
@@ -323,11 +322,11 @@ function panMerger() {
 
 function panVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.09, warp: 0.5 });
+               { scale: 0.5, amount: 0.09, warp: 0.5, near: 0.32, nearScale: 8, contact: 1 });
 }
 function panVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.19, warp: 0 });
+               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1 });
 }
 /** THE LEAF MATERIAL: the same grain, seen from both sides. Everything built
  *  out of `M.quad` needs this and nothing else may use it, or half the

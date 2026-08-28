@@ -1,0 +1,82 @@
+[
+ {
+  "want": "sydney",
+  "biome": "sydney",
+  "err": null,
+  "samples": 165888,
+  "meanL": 159.6,
+  "sd": 7.82,
+  "cols5bit": 34,
+  "clipPct": 0
+ },
+ {
+  "want": "kyoto",
+  "biome": "kyoto",
+  "err": null,
+  "samples": 165888,
+  "meanL": 125.1,
+  "sd": 23.51,
+  "cols5bit": 56,
+  "clipPct": 0
+ },
+ {
+  "want": "rio",
+  "biome": "rio",
+  "err": null,
+  "samples": 165888,
+  "meanL": 137,
+  "sd": 56.37,
+  "cols5bit": 168,
+  "clipPct": 0
+ },
+ {
+  "want": "iceland",
+  "biome": "iceland",
+  "err": null,
+  "samples": 165888,
+  "meanL": 52.1,
+  "sd": 16.59,
+  "cols5bit": 70,
+  "clipPct": 0
+ },
+ {
+  "want": "venice",
+  "biome": "venice",
+  "err": null,
+  "samples": 165888,
+  "meanL": 188.2,
+  "sd": 9.45,
+  "cols5bit": 42,
+  "clipPct": 0
+ },
+ {
+  "want": "kowloon",
+  "biome": "kowloon",
+  "err": null,
+  "samples": 165888,
+  "meanL": 33,
+  "sd": 12.91,
+  "cols5bit": 115,
+  "clipPct": 0
+ },
+ {
+  "want": "palawan",
+  "biome": "palawan",
+  "err": null,
+  "samples": 165888,
+  "meanL": 226.1,
+  "sd": 5.63,
+  "cols5bit": 14,
+  "clipPct": 0
+ },
+ {
+  "want": "monaco",
+  "biome": "monaco",
+  "err": null,
+  "samples": 165888,
+  "meanL": 109.1,
+  "sd": 14.52,
+  "cols5bit": 113,
+  "clipPct": 0
+ }
+]

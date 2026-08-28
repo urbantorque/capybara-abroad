@@ -121,7 +121,6 @@ const gorDECOR_N = 26;               // the other balloons
 const gorCYCLE = 156;                // s — one dawn, on a loop
 const gorLAUNCH_P = 0.240;           // the field starts sending them up
 const gorSUN_P = 0.470;              // and the sun clears the ridge
-const gorDAY_P = 0.760;
 
 const gorCHIM_N = 74;
 // WHERE THE CHIMNEYS ACTUALLY WENT. They are placed by a seeded random walk
@@ -353,7 +352,7 @@ function gorMerger() {
  */
 function gorVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.09, warp: 0.55 });
+               { scale: 0.42, amount: 0.09, warp: 0.55, near: 0.38, nearScale: 6, contact: 1 });
 }
 /**
  * THE SAME THING, BUT NOBODY ELSE HAS IT.

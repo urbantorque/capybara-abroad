@@ -32,6 +32,26 @@ import { createCondor } from './condor.js';
 // isolated so one bad module degrades the game instead of blanking the screen.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// THE ANNOUNCEMENT BUS, AND WHO IS ALLOWED TO LEAVE IT.
+//
+// Fifty `on()` registrations across the twenty-eight modules and, at the time
+// of writing, not one `off()`. That is CORRECT rather than leaky, but only
+// because of a property nothing in this file was stating: every registration
+// sits in a module constructor, and those run exactly once, at boot. Nobody
+// needs to unsubscribe because nobody is ever torn down.
+//
+// The reason to write it down is that chapters are no longer all built at boot
+// — they build on first entry. A chapter that called `on()` from its
+// `ensureBuilt()` would look identical to every other registration here and
+// would be fine right up until something rebuilt it, at which point that
+// chapter handles every announcement twice and nothing on screen says so.
+//
+// SO: THE RULE. Register in a module constructor and never unsubscribe. If you
+// must register from a lazy `ensureBuilt()`, pair it with an `off()` in that
+// chapter's `onExit` — that is what `off` is here for, and it is the only case
+// that should ever call it.
+// ---------------------------------------------------------------------------
 function mainMakeEvents() {
   const map = new Map();
   return {
@@ -194,13 +214,27 @@ function mainMakeTime(game) {
   return time;
 }
 
+/**
+ * One place a failure is reported, so nothing important can fail only into the
+ * console. A lazily-built chapter throws long after boot, and until this was
+ * split out of mainSafe there was no way for that path to reach the panel the
+ * player can actually see.
+ */
+function mainReport(label, e) {
+  console.error('[' + label + ']', e);
+  try {
+    const el = document.getElementById('err');
+    if (el) {
+      el.style.display = 'block';
+      el.textContent += '[' + label + '] ' + ((e && (e.stack || e.message)) || e) + '\n';
+    }
+  } catch (ignored) { /* the panel is a courtesy, never a second failure */ }
+}
+
 function mainSafe(label, fn) {
   try { return fn(); }
   catch (e) {
-    console.error('[module ' + label + ' failed]', e);
-    const el = document.getElementById('err');
-    el.style.display = 'block';
-    el.textContent += '[' + label + '] ' + (e.stack || e.message) + '\n';
+    mainReport('module ' + label + ' failed', e);
     return null;
   }
 }
@@ -224,7 +258,7 @@ function mainMakeBiomes(game) {
 
   function setOf(name) {
     let s = sets.get(name);
-    if (!s) { s = { objects: [], bodies: [], api: null, built: false }; sets.set(name, s); }
+    if (!s) { s = { objects: [], bodies: [], vis: [], api: null, built: false }; sets.set(name, s); }
     return s;
   }
 
@@ -420,7 +454,46 @@ function mainMakeBiomes(game) {
     attach(name, on) {
       const s = sets.get(name);
       if (!s) return;
-      for (let i = 0; i < s.objects.length; i++) s.objects[i].visible = on;
+      for (let i = 0; i < s.objects.length; i++) {
+        const o = s.objects[i];
+        // PUT BACK WHAT WAS THERE, NOT `true`.
+        //
+        // This used to blanket-assign `visible = on`, which is wrong in one
+        // direction: a chapter is full of things that are deliberately hidden
+        // AT REST — a smoke puff, a thrown seed, a shred of paper, a sweep
+        // mesh — and re-attaching turned every one of them back on. Most are
+        // re-hidden by their own update on the next frame, so it read as a
+        // one-frame flash of stale effects on chapter re-entry; the ones whose
+        // update only hides them on a state change stayed on. Measured on a
+        // Sydney re-attach: 151 meshes visible before, 210 after, and it did
+        // not settle back.
+        //
+        // So the flag each object had is remembered on the way out and handed
+        // back on the way in. Anything added to the set while the chapter was
+        // away has no remembered value and correctly defaults to visible.
+        if (on) {
+          o.visible = (s.vis && s.vis[i] !== undefined) ? s.vis[i] : true;
+        } else {
+          if (!s.vis) s.vis = [];
+          s.vis[i] = o.visible;
+          o.visible = false;
+        }
+        // ...AND THE MATRIX WALK HAS TO BE TOLD SEPARATELY.
+        // `visible = false` takes a subtree out of the RENDER traversal and
+        // nothing else. Object3D.updateMatrixWorld() does not consult it: it
+        // recurses into every child whose matrixWorldAutoUpdate is true and
+        // re-composes the local matrix of anything with matrixAutoUpdate on.
+        // Measured with all nineteen chapters resident, the walk visited all
+        // 4,500 objects every frame, of which 4,262 belonged to the eighteen
+        // chapters nobody was looking at; setting this drops it to 239.
+        // The cost per object is small — this is hygiene that scales with the
+        // chapter count rather than a saving you can feel today.
+        // THE ONE RULE THIS CREATES: anything reading a DETACHED chapter's
+        // world matrices must force the update itself with
+        // obj.updateMatrixWorld(true). Nothing does at present, and that is
+        // the failure this line would cause if something ever started.
+        o.matrixWorldAutoUpdate = on;
+      }
       for (let i = 0; i < s.bodies.length; i++) {
         const b = s.bodies[i];
         if (on) { if (game.world.bodies.indexOf(b) < 0) game.world.addBody(b); }
@@ -436,11 +509,42 @@ function mainMakeBiomes(game) {
       if (fromSet && fromSet.api && fromSet.api.onExit) { try { fromSet.api.onExit(); } catch (e) { console.error(e); } }
       biome.attach(from, false);
 
+      // A CHAPTER THAT FAILS TO BUILD MUST NOT BE MARKED BUILT.
+      //
+      // `built` used to be set BEFORE ensureBuilt() ran, and the build was
+      // wrapped in a catch that only reached the console. So a chapter that
+      // threw half way through was flagged built for the rest of the session,
+      // switchTo still answered true, and biomeGo teleported the animal onto a
+      // spawn whose terrain collider might never have been created — into a
+      // chapter it falls through, that re-entry can never repair, and that says
+      // nothing at all on screen. It is the one failure in this file that
+      // cannot be walked away from.
+      //
+      // ROLLBACK, NOT REORDER. The obvious repair is to build BEFORE detaching
+      // `from`, which would make failure free. It is the wrong one: every
+      // chapter is authored in the SAME world coordinates and the whole scheme
+      // rests on only one being attached at a time (see the block at the top of
+      // mainMakeBiomes). Building while the old chapter is still live would put
+      // two of them in the world together, and any build that asks the world a
+      // spatial question — a ground height, a ray, an overlap — would quietly
+      // get the OTHER chapter's answer. So the order stands and the failure is
+      // undone instead: put `from` back, leave `built` false so a later attempt
+      // can retry, and answer false so biomeGo does not move the animal.
       if (!toSet.built) {
-        toSet.built = true;
+        let ok = true;
         if (toSet.api && toSet.api.ensureBuilt) {
-          biome.capture(to, () => { try { toSet.api.ensureBuilt(); } catch (e) { console.error(e); } });
+          biome.capture(to, () => {
+            try { toSet.api.ensureBuilt(); }
+            catch (e) { ok = false; mainReport('biome ' + to + ' failed to build', e); }
+          });
         }
+        if (!ok) {
+          biome.attach(from, true);
+          if (fromSet && fromSet.api && fromSet.api.onEnter) { try { fromSet.api.onEnter(); } catch (e) { console.error(e); } }
+          captureTag = from;
+          return false;
+        }
+        toSet.built = true;          // only once it actually built
       }
       biome.current = to;
       captureTag = to;

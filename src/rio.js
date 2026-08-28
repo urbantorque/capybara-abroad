@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -118,7 +118,7 @@ let rioBateriaBody = null, rioFloatBody = null, rioBateriaPX = 0;
 let rioFloatGroup = null;
 let rioCabinGroup = null, rioCabinBody = null, rioCabinT = 0, rioCabinDir = 1;
 let rioCabinPX = 0, rioCabinPY = 0, rioCabinPZ = 0;
-let rioGloboGroup = null, rioGloboGone = false;
+let rioGloboGroup = null;
 // The yaw he stands at, so a re-entry can put him back — see rioBuildGlobo and
 // the onEnter note about one-shot objects.
 const rioGloboYaw = -2.2;
@@ -248,13 +248,13 @@ function rioMerger() {
  */
 function rioVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.55 });
+               { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.32, nearScale: 8, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function rioVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.58, amount: 0.18, warp: 0 });
+               { scale: 0.58, amount: 0.18, warp: 0, near: 0.55, nearScale: 7, contact: 1 });
 }
 function rioPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function rioInstance(root, geo, color, list, cast, recv) {
@@ -2702,7 +2702,14 @@ function rioBuildFlora(root) {
     rioPush9(trunk, tipX, tipY - 0.45, z, 0, 0, 0, 0.62, 0.5, 0.62);
   }
   rioInstance(root, rioG.cyl6, PALETTE.rioPalmTrunk, trunk, true, false);
-  rioInstance(root, rioG.blade, PALETTE.rioPalm, frond, true, false);
+  // AND THE FRONDS MOVE. See sway() in shared.js: rioG.blade is a box tapered
+  // toward +x, so +x IS the tip and the window is the whole of it. Each frond
+  // is two segments laid end to end and each carries its own phase from its own
+  // world position, so a frond ripples from the crown outwards rather than
+  // translating in one piece — which is what a coconut frond does in the
+  // onshore breeze this chapter is set in.
+  swayMesh(rioInstance(root, rioG.blade, PALETTE.rioPalm, frond, true, false),
+           { amount: 0.16, axis: 'x', lo: -0.5, hi: 0.5, stiff: 1.8, hz: 1.1 });
 
   // forest on the hills — cones, instanced, only where the ground is high
   const tree = [];
@@ -3964,6 +3971,118 @@ export function createRio(game) {
     localWater: true,
     inZone: rioInZone,
     SPAWN: rioSPAWN,
+
+    // ---- THE SECOND FLIER, AND THE BIRD WAS ALREADY IN THE SKY -----------
+    //
+    // condor.js is 2,500 lines of real aerodynamics — lift with the square of
+    // airspeed, induced drag, a G-limited elevator, a weathervane yaw, thermals
+    // as a rising airmass — and for nineteen chapters it could only ever happen
+    // in one of them, because the plumbing went to `game.pasto` by name. It asks
+    // the live HOST now, and a chapter hosts a flier by publishing `thermals`.
+    //
+    // Rio is the right second host and it costs three properties, because the
+    // chapter already had everything else: eighty-four metres of Corcovado and
+    // sixty-two of Pao de Acucar for the air to rise off, and NINE FRIGATEBIRDS
+    // ALREADY DRAWN over the bay — rioBuildBirds, whose own comment opens "A
+    // FRIGATEBIRD IN PLAN IS A LETTER W". The bird was in the sky the whole
+    // time and there was no way to reach it.
+    //
+    // It is also the right bird for the mechanic rather than merely for the
+    // place. A fragata has the lowest wing loading of any bird alive and it
+    // does not land on water — it hangs on the sea breeze coming up the face of
+    // the granite for hours without a wingbeat. A chapter about a soaring mount
+    // could not have a better local excuse.
+    //
+    // THE COLUMNS ARE SITED WHERE THE HEAT IS, NOT WHERE THE VIEW IS. Bare
+    // granite at four in the afternoon is the strongest lift on this coast, so
+    // the two big ones sit on the sunward flanks of the loaf and the Corcovado
+    // massif; the third is the city itself, weaker and wider, over Lapa. That
+    // is also the route: the beach lifts you enough to reach Urca, Urca to the
+    // loaf, and the loaf to the Redentor. Nobody has to be told that — it is
+    // the same thing the terrain already says.
+    //
+    // Strengths are in pasto.js's units — the updraft ACCELERATION — because
+    // condorThermalUpdraft maps them through condorTHERMAL_ACC_PER_MS, and a
+    // second host inventing its own scale is how two chapters end up with the
+    // same bird flying differently. 30 is Galeras' strongest column.
+    thermals: [
+      // the sunward face of Pao de Acucar — the strongest air in the chapter
+      { x: rioSUGAR.x - 10, z: rioSUGAR.z + 14, radius: 26, strength: 30, top: 150 },
+      // Morro da Urca, the halfway hill, and the halfway climb
+      { x: rioURCA.x - 6,  z: rioURCA.z + 10, radius: 20, strength: 22, top: 110 },
+      // the Corcovado massif, wide and steady, with the Redentor on top of it
+      { x: rioCORCOVADO.x + 18, z: rioCORCOVADO.z - 20, radius: 34, strength: 26, top: 170 },
+      // and the city, which is warm and rough and lifts weakly over everything
+      { x: rioLAPA.x, z: rioLAPA.z - 8, radius: 30, strength: 14, top: 80 },
+    ],
+
+    /**
+     * ...AND IT IS NOT AN ANDEAN CONDOR. A condor over Copacabana is a mistake
+     * anybody who lives there would see from the beach, and the silhouette is
+     * already right — a big soaring bird is the same bird — so what has to
+     * change is the plumage, which is six colours.
+     *
+     * A male magnificent frigatebird is entirely black with a green-purple
+     * oil-slick sheen on the back, and the one piece of colour on it is the
+     * GULAR POUCH, which is scarlet. So the condor's white ruff — the brightest
+     * thing on the Andean bird — becomes the red throat, and every other
+     * surface goes to black. That is a straight swap of roles rather than a new
+     * model, and it is why the plumage is six numbers and not a mesh.
+     */
+    flier: {
+      name: 'fragata',
+      // Rio's own lines. `peak` is deliberately absent: that task is "ride a
+      // thermal to the crater rim" and there is no crater on this coast. The
+      // RECORD it feeds — how high the air carried you — is chapter-neutral and
+      // files here anyway; only the crater line is Pasto's.
+      tasks: { summon: 'fragata', ride: 'fragata-ride' },
+      plume: {
+        wing: 0x14161a,     // black, with the faintest blue in it
+        body: 0x1b1d22,     // ...and a shade up, so the two read apart at all
+        ruff: 0xb3242a,     // THE POUCH. The only colour on the bird
+        skin: 0x1b1d22,
+        beak: 0x8d949c,     // long, grey, and hooked at the end
+        comb: 0x8d1c22,     // the shaded underside of the pouch
+      },
+    },
+
+    /**
+     * THE FENCE. Rio never published one because nothing had ever needed it —
+     * the chapter is walked, and a walker is stopped by the terrain and the
+     * solids. A bird is not: condorFence needs to know where the world ends or
+     * it will carry a passenger out over an Atlantic that has no floor.
+     *
+     * Drawn round what is actually built rather than round the far plane:
+     * Corcovado's centre is x -96 and the loaf's is x +96 with a 32 m radius,
+     * so +/-150 holds both massifs with room for the bird to turn outside them.
+     * South is the sea and the set off Arpoador; north is the avenue at z 46
+     * and Lapa at 76, so the box reaches past the arches and stops.
+     */
+    bounds() { return { x0: -150, x1: 150, z0: -120, z1: 130 }; },
+
+    /**
+     * FRAME THE LAUNCH. The same channel Pasto's condorShot uses, and it wants
+     * the opposite bearing: Galeras looks UP at a volcano, and the whole point
+     * of this one is what is BEHIND the bird as it leaves the beach — the bay,
+     * the loaf, and two hundred metres of Copacabana. A bearing alone, because
+     * the closeout proved on Hanoi that a distance and a raise do not survive
+     * an occluded line and the rig's own solve is better than a guess.
+     */
+    condorShot() {
+      if (typeof game.frameShot !== 'function' || !game.capy) return false;
+      const p = game.capy.position;
+      game.frameShot({
+        // Away from the loaf rather than toward it, which is the opposite of
+        // Pasto's. Galeras is a cone you launch AT and Pao de Acucar is a rock
+        // you launch FROM, so the subject here is the bay opening up behind the
+        // bird rather than the summit ahead of it.
+        yaw: Math.atan2(rioSUGAR.x - p.x, rioSUGAR.z - p.z),
+        // Wider and flatter still than Galeras: this launch is over water with
+        // a 62 m loaf on one side, and the whole picture is horizontal.
+        dist: 30, pitch: 9 * Math.PI / 180, raise: 4.4, hold: 3.4, over: true
+      });
+      return true;
+    },
 
     // landmarks, for the task beacons
     globo: rioGLOBO,

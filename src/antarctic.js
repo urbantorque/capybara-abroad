@@ -151,7 +151,6 @@ const antE = new THREE.Euler();
 const antSc = new THREE.Vector3();
 const antM = new THREE.Matrix4();
 const antCol = new THREE.Color();
-const antFrame = { x: 0, z: 0 };
 
 // ---------------------------------------------------------------- module ----
 let antGame = null;
@@ -419,7 +418,8 @@ function antGlow(color, intensity) {
   return mat(color, { emissive: color, emissiveIntensity: intensity === undefined ? 1 : intensity });
 }
 function antVCI() {
-  return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.10, amount: 0.055, warp: 0.9 });
+  return grain(mat(0xffffff, { vertexColors: true }),
+               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34, contact: 1 });
 }
 
 function antSyncBody(b) {

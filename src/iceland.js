@@ -213,7 +213,7 @@ const icePuffinData = new Float32Array(icePUFFIN_N * 8); // x,y,z,yaw,vx,vy,vz,s
 const icePuffinHome = new Float32Array(icePUFFIN_N * 8);
 let iceSettle = 0;                    // s until they are all back on the rock
 let iceGeyCol = null, iceGeyDome = null;
-let icePylsaGroup = null, icePylsaGone = false;
+let icePylsaGroup = null;
 let iceBergGroup = null, iceBergBody = null;
 const iceChimneys = [];              // x, y, z of every chimney with a fire in it
 let iceVents = null;                 // x, y, z, r of every fumarole and mud pool
@@ -245,7 +245,6 @@ let iceGeyRiding = false, iceGeyPeak = 0;
 let iceAurLastApplied = -1;
 const iceAurGreen = new THREE.Color(PALETTE.iceAurora2);
 const iceAurBase = new THREE.Color(0xffffff);
-const iceAurSpring = new THREE.Color(PALETTE.iceGeoBlue);
 
 // ============================================================== helpers ======
 function iceXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
@@ -380,13 +379,13 @@ function iceMerger() {
  */
 function iceVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.075, warp: 0.55 });
+               { scale: 0.42, amount: 0.075, warp: 0.55, near: 0.34, nearScale: 8, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function iceVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.12, warp: 0 });
+               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7, contact: 1 });
 }
 function icePush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function iceInstance(root, geo, color, list, cast, recv, twoSided) {

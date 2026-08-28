@@ -4,7 +4,8 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick } from './shared.js';
+         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
+         rimTick, contactSlots, contactTick, swayTick, spillSlots, spillTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -41,11 +42,104 @@ const sysWorldUp   = new THREE.Vector3(0, 1, 0);
 const sysAimA      = new THREE.Vector3();   // hint arrow: capybara, in NDC
 const sysAimB      = new THREE.Vector3();   // hint arrow: target, in NDC
 
+// ---------------------------------------------------------------------------
+// THE CONTACT POOL — see the CONTACT block in shared.js for what it feeds and
+// why it exists at all. This end owns the ranking and the fade; that end owns
+// the shader and the uniforms.
+//
+// It is written as a NEAREST-N POOL rather than as "one patch per object"
+// because the array size in the shader is a compile-time literal and must stay
+// constant for the life of the program — the moment it varies, three recompiles
+// every grained material in the chapter and the frame hitches. The pool is the
+// shape the point-light work will want next, and it is deliberately the same
+// shape so that it can be lifted rather than re-derived.
+const sysCTC_FAR    = 26;    // m from the camera past which a thing cannot claim a slot.
+                             // The shader's own radial falloff kills a patch long
+                             // before this; the cull is here so the RANKING does not
+                             // spend its slots on things nobody can see.
+const sysCTC_HYST   = 4;     // m of hysteresis on that cull. Without it an object
+                             // sitting exactly at the boundary claims and releases a
+                             // slot on alternate frames and the patch flickers.
+const sysCTC_LAMBDA = 7.0;   // the fade in and out, ~0.15 s of travel. Slower and a
+                             // patch visibly lags the thing that casts it; faster and
+                             // the hand-over between slots pops, which is the one
+                             // failure this whole mechanism exists to avoid.
+// FOOTPRINT RADIUS AS A MULTIPLE OF THE OBJECT'S OWN HALF-WIDTH, and the first
+// build had this at 0.95 — "contact is a little wider than the thing" — which
+// measured as very nearly nothing. A/B against an identical frame with the pool
+// emptied (qa/pr-c3.js): 0.74 % of the lower frame touched, mean darkening 6 of
+// 255, and the capybara's own patch contributed NOTHING to it.
+//
+// The reason is obvious in hindsight and invisible in a screenshot: THE DARKEST
+// PART OF A CONTACT PATCH IS UNDERNEATH THE OBJECT, WHERE NOBODY CAN SEE IT.
+// What actually reads is the ring OUTSIDE the silhouette, so a patch the width
+// of the thing is a patch the player never sees. At 0.95 the capybara's whole
+// patch fell inside its own outline and the term did not exist.
+const sysCTC_SPREAD = 1.90;
+const sysCTC_RMIN   = 0.30;
+const sysCTC_RMAX   = 3.20;  // a market stall, not a building. Anything wider than
+                             // this is scenery and has a real shadow doing the work.
+const sysCtcBox     = new THREE.Box3();
+const sysCtcV       = new THREE.Vector3();
+// Measured once per object and kept: setFromObject traverses, and doing that for
+// every prop and every NPC every frame is the one way this becomes expensive.
+const sysCtcSize    = new WeakMap();   // Object3D -> { r, dy }
+// The live slots. Fixed length, allocated once, never resized — see above.
+const sysCtcSlots   = [];              // { obj, k, x, y, z, r }
+const sysCtcWant    = [];              // scratch: this frame's ranking
+const sysCtcOut     = [];              // scratch: what goes to the shader
+
+// ---------------------------------------------------------------------------
+// THE SPILL POOL. See the SPILL block in shared.js for the finding and the
+// shader. This end finds the emitters, clusters them, ranks them and fades
+// them; that end adds the light.
+//
+// THE EMITTERS ARE DISCOVERED, NOT AUTHORED, and that is the decision that
+// makes this affordable. The alternative was three chapters hand-placing sign
+// clusters, which is per-place archaeology in three of the largest files in the
+// repo — and it would have covered exactly those three for ever. Every glowing
+// thing in this game is already an `emissive` material, so the scene already
+// knows where the lights are; it simply had nobody asking.
+const sysSPL_LUM    = 0.10;  // emissive luminance below which a thing is a detail,
+                             // not a light. Iceland's dimmest shopfront is 0.14.
+const sysSPL_MINY   = 1.00;  // metres. A LIGHT THAT SPILLS IS A LIGHT ABOVE THE
+                             // FLOOR. This one line is doing real work: it drops
+                             // the ground-level glow decals — Kowloon's wet-road
+                             // reflection discs are emissive quads lying at y = 0
+                             // — which would otherwise each register as a lamp
+                             // sitting in the road, lighting the road they are a
+                             // picture of.
+const sysSPL_CLUS   = 7.0;   // m. One light per sign CLUSTER, not per sign.
+const sysSPL_MAXC   = 24;    // clusters kept; the pool picks the nearest 8 of them
+const sysSPL_FAR    = 40;    // m from the camera past which a cluster cannot claim
+const sysSPL_HYST   = 6;     // ...with hysteresis, for sysCTC_HYST's reason
+const sysSPL_LAMBDA = 3.2;   // the fade. SLOWER than contact's: a patch of shade
+                             // may snap to a foot, but a light coming up is the
+                             // most obvious pop there is.
+const sysSPL_K      = 0.46;  // the brightest a cluster may burn. Measured, not
+                             // chosen — see the note at sysSpillScan.
+const sysSPL_REACH0 = 14.0;  // m, the reach of a single lamp...
+const sysSPL_REACH1 = 26.0;  // ...and of the biggest cluster in the game.
+                             // MEASURED, and the first pair (8 and 17) was too
+                             // short by half. Mong Kok's nearest sign cluster is
+                             // 10.5 m from the animal and six metres UP, and a
+                             // shopfront sign lights the whole width of a street:
+                             // at a reach of 8 m its light stopped in the air
+                             // above the kerb and the road under it moved by five
+                             // levels of 255, which is not visible and was not
+                             // worth the instruction.
+const sysSplFound   = [];    // { x, y, z, r, cr, cg, cb } — rebuilt on biome swap
+const sysSplSlots   = [];    // { src, k }
+const sysSplWant    = [];
+const sysSplOut     = [];
+const sysSplM4      = new THREE.Matrix4();
+const sysSplV       = new THREE.Vector3();
+const sysSplC       = new THREE.Color();
+
 // Mid-afternoon sun, high and from the north-west over the harbour...
 const sysSUN_DIR      = new THREE.Vector3(-0.62, 0.66, 0.42).normalize();
 // ...drifting to golden hour as the list gets ticked: lower, further west, so every
 // shadow in the harbour stretches out east and warms up.
-const sysSUN_DIR2     = new THREE.Vector3(-0.88, 0.31, 0.25).normalize();
 // Pasto is 1.2 degrees north of the equator at 2 527 m. Sydney's 41-degree
 // afternoon sun is simply the wrong star for it: measured live, the 20.7 m church
 // tower threw a 23 m hard-edged slab clean across the Plaza de Nariño and read as
@@ -747,6 +841,46 @@ const sysDAY_GND_B   = new THREE.Color(PALETTE.cloth8);     // warm bounce = war
 const sysDAY_FOG_A   = new THREE.Color(PALETTE.fog);
 const sysDAY_FOG_B   = new THREE.Color(PALETTE.towel);
 const sysColA        = new THREE.Color();
+const sysColR        = new THREE.Color();   // the rim's, and it is not the fill's
+const sysRIM_WHITE   = new THREE.Color(1, 1, 1);
+
+// ---------------------------------------------------------------------------
+// HOW HARD THE RIM IS, PER CHAPTER — and it is one number, not a table of them.
+//
+// See the rim block in shared.js for what it does and why it is in mat(). What
+// belongs HERE is the only thing that is genuinely per-place: how much of it.
+//
+// The term behaves OPPOSITELY in a bright chapter and a dark one, and a single
+// figure tuned in either is wrong in the other. A rim against a Palawan beach at
+// 226/255 is invisible — there is no headroom above the sand for it to be seen
+// in — while the same figure against a Mong Kok carriageway at 34/255 is a halo
+// with a hole in the middle. So the bright chapters get a whisper and the three
+// dark ones get real light: Son Doong, where the only illumination is the
+// animal's own, Mong Kok, and Monte Carlo after eight in the evening.
+//
+// Anything not named takes the default, which is the daylight number.
+// ...AND EVERY FIGURE HERE IS HALF WHAT THE FIRST PASS HAD. Photographed on
+// Mong Kok at 0.22 the animal came back wearing a pale pink band round its
+// rump with a hard inner edge — an outline, reached from the bright side.
+// The useful range turned out to be far narrower than expected: about 0.03
+// under an Antarctic albedo and about 0.10 in a cave, and past that it stops
+// being light and starts being a sticker.
+// ...AND THE BRIGHT CHAPTERS WANT MORE OF IT, NOT LESS, WHICH IS THE OPPOSITE
+// OF WHAT WAS EXPECTED. The prediction reasoned about the GROUND: a rim against
+// a bright floor is invisible and against a dark one is a halo. What the rim is
+// actually on is the ANIMAL, and what makes it visible is its contrast against
+// the animal's own interior. In Mong Kok the capybara is lit to about a quarter
+// and 0.085 is a third again on top; on a Sydney lawn at noon the same animal is
+// lit to well over twice that, so the same figure is half the lift and reads as
+// nothing. The number that produces the same APPARENT rim is therefore larger
+// where the light is stronger. Photographed both ways to settle it.
+const sysRIM_DEF = 0.075;
+const sysRIM = {
+  sydney: 0.075, pasto: 0.080, quay: 0.075, kyoto: 0.085, cali: 0.095,
+  rio: 0.075, iceland: 0.090, sahara: 0.070, drift: 0.085, venice: 0.055,
+  kowloon: 0.085, palawan: 0.048, goreme: 0.075, manly: 0.062, pantanal: 0.085,
+  cave: 0.100, antarctic: 0.040, monaco: 0.090, hanoi: 0.085,
+};
 const sysDAY_SUN_MIX = 0.62;   // how far the sun colour is allowed to travel
 const sysDAY_SKY_MIX = 0.30;
 const sysDAY_GND_MIX = 0.52;
@@ -2479,7 +2613,17 @@ const sysMUS_PAL = [
   // it must not sound like is a jingle over a postcard.
   { chords: sysMUS_CHORDS13, roots: sysMUS_ROOTS13, next: sysMUS_NEXT13,
     dwellA: 7.5, dwellB: 13.0, pluckA: 2.6, pluckB: 6.2, cut: 1180, bus: 0.135, bass: 0.195,
-    lead: 'mallet', xfade: 4.6, rhythm: null,
+    // A KULINTANG, NOT SYDNEY'S MALLETS. A row of bossed bronze gongs, which is
+    // the melodic instrument of the Sulu Sea — the water this chapter is in —
+    // and the row's lydian voicing and 1180 cut were written for something
+    // bright and struck, which this is and a felt mallet on a wooden bar is not.
+    //
+    // THE LIFT STAYS ON GLASS. Every other row in this correction had its lift
+    // playing the SAME borrowed voice as its lead, so both moved together; this
+    // one does not. Palawan's lift is deliberately not the palette's own
+    // instrument — see the note under it — and that argument has nothing to do
+    // with the one being fixed here.
+    lead: 'kulintang', xfade: 4.6, rhythm: null,
     // Being under when the water lights up. Glass rather than the palette's own
     // mallet, and quiet: bioluminescence does not announce itself, it is ALREADY
     // THERE when you notice it. Eighteen notes is the densest figure in the game
@@ -2492,14 +2636,19 @@ const sysMUS_PAL = [
   // with a flute over it. It is a chapter about waiting for something.
   { chords: sysMUS_CHORDS14, roots: sysMUS_ROOTS14, next: sysMUS_NEXT14,
     dwellA: 10.0, dwellB: 17.0, pluckA: 3.6, pluckB: 8.0, cut: 720, bus: 0.115, bass: 0.185,
-    lead: 'quena', xfade: 5.2, rhythm: null,
+    // A NEY, NOT A QUENA. Same hijaz, same D, same cut at 720 — which was
+    // already written for a flute with almost no upper partials, and had been
+    // pointed at an Andean one since the row was authored. The bendir is the
+    // other half of the correction: a frame drum with a gut snare, sparse
+    // enough that it never becomes a pulse.
+    lead: 'ney', xfade: 5.2, rhythm: null, bendir: true,
     // The sun clearing the rim. Six flute notes, opening out — the same 'soar'
     // as the condor, two hundred degrees of longitude and eleven chapters away,
     // and deliberately so: those are the only two moments in this game that are
     // a slow rise in silence with no ground under them. goreme.js holds the
     // swell across the whole climb, so like Iceland's this is a melody, not a
     // punctuation mark.
-    lift: { inst: 'quena', shape: 'soar', n: 6, gap: 0.34, oct: 0, vel: 1.05,
+    lift: { inst: 'ney', shape: 'soar', n: 6, gap: 0.34, oct: 0, vel: 1.05,
             up: 2.8, dn: 12.0 } },
   // 14 — Manly. Sydney's mallets, a tone down and moving twice as often. The
   // buoy bell from the quay palette comes back, because it is the same water
@@ -2517,12 +2666,16 @@ const sysMUS_PAL = [
   // 15 — The Pantanal. The warmest thing here, and the only bowed one.
   { chords: sysMUS_CHORDS16, roots: sysMUS_ROOTS16, next: sysMUS_NEXT16,
     dwellA: 9.5, dwellB: 15.5, pluckA: 2.8, pluckB: 6.8, cut: 820, bus: 0.155, bass: 0.30,
-    lead: 'violin', xfade: 5.0, rhythm: null,
+    // A VIOLA CAIPIRA, NOT A VIOLIN. Ten steel strings in five courses,
+    // PLUCKED — which is the whole of the error being corrected — and the row's
+    // major sevenths, its 820 cut and its five-second crossfade were all asking
+    // for something warm and sustained rather than for something bowed.
+    lead: 'caipira', xfade: 5.0, rhythm: null,
     // The whole herd going over at sundown. Seven notes opening out on the
     // bowed voice — the 'soar' shape again, and deliberately: this and the
     // condor are the two moments in the game where the animal is not doing
     // anything clever, it is just being carried along by something bigger.
-    lift: { inst: 'violin', shape: 'soar', n: 7, gap: 0.30, oct: 0, vel: 0.98,
+    lift: { inst: 'caipira', shape: 'soar', n: 7, gap: 0.30, oct: 0, vel: 0.98,
             up: 3.0, dn: 13.0 } },
   // 16 — Sơn Đoòng. The lowest, slowest, wettest palette in the game.
   { chords: sysMUS_CHORDS17, roots: sysMUS_ROOTS17, next: sysMUS_NEXT17,
@@ -5157,6 +5310,364 @@ export function createSystems(game) {
   }
 
   // =========================================================================
+  // 1c-bis. THE CONTACT POOL. See the CONTACT block in shared.js for the
+  // finding and the shader; this is the ranking and the fade.
+  //
+  // Fed from the three registries that already exist — the capybara, game.props
+  // and game.npcs — rather than from a new opt-in registry, because a system
+  // that requires nineteen chapters to remember to call it is a system that
+  // ends up called by three of them.
+  // =========================================================================
+
+  /**
+   * The footprint radius, and how far the object's base sits below its origin.
+   *
+   * Measured ONCE per object and kept. `Box3.setFromObject` traverses the whole
+   * subtree, and doing that for every prop and every NPC on every frame is the
+   * one way this subsystem becomes expensive rather than free.
+   *
+   * A geometry that is not built yet measures empty; that case is deliberately
+   * NOT cached, so a lazily-built prop gets measured properly the frame it
+   * appears instead of being stuck at the fallback for the rest of the session.
+   */
+  function sysCtcMeasure(o) {
+    const hit = sysCtcSize.get(o);
+    if (hit) return hit;
+    sysCtcBox.makeEmpty();
+    sysCtcBox.setFromObject(o);
+    if (sysCtcBox.isEmpty() || !isFinite(sysCtcBox.min.x)) return null;
+    const sx = sysCtcBox.max.x - sysCtcBox.min.x;
+    const sz = sysCtcBox.max.z - sysCtcBox.min.z;
+    // THE FOOTPRINT, NOT THE BOUNDING SPHERE. A lamp post is three metres tall
+    // and stands on a disc the width of its own base; a sphere would give it a
+    // three-metre patch and the pavement would go dark for half a street.
+    const m = {
+      r: clamp(0.5 * Math.max(sx, sz) * sysCTC_SPREAD, sysCTC_RMIN, sysCTC_RMAX),
+      dy: o.getWorldPosition(sysCtcV).y - sysCtcBox.min.y,
+    };
+    sysCtcSize.set(o, m);
+    return m;
+  }
+
+  /** True while `o` still owns a slot — including one that is fading out. */
+  function sysCtcHolds(o) {
+    for (let s = 0; s < sysCtcSlots.length; s++) if (sysCtcSlots[s].obj === o) return true;
+    return false;
+  }
+
+  // The candidate entries are recycled, not allocated: this runs inside
+  // update() and the file's rule is zero allocations there. The array grows
+  // once to whatever a busy chapter needs and then never again.
+  const sysCtcCand = [];
+  let sysCtcCandN = 0;
+  function sysCtcOffer(o) {
+    if (!o || !o.visible) return;
+    const m = sysCtcMeasure(o);
+    if (!m) return;
+    o.getWorldPosition(sysCtcV);
+    const dx = sysCtcV.x - camera.position.x;
+    const dy = sysCtcV.y - camera.position.y;
+    const dz = sysCtcV.z - camera.position.z;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    // HYSTERESIS ON THE CULL, and it is not a nicety: an object sitting exactly
+    // at the boundary would claim a slot on one frame and release it on the
+    // next, for ever, and the patch under it would strobe.
+    const far = sysCtcHolds(o) ? sysCTC_FAR + sysCTC_HYST : sysCTC_FAR;
+    if (d2 > far * far) return;
+    let e = sysCtcCand[sysCtcCandN];
+    if (!e) { e = { obj: null, d2: 0, x: 0, y: 0, z: 0, r: 1, taken: false }; sysCtcCand[sysCtcCandN] = e; }
+    sysCtcCandN++;
+    e.obj = o; e.d2 = d2; e.taken = false;
+    e.x = sysCtcV.x; e.z = sysCtcV.z;
+    // The BASE, not the origin. A contact patch belongs where the thing meets
+    // the ground, and the shader's vertical gate is measured from it.
+    e.y = sysCtcV.y - m.dy;
+    e.r = m.r;
+    sysCtcWant.push(e);
+  }
+
+  function sysCtcRank(a, b) { return a.d2 - b.d2; }
+
+  function sysContactFrame(dt) {
+    // THE A/B SWITCH, AND IT IS NOT A LUXURY. This effect is a few per cent of
+    // a diffuse under things that are ALSO casting real sun shadows, so a
+    // screenshot cannot tell you whether it is working — the first attempt to
+    // measure it read the cast shadow and called it contact. Nothing sets this
+    // in play; `qa/pr-*.js` set it to take the other half of a pair.
+    if (game.state.noContact) { contactTick(sysCtcOut, 0); return; }
+    const N = contactSlots();
+    if (sysCtcSlots.length === 0) {
+      for (let i = 0; i < N; i++) {
+        sysCtcSlots.push({ obj: null, k: 0, x: 0, y: -9999, z: 0, r: 1 });
+      }
+    }
+
+    // ---- gather -----------------------------------------------------------
+    sysCtcWant.length = 0;
+    sysCtcCandN = 0;
+    const capy = game.capy;
+    if (capy && capy.group) sysCtcOffer(capy.group);
+    const props = game.props;
+    for (let i = 0; i < props.length; i++) {
+      const p = props[i];
+      // A held prop is at mouth height and its patch would sit under the
+      // animal's own; a spilled one has already stopped being an object.
+      if (p && p.mesh && !p.held) sysCtcOffer(p.mesh);
+    }
+    const npcs = game.npcs;
+    for (let i = 0; i < npcs.length; i++) {
+      const n = npcs[i];
+      if (n && n.group) sysCtcOffer(n.group);
+    }
+    sysCtcWant.sort(sysCtcRank);
+    if (sysCtcWant.length > N) sysCtcWant.length = N;
+
+    // ---- hold, and fade what is leaving -----------------------------------
+    for (let s = 0; s < N; s++) {
+      const sl = sysCtcSlots[s];
+      let keep = null;
+      if (sl.obj) {
+        for (let i = 0; i < sysCtcWant.length; i++) {
+          if (sysCtcWant[i].obj === sl.obj) { keep = sysCtcWant[i]; keep.taken = true; break; }
+        }
+      }
+      if (keep) {
+        sl.x = keep.x; sl.y = keep.y; sl.z = keep.z; sl.r = keep.r;
+        sl.k = damp(sl.k, 1, sysCTC_LAMBDA, dt);
+      } else {
+        sl.k = damp(sl.k, 0, sysCTC_LAMBDA, dt);
+        // A slot is not free until it is actually dark, or the hand-over IS
+        // the pop this fade exists to prevent.
+        if (sl.k < 0.004) { sl.k = 0; sl.obj = null; }
+      }
+    }
+
+    // ---- and let what is arriving into whatever is free --------------------
+    for (let i = 0; i < sysCtcWant.length; i++) {
+      const w = sysCtcWant[i];
+      if (w.taken) continue;
+      for (let s = 0; s < N; s++) {
+        const sl = sysCtcSlots[s];
+        if (sl.obj === null) {
+          sl.obj = w.obj; sl.x = w.x; sl.y = w.y; sl.z = w.z; sl.r = w.r; sl.k = 0;
+          break;
+        }
+      }
+    }
+
+    // ---- write it out ------------------------------------------------------
+    let n = 0;
+    for (let s = 0; s < N; s++) {
+      const sl = sysCtcSlots[s];
+      if (sl.k <= 0.002) continue;
+      let e = sysCtcOut[n];
+      if (!e) { e = { x: 0, y: 0, z: 0, r: 1, k: 0 }; sysCtcOut[n] = e; }
+      e.x = sl.x; e.y = sl.y; e.z = sl.z; e.r = sl.r; e.k = sl.k;
+      n++;
+    }
+    contactTick(sysCtcOut, n);
+  }
+
+  /**
+   * Drop every slot at once. A biome swap replaces the whole cast, and a patch
+   * left over from the chapter you just left would fade out over Venice from a
+   * position in Sydney — which is the shared-space leak this repo has paid for
+   * more than once. Called from the same place the grade is switched.
+   */
+  function sysContactClear() {
+    for (let s = 0; s < sysCtcSlots.length; s++) {
+      const sl = sysCtcSlots[s];
+      sl.obj = null; sl.k = 0; sl.y = -9999;
+    }
+    contactTick(sysCtcOut, 0);
+  }
+
+  // =========================================================================
+  // 1c-ter. THE SPILL POOL. See the SPILL block in shared.js.
+  // =========================================================================
+
+  /**
+   * Walk the live chapter and find every emitter in it.
+   *
+   * Run ONCE per biome attach, never per frame — it traverses the whole scene
+   * and reads instance matrices, which is a build-time cost and nothing like a
+   * frame-time one. Detached biomes have `visible = false` on their roots, so
+   * scoping to the live chapter needs no biome argument at all: three's
+   * traverse already skips what is not being drawn.
+   *
+   * SIGNS ARE INSTANCED, so `getWorldPosition` on the mesh returns the chapter
+   * root and every sign in Mong Kok clusters at the origin. Measured that way
+   * first, and it produced one enormous lamp under the road. The positions have
+   * to come out of the instance matrices.
+   *
+   * sysSPL_K was measured rather than chosen: at 0.9 the street under a sign
+   * blew past the chapter's bloom threshold and Mong Kok grew a white puddle;
+   * at 0.2 the ground moved by less than two levels of 255 and there was no
+   * point having done it. 0.46 lifts Hong Kong's floor from 34 to the low
+   * fifties near a cluster and leaves the grade alone.
+   */
+  let sysSplRescan = 2;
+  function sysSpillScan() {
+    sysSplFound.length = 0;
+    const cand = [];
+    scene.traverse(function (o) {
+      if (!o.isMesh || !o.visible) return;
+      const m = o.material;
+      if (!m || !m.emissive) return;
+      const ei = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
+      const lum = (0.2126 * m.emissive.r + 0.7152 * m.emissive.g + 0.0722 * m.emissive.b) * ei;
+      if (lum < sysSPL_LUM) return;
+      if (o.isInstancedMesh) {
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, sysSplM4);
+          sysSplV.setFromMatrixPosition(sysSplM4);
+          o.localToWorld(sysSplV);
+          if (sysSplV.y < sysSPL_MINY) continue;
+          cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
+                      r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
+        }
+      } else {
+        o.getWorldPosition(sysSplV);
+        if (sysSplV.y < sysSPL_MINY) return;
+        cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
+                    r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
+      }
+    });
+    if (!cand.length) return;
+    // Brightest first, then absorb everything within sysSPL_CLUS of it. Greedy
+    // and O(n^2) on a few hundred candidates, once per chapter attach.
+    cand.sort(function (a, b) { return b.l - a.l; });
+    for (let i = 0; i < cand.length && sysSplFound.length < sysSPL_MAXC; i++) {
+      if (cand[i].used) continue;
+      let sx = 0, sy = 0, sz = 0, sr = 0, sg = 0, sb = 0, w = 0, n = 0, spread = 0;
+      for (let j = i; j < cand.length; j++) {
+        const c = cand[j];
+        if (c.used) continue;
+        const dx = c.x - cand[i].x, dy = c.y - cand[i].y, dz = c.z - cand[i].z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > sysSPL_CLUS * sysSPL_CLUS) continue;
+        c.used = true; n++;
+        if (d2 > spread) spread = d2;
+        sx += c.x * c.l; sy += c.y * c.l; sz += c.z * c.l;
+        sr += c.r * c.l; sg += c.g * c.l; sb += c.b * c.l; w += c.l;
+      }
+      if (w <= 0) continue;
+      // THE COLOUR IS NORMALISED AND THE STRENGTH IS SEPARATE. A dim red sign
+      // and a bright red sign are the same colour of light; what differs is how
+      // much. Multiplying the emissive straight in makes every dim thing a
+      // muddy brown light instead of a faint red one.
+      sysSplC.setRGB(sr / w, sg / w, sb / w);
+      const mx = Math.max(sysSplC.r, Math.max(sysSplC.g, sysSplC.b));
+      if (mx > 0.001) sysSplC.multiplyScalar(1 / mx);
+      // Bigger clusters reach further and burn a little harder, but both are
+      // capped: this is a sign, not the sun.
+      const big = clamp(Math.sqrt(spread) / sysSPL_CLUS, 0, 1);
+      const k = sysSPL_K * clamp(0.55 + 0.45 * clamp(w / 2.2, 0, 1), 0, 1);
+      sysSplFound.push({
+        x: sx / w, y: sy / w, z: sz / w,
+        r: lerp(sysSPL_REACH0, sysSPL_REACH1, big),
+        cr: sysSplC.r * k, cg: sysSplC.g * k, cb: sysSplC.b * k,
+      });
+    }
+  }
+
+  function sysSplRank(a, b) { return a.d2 - b.d2; }
+
+  function sysSpillFrame(dt) {
+    const N = spillSlots();
+    if (sysSplSlots.length === 0) {
+      for (let i = 0; i < N; i++) sysSplSlots.push({ src: null, k: 0 });
+    }
+    // THE A/B SWITCH, AND IT CUTS RATHER THAN FADES. The first version faded,
+    // which is right for the world and useless as an instrument: every probe in
+    // this repo reads its two frames at dt = 0 so nothing else can move between
+    // them, and at dt = 0 a damped fade does not fade. Both arms came back
+    // pixel-identical and the whole effect measured as doing nothing. Nothing
+    // in play sets this.
+    if (game.state.noSpill) {
+      for (let s = 0; s < N; s++) { sysSplSlots[s].src = null; sysSplSlots[s].k = 0; }
+      spillTick(sysSplOut, 0);
+      return;
+    }
+    if (!sysSplFound.length) {
+      // An empty chapter DOES fade, because that is a light going out rather
+      // than an instrument being read.
+      let any = 0;
+      for (let s = 0; s < N; s++) {
+        const sl = sysSplSlots[s];
+        if (!sl.src) continue;
+        sl.k = damp(sl.k, 0, sysSPL_LAMBDA, dt);
+        if (sl.k < 0.004) { sl.k = 0; sl.src = null; } else any++;
+      }
+      if (!any) { spillTick(sysSplOut, 0); return; }
+    }
+
+    // ---- rank what is near enough to matter --------------------------------
+    sysSplWant.length = 0;
+    if (!game.state.noSpill) {
+      for (let i = 0; i < sysSplFound.length; i++) {
+        const f = sysSplFound[i];
+        const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        let held = false;
+        for (let s = 0; s < N; s++) if (sysSplSlots[s].src === f) { held = true; break; }
+        const far = held ? sysSPL_FAR + sysSPL_HYST : sysSPL_FAR;
+        if (d2 > far * far) continue;
+        f.d2 = d2;
+        sysSplWant.push(f);
+      }
+      sysSplWant.sort(sysSplRank);
+      if (sysSplWant.length > N) sysSplWant.length = N;
+    }
+
+    // ---- hold, fade, and hand over -----------------------------------------
+    for (let s = 0; s < N; s++) {
+      const sl = sysSplSlots[s];
+      let keep = false;
+      if (sl.src) {
+        for (let i = 0; i < sysSplWant.length; i++) {
+          if (sysSplWant[i] === sl.src) { keep = true; sysSplWant[i].taken = true; break; }
+        }
+      }
+      if (keep) sl.k = damp(sl.k, 1, sysSPL_LAMBDA, dt);
+      else {
+        sl.k = damp(sl.k, 0, sysSPL_LAMBDA, dt);
+        if (sl.k < 0.004) { sl.k = 0; sl.src = null; }
+      }
+    }
+    for (let i = 0; i < sysSplWant.length; i++) {
+      const w2 = sysSplWant[i];
+      if (w2.taken) { w2.taken = false; continue; }
+      for (let s = 0; s < N; s++) {
+        if (sysSplSlots[s].src === null) { sysSplSlots[s].src = w2; sysSplSlots[s].k = 0; break; }
+      }
+    }
+
+    // ---- write it out ------------------------------------------------------
+    let n = 0;
+    for (let s = 0; s < N; s++) {
+      const sl = sysSplSlots[s];
+      if (!sl.src || sl.k <= 0.002) continue;
+      let e = sysSplOut[n];
+      if (!e) { e = { x: 0, y: 0, z: 0, r: 1, cr: 0, cg: 0, cb: 0 }; sysSplOut[n] = e; }
+      e.x = sl.src.x; e.y = sl.src.y; e.z = sl.src.z; e.r = sl.src.r;
+      e.cr = sl.src.cr * sl.k; e.cg = sl.src.cg * sl.k; e.cb = sl.src.cb * sl.k;
+      n++;
+    }
+    spillTick(sysSplOut, n);
+  }
+
+  /** A biome swap replaces every light in the world. Same argument as
+   *  sysContactClear, and the rescan is deferred to the next frame so it runs
+   *  after the incoming chapter has finished making itself visible. */
+  function sysSpillClear() {
+    for (let s = 0; s < sysSplSlots.length; s++) { sysSplSlots[s].src = null; sysSplSlots[s].k = 0; }
+    sysSplFound.length = 0;
+    sysSplRescan = 2;
+    spillTick(sysSplOut, 0);
+  }
+
+  // =========================================================================
   // 1d. THE SKY DOME — see sysSKY_TOP. Biome-neutral, one draw call, ~1 100
   // vertices, and it is a SKYBOX: it rides the lens, it neither reads nor
   // writes depth, and it is drawn before everything else. That is why one
@@ -6172,6 +6683,739 @@ export function createSystems(game) {
     ns2.start(t); ns2.stop(t + 2.1);
   }
 
+
+  // =========================================================================
+  // THE PLACE, AND WHAT IT SOUNDS LIKE
+  //
+  // The SCORE in this game is researched per place — son clave in absolute
+  // eighths, a surdo on the two, a 12/8 gnawa cell, baroque descending fifths,
+  // the yu mode for Hong Kong, dorian for Iceland, and seven bespoke ethnic
+  // voices. The AMBIENCE was not. The ladder in sysDressFrame branches
+  // correctly per biome and then draws from THIRTEEN generic tokens —
+  //
+  //     bark cheer chime gull hiss horn pop rustle splash strum thud tick whistle
+  //
+  // — separated only by a pitch and a volume. So Kyoto was `chime` at 0.5,
+  // Marrakech was `hiss` and `bark`, and nineteen cultures shared one bag of
+  // thirteen sounds with a knob on it.
+  //
+  // That is worth fixing before almost anything else in the sound, because
+  // ambience is POSITIONAL and CONSTANT: the player hears far more of it than
+  // of any melodic figure in the score. The structure was already right. This
+  // is purely a vocabulary problem, and what follows is the vocabulary.
+  //
+  // THREE RULES, and they matter more than the list:
+  //   - Everything goes out through sysAmb(), never sfx() — that is what puts
+  //     the event in the world and gives it a bearing. A mono cue is the
+  //     finding that has come out of every audio pass this repo has had.
+  //   - NOTHING HERE IS A STINGER. These are things you overhear. The existing
+  //     range is 0.03..0.26 and none of them leaves it.
+  //   - NOTHING HERE MAY BECOME AN IRRITATION. A sound heard two hundred times
+  //     in one chapter has to survive being heard two hundred times, so every
+  //     one of these varies its own pitch, its own count and its own spacing
+  //     internally, on top of whatever the ladder rolls. That is the single
+  //     way this batch could make the game actively worse.
+  //
+  // The per-chapter convolver rooms already exist and already work, so these
+  // land in the right acoustic space for nothing. No reverb is added here.
+  // =========================================================================
+
+  /** Anything that is not a positive number means "the default, please". */
+  function sfxArg(v, d) { return v > 0 ? v : d; }
+
+  // ---- KYOTO --------------------------------------------------------------
+  /**
+   * HIGURASHI. Tanna japonensis, the evening cicada, and the single most
+   * evocative sound in Japan — it is what late summer means there in the way a
+   * cuckoo means spring in England. It is NOT the rasp of a Sydney cicada: it
+   * is a clear ringing tone around three and a half kilohertz, pulsed at a rate
+   * that starts fast and slows as the phrase falls away, which is where the
+   * onomatopoeia kana-kana-kana comes from. Built as a carrier with a hard
+   * amplitude modulation whose rate and pitch both descend together.
+   */
+  function sfxHigurashi(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.10) * pitch;
+    const dur = rand(2.1, 3.4);
+    const f0 = 3350 * v;
+    const o = ac.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.80, t + dur);
+    // the second partial is what makes it ring rather than whistle
+    const o2 = ac.createOscillator(); o2.type = 'sine';
+    o2.frequency.setValueAtTime(f0 * 1.51, t);
+    o2.frequency.exponentialRampToValueAtTime(f0 * 1.51 * 0.80, t + dur);
+    const mix = ac.createGain(); mix.gain.value = 1;
+    const sub = ac.createGain(); sub.gain.value = 0.42;
+    o.connect(mix); o2.connect(sub); sub.connect(mix);
+    // THE PULSE. A square LFO through a gain node IS the kana-kana; its rate
+    // falling from about thirty a second to about eighteen is the whole shape
+    // of the phrase and is why it reads as an animal running down rather than
+    // as a tone.
+    const amGate = ac.createGain(); amGate.gain.value = 0.0;
+    const lfo = ac.createOscillator(); lfo.type = 'square';
+    lfo.frequency.setValueAtTime(rand(28, 34), t);
+    lfo.frequency.exponentialRampToValueAtTime(rand(15, 20), t + dur);
+    const lg = ac.createGain(); lg.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(amGate.gain);
+    const bias = ac.createConstantSource(); bias.offset.value = 0.5;
+    bias.connect(amGate.gain);
+    const outg = ac.createGain();
+    const gg = outg.gain;
+    const pk = 0.13 * vol;
+    gg.setValueAtTime(0.0001, t);
+    gg.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.28);
+    gg.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.7), t + dur * 0.7);
+    gg.exponentialRampToValueAtTime(0.0001, t + dur);
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = f0; bp.Q.value = 2.2;
+    mix.connect(amGate); amGate.connect(bp); bp.connect(outg); outg.connect(acMaster);
+    o.start(t); o2.start(t); lfo.start(t); bias.start(t);
+    const stop = t + dur + 0.08;
+    o.stop(stop); o2.stop(stop); lfo.stop(stop); bias.stop(stop);
+  }
+
+  /**
+   * SHISHI-ODOSHI. The bamboo tube in a temple garden that fills with water,
+   * tips, empties and falls back onto its stone — and the reason it is there at
+   * all is the CLACK, which was meant to startle deer. It is a hollow woody
+   * knock with almost no sustain: a short pitched body around two hundred hertz
+   * with a real transient on the front, and the trickle of the tube emptying
+   * just before it.
+   */
+  function sfxShishi(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.14) * pitch;
+    // the tube emptying — a quarter of a second of thin water, and then nothing
+    const ns = noiseSrc();
+    const bpw = ac.createBiquadFilter(); bpw.type = 'bandpass';
+    bpw.frequency.value = 2600 * v; bpw.Q.value = 1.1;
+    const gw = ac.createGain();
+    env(gw, t, 0.045 * vol, 0.05, 0.22);
+    ns.connect(bpw); bpw.connect(gw); gw.connect(acMaster);
+    ns.start(t); ns.stop(t + 0.34);
+    // ...and the tube coming down on the stone
+    const st = t + rand(0.30, 0.40);
+    for (let i = 0; i < 2; i++) {
+      // Two partials, and the upper one is NOT harmonic: a length of green
+      // bamboo is a tube closed at one end and it does not ring in octaves.
+      const hz = (i ? 452 : 196) * v;
+      const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle';
+      o.frequency.setValueAtTime(hz, st);
+      o.frequency.exponentialRampToValueAtTime(hz * 0.94, st + 0.12);
+      const g = ac.createGain();
+      env(g, st, (i ? 0.075 : 0.19) * vol, 0.003, i ? 0.09 : 0.17);
+      o.connect(g); g.connect(acMaster);
+      o.start(st); o.stop(st + 0.30);
+    }
+    const ck = noiseSrc();
+    const bpc = ac.createBiquadFilter(); bpc.type = 'bandpass';
+    bpc.frequency.value = 1500 * v; bpc.Q.value = 0.9;
+    const gc = ac.createGain();
+    env(gc, st, 0.11 * vol, 0.002, 0.045);
+    ck.connect(bpc); bpc.connect(gc); gc.connect(acMaster);
+    ck.start(st); ck.stop(st + 0.09);
+  }
+
+  /**
+   * THE BONSHO, HEARD FROM THE OTHER END OF THE VALLEY.
+   *
+   * Not the one the player rings — that is the organ voice an octave and a half
+   * down, felt before it is heard, and nothing here touches it. This is a temple
+   * bell a kilometre off, which is a completely different sound: no transient to
+   * speak of, a slow swell as the front arrives, a fundamental with two
+   * INHARMONIC partials over it, and a decay measured in tens of seconds rather
+   * than in tenths. Ten is as far as this goes, which is already six times
+   * longer than anything else in the table.
+   */
+  function sfxBonsho(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.95, 1.06) * pitch;
+    const f0 = 88 * v;
+    // 1, 2.61, 4.13 — a struck bronze barrel, not a harmonic series. The two
+    // upper partials die a great deal faster, which is what makes a bell
+    // DARKEN as it rings out instead of merely getting quieter.
+    const parts = [[1.00, 0.20, 9.5], [2.61, 0.085, 3.4], [4.13, 0.045, 1.6]];
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.value = f0 * p[0] * rand(0.998, 1.002);
+      const g = ac.createGain();
+      const pk = p[1] * vol;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + 0.09 + i * 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + p[2]);
+      o.connect(g); g.connect(acMaster);
+      o.start(t); o.stop(t + p[2] + 0.1);
+    }
+    // the beat. Two bells are never quite one bell, and a real bonsho warbles.
+    const b = ac.createOscillator(); b.type = 'sine';
+    b.frequency.value = f0 * 1.006;
+    const bg = ac.createGain();
+    bg.gain.setValueAtTime(0.0001, t);
+    bg.gain.exponentialRampToValueAtTime(Math.max(0.0004, 0.09 * vol), t + 0.12);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + 8.0);
+    b.connect(bg); bg.connect(acMaster);
+    b.start(t); b.stop(t + 8.1);
+  }
+
+  // ---- MARRAKECH ----------------------------------------------------------
+  /**
+   * THE MUEZZIN, FROM A MINARET YOU CANNOT SEE.
+   *
+   * The call to prayer over a medina is not a melody you can hear the notes of
+   * — it is a voice, a long way off, bent through a horn speaker and half a
+   * kilometre of warm air, and what survives that trip is the FORMANTS and the
+   * melisma. So: a sawtooth larynx through two bandpass formants at seven
+   * hundred and eleven-fifty, sliding between degrees of the same hijaz the
+   * chapter's own row is built on, with a vibrato that fades IN over each note
+   * the way a trained voice does.
+   */
+  function sfxMuezzin(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.08) * pitch;
+    // hijaz on D, which is the row Cappadocia and Marrakech share: 1 b2 3 4 5
+    const deg = [0, 1, 4, 5, 7];
+    const notes = randInt(3, 5);
+    let st = t;
+    let d = randInt(1, 3);
+    for (let i = 0; i < notes; i++) {
+      const dur = rand(0.5, 1.15);
+      d = clamp(d + randInt(-1, 1), 0, deg.length - 1);
+      const hz = sysMidiHz(50 + deg[d]) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * rand(0.94, 0.98), st);
+      o.frequency.exponentialRampToValueAtTime(hz, st + rand(0.06, 0.14));
+      // the fall away at the end of a phrase
+      if (i === notes - 1) o.frequency.exponentialRampToValueAtTime(hz * 0.88, st + dur);
+      const vib = ac.createOscillator(); vib.type = 'sine';
+      vib.frequency.value = rand(5.0, 6.4);
+      const vg = ac.createGain();
+      vg.gain.setValueAtTime(0.0001, st);
+      vg.gain.exponentialRampToValueAtTime(hz * 0.022, st + dur * 0.7);
+      vib.connect(vg); vg.connect(o.frequency);
+      const f1 = ac.createBiquadFilter(); f1.type = 'bandpass';
+      f1.frequency.value = 700; f1.Q.value = 5.5;
+      const f2 = ac.createBiquadFilter(); f2.type = 'bandpass';
+      f2.frequency.value = 1150; f2.Q.value = 7.0;
+      const g2 = ac.createGain(); g2.gain.value = 0.7;
+      const g = ac.createGain();
+      const pk = 0.16 * vol * (i === 0 ? 0.8 : 1);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.10);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.8), st + dur * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur + 0.12);
+      o.connect(f1); f1.connect(g);
+      o.connect(f2); f2.connect(g2); g2.connect(g);
+      g.connect(acMaster);
+      o.start(st); vib.start(st);
+      o.stop(st + dur + 0.16); vib.stop(st + dur + 0.16);
+      st += dur + rand(0.02, 0.18);
+    }
+  }
+
+  /**
+   * A DARBUKA IN ANOTHER SQUARE. Two strokes and nothing else: the DOUM in the
+   * middle of the skin, which is a pitched thump that bends down, and the TEK on
+   * the rim, which is almost all noise. Half a dozen of them in a loose cell,
+   * because what carries across a medina at night is a rhythm and not a drum.
+   */
+  function sfxDarbuka(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const step = rand(0.155, 0.215);
+    // a 12/8 gnawa-ish cell, and the holes in it are the point
+    const cell = [1, 0, 2, 1, 0, 2, 2, 0, 1, 2, 0, 0];
+    const off = randInt(0, 11);
+    for (let i = 0; i < 12; i++) {
+      const hit = cell[(i + off) % 12];
+      if (!hit) continue;
+      const st = t + i * step + rand(-0.008, 0.008);
+      if (hit === 1) {
+        const hz = 96 * v;
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(hz * 1.9, st);
+        o.frequency.exponentialRampToValueAtTime(hz, st + 0.045);
+        const g = ac.createGain();
+        env(g, st, 0.20 * vol, 0.004, 0.16);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + 0.24);
+      } else {
+        const ns = noiseSrc();
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = rand(2600, 3600) * v; bp.Q.value = 1.4;
+        const g = ac.createGain();
+        env(g, st, 0.075 * vol, 0.002, 0.05);
+        ns.connect(bp); bp.connect(g); g.connect(acMaster);
+        ns.start(st); ns.stop(st + 0.09);
+      }
+    }
+  }
+
+  /**
+   * A CART ON STONE. Iron rim, no bearings, cobbles: a continuous low rumble
+   * with a periodic knock in it at wheel rate, which is what says WHEEL rather
+   * than traffic. It comes past — the level swells and falls — because a cart
+   * standing still makes no sound at all.
+   */
+  function sfxCart(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.2) * pitch;
+    const dur = rand(2.2, 3.6);
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 900 * v; lp.Q.value = 0.7;
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 110;
+    const g = ac.createGain();
+    const pk = 0.12 * vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.42);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(lp); lp.connect(hp); hp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.1);
+    // the knock, once a revolution, and it slows very slightly as it goes past
+    const rate = rand(4.6, 6.4);
+    const n = Math.floor(dur * rate);
+    for (let i = 0; i < n; i++) {
+      const u = i / Math.max(1, n - 1);
+      const st = t + i / rate * (1 + u * 0.09) + rand(-0.01, 0.01);
+      const o = ac.createOscillator(); o.type = 'triangle';
+      o.frequency.value = rand(150, 240) * v;
+      const gk = ac.createGain();
+      const near = Math.sin(u * Math.PI);
+      env(gk, st, 0.055 * vol * near, 0.003, 0.05);
+      o.connect(gk); gk.connect(acMaster);
+      o.start(st); o.stop(st + 0.09);
+    }
+  }
+
+  // ---- HONG KONG ----------------------------------------------------------
+  /**
+   * MAHJONG. Not the game — the WASHING of the tiles, which is a hundred and
+   * forty-four melamine bricks being shoved round a table by four people at
+   * once, and which is audible from the street through an open window at any
+   * hour in this city. Dense, bright, irregular, completely unpitched at the top
+   * with a small hollow body underneath about half the time.
+   */
+  function sfxMahjong(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const n = randInt(9, 16);
+    const span = rand(0.5, 0.95);
+    for (let i = 0; i < n; i++) {
+      const st = t + Math.random() * span;
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = rand(2200, 4200) * v; bp.Q.value = rand(2.0, 4.5);
+      const g = ac.createGain();
+      env(g, st, rand(0.05, 0.10) * vol, 0.001, rand(0.018, 0.04));
+      ns.connect(bp); bp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.07);
+      if (Math.random() < 0.5) {
+        const o = ac.createOscillator(); o.type = 'triangle';
+        o.frequency.value = rand(520, 900) * v;
+        const g2 = ac.createGain();
+        env(g2, st, rand(0.02, 0.045) * vol, 0.002, 0.035);
+        o.connect(g2); g2.connect(acMaster);
+        o.start(st); o.stop(st + 0.06);
+      }
+    }
+  }
+
+  /**
+   * A CLEAVER ON A BLOCK. A wet market at six in the morning, and it is the
+   * loudest repeating sound in one: a very hard broadband transient, a low
+   * wooden thump from the end-grain block, and a short bright ring off the
+   * blade. Three or four of them, evenly spaced, because somebody is portioning
+   * something rather than hitting it once.
+   */
+  function sfxCleaver(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.88, 1.16) * pitch;
+    const n = randInt(2, 4);
+    const step = rand(0.30, 0.46);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * step + rand(-0.02, 0.02);
+      const ns = noiseSrc();
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400 * v;
+      const g = ac.createGain();
+      env(g, st, 0.11 * vol, 0.001, 0.035);
+      ns.connect(hp); hp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.06);
+      // the block, which is the half that carries down the street
+      const o = ac.createOscillator(); o.type = 'triangle';
+      const hz = rand(120, 168) * v;
+      o.frequency.setValueAtTime(hz * 1.5, st);
+      o.frequency.exponentialRampToValueAtTime(hz, st + 0.03);
+      const g2 = ac.createGain();
+      env(g2, st, 0.17 * vol, 0.003, 0.13);
+      o.connect(g2); g2.connect(acMaster);
+      o.start(st); o.stop(st + 0.2);
+      // the blade, ringing very briefly, on the harder strokes
+      if (Math.random() < 0.55) {
+        const b = ac.createOscillator(); b.type = 'sine';
+        b.frequency.value = rand(2400, 3400) * v;
+        const g3 = ac.createGain();
+        env(g3, st, 0.035 * vol, 0.002, 0.10);
+        b.connect(g3); g3.connect(acMaster);
+        b.start(st); b.stop(st + 0.16);
+      }
+    }
+  }
+
+  /**
+   * THE DING-DING. The Hong Kong tram is named after this and nothing else: two
+   * strikes on a small foot-operated gong, bright, close together, with an
+   * inharmonic partial a minor tenth up that gives it its clank. Occasionally
+   * three, when somebody is not getting out of the way.
+   */
+  function sfxTram(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.93, 1.10) * pitch;
+    const n = Math.random() < 0.25 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(0.19, 0.27);
+      const f0 = 1080 * v;
+      const parts = [[1.00, 0.13, 0.55], [2.38, 0.055, 0.28], [3.61, 0.028, 0.16]];
+      for (let k = 0; k < parts.length; k++) {
+        const p = parts[k];
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = f0 * p[0] * rand(0.995, 1.005);
+        const g = ac.createGain();
+        env(g, st, p[1] * vol * (1 - i * 0.14), 0.002, p[2]);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + p[2] + 0.06);
+      }
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 4200 * v; bp.Q.value = 1.6;
+      const gn = ac.createGain();
+      env(gn, st, 0.03 * vol, 0.001, 0.02);
+      ns.connect(bp); bp.connect(gn); gn.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.04);
+    }
+  }
+
+  // ---- VENICE -------------------------------------------------------------
+  /**
+   * A HUNDRED PIGEONS DECIDING AT ONCE. In San Marco this happens every few
+   * minutes and it is the loudest thing in the square. It is not a bird CALL at
+   * all — it is WING CLAPS: dozens of uncorrelated broadband slaps whose rate
+   * peaks a third of a second in and then thins out as the flock gets away, with
+   * one coo left behind from whichever bird could not be bothered.
+   */
+  function sfxPigeons(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const dur = rand(1.1, 1.8);
+    const n = randInt(26, 46);
+    for (let i = 0; i < n; i++) {
+      // clustered early: the flock goes up together and lands apart
+      const u = Math.pow(Math.random(), 0.55);
+      const st = t + u * dur;
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = rand(700, 1900) * v; bp.Q.value = rand(0.7, 1.6);
+      const g = ac.createGain();
+      env(g, st, rand(0.030, 0.062) * vol * (1 - u * 0.55), 0.004, rand(0.03, 0.07));
+      ns.connect(bp); bp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.11);
+    }
+    if (Math.random() < 0.45) {
+      const st = t + dur * rand(0.75, 1.05);
+      const o = ac.createOscillator(); o.type = 'sine';
+      const hz = rand(300, 380) * v;
+      o.frequency.setValueAtTime(hz, st);
+      o.frequency.exponentialRampToValueAtTime(hz * 0.86, st + 0.30);
+      const lfo = ac.createOscillator(); lfo.type = 'sine';
+      lfo.frequency.value = 11;
+      const lg = ac.createGain(); lg.gain.value = hz * 0.03;
+      lfo.connect(lg); lg.connect(o.frequency);
+      const g = ac.createGain();
+      env(g, st, 0.055 * vol, 0.06, 0.34);
+      o.connect(g); g.connect(acMaster);
+      o.start(st); lfo.start(st);
+      o.stop(st + 0.45); lfo.stop(st + 0.45);
+    }
+  }
+
+  /**
+   * WATER AGAINST A FONDAMENTA. Not a splash — a splash is something ENTERING
+   * water, and this is water arriving at a wall. A low broadband swell with a
+   * slap on the front of it and a long suck off the stone afterwards, two or
+   * three times, about a second and a half apart, which is the period of the
+   * wash from a vaporetto that went past twenty seconds ago.
+   */
+  function sfxLap(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.2) * pitch;
+    const n = randInt(2, 4);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(1.25, 1.75);
+      const k = 1 - i * 0.18;
+      const ns = noiseSrc();
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(1500 * v, st);
+      lp.frequency.exponentialRampToValueAtTime(420 * v, st + 0.55);
+      lp.Q.value = 0.6;
+      const g = ac.createGain();
+      const pk = 0.13 * vol * k;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.05);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.30), st + 0.30);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.85);
+      ns.connect(lp); lp.connect(g); g.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.95);
+      const ns2 = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 3000 * v; bp.Q.value = 0.8;
+      const g2 = ac.createGain();
+      env(g2, st + 0.36, 0.035 * vol * k, 0.12, 0.34);
+      ns2.connect(bp); bp.connect(g2); g2.connect(acMaster);
+      ns2.start(st + 0.36); ns2.stop(st + 0.86);
+    }
+  }
+
+  /**
+   * A CAMPANILE, ACROSS WATER. A swung bronze bell, which is a different animal
+   * from a struck Japanese one: brighter, a real strike transient, a proper hum
+   * tone an octave under the prime, and a decay of four seconds rather than ten.
+   * It strikes the hour, so it comes in twos and threes with a wide gap.
+   */
+  function sfxCampanile(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.97, 1.04) * pitch;
+    const n = randInt(2, 4);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * rand(1.5, 2.1);
+      const f0 = 214 * v;
+      // hum, prime, tierce, quint, nominal — the five a founder actually tunes
+      const parts = [[0.50, 0.075, 4.4], [1.00, 0.115, 3.2],
+                     [1.19, 0.055, 2.0], [1.50, 0.035, 1.4], [2.00, 0.045, 1.1]];
+      for (let k = 0; k < parts.length; k++) {
+        const p = parts[k];
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = f0 * p[0] * rand(0.997, 1.003);
+        const g = ac.createGain();
+        env(g, st, p[1] * vol, 0.006, p[2]);
+        o.connect(g); g.connect(acMaster);
+        o.start(st); o.stop(st + p[2] + 0.1);
+      }
+      const ns = noiseSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 2600 * v; bp.Q.value = 1.2;
+      const gn = ac.createGain();
+      env(gn, st, 0.025 * vol, 0.002, 0.05);
+      ns.connect(bp); bp.connect(gn); gn.connect(acMaster);
+      ns.start(st); ns.stop(st + 0.08);
+    }
+  }
+
+  // ---- HANOI --------------------------------------------------------------
+  /**
+   * A VENDOR'S CRY. Every one of them has their own, it is two or three
+   * syllables long, it is the same every time, and it is pitched high so that it
+   * carries over engines. Vietnamese is tonal, so the CONTOUR is the word: each
+   * syllable gets its own glide rather than one arc across the phrase, and that
+   * is the whole difference between this and the muezzin above.
+   */
+  function sfxVendor(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.90, 1.14) * pitch;
+    const syll = randInt(2, 4);
+    // per syllable: start ratio, end ratio — a rise, a fall, a dip, a level
+    const shapes = [[1.0, 1.18], [1.12, 0.86], [1.0, 0.88], [1.0, 1.0], [0.92, 1.26]];
+    let st = t;
+    for (let i = 0; i < syll; i++) {
+      const sh = shapes[randInt(0, shapes.length - 1)];
+      const dur = rand(0.22, 0.42);
+      const hz = rand(330, 430) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * sh[0], st);
+      o.frequency.exponentialRampToValueAtTime(hz * sh[1], st + dur);
+      const f1 = ac.createBiquadFilter(); f1.type = 'bandpass';
+      f1.frequency.value = rand(620, 820); f1.Q.value = 6.0;
+      const f2 = ac.createBiquadFilter(); f2.type = 'bandpass';
+      f2.frequency.value = rand(1500, 2200); f2.Q.value = 8.0;
+      const g2 = ac.createGain(); g2.gain.value = 0.55;
+      const g = ac.createGain();
+      const pk = 0.135 * vol * (i === syll - 1 ? 1.15 : 1);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), st + 0.045);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.7), st + dur * 0.75);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur + 0.06);
+      o.connect(f1); f1.connect(g);
+      o.connect(f2); f2.connect(g2); g2.connect(g);
+      g.connect(acMaster);
+      o.start(st); o.stop(st + dur + 0.10);
+      st += dur + rand(0.03, 0.12);
+    }
+  }
+
+  /**
+   * A BOWL AND A PAIR OF CHOPSTICKS. Thin porcelain, so the ring is high, short
+   * and slightly detuned against itself; the sticks are bamboo, so they are a
+   * dry tick with no pitch at all. Six or eight of them in a hurry, because
+   * whoever it is has forty bowls to do.
+   */
+  function sfxBowls(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const n = randInt(5, 9);
+    let st = t;
+    for (let i = 0; i < n; i++) {
+      st += rand(0.07, 0.19);
+      const at = st + rand(-0.015, 0.015);
+      if (Math.random() < 0.62) {
+        const hz = rand(1500, 2600) * v;
+        for (let k = 0; k < 2; k++) {
+          const o = ac.createOscillator(); o.type = 'sine';
+          o.frequency.value = hz * (k ? rand(1.004, 1.012) : 1);
+          const g = ac.createGain();
+          env(g, at, (k ? 0.03 : 0.06) * vol, 0.001, rand(0.10, 0.22));
+          o.connect(g); g.connect(acMaster);
+          o.start(at); o.stop(at + 0.3);
+        }
+      } else {
+        const ns = noiseSrc();
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = rand(900, 1800) * v; bp.Q.value = 2.4;
+        const g = ac.createGain();
+        env(g, at, rand(0.03, 0.055) * vol, 0.001, 0.022);
+        ns.connect(bp); bp.connect(g); g.connect(acMaster);
+        ns.start(at); ns.stop(at + 0.05);
+      }
+    }
+  }
+
+  // ---- SYDNEY -------------------------------------------------------------
+  /**
+   * A CICADA CHORUS, and it is nothing like the Kyoto one. An Australian
+   * greengrocer is a RASP, not a ring: a broadband band up around seven
+   * kilohertz, hard-modulated at a rate too fast to count, that swells for a
+   * couple of seconds, holds, and drops away when whatever startled them turns
+   * out to be nothing. It is the loudest insect on earth and on a summer
+   * afternoon in the Botanic Gardens it is the loudest thing there.
+   */
+  function sfxCicada(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.85, 1.18) * pitch;
+    const dur = rand(2.6, 4.6);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(6200 * v, t);
+    bp.frequency.linearRampToValueAtTime(7400 * v, t + dur * 0.5);
+    bp.frequency.linearRampToValueAtTime(6000 * v, t + dur);
+    bp.Q.value = 2.6;
+    // the rasp. A hundred and forty a second is fast enough that the ear reads
+    // it as timbre rather than as a rhythm, which is exactly what it is.
+    const amGate = ac.createGain(); amGate.gain.value = 0.5;
+    const lfo = ac.createOscillator(); lfo.type = 'sawtooth';
+    lfo.frequency.setValueAtTime(rand(120, 155), t);
+    lfo.frequency.linearRampToValueAtTime(rand(100, 130), t + dur);
+    const lg = ac.createGain(); lg.gain.value = 0.45;
+    lfo.connect(lg); lg.connect(amGate.gain);
+    const g = ac.createGain();
+    const pk = 0.085 * vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk), t + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, pk * 0.85), t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(bp); bp.connect(amGate); amGate.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.1);
+    lfo.start(t); lfo.stop(t + dur + 0.1);
+  }
+
+  /**
+   * THE MAGPIE CAROL, which is the sound of an Australian morning, and this goes
+   * for the two things that actually identify it rather than for the tune.
+   * First, it is FLUTY — almost a pure tone, with the second partial well down.
+   * Second, a magpie has two independently controlled halves to its syrinx and
+   * sings with BOTH AT ONCE, so a carol is two voices that are not doing the
+   * same thing; that is where the gurgle comes from and it is why one
+   * oscillator can never sound like this.
+   */
+  function sfxMagpie(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.10) * pitch;
+    const phr = randInt(4, 7);
+    let st = t;
+    for (let i = 0; i < phr; i++) {
+      const dur = rand(0.12, 0.30);
+      for (let k = 0; k < 2; k++) {
+        const base = (k ? rand(760, 1150) : rand(520, 780)) * v;
+        const to = base * rand(0.78, 1.32);
+        const o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(base, st);
+        o.frequency.exponentialRampToValueAtTime(to, st + dur * rand(0.5, 0.9));
+        o.frequency.exponentialRampToValueAtTime(to * rand(0.92, 1.08), st + dur);
+        const h = ac.createOscillator(); h.type = 'sine';
+        h.frequency.setValueAtTime(base * 2, st);
+        h.frequency.exponentialRampToValueAtTime(to * 2, st + dur);
+        const hg = ac.createGain(); hg.gain.value = 0.16;
+        const g = ac.createGain();
+        env(g, st, (k ? 0.075 : 0.10) * vol, 0.012, dur);
+        o.connect(g); h.connect(hg); hg.connect(g); g.connect(acMaster);
+        o.start(st); h.start(st);
+        o.stop(st + dur + 0.06); h.stop(st + dur + 0.06);
+      }
+      st += dur + rand(0.01, 0.09);
+    }
+  }
+
+  /**
+   * RAINBOW LORIKEETS GOING PAST. There is no melody in this and no attempt at
+   * one: six or ten harsh, bright, very short screeches from several birds at
+   * once, all talking over each other, and it is over in a second. What makes it
+   * a lorikeet rather than a gull is that every note is SHORT and every note is
+   * up at two kilohertz with nothing underneath it.
+   */
+  function sfxLorikeet(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.16) * pitch;
+    const n = randInt(5, 10);
+    const span = rand(0.55, 1.05);
+    for (let i = 0; i < n; i++) {
+      const st = t + Math.random() * span;
+      const dur = rand(0.055, 0.12);
+      const hz = rand(1750, 2700) * v;
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz * rand(0.86, 0.98), st);
+      o.frequency.exponentialRampToValueAtTime(hz * rand(1.05, 1.30), st + dur * 0.4);
+      o.frequency.exponentialRampToValueAtTime(hz * rand(0.72, 0.94), st + dur);
+      const o2 = ac.createOscillator(); o2.type = 'square';
+      o2.frequency.value = hz * 1.5;
+      o2.detune.value = rand(20, 60);
+      const sub = ac.createGain(); sub.gain.value = 0.22;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = hz * 1.15; bp.Q.value = 2.4;
+      const hpf = ac.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 900;
+      const g = ac.createGain();
+      env(g, st, rand(0.045, 0.085) * vol, 0.006, dur);
+      o.connect(bp); o2.connect(sub); sub.connect(bp);
+      bp.connect(hpf); hpf.connect(g); g.connect(acMaster);
+      o.start(st); o2.start(st);
+      o.stop(st + dur + 0.05); o2.stop(st + dur + 0.05);
+    }
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -6389,6 +7633,7 @@ export function createSystems(game) {
   let musPal = sysMUS_PAL[0];
   let musShakuAt = 0, musBuoyAt = 0;   // the slow voices keep their own clocks
   let musTranhAt = 0, musLoanAt = 0;   // ...and so do chapter 19's two
+  let musBendirAt = 0;                 // ...and Cappadocia's frame drum
   let musCurChord = null, musPrevChord = null;
   let musShimGain = null, musShimV = null, musProg = 0;
   // The choir. Real pad voices through a formant pair rather than the main
@@ -6567,6 +7812,11 @@ export function createSystems(game) {
       case 'bow':    musBow(when, midi, pan, vel); return;
       case 'glass':  musGlass(when, midi, pan, vel); return;
       case 'quena':  musQuena(when, midi, vel); return;
+      // The ney is blown as a single line like the quena, so it has no pan
+      // either. The caipira and the kulintang both take one.
+      case 'ney':    musNey(when, midi, vel); return;
+      case 'caipira': musCaipira(when, midi, pan, vel); return;
+      case 'kulintang': musKulintang(when, midi, pan, vel); return;
       case 'violin': musViolin(when, midi, vel, gap * 1.6); return;
       case 'twang':  musTwang(when, midi, pan, vel, 2); return;
       case 'danbau': musDanBau(when, midi, vel); return;
@@ -7298,6 +8548,236 @@ export function createSystems(game) {
    * noise at the blowing frequency that comes in with the note and leaves before
    * it does. The vibrato arrives late, the way a player's does.
    */
+
+  // =========================================================================
+  // THREE CHAPTERS WERE PLAYING RESEARCHED HARMONY ON A BORROWED TIMBRE.
+  //
+  //   Cappadocia   hijaz on D, correct — on the `quena`, the Andean flute
+  //                from chapter 2
+  //   the Pantanal major sevenths, correct — on `violin`, Venice's baroque
+  //                bowed voice
+  //   Palawan      lydian, correct — on `mallet`, Sydney's felt mallets
+  //
+  // Two of the three are conceded in the source comments already. Nothing about
+  // the harmony in those rows is wrong and nothing about it is touched here:
+  // the chords, the roots, the next-tables, the dwells and the filters stay
+  // exactly as they are. What changes is what plays them.
+  //
+  // AND THREE THINGS DELIBERATELY DO NOT CHANGE. Sydney, Circular Quay and
+  // Manly share mallets because it is one city and the score says so on
+  // purpose. The Drift, Son Doong and Antarctica are placeless BY DESIGN —
+  // quartal stacks and open fifths with no thirds, chosen so the harmony
+  // refuses to tell you how to feel about somewhere — so they get no
+  // instrument and never will.
+  // =========================================================================
+
+  /**
+   * THE NEY. An end-blown rim flute, and the oldest instrument still in use.
+   *
+   * Everything that makes it not a quena is in the BREATH. A quena's noise
+   * component sits at half the note's level and reads as an artefact of playing;
+   * a ney's is most of the sound and reads as the point of it — you are meant to
+   * hear the player. So the noise runs above the tone here rather than under it,
+   * it is wide rather than tuned, and it STARTS FIRST: a ney speaks late and
+   * uncertainly, over about a fifth of a second, where the quena is there in
+   * seventy milliseconds.
+   *
+   * The tone itself is almost a pure sine with a second partial at a third of
+   * what the quena carries, which is why Cappadocia's row already sits at a
+   * filter cutoff of 720 and has done since it was written for a flute it did
+   * not have. The scoop up into the note is the other tell: the pitch arrives
+   * from underneath, because an embouchure against a bare rim has to find it.
+   */
+  function musNey(when, midi, vel) {
+    const hz = sysMidiHz(midi);
+    const atk = rand(0.16, 0.30);
+    const dur = rand(1.1, 2.2);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel), when + atk);
+    g.gain.setValueAtTime(Math.max(0.0006, vel), when + dur * 0.66);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    const o = ac.createOscillator(); o.type = 'sine';
+    // finding the note from underneath
+    o.frequency.setValueAtTime(hz * rand(0.955, 0.985), when);
+    o.frequency.exponentialRampToValueAtTime(hz, when + atk * 0.8);
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2;
+    const g2 = ac.createGain(); g2.gain.value = 0.075;
+    // A SLOWER, WIDER VIBRATO than the quena's, arriving later. It is a breath
+    // vibrato from the diaphragm rather than a finger one, and it is the second
+    // thing anybody would name about this instrument.
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = rand(3.6, 4.8);
+    const lg = ac.createGain();
+    lg.gain.setValueAtTime(0.0001, when);
+    lg.gain.linearRampToValueAtTime(hz * 0.016, when + dur * 0.6);
+    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+    o.connect(g); o2.connect(g2); g2.connect(g);
+    // THE BREATH, and it is the instrument. Above the tone, not under it, and
+    // it leads the note in — the air is moving before the pipe speaks.
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = hz * 1.6; bp.Q.value = 0.55;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = hz * 0.8;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, when);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel * 1.35), when + atk * 0.45);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0006, vel * 0.55), when + dur * 0.7);
+    ng.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    ns.connect(bp); bp.connect(hp); hp.connect(ng);
+    ng.connect(musPluckDry); ng.connect(musSend);
+    ns.start(when); ns.stop(when + dur + 0.1);
+    g.connect(musPluckDry); g.connect(musSend);
+    o.start(when); o2.start(when); lfo.start(when);
+    const stop = when + dur + 0.08;
+    o.stop(stop); o2.stop(stop); lfo.stop(stop);
+  }
+
+  /**
+   * THE BENDIR. A frame drum about half a metre across with a gut snare laid
+   * against the inside of the head, which is the whole of its character: every
+   * stroke is a low tuned thump followed immediately by a short dry buzz. Two
+   * strokes, a dum in the middle and a tak on the rim, and it is SPARSE — this
+   * chapter is about waiting for something and a drum that keeps time would
+   * take that away.
+   */
+  function musBendir(when, vel) {
+    const hz = rand(72, 88);
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(hz * 2.1, when);
+    o.frequency.exponentialRampToValueAtTime(hz, when + 0.06);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel), when + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.28, 0.45));
+    o.connect(g); g.connect(musPluckDry); g.connect(musSend);
+    o.start(when); o.stop(when + 0.6);
+    // the snare against the head — short, dry, and the reason it is a bendir
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = rand(1500, 2400); bp.Q.value = 0.9;
+    const ng = ac.createGain();
+    env(ng, when + 0.004, vel * 0.45, 0.004, rand(0.06, 0.13));
+    ns.connect(bp); bp.connect(ng); ng.connect(musPluckDry); ng.connect(musSend);
+    ns.start(when); ns.stop(when + 0.3);
+  }
+
+  /**
+   * THE VIOLA CAIPIRA. A ten-string steel guitar in five COURSES, and the
+   * courses are the instrument: the top three are unisons and the bottom two are
+   * octaves, so a single note is never a single string. That is where its whole
+   * chorused warmth comes from, and it is why the Pantanal's row asked for
+   * something warm and sustained and got a baroque violin instead.
+   *
+   * Plucked, not bowed, which is the error being corrected. Three voices per
+   * note — two unisons a few cents apart and one an octave up at a third of the
+   * level — a bright steel transient on the front, and a filter that closes
+   * slowly over a decay long enough to still be there under the next note.
+   */
+  function musCaipira(when, midi, panv, vel) {
+    const hz = sysMidiHz(midi);
+    const dur = rand(1.9, 3.2);
+    const out = ac.createGain(); out.gain.value = 1;
+    let tail = out;
+    if (ac.createStereoPanner) {
+      const pan = ac.createStereoPanner();
+      pan.pan.value = clamp(panv === undefined ? 0 : panv, -1, 1);
+      out.connect(pan); tail = pan;
+    }
+    tail.connect(musPluckDry); tail.connect(musSend);
+    // the course. Cents, not semitones: two strings tuned by hand are never
+    // quite one string, and the beat between them IS the sound.
+    const strings = [[1.0, 1.0], [rand(1.0035, 1.0075), 0.85], [2.0, 0.32]];
+    for (let i = 0; i < strings.length; i++) {
+      const s = strings[i];
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = hz * s[0];
+      const o2 = ac.createOscillator(); o2.type = 'triangle';
+      o2.frequency.value = hz * s[0] * 2.002;
+      const g2 = ac.createGain(); g2.gain.value = 0.3;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 1.6;
+      lp.frequency.setValueAtTime(Math.min(9000, hz * 11), when + i * 0.006);
+      lp.frequency.exponentialRampToValueAtTime(Math.max(380, hz * 2.2), when + dur * 0.7);
+      const g = ac.createGain();
+      const st = when + i * 0.006;        // a plectrum crosses the course
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel * s[1]), st + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+      o.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g); g.connect(out);
+      o.start(st); o2.start(st);
+      o.stop(st + dur + 0.06); o2.stop(st + dur + 0.06);
+    }
+    // steel under a nail, and it is the front of the note
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = Math.min(9000, hz * 7); bp.Q.value = 0.8;
+    const ng = ac.createGain();
+    env(ng, when, vel * 0.55, 0.002, 0.035);
+    ns.connect(bp); bp.connect(ng); ng.connect(out);
+    ns.start(when); ns.stop(when + 0.09);
+  }
+
+  /**
+   * THE KULINTANG. A row of eight bossed gongs lying on a rack, struck with a
+   * padded stick — the melodic instrument of the southern Philippines and of the
+   * Sulu Sea, which is the water Palawan sits in.
+   *
+   * It is a GONG and not a bar, and the difference is that its partials are
+   * inharmonic: musBuoy's ratios rather than musMallet's near-harmonic ones. The
+   * envelope is the mallet's, because a boss struck through felt speaks in four
+   * milliseconds and is gone in a second and a half. What has to be added on top
+   * of both is the SHIMMER — a bronze boss has a wash of very high, very short
+   * partials that a marimba bar simply does not, and without it this is a
+   * detuned xylophone.
+   */
+  function musKulintang(when, midi, panv, vel) {
+    const hz = sysMidiHz(midi);
+    const rel = rand(1.0, 1.9);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0004, vel), when + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rel);
+    // inharmonic, and the upper ones die first — which is what makes a struck
+    // bronze thing DARKEN rather than merely fade
+    const parts = [[1, 1], [2.41, 0.42], [3.86, 0.18], [5.9, 0.07]];
+    const oscs = [];
+    for (let i = 0; i < parts.length; i++) {
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.value = hz * parts[i][0] * rand(0.996, 1.004);
+      const pg = ac.createGain();
+      pg.gain.setValueAtTime(parts[i][1], when);
+      // each partial on its own clock: the fourth is gone in a fifth of the time
+      pg.gain.exponentialRampToValueAtTime(0.0001, when + rel * (1 - i * 0.22));
+      o.connect(pg); pg.connect(g);
+      oscs.push(o);
+    }
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = Math.min(9000, hz * 10);
+    g.connect(lp);
+    let tail = lp;
+    if (ac.createStereoPanner) {
+      const pan = ac.createStereoPanner(); pan.pan.value = panv;
+      lp.connect(pan); tail = pan;
+    }
+    tail.connect(musPluckDry); tail.connect(musSend);
+    for (let i = 0; i < oscs.length; i++) { oscs[i].start(when); oscs[i].stop(when + rel + 0.1); }
+    // the shimmer off the boss
+    const ns = noiseSrc();
+    const bpS = ac.createBiquadFilter();
+    bpS.type = 'bandpass'; bpS.frequency.value = Math.min(9500, hz * 8.5); bpS.Q.value = 1.6;
+    const ng = ac.createGain();
+    env(ng, when, vel * 0.30, 0.003, rand(0.12, 0.26));
+    ns.connect(bpS); bpS.connect(ng);
+    let stail = ng;
+    if (ac.createStereoPanner) {
+      const pan2 = ac.createStereoPanner(); pan2.pan.value = panv;
+      ng.connect(pan2); stail = pan2;
+    }
+    stail.connect(musPluckDry); stail.connect(musSend);
+    ns.start(when); ns.stop(when + 0.4);
+  }
+
   function musQuena(when, midi, vel) {
     const hz = sysMidiHz(midi);
     const dur = rand(0.55, 1.15);
@@ -8490,6 +9970,35 @@ export function createSystems(game) {
           if (lead === 'quena') {
             musQuena(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
               rand(0.030, 0.058) * (0.8 + musIntensity * 0.4));
+          } else if (lead === 'ney') {
+            // THE SAME REGISTER AND THE SAME CHORD TONE AS THE QUENA IT
+            // REPLACES. A ney is a longer pipe and does sit lower in life, but
+            // the row's chords, roots and filter were tuned against these
+            // pitches and none of that is what was wrong. Only the velocity
+            // moves, and downward: this voice carries a great deal more breath
+            // per unit of tone, so the same number is louder.
+            musNey(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
+              rand(0.024, 0.046) * (0.8 + musIntensity * 0.4));
+          } else if (lead === 'caipira') {
+            // A PONTEIO, NOT A NOTE — and it keeps the violin's argument, which
+            // was right: one note in a warm sustained idiom sounds like
+            // somebody testing an instrument. Three or four steps through the
+            // chord in one direction, at the same quaver the row already used.
+            const cdir = Math.random() < 0.55 ? 1 : -1;
+            let cidx = randInt(0, ch.length - 1);
+            const cn = randInt(3, 4);
+            for (let k = 0; k < cn; k++) {
+              const m = musFold(ch[((cidx % ch.length) + ch.length) % ch.length] + 12, 55, 79);
+              musCaipira(musPluckAt + k * sysMUS_BAR_Q * 1.15, m, pan * 0.7,
+                         rand(0.026, 0.046) * (0.85 + musIntensity * 0.3) * (k === 0 ? 1.15 : 1));
+              cidx += cdir;
+            }
+          } else if (lead === 'kulintang') {
+            // Same register and same octave choice the mallet had, because the
+            // row's lydian voicing was written for it. A gong carries further
+            // than felt on wood, so the velocity comes down rather than up.
+            musKulintang(musPluckAt, Math.min(88, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2)),
+              pan, v * 0.95);
           } else if (lead === 'koto') {
             // A koto sits LOW compared with the pluck it replaces — the open
             // strings of a standard hirajoshi tuning run from about D3 — and the
@@ -8581,6 +10090,24 @@ export function createSystems(game) {
       while (musLoanAt < horizon && guard++ < 12) {
         musSongLoan(musLoanAt, 0.55 + musIntensity * 0.35);
         musLoanAt += 1.10;
+      }
+    }
+    if (musPal.bendir) {
+      // SPARSE, and that is the whole specification. Cappadocia's row is the
+      // quietest palette in the game and the chapter is about waiting for
+      // something; a frame drum keeping time would answer the question the
+      // chapter is asking. Two or three strokes, then eleven to twenty-four
+      // seconds of nothing. Its own clock, same as the shakuhachi's and the
+      // dan tranh's, and for the same reason.
+      if (musBendirAt < now) musBendirAt = now + rand(4, 11);
+      guard = 0;
+      while (musBendirAt < horizon && guard++ < 4) {
+        const bn = randInt(2, 3);
+        for (let k = 0; k < bn; k++) {
+          musBendir(musBendirAt + k * rand(0.42, 0.68),
+                    rand(0.030, 0.052) * (0.8 + musIntensity * 0.35) * (k ? 0.7 : 1));
+        }
+        musBendirAt += rand(11, 24);
       }
     }
     if (musPal.buoy) {
@@ -9021,6 +10548,15 @@ export function createSystems(game) {
     thunder: sfxThunder, drip: sfxDrip,
     // What a hard thing sounds like. See physVOICE in props.js for who asks.
     clink: sfxClink,
+    // ---- THE PLACE, AND WHAT IT SOUNDS LIKE ----------------------------
+    // Seventeen voices for six chapters, replacing a pitch-shifted 'chime'
+    // and a pitch-shifted 'hiss'. See the block above sfxHigurashi.
+    higurashi: sfxHigurashi, shishi: sfxShishi, bonsho: sfxBonsho,
+    muezzin: sfxMuezzin, darbuka: sfxDarbuka, cart: sfxCart,
+    mahjong: sfxMahjong, cleaver: sfxCleaver, tram: sfxTram,
+    pigeons: sfxPigeons, lap: sfxLap, campanile: sfxCampanile,
+    vendor: sfxVendor, bowls: sfxBowls,
+    cicada: sfxCicada, magpie: sfxMagpie, lorikeet: sfxLorikeet,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -9037,6 +10573,19 @@ export function createSystems(game) {
     // of the impact channel, so a tumbling stack of bowls has to be allowed to
     // sound like a tumbling stack of bowls.
     clink: 0.05,
+    // ---- and the place's own voices -------------------------------------
+    // These gaps are LONG, and deliberately much longer than the ambience
+    // ladder's own timer ever asks for. They are not a throttle against a
+    // machine-gun, they are a second fence against the one way this batch can
+    // make the game worse: a characterful sound is exactly the kind that stops
+    // being characterful the two hundredth time. Every one of them is at least
+    // as long as the voice itself, so two can never overlap into a chorus.
+    higurashi: 3.5, shishi: 2.0, bonsho: 12.0,
+    muezzin: 9.0, darbuka: 3.0, cart: 4.0,
+    mahjong: 2.0, cleaver: 2.5, tram: 2.5,
+    pigeons: 3.0, lap: 4.5, campanile: 9.0,
+    vendor: 2.5, bowls: 2.0,
+    cicada: 5.0, magpie: 3.0, lorikeet: 2.5,
   };
 
   function sfx(name, opts) {
@@ -12031,6 +13580,23 @@ export function createSystems(game) {
                       return 'the terminus is at the foot of the ramp. the step is the seat.';
                     },
                     where: function () { return hintObj(game.rio && game.rio.bonde()); } },
+    // The second flier. Same two verbs as Pasto's condor and deliberately the
+    // same words for them — the whole argument for a verb coming back is that
+    // the player already knows what to do, and a clue that re-teaches it in new
+    // language would be saying this is a different thing. It is not.
+    'fragata':        { clue: 'wheek out on the sand — press Q', where: function () { return null; } },
+    'fragata-ride':   { clue: function () {
+                      const c = game.condor;
+                      if (c && c.active) return 'wheek again, then press E under it';
+                      return 'call one down first. they hang over the loaf all afternoon.';
+                    },
+                    where: function () {
+                      const c = game.condor;
+                      if (c && c.active) return hintObj(c.group);
+                      // Before there is a bird, point at the air it lives in:
+                      // the sunward face of the loaf, which is also the lift.
+                      return hintObj(game.rio && game.rio.sugarloaf);
+                    } },
 
     'volo':           { clue: function () {
                       const v = game.venice;
@@ -15005,6 +16571,31 @@ export function createSystems(game) {
     // sparkle is a decorative loop that never stops and never asks; the specks
     // stay where they are and the water still reads as water.
     grainTick(sysCalmMotion ? 12.5 : game.state.time);
+    // ...and twelve vec4s, and everything in the live chapter stops floating.
+    // Same deal as the sparkle clock: the pool is a shared uniform block, so
+    // this is the entire per-frame cost of contact on every grained surface in
+    // the world, not a cost per material.
+    sysContactFrame(dt);
+    // ---- and the light that lands on something ----------------------------
+    // The rescan is DEFERRED a couple of frames past the swap: a chapter is
+    // still making its roots visible on the frame the grade is switched, and a
+    // scan run there finds an empty world and leaves the neon chapter dark
+    // until the next swap. Two frames costs nothing and cannot race.
+    if (sysSplRescan > 0 && --sysSplRescan === 0) sysSpillScan();
+    sysSpillFrame(dt);
+    // ---- the wind, in the picture -----------------------------------------
+    // One float, one clock and one unit vector, and every swaying material in
+    // the live chapter leans. The vector is weather.js's gust() UNCHANGED — it
+    // already carries the biome's base wind, its bearing and its gusting, so
+    // the thing the player sees and the thing that shoves a bin are one number
+    // and cannot drift apart.
+    //
+    // FROZEN UNDER prefers-reduced-motion, exactly as the sparkle is, and by
+    // holding the CLOCK rather than the strength: a world stopped mid-gust
+    // still leans the way the wind is blowing, where one stopped at zero
+    // strength snaps upright the moment the setting is read.
+    swayTick(sysCalmMotion ? 7.5 : game.state.time,
+             game.weather ? game.weather.gust() : null);
     const B = game.biome;
     const name = (B && B.current) || 'sydney';
 
@@ -15031,6 +16622,33 @@ export function createSystems(game) {
     } else {
       wetTick(0, null);
     }
+
+    // ---- the rim ----------------------------------------------------------
+    // Same deal as the wet ground and for the same reason: one float and one
+    // colour, and every Lambert in the live chapter separates from what is
+    // behind it. The COLOUR is the hemisphere's, taken here so that the aurora,
+    // the Symphony of Lights, the sun clearing the ridge over Goreme and going
+    // under the water in Palawan all move it without knowing this exists.
+    //
+    // ...but at FULL CHROMA, which is the one thing it does not take from the
+    // fill. hemi.color at half past eleven at night in Reykjavik is a very dark
+    // blue, and multiplying a rim by it produces a rim you cannot see in exactly
+    // the chapters the rim is most for. Normalising the brightest channel to 1
+    // keeps the sky's HUE — which is the whole argument for tinting it at all —
+    // and leaves the level to sysRIM, where it is a number somebody chose.
+    sysColR.copy(hemi.color);
+    {
+      const rmx = Math.max(sysColR.r, Math.max(sysColR.g, sysColR.b));
+      if (rmx > 0.001) sysColR.multiplyScalar(1 / rmx);
+      else sysColR.setRGB(1, 1, 1);
+      // ...AND THEN BACK OFF THE CHROMA. Normalising alone hands the rim the
+      // hemisphere's saturation at full strength, and Mong Kok's hemisphere is
+      // a neon magenta: photographed, the animal came out edged in pink. Two
+      // fifths of the way to white keeps the hue — which is the entire argument
+      // for tinting it — and stops the sky choosing the animal's colour.
+      sysColR.lerp(sysRIM_WHITE, 0.40);
+    }
+    rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
 
     // ---- the dome ---------------------------------------------------------
     if (sysSkyMesh && sysSkyMesh.visible) {
@@ -15306,6 +16924,8 @@ export function createSystems(game) {
    * afternoon, and a damped dome opens it on a second of Sydney's blue.
    */
   function sysDressPrime(name) {
+    sysContactClear();
+    sysSpillClear();
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
     for (let i = 0; i < sysGRADE_KEYS.length; i++) {
       const key = sysGRADE_KEYS[i];
@@ -16307,6 +17927,11 @@ export function createSystems(game) {
     // the fog and the shadow frustum are. Both cross-fade; only the dome's
     // OWNERSHIP is a hard swap, because two domes cannot both be the sky.
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
+    // The whole cast has just been replaced. A patch left holding a slot would
+    // fade out over the Piazzetta from a position in the Botanic Gardens —
+    // the shared-space leak this repo has paid for more than once.
+    sysContactClear();
+    sysSpillClear();
     sysSkyTopWant.set(sysSKY_TOP[name] || PALETTE.skyTop);
     if (sysSkyMesh) sysSkyMesh.visible = !sysSKY_OWN[name];
     // The list and the score both belong to the place, not to a progress
@@ -18053,10 +19678,24 @@ export function createSystems(game) {
               else if (r < 0.86) sysAmb('splash', { volume: rand(0.06, 0.12), pitch: rand(0.7, 1.0) });
               else sysAmb('gull', { volume: rand(0.04, 0.08), pitch: rand(0.42, 0.56) });
               ambTimer = rand(4, 9);
-            } else if (r < 0.42) {
-              sysAmb('chime', { volume: rand(0.12, 0.22), pitch: rand(0.44, 0.58) });
-              ambTimer = rand(16, 34);
-            } else if (r < 0.72) {
+            } else if (r < 0.30) {
+              // THE BELL IS NOW A BELL. This was 'chime' — the four-note
+              // triangle arpeggio Sydney's tick is built from — pitched down to
+              // a half, which is a xylophone in a temple garden. sfxBonsho is a
+              // struck bronze barrel with two inharmonic partials and a
+              // ten-second decay, and it is a different object.
+              sysAmb('bonsho', { volume: rand(0.10, 0.19), pitch: rand(0.92, 1.06) });
+              ambTimer = rand(22, 44);
+            } else if (r < 0.52) {
+              // ...and the evening cicada, which is what summer MEANS there.
+              sysAmb('higurashi', { volume: rand(0.07, 0.14), pitch: rand(0.90, 1.12) });
+              ambTimer = rand(7, 16);
+            } else if (r < 0.68) {
+              // the sozu in the garden, tipping. Very occasionally, because a
+              // shishi-odoshi that goes off every six seconds is a metronome.
+              sysAmb('shishi', { volume: rand(0.08, 0.15), pitch: rand(0.88, 1.16) });
+              ambTimer = rand(17, 33);
+            } else if (r < 0.86) {
               sysAmb('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.3) });
               ambTimer = rand(9, 19);
             } else {
@@ -18165,17 +19804,29 @@ export function createSystems(game) {
             const tide = ve ? ve.tide() : 0;
             const r = Math.random();
             if (tide > 0.5) {
-              sysAmb('splash', { volume: rand(0.08, 0.16), pitch: rand(0.5, 0.75) });
-              ambTimer = rand(3.5, 8);
-            } else if (r < 0.4) {
-              sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.7, 1.0) });
-              ambTimer = rand(6, 13);
-            } else if (r < 0.75) {
+              // In the acqua alta it is nothing but water, and now it is the
+              // RIGHT water: a lap is the sea arriving at a wall and a splash is
+              // something falling into it. They are not the same event, and the
+              // whole square was using the second one for the first.
+              sysAmb('lap', { volume: rand(0.09, 0.17), pitch: rand(0.7, 1.05) });
+              ambTimer = rand(4.5, 9);
+            } else if (r < 0.30) {
+              sysAmb('lap', { volume: rand(0.06, 0.12), pitch: rand(0.8, 1.2) });
+              ambTimer = rand(7, 15);
+            } else if (r < 0.52) {
+              // A HUNDRED OF THEM AT ONCE, which is what San Marco does every
+              // few minutes and is the loudest thing in the square. The gull
+              // stays too — Venice has both and they sound nothing alike.
+              sysAmb('pigeons', { volume: rand(0.07, 0.14), pitch: rand(0.9, 1.15) });
+              ambTimer = rand(9, 20);
+            } else if (r < 0.76) {
               sysAmb('gull', { volume: rand(0.09, 0.16), pitch: rand(1.0, 1.35) });
               ambTimer = rand(7, 16);
             } else {
-              sysAmb('chime', { volume: rand(0.10, 0.18), pitch: rand(0.5, 0.66) });
-              ambTimer = rand(14, 30);
+              // ...and a campanile is a SWUNG bell: a hum tone, a real strike
+              // and four seconds. It was a pitched-down triangle arpeggio.
+              sysAmb('campanile', { volume: rand(0.08, 0.15), pitch: rand(0.95, 1.06) });
+              ambTimer = rand(26, 52);
             }
           } else if (bio === 'kowloon') {
             // The densest soundscape in the game, and it should be: a horn, a
@@ -18190,11 +19841,20 @@ export function createSystems(game) {
               else sysAmb('chime', { volume: rand(0.05, 0.10), pitch: rand(1.5, 2.0) });
               ambTimer = rand(5, 11);
             } else {
+              // FOUR OF THE SEVEN ARE NEW, and they are the four things a Hong
+              // Kong street actually sounds like at this hour: a mahjong table
+              // through an open window, a cleaver on a block in the wet market,
+              // the ding-ding the tram is named after, and the aircon dripping
+              // on you — which is the single most universal experience of Mong
+              // Kok and was already in the table as 'drip', unused here.
               const r = Math.random();
-              if (r < 0.42) sysAmb('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
-              else if (r < 0.68) sysAmb('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
-              else if (r < 0.86) sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
-              else sysAmb('pop', { volume: rand(0.05, 0.09), pitch: rand(0.6, 0.9) });
+              if (r < 0.20) sysAmb('mahjong', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.18) });
+              else if (r < 0.34) sysAmb('cleaver', { volume: rand(0.06, 0.11), pitch: rand(0.85, 1.15) });
+              else if (r < 0.46) sysAmb('tram', { volume: rand(0.06, 0.12), pitch: rand(0.92, 1.12) });
+              else if (r < 0.58) sysAmb('drip', { volume: rand(0.05, 0.10), pitch: rand(1.3, 2.0) });
+              else if (r < 0.74) sysAmb('horn', { volume: rand(0.09, 0.16), pitch: rand(1.9, 2.4) });
+              else if (r < 0.88) sysAmb('cheer', { volume: rand(0.06, 0.11), pitch: rand(1.2, 1.6) });
+              else sysAmb('rustle', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.2) });
               ambTimer = rand(3.5, 8);
             }
           } else if (bio === 'palawan') {
@@ -18288,11 +19948,33 @@ export function createSystems(game) {
               sysAmb('hiss', { volume: rand(0.06, 0.13), pitch: rand(0.5, 0.8) });
               ambTimer = rand(9, 20);
             } else {
+              // THE MEDINA HAD A CAR HORN, A FOOTBALL CROWD AND A GUITAR IN IT.
+              // All three are real sounds and none of them is Marrakech. The
+              // three that are: the call to prayer from a minaret you cannot
+              // see, a hand drum in a square that is not this one, and an
+              // iron-rimmed cart on stone — which is the sound of the one city
+              // in this game where nothing has an engine.
               const r = Math.random();
-              if (r < 0.4) sysAmb('horn', { volume: rand(0.07, 0.13), pitch: rand(1.7, 2.3) });
-              else if (r < 0.7) sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
-              else sysAmb('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
-              ambTimer = rand(5, 12);
+              if (r < 0.16) {
+                // ONCE IN A WHILE AND NEVER TWICE RUNNING. It is a minute and a
+                // half long in life and about three seconds here, and it is the
+                // most recognisable sound in the chapter — which is exactly why
+                // it carries the longest gap in the whole ladder.
+                sysAmb('muezzin', { volume: rand(0.09, 0.16), pitch: rand(0.94, 1.08) });
+                ambTimer = rand(48, 95);
+              } else if (r < 0.44) {
+                sysAmb('darbuka', { volume: rand(0.07, 0.13), pitch: rand(0.85, 1.20) });
+                ambTimer = rand(11, 24);
+              } else if (r < 0.68) {
+                sysAmb('cart', { volume: rand(0.08, 0.15), pitch: rand(0.8, 1.25) });
+                ambTimer = rand(9, 19);
+              } else if (r < 0.86) {
+                sysAmb('cheer', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.4) });
+                ambTimer = rand(7, 15);
+              } else {
+                sysAmb('strum', { volume: rand(0.09, 0.16), pitch: rand(0.7, 1.0) });
+                ambTimer = rand(8, 17);
+              }
             }
           } else if (bio === 'manly') {
             // A surf beach is the loudest quiet place there is, and the thing
@@ -18385,9 +20067,17 @@ export function createSystems(game) {
             // unswitched layer over it. It gets one thing: the CITY, a long way
             // off, which is the one sound the biome cannot own because it has
             // no position.
+            // ...and the two things that ARE the Old Quarter and that no
+            // positional bed can own, because whoever is making them is never
+            // where you are: somebody selling something, and forty bowls being
+            // washed in a doorway. Both sit at the same very low level as the
+            // rest of this rung — hanoi.js owns the loud half and this must not
+            // compete with it.
             const rr = Math.random();
-            if (rr < 0.5) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
-            else if (rr < 0.82) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
+            if (rr < 0.26) sysAmb('vendor', { volume: rand(0.04, 0.08), pitch: rand(0.9, 1.14) });
+            else if (rr < 0.46) sysAmb('bowls', { volume: rand(0.035, 0.07), pitch: rand(0.9, 1.15) });
+            else if (rr < 0.70) sysAmb('bark', { volume: rand(0.03, 0.06), pitch: rand(1.9, 2.8) });
+            else if (rr < 0.88) sysAmb('hiss', { volume: rand(0.03, 0.06), pitch: rand(0.8, 1.3) });
             else sysAmb('tick', { volume: rand(0.03, 0.05), pitch: rand(2.2, 3.0) });
             ambTimer = rand(5, 13);
           } else if (bio === 'monaco') {
@@ -18425,8 +20115,36 @@ export function createSystems(game) {
             // bug, and it could only ever fire in Sydney and Quay because every
             // other biome above already goes through the dispatcher. The defaults
             // it fills in (volume 1, pitch 1) are exactly what the bare call meant.
-            sysAmb('gull');
-            ambTimer = rand(8, 20);
+            // SYDNEY FELL THROUGH THE WHOLE LADDER TO ONE SILVER GULL.
+            //
+            // Chapter one, the first thing anybody hears, and its entire
+            // soundscape was the fallback at the bottom of this ladder: a gull,
+            // every eight to twenty seconds, in the Botanic Gardens, four
+            // hundred metres from the water. It is a real Sydney sound and it is
+            // ONE, and the three that belong over that lawn on a summer
+            // afternoon are a cicada chorus, a magpie carolling and a dozen
+            // lorikeets going over — which between them are more of what that
+            // place sounds like than anything else that could be put there.
+            //
+            // The gull stays in the roll, because it was never wrong. It is now
+            // a fifth of the bed instead of all of it.
+            const sr = Math.random();
+            if (sr < 0.30) {
+              sysAmb('cicada', { volume: rand(0.07, 0.14), pitch: rand(0.85, 1.18) });
+              ambTimer = rand(9, 22);
+            } else if (sr < 0.54) {
+              sysAmb('magpie', { volume: rand(0.07, 0.13), pitch: rand(0.94, 1.10) });
+              ambTimer = rand(11, 24);
+            } else if (sr < 0.74) {
+              sysAmb('lorikeet', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.16) });
+              ambTimer = rand(10, 21);
+            } else if (sr < 0.90) {
+              sysAmb('gull', { volume: rand(0.07, 0.13), pitch: rand(1.0, 1.4) });
+              ambTimer = rand(10, 22);
+            } else {
+              sysAmb('rustle', { volume: rand(0.05, 0.10), pitch: rand(0.8, 1.2) });
+              ambTimer = rand(12, 26);
+            }
           }
         }
       }

@@ -52,7 +52,6 @@ const cavSPAWN = { x: 0, y: 4.0, z: 62 };
 const cavWATER = -7.4;               // the river surface, and it is a long way down
 
 const cavMOUTH_Z = 50;               // where the roof starts
-const cavPASS_Z0 = -104;             // the Great Wall
 const cavDOLINE = { x: 4, z: -48, r: 26 };
 const cavHAND = { x: 16, z: -4 };    // the big stalagmite
 const cavROOST = { x: -30, z: -126 };
@@ -127,7 +126,6 @@ const cavMOTE_N = 260;
 let cavMotes = null, cavMoteData = null, cavMoteStir = 0;
 
 // the expedition. Nobody has ever been in this cave alone.
-let cavLampA = null, cavLampB = null;
 // ...and the stove, which is the only warm light in the chapter. See cavBuildCamp.
 let cavStove = null, cavStoveFlame = null;
 let cavWallLamp = null, cavWallLampMesh = null;   // the marker at the top of the Great Wall
@@ -322,11 +320,11 @@ function cavMerger() {
 
 function cavVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.32, amount: 0.14, warp: 0.6 });
+               { scale: 0.32, amount: 0.14, warp: 0.6, near: 0.34, nearScale: 10, contact: 1 });
 }
 function cavVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.28, amount: 0.22, warp: 0.25 });
+               { scale: 0.28, amount: 0.22, warp: 0.25, near: 0.70, nearScale: 11, contact: 1 });
 }
 /**
  * ANYTHING IN HERE THAT GIVES OFF LIGHT IS BUILT WITH THIS.

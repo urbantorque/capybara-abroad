@@ -1376,15 +1376,254 @@ export const PALETTE = {
 // MeshLambertMaterial directly — go through this so the cache stays effective.
 // mat(0xff0000) / mat(PALETTE.grass, { side: THREE.DoubleSide, transparent: true, opacity: .8 })
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// THE RIM, AND WHY IT LIVES IN THE MATERIAL FACTORY RATHER THAN ANYWHERE ELSE.
+//
+// Audited across all 28 modules: there is no rim term, no fresnel, no ambient
+// occlusion and no contact shadow anywhere in this game. The ONLY grazing-angle
+// term in the codebase is grain()'s wet sheen, and that is gated on uGrainWet,
+// so it exists only when it is raining. A capybara standing on a lawn is a flat
+// brown silhouette against a flat green one with nothing at all separating them,
+// and that absence is most of why the art style reads as unfinished rather than
+// as deliberate. A sky-tinted rim is the single strongest polished-low-poly cue
+// there is.
+//
+// It goes HERE because mat() is the one factory every Lambert in the game comes
+// through — the animal, the props, the people, the buildings and the ground —
+// and because the strength wants to be ONE number per biome rather than a
+// hundred per chapter. So the hook is attached once, the numbers come off two
+// shared uniforms, and turning it on for a chapter is a single float write.
+//
+// FOUR THINGS MAKE IT LIGHT RATHER THAN AN OUTLINE, and each of them was needed:
+//
+//  1. IT IS THE SKY'S COLOUR, not white. A white edge is a video-game outline;
+//     an edge in the colour of the hemisphere the object is standing under reads
+//     as light wrapping round it. It is the same argument the wet sheen and the
+//     sky dome's horizon are already built on, and it means neon over Mong Kok
+//     and flat grey over Kyoto for free.
+//  2. IT DIES WITH DISTANCE. A fresnel on a ground plane is strongest where the
+//     view is most grazing, which is the HORIZON — so with no distance term the
+//     whole far half of every chapter lifts into a haze. Fading it out by forty
+//     metres leaves it doing the one job it is for: separating things near the
+//     lens from what is behind them.
+//  3. IT USES gl_FrontFacing. The sky dome is drawn from the inside; taking the
+//     object normal without flipping it makes dot(N, V) negative everywhere on
+//     the dome, the clamp turns that into a full-strength rim, and the entire
+//     sky washes out.
+//  4. IT IS NOT ON TRANSPARENT OR EMISSIVE MATERIALS. A glow quad and a sheet of
+//     water are exactly the surfaces whose silhouettes are meant to be soft, and
+//     a rim on an additive sheet is added light on top of added light.
+//
+// CONTRACT: no black outlines. This is that in reverse and it breaks the same
+// rule if it is pushed. If the edge reads as an edge instead of as light, it is
+// too strong.
+const _rimK = { value: 0 };
+const _rimC = { value: new THREE.Color(1, 1, 1) };
+// The two numbers live inside the shader below rather than as constants read
+// into it: 42 metres is where the term is gone entirely, and the exponent is
+// how tight to the silhouette it stays. Both are tuned against a photograph and
+// neither is worth a uniform.
+//
+// 2.5 AND NOT 4. Photographed on Mong Kok at the fourth power, the rump came
+// back with a pale band round it that had a hard inner boundary — an OUTLINE,
+// which is the one thing CONTRACT.md forbids, arrived at from the bright side
+// instead of the dark one. A tight exponent puts all of the light in the last
+// few degrees before the silhouette, and a narrow bright strip against a body
+// is a line drawn on it. A softer one spreads the same energy up the flank,
+// which is what light wrapping round a thing actually looks like — and it costs
+// nothing on the ground, because the distance fade has already taken care of
+// the only place a low exponent would have shown.
+/**
+ * How hard the rim is in the live chapter, and the colour of the sky doing it.
+ * systems.js calls this once per frame, from the hemisphere, for the same reason
+ * wetTick() takes its colour from there: a rim is bounce light and bounce light
+ * is the sky, so every event that already moves the atmosphere moves this too
+ * and no second table has to be kept in step.
+ */
+export function rimTick(k, color) {
+  _rimK.value = k > 0 ? (k < 2 ? k : 2) : 0;
+  if (color) _rimC.value.copy(color);
+}
+/**
+ * The declarations and the term, shared by mat()'s hook and grain()'s.
+ *
+ * Written as template literals rather than as joined arrays of quoted lines:
+ * this is GLSL, it has no numbers to interpolate, and a shader you can read is
+ * a shader whose brace you can count.
+ */
+const _RIM_VS_COMMON = `#include <common>
+varying vec3 vRimW;
+varying vec3 vRimN;`;
+const _RIM_VS_BEGIN = `#include <begin_vertex>
+vRimW = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vRimN = normalize(mat3(modelMatrix) * objectNormal);`;
+// ---------------------------------------------------------------------------
+// SPILL — AND IT IS DELIBERATELY NOT A PointLight.
+//
+// Measured (qa/PRESENCE-PASS.md): eight of nine sampled chapters have ZERO
+// point lights, and Hong Kong's ground reads a mean luminance of 34.1/255 with
+// a sign blazing beside the animal. Monte Carlo's lamp burns white-hot over
+// pavement no brighter than pavement fifteen metres away. The composite pass's
+// own opening comment says the problem it exists to solve is that a light which
+// does not spill is a sticker: it fixed the lens, and the lights still do not
+// spill onto the floor.
+//
+// The obvious fix is a pool of THREE.PointLights, and it is the wrong one HERE.
+// Every light three knows about changes NUM_POINT_LIGHTS, which recompiles
+// every material in the chapter, and then costs a full lambert-plus-specular
+// evaluation per light per fragment on all of them — for an effect that is
+// wanted on the floor and on the animal and nowhere else.
+//
+// This is the same shape as the contact pool one field over: a fixed-size
+// uniform block of the nearest N emitters, and a term that ADDS. Eight slots,
+// a compile-time literal, one branch when the chapter has no emitters, no
+// recompiles ever, no shadow lookups, no specular.
+//
+// IT LIVES IN THE RIM'S INJECTION, and that is the point. The rim already
+// compiles into essentially every material in the game through mat(), it
+// already carries the world position and the world normal as varyings, and it
+// already sits at <opaque_fragment> where `outgoingLight` is. So the spill
+// reaches the ground, the walls, the stalls AND THE CAPYBARA — which no term
+// living in grain() could, because the animal's fur is not a grained material.
+const _SPILL_N = 8;
+const _spillP = { value: [] };   // xyz world position of the cluster, w = its reach
+const _spillC = { value: [] };   // colour premultiplied by strength
+const _spillOn = { value: 0 };
+// HOW MANY SLOTS ARE ACTUALLY LIVE. The loop bound has to be a literal, but a
+// break against a uniform is free and it is most of the cost: a chapter with
+// two sign clusters in range was paying for eight, on every fragment of every
+// object, and the two-thirds it was throwing away is the two-thirds this
+// recovers.
+const _spillN = { value: 0 };
+for (let i = 0; i < _SPILL_N; i++) {
+  _spillP.value.push(new THREE.Vector4(0, -9999, 0, 1));
+  _spillC.value.push(new THREE.Vector3(0, 0, 0));
+}
+// A wall facing away from a sign is not pitch black — a lit street is full of
+// bounce, and a pure lambert term on a fake light reads as a hard edge running
+// down every column. A third of the light arrives regardless of facing.
+const _spillWRAP = 0.34;
+/** How many slots the pool has. systems.js ranks into this many. */
+export function spillSlots() { return _SPILL_N; }
+/**
+ * Write the pool. systems.js calls this once per frame with at most
+ * spillSlots() entries, already ranked and already faded:
+ *
+ *     list[i] = { x, y, z, r, cr, cg, cb }   // colour already scaled by strength
+ *
+ * Slots past `n` are zeroed for contactTick()'s reason: a source that leaves
+ * the pool must not leave a lit patch behind.
+ */
+export function spillTick(list, n) {
+  const P = _spillP.value, C = _spillC.value;
+  let live = 0;
+  for (let i = 0; i < _SPILL_N; i++) {
+    if (i < n) {
+      const e = list[i];
+      P[i].set(e.x, e.y, e.z, e.r > 0.5 ? e.r : 0.5);
+      C[i].set(e.cr, e.cg, e.cb);
+      if (e.cr + e.cg + e.cb > 0.002) live++;
+    } else {
+      C[i].set(0, 0, 0);
+    }
+  }
+  _spillOn.value = live > 0 ? 1 : 0;
+  // systems.js packs the live slots to the front, so this is a bound and not
+  // merely a count — see the break in the loop.
+  _spillN.value = n < _SPILL_N ? n : _SPILL_N;
+}
+
+const _RIM_FS_COMMON = `#include <common>
+varying vec3 vRimW;
+varying vec3 vRimN;
+uniform float uRimK;
+uniform vec3 uRimC;
+uniform vec4 uSpillP[${_SPILL_N}];
+uniform vec3 uSpillC[${_SPILL_N}];
+uniform float uSpillOn;
+uniform float uSpillN;`;
+// ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
+// make the rim take the object's own colour and its own lighting, which is a
+// brighter version of the thing rather than light on it. Added at the end it is
+// light, it is the sky's colour, and it survives the object standing in shadow
+// — which is exactly where a thing most needs separating from what is behind it.
+const _RIM_FS_OUT = `{
+  vec3 rN = normalize(vRimN);
+  if (!gl_FrontFacing) rN = -rN;
+  if (uRimK > 0.0005) {
+    vec3 rD = cameraPosition - vRimW;
+    float rL = length(rD);
+    float rf = pow(1.0 - clamp(dot(rN, rD / max(rL, 0.0001)), 0.0, 1.0), 2.5);
+    rf *= clamp(1.0 - rL / 42.0, 0.0, 1.0);
+    outgoingLight += rf * uRimK * uRimC;
+  }
+  // ---- THE SPILL. See the block above _RIM_FS_COMMON. ----------------------
+  // One coherent branch in the sixteen chapters that register no emitters, so
+  // they pay for this exactly nothing.
+  if (uSpillOn > 0.5) {
+    vec3 sAcc = vec3(0.0);
+    for (int si = 0; si < ${_SPILL_N}; si++) {
+      if (float(si) >= uSpillN) break;
+      vec3 sD = uSpillP[si].xyz - vRimW;
+      float sL = length(sD);
+      // Reach, not inverse-square. A physical falloff on a fake light either
+      // blows out at the source or dies before it reaches the floor, and the
+      // thing being modelled here is a SIGN CLUSTER several metres across
+      // rather than a point. A smooth ramp to nothing at the stated reach is
+      // also what lets a source leave the pool without a visible edge.
+      float sAt = 1.0 - smoothstep(uSpillP[si].w * 0.12, uSpillP[si].w, sL);
+      float sNd = max(dot(rN, sD / max(sL, 0.0001)), 0.0);
+      sAcc += uSpillC[si] * sAt * (${_spillWRAP.toFixed(2)} + ${(1 - _spillWRAP).toFixed(2)} * sNd);
+    }
+    // MULTIPLIED BY THE ALBEDO, which is the whole difference between light and
+    // paint: a magenta sign over grey asphalt makes a grey street slightly
+    // magenta, and over a red awning it makes the awning glow. Added flat it
+    // would wash every surface to the same colour and read as fog.
+    outgoingLight += sAcc * diffuseColor.rgb;
+  }
+}
+#include <opaque_fragment>`;
+function _rimInject(shader) {
+  shader.uniforms.uRimK = _rimK;
+  shader.uniforms.uRimC = _rimC;
+  shader.uniforms.uSpillP = _spillP;
+  shader.uniforms.uSpillC = _spillC;
+  shader.uniforms.uSpillOn = _spillOn;
+  shader.uniforms.uSpillN = _spillN;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', _RIM_VS_COMMON)
+    .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', _RIM_FS_COMMON)
+    .replace('#include <opaque_fragment>', _RIM_FS_OUT);
+}
+/** True where a rim would be wrong on principle rather than merely subtle. */
+function _rimWants(opts) {
+  if (!opts) return true;
+  if (opts.transparent) return false;
+  if (opts.emissive !== undefined) return false;
+  if (opts.blending !== undefined && opts.blending !== THREE.NormalBlending) return false;
+  if (opts.depthWrite === false) return false;
+  return true;
+}
+
 const _matCache = new Map();
 export function mat(color, opts) {
   const key = color + '|' + (opts ? JSON.stringify(opts) : '');
   let m = _matCache.get(key);
   if (m) return m;
   m = new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: true }, opts || {}));
+  if (_rimWants(opts)) {
+    m.onBeforeCompile = _rimInject;
+    // Every rimmed material injects the SAME source, so they must all report the
+    // same key or three compiles one program per material instead of sharing
+    // across the hundreds of them that differ only in a colour uniform.
+    m.customProgramCacheKey = _rimKey;
+  }
   _matCache.set(key, m);
   return m;
 }
+function _rimKey() { return 'rim2'; }
 
 // ---------------------------------------------------------------------------
 // Task list — the goose-game checklist. IDs are contract-locked.
@@ -1624,6 +1863,19 @@ export const TASKS = [
   // and then nothing ran on it and nothing could stand on it.
   { id: 'o-bonde',       text: 'Cross the arches on the running board',          chapter: 6,
     mini: 'O BONDE' },
+  // ---- THE SECOND FLIER, AND IT IS DELIBERATELY NOT A THIRD SET PIECE -----
+  // condor.js stopped belonging to Pasto (see condorHost) and Rio is the second
+  // chapter to host it: eighty-four metres of Corcovado for the air to rise off
+  // and nine frigatebirds already drawn over the bay, which nothing could reach.
+  //
+  // Two ordinary lines and no `mini`, on purpose. Rio already carries the wow
+  // (samba-parade) and TWO minis — it was one of the four chapters the pacing
+  // audit measured shortest, so it got a second — and the middle-rung rule says
+  // no chapter has two of the same KIND of moment in it. A third elevated
+  // moment here would take from the three that are already earned. The flight
+  // is its own reward; it does not need a banner to say so.
+  { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6 },
+  { id: 'fragata-ride',  text: 'Ride the sea breeze up the Sugarloaf',           chapter: 6 },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
   // The first chapter that happens at NIGHT, and the first one whose centrepiece
@@ -2415,11 +2667,6 @@ export const FINDS = [
 ];
 
 /** Every find id, for the audit and the save. */
-export function findIds() {
-  const out = [];
-  for (let i = 0; i < FINDS.length; i++) out.push(FINDS[i].id);
-  return out;
-}
 
 export const RECORDS = {
   'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },
@@ -2705,12 +2952,329 @@ const _wetDARK  = 0.26;   // fraction of the diffuse a fully wet surface loses
 const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
 const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
 
+// ---------------------------------------------------------------------------
+// CONTACT — THE OTHER HALF OF THE RIM, AND THE REASON NOTHING IN THIS GAME
+// LOOKED LIKE IT WAS RESTING ON ANYTHING.
+//
+// The rim (see _rimInject above) separates a silhouette from the BACKGROUND.
+// Photographed, that worked. What it cannot do — and what six of six frames in
+// qa/PRESENCE-PASS.md show — is separate a thing from the FLOOR: the capybara
+// casts a soft offset sun shadow and has no darkening at all under its feet,
+// and the bench legs, the bollards and the tree trunks all meet the ground on a
+// clean seam. Everything floats.
+//
+// THE THREE THINGS THIS IS DELIBERATELY NOT:
+//
+//   Not SSAO. No second render target, no depth prepass, no normal buffer. The
+//   composite pass is doing enough work and this is a flat-shaded low-poly game.
+//
+//   Not decals. Alpha-blended dark quads bring z-fighting on a heightfield and
+//   transparency sorting against the weather motes — and Sydney already has
+//   flat lilac jacaranda decals on the lawn, which are the worst-looking thing
+//   in qa/na-sydney.png. A second family of flat blobs is not the answer.
+//
+//   Not per-object. A term on the object darkens the OBJECT; what has to darken
+//   is the surface the object is standing on, which belongs to a different mesh
+//   and usually to a different module.
+//
+// So it is a term in the fragment shader of the surfaces that already take
+// grain(), fed a fixed-size uniform pool of the nearest contact points. No
+// extra draw calls, no sorting, no z-fighting, correct on a heightfield, and it
+// composites with the grain rather than on top of it.
+//
+// TWELVE SLOTS, and the number is a compile-time literal because a GLSL ES 1.0
+// array size and loop bound have to be. It is a shared uniform block, so twelve
+// contact patches on every grained surface in the live chapter cost twelve
+// vec4 writes per frame in total, not per material — the same deal grainTick()
+// and rimTick() already get.
+const _CONTACT_N = 12;
+// xyz = the world position of the contact centre, at the object's BASE, not its
+// origin. w = the radius of its footprint.
+const _contactP = { value: [] };
+// 0..1, and it is faded rather than switched: a patch that pops on as the
+// distance ranking changes reads as a bug, and it is the first thing that gets
+// skipped under time pressure. systems.js owns the ramp.
+const _contactK = { value: [] };
+// One float so an empty pool costs a coherent branch and not twelve iterations.
+const _contactOn = { value: 0 };
+for (let i = 0; i < _CONTACT_N; i++) {
+  _contactP.value.push(new THREE.Vector4(0, -9999, 0, 1));
+  _contactK.value.push(0);
+}
+// The deepest a fully-weighted patch is allowed to take the diffuse. This is
+// contact, not drama: past about a third the ring stops reading as the absence
+// of bounce light and starts reading as paint, which is the failure mode of
+// every decal-based version of this effect.
+const _contactMAX = 0.32;
+// Absolute metres, NOT a multiple of the radius. A prop on a balcony must not
+// darken the street six metres below it, and expressing that gate in radii
+// makes the cut-off depend on how big the prop is — so a market stall on a
+// terrace would reach further down than a bin on one. The gate closes a metre
+// below the object's base whatever the object is.
+const _contactRISE0 = 0.25;
+const _contactRISE1 = 1.00;
+/** How many slots the pool has. systems.js ranks into this many. */
+export function contactSlots() { return _CONTACT_N; }
+/**
+ * Write the pool. systems.js calls this once per frame with at most
+ * contactSlots() entries, already ranked and already faded:
+ *
+ *     list[i] = { x, y, z, r, k }
+ *
+ * Slots beyond `n` are zeroed, so a contributor that leaves the pool cannot
+ * leave a dark patch behind — which it would, silently, if this only ever wrote
+ * the slots it was given.
+ */
+export function contactTick(list, n) {
+  const P = _contactP.value, K = _contactK.value;
+  let live = 0;
+  for (let i = 0; i < _CONTACT_N; i++) {
+    if (i < n) {
+      const e = list[i];
+      P[i].set(e.x, e.y, e.z, e.r > 0.06 ? e.r : 0.06);
+      K[i] = e.k > 0 ? (e.k < 1 ? e.k : 1) : 0;
+      if (K[i] > 0.002) live++;
+    } else {
+      K[i] = 0;
+    }
+  }
+  _contactOn.value = live > 0 ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// SWAY — NINETEEN WORLDS OF PALMS AND CLOTH, AND NOT ONE OF THEM MOVED.
+//
+// `wxMOOD` in weather.js is nineteen hand-set rows of real wind — a base speed,
+// a gust swing, a frequency and a bearing. Sydney is 3.4 m/s swinging 1.6 at
+// 0.070 Hz on a bearing of 1.90 rad; Kyoto is a still 1.1; Pasto is 2.6 swinging
+// 1.9. It is damped, it gusts, it has a direction, and `gust()` hands it out as
+// a live vector.
+//
+// It had exactly two readers — the shove on a loose prop (props.js) and an NPC's
+// reaction (npc.js) — and a grep across all twenty-seven modules for foliage,
+// canopy, frond, banner, awning, laundry, sail, tarp or flag motion returned
+// NOTHING. There was no vertex animation anywhere in this game. The player
+// could feel a gust push a bin and could not see the world it was blowing
+// through.
+//
+// THE ONE DECISION THIS HELPER IS BUILT AROUND, and the batch that specified it
+// was right to demand it up front: MOST CHAPTER GEOMETRY IS MERGED, so "how far
+// is this vertex above the object's own base" is unanswerable — the base is the
+// merged root, and a canopy twelve metres up would sway like twelve metres of
+// rope. Three answers were available and only one of them is cheap:
+//
+//   NOT a per-vertex base attribute — that means touching every merger in the
+//   game, and the mergers are the most load-bearing code in the chapters.
+//   NOT "only unmerged meshes" — that is most of the foliage excluded.
+//   BUT a WINDOW on a local axis, `lo`..`hi`, declared by the call site, which
+//   already knows how tall its own palms are. On an InstancedMesh the window is
+//   in the instance's OWN frame, which is why instanced foliage — Palawan's
+//   ninety palms, Marrakech's dates — is the cleanest possible target: each
+//   frond arrives in its own coordinates with its base at the origin.
+//
+// AND THE DIRECTION IS A WORLD DIRECTION, PUSHED THROUGH THE TRANSPOSE.
+// `transformed` is local and pre-instancing, so displacing it by a world vector
+// would have every frond of a radiating crown bend a different way. GLSL ES has
+// no inverse(), but the rotation part of a model matrix is orthonormal and its
+// inverse IS its transpose — and `v * M` in GLSL is exactly `transpose(M) * v`.
+// So one multiply puts the world wind into local space. Where the instance
+// matrix also carries scale the transpose is off by that scale, which comes out
+// as a bigger frond swinging further: wrong in theory and right in the picture.
+const _swayT = { value: 0 };
+const _swayD = { value: new THREE.Vector2(0, 1) };  // unit, world x/z
+const _swayK = { value: 0 };                        // 0 (still) .. ~1.4 (gusting)
+// The wind speed that counts as a full-strength sway. Chosen against the table
+// rather than by eye: at 3.5 the still chapters (Kyoto 1.1, Son Doong 0.6) come
+// out near a third and the open ones (Sydney 3.4, Manly, Antarctica) near one,
+// which is the ordering wxMOOD already asserts.
+const _swayREF = 3.5;
+/**
+ * The wind, once per frame, for every swaying material in the game.
+ *
+ * `g` is weather.js's `gust()` — a VECTOR in m/s that already carries the
+ * biome's base wind, its bearing and its gusting, damped. Passing the vector
+ * rather than a speed and an angle is deliberate: the direction and the
+ * strength must never be able to disagree about which frame they are in.
+ */
+export function swayTick(t, g) {
+  _swayT.value = t;
+  const gx = g ? g.x : 0, gz = g ? g.z : 0;
+  const m = Math.sqrt(gx * gx + gz * gz);
+  if (m > 0.0001) _swayD.value.set(gx / m, gz / m);
+  const k = m / _swayREF;
+  _swayK.value = k > 0 ? (k < 1.4 ? k : 1.4) : 0;
+}
+
+const _swayCache = new Map();
+function _swayInject(shader, amount, axis, lo, hi, stiff, hz) {
+  shader.uniforms.uSwayT = _swayT;
+  shader.uniforms.uSwayD = _swayD;
+  shader.uniforms.uSwayK = _swayK;
+  const span = (hi - lo) > 0.0001 ? (hi - lo) : 0.0001;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>',
+             '#include <common>\nuniform float uSwayT;\nuniform vec2 uSwayD;\nuniform float uSwayK;')
+    .replace('#include <begin_vertex>', [
+      '#include <begin_vertex>',
+      '{',
+      // The ramp, on the call site's own axis and window. pow() rather than a
+      // linear ramp because a frond is not a rope: the base of anything that
+      // sways is stiffer than its tip, and the exponent is the only knob that
+      // tells a palm from a banner.
+      '  float swR = clamp((transformed.' + axis + ' - ' + lo.toFixed(4) + ') * ' +
+                    (1 / span).toFixed(6) + ', 0.0, 1.0);',
+      '  swR = pow(swR, ' + stiff.toFixed(3) + ');',
+      // THE PHASE, AND IT HAS TO COME FROM SOMEWHERE THAT DOES NOT MOVE WITH
+      // THE CAMERA. On an instanced mesh it is the instance's own origin, so a
+      // crown of nine fronds moves as one tree and the tree next to it does
+      // not; on a merged mesh there is only one origin, so it falls back to the
+      // vertex's own world position and the sway travels across the surface —
+      // which is what a gust crossing a row of awnings actually looks like.
+      '  vec4 swO = vec4(0.0, 0.0, 0.0, 1.0);',
+      '  #ifdef USE_INSTANCING',
+      '    swO = instanceMatrix * swO;',
+      '  #else',
+      '    swO = vec4(transformed, 1.0);',
+      '  #endif',
+      '  swO = modelMatrix * swO;',
+      '  float swP = swO.x * 0.31 + swO.z * 0.27;',
+      // TWO FREQUENCIES, NOT ONE. A single sine is a metronome and a whole
+      // street of awnings breathing on it reads as one organism. The slow term
+      // is the lean into the gust; the fast one, at a quarter of the weight and
+      // an incommensurate ratio, is the flutter that stops it looping visibly.
+      '  float swA = sin(uSwayT * ' + (0.90 * hz).toFixed(4) + ' + swP) * 0.74',
+      '            + sin(uSwayT * ' + (2.73 * hz).toFixed(4) + ' + swP * 1.7 + 1.3) * 0.26;',
+      '  float swM = swR * ' + amount.toFixed(4) + ' * uSwayK * swA;',
+      // ...and back into local space through the transpose. See the note above.
+      '  mat3 swB = mat3(modelMatrix);',
+      '  #ifdef USE_INSTANCING',
+      '    swB = swB * mat3(instanceMatrix);',
+      '  #endif',
+      '  transformed += vec3(uSwayD.x, 0.0, uSwayD.y) * swB * swM;',
+      '}',
+    ].join('\n'));
+}
+/**
+ * A swaying clone of `m`. Returns a CLONE for grain()'s reason: mat() hands back
+ * a shared cached material and compiling a hook onto it would sway every mesh in
+ * the game that happens to share a hex.
+ *
+ *   amount  metres of travel at the tip at a full gust, 0 (off, THE DEFAULT)
+ *   axis    'x' | 'y' | 'z' — which LOCAL axis the ramp runs along. 'z' for
+ *           Palawan's fronds, whose own frame runs 0 (base) to 1 (tip) in z.
+ *   lo, hi  the window on that axis, in the mesh's own units
+ *   stiff   the exponent on the ramp: 1 a rope, 3 a trunk
+ *   hz      frequency multiplier, for something lighter or heavier than a leaf
+ */
+export function sway(m, opts) {
+  const o = opts || {};
+  const amount = o.amount === undefined ? 0 : o.amount;
+  if (!(amount > 0)) return m;
+  const axis = o.axis === 'x' ? 'x' : (o.axis === 'z' ? 'z' : 'y');
+  const lo = o.lo === undefined ? 0 : o.lo;
+  const hi = o.hi === undefined ? 1 : o.hi;
+  const stiff = o.stiff === undefined ? 1.6 : o.stiff;
+  const hz = o.hz === undefined ? 1 : o.hz;
+  const key = m.uuid + '|' + amount + '|' + axis + '|' + lo + '|' + hi + '|' + stiff + '|' + hz;
+  const hit = _swayCache.get(key);
+  if (hit) return hit;
+  const g = m.clone();
+  const prev = m.onBeforeCompile;
+  // The clone drops onBeforeCompile — that is grainOwn()'s bug, and a swaying
+  // rimmed material would silently lose its rim the way five seas once lost
+  // their glitter. Whatever the source had runs first, then the sway.
+  const hadHook = typeof prev === 'function' && m.hasOwnProperty('onBeforeCompile');
+  const prevKey = m.customProgramCacheKey;
+  g.onBeforeCompile = function (shader) {
+    if (hadHook) prev.call(this, shader);
+    _swayInject(shader, amount, axis, lo, hi, stiff, hz);
+  };
+  g.customProgramCacheKey = function () {
+    return 'sway' + key + (prevKey ? '|' + prevKey.call(this) : '');
+  };
+  g.needsUpdate = true;
+  _swayCache.set(key, g);
+  return g;
+}
+/**
+ * Make one mesh sway — material AND shadow.
+ *
+ * THE HALF THAT WOULD OTHERWISE BE FORGOTTEN. The shadow pass compiles its own
+ * program from its own material, so a mesh that sways in the colour pass and
+ * not in the depth pass has a shadow that walks away from it — and it is
+ * exactly the kind of thing that survives review because the shadow is the last
+ * place anybody looks. Doing both in one call is the only way it cannot be
+ * half-done.
+ */
+export function swayMesh(mesh, opts) {
+  if (!mesh || !mesh.material) return mesh;
+  const o = opts || {};
+  if (!(o.amount > 0)) return mesh;
+  mesh.material = sway(mesh.material, o);
+  if (mesh.castShadow) {
+    const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    const amount = o.amount;
+    const axis = o.axis === 'x' ? 'x' : (o.axis === 'z' ? 'z' : 'y');
+    const lo = o.lo === undefined ? 0 : o.lo;
+    const hi = o.hi === undefined ? 1 : o.hi;
+    const stiff = o.stiff === undefined ? 1.6 : o.stiff;
+    const hz = o.hz === undefined ? 1 : o.hz;
+    d.onBeforeCompile = function (shader) { _swayInject(shader, amount, axis, lo, hi, stiff, hz); };
+    d.customProgramCacheKey = function () { return 'swayD' + amount + axis + lo + hi + stiff + hz; };
+    mesh.customDepthMaterial = d;
+  }
+  return mesh;
+}
+
 const _grainCache = new Map();
 export function grain(m, opts) {
   const o = opts || {};
   const scale = o.scale === undefined ? 0.7 : o.scale;
   const amount = o.amount === undefined ? 0.12 : o.amount;
   const warp = o.warp === undefined ? 0.35 : o.warp;
+  // ---------------------------------------------------------------------
+  // NEAR — THE OCTAVE THE FIELD WAS MISSING, AND THE FADE THAT LETS IT EXIST.
+  //
+  // Measured (qa/vis-flat2.js, bottom third / centre 60%): the ground is 40-55%
+  // of every frame and in most chapters it is one value. Palawan's sand came
+  // back at SD 2.05 over five distinct 5-bit colours; Sydney's lawn at 4.30 over
+  // thirteen. Rio measured 51 for one reason only — it has a GRAPHIC on the
+  // floor. Nothing else about its renderer differs.
+  //
+  // grain() was not wrong, it was an octave and a half too low to see. `scale`
+  // 0.5-0.72 puts the coarse term at a metre and a half and the fine one at half
+  // a metre; the gameplay band of the frame is ground three to six metres from
+  // the lens, where half a metre is a third of the screen height. There was
+  // nothing in the field at the size of a tuft, a paving joint or a ripple in
+  // sand.
+  //
+  // WHY IT COULD NOT SIMPLY BE TURNED UP, and this is the whole reason the fade
+  // is the enabling change rather than a nicety: the base grain has NO distance
+  // term. Raise its frequency and the far half of a hundred-and-sixty-metre lawn
+  // is sampled far under Nyquist, so it stops being noise and becomes crawl —
+  // it boils as the camera moves. `sparkle` solved exactly this, for exactly
+  // this reason, with `fwidth`; this is the same solution one field over.
+  //
+  //   near       peak-to-peak fraction of the diffuse, 0 (off) .. ~0.4
+  //   nearScale  multiplier ON TOP of `scale`, so a chapter that already knows
+  //              how big its ground features are gets the near octave in
+  //              proportion for free
+  //
+  // DEFAULTS TO ZERO. Every existing call site keeps the picture it was tuned
+  // against until it opts in, one at a time.
+  //
+  // The fade goes to nothing at a footprint of half a cell, which IS Nyquist for
+  // a smoothstep-interpolated value noise: one cycle per cell needs two pixels
+  // per cycle, so one pixel may cover at most half a cell before what is drawn
+  // stops being the field and starts being an alias of it. Hence * 2.0 and not
+  // the sparkle's 0.60 — a sparkle is a thresholded speck and dies honestly much
+  // later.
+  //
+  // And it is sampled in a ROTATED frame. Value noise sits on a square lattice;
+  // stacked on the base octave at the same orientation the two agree along the
+  // axes and the eye finds the grid. Half a radian is enough that it never does.
+  const near = o.near === undefined ? 0 : o.near;
+  const nearScale = o.nearScale === undefined ? 6 : o.nearScale;
   // SPARKLE — the second half of this helper, and it is only ever for water.
   //
   // Lambert has no specular term, so every water surface in this game is a flat
@@ -2747,13 +3311,32 @@ export function grain(m, opts) {
   const sparkCut = o.sparkleCut === undefined ? 0.52 : o.sparkleCut;
   const sparkBand = o.sparkleBand === undefined ? 0.11 : o.sparkleBand;
   const sparkCol = o.sparkleColor === undefined ? 0xffffff : o.sparkleColor;
-  const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' +
+  // CONTACT — see the block above _grainCache. Off unless a call site asks, so
+  // every surface in the game keeps the picture it was tuned against until it
+  // opts in, one at a time.
+  //
+  // NEVER ON WATER, and never on the wet-only build. A sea does not have things
+  // resting on it — the capybara swims IN it — and `spark > 0` is this helper's
+  // existing and only marker for "this material is a sea", exactly as the wet
+  // term already uses it. The wet-only build is props.js's one shared material
+  // and its whole invariant is "the wet gate and nothing else".
+  const cont = (wetOnly || spark > 0 || o.contact === undefined) ? 0 : o.contact;
+  const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' + near + '|' + nearScale + '|' +
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
-              '|' + (wetOnly ? 'w' : '');
+              '|' + cont + '|' + (wetOnly ? 'w' : '');
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
   const g = m.clone();
+  // ...AND THE CLONE DROPS THE RIM WITH IT. Material.copy() does not carry
+  // onBeforeCompile — that is the whole of the grainOwn() bug, one function
+  // down — so every grained surface in the game would have been the only
+  // thing in it without a rim. grain() re-injects it at the bottom of its own
+  // hook, and it asks the SOURCE material whether a rim belongs there at all:
+  // a sea and a glow quad are not things you put an edge on.
+  const rimHere = !wetOnly && spark <= 0 && !m.transparent &&
+                  m.blending === THREE.NormalBlending && m.depthWrite !== false &&
+                  !(m.emissive && (m.emissive.r > 0.001 || m.emissive.g > 0.001 || m.emissive.b > 0.001));
   const sc = new THREE.Color(sparkCol);
   // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
   // existing and only marker for "this material is a sea", and darkening a sea
@@ -2765,6 +3348,11 @@ export function grain(m, opts) {
     if (wet) {
       shader.uniforms.uGrainWet = _grainWet;
       shader.uniforms.uGrainWetC = _grainWetC;
+    }
+    if (cont > 0) {
+      shader.uniforms.uCtcP = _contactP;
+      shader.uniforms.uCtcK = _contactK;
+      shader.uniforms.uCtcOn = _contactOn;
     }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
@@ -2786,6 +3374,9 @@ export function grain(m, opts) {
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
         spark > 0 ? 'uniform float uGrainT;' : '',
+        cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
+        cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
+        cont > 0 ? 'uniform float uCtcOn;' : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
         wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
@@ -2804,7 +3395,46 @@ export function grain(m, opts) {
         wetOnly ? '' : '  vec2 gq = vec2(vGrainW.x + vGrainW.y * ' + (0.71 * warp).toFixed(4) + ',',
         wetOnly ? '' : '                 vGrainW.z + vGrainW.y * ' + (0.43 * warp).toFixed(4) + ') * ' + scale.toFixed(4) + ';',
         wetOnly ? '' : '  float gn = grNoise(gq) * 0.64 + grNoise(gq * 2.83 + 19.31) * 0.36 - 0.5;',
-        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) + ';',
+        // ---- THE NEAR-FIELD OCTAVE ------------------------------------
+        // One more octave, six-ish times finer, in a frame rotated half a
+        // radian so it never lines up with the lattice underneath it, and
+        // faded out on its own screen-space footprint so the far ground is
+        // exactly as smooth as it was before this existed. See the note on
+        // `near` above for why the fade is the enabling half.
+        // AND IT HAS TO BE TWO OCTAVES, WHICH THE FIRST BUILD LEARNED THE HARD
+        // WAY. One octave of value noise at an amplitude big enough to measure
+        // does not read as ground, it reads as SQUARES: smoothstep has zero
+        // derivative at the cell boundary, so every cell of the lattice shows
+        // its own edge and a lawn comes out looking quilted. Photographed at
+        // near 0.36 the Botanic Gardens were unmistakably a grid. A second
+        // octave at 2.17x, in a frame rotated another radian, has no shared
+        // boundary anywhere with the first, and the quilt goes.
+        (wetOnly || near <= 0) ? '' : '  vec2 gnq = vec2(gq.x * 0.8776 - gq.y * 0.4794,',
+        (wetOnly || near <= 0) ? '' : '                  gq.x * 0.4794 + gq.y * 0.8776) * ' + nearScale.toFixed(4) + ' + 41.7;',
+        // ...AND THE LATTICE STILL SHOWED, so the sample is DOMAIN-WARPED by
+        // the octave underneath it before either one is taken. `gn` is already
+        // computed and its wavelength is a metre and a half, so pushing the
+        // near coordinate around by a cell and a half of it bends the whole
+        // near lattice into slow curves — for two multiplies and no extra hash.
+        // Photographed on the Piazzetta at near 0.62 the flagstones were a
+        // visible diagonal grid; warped, the same number reads as worn stone.
+        // It also has to happen BEFORE fwidth is taken, or the footprint fade
+        // is measuring a field that is not the one being drawn.
+        (wetOnly || near <= 0) ? '' : '  gnq += gn * 3.0;',
+        (wetOnly || near <= 0) ? '' : '  vec2 gnq2 = vec2(gnq.x * 0.5403 - gnq.y * 0.8415,',
+        (wetOnly || near <= 0) ? '' : '                   gnq.x * 0.8415 + gnq.y * 0.5403) * 2.17 + 11.3;',
+        // Each octave fades on ITS OWN footprint. Sharing the coarse one's
+        // fade would leave the fine one alive a full octave past Nyquist,
+        // which is precisely the crawl this whole term exists to avoid.
+        (wetOnly || near <= 0) ? '' : '  float nfw = max(fwidth(gnq.x), fwidth(gnq.y));',
+        (wetOnly || near <= 0) ? '' : '  float gnr = ((grNoise(gnq) - 0.5) * 0.62 * clamp(1.0 - nfw * 2.00, 0.0, 1.0)',
+        (wetOnly || near <= 0) ? '' : '             + (grNoise(gnq2) - 0.5) * 0.38 * clamp(1.0 - nfw * 4.34, 0.0, 1.0))',
+        (wetOnly || near <= 0) ? '' : '             * ' + near.toFixed(4) + ';',
+        // ONE multiply, not two: a second `*=` on the same channel compounds,
+        // so a chapter that tuned `amount` against the picture would quietly
+        // get a different number back the day it opted into `near`.
+        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) +
+                       ((!wetOnly && near > 0) ? ' + gnr' : '') + ';',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what
@@ -2851,13 +3481,63 @@ export function grain(m, opts) {
           '  diffuseColor.rgb += sp * ' + spark.toFixed(4) +
             ' * vec3(' + sc.r.toFixed(4) + ', ' + sc.g.toFixed(4) + ', ' + sc.b.toFixed(4) + ');',
         ].join('\n') : '',
+        cont > 0 ? [
+          // ---- CONTACT ---------------------------------------------------
+          // LAST IN THE BLOCK, AND THAT IS THE ONE ORDERING DECISION HERE.
+          // It multiplies AFTER the wet sheen has been added, so a contact ring
+          // on wet asphalt attenuates the highlight as well as the diffuse —
+          // which is what occlusion does, and what a ring drawn before the
+          // sheen would fail to do in exactly the chapter (Mong Kok in the
+          // rain) where it is most visible.
+          //
+          // AND IT MULTIPLIES diffuseColor, NOT outgoingLight. The rim is ADDED
+          // to outgoing light on purpose: a rim is light. This is the opposite
+          // — it is light that never arrived — so it belongs on the albedo,
+          // where the sun's own shading then acts on it. Added to outgoing
+          // light instead, a patch would survive into shadow at full strength
+          // and read as paint on the floor.
+          '  if (uCtcOn > 0.5) {',
+          '    float cOcc = 0.0;',
+          '    for (int ci = 0; ci < ' + _CONTACT_N + '; ci++) {',
+          '      vec4 cp = uCtcP[ci];',
+          '      float cr = cp.w;',
+          '      float cd = length(vGrainW.xz - cp.xz);',
+          // A FLAT CORE OUT TO 0.45 OF THE FOOTPRINT, then a smooth fall to
+          // nothing at the rim — and the 0.45 is the second half of the lesson
+          // sysCTC_SPREAD carries. The patch is 1.9x the object's half-width,
+          // so the object's own silhouette ends at roughly 0.53 of the radius:
+          // everything inside that is hidden underneath the thing and every
+          // bit of strength spent there is spent where nobody can see it. A
+          // core that runs out to just short of the silhouette puts nearly the
+          // whole term in the ring that actually reads. At 0.18 the visible
+          // edge got 61 % of the strength; at 0.45 it gets 94 %.
+          '      float cf = 1.0 - smoothstep(cr * 0.45, cr, cd);',
+          // THE VERTICAL GATE, IN ABSOLUTE METRES. See _contactRISE0/1: a gate
+          // expressed in radii would let a market stall on a terrace reach
+          // further down than a bin on the same terrace, which is nonsense.
+          '      cf *= 1.0 - smoothstep(' + _contactRISE0.toFixed(3) + ', ' +
+                                           _contactRISE1.toFixed(3) + ', abs(vGrainW.y - cp.y));',
+          // MAX, NOT SUM. Two tourists standing together are two patches, not a
+          // hole in the pavement, and a sum is how every naive version of this
+          // ends up with black wherever a crowd forms.
+          '      cOcc = max(cOcc, cf * uCtcK[ci]);',
+          '    }',
+          '    diffuseColor.rgb *= 1.0 - cOcc * ' + (cont * _contactMAX).toFixed(4) + ';',
+          '  }',
+        ].join('\n') : '',
         '}',
       ].join('\n'));
+    // LAST, and it has to BE last: _rimInject anchors on '#include <common>'
+    // and on '#include <opaque_fragment>', and grain's own replacements above
+    // keep the '#include <common>' text at the head of what they substitute —
+    // so running it here finds both anchors, and running it first would leave
+    // grain with nothing left to match.
+    if (rimHere) _rimInject(shader);
   };
   // Without this three shares one compiled program between the grained and the
   // ungrained variant of the same material config, and which one you get
   // depends on draw order.
-  g.customProgramCacheKey = function () { return 'grain' + key; };
+  g.customProgramCacheKey = function () { return 'grain' + key + (rimHere ? '|r' : ''); };
   g.needsUpdate = true;
   _grainCache.set(key, g);
   return g;
