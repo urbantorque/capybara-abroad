@@ -952,11 +952,28 @@ function monOnPontoon(x, z) {
  * the floor of the sea where there is water over it.
  */
 function monBuildGround(game, root) {
+  // ---- NX * EL, NOT X1 - X0 (integrity 10) ------------------------------
+  // THE ELEMENT SIZE MATCHING IS NOT ENOUGH: THE SPAN HAS TO BE A WHOLE
+  // NUMBER OF THEM. This chapter runs z = -330..220, which is 550 m, and 550
+  // is not divisible by 4. `PlaneGeometry(550, 138)` therefore steps 3.98551 m
+  // while monBuildGroundBody's heightfield steps exactly 4, so the two
+  // lattices agree at z = -330 and are TWO METRES apart by the north end —
+  // and on the west flank, where the slope is 1.0 to 2.5, two metres of
+  // horizontal offset is one to two and a half metres of height.
+  //
+  // Measured before this: the collider sat more than 15 cm from the drawn
+  // ground sheet on 21.6% of the chapter and more than 50 cm on 7.1%, the
+  // worst in the game — and block 3 had already matched the element size and
+  // could not move it, because the element size was never the whole of it.
+  //
+  // Drawing the plane over NX * EL puts every vertex at X0 + i * EL exactly.
+  // It costs 2 m of extra sea off the north edge and nothing else.
   const X0 = monSEA_X0, X1 = monSEA_X1, Z0 = monSEA_Z0, Z1 = monSEA_Z1, EL = 4;
   const NX = Math.round((X1 - X0) / EL), NZ = Math.round((Z1 - Z0) / EL);
-  const g = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, NX, NZ);
+  const W = NX * EL, H = NZ * EL;
+  const g = new THREE.PlaneGeometry(W, H, NX, NZ);
   g.rotateX(-Math.PI / 2);
-  g.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
+  g.translate(X0 + W / 2, 0, Z0 + H / 2);
   const p = g.attributes.position.array;
   const col = new Float32Array(p.length);
   const c = new THREE.Color();

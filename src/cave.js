@@ -641,11 +641,16 @@ function cavBuild(game) {
 }
 
 function cavBuildFloor(game, root) {
+  // nx * EL, not X1 - X0 — see the note in monaco.js's monBuildGround
+  // (integrity 10). 140 and 278 are neither of them divisible by 3, so this
+  // plane used to step 2.9787 in x and 2.9892 in z while cavBuildCollision
+  // stepped exactly 4: three lattices, no two of them the same surface.
   const X0 = -70, X1 = 70, Z0 = -186, Z1 = 92, EL = 3;
   const nx = Math.round((X1 - X0) / EL), nz = Math.round((Z1 - Z0) / EL);
-  const g = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, nx, nz);
+  const W = nx * EL, H = nz * EL;
+  const g = new THREE.PlaneGeometry(W, H, nx, nz);
   g.rotateX(-Math.PI / 2);
-  g.translate((X0 + X1) * 0.5, 0, (Z0 + Z1) * 0.5);
+  g.translate(X0 + W * 0.5, 0, Z0 + H * 0.5);
   const p = g.attributes.position.array;
   const col = new Float32Array(p.length);
   const rock = new THREE.Color(PALETTE.cavRock);
@@ -770,8 +775,14 @@ function cavColOut(a, b, x, z) {
 function cavBuildCollision(game) {
   // MIND WHICH WAY THE SECOND AXIS RUNS: local +y maps to world MINUS z, so j
   // walks BACK from the far edge.
-  const X0 = -70, EL = 4;
-  const NX = 35, NZ = 69;
+  // ---- THE FLOOR'S OWN LATTICE, NOT ONE OF ITS OWN (integrity 10) -------
+  // EL was 4 here and 3 in cavBuildFloor, over the same rectangle, so the
+  // collider and the drawn floor were two different piecewise-linear surfaces
+  // that met only every twelve metres. Matching it costs 2 520 heightfield
+  // nodes to 4 512 and makes them the same surface. If cavBuildFloor's EL or
+  // rectangle changes, THESE MUST CHANGE WITH IT.
+  const X0 = -70, EL = 3;
+  const NX = 47, NZ = 93;                      // = cavBuildFloor's nx, nz
   const Z0 = -186, Z1 = Z0 + NZ * EL;
   const data = [];
   for (let i = 0; i <= NX; i++) {
