@@ -384,6 +384,93 @@ function pastoWarpRaw(s, c) {
   return c + pastoWARP_W * e * (1 - pastoWARP_K * Math.exp(-e * e));
 }
 
+// ===========================================================================
+// THE SURFACE THAT IS ACTUALLY DRAWN (integrity 8)
+// ===========================================================================
+// pastoHeight is the analytic law. It is NOT what the player is looking at.
+// pastoBuildTerrainMesh evaluates that law at 45 x 45 warped vertices and joins
+// them with flat triangles, so the drawn ground is piecewise LINEAR over facets
+// 3.4 to 5.9 m across — and mid-facet the chord is a long way from the curve.
+// Measured against the drawn mesh (qa/b3-ground.js): the collider, built from
+// the law on a 4 m lattice, disagreed with the picture by more than 15 cm over
+// 30.7 per cent of the chapter and by more than half a metre over 13.9, with
+// the drawn ground sitting a mean 7.9 cm ABOVE it. That is the capybara visibly
+// sunk into Galeras, and it is the one thing block 3 measured and could not fix.
+//
+// THE WARP IS SEPARABLE AND MONOTONE, WHICH IS WHY THIS IS ARITHMETIC. Each
+// axis is warped by its own function of one variable, so the mesh's vertices —
+// although unevenly spaced — still lie on a RECTILINEAR grid in world space.
+// The drawn height at any point is therefore the flat triangle spanning the
+// four grid lines around it, and finding it is two binary searches over
+// forty-five numbers. No raycast, no inverse warp, no per-triangle search.
+//
+// Block 3's note says "no uniform grid can match a warped mesh" and that is
+// still true — but the collider does not have to match the LAW. It has to match
+// the SURFACE, and the surface is this.
+const pastoMESH_SEG = 44;
+let pastoMeshXS = null, pastoMeshZS = null, pastoMeshH = null;
+
+function pastoMeshInit() {
+  const N = pastoMESH_SEG, R = pastoREGION;
+  // the same four rescale factors pastoBuildTerrainMesh uses, so the grid lines
+  // are the mesh's own and not merely something like them
+  const sxHi = (R - pastoGAL_X) / (pastoWarpRaw(R, pastoGAL_X) - pastoGAL_X);
+  const sxLo = (-R - pastoGAL_X) / (pastoWarpRaw(-R, pastoGAL_X) - pastoGAL_X);
+  const szHi = (R - pastoGAL_Z) / (pastoWarpRaw(R, pastoGAL_Z) - pastoGAL_Z);
+  const szLo = (-R - pastoGAL_Z) / (pastoWarpRaw(-R, pastoGAL_Z) - pastoGAL_Z);
+  pastoMeshXS = new Float64Array(N + 1);
+  pastoMeshZS = new Float64Array(N + 1);
+  for (let i = 0; i <= N; i++) {
+    const u = -R + 2 * R * i / N;
+    let r = pastoWarpRaw(u, pastoGAL_X);
+    pastoMeshXS[i] = pastoGAL_X + (r - pastoGAL_X) * (r >= pastoGAL_X ? sxHi : sxLo);
+    r = pastoWarpRaw(u, pastoGAL_Z);
+    pastoMeshZS[i] = pastoGAL_Z + (r - pastoGAL_Z) * (r >= pastoGAL_Z ? szHi : szLo);
+  }
+  // 2 025 heights, evaluated once. The alternative is four pastoHeight calls
+  // per query, and terrainHeight is asked five times a frame by the slope pose
+  // alone.
+  pastoMeshH = new Float64Array((N + 1) * (N + 1));
+  for (let i = 0; i <= N; i++) {
+    for (let j = 0; j <= N; j++) {
+      pastoMeshH[i * (N + 1) + j] = pastoHeight(pastoMeshXS[i], pastoMeshZS[j]);
+    }
+  }
+}
+
+/** Index of the cell containing v in the monotone array A, clamped to the ends. */
+function pastoMeshFind(A, v) {
+  let lo = 0, hi = A.length - 1;
+  if (v <= A[0]) return 0;
+  if (v >= A[hi]) return hi - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (A[m] <= v) lo = m; else hi = m; }
+  return lo;
+}
+
+/**
+ * THE HEIGHT OF THE GROUND THE PLAYER CAN SEE, at any (x, z).
+ *
+ * Published as terrainHeight, and read by the heightfield collider, the slope
+ * pose, prop placement, the hint arrow, the local anchors and the stuck-rescue.
+ * Every one of those wants the surface in the picture rather than the curve it
+ * was generated from.
+ *
+ * Outside the mesh — the collider strips run two metres past it on each side —
+ * the edge facet is extended flat, which is the only honest answer where
+ * nothing is drawn at all.
+ */
+function pastoMeshY(x, z) {
+  if (!pastoMeshXS) pastoMeshInit();
+  const XS = pastoMeshXS, ZS = pastoMeshZS, H = pastoMeshH, W = pastoMESH_SEG + 1;
+  const i = pastoMeshFind(XS, x), j = pastoMeshFind(ZS, z);
+  const u = clamp((x - XS[i]) / (XS[i + 1] - XS[i]), 0, 1);
+  const v = clamp((z - ZS[j]) / (ZS[j + 1] - ZS[j]), 0, 1);
+  const h00 = H[i * W + j], h10 = H[(i + 1) * W + j];
+  const h01 = H[i * W + j + 1], h11 = H[(i + 1) * W + j + 1];
+  if (u + v <= 1) return h00 + (h10 - h00) * u + (h01 - h00) * v;
+  return h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
+}
+
 function pastoBuildTerrainMesh() {
   // 44 x 44 quads = 3 872 triangles. ~5.9 m base quads, ~3.4 m across Galeras
   // once the warp has squeezed them: big, blunt facets you can count.
@@ -551,7 +638,7 @@ function pastoBuildFarPeaks() {
 // So this stays at 4.0 and the real fix is to build the collider FROM the mesh
 // vertices rather than from the law. That is a different piece of work and it
 // is logged in the block 3 notes rather than half-done here.
-const pastoHF_ES = 4.0;
+const pastoHF_ES = 2.0;
 const pastoSHELF_X = 36;      // = -36 + 18*4
 const pastoSHELF_Z0 = 6;      // inside the flat rect (z >= 4), on the lattice
 const pastoSHELF_Z1 = 66;     // = 6 + 15*4
@@ -573,7 +660,8 @@ function pastoHeightfieldStrip(game, x0, x1, z0, z1, es) {
     const colArr = new Array(nj + 1);
     const wx = x0 + i * es;
     for (let j = 0; j <= nj; j++) {
-      const y = pastoHeight(wx, z1 - j * es);
+      // THE DRAWN SURFACE, not the law it came from. See pastoMeshY.
+      const y = pastoMeshY(wx, z1 - j * es);
       colArr[j] = y;
       if (y < lo) lo = y;
       if (y > hi) hi = y;
@@ -2767,7 +2855,10 @@ export function createPasto(game) {
       });
       return true;
     },
-    terrainHeight: pastoHeight,
+    // THE DRAWN SURFACE. It was pastoHeight, the analytic law, which is a
+    // different surface from the one in the picture by up to half a metre --
+    // see pastoMeshY. Everything that reads terrainHeight wants the picture.
+    terrainHeight: pastoMeshY,
     // ---- WHERE THERE IS ACTUALLY A FLOOR (v20) ----------------------------
     // pastoHeight is an ANALYTIC law and answers for every point in the plane;
     // the four heightfield strips that back it with a rigid body cover exactly

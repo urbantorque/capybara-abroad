@@ -7,7 +7,7 @@ async page => {
 
   const out = await page.evaluate(async () => {
     const g = window.__capy, THREE = g.THREE;
-    if (g.biome.current !== 'sydney') g.biome.switchTo('sydney');
+    if (g.biome.current !== 'pasto') g.biome.switchTo('pasto');
     for (let i = 0; i < 30; i++) g.tick(1 / 60, false);
     const r = { live: g.biome.current };
 
@@ -56,8 +56,8 @@ async page => {
     });
     r.points = pts.length / 3;
 
-    const sp = g.biome.spawnOf('sydney');
-    const api = g.env;
+    const sp = g.biome.spawnOf('pasto');
+    const api = g.pasto;
     const th = (x, z) => {
       if (!api || typeof api.terrainHeight !== 'function') return 0;
       const v = api.terrainHeight(x, z); return (v === v) ? v : 0;
@@ -98,21 +98,23 @@ async page => {
                      pct: cells ? Math.round(100 * filled / cells) : 0 });
     }
 
-    // ---- and the EAST GARDEN specifically, which is the reported hole
-    let east = 0, eastFull = 0;
-    for (let x = 40; x <= 66; x += 6) {
-      for (let z = 24; z <= 66; z += 6) {
-        east++;
+    // ---- and the WALK TO THE CRATER, which is the chapter's spine: from the
+    // plaza edge north-west up the flank of Galeras.
+    let walk = 0, walkFull = 0;
+    for (let t = 0; t <= 20; t++) {
+      const x = -8 - t * 1.6, z = 4 - t * 3.6;
+      for (const off of [-14, 0, 14]) {
+        walk++;
         let n = 0;
         for (let i = 0; i < pts.length; i += 3) {
-          const dx = pts[i] - x, dz = pts[i + 2] - z;
-          if (dx * dx + dz * dz <= 64) { n++; if (n >= 3) break; }
+          const dx = pts[i] - (x + off), dz = pts[i + 2] - z;
+          if (dx * dx + dz * dz <= 100) { n++; if (n >= 2) break; }
         }
-        if (n >= 3) eastFull++;
+        if (n >= 2) walkFull++;
       }
     }
-    r.eastCells = east; r.eastFull = eastFull;
-    r.eastPct = east ? Math.round(100 * eastFull / east) : 0;
+    r.eastCells = walk; r.eastFull = walkFull;
+    r.eastPct = walk ? Math.round(100 * walkFull / walk) : 0;
 
     let tris = 0;
     g.scene.traverse((o) => {
@@ -129,7 +131,7 @@ async page => {
     return r;
   });
   await page.evaluate(async (o) => {
-    await fetch('/shot?name=b7-ring.json', {
+    await fetch('/shot?name=b8-ring.json', {
       method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))),
     });
   }, out);

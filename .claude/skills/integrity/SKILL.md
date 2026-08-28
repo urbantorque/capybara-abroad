@@ -556,3 +556,74 @@ read as a field: no route through it, so nothing to walk along.
     different ring definitions gave 29%, 93% and 78% for the same corner of the
     same chapter on the same build. Whichever one a block picks, it must state
     the rule and re-measure with it, and the screenshot is still the arbiter.
+
+### BLOCK 8, 28 Aug. THE COLLIDER NOW SAMPLES THE PICTURE. THE RING WAS NEVER EMPTY.
+
+**The half that mattered.** Block 3 measured Pasto as the worst chapter in the
+game — collider against drawn ground 0.202 m mean, 30.7% over 15 cm, 13.9% over
+50 — tried a finer lattice, got a WORSE number, and logged the real fix here.
+
+The real fix turned out to be arithmetic. `pastoWarpRaw` is applied **separately
+to each axis and is monotone**, so although the mesh's 45 x 45 vertices are
+unevenly spaced they still lie on a RECTILINEAR grid in world space. The drawn
+height at any point is therefore the flat triangle spanning the four grid lines
+around it, and finding it is two binary searches over forty-five numbers.
+`pastoMeshY` does that; the heightfield samples it, and `terrainHeight` publishes
+it.
+
+```
+pasto, collider vs drawn ground          mean|e|   >15cm   >50cm   signed
+before (law, 4 m lattice)                 0.202    30.7%   13.9%   +0.079
+after  (mesh, 4 m lattice)                0.086    15.6%    2.7%   +0.024
+after  (mesh, 2 m lattice)                0.025     3.1%    0.6%   -0.001
+```
+
+**AND FINER IS NOW BETTER, WHICH IS THE EXACT INVERSE OF BLOCK 3.** Halving the
+lattice against the smooth LAW made things worse, because it tracked a surface
+nobody can see. Halving it against the MESH cuts the error by another factor of
+three, because the target is piecewise linear and a finer grid follows its
+creases. Cost: 4 351 heightfield nodes to 16 870, and ms/tick unchanged inside
+session drift. Pasto goes from the worst chapter on this metric to the best.
+
+It also fixed the pose for free. `qa/b4-pose.js` for Pasto: four-foot spread
+0.150 -> 0.024, mean absolute foot gap 0.253 -> 0.067, and **the number of sites
+where the law and the drawn ground disagree went 3 of 10 to 0 of 10** — the
+`split` column exists precisely for chapters like this one and Pasto no longer
+needs it.
+
+**The half that did not matter, and the fifth lying instrument — this one mine.**
+`qa/b8-ring.js` (and `qa/b7-ring.js`, which shipped in block 7) filtered
+instances by the height of their ORIGIN, `y0 + 0.30`. A field wall, a shrub and
+a coffee bush are all PLACED at ground level and grow upward from it, so their
+origins sit at `y0 - 0.06` and every one of them was dropped. Corrected — the
+0.40 m radius test is what excludes crumbs, and the height test is gone —
+
+```
+Pasto scenery rings              card says      broken metric      corrected
+ring 20                            100%             100%             100%
+ring 45                              0%               0%              80%
+ring 70                              0%              32%              95%
+ring 95                              0%              23%              73%
+```
+
+**So "everything in chapter 2 is within 20 m of the spawn and there is nothing
+beyond it" is false.** Field walls WERE built, measured (80 -> 87 and 95 -> 100),
+looked at, and then **taken out again**: they cost +38% triangles on a chapter
+the card itself notes was already at 98 k, they read as a grid of turf slabs
+rather than as the chapter's own work, and they were bought against a number
+that was wrong. The card's rule decided it — "an hour spent filling a field that
+was never empty is the worst outcome available here."
+
+What IS true is thinner than the card claims and worth writing down: on eight of
+twelve bearings the 45 m ring holds two to five shrubs and nothing else, and at
+60 degrees it holds nothing. The chapter's dressing is in three places — the
+plaza, the coffee rect, and a frailejone annulus centred on Galeras a hundred
+metres from the spawn. A future pass that wants to dress the walk out of town
+should start from `qa/b8-diag.js`, which prints exactly that.
+
+17. **A metric that filters by an object's ORIGIN height measures where things
+    are anchored, not where they are.** Half the vegetation in this game is
+    placed at ground level and drawn upward. Filter by size, never by height.
+18. **Block 8 ran to roughly four hours, not two to three.** The heightfield
+    work was about ninety minutes; the rest went on a content half whose premise
+    was false and on the three measurements it took to establish that.

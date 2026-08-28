@@ -1,0 +1,39 @@
+{
+ "live": "pasto",
+ "points": 1644,
+ "rings": [
+  {
+   "R": 20,
+   "cells": 7,
+   "water": 0,
+   "filled": 7,
+   "pct": 100
+  },
+  {
+   "R": 45,
+   "cells": 15,
+   "water": 0,
+   "filled": 0,
+   "pct": 0
+  },
+  {
+   "R": 70,
+   "cells": 22,
+   "water": 0,
+   "filled": 7,
+   "pct": 32
+  },
+  {
+   "R": 95,
+   "cells": 30,
+   "water": 0,
+   "filled": 7,
+   "pct": 23
+  }
+ ],
+ "eastCells": 63,
+ "eastFull": 60,
+ "eastPct": 95,
+ "tris": 104164,
+ "bodies": 79
+}
