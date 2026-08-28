@@ -503,3 +503,56 @@ thing that makes a frame-time before/after readable at all (see `b3-perf.js`).
     Kowloon read 13% and was working exactly as written — the probe samples all
     eighty wherever they are, and only the near ones were solid. If a gate is
     genuinely needed, the audit has to gate with it or the number is a lie.
+
+### BLOCK 7, 28 Aug. THE RING METRIC IS THE FOURTH INSTRUMENT THAT LIED.
+
+`qa/rev-people.js`'s scenery rings open with `if (!o.isMesh) return`, so they
+**never see a single `InstancedMesh`** — and Sydney's hedges, flower petals,
+stems, lily pads, palings and half its dressing are instanced. They also drop
+any mesh with a bounding radius over 60 m, which is every merged garden mesh in
+the chapter. That is how a chapter whose western beds are full read 29/0/0/3.
+
+But the OTHER direction is just as wrong: counting every instance reads the east
+garden at 93% full against a screenshot of bare lawn, because one flower bed is
+four hundred petal spheres. **`qa/b7-ring.js` counts positions from meshes AND
+instances, drops anything whose instance-scaled radius is under 0.40 m or whose
+centre is under 0.30 m above the ground, and calls a cell dressed only when it
+holds two of them at least 3 m apart.**
+
+```
+Sydney scenery rings, qa/b7-ring.js      before -> after      card's target
+ring 20                                    86% ->  86%
+ring 45                                    55% ->  82%        over 40%: met
+ring 70                                    14% ->  71%        over 40%: met
+ring 95                                     0% ->   0%        see below
+east garden, x 40..66 z 24..66              78% -> 100%
+triangles                                74 960 -> 89 264
+bodies                                      139 -> 148
+```
+
+**Ring 95 cannot move and it is not a failure.** Twelve of its eighteen cells are
+open harbour and the rest are past x = +/-70 or z = 70 — outside the land
+rectangle block 1 fixed. Anything placed there is decoration in a place the
+player is now rescued from.
+
+**A boundary is content, not a fence.** Block 1 put Sydney's edge at z = 70
+because the ground body stops there; the lawn mesh runs to z = 150 so the
+horizon has no hard edge, so the toast fired while the player stood on visible
+grass. The fix is a sandstone plinth with an iron palisade along z = 68.6 and
+down both flanks to z = 8 — and **it is solid**, so the north bearings now meet
+a railing at z = 67.9 instead of a sentence at 70. Measured by sprinting: north
+and north-west stop at 67.9 and 67.8 and are never rescued; bearings that reach
+open water still are. `qa/b7-northlawn-before.png` against `-after.png`.
+
+The lawn still runs past it to the skyline, which is the point — a boundary you
+can see over reads as "the garden ends here", where a wall reads as a box.
+
+**And the white plane at (48, 46) is the path network**, a 286-triangle merged
+ribbon at y 0.07 in `PALETTE.path`. Not a placeholder — `envPATHS` simply stopped
+at (56, 52) with nothing beyond it, which is most of why the north-east quarter
+read as a field: no route through it, so nothing to walk along.
+
+16. **A content block needs its own ring metric before it starts.** Three
+    different ring definitions gave 29%, 93% and 78% for the same corner of the
+    same chapter on the same build. Whichever one a block picks, it must state
+    the rule and re-measure with it, and the screenshot is still the arbiter.

@@ -1,0 +1,39 @@
+{
+ "live": "sydney",
+ "points": 699,
+ "rings": [
+  {
+   "R": 20,
+   "cells": 7,
+   "water": 0,
+   "filled": 6,
+   "pct": 86
+  },
+  {
+   "R": 45,
+   "cells": 11,
+   "water": 4,
+   "filled": 6,
+   "pct": 55
+  },
+  {
+   "R": 70,
+   "cells": 14,
+   "water": 8,
+   "filled": 2,
+   "pct": 14
+  },
+  {
+   "R": 95,
+   "cells": 18,
+   "water": 12,
+   "filled": 0,
+   "pct": 0
+  }
+ ],
+ "eastCells": 40,
+ "eastFull": 31,
+ "eastPct": 78,
+ "tris": 74960,
+ "bodies": 139
+}

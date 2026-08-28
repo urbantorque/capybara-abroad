@@ -182,9 +182,22 @@ const envG = {
 const envFIG_SPOTS = [[-19, 5], [-25, 11], [18.5, 2.5], [27, 7.5], [34.5, 12],
                       [23, 21], [37, 31], [19.5, 35], [43, 53], [57.5, 29],
                       // …and three breaking the horizon over the spawn lawn
-                      [-11.5, 17.5], [12.5, 30.5], [-13, 36.5]];
+                      [-11.5, 17.5], [12.5, 30.5], [-13, 36.5],
+                      // ---- THE EASTERN GARDEN (integrity 7) ---------------
+                      // Everything above stops at x = 57 and z = 53, and the
+                      // frame from (58, 50) is mown stripes and nothing else
+                      // for eighty metres — see qa/b7-gardens-before.png. This
+                      // is the same avenue carried on to the boundary rather
+                      // than a new kind of thing: six more figs on the line the
+                      // first ten already make, and two on the north lawn so
+                      // the walk up to the railing has something in it.
+                      [55, 47], [61.5, 38], [59, 57], [48, 62],
+                      [33.5, 62], [17, 58.5], [3, 52], [-20, 50]];
 const envJAC_SPOTS = [[30, 20], [40.5, 26], [47, 45], [26.5, 49], [54, 36], [21, 27],
-                      [6, 22.5], [-6.5, 36]];
+                      [6, 22.5], [-6.5, 36],
+                      // the junctions of the eastern walks
+                      [58.5, 50.5], [51.5, 55], [40, 57.5], [62, 44], [24, 56],
+                      [-27, 40], [-34, 55]];
 
 // Fallen jacaranda blossom on the spawn lawn: cx, cz, radius.
 const envBLOSSOM = [
@@ -530,6 +543,16 @@ const envBEDS = [
   { cx: 52.0, cz: 23.0, hx: 2.3, hz: 3.0, prize: false, a: PALETTE.petalWhite,  b: PALETTE.petalYellow },
   { cx: 24.0, cz: 42.0, hx: 3.1, hz: 2.1, prize: false, a: PALETTE.petalPink,   b: PALETTE.petalPurple },
   { cx: 36.5, cz: 48.0, hx: 2.6, hz: 2.1, prize: false, a: PALETTE.petalYellow, b: PALETTE.petalPurple },
+  // ---- THE EASTERN GARDEN (integrity 7) ---------------------------------
+  // Four of the six above are west of x = 40 and none is past z = 48, which is
+  // most of why the east half photographs as a field. These extend the same
+  // table with the same two-colour scheme; the prize bed stays the one at
+  // (20.5, 9) because the task points at it and there is only ever one.
+  { cx: 51.0, cz: 44.5, hx: 2.9, hz: 2.0, prize: false, a: PALETTE.petalRed,    b: PALETTE.petalYellow },
+  { cx: 59.5, cz: 33.0, hx: 2.2, hz: 3.2, prize: false, a: PALETTE.petalBlue,   b: PALETTE.petalWhite },
+  { cx: 44.0, cz: 59.0, hx: 3.3, hz: 2.0, prize: false, a: PALETTE.petalPurple, b: PALETTE.petalWhite },
+  { cx: 55.5, cz: 61.0, hx: 2.4, hz: 2.2, prize: false, a: PALETTE.petalYellow, b: PALETTE.petalPink },
+  { cx: 29.0, cz: 58.0, hx: 2.7, hz: 1.9, prize: false, a: PALETTE.petalWhite,  b: PALETTE.petalBlue },
 ];
 for (let i = 0; i < envBEDS.length; i++) {
   const b = envBEDS[i];
@@ -547,6 +570,16 @@ const envPATHS = [
   [32, 17.2, 31, 21.5, 30, 26.5],
   [44, 34, 39.2, 36.4, 37.8, 41.5, 40.2, 45.6, 45.4, 46.4, 49.6, 43.4, 49.6, 38, 44, 34],
   [44, 34, 48, 42, 52, 48, 56, 52],
+  // ---- THE EASTERN WALKS (integrity 7) ----------------------------------
+  // Every path above dies at (56, 52) with nothing beyond it, which is most of
+  // why the north-east quarter reads as a field rather than as a garden: there
+  // is no route through it, so there is nothing to walk along. Two more legs
+  // carry the last one up to the new boundary and back west along it, and a
+  // spur runs down the eastern flank. A path is also what keeps the tree
+  // scatter honest — envTreeSpotOk clears 3 m either side of every one of
+  // these, so the walks stay walks.
+  [56, 52, 58.5, 57, 57, 62.5, 51, 65, 43, 65.5, 34, 64.5, 26, 62, 20, 58.5],
+  [56, 52, 60, 46, 61.5, 39, 60, 32, 56, 27],
 ];
 
 // ------------------------------------------------------------- navigation --
@@ -2524,10 +2557,28 @@ export function createEnvironment(game) {
     return [envPOND.x + Math.cos(a) * 9.2, envPOND.z + Math.sin(a) * 9.2, -a];
   }, 14, 3);
   envHedgeRun(t => [50.5, 16 + t * 10, 0], 8, 3);
+  // ---- THE EASTERN WALKS (integrity 7) ----------------------------------
+  // The four runs above enclose the western beds and stop at x = 58, z = 56.
+  // These three carry the same shrubbery round the eastern quarter and up to
+  // the new boundary, so the walk to the railing is a walk between things.
+  envHedgeRun(t => {
+    const z = 30 + t * 26;
+    return [63.5 - Math.sin(t * Math.PI) * 2.4, z, Math.sin(t * Math.PI) * 0.28];
+  }, 22, 3);
+  envHedgeRun(t => {
+    const x = 26 + t * 34;
+    return [x, 63.5 - Math.sin(t * Math.PI) * 1.8, Math.PI / 2 + Math.sin(t * Math.PI) * 0.2];
+  }, 26, 3);
+  envHedgeRun(t => {
+    const a = 0.4 + t * 1.7;
+    return [52 + Math.cos(a) * 7.4, 50 + Math.sin(a) * 7.4, -a];
+  }, 13, 3);
   envInstance(root, envG.box, PALETTE.hedge, hedges, true, true);
   envStaticBox(game, 16.6, 0.8, 33, 1.6, 0.8, 19);
   envStaticBox(game, 38, 0.8, 55.2, 20, 0.8, 1.4);
   envStaticBox(game, 50.5, 0.8, 21, 0.7, 0.8, 5);
+  envStaticBox(game, 62.6, 0.8, 43, 1.5, 0.8, 13);
+  envStaticBox(game, 43, 0.8, 63.1, 17, 0.8, 1.3);
 
   // lily pads
   const lilies = [];
@@ -2553,10 +2604,21 @@ export function createEnvironment(game) {
   envAddBench(Gm, 46.5, 33.5, -0.7);
   envAddBench(Gm, -30, -6.5, Math.PI);
   envAddBench(Gm, -48, -6.5, Math.PI);
+  // ---- and four in the east, all of them facing something (integrity 7):
+  // two out at the harbour over the north lawn, one back down the fig avenue,
+  // one at the corner where the two new hedge runs meet.
+  envAddBench(Gm, 56.5, 52.0, -0.55);
+  envAddBench(Gm, 38.0, 60.5, 0.0);
+  envAddBench(Gm, 60.5, 40.0, -1.5);
+  envAddBench(Gm, 20.0, 60.0, 0.35);
   envStaticBox(game, 26, 0.5, 14.5, 1.0, 0.5, 0.4);
   envStaticBox(game, 46.5, 0.5, 33.5, 1.0, 0.5, 0.4);
   envStaticBox(game, -30, 0.5, -6.5, 1.0, 0.5, 0.4);
   envStaticBox(game, -48, 0.5, -6.5, 1.0, 0.5, 0.4);
+  envStaticBox(game, 56.5, 0.5, 52.0, 1.0, 0.5, 0.4);
+  envStaticBox(game, 38.0, 0.5, 60.5, 1.0, 0.5, 0.4);
+  envStaticBox(game, 60.5, 0.5, 40.0, 0.4, 0.5, 1.0);
+  envStaticBox(game, 20.0, 0.5, 60.0, 1.0, 0.5, 0.4);
 
   // ------------------------------------------------- SPAWN LAWN FURNITURE --
   // Every piece has ONE explicit hand-chosen position — nothing here is
@@ -2680,6 +2742,95 @@ export function createEnvironment(game) {
   Gm.box(18.6, 1.6, 7.2, 1.6, 0.32, 0.1, PALETTE.wood, 0, -1.9, 0);
   Gm.box(19.2, 2.42, 7.2, 0.34, 0.22, 0.34, PALETTE.stone);
   envNavC.push(19.2, 7.2, 0.7);
+
+  // ================================================== THE GARDEN'S BOUNDARY
+  //
+  // Block 1 gave Sydney its two rectangles and the land one stops at z = 70,
+  // because the ground BODY stops there. The lawn mesh does not — it runs to
+  // z = 150 so the horizon has no hard edge in it — so the "that is not part of
+  // the world" toast fired while the player was standing on visible grass with
+  // nothing anywhere to say why. qa/b7-northlawn-before.png is the frame: at
+  // (0, 66), the last legal step, there is lawn to the skyline and one fig.
+  //
+  // THE FIX IS NOT TO MOVE THE FENCE. Moving it out puts the animal back on
+  // ground with no collider under it, which is the bug block 1 closed. The fix
+  // is to make z = 70 LOOK like the end of the gardens, which in life it is:
+  // the Royal Botanic Garden has a boundary, and it is a sandstone plinth with
+  // an iron palisade on it and a pier every few metres.
+  //
+  // AND IT IS SOLID, which means the toast now almost never fires on the north
+  // — you meet a railing at 68.6 instead of a message at 70. A wall you bump
+  // into is a better answer than a sentence, and it is the same answer the
+  // harbour gives on the other three sides.
+  //
+  // The lawn still runs past it to the skyline. That is the point: a boundary
+  // you can see over reads as "the garden ends here", where a wall reads as a
+  // box. Same reason the mesh was drawn long in the first place.
+  {
+    const bBody = envPoolBody();
+    const bars = [];
+    const BY = 1.62;                       // top of the palisade
+    // one run: from (ax, az) to (bx, bz), piers every ~7.5 m
+    function envBoundRun(ax, az, bx, bz) {
+      const dx = bx - ax, dz = bz - az;
+      const len = Math.hypot(dx, dz);
+      const yaw = Math.atan2(dx, dz);
+      const cx = (ax + bx) * 0.5, cz = (az + bz) * 0.5;
+      const ux = dx / len, uz = dz / len;
+      // the plinth — one merged box per run, sandstone, kerb-height
+      Gm.box(cx, 0.26, cz, 0.46, 0.52, len, PALETTE.sandstone, 0, yaw, 0);
+      Gm.box(cx, 0.55, cz, 0.56, 0.10, len, PALETTE.sandstoneDark, 0, yaw, 0);
+      // the top rail, which is what actually draws the line at this distance
+      Gm.box(cx, BY, cz, 0.10, 0.09, len, PALETTE.ironDark, 0, yaw, 0);
+      // piers
+      const piers = Math.max(2, Math.round(len / 7.5));
+      for (let i = 0; i <= piers; i++) {
+        const t = i / piers;
+        const px = ax + dx * t, pz = az + dz * t;
+        Gm.box(px, 0.95, pz, 0.62, 1.90, 0.62, PALETTE.sandstone, 0, yaw, 0);
+        Gm.box(px, 1.95, pz, 0.74, 0.16, 0.74, PALETTE.sandstoneDark, 0, yaw, 0);
+        envNavC.push(px, pz, 0.8);
+      }
+      // the palings, instanced — 55 cm apart, which is close enough to read as
+      // a railing from the 35 degree camera and far enough to see the park
+      // through. Skipped where a pier already stands.
+      const n = Math.floor(len / 0.55);
+      for (let i = 1; i < n; i++) {
+        const t = i / n;
+        const px = ax + dx * t, pz = az + dz * t;
+        let onPier = false;
+        for (let k = 0; k <= piers; k++) {
+          if (Math.abs(t - k / piers) * len < 0.62) { onPier = true; break; }
+        }
+        if (onPier) continue;
+        envPush9(bars, px, 0.85, pz, 0, yaw, 0, 0.075, 1.55, 0.075);
+      }
+      // ONE COLLIDER PER SEGMENT, not per paling. Boxes of 6 m along the run,
+      // so a diagonal run is a staircase of short boxes rather than one long
+      // box that bulges away from the line it is drawn on.
+      // envPoolBox has no yaw — only rx — so the half-extents have to be put on
+      // the right axis by hand. Every run here is axis-aligned, which is why
+      // that is allowed to be an if.
+      const segs = Math.max(1, Math.round(len / 6));
+      const half = len / segs * 0.5 + 0.05;
+      const alongX = Math.abs(ux) > Math.abs(uz);
+      for (let i = 0; i < segs; i++) {
+        const t0 = (i + 0.5) / segs;
+        envPoolBox(bBody, ax + dx * t0, 0.95, az + dz * t0,
+                   alongX ? half : 0.30, 0.95, alongX ? 0.30 : half);
+      }
+      return [ux, uz];
+    }
+    // The north edge, and the two flanks as far south as the garden goes. The
+    // flanks stop at z = 8 rather than running to the waterline: south of that
+    // is the Opera House forecourt and the quay, which have their own edges and
+    // do not want a park railing across them.
+    envBoundRun(-66, 68.6, 66, 68.6);
+    envBoundRun(66.6, 8, 66.6, 68.6);
+    envBoundRun(-66.6, 8, -66.6, 68.6);
+    envInstance(root, envG.box, PALETTE.ironDark, bars, true, false);
+    envPoolDone(game, bBody);
+  }
 
   const garden = new THREE.Mesh(Gm.build(), matVC);
   garden.castShadow = true;
