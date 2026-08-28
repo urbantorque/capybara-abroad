@@ -627,3 +627,71 @@ should start from `qa/b8-diag.js`, which prints exactly that.
 18. **Block 8 ran to roughly four hours, not two to three.** The heightfield
     work was about ninety minutes; the rest went on a content half whose premise
     was false and on the three measurements it took to establish that.
+
+### BLOCK 9, 28 Aug. NEITHER SPAWN RING WAS EMPTY. HANOI'S FRONTAGE WAS IN THE LAKE.
+
+The card's finding — pantanal and hanoi both 0% at 20 m — is false in both, and
+it is `rev-people.js`'s ring metric again (see block 7). `qa/b9-ring.js` is
+block 8's corrected counter generalised over two chapters; both spawn rings read
+**100%**, and the frames corroborate it: `qa/b9-pantanal-spawn-before.png` is a
+road, cattle, capybaras and termite mounds, `qa/b9-hanoi-spawn-before.png` is the
+lake, Thap Rua, the red bridge and the scooter ring.
+
+**PANTANAL WAS NOT TOUCHED.** 100/100/67/70, and **0% dead area over the whole
+of its bounds rectangle** — the only chapter measured this pass with none. Its
+70 and 95 residue is open water and the far side of the fazenda.
+
+**HANOI HAD A DIFFERENT BUG IN THE SAME PLACE, AND IT WAS ONE CHARACTER.**
+`hanTerrace`'s normal is `(cos yaw, -sin yaw)` with `yaw = atan2(dx, dz)`, which
+is `(dz, -dx)` — and the lake ring's polyline is wound so that points INTO the
+water at all eleven of its segments. So "the one continuous frontage in the
+chapter and the reason the lake feels enclosed" was laid in Hoan Kiem, where
+hanTerrace's own `hanTerrain < hanWATER + 0.3` test threw it away in silence.
+Twenty-four stations round the ring at 10/16/24 m outside it: **21 read bare
+ground**. `off = -1`, and 17 of 24 now have a building on them.
+
+```
+hanoi, qa/b9-ring.js         before -> after
+ring 20                        100%  ->  100%
+ring 45                         36%  ->  100%
+ring 70                         22%  ->   83%
+ring 95                         32%  ->   54%
+triangles                   253 974  -> 298 710  (+17.6%)
+bodies                           41  ->      41  (pooled)
+blocked ground of 839           213  ->     287  (+74, the new city)
+ ...under nothing drawn          18  ->      24  (+6, 0.7%)
+ms/tick median                          0.5, Sydney 0.6 in the same run
+```
+
+Four more in the same file: no `bounds()` at all (so `boundsOf()` handed
+backVoid the ground heightfield, and the edge of the world was x = ±230 — now
+two rects, city and bridge, verified rescued at three points outside and not at
+three inside); `hanBuildBackdrop` covered the Old Quarter rectangle only, which
+is everything north of z = −24; a second terrace row on the ring's outer side at
+34 m, which is the far side of the boulevard the player lands on; and
+`hanBuildScatter`'s litter rectangle was the Old Quarter's too, so the pavement
+the player is put down on had not one leaf on it.
+
+**A RESTORED FRONTAGE IS A THING THE ARRIVAL LENS CAN BE INSIDE.** The camera
+sits 12 m out on `SPAWN.yaw`, which in Hanoi is the ring's outer side, so the
+chapter opened looking at the lake through the gap between two shophouses. The
+rig's occlusion ray would have hauled the boom in to a metre and a half, which
+is a bug being masked rather than a shot. A sixth keep-out at the spawn.
+
+**NOT DONE, AND IT IS VISIBLE.** At 55 m west of the spawn the animal is among
+the backdrop blocks, which are blank instanced boxes with no windows or signs,
+and it reads as a yard rather than as Hanoi (`qa/b9-hanoi-w55-after.png`). Real
+streets out there mean new entries in `hanLANES`, which is also the scooter
+distribution and the marquee, so it is not a block 9 change.
+
+19. **`g.biome.switchTo(tag)` BUILDS THE CHAPTER AND DOES NOT MOVE THE ANIMAL.**
+    The first spawn frames of this block were taken from wherever Sydney had
+    left the capybara — (0, 22) in the Pantanal, which is the first bridge, so
+    the "spawn shot" was a close-up of its planks. Place the body at
+    `spawnOf()` and settle it, as `b8-shot.js` does.
+20. **THE ARRIVAL YAW IS THE CAMERA'S BEARING, NOT THE VIEW'S.** `teleportCapy`
+    puts the lens at `anchor + (sin camYaw, cos camYaw) * dist` and looks BACK
+    at the animal. A shot helper that copies `b8-shot.js`'s `camera at
+    -sin(yaw)` renders every documented arrival backwards — it is how Hanoi's
+    composed opening first read as an empty plain, and it nearly cost an hour
+    of work on a chapter whose spawn was already right.
