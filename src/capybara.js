@@ -62,7 +62,11 @@ const capyBONK_GAP = 0.40;          // s between bonks
 // only a genuine run leaps; the push ramps in over the 1.6 m/s above it rather
 // than switching on, so there is no step in the arc at the boundary.
 const capyLEAP_V    = 4.6;          // m/s over the floor before a hop is a leap
-const capyLEAP_PUSH = 3.2;          // m/s of forward shove at a full run
+// It is an IMPULSE, added once to the velocity on the launch frame — not a
+// per-frame force. The airborne speed cap spends most of it over the first
+// ten frames, so what it buys is a kick off the mark (7.4 -> 10.1 m/s) and
+// about 0.2 m of range, rather than a second arc. See the hop.
+const capyLEAP_PUSH = 3.2;          // m/s of forward impulse at a full run
 // ---- THE ANCHOR THE SNAP NEEDED, AND HOW FAR IT IS ALLOWED TO REACH -------
 // See THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED, below. Past this the
 // animal has genuinely been moved — a teleport, a rescue, a launch, a carrier
@@ -2376,10 +2380,42 @@ export function createCapybara(game) {
       // additive and purely horizontal, and the apex and the airtime come out
       // of qa/mv-feel.js unchanged to the last centimetre.
       //
-      // Through capyShove and not through the velocity, for the reason the note
-      // on external forces gives: a bare write is deleted by the speed cap on
-      // the very next frame, and shove is added AFTER the solve and widens the
-      // cap by its own magnitude. It is the same channel the Drift's puff uses.
+      // ---- ...AND IT IS AN IMPULSE, SO IT IS APPLIED ONCE -----------------
+      //
+      // THIS WENT THROUGH capyShove AND capyShove IS NOT AN IMPULSE CHANNEL.
+      // Read its own doc comment: it "takes a VELOCITY INCREMENT ... so calling
+      // it every frame builds to a steady state against the decay". It is a
+      // FORCE channel, and it only ever settles because something opposes it —
+      // on the ground, the grip damper at lambda 60. The whole value is added
+      // to the velocity every frame, and the velocity already carries what was
+      // added last frame, so the only thing standing between it and a runaway
+      // is the damper.
+      //
+      // In the air there is no damper. The airborne bleed is
+      // capySTOP_LAMBDA * 0.15, which is nothing, and the speed cap cannot help
+      // because the cap is WIDENED by the live shove. So a one-shot 3.2 m/s
+      // push, handed to a channel that re-integrates it for the whole of a
+      // 0.717 s hop, compounded. Measured on the Sydney lawn, a sprinting hop:
+      //
+      //     push 0.0   7.4 m/s flat for the whole arc      5.42 m
+      //     push 3.2   7.4 -> 10.6 -> 20.3 -> 25.4 m/s    14.80 m
+      //
+      // Fourteen point eight metres and three and a half times the run speed,
+      // out of a number that says 3.2. It is the one caller that shoves on the
+      // exact frame the feet leave the floor, which is why it is the one that
+      // blew up and a bow wave did not.
+      //
+      // So it goes straight onto the velocity, ONCE. The note on external
+      // forces says a bare write is deleted by the speed cap, and that is true
+      // of the GROUND path, where the damper is lambda 60; the airborne cap
+      // bleeds at lambda 3, which over one hop leaves a third of the push and
+      // spends the rest — the arc decays instead of holding, which is what a
+      // leap should do anyway. capyShove is left to the sandstorms and the bow
+      // waves it was written for, unchanged.
+      //
+      // Added in the PLATFORM's frame, which is what lvx/lvz already are:
+      // body.velocity is local + platform, so a local increment is the right
+      // thing to add to it and a hop off a moving ferry keeps the deck.
       //
       // Gated on the speed the animal ACTUALLY HAS over the floor, not on the
       // run key: a capybara shoved off a roof at nine metres a second has a
@@ -2395,8 +2431,8 @@ export function createCapybara(game) {
         const lsp = Math.sqrt(lvx * lvx + lvz * lvz);
         if (lsp > capyLEAP_V) {
           const k = capyLEAP_PUSH * clamp((lsp - capyLEAP_V) / 1.6, 0, 1) / lsp;
-          capyShove.x += lvx * k;
-          capyShove.z += lvz * k;
+          body.velocity.x += lvx * k;
+          body.velocity.z += lvz * k;
         }
       }
       if (!capySwimming) {

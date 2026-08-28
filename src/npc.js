@@ -3320,7 +3320,44 @@ export function createNPCs(game) {
   function emit(name, npcRec) {
     try { game.events.emit(name, { npc: npcRec }); } catch (e) { /* bus optional */ }
   }
-  function sfx(n) { try { game.sfx(n); } catch (e) { /* optional */ } }
+  /**
+   * A SOUND A PERSON MAKES COMES FROM WHERE THE PERSON IS STANDING.
+   *
+   * This was `game.sfx(n)` — no volume, no position — which is volume 1.0,
+   * dead centre, in both ears. The loudest thing this game can play, and it
+   * was every gasp, pop, bark and strum in nineteen chapters. The ambience
+   * ladder in systems.js had exactly this bug and was fixed by putting its
+   * ninety-six calls on a ring around the animal; the people were never done.
+   *
+   * Ninety seconds standing perfectly still on the Sydney lawn, attributed:
+   *
+   *     strum   x24   the busker, volume 1.0, wherever he is
+   *     pop     x8    volume 1.0
+   *     ...and eighty sounds in ninety seconds all told, one every 1.1 s.
+   *
+   * The busker is forty metres away across the Gardens and he was playing
+   * inside the player's skull, on a two-to-five second loop, for ever. That is
+   * the "random environment noise" — it is not random and it is not the
+   * environment, it is four actors with no distance law between them and the
+   * ear.
+   *
+   * So it goes through sfxAt, which is the law this file already had and which
+   * only the ibises were using: near 7, far 70. Pass the record and a gasp is
+   * over there and fades with the walk away from it. The default level is a
+   * third rather than full, because 1.0 is reserved for things that happen TO
+   * the player, and none of these do.
+   *
+   * A caller with no record still gets the level, so nothing in this file is
+   * capable of playing at 1.0 by omission any more.
+   */
+  const npcSFX_VOL = 0.34;
+  function sfx(n, rec, vol, pitch) {
+    const p = rec && rec.group && rec.group.position;
+    const v = typeof vol === 'number' ? vol : npcSFX_VOL;
+    if (p) { sfxAt(n, p.x, p.z, v, pitch || 1); return; }
+    try { game.sfx(n, { volume: v, pitch: pitch || 1 }); }
+    catch (e) { /* optional */ }
+  }
 
   // ------------------------------------------------------------ env helpers
   function inZone(name, x, z) {
@@ -4639,7 +4676,7 @@ export function createNPCs(game) {
     rec.poseArmL = -2.5; rec.poseArmR = -2.5;
     lookAtCapy(rec);
     pickLine(rec, 'standUp');
-    sfx('gasp');
+    sfx('gasp', rec);
     emit('npc:startled', rec);
     // ...and everybody near enough to hear it looks over. This is the third
     // mischief chain, reaching the two chapters that have no `locals`.
@@ -4689,7 +4726,7 @@ export function createNPCs(game) {
     p.lastCapyTouch = t;
     p.releaseTime = t;
     p.lastImpact = t;
-    sfx('gasp');
+    sfx('gasp', rec);
     try { game.shake(0.18); } catch (e) { /* optional */ }
   }
 
@@ -4821,7 +4858,7 @@ export function createNPCs(game) {
           owner.lookX = ox;
           owner.lookZ = oz;
           pickLine(owner, 'coffee');
-          sfx('gasp');
+          sfx('gasp', owner);
           reacted = true;
         }
       }
@@ -5036,7 +5073,7 @@ export function createNPCs(game) {
           if (capy.position) capy.position.set(npcGATE_X - 2.0, 1.5, npcGATE_Z + 0.5);
         }
         pickLine(rec, 'dump');
-        sfx('thud');
+        sfx('thud', rec);
         try { game.shake(0.35); } catch (e) { /* optional */ }
         try { game.toast('Escorted from the premises.'); } catch (e) { /* optional */ }
         rec.carryT = -1;
@@ -5116,7 +5153,7 @@ export function createNPCs(game) {
             setState(rec, 'cornered');
             rec.cornerT = 0;
             pickLine(rec, 'cornered');
-            sfx('gasp');
+            sfx('gasp', rec);
             break;
           }
         }
@@ -5170,7 +5207,7 @@ export function createNPCs(game) {
           rec.splashed = true;
           const wy = envWaterY(rec.group.position.x, rec.group.position.z);
           fireSplash(rec.group.position.x, wy, rec.group.position.z);
-          sfx('splash');
+          sfx('splash', rec);
           try {
             game.events.emit('npc:splash',
               { npc: rec, position: npcV3.set(rec.group.position.x, wy, rec.group.position.z) });
@@ -5331,7 +5368,7 @@ export function createNPCs(game) {
             rec.tgtLean = dip * 0.5;
             if (!rec.served && rec.stateT > 0.55) {
               rec.served = 1;
-              sfx('pop', { volume: 0.26, pitch: rand(1.5, 1.9) });
+              sfx('pop', rec, 0.26, rand(1.5, 1.9));
               if (rec.talkCd <= 0) { rec.talkCd = rand(11, 24); pickLine(rec, 'serve'); }
               // ...and the pair at this table look up. Nothing else on that
               // terrace has ever reacted to anything but the capybara.
@@ -5369,7 +5406,7 @@ export function createNPCs(game) {
               if (game.physics && typeof game.physics.release === 'function') {
                 try { game.physics.release(null); } catch (e) { /* optional */ }
               }
-              sfx('pop');
+              sfx('pop', rec);
               break;
             }
             const out = !inZone('gardens', capyX, capyZ);
@@ -5425,7 +5462,7 @@ export function createNPCs(game) {
           fireFlash(npcV1.x, npcV1.y, npcV1.z);
           emit('npc:photo', rec);
           finish('photo-op');
-          sfx('pop');
+          sfx('pop', rec);
         }
         if (rec.stateT > 1.8) {
           rec.flashed = false;
@@ -5451,7 +5488,12 @@ export function createNPCs(game) {
         rec.lookX = rec.group.position.x + Math.sin(rec.yaw) * 6;
         rec.lookZ = rec.group.position.z + Math.cos(rec.yaw) * 6;
         rec.strum -= dt;
-        if (rec.strum <= 0) { rec.strum = rand(2.4, 4.8); sfx('strum'); }
+        // ONE LAZY STRUM, FROM WHERE HE IS ACTUALLY SITTING. At volume 1.0 in
+        // both ears every two to five seconds this was twenty-four of the
+        // eighty sounds Sydney made in a minute and a half, and the single
+        // loudest thing on the lawn. Through the distance law he is a busker
+        // across the Gardens again: you walk toward him and he gets louder.
+        if (rec.strum <= 0) { rec.strum = rand(3.4, 6.2); sfx('strum', rec, 0.30, 1); }
         break;
       }
       case 'calm': {      // hands on knees, getting the breath back
@@ -5496,7 +5538,7 @@ export function createNPCs(game) {
             rec.nodes.coneN.scale.setScalar(1);
             rec.queueCd = rand(70, 140);       // one each, and not again soon
             pickLine(rec, 'whippyGot');
-            sfx('pop');
+            sfx('pop', rec);
             pickPOI(rec);
             setState(rec, 'wander');
             break;
@@ -6319,7 +6361,7 @@ export function createNPCs(game) {
     if (rec.kind === 'abuela') {
       paSet(rec, 'scold');
       paSay(rec, 'paScold');
-      sfx('rustle');
+      sfx('rustle', rec);
     } else if (wheeze) { paSet(rec, 'wheeze'); paSay(rec, 'paWheeze'); }
     else paSet(rec, 'return');
     emit('npc:calm', rec);
@@ -6564,7 +6606,7 @@ export function createNPCs(game) {
           if (d < 1.8 && rec.swatCd <= 0) {
             rec.swatCd = 2.6;
             paSay(rec, 'paSwat');
-            sfx('thud');
+            sfx('thud', rec);
             paShoveCapy(rec, 78, 46);
             try { game.shake(0.16); } catch (e) { /* optional */ }
           }
@@ -6573,7 +6615,7 @@ export function createNPCs(game) {
           rec.tgtArmL = -0.5;
           if (rec.kind === 'farmer' && d < 1.6 && rec.swatCd <= 0) {
             rec.swatCd = 2.2;
-            sfx('thud');
+            sfx('thud', rec);
             paShoveCapy(rec, 64, 40);
           }
         }
@@ -6816,7 +6858,7 @@ export function createNPCs(game) {
           rec.tgtNeck = rec.stateT < 0.42 ? -0.75 : 0.55;
           if (!rec.spat && rec.stateT > 0.45) {
             rec.spat = true;
-            sfx('pop');
+            sfx('pop', rec);
             paShoveCapy(rec, 52, 26);
             try { game.toast('The llama has made its position clear.'); } catch (e) { /* optional */ }
           }
@@ -6872,7 +6914,7 @@ export function createNPCs(game) {
               // to just turn round mid-stride and wander off, which read as a
               // bug rather than as a win.
               paSet(rec, 'lost');
-              sfx('wheek');
+              sfx('wheek', rec);
             }
           } else paSet(rec, 'plod');
           break;
@@ -7391,7 +7433,7 @@ export function createNPCs(game) {
       paGrudge(best);                     // an actual offence, actually counted
       paStartChase(best);
       paSay(best, 'paTheft');            // replaces the generic chase line
-      sfx('gasp');
+      sfx('gasp', best);
       // Anyone else in the market who can see it joins in. It is a small town.
       for (let i = 0; i < paHumans.length; i++) {
         const rec = paHumans[i];
@@ -7655,7 +7697,7 @@ export function createNPCs(game) {
     qdog.t = 0;
     qdog.barkCd = 0;
     leadMesh.visible = false;
-    sfx('bark');
+    sfxAt('bark', qdog.x, qdog.z, 0.34, 1);
     try { game.shake(0.12); } catch (e) { /* optional */ }
     if (dogOwnerRec) {
       startle(dogOwnerRec, qdog.x, qdog.z);
@@ -7721,7 +7763,7 @@ export function createNPCs(game) {
         else { qdog.x = nx; qdog.z = nz; }
         qdog.yaw = npcDampAngle(qdog.yaw, Math.atan2(dx, dz), 7, dt);
       }
-      if (qdog.barkCd <= 0) { qdog.barkCd = rand(2.5, 6); sfx('bark'); }
+      if (qdog.barkCd <= 0) { qdog.barkCd = rand(2.5, 6); sfxAt('bark', qdog.x, qdog.z, 0.30, 1); }
     }
     qdog.spd = damp(qdog.spd, spd, 8, dt);
 
@@ -7920,7 +7962,7 @@ export function createNPCs(game) {
       rec.flail = 1;
       rec.stumble = 1;
       pickLine(rec, 'soaked');
-      sfx('gasp');
+      sfx('gasp', rec);
       finish('sprinkler');
       try { game.shake(0.1); } catch (e) { /* optional */ }
     }

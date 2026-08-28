@@ -1119,8 +1119,15 @@ function envVanStep(game, dt) {
     const far = cp ? Math.hypot(cp.x - envVanPos.x, cp.z - envVanPos.z) : 999;
     if (envVanDwell <= 0 && far < 56) {
       envVanChimeT = riding ? envVAN_CHIME * 0.45 : envVAN_CHIME;
-      game.sfx('chime', { volume: riding ? 0.55 : clamp(0.42 - far * 0.005, 0.08, 0.42),
-                          pitch: 1.32 });
+      // ...and it comes from the van. The hand-rolled rolloff was right about
+      // distance and had no pan in it, so a van behind you and a van in front
+      // of you sounded identical — and the ceiling was loud enough that a
+      // chime every 5.4 s was competing with the score. Riding on the roof is
+      // the one case that stays big, because then you ARE the ice cream van.
+      game.sfx('chime', { volume: riding ? 0.50 : clamp(0.30 - far * 0.004, 0.05, 0.30),
+                          pitch: 1.32,
+                          at: { x: envVanPos.x, y: 1.6, z: envVanPos.z },
+                          near: 12, far: 70 });
     } else {
       envVanChimeT = 1.5;
     }
@@ -1371,6 +1378,7 @@ const envLORI_STRIDE = 9;               // floats per bird
 let envLoriMesh = null;
 let envLoriData = null;
 let envLoriTrees = null;                // x, z, canopy y, cooldown  (4 per tree)
+let envLoriIn = null;                    // per tree: was the capybara inside its radius last frame
 let envLoriSeen = false;
 
 /** One bird: body, breast, head, beak, tail, two wings. */
@@ -1404,6 +1412,7 @@ function envBuildLorikeets(root) {
   for (let i = 0; i < envFIG_SPOTS.length; i++) trees.push(envFIG_SPOTS[i][0], envFIG_SPOTS[i][1], 6.3, 0, 3.1);
   for (let i = 0; i < envJAC_SPOTS.length; i++) trees.push(envJAC_SPOTS[i][0], envJAC_SPOTS[i][1], 4.4, 0, 2.2);
   envLoriTrees = trees;
+  envLoriIn = new Uint8Array(trees.length / 5);
   const nT = trees.length / 5;
 
   envLoriData = new Float32Array(envLORI_N * envLORI_STRIDE);
@@ -1449,8 +1458,19 @@ function envFlushTree(game, t, loud) {
     // A lorikeet is a gull's voice a fifth higher and half as long. Jittered on
     // both axes, because a flock that screeches on one pitch is a car alarm —
     // nothing in this game's ambience is allowed to be periodic.
-    game.sfx('gull', { volume: loud ? 0.55 : 0.42, pitch: rand(1.62, 1.86) });
-    game.sfx('rustle', { volume: 0.5, pitch: rand(1.1, 1.35) });
+    // ...AND IT COMES FROM THE TREE, NOT FROM INSIDE YOUR HEAD.
+    // Two sounds at 0.42 and 0.50, both dead centre, ten times in ninety
+    // seconds while the player stood perfectly still: between them the second
+    // loudest thing in the chapter after the busker, and the reason a quiet
+    // lawn read as a racket. The flock is a real event and it keeps its bite
+    // when it is YOUR wheek that put them up (`loud`); what it stops being is
+    // a thing that happens at full volume in the middle of your skull while
+    // you are forty metres away doing nothing.
+    const at = { x: T[t * 5], y: T[t * 5 + 2], z: T[t * 5 + 1] };   // x, canopy y, z
+    game.sfx('gull', { volume: loud ? 0.34 : 0.20, pitch: rand(1.62, 1.86),
+                       at: at, near: 10, far: 90 });
+    game.sfx('rustle', { volume: loud ? 0.28 : 0.17, pitch: rand(1.1, 1.35),
+                         at: at, near: 10, far: 90 });
   }
   return true;
 }
@@ -1468,7 +1488,20 @@ function envLoriStep(game, dt) {
     if (!cp) continue;
     const dx = cp.x - T[t * 5], dz = cp.z - T[t * 5 + 1];
     const r = wheeked ? envLORI_R * 2.6 : envLORI_R;
-    if (dx * dx + dz * dz > r * r) continue;
+    const inside = dx * dx + dz * dz <= r * r;
+    // ---- A FLUSH IS AN ARRIVAL, NOT A PLACE YOU CAN STAND ----------------
+    // The test was `is the capybara within r`, so a player standing under a
+    // fig — and the spawn is under one — put the same flock up every time the
+    // cooldown expired, for ever: ten flushes in ninety seconds without
+    // moving a centimetre, which is most of what Sydney's "random noise" was.
+    // Birds that have been put up do not come back and get put up again by an
+    // animal that has not moved. So it fires on the RISING EDGE of walking
+    // into the canopy, and a wheek is always allowed to take them because
+    // that is the player asking for it.
+    const was = envLoriIn ? envLoriIn[t] : 0;
+    if (envLoriIn) envLoriIn[t] = inside ? 1 : 0;
+    if (!inside) continue;
+    if (was && !wheeked) continue;
     if (envFlushTree(game, t, wheeked) && !envLoriSeen) {
       envLoriSeen = true;
       if (typeof game.toast === 'function') game.toast('the figs were full of lorikeets, apparently');
