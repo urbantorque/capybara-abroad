@@ -84,9 +84,26 @@ edge, and nothing else. `qa/rev-syd-gardens.png`. Look at it first.
    and two palette colours — four of the six are already west of x = 55. The
    fig avenue, the benches, the hedges and the sandstone kerb all have builders.
    This is extending a system, not inventing one.
-3. **Keep it inside the land box** (x ±70, z −10…70). Block 1 will have made
-   walking past that a rescue rather than a stroll, so there is no value in
-   decorating outside it.
+3. **Keep it inside the land box** (x ±70, z −10…70). Block 1 made walking past
+   that a rescue rather than a stroll, so there is no value in decorating
+   outside it.
+
+4. **AND THE NORTH LAWN IS NOW THE BOUNDARY — MAKE IT READ AS ONE.** Block 1
+   found this and could not fix it, because it is content work and belongs
+   here. Sydney's ground collider stops at z = 70; the lawn MESH runs to
+   z = 150, deliberately, so the horizon has no hard edge in it. The fence now
+   sits on the collider, which is correct — but it means the "that is not part
+   of the world" toast fires while the player is standing on visible grass.
+   `qa/b1-syd-edge.png` is the frame: at (0, 66), the last legal step, there is
+   featureless lawn and one fig.
+
+   The fix is not to move the fence — moving it out puts the player back on
+   ground with no collider under it, which is the bug the block was closing.
+   The fix is to make z = 70 **look like** the edge of the gardens, which in
+   life it is: the Botanic Gardens have a boundary. A wall, a railing, a hedge
+   line, a road — anything that says "this is the end" before the toast does.
+   Do this first in the block; it is the difference between a fence and a
+   punishment.
 4. **Sydney has no `terrainHeight`** — it is flat at y = 0 and the soft floor
    answers for the whole plane. That makes this the easiest chapter in the group
    to place things in, and it is why it goes first.

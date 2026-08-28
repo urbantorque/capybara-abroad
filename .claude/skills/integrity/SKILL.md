@@ -124,7 +124,8 @@ in the same session, as a number.
 
 | probe | what it gives | run as |
 |---|---|---|
-| `qa/rev-edge2.js` | per bearing: where the world stops being drawn, and whether you are rescued | `run-code` |
+| `qa/rev-edge2.js` | per bearing: where the world stops being drawn, and whether you are rescued. **It starts its rescue scan AT the drawn edge, so it cannot detect a rescue that fires too EARLY** — use `rev-walk.js` for that | `run-code` |
+| `qa/rev-walk.js` | 25 s of real sprinting per bearing, real key events. The only instrument here that can catch an early rescue | `run-code` |
 | `qa/rev-terr.js` | `terrainHeight` vs the drawn mesh, % of samples over 15 / 30 cm | `run-code` |
 | `qa/rev-foot.js` | model feet vs drawn ground after settling; float, sink, void points | `run-code` |
 | `qa/rev-world.js` | the hook matrix, slope-burial %, collider coverage, dead area | `run-code` |

@@ -434,6 +434,95 @@ function mainMakeBiomes(game) {
       return biome[k] || biome.SYDNEY_SPAWN;
     },
 
+    /**
+     * WHERE A CHAPTER'S WORLD STOPS, WORKED OUT RATHER THAN WRITTEN DOWN.
+     *
+     * `backVoid()` in systems.js is the only thing in the game that can notice
+     * the player has left the world, and until now it could only do that for a
+     * chapter that published its own `bounds()`. FOUR of nineteen did. The
+     * other fifteen were unbounded — and because every chapter's terrainHeight
+     * is an analytic law that answers for the whole infinite plane, the animal
+     * never falls either: capybara.js's soft floor catches it on the second
+     * frame and it stands on invisible ground for ever. Measured before this:
+     * the world stops being drawn at 72 m in Son Doong and 96 m in Kowloon, and
+     * no bearing in either was ever rescued out to 440 m.
+     *
+     * A chapter's colliders are the honest answer to "does the world exist
+     * here", so the box is the union of them and nothing else. Not the drawn
+     * objects: an objects-based box is blown out to the radius of the sky dome
+     * and the haze shell, which are the two largest things in every chapter and
+     * are not places.
+     *
+     * THREE SHAPE CASES, AND TWO OF THEM CANNOT USE body.aabb:
+     *
+     *   Plane      — cannon gives an infinite plane an AABB of +/-MAX_VALUE,
+     *                which passes isFinite() and silently makes the union the
+     *                whole float range. Skipped: an infinite floor says nothing
+     *                about where the world is.
+     *   Heightfield— cannon leaves its AABB at Infinity until the body moves.
+     *                It is also the single most important body in most
+     *                chapters, so it is measured from its own data instead:
+     *                (n-1) * elementSize along each local axis, the four
+     *                corners pushed through the body transform.
+     *   everything — the shape's bounding radius about its world-space centre.
+     *   else         Slightly generous, never infinite, and generous is the
+     *                right way to be wrong here.
+     *
+     * Validation: this reproduces Pasto's hand-written rectangle EXACTLY
+     * (-132..132 / -130..134) without being told it. Rio's and Sydney's
+     * hand-written boxes are tighter than their geometry, which is why a
+     * chapter's own bounds() still wins — see api.bounds in systems.js.
+     */
+    boundsOf(name) {
+      const s = sets.get(name);
+      if (!s || !s.bodies.length) return null;
+      // Cheap invalidation: a chapter that has grown or shrunk since the last
+      // call is recomputed. A chapter never edits a body's position after the
+      // build, so nothing subtler is needed.
+      if (s.boundsBox && s.boundsN === s.bodies.length) return s.boundsBox;
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      const v = new CANNON.Vec3();
+      function eat(wx, wz) {
+        if (wx < x0) x0 = wx;
+        if (wx > x1) x1 = wx;
+        if (wz < z0) z0 = wz;
+        if (wz > z1) z1 = wz;
+      }
+      for (let bi = 0; bi < s.bodies.length; bi++) {
+        const b = s.bodies[bi];
+        if (b.mass !== 0) continue;              // props move; they are not the world
+        for (let si = 0; si < b.shapes.length; si++) {
+          const sh = b.shapes[si];
+          const off = b.shapeOffsets[si];
+          if (sh instanceof CANNON.Plane) continue;
+          if (sh instanceof CANNON.Heightfield) {
+            const d = sh.data;
+            if (!d || !d.length || !d[0] || !d[0].length) continue;
+            const w = (d.length - 1) * sh.elementSize;
+            const h = (d[0].length - 1) * sh.elementSize;
+            for (let c = 0; c < 4; c++) {
+              v.set(c === 1 || c === 3 ? w : 0, c === 2 || c === 3 ? h : 0, 0);
+              if (off) v.vadd(off, v);
+              b.quaternion.vmult(v, v);
+              v.vadd(b.position, v);
+              eat(v.x, v.z);
+            }
+            continue;
+          }
+          if (off) v.copy(off); else v.set(0, 0, 0);
+          b.quaternion.vmult(v, v);
+          v.vadd(b.position, v);
+          const rad = sh.boundingSphereRadius || 0;
+          eat(v.x - rad, v.z - rad);
+          eat(v.x + rad, v.z + rad);
+        }
+      }
+      if (!isFinite(x0) || !isFinite(x1) || !isFinite(z0) || !isFinite(z1)) return null;
+      s.boundsN = s.bodies.length;
+      s.boundsBox = { x0: x0, x1: x1, z0: z0, z1: z1 };
+      return s.boundsBox;
+    },
+
     /** Run `fn` with everything it adds tagged as belonging to `name`. */
     capture(name, fn) {
       const prev = captureTag;

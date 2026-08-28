@@ -449,6 +449,27 @@ const quaySEA_X0 = -420, quaySEA_X1 = 460;
 const quaySEA_Z0 = -760, quaySEA_Z1 = 120;
 // The same rectangle, published — see api.bounds(). It is exactly the extent
 // of the drawn sea, because outside it there is neither water nor ground.
+//
+// ---- AND IT IS DELIBERATELY THE BIGGEST BOX IN THE GAME (integrity 1) ------
+// 880 by 880 metres, against 264 for Pasto. The edges audit flagged that as
+// "effectively unbounded on foot" and the flag was raised correctly; the
+// decision is to KEEP it, for three reasons worth writing down so it is not
+// re-opened every pass:
+//
+//   1. The sea is DRAWN across the whole rectangle. Every other chapter's
+//      unbounded region was featureless nothing; this one is water, with the
+//      headlands and the Bridge in sight from all of it. The player is never
+//      lost in grey — which is the failure bounds() exists to prevent.
+//   2. Out there `quayIsOverWater` is true, so the animal is SWIMMING, capped
+//      at 2.6 m/s. Reaching the far edge on purpose takes four minutes and
+//      nothing about it is a trap.
+//   3. A tighter on-foot rectangle would have to be dropped the moment the
+//      helm is taken and restored when it is given up. A bounds rectangle that
+//      changes under the player is a rescue that can fire because you stepped
+//      off a boat — a worse bug, and a much harder one to see, than the one it
+//      would be fixing.
+//
+// So: chapter 3 is a boat chapter, the sea is the world, and the world is big.
 const quayBOUNDS = { x0: quaySEA_X0, x1: quaySEA_X1, z0: quaySEA_Z0, z1: quaySEA_Z1 };
 const quaySEA_STEP = 22;
 

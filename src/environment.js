@@ -480,7 +480,37 @@ function envCamCeil(x, z) {
 }
 
 // The whole of the world that has a floor or a sea under it. See api.bounds().
-const envBOUNDS = { x0: -142, x1: 142, z0: -152, z1: 96 };
+//
+// ---- THIS USED TO BE ONE RECTANGLE AND SYDNEY IS NOT ONE (integrity 1) -----
+// It was `{ x0: -142, x1: 142, z0: -152, z1: 96 }`, described in the comment on
+// api.bounds() as the UNION of the two places there is something under you.
+// The description was accurate and the geometry was the bug: the land box and
+// the harbour meet along a waterline, so their union is an L, and the smallest
+// rectangle containing an L contains two large quadrants of NOTHING.
+//
+// Those quadrants are x 70..142 and x -142..-70 for z > -10 (east and west of
+// the gardens, on the land side) plus z 70..96 across the full width. About
+// 19 000 m2 of walkable nowhere, all of it inside the rectangle that was
+// supposed to be keeping the player out of exactly that.
+//
+// Measured walking out of the gardens before this: the last collider is 52-72 m
+// from the spawn and the rescue did not fire for another 40-80 m. That is the
+// "you can walk out of the map in Sydney" this pass was started by.
+//
+// So it is the two rectangles it always was, said properly. systems.js's
+// sysOutside() takes either form; inside ANY rectangle is inside, which is why
+// they are allowed to overlap along z = -10 rather than having to abut exactly.
+const envBOUNDS = {
+  rects: [
+    // THE LAND. The ground body is a box over x +/-70, z -10..70 and nothing at
+    // all exists past it — the lawn MESH runs to z = 150 purely so the horizon
+    // has no hard edge in it, which is what made walking north feel legal.
+    { x0: -70, x1: 70, z0: -10, z1: 70 },
+    // THE HARBOUR. The water mesh runs x +/-140, z -150..-10 and the seabed
+    // body under it is wider still, so swimming to the far shore stays legal.
+    { x0: -140, x1: 140, z0: -150, z1: -8 },
+  ],
+};
 
 const envZONES = {
   operaStage: { x0: -9.0, z0: 1.05, x1: 9.0, z1: 3.9 },
@@ -3041,12 +3071,12 @@ export function createEnvironment(game) {
     // Pasto was given bounds() for, in the one chapter every player walks in
     // first, and never fixed here.
     //
-    // The rectangle is the UNION of the two places there is something under
-    // you: the land box, and the harbour, which is much the wider of the two
-    // (the water mesh runs x ±140, z -150..-10, and the seabed body under it
-    // is wider still). Swimming to the far shore stays legal; walking off the
-    // north end of the lawn does not. systems.js's backVoid adds its own four
-    // metres of grace on top of this — see sysVOID_PAD.
+    // TWO rectangles, not their union — the land box and the harbour, tested
+    // separately. Swimming to the far shore stays legal; walking off the north
+    // end of the lawn does not, and neither does walking east or west off it,
+    // which the old single-rectangle form allowed for 72 m. See envBOUNDS.
+    // systems.js's backVoid adds its own four metres of grace on top of this —
+    // see sysVOID_PAD.
     bounds() { return envBOUNDS; },
     // The trees are this chapter's roofs. See CANOPY CEILING.
     camCeil: envCamCeil,

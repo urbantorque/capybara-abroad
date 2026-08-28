@@ -17127,6 +17127,32 @@ export function createSystems(game) {
    * thing that would catch a genuine fall through a chapter with no terrain
    * law at all.
    */
+  /**
+   * IS (x, z) OUTSIDE EVERY RECTANGLE `b` DESCRIBES?
+   *
+   * `bounds()` may answer with one rectangle — `{x0,x1,z0,z1}` — or with a LIST
+   * of them under `.rects`. The list exists for one reason: Sydney's world is
+   * L-shaped, and the union of an L is a rectangle containing two large
+   * quadrants of nothing. See envBOUNDS. A chapter whose world really is a
+   * rectangle keeps the cheaper form and this is the same four comparisons it
+   * always was.
+   *
+   * Outside ALL of them is outside. Inside ANY of them is inside — which is
+   * what makes the L work, and what makes it safe for the rectangles to
+   * overlap, as Sydney's do along the waterline.
+   */
+  function sysOutside(b, x, z) {
+    if (!b) return false;
+    const list = b.rects || null;
+    if (list) {
+      for (let i = 0; i < list.length; i++) if (!sysOutside(list[i], x, z)) return false;
+      return list.length > 0;
+    }
+    if (!isFinite(b.x0 + b.x1 + b.z0 + b.z1)) return false;
+    return x < b.x0 - sysVOID_PAD || x > b.x1 + sysVOID_PAD ||
+           z < b.z0 - sysVOID_PAD || z > b.z1 + sysVOID_PAD;
+  }
+
   let backVoidT = 0;
   function backVoid(dt) {
     const capy = game.capy;
@@ -17134,14 +17160,19 @@ export function createSystems(game) {
     const p = capy.position;
     let lost = !(p.y === p.y) ? false : p.y < sysVOID_Y;
     if (!lost) {
+      // ---- THE CHAPTER'S OWN ANSWER, THEN THE WORKED-OUT ONE (integrity 1) --
+      // A chapter that publishes bounds() has been reasoned about and wins:
+      // Sydney's, Pasto's, Rio's and Quay's are all tighter or better shaped
+      // than the union of their colliders. The other fifteen published nothing
+      // at all and were therefore never checked — fifteen chapters in which
+      // walking past the last collider was a one-way trip. biome.boundsOf()
+      // works a box out of the chapter's own colliders; see main.js.
       const api = sysLiveBiomeApi(game);
-      if (api && typeof api.bounds === 'function') {
-        const b = api.bounds();
-        if (b && isFinite(b.x0 + b.x1 + b.z0 + b.z1)) {
-          lost = p.x < b.x0 - sysVOID_PAD || p.x > b.x1 + sysVOID_PAD ||
-                 p.z < b.z0 - sysVOID_PAD || p.z > b.z1 + sysVOID_PAD;
-        }
+      let b = (api && typeof api.bounds === 'function') ? api.bounds() : null;
+      if (!b && game.biome && typeof game.biome.boundsOf === 'function') {
+        b = game.biome.boundsOf(game.biome.current);
       }
+      if (b) lost = sysOutside(b, p.x, p.z);
     }
     if (!lost) { backVoidT = 0; return; }
     backVoidT += dt;
