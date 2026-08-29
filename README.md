@@ -171,6 +171,41 @@ takes nine seconds to go away.
 It is once a chapter, sixteen times in the game, and that is the whole mechanism: a second one
 in a chapter would halve what the first is worth.
 
+### And where it stops
+
+For a long time the score never did. Not once, in nineteen chapters, for the whole hour: chord,
+pluck, chord, pluck, at a density set only by how much trouble you were causing. It was
+beautifully composed and it was a carpet — and a carpet is the one thing a beautiful piece of
+music is not. A phrase is beautiful because it ends, because you notice it ending, and because
+something comes back.
+
+So about twice a minute, for eight or nine seconds, it takes a breath. The plucks fall away, the
+pad comes down and darkens with it, and the reverb opens, so what you are left with is mostly
+the room the last chord is dying in. Then it comes back, over a longer ramp than it left by. It
+is never silent — a game that goes quiet reads as a fault and half the players reach for the
+volume — it goes *distant*, and that is what buys the return. It will not do it under a band,
+or while a set piece is lifting, or while anything is going on: the whole point of a breath is
+that nothing is.
+
+The rest of the mix caught up at the same time. The pad, the choir, the shimmer and the lift
+used to be mono — a bed one pixel wide in the exact centre of your head — and now sit under a
+two-tap ensemble that detunes each side a few cents against the middle and never settles. The
+weather was one and a fifth seconds of mono noise on a loop, which is short enough to hear;
+it is six seconds of stereo now, and every voice takes a different slice of it. The reverb grew
+a pre-delay and eight early reflections, which is the difference between a wash and a room —
+and the score now gets **its own room per chapter**, out of the same table the footsteps have
+used since the sound came from somewhere. Manly's beach is the driest place in the game to play
+music in and Son Doong is by a long way the wettest, and you can hear which one you are in with
+your eyes shut.
+
+And the bands stopped being perfect. Every struck note used to land on the grid to the sample,
+which is the one thing that most reliably tells you a machine is playing. Now the bass and the
+surdo lean late, the montuno and the cavaquinho push early, no two strokes are quite the same
+weight — and the clave, the campana and the ride barely move at all, because they are what
+everyone else is late *against*. Two things stayed rigid on purpose: a harpsichord, which
+cannot be played louder and never could be, and Mong Kok's drum machine, because the chapter is
+a joke about a city that runs like a machine.
+
 ## The middle rung
 
 Every chapter has one moment it is for — the condor over Galeras, the Adriatic arriving in San

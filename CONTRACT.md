@@ -3023,6 +3023,238 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE MIX PASS (v41 — 30 Aug 2026)
+
+The score has been beautifully *composed* for thirty-odd versions — nineteen palettes,
+twenty-eight modelled instruments, six band arrangements, a voice-leading pad that never
+repeats — and it had never once been **produced**. Everything here is mixing and
+performance, not composition: not one chord, root, next-table, dwell, tempo, riff or
+instrument model changed. Five things, all in `src/systems.js`, all in section 5/5b.
+
+The brief was *keep the chill*, and every one of these is on the side of calm: width,
+depth, a room, a pocket, and a place where the music stops.
+
+**MEASURED, both arms, three minutes each** (`qa/v41-ab.js` with `qa/v41-arm.mjs off|on`):
+
+| | Sydney before | Sydney after | Son Doong before | Son Doong after |
+|---|---|---|---|---|
+| L/R correlation | 0.558 | **0.483** | 0.395 | **0.264** |
+| side energy | 0.226 | **0.264** | 0.310 | **0.374** |
+| master RMS | 0.0501 | 0.0516 | 0.0666 | 0.0794 |
+| peak | 0.272 | 0.275 | 0.408 | 0.507 |
+| clipped frames | 0 | 0 | 0 | 0 |
+| `lastError` | none | none | none | none |
+
+Correlation down and side energy up in both, with the level and the headroom held: the mix
+is wider and it is not louder. Son Doong ends 1.54× Sydney's RMS where it was 1.33×, which
+is about what "much more reverberant" should cost. Both arms carry the breath (it is held
+constant), and both fired it, to a floor of 0.42.
+
+### 1. THE NOISE FLOOR WAS 1.2 SECONDS OF MONO (`noiseBuf`)
+
+Every continuous non-tonal sound in the game — rain, wind, surf, crowd, crickets, the
+cave's drip, the ambience bed, and a good half of the sfx — was **one** 1.2 s **mono**
+buffer on loop. Two consequences, both audible:
+
+- a mono source up-mixes to two *identical* channels, so the entire weather and ambience
+  layer was a panel one pixel wide in the exact centre of the head, while the score's
+  plucks panned around it;
+- 1.2 s is short enough to *hear*. Noise has no melody to give a loop away but it has
+  texture, and the same texture fifty times a minute reads as a machine, not as weather.
+
+Now **6.0 s, two channels, partially decorrelated**: a shared core plus a per-channel
+difference, landing near 0.59 correlation. Fully independent noise is wider still and has
+a hole in the middle of it — mono-summing loses 3 dB and the centre goes hollow — which
+is why it is not that. The one-pole colour is bit-for-bit what it was, so no filter
+downstream needed re-tuning. Every source also gets its **own loop window**
+(`loopStart`/`loopEnd`), so no two voices on the one buffer come round together.
+
+**AND THERE ARE TWO BUFFERS, WHICH IS NOT AN OPTIMISATION.** `StereoPannerNode` uses a
+different algorithm for a stereo input than for a mono one, and it has to: at pan 0.5 a
+mono source lands 0.38/0.92 across the ears and a stereo source lands 0.71/1.22, because
+the panner has an incoming left channel it may not throw away. Right for a bed, wrong for
+a footstep — one buffer would have quietly taken ~40% off the positional cue of every
+noise-based effect in the game, which is exactly what a width improvement may not cost.
+So **`noiseSrc()` (everything placed) stays mono and pans exactly as it did**, and
+`noiseWideSrc()` (the ambience and the four weather voices — none of which is anywhere) is
+the stereo one. Both are cut from the same three streams in one pass.
+
+### 2. THE PAD WAS IN THE MIDDLE OF YOUR HEAD (`musWide`, `sysMUS_ENS_*`)
+
+Same fault, one layer up. Oscillator banks → shared low-pass → one gain → out: every node
+mono. So the sustained bed under the whole game — pad, shimmer, choir *and* lift — was
+dead centre and only the transients had an image, which is exactly backwards.
+
+`musWide` is a bus that all four sustained layers now feed, with **two short modulated
+delays panned hard apart underneath the dry centre** — the oldest widener there is and
+what a string machine literally is. 16–23 ms is below the echo threshold so it does not
+read as a repeat; moving it ±3 ms on a slow LFO detunes each copy a few cents so the
+sides beat against the centre and never settle. Rates are incommensurate with each other
+*and* with the three LFOs already on the bus. `sysMUS_ENS_TRIM` pays back the ~1.4 dB the
+taps add in **one** place, so nineteen chapters' level balance is untouched, and
+`musPad.gain` still has exactly one writer.
+
+**THE TAPS GO TO THE DRY PATH ONLY, AND THAT IS THE WHOLE POINT.** The first version fed
+`musWide` through one trimmed output into *both* `musDry` and `musSend`, and it was
+measurably worth nothing: Sydney's master L/R correlation was **0.559 without the ensemble
+and 0.564 with it** — no change at all, over a three-minute sample in each arm
+(`qa/v41-ab.js`). The reason is the wet/dry ratio. This score runs ~0.95 wet against 0.5
+dry, so two thirds of what reaches the speakers is the convolver's output — and **a
+convolver replaces the stereo image of whatever goes into it with the image of its own
+IR**. Widening the reverb's *input* buys nothing, because the IR's two decorrelated
+channels were already doing that, and it costs something: delayed copies smear the
+reverb's attack. So the send takes the pad exactly as it always did — clean, un-widened,
+one signal — the ensemble lives entirely on the dry path, and the trim moved with it, so
+the **wet level is bit-for-bit what it was before v41**.
+
+### 3. THE REVERB WAS A WASH, NOT A ROOM (`musIR`)
+
+Decayed noise starting at sample zero. Three properties of a real space were missing:
+
+1. **No pre-delay.** Sound reaches you before it reaches the wall. An IR starting at zero
+   glues the tail to the source and the price is paid in *clarity* — every pluck, mallet
+   and footstep was smeared by its own reverb. It is the cheapest thing that makes a wet
+   mix legible, and it is why a ~65% wet score can still sound like notes.
+2. **No early reflections.** Room *size* is told by the handful of discrete bounces before
+   the tail goes dense, not by the tail — tails all sound alike. Eight taps, irrationally
+   spaced so the cluster has no pitch, alternating sign, and at **different times in the
+   two channels**, which is what gives a room a width as well as a depth.
+3. **The tail never got darker.** Air eats treble far faster than bass. The one-pole
+   coefficient now walks `sysIR_LP0 → sysIR_LP1` across the buffer (≈3.6 kHz → 1 kHz), with
+   a `sqrt(1-k²)` term so the darkening does not double as a fade. 0.4842 is the constant
+   that makes `k = 0.62` come out at the old 0.38, so the *head* of every tail is unchanged.
+
+Plus a **build**: the diffuse half starts at `sysIR_BUILD` and fills in over the ER window,
+because at full density on arrival the noise swallows the taps and you have built early
+reflections nobody can hear.
+
+**Measured — `node qa/v41-ir.mjs`**, which rebuilds these buffers offline and reports them.
+Pre-delay 29.5 ms (Manly) → 42.0 ms (Son Doong, at the clamp). ER span 33 → 85 ms, ER peak
+2.0–3.0× the diffuse level just behind it. Tail brightness 7.4 kHz at the head → 4.0 kHz at
+the end; **the old one was 7.4 → 7.6, i.e. flat**. RT60 3.0 s (Manly) → 6.3 s (the cave),
+where it used to be 3.60 s in all nineteen places. Run it after touching any `sysIR_*`.
+
+The first `erSpan` was `secs * 0.024` and that measurement is why it is not: the music rooms
+only run 3.45–6.5 s, so a straight proportion pinned **every chapter but Manly at exactly the
+85 ms ceiling** and the one number that says how big a place is said the same thing
+everywhere. `(secs - REF) * K + BASE` gives the 2.6× spread above.
+
+### 4. THE SCORE WAS IN THE SAME ROOM IN ALL NINETEEN PLACES (`musRoomLoad`/`musRoomSet`)
+
+One convolver, `musIR(3.6, 2.4)`, built at the first gesture and never touched. The ice
+cathedral, the tuff valley, the 4.5 m Hanoi alley and the open beach at Manly all played
+their music in an identical hall — while the **sound effects** in those same places have
+had per-chapter rooms from a hand-tuned table since v16. The half of the mix that runs for
+the whole hour was the half that never moved.
+
+It reads **`sysROOMS`**. There is no second table: those numbers were written by somebody
+standing in each place and they are the same places. They are stretched
+(`sysMUS_ROOM_A/B`) because a chord wants a longer tail than a footstep does. Manly
+3.45 s, Sydney ≈3.8 (the old fixed value), Son Doong 6.5.
+
+**WHICH ROOM AND HOW LOUD ARE NOT THE SAME QUESTION.** The first version took the send
+straight off that table's `wet` column and measured badly: Son Doong came out **3.4 dB
+louder than it had been**, 0.094 master RMS against Sydney's 0.045 — twice its neighbours
+on the same pad palette, where before v41 it was 1.22×. A pass that turns 1.22× into 2.06×
+has not deepened the cave, it has turned it up. Two things were leaking into level:
+
+- `wet` in `sysROOMS` spans 0.04–0.42, a factor of **ten**. That is right for a footstep
+  and absurd for a bed that runs for an hour. `sysMUS_WET_BASE/_SPR` compress it to about
+  ±1.4 dB around the old fixed 0.95 (measured range 0.81 Drift → 1.01 Hanoi).
+- **A longer tail is louder at the same send, and `normalize` does not fix it** — it
+  normalises the *impulse*, but a sustained input into a 6.5 s tail has nearly twice as
+  much of its own history summed into it at any instant. True of a real cave, still a mix
+  fault. The send comes down by `sqrt(sysMUS_WET_REF / secs)` to cancel it.
+
+What survives is that the cave has a 6.5 s tail and an 85 ms early cluster, both the
+longest in the game, and Manly has 3.0 s and 33 ms. *That* is what a different room sounds
+like. Being louder is not. Re-measured, the send now spans 0.81 (the Drift) to 1.01
+(Hanoi) around the old fixed 0.95, and the cave's excess fell from +3.4 dB to +1.5 dB.
+
+**Two convolvers, not one.** A convolver whose buffer changes while it is ringing *drops*
+the tail in it, and the cave's is 5.5 s. The border cross-fades between slots over
+`sysMUS_ROOM_XF` — so for a moment you are in both rooms, which is what walking out of
+somewhere sounds like — and the room being left is then **disconnected from the send**, so
+a chapter never pays for a room it is not in. Same shape as `sysRoomSet`, driven from the
+same line of `update`.
+
+### 5. THE BAND WAS NEVER LATE (`musFeel` / `musVel`)
+
+Every struck note was scheduled at `t0 + step * grid`, to the sample, in all six bands,
+forever. That is the single thing that most reliably tells a listener they are hearing a
+machine, and no amount of instrument modelling fixes it.
+
+Three things people do, and all three are now here: they **scatter** (triangular, not
+uniform — human error is bell-shaped and a flat distribution sounds drunk rather than
+alive); they **sit somewhere** (the bass and the surdo lean late, the montuno and the
+cavaquinho push early — a constant, because it is a style, not an error); and they **do
+not hit everything the same** (`sysMUS_VEL_H`). Numbers are in `sysMUS_F_*`, in
+milliseconds, and they are small.
+
+The asymmetry is the trick: the **pulse-keepers barely move**, because the clave, campana,
+ride, caixa and hats are what the rest of the band is early or late *against*, and a grid
+that wobbles is not a grid. Two deliberate exemptions: the **harpsichord's velocity** (a
+harpsichord has no dynamic — that constraint *is* the instrument, so only its timing
+moves) and the **Kowloon drum machine**, which stays quantised because the chapter is a
+joke about a city that runs like a machine and a swung kick would be a different joke.
+Its guzheng — the one thing there played by a person — does get a feel.
+
+**`musBarAnchor` and `musBeatLen` are untouched.** Cali's dance floor and Kowloon's towers
+are scored against the *bar*, and the bar is exactly where it always was. Only notes move.
+
+### 6. AND THE SCORE NEVER STOPPED (`musBreathStep`, `game.music.breath`)
+
+Not once, in nineteen chapters, for the whole hour: chord, pluck, chord, pluck, at a
+density set only by how much chaos the player was causing. That is a **carpet**, and a
+carpet is the one thing a beautiful piece of music is not — a phrase is beautiful because
+it ends, because you notice it ending, and because something comes back.
+
+Every 78–146 s, for 9–13 s, the music **thins**: the plucks stop (thinned by a gliding
+number, so the last few fall away rather than hitting a wall), the pad comes down and
+**darkens with it** — the one parameter combination none of chase, calm or lift makes, and
+the difference between *quieter* and *further away* — and the room opens up
+(`sysMUS_BREATH_WET`) so what you hear is mostly the space the last chord is dying in.
+Then it returns, over a longer ramp than it left by.
+
+**Nothing is ever silent.** `sysMUS_BREATH_DIP` is 0.42, not 0: a game that goes quiet
+reads as a bug and half the players reach for the volume. It goes *distant*, which is what
+the return is bought with.
+
+Deliberately unavailable under a **band** (salsa, samba, gnawa, Kowloon, Monte Carlo — an
+arrangement that evaporates mid-bar is a dropout, not a phrase), while a **lift** is up
+(the opposite gesture), or above `sysMUS_BREATH_MAXI` **intensity** (the point of a breath
+is that nothing is going on). Any of those *cancels it early* rather than blocking it, so
+the music can never hold a hush through a moment that wanted the opposite.
+
+### THREE NEW GETTERS ON `game.music`, ALL READ-ONLY
+
+`breath` (0..1), `room` (which chapter's IR the score's convolver holds), and `bus`
+(`{ac, out}` — a place to hang an analyser, nothing in `src` reads it). The breath is slow,
+rare and invisible; a soak that samples it for two minutes and never sees it move has found
+a bug no screenshot could.
+
+### HOW TO MEASURE ANY OF THIS AGAIN
+
+| | |
+|---|---|
+| `node qa/v41-ir.mjs` | Rebuilds the IRs offline and prints pre-delay, ER span, ER/tail ratio, head and tail brightness, RT60 and the send, per chapter, plus the old shape for comparison. **Zero-crossing rate is a fine brightness proxy and needs no FFT.** Run after touching any `sysIR_*` or `sysMUS_ROOM_*`. |
+| `qa/v41-rooms.js` | One reload per chapter through the title picker, a `ChannelSplitter` and two `AnalyserNode`s on `game.music.bus`, reporting RMS, peak, L/R correlation, side energy, clip count and `music.room`. |
+| `qa/v41-ab.js` + `qa/v41-arm.mjs off\|on` | **The differential.** Sydney and Son Doong, three minutes each. |
+
+**`git stash` DOES NOT WORK FOR AN AUDIO DIFFERENTIAL HERE.** The pre-v41 build has no
+`game.music.bus`, so the probe has nothing to hang an analyser on and the whole arm comes
+back `"no bus"`. `qa/v41-arm.mjs off` instead switches the three mix changes off *in place*
+and leaves the hook — which is a cleaner isolation anyway, because it holds the reverb
+internals, the feel and the breath constant and moves only the width and the room. `on`
+must leave the file byte-identical; it round-trips 7/7.
+
+**AND `KeyJ` + A DIGIT DOES NOT TRAVEL.** `jrTravel` returns immediately without
+`jrDepart`, and `jrToggle` opens the read-only book. A nineteen-chapter sweep came back
+with `biome: "sydney"` in all nineteen rows and read exactly like a room system that never
+switched. The **title card takes a picker digit directly** (`sysPickFromKey` → `startGame`),
+so a per-chapter sweep is one reload per chapter and that is the only keyboard route in.
+Assert `game.biome.current` in every row — that is the only reason it was caught.
+
 ## THE LENS PASS (v40 — 30 Aug 2026)
 
 Five things between the Lambert output and the canvas, and one bug found while

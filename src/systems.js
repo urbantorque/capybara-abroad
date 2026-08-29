@@ -719,6 +719,20 @@ const sysSFX_PAN_K  = 1.35;   // widen the middle: 45 degrees off axis is well p
 // the send level against a 0.85 master.
 const sysROOM_LAM   = 0.9;    // how fast the wet level crosses on a chapter change
 const sysROOM_DEF   = { size: 1.5, decay: 2.6, wet: 0.07 };
+// ---- WHAT AN IMPULSE RESPONSE IS MADE OF (v41; see musIR) -----------------
+const sysIR_PRE_MAX  = 0.042;   // s. Longest pre-delay any room in the game gets.
+const sysIR_LP0      = 0.62;    // the one-pole at the head of the tail (~3.6 kHz)
+const sysIR_LP1      = 0.89;    // ...and at the end of it (~1 kHz). Air eats treble.
+// Eight early reflections, as fractions of the cluster's span. Not a series:
+// no value here is a rational multiple of another, so the taps never line up
+// into a pitch. The first one is not zero — that would be the direct sound.
+const sysIR_ER = [0.13, 0.211, 0.347, 0.443, 0.577, 0.694, 0.829, 0.958];
+const sysIR_ER_G     = 0.46;    // ...and how loud the first of them is
+const sysIR_ER_SPAN  = 0.085;   // s. Later than this is an echo, not a room.
+const sysIR_ER_REF   = 3.0;     // s of tail the base span is quoted at...
+const sysIR_ER_BASE  = 0.020;   // ...and the span there
+const sysIR_ER_K     = 0.028;   // s of extra span per second of tail
+const sysIR_BUILD    = 0.34;    // ...and how dense the diffuse tail is on arrival
 const sysROOMS = {
   // Open, grassy, nothing to reflect off but the Opera House.
   sydney:    { size: 1.4, decay: 2.8, wet: 0.06 },
@@ -2000,6 +2014,54 @@ const sysMUS_XFADE2 = 6.5;             // chapter change: reads as a drift, not 
 const sysMUS_LOOK   = 2.0;             // scheduler lookahead, seconds
 const sysMUS_TICK   = 240;             // scheduler period, ms
 const sysMUS_BUS    = 0.17;            // music sits UNDER the sfx
+// THE ENSEMBLE. See the note in musicStart. Two taps at 0.46 add
+// sqrt(1 + 2*0.46^2) = 1.19 to the bus, so the trim is 1/1.19.
+const sysMUS_ENS_MIX  = 0.46;
+const sysMUS_ENS_PAN  = 0.84;          // not 1: a hard-panned tap has no body
+const sysMUS_ENS_TRIM = 0.84;
+// ---- THE SCORE'S ROOM, PER CHAPTER (v41; see musRoomLoad) -----------------
+// secs = A + B * sysROOMS[x].size, so Manly's beach is 3.45 s and the cave is
+// 6.5. The old fixed value was 3.6, which is roughly where Sydney lands.
+const sysMUS_ROOM_A   = 2.6;
+const sysMUS_ROOM_B   = 0.85;
+const sysMUS_ROOM_MIN = 2.8;
+const sysMUS_ROOM_MAX = 6.5;
+const sysMUS_ROOM_XF  = 2.6;    // s, border crossing: you are in both rooms
+const sysMUS_ROOM_TAIL = 4.0;   // ...and the one you left rings out for this
+const sysMUS_WET      = 0.95;   // what the send was, everywhere, before v41
+// …and how far a chapter may move off it. See the long note in musRoomLoad:
+// these two are deliberately small, because the per-place difference this pass
+// is buying is a TAIL LENGTH and an EARLY CLUSTER, not a level. Measured, the
+// first version of this was 0.80 + wet*1.9 and made the cave 2.06x Sydney.
+const sysMUS_WET_BASE = 0.93;
+const sysMUS_WET_SPR  = 0.42;
+// The tail length the send is quoted at. A longer tail sums more of its own
+// history and is louder at the same send, so the send comes down by
+// sqrt(REF/secs). 4.0 s is about the middle of the nineteen.
+const sysMUS_WET_REF  = 4.0;
+const sysMUS_WET_MIN  = 0.72;
+const sysMUS_WET_MAX  = 1.10;
+// ---- THE BREATH (v41; see musBreathStep) ---------------------------------
+const sysMUS_BREATH_DIP   = 0.42;  // how far the pad falls. Never to nothing.
+const sysMUS_BREATH_IN    = 3.4;   // s to go away...
+const sysMUS_BREATH_OUT   = 4.6;   // ...and longer to come back
+const sysMUS_BREATH_LEN_A = 9.0;   // s, the whole gesture including both ramps
+const sysMUS_BREATH_LEN_B = 13.0;
+const sysMUS_BREATH_GAP_A = 78;    // s between them
+const sysMUS_BREATH_GAP_B = 146;
+const sysMUS_BREATH_MAXI  = 0.22;  // musIntensity above which there is no breath
+const sysMUS_BREATH_CUT   = 690;   // Hz the pad's filter closes by at the bottom
+const sysMUS_BREATH_WET   = 0.34;  // ...and how far the room opens, as a fraction
+// ---- THE FEEL (v41; see musFeel). Milliseconds, and they are small. -------
+// One sigma of scatter, and the pocket, per role. The pulse-keepers barely
+// move: they are the grid the rest of the band is early or late against.
+const sysMUS_F_PULSE = { s: 3.5, b: 0 };    // clave, campana, ride, caixa, hats
+const sysMUS_F_HAND  = { s: 9,   b: 3 };    // congas, tamborim, agogo, qraqeb, bendir
+const sysMUS_F_KICK  = { s: 5,   b: 1.5 };  // surdo, bombo, tbel, the kick
+const sysMUS_F_BASS  = { s: 6.5, b: 6 };    // ...and the bass leans LATE. That is the pocket.
+const sysMUS_F_COMP  = { s: 9,   b: -2.5 }; // montuno, cavaquinho, charango, guajeo: pushed
+const sysMUS_F_LEAD  = { s: 13,  b: 4 };    // brass, horns, cuica, the answering voices
+const sysMUS_VEL_H   = 0.14;                // ...and how much a stroke varies
 // Everything that differs between chapters lives here, so the scheduler itself is
 // chapter-agnostic and a switch is a pointer swap, never a restart. Indexed by
 // chapter - 1, so entry 0 is Sydney (which now includes Circular Quay) and entry
@@ -6319,26 +6381,91 @@ export function createSystems(game) {
     musSetPalette(sysMUS_PAL_TITLE);
     musicStart();
   }
-  function noiseBuf() {
-    if (acNoise) return acNoise;
-    const n = Math.floor(ac.sampleRate * 1.2);
-    acNoise = ac.createBuffer(1, n, ac.sampleRate);
-    const d = acNoise.getChannelData(0);
-    let last = 0;
+  // ---- THE NOISE FLOOR, AND IT WAS 1.2 SECONDS OF MONO (v41) ---------------
+  //
+  // Every continuous sound in this game that is not a tone is this one buffer:
+  // the rain, the wind, the surf, the crowd, the crickets, the cave drip's
+  // body, the ambience bed. It was ONE channel, 1.2 seconds long, looped.
+  //
+  // Two things follow from that and both of them are audible.
+  //
+  //   1. A MONO SOURCE UP-MIXES TO TWO IDENTICAL CHANNELS, which is not a
+  //      quiet sound and not a wide one — it is a sound in the exact middle of
+  //      your head. So a downpour in Kowloon, a gale in the Drift and the surf
+  //      at Manly were all a flat panel one pixel wide, and the score — whose
+  //      plucks DO pan — sat in front of a cardboard cut-out of the weather.
+  //   2. 1.2 SECONDS IS SHORT ENOUGH TO HEAR. Noise has no melody to give the
+  //      loop away, but it has texture, and the same 1.2 s of texture fifty
+  //      times a minute reads as a machine somewhere rather than as weather.
+  //
+  // Six seconds, two channels, and the channels are PARTIALLY decorrelated
+  // rather than independent. Fully independent noise is very wide and has a
+  // hole in the middle of it — mono-summing it loses 3 dB and the centre goes
+  // hollow. A common core plus a per-channel difference keeps the centre solid
+  // and still opens the image right out: correlation lands near 0.6, which is
+  // about where a real stereo pair of microphones in front of rain sits.
+  //
+  // Generated once, on the first gesture, and about 20 ms of it.
+  // ---- ...AND WHY THERE ARE TWO OF THEM ------------------------------------
+  //
+  // A PLACED SOUND MUST STILL BE ABLE TO PAN. `StereoPannerNode` uses a
+  // different algorithm for a stereo input than for a mono one, and it has to:
+  // at pan 0.5 a mono source lands 0.38/0.92 across the two ears, and a stereo
+  // source lands 0.71/1.22, because the panner has an incoming left channel it
+  // is not allowed to throw away. That is right for a bed and WRONG for a
+  // footstep — it would have quietly taken about forty per cent off the
+  // positional cue of every noise-based effect in the game, which is exactly
+  // the sort of thing a width improvement is not allowed to cost.
+  //
+  // So: `noiseSrc()` — every placed effect — stays MONO and pans exactly as it
+  // did. `noiseWideSrc()` — the ambience and the weather bed, neither of which
+  // has a position because neither of them is anywhere — is the stereo one.
+  // Both are cut from the same three noise streams in one pass, so the mono
+  // buffer's colour is bit-for-bit what it always was.
+  const sysNOISE_SECS = 6.0;
+  const sysNOISE_COMMON = 0.74;   // weight of the shared core...
+  const sysNOISE_WIDE   = 0.62;   // ...and of each channel's own part
+  let acNoiseW = null;
+  function noiseBuild() {
+    if (acNoise) return;
+    const rate = ac.sampleRate;
+    const n = Math.floor(rate * sysNOISE_SECS);
+    acNoise = ac.createBuffer(1, n, rate);
+    acNoiseW = ac.createBuffer(2, n, rate);
+    const dm = acNoise.getChannelData(0);
+    const d0 = acNoiseW.getChannelData(0);
+    const d1 = acNoiseW.getChannelData(1);
+    // Unity-ish across the pair, so no filter downstream of either has to be
+    // re-tuned: the one-pole is bit-for-bit the colour the old buffer had.
+    const norm = 1 / Math.sqrt(sysNOISE_COMMON * sysNOISE_COMMON +
+                               sysNOISE_WIDE * sysNOISE_WIDE);
+    let mc = 0, m0 = 0, m1 = 0;
     for (let i = 0; i < n; i++) {
-      const w = Math.random() * 2 - 1;
-      last = last * 0.22 + w * 0.78;
-      d[i] = last;
+      mc = mc * 0.22 + (Math.random() * 2 - 1) * 0.78;
+      m0 = m0 * 0.22 + (Math.random() * 2 - 1) * 0.78;
+      m1 = m1 * 0.22 + (Math.random() * 2 - 1) * 0.78;
+      dm[i] = mc;
+      d0[i] = (mc * sysNOISE_COMMON + m0 * sysNOISE_WIDE) * norm;
+      d1[i] = (mc * sysNOISE_COMMON + m1 * sysNOISE_WIDE) * norm;
     }
-    return acNoise;
   }
-  function noiseSrc() {
+  function noiseMake(buf) {
     const s = ac.createBufferSource();
-    s.buffer = noiseBuf();
+    s.buffer = buf;
     s.loop = true;
+    // ...and every source takes a DIFFERENT slice of it. Two voices on one
+    // buffer at one rate are the same sound twice however they are filtered;
+    // a per-source loop window means the rain's bright band and its dark one
+    // never come round together, and neither do any two chapters' beds.
+    s.loopStart = rand(0, sysNOISE_SECS * 0.42);
+    s.loopEnd = rand(sysNOISE_SECS * 0.72, sysNOISE_SECS);
     s.playbackRate.value = rand(0.9, 1.1);
     return s;
   }
+  /** Mono, and it must stay mono: everything that says where it is. */
+  function noiseSrc() { noiseBuild(); return noiseMake(acNoise); }
+  /** Stereo. The beds, which are not anywhere. */
+  function noiseWideSrc() { noiseBuild(); return noiseMake(acNoiseW); }
   function env(node, t, peak, atk, dec) {
     const g = node.gain;
     g.setValueAtTime(0.0001, t);
@@ -7705,7 +7832,8 @@ export function createSystems(game) {
     acAmbGain = ac.createGain();
     acAmbGain.gain.value = 0.0001;
     acAmbGain.connect(acMaster);
-    const ns = noiseSrc();
+    // Wide: the ambience is not anywhere. See noiseWideSrc.
+    const ns = noiseWideSrc();
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 430; lp.Q.value = 0.5;
     const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
     const sway = ac.createGain(); sway.gain.value = 0.7;
@@ -7761,13 +7889,13 @@ export function createSystems(game) {
     // bright band is the drops hitting things and a dark one is the general
     // roar of a lot of them at once a long way off.
     wxBedRain = ac.createGain(); wxBedRain.gain.value = 0.0001;
-    const rn = noiseSrc();
+    const rn = noiseWideSrc();
     wxBedRainBP = ac.createBiquadFilter();
     wxBedRainBP.type = 'bandpass'; wxBedRainBP.frequency.value = 1750; wxBedRainBP.Q.value = 0.42;
     const rlo = ac.createBiquadFilter();
     rlo.type = 'lowpass'; rlo.frequency.value = 620; rlo.Q.value = 0.4;
     const rloG = ac.createGain(); rloG.gain.value = 0.55;
-    const rn2 = noiseSrc();
+    const rn2 = noiseWideSrc();
     rn.connect(wxBedRainBP); wxBedRainBP.connect(wxBedRain);
     rn2.connect(rlo); rlo.connect(rloG); rloG.connect(wxBedRain);
     wxBedRain.connect(wxBedBus);
@@ -7777,7 +7905,7 @@ export function createSystems(game) {
     // level: moving the level is a fan being switched on and off, moving the
     // cutoff is air going round something.
     wxBedWind = ac.createGain(); wxBedWind.gain.value = 0.0001;
-    const wn = noiseSrc();
+    const wn = noiseWideSrc();
     wxBedWindLP = ac.createBiquadFilter();
     wxBedWindLP.type = 'lowpass'; wxBedWindLP.frequency.value = 340; wxBedWindLP.Q.value = 0.7;
     const whp = ac.createBiquadFilter(); whp.type = 'highpass'; whp.frequency.value = 70;
@@ -7814,7 +7942,7 @@ export function createSystems(game) {
     // the gust actually drives, and it is the reason a wind shift is audible
     // in a chapter that has no rain in it at all.
     wxBedRustle = ac.createGain(); wxBedRustle.gain.value = 0.0001;
-    const sn = noiseSrc();
+    const sn = noiseWideSrc();
     const shp = ac.createBiquadFilter(); shp.type = 'highpass'; shp.frequency.value = 2300;
     const slp = ac.createBiquadFilter(); slp.type = 'lowpass'; slp.frequency.value = 7400;
     const ssway = ac.createGain(); ssway.gain.value = 0.6;
@@ -7890,6 +8018,8 @@ export function createSystems(game) {
   let musVol = null, musDry = null, musSend = null, musWet = null, musConv = null;
   let musPlaceLP = null, musPlacePan = null, musPlaceGain = null;
   let musPad = null, musFilt = null, musBassGain = null, musPluckDry = null;
+  // The ensemble bus — everything SUSTAINED goes through it. See musicStart.
+  let musWide = null;
   let musTimerId = 0;
   let musChordAt = 0, musPluckAt = 0, musIdx = 0, musChordStart = 0;
   let musMuted = false, musLevel = 1;
@@ -7941,21 +8071,259 @@ export function createSystems(game) {
 
   // Procedurally generated impulse response: exponentially decaying, darkened
   // noise. This is the difference between thin beeps and something lush.
-  function musIR(secs, decay) {
+  //
+  // ---- ...AND IT WAS A WASH, NOT A ROOM (v41) -----------------------------
+  //
+  // The old shape was decayed noise starting at sample zero with a 6 ms fade
+  // on the front. That is a reverb, and it is the one everybody writes first,
+  // and three things about a real space were missing from it:
+  //
+  //   1. NO PRE-DELAY. Sound reaches you before it reaches the wall, so the
+  //      first reflection of anything is 10–40 ms behind the direct sound. An
+  //      IR that starts at zero glues the tail to the source, and the price is
+  //      paid in CLARITY: the attack of every pluck, every mallet, every
+  //      footstep was smeared by its own reverb. A pre-delay is the single
+  //      cheapest thing that makes a wet mix legible, and it is why a 65% wet
+  //      score can still sound like notes rather than like fog.
+  //   2. NO EARLY REFLECTIONS. The size of a room is not told by its tail —
+  //      tails all sound alike — it is told by the handful of discrete bounces
+  //      that arrive before the tail becomes dense. Without them a cave and a
+  //      lawn differ only in length. Eight taps, spaced irrationally so they
+  //      do not ring, and at DIFFERENT times in the two channels, which is
+  //      what makes the room have a width as well as a depth.
+  //   3. THE TAIL DID NOT GET DARKER. Air and soft surfaces eat treble far
+  //      faster than bass, so a real tail loses its top over its length; a
+  //      one-pole with a fixed coefficient keeps the same brightness all the
+  //      way down and the last second of it hisses. The coefficient here walks
+  //      from sysIR_LP0 to sysIR_LP1 across the buffer, so the tail warms as
+  //      it goes and the last of it is a hum rather than a shhh.
+  //
+  // Costs nothing at run time: this is called once per chapter, on the border,
+  // in the same breath as sysRoomLoad already was.
+  function musIR(secs, decay, pre) {
     const rate = ac.sampleRate;
-    const n = Math.max(1, Math.floor(rate * secs));
+    // Pre-delay scales with the room: a beach has almost none and a cave has
+    // a lot, and the size number in sysROOMS is already exactly that ordering.
+    const pd = pre === undefined
+      ? clamp(0.006 + secs * 0.0068, 0.006, sysIR_PRE_MAX)
+      : pre;
+    const p = Math.floor(rate * pd);
+    const n = Math.max(1, Math.floor(rate * secs) + p);
     const buf = ac.createBuffer(2, n, rate);
     const atk = Math.max(1, Math.floor(rate * 0.006));
+    const body = n - p;
+    // How far the early cluster spreads, and it is the ONE number here that
+    // says how big the place is: a beach's bounces are all back inside 30 ms
+    // and a cave's are still arriving at 85. Clamped at the top because a
+    // reflection later than that is an echo, not a room.
+    //
+    // The offset matters more than the slope. `secs * k` looks like the obvious
+    // form and is useless: the music rooms only run 3.45–6.5 s, so any straight
+    // proportion of them either sits on the ceiling for eighteen chapters or
+    // makes the cave's cluster too tight to hear. Measured — qa/v41-ir.mjs —
+    // the first version pinned every room but Manly at exactly 85 ms.
+    const erSpan = clamp((secs - sysIR_ER_REF) * sysIR_ER_K + sysIR_ER_BASE,
+                         0.012, sysIR_ER_SPAN);
+    const erN = Math.max(1, Math.floor(rate * erSpan));
     for (let ch = 0; ch < 2; ch++) {
       const d = buf.getChannelData(ch);
       let lp = 0;
-      for (let i = 0; i < n; i++) {
-        lp = lp * 0.62 + (Math.random() * 2 - 1) * 0.38;
-        const tail = Math.pow(1 - i / n, decay);
-        d[i] = lp * tail * (i < atk ? i / atk : 1);
+      for (let i = 0; i < body; i++) {
+        // …and the low-pass closes as the tail runs out.
+        const k = sysIR_LP0 + (sysIR_LP1 - sysIR_LP0) * (i / body);
+        // sqrt(1-k^2) keeps the NOISE's level constant as the filter closes;
+        // without it the darkening reads as a fade and shortens the reverb.
+        // 0.4842 is the number that makes k = 0.62 come out bit-for-bit at the
+        // 0.38 the old one-pole used, so the head of every tail is unchanged.
+        lp = lp * k + (Math.random() * 2 - 1) * 0.4842 * Math.sqrt(1 - k * k);
+        const tail = Math.pow(1 - i / body, decay);
+        // …and the diffuse half BUILDS. A real tail is not dense on arrival —
+        // it takes as long to fill in as the early reflections take to stop
+        // being countable — and without this ramp the noise sits at full level
+        // underneath the taps below and swallows them, which is how you end up
+        // having built early reflections nobody can hear.
+        const bld = i < erN ? sysIR_BUILD + (1 - sysIR_BUILD) * (i / erN) : 1;
+        d[i + p] = lp * tail * bld * (i < atk ? i / atk : 1);
+      }
+      // ---- the early reflections, in front of the diffuse tail ------------
+      // Irrationally spaced (no tap time is a multiple of another, so the
+      // cluster does not ring at a pitch), quieter with distance, alternating
+      // sign so they do not pile into one thump, and at different times in the
+      // two channels — which is what gives the room a width as well as a depth.
+      for (let e = 0; e < sysIR_ER.length; e++) {
+        const j = p + Math.floor(rate * sysIR_ER[e] * erSpan * (ch ? 1.083 : 0.941));
+        if (j >= n) break;
+        // 1/(1+kd): a reflection loses level with the distance it travelled,
+        // not with some power of where it sits in the list — an exponent here
+        // buries the last four taps under the noise floor and the cluster
+        // stops being a cluster.
+        d[j] += (e & 1 ? -1 : 1) * sysIR_ER_G / (1 + 2.6 * sysIR_ER[e]);
       }
     }
     return buf;
+  }
+
+  // ---- THE SCORE'S OWN ROOM, ONE PER CHAPTER (v41) -------------------------
+  // See the note in musicStart. Two slots, one live, cross-faded on the border.
+  const musRoomSlot = [];
+  let musRoomCur = 0, musRoomFor = '', musRoomWant = sysMUS_WET, musRoomFadeT = 0;
+
+  /**
+   * Move the score into `name`'s room. Once per border crossing, and it is the
+   * only thing in the audio graph that allocates on a chapter change.
+   *
+   * Nothing here is fatal: if musIR throws, the live slot keeps the room it has
+   * and the score goes on sounding exactly as it did, which is the same
+   * contract sysRoomLoad has kept since v16.
+   */
+  function musRoomLoad(name) {
+    if (!ac || musRoomSlot.length < 2 || !musSend) return;
+    const key = name || 'sydney';
+    if (musRoomFor === key) return;
+    const R = sysROOMS[key] || sysROOM_DEF;
+    // Stretched out of the sfx table: a score wants a longer tail and a wetter
+    // send than a footstep does, and the ORDERING in that table is the part
+    // that was worth having — Manly driest, the cave wettest, by a long way.
+    const secs = clamp(sysMUS_ROOM_A + R.size * sysMUS_ROOM_B,
+                       sysMUS_ROOM_MIN, sysMUS_ROOM_MAX);
+    const dec  = clamp(R.decay * 0.85 + 0.5, 1.4, 3.6);
+    // ---- WHICH ROOM AND HOW LOUD ARE NOT THE SAME QUESTION ----------------
+    //
+    // The first version set the send straight off sysROOMS' `wet` column and
+    // measured badly: Son Doong came out **3.4 dB louder than it had been**,
+    // at 0.094 master RMS against Sydney's 0.045 — twice its neighbours on the
+    // same pad palette. Before v41 it was 1.22x Sydney; a mix pass that turns
+    // that into 2.06x has not deepened the cave, it has just turned it up.
+    //
+    // Two separate things were leaking into level and both are handled here:
+    //
+    //   1. `wet` in sysROOMS is a SFX number, where the send is a small
+    //      fraction of a short sound. Used raw it spans 0.04..0.42 — a factor
+    //      of ten — which is right for a footstep and absurd for a bed that
+    //      runs for an hour. `sysMUS_WET_SPR` compresses that to about a
+    //      decibel and a half either side of the old fixed 0.95.
+    //   2. A LONGER TAIL IS LOUDER EVEN AT THE SAME SEND, and `normalize` does
+    //      not fix it: the convolver normalises the impulse, but a sustained
+    //      input into a 6.5 s tail has nearly twice as much of its own history
+    //      summed into it at any instant as one into a 3.6 s tail. That is
+    //      physically true of a real cave and it is still a mix fault, so the
+    //      send comes down by sqrt(REF/secs) to cancel it.
+    //
+    // What is left is that the cave has a six-and-a-half second tail and an
+    // eighty-five millisecond early cluster, both the longest in the game, and
+    // Manly has neither. That is what a different room sounds like. Being
+    // louder is not.
+    const wet  = clamp(sysMUS_WET * (sysMUS_WET_BASE + R.wet * sysMUS_WET_SPR) *
+                       Math.sqrt(sysMUS_WET_REF / secs),
+                       sysMUS_WET_MIN, sysMUS_WET_MAX);
+    let buf;
+    try { buf = musIR(secs, dec); } catch (e) { return; }
+    const nxt = musRoomSlot[1 - musRoomCur];
+    const cur = musRoomSlot[musRoomCur];
+    nxt.conv.buffer = buf;
+    if (!nxt.fed) { try { musSend.connect(nxt.conv); nxt.fed = true; } catch (e) { return; } }
+    // The FIRST room is not a crossfade — there is nothing to cross from, and
+    // a score that takes two and a half seconds to acquire a reverb sounds
+    // like a bug on the one screen where nothing else is happening yet.
+    const xf = musRoomFor === '' ? 0.2 : sysMUS_ROOM_XF;
+    const t = ac.currentTime;
+    for (let k = 0; k < 2; k++) {
+      const s = musRoomSlot[k];
+      const to = s === nxt ? wet : 0.0001;
+      s.wet.gain.cancelScheduledValues(t);
+      s.wet.gain.setValueAtTime(Math.max(0.0001, s.wet.gain.value), t);
+      s.wet.gain.linearRampToValueAtTime(Math.max(0.0001, to), t + xf);
+    }
+    musRoomCur = 1 - musRoomCur;
+    musRoomFor = key;
+    musRoomWant = wet;
+    // ...and the room being left is released only once it has finished ringing.
+    musRoomFadeT = xf + sysMUS_ROOM_TAIL;
+    void cur;
+  }
+
+  /**
+   * One gain write a frame, and the border check. Called from the same breath
+   * as sysRoomSet, because it is the same state: the place you are in.
+   */
+  function musRoomSet(dt) {
+    if (!ac || musRoomSlot.length < 2 || ac.state !== 'running') return;
+    if (musRoomFadeT > 0) {
+      musRoomFadeT -= dt;
+      if (musRoomFadeT <= 0) {
+        const old = musRoomSlot[1 - musRoomCur];
+        if (old.fed) { try { musSend.disconnect(old.conv); } catch (e) {} old.fed = false; }
+      }
+      return;                  // the crossfade owns both wet gains while it runs
+    }
+    const live = (game.biome && game.biome.current) || 'sydney';
+    if (musRoomFor !== live) { musRoomLoad(live); return; }
+    // ...and THE BREATH opens the room, which is most of why the return lands:
+    // the hush is not a gap, it is the same music further away.
+    const w = musRoomWant * (1 + (1 - musBreath) * sysMUS_BREATH_WET);
+    musRoomSlot[musRoomCur].wet.gain
+      .setTargetAtTime(Math.max(0.0001, w), ac.currentTime, 0.9);
+  }
+
+  // ---- THE BREATH ----------------------------------------------------------
+  //
+  // The score never stopped. Not once, in nineteen chapters, for the whole
+  // hour: chord, pluck, chord, pluck, at a density set only by how much chaos
+  // the player was causing. It was a carpet, and a carpet is the one thing a
+  // beautiful piece of music is not — a phrase is beautiful because it ENDS,
+  // and because you notice it ending, and because something comes back.
+  //
+  // So about every two minutes, for seven or eight seconds, the music thins:
+  // the plucks stop, the pad comes down and darkens, and the reverb opens up
+  // so the thing you are hearing is mostly the ROOM the last chord is dying
+  // in. Then it comes back. Nothing is ever silent — a game that goes quiet
+  // reads as a bug and half the players reach for the volume — it goes DISTANT,
+  // which is the effect the return is bought with.
+  //
+  // It is deliberately not available everywhere:
+  //   - not under a band (`musPal.band`), because salsa, samba, gnawa, the
+  //     Kowloon four-to-the-floor and the Monte Carlo section are ARRANGEMENTS
+  //     and an arrangement that evaporates mid-bar is a dropout, not a phrase;
+  //   - not while a set piece is lifting, which is the opposite gesture;
+  //   - not while anything is going on (`musIntensity`), because the point of
+  //     a breath is that nothing is.
+  // Any of those cancels it early rather than blocking it, so the music never
+  // ends up holding a hush through a moment that wanted the opposite.
+  let musBreath = 1;          // 1 = playing, sysMUS_BREATH_DIP = at the bottom
+  let musBreathT = 0;         // s left of the current breath, 0 = not in one
+  let musBreathLen = 0;
+  let musBreathAt = sysMUS_BREATH_GAP_A;   // s until the next one may start
+
+  function musBreathStep(dt) {
+    const allowed = !musPal.band && musIntensity < sysMUS_BREATH_MAXI &&
+                    musLift * musLiftEnv() < 0.02;
+    if (musBreathT > 0) {
+      musBreathT -= dt;
+      if (!allowed) musBreathT = Math.min(musBreathT, sysMUS_BREATH_OUT);
+      if (musBreathT <= 0) {
+        musBreathT = 0;
+        musBreathAt = rand(sysMUS_BREATH_GAP_A, sysMUS_BREATH_GAP_B);
+      }
+    } else if (allowed) {
+      musBreathAt -= dt;
+      if (musBreathAt <= 0) {
+        musBreathLen = rand(sysMUS_BREATH_LEN_A, sysMUS_BREATH_LEN_B);
+        musBreathT = musBreathLen;
+      }
+    }
+    // The shape: down over sysMUS_BREATH_IN, hold, back up over _OUT. Longer
+    // coming back than going away, because a return that is quicker than the
+    // departure reads as a switch rather than as a phrase.
+    let want = 1;
+    if (musBreathT > 0) {
+      const gone = musBreathLen - musBreathT;
+      const k = gone < sysMUS_BREATH_IN ? gone / sysMUS_BREATH_IN
+              : musBreathT < sysMUS_BREATH_OUT ? musBreathT / sysMUS_BREATH_OUT : 1;
+      // smoothstep, so neither end of it has a corner on it
+      const s = k * k * (3 - 2 * k);
+      want = 1 - s * (1 - sysMUS_BREATH_DIP);
+    }
+    musBreath = damp(musBreath, want, 1.4, dt);
   }
 
   function musMakeVoice(centre, level, type, spread, out) {
@@ -8247,6 +8615,51 @@ export function createSystems(game) {
   }
 
   // Sparse bell / marimba-ish pluck, long release, always a tone of the chord.
+  // ---- THE FEEL, AND THERE WAS NONE (v41) ----------------------------------
+  //
+  // Every struck note in this game was scheduled at `t0 + step * gridUnit`, to
+  // the sample. Six bands — salsa, samba, gnawa, baroque, the Kowloon four to
+  // the floor, the Monte Carlo section — all of them perfect, all of them
+  // forever. That is the single thing that most reliably tells a listener they
+  // are hearing a machine, and no amount of instrument design fixes it: the
+  // congas can be beautifully modelled and the bar will still sound like a
+  // sequencer, because a bar played by people is NEVER on the grid.
+  //
+  // What people actually do is three things, and all three are here:
+  //
+  //   1. THEY SCATTER. Even a metronomic drummer lands within about ±5 ms of
+  //      the click; a conga player answering a clave is at ±10. `spread` is
+  //      that, in milliseconds, and it is drawn TRIANGULAR (two uniforms
+  //      summed) rather than uniform, because human error is bell-shaped and a
+  //      flat distribution puts as many notes at the extreme as at the centre,
+  //      which sounds drunk rather than alive.
+  //   2. THEY SIT SOMEWHERE. A section has a pocket: the bass and the surdo
+  //      lean LATE and that is what makes a groove feel relaxed, the montuno
+  //      and the cavaquinho push EARLY and that is what makes it feel urgent.
+  //      `bias` is that, also in milliseconds, and it is a constant — it is a
+  //      style, not an error.
+  //   3. THEY DO NOT HIT EVERYTHING THE SAME. `musVel` varies the stroke by
+  //      about a seventh, which is roughly the spread of a real player holding
+  //      one dynamic.
+  //
+  // The pulse-keepers get the least of all three — the clave, the campana, the
+  // ride and the hats are what the others are late AGAINST, and a grid that
+  // wobbles is not a grid. That asymmetry is the whole trick.
+  //
+  // Everything is scheduled at least sysMUS_RHY_LOOK (0.7 s) ahead, so no
+  // amount of negative bias here can push a note into the past.
+  //
+  // NOT the beat clock. `musBarAnchor` and `musBeatLen` are untouched: the
+  // dance floor in Cali and the towers in Kowloon are scored against the BAR,
+  // and the bar is exactly where it always was. Only the notes move.
+  function musFeel(t, spread, bias) {
+    return t + bias * 0.001 +
+           (Math.random() + Math.random() - 1) * spread * 0.001;
+  }
+  function musVel(v) {
+    return v * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
+  }
+
   function musPluck(when, midi, panv, vel) {
     const hz = sysMidiHz(midi);
     const rel = rand(2.4, 4.2);
@@ -9339,8 +9752,9 @@ export function createSystems(game) {
     for (let i = 0; i < rh.length; i++) {
       const e = rh[i];
       const w = t0 + e.t * sysMUS_EIGHTH;
-      if (e.k === 1) musBombo(w, e.v * lvl);
-      else musCharango(w, chord, e.v * lvl, e.t === 3);
+      const F = e.k === 1 ? sysMUS_F_KICK : sysMUS_F_COMP;
+      if (e.k === 1) musBombo(musFeel(w, F.s, F.b), musVel(e.v * lvl));
+      else musCharango(musFeel(w, F.s, F.b), chord, musVel(e.v * lvl), e.t === 3);
     }
   }
 
@@ -9361,34 +9775,40 @@ export function createSystems(game) {
     //     strokes that fall inside its own eight.
     for (let i = 0; i < sysMUS_CLAVE.length; i++) {
       const e = sysMUS_CLAVE[i] - half * sysMUS_SALSA_BAR;
-      if (e >= 0 && e < sysMUS_SALSA_BAR) musClave(t0 + e * E, lvl);
+      if (e >= 0 && e < sysMUS_SALSA_BAR) {
+        musClave(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(lvl));
+      }
     }
     // --- congas
     for (let i = 0; i < sysMUS_CONGA.length; i++) {
       const c = sysMUS_CONGA[i];
-      musConga(t0 + c.t * E, c.k, c.v * lvl);
+      musConga(musFeel(t0 + c.t * E, sysMUS_F_HAND.s, sysMUS_F_HAND.b), c.k, musVel(c.v * lvl));
     }
     // --- campana on the quarters, accented on 1 and 3
     for (let e = 0; e < sysMUS_SALSA_BAR; e += 2) {
-      musCampana(t0 + e * E, (e % 4 === 0 ? 0.9 : 0.55) * lvl);
+      musCampana(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
+                 musVel((e % 4 === 0 ? 0.9 : 0.55) * lvl));
     }
     // --- tumbao. The beat-4 note anticipates the next chord, which is the
     //     entire feel of a salsa bassline.
     for (let i = 0; i < sysMUS_TUMBAO.length; i++) {
       const b = sysMUS_TUMBAO[i];
       const useNext = b.a && half === 1;
-      musTumbaoNote(t0 + b.t * E, (useNext ? nextRoot : root) + (b.a ? 12 : 0), b.v * lvl);
+      musTumbaoNote(musFeel(t0 + b.t * E, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
+                    (useNext ? nextRoot : root) + (b.a ? 12 : 0), musVel(b.v * lvl));
     }
     // --- montuno guajeo, in octaves off the chord tones
     for (let i = 0; i < sysMUS_MONTUNO.length; i++) {
       const m = sysMUS_MONTUNO[i];
-      musMontunoNote(t0 + m.t * E, chord[m.d] + 12, m.v * lvl * 0.9);
+      musMontunoNote(musFeel(t0 + m.t * E, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
+                     chord[m.d] + 12, musVel(m.v * lvl * 0.9));
     }
     // --- brass: one stab per cycle, on the last clave stroke, and only when
     //     something is actually going on. Sparse is the point — a section that
     //     plays every bar is a fanfare, not a band.
     if (half === 1 && (musIntensity > 0.25 || Math.random() < 0.22)) {
-      musBrassStab(t0 + 6 * E, chord, (0.55 + musIntensity * 0.6) * lvl);
+      musBrassStab(musFeel(t0 + 6 * E, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), chord,
+                   musVel((0.55 + musIntensity * 0.6) * lvl));
     }
   }
 
@@ -9405,35 +9825,44 @@ export function createSystems(game) {
     // --- the surdo. The chapter, in two strokes.
     for (let i = 0; i < sysMUS_SURDO.length; i++) {
       const u = sysMUS_SURDO[i];
-      musSurdo(t0 + u.t * S, u.k, u.v * lvl);
+      musSurdo(musFeel(t0 + u.t * S, sysMUS_F_KICK.s, sysMUS_F_KICK.b), u.k, musVel(u.v * lvl));
     }
     // --- caixa, every sixteenth
-    for (let e = 0; e < sysMUS_SAMBA_BAR; e++) musCaixa(t0 + e * S, sysMUS_CAIXA[e] * lvl);
+    for (let e = 0; e < sysMUS_SAMBA_BAR; e++) {
+      musCaixa(musFeel(t0 + e * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
+               musVel(sysMUS_CAIXA[e] * lvl));
+    }
     // --- tamborim, the two-bar teleco-teco
     const tp = sysMUS_TAMB[half];
-    for (let i = 0; i < tp.length; i++) musTamborim(t0 + tp[i] * S, (i === 0 ? 0.9 : 0.7) * lvl);
+    for (let i = 0; i < tp.length; i++) {
+      musTamborim(musFeel(t0 + tp[i] * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b),
+                  musVel((i === 0 ? 0.9 : 0.7) * lvl));
+    }
     // --- agogo
     for (let i = 0; i < sysMUS_AGOGO.length; i++) {
       const a = sysMUS_AGOGO[i];
-      musAgogo(t0 + a.t * S, a.h, a.v * lvl);
+      musAgogo(musFeel(t0 + a.t * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), a.h, musVel(a.v * lvl));
     }
     // --- bass, with the surdo
     for (let i = 0; i < sysMUS_SAMBA_BASS.length; i++) {
       const b = sysMUS_SAMBA_BASS[i];
       const useNext = b.a && half === 1;
-      musSambaBassNote(t0 + b.t * S, useNext ? nextRoot : root, b.v * lvl);
+      musSambaBassNote(musFeel(t0 + b.t * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
+                       useNext ? nextRoot : root, musVel(b.v * lvl));
     }
     // --- cavaquinho, off the beat
     for (let i = 0; i < sysMUS_CAVACO.length; i++) {
       const c = sysMUS_CAVACO[i];
-      musCavaco(t0 + c.t * S, chord, c.v * lvl * 0.9);
+      musCavaco(musFeel(t0 + c.t * S, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
+                chord, musVel(c.v * lvl * 0.9));
     }
     // --- the cuica, sparingly. It is a voice, and a voice that talks over every
     //     bar stops being funny by the second one.
     if (half === 1 && (musIntensity > 0.3 || Math.random() < 0.3)) {
-      musCuica(t0 + 6 * S, (0.6 + musIntensity * 0.5) * lvl, 1);
+      musCuica(musFeel(t0 + 6 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b),
+               musVel((0.6 + musIntensity * 0.5) * lvl), 1);
     } else if (half === 0 && Math.random() < 0.12) {
-      musCuica(t0 + 2 * S, 0.45 * lvl, 0);
+      musCuica(musFeel(t0 + 2 * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b), musVel(0.45 * lvl), 0);
     }
   }
 
@@ -9934,35 +10363,54 @@ export function createSystems(game) {
     // the written level and the lead voice of the whole palette drops by a
     // third, which is the opposite of the point. 1.65 is a shade under what it
     // was, with half the notes and none of the stacked tremolo.
+    // …AND THIS IS THE ARRANGEMENT THAT NEEDED A FEEL MOST. Four people in a
+    // room at 132 bpm is the one idiom in this table where being on the grid is
+    // not merely unrealistic, it is the wrong genre — a quantised jazz quartet
+    // is a demo, not a band. The riff pushes, the upright leans back, and the
+    // ride barely moves at all, which is exactly the arrangement of trust in a
+    // real rhythm section. See musFeel.
     for (let i = 0; i < sysMUS_BOND_RIFF.length; i++) {
       const r = sysMUS_BOND_RIFF[i];
-      musTwang(t0 + r.t * S, root + 24 + r.d, ((i % 3) - 1) * 0.22,
-               r.v * lvl * 1.65, heat > 0.5 ? r.trem + 1 : r.trem);
+      musTwang(musFeel(t0 + r.t * S, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
+               root + 24 + r.d, ((i % 3) - 1) * 0.22,
+               musVel(r.v * lvl * 1.65), heat > 0.5 ? r.trem + 1 : r.trem);
     }
     // --- the upright
     for (let i = 0; i < sysMUS_BOND_BASS.length; i++) {
       const b = sysMUS_BOND_BASS[i];
-      musUpright(t0 + b.t * S, root + b.d, b.v * lvl);
+      musUpright(musFeel(t0 + b.t * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
+                 root + b.d, musVel(b.v * lvl));
       // the chromatic approach into the next bar, which is the whole feel
       if (b.t === 12 && Math.random() < 0.55 + heat * 0.3) {
-        musUpright(t0 + 14 * S, root + 11, 0.52 * lvl);
+        musUpright(musFeel(t0 + 14 * S, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
+                   root + 11, musVel(0.52 * lvl));
       }
     }
     // --- the ride, and the brushes under it
     for (let i = 0; i < sysMUS_BOND_RIDE.length; i++) {
       const r = sysMUS_BOND_RIDE[i];
-      musRide(t0 + r.t * S, r.v * lvl);
+      musRide(musFeel(t0 + r.t * S, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b), musVel(r.v * lvl));
     }
-    musBrush(t0 + 4 * S, 0.9 * lvl, false);
-    musBrush(t0 + 12 * S, 0.9 * lvl, false);
-    musBrush(t0, 0.7 * lvl, true);
-    if (heat > 0.45) { musBrush(t0 + 8 * S, 0.6 * lvl, true); musBrush(t0 + 6 * S, 0.5 * lvl, false); }
+    const FB = sysMUS_F_HAND;
+    musBrush(musFeel(t0 + 4 * S, FB.s, FB.b), musVel(0.9 * lvl), false);
+    musBrush(musFeel(t0 + 12 * S, FB.s, FB.b), musVel(0.9 * lvl), false);
+    musBrush(musFeel(t0, FB.s, FB.b), musVel(0.7 * lvl), true);
+    if (heat > 0.45) {
+      musBrush(musFeel(t0 + 8 * S, FB.s, FB.b), musVel(0.6 * lvl), true);
+      musBrush(musFeel(t0 + 6 * S, FB.s, FB.b), musVel(0.5 * lvl), false);
+    }
     // --- and the horns, which are the reason for all of the above
+    let bondHornT = 0;
     const every = heat > 0.5 ? 4 : 8;
     if (bar % every === every - 1) {
       for (let i = 0; i < sysMUS_BOND_HORN.length; i++) {
         const h = sysMUS_BOND_HORN[i];
-        musBondHorn(t0 + (8 + h.t) * S, root + 24 + h.o, h.v * lvl * 1.05);
+        // A section breathes together, so the WHOLE line takes one draw rather
+        // than each note taking its own: three players entering at three
+        // different times is not a section, it is a mistake. Hence `i === 0`.
+        if (i === 0) bondHornT = musFeel(0, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b);
+        musBondHorn(t0 + (8 + h.t) * S + bondHornT, root + 24 + h.o,
+                    musVel(h.v * lvl * 1.05));
       }
     }
     // --- the sting: the whole chord, once, when the harmony reaches it.
@@ -10129,14 +10577,19 @@ export function createSystems(game) {
     for (let i = 0; i < sysMUS_CONTINUO.length; i++) {
       const c = sysMUS_CONTINUO[i];
       const midi = musFold(chord[c.d % chord.length], root + 5, root + 21);
-      musCello(t0 + c.t * Q, midi, c.v * lvl * (1 - tide * 0.18), Q * 1.85);
+      musCello(musFeel(t0 + c.t * Q, sysMUS_F_BASS.s, sysMUS_F_BASS.b), midi,
+               musVel(c.v * lvl * (1 - tide * 0.18)), Q * 1.85);
     }
     // the harpsichord is what the water takes away
     if (tide < 0.92) {
       for (let i = 0; i < sysMUS_CEMBALO.length; i++) {
         const c = sysMUS_CEMBALO[i];
         if (tide > 0.35 && i > 1 && Math.random() < tide) continue;
-        musCembalo(t0 + c.t * Q, chord, c.v * lvl * (1 - tide * 0.55));
+        // A harpsichord has NO DYNAMIC — that is the note above musCembalo and
+        // it is why the velocity here is not humanised, only the timing. What a
+        // continuo player varies is when the chord arrives, not how hard.
+        musCembalo(musFeel(t0 + c.t * Q, sysMUS_F_COMP.s, sysMUS_F_COMP.b),
+                   chord, c.v * lvl * (1 - tide * 0.55));
       }
     }
     // ...and the organ is what it brings
@@ -10183,15 +10636,26 @@ export function createSystems(game) {
     for (let e = 0; e < sysMUS_HK_BAR; e++) {
       const step = sysMUS_HK_ARP[(e + bar * 3) % sysMUS_HK_ARP.length];
       const midi = musFold(root + 24 + sysMUS_HK_YU[step], 62, 86);
-      musHkArp(t0 + e * S, midi, (e % 2 === 0 ? 1 : 0.62) * lvl, show);
+      musHkArp(t0 + e * S, midi, musVel((e % 2 === 0 ? 1 : 0.62) * lvl), show);
     }
-    // the guzheng, every fourth bar, and only in the gaps
+    // ---- AND THE MACHINE STAYS ON THE GRID (v41) -------------------------
+    // Every other band in this table gets a feel — see musFeel — and this one
+    // deliberately does not. The kick, the snare, the hats, the bass and the
+    // arp of a four-to-the-floor track are QUANTISED, and that is not a
+    // limitation of the idiom, it IS the idiom: the whole chapter is a joke
+    // about a city that runs like a machine, and a swung kick would be a
+    // different joke. Only the velocities move, which is what a compressor and
+    // a human on the faders do to a track like this.
+    //
+    // The guzheng is the exception, because it is the one thing in this
+    // arrangement played by a person on a real instrument, and it is the one
+    // thing here you are supposed to notice.
     if (bar % 4 === 2) {
       const n = 3 + (Math.random() < 0.5 ? 1 : 0);
       for (let i = 0; i < n; i++) {
         const step = sysMUS_HK_YU[randInt(0, 4)];
-        musGuzheng(t0 + (4 + i * 3) * S, musFold(root + 24 + step, 66, 88),
-                   (0.8 - i * 0.12) * lvl);
+        musGuzheng(musFeel(t0 + (4 + i * 3) * S, sysMUS_F_LEAD.s, sysMUS_F_LEAD.b),
+                   musFold(root + 24 + step, 66, 88), musVel((0.8 - i * 0.12) * lvl));
       }
     }
     if (show > 0.25) musHkStab(t0, chord, show * lvl);
@@ -10222,28 +10686,41 @@ export function createSystems(game) {
 
     // --- the iron. Never stops, and in the storm it is all there is.
     for (let e = 0; e < sysMUS_GNAWA_CELL; e++) {
-      musQraqeb(t0 + e * P, sysMUS_QRAQEB[e] * (0.62 + build * 0.5) * (0.7 + strip * 0.5));
+      musQraqeb(musFeel(t0 + e * P, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
+                musVel(sysMUS_QRAQEB[e] * (0.62 + build * 0.5) * (0.7 + strip * 0.5)));
       // at full build they double, which is what a gnawa group does when the
-      // thing they are playing for starts to work
-      if (build > 0.5 && e % 2 === 1) musQraqeb(t0 + (e + 0.5) * P, sysMUS_QRAQEB[e] * 0.34 * build);
+      // thing they are playing for starts to work. The doubling is a SECOND
+      // PAIR OF HANDS, so it gets the hand feel rather than the iron's.
+      if (build > 0.5 && e % 2 === 1) {
+        musQraqeb(musFeel(t0 + (e + 0.5) * P, sysMUS_F_HAND.s, sysMUS_F_HAND.b),
+                  musVel(sysMUS_QRAQEB[e] * 0.34 * build));
+      }
     }
     if (open < 0.05) return;
 
     // --- the guembri
     for (let i = 0; i < sysMUS_GUEMBRI.length; i++) {
       const gq = sysMUS_GUEMBRI[i];
-      musGuembri(t0 + gq.t * P, root + sysMUS_GUEMBRI_P[gq.d], gq.v * lvl * open);
+      musGuembri(musFeel(t0 + gq.t * P, sysMUS_F_BASS.s, sysMUS_F_BASS.b),
+                 root + sysMUS_GUEMBRI_P[gq.d], musVel(gq.v * lvl * open));
     }
     // --- the drum
     for (let i = 0; i < sysMUS_TBEL.length; i++) {
       const tb = sysMUS_TBEL[i];
-      musTbel(t0 + tb.t * P, tb.v * lvl * open);
-      if (build > 0.45 && tb.t === 0) musTbel(t0 + 3 * P, tb.v * 0.55 * build * open);
+      musTbel(musFeel(t0 + tb.t * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b), musVel(tb.v * lvl * open));
+      if (build > 0.45 && tb.t === 0) {
+        musTbel(musFeel(t0 + 3 * P, sysMUS_F_KICK.s, sysMUS_F_KICK.b),
+                musVel(tb.v * 0.55 * build * open));
+      }
     }
     // --- and the hands, only when something is going on
     if (build > 0.2) {
       for (let i = 0; i < sysMUS_GNAWA_CLAP.length; i++) {
-        musClap(t0 + sysMUS_GNAWA_CLAP[i] * P, (0.5 + build * 0.6) * open);
+        // Hands scatter MORE than anything else in a band — a room clapping is
+        // a dozen people, not one — so this is the one place the spread is
+        // deliberately doubled. It is what turns a clap into a crowd.
+        musClap(musFeel(t0 + sysMUS_GNAWA_CLAP[i] * P, sysMUS_F_HAND.s * 2, sysMUS_F_HAND.b),
+                musVel((0.5 + build * 0.6) * open));
       }
     }
   }
@@ -10265,8 +10742,15 @@ export function createSystems(game) {
     }
     guard = 0;
     const lead = musPal.lead;
+    // THE BREATH, on the scheduler side. The pad only ducks; what actually
+    // makes the hush read as a phrase ending is that the NOTES stop. Thinned
+    // rather than switched off, and thinned by a number that is already
+    // gliding, so the last few plucks fall away over a couple of seconds
+    // instead of the melody hitting a wall. See musBreathStep.
+    const brK = musBreath < 0.995
+      ? clamp((musBreath - sysMUS_BREATH_DIP) / (1 - sysMUS_BREATH_DIP), 0, 1) : 1;
     while (musPluckAt < horizon && guard++ < 12) {
-      if (Math.random() < 0.7) {
+      if (Math.random() < 0.7 * brK) {
         const ch = (musPluckAt < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
         if (ch) {
           const pan = rand(-0.75, 0.75);
@@ -10392,7 +10876,9 @@ export function createSystems(game) {
       if (musLoanAt < now) musLoanAt = now + 0.4;
       guard = 0;
       while (musLoanAt < horizon && guard++ < 12) {
-        musSongLoan(musLoanAt, 0.55 + musIntensity * 0.35);
+        // …and the clapper stops with the plucks. It is the only pulse this
+        // palette has, and a pulse that keeps time through a hush cancels it.
+        if (brK > 0.06) musSongLoan(musLoanAt, (0.55 + musIntensity * 0.35) * brK);
         musLoanAt += 1.10;
       }
     }
@@ -10584,13 +11070,39 @@ export function createSystems(game) {
     else musPlaceLP.connect(musPlaceGain);
     musPlaceGain.connect(acMaster);
 
-    musConv = ac.createConvolver();
-    musConv.normalize = true;
-    musConv.buffer = musIR(3.6, 2.4);
-    musWet = ac.createGain(); musWet.gain.value = 0.95;
-    musConv.connect(musWet); musWet.connect(musVol);
+    // ---- THE SCORE WAS IN THE SAME ROOM IN ALL NINETEEN PLACES (v41) ------
+    //
+    // One convolver, one buffer, `musIR(3.6, 2.4)`, built at the first gesture
+    // and never touched again. So the ice cathedral in Antarctica, the tuff
+    // valley at Göreme, the four-and-a-half-metre alley in Hanoi and the open
+    // beach at Manly all played their music in an identical 3.6-second hall —
+    // while the SOUND EFFECTS in those same places had had their own rooms,
+    // from a hand-tuned table, since v16. The half of the mix that runs for the
+    // whole hour was the half that never moved.
+    //
+    // It reads sysROOMS. There is no second table: the sizes and wetnesses in
+    // there were written by somebody standing in each place and they are the
+    // same places. They are stretched, because a score wants a longer tail than
+    // a footstep does and the numbers in that table are footstep-sized.
+    //
+    // TWO convolvers, not one, because a convolver whose buffer changes while
+    // it is ringing DROPS the tail that is in it, and the cave's is five and a
+    // half seconds long. The border crossing cross-fades between them over two
+    // and a half seconds — so for a moment you are in both rooms, which is what
+    // walking out of somewhere actually sounds like — and the one being left is
+    // then taken off the send entirely, so a chapter never pays for a room it
+    // is not in.
     musSend = ac.createGain(); musSend.gain.value = 1;
-    musSend.connect(musConv);
+    musWet = ac.createGain(); musWet.gain.value = 1;
+    musWet.connect(musVol);
+    for (let k = 0; k < 2; k++) {
+      const cv = ac.createConvolver();
+      cv.normalize = true;
+      const wg = ac.createGain(); wg.gain.value = 0.0001;
+      cv.connect(wg); wg.connect(musWet);
+      musRoomSlot.push({ conv: cv, wet: wg, fed: false });
+    }
+    musConv = musRoomSlot[0].conv;    // kept for anything that reaches for it
     musDry = ac.createGain(); musDry.gain.value = 0.5;
     musDry.connect(musVol);
     musPluckDry = ac.createGain(); musPluckDry.gain.value = 0.42;
@@ -10607,7 +11119,82 @@ export function createSystems(game) {
     musFilt.type = 'lowpass'; musFilt.Q.value = 0.6; musFilt.frequency.value = 620;
     musPad = ac.createGain(); musPad.gain.value = sysMUS_BUS;
     musFilt.connect(musPad);
-    musPad.connect(musDry); musPad.connect(musSend);
+    // ---- THE PAD WAS IN THE MIDDLE OF YOUR HEAD (v41) ---------------------
+    //
+    // Seven detuned oscillator banks, a shared low-pass, one gain, and out.
+    // Every node in that chain is MONO, so the sustained bed under the whole
+    // game — the pad, the bass, the shimmer, the choir, the lift — arrived at
+    // both ears identically. Only the plucks panned and only the reverb was
+    // stereo, which is exactly backwards: in a record the bed is the wide
+    // thing and the transients sit in front of it.
+    //
+    // The fix is the oldest one there is and it is what a string machine
+    // actually IS: two short modulated delays, panned hard apart, under the
+    // dry centre. A delay of 16–23 ms is below the echo threshold, so it does
+    // not read as a repeat; moving it by ±3 ms on a slow LFO detunes the copy
+    // a few cents either way, so the two sides beat against the centre and
+    // against each other and never settle. That drift is the sound of an
+    // ensemble rather than an oscillator.
+    //
+    // The two rates are deliberately incommensurate with each other AND with
+    // the three LFOs already on this bus (0.031, 0.0173, 0.077), so nothing
+    // in the pad has a cycle you can learn.
+    //
+    // `musWideOut` exists so the added energy is paid back in ONE place: the
+    // two taps put about 1.4 dB on the bus and this takes it off, leaving the
+    // pad's level against the plucks, the sfx and the weather bed exactly
+    // where nineteen chapters were tuned with it. musPad.gain is still the
+    // only thing the update loop writes.
+    // It is ONE bus rather than one per voice, because the shimmer, the choir
+    // and the lift are all sustained chord voices too and all three were dead
+    // centre for the same reason. Two delay lines widen all four.
+    //
+    // ---- AND THE TAPS GO TO THE DRY PATH ONLY, WHICH IS THE WHOLE POINT ----
+    //
+    // The first version fed `musWide` into a single trimmed output that went to
+    // BOTH musDry and musSend, and it was measurably worthless: Sydney's master
+    // L/R correlation was 0.559 without the ensemble and 0.564 with it — no
+    // change at all, on a three-minute sample. (qa/v41-ab.js, both arms.)
+    //
+    // The reason is the wet/dry ratio. This score runs ~0.95 wet against 0.5
+    // dry, so two thirds of what you hear is the convolver's output — and a
+    // convolver REPLACES the stereo image of whatever goes into it with the
+    // image of its own impulse response. Widening the reverb's INPUT buys
+    // nothing, because the IR's two decorrelated channels were already doing
+    // that, and it costs something: delayed copies smear the reverb's attack.
+    //
+    // So the send takes the pad exactly as it always did — un-widened, clean,
+    // one signal — and the ensemble lives entirely on the dry path, which is
+    // the only path whose image survives to the speakers. `sysMUS_ENS_TRIM`
+    // now sits between the taps and musDry rather than in front of the send, so
+    // the WET level is bit-for-bit unchanged from before v41 and only the dry
+    // image moves.
+    musWide = ac.createGain();
+    musWide.gain.value = 1;
+    musPad.connect(musWide);
+    musWide.connect(musSend);                       // the reverb gets it clean
+    const musWideDry = ac.createGain();
+    musWideDry.gain.value = sysMUS_ENS_TRIM;
+    musWide.connect(musWideDry);
+    musWideDry.connect(musDry);
+    if (ac.createStereoPanner && ac.createDelay) {
+      const eRate = [0.0829, 0.1153];
+      const eBase = [0.0164, 0.0227];
+      const eDep  = [0.0033, 0.0026];
+      for (let k = 0; k < 2; k++) {
+        const dl = ac.createDelay(0.08);
+        dl.delayTime.value = eBase[k];
+        const elf = ac.createOscillator();
+        elf.type = 'sine'; elf.frequency.value = eRate[k];
+        const elg = ac.createGain(); elg.gain.value = eDep[k];
+        elf.connect(elg); elg.connect(dl.delayTime); elf.start();
+        const ep = ac.createStereoPanner();
+        ep.pan.value = k === 0 ? -sysMUS_ENS_PAN : sysMUS_ENS_PAN;
+        const eg = ac.createGain(); eg.gain.value = sysMUS_ENS_MIX;
+        musWide.connect(dl); dl.connect(ep); ep.connect(eg);
+        eg.connect(musWideDry);
+      }
+    }
 
     // two independent slow LFOs so the drift never repeats on a short cycle
     const lf1 = ac.createOscillator(); lf1.frequency.value = 0.031;
@@ -10638,9 +11225,10 @@ export function createSystems(game) {
     musShimGain = ac.createGain();
     musShimGain.gain.value = 0.0001;
     // Routed around the pad's low-pass so it stays airy rather than muffled, but
-    // still through the same reverb, so it sits in the same room as everything else.
-    musShimGain.connect(musDry);
-    musShimGain.connect(musSend);
+    // still through the same reverb, so it sits in the same room as everything
+    // else — and, since v41, through the same ensemble, because a shimmer is a
+    // sustained chord voice and a sustained chord voice belongs in the width.
+    musShimGain.connect(musWide);
     musShimV = musMakeVoice(sysMUS_SHIM, sysMUS_SHIM_L, 'triangle', sysMUS_SPREAD, musShimGain);
     for (let b = 0; b < 2; b++) lg3.connect(musShimV.banks[b].oscs[0].detune);
     musVoices.push(musShimV);
@@ -10655,8 +11243,7 @@ export function createSystems(game) {
     // down. And the gain is down everywhere but under one sky.
     musChoirGain = ac.createGain();
     musChoirGain.gain.value = 0.0001;
-    musChoirGain.connect(musDry);
-    musChoirGain.connect(musSend);
+    musChoirGain.connect(musWide);
     musChoirIn = ac.createGain();
     musChoirIn.gain.value = 1;
     for (let k = 0; k < sysMUS_FORMANT.length; k++) {
@@ -10687,8 +11274,7 @@ export function createSystems(game) {
     // nothing but three oscillator phases for the other fifty-nine minutes.
     musLiftGain = ac.createGain();
     musLiftGain.gain.value = 0.0001;
-    musLiftGain.connect(musDry);
-    musLiftGain.connect(musSend);
+    musLiftGain.connect(musWide);
     for (let k = 0; k < sysMUS_LIFT.length; k++) {
       const v = musMakeVoice(sysMUS_LIFT[k], sysMUS_LIFT_L[k], 'triangle', sysMUS_SPREAD, musLiftGain);
       for (let b = 0; b < 2; b++) lg3.connect(v.banks[b].oscs[0].detune);
@@ -18417,6 +19003,24 @@ export function createSystems(game) {
      * calling it every frame holds the swell up rather than restarting it.
      */
     swell(k) { try { musSwell(k); } catch (e) {} },
+    /**
+     * THE BREATH, 0..1. 1 is playing; it falls toward sysMUS_BREATH_DIP for
+     * seven or eight seconds about twice a minute and comes back. Published
+     * because it is a slow, rare, invisible thing and the only way to see it
+     * from a probe is to be told — a soak that samples this for two minutes and
+     * never sees it below 0.99 has found a bug that no screenshot could.
+     */
+    get breath() { return musBreath; },
+    /** Which chapter's room the SCORE's convolver is in. See musRoomLoad. */
+    get room() { return musRoomFor; },
+    /**
+     * A PLACE TO PUT AN ANALYSER, and nothing else. Everything audible in this
+     * game is summed at `out` before the limiter, so a probe that wants to
+     * measure what a player actually hears — the stereo width of the pad, a
+     * clip on a busy bar, whether the ensemble is running at all — hangs a
+     * splitter here. Read-only in spirit: nothing in src reads it.
+     */
+    get bus() { return (ac && acMaster) ? { ac: ac, out: acMaster } : null; },
   };
 
   // WHICH LANDMARKS THIS WORLD ACTUALLY DRAWS. Every mark past the first two
@@ -20327,8 +20931,12 @@ export function createSystems(game) {
     // just took a third of the sun is the shower you can now hear.
     sysWxBedSet(dt);
     // ...and so is the room it is all heard in, for the same reason and in the
-    // same breath. See sysROOMS.
+    // same breath. See sysROOMS. Twice, because since v41 the score has a room
+    // of its own built out of the same table — a longer, wetter version of the
+    // same place, because a chord wants a tail that a footstep does not.
     sysRoomSet(dt);
+    musRoomSet(dt);
+    musBreathStep(dt);
 
     // ---- the score goes to sea -------------------------------------------
     // Palette 3 is only ever alive while somebody is actually driving. Taking
@@ -21275,14 +21883,21 @@ export function createSystems(game) {
       // quieter and closer for as long as the animal is sitting there, and
       // goes back the moment it gets up.
       const calmLean = musCalm * (1 + sysLoafNow * (sysLOAF_MUS / sysCALM_MUS));
+      // ...AND THE BREATH IS THE SAME THREE PARAMETERS AGAIN, a fourth time.
+      // A chase ducks the pad and opens the filter; a calm raises it and closes
+      // it; a lift does both upward. A breath takes the level DOWN and the
+      // filter down WITH it, which is the one combination none of the others
+      // make and is the difference between quieter and further away.
+      const br = 1 - musBreath;              // 0 normally, up to 1-DIP at the bottom
       musPad.gain.setTargetAtTime(musPal.bus * (1 - musIntensity * 0.3) *
-        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS),
+        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath,
         nowA, lift > 0.02 ? 0.6 : 1.2);
-      musFilt.frequency.setTargetAtTime(musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
-        musIntensity * 780 + lift * 1100,
+      musFilt.frequency.setTargetAtTime(Math.max(180,
+        musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
+        musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT),
         nowA, lift > 0.02 ? 0.7 : 1.4);
-      musBassGain.gain.setTargetAtTime(musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
-        musIntensity * 0.08 + lift * 0.05, nowA, 1.5);
+      musBassGain.gain.setTargetAtTime((musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
+        musIntensity * 0.08 + lift * 0.05) * musBreath, nowA, 1.5);
       // the thickening layer: silent at zero tasks, a shimmer at all of them
       if (musShimGain) musShimGain.gain.setTargetAtTime(0.0001 + musProg * 0.85, nowA, 2.5);
       // ---- THE AURORA'S CHOIR ------------------------------------------

@@ -1,0 +1,36 @@
+[
+ {
+  "n": 1801,
+  "rms": 0.05156,
+  "corr": 0.483,
+  "side": 0.264,
+  "peak": 0.275,
+  "clip": 0,
+  "rmsMin": 0.0072,
+  "rmsMax": 0.0945,
+  "breathMin": 0.427,
+  "dips": 1,
+  "key": "Digit1",
+  "range": 13.1,
+  "biome": "sydney",
+  "room": "sydney",
+  "err": null
+ },
+ {
+  "n": 1800,
+  "rms": 0.07936,
+  "corr": 0.264,
+  "side": 0.374,
+  "peak": 0.507,
+  "clip": 0,
+  "rmsMin": 0.01065,
+  "rmsMax": 0.1653,
+  "breathMin": 0.429,
+  "dips": 1,
+  "key": "Quote",
+  "range": 15.5,
+  "biome": "cave",
+  "room": "cave",
+  "err": null
+ }
+]
