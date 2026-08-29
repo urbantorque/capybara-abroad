@@ -14528,6 +14528,11 @@ export function createSystems(game) {
     const parWas = recAtPar(def, prev);
     jrRecs[id] = value;
     saveSoon();
+    // ...and the run that set it becomes the ghost for the next one. See THE
+    // GHOST. Only ever here — a trace is kept when a figure IMPROVES, which is
+    // what makes "no ghost on a first attempt" a property of the mechanism
+    // rather than a rule somebody has to remember.
+    ghKeep(id);
     // Only shout about it if it BEAT something. The first time you do a thing,
     // the tick is the news and a personal best on a first attempt is noise.
     //
@@ -14662,6 +14667,201 @@ export function createSystems(game) {
       if (recLiveSince > sysREC_STALE) { recLiveId = ''; recLiveVal = NaN; }
     }
     recPaint();
+  }
+
+  // =========================================================================
+  // THE GHOST — the animal you were, the last time you did this well (v37)
+  // =========================================================================
+  //
+  // The live line put the number you have to beat on the paper. This puts the
+  // RUN back in the world: while an attempt is open on a record you already
+  // hold, your own best go at it is played back beside you, translucent, at
+  // the same point in its own clock. The question stops being "am I under
+  // 42.1" and becomes "am I in front", which is a different and much older
+  // kind of question.
+  //
+  // FIVE RULES, and four of them are the doctrine this feature could most
+  // easily break:
+  //
+  //  1. IT GATES NOTHING AND CANNOT FAIL YOU. It writes four floats into a
+  //     mesh. `recordValue`'s contract is untouched, no task is harder, and a
+  //     player who never notices it plays the game that shipped yesterday.
+  //  2. NO GHOST ON A FIRST ATTEMPT. A trace is kept when a run BEATS
+  //     something, so the earliest a ghost can appear is your second go —
+  //     which is right, because a ghost of a run you have not made is a
+  //     stranger, and the first time you do a thing the doing is the news.
+  //  3. THERE IS NO READOUT. It does not say how far ahead you are, ever. The
+  //     picture says it, and a number beside it would turn a race into a
+  //     spreadsheet.
+  //  4. IT MAY NOT RIDE IN THE JOURNEY SAVE. `saveWrite` puts everything
+  //     through one setItem and swallows a quota throw, so a fat ghost store
+  //     would silently take the tasks, the records and the finds with it.
+  //     Separate key, separate try/catch, oldest-out on quota — the album's
+  //     rules, for the album's reason.
+  //  5. A RUN THAT DID NOT GO ANYWHERE IS NOT A RUN. The trace is kept only if
+  //     the animal actually covered ground, and that one line sorts the
+  //     fifty-three out by itself: the glacier, the Uji, the souk and the
+  //     passage up the harbour all qualify, and sitting in a hot spring for
+  //     four minutes, winning at roulette and putting two hundred pigeons up
+  //     do not — none of which had to be listed anywhere.
+  //
+  // WHAT IS STORED. Four numbers a sample — x, y, z, yaw — at a FIXED rate, so
+  // the time of a sample is its index and nothing has to carry a clock. Two
+  // decimal places, because a ghost is a silhouette at ten metres and the
+  // third one is forty per cent of the file for nothing.
+  const sysGHOST_KEY   = 'capy3.ghosts.v1';
+  const sysGHOST_HZ    = 10;      // samples a second. A capybara is not fast.
+  const sysGHOST_MAX_S = 150;     // s of one attempt that will be kept
+  const sysGHOST_KEEP  = 8;       // how many runs the store holds, oldest out
+  const sysGHOST_MIN_M = 8;       // m the animal must cover for it to be a run
+  const sysGHOST_FADE  = 0.6;     // s the ghost takes to arrive and to leave
+  const sysGHOST_N     = sysGHOST_HZ * sysGHOST_MAX_S;
+
+  let ghStore = null;             // id -> flat array, lazily read
+  const ghRec = new Float32Array(sysGHOST_N * 4);   // the attempt being recorded
+  let ghRecN = 0;                 // samples written
+  let ghRecT = 0;                 // s of attempt elapsed
+  let ghRecM = 0;                 // m of ground covered
+  let ghLastX = 0, ghLastZ = 0, ghHaveLast = false;
+  let ghPlay = null;              // the flat array being played back, or null
+  let ghPlayN = 0;
+  let ghFade = 0;                 // 0..1 in
+  let ghId = '';                  // the attempt these belong to
+  // WAS THE LINE OPEN LAST FRAME. A second go at the SAME record is a new
+  // attempt and must start the recorder from zero, and "the id changed" cannot
+  // see that: measured, two nine-second runs at `uji-run` produced one
+  // hundred-and-eighty-one-sample trace and a ghost that was already past its
+  // own finish on the first frame of the second run. `ghId` is deliberately
+  // NOT cleared when the line closes, because a chapter may file its record
+  // after `recordEnd` — or after the watchdog — and `ghKeep` has to still
+  // recognise the trace it is being asked to keep.
+  let ghWasOpen = false;
+
+  function ghAll() {
+    if (ghStore) return ghStore;
+    ghStore = Object.create(null);
+    try {
+      const raw = localStorage.getItem(sysGHOST_KEY);
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (o && o.v === 1 && o.g && typeof o.g === 'object') {
+          for (const k in o.g) if (Array.isArray(o.g[k])) ghStore[k] = o.g[k];
+        }
+      }
+    } catch (e) { ghStore = Object.create(null); }
+    return ghStore;
+  }
+
+  /** Oldest-out until it fits. Silent on failure: a ghost is a nicety. */
+  function ghWrite() {
+    const all = ghAll();
+    for (let guard = 0; guard < sysGHOST_KEEP + 2; guard++) {
+      try {
+        localStorage.setItem(sysGHOST_KEY, JSON.stringify({ v: 1, g: all }));
+        return true;
+      } catch (e) {
+        const ks = Object.keys(all);
+        if (!ks.length) return false;
+        delete all[ks[0]];        // insertion order: the oldest run is first
+      }
+    }
+    return false;
+  }
+
+  /** THE ATTEMPT IS OPEN AND IT IS A NEW ONE. Called from recordLive. */
+  function ghOpen(id) {
+    ghId = id;
+    ghRecN = 0; ghRecT = 0; ghRecM = 0; ghHaveLast = false;
+    const all = ghAll();
+    const t = all[id];
+    ghPlay = (t && t.length >= 8) ? t : null;
+    ghPlayN = ghPlay ? (ghPlay.length >> 2) : 0;
+    ghFade = 0;
+  }
+
+  /**
+   * One frame of the open attempt: sample where the animal is, and draw where
+   * it was. Raw dt, like everything else on the wall clock — a ghost that ran
+   * at the rate of a slow-motion would be racing a different run.
+   */
+  function ghTick(dt) {
+    const capy = game.capy;
+    if (!capy || !capy.ghost) return;
+    if (!recLiveId) {
+      ghWasOpen = false;
+      if (ghFade > 0) {
+        ghFade = Math.max(0, ghFade - dt / sysGHOST_FADE);
+        if (ghFade <= 0) capy.ghost.hide();
+      }
+      return;
+    }
+    // A NEW ATTEMPT IS EITHER A NEW ID OR A LINE THAT WAS SHUT. See ghWasOpen.
+    if (!ghWasOpen || recLiveId !== ghId) ghOpen(recLiveId);
+    ghWasOpen = true;
+    ghRecT += dt;
+
+    // ---- record ----------------------------------------------------------
+    const p = capy.position;
+    if (p) {
+      if (ghHaveLast) ghRecM += Math.hypot(p.x - ghLastX, p.z - ghLastZ);
+      ghLastX = p.x; ghLastZ = p.z; ghHaveLast = true;
+      // Index from the clock, not a counter: a frame hitch must not shorten
+      // the trace, and a slow frame must not write two samples.
+      const want = Math.floor(ghRecT * sysGHOST_HZ);
+      if (want >= ghRecN && ghRecN < sysGHOST_N) {
+        const o = ghRecN * 4;
+        ghRec[o] = p.x; ghRec[o + 1] = p.y; ghRec[o + 2] = p.z;
+        ghRec[o + 3] = (capy.group && capy.group.rotation.y) || 0;
+        ghRecN++;
+      }
+    }
+
+    // ---- and play ---------------------------------------------------------
+    if (!ghPlay) { if (ghFade > 0) { ghFade = 0; capy.ghost.hide(); } return; }
+    const f = ghRecT * sysGHOST_HZ;
+    const i = Math.floor(f);
+    if (i >= ghPlayN - 1) {
+      // The ghost finished. It does not linger at the post: it fades out
+      // wherever it got to, which is the only honest thing a finished run can
+      // do while yours is still going.
+      ghFade = Math.max(0, ghFade - dt / sysGHOST_FADE);
+      if (ghFade <= 0) { capy.ghost.hide(); return; }
+    } else {
+      ghFade = Math.min(1, ghFade + dt / sysGHOST_FADE);
+    }
+    const a = Math.min(i, ghPlayN - 1) * 4;
+    const b = Math.min(i + 1, ghPlayN - 1) * 4;
+    const u = clamp(f - i, 0, 1);
+    const gx = lerp(ghPlay[a], ghPlay[b], u);
+    const gy = lerp(ghPlay[a + 1], ghPlay[b + 1], u);
+    const gz = lerp(ghPlay[a + 2], ghPlay[b + 2], u);
+    // The yaw is an ANGLE and it wraps. Lerping it the flat way spins the
+    // ghost the long way round every time a run crosses -pi, which is the one
+    // artefact that would make it read as a bug rather than as an animal.
+    const gyaw = ghPlay[a + 3] + sysWrapPi(ghPlay[b + 3] - ghPlay[a + 3]) * u;
+    capy.ghost.show(gx, gy, gz, gyaw, ghFade);
+  }
+
+  /**
+   * THAT RUN WAS A BEST — keep it if it was a run. Called from recordValue,
+   * which has already decided the figure is an improvement.
+   */
+  function ghKeep(id) {
+    if (id !== ghId || ghRecN < sysGHOST_HZ || ghRecM < sysGHOST_MIN_M) return false;
+    const flat = new Array(ghRecN * 4);
+    for (let k = 0; k < ghRecN * 4; k++) flat[k] = Math.round(ghRec[k] * 100) / 100;
+    const all = ghAll();
+    // Re-inserted rather than overwritten in place, so the key order stays
+    // "oldest first" and the eviction in ghWrite drops the run nobody has
+    // been back to rather than the one they are standing in.
+    delete all[id];
+    all[id] = flat;
+    const ks = Object.keys(all);
+    while (ks.length > sysGHOST_KEEP) { delete all[ks.shift()]; }
+    ghWrite();
+    // The run just filed becomes the ghost for the NEXT attempt, not this one.
+    ghPlay = flat; ghPlayN = ghRecN;
+    return true;
   }
 
   // =========================================================================
@@ -18001,6 +18201,22 @@ export function createSystems(game) {
     },
     /** Is the camera out, and how many pictures has it taken. */
     photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
+    /**
+     * THE GHOST, without the traces — the harness cannot hold eight thousand
+     * floats and does not need to. Nothing in src reads this. See THE GHOST.
+     */
+    ghostAudit: function () {
+      const all = ghAll();
+      const runs = Object.create(null);
+      for (const k in all) runs[k] = all[k].length >> 2;
+      let stored = -1;
+      try { stored = (localStorage.getItem(sysGHOST_KEY) || '').length; } catch (e) {}
+      return { runs: runs, kept: Object.keys(all).length, cap: sysGHOST_KEEP,
+               chars: stored, id: ghId, recording: ghRecN, metres: +ghRecM.toFixed(1),
+               playing: ghPlayN, fade: +ghFade.toFixed(2), t: +ghRecT.toFixed(2),
+               wasOpen: ghWasOpen, live: recLiveId,
+               on: !!(game.capy && game.capy.ghost && game.capy.ghost.on()) };
+    },
     /** The album, without the pictures — the harness cannot hold 36 dataURLs. */
     albumAudit: function () {
       const arr = albAll();
@@ -18155,6 +18371,13 @@ export function createSystems(game) {
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
     backRing.length = 0; backT = 0; backHold = 0; backBusy = 0;
+    // ...and a ghost belongs to the run it came out of. Every chapter is
+    // authored in the same coordinates, so a trace played on the other side of
+    // a border is a capybara jogging through a basilica. See THE GHOST.
+    recLiveId = ''; recLiveVal = NaN;
+    ghId = ''; ghPlay = null; ghPlayN = 0; ghFade = 0; ghRecN = 0;
+    ghHaveLast = false; ghWasOpen = false;
+    if (game.capy && game.capy.ghost) game.capy.ghost.hide();
     // A shot belongs to the moment that asked for it. Crossing a border ends
     // the moment, and a framing left running into a teleport would fight the
     // arrival yaw the spawn sets two lines later. Same rule as shake and time.
@@ -18951,6 +19174,10 @@ export function createSystems(game) {
     // the same reason: an attempt does not stop being open because a `wow` put
     // the world at 0.45x, and sysREC_STALE is a wall-clock promise.
     recLiveTick(game.state.rawDt || dt);
+    // ...and the ghost, on the same wall clock the line's watchdog runs on. A
+    // ghost stepped by the SCALED dt would slow down inside a hitstop and be
+    // racing a run that never happened. See THE GHOST.
+    ghTick(game.state.rawDt || dt);
     // Raw dt for the same reason the finds use it: sitting down among the
     // seventeen should not take longer because something else slowed time.
     sysFinaleStep(game.state.rawDt || dt);

@@ -1734,6 +1734,97 @@ export function createCapybara(game) {
     capyShove.z += n.z * s * sign;
   });
 
+  // ===================================================================
+  // THE GHOST — the animal you were, the last time you did this well (v37)
+  // ===================================================================
+  //
+  // Fifty-three tasks in this game carry a number, and the block that draws
+  // the live line says what they are for: "records are the only reason to
+  // re-enter a finished chapter, so this is the whole of the game's replay
+  // surface". The way you beat one was by remembering a figure. This is that
+  // figure put back in the world: your own best run, played back beside you,
+  // so the question stops being "am I under 42.1" and becomes "am I in front".
+  //
+  // WHO OWNS WHAT. systems.js owns the trace — it knows when an attempt opens,
+  // when it closes, whether it beat anything, and it owns localStorage. This
+  // file owns the ANIMAL: the model, its materials and its rest pose are here
+  // and nowhere else. Two functions between them, `show` and `hide`, and the
+  // ghost never touches the body, the solver or a single number the player is
+  // being measured on.
+  //
+  // ONE MESH, NOT EIGHTEEN. `capyModel` is eighteen parts, and eighteen extra
+  // draw calls to draw a thing that is deliberately not detailed is the wrong
+  // trade — so the parts are baked ONCE, here, into a single geometry with the
+  // rest pose folded into the vertices. It is built at construction and before
+  // any frame has run, which is also the only moment the model is in a pose
+  // worth freezing: the gait, the loaf, the squash and the idle beats have all
+  // not happened yet, so what gets baked is the animal standing.
+  //
+  // NOT A CLONE OF THE MATERIALS. `mat()` caches by colour and options, so a
+  // cloned fur material is either shared with the real animal (and a wetness
+  // write would dye the ghost) or a fresh one that misses the cache. It gets
+  // ONE material of its own, flat, transparent, unlit by the shadow pass and
+  // writing no depth — which is what makes it read as a memory of an animal
+  // rather than a second animal.
+  const capyGhostMat = mat(PALETTE.capy, {
+    transparent: true, opacity: 0.34, depthWrite: false, fog: true,
+  });
+  let capyGhost = null;
+
+  /**
+   * Bake `capyModel`'s parts into one geometry, in model space. Called once.
+   * Returns null if anything about the model is not what this expects, because
+   * a ghost is a nicety and must never be able to take the animal down.
+   */
+  function capyBakeGhost() {
+    try {
+      const parts = [];
+      capyModel.updateWorldMatrix(true, true);
+      const inv = new THREE.Matrix4().copy(capyModel.matrixWorld).invert();
+      const m4 = new THREE.Matrix4();
+      let verts = 0;
+      capyModel.traverse(function (o) {
+        if (!o.isMesh || !o.geometry || !o.geometry.attributes ||
+            !o.geometry.attributes.position) return;
+        // Skip anything hidden at rest — the held-prop sockets and the like.
+        if (!o.visible) return;
+        o.updateWorldMatrix(true, false);
+        const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        m4.copy(inv).multiply(o.matrixWorld);
+        g.applyMatrix4(m4);
+        verts += g.attributes.position.count;
+        parts.push(g);
+      });
+      if (!parts.length || verts < 3) return null;
+      const pos = new Float32Array(verts * 3);
+      const nor = new Float32Array(verts * 3);
+      let o3 = 0;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i].attributes.position, n = parts[i].attributes.normal;
+        for (let k = 0; k < p.count; k++, o3 += 3) {
+          pos[o3] = p.getX(k); pos[o3 + 1] = p.getY(k); pos[o3 + 2] = p.getZ(k);
+          if (n) { nor[o3] = n.getX(k); nor[o3 + 1] = n.getY(k); nor[o3 + 2] = n.getZ(k); }
+        }
+        parts[i].dispose();
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geo, capyGhostMat);
+      mesh.name = 'capyGhost';
+      // No shadow, either way. A translucent memory that casts a hard shadow is
+      // a second animal standing there, which is exactly what it must not be.
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+      mesh.visible = false;
+      scene.add(mesh);
+      return mesh;
+    } catch (e) { return null; }
+  }
+
   // -------------------------------------------------------------------
   // The published record
   // -------------------------------------------------------------------
@@ -1772,6 +1863,34 @@ export function createCapybara(game) {
     depth: 0,                        // metres below the live waterline, 0 on land
     diveTime: 0,                     // s this breath has lasted
     threwAt: -1,
+    /**
+     * THE GHOST — see the block above. Two verbs, and systems.js is the only
+     * caller: it owns the trace and this file owns the animal.
+     *
+     *   capy.ghost.show(x, y, z, yaw, a)   put it there, `a` is 0..1 of the
+     *                                      material's own opacity (a fade-in)
+     *   capy.ghost.hide()                  gone
+     *
+     * Built on the FIRST show and never before: a player who has no record
+     * anywhere never pays for the geometry. Both are safe to call every frame
+     * and safe to call when the bake failed — `show` simply does nothing, and
+     * the run measures exactly as it did before ghosts existed.
+     */
+    ghost: {
+      show: function (x, y, z, yaw, a) {
+        if (!capyGhost) {
+          capyGhost = capyBakeGhost();
+          if (!capyGhost) { this.show = function () {}; return; }
+        }
+        capyGhost.position.set(x, y - capyFOOT_Y, z);
+        capyGhost.rotation.y = yaw;
+        capyGhostMat.opacity = 0.34 * clamp(a === undefined ? 1 : a, 0, 1);
+        capyGhost.visible = capyGhostMat.opacity > 0.01;
+      },
+      hide: function () { if (capyGhost) capyGhost.visible = false; },
+      /** Is there one on screen. The harness asks; nothing in src does. */
+      on: function () { return !!(capyGhost && capyGhost.visible); },
+    },
     /**
      * POINT THE ANIMAL. For arrivals, and for arrivals only.
      *
