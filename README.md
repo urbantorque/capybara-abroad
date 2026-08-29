@@ -1086,6 +1086,49 @@ places.
   different language. Sixteen lines of text is a timetable; one small mark per row makes the
   board scannable by colour, which at sixteen rows is the only way anybody scans anything.
 
+## A light that behaves like a light
+
+There has been a composite pass between the scene and the screen for a while — bloom, an
+S-curve, a per-chapter tint and a vignette. Looking hard at nineteen arrival frames turned up
+the same two sentences over and over, though: **a light in this game was a sticker, and a frame
+in this game had one tint on it.** The lamp on the Monte Carlo quay was a white disc with a
+hard edge. Reykjavík's windows were yellow rectangles painted on a flat grey street. Sydney's
+lawn, the sand of the Jemaa el-Fnaa and the Piazzetta were each one value from corner to corner.
+
+Five things, and none of them is a texture, a mesh or a colour — the aesthetic law is exactly
+where it was.
+
+**A light now has air around it.** One scale of blur is the glow *on* a lamp; the halo is an
+octave down and much wider, and it is what makes a bulb read as a source rather than a shape.
+It is blurred out of the finished tight bloom rather than from a second reading of the scene,
+so the two can never disagree. How much of it a chapter takes is per-chapter, because in Mong
+Kok the bright pixels are neon and in Sydney they are a hundred square metres of sunlit sail —
+turn it up in Sydney and you have fog.
+
+**Small lights stopped flickering.** The bright pass ran at a quarter resolution and read one
+of the sixteen pixels each of its texels covers, so a glow-worm, a window across the street or a
+speck of sun on water blinked in and out of the bloom depending on where the sample happened to
+land. It reads all sixteen now, for four texture fetches.
+
+**The highlights roll off.** Everything over white used to meet a hard clamp, so a sunlit wall,
+a bulb and a sheet of foam all arrived at the same flat white with a visible seam where they
+got there.
+
+**And the sun is warm while the shade is not.** The old tint was one multiply over the whole
+frame, which is the one thing a grade cannot use it to say. Blue hour in Monte Carlo *is* warm
+lamps against a blue sky, and now it looks like it. It is a couple of per cent, applied to the
+top and bottom of the range with the middle left alone — turn it up and Sydney's lawn goes
+olive, which is how we found out.
+
+**The corner of the frame goes cool as well as dark**, because that is what a corner of a lens
+does, and it is the half that makes the middle look lit instead of the edge look painted.
+
+All five together cost **+0.009 to +0.021 ms**. Along the way it turned out the bloom's blur
+was measured in pixels rather than in fractions of the frame, so **the halo shrank as the
+window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is anchored now,
+and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
+lose a fifth.
+
 ## Performance
 
 Measured live at 1280×760:

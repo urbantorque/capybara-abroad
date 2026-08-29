@@ -1255,7 +1255,11 @@ function sysGrade(bloom, threshold, radius, contrast, saturation, vignette, vigS
   return { bloom: bloom, threshold: threshold, knee: 0.38, radius: radius,
            contrast: contrast, saturation: saturation,
            vignette: vignette, vigStart: vigStart,
-           tintR: tr, tintG: tg, tintB: tb, liftR: 0, liftG: 0, liftB: 0 };
+           tintR: tr, tintG: tg, tintB: tb, liftR: 0, liftG: 0, liftB: 0,
+           // The v40 lens pass. Filled in from sysLENS below rather than from
+           // twenty more positional arguments, so the rows above keep reading
+           // as the paragraph each of them is.
+           wide: 0, splitW: 0, splitC: 0 };
 }
 const sysGRADES = {
   //                      bloom  thr   rad  cont  sat   vig   vigS  tint
@@ -1341,6 +1345,70 @@ const sysGRADES = {
   // whole street.
   hanoi:     sysGrade(0.22, 0.90, 0.92, 0.12, 1.02, 0.22, 0.74, 1.008, 1.002, 0.996),
 };
+
+// ===========================================================================
+// THE LENS — three more numbers a chapter gets, added by the v40 pass.
+//
+//   wide    how much of the chapter's own bloom is carried out into a SECOND,
+//           much wider octave. The tight halo is the glow on a light; this is
+//           the air around it. A chapter whose subject is light wants most of
+//           it (Mong Kok 0.90, the blue hour 0.75); a noon chapter where the
+//           bright pixels are a hundred square metres of sunlit wall wants a
+//           third, or the whole frame veils over.
+//   splitW  how WARM the highlights go.
+//   splitC  how COOL the shadows go.
+//
+// The last two are the thing eight of the rows above are already written
+// about and none of them could say: `tint` is one multiply over the entire
+// frame, so "warm in the highlights and blue in the shadows, which is what
+// blue hour IS" was a comment on a line of code that cannot do it. The two
+// axes live in main.js; here a row is how far along each it sits.
+//
+// THEY ARE SMALL ON PURPOSE and for the reason at the top of this section: a
+// grade you can point at has gone too far. 0.03 is a five per cent red-blue
+// spread between the sun side and the shade side of the same white wall,
+// which is roughly what an afternoon does and well under what anyone reads
+// as a filter.
+// ===========================================================================
+const sysLENS = {
+  //             wide  splitW splitC
+  sydney:    [0.35, 0.020, 0.026],
+  pasto:     [0.35, 0.018, 0.034],   // thin air; the shade up there is very blue
+  quay:      [0.45, 0.020, 0.028],
+  kyoto:     [0.30, 0.012, 0.016],   // the chapter that wants less of everything
+  cali:      [0.38, 0.024, 0.024],
+  rio:       [0.42, 0.026, 0.026],
+  iceland:   [0.85, 0.030, 0.030],   // a window is the only warm thing for a mile
+  sahara:    [0.45, 0.028, 0.022],
+  drift:     [0.80, 0.018, 0.030],
+  venice:    [0.40, 0.026, 0.030],   // white stone takes a split better than anything
+  kowloon:   [0.72, 0.026, 0.032],   // the one this half of the pass was built for
+  palawan:   [0.38, 0.018, 0.026],
+  // The ridge event ADDS bloom, and `wide` multiplies the sum — at 0.70 the
+  // moment the sun clears the rock veiled the cobbles it is supposed to light.
+  goreme:    [0.58, 0.034, 0.030],
+  manly:     [0.55, 0.028, 0.024],
+  pantanal:  [0.32, 0.020, 0.022],
+  cave:      [0.80, 0.022, 0.026],
+  antarctic: [0.40, 0.016, 0.030],   // three colours: the warm side must stay tiny
+  monaco:    [0.75, 0.034, 0.036],   // the row above asks for exactly this in words
+  hanoi:     [0.28, 0.016, 0.014],   // nothing here is switched on and nothing blooms
+};
+for (const k in sysLENS) {
+  if (!sysGRADES[k]) continue;
+  sysGRADES[k].wide = sysLENS[k][0];
+  sysGRADES[k].splitW = sysLENS[k][1];
+  sysGRADES[k].splitC = sysLENS[k][2];
+}
+// The shoulder and the vignette's colour are NOT per-chapter. They are
+// properties of the lens rather than of the place: every chapter in the game
+// wants its highlights to roll off instead of meeting a wall, and every
+// chapter wants the corner it already darkens to lose a little colour with it.
+// vigTone is multiplied by the row's own vignette at the call site, so a
+// chapter that barely vignettes barely tones.
+const sysSHOULDER = 0.86;
+const sysVIG_TONE = 0.42;
+
 const sysGRADE_LAMBDA = 2.2;
 const sysGradeCur = sysGrade(0.20, 1.00, 1.00, 0.10, 1.05, 0.20, 0.58, 1, 1, 1);
 let   sysGradeWant = sysGRADES.sydney;
@@ -1379,7 +1447,8 @@ const sysPAN_DUSK_C = new THREE.Color(PALETTE.panSkyDusk);
 // key array every frame, and this runs in update().
 const sysGRADE_KEYS = ['bloom', 'threshold', 'knee', 'radius', 'contrast',
                        'saturation', 'vignette', 'vigStart',
-                       'tintR', 'tintG', 'tintB', 'liftR', 'liftG', 'liftB'];
+                       'tintR', 'tintG', 'tintB', 'liftR', 'liftG', 'liftB',
+                       'wide', 'splitW', 'splitC'];
 
 function sysCamFarFor(name) {
   const d = chapterDef(chapterOf(name));
@@ -17432,6 +17501,17 @@ export function createSystems(game) {
     pp.vigStart = cur.vigStart;
     pp.tintR = cur.tintR; pp.tintG = cur.tintG; pp.tintB = cur.tintB;
     pp.liftR = cur.liftR; pp.liftG = cur.liftG; pp.liftB = cur.liftB;
+    // ---- THE LENS -------------------------------------------------------
+    // Four switches, and every one of them CUTS rather than fades: a probe
+    // reads two frames at dt = 0 and a damped switch does not move in two
+    // frames, so a fading one makes both arms of an A/B identical and the
+    // feature measures as doing nothing.
+    pp.wide = game.state.noWide ? 0 : cur.wide;
+    pp.splitW = game.state.noSplit ? 0 : cur.splitW;
+    pp.splitC = game.state.noSplit ? 0 : cur.splitC;
+    // 1.0 is arithmetically the hard clamp this replaced — see the shader.
+    pp.shoulder = game.state.noShoulder ? 1.0 : sysSHOULDER;
+    pp.vigTone = game.state.noVigTone ? 0 : sysVIG_TONE;
     // ---- AND THE POSTCARD LEANS ON THE SAME THREE ------------------------
     // Not a second grade and not a filter: photo mode nudges the row the
     // chapter is already on, by an amount you would not notice as an effect

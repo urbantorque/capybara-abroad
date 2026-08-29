@@ -689,6 +689,22 @@ function mainMakeBiomes(game) {
 //      dither — that last one is not decoration, it is what stops the new sky
 //      domes banding into eight visible steps on an 8-bit canvas.
 //
+// AND FOUR MORE, THE v40 LENS PASS. Every one of them is a no-op at its
+// default, so a chapter that sets none is the chapter that shipped:
+//
+//   5. A SECOND BLOOM OCTAVE at an eighth, blurred from the finished quarter-res
+//      one. A single scale of bloom is the glow ON a light; the wide one is the
+//      air AROUND it, and without it the lamp on the Monte Carlo quay was a
+//      white disc with a hard edge rather than a lamp.
+//   6. A BOX DOWNSAMPLE IN THE BRIGHT PASS. It read one of the sixteen source
+//      texels a quarter-res texel covers, so a one-pixel light flickered in and
+//      out of the bloom as the camera moved.
+//   7. A SHOULDER. Everything over white met a hard clamp and arrived at 1.0
+//      with an edge on it. Now the top rolls off.
+//   8. SPLIT TONING. `uTint` is one multiply over the whole frame and cannot say
+//      the thing half the rows in sysGRADES are written about — that the sun is
+//      warm and the sky filling its shadows is not.
+//
 // Every number is a uniform and systems.js drives all of them from the same
 // place it drives the fog and the sun, so the grade cross-fades with the
 // hemisphere instead of snapping at a biome edge.
@@ -716,10 +732,24 @@ const MAIN_POST_HEAD = [
 
 const MAIN_POST_BRIGHT = MAIN_POST_HEAD + '\n' + [
   'uniform sampler2D tDiffuse;',
+  'uniform vec2 uTexel;',
   'uniform float uThreshold;',
   'uniform float uKnee;',
   'void main() {',
-  '  vec3 c = texture(tDiffuse, vUv).rgb;',
+  // A QUARTER-RES TEXEL COVERS SIXTEEN SOURCE TEXELS AND THIS USED TO READ ONE.
+  // A one-pixel light — a glow-worm, a window across the street, a speck of
+  // sea sparkle — therefore flickered in and out of the bright pass as the
+  // camera moved, because whether it survived depended on which of sixteen
+  // texels the sample happened to land on. Four bilinear taps at the centres
+  // of the four 2x2 quadrants is an EXACT 4x4 box average for four reads, and
+  // a light that is averaged IN cannot flicker out. It is also what stops a
+  // cluster of one-pixel lights growing the quarter-res LATTICE that the
+  // cave's grade row is written around.
+  '  vec3 c = texture(tDiffuse, vUv + uTexel * vec2( 1.0,  1.0)).rgb;',
+  '  c += texture(tDiffuse, vUv + uTexel * vec2(-1.0,  1.0)).rgb;',
+  '  c += texture(tDiffuse, vUv + uTexel * vec2( 1.0, -1.0)).rgb;',
+  '  c += texture(tDiffuse, vUv + uTexel * vec2(-1.0, -1.0)).rgb;',
+  '  c *= 0.25;',
   // Max-channel rather than luma: a saturated red neon tube has a luma of 0.21
   // and would never clear any threshold worth setting on a daylit chapter.
   '  float l = max(max(c.r, c.g), c.b);',
@@ -747,13 +777,20 @@ const MAIN_POST_BLUR = MAIN_POST_HEAD + '\n' + [
 const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform sampler2D tDiffuse;',
   'uniform sampler2D tBloom;',
+  'uniform sampler2D tWide;',
   'uniform float uBloom;',
+  'uniform float uWide;',
+  'uniform float uShoulder;',
   'uniform float uContrast;',
   'uniform float uSaturation;',
   'uniform float uVignette;',
   'uniform float uVigStart;',
+  'uniform float uVigTone;',
   'uniform vec3  uTint;',
   'uniform vec3  uLift;',
+  'uniform vec3  uSplitS;',
+  'uniform vec3  uSplitH;',
+  'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
   'vec3 mainSRGB(vec3 c) {',
   '  c = clamp(c, 0.0, 1.0);',
   '  return mix(c * 12.92, 1.055 * pow(c, vec3(0.4166666667)) - 0.055, step(vec3(0.0031308), c));',
@@ -761,15 +798,47 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'void main() {',
   '  vec3 lin = texture(tDiffuse, vUv).rgb;',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
+  // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
+  // this is the air AROUND it, and a lamp without it is a white sticker.
+  '  lin += texture(tWide, vUv).rgb * uWide;',
+  // THE SHOULDER. Everything above the knee used to meet a hard clamp, so a
+  // sunlit white wall, a lamp bulb and a sheet of foam all arrived at exactly
+  // 1.0 with a visible edge where they got there. This rolls the top off
+  // instead: an exponential that is continuous at the knee and asymptotic to
+  // white, so 1.2 lands at 0.99 and 3.0 lands at 0.9999 and there is a
+  // gradient between them. At uShoulder = 1.0 it is arithmetically the old
+  // clamp, which is what the A/B switch sets it to.
+  '  vec3 sh = max(lin - uShoulder, 0.0);',
+  '  float sk = max(1.0 - uShoulder, 0.001);',
+  '  lin = min(lin, vec3(uShoulder)) + sk * (1.0 - exp(-sh / sk));',
   '  vec3 c = mainSRGB(lin);',
   // Contrast as a blend toward a smoothstep of itself: an S-curve that is exact
   // at 0 and at 1 and therefore cannot clip either end, unlike (c-0.5)*k+0.5.
   '  c = mix(c, c * c * (3.0 - 2.0 * c), uContrast);',
-  '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));',
+  '  float l = dot(c, MAIN_LUMA);',
   '  c = mix(vec3(l), c, uSaturation);',
+  // SPLIT TONE. uTint is one multiply over the whole frame and therefore
+  // cannot say the thing half the rows in sysGRADES are written about — that
+  // the sun is warm and the sky filling the shadows is not.
+  //
+  // TWO RAMPS WITH A GAP BETWEEN THEM, not one mix from shadow tint to
+  // highlight tint. A single mix has no neutral: every pixel gets one tint or
+  // the other in proportion, so Sydney's lawn — which is 0.55 luma and two
+  // thirds of the frame — took nearly the whole warm push and the chapter went
+  // olive. The shadow ramp is spent by 0.45 and the highlight ramp does not
+  // start until 0.55, so the middle of the picture is left exactly alone and
+  // only the ends move, which is what a split tone is.
+  '  float wS = 1.0 - smoothstep(0.02, 0.45, l);',
+  '  float wH = smoothstep(0.55, 0.98, l);',
+  '  c *= 1.0 + (uSplitS - 1.0) * wS + (uSplitH - 1.0) * wH;',
   '  c = clamp(c * uTint + uLift, 0.0, 1.0);',
   '  float d = length(vUv - 0.5) * 1.41421356;',
-  '  c *= 1.0 - uVignette * smoothstep(uVigStart, 1.0, d);',
+  '  float vg = uVignette * smoothstep(uVigStart, 1.0, d);',
+  // ...and the corner of a real lens does not only go DARK. It loses colour
+  // and goes cool, which is the half of a vignette that makes the middle of
+  // the frame look lit rather than the edge look painted.
+  '  c = mix(c, vec3(dot(c, MAIN_LUMA)) * vec3(0.94, 0.975, 1.07), vg * uVigTone);',
+  '  c = clamp(c * (1.0 - vg), 0.0, 1.0);',
   // One hash, a 255th of a step: invisible on its own, and the difference
   // between a smooth dome and eight visible bands of sky.
   '  float dth = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);',
@@ -778,6 +847,17 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '}',
 ].join('\n');
 
+// The two axes the split tone runs on. They are unit-ish pushes rather than
+// colours so a grade row is TWO NUMBERS — how warm the light is and how cool
+// the shade is — instead of six, and a row that wants the reverse (a sodium
+// street under a black sky) writes a negative one.
+const MAIN_SPLIT_WARM = [ 1.00,  0.30, -1.00];
+const MAIN_SPLIT_COOL = [-0.55, -0.10,  1.00];
+
+// The height every grade row in sysGRADES was tuned at. The blur offsets are
+// referenced to it so a chapter looks the way it was authored on a monitor
+// that is not this one — see the note in post.render.
+const MAIN_POST_REF_H = 720;
 const mainPostSize = new THREE.Vector2();
 // A 1x1 black texture standing in for the bloom buffer when bloom is off, so
 // the composite shader never samples an unbound sampler.
@@ -794,16 +874,20 @@ function mainMakePost(game) {
       bloom: 0.0, threshold: 1.0, knee: 0.35, radius: 1.0,
       contrast: 0.0, saturation: 1.0, vignette: 0.0, vigStart: 0.62,
       tintR: 1, tintG: 1, tintB: 1, liftR: 0, liftG: 0, liftB: 0,
+      // The four added by the v40 lens pass, and their no-op values: no second
+      // octave, no split, the shoulder at 1.0 (which IS the old hard clamp) and
+      // a vignette that only darkens.
+      wide: 0.0, splitW: 0.0, splitC: 0.0, shoulder: 1.0, vigTone: 0.0,
     },
     render() { renderer.setRenderTarget(null); renderer.render(game.scene, game.camera); },
     resize() {},
     set() {},
   };
 
-  let sceneRT = null, bloomA = null, bloomB = null;
+  let sceneRT = null, bloomA = null, bloomB = null, wideA = null, wideB = null;
   let quadScene = null, quadCam = null, quad = null;
   let matBright = null, matBlur = null, matComp = null;
-  let vw = 0, vh = 0, bw = 0, bh = 0;
+  let vw = 0, vh = 0, bw = 0, bh = 0, ww = 0, wh = 0;
 
   try {
     if (!renderer.capabilities.isWebGL2) throw new Error('needs WebGL2');
@@ -824,6 +908,12 @@ function mainMakePost(game) {
     };
     bloomA = new THREE.WebGLRenderTarget(2, 2, half);
     bloomB = new THREE.WebGLRenderTarget(2, 2, half);
+    // The wide octave's own ping-pong, at an eighth. Two more pairs of the same
+    // separable blur over a buffer a sixteenth the area of the quarter-res one:
+    // four passes over twenty-two thousand pixels, which is a rounding error on
+    // the frame and the difference between a bulb and a lamp.
+    wideA = new THREE.WebGLRenderTarget(2, 2, half);
+    wideB = new THREE.WebGLRenderTarget(2, 2, half);
 
     // One triangle, in clip space, with uv baked in. No matrices, no camera
     // maths, and no chance of the quad being frustum-culled out of its own pass.
@@ -847,17 +937,22 @@ function mainMakePost(game) {
     };
 
     matBright = raw(MAIN_POST_BRIGHT, {
-      tDiffuse: { value: null }, uThreshold: { value: 1.0 }, uKnee: { value: 0.35 },
+      tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() },
+      uThreshold: { value: 1.0 }, uKnee: { value: 0.35 },
     });
     matBlur = raw(MAIN_POST_BLUR, {
       tDiffuse: { value: null }, uStep: { value: new THREE.Vector2() },
     });
     matComp = raw(MAIN_POST_COMP, {
       tDiffuse: { value: null }, tBloom: { value: mainPostBlack },
-      uBloom: { value: 0 }, uContrast: { value: 0 }, uSaturation: { value: 1 },
-      uVignette: { value: 0 }, uVigStart: { value: 0.62 },
+      tWide: { value: mainPostBlack },
+      uBloom: { value: 0 }, uWide: { value: 0 }, uShoulder: { value: 1 },
+      uContrast: { value: 0 }, uSaturation: { value: 1 },
+      uVignette: { value: 0 }, uVigStart: { value: 0.62 }, uVigTone: { value: 0 },
       uTint: { value: new THREE.Vector3(1, 1, 1) },
       uLift: { value: new THREE.Vector3(0, 0, 0) },
+      uSplitS: { value: new THREE.Vector3(1, 1, 1) },
+      uSplitH: { value: new THREE.Vector3(1, 1, 1) },
     });
 
     quad = new THREE.Mesh(tri, matBright);
@@ -886,9 +981,15 @@ function mainMakePost(game) {
     if (w === vw && h === vh) return;
     vw = w; vh = h;
     bw = Math.max(2, w >> 2); bh = Math.max(2, h >> 2);
+    ww = Math.max(2, w >> 3); wh = Math.max(2, h >> 3);
     sceneRT.setSize(vw, vh);
     bloomA.setSize(bw, bh);
     bloomB.setSize(bw, bh);
+    wideA.setSize(ww, wh);
+    wideB.setSize(ww, wh);
+    // The bright pass's taps are in FULL-resolution texels — it is reading
+    // sceneRT, not the target it is writing.
+    matBright.uniforms.uTexel.value.set(1 / vw, 1 / vh);
   };
   post.resize();
 
@@ -913,7 +1014,20 @@ function mainMakePost(game) {
 
       // Two ping-ponged H/V pairs, the second at 2.4x the offset: a wide, soft,
       // cheap approximation of a kernel far larger than nine taps.
-      const ux = p.radius / bw, uy = p.radius / bh;
+      //
+      // THE OFFSET IS A FRACTION OF THE SCREEN, NOT A COUNT OF TEXELS. It used
+      // to be `radius / bw`, which is the same number of quarter-res texels at
+      // every size — and a quarter-res texel is a smaller piece of the picture
+      // on a bigger monitor, so the halo shrank as the window grew. Measured on
+      // the lamp on the Monte Carlo quay: at 720 it spread well past the bulb,
+      // at 1440 it barely cleared it. Nineteen grade rows were tuned by eye at
+      // 720 and only existed there. Anchored to that height, with the
+      // correction capped at 2x so the five taps of the second octave cannot
+      // spread far enough apart to ring on a very large screen.
+      const rad = game.state.noBloomRef ? p.radius
+                : p.radius * Math.min(2, vh / MAIN_POST_REF_H);
+      const uy = rad / bh;
+      const ux = uy * (vh / vw);
       const u = matBlur.uniforms;
       u.tDiffuse.value = bloomA.texture; u.uStep.value.set(ux, 0);       mainPostDraw(matBlur, bloomB);
       u.tDiffuse.value = bloomB.texture; u.uStep.value.set(0, uy);       mainPostDraw(matBlur, bloomA);
@@ -921,9 +1035,28 @@ function mainMakePost(game) {
       u.tDiffuse.value = bloomB.texture; u.uStep.value.set(0, uy * 2.4); mainPostDraw(matBlur, bloomA);
       matComp.uniforms.tBloom.value = bloomA.texture;
       matComp.uniforms.uBloom.value = p.bloom;
+
+      // ...and the same again an octave down, starting FROM the finished
+      // quarter-res bloom, so the wide halo is the tight one carried outward
+      // rather than a second reading of the scene. The first draw's bilinear
+      // read does the 2:1 downsample for nothing.
+      if (p.wide > 0.0005) {
+        const wy = rad / wh, wx = wy * (vh / vw);
+        u.tDiffuse.value = bloomA.texture; u.uStep.value.set(wx, 0);       mainPostDraw(matBlur, wideB);
+        u.tDiffuse.value = wideB.texture;  u.uStep.value.set(0, wy);       mainPostDraw(matBlur, wideA);
+        u.tDiffuse.value = wideA.texture;  u.uStep.value.set(wx * 2.4, 0); mainPostDraw(matBlur, wideB);
+        u.tDiffuse.value = wideB.texture;  u.uStep.value.set(0, wy * 2.4); mainPostDraw(matBlur, wideA);
+        matComp.uniforms.tWide.value = wideA.texture;
+        matComp.uniforms.uWide.value = p.bloom * p.wide;
+      } else {
+        matComp.uniforms.tWide.value = mainPostBlack;
+        matComp.uniforms.uWide.value = 0;
+      }
     } else {
       matComp.uniforms.tBloom.value = mainPostBlack;
       matComp.uniforms.uBloom.value = 0;
+      matComp.uniforms.tWide.value = mainPostBlack;
+      matComp.uniforms.uWide.value = 0;
     }
 
     const c = matComp.uniforms;
@@ -932,8 +1065,13 @@ function mainMakePost(game) {
     c.uSaturation.value = p.saturation;
     c.uVignette.value = p.vignette;
     c.uVigStart.value = p.vigStart;
+    c.uVigTone.value = p.vigTone;
+    c.uShoulder.value = p.shoulder;
     c.uTint.value.set(p.tintR, p.tintG, p.tintB);
     c.uLift.value.set(p.liftR, p.liftG, p.liftB);
+    const W = MAIN_SPLIT_WARM, C = MAIN_SPLIT_COOL;
+    c.uSplitH.value.set(1 + W[0] * p.splitW, 1 + W[1] * p.splitW, 1 + W[2] * p.splitW);
+    c.uSplitS.value.set(1 + C[0] * p.splitC, 1 + C[1] * p.splitC, 1 + C[2] * p.splitC);
     mainPostDraw(matComp, null);
   };
 

@@ -3023,6 +3023,163 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE LENS PASS (v40 — 30 Aug 2026)
+
+Five things between the Lambert output and the canvas, and one bug found while
+measuring them. Everything is in `mainMakePost` / the three `MAIN_POST_*`
+shaders plus one table and eight lines in `sysDressFrame`. **No mesh, no
+`PALETTE` entry, no chapter file and no line of the aesthetic law was touched**,
+and every one of the five is a no-op at its default, so a chapter that opts into
+nothing is byte-for-byte the chapter that shipped.
+
+The review that specified it was nineteen arrival frames (`qa/vis-review.js`),
+and it found the same two sentences over and over: **a light in this game was a
+sticker, and a frame in this game had one tint on it.** The lamp on the Monte
+Carlo quay was a white disc with a hard edge. Reykjavík's windows were yellow
+rectangles on a flat grey street. Sydney's lawn, the Jemaa's sand and the
+Piazzetta were each one value from corner to corner.
+
+### 1. A SECOND BLOOM OCTAVE — `wide`
+
+One scale of blur is the glow ON a light. The air AROUND it is an octave down
+and much wider, and without it a bulb is a shape rather than a source. The wide
+pass starts **from the finished quarter-res bloom**, not from a second reading
+of the scene: four more separable passes at an eighth, so the halo is the tight
+one carried outward and cannot disagree with it. Composited on its own uniform
+at `bloom * wide`.
+
+`wide` is one number per chapter in `sysLENS`. **A chapter whose subject is
+light wants most of it and a noon chapter wants a third**, because in Sydney the
+pixels over threshold are a hundred square metres of sunlit sail and a wide blur
+of that veils the whole frame. Mong Kok was authored at 0.90 and pulled back to
+0.72 for exactly that reason — at 0.90 the pink sign across the street washed
+the shelves of the shop under it.
+
+### 2. THE BRIGHT PASS READ ONE TEXEL IN SIXTEEN
+
+A quarter-res texel covers sixteen source texels and the bright pass point-
+sampled one of them. **A one-pixel light therefore flickered in and out of the
+bloom as the camera moved**, because whether it survived depended on which of
+the sixteen the sample landed on — a glow-worm, a window across the street, a
+speck of sea sparkle. Four bilinear taps at the centres of the four 2×2
+quadrants is an exact 4×4 box average for four reads, and a light that is
+averaged IN cannot flicker out. It is also the other half of the note in the
+cave's grade row about a quarter-res lattice.
+
+### 3. A SHOULDER
+
+Everything over white met `clamp(c, 0.0, 1.0)`, so a sunlit wall, a bulb and a
+sheet of foam all arrived at exactly 1.0 with a visible edge where they got
+there. The top rolls off now: `min(x,k) + (1-k)(1 - exp(-(x-k)/(1-k)))`, which
+is continuous at the knee and asymptotic to white — 1.2 lands at 0.99, 3.0 lands
+at 0.9999, and there is a gradient between them. **At `shoulder = 1.0` it is
+arithmetically the old clamp**, which is what the A/B switch writes.
+
+`sysSHOULDER` is 0.86 and it is NOT per-chapter: it is a property of the lens,
+not of the place.
+
+### 4. SPLIT TONING — `splitW` / `splitC`
+
+`uTint` is one multiply over the whole frame, so half the rows in `sysGRADES`
+were **written about something the code could not do**. Monte Carlo's says "the
+tint splits, warm in the highlights and blue in the shadows, which is what blue
+hour IS and is the only reason to set a chapter in it", above a line that
+multiplies every pixel by the same three numbers.
+
+Two tints against luminance now. Two things about how:
+
+- **TWO RAMPS WITH A GAP BETWEEN THEM, not one mix from shadow tint to
+  highlight tint.** A single mix has no neutral: every pixel gets one tint or
+  the other in proportion, and Sydney's lawn is 0.55 luma and two thirds of the
+  frame, so it took most of the warm push and the chapter went olive. The
+  shadow ramp is spent by 0.45, the highlight ramp starts at 0.55, and the
+  middle of the picture is left alone. That is what a split tone is.
+- **A row is two numbers, not six.** The warm and cool axes live in main.js
+  (`MAIN_SPLIT_WARM`, `MAIN_SPLIT_COOL`); a chapter says how far along each it
+  sits, and a chapter that wants the reverse writes a negative one. 0.03 is a
+  five per cent red-blue spread between the sun side and the shade side of the
+  same white wall — about what an afternoon does, and well under what anyone
+  reads as a filter.
+
+### 5. THE VIGNETTE HAS A COLOUR
+
+The corner of a real lens does not only go dark, it loses colour and goes cool.
+`vigTone` mixes toward a cool desaturation **in proportion to the vignette the
+row already asks for**, so a chapter that barely vignettes barely tones and no
+second table is needed. It is the half of a vignette that makes the middle of
+the frame look lit instead of the edge look painted.
+
+### AND THE BLOOM ONLY EXISTED AT ONE WINDOW SIZE
+
+Found while photographing the lamp at three resolutions to check the wide
+octave. The blur offset was `radius / bw` — **the same number of quarter-res
+texels at every size, and a quarter-res texel is a smaller piece of the picture
+on a bigger monitor.** So the halo shrank as the window grew, and nineteen grade
+rows tuned by eye at 720 only existed at 720. Anchored to `MAIN_POST_REF_H` now,
+with the correction capped at 2× so the five taps of the second octave cannot
+spread far enough apart to ring on a very large screen.
+
+Measured with `qa/lens-res4.js` — mean luminance of an annulus 0.10–0.20 of
+frame HEIGHT out from the bulb, which is the same piece of the picture at every
+size (the first probe walked outward from the brightest pixel and measured the
+BULB, which is constant, and read almost no difference):
+
+| frame height | old | new |
+|---|---|---|
+| 720 | 0.3001 | **0.3001** — the anchor, identical to the byte |
+| 1080 | 0.2918 | 0.3045 |
+| 1440 | 0.2871 | 0.3057 |
+
+### WHAT IT COST
+
+**+0.009 ms (Sydney), +0.013 ms (Monte Carlo), +0.021 ms (Mong Kok)** — the
+whole pass, all five things. Frame time 16.5–16.9 ms median in every chapter
+measured, unchanged, a locked 60 in both arms.
+
+An rAF-interval benchmark cannot see any of this: the game is vsync-locked, so
+both arms read 16.6–17.0 and the number is the display, not the work. The
+figures above are `post.render()` × 60 with a `gl.readPixels` at each end to
+drain the command queue, medians of five, arms interleaved — **and the first
+arm of every single run was 5–10 % slow**, exactly as the presence pass wrote
+down, so a two-arm comparison that does not interleave and take a median
+measures warm-up.
+
+### THE SWITCHES
+
+`noWide`, `noSplit`, `noShoulder`, `noVigTone`, `noBloomRef` on `game.state`.
+All five **CUT rather than fade**, for the reason in the presence pass: a probe
+reads two frames at `dt = 0`, a damped switch does not move in two frames, and a
+fading switch therefore makes both arms of an A/B identical and the feature
+measures as doing nothing.
+
+## CAN EVERY TASK ACTUALLY BE DONE (v39 — 29 Aug 2026)
+
+Prompted by one report from play — the Monte Carlo dinner jacket could not be
+reached. It could not, and neither could the chapter's high dive; see chapter 18
+below. The question that followed was whether anything else in the other
+eighteen chapters had the same shape, and it needed an instrument rather than a
+reading.
+
+**`game.hintTarget(id)`.** `sysHINTS` and its dozen `hint*` helpers are
+closure-local, so before this an audit that wanted a task's pointer target had
+to re-implement `hintObj` / `hintProp` / `hintNpc` / `hintZone` / `hintXZ` /
+`hintKyoLantern` / … and got `ReferenceError` for its trouble. One getter, no
+setter, and null for anything that throws — a `where()` that dies answers the
+same way an unbuilt chapter does.
+
+**Three sweeps, and what each is worth:**
+
+| | |
+|---|---|
+| `qa/taskaudit.mjs` — static | Every id in the `TASKS` table against every reference in the nineteen chapter files, both directions. **271 rows, 0 orphans, 0 ghosts.** Cheap, and it only proves the wiring exists. |
+| `qa/reach2.js` — the pointer sweep | For all 271: resolve the target, drop the animal on its column, let it settle, and report the gap between the target and what it ended up standing on. **207 targets resolved, 64 null — and all 64 are the arrival rows, the place finds and the call-an-animal verbs, which is correct.** 45 flagged; every one accounted for (moving carriers — the chiva roof, the bondinho, the snowcat, the gondola, the volo cradle mid-flight; underwater targets in Palawan where the animal floats; and the Venice passerelle, which is not deployed until the siren). Nothing else of the yacht's shape. |
+| `qa/buried.js` — the buried-platform detector | Every axis-aligned static box in the live world whose TOP FACE is inside another box, over 75% of its area. This is the detector for the class the yacht was in — a floor you cannot stand on. Monte Carlo now returns clean. Of the 54 elsewhere, 40 are Son Doong's interior floors under the mountain and the other 14 were drop-tested by hand (`qa/buried2.js`): every one is a foundation inside terrain or a step in a stack, and the animal lands on a real surface at or above the flagged slab. **It cries wolf and it is still worth running** — it found the only real instance in the game in one pass. |
+
+**What this does NOT cover, and it should be said plainly:** the sweep proves a
+task's target sits somewhere the animal can stand. It cannot prove a task's GATE
+can fire. A completion playtest of all 271 was not run; chapter 18 was walked
+end to end because it was the reported one.
+
 ## CHAPTERS 18 AND 19 — MONTE CARLO AND HANOI (v29 — 26 Aug 2026)
 
 Two places, and they were built together on purpose: they are the two ends of
@@ -4701,6 +4858,12 @@ One row per chapter. `bloom / threshold / knee / radius / contrast / saturation 
 vignette / vigStart / tint`. It cross-fades on a biome change at the fog's own
 rate, and `sysDressPrime()` slams it on the first frame for the same reason
 `atmosPrime()` exists.
+
+**Three more since v40, in `sysLENS` rather than in the literal above** — `wide`
+(how much of the row's bloom goes out into the second octave) and `splitW` /
+`splitC` (how warm the highlights and how cool the shadows). They cross-fade on
+the same keys. `sysSHOULDER` and `sysVIG_TONE` are lens constants and are
+deliberately NOT per-chapter. See **THE LENS PASS (v40)** above.
 
 **The threshold is the whole trick.** In a night chapter nothing on the ground
 clears 0.4, so a low threshold blooms the lights and only the lights. In a noon
