@@ -1,0 +1,37 @@
+{
+ "have": {
+  "env": 30,
+  "pasto": 22,
+  "quay": 26,
+  "manly": 36,
+  "kyoto": 42,
+  "condor": 11,
+  "physics": 19,
+  "hud": 17,
+  "weather": 17
+ },
+ "asked": {
+  "env": {
+   "terraceTables": [
+    "npc"
+   ],
+   "diningTables": [
+    "npc"
+   ],
+   "terraceCounter": [
+    "npc"
+   ]
+  },
+  "pasto": {
+   "marketStalls": [
+    "npc"
+   ],
+   "dryingPatio": [
+    "npc"
+   ],
+   "patio": [
+    "npc"
+   ]
+  }
+ }
+}

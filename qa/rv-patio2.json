@@ -1,0 +1,99 @@
+{
+ "patio": {
+  "x": 52,
+  "z": 12,
+  "w": 13,
+  "d": 10
+ },
+ "npcs": 56,
+ "byKind": {
+  "tourist": 11,
+  "gardener": 2,
+  "jogger": 3,
+  "busker": 1,
+  "patron": 5,
+  "waiter": 1,
+  "owner": 1,
+  "queue": 4,
+  "commuter": 4,
+  "ibis": 6,
+  "vendor": 4,
+  "abuela": 2,
+  "farmer": 3,
+  "churchgoer": 4,
+  "llama": 3,
+  "streetdog": 2
+ },
+ "rows": [
+  {
+   "kind": "vendor",
+   "at": [
+    -18,
+    13.8
+   ],
+   "state": "stall",
+   "onPatio": false,
+   "d": 70
+  },
+  {
+   "kind": "vendor",
+   "at": [
+    -6,
+    13.8
+   ],
+   "state": "stall",
+   "onPatio": false,
+   "d": 58
+  },
+  {
+   "kind": "vendor",
+   "at": [
+    6,
+    13.8
+   ],
+   "state": "stall",
+   "onPatio": false,
+   "d": 46
+  },
+  {
+   "kind": "vendor",
+   "at": [
+    18,
+    13.8
+   ],
+   "state": "stall",
+   "onPatio": false,
+   "d": 34
+  },
+  {
+   "kind": "farmer",
+   "at": [
+    51.8,
+    11.5
+   ],
+   "state": "work",
+   "onPatio": true,
+   "d": 0.6
+  },
+  {
+   "kind": "farmer",
+   "at": [
+    41.3,
+    -8.2
+   ],
+   "state": "work",
+   "onPatio": false,
+   "d": 22.8
+  },
+  {
+   "kind": "farmer",
+   "at": [
+    84.2,
+    -0.9
+   ],
+   "state": "work",
+   "onPatio": false,
+   "d": 34.7
+  }
+ ]
+}

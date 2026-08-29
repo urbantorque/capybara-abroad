@@ -1,0 +1,33 @@
+{
+ "afterBarge": {
+  "owner": false,
+  "stolenFrom": true,
+  "wasStolen": false,
+  "stealHat": false,
+  "hatAt": [
+   7.6,
+   17.1
+  ]
+ },
+ "afterGrab": {
+  "held": "hat",
+  "wasStolen": true,
+  "stealHat": true,
+  "npcState": "chase"
+ },
+ "afterSwim": {
+  "hatHarbour": false,
+  "at": [
+   -9.2,
+   -20.8
+  ],
+  "hatAt": [
+   -9.7,
+   -0.3,
+   -21.5
+  ],
+  "inWater": false,
+  "wasStolen": true
+ },
+ "lastError": null
+}
