@@ -809,6 +809,94 @@ are in and turns into that place's **record board**: every number you hold here,
 on, in words, because a player who has just finished somewhere is exactly the player who has
 stopped looking at the map.
 
+### ...and there is something to beat before there is a best
+
+Fifty-three of them now, and for thirty-five versions a record only ever compared you to
+yourself — so on a first attempt it compared you to nothing at all. The line under the clock
+said *no best yet*, which is true and tells you nothing about whether the run you just made
+was any good. It says what a good one is instead: an authored figure on forty of the
+fifty-three, every one of them derived from something the game already knew — the task's own
+gate improved on, the height of the roof the scaffold serves, the fact that there are eight
+gulls and a hundred and eighty pigeons. Pass it and the number goes green while you are still
+running. Meet it for the first time and the game says one sentence, once, ever.
+
+Thirteen rows have no par and are left exactly as they were, because a par nobody can defend
+is worse than no par.
+
+And **twenty-one of the fifty-three had no readout at all** — the block that draws that line
+calls it "the whole of the game's replay surface", and for two fifths of them it was dark.
+The height of a bamboo climb was banked in silence all the way up and posted after you let
+go. The best question in the game — not how fast you crossed Hanoi, *how many of them had to
+go round you* — was answered on the far kerb, a metre after it could have changed what you
+did. They are all on the paper now, and the ones that are a COUNT rather than a clock are a
+flash instead of a line: two hundred pigeons going up over San Marco is a number climbing
+past forty for a second and a half, and then the card is a to-do list again.
+
+## Three thousand seven hundred people, and now they are there
+
+`qa/CROWDS.md` walked every instanced crowd in the game and put a chest-height ray through
+each one. Venice: nought per cent solid. Hanoi eight, Monte Carlo six, the Quay three, Manly
+five. Forty-eight people standing in the most photographed square in Europe and the animal
+went through every one of them.
+
+Six chapters closed. It is one helper now instead of the same twenty lines written three
+times — a standing crowd pools every shape into one body, a walking one gets a box each and
+is carried along by the same loop that draws it. **Except on the passerelle**, where it stays
+a picture on purpose: the boards are a metre wide, the chapter asks you to run the whole
+chain against a clock, and a solid queue up there would not make that harder, it would make
+it impossible. Cali's ten dancers keep their ghosthood for the same reason and its eighteen
+at the ringside do not. Manly's bathers were left alone because they already do the thing a
+collider would be for — they get out of your way.
+
+## Sit still, and more of the world notices
+
+The calm has been in this game since v23: stop moving, the score goes close, the camera opens
+out, the animal sits down, and an animal that would have fled lets you sixty per cent closer.
+That last part reached six chapters out of nineteen.
+
+Three more, and two of them use the half of it nobody had used. Nothing on the Antarctic
+Peninsula runs away from you — a Weddell seal on a pan and a colony of gentoos are the least
+frightened animals in the game — so what stillness buys down there is not that they let you
+closer, it is that they notice you from **further**: twenty-four metres to thirty-six for the
+seal, twenty to thirty for the colony. The lampflies in the Drift answer a wheek from half
+again as far away if you have been sitting on the moss. And in the Pantanal, which is the one
+chapter the animal is actually from and which had registered nothing at all, the jabiru
+flushes at nine metres or at one and a half, and the jacarés take under a fifth off theirs
+however quiet you are, because a jacaré is not impressed by anybody being quiet.
+
+## The first hour finds out what you have been doing
+
+Seventeen chapters have had lines that turn on and off with what you have ticked since v20 —
+the reason written down at the time is that "a chapter is a sequence of things happening and
+the people in it were outside time". It reached sixteen of the nineteen. Sydney and Pasto
+predate the whole system: their casts are the two oldest in the game and they read a flat
+table of sentences that no gate had ever touched. So the two chapters with the most tasks in
+the game — nineteen and eleven, and the longest single list in it is Sydney's — were the two
+where nobody ever noticed anything, in the first hour, which is exactly when a player is
+deciding whether the world is paying attention.
+
+Thirty-nine lines. The gardener having a day of it. A hat somebody lost this morning. The
+bins all over the path. A busker whose hat is empty now, thanks. A couple comparing four
+blurry photographs of the thing that got on the steps. And in the plaza, a stallholder on his
+third stall this week, a farmer who watched a year of coffee walk away, and the woman with
+the broom, who does not change her philosophy for anybody: *you went up with the bird. You
+still came back down here.*
+
+## The ledger is made of your own photographs
+
+The end of this game is described up there as being made of what the journey actually left
+behind — and the one thing in it you made yourself was not in it. The camera is the only
+thing that leaves this game, the album keeps thirty-six pictures past a reload, and the
+question "what is the newest picture taken in this place" had exactly one reader: the title
+card. So the ledger, which exists to answer *where have I been*, drew seventeen hand-authored
+polygons instead.
+
+It asks now, and so does the departures board. The mark is still underneath — it is the
+ground the photograph sits on and the colour behind it — and a place you never photographed
+looks exactly as it always did. Not the card a finished chapter gets, because that is a
+ceremony and a ceremony is the game's own voice; not the shelf, because the shelf holds the
+thing you took, which is a different question from what the place looked like.
+
 ## The title card is sixteen postcards
 
 It was thirteen identical beige rectangles with words in them, which told a returning player

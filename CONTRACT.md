@@ -2056,6 +2056,120 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE LIFT PASS, v36 — FIVE THINGS THAT WERE ALREADY BUILT (29 Aug 2026)
+
+Five systems that existed, were paid for, and were reaching a fraction of the game. Nothing
+here invents a mechanic, adds a task or gates anything; every one is a channel that was
+already open being pointed at the rest of the game.
+
+### 1. `par` — a target before there is a best
+
+`RECORDS` rows may carry `par: n`, an authored figure meaning "this is what a good one looks
+like". **It gates nothing.** A row without one behaves exactly as it did; thirteen of the
+fifty-three have none, because a par nobody can defend is worse than no par.
+
+- **The live line** prints the par where it printed `no best yet`, and the running number
+  goes the ticked-row green when it is past whatever the line is showing.
+- **`recordValue` still says nothing on a first run.** That silence is the v32 doctrine and
+  it stays. What is new is one sentence the first time a figure MEETS the par — a different
+  fact from beating yourself, which is why it may happen on a first attempt.
+- **Nothing new is stored.** "Have I passed par" is `jrRecs[id]` read against `par`, the same
+  way the shelf is the tick list read differently. A reload cannot say it twice.
+- **Every figure is derived from a constant the source already states** — the task's own gate
+  improved on, or a fraction of a population or a length that is written down. Provenance is
+  on the row.
+
+**AND EVERY RECORD HAS A LIVE LINE NOW.** Twenty-one of fifty-three never called
+`recordLive`, so for two fifths of them the block whose own comment calls that readout "the
+whole of the game's replay surface" was dark. `qa/audit-tasks.mjs` **fails** on a record with
+no live caller and reports the par coverage.
+
+Two shapes, and the choice is not a style question:
+
+| | |
+|---|---|
+| **a clock or a distance** | hand it over EVERY FRAME the attempt is open |
+| **a count** (pigeons up, chips won, stools over) | call it ONCE on the frame the number moves. `sysREC_STALE` (1.6 s) takes the line down by itself, so it is a flash and not furniture, and it costs no timer and no new state |
+
+**A LIVE LINE MUST REPORT THE QUANTITY THE RECORD FILES.** The Drift's `updraft` files
+`driColPeak`, an ALTITUDE, while the task is measured on a RISE; a line showing the rise
+would have been a different number under the same label. One deliberate exception, named in
+the source: Monte Carlo's `chip-stack` shows what you are up NOW against a best that is the
+peak, because "you are 6 up, best 14" is a true and useful sentence and "peak 14, best 14"
+is not.
+
+**ONE SLOT, SO ORDER IS THE API.** `recLiveId` holds one attempt; the LAST caller in a frame
+owns the line. A chapter with two open attempts decides which by call order — the Quay's
+dolphin escort sits below the voyage clock on purpose, Monte Carlo's tunnel below the lap.
+Where two systems in different update functions can be open at once and the wrong one runs
+later, a small timer is the fix: `monChipShow` exists because the wheel runs before the floor
+and the chip flash otherwise lived exactly one frame.
+
+### 2. `game.addCrowdBodies` — a crowd you cannot walk through
+
+props.js owns it, main.js promotes it onto `game` **after `createProps`** (`game.physics` is
+assembled there, not in `createPhysicsWorld`). Signature:
+
+    game.addCrowdBodies({ n, at(i, out), moving, y })  ->  { bodies, moving, step(at) }
+
+`at(i, out)` writes the i-th person's **foot** position into `out` and returns `false` for
+anybody who is not there.
+
+| | |
+|---|---|
+| `moving: false` (default) | ONE body, N shapes, offset into place. Correct whenever nothing moves after placement — one broadphase entry for three hundred people. Rio's pattern. |
+| `moving: true` | one body EACH, because a compound body cannot move one of its shapes. Call `handle.step()` from the chapter's update, AFTER the loop that moved the people. Kowloon's pattern. |
+
+Four rules, all of them paid for:
+
+1. **The box is npc.js's** — `CANNON.Box(0.26, 0.85, 0.24)` on `game.mats.npc` — or a person
+   drawn by a chapter feels different from a person drawn by the locals rig.
+2. **The shape is offset by its own half-height.** `at()` gives the feet.
+3. **A moved body carries all three of cannon's position fields AND sets `aabbNeedsUpdate`.**
+   The three fields are the render transform; the flag is the BROADPHASE. `position.set()`
+   does not set it, so a hand-moved static body keeps the AABB it was built with for ever and
+   both the contact test and `raycastClosest` go on using it. Every box in the right place and
+   Venice still measured 44% solid.
+4. **It is not a wall.** These bodies are deliberately in no chapter's static/solid list: a
+   crowd is something you push through the edge of, not something to route around.
+
+`at` returning `false` for a moving crowd **parks** the box under the world rather than
+skipping it — leaving it where it was is an invisible body standing in the square, which is
+worse than the ghost it replaced.
+
+### 3. The calm registry has two halves and only one was used
+
+`game.addCritter` publishes `near` AND `appr`, and every chapter before v36 read only `near`.
+
+| | |
+|---|---|
+| `near` | a FLEE radius shrunk by how settled the player is. `if (d < cr.near) spook()` |
+| `appr` | 0..1, how much this animal has decided to come over. For an animal that does not flee, what stillness buys is that it notices you from FURTHER — multiply the radius it already had |
+
+Antarctica's seal and colony and the Drift's lampflies are the first readers of `appr` outside
+Iceland. **Ten of nineteen chapters still register nothing, and that is a content gap and not
+a plumbing one:** they have no living animal with a proximity reaction to register.
+
+### 4. `npcLINES` goes through `localResolve`
+
+`pickLine` runs the same `{ t, after, before }` gate every other chapter's pool goes through,
+so **Sydney and Pasto** — the two oldest casts, the two with the most tasks in the game, and
+the two that predate `addLocal` — can react to what you have done. `qa/lines.mjs` audits
+npc.js as a SET of two chapters and scores its floor **per chapter**, or Sydney's twenty-eight
+would carry Pasto's zero.
+
+### 5. `albShotOn(biome, host)` — three surfaces, not one
+
+The album's `albBest` had one reader. It has three: the picker tile, the ledger leaf and the
+departures board row. The authored mark is still built, still appended, and still the ground
+and the tint under the photograph; a place you have never photographed is unchanged. **Not**
+the chapter-done card (a ceremony is the game's own voice) and **not** the shelf (that holds
+the object you took, a different question). The board's rows are built ONCE at boot and only
+their text is refreshed, so the image is latched per row — appending on every refresh stacks
+a hundred of them on one span.
+
+---
+
 ## THE MOVEMENT PASS, ROW 5b — THE SECOND FLIER (v35 — 28 Aug 2026)
 
 The last open row of `qa/MOVEMENT-PASS.md`, and the sixth time this codebase has replaced a
