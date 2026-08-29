@@ -74,6 +74,33 @@ export const PALETTE = {
   capyBowtie:   0x1a1c26,
   capyShade:    0x1b1f2a,
   capyShadeRim: 0xb8974e,
+  // ---- THE REST OF THE WARDROBE. Ten chapters, one costume each.
+  // Every one of these is a value a capybara's own three browns are NOT, which
+  // is the only rule the set has: a hat the colour of the animal is a lump.
+  capyStraw:    0xe0c98a,      // ch1  the stolen sun hat, and ch10's boater
+  capyStrawDk:  0xb99e63,
+  capyHatBand:  0xb0574f,
+  capyNavy:     0x2b3a52,      // ch3  the ferry master's cap
+  capyPeak:     0x1b2333,
+  capyGold:     0xd8b158,
+  capyPlumeA:   0x4bbf9a,      // ch6  Rio, and it is three colours or it is one
+  capyPlumeB:   0xe8c25c,
+  capyPlumeC:   0xd8628a,
+  capyRibbon:   0xc0433f,      // ch10 the boater's band, and the neckerchief
+  capyRubber:   0x24272c,      // ch12 mask and snorkel
+  capyLens:     0x9fd6e4,
+  capySnorkel:  0xe8b93c,
+  capyLeather:  0x7d5334,      // ch13 the balloon pilot
+  capyLeatherDk:0x5c3c26,
+  capyAmber:    0xd9a24e,
+  capyLifeRed:  0xc8433c,      // ch14 the surf cap, in its two colours
+  capyLifeYel:  0xe6c34a,
+  capyHelmet:   0xdcd7c8,      // ch16 the caver
+  capyHelmetDk: 0x8f8b7e,
+  capyLampOn:   0xffe9b0,
+  capyParka:    0xc4453d,      // ch17 and the ruff is the whole point
+  capyParkaDk:  0x8f322c,
+  capyFur:      0xd9cdb4,
 
   // people
   skin1:        0xf3cca4,

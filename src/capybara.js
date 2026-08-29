@@ -378,6 +378,13 @@ const capyGeoBead = new THREE.SphereGeometry(1, 6, 4);
 const capyGeoLeg = new THREE.CylinderGeometry(0.078, 0.10, 0.32, 6);
 const capyGeoFoot = new THREE.BoxGeometry(1, 1, 1);
 const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
+// The wardrobe's three. A unit disc (hat brims, bands, lenses), a unit dome
+// (crowns, hoods, helmets) and a unit box are between them every costume in the
+// game, which is the point of building them here: ten hats that each allocate
+// their own cylinder are ten geometries for one shape.
+const capyGeoDisc = new THREE.CylinderGeometry(1, 1, 1, 12);
+const capyGeoDome = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.52);
+const capyGeoBox = new THREE.BoxGeometry(1, 1, 1);
 
 // --- scratch (NEVER allocate inside update) --------------------------------
 const capyThrow = new THREE.Vector3();
@@ -1621,108 +1628,339 @@ export function createCapybara(game) {
     legs.push(g);
   }
 
-  // -------------------------------------------------------------------
-  // BLACK TIE — the one costume in the game, and it is a REWARD.
-  // -------------------------------------------------------------------
+  // ===================================================================
+  // THE WARDROBE — ten costumes, one per chapter that earns one.
+  // ===================================================================
   // Chapter 18 asks you to acquire a dinner jacket off a lounger on somebody
-  // else's sun deck. Until v39 the only thing that happened when you did was a
-  // line of toast; the jacket stayed in your mouth, which is the one place a
-  // dinner jacket does not go. Now it goes ON.
+  // else's sun deck, and until v39 the only thing that happened when you did
+  // was a line of toast — the jacket stayed in your mouth, which is the one
+  // place a dinner jacket does not go. That became the first costume, and once
+  // there was one there was obviously room for the rest: ten of the nineteen
+  // chapters ask you to do something that IMPLIES a piece of kit, and handing
+  // it over is the cheapest delight in the game.
   //
-  // Three rules, all of which were the difference between a costume and a
-  // sticker:
+  // The rule for what earns one is the same every time: **the task has to be
+  // the reason you have the thing.** You stole a tourist's hat, so you are
+  // wearing a tourist's hat. You brought the ferry alongside at Manly, so you
+  // have the master's cap. You went under in Palawan, so you have a mask on.
+  // Nothing here is a badge for finishing a chapter; each is the object the
+  // task was about.
   //
-  //  - IT IS BUILT ONCE AND HIDDEN, never built on demand. A costume assembled
-  //    the frame a task ticks is a hitch in the middle of a celebration, and
-  //    a costume torn down on a chapter change is a leak waiting to happen.
-  //    Twelve boxes cost nothing to carry around invisible.
-  //  - THE JACKET RIDES THE SQUASH AND THE GLASSES RIDE THE HEAD. Put the
-  //    glasses on the body and they float off the face the moment the animal
-  //    looks up; put the jacket on the head and it swims on every hop.
-  //  - NOTHING HERE JOINS `wetParts`. The soak swaps a mesh's material for its
-  //    wet twin, and a jacket that has no wet twin would come out of the
-  //    harbour wearing the belly's colour.
+  // Five rules, and every one of them was a bug first:
   //
-  // The read is a silhouette read, because at this camera distance that is the
-  // only read there is: a shawl collar standing proud of the shoulders, a wedge
-  // of white shirt down the chest, a bow tie under the jaw, and a black bar
-  // across the eyes with a brass rim on it.
-  const mTux = mat(PALETTE.capyTux);
-  const mSatin = mat(PALETTE.capyTuxSatin);
-  const mShirt = mat(PALETTE.capyShirt);
-  const mBow = mat(PALETTE.capyBowtie);
-  const mShade = mat(PALETTE.capyShade);
-  const mShadeRim = mat(PALETTE.capyShadeRim);
-
-  const tuxGroup = new THREE.Group();
-  tuxGroup.visible = false;
-  capySquash.add(tuxGroup);
-  // the body of the jacket: a shell over the barrel and the shoulders. It is
-  // 1.5 cm proud of the barrel on every axis except the front, where it stops
-  // short so the animal's own chest is what the collar opens onto.
-  capyAddPart(tuxGroup, capyGeoBlob, mTux, 0, 0.455, -0.075, 0.335, 0.268, 0.395);
-  // ...and the skirt of it over the rump. Deliberately SHORTER than the rump —
-  // a jacket that reaches the tail is a horse blanket.
-  capyAddPart(tuxGroup, capyGeoBlob, mTux, 0, 0.430, -0.375, 0.300, 0.252, 0.150);
-  // the shawl collar, in satin: two slabs down the shoulders converging on the
-  // chest. THE most legible half of the costume at any distance over four
-  // metres, because it is the only part of it that breaks the silhouette.
-  for (let s = -1; s <= 1; s += 2) {
-    const lapel = capyAddPart(tuxGroup, new THREE.BoxGeometry(0.075, 0.235, 0.065), mSatin,
-                              s * 0.150, 0.455, 0.290);
-    lapel.rotation.z = s * 0.20;
-    const shoulder = capyAddPart(tuxGroup, new THREE.BoxGeometry(0.065, 0.075, 0.30), mSatin,
-                                 s * 0.270, 0.505, 0.115);
-    shoulder.rotation.z = s * -0.30;
+  //  - BUILT ONCE AT CREATE, HIDDEN, never built on demand. A costume
+  //    assembled on the frame a task ticks is a hitch in the middle of a
+  //    celebration, and one torn down on a chapter change is a leak waiting to
+  //    happen. Ten costumes of a dozen boxes cost nothing to carry invisible.
+  //  - EVERY COSTUME IS TWO GROUPS: one on `capySquash` and one on `head`.
+  //    Put headgear on the body and it leaves the face the moment the animal
+  //    looks up; put a jacket on the head and it swims on every hop.
+  //  - NOTHING JOINS `wetParts`. The soak swaps a mesh's material for its wet
+  //    twin, and a hat with no wet twin comes out of the harbour wearing the
+  //    belly's colour.
+  //  - ONE AT A TIME. `wear` hides the lot and shows one, so there is no
+  //    state to get out of step and no order to get wrong.
+  //  - A CAPYBARA HAS NO NECK, and it has ears at head-y 0.12–0.28. The skull
+  //    box runs z 0.08–0.58 and the jaw 0.52–0.76, so there is nothing between
+  //    the shoulders and the muzzle that is ever on screen — anything meant to
+  //    read as a collar goes under the jaw's front, and any brim wide enough to
+  //    matter sits BELOW the ear tips so they come through it. A hat that
+  //    clears the ears is a hat floating over an animal.
+  const capyWardrobe = {};
+  function capyCostume(id) {
+    const o = { body: new THREE.Group(), head: new THREE.Group() };
+    o.body.visible = false;
+    o.head.visible = false;
+    capySquash.add(o.body);
+    head.add(o.head);
+    capyWardrobe[id] = o;
+    return o;
   }
-  // a white pocket square, because a capybara in a dinner jacket is a joke and
-  // a joke needs a detail nobody asked for
-  capyAddPart(tuxGroup, new THREE.BoxGeometry(0.050, 0.028, 0.012), mShirt,
-              0.268, 0.500, 0.020);
-
-  // ---- THE COLLAR AND THE TIE GO ON THE HEAD, AND THEY GO UNDER THE JAW ----
-  // A capybara has no neck. The first pass put a shirt front on the CHEST at
-  // capySquash z 0.30 and a bow tie inside the skull, and both were completely
-  // invisible: the skull box runs from z 0.08 to 0.58 and the jaw from 0.52 to
-  // 0.76, so everything between the shoulders and the muzzle is behind the
-  // head from every angle a player ever has. The only piece of this animal
-  // that reads as a throat is the 4 cm under the jaw's front — so that is
-  // where the wing collar and the tie are, hanging off the head so they stay
-  // put when it looks up.
-  const bowGroup = new THREE.Group();
-  bowGroup.visible = false;
-  head.add(bowGroup);
-  // the wing collar: white, a BAND and not a bib — it exists so the black bow
-  // in front of it has something to be black against, and a white patch big
-  // enough to see on its own just reads as a bald chin.
-  capyAddPart(bowGroup, new THREE.BoxGeometry(0.160, 0.052, 0.092), mShirt, 0, -0.248, 0.342);
-  capyAddPart(bowGroup, new THREE.BoxGeometry(0.056, 0.056, 0.046), mBow, 0, -0.266, 0.398);
-  for (let s = -1; s <= 1; s += 2) {
-    const wing = capyAddPart(bowGroup, new THREE.BoxGeometry(0.086, 0.074, 0.038), mBow,
-                             s * 0.073, -0.266, 0.394);
-    wing.rotation.z = s * 0.36;
+  /** A brim, a band, a lens: a disc lying flat unless it is turned. */
+  function capyDisc(p, m, x, y, z, r, h, rz) {
+    const d = capyAddPart(p, capyGeoDisc, m, x, y, z, r, h, r);
+    if (rz) d.rotation.x = rz;
+    return d;
+  }
+  /**
+   * TWO LENSES ON THE PLANES THE EYES ARE ALREADY ON.
+   *
+   * The eye sockets are turned outward-and-forward by 0.62 rad each so that
+   * both beads catch the light from a three-quarter front view; anything worn
+   * over them has to be on the same two planes or it sits across the face like
+   * a plank. Copying the sockets' own transform is the only way that stays
+   * true if the head is ever re-proportioned.
+   */
+  function capyEyewear(parent, mLens, mRim, w, h) {
+    const socks = [eyeSockL, eyeSockR];
+    for (let i = 0; i < 2; i++) {
+      const s = i === 0 ? 1 : -1;
+      const g = new THREE.Group();
+      g.position.copy(socks[i].position);
+      g.rotation.y = socks[i].rotation.y;
+      parent.add(g);
+      capyAddPart(g, capyGeoBox, mLens, 0, 0.008, 0.082, w, h, 0.022);
+      capyAddPart(g, capyGeoBox, mRim, 0, 0.008, 0.076, w + 0.013, h + 0.013, 0.014);
+      const arm = capyAddPart(g, capyGeoBox, mRim, s * 0.050, 0.012, -0.020,
+                              0.012, 0.014, 0.19);
+      arm.rotation.y = s * -0.30;
+    }
   }
 
-  // the sunglasses: one bar across the brow, two lenses angled onto the same
-  // outward-and-forward planes the eyes are set into, and a brass rim so the
-  // dark lens has an edge at distance. Parented to the head.
-  const shadeGroup = new THREE.Group();
-  shadeGroup.visible = false;
-  head.add(shadeGroup);
-  capyAddPart(shadeGroup, new THREE.BoxGeometry(0.10, 0.030, 0.030), mShadeRim, 0, 0.140, 0.325);
-  const shadeSock = [eyeSockL, eyeSockR];
-  for (let i = 0; i < 2; i++) {
-    const s = i === 0 ? 1 : -1;
+  // ---- ch18 · MONTE CARLO · black tie --------------------------------------
+  // The read is a silhouette read, because at four metres that is the only read
+  // there is: a shawl collar standing proud of the shoulders, a bow under the
+  // jaw and a black bar across the eyes with a brass rim on it.
+  {
+    const mTux = mat(PALETTE.capyTux);
+    const mSatin = mat(PALETTE.capyTuxSatin);
+    const mShirt = mat(PALETTE.capyShirt);
+    const mBow = mat(PALETTE.capyBowtie);
+    const mShade = mat(PALETTE.capyShade);
+    const mRim = mat(PALETTE.capyShadeRim);
+    const o = capyCostume('black-tie');
+    // the jacket: a shell over the barrel and the shoulders, 1.5 cm proud of it
+    // on every axis except the front, where it stops short so the animal's own
+    // chest is what the collar opens onto
+    capyAddPart(o.body, capyGeoBlob, mTux, 0, 0.455, -0.075, 0.335, 0.268, 0.395);
+    // ...and the skirt of it over the rump. Deliberately SHORTER than the rump:
+    // a jacket that reaches the tail is a horse blanket.
+    capyAddPart(o.body, capyGeoBlob, mTux, 0, 0.430, -0.375, 0.300, 0.252, 0.150);
+    for (let s = -1; s <= 1; s += 2) {
+      const lapel = capyAddPart(o.body, capyGeoBox, mSatin, s * 0.150, 0.455, 0.290,
+                                0.075, 0.235, 0.065);
+      lapel.rotation.z = s * 0.20;
+      const shoulder = capyAddPart(o.body, capyGeoBox, mSatin, s * 0.270, 0.505, 0.115,
+                                   0.065, 0.075, 0.30);
+      shoulder.rotation.z = s * -0.30;
+    }
+    // a pocket square, because a capybara in a dinner jacket is a joke and a
+    // joke needs a detail nobody asked for
+    capyAddPart(o.body, capyGeoBox, mShirt, 0.268, 0.500, 0.020, 0.050, 0.028, 0.012);
+    // the wing collar: a BAND and not a bib — it exists so the black bow in
+    // front of it has something to be black against
+    capyAddPart(o.head, capyGeoBox, mShirt, 0, -0.248, 0.342, 0.160, 0.052, 0.092);
+    capyAddPart(o.head, capyGeoBox, mBow, 0, -0.266, 0.398, 0.056, 0.056, 0.046);
+    for (let s = -1; s <= 1; s += 2) {
+      const wing = capyAddPart(o.head, capyGeoBox, mBow, s * 0.073, -0.266, 0.394,
+                               0.086, 0.074, 0.038);
+      wing.rotation.z = s * 0.36;
+    }
+    capyAddPart(o.head, capyGeoBox, mRim, 0, 0.140, 0.325, 0.10, 0.030, 0.030);
+    capyEyewear(o.head, mShade, mRim, 0.115, 0.085);
+  }
+
+  // ---- ch1 · SYDNEY · the stolen sun hat -----------------------------------
+  // The first thing this game ever asks of you is to take a hat off a tourist,
+  // and the keepsake for the chapter is that hat. It is worn ASKEW, because a
+  // hat a rodent has taken off a person is not a hat that fits.
+  {
+    const mStraw = mat(PALETTE.capyStraw);
+    const mStrawDk = mat(PALETTE.capyStrawDk);
+    const mBand = mat(PALETTE.capyHatBand);
+    const o = capyCostume('sunhat');
     const g = new THREE.Group();
-    g.position.copy(shadeSock[i].position);
-    g.rotation.y = shadeSock[i].rotation.y;
-    shadeGroup.add(g);
-    capyAddPart(g, new THREE.BoxGeometry(0.115, 0.085, 0.022), mShade, 0, 0.008, 0.082);
-    capyAddPart(g, new THREE.BoxGeometry(0.128, 0.098, 0.014), mShadeRim, 0, 0.008, 0.076);
-    // the arm, back along the side of the skull to the ear
-    const arm = capyAddPart(g, new THREE.BoxGeometry(0.012, 0.014, 0.19), mShadeRim,
-                            s * 0.050, 0.012, -0.020);
-    arm.rotation.y = s * -0.30;
+    g.position.set(0, 0.185, 0.05);
+    g.rotation.z = 0.15;
+    g.rotation.x = -0.10;
+    o.head.add(g);
+    capyDisc(g, mStraw, 0, 0.02, 0, 0.300, 0.030);         // the brim
+    capyDisc(g, mStrawDk, 0, 0.008, 0, 0.305, 0.012);      // its underside shade
+    capyAddPart(g, capyGeoDome, mStraw, 0, 0.03, 0, 0.150, 0.135, 0.150);
+    capyDisc(g, mBand, 0, 0.062, 0, 0.158, 0.042);         // the ribbon
+  }
+
+  // ---- ch3 · CIRCULAR QUAY · the master's cap ------------------------------
+  // You took the helm, you found the heads, you put her alongside at Manly.
+  // Nobody gives a capybara a ferry; a capybara that has driven one gets a cap.
+  {
+    const mNavy = mat(PALETTE.capyNavy);
+    const mPeak = mat(PALETTE.capyPeak);
+    const mGold = mat(PALETTE.capyGold);
+    const o = capyCostume('ferrycap');
+    const g = new THREE.Group();
+    g.position.set(0, 0.175, 0.02);
+    o.head.add(g);
+    capyAddPart(g, capyGeoDome, mNavy, 0, 0.030, 0, 0.180, 0.120, 0.195);
+    capyDisc(g, mNavy, 0, 0.145, 0, 0.181, 0.030);
+    capyDisc(g, mPeak, 0, 0.032, 0, 0.187, 0.040);          // the band
+    const peak = capyAddPart(g, capyGeoBox, mPeak, 0, 0.030, 0.230, 0.235, 0.028, 0.150);
+    peak.rotation.x = -0.24;
+    capyAddPart(g, capyGeoBox, mGold, 0, 0.070, 0.180, 0.070, 0.048, 0.020);
+  }
+
+  // ---- ch6 · RIO · the parade plumes ---------------------------------------
+  // Samba down the avenue on the two and the avenue puts a headdress on you.
+  // Seven feathers in three colours, on their own pivots so the fan spreads
+  // from a point behind the ears rather than from the middle of each feather.
+  {
+    const PLUME = [mat(PALETTE.capyPlumeA), mat(PALETTE.capyPlumeB), mat(PALETTE.capyPlumeC)];
+    const mSeq = mat(PALETTE.capyGold);
+    const o = capyCostume('plumes');
+    for (let i = 0; i < 7; i++) {
+      const piv = new THREE.Group();
+      piv.position.set(0, 0.130, -0.130);
+      piv.rotation.z = (i - 3) * 0.245;
+      piv.rotation.x = -0.40;
+      o.head.add(piv);
+      const m = PLUME[i % 3];
+      const len = 0.30 + (3 - Math.abs(i - 3)) * 0.035;
+      capyAddPart(piv, capyGeoBox, m, 0, len * 0.5, 0, 0.048, len, 0.018);
+      capyAddPart(piv, capyGeoBead, m, 0, len + 0.010, 0, 0.032, 0.048, 0.016);
+    }
+    capyDisc(o.head, mSeq, 0, 0.150, -0.110, 0.115, 0.045);  // the mount
+    // and a sequinned collar on the shoulders, which is what stops the plumes
+    // reading as something that has landed on the animal
+    for (let s = -1; s <= 1; s += 2) {
+      const c = capyAddPart(o.body, capyGeoBox, mSeq, s * 0.215, 0.520, 0.115,
+                            0.075, 0.055, 0.26);
+      c.rotation.z = s * -0.34;
+    }
+  }
+
+  // ---- ch10 · VENICE · the gondolier's boater ------------------------------
+  // Ride the prow of a gondola standing up and you have effectively applied for
+  // the job. Flat crown, wide flat brim, red band — and the neckerchief, which
+  // is the half of the outfit people actually picture.
+  {
+    const mStraw = mat(PALETTE.capyStraw);
+    const mStrawDk = mat(PALETTE.capyStrawDk);
+    const mRib = mat(PALETTE.capyRibbon);
+    const o = capyCostume('boater');
+    const g = new THREE.Group();
+    g.position.set(0, 0.190, 0.04);
+    o.head.add(g);
+    capyDisc(g, mStraw, 0, 0.020, 0, 0.272, 0.028);
+    capyDisc(g, mStrawDk, 0, 0.006, 0, 0.276, 0.012);
+    capyDisc(g, mStraw, 0, 0.075, 0, 0.152, 0.090);          // the flat crown
+    capyDisc(g, mStrawDk, 0, 0.122, 0, 0.155, 0.016);
+    capyDisc(g, mRib, 0, 0.048, 0, 0.159, 0.036);
+    // the neckerchief, under the jaw where the tux's collar goes
+    capyAddPart(o.head, capyGeoBox, mRib, 0, -0.246, 0.336, 0.168, 0.056, 0.096);
+    capyAddPart(o.head, capyGeoBox, mRib, 0, -0.276, 0.392, 0.070, 0.062, 0.044);
+  }
+
+  // ---- ch12 · PALAWAN · mask and snorkel -----------------------------------
+  // `first-dive` is the moment the game hands over a verb it then keeps for
+  // ever, and this is the only costume in the set that is equipment rather than
+  // uniform. The snorkel is on the LEFT and it is bent, because a straight tube
+  // sticking out of a rodent's head is an antenna.
+  {
+    const mRub = mat(PALETTE.capyRubber);
+    const mLens = mat(PALETTE.capyLens, { transparent: true, opacity: 0.82 });
+    const mSnk = mat(PALETTE.capySnorkel);
+    const o = capyCostume('snorkel');
+    // the strap, right round the skull
+    capyAddPart(o.head, capyGeoBox, mRub, 0, 0.120, 0.040, 0.375, 0.050, 0.400);
+    // the skirt of the mask, over both eyes and the top of the muzzle
+    capyAddPart(o.head, capyGeoBox, mRub, 0, 0.120, 0.300, 0.345, 0.150, 0.110);
+    for (let s = -1; s <= 1; s += 2) {
+      capyAddPart(o.head, capyGeoBox, mLens, s * 0.088, 0.126, 0.358, 0.120, 0.095, 0.020);
+    }
+    const piv = new THREE.Group();
+    piv.position.set(0.190, 0.060, 0.140);
+    piv.rotation.z = -0.14;
+    o.head.add(piv);
+    capyAddPart(piv, capyGeoBox, mSnk, 0, 0.170, 0, 0.042, 0.340, 0.042);
+    const bend = capyAddPart(piv, capyGeoBox, mSnk, -0.020, -0.010, 0.075, 0.040, 0.040, 0.140);
+    bend.rotation.x = 0.34;
+  }
+
+  // ---- ch13 · CAPPADOCIA · the pilot's cap ---------------------------------
+  // Be up there when the sun clears the rim. Leather cap, ear flaps, and the
+  // goggles PUSHED UP ON THE BROW rather than over the eyes — a pilot wears
+  // them up, and up is also the only place they do not fight the animal's own.
+  {
+    const mLea = mat(PALETTE.capyLeather);
+    const mLeaDk = mat(PALETTE.capyLeatherDk);
+    const mAmb = mat(PALETTE.capyAmber, { transparent: true, opacity: 0.85 });
+    const o = capyCostume('flycap');
+    capyAddPart(o.head, capyGeoDome, mLea, 0, 0.170, 0.010, 0.200, 0.150, 0.215);
+    for (let s = -1; s <= 1; s += 2) {
+      const flap = capyAddPart(o.head, capyGeoBox, mLea, s * 0.186, 0.060, 0.020,
+                               0.046, 0.180, 0.180);
+      flap.rotation.z = s * 0.10;
+    }
+    capyAddPart(o.head, capyGeoBox, mLeaDk, 0, 0.246, 0.170, 0.320, 0.070, 0.058);
+    for (let s = -1; s <= 1; s += 2) {
+      capyDisc(o.head, mAmb, s * 0.088, 0.250, 0.196, 0.062, 0.024, Math.PI * 0.5);
+    }
+    // the scarf, and it is the whole reason this reads as flying
+    for (let i = 0; i < 3; i++) {
+      const sc = capyAddPart(o.body, capyGeoBox, mat(PALETTE.capyShirt),
+                             0.030 * i, 0.500 - i * 0.030, -0.150 - i * 0.140,
+                             0.110 - i * 0.020, 0.055, 0.150);
+      sc.rotation.y = i * 0.20;
+    }
+  }
+
+  // ---- ch14 · MANLY · the surf cap -----------------------------------------
+  // Take the biggest of the set all the way to the sand and the club gives you
+  // the cap. Red and yellow in quarters, and a strap under the jaw, which is
+  // the only part of it that says SWIM rather than HAT.
+  {
+    const mRed = mat(PALETTE.capyLifeRed);
+    const mYel = mat(PALETTE.capyLifeYel);
+    const o = capyCostume('surfcap');
+    capyAddPart(o.head, capyGeoDome, mRed, 0, 0.166, 0.020, 0.190, 0.120, 0.205);
+    // the yellow quarters: one band fore-and-aft over the crown, standing a
+    // millimetre proud so it does not z-fight the shell it sits on
+    capyAddPart(o.head, capyGeoBox, mYel, 0, 0.230, 0.020, 0.098, 0.100, 0.400);
+    capyAddPart(o.head, capyGeoBox, mRed, 0, 0.166, 0.020, 0.394, 0.030, 0.418);
+    for (let s = -1; s <= 1; s += 2) {
+      const str = capyAddPart(o.head, capyGeoBox, mYel, s * 0.176, 0.020, 0.070,
+                              0.026, 0.230, 0.030);
+      str.rotation.z = s * 0.12;
+    }
+    capyAddPart(o.head, capyGeoBox, mYel, 0, -0.112, 0.120, 0.330, 0.028, 0.032);
+  }
+
+  // ---- ch16 · SON DOONG · the caver's helmet -------------------------------
+  // Stand in the light inside the mountain. The lamp is the point: it is the
+  // one piece of the wardrobe with an EMISSIVE on it, because a lamp that is
+  // shaded like everything else is a white box, and this chapter is the only
+  // place in the game dark enough for the difference to matter.
+  {
+    const mShell = mat(PALETTE.capyHelmet);
+    const mShellDk = mat(PALETTE.capyHelmetDk);
+    const mLamp = mat(PALETTE.capyLampOn, { emissive: PALETTE.capyLampOn,
+                                            emissiveIntensity: 1 });
+    const o = capyCostume('cavehelm');
+    capyAddPart(o.head, capyGeoDome, mShell, 0, 0.168, 0.020, 0.205, 0.140, 0.220);
+    capyAddPart(o.head, capyGeoBox, mShell, 0, 0.176, 0.225, 0.240, 0.036, 0.100);
+    capyAddPart(o.head, capyGeoBox, mShellDk, 0, 0.230, 0.020, 0.055, 0.075, 0.420);
+    capyAddPart(o.head, capyGeoBox, mShellDk, 0, 0.222, 0.238, 0.100, 0.078, 0.062);
+    capyDisc(o.head, mLamp, 0, 0.222, 0.276, 0.042, 0.024, Math.PI * 0.5);
+    for (let s = -1; s <= 1; s += 2) {
+      const str = capyAddPart(o.head, capyGeoBox, mShellDk, s * 0.190, 0.030, 0.060,
+                              0.022, 0.200, 0.028);
+      str.rotation.z = s * 0.10;
+    }
+  }
+
+  // ---- ch17 · ANTARCTICA · the expedition hood -----------------------------
+  // Run with the pod, and the bottom of the world lends you a coat. The RUFF is
+  // the whole costume — eleven beads on a ring around the face opening, which
+  // is the one shape that says parka from any angle including behind, and the
+  // only piece of the wardrobe that frames the animal's face rather than
+  // covering part of it.
+  {
+    const mPk = mat(PALETTE.capyParka);
+    const mPkDk = mat(PALETTE.capyParkaDk);
+    const mFur = mat(PALETTE.capyFur);
+    const o = capyCostume('parka');
+    capyAddPart(o.body, capyGeoBlob, mPk, 0, 0.455, -0.090, 0.338, 0.270, 0.390);
+    capyAddPart(o.body, capyGeoBlob, mPk, 0, 0.430, -0.380, 0.302, 0.254, 0.155);
+    capyAddPart(o.body, capyGeoBox, mPkDk, 0, 0.470, 0.010, 0.560, 0.070, 0.240);
+    // the hood shell, behind and over the skull
+    capyAddPart(o.head, capyGeoBlob, mPk, 0, 0.040, -0.120, 0.250, 0.245, 0.230);
+    // ...and the ruff, on a ring about the face
+    for (let i = 0; i < 11; i++) {
+      const a = -Math.PI * 0.5 + (i / 10) * Math.PI * 2 * 0.86;
+      capyAddPart(o.head, capyGeoBead, mFur,
+                  Math.cos(a) * 0.238, 0.040 + Math.sin(a) * 0.238, 0.090,
+                  0.062, 0.062, 0.070);
+    }
   }
 
   // --- fx: splash rings, one InstancedMesh (three instances, one draw) --
