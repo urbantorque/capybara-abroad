@@ -4531,7 +4531,12 @@ function sysBuildCSS() {
    panel. `cover` because the thumbnail is 8:5 and the tile is 64:26 — letterbox
    bars inside a postcard would read as a rendering fault. Absolute, so it does
    not disturb the key badge that is positioned against this same box. */
-'.capyui-pickshot{position:absolute;inset:0;width:100%;height:100%;display:block;',
+/* YOUR OWN PHOTOGRAPH, OVER A PLACE'S AUTHORED MARK. One rule and three
+   surfaces — the picker tile, the ledger leaf and the departures board row —
+   because it is the same idea in all three: the mark stays underneath as the
+   ground and the tint, and where you have taken a picture you get the picture.
+   It was called `pickshot` when the title card was the only one that had it. */
+'.capyui-shot{position:absolute;inset:0;width:100%;height:100%;display:block;',
   'object-fit:cover;border-radius:inherit;}',
 '.capyui-pickart svg{display:block;width:100%;height:100%;',
   'transition:transform .35s cubic-bezier(.16,1,.3,1);}',
@@ -11087,18 +11092,7 @@ export function createSystems(game) {
     // photographed looks exactly as it always did. This is the point of keeping
     // the album at all: the menu of a game about going places should show the
     // places as YOU saw them, not as seventeen hand-authored polygons.
-    try {
-      const shot = albBest(d.biome);
-      if (shot && shot.u) {
-        const im = document.createElement('img');
-        im.className = 'capyui-pickshot';
-        im.src = shot.u;
-        im.alt = '';
-        im.setAttribute('aria-hidden', 'true');
-        im.decoding = 'async';
-        art.appendChild(im);
-      }
-    } catch (e) { /* the mark underneath is a complete tile on its own */ }
+    albShotOn(d.biome, art);
     // A ROW WITH NO KEY IS STILL A ROW YOU CAN CLICK. Past the twentieth
     // chapter sysPickLabel runs out; the badge simply is not drawn, and
     // nothing else about the tile changes.
@@ -11827,6 +11821,44 @@ export function createSystems(game) {
     const arr = albAll();
     for (let i = arr.length - 1; i >= 0; i--) if (arr[i].place === place) return arr[i];
     return null;
+  }
+
+  // ---- ...AND THREE SURFACES ASK IT NOW (v36) -----------------------------
+  //
+  // THE END OF THIS GAME IS DESCRIBED AS "MADE OF WHAT THE JOURNEY ACTUALLY
+  // LEFT BEHIND" AND THE ONE THING THE PLAYER MADE THEMSELVES WAS NOT IN IT.
+  // The camera is the only thing in this game that leaves it; the album keeps
+  // thirty-six pictures past a reload; and `albBest` had exactly one reader —
+  // the title card — so the ledger, which is the surface that exists to say
+  // where you have been, drew seventeen hand-authored polygons instead.
+  //
+  // This is that one reader made into three, and it is deliberately the SAME
+  // gesture each time: the authored mark is still built and still appended, it
+  // is still the ground and the tint under the photograph, and a place you have
+  // never photographed is drawn exactly as it always was. Nothing is stored to
+  // make it work — it is the album, read from a different card.
+  //
+  // NOT THE CHAPTER-DONE CARD, AND NOT THE SHELF. The done card is a ceremony
+  // and the ceremony is the game's own voice, once per place; and the shelf
+  // holds the OBJECT you took out of a chapter, which is a different question
+  // from what the place looked like. Both keep their authored art on purpose.
+  //
+  // Never throws. A dataURL that will not decode leaves the mark showing, which
+  // is a complete tile on its own.
+  function albShotOn(biome, host) {
+    if (!host) return false;
+    try {
+      const shot = albBest(biome);
+      if (!shot || !shot.u) return false;
+      const im = document.createElement('img');
+      im.className = 'capyui-shot';
+      im.src = shot.u;
+      im.alt = '';
+      im.setAttribute('aria-hidden', 'true');
+      im.decoding = 'async';
+      host.appendChild(im);
+      return true;
+    } catch (e) { return false; }
   }
 
   function photoShoot() {
@@ -12753,6 +12785,10 @@ export function createSystems(game) {
       mk.style.background = sysMarkTint(def.biome, 0.42);
       const mark = sysBuildMark(def.biome);
       if (mark) mk.appendChild(mark);
+      // ...and if you took a picture there, it is your picture. See albShotOn.
+      // The ledger is rebuilt every time it opens, so a photograph taken five
+      // minutes ago is on the leaf the next time it is read.
+      albShotOn(def.biome, mk);
       row.appendChild(mk);
       row.appendChild(sysEl('div', 'capyui-ledname', def.name));
       const ms = jrChapMs[n];
@@ -12907,7 +12943,12 @@ export function createSystems(game) {
     // is one listener rather than three, and it cannot get out of step with them.
     row.addEventListener('click', go);
     jrCard.appendChild(row);
-    jrRows.push({ n: n, row: row, tally: tally, rec: rec, bar: barFill, def: def });
+    // `thumb` is carried so jrRefresh can put your own photograph on the row.
+    // The rows are built ONCE at boot and only their text is refreshed, so an
+    // image appended here would be whatever the album held on frame zero —
+    // which is nothing, for ever. See the block in jrRefresh.
+    jrRows.push({ n: n, row: row, tally: tally, rec: rec, bar: barFill, def: def,
+                  thumb: thumb, shot: null });
 
     // ---- and this chapter's slot on the shelf ----------------------------
     // A <button> so a tap can name it — a tooltip is not a thing a phone has,
@@ -13052,6 +13093,15 @@ export function createSystems(game) {
     for (let i = 0; i < jrRows.length; i++) {
       const r = jrRows[i];
       const rec = chapRec[r.n];
+      // ---- YOUR OWN PHOTOGRAPH ON THE ROW (v36) ---------------------------
+      // The board answers "where can I go" and the ledger answers "where have
+      // I been", and both of them drew the same seventeen authored polygons.
+      // Done ONCE per row and latched on `r.shot`: the card is refreshed every
+      // time it opens and on every travel, and appending an <img> on each pass
+      // would stack a hundred of them on one span.
+      if (!r.shot && albShotOn(r.def.biome, r.thumb)) {
+        r.shot = r.thumb.lastChild;
+      }
       let d = 0;
       for (let k = 0; k < rec.ids.length; k++) if (taskRec[rec.ids[k]].done) d++;
       const full = d >= rec.ids.length;
