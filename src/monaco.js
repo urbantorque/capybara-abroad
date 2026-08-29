@@ -2752,6 +2752,26 @@ function monUpdateRide(game, dt) {
  * another to the sun deck at nine metres — and nine metres over water is the
  * highest thing in this chapter you can jump off, which is the whole reason the
  * decks are at the heights they are.
+ *
+ * ---- A DECKHOUSE IS A WALL, NOT A LID (v39) -------------------------------
+ * The first build of this boat put both companionways at local x ±2.2, z −6 to
+ * −2.3 — which is INSIDE the deckhouse, in the drawing and in the collider. The
+ * deckhouse colliders are solid boxes, so the whole volume from the main deck
+ * at 2.8 up to 8.7 was one block: the treads were sealed inside it, the sun
+ * deck was buried 0.3 m under the roof above it, and the only standable surface
+ * over the main deck was a roof 3.2 m up. `black-tie` and `high-dive` were both
+ * uncompletable and neither of them said so — the jacket was lying there in
+ * plain sight on a deck with no way onto it.
+ *
+ * Two rules came out of it, and they are cheap to check:
+ *   - A DECKHOUSE COLLIDER MUST STOP AT THE DECK IT CARRIES. cabin 1 now spans
+ *     monDECK1..monDECK2 and cabin 2 monDECK2..monDECK3, so the walkable
+ *     surface is the teak you can see and not a slab 30 cm above it.
+ *   - A COMPANIONWAY MUST BE IN OPEN AIR. Flight A is on the aft deck, abaft
+ *     the deckhouse; flight B is on the foredeck ahead of the sun-deck house
+ *     and climbs aft. Both are drawn, both are outside every other collider,
+ *     and the route reads from the quay: up the passerelle, up the back, walk
+ *     forward, up the front.
  */
 const monYACHT = { x: 10, z: -59, yaw: 0.0, L: 42, B: 8.6 };
 const monDECK1 = 3.4, monDECK2 = 6.2, monDECK3 = 9.0;
@@ -2770,19 +2790,30 @@ function monBuildYacht(game, root) {
   // the main deck, in teak
   K.box(0, y + monDECK1 - 0.1, -L * 0.06, B - 0.5, 0.24, L * 0.80, PALETTE.monTeak);
   monPoolBox(body, monYACHT.x, y + monDECK1 - 0.4, monYACHT.z - L * 0.06, B - 0.5, 0.8, L * 0.80);
-  // the superstructure
-  K.box(0, y + monDECK1 + 1.5, -2, B - 1.4, 3.0, L * 0.42, PALETTE.monHull);
+  // the superstructure. Drawn UP TO THE UNDERSIDE of the bridge deck's teak,
+  // so the plate above lies on it rather than sinking into it, and collided
+  // from the main deck to the bridge deck's top surface — see the header.
+  const HOUSE1 = monDECK2 - 0.23 - monDECK1;      // 2.57 m, deck to deck plate
+  K.box(0, y + monDECK1 + HOUSE1 * 0.5, -2, B - 1.4, HOUSE1, L * 0.42, PALETTE.monHull);
   K.box(0, y + monDECK1 + 1.6, -2 + L * 0.21, B - 1.6, 1.4, 0.3, PALETTE.monCarGlass);
   for (let s = -1; s <= 1; s += 2) {
     K.box(s * (B * 0.5 - 0.72), y + monDECK1 + 1.6, -2, 0.3, 1.4, L * 0.40, PALETTE.monCarGlass);
   }
-  monPoolBox(body, monYACHT.x, y + monDECK1 + 1.6, monYACHT.z - 2, B - 1.4, 3.2, L * 0.42);
+  monPoolBox(body, monYACHT.x, y + (monDECK1 + monDECK2) * 0.5, monYACHT.z - 2,
+             B - 1.4, monDECK2 - monDECK1, L * 0.42);
   // the bridge deck
   K.box(0, y + monDECK2 - 0.1, -1, B - 1.0, 0.26, L * 0.50, PALETTE.monTeak);
   monPoolBox(body, monYACHT.x, y + monDECK2 - 0.4, monYACHT.z - 1, B - 1.0, 0.8, L * 0.50);
-  K.box(0, y + monDECK2 + 1.4, -4, B - 2.4, 2.8, L * 0.26, PALETTE.monHull);
-  K.box(0, y + monDECK2 + 1.6, -4 + L * 0.13, B - 2.6, 1.5, 0.3, PALETTE.monCarGlass);
-  monPoolBox(body, monYACHT.x, y + monDECK2 + 1.6, monYACHT.z - 4, B - 2.4, 3.0, L * 0.26);
+  // THE SUN-DECK HOUSE IS NARROW, AND THAT IS A ROUTE DECISION. It used to be
+  // B − 2.4, which left a 70 cm side deck between it and the rail — and the two
+  // flights are at opposite ends of the boat, so getting from the top of one to
+  // the foot of the other means walking eleven metres past this house. A capy
+  // does not fit down 70 cm with any confidence. B − 3.8 gives 1.4 m a side,
+  // the sun deck above overhangs it by 60 cm, and the walk reads as a walk.
+  K.box(0, y + monDECK2 + 1.4, -4, B - 3.8, 2.8, L * 0.26, PALETTE.monHull);
+  K.box(0, y + monDECK2 + 1.6, -4 + L * 0.13, B - 4.0, 1.5, 0.3, PALETTE.monCarGlass);
+  monPoolBox(body, monYACHT.x, y + (monDECK2 + monDECK3) * 0.5, monYACHT.z - 4,
+             B - 3.8, monDECK3 - monDECK2, L * 0.26);
   // the sun deck, and the lounger on it that has a dinner jacket over the back
   K.box(0, y + monDECK3 - 0.1, -4, B - 2.6, 0.26, L * 0.24, PALETTE.monTeak);
   monPoolBox(body, monYACHT.x, y + monDECK3 - 0.4, monYACHT.z - 4, B - 2.6, 0.8, L * 0.24);
@@ -2821,15 +2852,38 @@ function monBuildYacht(game, root) {
   for (let s = -1; s <= 1; s += 2) {
     K.box(s * 0.9, y + monDECK1 - 0.05, -L * 0.40 - 3.2, 0.05, 0.72, 7.0, PALETTE.monBrass, -0.11, 0, 0);
   }
-  // the two companionways up through the decks
-  for (let st = 0; st < 2; st++) {
-    const from = st ? monDECK2 : monDECK1, to = st ? monDECK3 : monDECK2;
-    for (let i = 0; i < 7; i++) {
-      const t = i / 6;
-      K.box(2.2 - st * 4.4, y + lerp(from, to, t) - 0.1, -6 + i * 0.62,
-            1.5, 0.16, 0.62, PALETTE.monTeakDk);
-      monPoolBox(body, monYACHT.x + 2.2 - st * 4.4, y + lerp(from, to, t) - 0.32,
-                 monYACHT.z - 6 + i * 0.62, 1.5, 0.5, 0.66);
+  // THE TWO COMPANIONWAYS, AND THEY ARE OUTSIDE THE HOUSE.
+  //
+  // Eight treads each, 0.40 m of rise on 0.62 m of run — the same stair the
+  // rest of the game uses, and the top tread of each flight lands flush on the
+  // deck above rather than a hand's width under it. Flight A runs FORWARD up
+  // the aft deck onto the bridge deck's after edge; flight B runs AFT up the
+  // foredeck onto the sun deck's forward edge. The z's are hand-checked against
+  // the deckhouse faces (cabin 1 abaft −10.82, cabin 2 forward +1.46) because a
+  // tread that overlaps a house is a tread inside a wall, which is the bug this
+  // replaces.
+  const monSTAIRS = [
+    { x: -2.2, from: monDECK1, to: monDECK2, z0: -15.84, dz:  0.62 },  // A: aft deck  -> bridge deck
+    { x:  0.0, from: monDECK2, to: monDECK3, z0:   5.80, dz: -0.62 },  // B: foredeck  -> sun deck
+  ];
+  for (let st = 0; st < monSTAIRS.length; st++) {
+    const S = monSTAIRS[st];
+    for (let i = 0; i < 8; i++) {
+      const h = lerp(S.from, S.to, i / 7);
+      const lz = S.z0 + i * S.dz;
+      K.box(S.x, y + h - 0.08, lz, 1.5, 0.16, 0.72, PALETTE.monTeakDk);
+      monPoolBox(body, monYACHT.x + S.x, y + h - 0.30, monYACHT.z + lz, 1.5, 0.6, 0.72);
+      // a brass rail each side, because an unrailed flight over a deck edge
+      // reads as scenery and this one has to read as a route
+      for (let s = -1; s <= 1; s += 2) {
+        K.cyl(S.x + s * 0.80, y + h + 0.30, lz, 0.028, 0.76, PALETTE.monBrass, 0, 0, 0, 4);
+      }
+    }
+    const run = Math.abs(S.dz) * 7, rise = S.to - S.from;
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(S.x + s * 0.80, y + (S.from + S.to) * 0.5 + 0.66, S.z0 + 3.5 * S.dz,
+            0.05, 0.05, Math.hypot(run, rise) + 0.7, PALETTE.monBrass,
+            Math.atan2(rise, run) * (S.dz > 0 ? -1 : 1), 0, 0);
     }
   }
 
@@ -4138,11 +4192,21 @@ function monUpdateTasks(game, dt) {
     }
   }
 
-  // ---- the dinner jacket -------------------------------------------------
+  // ---- the dinner jacket, and PUTTING IT ON ------------------------------
+  // It used to tick the task and leave the jacket in the animal's mouth, which
+  // is the one place a dinner jacket does not go. It goes on: the prop is taken
+  // out of the world and the costume comes up in its place, so the reward for
+  // the task is a thing you can see for the rest of the chapter rather than a
+  // line of toast. See capy.dress().
   if (monTuxProp && !monTuxGone && monTuxProp.held) {
     monTuxGone = true;
     monTask('black-tie');
     monSfx('rustle', { volume: 0.5 });
+    if (game.physics && typeof game.physics.removeProp === 'function') {
+      game.physics.removeProp(monTuxProp);
+    }
+    monTuxProp = null;
+    if (capy && typeof capy.dress === 'function') capy.dress(true);
     monToast('it is a little long in the leg. it will do.');
   }
 
@@ -4350,6 +4414,41 @@ export function createMonaco(game) {
     beenIn() { return monEverIn; },
     inside() { return monInside; },
     stack() { return monStack; },
+    /**
+     * HOW MUCH IS GOING ON, 0..1 — and the band is written against it.
+     *
+     * The three mechanics of this chapter are the eye, the stack and the
+     * circuit, so those are the three things that turn the section up. The
+     * arrangement in systems.js reads this and nothing else: at rest it is a
+     * guitar, a bass and a ride; at heat the brushes double, the riff picks
+     * harder and the horns answer every fourth bar instead of every eighth.
+     *
+     * It was NEVER WIRED. `musBondHeat` was declared, read in four places, and
+     * written by nobody — so the loudest half of this palette had never once
+     * played, in the same way and for the same reason `monEYE_FILL` at 0.60 was
+     * a mechanic that was switched off. The tell is identical: an arrangement
+     * with a documented top end that no session had ever reached.
+     *
+     * The falls are slow on purpose. A cue that tracks the eye frame by frame
+     * flutters; what is wanted is that a room which has noticed you STAYS
+     * noticed for a few bars after it stops looking.
+     */
+    heat() {
+      let h = monSeen * 0.9;                       // the room looking at you
+      if (monOutT > 0) h = 1;                      // ...and being carried out
+      if (monRider >= 0) {
+        // on somebody's roof, and the tunnel is the loudest place in the chapter
+        h = Math.max(h, 0.62 + 0.30 * clamp(monCarV[monRider] / monCAR_VMAX, 0, 1)
+                          + 0.28 * monTunnelK);
+      }
+      if (monInside) h = Math.max(h, 0.30);        // the floor, at rest
+      const capy = monGame && monGame.capy;
+      if (capy && capy.heldProp && capy.heldProp.type === 'plaque') h = Math.max(h, 0.55);
+      if (monStack > 0 && monStack < monSTACK_WIN) {
+        h = Math.max(h, 0.34 + 0.5 * (monStack / monSTACK_WIN));
+      }
+      return clamp(h, 0, 1);
+    },
     /** Which car the animal is on, or -1. */
     riding() { return monRider; },
     ridingSpeed() { return monRider >= 0 ? monCarV[monRider] : 0; },
@@ -4431,6 +4530,13 @@ export function createMonaco(game) {
       // chapter is built lazily on first entry.
       if (!monSpawned && game.physics) {
         monSpawned = true;
+        // ...and NOT if it is already being worn. Module state says `monTuxGone`
+        // is false in a fresh session, but a restored save has the task ticked
+        // and the animal dressed, and a second jacket on the lounger is one you
+        // can pick up. The task table is the authority across a reload; the
+        // flag is only the authority inside a session.
+        const worn = typeof game.taskDone === 'function' && game.taskDone('black-tie');
+        if (worn) monTuxGone = true;
         if (!monTuxGone && !monTuxProp) {
           monTuxProp = game.physics.spawnProp('dinnerjacket', monYACHT.x + 1.4,
                                               monYACHT.z - 3.0,

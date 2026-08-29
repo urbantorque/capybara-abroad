@@ -1,0 +1,3241 @@
+[
+ {
+  "id": "wheek",
+  "text": "Announce yourself (wheek)",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:1",
+   "cali.js:1",
+   "capybara.js:3",
+   "cave.js:1",
+   "goreme.js:2",
+   "npc.js:7",
+   "pantanal.js:4",
+   "systems.js:2",
+   "venice.js:1"
+  ]
+ },
+ {
+  "id": "steal-hat",
+  "text": "Steal a tourist’s hat",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:4",
+   "props.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "coffee-spill",
+  "text": "Make someone spill their flat white",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:3",
+   "props.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "picnic-thief",
+  "text": "Steal the picnic sandwich",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "props.js:1",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "bin-chicken",
+  "text": "Knock over a bin (for the ibis)",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dig-flower",
+  "text": "Dig up the gardener’s prize rose",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chased",
+  "text": "Get chased by the gardener",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:2"
+  ]
+ },
+ {
+  "id": "photo-op",
+  "text": "Get your photo taken",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "opera-stage",
+  "text": "Take the stage at the Opera House",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "capybara.js:2",
+   "environment.js:2",
+   "npc.js:4",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "ball-harbour",
+  "text": "Put the beach ball in the harbour",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "environment.js:1",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "swim",
+  "text": "Have a dignified swim",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "capybara.js:1",
+   "environment.js:1",
+   "npc.js:23",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "hat-harbour",
+  "text": "Drop the stolen hat in the harbour",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "environment.js:1",
+   "npc.js:2",
+   "props.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cafe-table",
+  "text": "Stand on a café table",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "environment.js:1",
+   "npc.js:5",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "busker-hat",
+  "text": "Rob the busker mid-song",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dog-loose",
+  "text": "Let the dog off its lead",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:3",
+   "props.js:1",
+   "quay.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "seagull-chips",
+  "text": "Introduce the seagulls to the chips",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:6",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "sprinkler",
+  "text": "Soak a tourist with the sprinkler",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:3"
+  ]
+ },
+ {
+  "id": "ferry-ride",
+  "text": "Stow away on the ferry",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "environment.js:1",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "whippy-run",
+  "text": "Ride the ice cream van down the promenade",
+  "ch": 1,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "environment.js:5",
+   "npc.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-pasto",
+  "text": "Emigrate (somehow)",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "steal-empanada",
+  "text": "Steal an empanada",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:3",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "market-chaos",
+  "text": "Bring down a market stall",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "pasto.js:1",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "whistle-condor",
+  "text": "Call down a condor",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "condor.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "condor-ride",
+  "text": "Grab its talons and hold on",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "condor.js:1",
+   "npc.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "thermal-peak",
+  "text": "Ride a thermal to the crater rim",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "condor.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "crater-drop",
+  "text": "Post something into the crater",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "ruana-thief",
+  "text": "Make off with a ruana",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "church-bell",
+  "text": "Ring the church bell (badly)",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:4",
+   "pasto.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "coffee-scatter",
+  "text": "Scatter the coffee harvest",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "npc.js:2",
+   "props.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "carroza",
+  "text": "Ride the carnival float up the plaza",
+  "ch": 2,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "npc.js:1",
+   "pasto.js:3",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "to-quay",
+  "text": "Cast off from the Quay",
+  "ch": 3,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "take-helm",
+  "text": "Take the helm",
+  "ch": 3,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "under-bridge",
+  "text": "Sound off under the Bridge",
+  "ch": 3,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "yacht-race",
+  "text": "Cut through the yacht race",
+  "ch": 3,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dolphin-escort",
+  "text": "Earn a dolphin escort",
+  "ch": 3,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "manly-voyage",
+  "text": "Bring her alongside at Manly",
+  "ch": 3,
+  "act": 2,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "quay.js:13",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "manly-pine",
+  "text": "Raid the chip shop on the Corso",
+  "ch": 3,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "quay.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "ferry-salute",
+  "text": "Trade horns with the Manly ferry",
+  "ch": 3,
+  "act": 2,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "quay.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-kyoto",
+  "text": "Turn up in Kyoto",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "torii-run",
+  "text": "Run the whole torii tunnel",
+  "ch": 4,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "kyoto.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lantern-topple",
+  "text": "Topple a stone lantern",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "zen-ruin",
+  "text": "Redesign the rock garden",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:13",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "golden-swim",
+  "text": "Swim in the golden pond",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dry-crossing",
+  "text": "Cross to the island without getting wet",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bamboo-dash",
+  "text": "Tear through the bamboo grove",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "uji-run",
+  "text": "Take the Uji down to the mill",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "kyoto.js:16",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "matcha-raid",
+  "text": "Get into the matcha at Uji",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "whisk-spin",
+  "text": "Whisk the largest bowl of tea in Japan",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kyoto.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-bell",
+  "text": "Be inside the bell when it goes",
+  "ch": 4,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "kyoto.js:11",
+   "npc.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-cali",
+  "text": "Land in Cali",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "gato-sit",
+  "text": "Sit on the Cat of Tejada",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lulada",
+  "text": "Make off with a lulada",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "puente-ortiz",
+  "text": "Swim under the Puente Ortiz",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chiva-ride",
+  "text": "Get on the chiva",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chiva-mirador",
+  "text": "Ride it up to the mirador",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "cali.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cane-run",
+  "text": "Disappear into the sugarcane",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "salsa-dance",
+  "text": "Dance salsa, properly",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:13",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cristo-rey",
+  "text": "Climb up to Cristo Rey",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cali.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cart-run",
+  "text": "Run the fruit barrow off the ridge",
+  "ch": 5,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "cali.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-rio",
+  "text": "Turn up in Rio",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "calcadao",
+  "text": "Run the whole wave",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "capybara.js:1",
+   "rio.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "globo-biscuit",
+  "text": "Rob the biscoito Globo man",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "futevolei",
+  "text": "Head the ball into the Atlantic",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:9",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "kiosk",
+  "text": "Help yourself at the kiosk",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "selaron-steps",
+  "text": "Take Selarón’s steps at speed",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bateria",
+  "text": "Get in among the bateria",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "samba-parade",
+  "text": "Samba down the avenue, on the two",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "rio.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bondinho",
+  "text": "Stow away on the Sugarloaf cable car",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "arpoador",
+  "text": "Take the applause at Arpoador",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:7",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "take-a-wave",
+  "text": "Take a wave in at Arpoador",
+  "ch": 6,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "rio.js:9",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "o-bonde",
+  "text": "Cross the arches on the running board",
+  "ch": 6,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "rio.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "fragata",
+  "text": "Call down a fragata",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "fragata-ride",
+  "text": "Ride the sea breeze up the Sugarloaf",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "rio.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-iceland",
+  "text": "Turn up in Iceland",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "pylsa",
+  "text": "Rob the hot dog stand",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:8",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "organ",
+  "text": "Lean on the church organ",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:1",
+   "iceland.js:13",
+   "kyoto.js:1",
+   "sahara.js:1",
+   "systems.js:1",
+   "venice.js:1"
+  ]
+ },
+ {
+  "id": "geysir",
+  "text": "Ride Strokkur",
+  "ch": 7,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "puffins",
+  "text": "Get in among the puffins",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "glacier-run",
+  "text": "Take the glacier down in one go",
+  "ch": 7,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:9",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "snowcat",
+  "text": "Cadge a lift off the piste machine",
+  "ch": 7,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "hot-spring",
+  "text": "Have a long sit in the hot spring",
+  "ch": 7,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "iceland.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-whale",
+  "text": "Be on the pier when the whale comes up",
+  "ch": 7,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "iceland.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "aurora",
+  "text": "Bring the sky down",
+  "ch": 7,
+  "act": 3,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "iceland.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-sahara",
+  "text": "Turn up in Marrakech",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "orange-cart",
+  "text": "Rob the orange juice cart",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "snake-basket",
+  "text": "Sit in the snake charmer’s basket",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "souk-escape",
+  "text": "Lose them in the souk",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:1",
+   "sahara.js:10",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "date-palm",
+  "text": "Bring the dates down",
+  "ch": 8,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "caravan",
+  "text": "Ride out with the caravan",
+  "ch": 8,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dune-surf",
+  "text": "Come down the great dune",
+  "ch": 8,
+  "act": 2,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "sahara.js:15",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "sandstorm",
+  "text": "Stand in the sandstorm",
+  "ch": 8,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "fire-circle",
+  "text": "Take over the fire circle",
+  "ch": 8,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "sahara.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "acrobats",
+  "text": "Let the acrobats throw you",
+  "ch": 8,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "sahara.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-drift",
+  "text": "Wake up somewhere impossible",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "puff-up",
+  "text": "Wheek in mid-air (trust me)",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cloud-dive",
+  "text": "Step off the end of the jetty",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "weathervane",
+  "text": "Watch the wind come all the way round",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lampfly",
+  "text": "Introduce yourself to a lampfly",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "updraft",
+  "text": "Let a column of air carry you up",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "handed-back",
+  "text": "Let the cloud hand you back",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "wander-isle",
+  "text": "Hitch a lift on a wandering island",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "long-gap",
+  "text": "Cross twenty metres of nothing, in one go",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "drift.js:15",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lantern",
+  "text": "Light the lantern at the top of the world",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "drift.js:16",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "driftseed",
+  "text": "Cross the void on a seed",
+  "ch": 9,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "drift.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-venice",
+  "text": "Turn up in Venice",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "spritz-theft",
+  "text": "Make off with somebody’s spritz",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:4"
+  ]
+ },
+ {
+  "id": "pigeon-storm",
+  "text": "Put up every pigeon in the piazza",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:6"
+  ]
+ },
+ {
+  "id": "passerelle",
+  "text": "Run the duckboards, end to end",
+  "ch": 10,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:7"
+  ]
+ },
+ {
+  "id": "the-well",
+  "text": "Look down the campo’s well",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:5"
+  ]
+ },
+ {
+  "id": "the-calli",
+  "text": "Cross the calli, side to side",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:6"
+  ]
+ },
+ {
+  "id": "gondola-ride",
+  "text": "Ride the prow of a gondola",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:4"
+  ]
+ },
+ {
+  "id": "rialto",
+  "text": "Take the Rialto at a run",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:2",
+   "venice.js:7"
+  ]
+ },
+ {
+  "id": "acqua-alta",
+  "text": "Be in San Marco when it goes under",
+  "ch": 10,
+  "act": 2,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "npc.js:1",
+   "systems.js:1",
+   "venice.js:4"
+  ]
+ },
+ {
+  "id": "mirror-swim",
+  "text": "Swim the length of the flooded square",
+  "ch": 10,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:3"
+  ]
+ },
+ {
+  "id": "traghetto",
+  "text": "Cross on the traghetto, standing",
+  "ch": 10,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:3"
+  ]
+ },
+ {
+  "id": "volo",
+  "text": "Take the angel’s flight off the campanile",
+  "ch": 10,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "systems.js:1",
+   "venice.js:2"
+  ]
+ },
+ {
+  "id": "to-kowloon",
+  "text": "Turn up in Kowloon",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "egg-tart",
+  "text": "Rob the bakery on Fa Yuen Street",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bamboo-climb",
+  "text": "Go up the bamboo",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "laundry-pole",
+  "text": "Cross the street on the laundry poles",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "wet-market",
+  "text": "Let the fish out at the wet market",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "neon-sign",
+  "text": "Hang off the biggest sign in Mong Kok",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "symphony",
+  "text": "Be on the roof when the lights come on",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "kowloon.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "star-ferry",
+  "text": "Ride the Star Ferry across",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "ferry-horn",
+  "text": "Lean on the Star Ferry’s horn",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "harbour-swim",
+  "text": "Swim in Victoria Harbour",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "kowloon.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bus-top",
+  "text": "Ride the open top down the street",
+  "ch": 11,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "kowloon.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "choi-cheng",
+  "text": "Be on the lion when it takes the lettuce",
+  "ch": 11,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "kowloon.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-palawan",
+  "text": "Turn up in Palawan",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "outrigger",
+  "text": "Ride the bangka out to the island",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "jetty-jump",
+  "text": "Go off the end of the jetty",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "first-dive",
+  "text": "Go under",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-crack",
+  "text": "Get into the hidden lagoon",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "sea-turtle",
+  "text": "Keep up with the turtle",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "giant-clam",
+  "text": "Take something from the giant clam",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cathedral",
+  "text": "Find the room with the hole in the roof",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:8",
+   "systems.js:2"
+  ]
+ },
+ {
+  "id": "the-bloom",
+  "text": "Be under when the water lights up",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "palawan.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bait-ball",
+  "text": "Swim into the middle of the bait ball",
+  "ch": 12,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "palawan.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-manta",
+  "text": "Take hold of the manta, and stay on",
+  "ch": 12,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "palawan.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "beach-fire",
+  "text": "Put the beach fire out",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "palawan.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-cappadocia",
+  "text": "Turn up in Cappadocia",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chimney-top",
+  "text": "Top out on a fairy chimney",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dovecote",
+  "text": "Let the pigeons out of the rock",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:13",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-tether",
+  "text": "Chew through something important",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-envelope",
+  "text": "Walk an envelope, end to end",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-mouth",
+  "text": "Get inside one while it is filling",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "aboard",
+  "text": "Get in a basket before it goes",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "three-winds",
+  "text": "Ride three different winds",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "sunrise",
+  "text": "Be up there when the sun clears the rim",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "goreme.js:13",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "on-the-trailer",
+  "text": "Put it down on the trailer",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "goreme.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-herd",
+  "text": "Ride the lead mare up the valley",
+  "ch": 13,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "goreme.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-manly",
+  "text": "Come over to the ocean side",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "pine-cone",
+  "text": "Bring down a Norfolk pine cone",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "move-flags",
+  "text": "Move the flags, and take the beach with them",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "sandcastle",
+  "text": "Flatten the best sandcastle on the beach",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "duck-dive",
+  "text": "Go under the white water, not over it",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-rip",
+  "text": "Let the rip take you out the back",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:12",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "take-off",
+  "text": "Catch one",
+  "ch": 14,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "manly.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "all-the-way",
+  "text": "Take the biggest of the set to the sand",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "manly.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-bommie",
+  "text": "Sit on the bommie while it breaks over you",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "bower-pool",
+  "text": "Swim a length of the ocean pool",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "blue-groper",
+  "text": "Introduce yourself to the blue groper",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "manly.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-surfboat",
+  "text": "Go out through the break in the surfboat",
+  "ch": 14,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "manly.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-pantanal",
+  "text": "Turn up in the Pantanal",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-locals",
+  "text": "Meet the neighbours",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "gather",
+  "text": "Get five of them to follow you",
+  "ch": 15,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "npc.js:6",
+   "pantanal.js:12",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "camalote",
+  "text": "Cross the bay on the floating meadow",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "caiman-nap",
+  "text": "Sit on a sleeping jacaré",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "jabiru-nest",
+  "text": "Look into the jabiru’s nest",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cowbird",
+  "text": "Give a cowbird a lift",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-otters",
+  "text": "Get told off by the giant otters",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "missing-plank",
+  "text": "Cross the bridge that is missing a plank",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "macaw-nut",
+  "text": "Take a palm nut off a hyacinth macaw",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "pantanal.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "tamandua",
+  "text": "Ride the anteater across the campo",
+  "ch": 15,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "pantanal.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-crossing",
+  "text": "Take the whole herd across the river",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "pantanal.js:14",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-cave",
+  "text": "Get inside the mountain",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "first-echo",
+  "text": "Find out what your voice is for",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "glow-trail",
+  "text": "Follow the glow-worms down to the river",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cave-river",
+  "text": "Swim the river in the dark",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "hand-of-dog",
+  "text": "Top out on the biggest stalagmite",
+  "ch": 16,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "swiftlets",
+  "text": "Put up the swiftlets (they steer on sound too)",
+  "ch": 16,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cave-pearl",
+  "text": "Pocket a cave pearl",
+  "ch": 16,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "blind-fish",
+  "text": "Meet something with no eyes",
+  "ch": 16,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "great-wall",
+  "text": "Climb the Great Wall of Vietnam",
+  "ch": 16,
+  "act": 3,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "cave.js:11",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-doline",
+  "text": "Stand in the light inside the mountain",
+  "ch": 16,
+  "act": 2,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "cave.js:10",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "phytokarst",
+  "text": "Shout at the garden that leans",
+  "ch": 16,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "cave.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-log",
+  "text": "Ride a log through the dark",
+  "ch": 16,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "cave.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-antarctic",
+  "text": "Get to the bottom of the world",
+  "ch": 17,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "take-tiller",
+  "text": "Take the tiller",
+  "ch": 17,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-lead",
+  "text": "Find the lead through the pack",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "station-mug",
+  "text": "Rob the southernmost bar on earth",
+  "ch": 17,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "haul-out",
+  "text": "Haul out on a floe",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "leopard-seal",
+  "text": "Be looked at by a leopard seal",
+  "ch": 17,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "berg-arch",
+  "text": "Take her through the arch in the berg",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "whale-bones",
+  "text": "Sit down inside the whale",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "spy-hop",
+  "text": "Get spy-hopped",
+  "ch": 17,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "colony-chorus",
+  "text": "Start something at the rookery",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:5",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "penguin-highway",
+  "text": "Take the penguin highway down",
+  "ch": 17,
+  "act": 2,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "antarctic.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "blue-ice",
+  "text": "Slide the glacier into the sea",
+  "ch": 17,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "antarctic.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "floe-drift",
+  "text": "Ride a floe down the channel",
+  "ch": 17,
+  "act": 2,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "antarctic.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "orca-ride",
+  "text": "Run with the pod",
+  "ch": 17,
+  "act": 3,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "antarctic.js:14",
+   "npc.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-monaco",
+  "text": "Turn up in Monte Carlo",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "superyacht",
+  "text": "Board a boat nobody invited you onto",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "black-tie",
+  "text": "Acquire a dinner jacket",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "high-dive",
+  "text": "Go off the top deck into the harbour",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-rock",
+  "text": "Get up onto the Rock",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "palace-guard",
+  "text": "Make the palace guard break",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "pass-the-door",
+  "text": "Get past the man on the door",
+  "ch": 18,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-floor",
+  "text": "Cross the floor without being seen",
+  "ch": 18,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chip-stack",
+  "text": "Leave the table ten up",
+  "ch": 18,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:8",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "champagne",
+  "text": "Redistribute the champagne",
+  "ch": 18,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "piano-solo",
+  "text": "Give the salon a piano solo",
+  "ch": 18,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-wheel",
+  "text": "Ride the roulette wheel",
+  "ch": 18,
+  "act": 2,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "monaco.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "chicane",
+  "text": "Put the chicane in the harbour",
+  "ch": 18,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "monaco.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-hairpin",
+  "text": "Take the Fairmont hairpin on the roof",
+  "ch": 18,
+  "act": 3,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "monaco.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-tunnel",
+  "text": "Go through the tunnel on the roof",
+  "ch": 18,
+  "act": 3,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "monaco.js:7",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "to-hanoi",
+  "text": "Turn up in Hanoi",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:1",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "cross-the-road",
+  "text": "Cross the road without stopping",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "pho-raid",
+  "text": "Get your whole face in a bowl of pho",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "flower-bike",
+  "text": "Unload a flower bicycle",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "barber",
+  "text": "Look into the pavement barber’s mirror",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "ride-the-flow",
+  "text": "Get on a scooter and stay on it",
+  "ch": 19,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "hanoi.js:4",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-stools",
+  "text": "Bring down the whole terrace",
+  "ch": 19,
+  "act": 1,
+  "mini": true,
+  "wow": false,
+  "hits": [
+   "hanoi.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-huc",
+  "text": "Cross the red bridge",
+  "ch": 19,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "turtle-tower",
+  "text": "Get out to the tower on the island",
+  "ch": 19,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "shuttlecock",
+  "text": "Stand in the middle of the da cau",
+  "ch": 19,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "water-puppets",
+  "text": "Get in among the water puppets",
+  "ch": 19,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "egg-coffee",
+  "text": "Take an egg coffee off a balcony",
+  "ch": 19,
+  "act": 2,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:2",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "fold-the-street",
+  "text": "Be there when the street folds up",
+  "ch": 19,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "long-bien",
+  "text": "Walk out onto the old bridge",
+  "ch": 19,
+  "act": 3,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "hanoi.js:3",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-train",
+  "text": "Be in the alley when it comes through",
+  "ch": 19,
+  "act": 3,
+  "mini": false,
+  "wow": true,
+  "hits": [
+   "hanoi.js:6",
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-sprinkler",
+  "text": "Stood in the sprinkler until there was not a dry bit left",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-queue",
+  "text": "Queued at the ice-cream van like an ordinary customer",
+  "ch": 1,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-rim-walk",
+  "text": "Walked the crater rim right round to the other side",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-whole-ride",
+  "text": "Stayed on the float for the whole of its circuit",
+  "ch": 2,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "let-her-sit",
+  "text": "Stopped her in the middle of the harbour and let her sit",
+  "ch": 3,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "swam-the-bridge",
+  "text": "Swam under the Bridge, which is not what it is for",
+  "ch": 3,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-heron",
+  "text": "Got close enough to make the heron leave",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "still-bamboo",
+  "text": "Stood still in the bamboo until it was the loudest thing there",
+  "ch": 4,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "floor-after-dark",
+  "text": "Came back down to the dance floor after dark",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "walked-the-hill",
+  "text": "Walked up to the mirador instead of taking the chiva",
+  "ch": 5,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "on-the-steps",
+  "text": "Sat down on the steps and let the city go past",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "under-the-arches",
+  "text": "Stood underneath the arches instead of on top of them",
+  "ch": 6,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-fox",
+  "text": "Called an arctic fox over, and it came most of the way",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "spring-and-sky",
+  "text": "Sat in the hot spring with the weather coming down on you",
+  "ch": 7,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lost-in-the-souk",
+  "text": "Spent a long time in the souk with nobody chasing you",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dune-at-dusk",
+  "text": "Was on top of the great dune when the light went",
+  "ch": 8,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-orchard",
+  "text": "Sat down in the orchard and let the seeds go past",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "after-the-lantern",
+  "text": "Stayed up at the lantern after you had lit it",
+  "ch": 9,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "pigeons-back",
+  "text": "Stood still long enough for the pigeons to come back",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "flooded-cafe",
+  "text": "Sat at a café table with the water over the floor",
+  "ch": 10,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "lit-from-the-water",
+  "text": "Was in the harbour, in the water, when the lights came on",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "missed-the-show",
+  "text": "Was in the wet market when the harbour lit up, and missed all of it",
+  "ch": 11,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "inside-the-wreck",
+  "text": "Went inside the wreck, which nobody ever mentions",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "under-the-bangka",
+  "text": "Went under the outrigger and looked up at it",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "in-the-shaft",
+  "text": "Went down and stood in the one bar of daylight that reaches the floor",
+  "ch": 12,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dawn-from-below",
+  "text": "Was down in the town when the sun came up, instead of up in it",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "kept-up",
+  "text": "Kept up with the horses on your own four feet",
+  "ch": 13,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "over-the-wall",
+  "text": "Was in the ocean pool when a wave came over the wall",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "round-the-corner",
+  "text": "Went round the corner to the quiet beach",
+  "ch": 14,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "on-the-sandbar",
+  "text": "Stood on the sandbar in the middle of the river",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "dusk-afloat",
+  "text": "Was still out on the water when the light went",
+  "ch": 15,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "nothing-behind",
+  "text": "Went far enough in that there was no daylight behind you",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "wet-in-a-mountain",
+  "text": "Stood still under a drip until it had got you",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "let-it-return",
+  "text": "Called into the dark and held still until the whole of it came back",
+  "ch": 16,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "the-whalers",
+  "text": "Went into the whaling station that nobody uses any more",
+  "ch": 17,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "ignored",
+  "text": "Stood about in the middle of the colony and was completely ignored",
+  "ch": 17,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "over-the-tunnel",
+  "text": "Went over the top of the tunnel instead of through it",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "nothing-up-here",
+  "text": "Sat down on the Rock with the whole principality going on below you",
+  "ch": 18,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "stood-in-the-river",
+  "text": "Stood perfectly still in the traffic and let all of it go round you",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ },
+ {
+  "id": "quiet-alley",
+  "text": "Found the one street in this city with nothing coming down it",
+  "ch": 19,
+  "act": 1,
+  "mini": false,
+  "wow": false,
+  "hits": [
+   "systems.js:1"
+  ]
+ }
+]

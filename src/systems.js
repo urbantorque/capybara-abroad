@@ -2428,8 +2428,18 @@ const sysMUS_NEXT18  = [[1, 2], [3], [0], [0, 1]];
 // notes about once every eight bars and is the loudest thing in the chapter
 // when it does. Everything else in this palette is turned down so that when
 // the horns come in there is somewhere for them to come in FROM.
+// ---- CHORD 0 IS THE WHOLE JOKE, AND IT WAS THE WRONG CHORD (v39) ---------
+// It was E B D F# B — an Em9 with no third — which is a perfectly good rootless
+// jazz voicing and is NOT the sound anybody means. The sound anybody means is
+// a MINOR TRIAD WITH A MAJOR SEVENTH ON IT: the minor third and the major
+// seventh a semitone below the octave, sounding at once. That one semitone is
+// the entire identity of the idiom and the old voicing did not contain it — no
+// third at all, and a plain minor seventh where the major seventh goes. The
+// palette's own comment said "the single most identifiable five-note stack in
+// twentieth-century film music" and then wrote a different stack.
+// E G B D# F# it is: root, minor third, fifth, MAJOR SEVENTH, ninth.
 const sysMUS_CHORDS19 = [
-  [52, 59, 62, 66, 71],   // E B D F# B   — the chord. No third, major ninth.
+  [52, 55, 59, 63, 66],   // E G B D# F#  — Em(maj9). The chord.
   [52, 59, 62, 67, 71],   // E B D G B    — the vamp it sits over
   [53, 60, 63, 68, 72],   // F C Eb Ab C  — a semitone up, which is the sting
   [50, 57, 60, 65, 69],   // D A C F A    — and the flat seven it falls through
@@ -4183,7 +4193,13 @@ function sysBuildCSS() {
   sysRgba(PALETTE.sandstone, 0.34) + ' 100%),',
   'repeating-linear-gradient(92deg,' + sysRgba(PALETTE.stoneDark, 0.05) + ' 0 1px,',
   'transparent 1px 4px);',
-  'box-shadow:0 24px 60px ' + shadow2 + ',0 2px 0 ' + sysRgba(PALETTE.sail, 0.9) + ' inset,',
+  /* THREE SHADOWS, NOT ONE. A single 24/60 blur is a card floating in a fog:
+     it has no contact with anything, so the eye reads it as a layer rather
+     than as a sheet lying on a surface. A tight one at 3 px is the contact,
+     a mid one at 20 carries the form, and the wide one at 70 is the room. */
+  'box-shadow:0 2px 5px ' + sysRgba(PALETTE.screenShadow, 0.13) + ',',
+  '0 10px 22px ' + shadow + ',0 34px 70px ' + shadow2 + ',',
+  '0 2px 0 ' + sysRgba(PALETTE.sail, 0.9) + ' inset,',
   '0 0 0 1px ' + sysRgba(PALETTE.stoneDark, 0.22) + ';',
   'padding:clamp(20px,4vw,40px) clamp(22px,5vw,54px);',
   'position:relative;z-index:1;',
@@ -4194,6 +4210,26 @@ function sysBuildCSS() {
    tilt is its signature; page two is a grid of seventeen rectangles, and a
    grid on the skew reads as a mistake rather than as charm. */
 '.capyui-card.two{transform:none;}',
+/* ---- ...AND THERE IS MORE THAN ONE SHEET (v38) -------------------------
+   One more piece of paper under the title card, tilted the other way and
+   showing about six pixels of itself down the right-hand side and the foot.
+   The card's whole conceit is that it is a printed thing lying on a table,
+   and a single sheet with a shadow is a dialog box with a rotation on it. Two
+   sheets is a stack, a stack is an object, and an object has a back.
+
+   Page one only. The picker is a grid of nineteen rectangles and the tilt was
+   already dropped there for exactly this reason — see .capyui-card.two — so a
+   second sheet behind it would be one more thing off-square.
+
+   z-index:-1 inside the card's own stacking context (it has z-index:1), so it
+   paints behind the card's paper and in front of the glow wash. */
+'.capyui-card:not(.two):before{content:"";position:absolute;z-index:-1;',
+  'left:8px;right:-6px;top:10px;bottom:-8px;border-radius:7px;',
+  'background:' + sysRgba(PALETTE.sailShade, 0.94) + ';',
+  'border:1px solid ' + sysRgba(PALETTE.stoneDark, 0.3) + ';',
+  'transform:rotate(1.25deg);box-shadow:0 8px 20px ' + shadow + ';}',
+'@media (max-width:520px){.capyui-card:not(.two):before{left:5px;right:-4px;',
+  'transform:rotate(.9deg);}}',
 '.capyui-card h1{font-size:clamp(24px,6.2vw,46px);line-height:1.05;color:' + ink + ';',
   'text-wrap:balance;',
   'font-weight:700;letter-spacing:-.01em;}',
@@ -4212,6 +4248,22 @@ function sysBuildCSS() {
 '.capyui-orn:after{background:linear-gradient(270deg,transparent,' +
   sysRgba(PALETTE.ibisHead, 0.42) + ');}',
 '.capyui-orn svg{display:block;width:clamp(38px,7vw,52px);height:auto;}',
+/* ---- THE ANIMAL UNDER THE MASTHEAD IS BREATHING (v38) ------------------
+   One and a half pixels, over five seconds, on transform alone. It is under
+   the threshold at which anybody would call it an animation and it is well
+   over the threshold at which a still drawing of an animal starts to feel
+   like an animal — which is the one thing the front of this game should feel
+   like before a frame of it has been played. Reduced motion turns it off with
+   everything else, through the global rule at the top of this sheet. */
+'@media (prefers-reduced-motion: no-preference){',
+  /* transform-origin at the FEET. Scaled about its centre the animal grows
+     downwards as well as up, so it sinks into the rule it is standing on
+     every other second — which reads as a wobble rather than as a breath.
+     Pinned to the bottom edge, only the back rises. */
+  '.capyui-orn svg{transform-origin:50% 100%;',
+  'animation:capyui-breathe 5s ease-in-out infinite;}}',
+'@keyframes capyui-breathe{0%,100%{transform:translateY(0) scaleY(1);}',
+  '50%{transform:translateY(-1px) scaleY(1.035);}}',
 /* ---------- the key rail, which used to be a blinking list of punctuation ----
    The line under the picker read
        OR PRESS ITS KEY · 1 2 3 4 5 6 7 8 9 0 - = [ ] ; ' , .
@@ -4373,9 +4425,19 @@ function sysBuildCSS() {
 '.capyui-go{display:flex;flex-direction:column;align-items:center;gap:2px;',
   'width:100%;margin-top:clamp(12px,2.4vw,18px);padding:clamp(9px,1.8vw,13px) 18px;',
   'border-radius:6px;border:1px solid ' + accent + ';background:' + accent + ';',
+  /* A FILLED SLAB OF ONE COLOUR IS A COLOUR SWATCH. Everything else on this
+     card is a printed thing with light on it — the paper has a rake, the
+     pictures now have a sun — and the one control the whole page is built
+     around was the only flat rectangle left. The gradient is four per cent
+     top to bottom and the inset hairline is the highlight along its top edge;
+     together they make it a pressable object rather than a filled div. */
+  'background-image:linear-gradient(180deg,' + sysRgba(0xffffff, 0.16) + ',',
+  sysRgba(PALETTE.screenShadow, 0.07) + ');',
   'color:' + paper + ';font:inherit;cursor:pointer;pointer-events:auto;',
-  'touch-action:manipulation;box-shadow:0 4px 14px ' + shadow2 + ';',
-  'transition:transform .16s ease,box-shadow .16s ease,filter .16s ease;}',
+  'touch-action:manipulation;box-shadow:0 4px 14px ' + shadow2 + ',',
+  '0 1px 0 ' + sysRgba(0xffffff, 0.32) + ' inset;',
+  'transition:transform .18s cubic-bezier(.21,.86,.32,1.18),box-shadow .18s ease,',
+  'filter .16s ease;}',
 '.capyui-go b{font-size:clamp(13px,2.7vw,17px);font-weight:700;letter-spacing:.01em;}',
 '.capyui-go i{font-style:normal;font-size:clamp(11px,1.9vw,11px);opacity:.82;',
   'letter-spacing:.08em;text-transform:uppercase;font-weight:700;}',
@@ -4468,7 +4530,13 @@ function sysBuildCSS() {
    is the only thing here that grows without limit. */
 '.capyui-pick.hero{flex-direction:row;align-items:stretch;margin-top:clamp(8px,1.6vw,13px);',
   'min-height:clamp(100px,15vh,150px);',
-  'border-color:' + accent + ';box-shadow:0 4px 18px ' + shadow2 + ';}',
+  /* the hero already wears the accent as a border; the halo is what stops
+     that border reading as an error state and makes it read as the one thing
+     on the shelf that is lit */
+  'border-color:' + accent + ';box-shadow:0 6px 22px ' + shadow2 + ',',
+  '0 0 0 4px ' + sysRgba(PALETTE.cloth1, 0.13) + ';}',
+'.capyui-pick.hero:hover,.capyui-pick.hero:focus-visible{',
+  'box-shadow:0 13px 30px ' + shadow2 + ',0 0 0 5px ' + sysRgba(PALETTE.cloth1, 0.2) + ';}',
 /* ...AND THE PANEL KEEPS AN ASPECT OF ITS OWN. `aspect-ratio:auto` on a box
    whose height is no longer fixed hands the decision to the <svg> inside it,
    which is authored 64 x 40 — so the hero grew to 205 px, three quarters of it
@@ -4515,9 +4583,15 @@ function sysBuildCSS() {
   'font:inherit;color:inherit;touch-action:manipulation;',
   'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:7px;',
   'padding:0;box-shadow:0 1px 2px ' + shadow + ';',
-  'transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease;}',
+  /* A LIFT SHOULD ARRIVE, NOT SLIDE. Three pixels on a linear ease is a tile
+     that moves; the same three on a curve that overshoots by a hair is a tile
+     that is PICKED UP. It is four numbers and it is the difference between a
+     shelf that responds and a shelf that feels like paper. */
+  'transition:border-color .16s ease,transform .2s cubic-bezier(.21,.86,.32,1.18),',
+  'box-shadow .2s ease;}',
 '.capyui-pick:hover,.capyui-pick:focus-visible{border-color:' + accent + ';',
-  'transform:translateY(-3px);box-shadow:0 9px 20px ' + shadow2 + ';}',
+  'transform:translateY(-4px);box-shadow:0 11px 24px ' + shadow2 + ',',
+  '0 2px 5px ' + shadow + ';}',
 '.capyui-pick:active{transform:translateY(0);}',
 '.capyui-pick:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* the place itself: a flat-shaded scene in the chapter's own palette */
@@ -4539,9 +4613,66 @@ function sysBuildCSS() {
 '.capyui-shot{position:absolute;inset:0;width:100%;height:100%;display:block;',
   'object-fit:cover;border-radius:inherit;}',
 '.capyui-pickart svg{display:block;width:100%;height:100%;',
-  'transition:transform .35s cubic-bezier(.16,1,.3,1);}',
+  'transition:transform .45s cubic-bezier(.16,1,.3,1);}',
 '.capyui-pick:hover .capyui-pickart svg,.capyui-pick:focus-visible .capyui-pickart svg{',
-  'transform:scale(1.045);}',
+  'transform:scale(1.065);}',
+/* ---- LIGHT IN THE POSTCARDS (v38) --------------------------------------
+   Nineteen hand-cut scenes and not one of them had a sun in it: flat fill on
+   flat tint, nineteen times over, so the shelf read as a colour chart rather
+   than as a row of little paintings. The marks themselves are right and are
+   not touched — what was missing is the light falling on them, and light is
+   not something a 64x40 polygon set should have to draw for itself.
+
+   Three things in one pseudo-element: sky down the top third, ground shade
+   along the bottom edge, and a soft box vignette that pulls the corners in.
+   Every mark now reads as a scene lit from above, which is also how the game
+   behind this card is lit.
+
+   ::after, not ::before, so it lies over the player's OWN photograph as well
+   as over the authored mark — a photo of a cave and a drawing of a cave
+   should sit in the same light, or the album makes the shelf inconsistent.
+   The three things on the picture that are information rather than scenery —
+   the key stub, the tally and the souvenir — are lifted clear of it. */
+'.capyui-pickart:after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;',
+  /* MEASURED BY LOOKING AT IT. The first pass put 22% white across the top
+     third, which is right over a dune and a night sky and blows out the six
+     marks whose top band is already near-paper — Sydney's harbour sky, Cali,
+     Manly, Palawan. Half of that reads as light on all nineteen and washes
+     out none of them, which is the number a top-light has to be when it is
+     shared by nineteen pictures that were never drawn to expect one. */
+  'background:linear-gradient(176deg,' + sysRgba(0xffffff, 0.13) + ' 0%,',
+  sysRgba(0xffffff, 0.03) + ' 30%,transparent 54%,',
+  sysRgba(PALETTE.screenShadow, 0.15) + ' 100%);',
+  /* the vignette is a FRACTION of the panel, not a fixed blur: 18 px is a
+     whisper on the hero's 410 and soot round the edge of a 150 px tile */
+  'box-shadow:inset 0 0 13px ' + sysRgba(PALETTE.screenShadow, 0.15) + ';}',
+'.capyui-pick.hero .capyui-pickart:after{box-shadow:inset 0 0 30px ' +
+  sysRgba(PALETTE.screenShadow, 0.15) + ';}',
+'.capyui-pickkey,.capyui-picktally,.capyui-pickkeep{z-index:2;}',
+/* ---- AND THE COLOUR OF THE PLACE BLEEDS DOWN INTO ITS WORDS ------------
+   The pictures are nineteen different colours and the paper under them was
+   one, so every tile went blue-grey-green at the top and then stopped dead at
+   a beige box. A short wash of the place's own tint, running out of the
+   bottom of its picture and gone by three quarters of the way down the words,
+   makes the tile ONE object instead of a postcard glued to a label — and it
+   gives the shelf nineteen different warmths to scan, which is the whole
+   argument for having drawn nineteen pictures in the first place.
+   `--pt` is set per tile from the same sysMarkTint the picture uses. */
+'.capyui-pickbody{background:linear-gradient(180deg,var(--pt,transparent) 0%,transparent 76%);}',
+/* ---- ...AND THE WHOLE TICKET CATCHES THE LIGHT WHEN YOU TOUCH IT -------
+   One narrow band swept diagonally across the tile on hover. The oldest trick
+   there is, and the right one here: these tiles are PAPER — it is what the
+   entire card is made of — and a sheet tilted into the light is exactly what
+   picking one up should feel like. Transform and opacity only, so it is one
+   composited layer and no repaint, and it is inside no-preference because the
+   lift, the border and the key stub already say the same thing without it. */
+'.capyui-pick:after{content:"";position:absolute;top:-40%;bottom:-40%;left:-62%;width:38%;',
+  'pointer-events:none;z-index:3;opacity:0;transform:translateX(0) rotate(13deg);',
+  'background:linear-gradient(90deg,transparent,' + sysRgba(0xffffff, 0.46) + ',transparent);}',
+'@media (prefers-reduced-motion: no-preference){',
+  '.capyui-pick:hover:after,.capyui-pick:focus-visible:after{opacity:1;',
+  'transform:translateX(330%) rotate(13deg);',
+  'transition:transform .66s cubic-bezier(.22,.61,.36,1),opacity .1s ease;}}',
 /* the key badge sits ON the scene, so the eye can still run straight down it */
 /* A PRINTED STUB, NOT A SYSTEM CHIP. Dark grey on every scene made seventeen
    identical blobs march down the left edge in a colour belonging to none of
@@ -4584,7 +4715,7 @@ function sysBuildCSS() {
    with a floor under the body, every tile in the grid is the same object. */
 '.capyui-pick i{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;',
   'overflow:hidden;margin-top:2px;font-style:normal;line-height:1.25;',
-  'font-size:clamp(8.5px,1.7vw,10.5px);color:' + sysRgba(PALETTE.ibisHead, 0.82) + ';}',
+  'font-size:clamp(8.5px,1.7vw,10.5px);color:' + sysRgba(PALETTE.ibisHead, 0.86) + ';}',
 '.capyui-picks .capyui-pickbody{min-height:clamp(40px,7vw,48px);}',
 '.capyui-pick.hero i{-webkit-line-clamp:3;}',
 '.capyui-pick.hero i{font-size:clamp(10px,2vw,12.5px);margin-top:3px;}',
@@ -9718,14 +9849,26 @@ export function createSystems(game) {
     const lvl = (0.72 + musIntensity * 0.30) * (0.80 + heat * 0.34);
     const root = musPal.roots[musIdx];
 
-    // --- the riff, twice a bar, on the guitar
-    for (let half = 0; half < 2; half++) {
-      for (let i = 0; i < sysMUS_BOND_RIFF.length; i++) {
-        const r = sysMUS_BOND_RIFF[i];
-        const t = t0 + (half * 8 + r.t * 0.5) * S * 2;
-        musTwang(t, root + 24 + r.d, ((i % 3) - 1) * 0.22, r.v * lvl * 0.95,
-                 heat > 0.5 ? r.trem + 1 : r.trem);
-      }
+    // --- the riff, once a bar, on the guitar.
+    // IT USED TO SAY `half < 2` AND IT PLAYED THE SAME BAR TWICE. The offset
+    // worked out at (half * 16 + r.t) sixteenths, and a bar is sixteen — so
+    // `half = 1` was this bar's figure written a whole bar late, on top of the
+    // NEXT bar's `half = 0`. Every bar got two statements at identical times:
+    // not a second statement, a unison double, twice the notes and twice the
+    // level for nothing. The figure spans eleven sixteenths of a sixteen-
+    // sixteenth bar, so it never could have gone twice; it is the vamp, and a
+    // vamp states once and leaves the rest of the bar alone.
+    //
+    // 1.65 AND NOT 0.95, BECAUSE THE DOUBLE WAS DOING WORK. Two identical
+    // notes at the same instant are the same note 6 dB up, so the old
+    // arrangement's guitar was effectively at 1.90 — take the double away at
+    // the written level and the lead voice of the whole palette drops by a
+    // third, which is the opposite of the point. 1.65 is a shade under what it
+    // was, with half the notes and none of the stacked tremolo.
+    for (let i = 0; i < sysMUS_BOND_RIFF.length; i++) {
+      const r = sysMUS_BOND_RIFF[i];
+      musTwang(t0 + r.t * S, root + 24 + r.d, ((i % 3) - 1) * 0.22,
+               r.v * lvl * 1.65, heat > 0.5 ? r.trem + 1 : r.trem);
     }
     // --- the upright
     for (let i = 0; i < sysMUS_BOND_BASS.length; i++) {
@@ -9753,11 +9896,19 @@ export function createSystems(game) {
         musBondHorn(t0 + (8 + h.t) * S, root + 24 + h.o, h.v * lvl * 1.05);
       }
     }
-    // --- the sting: the whole chord, once, when the harmony reaches it
+    // --- the sting: the whole chord, once, when the harmony reaches it.
+    // Guitar always; brass on top of it once the chapter is doing something,
+    // because a minor-major ninth held on three saxophones IS the gesture and
+    // firing it every eight bars regardless would spend it.
     if (musIdx === 0 && bar % 2 === 0) {
       for (let i = 0; i < chord.length; i++) {
         musTwang(t0 + 8 * S + i * 0.012, musFold(chord[i], 55, 84), (i - 2) * 0.28,
-                 0.52 * lvl, 1);
+                 0.62 * lvl, 1);
+      }
+      if (heat > 0.34) {
+        for (let i = 0; i < chord.length; i++) {
+          musBondHorn(t0 + 8 * S, chord[i] + 12, (0.34 + heat * 0.42) * lvl);
+        }
       }
     }
   }
@@ -11075,6 +11226,18 @@ export function createSystems(game) {
     el.type = 'button';
     if (hero) el.classList.add('hero');
     el.style.setProperty('--i', String(i));
+    // ...and the tile's own colour, for the wash that runs out of the bottom
+    // of the picture and into the words. Off the SAME tint the picture is
+    // drawn on, so a place cannot end up with two colours. See --pt.
+    // 0.15, AND THE CEILING IS WCAG 1.4.3 RATHER THAN TASTE. Measured at 0.20
+    // against the tile's own paper, taking the worst case (the head of the
+    // gradient, under the place name): the four chapters whose tint is a night
+    // sky — Iceland, the Drift, Hong Kong, Son Doong — took the SUBTITLE from
+    // 5.6:1 to between 4.38 and 4.48, i.e. under the 4.5 floor, on 10.5 px
+    // text. At 0.15, with the subtitle four hundredths less transparent, the
+    // worst row in the shelf is back over it and the wash still reads.
+    // The same argument the note over `inkSoft` makes, one screen along.
+    el.style.setProperty('--pt', sysMarkTint(d.biome, 0.15));
     // the place itself, drawn in its own colours
     const art = sysEl('span', 'capyui-pickart');
     art.style.background = sysMarkTint(d.biome, 0.30);
@@ -17708,9 +17871,11 @@ export function createSystems(game) {
   //     that flinches every time a bin rolls behind it is worse than one that
   //     is briefly behind a bin. Static geometry only.
   //   * TRIGGERS. They are volumes, not walls, and several of them are enormous.
-  //   * THE CAPYBARA, and whatever is carrying it. The ray starts inside the
-  //     animal's own body, and a boat, a raft or a floe is a floor rather than
-  //     an obstruction.
+  //   * THE CAPYBARA, whatever is carrying it, and whatever it is STANDING ON.
+  //     The ray starts inside the animal's own body, and a boat, a raft or a
+  //     floe is a floor rather than an obstruction. The last of those three is
+  //     `capy.rideBody` and it was missing for the life of the game — see the
+  //     note on sysCamSkipC below.
   //
   // The near cap means the boom can be cut to nothing but never inverted, and
   // the small step back off the hit point keeps the near plane out of the wall.
@@ -17732,12 +17897,12 @@ export function createSystems(game) {
   // The callback, the running best and the three things it has to skip all live
   // out here rather than in a closure built per frame — this file's whole
   // premise is that update() allocates nothing.
-  let sysCamBest = 1, sysCamLen = 1, sysCamSkipA = null, sysCamSkipB = null;
+  let sysCamBest = 1, sysCamLen = 1, sysCamSkipA = null, sysCamSkipB = null, sysCamSkipC = null;
   function sysCamRayHit(res) {
     if (!res.hasHit) return;
     const b = res.body;
     if (!b || b.mass > 0 || b.isTrigger) return;
-    if (b === sysCamSkipA || b === sysCamSkipB) return;
+    if (b === sysCamSkipA || b === sysCamSkipB || b === sysCamSkipC) return;
     const t = res.shape && res.shape.type;
     if (t === sysSHAPE_HEIGHTFIELD || t === sysSHAPE_PLANE) return;
     const f = res.distance / sysCamLen;
@@ -17755,6 +17920,25 @@ export function createSystems(game) {
     const carrier = capy && capy.carriedBy;
     sysCamSkipA = (capy && capy.body) || null;
     sysCamSkipB = (carrier && (carrier.body || carrier)) || null;
+    // ---- ...AND THE DECK UNDER YOUR FEET (v38) ---------------------------
+    // The list above already SAYS "a boat, a raft or a floe is a floor rather
+    // than an obstruction" — and it only ever implemented the half of that a
+    // biome declares through `carriedBy`. Nothing declares a ferry: you walk
+    // onto it and stand on it, and a KINEMATIC hull is mass 0, so it fell
+    // straight through the mass gate above and was treated as a wall.
+    //
+    // Measured at Circular Quay, at the wheel, full ahead: the rig asked for
+    // 21.0 m of boom, the ray hit MV Wheek's own wheelhouse 0.84 m out, the
+    // boom was cut to the 1.9 m floor and the eye sat 4.7 m from the animal.
+    // The whole voyage — the Bridge, the Opera House, the Freshwater, four
+    // hundred metres of open harbour — was played from inside the boat's own
+    // superstructure. Chapter 17's tender did the same thing at the tiller,
+    // and so did simply STANDING on either deck.
+    //
+    // capy.rideBody is that hull, published by capybara.js's contact sweep for
+    // anyone walking about on it and by the two helms directly (they stop the
+    // sweep running at all). See capyRIDE_HOLD for why it survives a hop.
+    sysCamSkipC = (capy && capy.rideBody) || null;
     sysCamBest = 1;
     sysCamLen = len;
     try { w.raycastAll(sysCamFrom, sysCamTo, sysCAM_RAY_OPTS, sysCamRayHit); }
@@ -17941,6 +18125,24 @@ export function createSystems(game) {
    * a chapter naming a task that has been renamed should go quiet, not crash.
    */
   game.taskDone = function (id) { const r = taskRec[id]; return !!(r && r.done); };
+  /**
+   * WHERE THE CARD WOULD POINT FOR THIS TASK, as a plain {x,y,z} or null.
+   *
+   * `sysHINTS` is closure-local and every `where` is written against a dozen
+   * helpers that are closure-local too, so the only way an audit could read a
+   * task's target was to re-implement all of them — which it cannot do, and
+   * which is why the sweep that found the buried sun deck had to be written
+   * against physics rather than against the table. One getter, no setter, and
+   * it throws for nobody: a where() that dies answers null the same way an
+   * unbuilt chapter does.
+   */
+  game.hintTarget = function (id) {
+    const h = sysHINTS[id];
+    if (!h || typeof h.where !== 'function') return null;
+    let p = null;
+    try { p = h.where(); } catch (e) { return null; }
+    return (p && typeof p.x === 'number') ? { x: p.x, y: p.y, z: p.z } : null;
+  };
   /**
    * HAS THIS ONE BEEN NOTICED. `taskDone` for the other table, and read-only
    * for the same reason. With no argument it is the count, which is what the
@@ -18656,6 +18858,20 @@ export function createSystems(game) {
     input.action = started && (!!keys.KeyE || mouseAction || touchAction || padAction);
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
     input.jump = started && (!!keys.Space || touchJump || padJump);
+
+    // ---- BLACK TIE ----------------------------------------------------------
+    // Asked every frame rather than raised on an event, because the answer has
+    // to survive a save restore, a chapter change and a picker jump — and every
+    // one of those is a place an event does not fire. `dress` is idempotent, so
+    // this is three visible-flag comparisons and no work at all on the frames
+    // where nothing has changed.
+    //
+    // Scoped to chapter 18 on purpose: the jacket is Monte Carlo's joke, and an
+    // animal that keeps it on in Antarctica is a different one.
+    if (game.capy && typeof game.capy.dress === 'function') {
+      game.capy.dress(!!(game.biome && game.biome.isActive('monaco')) &&
+                      taskRec['black-tie'] && taskRec['black-tie'].done);
+    }
 
     // ---- put me back --------------------------------------------------------
     // Sampled every frame, acted on after sysBACK_HOLD of held R. backBusy is a
@@ -20934,6 +21150,17 @@ export function createSystems(game) {
     // It cannot reach the top on its own — sysHEAT_MUS is a quarter — because
     // a hot square is a mood and a chase is still an event.
     const musHeat = sysPlaceHeat();
+    // ---- THE BAND'S OWN HEAT, WHICH NOTHING USED TO WRITE (v39) ----------
+    // musBondHeat had four readers and no writer, so the top half of the Monte
+    // Carlo arrangement — doubled brushes, harder tremolo, horns every fourth
+    // bar — had never played in any session. Rises fast (something is
+    // happening NOW) and falls over about two seconds, because a cue that
+    // tracks the eye frame by frame flutters instead of swelling.
+    {
+      const bh = (game.monaco && game.biome && game.biome.isActive('monaco') &&
+                  typeof game.monaco.heat === 'function') ? game.monaco.heat() : 0;
+      musBondHeat = damp(musBondHeat, bh, bh > musBondHeat ? 5.0 : 0.55, dt);
+    }
     if (musChaseT > 0) musChaseT -= dt * (1 - musHeat * sysHEAT_HOLD);
     const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0)
                           + musHeat * sysHEAT_MUS, 0, 1);

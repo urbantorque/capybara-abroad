@@ -633,6 +633,11 @@ let capyWakeT = 0;
 let capyBreathAmt = 0;
 let capyStageTime = 0;
 let capyPlatVX = 0, capyPlatVZ = 0, capyPlatT = 0;   // the frame the floor is moving in
+// ...and the BODY that floor is. Held across a hop for the same reason the
+// frame is: a capybara half a metre above a ferry's deck is still on the ferry,
+// and the camera must not spend the hop cutting its boom against the wheelhouse.
+let capyRideBody = null, capyRideT = 0;
+const capyRIDE_HOLD = 1.20;         // s of no contact before the deck is let go
 // WHERE THE ANIMAL WAS WHEN IT STOPPED. See THE SNAP CANNOT SEE THE STEP THAT
 // ALREADY HAPPENED — this is the anchor the idle snap holds against, and it is
 // carried in the floor's frame, not the world's.
@@ -1616,6 +1621,110 @@ export function createCapybara(game) {
     legs.push(g);
   }
 
+  // -------------------------------------------------------------------
+  // BLACK TIE — the one costume in the game, and it is a REWARD.
+  // -------------------------------------------------------------------
+  // Chapter 18 asks you to acquire a dinner jacket off a lounger on somebody
+  // else's sun deck. Until v39 the only thing that happened when you did was a
+  // line of toast; the jacket stayed in your mouth, which is the one place a
+  // dinner jacket does not go. Now it goes ON.
+  //
+  // Three rules, all of which were the difference between a costume and a
+  // sticker:
+  //
+  //  - IT IS BUILT ONCE AND HIDDEN, never built on demand. A costume assembled
+  //    the frame a task ticks is a hitch in the middle of a celebration, and
+  //    a costume torn down on a chapter change is a leak waiting to happen.
+  //    Twelve boxes cost nothing to carry around invisible.
+  //  - THE JACKET RIDES THE SQUASH AND THE GLASSES RIDE THE HEAD. Put the
+  //    glasses on the body and they float off the face the moment the animal
+  //    looks up; put the jacket on the head and it swims on every hop.
+  //  - NOTHING HERE JOINS `wetParts`. The soak swaps a mesh's material for its
+  //    wet twin, and a jacket that has no wet twin would come out of the
+  //    harbour wearing the belly's colour.
+  //
+  // The read is a silhouette read, because at this camera distance that is the
+  // only read there is: a shawl collar standing proud of the shoulders, a wedge
+  // of white shirt down the chest, a bow tie under the jaw, and a black bar
+  // across the eyes with a brass rim on it.
+  const mTux = mat(PALETTE.capyTux);
+  const mSatin = mat(PALETTE.capyTuxSatin);
+  const mShirt = mat(PALETTE.capyShirt);
+  const mBow = mat(PALETTE.capyBowtie);
+  const mShade = mat(PALETTE.capyShade);
+  const mShadeRim = mat(PALETTE.capyShadeRim);
+
+  const tuxGroup = new THREE.Group();
+  tuxGroup.visible = false;
+  capySquash.add(tuxGroup);
+  // the body of the jacket: a shell over the barrel and the shoulders. It is
+  // 1.5 cm proud of the barrel on every axis except the front, where it stops
+  // short so the animal's own chest is what the collar opens onto.
+  capyAddPart(tuxGroup, capyGeoBlob, mTux, 0, 0.455, -0.075, 0.335, 0.268, 0.395);
+  // ...and the skirt of it over the rump. Deliberately SHORTER than the rump —
+  // a jacket that reaches the tail is a horse blanket.
+  capyAddPart(tuxGroup, capyGeoBlob, mTux, 0, 0.430, -0.375, 0.300, 0.252, 0.150);
+  // the shawl collar, in satin: two slabs down the shoulders converging on the
+  // chest. THE most legible half of the costume at any distance over four
+  // metres, because it is the only part of it that breaks the silhouette.
+  for (let s = -1; s <= 1; s += 2) {
+    const lapel = capyAddPart(tuxGroup, new THREE.BoxGeometry(0.075, 0.235, 0.065), mSatin,
+                              s * 0.150, 0.455, 0.290);
+    lapel.rotation.z = s * 0.20;
+    const shoulder = capyAddPart(tuxGroup, new THREE.BoxGeometry(0.065, 0.075, 0.30), mSatin,
+                                 s * 0.270, 0.505, 0.115);
+    shoulder.rotation.z = s * -0.30;
+  }
+  // a white pocket square, because a capybara in a dinner jacket is a joke and
+  // a joke needs a detail nobody asked for
+  capyAddPart(tuxGroup, new THREE.BoxGeometry(0.050, 0.028, 0.012), mShirt,
+              0.268, 0.500, 0.020);
+
+  // ---- THE COLLAR AND THE TIE GO ON THE HEAD, AND THEY GO UNDER THE JAW ----
+  // A capybara has no neck. The first pass put a shirt front on the CHEST at
+  // capySquash z 0.30 and a bow tie inside the skull, and both were completely
+  // invisible: the skull box runs from z 0.08 to 0.58 and the jaw from 0.52 to
+  // 0.76, so everything between the shoulders and the muzzle is behind the
+  // head from every angle a player ever has. The only piece of this animal
+  // that reads as a throat is the 4 cm under the jaw's front — so that is
+  // where the wing collar and the tie are, hanging off the head so they stay
+  // put when it looks up.
+  const bowGroup = new THREE.Group();
+  bowGroup.visible = false;
+  head.add(bowGroup);
+  // the wing collar: white, a BAND and not a bib — it exists so the black bow
+  // in front of it has something to be black against, and a white patch big
+  // enough to see on its own just reads as a bald chin.
+  capyAddPart(bowGroup, new THREE.BoxGeometry(0.160, 0.052, 0.092), mShirt, 0, -0.248, 0.342);
+  capyAddPart(bowGroup, new THREE.BoxGeometry(0.056, 0.056, 0.046), mBow, 0, -0.266, 0.398);
+  for (let s = -1; s <= 1; s += 2) {
+    const wing = capyAddPart(bowGroup, new THREE.BoxGeometry(0.086, 0.074, 0.038), mBow,
+                             s * 0.073, -0.266, 0.394);
+    wing.rotation.z = s * 0.36;
+  }
+
+  // the sunglasses: one bar across the brow, two lenses angled onto the same
+  // outward-and-forward planes the eyes are set into, and a brass rim so the
+  // dark lens has an edge at distance. Parented to the head.
+  const shadeGroup = new THREE.Group();
+  shadeGroup.visible = false;
+  head.add(shadeGroup);
+  capyAddPart(shadeGroup, new THREE.BoxGeometry(0.10, 0.030, 0.030), mShadeRim, 0, 0.140, 0.325);
+  const shadeSock = [eyeSockL, eyeSockR];
+  for (let i = 0; i < 2; i++) {
+    const s = i === 0 ? 1 : -1;
+    const g = new THREE.Group();
+    g.position.copy(shadeSock[i].position);
+    g.rotation.y = shadeSock[i].rotation.y;
+    shadeGroup.add(g);
+    capyAddPart(g, new THREE.BoxGeometry(0.115, 0.085, 0.022), mShade, 0, 0.008, 0.082);
+    capyAddPart(g, new THREE.BoxGeometry(0.128, 0.098, 0.014), mShadeRim, 0, 0.008, 0.076);
+    // the arm, back along the side of the skull to the ear
+    const arm = capyAddPart(g, new THREE.BoxGeometry(0.012, 0.014, 0.19), mShadeRim,
+                            s * 0.050, 0.012, -0.020);
+    arm.rotation.y = s * -0.30;
+  }
+
   // --- fx: splash rings, one InstancedMesh (three instances, one draw) --
   const capyRingMesh = new THREE.InstancedMesh(
     capyGeoRing,
@@ -1777,6 +1886,14 @@ export function createCapybara(game) {
    * a ghost is a nicety and must never be able to take the animal down.
    */
   function capyBakeGhost() {
+    // THE GHOST IS THE ANIMAL, NOT THE OUTFIT. It is baked once, lazily, on the
+    // first show and cached for the session — so a bake that happened to land
+    // while the jacket was on would put a dinner jacket on the ghost in all
+    // nineteen chapters for the rest of the run. Off for the bake, and back in
+    // the `finally` so an early return or a throw cannot leave the animal
+    // undressed on the deck it just earned the thing on.
+    const wasDressed = tuxGroup.visible;
+    tuxGroup.visible = false; bowGroup.visible = false; shadeGroup.visible = false;
     try {
       const parts = [];
       capyModel.updateWorldMatrix(true, true);
@@ -1787,7 +1904,17 @@ export function createCapybara(game) {
         if (!o.isMesh || !o.geometry || !o.geometry.attributes ||
             !o.geometry.attributes.position) return;
         // Skip anything hidden at rest — the held-prop sockets and the like.
+        // ...AND ANYTHING INSIDE A HIDDEN GROUP. `traverse` does not stop at an
+        // invisible node, and the costume's three groups are hidden while their
+        // own meshes are perfectly `visible: true` — so an `o.visible` test
+        // alone bakes a dinner jacket into every ghost in the game, including
+        // the seventeen chapters that have never seen one.
         if (!o.visible) return;
+        {
+          let q = o.parent, vis = true;
+          while (vis && q && q !== capyModel) { vis = q.visible; q = q.parent; }
+          if (!vis) return;
+        }
         o.updateWorldMatrix(true, false);
         const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
         m4.copy(inv).multiply(o.matrixWorld);
@@ -1822,7 +1949,11 @@ export function createCapybara(game) {
       mesh.visible = false;
       scene.add(mesh);
       return mesh;
-    } catch (e) { return null; }
+    } catch (e) { return null; } finally {
+      tuxGroup.visible = wasDressed;
+      bowGroup.visible = wasDressed;
+      shadeGroup.visible = wasDressed;
+    }
   }
 
   // -------------------------------------------------------------------
@@ -1857,6 +1988,13 @@ export function createCapybara(game) {
     frameVX: 0, frameVZ: 0,
     blown: false,                    // out of puff — walk only until it comes back
     carriedBy: null,
+    // THE VESSEL UNDER YOUR FEET, as a cannon body. `carriedBy` is a biome's
+    // api token for "something is flying/swimming me about"; this is the plain
+    // physics body of whatever DECK the animal is standing or steering on — a
+    // ferry, a raft, a floe, the roof of a bus. Published for one reader:
+    // systems.js's camera occlusion ray, which has to know that the thing
+    // between the lens and the animal is the floor, not a wall. See sysCamClear.
+    rideBody: null,
     atHelm: false,
     climbing: false,                 // hanging off a face — see capyCLIMB_UP
     diving: false,                   // under the surface on purpose — see capyDIVE_V
@@ -1924,6 +2062,24 @@ export function createCapybara(game) {
       capyYaw = was;
       return h ? { nx: h.nx, nz: h.nz, top: h.top } : null;
     },
+    /**
+     * PUT THE DINNER JACKET ON, OR TAKE IT OFF. See the build above.
+     *
+     * Idempotent, cheap, and safe to call every frame — which is how chapter 18
+     * calls it, because "am I in Monte Carlo and have I got the jacket" is a
+     * question with an answer on every frame and no event worth trusting. Three
+     * meshes' `visible`, and nothing else in the animal changes: the costume is
+     * a costume, not a state.
+     */
+    dressed: false,
+    dress(on) {
+      const v = !!on;
+      if (v === capy.dressed) return;
+      capy.dressed = v;
+      tuxGroup.visible = v;
+      bowGroup.visible = v;
+      shadeGroup.visible = v;
+    },
     face(yaw) {
       if (typeof yaw !== 'number' || yaw !== yaw) return;
       capyYaw = yaw; capyPrevYaw = yaw; capyBodyYaw = yaw; capyYawRate = 0;
@@ -1950,6 +2106,7 @@ export function createCapybara(game) {
       body.velocity.set(vx, vy, vz);
       body.wakeUp();
       capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
+      capyRideBody = null; capyRideT = 0; capy.rideBody = null;
       capyLaunchT = capyLAUNCH_HOLD;
       body.position.y += capyLAUNCH_LIFT;
       body.previousPosition.copy(body.position);
@@ -2010,6 +2167,7 @@ export function createCapybara(game) {
     capyLoaf = 0; capy.loaf = 0;
     capyLaunchT = 0;
     capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
+    capyRideBody = null; capyRideT = 0; capy.rideBody = null;
   });
 
   // -------------------------------------------------------------------
@@ -2230,6 +2388,7 @@ export function createCapybara(game) {
     // friction ever was — the deck now moves you exactly, not approximately.
     let grounded = false;
     let platVX = 0, platVZ = 0;
+    let ride = null;
     const contacts = game.world.contacts;
     for (let i = 0; i < contacts.length; i++) {
       const c = contacts[i];
@@ -2237,6 +2396,14 @@ export function createCapybara(game) {
       if (c.bi === body) { if (-c.ni.y > 0.4) { grounded = true; other = c.bj; } }
       else if (c.bj === body) { if (c.ni.y > 0.4) { grounded = true; other = c.bi; } }
       if (!other) continue;
+      // ---- ...AND WHICH BODY IT IS, for the camera --------------------------
+      // Taken BEFORE the two gates below, because both of them are about the
+      // reference FRAME and this is about the SHAPE: a ferry lying alongside is
+      // not moving and still must not be treated as a wall by the occlusion
+      // ray. Kinematic only — that is what "a deck somebody drives" is in this
+      // game, and a loose prop is already skipped by the ray itself. See
+      // capy.rideBody and sysCamClear.
+      if (other.type === CANNON.Body.KINEMATIC) ride = other;
       // Only something being DRIVEN counts — a static kerb has a zero velocity
       // and a loose prop is cargo, not a floor.
       if (other.mass !== 0 && other.mass < capyPLAT_MIN_MASS) continue;
@@ -2289,6 +2456,19 @@ export function createCapybara(game) {
       if (Math.abs(capyPlatVX) < 0.05 && Math.abs(capyPlatVZ) < 0.05) { capyPlatVX = 0; capyPlatVZ = 0; }
       platVX = capyPlatVX; platVZ = capyPlatVZ;
     }
+
+    // ---- and the same three-state latch for the DECK ITSELF ----------------
+    // Its own timer rather than a ride along on capyPlatT, because the two ask
+    // different questions: capyPlatT is "how fast is my floor going", which a
+    // berthed ferry answers zero, and this is "am I on a floor at all", which
+    // it answers yes. Standing on something static (or swimming) lets go at
+    // once; a hop keeps it for capyRIDE_HOLD and then drops it.
+    if (capyLaunchT > 0) { capyRideBody = null; capyRideT = 0; }
+    else if (ride) { capyRideBody = ride; capyRideT = capyRIDE_HOLD; }
+    else if (grounded || capySwimming) { capyRideBody = null; capyRideT = 0; }
+    else if (capyRideT > 0) capyRideT -= dt;
+    else capyRideBody = null;
+    capy.rideBody = capyRideBody;
 
     const px = body.position.x, py = body.position.y, pz = body.position.z;
     // How much the floor has agreed to hold on to. Zero everywhere but a

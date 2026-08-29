@@ -4617,7 +4617,14 @@ function quayTakeHelm() {
   quayHelmOn = true;
   quayHelmCool = 0.35;
   g.state.sailing = true;
-  if (g.capy) g.capy.atHelm = true;
+  // AT THE WHEEL capybara.js STOPS SOLVING — see the note over capyUpdate's
+  // early return — so the contact sweep that normally publishes rideBody never
+  // runs, and the camera's occlusion ray spends the whole voyage cutting its
+  // twenty-one metre boom down to one-nine against MV Wheek's own wheelhouse.
+  // Measured, holding full ahead: the eye ended up 4.7 m from the animal, which
+  // is the back of a capybara's head and a cream bulkhead, not a harbour. The
+  // deck you are steering is a floor; say so. See sysCamClear.
+  if (g.capy) { g.capy.atHelm = true; g.capy.rideBody = quayBoatBody; }
   if (typeof g.sfx === 'function') g.sfx('chime', { volume: 0.7 });
   if (typeof g.toast === 'function') g.toast('W/S throttle · A/D wheel · E to step away');
   quayTask('take-helm');

@@ -1300,10 +1300,32 @@ are being carried by something very much larger than you at ninety-five kilometr
 
 The score is the fifth band in this game and the first that is a piece of fiction. Nothing is
 actually playing in Monaco. What is playing in Monaco is what you have in your head the moment
-you see a casino, a dinner jacket and a silver car — E minor with a major ninth on it, a
-tremolo-picked guitar through a very hard spring, a walking upright, brushes and a ride, and a
-brass section that plays four notes about once every eight bars and is the loudest thing in the
-principality when it does.
+you see a casino, a dinner jacket and a silver car — a minor triad with a major seventh sitting
+on it, a tremolo-picked guitar through a very hard spring, a walking upright, brushes and a
+ride, and a brass section that plays four notes about once every eight bars and is the loudest
+thing in the principality when it does.
+
+For three versions the loud half of that band had never played a note. The arrangement is
+written against how much is going on in the world — the eye, the stack, the circuit — and the
+number it reads was declared, read in four places and set by nobody, so the section sat
+permanently at rest: no doubled brushes, no harder picking, and horns every eighth bar instead
+of every fourth. The riff, meanwhile, was playing each bar twice in unison with itself, and the
+chord the whole joke rests on was written without the one interval that makes it that chord.
+It is wired now, and it does the thing.
+
+**And the jacket goes on.** There is a dinner jacket over the back of a lounger on the sun deck
+of a boat nobody invited you onto, nine metres above the harbour. Taking it used to tick a line
+and leave a dinner jacket in a capybara's mouth. Now the animal puts it on — midnight cloth over
+the shoulders, a satin shawl collar, a black bow under the chin and a pair of sunglasses with a
+brass rim — and wears it for the rest of the evening. It is the only costume in the game.
+
+Getting up there is also, now, possible. Both companionways on that boat were drawn and collided
+*inside* the deckhouse they were meant to climb, so the whole vessel above the main deck was one
+solid block: the jacket sat in plain sight on a deck with no route to it, and going off the top
+deck into the harbour could not be done either. Two of the chapter's seventeen lines were
+uncompletable and neither of them said so. The flights are in open air now — up the back, along
+the side, up the front — and the walk from the passerelle to the lounger has been done, one leg
+at a time, with a stopwatch on it.
 
 ## Hanoi, where the road is not going to stop
 

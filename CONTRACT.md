@@ -3112,6 +3112,62 @@ test, and against a clear camera arm at the spawn's own yaw — which is what a
 chapter with 153 lamps, 54 palms and 34 bollards on it requires. **A spawn is
 not a coordinate you pick off a map.**
 
+**THE SUN DECK WAS INSIDE THE DECKHOUSE, AND TWO TASKS WERE UNCOMPLETABLE.**
+Reported from play: the dinner jacket could not be reached. It could not. The
+yacht's two deckhouses were collided as solid boxes running from the main deck
+at 2.8 m up to 8.7 m, and BOTH companionways were drawn and collided inside
+them — every tread sealed in the wall it was supposed to climb. The measured
+standable surfaces on the boat were 2.8 (the main deck, off the passerelle) and
+then nothing until 6.0 and 8.7, which are the two deckhouse ROOFS; `capyJUMP_V`
+peaks at about 1.2 m of rise. There was no route above the main deck at all.
+
+`black-tie` (the jacket, lying in plain sight on a lounger at 8.4 m) and
+`high-dive` (which needs a departure above 5.5 m over the water) were therefore
+both impossible, and neither said so — the card pointed at the jacket and gave
+its range all evening.
+
+Three rules came out of it and all three are cheap to check on any vessel or
+building with a floor above another floor:
+
+| | |
+|---|---|
+| **a deckhouse collider stops at the deck it carries** | cabin 1 spans `monDECK1..monDECK2` and cabin 2 `monDECK2..monDECK3`. They were 0.4 and 0.3 m too tall, so each deck's teak was buried under the roof of the house standing on it and the animal stood on a slab a hand's width above the floor it could see. |
+| **a companionway must be in open air** | flight A is on the aft deck abaft the deckhouse; flight B is on the foredeck ahead of the sun-deck house and climbs aft. Eight treads each, 0.40 m of rise on 0.62 m of run, and the top tread lands flush on the deck above rather than a hand's width under it. |
+| **the route between two flights has to be walkable** | with the flights at opposite ends of the boat, the walk between them is eleven metres past the sun-deck house. At `B − 2.4` that left a 70 cm side deck. `B − 3.8` gives 1.4 m a side and the sun deck above overhangs it. |
+
+Verified by walking it, not by reading it: quay → passerelle → aft deck →
+flight A → bridge deck → port side deck → foredeck → flight B → sun deck →
+grab. `superyacht`, `black-tie` and `high-dive` all tick, and the dive files
+9.7 m.
+
+**AND THE JACKET GOES ON.** `black-tie` used to tick and leave a dinner jacket
+in the animal's mouth, which is the one place a dinner jacket does not go. The
+prop is removed and `capy.dress(true)` puts the costume up instead: a midnight
+jacket over the barrel and the shoulders, a satin shawl collar, a wing collar
+and a black bow under the jaw, and sunglasses with a brass rim. Three things
+about it are the whole of the implementation and each was a bug first:
+
+- **Built once at `createCapybara`, hidden, never built on demand.** A costume
+  assembled on the frame a task ticks is a hitch in the middle of a
+  celebration; twelve boxes cost nothing to carry around invisible.
+- **The jacket rides `capySquash` and the glasses and tie ride `head`.** Put
+  the glasses on the body and they leave the face the moment the animal looks
+  up; put the jacket on the head and it swims on every hop.
+- **A capybara has no neck.** The first pass put a shirt front on the chest at
+  z 0.30 and a bow tie at head-y −0.115, and both were invisible from every
+  angle a player ever has: the skull box runs z 0.08–0.58 and the jaw 0.52–0.76,
+  so there is nothing between the shoulders and the muzzle that is ever on
+  screen. The only part of this animal that reads as a throat is the four
+  centimetres under the jaw's front, and that is where the collar and the tie
+  are.
+
+Nothing in the costume joins `wetParts` — the soak swaps a mesh for its wet
+twin, and a jacket with no wet twin comes out of the harbour wearing the
+belly's colour. It is asked for every frame in `update()` rather than raised on
+an event (`isActive('monaco') && taskRec['black-tie'].done`), because a save
+restore, a chapter change and a picker jump are three places an event does not
+fire, and `dress` is idempotent.
+
 ### CHAPTER 19 — HANOI (`hanoi`)
 
 **THE FLOW.** Two hundred and forty scooters over four street centrelines,
@@ -3233,6 +3289,24 @@ upright, brushes and a ride — and a brass section that plays four notes once
 every eight bars and is the loudest thing in the chapter when it does.
 Everything else in the arrangement is turned down so that there is somewhere
 for the horns to arrive FROM.
+
+**...AND THE LOUD HALF OF IT HAD NEVER ONCE PLAYED (v39).** Reported from play:
+the chapter does not sound like the thing it is a joke about. It did not, and
+the reasons were three, all of them the same shape as `monEYE_FILL` at 0.60 —
+a documented top end that no session had ever reached.
+
+| | |
+|---|---|
+| **`musBondHeat` had four readers and no writer.** | The arrangement is written against it exactly the way the gnawa cell is written against the sandstorm: doubled brushes, harder tremolo picking, the chromatic approach on the bass, and **the horns every fourth bar instead of every eighth**. It was `let musBondHeat = 0`, read in four places, assigned in none — so the section was permanently at rest and 20% under its own level. It is driven now from `game.monaco.heat()`: the eye, the stack and the circuit, which are the chapter's three mechanics. It rises in a fifth of a second and falls over two, because a cue that tracks the eye frame by frame flutters instead of swelling. |
+| **The riff played the same bar twice, in unison.** | `for (half = 0; half < 2)` worked out at `(half * 16 + r.t)` sixteenths and a bar is sixteen, so `half = 1` was this bar's figure written a whole bar late, landing exactly on top of the next bar's `half = 0`. Not a second statement — a unison double, twice the notes and twice the level for nothing. The figure spans eleven sixteenths of a sixteen-sixteenth bar and never could have gone twice. It states once — **at 1.65 and not at its written 0.95**, because two identical notes at the same instant are one note 6 dB up: taking the double away at the written level drops the palette's lead voice by a third, which is the opposite of the fix. |
+| **Chord 0 was not the chord.** | It was `E B D F# B`: an Em9 with no third. The sound everybody means is a **minor triad with a MAJOR SEVENTH on it** — the minor third and the major seventh sounding at once, one semitone below the octave, and that semitone is the whole identity of the idiom. The palette's own comment called it "the single most identifiable five-note stack in twentieth-century film music" and then wrote a different stack. `E G B D# F#`. |
+
+The sting — the whole chord, arpeggiated on the guitar when the harmony reaches
+it — now takes the brass with it once `heat > 0.34`, because a minor-major
+ninth held on three saxophones IS the gesture and firing it every eight bars
+regardless would spend it. It is the idiom, written from the idiom's own
+ingredients: it is not a transcription of anybody's tune, and it must not
+become one.
 
 **Hanoi is the sparsest palette here after Kyoto's**, and for the opposite
 reason to every other quiet chapter: the place is the loudest in the game, so

@@ -3644,7 +3644,12 @@ function antTakeHelm() {
   antHelmOn = true;
   antHelmCool = 0.35;
   g.state.sailing = true;
-  if (g.capy) g.capy.atHelm = true;
+  // The same line chapter 3 needs, for the same reason: at the tiller the
+  // capybara's own contact sweep does not run, so nothing else would tell the
+  // camera that the tender between the lens and the animal is the floor.
+  // Measured before this: 14.0 m of boom asked for, and the eye pulled in to
+  // the tender's own coaming. See capy.rideBody and sysCamClear.
+  if (g.capy) { g.capy.atHelm = true; g.capy.rideBody = antBoatBody; }
   antSfx('chime', { volume: 0.7 });
   antToast('W/S throttle · A/D tiller · Q to call · E to step off');
   antTask('take-tiller');

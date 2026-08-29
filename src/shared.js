@@ -62,6 +62,18 @@ export const PALETTE = {
   capyNose:     0x5f3d29,
   capyEye:      0x2f2118,
   capyEar:      0x8a5a37,
+  // ---- BLACK TIE. What the animal has on after chapter 18's dinner jacket.
+  // Midnight blue rather than black, which is what a dinner jacket actually is
+  // and which is the only reason it reads as a garment at blue hour instead of
+  // as a hole in the animal. The satin is one step up from the cloth so the
+  // lapel catches an edge, and the lens is not pure black either — a black lens
+  // on a dark head is a smudge, a very dark blue-grey is a lens.
+  capyTux:      0x232634,
+  capyTuxSatin: 0x333747,
+  capyShirt:    0xf2efe4,
+  capyBowtie:   0x1a1c26,
+  capyShade:    0x1b1f2a,
+  capyShadeRim: 0xb8974e,
 
   // people
   skin1:        0xf3cca4,
