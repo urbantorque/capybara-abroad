@@ -5300,7 +5300,7 @@ function venBuild(game) {
     venFloatGroup.position.y = venWaterY;
     venRoot.add(venFloatGroup);
   }
-  venBuildCrowd(venRoot);
+  venBuildCrowd(game, venRoot);
   venBuildFlotsam(venRoot);
   venBuildFar(venRoot);
   venBuildWater(venRoot);
@@ -5620,13 +5620,14 @@ function venBuild(game) {
  */
 const venCROWD_N = 48;
 let venCrowd = null;
+let venCrowdBodies = null;   // one box each — see ...AND THEY ARE THERE
 // x, z, yaw, phase, speed, state, target x, target z, gawp, queue slot
 const venCrowdData = new Float32Array(venCROWD_N * 10);
 const venCROWD_WALK = 0, venCROWD_TOBOARD = 1, venCROWD_ONBOARD = 2, venCROWD_WADE = 3;
 
 function venCrowdGeo(parts) { const M = venMerger(); parts(M); return M.build(); }
 
-function venBuildCrowd(root) {
+function venBuildCrowd(game, root) {
   const limb = (sgn) => venCrowdGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);
     M.box(sgn * 0.11, -0.79, 0.03, 0.17, 0.1, 0.26, 0xdcdcdc);
@@ -5708,6 +5709,40 @@ function venBuildCrowd(root) {
   for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
     venCrowd[k].instanceColor.needsUpdate = true;
   }
+  venCrowdBodies = game && typeof game.addCrowdBodies === 'function'
+    ? game.addCrowdBodies({ n: venCROWD_N, at: venCrowdFoot, moving: true })
+    : null;
+}
+
+// ---------------------------------------------------------------------------
+// ...AND THEY ARE THERE (v36)
+//
+// The comment eighty lines up said "no bodies (a crowd you can walk through is
+// the right crowd)" and it was wrong in the way every crowd in this game was
+// wrong: `qa/CROWDS.md` put a chest-height ray through forty-eight of them and
+// got 0% solid. Forty-eight people standing in the most photographed square in
+// Europe and the animal went through every one of them.
+//
+// They walk — errands, a queue, a wade — so it is one body each and
+// `venCrowdBodies.step()` in the update, which is Kowloon's pattern.
+//
+// EXCEPT ON THE PLANKS, AND THAT IS A DESIGN CALL AND NOT AN OVERSIGHT. The
+// passerelle is a metre wide, a person's box is half of that, and the chapter
+// asks you to run the whole chain end to end against a clock. A solid queue on
+// the boards does not make that harder, it makes it impossible — so anybody who
+// is on a plank or heading for one is drawn and not felt, and the square's own
+// crowd is solid everywhere else. It is the one place in this chapter where
+// what you can see and what you can touch deliberately differ.
+// ---------------------------------------------------------------------------
+function venCrowdFoot(i, out) {
+  const o = i * 10;
+  const st = venCrowdData[o + 5];
+  if (st === venCROWD_ONBOARD || st === venCROWD_TOBOARD) return false;
+  const x = venCrowdData[o], z = venCrowdData[o + 1];
+  let fy = venTerrain(x, z);
+  if (st === venCROWD_WADE) fy -= clamp(venWaterY - fy, 0, 0.34);
+  out.x = x; out.y = fy; out.z = z;
+  return true;
 }
 
 /** A new errand somewhere else on the paving, clear of the buildings. */
@@ -5913,6 +5948,10 @@ function venUpdateCrowd(game, dt) {
   for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
     venCrowd[k].instanceMatrix.needsUpdate = true;
   }
+  // ...and every box goes where its person went. AFTER the loop, not inside
+  // it: the loop is where x and z are decided, and a body dragged along on the
+  // frame before is a body standing where somebody used to be.
+  if (venCrowdBodies) venCrowdBodies.step();
 
   // ---- the murmur ---------------------------------------------------------
   venMurmurT -= dt;

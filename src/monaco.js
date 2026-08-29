@@ -3070,7 +3070,7 @@ function monBuildPalms(root) {
  * turns at once is the only thing in a chapter this size that can tell you
  * something is coming before you can see it.
  */
-function monBuildWatchers(root) {
+function monBuildWatchers(game, root) {
   const K = monMerger();
   K.box(0, 0.42, 0, 0.44, 0.84, 0.30, PALETTE.monCrowdA);
   K.box(0, 1.12, 0, 0.50, 0.60, 0.34, PALETTE.monCrowdB);
@@ -3114,6 +3114,21 @@ function monBuildWatchers(root) {
   m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
   monWatchMesh = m;
   root.add(m);
+  // ---- ...AND YOU CANNOT WALK THROUGH THEM (v36) ------------------------
+  // `qa/CROWDS.md` put a ray through the forty-six and got 6% solid: the crowd
+  // that exists to tell you a car is coming was scenery, and the animal went
+  // straight through the grandstand. Nothing here moves after placement —
+  // `monWatchPh` is written in this function and read by the head-turn and
+  // nowhere else — so it is ONE pooled body with forty-six shapes rather than
+  // forty-six bodies, which is one broadphase entry for the whole stand.
+  if (game && typeof game.addCrowdBodies === 'function') {
+    game.addCrowdBodies({ n: monWatchN, at: function (i, out) {
+      out.x = monWatchPh[i * 4];
+      out.y = monWatchPh[i * 4 + 1];
+      out.z = monWatchPh[i * 4 + 2];
+      return true;
+    } });
+  }
   monUpdateWatchers(0);
 }
 function monUpdateWatchers(dt) {
@@ -4027,7 +4042,7 @@ function monBuild(game) {
   monBuildSmallCraft(monRoot);
   monBuildPalms(monRoot);
   monBuildLamps(monRoot);
-  monBuildWatchers(monRoot);
+  monBuildWatchers(game, monRoot);
   // LAST, because every builder above may have asked for a lit window and this
   // is the one draw call all of them land in.
   monBuildWindows(monRoot);

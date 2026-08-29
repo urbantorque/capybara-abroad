@@ -1431,6 +1431,11 @@ export function createProps(game) {
     spill: physSpill,
     dust: physDust3,
     foam: physFoamRing,
+    // A CROWD YOU CANNOT WALK THROUGH. See the block above physAddCrowdBodies
+    // for the two shapes it takes and the four things that are easy to get
+    // wrong. Published on `game` as well (main.js), because a chapter calls it
+    // at build time and `game.physics` is the long way round for one verb.
+    addCrowdBodies: physAddCrowdBodies,
     // ---- Pasto (chapter 2) ----
     collapseStall: physCollapseStallByRef,
     shatter: physShatter,
@@ -1495,6 +1500,140 @@ function physSyncBodyTransform(b) {
   b.interpolatedPosition.copy(b.position);
   b.previousQuaternion.copy(b.quaternion);
   b.interpolatedQuaternion.copy(b.quaternion);
+}
+
+// ===========================================================================
+// A CROWD IS MADE OF PEOPLE, AND YOU MAY NOT WALK THROUGH ONE (v36)
+// ===========================================================================
+//
+// Nineteen chapters draw 3,761 people-shaped instances between them and, until
+// the crowd audit went looking, ALMOST NONE OF THEM WERE THERE. `qa/CROWDS.md`
+// measured it with a chest-height ray through each sampled instance: Rio 3%
+// solid, Kowloon 3%, the Quay 3%, Manly 5%, Monte Carlo 6%, Hanoi 8%, Venice
+// and Cali 0%. Three chapters were fixed by hand and the other six were left,
+// which is the state this replaces.
+//
+// The three fixes were the same twenty lines written three times — rio.js:2496,
+// kowloon.js:2562 and sahara.js:1787 each build `CANNON.Box(0.26, 0.85, 0.24)`
+// on `game.mats.npc` from scratch — so this is that, once, with the two shapes
+// it has to take and the four things that are easy to get wrong.
+//
+//   game.addCrowdBodies({ n, at(i, out), moving, y })  ->  a handle
+//
+// `at(i, out)` writes the i-th person's FOOT position into `out` ({x,y,z}) and
+// returns false for an instance that is not a person (a spare slot, a hidden
+// one). `moving` chooses the shape:
+//
+//   STATIC CROWD (`moving` false, the default) — ONE body, N shapes, offset
+//   into place. Correct whenever nothing moves after placement, and it is one
+//   broadphase entry for three hundred people. This is Rio's pattern.
+//
+//   WALKING CROWD (`moving` true) — one body EACH, because a compound body
+//   cannot move one of its shapes. Call `handle.step(at)` from the chapter's
+//   own update and every box follows its walker. This is Kowloon's pattern.
+//
+// FOUR THINGS THAT ARE EASY TO GET WRONG, ALL OF THEM PAID FOR ALREADY:
+//
+//  1. THE BOX IS npc.js's, to the centimetre, on `game.mats.npc` — or a person
+//     drawn by a chapter feels different from a person drawn by the locals rig
+//     and the same shove gives two different answers.
+//  2. THE SHAPE IS OFFSET BY ITS OWN HALF-HEIGHT. `at()` returns where the
+//     feet are; a box centred there is buried to the waist and trips the
+//     animal instead of stopping it.
+//  3. A MOVED BODY CARRIES ALL THREE OF CANNON'S POSITION FIELDS **AND SETS
+//     `aabbNeedsUpdate`**. The three position fields are the render-time
+//     transform: without them the box is solid where the walker was a frame
+//     ago. The flag is the BROADPHASE: cannon only recomputes a body's AABB
+//     when it is set, and `body.position.set()` does not set it — so a static
+//     body moved by hand keeps the bounding box it was BUILT with, for ever,
+//     and both the contact test and `world.raycastClosest` go on using it.
+//     Measured on the first cut of this pass: every box was in the right
+//     place, `qa/b6-crowds.js` still read Venice at 44% and the Quay at 40%,
+//     and the bodies were provably there. kowloon.js:2659 has always set it;
+//     the helper that was meant to replace that code did not.
+//  4. IT IS NOT A WALL. These bodies are deliberately not registered with any
+//     chapter's static/solid list: a crowd is something you push through the
+//     edge of, not something the navigation grid should route around.
+//
+// The cost is measured and it is nothing: Marrakech went 67 -> 239 bodies for
+// 0.1 ms of median tick, against the 0.3 ms the card allows.
+const physCROWD_HX = 0.26, physCROWD_HY = 0.85, physCROWD_HZ = 0.24;
+const physCrowdV = { x: 0, y: 0, z: 0 };
+
+function physAddCrowdBodies(o) {
+  const game = physGame;
+  if (!game || !game.world || !o || !(o.n > 0) || typeof o.at !== 'function') return null;
+  const mat = (game.mats && game.mats.npc) || undefined;
+  const half = new CANNON.Vec3(physCROWD_HX, physCROWD_HY, physCROWD_HZ);
+  const lift = typeof o.y === 'number' ? o.y : physCROWD_HY;
+  const bodies = [];
+
+  if (o.moving) {
+    for (let i = 0; i < o.n; i++) {
+      physCrowdV.x = physCrowdV.y = physCrowdV.z = 0;
+      if (o.at(i, physCrowdV) === false) { bodies.push(null); continue; }
+      const b = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: mat });
+      b.addShape(new CANNON.Box(half));
+      b.position.set(physCrowdV.x, physCrowdV.y + lift, physCrowdV.z);
+      // A walker's box is written every frame, so it must never be allowed to
+      // fall asleep — a sleeping static body stops being re-broadphased and the
+      // person becomes a ghost again without anything on screen saying so.
+      b.allowSleep = false;
+      physSyncBodyTransform(b);
+      game.world.addBody(b);
+      bodies.push(b);
+    }
+  } else {
+    const b = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: mat });
+    let put = 0;
+    for (let i = 0; i < o.n; i++) {
+      physCrowdV.x = physCrowdV.y = physCrowdV.z = 0;
+      if (o.at(i, physCrowdV) === false) continue;
+      b.addShape(new CANNON.Box(half),
+                 new CANNON.Vec3(physCrowdV.x, physCrowdV.y + lift, physCrowdV.z));
+      put++;
+    }
+    if (!put) return null;
+    b.allowSleep = true;
+    physSyncBodyTransform(b);
+    game.world.addBody(b);
+    bodies.push(b);
+  }
+
+  return {
+    bodies: bodies,
+    moving: !!o.moving,
+    /**
+     * Walking crowds only. Re-read every person and carry its box with it.
+     *
+     * `at` RETURNING FALSE HERE MEANS "NOT SOLID RIGHT NOW", and it PARKS the
+     * box under the world rather than skipping it. Leaving it where it was is
+     * the whole failure this exists to prevent: a person who has stepped onto
+     * a plank, gone into a doorway or been despawned would otherwise leave an
+     * invisible body standing in the square, which is worse than the ghost it
+     * replaced because now you cannot see what you are walking into.
+     */
+    step: function (at) {
+      if (!this.moving) return;
+      const fn = typeof at === 'function' ? at : o.at;
+      for (let i = 0; i < bodies.length; i++) {
+        const b = bodies[i];
+        if (!b) continue;
+        physCrowdV.x = physCrowdV.y = physCrowdV.z = 0;
+        if (fn(i, physCrowdV) === false) {
+          if (b.position.y > -800) {
+            b.position.set(0, -900, 0);
+            physSyncBodyTransform(b);
+            b.aabbNeedsUpdate = true;
+          }
+          continue;
+        }
+        b.position.set(physCrowdV.x, physCrowdV.y + lift, physCrowdV.z);
+        physSyncBodyTransform(b);
+        b.aabbNeedsUpdate = true;      // see 3. — the box, not just the picture
+      }
+    },
+  };
 }
 
 /**

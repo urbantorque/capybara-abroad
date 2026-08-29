@@ -1,5 +1,57 @@
 # EVERY INSTANCED CROWD IN THE GAME
 
+> **Closed 29 Aug 2026 (v36).** The six chapters this document left open are done,
+> and the twenty lines that were written three times are now one helper —
+> `game.addCrowdBodies()` in props.js. Re-measured with the same `qa/b6-crowds.js`:
+>
+> | chapter | crowd | before | after |
+> |---|---|---|---|
+> | venice | 48 walkers | 0% | **100%** |
+> | hanoi | 70 walkers | 8% | **100%** |
+> | monte carlo | 46 watchers | 6% | **100%** |
+> | the quay | 30 commuters | 3% | **100%** |
+> | cali | 18 ringside | 56% | **100%** |
+> | cali | 10 dancers | 0% | 0% — the open call, still open |
+> | manly | 22 bathers | 5% | 5% — decided, see below |
+>
+> **THE BUG THAT MADE THE FIRST CUT MEASURE AS A NO-OP.** Every box was built and
+> every box was in the right place, and the probe still read Venice at 44% and the
+> Quay at 40%. `body.position.set()` does not set `aabbNeedsUpdate`, so cannon
+> keeps the AABB the body was BUILT with — and both the contact test and
+> `world.raycastClosest` go on using it. A static body moved by hand is invisible
+> to the broadphase until you say so. `kowloon.js:2659` has always set the flag;
+> the helper written to replace that code did not. Now it does, in one place.
+>
+> **AND A SECOND ONE, IN THE WIRING.** `game.physics` is assembled by
+> `createProps`, not by `createPhysicsWorld` above it — so the first cut of the
+> `game.addCrowdBodies` promotion in main.js ran against an object that did not
+> exist yet, silently left the stub in place, and cost a full probe run.
+>
+> **Cost, differential, `git stash` on the six files, same browser session, with
+> Sydney and Kowloon as untouched controls** (ms per `world.step`, median of 300):
+>
+> ```
+>              bodies         med          p90
+> quay        75 ->  105    0.1 -> 0.2   0.2 -> 0.3
+> venice     190 ->  238    0.4 -> 0.5   0.6 -> 1.2
+> hanoi       41 ->  111    0.3 -> 0.5   0.4 -> 0.8
+> monaco      54 ->   55    0.4 -> 0.7   0.6 -> 1.1   (pooled: +1 body, +46 shapes)
+> cali       134 ->  135    0.2 -> 0.2   0.2 -> 0.4   (pooled: +1 body, +18 shapes)
+> sydney     148 ->  148    0.7 -> 0.5   1.2 -> 0.8   <- control
+> kowloon    173 ->  173    0.3 -> 0.4   0.4 -> 0.5   <- control
+> ```
+>
+> The controls move ±0.2 ms with nothing changed, which is the size of every delta
+> here — so the honest reading is "inside the noise floor, and the same +0.1 ms
+> Kowloon measured for eighty bodies". Nothing is near the 0.3 ms the card allows.
+>
+> **Two tasks were checked by hand for a block, and neither is one:** Hanoi's
+> nearest plastic stool to a sitter's box is 1.84 m and no stool is inside a
+> person, so `the-stools` is unaffected; and with the boards out, 48 of Venice's
+> 56 crowd boxes are parked under the world and **zero** are standing on the plank
+> deck, so `passerelle` runs clear.
+
+
 Measured 28 Aug 2026 by `qa/b6-crowds.js`, which walks every `InstancedMesh` in
 every chapter and classifies it by **what its instances measure**, not by what
 they are called. Re-run it; do not re-derive this by hand.
@@ -106,3 +158,41 @@ are standing crowds and are the Rio pattern exactly.
 the player has to dance on, and Manly's twenty-two bathers are in the surf. In
 both, making the crowd solid changes how the chapter plays rather than fixing
 something that is wrong, and that is not this pass's call to make.
+
+## The decisions, made (v36, 29 Aug 2026)
+
+**Cali — split, and only half of it was ever the hard question.** The ten
+dancers are on the floor `salsa-dance` is scored on and they stay drawn-only:
+that is still the open call. But the eighteen `caliWatch` are not dancers. They
+stand at the bar and around the outside of the ring wall, at
+`caliFLOOR.r + 0.35`, they never move after placement, and every one of them is
+outside the circle the task is scored in — so they are a pooled body now and the
+edge of the salsoteca stops being a mural without the floor being touched at all.
+The chapter went 34% → 66% and the remaining third is the ten, on purpose.
+
+**Manly — left alone, and it is a decision and not a deferral.** The twenty-two
+bathers already model the thing a collider would be for: `manUpdateBathers`
+pushes any bather within 3.2 m away from the capybara at 2.2 m/s. A chapter that
+already says "people get out of your way" does not need a box to stop being a
+mural, and the comment above that push is four paragraphs long because the shove
+is tuned around `move-flags` — the headline task, which tests that twenty of the
+twenty-two reach their own target within a metre and a half, and which a previous
+pass watched fail silently when the push was wrong. Dropping a static body into
+that loop would fight a behaviour that exists to protect the task. 5% stands.
+
+**Venice — solid, EXCEPT on the planks.** The square's crowd is one box each and
+100% solid, but anybody who is on a passerelle or walking toward one is drawn and
+not felt. The chain is a metre wide, a person's box is half of that, and
+`passerelle` asks you to run the whole thing against a clock: a solid queue on
+the boards does not make that harder, it makes it impossible. Measured with the
+boards out — 48 of 56 boxes parked, zero on the deck.
+
+## The helper
+
+`game.addCrowdBodies({ n, at(i, out), moving, y })`, in props.js. `at` writes the
+i-th person's FOOT position and returns false for anybody who is not there.
+`moving: false` (default) pools every shape into one body — correct whenever
+nothing moves after placement, and one broadphase entry for three hundred people.
+`moving: true` gives one body each and you call `handle.step()` from the chapter's
+update. See the block above `physAddCrowdBodies` for the four things that are easy
+to get wrong; two of them cost a probe run each in this pass.

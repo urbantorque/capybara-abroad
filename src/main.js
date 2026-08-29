@@ -1014,6 +1014,13 @@ function mainBoot() {
     // two calls have to exist on frame zero and be harmless if nobody has
     // wired them up yet. See npc.js, THE LOCALS.
     addLocal() { return null; }, addExchange() { return null; }, say() {},
+    // A CROWD YOU CANNOT WALK THROUGH, stubbed here and filled in from
+    // props.js two dozen lines below. Same reason as the locals service: a
+    // chapter calls this from its BUILD, and a lazily-built chapter runs long
+    // after every module exists while `createPhysicsWorld` itself runs before
+    // most of them. Answering null is harmless — the chapter simply draws the
+    // crowd it already drew and nobody gets a body.
+    addCrowdBodies() { return null; },
   };
   window.__capy = game;
 
@@ -1048,6 +1055,18 @@ function mainBoot() {
   // capybara, condor and systems are biome-neutral and stay resident always.
   const env     = biome.capture('sydney', () => mainSafe('environment', () => createEnvironment(game)));
   const props   = biome.capture('sydney', () => mainSafe('props',       () => createProps(game)));
+  // A CROWD YOU CANNOT WALK THROUGH — the one verb off props.js that chapters
+  // call from their own BUILD, promoted onto `game` the way `addLocal` is.
+  //
+  // IT HAS TO BE HERE AND NOT UP BY `createPhysicsWorld`, and the first cut had
+  // it up there: `game.physics` is assembled by `createProps`, not by the world
+  // builder above it, so the wiring ran against an object that did not exist
+  // yet, silently left the stub in place, and every chapter in the pass
+  // measured exactly as unsolid as it had before. It cost a full probe run,
+  // and the tell was the six chapters coming back 1-17% instead of ~100%.
+  if (game.physics && typeof game.physics.addCrowdBodies === 'function') {
+    game.addCrowdBodies = game.physics.addCrowdBodies;
+  }
   const capy    = mainSafe('capybara',    () => createCapybara(game));
   const npcs    = biome.capture('sydney', () => mainSafe('npc',         () => createNPCs(game)));
   const condor  = mainSafe('condor',      () => createCondor(game));

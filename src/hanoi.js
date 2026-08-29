@@ -244,6 +244,7 @@ let hanSignMesh = null;
 const hanFolkMeshes = [];
 const hanFolkGroups = [];
 let hanFolkData = null;
+let hanFolkBodies = null;        // one box each — see ...AND SEVENTY OF THEM ARE THERE
 const hanFOLK_N = 70;
 let hanLanternMesh = null;
 
@@ -2742,7 +2743,7 @@ function hanFolkGeo(shirt, hat) {
   if (hat) K.cone(0, 1.76, 0, 0.34, 0.26, PALETTE.hanConical, 0, 0, 0, 8);
   return K.build();
 }
-function hanBuildFolk(root) {
+function hanBuildFolk(game, root) {
   hanInitLanes();
   hanFolkData = new Float32Array(hanFOLK_N * 6);   // lane s dir speed sit phase
   for (let i = 0; i < hanFOLK_N; i++) {
@@ -2768,7 +2769,43 @@ function hanBuildFolk(root) {
     hanFolkMeshes.push(mm);
     root.add(mm);
   }
+  hanFolkBodies = game && typeof game.addCrowdBodies === 'function'
+    ? game.addCrowdBodies({ n: hanFOLK_N, at: hanFolkFoot, moving: true })
+    : null;
   hanUpdateFolk(0);
+}
+
+// ---------------------------------------------------------------------------
+// ...AND SEVENTY OF THEM ARE THERE (v36)
+//
+// `qa/CROWDS.md` measured Hanoi's ten `hanFolk` variants at 8% solid — the
+// worst reading of the six chapters it left open, in the chapter whose entire
+// argument is that the street is full of people who are not going to stop for
+// you. The pavement was a mural.
+//
+// They walk their lanes, so it is one box each and a `step()` in the update.
+// TWO THINGS THIS HAS TO GET RIGHT AND BOTH ARE JUST "READ THE DRAW":
+//
+//  - the sitters are lower. A person on a plastic stool is drawn at
+//    hanGROUND − 0.52 and scaled to two thirds, and a box standing at
+//    hanGROUND would put a head-height wall over somebody eating soup.
+//  - the offset is the pavement, not the lane. `off` is the same expression
+//    the draw uses, so nobody acquires a body out in the traffic — which
+//    would be the one thing that could make `cross-the-road` harder, and it
+//    does not.
+// ---------------------------------------------------------------------------
+function hanFolkFoot(i, out) {
+  if (!hanFolkData) return false;
+  const o = i * 6;
+  const L = hanFolkData[o] | 0;
+  const sit = hanFolkData[o + 4] > 0.5;
+  hanLaneAtS(L, hanFolkData[o + 1], hanTmp);
+  const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+  const off = (i & 2 ? 1 : -1) * (hanLANES[L].w + (sit ? 2.9 : 1.7));
+  out.x = hanTmp.x + nx * off;
+  out.y = hanGROUND - (sit ? 0.52 : 0);
+  out.z = hanTmp.z + nz * off;
+  return true;
 }
 function hanUpdateFolk(dt) {
   if (!hanFolkMeshes.length) return;
@@ -2800,6 +2837,9 @@ function hanUpdateFolk(dt) {
    }
    mm.instanceMatrix.needsUpdate = true;
   }
+  // ...and every box goes where its walker went. After the loop that advanced
+  // `hanFolkData`, so the two read the same `s`.
+  if (hanFolkBodies) hanFolkBodies.step();
 }
 
 /** The lanterns, over the lake walk and the puppet theatre. */
@@ -3272,7 +3312,7 @@ function hanBuild(game) {
   hanBuildCables(game, hanRoot);
   hanBuildBikes(game, hanRoot);
   hanBuildRideBody(game);
-  hanBuildFolk(hanRoot);
+  hanBuildFolk(game, hanRoot);
   hanBuildLanterns(hanRoot);
   // LAST, because everything above may have asked for a lit window or a sign
   // and these are the two draw calls all of them land in.

@@ -2927,7 +2927,7 @@ function caliBuildMiradorLife(game, root) {
  */
 const caliWATCH_N = 18;
 let caliWatchMesh = null, caliWatchHead = null, caliWatchArm = null, caliWatchData = null;
-function caliBuildWatchers(root) {
+function caliBuildWatchers(game, root) {
   const B = caliMerger();
   B.box(-0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
   B.box(0.10, 0.34, 0, 0.16, 0.68, 0.18, 0xffffff);
@@ -2990,6 +2990,27 @@ function caliBuildWatchers(root) {
   root.add(caliWatchMesh);
   root.add(caliWatchHead);
   root.add(caliWatchArm);
+  // ---- ...AND THE RINGSIDE IS SOLID (v36) -------------------------------
+  //
+  // THE RING, AND DELIBERATELY NOT THE FLOOR. `qa/CROWDS.md` left Cali open
+  // because "the ten dancers move on the floor the player has to dance on, and
+  // making the crowd solid changes how the chapter PLAYS" — which is true of
+  // the dancers and is not true of these eighteen. They stand at the bar and
+  // around the outside of the ring wall, they never move after this loop, and
+  // every one of them is at `caliFLOOR.r + 0.35` or behind the bar: outside
+  // the circle `salsa-dance` is scored in. So the edge of the salsoteca stops
+  // being a mural and the floor itself is untouched.
+  //
+  // One pooled body, because nothing here moves. The dancers keep their
+  // ghosthood on purpose and that is the open call, still open.
+  if (game && typeof game.addCrowdBodies === 'function') {
+    game.addCrowdBodies({ n: caliWATCH_N, at: function (i, out) {
+      out.x = caliWatchData[i * 4];
+      out.y = caliWatchY;
+      out.z = caliWatchData[i * 4 + 1];
+      return true;
+    } });
+  }
   caliUpdateWatchers(null);
 }
 let caliWatchY = 0;
@@ -4217,7 +4238,7 @@ function caliBuild(game) {
   caliBuildCityLights(caliRoot);
   caliBuildSalsoteca(game, caliRoot);
   caliBuildDancers(caliRoot);
-  caliBuildWatchers(caliRoot);
+  caliBuildWatchers(game, caliRoot);
   caliBuildCane(caliRoot);
   caliBuildCristo(game, caliRoot);
   caliBuildFlora(caliRoot);

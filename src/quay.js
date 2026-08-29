@@ -4252,6 +4252,7 @@ const quayCROWD_SHIRT = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE
                          PALETTE.cloth5, PALETTE.cloth6, PALETTE.cloth7, PALETTE.cloth8,
                          PALETTE.hiVis, PALETTE.denim];
 let quayCrowdLegA = null, quayCrowdLegB = null;
+let quayCrowdBodies = null;      // one box each — see ...AND THE CONCOURSE IS SOLID
 
 let quayCrowdShirt = null;
 /**
@@ -4262,7 +4263,7 @@ let quayCrowdShirt = null;
  * mesh, and the shirt (drawn white, tinted per instance) on another — which is
  * one extra draw call and the only way this works at all.
  */
-function quayBuildCrowd(root) {
+function quayBuildCrowd(game, root) {
   // ---- the fixed half: head, hair, nose, bare arms, hips. Hip is the origin.
   const B = quayMerger();
   B.box(0, 0.78, 0, 0.25, 0.29, 0.24, PALETTE.skin2);
@@ -4314,7 +4315,36 @@ function quayBuildCrowd(root) {
     quayCrowdData[o + 4] = rand(0, Math.PI * 2);
     quayCrowdData[o + 5] = 0;
   }
+  quayCrowdBodies = game && typeof game.addCrowdBodies === 'function'
+    ? game.addCrowdBodies({ n: quayCROWD_N, at: quayCrowdFoot, moving: true })
+    : null;
   quayUpdateCrowd(0);
+}
+
+// ---------------------------------------------------------------------------
+// ...AND THE CONCOURSE IS SOLID (v36)
+//
+// Thirty commuters on the apron at Circular Quay, and `qa/CROWDS.md` measured
+// 3% of them solid — which is to say the busiest square metre in chapter three
+// was a slideshow. They walk their routes, so it is one box each and a `step()`
+// in the update, and the foot height is the same GY the draw uses because the
+// apron is flat.
+//
+// Recomputed from the route rather than cached: `quayCrowdData` is six floats
+// wide and everything in it is a parameter, not a position, so the position is
+// derived in exactly one place — here and in the draw — off the same two lines.
+// A cached copy is a second writer of the same fact, which is how a body ends
+// up a frame behind a person.
+// ---------------------------------------------------------------------------
+function quayCrowdFoot(i, out) {
+  if (!quayCrowdData) return false;
+  const o = i * 6;
+  const r = quayCROWD_ROUTE[quayCrowdData[o] | 0];
+  const u = quayCrowdData[o + 1];
+  out.x = lerp(r[0], r[2], u);
+  out.y = 0.20;                       // GY, the top of the apron
+  out.z = lerp(r[1], r[3], u);
+  return true;
 }
 
 function quayUpdateCrowd(dt) {
@@ -4360,6 +4390,9 @@ function quayUpdateCrowd(dt) {
   quayCrowdShirt.instanceMatrix.needsUpdate = true;
   quayCrowdLegA.instanceMatrix.needsUpdate = true;
   quayCrowdLegB.instanceMatrix.needsUpdate = true;
+  // ...and every box goes where its commuter went, after the loop that moved
+  // them and never before it.
+  if (quayCrowdBodies) quayCrowdBodies.step();
 }
 
 // ============================================================== HER PASSENGERS ==
@@ -5256,7 +5289,7 @@ function quayBuild(game) {
   quayBuildSpray(quayRoot);
   quayBuildTraffic(quayRoot);
   quayBuildBerthed(game, quayRoot);
-  quayBuildCrowd(quayRoot);
+  quayBuildCrowd(game, quayRoot);
   quayBuildPax(quayRoot);
   quayBuildLine(quayRoot);
   quayBuildChips(quayRoot);
