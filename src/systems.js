@@ -13315,7 +13315,10 @@ export function createSystems(game) {
     'ferry-salute': { clue: 'get inside eighty metres of her, then blow the horn',
                     where: function () { return hintObj(game.quay && game.quay.freshwater && game.quay.freshwater()); } },
     'manly-pine':     { clue: 'ashore, up the Corso, red awning',
-                    where: function () { return hintXZ(118, -586); } },
+                    // The counter, not a literal beside it: the written (118, -586)
+                    // was 5.9 m from quayCHIPS and the trigger is 2.1 m, so the
+                    // arrow led to a patch of sand where nothing happens.
+                    where: function () { return hintObj(game.quay && game.quay.chips) || hintXZ(121.4, -581); } },
     // ---- Kyoto & Uji -------------------------------------------------------
     'to-kyoto':       { clue: 'the terminal at Manly goes further than you think',
                     where: function () { return null; } },

@@ -147,6 +147,10 @@ const physTASK_GRACE = 2.0;      // s — the opening settle earns the player no
 const physCAUSE_TIP = 1.5;       // s — bin must go over right after a capy hit
 const physCAUSE_SPILL = 4.0;     // s — a lobbed cup gets a longer arc
 const physCAUSE_WATER = 8.0;     // s — a thrown ball can take a while to bob in
+// s — you knocked it out of their hands and then picked it up. Long, because
+// the barge sends it tumbling and the animal has to turn round and chase it;
+// short enough that a hat lying on the lawn since the last chapter is litter.
+const physCAUSE_SNATCH = 12.0;
 
 // ---- the wheek is a pressure wave -----------------------------------------
 // THIS IS EXPRESSION AND IT IS NOT A MECHANIC. Same rule wariness follows — IT
@@ -2295,7 +2299,26 @@ function physGrab(prop) {
   // NOTE: prop.owner is deliberately LEFT SET here. capybara.js is the contract
   // owner of 'capy:grab' and emits it immediately after this call; npc.js's
   // subscriber needs an intact owner to start the chase. It clears it itself.
-  const prev = prop.owner;
+  // ---- ...AND A HAT YOU KNOCKED OFF FIRST IS STILL A HAT YOU STOLE --------
+  //
+  // `prop.owner` alone is not the question. `physBarge` — which fires whenever
+  // the capybara touches a carried prop above 3.2 m/s, i.e. the moment you run
+  // into anybody — takes the thing out of their hands, records `stolenFrom`,
+  // and CLEARS `owner`. So the whole knock-it-off-and-pick-it-up route arrived
+  // here with `prev === null`: `wasStolen` was never set, the 'capy:grab'
+  // payload carried no victim so npc.js's listener fell straight out without
+  // ticking 'steal-hat', and because 'hat-harbour' gates on `wasStolen` that
+  // hat could never be carried into the harbour for the checklist either — for
+  // the rest of the session, silently. Measured walking up to a tourist: the
+  // animal ends up holding the hat, and neither line ticks.
+  //
+  // The rule is the one `earnedSpill` already uses for 'coffee-spill' twelve
+  // lines further down — owner OR stolenFrom, behind the causation window — so
+  // a prop somebody ELSE knocked over, or one that has been lying on the lawn
+  // since the last chapter, is still not yours. npc.js clears `stolenFrom` the
+  // moment the victim gets it back, so a retrieved hat is clean again.
+  const prev = prop.owner ||
+    (prop.stolenFrom && physCausedByCapy(prop, physCAUSE_SNATCH) ? prop.stolenFrom : null);
   prop.held = true;
   prop.frozen = false;
   prop.inWater = false;

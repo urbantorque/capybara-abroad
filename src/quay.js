@@ -3459,7 +3459,19 @@ function quayUpdateBigFerry(game, dt) {
       // A quarter of your pitch and all of the volume. a forced sfx is not needed:
       // the player's own horn was 1.5 s ago and the gap on 'horn' is 2.2, so
       // the reply has to WAIT for it — which is also how it should sound.
-      if (typeof game.sfx === 'function') game.sfx('horn', { volume: 1.0, pitch: 0.44 });
+      //
+      // ...AND IT COMES FROM HER. This was mono at full level: the Freshwater
+      // answers from as far as quayBIG_HAIL (82 m) off your beam and it arrived
+      // dead centre on the player's own foredeck, with no pan and no distance
+      // in it — which is exactly what the arrival horn eighty lines down was
+      // already fixed for, on a hull whose position is right here in
+      // quayBigPos. Near/far are hers, not the player's: she is enormous and
+      // she carries, so the far plane is the arrival horn's.
+      if (typeof game.sfx === 'function') {
+        game.sfx('horn', { volume: 1.0, pitch: 0.44,
+                           at: { x: quayBigPos.x, y: quayWATER_Y + 6.0, z: quayBigPos.z },
+                           near: 26, far: 260 });
+      }
       if (typeof game.shake === 'function') game.shake(0.05);
       // AND FOURTEEN PEOPLE ON HER RAIL PUT A HAND UP. See quayBuildPax: the
       // salute was four hundred tonnes of sound and nothing that was a person.
@@ -5702,6 +5714,17 @@ export function createQuay(game) {
     // wanted to ask where it is. Read-only — a caller that writes into it
     // moves the geometry's source of truth.
     bridge: quayBRIDGE,
+    // ---- THE CHIP SHOP COUNTER, WHICH NOTHING COULD ASK FOR ---------------
+    // Same defect the Bridge had two lines up. `manly-pine` fires inside
+    // quayCHIP_R (2.1 m) of quayCHIPS, and the card's beacon for it was the
+    // hand-written literal (118, -586) — 5.9 m away, on the far side of the
+    // Corso from the counter and comfortably outside the trigger. Walking to
+    // the arrow put you next to nothing. Published so the hint can point at
+    // the thing rather than at a remembered guess about where it is.
+    // In WORLD y — quayCHIPS.y is measured off the waterline, and a beacon
+    // handed the raw number would float half a metre high.
+    chips: { x: quayCHIPS.x, y: quayWATER_Y + quayCHIPS.y, z: quayCHIPS.z },
+    chipsGone() { return quayChipsGone; },
     // The Freshwater. She MOVES — ask, never cache.
     freshwater() { return quayBigPos; },
     freshwaterRange: quayBigRange,

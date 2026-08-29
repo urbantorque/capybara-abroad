@@ -460,7 +460,6 @@ const npcSEAT_LEG = -0.72;       // thighs swung forward under the table
 // Fallback fixtures, used only until environment.js publishes the real ones.
 const npcFB_BUSKER = { x: -25.0, z: 2.0 };
 const npcFB_KIOSK = { x: -18.5, z: 5.0 };
-const npcFB_TABLES = [-34, 5.0, -30.5, 8.0, -37.0, 7.5, -32.5, 2.0];
 const npcFB_FERRY = { x: -40, z: -14.5 };
 const npcDOG_HOME = { x: -28.5, z: -3.0 };
 const npcQUAY_PTS = [-22, 7, -30, -1, -38, 4, -44, 8, -20, -2, -35, 9, -43, -3];
@@ -3620,21 +3619,10 @@ export function createNPCs(game) {
   }
   const quayBusker = quayPt(game.env && game.env.buskerSpot, npcFB_BUSKER);
   const quayKiosk = quayPt(game.env && game.env.kioskSpot, npcFB_KIOSK);
-  const quayTables = [];                 // flat x,z pairs
-  (function () {
-    const src = game.env && game.env.cafeTables;
-    if (src && src.length) {
-      for (let i = 0; i < src.length; i++) {
-        const p = quayXOf(src[i]);
-        if (p && isFinite(p.x) && isFinite(p.z)) quayTables.push(p.x, p.z);
-      }
-    }
-    if (quayTables.length < 4) {
-      quayTables.length = 0;
-      for (let i = 0; i < npcFB_TABLES.length; i++) quayTables.push(npcFB_TABLES[i]);
-    }
-  })();
-  const quayTableN = quayTables.length / 2;
+  // The café tables are read ONCE, by the terrace block below — this used to
+  // parse `env.cafeTables` into a second list that nothing ever read, next to a
+  // terrace that was asking for a name environment.js does not publish. Two
+  // lists, one of them correct and dead, is exactly how that happened.
   const quayTableR = 1.15;
 
   // ------------------------------------------------------- dining terrace
@@ -3654,7 +3642,22 @@ export function createNPCs(game) {
   }
   const terrTables = [];                  // flat x,z pairs, one per table
   (function () {
-    const src = (game.env && (game.env.terraceTables || game.env.diningTables)) || null;
+    // ---- SIT THEM AT THE TABLES THE CHAPTER DRAWS -----------------------
+    // This asked for `terraceTables` / `diningTables`, and environment.js has
+    // never published either: the name it publishes is `cafeTables`, and it is
+    // the same array the hint arrow for 'cafe-table' points at. So this fell
+    // through to `envRandomIn('terrace')` and seated all five diners at RANDOM
+    // points on the terrace paving — measured 2.9-3.3 m from the nearest table
+    // that is actually built, i.e. every one of them eating off thin air.
+    //
+    // It also broke the task outright. `capyOnTable` tests 1.15 m around the
+    // DINER's table point, so standing on a real tabletop — the only thing in
+    // the chapter you can stand on up there, and the only place the clue sends
+    // you — was never within three metres of anything that could notice, and
+    // 'cafe-table' could not be completed at all. The two aliases stay ahead of
+    // it so a chapter that publishes its own terrace still wins.
+    const src = (game.env && (game.env.terraceTables || game.env.diningTables ||
+                              game.env.cafeTables)) || null;
     if (src && src.length) {
       for (let i = 0; i < src.length; i++) {
         const p = quayXOf(src[i]);
@@ -3728,9 +3731,14 @@ export function createNPCs(game) {
         npcSKINS[randInt(0, 3)], npcHAIRS[randInt(0, 4)], PALETTE.cloth6, PALETTE.metal);
     } else if (kind === 'patron') {
       // Terrace diner. Two to a table, seated across from one another so the
-      // pair reads as a conversation from the overhead-behind camera.
-      const ti = terrTableN > 0 ? (patronN % terrTableN) : 0;
-      const side = (patronN < terrTableN) ? 1 : -1;
+      // pair reads as a conversation from the overhead-behind camera — which
+      // is what this line has always said and what the old form never did:
+      // `patronN % terrTableN` with `side` flipping only after a full pass put
+      // one diner at each of five tables and nobody opposite anybody. Pair them
+      // off instead — table 0 gets diners 0 and 1, table 1 gets 2 and 3, and
+      // the odd one out sits alone.
+      const ti = terrTableN > 0 ? ((patronN >> 1) % terrTableN) : 0;
+      const side = (patronN & 1) ? -1 : 1;
       patronN++;
       const tx = terrTables[ti * 2], tz = terrTables[ti * 2 + 1];
       rec.tableX = tx; rec.tableZ = tz;
@@ -7149,8 +7157,26 @@ export function createNPCs(game) {
 
     // The drying patio, if Agent A has published one. Mutating the fallback in
     // place keeps every read site a plain constant lookup.
-    const dp = quayXOf(game.pasto && (game.pasto.dryingPatio || game.pasto.patio));
-    if (dp && isFinite(dp.x) && isFinite(dp.z)) { npcPA_PATIO.x = dp.x; npcPA_PATIO.z = dp.z; }
+    //
+    // ---- ...AND THE NAME IT IS PUBLISHED UNDER IS `coffeePatio` -----------
+    // Neither `dryingPatio` nor `patio` has ever existed on pasto's api, so
+    // this override never once fired and the fallback (46, 4) r 7.5 was the
+    // whole truth. The real floor is 13 x 10 centred on (52, 12) — ten metres
+    // away — which put the farmer who is supposed to be ON it out in the
+    // terraces, and left `paOnPatio` testing a disc that covers only the
+    // patio's south-west corner: standing on most of the drying beds did not
+    // make him cross. Same defect the Sydney café tables had, in the same file.
+    const cp = game.pasto && (game.pasto.dryingPatio || game.pasto.patio || game.pasto.coffeePatio);
+    const dp = quayXOf(cp);
+    if (dp && isFinite(dp.x) && isFinite(dp.z)) {
+      npcPA_PATIO.x = dp.x; npcPA_PATIO.z = dp.z;
+      // ...and the radius comes off the published footprint when there is one,
+      // so the disc actually covers the floor rather than a remembered guess
+      // about how big it is. Half the diagonal: a rect's own circumcircle.
+      if (cp && isFinite(cp.w) && isFinite(cp.d)) {
+        npcPA_PATIO.r = Math.hypot(cp.w, cp.d) * 0.5;
+      }
+    }
 
     const RUANAS = [PALETTE.ruana1, PALETTE.ruana2, PALETTE.ruana3];
     const SKIRTS = [PALETTE.adobeShade, PALETTE.balconyWood, PALETTE.paramoSoil, PALETTE.stoneDark];
