@@ -31,14 +31,26 @@ for (const m of tasksBlock[0].matchAll(/\{\s*id:\s*'([^']+)',\s*text:\s*'[^']*'[
 }
 
 // ---- which file is which chapter -----------------------------------------
-// Only the chapters that carry their own cast. environment.js and npc.js hold
-// Sydney's and Pasto's, and neither of those crowds uses this system.
+// The chapters that carry their own cast, one file each — plus npc.js, which
+// carries TWO.
+//
+// This table read "environment.js and npc.js hold Sydney's and Pasto's, and
+// neither of those crowds uses this system", and it was true for thirty-five
+// versions: `npcLINES` was a flat table of strings that no gate touched, so the
+// two chapters with the most tasks in the game were the two nobody audited
+// because there was nothing in them to audit. v36 gave `pickLine` the same
+// `localResolve` every other chapter's pool goes through, so npc.js is in the
+// table now — as a SET, because a Sydney commuter and a Pasto stallholder are
+// both in that file and both are right.
 const FILE_CHAPTER = {
+  'npc.js': [1, 2],
   'quay.js': 3, 'kyoto.js': 4, 'cali.js': 5, 'rio.js': 6, 'iceland.js': 7,
   'sahara.js': 8, 'drift.js': 9, 'venice.js': 10, 'kowloon.js': 11,
   'palawan.js': 12, 'goreme.js': 13, 'manly.js': 14, 'pantanal.js': 15,
   'cave.js': 16, 'antarctic.js': 17, 'monaco.js': 18, 'hanoi.js': 19,
 };
+/** True if `ch` is one of the chapters this file's cast is allowed to name. */
+const chapterOk = (want, ch) => Array.isArray(want) ? want.includes(ch) : want === ch;
 // A CHAPTER WITH NO CONDITIONAL LINE AT ALL IS A FINDING, NOT A PASS. This
 // audit checks that every `after:`/`before:` names a real task in the right
 // chapter, and for eighteen months the way to score zero on it was to have no
@@ -49,6 +61,10 @@ const MIN_CONDITIONAL = 6;
 
 let bad = 0, warn = 0, total = 0;
 const perFile = [];
+// ...AND PER CHAPTER, NOT PER FILE, FOR THE ONE FILE THAT HOLDS TWO. A floor
+// counted over npc.js as a whole would let Sydney's nineteen tasks carry Pasto
+// entirely: thirty-nine lines, none of them in the plaza, and a clean run.
+const perChapter = new Map();
 for (const f of readdirSync(SRC).sort()) {
   if (!f.endsWith('.js')) continue;
   const src = readFileSync(join(SRC, f), 'utf8');
@@ -65,7 +81,8 @@ for (const f of readdirSync(SRC).sort()) {
       continue;
     }
     const ch = taskChapter.get(id);
-    if (want !== undefined && ch !== want) {
+    perChapter.set(ch, (perChapter.get(ch) || 0) + 1);
+    if (want !== undefined && !chapterOk(want, ch)) {
       console.log('WARN     ' + f + ' (ch' + want + '): ' + key + ": '" + id +
                   "' belongs to chapter " + ch);
       warn++;
@@ -86,15 +103,23 @@ const perFileN = new Map(perFile.map(s => {
   return [s.slice(0, i) + '.js', Number(s.slice(i + 1))];
 }));
 for (const f of Object.keys(FILE_CHAPTER)) {
-  const n = perFileN.get(f) || 0;
-  if (n === 0) {
-    console.log('BLOCKER  ' + f + ' (ch' + FILE_CHAPTER[f] +
-                ') has NO conditional lines — nobody there reacts to what you have done');
-    bad++;
-  } else if (n < MIN_CONDITIONAL) {
-    console.log('WARN     ' + f + ' (ch' + FILE_CHAPTER[f] + ') has only ' + n +
-                ' conditional lines, under the ' + MIN_CONDITIONAL + ' floor');
-    warn++;
+  const want = FILE_CHAPTER[f];
+  // A file that names two chapters is scored per chapter — see the note by
+  // `perChapter`. A file that names one is scored on its own count, exactly
+  // as before, because for those two numbers are the same number.
+  const parts = Array.isArray(want) ? want : null;
+  const n = parts ? null : (perFileN.get(f) || 0);
+  const scores = parts ? parts.map(c => [c, perChapter.get(c) || 0]) : [[want, n]];
+  for (const [ch, cn] of scores) {
+    if (cn === 0) {
+      console.log('BLOCKER  ' + f + ' (ch' + ch +
+                  ') has NO conditional lines — nobody there reacts to what you have done');
+      bad++;
+    } else if (cn < MIN_CONDITIONAL) {
+      console.log('WARN     ' + f + ' (ch' + ch + ') has only ' + cn +
+                  ' conditional lines, under the ' + MIN_CONDITIONAL + ' floor');
+      warn++;
+    }
   }
 }
 console.log('\n' + bad + ' blockers, ' + warn + ' warnings');

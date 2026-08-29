@@ -172,7 +172,12 @@ const npcLINES = {
   laugh:   ['Aww, look at him!', 'He’s just going about his day.', 'He’s having a lovely time.',
             'Get a photo of that.', 'Don’t make eye contact.',
             'He’s doing better than I am.', 'Look at the little face on him.',
-            'That’s the most relaxed animal I’ve ever seen.', 'He owns the place, apparently.'],
+            'That’s the most relaxed animal I’ve ever seen.', 'He owns the place, apparently.',
+            { t: 'He was up on the stage. I’ve got the photo.', after: 'opera-stage' },
+            { t: 'He’s wearing somebody’s hat.', after: 'steal-hat', before: 'hat-harbour' },
+            { t: 'He carried it all that way and then threw it in.', after: 'hat-harbour' },
+            { t: 'He’s soaked. He did that to himself.', after: 'swim' },
+            { t: 'He’s been in the sprinkler. On purpose.', after: 'sprinkler' }],
   // What somebody says the second time you come near them. See the npcWARY_*
   // block: this is the whole of what being remembered sounds like.
   wary:    ['You again.', 'Oh, it’s you.', 'I’m watching you, mate.', 'Not again.',
@@ -195,9 +200,28 @@ const npcLINES = {
             'Six dollars. SIX.', 'I hadn’t even started it.'],
   jog:     ['Whoa!', 'Comin’ through!', 'Sorry! Sorry!', 'On your left!',
             'That’s a big one!', 'Not stopping! Can’t stop!'],
+  // ---- AND THE SQUARE KEEPS UP WITH YOU (v36) ---------------------------
+  // Sydney has nineteen tasks — the longest list in the game — and for
+  // thirty-five versions not one person in it said anything different after
+  // any of them. See ...AND THE TWO OLDEST CASTS KNOW WHAT YOU HAVE DONE, by
+  // pickLine, for the one line of plumbing that makes these resolve.
+  //
+  // The rule is the one every other chapter's pool keeps: a line goes in a
+  // pool ONLY if the person who owns that pool would say it, none of them
+  // names a task or an objective, and every one is something you could
+  // overhear on that promenade rather than a receipt for what you just did.
   idle:    ['Lovely day.', 'Is that the Opera House?', 'Reckon it’ll rain.', 'Beautiful, but.',
             'Where’s the ferry?', 'Twelve dollars for a coffee.', 'It’s bigger in person, isn’t it.',
-            'I said we should’ve gone to Bondi.', 'Is that a bin chicken or a real bird?'],
+            'I said we should’ve gone to Bondi.', 'Is that a bin chicken or a real bird?',
+            { t: 'Did you see it on the steps? It was ON the steps.', after: 'opera-stage' },
+            { t: 'There’s one in the harbour. Swimming. Just swimming.', after: 'swim' },
+            { t: 'Somebody’s lost a hat this morning.', after: 'steal-hat' },
+            { t: 'The gardener’s having a day of it.', after: 'chased' },
+            { t: 'There were birds everywhere. EVERYWHERE.', after: 'seagull-chips' },
+            { t: 'It got on the van. It rode the van.', after: 'whippy-run' },
+            { t: 'The bins are all over the path.', after: 'bin-chicken' },
+            { t: 'Someone’s going to have to tell the council about those roses.', after: 'dig-flower' },
+            { t: 'There’s a dog loose in the gardens.', after: 'dog-loose' }],
 
   // ---- TWO PEOPLE TALKING (see chatStep) -------------------------------
   // Openers and replies are separate lists on purpose: an exchange must never
@@ -212,23 +236,34 @@ const npcLINES = {
             'What is that, a wombat?', 'I could live here, you know.',
             'Do you want to sit down for a bit?', 'Is it always this bright?',
             'Nine dollars. For a coffee.', 'Have we been here before?',
-            'Right, so where are we meeting them?'],
+            'Right, so where are we meeting them?',
+            { t: 'Did you get a photo of the thing on the steps?', after: 'opera-stage' },
+            { t: 'I told you it would swim.', after: 'swim' },
+            { t: 'Is that the one that was on the ice cream van?', after: 'whippy-run' }],
   chatB:   ['Mm.', 'You said that yesterday.', 'Probably.', 'I wasn’t listening, sorry.',
             'That’s what I said.', 'Ask your father.', 'It’s in the other bag.',
             'Don’t start.', 'We’ll see.', 'It’s the humidity, that.',
             'I’m not walking back up that hill.', 'Lovely, though. Isn’t it.',
             'Well. There you go.', 'Have a look on your phone.',
-            'That is genuinely the biggest one I have ever seen.'],
+            'That is genuinely the biggest one I have ever seen.',
+            { t: 'I got four. All of them blurry.', after: 'opera-stage' },
+            { t: 'I never said it wouldn’t.', after: 'swim' },
+            { t: 'I have stopped being surprised, is the thing.', after: 'whippy-run' }],
 
   // ---- Circular Quay (chapter 1) ----
   busk:    ['Any requests?', 'Cheers, mate.', 'This one’s in G.', 'Ta very much.',
-            'Everything’s in G, mate.', 'Tips go in the hat. The HAT.'],
+            'Everything’s in G, mate.', 'Tips go in the hat. The HAT.',
+            { t: 'Watch the hat, would you. Just — watch the hat.', before: 'busker-hat' },
+            { t: 'Hat’s empty, mate. Ask the rodent.', after: 'busker-hat' }],
   buskRob: ['That’s my hat!', 'That’s my takings!', 'Oi — I’m working here!', 'Mate. MATE.',
             'There was eleven dollars in that!', 'I have been robbed by a rodent.'],
   buskSad: ['Right. Where was I.', 'Every Sunday, this.', 'Back to it, then.', 'Terrific.',
             'I’ll write a song about it.', 'This one’s about a capybara.'],
   cafe:    ['…and she said no, obviously.', 'The coffee here is criminal.', 'Lovely spot, this.',
-            'Is that a very large guinea pig?', 'We should get the ferry after.'],
+            'Is that a very large guinea pig?', 'We should get the ferry after.',
+            { t: 'Something stood on our table. Stood on it.', after: 'cafe-table' },
+            { t: 'I’m not putting my bag down again.', after: 'cafe-table' },
+            { t: 'Mine went everywhere. Everywhere.', after: 'coffee-spill' }],
   shoo:    ['Off the table!', 'Get DOWN!', 'That is a table, mate.', 'Excuse me!', 'Someone eats off that!'],
   waiter:  ['Two flat whites.', 'Sorry about him.', 'Right. Yep. Fine.', 'I only started Tuesday.',
             'This is not in my job description.',
@@ -270,7 +305,9 @@ const npcLINES = {
             'It’s warmer than I expected, in fairness.'],
   // ---- the dining terrace ----
   diner:   ['The calamari here is unreal.', 'Is that included?', 'Lovely spot for it.',
-            'We should sit outside more often.', 'Table with a view, you said.'],
+            'We should sit outside more often.', 'Table with a view, you said.',
+            { t: 'Don’t put your food down. I’m telling you. Don’t.', after: 'picnic-thief' },
+            { t: 'They warned us about the birds. They did not warn us about that.', after: 'seagull-chips' }],
   standUp: ['GET OFF THE TABLE!', 'That is our LUNCH!', 'Excuse me — EXCUSE ME!',
             'He’s ON the table!', 'Off! OFF!'],
   serve:   ['Two flat whites, yeah?', 'Won’t be a moment.', 'Sorry about the rodent.',
@@ -292,7 +329,13 @@ const npcLINES = {
   // still could not have been said anywhere else.
   paNotice:  ['…and what is that, pues?', 'Ave María. It is a chigüiro.',
               'That is the largest guinea pig in Nariño.', 'Look at it. Just look at it.',
-              'Is that somebody’s?', 'It is not a dog. I know that much.'],
+              'Is that somebody’s?', 'It is not a dog. I know that much.',
+              // ...AND THE PLAZA KEEPS UP TOO (v36). Same rule as Sydney's above:
+              // in this chapter's own register, and none of them a receipt.
+              { t: 'It went up with the condor. I watched it go.', after: 'condor-ride' },
+              { t: 'That is the one that took my neighbour’s empanada.', after: 'steal-empanada' },
+              { t: 'It rang the bell. A chigüiro rang the bell.', after: 'church-bell' },
+              { t: 'It was on the carroza, hombre. ON it.', after: 'carroza' }],
   paTheft:   ['¡Oiga! That is MINE!', 'Thief! Sinvergüenza!', 'Put it back. Put it BACK.',
               'I saw that, chigüiro.', 'That is my living, hombre!'],
   paChase:   ['¡Venga acá!', 'Do not run from me!', 'Out of my stall!',
@@ -300,20 +343,26 @@ const npcLINES = {
   paWheeze:  ['I am too old for this, pues.', 'Ay, my back.',
               'Every Tuesday. Every single Tuesday.', 'Gone. Of course he is gone.'],
   paRestock: ['Right. Start again.', 'Tomorrow I bring the dog.',
-              'Next time, chigüiro.', 'I know your face now.'],
+              'Next time, chigüiro.', 'I know your face now.',
+              { t: 'Third time this week. The third.', after: 'market-chaos' },
+              { t: 'And it eats the stock as well. Of course it does.', after: 'steal-empanada' }],
   // THE WOMAN WITH THE BROOM. The one recurring character in this chapter and
   // the only person in the game who never once breaks into a run — the whole
   // joke is that she does not have to, and every line she has is a variation on
   // it. Nobody else here gets a philosophy.
   paBroom:   ['I do not run. I arrive.', 'The broom is patient, mijo.',
               'Walk, then. I will still get there.', 'Sinvergüenza. Come here.',
-              'I have all afternoon.', 'You are faster. I am closer.'],
+              'I have all afternoon.', 'You are faster. I am closer.',
+              // She keeps her philosophy. This is the same sentence about it.
+              { t: 'You went up with the bird. You still came back down here.', after: 'condor-ride' }],
   paSwat:    ['Take that!', 'And that!', 'Learn, pues!'],
   paScold:   ['Go on. Off with you.', 'The broom does not forget.',
               'I will be here tomorrow.', 'We both know you will be back.',
               'Another day, chigüiro.'],
   paFarm:    ['Out of the drying beds!', 'Not the café — NOT THE CAFÉ!',
-              'That is a year of work you are standing on!', '¡Fuera! Get off!'],
+              'That is a year of work you are standing on!', '¡Fuera! Get off!',
+              { t: 'A whole year. And it walked straight through it.', after: 'coffee-scatter' },
+              { t: 'Not one bean out of place today. Not one.', before: 'coffee-scatter' }],
   // EATING THE STOCK, in this chapter's voice. Pasto has THIRTEEN edible props
   // — more than any other chapter in the game, Sydney's seven included — and
   // until v30 not one of them could start a reaction, because the produce chain
@@ -325,7 +374,9 @@ const npcLINES = {
               'You are eating my morning.', '¿Y quién paga? Not you.',
               'That is stock, chigüiro.', 'Every week the same animal.'],
   paChurch:  ['God preserve us.', 'Buenas.', 'Mass is at six.',
-              'The courtyard is lovely at this hour.'],
+              'The courtyard is lovely at this hour.',
+              { t: 'Nobody has touched that rope in forty years.', before: 'church-bell' },
+              { t: 'We are still finding out who rang it.', after: 'church-bell' }],
   paScandal: ['THE BELL!', 'Who is ringing at this hour?!', 'That is sacrilege!',
               '¡Ave María purísima!', 'In the middle of Mass!'],
   // ---- TWO PEOPLE TALKING, IN PASTO (see chatStep) ---------------------
@@ -3245,9 +3296,36 @@ export function createNPCs(game) {
     }
   }
 
+  // =======================================================================
+  // ...AND THE TWO OLDEST CASTS KNOW WHAT YOU HAVE DONE (v36)
+  //
+  // `localResolve` — the `{ t, after, before }` gate that lets a person say
+  // something only once a task is ticked — has been the shape of every line in
+  // seventeen chapters since v20, and its own design note says why: "a chapter
+  // is a sequence of things happening and the people in it were outside time".
+  //
+  // It reached SIXTEEN of the nineteen. Sydney and Pasto predate `addLocal`
+  // and their casts come out of `humans`/`paCast` and read `npcLINES`, a flat
+  // table of strings that no gate has ever touched — so the two chapters with
+  // the most tasks in the game (nineteen and eleven, and the largest single
+  // list in it is Sydney's) were the two where nobody ever noticed anything.
+  // That is the first hour of the game: the stretch where a player is deciding
+  // whether the world is paying attention.
+  //
+  // One line of plumbing. `npcLINES` may now hold the same three forms every
+  // other chapter's pool holds, `localResolve` filters them, and a pool with
+  // no conditional entries in it resolves to itself and costs one pass over an
+  // array of eight strings at the rate somebody says something.
+  //
+  // The never-twice guard still works, because it compares the RESOLVED
+  // string against the last one — not an index into a list whose length now
+  // changes as the chapter goes on.
+  // =======================================================================
   function pickLine(npcRec, key) {
-    const arr = npcLINES[key];
-    if (!arr) return;
+    const raw = npcLINES[key];
+    if (!raw) return;
+    const arr = localResolve(raw);
+    if (!arr.length) return;
     let i = randInt(0, arr.length - 1);
     for (let k = 0; k < 3 && arr.length > 2 &&
          (arr[i] === npcRec.lastLine || arr[i] === npcLastGlobal[key]); k++) {
