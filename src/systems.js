@@ -276,6 +276,81 @@ const sysEYE_RAISE_W = 0.70;
 // aurora and completely wrong for a key: a verb that takes three seconds to
 // answer and three more to let go reads as broken.
 const sysEYE_LAMBDA  = 2.6;
+// ---- ...AND THE RIG OPENS OUT ON ITS OWN WHEN YOU STOP (v34) -------------
+// The eye-raise fixed the standstill frame for a player who knows about V. It
+// did nothing at all for the resting frame, which is what this game is mostly
+// LOOKING AT: measured across nineteen chapters, standing still, the picture is
+// the ground. Venice is the Piazza San Marco and the frame is grey flagstones —
+// the Basilica, the Campanile, the arcades and a hundred and eighty pigeons are
+// all above the top edge. Run the same twenty metres and the whole square is
+// there, because the speed dolly takes the view pitch to 23 degrees. So the
+// best picture in the game is the one nobody is standing still to look at, and
+// the worst is the default.
+//
+// The rig ALREADY knows when the player has stopped: `camIdleT` is the signal
+// that swings the boom back behind the animal after sysCAM_IDLE_T, and it
+// requires both a low speed AND a stick at rest, so it means "not asking to go
+// anywhere" rather than "briefly slow". This is one more thing to do with it.
+//
+// A FOURTH VOICE ON THE SKYWARD CHANNEL, not a fifth rig — same argument the
+// eye-raise made, and the loudest of the voices wins. It is the QUIETEST of
+// them: 0.55 against V's 0.70, so a deliberate press still visibly buys more
+// sky, and the crane at 1.0 is still a shot rather than a way of standing.
+// At 0.55 the pitch eases 41 -> 24.5 degrees, the boom goes 9.5 -> 11.4 m and
+// the look target rises to 1.59 m, which is the running composition, held.
+//
+// Asymmetric on purpose. It arrives slowly — you have to have actually stopped,
+// and an opening that raced the player's hand would read as the camera being
+// startled — and it leaves fast, because the first frame of W is a request for
+// the driving lens back and anything slower is a rig that swims.
+// ---- ...AND IT BANKS ITS OWN STILLNESS, BECAUSE camIdleT FORGETS --------
+// `camIdleT` resets to zero on any frame the animal is over sysCAM_AUTO_V, and
+// that is correct for the yaw tidy-up, which is cheap to restart. It is wrong
+// here. Measured in Pasto, standing on the flank of Galeras with nothing
+// touched for twenty seconds: the animal creeps downhill, is caught, and creeps
+// again — body speed peaks at 2.6 m/s about every two and a half seconds — so
+// camIdleT never got past 2.5 and chapter 2 was the one chapter in nineteen
+// that never opened out. The rig was answering to the solver.
+//
+// So the ask banks its own timer, on two different signals:
+//
+//   the STICK zeroes it outright. A player asking to go somewhere wants the
+//   driving lens back on the next frame, and that is the only thing that should
+//   be able to shut the wide shot instantly.
+//
+//   SPEED only drains it, at sysREST_FORGET times real time. A quarter-second
+//   slide costs three quarters of a second of the bank and the shot survives;
+//   anything sustained — a slope that really is carrying you, a moving deck —
+//   empties it in well under a second and the shot closes.
+const sysREST_W      = 0.55;  // share of the crane blend a settled rig asks for
+const sysREST_FORGET = 3.0;   // how much faster the bank drains than it fills
+const sysREST_T      = 1.5;   // s of banked stillness before it starts to open out
+const sysREST_LAMBDA = 1.15;  // opening out: ~2.5 s, under the player's notice
+const sysREST_DROP   = 5.0;   // ...and closing again: under half a second
+const sysREST_SKY    = 2.0;   // what skyT follows the rest voice at
+// ---- ...AND THE RESTING FRAME IS ALLOWED TO BREATHE ----------------------
+// Once the rig opens out and the player stops, NOTHING in the frame moves that
+// the camera is responsible for: the eye is a damped spring that has converged,
+// so it is exactly still, to the float. A still eye on a wide shot is the one
+// place this game looks like a screenshot instead of a place, and it is the
+// cheapest thing in the file to fix — three sines on the EYE ONLY, in the same
+// slot and by the same argument as shake(): the look target is never moved, so
+// the animal cannot drift in the frame and the bearing cannot wander.
+//
+// The numbers are chosen to be under the threshold of "the camera is doing
+// something" and over the threshold of "this is a photograph". At the resting
+// boom of 11.4 m, 5.5 cm of lateral travel is 4.8 mrad — about five pixels of a
+// 900-line frame — and the periods are 11.0, 9.3 and 7.7 seconds, which are
+// mutually irrational enough that the sum never visibly repeats.
+//
+// Scaled by the rest blend, so it arrives with the wide shot and is gone the
+// frame the player touches a key; and off entirely under prefers-reduced-
+// motion, which is a setting about exactly this.
+const sysREST_BR_XZ  = 0.055; // m of lateral drift at a full rest blend
+const sysREST_BR_Y   = 0.035; // m of vertical
+const sysREST_BR_A   = 0.571; // rad/s — 11.0 s
+const sysREST_BR_B   = 0.676; // rad/s —  9.3 s
+const sysREST_BR_C   = 0.816; // rad/s —  7.7 s
 const sysRUN_SPEED   = 7.4;   // capybara top ground speed
 const sysLOOK_LEAD   = 0.30;  // seconds of velocity to lead the look target by
 const sysLOOK_LEADMAX= 2.5;
@@ -15800,6 +15875,8 @@ export function createSystems(game) {
   let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
   let camDolly = 0;             // 0..1 of the run speed, damped. See sysCAM_DOLLY_P.
   let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
+  let skyRestT = 0;             // ...and the STILLNESS's share of it. See sysREST_W.
+  let restIdleT = 0;            // banked stillness, which camIdleT is not. See sysREST_FORGET.
   let shakeAmt = 0;
   let camInit = false;
   // flight rig: blend 0..1, the heading the rig is chasing, and its damped follow
@@ -17349,7 +17426,11 @@ export function createSystems(game) {
   // Batch 5 has to answer it nineteen times, before and after moving the pitch.
   // Published as one pre-allocated object written once a frame: nothing reads
   // it inside the game, and nothing here may ever read it back.
-  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0 };
+  // `idle` and `hand` are here for the same reason `clear` is: both drive the
+  // rig from inside this closure and neither had ever left it, so "the camera
+  // will not settle in this chapter" was a question nothing could answer. See
+  // sysREST_W, which is the second feature to hang off camIdleT.
+  const sysCamInfo = { reach: 0, dist: 0, clear: 1, pitch: 0, sky: 0, rest: 0, rig: 0, shot: 0, lift: 0, lift2: 0, floor: 0, idle: 0, hand: 0 };
   // The callback, the running best and the three things it has to skip all live
   // out here rather than in a closure built per frame — this file's whole
   // premise is that update() allocates nothing.
@@ -17839,6 +17920,46 @@ export function createSystems(game) {
     },
     albumShow: function () { albShow(); },
     root: hudRoot,
+    /**
+     * THE OPAQUE PANELS, IN NDC, FOR ANYTHING THAT DRAWS OVER THE PICTURE.
+     *
+     * The to-do card and the minimap are solid paper sitting on two corners of
+     * the frame, and the one other thing this game draws in screen space — an
+     * NPC's speech bubble — knew about the capybara and about the screen edges
+     * and about neither of these. Measured in Mong Kok: a local's line landed
+     * squarely on the card and took out the middle two rows of it, so the
+     * sentence and the task list were both unreadable for a second and a half.
+     * It is the only channel the game has for saying somebody noticed you.
+     *
+     * Published rather than looked up by class name in npc.js, because systems
+     * owns the HUD and is the only thing that knows which panels are actually
+     * up: `bare` mode hides both, the card is hidden at the title and during a
+     * shot, and the map has a different corner on a coarse pointer.
+     *
+     * Fills and returns `out` (an array, reused by the caller — this allocates
+     * nothing per call). Boxes are {x0, y0, x1, y1} in NDC with y UP, so they
+     * compare directly against a projected point. One getBoundingClientRect per
+     * visible panel, so callers should ask on a slow tick, not per frame.
+     */
+    panels: function (out) {
+      out.length = 0;
+      if (!hudRoot || hudRoot.classList.contains('bare')) return out;
+      const iw = Math.max(1, innerWidth), ih = Math.max(1, innerHeight);
+      const add = function (el) {
+        if (!el || !el.offsetParent) return;          // display:none or detached
+        // Both panels fade in on `.show` and are transparent without it, and a
+        // transparent panel is not in the way — offsetParent alone would keep
+        // the card's box live at the title card, where nothing should dodge it.
+        if (!el.classList.contains('show')) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        out.push({ x0: r.left / iw * 2 - 1, x1: r.right / iw * 2 - 1,
+                   y0: 1 - r.bottom / ih * 2, y1: 1 - r.top / ih * 2 });
+      };
+      add(todoEl);
+      add(mapEl);
+      return out;
+    },
     toast: toast,
     completeTask: completeTask,
     isTaskDone: function (id) { return !!(taskRec[id] && taskRec[id].done); },
@@ -18294,11 +18415,39 @@ export function createSystems(game) {
     const eyeLive = eyeAsk > 0 || skyEyeT > 0.002;
     skyEyeT = damp(skyEyeT, eyeAsk, sysEYE_LAMBDA, dt);
     if (skyEyeT > skyWant) skyWant = skyEyeT;
+    // ---- ...AND SO DOES SIMPLY HAVING STOPPED (v34) ----------------------
+    // Third voice, same channel, quietest of the three. The gate is the one the
+    // yaw tidy-up already uses and is not relaxed by a term: `camIdleT` is only
+    // running when the speed is low AND the stick is at rest, `camHandT` means
+    // the player has just moved the camera by hand and should keep it, and
+    // `mounted` is a condor. See sysREST_W.
+    //
+    // NOT gated on prefers-reduced-motion, and that is deliberate. The line
+    // this file already draws is that involuntary OSCILLATIONS are gated —
+    // shake(), the FOV breathe, the minimap sweep, the glitter on eight seas —
+    // and deliberate rig BLENDS are not: the crane, the speed dolly and the yaw
+    // tidy-up are all un-gated, and the tidy-up fires off this very trigger and
+    // swings the boom ninety degrees, which is a far larger motion than this
+    // sixteen degrees of pitch. Gating it would take the composition away from
+    // the readers who have the setting on and leave them the one picture it
+    // exists to replace. The breath that rides on top of it IS an oscillation,
+    // and that one is gated.
+    //
+    // The bank. See sysREST_FORGET for why this is not simply camIdleT.
+    restIdleT = (Math.abs(ix) + Math.abs(iz) >= 0.02) ? 0
+              : clamp(restIdleT + (camIdle ? dt : -dt * sysREST_FORGET),
+                      0, sysREST_T + 0.5);
+    const restAsk = (started && !mounted &&
+                     camHandT <= 0 && restIdleT >= sysREST_T) ? sysREST_W : 0;
+    skyRestT = damp(skyRestT, restAsk,
+                    restAsk > 0 ? sysREST_LAMBDA : sysREST_DROP, dt);
+    if (skyRestT > skyWant) skyWant = skyRestT;
+    const restLive = !eyeLive && (restAsk > 0 || skyRestT > 0.002);
     // The gate is the crane's own and is not relaxed: at the helm or on a
     // condor the lens is already somebody else's, and the eye-raise is one more
     // thing that may not join that argument.
     skyT = damp(skyT, (flyT > 0.1 || sailT > 0.1) ? 0 : skyWant,
-                eyeLive ? sysEYE_LAMBDA : sysSKY_LAMBDA, dt);
+                eyeLive ? sysEYE_LAMBDA : restLive ? sysREST_SKY : sysSKY_LAMBDA, dt);
     let camReach = lerp(lerp(lerp(camDist + camDolly * sysCAM_DOLLY, sysSKY_DIST, skyT), sysSAIL_DIST, sailT), sysFLY_DIST, flyT);
     let camPitch = lerp(lerp(lerp(sysCAM_PITCH - camDolly * sysCAM_DOLLY_P, sysSKY_PITCH, skyT), sysSAIL_PITCH, sailT), sysFLY_PITCH, flyT);
     // ---- ...AND IT EASES BACK WHEN THE ANIMAL SITS DOWN (v23) ------------
@@ -18571,7 +18720,8 @@ export function createSystems(game) {
     // The readout. See sysCamInfo — written, never read.
     sysCamInfo.reach = camReach; sysCamInfo.dist = dd; sysCamInfo.clear = camClearF;
     sysCamInfo.pitch = camPitch; sysCamInfo.sky = skyT; sysCamInfo.rig = rigT;
-    sysCamInfo.shot = shotW;
+    sysCamInfo.shot = shotW; sysCamInfo.rest = skyRestT;
+    sysCamInfo.idle = restIdleT; sysCamInfo.hand = camHandT;
 
     // The spring is tracked separately from camera.position so the shake offset
     // is never fed back into the smoothing (that is what made shake "swim").
@@ -18597,6 +18747,18 @@ export function createSystems(game) {
       if (camera.position.y < camFloorY) camera.position.y = camFloorY;
     } else {
       shakeAmt = 0;
+    }
+    // ---- ...AND THE RESTING FRAME BREATHES (v34) --------------------------
+    // Same slot and same rule as the shake above: the EYE only, never the look
+    // target, and continuous in `time` so it can never jump between frames.
+    // Weighted by the rest blend normalised to 0..1, so it fades up with the
+    // wide shot and is gone with it. See sysREST_BR_XZ.
+    if (skyRestT > 0.002 && !sysCalmMotion) {
+      const bw = skyRestT / sysREST_W, bt = game.state.time;
+      camera.position.x += Math.sin(bt * sysREST_BR_A) * sysREST_BR_XZ * bw;
+      camera.position.z += Math.cos(bt * sysREST_BR_B) * sysREST_BR_XZ * bw;
+      camera.position.y += Math.sin(bt * sysREST_BR_C + 1.3) * sysREST_BR_Y * bw;
+      if (camera.position.y < camFloorY) camera.position.y = camFloorY;
     }
     // Second clearance test, on the position actually being rendered from: the
     // spring lags the desired point by a few metres and a shake can add half of one.

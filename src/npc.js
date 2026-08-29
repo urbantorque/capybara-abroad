@@ -420,6 +420,21 @@ const npcDRINK = { coffee: 1, icecream: 1 };
 // Speech bubbles at the closer (~9.5) camera.
 const npcBUB_AVOID_X = 0.20;  // NDC half-width of the capybara's no-fly zone
 const npcBUB_AVOID_Y = 0.34;
+// ---- ...AND THE PAPER IS ALSO IN THE WAY (v34) --------------------------
+// The bubble dodged the capybara and the screen edges and knew nothing about
+// the two opaque panels on the corners of the frame. Measured in Mong Kok: a
+// local's line landed on the to-do card and took out two of its rows, so the
+// sentence and the task list were unreadable together for a second and a half.
+//
+// Same mechanism as the capybara dodge — a horizontal push on `ox`, damped, so
+// it glides rather than pops — and it pushes toward the middle of the screen,
+// which is away from whichever corner the panel is in. The pad keeps a little
+// daylight so the two do not merely touch.
+//
+// Asked of game.hud.panels() on a slow tick, not per frame: it is a layout
+// read, and a panel that has just changed size is one frame late at worst.
+const npcBUB_PANEL_PAD = 0.035;  // NDC of daylight left beside a panel
+const npcBUB_PANEL_T   = 0.20;   // s between layout reads
 
 // Skeleton dimensions the animation maths depends on (metres, feet at y = 0).
 const npcLEG_L = 0.62;      // hip pivot height == leg length
@@ -7499,7 +7514,21 @@ export function createNPCs(game) {
   for (let i = 0; i < humans.length; i++) all.push(humans[i]);
   for (let i = 0; i < ibises.length; i++) all.push(ibises[i]);
 
+  // The opaque HUD panels, in NDC, refreshed on a slow tick. See
+  // npcBUB_PANEL_PAD — these come from game.hud.panels(), which does a layout
+  // read, so this is deliberately not a per-frame question.
+  const npcBubPanels = [];
+  let npcBubPanelT = 0;
+
   function updateBubbles(dt) {
+    npcBubPanelT -= dt;
+    if (npcBubPanelT <= 0) {
+      npcBubPanelT = npcBUB_PANEL_T;
+      // A build without the accessor (or before systems.js is up) simply gets
+      // an empty list and the bubble behaves exactly the way it did before.
+      if (game.hud && typeof game.hud.panels === 'function') game.hud.panels(npcBubPanels);
+      else npcBubPanels.length = 0;
+    }
     // Where the capybara is on screen. At the closer camera a bubble parked on
     // top of him hides the one thing the player is watching, so bubbles slide
     // out of his column rather than sitting over him.
@@ -7538,7 +7567,6 @@ export function createNPCs(game) {
         if (Math.abs(ddx) < npcBUB_AVOID_X && Math.abs(ddy) < npcBUB_AVOID_Y) {
           want = (ddx >= 0 ? 1 : -1) * (npcBUB_AVOID_X - Math.abs(ddx)) * 1.35;
         }
-        b.ox = damp(b.ox, want, 10, dt);
         // legible up close, still readable across the lawn
         const sc = clamp(14 / Math.max(dist, 1) + 0.52, 0.78, 1.22);
         // ---- THE CLAMP HAD NO WIDTH TERM, SO THE BOX RAN OFF THE SCREEN --
@@ -7559,9 +7587,27 @@ export function createNPCs(game) {
         const halfX = b.bw ? (b.bw * sc) / Math.max(1, innerWidth) : 0.16;
         const fullY = b.bh ? (b.bh * sc * 2) / Math.max(1, innerHeight) : 0.14;
         const limX = clamp(1 - halfX - 0.012, 0.05, 0.93);
-        const nx = clamp(npcV1.x + b.ox, -limX, limX);
         // the bubble is drawn ABOVE this point, so leave headroom at the top
         const ny = clamp(npcV1.y, -0.80, Math.min(0.82, 1 - fullY - 0.012));
+        // ---- ...AND OFF THE PAPER (v34). See npcBUB_PANEL_PAD -------------
+        // Resolved AFTER the box size is known, because whether a bubble is on
+        // the card is a question about the box and not about its anchor — the
+        // capybara dodge above can be answered from a point, and this cannot.
+        // The push goes to whichever side is nearer, which for a panel in a
+        // corner is always the middle of the screen.
+        // The box is drawn UPWARD from its anchor (translate(-50%,-100%)), so
+        // it spans x in [bx-halfX, bx+halfX] and y in [ny, ny+fullY].
+        for (let q = 0; q < npcBubPanels.length; q++) {
+          const pz = npcBubPanels[q];
+          const bx = clamp(npcV1.x + want, -limX, limX);
+          if (bx + halfX <= pz.x0 || bx - halfX >= pz.x1) continue;
+          if (ny + fullY <= pz.y0 || ny >= pz.y1) continue;
+          const goR = pz.x1 + npcBUB_PANEL_PAD + halfX - bx;   // > 0, push right
+          const goL = pz.x0 - npcBUB_PANEL_PAD - halfX - bx;   // < 0, push left
+          want += (goR < -goL) ? goR : goL;
+        }
+        b.ox = damp(b.ox, want, 10, dt);
+        const nx = clamp(npcV1.x + b.ox, -limX, limX);
         b.el.style.left = ((nx * 0.5 + 0.5) * 100) + '%';
         b.el.style.top = ((-ny * 0.5 + 0.5) * 100) + '%';
         b.el.style.transform = 'translate(-50%,-100%) scale(' + sc.toFixed(3) + ')';
