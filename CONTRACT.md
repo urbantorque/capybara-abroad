@@ -2056,6 +2056,81 @@ where there is no floor and no contact to have.
    through a fairy chimney. Check the ENDPOINTS as well as the middle.
 
 
+## THE TWO LOOPS, v37 — THE GHOST AND THE INCIDENT (29 Aug 2026)
+
+The two that ADD a loop rather than finishing one. Both are built out of machinery that was
+already running; neither adds a task, a key or a gate.
+
+### THE GHOST — `capy.ghost`
+
+While an attempt is open on a record you already hold, your own best run is played back beside
+you, translucent, at the same point in its own clock.
+
+**Ownership is split and the split is the design.** systems.js owns the TRACE — it knows when
+an attempt opens and closes (`recordLive` / `recordEnd`), whether a figure improved
+(`recordValue`), and it owns localStorage. capybara.js owns the ANIMAL. Two functions between
+them:
+
+    capy.ghost.show(x, y, z, yaw, a)    a is 0..1 of the material's own opacity
+    capy.ghost.hide()
+    capy.ghost.on()                     harness only; nothing in src reads it
+
+- **One mesh, not eighteen.** `capyModel`'s parts are baked ONCE, at construction, into a
+  single geometry with the rest pose folded into the vertices — which is also the only moment
+  the model is in a pose worth freezing, because the gait, the loaf and the idle beats have
+  not run yet. Built on the FIRST `show`, so a player with no record never pays for it.
+- **One material of its own, and NOT a clone of the fur.** `mat()` caches by colour and
+  options, so a cloned fur material is either shared with the real animal (a wetness write
+  would dye the ghost) or a fresh one that misses the cache. Flat, transparent, no shadow
+  either way, `depthWrite: false`.
+- **Five rules.** It gates nothing and cannot fail you. There is no ghost on a first attempt,
+  because a trace is only kept when a figure IMPROVES — a property of the mechanism, not a
+  rule to remember. There is no readout of the gap, ever. It has its own storage key, oldest
+  out on quota, for the reason the album has one. And **a run that did not go anywhere is not
+  a run**: `sysGHOST_MIN_M` sorts the fifty-three out by itself, so the glacier and the Uji
+  qualify and a four-minute sit in a hot spring does not.
+- **Four floats a sample at a FIXED rate**, so a sample's time is its index and nothing
+  carries a clock. Two decimal places.
+
+**TWO TRAPS.** A second go at the SAME record is a new attempt and "the id changed" cannot
+see it — `ghWasOpen` is what does. And `ghId` is deliberately NOT cleared when the line
+closes, because a chapter may file its record after `recordEnd` or after the watchdog, and
+`ghKeep` has to still recognise the trace it is handed.
+
+### THE INCIDENT — `capy:incident`
+
+Three things you did that somebody saw, in one place, inside twelve seconds. systems.js
+decides WHEN; npc.js decides what it sounds like.
+
+| | |
+|---|---|
+| what counts | a prop hit over `sysINC_HIT` · something in the water · something broken · something taken off its owner — each of them **only if `prop.disturbed`**, which is props.js's own causation stamp |
+| who saw it | `findPeople(x, z, sysINC_SEE) > 0` |
+| tiers | 3 → `AN INCIDENT` · 5 → `A SCENE`, half a lift, a chime, a card, confetti |
+
+**`findPeople` AND NOT `npcHeat`.** `npcHeat` answers "who near here is watching FOR you" —
+it counts only people whose `wary`/`alarm` is already over `npcWARY_HEAT`, i.e. people you
+have already had a go at. As a gate on the FIRST event of a chain that is a chicken and an
+egg: measured, six hard impacts two metres from the animal in a Venetian square and heat was
+zero for all six.
+
+**THE COOLDOWN GATES THE CARD, NOT THE COUNTING, and starts when the chain ENDS.** Checked at
+the top of the counter — the obvious place — it silently makes the second tier unreachable,
+because a chain that has just carded stops being counted and `incN` can never reach five.
+
+Four things keep it from being noise, and all four are measured: one prop counts once
+(`sysINC_SAME`); it has to be one place (`sysINC_R` from the first); the cooldown; and the
+audience. It obeys the finds' three laws — unlisted, ungated, unmissable — and breaks their
+fourth on purpose: it is **repeatable**, because it is a moment and not a collectible.
+
+npc.js answers in three casts, as every reaction in that file has since v30: `incident` in
+`npcLOC_SAY` for the seventeen locals chapters, and `npcINC_SYD` / `npcINC_PA` for the two
+that have none. Held to the pools' own chapter-neutral standard **and one rule further: none
+of them may name what was done**, because the same line is spoken over a knocked-over crate,
+a stolen hat and a bicycle in a canal. All any of them can be about is the pattern.
+
+---
+
 ## THE LIFT PASS, v36 — FIVE THINGS THAT WERE ALREADY BUILT (29 Aug 2026)
 
 Five systems that existed, were paid for, and were reaching a fraction of the game. Nothing

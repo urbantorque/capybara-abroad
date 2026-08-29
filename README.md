@@ -832,6 +832,46 @@ did. They are all on the paper now, and the ones that are a COUNT rather than a 
 flash instead of a line: two hundred pigeons going up over San Marco is a number climbing
 past forty for a second and a half, and then the card is a to-do list again.
 
+## And now you are racing yourself
+
+A number you beat is arithmetic. So the run comes back: go at a record you already hold and
+your own best go at it is out there beside you, translucent, at the same point in its own
+clock — and the question stops being *am I under forty-two point one* and becomes *am I in
+front*, which is a different and much older kind of question.
+
+It says nothing. There is no gap, no split, no arrow; it is a capybara, doing what you did,
+and either you are ahead of it or you are not. There is no ghost on your first attempt, and
+that is not a rule anybody has to remember — a run is only kept when it BEATS something, so
+the earliest one can appear is your second go. And **a run that did not go anywhere is not a
+run**: the trace is kept only if the animal actually covered ground, which sorts the
+fifty-three out without a single one of them being listed. The glacier, the river at Uji, the
+souk with six traders behind you and seventy seconds of open water up to Manly all qualify.
+Sitting in a hot spring for four minutes, winning at roulette and putting two hundred pigeons
+up off the paving do not.
+
+## Somebody is keeping count
+
+Everything needed for this has been running for versions. Every prop remembers whether the
+capybara was the one that moved it. People recruit each other by line of sight, remember you
+for twenty-six seconds, and a square keeps a heat field so one corner of it can have had
+enough of you while the rest has not. There has been a mayhem number since version two.
+Between them they had two readers — how loud the music is and how still the world feels — and
+in nineteen chapters nothing ever said out loud that you had just done three things in front
+of the same people.
+
+Three things somebody saw, in one place, inside twelve seconds, and the score lifts, the card
+comes up, and the people say the one thing they only say when it has been three in a row:
+*right, that is not an accident* · *somebody is keeping count* · *I have been watching this
+the whole time*. Five is **a scene**, and they have all turned round.
+
+It is on nobody's list, nothing points at it, no task and no chapter needs it, and it will
+happen again — which is the one place it parts company with the finds. A find is something
+you noticed once. This is a thing you are doing.
+
+There has to be an audience: do the same three things in the far corner of the gardens with
+nobody in sight and nothing happens at all, which is the whole game saying the quiet part.
+And one bin bouncing off a wall four times is one thing happening, not four.
+
 ## Three thousand seven hundred people, and now they are there
 
 `qa/CROWDS.md` walked every instanced crowd in the game and put a chest-height ray through
