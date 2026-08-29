@@ -4675,11 +4675,36 @@ function driUpdateWanderers(game, dt) {
 }
 
 // ================================================================ LAMPFLIES ==
+// ---------------------------------------------------------------------------
+// THE CALM REGISTRY, AND THE ONE ANIMAL IN THE VOID
+//
+// The Drift is the chapter with nobody in it, and the lampflies are the only
+// living thing you can reach. `game.addCritter` had never been called here, so
+// the one place in the game where being still is the whole texture of the world
+// was also one of the thirteen where being still changed nothing in it.
+//
+// This uses `appr` and not `near` — the same reading as Antarctica's two, and
+// for the same reason. `driWAKE_R` is not a flee radius: it is how far the
+// animal's voice reaches a sleeping fly, and a lampfly is not frightened of
+// anybody. What stillness buys is REACH: an orchard shouted at by something
+// that has been sitting on the moss for eight seconds answers from half again
+// as far away, which is worth about two extra flies a shout and is the whole
+// difference between an orchard that responds and one that has to be walked
+// round twice.
+//
+// Nothing is gated on it. Six is still six, the cap of four per shout is
+// untouched, and at appr 0 this is the chapter that shipped.
+// ---------------------------------------------------------------------------
+let driFlyCrit = null;
+
 function driUpdateLampflies(game, dt) {
   const capy = game.capy;
   const p = capy && capy.position;
   if (!p || !driFlyMesh) return;
   const input = game.input;
+  if (!driFlyCrit && typeof game.addCritter === 'function') {
+    driFlyCrit = game.addCritter({ biome: 'drift', r: driWAKE_R, bold: 1 });
+  }
 
   // --- the wheek wakes them ------------------------------------------------
   // Deliberately generous, and deliberately capped at four per shout: the
@@ -4687,11 +4712,15 @@ function driUpdateLampflies(game, dt) {
   // goes to get the six the lantern wants.
   if (input && input.honkPressed && capy.grounded) {
     let woke = 0;
+    // ...and the reach grows with how settled you have been. See THE CALM
+    // REGISTRY above. Squared once, out of the loop.
+    const wakeR = driWAKE_R * (1 + (driFlyCrit ? driFlyCrit.appr : 0) * 0.5);
+    const wake2 = wakeR * wakeR;
     for (let i = 0; i < driFLY_N && woke < 4; i++) {
       const o = i * 11;
       if (driFlyData[o + 7] !== 0) continue;
       const dx = driFlyData[o] - p.x, dy = driFlyData[o + 1] - p.y, dz = driFlyData[o + 2] - p.z;
-      if (dx * dx + dy * dy + dz * dz > driWAKE_R * driWAKE_R) continue;
+      if (dx * dx + dy * dy + dz * dz > wake2) continue;
       driFlyData[o + 7] = 1;
       driFlyData[o + 10] = driTime;
       driFlyData[o + 8] = driFliesAwake;

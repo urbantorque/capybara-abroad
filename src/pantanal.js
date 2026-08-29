@@ -3489,10 +3489,41 @@ function panUpdateAnteater(game, dt) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// THE CALM REGISTRY, AND THE TWO ANIMALS IN THIS CHAPTER THAT ANSWER TO IT
+//
+// `game.addCritter` has existed since v23 and only six of nineteen chapters
+// ever registered anything, so in thirteen places sitting still bought the
+// music and the loaf and changed nothing in the world. The Pantanal is the one
+// chapter the animal is actually FROM and it registered nothing at all — while
+// the API's own worked example in systems.js reads "a jacare is not impressed
+// by anybody being quiet and passes 0.3", describing a call that did not exist.
+//
+// It does now, and it is two animals with two different answers:
+//
+//   THE JABIRU is shy. It flushes at nine metres and takes five seconds on the
+//   ground before it will do it again; registered plainly, so a settled player
+//   is let up to sixty per cent closer before it goes. `bold: 0.6` — a stork
+//   that has decided you are furniture will take a step toward you, and this
+//   is the bird that spends its whole life standing in one place anyway.
+//
+//   THE JACARES ARE NOT SHY, THEY ARE JACARES. `k: 0.3` takes less than a
+//   fifth off their four-metre body-length radius however still you are, which
+//   is the whole of what the doc's example was describing. `bold: 0` and it
+//   stays 0: nothing with that many teeth comes over to have a look at you.
+//   It can only help — 'sit on a sleeping jacare' is the task that radius was
+//   tuned around, and a quiet approach now gets marginally nearer before one
+//   slides. Nothing about it gets harder.
+// ---------------------------------------------------------------------------
+let panJabCrit = null, panCaimanCrit = null;
+
 function panUpdateJabiru(game, dt) {
   if (!panJabiru) return;
   panJabT += dt;
   const capy = game.capy;
+  if (!panJabCrit && typeof game.addCritter === 'function') {
+    panJabCrit = game.addCritter({ biome: 'pantanal', r: 9, bold: 0.6 });
+  }
   const near = capy ? panJabiru.position.distanceTo(capy.position) : 99;
   const groundY = panBedH(panJabiru.position.x, panJabiru.position.z);
   if (panJabState === 'nest') {
@@ -3537,7 +3568,13 @@ function panUpdateJabiru(game, dt) {
     // clock that resets on landing means a player standing under the tree gets
     // a bird that takes off, flies a circuit, lands, and takes off again for
     // ever; five seconds on the ground is the least a stork would give you.
-    if (panJabT > 24 || (near < 9 && panJabT > 5)) {
+    // `panJabCrit.near` and not the bare nine: a player who has been sitting
+    // still is let closer before the bird goes, and one who has decided you are
+    // furniture altogether (bold, appr → 1) is not flushed at all. The
+    // twenty-four second self-flush above is untouched, so the bird still
+    // moves on its own whatever you do.
+    const jabR = panJabCrit ? panJabCrit.near : 9;
+    if (panJabT > 24 || (near < jabR && panJabT > 5)) {
       panJabState = 'up'; panJabT = 0;
       // WHERE IT TOOK OFF FROM, so it can come back to it. The flight was a
       // circle drawn round a hard-coded centre and ending 15 m from it, and
@@ -3961,6 +3998,13 @@ function panUpdateCaimans(game, dt) {
   if (!panCaimans) return;
   const capy = game.capy;
   const p = capy && capy.body ? capy.body.position : null;
+  if (!panCaimanCrit && typeof game.addCritter === 'function') {
+    // 4.243 m is a body length — sqrt(18), the radius three lines down, which
+    // is where that squared literal came from. See THE CALM REGISTRY above for
+    // why this one passes k: 0.3 and will never pass a bold.
+    panCaimanCrit = game.addCritter({ biome: 'pantanal', r: 4.243, k: 0.3, bold: 0 });
+  }
+  const cai2 = panCaimanCrit ? panCaimanCrit.near * panCaimanCrit.near : 18;
   for (let i = 0; i < panCAIMAN_N; i++) {
     const c = panCaimanAt[i];
     // ---- does it want to be in the water? --------------------------------
@@ -3970,7 +4014,7 @@ function panUpdateCaimans(game, dt) {
       // gone. Deliberately NOT close enough to make 'sit on a sleeping jacare'
       // impossible — that task is on the eight on the sandbar, and they only
       // go if you come at them across open sand rather than off the water.
-      if (dx * dx + dz * dz < 18 && p.y < c.y0 + 0.6) c.slide = rand(3.4, 5.0);
+      if (dx * dx + dz * dz < cai2 && p.y < c.y0 + 0.6) c.slide = rand(3.4, 5.0);
       // ---- AND NINE OF THEM GO PAST AND NOTHING HAPPENS --------------------
       //
       // The chapter's signature toy is the LINE — a herd recruited one animal

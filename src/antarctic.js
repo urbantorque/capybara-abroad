@@ -4395,6 +4395,18 @@ function antUpdatePenguins(game, dt) {
   const capy = game.capy;
   const px = capy && capy.position ? capy.position.x : 0;
   const pz = capy && capy.position ? capy.position.z : 0;
+  if (!antColonyCrit && typeof game.addCritter === 'function') {
+    // 20 m is the look radius the birds already had; bold 0.8 rather than 1
+    // because a gentoo standing on its own nest is committed to the nest and
+    // will only turn its head. See THE CALM REGISTRY above antUpdateSeal.
+    antColonyCrit = game.addCritter({ biome: 'antarctic', r: 20, bold: 0.8 });
+  }
+  // ...and the whole colony looks up from further when the animal has settled.
+  // Squared, because the test below is squared. 400 is 20 m.
+  const pengLook2 = (function () {
+    const r = 20 * (1 + (antColonyCrit ? antColonyCrit.appr : 0) * 0.6);
+    return r * r;
+  })();
   antColonyCall = damp(antColonyCall, 0, 0.9, dt);
   // ---- AND THE FRONT MOVES OUTWARD. See antCALL_SPD ---------------------
   if (antCallR >= 0) {
@@ -4465,7 +4477,7 @@ function antUpdatePenguins(game, dt) {
         // is usually another penguin and today is you
         const dx = px - x, dz = pz - z;
         const d2 = dx * dx + dz * dz;
-        if (d2 < 400) antPengData[o + 2] = Math.atan2(dx, dz);
+        if (d2 < pengLook2) antPengData[o + 2] = Math.atan2(dx, dz);
         else antPengData[o + 2] += Math.sin(antTime * 0.4 + i) * dt * 0.5;
         yaw = antPengData[o + 2];
         y = antLandOnly(x, z);
@@ -4717,8 +4729,34 @@ function antUpdateBirds(game, dt) {
  * floe goes, which is the only reason a hauled-out seal can be in a chapter
  * whose ground is all moving.
  */
+// ---------------------------------------------------------------------------
+// THE CALM REGISTRY, AND WHY THIS CHAPTER'S TWO ANIMALS USE THE OTHER HALF OF IT
+//
+// `game.addCritter` publishes two numbers. `near` is a FLEE radius shrunk by
+// how settled the player is, and every one of the six chapters that had
+// registered anything before this reads that one: `if (d < cr.near) spook()`.
+// `appr` is the other half, published since v23 and read by nobody outside
+// Iceland — 0..1, how much this animal has decided to come over.
+//
+// Nothing on the Peninsula flees. A Weddell seal hauled out on a pan and a
+// colony of gentoos are the two least frightened animals in the game: they
+// look AT you, and what stillness should buy is that they notice you from
+// further away, not that they let you closer. So both of these register bold
+// and read `appr`, and neither one touches `near` — which is the first time in
+// the game the approaching half of the inversion has been used for what the
+// comment in systems.js says it is for.
+//
+// It is one multiplier on a radius that already existed. Nothing new is drawn,
+// nothing moves that did not move, and at appr 0 both are the chapter that
+// shipped.
+// ---------------------------------------------------------------------------
+let antSealCrit = null, antColonyCrit = null;
+
 function antUpdateSeal(game, dt) {
   if (!antSealGroup) return;
+  if (!antSealCrit && typeof game.addCritter === 'function') {
+    antSealCrit = game.addCritter({ biome: 'antarctic', r: antSEAL_NOTICE, bold: 1 });
+  }
   const i = antSealFloe;
   const fx = antFloeX[i], fz = antFloeZ[i];
   const fy = antWATER + antFLOE_TOP + 0.32;
@@ -4853,7 +4891,12 @@ function antUpdateSeal(game, dt) {
   } else {
     // hauled out, and she goes where her pan goes
     antSealX = fx; antSealZ = fz; antSealY = fy;
-    if (dFloe < antSEAL_NOTICE) { antSealState = "watching"; antSealT = 0; }
+    // ...and she notices from FURTHER when you have been still. `appr` is the
+    // registry's approach term (see THE CALM REGISTRY above); at 1 it is half
+    // as far again, which on a pan out in the pack is the difference between
+    // being ignored and being come over to.
+    const notice = antSEAL_NOTICE * (1 + (antSealCrit ? antSealCrit.appr : 0) * 0.5);
+    if (dFloe < notice) { antSealState = "watching"; antSealT = 0; }
   }
 
   antSealGroup.position.set(antSealX, antSealY, antSealZ);
@@ -4861,7 +4904,10 @@ function antUpdateSeal(game, dt) {
   // ---- what she is doing with her head -----------------------------------
   const onIce = antSealState === "hauled" || antSealState === "watching";
   const near = Math.hypot(px - antSealX, pz - antSealZ);
-  const want = onIce ? (near < 22 ? clamp(1 - (near - 6) / 16, 0, 1) : 0) : antSealSurf;
+  // 22 is the head-turn's own reach and it moves with the notice radius, or a
+  // seal who has come over because you sat still arrives and looks past you.
+  const lookR = 22 * (1 + (antSealCrit ? antSealCrit.appr : 0) * 0.5);
+  const want = onIce ? (near < lookR ? clamp(1 - (near - 6) / (lookR - 6), 0, 1) : 0) : antSealSurf;
   antSealLook = damp(antSealLook, want, 2.4, dt);
   const faceYaw = onIce ? Math.atan2(px - antSealX, pz - antSealZ) : antSealYaw;
   antSealGroup.rotation.y = damp(antSealGroup.rotation.y,
