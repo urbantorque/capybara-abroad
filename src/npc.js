@@ -7983,6 +7983,15 @@ export function createNPCs(game) {
             try { game.record("seagull-chips", arrived); } catch (e) {}
           }
         }
+        // ...AND THE COUNT IS ON THE PAPER WHILE THEY ARE ON IT (v36).
+        // `arrived`, not `qgBestMob`: the interesting number is how many are on
+        // the chips RIGHT NOW, which is what changes when the player drags the
+        // food into the open. Handed over every frame the mob is live, so the
+        // line climbs and falls with the birds and its own watchdog takes it
+        // down when they go.
+        if (typeof game.recordLive === "function") {
+          try { game.recordLive("seagull-chips", arrived); } catch (e) {}
+        }
 
         // anyone standing in the middle of it gets an opinion about it
         for (let i = 0; i < humans.length; i++) {

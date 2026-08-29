@@ -4411,6 +4411,14 @@ function hkUpdateTasks(game, dt) {
   // shape as gorFlushPeak in Cappadocia and palFlushDive in Palawan.
   if (capy.climbing) {
     if (p.y > hkClimbBest) hkClimbBest = p.y;
+    // ...AND HOW HIGH YOU ARE, WHILE YOU ARE UP THERE (v36). The one verb this
+    // chapter exists for had no readout at all: the height was banked silently
+    // all the way up and posted after the animal let go, which is the one
+    // moment it is no longer interesting. `hkClimbBest` and not `p.y`, because
+    // that is the quantity hkFlushClimb files, and a shuffle sideways two
+    // metres down should not walk the number backwards. Four is the record's
+    // own floor in hkFlushClimb.
+    if (hkClimbBest > 4 && game.recordLive) game.recordLive('bamboo-climb', hkClimbBest);
     if (!hkClimbDone && p.y > 20) {
       hkClimbDone = true;
       hkTask('bamboo-climb');

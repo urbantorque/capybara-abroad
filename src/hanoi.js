@@ -1635,6 +1635,17 @@ function hanUpdateCrossing(game, dt) {
   }
   if (hanLaneI !== hanCrossLane) { hanCrossLane = -1; return; }
   if (sp < hanHOLD_V * 0.6 || hanDither > hanTURN_MAX) hanCrossOk = false;
+  // ---- HOW MANY HAVE GONE ROUND YOU, WHILE THEY ARE DOING IT (v36) -------
+  // The best question in the game — not how fast you crossed, HOW MANY OF THEM
+  // HAD TO GO ROUND YOU — and it was answered on the far kerb, after the only
+  // moment it could have changed what you did. The whole instruction of this
+  // chapter is "do not stop, do not flinch"; a figure climbing on the card
+  // while a hundred and forty scooters part in front of you is that
+  // instruction, said in the only language the crossing has.
+  //
+  // Only while the crossing is still GOOD: a run you have already dithered out
+  // of is not going to file anything, and a live line on it would be a lie.
+  if (hanCrossOk && game.recordLive) game.recordLive('cross-the-road', Math.round(hanSwerved));
   // THE FAR KERB, and it is w + 1.8 rather than w + 3.0. Measured: a clean
   // crossing of the widest street in the chapter ends about seven and a half
   // metres from the centreline, because that is where the pavement is, and at
@@ -2046,6 +2057,13 @@ function hanUpdateTrain(game, dt) {
       const along = clamp(p.x, x - 7, back);
       const d = Math.max(0, Math.hypot(p.x - along, p.z - hanTRAIN.z) - 1.45);
       if (d < hanTrainNear) hanTrainNear = d;
+      // ...and how close it HAS come, while it is still coming (v36). The
+      // closest approach so far and not the instantaneous gap: `hanTrainNear`
+      // is the quantity filed when the train has gone, and a figure that
+      // climbed again as the last carriage went past would be telling you the
+      // opposite of what you just did. Ninety is the same ceiling the filing
+      // branch uses for "it was never really near you".
+      if (hanTrainNear < 90 && game.recordLive) game.recordLive('the-train', hanTrainNear);
       // ---- THE MARQUEE PAYS OUT HERE, WHILE THE TRAIN IS ON TOP OF YOU ----
       //
       // It used to pay out in the despawn branch below, and that branch runs
@@ -2488,6 +2506,14 @@ function hanUpdateStools(game, dt) {
     hanCue('pop', hanStoolData[o], hanGROUND + 0.2, hanStoolData[o + 1], 0.24, rand(2.4, 3.4));
   }
   if (moved) hanSyncStools();
+  // ...and the tally is on the paper while they are going over (v36). Called
+  // only on the frame the count MOVES — a flash, not a line, the same shape the
+  // yacht count and the chip stack use, so a street with three stools on their
+  // side does not carry a permanent readout. The live line's own watchdog takes
+  // it down a second and a half after the last one falls.
+  if (down !== hanStoolDown && down > 0 && game.recordLive) {
+    game.recordLive('the-stools', down);
+  }
   hanStoolDown = down;
   if (down > hanStoolBest) {
     hanStoolBest = down;

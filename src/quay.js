@@ -5098,6 +5098,14 @@ function quayCheckVoyage(game, dt) {
         if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.45, pitch: 1.1 + quayRaceT * 0.06 });
       }
       if (quayRaceT >= 2 && typeof game.record === 'function') game.record('yacht-race', quayRaceT);
+      // ---- AND THE TALLY IS ON THE PAPER, FOR A BEAT (v36) ----------------
+      // A count is not an attempt with a clock on it, so it does not want a
+      // line that is up for the whole passage — that would take the voyage's
+      // own clock off the card for seventy seconds to show a number that moved
+      // six times. Called ONCE, here, on the frame it changes: the line's
+      // watchdog (sysREC_STALE, 1.6 s) takes it down again by itself, so this
+      // is a flash and not furniture, and it costs no timer and no new state.
+      if (typeof game.recordLive === 'function') game.recordLive('yacht-race', quayRaceT);
       break;
     }
   }
@@ -5109,6 +5117,13 @@ function quayCheckVoyage(game, dt) {
   // could not tell you. It runs on now, and the run is posted when they leave.
   if (quayDolphinOn > 0.7) {
     quayEscortT += dt;
+    // ...and the clock is on the paper while they are alongside (v36). This one
+    // DOES take the line off the voyage, deliberately: the passage is seventy
+    // seconds long and the escort is a handful, so for as long as there are
+    // dolphins off the bow the specific thing happening is the interesting
+    // number. It is below the voyage's own call in this file for exactly that
+    // reason — the last caller in a frame owns the line.
+    if (typeof game.recordLive === 'function') game.recordLive('dolphin-escort', quayEscortT);
     if (quayEscortT > 6 && !quayEscorted) {
       quayEscorted = true;
       quayTask('dolphin-escort');

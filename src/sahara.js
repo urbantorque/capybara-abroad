@@ -937,6 +937,12 @@ function sahUpdateAcrobats(game, dt) {
     sahAcroFly += dt;
     const h = cp.y - sahAcroY0;
     if (h > sahAcroTop) sahAcroTop = h;
+    // ...and how far up they have put you, while you are up there (v36). The
+    // apex so far, which is the quantity the record takes three screens down —
+    // the instantaneous height would fall back through the arc and report the
+    // wrong thing on the way down. Two metres of floor: stepping off the mat is
+    // not being thrown by anybody.
+    if (sahAcroTop > 2 && game.recordLive) game.recordLive('acrobats', sahAcroTop);
     // A TIMER AS WELL AS THE LANDING. Waiting on `grounded` alone is waiting on
     // a flight that ends where you left it, and this one very often does not:
     // an awning is 2.7 m up, the gate is eight, and a capybara that comes down

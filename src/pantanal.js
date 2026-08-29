@@ -3172,6 +3172,16 @@ function panUpdateHerd(game, dt) {
       game.sfx('pop', panSfx);
     }
   } else panHerdChat = rand(2, 5);
+  // ---- THE STRING, ON THE PAPER, WHEN IT CHANGES (v36) -------------------
+  // A FLASH AND NOT A LINE. The herd follows for minutes at a time, so a
+  // readout handed over every frame would be permanent furniture and would sit
+  // on top of every other number in the chapter. Called only on the frame the
+  // count actually moves: the live line's own watchdog (sysREC_STALE, 1.6 s)
+  // takes it away again, so picking up a seventh is a beat of "seven behind
+  // you" and then the card is a to-do list again.
+  if (following !== panFollowing && game.recordLive && (following || panFollowing)) {
+    game.recordLive('gather', following);
+  }
   panFollowing = following;
   if (following > panBestString) {
     panBestString = following;
@@ -3780,6 +3790,12 @@ function panUpdateCowbird(game, dt) {
     panCowbird.rotation.x = dip * 1.0;
     panCowbird.rotation.y = yaw + Math.sin(panTime * 0.9) * 0.6;
     panCowbird.rotation.z = 0;
+    // ...and the clock is on the paper while it is up there (v36). Two seconds
+    // of floor: a bird that touched down and left again is not a ride. It
+    // cannot fight the herd's line, because that one is a flash on change
+    // rather than a line that stays up (see panUpdateHerd), and the crossing
+    // outranks both — panUpdateTasks runs after this.
+    if (panCowRide > 2 && game.recordLive) game.recordLive('cowbird', panCowRide);
     if (panCowRide > 20) panTask(game, 'cowbird');
     // it leaves if you go swimming, which is fair enough
     if (capy.swimming || panCowRide > 70) {

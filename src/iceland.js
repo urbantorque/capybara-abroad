@@ -3790,6 +3790,13 @@ function iceUpdateGeyser(game, dt) {
   if (iceGeyRiding && capy && capy.position) {
     const h = capy.position.y - iceTerrain(capy.position.x, capy.position.z);
     if (h > iceGeyPeak) iceGeyPeak = h;
+    // ...and how far up it HAS thrown you, on the paper, while you are still up
+    // there (v36). The peak so far rather than the instantaneous height, which
+    // is the quantity the record holds — a readout that fell back down the arc
+    // with the animal would be reporting the wrong thing. Three metres is the
+    // record's own floor two lines down, so a hop off the sinter does not put a
+    // number on the card.
+    if (iceGeyPeak > 3 && game.recordLive) game.recordLive('geysir', iceGeyPeak);
     if (capy.grounded && iceGeyPeak > 3) {
       iceGeyRiding = false;
       if (typeof game.record === 'function') game.record('geysir', iceGeyPeak);

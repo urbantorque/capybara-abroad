@@ -3882,6 +3882,11 @@ function cavUpdateLog(game, dt) {
     cavLogFrame.x = cavLogBody.velocity.x;
     cavLogFrame.z = cavLogBody.velocity.z;
     cavLogRide += Math.abs(cavLogBody.velocity.z) * dt;
+    // ...and the metres are on the paper while the river has you (v36). In a
+    // chapter where the only light is the one you make, a number climbing on
+    // the card is also the only thing telling you the log is still moving.
+    // Three metres is the record's own floor in the branch below.
+    if (cavLogRide > 3 && game.recordLive) game.recordLive('the-log', cavLogRide);
     if (cavLogRide > 50) cavTask(game, 'the-log');
   } else if (cavLogRide > 0) {
     // ONCE, WHEN THE RIDE ENDS. `record` toasts on every improvement, so a
@@ -4135,6 +4140,14 @@ function cavUpdateSwifts(game, dt) {
   // THE COUNT IS TAKEN WHILE THEY ARE UP AND FILED WHEN THEY SETTLE. Recording
   // on every new maximum fires a personal best ninety times as the roost lifts.
   if (up > cavSwiftPeak) cavSwiftPeak = up;
+  // ...and the count is on the paper while they are off the wall (v36), but
+  // ONLY for a lift the player caused — `cavSwiftMine` is the same latch that
+  // stops the task ticking itself, and without it this line would come up on
+  // its own every time the colony turned over on its own clock. The peak of
+  // this lift, which is what gets filed when they settle.
+  if (cavSwiftMine && cavSwiftPeak > 8 && game.recordLive) {
+    game.recordLive('swiftlets', cavSwiftPeak);
+  }
   if (cavSwiftUp < 0.06 && cavSwiftPeak > 0) {
     if (cavSwiftPeak > cavSwiftBest) {
       cavSwiftBest = cavSwiftPeak;

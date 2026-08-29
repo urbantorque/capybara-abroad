@@ -4470,6 +4470,15 @@ function driUpdateColumns(game, dt) {
       if (ci !== driColIdx) { driColIdx = ci; driColPeak = p.y; driColFoot = p.y; }
       if (p.y > driColPeak) driColPeak = p.y;
       if (p.y < driColFoot) driColFoot = p.y;
+      // ...and how high the column has taken you, while it is taking you (v36).
+      // `driColPeak` and NOT the rise: the TASK is measured on peak-minus-foot
+      // but the RECORD is filed as `driColPeak` five lines down, and a live line
+      // that showed a different quantity from the one it says it is against
+      // would be worse than no line. Four metres of climb before it appears, so
+      // standing in the bottom of a column does not post one.
+      if (driColPeak - driColFoot > 4 && game.recordLive) {
+        game.recordLive('updraft', driColPeak);
+      }
       if (!driColDone && driColPeak - driColFoot > driCOL_CLIMB) {
         driColDone = true;
         driTask('updraft');
@@ -4585,6 +4594,20 @@ function driUpdateFlight(game, dt) {
     driFlightOn = true;
   } else if (inCloud) {
     driFlightOn = false;      // a fall is not a crossing
+  } else if (driFlightOn) {
+    // ---- HOW FAR YOU HAVE COME, WHILE YOU ARE STILL IN THE AIR (v36) ------
+    // The whole of this chapter is a decision taken before you jump, and the
+    // number that decides it was only ever readable AFTER you landed. This is
+    // the straight-line distance from the last solid ground, handed over every
+    // airborne frame — so the twenty-five metre crossing at the top of the
+    // world has a figure climbing beside it on the way across.
+    //
+    // It is deliberately NOT gated on being over the target: watching it stop
+    // at nineteen is the same information as watching it pass twenty, and the
+    // second one is only worth having if the first one was there too.
+    const fdx = p.x - driFlightX, fdz = p.z - driFlightZ;
+    const fd = Math.sqrt(fdx * fdx + fdz * fdz);
+    if (fd > 3 && game.recordLive) game.recordLive('long-gap', fd);
   }
   driWasGrounded = solid;
 }

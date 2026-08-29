@@ -336,6 +336,10 @@ let monOutT = -1;                 // > 0 while being carried out
 let monCoolT = 0;
 let monWarned = false;
 let monFloorRun = -1;             // the clock on 'cross the floor unseen'
+// s of the chip-stack flash still owed. The wheel stands in the room the floor
+// run crosses and monUpdateWheel runs BEFORE monUpdateTasks, so without this
+// the flash would live exactly one frame. Matches sysREC_STALE.
+let monChipShow = 0;
 let monFloorBest = 0;
 let monFloorDone = false;
 let monInside = false;            // is the animal on the gaming floor right now
@@ -3391,6 +3395,18 @@ function monSettle(game, pocket) {
     monToast((pocket % 2 ? 'rouge. ' : 'noir. ') + pay + '. you are ' + monStack + ' up.');
   }
   monRecord('chip-stack', monStackBest);
+  // ...and the stack is on the paper for a beat after every spin (v36). Called
+  // ONCE, here, on the frame the wheel pays: a stack is not an attempt with a
+  // clock on it, and the live line's own watchdog takes it down again — so this
+  // is the number flashing up beside the toast that names it and then going
+  // away, rather than a chip count parked on the card all night.
+  // `monStack`, not `monStackBest`, and that is the one place in the game where
+  // the live figure is deliberately a DIFFERENT quantity from the filed one.
+  // The record is the peak; what just changed — and what you can still lose —
+  // is where you stand now, and "you are 6 up, best 14" is a true and useful
+  // sentence in a way that "peak 14, best 14" is not.
+  if (typeof game.recordLive === 'function') game.recordLive('chip-stack', monStack);
+  monChipShow = 1.6;
   if (monStack >= monSTACK_WIN && !monStackDone) {
     monStackDone = true;
     monTask('chip-stack');
@@ -3588,6 +3604,13 @@ function monUpdateYacht(game, dt) {
   if (monDiveTop > monWATER + 4 && !aboard) {
     const inWater = p.y < monWATER + 0.5 &&
                     p.x > monPORT.x0 && p.x < monPORT.x1 && p.z > monPORT.z0 && p.z < monPORT.z1;
+    // ---- WHAT YOU ARE ABOUT TO SCORE, ON THE WAY DOWN (v36) --------------
+    // `monDiveTop - monWATER` is the height you left from, and it is fixed the
+    // moment your feet do — so this is not a guess about the landing, it is
+    // the exact figure the record will take if the water is where you end up.
+    // Handed over for the whole fall, which is the only part of a dive long
+    // enough to read anything during.
+    if (!inWater && game.recordLive) game.recordLive('high-dive', monDiveTop - monWATER);
     if (inWater) {
       const h = monDiveTop - monWATER;
       if (h > monDiveBest) { monDiveBest = h; monRecord('high-dive', h); }
@@ -3640,6 +3663,15 @@ function monUpdateTunnel(game, dt) {
     monCue('hiss', monCarG[monRider].position.x, monCarG[monRider].position.y + 1.5,
            monCarG[monRider].position.z, 0.5, 0.6);
   }
+  // ---- THE SPEED, ON THE PAPER, FOR THE FOUR AND A HALF SECONDS (v36) -----
+  // The marquee is being carried through a hole in a hill at twenty-six metres
+  // a second and the number that says so arrived after it was over. This is the
+  // car's own speed while the animal is inside the bore, which is exactly the
+  // quantity filed at the far mouth — so what the player watches is what the
+  // record takes. It takes the line off `the-hairpin`, which is live for the
+  // whole lap, and that is right: the tunnel is the four seconds of it that
+  // matter, and this call sits after the hairpin's in the frame.
+  if (inBore && game.recordLive) game.recordLive('the-tunnel', monCarV[monRider]);
   // A ONE-FRAME GAP IS NOT GETTING OFF. The rider test is a box in the car's
   // own frame and at twenty-six metres a second a corner can put the animal
   // outside it for a frame or two while the contact is still perfectly sound;
@@ -4016,6 +4048,7 @@ function monUpdateTasks(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
+  if (monChipShow > 0) monChipShow -= dt;
 
   if (!monArrived) {
     monArrived = true;
@@ -4049,8 +4082,13 @@ function monUpdateTasks(game, dt) {
     if (monFloorRun < 0 && atDoor && monSeen < 0.05) monFloorRun = 0;
     else if (monFloorRun >= 0) {
       monFloorRun += dt;
-      // the clock, on the paper, while you are on the floor
-      if (game.recordLive) game.recordLive('the-floor', monFloorRun);
+      // the clock, on the paper, while you are on the floor — EXCEPT for the
+      // beat after a spin (v36). monUpdateWheel runs before this one, so a
+      // chip-stack flash fired on the frame the wheel pays would be overwritten
+      // by this clock on the very next frame and the player would never see it.
+      // The wheel is IN the room the crossing runs through, so the two really
+      // can be open at once; the table wins for its own second and a half.
+      if (game.recordLive && monChipShow <= 0) game.recordLive('the-floor', monFloorRun);
       if (monSeen > monEYE_WARN || !monInside) monFloorRun = -1;
       else {
         const dx = p.x - monWHEEL.x, dz = p.z - monWHEEL.z;

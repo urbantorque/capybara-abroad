@@ -2991,6 +2991,12 @@ function venUpdatePigeons(game, dt) {
 
   if (venPigeonHold > 0) {
     venPigeonHold -= dt;
+    // ...and the count is on the paper while they are in the air (v36). The
+    // peak of THIS storm, which is what gets filed when the hold runs out —
+    // watching it climb through forty and keep going as more of the square goes
+    // up is the whole of what this task is. Twelve of a floor so a couple of
+    // birds shuffling off the paving does not post a line.
+    if (venPigeonPeak > 12 && game.recordLive) game.recordLive('pigeon-storm', venPigeonPeak);
     if (venPigeonHold <= 0) {
       if (venPigeonPeak >= 40) {
         if (!venPigeonDone) {

@@ -4813,6 +4813,10 @@ function sysBuildCSS() {
   'color:' + accent + ';font-weight:700;}',
 '.capyui-recbest{display:block;font-size:clamp(8.5px,1.35vw,10.5px);line-height:1.3;',
   'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;}',
+/* ...and the one thing a live number can say without a word: you are past the
+   figure written under you. Same green a ticked row uses, so it means the same
+   thing it already means everywhere else on this card. One rule, no layout. */
+'.capyui-rec.ahead .capyui-recnow{color:' + tick + ';}',
 /* ---------- the hint on the top row ---------- */
 /* A bearing and a distance for whatever is next, plus one line naming the verb.
    Only ever on the first open row, so the card stays a to-do list and not a HUD. */
@@ -14450,6 +14454,14 @@ export function createSystems(game) {
    * record that blocked progress would turn a game about being a nuisance into
    * an exam, which is the one thing this must not become.
    */
+  /**
+   * IS THIS FIGURE AS GOOD AS THE ROW SAYS A GOOD ONE IS. False for every row
+   * with no `par`, which is thirteen of the fifty-three — see RECORDS.
+   */
+  function recAtPar(def, v) {
+    if (!def || typeof def.par !== 'number' || typeof v !== 'number' || v !== v) return false;
+    return def.better === 'lower' ? v <= def.par : v >= def.par;
+  }
   function recordValue(id, value) {
     const def = RECORDS[id];
     if (!def || typeof value !== 'number' || value !== value) return false;
@@ -14457,11 +14469,29 @@ export function createSystems(game) {
     const better = prev === undefined ||
       (def.better === 'lower' ? value < prev : value > prev);
     if (!better) return false;
+    // ---- PAR, AND WHY IT IS SAFE TO ASK HERE (v36) ------------------------
+    // Read BEFORE the write, because the write is what makes the answer stale.
+    // And it is only ever asked inside the `better` branch, which is sound: a
+    // run that meets par for the first time is necessarily a personal best,
+    // since any earlier run that met it would already have set the flag — so
+    // there is no path where par is crossed on a run this function rejects.
+    const parWas = recAtPar(def, prev);
     jrRecs[id] = value;
     saveSoon();
     // Only shout about it if it BEAT something. The first time you do a thing,
     // the tick is the news and a personal best on a first attempt is noise.
-    if (prev !== undefined) {
+    //
+    // ...WITH ONE EXCEPTION, AND IT IS NOT THAT RULE BENDING. Meeting the par
+    // is a different fact from beating yourself: it is the only moment the
+    // game ever says "that was a good one" rather than "that was better than
+    // your last one", and it can happen on a first attempt precisely because
+    // it is not about your last one. It is said ONCE — `parWas` is derived
+    // from the stored figure, so nothing new is saved to know it, and a reload
+    // cannot make it happen twice.
+    if (!parWas && recAtPar(def, value)) {
+      toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
+      sfx('chime', { volume: 0.6, pitch: 1.62 });
+    } else if (prev !== undefined) {
       toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
       sfx('chime', { volume: 0.55, pitch: 1.45 });
     }
@@ -14555,9 +14585,24 @@ export function createSystems(game) {
     recNowEl.textContent = live
       ? def.label + ' ' + recLiveVal.toFixed(def.dp) + def.unit
       : (recText(recLiveId) || def.label);
-    recBestEl.textContent = best === undefined
-      ? (live ? 'no best yet' : '')
-      : (live ? 'best  ' + best.toFixed(def.dp) + def.unit : 'to beat');
+    // ---- WHAT THE SECOND LINE IS, AND WHY IT IS THREE CASES (v36) ---------
+    // The standing best is the target once there is one. Before there is one
+    // the row's own `par` is, which is the whole of what that field bought: a
+    // first attempt used to be told `no best yet`, which is true and says
+    // nothing about whether the run was any good. A row with no par falls all
+    // the way back to the old sentence, and thirteen of the fifty-three do.
+    recBestEl.textContent = best !== undefined
+      ? (live ? 'best  ' + best.toFixed(def.dp) + def.unit : 'to beat')
+      : (typeof def.par === 'number'
+           ? 'a good one is  ' + def.par.toFixed(def.dp) + def.unit
+           : (live ? 'no best yet' : ''));
+    // ...AND THE LINE SAYS WHEN YOU ARE PAST IT. One class, no new element:
+    // the target is whichever of the two the line is actually showing, so it
+    // reads as "you are beating the thing written next to you" either way.
+    const recAim = best !== undefined ? best : (typeof def.par === 'number' ? def.par : NaN);
+    const recAhead = live && recAim === recAim &&
+      (def.better === 'lower' ? recLiveVal <= recAim : recLiveVal >= recAim);
+    recEl.classList.toggle('ahead', !!recAhead);
     if (!recShown) { recShown = true; recEl.classList.add('on'); }
   }
   /** The watchdog and the paint, once a frame. Raw dt: this is wall clock. */

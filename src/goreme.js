@@ -4215,6 +4215,22 @@ function gorUpdateBalloon(game, dt) {
     // (v32). Twelve is the record's own floor — see gorFlightEnd — so a hop off
     // a chimney does not put a number on the card.
     if (game.recordLive && gorPeakAlt > 12) game.recordLive('three-winds', gorPeakAlt);
+    // ---- ...AND ON THE WAY DOWN IT IS A DIFFERENT NUMBER (v36) ------------
+    // The chapter's last task is a landing accuracy and it was only ever
+    // readable after the basket was on the ground, which is a metre too late to
+    // do anything about. This is how far the balloon is from the trailer RIGHT
+    // NOW, in plan — the same quantity gorLandCheck files — and in a chapter
+    // whose only control is a burner, watching that figure shrink as the layer
+    // carries you across the field IS the steering.
+    //
+    // It takes the line off `three-winds` above it on purpose and only when
+    // both halves of "coming in" are true: under thirty metres, and sinking.
+    // A climb through thirty on the way up is still the altimeter's.
+    if (game.recordLive && alt < 30 && gorBalVY < -0.15) {
+      const ltx = gorTruckX + Math.sin(gorTruckYaw) * 2.4;
+      const ltz = gorTruckZ + Math.cos(gorTruckYaw) * 2.4;
+      game.recordLive('on-the-trailer', Math.hypot(gorBalX - ltx, gorBalZ - ltz));
+    }
 
     // ---- the sunrise ------------------------------------------------------
     // THE ROW SAYS "BE UP THERE WHEN THE SUN CLEARS THE RIM" AND IT USED TO PAY

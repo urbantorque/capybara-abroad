@@ -2441,6 +2441,40 @@ export function chapterDef(n) { return CHAPTERS[n - 1] || CHAPTERS[0]; }
 // So: a task may declare a number it is measured by. It is kept, it is beaten,
 // and it is shown. Nothing is gated on it — a record is never a requirement,
 // because the moment it is, a cosy game about a rodent has an exam in it.
+//
+// ---- ...AND `par`: THE TARGET BEFORE THERE IS A BEST (v36) ----------------
+//
+// Fifty-three numbers, and a record only ever compared you to YOURSELF — so on
+// a first attempt it compared you to nothing at all. The live line said `no
+// best yet`, which is a true sentence that tells a player nothing about
+// whether the run they just made was any good, and the block that draws it
+// (see THE RECORD YOU CANNOT SEE WHILE YOU ARE SETTING IT in systems.js) had
+// already written down the diagnosis: "a player attempting one of the measured
+// tasks is running against an invisible target".
+//
+// `par` is that target. It is optional, it is authored, and it is the figure a
+// considered attempt reaches and a first one does not.
+//
+//   IT GATES NOTHING AND IT DENIES NOTHING. It is a comparison. No task is
+//   harder, no record is refused, and a row with no `par` behaves exactly as
+//   it did before this field existed — which is why thirteen of them still
+//   have none: a par nobody can defend is worse than no par at all.
+//
+//   IT DOES NOT BREAK THE SILENCE ON A FIRST RUN. `recordValue` still says
+//   nothing when there is no previous figure to beat, and that stays. What a
+//   par changes is the LIVE line, which is where the target belongs — it is
+//   on screen before the attempt and for the whole of it.
+//
+//   IT IS SAID ONCE, EVER. Crossing it for the first time gets one line, and
+//   the game stores nothing new to know that: "have I passed par" is
+//   `jrRecs[id]` read against `par`, the same way the shelf is the tick list
+//   read a different way.
+//
+// EVERY FIGURE BELOW IS DERIVED FROM A CONSTANT THE SOURCE ALREADY STATES —
+// the task's own gate improved on, or a fraction of a population or a length
+// that is written down somewhere. The provenance is on the row. Where neither
+// exists the row has no `par`, and `qa/audit-tasks.mjs` reports the coverage
+// so the gap stays visible instead of going quiet.
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // FINDS — the things nobody tells you about (v19)
@@ -2670,88 +2704,92 @@ export const FINDS = [
 
 export const RECORDS = {
   'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },
-  'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
+  'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 18 },
   'dune-surf':     { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
   'souk-escape':   { label: 'shook them in', unit: ' s', better: 'lower', dp: 1 },
-  'selaron-steps': { label: 'the whole flight in', unit: ' s', better: 'lower', dp: 1 },
-  'samba-parade':  { label: 'longest run', unit: ' on the two', better: 'higher', dp: 0 },
-  'salsa-dance':   { label: 'longest run', unit: ' on the beat', better: 'higher', dp: 0 },
-  'geysir':        { label: 'thrown', unit: ' m up', better: 'higher', dp: 0 },
-  'hot-spring':    { label: 'sat still for', unit: ' s', better: 'higher', dp: 1 },
-  'long-gap':      { label: 'longest crossing', unit: ' m', better: 'higher', dp: 1 },
-  'updraft':       { label: 'carried up to', unit: ' m', better: 'higher', dp: 0 },
+  'selaron-steps': { label: 'the whole flight in', unit: ' s', better: 'lower', dp: 1, par: 7 },
+  'samba-parade':  { label: 'longest run', unit: ' on the two', better: 'higher', dp: 0, par: 16 },
+  'salsa-dance':   { label: 'longest run', unit: ' on the beat', better: 'higher', dp: 0, par: 16 },
+  'geysir':        { label: 'thrown', unit: ' m up', better: 'higher', dp: 0, par: 22 },
+  'hot-spring':    { label: 'sat still for', unit: ' s', better: 'higher', dp: 1, par: 58 },
+  'long-gap':      { label: 'longest crossing', unit: ' m', better: 'higher', dp: 1, par: 25 },
+  // ...and this one is an ALTITUDE, not a rise: driRecord files driColPeak.
+  // The Anvil, where the first column starts, is at 41.5 m and the Orchard the
+  // column serves is at 80 — so eighty is riding one the whole way up.
+  'updraft':       { label: 'carried up to', unit: ' m', better: 'higher', dp: 0, par: 80 },
   'passerelle':    { label: 'the boards in', unit: ' s', better: 'lower', dp: 1 },
-  'pigeon-storm':  { label: 'put up', unit: ' at once', better: 'higher', dp: 0 },
-  'bamboo-climb':  { label: 'highest hold', unit: ' m', better: 'higher', dp: 0 },
+  'pigeon-storm':  { label: 'put up', unit: ' at once', better: 'higher', dp: 0, par: 120 },
+  // hkROOF_Y — the deck the scaffold serves — is 34.2 m, and the tick is at 20.
+  'bamboo-climb':  { label: 'highest hold', unit: ' m', better: 'higher', dp: 0, par: 32 },
   'laundry-pole':  { label: 'crossed in', unit: ' s', better: 'lower', dp: 1 },
-  'first-dive':    { label: 'deepest', unit: ' m down', better: 'higher', dp: 1 },
-  'sea-turtle':    { label: 'stayed with it', unit: ' s', better: 'higher', dp: 1 },
-  'cathedral':     { label: 'held your breath', unit: ' s', better: 'higher', dp: 1 },
+  'first-dive':    { label: 'deepest', unit: ' m down', better: 'higher', dp: 1, par: 10 },
+  'sea-turtle':    { label: 'stayed with it', unit: ' s', better: 'higher', dp: 1, par: 30 },
+  'cathedral':     { label: 'held your breath', unit: ' s', better: 'higher', dp: 1, par: 16 },
   'three-winds':   { label: 'highest', unit: ' m up', better: 'higher', dp: 0 },
-  'on-the-trailer':{ label: 'landed within', unit: ' m', better: 'lower', dp: 1 },
+  'on-the-trailer':{ label: 'landed within', unit: ' m', better: 'lower', dp: 1, par: 3 },
   // THE FIRST THREE CHAPTERS HAD NO NUMBER IN THEM AT ALL. Nineteen records
   // across thirteen places and not one of them in Sydney, on the harbour or in
   // Pasto — so the three chapters a player meets FIRST were also the only three
   // with nothing to come back for once the list was ticked. Each of these hangs
   // off the task that is already the best thing in its chapter.
-  'manly-voyage':  { label: 'the passage in', unit: ' s', better: 'lower', dp: 1 },
+  'manly-voyage':  { label: 'the passage in', unit: ' s', better: 'lower', dp: 1, par: 66 },
   // …and the two other things on the harbour worth doing WELL rather than
   // merely doing. Both were switches that flipped at two and at six seconds
   // and then stopped caring, on a chapter whose whole body is one long run.
-  'yacht-race':    { label: 'threaded', unit: ' of the six', better: 'higher', dp: 0 },
-  'dolphin-escort':{ label: 'they stayed', unit: ' s', better: 'higher', dp: 1 },
+  'yacht-race':    { label: 'threaded', unit: ' of the six', better: 'higher', dp: 0, par: 5 },
+  'dolphin-escort':{ label: 'they stayed', unit: ' s', better: 'higher', dp: 1, par: 20 },
   'thermal-peak':  { label: 'carried up to', unit: ' m', better: 'higher', dp: 0 },
-  'seagull-chips': { label: 'put up', unit: ' gulls at once', better: 'higher', dp: 0 },
+  'seagull-chips': { label: 'put up', unit: ' gulls at once', better: 'higher', dp: 0, par: 6 },
   // …and the chapter's mini. Twelve seconds on the roof ticks it; the number
   // is how far you actually rode, which is a different and much better
   // question, because the promenade is sixty-two metres long and the van
   // turns round at both ends.
-  'whippy-run':    { label: 'rode', unit: ' m in one go', better: 'higher', dp: 0 },
+  'whippy-run':    { label: 'rode', unit: ' m in one go', better: 'higher', dp: 0, par: 52 },
   // Same question, on the other chapter whose mini is a ride you climb onto.
-  'carroza':       { label: 'carried', unit: ' m up the plaza', better: 'higher', dp: 0 },
+  'carroza':       { label: 'carried', unit: ' m up the plaza', better: 'higher', dp: 0, par: 27 },
   // The minis that are worth doing WELL as well as doing. Only two of the
   // thirteen are: a gravity ride has a number in it by construction, and so
   // does anything with a clock on it.
-  'cart-run':      { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
-  'take-a-wave':   { label: 'longest ride', unit: ' m', better: 'higher', dp: 1 },
-  'acrobats':      { label: 'thrown', unit: ' m up', better: 'higher', dp: 1 },
-  'driftseed':     { label: 'carried', unit: ' m', better: 'higher', dp: 0 },
+  'cart-run':      { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 8.5 },
+  'take-a-wave':   { label: 'longest ride', unit: ' m', better: 'higher', dp: 1, par: 32 },
+  'acrobats':      { label: 'thrown', unit: ' m up', better: 'higher', dp: 1, par: 10 },
+  'driftseed':     { label: 'carried', unit: ' m', better: 'higher', dp: 0, par: 80 },
   // The three new places. A surf zone, a herd and a cave passage all have a
   // number in them by construction — how far, how many, how long — and a
   // chapter whose best line is a RIDE has to have somewhere to put it, or the
   // ride is a switch you flip once.
   'the-rip':       { label: 'out the back in', unit: ' s', better: 'lower', dp: 1 },
-  'all-the-way':   { label: 'longest ride', unit: ' m', better: 'higher', dp: 1 },
-  'take-off':      { label: 'fastest take-off', unit: ' m/s', better: 'higher', dp: 1 },
-  'the-crossing':  { label: 'brought over', unit: ' of them', better: 'higher', dp: 0 },
-  'cowbird':       { label: 'carried it for', unit: ' s', better: 'higher', dp: 1 },
-  'gather':        { label: 'longest string', unit: ' behind you', better: 'higher', dp: 0 },
+  'all-the-way':   { label: 'longest ride', unit: ' m', better: 'higher', dp: 1, par: 55 },
+  'take-off':      { label: 'fastest take-off', unit: ' m/s', better: 'higher', dp: 1, par: 6 },
+  'the-crossing':  { label: 'brought over', unit: ' of them', better: 'higher', dp: 0, par: 7 },
+  'cowbird':       { label: 'carried it for', unit: ' s', better: 'higher', dp: 1, par: 45 },
+  'gather':        { label: 'longest string', unit: ' behind you', better: 'higher', dp: 0, par: 8 },
   'great-wall':    { label: 'the wall in', unit: ' s', better: 'lower', dp: 1 },
-  'swiftlets':     { label: 'put up', unit: ' at once', better: 'higher', dp: 0 },
-  'the-log':       { label: 'stayed on for', unit: ' m', better: 'higher', dp: 0 },
+  'swiftlets':     { label: 'put up', unit: ' at once', better: 'higher', dp: 0, par: 60 },
+  'the-log':       { label: 'stayed on for', unit: ' m', better: 'higher', dp: 0, par: 90 },
   // Chapter 17. Three of the four things worth doing WELL down there are
   // things you cannot do at all in any other chapter, which is a reasonable
   // definition of what a chapter is for.
-  'orca-ride':       { label: 'held station for', unit: ' s', better: 'higher', dp: 1 },
-  'penguin-highway': { label: 'the hill in', unit: ' s', better: 'lower', dp: 1 },
-  'blue-ice':        { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
-  'floe-drift':      { label: 'carried', unit: ' m', better: 'higher', dp: 0 },
+  'orca-ride':       { label: 'held station for', unit: ' s', better: 'higher', dp: 1, par: 18 },
+  'penguin-highway': { label: 'the hill in', unit: ' s', better: 'lower', dp: 1, par: 24 },
+  'blue-ice':        { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 12 },
+  'floe-drift':      { label: 'carried', unit: ' m', better: 'higher', dp: 0, par: 90 },
   // Chapter 18. Four numbers, and three of them are the reason to come back:
   // a stack is a thing you can be better at, a crossing is a thing you can be
   // quieter at, and a tunnel is a thing you can be faster through. The fourth
   // is nine and a half metres of yacht and is simply funny.
-  'chip-stack':      { label: 'left the table', unit: ' up', better: 'higher', dp: 0 },
+  'chip-stack':      { label: 'left the table', unit: ' up', better: 'higher', dp: 0, par: 20 },
   'the-floor':       { label: 'across in', unit: ' s', better: 'lower', dp: 1 },
-  'the-tunnel':      { label: 'through it at', unit: ' m/s', better: 'higher', dp: 1 },
+  'the-tunnel':      { label: 'through it at', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
   'the-hairpin':     { label: 'rode', unit: ' m of the lap', better: 'higher', dp: 0 },
-  'high-dive':       { label: 'went in from', unit: ' m up', better: 'higher', dp: 1 },
+  'high-dive':       { label: 'went in from', unit: ' m up', better: 'higher', dp: 1, par: 9 },
   // Chapter 19, and the first of these is the best question in the game: not
   // how fast you crossed, not how far — HOW MANY OF THEM HAD TO GO ROUND YOU.
   // It is the only number here that measures a crossing rather than a walk.
   'cross-the-road':  { label: 'made', unit: ' of them go round you', better: 'higher', dp: 0 },
   'ride-the-flow':   { label: 'carried', unit: ' m through the quarter', better: 'higher', dp: 0 },
-  'the-stools':      { label: 'had', unit: ' down at once', better: 'higher', dp: 0 },
-  'the-train':       { label: 'stood your ground within', unit: ' m of it', better: 'lower', dp: 2 },
+  'the-stools':      { label: 'had', unit: ' down at once', better: 'higher', dp: 0, par: 30 },
+  'the-train':       { label: 'stood your ground within', unit: ' m of it', better: 'lower', dp: 2, par: 1.8 },
 };
 
 

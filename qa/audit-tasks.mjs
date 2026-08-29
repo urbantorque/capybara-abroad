@@ -269,6 +269,44 @@ try {
   P('BLOCKER', 'all-task-ids', 'qa/all-task-ids.json is missing or unreadable — ' + e.message);
 }
 
+// ---- 8. the records: a live line each, and a par where one is defensible ---
+//
+// TWO DIFFERENT KINDS OF FINDING, so they are two different severities.
+//
+// A record with no `recordLive` caller is a BLOCKER-shaped hole in the one
+// surface the game has for replay: the block that draws the line says so
+// itself — "a player attempting one of the measured tasks is running against an
+// invisible target". Twenty-one of fifty-three were in that state before v36.
+//
+// A record with no `par` is REPORTED AND NOT FAILED. Thirteen of them have no
+// figure anywhere in the source to derive one from, and a par nobody can defend
+// is worse than no par at all — so this counts and names them rather than
+// pretending the gap is a bug. If the number ever drops to zero, delete the
+// branch; if it grows, somebody added a record without thinking about what a
+// good one looks like.
+{
+  const recBlock = shared.slice(shared.indexOf('export const RECORDS = {'),
+                                shared.indexOf('\n};', shared.indexOf('export const RECORDS = {')));
+  const recs = [...recBlock.matchAll(/^\s*'([a-z0-9-]+)':\s*\{([^}]*)\}/gm)]
+    .map(x => ({ id: x[1], par: /\bpar:\s*[-0-9.]+/.test(x[2]) }));
+  // Every chapter wraps recordLive in its own helper — antLive, hanLive,
+  // driRecordLive — so the test is any identifier ending in "Live" (or
+  // recordLive itself) called with this id as a literal.
+  const liveRe = id => new RegExp('[A-Za-z_]*[Ll]ive\\s*\\(\\s*[\'"]' + id + '[\'"]');
+  const noLive = [], noPar = [];
+  for (const r of recs) {
+    if (!files.some(f => liveRe(r.id).test(all[f]))) noLive.push(r.id);
+    if (!r.par) noPar.push(r.id);
+  }
+  if (noLive.length) P('BLOCKER', 'records-live', noLive.length + ' of ' + recs.length +
+    ' records never call recordLive, so nothing is on screen while they are being set (' +
+    noLive.join(', ') + ')');
+  console.log('RECORDS parsed: ' + recs.length + ' — ' + (recs.length - noLive.length) +
+              ' with a live line, ' + (recs.length - noPar.length) + ' with a par' +
+              (noPar.length ? '\n  no par (no figure in the source to derive one from): ' +
+                              noPar.join(', ') : ''));
+}
+
 // ---- report --------------------------------------------------------------
 console.log('');
 const blockers = problems.filter(p => p.sev === 'BLOCKER');

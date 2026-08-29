@@ -4027,6 +4027,11 @@ function antUpdateFloes(game, dt) {
       antTask('haul-out');
       antToast('sea ice. it is going somewhere, and now so are you.');
     }
+    // ...and the metres are on the paper while the ice carries you (v36). THIS
+    // ride, not `antFloeBest`: a figure stuck at the best of the afternoon says
+    // nothing about the floe you are standing on. Six metres of floor, because
+    // stepping onto one and off again is not a drift.
+    if (antFloeRide > 6) antLive('floe-drift', antFloeRide);
     if (antFloeRide > 45) {
       antRecord('floe-drift', antFloeBest);
       antTask('floe-drift');
