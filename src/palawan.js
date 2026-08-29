@@ -150,7 +150,9 @@ let palPalmMesh = null;
 let palDiveDone = false, palCrackDone = false, palTurtleDone = false;
 let palClamDone = false, palCathDone = false, palBloomDone = false;
 let palRideDone = false;
-let palDeepest = 0;
+// THE PEAK OF THE DIVE THE ANIMAL IS ON, not the deepest of the session: a
+// record is filed once, when it surfaces. See palFlushDive.
+let palDivePeak = 0;
 let palTurtleWith = 0;               // s of the current run alongside
 let palBreathIn = 0;                 // s of the current breath inside the cathedral
 let palToldDive = false, palToldCrack = false, palToldBreath = false;
@@ -3952,6 +3954,33 @@ function palSfx(n, o) {
   if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
 }
 
+// ---- THE THREE MEASURED THINGS IN THIS CHAPTER, EACH FILED ONCE ------------
+// Every one of them is a value that CLIMBS while an attempt is open — how deep
+// this dive got, how long you have held the turtle, how long you have held your
+// breath — and `game.record()` speaks on every improvement. Handed a climbing
+// number every frame it speaks sixty times a second. Each attempt banks its own
+// peak and reports it on the edge that ends it, which is the shape gorFlushPeak
+// has had in Cappadocia since the fifth pass. Called from the edges below AND
+// from onExit, so an attempt interrupted by travel is still filed.
+function palFlushDive(game) {
+  if (palDivePeak > 1.5 && game && typeof game.record === 'function') {
+    game.record('first-dive', palDivePeak);
+  }
+  palDivePeak = 0;
+}
+function palFlushTurtle(game) {
+  if (palTurtleWith > 1.5 && game && typeof game.record === 'function') {
+    game.record('sea-turtle', palTurtleWith);
+  }
+  palTurtleWith = 0; palTurtleOff = 0;
+}
+function palFlushBreath(game) {
+  if (palBreathIn > 2 && game && typeof game.record === 'function') {
+    game.record('cathedral', palBreathIn);
+  }
+  palBreathIn = 0;
+}
+
 function palUpdateTasks(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position) return;
@@ -3974,15 +4003,25 @@ function palUpdateTasks(game, dt) {
   }
 
   // ---- going under, and how far -------------------------------------------
-  if (depth > palDeepest) palDeepest = depth;
+  // ---- ONE DIVE, ONE NUMBER ----------------------------------------------
+  // `game.record()` TOASTS AND CHIMES EVERY TIME THE NUMBER IMPROVES, and this
+  // was calling it every frame on `palDeepest` — a value that only ever climbs
+  // and climbs on nearly every frame of a descent. MEASURED, one seven-second
+  // dive to a ten-metre seabed: 372 calls, of which 272 were strict
+  // improvements. On a second visit — the only time `record` has a previous
+  // best to beat — that is two hundred and seventy-two personal-best toasts
+  // and chimes stacked over the animal's head while it is being taught the
+  // chapter's own new verb. Exactly the cowbird in the Pantanal and
+  // `three-winds` in Cappadocia; the fix is theirs. Bank the peak of THIS
+  // dive, report it once when the animal comes up. `record` keeps the session
+  // best itself, so nothing is lost by filing per dive rather than per session.
+  if (under) { if (depth > palDivePeak) palDivePeak = depth; }
+  else if (palDivePeak > 0) palFlushDive(game);
   if (under && !palDiveDone) {
     palDiveDone = true;
     palTask('first-dive');
     palToast('twelve chapters of paddling about on the top of it. finally.');
     palSfx('splash', { volume: 0.6, pitch: 0.65 });
-  }
-  if (palDiveDone && typeof game.record === 'function' && palDeepest > 1.5) {
-    game.record('first-dive', palDeepest);
   }
   // ---- HOW FAR DOWN YOU ARE, WHILE YOU ARE DOWN THERE (v32) ---------------
   // The live figure is THIS dive's depth, not the session's deepest: a readout
@@ -4047,9 +4086,6 @@ function palUpdateTasks(game, dt) {
       palToast('it has been doing this lap for sixty years. do not rush it.');
       palSfx('pop', { volume: 0.6, pitch: 0.8 });
     }
-    if (typeof game.record === 'function' && palTurtleWith > 1.5) {
-      game.record('sea-turtle', palTurtleWith);
-    }
     // ...and it is on the paper for the whole of the swim, not just at the end
     if (game.recordLive) game.recordLive('sea-turtle', palTurtleWith);
     // ---- AND THE CHAPTER SAYS WHAT IT WANTS ------------------------------
@@ -4065,7 +4101,8 @@ function palUpdateTasks(game, dt) {
     // A BUMP INTO A BOMMIE IS NOT LOSING HER. Half a second, the same grace
     // the bangka's deck gets, and then the run is over.
     palTurtleOff += dt;
-    if (palTurtleOff > 0.6) { palTurtleWith = 0; palTurtleOff = 0; }
+    // ...and THAT is where the run's number is filed. See palFlushTurtle.
+    if (palTurtleOff > 0.6) palFlushTurtle(game);
   }
 
   // ---- the giant clam -----------------------------------------------------
@@ -4100,18 +4137,15 @@ function palUpdateTasks(game, dt) {
     // place in the chapter where holding it is a thing you are doing on purpose
     if (under) {
       palBreathIn += dt;
-      if (typeof game.record === 'function' && palBreathIn > 2) {
-        game.record('cathedral', palBreathIn);
-      }
       // the breath, on the paper, while you are holding it (v32). Last of the
       // three in this function, so in here it is what the line says.
       if (game.recordLive) game.recordLive('cathedral', palBreathIn);
-    } else palBreathIn = 0;
+    } else palFlushBreath(game);
     if (!palToldBreath && under && palBreathIn > 3) {
       palToldBreath = true;
       palToast('the bar is your breath now. it comes back the moment you surface.');
     }
-  } else palBreathIn = 0;
+  } else palFlushBreath(game);
 
   // ---- the bloom ----------------------------------------------------------
   if (palBloom > 0.55) {
@@ -4218,13 +4252,18 @@ export function createPalawan(game) {
       palTurtleT = 24;
       palJumpArmed = false;
       palFireTold = false; palToldBreath = false;
-      palDeepest = 0;
+      palDivePeak = 0;
       if (palBubData) for (let i = 0; i < palBUB_N; i++) palBubData[i * 5 + 3] = -1;
     },
     onExit() {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
       palJumpArmed = false;
+      // ...AND AN OPEN ATTEMPT IS FILED ON THE WAY OUT rather than thrown away.
+      // All three of these are banked peaks now (see palFlushDive), so leaving
+      // the chapter mid-dive, mid-lap or mid-breath is an end to the attempt
+      // like any other. Flushed BEFORE the clears below, which zero them.
+      palFlushDive(game); palFlushTurtle(game); palFlushBreath(game);
       // Anything stateful that could hold the player, cleared on the way out.
       palBangkaRideT = 0; palTurtleWith = 0; palBreathIn = 0; palBloomT = -1;
       palCarrying = false;

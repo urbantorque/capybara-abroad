@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -2140,7 +2140,13 @@ function hkUpdateQueue(dt) {
       ty = -u * u * 1.9;                          // and he sinks out of frame
     }
     f.position.set(tx, ty, tz);
-    f.rotation.y = damp(f.rotation.y, yaw, 6, dt);
+    // dampAngle, NOT damp: the two headings this switches between are -pi/2
+    // (facing the counter) and pi (walking off up the pavement), and the short
+    // way between them is a quarter turn while a plain lerp takes three
+    // quarters — so the one who has just been served spun 270 degrees the
+    // wrong way as he left and 270 back as he rejoined the queue, twice every
+    // hkQ_SERVE, for the whole chapter. See dampAngle in shared.js.
+    f.rotation.y = dampAngle(f.rotation.y, yaw, 6, dt);
     // the shuffle: weight on one foot, then the other, and a look up the
     // street while you wait, which is the whole of standing in a queue
     const ph = hkTime * 0.9 + hkQueueData[o + 1];
@@ -4354,6 +4360,14 @@ function hkUpdateVoices(game, dt) {
 }
 
 // ================================================================== TASKS ===
+/** The climb is over: one number for how high it got. See hkClimbBest. */
+function hkFlushClimb(game) {
+  if (hkClimbBest > 4 && game && typeof game.record === 'function') {
+    game.record('bamboo-climb', hkClimbBest);
+  }
+  hkClimbBest = 0;
+}
+
 function hkUpdateTasks(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position) return;
@@ -4388,6 +4402,13 @@ function hkUpdateTasks(game, dt) {
     } else hkHarbourT = 0;
   }
   // ---- the climb ----------------------------------------------------------
+  // ---- ONE CLIMB, ONE NUMBER --------------------------------------------
+  // `game.record()` toasts and chimes on every improvement, and `hkClimbBest`
+  // only ever climbs — so handing it over every frame fired a personal best on
+  // every frame of the ascent once a best existed. Forty metres of bamboo at
+  // the climb rate is several hundred of them, through the one verb this
+  // chapter exists for. Bank the peak; file it when the animal lets go. Same
+  // shape as gorFlushPeak in Cappadocia and palFlushDive in Palawan.
   if (capy.climbing) {
     if (p.y > hkClimbBest) hkClimbBest = p.y;
     if (!hkClimbDone && p.y > 20) {
@@ -4395,10 +4416,7 @@ function hkUpdateTasks(game, dt) {
       hkTask('bamboo-climb');
       hkToast('a grass. forty storeys of it, tied together by hand.');
     }
-    if (typeof game.record === 'function' && hkClimbBest > 4) {
-      game.record('bamboo-climb', hkClimbBest);
-    }
-  }
+  } else if (hkClimbBest > 0) hkFlushClimb(game);
   // ---- AND THE WAY UP PAYS AS YOU GO -------------------------------------
   // The bamboo is this chapter's whole reason to exist — the one verb in
   // eighteen chapters that is about the other axis — and forty metres of it
@@ -4564,9 +4582,14 @@ export function createKowloon(game) {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
       hkHarbourT = 0;
+      // A climb still in progress is FILED on the way out rather than
+      // discarded — leaving the chapter ends the attempt exactly the way
+      // letting go does. This also zeroes hkClimbBest, which is what the old
+      // line at the end of the next one did by hand.
+      hkFlushClimb(game);
       // Anything stateful that could hold the player, cleared on the way out.
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0; hkShowT = -1;
-      hkLionShredT = -1; hkBusRideT = 0; hkHarbourT = 0; hkClimbBest = 0;
+      hkLionShredT = -1; hkBusRideT = 0; hkHarbourT = 0;
     },
   });
 
