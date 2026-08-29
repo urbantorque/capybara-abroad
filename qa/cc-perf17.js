@@ -1,9 +1,16 @@
 async page => {
   await page.reload(); await page.waitForTimeout(5500)
   await page.mouse.click(400, 400); await page.waitForTimeout(2500)
-  const names = ['sydney','pasto','quay','kyoto','cali','rio','iceland','sahara','drift',
-                 'venice','kowloon','palawan','goreme','manly','pantanal','cave','antarctic']
-  const out = {}
+  // THE LIST IS DERIVED, NEVER SPELLED. This file carried a hard-coded
+  // seventeen and was therefore blind to Monte Carlo and Hanoi — the two
+  // LARGEST chapters in the game and the two qa/BUDGET.md flags as over the
+  // triangle gate. It is the same hole the closeout found in channels.mjs,
+  // budget.js, stillness.js and fuzz.js and closed in four of the five; this
+  // was the fifth, and it went on printing a confident seventeen-row table.
+  // The file keeps its name because every script and every note refers to it.
+  const shared = await (await page.request.get('http://localhost:5188/src/shared.js')).text()
+  const names = [...shared.matchAll(/\{\s*n:\s*(\d+),\s*biome:\s*'([a-z]+)'/g)].map(m => m[2])
+  const out = { _chapters: names.length }
   for (const n of names) {
     out[n] = await page.evaluate(async (name) => {
       function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
