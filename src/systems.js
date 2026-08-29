@@ -18316,12 +18316,40 @@ export function createSystems(game) {
     sfx(voice, sysSpatial);
     sysSpatial.at = null;
     game.state.chaos = clamp(game.state.chaos + clamp(s * 0.012, 0, 0.12), 0, 1);
+    // ...and it may be one of three. See THE INCIDENT. `disturbed` is props.js's
+    // own causation stamp — a bin that blew over on its own is not a thing you
+    // did — and the speed gate is above a walk, so brushing past a crate is not
+    // an event either.
+    if (s >= sysINC_HIT && p && p.prop && p.prop.disturbed && p.position) {
+      incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type);
+    }
   });
   game.events.on('prop:water', function (p) {
     sysSpatial.volume = 1; sysSpatial.pitch = 1;
     sysSpatial.at = (p && p.position) || null;
     sfx('splash', sysSpatial);
     sysSpatial.at = null;
+    // Something went in the drink, and it counts if it was yours to put there.
+    const wp = p && p.prop, wb = wp && wp.body;
+    if (wp && wp.disturbed && wb) {
+      incAdd(wb.position.x, wb.position.z, wp.id !== undefined ? wp.id : wp.type);
+    }
+  });
+  // ...and the other two halves of "a thing you did that somebody saw".
+  game.events.on('prop:destroy', function (p) {
+    const dp = p && p.prop, db = dp && dp.body;
+    if (dp && dp.disturbed && db) {
+      incAdd(db.position.x, db.position.z, dp.id !== undefined ? dp.id : dp.type);
+    }
+  });
+  game.events.on('capy:grab', function (p) {
+    // A THEFT, NOT A PICK-UP. `owner` is the person it belongs to, which is the
+    // only difference between taking something and finding something.
+    const gp = p && p.prop;
+    const cp = game.capy && game.capy.position;
+    if (gp && (gp.owner || (p && p.from)) && cp) {
+      incAdd(cp.x, cp.z, gp.id !== undefined ? gp.id : gp.type);
+    }
   });
   game.events.on('npc:startled', function (p) {
     // A gasp from behind you is one of the funniest things this game does and
@@ -18335,6 +18363,157 @@ export function createSystems(game) {
     musChaseT = Math.max(musChaseT, 2.5);
     game.state.chaos = clamp(game.state.chaos + 0.06, 0, 1);
   });
+  // =========================================================================
+  // THE INCIDENT — three things in a row, and somebody saw all of them (v37)
+  // =========================================================================
+  //
+  // There is a full simulation of being noticed in this game and the player
+  // can barely perceive it. props.js stamps causation on every prop the animal
+  // touched; npc.js recruits witnesses by line of sight, remembers you for
+  // twenty-six seconds, and keeps a heat field so one corner of a square can
+  // be cross with you while the rest is not; `game.state.chaos` has existed
+  // since version two. Between them they had TWO readers: the music intensity
+  // and the calm suppressor. Nothing in nineteen chapters ever said out loud
+  // that you had just done three things in front of the same people.
+  //
+  // And the game already knew how to say it. `sysTASK_STREAK` — six seconds —
+  // raises the tick's pitch a tone for consecutive TASKS, and has done since
+  // v18. This is that idea pointed at the half of the game the genre is
+  // actually made of: set it up, watch it go, get out.
+  //
+  // WHAT COUNTS. Something you did, that somebody saw:
+  //   a prop hit hard enough to make a noise · something in the water ·
+  //   something broken · something taken off its owner
+  // and at least one person near enough to have seen it.
+  //
+  // AND THAT IS `findPeople`, NOT `npcHeat`, WHICH IS THE WHOLE OF WHAT THE
+  // FIRST CUT GOT WRONG. `npcHeat` answers "who near here is watching FOR you"
+  // — it counts only people whose `wary` or `alarm` is already over
+  // npcWARY_HEAT, which is to say people you have ALREADY had a go at. As a
+  // gate on the first event of a chain that is a chicken and an egg: measured,
+  // six hard impacts two metres from the animal in a Venetian square and heat
+  // was zero for all six. `findPeople` is the honest question — is there an
+  // audience — and the crowd's own alarm still does what it always did, which
+  // is decide how loudly they react to each one.
+  //
+  // FOUR THINGS THAT KEEP IT FROM BECOMING NOISE, and every one of them is
+  // what separates a chain from a rattle:
+  //
+  //  1. ONE PROP COUNTS ONCE. A bin bouncing off a wall four times is one
+  //     thing happening, not four; `sysINC_SAME` is the gap before the same
+  //     prop may be counted again.
+  //  2. IT HAS TO BE ONE PLACE. Everything after the first is measured against
+  //     where the first one happened — walk twenty-two metres and you have
+  //     started somewhere else, which is exactly what "getting out" means.
+  //  3. IT HAS A COOLDOWN. One card per `sysINC_COOL`, so a genuinely chaotic
+  //     minute reads as one incident rather than as a slot machine.
+  //  4. IT IS UNLISTED, UNGATED AND CANNOT BE MISSED — the finds' three laws.
+  //     Nothing is on the paper, nothing points at it, no task and no chapter
+  //     depends on it, and it is REPEATABLE, which is the one place it parts
+  //     company with a find: this is a moment, not a collectible.
+  //
+  // Two tiers, because a chain that keeps going is a different fact from a
+  // chain that reached three.
+  const sysINC_N     = 3;      // witnessed things that make an incident
+  const sysINC_N2    = 5;      // ...and that make a scene
+  const sysINC_T     = 12;     // s the window stays open, from the last one
+  const sysINC_R     = 22;     // m from the first one that is still "here"
+  const sysINC_SEE   = 16;     // m npcHeat is asked over — did anybody see it
+  const sysINC_SAME  = 4;      // s before the same prop may count again
+  const sysINC_COOL  = 50;     // s after a card before another may be earned
+  const sysINC_HIT   = 2.6;    // m/s of impact that is a thing happening
+  // Chapter-neutral to the same standard the locals' pools are held to: these
+  // are spoken over a Venetian square, a Mong Kok doorway and an Antarctic
+  // jetty, so not one of them may name a season, a country, a building or a
+  // thing that was knocked over.
+  const sysINC_SAY = [
+    'Three things, and somebody saw every one of them.',
+    'One of those is an accident. Three is a decision.',
+    'They have stopped being surprised.',
+    'Nobody here is going to pretend they missed that.',
+    'That is going to be talked about.',
+  ];
+  const sysINC_SAY2 = [
+    'Five. Nothing else is happening here now.',
+    'This has stopped being a series of accidents.',
+    'Everybody has turned round. Everybody.',
+  ];
+  let incN = 0;            // things in the open chain
+  let incT = -1;           // s left on the window, -1 for none
+  let incX = 0, incZ = 0;  // where the first one happened
+  let incCool = 0;         // s until another card may be earned
+  let incCarded = 0;       // the tier already shown for this chain
+  const incSeen = Object.create(null);   // prop id -> game time it last counted
+
+  /**
+   * ONE THING HAPPENED, AT A POINT. Called from the four handlers below.
+   * `key` identifies the prop so the same one cannot count twice in a row.
+   */
+  function incAdd(x, z, key) {
+    if (!started || game.state.paused) return;
+    if (typeof x !== 'number' || x !== x) return;
+    const t = game.state.time;
+    if (key !== undefined && key !== null) {
+      const was = incSeen[key];
+      if (was !== undefined && t - was < sysINC_SAME) return;
+      incSeen[key] = t;
+    }
+    // DID ANYBODY SEE IT. Both casts, one number, the same helper the finds
+    // use. Zero is the whole gate, and it is why the Drift — a chapter with
+    // nobody in it — can never produce one of these however much is thrown off
+    // how many islands.
+    let saw = 0;
+    try { saw = findPeople(x, z, sysINC_SEE); } catch (e) { saw = 0; }
+    if (!(saw > 0)) return;
+    if (incT < 0 || Math.hypot(x - incX, z - incZ) > sysINC_R) {
+      incN = 0; incX = x; incZ = z; incCarded = 0;
+    }
+    incN++;
+    incT = sysINC_T;
+    const tier = incN >= sysINC_N2 ? 2 : (incN >= sysINC_N ? 1 : 0);
+    if (tier <= incCarded) return;
+    // ---- THE COOLDOWN GATES THE CARD AND NOT THE COUNTING -----------------
+    // The first cut checked it at the top of this function, which is the
+    // obvious place and is wrong in a way nothing on screen says: a chain that
+    // has just shown AN INCIDENT then stops being counted, so `incN` can never
+    // reach five and A SCENE is unreachable code. Measured — seven impacts in
+    // five seconds, one card. The chain always counts; what a cooldown buys is
+    // that the NEXT one does not get a card too soon, and it therefore starts
+    // when the chain ENDS. See incTick.
+    if (incCool > 0) return;
+    incCarded = tier;
+    const pool = tier === 2 ? sysINC_SAY2 : sysINC_SAY;
+    // Half a lift and a chime, which is the mini's own weight — see the `mini`
+    // branch in completeTask. Not the banner's: a chapter's marquee happens
+    // once and this can happen in any of them, so it may never be worth as
+    // much as the thing the place is for.
+    musSwell(sysMINI_SWELL * (tier === 2 ? 0.9 : 0.7));
+    sfx('chime', { volume: 0.5, pitch: tier === 2 ? 1.32 : 1.18, force: true });
+    const cp = game.capy && game.capy.position;
+    if (cp) confettiBurst(cp.x, cp.y + 0.5, cp.z, tier === 2 ? 22 : 16);
+    showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
+               pool[randInt(0, pool.length - 1)]);
+    punch(tier === 2 ? 0.12 : 0.09);
+    // ...and the people say the one thing they only say when it has been three
+    // in a row. npc.js owns what that sounds like; this owns when.
+    game.events.emit('capy:incident', { x: x, z: z, n: incN, tier: tier, saw: saw });
+  }
+
+  function incTick(dt) {
+    if (incCool > 0) incCool -= dt;
+    if (incT >= 0) {
+      incT -= dt;
+      if (incT < 0) {
+        // The chain is over. If it earned a card, nothing else may earn one for
+        // a while — so a genuinely chaotic minute reads as one incident that
+        // got out of hand rather than as a slot machine. A chain that never
+        // reached three costs nothing.
+        if (incCarded > 0) incCool = sysINC_COOL;
+        incN = 0; incCarded = 0;
+      }
+    }
+  }
+
   // Music reacts to a chase: the pad ducks and opens up, plucks thicken slightly.
   game.events.on('npc:chase', function () { musChaseT = 7; });
   game.events.on('npc:calm', function () { musChaseT = Math.min(musChaseT, 1.2); });
@@ -18377,6 +18556,12 @@ export function createSystems(game) {
     recLiveId = ''; recLiveVal = NaN;
     ghId = ''; ghPlay = null; ghPlayN = 0; ghFade = 0; ghRecN = 0;
     ghHaveLast = false; ghWasOpen = false;
+    // ...and a chain belongs to the square it was made in. Two things in
+    // Sydney and a third in Venice is not three things in a row, and the
+    // coordinates would agree with it if nothing said otherwise, because every
+    // chapter is authored in the same ones. See THE INCIDENT.
+    incN = 0; incT = -1; incCarded = 0; incCool = 0;
+    for (const k in incSeen) delete incSeen[k];
     if (game.capy && game.capy.ghost) game.capy.ghost.hide();
     // A shot belongs to the moment that asked for it. Crossing a border ends
     // the moment, and a framing left running into a teleport would fight the
@@ -19178,6 +19363,7 @@ export function createSystems(game) {
     // ghost stepped by the SCALED dt would slow down inside a hitstop and be
     // racing a run that never happened. See THE GHOST.
     ghTick(game.state.rawDt || dt);
+    incTick(dt);          // the chain's window and its cooldown. See THE INCIDENT.
     // Raw dt for the same reason the finds use it: sitting down among the
     // seventeen should not take longer because something else slowed time.
     sysFinaleStep(game.state.rawDt || dt);

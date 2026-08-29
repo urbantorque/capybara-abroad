@@ -1081,6 +1081,20 @@ export function createNPCs(game) {
     produce:  ['It is eating that.', 'Is it allowed to do that?',
                'Well, it is enjoying itself.', 'That was somebody’s.',
                'Just going to eat it, then.', 'Look at it go.'],
+    // ---- ...AND ONE FOR THE THIRD THING IN A ROW (v37) -------------------
+    // Spoken when `capy:incident` lands — three things somebody actually saw,
+    // in one place, inside twelve seconds. See THE INCIDENT in systems.js.
+    //
+    // Held to the same chapter-neutral standard as everything above it, and
+    // one rule further: NONE OF THEM MAY NAME WHAT WAS DONE. This pool is
+    // spoken over a knocked-over crate, a stolen hat, a shattered bowl and a
+    // bicycle in a canal, in any order, so the only thing every line here can
+    // be about is the PATTERN — that it has happened three times and that
+    // people have stopped assuming it is an accident.
+    incident: ['That is three.', 'Right. That is not an accident.',
+               'Somebody is keeping count.', 'Again? Again.',
+               'It is doing it on purpose.', 'Is anybody going to stop it?',
+               'I have been watching this the whole time.'],
   };
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
@@ -2107,6 +2121,18 @@ export function createNPCs(game) {
   const npcWIT_CHAIN = ['What?', 'What was that?', 'Did you see that?', 'Hm?',
                         'What is going on over there?', 'Oh, what now.',
                         'Something is happening.', 'Everybody all right?'];
+  // ...and the same for a chain of three. One pool per chapter for the reason
+  // the two above have one: these two places have voices, and a Sydneysider
+  // saying a line written for a plaza in Nariño is the only flat sentence in
+  // either of them. See npcOnIncident.
+  const npcINC_SYD = ['Right. That is three.', 'That’s not an accident, that.',
+                      'Someone’s counting, mate.', 'Again?! It did it AGAIN.',
+                      'I’ve been watching this the whole time.',
+                      'Is anyone going to do something?'];
+  const npcINC_PA  = ['Eso es tres. Three.', 'That is not an accident, hombre.',
+                      '¿Otra vez? ¡Otra vez!', 'Somebody is counting, chigüiro.',
+                      'I have watched every one of them.',
+                      '¿Y nadie hace nada?'];
   const npcWIT_CHAIN_PA = ['¿Qué pasó?', 'What was that, pues?', 'Ay, what now.',
                            '¿Otra vez?', 'Somebody look at that.',
                            'That animal again.', 'What is he doing now?'];
@@ -2668,6 +2694,46 @@ export function createNPCs(game) {
   //
   // One at a time, and it dies at the border — a held line delivered in the
   // next chapter would be nonsense.
+  // ---- THE INCIDENT, FROM THIS SIDE (v37) --------------------------------
+  //
+  // systems.js decides WHEN — three things you did that somebody saw, in one
+  // place, inside twelve seconds; see THE INCIDENT there. This decides what it
+  // SOUNDS LIKE, which is this file's half of every other reaction in the game.
+  //
+  // Three casts and therefore three routes, which is the shape every reaction
+  // in this module has had since v30: `locals` covers seventeen chapters, and
+  // Sydney and Pasto predate `addLocal` and have their own. Nobody is built,
+  // no state machine is touched, nothing is denied: a person turns and says one
+  // line, and at most two of them do.
+  function npcOnIncident(p) {
+    const x = p && p.x, z = p && p.z;
+    if (typeof x !== 'number' || x !== x) return;
+    // The seventeen. A wider radius than a bang gets — an incident is a thing
+    // the whole corner has noticed, not a noise one person was standing next to.
+    localsReact('incident', x, z, 0.5, npcLOC_REACT_R * 1.7);
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney' && live !== 'pasto') return;
+    const cast = live === 'sydney' ? humans : paHumans;
+    const arr = live === 'sydney' ? npcINC_SYD : npcINC_PA;
+    // The two nearest who are free to speak, and no more. Two is the same
+    // ceiling npcLOC_REACT_N sets for the locals and it is there for the same
+    // reason: three people saying it at once is a chorus.
+    let said = 0;
+    const r2 = 24 * 24;
+    for (let i = 0; i < cast.length && said < 2; i++) {
+      const r = cast[i];
+      if (!r || !r.group || !r.group.visible || (r.talkCd || 0) > 0) continue;
+      if (r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
+      const dx = r.group.position.x - x, dz = r.group.position.z - z;
+      if (dx * dx + dz * dz > r2) continue;
+      r.talkCd = rand(10, 22);
+      r.lookX = x; r.lookZ = z;
+      r.speak(arr[randInt(0, arr.length - 1)]);
+      said++;
+    }
+  }
+  game.events.on('capy:incident', npcOnIncident);
+
   let npcWowOwed = null, npcWowOwedBiome = null, npcWowOwedT = 0;
   const npcWOW_OWED_TTL = 600;   // s of gameplay; effectively "this visit"
   const npcWowIds = {};
