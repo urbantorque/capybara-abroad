@@ -3602,6 +3602,15 @@ function caliUpdateDance(game, dt) {
   caliFlash = damp(caliFlash, 0, 6, dt);
   caliFloorT += dt;
 
+  // ---- THE HEADING IS SAMPLED WHETHER OR NOT YOU ARE ON THE FLOOR -------
+  // onEnter clears caliLastYaw so a heading cannot cross a border (see the
+  // note there), and this is the same bug one scale down: the yaw was only
+  // read after the early-out below, so it held whatever the animal was facing
+  // the last frame it was ON the floor. Step off, turn round, step back on,
+  // and the first frame differences two headings seconds apart — a guaranteed
+  // "acted", and a free step if it lands inside the window.
+  if (!caliOnFloor) caliLastYaw = capy.group ? capy.group.rotation.y : 0;
+
   // the floor breathes with the beat whether or not anybody is on it
   const mus = game.music;
   const beatPhase = (mus && mus.playing) ? (1 - Math.abs(mus.off()) * 2) : 0;

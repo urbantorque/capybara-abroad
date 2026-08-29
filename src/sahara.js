@@ -161,6 +161,8 @@ let sahCamelMesh = null, sahCamelLegs = null;
 // The three people travelling with the caravan, by index into sahPplData.
 const sahCarPeople = [];
 let sahCaravanBody = null, sahCarPX = 0, sahCarPY = 0, sahCarPZ = 0;
+// THE SADDLE'S OWN GROUND SPEED — see carryFrame() at the foot of this file.
+const sahCarFrame = { x: 0, z: 0 };
 let sahCartGroup = null, sahBasketGroup = null;
 // The ten people who live here, kept so addExchange can pair them up. See
 // THE PEOPLE WHO LIVE HERE at the foot of sahBuild.
@@ -1999,6 +2001,15 @@ function sahStartChase(game) {
   sahLoseT = 0;
   sahChaseDelay = sahCHASE_DELAY;
   sahCatchT = 0;
+  // ---- AND THE NEAR MISSES ARE PER CHASE, WHICH THEY WERE NOT ----------
+  // The block in sahUpdateChase says "once per pursuer per chase" for the
+  // sound and "once per chase" for the line, and both counters were only ever
+  // cleared in the BUILD. So the second time you rob the cart — which the cart
+  // explicitly re-arms, so it is the expected way to play this — five traders
+  // walk past the end of your alley in silence and neither line is ever said
+  // again for the life of the page.
+  sahMissN = 0;
+  for (let i = 0; i < sahPURSUER_N; i++) sahPurMiss[i] = 0;
   for (let i = 0; i < sahPURSUER_N; i++) {
     const o = i * 8;
     sahPurData[o] = sahPurData[o + 2];
@@ -3959,26 +3970,53 @@ function sahUpdateCaravan(game, dt) {
   const dx = nx - sahCarPX, dy = ny - sahCarPY, dz = nz - sahCarPZ;
   sahCaravanBody.position.set(nx, ny, nz);
   sahSyncBody(sahCaravanBody);
-  // The velocity stays ZERO deliberately — see rio.js's cable car. An honest
-  // velocity on a kinematic body that is ALSO having its position written moves
-  // it twice, and the rider gets dragged by contact friction on top of the
-  // carry below, creeps forward and walks off the front.
-  sahCaravanBody.velocity.set(0, 0, 0);
+  // ---- THE VELOCITY IS THE CARRY, AND ZERO WAS THE WHOLE BUG -------------
+  //
+  // This body used to be moved the way rio.js's cable car is: velocity pinned
+  // to zero, position written by hand, and the passenger dragged along by
+  // adding the saddle's displacement to `capy.body.position` every frame. It
+  // does not work at this speed. MEASURED (qa/rb-car2.js): the animal sits
+  // perfectly still on the blanket for as long as the string is standing at
+  // the gate, and slides off the back the instant it starts walking — 1.39 m
+  // of relative drift in 1.1 s, which is 55% of the camel's own 2.3 m/s, over
+  // the tail and on the sand four seconds later. So `caravan` — 'Ride out with
+  // the caravan', which wants sahCaravanT past 0.72, some hundred and sixty
+  // metres up the track — could not be completed from any starting point.
+  //
+  // The reason is the one this project has now written down five times: a body
+  // whose velocity is zero is SOLID GROUND to capybara.js's contact sweep, so
+  // the controller holds the animal's world velocity at zero — which is the
+  // exact opposite of what standing on a moving camel means — and the hand
+  // carry then fights that solve for whatever is left of the ±0.9 m saddle and
+  // loses. The chiva, the bonde, the snowcat and the Drift's wandering islands
+  // are all the same object and all four carry a passenger without a single
+  // line of hand-carrying, because all four write an HONEST VELOCITY and let
+  // the solver do it. Differenced against the PREVIOUS TARGET, never against
+  // the body's own position, which is where the last velocity already put it.
+  const inv = dt > 1e-5 ? 1 / dt : 60;
+  sahCaravanBody.velocity.set(clamp(dx * inv, -12, 12), clamp(dy * inv, -12, 12),
+                              clamp(dz * inv, -12, 12));
+  // ...and the same number on the declared channel, which is what capybara.js
+  // asks for by name and prefers to anything it can sniff off a contact. Seven
+  // other chapters answer carryFrame() and this one never did.
+  sahCarFrame.x = dx * inv;
+  sahCarFrame.z = dz * inv;
 
   const capy = game.capy;
   sahRiding = false;
   if (capy && capy.position && capy.body) {
     const ox = capy.position.x - nx, oz = capy.position.z - nz;
     const oy = capy.position.y - ny;
-    if (Math.abs(ox) < 1.4 && Math.abs(oz) < 2.0 && oy > -0.3 && oy < 2.4) {
+    // 1.4, NOT 2.4. The band was two metres and seventy centimetres tall on a
+    // blanket the animal stands 52 cm above, and the caravan sets off from the
+    // gate — so an animal on top of the gate's own masonry, a metre and eighty
+    // clear of the camel, read as ABOARD. That was harmless while `sahRiding`
+    // only gated a task line; it is not harmless now that it also publishes a
+    // reference frame, because a frame handed to somebody standing on a wall
+    // drags them along it. A hop off the saddle still keeps it (capybara.js
+    // holds the frame through capyPLAT_AIR on its own).
+    if (Math.abs(ox) < 1.4 && Math.abs(oz) < 2.0 && oy > -0.3 && oy < 1.4) {
       sahRiding = true;
-      capy.body.position.x += dx; capy.body.position.y += dy; capy.body.position.z += dz;
-      capy.body.previousPosition.x += dx;
-      capy.body.previousPosition.y += dy;
-      capy.body.previousPosition.z += dz;
-      capy.body.interpolatedPosition.x += dx;
-      capy.body.interpolatedPosition.y += dy;
-      capy.body.interpolatedPosition.z += dz;
       if (!sahCaravanDone && sahCaravanT > 0.72) {
         sahCaravanDone = true;
         sahTask('caravan');
@@ -4928,6 +4966,8 @@ export function createSahara(game) {
     waterHeightAt() { return -400; },
     inZone: sahInZone,
     navBlocked: sahNavBlocked,
+    /** The lead camel's blanket, for anything standing on it. See sahUpdateCaravan. */
+    carryFrame() { return sahRiding ? sahCarFrame : null; },
     // The lens may not climb out through the souk's roof. See sahCamCeil —
     // this is camFloor's mirror and systems.js asks for it by name.
     camCeil: sahCamCeil,

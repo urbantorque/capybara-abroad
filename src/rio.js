@@ -1516,6 +1516,24 @@ function rioBuildSugarloaf(game, root) {
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
     material: (game.mats && game.mats.ground) || undefined });
   b.addShape(new CANNON.Box(new CANNON.Vec3(1.4, 0.16, 1.4)));
+  // ---- AND FOUR KERBS, BECAUSE A BARE PLATE IS NOT A CAR -----------------
+  // Iceland's snowcat learned this and wrote it down ("with one flat box for a
+  // floor the animal slides over the side the first time the machine leans
+  // into the hill") and this car had the same bare plate. MEASURED
+  // (qa/rb-carry3.js) with the animal put down dead centre and never touched:
+  // it holds station to the metre for fourteen seconds and then walks sideways
+  // off the edge on the pull up to Morro da Urca, at thirty-six metres over
+  // the bay. The waist rail is ALREADY DRAWN at exactly this height — it is
+  // the red band round the middle of a bondinho car, the thing everybody in
+  // every photograph is leaning on — so this makes solid a thing the picture
+  // has always claimed. Low enough that a 1.4 m hop still gets out, which is
+  // the reason the floor is a slab and not a box.
+  for (let s2 = -1; s2 <= 1; s2 += 2) {
+    b.addShape(new CANNON.Box(new CANNON.Vec3(0.07, 0.30, 1.4)),
+               new CANNON.Vec3(s2 * 1.33, 0.46, 0));
+    b.addShape(new CANNON.Box(new CANNON.Vec3(1.4, 0.30, 0.07)),
+               new CANNON.Vec3(0, 0.46, s2 * 1.33));
+  }
   rioCablePoint(0, rioV3);
   b.position.set(rioV3.x, rioV3.y - 2.6, rioV3.z);
   // It must never sleep. Its velocity is deliberately zero (see rioUpdateCabin),
@@ -1543,6 +1561,27 @@ function rioBuildSugarloaf(game, root) {
  * the sag, so it is untouched at both ends and the car still meets its stations
  * exactly. That is also just what a cable car does.
  */
+/**
+ * THE THREE STATIONS, AS FOOTPRINTS THE WIRE HAS TO RESPECT.
+ *
+ * Half extents in plan, inflated by the cabin's own half width (1.4) and a
+ * little more, so the CAR clears the building rather than its centreline
+ * doing. See rioSpanPoint.
+ */
+const rioSTATION_HULL = [
+  { x: 58, z: -24 },   // Praia Vermelha
+  { x: 74, z: -38 },   // Morro da Urca
+  { x: 96, z: -54 },   // the summit
+];
+// How far out the wire starts lifting toward a platform, and how close in it
+// is fully up. It has to be a RAMP and not a step — a hard hull moved the car
+// seventeen metres in a single frame (measured at 1044 m/s) and left the
+// passenger standing in the air — and it has to be FULLY up before the
+// building starts: the block is 8 x 6.4 in plan and the car is 2.8 across, so
+// the last point that may still be low is about seven metres out.
+const rioSTATION_RAMP = 15;
+const rioSTATION_HOLD = 7;
+
 function rioSpanPoint(x0, y0, z0, x1, y1, z1, s, out) {
   const x = lerp(x0, x1, s), z = lerp(z0, z1, s);
   let y = lerp(y0, y1, s) - 3.2 * Math.sin(s * Math.PI);
@@ -1551,7 +1590,40 @@ function rioSpanPoint(x0, y0, z0, x1, y1, z1, s, out) {
   // climbing Sugarloaf at once but the taper has not come in yet. Because every
   // station height is itself defined as terrain + rioCABLE_CLEAR, the floor is
   // exactly equal to the curve at both ends and never lifts it off its towers.
-  const need = rioTerrain(x, z) + rioCABLE_CLEAR;
+  let need = rioTerrain(x, z) + rioCABLE_CLEAR;
+  // ---- ...AND IT HAS TO CLEAR THE PLATFORM IT IS ARRIVING AT -------------
+  //
+  // THE CAR FLEW THROUGH THE MIDDLE STATION. Each station is a solid block
+  // 6.4 m tall whose TOP is the platform ("the platform stops level with the
+  // cabin floor", above) — and the wire sags 3.2 m, so over the last twenty per
+  // cent of a span the car hangs well BELOW the deck it is heading for while
+  // already inside the building's plan. MEASURED (qa/rb-carry3.js): with the
+  // animal put down in the middle of the cabin floor and never touched again,
+  // the car enters the Morro da Urca block at (72, 37, -36) — the block runs
+  // y 36 to 42.4 — and the passenger is scraped off it at t = 0.44, thirty-six
+  // metres over the bay. `bondinho` wants t > 0.86, so the task could not be
+  // completed by riding at all; the only reason it has ever been seen to tick
+  // is a QA probe that re-seated the animal every frame.
+  //
+  // A station's own endpoint height IS terrain + rioCABLE_CLEAR by
+  // construction, so the rule needs no new numbers: within rioSTATION_RAMP of
+  // a station the wire is eased up to that station's own height, so the car
+  // arrives ON the platform instead of through the side of it. The drawn cable
+  // comes off this same function, so the picture and the car agree by
+  // construction — which is the whole reason rioSpanPoint exists — and the
+  // approach is GENTLER than it was: the unramped wire climbed the last eight
+  // metres into Morro da Urca at sixty-five degrees, because the station is on
+  // the summit of a thirty-metre dome.
+  for (let i = 0; i < rioSTATION_HULL.length; i++) {
+    const st = rioSTATION_HULL[i];
+    const d = Math.sqrt((x - st.x) * (x - st.x) + (z - st.z) * (z - st.z));
+    if (d >= rioSTATION_RAMP) continue;
+    const k = clamp((rioSTATION_RAMP - d) / (rioSTATION_RAMP - rioSTATION_HOLD), 0, 1);
+    const w = k * k * (3 - 2 * k);
+    const top = rioTerrain(st.x, st.z) + rioCABLE_CLEAR;
+    const cand = lerp(need, top, w);
+    if (cand > need) need = cand;
+  }
   if (y < need) y = need;
   return out.set(x, y, z);
 }
@@ -3543,6 +3615,20 @@ function rioUpdateSamba(game, dt) {
   rioFlash = damp(rioFlash, 0, 6, dt);
   rioWrongFlash = damp(rioWrongFlash, 0, 5, dt);
 
+  // ---- THE HEADING IS SAMPLED WHETHER OR NOT YOU ARE IN THE COLUMN ------
+  // It used to be read only after the early-out below, so it held the heading
+  // from the last frame the animal was inside — and walking back in on a
+  // different bearing differenced two headings a hundred metres and several
+  // seconds apart. That is a guaranteed "acted" on the frame you step in, and
+  // if that frame happens to land on a two inside the window it is a free step
+  // the player did not dance. The same line moved for the same reason in
+  // cali.js. Sampling it every frame costs one subtraction and makes the test
+  // mean what it says: did the animal just change what it was doing.
+  {
+    const yawNow = capy.group ? capy.group.rotation.y : 0;
+    if (!rioInColumn) rioLastYaw = yawNow;
+  }
+
   // ---- THE COLUMN DOES NOT CLOSE WHEN THE TICK LANDS (v32) ----------------
   // Same shape as the Cali floor, same fix: `|| rioSambaDone` here froze
   // `samba-parade` at whatever run first hit the target, so the chapter's one
@@ -3808,23 +3894,39 @@ function rioUpdateCabin(game, dt) {
 
   rioCabinBody.position.set(nx, ny, nz);
   rioSyncBody(rioCabinBody);
-  // The velocity stays ZERO on purpose, which looks wrong and is not.
+  // ---- THE VELOCITY IS NOT ZERO, AND ZERO THREW THE PASSENGER OUT --------
   //
-  // A kinematic body in cannon is integrated from its velocity, so giving this
-  // one an honest velocity AND writing its position by hand moves it twice; and
-  // worse, the rider then gets dragged by contact friction on top of the carry
-  // below. The capybara crept forward relative to the floor it was standing on
-  // a few centimetres a second, walked off the front of the car about five
-  // seconds into the ride, and fell into the bay. One carry, not two.
-  rioCabinBody.velocity.set(0, 0, 0);
-  // ...but the FRAME is published, which is a different thing from the body's
-  // velocity and is the channel capybara.js actually wants. Seven biomes
-  // already answer carryFrame(); Rio did not, so the sixty-metre climb was
-  // carried by a bare position write and nothing else on the cabin floor moved
-  // at all. The frame is the cabin's real ground speed, derived from the
-  // displacement we just applied.
-  rioCabinFrame.x = dt > 0 ? dx / dt : 0;
-  rioCabinFrame.z = dt > 0 ? dz / dt : 0;
+  // The comment that used to stand here argued that an honest velocity on a
+  // body whose position is also written "moves it twice", so the rider was
+  // carried instead by adding the cabin's displacement to its body position
+  // every frame. MEASURED (qa/rb-carry.js), with the animal put down in the
+  // middle of the cabin floor and never touched again: it creeps 1.43 m
+  // forward and 1.25 m sideways in four seconds, is out of the car by the
+  // fifth, and falls forty metres into the Baia de Guanabara. `bondinho` — the
+  // task that wants rioCabinT past 0.86, four fifths of the way up the
+  // Sugarloaf — cannot be reached at all.
+  //
+  // It does not move it twice. cannon integrates a kinematic body from its
+  // velocity INSIDE world.step and this line runs afterwards, so the position
+  // written here is authoritative and the velocity is only ever read by the
+  // contact solver — which is exactly who needs it: a body with zero velocity
+  // is SOLID GROUND to capybara.js's contact sweep, and the controller then
+  // holds the animal's world velocity at zero while the hand carry drags it,
+  // so the two fight and the animal walks out of the car. The chiva, the
+  // bonde, the snowcat, the Drift's wandering islands and Cappadocia's balloon
+  // basket are all this same object and all five carry a passenger with an
+  // honest velocity and no hand carry at all. Marrakech's caravan was the same
+  // bug, found in the same sweep.
+  //
+  // Differenced against the PREVIOUS TARGET, never against the body's own
+  // position, which is where the last velocity already put it.
+  const inv = dt > 1e-5 ? 1 / dt : 60;
+  rioCabinBody.velocity.set(clamp(dx * inv, -14, 14), clamp(dy * inv, -14, 14),
+                            clamp(dz * inv, -14, 14));
+  // ...and the same number on the declared channel, which capybara.js asks for
+  // by name and prefers to anything it can sniff off a contact.
+  rioCabinFrame.x = dx * inv;
+  rioCabinFrame.z = dz * inv;
   if (rioCabinGroup) rioCabinGroup.position.set(nx, ny + 1.3, nz);
 
   // is the capybara aboard?
@@ -3835,15 +3937,17 @@ function rioUpdateCabin(game, dt) {
     const oy = capy.position.y - ny;
     if (Math.abs(ox) < 1.5 && Math.abs(oz) < 1.5 && oy > -0.2 && oy < 2.6) {
       rioRiding = true;
-      capy.body.position.x += dx;
-      capy.body.position.y += dy;
-      capy.body.position.z += dz;
-      capy.body.previousPosition.x += dx;
-      capy.body.previousPosition.y += dy;
-      capy.body.previousPosition.z += dz;
-      capy.body.interpolatedPosition.x += dx;
-      capy.body.interpolatedPosition.y += dy;
-      capy.body.interpolatedPosition.z += dz;
+      // ---- THE VERTICAL IS STILL ASSIGNED, BECAUSE THERE IS NO VERTICAL
+      // FRAME. carryFrame() is horizontal-only by construction, and a floor
+      // that climbs at a metre and a half a second under a capybara is a
+      // capybara that spends the whole ride bouncing off it. Cappadocia's
+      // basket does exactly this and for exactly this reason; the band keeps
+      // it to an animal that is actually STANDING in the car, so a hop still
+      // leaves and stepping off at sixty metres is still allowed.
+      if (oy > -0.2 && oy < 1.4 && dt > 0) {
+        const vy = dy * inv;
+        if (capy.body.velocity.y < vy + 1.4) capy.body.velocity.y = vy;
+      }
       // THE SCORE GOES UP WITH THE CAR. The bonde does this over the arches
       // and the cable car — which climbs sixty metres out of the bay and is
       // the biggest single change of altitude in the chapter — did not. Held
@@ -3901,6 +4005,15 @@ export function createRio(game) {
     ensureBuilt() { rioBuild(game); },
     onEnter() {
       rioCombo = 0; rioLastBeat = -1; rioInColumn = false; rioOutT = 0;
+      // ---- AND THE REST OF THE COLUMN'S STATE, WHICH WAS NOT ON THIS LIST --
+      // cali.js found and fixed exactly this on its own floor and the same four
+      // names here were left behind. `rioLastYaw` holds the capybara's heading
+      // from wherever it was standing when it left Rio, so the first frame back
+      // inside the column differences a Rio yaw against an Icelandic one and
+      // scores a step the player did not take; `rioStepCool` can arrive already
+      // spent; and `rioFlash` / `rioWrongFlash` are a lit board and a "that was
+      // the ONE" flash carried in from another country.
+      rioLastYaw = 0; rioStepCool = 0; rioFlash = 0; rioWrongFlash = 0;
       rioSelaronT = -1; rioRiding = false;
       // Put the column somewhere the player can see it coming rather than
       // wherever it happened to be when they left.

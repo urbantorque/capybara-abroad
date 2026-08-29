@@ -4656,6 +4656,10 @@ function iceWhaleRunAt(u, out) {
   return out;
 }
 const iceWhaleRunOut = { x: 0, z: 0 };
+// The SECOND sample, for the heading. It was a fresh `{ x: 0, z: 0 }` written
+// inline in the loop — one object per frame for the fifteen seconds of every
+// pass, which is the one thing CONTRACT.md forbids outright in an update().
+const iceWhaleRunAhead = { x: 0, z: 0 };
 
 function iceUpdateWhale(game, dt) {
   if (!iceWhaleGroup) return;
@@ -4681,7 +4685,7 @@ function iceUpdateWhale(game, dt) {
     // ---- the fin ----------------------------------------------------------
     const u = clamp(iceWhaleP / iceWHALE_RUN, 0, 1);
     const a = iceWhaleRunAt(u, iceWhaleRunOut);
-    const b = iceWhaleRunAt(Math.min(1, u + 0.02), { x: 0, z: 0 });
+    const b = iceWhaleRunAt(Math.min(1, u + 0.02), iceWhaleRunAhead);
     iceWhaleFin.visible = true;
     iceWhaleFin.position.set(a.x, iceSEA_Y - 0.05 + Math.sin(iceWhaleP * 1.7) * 0.10, a.z);
     iceWhaleFin.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
