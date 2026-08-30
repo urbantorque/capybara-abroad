@@ -15779,6 +15779,92 @@ export function createSystems(game) {
   const sysDARK_WATER   = { 7: 1, 11: 1, 16: 1, 17: 1 };
 
   // =========================================================================
+  // THE WARDROBE. Ten chapters, ten costumes, and one rule about which task.
+  // =========================================================================
+  // The task has to be THE REASON YOU HAVE THE THING, not a prize for finishing
+  // the place. That is why five of these ten are not the chapter's marquee:
+  //
+  //   ch1  you stole a tourist's hat, so you are wearing a tourist's hat. The
+  //        first thing this game ever asks of you, and the chapter's keepsake.
+  //   ch3  `manly-voyage`, not `take-helm` — the cap is for having brought her
+  //        alongside, and anybody can hold a wheel in open water.
+  //   ch6  the marquee, because the parade is where headdresses come from.
+  //   ch10 `gondola-ride`, not the marquee: stand on the prow of a gondola and
+  //        you have effectively applied for the job. `acqua-alta` is a flood.
+  //   ch12 `first-dive`, not the bloom — the mask is the moment the game hands
+  //        over a verb, and this is the only costume that is equipment.
+  //   ch13 the marquee: the sun clearing the rim is what a pilot is up there
+  //        for, and nobody puts a flying cap on to walk an envelope.
+  //   ch14 `all-the-way`, not `take-off`. The club does not give you the cap
+  //        for standing up; it gives it to you for the whole wave.
+  //   ch16 `the-doline`, not `great-wall`: the helmet is for having been deep
+  //        enough that the light is a thing that happens to you.
+  //   ch17 the marquee, and it is the last one in the journey.
+  //   ch18 `black-tie`, which IS the object. See monaco.js.
+  //
+  // One row per biome, and the lookup below stops at the first row whose biome
+  // is live — so a second row for a chapter would be dead and is not written.
+  // =========================================================================
+  // ...AND THE OTHER NINE CHAPTERS TEACH A MOVE. See capySkill in capybara.js.
+  // =========================================================================
+  // The ten in sysWARDROBE hand over a costume, which stays in its chapter
+  // because it is that chapter's joke. These nine hand over a SKILL, and a
+  // skill travels: this game's own rule is that a verb is a property of the
+  // world and the chapter that teaches it is not the only one that affords it
+  // (see capyCanDive, sysDIVE_TAUGHT and the `brought-` finds). So there is no
+  // biome column here — once it is learnt it is yours for the journey.
+  //
+  // The task is chosen the same way the costumes' are: it has to be the thing
+  // that TEACHES the move, not the chapter's biggest moment. Walking the crater
+  // rim is what gives you the wind for it; being thrown by the acrobats is what
+  // teaches a wall-kick; twenty seconds hanging off a driftseed is what teaches
+  // a seed. Four of the nine are their chapter's marquee and five are not.
+  const sysSkillTold = {};       // skill -> announced, so a row fires once
+  const sysSkillQueue = [];      // rows waiting for the card, one at a time
+  let sysSkillT = 0;             // s until the next one may go up
+  let sysSkillSeeded = false;    // the first frame after `started` announces nothing
+  const sysSKILLS = [
+    { task: 'the-rim-walk',   skill: 'lungs',  name: 'THE LUNGS',
+      line: 'two and a half thousand metres. everything below this is easy now.' },
+    { task: 'still-bamboo',   skill: 'quiet',  name: 'SOFT FEET',
+      line: 'you can move like that anywhere. most things will not notice.' },
+    { task: 'salsa-dance',    skill: 'beat',   name: 'ON THE TWO',
+      line: 'there is a pulse in every one of these places. you can hear it now.' },
+    { task: 'glacier-run',    skill: 'carve',  name: 'THE EDGE',
+      line: 'you cannot stop on ice. you can decide where you come out.' },
+    { task: 'acrobats',       skill: 'vault',  name: 'THE VAULT',
+      line: 'a wall is a thing to push off. hop again while you are on one.' },
+    { task: 'driftseed',      skill: 'seed',   name: 'THE SEED',
+      line: 'hold the hop key on the way down. you come down like one of those.' },
+    { task: 'bamboo-climb',   skill: 'mantle', name: 'THE REACH',
+      line: 'get your chin over it and the rest of you follows.' },
+    // CHAPTER 15 TEACHES TWO, and it is the only one that does. It is the one
+    // place in the journey where the animal is not a novelty, and there are two
+    // separate things about being a capybara that it can show you: `gather` is
+    // five of your own kind falling in behind you, and `the-crossing` is the
+    // water not being somewhere you are on your way through.
+    { task: 'gather',         skill: 'herd',   name: 'THE HERD',
+      line: 'wheek at anything small. keep wheeking, or they wander off.' },
+    { task: 'the-crossing',   skill: 'float',  name: 'THE FLOAT',
+      line: 'you can just sit in it now. any water, anywhere.' },
+    { task: 'cross-the-road', skill: 'flow',   name: 'RIGHT OF WAY',
+      line: 'hold your line and the world opens. it works everywhere.' },
+  ];
+
+  const sysWARDROBE = [
+    { biome: 'sydney',    task: 'steal-hat',    wear: 'sunhat' },
+    { biome: 'quay',      task: 'manly-voyage', wear: 'ferrycap' },
+    { biome: 'rio',       task: 'samba-parade', wear: 'plumes' },
+    { biome: 'venice',    task: 'gondola-ride', wear: 'boater' },
+    { biome: 'palawan',   task: 'first-dive',   wear: 'snorkel' },
+    { biome: 'goreme',    task: 'sunrise',      wear: 'flycap' },
+    { biome: 'manly',     task: 'all-the-way',  wear: 'surfcap' },
+    { biome: 'cave',      task: 'the-doline',   wear: 'cavehelm' },
+    { biome: 'antarctic', task: 'orca-ride',    wear: 'parka' },
+    { biome: 'monaco',    task: 'black-tie',    wear: 'black-tie' },
+  ];
+
+  // =========================================================================
   // FIVE HELPERS FOR THE PLACE FINDS, AND NONE OF THEM ALLOCATES
   // =========================================================================
   // Thirty-four of the fifty-four rows are about one world, and almost all of
@@ -18951,6 +19037,265 @@ export function createSystems(game) {
     sysCritters.push(rec);
     return rec;
   };
+  // =========================================================================
+  // THE HERD — ch15's skill, and the only one that is a whole system.
+  // =========================================================================
+  // `gather` in the Pantanal is "get five of them to follow you", and what it
+  // teaches is that it works on anything. Wheek at a flock of pigeons in San
+  // Marco, at the sheep on an Icelandic hillside, at the cats on a Göreme roof,
+  // and some of them fall in behind you.
+  //
+  // FOUR RULES, and the first two are what stop it being a switch:
+  //
+  //  1. IT IS ON A TIMER. One wheek buys herdHOLD seconds of company and no
+  //     more. A herd is a thing you are actively keeping, not a thing you have
+  //     collected — so the verb stays in use for as long as the herd exists,
+  //     and walking a line of nine animals across a city is a performance
+  //     rather than an inventory.
+  //  2. SOME OF THEM TAKE MORE ASKING. `obey` is 1, 2 or 3 wheeks, and it is
+  //     never more than 3: a pigeon will follow anything, a cat wants asking
+  //     twice, and a heron — the single most cautious animal in this game — is
+  //     three. The counter DECAYS (herdHEARD_T), so the extra wheeks have to be
+  //     periodic. Three wheeks over four minutes recruits nothing.
+  //  3. EVERYTHING ANSWERS THE FIRST WHEEK. This is the rule that makes the
+  //     tiers legible rather than mysterious. A three-wheek heron still turns
+  //     its head on the first one — you can see you have been heard, and you
+  //     can see it has not moved, and those two facts together are the whole
+  //     tutorial. Nothing in earshot ever ignores you.
+  //  4. THEY WALK THE TRAIL, not a steering behaviour. Straight off the
+  //     Pantanal's own herd: a line down the player's own path cannot pile up,
+  //     cannot orbit, cannot oscillate and cannot walk through the thing the
+  //     player just walked round.
+  //
+  // A chapter OFFERS its animals and keeps ownership of drawing them; this
+  // system only ever asks it to put one somewhere, and only for the ones that
+  // are actually following. systems.js updates last, so the put lands after
+  // the chapter's own wander has run and wins for that frame.
+  const herdEARSHOT = 15.0;     // m a wheek recruits within
+  const herdHOLD    = 21.0;     // s of company one wheek buys
+  const herdHEARD_T = 7.5;      // s before an unrepeated wheek is forgotten
+  const herdGAP     = 1.55;     // m between one animal and the next in the line
+  const herdLOOK    = 1.30;     // s of turning to look at you — rule 3
+  const herdMAX     = 14;       // most that may be in a line at once
+  const herdSPEED   = 9.0;      // m/s a straggler may close at
+  const herdKinds = [];
+  // the player's own path: a ring of points about a third of a metre apart
+  const herdTX = new Float32Array(512);
+  const herdTZ = new Float32Array(512);
+  let herdTN = 0, herdTHead = 0;
+  function herdTrailPush(x, z) {
+    if (herdTN > 0) {
+      const li = (herdTHead - 1 + 512) % 512;
+      const dx = x - herdTX[li], dz = z - herdTZ[li];
+      if (dx * dx + dz * dz < 0.1024) return;      // 0.32 m
+    }
+    herdTX[herdTHead] = x; herdTZ[herdTHead] = z;
+    herdTHead = (herdTHead + 1) % 512;
+    if (herdTN < 512) herdTN++;
+  }
+  /** The point `back` metres along the trail behind the animal, or null. */
+  function herdTrailAt(back, out) {
+    if (herdTN < 2) return null;
+    let run = 0;
+    for (let k = 1; k < herdTN; k++) {
+      const a = (herdTHead - k + 512) % 512;
+      const b = (herdTHead - k - 1 + 512) % 512;
+      const dx = herdTX[a] - herdTX[b], dz = herdTZ[a] - herdTZ[b];
+      const seg = Math.sqrt(dx * dx + dz * dz);
+      if (run + seg >= back) {
+        const t = seg > 1e-5 ? (back - run) / seg : 0;
+        out.x = herdTX[a] - dx * t;
+        out.z = herdTZ[a] - dz * t;
+        return out;
+      }
+      run += seg;
+    }
+    return null;
+  }
+  const herdPt = { x: 0, z: 0 };
+  const herdV = { x: 0, y: 0, z: 0 };
+  const herdSfx = { volume: 1, pitch: 1 };
+  /**
+   * OFFER A CHAPTER'S ANIMALS TO THE HERD.
+   *
+   *   game.herdOffer({
+   *     biome: 'venice', kind: 'pigeon', obey: 1, voice: 'pop',
+   *     count: () => venPIGEON_N,
+   *     at:  (i, o) => { o.x = ...; o.y = ...; o.z = ...; },
+   *     put: (i, x, z, yaw) => { ...the chapter's own writer... },
+   *   })
+   *
+   * `obey` is clamped to 1..3 — see rule 2, and there is deliberately no way to
+   * ask for a fourth. `put` is only ever called for animals that are following;
+   * everything else the chapter goes on doing exactly as it did.
+   */
+  game.herdOffer = function (o) {
+    if (!o || typeof o.count !== 'function' || typeof o.at !== 'function' ||
+        typeof o.put !== 'function') return null;
+    const rec = {
+      biome: o.biome || (game.biome && game.biome.current) || 'sydney',
+      kind: o.kind || 'animal',
+      obey: clamp(Math.round(o.obey || 1), 1, 3),
+      voice: o.voice || null,
+      pitch: o.pitch || 1,
+      count: o.count, at: o.at, put: o.put,
+      st: [],
+    };
+    herdKinds.push(rec);
+    return rec;
+  };
+  function herdState(rec, i) {
+    let s = rec.st[i];
+    if (!s) { s = rec.st[i] = { heard: 0, heardT: 0, hold: 0, led: false, look: 0, order: 0 }; }
+    return s;
+  }
+  /** How many animals are following right now. The card and the record ask. */
+  game.herdCount = function () {
+    let n = 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      for (let i = 0; i < rec.st.length; i++) if (rec.st[i] && rec.st[i].led) n++;
+    }
+    return n;
+  };
+  /**
+   * WHAT IS ON OFFER HERE AND WHAT IT IS DOING, read-only.
+   *
+   * `herdKinds` is closure-local and the animals belong to sixteen different
+   * files, so without this there is no way from outside to answer "is there
+   * anything recruitable in this chapter, where is it, and has it heard me" —
+   * and a mechanic with three tiers and two timers that cannot be asked those
+   * three questions is a mechanic that gets tuned by guessing. It is also the
+   * only way a probe can find an animal to wheek at: the first attempt at one
+   * walked a coarse grid hoping to bump into a pigeon.
+   *
+   * Never throws and never allocates per animal beyond the row it returns.
+   */
+  game.herdDebug = function () {
+    const live = game.biome && game.biome.current;
+    const outK = [];
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live) continue;
+      const n = rec.count() | 0;
+      let led = 0, heard = 0, looking = 0, first = null;
+      for (let i = 0; i < n; i++) {
+        const s = rec.st[i];
+        if (s) { if (s.led) led++; if (s.heard > 0) heard++; if (s.look > 0) looking++; }
+        if (!first) {
+          herdV.x = herdV.y = herdV.z = 0;
+          rec.at(i, herdV);
+          first = { x: +herdV.x.toFixed(2), y: +herdV.y.toFixed(2), z: +herdV.z.toFixed(2) };
+        }
+      }
+      outK.push({ kind: rec.kind, obey: rec.obey, n: n, led: led, heard: heard,
+                  looking: looking, first: first });
+    }
+    return { biome: live, total: game.herdCount(), kinds: outK };
+  };
+  function herdOnWheek(e) {
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    if (typeof capy.can !== 'function' || !capy.can('herd')) return;
+    const p = (e && e.position) || capy.position;
+    const live = game.biome && game.biome.current;
+    // a soft wheek carries, but not as far
+    const R = herdEARSHOT * ((e && e.soft === true) ? 0.6 : 1);
+    let led = game.herdCount();
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live) continue;
+      const n = rec.count() | 0;
+      for (let i = 0; i < n; i++) {
+        herdV.x = herdV.y = herdV.z = 0;
+        rec.at(i, herdV);
+        const dx = herdV.x - p.x, dz = herdV.z - p.z;
+        if (dx * dx + dz * dz > R * R) continue;
+        const s = herdState(rec, i);
+        // ---- RULE 3: EVERYTHING ANSWERS, whatever its tier ----------------
+        s.look = herdLOOK;
+        // The answer, and it is the same shape as the Pantanal's own reply:
+        // volume and pitch only. `sfx` here is not the positional channel.
+        if (rec.voice) {
+          herdSfx.volume = 0.24 + Math.random() * 0.10;
+          herdSfx.pitch = rec.pitch * (0.94 + Math.random() * 0.12);
+          sfx(rec.voice, herdSfx);
+        }
+        if (s.led) { s.hold = herdHOLD; continue; }     // already yours: refreshed
+        s.heard++;
+        s.heardT = herdHEARD_T;
+        if (s.heard >= rec.obey && led < herdMAX) {
+          s.led = true;
+          s.hold = herdHOLD;
+          s.order = led;
+          led++;
+        }
+      }
+    }
+  }
+  game.events.on('capy:wheek', herdOnWheek);
+  function herdUpdate(dt) {
+    const capy = game.capy;
+    const p = capy && capy.position;
+    const can = !!(capy && typeof capy.can === 'function' && capy.can('herd'));
+    if (p && can) herdTrailPush(p.x, p.z);
+    const live = game.biome && game.biome.current;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      const same = rec.biome === live;
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (!s) continue;
+        // ---- the counter bleeds, so the asking has to be PERIODIC ---------
+        if (s.heardT > 0) {
+          s.heardT -= dt;
+          if (s.heardT <= 0 && s.heard > 0) { s.heard--; s.heardT = s.heard > 0 ? herdHEARD_T : 0; }
+        }
+        if (s.look > 0) s.look -= dt;
+        if (!s.led) continue;
+        // ---- and the company is on a clock -------------------------------
+        // Dropped outright when the chapter changes: a line of Venetian
+        // pigeons must not be following you through a Vietnamese mountain,
+        // and the chapter that owns them is not being ticked to draw them.
+        s.hold -= dt;
+        if (s.hold <= 0 || !same || !can || !p) {
+          s.led = false; s.heard = 0; s.heardT = 0;
+          continue;
+        }
+      }
+      if (!same || !can || !p) continue;
+      // ---- walk the line ------------------------------------------------
+      const n = rec.count() | 0;
+      for (let i = 0; i < n; i++) {
+        const s = rec.st[i];
+        if (!s || (!s.led && s.look <= 0)) continue;
+        herdV.x = herdV.y = herdV.z = 0;
+        rec.at(i, herdV);
+        if (!s.led) {
+          // RULE 3 again, on the way out: turn to look, and do not move.
+          rec.put(i, herdV.x, herdV.z, Math.atan2(p.x - herdV.x, p.z - herdV.z));
+          continue;
+        }
+        const at = herdTrailAt(herdGAP * (s.order + 1), herdPt);
+        const tx = at ? at.x : p.x, tz = at ? at.z : p.z;
+        const dx = tx - herdV.x, dz = tz - herdV.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        let nx = herdV.x, nz = herdV.z, yaw;
+        if (d > 0.22) {
+          // a straggler closes faster, or the line stretches on every sprint
+          // and never comes back — the Pantanal's own rule, same numbers.
+          const sp = clamp(1.4 + (d - 2) * 1.5, 1.4, herdSPEED);
+          const step = Math.min(1, (sp * dt) / d);
+          nx += dx * step; nz += dz * step;
+          yaw = Math.atan2(dx, dz);
+        } else {
+          yaw = s.look > 0 ? Math.atan2(p.x - nx, p.z - nz) : Math.atan2(dx, dz);
+        }
+        rec.put(i, nx, nz, yaw);
+      }
+    }
+  }
+
   game.registerShadowTarget = registerShadowTarget;
   // The modules that call registerShadowTarget ran before systems existed and hit
   // main.js's no-op stub, so sweep them retroactively.
@@ -19543,18 +19888,78 @@ export function createSystems(game) {
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
     input.jump = started && (!!keys.Space || touchJump || padJump);
 
-    // ---- BLACK TIE ----------------------------------------------------------
-    // Asked every frame rather than raised on an event, because the answer has
-    // to survive a save restore, a chapter change and a picker jump — and every
-    // one of those is a place an event does not fire. `dress` is idempotent, so
-    // this is three visible-flag comparisons and no work at all on the frames
-    // where nothing has changed.
+    // ---- THE WARDROBE -------------------------------------------------------
+    // One row per costume, and the whole rule is: you are in the chapter, and
+    // you have done the thing that is the REASON you have the object. See the
+    // wardrobe block in capybara.js for the ten of them and why each is that
+    // task and not the chapter's marquee.
     //
-    // Scoped to chapter 18 on purpose: the jacket is Monte Carlo's joke, and an
-    // animal that keeps it on in Antarctica is a different one.
-    if (game.capy && typeof game.capy.dress === 'function') {
-      game.capy.dress(!!(game.biome && game.biome.isActive('monaco')) &&
-                      taskRec['black-tie'] && taskRec['black-tie'].done);
+    // Asked every frame rather than raised on an event, because the answer has
+    // to survive a save restore, a chapter change and a picker jump, and every
+    // one of those is a place an event does not fire. `wear` is idempotent and
+    // exits on a string compare, so the frames where nothing has changed cost
+    // nothing at all.
+    //
+    // SCOPED TO THE CHAPTER ON PURPOSE. A costume that travels is a different
+    // game: the jacket is Monte Carlo's joke and the mask is Palawan's verb,
+    // and an animal wearing either of them in Son Doong is wearing fancy dress
+    // rather than the thing it just earnt. The one place they are all together
+    // is the album, which is where a wardrobe belongs.
+    if (game.capy && typeof game.capy.wear === 'function') {
+      let put = null;
+      for (let i = 0; i < sysWARDROBE.length; i++) {
+        const w = sysWARDROBE[i];
+        if (!game.biome || !game.biome.isActive(w.biome)) continue;
+        const r = taskRec[w.task];
+        if (r && r.done) put = w.wear;
+        break;                          // one chapter, one row, one answer
+      }
+      game.capy.wear(put);
+    }
+
+    // ---- ...AND THE NINE SKILLS ---------------------------------------------
+    // Same frame, same reason, no biome column: see sysSKILLS. The ANNOUNCEMENT
+    // is the only part of it that is an event — a skill that arrives silently
+    // is a skill nobody knows they have, and this game has been caught by that
+    // before — so the first frame a row goes true gets the moment card.
+    //
+    // A RESTORE MUST NOT ANNOUNCE. Every finished task ticks again while a save
+    // is replayed, so the naive version opens a loaded journey with nine
+    // banners. There is no `restoring` flag to test and there does not need to
+    // be one: the first frame after `started` marks everything ALREADY done as
+    // told, and only transitions after that are new. That also covers the
+    // picker, which jumps straight into a chapter with a save behind it.
+    if (game.capy && typeof game.capy.learn === 'function' && started) {
+      for (let i = 0; i < sysSKILLS.length; i++) {
+        const s = sysSKILLS[i];
+        // A TEACHER MAY BE A FIND AND NOT A TASK, and for two of the nine it
+        // has to be: walking the crater rim right round and standing in the
+        // bamboo until the bamboo is the loudest thing there are both `FINDS`
+        // rows, and they are precisely the right teachers for a pair of lungs
+        // and a pair of soft feet — nobody is told to do either, which is what
+        // makes having done them worth something. Both tables answer here.
+        // Written as it is because `taskRec` and `findDone` are two registries
+        // that do not know about each other, and a row that names neither
+        // silently never fires — which is how `the-rim-walk` shipped granting
+        // nothing at all in the first measured run of this.
+        const r = taskRec[s.task];
+        const on = !!(r && r.done) || !!findDone[s.task];
+        game.capy.learn(s.skill, on);
+        if (on && !sysSkillTold[s.skill]) {
+          sysSkillTold[s.skill] = 1;
+          if (sysSkillSeeded) sysSkillQueue.push(s);
+        }
+      }
+      sysSkillSeeded = true;
+      // One at a time, and not on top of the end card.
+      if (sysSkillQueue.length) {
+        sysSkillT -= dt;
+        if (sysSkillT <= 0 && !jrShown) {
+          const s = sysSkillQueue.shift();
+          sysSkillT = 4.6;
+          showMoment(s.name, s.line);
+        }
+      }
     }
 
     // ---- put me back --------------------------------------------------------
@@ -20255,6 +20660,13 @@ export function createSystems(game) {
     // cannot change usefully faster than four times a second. Raw dt, not the
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
+    // THE HERD RUNS LAST OF ALL, and that is the whole reason it needs no
+    // per-chapter surgery in the updaters: systems.js is the last module in
+    // the frame (env → …16 biomes… → weather → props → capy → condor → npcs →
+    // systems), so a `put` here lands after the chapter's own wander has
+    // already moved the animal and wins for that frame. Give a chapter the
+    // herd and it goes on drawing its animals exactly as it did.
+    herdUpdate(dt);
     // The live record line, on the same raw clock and for a third version of
     // the same reason: an attempt does not stop being open because a `wow` put
     // the world at 0.45x, and sysREC_STALE is a wall-clock promise.

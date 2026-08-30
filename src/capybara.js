@@ -376,7 +376,6 @@ const capyRAIN_WET = 0.85;
 const capyGeoBlob = new THREE.SphereGeometry(1, 8, 6);
 const capyGeoBead = new THREE.SphereGeometry(1, 6, 4);
 const capyGeoLeg = new THREE.CylinderGeometry(0.078, 0.10, 0.32, 6);
-const capyGeoFoot = new THREE.BoxGeometry(1, 1, 1);
 const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
 // The wardrobe's three. A unit disc (hat brims, bands, lenses), a unit dome
 // (crowns, hoods, helmets) and a unit box are between them every costume in the
@@ -385,6 +384,9 @@ const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
 const capyGeoDisc = new THREE.CylinderGeometry(1, 1, 1, 12);
 const capyGeoDome = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.52);
 const capyGeoBox = new THREE.BoxGeometry(1, 1, 1);
+// ...and the foot IS the unit box, under a name that says what it is being used
+// for. It was a second identical BoxGeometry until the wardrobe wanted one too.
+const capyGeoFoot = capyGeoBox;
 
 // --- scratch (NEVER allocate inside update) --------------------------------
 const capyThrow = new THREE.Vector3();
@@ -670,6 +672,73 @@ const capySTAM_TIRED   = 0.90;      // walk speed multiplier while blown
 let capyStam = 1;                   // 0..1
 let capyStamBlown = false;          // out of puff: walk only, no hops
 let capyStamHold = 0;               // s left of the regen delay
+
+// ===========================================================================
+// WHAT THE PLACES TAUGHT YOU — nine skills, and they TRAVEL.
+// ===========================================================================
+// Ten chapters hand over a costume (see THE WARDROBE); the other nine hand over
+// a MOVE. The costume is the chapter's joke and stays in it; a skill is a thing
+// the animal learned and keeps, which is the rule this codebase already holds
+// for the dive and the climb — a verb is a property of the world, and the
+// chapter that teaches it is not the only chapter that affords it.
+//
+// That is also what makes the back half of the journey feel different from the
+// front: by Hanoi you have Andean lungs, Kyoto's feet, Cali's ear, Iceland's
+// edges, Marrakech's wall-kick, the Drift's glide, Kowloon's reach, a herd, and
+// right of way. None of it is a number on a screen.
+//
+// THREE OF THEM WIDEN THE REACH ENVELOPE ON PURPOSE — the vault, the seed and
+// the mantle — and that is the point of them. The other six do not touch it at
+// all, and NOTHING here changes the jump apex: eighteen chapters of geometry
+// are sized against 1.37 m, and see the long note in the hop for why that is
+// the worst regression this game can have. The vault is a NEW launch, not a
+// bigger one; the seed only ever slows a descent and can never gain height;
+// the mantle only finishes a reach that was already within a hop of the ledge.
+//
+// systems.js owns which are on (`sysSKILLS`) and writes them here every frame.
+// Unknown names are ignored rather than added, so a renamed task goes quiet.
+const capySkill = {
+  lungs: false,     // ch2  Pasto      — altitude: deeper wind, quicker recovery
+  quiet: false,     // ch4  Kyoto      — soft feet: the world takes longer to mind
+  beat: false,      // ch5  Cali       — on the two: a step on the beat carries
+  carve: false,     // ch7  Iceland    — steering authority on ground that slides
+  vault: false,     // ch8  Marrakech  — one kick off a wall per airtime
+  seed: false,      // ch9  the Drift  — hold the hop key falling and you drift
+  mantle: false,    // ch11 Kowloon    — catch the ledge you just missed
+  herd: false,      // ch15 Pantanal   — wheek and they fall in behind you
+  float: false,     // ch15 Pantanal   — ...and the loaf works on water
+  flow: false,      // ch19 Hanoi      — hold a line and the world gives way
+};
+// ---- the vault ----
+const capyVAULT_V     = 5.4;        // m/s of rise off the wall (0.9 of a hop)
+const capyVAULT_PUSH  = 4.2;        // m/s away from the face
+const capyVAULT_MINY  = -7.5;       // no kick once you are falling faster than this
+let capyVaultUsed = false;          // one per airtime, spent until the feet land
+// ---- the seed ----
+const capySEED_V      = -1.85;      // m/s of descent while drifting
+const capySEED_LAM    = 9.0;        // how fast the flare brings the fall to it
+const capySEED_FLARE  = 0.40;       // s of easing before the rate is simply assigned
+const capySEED_CTRL   = 0.62;       // air control while drifting (vs capyAIR_CONTROL)
+const capySEED_ARM    = 0.22;       // s of falling before the key means "drift"
+let capySeedT = 0;                  // s the drift has been open
+// ---- the mantle ----
+const capyMANTLE_UP   = 0.62;       // m above the feet a lip may be and still be caught
+const capyMANTLE_DOWN = -0.30;      // ...and below, for a lip you are already level with
+const capyMANTLE_V    = 4.4;        // m/s of pull-up
+const capyMANTLE_FWD  = 2.6;        // m/s over the lip once you are up
+const capyMANTLE_COOL = 0.45;       // s before another one, so it cannot ladder
+let capyMantleT = 0;                // s of pull-up left to run
+let capyMantleCool = 0;
+// ---- on the two ----
+const capyBEAT_WIN    = 0.16;       // beats either side of the one that counts
+const capyBEAT_PUSH   = 2.35;       // m/s along the travel, horizontal only
+let capyBeatFlash = 0;              // 0..1, render-only: the animal answers
+// ---- the flow ----
+const capyFLOW_V      = 1.5;        // m/s below which you are not going anywhere
+const capyFLOW_TURN   = 1.15;       // rad of accumulated wobble that breaks it
+const capyFLOW_LAM    = 0.9;        // per second the wobble bleeds off
+let capyFlowDither = 0;
+let capyFlowYawWas = 0;
 let capyJumpT = 0;                  // s left of the launch grace
 let capyJumpHold = 0;               // s left of the sustain window
 let capyJumpCool = 0;
@@ -1809,13 +1878,12 @@ export function createCapybara(game) {
       capyAddPart(piv, capyGeoBead, m, 0, len + 0.010, 0, 0.032, 0.048, 0.016);
     }
     capyDisc(o.head, mSeq, 0, 0.150, -0.110, 0.115, 0.045);  // the mount
-    // and a sequinned collar on the shoulders, which is what stops the plumes
-    // reading as something that has landed on the animal
-    for (let s = -1; s <= 1; s += 2) {
-      const c = capyAddPart(o.body, capyGeoBox, mSeq, s * 0.215, 0.520, 0.115,
-                            0.075, 0.055, 0.26);
-      c.rotation.z = s * -0.34;
-    }
+    // and a sequinned collar, which is what stops the plumes reading as
+    // something that has landed on the animal. A RING round the base of the
+    // skull, not two slabs on the shoulders: the first version was a pair of
+    // boxes at s * 0.215 and from three-quarter front they read as one gold
+    // shard sticking out of the animal's side.
+    capyDisc(o.body, mSeq, 0, 0.548, 0.150, 0.245, 0.048);
   }
 
   // ---- ch10 · VENICE · the gondolier's boater ------------------------------
@@ -1851,7 +1919,7 @@ export function createCapybara(game) {
     const mSnk = mat(PALETTE.capySnorkel);
     const o = capyCostume('snorkel');
     // the strap, right round the skull
-    capyAddPart(o.head, capyGeoBox, mRub, 0, 0.120, 0.040, 0.375, 0.050, 0.400);
+    capyAddPart(o.head, capyGeoBox, mRub, 0, 0.120, 0.040, 0.398, 0.052, 0.400);
     // the skirt of the mask, over both eyes and the top of the muzzle
     capyAddPart(o.head, capyGeoBox, mRub, 0, 0.120, 0.300, 0.345, 0.150, 0.110);
     for (let s = -1; s <= 1; s += 2) {
@@ -1874,16 +1942,26 @@ export function createCapybara(game) {
     const mLea = mat(PALETTE.capyLeather);
     const mLeaDk = mat(PALETTE.capyLeatherDk);
     const mAmb = mat(PALETTE.capyAmber, { transparent: true, opacity: 0.85 });
+    const mFleece = mat(PALETTE.capyFur);
+    const mBrass = mat(PALETTE.capyShadeRim);
     const o = capyCostume('flycap');
     capyAddPart(o.head, capyGeoDome, mLea, 0, 0.170, 0.010, 0.200, 0.150, 0.215);
+    // THE SHEARLING IS WHAT MAKES IT A CAP AND NOT A SHADOW. A dark leather
+    // dome on a brown animal in Cappadocian light is invisible; the cream edge
+    // round the face and down the flaps is the whole read at any distance.
+    capyDisc(o.head, mFleece, 0, 0.176, 0.010, 0.212, 0.046);
     for (let s = -1; s <= 1; s += 2) {
-      const flap = capyAddPart(o.head, capyGeoBox, mLea, s * 0.186, 0.060, 0.020,
-                               0.046, 0.180, 0.180);
+      const flap = capyAddPart(o.head, capyGeoBox, mLea, s * 0.194, 0.055, 0.020,
+                               0.046, 0.185, 0.180);
       flap.rotation.z = s * 0.10;
+      const trim = capyAddPart(o.head, capyGeoBox, mFleece, s * 0.196, -0.042, 0.020,
+                               0.056, 0.050, 0.190);
+      trim.rotation.z = s * 0.10;
     }
-    capyAddPart(o.head, capyGeoBox, mLeaDk, 0, 0.246, 0.170, 0.320, 0.070, 0.058);
+    capyAddPart(o.head, capyGeoBox, mLeaDk, 0, 0.244, 0.176, 0.330, 0.076, 0.062);
     for (let s = -1; s <= 1; s += 2) {
-      capyDisc(o.head, mAmb, s * 0.088, 0.250, 0.196, 0.062, 0.024, Math.PI * 0.5);
+      capyDisc(o.head, mBrass, s * 0.090, 0.248, 0.200, 0.076, 0.020, Math.PI * 0.5);
+      capyDisc(o.head, mAmb, s * 0.090, 0.248, 0.214, 0.064, 0.022, Math.PI * 0.5);
     }
     // the scarf, and it is the whole reason this reads as flying
     for (let i = 0; i < 3; i++) {
@@ -1905,7 +1983,7 @@ export function createCapybara(game) {
     capyAddPart(o.head, capyGeoDome, mRed, 0, 0.166, 0.020, 0.190, 0.120, 0.205);
     // the yellow quarters: one band fore-and-aft over the crown, standing a
     // millimetre proud so it does not z-fight the shell it sits on
-    capyAddPart(o.head, capyGeoBox, mYel, 0, 0.230, 0.020, 0.098, 0.100, 0.400);
+    capyAddPart(o.head, capyGeoBox, mYel, 0, 0.238, 0.020, 0.100, 0.118, 0.404);
     capyAddPart(o.head, capyGeoBox, mRed, 0, 0.166, 0.020, 0.394, 0.030, 0.418);
     for (let s = -1; s <= 1; s += 2) {
       const str = capyAddPart(o.head, capyGeoBox, mYel, s * 0.176, 0.020, 0.070,
@@ -1954,13 +2032,29 @@ export function createCapybara(game) {
     capyAddPart(o.body, capyGeoBox, mPkDk, 0, 0.470, 0.010, 0.560, 0.070, 0.240);
     // the hood shell, behind and over the skull
     capyAddPart(o.head, capyGeoBlob, mPk, 0, 0.040, -0.120, 0.250, 0.245, 0.230);
-    // ...and the ruff, on a ring about the face
+    // ...and the ruff, on a ring about the face. SYMMETRIC, with the gap at the
+    // bottom where the jaw is: an arc that simply stops after 86% of a circle
+    // leaves a bald quarter on one side and the hood looks knocked askew.
+    const GAP = 0.95;                       // radians of ring left open, at the jaw
     for (let i = 0; i < 11; i++) {
-      const a = -Math.PI * 0.5 + (i / 10) * Math.PI * 2 * 0.86;
+      const a = -Math.PI * 0.5 + GAP * 0.5 + (i / 10) * (Math.PI * 2 - GAP);
       capyAddPart(o.head, capyGeoBead, mFur,
                   Math.cos(a) * 0.238, 0.040 + Math.sin(a) * 0.238, 0.090,
                   0.062, 0.062, 0.070);
     }
+  }
+
+  // ---- and the one verb -----------------------------------------------------
+  let capyWorn = null;
+  function capyWear(id) {
+    const next = (id && capyWardrobe[id]) ? id : null;
+    if (next === capyWorn) return;
+    for (const k in capyWardrobe) {
+      const on = k === next;
+      capyWardrobe[k].body.visible = on;
+      capyWardrobe[k].head.visible = on;
+    }
+    capyWorn = next;
   }
 
   // --- fx: splash rings, one InstancedMesh (three instances, one draw) --
@@ -2126,12 +2220,17 @@ export function createCapybara(game) {
   function capyBakeGhost() {
     // THE GHOST IS THE ANIMAL, NOT THE OUTFIT. It is baked once, lazily, on the
     // first show and cached for the session — so a bake that happened to land
-    // while the jacket was on would put a dinner jacket on the ghost in all
-    // nineteen chapters for the rest of the run. Off for the bake, and back in
-    // the `finally` so an early return or a throw cannot leave the animal
-    // undressed on the deck it just earned the thing on.
-    const wasDressed = tuxGroup.visible;
-    tuxGroup.visible = false; bowGroup.visible = false; shadeGroup.visible = false;
+    // while a costume was on would put that costume on the ghost in all
+    // nineteen chapters for the rest of the run. Everything off for the bake,
+    // and back in the `finally` so an early return or a throw cannot leave the
+    // animal undressed on the deck it just earned the thing on.
+    //
+    // The `traverse` below tests `o.visible` per mesh, which is NOT enough on
+    // its own: a hidden costume's group is invisible while its own meshes are
+    // perfectly `visible: true`, and traverse does not stop at an invisible
+    // node. Both belts are worn — this one and the parent walk inside the loop.
+    const wasWorn = capyWorn;
+    capyWear(null);
     try {
       const parts = [];
       capyModel.updateWorldMatrix(true, true);
@@ -2188,9 +2287,7 @@ export function createCapybara(game) {
       scene.add(mesh);
       return mesh;
     } catch (e) { return null; } finally {
-      tuxGroup.visible = wasDressed;
-      bowGroup.visible = wasDressed;
-      shadeGroup.visible = wasDressed;
+      capyWear(wasWorn);
     }
   }
 
@@ -2301,23 +2398,46 @@ export function createCapybara(game) {
       return h ? { nx: h.nx, nz: h.nz, top: h.top } : null;
     },
     /**
-     * PUT THE DINNER JACKET ON, OR TAKE IT OFF. See the build above.
+     * PUT ON ONE OF THE COSTUMES, OR NONE. See THE WARDROBE above.
      *
-     * Idempotent, cheap, and safe to call every frame — which is how chapter 18
-     * calls it, because "am I in Monte Carlo and have I got the jacket" is a
-     * question with an answer on every frame and no event worth trusting. Three
-     * meshes' `visible`, and nothing else in the animal changes: the costume is
-     * a costume, not a state.
+     * Idempotent, cheap, and safe to call every frame — which is how systems.js
+     * calls it, because "which chapter am I in and what have I earnt in it" is
+     * a question with an answer on every frame and no event worth trusting: a
+     * save restore, a chapter change and a picker jump are three places an
+     * event does not fire. A repeat of the costume already on returns after one
+     * string compare; a change is at most four `visible` flags.
+     *
+     * Unknown ids take everything off rather than throwing. A chapter naming a
+     * costume that has been renamed should go bare, not crash.
      */
-    dressed: false,
-    dress(on) {
-      const v = !!on;
-      if (v === capy.dressed) return;
-      capy.dressed = v;
-      tuxGroup.visible = v;
-      bowGroup.visible = v;
-      shadeGroup.visible = v;
-    },
+    get worn() { return capyWorn; },
+    wear(id) { capyWear(id); },
+    /** The v39 name for `wear('black-tie')`. Chapter 18 still calls it. */
+    dress(on) { capyWear(on ? 'black-tie' : null); },
+
+    /**
+     * WHAT THE PLACES TAUGHT YOU. See capySkill for the nine and the rules.
+     *
+     * `learn` is systems.js's alone and is written every frame from the task
+     * table, for the same reason the wardrobe is: a save restore, a chapter
+     * change and a picker jump are three places an event does not fire. It
+     * ignores names it does not know rather than adding them, so a renamed
+     * task goes quiet instead of creating a skill nothing reads.
+     *
+     * `can` is for everybody — npc.js asks about `herd`, and a chapter that
+     * wants to say something the first time it sees you drift can ask too.
+     */
+    can(id) { return !!capySkill[id]; },
+    learn(id, on) { if (id in capySkill) capySkill[id] = !!on; },
+    /** 0..1, render-only: the beat flash, for anything that wants to answer it. */
+    get beatFlash() { return capyBeatFlash; },
+    /** True while the seed is open — a descent, never a climb. */
+    drifting: false,
+    /**
+     * A STEADY LINE, HELD. See THE FLOW. npc.js reads this to decide whether to
+     * step out of the way; it is false for everybody until Hanoi is crossed.
+     */
+    committed: false,
     face(yaw) {
       if (typeof yaw !== 'number' || yaw !== yaw) return;
       capyYaw = yaw; capyPrevYaw = yaw; capyBodyYaw = yaw; capyYawRate = 0;
@@ -2918,11 +3038,20 @@ export function createCapybara(game) {
       if (capyStam > 1) capyStam = 1;
     } else if (stamWantRun && !capyStamBlown) {
       capyStamHold = capySTAM_DELAY;
-      capyStam -= capySTAM_DRAIN * dt;
+      // ---- ch2 · THE LUNGS ------------------------------------------------
+      // Pasto is 2,527 m up and the crater rim is a long way round. An animal
+      // that has walked it has done altitude training whether it meant to or
+      // not, and the whole of the upgrade is that this is a smaller number and
+      // the two below are bigger ones: 14 s at a flat run instead of 10, and
+      // half the wait before any of it comes back. It changes no distance, no
+      // speed and no reach — only how long you may keep going, which is the
+      // one thing a mountain can actually teach a body.
+      capyStam -= capySTAM_DRAIN * (capySkill.lungs ? 0.71 : 1) * dt;
     } else if (capyStamHold > 0) {
-      capyStamHold -= dt;
+      capyStamHold -= dt * (capySkill.lungs ? 2.0 : 1);
     } else if (capyStam < 1) {
-      capyStam += capySTAM_REGEN * (stamMag2 > 0.01 ? capySTAM_REGEN_M : 1) * dt;
+      capyStam += capySTAM_REGEN * (capySkill.lungs ? 1.45 : 1) *
+                  (stamMag2 > 0.01 ? capySTAM_REGEN_M : 1) * dt;
       if (capyStam > 1) capyStam = 1;
     }
     if (capyStam <= 0) {
@@ -3070,6 +3199,35 @@ export function createCapybara(game) {
           body.velocity.z += lvz * k;
         }
       }
+      // ---- ch5 · ON THE TWO -------------------------------------------------
+      // Cali is the one chapter that already judges you against the pulse —
+      // `salsa-dance` is scored on `game.music.off()`, the signed distance to
+      // the nearest beat — and what it teaches is that the beat is there in the
+      // other eighteen places too. Land the hop on it and the step carries.
+      //
+      // HORIZONTAL, NEVER THE APEX. See the long note above: the arc is 1.37 m
+      // in eighteen chapters of geometry and a rhythm bonus that raised it
+      // would make the game's reach depend on a drummer. This is the same
+      // channel as the run-up and it is added the same way — once, onto the
+      // velocity, in the platform's frame — so on the beat a standing hop
+      // travels like a moving one and a running hop travels further, and the
+      // ceiling of what you can land on does not move a millimetre.
+      //
+      // Silent when there is no pulse: `beats()` answers -1 for every pad
+      // palette in the game, and a bonus you cannot hear the cue for is a
+      // bonus that reads as the game being inconsistent.
+      if (capySkill.beat && !capySwimming && game.music &&
+          typeof game.music.off === 'function' && game.music.playing) {
+        const off = game.music.off();
+        if (off === off && Math.abs(off) < capyBEAT_WIN) {
+          const bx = Math.sin(capyYaw), bz = Math.cos(capyYaw);
+          body.velocity.x += bx * capyBEAT_PUSH;
+          body.velocity.z += bz * capyBEAT_PUSH;
+          capyBeatFlash = 1;
+          capySfxOpts.pitch = 1.9; capySfxOpts.volume = 0.34;
+          game.sfx('tick', capySfxOpts);
+        }
+      }
       if (!capySwimming) {
         capyStam -= capySTAM_HOP;
         if (capyStam < 0) capyStam = 0;
@@ -3116,9 +3274,161 @@ export function createCapybara(game) {
         body.velocity.y += capyJUMP_HOLD_A * dt;
       }
     }
+
+    // ---- ch9 · THE SEED ----------------------------------------------------
+    // The Drift is the chapter where the air is the floor, and `driftseed` is
+    // twenty seconds of hanging off one while the wind takes it somewhere. What
+    // it teaches is what a seed is FOR: hold the hop key once you are falling
+    // and the animal splays and comes down at 1.85 m/s instead of terminal.
+    //
+    // IT CAN NEVER GAIN HEIGHT, and that is the whole safety argument. The only
+    // thing this does to velocity.y is bring it UP TOWARD a negative number, so
+    // a drift is always a descent and no ledge in the game becomes reachable
+    // that a hop could not already reach. What it buys is TIME in the air, and
+    // therefore distance across — which is exactly what a seed buys.
+    //
+    // Armed after capySEED_ARM of falling so it cannot eat the hop's own
+    // sustain (the block above owns the key while the arc is still rising), and
+    // closed by water, ground, a cling, a carry and the dive, all of which have
+    // their own opinion about which way is up.
+    const seedWant = capySkill.seed && input.jump && !grounded && !capySwimming &&
+                     !capyClinging && !capy.carriedBy && !capyDiving &&
+                     capyJumpArm === false && body.velocity.y < -0.4;
+    // A DAMP ALONE LOSES TO GRAVITY, and by a lot. capybara.js runs BEFORE the
+    // world step, so every frame the solver puts back what the damp just took:
+    // at lambda 6 the equilibrium is where 9.5% of the gap equals one frame of
+    // gravity, which measured at −5.64 m/s against a target of −1.85 — a third
+    // of the fall it says on the tin, and the sort of number that reads as the
+    // feature working because it is obviously better than terminal velocity.
+    //
+    // So the damp is the FLARE only — capySEED_FLARE of it, so the animal eases
+    // into the drift instead of hitting an invisible floor at twenty metres a
+    // second — and after that the rate is ASSIGNED. Assigning is safe here for
+    // the same reason it is safe in the climb: this is a controller writing its
+    // own axis, not an external force, and it only ever assigns a DESCENT.
+    if (seedWant) {
+      capySeedT += dt;
+      if (capySeedT > capySEED_ARM && body.velocity.y < capySEED_V) {
+        body.velocity.y = (capySeedT < capySEED_ARM + capySEED_FLARE)
+          ? damp(body.velocity.y, capySEED_V, capySEED_LAM, dt)
+          : capySEED_V;
+      }
+    } else if (capySeedT > 0) {
+      capySeedT = 0;
+    }
+    capy.drifting = capySeedT > capySEED_ARM;
+
+    // ---- ch8 · THE VAULT ---------------------------------------------------
+    // `acrobats` is a Marrakech square throwing a capybara into the air, and
+    // what comes back down knows what a wall is for. One kick per airtime,
+    // spent until the feet touch anything: press hop in mid-air with a face
+    // within reach and the animal goes off it.
+    //
+    // It reuses capyClimbAt, which is the game's one answer to "is there
+    // something here to hang off, and which way is it facing" — so the vault
+    // works on every surface the climb works on and on no surface it does not,
+    // and the sixteen chapters that got the generic fallback in v31 get the
+    // vault with it. `force` bypasses the grab-key gate, because a wall-kick is
+    // asked for with the hop key.
+    //
+    // 0.9 OF A HOP AND NOT A HOP. Stacking full-height kicks up a corner is a
+    // ladder to anywhere; at 0.9, decaying against gravity, a second kick off
+    // the same wall gains less than the first and a third gains almost nothing.
+    if (capySkill.vault && !grounded && !capySwimming && !capyClinging &&
+        !capy.carriedBy && !capyVaultUsed && capyJumpCool <= 0 &&
+        body.velocity.y > capyVAULT_MINY &&
+        (input.jumpPressed || capyBuffered(input, 'jumpBuf'))) {
+      const h = capyClimbAt(game, px, body.position.y, pz, true);
+      if (h) {
+        capyEatBuf(input, 'clearJumpBuf');
+        capyVaultUsed = true;
+        if (body.velocity.y < capyVAULT_V) body.velocity.y = capyVAULT_V;
+        body.velocity.x += h.nx * capyVAULT_PUSH;
+        body.velocity.z += h.nz * capyVAULT_PUSH;
+        capyJumpCool = capyJUMP_COOL;
+        capySeedT = 0;
+        capyPop = capyPop < 0.34 ? 0.34 : capyPop;
+        capyPopVel = 6;
+        capyEarFlick = 1;
+        capySfxOpts.pitch = 1.5; capySfxOpts.volume = 0.5;
+        game.sfx('pop', capySfxOpts);
+      }
+    }
+    if (grounded || capySwimming || capy.carriedBy) capyVaultUsed = false;
+
+    // ---- ch11 · THE MANTLE -------------------------------------------------
+    // Kowloon is the chapter that is a direction, and `bamboo-climb` is forty
+    // metres of somebody else's scaffolding. What it teaches is the last half
+    // metre: a hop that ARRIVES at a lip with its chin over it used to slide
+    // back down the face, because the climb wants a hold and a hop has no hands.
+    //
+    // The lip has to be in a narrow band about the feet — capyMANTLE_DOWN to
+    // capyMANTLE_UP, i.e. 30 cm below to 62 cm above — so this only ever
+    // finishes a reach that was already within a hop of the ledge, and cannot
+    // pull the animal up something it never got near. The cooldown is what
+    // stops it laddering a flat wall.
+    if (capyMantleCool > 0) capyMantleCool -= dt;
+    if (capySkill.mantle && capyMantleT <= 0 && capyMantleCool <= 0 &&
+        !grounded && !capySwimming && !capyClinging && !capy.carriedBy &&
+        body.velocity.y < 1.2 && (input.x !== 0 || input.z !== 0)) {
+      const h = capyClimbAt(game, px, body.position.y, pz, true);
+      if (h && typeof h.top === 'number' && h.top === h.top) {
+        const feet = body.position.y - capyFOOT_Y;
+        const rise = h.top - feet;
+        if (rise > capyMANTLE_DOWN && rise < capyMANTLE_UP) {
+          capyMantleT = 0.30;
+          capyMantleCool = capyMANTLE_COOL;
+          capySeedT = 0;
+          capyEarFlick = 1;
+          capySfxOpts.pitch = 1.15; capySfxOpts.volume = 0.38;
+          game.sfx('pop', capySfxOpts);
+        }
+      }
+    }
+    if (capyMantleT > 0) {
+      capyMantleT -= dt;
+      if (body.velocity.y < capyMANTLE_V) body.velocity.y = capyMANTLE_V;
+      // ...and OVER the lip, not up the face of it: a pull-up that only goes
+      // up puts the animal back on the same wall a tenth of a second later.
+      //
+      // Along the NOSE and not along the stick. `dx`/`dz` — the camera-relative
+      // move vector — are not declared until sixty lines below this and reading
+      // them here is a TDZ throw, not a compile error; and the nose is the
+      // better answer anyway, because facing is driven by intent in this file
+      // and is therefore already where the player asked to go.
+      body.velocity.x = Math.sin(capyYaw) * capyMANTLE_FWD + platVX;
+      body.velocity.z = Math.cos(capyYaw) * capyMANTLE_FWD + platVZ;
+    }
     // Leaving the ground has to STICK for a few frames or the contact the
     // capybara has not cleared yet reports grounded and the gait never lifts.
     if (capyJumpT > 0) grounded = false;
+
+    // ---- ch19 · THE FLOW ---------------------------------------------------
+    // Hanoi's whole lesson is one sentence: you cross a road by walking into it
+    // at a steady pace, and what gets you clipped is not speed, it is CHANGING
+    // YOUR MIND. `hanDither` — accumulated heading change over the last second
+    // and a half — is how the chapter measures that, and it is measured against
+    // two hundred and forty scooters that are all reading it.
+    //
+    // The skill is that sentence made portable. `capy.committed` is the same
+    // quantity in the same shape, published for anybody: npc.js reads it so
+    // that people step out of a committed animal's way in the other eighteen
+    // chapters too. Hanoi keeps its own — the traffic there is a much richer
+    // model and this is not going to second-guess it.
+    //
+    // IT IS NOT INVULNERABILITY AND IT IS NOT SPEED. It is being taken
+    // seriously: hold a line and a line opens. Stop, or waver, and it shuts,
+    // which is the honest version of the lesson and the only one worth having.
+    {
+      const fsp = Math.sqrt(capyVelocity.x * capyVelocity.x +
+                            capyVelocity.z * capyVelocity.z);
+      const dyaw = capyWrapAngle(capyYaw - capyFlowYawWas);
+      capyFlowYawWas = capyYaw;
+      capyFlowDither = clamp(capyFlowDither + Math.abs(dyaw) - dt * capyFLOW_LAM,
+                             0, 3);
+      capy.committed = capySkill.flow && fsp > capyFLOW_V &&
+                       capyFlowDither < capyFLOW_TURN && !capy.carriedBy;
+    }
 
     if (grounded) capyAirTime = 0; else capyAirTime += dt;
     const effGround = grounded || capyAirTime < 0.12;
@@ -3246,8 +3556,28 @@ export function createCapybara(game) {
       const slipSpeed = topSpeed * (1 + slip * capySLIP_CAP);
       const tx = dx * slipSpeed * (0.74 + 0.26 * align);
       const tz = dz * slipSpeed * (0.74 + 0.26 * align);
+      // ---- ch7 · THE CARVE --------------------------------------------------
+      // A glacier takes 80% of the steering away (capySLIP_CTRL) and that is
+      // correct: sliding is supposed to be sliding. What Iceland teaches by the
+      // bottom of `glacier-run` is that you can put an EDGE in — the authority
+      // loss drops to a third, so the animal holds a line down the ice instead
+      // of going wherever the ice was going. Measured at full slip: 6.65 m of
+      // lateral gain over two and a half seconds of steering becomes 12.86 m.
+      //
+      // THE CEILING DOES NOT MOVE. capySLIP_CAP is untouched, so the fastest a
+      // carve can be down a glacier is the fastest a fall can be. It does read
+      // a little quicker in the middle of a run (3.05 -> 3.93 m/s measured)
+      // and that is not extra speed, it is the same target reached instead of
+      // fought — which is the honest description of what an edge does.
+      //
+      // ...AND THE SEED FLIES ON THE SAME LINE. A drifting animal is not on the
+      // ground, so it takes the air branch; capySEED_CTRL is deliberately over
+      // capyAIR_CONTROL, because a seed that cannot be steered is a stone.
+      const slipCtl = capySkill.carve ? capySLIP_CTRL * 0.34 : capySLIP_CTRL;
       const control = capySwimming ? 0.55
-        : (effGround ? 1 - slip * capySLIP_CTRL : capyAirCtl(game));
+        : (effGround ? 1 - slip * slipCtl
+                     : (capySeedT > 0 ? Math.max(capySEED_CTRL, capyAirCtl(game))
+                                      : capyAirCtl(game)));
       const step = capyACCEL * control * (0.62 + 0.38 * align) * dt;
       let ex = tx - vx, ez = tz - vz;
       const el = Math.sqrt(ex * ex + ez * ez);
@@ -3726,9 +4056,27 @@ export function createCapybara(game) {
     // earned by holding still, given away before they touched a key. It only
     // shows in Sydney: every other chapter is arrived at through a teleport,
     // and teleport zeroes both (see capyTeleport). Sydney is not travelled to.
-    const capyBusy = mag > 0.02 || groundSpeed > 0.35 || !grounded ||
-                     capySwimming || capyClinging || carried || capyDiving ||
-                     !game.state.started;
+    // ---- ch15 · THE FLOAT --------------------------------------------------
+    // Swimming is on this list, which is why a capybara — an animal whose ENTIRE
+    // cultural identity is sitting placidly in water — could not sit still in
+    // any of it, and why the one chapter with a task about doing exactly that
+    // had to ask for it by hand every frame (see capy.loafAsk below).
+    //
+    // The Pantanal is the only place in the journey where the animal is not a
+    // novelty; `the-crossing` is nine of its own kind following it into a river.
+    // What that is worth is the water stops being somewhere you are on your way
+    // through. Float still and the loaf comes on, and with it everything built
+    // on `capy.loaf`: the calm field, the camera settling, the critters coming
+    // closer, the breath coming back.
+    //
+    // NOT while diving and not while moving — the same two conditions the land
+    // loaf already has, tested the same way. A drifting swimmer is still busy.
+    const floating = capySkill.float && capySwimming && !capyDiving &&
+                     mag <= 0.02 && groundSpeed <= 0.35;
+    const capyBusy = mag > 0.02 || groundSpeed > 0.35 ||
+                     (!grounded && !floating) ||
+                     (capySwimming && !floating) || capyClinging || carried ||
+                     capyDiving || !game.state.started;
     if (capyBusy || capy.heldProp) capyStillT = 0; else capyStillT += dt;
     if (capyBusy) capyRestT = 0; else capyRestT += dt;
     // Published because THE CALM is built on them and systems.js owns that.
@@ -4313,6 +4661,10 @@ export function createCapybara(game) {
     capyEarTimer -= dt;
     if (capyEarTimer <= 0) { capyEarTimer = rand(2.2, 5.5); capyEarFlick = 1; capyBlink = 0.11; }
     capyEarFlick = damp(capyEarFlick, 0, 7, dt);
+    // ON THE TWO, on the way out. Render-only and nothing in src reads it yet:
+    // it is published so a chapter or the card can answer a beat-landed hop
+    // without capybara.js having to know what the answer looks like.
+    if (capyBeatFlash > 0) capyBeatFlash = damp(capyBeatFlash, 0, 5, dt);
     const earBack = clamp(gaitSpeed * (running ? 0.115 : 0.075), 0, 0.88) +
                     (capySwimming ? 0.2 : 0) + capyIdleEar * 0.25;
     const flick = Math.sin(t * 34) * capyEarFlick * 0.5;

@@ -459,6 +459,26 @@ const npcSEP_R = 1.05;
 // walker exactly on the contact boundary and cannon spent the rest of the
 // encounter resolving a hair of penetration, which for a mass-0 kinematic body
 // against a dynamic one means moving the ANIMAL. See moveRec.
+// ---- ch4 · SOFT FEET, and ch19 · THE FLOW --------------------------------
+// Two numbers, and between them they are the whole of what those two chapters
+// hand over to the other seventeen.
+//
+// `npcQUIET_K` scales what the animal is WORTH as a fright: a startled walker
+// still startles, but half as much of it sticks. Kyoto is the chapter that asks
+// you to be a menace *quietly* and `still-bamboo` is the find for standing in
+// it until the bamboo is the loudest thing there; what that is worth is that
+// the rest of the world takes longer to mind you. It scales the wariness a
+// scare LEAVES BEHIND, not the scare — a person who has just been walked into
+// still says so, they simply do not hold it against you for as long.
+//
+// `npcFLOW_R` is Hanoi's lesson, made portable. In Hanoi two hundred and forty
+// riders read your heading and swing off it a second and a half early; here
+// people simply give a committed animal a wider berth than the 1.05 m at which
+// the meshes interpenetrate, and they step ACROSS the line rather than being
+// pushed back along it. It is not speed and it is not invulnerability. It is
+// being taken seriously, and it shuts the moment you waver.
+const npcQUIET_K   = 0.45;    // multiplier on wariness left behind, with soft feet
+const npcFLOW_R    = 2.25;    // m of berth a committed animal is given
 const npcWALK_CLEAR = 1.30;   // m between centres, with the margin the shapes need
 const npcSEP_LAMBDA = 14;     // damping on the shove — never a teleport
 const npcSEP_VMAX = 2.6;      // m/s cap on how fast anyone can be pushed
@@ -4331,18 +4351,40 @@ export function createNPCs(game) {
     const px = rec.group.position.x, pz = rec.group.position.z;
     let dx = px - capyX, dz = pz - capyZ;
     let d = Math.sqrt(dx * dx + dz * dz);
-    if (d >= npcSEP_R) { rec.sepD = d; return; }
+    // ---- ch19 · THE FLOW ---------------------------------------------------
+    // A committed animal is given npcFLOW_R instead of npcSEP_R, so the room
+    // opens BEFORE the meshes touch rather than after — which is the whole
+    // difference between a crowd that parts and a crowd that is bulldozed.
+    const flow = capyCommitted && capySpdH > 0.9;
+    const R = flow ? npcFLOW_R : npcSEP_R;
+    if (d >= R) { rec.sepD = d; return; }
     if (d < 1e-4) {            // dead centre — break the tie sideways
       dx = Math.sin(rec.yaw + 1.5708); dz = Math.cos(rec.yaw + 1.5708); d = 1e-4;
     } else { dx /= d; dz /= d; }
-    const overlap = npcSEP_R - d;
+    // ...and ACROSS the line, not back along it. Pushed radially, somebody
+    // standing dead ahead is shoved down the lane in front of the animal for as
+    // long as it keeps coming, which reads as being chased rather than as
+    // giving way. Projected onto the perpendicular of the travel, they take one
+    // step to whichever side they are already nearer and the lane is clear.
+    if (flow) {
+      const hx = capyVX / capySpdH, hz = capyVZ / capySpdH;
+      let sx = -hz, sz = hx;                      // the left-hand normal
+      if (dx * sx + dz * sz < 0) { sx = -sx; sz = -sz; }
+      dx = dx * 0.30 + sx * 0.70;
+      dz = dz * 0.30 + sz * 0.70;
+      const m = Math.sqrt(dx * dx + dz * dz) || 1;
+      dx /= m; dz /= m;
+    }
+    const overlap = R - d;
 
     // A shove that arrives out of nowhere earns a comic stagger — once, on the
     // frame the overlap starts, so it cannot buzz while the capy leans on them.
     // The +0.3 margin is hysteresis: the shove only ever settles them AT the
     // radius, so without it a capybara leaning on someone would re-trigger the
     // stagger every few frames and they would buzz.
-    if (rec.sepD > npcSEP_R + 0.3 && rec.stumble < 0.2 && rec.dejected <= 0) {
+    // ...on R and not on npcSEP_R, or the flow's wider radius settles people
+    // inside the hysteresis band and every one of them buzzes a stagger.
+    if (rec.sepD > R + 0.3 && rec.stumble < 0.2 && rec.dejected <= 0) {
       rec.stumble = clamp(0.45 + overlap, 0, 1);
       if (capySpdH > 1.1) {
         if (rec.hopV < 1.5 && rec.hop < 0.02) rec.hopV = 1.5;
@@ -4362,6 +4404,14 @@ export function createNPCs(game) {
   // ================================================================= capy ref
   let capyX = 0, capyZ = 0, capySpd = 0, capyOk = false;
   let capyVX = 0, capyVZ = 0, capySpdH = 0;
+  // ---- TWO OF THE NINE SKILLS ARE READ HERE (see capySkill in capybara.js) --
+  // `quiet` (ch4 Kyoto) is how much of an impression the animal makes; `flow`
+  // (ch19 Hanoi) is whether it is holding a line worth getting out of the way
+  // of. Both are mirrored on the same tick as the position, so this file asks
+  // `game.capy` once a frame rather than once per person.
+  let npcIbisOffered = false;
+  let capyQuiet = 1;               // multiplier on how much the animal alarms
+  let capyCommitted = false;       // a steady line, held. See THE FLOW.
   function refreshCapy() {
     const c = game.capy;
     if (!c || !c.position) { capyOk = false; npcCapyOk = false; return; }
@@ -4371,6 +4421,8 @@ export function createNPCs(game) {
     capyVX = c.velocity ? c.velocity.x : 0;
     capyVZ = c.velocity ? c.velocity.z : 0;
     capySpdH = Math.sqrt(capyVX * capyVX + capyVZ * capyVZ);
+    capyQuiet = (typeof c.can === 'function' && c.can('quiet')) ? npcQUIET_K : 1;
+    capyCommitted = !!c.committed;
     capyOk = true;
   }
   function distToCapy(rec) {
@@ -5151,7 +5203,13 @@ export function createNPCs(game) {
     // each of the six places that raise it — so being startled, robbed, chased,
     // soaked or barged all feed it for free and none of those call sites had to
     // learn a new word. See the npcWARY_* block.
-    if (rec.alarm > (rec.wary || 0)) rec.wary = rec.alarm;
+    // SOFT FEET SCALES WHAT IS LEFT BEHIND, NOT THE FRIGHT ITSELF (see
+    // npcQUIET_K). `alarm` is untouched — a person walked into still says so,
+    // still looks up, still hops — and only the memory it writes is smaller.
+    // Scaling the alarm instead would have made the animal quiet by making the
+    // world unresponsive, which is the opposite of the thing.
+    const wleft = rec.alarm * capyQuiet;
+    if (wleft > (rec.wary || 0)) rec.wary = wleft;
     else if (rec.wary > 0) { rec.wary -= dt / npcWARY_T; if (rec.wary < 0) rec.wary = 0; }
     rec.moveX = rec.moveX || 0; rec.moveZ = rec.moveZ || 0;
 
@@ -8484,6 +8542,45 @@ export function createNPCs(game) {
     wasLive = true;
     localsStep(dt);
     npcExStep(dt);
+
+    // ---- AND THE BIN CHICKENS WILL FOLLOW YOU (see THE HERD in systems.js) --
+    // obey 1, and chapter one is the right place for the easiest tier: a Sydney
+    // ibis will take a chip out of a stranger's hand and has no opinion at all
+    // about dignity. It is also the first animal a player ever meets, so if the
+    // herd is ever going to be discovered by accident it is discovered here.
+    //
+    // OFFERED HERE AND NOT AT BUILD TIME, and that is not a style choice: this
+    // module is created at boot BEFORE systems.js is (…npcs → systems), so
+    // `game.herdOffer` does not exist yet in the spawn loop and the offer was
+    // silently skipped — Sydney reported no recruitable kinds at all in the
+    // first measured run. One null check a frame, the same way `addCritter`
+    // has to be reached.
+    //
+    // These are full NPC records, so the put writes the TARGET as well as the
+    // position: `thinkIbis` steers toward `rec.target` on its own clock and
+    // would spend the next second walking back to wherever it had been going.
+    // Setting both means the bird and the herd agree about where it is going
+    // instead of taking turns.
+    if (!npcIbisOffered && typeof game.herdOffer === 'function') {
+      npcIbisOffered = true;
+      game.herdOffer({
+        biome: 'sydney', kind: 'ibis', obey: 1, voice: 'gull', pitch: 0.8,
+        count: function () { return ibises.length; },
+        at: function (n, o) {
+          const r = ibises[n];
+          if (!r) return;
+          o.x = r.group.position.x; o.y = r.group.position.y; o.z = r.group.position.z;
+        },
+        put: function (n, x, z, yaw) {
+          const r = ibises[n];
+          if (!r) return;
+          r.group.position.x = x; r.group.position.z = z;
+          r.target.set(x, r.group.position.y, z);
+          r.yaw = yaw;
+          r.state = 'wander';
+        },
+      });
+    }
 
     refreshCapy();
 

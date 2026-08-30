@@ -1346,6 +1346,34 @@ function gorUpdateCats(game, dt) {
     // bold 0.85: a town cat will absolutely come and sit next to something that
     // has stopped moving, and it is the funniest of the four. See THE LOAF.
     gorCatCrit = game.addCritter({ biome: 'goreme', r: gorCAT_NEAR, bold: 0.85 });
+    // ---- ...AND THEY WILL FOLLOW YOU, EVENTUALLY (see THE HERD) -----------
+    // obey 2, and a cat is the reason the tiers exist at all. It hears the
+    // first wheek and it looks at you, and that is ALL it does — which is both
+    // the truest thing about a cat and the clearest possible statement of the
+    // rule: being heard and being obeyed are two different events, and you can
+    // see the gap between them. Ask again inside the memory window and it
+    // comes.
+    //
+    // `st` is forced off 'walk' when it joins, or gorUpdateCats' own state
+    // machine keeps steering it away from the very animal it is following.
+    if (typeof game.herdOffer === 'function') {
+      game.herdOffer({
+        biome: 'goreme', kind: 'cat', obey: 2, voice: 'pop', pitch: 1.25,
+        count: function () { return gorCAT_N; },
+        at: function (i, o) {
+          const c = gorCats[i];
+          if (!c) return;
+          o.x = c.x; o.z = c.z; o.y = gorTerrain ? gorTerrain(c.x, c.z) : 0;
+        },
+        put: function (i, x, z, yaw) {
+          const c = gorCats[i];
+          if (!c) return;
+          c.x = x; c.z = z; c.yaw = yaw;
+          c.tx = x; c.tz = z;                 // ...and stop it walking off
+          if (c.st === 'walk') { c.st = 'sit'; c.t = 3; }
+        },
+      });
+    }
   }
   const catNear = gorCatCrit ? gorCatCrit.near : gorCAT_NEAR;
   const catAppr = gorCatCrit ? (gorCatCrit.appr || 0) : 0;

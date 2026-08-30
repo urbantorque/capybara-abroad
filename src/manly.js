@@ -2676,6 +2676,28 @@ function manUpdateGulls(game, dt) {
     // thing this chapter asks you to do with the gulls is unaffected either
     // way. See THE LOAF in systems.js.
     manGullCrit = game.addCritter({ biome: 'manly', r: manGULL_NEAR, bold: 0.9 });
+    // ---- ...AND THEY WILL FOLLOW YOU, FOR A PRICE (see THE HERD) ---------
+    // obey 2. A silver gull will mug a stranger for a chip without being asked
+    // at all, and will not walk anywhere for anybody without being asked
+    // twice — which is a different animal from a St Mark's pigeon and is why
+    // the tier is not the same. Only the ones on the ground: a gull that is
+    // already up is flying, and `manGullData[o + 4]` is its own vertical
+    // velocity, so a bird in the air is left entirely alone.
+    if (typeof game.herdOffer === 'function') {
+      game.herdOffer({
+        biome: 'manly', kind: 'silver gull', obey: 2, voice: 'gull', pitch: 1.15,
+        count: function () { return manGULL_N; },
+        at: function (i, o) {
+          const q = i * 7;
+          o.x = manGullData[q]; o.y = manGullData[q + 1]; o.z = manGullData[q + 2];
+        },
+        put: function (i, x, z) {
+          const q = i * 7;
+          if (manGullData[q + 1] > manPROM_Y + 0.6) return;   // airborne: leave it
+          manGullData[q] = x; manGullData[q + 2] = z;
+        },
+      });
+    }
   }
   if (capy && capy.position) {
     const d = Math.hypot(capy.position.x - manGULL_HOME.x, capy.position.z - manGULL_HOME.z);

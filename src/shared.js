@@ -90,8 +90,13 @@ export const PALETTE = {
   capyRubber:   0x24272c,      // ch12 mask and snorkel
   capyLens:     0x9fd6e4,
   capySnorkel:  0xe8b93c,
-  capyLeather:  0x7d5334,      // ch13 the balloon pilot
-  capyLeatherDk:0x5c3c26,
+  // ch13 the balloon pilot. 0x7d5334 and 0x5c3c26 first, which are both a
+  // capybara — the flying cap went on and DISAPPEARED, in warm Cappadocian
+  // light on a warm brown animal, which is the one rule this block states and
+  // the one it broke. Dark and slightly cool now, with the shearling doing the
+  // separating: a leather cap needs a cream edge to be a leather cap anyway.
+  capyLeather:  0x453729,
+  capyLeatherDk:0x2b231b,
   capyAmber:    0xd9a24e,
   capyLifeRed:  0xc8433c,      // ch14 the surf cap, in its two colours
   capyLifeYel:  0xe6c34a,

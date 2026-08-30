@@ -4405,6 +4405,34 @@ function antUpdatePenguins(game, dt) {
     // because a gentoo standing on its own nest is committed to the nest and
     // will only turn its head. See THE CALM REGISTRY above antUpdateSeal.
     antColonyCrit = game.addCritter({ biome: 'antarctic', r: 20, bold: 0.8 });
+    // ---- ...AND THEY WILL FOLLOW YOU (see THE HERD in systems.js) ---------
+    // obey 1. A gentoo colony has worn a polished track down a hillside by
+    // walking in single file behind whichever bird set off first, which is the
+    // entire mechanic already, and the chapter has a task about that track.
+    // A line of them behind a capybara is the joke this whole system exists
+    // for and it costs ten lines.
+    //
+    // The birds ON NESTS are not offered: `antPENG_COL` of them are sitting on
+    // eggs and a bird that walks off its nest to follow a rodent is a bird
+    // that has abandoned an egg. The index is shifted past them, so `count`
+    // reports only the ones standing about — which is also the third of the
+    // colony that is genuinely at a loose end.
+    if (typeof game.herdOffer === 'function') {
+      game.herdOffer({
+        biome: 'antarctic', kind: 'gentoo', obey: 1, voice: 'gull', pitch: 1.35,
+        count: function () { return Math.max(0, antPENG_N - antPENG_COL); },
+        at: function (i, o) {
+          const q = (i + antPENG_COL) * antPENG_S;
+          o.x = antPengData[q]; o.z = antPengData[q + 1];
+          o.y = antWATER + antFLOE_TOP;
+        },
+        put: function (i, x, z, yaw) {
+          const q = (i + antPENG_COL) * antPENG_S;
+          antPengData[q] = x; antPengData[q + 1] = z; antPengData[q + 2] = yaw;
+          antPengData[q + 6] = x; antPengData[q + 7] = z;   // ...and its own target
+        },
+      });
+    }
   }
   // ...and the whole colony looks up from further when the animal has settled.
   // Squared, because the test below is squared. 400 is 20 m.
@@ -4761,6 +4789,22 @@ function antUpdateSeal(game, dt) {
   if (!antSealGroup) return;
   if (!antSealCrit && typeof game.addCritter === 'function') {
     antSealCrit = game.addCritter({ biome: 'antarctic', r: antSEAL_NOTICE, bold: 1 });
+    // ---- THE LEOPARD SEAL IS NOT OFFERED, AND SHE WAS ---------------------
+    // She was the second animal at obey 3, to stand beside the Kyoto heron,
+    // and she had to come out. Her whole state machine is built around GOING
+    // INTO THE WATER when anything approaches: antSEAL_NOTICE is 24 m and puts
+    // her to watching, and closing further puts her to in. The herd carries
+    // fifteen metres, so there is no distance at which she is both on the floe
+    // and inside earshot — measured n: 0 on every wheek of every attempt,
+    // first gating the offer on hauled and then on hauled-or-watching.
+    //
+    // Widening it would mean overriding the chapter own marquee — the whole of
+    // leopard-seal is her leaving the ice to come and inspect you — which is
+    // the same reason the Pantanal capybaras are not offered (they have a
+    // native follower system) and its caimans are not either: a caiman is a
+    // load-bearing FLOOR with a collider baked at build time, and moving one
+    // desyncs the two. An offer that cannot be completed is the exact bug this
+    // whole pass exists to find, so it is a comment instead of an offer.
   }
   const i = antSealFloe;
   const fx = antFloeX[i], fz = antFloeZ[i];

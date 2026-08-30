@@ -2746,6 +2746,32 @@ function venUpdatePigeons(game, dt) {
     // bold 0.85: a St Mark's pigeon is very nearly as bold as a heron and much
     // less dignified about it.
     venPigeonCrit = game.addCritter({ biome: 'venice', r: venPIGEON_R, bold: 0.85 });
+    // ---- ...AND THEY WILL FOLLOW YOU (see THE HERD in systems.js) ---------
+    // obey 1, because a San Marco pigeon will follow anything at all that
+    // looks like it might have a plan. `at` reads the pair the flock update
+    // already keeps and `put` writes it back — the drawing, the wing beat,
+    // the take-off and the landing all stay exactly where they are, and the
+    // only frames this touches are the ones where a bird is actually in the
+    // line. A bird that is AIRBORNE is skipped: a pigeon that has just been
+    // put up is not walking behind anybody, and dragging one back to the
+    // paving mid-flight is the one thing that would look like a bug.
+    if (typeof game.herdOffer === 'function') {
+      game.herdOffer({
+        biome: 'venice', kind: 'pigeon', obey: 1, voice: 'pop', pitch: 1.7,
+        count: function () { return venPIGEON_N; },
+        at: function (i, o) {
+          const q = i * 10;
+          o.x = venPigeonData[q]; o.z = venPigeonData[q + 1];
+          o.y = venCITY_Y + venPigeonData[q + 5];
+        },
+        put: function (i, x, z, yaw) {
+          const q = i * 10;
+          if (venPigeonData[q + 3] > 0) return;      // in the air: leave it alone
+          venPigeonData[q] = x; venPigeonData[q + 1] = z;
+          venPigeonData[q + 2] = yaw;
+        },
+      });
+    }
   }
   venFlockX = -4 + Math.sin(venTime * 0.11) * 5.0;
   venFlockZ = -34 + Math.sin(venTime * 0.073 + 1.1) * 12.0;

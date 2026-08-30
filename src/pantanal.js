@@ -3909,8 +3909,43 @@ function panUpdateEcho(game, dt) {
  * height is that a HERD of white shapes on green is a texture that MOVES, so
  * the requirement is only that no two of them ever step at the same moment.
  */
+let panCowsOffered = false;
 function panUpdateCattle(game, dt) {
   if (!panCattle) return;
+  // ---- THE CATTLE WILL FOLLOW YOU TOO (see THE HERD in systems.js) -------
+  // obey 1: a cow will follow anything that looks like it is going somewhere,
+  // and the Pantanal is where the animal learns that this works at all.
+  //
+  // ONLY THE THIRTEEN OUT ON THE CAMPO. The other eleven are in the corral and
+  // the peão is counting them; a cow that walks out through the rails behind a
+  // capybara is a cow that has broken the one bit of arithmetic anybody in this
+  // chapter is doing. The index is shifted past the penned ones rather than
+  // filtered, because a `count` that reports twenty-four and an `at` that
+  // sometimes declines is a registry with a hole in the middle of it.
+  //
+  // The chapter's own capybara herd is deliberately NOT offered anywhere: it
+  // has a native follower system and two of them would fight over the same
+  // nine animals.
+  if (!panCowsOffered && typeof game.herdOffer === 'function') {
+    panCowsOffered = true;
+    const free = function (i) { return panCows[i + 11] || null; };
+    game.herdOffer({
+      biome: 'pantanal', kind: 'cow', obey: 1, voice: 'wheek', pitch: 0.55,
+      count: function () { return Math.max(0, panCows.length - 11); },
+      at: function (i, o) {
+        const c = free(i);
+        if (!c) return;
+        o.x = c.x; o.z = c.z; o.y = panBedH(c.x, c.z);
+      },
+      put: function (i, x, z, yaw) {
+        const c = free(i);
+        if (!c) return;
+        c.x = x; c.z = z; c.yaw = yaw;
+        c.hx = x; c.hz = z;             // ...and it grazes wherever it ends up
+        c.moving = 1;
+      },
+    });
+  }
   for (let i = 0; i < panCows.length; i++) {
     const c = panCows[i];
     c.t -= dt;

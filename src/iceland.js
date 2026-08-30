@@ -3182,6 +3182,46 @@ function iceUpdateSheep(game, dt) {
     // bold 0.7: a sheep will come and look at you, and it will take longer to
     // make up its mind about it than a heron does. See THE LOAF in systems.js.
     iceSheepCrit = game.addCritter({ biome: 'iceland', r: iceSHEEP_NEAR, bold: 0.7 });
+    // ---- ...AND THEY WILL FOLLOW YOU (see THE HERD in systems.js) ---------
+    // obey 1. A sheep does not need asking twice to follow something; it is
+    // the only thing a sheep is famous for. The flocks are separate arrays, so
+    // the herd is handed ONE flat index and this maps it — a registry that
+    // needs the caller to know there are four flocks is a registry that gets
+    // the arithmetic wrong somewhere else later.
+    //
+    // The write lands in `data`, which iceland's own update reads on the NEXT
+    // frame to build the instance matrices. One frame of latency, and it is
+    // invisible: the alternative is this file's draw code moving into a shared
+    // one, which is a much worse trade.
+    if (typeof game.herdOffer === 'function') {
+      const flat = function (i) {
+        for (let f = 0; f < iceSheep.length; f++) {
+          const n = iceSheep[f].def.n;
+          if (i < n) return { S: iceSheep[f], o: i * iceSHEEP_STRIDE };
+          i -= n;
+        }
+        return null;
+      };
+      game.herdOffer({
+        biome: 'iceland', kind: 'sheep', obey: 1, voice: 'wheek', pitch: 1.45,
+        count: function () {
+          let n = 0;
+          for (let f = 0; f < iceSheep.length; f++) n += iceSheep[f].def.n;
+          return n;
+        },
+        at: function (i, out) {
+          const h = flat(i);
+          if (!h) return;
+          out.x = h.S.data[h.o]; out.z = h.S.data[h.o + 1];
+          out.y = iceTerrain(out.x, out.z);
+        },
+        put: function (i, x, z, yaw) {
+          const h = flat(i);
+          if (!h) return;
+          h.S.data[h.o] = x; h.S.data[h.o + 1] = z; h.S.data[h.o + 2] = yaw;
+        },
+      });
+    }
   }
   const near = iceSheepCrit ? iceSheepCrit.near : iceSHEEP_NEAR;
   const iceSheepNear2 = near * near;

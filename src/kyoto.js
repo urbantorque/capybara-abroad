@@ -1324,6 +1324,36 @@ function kyoUpdateHeron(game, dt) {
       // bold: a heron in a garden pond is the boldest animal in the game and
       // is the direct test of the inverted registry. See THE LOAF.
       kyoHeronCrit = game.addCritter({ biome: 'kyoto', r: kyoHERON_NEAR, bold: 1 });
+      // ---- ...AND IT IS THE HARDEST THING IN THE GAME TO RECRUIT ----------
+      // obey 3, the ceiling, and there is exactly one animal at it. A heron is
+      // the whole argument for the tier system: it answers the FIRST wheek —
+      // the head comes round and it looks at you, on rule 3, like everything
+      // else in earshot — and then it does not move, and it does not move
+      // again, and on the third wheek inside the memory window it walks over
+      // and falls in behind a rodent. One bird, and it is worth more than the
+      // hundred and eighty pigeons.
+      //
+      // Only ever offered while it is STANDING (phase 0). A heron in the air
+      // is doing the thing the chapter is actually about and the herd may not
+      // reach up and pull it out of that.
+      if (typeof game.herdOffer === 'function') {
+        game.herdOffer({
+          biome: 'kyoto', kind: 'heron', obey: 3, voice: 'gull', pitch: 0.62,
+          count: function () { return kyoHeronPhase === 0 ? 1 : 0; },
+          at: function (i, o) {
+            o.x = kyoHeronWadeX; o.z = kyoHeronWadeZ;
+            o.y = kyoHeronGroup ? kyoHeronGroup.position.y : 0;
+          },
+          put: function (i, x, z, yaw) {
+            if (kyoHeronPhase !== 0 || !kyoHeronGroup) return;
+            kyoHeronWadeX = x; kyoHeronWadeZ = z;
+            kyoHeronGroup.position.x = x;
+            kyoHeronGroup.position.z = z;
+            kyoHeronStalk = kyoWrapY(yaw);
+            kyoHeronGroup.rotation.set(0, kyoHeronStalk, 0);
+          },
+        });
+      }
     }
     let near = cp && Math.hypot(cp.x - from.x, cp.z - from.z) <
                (kyoHeronCrit ? kyoHeronCrit.near : kyoHERON_NEAR);

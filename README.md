@@ -1395,7 +1395,8 @@ It is wired now, and it does the thing.
 of a boat nobody invited you onto, nine metres above the harbour. Taking it used to tick a line
 and leave a dinner jacket in a capybara's mouth. Now the animal puts it on — midnight cloth over
 the shoulders, a satin shawl collar, a black bow under the chin and a pair of sunglasses with a
-brass rim — and wears it for the rest of the evening. It is the only costume in the game.
+brass rim — and wears it for the rest of the evening. It was the first costume in the game, and
+it turned out there should be ten.
 
 Getting up there is also, now, possible. Both companionways on that boat were drawn and collided
 *inside* the deckhouse they were meant to climb, so the whole vessel above the main deck was one
@@ -1404,6 +1405,131 @@ deck into the harbour could not be done either. Two of the chapter's seventeen l
 uncompletable and neither of them said so. The flights are in open air now — up the back, along
 the side, up the front — and the walk from the passerelle to the lounger has been done, one leg
 at a time, with a stopwatch on it.
+
+## Nine things the other places teach you
+
+Ten chapters give you something to wear. The other nine give you something to
+**do** — and the difference is the point. A costume is that chapter's joke and it
+stays there. A skill is a thing the animal learned, so it comes with you.
+
+Walk the crater rim right round at two and a half thousand metres, which nobody
+asks you to do, and you have done altitude training whether you meant to or not:
+you run for fourteen seconds instead of ten and get your breath back in half the
+time, everywhere, for the rest of the journey. Stand still in the Kyoto bamboo
+until the bamboo is the loudest thing there and you come out with soft feet —
+people still jump when a capybara runs into them, they just stop holding it
+against you. Dance salsa properly in Cali and you can hear the pulse in the other
+eighteen places; land a hop on the beat anywhere and the step carries.
+
+Take the glacier down in one go and you learn what an edge is: you still cannot
+stop on ice, but you can decide where you come out, and the same is true of
+Antarctic blue ice and wet stone. Let the Marrakech acrobats throw you and you
+work out what a wall is for — hop again while you are on one, once per jump.
+Hang off a driftseed for twenty seconds and you learn what a seed is *for*: hold
+the hop key on the way down and you come down like one, slowly, drifting, which
+turns a fall into a decision. Go up the bamboo scaffolding in Kowloon and you get
+the last half metre — a jump that arrives at a lip with its chin over it now
+finishes instead of sliding back down the face.
+
+The Pantanal is the one place in the game where you are not a novelty, and it is
+the only chapter that teaches two things. Take the whole herd across the river
+and the water stops being somewhere you are on your way through: you can just sit
+in it. Any water, anywhere. And get five of your own kind to follow you and you
+find out that it works on **anything** — see below. And cross a Hanoi road
+without stopping and you have learned the only thing that city teaches — hold
+your line and the line opens. People step out of a committed animal's way in the
+other eighteen chapters too, and the moment you waver, they stop.
+
+## Wheek at it, and keep wheeking
+
+The herd is the one skill that is a whole system rather than a number, and it has
+two rules that stop it being a switch you flip once.
+
+**It is on a timer.** One wheek buys you twenty-one seconds of company. Nobody
+joins a collection; they fall in behind you for a while and then they wander off,
+so keeping nine animals in a line across San Marco is a performance you are
+actively giving rather than a score you have banked. Stop asking and you are on
+your own inside half a minute.
+
+**And some of them take more asking than others.** A pigeon in St Mark's Square
+will follow anything that looks like it might have a plan — one wheek, and ninety
+of them turn round. So will an Icelandic sheep, a Pantanal cow, a gentoo penguin
+standing about between the nests, and the very first animal you ever meet: a
+Sydney ibis, which will take a chip out of a stranger's hand and has no opinion
+at all about dignity. A Göreme rooftop cat wants asking twice, and the first wheek
+gets you a long look and absolutely nothing else — which is both the truest thing
+about a cat and the clearest possible statement of the rule. So does a Manly
+silver gull, which will mug you for a chip unasked and will not walk anywhere for
+anybody without being asked properly.
+
+And at the top of the scale there is exactly one animal: the grey heron in the
+Kyoto garden. It takes three, and it flushes if you come within nine metres — so
+the only way to get it is to stand back further than that and ask, and ask, and
+ask. One bird, and it is worth more than the hundred and eighty pigeons.
+
+Three animals were offered the job and had it taken back off them, and the
+reasons are the rule for what can be offered at all. The Antarctic leopard seal
+was going to be the second three — a wading bird and the apex predator of the
+Southern Ocean, both eventually walking behind a rodent — but she notices
+anything within twenty-four metres and goes into the water, and a wheek only
+carries fifteen, so there is no distance at which she is both on the ice and
+within earshot. The Pantanal's caimans are floors you stand on, with colliders
+baked where they were built, so moving one takes the animal through it. And the
+Pantanal's own capybaras already have a herd of their own, and two systems
+arguing over the same nine animals is worse than one.
+
+Nothing ever ignores you. That is the rule that makes the rest of it legible: a
+three-wheek heron still turns its head on the first wheek, exactly like everything
+else within earshot. You can see that you were heard and you can see that it has
+not moved, and those two facts together are the whole tutorial — there is no
+meter, and there was never going to be one.
+
+They walk down the path you walked, so a line of them cannot pile up, cannot
+orbit you and cannot walk through the thing you just went round. And they do not
+come with you when you leave: a string of Venetian pigeons following a capybara
+through a Vietnamese mountain is a different game.
+
+Three of the nine let you reach places you could not reach before, which is what
+they are for. None of them changes how high you jump. Eighteen chapters of
+geometry are built against a 1.37 metre arc and moving it is the one thing that
+could quietly make something in this game impossible — so the wall-kick is a new
+jump rather than a bigger one, the glide can only ever slow a fall, and the beat
+bonus goes forwards and never up.
+
+## Ten things you can only be wearing because of what you did
+
+Ten of the nineteen chapters ask you to do something that implies a piece of kit, and the rule
+for earning one is always the same: **the task has to be the reason you have the thing.** Not a
+badge for finishing a place — the object the task was about. So five of the ten are not their
+chapter's marquee at all.
+
+You steal a tourist's hat in the gardens on the first afternoon of the game, so you spend the
+rest of that afternoon wearing a tourist's hat, askew, because a hat a rodent has taken off a
+person is not a hat that fits. You bring the ferry alongside at Manly and you get the master's
+cap — not for taking the helm, which anybody can do in open water, but for the landing. You
+samba down the avenue on the two and the avenue puts seven feathers and a gold collar on you.
+Stand on the prow of a gondola all the way down the canal and you have effectively applied for
+the job: straw boater, red band, neckerchief. Go under for the first time in Palawan and you
+come up in a mask and snorkel, which is the only one of the ten that is equipment rather than
+uniform. Be up over Göreme when the sun clears the rim and you have the pilot's leather cap with
+the goggles pushed up where a pilot keeps them. Take the biggest of the set all the way to the
+sand at Manly and the club gives you the red and yellow cap. Get deep enough into Son Doong that
+the light becomes a thing that happens to you, and you have a caver's helmet with a lamp on it
+that is genuinely lit — the only glowing thing in the wardrobe, because Son Doong is the only
+place dark enough for it to matter. Run with the pod at the bottom of the world and Antarctica
+lends you a coat with a fur ruff round the hood, which frames the animal's face instead of
+covering any of it and is the best thing in the set.
+
+None of them travels. The jacket is Monte Carlo's joke and the mask is Palawan's verb, and a
+capybara wearing either of them inside a Vietnamese mountain is in fancy dress rather than
+wearing the thing it just earnt.
+
+They are cheap — thirty-one meshes bare, four to eighteen more with something on — and they are
+built once when the animal is, sitting invisible until the moment they are yours. The two rules
+that cost the most to find are both about the shape of a capybara: the ears reach higher than
+the top of the skull, so any brim worth having sits *under* them and lets them through; and there
+is no neck at all, so a shirt front on the chest is a shirt front nobody will ever see. The only
+part of this animal that reads as a throat is four centimetres under the front of its jaw.
 
 ## Hanoi, where the road is not going to stop
 

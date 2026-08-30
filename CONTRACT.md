@@ -3384,6 +3384,202 @@ reads two frames at `dt = 0`, a damped switch does not move in two frames, and a
 fading switch therefore makes both arms of an A/B identical and the feature
 measures as doing nothing.
 
+## WHAT THE OTHER NINE CHAPTERS TEACH (v43 — 30 Aug 2026)
+
+Ten chapters hand over a costume. These nine hand over a **move** — and the
+difference between the two halves is the whole design: a costume is that
+chapter's joke and stays in it, and a skill is a thing the animal learned and
+keeps. That is this codebase's own rule for the dive and the climb (a verb is a
+property of the world; the chapter that teaches it is not the only one that
+affords it — see `capyCanDive`, `sysDIVE_TAUGHT` and the `brought-` finds), so
+`sysSKILLS` has no biome column.
+
+It is also what makes the back half of the journey feel unlike the front. By
+Hanoi you have Andean lungs, Kyoto's feet, Cali's ear, Iceland's edges,
+Marrakech's wall-kick, the Drift's glide, Kowloon's reach, a place to sit and
+right of way. None of it is a number on a screen.
+
+**The teacher is chosen the same way the costumes' is: the task has to be the
+thing that TEACHES the move.** Four of the nine are their chapter's marquee and
+five are not — and two are FINDS rather than tasks, which is right for the two
+subtlest skills, because nobody is told to do either.
+
+| ch | earned by | skill | what it does | measured, off → on |
+|---|---|---|---|---|
+| 2 Pasto | `the-rim-walk` *(find)* | **THE LUNGS** | altitude: deeper wind, quicker recovery | 10.02 → **14.12 s** at a flat run; recovery 4.32 → **2.87 s** |
+| 4 Kyoto | `still-bamboo` *(find)* | **SOFT FEET** | a fright leaves less behind | peak alarm **1.0 → 1.0** (untouched); peak wariness 0.985 → **0.443** |
+| 5 Cali | `salsa-dance` | **ON THE TWO** | a hop on the beat carries | standing hop 0 → **0.76 m**; apex **0.93 → 0.93** |
+| 7 Iceland | `glacier-run` | **THE EDGE** | steering on ground that slides | lateral gain at full slip 6.65 → **12.86 m** |
+| 8 Marrakech | `acrobats` | **THE VAULT** | one kick off a wall per airtime | rise off a face 0.97 → **1.54 m** |
+| 9 the Drift | `driftseed` | **THE SEED** | hold the hop key falling and you drift | 2.5 s of fall 57.0 → **10.8 m**, across 5.8 → **10.1 m**, rate exactly −1.85 |
+| 11 Kowloon | `bamboo-climb` | **THE REACH** | catch the lip you just missed | topped out **0/6 → 5/6** |
+| 15 Pantanal | `gather` | **THE HERD** | wheek and they fall in behind you | see below |
+| 15 Pantanal | `the-crossing` | **THE FLOAT** | the loaf works on water | loaf in the harbour **0 → 1** |
+| 19 Hanoi | `cross-the-road` | **RIGHT OF WAY** | hold a line and the world gives way | committed **0 → 124** frames of 180 straight; **16** of 180 wavering |
+
+**THREE OF THEM WIDEN THE REACH ENVELOPE ON PURPOSE** — the vault, the seed and
+the reach — and that is what they are for. The other six do not touch it at all.
+**Nothing here changes the jump apex**, which is the constraint the hop's own
+long note sets out: eighteen chapters of geometry are sized against 1.37 m and a
+changed arc is the worst regression this game can have. The vault is a NEW
+launch and not a bigger one; the seed only ever slows a descent and can never
+gain height; the reach only finishes a lip that was already within a hop. The
+beat bonus is horizontal for exactly this reason, and the apex came out of the
+A/B at 0.93 m on and off.
+
+Five things that were measured or were bugs:
+
+| | |
+|---|---|
+| **`the-rim-walk` granted nothing at all** | It is a `FINDS` row, not a `TASKS` row, and `taskRec` and `findDone` are two registries that do not know about each other. The first measured run showed 10.02 s of running with the skill "on" — a row naming neither table fires silently for ever. Both are consulted now. |
+| **a damp loses to gravity, by a factor of three** | capybara.js runs BEFORE the world step, so the solver puts back every frame what the damp just took. The seed at lambda 6 settled at **−5.64 m/s** against a stated −1.85: obviously better than terminal velocity, and therefore obviously "working". The damp is the flare only; after `capySEED_FLARE` the rate is assigned. |
+| **the wall-kick had no wall** | The first vault probe stood five metres off the Kowloon spawn at ten bearings and found **zero** climb holds — because the spawn sweep deliberately puts the animal in the clear. A mechanic measured against nothing measures as nothing. |
+| **the beat window cannot be sampled from a tick loop** | `ac.currentTime` is a REAL clock and `g.tick()` runs hundreds of sim frames per real second, so sixteen hops inside one `page.evaluate` all sample the same beat phase. Real waits between hops, and the phase read at the press so a hit is attributable. |
+| **soft feet scales what is LEFT BEHIND, not the fright** | Scaling `alarm` would have made the animal quiet by making the world unresponsive. `alarm` is untouched — a person walked into still says so, still looks up, still hops — and only the wariness it writes is smaller. The measurement is the proof: alarm 1.0 either way, wariness more than halved. |
+
+**Soaked** (`qa/skillsoak.js`): all nineteen chapters, every skill forced on,
+every key that touches one held for four seconds. No errors, no NaN, and the
+animal is inside the world in all nineteen.
+
+**CHAPTER 15 TEACHES TWO**, and it is the only one that does. It is the one place
+in the journey where the animal is not a novelty, and there are two separate
+things about being a capybara it can show you.
+
+### THE HERD — the only skill that is a whole system
+
+`gather` is "get five of them to follow you", and what it teaches is that it
+works on anything. Four rules, and the first two are what stop it being a switch:
+
+| | |
+|---|---|
+| **it is on a timer** | One wheek buys `herdHOLD` = 21 s and no more. A herd is a thing you are actively KEEPING, not a thing you have collected — so the verb stays in use for as long as the herd exists, and walking a line of animals across a city is a performance rather than an inventory. Measured: 14 pigeons still at 18 s, 0 by 24 s, and rebuildable to 10 immediately after. |
+| **some of them take more asking** | `obey` is 1, 2 or 3 wheeks and there is deliberately no way to ask for a fourth — it is `clamp(…, 1, 3)` in the offer. The counter DECAYS over `herdHEARD_T` = 7.5 s, so the extra wheeks have to be periodic; three wheeks over four minutes recruits nothing. |
+| **everything answers the first wheek** | The rule that makes the tiers legible instead of mysterious. A three-wheek heron still turns its head on the first one. You can see you were heard, and you can see it has not moved, and those two facts together are the whole tutorial. Nothing in earshot ever ignores you. |
+| **they walk the trail** | Straight off the Pantanal's own herd: a line down the player's own path cannot pile up, cannot orbit, cannot oscillate and cannot walk through the thing the player just walked round. |
+
+**A chapter OFFERS its animals and keeps ownership of drawing them.**
+`game.herdOffer({biome, kind, obey, voice, count, at, put})` — the system only
+ever asks a chapter to put an animal somewhere, and only for the ones actually
+following. **systems.js updates last** (env → …16 biomes… → weather → props →
+capy → condor → npcs → systems), so a `put` lands after the chapter's own wander
+has already run and wins for that frame. That is why this needed no surgery in
+any chapter's updater: four offers, ten lines each, and nothing else moved.
+
+**Wired, and measured from a clean animal** (`qa/herd2.js`, `qa/herd4.js`,
+`qa/herd5.js`, `qa/heron.js`) — eight chapters, all three tiers:
+
+| chapter | kind | obey | joined on wheek |
+|---|---|---|---|
+| 1 Sydney | ibis ×6 | 1 | **1** — the easiest tier, on the first animal a player ever meets |
+| 7 Iceland | sheep ×14 | 1 | **1** |
+| 10 Venice | pigeon ×180 | 1 | **1** — 80–93 looked, 14 recruited (the cap) |
+| 15 Pantanal | cow ×13 | 1 | **1** — the thirteen on the campo, never the eleven in the corral |
+| 17 Antarctica | gentoo ×42 | 1 | **1** — 42 looked, 14 recruited |
+| 13 Göreme | cat ×9 | 2 | **2** — looked on wheek 1 and did not move |
+| 14 Manly | silver gull ×30 | 2 | **joins** — they flush at 7 m and mill, so the tier is noisy to measure; called from 9–13 m they come |
+| 4 Kyoto | heron ×1 | 3 | **3** — looked on 1, refused on 2, joined on 3 |
+
+**The heron is the exemplar and it costs the most to get.** It flushes at
+`kyoHERON_NEAR` = 9 m, and the herd's earshot is 15 m — so it can only be
+recruited from OUTSIDE its own flush radius, three times, without startling it.
+One bird, and it is worth more than the hundred and eighty pigeons.
+
+**THREE ANIMALS WERE OFFERED AND TAKEN BACK OUT**, and the reasons are the rule
+for what may be offered at all:
+
+| | |
+|---|---|
+| **the leopard seal** — was to be the second obey 3 | `antSEAL_NOTICE` is 24 m and puts her to `watching`; closer puts her `in`. The herd carries 15 m, so **there is no distance at which she is both on the floe and inside earshot** — measured `n: 0` on every wheek of every attempt, gating first on `hauled` and then on `hauled \|\| watching`. Her marquee IS her leaving the ice to inspect you. |
+| **the Pantanal caimans** | They are load-bearing FLOORS (`panCaimanTop`) with `panPoolBox` colliders baked at build time. Moving one desyncs mesh from collider. |
+| **the Pantanal capybaras** | A native follower system already owns them and two would fight over the same nine animals. |
+| **the Quay's apron gulls** | They store a PERCH INDEX, not a position — there is nothing to write. |
+
+**An offer that cannot be completed is the exact bug this pass exists to find**,
+so all four are comments where the offer would have been rather than dead code.
+
+Three things that were bugs or were measured:
+
+| | |
+|---|---|
+| **forcing the skill in a tick loop does not work for this one** | `herdUpdate()` runs at the END of `systems.update()`, which is after the skill table has rewritten `learn('herd')` from the task list — so every recruit was undone on the frame it was made and the first run measured `following: 0` everywhere. The tell was exact and worth keeping: 21 pigeons looked, 14 (the cap) were recruited and dropped, and the 7 over the cap kept `heard: 1`. Tick the real task. |
+| **a tier cannot be measured on a dirty animal** | `gather` persists once ticked, so testing chapter after chapter carried the previous chapter's wheeks into the next one's arithmetic and measured a two-wheek cat joining on one. Stand 60 m off for twelve seconds and let `heardT` bleed first. |
+| **`game.herdDebug()`** | Read-only, and it exists for the same reason `game.hintTarget` does: `herdKinds` is closure-local and the animals belong to four different files, so without it there is no way to ask "is there anything recruitable here, where is it, and has it heard me". The first probe walked a coarse grid hoping to bump into a pigeon. |
+
+**Soaked** (`qa/herdsoak.js`): all nineteen chapters, six wheeks and four seconds
+of running in each. No errors, no NaN. Eight chapters offer animals and eleven do
+not — Pasto, the Quay, Cali, Rio, Marrakech, the Drift, Kowloon, Palawan, Son
+Doong, Monte Carlo and Hanoi have no ground animal with a settable position, and
+a wheek in those does exactly what it always did.
+
+**AND THE OFFER MUST BE MADE FROM AN UPDATE, NOT A BUILD.** npc.js is created at
+boot BEFORE systems.js is (…npcs → systems), so `game.herdOffer` did not exist in
+the ibis spawn loop and the offer was silently skipped — Sydney reported no
+recruitable kinds at all in the first measured run. It is one null check a frame,
+the same way `addCritter` already has to be reached.
+
+## THE WARDROBE (v42 — 30 Aug 2026)
+
+Ten of the nineteen chapters ask you to do something that IMPLIES a piece of
+kit, and handing it over afterwards is the cheapest delight in the game. The
+dinner jacket proved the shape in Monte Carlo; this is the other nine.
+
+**The rule for what earns one: the task has to be THE REASON YOU HAVE THE
+THING.** Not a badge for finishing a chapter, not the marquee by default — the
+object the task was about. That is why five of the ten are not their chapter's
+`wow`:
+
+| ch | earned by | worn | and why that task |
+|---|---|---|---|
+| 1 Sydney | `steal-hat` | the tourist's sun hat, askew | It is literally the hat you took, and the chapter's keepsake. The first thing this game ever asks of you. |
+| 3 Circular Quay | `manly-voyage` | the ferry master's cap | Not `take-helm`. Anybody can hold a wheel in open water; the cap is for having put her alongside. |
+| 6 Rio | `samba-parade` | seven carnival plumes and a gold collar | The marquee, because the parade is where headdresses come from. |
+| 10 Venice | `gondola-ride` | the gondolier's boater and neckerchief | Not the marquee. Stand on the prow of a gondola and you have effectively applied for the job; `acqua-alta` is a flood. |
+| 12 Palawan | `first-dive` | mask and snorkel | The moment the game hands over a verb it then keeps for ever. The only costume in the set that is equipment rather than uniform. |
+| 13 Cappadocia | `sunrise` | the pilot's leather cap, goggles up | The marquee: the sun clearing the rim is what a pilot is up there for. Nobody puts a flying cap on to walk an envelope. |
+| 14 Manly | `all-the-way` | the surf lifesaver's cap | Not `take-off`. The club does not give you the cap for standing up; it gives it to you for the whole wave. |
+| 16 Son Doong | `the-doline` | the caver's helmet, lamp lit | Not `great-wall`. The helmet is for having been deep enough that light is a thing that happens to you. |
+| 17 Antarctica | `orca-ride` | the expedition hood and its fur ruff | The marquee, and the last one in the journey. |
+| 18 Monte Carlo | `black-tie` | the dinner jacket and sunglasses | The task IS the object. |
+
+**One system, one verb.** `capy.wear(id)` hides the lot and shows one, so there
+is no state to get out of step and no order to get wrong. `capy.dress(on)`
+survives as the v39 name for `wear('black-tie')`. Every costume is TWO groups —
+one on `capySquash`, one on `head` — because headgear on the body leaves the
+face the moment the animal looks up, and a jacket on the head swims on every
+hop. The table lives in systems.js as `sysWARDROBE` and is asked every frame;
+the loop stops at the first row whose biome is live, so a second row for a
+chapter would be dead and is not written.
+
+**Scoped to the chapter on purpose.** A costume that travels is a different
+game: the jacket is Monte Carlo's joke and the mask is Palawan's verb, and an
+animal wearing either in Son Doong is in fancy dress rather than the thing it
+just earnt.
+
+Five things that were measured or were bugs:
+
+| | |
+|---|---|
+| **the ears are at head-y 0.12–0.28 and the skull top is 0.18** | So a brim wide enough to matter sits BELOW the ear tips and they come through it. A hat that clears the ears is a hat floating over an animal. |
+| **a capybara has no neck** | The skull box runs z 0.08–0.58 and the jaw 0.52–0.76, so nothing between the shoulders and the muzzle is ever on screen. Anything meant to read as a collar — the wing collar, the neckerchief — goes under the jaw's FRONT. The tux's first pass put a shirt on the chest and it was invisible from every angle. |
+| **`capyLeather` was a capybara** | 0x7d5334 on 0xb0784a: the flying cap went on in warm Cappadocian light and DISAPPEARED. The palette block states the rule — every value is one the animal's own three browns are not — and then broke it. Dark and cool now, and the shearling trim does the separating, which is what makes a leather cap read as one anyway. |
+| **Rio's collar was two boxes on the shoulders** | From three-quarter front they read as one gold shard sticking out of the animal's side. It is a ring round the base of the skull. |
+| **the parka ruff has a GAP, and the gap is symmetric** | An arc that simply stops after 86% of a circle leaves a bald quarter on one side and the hood looks knocked askew. 0.95 rad open, centred on the jaw. |
+
+**The lamp is the one emissive in the set**, because Son Doong is the only place
+dark enough for the difference between a lit lamp and a white box to matter.
+
+**Nothing joins `wetParts`** — the soak swaps a mesh for its wet twin, and a hat
+with no wet twin comes out of the harbour wearing the belly's colour.
+
+**Measured** (`qa/wear-smoke.js`): 31 meshes drawn bare; each costume adds 4–18;
+wearing all ten in sequence and settling on one leaves exactly that one's count,
+so nothing leaks; `wear(null)` returns to 31; an unknown id takes everything off
+rather than throwing; and the ghost bake puts back what was on. The count has to
+walk each mesh's PARENTS — `traverse` does not stop at an invisible node and
+every costume mesh is `visible: true` inside a hidden group, so an `o.visible`
+test alone reports the same number dressed and bare. That is the same trap the
+ghost bake had to be fixed for and it will catch the next person too.
+
 ## CAN EVERY TASK ACTUALLY BE DONE (v39 — 29 Aug 2026)
 
 Prompted by one report from play — the Monte Carlo dinner jacket could not be
@@ -3553,9 +3749,11 @@ about it are the whole of the implementation and each was a bug first:
 Nothing in the costume joins `wetParts` — the soak swaps a mesh for its wet
 twin, and a jacket with no wet twin comes out of the harbour wearing the
 belly's colour. It is asked for every frame in `update()` rather than raised on
-an event (`isActive('monaco') && taskRec['black-tie'].done`), because a save
-restore, a chapter change and a picker jump are three places an event does not
-fire, and `dress` is idempotent.
+an event, because a save restore, a chapter change and a picker jump are three
+places an event does not fire, and `wear` is idempotent.
+
+...and once there was one costume it was obvious there should be ten. See
+**THE WARDROBE** below.
 
 ### CHAPTER 19 — HANOI (`hanoi`)
 
