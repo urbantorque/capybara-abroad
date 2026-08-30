@@ -1164,6 +1164,40 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## Palawan stopped being made of paper
+
+The beach in Palawan is crushed coral and it really is almost white, and the
+lighting in this game deliberately runs a sunlit surface a little over full
+brightness so that the bloom has something to catch. Put those two together and
+the whole beach sat jammed against the top of what a screen can show: twenty-seven
+per cent of the frame in the brightest few per cent of the range, and — the number
+that actually matters — the brightest tenth of the picture spread across just
+**nine distinct shades**. Not blown out exactly, since nothing in this game
+clips; simply flat. A sheet of paper where there should be dunes.
+
+The fix is a stop of exposure, in one chapter. The beach comes down off the
+ceiling, the shading in it comes back, and the sea and the karst come with it
+rather than having to be re-graded around it. The brightest tenth of the frame
+now spans eighteen shades instead of nine.
+
+Two things worth writing down about getting there.
+
+**Most of what looked like the problem was not the problem.** Venice's white
+stone and Antarctica's snow had both been on the list, on the strength of looking
+at pictures of them. Measured, Venice puts nothing at all in the top band and
+Antarctica's highlights already spread over seventy-four shades. One chapter had
+the fault; two more looked like they did.
+
+**And the obvious lever did nothing.** There is already a soft roll-off at the
+top of the range, and pulling it down earlier ought to have been the surgical
+answer — it only touches the highlights and leaves everything else alone. Tried
+against the real frame, it moved the top of the picture down without spreading it
+out: darker highlights, exactly as flat, nine shades still. Exposure works
+because it moves the beach *below* the roll-off, into the part of the range where
+the screen still has room to tell one shade from the next. That is not obvious
+from the arithmetic, and it is the reason both levers got measured instead of one
+getting argued for.
+
 ## Light through a leaf
 
 There has never been any translucency in this game. Not a wrap term, not a

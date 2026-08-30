@@ -1520,6 +1520,80 @@ const sysSHOULDER = 0.86;
 const sysVIG_TONE = 0.42;
 
 // ===========================================================================
+// EXPOSURE — ONE NUMBER, AND ONLY TWO CHAPTERS NEED IT (v47).
+//
+// The lighting header above says intensities are scaled so a fully lit surface
+// reads ~1.2 albedo. That is deliberate — it is what gives the bright pass
+// something to catch — and it is fine everywhere the ground is a colour. It
+// stops being fine where the ground is nearly WHITE: `palSand` is 0xf2e9d2,
+// which is 0.887 linear in red, and 0.887 x 1.2 is 1.06, so the entire beach
+// lives above the shoulder's knee and every bit of shading in it is squeezed
+// into the last few levels of the display.
+//
+// MEASURED (qa/tone-hist.js, all nineteen). The instrument that matters is not
+// how much of the frame is bright, it is HOW MANY DISTINCT LEVELS THE TOP
+// DECILE OCCUPIES — a frame whose highlights live in nine levels has no
+// shading in them at all:
+//
+//     palawan   26.96% over 235      9 levels     <-- and it is alone out here
+//     pasto      6.81%              17
+//     rio        2.24%              36
+//     iceland    2.14%             112
+//     sahara     1.25%              32
+//     sydney     0.00%              41
+//     venice     0.00%              25
+//     antarctic  0.45%              74
+//
+// TWO THINGS THAT CHANGES ABOUT THE JOB. Nothing in the game CLIPS — `>253` is
+// 0.00% in all nineteen, so the v40 shoulder is working and this is a
+// compression problem, not a clipping one. And Venice and Antarctica, both of
+// which were named as ceiling cases on the strength of looking at frames, are
+// not: Venice is 0.00% over 235 and Antarctica has 74 levels in its top decile.
+// So this is one severe chapter and one mild one, and it needs no global
+// re-grade at all.
+//
+// WHY EXPOSURE AND NOT A PER-CHAPTER SHOULDER, AND THE ARITHMETIC THAT SAID
+// OTHERWISE. On paper a lower shoulder looked like the surgical answer: it is
+// identity below its knee, so it would touch only the highlights and leave the
+// midtones alone. Swept against exposure on the real frame (qa/tone-sweep.js),
+// it does not work at all —
+//
+//     arm        >235%   top-decile levels
+//     ship       27.19    9
+//     shoulder 0.70      14.10   10
+//     shoulder 0.58       2.11    9      <-- no better than shipping
+//     exposure 0.86       0.95   18
+//     exposure 0.80       0.02   19
+//
+// A lower shoulder moves the whole top of the picture DOWN without spreading
+// it: it lifts the curve's slope a little, and the sRGB encode's slope at the
+// lower output it now lands on falls by about as much, so the two cancel and
+// the highlights are darker and just as flat. Exposure moves the content BELOW
+// the knee, where the roll-off is identity and sRGB is steep — which is where
+// the separation actually comes from. The shoulder is a property of the lens
+// and stays one; what is wrong here is that the SCENE is too bright for the
+// sensor, and that is what exposure means.
+//
+// It costs nothing in the shadows: every chapter in the game reads 0.00% under
+// 8/255, so there is room underneath to give.
+const sysEXPOSURE = {
+  // 0.86 AND NOT LOWER. It is the knee of the curve — 27.19% of the frame over
+  // 235 becomes 0.95% and the top decile goes from nine levels to eighteen, for
+  // six per cent of mean brightness. 0.80 and 0.74 buy one and two more levels
+  // respectively and cost another three and six per cent, which is paying real
+  // brightness for nothing anybody can see.
+  palawan: 0.86,
+};
+// PASTO IS DELIBERATELY NOT IN HERE, and it was in the first draft of this
+// table. It reads 6.62% over 235, which is second worst in the game and looks
+// like a case — but its top decile is already eighteen levels and exposure at
+// 0.86 takes it to NINETEEN. There is no compression there to recover: a plaza
+// at 2 527 m under a 61-degree sun is simply bright, and dimming it by an
+// eighth to buy one level of separation is a re-grade of a finished chapter in
+// exchange for nothing.
+const sysEXP_DEF = 1.0;
+
+// ===========================================================================
 // THE DEPTH — one row per chapter, and the only place a chapter says how DEEP
 // it wants to look. See THE DEPTH PASS in CONTRACT.md and the header over
 // MAIN_POST_COC in main.js.
@@ -18503,6 +18577,12 @@ export function createSystems(game) {
     // 1.0 is arithmetically the hard clamp this replaced — see the shader.
     pp.shoulder = game.state.noShoulder ? 1.0 : sysSHOULDER;
     pp.vigTone = game.state.noVigTone ? 0 : sysVIG_TONE;
+    // Exposure. Not cross-faded and not in sysGRADE_KEYS, for the reason the
+    // depth row is not: it is a property of how bright the place is, and
+    // lerping between two chapters' exposures across a swap gives half a second
+    // of a stop that belongs to neither. The swap is inside the white hold.
+    pp.exposure = game.state.noExposure ? 1
+                : (sysEXPOSURE[name] === undefined ? sysEXP_DEF : sysEXPOSURE[name]);
     // ---- AND THE DEPTH ---------------------------------------------------
     // Three more switches on the same terms: cut, never faded.
     //

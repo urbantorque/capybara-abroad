@@ -873,6 +873,7 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform float uBloom;',
   'uniform float uWide;',
   'uniform float uShoulder;',
+  'uniform float uExposure;',
   'uniform float uContrast;',
   'uniform float uSaturation;',
   'uniform float uVignette;',
@@ -1010,6 +1011,20 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
   // this is the air AROUND it, and a lamp without it is a white sticker.
   '  lin += texture(tWide, vUv).rgb * uWide;',
+  // ---- EXPOSURE (v47) ----------------------------------------------------
+  // AFTER the bloom and BEFORE the shoulder, which is the only place it can
+  // go without invalidating work. After the bloom, because exposure is the
+  // last thing that happens before a sensor and it must scale the glow with
+  // the thing glowing. Before the shoulder, because the whole point is to
+  // give the roll-off something to roll off.
+  //
+  // And NOT before the bright pass: `threshold` is a per-chapter number in
+  // nineteen hand-tuned grade rows, expressed in the units the scene target
+  // is written in. Scaling the scene before the bright pass reads it would
+  // re-base every one of them at once.
+  //
+  // 1.0 is an exact no-op and is what eighteen chapters use.
+  '  lin *= uExposure;',
   // THE SHOULDER. Everything above the knee used to meet a hard clamp, so a
   // sunlit white wall, a lamp bulb and a sheet of foam all arrived at exactly
   // 1.0 with a visible edge where they got there. This rolls the top off
@@ -1107,6 +1122,8 @@ function mainMakePost(game) {
       // octave, no split, the shoulder at 1.0 (which IS the old hard clamp) and
       // a vignette that only darkens.
       wide: 0.0, splitW: 0.0, splitC: 0.0, shoulder: 1.0, vigTone: 0.0,
+      // v47. 1.0 is an exact no-op; see the note in MAIN_POST_COMP.
+      exposure: 1.0,
       // The three added by the v45 depth pass, and their no-op values. All
       // three at zero does not merely multiply out — it takes uDepthOn to 0
       // and the depth texture is not sampled at all.
@@ -1213,6 +1230,7 @@ function mainMakePost(game) {
       tDiffuse: { value: null }, tBloom: { value: mainPostBlack },
       tWide: { value: mainPostBlack },
       uBloom: { value: 0 }, uWide: { value: 0 }, uShoulder: { value: 1 },
+      uExposure: { value: 1 },
       uContrast: { value: 0 }, uSaturation: { value: 1 },
       uVignette: { value: 0 }, uVigStart: { value: 0.62 }, uVigTone: { value: 0 },
       uTint: { value: new THREE.Vector3(1, 1, 1) },
@@ -1411,6 +1429,7 @@ function mainMakePost(game) {
     c.uVigStart.value = p.vigStart;
     c.uVigTone.value = p.vigTone;
     c.uShoulder.value = p.shoulder;
+    c.uExposure.value = p.exposure;
     c.uTint.value.set(p.tintR, p.tintG, p.tintB);
     c.uLift.value.set(p.liftR, p.liftG, p.liftB);
     const W = MAIN_SPLIT_WARM, C = MAIN_SPLIT_COOL;

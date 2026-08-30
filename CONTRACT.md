@@ -3023,6 +3023,107 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## EXPOSURE (v47 — 30 Aug 2026)
+
+One uniform in `MAIN_POST_COMP`, one table in systems.js, **one chapter in it**.
+`params.exposure` is 1.0 by default and 1.0 is an exact no-op, so eighteen of
+nineteen chapters are byte-for-byte what they were.
+
+### The thing it fixes, and how much of it there actually was
+
+The lighting header says intensities are scaled so a fully lit surface reads
+~1.2 albedo. That is deliberate — it is what gives the bright pass something to
+catch — and it is fine everywhere the ground is a colour. It stops being fine
+where the ground is nearly WHITE. `palSand` is `0xf2e9d2`, which is 0.887 linear
+in red, and 0.887 × 1.2 is 1.06: the entire beach lives above the shoulder's
+knee, and every bit of shading in it is squeezed into the last few levels of the
+display.
+
+**THE INSTRUMENT IS THE NUMBER OF DISTINCT LEVELS THE TOP DECILE OCCUPIES**, not
+how much of the frame is bright. A frame whose highlights live in nine levels
+has no shading in them; one with forty has. Measured across all nineteen with
+`qa/tone-hist.js`:
+
+| chapter | >235 | top-decile levels |
+|---|---|---|
+| **palawan** | **26.96%** | **9** |
+| pasto | 6.81% | 17 |
+| rio | 2.24% | 36 |
+| iceland | 2.14% | 112 |
+| sahara | 1.25% | 32 |
+| antarctic | 0.45% | 74 |
+| sydney | 0.00% | 41 |
+| venice | 0.00% | 25 |
+
+**TWO THINGS THAT CHANGED ABOUT THE JOB, BOTH FROM THAT TABLE.**
+
+1. **NOTHING IN THIS GAME CLIPS.** `>253` is 0.00% in all nineteen — the v40
+   shoulder is doing exactly what it was built for. This is a compression
+   problem, not a clipping one, and calling it "the albedo ceiling" was
+   describing the symptom as if it were the mechanism.
+2. **VENICE AND ANTARCTICA ARE NOT CASES**, and both had been named as ones on
+   the strength of looking at frames. Venice is 0.00% over 235; Antarctica has
+   74 levels in its top decile. So this is one severe chapter, and it needs no
+   global re-grade at all — which is what it had been scoped as.
+
+### Why exposure, and the arithmetic that said otherwise
+
+A lower per-chapter shoulder looked like the surgical answer on paper: the
+roll-off is identity below its knee, so it would touch only the highlights and
+leave the midtones exactly alone. **Swept against exposure on the real frame it
+does not work at all** (`qa/tone-sweep.js`, Palawan):
+
+| arm | >235% | top-decile levels |
+|---|---|---|
+| ship | 27.19 | 9 |
+| shoulder 0.70 | 14.10 | 10 |
+| shoulder 0.58 | 2.11 | **9** |
+| exposure 0.92 | 7.81 | 15 |
+| **exposure 0.86** | **0.95** | **18** |
+| exposure 0.80 | 0.02 | 19 |
+| exposure 0.74 | 0.00 | 20 |
+
+A lower shoulder moves the whole top of the picture DOWN without spreading it.
+It raises the curve's slope a little, and the sRGB encode's slope at the lower
+output it now lands on falls by about as much, so the two cancel: darker
+highlights, just as flat. Exposure moves the content **below** the knee, where
+the roll-off is identity and sRGB is steep, and that is where the separation
+comes from.
+
+The shoulder therefore stays what `sysSHOULDER`'s own note says it is — a
+property of the lens and not of the place. What is wrong in Palawan is that the
+SCENE is too bright for the sensor, and that is what exposure means.
+
+**0.86 and not lower.** It is the knee: 27.19% over 235 becomes 0.95% and the
+top decile doubles, for six per cent of mean brightness. 0.80 and 0.74 buy one
+and two more levels and cost another three and six per cent — paying real
+brightness for something nobody can see.
+
+**PASTO IS DELIBERATELY ABSENT**, and was in the first draft of the table. It is
+second worst on the >235 column and looks like a case, but its top decile is
+already eighteen levels and exposure at 0.86 takes it to nineteen. There is no
+compression there to recover: a plaza at 2 527 m under a 61-degree sun is simply
+bright.
+
+### Where it goes in the chain
+
+**After the bloom and before the shoulder.** After the bloom, because exposure
+is the last thing that happens before a sensor and it must scale the glow along
+with the thing glowing. Before the shoulder, because the whole point is to give
+the roll-off something to roll off.
+
+**And NOT before the bright pass.** `threshold` is a per-chapter number in
+nineteen hand-tuned grade rows, expressed in the units the scene target is
+written in; scaling the scene before the bright pass reads it would re-base
+every one of them at once.
+
+Not cross-faded and not in `sysGRADE_KEYS`, for the reason the depth row is not:
+it is a property of how bright a place is, and lerping two chapters' exposures
+across a swap gives half a second of a stop belonging to neither. The swap
+happens inside `biomeFadeTo`'s white hold.
+
+The switch is `game.state.noExposure` and it cuts.
+
 ## THE LEAF (v46 — 30 Aug 2026)
 
 `shared.js` owns it. Audited across all twenty-eight modules before a line was
