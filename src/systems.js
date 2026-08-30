@@ -3497,15 +3497,79 @@ const sysLEGEND_MORE = [
   ['pad  ·  sticks', 'move  ·  look, and click to recentre'],
   ['pad  ·  A  X  B', 'hop  ·  grab  ·  WHEEK   (RT runs)'],
 ];
+// ---- AND THE SAME TABLE FOR SOMEBODY WITH NO KEYBOARD ---------------------
+// The title card put `WASD / arrows`, `Shift`, `Space`, `Ctrl (held)`, `E /
+// left click`, `Q` and `drag · wheel` in front of every player — including one
+// holding a phone, for whom all seven name a key that is not there. Seven rows
+// of the first thing anybody reads, and not one of them true. The touch fan has
+// always been a real scheme; it had simply never been written down anywhere the
+// person using it would look.
+const sysLEGEND_TOUCH = [
+  ['stick', 'waddle about'],
+  ['stick, all the way', 'run'],
+  ['HOP', 'hop'],
+  ['SLIDE', 'slide'],
+  ['GRAB', 'grab, dig, hold on'],
+  ['WHEEK', 'WHEEK'],
+  ['drag  ·  pinch', 'look around  ·  zoom'],
+  ['STUCK (held)', 'put me back'],
+];
+/** True on a device driven by a finger rather than a mouse — the same test the
+ *  touch layer itself switches on, so the legend and the buttons can never
+ *  disagree about which scheme the player has. */
+function sysIsTouch() {
+  return !!(window.matchMedia &&
+            window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+}
+
+// ---- AND THE HINTS NAME KEYS TOO ------------------------------------------
+// Thirty-nine of the hundred and ninety-one clues tell the player to press a
+// key: `press E at the fire`, `hold Shift and barge them`, `press Q, anywhere`.
+// On a phone that is the game giving an instruction that cannot be carried out
+// — the single most confusing thing a hint can do, because the player believes
+// it and goes looking for the thing they are missing.
+//
+// One table, applied where a clue is resolved and nowhere else. Longest first,
+// so `press E` becomes `tap GRAB` rather than `press GRAB`. Checked against all
+// 191 clue strings before it was wired in: 39 rewrite, 152 are untouched, and
+// no lone capital survives — that is the whole test, and it is why the bare
+// `\bE\b` and `\bQ\b` rules at the end are safe here and would not be safe on
+// arbitrary prose.
+const sysTOUCH_WORDS = [
+  [/\bhold Shift\b/g, 'push the stick all the way'],
+  [/\bhold R\b/g,     'hold STUCK'],
+  [/\bpress Q\b/g,    'tap WHEEK'],
+  [/\bpress E\b/g,    'tap GRAB'],
+  [/\bhold E\b/g,     'hold GRAB'],
+  [/\bQ\b/g,          'WHEEK'],
+  [/\bE\b/g,          'GRAB'],
+  [/\bSpace\b/g,      'HOP'],
+  [/\bShift\b/g,      'the stick, all the way'],
+  [/\bCtrl\b/g,       'SLIDE'],
+];
+/** A line of guidance, in the control scheme the player actually has. */
+function sysSay(s) {
+  if (!s || !sysIsTouch()) return s;
+  let o = s;
+  for (let i = 0; i < sysTOUCH_WORDS.length; i++) {
+    o = o.replace(sysTOUCH_WORDS[i][0], sysTOUCH_WORDS[i][1]);
+  }
+  return o;
+}
+
 /**
  * Fill `el` with a control legend. `which` picks the table: undefined or
  * 'core' for the six verbs, 'more' for the furniture, 'all' for both with a
  * rule between them (the journal, which has room and is read deliberately).
+ * On a touch device the core table is the touch scheme instead — the furniture
+ * is still listed, because a phone can have a keyboard attached to it and
+ * nothing down there is needed to play.
  */
 function sysFillLegend(el, which) {
+  const core = sysIsTouch() ? sysLEGEND_TOUCH : sysLEGEND;
   const tables = which === 'more' ? [sysLEGEND_MORE]
-               : which === 'all' ? [sysLEGEND, sysLEGEND_MORE]
-               : [sysLEGEND];
+               : which === 'all' ? [core, sysLEGEND_MORE]
+               : [core];
   for (let t = 0; t < tables.length; t++) {
     if (t > 0) {
       // A spanning divider inside a two-column grid, so the second table reads
@@ -5888,9 +5952,28 @@ function sysBuildCSS() {
 '.capyui-btn.press{transform:scale(.9);background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
 '.capyui-wheek{right:18px;bottom:26px;width:96px;height:96px;font-size:15px;}',
 '.capyui-grab{right:120px;bottom:96px;width:74px;height:74px;font-size:13px;}',
-/* third button of the fan, outboard of GRAB — the hop. There is no fourth: the
-   whistle folded into the wheek. */
+/* third button of the fan, outboard of GRAB — the hop. */
 '.capyui-hop{right:132px;bottom:22px;width:68px;height:68px;font-size:12px;}',
+/* Fourth: the slide, closing the arc above GRAB. The whistle is NOT a fifth —
+   it folded into the wheek — and the two below are not verbs. */
+'.capyui-slide{right:60px;bottom:174px;width:64px;height:64px;font-size:11px;}',
+/* The rescue. Not part of the fan and styled so it does not read as one: barely
+   any fill, a dashed edge, and parked in the TOP right directly under the chart.
+   Not bottom-left, which is where it went first and which is wrong twice over —
+   that is inside `.capyui-zone`, so it eats the corner a thumb rests the stick
+   on, and it puts a rescue in among the controls. Up here it is next to the
+   other thing you read rather than press, and no thumb arrives by accident.
+   The offset tracks the chart's own clamp so the two cannot overlap at any
+   width, and clears a notch the same way the chart does. */
+'.capyui-back{right:calc(12px + env(safe-area-inset-right,0px));',
+  // 12px to clear the notch + the chart's own height + 20px of air. The chart
+  // carries a distance pill on its bottom edge, so a gap sized to the chart
+  // alone reads as crowded even though the boxes do not touch.
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px));',
+  'width:58px;height:58px;font-size:10px;',
+  'background:' + sysRgba(PALETTE.sail, 0.42) + ';border-style:dashed;',
+  'border-color:' + sysRgba(PALETTE.ibisHead, 0.34) + ';box-shadow:none;opacity:.62;}',
+'.capyui-back.press{opacity:1;}',
 
 /* Phone: tighter leading and smaller tick boxes. Five rows fit anywhere, so the
    card no longer needs a scroll of its own at any size. */
@@ -15620,7 +15703,7 @@ export function createSystems(game) {
       hintHas = false;
       hintT = 0;                                   // resolve on the next frame
       const h = top ? sysHINTS[top] : null;
-      const clue = h ? (typeof h.clue === 'function' ? h.clue() : h.clue) : '';
+      const clue = sysSay(h ? (typeof h.clue === 'function' ? h.clue() : h.clue) : '');
       clueEl.textContent = clue || '';
       clueEl.classList.toggle('off', !clue);
     }
@@ -17693,7 +17776,21 @@ export function createSystems(game) {
   let mouseAction = false;
   let touchHonk = false, touchHonkPend = false, touchAction = false, touchActionPend = false;
   let touchWhistlePend = false;
+  // ---- THE TWO THINGS A THUMB COULD NOT DO --------------------------------
+  // The touch fan carried three of the seven verbs — WHEEK, GRAB, HOP — plus
+  // run, which the stick gives you for free at full deflection. That left the
+  // SLIDE, which is a verb the capybara has and which four chapters are partly
+  // built around, and `R`, which is not a verb at all but the only way out of
+  // being wedged in a gap. On a phone there is no keyboard, so a player who got
+  // stuck had exactly one option: reload, and walk back. The rescue was written
+  // precisely so that a three-hour game would not have a state whose only
+  // answer is F5 (see sysBACK_HOLD), and on touch it had one anyway.
+  let touchSlide = false, touchBack = false;
   let stickX = 0, stickZ = 0, stickActive = false;
+  // The fingers currently down on the canvas, and the last distance between
+  // them. See the pinch block in the canvas pointermove handler.
+  const sysPinchPts = new Map();
+  let sysPinchD = 0, sysDragLastX = null;
   let camYaw = 0, camYawTarget = 0, camHandT = 0, camIdleT = 0;
   let camDist = sysCAM_DEF, camDistTarget = sysCAM_DEF;
   let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
@@ -18142,6 +18239,11 @@ export function createSystems(game) {
   addEventListener('blur', function () {
     for (const k in keys) keys[k] = false;
     mouseAction = false; dragId = -1;
+    // A pinch interrupted by leaving the window never gets its pointerups, so
+    // the two fingers would still be "down" on the way back and the next single
+    // touch would read as the second half of a pinch.
+    sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
+    touchSlide = false; touchBack = false;
     // rAF stops while the tab is hidden, so a buffered press taken half a
     // second before an alt-tab would still be 0.02 s old on the way back and
     // would fire by itself. A press does not survive leaving the window.
@@ -18158,17 +18260,62 @@ export function createSystems(game) {
       else if (e.button === 2) { dragId = e.pointerId; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
     } else {
       dragId = e.pointerId;
-      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+      sysDragLastX = e.clientX;
+      sysPinchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // NOT captured once a second finger is down: pointer capture routes every
+      // subsequent event for that id to this element, which is what we want for
+      // a one-finger turn, but the second finger of a pinch must be free to be
+      // tracked in its own right.
+      if (sysPinchPts.size < 2) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+      else { sysPinchD = 0; }
     }
   });
   canvas.addEventListener('pointermove', function (e) {
+    // Every live finger on the canvas, so the two-finger case can be told from
+    // the one-finger case. A mouse never gets in here — it has the wheel.
+    if (e.pointerType !== 'mouse' && sysPinchPts.has(e.pointerId)) {
+      const p = sysPinchPts.get(e.pointerId);
+      p.x = e.clientX; p.y = e.clientY;
+    }
+    // ---- PINCH TO ZOOM ---------------------------------------------------
+    // The zoom was the mouse wheel and the pad's right stick, and nothing else:
+    // on a phone the camera distance could not be changed at all. Worse, the
+    // control legend written for touch advertised a pinch, so the first thing
+    // it told a phone player was to do something the game did not do.
+    if (sysPinchPts.size === 2) {
+      const it = sysPinchPts.values();
+      const a = it.next().value, b = it.next().value;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (sysPinchD > 0) {
+        // Spreading the fingers pulls the camera IN, which is the direction
+        // every map and every photo app on the device has already taught.
+        camDistTarget = clamp(camDistTarget - (d - sysPinchD) * 0.035,
+                              sysCAM_MIN, sysCAM_MAX);
+      }
+      sysPinchD = d;
+      return;                      // two fingers zoom; they do not also turn
+    }
     if (e.pointerId !== dragId) return;
-    const dx = e.movementX !== undefined ? e.movementX : 0;
+    // `movementX` is a mouse concept and is not reliably filled in for touch
+    // pointers, so a finger drag gets its delta from the last position we were
+    // given. Same number, one that every browser actually reports.
+    let dx;
+    if (e.pointerType === 'mouse') {
+      dx = e.movementX !== undefined ? e.movementX : 0;
+    } else {
+      dx = (sysDragLastX === null) ? 0 : (e.clientX - sysDragLastX);
+      sysDragLastX = e.clientX;
+    }
     if (dx) { camYawTarget -= dx * 0.005; camHandT = sysCAM_HAND_T; }
   });
   function endPointer(e) {
     if (e.pointerType === 'mouse' && e.button === 0) mouseAction = false;
-    if (e.pointerId === dragId) dragId = -1;
+    if (e.pointerId === dragId) { dragId = -1; sysDragLastX = null; }
+    if (sysPinchPts.delete(e.pointerId)) {
+      // Below two fingers there is no pinch to continue, and the next one must
+      // start from a fresh baseline or the camera jumps by the whole gap.
+      if (sysPinchPts.size < 2) sysPinchD = 0;
+    }
   }
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
@@ -18189,9 +18336,20 @@ export function createSystems(game) {
   const wheekBtn = sysEl('div', 'capyui-btn capyui-wheek', 'WHEEK');
   const grabBtn = sysEl('div', 'capyui-btn capyui-grab', 'GRAB');
   const hopBtn = sysEl('div', 'capyui-btn capyui-hop', 'HOP');
+  // The fourth verb of the fan. SLIDE completes the arc above GRAB rather than
+  // going outboard of it, because it is held — the thumb rests on it — and the
+  // outboard positions are where the taps are.
+  const slideBtn = sysEl('div', 'capyui-btn capyui-slide', 'SLIDE');
+  // And the fifth thing, which is deliberately NOT one of the fan. It is a
+  // rescue, not a verb: smaller, quieter, off on its own above the stick, where
+  // a thumb will not find it by accident in the middle of a chase and where it
+  // is nowhere near the three buttons a player is actually aiming at.
+  const backBtn = sysEl('div', 'capyui-btn capyui-back', 'STUCK');
   touchLayer.appendChild(wheekBtn);
   touchLayer.appendChild(grabBtn);
   touchLayer.appendChild(hopBtn);
+  touchLayer.appendChild(slideBtn);
+  touchLayer.appendChild(backBtn);
   hudRoot.appendChild(touchLayer);
 
   // Touchscreen laptops driven by mouse+keyboard must NOT get the stick zone —
@@ -18274,6 +18432,11 @@ export function createSystems(game) {
     touchJump = true; touchJumpPend = true; input.jumpPressed = true; input.jump = true;
     sysBufJump();
   }, function () { touchJump = false; });
+  // Held, not latched — the same shape as the key and the left trigger, because
+  // a slide is a thing you are doing rather than a thing you did.
+  bindBtn(slideBtn, function () { touchSlide = true; }, function () { touchSlide = false; });
+  // Also held: the rescue reads sysBACK_HOLD seconds of it, exactly as R does.
+  bindBtn(backBtn, function () { touchBack = true; }, function () { touchBack = false; });
 
   // ---- THE PAD, POLLED ----------------------------------------------------
   // See the sysPAD_* block. Called once at the top of update(). Writes the held
@@ -19566,6 +19729,10 @@ export function createSystems(game) {
       // capybara sprints off on its own the moment the tab comes back.
       for (const k in keys) keys[k] = false;
       mouseAction = false; dragId = -1;
+      // Same reason as the blur handler: a held touch button or half a pinch
+      // cannot produce its own release while the tab is in the background.
+      sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
+      touchSlide = false; touchBack = false;
       if (ac && ac.suspend && ac.state === 'running') {
         const pz = ac.suspend(); if (pz && pz.catch) pz.catch(function () {});
       }
@@ -20738,7 +20905,7 @@ export function createSystems(game) {
     // and for the same reason. On the pad it is the LEFT trigger, opposite the
     // right one that runs, which is the only pair of buttons on a controller
     // that reads as "faster" and "lower" without being told.
-    input.slide = started && (!!keys.ControlLeft || !!keys.ControlRight || padSlide);
+    input.slide = started && (!!keys.ControlLeft || !!keys.ControlRight || padSlide || touchSlide);
 
     // ---- THE WARDROBE -------------------------------------------------------
     // One row per costume, and the whole rule is: you are in the chapter, and
@@ -20821,7 +20988,9 @@ export function createSystems(game) {
     if (started) {
       backCrumb(dt);
       backVoid(dt);
-      if (keys.KeyR && !jrShown && !ended) {
+      // The touch button holds exactly as the key does — same sysBACK_HOLD, so
+      // a thumb brushing it in a panic cannot fire it either.
+      if ((keys.KeyR || touchBack) && !jrShown && !ended) {
         backHold += dt;
         if (backHold >= sysBACK_HOLD && !backBusy) { backBusy = 1; backRescue(); }
       } else { backHold = 0; backBusy = 0; }
@@ -21587,7 +21756,10 @@ export function createSystems(game) {
       // branch already puts on the element and is therefore the honest question
       // to ask — there is no second flag to keep in step with it.
       if (h && !clueEl.classList.contains('recs')) {
-        const clue = typeof h.clue === 'function' ? h.clue() : h.clue;
+        // Rewritten BEFORE the comparison, not after: comparing the raw clue
+        // against the rewritten text on screen is never equal, and this runs
+        // four times a second.
+        const clue = sysSay(typeof h.clue === 'function' ? h.clue() : h.clue);
         if (clue !== clueEl.textContent) {
           clueEl.textContent = clue || '';
           clueEl.classList.toggle('off', !clue);

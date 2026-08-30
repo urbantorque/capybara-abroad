@@ -92,15 +92,107 @@ if (problems.length) {
   process.exit(1);
 }
 
+// ---------------------------------------------------------------------------
+// THE TWO LIBRARIES GO IN THE FILE.
+//
+// This build step has always described its output as "a single self-contained
+// HTML file that runs straight from file:// with no server", and until 31 Aug
+// 2026 it was neither: it inlined 7.5 MB of game and left `import * as THREE
+// from 'three'` pointing at an importmap entry on jsdelivr. So the one artefact
+// meant to be handed to somebody needed the network to start, and when it could
+// not reach the CDN it showed a pale blue card reading "warming up the
+// harbour…" for ever, in silence. Measured; see index.html.
+//
+// Each library is wrapped in an IIFE rather than concatenated flat, because
+// three.js and cannon-es BOTH declare a top-level `Material` (and `Quaternion`,
+// `Shape`, `Plane`, `Sphere`, `Vector3`/`Vec3`...). One scope each, one
+// namespace object out, and the game's own `import * as X` is replaced by a
+// `const` binding of exactly the same shape.
+//
+// Both files are single-export, import-free and use no `as` aliases — checked
+// here rather than assumed, because a silent mistranslation of the export list
+// would produce a bundle that boots and then fails somewhere deep in a chapter.
+function vendorIIFE(file, name) {
+  const src = readFileSync(join(ROOT, file), 'utf8');
+  const m = src.match(/^export \{([^}]*)\};?\s*$/m);
+  if (!m) { problems.push(`${file}: expected exactly one trailing "export { ... };"`); return ''; }
+  if (/\bas\b/.test(m[1])) { problems.push(`${file}: export list uses "as" aliases — the shorthand transform is wrong for it`); return ''; }
+  if (/^\s*import[\s(]/m.test(src)) { problems.push(`${file}: has imports of its own`); return ''; }
+  if (/import\.meta/.test(src)) { problems.push(`${file}: uses import.meta and cannot be wrapped`); return ''; }
+  const names = m[1].split(',').map(s => s.trim()).filter(Boolean);
+  const body = src.slice(0, m.index) + '\nreturn { ' + names.join(', ') + ' };\n';
+  return `/* ================= ${file} (${names.length} exports) ================= */\n` +
+         `const ${name} = (function () {\n${body}})();\n`;
+}
+
+// MIT requires the notice to travel with the code, and inlining the code into
+// a single file is exactly the case it is talking about. Kept as an HTML
+// comment at the top of <body> so it survives in the artefact itself and not
+// only in a repository nobody who was handed the file can see.
+const VENDOR_NOTICE = [
+  '<!--',
+  '  This file bundles two MIT-licensed libraries.',
+  '',
+  '  three.js r169 — Copyright (c) 2010-2024 three.js authors',
+  '  cannon-es 0.20.0 — Copyright (c) 2015 cannon.js authors, (c) 2020 cannon-es authors',
+  '',
+  '  Permission is hereby granted, free of charge, to any person obtaining a copy',
+  '  of this software and associated documentation files (the "Software"), to deal',
+  '  in the Software without restriction, including without limitation the rights',
+  '  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  '  copies of the Software, and to permit persons to whom the Software is',
+  '  furnished to do so, subject to the following conditions:',
+  '',
+  '  The above copyright notice and this permission notice shall be included in',
+  '  all copies or substantial portions of the Software.',
+  '',
+  '  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  '  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  '  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  '  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  '  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  '  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN',
+  '  THE SOFTWARE.',
+  '',
+  '  Full provenance, versions and checksums: vendor/README.md in the source tree.',
+  '-->'
+].join('\n');
+
+const vendored = vendorIIFE('vendor/three.module.js', 'THREE') +
+                 vendorIIFE('vendor/cannon-es.js', 'CANNON');
+
+if (problems.length) {
+  console.error('\n  BUILD BLOCKED — vendor problems:\n');
+  for (const p of problems) console.error('   * ' + p);
+  console.error('');
+  process.exit(1);
+}
+
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-const bundled = html.replace(
+// ---- THE REPLACEMENT IS A FUNCTION, AND IT HAS TO BE ----------------------
+// `String.replace(pattern, string)` interprets `$&`, `$'` and "$`" INSIDE THE
+// REPLACEMENT — so a single `$'` anywhere in the code being inlined splices
+// "everything after the match" into the middle of the bundle. three.js
+// contains one. The symptom was a dist file that looked fine, was the right
+// sort of size, and died with `SyntaxError: Invalid or unexpected token`
+// 1.2 MB in, with `</script></body></html>` sitting in the middle of a string
+// literal in the middle of a library. A replacer function is passed the match
+// instead of scanning for `$`, and has no such behaviour.
+const inlineScript = '<script type="module">\n' + vendored + bodies.join('\n') + '\n</script>';
+let bundled = html.replace(
   '<script type="module" src="./src/main.js"></script>',
-  '<script type="module">\n' +
-  "import * as THREE from 'three';\n" +
-  "import * as CANNON from 'cannon-es';\n" +
-  bodies.join('\n') +
-  '\n</script>'
+  () => inlineScript
 );
+// The importmap is now dead weight, and worse: leaving a bare specifier map in
+// a file that resolves nothing would be a lie about where the code came from.
+bundled = bundled.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
+// A function again, for the same reason as above — the notice has no `$` in it
+// today, and the next person to edit it should not have to know that it must not.
+bundled = bundled.replace('<body>', () => '<body>\n' + VENDOR_NOTICE);
+if (/cdn\.jsdelivr\.net|unpkg\.com|cdnjs/.test(bundled)) {
+  console.error('\n  BUILD BLOCKED — the bundle still references a CDN.\n');
+  process.exit(1);
+}
 
 mkdirSync(join(ROOT, 'dist'), { recursive: true });
 const outPath = join(ROOT, 'dist', 'untitled-capybara-game.html');

@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Untitled Capybara Game — Sydney</title>
+<meta name="description" content="A physics sandbox where a mischievous capybara terrorises nineteen places.">
+<meta name="theme-color" content="#cfe8ef">
 <!-- A capybara, at 32 px, in the palette. Inline so the game stays a single
      file with no external asset of any kind — and so the browser stops asking
      for /favicon.ico, which is the only console error this game has ever had
@@ -18,27 +20,170 @@
   #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }
   #boot { position:fixed; inset:0; background:#cfe8ef; display:flex; align-items:center;
           justify-content:center; flex-direction:column; gap:14px; z-index:50;
-          transition:opacity .6s ease; color:#5c6b52; }
+          transition:opacity .6s ease; color:#5c6b52; padding:24px; text-align:center; }
   #boot h1 { font-size:clamp(22px,4vw,40px); letter-spacing:.02em; font-weight:700; color:#6b7c5e; }
   #boot .sub { font-size:14px; opacity:.7; }
   #boot.hidden { opacity:0; pointer-events:none; }
+
+  /* ---- THE SCREEN A STRANGER GETS WHEN IT DOES NOT START -------------------
+     Three different failures — no WebGL, a dependency that never arrived, a
+     throw during boot — all used to end in the same place: the words "warming
+     up the harbour…" on a pale blue field, for ever, with no way to tell which
+     one had happened or whether waiting longer would help. Measured 31 Aug
+     2026: block the CDN and the splash sits there silently; take WebGL away
+     and it sits there with a monospace stack trace pinned to the bottom of the
+     window. Neither is a thing you can hand to somebody.
+     This is the same card in the same palette, and it says which of the three
+     it was and what to do about it. */
+  #boot.failed { transition:none; }
+  #boot .fail { display:none; max-width:34em; }
+  #boot.failed .fail { display:block; }
+  #boot.failed .sub, #boot.failed .spin { display:none; }
+  #boot .fail p { font-size:15px; line-height:1.65; opacity:.85; margin:0 0 10px; }
+  #boot .fail ul { text-align:left; display:inline-block; margin:2px 0 14px; padding-left:1.1em;
+                   font-size:14px; line-height:1.7; opacity:.75; }
+  #boot .fail button { font:inherit; font-size:14px; font-weight:700; cursor:pointer;
+          color:#fff; background:#e08a7d; border:0; border-radius:9px; padding:10px 22px;
+          box-shadow:0 3px 9px rgba(60,70,55,.22); letter-spacing:.03em; }
+  #boot .fail button:hover { background:#d97b6c; }
+  #boot .fail .detail { font:12px/1.5 ui-monospace,Consolas,monospace; opacity:.5;
+          margin-top:14px; word-break:break-word; }
+
+  /* The waiting animation, so a slow connection reads as progress rather than
+     as the same frozen card the failures produce. */
+  .spin { width:34px; height:34px; border-radius:50%; border:3px solid rgba(107,124,94,.22);
+          border-top-color:#6b7c5e; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation:none; } }
+
   #err { position:fixed; left:0; right:0; bottom:0; max-height:45%; overflow:auto; z-index:99;
          background:#3a3229; color:#ffd9a0; font:12px/1.5 ui-monospace,Consolas,monospace;
          padding:10px 14px; white-space:pre-wrap; display:none; }
+  /* The developer strip is for a developer. Once the failure card is up, the
+     player has been told what happened in words they can use, and a stack trace
+     pinned across the bottom of it only makes the same news look worse. The
+     console still has all of it, and so does the card's own detail line. */
+  #boot.failed ~ #err { display:none !important; }
 </style>
 </head>
 <body>
-<div id="boot"><h1>Untitled Capybara Game</h1><div class="sub">warming up the harbour…</div></div>
+<div id="boot">
+  <h1>Untitled Capybara Game</h1>
+  <div class="spin" aria-hidden="true"></div>
+  <div class="sub">warming up the harbour…</div>
+  <div class="fail" role="alert">
+    <p id="failmsg"></p>
+    <ul id="failtips"></ul>
+    <div><button type="button" id="failgo">Try again</button></div>
+    <div class="detail" id="faildetail"></div>
+  </div>
+</div>
 <div id="hud"></div>
 <pre id="err"></pre>
 
+<!-- THE TWO LIBRARIES ARE IN THE REPOSITORY, NOT ON A CDN.
+     They used to be fetched from jsdelivr at boot. That is one more thing
+     between a stranger and the game than there needs to be: an ad-blocker, a
+     school or office proxy, a country that does not reach that host, a laptop
+     on a train, or ten minutes of jsdelivr being down, and the game does not
+     start — silently. Both are MIT and together they are 1.6 MB; they sit in
+     vendor/ and are inlined into dist/ by build.mjs. See vendor/README.md. -->
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    "three": "./vendor/three.module.js",
+    "cannon-es": "./vendor/cannon-es.js"
   }
 }
+</script>
+<script>
+  // ---- BEFORE ANYTHING ELSE: CAN THIS BROWSER DRAW AT ALL? -----------------
+  // Asked here rather than inside the renderer because three.js answers it by
+  // throwing from 1.3 MB down a stack the player cannot read, and because the
+  // answer decides whether loading the rest is worth doing.
+  (function () {
+    var boot = document.getElementById('boot');
+    var shown = false;
+
+    function fail(msg, tips, detail) {
+      if (shown) return;
+      shown = true;
+      window.__capyFailed = true;
+      document.getElementById('failmsg').textContent = msg;
+      var ul = document.getElementById('failtips');
+      ul.innerHTML = '';
+      for (var i = 0; i < tips.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = tips[i];
+        ul.appendChild(li);
+      }
+      document.getElementById('faildetail').textContent = detail || '';
+      boot.classList.remove('hidden');
+      boot.classList.add('failed');
+    }
+    window.__capyFail = fail;
+
+    // EXACTLY THE TWO CONTEXTS three.js ASKS FOR, IN ITS ORDER, AND NO MORE.
+    // This probe used to fall back to 'experimental-webgl', which some browsers
+    // still answer when they will not answer 'webgl' — so the probe passed, the
+    // renderer then failed on its own request, and the player got the generic
+    // "hit a problem while starting up" card instead of the one that names the
+    // cause and tells them to turn hardware acceleration on. A capability check
+    // that is more generous than the thing it is checking for is worse than no
+    // check at all.
+    var canvas = document.createElement('canvas');
+    var gl = null;
+    try {
+      gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    } catch (e) { gl = null; }
+    if (!gl) {
+      fail('This game draws with WebGL, and this browser could not start it.',
+           ['Check that hardware acceleration is switched on in your browser settings.',
+            'Try Chrome, Edge, Firefox or Safari, updated to a recent version.',
+            'On a desktop, a graphics-driver update often fixes this.'],
+           'no WebGL context');
+      return;
+    }
+    // Not fatal — plenty of machines run this fine on a software rasteriser —
+    // but worth saying once, because it is the difference between "this game
+    // is slow" and "this machine is not using its graphics card".
+    try {
+      var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      var r = dbg && gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '';
+      if (/swiftshader|llvmpipe|software/i.test(r)) window.__capySoftGL = r;
+    } catch (e) { /* the probe is a courtesy, never a second failure */ }
+
+    // ---- AND IF THE CODE ITSELF NEVER ARRIVES -----------------------------
+    // A module script that 404s, or whose bare specifier will not resolve,
+    // does not reach window.onerror with anything readable — it simply never
+    // runs, and the splash stays up for ever. The watchdog is the only thing
+    // that catches all of those at once. main.js clears it the moment the
+    // first frame is drawn.
+    var t0 = Date.now();
+    window.__capyWatchdog = setTimeout(function () {
+      if (window.__capyRunning) return;   // it booted, just slowly
+      var secs = Math.round((Date.now() - t0) / 1000);
+      // Two different failures, and the difference matters to whoever is
+      // looking at it: nothing arrived, or it arrived and never drew.
+      if (window.__capy) {
+        fail('The game loaded but never drew its first frame.',
+             ['Reload the page.',
+              'If your browser has hardware acceleration switched off, switch it on.',
+              'A very old graphics driver can also do this.'],
+             'no frame after ' + secs + 's');
+      } else {
+        fail('The game did not finish loading.',
+             ['Check your connection and reload.',
+              'If you use an ad-blocker or a strict privacy extension, allow this page and reload.',
+              'On a work, school or public network, a proxy may be blocking part of it.'],
+             'no boot after ' + secs + 's');
+      }
+    }, 25000);
+
+    document.getElementById('failgo').addEventListener('click', function () {
+      location.reload();
+    });
+  })();
 </script>
 <script type="module" src="./src/main.js"></script>
 <script>
@@ -46,6 +191,14 @@
     const el = document.getElementById('err');
     el.style.display = 'block';
     el.textContent += (e.message || e.error) + '\n  ' + (e.filename||'') + ':' + (e.lineno||'') + '\n';
+    // A throw before the game object exists is a boot failure, not a bad
+    // frame: nothing is on screen to go back to, so say so in words.
+    if (!window.__capy && window.__capyFail) {
+      window.__capyFail('The game hit a problem while starting up.',
+        ['Reload the page — this is often a one-off.',
+         'If it keeps happening, try another browser, or a private window with extensions off.'],
+        String(e.message || e.error || '').slice(0, 200));
+    }
   });
   window.addEventListener('unhandledrejection', e => {
     const el = document.getElementById('err');

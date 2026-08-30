@@ -1594,6 +1594,47 @@ function mainBoot() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
 
+  // ---------------------------------------------------------------------
+  // THE GRAPHICS CARD IS ALLOWED TO GO AWAY.
+  //
+  // Nothing in this game had ever listened for it. A WebGL context is lost on
+  // a driver reset, on a laptop waking from sleep, when another tab asks for
+  // too much memory, when a phone backgrounds the page for long enough, and on
+  // Windows every time the GPU is preempted for more than two seconds. The
+  // result was a black rectangle, for ever, with the HUD still drawn over the
+  // top of it and every key still working — the worst kind of failure, because
+  // it looks like the game is running and the player is doing something wrong.
+  //
+  // preventDefault() is not optional: without it the browser will not even
+  // TRY to give the context back. With it, `webglcontextrestored` usually
+  // arrives within a second or two, and three.js re-uploads what it needs
+  // lazily. So the honest behaviour is: stop drawing, say so in words, and
+  // pick the game back up if the context comes back — with the reload button
+  // on the card as the guaranteed way out if it does not.
+  let glLost = false;
+  canvas.addEventListener('webglcontextlost', function (e) {
+    e.preventDefault();
+    glLost = true;
+    if (window.__capyFail) {
+      window.__capyFail('The graphics context was lost.',
+        ['This is usually the graphics driver restarting, or the computer waking from sleep.',
+         'It often comes back on its own after a moment.',
+         'If it does not, reload — your progress is saved.'],
+        'webglcontextlost');
+    }
+  }, false);
+  canvas.addEventListener('webglcontextrestored', function () {
+    glLost = false;
+    // Take the card down again and let the loop carry on. Anything three.js
+    // could not re-upload will throw from a module's update, and the strike
+    // system three hundred lines below turns that into a visible one-line
+    // report rather than another silent black frame.
+    const el = document.getElementById('boot');
+    if (el) { el.classList.remove('failed'); el.classList.add('hidden'); }
+    window.__capyFailed = false;
+    console.log('[gl] context restored');
+  }, false);
+
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.fog);
   scene.fog = new THREE.Fog(PALETTE.fog, 90, 230);
@@ -1832,6 +1873,11 @@ function mainBoot() {
   // One full frame. Exposed as game.tick so the game can also be advanced manually
   // (headless QA, deterministic capture) when requestAnimationFrame is throttled.
   game.tick = function (dt, render) {
+    // Nothing can be drawn without a context, and stepping the world while the
+    // player is reading a card that says the graphics stopped would hand them
+    // back a capybara somewhere else entirely. See the two listeners up in
+    // mainBoot.
+    if (glLost) return;
     if (dt > 0.1) dt = 0.1;              // tab-switch guard
     game.state.rawDt = dt;
     // THE ONE PLACE THE WORLD'S CLOCK IS SET. Everything below — the solver,
@@ -1906,8 +1952,22 @@ function mainBoot() {
 
   const boot = document.getElementById('boot');
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    boot.classList.add('hidden');
-    setTimeout(() => boot.remove(), 700);
+    // THE WATCHDOG IS CALLED OFF BY A FRAME, NOT BY A MODULE.
+    // index.html arms a timer at parse time that puts a readable failure card
+    // over the splash if the game never starts. The signal that clears it has
+    // to be the thing the player is actually waiting for — two rAFs, i.e. a
+    // frame has genuinely been drawn — and not merely `window.__capy` being
+    // assigned, which happens in the first ten lines of mainBoot and would
+    // call the watchdog off before any of the twenty-three modules had run.
+    window.__capyRunning = true;
+    if (window.__capyWatchdog) { clearTimeout(window.__capyWatchdog); window.__capyWatchdog = null; }
+    // The card is HIDDEN and never removed. It used to be removed 700 ms after
+    // the first frame, which was fine while the only thing it could say was
+    // "warming up the harbour…" — but it is now the one place in the game that
+    // can speak to a player in plain words when something has gone wrong, and
+    // the most likely such thing (a lost GL context) happens hours in. One
+    // hidden div is not worth a second implementation of the same card.
+    if (boot) boot.classList.add('hidden');
   }));
 }
 

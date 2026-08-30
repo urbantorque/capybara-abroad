@@ -1,0 +1,30 @@
+{
+  "name": "untitled-capybara-game",
+  "version": "0.52.0",
+  "private": true,
+  "description": "A physics sandbox where a mischievous capybara terrorises nineteen places.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "build": "node build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "//": [
+    "There are no dependencies and there is no bundler. The two libraries the",
+    "game is built on are checked in under vendor/ (see vendor/README.md for",
+    "versions, checksums and licences); build.mjs inlines them, along with the",
+    "twenty-seven source modules, into one self-contained HTML file.",
+    "",
+    "`npm start` serves the unbundled source for development. `npm run build`",
+    "produces dist/untitled-capybara-game.html, which needs no server and no",
+    "network and opens straight from file://.",
+    "",
+    "This package is marked private and carries no `license` field on purpose:",
+    "the repository has no LICENSE file yet, and picking one is the author's",
+    "call, not the build's. Until there is one, nobody else has permission to",
+    "use this — which is the one thing left in the way of sharing it."
+  ]
+}
