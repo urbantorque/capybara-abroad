@@ -3023,6 +3023,101 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE PENUMBRA (v49 — 30 Aug 2026)
+
+Everything else in the picture softened over v45–v48 and the shadows did not.
+They were the last hard edge in the frame, and the reason turned out to be that
+the table meant to control them had never been connected to anything.
+
+### `sysBIO_SH_RAD` HAD NEVER DONE ANYTHING
+
+It has been in systems.js since chapter 2 with a comment saying *"PCFShadowMap
+does honour shadow.radius (it scales the PCF tap offsets), so this is free."*
+That sentence is true, and it is about the wrong constant: the renderer is set
+to **`PCFSoftShadowMap`** thirty lines below it, and three's PCF_SOFT branch
+does not reference `shadowRadius` at all.
+
+Measured byte-exact (`qa/shadow-probe.js`), which is the only way to be sure of
+a claim like this:
+
+| | `shadow.radius` 1 vs 25 |
+|---|---|
+| under PCF_SOFT | **0.000% of frame, peak 0** |
+| under PCF | 15.485% of frame, peak 62 |
+
+So every shadow in all nineteen chapters has been the same fixed one-texel
+kernel — 2.15 cm at 2048 over a 44 m box, about a six-centimetre penumbra —
+whether the thing casting it is a bollard twenty centimetres up or a building
+twenty metres up.
+
+### What replaces it
+
+Contact hardening, which is the actual physics: a penumbra grows with the
+distance between the caster and the surface it lands on. A five-tap blocker
+search first, then a twelve-tap PCF whose radius comes out of what it found.
+
+- **IT IS NOT MORE EXPENSIVE.** three's PCF_SOFT is a fixed sixteen taps for
+  every fragment in the frame. This is five, and only fragments that find a
+  blocker spend twelve more — so the lit two thirds of a daylight frame get
+  *cheaper* and only real penumbra pays. Measured as a differential (`git stash`
+  the file, rebuild, re-run, restore): **−0.198 to +0.137 ms across four
+  chapters**, and a negative delta is impossible for added work, so the noise
+  floor is ±0.2 and the cost is unmeasurable.
+- **`shadowRadius` BECOMES THE LIGHT SIZE**, which is what it means in a soft
+  shadow and what the dead table was reaching for. One number per biome, already
+  plumbed, and now it arrives.
+- **NO JITTER, AND THEREFORE NO NOISE.** A rotated sample disc is the usual way
+  to hide a low tap count, and this game has no denoiser anywhere in the chain —
+  the same argument the crease's opposed pairs are built on. Two fixed rings
+  instead, four and eight.
+
+It is a global override of a three `ShaderChunk`, because `getShadow()` is called
+from `<lights_fragment_begin>` and shadows have no per-material hook. It is
+installed from systems.js, which already owns every other decision about the sun,
+and it **refuses to install** if three ever restructures that chunk — a wrong
+replacement there breaks every shadow in the game, so a missing `#elif` returns
+rather than corrupting it.
+
+### What it measures
+
+`qa/shadow-pen.js` puts a controlled 4 m plate over flat lawn at four heights and
+diffs the new filter against a stand-in for the old one (`shadowRadius = 0`
+clamps the derived radius to its one-texel floor, which *is* the fixed-kernel
+behaviour, so the old filter can be compared without reverting the chunk):
+
+| caster height | frame differing | mean | peak |
+|---|---|---|---|
+| 0.25 m | 1.71% | 7.6 | 22 |
+| 1 m | 2.16% | 9.2 | 32 |
+| 3 m | 6.14% | 12.7 | 38 |
+| 8 m | 14.24% | 13.4 | 41 |
+
+**8.3× more of the frame affected at eight metres than at twenty-five
+centimetres** — a shadow on the ground barely moves, one cast from high up
+softens completely. That is the whole of the feature.
+
+### FOUR ATTEMPTS AT THE INSTRUMENT, AND THE FOURTH WAS TO STOP MEASURING WIDTH
+
+The obvious probe is the 10–90% transition width of a shadow edge. It failed
+three times:
+
+1. **It measured the depth of field.** The lens is still on: the defocus blurs
+   the very edge under test, and the first run reported a 1279-pixel penumbra —
+   the entire scanline. `dof`, `air`, `crease`, `vignette`, `contrast` and
+   `bloom` all have to come off first.
+2. **It measured world motion.** `shot()` awaited an image decode between two
+   renders, and an await yields to rAF, which ticks the game. That reported an
+   11.3% frame difference from a uniform the shader provably never reads — NPCs
+   walking. **Third time this trap has been paid for in this session.**
+3. **It measured the caster.** Looking straight down at where the shadow lands,
+   the plate is also in frame at low heights, and a dark box on a bright lawn is
+   a far steeper edge than any penumbra.
+
+The fix was to abandon the width entirely. **The prediction does not need one** —
+it is simply that the two filters agree for a caster on the ground and diverge as
+it rises. A per-pixel diff between the arms tests exactly that and cannot be
+fooled by clutter, because the clutter is identical in both arms.
+
 ## THE AIRLIGHT (v48 — 30 Aug 2026)
 
 The spill (v-presence) lights SURFACES. It lives in the rim's injection and

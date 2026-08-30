@@ -5903,6 +5903,116 @@ function sysBuildCSS() {
   ].join('');
 }
 
+// ===========================================================================
+// THE PENUMBRA (v49) — AND THE TABLE THAT HAD NEVER DONE ANYTHING.
+//
+// `sysBIO_SH_RAD` has been in this file since chapter 2 with a comment saying
+// "PCFShadowMap does honour shadow.radius (it scales the PCF tap offsets), so
+// this is free". That sentence is true and it is about the wrong constant:
+// the renderer is set to **PCFSoftShadowMap** thirty lines below it, and
+// three's PCF_SOFT branch does not reference `shadowRadius` at all.
+//
+// MEASURED, byte-exact (qa/shadow-probe.js): `shadow.radius` 1 against 25
+// under PCF_SOFT changes **0.000% of the frame, peak 0**. Under plain PCF the
+// same change moves 15.5%. So the per-biome softness table has never once
+// reached the shader, and every shadow in all nineteen chapters has been the
+// same fixed one-texel kernel — 2.15 cm at 2048 over a 44 m box, so about a
+// six-centimetre penumbra whether the thing casting it is a bollard twenty
+// centimetres up or a building twenty metres up.
+//
+// That is the last hard edge in the picture. Everything else softened over
+// v45–v48 and the shadows did not.
+//
+// WHAT REPLACES IT. Contact hardening, which is the actual physics: a penumbra
+// grows with the distance between the caster and the surface it lands on. A
+// blocker search first, then a PCF whose radius comes out of what it found.
+//
+//   - IT IS NOT MORE EXPENSIVE. three's PCF_SOFT is a fixed sixteen taps for
+//     every fragment in the frame. This is five, and only fragments that found
+//     a blocker go on to spend twelve more — so the lit two thirds of a
+//     daylight frame get CHEAPER and only real penumbra pays.
+//   - `shadowRadius` BECOMES THE LIGHT SIZE, which is what it means in a soft
+//     shadow and what the dead table was reaching for. One number per biome,
+//     already plumbed, and now it arrives.
+//   - NO JITTER, and therefore no noise. A rotated sample disc is the usual
+//     way to hide a low tap count and this game has no denoiser anywhere in
+//     the chain — the same argument the crease's opposed pairs are built on.
+//     Two fixed rings instead, four and eight.
+//
+// It is a global override of a three ShaderChunk, which is the only injection
+// point shadows have: `getShadow()` is called from <lights_fragment_begin> and
+// there is no per-material hook for it. Installed once, from here, because
+// this file already owns every other decision about the sun.
+// ===========================================================================
+// Depth difference (0..1 across the shadow frustum) to penumbra radius in
+// texels. Calibrated in qa/shadow-pen.js against a measured edge: see the
+// header there. The frustum is 64 m deep in a flat chapter, so a caster two
+// metres up is 0.031 of depth and lands about eight texels of blur — 17 cm,
+// which is what a two-metre-high edge actually looks like.
+const sysPEN_K   = 260.0;
+const sysPEN_MAX = 16.0;    // texels. 34 cm; past this it stops being a shadow.
+const sysPEN_MIN = 1.0;     // texels. A contact edge is allowed to be sharp.
+// How far the blocker search looks, in texels. Too small and a tall caster's
+// penumbra never finds the thing casting it and stays hard; too large and a
+// nearby unrelated object bleeds softness onto a contact edge.
+const sysPEN_SEARCH = 3.0;
+let   sysShadowFilterDone = false;
+function sysInstallShadowFilter(T) {
+  if (sysShadowFilterDone) return;
+  const ch = T.ShaderChunk.shadowmap_pars_fragment;
+  const i = ch.indexOf('#elif defined( SHADOWMAP_TYPE_PCF_SOFT )');
+  const j = i < 0 ? -1 : ch.indexOf('#elif', i + 10);
+  // If three ever restructures this chunk, leave it alone rather than
+  // corrupting it: a wrong replacement here breaks every shadow in the game.
+  if (i < 0 || j < 0) return;
+  // Unrolled rather than looped over a const array: GLSL ES 1.00 has no array
+  // constructors, and whether a given material compiles as 1.00 or 3.00 is
+  // three's business and not something to bet the shadows on.
+  const B = [[0, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+  const R = [];
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI * 0.5 + Math.PI * 0.25;
+    R.push([Math.cos(a) * 0.5, Math.sin(a) * 0.5]);
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI * 0.25;
+    R.push([Math.cos(a), Math.sin(a)]);
+  }
+  const f = (v) => v.toFixed(4);
+  const body = [
+    '#elif defined( SHADOWMAP_TYPE_PCF_SOFT )',
+    '  vec2 texelSize = vec2( 1.0 ) / shadowMapSize;',
+    '  float capyRec = shadowCoord.z;',
+    '  vec2 capySrch = texelSize * ( ' + f(sysPEN_SEARCH) + ' + shadowRadius * ' + f(sysPEN_SEARCH) + ' );',
+    '  float capyBSum = 0.0;',
+    '  float capyBN = 0.0;',
+    '  float capyD;',
+  ].concat(B.map(function (o) {
+    return '  capyD = unpackRGBAToDepth( texture2D( shadowMap, shadowCoord.xy + vec2( ' +
+           f(o[0]) + ', ' + f(o[1]) + ' ) * capySrch ) );\n' +
+           '  if ( capyD < capyRec ) { capyBSum += capyD; capyBN += 1.0; }';
+  })).concat([
+    // NOTHING IN FRONT OF THIS FRAGMENT: it is lit, and it costs five taps
+    // rather than sixteen to say so.
+    '  if ( capyBN < 0.5 ) {',
+    '    shadow = 1.0;',
+    '  } else {',
+    '    float capyPen = capyRec - capyBSum / capyBN;',
+    '    float capyR = clamp( capyPen * shadowRadius * ' + f(sysPEN_K) + ', ' +
+      f(sysPEN_MIN) + ', ' + f(sysPEN_MAX) + ' );',
+    '    vec2 capyStep = texelSize * capyR;',
+    '    float capyS = 0.0;',
+  ]).concat(R.map(function (o) {
+    return '    capyS += texture2DCompare( shadowMap, shadowCoord.xy + vec2( ' +
+           f(o[0]) + ', ' + f(o[1]) + ' ) * capyStep, capyRec );';
+  })).concat([
+    '    shadow = capyS * ( 1.0 / ' + R.length.toFixed(1) + ' );',
+    '  }',
+  ]).join('\n') + '\n';
+  T.ShaderChunk.shadowmap_pars_fragment = ch.slice(0, i) + body + ch.slice(j);
+  sysShadowFilterDone = true;
+}
+
 // ---------------------------------------------------------------------------
 export function createSystems(game) {
   const THREEx = game.THREE || THREE;
@@ -5915,6 +6025,7 @@ export function createSystems(game) {
   // about a tenth of it, and the staircase along the edge of a palm shadow on
   // flat sand is the most obviously unfinished thing in a still of this game.
   renderer.shadowMap.type = THREEx.PCFSoftShadowMap;
+  sysInstallShadowFilter(THREEx);
 
   // =========================================================================
   // 1. LIGHTING

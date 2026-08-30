@@ -1164,6 +1164,47 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## Shadows found out how high things are
+
+Every other edge in this game softened over the last few passes and the shadows
+did not. They turned out to be the last hard thing in the frame, and the reason
+was better than expected: the table meant to control how soft they are had never
+been connected to anything.
+
+It has been sitting in the lighting code since the second chapter, with a comment
+explaining that this particular shadow filter scales its blur by that number. The
+comment is correct. It is also about a different filter from the one the renderer
+was switched to some time later, and the one actually in use ignores the setting
+completely. Turning it from one to twenty-five changes exactly nothing: not a
+subtle difference, not a small one — zero pixels, measured.
+
+So every shadow in all nineteen chapters has been the same width of soft edge,
+about six centimetres, whether it was cast by a bollard twenty centimetres off
+the ground or a building twenty metres up.
+
+Shadows know how high things are now. A crate sitting on the sand has a crisp
+edge where it meets the ground; the shadow of a palm eight metres up spreads out
+into something soft, the way it does outside. It is the difference between an
+object resting on a surface and an object floating above one, and it is doing
+work in every chapter at once.
+
+It costs nothing, which is the pleasant surprise. The old filter took sixteen
+measurements of the shadow map for every pixel on screen, always. The new one
+takes five to find out whether there is anything overhead at all — and about two
+thirds of a daylight frame is lit, so most pixels stop there and are done. Only
+the pixels actually inside a soft edge go on to do the rest of the work.
+
+The measurement was harder than the change. The obvious thing to check is how
+wide a shadow edge is, and three attempts to measure that failed in three
+different ways: the first measured the depth-of-field blur that was still
+switched on, the second measured pedestrians walking through the shot between the
+two photographs, and the third measured the outline of the test object rather
+than its shadow. The fourth attempt gave up on measuring width at all. The thing
+worth proving is not a number of pixels — it is that a shadow on the ground
+barely changes and a shadow from high up changes a great deal. Comparing the two
+versions of the same frame says that directly, and nothing in the scene can
+confuse it, because everything in the scene is in both photographs.
+
 ## The neon reaches the air now
 
 Lights in this game have painted the road, the shopfronts and the capybara for a
