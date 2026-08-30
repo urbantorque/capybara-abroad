@@ -364,7 +364,7 @@ function hanVC() {
  *  Flat, because the ground is horizontal and wants no vertical shear. */
 function hanVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearScale: 14, contact: 1 });
+               { scale: 0.24, amount: 0.09, warp: 0, near: 0.56, nearScale: 14, contact: 1, broad: 0.08, broadM: 16 });
 }
 function hanVCF() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });

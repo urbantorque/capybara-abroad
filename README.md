@@ -1164,6 +1164,73 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## The frame found out how far away things are
+
+The composite pass had colour in it and nothing else. The scene has always been rendered into a
+buffer that carries depth as well, and that depth has always been thrown away the moment the
+frame was drawn — so the whole chain between the world and the screen was working from a flat
+picture. Nineteen arrival frames again, and again the same two sentences: **every frame in this
+game is uniformly sharp from two metres to the fog, and every surface in it meets every other
+surface on a clean seam.**
+
+Venice is the clearest case. Sixty people between eight metres and forty-five, all of them
+equally crisp, standing on a pavement that is one value corner to corner, under an arcade whose
+arches read as flat panels rather than as holes. There was nowhere for the eye to land.
+
+Keeping the depth costs the copy and nothing else, and three things come out of it.
+
+**There is a focus now.** The animal is sharp, the far side of the square goes soft, and so does
+the very bottom edge of the frame. It is what makes a photograph of a small thing look like a
+photograph of a small thing, and it is the one cue no amount of grading can fake. Where the
+focus falls is a multiple of how far the camera is from the capybara rather than a distance in
+metres — which is what lets it stay right on a lawn, at a ship's wheel, and under a balloon
+seventy metres up, without any of those places having to say so.
+
+**There is air between here and there.** The fog in this game is linear and does not begin until
+about eighty metres, and the camera is six metres up with the whole of the game happening
+between three and forty — so aerial perspective, which is the cheapest depth cue there has ever
+been, was switched off exactly where the game is. Now a wall thirty metres away carries a few
+per cent of the horizon's colour, and the Transpantaneira finally goes somewhere instead of
+running two hundred metres to a horizon at exactly the value it started at. It takes its colour
+from the fog's own, so every event that already moves the weather moves the haze with it and the
+two can never drift apart.
+
+**And a corner is a corner.** There has never been any ambient occlusion in this game — not one
+term, anywhere, in twenty-eight modules. The contact patches added a while back are a pool of
+soft shadows under objects and cannot darken a box against a box, a wall against its own
+pavement, or the inside of an arch. Now the food truck has a seam under its awning, the steps up
+to the Opera House forecourt read as steps instead of stripes, the crates at the Antarctic
+station separate from each other, and Venice's arcade is a recess.
+
+The trick in that last one is telling a corner from a floor. The obvious version of it darkens
+every lawn, every pavement and every dune in the game, because the biggest surface seen at a
+grazing angle in any of these frames is the ground and it is half the picture — measured, it
+took Sydney's grass down almost three levels of 255 everywhere. Sampling in opposed pairs and
+taking the smaller of each fixes it exactly: on a flat surface, whatever its angle, one side is
+nearer by as much as the other is further, so the pair cancels; in a real corner both sides come
+toward you. The same measurement now reads **one thousandth** of a level on that grass.
+
+**The ground stopped being one colour.** The noise field that breaks up the big surfaces varies
+brightness and has never varied hue, and it runs from a metre and a half down to a few
+centimetres — so there was nothing in it at the size of a patch. Grass yellows where it is dry
+and goes blue-green in the damp; sand is pink loose and grey packed. There is an octave above
+the others now, about sixteen metres across, and it moves colour as well as level: the bright
+half of it goes warm and the dark half goes cool, which is not a shortcut but the actual case,
+because a dip in a lawn is darker for seeing less sun and cooler for seeing more sky.
+
+Frame time is **16.3–17.1 ms** in all nineteen chapters, which is the locked sixty it has always
+been, and the composite pass itself grew by **0.01 to 0.46 ms** — though the instrument that
+measures that has a noise floor of about a tenth of a millisecond, so only the total is worth
+quoting.
+
+Two things measured wrong first and both were the same mistake, which is guessing where the
+picture is. The near blur was aimed at two to seven metres, and nothing on screen is nearer than
+nine — so it did precisely nothing, byte for byte, in the two thirds of the frame it was written
+for. And the haze was authored at twice what it is worth: at the first setting Sydney's harbour
+came back grey-green, and the instrument could not see it happen, because mixing toward a pale
+haze *raises* average brightness. Saturation is the thing to watch, and every chapter's is now
+measured rather than judged.
+
 ## Performance
 
 Measured live at 1280×760:

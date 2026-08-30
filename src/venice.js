@@ -485,7 +485,7 @@ function venVC() {
  *  so it wants no vertical shear in the sample at all. */
 function venVCG() {
   if (!venGroundMat) venGroundMat = venWet(grainOwn(mat(0xffffff, { vertexColors: true }),
-    { scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1 }));
+    { scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1, broad: 0.08, broadM: 15 }));
   return venGroundMat;
 }
 function venPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }

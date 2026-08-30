@@ -347,7 +347,7 @@ function sahVC() {
  *  so it wants no vertical shear in the sample at all. */
 function sahVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearScale: 8, contact: 1 });
+               { scale: 0.45, amount: 0.15, warp: 0, near: 0.48, nearScale: 8, contact: 1, broad: 0.12, broadM: 20 });
 }
 function sahPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function sahInstance(root, geo, color, list, cast, recv, opts) {

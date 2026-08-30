@@ -533,7 +533,7 @@ function pastoBuildTerrainMesh() {
    * looking at.
    */
   const mesh = new THREE.Mesh(geo, grain(mat(PALETTE.volcanoSnow, { vertexColors: true }),
-                                         { scale: 0.48, amount: 0.15, warp: 0, near: 0.52, nearScale: 8, contact: 1 }));
+                                         { scale: 0.48, amount: 0.15, warp: 0, near: 0.52, nearScale: 8, contact: 1, broad: 0.1, broadM: 15 }));
   mesh.name = 'pastoLandscape';
   mesh.receiveShadow = true;
   mesh.castShadow = false;                            // 260 m of caster would eat the 2048 map

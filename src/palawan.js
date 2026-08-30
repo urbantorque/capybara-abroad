@@ -345,7 +345,7 @@ function palVC() {
  *  so it wants no vertical shear in the sample at all. */
 function palVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1 });
+               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1, broad: 0.11, broadM: 18 });
 }
 
 /**

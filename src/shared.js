@@ -3429,6 +3429,60 @@ export function grain(m, opts) {
   // axes and the eye finds the grid. Half a radian is enough that it never does.
   const near = o.near === undefined ? 0 : o.near;
   const nearScale = o.nearScale === undefined ? 6 : o.nearScale;
+  // ---------------------------------------------------------------------
+  // BROAD — THE OCTAVE ABOVE, AND THE ONE CHANNEL THIS FIELD NEVER HAD.
+  //
+  // Everything above varies BRIGHTNESS. `gn` is a multiply on the diffuse and
+  // so is `gnr`, and between them they run from a metre and a half down to a
+  // few centimetres. Two things were still missing and they are the same
+  // thing looked at twice:
+  //
+  //   - THERE IS NO OCTAVE ABOVE A METRE AND A HALF. A lawn is not uniform
+  //     over thirty metres, it is patchy over ten; sand is packed in some
+  //     places and loose in others; a piazza has been mended. At 1/scale the
+  //     field is finer than any of that, so a big ground still reads as one
+  //     value with a texture on it rather than as a place with variation in
+  //     it. The ground is 40-55% of every frame in this game.
+  //   - AND NOTHING HERE HAS EVER MOVED A HUE. Grass yellows where it is dry
+  //     and goes blue-green in the damp; sand goes pink dry and grey packed.
+  //     A pure luminance field cannot say any of that, and a flat hue over
+  //     half the picture is most of what makes a large surface read as a
+  //     polygon rather than as ground.
+  //
+  // ONE SAMPLE DOES BOTH, and they are CORRELATED ON PURPOSE: the gain is
+  // per-channel, so the bright half of the field goes warm and the dark half
+  // goes cool. That is not a shortcut, it is the physical case — a dip in a
+  // lawn is darker because it sees less sun and cooler because what it does
+  // see is sky. At broad = 0.10 the warm-to-cool spread across the whole
+  // field is about 7%, which is the same order as the split tone in the lens
+  // pass and, like it, is meant to be invisible until it is switched off.
+  //
+  // NO DISTANCE FADE, unlike `near` and unlike the sparkle: at roughly an
+  // eighteen-metre wavelength this field is never within an octave of Nyquist
+  // in any frame this camera can compose, so there is nothing to alias and
+  // the fwidth those two need would cost a derivative for nothing.
+  //
+  // It is WARPED BY `gn`, which is already computed and therefore free, for
+  // the reason the near octave is: value noise sits on a square lattice, and
+  // an eighteen-metre lattice across a thirty-metre frame is two cells and
+  // shows itself as two soft squares.
+  // IN METRES, and taken off the world position rather than off `gq`. Every
+  // other octave in here is a multiple of `scale`, which is a per-chapter
+  // number between 0.24 and 0.62 — so the same multiplier would put this
+  // field at eighteen metres in Kyoto and forty-six in Hanoi, and "how big is
+  // a patch of ground" is not a thing that varies by a factor of three
+  // between two streets. A wavelength is the honest unit for it.
+  //
+  // Sampled on XZ only: a wall gets one value up its whole height, which is
+  // what a wall does. There is no y-warp for the same reason `gq` has one —
+  // that warp exists so a vertical face does not get a stretched copy of the
+  // fine field, and at sixteen metres there is nothing to stretch.
+  const broad = o.broad === undefined ? 0 : o.broad;
+  const broadM = o.broadM === undefined ? 16 : o.broadM;
+  // How the per-channel gain splits. Red rises fastest and blue slowest, so
+  // the bright half of the field is the warm half. Not in PALETTE because it
+  // is not a colour — it is the shape of a ramp, exactly like MAIN_SPLIT_WARM.
+  const _BROAD_K = [1.35, 1.0, 0.62];
   // SPARKLE — the second half of this helper, and it is only ever for water.
   //
   // Lambert has no specular term, so every water surface in this game is a flat
@@ -3475,9 +3529,14 @@ export function grain(m, opts) {
   // term already uses it. The wet-only build is props.js's one shared material
   // and its whole invariant is "the wet gate and nothing else".
   const cont = (wetOnly || spark > 0 || o.contact === undefined) ? 0 : o.contact;
+  // BOTH CACHES COME OFF THIS ONE STRING — the material cache below and
+  // customProgramCacheKey at the bottom of the hook — so a new option that is
+  // not in it gets two call sites sharing one compiled program, and which one
+  // you get depends on draw order. That is the failure this key was written
+  // for; `broad` and `broadScale` change the source, so they are in it.
   const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' + near + '|' + nearScale + '|' +
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
-              '|' + cont + '|' + (wetOnly ? 'w' : '');
+              '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -3584,11 +3643,25 @@ export function grain(m, opts) {
         (wetOnly || near <= 0) ? '' : '  float gnr = ((grNoise(gnq) - 0.5) * 0.62 * clamp(1.0 - nfw * 2.00, 0.0, 1.0)',
         (wetOnly || near <= 0) ? '' : '             + (grNoise(gnq2) - 0.5) * 0.38 * clamp(1.0 - nfw * 4.34, 0.0, 1.0))',
         (wetOnly || near <= 0) ? '' : '             * ' + near.toFixed(4) + ';',
+        // ---- THE BROAD OCTAVE ------------------------------------------
+        // See the note on `broad` above. Warped by `gn` before it is sampled,
+        // which costs two multiplies and is what stops an eighteen-metre
+        // lattice reading as two soft squares across a frame.
+        (wetOnly || broad <= 0) ? '' : '  vec2 gbq = vGrainW.xz * ' + (1 / broadM).toFixed(5) + ' + 7.13;',
+        (wetOnly || broad <= 0) ? '' : '  gbq += gn * 0.8;',
+        (wetOnly || broad <= 0) ? '' : '  float gb = (grNoise(gbq) - 0.5) * ' + broad.toFixed(4) + ';',
         // ONE multiply, not two: a second `*=` on the same channel compounds,
         // so a chapter that tuned `amount` against the picture would quietly
-        // get a different number back the day it opted into `near`.
-        wetOnly ? '' : '  diffuseColor.rgb *= 1.0 + gn * ' + amount.toFixed(4) +
-                       ((!wetOnly && near > 0) ? ' + gnr' : '') + ';',
+        // get a different number back the day it opted into `near`. The broad
+        // term joins the same bracket for the same reason — and it is the one
+        // term in here that is a vec3, because it is the only one that moves a
+        // hue rather than a level.
+        wetOnly ? '' : '  diffuseColor.rgb *= vec3(1.0 + gn * ' + amount.toFixed(4) +
+                       ((!wetOnly && near > 0) ? ' + gnr' : '') + ')' +
+                       ((!wetOnly && broad > 0)
+                         ? ' + gb * vec3(' + _BROAD_K[0].toFixed(3) + ', ' +
+                           _BROAD_K[1].toFixed(3) + ', ' + _BROAD_K[2].toFixed(3) + ')'
+                         : '') + ';',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what

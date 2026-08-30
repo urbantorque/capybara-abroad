@@ -498,7 +498,7 @@ function monVC() {
  *  Ground is horizontal, so it also wants no vertical shear in the sample. */
 function monVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.26, amount: 0.085, warp: 0, near: 0.58, nearScale: 13, contact: 1 });
+               { scale: 0.26, amount: 0.085, warp: 0, near: 0.58, nearScale: 13, contact: 1, broad: 0.07, broadM: 15 });
 }
 /** Stone and plaster take a finer grain than rock: at 0.26 a wall reads as brick. */
 function monVCF() {

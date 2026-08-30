@@ -3231,6 +3231,51 @@ breakdown is not trustworthy and only the total is quoted.
 Two render targets at a quarter (about 1.4 MB at 1600×900) and, when `dof` is
 on, five quarter-res passes.
 
+## THE BROAD OCTAVE — `grain({ broad, broadM })` (v45 — 30 Aug 2026)
+
+Shipped alongside the depth pass and independent of it. `shared.js` owns it;
+nineteen ground materials opt in, one per chapter, and every other call site in
+the game is untouched because it defaults to zero.
+
+**Everything `grain()` did varied BRIGHTNESS.** `gn` and `gnr` are both a
+multiply on the diffuse and between them they run from a metre and a half down
+to a few centimetres. Two things were missing and they are one thing looked at
+twice:
+
+- **There is no octave above a metre and a half.** A lawn is not uniform over
+  thirty metres, it is patchy over ten; sand is packed in places and loose in
+  others; a piazza has been mended. The ground is 40–55% of every frame in this
+  game and it still read as one value with a texture on it.
+- **Nothing here has ever moved a HUE.** Grass yellows where it is dry and goes
+  blue-green in the damp. A flat hue over half the picture is most of what makes
+  a large surface read as a polygon rather than as ground.
+
+One extra `grNoise` does both, and they are **correlated on purpose**: the gain
+is per-channel (`_BROAD_K`, 1.35 / 1.0 / 0.62), so the bright half of the field
+goes warm and the dark half goes cool. That is not a shortcut, it is the
+physical case — a dip in a lawn is darker for seeing less sun and cooler for
+seeing more sky. At `broad = 0.10` the warm-to-cool spread is about 7%, the same
+order as the split tone and, like it, meant to be invisible until switched off.
+
+**`broadM` IS A WAVELENGTH IN METRES, not a multiple of `scale`.** Every other
+octave in that helper is a multiple, and `scale` is a per-chapter number between
+0.24 and 0.62 — so one multiplier would put this field at eighteen metres in
+Kyoto and forty-six in Hanoi, and "how big is a patch of ground" does not vary
+by a factor of three between two streets. It is taken off the world position on
+**XZ only**: a wall gets one value up its whole height, which is what a wall
+does.
+
+**No distance fade**, unlike `near` and unlike the sparkle. At roughly sixteen
+metres this field is never within an octave of Nyquist in any frame this camera
+can compose, so there is nothing to alias and the `fwidth` those two need would
+be a derivative for nothing. It IS warped by `gn` — free, already computed —
+because a sixteen-metre value-noise lattice across a thirty-metre frame is two
+cells and shows itself as two soft squares.
+
+**`broad` and `broadM` are both in `key`.** That string feeds the material cache
+AND `customProgramCacheKey`, so an option missing from it means two call sites
+sharing one compiled program and which one you get depends on draw order.
+
 ## THE FEEL PASS (v44 — 30 Aug 2026)
 
 Five things aimed at the ninety per cent of this game that is not a task: moving

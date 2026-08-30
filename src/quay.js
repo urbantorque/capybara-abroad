@@ -396,7 +396,7 @@ function quayMerger() {
  */
 function quayVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1 });
+               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14 });
 }
 
 function quayInstance(root, geo, color, list, cast, recv) {

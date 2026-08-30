@@ -326,7 +326,7 @@ function panVC() {
 }
 function panVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1 });
+               { scale: 0.42, amount: 0.19, warp: 0, near: 0.75, nearScale: 9, contact: 1, broad: 0.12, broadM: 20 });
 }
 /** THE LEAF MATERIAL: the same grain, seen from both sides. Everything built
  *  out of `M.quad` needs this and nothing else may use it, or half the

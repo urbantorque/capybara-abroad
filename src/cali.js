@@ -292,7 +292,7 @@ function caliVC() {
  *  so it wants no vertical shear in the sample at all. */
 function caliVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7, contact: 1 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7, contact: 1, broad: 0.1, broadM: 16 });
 }
 function caliPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function caliInstance(root, geo, color, list, cast, recv) {

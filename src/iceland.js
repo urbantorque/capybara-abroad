@@ -385,7 +385,7 @@ function iceVC() {
  *  so it wants no vertical shear in the sample at all. */
 function iceVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7, contact: 1 });
+               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7, contact: 1, broad: 0.1, broadM: 18 });
 }
 function icePush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function iceInstance(root, geo, color, list, cast, recv, twoSided) {
