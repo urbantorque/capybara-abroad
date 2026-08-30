@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -1053,6 +1053,17 @@ function gorInstance(root, geo, colour, list, cast, recv, name) {
   // userData.noShadow — it is one of the two in the project that does — so the
   // flag is all that is needed.
   if (!cast) im.userData.noShadow = true;
+  // ---- WHAT IN THE VALLEY IS ALIVE (v44) ---------------------------------
+  // See THE WAKE in shared.js. The batch names carry the species already
+  // (`gorScat:vine:c6`), so this is a lookup and not a second table of
+  // coordinates. Tuff, rubble and the pigeons are not plants; the vine, its
+  // stem and the scrub are, and they are the things at capybara height in a
+  // valley whose whole picture is wind over stone.
+  const kind = im.name.split(':')[1];
+  const a = kind === 'vine' ? [0.070, 2.0, 1.10]
+          : kind === 'vineStem' ? [0.045, 2.6, 1.10]
+          : kind === 'scrub' ? [0.060, 2.2, 1.25] : null;
+  if (a) swayMesh(im, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
   root.add(im);
   return im;
 }

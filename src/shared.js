@@ -3187,15 +3187,45 @@ export function swayTick(t, g) {
   _swayK.value = k > 0 ? (k < 1.4 ? k : 1.4) : 0;
 }
 
+// --- THE WAKE (v44) ---------------------------------------------------------
+// Every swaying thing in the game answers the wind and NOTHING answered the
+// animal. A capybara at a flat run through a reed bed, a rice paddy, a bamboo
+// grove or a row of market awnings went through them as though it were a
+// photograph of a capybara: the one moving object in the world had no effect on
+// the only surfaces built to move.
+//
+// It is the same shader hook and the same ramp — the tip moves and the base
+// does not — with a second, radial displacement pushed away from one point. So
+// it costs one uniform, seven lines of GLSL, and NOTHING per chapter: every
+// mesh that already swayed now also parts, in all nineteen worlds, including
+// the ones written before this existed.
+//
+// `x`/`z` is where the animal is and `k` is how hard it is pushing, which is
+// its own speed — a walk brushes the grass and a run shoves it. Packed into one
+// vec3 because three uniforms that must never disagree about which frame they
+// are in should be one uniform. See swayTick, which has the same rule.
+const _wakeP = { value: new THREE.Vector3(0, 0, 0) };   // world x, world z, strength
+const _wakeREF = 6.6;    // m/s that counts as a full push (a shade under capyRUN)
+// The radius is the animal plus a little — a capybara is 1.1 m long and what
+// parts around it should read as contact, not as a force field. The amount is
+// deliberately under the wind's own: a gust moves a frond further than a
+// capybara does, and it would be a strange world where that were not true.
+const _WAKE_R = 1.75;    // m
+const _WAKE_A = 0.34;    // m of travel at the tip, at the radius centre, at a run
+export function wakeTick(x, z, speed) {
+  _wakeP.value.set(x, z, Math.min(1, Math.max(0, speed / _wakeREF)));
+}
+
 const _swayCache = new Map();
 function _swayInject(shader, amount, axis, lo, hi, stiff, hz) {
   shader.uniforms.uSwayT = _swayT;
   shader.uniforms.uSwayD = _swayD;
   shader.uniforms.uSwayK = _swayK;
+  shader.uniforms.uWakeP = _wakeP;
   const span = (hi - lo) > 0.0001 ? (hi - lo) : 0.0001;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>',
-             '#include <common>\nuniform float uSwayT;\nuniform vec2 uSwayD;\nuniform float uSwayK;')
+             '#include <common>\nuniform float uSwayT;\nuniform vec2 uSwayD;\nuniform float uSwayK;\nuniform vec3 uWakeP;')
     .replace('#include <begin_vertex>', [
       '#include <begin_vertex>',
       '{',
@@ -3233,6 +3263,19 @@ function _swayInject(shader, amount, axis, lo, hi, stiff, hz) {
       '    swB = swB * mat3(instanceMatrix);',
       '  #endif',
       '  transformed += vec3(uSwayD.x, 0.0, uSwayD.y) * swB * swM;',
+      // ---- THE WAKE. Same ramp, radial instead of directional. -----------
+      // Squared falloff rather than linear: a linear one has a hard outer edge
+      // that travels across a reed bed like a ring, and the whole effect is
+      // supposed to be something you notice without being able to point at.
+      // The tip is what moves — swR again — so the bases stay put and the bed
+      // opens rather than sliding.
+      '  vec2 wkD = swO.xz - uWakeP.xy;',
+      '  float wkL = length(wkD);',
+      '  if (wkL < ' + _WAKE_R.toFixed(3) + ' && wkL > 0.0001 && uWakeP.z > 0.0) {',
+      '    float wkF = 1.0 - wkL * ' + (1 / _WAKE_R).toFixed(6) + ';',
+      '    wkF = wkF * wkF * uWakeP.z * swR * ' + _WAKE_A.toFixed(4) + ';',
+      '    transformed += vec3(wkD.x / wkL, 0.0, wkD.y / wkL) * swB * wkF;',
+      '  }',
       '}',
     ].join('\n'));
 }
@@ -3290,8 +3333,37 @@ export function sway(m, opts) {
  */
 export function swayMesh(mesh, opts) {
   if (!mesh || !mesh.material) return mesh;
-  const o = opts || {};
+  let o = opts || {};
   if (!(o.amount > 0)) return mesh;
+  // ---- `auto: true` — TAKE THE WINDOW FROM THE GEOMETRY ITSELF (v44) -------
+  // The window is the one thing a call site gets wrong, because it is the one
+  // thing that is a property of the GEOMETRY and not of the plant: a unit
+  // cylinder built centred runs -0.5..0.5 and one built based runs 0..1, they
+  // look identical in the file that uses them, and getting it backwards bends
+  // the tuft into the ground instead of away from it. Every geometry in this
+  // game knows its own extent, so ask it.
+  //
+  // This is what makes the wake affordable to roll out: opting a chapter's
+  // foliage in is now one line that cannot be wrong about a shape somebody
+  // else authored. Explicit lo/hi still win, for the three call sites that
+  // deliberately window a SUBSET of their geometry.
+  if (o.auto && mesh.geometry) {
+    const ax = o.axis === 'x' ? 'x' : (o.axis === 'z' ? 'z' : 'y');
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const bb = mesh.geometry.boundingBox;
+    if (bb) {
+      // ROUNDED, because lo/hi go into the program cache key: two tuft batches
+      // whose bounding boxes differ in the fifth decimal are the same plant and
+      // must not compile two shaders.
+      const lo = Math.round(bb.min[ax] * 100) / 100;
+      const hi = Math.round(bb.max[ax] * 100) / 100;
+      if (hi - lo > 0.0001) {
+        // A COPY, not a mutation of the caller's object: these option literals
+        // are frequently shared between several batches in one loop.
+        o = { amount: o.amount, axis: ax, lo: lo, hi: hi, stiff: o.stiff, hz: o.hz };
+      }
+    }
+  }
   mesh.material = sway(mesh.material, o);
   if (mesh.castShadow) {
     const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });

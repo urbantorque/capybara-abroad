@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 5 — SANTIAGO DE CALI, VALLE DEL CAUCA
@@ -1297,7 +1297,7 @@ function caliRouteAt(s) {
  * centimetres over whatever caliRoadY says, so that the bus and the picture of
  * the road it drives on can never disagree.
  */
-function caliBuildRoad(root) {
+function caliBuildRoad(game, root) {
   const HW = 3.6;                        // half width: two lanes, barely
   const M = caliMerger();
   const asphalt = PALETTE.caliRoad, line = PALETTE.caliRoadLine, kerb = PALETTE.caliStoneDark;
@@ -1324,6 +1324,34 @@ function caliBuildRoad(root) {
       M.tri(pr, pkr, kr); M.tri(pr, kr, r);
     }
     pl = l; pr = r; pkl = kl; pkr = kr;
+
+    // ---- AND WHERE THE ROAD LEAVES THE GROUND, IT HAS TO BE SOLID ---------
+    // caliRoadY is not caliTerrain, and caliTerrain is what the biome publishes
+    // as terrainHeight — so anywhere the two differ, the ribbon is drawn at one
+    // height and the animal walks at the other. The Puente Ortiz approach is the
+    // bad one: caliRoadY blends to the 1.03 m deck over |z| < 24 and the deck's
+    // own collider stops at |z| = 13, so eleven metres of ramp on the main route
+    // between the two halves of this chapter was tarmac drawn up to 64 cm over
+    // the animal's head. Measured at (-6.6, -18.3): drawn 0.64, terrain 0, feet
+    // 0. The bridge is the loud one; San Antonio's 16 cm of cobble and the
+    // approach to the mirador are the same defect quieter.
+    //
+    // Emitted from the ribbon itself rather than written out per landmark, so a
+    // road that is later routed over something else cannot acquire the bug
+    // again — and only where it is actually needed, which on the flat is
+    // nowhere, so the whole run costs a handful of boxes.
+    const lift = y - caliTerrain(x, z);
+    if (i && lift > 0.10) {
+      const px = (x + caliRX[i - 1]) * 0.5, pz = (z + caliRZ[i - 1]) * 0.5;
+      const dx = x - caliRX[i - 1], dz = z - caliRZ[i - 1];
+      const seg = Math.hypot(dx, dz);
+      if (seg > 0.01) {
+        const top = (caliRY[i] + caliRY[i - 1]) * 0.5 + 0.05;
+        const hy = 0.30;
+        caliStaticBox(game, px, top - hy, pz, HW + 0.7, hy, seg * 0.5 + 0.15,
+                      Math.atan2(dx, dz));
+      }
+    }
   }
   // the dashed centre line, laid on top as short slabs
   for (let s = 6; s < caliRouteLen - 6; s += 9) {
@@ -3163,8 +3191,14 @@ function caliBuildStreetLife(game, root) {
   // TWO LISTS, TWO COLOURS. A bougainvillea is magenta and a plantain is
   // green, and one instanced draw cannot be both — the first cut had ninety
   // plantains in the east field rendering as fuchsia.
-  caliInstance(root, caliG.box, PALETTE.caliBougain, leaves, true, false);
-  caliInstance(root, caliG.box, PALETTE.caliPlantain, fronds, true, false);
+  swayMesh(caliInstance(root, caliG.box, PALETTE.caliBougain, leaves, true, false),
+           { amount: 0.09, axis: 'y', auto: true, stiff: 2.0, hz: 1.2 });
+  // ---- AND THE PLANTAINS MOVE (v44) -------------------------------------
+  // See THE WAKE in shared.js. A plantain leaf is two metres of unsupported
+  // membrane and it is the loosest thing in this chapter; the bougainvillea
+  // beside it is woody and gets a third of the travel.
+  swayMesh(caliInstance(root, caliG.box, PALETTE.caliPlantain, fronds, true, false),
+           { amount: 0.30, axis: 'y', auto: true, stiff: 1.3, hz: 0.85 });
   void sy0;
 }
 
@@ -3188,7 +3222,11 @@ function caliBuildCane(root) {
   }
   caliCaneList = stems;
   caliCaneMesh = caliInstance(root, caliG.cyl6, PALETTE.caliCaneStem, stems, true, false);
-  caliInstance(root, caliG.plane, PALETTE.caliCane, tops, false, false);
+  // the cane tops. The STEMS are left alone: caliUpdateCane already solves
+  // them, and two writers on one transform is the trap this codebase keeps
+  // relearning.
+  swayMesh(caliInstance(root, caliG.plane, PALETTE.caliCane, tops, false, false),
+           { amount: 0.22, axis: 'y', auto: true, stiff: 1.4, hz: 1.0 });
 }
 
 function caliUpdateCane() {
@@ -4217,7 +4255,7 @@ function caliBuild(game) {
   caliBuildScatter(caliRoot);
   caliRoot.add(caliBuildRiver());
   caliBuildDrift(caliRoot);
-  caliBuildRoad(caliRoot);
+  caliBuildRoad(game, caliRoot);
   caliBuildRiverside(game, caliRoot);
   caliBuildGato(game, caliRoot);
   caliBuildErmita(game, caliRoot);

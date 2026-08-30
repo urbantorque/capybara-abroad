@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -2528,7 +2528,9 @@ export function createEnvironment(game) {
       }
     }
   }
-  envInstance(root, envG.cyl4, PALETTE.leafC, stems, false, false);
+  // the flowerbeds, which are the other thing at capybara height in the gardens
+  swayMesh(envInstance(root, envG.cyl4, PALETTE.leafC, stems, false, false),
+           { amount: 0.055, axis: 'y', auto: true, stiff: 2.0, hz: 1.5 });
   const petalKeys = Object.keys(petalLists);
   for (let i = 0; i < petalKeys.length; i++) {
     envInstance(root, envG.sph5, parseInt(petalKeys[i], 10), petalLists[petalKeys[i]], false, false);
@@ -3021,8 +3023,17 @@ export function createEnvironment(game) {
     const a = envRR(0, 6.283), d = envRR(1.2, 2.6);
     envTuftClump(hedges[h] + Math.cos(a) * d, hedges[h + 2] + Math.sin(a) * d, 3, true);
   }
-  envInstance(root, envG.cone4, PALETTE.grassDark, tufts, false, false);
-  envInstance(root, envG.cone4, PALETTE.grassPale, tuftsPale, false, false);
+  // ---- AND THE LAWN MOVES (v44) -----------------------------------------
+  // See THE WAKE in shared.js. Chapter 1 is the first thing anybody sees and
+  // the most static thing in it was the ground cover. A tuft is fourteen
+  // centimetres tall, so the amount is small in absolute terms and large as a
+  // fraction of the plant, which is what grass does; and the wake radius is
+  // 1.75 m, so a capybara at a run opens a path through the lawn about its own
+  // length across. `auto` reads the squashed cone rather than being told.
+  swayMesh(envInstance(root, envG.cone4, PALETTE.grassDark, tufts, false, false),
+           { amount: 0.045, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
+  swayMesh(envInstance(root, envG.cone4, PALETTE.grassPale, tuftsPale, false, false),
+           { amount: 0.050, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
 
   // trunk collision, bucketed so we stay well inside the body budget
   for (let i = 0; i < trunkShapes.length; i += 4 * 6) {

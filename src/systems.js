@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick, contactSlots, contactTick, swayTick, spillSlots, spillTick } from './shared.js';
+         rimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -903,6 +903,101 @@ const sysLOAF_MUS   = 0.26;   // ...and how much further the score is allowed to
 // it". Held high on purpose: the inversion is the reward for the whole verb and
 // it must not happen by accident on the way past.
 const sysCALM_INVERT = 0.72;  // loaf past which a bold species approaches
+
+// --- THE FLOW (v44) ---------------------------------------------------------
+// The third number, and the one the game did not have.
+//
+//   chaos  is a SPIKE.  "What just happened?"      Rests at zero.
+//   calm   is a HOLD.   "How long has nothing?"    Rests at zero.
+//   flow   is a STREAK. "How long have you been moving WELL?"
+//
+// Running is what a player spends most of the game doing and it was the one
+// thing in the game the world had no opinion about. Chaos answers a bin going
+// over; calm answers a sit-down; a clean two-hundred-metre line through a
+// market at a flat run — the most skilful and the most common thing anybody
+// does here — read to every system as identical to standing still.
+//
+// It is a STREAK and not a speedometer, and the difference is the whole point:
+// a speedometer is a fact about this frame and cannot be lost, and the thing
+// that makes moving well feel like anything is having something to lose. So it
+// accrues while the line holds and collapses when it breaks — and a HOP DOES
+// NOT BREAK IT, which is what makes hopping the kerb rather than going round
+// worth doing.
+//
+// FOUR READERS, all of them channels that already existed, and none of them a
+// number on a screen (the skills' rule, and it is the right one):
+//   the lens  — the frame opens a few degrees and eases back on its boom
+//   the grade — a whisker of warmth, at the top of the streak only
+//   the score — musIntensity leans in beside chaos, on the same writer
+//   the ground— the dust off a footfall thickens with it
+const sysFLOW_MIN    = 3.6;   // m/s of ground covered that counts as a line at all
+const sysFLOW_REF    = 7.4;   // ...and the run it accrues at full rate at (capyRUN)
+const sysFLOW_SLOW   = 0.30;  // the least a line above the floor may accrue at
+const sysFLOW_FULL   = 5.2;   // s at full rate that counts as full flow
+const sysFLOW_RISE   = 0.42;  // damp lambda up. Earned, but not as slowly as calm.
+const sysFLOW_FALL   = 4.2;   // ...and down. A break costs most of it inside 0.3 s.
+const sysFLOW_AIR    = 0.95;  // s of airtime a streak survives — a hop is part of the line
+const sysFLOW_STALL  = 0.28;  // s under sysFLOW_MIN before the line is called broken
+const sysFLOW_FOV    = 3.4;   // deg of extra field at the top of it
+const sysFLOW_DOLLY  = 0.85;  // m the boom eases back with it
+const sysFLOW_MUS    = 0.34;  // ...and how far the score is allowed to lean
+const sysFLOW_WARM   = 0.16;  // share of the grade's own warm lift
+const sysFLOW_MARK   = 0.78;  // the one edge that makes a sound, once per streak
+
+// --- THE ECHO (v44) ---------------------------------------------------------
+// The wheek is this game's signature and its only voice, and in eighteen of
+// nineteen chapters it went out and never came back. Son Doong has an echo,
+// because a cave without one would be absurd — but the echo is not a property
+// of a cave, it is a property of BEING NEAR SOMETHING, and the game is full of
+// alleys, arcades, canyons, sea walls, station halls and the underside of a
+// harbour bridge that were all acoustically identical to standing in a field.
+//
+// So: on every wheek, cast for the nearest hard surface on eight bearings and
+// play the voice back off it — delayed by the real flight time of sound,
+// positioned AT THE REFLECTOR so the existing spatial mix pans it, quieter and
+// duller the further it came from. In the open there is no reflector and
+// nothing happens, which is the entire tuning: the effect IS the difference
+// between a square and a lane, and it costs one raycast set on a keypress.
+//
+// It is also the cheapest map this game will ever have. You can hear which way
+// is out.
+const sysECHO_R     = 34;     // m — past this the return is under the noise floor
+const sysECHO_MIN   = 3.2;    // ...and closer than this it is the sound itself
+const sysECHO_C     = 343;    // m/s. It is the speed of sound and it is not a knob.
+const sysECHO_GAIN  = 0.52;   // of the original, at the closest wall
+const sysECHO_COOL  = 0.40;   // s between echoes, so a held key does not stack them
+const sysECHO_MAX   = 2;      // returns per wheek: the nearest, and the best other
+const sysECHO_SPREAD = 7.0;   // m of difference before a second return is worth it
+
+// --- THE CREST (v44) --------------------------------------------------------
+// Nineteen worlds were built to be looked at and the camera has never once
+// noticed that you had arrived somewhere worth looking from. The rest voice
+// opens the boom when you STOP — which is a different thing, and it is why this
+// is not that: cresting a ridge at a run is the single most reliable beautiful
+// moment in any of these chapters and it lasted exactly as long as it took to
+// run down the other side, framed at the same 9.5 m the flat is framed at.
+//
+// The test is the honest one and needs no per-chapter data: sample the ground
+// AHEAD, along the way the camera is facing, and ask whether it falls away and
+// keeps falling. A hill you are climbing fails it. A shelf with a wall behind it
+// fails it. The lip of a caldera, the top of the Corso, the last dune before
+// the erg, the moraine, the roof of a Kowloon block and the brink of the great
+// dune all pass it, and none of them had to be told to.
+//
+// It pays out through the two camera terms the loaf and the flow already share
+// and one the sky already owns. There is no card and no sound: a view is not an
+// achievement, and the moment it congratulates you for standing somewhere it
+// stops being a view.
+const sysCREST_AT   = [9, 19, 32, 48];   // m ahead to sample
+const sysCREST_DROP = 5.5;    // m the ground must fall over the furthest sample
+const sysCREST_FULL = 15.0;   // ...and the fall that counts as a full crest
+const sysCREST_MIN  = 1.2;    // m/s — standing on a lip is the rest voice's job
+const sysCREST_RISE = 0.85;   // damp lambda in. Slow: it is a reveal, not a snap.
+const sysCREST_FALL = 2.6;    // ...and out, as the ground comes back up
+const sysCREST_DOLLY = 2.30;  // m the boom pulls back at a full crest
+const sysCREST_PITCH = 0.085; // rad it lifts its eye by, so the far side is in frame
+const sysCREST_SKY   = 0.30;  // ...and how much of the sky voice it borrows
+const sysCREST_EVERY = 0.22;  // s between samples — four terrainHeight calls, not per frame
 const sysCALM_APPR_L = 1.6;   // damp lambda on the approach term. Slow either way.
 
 // --- CAMERA SHAKE -----------------------------------------------------------
@@ -3068,6 +3163,11 @@ const sysLEGEND = [
   ['WASD / arrows', 'waddle about'],
   ['Shift', 'run'],
   ['Space', 'hop'],
+  // THE SLIDE goes on the FRONT and not in the fold, which is the one place
+  // this table's own rule has to be read carefully: the fold is for things that
+  // are not verbs the capybara has. A slide is a verb the capybara has. It is
+  // the seventh of six, and the six were never a target.
+  ['Ctrl (held)', 'slide'],
   ['E / left click', 'grab, dig, hold on'],
   ['Q', 'WHEEK'],
   ['drag  ·  wheel', 'look around  ·  zoom'],
@@ -8713,8 +8813,12 @@ export function createSystems(game) {
     const rel = rand(3.4, 5.4);
     const out = ac.createGain();
     out.gain.value = 1;
-    // the plectrum
-    const ns = ac.createBufferSource(); ns.buffer = noiseBuf();
+    // the plectrum. noiseSrc(), not a hand-rolled source off a `noiseBuf` that
+    // has never existed: both koto notes and every shakuhachi note threw
+    // ReferenceError before a single sample was scheduled, which took Kyoto's
+    // two lead instruments out of the score and put an uncaught throw in the
+    // audio path on every beat.
+    const ns = noiseSrc();
     const nf = ac.createBiquadFilter(); nf.type = 'bandpass';
     nf.frequency.value = Math.min(9000, hz * 3.4); nf.Q.value = 1.2;
     const ng = ac.createGain();
@@ -8775,7 +8879,7 @@ export function createSystems(game) {
     vg.gain.setValueAtTime(0.0001, when);
     vg.gain.linearRampToValueAtTime(hz * 0.008, when + dur * 0.55);
     vib.connect(vg); vg.connect(o.frequency);
-    const ns = ac.createBufferSource(); ns.buffer = noiseBuf(); ns.loop = true;
+    const ns = noiseSrc();          // loops already; see musKoto
     const nf = ac.createBiquadFilter(); nf.type = 'bandpass';
     nf.frequency.value = Math.min(8000, hz * 2.1); nf.Q.value = 0.75;
     const ng = ac.createGain();
@@ -17102,7 +17206,7 @@ export function createSystems(game) {
   // poll; the four edges are queued here and published at the very END of
   // update(), because that is the only place they can be published from.
   let padOn = false, padIdx = -1, padSeen = false;
-  let padX = 0, padZ = 0, padRun = false;
+  let padX = 0, padZ = 0, padRun = false, padSlide = false;
   let padHonk = false, padAction = false, padJump = false;
   let padWasHonk = false, padWasAction = false, padWasJump = false;
   let padWasStart = false, padWasBack = false, padWasSnap = false;
@@ -17695,7 +17799,7 @@ export function createSystems(game) {
       else for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) { g = pads[i]; padIdx = i; break; }
     }
     if (!g || !g.axes || !g.buttons) {
-      padOn = false; padX = 0; padZ = 0; padRun = false;
+      padOn = false; padX = 0; padZ = 0; padRun = false; padSlide = false;
       padHonk = padAction = padJump = false;
       padWasHonk = padWasAction = padWasJump = false;
       return;
@@ -17717,6 +17821,7 @@ export function createSystems(game) {
     // on it. Three ways, because a sprint that only one of them reaches is a
     // sprint half the people holding a pad never find.
     padRun = padBtn(g, 7) || padBtn(g, 10) || mag > sysPAD_RUN;
+    padSlide = padBtn(g, 6);            // left trigger — see the slide note on input
 
     // ---- the verbs --------------------------------------------------------
     // ONE VOICE is on two buttons and grab is on two: B and Y both wheek, X and
@@ -17875,6 +17980,19 @@ export function createSystems(game) {
     // strength snaps upright the moment the setting is read.
     swayTick(sysCalmMotion ? 7.5 : game.state.time,
              game.weather ? game.weather.gust() : null);
+    // ---- ...AND THE ANIMAL, WHICH IS THE OTHER THING THAT MOVES ---------
+    // See THE WAKE in shared.js. Frozen with the wind under reduced motion —
+    // a world that has been asked to hold still must not have a capybara
+    // ploughing a furrow through it — and zeroed whenever the animal is not
+    // walking through anything: carried, at a wheel, under water or on a bird.
+    {
+      const cp = game.capy;
+      const cv = cp && cp.body && cp.body.velocity;
+      const off = sysCalmMotion || !cp || cp.carriedBy || cp.atHelm || cp.diving ||
+                  (game.condor && game.condor.mounted);
+      if (off || !cv) wakeTick(0, 0, 0);
+      else wakeTick(cp.position.x, cp.position.z, Math.hypot(cv.x, cv.z));
+    }
     const B = game.biome;
     const name = (B && B.current) || 'sydney';
 
@@ -17991,6 +18109,17 @@ export function createSystems(game) {
     // different chapter.
     let bloom = cur.bloom, thr = cur.threshold, rad = cur.radius;
     let sat = cur.saturation, vig = cur.vignette;
+
+    // ---- THE FLOW, and it is the smallest term in this whole block --------
+    // A hair of saturation and a hair off the corners at the top of a long
+    // clean line. Deliberately under the threshold at which anybody could name
+    // it: the flow is meant to be the reason the frame feels good, not a thing
+    // the player watches happen. Nineteen chapters, one row, no per-chapter
+    // tuning — which is only safe BECAUSE it is this small. See THE FLOW.
+    if (sysFlowNow > 0.002) {
+      sat += sysFlowNow * sysFLOW_WARM;
+      vig -= sysFlowNow * sysFLOW_WARM * 0.45;
+    }
 
     if (iceT > 0.002 && auroraT > 0.01) bloom += auroraT * iceT * 0.30;
     if (hkT > 0.002 && B.isActive('kowloon') && game.kowloon) {
@@ -18864,6 +18993,23 @@ export function createSystems(game) {
   let sysCalmNow = 0;
   let sysLoafNow = 0;      // capy.loaf, read once a frame. See THE LOAF.
   const sysCritters = [];
+  // THE FLOW (see the block at the top of this file). `sysFlowT` is the streak
+  // in seconds, `sysFlowNow` the damped 0..1 the readers use, `sysFlowAir` how
+  // long we have forgiven being off the ground, `sysFlowStall` how long the
+  // line has been below speed, and `sysFlowRang` the one-shot latch on the mark.
+  let sysFlowNow = 0, sysFlowT = 0, sysFlowAir = 0, sysFlowStall = 0, sysFlowRang = false;
+  // THE CREST. `sysCrestNow` is the damped 0..1 the camera reads; the timer
+  // keeps the four terrain samples off the per-frame path.
+  let sysCrestNow = 0, sysCrestT = 0, sysCrestWant = 0;
+  // THE ECHO. A tiny ring of pending returns — {t, x, y, z, gain} — drained in
+  // update(). Fixed length and never reallocated, like every other pool here.
+  const sysEchoQ = [];
+  let sysEchoCool = 0;
+  const sysEchoRay = new THREE.Raycaster();
+  const sysEchoFrom = new THREE.Vector3();
+  const sysEchoDir = new THREE.Vector3();
+  const sysEchoAt = { x: 0, y: 0, z: 0 };
+  const sysEchoOpts = { at: sysEchoAt, volume: 1, pitch: 1, near: 3, far: 80 };
 
   // =========================================================================
   // wiring
@@ -19515,10 +19661,80 @@ export function createSystems(game) {
     musicVolume: function () { return musMuted ? 0 : musLevel; },
   };
 
+  /**
+   * THE ECHO — see the sysECHO_* block at the top of this file.
+   *
+   * Eight bearings at ear height, nearest hard thing on each. The scene is
+   * raycast rather than the physics world for one reason: the picture is what
+   * the player is standing in. A drawn arcade with no collider still sounds
+   * like an arcade, and a chapter that never built a wall for its alley would
+   * otherwise be silent in the one place the effect is for.
+   *
+   * `recursive`, and it hits the biome root only — the sky dome is a 300 m
+   * sphere centred on nothing and would return an echo from every direction in
+   * every chapter, which is the one result that would make this worthless.
+   */
+  function sysEchoCast() {
+    if (sysEchoCool > 0) return;
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    const B = game.biome;
+    // TWO ROOTS, NOT ONE. Sixteen chapters put their world under a group named
+    // for the biome; SYDNEY DOES NOT — chapter 1 is built into `environment`,
+    // which is also where the sky dome lives. Testing both and taking the
+    // nearest is what stops the first chapter in the game being the one place
+    // the effect does not exist, and the 300 m dome cannot be hit because the
+    // ray is 34 m long.
+    const root = B && B.current ? scene.getObjectByName(B.current) : null;
+    const envRoot = scene.getObjectByName('environment');
+    if (!root && !envRoot) return;
+    sysEchoCool = sysECHO_COOL;
+    sysEchoFrom.set(capy.position.x, capy.position.y + 0.30, capy.position.z);
+    let bestD = 1e9, bestX = 0, bestZ = 0;
+    let altD = 1e9, altX = 0, altZ = 0;
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      sysEchoDir.set(Math.cos(a), 0, Math.sin(a));
+      sysEchoRay.set(sysEchoFrom, sysEchoDir);
+      sysEchoRay.far = sysECHO_R;
+      let hit = null;
+      try {
+        if (root) hit = sysEchoRay.intersectObject(root, true)[0];
+        if (envRoot) {
+          const eh = sysEchoRay.intersectObject(envRoot, true)[0];
+          if (eh && (!hit || eh.distance < hit.distance)) hit = eh;
+        }
+      } catch (e) { return; }
+      if (!hit || hit.distance < sysECHO_MIN) continue;
+      if (hit.distance < bestD) {
+        // the old best becomes the alternate, so the two returns are never the
+        // same wall read twice off two adjacent bearings
+        if (bestD < 1e8 && bestD - hit.distance > sysECHO_SPREAD) {
+          altD = bestD; altX = bestX; altZ = bestZ;
+        }
+        bestD = hit.distance; bestX = hit.point.x; bestZ = hit.point.z;
+      } else if (hit.distance - bestD > sysECHO_SPREAD && hit.distance < altD) {
+        altD = hit.distance; altX = hit.point.x; altZ = hit.point.z;
+      }
+    }
+    if (bestD > 1e8) return;                 // open ground: no echo, and that is the point
+    sysEchoPush(bestD, bestX, sysEchoFrom.y, bestZ);
+    if (sysECHO_MAX > 1 && altD < 1e8) sysEchoPush(altD, altX, sysEchoFrom.y, altZ);
+  }
+  function sysEchoPush(d, x, y, z) {
+    // Out and back, at the speed of sound. Inverse-square on the round trip,
+    // and the pitch drops a little with distance because a long return has
+    // been through more air and off more surface — which is what makes a big
+    // room sound big rather than merely late.
+    const k = clamp(1 - d / sysECHO_R, 0, 1);
+    sysEchoQ.push({ t: 2 * d / sysECHO_C, x: x, y: y, z: z,
+                    gain: sysECHO_GAIN * k * k, pitch: 0.94 - 0.10 * (1 - k) });
+    if (sysEchoQ.length > 6) sysEchoQ.shift();
+  }
   game.events.on('task:complete', function (p) { if (p && p.id) completeTask(p.id); });
   game.events.on('hud:toast', function (p) { toast(p && p.text !== undefined ? p.text : p); });
   // A wheek is not an earthquake: the barest tap, below which shake() ignores it.
-  game.events.on('capy:wheek', function () { shake(0.03); sfx('wheek'); });
+  game.events.on('capy:wheek', function () { shake(0.03); sfx('wheek'); sysEchoCast(); });
   game.events.on('capy:grab', function (e) {
     const pr = e && e.prop;
     if (pr && pr.type === 'sandwich') completeTask('picnic-thief');
@@ -19887,6 +20103,13 @@ export function createSystems(game) {
     input.action = started && (!!keys.KeyE || mouseAction || touchAction || padAction);
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
     input.jump = started && (!!keys.Space || touchJump || padJump);
+    // ---- THE SLIDE (v44) --------------------------------------------------
+    // Ctrl, held. It is a HELD state and not a latched edge, because a slide is
+    // a thing you are doing and not a thing you did — the same shape as `run`
+    // and for the same reason. On the pad it is the LEFT trigger, opposite the
+    // right one that runs, which is the only pair of buttons on a controller
+    // that reads as "faster" and "lower" without being told.
+    input.slide = started && (!!keys.ControlLeft || !!keys.ControlRight || padSlide);
 
     // ---- THE WARDROBE -------------------------------------------------------
     // One row per costume, and the whole rule is: you are in the chapter, and
@@ -20278,6 +20501,27 @@ export function createSystems(game) {
       camReach += sysLOAF_DOLLY * lw;
       camPitch += sysLOAF_PITCH * lw;
     }
+    // ---- ...AND THE FLOW EASES IT BACK THE OTHER WAY --------------------
+    // The loaf pulls the boom out because the animal has stopped and there is
+    // suddenly room to look at the place. The flow pulls it out because there
+    // is suddenly a lot of world arriving and not enough of it in frame. Same
+    // number, opposite reasons, and they cannot both be up: the loaf needs
+    // stillness and the flow needs 2.9 m/s. Gated off the same three rigs, for
+    // the same reason — a boom the helm is already solving is not ours to move.
+    if (sysFlowNow > 0.001) {
+      camReach += sysFLOW_DOLLY * sysFlowNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
+    }
+    // ---- ...AND THE CREST, WHICH IS THE ONLY ONE THAT LIFTS THE EYE -------
+    // The loaf and the flow both move the boom and neither touches the pitch:
+    // a longer boom at the same angle shows you more GROUND. A view is the
+    // other thing — the horizon has to come up the frame — so this is the one
+    // that takes pitch off as well, and borrows a little of the sky voice to
+    // do it. Gated off the same three rigs as everything else here.
+    if (sysCrestNow > 0.001) {
+      const cw = sysCrestNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
+      camReach += sysCREST_DOLLY * cw;
+      camPitch -= sysCREST_PITCH * cw;
+    }
 
     // ---- A BIOME MAY ASK FOR ITS OWN LENS -------------------------------
     // Four hardcoded rigs (ground, crane, helm, flight) were enough for as long
@@ -20607,7 +20851,15 @@ export function createSystems(game) {
       // frames a session where a marquee has actually landed.
       const slow = 1 - clamp(game.time ? game.time.slow : 1, 0, 1);
       const breathe = sysCalmMotion ? 0 : 1;
-      const fovWant = clamp(sysFOV_BASE + (fovSpeed * sysFOV_SPEED + fovKick - slow * sysFOV_SLOW) * breathe,
+      // ---- AND THE FLOW, WHICH IS NOT THE SPEED TERM AGAIN ---------------
+      // fovSpeed is a fact about this frame and follows the speedometer up and
+      // down inside a second. The flow is the STREAK, so this term arrives
+      // slowly, sits there while the line holds, and leaves the moment it
+      // breaks — which is what makes a long run feel different from a fast one.
+      // Both are on the same `breathe` gate, so a player who asked the system
+      // for less motion gets neither. See THE FLOW.
+      const fovWant = clamp(sysFOV_BASE + (fovSpeed * sysFOV_SPEED + sysFlowNow * sysFLOW_FOV
+                                           + fovKick - slow * sysFOV_SLOW) * breathe,
                             sysFOV_MIN, sysFOV_MAX);
       // updateProjectionMatrix rebuilds a matrix and dirties the frustum, so it
       // is only called when a viewer could tell.
@@ -22237,6 +22489,121 @@ export function createSystems(game) {
       sysLoafNow = loafNow;
     }
 
+    // ---- THE ECHO comes back --------------------------------------------
+    // See the sysECHO_* block. Drained on the SCALED dt like everything else,
+    // so a return fired the instant before a marquee hitstop arrives late with
+    // the rest of the world rather than cutting through it.
+    if (sysEchoCool > 0) sysEchoCool -= dt;
+    for (let i = sysEchoQ.length - 1; i >= 0; i--) {
+      const e = sysEchoQ[i];
+      e.t -= dt;
+      if (e.t > 0) continue;
+      sysEchoQ.splice(i, 1);
+      sysEchoAt.x = e.x; sysEchoAt.y = e.y; sysEchoAt.z = e.z;
+      sysEchoOpts.volume = e.gain;
+      sysEchoOpts.pitch = e.pitch;
+      sfx('wheek', sysEchoOpts);
+    }
+
+    // ---- THE CREST -------------------------------------------------------
+    // See the sysCREST_* block. Sampled along the CAMERA yaw and not the
+    // animal yaw, because this is about what is in frame — an animal running
+    // along a ridge with the camera pointed over the edge is looking at the
+    // view whatever its feet are doing.
+    sysCrestT -= dt;
+    if (sysCrestT <= 0) {
+      sysCrestT = sysCREST_EVERY;
+      sysCrestWant = 0;
+      const capy = game.capy;
+      // `game[name]`, which is this file's own idiom for the live chapter —
+      // NOT npc.js's biomeLive(), which is a different module's helper, is
+      // hard-coded to Sydney, and only resolves at all because the bundler
+      // flattens the scope. See the module-tag rule in the contract.
+      const liveName = game.biome && game.biome.current;
+      const api = liveName ? game[liveName] : null;
+      const th = api && typeof api.terrainHeight === 'function' ? api.terrainHeight : null;
+      const v = capy && capy.body && capy.body.velocity;
+      const busy = !capy || capy.carriedBy || capy.atHelm || capy.climbing ||
+                   capy.diving || capy.swimming || (game.condor && game.condor.mounted);
+      if (th && v && !busy && capy.grounded &&
+          Math.hypot(v.x, v.z) > sysCREST_MIN) {
+        const yaw = input.camYaw;
+        const fx = Math.sin(yaw), fz = Math.cos(yaw);
+        const here = th(capy.position.x, capy.position.z);
+        if (here === here) {
+          let lowest = here, ok = true, prev = here;
+          for (let i = 0; i < sysCREST_AT.length; i++) {
+            const d = sysCREST_AT[i];
+            const h = th(capy.position.x + fx * d, capy.position.z + fz * d);
+            if (h !== h) { ok = false; break; }
+            // it has to KEEP falling. A dip and a rise is a gully, not a view,
+            // and a small tolerance stops one noisy vertex ending a real one.
+            if (h > prev + 0.9) { ok = false; break; }
+            prev = h;
+            if (h < lowest) lowest = h;
+          }
+          if (ok) {
+            const drop = here - lowest;
+            if (drop > sysCREST_DROP) {
+              sysCrestWant = clamp((drop - sysCREST_DROP) /
+                                   (sysCREST_FULL - sysCREST_DROP), 0, 1);
+            }
+          }
+        }
+      }
+    }
+    sysCrestNow = damp(sysCrestNow, sysCrestWant,
+                       sysCrestWant > sysCrestNow ? sysCREST_RISE : sysCREST_FALL, dt);
+
+    // ---- THE FLOW, which is the other end of the other stick -------------
+    // See the block at the top of this file. Everything that solves the
+    // animal's position somewhere else is excluded, because none of those is
+    // the player moving well: a wheel, a carrier, a climb and a dive are four
+    // different games and the streak belongs to the one with feet in it.
+    {
+      const capy = game.capy;
+      const v = capy && capy.body && capy.body.velocity;
+      const sp = v ? Math.hypot(v.x, v.z) : 0;
+      const busy = !capy || capy.carriedBy || capy.rideBody || capy.atHelm ||
+                   capy.climbing || capy.diving || capy.swimming ||
+                   (game.condor && game.condor.mounted);
+      if (busy) {
+        sysFlowT = 0; sysFlowAir = 0; sysFlowStall = 0;
+      } else {
+        // A HOP IS PART OF THE LINE. Airtime is forgiven for sysFLOW_AIR, which
+        // is comfortably longer than the 1.37 m arc the whole game is sized
+        // against and comfortably shorter than falling off anything.
+        if (capy.grounded) sysFlowAir = 0;
+        else sysFlowAir += dt;
+        // ...and speed is judged on the GROUND SPEED the solver actually
+        // produced, not on the stick: running into a wall is not a line, and
+        // asking the intent would have called it one for as long as you held it.
+        if (sp >= sysFLOW_MIN) sysFlowStall = 0;
+        else sysFlowStall += dt;
+        if (sysFlowAir > sysFLOW_AIR || sysFlowStall > sysFLOW_STALL) sysFlowT = 0;
+        // ...and it accrues AT THE SPEED IT IS GOING. A flat walk is a line and
+        // should count as one, but it should not count as much as a run — a
+        // single threshold made the two identical, which meant the top of the
+        // streak was five seconds of ambling and the whole thing was free.
+        // Airborne holds the rate it left the ground at rather than reading a
+        // horizontal speed that gravity is not touching.
+        else sysFlowT += dt * clamp((sp - sysFLOW_MIN) / (sysFLOW_REF - sysFLOW_MIN),
+                                    sysFLOW_SLOW, 1);
+      }
+      const fw = clamp(sysFlowT / sysFLOW_FULL, 0, 1);
+      sysFlowNow = damp(sysFlowNow, fw, fw > sysFlowNow ? sysFLOW_RISE : sysFLOW_FALL, dt);
+      game.state.flow = sysFlowNow;
+      // ONE SOUND, ONCE A STREAK. A channel that pings every frame it is happy
+      // is a channel the player stops hearing; this fires as the line becomes
+      // properly long and does not fire again until it has been broken.
+      if (sysFlowNow > sysFLOW_MARK && !sysFlowRang) {
+        sysFlowRang = true;
+        if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.28 });
+      } else if (sysFlowNow < sysFLOW_MARK * 0.45) {
+        sysFlowRang = false;
+      }
+    }
+
     // ---- music intensity: a shift in mood on a chase, never a stinger ----
     // ---- 2d: AND IT SUSTAINS WHERE THE PLACE IS HOT, RATHER THAN SPIKING --
     // `chaos` is a SPIKE — one wheek takes it to 0.21 and it is back to 0.07
@@ -22262,8 +22629,12 @@ export function createSystems(game) {
       musBondHeat = damp(musBondHeat, bh, bh > musBondHeat ? 5.0 : 0.55, dt);
     }
     if (musChaseT > 0) musChaseT -= dt * (1 - musHeat * sysHEAT_HOLD);
+    // The flow leans the band in beside the chaos, on the same writer and for
+    // the opposite reason: chaos is the score reacting to trouble, the flow is
+    // the score going WITH you. It is deliberately the smallest of the three
+    // terms — a long clean run should lift the music, not score it.
     const musWant = clamp(game.state.chaos * 0.7 + (musChaseT > 0 ? 0.55 : 0)
-                          + musHeat * sysHEAT_MUS, 0, 1);
+                          + musHeat * sysHEAT_MUS + sysFlowNow * sysFLOW_MUS, 0, 1);
     musIntensity = damp(musIntensity, musWant, musChaseT > 0 ? 0.9 : 0.35, dt);
     musApplyT += dt;
     if (musApplyT > 0.3 && musPad && ac.state === 'running') {

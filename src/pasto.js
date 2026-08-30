@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT A — PASTO, NARIÑO (chapter 2). ROUNDS 7-9: GALERAS AND THE VALLEY.
@@ -969,12 +969,29 @@ function pastoCoffeeGeom() {
   return g;
 }
 
+// ---- WHAT IN THE VALLEY IS ALIVE (v44) -------------------------------------
+// See THE WAKE in shared.js. Pasto is the windiest chapter in the first half —
+// it is 2 527 m up a volcano — and the only things that ever moved in it were
+// the smoke and the swifts. A frailejón is a rosette on a woolly trunk and a
+// coffee bush is a bush; both stood in it like fenceposts.
+//
+// By name, and only the growing things: the talc and the thermal motes are
+// airborne already and the smoke has its own solver. `auto` takes the window
+// off each geometry so nothing here has to know how pastoShrubGeom is built.
+const pastoALIVE = {
+  pastoShrubs: [0.085, 2.2, 1.15],
+  pastoCoffee: [0.060, 2.4, 1.30],
+  pastoFrailejones: [0.070, 2.6, 0.95],
+  pastoFrailejonBlooms: [0.055, 1.6, 1.20],
+};
 function pastoMakeInstanced(geom, count, name, shadow) {
   const im = new THREE.InstancedMesh(geom, mat(PALETTE.volcanoSnow, { vertexColors: true }), count);
   im.name = name;
   im.castShadow = !!shadow;
   im.receiveShadow = false;
   im.count = 0;
+  const a = pastoALIVE[name];
+  if (a) swayMesh(im, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
   return im;
 }
 

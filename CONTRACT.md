@@ -3023,6 +3023,213 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE FEEL PASS (v44 — 30 Aug 2026)
+
+Five things aimed at the ninety per cent of this game that is not a task: moving
+about in it. None of them adds a task, a gate, a collectible or a number on a
+screen, and every one is additive — a chapter that ignores all five behaves
+exactly as it did.
+
+### 1. THE FLOW — `game.state.flow`
+
+The third number, beside the two that already existed.
+
+    chaos   a SPIKE.  "what just happened?"        rests at zero
+    calm    a HOLD.   "how long has nothing?"      rests at zero
+    flow    a STREAK. "how long have you been moving WELL?"
+
+Accrues while the animal is covering ground above `sysFLOW_MIN` (3.6 m/s, under
+the 4.2 walk so a turn or a slope does not break it) **at a rate scaled by
+speed**, so a walk is a line and a run is a better one. Collapses on a stall of
+`sysFLOW_STALL` — and **a hop does not break it**, which is what makes hopping
+the kerb rather than going round worth doing.
+
+Four readers, all of them channels that already existed:
+
+| | |
+|---|---|
+| the lens | `sysFLOW_FOV` degrees on top of the speed term — but arriving on the STREAK's clock, not the speedometer's, which is what makes a long run feel unlike a fast one |
+| the boom | `sysFLOW_DOLLY` back. Same number the loaf moves, opposite reason: the loaf because you stopped and there is room to look, the flow because too much world is arriving |
+| the score | `sysFLOW_MUS` into `musWant`, beside chaos. Deliberately the smallest of the three terms — a clean run should lift the music, not score it |
+| the ground | the footfall dust thickens with it, one mote to four. The only reader at ground level |
+
+Read-only. Nothing outside systems.js may write it.
+
+### 2. THE SLIDE — `input.slide`, `capy.sliding`
+
+**Ctrl held**, or the pad's left trigger. Held, not latched: a slide is a state.
+
+**It is not a new movement model.** A slide is being slippery on purpose, and
+capybara.js already has a solved, measured model of slippery ground — the
+glacier. So the slide does one thing: it raises the friction half of `slip`.
+Everything else falls out of chapter 7's machinery, including THE CARVE, so a
+player who has done `glacier-run` slides better everywhere for the rest of the
+game.
+
+**`slip` AND `slipG` ARE TWO NUMBERS AND THE SPLIT IS THE WHOLE DESIGN.** The
+first cut put the slide into `slip` itself, which feeds three things — the grip
+damper, the steering authority AND the top-speed multiplier. Measured on the
+erg: holding the stick through a slide reached **17.9 m/s on the flat**, two and
+a half times a run, on a key. A slide is a way of CARRYING speed, so it belongs
+on the friction half only: `slipG` (ground + belly) drives the grip damper, the
+steering, Tobler and the skid; `slip` (ground alone) keeps both speed ceilings.
+Downhill still accelerates, because that is gravity against a body that has
+stopped gripping — and that is now the only way a slide can gain.
+
+Three rules keep it honest: you must already be moving (`capySLIDE_MIN`); it
+cannot be pumped (one entry kick, then `capySLIDE_COOL`); and it ends itself
+below `capySLIDE_OUT`, so it can never be held as a cheaper walk.
+
+The pose is MODEL ONLY (`capySLIDE_DROP`/`_TILT`), for the landing spring's
+reason: the collider is three spheres and a shorter capybara falls through
+eighteen chapters of geometry sized against the one that exists.
+
+### 3. THE WAKE — `wakeTick(x, z, speed)` in shared.js
+
+Every swaying thing in the game answered the wind and nothing answered the
+animal. Same shader hook, same `swR` tip ramp, one more uniform (`uWakeP` —
+world x, world z, strength packed into one vec3 so the three can never disagree
+about which frame they are in), and a radial displacement away from one point
+with a squared falloff — a linear one has a hard outer edge that crosses a reed
+bed like a ring.
+
+Zeroed under `prefers-reduced-motion` and whenever the animal is not walking
+through anything: carried, at a wheel, under water, on a bird.
+
+**IT ONLY REACHES WHAT ALREADY SWAYS**, and when the wake was first built that
+was three chapters (Palawan's fronds, Rio, Marrakech) — so it was a mechanism
+with almost nothing to act on. THE ROLLOUT IS THE OTHER HALF OF THE FEATURE.
+
+#### `swayMesh(mesh, { auto: true })` — the window comes off the geometry
+
+The one thing a call site gets wrong is `lo`/`hi`, because it is a property of
+the GEOMETRY and not of the plant: a unit cylinder built centred runs -0.5..0.5
+and one built based runs 0..1, they read identically in the file using them, and
+getting it backwards bends the tuft INTO the ground. `auto` reads the geometry's
+own bounding box on the chosen axis. Rounded to 2 dp, because lo/hi go into the
+program cache key and two tuft batches differing in the fifth decimal are the
+same plant and must not compile two shaders — Göreme's **52 meshes share 3
+programs** because of that line.
+
+Explicit `lo`/`hi` still win, for the three original call sites that window a
+deliberate SUBSET of their geometry.
+
+#### What was opted in (v44), and what was left out and why
+
+| chapter | what moves |
+|---|---|
+| Sydney | the lawn tufts, both shades, and the flowerbed stems — chapter 1's ground cover was the most static thing in the game |
+| Pasto | shrubs, coffee, frailejones and their blooms. The windiest chapter in the first half and only its smoke ever moved |
+| Kyoto | the iris at the pond edge, the bamboo culms (stiff — a culm's top eight metres travel and its base does not) and their leaves |
+| Cali | plantain leaves (2 m of unsupported membrane), bougainvillea, cane tops |
+| Iceland | lupins and their stems, by batch name |
+| Göreme | vine, vine stem and scrub, by batch name |
+| Pantanal | the grass — 2 619 waist-high tufts, the best wake target in the project |
+| Drift | island turf, moss blades and stalks. The chapter that is ABOUT wind and whose turf the wind did not touch |
+| Hanoi | the kerb weeds only |
+
+**3 chapters → 12. 83 meshes, 24 696 instances.** Measured, and the frame time is
+unchanged (vsync-locked at 16.6 ms with and without); the real cost is 4–17
+extra shader programs per chapter, which is compile time on chapter entry.
+
+**NOT DONE, AND FOR A REASON.** Antarctica has no plants. The Quay is a boat.
+Venice, Kowloon, Monaco, Manly and Son Doong keep their foliage in MERGED
+meshes, where the window is in the merged root's frame — the exact case the note
+at the top of `_swayInject` warns about, and a y-window over a mesh spanning
+y −10..+15 is meaningless. Those need a per-mesh window, not a one-liner, and
+`auto` would confidently get them wrong.
+
+**Flat cards lying on the ground are never swayed** — Iceland's tussock, Hanoi's
+litter, the lily pads. A ramp along the y of a flat card slides the whole card
+sideways instead of bending it.
+
+### 4. THE ECHO — off `capy:wheek`, systems.js
+
+The wheek is this game's only voice and in eighteen of nineteen chapters it went
+out and never came back. Son Doong has an echo because a cave without one would
+be absurd — but an echo is not a property of a cave, it is a property of BEING
+NEAR SOMETHING, and the game is full of alleys, arcades, sea walls and the
+underside of a harbour bridge that were acoustically identical to a field.
+
+Eight bearings at ear height, nearest hard surface on each, played back off it
+delayed by the real flight time (`2d/c`), positioned AT THE REFLECTOR so the
+existing spatial mix pans it, quieter and duller the further it came from. In
+the open there is no reflector and nothing happens — the effect IS the
+difference between a square and a lane.
+
+**THE SCENE, NOT THE PHYSICS WORLD.** The picture is what the player is standing
+in: a drawn arcade with no collider still sounds like an arcade.
+
+**TWO ROOTS, NOT ONE.** Sixteen chapters put their world under a group named for
+the biome; **Sydney does not** — chapter 1 is built into `environment`. Testing
+both is what stops the first chapter being the one place the effect is absent.
+The 300 m sky dome cannot be hit because the ray is 34 m long.
+
+### 5. THE CREST — systems.js
+
+The rest voice opens the boom when you STOP. This is the other thing: cresting a
+ridge at a run is the most reliable beautiful moment in any of these chapters
+and it was framed at the same 9.5 m as the flat.
+
+Four terrain samples ahead along the CAMERA yaw (not the animal's — an animal
+running along a ridge with the camera over the edge is looking at the view
+whatever its feet are doing), every `sysCREST_EVERY`. The ground must fall and
+KEEP falling: a hill you are climbing fails, a shelf with a wall behind it
+fails, a gully fails. No per-chapter data, and the caldera rim, the top of the
+Corso, the brink of the great dune and a Kowloon roof all pass without being
+told to.
+
+It is the only camera term here that takes PITCH off as well as adding boom — a
+longer boom at the same angle shows you more ground, and a view needs the
+horizon to come up the frame. No card and no sound: a view is not an
+achievement, and the moment it congratulates you it stops being a view.
+
+### WHAT WAS MEASURED (30 Aug 2026, in a browser)
+
+| | |
+|---|---|
+| flow, flat run on the erg | 0.06 → 0.62 over five seconds; **a hop carried it 0.62 → 0.78**; a stop took it to 0 in 1.9 s |
+| flow, the lens | FOV 48 → 59.6 across a run; **max 60.6 across nineteen chapters** |
+| slide | engages at 3.3 m/s, `slip` 0.86, **carries 7.4 and does not exceed it**, ends itself at ~3.5 s |
+| wake | GLSL injected and the uniform tracks: still 0.001, running 0.862 at (20.2, 10) |
+| echo | Sydney two returns at 116/231 ms (20 m, 40 m); Kowloon one at 110 ms (19 m); open ground silent |
+| crest | over a 7.6 m lip in Göreme the boom went 8.87 → **12.13 m** and the eye lifted 17.9 → 20.9 m |
+| all nineteen | 900 ticks each, running/hopping/sliding: **no NaN, no errors** |
+
+### `qa/xmodule.mjs` — AND NOW THERE IS AN AUDIT FOR IT
+
+    node qa/xmodule.mjs [srcDir]
+
+For every file: is each name it CALLS declared in that file, imported by it, or
+a known global? Anything else is either undeclared (throws everywhere) or
+declared in another module (throws in the dev build, and resolves to the wrong
+function in the bundle).
+
+**The question is per file, not per bundle.** An earlier version unioned every
+module's declarations and asked "is this declared anywhere" — which is the
+bundle's question, and it answers "yes" for `biomeLive`.
+
+Two things it had to learn, both of which produced 187 findings before they were
+fixed: **block comments must be stripped over the whole file**, not line by line
+(this codebase's jsdoc is long English prose full of "the position it is at
+(x, z)"); and **method shorthand is not anchored to a line start** — main.js
+declares four stubs on one line, `toast() {}, shake() {}, sfx() {}`.
+
+**Validated against both real bugs rather than trusted on a green run**: it
+reports `noiseBuf` UNDECLARED on the v41 tree and `biomeLive` CROSS-MODULE when
+that call is put back. The tree is clean as of v44.
+
+### AND ONE BUG THIS PASS ALMOST SHIPPED, WHICH IS THE `noiseBuf` ONE AGAIN
+
+The crest's first cut called `biomeLive()` for the live chapter's api. That
+function exists — **in npc.js** — so the bundle resolved it silently to another
+module's helper, which is hard-coded to Sydney, and the unbundled dev build
+would have thrown `ReferenceError` on the first frame of every chapter. `node
+build.mjs` reports "no collisions" and cannot see this: it checks that top-level
+names do not COLLIDE, not that a name belongs to the file using it. The idiom in
+systems.js is `game[game.biome.current]`. See the module-tag rule at the top of
+this contract — it exists for exactly this.
+
 ## THE MIX PASS (v41 — 30 Aug 2026)
 
 The score has been beautifully *composed* for thirty-odd versions — nineteen palettes,

@@ -1110,6 +1110,9 @@ function mainBoot() {
       honk: false, honkPressed: false,
       whistle: false, whistlePressed: false,
       jump: false, jumpPressed: false,
+      // THE SLIDE (v44). Held, not latched: a slide is a state you stay in, and
+      // the only edge anyone needs is the one capybara.js derives for itself.
+      slide: false,
       camYaw: 0,
     },
     // `dt` is the SCALED frame time every module is handed; `rawDt` is the wall
@@ -1117,7 +1120,9 @@ function mainBoot() {
     // `chaos` is the mayhem input and `calm` is the other end of the same
     // stick — a spike that decays and a hold that accrues. See THE CALM in
     // systems.js, which owns both.
-    state: { time: 0, dt: 0, rawDt: 0, timeScale: 1, paused: false, started: false, score: 0, chaos: 0, calm: 0, sailing: false },
+    // `flow` is the THIRD number beside them: a streak rather than a spike or a
+    // hold. See THE FLOW in systems.js, which owns it.
+    state: { time: 0, dt: 0, rawDt: 0, timeScale: 1, paused: false, started: false, score: 0, chaos: 0, calm: 0, flow: 0, sailing: false },
     mats: null,
     props: [], npcs: [],
     capy: null, env: null, physics: null, hud: null, post: null,

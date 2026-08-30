@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 9 — THE DRIFT
@@ -2336,6 +2336,11 @@ function driBuildAirfield(root) {
   }
   driAirMesh = driInstance(root, driG.oct, mat(PALETTE.driRock), stones, false, false);
   driAirTurf = driInstance(root, driG.box, mat(PALETTE.driGrassDark), turfs, false, false);
+  // ---- AND THE ISLANDS ARE GRASSED (v44) --------------------------------
+  // See THE WAKE in shared.js. This chapter is ABOUT wind — it has a wind
+  // frame, three pennants and a glide — and its turf was the one surface in
+  // it that the wind did not touch.
+  swayMesh(driAirTurf, { amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.6 });
   driAirChip = driInstance(root, driG.tet, mat(PALETTE.driRockDark), chips, false, false);
   if (driAirMesh) driAirMesh.frustumCulled = false;
   if (driAirTurf) driAirTurf.frustumCulled = false;
@@ -2400,9 +2405,13 @@ function driBuildGroundCover(root) {
   // 16 cm wide the first cut photographed as a churchyard: two thousand pale
   // upright rectangles standing in a dark meadow. driMoss is one step, which
   // is what grain wants — see driVC.
-  driInstance(root, driG.quad, mat(PALETTE.driMoss, { side: THREE.DoubleSide }),
-              blades, false, false);
-  if (stalks.length) driInstance(root, driG.cyl4, mat(PALETTE.driGrassPale), stalks, false, false);
+  swayMesh(driInstance(root, driG.quad, mat(PALETTE.driMoss, { side: THREE.DoubleSide }),
+                       blades, false, false),
+           { amount: 0.10, axis: 'y', auto: true, stiff: 1.3, hz: 1.75 });
+  if (stalks.length) {
+    swayMesh(driInstance(root, driG.cyl4, mat(PALETTE.driGrassPale), stalks, false, false),
+             { amount: 0.085, axis: 'y', auto: true, stiff: 1.9, hz: 1.4 });
+  }
   if (pebbles.length) driInstance(root, driG.oct, mat(PALETTE.driStone), pebbles, false, true);
 }
 

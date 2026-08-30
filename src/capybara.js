@@ -126,6 +126,41 @@ const capyPIN_VMAX = 3.0;           // m/s
 const capyGRIP_ICE  = 0.42;         // the residual damper at full slip
 const capySLIP_CTRL = 0.80;         // how much steering authority slip takes
 const capySLIP_CAP  = 1.65;         // extra top speed, as a multiple, at full slip
+
+// ---- THE SLIDE (v44) -------------------------------------------------------
+// A capybara at a flat run, told to get down, should get down. It is the single
+// most capybara thing the animal could not do, and every chapter has ground to
+// do it on.
+//
+// IT IS NOT A NEW MOVEMENT MODEL. A slide IS being slippery on purpose, and
+// this file already has a fully-solved, fully-measured model of being on
+// slippery ground — the glacier. So the slide does exactly one thing to the
+// simulation: it raises `slip`. Everything else falls out of machinery that has
+// been in the game since chapter 7 and has been tuned against a real hill —
+// the grip damper softens (capyGRIP_ICE), the steering authority drops
+// (capySLIP_CTRL), the speed ceiling lifts (capySLIP_CAP), gravity gets to do
+// the work on a gradient, and THE CARVE APPLIES, so a player who has done
+// `glacier-run` slides better everywhere for the rest of the game. None of
+// that had to be written, decided or re-tuned, and none of it can drift away
+// from the glacier's version because it IS the glacier's version.
+//
+// Three rules keep it honest:
+//   1. YOU HAVE TO BE MOVING to start one. It is a way of carrying speed, not
+//      a way of making it — otherwise it is a second run button.
+//   2. IT CANNOT BE PUMPED. The entry kick is once per slide and there is a
+//      cooldown after one ends, so tapping the key down a hill is slower than
+//      holding it.
+//   3. IT ENDS ITSELF. Below capySLIDE_OUT the animal gets up, so the state
+//      cannot be held as a cheaper walk.
+const capySLIDE_MIN  = 3.30;        // m/s of ground speed needed to go down
+const capySLIDE_OUT  = 1.55;        // ...and the speed it gets back up at
+const capySLIDE_SLIP = 0.86;        // the slip a belly on the ground is worth
+const capySLIDE_KICK = 1.35;        // m/s of shove into the slide, once, on entry
+const capySLIDE_MINT = 0.28;        // s it always lasts, so a tap still reads
+const capySLIDE_COOL = 0.34;        // s before another can be started
+const capySLIDE_AIR  = 0.45;        // s of airtime a slide survives (a lip, a kerb)
+const capySLIDE_DROP = 0.20;        // m the model settles by
+const capySLIDE_TILT = 0.16;        // rad of nose-down it takes with it
 const capySLIP_LAM  = 8.2;          // how much gentler the cap comes back down
 // --- THE CLIMB (chapter 11) -------------------------------------------------
 // Ten chapters of locomotion are horizontal plus a hop. The Drift added air but
@@ -211,6 +246,24 @@ const capyGROUND_KP = 9;            // floor recovery gain, metres of gap -> m/s
 const capyGROUND_SLOP = 0.02;       // penetration we simply ignore (real contacts own it)
 const capyGROUND_VMAX = 3.0;        // cap on the corrective rise so it can't launch
 const capyVOID_Y = -3;              // below this we genuinely fell out of the world
+// ---- ...AND THE HALF-METRE VERSION OF IT, WHICH IS THE ONE THAT HAPPENS ----
+// capyVOID_Y catches an animal that has fallen OUT of the world. The failure
+// players actually report is thirty centimetres of it: something puts the body
+// inside a solid — a stall collapsing on you, a vehicle, a corner whose collider
+// does not agree with its picture — and the contact equation pushes it out
+// through the nearest face, which under a building floor is DOWNWARDS. What is
+// left is a stalemate that never resolves: the backstop below asks for a rise
+// every frame, the contact push puts it straight back, and the animal stands
+// under the pavement with grounded === true and a permanent 0.85 m/s of upward
+// velocity going nowhere. Measured in Cali, Hanoi, Kowloon, Manly and Rio.
+//
+// The tell is not the depth, it is that THE CORRECTION IS NOT WORKING: the
+// backstop has been asking for the same rise for capySTUCK_T and the body has
+// not moved. Falling does not trigger it, because a falling body is moving; and
+// standing on anything at all does not, because the gap is then <= 0.
+const capySTUCK_GAP = 0.22;         // m below the floor before we start counting
+const capySTUCK_MOVE = 0.05;        // m of vertical travel that says it is not stuck
+const capySTUCK_T = 0.45;           // s of not moving before we put it back
 // --- THE HOP THAT ATE THE MOVEMENT -----------------------------------------
 // The contact equation does not merely stop the body, it pushes accumulated
 // penetration out — and at contactEquationStiffness 1e7 that push-out arrives as
@@ -536,6 +589,13 @@ let capyYawRate = 0;
 let capyBodyYaw = 0;
 let capyLegPhase = 0;
 let capySpeedSm = 0;                // smoothed ground speed — drives the whole gait
+let capyStuckT = 0, capyStuckY = 0; // see capySTUCK_T: the under-the-floor stalemate
+// THE SLIDE. `capySlideT` is how long this one has run, `capySlideAir` how long
+// we have forgiven being off the ground, `capySlideCool` the lockout after one
+// ends, and `capySlideW` the 0..1 the pose and the readers are damped on.
+let capySliding = false, capySlideT = 0, capySlideAir = 0, capySlideCool = 0, capySlideW = 0;
+let capySlideSpray = 0;             // s to the next puff off the belly
+let capyStuckN = 0, capyStuckAge = 9; // consecutive rescues, and s since the last one
 let capyPop = 0;
 let capyPopVel = 0;
 let capyEarTimer = 2;
@@ -806,6 +866,64 @@ function capyAskNum(game, name, x, z, dflt) {
 function capyGroundY(game, x, z) {
   return capyAskNum(game, 'terrainHeight', x, z, 0);
 }
+
+/**
+ * WHERE TO PUT AN ANIMAL THAT IS UNDER THE FLOOR, given that straight up is
+ * usually back inside the thing that put it there.
+ *
+ * Popping it to terrainHeight and nothing else turns a permanent bury into a
+ * half-second cycle — up, pushed down, up — which is not a fix, it is a
+ * flicker. Most biomes publish navBlocked() off their own static boxes (see
+ * makeSolidIndex), and that is exactly the question being asked here: is there
+ * room to stand. Ring search outward, nearest first, and fall back to straight
+ * up for the chapters that do not answer, where straight up is still better
+ * than staying under the pavement.
+ *
+ * AND navBlocked IS NOT THE WHOLE QUESTION. makeSolidIndex deliberately reports
+ * a box whose top is within solidRISE of the ground as NOT blocked — "a kerb, a
+ * deck, a road: walk on it" — which is right for navigation and useless here,
+ * because the thing that most often has an animal underneath it is exactly a
+ * deck. Measured in Manly and the Sahara: the ring search said the spot was
+ * clear, the rescue put the animal straight back under the same floor, and the
+ * whole thing became a cycle instead of a fix.
+ *
+ * So `n` is the number of times this has already fired without the animal
+ * getting free, and it drives a spiral: golden angle so successive attempts
+ * never repeat a heading, radius growing about a metre a go. A pocket that
+ * navBlocked cannot see is escaped by walking out of it, and two seconds is the
+ * worst case anywhere.
+ *
+ * Writes into `out`. Deliberately coarse: eight headings and four radii is
+ * thirty-two calls, once, on a frame that has already gone wrong.
+ */
+function capyFreeSpot(game, x, z, n, out) {
+  out.x = x; out.z = z;
+  if (n > 0) {
+    // nothing the biome can see is wrong here, and yet here we are again
+    const th = n * 2.399963;                    // golden angle
+    const r = Math.min(1.4 + n * 1.1, 6.5);
+    out.x = x + Math.cos(th) * r;
+    out.z = z + Math.sin(th) * r;
+    return out;
+  }
+  const api = capyBiomeApi(game);
+  if (!api || typeof api.navBlocked !== 'function') return out;
+  try {
+    if (!api.navBlocked(x, z, capyR)) return out;
+    for (let ri = 1; ri <= 4; ri++) {
+      const r = ri * 1.4;
+      for (let a = 0; a < 8; a++) {
+        const th = a * Math.PI / 4;
+        const nx = x + Math.cos(th) * r, nz = z + Math.sin(th) * r;
+        if (api.navBlocked(nx, nz, capyR)) continue;
+        out.x = nx; out.z = nz;
+        return out;
+      }
+    }
+  } catch (e) { /* a biome that throws gets the straight-up rescue */ }
+  return out;
+}
+const capyFreeXZ = { x: 0, z: 0 };
 
 /**
  * HOW SLIPPERY THE GROUND IS UNDER (x, z), 0..1.
@@ -2331,6 +2449,9 @@ export function createCapybara(game) {
     // between the lens and the animal is the floor, not a wall. See sysCamClear.
     rideBody: null,
     atHelm: false,
+    // THE SLIDE. Read-only; systems.js draws nothing off it yet and the biomes
+    // may. Written every frame by the block that owns it.
+    sliding: false,
     climbing: false,                 // hanging off a face — see capyCLIMB_UP
     diving: false,                   // under the surface on purpose — see capyDIVE_V
     depth: 0,                        // metres below the live waterline, 0 on land
@@ -2832,7 +2953,90 @@ export function createCapybara(game) {
     // How much the floor has agreed to hold on to. Zero everywhere but a
     // glacier and a dune face; see capySLIP_GRIP.
     const slip = capySlipAt(game, px, pz);
-    capy.slip = slip;
+    // How much of the loss of grip is the ANIMAL rather than the ground. Kept
+    // apart from the ground's own on purpose — see the ceiling note below.
+    let capySlideSlip = 0;
+
+    // ---- THE SLIDE (see the constants block) ------------------------------
+    // Decided here, one block, before anything reads either number — which is
+    // the whole implementation: soften the grip the glacier already taught this
+    // file to respect, and let the rest of the frame do the work.
+    {
+      // World speed, not deck-relative: platVX is not solved until further down
+      // the frame, and a deck fast enough to matter here is a deck you are
+      // already being carried by, which is excluded on the next line.
+      const gsp = Math.hypot(body.velocity.x, body.velocity.z);
+      // The helm is not in this list because update() has already returned for
+      // it forty lines up; `capy.atHelm` cannot be true here.
+      const canSlide = !capySwimming && !capyDiving && !capyClinging &&
+                       !capy.carriedBy && !capyStamBlown;
+      if (capySlideCool > 0) capySlideCool -= dt;
+      if (capySliding) {
+        capySlideT += dt;
+        if (grounded) capySlideAir = 0; else capySlideAir += dt;
+        // Three ways out, and the speed one is the important one: a slide that
+        // could be held at a standstill is a crouch, and a crouch is a
+        // different game.
+        if (!canSlide || !input.slide || capySlideAir > capySLIDE_AIR ||
+            (capySlideT > capySLIDE_MINT && gsp < capySLIDE_OUT)) {
+          capySliding = false;
+          capySlideCool = capySLIDE_COOL;
+          capySlideAir = 0;
+        }
+      } else if (input.slide && canSlide && grounded && capySlideCool <= 0 &&
+                 gsp >= capySLIDE_MIN) {
+        capySliding = true;
+        capySlideT = 0;
+        capySlideAir = 0;
+        // ONE kick, on entry, along the way the animal is already going — not
+        // along the stick. Getting down does not change where you were headed,
+        // and reading the stick here would let a player slide sideways out of a
+        // turn at full speed, which is a dodge and not a flop.
+        const inv = gsp > 0.001 ? capySLIDE_KICK / gsp : 0;
+        body.velocity.x += body.velocity.x * inv;
+        body.velocity.z += body.velocity.z * inv;
+        if (typeof game.sfx === 'function') {
+          capySfxAt.pitch = capySurfacePitch(game, env, px, pz, py);
+          capySfxAt.volume = 0.8;
+          game.sfx('rustle', capySfxAt);
+        }
+        if (game.physics && typeof game.physics.dust === 'function') {
+          game.physics.dust(px, py - 0.26, pz, 7);
+        }
+        if (typeof game.punch === 'function') game.punch(0.10);
+      }
+      capySlideW = damp(capySlideW, capySliding ? 1 : 0, capySliding ? 16 : 9, dt);
+      if (capySliding) {
+        // ---- AND IT RAISES THE FRICTION TERM, NOT THE CEILING ------------
+        // The first cut put the slide's slip into `slip` itself, which is one
+        // number feeding three things — the grip damper, the steering
+        // authority AND the top-speed multiplier. Measured on the erg: holding
+        // the stick forward through a slide accelerated to 17.9 m/s on the
+        // flat, which is two and a half times a flat run, on a key. That is not
+        // a slide, it is a second run button with a nicer pose.
+        //
+        // A slide is a way of CARRYING speed, so it belongs on the friction
+        // half and nowhere near the drive target: `capySlideSlip` softens the
+        // grip and costs steering exactly as ice does, and the ceiling stays
+        // the ground's own. Downhill still accelerates, because that is
+        // gravity against a body that has stopped gripping — which is the
+        // whole point and is now the only way a slide can gain.
+        capySlideSlip = capySLIDE_SLIP * capySlideW;
+        // ...and it goes on kicking up whatever it is on, the whole way down.
+        capySlideSpray -= dt;
+        if (capySlideSpray <= 0) {
+          capySlideSpray = 0.055;
+          if (game.physics && typeof game.physics.dust === 'function') {
+            game.physics.dust(px, py - 0.28, pz, 2);
+          }
+        }
+      }
+      capy.sliding = capySliding;
+    }
+    // The published figure is what the FLOOR is doing to the animal, ground and
+    // belly together, because that is the question every reader of it asks.
+    const slipG = Math.max(slip, capySlideSlip);
+    capy.slip = slipG;
     const waterY = capyWaterY(env, px, pz);
     const overWater = !!(env && typeof env.isOverWater === 'function' && env.isOverWater(px, pz));
     const wantSwim = overWater && py < waterY + capySWIM_ENTER;
@@ -2995,10 +3199,34 @@ export function createCapybara(game) {
           gap > -capyREST_BAND) {
         body.velocity.y = 0;
       }
-      // last resort: genuinely fell out of the world. This one IS a teleport, so
-      // the interpolation history has to be rewritten with it.
-      if (body.position.y < terr + capyVOID_Y) {
-        body.position.y = terr + capyFOOT_Y;
+      // ---- the stalemate, which is the void rescue three metres too late ----
+      // See capySTUCK_T. Anything that is legitimately solving the animal's
+      // height somewhere else is excluded: a carrier, a wheel, a climb and a
+      // dive all put the body where the terrain is not, on purpose.
+      capyStuckAge += dt;
+      if (gap > capySTUCK_GAP && !capy.carriedBy && !capy.rideBody &&
+          !capy.atHelm && !capy.climbing && !capy.diving) {
+        if (Math.abs(body.position.y - capyStuckY) > capySTUCK_MOVE) {
+          capyStuckY = body.position.y;
+          capyStuckT = 0;
+        } else {
+          capyStuckT += dt;
+        }
+      } else {
+        capyStuckT = 0;
+        capyStuckY = body.position.y;
+      }
+      // last resort: genuinely fell out of the world, or wedged under it. Both
+      // ARE teleports, so the interpolation history has to be rewritten with it.
+      if (body.position.y < terr + capyVOID_Y || capyStuckT > capySTUCK_T) {
+        // out of the solid first, then up — see capyFreeSpot. On the void case
+        // the animal is already in open air and the search is a no-op.
+        capyStuckN = capyStuckAge < 2.0 ? capyStuckN + 1 : 0;
+        capyStuckAge = 0;
+        capyFreeSpot(game, body.position.x, body.position.z, capyStuckN, capyFreeXZ);
+        body.position.x = capyFreeXZ.x;
+        body.position.z = capyFreeXZ.z;
+        body.position.y = capyGroundY(game, capyFreeXZ.x, capyFreeXZ.z) + capyFOOT_Y;
         body.velocity.set(0, 0, 0);
         body.previousPosition.copy(body.position);
         body.interpolatedPosition.copy(body.position);
@@ -3006,6 +3234,8 @@ export function createCapybara(game) {
         body.interpolatedQuaternion.copy(body.quaternion);
         capyRenderPos.set(body.position.x, body.position.y, body.position.z);
         grounded = true;
+        capyStuckT = 0;
+        capyStuckY = body.position.y;
       }
     }
 
@@ -3518,7 +3748,7 @@ export function createCapybara(game) {
     // rather than a run, and switched off wherever the ground is already
     // sliding: on ice the slip model owns the speed and the two would fight.
     capyGrade = 0;
-    if (effGround && !capySwimming && !capyClinging && mag > 0.02 && slip < 0.35) {
+    if (effGround && !capySwimming && !capyClinging && mag > 0.02 && slipG < 0.35) {
       const ah = capyGroundY(game, px + dx * capyGRADE_LOOK, pz + dz * capyGRADE_LOOK);
       const here = capyGroundY(game, px, pz);
       if (ah === ah && here === here) {
@@ -3575,7 +3805,7 @@ export function createCapybara(game) {
       // capyAIR_CONTROL, because a seed that cannot be steered is a stone.
       const slipCtl = capySkill.carve ? capySLIP_CTRL * 0.34 : capySLIP_CTRL;
       const control = capySwimming ? 0.55
-        : (effGround ? 1 - slip * slipCtl
+        : (effGround ? 1 - slipG * slipCtl
                      : (capySeedT > 0 ? Math.max(capySEED_CTRL, capyAirCtl(game))
                                       : capyAirCtl(game)));
       const step = capyACCEL * control * (0.62 + 0.38 * align) * dt;
@@ -3596,8 +3826,8 @@ export function createCapybara(game) {
       // off and the frictionless contact does the rest; the snap-to-zero has to
       // go with it, or the animal would stick to a twenty-degree slope every
       // time it dipped below walking pace.
-      const grip = slip > 0.001
-        ? 1 / lerp(1 / capyGRIP_LAMBDA, 1 / capyGRIP_ICE, slip)
+      const grip = slipG > 0.001
+        ? 1 / lerp(1 / capyGRIP_LAMBDA, 1 / capyGRIP_ICE, slipG)
         : capyGRIP_LAMBDA;
       // ---- ...AND THERE ARE TWO BANDS, WHICH IS WHAT THE NOTE AT THE TOP OF
       //      THIS FILE HAS ALWAYS SAID AND WHAT THE CODE NEVER DID ----------
@@ -3640,7 +3870,7 @@ export function createCapybara(game) {
       // the same dust a hard landing kicks up. Gated on capySKID_V so a walk
       // never does it, and on capySkidArm so it fires once per stop rather than
       // every frame of the slide.
-      if (capySkidArm && slip < 0.35 && sp2now > capySKID_V * capySKID_V) {
+      if (capySkidArm && slipG < 0.35 && sp2now > capySKID_V * capySKID_V) {
         capySkidArm = false;
         if (capyPop > -0.14) capyPop = -0.14;
         if (capyPopVel > -2.4) capyPopVel = -2.4;
@@ -3651,7 +3881,7 @@ export function createCapybara(game) {
       }
       vx = damp(vx, 0, brake, dt);
       vz = damp(vz, 0, brake, dt);
-      if (slip < 0.35 && vx * vx + vz * vz < capyGRIP_SNAP * capyGRIP_SNAP) {
+      if (slipG < 0.35 && vx * vx + vz * vz < capyGRIP_SNAP * capyGRIP_SNAP) {
         vx = 0; vz = 0;
         // ---- THE SNAP CANNOT SEE THE STEP THAT ALREADY HAPPENED ----------
         //
@@ -4322,6 +4552,18 @@ export function createCapybara(game) {
             capyDigPayload.position = capyPosition;
             game.events.emit('capy:step', capyDigPayload);
           }
+          // ---- AND THE LONGER THE LINE, THE MORE IT KICKS UP -------------
+          // The flow's fourth reader, and the only one at ground level: a
+          // streak leaves a trail. One mote at a jog, four at the top of a
+          // long clean run, none at all at a walk — so it reads as the run
+          // having weight rather than as a permanent dust cloud. Through
+          // props.js's own pool, which is already routed to whichever biome is
+          // live and already takes that biome's colour. See THE FLOW.
+          const fl = (game.state && game.state.flow) || 0;
+          if (fl > 0.12 && gaitSpeed > capyWALK * 1.2 &&
+              game.physics && typeof game.physics.dust === 'function') {
+            game.physics.dust(px, body.position.y - 0.26, pz, 1 + Math.round(fl * 3));
+          }
         }
       }
     } else {
@@ -4406,7 +4648,12 @@ export function createCapybara(game) {
     capyLandVel += (-capyLand * capyLAND_K - capyLandVel * capyLAND_C) * dt;
     capyLand += capyLandVel * dt;
     if (capyLand < -0.30) { capyLand = -0.30; if (capyLandVel < 0) capyLandVel = 0; }
-    capyModel.position.y = -capyFOOT_Y + bob + capyLand + (capySwimming ? 0.02 : 0);
+    // ...and the slide, which is the animal getting DOWN. Model only, like the
+    // landing spring above it and for the same reason: the collider is three
+    // spheres and a shorter capybara would fall through eighteen chapters of
+    // geometry sized against the one that exists. See THE SLIDE.
+    capyModel.position.y = -capyFOOT_Y + bob + capyLand - capySLIDE_DROP * capySlideW +
+                           (capySwimming ? 0.02 : 0);
     // ---- the idle beat ----------------------------------------------------
     // Only on its feet, on land, and not in the middle of doing something else:
     // every one of those states already owns the pose, and a capybara that
@@ -4580,7 +4827,11 @@ export function createCapybara(game) {
     // toward the lean while the terrain pitch is also written into it would
     // feed the hill back into its own filter every frame.
     capyLean = damp(capyLean, lerp(leanTarget, capyLOAF_PITCH, capyLoaf), 8, dt);
-    capyModel.rotation.x = capyLean + capyPosePitch;
+    // The slide's nose-down goes on OUTSIDE the filter, beside the terrain
+    // pitch, for the reason the comment above gives: capySlideW is already
+    // damped on its own clock and running it through this one as well would
+    // make getting down take half a second.
+    capyModel.rotation.x = capyLean + capyPosePitch - capySLIDE_TILT * capySlideW;
     const sqY = 1 + capyPop * 0.38;
     const sqXZ = 1 - capyPop * 0.19;
     capySquash.scale.set(sqXZ, sqY, sqXZ);

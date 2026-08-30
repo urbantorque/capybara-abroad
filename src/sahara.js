@@ -3271,8 +3271,46 @@ function sahBuildErg(root) {
       // cards, which is the fourth time this chapter has drawn a texture as a
       // scatter of objects. 11 ± 3 m on the same 9 m grid always overlaps.
       const len = 14.0 + j * 3.0;
-      sahPush9(rip, x - 0.5, y + 0.02, zz, 0, yaw, -0.30, 1.15, 1, len);
-      sahPush9(rip, x + 0.5, y + 0.02, zz, 0, yaw, 0.30, 1.15, 1, len);
+      // ---- AND THEY HAVE TO LIE ON THE DUNE, NOT ACROSS IT -----------------
+      // The plate is fifteen metres long and was laid FLAT at the terrain height
+      // of its own centre. On a dune face that is a fifteen-metre plank resting
+      // on a hillside: measured, the uphill end stood up to 1.05 m clear of the
+      // sand, and since the plates are the same colour as the face they are on,
+      // what the player sees is not a floating plate — it is GROUND, a metre
+      // above the ground they are walking on, with the capybara buried in it to
+      // the shoulders. That is this chapter's "falling below the ground".
+      //
+      // Fitted to the CHORD, not to the centre: sample the terrain at the
+      // plate's own two ends, pitch it to the line between them and hang it from
+      // the midpoint of that line. Both ends then sit exactly on the sand and
+      // only the middle can deviate — by the sagitta of the dune over fifteen
+      // metres, which on a convex face puts the middle UNDER the sand, where it
+      // cannot be seen. -atan2, because with the 'YXZ' order Rx sends the local
+      // +z end DOWN for a positive angle.
+      // A chord alone is not enough: fitting the two ENDS leaves the middle
+      // standing proud of anything concave and buried in anything convex, and
+      // the toe of a slipface is concave — measured, that still left plates
+      // 0.81 m over the sand. So the chord is fitted and then the whole plate is
+      // DROPPED by the worst amount it stands above the ground along its own
+      // length. It can then only ever be at or under the sand, which is the
+      // right way round to be wrong: a buried ripple is a missing ripple, and a
+      // floating one is a metre of false ground with the animal inside it.
+      const hl = len * 0.5, ax = Math.sin(yaw), az = Math.cos(yaw);
+      for (let s = -1; s <= 1; s += 2) {
+        const px = x + s * 0.5;
+        const y0 = sahTerrain(px - ax * hl, zz - az * hl);
+        const y1 = sahTerrain(px + ax * hl, zz + az * hl);
+        const mid = (y0 + y1) * 0.5;
+        let over = 0;
+        for (let k = -3; k <= 3; k++) {
+          const f = k / 6;                       // -0.5 .. 0.5 of the length
+          const gy = sahTerrain(px + ax * f * len, zz + az * f * len);
+          const py = mid + (y1 - y0) * f;
+          if (py - gy > over) over = py - gy;
+        }
+        sahPush9(rip, px, mid - over + 0.02, zz,
+                 -Math.atan2(y1 - y0, len), yaw, s * 0.30, 1.15, 1, len);
+      }
     }
   }
   // sahSandLit, NOT sahSand. sahBuildGround lerps the whole windward face

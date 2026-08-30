@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -3281,6 +3281,14 @@ function hanBuildScatter(root) {
     im.castShadow = !!cast;
     im.receiveShadow = false;
     if (!cast) im.userData.noShadow = true;
+    // ---- AND THE WEEDS MOVE (v44) ---------------------------------------
+    // See THE WAKE in shared.js. Only the blades: leaf, scrap and grit are
+    // litter lying FLAT on the road, and a ramp along the y of a flat card
+    // slides the whole thing sideways instead of bending it. The weeds coming
+    // up through the kerb are the one growing thing in this scatter.
+    if (geo === bladeGeo) {
+      swayMesh(im, { amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.8 });
+    }
     root.add(im);
   };
   put(leaf, flat, PALETTE.hanMud, false);

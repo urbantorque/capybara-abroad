@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 15 — THE PANTANAL. WHERE YOU ARE, AS IT HAPPENS, FROM.
@@ -2095,6 +2095,20 @@ function panBuildGrass(root) {
   // it. A tuft's shadow is its own shadow acne and nothing else.
   mesh.castShadow = false;
   mesh.userData.noShadow = true;
+  // ---- AND IT MOVES (v44) ------------------------------------------------
+  // See THE WAKE in shared.js. This is the largest field of anything in the
+  // game — four thousand tufts, waist-high on a capybara, and the whole point
+  // of the chapter's ground is that the animal is IN it rather than on it.
+  // Standing perfectly rigid in the wind was the one thing that gave it away
+  // as scatter, and it is the single best wake target in the project: at
+  // capybara height, everywhere the player walks.
+  //
+  // The blade quads are built at b[2]*0.5 with height b[2], so the tuft runs
+  // from 0 to about 0.95 in its own frame — `auto` reads that rather than
+  // being told it. A LOW amount, because grass this dense reads its motion in
+  // the aggregate: a tenth of a metre across four thousand tufts is a field
+  // breathing, and anything more is a wheat advert.
+  swayMesh(mesh, { amount: 0.10, axis: 'y', auto: true, stiff: 1.5, hz: 1.55 });
   let n = 0;
   {
     for (let gz = 0; gz < NZ; gz++) {

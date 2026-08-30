@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 7 — ICELAND
@@ -2709,10 +2709,28 @@ function iceBuildScatter(game, root) {
   // walk through is a walk-through hit in qa/audit-solid.js and, worse, it is
   // the only object on the moraine that reads as an obstacle.
   const SG = iceStaticGroup(game);
+  // ---- WHAT IN THE SCATTER IS ALIVE (v44) --------------------------------
+  // See THE WAKE in shared.js. The wind has always been in this chapter and
+  // nothing in it has ever moved: a lupin is a stem with a head on it and it
+  // stood in a forty-knot gust like a bollard.
+  //
+  // ONE TABLE, BY BATCH NAME, and only the growing things. Moss, rubble,
+  // crust, sulphur, erratics, drift and the posts are all rock, mud or timber
+  // and must not sway; the tussock is a flat quad LYING ON THE GROUND, and a
+  // ramp along its own y would slide the whole card rather than bend it.
+  // `auto` takes the window off each geometry, so nothing here has to know
+  // whether iceG.cyl4 is built centred or based.
+  const iceALIVE = { lupinStem: [0.055, 2.4], lupin: [0.075, 1.9] };
   const mkBatch = (geo, colour, list, cast, recv, name, two) => {
     if (!list.length) return;
     const m = iceInstance(root, geo, colour, list, cast, recv, two);
-    if (m) { m.name = name; iceScatMeshes.push(m); }
+    if (m) {
+      m.name = name;
+      iceScatMeshes.push(m);
+      const kind = name.split(':')[1];
+      const a = iceALIVE[kind];
+      if (a) swayMesh(m, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: 1.35 });
+    }
   };
   for (let b = 0; b < iceSCAT_BANDS.length; b++) {
     const band = iceSCAT_BANDS[b];

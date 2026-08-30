@@ -89,6 +89,20 @@ const quayHELM      = { x: 0, z: 3.1 };              // helm station in boat-loc
 // a beginning.
 const quayBRIDGE = { x: 12, z: -58, span: 132, deck: 25, arch: 39, yaw: 0.07 };
 
+// How far the deck runs each side of the arch, and where it comes ashore.
+//
+// THE BRIDGE USED TO END IN MID-AIR AT BOTH ENDS. The deck stopped 25 m
+// outboard of each pylon and hung there over open water with nothing under it
+// and nothing at the end of it — and there was nothing it COULD reach, because
+// the bridge axis is water from x -267 to x +378, which is the whole width of
+// the world. So the landfall is built: a bluff at each end for the road to
+// arrive at, an abutment of sandstone where the deck meets it, and a viaduct
+// on stone piers over the water in between. quayABUT is read by
+// quayBuildLand (headlands are only solid if they go through quayHeadland)
+// and quayDECK_HALF by both quayBuildBridge and the traffic that runs on it.
+const quayDECK_HALF = 190;
+const quayABUT = { u: 190, r: 42, h: 25 };
+
 // Landmarks, in the order you meet them.
 const quayFORT   = { x: 6, z: -126, r: 13 };         // Fort Denison, fine on the port bow
 const quayBRAD   = { x: -76, z: -196, r: 40 };       // Bradleys Head
@@ -1235,11 +1249,19 @@ function quayBuildBridge(game, root) {
     if (ym > D + 2) place(um, (D + ym) * 0.5 - 1.5, 0, 0.42, ym - D, 0.42, PALETTE.bridge);
   }
   // deck + approach spans
-  place(0, D - 1.4, 0, S + 60, 1.5, 12.0, PALETTE.stoneDark);
-  place(0, D - 0.3, 0, S + 60, 0.7, 12.8, PALETTE.bridge);
+  //
+  // See quayABUT: the deck now runs from bluff to bluff instead of stopping
+  // 25 m outboard of each pylon and hanging there over open water.
+  const APPROACH = [105, 139];             // viaduct piers along the deck, per side
+  const DECK_HALF = quayDECK_HALF;
+  place(0, D - 1.4, 0, DECK_HALF * 2, 1.5, 12.0, PALETTE.stoneDark);
+  place(0, D - 0.3, 0, DECK_HALF * 2, 0.7, 12.8, PALETTE.bridge);
   // pylons
   for (let s = -1; s <= 1; s += 2) {
-    place(s * (S * 0.5 + 5), D * 0.5 + 4, 0, 8.5, D + 8, 12.5, PALETTE.sandstone);
+    // The shaft runs the whole way to the underside of the cap. It used to stop
+    // at y = 33 while the cap sat at 37.0, so every pylon wore its capital four
+    // metres above its own head with harbour sky in the gap.
+    place(s * (S * 0.5 + 5), (D + 12.0) * 0.5, 0, 8.5, D + 12.0, 12.5, PALETTE.sandstone);
     place(s * (S * 0.5 + 5), D + 12.6, 0, 9.4, 1.2, 13.4, PALETTE.sandstoneDark);
     // A FOOTING, because the drawn pylon stops at y = 0 and the harbour is at
     // -0.5: both of them were standing half a metre clear of the water they are
@@ -1247,6 +1269,34 @@ function quayBuildBridge(game, root) {
     place(s * (S * 0.5 + 5), -1.4, 0, 10.6, 3.0, 14.6, PALETTE.sandstoneDark);
     const u = s * (S * 0.5 + 5);
     quayPYLON.push({ x: cx + u * cs, z: cz - u * sn, hx: 5.3, hz: 7.3, ry: yaw });
+  }
+  // approach piers. Footing at the water, shaft, cap under the deck soffit —
+  // the same three courses as a pylon at two thirds the size, so the viaduct
+  // reads as the same structure getting smaller rather than as a second one.
+  // Solid, and in quayHARD, for the reason the pylons are: they stand in
+  // navigable water and the ferry would otherwise sail through all eight.
+  for (let s = -1; s <= 1; s += 2) {
+    for (let i = 0; i < APPROACH.length; i++) {
+      const u = s * APPROACH[i];
+      place(u, 11.2, 0, 5.0, 22.4, 9.0, PALETTE.sandstone);        // shaft: water to soffit
+      place(u, 22.15, 0, 6.2, 1.4, 10.2, PALETTE.sandstoneDark);   // cap, up against D - 2.15
+      place(u, -1.4, 0, 6.6, 3.0, 10.6, PALETTE.sandstoneDark);    // footing, in the water
+      const px = cx + u * cs, pz = cz - u * sn;
+      quayStaticBox(game, px, 10.0, pz, 3.3, 12.0, 5.3, yaw);
+      quayHARD.push({ x: px, z: pz, r: 6.4 + quayBOAT_HX, name: 'pier' });
+    }
+  }
+  // ...and the abutment the deck actually ends on. A block of sandstone wider
+  // than the deck and taller than its parapet, buried in the bluff that
+  // quayBuildLand puts around it, so the end face of the deck is never drawn
+  // against sky however the bluff's own crown happens to fall.
+  for (let s = -1; s <= 1; s += 2) {
+    const u = s * (DECK_HALF - 11);
+    place(u, 11.8, 0, 22.0, 27.6, 22.0, PALETTE.sandstone);
+    place(u, 25.9, 0, 23.0, 1.2, 23.0, PALETTE.sandstoneDark);
+    const ax = cx + u * cs, az = cz - u * sn;
+    quayStaticBox(game, ax, 11.8, az, 11.0, 13.8, 11.0, yaw);
+    quayHARD.push({ x: ax, z: az, r: 13.5 + quayBOAT_HX, name: 'abutment' });
   }
   // solid, and the hull is turned away from them by quayShore()
   for (let i = 0; i < quayPYLON.length; i++) {
@@ -1345,6 +1395,20 @@ function quayBuildLand(game, root) {
   quayHeadland(L, 210, -180, 74, 20, 131, PALETTE.cliffShade, PALETTE.headScrubDk);
   quayHeadland(L, 240, -320, 66, 24, 149, PALETTE.cliffRock, PALETTE.headScrub);
   quayHeadland(L, -150, -130, 62, 17, 167, PALETTE.cliffShade, PALETTE.headScrubDk);
+
+  // --- the two the bridge lands on ----------------------------------------
+  // Dawes Point and Milsons Point, in effect. They are placed off quayBRIDGE
+  // rather than written out as coordinates so they cannot drift away from the
+  // thing they exist to carry, and both are close enough to the shore already
+  // there (x -150 west, x 210 east) to merge with it — a bluff with a bridge
+  // landing on it, not an island with a bridge sitting on it. See quayABUT.
+  for (let s = -1; s <= 1; s += 2) {
+    const u = s * quayABUT.u;
+    const cs = Math.cos(quayBRIDGE.yaw), sn = Math.sin(quayBRIDGE.yaw);
+    quayHeadland(L, quayBRIDGE.x + u * cs, quayBRIDGE.z - u * sn,
+                 quayABUT.r, quayABUT.h, s < 0 ? 239 : 251,
+                 PALETTE.cliffShade, PALETTE.headScrubDk);
+  }
 
   // --- Fort Denison: a martello tower on a rock ---------------------------
   L.cyl(quayFORT.x, quayWATER_Y + 1.1, quayFORT.z, quayFORT.r, 3.4, PALETTE.cliffRock, 0, 0, 0, 8);
@@ -2866,7 +2930,10 @@ function quayUpdateLine(game, dt) {
  * at each end of the approach spans. They are two hundred triangles apiece and
  * they are the reason the arch has a scale.
  */
-const quayCAR_N = 22;
+// Thirty-eight, not twenty-two: the carriageway is 336 m long now rather than
+// 190, and the old count spread over it leaves fifteen metres of empty road
+// between cars on the busiest thing in the picture.
+const quayCAR_N = 38;
 const quayCAR_COL = [PALETTE.hullRed, PALETTE.sail, PALETTE.wharfIron, PALETTE.cloth2,
                      PALETTE.hair2, PALETTE.buoyGreen, PALETTE.maiz, PALETTE.stoneDark];
 let quayTrainMesh = null, quayTrainU = 0.2, quayTrainDir = 1, quayTrainWait = 0;
@@ -2914,7 +2981,10 @@ function quayUpdateTraffic(game, dt) {
   if (!quayCarMesh) return;
   const B = quayBRIDGE;
   const cs = Math.cos(B.yaw), sn = Math.sin(B.yaw);
-  const SPAN = B.span + 58;
+  // The road is as long as the deck is, less the two abutments it runs into —
+  // a carriageway that stopped at the old 190 m would have left the whole
+  // viaduct at either end as empty tarmac. See quayDECK_HALF.
+  const SPAN = (quayDECK_HALF - 22) * 2;
   const place = (mesh, idx, u, lane, ang) => {
     const uu = (u - 0.5) * SPAN;
     const x = B.x + uu * cs + lane * sn;
@@ -2942,7 +3012,8 @@ function quayUpdateTraffic(game, dt) {
     return;
   }
   quayTrainMesh.visible = true;
-  quayTrainU += 0.075 * quayTrainDir * dt;
+  // 0.045 over the longer deck is the 15 m/s that 0.075 was over the old one.
+  quayTrainU += 0.045 * quayTrainDir * dt;
   if (quayTrainU > 1) { quayTrainU = 1; quayTrainDir = -1; quayTrainWait = rand(14, 26); }
   else if (quayTrainU < 0) { quayTrainU = 0; quayTrainDir = 1; quayTrainWait = rand(14, 26); }
   place(quayTrainMesh, -1, quayTrainU, 5.0, Math.PI * 0.5);
