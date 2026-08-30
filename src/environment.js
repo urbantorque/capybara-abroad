@@ -446,13 +446,138 @@ function envRibbon(M, pts, halfW, y, color) {
   }
 }
 
+// ===========================================================================
+// FALLEN JACARANDA — AND WHY IT IS NOT A FLAT DISC ANY MORE.
+//
+// shared.js's own contact header calls these "the worst-looking thing in
+// qa/na-sydney.png", and uses them as the argument against ever solving contact
+// shadows with decals. Four separate things were wrong with them and all four
+// are visible in a still:
+//
+//   1. ONE FLAT COLOUR over two and a half metres, on a lawn that carries a
+//      three-octave noise field. The ground got grain, a near octave and a
+//      broad hue octave over v45-v46 and the blossom got none of it, because
+//      the decal mesh is built on matVC2 — which has no grain() at all. Every
+//      improvement to the lawn made these stand out more.
+//   2. A VISIBLE OCTAGON. Eight segments, and at two and a half metres across
+//      you can count them.
+//   3. FLOATING FIVE CENTIMETRES over a lawn that undulates by three. Blossom
+//      lies ON grass.
+//   4. A HARD EDGE. The disc simply stops, which is the one thing drifted
+//      blossom never does.
+//
+// THE FIX IS THE RIM, and it costs nothing: the outer ring is given THE LAWN'S
+// OWN COLOUR, computed with the same two noise fields the ground mesh uses, so
+// the disc dissolves into the grass instead of ending on it. No alpha, no
+// sorting, no z-fighting — the same reasoning that made the crease and the
+// shore ramps work, one surface over.
+//
+// AND IT GOES ON THE GROUND'S MATERIAL, not the decals'. In exchange the
+// blossom picks up the grain, the near octave, the broad hue field and the
+// contact term that the lawn around it already has — so it is lit and textured
+// as part of the same surface rather than as a sticker on top of one.
+//
+// COST, measured as a differential rather than asserted: one more mesh, and
+// 480 triangles replacing 80, against a chapter that draws about 87 000. The
+// draw-call count came back 140 against a baseline of 141 — i.e. INSIDE the
+// run-to-run variance of what the frustum happens to cull on an arrival frame,
+// which is worth knowing before quoting a "+1" that cannot be seen.
+//
+// PAINTING THE GROUND MESH INSTEAD WAS THE FIRST IDEA AND IT CANNOT WORK: that
+// mesh is 64x46 over 220x160 m, so its cells are 3.44 m and eight of the ten
+// drifts are SMALLER THAN ONE CELL. There is nothing there to paint with.
+const envBL_SEG = 16;
+const envBL_OFF = 0.022;   // metres above the lawn. Was 0.05 and flat.
+const envColBl = new THREE.Color();
+const envColGr = new THREE.Color();
+/** The lawn's own height at a point — the ground mesh's rule, verbatim. */
+function envLawnY(x, z) { return envNoise(x * 0.09, z * 0.09) * 0.03; }
+/**
+ * The lawn's own colour at a point.
+ *
+ * The ground loop's rule minus its sand and aerial-perspective terms, which is
+ * EXACT here rather than an approximation: all ten drifts sit inside
+ * x[-8.7, 10.2] z[20.2, 38.3], and both of those terms are identically zero
+ * over that box (the sand needs x < -10 or x > 12, the haze needs |x| > 66 or
+ * z > 62). Checked rather than assumed, because a rim that is nearly the grass
+ * colour is worse than one that is obviously not.
+ */
+function envLawnColor(x, z, out) {
+  const t1 = 0.5 + 0.5 * envNoise(x * 0.19 + 11, z * 0.17 - 4);
+  const t2 = 0.5 + 0.5 * envNoise(x * 0.07 - 3, z * 0.06 + 7);
+  out.set(PALETTE.grassDark).lerp(envColA.set(PALETTE.grass), t1);
+  return out.lerp(envColA.set(PALETTE.grassPale), t2 * 0.55);
+}
+/**
+ * One drift of fallen blossom. Centre and an inner ring carry the petal colour;
+ * the outer ring carries the grass. Two rings rather than a plain fan because a
+ * fan interpolates straight from the centre to the rim, which spends the whole
+ * drift on the falloff and leaves it with no solid middle.
+ */
+function envBlossom(M, cx, cz, r) {
+  const ci = M.vert(cx, envLawnY(cx, cz) + envBL_OFF, cz,
+                    envColBl.set(PALETTE.petalPurple));
+  const inner = [], outer = [];
+  for (let i = 0; i < envBL_SEG; i++) {
+    const a = i / envBL_SEG * Math.PI * 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // THE OUTLINE IS NOT A CIRCLE. Blossom drifts; a perfect disc reads as a
+    // decal however soft its edge is.
+    const wob = 0.80 + 0.34 * (0.5 + 0.5 * envNoise(cx + ca * 3.1, cz + sa * 3.1));
+    const ri = r * 0.52 * wob, ro = r * wob;
+    // ...and the petal colour is not one value either: a drift is thicker in
+    // some places than others and the grass shows through the thin parts.
+    const mixv = 0.5 + 0.5 * envNoise(cx * 1.7 + ca * 2.3, cz * 1.7 + sa * 2.3);
+    envColBl.set(PALETTE.petalPurple).lerp(envColA.set(PALETTE.petalPink), mixv * 0.45);
+    const ix = cx + ca * ri, iz = cz + sa * ri;
+    inner.push(M.vert(ix, envLawnY(ix, iz) + envBL_OFF, iz,
+                      envColBl.lerp(envLawnColor(ix, iz, envColGr), 0.18)));
+    const ox = cx + ca * ro, oz = cz + sa * ro;
+    outer.push(M.vert(ox, envLawnY(ox, oz) + envBL_OFF, oz,
+                      envLawnColor(ox, oz, envColGr)));
+  }
+  // WOUND FOR A FRONT FACE, WHICH envDisc IS NOT.
+  //
+  // The blossom came back completely invisible the first time this ran, and the
+  // reason is worth writing down: `envDisc` emits tri(centre, v[i-1], v[i]),
+  // which with x = cos and z = sin puts the geometric normal at **-Y**. Every
+  // ground disc in this chapter — the pond bed included — is therefore wound
+  // face-DOWN, and they are only on screen at all because `matVC2` happens to
+  // be `side: DoubleSide` for the Opera House sails. Move one of them onto a
+  // front-faced material, which the ground's is, and it is culled.
+  //
+  // Cross product, not trial and error: for a = centre and b, c on the ring at
+  // increasing angle, ((b-a) x (c-a)).y is -sin(θc - θb), so the outer pair has
+  // to be listed in DECREASING angle for the face to point up.
+  for (let i = 0; i < envBL_SEG; i++) {
+    const j = (i + 1) % envBL_SEG;
+    M.tri(ci, inner[j], inner[i]);
+    M.tri(inner[j], outer[j], outer[i]);
+    M.tri(inner[j], outer[i], inner[i]);
+  }
+}
+
+/**
+ * A flat disc on the ground. Used for the pond bed, the pond water and the
+ * flower-bed pads.
+ *
+ * THE WINDING WAS BACKWARDS AND NOTHING EVER NOTICED, because every one of
+ * these is drawn with `matVC2`, which is `side: DoubleSide` — for the Opera
+ * House sails, not for these. It emitted tri(centre, v[i-1], v[i]), which with
+ * x = cos and z = sin puts the geometric normal at -Y: face-down. It is fixed
+ * here rather than left alone because it is a trap rather than a defect —
+ * nothing looks different today (a double-sided material draws both, and the
+ * merger writes a +Y normal attribute so the lighting was never affected), and
+ * the day somebody moves a disc onto a front-faced material it vanishes. Which
+ * is exactly what happened to the blossom, one function up.
+ */
 function envDisc(M, cx, cz, r, seg, y, color) {
   const ci = M.vert(cx, y, cz, color);
   let prev = -1;
   for (let i = 0; i <= seg; i++) {
     const a = i / seg * Math.PI * 2;
     const v = M.vert(cx + Math.cos(a) * r, y, cz + Math.sin(a) * r, color);
-    if (prev >= 0) M.tri(ci, prev, v);
+    if (prev >= 0) M.tri(ci, v, prev);
     prev = v;
   }
 }
@@ -2221,12 +2346,9 @@ export function createEnvironment(game) {
     const b = envBEDS[i];
     D.quad(b.x0 - 0.35, b.z0 - 0.35, b.x1 + 0.35, b.z1 + 0.35, 0.078, PALETTE.soil);
   }
-  // fallen jacaranda blossom drifted across the spawn lawn. y = 0.05 clears the
-  // ±0.03 ground undulation and stays under the paving decals at 0.07.
-  for (let i = 0; i < envBLOSSOM.length; i++) {
-    const bl = envBLOSSOM[i];
-    envDisc(D, bl[0], bl[1], bl[2], 8, 0.05, PALETTE.petalPurple);
-  }
+  // The fallen jacaranda used to be built HERE, as eight-segment discs at a
+  // flat y = 0.05 in the decal merger. It is its own mesh on the ground's own
+  // material now — see envBlossom, and the block above it for why.
   // podium deck paving joints. The deck plate is pale PALETTE.stone and the
   // forecourt below is sandstone, so the two surfaces already read apart; the
   // joints give the deck a scale and stop it looking like one poured slab.
@@ -2246,6 +2368,19 @@ export function createEnvironment(game) {
   decals.receiveShadow = true;
   decals.castShadow = false;
   root.add(decals);
+
+  // ---- the fallen blossom, on the GROUND's material ------------------------
+  // envBaseA and matVCGnd, so it de-tints the way the lawn does and picks up
+  // the same grain, near octave, broad hue field and contact term. One extra
+  // draw call, and the whole reason these stopped reading as stickers.
+  const BL = envMerger(envBaseA);
+  for (let i = 0; i < envBLOSSOM.length; i++) {
+    envBlossom(BL, envBLOSSOM[i][0], envBLOSSOM[i][1], envBLOSSOM[i][2]);
+  }
+  const blossom = new THREE.Mesh(BL.build(), matVCGnd);
+  blossom.receiveShadow = true;
+  blossom.castShadow = false;
+  root.add(blossom);
 
   // ========================================================== ARCHITECTURE ==
   const A = envMerger(envBaseA);

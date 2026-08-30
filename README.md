@@ -1164,6 +1164,43 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## The jacaranda finally fell properly
+
+There has been fallen blossom drifted across the lawn in the Botanic Gardens
+since the first week, and it has been the worst-looking thing in the game for
+just as long — so much so that the comment explaining why contact shadows are
+not drawn as flat patches on the ground cites it by name as the reason.
+
+It was ten flat lilac octagons, one colour each, hovering five centimetres over
+a lawn that rises and falls by three. Every improvement made to the grass over
+the last few passes — the fine noise, the patchy colour, the soft darkening
+where things touch it — went to the ground and not to the blossom, so each one
+made the difference between them worse.
+
+The trick turned out to be the edge. The outer rim of each drift is now painted
+**the colour of the grass underneath it**, worked out from the same two noise
+patterns the lawn itself uses, so a drift fades out into the lawn instead of
+stopping on it. No transparency, no sorting, nothing that can flicker — the same
+idea as the soft corners and the wet sand at Palawan, one surface over. The
+outline wanders rather than being a circle, the middle stays dense, and the
+whole thing now lies on the grass and picks up the same texture and shading as
+the grass, because it is built out of the same material.
+
+The first idea was better and did not work: paint the lawn itself lilac under
+the trees, and have no extra geometry at all. The lawn mesh turns out to be
+divided into squares three and a half metres across, and eight of the ten drifts
+are smaller than one square. There was nothing there to paint with.
+
+**And it revealed that every flat disc on the ground in Sydney is inside out.**
+The blossom vanished completely the first time it was rebuilt. The helper that
+builds these — used for the pond, the pond bed and the flower beds as well —
+has always built them facing *downwards*. Nobody has ever seen this, because the
+material they are drawn with happens to be double-sided, for an unrelated reason
+involving the Opera House sails, and a double-sided surface is drawn whichever
+way it faces. Move one onto a normal material and it disappears. Nothing looks
+different now that it is fixed; it is simply a hole somebody would have fallen
+into again.
+
 ## Shadows found out how high things are
 
 Every other edge in this game softened over the last few passes and the shadows

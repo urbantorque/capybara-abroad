@@ -3023,6 +3023,76 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE FALLEN BLOSSOM (v50 — 30 Aug 2026)
+
+`shared.js`'s contact header calls these *"the worst-looking thing in
+qa/na-sydney.png"* and uses them as the standing argument against ever solving
+contact shadows with decals. Four separate things were wrong with them, all four
+visible in a still:
+
+1. **ONE FLAT COLOUR** over two and a half metres, on a lawn carrying a
+   three-octave noise field. The decal mesh is built on `matVC2`, which has no
+   `grain()` at all — so every improvement made to the ground over v45–v46 (the
+   near octave, the broad hue field, the contact term) made the blossom stand
+   out *more*.
+2. **A VISIBLE OCTAGON.** Eight segments at two and a half metres across.
+3. **FLOATING FIVE CENTIMETRES** over a lawn that undulates by three.
+4. **A HARD EDGE.** The disc simply stops, which is the one thing drifted
+   blossom never does.
+
+### The rim is the fix
+
+The outer ring is given **the lawn's own colour**, computed from the same two
+noise fields the ground mesh uses, so the drift dissolves into the grass instead
+of ending on it. No alpha, no sorting, no z-fighting — the same reasoning the
+crease's opposed pairs and Palawan's swash ramp are built on.
+
+Two rings rather than a plain triangle fan: a fan interpolates straight from the
+centre to the rim, which spends the whole drift on the falloff and leaves it
+with no solid middle. Sixteen segments, and the outer radius is **wobbled by a
+noise field** — a perfect circle reads as a decal however soft its edge is.
+Vertices follow `envLawnY` at a 2.2 cm offset, so the drift lies on the grass.
+
+**It is built on the GROUND's material** (`matVCGnd`, `envMerger(envBaseA)`) and
+not the decals', which is the whole reason it stopped reading as a sticker: it
+picks up the grain, the near octave, the broad hue field and the contact term
+that the lawn around it already has.
+
+**PAINTING THE GROUND MESH INSTEAD WAS THE FIRST IDEA AND CANNOT WORK.** That
+mesh is 64×46 over 220×160 m, so its cells are **3.44 m**, and eight of the ten
+drifts are smaller than one cell. There is nothing there to paint with. Worth
+checking before designing around it.
+
+### AND EVERY GROUND DISC IN THE CHAPTER IS WOUND FACE-DOWN
+
+The blossom came back **completely invisible** the first time it ran. `envDisc`
+emits `tri(centre, v[i-1], v[i])`, which with `x = cos` and `z = sin` puts the
+geometric normal at **−Y**. Every disc it has ever built — the pond bed, the pond
+water, the flower-bed pads — is wound face-down, and they are all on screen only
+because `matVC2` happens to be `side: DoubleSide` **for the Opera House sails**.
+Move one onto a front-faced material, which the ground's is, and it is culled.
+
+Nothing looks different today: a double-sided material draws both faces, and the
+merger writes a `+Y` normal attribute so the lighting was never affected. It is
+fixed in `envDisc` anyway, because it is a trap and not a defect — the cost of
+leaving it is that the next person to do what this pass just did loses an hour.
+
+The winding was settled by the cross product rather than by trying both: for
+`a` = centre and `b`, `c` on the ring at increasing angle,
+`((b−a) × (c−a)).y` is `−sin(θc − θb)`, so the outer pair must be listed in
+**decreasing** angle for the face to point up.
+
+### Cost
+
+Measured as a differential (`git stash` the file, reload, re-measure, restore),
+with `shadowMap.enabled = false` and `info.autoReset = false` so the counter is
+the main pass and not the composite quad:
+
+- **480 triangles replacing 80**, against a chapter that draws about 87 000.
+- **140 draw calls against a baseline of 141** — i.e. inside the run-to-run
+  variance of what the frustum culls on an arrival frame. Worth measuring before
+  quoting the "+1" that the design predicts and the instrument cannot see.
+
 ## THE PENUMBRA (v49 — 30 Aug 2026)
 
 Everything else in the picture softened over v45–v48 and the shadows did not.
