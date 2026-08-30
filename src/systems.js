@@ -1518,6 +1518,163 @@ for (const k in sysLENS) {
 const sysSHOULDER = 0.86;
 const sysVIG_TONE = 0.42;
 
+// ===========================================================================
+// THE DEPTH — one row per chapter, and the only place a chapter says how DEEP
+// it wants to look. See THE DEPTH PASS in CONTRACT.md and the header over
+// MAIN_POST_COC in main.js.
+//
+//   dof      how much of the defocused image is mixed in at full circle of
+//            confusion. 0 is off and is not a small number — it takes the
+//            depth texture out of the composite entirely.
+//   dofK     where the far blur BEGINS, as a multiple of the distance from the
+//            lens to the animal. A multiple and not a distance, because the
+//            camera is six metres behind the capybara on a lawn and seventy
+//            above it under a balloon, and a chapter should not have to know
+//            which. It ends at sysDOF_SPAN times that.
+//   nearK    where the near blur ENDS, same units. 0 switches the near half
+//            off, which most chapters want: this is the bottom edge of the
+//            frame going soft, and it is the strongest miniature cue there is
+//            in exactly the chapters that are looking at something small.
+//   air      haze per metre. This is the term scene.fog has never been able to
+//            express — it is LINEAR and starts at 78-90 m, and the camera is
+//            six metres up with the whole of the game happening between three
+//            and forty. 0.004 puts about 12% of the horizon colour on a wall
+//            thirty metres away and nothing at all on the animal.
+//   airMax   the ceiling. Past it the fog is the better instrument and two of
+//            them arguing is a band across the horizon.
+//   crease   how far a corner may go down. This is the ambient occlusion this
+//            game has never had; `contact` is a pool of ground patches under
+//            objects and cannot darken a box against a box or the inside of
+//            an arch. Keep it under a third, for the reason _contactMAX is
+//            0.32 in shared.js: past that it stops reading as the absence of
+//            bounce light and starts reading as paint.
+//
+// A ROW OF ZEROES IS THE CHAPTER THAT SHIPPED. Every number here is additive
+// over a pass that was already finished.
+// ===========================================================================
+// THE AIR COLUMN WAS AUTHORED AT ROUGHLY TWICE THIS AND MEASURED WRONG.
+// The first table put 0.0038/m and a 0.26 ceiling on Sydney, which is 26% of
+// the horizon colour over anything past eighty metres — and the harbour is
+// eighty to a hundred and fifty metres out. It came back grey-green. Aerial
+// perspective is real and it does desaturate, but the blue of that harbour is
+// one of the four things the chapter is FOR, and a term that spends it has
+// been turned up past what it is worth. Read off the A/B frames rather than
+// arithmetic: **about seven per cent at forty metres, and a ceiling it does
+// not reach until well past anything the player is looking at.**
+const sysDEPTH = {
+  //              dof   dofK  nearK   air     airMax crease
+  sydney:      [0.60, 1.55, 0.88,  0.0020, 0.15,  0.25],
+  // Two and a half thousand metres of thin air, and a volcano to put it in
+  // front of. The haze is the whole reason you can tell how far away Galeras
+  // is — but it is CLEAN air, so it goes FURTHER per metre and not harder: a
+  // low coefficient under a high ceiling, which is the opposite shape to Hanoi
+  // and is what altitude actually looks like.
+  pasto:       [0.55, 1.80, 0.00,  0.0014, 0.20,  0.22],
+  // Seven hundred metres of open water. Nothing to occlude and everything to
+  // put distance into.
+  quay:        [0.50, 1.90, 0.00,  0.0016, 0.13,   0.15],
+  // A lane four metres wide with a building on each side: the chapter with
+  // more corners per square metre than any other, and the one where a
+  // razor-edged shadow down the middle was doing all of the separating.
+  kyoto:       [0.62, 1.45, 0.90,  0.0014, 0.09,   0.32],
+  cali:        [0.58, 1.55, 0.88,  0.0018, 0.14,   0.27],
+  rio:         [0.55, 1.60, 0.86,  0.0016, 0.13,   0.25],
+  // Half past eleven at night. Air at night is a scatter around a light, not a
+  // veil over a distance, and a strong one greys out the only warm windows for
+  // a mile — which in that chapter is the entire picture.
+  iceland:     [0.62, 1.50, 0.88,  0.0012, 0.11,  0.30],
+  // Noon over a square with no shade in it, and forty minutes east of it,
+  // three hundred metres of nothing. The most air in the game, and it is what
+  // turns one flat sheet of ochre into a distance.
+  sahara:      [0.55, 1.75, 0.84,  0.0028, 0.24,  0.22],
+  // Cloud. There is no ground, the whole subject is the drop, and the near
+  // half of the frame is the only thing that is real — so the near blur is the
+  // strongest in the game here and the creases the weakest.
+  drift:       [0.65, 1.60, 0.92,  0.0026, 0.20,  0.17],
+  // WHITE STONE, AND THE ARCADE. Sixty people between eight metres and
+  // forty-five, all of them equally crisp, under arches that read as flat
+  // panels. This chapter is the one both halves of this pass were built for
+  // and it gets the most of both.
+  venice:      [0.65, 1.45, 0.90,  0.0021, 0.17,  0.34],
+  // Up is a direction here, so the near blur has to stay small: the frame is
+  // full of things directly overhead and softening those loses the wall of
+  // light that IS the chapter. The creases are worth a great deal — every sign
+  // in Mong Kok is a box on a box on a box.
+  kowloon:     [0.55, 1.70, 0.72,  0.0018, 0.13,  0.32],
+  // Sixty per cent of this frame is white sand at 1.2 albedo. It does not need
+  // more bloom, it needs somewhere for the eye to stop.
+  palawan:     [0.62, 1.50, 0.90,  0.0020, 0.17,  0.22],
+  goreme:      [0.58, 1.75, 0.80,  0.0018, 0.19,  0.30],
+  manly:       [0.55, 1.60, 0.86,  0.0012, 0.10,   0.25],
+  // Two hundred metres of road going to a horizon, and past twenty-two metres
+  // nothing in this game casts a shadow at all. The air is doing the work a
+  // second shadow cascade would have done, and it costs a great deal less.
+  pantanal:    [0.55, 1.70, 0.86,  0.0016, 0.13,   0.25],
+  // Inside a mountain. There IS no distance and there is nothing to haze; what
+  // there is, is more concave rock than the rest of the game put together.
+  cave:        [0.58, 1.45, 0.84,  0.0009, 0.08,  0.36],
+  // THE ALBEDO CEILING. Three colours, all of them near white, over a ground
+  // that reads as flat mid-grey because nothing separates any part of it from
+  // any other part. The crease is the only instrument that works here.
+  antarctic:   [0.58, 1.60, 0.84,  0.0016, 0.16,  0.36],
+  // Blue hour, which is a haze with a colour in it. The one chapter where this
+  // term is allowed to be noticed.
+  monaco:      [0.62, 1.55, 0.88,  0.0014, 0.11,   0.30],
+  // "ten in the morning, and it is a HAZE" — the palette row says exactly that
+  // in words, and nothing in this renderer could draw it until now.
+  hanoi:       [0.58, 1.60, 0.84,  0.0024, 0.20,   0.30],
+};
+// WHERE THE FRAME ACTUALLY IS, WHICH THE FIRST VERSION OF THIS GUESSED.
+// Measured with qa/depth-map.js — a raycast through a 3x5 NDC grid in seven
+// chapters — and the resting frame is remarkably consistent:
+//
+//     bottom edge   9.3 - 10.5 m        the capybara      ~12.0 m
+//     lower third   11.6 - 13 m         centre            16 - 18 m
+//     upper third   27 - 42 m           top edge          30 - 200 m
+//
+// The first table put the near ramp at 2.8 .. 7.5 m — entirely IN FRONT of the
+// nearest thing on screen — and the far ramp at 27.8 .. 83.3, so only the top
+// quarter of the picture was ever touched and it never reached full. It
+// measured as a 5.7% loss of gradient energy in the top band and BYTE-IDENTICAL
+// in the other two, which is exactly what a focus field aimed past the frame
+// should measure. Both numbers come off that table now.
+//
+// The span and the near fraction are properties of the aperture and not of the
+// place, like sysSHOULDER: what a chapter has an opinion about is where the
+// focus falls, not how abruptly a lens gives up.
+const sysDOF_SPAN  = 2.6;
+// The near ramp is SHORT — 0.70 of where it ends, not 0.38. The near side of a
+// real focus field is much shorter than the far side, and more to the point the
+// whole of it has to fit between the bottom edge of the frame (0.78 of the
+// subject distance) and the subject.
+const sysDOF_NEAR0 = 0.70;
+// The distance the whole table is expressed in multiples of, when there is no
+// animal to measure to — the title card, and the two frames of a biome swap
+// where the old capybara is gone and the new one is not yet placed.
+const sysDOF_FALLBACK = 12.0;
+// AND THE CLAMP, WHICH ANTARCTICA IS THE REASON FOR. The rig holds twelve
+// metres in eighteen chapters and the multiples are written for that; at the
+// Antarctic station the animal spawns against the hut and the camera comes in
+// to 3.5 m, which collapses the whole focus field onto the near ground and
+// defocuses the chapter. A multiple is the right unit for a condor at seventy
+// metres and the wrong one for a camera pinned against a wall.
+// ELEVEN AND NOT EIGHT. At eight, Antarctica and Manly both sat ON the floor
+// (measured: their far ramps came out 12.8..33.3 where every other chapter was
+// 18..50) and the Antarctic boat — which is where a task sends you, thirty
+// metres out — came back visibly soft. A focus field that defocuses the thing
+// the card is pointing at is a bug however good it looks. Eleven is just under
+// the twelve the rig actually holds in seventeen of nineteen chapters, so the
+// clamp now only catches a camera pinned against geometry and never shortens
+// the field in normal play.
+const sysDOF_MIN = 11;
+const sysDOF_MAX = 60;
+// Damped, so a camera that swings round a corner PULLS focus instead of
+// snapping it. This is not one of the switches and does not need to cut: the
+// A/B probes drive post.render() directly and never let sysDressFrame run.
+const sysDOF_LAMBDA = 3.0;
+let   sysDofDist = sysDOF_FALLBACK;
+const sysDepthV = new THREE.Vector3();
+
 const sysGRADE_LAMBDA = 2.2;
 const sysGradeCur = sysGrade(0.20, 1.00, 1.00, 0.10, 1.05, 0.20, 0.58, 1, 1, 1);
 let   sysGradeWant = sysGRADES.sydney;
@@ -18313,6 +18470,60 @@ export function createSystems(game) {
     // 1.0 is arithmetically the hard clamp this replaced — see the shader.
     pp.shoulder = game.state.noShoulder ? 1.0 : sysSHOULDER;
     pp.vigTone = game.state.noVigTone ? 0 : sysVIG_TONE;
+    // ---- AND THE DEPTH ---------------------------------------------------
+    // Three more switches on the same terms: cut, never faded.
+    //
+    // THIS ROW IS NOT CROSS-FADED and is not in sysGRADE_KEYS. A grade is a
+    // look and looks may dissolve into one another; a focus distance and a
+    // haze coefficient are geometry, and lerping between two chapters' geometry
+    // across a biome swap means half a second of a focus plane that belongs to
+    // neither place. The swap happens inside biomeFadeTo's white hold, where
+    // there is nothing on screen to see it snap.
+    {
+      const dr = sysDEPTH[name] || null;
+      if (!dr) {
+        pp.dof = 0; pp.air = 0; pp.crease = 0;
+      } else {
+        // The distance from the lens to the animal, every frame. It is a
+        // multiple and not a metre count for exactly this reason: this number
+        // is six on a lawn, thirty at a helm and seventy under a balloon, and
+        // a focus plane written in metres would be behind the camera in one of
+        // those and past the fog in another.
+        let want = sysDOF_FALLBACK;
+        const cp = game.capy;
+        if (cp && cp.position) {
+          sysDepthV.set(cp.position.x, cp.position.y, cp.position.z);
+          const m = sysDepthV.distanceTo(camera.position);
+          if (m > 0.5 && m < 4000) want = clamp(m, sysDOF_MIN, sysDOF_MAX);
+        }
+        sysDofDist = damp(sysDofDist, want, sysDOF_LAMBDA, game.state.dt || 0.016);
+        const sd = sysDofDist;
+        pp.dof = game.state.noDof ? 0 : dr[0];
+        const f0 = sd * dr[1];
+        pp.dofFar0 = f0;
+        pp.dofFar1 = f0 * sysDOF_SPAN;
+        if (dr[2] > 0.001) {
+          const n1 = sd * dr[2];
+          pp.dofNear1 = n1;
+          pp.dofNear0 = n1 * sysDOF_NEAR0;
+        } else {
+          // The cut. smoothstep(-1, 0, d) is 1 for every distance in front of
+          // the lens, so the near term is exactly zero rather than nearly it.
+          pp.dofNear0 = -1; pp.dofNear1 = 0;
+        }
+        pp.air = game.state.noAir ? 0 : dr[3];
+        pp.airMax = dr[4];
+        pp.crease = game.state.noCrease ? 0 : dr[5];
+        // THE HAZE IS THE FOG'S OWN COLOUR, and that is the whole reason this
+        // needs no table of its own. scene.fog.color is already cross-faded by
+        // atmosApply, already moved by the aurora and the storm and the tide,
+        // and is already what the far field converges to — so the near air and
+        // the far fog agree by construction and can never drift apart. It is
+        // in linear working space, which is what the composite wants.
+        const fc = scene.fog;
+        if (fc) { pp.airR = fc.color.r; pp.airG = fc.color.g; pp.airB = fc.color.b; }
+      }
+    }
     // ---- AND THE POSTCARD LEANS ON THE SAME THREE ------------------------
     // Not a second grade and not a filter: photo mode nudges the row the
     // chapter is already on, by an amount you would not notice as an effect
@@ -18345,6 +18556,10 @@ export function createSystems(game) {
   function sysDressPrime(name) {
     sysContactClear();
     sysSpillClear();
+    // ...and the focus, for the same reason as everything else in here: a
+    // damped focus distance carried across a biome swap opens the new chapter
+    // pulling focus from where the last one's animal was standing.
+    sysDofDist = sysDOF_FALLBACK;
     sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
     for (let i = 0; i < sysGRADE_KEYS.length; i++) {
       const key = sysGRADE_KEYS[i];

@@ -3023,6 +3023,214 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE DEPTH PASS (v45 — 30 Aug 2026)
+
+Until now there was nothing in the frame buffer but colour. `sceneRT` has always
+had a depth buffer attached and has always thrown it away, and three of the four
+things most obviously missing from a still of this game all wanted that one
+texture. It costs the resolve and nothing else.
+
+The review that specified it was the nineteen arrival frames again
+(`qa/vr30.js`), and it came back with two sentences: **every frame in this game
+is uniformly sharp from two metres to the fog, and every surface in it meets
+every other surface on a clean seam.** Venice is the clearest case — sixty
+people between eight metres and forty-five, all equally crisp, on a pavement
+that is one value corner to corner, under arches that read as flat panels.
+
+**Everything below is a no-op at its default.** A chapter with a row of zeroes
+in `sysDEPTH` is byte-for-byte the chapter that shipped, and `uDepthOn` goes to
+zero so the depth texture is not merely multiplied out but never sampled.
+
+### 0. The attachment
+
+`sceneDepth` is a `DepthTexture`, `UnsignedIntType` / `DepthFormat`, on the
+existing `samples: 4` half-float target. A multisampled depth attachment has to
+be RESOLVED, and a driver that declined would have taken the whole post chain
+down with it — so it was **probed on the real target before a line of this was
+written** (`qa/depthprobe.js`): range 0..245, `glErr` 0, identical in the
+multisampled and single-sample arms.
+
+At a 0.5 m near plane, 24 bits resolves under a millimetre at forty metres in
+the coarsest chapter in the game (Göreme, far 2200), which is two orders of
+magnitude finer than the smallest thing any term below asks about.
+
+### 1. Defocus — `dof`
+
+One scale of blur says how far away a thing is in a way no amount of grading
+can. The chain is a coverage-premultiplied quarter-res downsample
+(`MAIN_POST_COC`) and then the bloom's own blur shader, twice, which is why
+`MAIN_POST_BLUR` now carries four channels instead of three — for the bloom
+that is arithmetically what it always was (the binomial weights sum to 0.99999
+and nothing reads bloom's alpha).
+
+**WHY PREMULTIPLIED.** A plain quarter-res blur of the scene smears the sharp
+foreground outward, and the composite then reads that smear wherever CoC is
+high — so a crisp capybara against a defocused square acquires a brown halo.
+Weighting every tap by its own CoC and normalising at the far end means an
+in-focus pixel contributes nothing to the blurred image at all. The CoC is
+taken **per tap** and not from an averaged depth, for the same argument one
+level down: an averaged depth across a silhouette is a distance at which
+nothing exists.
+
+The mix uses the FULL-RES CoC at the pixel, so an in-focus pixel stays exactly
+the pixel it was and there is no quarter-res lattice on a sharp subject.
+
+### 2. The air — `air` / `airMax`
+
+`scene.fog` is **linear and starts at 78–90 m**. The camera is six metres up
+and the whole of the game happens between three and forty, so aerial
+perspective — the cheapest depth cue there is — was switched off exactly where
+the game is. This is an exponential term starting at zero, capped, and mixed
+toward **`scene.fog.color` itself**, which is why it needs no table of its own:
+that colour is already cross-faded by `atmosApply` and already moved by the
+aurora, the storm and the tide, so the near air and the far fog agree by
+construction and can never drift apart.
+
+**THE SKY IS EXEMPT, OFF THE RAW DEPTH.** Every dome in this game is
+`fog: false` on purpose — a dome IS the haze, and hazing it toward the haze
+flattens the ramp it exists to draw. An untouched depth buffer is exactly 1.0
+and no piece of world ever is, so `raw < 0.999999` is exact and free.
+
+### 3. The crease — `crease`
+
+This is the ambient occlusion this codebase has never had. The rim's own header
+says it in words — *"no rim term, no fresnel, no ambient occlusion and no
+contact shadow anywhere in this game"* — and `contact` (v-presence), which
+arrived after it, is a twelve-slot pool of ground patches UNDER OBJECTS on the
+**32 of 108** surfaces that opted in. It cannot darken a box against a box, a
+wall against its own pavement, or the inside of an arch.
+
+Eight taps, **four opposed pairs**, and the pairing is the whole algorithm:
+
+- **A FLAT PLANE SEEN AT A GRAZING ANGLE** is the case that matters, because
+  the biggest grazing plane in every frame of this game is the ground and it is
+  half the picture. A single tap on a steeply inclined surface finds a
+  neighbour tens of centimetres nearer and calls it a corner. Measured, the
+  naive version took Sydney's lawn down **2.8 of 255** across the whole lower
+  third — a shading term that darkens a flat plane is not an occlusion term, it
+  is a filter. On any flat surface, whatever its inclination, one side of an
+  opposed pair is nearer by exactly as much as the other is further, so the
+  **minimum of the pair is zero**; in a real concave corner both sides come
+  toward the lens and both are positive. After the fix the same measurement
+  reads **0.001 of 255**.
+- **A SILHOUETTE IS NOT A CREASE.** A neighbour four hundred metres in front of
+  this pixel is a roofline against the sky, and darkening that draws a black
+  outline round it — the one thing the aesthetic law names. Each weight ramps
+  in over `MAIN_CREASE_RANGE` and back out over six times it.
+
+The radius is **world-constant**, not screen-constant (`uFocalPx` metres-to-
+pixels at one metre, over the distance): a fixed pixel radius gives a near wall
+a hairline and a far one a black band. `MAIN_CREASE_R` (0.14 m) and
+`MAIN_CREASE_RANGE` (0.30 m) are lens constants and deliberately NOT
+per-chapter, like `sysSHOULDER` — every chapter wants a corner to be a corner.
+Only the strength is a row.
+
+### 4. `sysDEPTH`, and why the focus is a MULTIPLE
+
+Six numbers per chapter: `dof`, `dofK`, `nearK`, `air`, `airMax`, `crease`.
+`dofK` and `nearK` are multiples of the **distance from the lens to the
+animal**, because that distance is six metres at a wall, twelve on a lawn,
+thirty at a helm and seventy under a balloon, and a focus plane written in
+metres would be behind the camera in one of those and past the fog in another.
+
+**THE ROW IS NOT CROSS-FADED and is not in `sysGRADE_KEYS`.** A grade is a look
+and looks may dissolve; a focus distance and a haze coefficient are geometry,
+and lerping two chapters' geometry across a swap gives half a second of a focus
+plane that belongs to neither place. The swap happens inside `biomeFadeTo`'s
+white hold.
+
+The subject distance is **clamped to 11..60 m** and lightly damped (a camera
+that swings round a corner pulls focus rather than snapping it). Eleven is the
+floor because the rig holds twelve in seventeen of nineteen chapters; at eight,
+Antarctica and Manly both sat ON the floor and the Antarctic boat — thirty
+metres out, and where a task sends you — came back visibly soft. **A focus
+field that defocuses the thing the card is pointing at is a bug however good it
+looks.**
+
+### THE SWITCHES
+
+`noDepth`, `noDof`, `noAir`, `noCrease` on `game.state`. All four **CUT rather
+than fade**, for the reason the lens pass wrote down.
+
+### WHAT MEASURED WRONG FIRST
+
+1. **THE NEAR BLUR WAS AIMED IN FRONT OF THE PICTURE.** The first table put it
+   at 2.8..7.5 m and the far ramp at 27.8..83.3, all guessed from the camera
+   height and the pitch. `qa/depth-map.js` raycasts a 3×5 NDC grid and the real
+   resting frame is **9.3 m at the bottom edge, 12 m at the animal, 16–18 m at
+   the centre, 27–42 m at the upper third**. So the near half was entirely in
+   front of the nearest visible thing and the far half only touched the top
+   quarter. It measured as −5.7% gradient energy in the top band and
+   **byte-identical** in the other two, which is exactly what a focus field
+   aimed past the frame should measure. Off the real numbers: **−22.8% top,
+   −17.8% bottom, −1.1% middle** — soft ends, sharp subject, which is the
+   signature of a lens rather than of a blur.
+2. **SYDNEY'S SKY DOME WAS THE ONLY ONE IN THE GAME THAT WROTE DEPTH.** A 300 m
+   sphere inside a 400 m frustum, so the first sky gate (a rolloff at 0.9 of
+   the far plane) never fired on it and the chapter came back milky. It is
+   `depthWrite: false` now like the other four, which also removes a latent
+   depth-clip on anything the harbour put past three hundred metres. **Cloned
+   first** — `mat()` hands back a shared cached material.
+3. **THE AIR COLUMN WAS AUTHORED AT ROUGHLY TWICE WHAT IT IS WORTH.** 0.0038/m
+   under a 0.26 ceiling put 26% of the horizon colour on anything past eighty
+   metres, and Sydney's harbour is eighty to a hundred and fifty out. It came
+   back grey-green. Aerial perspective is real and it does desaturate, but that
+   blue is one of the things the chapter is FOR. **Chroma is the metric, not
+   luminance** — a mix toward a pale haze RAISES the mean, so the luminance
+   probe could not see the cost it was paying.
+
+   `qa/depth-chroma.js` measures the air term ALONE (the defocus also lowers
+   local max-minus-min, and that is a blur and not a desaturation; mixing the
+   two spends the budget on the wrong term) in all nineteen. **Sydney at −14%
+   in the top band is the calibration point** — that is the arm judged
+   acceptable by eye. Eleven chapters were past −12% on the first pass and
+   eight were retuned; the table now runs −1% to −20%, with Monte Carlo (−25)
+   and Hanoi (−24) deliberately over because in both of those the haze is the
+   subject. The mid band, which is where the game is, is −1 to −11 everywhere.
+4. **NO PROBE THAT CALLS `game.tick()` CAN ISOLATE ANY OF THIS.** Even at
+   `dt = 0` the camera moved 0.16 m across five arms. `post.render()` re-renders
+   the same scene through the same camera and does nothing else, and
+   `sysDressFrame` cannot overwrite the params because it never runs. And every
+   arm must be **captured before any of them is decoded**: `await` yields to the
+   event loop, the event loop is where rAF lives, and the real game steps
+   between arms. With both, the camera is identical to four decimal places in
+   every row — which is the assertion, and it is in the output.
+
+### AND THE SECOND SHADOW CASCADE WAS RETIRED BY MEASUREMENT
+
+`sysSHADOW_HALF` is 22, so the sun's shadow frustum is a **44 m box centred on
+the animal** and nothing further than that casts a shadow at all, at any time,
+in any chapter. In the wide places — the Pantanal, the Erg, the Piazza, the
+pack ice — that is most of the frame, and it is why the far field read as one
+flat sheet. It was on the list for this pass as a second, wider, lower-
+resolution cascade: one more shadow render per frame.
+
+**It is not being built, because the air and the crease already carry the
+distance and a cascade would be paying a whole extra pass for something no
+longer visible.** Compare `qa/VR30-15-pantanal.png` with
+`qa/D45-15-pantanal.png`: the Transpantaneira used to run two hundred metres to
+the horizon at exactly the value it started at, and now it recedes. Anything a
+cascade drew out there would be drawn behind a haze and inside a defocus.
+
+Same reasoning as the sun glow in `/presence 2`. If the far field is ever
+brought back into focus — a chapter with a long lens, or a marquee shot down a
+valley — this is the first thing to reconsider, and the note is here so it can
+be.
+
+### WHAT IT COST
+
+Frame time **16.2–16.8 ms median, 18.2–20.1 ms p95 in all nineteen** — a locked
+sixty, unchanged, `qa/depth-sweep.js`, zero errors, and every row asserting its
+own biome. The composite-pass delta
+(`qa/depth-perf.js`, `post.render()` × 60 with a `readPixels` at each end,
+interleaved, medians of five) is **+0.01 to +0.46 ms**, worst in Mong Kok.
+**The instrument's own noise floor is about ±0.1 ms** — three of the five
+per-term deltas came back negative, which is impossible — so the per-term
+breakdown is not trustworthy and only the total is quoted.
+
+Two render targets at a quarter (about 1.4 MB at 1600×900) and, when `dof` is
+on, five quarter-res passes.
+
 ## THE FEEL PASS (v44 — 30 Aug 2026)
 
 Five things aimed at the ninety per cent of this game that is not a task: moving

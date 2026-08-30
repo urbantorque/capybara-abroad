@@ -759,18 +759,110 @@ const MAIN_POST_BRIGHT = MAIN_POST_HEAD + '\n' + [
   '}',
 ].join('\n');
 
+// FOUR CHANNELS AND NOT THREE. The bloom chain only ever cared about rgb, and
+// for it this is arithmetically what it always was: the binomial weights sum to
+// 0.99999, so the 1.0 the bright pass writes into alpha comes back out as 1.0
+// and nothing downstream reads it anyway. The defocus chain is why — its buffer
+// is COVERAGE-PREMULTIPLIED (rgb * coc, coc), and a blur that drops the fourth
+// channel cannot carry a premultiplied image. One shader, two customers.
 const MAIN_POST_BLUR = MAIN_POST_HEAD + '\n' + [
   'uniform sampler2D tDiffuse;',
   'uniform vec2 uStep;',
   'void main() {',
   // 9-tap binomial folded to 5 reads by landing the outer taps between texels
   // and letting the bilinear filter do the pairwise sum for free.
-  '  vec3 c = texture(tDiffuse, vUv).rgb * 0.2270270270;',
-  '  c += texture(tDiffuse, vUv + uStep * 1.3846153846).rgb * 0.3162162162;',
-  '  c += texture(tDiffuse, vUv - uStep * 1.3846153846).rgb * 0.3162162162;',
-  '  c += texture(tDiffuse, vUv + uStep * 3.2307692308).rgb * 0.0702702703;',
-  '  c += texture(tDiffuse, vUv - uStep * 3.2307692308).rgb * 0.0702702703;',
-  '  fragColor = vec4(c, 1.0);',
+  '  vec4 c = texture(tDiffuse, vUv) * 0.2270270270;',
+  '  c += texture(tDiffuse, vUv + uStep * 1.3846153846) * 0.3162162162;',
+  '  c += texture(tDiffuse, vUv - uStep * 1.3846153846) * 0.3162162162;',
+  '  c += texture(tDiffuse, vUv + uStep * 3.2307692308) * 0.0702702703;',
+  '  c += texture(tDiffuse, vUv - uStep * 3.2307692308) * 0.0702702703;',
+  '  fragColor = c;',
+  '}',
+].join('\n');
+
+// ---------------------------------------------------------------------------
+// THE DEPTH TERMS (v45). See THE DEPTH PASS in CONTRACT.md.
+//
+// Until now there was NOTHING in the buffer but colour, and three of the four
+// things most obviously missing from a still of this game all wanted the same
+// one texture:
+//
+//   - every frame is uniformly sharp from two metres to the fog, so a
+//     photograph of the Piazzetta has sixty people in it and nowhere for the
+//     eye to land;
+//   - `scene.fog` is LINEAR and starts at 78-90 m, and the camera is six
+//     metres up with the whole of the game happening between 3 and 40, so
+//     aerial perspective — the cheapest depth cue there is — is switched off
+//     exactly where the game is;
+//   - and there is no ambient occlusion anywhere in this codebase. `contact`
+//     (v-presence) is a twelve-slot pool of ground patches UNDER OBJECTS on
+//     the 32 of 108 surfaces that opted in; it cannot darken a box against a
+//     box, a wall against its own pavement, or the inside of an arch.
+//
+// The depth is already being written — sceneRT has always had a depth buffer,
+// it was simply thrown away. Attaching a DepthTexture to it costs the resolve
+// and nothing else, and MEASURED (qa/depthprobe.js) it resolves correctly off
+// the samples:4 multisampled target in both arms, glErr 0, range 0..245.
+//
+// All three terms are a no-op at their default and every one of them has a
+// switch on game.state that CUTS rather than fades, for the reason the lens
+// pass wrote down: a probe reads two frames at dt = 0 and a damped switch does
+// not move in two frames.
+// ---------------------------------------------------------------------------
+const MAIN_POST_DEPTH_FN = [
+  // Window-space z back to a positive distance along the view axis, in metres.
+  // The sky dome writes NO depth (depthWrite false, renderOrder -20), so the
+  // sky arrives here as the clear value and reads as exactly `far` — which is
+  // what it is, and which is what lets every term below gate itself off it.
+  'float mainViewZ(float d, float n, float f) {',
+  '  float z = d * 2.0 - 1.0;',
+  '  return (2.0 * n * f) / (f + n - z * (f - n));',
+  '}',
+  // CIRCLE OF CONFUSION, 0..1, geometry only — the STRENGTH is applied at the
+  // mix in the composite and never here, because this number is also the
+  // coverage weight the premultiplied blur is normalised by, and a weight
+  // scaled by an artistic strength is not a weight.
+  //
+  // uDof is (nearStart, nearEnd, farStart, farEnd) in metres. The near half is
+  // switched off by passing (-1, 0), which makes its smoothstep 1 for every
+  // positive distance and the term exactly zero — a cut, not a small number.
+  'float mainCoC(float d, vec4 uDof) {',
+  '  float fa = smoothstep(uDof.z, uDof.w, d);',
+  '  float ne = 1.0 - smoothstep(uDof.x, uDof.y, d);',
+  '  return clamp(max(fa, ne), 0.0, 1.0);',
+  '}',
+].join('\n');
+
+// The coverage-premultiplied quarter-res downsample that feeds the defocus.
+//
+// WHY PREMULTIPLIED, AND WHY THE CoC IS PER TAP. A plain quarter-res blur of
+// the scene smears the SHARP foreground outward, and the composite then reads
+// that smear wherever CoC is high — so a crisp capybara against a defocused
+// square acquires a brown halo. Weighting every tap by its own CoC and
+// normalising at the far end means an in-focus pixel contributes nothing to
+// the blurred image at all, which is the whole of the fix. Taking the CoC per
+// tap rather than from an averaged depth is the same argument one level down:
+// an averaged depth across a silhouette is a distance at which nothing exists.
+const MAIN_POST_COC = MAIN_POST_HEAD + '\n' + [
+  'uniform sampler2D tDiffuse;',
+  'uniform sampler2D tDepth;',
+  'uniform vec2 uTexel;',
+  'uniform vec2 uCam;',
+  'uniform vec4 uDof;',
+  MAIN_POST_DEPTH_FN,
+  'vec4 mainTap(vec2 uv) {',
+  '  float d = mainViewZ(texture(tDepth, uv).x, uCam.x, uCam.y);',
+  '  float c = mainCoC(d, uDof);',
+  '  return vec4(texture(tDiffuse, uv).rgb * c, c);',
+  '}',
+  'void main() {',
+  // The same four quadrant centres the bright pass uses, and for the same
+  // reason: an exact 4x4 box average for four bilinear reads.
+  '  vec4 a = mainTap(vUv + uTexel * vec2( 1.0,  1.0));',
+  '  a += mainTap(vUv + uTexel * vec2(-1.0,  1.0));',
+  '  a += mainTap(vUv + uTexel * vec2( 1.0, -1.0));',
+  '  a += mainTap(vUv + uTexel * vec2(-1.0, -1.0));',
+  '  fragColor = a * 0.25;',
   '}',
 ].join('\n');
 
@@ -790,13 +882,130 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform vec3  uLift;',
   'uniform vec3  uSplitS;',
   'uniform vec3  uSplitH;',
+  // ---- the v45 depth terms. uDepthOn is 0 in a chapter that asks for none of
+  // them, and the whole block below is then not merely zero but UNREACHED —
+  // the depth texture is never sampled, so a chapter that opts into nothing
+  // pays nothing and an A/B against it is honest.
+  'uniform sampler2D tDepth;',
+  'uniform sampler2D tDof;',
+  'uniform float uDepthOn;',
+  'uniform vec2  uCam;',
+  'uniform vec2  uPx;',
+  'uniform float uFocalPx;',
+  'uniform float uDofK;',
+  'uniform vec4  uDof;',
+  'uniform float uAirK;',
+  'uniform float uAirMax;',
+  'uniform vec3  uAirCol;',
+  'uniform float uCreaseK;',
+  'uniform vec2  uCrease;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
+  MAIN_POST_DEPTH_FN,
+  // FOUR OPPOSED PAIRS. Index 2i and 2i+1 are the same axis in opposite
+  // directions, and that pairing is the entire algorithm — see below. Two
+  // scales, so a corner is sampled coarse and fine without a per-pixel
+  // rotation, which is the usual trick and which this game cannot afford:
+  // there is no denoiser anywhere in the chain and a rotated ring is noise.
+  'const vec2 MAIN_CR[8] = vec2[8](',
+  '  vec2( 1.0,   0.0  ), vec2(-1.0,  -0.0  ),',
+  '  vec2( 0.0,   1.0  ), vec2(-0.0,  -1.0  ),',
+  '  vec2( 0.389, 0.389), vec2(-0.389,-0.389),',
+  '  vec2( 0.389,-0.389), vec2(-0.389, 0.389));',
+  // THE TWO THINGS THIS HAS TO TELL APART FROM A CREASE, AND HOW.
+  //
+  // 1. A FLAT PLANE SEEN AT A GRAZING ANGLE. This is the one that matters,
+  //    because the biggest grazing plane in every frame of this game is the
+  //    GROUND, and it is half the picture. A single tap on a steeply inclined
+  //    surface finds a neighbour tens of centimetres nearer and calls it a
+  //    corner, so the naive version of this function darkens every lawn,
+  //    every pavement and every dune — measured, it took Sydney's grass down
+  //    2.8 of 255 across the whole lower third, and a shading term that
+  //    darkens a flat plane is not an occlusion term, it is a filter.
+  //
+  //    THE OPPOSED PAIR IS THE DISCRIMINATOR. On any flat surface, whatever
+  //    its inclination, one side of a pair is nearer by exactly as much as
+  //    the other is further — so one of the two weights is zero, and their
+  //    MINIMUM is zero. In a real concave corner BOTH sides come toward the
+  //    lens and both weights are positive. min() of the pair is therefore
+  //    free (the taps were already being read) and exact for the case that
+  //    was doing the damage.
+  //
+  // 2. A SILHOUETTE. A neighbour four hundred metres in front of this pixel
+  //    is the edge of a building against the sky, and darkening that draws a
+  //    black outline round every roofline in the game — which is the one
+  //    thing the aesthetic law names. So each weight ramps IN over uCrease.y
+  //    and back OUT again over six times it.
+  //
+  // The radius is WORLD-CONSTANT and not screen-constant: uFocalPx metres-to-
+  // pixels at one metre, divided by the distance. A fixed pixel radius gives a
+  // near wall a hairline and a far one a black band, which reads as the effect
+  // being distance-dependent — which it is not.
+  'float mainCrW(float d0, vec2 uv, vec2 o) {',
+  '  float dn = mainViewZ(texture(tDepth, uv + o).x, uCam.x, uCam.y);',
+  '  float df = d0 - dn;',
+  '  return smoothstep(0.0, uCrease.y, df) *',
+  '         (1.0 - smoothstep(uCrease.y, uCrease.y * 6.0, df));',
+  '}',
+  'float mainCrease(float d0, vec2 uv) {',
+  '  float rpx = clamp(uFocalPx * uCrease.x / max(d0, 0.05), 1.5, 24.0);',
+  '  vec2 r = rpx * uPx;',
+  '  float occ = 0.0;',
+  '  for (int i = 0; i < 8; i += 2) {',
+  '    occ += min(mainCrW(d0, uv, MAIN_CR[i]     * r),',
+  '               mainCrW(d0, uv, MAIN_CR[i + 1] * r));',
+  '  }',
+  '  return occ * 0.25;',
+  '}',
   'vec3 mainSRGB(vec3 c) {',
   '  c = clamp(c, 0.0, 1.0);',
   '  return mix(c * 12.92, 1.055 * pow(c, vec3(0.4166666667)) - 0.055, step(vec3(0.0031308), c));',
   '}',
   'void main() {',
   '  vec3 lin = texture(tDiffuse, vUv).rgb;',
+  // ---- THE THREE DEPTH TERMS, ALL BEFORE THE BLOOM -----------------------
+  // Before, because all three of them are things that happen to the light on
+  // its way to the lens and the bloom is what the lens does with what arrives.
+  // A haze applied after the bloom washes the bloom; a defocus applied after
+  // it sharpens a halo that is already a blur.
+  '  if (uDepthOn > 0.5) {',
+  '    float raw = texture(tDepth, vUv).x;',
+  '    float d = mainViewZ(raw, uCam.x, uCam.y);',
+  // 1. DEFOCUS. The mix uses the FULL-RES CoC at this pixel, not the quarter-
+  //    res one from the premultiplied buffer, so an in-focus pixel stays
+  //    exactly the pixel it was — no quarter-res lattice on a sharp subject.
+  '    float coc = 0.0;',
+  '    if (uDofK > 0.0005) {',
+  '      coc = mainCoC(d, uDof);',
+  '      vec4 b = texture(tDof, vUv);',
+  '      lin = mix(lin, b.rgb / max(b.a, 0.001), coc * uDofK);',
+  '    }',
+  // 2. CREASE. Faded out by the defocus that has just been applied: a sharp
+  //    dark seam inside a blurred background is the one way this term shows
+  //    itself as a post effect rather than as shape.
+  '    if (uCreaseK > 0.0005) {',
+  '      float oc = mainCrease(d, vUv) * uCreaseK * (1.0 - coc * uDofK);',
+  '      lin *= 1.0 - oc;',
+  '    }',
+  // 3. THE AIR. Exponential and starting at ZERO, which is the half that
+  //    scene.fog — linear, and not beginning until 78-90 m — has never been
+  //    able to say. Capped, because past a point the fog is the better
+  //    instrument and two of them fighting is a band on the horizon.
+  //
+  //    AND THE SKY IS EXEMPT, off the RAW depth rather than a distance.
+  //    Every sky dome in this game is `fog: false` on purpose — a dome IS the
+  //    haze, and hazing it toward the haze flattens the zenith-to-horizon ramp
+  //    it exists to draw. The first version of this gate rolled off at 0.9 of
+  //    the far plane and did not work: Sydney's dome is a 300 m sphere inside
+  //    a 400 m frustum, so it sat at 0.75 and took the full airMax, which is
+  //    the entire reason that chapter came back milky. An untouched depth
+  //    buffer is exactly 1.0 and no piece of world ever is, so testing the raw
+  //    value is both exact and free — and it costs nothing on the domes that
+  //    do write depth, because they are handled a line below.
+  '    if (uAirK > 0.000001 && raw < 0.999999) {',
+  '      float a = min(1.0 - exp(-d * uAirK), uAirMax);',
+  '      lin = mix(lin, uAirCol, a);',
+  '    }',
+  '  }',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
   // THE SECOND OCTAVE. See the header: the tight one is the glow ON a light,
   // this is the air AROUND it, and a lamp without it is a white sticker.
@@ -858,6 +1067,26 @@ const MAIN_SPLIT_COOL = [-0.55, -0.10,  1.00];
 // referenced to it so a chapter looks the way it was authored on a monitor
 // that is not this one — see the note in post.render.
 const MAIN_POST_REF_H = 720;
+
+// HOW BIG A CREASE IS, AND WHAT COUNTS AS ONE. Both are properties of the lens
+// rather than of the place, for the same reason sysSHOULDER is: every chapter
+// in this game wants a corner to be a corner. Only the STRENGTH is per-chapter.
+//
+// 0.14 m is the radius the ring samples at, in WORLD units — about the width of
+// the gap where a crate meets a crate, and about a tenth of the capybara. The
+// range is what separates a corner from a silhouette: a neighbour up to 0.30 m
+// in front of this pixel is geometry folding, past about 1.8 m it is a different
+// object entirely and gets no weight at all.
+const MAIN_CREASE_R = 0.14;
+const MAIN_CREASE_RANGE = 0.30;
+
+// How wide the defocus blur is, in quarter-res texels at MAIN_POST_REF_H. It
+// is a lens constant and not a grade row because HOW BLURRED the out-of-focus
+// part of a photograph is, is a property of the aperture; WHERE the focus
+// falls is the thing a chapter has an opinion about, and that is what
+// params.dofFar0/1 carry. 1.6 lands a forty-metre background at about three
+// pixels of circle at 720 — a softness rather than an effect.
+const MAIN_DOF_RADIUS = 1.6;
 const mainPostSize = new THREE.Vector2();
 // A 1x1 black texture standing in for the bloom buffer when bloom is off, so
 // the composite shader never samples an unbound sampler.
@@ -878,6 +1107,18 @@ function mainMakePost(game) {
       // octave, no split, the shoulder at 1.0 (which IS the old hard clamp) and
       // a vignette that only darkens.
       wide: 0.0, splitW: 0.0, splitC: 0.0, shoulder: 1.0, vigTone: 0.0,
+      // The three added by the v45 depth pass, and their no-op values. All
+      // three at zero does not merely multiply out — it takes uDepthOn to 0
+      // and the depth texture is not sampled at all.
+      //   dof        how much of the defocused image is mixed in at full CoC
+      //   dofNear/Far  metres. systems.js derives them from the distance to
+      //                the subject, so the focus follows the animal onto a
+      //                condor or a balloon without a table saying so.
+      //   air        haze per metre, and airMax the ceiling it may reach
+      //   crease     how deep a corner may go, 0 .. ~0.35
+      dof: 0.0, dofNear0: -1, dofNear1: 0, dofFar0: 1e6, dofFar1: 2e6,
+      air: 0.0, airMax: 0.0, airR: 1, airG: 1, airB: 1,
+      crease: 0.0,
     },
     render() { renderer.setRenderTarget(null); renderer.render(game.scene, game.camera); },
     resize() {},
@@ -885,12 +1126,27 @@ function mainMakePost(game) {
   };
 
   let sceneRT = null, bloomA = null, bloomB = null, wideA = null, wideB = null;
+  let dofA = null, dofB = null, sceneDepth = null;
   let quadScene = null, quadCam = null, quad = null;
-  let matBright = null, matBlur = null, matComp = null;
+  let matBright = null, matBlur = null, matComp = null, matCoC = null;
   let vw = 0, vh = 0, bw = 0, bh = 0, ww = 0, wh = 0;
 
   try {
     if (!renderer.capabilities.isWebGL2) throw new Error('needs WebGL2');
+
+    // THE DEPTH THIS TARGET HAS ALWAYS WRITTEN AND ALWAYS THROWN AWAY.
+    // 24-bit unsigned integer: at a 0.5 m near plane the coarsest chapter in
+    // the game (Goreme, far 2200) still resolves under a millimetre at forty
+    // metres, which is two orders of magnitude finer than the smallest thing
+    // any term below asks about. Probed on the real target before any of this
+    // was written — see qa/depthprobe.js — because a multisampled depth
+    // attachment has to be RESOLVED, and a driver that declines to do it would
+    // have taken the whole pass down.
+    sceneDepth = new THREE.DepthTexture(2, 2);
+    sceneDepth.type = THREE.UnsignedIntType;
+    sceneDepth.format = THREE.DepthFormat;
+    sceneDepth.minFilter = THREE.NearestFilter;
+    sceneDepth.magFilter = THREE.NearestFilter;
 
     sceneRT = new THREE.WebGLRenderTarget(2, 2, {
       type: THREE.HalfFloatType,
@@ -899,6 +1155,7 @@ function mainMakePost(game) {
       magFilter: THREE.LinearFilter,
       depthBuffer: true,
       stencilBuffer: false,
+      depthTexture: sceneDepth,
       samples: 4,
     });
     const half = {
@@ -914,6 +1171,9 @@ function mainMakePost(game) {
     // the frame and the difference between a bulb and a lamp.
     wideA = new THREE.WebGLRenderTarget(2, 2, half);
     wideB = new THREE.WebGLRenderTarget(2, 2, half);
+    // The defocus ping-pong, at a quarter, carrying (rgb * coc, coc).
+    dofA = new THREE.WebGLRenderTarget(2, 2, half);
+    dofB = new THREE.WebGLRenderTarget(2, 2, half);
 
     // One triangle, in clip space, with uv baked in. No matrices, no camera
     // maths, and no chance of the quad being frustum-culled out of its own pass.
@@ -943,6 +1203,12 @@ function mainMakePost(game) {
     matBlur = raw(MAIN_POST_BLUR, {
       tDiffuse: { value: null }, uStep: { value: new THREE.Vector2() },
     });
+    matCoC = raw(MAIN_POST_COC, {
+      tDiffuse: { value: null }, tDepth: { value: null },
+      uTexel: { value: new THREE.Vector2() },
+      uCam: { value: new THREE.Vector2(0.5, 400) },
+      uDof: { value: new THREE.Vector4(-1, 0, 1e6, 2e6) },
+    });
     matComp = raw(MAIN_POST_COMP, {
       tDiffuse: { value: null }, tBloom: { value: mainPostBlack },
       tWide: { value: mainPostBlack },
@@ -953,6 +1219,17 @@ function mainMakePost(game) {
       uLift: { value: new THREE.Vector3(0, 0, 0) },
       uSplitS: { value: new THREE.Vector3(1, 1, 1) },
       uSplitH: { value: new THREE.Vector3(1, 1, 1) },
+      tDepth: { value: null }, tDof: { value: mainPostBlack },
+      uDepthOn: { value: 0 },
+      uCam: { value: new THREE.Vector2(0.5, 400) },
+      uPx: { value: new THREE.Vector2() },
+      uFocalPx: { value: 800 },
+      uDofK: { value: 0 },
+      uDof: { value: new THREE.Vector4(-1, 0, 1e6, 2e6) },
+      uAirK: { value: 0 }, uAirMax: { value: 0 },
+      uAirCol: { value: new THREE.Vector3(1, 1, 1) },
+      uCreaseK: { value: 0 },
+      uCrease: { value: new THREE.Vector2(MAIN_CREASE_R, MAIN_CREASE_RANGE) },
     });
 
     quad = new THREE.Mesh(tri, matBright);
@@ -987,9 +1264,13 @@ function mainMakePost(game) {
     bloomB.setSize(bw, bh);
     wideA.setSize(ww, wh);
     wideB.setSize(ww, wh);
+    dofA.setSize(bw, bh);
+    dofB.setSize(bw, bh);
     // The bright pass's taps are in FULL-resolution texels — it is reading
-    // sceneRT, not the target it is writing.
+    // sceneRT, not the target it is writing. So are the CoC pass's.
     matBright.uniforms.uTexel.value.set(1 / vw, 1 / vh);
+    matCoC.uniforms.uTexel.value.set(1 / vw, 1 / vh);
+    matComp.uniforms.uPx.value.set(1 / vw, 1 / vh);
   };
   post.resize();
 
@@ -1005,6 +1286,69 @@ function mainMakePost(game) {
     renderer.setRenderTarget(sceneRT);
     renderer.clear();
     renderer.render(game.scene, game.camera);
+
+    // ---- THE DEPTH TERMS ---------------------------------------------------
+    // The camera's own planes, read here rather than pushed from systems.js:
+    // `far` is per-chapter (400 in Sydney, 2200 over Goreme) and the helm and
+    // the condor move it again, and a linearisation that is one frame behind
+    // the projection it is inverting is a haze that jumps on a biome edge.
+    const cam = game.camera;
+    const wantDepth = !game.state.noDepth &&
+                      (p.dof > 0.0005 || p.air > 0.000001 || p.crease > 0.0005);
+    const cu = matComp.uniforms;
+    cu.uDepthOn.value = wantDepth ? 1 : 0;
+    // Bound unconditionally. uDepthOn already stops it being READ, and a
+    // sampler left null is a sampler three binds its own empty texture to —
+    // which works, and which means a genuinely unbound depth texture and a
+    // switched-off one look identical the day one of them is a bug.
+    cu.tDepth.value = sceneDepth;
+    if (wantDepth) {
+      cu.uCam.value.set(cam.near, cam.far);
+      // Metres-to-pixels at one metre: half the drawing-buffer height over the
+      // tangent of half the vertical field of view. This is what makes the
+      // crease radius a WORLD size instead of a screen one, and it has to be
+      // recomputed every frame because the eye-raise and the helm both move
+      // the fov.
+      cu.uFocalPx.value = (vh * 0.5) /
+        Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
+      cu.uCreaseK.value = game.state.noCrease ? 0 : p.crease;
+      cu.uAirK.value = game.state.noAir ? 0 : p.air;
+      cu.uAirMax.value = p.airMax;
+      cu.uAirCol.value.set(p.airR, p.airG, p.airB);
+
+      const dofK = game.state.noDof ? 0 : p.dof;
+      cu.uDofK.value = dofK;
+      if (dofK > 0.0005) {
+        cu.uDof.value.set(p.dofNear0, p.dofNear1, p.dofFar0, p.dofFar1);
+        const q = matCoC.uniforms;
+        q.tDiffuse.value = sceneRT.texture;
+        q.tDepth.value = sceneDepth;
+        q.uCam.value.copy(cu.uCam.value);
+        q.uDof.value.copy(cu.uDof.value);
+        mainPostDraw(matCoC, dofA);
+        // Two H/V pairs, the second at 2.4x, exactly as the bloom does — and
+        // on the same shader, which is why it had to learn a fourth channel.
+        // The offsets are anchored to MAIN_POST_REF_H for the reason the bloom
+        // is: a quarter-res texel is a smaller piece of the picture on a
+        // bigger monitor, and a defocus that shrinks as the window grows is a
+        // defocus that only exists at one size.
+        const dy = MAIN_DOF_RADIUS * Math.min(2, vh / MAIN_POST_REF_H) / bh;
+        const dx = dy * (vh / vw);
+        const u = matBlur.uniforms;
+        u.tDiffuse.value = dofA.texture; u.uStep.value.set(dx, 0);       mainPostDraw(matBlur, dofB);
+        u.tDiffuse.value = dofB.texture; u.uStep.value.set(0, dy);       mainPostDraw(matBlur, dofA);
+        u.tDiffuse.value = dofA.texture; u.uStep.value.set(dx * 2.4, 0); mainPostDraw(matBlur, dofB);
+        u.tDiffuse.value = dofB.texture; u.uStep.value.set(0, dy * 2.4); mainPostDraw(matBlur, dofA);
+        cu.tDof.value = dofA.texture;
+      } else {
+        cu.tDof.value = mainPostBlack;
+      }
+    } else {
+      // Cut, not faded, and the samplers go back to the 1x1 black so nothing
+      // downstream can be reading a stale target.
+      cu.uDofK.value = 0; cu.uAirK.value = 0; cu.uCreaseK.value = 0;
+      cu.tDof.value = mainPostBlack;
+    }
 
     if (p.bloom > 0.0005) {
       matBright.uniforms.tDiffuse.value = sceneRT.texture;

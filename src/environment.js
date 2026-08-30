@@ -1996,7 +1996,7 @@ export function createEnvironment(game) {
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
   const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
-                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, nearScale: 8, contact: 1 });
+                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, nearScale: 8, contact: 1, broad: 0.11, broadM: 17 });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.
@@ -2016,7 +2016,23 @@ export function createEnvironment(game) {
   }
   skyGeo.setAttribute('color', new THREE.BufferAttribute(skyCol, 3));
   // flatShading:false — a faceted Lambert dome bands badly under the sun.
-  const sky = new THREE.Mesh(skyGeo, mat(envVC_BASE, { vertexColors: true, fog: false, side: THREE.BackSide, flatShading: false }));
+  //
+  // depthWrite:false — A SKYBOX IS NOT A PIECE OF WORLD, and this was the only
+  // dome in the game still saying it was. The other four (the shared one in
+  // systems.js, the Drift's stars and moon, Cappadocia's sunrise) have always
+  // written no depth; this one wrote at a 300 m radius inside a 400 m frustum,
+  // which silently depth-clipped anything the harbour put past three hundred
+  // metres. It also made the v45 air term impossible to gate: the exemption
+  // that keeps haze off a `fog:false` dome tests for an untouched depth buffer,
+  // and this dome was the one sky in nineteen chapters that failed it — which
+  // is why Sydney, and only Sydney, came back milky the first time the term
+  // was switched on.
+  // CLONED, for the reason grain() clones: mat() hands back a SHARED cached
+  // material and writing a flag onto it writes it onto every other mesh that
+  // asked for the same colour and options.
+  const skyMat = mat(envVC_BASE, { vertexColors: true, fog: false, side: THREE.BackSide, flatShading: false }).clone();
+  skyMat.depthWrite = false;
+  const sky = new THREE.Mesh(skyGeo, skyMat);
   sky.frustumCulled = false;
   sky.renderOrder = -10;
   root.add(sky);
