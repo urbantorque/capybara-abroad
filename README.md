@@ -466,24 +466,81 @@ rather than a trophy for finishing. And **Escape closes it and the world is stil
 there.** Reloading was the only thing you could ever do with the end of this game,
 and a sandbox whose ending throws the sandbox away has it the wrong way round.
 
+## The front door
+
+Fifty-one versions went into the nineteen places. This one went into the two
+minutes before you get to them, because a review that went looking for something
+wrong with the game did not find it — nineteen chapters, zero errors, zero NaN,
+sixty frames a second in all of them — and then found that **the file this README
+told you to double-click could not start without the internet, and said nothing
+at all when it could not.**
+
+Three different failures all ended on the same pale blue card reading `warming up
+the harbour…`, for ever: no WebGL, a blocked CDN, or a throw during boot. The
+first two are what a stranger behind an ad-blocker, on an office network, or on a
+train actually gets. There was no message, no error and nothing to click, and the
+honest reading of that screen is that the game is broken.
+
+Three.js and cannon-es live in `vendor/` now, so the only host involved in
+starting the game is the one serving the game, and `dist/untitled-capybara-game.html`
+really is the single self-contained file its own build step has always claimed it
+was — it opens from `file://` on a laptop with the wifi off. When something *does*
+go wrong there is a card in the game's own palette that says which of the three it
+was, what to try, and has a button on it.
+
+And the graphics card is now allowed to go away. Nothing in the tree had ever
+listened for a lost WebGL context — it happens when a driver restarts, when a
+laptop wakes up, when another tab takes the memory — and the result was a black
+rectangle with the checklist still drawn over the top of it and every key still
+working, which is the worst way for anything to fail, because it looks like you
+are the one doing it wrong.
+
+**And a phone was being told to press keys.** The touch scheme has been real for
+a long time; it had simply never been written down anywhere the person using it
+would look. The title card listed seven keyboard controls, and thirty-nine of the
+hundred and ninety-one hints said things like *press E at the fire* — an
+instruction that cannot be carried out, which is the most confusing thing a hint
+can do, because you believe it and go looking for what you are missing. Both are
+in the scheme you actually have now. The **slide** got a button, the camera got a
+**pinch**, and — the one that matters — so did **put me back**. That rescue was
+written precisely so a three-hour game would not have a state whose only answer is
+reloading the page, and on a phone it had one anyway.
+
+The rest of the way to a published game is in [ROADMAP.md](ROADMAP.md). The short
+version is that there is no `LICENSE` file, and that is the one thing left that is
+not a technical decision.
+
 ## Play
 
-**Single file, no build, no server:**
+**You need:** any current browser with WebGL — Chrome, Edge, Firefox or Safari. No
+install, no account, no plugin. It runs on integrated graphics; the render
+resolution backs itself off if the frame rate drops, so a slower machine gets a
+softer picture rather than a slideshow.
+
+**One file, no build, no server, no network:**
 
 ```bash
-start dist/untitled-capybara-game.html
+node build.mjs
 ```
 
-Everything is inlined into that one HTML file; Three.js and cannon-es load from CDN via an
-import map. If your browser blocks module scripts on `file://`, serve it instead:
+...then open `dist/untitled-capybara-game.html`. Everything is in that one file —
+the whole game, and Three.js and cannon-es with it. It runs from `file://` on a
+laptop with the wifi off. (It did not, until 31 Aug 2026: the two libraries were
+fetched from a CDN at boot, and the file this section has always told you to
+double-click showed `warming up the harbour…` for ever if it could not reach
+jsdelivr. They live in `vendor/` now. See `vendor/README.md`.)
+
+**To work on it**, serve the unbundled source instead — no build step, edit and
+reload:
 
 ```bash
 node server.mjs
 ```
 
-Then open <http://localhost:5173> (modular source) or
-<http://localhost:5173/dist/untitled-capybara-game.html> (the bundle). Set `PORT` to use
-another port.
+Then open <http://localhost:5173>. `PORT=5188 node server.mjs` to move it.
+
+Your progress is kept in the browser's own storage, per browser and per machine.
+Nothing is uploaded anywhere, because there is nowhere to upload it to.
 
 ## Controls
 
@@ -494,10 +551,19 @@ another port.
 | `Space` | **Hop.** Tap it for a kerb; hold it for a ledge — 1.4 m, which is the Opera House podium. Costs stamina. |
 | `E` / `Numpad0` / left click | Grab · press again to throw. Hold while still on soil to **dig**. Grab the condor's talons. Take the ship's wheel. |
 | `Q` | **WHEEK.** One mouth, one button. It startles everyone nearby, it is the ferry's horn, it flaps the condor's wings, it calls a condor down if one is up there — and three of them at a departure point is the ticket to the next place. |
+| `Ctrl` (held) | **Slide.** The seventh verb, and the only one that is a state rather than a press — down a glacier, down a dune, down a wet street. |
+| `R` (held) | **Put me back.** Wedged in a gap you cannot get out of? Hold it for half a second and you are back where you were standing four seconds ago, on your feet. Nothing is undone — no task, no record, no clock — because being stuck is not a mistake anybody should be charged for. |
+| `F` · `Shift+F` | Point the arrow at another task |
 | `Z` / `X`, right-drag | Orbit camera |
 | `C` | Snap the camera behind you |
+| `V` (held) | Raise the eye — look at the sky |
 | Mouse wheel | Zoom |
-| `M` | Mute · `` ` `` Perf overlay · `\` debug biome swap |
+| `K` · `Enter` | The camera · keep the picture. Shots go in the album in the journal. |
+| `P` | Hide the paper — the checklist, the chart and the hint, for a screenshot or for the view |
+| `M` · `N` · `[` `]` | Mute · music on/off · music volume |
+| `` ` `` · `\` | Perf overlay · debug biome swap |
+| **Gamepad** | Left stick moves, right stick looks, click it to recentre. `A` hop · `X` grab · `B` WHEEK · `RT` run. |
+| **Touch** | A stick in the bottom-left — push it all the way to run — and WHEEK, GRAB and HOP under the right thumb. |
 | `Tab` | **The journal.** The shelf of souvenirs, everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. It is also the way into **the ledger**: the whole journey, laid out. |
 | `1`..`0`, then `–  =  [  ]  ;  '` | On the title card: pick a place. Ten digits and seventeen chapters, so the last seven are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |
 | `Enter` | On the title card, if there is a saved journey: carry on from where you stopped |
@@ -1163,6 +1229,131 @@ was measured in pixels rather than in fractions of the frame, so **the halo shra
 window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is anchored now,
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
+
+## Seven versions of light, and then somebody asked whether it was still fun
+
+The last seven passes were all about the picture — the leaf, the exposure, the
+airlight, the penumbra, the blossom. The last change to the *loop* was three
+weeks earlier. So this one asked a different question, the only one that
+matters after hour one: **is a chapter still worth being in at minute
+twenty-five.**
+
+Five things came out of it. Three of them are features that were written,
+shipped, documented at length, and could never actually be reached.
+
+### There was nothing to knock over
+
+Count the loose props in each chapter and the number does not look like the
+game feels. Sydney has forty-nine. Pasto, Monte Carlo and Hanoi have twenty-four,
+twenty and sixteen. **Every other chapter has between eight and eleven**, and
+all of them sit in one cluster about twenty metres across — so two streets from
+that cluster the world has nothing in it that a capybara can pick up, shove or
+tip over. Forty-five seconds of active play, measured, produced **zero prop
+impacts in Kyoto, Cali, Rio, the Drift, Sơn Đoòng and the Pantanal**.
+
+Worst of all at the arrival, which is the worst place for it. Props within
+twenty metres of where the chapter puts you down: **none** in Cali, the
+Pantanal, Sơn Đoòng and Hanoi; **one** in Kyoto and Monte Carlo. Sydney's is
+nine. Sơn Đoòng had none within *eighty* metres — its whole list is at the
+survey camp, a hundred and nine metres away, and the first two minutes of that
+chapter were a very large room with nothing in it.
+
+Sixteen chapters now have a **second cluster**, and every one of its centres is
+a position measured off that chapter's own people rather than a coordinate
+somebody liked the look of — because ownership in this game is *where a thing
+lives*, and a pile of belongings on empty ground belongs to nobody and cannot
+start an argument. Nothing new was modelled: it is the same lists, in a second
+place, put through the same test that refuses water, walls and anything the
+biome calls blocked.
+
+Cali's arrival went from nothing to eight. Sơn Đoòng's from nothing within
+eighty metres to five within forty. Monte Carlo's from one to ten. The fifteen
+thin chapters are now fifteen to twenty. Frame time did not move: 16.5–16.8 ms
+in all nineteen.
+
+The Drift does not get one, and that is deliberate — its nine things are one
+household's, on islands forty metres of sky apart, and the argument for keeping
+them together is better than the argument for spreading them out.
+
+### The board at the end of a chapter had never once been on screen
+
+Finish everything in a place and the paper is supposed to turn into that
+chapter's record board: every number you hold here, the way on, the souvenir.
+It was written a long time ago and the reasoning above it is still right — an
+empty card is the moment a player leaves and does not come back.
+
+It was overwritten four times a second by the code that keeps the hint under
+the arrow up to date, and what was left of it was clipped by a height limit
+meant for a one-sentence clue. Both have been there since the day it was
+written, and both are now fixed.
+
+And it could only ever list what you had already done — it was built out of the
+records you hold, so a chapter you finished without racing anything showed a
+blank. **A number you have not put a figure on yet is the more interesting line
+of the two.** It is the only thing on that card that is an invitation.
+
+```
+DONE HERE
+  the way on: the bridge at Uji            ▸ 79 m
+  three wheeks when you get there, and the board opens
+  the tunnel in — not yet
+  the grove in — not yet
+  the river in 40.0 s
+  you kept: a tea whisk, slightly chewed
+KYOTO & UJI  ·  11 / 11
+```
+
+### So close
+
+Fifty-five things in this game are measured, and they paid out on exactly one
+of their outcomes. Beat your best and it says so. Miss it by a tenth and it
+said precisely what it says when you fall over at the first corner: nothing.
+
+Now, if you had a figure to beat and you came within a whisker of it, it tells
+you by how much and nothing else — a line of text and a flat little chime under
+the pitch of the real one. It cannot fire on a first attempt, which keeps that
+silence exactly as deliberate as it always was; it cannot fire on a run you
+walked away from, because that run is nowhere near; and it cannot fire twice in
+twelve seconds.
+
+> **so close  ·  1.5 s off your best**
+
+### The chain got a voice
+
+Three things in one place inside twelve seconds, with somebody watching, is AN
+INCIDENT; five is A SCENE. It is the only reward in this game you can have
+again, and it was completely silent right up until the moment it paid — so it
+arrived out of nowhere, once or twice in eight hours, and there was no way to
+learn what had caused it.
+
+There is a note per event now, going up, from where the thing happened. Quiet,
+positional, and rising over the length of the chain. It is the same trick the
+torii tunnel uses for its forty-four gates: you learn the rule by ear, once,
+and after that you can play for it. Nothing is listed, nothing is named,
+nothing is gated. And a chain that got to two and then died says so, going
+down.
+
+### Kyoto had one number in it
+
+Eleven tasks and a single record — the thinnest chapter in the game to come
+back to. It had two set pieces with a clock in them by construction, and **both
+switched themselves off for ever the first time you did them**. Forty-four
+gates up a mountain, a wooden block per gate climbing a scale, a camera rail
+written specially for it — inert scenery from the moment it paid out.
+
+The tunnel and the grove re-arm now. You get the tick once, as before, and
+after that the gates go on singing every time you go up, and there is a figure
+on it:
+
+| | |
+|---|---|
+| **the tunnel in** | 44 gates, bottom to top, par 32 s |
+| **the grove in** | end to end at a sprint, par 17 s |
+
+Both pars were measured, not guessed: a scripted run holding sprint the whole
+way and aimed gate to gate does the tunnel in 24.7 s and the grove in 14.5.
+The first guesses were 34 and 12, and 12 could not be reached by anybody.
+
 
 ## The jacaranda finally fell properly
 

@@ -5504,8 +5504,16 @@ function sysBuildCSS() {
 '.capyui-clue.off{max-height:0;opacity:0;padding:0;}',
 /* the record board a finished chapter turns into: one number per line, and the
    numbers line up under each other because they are what is being compared */
+/* ...AND IT HAS TO BE ALLOWED TO BE TALL (v51). The base rule clamps this
+   element to max-height 3.2em because a CLUE is one sentence; the board is up
+   to eight lines — the way on, one row per record in the chapter, and the
+   souvenir — so every line after the second was clipped by `overflow:hidden`
+   and the board has never been legible. The clamp stays on the clue, which
+   still wants it. 16em is Monte Carlo, which has the most rows of any chapter
+   at five, with the way clue wrapped to two lines above them. */
 '.capyui-clue.recs{white-space:pre-line;font-style:normal;font-weight:700;',
-  'color:' + accent + ';font-variant-numeric:tabular-nums;line-height:1.45;}',
+  'color:' + accent + ';font-variant-numeric:tabular-nums;line-height:1.45;',
+  'max-height:16em;}',
 
 /* ---------- toast ---------- */
 '.capyui-toasts{position:absolute;left:50%;bottom:clamp(74px,15vh,128px);transform:translateX(-50%);',
@@ -15682,8 +15690,23 @@ export function createSystems(game) {
     if (done >= rec.ids.length && rec.ids.length) {
       let best = '';
       for (let i = 0; i < rec.ids.length; i++) {
-        const t = recText(rec.ids[i]);
-        if (t) best += (best ? '\n' : '') + t;
+        const id = rec.ids[i];
+        const t = recText(id);
+        if (t) { best += (best ? '\n' : '') + t; continue; }
+        // ---- AND THE ONES YOU HAVE NOT PUT A FIGURE ON YET (v51) ----------
+        // The board was built out of `recText`, which is empty for a row with
+        // no stored figure — so a chapter you finished without ever racing
+        // anything in it showed a board with NOTHING on it, and the one
+        // surface in the game whose whole job is "here is what is still worth
+        // doing here" could only ever list what you had already done. It was a
+        // receipt. A row you do not hold is the more interesting line of the
+        // two, and it is the only thing on this card that is an invitation.
+        //
+        // The par is not printed here on purpose: the live line already says
+        // what a good one is, at the moment that is worth knowing, and five
+        // rows of "a good one is" is a spreadsheet on a piece of scrap paper.
+        const def = RECORDS[id];
+        if (def) best += (best ? '\n' : '') + def.label + ' — not yet';
       }
       // ...and what to DO at the door. Naming the door is now the row above
       // this board rather than a line inside it — the row carries a bearing and
@@ -15931,10 +15954,85 @@ export function createSystems(game) {
   let recPaintedId = '';      // what the two strings were last built FROM
   let recPaintedQ = NaN;      // ...and at what rounded value
 
+  // =========================================================================
+  // THE NEAR MISS (v51)
+  //
+  // `recordValue` speaks when a run BEATS something and is silent otherwise,
+  // and `recordEnd` clears the line without a word. So the fifty-three
+  // measured things in this game pay out on exactly one of their outcomes:
+  // a run that came within a tenth of your best was told the same thing as a
+  // run that fell over at the first corner, which is nothing at all, and the
+  // "one more go" that every one of these rows exists to produce had no voice.
+  //
+  // FOUR RULES, and the first is the one that keeps the old law intact:
+  //
+  //  1. IT NEEDS A BEST TO BE NEAR. With no stored figure there is no near
+  //     miss — the deliberate silence on a first attempt is untouched, and
+  //     `recOpenBest` is captured when the attempt OPENS so that a run which
+  //     beat the best (and has therefore already overwritten it) is correctly
+  //     read as a win and says nothing here.
+  //  2. IT HAS TO BE NEAR. `sysNEAR_BAND` of the standing figure, floored by
+  //     `sysNEAR_FLOOR` so a two-second record is not held to two hundredths.
+  //     An abandoned run is a long way off and is silent by construction —
+  //     nothing had to be told that the player had walked away.
+  //  3. IT IS THE SMALLEST CHANNEL THERE IS: a toast and a flat chime, under
+  //     the personal best's pitch and volume, so it can never be mistaken for
+  //     one. No card, no lift, no confetti, no slow motion.
+  //  4. IT CANNOT NAG. One line per closed attempt and one per
+  //     `sysNEAR_COOL`, so a chapter that opens and shuts an attempt every
+  //     few seconds says it once.
+  // =========================================================================
+  const sysNEAR_BAND  = 0.07;   // share of the standing figure that is "close"
+  const sysNEAR_FLOOR = 0.35;   // ...and the smallest absolute gap that counts
+  const sysNEAR_COOL  = 12;     // s between two of these, whatever happens
+  let recOpenBest = undefined;  // the figure to beat, read when the attempt opened
+  let recNearCool = 0;          // s until another near miss may be spoken
+
+  /**
+   * THE GAP, IN WORDS THAT WORK FOR EVERY ROW. Half the fifty-three are
+   * counts — gulls, pigeons, of the six, on the two — where "2 of them off"
+   * reads as nonsense, so a unit is printed only when it is a magnitude the
+   * gap is actually IN. Everything else prints the bare number, which is
+   * exactly what a count wants.
+   */
+  function recGapUnit(def) {
+    const u = (def && def.unit) || '';
+    if (u.indexOf(' m/s') === 0) return ' m/s';
+    if (u.indexOf(' s') === 0) return ' s';
+    if (u.indexOf(' m') === 0) return ' m';
+    return '';
+  }
+  /**
+   * THE ATTEMPT HAS CLOSED. Called from `recordEnd` and from the watchdog, so
+   * a chapter that simply stops handing over a figure is treated the same as
+   * one that tidies up after itself — both of them are the run ending.
+   */
+  function recClose(id) {
+    const def = RECORDS[id];
+    const v = recLiveVal, best = recOpenBest;
+    recOpenBest = undefined;
+    if (!def || v !== v || typeof best !== 'number' || best !== best) return;
+    if (recNearCool > 0) return;
+    // Did it BEAT the figure it opened against? Then recordValue has already
+    // said so and there is nothing for this to add.
+    const beat = def.better === 'lower' ? v < best : v > best;
+    if (beat) return;
+    const gap = Math.abs(best - v);
+    if (!(gap > 0)) return;                       // dead heat: silence
+    if (gap > Math.max(sysNEAR_FLOOR, Math.abs(best) * sysNEAR_BAND)) return;
+    recNearCool = sysNEAR_COOL;
+    const dp = Math.max(def.dp || 0, gap < 1 ? 1 : 0);
+    toast('so close  ·  ' + gap.toFixed(dp) + recGapUnit(def) + ' off your best');
+    sfx('chime', { volume: 0.34, pitch: 1.06 });
+  }
+
   /** THE ATTEMPT IS OPEN, AND IT STANDS HERE. Call it every frame. */
   function recordLive(id, value) {
     if (!RECORDS[id]) return false;
-    if (id !== recLiveId) { recLiveId = id; recLiveVal = NaN; }
+    // A NEW attempt captures the figure it is running against. Not on every
+    // call: the whole point is to hold the number from BEFORE `recordValue`
+    // overwrites it, and this function is handed over every frame.
+    if (id !== recLiveId) { recLiveId = id; recLiveVal = NaN; recOpenBest = jrRecs[id]; }
     recLiveSince = 0;
     if (typeof value === 'number' && value === value) recLiveVal = value;
     return true;
@@ -15947,6 +16045,7 @@ export function createSystems(game) {
   function recordEnd(id) {
     if (!recLiveId) return false;
     if (id !== undefined && id !== recLiveId) return false;
+    recClose(recLiveId);
     recLiveId = ''; recLiveVal = NaN; recLiveSince = 0;
     recPaint();
     return true;
@@ -15997,9 +16096,15 @@ export function createSystems(game) {
   }
   /** The watchdog and the paint, once a frame. Raw dt: this is wall clock. */
   function recLiveTick(dt) {
+    if (recNearCool > 0) recNearCool -= dt;
     if (recLiveId) {
       recLiveSince += dt;
-      if (recLiveSince > sysREC_STALE) { recLiveId = ''; recLiveVal = NaN; }
+      if (recLiveSince > sysREC_STALE) {
+        // The chapter stopped handing a figure over, which IS the run ending —
+        // see recClose. Nine of the fifty-three close this way and no other.
+        recClose(recLiveId);
+        recLiveId = ''; recLiveVal = NaN;
+      }
     }
     recPaint();
   }
@@ -20411,6 +20516,27 @@ export function createSystems(game) {
     incN++;
     incT = sysINC_T;
     const tier = incN >= sysINC_N2 ? 2 : (incN >= sysINC_N ? 1 : 0);
+    // ---- THE CHAIN CLIMBS, AND THAT IS THE WHOLE OF WHAT IT SAYS (v51) ----
+    // This is the only repeatable reward in the game and it was completely
+    // silent until the moment it paid out: three things happened, a card
+    // appeared, and nothing on the way there had told the player that
+    // anything was being counted. A reward you cannot AIM at is a lottery,
+    // not a loop — every player meets one or two of these in eight hours and
+    // never finds out why.
+    //
+    // The fix is the one the torii tunnel already found: a note per event,
+    // going UP. Quiet, positional, from where the thing happened, and rising
+    // over the length of the chain, so the rule is learnt by ear inside one
+    // chapter and can be played for after that. It adds no HUD, names
+    // nothing, lists nothing and gates nothing, so the finds' three laws hold
+    // and the card is still the payout — this is the run-up to it.
+    //
+    // NOT ON THE EVENT THAT CARDS. That one has a chime, a lift, confetti and
+    // a card of its own; a fourth voice on the same frame is mud.
+    if (tier <= incCarded || incCool > 0) {
+      const f = Math.min(incN, sysINC_N2) / sysINC_N2;
+      sfx('tick', { volume: 0.13 + f * 0.10, pitch: 0.92 + f * 0.62, at: { x: x, y: 1.2, z: z } });
+    }
     if (tier <= incCarded) return;
     // ---- THE COOLDOWN GATES THE CARD AND NOT THE COUNTING -----------------
     // The first cut checked it at the top of this function, which is the
@@ -20449,6 +20575,12 @@ export function createSystems(game) {
         // got out of hand rather than as a slot machine. A chain that never
         // reached three costs nothing.
         if (incCarded > 0) incCool = sysINC_COOL;
+        // ...and a chain that got close and then stopped says so, once, going
+        // DOWN. It is the other half of the climb above: without it a player
+        // who reached two and wandered off is told nothing, and the pattern is
+        // half a pattern. Never after a card — that chain ended in a card,
+        // which is not a thing to be disappointed about.
+        else if (incN >= sysINC_N - 1) sfx('tick', { volume: 0.11, pitch: 0.70 });
         incN = 0; incCarded = 0;
       }
     }
@@ -20493,7 +20625,11 @@ export function createSystems(game) {
     // ...and a ghost belongs to the run it came out of. Every chapter is
     // authored in the same coordinates, so a trace played on the other side of
     // a border is a capybara jogging through a basilica. See THE GHOST.
-    recLiveId = ''; recLiveVal = NaN;
+    // ...and an attempt abandoned by TRAVELLING is not a near miss, however
+    // close the figure happened to be standing when the world changed. Cleared
+    // WITHOUT going through recClose, which is the whole reason it is written
+    // out here rather than calling recordEnd. See THE NEAR MISS.
+    recLiveId = ''; recLiveVal = NaN; recOpenBest = undefined;
     ghId = ''; ghPlay = null; ghPlayN = 0; ghFade = 0; ghRecN = 0;
     ghHaveLast = false; ghWasOpen = false;
     // ...and a chain belongs to the square it was made in. Two things in
@@ -21435,7 +21571,22 @@ export function createSystems(game) {
         if (pt) { hintHas = true; hintX = pt.x; hintZ = pt.z; hintY = pt.y; }
       }
       // the clue can depend on what is in the mouth, so refresh its wording too
-      if (h) {
+      //
+      // ---- ...BUT NOT OVER THE RECORD BOARD (v51) ------------------------
+      // THE BOARD HAS NEVER ONCE BEEN VISIBLE. `todoRefresh` builds it into
+      // this very element the moment a chapter is finished — every number you
+      // hold here, the way on, the souvenir — and then `todoTopId` is
+      // `sysWAY_ID`, whose `clue` is `wayClue`, so four times a second this
+      // block quietly overwrote all of it with the one sentence about
+      // wheeking at the door. Measured in Kyoto: 11 / 11 on the tally and a
+      // clue reading `three wheeks when you get there, and the board opens`
+      // with the board it was built next to already gone.
+      //
+      // Every chapter declares `way`, so this happened in all nineteen, and it
+      // has happened since the board was written. `recs` is the class the board
+      // branch already puts on the element and is therefore the honest question
+      // to ask — there is no second flag to keep in step with it.
+      if (h && !clueEl.classList.contains('recs')) {
         const clue = typeof h.clue === 'function' ? h.clue() : h.clue;
         if (clue !== clueEl.textContent) {
           clueEl.textContent = clue || '';

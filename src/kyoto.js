@@ -143,8 +143,10 @@ let kyoFroth = null;
 let kyoMatchaCloud = null, kyoMatchaT = 0;
 
 let kyoToriiSeq = 0, kyoToriiDone = false, kyoToriiT = 0;
+// s of the open run, -1 for none. See kyoCheckTorii and 'torii-run' in RECORDS.
+let kyoToriiRunT = -1;
 let kyoZenTouched = 0, kyoZenDone = false;
-let kyoBambooEnter = 0, kyoBambooIn = false, kyoBambooDone = false;
+let kyoBambooEnter = 0, kyoBambooIn = false, kyoBambooDone = false, kyoBambooT = 0;
 let kyoSwamT = 0, kyoSwimDone = false;
 let kyoMatchaDone = false, kyoWhiskDone = false;
 
@@ -3555,15 +3557,40 @@ function kyoToriiCam(cx, cz, back) {
   return { x: rx, y: ey, z: rz, w: w };
 }
 
-/** The torii run: through every gate, in order, without going back down. */
+/**
+ * The torii run: through every gate, in order, without going back down.
+ *
+ * ---- IT DOES NOT STOP HAPPENING WHEN IT IS TICKED (v51) --------------------
+ * This function used to open `if (kyoToriiDone) return`, and that one line was
+ * the whole of what was wrong with the last twenty minutes of this chapter.
+ * Forty-four gates up a mountain, a wooden block per gate climbing a scale, a
+ * camera rail written specially for it — and every bit of it switched off for
+ * ever the first time a player reached the top. The best thing in Kyoto became
+ * inert scenery at the moment it paid out, which is exactly backwards: a run
+ * up a hill is the kind of thing you do AGAIN.
+ *
+ * So the task keeps its latch (a tick fires once, `completeTask` would ignore
+ * a second one anyway) and the RUN re-arms: the counter goes back to zero, the
+ * gates go on singing, and there is now a clock on it — see 'torii-run' in
+ * RECORDS. Nothing is gated on any of this, nothing is harder, and a player
+ * who never goes back up plays the chapter that shipped.
+ */
 function kyoCheckTorii(game, dt) {
-  if (kyoToriiDone) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
+  // The clock, and the line on the paper. It runs from the first gate to the
+  // last and is handed over every frame, which is what `recordLive` wants.
+  if (kyoToriiRunT >= 0) {
+    kyoToriiRunT += dt;
+    if (game.recordLive) game.recordLive('torii-run', kyoToriiRunT);
+  }
   const i = kyoToriiSeq;
   const gx = kyoTORII[i * 2], gz = kyoTORII[i * 2 + 1];
   const dx = capy.position.x - gx, dz = capy.position.z - gz;
   if (dx * dx + dz * dz < 6.0 * 6.0) {
+    // The first gate STARTS the clock, and it is the only place it starts —
+    // so walking down through gate forty and back up is not a 2-second run.
+    if (kyoToriiSeq === 0) kyoToriiRunT = 0;
     kyoToriiSeq++;
     kyoToriiT = 0;
     // ---- EVERY GATE MAKES A SOUND, AND THE SOUND CLIMBS -----------------
@@ -3575,16 +3602,37 @@ function kyoCheckTorii(game, dt) {
     // over the length of the tunnel — is the cheapest possible version of "this
     // is going somewhere", and going up a scale is the whole feeling of the
     // climb. Deliberately soft: forty-four loud ticks is a smoke alarm.
-    if (typeof game.sfx === 'function' && !kyoToriiDone) {
+    if (typeof game.sfx === 'function') {
       const f = kyoToriiSeq / kyoTORII_N;
       game.sfx('tick', { volume: 0.16 + f * 0.16, pitch: 0.86 + f * 0.85,
                          at: { x: gx, y: kyoTerrain(gx, gz) + 2.4, z: gz } });
     }
     if (kyoToriiSeq >= kyoTORII_N) {
+      const again = kyoToriiDone;
       kyoToriiDone = true;
-      kyoTask('torii-run');
-      if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.9 });
-      if (typeof game.toast === 'function') game.toast('senbon torii. a thousand gates, they say. it is nearer ten.');
+      // The number, and it is filed on EVERY run including the first — the
+      // tick is the news that time and `recordValue` stays quiet on a first
+      // figure, which is the rule it has always kept.
+      if (kyoToriiRunT >= 0 && typeof game.record === 'function') {
+        game.record('torii-run', kyoToriiRunT);
+      }
+      if (game.recordEnd) game.recordEnd('torii-run');
+      kyoToriiRunT = -1;
+      // ...AND THE TUNNEL RE-ARMS. Back to the bottom of the counter, so the
+      // gates sing again for anybody who walks down and turns round. Not on the
+      // same frame the run finished: gate forty-four is within six metres of
+      // itself, so a counter reset here and nothing else would immediately
+      // re-count it as gate one. kyoToriiT is what holds it off — the decay
+      // below cannot bite at seq 0, and the next gate-1 hit is a genuine one
+      // because gate 1 is sixty metres down the hill.
+      kyoToriiSeq = 0; kyoToriiT = 0;
+      if (!again) {
+        kyoTask('torii-run');
+        if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.9 });
+        if (typeof game.toast === 'function') game.toast('senbon torii. a thousand gates, they say. it is nearer ten.');
+      } else if (typeof game.sfx === 'function') {
+        game.sfx('chime', { volume: 0.7, pitch: 1.18 });
+      }
     } else if (kyoToriiSeq % 11 === 0) {
       if (typeof game.toast === 'function') {
         game.toast(kyoToriiSeq + ' of ' + kyoTORII_N + ' …keep going');
@@ -3595,7 +3643,13 @@ function kyoCheckTorii(game, dt) {
   // wandered off: the count decays rather than resetting, so one bad step does
   // not cost forty gates
   kyoToriiT += dt;
-  if (kyoToriiT > 12 && kyoToriiSeq > 0) { kyoToriiSeq--; kyoToriiT = 0; }
+  if (kyoToriiT > 12 && kyoToriiSeq > 0) {
+    kyoToriiSeq--; kyoToriiT = 0;
+    // ...and a run that has decayed all the way back to nothing is over, so
+    // the clock and the line go with it rather than counting up beside a
+    // player who left the mountain twenty seconds ago.
+    if (kyoToriiSeq === 0) { kyoToriiRunT = -1; if (game.recordEnd) game.recordEnd('torii-run'); }
+  }
 }
 
 /** The rock garden: paw prints in the gravel, and enough of them is enough. */
@@ -3663,9 +3717,13 @@ function kyoCheckSwim(game, dt) {
   }
 }
 
+/**
+ * THE DASH, AND IT ALSO STOPPED HAPPENING (v51). Same shape as the tunnel
+ * above and the same one-line cause: `if (kyoBambooDone) return`. Fifty-one
+ * metres of grove at a sprint is a thing with a clock in it, and it had
+ * neither a clock nor a second go.
+ */
 function kyoCheckBamboo(game, dt) {
-  void dt;
-  if (kyoBambooDone) return;
   const capy = game.capy;
   if (!capy) return;
   const inside = Math.abs(capy.position.x - kyoBAMBOO.x) < kyoBAMBOO.hx &&
@@ -3675,16 +3733,34 @@ function kyoCheckBamboo(game, dt) {
     // entry z is negative and a negative sentinel re-armed the mark on every
     // frame: the distance travelled was always about zero and the task could
     // never fire. A separate flag, because the value has no spare range.
-    if (!kyoBambooIn) { kyoBambooIn = true; kyoBambooEnter = capy.position.z; }
+    if (!kyoBambooIn) { kyoBambooIn = true; kyoBambooEnter = capy.position.z; kyoBambooT = 0; }
+    kyoBambooT += dt;
+    // THE LINE WAITS UNTIL IT IS A CROSSING. Standing in the corner of the
+    // grove is not an attempt at anything, and a clock that starts on the
+    // first culm would put one on the paper every time a player walked past.
+    // A third of the way over is a commitment.
+    const kbGone = Math.abs(capy.position.z - kyoBambooEnter);
+    if (kbGone > kyoBAMBOO.hz * 0.5 && game.recordLive) game.recordLive('bamboo-dash', kyoBambooT);
     // crossed the grove end to end, at a run
-    if (Math.abs(capy.position.z - kyoBambooEnter) > kyoBAMBOO.hz * 1.5 && capy.isRunning) {
+    if (kbGone > kyoBAMBOO.hz * 1.5 && capy.isRunning) {
+      const again = kyoBambooDone;
       kyoBambooDone = true;
-      kyoTask('bamboo-dash');
+      if (typeof game.record === 'function') game.record('bamboo-dash', kyoBambooT);
+      if (game.recordEnd) game.recordEnd('bamboo-dash');
+      // Re-armed on the spot: the mark moves to where you are, so turning
+      // round and going back the other way is the next attempt and not a free
+      // one — you have to cross the whole fifty-one metres again either way.
+      kyoBambooEnter = capy.position.z; kyoBambooT = 0;
       if (typeof game.sfx === 'function') game.sfx('rustle', { volume: 1.0 });
-      if (typeof game.toast === 'function') game.toast('the grove will recover. probably.');
+      if (!again) {
+        kyoTask('bamboo-dash');
+        if (typeof game.toast === 'function') game.toast('the grove will recover. probably.');
+      }
     }
   } else {
+    if (kyoBambooIn && game.recordEnd) game.recordEnd('bamboo-dash');
     kyoBambooIn = false;
+    kyoBambooT = 0;
   }
 }
 
@@ -3952,8 +4028,11 @@ export function createKyoto(game) {
       // kyoBambooIn is the same shape one task along: it holds a z from a
       // previous visit, so the first frame back inside the grove measures the
       // dash against a mark nobody set this time.
-      if (!kyoToriiDone) { kyoToriiSeq = 0; kyoToriiT = 0; }
-      kyoBambooIn = false;
+      // ...and it is unconditional since v51, because the tunnel re-arms now:
+      // there is no longer a state in which leaving forty gates up is anything
+      // other than a run walked away from.
+      kyoToriiSeq = 0; kyoToriiT = 0; kyoToriiRunT = -1;
+      kyoBambooIn = false; kyoBambooT = 0;
       kyoSwamT = 0;
     },
   });

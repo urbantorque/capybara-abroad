@@ -2216,20 +2216,45 @@ const physBIOME_SCATTER = {
   // and quayBurstChips is already written; a dropped packet is what it is for.
   quay:      { x: 4, z: 26, r0: 4, r1: 20,
                props: [['bin', 1], ['cone', 2], ['sign', 1], ['esky', 1], ['basket', 1],
-                       ['coffee', 1], ['camera', 1], ['handbag', 1], ['chips', 1]] },
-  kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['dango', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]] },
-  cali:      { x: 0, z: 24, r0: 5, r1: 26, props: [['empanada', 2], ['arepa', 1], ['plantain', 1], ['sombrero', 1], ['basket', 1], ['bin', 1], ['cone', 2], ['sign', 1]] },
+                       ['coffee', 1], ['camera', 1], ['handbag', 1], ['chips', 1]],
+    // Second cluster: the five-person knot inboard of the apron, measured at
+    // (-20, 17). The apron's own list again, minus the chips: one packet, one
+    // flock, and two would halve what the first one is for.
+    also: { x: -20, z: 17, r0: 4, r1: 16, props: [['bin', 1], ['cone', 2], ['sign', 1], ['esky', 1], ['basket', 1], ['coffee', 1], ['handbag', 1]] },
+  },
+  kyoto:     { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['dango', 2], ['hat', 1], ['coffee', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['handbag', 1]],
+    // Second cluster: UJI. The chapter's whole southern half — the mill, the
+    // tea house, 'matcha-raid' and 'whisk-spin' — had not one loose object on
+    // it, and its two locals are measured at (14, 176) and (33, 198).
+    also: { x: 16, z: 178, r0: 3, r1: 16, props: [['basket', 2], ['dango', 2], ['cuencobowl', 2], ['mug', 2], ['hat', 1]] },
+  },
+  cali:      { x: 0, z: 24, r0: 5, r1: 26, props: [['empanada', 2], ['arepa', 1], ['plantain', 1], ['sombrero', 1], ['basket', 1], ['bin', 1], ['cone', 2], ['sign', 1]],
+    // Second cluster: THE ARRIVAL. Cali measured 0 props within 20 m of the
+    // spawn and 4 within 40 — the emptiest place this game ever puts you down
+    // — and there is a local standing four metres from it at (-20, -19).
+    also: { x: -20, z: -19, r0: 4, r1: 17, props: [['empanada', 1], ['arepa', 1], ['plantain', 1], ['basket', 2], ['bin', 1], ['cone', 1], ['sign', 1]] },
+  },
   // ...AND ONE OF THEM IS FOOD. Rio had 0 edible props of 10, so batch 1's
   // produce reaction — graze someone's lunch, earn a line and a shoo — could
   // not fire in a chapter whose whole beach is people eating. The esky goes:
   // it is the one thing on the list a person does not carry down and put down.
-  rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['icecream', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]] },
-  iceland:   { x: 0, z: 99, r0: 5, r1: 24, props: [['coffee', 2], ['camera', 1], ['handbag', 1], ['basket', 1], ['bin', 2], ['cone', 1], ['sign', 2]] },
+  rio:       { x: 0, z: 0,  r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 1], ['icecream', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1], ['cone', 2]],
+    // Second cluster: the far end of the beach at (-34, -4), where the chapter
+    // stands a walker and nothing else.
+    also: { x: -34, z: -4, r0: 4, r1: 18, props: [['ball', 1], ['towel', 1], ['thong', 1], ['icecream', 1], ['sunglasses', 1], ['frisbee', 1], ['bin', 1], ['cone', 1]] },
+  },
+  iceland:   { x: 0, z: 99, r0: 5, r1: 24, props: [['coffee', 2], ['camera', 1], ['handbag', 1], ['basket', 1], ['bin', 2], ['cone', 1], ['sign', 2]],
+    // Second cluster: out of town, on the local measured at (24, 132).
+    also: { x: 24, z: 132, r0: 4, r1: 16, props: [['coffee', 1], ['camera', 1], ['basket', 1], ['bin', 1], ['sign', 1], ['handbag', 1], ['mug', 2]] },
+  },
   // Was `sombrero, plantain, maiz` — a Nariño hat, a bunch of plantains and a
   // cob of maize, scattered across Jemaa el-Fnaa. The Pasto market's props
   // travel and that is deliberate, but three of them are the wrong CONTINENT
   // and the square is the most identifiable place in the chapter.
-  sahara:    { x: 0, z: 8,  r0: 5, r1: 24, props: [['basket', 3], ['cuencobowl', 3], ['hat', 1], ['mug', 1], ['camera', 1], ['handbag', 1], ['cone', 1]] },
+  sahara:    { x: 0, z: 8,  r0: 5, r1: 24, props: [['basket', 3], ['cuencobowl', 3], ['hat', 1], ['mug', 1], ['camera', 1], ['handbag', 1], ['cone', 1]],
+    // Second cluster: east of the square, on the local measured at (-6, -50).
+    also: { x: -6, z: -50, r0: 4, r1: 18, props: [['basket', 2], ['cuencobowl', 2], ['mug', 2], ['hat', 1], ['handbag', 1]] },
+  },
   // The Shelf is high, thin and windy, so nothing here is light enough to blow
   // about — but the list that enforced that was TWO WHEELIE BINS, TWO ROAD
   // SIGNS, TWO TRAFFIC CONES, AN ESKY AND A MENU BOARD, scattered over the
@@ -2256,21 +2281,36 @@ const physBIOME_SCATTER = {
   // chapter's own gale (measured, cuencobowl 0.8 kg drifts 4 cm in 40 s; the
   // esky never moves), and this is the chapter the wind comedy lives in.
   drift:     { x: 17, z: 33, r0: 2, r1: 7, props: [['basket', 3], ['cuencobowl', 1], ['mug', 2], ['winebottle', 1], ['hat', 1], ['thong', 1]] },
-  venice:    { x: -4, z: 13, r0: 4, r1: 22, props: [['winebottle', 2], ['menu', 1], ['coffee', 1], ['camera', 1], ['handbag', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['basket', 1]] },
-  kowloon:   { x: 0, z: 34, r0: 4, r1: 22, props: [['chips', 2], ['coffee', 1], ['sign', 2], ['cone', 2], ['bin', 2], ['basket', 1], ['camera', 1]] },
+  venice:    { x: -4, z: 13, r0: 4, r1: 22, props: [['winebottle', 2], ['menu', 1], ['coffee', 1], ['camera', 1], ['handbag', 1], ['bin', 1], ['cone', 1], ['sign', 1], ['basket', 1]],
+    // Second cluster: the three-person knot south of the campo at (-14, -17).
+    also: { x: -14, z: -17, r0: 4, r1: 18, props: [['winebottle', 1], ['menu', 1], ['coffee', 1], ['camera', 1], ['basket', 2], ['bin', 1], ['cone', 1]] },
+  },
+  kowloon:   { x: 0, z: 34, r0: 4, r1: 22, props: [['chips', 2], ['coffee', 1], ['sign', 2], ['cone', 2], ['bin', 2], ['basket', 1], ['camera', 1]],
+    // Second cluster: down the street at (9, 3), where two more people are.
+    also: { x: 9, z: 3, r0: 4, r1: 18, props: [['chips', 1], ['coffee', 1], ['sign', 1], ['cone', 2], ['bin', 1], ['basket', 2], ['camera', 1]] },
+  },
   // ...and no TRAFFIC CONE. There is no road within forty kilometres of that
   // beach and there is not a wheeled vehicle in the chapter — same argument as
   // the sombrero on Jemaa el-Fnaa and the wheelie bins on the Drift. The rest of
   // the beach household stays: props are allowed to travel, they are just not
   // allowed to be from a different KIND of place.
-  palawan:   { x: 0, z: 46, r0: 5, r1: 24, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['basket', 2], ['frisbee', 1], ['sunglasses', 1], ['cuencobowl', 1]] },
+  palawan:   { x: 0, z: 46, r0: 5, r1: 24, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['basket', 2], ['frisbee', 1], ['sunglasses', 1], ['cuencobowl', 1]],
+    // Second cluster: the two people down the sand at (6, 21).
+    also: { x: 6, z: 21, r0: 4, r1: 16, props: [['ball', 1], ['towel', 1], ['thong', 1], ['basket', 2], ['frisbee', 1], ['cuencobowl', 2]] },
+  },
   // Was 'sombrero' — a Nariño hat scattered across a square in Anatolia, which
   // is the same mistake Jemaa el-Fnaa had and which was fixed there for the same
   // reason: the Pasto market's props are allowed to travel, but not onto the one
   // piece of ground in the chapter the player is put down on. A Cappadocian
   // square at ten past five has tea glasses, clay from Avanos and baskets on it.
-  goreme:    { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 3], ['mug', 2], ['hat', 1], ['cone', 1], ['sign', 1], ['bin', 1]] },
-  manly:     { x: 0, z: 46, r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['frisbee', 1], ['hat', 1], ['sunglasses', 1], ['deckchair', 1], ['bin', 1]] },
+  goreme:    { x: 0, z: 34, r0: 5, r1: 26, props: [['basket', 2], ['cuencobowl', 3], ['mug', 2], ['hat', 1], ['cone', 1], ['sign', 1], ['bin', 1]],
+    // Second cluster: the local measured south of the square at (6, 4).
+    also: { x: 6, z: 4, r0: 4, r1: 18, props: [['basket', 2], ['cuencobowl', 2], ['mug', 2], ['hat', 1], ['sign', 1]] },
+  },
+  manly:     { x: 0, z: 46, r0: 5, r1: 26, props: [['ball', 1], ['towel', 2], ['thong', 2], ['esky', 1], ['frisbee', 1], ['hat', 1], ['sunglasses', 1], ['deckchair', 1], ['bin', 1]],
+    // Second cluster: the two people at the north end, measured (39, 36).
+    also: { x: 39, z: 36, r0: 4, r1: 16, props: [['ball', 1], ['towel', 2], ['thong', 1], ['esky', 1], ['frisbee', 1], ['sunglasses', 1], ['bin', 1]] },
+  },
   // ---- THE DRIFT’S FAILURE, TWICE MORE, AND FOUND THE SAME WAY --------
   //
   // Ownership is by where a prop LIVES: npcOWN_R = 11 m from its home. Both of
@@ -2289,32 +2329,49 @@ const physBIOME_SCATTER = {
   // CAMPS, which is also the only place in a cave where anybody’s belongings
   // would be: a bin, a sign, a camera and an esky are expedition kit, and they
   // are meant to be somebody’s.
-  pantanal:  { x: 30, z: 77, r0: 3, r1: 13, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]] },
-  cave:      { x: 20, z: -41, r0: 3, r1: 13, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
-  antarctic: { x: 0, z: 52, r0: 5, r1: 24, props: [['esky', 1], ['bin', 1], ['sign', 2], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]] },
+  pantanal:  { x: 30, z: 77, r0: 3, r1: 13, props: [['basket', 2], ['esky', 1], ['maiz', 2], ['plantain', 1], ['hat', 1], ['cone', 1], ['bin', 1]],
+    // Second cluster: the local at (43, 13), sixty-five metres from the
+    // fazenda — the southern half of the campo had nothing loose on it at all.
+    also: { x: 43, z: 13, r0: 4, r1: 16, props: [['basket', 2], ['maiz', 2], ['plantain', 1], ['hat', 1], ['esky', 1], ['bin', 1]] },
+  },
+  cave:      { x: 20, z: -41, r0: 3, r1: 13, props: [['bin', 1], ['sign', 2], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]],
+    // Second cluster: THE ARRIVAL, and it is the worst case in the game. Son
+    // Doong's eight props are all at the survey camp and the camp is 109 m
+    // from where the chapter puts you down: measured, ZERO props within eighty
+    // metres of the spawn. There is a local at (12, 33), thirty-one metres from
+    // it and seventy-four from the camp.
+    also: { x: 12, z: 33, r0: 3, r1: 14, props: [['bin', 1], ['sign', 1], ['cone', 2], ['basket', 1], ['camera', 1], ['esky', 1]] },
+  },
+  antarctic: { x: 0, z: 52, r0: 5, r1: 24, props: [['esky', 1], ['bin', 1], ['sign', 2], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]],
+    // Second cluster: the local out on the ice at (16, 83).
+    also: { x: 16, z: 83, r0: 4, r1: 16, props: [['esky', 1], ['bin', 1], ['sign', 1], ['cone', 2], ['camera', 1], ['coffee', 1], ['basket', 1]] },
+  },
   // The quay under the Rocher, which is where the chapter puts you down and
   // the one place in Monaco anybody leaves anything lying about. Centred on
   // the FISHERMAN and not on the spawn: ownership is by where a prop lives
   // (npcOWN_R = 11 m from its home) and an annulus round an empty quay is a
   // guarantee that nothing belongs to anybody. See THE DRIFT'S FAILURE above.
-  monaco: { x: -58, z: -30, r0: 4, r1: 15, props: [['bin', 1], ['sign', 1], ['cone', 2], ['esky', 1], ['basket', 1], ['winebottle', 2], ['camera', 1], ['sunglasses', 1]] },
+  monaco: { x: -58, z: -30, r0: 4, r1: 15, props: [['bin', 1], ['sign', 1], ['cone', 2], ['esky', 1], ['basket', 1], ['winebottle', 2], ['camera', 1], ['sunglasses', 1]],
+    // Second cluster: THE ARRIVAL. The fisherman's quay is 84 m from where the
+    // chapter puts you down, and there was exactly one prop within twenty
+    // metres of the spawn. A local stands seven metres from it at (8, -73).
+    also: { x: 8, z: -73, r0: 4, r1: 16, props: [['bin', 1], ['sign', 1], ['cone', 2], ['esky', 1], ['basket', 1], ['winebottle', 1], ['camera', 1], ['sunglasses', 1]] },
+  },
   // The bia hoi corner, because that is where anybody in this chapter would
   // put anything down. Centred on the corner and NOT on the spawn: the spawn
   // is a lake walk with nobody's belongings on it, and an annulus round an
   // empty walk is a guarantee that nothing is owned by anybody.
-  hanoi: { x: 62, z: 18, r0: 4, r1: 15, props: [['basket', 2], ['bin', 1], ['esky', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 2], ['camera', 1]] },
+  hanoi: { x: 62, z: 18, r0: 4, r1: 15, props: [['basket', 2], ['bin', 1], ['esky', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 2], ['camera', 1]],
+    // Second cluster: the local at (-8, -7), between the lake walk you arrive
+    // on and the bia hoi corner — seventy-four metres from the corner, and the
+    // whole of the walk in had nothing on it.
+    also: { x: -8, z: -7, r0: 4, r1: 16, props: [['basket', 2], ['bin', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 1], ['coffee', 1]] },
+  },
 };
 const physBiomeScattered = {};   // biome name -> true, so re-entry never doubles up
 
-/**
- * Scatter one chapter's list in an annulus about its centre. Every candidate is
- * put through physSpotOk, which now asks the LIVE biome, so water, buildings and
- * anything else that biome calls blocked are all refused for free.
- */
-function physScatterBiome(name) {
-  const def = physBIOME_SCATTER[name];
-  if (!def || physBiomeScattered[name]) return;
-  physBiomeScattered[name] = true;
+/** One annulus. Split out of physScatterBiome so a chapter can have two. */
+function physScatterRing(def) {
   let placed = 0;
   for (let i = 0; i < def.props.length; i++) {
     const type = def.props[i][0];
@@ -2332,6 +2389,54 @@ function physScatterBiome(name) {
       }
     }
   }
+  return placed;
+}
+
+/**
+ * Scatter one chapter's lists. Every candidate is put through physSpotOk, which
+ * asks the LIVE biome, so water, buildings and anything else that biome calls
+ * blocked are all refused for free — a missing bin is always better than a bin
+ * inside a façade, which is also why a badly chosen centre costs coverage and
+ * never correctness.
+ *
+ * ---- ONE CLUSTER WAS NOT A SANDBOX (v51) ---------------------------------
+ * MEASURED, all nineteen chapters, live props by `p.biome`: Sydney 49, Pasto
+ * 24, Monaco 20, Hanoi 16 — and 8 to 11 in the other fifteen, every one of them
+ * inside a single annulus 13 to 26 m across. So outside that one cluster there
+ * was NOTHING LOOSE IN THE WORLD, and a player who walked two streets ran out
+ * of things to touch. Forty-five seconds of active free play measured ZERO prop
+ * impacts in Kyoto, Cali, Rio, the Drift, the cave and the Pantanal.
+ *
+ * It shows worst at the arrival, which is the worst place for it to show:
+ * props within 20 m of the spawn were 0 in Cali, the Pantanal, Sơn Đoòng and
+ * Hanoi, and 1 in Kyoto and Monaco. Sydney's is 9. The first minute of six
+ * chapters was a room with nothing in it.
+ *
+ * So a row may name a SECOND annulus, `also`, and sixteen do. Three rules, and
+ * the first two are the ones the first annulus was already held to:
+ *
+ *  1. IT IS CENTRED ON A PERSON. Ownership is by where a prop LIVES — within
+ *     npcOWN_R (11 m) of its home — so an annulus on empty ground is a
+ *     guarantee that nothing belongs to anybody and the ownership chase cannot
+ *     fire. Every centre below is a position measured off that chapter's own
+ *     `game.locals`, not a coordinate somebody liked the look of.
+ *  2. NOTHING IS FROM THE WRONG KIND OF PLACE. Same list as the chapter's own
+ *     first annulus, or a subset of it. No new geometry, no new types.
+ *  3. IT GOES WHERE THE FIRST ONE IS NOT. Every second centre is at least
+ *     twenty-five metres from the first, and where a chapter had nobody's
+ *     belongings at the arrival, that is where it goes.
+ *
+ * THE DRIFT IS THE ONE THAT DOES NOT GET ONE, and deliberately: its nine props
+ * are one household's, its islands are forty metres of sky apart at different
+ * altitudes, and the long note on its row above is an argument for exactly one
+ * cluster. Sydney and Pasto do not need one.
+ */
+function physScatterBiome(name) {
+  const def = physBIOME_SCATTER[name];
+  if (!def || physBiomeScattered[name]) return;
+  physBiomeScattered[name] = true;
+  let placed = physScatterRing(def);
+  if (def.also) placed += physScatterRing(def.also);
   // Placed resting on their own surface, so there is nothing to solve.
   const arr = physGame.props;
   for (let i = 0; i < arr.length; i++) {

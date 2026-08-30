@@ -3023,6 +3023,336 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE FRONT DOOR (v52 — 31 Aug 2026)
+
+Fifty-one versions of content, picture, feel and audio, and **the review that
+produced this section could not find anything wrong with the game.** Nineteen
+chapters entered through the picker, driven for nine seconds each, seventy
+frames sampled: zero console errors, zero NaN positions, zero solver saves,
+16.5–17.0 ms median everywhere. So this version is not about the game. It is
+about the three ways it could not be given to anybody, all measured rather than
+guessed, and all of which ended in **the same permanent `warming up the
+harbour…` splash**.
+
+**1. THE TWO LIBRARIES ARE IN THE REPOSITORY NOW (`vendor/`).** They were
+resolved through an importmap pointing at jsdelivr. Block that host and the game
+does not start — with no error, no message and nothing to click, because a
+module script whose bare specifier will not resolve never reaches
+`window.onerror` with anything readable. An ad-blocker, an office or school
+proxy, a laptop away from a signal or ten minutes of CDN trouble all produce it.
+`vendor/README.md` carries versions, source URLs, SHA-256s and both MIT notices.
+
+**2. `dist/` IS NOW WHAT ITS OWN BUILD HEADER HAS ALWAYS SAID IT WAS.**
+`build.mjs` described its output as "a single self-contained HTML file that runs
+straight from `file://` with no server" and it was neither — it inlined 7.5 MB
+of game and left `import * as THREE from 'three'` pointing at the network. It
+inlines both libraries now, **each in its own IIFE**, which is not tidiness:
+three.js and cannon-es both declare a top-level `Material` (and `Quaternion`,
+`Shape`, `Plane`, `Sphere`), so a flat concatenation collides immediately. The
+build re-checks that each file is import-free, `import.meta`-free, has exactly
+one trailing `export { … };` and uses no `as` aliases before wrapping it, and
+refuses to emit a bundle that still names a CDN.
+
+**AND THE TRAP THAT COST THE MOST: `String.replace(pattern, string)` INTERPRETS
+`$&`, `` $` `` AND `$'` IN THE REPLACEMENT.** three.js contains a `$'`. The
+bundle therefore had "everything after the match" — `</script></body></html>` —
+spliced into the middle of a string literal 1.2 MB in. It was the right sort of
+size, it looked fine, and it died with `SyntaxError: Invalid or unexpected
+token`. **A replacer function is passed the match instead of scanning for `$`
+and has no such behaviour**; both `replace` calls in `build.mjs` are functions
+now, including the one inserting fixed text, so the next person to edit it does
+not have to know this. The latent bug was always there — the game's own source
+simply never happened to contain a `$` sequence.
+
+**3. A FAILURE CARD, IN THE GAME'S OWN PALETTE, THAT SAYS WHICH FAILURE IT WAS**
+(`index.html`). No WebGL, nothing loaded, or a throw during boot — each gets its
+own words, its own list of things to try, and a reload button. Two rules make it
+work:
+
+- **The pre-flight probe asks for EXACTLY the two contexts three.js asks for, in
+  its order** (`webgl2` then `webgl`). It used to fall back to
+  `experimental-webgl`, which some browsers answer when they will not answer
+  `webgl`, so the probe passed, the renderer failed on its own request, and the
+  player got the generic card instead of the one naming the cause. *A capability
+  check that is more generous than the thing it is checking for is worse than no
+  check at all.*
+- **The watchdog is called off by a FRAME, not by a module.** `window.__capy` is
+  assigned in the first ten lines of `mainBoot`, so clearing on that would call
+  it off before any of the twenty-three modules had run. `main.js` sets
+  `window.__capyRunning` after two `requestAnimationFrame`s.
+
+The `#boot` card is **hidden and never removed** now. It used to be removed
+700 ms after the first frame, which was fine while the only thing it could say
+was "warming up the harbour…"; it is now the one place in the game that can talk
+to a player in plain words, and the most likely such moment happens hours in.
+
+**4. A LOST GL CONTEXT HAD NEVER BEEN LISTENED FOR ANYWHERE IN THE TREE**
+(`main.js`). It happens on a driver reset, on a laptop waking from sleep, when
+another tab takes the memory, and on Windows whenever the GPU is preempted for
+more than about two seconds. The result was a black rectangle with the HUD still
+drawn over it and every key still answering — the worst kind of failure, because
+it looks like the game is fine and the player is doing something wrong.
+`webglcontextlost` **must** `preventDefault()`, or the browser will not even try
+to give the context back; `game.tick` returns early while it is gone, because
+stepping the world behind that card would hand the player back a capybara
+somewhere else.
+
+**5. TOUCH WAS ABOUT 60 % OF A CONTROL SCHEME** (`systems.js`). The plumbing was
+never the problem — the fan, the phone CSS, the safe-area insets and the gamepad
+map are all thought through. The problem was that a phone player was *shown* a
+scheme they did not have:
+
+- The title legend listed seven keyboard keys, every one naming something a
+  phone does not have. `sysLEGEND_TOUCH` is chosen by `sysIsTouch()`, which is
+  the same media query the touch layer itself switches on — so the legend and
+  the buttons cannot disagree about which scheme the player has.
+- **Thirty-nine of the 191 hint clues name a key** (`press E at the fire`, `hold
+  Shift and barge them`). `sysSay()` rewrites them at the two places a clue is
+  resolved — **before** the `clue !== clueEl.textContent` comparison, or the
+  rewritten text is never equal and it rewrites four times a second. Checked
+  against all 191 strings first: 39 rewrite, 152 untouched, no lone capital
+  survives. That test is why the bare `\bE\b` and `\bQ\b` rules are safe here
+  and would not be safe on arbitrary prose.
+- **The slide** got a fourth button in the fan. **The stuck-rescue got a fifth,
+  and deliberately not in the fan** — it is a rescue, not a verb, so it is
+  smaller, dashed, quieter, and parked under the chart in the top right where no
+  thumb arrives by accident. It went bottom-left first, which is wrong twice
+  over: that is inside `.capyui-zone`, so it eats the corner a thumb rests the
+  stick on, and it puts a rescue in among the controls. Measured: held 1.4 s it
+  puts the animal 14.5 m back, on its feet. `R` exists precisely so a three-hour
+  game has no state whose only answer is F5, and on a phone it had one anyway.
+- **Pinch to zoom.** The camera distance was the wheel and the pad's right stick
+  and nothing else. Writing the touch legend advertised a pinch, which made the
+  legend a lie the moment it was written — so it was implemented rather than
+  retracted. Two fingers zoom and do not also turn; the second finger is *not*
+  pointer-captured, because capture routes every later event for that id to one
+  element. Touch drags now take their delta from the last client position:
+  **`movementX` is a mouse concept and is not reliably filled in for touch
+  pointers.** Both handlers clear on `blur` and on `visibilitychange`, because
+  an interrupted pinch never gets its `pointerup`s.
+
+**AND ONE MEASUREMENT THAT IS NOT A FINDING.** Render cost is entirely
+resolution-bound — 1.96 ms at 1280×720, 8.12 ms at 2560×1440, **17.4 ms at
+3200×1800**, i.e. past the budget. That is fine, because the adaptive scaler
+already existed and is correct (`sysMaxDPR()` scales the ceiling by pixel count;
+a 2 s sampler walks the render scale down to 0.7 below 50 fps). It is
+load-bearing on any high-DPI display and should not be removed. The first probe
+written for this pass reported `hasQualityApi: false` and it was **the probe
+that was wrong**, not the game — the fourth time in this project's history that
+a review's opening instrument has lied about a feature that was already built.
+
+What is left, and why the rest of it is not in this file: see `ROADMAP.md`. The
+short version is that the one remaining hard blocker is a `LICENSE`, and that is
+not a technical decision.
+
+## THE SECOND HOUR (v51 — 31 Aug 2026)
+
+Seven versions of picture work (v44–v50) and the last change to the *loop* was
+v43. So this one asks the question the picture cannot: **is a chapter still fun
+at minute twenty-five.** Five things, every one of them measured first, and
+three of the five are a feature that was already written and could not be
+reached.
+
+### 1. THE MISCHIEF SANDBOX WAS A FIFTH THE SIZE IT LOOKED (props.js)
+
+Measured, all nineteen chapters, live props counted by `p.biome`:
+
+| | |
+|---|---|
+| Sydney | **49** (42 grabbable) |
+| Pasto · Monte Carlo · Hanoi | 24 · 20 · 16 |
+| the other fifteen | **8 to 11**, every one of them inside a single annulus |
+
+Sydney is the chapter everybody's sense of this game comes from, and it has five
+times what the average chapter has. Worse, the fifteen keep theirs in ONE
+cluster 13–26 m across, so two streets away the world has nothing loose in it at
+all: forty-five seconds of active free play measured **zero prop impacts in
+Kyoto, Cali, Rio, the Drift, Sơn Đoòng and the Pantanal**.
+
+And it shows worst at the arrival, which is the worst place for it to show.
+Props within 20 m of the spawn: **0** in Cali, the Pantanal, Sơn Đoòng and
+Hanoi, **1** in Kyoto and Monte Carlo. Sydney's is nine. Sơn Đoòng had zero
+within *eighty* metres — its whole list is at the survey camp, 109 m away.
+
+A `physBIOME_SCATTER` row may now carry **`also`**, a second annulus, and
+sixteen do. `physScatterRing` is the old loop, split out; `physScatterBiome`
+runs it twice. Three rules, and the first two are the ones the first annulus was
+already held to:
+
+1. **It is centred on a person.** Ownership is by where a prop LIVES — inside
+   `npcOWN_R` (11 m) of its home — so an annulus on empty ground is a guarantee
+   that nothing belongs to anybody and the ownership chase cannot fire. Every
+   centre is a position read off that chapter's own `game.locals`, not a
+   coordinate somebody liked the look of.
+2. **Nothing is from the wrong kind of place.** Same list as the chapter's own
+   first annulus or a subset of it. No new geometry, no new types.
+3. **It goes where the first one is not** — at least twenty-five metres away,
+   and where a chapter had nobody's belongings at the arrival, that is where it
+   goes.
+
+**The Drift does not get one, on purpose**: its nine props are one household's,
+its islands are forty metres of sky apart at different altitudes, and the long
+note on its row is an argument for exactly one cluster. Sydney and Pasto do not
+need one.
+
+**MEASURED AFTER: 100% placement in all sixteen** (`physSpotOk` refused not one
+candidate centre), every new prop resting 0.1–0.8 m above its own terrain, the
+fifteen thin chapters now at 15–20, Cali's arrival 0 → 8, Sơn Đoòng's 0 within
+80 m → 5 within 40, Monte Carlo's 1 → 10. Frame time 16.5–16.8 ms median in all
+nineteen, against a v50 baseline of 16.6–17.0. `qa/fuzz.js` 19/19 clean.
+
+### 2. THE RECORD BOARD HAD NEVER BEEN VISIBLE (systems.js)
+
+v18 built it and the note above it is still true — *"tick the last thing in a
+place and the paper went blank… that is the moment a player leaves and does not
+come back, and it arrives thirteen times"*. **Two things stopped it working and
+both had been there since it was written.**
+
+- `todoRefresh` writes the board into `clueEl`. But a finished chapter's
+  `todoTopId` is `sysWAY_ID`, whose `clue` is `wayClue`, and the hint tick
+  rewrites `clueEl.textContent` from `sysHINTS[todoTopId]` **four times a
+  second** — so the board survived about 250 ms. Measured in Kyoto: 11 / 11 on
+  the tally and a clue reading `three wheeks when you get there, and the board
+  opens`. Every chapter declares `way`, so this happened in all nineteen. The
+  hint tick now skips the element while it carries the `recs` class, which is
+  the class the board branch already sets — no second flag to keep in step.
+- `.capyui-clue` is clamped to `max-height:3.2em` with `overflow:hidden`,
+  because a CLUE is one sentence. The board is up to eight lines. `.recs` now
+  raises it to 16em, which is Monte Carlo — five records with the way clue
+  wrapped above them.
+
+**...and it could only ever list what you had already done.** It was built out
+of `recText`, which is empty for a row with no stored figure, so a chapter you
+finished without racing anything showed an empty board. A row you do NOT hold is
+the more interesting line of the two — it is the only thing on that card that is
+an invitation — so an unheld record now prints `<label> — not yet`. The par is
+deliberately not printed there: the live line says what a good one is at the
+moment that is worth knowing, and five rows of it is a spreadsheet on a piece of
+scrap paper.
+
+Kyoto, finished, now reads:
+
+```
+DONE HERE
+  the way on: the bridge at Uji            ▸ 79 m
+  three wheeks when you get there, and the board opens
+  the tunnel in — not yet
+  the grove in — not yet
+  the river in 40.0 s
+  you kept: a tea whisk, slightly chewed
+KYOTO & UJI  ·  11 / 11
+```
+
+### 3. THE NEAR MISS (systems.js)
+
+`recordValue` speaks when a run BEATS something and is silent otherwise, and
+`recordEnd` cleared the line without a word — so fifty-five measured things paid
+out on exactly one of their outcomes. A run that came within a tenth of your
+best was told the same thing as a run that fell over at the first corner, and
+the "one more go" that every one of those rows exists to produce had no voice.
+
+    game.recordLive(id, v)   ...captures jrRecs[id] as recOpenBest when the id CHANGES
+    game.recordEnd(id)       ...and recClose() compares against it
+
+Four rules:
+
+1. **It needs a best to be near.** With no stored figure there is no near miss,
+   so the deliberate silence on a first attempt is untouched. `recOpenBest` is
+   read when the attempt OPENS, which is what makes a run that beat the best —
+   and has therefore already overwritten it — read correctly as a win.
+2. **It has to be near**: `sysNEAR_BAND` (7%) of the standing figure, floored by
+   `sysNEAR_FLOOR` (0.35) so a two-second record is not held to two hundredths.
+   An abandoned run is a long way off and is silent by construction.
+3. **The smallest channel there is**: a toast and a flat chime under the personal
+   best's pitch and volume. No card, no lift, no confetti, no slow motion.
+4. **It cannot nag**: one line per closed attempt and one per `sysNEAR_COOL`
+   (12 s).
+
+`recClose` runs from `recordEnd` AND from the stale watchdog, because a chapter
+that simply stops handing a figure over is the run ending too. It does **not**
+run on `biome:enter` — an attempt abandoned by travelling is not a near miss,
+which is why that clear is written out by hand rather than calling `recordEnd`.
+
+`recGapUnit` prints a unit only when the gap is IN one — half the rows are
+counts (`of the six`, `on the two`, `gulls at once`) where *"2 of them off"* is
+nonsense and *"2 off your best"* is right.
+
+Measured: best 40.0 s, run 41.5 → `so close · 1.5 s off your best`; run 48.0 →
+silence; run 38.0 → silence; no best at all → silence.
+
+### 4. THE CHAIN CLIMBS (systems.js)
+
+The incident is the only repeatable reward in this game and it was **completely
+silent until the moment it paid out**: three things happened, a card appeared,
+and nothing on the way there said anything was being counted. A reward you
+cannot aim at is a lottery, not a loop.
+
+The fix is the one the torii tunnel already found — a note per event, going up.
+Quiet, positional, from where the thing happened, rising over the length of the
+chain, so the rule is learnt by ear inside one chapter and can be played for
+after that. No HUD, nothing named, nothing listed, nothing gated: the finds'
+three laws hold and the card is still the payout. **Not on the event that
+cards** — that one has a chime, a lift, confetti and a card of its own, and a
+fourth voice on the same frame is mud. And a chain that reached two and then
+died says so once, going DOWN, which is the other half of the pattern.
+
+### 5. THE ENCORE, AND KYOTO HAD ONE NUMBER IN IT (kyoto.js, shared.js)
+
+Kyoto: eleven tasks and a single record — the thinnest chapter in the game to
+come back to. It had TWO set pieces with a clock in them by construction and
+both **switched themselves off for ever** the first time they were done:
+`kyoCheckTorii` opened `if (kyoToriiDone) return` and `kyoCheckBamboo` opened
+`if (kyoBambooDone) return`.
+
+That one line was the whole of what was wrong with the last twenty minutes of
+the chapter. Forty-four gates up a mountain, a wooden block per gate climbing a
+scale, a camera rail written specially for it — all of it inert scenery from the
+moment it paid out.
+
+Rio's Selarón steps has done it the right way since v32 (*"been here before: no
+tick, no instruction, just the number"*), and Venice's passerelle and Hong
+Kong's laundry pole both re-arm. Kyoto was the exception, so now:
+
+- the task keeps its latch (a tick fires once) and the RUN re-arms — counter
+  back to zero, gates singing, `game.record` filed on every run including the
+  first;
+- **`torii-run`** — `the tunnel in`, lower, par **32 s**;
+- **`bamboo-dash`** — `the grove in`, lower, par **17 s**;
+- the tunnel's clock starts at gate ONE and nowhere else, so walking down
+  through gate forty and back up is not a two-second run; a run decayed all the
+  way back to nothing closes the line rather than counting up beside a player
+  who left the mountain; and the grove's line waits until the crossing is a
+  third done, so walking past the corner does not put a clock on the paper.
+
+**BOTH PARS ARE MEASURED.** A scripted steer holding sprint the whole way, aimed
+gate to gate, does the tunnel in **24.7 s** and the grove in **14.5 s**. Those
+are the machine floors, and a par a player cannot reach is worse than no par —
+the first guesses were 34 and 12, and 12 was unreachable.
+
+**Verified:** three consecutive runs of the tunnel, **44 gate ticks every time**,
+the arrival toast on the first only, the record filed on all three. Before the
+change, runs two and three produced nothing at all.
+
+### WHAT THE MEASURING TAUGHT, AND IT IS THE SAME LESSON AS v36
+
+Three of these five are a feature that was written, published, documented at
+length and then **never once reached**: the board (two independent blockers), the
+chain's legibility, the tunnel's second run. The instrument that found all three
+was the same — *play it the way a player would and count what happens* — and the
+one that found the props was a single line: live props per chapter, by
+`p.biome`. None of it needed a new system. See [[capy3-payoff-batch-one]] and
+[[capy3-five-things-already-built]] for the previous two times this was the
+answer.
+
+**AND TWO HARNESS TRAPS, BOTH OF WHICH READ AS THE FEATURE NOT WORKING.**
+`toast()` and `sfx()` inside systems.js are module-local — wrapping `game.toast`
+or `game.sfx` from a probe sees NOTHING they emit, and the first near-miss run
+came back with six empty arrays against a feature that worked. Observe the
+`.capyui-toasts` DOM instead. And a closed-loop steer with no pathfinding walks
+into the first wall between the spawn and the target and stands there for two
+minutes: put the animal at the START of the corridor being measured.
+
+
 ## THE FALLEN BLOSSOM (v50 — 30 Aug 2026)
 
 `shared.js`'s contact header calls these *"the worst-looking thing in

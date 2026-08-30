@@ -2897,6 +2897,21 @@ export const FINDS = [
 
 export const RECORDS = {
   'uji-run':       { label: 'the river in', unit: ' s', better: 'lower', dp: 1 },
+  // ---- KYOTO HAD ONE NUMBER IN IT (v51) ---------------------------------
+  // Eleven tasks and a single record, which made it the thinnest chapter in the
+  // game to come back to — and it had TWO set pieces sitting there with a clock
+  // in them by construction, both of which switched themselves off for ever the
+  // first time they were done. See kyoCheckTorii and kyoCheckBamboo: the run
+  // re-arms now, so these two rows are things you can be better at rather than
+  // switches you flipped once.
+  //
+  // BOTH PARS ARE MEASURED, NOT GUESSED. A scripted steer holding sprint the
+  // whole way, aimed gate to gate, does the tunnel in 24.7 s and the grove in
+  // 14.5 s — those are the machine floors, and a par a player cannot reach is
+  // worse than no par at all. The figures below sit above them by about the
+  // margin a person steering an S-curve uphill on a stamina bar actually loses.
+  'torii-run':     { label: 'the tunnel in', unit: ' s', better: 'lower', dp: 1, par: 32 },
+  'bamboo-dash':   { label: 'the grove in', unit: ' s', better: 'lower', dp: 1, par: 17 },
   'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 18 },
   'dune-surf':     { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
   'souk-escape':   { label: 'shook them in', unit: ' s', better: 'lower', dp: 1 },
