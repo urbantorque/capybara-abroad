@@ -1594,6 +1594,56 @@ const sysEXPOSURE = {
 const sysEXP_DEF = 1.0;
 
 // ===========================================================================
+// THE AIRLIGHT — WHAT THE SPILL COULD NEVER REACH (v48).
+//
+// The spill lights SURFACES: it lives in the rim's injection and reaches the
+// ground, the stalls and the animal. What it cannot reach is the air BETWEEN
+// the lens and them, because there is no fragment out there. On a wet night in
+// Mong Kok the neon paints the road and the shopfronts and then simply stops,
+// and the fifteen metres of humid air it is actually shining through is drawn
+// as nothing at all.
+//
+// One number per chapter, and it is ONLY for chapters that have both an
+// emitter pool and something in the air to catch it. A lamp in clean daylight
+// scatters nothing worth drawing, which is why this table is four rows and not
+// nineteen — and why a chapter that registers no emitters pays a single
+// coherent branch whatever is written here.
+//
+// It reads the SAME pool the spill does (shared.js `spillUniforms`), so the
+// lights on the road and the light in the air over it are one ranking and can
+// never disagree about where the lamps are.
+//
+// THESE ARE AN ORDER OF MAGNITUDE SMALLER THAN THE FIRST DRAFT, which had them
+// at 0.20-0.34 by guess. Swept (qa/airlit-sweep.js), Mong Kok at 0.05 already
+// touched 92% of the frame and at 0.24 it was 99% with a mean of +25 — a wash,
+// not a glow. The band where this reads as light in the air rather than as a
+// filter over the picture is 0.02 to 0.04: peak around +33 of 255 on the halo,
+// a quarter to a half of the frame touched, and nothing blown.
+//
+// AND THE CAVE ROW CANNOT BE JUDGED FROM ITS ARRIVAL FRAME. Swept there it read
+// 0.00 at every strength, which looks exactly like a dead row — the chapter in
+// fact has 826 emitters and the doline mouth simply has none within reach.
+// Measured ten metres from the brightest of them (qa/airlit-cave.js) the same
+// 0.24 gave a peak of +216. A chapter whose lights are all somewhere else needs
+// probing where its lights are.
+const sysAIRLIT = {
+  // The chapter this was built for. A wall of neon over a wet street, and the
+  // one place in the game where the air is the subject rather than the medium.
+  kowloon: 0.030,
+  // Blue hour on the quay: one lamp, damp air off the harbour, and a chapter
+  // whose whole grade row is written about what light does at that hour.
+  monaco: 0.035,
+  // Half past eleven at night, and the windows are the only warm thing for a
+  // mile. Iceland's air is thin and cold — less of it than Hong Kong's, and
+  // the point here is the halo around a window rather than a haze on a street.
+  iceland: 0.028,
+  // Inside a mountain, where there is genuinely mist and the glow-worms and
+  // the lantern are the only light there is.
+  cave: 0.030,
+};
+const sysAIRLIT_DEF = 0;
+
+// ===========================================================================
 // THE DEPTH — one row per chapter, and the only place a chapter says how DEEP
 // it wants to look. See THE DEPTH PASS in CONTRACT.md and the header over
 // MAIN_POST_COC in main.js.
@@ -18583,6 +18633,10 @@ export function createSystems(game) {
     // of a stop that belongs to neither. The swap is inside the white hold.
     pp.exposure = game.state.noExposure ? 1
                 : (sysEXPOSURE[name] === undefined ? sysEXP_DEF : sysEXPOSURE[name]);
+    // ...and the light in the air. Same rule: not cross-faded, cut by its
+    // switch, and zero in the fifteen chapters that do not ask for it.
+    pp.airLight = game.state.noAirLight ? 0
+                : (sysAIRLIT[name] === undefined ? sysAIRLIT_DEF : sysAIRLIT[name]);
     // ---- AND THE DEPTH ---------------------------------------------------
     // Three more switches on the same terms: cut, never faded.
     //

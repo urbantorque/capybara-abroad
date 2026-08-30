@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, clamp } from './shared.js';
+import { PALETTE, clamp, spillSlots, spillUniforms } from './shared.js';
 import { createEnvironment } from './environment.js';
 import { createPhysicsWorld, createProps } from './props.js';
 import { createCapybara } from './capybara.js';
@@ -713,6 +713,15 @@ function mainMakeBiomes(game) {
 // refuses a multisampled target — `enabled` goes false and the game renders
 // exactly the way it did before. A post chain is not worth a black screen.
 // ---------------------------------------------------------------------------
+// The pool size is shared.js's and is a compile-time literal in both shaders.
+const MAIN_SPILL_N = spillSlots();
+const mainSpillU = spillUniforms();
+// How far down a view ray the airlight is allowed to look, in metres. A pixel
+// of SKY carries the far plane as its depth, which is 2 200 m over Goreme, and
+// integrating two kilometres of air for a lamp ten metres away saturates the
+// term on the horizon. Every emitter in the game has a reach of 14-26 m, so
+// there is nothing past this to find.
+const MAIN_AIRLIT_FAR = 90;
 const MAIN_POST_VERT = [
   'in vec3 position;',
   'in vec2 uv;',
@@ -900,6 +909,17 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform vec3  uAirCol;',
   'uniform float uCreaseK;',
   'uniform vec2  uCrease;',
+  // ---- AIRLIGHT (v48). See the block over mainAirLight below.
+  'uniform float uAirLitK;',
+  'uniform float uAirLitFar;',
+  'uniform vec3  uCamPos;',
+  'uniform vec3  uRayBL;',
+  'uniform vec3  uRayDX;',
+  'uniform vec3  uRayDY;',
+  'uniform vec4  uSpillP[' + MAIN_SPILL_N + '];',
+  'uniform vec3  uSpillC[' + MAIN_SPILL_N + '];',
+  'uniform float uSpillOn;',
+  'uniform float uSpillN;',
   'const vec3 MAIN_LUMA = vec3(0.2126, 0.7152, 0.0722);',
   MAIN_POST_DEPTH_FN,
   // FOUR OPPOSED PAIRS. Index 2i and 2i+1 are the same axis in opposite
@@ -946,6 +966,77 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '  float df = d0 - dn;',
   '  return smoothstep(0.0, uCrease.y, df) *',
   '         (1.0 - smoothstep(uCrease.y, uCrease.y * 6.0, df));',
+  '}',
+  // ---- AIRLIGHT: A LAMP IN MIST -------------------------------------------
+  //
+  // The spill (v-presence) lights SURFACES — it lives in the rim's injection
+  // and reaches the ground, the stalls and the animal. What it has never been
+  // able to reach is the air BETWEEN the lens and those surfaces, because
+  // there is no fragment out there: on a wet night in Mong Kok the neon paints
+  // the road and the shopfronts and then simply stops, and the fifteen metres
+  // of humid air it is actually shining through is drawn as nothing at all.
+  //
+  // The composite is the only place this can happen, because it is the only
+  // place with a depth buffer — and therefore the only place that knows how
+  // far the air in front of each pixel goes before something solid stops it.
+  //
+  // IT IS THE REAL INTEGRAL, AND THE FIRST VERSION WAS NOT.
+  //
+  // The cheap version asked only "how close does this ray pass to the lamp",
+  // shaped with the same reach ramp the spill uses on surfaces. Measured, that
+  // touched **99.8% of the Mong Kok frame with a mean of +64 of 255** — a wash
+  // over the whole picture rather than a glow around anything. The reason is
+  // that it had NO DEPENDENCE ON HOW FAR AWAY THE LAMP WAS: the camera stands
+  // ten metres from a cluster whose reach is twenty, so essentially every ray
+  // in the frame passes inside that radius and every one of them scored the
+  // same. The spill gets away with a reach ramp because it measures from a
+  // SURFACE POINT, which is bounded; a view ray is not.
+  //
+  // So this is the scattering integral, which is the thing that actually has
+  // the right shape:
+  //
+  //     ∫₀^tMax dt / (dmin² + (t-b)²)  =  (1/dmin)·[atan((tMax-b)/dmin) − atan(−b/dmin)]
+  //
+  // where b is the lamp's projection onto the ray and dmin its perpendicular
+  // distance from it. Two atan per light, and it gives all three behaviours the
+  // cheap form was missing for free: it falls with perpendicular distance, it
+  // falls with the lamp's distance from the lens (the angular span closes), and
+  // it accounts for how much of the segment actually lies near the lamp — so a
+  // ray that stops at a wall in front of a lamp collects almost nothing.
+  //
+  // Only the four chapters with a strength pay for it, and only when their
+  // pool is non-empty: uSpillOn is a coherent branch and uSpillN is a bound.
+  //
+  // STILL BOUNDED BY REACH, because an inverse square never quite reaches zero
+  // and a sign cluster on the next street should not tint this one.
+  //
+  // Clamped to uAirLitFar, because a pixel of SKY carries the far plane as its
+  // depth and the segment would otherwise be two kilometres of air.
+  //
+  // ADDITIVE, AND NOT MULTIPLIED BY THE ALBEDO — the exact opposite of the rule
+  // one function over in the spill, and for the opposite reason. The spill is
+  // light landing ON something and takes that thing's colour; this is light
+  // scattered by the air on its way to the lens, and there is no surface
+  // involved to take the colour of.
+  'vec3 mainAirLight(float d, vec2 uv) {',
+  '  vec3 rd = uRayBL + uRayDX * uv.x + uRayDY * uv.y;',
+  '  float rlen = length(rd);',
+  '  vec3 dir = rd / rlen;',
+  // d is measured along the VIEW AXIS; the ray is longer than that everywhere
+  // except the centre of the frame, and rlen is exactly that ratio.
+  '  float tMax = min(d * rlen, uAirLitFar);',
+  '  vec3 acc = vec3(0.0);',
+  '  for (int i = 0; i < ' + MAIN_SPILL_N + '; i++) {',
+  '    if (float(i) >= uSpillN) break;',
+  '    vec3 L = uSpillP[i].xyz - uCamPos;',
+  '    float b = dot(L, dir);',
+  '    float dmin = sqrt(max(dot(L, L) - b * b, 0.04));',
+  '    float I = (atan((tMax - b) / dmin) - atan(-b / dmin)) / dmin;',
+  '    float reach = uSpillP[i].w;',
+  '    I *= 1.0 - smoothstep(reach * 0.5, reach * 1.5, dmin);',
+  '    acc += uSpillC[i] * I;',
+  '  }',
+  '  return acc;',
   '}',
   'float mainCrease(float d0, vec2 uv) {',
   '  float rpx = clamp(uFocalPx * uCrease.x / max(d0, 0.05), 1.5, 24.0);',
@@ -1005,6 +1096,12 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '    if (uAirK > 0.000001 && raw < 0.999999) {',
   '      float a = min(1.0 - exp(-d * uAirK), uAirMax);',
   '      lin = mix(lin, uAirCol, a);',
+  '    }',
+  // 4. AND THE LIGHT IN IT. Last, because it is the only one of the four that
+  //    ADDS rather than modifying what is there: haze goes over the picture
+  //    and a glow in the air goes over the haze.
+  '    if (uAirLitK > 0.0 && uSpillOn > 0.5) {',
+  '      lin += mainAirLight(d, vUv) * uAirLitK;',
   '    }',
   '  }',
   '  lin += texture(tBloom, vUv).rgb * uBloom;',
@@ -1103,6 +1200,10 @@ const MAIN_CREASE_RANGE = 0.30;
 // pixels of circle at 720 — a softness rather than an effect.
 const MAIN_DOF_RADIUS = 1.6;
 const mainPostSize = new THREE.Vector2();
+// Scratch for the airlight ray basis. Nothing in post.render allocates.
+const mainAirR = new THREE.Vector3();
+const mainAirU = new THREE.Vector3();
+const mainAirF = new THREE.Vector3();
 // A 1x1 black texture standing in for the bloom buffer when bloom is off, so
 // the composite shader never samples an unbound sampler.
 const mainPostBlack = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
@@ -1135,6 +1236,8 @@ function mainMakePost(game) {
       //   crease     how deep a corner may go, 0 .. ~0.35
       dof: 0.0, dofNear0: -1, dofNear1: 0, dofFar0: 1e6, dofFar1: 2e6,
       air: 0.0, airMax: 0.0, airR: 1, airG: 1, airB: 1,
+      // v48. Light IN the air rather than on the things in it.
+      airLight: 0.0,
       crease: 0.0,
     },
     render() { renderer.setRenderTarget(null); renderer.render(game.scene, game.camera); },
@@ -1247,7 +1350,16 @@ function mainMakePost(game) {
       uAirK: { value: 0 }, uAirMax: { value: 0 },
       uAirCol: { value: new THREE.Vector3(1, 1, 1) },
       uCreaseK: { value: 0 },
+      uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
+      uCamPos: { value: new THREE.Vector3() },
+      uRayBL: { value: new THREE.Vector3() },
+      uRayDX: { value: new THREE.Vector3() },
+      uRayDY: { value: new THREE.Vector3() },
       uCrease: { value: new THREE.Vector2(MAIN_CREASE_R, MAIN_CREASE_RANGE) },
+      // THE LIVE POOL, not a copy: systems.js goes on writing it exactly as
+      // it did for the surfaces, and one ranking per frame feeds both.
+      uSpillP: mainSpillU.p, uSpillC: mainSpillU.c,
+      uSpillOn: mainSpillU.on, uSpillN: mainSpillU.n,
     });
 
     quad = new THREE.Mesh(tri, matBright);
@@ -1330,6 +1442,35 @@ function mainMakePost(game) {
       cu.uFocalPx.value = (vh * 0.5) /
         Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
       cu.uCreaseK.value = game.state.noCrease ? 0 : p.crease;
+      // ---- the airlight's ray basis ------------------------------------
+      // Three world vectors, rebuilt once a frame, so the fragment shader can
+      // get a world ray out of its own uv with two multiplies and an add and
+      // needs no inverse-view-projection.
+      //
+      // THEY ARE SCALED SO THAT rd . forward == 1 EXACTLY. That is what makes
+      // the linear depth usable as a ray parameter without a second dot
+      // product per pixel: the shader takes `length(rd)` as the ratio between
+      // view-axis depth and true distance, which is 1 at the centre of the
+      // frame and larger at the corners.
+      const airLit = game.state.noAirLight ? 0 : p.airLight;
+      cu.uAirLitK.value = airLit;
+      if (airLit > 0.0005) {
+        cam.updateMatrixWorld();
+        const e = cam.matrixWorld.elements;
+        // the camera's own basis, straight out of its world matrix
+        mainAirR.set(e[0], e[1], e[2]);
+        mainAirU.set(e[4], e[5], e[6]);
+        mainAirF.set(-e[8], -e[9], -e[10]);
+        const th = Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * cam.fov);
+        const tw = th * cam.aspect;
+        cu.uCamPos.value.setFromMatrixPosition(cam.matrixWorld);
+        // uv 0..1, so the corner is -tw and the span is 2*tw
+        cu.uRayDX.value.copy(mainAirR).multiplyScalar(2 * tw);
+        cu.uRayDY.value.copy(mainAirU).multiplyScalar(2 * th);
+        cu.uRayBL.value.copy(mainAirF)
+          .addScaledVector(mainAirR, -tw)
+          .addScaledVector(mainAirU, -th);
+      }
       cu.uAirK.value = game.state.noAir ? 0 : p.air;
       cu.uAirMax.value = p.airMax;
       cu.uAirCol.value.set(p.airR, p.airG, p.airB);

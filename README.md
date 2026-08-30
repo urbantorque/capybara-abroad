@@ -1164,6 +1164,50 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## The neon reaches the air now
+
+Lights in this game have painted the road, the shopfronts and the capybara for a
+while. What they have never touched is the fifteen metres of air in between,
+because there is nothing out there to paint — a fragment shader colours
+surfaces, and air is not one. So Mong Kok's neon lit the street and then simply
+stopped, and Monte Carlo's lamp burned on the quay with nothing at all happening
+around it.
+
+That needs to know how far the air in front of each pixel goes before something
+solid stops it, which is exactly what the depth buffer added a couple of passes
+ago is for. Four chapters have it: the wall of neon over a wet Mong Kok street,
+blue hour on the Monte Carlo quay, the lit windows of a Reykjavík that is dark
+at half past eleven, and the inside of Sơn Đoòng, where the glow-worms and one
+lantern are the only light there is.
+
+It uses the same list of lamps the surfaces already use, so the glow in the air
+and the light on the road are worked out from one answer to "where are the
+lights" and can never drift apart.
+
+Two things went wrong on the way, and they were the same mistake twice: guessing
+a number instead of measuring one.
+
+**The first version had no idea how far away the lamp was.** It asked only how
+near the line of sight passed to a light, which sounds right and is not: the
+camera stands ten metres from a sign whose glow reaches twenty, so *every* line
+of sight in the frame passes close to it and every one of them glowed equally.
+The result covered 99.8% of the picture — a coloured fog over everything rather
+than a halo around anything. Doing the real arithmetic instead, the one that
+accounts for how much of the view actually passes near the lamp before it hits a
+wall, fixed it: now a light behind you does nothing, a light across the street
+does a little, and a light you are standing under does a lot.
+
+**And the strengths were an order of magnitude too high.** At the first guess
+Mong Kok was 99% covered; the band where this reads as light in the air rather
+than as a filter over the lens turned out to be about a tenth of that.
+
+There was also a near miss worth recording. Sơn Đoòng measured as doing nothing
+at all — zero at every strength — which looks exactly like a feature that is not
+wired up. It has eight hundred and twenty-six lights in it. The chapter simply
+opens at the cave mouth, where none of them are within reach. Every other visual
+pass in this game has been checked from the nineteen opening shots, and for this
+one thing that method confidently returns the wrong answer.
+
 ## Palawan stopped being made of paper
 
 The beach in Palawan is crushed coral and it really is almost white, and the

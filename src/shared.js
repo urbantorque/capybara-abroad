@@ -1550,6 +1550,27 @@ const _spillWRAP = 0.34;
 /** How many slots the pool has. systems.js ranks into this many. */
 export function spillSlots() { return _SPILL_N; }
 /**
+ * THE SAME UNIFORM OBJECTS, for the composite pass to bind (v48).
+ *
+ * The spill lights SURFACES — it lives in the rim's injection and reaches the
+ * ground, the stalls and the animal. What it cannot reach is the air BETWEEN
+ * the lens and those surfaces, because there is no fragment there: a lamp in
+ * mist is a glow in nothing, and nothing is not a thing this renderer draws.
+ * The composite pass is where that has to happen, because it is the only place
+ * with a depth buffer and therefore the only place that knows how far the air
+ * in front of each pixel goes.
+ *
+ * It hands back the LIVE objects rather than copies, so main.js binds them once
+ * and systems.js goes on writing the pool exactly as it did — one ranking per
+ * frame feeding both the surfaces and the air, which is the only way the two
+ * can never disagree about where the lights are.
+ *
+ * `n` is a bound and not a count: systems.js packs live slots to the front.
+ */
+export function spillUniforms() {
+  return { p: _spillP, c: _spillC, on: _spillOn, n: _spillN };
+}
+/**
  * Write the pool. systems.js calls this once per frame with at most
  * spillSlots() entries, already ranked and already faded:
  *

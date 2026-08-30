@@ -3023,6 +3023,113 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE AIRLIGHT (v48 — 30 Aug 2026)
+
+The spill (v-presence) lights SURFACES. It lives in the rim's injection and
+reaches the ground, the stalls and the animal. What it has never been able to
+reach is the air BETWEEN the lens and those surfaces, because there is no
+fragment out there — so on a wet night in Mong Kok the neon paints the road and
+the shopfronts and then simply stops, and the fifteen metres of humid air it is
+actually shining through is drawn as nothing at all.
+
+The composite is the only place this can happen: it is the only pass with a
+depth buffer, and therefore the only one that knows how far the air in front of
+each pixel goes before something solid stops it. That buffer arrived in v45 and
+this is the second thing it has paid for.
+
+### One pool, two consumers
+
+`shared.js` exports `spillUniforms()`, which hands back the **live** uniform
+objects rather than copies. main.js binds them into the composite material once;
+systems.js goes on writing the pool exactly as it did. One ranking per frame
+feeds both the surfaces and the air, which is the only arrangement in which the
+two can never disagree about where the lamps are.
+
+### It is the real integral, and the first version was not
+
+The cheap version asked only *how close does this ray pass to the lamp*, shaped
+with the same reach ramp the spill uses on surfaces. Measured, that touched
+**99.8% of the Mong Kok frame with a mean of +64 of 255** — a wash over the
+whole picture rather than a glow around anything.
+
+The reason is that it had **no dependence on how far away the lamp was**. The
+camera stands ten metres from a cluster whose reach is twenty, so essentially
+every ray in the frame passes inside that radius and every one of them scored
+the same. The spill gets away with a reach ramp because it measures from a
+SURFACE POINT, which is bounded; a view ray is not.
+
+So it is the scattering integral:
+
+```
+∫₀^tMax dt / (dmin² + (t−b)²)  =  (1/dmin)·[atan((tMax−b)/dmin) − atan(−b/dmin)]
+```
+
+where `b` is the lamp's projection onto the ray and `dmin` its perpendicular
+distance from it. Two `atan` per light, and it gives all three behaviours the
+cheap form was missing: it falls with perpendicular distance, it falls with the
+lamp's distance from the lens (the angular span closes), and it accounts for how
+much of the segment actually lies near the lamp — so a ray that stops at a wall
+in front of a lamp collects almost nothing.
+
+Still bounded by the emitter's reach, because an inverse square never quite
+reaches zero and a sign cluster on the next street should not tint this one. And
+clamped to `MAIN_AIRLIT_FAR` (90 m), because a pixel of SKY carries the far
+plane as its depth and the segment would otherwise be two kilometres of air in a
+chapter whose lamps are ten metres away.
+
+**ADDITIVE, AND NOT MULTIPLIED BY THE ALBEDO** — the exact opposite of the rule
+one function over in the spill, and for the opposite reason. The spill is light
+landing ON something and takes that thing's colour; this is light scattered by
+the air on its way to the lens, and there is no surface involved to take the
+colour of.
+
+### The ray basis
+
+Three world vectors rebuilt once a frame (`uRayBL`, `uRayDX`, `uRayDY`), so the
+fragment gets a world ray out of its own uv with two multiplies and an add and
+the pass needs no inverse-view-projection. **They are scaled so `rd · forward`
+is exactly 1**, which is what makes the linear depth usable as a ray parameter
+without a second dot product per pixel: `length(rd)` is then the ratio between
+view-axis depth and true distance, 1 at the centre of the frame and larger at
+the corners.
+
+### `sysAIRLIT` — four rows, and an order of magnitude
+
+Only chapters with both an emitter pool and something in the air to catch it. A
+lamp in clean daylight scatters nothing worth drawing, and a chapter that
+registers no emitters pays one coherent branch (`uSpillOn`) whatever is written
+here.
+
+The first draft had these at **0.20–0.34 by guess**. Swept (`qa/airlit-sweep.js`),
+Mong Kok at 0.05 already touched 92% of the frame and at 0.24 it was 99% with a
+mean of +25. The band where this reads as light in the air rather than as a
+filter over the picture is **0.02–0.04**: a peak around +33 of 255 on the halo,
+a quarter to a half of the frame touched, nothing blown.
+
+| chapter | k |
+|---|---|
+| kowloon | 0.030 |
+| monaco | 0.035 |
+| iceland | 0.028 |
+| cave | 0.030 |
+
+### THE CAVE CANNOT BE JUDGED FROM ITS ARRIVAL FRAME
+
+Swept at the doline mouth it read **0.00 at every strength**, which looks exactly
+like a dead table row — and a published row with no effect is the failure named
+in the payoff pass. It is not dead: the chapter has **826 emitters** and the
+mouth simply has none within reach. Measured ten metres from the brightest of
+them (`qa/airlit-cave.js`, which finds emitters the same way `sysSpillScan`
+does, teleports the animal and ticks ninety frames so the pool re-ranks), the
+same 0.24 gave a peak of **+216**.
+
+**A chapter whose lights are all somewhere else has to be probed where its
+lights are.** Every other visual pass in this game has been verified from
+nineteen arrival frames, and for this one term that method returns a confident
+false negative.
+
+The switch is `game.state.noAirLight` and it cuts.
+
 ## EXPOSURE (v47 — 30 Aug 2026)
 
 One uniform in `MAIN_POST_COMP`, one table in systems.js, **one chapter in it**.
