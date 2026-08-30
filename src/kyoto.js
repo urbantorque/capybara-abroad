@@ -2154,7 +2154,7 @@ function kyoBuildPondEdge(root) {
   // in the garden that read as geometry. The lily pads are NOT swayed: a pad
   // lies flat on the water and the waterline already moves it.
   swayMesh(kyoInstance(root, kyoG.box, PALETTE.irisLeaf, blades, false, false),
-           { amount: 0.075, axis: 'y', auto: true, stiff: 1.7, hz: 1.45 });
+           { leaf: 0.55, amount: 0.075, axis: 'y', auto: true, stiff: 1.7, hz: 1.45 });
 }
 
 // ======================================================== THE MIRROR POND ===
@@ -4250,7 +4250,7 @@ function kyoBuild(game) {
   // A GROVE THAT DOES NOT MOVE IS A COLONNADE. Stiff, because a bamboo culm
   // is stiff — it is the TOP eight metres that travel and the base does not —
   // and that is exactly what the ramp exponent is for.
-  swayMesh(kyoBambooMesh, { amount: 0.20, axis: 'y', auto: true, stiff: 3.0, hz: 0.62 });
+  swayMesh(kyoBambooMesh, { leaf: 0.55, amount: 0.20, axis: 'y', auto: true, stiff: 3.0, hz: 0.62 });
   const leaves = [];
   for (let i = 0; i < kyoBAMBOO_N; i++) {
     const o = i * 9;
@@ -4260,7 +4260,7 @@ function kyoBuild(game) {
     }
   }
   swayMesh(kyoInstance(kyoRoot, kyoG.cone6, PALETTE.bambooLeaf, leaves, false, false),
-           { amount: 0.26, axis: 'y', auto: true, stiff: 1.2, hz: 0.78 });
+           { leaf: 0.55, amount: 0.26, axis: 'y', auto: true, stiff: 1.2, hz: 0.78 });
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,

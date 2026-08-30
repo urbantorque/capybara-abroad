@@ -3287,7 +3287,7 @@ function hanBuildScatter(root) {
     // slides the whole thing sideways instead of bending it. The weeds coming
     // up through the kerb are the one growing thing in this scatter.
     if (geo === bladeGeo) {
-      swayMesh(im, { amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.8 });
+      swayMesh(im, { leaf: 0.45, amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.8 });
     }
     root.add(im);
   };

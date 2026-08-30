@@ -1164,6 +1164,54 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## Light through a leaf
+
+There has never been any translucency in this game. Not a wrap term, not a
+transmission term, not one line of back-lighting anywhere in twenty-eight
+modules — so every leaf, frond, blade, petal and lily pad in nineteen chapters
+was an opaque facet with a light on it, and a leaf is the one thing in the
+natural world that is famously not opaque. The vegetation in Sơn Đoòng reads as
+cut paper for this reason and no other.
+
+Now the sun comes *through* them. Stand with the light behind a jacaranda and
+the crown lights up from the far side; walk round it and it goes back to being a
+crown. It is the leaf's own colour that arrives, not a white glow — light through
+something green comes out green, and getting that wrong is what makes most
+cheap versions of this look like fog caught on a plant.
+
+It is deliberately strongest exactly where you would expect and absent where you
+would not, which made it surprisingly hard to check: photographing one frame
+proves nothing, because in that frame the sun is usually behind you and there is
+correctly almost nothing to see. Walking the camera all the way round the animal
+is the only honest way to look at it — from the front-lit side the term touches
+three hundredths of a per cent of the picture, and from the backlit side it
+touches six per cent.
+
+The first strength shipped was about a fifth of what it should have been, and
+the instrument agreed with it: an average-brightness comparison read *one
+thousandth of a level* in five chapters and would have signed it off as working.
+A few hundred backlit canopy facets do not move a frame average. Comparing the
+two versions pixel by pixel instead, and then deliberately overdoing it until
+the Pantanal's grass went acid green to find the ceiling, put it about four
+times higher.
+
+Twenty-six places are wired: every swaying plant in ten chapters, and Sydney's
+figs, palms, pines, jacarandas and lily pads. Sơn Đoòng — the chapter that
+prompted the whole thing — is not, because its vegetation is merged into a
+single mesh with the rock and the cave walls and there is nothing there that is
+only leaves.
+
+**And a beach got its wet sand back.** Palawan's shoreline switched from dry sand
+to sea at one contour line, so the swash zone — the band of darker sand that is
+wet because the sea was just there, which is the entire signature of a beach —
+did not exist. It shades off over half a metre of rise now.
+
+Three other shorelines that were on the list to fix turned out to have been built
+already: the Pantanal fades its flood out where it gets thin, Manly runs dry sand
+to wet sand to submerged bank across the whole beach, and Antarctica has a band
+of wet rock and scree at its waterline. Worth knowing before setting out to add
+a thing twice.
+
 ## The frame found out how far away things are
 
 The composite pass had colour in it and nothing else. The scene has always been rendered into a

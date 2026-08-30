@@ -1193,7 +1193,7 @@ function palBuildBeach(game, root) {
   //
   // swayMesh(), not sway(): these cast onto the sand, and a shadow that does
   // not sway with the thing casting it walks away from it.
-  swayMesh(fronds, { amount: 0.22, axis: 'z', lo: 0.10, hi: 1.0, stiff: 2.2, hz: 1.15 });
+  swayMesh(fronds, { leaf: 0.45, amount: 0.22, axis: 'z', lo: 0.10, hi: 1.0, stiff: 2.2, hz: 1.15 });
   root.add(fronds);
   palPalmMesh = fronds;
 }
@@ -4485,7 +4485,18 @@ function palBuild(game) {
     for (let i = 0; i < p.length; i += 3) {
       const h = palTerrain(p[i], p[i + 2]);
       p[i + 1] = h;
-      if (h > 0.1) palCol.copy(dry);
+      // A BEACH DOES NOT HAVE AN EDGE ON IT, and this was the one waterline in
+      // the game that did. `dry` above one contour and `wetc` below it is a
+      // step, so the swash zone — the band of sand that is wet because the sea
+      // was just there, which is the whole visual signature of a beach — did
+      // not exist above the waterline at all: the sand went from 0.92 albedo to
+      // teal across one row of vertices.
+      //
+      // Continuous at h = 0.1 by construction, so it cannot introduce a seam of
+      // its own: at 0.1 the ramp is fully wet, which is exactly what the branch
+      // below starts from. Half a metre of rise is about four metres of beach at
+      // this slope, which is what a swash zone is.
+      if (h > 0.1) palCol.copy(dry).lerp(wetc, clamp((0.55 - h) / 0.45, 0, 1));
       else {
         palCol.copy(wetc).lerp(deep, clamp(-h / 12, 0, 1));
         // the rock floors of the lagoon, the tunnel and the cathedral are not

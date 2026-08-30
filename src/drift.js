@@ -2340,7 +2340,7 @@ function driBuildAirfield(root) {
   // See THE WAKE in shared.js. This chapter is ABOUT wind — it has a wind
   // frame, three pennants and a glide — and its turf was the one surface in
   // it that the wind did not touch.
-  swayMesh(driAirTurf, { amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.6 });
+  swayMesh(driAirTurf, { leaf: 0.5, amount: 0.055, axis: 'y', auto: true, stiff: 1.4, hz: 1.6 });
   driAirChip = driInstance(root, driG.tet, mat(PALETTE.driRockDark), chips, false, false);
   if (driAirMesh) driAirMesh.frustumCulled = false;
   if (driAirTurf) driAirTurf.frustumCulled = false;
@@ -2407,10 +2407,10 @@ function driBuildGroundCover(root) {
   // is what grain wants — see driVC.
   swayMesh(driInstance(root, driG.quad, mat(PALETTE.driMoss, { side: THREE.DoubleSide }),
                        blades, false, false),
-           { amount: 0.10, axis: 'y', auto: true, stiff: 1.3, hz: 1.75 });
+           { leaf: 0.5, amount: 0.10, axis: 'y', auto: true, stiff: 1.3, hz: 1.75 });
   if (stalks.length) {
     swayMesh(driInstance(root, driG.cyl4, mat(PALETTE.driGrassPale), stalks, false, false),
-             { amount: 0.085, axis: 'y', auto: true, stiff: 1.9, hz: 1.4 });
+             { leaf: 0.5, amount: 0.085, axis: 'y', auto: true, stiff: 1.9, hz: 1.4 });
   }
   if (pebbles.length) driInstance(root, driG.oct, mat(PALETTE.driStone), pebbles, false, true);
 }

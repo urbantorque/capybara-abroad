@@ -3023,6 +3023,112 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE LEAF (v46 — 30 Aug 2026)
+
+`shared.js` owns it. Audited across all twenty-eight modules before a line was
+written: **there is no translucency, no transmission, no wrap and no
+back-lighting term anywhere in this game.** The only occurrences of the word are
+four comments, about a propeller, a bag of biscuits, a ghost and a silhouette.
+
+So every leaf, frond, blade, petal and lily pad in nineteen chapters is an
+opaque Lambert facet — and a leaf is the one thing in the natural world that is
+famously not opaque. Son Doong's vegetation reads as cut paper for this reason
+and no other. It is the same argument the rim is built on, one surface type
+over: the rim separates a silhouette from the background, and this is what makes
+a canopy read as a canopy rather than as a green polygon with a light on it.
+
+### The term
+
+A lobe around the ANTI-SUN direction, not a fresnel. The eye sees transmitted
+light when it is roughly opposite the sun *through* the leaf, so the term peaks
+at `dot(V, -L)` and is tightened with a power; the sample direction is distorted
+toward the surface normal so a leaf turned part-way still catches some.
+
+**MULTIPLIED BY THE ALBEDO.** Light through a leaf comes out the colour of the
+leaf. Added flat it is a white haze down one side of every plant, which is the
+failure mode of every cheap version of this — the same reasoning as the spill's
+own multiply, one line above it in the same block.
+
+**IT WORKS IN VIEW SPACE AND ADDS NO VARYINGS.** `vViewPosition` and `normal`
+are already in scope at `<opaque_fragment>` in every Lambert three compiles, so
+the term needs none of the plumbing the rim carries. It costs the sun direction
+being pushed through the camera once a frame, which `leafTick` does for the
+caller — the camera is in systems.js and the nineteen chapters that own foliage
+are not.
+
+**IT IS ITS OWN PROGRAM.** The rim compiles into essentially every material in
+the game and reports ONE cache key so that hundreds of them share a program;
+putting this in there would make every wall, bollard and capybara in the game
+pay a normalize and a `pow` for a thing only plants want. A leaf material gets a
+second program and nothing else in the game changes.
+
+**SHADOWS ARE DELIBERATELY IGNORED.** A leaf glowing in the shade is wrong, and
+the fix is a shadow lookup this term cannot afford. The bargain is to keep the
+strength low enough that the case never reads as a mistake — the same bargain
+the spill already takes.
+
+### Wiring
+
+`leaf(material, k)` and `leafMesh(mesh, k)`, both of which CLONE and chain
+whatever hook the material already had, exactly as `sway()` does. A canopy is
+precisely the kind of thing that has a rim and a grain already, and a leaf
+material that silently dropped either would be the `grainOwn()` bug again.
+
+**`swayMesh` carries a `leaf:` option**, because that call is already the marker
+for "this mesh is a plant" — every swaying thing in the game is foliage, so
+opting a chapter's greenery in is one word on a line that already exists. It is
+read BEFORE the `auto` branch, which rebuilds the options object as a copy and
+would otherwise drop it. Plants that do not sway (Sydney's fig and jacaranda
+crowns, the lily pads) use `leafMesh` directly.
+
+Twenty-six call sites: eighteen swaying batches across ten chapters and eight
+static canopies in Sydney. **Son Doong is NOT wired and it is the chapter that
+motivated the term** — its vegetation is merged into one mesh with the rock and
+the walls, so there is no material that is only leaves to attach it to. Splitting
+that merge is its own job.
+
+### `sysLEAF_K` is 0.75, and the first guess was 0.16
+
+How translucent a leaf is, is a property of leaves and not of places, so this is
+a lens-style constant like `sysSHOULDER`; what varies per call site is how much
+a given plant passes (a coconut frond is one cell thick, a fig crown is not).
+
+**0.16 was invisible and the instrument could not see that it was.** A frame-mean
+luminance A/B read 0.001 in five chapters — which is the same mistake as
+measuring a defocus with mean luminance, one term over: a few hundred backlit
+canopy facets do not move a frame average. `qa/leaf-orbit.js` orbits the camera
+to eight azimuths around the animal and diffs the two arms PER PIXEL, and that
+is the only measurement here worth anything.
+
+Cranking it to 3.0 found the ceiling: the Pantanal's campo went acid
+yellow-green and the grass read as emissive. A quarter of that puts a fully
+backlit facet about 20 of 255 over its unlit self and touches ~6% of a Sydney
+frame from the backlit side.
+
+**IT IS STRONGLY DIRECTIONAL AND THAT IS THE POINT.** Measured across the orbit,
+Sydney runs 0.03% of the frame affected at the front-lit azimuth and 6.2% at the
+backlit one. A probe that photographs one arrival frame will conclude this term
+does nothing, and in that frame it very nearly does.
+
+The switch is `game.state.noLeaf` and it cuts.
+
+### AND THE SHORE, WHICH WAS ALREADY BUILT
+
+A companion item — "generalise the Pantanal's depth-graded waterline to the
+chapters that lack it" — was **retired by reading the code**. Three of the four
+chapters named already have a shore: the Pantanal fades its sheet out on vertex
+alpha, Manly blends `manSand` → `manSandWet` → `manSandDeep` across the terrain,
+and Antarctica carries a rock-and-scree band at `antWATER + 0.3`. Manly and
+Antarctica's seas are also OPAQUE by design, so the alpha approach is not
+portable to them without changing how they sort against the floes, the boat and
+the dive — which is its own piece of work and not a batch-one item.
+
+The one genuine defect was **Palawan, which switched at a single contour**:
+`dry` above `h > 0.1` and `wetc` below it, so the swash zone — the band of sand
+that is wet because the sea was just there, and the entire visual signature of a
+beach — did not exist above the waterline. It ramps over half a metre of rise
+now, continuous at 0.1 by construction so it cannot introduce a seam of its own.
+
 ## THE DEPTH PASS (v45 — 30 Aug 2026)
 
 Until now there was nothing in the frame buffer but colour. `sceneRT` has always

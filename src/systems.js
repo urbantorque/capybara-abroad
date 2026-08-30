@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick } from './shared.js';
+         rimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         leafTick } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -1672,6 +1673,26 @@ const sysDOF_MAX = 60;
 // snapping it. This is not one of the switches and does not need to cut: the
 // A/B probes drive post.render() directly and never let sysDressFrame run.
 const sysDOF_LAMBDA = 3.0;
+// How much of the sun a leaf is allowed to pass. It is NOT per-chapter: how
+// translucent a leaf is, is a property of leaves, and the strength that varies
+// is per-material at the call site (a frond passes more than a bamboo culm).
+//
+// 0.75 AND NOT 0.16, WHICH WAS THE FIRST GUESS AND WAS INVISIBLE. Measured by
+// orbiting the camera around the animal at eight azimuths and diffing the two
+// arms PER PIXEL (qa/leaf-orbit.js): at 0.16 the term moved the affected
+// pixels by under one part in 255 and could not be seen at all. The frame-mean
+// metric could not see it either and read 0.001 in five chapters, which is the
+// same mistake as measuring a defocus with mean luminance — a term that lights
+// a few hundred canopy facets does not move a frame average.
+//
+// The ceiling was found by cranking it to 3.0: the Pantanal's campo went acid
+// yellow-green and the grass read as emissive, which is the failure this must
+// stay well under. A quarter of that puts a fully backlit canopy facet about
+// 20 of 255 over its unlit self and touches ~13% of a Sydney frame from the
+// backlit side — visible as light coming through a thing, and nothing like a
+// glow.
+const sysLEAF_K = 0.75;
+const sysColL = new THREE.Color();
 let   sysDofDist = sysDOF_FALLBACK;
 const sysDepthV = new THREE.Vector3();
 
@@ -18203,6 +18224,18 @@ export function createSystems(game) {
       sysColR.lerp(sysRIM_WHITE, 0.40);
     }
     rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
+    // ---- and the light coming THROUGH things ------------------------------
+    // See the leaf block in shared.js. The direction is the live sun axis —
+    // sunAxes() rebuilds it on every biome change, so a chapter with a 61
+    // degree sun gets a 61 degree backlight without a table — and the colour
+    // is the sun's own, scaled: transmitted light is the light that was
+    // transmitted, so every event that already warms the sun warms this.
+    //
+    // sysAxDir points FROM the ground TOWARD the sun, which is what the term
+    // wants. shared.js pushes it into view space itself, because the camera is
+    // here and the nineteen chapters that own foliage are not.
+    sysColL.copy(sun.color).multiplyScalar(Math.max(0, sun.intensity) * sysLEAF_K);
+    leafTick(sysAxDir, sysColL, camera, !game.state.noLeaf);
 
     // ---- the dome ---------------------------------------------------------
     if (sysSkyMesh && sysSkyMesh.visible) {

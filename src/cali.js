@@ -3192,13 +3192,13 @@ function caliBuildStreetLife(game, root) {
   // green, and one instanced draw cannot be both — the first cut had ninety
   // plantains in the east field rendering as fuchsia.
   swayMesh(caliInstance(root, caliG.box, PALETTE.caliBougain, leaves, true, false),
-           { amount: 0.09, axis: 'y', auto: true, stiff: 2.0, hz: 1.2 });
+           { leaf: 0.55, amount: 0.09, axis: 'y', auto: true, stiff: 2.0, hz: 1.2 });
   // ---- AND THE PLANTAINS MOVE (v44) -------------------------------------
   // See THE WAKE in shared.js. A plantain leaf is two metres of unsupported
   // membrane and it is the loosest thing in this chapter; the bougainvillea
   // beside it is woody and gets a third of the travel.
   swayMesh(caliInstance(root, caliG.box, PALETTE.caliPlantain, fronds, true, false),
-           { amount: 0.30, axis: 'y', auto: true, stiff: 1.3, hz: 0.85 });
+           { leaf: 0.55, amount: 0.30, axis: 'y', auto: true, stiff: 1.3, hz: 0.85 });
   void sy0;
 }
 
@@ -3226,7 +3226,7 @@ function caliBuildCane(root) {
   // them, and two writers on one transform is the trap this codebase keeps
   // relearning.
   swayMesh(caliInstance(root, caliG.plane, PALETTE.caliCane, tops, false, false),
-           { amount: 0.22, axis: 'y', auto: true, stiff: 1.4, hz: 1.0 });
+           { leaf: 0.55, amount: 0.22, axis: 'y', auto: true, stiff: 1.4, hz: 1.0 });
 }
 
 function caliUpdateCane() {

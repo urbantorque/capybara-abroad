@@ -2108,7 +2108,7 @@ function panBuildGrass(root) {
   // being told it. A LOW amount, because grass this dense reads its motion in
   // the aggregate: a tenth of a metre across four thousand tufts is a field
   // breathing, and anything more is a wheat advert.
-  swayMesh(mesh, { amount: 0.10, axis: 'y', auto: true, stiff: 1.5, hz: 1.55 });
+  swayMesh(mesh, { leaf: 0.6, amount: 0.10, axis: 'y', auto: true, stiff: 1.5, hz: 1.55 });
   let n = 0;
   {
     for (let gz = 0; gz < NZ; gz++) {

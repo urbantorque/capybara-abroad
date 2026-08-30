@@ -2729,7 +2729,7 @@ function iceBuildScatter(game, root) {
       iceScatMeshes.push(m);
       const kind = name.split(':')[1];
       const a = iceALIVE[kind];
-      if (a) swayMesh(m, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: 1.35 });
+      if (a) swayMesh(m, { leaf: 0.35, amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: 1.35 });
     }
   };
   for (let b = 0; b < iceSCAT_BANDS.length; b++) {

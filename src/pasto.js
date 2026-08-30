@@ -991,7 +991,7 @@ function pastoMakeInstanced(geom, count, name, shadow) {
   im.receiveShadow = false;
   im.count = 0;
   const a = pastoALIVE[name];
-  if (a) swayMesh(im, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
+  if (a) swayMesh(im, { leaf: 0.45, amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
   return im;
 }
 

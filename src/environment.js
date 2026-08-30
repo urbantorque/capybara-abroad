@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain, swayMesh, leafMesh } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -2546,7 +2546,7 @@ export function createEnvironment(game) {
   }
   // the flowerbeds, which are the other thing at capybara height in the gardens
   swayMesh(envInstance(root, envG.cyl4, PALETTE.leafC, stems, false, false),
-           { amount: 0.055, axis: 'y', auto: true, stiff: 2.0, hz: 1.5 });
+           { leaf: 0.45, amount: 0.055, axis: 'y', auto: true, stiff: 2.0, hz: 1.5 });
   const petalKeys = Object.keys(petalLists);
   for (let i = 0; i < petalKeys.length; i++) {
     envInstance(root, envG.sph5, parseInt(petalKeys[i], 10), petalLists[petalKeys[i]], false, false);
@@ -2603,7 +2603,7 @@ export function createEnvironment(game) {
   envPush9(lilies, 42.4, 0.07, 38.6, 0, 0.4, 0, 1.15, 0.08, 1.15);
   envPush9(lilies, 45.8, 0.07, 41.6, 0, 1.1, 0, 0.9, 0.08, 0.9);
   envPush9(lilies, 44.2, 0.07, 43.2, 0, 2.2, 0, 0.7, 0.08, 0.7);
-  envInstance(root, envG.cyl6, PALETTE.leafB, lilies, false, false);
+  leafMesh(envInstance(root, envG.cyl6, PALETTE.leafB, lilies, false, false), 0.55);
   envNavC.push(envPOND.x, envPOND.z, envPOND.r + 0.6);
 
   // benches
@@ -2981,16 +2981,16 @@ export function createEnvironment(game) {
 
   envInstance(root, envG.cyl6, PALETTE.trunk, figTrunk, true, true);
   envInstance(root, envG.cone6, PALETTE.trunkDark, figRoot, true, false);
-  envInstance(root, envG.sph6, PALETTE.leafA, canA, true, false);
-  envInstance(root, envG.sph6, PALETTE.leafB, canB, true, false);
-  envInstance(root, envG.sph6, PALETTE.leafC, canC, true, false);
+  leafMesh(envInstance(root, envG.sph6, PALETTE.leafA, canA, true, false), 0.3);
+  leafMesh(envInstance(root, envG.sph6, PALETTE.leafB, canB, true, false), 0.3);
+  leafMesh(envInstance(root, envG.sph6, PALETTE.leafC, canC, true, false), 0.3);
   envInstance(root, envG.cyl6, PALETTE.trunkDark, pineTrunk, true, true);
-  envInstance(root, envG.cone6, PALETTE.leafC, pineConeA, true, false);
-  envInstance(root, envG.cone6, PALETTE.leafA, pineConeB, true, false);
+  leafMesh(envInstance(root, envG.cone6, PALETTE.leafC, pineConeA, true, false), 0.34);
+  leafMesh(envInstance(root, envG.cone6, PALETTE.leafA, pineConeB, true, false), 0.34);
   envInstance(root, envG.cyl6, PALETTE.trunk, palmTrunk, true, true);
-  envInstance(root, envG.cone4, PALETTE.palmLeaf, palmFrond, true, false);
+  leafMesh(envInstance(root, envG.cone4, PALETTE.palmLeaf, palmFrond, true, false), 0.62);
   envInstance(root, envG.cyl6, PALETTE.trunkDark, jacTrunk, true, true);
-  envInstance(root, envG.sph6, PALETTE.petalPurple, jacCan, true, false);
+  leafMesh(envInstance(root, envG.sph6, PALETTE.petalPurple, jacCan, true, false), 0.4);
 
   // ---- ground cover: low, wide grass tufts in irregular clumps
   function envTuftOk(x, z, r) {
@@ -3047,9 +3047,9 @@ export function createEnvironment(game) {
   // 1.75 m, so a capybara at a run opens a path through the lawn about its own
   // length across. `auto` reads the squashed cone rather than being told.
   swayMesh(envInstance(root, envG.cone4, PALETTE.grassDark, tufts, false, false),
-           { amount: 0.045, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
+           { leaf: 0.45, amount: 0.045, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
   swayMesh(envInstance(root, envG.cone4, PALETTE.grassPale, tuftsPale, false, false),
-           { amount: 0.050, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
+           { leaf: 0.45, amount: 0.050, axis: 'y', auto: true, stiff: 1.3, hz: 1.7 });
 
   // trunk collision, bucketed so we stay well inside the body budget
   for (let i = 0; i < trunkShapes.length; i += 4 * 6) {

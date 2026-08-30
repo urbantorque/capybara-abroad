@@ -1063,7 +1063,7 @@ function gorInstance(root, geo, colour, list, cast, recv, name) {
   const a = kind === 'vine' ? [0.070, 2.0, 1.10]
           : kind === 'vineStem' ? [0.045, 2.6, 1.10]
           : kind === 'scrub' ? [0.060, 2.2, 1.25] : null;
-  if (a) swayMesh(im, { amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
+  if (a) swayMesh(im, { leaf: 0.45, amount: a[0], axis: 'y', auto: true, stiff: a[1], hz: a[2] });
   root.add(im);
   return im;
 }

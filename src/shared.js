@@ -1651,6 +1651,134 @@ function _rimWants(opts) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// THE LEAF — LIGHT COMING THROUGH A THING RATHER THAN OFF IT.
+//
+// Audited across all 28 modules before writing this: there is no translucency,
+// no transmission, no wrap and no back-lighting term anywhere in this game. The
+// only hits for the word are four comments about a propeller, a bag of
+// biscuits, a ghost and a silhouette. So every leaf, frond, blade, petal and
+// lily pad in nineteen chapters is an opaque Lambert facet — and a leaf is the
+// one thing in the natural world that is famously NOT opaque. Son Doong's
+// vegetation reads as cut paper for this reason and nothing else.
+//
+// It is the same argument the rim is built on, one surface type over: the rim
+// separates a silhouette from the background, and this is what makes a canopy
+// read as a canopy instead of as a green polygon with a light on it.
+//
+// FOUR THINGS ABOUT HOW.
+//
+//  1. IT IS MULTIPLIED BY THE ALBEDO. Light through a leaf comes out the
+//     colour of the leaf. Added flat it is a white haze on one side of every
+//     plant, which is the failure mode of every cheap version of this. Same
+//     reasoning as the spill's own multiply, one line down from it.
+//  2. IT IS A LOBE AROUND THE ANTI-SUN DIRECTION, not a fresnel. The eye sees
+//     transmitted light when it is roughly opposite the sun THROUGH the leaf,
+//     so the term peaks at dot(V, -L) and is tightened with a power. Distorted
+//     toward the surface normal so a leaf turned part-way still catches some,
+//     which is what the distortion term in every screen-space approximation of
+//     this is for.
+//  3. IT WORKS IN VIEW SPACE AND ADDS NO VARYINGS. `vViewPosition` and
+//     `normal` are already in scope at <opaque_fragment> in every Lambert
+//     three compiles, so the whole term is free of the plumbing the rim needs
+//     — it only costs the sun direction being pushed through the camera once
+//     a frame, which leafTick does for the caller.
+//  4. IT IS ITS OWN PROGRAM. The rim compiles into essentially every material
+//     in the game and reports ONE cache key so the hundreds of them share one
+//     program; putting this term in there would make every wall, bollard and
+//     capybara in the game pay a normalize and a pow for a thing only plants
+//     want. A leaf material gets a second program and nothing else changes.
+//
+// SHADOWS ARE DELIBERATELY IGNORED. A leaf glowing in the shade is wrong and
+// the fix is a shadow lookup this term cannot afford; the answer is to keep the
+// strength low enough that the case never reads as a mistake. Same bargain the
+// spill already takes.
+const _leafL = { value: new THREE.Vector3(0, 1, 0) };   // toward the sun, VIEW space
+const _leafC = { value: new THREE.Vector3(1, 1, 1) };
+const _leafOn = { value: 0 };
+const _leafDIST = 0.30;
+const _leafPOW = 3.0;
+const _leafV = new THREE.Vector3();
+/**
+ * The sun, for everything with a leaf on it. systems.js calls this once a
+ * frame from the same place it calls rimTick — a transmitted colour is the
+ * sun's colour, so every event that already moves the light moves this and no
+ * second table has to be kept in step.
+ *
+ * `dir` is the WORLD direction from the ground toward the sun; the camera is
+ * taken so the push into view space happens once here rather than in nineteen
+ * chapters. `on` is the cut — see game.state.noLeaf.
+ */
+export function leafTick(dir, color, camera, on) {
+  _leafOn.value = on === false ? 0 : 1;
+  if (dir && camera) {
+    _leafV.copy(dir).transformDirection(camera.matrixWorldInverse);
+    _leafL.value.copy(_leafV).normalize();
+  }
+  if (color) _leafC.value.set(color.r, color.g, color.b);
+}
+const _LEAF_FS_OUT = `{
+  if (uLeafOn > 0.5 && uLeafK > 0.0) {
+    vec3 lV = normalize(vViewPosition);
+    vec3 lH = normalize(uLeafL + normal * ${_leafDIST.toFixed(3)});
+    float lB = pow(clamp(dot(lV, -lH), 0.0, 1.0), ${_leafPOW.toFixed(2)});
+    outgoingLight += lB * uLeafK * uLeafC * diffuseColor.rgb;
+  }
+}
+#include <opaque_fragment>`;
+const _leafCache = new Map();
+/**
+ * Give a MATERIAL the term. Returns a clone; the original is untouched.
+ * Chains whatever hook the material already had, exactly as sway() does — a
+ * leaf material that lost its rim or its grain would be the grainOwn() bug
+ * again, and a canopy is precisely the kind of thing that has both.
+ */
+export function leaf(m, k) {
+  if (!m || !(k > 0)) return m;
+  const key = m.uuid + '|' + k;
+  const hit = _leafCache.get(key);
+  if (hit) return hit;
+  const g = m.clone();
+  const prev = m.onBeforeCompile;
+  const hadHook = typeof prev === 'function' && m.hasOwnProperty('onBeforeCompile');
+  const prevKey = m.customProgramCacheKey;
+  // Per material, so one program serves every strength in the game.
+  const uK = { value: k };
+  g.onBeforeCompile = function (shader) {
+    if (hadHook) prev.call(this, shader);
+    shader.uniforms.uLeafL = _leafL;
+    shader.uniforms.uLeafC = _leafC;
+    shader.uniforms.uLeafOn = _leafOn;
+    shader.uniforms.uLeafK = uK;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>',
+               '#include <common>\nuniform vec3 uLeafL;\nuniform vec3 uLeafC;\n' +
+               'uniform float uLeafOn;\nuniform float uLeafK;')
+      // The rim, if there is one, has already replaced <opaque_fragment> with
+      // its own block ending in the include — so this lands OUTSIDE it and
+      // both terms reach outgoingLight before it is consumed.
+      .replace('#include <opaque_fragment>', _LEAF_FS_OUT);
+  };
+  g.customProgramCacheKey = function () {
+    return 'leaf1' + (prevKey ? '|' + prevKey.call(this) : '');
+  };
+  g.needsUpdate = true;
+  _leafCache.set(key, g);
+  return g;
+}
+/**
+ * Give a MESH the term, which is what a call site actually wants.
+ *
+ * Deliberately NOT touching customDepthMaterial, unlike swayMesh: this term
+ * only ever adds to outgoingLight and the depth pass does not have one, so
+ * there is nothing there to keep in step.
+ */
+export function leafMesh(mesh, k) {
+  if (!mesh || !mesh.material || !(k > 0)) return mesh;
+  mesh.material = leaf(mesh.material, k);
+  return mesh;
+}
+
 const _matCache = new Map();
 export function mat(color, opts) {
   const key = color + '|' + (opts ? JSON.stringify(opts) : '');
@@ -3334,7 +3462,14 @@ export function sway(m, opts) {
 export function swayMesh(mesh, opts) {
   if (!mesh || !mesh.material) return mesh;
   let o = opts || {};
-  if (!(o.amount > 0)) return mesh;
+  // `leaf` RIDES ALONG HERE because this call is already the marker for "this
+  // mesh is a plant" — every swaying thing in the game is foliage, so opting a
+  // chapter's greenery into the transmission term is one word on a line that
+  // already exists. Read BEFORE the `auto` branch below, which rebuilds `o` as
+  // a copy and would drop it. A plant that does not sway (a jacaranda crown, a
+  // lily pad) uses leafMesh() directly.
+  const lk = (opts && opts.leaf) || 0;
+  if (!(o.amount > 0)) return leafMesh(mesh, lk);
   // ---- `auto: true` — TAKE THE WINDOW FROM THE GEOMETRY ITSELF (v44) -------
   // The window is the one thing a call site gets wrong, because it is the one
   // thing that is a property of the GEOMETRY and not of the plant: a unit
@@ -3365,6 +3500,9 @@ export function swayMesh(mesh, opts) {
     }
   }
   mesh.material = sway(mesh.material, o);
+  // AFTER the sway, so leaf() chains onto it rather than being overwritten by
+  // it — the same ordering rule the sway itself follows with the rim.
+  if (lk > 0) mesh.material = leaf(mesh.material, lk);
   if (mesh.castShadow) {
     const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
     const amount = o.amount;
