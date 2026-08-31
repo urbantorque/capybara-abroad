@@ -43,8 +43,17 @@ const ORDER = [
   'src/main.js',
 ];
 
-const IMPORT_RE = /^[ \t]*import[\s\S]*?from\s*['"][^'"]+['"];?[ \t]*\r?\n/gm;
-const BARE_IMPORT_RE = /^[ \t]*import\s*['"][^'"]+['"];?[ \t]*\r?\n/gm;
+// `import\b`, AND A SPAN THAT CANNOT CROSS A STATEMENT.
+//
+// This was `^[ \t]*import[\s\S]*?from...`, which has two holes. Without the
+// word boundary, a top-level line beginning `importantThing = ...` matches the
+// first six characters; and because `[\s\S]*?` crosses newlines it then runs on
+// to the NEXT `from '...'` anywhere below and deletes everything in between —
+// silently, from the bundle only, with no build error. A real import list may
+// span lines but contains no semicolon until its end, so `[^;]*?` keeps the
+// multi-line form working while pinning the match inside one statement.
+const IMPORT_RE = /^[ \t]*import\b[^;]*?from\s*['"][^'"]+['"];?[ \t]*\r?\n/gm;
+const BARE_IMPORT_RE = /^[ \t]*import\b\s*['"][^'"]+['"];?[ \t]*\r?\n/gm;
 const EXPORT_RE = /^[ \t]*export\s+(?=(?:async\s+)?function|const|let|var|class)/gm;
 
 const problems = [];
@@ -57,6 +66,17 @@ function strip(file, src) {
     if (spec !== 'three' && spec !== 'cannon-es' && !/^\.\/[a-z]+\.js$/.test(spec)) {
       problems.push(`${file}: illegal import specifier "${spec}"`);
     }
+  }
+  // ...AND THE SIDE-EFFECT FORM GOES THROUGH THE SAME GATE. `import './x.js'`
+  // was stripped by BARE_IMPORT_RE but never entered the loop above, which only
+  // walks matches that have a `from`. So `import 'https://cdn/…'` would have
+  // been silently DELETED rather than blocked: the module runs in dev, where
+  // the browser honours it, and is simply absent from dist. Different
+  // behaviour in the two artefacts, and nothing anywhere says so.
+  const bare = src.match(BARE_IMPORT_RE) || [];
+  for (const line of bare) {
+    const m = line.match(/['"]([^'"]+)['"]/);
+    problems.push(`${file}: side-effect import "${m && m[1]}" — every import must be a named one the bundler can account for`);
   }
   if (/^[ \t]*export\s+default/m.test(src)) problems.push(`${file}: uses export default (contract violation)`);
   if (/\bimport\s*\(/.test(src)) problems.push(`${file}: uses dynamic import()`);
@@ -168,6 +188,30 @@ if (problems.length) {
   process.exit(1);
 }
 
+// ---- A SPLICE THAT DID NOT HAPPEN IS SILENT, AND THAT IS THE DANGER -------
+// All three replacements below key off an exact anchor in index.html, and
+// `String.replace` with no match is a no-op that returns the string unchanged.
+// So any reformat of index.html — a reordered attribute, a different quote, a
+// line break — would produce a dist file that is the right sort of size, opens
+// without complaint, and is missing the entire game, or the MIT notice the
+// licence requires to travel with the code. The build would print OK.
+//
+// Same family as the `$'` bug the comment below describes: the failure is not
+// that something goes wrong, it is that nothing does.
+function replaceOnce(text, anchor, make, what) {
+  const g = anchor instanceof RegExp
+    ? new RegExp(anchor.source, anchor.flags.includes('g') ? anchor.flags : anchor.flags + 'g')
+    : null;
+  const n = g ? (text.match(g) || []).length : text.split(anchor).length - 1;
+  if (n !== 1) {
+    console.error(`\n  BUILD BLOCKED — ${what}: expected exactly one match, found ${n}.\n`);
+    console.error('  index.html has almost certainly been reformatted. Without this check');
+    console.error('  the build would have written a dist file missing it and printed OK.\n');
+    process.exit(1);
+  }
+  return text.replace(anchor, make);
+}
+
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 // ---- THE REPLACEMENT IS A FUNCTION, AND IT HAS TO BE ----------------------
 // `String.replace(pattern, string)` interprets `$&`, `$'` and "$`" INSIDE THE
@@ -179,16 +223,20 @@ const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 // literal in the middle of a library. A replacer function is passed the match
 // instead of scanning for `$`, and has no such behaviour.
 const inlineScript = '<script type="module">\n' + vendored + bodies.join('\n') + '\n</script>';
-let bundled = html.replace(
+let bundled = replaceOnce(
+  html,
   '<script type="module" src="./src/main.js"></script>',
-  () => inlineScript
+  () => inlineScript,
+  'the game itself'
 );
 // The importmap is now dead weight, and worse: leaving a bare specifier map in
 // a file that resolves nothing would be a lie about where the code came from.
-bundled = bundled.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
+bundled = replaceOnce(bundled, /<script type="importmap">[\s\S]*?<\/script>\s*/,
+                      () => '', 'the importmap');
 // A function again, for the same reason as above — the notice has no `$` in it
 // today, and the next person to edit it should not have to know that it must not.
-bundled = bundled.replace('<body>', () => '<body>\n' + VENDOR_NOTICE);
+bundled = replaceOnce(bundled, '<body>', () => '<body>\n' + VENDOR_NOTICE,
+                      'the MIT notice');
 if (/cdn\.jsdelivr\.net|unpkg\.com|cdnjs/.test(bundled)) {
   console.error('\n  BUILD BLOCKED — the bundle still references a CDN.\n');
   process.exit(1);

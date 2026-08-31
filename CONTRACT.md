@@ -21,7 +21,9 @@ must be requested from the Coordinator, not made unilaterally.
 
 ## Runtime & imports (bundler-critical — obey exactly)
 
-Each module file may contain imports ONLY in these exact forms, ONLY at the very top:
+Each module file may contain imports ONLY at the very top, and every one of them
+must be a NAMED import whose specifier is `three`, `cannon-es`, or `./<name>.js`
+in this directory:
 
 ```js
 import * as THREE from 'three';
@@ -29,7 +31,21 @@ import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
 ```
 
-- Export ONLY via `export function name(...)`. No default exports, no `export const`, no classes.
+The named list from `./shared.js` is whatever that module exports and the
+importer needs — it is not a fixed set of eight, and modules differ. Side-effect
+imports (`import './x.js'`) are refused: the bundler has to be able to account
+for every name it inlines.
+
+- Export via `export function`, `export const`, `export let`, `export var` or
+  `export class`. **No default exports** — that one is still absolute, and the
+  build fails on it.
+
+  *(This section used to say "`export function` only, no `export const`, no
+  classes", and had not been true for a long time: `shared.js` exports
+  `PALETTE`, `TASKS` and `CHAPTERS` as consts and `build.mjs`'s EXPORT_RE was
+  widened to match. The one section headed "obey exactly" was the one section
+  describing rules the build does not enforce, which is the worst place in the
+  repository for that to be true.)*
 - **Every internal helper function/const at module top-level MUST be prefixed with your module tag**
   (`env`, `capy`, `phys`, `npc`, `sys`) e.g. `function envMakeTree()`, `const envTREE_COLORS = ...`.
   The bundler concatenates all modules into one scope — unprefixed top-level names WILL collide.
@@ -2988,10 +3004,18 @@ the changed geometry — `qa/b4-view.js`, `qa/J2A-*.png` after against `qa/J2B-*
 `qa/budget.js`. `out.pass` is green when nothing is over the cost gate and nothing is over
 its ratchet ceiling.
 
-1. **Triangles, 130,000** — the Payoff Pass brief's gate. Ten of seventeen are over it and
+1. **Triangles, 130,000** — the Payoff Pass brief's gate. Most chapters are over it and
    the audit REPORTS rather than fails on it, with the cost beside every chapter that
    misses. Closing the rest means cutting density where the player is standing, and the
    same brief forbids visual regressions.
+
+   *(The count here said "ten of seventeen" and the game has had nineteen chapters for a
+   while. It is deliberately not replaced with a fresh figure: `renderer.info.render
+   .triangles` sampled after a `tick(dt, false)` reads **1** — the composite quad, exactly
+   the trap described at the end of this section — and `qa/budget.js`, which does walk the
+   scene, is one of the suites that moves by four figures with nothing changed between
+   runs. Anything quoted here has to come from budget.js over several runs, and it has to
+   say whether it includes the shadow pass, because the ROADMAP's 139k–454k soak did.)*
 2. **Cost, 5.5 ms** — milliseconds of real render, and the gate that decides. rAF is pinned
    to the display, so every chapter reads 16.67 ms and a frame-time measurement says
    nothing; the only way past vsync is N renders back to back with a `gl.finish()`. The

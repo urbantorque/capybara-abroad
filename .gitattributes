@@ -1,0 +1,22 @@
+# LINE ENDINGS, SO THAT A MEASUREMENT MEANS SOMETHING.
+#
+# core.autocrlf is true on the machine this was written on and there was no
+# .gitattributes, so every checkout — including the ones git does internally for
+# `stash push` and `stash pop` — rewrote the working copy of any file it touched
+# to CRLF. Committed content was never affected (git normalises on the way in)
+# and `git diff` stayed honest, but `build.mjs` reads the WORKING TREE, so the
+# size it prints moved with whichever files git had last handled.
+#
+# Measured 31 Aug 2026: the same source built to 8980.4 KB twice, and then to
+# 9018.0 KB after a single stash round-trip — 44,236 lines gaining one byte
+# each. Any statement about how big this game is needs this file to be true.
+* text=auto eol=lf
+
+# ...and the things that are not text, so nothing tries.
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

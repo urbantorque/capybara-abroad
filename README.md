@@ -289,7 +289,7 @@ field. It is the busiest chapter in the game already.
 
 ## The dive stopped belonging to Palawan
 
-A capybara is the finest swimmer of any rodent alive, and for seventeen chapters it
+A capybara is the finest swimmer of any rodent alive, and for nineteen chapters it
 could prove it in three of them. The verb was taught in Palawan and then taken away
 again — which is the shape every new verb in this game had, and the single reason hour
 five was never mechanically richer than hour one.
@@ -450,9 +450,9 @@ list, read a different way.
 ## The end is not a receipt
 
 The ending was a full-screen rectangle reading MISCHIEF COMPLETE, a number, and then
-it reloaded the page. A hundred and ninety-nine tasks, forty-two records, seventeen
+it reloaded the page. Two hundred and thirty-one tasks, forty-two records, nineteen
 places and the better part of a working day, resolved to one string and then thrown
-away — and almost nobody had ever seen it, because it only existed at 199 out of 199.
+away — and almost nobody had ever seen it, because it only existed at 231 out of 231.
 
 It is a **ledger** now, and it is made of what the journey actually left behind: one
 leaf per place you have stood in, each with its postcard, what you took out of it,
@@ -565,7 +565,7 @@ Nothing is uploaded anywhere, because there is nowhere to upload it to.
 | **Gamepad** | Left stick moves, right stick looks, click it to recentre. `A` hop · `X` grab · `B` WHEEK · `RT` run. |
 | **Touch** | A stick in the bottom-left — push it all the way to run — and WHEEK, GRAB and HOP under the right thumb. |
 | `Tab` | **The journal.** The shelf of souvenirs, everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. It is also the way into **the ledger**: the whole journey, laid out. |
-| `1`..`0`, then `–  =  [  ]  ;  '` | On the title card: pick a place. Ten digits and seventeen chapters, so the last seven are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |
+| `1`..`0`, then `–  =  [  ]  ;  '  ,  .  /` | On the title card: pick a place. Ten digits and nineteen chapters, so the last nine are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |
 | `Enter` | On the title card, if there is a saved journey: carry on from where you stopped |
 
 Walk into the harbour and the capybara swims, riding the waterline with its back above the
@@ -576,7 +576,7 @@ legs simply find it.
 
 ## The list
 
-198 tasks across seventeen chapters — one per place, because a chapter is somewhere you have to
+231 tasks across nineteen chapters — one per place, because a chapter is somewhere you have to
 travel to.
 
 - **Chapter 1 — Sydney (18).** *Royal Botanic Gardens and the Opera House:* wheek, steal a
@@ -625,8 +625,8 @@ below the fold on a 720p laptop. Every row carries its own tally once there is o
 standing somewhere obvious, using a verb you already have — three wheeks. What has changed is
 where it LEADS: the third wheek opens the **departures board** (the same card Tab opens
 read-only) and you pick. Getting abroad used to cost a ferry, a boat, seven hundred metres of
-open water and a walk up the Corso, and with seventeen chapters that toll would have been paid
-twelve times.
+open water and a walk up the Corso, and with nineteen chapters that toll would have been paid
+eighteen times.
 
 ```
    three wheeks at:                 opens the board, and the board goes to:
@@ -728,35 +728,6 @@ qa/                 screenshots captured during live browser QA
 Modules only talk through the `game` object and the event bus defined in `CONTRACT.md`. The
 bundler enforces the contract: it fails the build on illegal imports, `export default`,
 `fetch`, dynamic `import()`, or any top-level name declared in two modules.
-
-## The salsa engine
-
-Chapter 5 is the only music in the game the player is asked to move in time with, so it had to be
-right rather than evocative. 100 bpm, because salsa caleña is fast — the local footwork runs
-ahead of Cuban or New York timing.
-
-Four things make it salsa rather than latin-flavoured, and all four are in  in
-systems.js:
-
-1. **The clave is the bar line.** Son clave 2-3, five strokes across TWO bars, written out as
-   absolute eighths over the whole cycle so the two halves can never be swapped — the one mistake
-   that sounds wrong to everybody in Cali and to nobody else.
-2. **The bass does not play on one.** The tumbao plays the bombo (the and of two) and beat
-   four, and the four ANTICIPATES the next chord.
-3. **The piano plays a guajeo, not chords** — an ostinato of syncopated octaves whose accents
-   fall on the off-eighths, so it interlocks with the bass instead of doubling it.
-4. **The harmony is a vamp**: i – iv – V7 – i in A minor, two bars a chord, round and round.
-   Salsa is not a progression you follow, it is a groove you stand inside.
-
-Six synthesised voices: clave (two hardwood partials, 80 ms), congas (heel / slap / open tone,
-each a struck membrane that drops in pitch), campana, tumbao bass, montuno piano, and a brass
-stab that only shows up once a cycle.
-
-The dance floor reads the same clock the notes are scheduled on.  publishes
-,  (signed distance to the nearest beat, in beats) and ; cali.js
-scores a step when the capybara turns, hops or wheeks within 0.19 of a beat, one step per beat,
-eight in a row to pass. Measured: 24 key presses over eleven seconds produced exactly 8 scored
-steps, because the presses inside an already-scored beat are correctly ignored.
 
 ## The salsa engine
 

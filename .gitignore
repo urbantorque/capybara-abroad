@@ -1,4 +1,13 @@
 dist/
-qa/*.png
 node_modules/
 .playwright-cli/
+
+# QA captures. `qa/*.png` only ever matched the TOP level, so every PNG written
+# into a subdirectory was tracked by default — which is how qa/pass/ came to
+# hold 29 MB of the repository. The double star closes that.
+qa/**/*.png
+
+# ...except the hero shots, which are one curated frame per chapter and are
+# meant to be in here. They are already tracked, so this line changes nothing
+# today; it is here to say that they are deliberate and the rule above is not.
+!qa/pass/*.png
