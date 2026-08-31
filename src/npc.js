@@ -1802,6 +1802,16 @@ export function createNPCs(game) {
   const npcLOC_CHASE = ['That is mine.', 'Give it here.', 'Bring it back.',
                         'Where are you going with that?', 'Come here.',
                         'I am not asking twice.', 'That is not yours.'];
+  // ...AND A POOL FOR THE END OF ONE, which retrieval did not have. Hitting the
+  // npcOWN_OUT_T ceiling used to draw from npcLOC_SAY.rush — 'Whoa!', 'Mind
+  // out!', 'Somebody is in a hurry.' — which is a BYSTANDER watching the animal
+  // go past, spoken by somebody who has just spent ten seconds chasing it and
+  // is walking back to their stall empty-handed. Every other give-up beat in
+  // the game has its own pool (Pasto's paWheeze and paScold, Sydney's giveUp);
+  // this is the chapter-neutral one, because it runs in seventeen of them.
+  const npcLOC_GIVEUP = ['Keep it, then.', 'It is not worth it.', 'Fine. Have it.',
+                         'I am not chasing you round the square.',
+                         'That is that, then.', 'Go on, then.'];
   let locChainFrom = null, locChainT = 0;
 
   // =======================================================================
@@ -2505,7 +2515,7 @@ export function createNPCs(game) {
     }
     if (rec.ownT > npcOWN_OUT_T) {
       // THE CEILING. They give up out loud, and they walk back.
-      if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.8, 1.4); localReactLine(rec, rec.says.rush || npcLOC_SAY.rush); }
+      if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.8, 1.4); localReactLine(rec, rec.says.giveUp || npcLOC_GIVEUP); }
       rec.ownBack = true; rec.ownT = 0;
       rec.tx = rec.ax; rec.tz = rec.az;
       return;
@@ -4966,7 +4976,10 @@ export function createNPCs(game) {
     rec.alarm = 1;
     emit('npc:chase', rec);
     pickLine(rec, rec.kind === 'gardener' ? 'chase' : 'stolen');
-    sfx(rec.kind === 'gardener' ? 'whistle' : 'gasp');
+    // ...FROM THE PERSON DOING IT. sfx() places the cue off rec.group.position
+    // and falls back to dead-centre mono without one, and this is the most
+    // frequent chase cue in the game — the sound of somebody noticing you.
+    sfx(rec.kind === 'gardener' ? 'whistle' : 'gasp', rec);
   }
 
   game.events.on('capy:wheek', (p) => {
@@ -5807,7 +5820,7 @@ export function createNPCs(game) {
           if (capyOk) {
             const dc = distToCapy(rec);
             if (dc < 3.0 && facingCapy(rec) > 0.3) {
-              if (rec.stumble < 0.1) { pickLine(rec, 'jog'); sfx('gasp'); }
+              if (rec.stumble < 0.1) { pickLine(rec, 'jog'); sfx('gasp', rec); }
               rec.stumble = 1;
               rec.avoidAng = (rec.group.position.x < capyX ? -1 : 1) * 1.1;
               rec.avoidT = 0.9;
@@ -6630,7 +6643,7 @@ export function createNPCs(game) {
     if (npcPAcond.ok && rec.kind !== 'llama' && rec.gawpCd <= 0) {
       const dC = paCondDist(rec);
       if (npcPAcond.mounted && dC < npcPA_COND_STARE) {
-        if (rec.kind === 'streetdog') { if (st !== 'bark') { paSet(rec, 'bark'); sfx('wheek'); } return; }
+        if (rec.kind === 'streetdog') { if (st !== 'bark') { paSet(rec, 'bark'); sfx('wheek', rec); } return; }
         if (st !== 'gawp') {
           paInterrupt(rec);
           rec.retState = paIdleState(rec);
@@ -6643,7 +6656,7 @@ export function createNPCs(game) {
         return;
       }
       if (npcPAcond.state === 'circling' && npcPAcond.low && dC < npcPA_COND_POINT) {
-        if (rec.kind === 'streetdog') { if (st !== 'bark') { paSet(rec, 'bark'); sfx('wheek'); } return; }
+        if (rec.kind === 'streetdog') { if (st !== 'bark') { paSet(rec, 'bark'); sfx('wheek', rec); } return; }
         if (st !== 'point' && st !== 'gawp') {
           paInterrupt(rec);
           rec.retState = paIdleState(rec);
@@ -7711,15 +7724,20 @@ export function createNPCs(game) {
 
   function paBellRung() {
     if (!paBuiltCast) return;
+    let first = null;
     for (let i = 0; i < paHumans.length; i++) {
       const rec = paHumans[i];
       if (rec.kind !== 'churchgoer') continue;
+      if (!first) first = rec;
       paSet(rec, 'scandal');
       rec.alarm = 1;
       rec.hopV = 2.2;
       if (i % 2 === 0) paSay(rec, 'paScandal');
     }
-    sfx('gasp');
+    // From the churchgoers, not from the middle of your head. It is a crowd
+    // reaction, so one of them stands for all of them — which is still the
+    // right side of the plaza, and mono was not.
+    sfx('gasp', first);
   }
   game.events.on('task:complete', (p) => {
     if (!paLive()) return;
@@ -8168,7 +8186,9 @@ export function createNPCs(game) {
     if (!qgTarget) return;
     if (arrived >= 2) {
       qgMobT += dt;
-      if (qgCryCd <= 0) { qgCryCd = rand(0.9, 1.8); sfx('gull'); }
+      // At the chips, which is where the birds are — tx/tz are the target's
+      // own position and were already in scope two lines up the function.
+      if (qgCryCd <= 0) { qgCryCd = rand(0.9, 1.8); sfxAt('gull', tx, tz, npcSFX_VOL, 1); }
       // The chips get worried at. A PECK ON A TIMER, not a per-frame force. Any
       // "top the vertical speed back up whenever it is low" rule is a levitator:
       // a 1.5 m/s hop decays through the trigger window in four frames at g = 24,

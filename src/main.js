@@ -628,6 +628,29 @@ function mainMakeBiomes(game) {
           });
         }
         if (!ok) {
+          // ...AND UNDO THE HALF THAT DID GET BUILT.
+          //
+          // Everything ensureBuilt() managed before it threw was added under
+          // `capture(to)`, so it is in the scene, visible, with its bodies in
+          // the world — and putting `from` back on top of it leaves TWO
+          // chapters in one coordinate space, which is the exact condition the
+          // block above refuses to allow. Worse, `built` stays false so a later
+          // attempt runs ensureBuilt() again and captures a SECOND copy into
+          // the same set; the retry then succeeds and attaches both.
+          //
+          // So the partial is detached and then discarded outright, which is
+          // what makes a retry clean rather than cumulative. Nothing is
+          // disposed: geometries and materials come out of shared caches
+          // (mat(), the mergers) and are still owned by chapters that are
+          // perfectly healthy — freeing them here would take those with it.
+          biome.attach(to, false);
+          for (let i = 0; i < toSet.objects.length; i++) {
+            const o = toSet.objects[i];
+            if (o && o.parent) o.parent.remove(o);
+          }
+          toSet.objects.length = 0;
+          toSet.bodies.length = 0;
+          toSet.vis = null;
           biome.attach(from, true);
           if (fromSet && fromSet.api && fromSet.api.onEnter) { try { fromSet.api.onEnter(); } catch (e) { console.error(e); } }
           captureTag = from;
@@ -1423,8 +1446,16 @@ function mainMakePost(game) {
     // the condor move it again, and a linearisation that is one frame behind
     // the projection it is inverting is a haze that jumps on a biome edge.
     const cam = game.camera;
+    // airLight IS A DEPTH TERM AND WAS NOT ON THE LIST. It is read inside the
+    // shader's `uDepthOn > 0.5` block and its uniforms are only refreshed in
+    // the branch below, so a chapter that asked for airlight and nothing else
+    // would get none of it — silently, with uAirLitK still holding the last
+    // chapter's value. Masked today only because all four sysAIRLIT chapters
+    // also carry a sysDEPTH row with air > 0; the day one does not, the term
+    // simply does not exist and nothing says so.
     const wantDepth = !game.state.noDepth &&
-                      (p.dof > 0.0005 || p.air > 0.000001 || p.crease > 0.0005);
+                      (p.dof > 0.0005 || p.air > 0.000001 || p.crease > 0.0005 ||
+                       p.airLight > 0.0005);
     const cu = matComp.uniforms;
     cu.uDepthOn.value = wantDepth ? 1 : 0;
     // Bound unconditionally. uDepthOn already stops it being READ, and a
@@ -1506,6 +1537,7 @@ function mainMakePost(game) {
       // Cut, not faded, and the samplers go back to the 1x1 black so nothing
       // downstream can be reading a stale target.
       cu.uDofK.value = 0; cu.uAirK.value = 0; cu.uCreaseK.value = 0;
+      cu.uAirLitK.value = 0;      // ...this one too, or it keeps the last chapter's
       cu.tDof.value = mainPostBlack;
     }
 

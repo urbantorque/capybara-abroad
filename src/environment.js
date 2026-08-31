@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain, swayMesh, leafMesh } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -141,8 +141,8 @@ let envVanDwell = envVAN_DWELL;
 let envVanYaw = 0;
 let envVanPX = 0, envVanPZ = 0;
 let envVanChimeT = 0;
-let envVanRideT = 0;
-let envVanRideM = 0;      // metres of route covered on this one ride          // s the capybara has been continuously on the roof
+let envVanRideT = 0;      // s the capybara has been continuously on the roof
+let envVanRideM = 0;      // metres of route covered on this one ride
 let envVanRode = false;       // 'whippy-run' already ticked
 const envVanPos = new THREE.Vector3();
 const envVanTmp = new THREE.Vector3();
@@ -1382,6 +1382,14 @@ const envPLANE_LAND = 12.0;                    // s of approach and splashdown
 let envPlaneGroup = null, envPlaneProp = null;
 let envPlanePhase = 0;                         // 0 moored, 1 taxi, 2 run, 3 fly, 4 land
 let envPlaneT = 0, envPlaneEng = 0;
+// THE ATTITUDE IS DAMPED, THE PATH IS NOT. Each phase computes the yaw/pitch/
+// roll it WANTS; these carry what is actually drawn. Every phase boundary is a
+// step change in all three (the run leaves on the runway heading and the
+// circuit's first tangent is 113 degrees off it; roll goes 0 to -0.30 in one
+// frame), and while the aeroplane was also teleporting 45 m at the same instant
+// nobody could see it. Fix the path and the snap is all that is left.
+let envPlaneYawS = Math.PI, envPlanePitchS = 0, envPlaneRollS = 0;
+let envPlaneAttInit = false;
 const envPlanePos = new THREE.Vector3();
 
 // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
@@ -1483,13 +1491,31 @@ function envPlaneStep(game, dt) {
     // one wide left-hand circuit, climbing for the first third and levelling
     const a = Math.atan2(envPLANE_RUN1.z - envPLANE_CIRC.z, envPLANE_RUN1.x - envPLANE_CIRC.x)
               + u * Math.PI * 2;
-    x = envPLANE_CIRC.x + Math.cos(a) * envPLANE_CIRC.r;
-    z = envPLANE_CIRC.z + Math.sin(a) * envPLANE_CIRC.r * 0.8;
+    const ex = envPLANE_CIRC.x + Math.cos(a) * envPLANE_CIRC.r;
+    const ez = envPLANE_CIRC.z + Math.sin(a) * envPLANE_CIRC.r * 0.8;
+    // ---- AND SHE HAS TO JOIN IT FROM WHERE SHE LEFT THE WATER --------------
+    // The circuit's start angle is taken from RUN1's BEARING off the centre,
+    // which is not the same thing as RUN1 being ON the circle: RUN1 is 11.3 m
+    // from the centre and the radius is 62, so u = 0 sat 44.9 m away from the
+    // point the take-off run had just ended on. She jumped that gap in one
+    // frame at six metres over the gardens, and again at the top of the
+    // circuit at fifty-eight, twice per ninety-four second cycle.
+    //
+    // The circuit itself is authored — centre, radius, the 0.8 squash and the
+    // ceiling are all deliberate — so it is not moved. She flies ON to it over
+    // the first tenth and OFF it over the last, which is what an aeroplane
+    // joining and leaving a circuit does anyway.
+    const join = clamp(u / 0.10, 0, 1);
+    const leave = clamp((1 - u) / 0.10, 0, 1);
+    const k = Math.min(join, leave);
+    const ks = k * k * (3 - 2 * k);
+    x = lerp(envPLANE_RUN1.x, ex, ks);
+    z = lerp(envPLANE_RUN1.z, ez, ks);
     y = lerp(sit + 5.5, envPLANE_CEIL, clamp(u / 0.34, 0, 1));
     const a2 = a + 0.05;
     const nx = envPLANE_CIRC.x + Math.cos(a2) * envPLANE_CIRC.r;
     const nz = envPLANE_CIRC.z + Math.sin(a2) * envPLANE_CIRC.r * 0.8;
-    yaw = Math.atan2(nx - x, nz - z);
+    yaw = Math.atan2(nx - ex, nz - ez);
     roll = -0.30;
     pitch = u < 0.34 ? 0.13 : 0.0;
     rpm = 1;
@@ -1510,7 +1536,17 @@ function envPlaneStep(game, dt) {
   }
 
   envPlaneGroup.position.set(x, y, z);
-  envPlaneGroup.rotation.set(pitch, yaw, roll, 'YXZ');
+  // The phase gives the attitude it WANTS; she turns on to it. First frame
+  // snaps, or she would swing round from whatever the last chapter left here.
+  if (!envPlaneAttInit) {
+    envPlaneAttInit = true;
+    envPlaneYawS = yaw; envPlanePitchS = pitch; envPlaneRollS = roll;
+  } else {
+    envPlaneYawS = dampAngle(envPlaneYawS, yaw, 2.2, dt);
+    envPlanePitchS = damp(envPlanePitchS, pitch, 3.0, dt);
+    envPlaneRollS = damp(envPlaneRollS, roll, 3.0, dt);
+  }
+  envPlaneGroup.rotation.set(envPlanePitchS, envPlaneYawS, envPlaneRollS, 'YXZ');
   envPlanePos.set(x, y, z);
   if (envPlaneProp) envPlaneProp.rotation.z += (2 + rpm * 26) * dt;
 

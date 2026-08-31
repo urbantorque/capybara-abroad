@@ -253,7 +253,12 @@ let hanLanternMesh = null;
 
 // bookkeeping
 let hanArrived = false;
-let hanToldFlow = false, hanToldTrain = false, hanToldLake = false;
+// ONE FLAG PER THING SAID, and hanToldFlow used to be two. It gated both the
+// clip toast ("do not stop") and the wheek-answer toast ("everybody answered"),
+// so whichever happened to you first permanently silenced the other — and the
+// one most often lost was the chapter's core instruction, to a player who had
+// simply wheeked in traffic before anybody clipped them.
+let hanToldFlow = false, hanToldHorn = false, hanToldTrain = false, hanToldLake = false;
 let hanAmbT = 0;
 let hanBridgeDone = false, hanHucDone = false, hanTowerDone = false;
 let hanPuppetDone = false;
@@ -3057,8 +3062,8 @@ function hanWheek(game) {
       }
       if (n > 9) break;
     }
-    if (n > 3 && !hanToldFlow) {
-      hanToldFlow = true;
+    if (n > 3 && !hanToldHorn) {
+      hanToldHorn = true;
       hanToast('everybody answered. that is what a horn is FOR here.');
     }
   }
@@ -3580,7 +3585,7 @@ export function createHanoi(game) {
         hanSyncStools();
       }
       hanArrived = false;
-      hanToldFlow = false; hanToldTrain = false; hanToldLake = false;
+      hanToldFlow = false; hanToldHorn = false; hanToldTrain = false; hanToldLake = false;
       hanAmbT = 0; hanQuietT = 0; hanRiverT = 0;
       hanSpawned = false;
     },

@@ -149,6 +149,41 @@ const sysSUN_DIR      = new THREE.Vector3(-0.62, 0.66, 0.42).normalize();
 // east along the church's own row instead of into the middle of the square.
 // Measured: church shadow 23.5 m -> 11.5 m, and it clears the plaza centre.
 const sysPASTO_SUN_DIR = new THREE.Vector3(-0.448, 0.875, 0.182).normalize();
+// ---------------------------------------------------------------------------
+// WHICH STAR EACH CHAPTER IS UNDER — AND IT USED TO BE DECIDED BY THE SHADOW
+// FRUSTUM, WHICH IS NOT A THING THAT KNOWS ABOUT THE SKY.
+//
+// shadowFitBiome() swaps the frustum DEPTH on `cdef.tall`, and the call site
+// reasons carefully about exactly that: "not about Pasto, it is about RELIEF —
+// a 46 m glacier and a 42 m dune need the same box a 62 m volcano does." True,
+// and the sun direction was riding along in the same function as a passenger.
+// So all NINE tall chapters got the star above, whose comment says plainly what
+// it is for: an equatorial near-noon sun whose azimuth was swung to stop the
+// Plaza de Nariño's church tower throwing a slab across the square.
+//
+// Measured, sun direction as drawn: Sydney 41.4 deg / 145.9 deg (its own), and
+// Pasto, Cappadocia, Iceland and Marrakech ALL 61.1 deg / 157.9 deg. Iceland's
+// own subtitle is "half past eleven, and the sun is not the plan" — it is lit
+// by a near-noon equatorial sun.
+//
+// THIS TABLE CHANGES NOTHING TODAY. Every tall chapter is listed with the star
+// it is already being drawn under, so the picture is identical to the frame
+// before it was written. What it buys is that the choice is now per chapter and
+// one line wide, instead of a side effect of how deep the shadow box is. Giving
+// Iceland its low midnight sun, or Cappadocia its dawn, is an art decision that
+// wants the frame in front of you — see REVIEW-2026-08-31.md.
+// ---------------------------------------------------------------------------
+const sysSUN_BY_BIOME = {
+  pasto:     sysPASTO_SUN_DIR,
+  iceland:   sysPASTO_SUN_DIR,
+  sahara:    sysPASTO_SUN_DIR,
+  drift:     sysPASTO_SUN_DIR,
+  kowloon:   sysPASTO_SUN_DIR,
+  palawan:   sysPASTO_SUN_DIR,
+  goreme:    sysPASTO_SUN_DIR,
+  antarctic: sysPASTO_SUN_DIR,
+  monaco:    sysPASTO_SUN_DIR,
+};
 const sysSUN_DIST     = 68;
 const sysSHADOW_HALF  = 22;      // ~44 unit box
 // Tall casters (17 m Opera House sails) project onto the light-space Y axis, so the
@@ -6152,7 +6187,7 @@ export function createSystems(game) {
 
   // The shadow frustum's DEPTH is per-biome: a flat harbour needs 64 units of it,
   // a 62 m volcano needs more than twice that. Swapped on biome:enter only.
-  function shadowFitBiome(i) {
+  function shadowFitBiome(i, name) {
     sc.near = Math.max(1, sysSUN_DIST - sysBIO_SC_NEAR[i]);
     sc.far = sysSUN_DIST + sysBIO_SC_FAR[i];
     sc.updateProjectionMatrix();
@@ -6161,7 +6196,11 @@ export function createSystems(game) {
     // ...and the star itself changes. This is the other half of the plaza fix: a
     // 61-degree sun throws half the shadow a 41-degree one does. Swapped inside the
     // white hold of the biome fade, so nothing on screen ever sees it move.
-    sunAxes(i ? sysPASTO_SUN_DIR : sysSUN_DIR);
+    //
+    // FROM THE CHAPTER, NOT FROM THE FRUSTUM INDEX — see sysSUN_BY_BIOME. The
+    // depth of the shadow box and the position of the sun are two different
+    // questions and only one of them is about how tall the scenery is.
+    sunAxes(sysSUN_BY_BIOME[name] || sysSUN_DIR);
   }
 
   // Rebuild the light-space basis from a sun direction. Called on biome change
@@ -6460,7 +6499,33 @@ export function createSystems(game) {
   function sysSpillScan() {
     sysSplFound.length = 0;
     const cand = [];
-    scene.traverse(function (o) {
+    // ---- THE LIVE CHAPTER, AND NOT THE WHOLE SCENE -------------------------
+    // `visible` DOES NOT DO WHAT THE OLD COMMENT HERE CLAIMED. Object3D
+    // .traverse() recurses into every child unconditionally — traverseVisible
+    // is the one that stops at a hidden node — and detaching a chapter sets
+    // visible=false on its ROOTS only (main.js attach()), leaving every mesh
+    // inside them visible:true. So this walked all nineteen chapters and the
+    // per-object test waved them through: after a visit to Kowloon, its four
+    // hundred emissive signs were still candidates, and a later chapter that
+    // overlaps those coordinates got street lighting from neon that is not
+    // being drawn.
+    //
+    // Scoped the way sysEchoCast scopes its ray, including its note that
+    // Sydney is the one chapter with no group named for the biome — chapter 1
+    // lives under `environment`. Cheaper as well: a few hundred objects rather
+    // than the ~4,500 resident across every chapter.
+    const B = game.biome;
+    const roots = [];
+    const bRoot = B && B.current ? scene.getObjectByName(B.current) : null;
+    if (bRoot) roots.push(bRoot);
+    if (B && B.current === 'sydney') {
+      const eRoot = scene.getObjectByName('environment');
+      if (eRoot) roots.push(eRoot);
+    }
+    // Never scan nothing: an unnamed or not-yet-built root falls back to the
+    // old whole-scene walk rather than silently switching the effect off.
+    const scan = roots.length ? roots : [scene];
+    const visit = function (o) {
       if (!o.isMesh || !o.visible) return;
       const m = o.material;
       if (!m || !m.emissive) return;
@@ -6482,7 +6547,8 @@ export function createSystems(game) {
         cand.push({ x: sysSplV.x, y: sysSplV.y, z: sysSplV.z, l: lum,
                     r: m.emissive.r, g: m.emissive.g, b: m.emissive.b, used: false });
       }
-    });
+    };
+    for (let i = 0; i < scan.length; i++) scan[i].traverse(visit);
     if (!cand.length) return;
     // Brightest first, then absorb everything within sysSPL_CLUS of it. Greedy
     // and O(n^2) on a few hundred candidates, once per chapter attach.
@@ -20838,7 +20904,7 @@ export function createSystems(game) {
     // RELIEF, not altitude: a 46 m glacier, a 42 m dune, a 62 m volcano and an
     // archipelago whose highest deck is seventy-eight metres over its lowest
     // all want the same deep shadow frustum.
-    shadowFitBiome(cdef.tall ? 1 : 0);
+    shadowFitBiome(cdef.tall ? 1 : 0, name);
     // The dome's zenith and the lens's grade are biome state exactly the way
     // the fog and the shadow frustum are. Both cross-fade; only the dome's
     // OWNERSHIP is a hard swap, because two domes cannot both be the sky.
