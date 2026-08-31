@@ -3,7 +3,7 @@ async page => {
   await page.evaluate(o => {
     localStorage.clear();
     localStorage.setItem('capy3.journey.v1', JSON.stringify({
-      v: 1, tasks: o.ids, seen: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17], recs: {},
+      v: 1, tasks: o.ids, seen: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19], recs: {},
       told: 1, ms: 3600000, chapms: {}, finds: [], foundAt: {}, biome: 'sydney', fin: 1
     }));
   }, { ids: ids });

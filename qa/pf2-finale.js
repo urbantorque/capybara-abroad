@@ -11,7 +11,7 @@ async page => {
       v: 1, tasks: o.ids, seen: o.seen, recs: {}, told: 1,
       ms: 3600000, chapms: {}, finds: [], foundAt: {}, biome: 'sydney', fin: 0
     }));
-  }, { ids: ids, seen: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] });
+  }, { ids: ids, seen: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19] });
   await page.reload();
   await page.evaluate(() => new Promise(r => setTimeout(r, 4500)));
   const out = { taskCount: ids.length, api: {}, steps: [] };

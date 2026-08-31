@@ -2297,7 +2297,29 @@ const sysREC_STALE = 1.6;      // s since the last recordLive() before it closes
 // One save file, one records table, one card. See sysJournal below.
 // ---------------------------------------------------------------------------
 const sysSAVE_KEY = 'capy3.journey.v1';
+// WHERE A FILE WE CANNOT READ GOES INSTEAD OF THE BIN (R3). A save that will
+// not parse — a half-written setItem, a quota kill mid-string, an extension
+// that mangled it — presented as a FIRST RUN: saveRead answered null, the title
+// card built its no-file face, and the first tile press took startGame's
+// non-restore branch, which calls saveClear() and destroys the only copy of a
+// journey that might have been three hours long and might have been recoverable
+// by hand. Bytes we cannot read are moved here, once, and never written over;
+// the journey key is then free to be cleared by whatever the player does next.
+const sysSAVE_BAD_KEY = 'capy3.journey.broken.v1';
 const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
+// ---- THE TWO WAYS STORAGE LETS A PLAYER DOWN, BOTH SILENT UNTIL R3 ---------
+// `sysSaveOff`: localStorage threw. A private window, a browser with site data
+// switched off, a full quota. The journey runs perfectly and is gone the moment
+// the tab closes, and nothing anywhere said so.
+// `sysSaveHurt`: there were bytes under the journey key and they would not
+// parse. Quarantined by saveRead, said once, never deleted.
+//
+// THEY LIVE UP HERE FOR THE SAME REASON sysALB_KEY DOES, and it is a real trap:
+// `saveRead()` is called by the title card, which is BUILT ABOVE the save block
+// it belongs to, so a `let` declared down there is still in its temporal dead
+// zone at the one moment these have to be written — a ReferenceError inside the
+// one function whose whole job is not to lose anything.
+let sysSaveOff = false, sysSaveHurt = false, sysSaveSaid = false;
 // THE ALBUM'S KEY AND ITS CACHE LIVE UP HERE, AWAY FROM THE REST OF THE ALBUM,
 // and the reason is worth the four lines. The title card asks the album for a
 // postcard WHILE IT BUILDS, and the title card is built earlier in this file
@@ -13978,11 +14000,11 @@ export function createSystems(game) {
   // --- THE LEDGER: what the journey actually was (v18) ---------------------
   // What used to be here was a full-screen div reading MISCHIEF COMPLETE and a
   // single number, and then location.reload(). That is a receipt, not an
-  // ending — a hundred and ninety-nine tasks, forty-two records, seventeen
+  // ending — two hundred and thirty-one tasks, fifty-six records, nineteen
   // places and eight hours all resolved to one string and were thrown away.
   //
   // It is also the screen almost nobody ever saw, because it only existed at
-  // 199 of 199. So it is not only rebuilt out of the pieces the journey
+  // 231 of 231. So it is not only rebuilt out of the pieces the journey
   // actually leaves behind — the postcards, the souvenirs, the numbers and the
   // clock — it is OPENABLE FROM THE JOURNAL at any point. A retrospective that
   // one player in a hundred sees once is not a feature, it is a trophy.
@@ -14420,8 +14442,32 @@ export function createSystems(game) {
     if (e.target === ledEl) ledHide();
   });
 
+  // =========================================================================
+  // THE LAST DOOR — the receipt is not the ending (R2)
+  // =========================================================================
+  // This function used to fire wherever the last tick of the game happened to
+  // land, which for a completionist is Antarctica: "MISCHIEF COMPLETE" drawn
+  // over an ice shelf, with a tap-anywhere page reload under it. The authored
+  // ending is THE LAWN — come home, walk into the horseshoe of souvenirs, sit
+  // down — and it lives at sysFinaleCheck/sysFinaleClose, several thousand
+  // lines below. The receipt was covering it, on the default path, every time.
+  //
+  // So the receipt is now behind the lawn rather than in front of it: it may
+  // not be drawn until the closing beat has been spent (`sysFinDone`), and the
+  // 231st tick anywhere else points home instead. sysFinaleClose opens the same
+  // ledger with `ledShow(true)` on its own path, so in practice the guard below
+  // is a HARD STOP and the body under it is unreachable on any honest save —
+  // which is the intent. It is kept rather than deleted because it is still the
+  // definition of what the receipt is, and because a file whose `fin` is set
+  // without its ticks (a hand-edited one, a QA fixture) should get a receipt
+  // rather than nothing at all.
+  //
+  // `sysFinDone` is declared far below in the same scope — this only ever runs
+  // long after module init, so the reference is sound; saveWrite reads it the
+  // same way from above.
   function showEnd() {
     if (ended) return;
+    if (!sysFinDone) { sysEndPointHome(); return; }
     ended = true;
     sfx('whistle');
     setTimeout(function () { sfx('wheek', { pitch: 1.12 }); }, 420);
@@ -14431,6 +14477,51 @@ export function createSystems(game) {
     // by construction; see musSwell.
     musSwell(1);
     ledShow(true);
+  }
+
+  // Said at most once a session, because the two callers are the last tick and
+  // every arrival after it, and a player crossing three borders on the way home
+  // does not need telling three times.
+  let sysEndHomeSaid = false;
+
+  /**
+   * THE 231st TICK, ANYWHERE THAT IS NOT THE LAWN. The paper is finished and
+   * there is exactly one thing left, so say the one thing — with the biggest
+   * card the HUD owns, because this is the largest moment in the game and a
+   * toast under a chapter ceremony is not it.
+   *
+   * If it happened to land in Sydney, there is nothing to point at: the lawn is
+   * here. sysFinaleCheck could not have staged it on arrival (nothing was
+   * finished then), so this is the only door it has in that case.
+   */
+  function sysEndPointHome() {
+    const bm = game.biome;
+    if (bm && bm.current === 'sydney') { sysFinaleCheck(); return; }
+    sysEndHomeSaid = true;
+    musSwell(1);
+    sfx('chime', { volume: 0.6, pitch: 1.3, force: true });
+    showPlace('THAT IS EVERYTHING',
+      'every place is ticked. go home to Sydney — the lawn is waiting.');
+    setTimeout(function () {
+      toast('three wheeks at the way out, then Sydney on the board.');
+    }, 2600);
+  }
+
+  /**
+   * ...AND THE SAME THING FOR A PLAYER WHO FINISHED, CLOSED THE TAB, AND CAME
+   * BACK. completeTask's `silent` branch returns above the doneCount test, so a
+   * restored file with everything done triggers nothing at all — which left the
+   * only pointer at the ending behind a reload the player had already done.
+   * Called from startGame and from every arrival that is not Sydney.
+   */
+  function sysEndSayHome() {
+    if (sysEndHomeSaid || sysFinDone || !sysFinaleAll()) return;
+    const bm = game.biome;
+    if (bm && bm.current === 'sydney') return;   // sysFinaleCheck has it
+    sysEndHomeSaid = true;
+    setTimeout(function () {
+      toast('everything is ticked. the lawn in Sydney is the last of it.');
+    }, 2200);
   }
 
   // =========================================================================
@@ -14582,7 +14673,7 @@ export function createSystems(game) {
    *     exactly what the overseas terminal at Manly has always offered.
    *
    * That last clause has to skip chapter one or it never offers anything at
-   * all: Sydney is eighteen tasks and is almost never the first chapter
+   * all: Sydney is nineteen tasks and is almost never the first chapter
    * finished, so "the lowest incomplete chapter" is Sydney for most of the game
    * and the board showed a single unlocked line reading 'Sydney' for two hours.
    * Measured on the first build of it, and it made the board useless.
@@ -16063,12 +16154,63 @@ export function createSystems(game) {
   let saveTold = false;
 
   function saveRead() {
+    let raw = null;
     try {
-      const raw = localStorage.getItem(sysSAVE_KEY);
-      if (!raw) return null;
-      const o = JSON.parse(raw);
-      return (o && o.v === 1) ? o : null;
-    } catch (e) { return null; }
+      raw = localStorage.getItem(sysSAVE_KEY);
+    } catch (e) {
+      // getItem itself throwing is the strongest possible signal that this
+      // browser will not keep anything — say so rather than guess later.
+      sysSaveOff = true;
+      return null;
+    }
+    if (!raw) return null;
+    let o = null;
+    try { o = JSON.parse(raw); } catch (e) { o = null; }
+    if (o && o.v === 1) return o;
+    // NON-EMPTY BYTES WE CANNOT READ. Set them aside before anybody else gets
+    // the chance to clear the key — this is the only reader, and it runs once,
+    // at boot, before the title card is built. A quarantine already on file is
+    // never written over: the FIRST broken copy is the one worth keeping, and a
+    // second boot must not overwrite it with the empty file that replaced it.
+    sysSaveHurt = true;
+    try {
+      if (localStorage.getItem(sysSAVE_BAD_KEY) == null) {
+        localStorage.setItem(sysSAVE_BAD_KEY, raw);
+      }
+    } catch (e) { /* no room to quarantine — the toast is still owed */ }
+    return null;
+  }
+
+  /**
+   * SAY THE DEGRADED THINGS, ONCE, KINDLY, AND ONLY AFTER THE GAME HAS STARTED.
+   * Three of them, and all three used to be said to nobody: storage that will
+   * not keep a file, a file that could not be read, and a machine drawing
+   * without its graphics card (index.html's probe sets `__capySoftGL` and, until
+   * now, absolutely nothing read it). Spaced out because the toast rail holds
+   * four and an arrival is already using some of them.
+   */
+  function saveSayDegraded() {
+    if (sysSaveSaid) return;
+    sysSaveSaid = true;
+    // ASK BEFORE SPEAKING. Reading works in a Safari private window and WRITING
+    // is what throws there, so a flag set only by saveRead would stay false in
+    // the exact case this sentence exists for — and the first real write may be
+    // a whole chapter away, since Sydney emits no biome:enter to nudge one.
+    if (!sysSaveOff) {
+      try {
+        localStorage.setItem('capy3.probe', '1');
+        localStorage.removeItem('capy3.probe');
+      } catch (e) { sysSaveOff = true; }
+    }
+    let n = 0;
+    const say = function (text) {
+      setTimeout(function () { toast(text); }, 2600 + (n++) * 3000);
+    };
+    if (sysSaveOff) say('this browser will not let the game keep a file — this journey lasts as long as the tab does.');
+    else if (sysSaveHurt) say('a saved journey here could not be read. it has been set aside, not deleted.');
+    let soft = null;
+    try { soft = window.__capySoftGL || null; } catch (e) { soft = null; }
+    if (soft) say('this machine is drawing without its graphics card. it will run, but slowly.');
   }
   function saveWrite() {
     savePending = false;
@@ -16085,8 +16227,12 @@ export function createSystems(game) {
       // a player who could not have found any.
       const finds = [];
       for (const k in findDone) if (findDone[k]) finds.push(k);
+      // `told` used to be written here and it was never once read: saveTold is
+      // set from the mere EXISTENCE of a restored file (see the restore branch
+      // in startGame), which is the same fact and needs no field. Removed in R3.
+      // Nothing migrates — an old file simply carries a key nobody looks at.
       localStorage.setItem(sysSAVE_KEY, JSON.stringify({
-        v: 1, tasks: tasks, seen: seen, recs: jrRecs, told: 1,
+        v: 1, tasks: tasks, seen: seen, recs: jrRecs,
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         biome: (game.biome && game.biome.current) || 'sydney',
@@ -16116,10 +16262,55 @@ export function createSystems(game) {
         saveTold = true;
         toast('saved — you can close this and come back');
       }
-    } catch (e) { /* storage off, quota full — the game does not care */ }
+    } catch (e) {
+      // ...AND IF IT THREW, THE PLAYER IS OWED THE OPPOSITE SENTENCE (R3).
+      // "the game does not care" was true of the game and false of the person
+      // playing it: three hours in a private window wrote nothing, said
+      // nothing, and vanished. saveSayDegraded latches, so a quota that throws
+      // on every write says this once and then goes back to being silent.
+      sysSaveOff = true;
+      saveSayDegraded();
+    }
   }
   function saveSoon() { savePending = true; saveT = 0; }
-  function saveClear() { try { localStorage.removeItem(sysSAVE_KEY); } catch (e) {} }
+
+  /**
+   * WRITE NOW, BECAUSE THERE MAY NOT BE A LATER (R3).
+   *
+   * The debounce drains inside the rAF loop and nowhere else, and a backgrounded
+   * tab gets no rAF — so the 700 ms after the tick that CLOSED A CHAPTER were
+   * routinely the 700 ms in which the player switched tabs and then shut the
+   * window from the strip. Measured shape, not a theory: hide, wait, reload,
+   * and the last tick is gone.
+   *
+   * Unconditional rather than `if (savePending)`, and deliberately: `ms` is the
+   * journey clock and it is always stale, so a session spent walking around
+   * without ticking anything used to lose all of its time. The one thing it
+   * will not do is manufacture a file for a journey that has not begun.
+   */
+  function saveFlush() {
+    if (!started) return;
+    if (!savePending && doneCount === 0 && jrCarriedMs === 0) return;
+    saveWrite();
+  }
+
+  /**
+   * START OVER MEANS START OVER (R3). The confirm copy on the title card
+   * promises "every record and every souvenir", and this used to remove one key
+   * of three: the album of photographs and the ghost traces both survived the
+   * wipe, so a "fresh" journey opened with somebody else's — or your own
+   * previous run's — pictures on the shelf and a ghost jogging the first record
+   * you attempted. The in-memory caches go with the bytes, or the very next
+   * write puts the same contents straight back.
+   */
+  function saveClear() {
+    try { localStorage.removeItem(sysSAVE_KEY); } catch (e) {}
+    try { localStorage.removeItem(sysALB_KEY); } catch (e) {}
+    try { localStorage.removeItem(sysGHOST_KEY); } catch (e) {}
+    albShots = null;
+    ghStore = null;
+    ghPlay = null; ghPlayN = 0; ghId = ''; ghRecN = 0; ghWasOpen = false;
+  }
 
   /**
    * A NUMBER WORTH BEATING.
@@ -17603,6 +17794,11 @@ export function createSystems(game) {
     // with its souvenir following two seconds later. The order that reads is
     // the other one — finish the place, take the thing, and only then lay the
     // whole journey out — so the end waits for the ceremony it just started.
+    //
+    // ...AND WHAT `showEnd` DOES HERE IS NOT WHAT IT USED TO DO (R2). The 231st
+    // tick almost never lands in Sydney, and the receipt it used to draw sat on
+    // top of the authored ending. It now points home instead, and the receipt
+    // waits for the lawn. See THE LAST DOOR.
     if (doneCount >= TASKS.length) {
       setTimeout(showEnd, ceremony ? 1100 + sysKEEP_WAIT + sysKEEP_CARD + 500 : 900);
     }
@@ -17694,7 +17890,7 @@ export function createSystems(game) {
   // ever shown to you on a CARD.
   //
   // So: come home. Bring it all back to the lawn you started on, and the
-  // seventeen things you took are set out there waiting — not dumped at the
+  // nineteen things you took are set out there waiting — not dumped at the
   // spawn in a two-metre huddle the way every border crossing leaves them, but
   // laid in a ring you can walk into the middle of. Then sit down among them.
   // That is the whole ending: the last thing the game asks of you is the first
@@ -17710,6 +17906,14 @@ export function createSystems(game) {
   //     registered before this file's, so staging from here happens after the
   //     huddle and simply overrides it. Nothing in props.js had to change for
   //     that; only a mover had to be published (physStageKeep).
+  //  1b. ...AND THE RECEIPT USED TO WIN ANYWAY (fixed in R2). Everything below
+  //     shipped in v24 and the receipt was left wired to the 231st tick, so on
+  //     the default path — last tick in Antarctica, not in Sydney — `showEnd`
+  //     drew MISCHIEF COMPLETE over the ice a second later and this whole
+  //     ending was never reached by anybody who did not happen to finish at
+  //     home. `showEnd` now refuses to draw until `sysFinDone` and points home
+  //     instead; the receipt is the second half of the beat below, not a rival
+  //     to it. See THE LAST DOOR next to showEnd.
   //  3. THE LEDGER MAY NOT OPEN ON ARRIVAL. `ledShow(true)` pauses the game and
   //     arms a tap-anywhere reload, so opening it the moment you walk in would
   //     replace the ending with its own receipt again — and put a page-reload
@@ -17720,11 +17924,11 @@ export function createSystems(game) {
   //     because you have already been home.
   const sysFIN_X = 30, sysFIN_Z = 26;   // the picnic lawn, 16 x 16 m and bed-free
   // RADIUS IS A COMPOSITION NUMBER, NOT A GEOMETRY ONE, and the first guess was
-  // wrong for a reason worth writing down: a keepsake is a 24 cm box. Seventeen
-  // of them on a 4.2 m ring sit 1.55 m apart, which from the shoulder camera is
-  // seventeen specks scattered over eight metres of lawn — it reads as litter,
+  // wrong for a reason worth writing down: a keepsake is a 24 cm box. Nineteen
+  // of them on a 4.2 m ring sit 1.39 m apart, which from the shoulder camera is
+  // nineteen specks scattered over eight metres of lawn — it reads as litter,
   // not as an arrangement, and the screenshot is what said so. At 2.6 m they are
-  // 96 cm apart and the whole ring is inside one frame with the animal in it.
+  // 86 cm apart and the whole ring is inside one frame with the animal in it.
   // Still ample to stand in: the capybara is 0.6 m across.
   const sysFIN_R = 2.6;
   const sysFIN_IN = 1.8;                // "inside the ring", for the closing test
@@ -17753,7 +17957,7 @@ export function createSystems(game) {
   const sysFIN_GAP = 1.75;              // rad of opening, ~100 degrees
 
   /**
-   * Lay the seventeen out, in chapter order round the horseshoe, so one horn is
+   * Lay the nineteen out, in chapter order round the horseshoe, so one horn is
    * Sydney and the other is Antarctica and the whole journey is one glance.
    */
   function sysFinaleStage() {
@@ -17831,7 +18035,18 @@ export function createSystems(game) {
     toast('and that is the lot.');
     // THEN the ledger — after the line has been read, and never before the
     // player has stopped moving, which by construction they have.
-    setTimeout(function () { sysFinClosing = false; ledShow(true); }, sysFIN_BEAT);
+    //
+    // `ended` IS SET HERE AND NOWHERE ELSE NOW (R2). It is what the ledger's
+    // own "press Enter to cause it all again" line is actually promising — the
+    // keydown handler tests `ended`, not `ledFinal` — and since showEnd is no
+    // longer the thing that opens this card, the flag has to be set on the path
+    // that is. It also stops the receipt being drawable a second time, and it
+    // is what the rescue and the ghost-replay key read to know the run is over.
+    setTimeout(function () {
+      sysFinClosing = false;
+      ended = true;
+      ledShow(true);
+    }, sysFIN_BEAT);
   }
 
   function chapterCeremony(n) {
@@ -17854,11 +18069,11 @@ export function createSystems(game) {
     // picking up one sandwich.
     //
     // THE SCARCITY LAW IN "THE LIFT" IS ABOUT TASKS, AND THIS IS NOT ONE.
-    // "Exactly one task per chapter carries `wow`" is a rule about a hundred
-    // and ninety-nine rows, and it is untouched: no biome may call musSwell for
+    // "Exactly one task per chapter carries `wow`" is a rule about two hundred
+    // and thirty-one rows, and it is untouched: no biome may call musSwell for
     // a tick, and no chapter may grow a second `wow`. A chapter CLOSE is a
-    // different kind of event and a rarer one — seventeen in the whole game,
-    // against a hundred and eighty-five ticks — so paying it in the same
+    // different kind of event and a rarer one — nineteen in the whole game,
+    // against two hundred and twelve ticks — so paying it in the same
     // currency does not dilute the banner, it puts the banner in proportion.
     // No slow motion, though: that stays the marquee's alone, because the
     // ceremony fires 1.1 s after a tick that has already finished and there is
@@ -18161,11 +18376,14 @@ export function createSystems(game) {
       // You did emigrate. Somehow.
       if (cdef.arrive) completeTask(cdef.arrive);
       showPlace(cdef.name.toUpperCase(), cdef.sub);
+      // Idempotent (it latches), and biomeGo's own biome:enter may well have
+      // fired before `started` was true. See sysEndSayHome.
+      sysEndSayHome();
     } else {
       // ...and if you did not, you are in Sydney, which is the one chapter that
       // emits no biome:enter — so this is the second and only other door THE
-      // LAWN can be reached through. A restored file with all seventeen done
-      // that opens straight into Sydney comes in exactly here.
+      // LAWN can be reached through. A restored file with all nineteen chapters
+      // done that opens straight into Sydney comes in exactly here.
       sysFinaleCheck();
       // ...and it is the one chapter that is never TRAVELLED to, so it is the
       // one chapter whose arrival shot cannot come from biomeGo. Chapter 1 is
@@ -18186,6 +18404,9 @@ export function createSystems(game) {
     setTimeout(function () {
       toast((landed && cdef.open) || 'be a menace.');
     }, 700);
+    // ...and whatever is degraded about this machine, said once, after that
+    // line and never on the title card. See saveSayDegraded (R3).
+    saveSayDegraded();
     sysBufClearAll();
     input.honkPressed = false; input.actionPressed = false; input.whistlePressed = false;
     input.jumpPressed = false;
@@ -19918,6 +20139,14 @@ export function createSystems(game) {
   }
   applyDPR();
   addEventListener('resize', applyDPR);
+  // ---- AND THE OTHER HALF OF IT (R3) --------------------------------------
+  // `pagehide` is the one that fires on a real navigation away and on a bfcache
+  // freeze, which `visibilitychange` does not reliably precede on every engine;
+  // between the two of them there is no route out of this page that does not
+  // pass through a flush. NOT `beforeunload`: it is unreliable on mobile, it is
+  // ignored inside a bfcache, and adding a listener for it disqualifies the page
+  // from the bfcache on some browsers — a real cost for a worse guarantee.
+  addEventListener('pagehide', function () { saveFlush(); });
   document.addEventListener('visibilitychange', function () {
     // The journal/departures board paused the game itself — coming back to the
     // tab must not unpause the world behind an open modal.
@@ -19927,6 +20156,12 @@ export function createSystems(game) {
     // it stayed open.
     game.state.paused = document.hidden || jrShown || ledShown || albShown;
     if (document.hidden) {
+      // ---- THE SAVE, BEFORE THE FRAMES STOP (R3) --------------------------
+      // FIRST, above everything else in this branch. The debounce is drained by
+      // the rAF loop and a hidden tab has no rAF, so this is the last chance
+      // the file gets: on every desktop and every phone, "backgrounded" is the
+      // state a tab is in when it is closed, discarded or killed for memory.
+      saveFlush();
       ambientSet(false);
       // Held keys can never produce a keyup while hidden — clear them or the
       // capybara sprints off on its own the moment the tab comes back.
@@ -20985,9 +21220,11 @@ export function createSystems(game) {
     sysKeepsRestore();
     // ...and if there is nothing left to do anywhere, coming back to Sydney
     // lays the lawn. Leaving clears the staging flag because props.js will
-    // huddle all seventeen at the next chapter's spawn on the way out, so the
+    // huddle all nineteen at the next chapter's spawn on the way out, so the
     // arrangement has to be made again the next time you walk in. See THE LAWN.
-    if (name === 'sydney') sysFinaleCheck(); else sysFinStaged = false;
+    // ...and every OTHER arrival, on a journey that is finished but has not
+    // been closed, is a chance to say where the last of it is. See sysEndSayHome.
+    if (name === 'sydney') sysFinaleCheck(); else { sysFinStaged = false; sysEndSayHome(); }
     // Every biome is authored in the SAME coordinates, so a breadcrumb dropped
     // on the Corso is a point inside a basilica once Venice is attached. The
     // trail belongs to the world it was walked in and to no other.
