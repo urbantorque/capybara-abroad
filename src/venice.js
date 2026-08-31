@@ -201,7 +201,7 @@ let venTime = 0;
 let venPhase = venTIDE_START;
 let venWaterY = venTIDE_LOW;
 let venWaterMesh = null, venWaterMat = null;
-let venWaterAttr = null, venWaterBase = null;
+let venWaterAttr = null, venWaterBase = null, venRipT = 0;
 let venLagoonMesh = null;
 let venBoardGroup = null, venBoardOut = 0;
 let venBoardBodies = null;
@@ -4820,7 +4820,16 @@ function venUpdateTide(game, dt) {
     // It goes FLATTER at the top of the tide: a metre of water trapped inside
     // a square with buildings round all four sides really is glassier than a
     // canal, and it is also when the reflections have to hold still.
-    if (venWaterAttr) {
+    // ...AT THIRTY HERTZ, which is the rate the Drift's identical cloud loop
+    // settled on (driRipT). This is 2,555 vertices, three sines each — some
+    // 7,700 of them — plus a full re-upload of the position attribute, every
+    // frame, in the heaviest chapter in the game, for a swell whose amplitude
+    // is between five and twelve centimetres and whose slowest wave has a
+    // period of about seven seconds. Nothing reads this attribute back: it is
+    // display geometry, so halving the rate costs smoothness nobody can see.
+    venRipT += dt;
+    if (venWaterAttr && venRipT >= 0.0333) {
+      venRipT = 0;
       const amp = lerp(0.115, 0.048, lvl);
       const t = venTime;
       for (let i = 0; i < venWaterAttr.count; i++) {

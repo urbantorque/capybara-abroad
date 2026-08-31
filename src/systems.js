@@ -6608,13 +6608,16 @@ export function createSystems(game) {
     if (!sysSplFound.length) {
       // An empty chapter DOES fade, because that is a light going out rather
       // than an instrument being read.
+      //
+      // ...BUT THE FADE IS THE LOOP BELOW'S JOB, AND IT WAS BEING DONE TWICE.
+      // With sysSplFound empty, sysSplWant is empty too, so every slot reaches
+      // the hold/fade loop with `keep` false and is damped toward zero there.
+      // Damping here as well applied sysSPL_LAMBDA a second time in the same
+      // frame, so a light going out took about half as long as the number it
+      // was tuned to. This only has to decide whether there is anything left
+      // to fade at all.
       let any = 0;
-      for (let s = 0; s < N; s++) {
-        const sl = sysSplSlots[s];
-        if (!sl.src) continue;
-        sl.k = damp(sl.k, 0, sysSPL_LAMBDA, dt);
-        if (sl.k < 0.004) { sl.k = 0; sl.src = null; } else any++;
-      }
+      for (let s = 0; s < N; s++) if (sysSplSlots[s].src) any++;
       if (!any) { spillTick(sysSplOut, 0); return; }
     }
 
@@ -13444,6 +13447,9 @@ export function createSystems(game) {
   const mapBase = document.createElement('canvas');
   mapBase.width = sysMAP_PX; mapBase.height = sysMAP_PX;
   const mapBaseCtx = mapBase.getContext('2d');
+  // Last strings written to the two per-frame transforms, so an unchanged value
+  // is not written again. Same idiom as mapDistLast / flyAltLast.
+  let sysArrowLast = '', sysStamLast = '';
   let mapBakedFor = null;            // biome name the base layer belongs to
   let mapBakedTide = -1;             // and, in Venice, WHICH TIDE it belongs to
   let mapSpec = null;                // the sysMAP_WORLDS entry in force
@@ -14558,6 +14564,32 @@ export function createSystems(game) {
     return false;
   }
 
+  // ---------------------------------------------------------------------------
+  // THE CARD IS NOT A LIVE VIEW OF ANYTHING BUT ITS OWN CLOCK.
+  //
+  // jrRefresh used to run EVERY FRAME while the journal was open: albAll(), a
+  // scan of all ~200 taskRec entries, chapComplete() for every chapter, then
+  // per row a double pass over its task ids and unconditional textContent,
+  // style.width, classList and setAttribute writes on all nineteen. Sixty times
+  // a second, at a standstill — the game is paused behind this card (jrShow
+  // sets state.paused) and jrTravel calls jrHide() BEFORE it moves anybody, so
+  // nothing on the card can change while it is up except the elapsed time.
+  //
+  // Setting identical textContent still replaces the text node, so this was
+  // also a steady stream of style invalidation on a screen that is holding
+  // still. The full rebuild now happens where it always should have — on open —
+  // and the per-frame path writes one string, and only when it differs, which
+  // in practice is about once a second.
+  // ---------------------------------------------------------------------------
+  let jrCountPre = '', jrCountPost = '', jrCountLast = '';
+  function jrTick() {
+    const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+    const s = jrCountPre + sysFmtTime(total) + jrCountPost;
+    if (s === jrCountLast) return;
+    jrCountLast = s;
+    jrCount.textContent = s;
+  }
+
   function jrRefresh() {
     // The album's button appears the moment there is a first picture in it and
     // never before. See where it is built.
@@ -14571,9 +14603,13 @@ export function createSystems(game) {
     // noticed" is a list of things you have not done, and a find that is
     // advertised before it is found has stopped being a find.
     const nf = findCount();
-    jrCount.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
-      ' places  ·  ' + sysFmtTime(total) +
-      (nf ? '  ·  ' + nf + ' noticed' : '');
+    // Split either side of the clock, because the clock is the ONLY part of this
+    // card that moves while it is open — see jrTick.
+    jrCountPre = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
+      ' places  ·  ';
+    jrCountPost = (nf ? '  ·  ' + nf + ' noticed' : '');
+    jrCountLast = jrCountPre + sysFmtTime(total) + jrCountPost;
+    jrCount.textContent = jrCountLast;
     const here = game.biome ? chapterOf(game.biome.current) : 1;
     // ---- the shelf ---------------------------------------------------------
     const kept = keepCount();
@@ -21865,7 +21901,11 @@ export function createSystems(game) {
       // NDC y is up, and CSS rotate() is clockwise from up, so this is direct.
       const deg = Math.atan2(sysAimB.x - sysAimA.x, sysAimB.y - sysAimA.y) * 180 / Math.PI;
       const near = hd < sysHINT_NEAR;
-      topRec.arrow.style.transform = 'rotate(' + deg.toFixed(0) + 'deg)';
+      // Change-guarded, like the readout above it: rounded to the degree this
+      // holds still whenever the player does, and writing an identical
+      // transform still costs a style recalculation.
+      const arrowT = 'rotate(' + deg.toFixed(0) + 'deg)';
+      if (arrowT !== sysArrowLast) { sysArrowLast = arrowT; topRec.arrow.style.transform = arrowT; }
       // THE MARK ON THE GROUND, AND THE GROUND IS NOT ALWAYS AT ZERO.
       // This used to name the seven chapters that had relief in them WHEN IT
       // WAS WRITTEN and fall back to y = 0 for the rest — so the beacon in
@@ -22586,7 +22626,11 @@ export function createSystems(game) {
     // scaleX rather than width: a width animation relayouts the bar every frame.
     if (capy) {
       const s = clamp(capy.stamina === undefined ? 1 : capy.stamina, 0, 1);
-      stamFill.style.transform = 'scaleX(' + s.toFixed(3) + ')';
+      // ...and only when it actually moves. Stamina sits pinned at 1.000 for
+      // most of a session, and this wrote the same string sixty times a second
+      // through all of it.
+      const stamT = 'scaleX(' + s.toFixed(3) + ')';
+      if (stamT !== sysStamLast) { sysStamLast = stamT; stamFill.style.transform = stamT; }
       if (s > 0.999 && !capy.blown) stamFullT += dt; else stamFullT = 0;
       const want = started && stamFullT < 1.2;
       if (want !== stamShown) { stamShown = want; stamEl.classList.toggle('show', want); }
@@ -23643,7 +23687,7 @@ export function createSystems(game) {
       saveT += (game.state.rawDt || dt) * 1000;
       if (saveT >= sysSAVE_DEBOUNCE) saveWrite();
     }
-    if (jrShown) jrRefresh();
+    if (jrShown) jrTick();
 
     confettiStep(dt);
 

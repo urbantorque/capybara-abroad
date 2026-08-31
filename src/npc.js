@@ -8123,6 +8123,13 @@ export function createNPCs(game) {
   }
 
   let qgTarget = null, qgMobT = 0, qgCryCd = 0, qgCool = 0, qgPeckT = 0;
+  // LOOKING IS ON A TICK, because the answer changes at most once a minute.
+  // qgFindChips walks every prop in the chapter with six field tests each, and
+  // with no target and no cooldown — which is the ordinary state of Sydney —
+  // that ran at 60 Hz for a condition that needs somebody to have kicked a cone
+  // of chips over first. Same shape as the stall-bind timer in props.js.
+  const npcQG_LOOK = 0.4;
+  let qgLookT = 0;
   let qgBestMob = 0;              // most gulls on the chips at once, this session
 
   function qgStep(dt) {
@@ -8132,7 +8139,12 @@ export function createNPCs(game) {
                      qgTarget.hidden || !qgTarget.body)) { qgTarget = null; qgMobT = 0; }
     // Without the cooldown the flock re-acquires the same cone on the very frame
     // it gives up on it — `disturbed` never clears — and mobs it forever.
-    if (!qgTarget && qgCool <= 0) { qgTarget = qgFindChips(); if (qgTarget) qgMobT = 0; }
+    qgLookT -= dt;
+    if (!qgTarget && qgCool <= 0 && qgLookT <= 0) {
+      qgLookT = npcQG_LOOK;
+      qgTarget = qgFindChips();
+      if (qgTarget) qgMobT = 0;
+    }
 
     const tx = qgTarget ? qgTarget.body.position.x : 0;
     const tz = qgTarget ? qgTarget.body.position.z : 0;

@@ -583,10 +583,18 @@ function mainMakeBiomes(game) {
         // the failure this line would cause if something ever started.
         o.matrixWorldAutoUpdate = on;
       }
+      // MEMBERSHIP ONCE, NOT ONCE PER BODY. This was a linear scan of
+      // world.bodies inside a loop over the chapter's own bodies — a few
+      // hundred against a few hundred, so ~10^5 comparisons, twice per travel.
+      // It is a one-off spike hidden inside the fade rather than anything you
+      // can feel, but it is quadratic in exactly the two numbers that grow.
+      // The set is kept in step as we go, so a body listed twice behaves the
+      // way it did under indexOf rather than being added twice.
+      const inWorld = new Set(game.world.bodies);
       for (let i = 0; i < s.bodies.length; i++) {
         const b = s.bodies[i];
-        if (on) { if (game.world.bodies.indexOf(b) < 0) game.world.addBody(b); }
-        else { if (game.world.bodies.indexOf(b) >= 0) game.world.removeBody(b); }
+        if (on) { if (!inWorld.has(b)) { game.world.addBody(b); inWorld.add(b); } }
+        else { if (inWorld.has(b)) { game.world.removeBody(b); inWorld.delete(b); } }
       }
     },
 

@@ -1414,6 +1414,29 @@ function hanSyncBikes() {
 }
 
 /** Where rider `i` is right now. Its own scratch vector — see the api note. */
+// ---------------------------------------------------------------------------
+// THE NEAREST SCOOTER, ONCE A FRAME AND NOT TWICE.
+//
+// hanUpdateRide wanted it to answer "am I standing in one", and api.bike()
+// wanted it to point the beacon at one, and each of them walked all 240
+// independently — every walk a lane resample plus trig per scooter. Stamped
+// with hanTime, which advances once per frame in update(), so whichever asks
+// first pays and the other reads the answer.
+// ---------------------------------------------------------------------------
+let hanNearBikeI = -1, hanNearBikeD = 1e9, hanNearBikeT = -1;
+function hanNearestBike(px, pz) {
+  if (hanNearBikeT === hanTime) return hanNearBikeI;
+  hanNearBikeT = hanTime;
+  let bi = -1, bd = 1e9;
+  for (let i = 0; i < hanBikeN; i++) {
+    hanBikeAt(i, hanV3b);
+    const d = Math.hypot(hanV3b.x - px, hanV3b.z - pz);
+    if (d < bd) { bd = d; bi = i; }
+  }
+  hanNearBikeI = bi; hanNearBikeD = bd;
+  return bi;
+}
+
 function hanBikeAt(i, out) {
   const o = i * hanBIKE_STRIDE;
   const L = hanBikeData[o] | 0;
@@ -1717,13 +1740,16 @@ function hanUpdateRide(game, dt) {
   const capy = game.capy;
   const p = capy && capy.position;
   if (!p) return;
+  // ---- NOT WHILE YOU ARE ON THE LAKE ------------------------------------
+  // Two hundred and forty scooters, each one a lane resample and a pair of
+  // trig calls, walked every frame to find the nearest — and then asked
+  // whether it is within 1.6 m. Off the lanes entirely there is no answer
+  // worth having, and half this map is lake, bridge and temple.
+  if (hanRider < 0 && hanLaneAt(p.x, p.z) > hanLaneW + 6) return;
   // which rider is nearest, and is the animal on it
-  let bi = -1, bd = 1e9;
-  for (let i = 0; i < hanBikeN; i++) {
-    hanBikeAt(i, hanV3b);
-    const d = Math.hypot(hanV3b.x - p.x, hanV3b.z - p.z);
-    if (d < bd) { bd = d; bi = i; }
-  }
+  const bi = hanNearestBike(p.x, p.z);
+  const bd = hanNearBikeD;
+  if (bi < 0) return;
   // ---- AM I *IN* ONE, AND THE HEIGHT IS THE WHOLE TEST ------------------
   //
   // The footwell floor is at 0.59 over the road, so an animal standing in it
@@ -3491,13 +3517,9 @@ export function createHanoi(game) {
     bike() {
       const capy = hanGame && hanGame.capy;
       if (!hanBikeN || !capy || !capy.position) return api.crossing();
-      let bi = 0, bd = 1e18;
-      for (let i = 0; i < hanBikeN; i++) {
-        hanBikeAt(i, hanV3b);
-        const d = Math.hypot(hanV3b.x - capy.position.x, hanV3b.z - capy.position.z);
-        if (d < bd) { bd = d; bi = i; }
-      }
-      hanBikeAt(bi, hanV3d);
+      // Shared with hanUpdateRide — see hanNearestBike.
+      const bi = hanNearestBike(capy.position.x, capy.position.z);
+      hanBikeAt(bi < 0 ? 0 : bi, hanV3d);
       return hanV3d;
     },
     pho() {
