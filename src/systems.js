@@ -3512,6 +3512,16 @@ const sysLEGEND = [
   // the seventh of six, and the six were never a target.
   ['Ctrl (held)', 'slide'],
   ['E / left click', 'grab, dig, hold on'],
+  // THE DIVE, which was on no legend anywhere — not the title card, not the
+  // journal, not the touch fan. It is the eighth of six by the same argument
+  // the slide is the seventh: it is a verb the capybara has, and the fold is
+  // for things that are not. It is also the one verb the game hands over in
+  // chapter TWELVE, so the row carries its own condition rather than being
+  // hidden until then: a key that does nothing in eleven chapters has to say
+  // why, and "deep water" is the whole of the why. It is also the shortest
+  // sentence that fits — the description column wraps past about nineteen
+  // characters and a wrapped row breaks the grid's rhythm for the two under it.
+  ['E (held) in water', 'dive  ·  deep water'],
   ['Q', 'WHEEK'],
   ['drag  ·  wheel', 'look around  ·  zoom'],
 ];
@@ -3551,6 +3561,9 @@ const sysLEGEND_TOUCH = [
   ['HOP', 'hop'],
   ['SLIDE', 'slide'],
   ['GRAB', 'grab, dig, hold on'],
+  // The same row as the keyboard table's, in the scheme the thumb has: GRAB is
+  // E, and holding it in deep water is the dive on both.
+  ['GRAB (held) in water', 'dive  ·  deep water'],
   ['WHEEK', 'WHEEK'],
   ['drag  ·  pinch', 'look around  ·  zoom'],
   ['STUCK (held)', 'put me back'],
@@ -4404,12 +4417,15 @@ const sysMAP_WORLDS = {
   // Sydney publishes zones rather than landmarks, so these come from the world
   // layout table in the contract.
   sydney: { x0: -80, x1: 80, z0: -44, z1: 76, pad: 4,
-    // 'the ferry at the Quay'. `get` resolves through game.env — see
-    // sysLiveBiomeApi — and she is on a timetable, so the mark and the arrow
-    // follow her round the harbour and back to the berth. The chart's own copy
-    // is the berth, because the chart resolves getters off game[biome] and
-    // there is no game.sydney.
-    way: { get: 'ferry', x: -45.8, z: -19.0, t: 'the ferry' }, marks: [
+    // 'the ferry wharf at the Quay'. THIS USED TO FOLLOW THE BOAT — `get:
+    // 'ferry'`, resolved through game.env, so the mark and the arrow went round
+    // the harbour with her. It was the right answer while chapter one's only
+    // exit was stowing away on her, and it is the wrong one now the wharf is a
+    // door in its own right: a door that moves is not a door, and the eighteen
+    // other chapters all point at a place you can walk to and stand still on.
+    // The boat is still findable — 'ferry-ride' has its own pointer, at her,
+    // wherever she is.
+    way: { x: -40, z: -21.0, t: 'the ferry wharf' }, marks: [
     { x: 0, z: -4, k: 'star', t: 'Opera House' },
     { x: 38, z: 30, k: 'leaf', t: 'gardens' },
     { x: 30, z: 26, k: 'dot', t: 'picnic' },
@@ -13663,12 +13679,12 @@ export function createSystems(game) {
     if (!m.get) return m;
     // ...and a mark may carry BOTH a getter and a literal, in which case the
     // literal is the fallback for every way the getter can come back empty.
-    // That is how the way-out mark works in Sydney: the ARROW follows the
-    // ferry through game.env (see wayPoint, which resolves through
-    // sysLiveBiomeApi), and the CHART — which resolves getters off
-    // game[biome], and there is no game.sydney — falls back to the berth she
-    // keeps coming home to. No mark in `marks` carries both, so every one of
-    // them still resolves to null exactly as it did.
+    // Sydney's way-out mark used to be the one that carried both — the ARROW
+    // followed the ferry through game.env (wayPoint resolves through
+    // sysLiveBiomeApi), and the CHART, which resolves getters off game[biome]
+    // and there is no game.sydney, fell back to the berth. Sydney's door is a
+    // wharf now and both are the same literal, so nothing in the game carries
+    // both any more; the fallback stays because the rule is right.
     const back = typeof m.x === 'number' ? m : null;
     const api = game[mapBakedFor];
     let v = api && api[m.get];
@@ -13937,8 +13953,19 @@ export function createSystems(game) {
 
   // --- the way home: three whistles, stood in the crater ---
   const homeEl = sysEl('div', 'capyui-home');
-  homeEl.appendChild(sysEl('span', null, 'wheek three times to go home'));
+  // The words are not fixed, and there is exactly one reason: the prompt now
+  // appears in Sydney too, and telling a player stood on the Circular Quay
+  // wharf to wheek three times "to go home" is telling them the door goes
+  // nowhere. Every other chapter keeps the sentence it has always had.
+  const homeLabel = sysEl('span', null, 'wheek three times to go home');
+  let homeLabelAway = true;
+  homeEl.appendChild(homeLabel);
   const homeDotsEl = sysEl('span', 'capyui-dots');
+  // Three empty spans that fill in as you wheek. They are a picture of the
+  // sentence beside them and carry nothing it does not already say, so they are
+  // hidden from assistive tech rather than read out as three unlabelled
+  // elements — the same call the minimap, the viewfinder and the fade make.
+  homeDotsEl.setAttribute('aria-hidden', 'true');
   const homeDots = [];
   for (let i = 0; i < 3; i++) {
     const d = sysEl('i');
@@ -14678,10 +14705,18 @@ export function createSystems(game) {
       // A row you cannot travel to is not a button at the moment: disabling it
       // takes it out of the tab order as well as greying it, so tabbing round
       // the board only ever lands on places you can actually go.
-      // Disabled means LOCKED, not merely "you are only reading". A place you
-      // could travel to stays focusable in read-only mode too, so a keyboard
-      // player can tab down the board and hear where they can go.
-      const live = open;
+      //
+      // ...AND "READ-ONLY" IS ONE OF THE WAYS YOU CANNOT TRAVEL TO IT. This
+      // used to be `open` alone, on the argument that a keyboard player should
+      // be able to tab down the board and hear where they can go. What they
+      // actually got was nine focusable, undimmed, unlabelled-as-dead buttons
+      // that DO NOTHING: jrTravel opens `if (!jrShown || !jrDepart) return`, so
+      // the card Tab opens is a ledger wearing a departures board's clothes,
+      // and pressing Space on a row is silence. A control that is live-looking
+      // and dead is worse than one that is plainly out of service — the rows
+      // are still read out in browse mode, they simply stop claiming to be
+      // pressable when there is nothing behind them.
+      const live = open && jrDepart;
       r.row.disabled = !live;
       r.row.setAttribute('aria-disabled', live ? 'false' : 'true');
       r.row.setAttribute('aria-current', r.n === here ? 'true' : 'false');
@@ -14953,8 +14988,21 @@ export function createSystems(game) {
     'whisk-spin':     { clue: 'run laps of the rim until it froths',
                     where: function () { return hintObj(game.kyoto && game.kyoto.bowl); } },
     // ---- Pasto ------------------------------------------------------------
-    'to-pasto':       { clue: 'sail to Manly, then wheek three times',
-                    where: function () { return null; } },
+    // 'sail to Manly, then wheek three times' — which was the only route out of
+    // Sydney when it was written, and is a two-chapter detour now that the
+    // ferry wharf is a door of its own. It also pointed at nothing, so the one
+    // sentence was the whole of the guidance. It points at the wharf now, which
+    // is the shortest true answer to "how do I get out of here".
+    // The pointer is GATED ON SYDNEY and not merely set: every chapter is
+    // authored in the same coordinates, so an ungated hintXZ(-40, -21) on a row
+    // that can be listed while the player is in Pasto is an arrow into the side
+    // of Galeras. The row is only ever open before you have arrived, and the
+    // only place you can be then is the one the wharf is in.
+    'to-pasto':       { clue: 'three wheeks at the ferry wharf, and pick a place',
+                    where: function () {
+                      return (game.biome && game.biome.isActive('sydney'))
+                        ? hintXZ(-40, -21) : null;
+                    } },
     'steal-empanada': { clue: 'grab one off a stall with E', where: function () { return hintProp('empanada'); } },
     'market-chaos':   { clue: 'run straight through the frame', where: hintStall },
     'whistle-condor': { clue: 'wheek out in the open — press Q', where: function () { return null; } },
@@ -15626,14 +15674,14 @@ export function createSystems(game) {
   }
   /** The sentence under the row: what the door is, and what to do at it. */
   function wayClue() {
-    const n = todoChapter();
-    const def = chapterDef(n);
-    // Sydney has no three-wheek departure point — its exit is a boat — so it
-    // must not be told to wheek at one.
-    const verb = (def && def.biome === 'sydney')
-      ? 'or open the board with Tab, from anywhere'
-      : 'three wheeks when you get there, and the board opens';
-    return verb;
+    // ONE SENTENCE, NINETEEN CHAPTERS. Sydney used to get its own — 'or open
+    // the board with Tab, from anywhere' — because chapter one had no
+    // three-wheek departure point and its exit was a boat. Two things were
+    // wrong with it: Sydney has a departure point now (the ferry wharf, see
+    // `atSyd`), and the sentence it was given was never true anyway, because
+    // the board Tab opens does not travel. It was the only line in the game
+    // that told a player to press a key that would not work.
+    return 'three wheeks when you get there, and the board opens';
   }
   sysHINTS[sysWAY_ID] = { clue: wayClue, where: wayPoint };
 
@@ -16048,6 +16096,11 @@ export function createSystems(game) {
         // the ticks and needs no field. Without it a returning player is handed
         // the ledger every single time they come home and sit down.
         fin: sysFinDone ? 1 : 0,
+        // Additive, like `fin` and `chapms` above, and the version does not
+        // move for it. `slid` means this journey has already been shown the
+        // slide; a file written before it existed simply has none, which is the
+        // right history for a player who was never taught.
+        slid: slidEver ? 1 : 0,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -17952,6 +18005,13 @@ export function createSystems(game) {
   let flyAltLast = -1, flyAirLast = -1, flyBarLast = -1;
   // the way home
   let homeCount = 0, homeT = 0, homeShown = false, homeHinted = false;
+  // ---- THE SLIDE, ASKED FOR ONCE ------------------------------------------
+  // `slidEver` is on the save file: a journey that has already put a belly on
+  // the ground never hears either line again, however many times it comes back
+  // to Sydney. `slidT` is how long the animal has been running fast enough for
+  // the slide to be a real option, and `slidSaid` stops the prompt repeating
+  // inside one session for a player who is ignoring it.
+  let slidEver = false, slidT = 0, slidSaid = false;
   // put me back — a short trail of places the animal was demonstrably able to
   // walk out of, and the hold that returns it to the oldest of them
   const backRing = [];
@@ -18048,6 +18108,9 @@ export function createSystems(game) {
       // as jrChapDone below: the world is still laid out on every return, only
       // the once-ever beat is remembered. See THE LAWN.
       sysFinDone = !!jrFile.fin;
+      // ...and a journey that has already been taught the slide is not taught
+      // it again. See THE SLIDE, ASKED FOR ONCE.
+      slidEver = !!jrFile.slid;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -20983,6 +21046,14 @@ export function createSystems(game) {
     // plane would guillotine the far ridge clean off. Swapped here, never per frame.
     camera.far = sysCamFarFor(name);
     camera.updateProjectionMatrix();
+    // THE LINE ABOUT THE DOOR BELONGS TO THE DOOR, and it was latched per
+    // SESSION with one reset, inside jrTravel. That was survivable while every
+    // border crossing went through the departures board — and it stopped being
+    // survivable the moment Sydney got an exit, because the OTHER way out of
+    // Sydney is the ferry, which crosses a border without going near jrTravel.
+    // Get the wharf's line, stow away, and Circular Quay's "up the Corso" was
+    // suppressed for the rest of the run by a latch set in another hemisphere.
+    homeHinted = false;
     // Leaving Pasto: drop the flight rig and the readout on the spot rather than
     // let them cross-fade over the harbour.
     if (!pasto) {
@@ -22661,6 +22732,40 @@ export function createSystems(game) {
       if (bl !== stamBlownCls) { stamBlownCls = bl; stamEl.classList.toggle('blown', bl); }
     }
 
+    // ---- THE SLIDE, ASKED FOR ONCE, WHERE EVERYBODY STARTS ------------------
+    // The slide is on the FRONT of the control legend — the six verbs and this
+    // one — and until now nothing in nineteen chapters ever asked for it. Not a
+    // task, not a clue, not a line of dialogue: a player could finish the whole
+    // journey having never once pressed the key, which makes it not a verb but
+    // a secret. Every verb the player is handed has to be asked for at least
+    // once, and the place to ask is the first hour, in the chapter that is also
+    // the tutorial.
+    //
+    // Two lines and no third. The first fires when the animal is demonstrably
+    // RUNNING (capyWALK is 4.2 m/s, so 5.2 cannot be reached at a walk) and has
+    // held it long enough to be going somewhere rather than turning round —
+    // which is the moment the slide is a real option rather than a fact. The
+    // second is the game answering the first belly on the ground, and after it
+    // neither is ever said again on this journey: `slidEver` is on the save.
+    //
+    // capy.sliding has been published, read-only, since v44 and read by
+    // nothing. This is its first reader.
+    if (inSyd && started && capy && !slidEver) {
+      if (capy.sliding) {
+        slidEver = true;
+        saveSoon();
+        toast('that is the slide. every hill in the game will take it.');
+        sfx('chime', { volume: 0.42, pitch: 1.44 });
+      } else if (!slidSaid && capy.grounded && !capy.carriedBy && !capy.rideBody &&
+                 !mounted && Math.sqrt(v.x * v.x + v.z * v.z) > 5.2) {
+        slidT += dt;
+        if (slidT > 1.2) {
+          slidSaid = true;
+          toast(sysSay('hold Ctrl while you are running. put your belly on it.'));
+        }
+      } else slidT = 0;
+    }
+
     // ---- the way home: three whistles, stood in the crater ----
     // Discoverable because the prompt appears the moment you are stood in the right
     // place, and it runs the same fade -> switchTo -> teleport path as the ferry.
@@ -22761,16 +22866,45 @@ export function createSystems(game) {
     const inHan = !!(game.biome && game.biome.isActive('hanoi'));
     const atHan = !!(inHan && game.hanoi && game.hanoi.inZone('bridge', p.x, p.z) &&
                      p.z > 190);
+    // ---- AND SYDNEY'S, WHICH IS THE ONE THAT WAS NEVER BUILT ---------------
+    // Eighteen chapters have a door you can stand at and the place the game
+    // STARTS did not. Chapter one's only way out was 'ferry-ride' — the
+    // eighteenth line of a nineteen-line list, which a four-row card does not
+    // surface for the first hour — so a player who never pressed Tab had no
+    // visible door out of the first thing they ever saw. That is the one
+    // omission in this ladder that costs a stranger the whole game.
+    //
+    // It is the ferry wharf, and it could not really be anywhere else: it is
+    // where the boat berths, it is the one structure in the chapter that is FOR
+    // leaving, and the shed at the head of it is the only roofed thing on the
+    // water. The deck is the static box at (-40, -16.9) with half-extents
+    // 3.5 x 7.3 (see environment.js); this is its seaward third, under and just
+    // short of the shelter. UNGATED, like the Pantanal's and Hanoi's: a chapter
+    // that is also the tutorial must not make you earn the door out of it. The
+    // y clamp keeps the shelter roof (2.85 m) out of it — that is a place you
+    // climb to, not a place you leave from.
+    const atSyd = !!(inSyd && p.y > -0.4 && p.y < 2.3 &&
+                     p.x > -43.4 && p.x < -36.6 && p.z > -24.2 && p.z < -17.6);
     const homeOk = !!(started && !transBusy && !mounted && capy &&
                       ((inPasto && p.y < groundY + sysHOME_STAND && homeZone(p.x, p.z)) ||
+                       atSyd ||
                        atManly || atUji || atCali || atRio || atIce || atSah || atDri ||
                        atVen || atHk || atPal || atGor || atMan || atPan || atCav || atAnt ||
                        atMon || atHan));
     if (homeOk) {
+      // Written only when it changes: this is inside the frame loop and the
+      // answer moves at most twice a journey.
+      const away = !atSyd;
+      if (away !== homeLabelAway) {
+        homeLabelAway = away;
+        homeLabel.textContent = away ? 'wheek three times to go home'
+                                     : 'wheek three times to go somewhere else';
+      }
       if (homeT > 0) { homeT -= dt; if (homeT <= 0) homeSet(0); }
       if (!homeHinted) {
         homeHinted = true;
-        toast(atManly ? 'there is a boat here that goes a very long way.'
+        toast(atSyd ? 'everything that leaves this city leaves off this wharf.'
+            : atManly ? 'there is a boat here that goes a very long way.'
             : atUji ? 'the river goes a long way south.'
             : atCali ? 'somebody down there is going to Sydney.'
             : atRio ? 'that ocean goes all the way to Sydney.'

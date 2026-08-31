@@ -2528,7 +2528,7 @@ export const TASKS = [
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
     arrive: '',           far: 400,  tall: false, pal: 0,
-    hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry at the Quay',
+    hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry wharf at the Quay',
     keep: 'a tourist’s hat' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
