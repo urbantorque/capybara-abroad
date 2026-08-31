@@ -2690,6 +2690,7 @@ function rioBuildBirds(root) {
   rioBirdMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   rioBirdMesh.frustumCulled = false;
   rioBirdMesh.castShadow = false;     // a shadow at 40 m over sand is a smudge
+  rioBirdMesh.userData.noShadow = true;   // ...and this is what makes it stick
   root.add(rioBirdMesh);
   rioBirdSeed = [];
   for (let i = 0; i < rioBIRD_N; i++) {
@@ -4329,6 +4330,12 @@ export function createRio(game) {
 function rioNoShadowOnGhosts(root) {
   root.traverse(function (n) {
     if (!n.isMesh && !n.isInstancedMesh) return;
+    // THE FLAG, WHICH THIS COPY WAS MISSING. Every other chapter's version of
+    // this helper (drift, goreme, sahara, palawan, iceland) reads it, and
+    // without it the only thing rio could protect was a see-through material —
+    // so an opaque mesh that had asked not to cast, like the frigatebirds, was
+    // turned back on by registerShadowTarget and this could not undo it.
+    if (n.userData && n.userData.noShadow) { n.castShadow = false; return; }
     const m = Array.isArray(n.material) ? n.material[0] : n.material;
     if (!m) return;
     if (m.transparent || m.depthWrite === false || m.blending === THREE.AdditiveBlending) {

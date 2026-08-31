@@ -8444,7 +8444,11 @@ export function createNPCs(game) {
     stand: 1, walk: 1, stall: 1, patrol: 1, plod: 1, pray: 1, restock: 1,
   };
   let chatT = rand(6, 16);
-  let chatReplyRec = null, chatReplyT = 0, chatReplyKey = '';
+  // chatReplyBiome is WHICH WORLD THE QUESTION WAS ASKED IN. chatStep is called
+  // with two different pools (Sydney's humans, Pasto's cast) through one set of
+  // reply slots, and these records carry no .biome of their own the way a local
+  // does — so without this the reply was owed by a person, not by a place.
+  let chatReplyRec = null, chatReplyT = 0, chatReplyKey = '', chatReplyBiome = '';
 
   /** Openers and replies, per chapter. Sydney and Pasto have their own. */
   function chatKeys() {
@@ -8459,8 +8463,15 @@ export function createNPCs(game) {
         const r = chatReplyRec;
         chatReplyRec = null;
         // …unless something happened to them in the meantime, in which case
-        // the question simply hangs, which is the better joke anyway.
-        if (r.group && npcCHAT_CALM[r.state] && r.dejected <= 0) pickLine(r, chatReplyKey);
+        // the question simply hangs, which is the better joke anyway. CROSSING
+        // A BORDER IS ONE OF THE THINGS THAT CAN HAPPEN: localsChat has always
+        // checked this and this did not, so a reply owed in Sydney could be
+        // delivered a chapter later, in the wrong register, projected from a
+        // coordinate with nobody standing on it.
+        if (r.group && npcCHAT_CALM[r.state] && r.dejected <= 0 &&
+            chatReplyBiome === ((game.biome && game.biome.current) || '')) {
+          pickLine(r, chatReplyKey);
+        }
       }
       return;
     }
@@ -8508,6 +8519,7 @@ export function createNPCs(game) {
         chatReplyRec = b;
         chatReplyKey = K[1];
         chatReplyT = rand(1.5, 2.4);
+        chatReplyBiome = (game.biome && game.biome.current) || '';
         chatT = rand(9, 24);        // …and now the long one, so it is not a chorus
         return;
       }

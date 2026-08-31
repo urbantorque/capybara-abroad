@@ -3285,6 +3285,8 @@ function caliBuildCristo(game, root) {
   }
   const tm = new THREE.Mesh(T.build(), caliVC());
   tm.castShadow = false;
+  // registerShadowTarget turns an opaque refusal back on unless it is flagged.
+  tm.userData.noShadow = true;
   tm.frustumCulled = false;
   root.add(tm);
 }
@@ -3468,6 +3470,7 @@ function caliBuildLoros(root) {
   caliLoroMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   caliLoroMesh.frustumCulled = false;
   caliLoroMesh.castShadow = false;
+  caliLoroMesh.userData.noShadow = true;   // a flock laying grey discs on a lawn
   root.add(caliLoroMesh);
   caliLoroSeed = [];
   for (let i = 0; i < caliLORO_N; i++) {
@@ -3556,6 +3559,7 @@ function caliBuildKites(root) {
   caliKiteMesh.name = 'caliKites';
   caliKiteMesh.frustumCulled = false;
   caliKiteMesh.castShadow = false;
+  caliKiteMesh.userData.noShadow = true;
   root.add(caliKiteMesh);
 
   // THE STRING, and it has to be drawn or five diamonds are hanging in the sky
@@ -3566,6 +3570,7 @@ function caliBuildKites(root) {
   caliKiteLineMesh = new THREE.InstancedMesh(L.build(), caliVC(), caliKITE_N);
   caliKiteLineMesh.frustumCulled = false;
   caliKiteLineMesh.castShadow = false;
+  caliKiteLineMesh.userData.noShadow = true;
   root.add(caliKiteLineMesh);
 
   caliKiteSeed = [];

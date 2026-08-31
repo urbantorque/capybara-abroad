@@ -3947,6 +3947,12 @@ function monBuildLocals(game) {
 
 /** The wheek. It does two things here and both of them are about being noticed. */
 function monWheek(game) {
+  // THE GATE — see cave.js. Registered on the global 'capy:wheek' and never
+  // removed. The casino half was safe by accident (monInside is cleared on
+  // exit), but the carabinier half measures raw world distance to
+  // monGuardG.position, so a wheek at those coordinates in any other chapter
+  // wound monGuardBreak up and ticked at the player from an empty street.
+  if (!game.biome.isActive('monaco')) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;

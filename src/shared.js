@@ -1819,6 +1819,34 @@ export function mat(color, opts) {
 function _rimKey() { return 'rim2'; }
 
 // ---------------------------------------------------------------------------
+// matOwn — A RIMMED MATERIAL THAT NOBODY ELSE SHARES.
+//
+// Exactly grainOwn's problem one layer down, and the same silent shape. mat()
+// caches by colour+options, so a caller that needs a PRIVATE material — because
+// it writes .color or .emissive on it every frame — has to clone. But
+// `Material.copy()` copies a fixed list of properties and `onBeforeCompile` is
+// not on it, so
+//
+//     mat(PALETTE.palFishA).clone()
+//
+// hands back a material whose rim hook is GONE, along with the
+// customProgramCacheKey that lets the rimmed materials share one program. The
+// mesh still draws; it is simply the one opaque batch in the chapter with no
+// rim on it, which is not something a frame-mean metric can see.
+//
+// Same guarantee as the clone, without the loss: build it uncached, and attach
+// the hook to the thing that is actually used.
+// ---------------------------------------------------------------------------
+export function matOwn(color, opts) {
+  const m = new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: true }, opts || {}));
+  if (_rimWants(opts)) {
+    m.onBeforeCompile = _rimInject;
+    m.customProgramCacheKey = _rimKey;
+  }
+  return m;
+}
+
+// ---------------------------------------------------------------------------
 // Task list — the goose-game checklist. IDs are contract-locked.
 // ---------------------------------------------------------------------------
 // `chapter` gates when a task is revealed. Chapter 1 is visible from the start;

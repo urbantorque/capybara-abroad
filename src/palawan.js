@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, matOwn, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -1772,12 +1772,18 @@ function palBuildFish(root) {
     { x: palHOLE.x, z: palHOLE.z, d: -4.5, r: 8, rate: 0.21, col: PALETTE.palFishB },
   ];
   const geo = new THREE.BoxGeometry(0.16, 0.24, 0.55);
-  // .clone(), AND IT IS NOT OPTIONAL. mat() caches by colour and options, so the
-  // bare call hands back an object anybody else asking for the same yellow also
-  // holds — and the bloom writes an emissive term onto this material every
-  // frame. See [[clone eats the shader]]: one chapter's plankton lighting up
-  // somebody else's props is a bug that only shows up two chapters later.
-  const m = new THREE.InstancedMesh(geo, mat(PALETTE.palFishA).clone(), palFISH_N);
+  // A PRIVATE MATERIAL, AND IT IS NOT OPTIONAL. mat() caches by colour and
+  // options, so the bare call hands back an object anybody else asking for the
+  // same yellow also holds — and the bloom writes an emissive term onto this
+  // material every frame. See [[clone eats the shader]]: one chapter's plankton
+  // lighting up somebody else's props is a bug that only shows up two chapters
+  // later.
+  //
+  // matOwn AND NOT .clone(), for the reason grainOwn exists: Material.copy()
+  // does not carry onBeforeCompile, so cloning the cached material bought the
+  // privacy and threw away the v50 rim — leaving the school as the one opaque
+  // batch down here with no rim term on it.
+  const m = new THREE.InstancedMesh(geo, matOwn(PALETTE.palFishA), palFISH_N);
   for (let i = 0; i < palFISH_N; i++) {
     const s = schools[i % schools.length];
     const o = i * 6;
@@ -2375,7 +2381,16 @@ function palUpdateManta(game, dt) {
     palMantaCool = 0.6;
     if (capy) capy.carriedBy = null;
     // It puts you down going the way it was going. A manta does not stop.
-    if (capy && capy.body) capy.body.velocity.set(Math.sin(yaw) * 1.6, 0, Math.cos(yaw) * 1.6);
+    //
+    // THROUGH launch(), NOT A BARE VELOCITY WRITE. It is the sanctioned channel
+    // for being thrown (see THE THREE WAYS TO MOVE THE CAPYBARA), and it is the
+    // right one twice over here: a write straight to body.velocity is eaten by
+    // the grip damper on any frame with ground contact, and launch is also what
+    // clears the platform and ride state left over from having been CARRIED —
+    // which is the state this line is ending. Same 1.6 m/s, same heading.
+    if (capy && typeof capy.launch === 'function') {
+      capy.launch(Math.sin(yaw) * 1.6, 0, Math.cos(yaw) * 1.6);
+    }
     palSfx('splash', { volume: 0.5, pitch: 0.9 });
   }
 }

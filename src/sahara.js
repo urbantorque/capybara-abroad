@@ -1526,6 +1526,7 @@ function sahBuildProps(game, root) {
   C.sph(0.06, 0.89, -0.07, 0.03, 0.03, 0.03, PALETTE.sahTileWhite);
   const cm = new THREE.Mesh(C.build(), sahVC());
   cm.castShadow = false;
+  cm.userData.noShadow = true;      // this file's own flag; see sahNoShadowOnGhosts
   cg2.add(cm);
   cg2.position.set(0, -0.9, 0);          // asleep, below the rim
   cg2.visible = false;
@@ -4378,6 +4379,7 @@ function sahBuildStorks(root) {
   sahStorkMesh.name = 'sahStorks';
   sahStorkMesh.frustumCulled = false;
   sahStorkMesh.castShadow = false;      // shadows at 50 m over a medina are noise
+  sahStorkMesh.userData.noShadow = true;   // ...and this is what makes it stick
   root.add(sahStorkMesh);
   sahStorkSeed = [];
   for (let i = 0; i < sahSTORK_N; i++) {

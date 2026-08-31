@@ -3033,6 +3033,14 @@ function hanBuildLocals(game) {
 
 /** The wheek. It does one thing here, and it is not being polite. */
 function hanWheek(game) {
+  // THE GATE. This is on the global 'capy:wheek' and is never taken off it, so
+  // without this line a wheek anywhere in the game ran Hanoi's position tests
+  // against the live capybara — and the chapters share a coordinate space. In
+  // another world standing at the alley's numbers it answered with Hanoi's
+  // bells, fired the train toast and burned the one-shot hanToldFlow, so the
+  // instruction was spent before you ever arrived. Every other chapter's wheek
+  // handler opens with exactly this (cave.js, antarctic.js, pantanal.js).
+  if (!game.biome.isActive('hanoi')) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;

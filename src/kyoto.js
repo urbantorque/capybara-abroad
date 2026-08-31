@@ -428,6 +428,12 @@ function kyoBuildGroundMesh() {
   const m = new THREE.Mesh(g, kyoVCG());
   m.receiveShadow = true;
   m.castShadow = false;
+  // AND SAY SO IN THE ONE LANGUAGE THE TRAVERSE READS. registerShadowTarget
+  // (systems.js, sysEnableShadows) only spares a ghost or a mesh flagged
+  // noShadow — an opaque refusal like this one sails straight through it and
+  // comes back on. This is 340 x 460 m of ground: exactly the caster Pasto
+  // measured as eating the whole 2048 map on its own.
+  m.userData.noShadow = true;
   m.frustumCulled = false;
   return m;
 }
@@ -714,6 +720,7 @@ function kyoBuildZen(game, root) {
   // paw prints, written into an instanced mesh as the capybara wrecks the place
   kyoTrackMesh = new THREE.InstancedMesh(kyoG.plane, mat(PALETTE.granite), kyoZEN_TRACKS);
   kyoTrackMesh.castShadow = false;
+  kyoTrackMesh.userData.noShadow = true;   // a paw print IS the ground
   kyoTrackMesh.receiveShadow = false;
   kyoTrackMesh.frustumCulled = false;
   for (let i = 0; i < kyoZEN_TRACKS; i++) {
@@ -1918,6 +1925,7 @@ function kyoBuildPickers(root) {
   H.box(0, 0.03, 0.28, 0.28, 0.06, 0.26, PALETTE.shoji, 0.5, 0, 0);
   kyoPickHead = new THREE.InstancedMesh(H.build(), kyoVC(), kyoPICK_N);
   kyoPickHead.castShadow = false;
+  kyoPickHead.userData.noShadow = true;
   kyoPickHead.frustumCulled = false;
 
   // DARK against a pale green hedge. The first cut ran through shoji and
@@ -2994,6 +3002,7 @@ function kyoBuildGates(game, root) {
   }
   kyoBirdWing = new THREE.InstancedMesh(W.build(), kyoVC(), kyoBirds.length);
   kyoBirdWing.castShadow = false;
+  kyoBirdWing.userData.noShadow = true;
   kyoBirdWing.frustumCulled = false;
   root.add(kyoBirdWing);
   kyoUpdateBirds(null, 0);

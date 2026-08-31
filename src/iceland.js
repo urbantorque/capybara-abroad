@@ -1531,6 +1531,10 @@ function iceBuildChurch(game, root) {
     emissive: PALETTE.iceWindow, emissiveIntensity: 0.92,
   }));
   wm.castShadow = false;
+  // Emissive on black is still an OPAQUE material, so the traverse claims it
+  // back unless it is flagged — the exact escape this file documents at the
+  // head of iceNoShadowOnGhosts and then did not use here.
+  wm.userData.noShadow = true;
   root.add(wm);
   // ---- and the wash of floodlight up the front of it ----------------------
   // Additive, unfogged, and it FADES UPWARD, because that is the only thing a
@@ -3482,6 +3486,7 @@ function iceBuildFlora(game_, root) {
     const gdm = new THREE.Mesh(GD.build(), iceVC());
     gdm.receiveShadow = true;
     gdm.castShadow = false;
+    gdm.userData.noShadow = true;
     root.add(gdm);
   }
 
@@ -3643,6 +3648,7 @@ function iceBuildFlora(game_, root) {
   const crm = new THREE.Mesh(crg, iceVC());
   crm.receiveShadow = true;
   crm.castShadow = false;               // a 16 cm lip casting a shadow is noise
+  crm.userData.noShadow = true;         // ...and the flag is what keeps it off
   root.add(crm);
 
   const sm = new THREE.Mesh(M.build(), iceVC());
