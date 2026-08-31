@@ -214,13 +214,16 @@ let hanTrainNear = 99;            // closest the animal has been to it, this pas
 let hanTrainBest = 99;
 let hanTrainDone = false, hanFoldDone = false;
 let hanTrainCount = 0;
-const hanFolders = [];            // {mesh, x, z, ox, oz, oy, kind}
+const hanFolders = [];            // {m, ox, oy, oz, fx, fy, fz, or, fr}
 let hanTrainWarned = false;
 
 // the lake set
 let hanHucG = null;
 const hanPuppets = [];
 let hanCauN = 5, hanCauT = 0, hanCauDone = false;
+// THE RALLY IS A CHAIN, so it has to be remembered rather than recomputed: the
+// shuttle leaves the player it last landed on. See hanUpdateCau.
+let hanCauFrom = 0, hanCauTo = 1, hanCauLeg = -1;
 const hanCauFolk = [];
 let hanShuttle = null;
 
@@ -1846,7 +1849,11 @@ function hanPlaceRideBody(tx, tz, yaw, dt) {
  * the alley but you.
  */
 function hanFolder(mesh, ox, oy, oz, fx, fy, fz, fr) {
-  hanFolders.push({ m: mesh, ox: ox, oy: oy, oz: oz, fx: fx, fy: fy, fz: fz, fr: fr || 0 });
+  // `or` is the OPEN yaw, read off the mesh as it is registered (every caller
+  // has already placed it). Without it there was nothing to fold back TO, and
+  // the rotation could only ever travel one way — see hanUpdateTrain.
+  hanFolders.push({ m: mesh, ox: ox, oy: oy, oz: oz, fx: fx, fy: fy, fz: fz,
+                    or: mesh.rotation.y, fr: fr || 0 });
 }
 
 function hanBuildTrainStreet(game, root) {
@@ -2200,7 +2207,11 @@ function hanUpdateTrain(game, dt) {
     const f = hanFolders[i];
     f.m.position.set(lerp(f.ox, f.fx, hanFoldK), lerp(f.oy, f.fy, hanFoldK),
                      lerp(f.oz, f.fz, hanFoldK));
-    if (f.fr) f.m.rotation.y = lerp(f.m.rotation.y, f.fr, Math.min(1, dt * 3));
+    // ON hanFoldK, exactly like the position above it. This used to chase f.fr
+    // every frame regardless of the fold, off its own value — so within about
+    // two seconds of arriving, every stool, table, crate and parked bike in the
+    // street had turned side-on as if folded, and nothing ever turned it back.
+    if (f.fr) f.m.rotation.y = lerp(f.or, f.fr, hanFoldK);
   }
   // ...and the shake, because eleven metres a second of train a metre away is
   // not a quiet thing
@@ -2687,8 +2698,28 @@ function hanUpdateCau(game, dt) {
   hanCauT += dt;
   const leg = 1.35;
   const k = (hanCauT % leg) / leg;
-  const from = Math.floor(hanCauT / leg) % hanCauN;
-  const to = (from + 1 + (Math.floor(hanCauT / leg / hanCauN) % 2)) % hanCauN;
+  // WHERE IT LANDED, NOT WHERE THE CLOCK SAYS. Both ends used to be derived
+  // from hanCauT independently: `to` skipped a player on alternate rounds
+  // while `from` only ever advanced by one, so on five legs in every ten the
+  // shuttle started three metres from where it had just been caught and the
+  // kick animation fired on somebody who never touched it.
+  const legI = Math.floor(hanCauT / leg);
+  if (hanCauLeg < 0) {
+    hanCauLeg = legI;
+  } else if (legI !== hanCauLeg) {
+    // Walk the chain forward one leg at a time. Capped, because a backgrounded
+    // tab can hand this a very large jump and the rally is ambient either way.
+    const steps = Math.min(legI - hanCauLeg, hanCauN * 2);
+    for (let s = 0; s < steps; s++) {
+      hanCauFrom = hanCauTo;
+      // every full round the circle switches between passing to a neighbour
+      // and passing across it, which is what the round counter is for
+      const across = Math.floor((legI - steps + 1 + s) / hanCauN) % 2;
+      hanCauTo = (hanCauFrom + 1 + across) % hanCauN;
+    }
+    hanCauLeg = legI;
+  }
+  const from = hanCauFrom, to = hanCauTo;
   const a0 = from * (6.283 / hanCauN), a1 = to * (6.283 / hanCauN);
   const x0 = hanCAU.x + Math.cos(a0) * 3.0, z0 = hanCAU.z + Math.sin(a0) * 3.0;
   const x1 = hanCAU.x + Math.cos(a1) * 3.0, z1 = hanCAU.z + Math.sin(a1) * 3.0;

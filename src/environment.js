@@ -1967,6 +1967,13 @@ function envBuildFerry(game, root, material) {
   envFerryDwell = envFERRY_NODES[3];
   envFerryYaw = envFerryHeading(0, 1);
   b.position.set(envFERRY_NODES[0], 0, envFERRY_NODES[1]);
+  // SEED THE PREVIOUS TARGET, exactly as the van does at envBuildVan. The step
+  // below drives velocity from (target - previous target), so leaving this at
+  // the origin made the very first frame read a 45 m move and hand the body a
+  // clamped 12 m/s kick while she was still tied up. Open-loop from the target
+  // means nothing ever corrected it: she spent the rest of the session that
+  // far off her berth, with the gangway gap no longer against the wharf edge.
+  envFerryPX = envFERRY_NODES[0]; envFerryPZ = envFERRY_NODES[1];
   b.quaternion.setFromEuler(0, envFerryYaw, 0);
   b.previousPosition.copy(b.position);
   b.interpolatedPosition.copy(b.position);

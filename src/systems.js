@@ -13437,6 +13437,10 @@ export function createSystems(game) {
   function mapBake(name) {
     const spec = sysMAP_WORLDS[name];
     mapSpec = spec || null;
+    // WHICH world the base layer belonged to a moment ago, because this
+    // function is no longer only called on arrival: Venice re-bakes on every
+    // fifth of the tide, and the trail must survive a re-bake of the same city.
+    const wasFor = mapBakedFor;
     mapBakedFor = name;
     mapBaseCtx.clearRect(0, 0, sysMAP_PX, sysMAP_PX);
     if (!spec) return;
@@ -13552,7 +13556,11 @@ export function createSystems(game) {
       mapBaseCtx.filter = 'none';
     }
     // A new world is a new walk. Never carried across — see mapTrailPush.
-    mapTrailClear();
+    // A NEW WORLD, though, and not merely a new bake: Venice re-bakes five
+    // times a tide cycle, and clearing here unconditionally wiped the
+    // breadcrumb trail several times a cycle in the one chapter whose chart
+    // is tide-aware — the only chapter where the trail was doing extra work.
+    if (name !== wasFor) mapTrailClear();
   }
 
   // A LANDMARK THAT MOVES IS PUBLISHED AS A FUNCTION, AND THIS NEVER CALLED ONE.
@@ -18505,12 +18513,15 @@ export function createSystems(game) {
     padSlide = padBtn(g, 6);            // left trigger — see the slide note on input
 
     // ---- the verbs --------------------------------------------------------
-    // ONE VOICE is on two buttons and grab is on two: B and Y both wheek, X and
-    // the left trigger both grab. Nothing else is competing for them and a
-    // player who guesses wrong should still get the thing they meant.
+    // ONE VOICE is on two buttons: B and Y both wheek. Grab is on X ALONE.
+    // It used to also be on the left trigger, from before the slide existed —
+    // and when v44 gave the slide that same trigger, every pad slide fired a
+    // grab edge as well, so sliding picked things up and triggered whatever
+    // was in reach. A button may carry two verbs; it may not carry two the
+    // player uses in the same motion.
     const wantJump   = padBtn(g, 0);
     const wantHonk   = padBtn(g, 1) || padBtn(g, 3);
-    const wantAction = padBtn(g, 2) || padBtn(g, 6);
+    const wantAction = padBtn(g, 2);
     if (started) {
       if (wantJump   && !padWasJump)   padEdgeJump = true;
       if (wantHonk   && !padWasHonk)   padEdgeHonk = true;
@@ -19722,7 +19733,11 @@ export function createSystems(game) {
   document.addEventListener('visibilitychange', function () {
     // The journal/departures board paused the game itself — coming back to the
     // tab must not unpause the world behind an open modal.
-    game.state.paused = document.hidden || jrShown;
+    // ALL THREE MODALS, not just the journal: ledShow/albShow set paused too,
+    // and a restore that only knew about jrShown ran the world — physics,
+    // incidents, the sfx gate — behind an open ledger or album for as long as
+    // it stayed open.
+    game.state.paused = document.hidden || jrShown || ledShown || albShown;
     if (document.hidden) {
       ambientSet(false);
       // Held keys can never produce a keyup while hidden — clear them or the

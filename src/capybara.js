@@ -2268,9 +2268,7 @@ export function createCapybara(game) {
       capyPunch(game, clamp((nv - capyBONK_V) * 0.032, 0.03, 0.20));
       capySfxAt.volume = clamp(nv * 0.11, 0.22, 0.85);
       capySfxAt.pitch = clamp(1.20 - nv * 0.035, 0.68, 1.20);
-      capySfxAt.at = capyPosition;
       game.sfx('thud', capySfxAt);
-      capySfxAt.at = null;
       // squash, and a short bounce back off the face so the animal arrives
       // rather than grinding. Through capyShove, which is the one channel an
       // outside force may use — see THE THREE WAYS TO MOVE THE CAPYBARA.

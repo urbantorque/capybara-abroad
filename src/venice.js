@@ -3316,15 +3316,29 @@ function venBuildTraghetto(game, root) {
   venTragGroup.position.copy(venTragPos);
   venTragGroup.rotation.y = venTragYaw;
 
-  // the two pontoons, one on each bank, which is what makes it read as a stop
+  // the two pontoons, one on each bank, which is what makes it read as a stop.
+  //
+  // THE DECK FLOATS AND THE POLES DO NOT, and that split is the whole of it.
+  // Both used to be authored against venWaterY at BUILD TIME, which is low
+  // water — so at the top of the flood the decks sat nearly two metres under
+  // the surface, invisible, while the boat they exist to serve floated two
+  // metres above them with nothing to come alongside. A pontoon is a raft:
+  // it goes in venFloatM, authored with y = 0 AT THE WATERLINE like the rio's
+  // topi and the fruit barge. A briccola is driven into the BED: it stays in
+  // the static merger, and the only thing it needs is to be long enough to
+  // still be a pole when the water is at its highest.
   const P = venMerger();
+  const F = venFloatM;
+  const poleBot = venTIDE_LOW - 0.10;        // into the bed
+  const poleTop = venTIDE_HIGH + 1.15;       // and still proud at the flood
+  const poleY = (poleTop + poleBot) * 0.5, poleH = poleTop - poleBot;
   for (let s2 = -1; s2 <= 1; s2 += 2) {
     const x = cx + venTragAxis.x * venTRAG_HALF * s2 * 1.16;
     const z = cz + venTragAxis.z * venTRAG_HALF * s2 * 1.16;
-    P.box(x, venWaterY + 0.34, z, 3.4, 0.22, 4.6, PALETTE.venGondolaTr, 0, venTragYaw, 0);
+    F.box(x, 0.34, z, 3.4, 0.22, 4.6, PALETTE.venGondolaTr, 0, venTragYaw, 0);
     for (let k = -1; k <= 1; k += 2) {
-      P.cyl(x + venTragAxis.x * 1.4, venWaterY + 1.1, z + venTragAxis.z * 1.4 + k * 1.8,
-            0.16, 2.4, PALETTE.venBriccolaR, 0, 0, 0, 6);
+      P.cyl(x + venTragAxis.x * 1.4, poleY, z + venTragAxis.z * 1.4 + k * 1.8,
+            0.16, poleH, PALETTE.venBriccolaR, 0, 0, 0, 6);
     }
   }
   const pm = new THREE.Mesh(P.build(), venVC());

@@ -2527,8 +2527,17 @@ export function createNPCs(game) {
     const d = Math.hypot(px - rec.x, pz - rec.z);
     if (d < npcOWN_TAKE) {
       if (p.held || p.owner) {
-        // CAUGHT YOU. The existing theft chain already has the verb for this.
-        if (game.physics && typeof game.physics.dropOwned === 'function') game.physics.dropOwned();
+        // CAUGHT YOU. TWO VERBS, AND THEY ARE NOT INTERCHANGEABLE. dropOwned is
+        // the verb for a prop an NPC is carrying — it refuses one the capybara
+        // holds (`if (!prop || prop.held) return`), and called with no argument
+        // at all it returns on the first word. Emptying the animal's mouth is
+        // release(), which works off capy.heldProp. This branch called the wrong
+        // one, with nothing in it, so being caught did nothing in any chapter.
+        if (p.held) {
+          if (game.physics && typeof game.physics.release === 'function') game.physics.release(null);
+        } else if (game.physics && typeof game.physics.dropOwned === 'function') {
+          game.physics.dropOwned(p);
+        }
         if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.6, 1.0); localReactLine(rec, npcLOC_CHASE); }
         rec.flV -= 8;                        // a lunge, on the flinch spring
         rec.flYaw = Math.atan2(px - rec.x, pz - rec.z);
@@ -7733,7 +7742,10 @@ export function createNPCs(game) {
     for (let i = 0; i < paBeasts.length; i++) paStepBeast(paBeasts[i], dt);
     paPush();
     if (paColorDirty) { paFlushColors(); paColorDirty = false; }
-    updateBubbles(dt);
+    // NOT updateBubbles(dt) — the only caller of paUpdate already ages the
+    // bubbles on the line after it, and doing it here as well ran the whole
+    // pool at 2x in Pasto alone: every bubble in chapter two lived half as
+    // long as the same bubble anywhere else.
   }
 
   // ================================================================== update
