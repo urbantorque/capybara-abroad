@@ -173,6 +173,12 @@ const sysPASTO_SUN_DIR = new THREE.Vector3(-0.448, 0.875, 0.182).normalize();
 // Iceland its low midnight sun, or Cappadocia its dawn, is an art decision that
 // wants the frame in front of you — see REVIEW-2026-08-31.md.
 // ---------------------------------------------------------------------------
+// Cappadocia flies its balloons at DAWN and has always been graded for it — the
+// sun is #f5b98a, there is festoon lighting strung over the square, and the
+// whole frame is peach. It was lit from 61 degrees, so the balloons dropped
+// round shadows directly underneath themselves: a dawn palette with noon
+// shadows, which is what a photograph of it shows. Same bearing, low.
+const sysGOREME_SUN_DIR = new THREE.Vector3(-0.710, 0.643, 0.287).normalize();
 const sysSUN_BY_BIOME = {
   pasto:     sysPASTO_SUN_DIR,
   iceland:   sysPASTO_SUN_DIR,
@@ -180,7 +186,7 @@ const sysSUN_BY_BIOME = {
   drift:     sysPASTO_SUN_DIR,
   kowloon:   sysPASTO_SUN_DIR,
   palawan:   sysPASTO_SUN_DIR,
-  goreme:    sysPASTO_SUN_DIR,
+  goreme:    sysGOREME_SUN_DIR,
   antarctic: sysPASTO_SUN_DIR,
   monaco:    sysPASTO_SUN_DIR,
 };

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
 
 // ===========================================================================
 // AGENT D — NPC AI.  Sydneysiders: tourists, gardeners, joggers, bin chickens.
@@ -3444,7 +3444,11 @@ export function createNPCs(game) {
   const flashes = [];
   const gFlash = new THREE_.BoxGeometry(1, 1, 0.02);
   for (let i = 0; i < 2; i++) {
-    const fm = mat(PALETTE.sail).clone();
+    // matOwn, not mat().clone() — see [[clone eats the shader]]. The clone is
+    // needed (this material is written per instance) but Material.copy() does
+    // not carry onBeforeCompile, so the sail was one of the few opaque surfaces
+    // in the harbour with no rim on it.
+    const fm = matOwn(PALETTE.sail);
     fm.transparent = true; fm.opacity = 0;
     fm.depthWrite = false; fm.depthTest = false; fm.fog = false;
     const q = new THREE_.Mesh(gFlash, fm);
@@ -3473,7 +3477,7 @@ export function createNPCs(game) {
   const splashes = [];
   const gSplash = new THREE_.CylinderGeometry(1, 1, 0.05, 8, 1, true);
   for (let i = 0; i < 3; i++) {
-    const sm = mat(PALETTE.foam, { side: THREE_.DoubleSide }).clone();
+    const sm = matOwn(PALETTE.foam, { side: THREE_.DoubleSide });
     sm.transparent = true; sm.opacity = 0; sm.depthWrite = false; sm.fog = false;
     const q = new THREE_.Mesh(gSplash, sm);
     q.visible = false;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
 
 // ===========================================================================
 // AGENT C — world physics + interactive props.
@@ -3379,7 +3379,9 @@ function physInitParticles() {
   // Its OWN material, not the shared cached one: physDust3 tints it per biome
   // (physDUST_BIOME) and mat() hands back one instance per hex, so writing to
   // the cached material would recolour every soil-coloured mesh in the game.
-  const dustMat = mat(PALETTE.soil).clone();
+  // matOwn rather than a clone of the cached one: the privacy is the point
+  // above, and Material.copy() would have dropped the rim on the way.
+  const dustMat = matOwn(PALETTE.soil);
   physDustColor = PALETTE.soil;
   physDust = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.1), dustMat, physDUST_MAX);
   physDust.frustumCulled = false;
