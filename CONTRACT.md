@@ -3169,6 +3169,128 @@ What is left, and why the rest of it is not in this file: see `ROADMAP.md`. The
 short version is that the one remaining hard blocker is a `LICENSE`, and that is
 not a technical decision.
 
+## THE REMAINDER (v53 — 31 Aug 2026)
+
+v51 closed with a list of what it had not done. This is that list, and four of
+the six items turned out to be defects in v51 itself or in the code it touched.
+
+### 1. THE ENCORE SWEEP, AND THE PATHOLOGY IS RARE
+
+v51 fixed two one-shot set pieces in Kyoto and left the other seventeen
+chapters unswept. **Swept now: 110 `xDone` latches across nineteen files.** The
+result is the good one — most of them are switches (sit on a cat, steal a
+tart) where one-shot is correct, and of the rest almost all put their feedback
+and their measurement ABOVE the guard, so only the tick is suppressed:
+
+| | |
+|---|---|
+| `condorPeakDone` | `recordLive('thermal-peak')` is above the guard — the altitude keeps being measured |
+| `gorHerdDone` | `gorMareCarry` is above it — you can still ride the mare |
+| `venTragDone` | the arrival thud is above it — the traghetto keeps running |
+| `hkClimbDone` | `hkClimbBest` is a continuously tracked peak, outside the latch |
+
+**The dangerous shape is a `Done` guard that early-returns out of the whole
+function**, and there were three left. Two are fixed here; the third
+(`rioCalcDone`) is a discipline test with no number in it and is left alone
+deliberately.
+
+- **`caliCaneDone`** — a hundred and six metres of sugarcane, wrapped in
+  `if (!caliCaneDone) { ... }`. Cali was the OTHER chapter that measured dead
+  in v51's free-play soak, and this was its only measurable set piece. Re-arms,
+  and carries **`cane-run`** — *the cane in*, par **8 s** against a measured
+  machine floor of **6.5**.
+- **`kyoDryDone`** — and this one switched off more than the torii did. The
+  guard killed the six rising water-notes, the arming, and **the heron**, which
+  holds its ground however close you get *only while an attempt is alive*. Tick
+  the crossing once and the best-behaved animal in the garden went back to
+  flushing at ten metres, and six stepping stones a hop apart stopped being a
+  skill test. **The second half of it was in `kyoDryCrossing()` itself**, which
+  returned `kyoDryArmed && !kyoDryDone` — so fixing the update function alone
+  would have left the bird broken. Now `kyoDryArmed` alone, which is the honest
+  question. Verified: **6 stone notes on run 1 and 6 on run 2**, task ticks once.
+
+No chapter now has fewer than two repeatable numbers in it. Kyoto went 1 → 3
+and Cali 2 → 3; the floor across all nineteen moved from one to two.
+
+### 2. CAUSATION TRAVELS ONE HOP — `physCarriesCause` (props.js)
+
+Knocking a bin into a crate is the oldest joke in this genre and the crate was
+not, by this file's reckoning, anything to do with you: `disturbed` was stamped
+only where the capybara itself touched. Measured over 75 s of driven play in
+Sydney: **nineteen impacts over `sysINC_HIT`, and two of them on a prop with
+`disturbed` set** — so the incident chain, which needs three witnessed things
+inside twelve seconds, essentially could not start.
+
+**THE CLOCK IS THE WHOLE SAFETY ARGUMENT.** The struck prop inherits the
+striker's `lastCapyTouch` rather than taking the current time, so causation
+decays from the moment the animal actually did something and **cannot be renewed
+by propagation**. A daisy-chain across six crates is still measured against the
+one shove that started it. That is what keeps `physCausedByCapy` — the gate
+every `completeTask` in props.js goes through — from becoming looser than it
+reads.
+
+Unit-tested both ways, and the random-walk probe was abandoned for it: a fresh
+shove (0.2 s) propagates and the struck prop's inherited clock reads 1.7 s old
+rather than 0; a stale one (5 s, over `physCAUSE_TIP`) propagates nothing.
+**The soak that first found this cannot verify it** — it depends entirely on
+where a random walker happens to go, and re-running it gave 48 impacts and zero
+disturbed, which is noise, not a result. Same family as trap 18 in the harness
+note: a probe is part of the experiment.
+
+### 3. ONE SHORT ON A COUNT IS THE NEAREST MISS THERE IS (systems.js)
+
+v51's near miss used a proportional band with an absolute floor —
+`max(0.35, best × 0.07)` — which is right for a clock and silently wrong for a
+tally. `yacht-race` is *threaded N of the six*: best 5, run 4, gap 1, band 0.35,
+**silent**. The most motivating outcome that row has, and it said nothing.
+
+`dp: 0` is the question — a row with no decimal place is counting whole things —
+so the band now floors at 1 for those. For the eleven rows that are distances
+rounded to the metre it changes nothing: a gap of one metre out of ninety is
+already inside seven per cent.
+
+**v51's own test missed this because its only count case beat the best instead
+of missing it**, so the branch was never reached. Same run also finally
+exercised the stale-watchdog close, which v51 left untested for the same
+reason — its `staleClose` figure was *lower* on a lower-is-better row, i.e. a
+win. Four cases now, all measured:
+
+```
+so close  ·  1.2 s off your best     (watchdog close, lower-better)
+(silent)                             (too far)
+so close  ·  1 off your best         (count — no "1 of the six off")
+so close  ·  0.7 m off your best     (metres keep their unit)
+```
+
+### 4. THE BOARD IS ANNOUNCED, BUT ONLY AS A BOARD (systems.js)
+
+The record board is an async update — it arrives on the frame a chapter is
+finished and nothing else says so — which is the one case in this HUD that has
+a live region everywhere else (the toasts carry `role="status"`, the journal's
+shelf caption `aria-live="polite"`). It could not simply BE one: as an ordinary
+clue this element is rewritten four times a second by the hint tick, and a live
+region on that reads a sentence about a doorway over and over for the length of
+a chapter.
+
+**So the region is the class.** `aria-live` goes on with `recs` and off with it,
+and the hint tick already skips the element while `recs` is set (v51), so the
+text under it is stable — at most one announcement per chapter, which is the
+number of times a chapter can be finished.
+
+Measured while there: the board does NOT clip at any viewport. Monte Carlo's
+seven lines are 131 px against a 176 px cap at 1280, and 114 against 136 at 320
+— the clamp and the font shrink together. The `transition: max-height` under it
+is not compositor-friendly and is pre-existing; it is left alone because
+`prefers-reduced-motion` already crushes it to 0.01 ms.
+
+### WHAT IS STILL NOT MEASURED, AND IT IS THE HEADLINE
+
+**Nobody has timed a chapter.** "Twenty to thirty-five minutes a place" is the
+target v51 and v53 were both aimed at, and every number in either section is a
+proxy for it: things to knock over, numbers to beat, set pieces that still work
+the second time. A real figure needs a real player and a clock, and until
+somebody does that this remains an argument rather than a result.
+
 ## THE SECOND HOUR (v51 — 31 Aug 2026)
 
 Seven versions of picture work (v44–v50) and the last change to the *loop* was

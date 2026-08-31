@@ -1201,6 +1201,61 @@ window grew** and nineteen grades hand-tuned at 720p only existed at 720p. It is
 and measured: the glow around the lamp holds within 2% from 720p to 1440p, where it used to
 lose a fifth.
 
+## Going back over the list of what was not done
+
+The engagement pass shipped with a list of its own gaps. Working through it
+found that four of the six were defects in the pass itself, which is roughly
+the expected rate and a good argument for writing the list down.
+
+**The set pieces that switch themselves off — swept properly this time.** All
+one hundred and ten one-shot latches across the nineteen chapters. The result
+is reassuring: most are switches, where doing it once is the whole point, and
+almost all of the rest keep their feedback and their measurement outside the
+latch, so only the tick is suppressed. Three killed the whole mechanism, and
+two of those are fixed.
+
+- **Cali's sugarcane.** A hundred and six metres of it, and the only measurable
+  thing in the chapter that measured deadest of all. It re-arms, and it has a
+  clock on it now — *the cane in*, par 8 seconds against a machine floor of 6.5.
+- **Kyoto's stepping stones**, and this one was worse than the tunnel. Six
+  stones a hop apart across the golden pond, and the latch killed the rising
+  water-note each one makes, *and the heron* — which stands its ground however
+  close you get, but only while a crossing is live. Tick it once and the one
+  animal in that garden that can decide to stay went back to flushing like any
+  other bird. Half the bug was in the function that answers "is a crossing
+  live", which had the latch baked into its answer.
+
+Every chapter now has at least two numbers in it worth going back for. The
+floor used to be one.
+
+**Knocking a bin into a crate is now your fault.** It was not before — the game
+stamped "the capybara did this" only where the capybara itself made contact, so
+a knock-on was an act of god. That is why three-things-in-one-place almost never
+fired: measured over seventy-five seconds of play, nineteen impacts hard enough
+to count and *two* of them on something the game thought you had touched.
+
+Causation travels one hop now, and the thing it hits inherits the *original*
+shove's clock rather than starting a fresh one — so a chain across six crates is
+still measured against the one thing you actually did, and a crate that topples
+by itself an hour later still earns nothing.
+
+**"So close" now works on the things you count.** The near miss measured a
+percentage of your best, which is right for a stopwatch and quietly useless for
+a tally: threading four of the six buoys when your best is five is a gap of one,
+against a band of a third, so the most one-more-go outcome that task has said
+nothing at all. It says it now — and without inventing a unit for it:
+
+> **so close · 1 off your best**
+
+**And the board says itself out loud, once.** The record board a finished
+chapter turns into is the sort of thing a screen reader should announce, and it
+could not simply be marked as one: as an ordinary clue that same line is rewritten
+four times a second, and announcing that would read a sentence about a doorway
+on a loop for a whole chapter. It is announced only while it is a board.
+
+One thing on the list is still not done, and it is the headline: **nobody has
+timed a chapter.** Every number in this section and the last is a proxy for it.
+
 ## Seven versions of light, and then somebody asked whether it was still fun
 
 The last seven passes were all about the picture — the leaf, the exposure, the

@@ -15922,9 +15922,25 @@ export function createSystems(game) {
       clueEl.classList.remove('off');
       if (clueEl.parentNode !== todoEl) todoEl.insertBefore(clueEl, countEl);
       clueEl.classList.add('recs');
+      // ---- AND IT IS ANNOUNCED, BUT ONLY AS A BOARD (v53) -----------------
+      // The board is an async update — it arrives on the frame a chapter is
+      // finished and nothing else says so — which is the one case in this HUD
+      // that has a live region everywhere else (the toasts, the journal's
+      // shelf caption). It could not simply BE one: as an ordinary clue this
+      // element is rewritten four times a second by the hint tick, and a live
+      // region on that is a screen reader reading a sentence about a doorway
+      // over and over for the length of a chapter.
+      //
+      // So the region is the CLASS. `recs` goes on when the board does and off
+      // when it does not, the hint tick already skips the element while it is
+      // set (see the v51 note there), so the text under it is stable — at most
+      // one announcement per chapter, which is the number of times a chapter
+      // can be finished.
+      clueEl.setAttribute('aria-live', 'polite');
       todoHeadEl.textContent = 'Done here';
     } else {
       clueEl.classList.remove('recs');
+      clueEl.removeAttribute('aria-live');
       // THE PAPER IS HEADED BY THE MOVEMENT YOU ARE IN. In eleven chapters
       // that is 'To do', as it always was; in six it is the act, which is the
       // whole of the structure being visible without a single extra element
@@ -16217,7 +16233,19 @@ export function createSystems(game) {
     if (beat) return;
     const gap = Math.abs(best - v);
     if (!(gap > 0)) return;                       // dead heat: silence
-    if (gap > Math.max(sysNEAR_FLOOR, Math.abs(best) * sysNEAR_BAND)) return;
+    // ---- ONE SHORT ON A COUNT IS THE NEAREST MISS THERE IS (v53) ----------
+    // A proportional band with an absolute floor of 0.35 is right for a clock
+    // and silently wrong for a tally. `yacht-race` is *threaded N of the six*:
+    // best 5, run 4, gap 1 — against a band of max(0.35, 5 x 0.07) = 0.35, so
+    // the most motivating outcome that row has said nothing. Measured; the v51
+    // test never caught it because its only count case beat the best instead.
+    // `dp: 0` IS the question — a row with no decimal place is counting whole
+    // things — and for the eleven rows that are distances rounded to the metre
+    // it changes nothing, because a gap of one metre out of ninety is already
+    // inside seven per cent.
+    const band = Math.max(sysNEAR_FLOOR, Math.abs(best) * sysNEAR_BAND,
+                          (def.dp || 0) === 0 ? 1 : 0);
+    if (gap > band) return;
     recNearCool = sysNEAR_COOL;
     const dp = Math.max(def.dp || 0, gap < 1 ? 1 : 0);
     toast('so close  ·  ' + gap.toFixed(dp) + recGapUnit(def) + ' off your best');

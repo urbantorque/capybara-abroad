@@ -3801,7 +3801,15 @@ let kyoDrySpook = 0;
 const kyoDryHit = new Uint8Array(kyoDRY_STONES);
 
 /** Is a dry crossing alive right now? Read by the heron, and published. */
-function kyoDryCrossing() { return kyoDryArmed && !kyoDryDone; }
+/**
+ * Is a dry crossing live right now — which is what makes the heron hold its
+ * ground (see the `near` test in the heron block). The `&& !kyoDryDone` this
+ * used to carry was the other half of the v53 finding above: it took the bird
+ * back to flushing at ten metres the moment the task was ticked, so the one
+ * animal in the garden that can decide to stay stopped being able to. Being
+ * ARMED is the honest question, and it is false whenever nobody is on a stone.
+ */
+function kyoDryCrossing() { return kyoDryArmed; }
 
 function kyoStoneAt(i, out) {
   out.x = kyoPAVILION.x - 9 - i * 2.6;
@@ -3810,8 +3818,20 @@ function kyoStoneAt(i, out) {
 }
 const kyoDryPt = { x: 0, z: 0 };
 
+/**
+ * ---- AND THE THIRD ONE IN THIS CHAPTER (v53) ------------------------------
+ * `if (kyoDryDone) return` at the top of this function is the same line that
+ * made the torii tunnel and the bamboo grove inert, and here it switched off
+ * more than either: the six rising water-notes, the arming, AND the heron —
+ * which holds its ground however close you get only while an attempt is alive
+ * (see kyoDryCrossing). Tick the crossing once and the best-behaved animal in
+ * the garden went back to flushing at ten metres like any other bird, and six
+ * stepping stones a hop apart stopped being a skill test.
+ *
+ * The task keeps its latch. The crossing re-arms on the island, so walking
+ * back round to the bank and doing it again works exactly as the first time.
+ */
 function kyoCheckDry(game) {
-  if (kyoDryDone) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
@@ -3855,10 +3875,19 @@ function kyoCheckDry(game) {
   // stones is that they go somewhere
   const dx = p.x - kyoPAVILION.x, dz = p.z - kyoPAVILION.z;
   if (dx * dx + dz * dz < 9 * 9) {
+    const again = kyoDryDone;
     kyoDryDone = true;
-    kyoTask('dry-crossing');
-    if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.55, pitch: 1.45 });
-    if (typeof game.toast === 'function') game.toast('not one drop. the koi are disappointed.');
+    // Re-armed on the island: the stones go quiet until you are back on one,
+    // and every one of the six answers again on the way over.
+    kyoDryArmed = false;
+    kyoDryHit.fill(0);
+    if (typeof game.sfx === 'function') {
+      game.sfx('chime', { volume: again ? 0.42 : 0.55, pitch: 1.45 });
+    }
+    if (!again) {
+      kyoTask('dry-crossing');
+      if (typeof game.toast === 'function') game.toast('not one drop. the koi are disappointed.');
+    }
   }
 }
 

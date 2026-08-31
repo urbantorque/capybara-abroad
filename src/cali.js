@@ -164,7 +164,7 @@ let caliCombo = 0, caliBestCombo = 0, caliStepCool = 0, caliOffFloorT = 0;
 let caliLastYaw = 0, caliLastBeat = -1;
 let caliDanceDone = false, caliGatoDone = false, caliChivaDone = false;
 let caliCaneDone = false, caliCristoDone = false;
-let caliCaneEnterX = 0, caliCaneIn = false;
+let caliCaneEnterX = 0, caliCaneIn = false, caliCaneT = 0;
 let caliFlash = 0;                  // 0..1 floor flash on a good step
 
 // --- the ride ---
@@ -3840,22 +3840,48 @@ function caliUpdateTasks(game, dt) {
     if (typeof game.toast === 'function') game.toast('the chiva does not stop. the chiva collects.');
   }
   // --- lost in the cane ------------------------------------------------------
-  if (!caliCaneDone) {
+  // ---- IT DOES NOT STOP HAPPENING WHEN IT IS TICKED (v53) -------------------
+  // This was `if (!caliCaneDone) { ... }` around the whole mechanism — the same
+  // one line that made Kyoto's torii tunnel and bamboo grove inert scenery the
+  // moment they paid out (see kyoCheckTorii). A hundred and six metres of cane
+  // is a thing you run THROUGH, and it is the only measurable set piece in a
+  // chapter that had two numbers in it. The task keeps its latch; the run
+  // re-arms and now carries a clock. See 'cane-run' in RECORDS.
+  {
     const inside = p.x > caliCANE.x0 && p.x < caliCANE.x1 && p.z > caliCANE.z0 && p.z < caliCANE.z1;
     if (inside) {
-      if (!caliCaneIn) { caliCaneIn = true; caliCaneEnterX = p.x; }
+      if (!caliCaneIn) { caliCaneIn = true; caliCaneEnterX = p.x; caliCaneT = 0; }
+      caliCaneT += dt;
       // ABS, AND IT WAS NOT. The cane block runs east-west and the road down
       // the ridge comes at it from the EAST, so a player who entered from that
       // side ran the whole hundred metres of it in -x and the task never fired.
       // Nothing said so; the field simply does not end.
-      if (Math.abs(p.x - caliCaneEnterX) > 34) {
+      const caneGone = Math.abs(p.x - caliCaneEnterX);
+      // The line waits until it is a crossing rather than a step inside, for
+      // the reason the bamboo grove's does: a clock on the paper every time
+      // somebody walks past a field is furniture.
+      if (caneGone > 12 && typeof game.recordLive === 'function') {
+        game.recordLive('cane-run', caliCaneT);
+      }
+      if (caneGone > 34) {
+        const again = caliCaneDone;
         caliCaneDone = true;
-        caliTask('cane-run');
+        if (typeof game.record === 'function') game.record('cane-run', caliCaneT);
+        if (typeof game.recordEnd === 'function') game.recordEnd('cane-run');
+        // Re-armed where you are, so turning round and going back is the next
+        // attempt and not a free one — it is the same thirty-four metres either
+        // way.
+        caliCaneEnterX = p.x; caliCaneT = 0;
         if (typeof game.sfx === 'function') game.sfx('rustle', { volume: 1 });
-        if (typeof game.toast === 'function') game.toast('nobody can see you. nobody at all.');
+        if (!again) {
+          caliTask('cane-run');
+          if (typeof game.toast === 'function') game.toast('nobody can see you. nobody at all.');
+        }
       }
     } else {
+      if (caliCaneIn && typeof game.recordEnd === 'function') game.recordEnd('cane-run');
       caliCaneIn = false;
+      caliCaneT = 0;
     }
   }
   // --- Cristo Rey ------------------------------------------------------------
@@ -3967,7 +3993,7 @@ export function createCali(game) {
       caliOrtizIn = false;
       caliCombo = 0;
       caliOnRoof = false; caliRoofT = 0; caliWireClear = 0;
-      caliCaneIn = false;
+      caliCaneIn = false; caliCaneT = 0;
       caliCartBack = 0;
       caliDanceCheer = 0;
       if (!caliMiradorDone && caliChivaState !== 'parked') caliChivaReset();

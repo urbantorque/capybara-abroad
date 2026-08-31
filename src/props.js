@@ -2728,6 +2728,37 @@ function physIsCapyAgent(body) {
 }
 
 /**
+ * ---- CAUSATION TRAVELS ONE HOP, AND ITS CLOCK DOES NOT RESTART (v53) ------
+ *
+ * Knocking a bin into a crate is the oldest joke in this genre and the crate
+ * was not, by this file's reckoning, anything to do with you: `disturbed` was
+ * stamped only where the CAPYBARA touched, so a knock-on was an act of god.
+ *
+ * It shows up as an almost unreachable incident chain. Measured over 75 s of
+ * driven play in Sydney: nineteen impacts over sysINC_HIT, and **two** of them
+ * on a prop with `disturbed` set — so the chain, which needs three witnessed
+ * things inside twelve seconds, essentially could not start, and the only
+ * repeatable reward in the game fires once or twice in eight hours.
+ *
+ * THE CLOCK IS THE WHOLE SAFETY ARGUMENT. The struck prop inherits the
+ * striker's `lastCapyTouch` rather than taking the current time, so causation
+ * DECAYS from the moment the animal actually did something and cannot be
+ * renewed by propagation. A daisy-chain across six crates is still measured
+ * against the one shove that started it, and once physCAUSE_TIP has passed
+ * nothing further propagates — which is what stops `physCausedByCapy`, the
+ * gate every completeTask in this file goes through, from becoming looser than
+ * it reads. A prop that topples on its own an hour later still earns nothing.
+ */
+function physCarriesCause(body) {
+  if (!body || !physGame.state) return null;
+  const other = physBodyToProp.get(body.id);
+  if (!other || !other.disturbed) return null;
+  const t = physGame.state.time;
+  if (t - other.lastCapyTouch >= physCAUSE_TIP && t - other.releaseTime >= physCAUSE_TIP) return null;
+  return other;
+}
+
+/**
  * The single gate every completeTask call in this file goes through. A prop
  * that tips, spills or drifts into the harbour on its own earns nothing.
  */
@@ -2743,6 +2774,15 @@ function physOnCollide(prop, e) {
   // Stamp causation BEFORE any speed gate: a slow shove that eventually topples
   // a bin is still the capybara's doing, and must be credited as such.
   if (physIsCapyAgent(e.body)) physStampTouch(prop);
+  else {
+    // ...and one hop further, on the striker's clock. See physCarriesCause.
+    const src = physCarriesCause(e.body);
+    if (src) {
+      prop.disturbed = true;
+      const inherited = Math.max(src.lastCapyTouch, src.releaseTime);
+      if (inherited > prop.lastCapyTouch) prop.lastCapyTouch = inherited;
+    }
+  }
   if (prop.held || prop.frozen || prop.hidden) return;
   const c = e.contact;
   if (!c) return;

@@ -2938,6 +2938,12 @@ export const RECORDS = {
   // 14.5 s — those are the machine floors, and a par a player cannot reach is
   // worse than no par at all. The figures below sit above them by about the
   // margin a person steering an S-curve uphill on a stamina bar actually loses.
+  // ...and Cali, which had two, and was the OTHER chapter that measured dead in
+  // free play. Same shape and the same one-line cause as the two below — see
+  // the cane block in cali.js.
+  // Machine floor measured at 6.5 s — thirty-four metres of cane at a flat
+  // sprint, slightly downhill. Eight is a player who runs it straight.
+  'cane-run':      { label: 'the cane in', unit: ' s', better: 'lower', dp: 1, par: 8 },
   'torii-run':     { label: 'the tunnel in', unit: ' s', better: 'lower', dp: 1, par: 32 },
   'bamboo-dash':   { label: 'the grove in', unit: ' s', better: 'lower', dp: 1, par: 17 },
   'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 18 },
