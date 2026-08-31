@@ -262,7 +262,7 @@ let hanToldFlow = false, hanToldHorn = false, hanToldTrain = false, hanToldLake 
 let hanAmbT = 0;
 let hanBridgeDone = false, hanHucDone = false, hanTowerDone = false;
 let hanPuppetDone = false;
-let hanQuietT = 0, hanRiverT = 0;
+let hanQuietT = 0;
 
 // ---------------------------------------------------------------- helpers ---
 function hanXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
@@ -3608,7 +3608,7 @@ export function createHanoi(game) {
       }
       hanArrived = false;
       hanToldFlow = false; hanToldHorn = false; hanToldTrain = false; hanToldLake = false;
-      hanAmbT = 0; hanQuietT = 0; hanRiverT = 0;
+      hanAmbT = 0; hanQuietT = 0;
       hanSpawned = false;
     },
     onExit() {

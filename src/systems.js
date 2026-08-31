@@ -8727,7 +8727,6 @@ export function createSystems(game) {
   // low-pass, silent until an Icelandic sky says otherwise.
   let musChoirGain = null, musChoirIn = null;
   const musChoirV = [];
-  let musChoirLevel = 0;
   // The lift. One gain, one envelope value and one clock — everything else
   // about it is the pad's own chord, read live.
   let musLiftGain = null, musLift = 0, musLiftT = 0;
@@ -17860,7 +17859,7 @@ export function createSystems(game) {
   // bottom of the same frame, which nothing ever read. sysBufPress() latches
   // one and publishes it in the same breath, because capybara.js runs BEFORE
   // systems and has to be able to see a press on the frame it happened.
-  let honkPend = -1, actionPend = -1, whistlePend = -1, jumpPend = -1;
+  let actionPend = -1, jumpPend = -1;
   // ...and the two the contract pins are published on game.input, along with
   // the two functions that empty them. A consumer that never calls the clear
   // is not a bug: the timer expires on its own after sysINPUT_BUF, so the
@@ -17871,9 +17870,8 @@ export function createSystems(game) {
   input.clearActionBuf = function () { actionPend = -1; input.actionBuf = -1; };
   function sysBufJump()   { jumpPend = 0; input.jumpBuf = 0; }
   function sysBufAction() { actionPend = 0; input.actionBuf = 0; }
-  function sysBufVoice()  { honkPend = 0; whistlePend = 0; }
   function sysBufClearAll() {
-    honkPend = -1; actionPend = -1; whistlePend = -1; jumpPend = -1;
+    actionPend = -1; jumpPend = -1;
     input.jumpBuf = -1; input.actionBuf = -1;
   }
   /** One timer, aged on RAW wall-clock seconds and expired at the window. */
@@ -17882,10 +17880,9 @@ export function createSystems(game) {
     const n = t + rdt;
     return n > sysINPUT_BUF ? -1 : n;
   }
-  let touchJump = false, touchJumpPend = false;
+  let touchJump = false;
   let mouseAction = false;
-  let touchHonk = false, touchHonkPend = false, touchAction = false, touchActionPend = false;
-  let touchWhistlePend = false;
+  let touchHonk = false, touchAction = false;
   // ---- THE TWO THINGS A THUMB COULD NOT DO --------------------------------
   // The touch fan carried three of the seven verbs — WHEEK, GRAB, HOP — plus
   // run, which the stick gives you for free at full deflection. That left the
@@ -18286,7 +18283,7 @@ export function createSystems(game) {
     // out. whistle* stays as an alias so every reader keeps working unchanged.
     // Q, because it is the one key the left hand reaches without leaving WASD.
     if (c === 'KeyQ' && started) {
-      sysBufVoice(); input.honkPressed = true; input.honk = true;
+      input.honkPressed = true; input.honk = true;
       input.whistlePressed = true; input.whistle = true;
     }
     // GRAB on E: the interact key in every third-person game of the last twenty
@@ -18530,16 +18527,15 @@ export function createSystems(game) {
   // input in the game with no travel and no feel, so an early tap is not a
   // slip, it is the normal case — these buffer exactly as the keys do.
   bindBtn(wheekBtn, function () {
-    touchHonk = true; touchHonkPend = true; input.honkPressed = true; input.honk = true;
-    touchWhistlePend = true; input.whistlePressed = true; input.whistle = true;
-    sysBufVoice();
+    touchHonk = true; input.honkPressed = true; input.honk = true;
+    input.whistlePressed = true; input.whistle = true;
   }, function () { touchHonk = false; });
   bindBtn(grabBtn, function () {
-    touchAction = true; touchActionPend = true; input.actionPressed = true; input.action = true;
+    touchAction = true; input.actionPressed = true; input.action = true;
     sysBufAction();
   }, function () { touchAction = false; });
   bindBtn(hopBtn, function () {
-    touchJump = true; touchJumpPend = true; input.jumpPressed = true; input.jump = true;
+    touchJump = true; input.jumpPressed = true; input.jump = true;
     sysBufJump();
   }, function () { touchJump = false; });
   // Held, not latched — the same shape as the key and the left trigger, because
@@ -19587,15 +19583,8 @@ export function createSystems(game) {
   // 5d. PASTO QUERIES — every one of these has to survive pasto.js not having
   // published its half of the API yet, and none of them may allocate.
   // =========================================================================
-  function pastoTerrainY(x, z) {
-    const pa = game.pasto;
-    if (pa && typeof pa.terrainHeight === 'function') {
-      const h = pa.terrainHeight(x, z);
-      // NaN would silently poison the camera and never come back.
-      if (typeof h === 'number' && h === h) return h;
-    }
-    return 0;
-  }
+  // (pastoTerrainY lived here: a Pasto-only ground query from before sysGroundY
+  // existed, which asks the live biome and is what every caller uses now.)
   /**
    * The ground under (x, z) in whichever biome is live, or 0 where the world is
    * flat and does not publish terrainHeight at all.
@@ -20927,11 +20916,11 @@ export function createSystems(game) {
     // the moment, and a framing left running into a teleport would fight the
     // arrival yaw the spawn sets two lines later. Same rule as shake and time.
     shotReq = null; shotW = 0; shotAge = 0; shotKill = 0;
-    // An attempt belongs to the world it was started in, for the same reason
-    // the breadcrumbs do. Crossing a border abandons it whatever the chapter
-    // being left behind thinks — it is not going to get another frame in which
-    // to say so.
-    recordEnd();
+    // (recordEnd() was called here, eighteen lines after recLiveId was cleared
+    // by hand above — and it opens `if (!recLiveId) return false`, so it had
+    // never once done anything. The block above already says why the clear is
+    // written out longhand rather than going through recClose; the call was the
+    // same intention expressed twice, and only the first one ran.)
     const cdef = chapterDef(chapterOf(name));
     const pasto = name === 'pasto';
     bioTarget = pasto ? 1 : 0;
@@ -20992,8 +20981,6 @@ export function createSystems(game) {
       const rdt = game.state.rawDt || dt;
       jumpPend = sysBufAge(jumpPend, rdt);
       actionPend = sysBufAge(actionPend, rdt);
-      honkPend = sysBufAge(honkPend, rdt);
-      whistlePend = sysBufAge(whistlePend, rdt);
       input.jumpBuf = jumpPend;
       input.actionBuf = actionPend;
     }
@@ -23630,7 +23617,6 @@ export function createSystems(game) {
       // this target is zero and the four voices cost nothing but their phase.
       if (musChoirGain) {
         const want = inIce ? auroraT * auroraT * 0.62 : 0;
-        musChoirLevel = want;
         musChoirGain.gain.setTargetAtTime(0.0001 + want, nowA, 2.5);
       }
       // ---- AND THE LIFT ------------------------------------------------
@@ -23733,10 +23719,6 @@ export function createSystems(game) {
     // early are the consumer (clearJumpBuf / clearActionBuf), leaving the
     // window, and starting a game. The one-frame edge flags above are
     // untouched and still mean exactly what they meant.
-    touchHonkPend = false;
-    touchActionPend = false;
-    touchWhistlePend = false;
-    touchJumpPend = false;
 
     // ...AND THE PAD'S EDGES ARE PUBLISHED HERE, AFTER THE CLEAR.
     // A pad has no event to latch at, and systems runs last: a press written at
@@ -23751,7 +23733,7 @@ export function createSystems(game) {
     // the NEXT update(), which is the same frame the edge above is read on —
     // so a pad and a keyboard hand the consumer the same age for the same
     // press.
-    if (padEdgeHonk)   { input.honkPressed = true; input.whistlePressed = true; padEdgeHonk = false; sysBufVoice(); }
+    if (padEdgeHonk)   { input.honkPressed = true; input.whistlePressed = true; padEdgeHonk = false; }
     if (padEdgeAction) { input.actionPressed = true; padEdgeAction = false; sysBufAction(); }
     if (padEdgeJump)   { input.jumpPressed = true; padEdgeJump = false; sysBufJump(); }
   }

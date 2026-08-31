@@ -310,7 +310,10 @@ let condorSpawnY = 0;
 let condorSpawnR = 0;
 
 let condorFlapT = 0, condorFlapCool = 0, condorFlapPhase = 0;
-let condorBankSm = 0, condorPitchSm = 0, condorSpeedSm = 0, condorAoASm = 0;
+// (condorBankSm / condorPitchSm lived here and were damped every frame by the
+// render pose without ever being read; condorSpeedSm and condorAoASm below are
+// read by the trim loop and the stall term and are not the same thing.)
+let condorSpeedSm = 0, condorAoASm = 0;
 // render-only smoothing state — see condorRender()
 const condorRENDER_L = 22;
 const condorRENDER_SNAP2 = 6 * 6;
@@ -2704,8 +2707,6 @@ function condorAnimate(dt, airspeed, bank, pitch, mounted) {
     condorHeadPivot.rotation.y = damp(condorHeadPivot.rotation.y, clamp(yaw, -0.7, 0.7), 8, dt);
     condorHeadPivot.rotation.x = damp(condorHeadPivot.rotation.x, clamp(pit, -0.6, 0.6), 8, dt);
   }
-  condorBankSm = damp(condorBankSm, bank, 10, dt);
-  condorPitchSm = damp(condorPitchSm, pitch, 10, dt);
 }
 
 // ---------------------------------------------------------------------------

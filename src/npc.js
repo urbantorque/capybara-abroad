@@ -531,7 +531,6 @@ const npcSEAT_LEG = -0.72;       // thighs swung forward under the table
 // Fallback fixtures, used only until environment.js publishes the real ones.
 const npcFB_BUSKER = { x: -25.0, z: 2.0 };
 const npcFB_KIOSK = { x: -18.5, z: 5.0 };
-const npcFB_FERRY = { x: -40, z: -14.5 };
 const npcDOG_HOME = { x: -28.5, z: -3.0 };
 const npcQUAY_PTS = [-22, 7, -30, -1, -38, 4, -44, 8, -20, -2, -35, 9, -43, -3];
 // Bollards and rail posts along the quay edge — where gulls loiter and judge.
@@ -3676,9 +3675,9 @@ export function createNPCs(game) {
       // ---- Mr Whippy ----
       queueI: 0, queueCd: rand(4, 40), coneT: -1,
       // ---- Circular Quay ----
-      quay: !!npcQUAY_KINDS[kind], homeState: 'idle', homeYaw: 0,
+      quay: !!npcQUAY_KINDS[kind], homeYaw: 0,
       seated: 0, seatPose: 0, chatPhase: rand(0, 6.28), sipT: rand(2, 8),
-      soak: 0, soakDark: 0, exasp: 0, slot: 0, table: -1, aboard: false,
+      soak: 0, soakDark: 0, exasp: 0, slot: 0, table: -1,
       strum: rand(0, 3), tap: 0, huff: 0, mugT: 0, zMin: npcEDGE_STOP, noAvoid: false,
       robbed: false, soakCd: 0,
       cT: PALETTE.cloth1, cH: PALETTE.denim, cS: PALETTE.skin1, cHr: PALETTE.hair1,
@@ -3871,22 +3870,14 @@ export function createNPCs(game) {
     return dx * dx + dz * dz < quayTableR * quayTableR;
   }
 
-  // Live ferry state, refreshed in place (no per-frame allocation).
-  const quayFerry = { ok: false, docked: false, x: npcFB_FERRY.x, z: npcFB_FERRY.z, deckY: 0.9 };
-  function quayReadFerry() {
-    const f = game.env && game.env.ferry;
-    quayFerry.ok = !!f;
-    if (!f) { quayFerry.docked = false; return; }
-    const d = (f.docked !== undefined) ? f.docked
-      : (f.atDock !== undefined) ? f.atDock
-      : (f.state !== undefined) ? (f.state === 'docked' || f.state === 'dock') : false;
-    quayFerry.docked = !!d;
-    const p = quayXOf(f);
-    if (p && isFinite(p.x) && isFinite(p.z)) { quayFerry.x = p.x; quayFerry.z = p.z; }
-    if (isFinite(f.deckY)) quayFerry.deckY = f.deckY;
-    if (isFinite(f.gangwayX) && isFinite(f.gangwayZ)) { quayFerry.x = f.gangwayX; quayFerry.z = f.gangwayZ; }
-  }
-  quayReadFerry();
+  // THE COMMUTERS NEVER BOARDED ANYTHING. `quayFerry` and `quayReadFerry` read
+  // the ferry's dock state, position, deck height and gangway once at build and
+  // wrote them into an object nothing ever consulted — the scaffolding for a
+  // boarding behaviour that was never written, alongside a `homeState` and an
+  // `aboard` flag on every human that were likewise only ever initialised. All
+  // of it removed rather than left to imply a feature that does not exist; the
+  // ferry's own api (game.env.ferry) is unchanged and still says all of this to
+  // anybody who does write it.
 
   // --- build the humans ----------------------------------------------------
   let camerasGiven = 0, hatsGiven = 0, coffeesGiven = 0, bagsGiven = 0;
@@ -8418,7 +8409,6 @@ export function createNPCs(game) {
     if (!b || typeof b.isActive !== 'function') return true;
     try { return !!b.isActive('sydney'); } catch (e) { return true; }
   }
-  let wasLive = true;
   function parkBubbles() {
     for (let i = 0; i < BUB; i++) {
       const b = bubbles[i];
@@ -8581,7 +8571,6 @@ export function createNPCs(game) {
     // world, so no state machine, raycast or steering step may run: the whole
     // module costs one boolean per frame.
     if (!biomeLive()) {
-      wasLive = false;
       // …but Pasto's locals are a different crowd on the same rig, and they only
       // run while Pasto is the attached biome.
       if (paLive()) paUpdate(dt);
@@ -8595,7 +8584,6 @@ export function createNPCs(game) {
       updateBubbles(dt);
       return;
     }
-    wasLive = true;
     localsStep(dt);
     npcExStep(dt);
 

@@ -267,7 +267,7 @@ let driWindX = 0, driWindZ = 0, driWindAng = 0;
 let driShelter = 1;                  // 1 in open air, 0.2 inside a column
 let driPuffReady = true, driPuffT = 0, driAirT = 0;
 let driWasGrounded = true;
-let driFlightX = 0, driFlightZ = 0, driFlightOn = false, driFlightBest = 0;
+let driFlightX = 0, driFlightZ = 0, driFlightOn = false;
 let driInCloud = 0;                  // s continuously in the cloud
 // ---- AND THE CLOUD ANSWERS THE WHEEK ------------------------------------
 // The wheek does four things in this chapter — it wakes a lampfly, it flushes
@@ -4578,7 +4578,6 @@ function driUpdateFlight(game, dt) {
     if (!driWasGrounded && driFlightOn) {
       const dx = p.x - driFlightX, dz = p.z - driFlightZ;
       const d = Math.sqrt(dx * dx + dz * dz);
-      if (d > driFlightBest) driFlightBest = d;
       if (d >= driLONG_GAP) {
         if (!driGapDone) {
           driGapDone = true;
@@ -5102,16 +5101,13 @@ function driUpdateBanks(dt) {
  * is positional is everything else in this block.
  */
 let driBreathSign = 0;
-let driTurnT = 999;
 
 function driUpdateBreathSound(game, dt) {
-  driTurnT += dt;
   const swing = Math.sin(driTime * 6.28318 / driBREATH);
   const sign = swing >= 0 ? 1 : -1;
   if (driBreathSign === 0) { driBreathSign = sign; return; }
   if (sign === driBreathSign) return;
   driBreathSign = sign;
-  driTurnT = 0;
   // A bell nobody is ringing is already this chapter's ambient signature (see
   // systems.js, the drift branch). This is the same bell, lower and certain,
   // and it is the only sound in the biome that is always exactly on time.

@@ -240,10 +240,10 @@ let venWasFlooded = false;
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
 let venBoardRunT = -1, venBoardFrom = 0, venBoardOff = 0;
-let venOnBoards = false, venBoardIdx = -1;
+let venOnBoards = false;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
 let venGondDone = false, venRialtoDone = false, venFloodDone = false, venSwimDone = false;
-let venRialtoT = -1, venRialtoFrom = 0, venRialtoHigh = 0;
+let venRialtoFrom = 0, venRialtoHigh = 0;
 let venSwimRun = 0, venSwimFromX = 0, venSwimTo = 0, venSwimHas = false;
 let venCafeGroup = null;
 let venTideTold = 0;
@@ -4974,7 +4974,6 @@ function venUpdateTasks(game, dt) {
   const bt = venBoardOut > 0.7 ? venBoardAt(p.x, p.z) : -1;
   const onBoards = bt >= 0 && p.y > venTerrain(p.x, p.z) + venBOARD_Y * 0.45;
   venOnBoards = onBoards;
-  venBoardIdx = bt;
   if (onBoards) {
     if (venBoardRunT < 0) {
       // only START a run near one of the two ends, so wandering onto the middle
@@ -5048,7 +5047,7 @@ function venUpdateTasks(game, dt) {
       const side = along > 3 ? 1 : along < -3 ? -1 : 0;
       if (p.y > venFOND_Y + 2.2) venRialtoHigh = 1;      // genuinely up on the arch
       if (side !== 0) {
-        if (venRialtoFrom === 0) { venRialtoFrom = side; venRialtoT = 0; venRialtoHigh = 0; }
+        if (venRialtoFrom === 0) { venRialtoFrom = side; venRialtoHigh = 0; }
         else if (side === -venRialtoFrom) {
           if (venRialtoHigh) {
             venRialtoDone = true;
@@ -5056,13 +5055,12 @@ function venUpdateTasks(game, dt) {
             venToast('nobody has ever crossed that bridge without stopping. until now.');
             venSfx('pop', { volume: 0.85, pitch: 1.15 });
           } else {
-            venRialtoFrom = side; venRialtoT = 0;
+            venRialtoFrom = side;
           }
         }
       }
-      if (venRialtoT >= 0) venRialtoT += dt;
     } else if (venRialtoFrom !== 0) {
-      venRialtoFrom = 0; venRialtoHigh = 0; venRialtoT = -1;
+      venRialtoFrom = 0; venRialtoHigh = 0;
     }
   }
 
@@ -5141,7 +5139,7 @@ export function createVenice(game) {
       venSirenT = -1; venSirenStep = 0;
       venWasFlooded = false;
       venBoardRunT = -1; venBoardOff = 0;
-      venRialtoT = -1; venRialtoFrom = 0; venRialtoHigh = 0;
+      venRialtoFrom = 0; venRialtoHigh = 0;
       venSwimHas = false; venSwimRun = 0;
       venGondRideT = 0;
       venTideTold = 0;
@@ -5193,7 +5191,7 @@ export function createVenice(game) {
       // Anything stateful that could hold the player is cleared on the way out.
       // Every biome shares one coordinate space and a latch that survives travel
       // is a bug waiting for somewhere it makes no sense.
-      venBoardRunT = -1; venRialtoT = -1; venRialtoFrom = 0; venRialtoHigh = 0;
+      venBoardRunT = -1; venRialtoFrom = 0; venRialtoHigh = 0;
       venSwimHas = false; venGondRideT = 0;
       venVoloAboard = false; venVoloConfT = -1;
     },
