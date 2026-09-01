@@ -143,6 +143,42 @@ measured; the record board is the endgame.
 
 ---
 
+## Review — 1 Sep 2026, after R1–R4
+
+The seven areas above are the 31 Aug snapshot and are left as written. What has
+moved since, checked against the source rather than against the batch notes:
+
+- **Every line number in §1–§4 is now wrong.** R1–R4 moved several thousand
+  lines in `systems.js`; the references are archaeology, not addresses. The
+  symbol names all still resolve, and those are what to grep for.
+- **§6's premise is stale.** "The in-flight v53 work (uncommitted: cane run,
+  Kyoto dry-crossing re-arm, `cane-run` record, aria-live board)" has landed —
+  `cane-run` is in `RECORDS` at par 8 (`shared.js:2946`) and `cali.js` files it.
+  R7's first bullet is therefore already done; the rest of R7 is untouched.
+- **§6's other finds are all still live**, re-verified: `rio.js:3281`
+  `if (rioCalcDone) return` still kills the calçadão tracker, and `calcadao` is
+  a TASK (`shared.js:2069`) with **no** `RECORDS` row; `driVaneWatch` still
+  zeroes; Venice's calli and Rialto crossings are both still one-shot and still
+  measured-and-discarded.
+- **§5 is unchanged and confirmed.** `caliBEAT_WINDOW` 0.19 beats,
+  `caliDANCE_TARGET` 8, combo zeroed by `caliDANCE_DROP` — no assist of any
+  kind. Pasto is still the thin chapter.
+- **§7 is unchanged and confirmed.** No `LICENSE`; `package.json` still carries
+  no `license` field, on purpose. One named stale count survives R2's sweep:
+  `npc.js:8216` still says "Sydney is eighteen tasks" (it is nineteen), and the
+  wider "seventeen"/"hundred and ninety-nine" prose drift across `src/` — around
+  sixty lines — was deliberately left alone. **Counts as of now: 231 tasks, 19
+  chapters, 56 records.**
+- **§4's last bullet is still an open question and is not mine to close.** It
+  asks somebody to decide whether key remapping, text-size and a colourblind
+  option are in scope. R4 shipped the card they would live on and none of the
+  three; R5 is touch parity and does not cover them either. **This needs an
+  owner decision, like LICENSE does.**
+- **Sizing.** R4 was written as one 2–3 h batch and is not one: ~800 lines
+  across three files, a fourth storage key, a new audio bus and a new
+  cross-module channel for calm-motion. R8 and R9 (a chapter's worth of
+  ambience and sfx each) should be expected to run the same way.
+
 ## The batches
 
 Ordered so the ship-blockers land first, each one commit, 2–3 h.
@@ -201,7 +237,39 @@ quarantine unparseable saves (never `saveClear` over non-empty bytes);
 (localStorage unavailable, `__capySoftGL`); kill the dead `told` field.
 Verify with a scripted tick→hide→reload loop and a corrupted-save fixture.
 
-**Batch R4 — the pause card.** A real pause surface on Escape (resume /
+**Batch R4 — the pause card.** ✅ **done 1 Sep 2026.** Escape opens a real pause
+surface (resume / settings / the journey so far / quit to the title, the last
+with a confirm whose copy tells the truth about the save); master, music and
+effects faders with per-bus mutes; a "less motion" switch that works at runtime;
+everything in a fourth key, `capy3.prefs.v1`, never in the journey file. Gamepad
+Start opens it (it used to open the departures board, which has no resume).
+
+Three things worth keeping: **`sysVOL_CEIL` stays 0.85** and the master fader is
+a scale on it, so at the default the graph is bit-for-bit the one the ~110
+hand-set sfx volumes were balanced on. **A third bus** (`acSfxBus`) now carries
+everything that is not the score — the synths via the existing acMaster swap,
+the room's wet return, the ambient bed and the weather voices — so "effects"
+means effects. **Calm-motion became one channel** at the foot of `shared.js`
+(`calmOn`/`calmSet`), replacing three independent module consts; the third copy
+was in `weather.js`, so without it the switch would have moved everything except
+two hundred tumbling petals.
+
+Probes: `qa/r4-pause.js` (18 assertions — card, faders, per-bus gains, mute
+echo, calm, prefs file, survival across reload, quit confirm, journal round
+trip), `qa/r4-gaps.js`, `qa/r4-shot3.js` → `qa/r4-pause.png`. R1, R2 and R3
+re-run green underneath it.
+
+**Two defects found in review and fixed here**, both the shape R3 had just
+removed from this file: `prefsFlush()` was on `pagehide` but not on
+`visibilitychange`-hidden, so a slider moved with the card still open and the
+tab then backgrounded was lost; and `sysPrefsOff` was written in two places and
+read in none. Wiring it up exposed a third, in R3's own code: `saveSayDegraded`
+had a single latch on the whole function and is called once at +700 ms, so any
+degradation discovered LATER — a full store, which is size-dependent and passes
+the two-byte probe — was silent for ever. It now carries one latch per sentence
+and is idempotent, and the prefs writer calls back into it.
+
+Original scope: A real pause surface on Escape (resume /
 settings / journal / quit-to-title with confirm); master/music/sfx sliders and
 mutes on it; a calm-motion toggle that works at runtime; settings persisted in
 a fourth key (`capy3.prefs.v1` — not the journey file). Gamepad Start opens

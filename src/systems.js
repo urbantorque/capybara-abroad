@@ -6,7 +6,7 @@ import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
          rimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
-         leafTick } from './shared.js';
+         leafTick, calmOn, calmSet, calmPreference } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -1887,10 +1887,13 @@ let   sysGradeWant = sysGRADES.sydney;
 const sysFILL_K   = 0.30;                 // of the hemisphere's own level
 const sysFillDir  = new THREE.Vector3();
 const sysFILL_LIFT = 0.16;                // how far off horizontal the fill sits
-// Read once. Everything decorative that loops forever checks this — the minimap
-// sweep already did, and now the glitter on eight seas does too.
-const sysCalmMotion = !!(typeof window !== 'undefined' && window.matchMedia &&
-                         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+// LESS MOTION, AND IT IS NOW A SWITCH RATHER THAN A ROOM SETTING (R4).
+// This was `const sysCalmMotion = matchMedia(...)`, resolved at load, and it was
+// one of THREE copies of the same query — the minimap had its own and weather.js
+// had a third. The one channel is in shared.js (see the calm block at the foot
+// of it); this is the local name every reader in this file already used, kept so
+// the call sites read the same as they always did.
+function sysCalmOn() { return calmOn(); }
 // The night sky over the Erg, for the dome. The lighting block already has
 // its own colours; this is the one the ZENITH goes to as the dusk runs.
 const sysSAH_NIGHT_C = new THREE.Color(PALETTE.sahSkyNight);
@@ -2319,7 +2322,12 @@ const sysSAVE_DEBOUNCE = 700;      // ms — a streak of ticks writes once
 // it belongs to, so a `let` declared down there is still in its temporal dead
 // zone at the one moment these have to be written — a ReferenceError inside the
 // one function whose whole job is not to lose anything.
+// `sysSaveSaid` is the STORAGE PROBE's latch and nothing else. The three
+// sentences each carry their own, because saveSayDegraded is called again by
+// every failing write and must be able to say a thing it did not know at boot.
+// See the block on saveSayDegraded.
 let sysSaveOff = false, sysSaveHurt = false, sysSaveSaid = false;
+let sysSaidStore = false, sysSaidHurt = false, sysSaidSoft = false;
 // THE ALBUM'S KEY AND ITS CACHE LIVE UP HERE, AWAY FROM THE REST OF THE ALBUM,
 // and the reason is worth the four lines. The title card asks the album for a
 // postcard WHILE IT BUILDS, and the title card is built earlier in this file
@@ -2337,6 +2345,75 @@ let sysSaveOff = false, sysSaveHurt = false, sysSaveSaid = false;
 const sysALB_KEY = 'capy3.album.v1';
 let albShots = null;               // lazily read; [{u, place, cap, n}]
 let albCan = null, albCtx = null;  // the offscreen downscaler, made on first use
+
+// ===========================================================================
+// THE PREFERENCES FILE (R4) — `capy3.prefs.v1`, and it is the FOURTH key.
+//
+// WHY NOT IN THE JOURNEY FILE. Three reasons, and the third is the one that
+// settles it. (1) A preference is about the MACHINE, not the journey: the
+// volume you want on a laptop in a quiet room is a fact about that laptop, and
+// "start over" must not reset it. (2) saveWrite puts the whole journey through
+// one setItem and swallows a quota throw, so a preference living in there is a
+// preference that silently stops being written the day the album fills up.
+// (3) `saveClear()` deletes the journey, the album and the ghosts — as of R3 it
+// does so properly — and a settings block in any of those would be wiped by a
+// button whose confirm copy promises ticks, records and souvenirs and says
+// nothing about your volume.
+//
+// It is read ONCE, here, at module load — before createSystems() is called and
+// therefore before the audio graph or the HUD exists, which is exactly what the
+// mix and the calm switch need. Every field is optional and every field is
+// clamped on the way in: a hand-edited or half-written file degrades to the
+// defaults rather than to a NaN in a GainNode, which is silence for the rest of
+// the session with nothing in the console.
+// ===========================================================================
+const sysPREFS_KEY = 'capy3.prefs.v1';
+// THE MIX WAS TUNED AGAINST 0.85 AND THAT NUMBER DOES NOT MOVE. The master
+// slider is a SCALE on this ceiling, never a replacement for it, so at 1.0 —
+// the default — the graph is bit-for-bit the one every one of the ~110 hand-set
+// sfx volumes and ten music palettes was balanced on. Raising the ceiling to
+// give the slider "headroom above default" would have quietly re-mixed the
+// whole game, which is the kind of change that measures as "the limiter is
+// working harder" and reads as "it clips now".
+const sysVOL_CEIL = 0.85;
+let sysVolMaster = 1, sysVolMusic = 1, sysVolSfx = 1;
+let sysMuteMaster = false, sysMuteMusic = false, sysMuteSfx = false;
+let sysPrefsOff = false;           // storage refused us — say so once, like R3
+function sysPrefsNum(v, d) {
+  return (typeof v === 'number' && v === v) ? clamp(v, 0, 1) : d;
+}
+function sysPrefsRead() {
+  let raw = null;
+  try { raw = localStorage.getItem(sysPREFS_KEY); } catch (e) { sysPrefsOff = true; return; }
+  if (!raw) return;
+  let o = null;
+  try { o = JSON.parse(raw); } catch (e) { o = null; }
+  if (!o || o.v !== 1) return;
+  sysVolMaster = sysPrefsNum(o.m, 1);
+  sysVolMusic  = sysPrefsNum(o.u, 1);
+  sysVolSfx    = sysPrefsNum(o.s, 1);
+  sysMuteMaster = !!o.mm;
+  sysMuteMusic  = !!o.um;
+  sysMuteSfx    = !!o.sm;
+  // TRI-STATE, AND THE THIRD STATE IS THE IMPORTANT ONE. `c` absent or null is
+  // "follow the operating system", which is what a player who has never touched
+  // the switch wants and is what an accessibility setting is FOR: somebody who
+  // turns reduce-motion on system-wide next month should get it here without
+  // coming back to this card. Only an explicit true/false overrides it.
+  calmSet(o.c === undefined ? null : o.c);
+}
+/** One setItem, wrapped, and never on a path that can lose a journey. */
+function sysPrefsWrite() {
+  try {
+    localStorage.setItem(sysPREFS_KEY, JSON.stringify({
+      v: 1,
+      m: sysVolMaster, u: sysVolMusic, s: sysVolSfx,
+      mm: sysMuteMaster ? 1 : 0, um: sysMuteMusic ? 1 : 0, sm: sysMuteSfx ? 1 : 0,
+      c: calmPreference(),
+    }));
+  } catch (e) { sysPrefsOff = true; }
+}
+sysPrefsRead();
 
 // --- BIOME TRANSITION -------------------------------------------------------
 const sysFADE_OUT   = 820;   // ms of white coming up  (CSS transition is .8s)
@@ -5730,6 +5807,129 @@ function sysBuildCSS() {
 '.capyui-jrled:focus{outline:none;}',
 '.capyui-jrled:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 
+/* ---------- THE PAUSE CARD (R4) ----------------------------------------
+   The frame around the game, and until R4 there was none: Escape opened the
+   departures board, there was no resume, no settings, no way back to the title
+   short of finishing the game or pressing F5, and the entire audio surface was
+   four unlabelled keys nobody is ever told about.
+
+   It is the journal's paper, deliberately and to the pixel — same veil, same
+   card, same rotation, same rule — because this HUD already has three
+   full-screen cards and a fourth with its own visual language would be a fourth
+   thing to learn. What is different is the BODY: a column of big targets over a
+   settings block, rather than a board. */
+'.capyui-pause{position:absolute;inset:0;z-index:64;display:flex;align-items:center;',
+  'justify-content:center;pointer-events:none;opacity:0;background:' + veil + ';',
+  'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
+  'transition:opacity .22s ease;padding:14px;}',
+'.capyui-pause.show{opacity:1;pointer-events:auto;}',
+'.capyui-pausecard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
+  'box-shadow:0 18px 40px ' + shadow2 + ';padding:clamp(15px,2.8vw,26px) clamp(17px,3.2vw,32px);',
+  'transform:rotate(.6deg);max-width:430px;width:100%;max-height:92vh;overflow:auto;',
+  'overscroll-behavior:contain;}',
+'.capyui-pausecard h2{font-size:clamp(17px,3.4vw,25px);color:' + ink + ';font-weight:700;',
+  'letter-spacing:.04em;text-align:center;}',
+'.capyui-pausesub{font-size:clamp(10px,1.9vw,11px);letter-spacing:.24em;text-transform:uppercase;',
+  'color:' + accentInk + ';font-weight:700;text-align:center;margin-top:4px;',
+  'font-variant-numeric:tabular-nums;}',
+/* The four doors. One column, full width, thumb-sized — this card is the one
+   surface a touch player reaches pause, travel and volume through (R5), so
+   nothing on it may be a 20 px target in a row of four. */
+'.capyui-pausemenu{display:flex;flex-direction:column;gap:6px;',
+  'margin-top:clamp(11px,2.2vw,16px);}',
+'.capyui-pausebtn{display:block;width:100%;border:1px solid ' + rule + ';border-radius:4px;',
+  'padding:clamp(8px,1.7vw,11px) 13px;background:none;font:inherit;cursor:pointer;',
+  'font-size:clamp(11px,2vw,12.5px);color:' + ink + ';font-weight:700;text-align:left;',
+  'letter-spacing:.1em;text-transform:uppercase;touch-action:manipulation;',
+  '-webkit-tap-highlight-color:transparent;transition:background .18s ease;}',
+'@media (hover:hover){.capyui-pausebtn:hover{background:' + veil2 + ';}}',
+'.capyui-pausebtn:focus{outline:none;}',
+'.capyui-pausebtn:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+/* Resume is the one accented control, for the same reason "carry on" is on the
+   title card: a pause menu whose most likely answer looks like its other three
+   answers makes the player read four things to get back to the game. */
+'.capyui-pausebtn.go{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';}',
+'@media (hover:hover){.capyui-pausebtn.go:hover{filter:brightness(1.06);background:' + accent + ';}}',
+'.capyui-pausebtn.warn{color:' + accentInk + ';}',
+/* ---- the settings block ---- */
+'.capyui-set{margin-top:clamp(10px,2vw,14px);border-top:1px solid ' + inkFaint + ';',
+  'padding-top:clamp(9px,1.8vw,13px);}',
+'.capyui-set[hidden]{display:none;}',
+'.capyui-setrow{display:flex;align-items:center;gap:9px;margin-bottom:7px;}',
+'.capyui-setname{flex:0 0 clamp(52px,11vw,66px);font-size:clamp(10px,1.8vw,11px);',
+  'color:' + inkSoft + ';font-weight:700;letter-spacing:.14em;text-transform:uppercase;}',
+/* A REAL <input type=range>. It is the one control on this card that must not
+   be hand-built: the native one is keyboard-operable, announces itself, has a
+   value and a step, and is the thing every screen reader and every pad-mapping
+   layer already knows what to do with. Only its skin is ours. */
+'.capyui-setrange{flex:1 1 auto;min-width:0;height:22px;background:none;',
+  'appearance:none;-webkit-appearance:none;cursor:pointer;touch-action:manipulation;}',
+'.capyui-setrange::-webkit-slider-runnable-track{height:4px;border-radius:2px;',
+  'background:' + inkFaint + ';}',
+'.capyui-setrange::-moz-range-track{height:4px;border-radius:2px;background:' + inkFaint + ';}',
+'.capyui-setrange::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;',
+  'width:15px;height:15px;margin-top:-5.5px;border-radius:50%;background:' + accent + ';',
+  'border:1px solid ' + paper + ';box-shadow:0 1px 2px ' + shadow2 + ';}',
+'.capyui-setrange::-moz-range-thumb{width:15px;height:15px;border-radius:50%;',
+  'background:' + accent + ';border:1px solid ' + paper + ';}',
+'.capyui-setrange:focus{outline:none;}',
+'.capyui-setrange:focus-visible{outline:2px solid ' + accent + ';outline-offset:3px;}',
+/* The per-bus mute, which is a button and not a checkbox: it has two states and
+   a picture, and the picture is the whole point of it at this size. */
+'.capyui-setmute{flex:0 0 auto;width:31px;height:27px;border:1px solid ' + rule + ';',
+  'border-radius:4px;background:none;font:inherit;line-height:0;padding:0;',
+  'display:flex;align-items:center;justify-content:center;',
+  'color:' + ink + ';cursor:pointer;touch-action:manipulation;',
+  '-webkit-tap-highlight-color:transparent;}',
+'.capyui-setmute svg{display:block;width:16px;height:16px;}',
+'.capyui-setmute .cross{display:none;}',
+'.capyui-setmute.off{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';}',
+'.capyui-setmute.off .wave{display:none;}',
+'.capyui-setmute.off .cross{display:inline;}',
+'.capyui-setmute:focus{outline:none;}',
+'.capyui-setmute:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+'.capyui-setval{flex:0 0 34px;text-align:right;font-size:clamp(10px,1.8vw,11px);',
+  'color:' + inkSoft + ';font-weight:700;font-variant-numeric:tabular-nums;}',
+/* the calm switch, which is a label wrapping a real checkbox */
+'.capyui-setcalm{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer;',
+  'font-size:clamp(10.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
+  'letter-spacing:.06em;touch-action:manipulation;}',
+'.capyui-setcalm input{width:16px;height:16px;flex:0 0 auto;accent-color:' + accent + ';',
+  'cursor:pointer;}',
+'.capyui-setnote{font-size:clamp(9.5px,1.7vw,10.5px);color:' + inkSoft + ';font-style:italic;',
+  'margin-top:7px;line-height:1.4;}',
+'.capyui-pausefoot{margin-top:clamp(9px,1.8vw,13px);text-align:center;',
+  'font-size:clamp(9.5px,1.8vw,10.5px);letter-spacing:.14em;text-transform:uppercase;',
+  'color:' + inkSoft + ';font-weight:700;}',
+/* ---- quit: the one destructive control, so it asks ---- */
+'.capyui-pauseask{margin-top:6px;border:1px solid ' + accent + ';border-radius:4px;',
+  'padding:9px 11px;background:' + veil2 + ';}',
+'.capyui-pauseask[hidden]{display:none;}',
+'.capyui-pauseaskline{font-size:clamp(10.5px,1.9vw,11.5px);color:' + ink + ';line-height:1.45;}',
+'.capyui-pauseaskrow{display:flex;gap:7px;margin-top:8px;}',
+'.capyui-pauseaskrow button{flex:1 1 0;border:1px solid ' + rule + ';border-radius:4px;',
+  'padding:7px 6px;background:' + paper + ';font:inherit;cursor:pointer;color:' + ink + ';',
+  'font-size:clamp(10px,1.8vw,11px);font-weight:700;letter-spacing:.08em;',
+  'text-transform:uppercase;touch-action:manipulation;}',
+'.capyui-pauseaskrow button:focus{outline:none;}',
+'.capyui-pauseaskrow button:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+/* ---- AND THE SWITCH HAS TO REACH THE SHEET (R4) --------------------------
+   The rule at the top of this file is inside `@media (prefers-reduced-motion:
+   reduce)`, which asks the OPERATING SYSTEM and cannot be told anything by a
+   checkbox. Three of the blocks in here are the other way round — they are
+   inside `no-preference` and switch motion ON — so a forced-calm player would
+   have kept the breathing capybara, the shine across a picked tile and the
+   dealt shelf. `html.capy-calm` is set by the switch and says the same things
+   the media query says, in the same sheet, without a reload. */
+'.capy-calm .capyui *{animation-duration:.01ms !important;animation-iteration-count:1 !important;',
+  'transition-duration:.01ms !important;scroll-behavior:auto !important;}',
+'.capy-calm .capyui-orn svg{animation:none !important;}',
+'.capy-calm .capyui-pick{opacity:1 !important;animation:none !important;}',
+'.capy-calm .capyui-pick:hover:after,.capy-calm .capyui-pick:focus-visible:after{',
+  'opacity:0 !important;transform:none !important;}',
+'.capy-calm .capyui-pflash,.capy-calm .capyui-pflash.show{opacity:0 !important;',
+  'transition:none !important;}',
+
 /* ---------- the souvenir card, at the end of a place (v18) ----------
    The chapter ceremony's second beat. Composed like the moment card — a
    kicker over a rule over a line — with the thing itself above all three,
@@ -6936,8 +7136,24 @@ export function createSystems(game) {
   let acSfxIn = null, acRoomSend = null, acRoomConv = null, acRoomOut = null;
   let acRoomFor = '', acRoomWet = 0;
   let acEarAt = -1;        // the frame the listener was last resolved on
-  let muted = false;
+  // FROM THE PREFERENCES FILE, NOT FROM ZERO (R4). This was a session `let`
+  // initialised false, which is why the mute key was a thing you did to a tab
+  // rather than a setting: every reload came back at full volume.
+  let muted = sysMuteMaster;
   const lastPlay = Object.create(null);
+  // ---- THE THREE BUSES, AND WHAT EACH ONE MEANS -------------------------
+  // master -> the ceiling, the limiter, the DAC.  music -> musVol, which the
+  // score already had.  sfx -> `acSfxBus`, which is NEW and is everything that
+  // is not the score: every synth in the table, the room's wet return, the
+  // ambient bed and the four weather voices. Three names on the card, three
+  // gains in the graph, and no fourth thing quietly outside all of them.
+  let acSfxBus = null;
+  /** The master's target, which is the ceiling scaled — never replaced. */
+  function sysMasterGain() { return muted ? 0.0001 : sysVOL_CEIL * sysVolMaster; }
+  function sysSfxGain() { return sysMuteSfx ? 0.0001 : sysVolSfx; }
+  /** Where a not-music voice belongs. Falls back to the master on a browser
+   *  whose audio graph would not build — the mix this game had before R4. */
+  function sysSfxOut() { return acSfxBus || acMaster; }
 
   function audioEnsure() {
     if (ac) return ac;
@@ -6945,7 +7161,7 @@ export function createSystems(game) {
     if (!AC) return null;
     try { ac = new AC(); } catch (e) { return null; }
     acMaster = ac.createGain();
-    acMaster.gain.value = muted ? 0 : 0.85;
+    acMaster.gain.value = sysMasterGain();
     // ---- ONE LIMITER, AND IT IS NOT AN EFFECT -----------------------------
     // Seventeen chapters' worth of ambience, a generative score, a crowd and a
     // physics engine all summed into one gain and went straight at the DAC.
@@ -6971,18 +7187,31 @@ export function createSystems(game) {
       }
     } catch (e) { acLimit = null; out = ac.destination; }
     acMaster.connect(out);
+    // ---- THE SFX BUS (R4) -------------------------------------------------
+    // One gain between everything-that-is-not-the-score and the master. It is
+    // built OUTSIDE the room's try/catch on purpose: the room is optional and
+    // may fail on an engine with no ConvolverNode, and the player's sfx fader
+    // must not be the thing that fails with it. Its own guard, so a browser
+    // that cannot even make a GainNode here degrades to the pre-R4 graph — the
+    // slider then does nothing, which is a slider that lies, but the game has
+    // sound. sysSfxOut() is the one thing anybody asks.
+    try {
+      acSfxBus = ac.createGain();
+      acSfxBus.gain.value = sysSfxGain();
+      acSfxBus.connect(acMaster);
+    } catch (e) { acSfxBus = null; }
     // ---- THE ROOM, AND IT IS FOUR NODES -----------------------------------
     //
-    //   every sfx synth -> [panner] -> acSfxIn --+--> acMaster        (dry)
+    //   every sfx synth -> [panner] -> acSfxIn --+--> acSfxBus        (dry)
     //                                            \-> send -> conv -> out
     //
     // Wrapped, because a browser without a ConvolverNode must still have a
     // game with sound in it: if any of this throws, acSfxIn stays null and
-    // sfx() points the synths at the master exactly as it did before.
+    // sfx() points the synths at the sfx bus exactly as it did before.
     try {
       acSfxIn = ac.createGain();
       acSfxIn.gain.value = 1;
-      acSfxIn.connect(acMaster);
+      acSfxIn.connect(sysSfxOut());
       acRoomConv = ac.createConvolver();
       acRoomConv.normalize = true;
       acRoomSend = ac.createGain();
@@ -6992,7 +7221,11 @@ export function createSystems(game) {
       acSfxIn.connect(acRoomSend);
       acRoomSend.connect(acRoomConv);
       acRoomConv.connect(acRoomOut);
-      acRoomOut.connect(acMaster);
+      // The WET return goes to the sfx bus too, not to the master. A fader that
+      // ducked the dry half and left the reverb tail at full level would turn
+      // the sfx slider into a wetness knob — quieter AND further away — which
+      // is the sort of thing that measures as "it works" and sounds wrong.
+      acRoomOut.connect(sysSfxOut());
       sysRoomLoad(game.biome && game.biome.current);
     } catch (e) {
       acSfxIn = null; acRoomSend = null; acRoomConv = null; acRoomOut = null;
@@ -8548,7 +8781,10 @@ export function createSystems(game) {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
     acAmbGain.gain.value = 0.0001;
-    acAmbGain.connect(acMaster);
+    // R4: the bed is not the score, so it hangs off the sfx bus like everything
+    // else that is not the score. It was on the master, which would have left it
+    // as the one voice a player could not turn down.
+    acAmbGain.connect(sysSfxOut());
     // Wide: the ambience is not anywhere. See noiseWideSrc.
     const ns = noiseWideSrc();
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 430; lp.Q.value = 0.5;
@@ -8600,7 +8836,7 @@ export function createSystems(game) {
     if (!ac || wxBedBus) return;
     wxBedBus = ac.createGain();
     wxBedBus.gain.value = 0.0001;
-    wxBedBus.connect(acMaster);
+    wxBedBus.connect(sysSfxOut());   // R4: not the score — see acAmbGain
 
     // ---- rain. Two bands, because one is a hiss and rain is not a hiss: a
     // bright band is the drops hitting things and a dark one is the general
@@ -8739,7 +8975,9 @@ export function createSystems(game) {
   let musWide = null;
   let musTimerId = 0;
   let musChordAt = 0, musPluckAt = 0, musIdx = 0, musChordStart = 0;
-  let musMuted = false, musLevel = 1;
+  // R4: from the preferences file. These were session lets, so N and the two
+  // bracket keys were controls whose effect ended with the tab.
+  let musMuted = sysMuteMusic, musLevel = sysVolMusic;
   let musIntensity = 0, musChaseT = 0, musApplyT = 0;
   // What a hot place is worth to the mix. See the note at the musWant line.
   const sysHEAT_HOLD = 0.70;   // how far full heat slows the chase tail: 2.5 s → 8.3
@@ -12062,15 +12300,23 @@ export function createSystems(game) {
     musPlaceLP.frequency.setTargetAtTime(f, now, 0.16);
     if (musPlacePan) musPlacePan.pan.setTargetAtTime(pan, now, 0.20);
   }
-  function setMusicMuted(m) {
+  // The music half of the three faders. Same contract as setMuted and its
+  // siblings above — `quiet` is the card, silence is not.
+  function setMusicMuted(m, quiet) {
     musMuted = !!m;
+    sysMuteMusic = musMuted;
     musApplyVolume();
-    toast(musMuted ? 'music off' : 'music on');
+    if (!quiet) toast(musMuted ? 'music off' : 'music on');
+    prefsSoon();
+    pauseEcho();
   }
-  function setMusicVolume(v) {
+  function setMusicVolume(v, quiet) {
     musLevel = clamp(v, 0, 1);
+    sysVolMusic = musLevel;
     musApplyVolume();
-    toast('music ' + Math.round(musLevel * 100) + '%');
+    if (!quiet) toast('music ' + Math.round(musLevel * 100) + '%');
+    prefsSoon();
+    pauseEcho();
   }
 
   /**
@@ -12286,7 +12532,11 @@ export function createSystems(game) {
     // also the one sound allowed to play while the world is not running, when
     // there is no room to be in.
     const saved = acMaster;
-    const bus = (acSfxIn && !(opts && opts.ui)) ? acSfxIn : saved;
+    // R4: the fallback for a UI sound — and for a build with no room — is the
+    // SFX BUS, not the master. It was the master, which is the shape that would
+    // have left the menu's own clicks and the whole game on a browser with no
+    // ConvolverNode outside the fader that claims to control them.
+    const bus = (acSfxIn && !(opts && opts.ui)) ? acSfxIn : sysSfxOut();
     let node = null;
     if (placed && c.createStereoPanner) {
       try {
@@ -12340,10 +12590,89 @@ export function createSystems(game) {
   }
   const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0 };
 
-  function setMuted(m) {
-    muted = m;
-    if (acMaster) acMaster.gain.setTargetAtTime(m ? 0.0001 : 0.85, ac.currentTime, 0.05);
-    toast(m ? 'sound off' : 'sound on');
+  /**
+   * THE THREE FADERS AND THE THREE MUTES (R4).
+   *
+   * `quiet` is the pause card's flag and it means "the player is looking at the
+   * control they just moved". A toast for every step of a slider is four toasts
+   * a second on a rail that holds four, so the card says nothing and the KEYS
+   * still do — a key press has no other feedback and must keep its sentence.
+   *
+   * Every one of these writes the preferences file. It is one setItem per
+   * gesture, not per frame: the sliders fire on `input`, which a mouse drag
+   * emits at pointer rate, so the write is debounced by prefsSoon() rather than
+   * called straight — a drag across a slider used to be the only thing in this
+   * game that would have written localStorage sixty times a second.
+   */
+  function setMuted(m, quiet) {
+    muted = !!m;
+    sysMuteMaster = muted;
+    if (acMaster) acMaster.gain.setTargetAtTime(sysMasterGain(), ac.currentTime, 0.05);
+    if (!quiet) toast(muted ? 'sound off' : 'sound on');
+    prefsSoon();
+    pauseEcho();
+  }
+  function setMasterVolume(v, quiet) {
+    sysVolMaster = clamp(v, 0, 1);
+    if (acMaster) acMaster.gain.setTargetAtTime(sysMasterGain(), ac.currentTime, 0.05);
+    if (!quiet) toast('sound ' + Math.round(sysVolMaster * 100) + '%');
+    prefsSoon();
+    pauseEcho();
+  }
+  function setSfxMuted(m, quiet) {
+    sysMuteSfx = !!m;
+    if (acSfxBus) acSfxBus.gain.setTargetAtTime(sysSfxGain(), ac.currentTime, 0.05);
+    if (!quiet) toast(sysMuteSfx ? 'effects off' : 'effects on');
+    prefsSoon();
+    pauseEcho();
+  }
+  function setSfxVolume(v, quiet) {
+    sysVolSfx = clamp(v, 0, 1);
+    if (acSfxBus) acSfxBus.gain.setTargetAtTime(sysSfxGain(), ac.currentTime, 0.05);
+    if (!quiet) toast('effects ' + Math.round(sysVolSfx * 100) + '%');
+    prefsSoon();
+    pauseEcho();
+  }
+  // ONE WRITE PER GESTURE, NOT PER POINTERMOVE. Cheap enough to call from
+  // anything; the timer is cleared and re-armed, so a drag writes once, ~250 ms
+  // after the player lets go of it. Written for real on pagehide as well, since
+  // a tab closed inside that window would otherwise lose the change — the same
+  // lesson the journey file learned in R3, for one twentieth of the bytes.
+  /**
+   * ...AND THE CARD IS A VIEW OF THE BUSES, SO IT HAS TO BE TOLD (R4).
+   *
+   * MEASURED, NOT REASONED. The first build of the card synced on open, on the
+   * settings toggle and from the four audio keys — and nowhere else, so moving
+   * a slider moved the gain and left the number beside it reading 100%, and
+   * pressing a mute changed the bus and left the speaker un-crossed. The probe
+   * did not catch it because it asserted on the graph (which was right) and
+   * only read the card's text after a reload (which rebuilds it). A screenshot
+   * caught it in one frame: three rows saying 100% over three faders, one of
+   * them a third of the way along.
+   *
+   * Every setter calls this. Setting `.value` on an <input> from script does
+   * not fire `input`, so there is no loop back into the handler that called it.
+   */
+  function pauseEcho() { if (pauseShown) pauseSync(); }
+  let prefsT = 0;
+  // sysPrefsWrite lives at module scope (it is read before createSystems runs)
+  // and saveSayDegraded does not, so the two call sites below are where the
+  // news crosses over. A settings file that will not write is the same fact as
+  // a journey that will not write, and on a size-dependent quota it is the
+  // first — often the only — component to find out. Idempotent by construction:
+  // saveSayDegraded spends each sentence once, however often it is asked.
+  function prefsPut() {
+    sysPrefsWrite();
+    if (sysPrefsOff) saveSayDegraded();
+  }
+  function prefsSoon() {
+    if (prefsT) clearTimeout(prefsT);
+    prefsT = setTimeout(function () { prefsT = 0; prefsPut(); }, 250);
+  }
+  function prefsFlush() {
+    if (!prefsT) return;
+    clearTimeout(prefsT); prefsT = 0;
+    prefsPut();
   }
 
   // =========================================================================
@@ -13045,6 +13374,320 @@ export function createSystems(game) {
   hudRoot.appendChild(jrEl);
   let jrShown = false, jrDepart = false;
 
+  // =========================================================================
+  // THE PAUSE CARD (R4) — the frame around the game
+  //
+  // WHAT WAS HERE BEFORE: nothing. Escape opened the departures board, which
+  // pauses, so the game had a pause the way a room has a light switch behind a
+  // wardrobe. There was no resume, no settings surface of any kind, no route
+  // back to the title short of finishing all 231 ticks or pressing F5, and the
+  // whole audio interface was four unlabelled keys — M, N, [ and ] — that
+  // nothing in the game has ever mentioned, controlling one hard-coded master
+  // and one music level, neither of which survived a reload.
+  //
+  // FOUR DOORS AND THREE FADERS. The doors are resume, settings, the journal
+  // (which is where travel and the ledger and the album already live, so this
+  // card does not grow a second copy of any of them) and quit-to-title, which
+  // asks first. The faders are master, music and effects — the three buses in
+  // the graph, one row each, each with its own mute.
+  //
+  // IT IS ITS OWN MODAL AND IT OBEYS THE SAME FOUR RULES the other three do:
+  // inert while hidden so Tab cannot walk into it; `paused` while shown;
+  // focus captured on open and returned on close; and Escape backs out of the
+  // innermost thing first — the quit question, then the card.
+  // =========================================================================
+  const pauseEl = sysEl('div', 'capyui-pause');
+  const pauseCard = sysEl('div', 'capyui-pausecard');
+  pauseCard.setAttribute('role', 'dialog');
+  pauseCard.setAttribute('aria-modal', 'true');
+  pauseCard.setAttribute('aria-label', 'Paused');
+  pauseCard.tabIndex = -1;
+  pauseCard.appendChild(sysEl('h2', null, 'Paused'));
+  const pauseSub = sysEl('div', 'capyui-pausesub', '');
+  pauseCard.appendChild(pauseSub);
+
+  const pauseMenu = sysEl('div', 'capyui-pausemenu');
+  function pauseBtn(cls, label, onGo) {
+    const b = sysEl('button', 'capyui-pausebtn' + (cls ? ' ' + cls : ''), label);
+    b.type = 'button';
+    // pointerdown is stopped, never handled: the veil closes the card on a
+    // pointerdown that reaches it, and a press that begins on a button must not
+    // also be a press on the backdrop behind it.
+    b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onGo(); });
+    pauseMenu.appendChild(b);
+    return b;
+  }
+  const pauseGo = pauseBtn('go', 'resume', function () { pauseHide(); });
+  const pauseSetBtn = pauseBtn('', 'settings', function () { pauseSetToggle(); });
+  pauseBtn('', 'the journey so far', function () {
+    // Same order as the journal's own ledger button, and for the same reason
+    // (see the note there): capture the focused control BEFORE anything blurs
+    // it, or a keyboard player who opens the board from here and closes it
+    // again is returned to BODY with both cards shut behind them.
+    const from = document.activeElement;
+    pauseHide();
+    jrShow(false);
+    if (from && from !== document.body) jrReturnFocus = from;
+  });
+  const pauseQuitBtn = pauseBtn('warn', 'quit to the title', function () { pauseAskOpen(); });
+  pauseSetBtn.setAttribute('aria-expanded', 'false');
+  pauseCard.appendChild(pauseMenu);
+
+  // ---- the question, and it is the only destructive control on the card ----
+  // The journey is SAFE across this — R3 gave the game a flush and this calls
+  // it — so the copy says what actually happens rather than warning about
+  // something that will not. It still asks, because "quit" next to "resume" is
+  // a mis-click waiting to happen and the cost of the mis-click is a reload.
+  const pauseAsk = sysEl('div', 'capyui-pauseask');
+  pauseAsk.hidden = true;
+  pauseAsk.setAttribute('role', 'group');
+  pauseAsk.setAttribute('aria-label', 'quit to the title — are you sure?');
+  pauseAsk.appendChild(sysEl('div', 'capyui-pauseaskline',
+    'this journey is saved. the title card will have it under "carry on", ' +
+    'exactly where you are standing now.'));
+  const pauseAskRow = sysEl('div', 'capyui-pauseaskrow');
+  const pauseAskYes = sysEl('button', null, 'quit to the title');
+  pauseAskYes.type = 'button';
+  const pauseAskNo = sysEl('button', null, 'stay here');
+  pauseAskNo.type = 'button';
+  pauseAskRow.appendChild(pauseAskYes);
+  pauseAskRow.appendChild(pauseAskNo);
+  pauseAsk.appendChild(pauseAskRow);
+  pauseCard.appendChild(pauseAsk);
+
+  // ---- the settings block --------------------------------------------------
+  const pauseSet = sysEl('div', 'capyui-set');
+  pauseSet.hidden = true;
+  let pauseSetOpen = false;
+  /**
+   * One fader row: a name, a real <input type=range>, a mute and a number.
+   *
+   * THE RANGE IS NATIVE ON PURPOSE. It is the one control on this card that
+   * must not be hand-built out of divs: the native one is already keyboard
+   * operable, already announces its name and its value, already has a step and
+   * an ARIA role, and is already understood by every assistive layer and every
+   * browser's own pad mapping. Only its skin is ours.
+   */
+  /** The cone, the two arcs and the cross. The arcs and the cross are the only
+   *  parts that move, so both are drawn once and shown by a class. */
+  function pauseSpeaker() {
+    const s = document.createElementNS(sysMARK_NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('aria-hidden', 'true');
+    s.setAttribute('focusable', 'false');
+    const path = function (d, cls) {
+      const n = document.createElementNS(sysMARK_NS, 'path');
+      n.setAttribute('d', d);
+      n.setAttribute('fill', 'none');
+      n.setAttribute('stroke', 'currentColor');
+      n.setAttribute('stroke-width', '1.9');
+      n.setAttribute('stroke-linecap', 'round');
+      n.setAttribute('stroke-linejoin', 'round');
+      if (cls) n.setAttribute('class', cls);
+      s.appendChild(n);
+    };
+    path('M4 9.4h3.4L12 5.6v12.8L7.4 14.6H4z');   // the box and the cone
+    path('M15.6 9.6a3.4 3.4 0 0 1 0 4.8', 'wave');
+    path('M18 7.2a6.8 6.8 0 0 1 0 9.6', 'wave');
+    path('M16.4 9.6l5 4.8M21.4 9.6l-5 4.8', 'cross');
+    return s;
+  }
+  function pauseFader(name, get, getMute, set, setMute) {
+    const row = sysEl('div', 'capyui-setrow');
+    row.appendChild(sysEl('div', 'capyui-setname', name));
+    const rng = document.createElement('input');
+    rng.type = 'range';
+    rng.className = 'capyui-setrange';
+    rng.min = '0'; rng.max = '100'; rng.step = '1';
+    rng.setAttribute('aria-label', name + ' volume');
+    const val = sysEl('div', 'capyui-setval', '');
+    const mute = sysEl('button', 'capyui-setmute');
+    mute.type = 'button';
+    // A DRAWN SPEAKER, NOT AN EMOJI. The first build of this card used 🔊/🔇,
+    // which renders as a full-colour system glyph — two saturated blue-grey
+    // icons per row, three rows, on hand-drawn cream paper. It was the only
+    // thing on the screenshot that did not belong to this game. One 14 px path
+    // in currentColor inherits the row's ink and the accent when it is muted,
+    // and it is the same idiom every other picture in this HUD uses.
+    mute.appendChild(pauseSpeaker());
+    // `input`, not `change`: a fader that only moves the bus when you LET GO is
+    // a fader you cannot hear yourself setting, which is the whole job of it.
+    // Quiet, because the card is the feedback — see the note on setMuted.
+    rng.addEventListener('input', function () { set(+rng.value / 100, true); });
+    rng.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    mute.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    mute.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      setMute(!getMute(), true);
+      // The one sound a muted bus is allowed to make is the click of its own
+      // mute coming OFF. `ui` so it is heard over a paused world.
+      if (!getMute()) sfx('tick', { volume: 0.3, pitch: 1.7, ui: true, force: true });
+    });
+    row.appendChild(rng); row.appendChild(mute); row.appendChild(val);
+    pauseSet.appendChild(row);
+    return { rng: rng, val: val, mute: mute, get: get, getMute: getMute };
+  }
+  const pauseRows = [
+    pauseFader('sound', function () { return sysVolMaster; }, function () { return muted; },
+               setMasterVolume, setMuted),
+    pauseFader('music', function () { return musLevel; }, function () { return musMuted; },
+               setMusicVolume, setMusicMuted),
+    pauseFader('effects', function () { return sysVolSfx; }, function () { return sysMuteSfx; },
+               setSfxVolume, setSfxMuted),
+  ];
+  // ---- and the calm switch, which is the reason shared.js grew a channel ----
+  const pauseCalm = sysEl('label', 'capyui-setcalm');
+  const pauseCalmBox = document.createElement('input');
+  pauseCalmBox.type = 'checkbox';
+  pauseCalm.appendChild(pauseCalmBox);
+  pauseCalm.appendChild(document.createTextNode('less motion'));
+  pauseCalm.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  pauseCalmBox.addEventListener('change', function () {
+    // An explicit true/false from here, never back to null: the player has now
+    // touched the switch, and a checkbox that silently reverts to following the
+    // operating system the next time it agrees with it is a checkbox that
+    // forgets. (The tri-state still exists — it is what a file with no `c` in
+    // it means, and it is what everybody who never opens this card gets.)
+    calmSet(pauseCalmBox.checked);
+    sysCalmApply();
+    prefsSoon();
+  });
+  pauseSet.appendChild(pauseCalm);
+  pauseSet.appendChild(sysEl('div', 'capyui-setnote',
+    'kept on this machine, not in the journey.'));
+  pauseCard.appendChild(pauseSet);
+  pauseCard.appendChild(sysEl('div', 'capyui-pausefoot', 'esc to resume'));
+  pauseEl.appendChild(pauseCard);
+  pauseEl.inert = true;
+  hudRoot.appendChild(pauseEl);
+  let pauseShown = false, pauseReturnFocus = null;
+
+  /**
+   * PUT THE CALM SWITCH ON THE DOCUMENT.
+   *
+   * The JS readers all go through calmOn() and need nothing. The CSS cannot:
+   * the sheet's reduce-motion rules are inside a media query, which asks the
+   * operating system and cannot be told anything by a checkbox. One class on
+   * <html>, and the sheet carries the same rules a second time under it.
+   */
+  function sysCalmApply() {
+    try { document.documentElement.classList.toggle('capy-calm', calmOn()); }
+    catch (e) { /* no document is not a crash */ }
+  }
+  sysCalmApply();
+
+  function pauseSetToggle(force) {
+    pauseSetOpen = force === undefined ? !pauseSetOpen : !!force;
+    pauseSet.hidden = !pauseSetOpen;
+    pauseSetBtn.setAttribute('aria-expanded', pauseSetOpen ? 'true' : 'false');
+    // FOCUS STAYS ON THE BUTTON THAT OPENED IT. Moving it into the first
+    // slider drew a focus ring around the SOUND row the moment the panel
+    // appeared, which reads as "this row is selected" on a card where nothing
+    // is selectable — measured off the first screenshot of it. The panel opens
+    // directly beneath this button, so Tab already walks straight into it.
+    if (pauseSetOpen) pauseSync();
+  }
+  function pauseAskOpen() {
+    pauseAsk.hidden = false;
+    pauseQuitBtn.hidden = true;
+    // Focus lands on STAY, never on the door out — the same rule the title
+    // card's "start over" follows, and for the same reason.
+    try { pauseAskNo.focus(); } catch (e) {}
+  }
+  function pauseAskShut() {
+    if (pauseAsk.hidden) return false;
+    pauseAsk.hidden = true;
+    pauseQuitBtn.hidden = false;
+    try { pauseQuitBtn.focus(); } catch (e) {}
+    return true;
+  }
+  pauseAskNo.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  pauseAskNo.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation(); pauseAskShut();
+  });
+  pauseAskYes.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  pauseAskYes.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    // THE TWO FILES GO DOWN BEFORE THE PAGE DOES. `pagehide` would fire on the
+    // reload anyway and R3's handler would catch the journey — but the settings
+    // debounce is a 250 ms timer that a reload simply deletes, so a player who
+    // moves a slider and immediately quits would have lost the change they had
+    // just made. Both, explicitly, in the order that matters least.
+    saveFlush();
+    prefsFlush();
+    location.reload();
+  });
+
+  /** Write the live audio state on to the card. Called on open, on toggle, and
+   *  by the four audio keys, which may be pressed while it is up. */
+  function pauseSync() {
+    for (let i = 0; i < pauseRows.length; i++) {
+      const r = pauseRows[i];
+      const v = Math.round(r.get() * 100);
+      // Never write the slider a player is dragging: setting .value mid-drag on
+      // some engines snaps the thumb to the rounded number under the pointer.
+      if (document.activeElement !== r.rng || +r.rng.value !== v) r.rng.value = String(v);
+      const m = !!r.getMute();
+      r.val.textContent = m ? '—' : v + '%';
+      r.mute.classList.toggle('off', m);
+      r.mute.setAttribute('aria-pressed', m ? 'true' : 'false');
+      r.mute.setAttribute('aria-label', (m ? 'unmute ' : 'mute ') + r.rng.getAttribute('aria-label'));
+    }
+    pauseCalmBox.checked = calmOn();
+  }
+
+  function pauseShow() {
+    if (pauseShown) return;
+    pauseShown = true;
+    // WHERE AM I AND HOW LONG HAVE I BEEN HERE. The two questions a pause card
+    // is opened with, and the clock is frozen at the moment of opening because
+    // the world is: a counter running behind a paused game is the one thing on
+    // this card that could be actively wrong.
+    const d = game.biome ? chapterDef(chapterOf(game.biome.current)) : null;
+    const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+    pauseSub.textContent = (d ? d.name : '') + '  ·  ' + sysFmtTime(total);
+    pauseAskShut();
+    pauseSync();
+    pauseEl.inert = false;
+    pauseEl.classList.add('show');
+    game.state.paused = true;
+    pauseReturnFocus = document.activeElement;
+    try { pauseGo.focus(); } catch (e) {}
+    // ---- LET GO OF EVERYTHING (the blur handler's argument, indoors) ------
+    // A player pauses mid-sprint, and the card then eats the keyboard — so the
+    // keyup for the W they are holding arrives at a window listener that is
+    // still live and all is well, but the mouse button they were dragging the
+    // camera with, and any half-finished pinch, have no such guarantee. Same
+    // clear the blur handler does, for the same reason: nothing may still be
+    // held down across a card that took the input away.
+    for (const k in keys) keys[k] = false;
+    mouseAction = false; dragId = -1;
+    sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
+    touchSlide = false; touchBack = false;
+    sysBufClearAll();
+  }
+  function pauseHide() {
+    if (!pauseShown) return;
+    pauseShown = false;
+    pauseEl.classList.remove('show');
+    pauseEl.inert = true;
+    pauseAskShut();
+    if (pauseReturnFocus && pauseReturnFocus.focus) {
+      try { pauseReturnFocus.focus(); } catch (e) {}
+    }
+    pauseReturnFocus = null;
+    // The same clause the other three modals use: this card is not the only
+    // thing that can be holding the world still.
+    if (!document.hidden && !jrShown && !ledShown && !albShown) game.state.paused = false;
+  }
+  function pauseToggle() { if (pauseShown) pauseHide(); else pauseShow(); }
+  // A press on the veil is a press on "not the card", which is resume. The
+  // buttons stop their own pointerdown, so this cannot fire from inside.
+  pauseEl.addEventListener('pointerdown', function (e) {
+    if (e.target === pauseEl) pauseHide();
+  });
+
   // --- to-do list ---
   const todoEl = sysEl('div', 'capyui-todo');
   const todoHeadEl = sysEl('h2', null, 'To do');
@@ -13406,7 +14049,7 @@ export function createSystems(game) {
     // the eye reads as the shutter, whatever happens to the file. Not under
     // prefers-reduced-motion — the CSS pins it to zero there anyway, and this
     // saves two class writes and a timer for a sheet that will not be drawn.
-    if (!sysCalmMotion) {
+    if (!sysCalmOn()) {
       photoFlash.classList.add('show');
       setTimeout(function () { photoFlash.classList.remove('show'); }, 40);
     }
@@ -13525,11 +14168,11 @@ export function createSystems(game) {
   // marker that says where to go next is neither: it is a radius computed from
   // game.state.time inside mapDraw. A player who has asked for less motion was
   // still getting a ring throbbing at four hertz in the corner of the screen.
-  // Read once — this is a preference, not a per-frame question — and the pulse
-  // becomes a steady ring that says exactly the same thing.
-  const mapCalm = !!(window.matchMedia &&
-                     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  function mapPulse(amp) { return mapCalm ? 0 : Math.sin(game.state.time * 4) * amp; }
+  // ...and it asks the one place that knows (R4), rather than reading the media
+  // query a second time: this had its own copy of the probe, so the pause card's
+  // calm switch would have moved everything decorative in the game EXCEPT the
+  // ring in the corner — the one thing on the screen that was pulsing.
+  function mapPulse(amp) { return sysCalmOn() ? 0 : Math.sin(game.state.time * 4) * amp; }
   const mapC = {                     // colours, resolved once
     water: sysHex(PALETTE.water), deep: sysHex(PALETTE.seaMid),
     lowLand: sysHex(PALETTE.sand), midLand: sysHex(PALETTE.leafC),
@@ -14099,7 +14742,9 @@ export function createSystems(game) {
     albEl.inert = true;
     if (albReturnFocus && albReturnFocus.focus) { try { albReturnFocus.focus(); } catch (e) {} }
     albReturnFocus = null;
-    if (!document.hidden && !jrShown) game.state.paused = false;
+    // ...and the pause card is a fourth thing that can be holding the world
+    // still. See the note in pauseHide.
+    if (!document.hidden && !jrShown && !pauseShown) game.state.paused = false;
   }
   /**
    * Called after a shot is kept, so an open card grows a picture live — and so
@@ -14432,7 +15077,9 @@ export function createSystems(game) {
     ledEl.inert = true;
     if (ledReturnFocus && ledReturnFocus.focus) { try { ledReturnFocus.focus(); } catch (e) {} }
     ledReturnFocus = null;
-    if (!document.hidden && !jrShown) game.state.paused = false;
+    // ...and the pause card is a fourth thing that can be holding the world
+    // still. See the note in pauseHide.
+    if (!document.hidden && !jrShown && !pauseShown) game.state.paused = false;
   }
   ledEl.addEventListener('pointerdown', function (e) {
     // At the true end, a tap anywhere still does what it always did.
@@ -14849,7 +15496,7 @@ export function createSystems(game) {
     jrEl.inert = true;
     if (jrReturnFocus && jrReturnFocus.focus) { try { jrReturnFocus.focus(); } catch (e) {} }
     jrReturnFocus = null;
-    if (!document.hidden) game.state.paused = false;
+    if (!document.hidden && !ledShown && !albShown && !pauseShown) game.state.paused = false;
   }
   function jrToggle() { if (jrShown) jrHide(); else jrShow(false); }
 
@@ -16190,13 +16837,35 @@ export function createSystems(game) {
    * four and an arrival is already using some of them.
    */
   function saveSayDegraded() {
-    if (sysSaveSaid) return;
-    sysSaveSaid = true;
-    // ASK BEFORE SPEAKING. Reading works in a Safari private window and WRITING
-    // is what throws there, so a flag set only by saveRead would stay false in
-    // the exact case this sentence exists for — and the first real write may be
-    // a whole chapter away, since Sydney emits no biome:enter to nudge one.
-    if (!sysSaveOff) {
+    // ---- ONE LATCH PER SENTENCE, NOT ONE LATCH FOR THE FUNCTION ------------
+    // This was a single `sysSaveSaid` guard on the whole function, and it made
+    // the function almost unreachable in the case it was written for. It is
+    // called once from startGame, at +700 ms — long before anything has tried
+    // to WRITE. On a store that is full rather than absent, the first failing
+    // write happens minutes later (saveWrite's catch calls back in here, and
+    // R4's prefs writer is later still), by which time the global latch had
+    // already been set by a call that found nothing wrong and said nothing.
+    // Measured: a size-dependent quota — accept two bytes, reject ninety, which
+    // is what a nearly-full store actually does — was completely silent.
+    //
+    // So the function is now IDEMPOTENT rather than once-only: every caller may
+    // call it as often as it likes, and each sentence is spent the first time
+    // it is true. `sysSaveSaid` remains as the probe's own latch, because
+    // probing storage on every failing write would be a write per write.
+    //
+    // R4's `sysPrefsOff` is folded in here rather than given a fourth sentence:
+    // there is only one thing to say about a browser that will not keep a file,
+    // and the prefs writer is simply another way of finding it out — on a
+    // size-dependent quota, the ONLY way, since the probe below writes two
+    // bytes and gets away with it.
+    if (sysPrefsOff) sysSaveOff = true;
+    // ASK BEFORE SPEAKING, ONCE. Reading works in a Safari private window and
+    // WRITING is what throws there, so a flag set only by saveRead would stay
+    // false in the exact case this sentence exists for — and the first real
+    // write may be a whole chapter away, since Sydney emits no biome:enter to
+    // nudge one.
+    if (!sysSaveOff && !sysSaveSaid) {
+      sysSaveSaid = true;
       try {
         localStorage.setItem('capy3.probe', '1');
         localStorage.removeItem('capy3.probe');
@@ -16206,11 +16875,22 @@ export function createSystems(game) {
     const say = function (text) {
       setTimeout(function () { toast(text); }, 2600 + (n++) * 3000);
     };
-    if (sysSaveOff) say('this browser will not let the game keep a file — this journey lasts as long as the tab does.');
-    else if (sysSaveHurt) say('a saved journey here could not be read. it has been set aside, not deleted.');
+    if (sysSaveOff && !sysSaidStore) {
+      // Saying both would be unkind and confusing: a store that cannot be
+      // written cannot be reassured about, so the quarantine line is spent
+      // rather than queued behind it.
+      sysSaidStore = true; sysSaidHurt = true;
+      say('this browser will not let the game keep a file — this journey lasts as long as the tab does.');
+    } else if (sysSaveHurt && !sysSaidHurt) {
+      sysSaidHurt = true;
+      say('a saved journey here could not be read. it has been set aside, not deleted.');
+    }
     let soft = null;
     try { soft = window.__capySoftGL || null; } catch (e) { soft = null; }
-    if (soft) say('this machine is drawing without its graphics card. it will run, but slowly.');
+    if (soft && !sysSaidSoft) {
+      sysSaidSoft = true;
+      say('this machine is drawing without its graphics card. it will run, but slowly.');
+    }
   }
   function saveWrite() {
     savePending = false;
@@ -18139,7 +18819,7 @@ export function createSystems(game) {
     // K is in the fold on the title card, so for many players this is the
     // first time they learn the camera exists at all.
     setTimeout(function () {
-      if (ledShown || albShown || jrShown) return;
+      if (ledShown || albShown || jrShown || pauseShown) return;
       if (!game.biome || chapterOf(game.biome.current) !== n) return;
       if (albBest(def.biome)) return;
       toast('no picture of ' + def.name + ' yet · K, then Enter');
@@ -18257,10 +18937,10 @@ export function createSystems(game) {
   function shake(a) {
     if (!(a > sysSHAKE_MIN)) return;
     // A player who asked the operating system for less motion asked for this
-    // one before anything else in the file. sysCalmMotion was already honoured
+    // one before anything else in the file. sysCalmOn() was already honoured
     // by the minimap sweep and the glitter on eight seas and was never wired to
     // the one effect that actually moves the whole frame.
-    if (sysCalmMotion) return;
+    if (sysCalmOn()) return;
     shakeAmt = clamp(shakeAmt + a, 0, sysSHAKE_MAX);
   }
 
@@ -18282,7 +18962,7 @@ export function createSystems(game) {
     if (!(a > 0)) return;
     shake(a);
     const m = clamp(a / sysSHAKE_MAX, 0, 1);
-    if (!sysCalmMotion) fovKickV += sysFOV_KICK_D * m * 12;
+    if (!sysCalmOn()) fovKickV += sysFOV_KICK_D * m * 12;
     // The fourth channel, and the only one the player feels in their hands.
     padRumble(a);
     if (freeze !== false && m > sysPUNCH_MIN && game.time) {
@@ -18536,6 +19216,34 @@ export function createSystems(game) {
       if (c === 'Tab') e.preventDefault();
       return;
     }
+    // ---- AND SO DOES THE PAUSE CARD (R4), WITH ONE DIFFERENCE -------------
+    // It does NOT eat Tab. The ledger and the album have nothing focusable in
+    // them, so Tab there could only walk the browser's focus order out of the
+    // back of a modal; this card is four buttons, three sliders and a checkbox,
+    // and Tab is how a keyboard player reaches the second of them. `inert` on
+    // everything else in the HUD is what keeps that walk inside the card.
+    //
+    // Everything else IS eaten, including the movement keys: a key latched here
+    // has no keyup while the card holds the pointer, and the capybara would
+    // resume mid-sprint on a key the player let go of two minutes ago.
+    if (pauseShown) {
+      if (c === 'Escape') {
+        e.preventDefault();
+        // The innermost thing first: the quit question, then the card.
+        if (!pauseAskShut()) pauseHide();
+        return;
+      }
+      if (c === 'Tab') return;
+      // The four audio keys keep working while the card that owns them is up —
+      // they are the same four settings, and a player who knows M should not
+      // have to close the settings to use it. The card follows, through the
+      // same pauseEcho() every setter calls.
+      if (c === 'KeyM') { setMuted(!muted, true); return; }
+      if (c === 'KeyN') { setMusicMuted(!musMuted, true); return; }
+      if (c === 'BracketLeft')  { setMusicVolume(musLevel - 0.1, true); return; }
+      if (c === 'BracketRight') { setMusicVolume(musLevel + 0.1, true); return; }
+      return;
+    }
     // TAB OPENS IT AND THEN GETS OUT OF THE WAY.
     // Tab was the toggle in both directions, which meant that once the board was
     // open the one key a keyboard player needs to move between the destinations
@@ -18555,8 +19263,11 @@ export function createSystems(game) {
     if (jrShown && c === 'Escape') { jrHide(); return; }
     // ESCAPE IS THE PAUSE KEY IN EVERY GAME EVER MADE, and here it did nothing
     // at all unless the board was already open — so the one key a player reaches
-    // for when the doorbell goes left the capybara stood in traffic. It opens
-    // the same card, which already pauses, and Escape then closes it again.
+    // for when the doorbell goes left the capybara stood in traffic. It used to
+    // open the JOURNAL, which pauses and was therefore a pause of sorts: a card
+    // with nineteen destinations on it, no resume, no settings and no way back
+    // to the title. R4 gives it the card it was always asking for; the board
+    // keeps Tab and J, and is one press away from here.
     if (started && c === 'Escape') {
       e.preventDefault();
       // ---- AND IT PUTS THE CAMERA AWAY FIRST ---------------------------
@@ -18568,7 +19279,7 @@ export function createSystems(game) {
       // Escape is the key a player reaches for when the doorbell goes: it
       // should back out of the innermost thing first.
       if (photoOn) { photoSet(false); return; }
-      jrShow(false);
+      pauseShow();
       return;
     }
     // THE BOARD RUNS OUT OF DIGITS AT NINE AND THE GAME DOES NOT.
@@ -18623,6 +19334,10 @@ export function createSystems(game) {
     // Move the arrow to the next thing you have not done. See todoStep.
     if (c === 'KeyF' && started) todoStep(e.shiftKey ? -1 : 1);
     if (c === 'ShiftLeft' || c === 'ShiftRight') input.run = true;
+    // The four audio keys, kept exactly as they were — they are muscle memory
+    // for anybody who has played this before R4 put the same four settings on a
+    // card. They speak (the toast is their only feedback) and they now persist,
+    // because every one of these setters writes the preferences file.
     if (c === 'KeyM') setMuted(!muted);
     if (c === 'KeyN') setMusicMuted(!musMuted);
     if (c === 'BracketLeft') setMusicVolume(musLevel - 0.2);
@@ -18969,8 +19684,13 @@ export function createSystems(game) {
     // ---- and the two cards ------------------------------------------------
     const start = padBtn(g, 9), back = padBtn(g, 8);
     if (start && !padWasStart) {
+      // START IS PAUSE ON EVERY PAD EVER MADE (R4). It opened the departures
+      // board, which is a menu of nineteen destinations and no way to resume —
+      // and a pad player could not reach a volume, a calm switch or the title
+      // from anywhere at all, because all four of those were keyboard letters.
+      // The board is still one press away, on the card.
       if (!started) { startResume(); }
-      else jrToggle();
+      else pauseToggle();
     }
     if (back && !padWasBack && started) {
       if (photoOn) photoSet(false);      // same door as KeyP, same reason
@@ -19062,7 +19782,7 @@ export function createSystems(game) {
     // FROZEN UNDER prefers-reduced-motion, like the minimap already is. The
     // sparkle is a decorative loop that never stops and never asks; the specks
     // stay where they are and the water still reads as water.
-    grainTick(sysCalmMotion ? 12.5 : game.state.time);
+    grainTick(sysCalmOn() ? 12.5 : game.state.time);
     // ...and twelve vec4s, and everything in the live chapter stops floating.
     // Same deal as the sparkle clock: the pool is a shared uniform block, so
     // this is the entire per-frame cost of contact on every grained surface in
@@ -19086,7 +19806,7 @@ export function createSystems(game) {
     // holding the CLOCK rather than the strength: a world stopped mid-gust
     // still leans the way the wind is blowing, where one stopped at zero
     // strength snaps upright the moment the setting is read.
-    swayTick(sysCalmMotion ? 7.5 : game.state.time,
+    swayTick(sysCalmOn() ? 7.5 : game.state.time,
              game.weather ? game.weather.gust() : null);
     // ---- ...AND THE ANIMAL, WHICH IS THE OTHER THING THAT MOVES ---------
     // See THE WAKE in shared.js. Frozen with the wind under reduced motion —
@@ -19096,7 +19816,7 @@ export function createSystems(game) {
     {
       const cp = game.capy;
       const cv = cp && cp.body && cp.body.velocity;
-      const off = sysCalmMotion || !cp || cp.carriedBy || cp.atHelm || cp.diving ||
+      const off = sysCalmOn() || !cp || cp.carriedBy || cp.atHelm || cp.diving ||
                   (game.condor && game.condor.mounted);
       if (off || !cv) wakeTick(0, 0, 0);
       else wakeTick(cp.position.x, cp.position.z, Math.hypot(cv.x, cv.z));
@@ -20146,7 +20866,7 @@ export function createSystems(game) {
   // pass through a flush. NOT `beforeunload`: it is unreliable on mobile, it is
   // ignored inside a bfcache, and adding a listener for it disqualifies the page
   // from the bfcache on some browsers — a real cost for a worse guarantee.
-  addEventListener('pagehide', function () { saveFlush(); });
+  addEventListener('pagehide', function () { saveFlush(); prefsFlush(); });
   document.addEventListener('visibilitychange', function () {
     // The journal/departures board paused the game itself — coming back to the
     // tab must not unpause the world behind an open modal.
@@ -20154,7 +20874,7 @@ export function createSystems(game) {
     // and a restore that only knew about jrShown ran the world — physics,
     // incidents, the sfx gate — behind an open ledger or album for as long as
     // it stayed open.
-    game.state.paused = document.hidden || jrShown || ledShown || albShown;
+    game.state.paused = document.hidden || jrShown || ledShown || albShown || pauseShown;
     if (document.hidden) {
       // ---- THE SAVE, BEFORE THE FRAMES STOP (R3) --------------------------
       // FIRST, above everything else in this branch. The debounce is drained by
@@ -20162,6 +20882,11 @@ export function createSystems(game) {
       // the file gets: on every desktop and every phone, "backgrounded" is the
       // state a tab is in when it is closed, discarded or killed for memory.
       saveFlush();
+      // ...AND THE SETTINGS FILE ON THE SAME TERMS. prefsSoon() is a 250 ms
+      // timer and a backgrounded tab is the state a tab is killed in, so a
+      // slider moved with the card still open — the one window pauseHide does
+      // not already cover — would otherwise be lost. Same one line as the save.
+      prefsFlush();
       ambientSet(false);
       // Held keys can never produce a keyup while hidden — clear them or the
       // capybara sprints off on its own the moment the tab comes back.
@@ -20862,6 +21587,34 @@ export function createSystems(game) {
     setMusicMuted: setMusicMuted,
     setMusicVolume: setMusicVolume,
     musicVolume: function () { return musMuted ? 0 : musLevel; },
+    // ---- R4: THE PAUSE CARD AND THE THREE BUSES -------------------------
+    // `pause` is here for the touch HUD (R5), which needs one call to reach
+    // pause, travel, the journal and the volume — they are all on this card.
+    pause: pauseToggle,
+    pauseShown: function () { return pauseShown; },
+    setMasterVolume: setMasterVolume,
+    setSfxVolume: setSfxVolume,
+    setSfxMuted: setSfxMuted,
+    calmOn: calmOn,
+    /**
+     * WHAT THE THREE FADERS ACTUALLY DID, read off the graph.
+     *
+     * A probe that asserts on the slider's own value proves the slider moved,
+     * which is not the question — every one of the settings bugs this batch
+     * fixes was a control writing a number nobody read. `gain.value` is the
+     * scheduled value, so it is read after the 50 ms ramp has landed. Null
+     * before the first gesture, when there is no AudioContext at all.
+     */
+    audioBuses: function () {
+      return {
+        ac: !!ac,
+        master: acMaster ? acMaster.gain.value : null,
+        music: musVol ? musVol.gain.value : null,
+        sfx: acSfxBus ? acSfxBus.gain.value : null,
+        levels: { master: sysVolMaster, music: musLevel, sfx: sysVolSfx },
+        mutes: { master: muted, music: musMuted, sfx: sysMuteSfx },
+      };
+    },
   };
 
   /**
@@ -22052,7 +22805,7 @@ export function createSystems(game) {
     // target, and continuous in `time` so it can never jump between frames.
     // Weighted by the rest blend normalised to 0..1, so it fades up with the
     // wide shot and is gone with it. See sysREST_BR_XZ.
-    if (skyRestT > 0.002 && !sysCalmMotion) {
+    if (skyRestT > 0.002 && !sysCalmOn()) {
       const bw = skyRestT / sysREST_W, bt = game.state.time;
       camera.position.x += Math.sin(bt * sysREST_BR_A) * sysREST_BR_XZ * bw;
       camera.position.z += Math.cos(bt * sysREST_BR_B) * sysREST_BR_XZ * bw;
@@ -22094,7 +22847,7 @@ export function createSystems(game) {
       // on game.time.slow. This term is exactly zero in all but the few hundred
       // frames a session where a marquee has actually landed.
       const slow = 1 - clamp(game.time ? game.time.slow : 1, 0, 1);
-      const breathe = sysCalmMotion ? 0 : 1;
+      const breathe = sysCalmOn() ? 0 : 1;
       // ---- AND THE FLOW, WHICH IS NOT THE SPEED TERM AGAIN ---------------
       // fovSpeed is a fact about this frame and follows the speedometer up and
       // down inside a second. The flow is the STREAK, so this term arrives

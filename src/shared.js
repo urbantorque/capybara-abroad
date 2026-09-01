@@ -4066,3 +4066,33 @@ export function placeCue(o, x, y, z, far) {
   p.far = f + 46;
   return p;
 }
+
+// ===========================================================================
+// LESS MOTION, AND ONE PLACE THAT KNOWS (R4)
+//
+// THREE MODULES HAD THREE COPIES OF THE SAME MEDIA QUERY. systems.js read it
+// into `sysCalmMotion`, the minimap read it AGAIN into its own `mapCalm`, and
+// weather.js read it a third time into `wxCalm` — all three as module consts,
+// resolved at load. That was tolerable while the only writer was the operating
+// system and the answer could never change; the moment R4 put a switch on the
+// pause card it became the classic shape this codebase has paid for before
+// (see the reference-frames note): a setting that moves four of the five things
+// it names and silently leaves the fifth — here, two hundred tumbling petals
+// and a pulsing ring in the corner — running at full tilt.
+//
+// One channel. `calmSys` is what the machine asked for, read once. `calmPref`
+// is what the player asked for, and `null` — the default — means "whatever the
+// machine said", which is bit-for-bit the behaviour every one of those three
+// consts had. Everything decorative that loops for ever calls calmOn().
+// ===========================================================================
+export const calmSys = !!(typeof window !== 'undefined' && window.matchMedia &&
+                          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+let calmPref = null;
+export function calmOn() { return calmPref === null ? calmSys : !!calmPref; }
+/** null follows the system; true/false override it. Returns the live answer. */
+export function calmSet(v) {
+  calmPref = (v === null || v === undefined) ? null : !!v;
+  return calmOn();
+}
+/** What the player chose, NOT what is in force — the switch's own state. */
+export function calmPreference() { return calmPref; }

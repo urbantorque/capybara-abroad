@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE, mat, rand, clamp, damp } from './shared.js';
+import { PALETTE, mat, rand, clamp, damp, calmOn } from './shared.js';
 
 // ===========================================================================
 // THE GLOBAL ENVIRONMENT — a biome's mood is FIXED, and it breathes anyway.
@@ -66,11 +66,13 @@ const wxLight = {
 };
 const wxBed = { rain: 0, wind: 0, chirp: 0, drip: 0, rustle: 0, thunder: 0 };
 
-// Read once, exactly as sysCalmMotion is. Everything decorative that loops for
-// ever has to check this, and a field of two hundred tumbling petals is the
-// most decorative thing in the game.
-const wxCalm = !!(typeof window !== 'undefined' && window.matchMedia &&
-                  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+// ASKED, NOT CACHED (R4). This was a module const holding its own copy of the
+// prefers-reduced-motion query — the third such copy in the codebase — which
+// meant the pause card's calm switch would have moved everything in the game
+// except the one thing in it that is a field of two hundred tumbling petals.
+// One channel, at the foot of shared.js. It is a call on two paths that run
+// once a frame.
+function wxCalm() { return calmOn(); }
 
 // ===========================================================================
 // 1. THE MOOD TABLE — one row per chapter, and the row IS the configuration
@@ -822,7 +824,7 @@ export function createWeather(game) {
     // ---- 2. cloud, pulse, gust -------------------------------------------
     // Under prefers-reduced-motion every oscillator holds at its centre. The
     // shower still happens — it is weather, not motion — but nothing wobbles.
-    if (wxCalm) {
+    if (wxCalm()) {
       cloudV = damp(cloudV, 0, 2, dt); pulseV = damp(pulseV, 0, 2, dt);
       wxGust.x = damp(wxGust.x, Math.sin(row.dir) * row.gust.base, 2, dt);
       wxGust.z = damp(wxGust.z, Math.cos(row.dir) * row.gust.base, 2, dt);
@@ -884,7 +886,7 @@ export function createWeather(game) {
       const sizeK = kind._sizeK || 1;
       const wk = kind.windK, fall = kind.fall, sway = kind.sway;
       const swayW = kind.swayHz * 6.28318, spin = kind.spin, blink = kind.blink;
-      const still = wxCalm ? 0.15 : 1;
+      const still = wxCalm() ? 0.15 : 1;
       for (let i = 0; i < n; i++) {
         const ph = mph[i], sp = msp[i];
         mx[i] += (gx * wk * 0.25 + Math.sin(wxT * swayW * sp + ph) * sway * still) * dt;

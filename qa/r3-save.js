@@ -92,7 +92,12 @@ async page => {
     kept: localStorage.getItem('capy3.journey.broken.v1') === g,
     // A file that would not parse must present as a first run — this is the
     // pre-existing behaviour and it is fine; what was not fine was the delete.
-    carryOn: (document.body.textContent || '').indexOf('carry on') >= 0
+    // SCOPED TO THE TITLE CARD, not to document.body: R4's pause card lives in
+    // the DOM from boot and its quit-to-title copy contains the words "carry
+    // on", so the whole-document search this used to be reported a carry-on
+    // title on a file that was not there.
+    carryOn: ((document.querySelector('.capyui-title') || {}).textContent || '')
+      .indexOf('carry on') >= 0
   }), GARBAGE);
   await start();                       // the tile press that used to destroy it
   await page.evaluate(() => new Promise(r => setTimeout(r, 2500)));
