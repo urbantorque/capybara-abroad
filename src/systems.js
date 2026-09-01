@@ -8955,6 +8955,164 @@ export function createSystems(game) {
     }
   }
 
+  // ---- AND FOUR FOR THE THIN CHAPTERS (R9) ---------------------------------
+  // Manly, Monaco, Göreme and the Drift were the four rows still standing on
+  // pitch-shifted generics — a `tick` for a town, a `hiss` for a propane
+  // burner, a `chime` for a bell. Each gets the one sound that could only be
+  // that place. Three of the four replace something; none of them adds a rung.
+
+  /**
+   * THE CORSO, FROM THE SAND. Manly is a beach with a shopping street running
+   * off it at right angles, and from the water the street is a wash of people
+   * with hard edges in it — a till, a bottle crate, a scooter. Formant-ish
+   * noise for the voices rather than tones, because a crowd at two hundred
+   * metres has no pitch, only a shape.
+   */
+  function sfxCorso(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.12) * pitch;
+    const dur = rand(1.6, 3.0);
+    // the wash: two bands, one at chest and one at the top of the voice
+    for (let k = 0; k < 2; k++) {
+      const ns = noiseWideSrc();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = (k ? rand(1500, 2200) : rand(430, 620)) * v;
+      bp.Q.value = k ? 1.1 : 0.85;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime((k ? rand(0.018, 0.034) : rand(0.045, 0.080)) * vol,
+                                     t + dur * 0.35);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      ns.connect(bp); bp.connect(g); g.connect(acMaster);
+      ns.start(t); ns.stop(t + dur + 0.05);
+    }
+    // one hard edge in it — a till, a crate, a shutter
+    const st = t + rand(0.2, dur * 0.7);
+    const ns2 = noiseSrc();
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = rand(1800, 3200);
+    const g2 = ac.createGain();
+    env(g2, st, rand(0.020, 0.042) * vol, 0.002, rand(0.05, 0.11));
+    ns2.connect(hp); hp.connect(g2); g2.connect(acMaster);
+    ns2.start(st); ns2.stop(st + 0.16);
+  }
+
+  /**
+   * THE WHEEL. An ivory ball going round a mahogany track, slowing, dropping
+   * off the rim, and rattling across the frets before it settles. It is the
+   * one sound in the world that is only ever one thing, and the chapter has a
+   * roulette wheel in it that the player can ride.
+   *
+   * The rattle is the point and it is a DECELERATION: the gap between hits
+   * opens as the ball loses the rim, so the timing does the work rather than
+   * the timbre.
+   */
+  function sfxRoulette(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.10) * pitch;
+    // the ball on the track: a fast tick slowing down
+    let at = t, gap = rand(0.030, 0.042);
+    const n = randInt(16, 26);
+    for (let i = 0; i < n; i++) {
+      const o = ac.createOscillator(); o.type = 'triangle';
+      o.frequency.value = rand(2100, 3400) * v;
+      const g = ac.createGain();
+      const k = 1 - i / n;
+      env(g, at, rand(0.010, 0.020) * vol * (0.45 + k * 0.55), 0.001, 0.018);
+      o.connect(g); g.connect(acMaster);
+      o.start(at); o.stop(at + 0.04);
+      at += gap;
+      gap *= rand(1.045, 1.085);        // ...and the gap opens. This is the sound.
+    }
+    // and it drops into a pocket
+    const st = at + rand(0.02, 0.08);
+    for (let i = 0; i < 3; i++) {
+      const o = ac.createOscillator(); o.type = 'square';
+      o.frequency.value = rand(700, 1300) * v;
+      const g = ac.createGain();
+      env(g, st + i * rand(0.045, 0.075), rand(0.014, 0.028) * vol, 0.001, 0.03);
+      o.connect(g); g.connect(acMaster);
+      o.start(st); o.stop(st + 0.4);
+    }
+  }
+
+  /**
+   * THE BURNER. Two seconds of propane through a coil, which is a ROAR and not
+   * a hiss: broadband noise with a hard low shelf under it, a metallic edge off
+   * the coil, and a valve click at the front that is the half of the sound
+   * everybody actually recognises. It is what tells you the other hundred and
+   * fifty balloons over that valley are real.
+   */
+  function sfxBurner(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.14) * pitch;
+    const dur = rand(1.1, 2.2);
+    // the valve, first — a hard little click and then the gas catches
+    const cl = ac.createOscillator(); cl.type = 'square';
+    cl.frequency.value = rand(1600, 2600) * v;
+    const cg = ac.createGain();
+    env(cg, t, rand(0.020, 0.038) * vol, 0.001, 0.016);
+    cl.connect(cg); cg.connect(acMaster);
+    cl.start(t); cl.stop(t + 0.05);
+    // the roar
+    const ns = noiseSrc();
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = rand(1700, 2600) * v; lp.Q.value = 0.6;
+    const ls = ac.createBiquadFilter(); ls.type = 'lowshelf';
+    ls.frequency.value = 220; ls.gain.value = 9;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t + 0.02);
+    g.gain.linearRampToValueAtTime(rand(0.075, 0.135) * vol, t + 0.09);
+    g.gain.setValueAtTime(rand(0.075, 0.135) * vol, t + dur * 0.72);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    ns.connect(lp); lp.connect(ls); ls.connect(g); g.connect(acMaster);
+    ns.start(t + 0.02); ns.stop(t + dur + 0.05);
+    // the coil ringing, quietly, which is what makes it metal and not weather
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    o.frequency.value = rand(310, 430) * v;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = rand(900, 1400) * v; bp.Q.value = 5.5;
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, t + 0.05);
+    og.gain.linearRampToValueAtTime(rand(0.008, 0.017) * vol, t + 0.22);
+    og.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp); bp.connect(og); og.connect(acMaster);
+    o.start(t + 0.05); o.stop(t + dur + 0.05);
+  }
+
+  /**
+   * A BELL NOBODY IS RINGING. The Drift's own comment has said this since the
+   * chapter was written and it was playing a pitch-shifted `chime`, which is
+   * the game's bright little confirmation sound and reads as somebody doing
+   * something. This is the opposite: three partials that are not in tune with
+   * each other, so the note BEATS rather than sings, a very long tail, and no
+   * attack to speak of — it arrives already having started.
+   */
+  function sfxFarbell(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.88, 1.12) * pitch;
+    const hz = rand(118, 168) * v;
+    const dur = rand(4.5, 8.0);
+    // Deliberately NOT harmonic: a real bell's hum, prime and tierce sit at
+    // ratios no oscillator bank finds on its own, and the small errors between
+    // them are the beating that makes it a bell rather than a tone.
+    const RATIO = [1, 2.02, 2.41, 3.47];
+    for (let i = 0; i < RATIO.length; i++) {
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.value = hz * RATIO[i] * rand(0.997, 1.003);
+      const g = ac.createGain();
+      const lvl = rand(0.020, 0.040) * vol / (1 + i * 0.85);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(lvl, t + rand(0.28, 0.55));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur * rand(0.6, 1.0));
+      o.connect(g); g.connect(acMaster);
+      o.start(t); o.stop(t + dur + 0.1);
+    }
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -12593,6 +12751,8 @@ export function createSystems(game) {
     cicada: sfxCicada, magpie: sfxMagpie, lorikeet: sfxLorikeet,
     // ...and the two the second chapter never had. See sfxFrailejon.
     frailejon: sfxFrailejon, banda: sfxBanda,
+    // ...and one each for the four rows still on pitch-shifted generics.
+    corso: sfxCorso, roulette: sfxRoulette, burner: sfxBurner, farbell: sfxFarbell,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -12626,6 +12786,9 @@ export function createSystems(game) {
     // band's phrase to two — so both gaps sit past their own length, which is
     // the rule stated above.
     frailejon: 7.0, banda: 5.0,
+    // The wheel is the short one and the far bell is the long one; both sit
+    // past their own length, same rule.
+    corso: 4.0, roulette: 3.0, burner: 2.6, farbell: 9.0,
   };
 
   function sfx(name, opts) {
@@ -24294,14 +24457,14 @@ export function createSystems(game) {
             if (zn('paramo') || zn('crater')) {
               // Above the treeline it is wind and almost nothing else, and the
               // gaps are long because that is what makes it high.
-              if (r < 0.62) sysAmb('frailejon', { volume: rand(0.55, 1.0), pitch: rand(0.9, 1.15) });
+              if (r < 0.62) sysAmb('frailejon', { volume: rand(0.09, 0.17), pitch: rand(0.9, 1.15) });
               else if (r < 0.86) sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.7) });
               // ...and once in a while the mountain, which is not asleep.
               else sysAmb('thunder', { volume: rand(0.05, 0.10), pitch: rand(0.35, 0.5) });
               ambTimer = rand(7, 15);
             } else if (zn('plaza') || zn('church')) {
               // The band is somewhere behind the church and it never stops.
-              if (r < 0.40) sysAmb('banda', { volume: rand(0.5, 0.9), pitch: rand(0.94, 1.08) });
+              if (r < 0.40) sysAmb('banda', { volume: rand(0.08, 0.15), pitch: rand(0.94, 1.08) });
               else if (r < 0.62) sysAmb('vendor', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.1) });
               else if (r < 0.80) sysAmb('bark', { volume: rand(0.05, 0.10), pitch: rand(0.8, 1.1) });
               else if (r < 0.92) sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(2.0, 2.4) });
@@ -24312,26 +24475,26 @@ export function createSystems(game) {
               if (r < 0.34) sysAmb('vendor', { volume: rand(0.08, 0.15), pitch: rand(0.85, 1.15) });
               else if (r < 0.56) sysAmb('thud', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });
               else if (r < 0.74) sysAmb('bark', { volume: rand(0.06, 0.11), pitch: rand(0.85, 1.2) });
-              else if (r < 0.90) sysAmb('banda', { volume: rand(0.3, 0.55), pitch: rand(0.9, 1.05) });
+              else if (r < 0.90) sysAmb('banda', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.05) });
               else sysAmb('rustle', { volume: rand(0.06, 0.11), pitch: rand(0.9, 1.3) });
               ambTimer = rand(3.5, 8);
             } else if (zn('coffee')) {
               // A finca on the slope: leaves, and the birds that live in them.
               if (r < 0.44) sysAmb('rustle', { volume: rand(0.07, 0.13), pitch: rand(1.0, 1.4) });
               else if (r < 0.76) sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(2.1, 2.5) });
-              else sysAmb('frailejon', { volume: rand(0.3, 0.55), pitch: rand(1.1, 1.35) });
+              else sysAmb('frailejon', { volume: rand(0.05, 0.10), pitch: rand(1.1, 1.35) });
               ambTimer = rand(5, 11);
             } else if (zn('street')) {
               if (r < 0.36) sysAmb('bark', { volume: rand(0.06, 0.12), pitch: rand(0.8, 1.15) });
               else if (r < 0.60) sysAmb('horn', { volume: rand(0.05, 0.09), pitch: rand(1.1, 1.45) });
-              else if (r < 0.84) sysAmb('banda', { volume: rand(0.28, 0.5), pitch: rand(0.92, 1.06) });
+              else if (r < 0.84) sysAmb('banda', { volume: rand(0.05, 0.09), pitch: rand(0.92, 1.06) });
               else sysAmb('vendor', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.1) });
               ambTimer = rand(5, 11);
             } else {
               // Between the town and the mountain: the wind wins.
-              if (r < 0.58) sysAmb('frailejon', { volume: rand(0.4, 0.75), pitch: rand(0.95, 1.2) });
+              if (r < 0.58) sysAmb('frailejon', { volume: rand(0.07, 0.13), pitch: rand(0.95, 1.2) });
               else if (r < 0.82) sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(2.0, 2.4) });
-              else sysAmb('banda', { volume: rand(0.18, 0.34), pitch: rand(0.9, 1.04) });
+              else sysAmb('banda', { volume: rand(0.035, 0.065), pitch: rand(0.9, 1.04) });
               ambTimer = rand(8, 16);
             }
           } else if (bio === 'quay') {
@@ -24518,7 +24681,14 @@ export function createSystems(game) {
               sysAmb('hiss', { volume: clamp(0.05 + w * 0.045, 0.05, 0.20), pitch: rand(0.30, 0.46) });
               ambTimer = rand(5, 11);
             } else {
-              sysAmb('chime', { volume: rand(0.08, 0.16), pitch: rand(0.36, 0.52) });
+              // ---- THE BELL NOBODY IS RINGING (R9) ----------------------
+              // The line above this one has claimed exactly that since the
+              // chapter was written, and it was playing `chime` — the game's
+              // bright little confirmation sound, the one that says you have
+              // just done something. Three partials that are not in tune with
+              // each other, so the note beats instead of singing, and no attack
+              // to speak of: it arrives already having started.
+              sysAmb('farbell', { volume: rand(0.09, 0.17), pitch: rand(0.88, 1.12) });
               ambTimer = rand(15, 32);
             }
           } else if (bio === 'venice') {
@@ -24642,9 +24812,15 @@ export function createSystems(game) {
             const r = Math.random();
             if (aboard && g.burner() > 0.4) {
               // ...and the one over your head gets LOUDER with height, because
-              // it is the only thing left to hear
-              sysAmb('hiss', { volume: rand(0.16, 0.26) * (1 + sky * 0.5), pitch: rand(1.4, 1.9) });
-              ambTimer = rand(0.5, 1.1);
+              // it is the only thing left to hear.
+              // ---- AND IT IS A ROAR, NOT A HISS (R9) --------------------
+              // The burner is this chapter's whole soundscape — its own comment
+              // says so — and it was the game's generic noise voice pitched up.
+              // Propane through a coil has a valve click at the front, a hard
+              // low shelf and a metallic ring off the coil, and the click is
+              // the half everybody actually recognises.
+              sysAmb('burner', { volume: rand(0.16, 0.26) * (1 + sky * 0.5), pitch: rand(0.92, 1.12) });
+              ambTimer = rand(0.9, 1.6);
             } else if (r < 0.34) {
               // a dog, two kilometres away, answered by another one
               sysAmb('bark', { volume: rand(0.05, 0.10) * gnd, pitch: rand(0.55, 0.85) });
@@ -24717,7 +24893,12 @@ export function createSystems(game) {
               sysAmb('whistle', { volume: rand(0.06, 0.11), pitch: rand(1.5, 1.9) });
               ambTimer = rand(12, 26);
             } else if (r < 0.82) {
-              sysAmb('cheer', { volume: rand(0.04, 0.09), pitch: rand(1.2, 1.5) });
+              // ---- SOMEBODY'S RADIO WAS A `cheer` (R9) ------------------
+              // The Corso runs off the beach at right angles and from the sand
+              // it is a wash of people with hard edges in it — a till, a crate,
+              // a shutter. `cheer` is a crowd agreeing with you, which is a
+              // completely different thing and belongs to a set piece.
+              sysAmb('corso', { volume: rand(0.06, 0.12), pitch: rand(0.92, 1.12) });
               ambTimer = rand(10, 20);
             } else {
               sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(1.1, 1.5) });
@@ -24815,11 +24996,27 @@ export function createSystems(game) {
             // layer on top of it. It gets the one thing the biome cannot
             // reasonably own, which is the town: a very long way off, very
             // occasionally, and quieter than anything else in this ladder.
+            // ---- ...AND INSIDE, THE ROOM HAS ONE SOUND (R9) ---------------
+            // The argument above holds for the TOWN and only for the town. In
+            // the salon it left the chapter's single most recognisable object
+            // — an ivory ball going round a mahogany track and rattling across
+            // the frets — represented by a pitch-shifted `tick`, which is the
+            // combo confirmation sound from the salsa floor.
+            const mp = capy && capy.position;
+            const inSalon = !!(game.monaco && mp &&
+                               game.monaco.inZone('casino', mp.x, mp.z));
             const rr = Math.random();
-            if (rr < 0.45) sysAmb('tick', { volume: rand(0.03, 0.06), pitch: rand(2.0, 2.8) });
-            else if (rr < 0.78) sysAmb('pop', { volume: rand(0.03, 0.06), pitch: rand(1.3, 1.9) });
-            else sysAmb('bark', { volume: rand(0.03, 0.05), pitch: rand(1.6, 2.2) });
-            ambTimer = rand(9, 22);
+            if (inSalon) {
+              if (rr < 0.55) sysAmb('roulette', { volume: rand(0.10, 0.19), pitch: rand(0.94, 1.1) });
+              else if (rr < 0.82) sysAmb('clink', { volume: rand(0.05, 0.10), pitch: rand(1.2, 1.7) });
+              else sysAmb('pop', { volume: rand(0.03, 0.06), pitch: rand(1.3, 1.9) });
+              ambTimer = rand(5, 13);
+            } else {
+              if (rr < 0.45) sysAmb('tick', { volume: rand(0.03, 0.06), pitch: rand(2.0, 2.8) });
+              else if (rr < 0.78) sysAmb('pop', { volume: rand(0.03, 0.06), pitch: rand(1.3, 1.9) });
+              else sysAmb('bark', { volume: rand(0.03, 0.05), pitch: rand(1.6, 2.2) });
+              ambTimer = rand(9, 22);
+            }
           } else if (bio === 'cave') {
             // AND THE OPPOSITE, WHICH IS THE POINT OF IT. Four sounds, all of
             // them small, all of them a very long way apart: water on stone, a

@@ -559,11 +559,77 @@ mini, records to 3. Verify: `qa/eng-rate.js` free-play instrument (the one
 that found Kyoto and Cali dead) before/after; ambience ladder branch grows
 from 3 lines toward the kyoto/kowloon class.
 
-**Batch R9 — audio identity, the thin three.** Manly and Monaco bespoke
+**Batch R9 — audio identity, the thin three. Done, 2 Sep 2026.** Four rows were
+still standing on pitch-shifted generics: a `tick` for a town, a `hiss` for a
+propane burner, a `chime` for a bell nobody is ringing, a `cheer` for a shopping
+street. Each gets the one sound that could only be that place. Three of the four
+replace something rather than adding a rung.
+
+| chapter | was | is |
+|---|---|---|
+| Manly | `cheer` — a crowd agreeing with you | **`corso`** — the strip from the sand |
+| Monaco | `tick` — the salsa floor's combo confirm | **`roulette`** — inside the salon only |
+| Göreme | `hiss` ×6 | **`burner`** ×6 |
+| the Drift | `chime` — the "you did something" sound | **`farbell`** |
+
+**`sfxCorso`.** Manly is a beach with a shopping street running off it at right
+angles, and from the water that street is a wash of people with hard edges in
+it — a till, a crate, a shutter. Formant-ish noise rather than tones, because a
+crowd at two hundred metres has no pitch, only a shape.
+
+**`sfxRoulette`.** An ivory ball round a mahogany track, slowing, dropping off
+the rim and rattling across the frets. The rattle is a *deceleration* — the gap
+between hits opens by 4.5–8.5 % each time — so the timing does the work, not the
+timbre. **Only in the salon**: outside it, monaco.js already runs a full
+positional bed and the ladder's own comment says the one thing it must not do
+there is add a second mono layer. The town keeps its deliberately quiet generics.
+
+**`sfxBurner`.** Göreme's own comment calls the burners "the whole soundscape",
+and it was the game's generic noise voice pitched up. Propane through a coil is
+a roar and not a hiss: a valve click at the front — the half everybody actually
+recognises — a hard low shelf, and a metallic ring off the coil. All six sites
+in goreme.js switched, including the two inside the filling envelope, which is
+the one sound in that chapter that gets louder the longer you stand still.
+
+**`sfxFarbell`.** The Drift's own line has said "a bell that nobody is ringing"
+since the chapter was written, and it was playing `chime`. Three partials
+deliberately *not* in tune with each other — a real bell's hum, prime and tierce
+sit at ratios no oscillator bank finds on its own — so it beats instead of
+singing, with a 4.5–8 s tail and no attack: it arrives already having started.
+
+**Measured** (`qa/r9-voices.js`, `qa/r9-goreme.js`). Every synth builds a real
+node graph and none throws — 5 to 46 nodes each, which is the only thing about a
+Web Audio voice observable from outside without hearing it, and it is what
+catches a name that never reached `sfxTable` (the fault that table's own comment
+records). The bed plays the new voice in Manly, Monaco-in-the-salon and the
+Drift; Göreme's ladder line is gated on being aboard with the burner lit, so
+that one was verified in the valley instead — **8 burners in 45 s** from the
+other balloons.
+
+**The level trap, which would have shipped.** The ladder calls every bespoke
+voice with `volume: 0.04–0.21` — the synth carries its own level, and the call
+volume is a small per-place multiplier. All six new voices (R8's two included)
+were first written into the ladder at **0.55–1.15**, five to ten times the house
+band, because they were authored against their own envelopes rather than against
+the table they were joining. Caught by reading the neighbouring call sites, not
+by hearing it. `sfxBurner`'s envelope was then set just under `sfxHiss`'s 0.13
+peak on purpose, so goreme.js's six existing call sites carry over untouched
+rather than each needing a new number.
+
+**The optional ducking is NOT built, and the number that decides it:** in 45 s
+of free play, one chapter fires **129 footsteps**. A duck keyed on sfx events is
+a duck keyed on footsteps, and the score would pump continuously. Restricting it
+to a chosen subset of "big" sounds is exactly the judgement the batch said had
+to be A/B-able, and the only thing measurable from here is whether the gain dips
+— which does not answer whether it sounds better. Noted rather than guessed. (An
+`sysWX_DUCK` already exists and runs the other way: the weather bed ducks under
+music intensity.)
+
+Original scope: Manly and Monaco bespoke
 ambience (Manly: rips, zinc, corso chatter; Monaco: marina halyards, the
 tunnel echo, roulette rattle) and goreme/drift one distinguishing voice each;
-optional: gentle music-under-sfx ducking on the ensemble bus if it can be
-A/B'd honestly (see `capy3-the-mix` for the measurement traps).
+optional: gentle music-under-sfx ducking on the ensemble bus if it can be A/B'd
+honestly (see `capy3-the-mix` for the measurement traps).
 
 **Batch R10 — ship.** LICENSE (owner decides; batch wires it: file, package
 field, dist notice); deploy to the chosen host; README address; CONTRACT.md

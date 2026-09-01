@@ -2467,7 +2467,7 @@ function gorUpdateFieldBurners(dt) {
       // whole difference between the crew twenty metres away and the crew at the
       // far end of the field.
       if (h > 0.03) {
-        gorSfx('hiss', gorPlace({ volume: 0.34 * h * rand(0.82, 1.12),
+        gorSfx('burner', gorPlace({ volume: 0.34 * h * rand(0.82, 1.12),
                                   pitch: (1.05 + h * 0.75) * rand(0.90, 1.10) },
                                 e.x, 3.2, e.z, 130));
       }
@@ -2660,7 +2660,7 @@ function gorUpdateDawnLine(dt) {
   if (gorSyncBurn > 0.45 && !gorSyncSaid) {
     gorSyncSaid = true;
     gorToast('every burner in the valley, all at once. it is coming.');
-    gorSfx('hiss', { volume: 0.42, pitch: 0.62 });
+    gorSfx('burner', { volume: 0.42, pitch: 0.62 });
   }
   for (let i = 0; i < gorDECOR_N; i++) {
     const o = i * 5, b = i * 3;
@@ -2733,7 +2733,7 @@ function gorUpdateDawnLine(dt) {
     if (gorDecorSaid <= 0) {
       const h = gorDecorBestH;
       gorDecorSaid = rand(gorDECOR_GAP_A, gorDECOR_GAP_B);
-      gorSfx('hiss', { volume: 0.26 * h * rand(0.85, 1.1),
+      gorSfx('burner', { volume: 0.26 * h * rand(0.85, 1.1),
                        pitch: (0.95 + h * 0.7) * rand(0.92, 1.08) });
     }
     gorDecorBestH = 0;
@@ -4065,7 +4065,7 @@ function gorUpdateBalloon(game, dt) {
   // the chapter and nobody was ever told they had got there.
   if (gorAboard && input && input.action && gorBalY >= gorCEIL && gorCeilT <= 0) {
     gorCeilT = 9;
-    gorSfx('hiss', { volume: 0.30, pitch: 1.55 });
+    gorSfx('burner', { volume: 0.30, pitch: 1.55 });
     if (!gorToldCeil) {
       gorToldCeil = true;
       gorToast('that is as high as it goes. everything else in the valley is below you.');
@@ -4512,14 +4512,14 @@ function gorCheckField(game, dt) {
   // you stand still — which is the whole joke of the place.
   if (gorMouthT < 6.0 && gorMouthRoar <= 0) {
     gorMouthRoar = rand(0.34, 0.52);
-    gorSfx('hiss', { volume: clamp(0.10 + gorMouthT * 0.10, 0.08, 0.34),
+    gorSfx('burner', { volume: clamp(0.10 + gorMouthT * 0.10, 0.08, 0.34),
                      pitch: rand(1.15, 1.5) });
   }
   if (gorMouthRoar > 0) gorMouthRoar -= dt;
   if (gorMouthT > 1.6 && !gorMouthDone) {
     gorMouthDone = true;
     gorTask('the-mouth');
-    gorSfx('hiss', { volume: 0.65, pitch: 0.5 });
+    gorSfx('burner', { volume: 0.65, pitch: 0.5 });
     gorToast('a cold nylon cave the size of a bus, and it is filling up.');
     gorSaysNow('crew',
       ['Everybody goes in there once. Nobody says anything while they are in there.',
