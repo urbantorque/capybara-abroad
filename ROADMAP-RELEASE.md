@@ -318,7 +318,94 @@ legend audio row; foot-rail keycaps hidden on touch; the `ROADMAP.md` §3 loose
 ends. Verify under mobile emulation: pause, mute, travel, journal all
 reachable by thumb.
 
-**Batch R6 — the wall.** Salsa mercy (window widens ~15% per failed streak,
+**Batch R6 — the wall. Done, 1 Sep 2026.** One rule in `cali.js`: the salsa
+window opens by 15% every time a streak is broken, four times and no further,
+and shuts back to 114 ms the moment the eight land. The target never moves, only
+a *miss* counts (being knocked off the floor already lapses the combo and is
+documented as not a punishment), and nothing on the screen changes. **The condor
+was measured and left alone** — see below, which is what the conditional in the
+original scope asked for.
+
+**The floor was measured first, and it deserved the change.** A scripted dancer
+on the real code path — the tick is wrapped, so it sets `input.jumpPressed`
+inside the frame and cali's own judge answers it — with Gaussian timing spread
+σ, seeded so the same mistakes come in the same order:
+
+| dancer | before | after |
+|---|---|---|
+| σ = 60 ms, near-clean | 1 attempt, 4.25 s | **1 attempt, 4.25 s — identical** |
+| σ = 90 ms, the gate | 5 / 2 / 8 attempts (three seeds) | 2 / 2 / 3 |
+| σ = 120 ms | **26 attempts, 65.4 s** | **3 attempts, 7.9 s** |
+
+Paired: same probe, same seeds, run against stashed and current `cali.js`, with
+the offset distributions agreeing to ±0.02 across the two passes. One run per
+condition cannot separate a working assist from a lucky seed, so every starting
+phase of each measured sequence was replayed through both rules — 134
+realisations a condition, the real timing errors in their real order:
+
+| | before | after |
+|---|---|---|
+| σ = 60, within 3 attempts | 100 % | 100 % |
+| σ = 90, mean / median / p90 | 3.3 / 3 / **7** | 2.3 / 2 / **4** |
+| σ = 90, within 3 attempts | 65 % | **86 %** |
+| σ = 120, mean | **19.3** | **3.8** |
+
+Both halves of the gate hold: ±90 ms clears within ~3 attempts (86 % do), and a
+clean run does not notice — at σ = 60 the before and after runs are identical to
+the frame, and 83 % of those dancers never earn a single step of mercy.
+
+**The ceiling had never run.** Across all ten paired runs the highest mercy
+reached live was 2, so levels 3, 4 and the cap itself had never once executed in
+the game. A σ = 160 dancer walks the whole ladder — 131 → 151 → 173 → **199 ms,
+capped** — clears on the fifth attempt, and the window shuts to 114 at the tick.
+
+**And the record does not get the assist.** `salsa-dance` is one of the twenty
+measured numbers and the floor keeps scoring for ever after the tick, so a
+record set through a 200 ms window would not be the same number as one set
+through 114 ms. Mercy increments only while the task is unticked and resets when
+it lands: measured, the post-tick hit rate matches the pre-tick rate in every
+condition (σ = 90: 0.867 → 0.863; σ = 120: 0.754 → 0.743).
+
+**The condor does not need softening, and the measurement says so.** Four
+scripted pilots on `thermal-peak` — within 15 m of the caldera, above the rim,
+hanging off the talons, from a launch 104 m away:
+
+| pilot | result |
+|---|---|
+| **none** — hands off the stick | never closer than **80.8 m**, dropped three times, no clear |
+| **naive** — points at the mountain, 0.9 s between corrections, 0.55 s lag, never flaps | cleared on the **second** ride, 84 s |
+| **average** — 18° aim error, five corrections a second, 0.32 s lag, flaps when slow | cleared on the **first** ride, 47 s |
+| **good** — aims true, circles in lift | first ride, 33 s |
+
+The zero-input row is the calibration and the reason to believe the other three:
+`pasto.js` records that an unsteered bird "never came closer than 95.4 m" over
+two minutes, and hands-off here reproduces that shape. So the task is not free —
+and it is also not a wall: **a pilot who does nothing but point at the volcano
+clears it**, because the flight model already carries its own invisible mercy
+(the flap fires automatically below 5.4 m/s of airspeed, so the save arrives
+without the player knowing the key exists).
+
+That last clause is a finding, but it is a *legibility* one and not a difficulty
+one, so it is left for R8 rather than done here: **the flap is never taught.**
+`input.honk` is unbound in flight and bound to the wingbeat, the mount toast says
+"hold on", and nothing ever mentions it. It is the difference between the naive
+pilot's two rides and the average pilot's one — and neither of them fails, which
+is why it is not R6's business.
+
+Probes: `qa/r6-dancer.js` (the first baseline, 100 s a condition),
+`qa/r6-mercy.js` (the paired differential, run twice), `qa/r6-cap.js` (the
+ceiling), `qa/r6-condor.js` (four pilots, pumped in slices — a single
+`page.evaluate` of that many hand-driven ticks dies at the ~20 s context limit),
+`qa/r6-shot.js` → `qa/r6-floor.png`. R1–R5 re-run green, zero console messages,
+build clean at 9065.8 KB.
+
+**One probe defect worth recording**, because it produced a confident wrong
+number: `r6-mercy.js` first sampled the window *after* the frame, and reaching
+eight resets mercy inside the same frame that scores the eighth step — so every
+clear in the run reported a 114 ms window and looked like proof the assist had
+done nothing. It was the instrument.
+
+Original scope: Salsa mercy (window widens ~15% per failed streak,
 capped, resets on success — the target stays 8); condor's chapter-2 sting
 softened only if a scripted average-input run says it needs it. Measure: a
 mid-skill scripted dancer (deliberate ±90 ms jitter) must clear the floor

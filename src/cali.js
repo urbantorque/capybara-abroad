@@ -71,6 +71,33 @@ const caliDANCE_DROP = 2.6;         // s off the floor before the combo lapses
 const caliSTEP_MIN_TURN = 1.1;      // rad of heading change that counts as a step
 const caliSTEP_COOL = 0.28;         // s between steps — no mashing
 
+// --- MERCY (R6) --------------------------------------------------------------
+// The salsa floor is the hardest thing in the game and it had no assist at all:
+// eight consecutive steps inside 114 ms, and one miss puts you back to nothing.
+// It gates 100%, not progression — but a wall that a player simply cannot climb
+// is a wall whether or not it is on the critical path.
+//
+// The answer is the one difficulty is supposed to have: it SATURATES. The
+// window opens by 15% every time a streak is broken, four times and no further,
+// and shuts back to 114 ms the moment the eight land. The TARGET never moves —
+// it is eight steps for everybody, and the player is never told any of this.
+// A skip button says "you could not do this"; a window nobody can see says
+// nothing at all.
+//
+// TWO THINGS THIS DELIBERATELY DOES NOT DO.
+//
+//   1. It does not count being knocked off the floor. caliDANCE_DROP lapsing
+//      the combo is already documented as "not a punishment", and a mercy that
+//      rewards standing in the road would be measuring the wrong thing.
+//   2. It stops existing once the task is ticked. `salsa-dance` is one of the
+//      twenty measured records, and the floor keeps scoring for ever after the
+//      tick precisely so the number can be improved on. A record set through a
+//      200 ms window is not the same number as one set through 114 ms, and two
+//      players comparing them would be comparing nothing. Mercy is how you get
+//      IN; the record is what you do once you are.
+const caliMERCY_STEP = 0.15;        // the window opens 15% per broken streak...
+const caliMERCY_MAX = 4;            // ...four times and no further: x1.75, 199 ms
+
 // --- THE CHIVA (the chapter's set piece) -------------------------------------
 // A chiva is a wooden-bodied bus with the sides cut out, painted like a parrot,
 // with a sound system in it and a luggage rack you are absolutely not supposed
@@ -116,7 +143,8 @@ const caliROOF_TOP = 3.70;          // top of the roof collider, in chiva-local 
 //     held (240 ms)  clears from 0.28 s to 0.52 s out   apex 1.7 m
 //
 // A quarter of a second either way. That is wider than this chapter's own salsa
-// window (0.19 of a beat, 114 ms) and it is telegraphed twice — by a row of
+// window (0.19 of a beat, 114 ms — 199 ms at the far end of caliMERCY_MAX, and
+// still narrower than this) and it is telegraphed twice — by a row of
 // pennants you can see forty metres off, and by three musicians going flat a
 // second before it arrives. Failing it costs you a bus, not a chapter.
 const caliWIRE_Y = 4.20;
@@ -161,6 +189,7 @@ const caliSparkData = new Float32Array(caliSPARK_N * 7);   // x,y,z,vx,vy,vz,lif
 // --- task / dance state ---
 let caliOnFloor = false, caliFloorT = 0;
 let caliCombo = 0, caliBestCombo = 0, caliStepCool = 0, caliOffFloorT = 0;
+let caliMercy = 0;                  // broken streaks so far — see caliWindow()
 let caliLastYaw = 0, caliLastBeat = -1;
 let caliDanceDone = false, caliGatoDone = false, caliChivaDone = false;
 let caliCaneDone = false, caliCristoDone = false;
@@ -3639,6 +3668,17 @@ function caliTask(id) {
  *   - the combo LAPSES rather than resets when you step off the floor, so
  *     being bumped by a dancer is not a punishment.
  */
+/**
+ * HOW WIDE THE WINDOW IS RIGHT NOW, in beats. 0.19 for everybody who has not
+ * missed, and for everybody at all once the eight have landed — see the note
+ * at caliMERCY_STEP for why the record does not get this.
+ */
+function caliWindow() {
+  if (caliMercy <= 0) return caliBEAT_WINDOW;
+  const n = Math.min(caliMercy, caliMERCY_MAX);
+  return caliBEAT_WINDOW * Math.pow(1 + caliMERCY_STEP, n);
+}
+
 function caliUpdateDance(game, dt) {
   const capy = game.capy;
   if (!capy || !capy.position) return;
@@ -3717,7 +3757,7 @@ function caliUpdateDance(game, dt) {
   caliStepCool = caliSTEP_COOL;
   caliLastBeat = beatIdx;
 
-  if (off <= caliBEAT_WINDOW) {
+  if (off <= caliWindow()) {
     caliCombo++;
     if (caliCombo > caliBestCombo) {
       caliBestCombo = caliCombo;
@@ -3750,6 +3790,8 @@ function caliUpdateDance(game, dt) {
     if (caliCombo === 4 && typeof game.toast === 'function') game.toast('¡eso!');
     if (caliCombo >= caliDANCE_TARGET && !caliDanceDone) {
       caliDanceDone = true;
+      caliMercy = 0;              // the window shuts on the way through the door
+
       // AND THE FLOOR ANSWERS. Ten people have been dancing three metres away
       // the whole time; the moment the capybara gets eight in a row they all
       // whoop, which is the only acknowledgement this task has ever had that
@@ -3763,6 +3805,9 @@ function caliUpdateDance(game, dt) {
     }
   } else if (caliCombo > 0) {
     caliCombo = 0;
+    // ...and the floor gives a little. Only a MISS counts, only before the tick,
+    // and the player is told nothing.
+    if (!caliDanceDone && caliMercy < caliMERCY_MAX) caliMercy++;
     if (typeof game.sfx === 'function') game.sfx('thud', { volume: 0.22, pitch: 0.7 });
   }
 }
@@ -4030,6 +4075,14 @@ export function createCali(game) {
     combo() { return caliCombo; },
     comboTarget: caliDANCE_TARGET,
     onFloor() { return caliOnFloor; },
+    /**
+     * HOW MUCH THE FLOOR HAS GIVEN, 0..caliMERCY_MAX, and the window it buys.
+     * Nothing in the game draws these — they are here so the widening can be
+     * MEASURED rather than inferred from a clear rate, which is the only way to
+     * tell a working assist from a lucky seed.
+     */
+    mercy() { return caliMercy; },
+    window() { return caliWindow(); },
 
     // ---- what the chiva publishes to the rest of the game ------------------
     /** 0 = afternoon, 1 = the city is lit. Read by systems.js's night blend. */
