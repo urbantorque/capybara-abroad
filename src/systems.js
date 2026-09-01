@@ -21663,6 +21663,27 @@ export function createSystems(game) {
     /** Is the camera out, and how many pictures has it taken. */
     photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
     /**
+     * WHAT IS ON THE BOARD, AND WHAT IS BEING SET RIGHT NOW.
+     *
+     * The only way in from outside was to flush the save and read `recs` out of
+     * localStorage, which cannot see an attempt in progress at all — so a probe
+     * measuring a par had to compute the figure itself and then hope the game
+     * agreed. Nothing in src reads this; it is here so a record can be VERIFIED
+     * rather than inferred, which is how R7's three pars were set.
+     */
+    recordAudit: function () {
+      const best = Object.create(null);
+      for (const k in jrRecs) best[k] = jrRecs[k];
+      return { best: best, rows: Object.keys(RECORDS).length,
+               live: recLiveId, val: recLiveVal,
+               // A row whose key is not a task id can never reach the chapter
+               // board or the picker, both of which look it up as
+               // RECORDS[taskId]. Cheap to check and it has been wrong before.
+               orphans: Object.keys(RECORDS).filter(function (id) {
+                 return !TASKS.some(function (t) { return t.id === id; });
+               }) };
+    },
+    /**
      * THE GHOST, without the traces — the harness cannot hold eight thousand
      * floats and does not need to. Nothing in src reads this. See THE GHOST.
      */

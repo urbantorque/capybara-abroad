@@ -135,6 +135,9 @@ let rioFlash = 0, rioWrongFlash = 0;
 let rioSambaDone = false, rioBateriaDone = false, rioGloboDone = false;
 let rioVoleiDone = false, rioSelaronDone = false, rioBondinhoDone = false;
 let rioArpoadorDone = false;
+// ...and whether she is UP there right now, so the applause fires on arrival
+// rather than on every frame she stands on the rock. See the Arpoador block.
+let rioArpoadorUp = false;
 let rioSelaronT = -1;               // >= 0 while the climb is being timed
 let rioRiding = false;
 let rioSalute = 0;                  // s of the bateria facing the capybara
@@ -3276,9 +3279,32 @@ const rioCALC_Z0 = rioPROM_Z, rioCALC_Z1 = 2.6;
 const rioCALC_RUN = 132;               // m of it that count, of about 190 drawn
 let rioCalcDone = false, rioCalcFrom = 0, rioCalcOn = false;
 let rioCalcMark = 0;                   // which quarter of the run has been marked
+let rioCalcPaid = false;               // has THIS run already crossed the 132?
+let rioCalcLastX = 0;                  // where she was last seen ON it, for onExit
+
+// ---- IT DOES NOT STOP HAPPENING WHEN IT IS TICKED (R7) ---------------------
+// `if (rioCalcDone) return` on the first line killed the whole thing the moment
+// it paid out: the 132 m span tracker, the four-stage tick ladder, the step-off
+// warning and the sparks. The same one line as Kyoto's torii tunnel and Cali's
+// cane, and this was the last one in the tree.
+//
+// The task keeps its latch. The RUN re-arms, and it now carries a number — the
+// longest unbroken span, in metres, which is the only question the wave has
+// ever asked and the one its own payoff line raises: about a hundred and ninety
+// metres of it are drawn and a hundred and thirty-two tick it, so there is
+// somewhere to go after the tick. See 'calcadao' in RECORDS.
+//
+// THE FIGURE IS FILED WHEN THE RUN ENDS, NOT WHILE IT GROWS. `game.record`
+// toasts whenever the new value beats the saved one, so filing on every
+// improvement means a personal-best card every metre — the fault condor.js
+// found in the frame of Rio's own first flight. recordLive carries the running
+// number on the paper; record is called once, by rioCalcFile.
+function rioCalcFile(game, run) {
+  if (run > 20 && typeof game.record === 'function') game.record('calcadao', run);
+  if (typeof game.recordEnd === 'function') game.recordEnd('calcadao');
+}
 
 function rioCheckCalcadao(game) {
-  if (rioCalcDone) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
@@ -3294,14 +3320,25 @@ function rioCheckCalcadao(game) {
     // not watching their own z, had no idea it had happened until they reached
     // the end and nothing ticked. One soft note, and only if the run was
     // actually worth losing — under twenty metres is a person walking about.
-    if (rioCalcOn && Math.abs(p.x - rioCalcFrom) > 20) {
-      rioBondeSfx('thud', { volume: 0.20, pitch: 0.65 });
-      rioBondeToast('off the paving. the wave starts again.');
+    if (rioCalcOn) {
+      const run = Math.abs(p.x - rioCalcFrom);
+      if (run > 20) {
+        rioBondeSfx('thud', { volume: 0.20, pitch: 0.65 });
+        rioBondeToast('off the paving. the wave starts again.');
+      }
+      rioCalcFile(game, run);
     }
-    rioCalcOn = false; rioCalcMark = 0; return;
+    rioCalcOn = false; rioCalcMark = 0; rioCalcPaid = false; return;
   }
-  if (!rioCalcOn) { rioCalcOn = true; rioCalcFrom = p.x; rioCalcMark = 0; return; }
+  if (!rioCalcOn) {
+    rioCalcOn = true; rioCalcFrom = p.x; rioCalcLastX = p.x;
+    rioCalcMark = 0; rioCalcPaid = false; return;
+  }
   const run = Math.abs(p.x - rioCalcFrom);
+  // The line waits until this is a RUN rather than a walk past a kiosk — the
+  // same twenty metres the step-off warning uses, and for the same reason.
+  rioCalcLastX = p.x;
+  if (run > 20 && typeof game.recordLive === 'function') game.recordLive('calcadao', run);
   // ---- THIRTY-TWO SECONDS OF THE FIRST TASK IN THE CHAPTER, IN SILENCE ---
   // A hundred and thirty-two metres with nothing at all between the start and
   // the tick. Four marks, a step brighter each time, and the last one is one
@@ -3312,9 +3349,14 @@ function rioCheckCalcadao(game) {
     rioCalcMark = mark;
     rioBondeSfx('tick', { volume: 0.20 + mark * 0.10, pitch: 1.0 + mark * 0.20 });
   }
-  if (run >= rioCALC_RUN) {
+  if (run >= rioCALC_RUN && !rioCalcPaid) {
+    // Once per RUN, not once per game. The burst below is earned every time the
+    // whole wave is run and there is no reason to give it only to the first
+    // person through; the task and its line are what happen once.
+    rioCalcPaid = true;
+    const again = rioCalcDone;
     rioCalcDone = true;
-    rioTask('calcadao');
+    if (!again) rioTask('calcadao');
     rioBondeSfx('chime', { volume: 0.6, pitch: 1.3 });
     // ---- AND THE END OF IT IS WORTH LANDING (v20) ----------------------
     // A hundred and thirty-two metres flat out, and the whole payoff was a
@@ -3327,7 +3369,9 @@ function rioCheckCalcadao(game) {
     if (rioGame && typeof rioGame.punch === 'function') rioGame.punch(0.12);
     rioBirdT += 0.9;                     // the flock breaks its circle
     rioBondeSfx('gull', { volume: 0.5, pitch: 1.35 });
-    rioBondeToast('four kilometres of it in real life. you did a hundred and thirty.');
+    if (!again) {
+      rioBondeToast('four kilometres of it in real life. you did a hundred and thirty.');
+    }
   }
 }
 
@@ -3853,21 +3897,41 @@ function rioUpdateTasks(game, dt) {
   }
 
   // --- Arpoador --------------------------------------------------------------
-  if (!rioArpoadorDone) {
+  // ---- THEY CLAP EVERY TIME YOU COME UP (R7) ------------------------------
+  // `if (!rioArpoadorDone)` wrapped the whole thing, so the twenty-two people on
+  // the rock came off their heels once, ever, and every visit after that was a
+  // crowd standing dead still on the best viewpoint in the chapter. The same
+  // file's wave-ride clap already re-fires; this is the inconsistency.
+  //
+  // They applaud the sunset here EVERY EVENING — that is the whole joke the
+  // task is built on, and it is the one set piece in the game with a real-world
+  // answer to "why would it happen again". The tick, the sparks and the line
+  // happen once; the applause happens whenever you climb up.
+  {
     const dx = p.x - rioARPOADOR.x, dz = p.z - rioARPOADOR.z;
-    if (dx * dx + dz * dz < 8 * 8 && p.y > rioTerrain(rioARPOADOR.x, rioARPOADOR.z) - 2.5) {
+    const up = dx * dx + dz * dz < 8 * 8 &&
+               p.y > rioTerrain(rioARPOADOR.x, rioARPOADOR.z) - 2.5;
+    if (up && !rioArpoadorUp) {
+      rioArpoadorUp = true;
+      const again = rioArpoadorDone;
       rioArpoadorDone = true;
-      rioTask('arpoador');
-      rioBurstSparks(p.x, p.y + 1.0, p.z, 20, 1.3);
       // AND THE ROCK ACTUALLY CLAPS. rioUpdatePeople reads this: the twenty-two
       // up here come off their heels for six seconds. The line below has been
       // claiming they do since the chapter shipped.
       rioClap = 6.0;
-      if (typeof game.shake === 'function') game.shake(0.14);
-      // they applaud the sunset here every evening. Tonight they are applauding
-      // something else.
-      if (typeof game.toast === 'function') game.toast('the whole rock is clapping. some of it is for the sunset.');
-      if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.95 });
+      if (typeof game.sfx === 'function') {
+        game.sfx('cheer', { volume: again ? 0.62 : 0.95, pitch: again ? 1.04 : 1 });
+      }
+      if (!again) {
+        rioTask('arpoador');
+        rioBurstSparks(p.x, p.y + 1.0, p.z, 20, 1.3);
+        if (typeof game.shake === 'function') game.shake(0.14);
+        // they applaud the sunset here every evening. Tonight they are
+        // applauding something else.
+        if (typeof game.toast === 'function') game.toast('the whole rock is clapping. some of it is for the sunset.');
+      }
+    } else if (!up) {
+      rioArpoadorUp = false;
     }
   }
 }
@@ -4062,7 +4126,13 @@ export function createRio(game) {
     onExit() {
       // ARMED FLAGS DO NOT SURVIVE TRAVEL. Every biome shares one coordinate
       // space, and a latch left set is a task that ticks in the wrong country.
-      rioCalcOn = false; rioCalcMark = 0;
+      // ...and the run in progress is FILED before it is forgotten, or a player
+      // who runs a hundred and eighty metres and then travels loses it. Same
+      // rule as the Selarón clock two lines down: state that leaves the country
+      // has to be settled, not merely cleared.
+      if (rioCalcOn && rioGame) rioCalcFile(rioGame, Math.abs(rioCalcLastX - rioCalcFrom));
+      rioCalcOn = false; rioCalcMark = 0; rioCalcPaid = false;
+      rioArpoadorUp = false;
       rioCombo = 0; rioRiding = false; rioBondeRideT = 0;
       // AND THE WAVE WAS NOT ON THE LIST. `rioWaveFrom` is the z the current
       // ride started at and `rioWaveRide` is how far it has run; both are set
@@ -4092,6 +4162,11 @@ export function createRio(game) {
      * vignette. The state was already here; it had no way out.
      */
     salute() { return clamp(rioSalute / 4.2, 0, 1); },
+    /** Seconds of applause left on Arpoador. rioUpdatePeople reads the same
+     *  number to take twenty-two people off their heels; this is here so that
+     *  "they clap again when you come back up" can be measured rather than
+     *  taken on trust. Same class as salute() above. */
+    clap() { return rioClap; },
     kiosk: { x: rioKIOSK.x, z: rioKIOSK_STAND },
     calcadao: { x: 0, z: (rioPROM_Z + 2.6) * 0.5 },
     terrainHeight: rioTerrain,

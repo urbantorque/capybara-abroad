@@ -2950,6 +2950,34 @@ export const RECORDS = {
   'dune-surf':     { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
   'souk-escape':   { label: 'shook them in', unit: ' s', better: 'lower', dp: 1 },
   'selaron-steps': { label: 'the whole flight in', unit: ' s', better: 'lower', dp: 1, par: 7 },
+  // ---- THE THREE THE PARITY SWEEP LEFT UNCLAIMED (R7) ---------------------
+  // Each of these was already being MEASURED by the chapter that owns it and
+  // then discarded the frame it ticked: the calçadão's 132 m span, the calli's
+  // side-to-side extent, and — the odd one out — the Rialto, which the task
+  // asks you to take AT A RUN and which nothing was clocking at all.
+  //
+  // A RECORDS key has to be a TASK id or the row is invisible: the chapter
+  // board and the picker both look it up as RECORDS[taskId] (systems.js), so
+  // the roadmap's working name of 'calcadao-run' would have filed a number
+  // nothing could ever show. Same trap as the api-key mismatch that seated five
+  // diners on thin air.
+  //
+  // ALL THREE PARS ARE MEASURED, MACHINE FLOOR FIRST — see qa/r7-pars.js. A par
+  // under the floor is unreachable by anybody, and a par a scripted sprint
+  // beats by half is not a par.
+  // The counted band is 188 m and 132 of them tick it. A scripted walk-on at
+  // the west end and a flat sprint east reaches 181.8 three times out of three,
+  // so that is the ceiling rather than a floor; 165 is a person who runs nearly
+  // all of it without putting a foot on the sand.
+  'calcadao':      { label: 'longest run', unit: ' m of the wave', better: 'higher', dp: 0, par: 165 },
+  // The maze is exactly 48 m across — the extent is clamped to it — and 36 tick
+  // it. 48.0 measured three times out of three, so 44 is a full crossing that
+  // gives away one wrong turn.
+  'the-calli':     { label: 'crossed', unit: ' m of the maze', better: 'higher', dp: 1, par: 44 },
+  // Machine floor 4.3 s, side to side over the arch at a flat sprint on the
+  // published axis. 5.5 is a person who slows at the top, which everybody does,
+  // because that is what the bridge is for.
+  'rialto':        { label: 'over the top in', unit: ' s', better: 'lower', dp: 1, par: 5.5 },
   'samba-parade':  { label: 'longest run', unit: ' on the two', better: 'higher', dp: 0, par: 16 },
   'salsa-dance':   { label: 'longest run', unit: ' on the beat', better: 'higher', dp: 0, par: 16 },
   'geysir':        { label: 'thrown', unit: ' m up', better: 'higher', dp: 0, par: 22 },

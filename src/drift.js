@@ -3877,8 +3877,19 @@ let driVaneSign = 0, driVaneDone = false, driVaneT = 0;
 // standing still and none of it used to be visible from anywhere.
 let driVaneWatch = 0, driVaneSlack = 0, driVaneHint = false;
 
+// ---- AND IT KEEPS BEING AN INSTRUMENT AFTER IT IS READ (R7) ---------------
+// `if (driVaneDone) return` was the first line, and it did more damage here
+// than the same line does anywhere else in the tree. This is not a set piece
+// that merely stopped being repeatable — it is the chapter's ONLY WIND
+// READOUT, and the chapter's hardest task, `long-gap`, is impossible into the
+// breath, marginal in calm and easy with it behind you. So the tick switched
+// off the one thing that tells you which of those three you are standing in,
+// and it did it the moment the player learned the vane existed.
+//
+// Everything below now runs for the life of the chapter: `driVaneWatch` for
+// the card, and the ripple of paper off the post as the breath goes slack,
+// which is the actual reading. Only the tick and the two lines are latched.
 function driCheckVane(game, dt) {
-  if (driVaneDone) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
@@ -3922,10 +3933,13 @@ function driCheckVane(game, dt) {
   }
   if (driVaneSign === 0) { driVaneSign = sign; return; }
   if (sign !== driVaneSign) {
-    driVaneDone = true;
-    driTask('weathervane');
-    driSfx('chime', { volume: 0.55, pitch: 1.15 });
-    driToast('all the way over, and all the way back, every thirty-eight seconds.');
+    driVaneSign = sign;                // ...and it keeps turning, so keep up
+    if (!driVaneDone) {
+      driVaneDone = true;
+      driTask('weathervane');
+      driSfx('chime', { volume: 0.55, pitch: 1.15 });
+      driToast('all the way over, and all the way back, every thirty-eight seconds.');
+    }
   }
 }
 /** Seconds until the breath next goes slack, for the task card. */

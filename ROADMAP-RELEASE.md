@@ -411,12 +411,64 @@ softened only if a scripted average-input run says it needs it. Measure: a
 mid-skill scripted dancer (deliberate ±90 ms jitter) must clear the floor
 within ~3 attempts; a clean run must not notice the change.
 
-**Batch R7 — replayability closeout.** Land the in-flight v53 work; rio
+**Batch R7 — replayability closeout. Done, 1 Sep 2026.** The last five set
+pieces in the tree that switched themselves off the first time they paid out,
+plus the three records the parity sweep left unclaimed. Every one of them was
+the same single line — an `if (xDone) return` at the top of the checker — and
+in each case the task keeps its latch while the THING re-arms.
+
+| | first | again |
+|---|---|---|
+| rio calçadão | 181.4 m, ticked, line said | 181.5 m, no line |
+| rio Arpoador | clap 5.7 s, ticked, line said | clap 5.7 s again, no line |
+| drift vane | watched 42 s, ticked | watched 20 s — **was 0 before** |
+| venice Rialto | 4.5 s, ticked, line said | 4.3 s the other way, no line |
+| venice calli | 48.0 m, ticked, line said | 48.0 m, no line |
+
+**The drift vane was the one that mattered beyond replayability.** It is the
+chapter's only wind readout, and `long-gap` — the Drift's hardest task — is
+impossible into the breath, marginal in calm and easy with it behind you. The
+tick switched off the instrument at the exact moment the player learned it
+existed. The ripple of paper off the post, and `driVaneWatch`, now run for the
+life of the chapter.
+
+**Three records, all three pars measured, machine floor first**
+(`qa/r7-pars.js`, `qa/r7-pars2.js`, three runs each):
+
+| record | floor / ceiling measured | task ticks at | par |
+|---|---|---|---|
+| `calcadao` longest run | **181.8 m** ceiling, of a 188 m band | 132 m | 165 |
+| `the-calli` crossed | **48.0 m** hard ceiling | 36 m | 44 |
+| `rialto` over the top in | **4.3 s** floor | — | 5.5 |
+
+**A RECORDS key has to be a TASK id.** The chapter board and the picker both
+look a row up as `RECORDS[taskId]` (systems.js), so the roadmap's working name
+of `calcadao-run` would have filed a number nothing could ever show — the same
+shape as the api-key mismatch that once seated five diners on thin air. The keys
+are `calcadao`, `the-calli` and `rialto`. `hud.recordAudit()` now reports
+orphans for exactly this, and the sweep is clean: **59 rows, 0 orphans.**
+
+Also added: `hud.recordAudit()` — the board and the live attempt, which could
+only be reached before by flushing the save and reading localStorage, and that
+cannot see an attempt in progress at all — and `rio.clap()`.
+
+**Two probe defects, both of which produced plausible wrong numbers.**
+`V.rialto` is a METHOD: read without the parentheses it is a truthy function
+object whose `.ax` is undefined, so every derived coordinate came out NaN and
+serialised as null, and nothing threw. And **teleporting onto the calçadão does
+not start a run** — the chapter spawns the animal ON the paving, so the tracker
+was already armed with its start at x = 0, and the first measured "sprint" came
+back as 91 m, which is exactly half the truth and therefore believable. She has
+to walk on, from off it.
+
+Verified by `qa/r7-rearm.js`. Zero console messages; build clean at 9076.7 KB.
+
+Original scope: Land the in-flight v53 work; rio
 calçadão re-arm + `calcadao-run` record (par measured, machine floor first);
 Arpoador re-clap; drift vane watch re-arm; Venice's two measured-and-discarded
 records claimed (`rialto-crossing`, calli span). Pars measured by scripted
-runs, never guessed (see `capy3-the-second-hour`: a par below the machine
-floor is unreachable by anybody).
+runs, never guessed (see `capy3-the-second-hour`: a par below the machine floor
+is unreachable by anybody).
 
 **Batch R8 — the second chapter.** Pasto depth: an ambience bed with an
 identity (páramo wind through frailejones, distant plaza band, the carroza),

@@ -244,6 +244,7 @@ let venOnBoards = false;
 let venSpritzDone = false, venPigeonDone = false, venBoardDone = false;
 let venGondDone = false, venRialtoDone = false, venFloodDone = false, venSwimDone = false;
 let venRialtoFrom = 0, venRialtoHigh = 0;
+let venRialtoT = 0;                    // the clock on THIS crossing — see RECORDS
 let venSwimRun = 0, venSwimFromX = 0, venSwimTo = 0, venSwimHas = false;
 let venCafeGroup = null;
 let venTideTold = 0;
@@ -4548,31 +4549,57 @@ let venCalliDone = false, venCalliIn = false;
 let venCalliW = 0, venCalliE = 0;      // the extent of this visit, in x
 let venCalliTold = false;
 
+// ---- AND THE METRES ARE KEPT (R7) -----------------------------------------
+// This already computed the thing it then threw away: `run` is the extent of
+// the visit in x, the maze is forty-eight metres wide and thirty-six of them
+// tick it — so there were twelve metres of headroom above the task, measured
+// every frame, discarded, in a chapter with two records in it. The other one is
+// the Rialto, forty lines up.
+//
+// The task keeps its latch; the crossing re-arms per visit and the widest one
+// is filed when she walks out of the maze. See 'the-calli' in RECORDS.
 function venCheckCalli(game) {
-  if (venCalliDone) return;
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
   const inside = p.x > venCAL_X0 && p.x < venCAL_X1 && p.z > venCAL_Z0 && p.z < venCAL_Z1;
-  if (!inside) { venCalliIn = false; return; }
+  if (!inside) {
+    if (venCalliIn) venCalliFile(game);
+    venCalliIn = false; return;
+  }
   if (!venCalliIn) { venCalliIn = true; venCalliW = p.x; venCalliE = p.x; }
   if (p.x < venCalliW) venCalliW = p.x;
   if (p.x > venCalliE) venCalliE = p.x;
   const run = venCalliE - venCalliW;
+  // Half the crossing before the paper says anything, for the reason the
+  // calçadão waits twenty metres: a number on the card every time somebody
+  // walks down a lane is furniture.
+  if (run > venCALLI_CROSS * 0.5 && typeof game.recordLive === 'function') {
+    game.recordLive('the-calli', run);
+  }
   // ---- and it says how it is going, once, in the middle -------------------
   // A maze is the one place in this chapter where the player cannot see where
   // they are going, so a task measured in metres crossed needs to admit that it
   // is being measured. Half way, once a visit, and then never again.
-  if (!venCalliTold && run > venCALLI_CROSS * 0.5) {
+  if (!venCalliTold && !venCalliDone && run > venCALLI_CROSS * 0.5) {
     venCalliTold = true;
     venToast('half way across. the rio is the hard bit — there are two bridges.');
   }
-  if (run >= venCALLI_CROSS) {
+  if (run >= venCALLI_CROSS && !venCalliDone) {
     venCalliDone = true;
     venTask('the-calli');
     venSfx('pop', { volume: 0.5, pitch: 1.3 });
     venToast('two bridges over that rio and you found one of them.');
   }
+}
+
+/** The widest crossing of the visit, filed on the way out of the maze. */
+function venCalliFile(game) {
+  const run = venCalliE - venCalliW;
+  if (run > venCALLI_CROSS * 0.5 && typeof game.record === 'function') {
+    game.record('the-calli', run);
+  }
+  if (typeof game.recordEnd === 'function') game.recordEnd('the-calli');
 }
 
 function venTask(id) {
@@ -5038,7 +5065,18 @@ function venUpdateTasks(game, dt) {
   // the arch since. Reaching the far side then finishes it, and it does not care
   // how gracefully. Going round by water sets the side again instead of ticking,
   // because that is not crossing the bridge.
-  if (!venRialtoDone) {
+  // ---- AND IT IS TIMED, AND IT RE-ARMS (R7) -------------------------------
+  // The task says 'Take the Rialto at a run' and nothing was ever clocking it —
+  // one of the two records this chapter was owed. `if (!venRialtoDone)` also
+  // wrapped the whole thing, so the busiest bridge in the world went inert the
+  // first time it was crossed.
+  //
+  // The clock starts the frame a side is claimed and stops on the far side, so
+  // it measures the crossing rather than the visit; standing on the arch to look
+  // at the Grand Canal costs you the attempt and nothing else. Crossing back is
+  // the next one — the far side becomes the new start, which is the same
+  // re-arm-where-you-are the cane run uses. See 'rialto' in RECORDS.
+  {
     const near = venInZone('rialto', p.x, p.z);
     if (near) {
       venLinePoint(venCanX, venCanZ, venCanS, venCanLen, venRIALTO_S, venLineOut);
@@ -5046,21 +5084,31 @@ function venUpdateTasks(game, dt) {
       const along = (p.x - venLineOut.x) * Math.cos(yaw) + (p.z - venLineOut.z) * -Math.sin(yaw);
       const side = along > 3 ? 1 : along < -3 ? -1 : 0;
       if (p.y > venFOND_Y + 2.2) venRialtoHigh = 1;      // genuinely up on the arch
+      if (venRialtoFrom !== 0) {
+        venRialtoT += dt;
+        if (typeof game.recordLive === 'function') game.recordLive('rialto', venRialtoT);
+      }
       if (side !== 0) {
-        if (venRialtoFrom === 0) { venRialtoFrom = side; venRialtoHigh = 0; }
+        if (venRialtoFrom === 0) { venRialtoFrom = side; venRialtoHigh = 0; venRialtoT = 0; }
         else if (side === -venRialtoFrom) {
           if (venRialtoHigh) {
+            const again = venRialtoDone;
             venRialtoDone = true;
-            venTask('rialto');
-            venToast('nobody has ever crossed that bridge without stopping. until now.');
+            if (typeof game.record === 'function') game.record('rialto', venRialtoT);
+            if (typeof game.recordEnd === 'function') game.recordEnd('rialto');
             venSfx('pop', { volume: 0.85, pitch: 1.15 });
+            if (!again) venTask('rialto');
+            if (!again) venToast('nobody has ever crossed that bridge without stopping. until now.');
+            // ...and the far side is the start of the next one.
+            venRialtoFrom = side; venRialtoHigh = 0; venRialtoT = 0;
           } else {
-            venRialtoFrom = side;
+            venRialtoFrom = side; venRialtoT = 0;
           }
         }
       }
     } else if (venRialtoFrom !== 0) {
-      venRialtoFrom = 0; venRialtoHigh = 0;
+      venRialtoFrom = 0; venRialtoHigh = 0; venRialtoT = 0;
+      if (typeof game.recordEnd === 'function') game.recordEnd('rialto');
     }
   }
 
@@ -5139,7 +5187,7 @@ export function createVenice(game) {
       venSirenT = -1; venSirenStep = 0;
       venWasFlooded = false;
       venBoardRunT = -1; venBoardOff = 0;
-      venRialtoFrom = 0; venRialtoHigh = 0;
+      venRialtoFrom = 0; venRialtoHigh = 0; venRialtoT = 0;
       venSwimHas = false; venSwimRun = 0;
       venGondRideT = 0;
       venTideTold = 0;
@@ -5169,6 +5217,10 @@ export function createVenice(game) {
       if (venSeedMesh) venSeedMesh.visible = false;
       venVoloScare = 0;
       venSwimRun = 0;
+      // ...and a crossing in progress is FILED before it is forgotten. Same
+      // rule as the Rialto clock two lines above: leaving the country settles
+      // the attempt, it does not delete it.
+      if (venCalliIn && venGame) venCalliFile(venGame);
       venCalliIn = false; venCalliW = 0; venCalliE = 0; venCalliTold = false;
       venFloodWin = 0;
       venBoardOff = 0;
@@ -5191,7 +5243,7 @@ export function createVenice(game) {
       // Anything stateful that could hold the player is cleared on the way out.
       // Every biome shares one coordinate space and a latch that survives travel
       // is a bug waiting for somewhere it makes no sense.
-      venBoardRunT = -1; venRialtoFrom = 0; venRialtoHigh = 0;
+      venBoardRunT = -1; venRialtoFrom = 0; venRialtoHigh = 0; venRialtoT = 0;
       venSwimHas = false; venGondRideT = 0;
       venVoloAboard = false; venVoloConfT = -1;
     },
