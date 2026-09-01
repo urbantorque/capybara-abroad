@@ -542,6 +542,19 @@ Then open <http://localhost:5173>. `PORT=5188 node server.mjs` to move it.
 Your progress is kept in the browser's own storage, per browser and per machine.
 Nothing is uploaded anywhere, because there is nowhere to upload it to.
 
+**There is no published address yet.** The game has been ready for one for a
+while — it is a folder of static files with no server-side anything, so any host
+that serves files and compresses them will do (GitHub Pages, Netlify, itch.io),
+and either the unbundled tree or `dist/` can be the thing served. Two numbers
+for whoever picks: **9.1 MB raw, ~2.6 MB gzipped** for the single file; 7.7 MB
+over 27 requests for the tree. Any real host compresses.
+
+**Licence: none yet, which means all rights reserved.** You may play a copy you
+were handed; you do not have permission to fork, modify or redistribute it. The
+two bundled libraries are MIT and their notice travels inside the built file.
+See [LICENSING.md](LICENSING.md) — it is one decision, and the wiring behind it
+is already done.
+
 ## Controls
 
 | Input | Action |

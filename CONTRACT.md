@@ -3009,13 +3009,24 @@ its ratchet ceiling.
    misses. Closing the rest means cutting density where the player is standing, and the
    same brief forbids visual regressions.
 
-   *(The count here said "ten of seventeen" and the game has had nineteen chapters for a
-   while. It is deliberately not replaced with a fresh figure: `renderer.info.render
-   .triangles` sampled after a `tick(dt, false)` reads **1** — the composite quad, exactly
-   the trap described at the end of this section — and `qa/budget.js`, which does walk the
-   scene, is one of the suites that moves by four figures with nothing changed between
-   runs. Anything quoted here has to come from budget.js over several runs, and it has to
-   say whether it includes the shadow pass, because the ROADMAP's 139k–454k soak did.)*
+   *(RECONCILED, R10, 2 Sep 2026. The count here said "ten of seventeen" and the game
+   has had nineteen chapters for a while. Measured with `qa/budget.js` over **three page
+   loads**, which is what this section has always asked for, and reported here **without
+   the shadow pass** — the walk counts every visible mesh once; casters are the separate
+   `shadowTris` column, and the ROADMAP's 139k–454k soak figure counted them twice, which
+   is most of the gap between the two numbers.*
+
+   ***13 of 19 are over the 130,000 line.** Worst to best over the line: hanoi 300k,
+   pantanal 210k, goreme 205k, iceland 200k, sahara 198k, drift 185k, venice 183k,
+   antarctic 182k, quay 169k, monaco 161k, cave 160k, kowloon 155k, palawan 130.4k.
+   Under it: rio 126k, kyoto 124k, cali 112k, pasto 104k, manly 86k, sydney 90k.*
+
+   *The measurement is stable enough to quote: across the three loads the widest spread
+   was iceland at 3,690 triangles and the narrowest four chapters did not move at all.
+   And the gate that decides still says the same thing it said in v28 — **the worst
+   chapter in the game costs 2.02 ms of a 16.67 ms frame against a 5.5 ms budget**, and
+   hanoi, which has by far the most triangles, is 1.90 ms while goreme at two thirds of
+   its count is 2.02. The triangle gate is a report and the cost gate is the gate.)*
 2. **Cost, 5.5 ms** — milliseconds of real render, and the gate that decides. rAF is pinned
    to the display, so every chapter reads 16.67 ms and a frame-time measurement says
    nothing; the only way past vsync is N renders back to back with a `gl.finish()`. The

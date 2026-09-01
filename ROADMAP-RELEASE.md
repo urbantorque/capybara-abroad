@@ -631,7 +631,93 @@ tunnel echo, roulette rattle) and goreme/drift one distinguishing voice each;
 optional: gentle music-under-sfx ducking on the ensemble bus if it can be A/B'd
 honestly (see `capy3-the-mix` for the measurement traps).
 
-**Batch R10 — ship.** LICENSE (owner decides; batch wires it: file, package
+**Batch R10 — ship. Done except two decisions that are not this run's to make,
+2 Sep 2026.**
+
+**Done**
+
+- **CONTRACT.md's budget is reconciled.** That section named its own conditions
+  — several runs of `qa/budget.js`, and it must say whether the shadow pass is
+  included — so: three page loads, reported **without** the shadow pass (the
+  walk counts each visible mesh once; casters are the separate `shadowTris`
+  column, and the ROADMAP's 139k–454k soak counted them twice, which is most of
+  the gap). **13 of 19 are over the 130,000 line**, not "ten of seventeen".
+  Stable enough to quote: the widest spread across the three loads was iceland
+  at 3,690 triangles and four chapters did not move at all. And the gate that
+  decides says what it said in v28 — **the worst chapter costs 2.02 ms of a
+  16.67 ms frame against a 5.5 ms budget**, with hanoi at 300k triangles
+  cheaper (1.90 ms) than goreme at 205k (2.02).
+- **The 19-chapter soak, clean profile.** 19/19 entered, nine seconds of driven
+  free play each, sampled every frame: **0 NaN, 0 solver saves, 0 console
+  messages, 0 errors**, and nothing fell through the world (the lowest reading
+  anywhere is Venice at −1.2, which is its water). Run on localhost, because
+  there is no deployed address; the only thing that hides is the host's
+  compression and TLS, and the vendored libraries mean no third party is
+  involved in starting the game at all.
+- **The private-window run.** localStorage made to *throw* — which is what
+  Safari private mode and an exhausted quota do, and a much less friendly
+  failure than clearing it. R3's sentence arrives: "be a menace." and then
+  *"this browser will not let the game keep a file — this journey lasts as long
+  as the tab does."*
+- **The distributable now says what it is.** It carried an MIT notice covering
+  three.js and cannon-es and **silence about the ninety thousand lines it is
+  mostly made of**, which reads as though MIT covered the lot. `build.mjs`
+  generates a notice above it: with no LICENSE file it says so in plain words,
+  and the moment one exists its first paragraph is lifted in automatically.
+- **README** says there is no published address and no licence, with the two
+  numbers a host needs (9.1 MB raw, ~2.6 MB gzipped; 7.7 MB over 27 requests).
+
+**And the soak found something, which is what a soak is for.**
+
+`[pantanal] local at -33 -48 is in the water (0.27) - skipped`. **The Pantanal
+has been shipping six locals and not seven**, and the missing one is the
+cattleman at the herd crossing — the man whose four lines are the only place
+anything acknowledges that you took the herd across, which is the thing the
+chapter exists for.
+
+The cause is better than the symptom. `put()` probed `panTerrain`, which
+answers *"what would the capybara stand on here"* — and that **includes the
+floating meadow mats and a sleeping caiman, both of which move**. So whether a
+person existed at all depended on where a raft happened to be drifting on the
+frame the chapter was built. That is why every previous soak reported a clean
+console: the warning is intermittent by construction.
+
+`panStandH` is the static ground — bed, plus the road laid over it, and no
+rafts — and `put()` asks that instead. **My first fix was measured against
+`panTerrain` and was wrong the same way**: it chose (−24, −51), which reads 0.56
+while a meadow is passing and −0.11 when it is not. Measured on static ground
+over a 68 × 68 m grid, the nearest real bank is (−41, −47) at 0.51, ten metres
+back up the west approach. Verified: seven locals, console clean, soak re-run
+green.
+
+**Two decisions, both deliberately left**
+
+1. **The LICENSE.** This roadmap has said "owner decides" since it was written
+   and that is right: it is a grant of permission over the author's own work and
+   it is irreversible in practice. What R10 owed was the *wiring*, and that is
+   done — `build.mjs` already looks for `LICENSE` / `.md` / `.txt` and needs no
+   change. **`LICENSING.md`** lays out what the choice costs *for this
+   repository* (the content is authored as well as the code; the two bundled
+   libraries are MIT and constrain nothing; publishing and licensing are
+   separate decisions) and the exact three edits that follow. One decision, then
+   `node build.mjs`.
+2. **The deploy.** No host has been chosen, there is no remote configured, and
+   publishing is an outward-facing move that does not get made on the author's
+   behalf. Everything it needs is ready: static files, no server-side anything,
+   no CDN, a build that refuses to emit a bundle naming one.
+
+Probes: `qa/r10-soak.js`, `qa/r10-private.js`, `qa/r10-pan.js`,
+`qa/r10-budget-{1,2,3}.json`, `qa/r10-shot.js`.
+
+**One probe lesson, and it is the third time this pass:** the private-window
+probe first hooked `game.toast` and saw **nothing at all** — not even "be a
+menace." — because `startGame` calls the module-private `toast()`, and
+`game.toast` is a separate binding onto it that systems.js never uses for its
+own lines. Hooking a public name shows what the CHAPTERS say and none of what
+the GAME says, exactly as hooking `game.sfx` shows every object in a chapter and
+none of its ambient bed. Watch the DOM, or add an audit.
+
+Original scope: LICENSE (owner decides; batch wires it: file, package
 field, dist notice); deploy to the chosen host; README address; CONTRACT.md
 budget reconciliation; full 19-chapter soak on the deployed address from a
 clean profile, plus one private-window run to see the new toast.

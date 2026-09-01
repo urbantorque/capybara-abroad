@@ -1,0 +1,254 @@
+{
+ "triBudget": 130000,
+ "msBudget": 5.5,
+ "ceilings": {
+  "pantanal": 217000,
+  "goreme": 222000,
+  "iceland": 205000,
+  "sahara": 205000,
+  "drift": 191000,
+  "venice": 188000,
+  "antarctic": 188000,
+  "quay": 165000,
+  "cave": 166000,
+  "kowloon": 160000,
+  "palawan": 136000,
+  "rio": 134000,
+  "kyoto": 128000,
+  "pasto": 110000,
+  "cali": 100000,
+  "manly": 92000,
+  "sydney": 87000,
+  "monaco": 141000,
+  "hanoi": 252000
+ },
+ "rows": [
+  {
+   "n": "goreme",
+   "tris": 206042,
+   "shadowTris": 115174,
+   "meshes": 333,
+   "ms": 2.23,
+   "msNoShadow": 1.87,
+   "shadowMs": 0.37,
+   "noisy": false
+  },
+  {
+   "n": "kowloon",
+   "tris": 155098,
+   "shadowTris": 116510,
+   "meshes": 256,
+   "ms": 2.22,
+   "msNoShadow": 1.78,
+   "shadowMs": 0.44,
+   "noisy": false
+  },
+  {
+   "n": "palawan",
+   "tris": 130366,
+   "shadowTris": 102406,
+   "meshes": 187,
+   "ms": 2.06,
+   "msNoShadow": 1.77,
+   "shadowMs": 0.29,
+   "noisy": false
+  },
+  {
+   "n": "cave",
+   "tris": 160044,
+   "shadowTris": 154886,
+   "meshes": 185,
+   "ms": 2.02,
+   "msNoShadow": 1.76,
+   "shadowMs": 0.25,
+   "noisy": false
+  },
+  {
+   "n": "hanoi",
+   "tris": 300076,
+   "shadowTris": 217436,
+   "meshes": 282,
+   "ms": 1.95,
+   "msNoShadow": 1.78,
+   "shadowMs": 0.17,
+   "noisy": false
+  },
+  {
+   "n": "antarctic",
+   "tris": 182046,
+   "shadowTris": 78962,
+   "meshes": 168,
+   "ms": 1.7,
+   "msNoShadow": 1.47,
+   "shadowMs": 0.23,
+   "noisy": false
+  },
+  {
+   "n": "monaco",
+   "tris": 160735,
+   "shadowTris": 66436,
+   "meshes": 267,
+   "ms": 1.62,
+   "msNoShadow": 1.32,
+   "shadowMs": 0.3,
+   "noisy": false
+  },
+  {
+   "n": "pantanal",
+   "tris": 210026,
+   "shadowTris": 148264,
+   "meshes": 151,
+   "ms": 1.6,
+   "msNoShadow": 1.06,
+   "shadowMs": 0.54,
+   "noisy": false
+  },
+  {
+   "n": "manly",
+   "tris": 86734,
+   "shadowTris": 82266,
+   "meshes": 179,
+   "ms": 1.52,
+   "msNoShadow": 1.19,
+   "shadowMs": 0.33,
+   "noisy": false
+  },
+  {
+   "n": "drift",
+   "tris": 184766,
+   "shadowTris": 42704,
+   "meshes": 219,
+   "ms": 1.42,
+   "msNoShadow": 0.85,
+   "shadowMs": 0.57,
+   "noisy": false
+  },
+  {
+   "n": "iceland",
+   "tris": 204180,
+   "shadowTris": 92866,
+   "meshes": 262,
+   "ms": 1.23,
+   "msNoShadow": 1.02,
+   "shadowMs": 0.2,
+   "noisy": false
+  },
+  {
+   "n": "venice",
+   "tris": 182850,
+   "shadowTris": 167812,
+   "meshes": 180,
+   "ms": 1.21,
+   "msNoShadow": 1,
+   "shadowMs": 0.21,
+   "noisy": false
+  },
+  {
+   "n": "sahara",
+   "tris": 199300,
+   "shadowTris": 117284,
+   "meshes": 328,
+   "ms": 1.18,
+   "msNoShadow": 0.58,
+   "shadowMs": 0.6,
+   "noisy": false
+  },
+  {
+   "n": "quay",
+   "tris": 169405,
+   "shadowTris": 84483,
+   "meshes": 252,
+   "ms": 1.13,
+   "msNoShadow": 0.93,
+   "shadowMs": 0.19,
+   "noisy": false
+  },
+  {
+   "n": "kyoto",
+   "tris": 123608,
+   "shadowTris": 90752,
+   "meshes": 253,
+   "ms": 0.97,
+   "msNoShadow": 0.65,
+   "shadowMs": 0.32,
+   "noisy": false
+  },
+  {
+   "n": "rio",
+   "tris": 128096,
+   "shadowTris": 115112,
+   "meshes": 166,
+   "ms": 0.92,
+   "msNoShadow": 0.48,
+   "shadowMs": 0.43,
+   "noisy": false
+  },
+  {
+   "n": "sydney",
+   "tris": 89664,
+   "shadowTris": 59624,
+   "meshes": 155,
+   "ms": 0.86,
+   "msNoShadow": 0.44,
+   "shadowMs": 0.41,
+   "noisy": false
+  },
+  {
+   "n": "cali",
+   "tris": 111932,
+   "shadowTris": 86904,
+   "meshes": 208,
+   "ms": 0.86,
+   "msNoShadow": 0.61,
+   "shadowMs": 0.24,
+   "noisy": false
+  },
+  {
+   "n": "pasto",
+   "tris": 104164,
+   "shadowTris": 68748,
+   "meshes": 97,
+   "ms": 0.59,
+   "msNoShadow": 0.28,
+   "shadowMs": 0.32,
+   "noisy": false
+  }
+ ],
+ "fail": [
+  "FAIL ratchet · sydney: 89664 triangles, over its recorded ceiling of 87000 by 2664. Something was ADDED. Reallocate it, or raise the line here with a measurement and a reason.",
+  "FAIL ratchet · quay: 169405 triangles, over its recorded ceiling of 165000 by 4405. Something was ADDED. Reallocate it, or raise the line here with a measurement and a reason.",
+  "FAIL ratchet · cali: 111932 triangles, over its recorded ceiling of 100000 by 11932. Something was ADDED. Reallocate it, or raise the line here with a measurement and a reason.",
+  "FAIL ratchet · monaco: 160735 triangles, over its recorded ceiling of 141000 by 19735. Something was ADDED. Reallocate it, or raise the line here with a measurement and a reason.",
+  "FAIL ratchet · hanoi: 300076 triangles, over its recorded ceiling of 252000 by 48076. Something was ADDED. Reallocate it, or raise the line here with a measurement and a reason."
+ ],
+ "overTri": [
+  "quay: 169405, over the 130000 brief gate by 39405 — renders in 1.13 ms (0.67 ms per 100k)",
+  "iceland: 204180, over the 130000 brief gate by 74180 — renders in 1.23 ms (0.60 ms per 100k)",
+  "sahara: 199300, over the 130000 brief gate by 69300 — renders in 1.18 ms (0.59 ms per 100k)",
+  "drift: 184766, over the 130000 brief gate by 54766 — renders in 1.42 ms (0.77 ms per 100k)",
+  "venice: 182850, over the 130000 brief gate by 52850 — renders in 1.21 ms (0.66 ms per 100k)",
+  "kowloon: 155098, over the 130000 brief gate by 25098 — renders in 2.22 ms (1.43 ms per 100k)",
+  "palawan: 130366, over the 130000 brief gate by 366 — renders in 2.06 ms (1.58 ms per 100k)",
+  "goreme: 206042, over the 130000 brief gate by 76042 — renders in 2.23 ms (1.08 ms per 100k)",
+  "pantanal: 210026, over the 130000 brief gate by 80026 — renders in 1.6 ms (0.76 ms per 100k)",
+  "cave: 160044, over the 130000 brief gate by 30044 — renders in 2.02 ms (1.26 ms per 100k)",
+  "antarctic: 182046, over the 130000 brief gate by 52046 — renders in 1.7 ms (0.93 ms per 100k)",
+  "monaco: 160735, over the 130000 brief gate by 30735 — renders in 1.62 ms (1.01 ms per 100k)",
+  "hanoi: 300076, over the 130000 brief gate by 170076 — renders in 1.95 ms (0.65 ms per 100k)"
+ ],
+ "noCeil": [],
+ "noisy": [],
+ "worst": {
+  "n": "goreme",
+  "tris": 206042,
+  "shadowTris": 115174,
+  "meshes": 333,
+  "ms": 2.23,
+  "msNoShadow": 1.87,
+  "shadowMs": 0.37,
+  "noisy": false
+ },
+ "pass": false,
+ "costUsable": true,
+ "summary": "FAIL (5) · 13 of 19 over the 130k brief gate · worst chapter goreme at 2.23 ms of a 16.67 ms frame"
+}

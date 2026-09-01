@@ -178,6 +178,48 @@ const VENDOR_NOTICE = [
   '-->'
 ].join('\n');
 
+// ---- AND WHAT THE GAME ITSELF IS UNDER (R10) -----------------------------
+// The block above is the two libraries' notice and it has always been correct.
+// What the artefact never said was anything about the ninety thousand lines it
+// is mostly made of — so a file that travels well, opens from file:// and can
+// be emailed to anybody carried an MIT grant covering three.js and cannon-es
+// and SILENCE about the game, which reads, to anyone who thinks about it for a
+// second, as though the MIT notice covered the lot.
+//
+// It does not. Until there is a LICENSE file, the honest line is the one the
+// law supplies by default, and it belongs in the artefact rather than only in
+// a repository nobody who was handed the file can see.
+//
+// THIS IS WIRING, NOT A DECISION. Drop a LICENSE file in the root and the
+// notice below becomes its first paragraph automatically; see LICENSING.md for
+// the three edits that go with it.
+function gameNotice() {
+  let grant = null;
+  for (const f of ['LICENSE', 'LICENSE.md', 'LICENSE.txt']) {
+    try { grant = readFileSync(join(ROOT, f), 'utf8'); break; } catch (e) { /* next */ }
+  }
+  const head = ['<!--', '  Untitled Capybara Game', ''];
+  if (grant) {
+    // The first paragraph of a licence file is its identity — "MIT License",
+    // "Creative Commons Attribution 4.0", the copyright line. Enough to tell
+    // somebody holding the file what they may do, with a pointer to the rest.
+    const para = grant.replace(/\r\n/g, '\n').split('\n\n')[0].trim().split('\n');
+    for (const l of para.slice(0, 8)) head.push('  ' + l);
+    head.push('');
+    head.push('  Full terms: the LICENSE file in the source tree.');
+  } else {
+    head.push('  No licence has been granted for this game.');
+    head.push('');
+    head.push('  The MIT notice below covers the two bundled libraries and NOTHING ELSE.');
+    head.push('  Everything outside them is © the author, all rights reserved: you may');
+    head.push('  play this file, and you do not have permission to redistribute or');
+    head.push('  modify it. If you were handed this and want to do either, ask.');
+  }
+  head.push('-->');
+  return head.join('\n');
+}
+const GAME_NOTICE = gameNotice();
+
 const vendored = vendorIIFE('vendor/three.module.js', 'THREE') +
                  vendorIIFE('vendor/cannon-es.js', 'CANNON');
 
@@ -235,8 +277,8 @@ bundled = replaceOnce(bundled, /<script type="importmap">[\s\S]*?<\/script>\s*/,
                       () => '', 'the importmap');
 // A function again, for the same reason as above — the notice has no `$` in it
 // today, and the next person to edit it should not have to know that it must not.
-bundled = replaceOnce(bundled, '<body>', () => '<body>\n' + VENDOR_NOTICE,
-                      'the MIT notice');
+bundled = replaceOnce(bundled, '<body>', () => '<body>\n' + GAME_NOTICE + '\n' + VENDOR_NOTICE,
+                      'the licence notices');
 if (/cdn\.jsdelivr\.net|unpkg\.com|cdnjs/.test(bundled)) {
   console.error('\n  BUILD BLOCKED — the bundle still references a CDN.\n');
   process.exit(1);

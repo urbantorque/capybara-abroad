@@ -574,6 +574,21 @@ function panTerrain(x, z) {
   return Math.max(bed, lerp(bed, panROAD_Y, r));
 }
 
+/**
+ * WHERE A PERSON CAN STAND — the STATIC ground, and the difference matters.
+ *
+ * panTerrain answers "what would the capybara stand on here", which includes
+ * the floating meadow mats and a sleeping caiman. Both move. Anything placed
+ * once, at build time, against panTerrain is therefore placed against wherever
+ * a raft happened to be drifting on that frame — see the note at put() in the
+ * locals block, and the six-of-seven it was quietly costing.
+ */
+function panStandH(x, z) {
+  const bed = panBedH(x, z);
+  const r = panOnRoad(x, z);
+  return r > 0 ? Math.max(bed, lerp(bed, panROAD_Y, r)) : bed;
+}
+
 function panSlope(x, z) {
   const e = 1.4;
   const hx = panTerrain(x + e, z) - panTerrain(x - e, z);
@@ -708,8 +723,23 @@ function panBuild(game) {
     // cattleman said the same four sentences whether the capybara had walked
     // past him or had just taken nine of his neighbours across the river at
     // sundown, which is the thing the whole chapter exists for.
+    // ---- AND IT MUST NOT ASK panTerrain (R10) -----------------------------
+    // panTerrain answers "what would the capybara stand on here", and that
+    // includes the floating meadow mats and a sleeping caiman, both of which
+    // MOVE. So whether a local was placed at all depended on where a mat
+    // happened to be drifting on the frame the chapter was built — which is
+    // why this warning is intermittent, and why every previous soak reported a
+    // clean console while the chapter was shipping six people instead of seven.
+    //
+    // A person stands on GROUND: the bed, or the road laid over it. Not on a
+    // raft, and not on a caiman.
+    const standH = function (x, z) {
+      const bed = panBedH(x, z);
+      const r = panOnRoad(x, z);
+      return r > 0 ? Math.max(bed, lerp(bed, panROAD_Y, r)) : bed;
+    };
     const put = function (key, x, z, o) {
-      const h = panTerrain(x, z);
+      const h = panStandH(x, z);
       if (h < panWATER + 0.05) {
         console.warn('[pantanal] local at', x, z, 'is in the water (' + h.toFixed(2) + ') - skipped');
         return null;
@@ -744,8 +774,28 @@ function panBuild(game) {
                 'gather': ['They have gone with you. Just like that. Just like that!'],
                 'tamandua': ['On the tamandua. It has not noticed. It never notices.'],
                 'missing-plank': ['You went over the gap. The truck still cannot.'] } });
-    put('cattleman', panCROSS.x + 1, panCROSS.z0 + 6, {
-      face: 0.2,
+    // ---- HE WAS NEVER THERE (R10) -----------------------------------------
+    // Found by the shipping soak, which is the only pass that ever entered all
+    // nineteen chapters and READ THE CONSOLE: `[pantanal] local at -33 -48 is
+    // in the water (0.27) - skipped`. The chapter has been shipping SIX locals
+    // and not seven, and the missing one is the man whose four lines are the
+    // only place anything says you took the herd across — the thing the whole
+    // chapter exists for, per the note twenty lines up.
+    //
+    // The guard was right and the anchor was wrong: `panCROSS.z0 + 6` is six
+    // metres into a river crossing, and the ground around a river crossing IS
+    // the flood — 0.269 there, three centimetres under the line, with no mat
+    // involved either way.
+    //
+    // THE FIRST FIX WAS MEASURED AGAINST panTerrain AND WAS ALSO WRONG, which
+    // is the reason panStandH now exists: it chose (-24, -51), which reads 0.56
+    // while a floating meadow is passing and -0.11 when it is not. Measured on
+    // the STATIC ground over a 68 x 68 m grid, the nearest real bank is
+    // (-41, -47) at 0.51, ten metres back up the west approach — which is
+    // where somebody watching a herd go over would stand anyway. He faces the
+    // water.
+    put('cattleman', -41, -47, {
+      face: 2.36,
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       lines: ['They go over here. Same place every evening.',
               { t: 'Let them go first. They will not wait for you.', before: 'gather' },
@@ -4713,6 +4763,8 @@ export function createPantanal(game) {
   const api = {
     built() { return panBuilt; },
     terrainHeight: panTerrain,
+    /** The static ground, without the drifting mats. See panStandH. */
+    standHeight: panStandH,
     slopeAt: panSlope,
     waterLevel: panWATER,
     isOverWater: panIsOverWater,

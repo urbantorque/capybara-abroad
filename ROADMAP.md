@@ -54,19 +54,26 @@ guessed.
   once you inline the code.
 - `package.json`, and a rewritten **Play** section in the README that is true.
 
-**Still to do**
+**Still to do** — *R10, 2 Sep 2026: the wiring for both is done; what is left in
+each is a decision, not a task.*
 
-- **A `LICENSE` file. This is the one remaining hard blocker and it is not a
-  technical decision.** Without one, nobody who is handed this repository has
-  permission to run, fork or modify it — "broader sharing" is legally
-  ill-defined until there is one. `package.json` is deliberately marked
-  `private` with no `license` field until that call is made.
-- **Pick a host and write the deploy step.** Static hosting with compression
-  (GitHub Pages, Netlify, itch.io) serving either the unbundled tree or `dist/`.
-  Nothing about the game needs a server; there is simply no published address.
-- **First-visit weight.** 9.0 MB raw, ~2.6 MB gzipped for the single file; the
-  unbundled tree is 7.7 MB raw over 27 requests. Any real host compresses, so
-  this is a second-order problem — but every chapter's builder is parsed at boot
+- **A `LICENSE` file. Still the one hard blocker, and still not a technical
+  decision.** What changed is that the artefact no longer implies otherwise:
+  `dist/` carried an MIT notice for three.js and cannon-es and said nothing at
+  all about the game, which reads as though MIT covered the lot. `build.mjs`
+  now generates a notice above it — all rights reserved while there is no
+  LICENSE, and the file's own first paragraph the moment there is one. See
+  **`LICENSING.md`**: what the choice costs for this repository specifically,
+  and the three edits behind it. `package.json` is still `private` with no
+  `license` field, on purpose.
+- **Pick a host and write the deploy step.** Unchanged and still open, because
+  publishing is the author's move to make. Everything it needs is ready: static
+  files, no server-side anything, no CDN, and a build that refuses to emit a
+  bundle naming one. The README now says there is no address rather than
+  implying there is.
+- **First-visit weight.** 9.1 MB raw, ~2.6 MB gzipped for the single file; the
+  unbundled tree is 7.7 MB over 27 requests. Any real host compresses, so this
+  is a second-order problem — but every chapter's builder is parsed at boot
   when nineteen out of twenty first visits only ever see Sydney. If the number
   ever matters, that is where the fat is, and the biome-streaming machinery in
   `mainMakeBiomes` is already the right shape to exploit it.
@@ -179,11 +186,12 @@ apart and one of them should be updated to match the other.
 
 ## The order to do the rest in
 
-1. **`LICENSE`.** Everything else is optional; this one is the gate.
-2. **Pick a host, deploy, and put the address in the README.** The game has been
-   finished for a while and has nowhere to be.
-3. The two silent degradations in §2 — the software rasteriser and the
-   unavailable `localStorage`. Both are one toast each.
-4. The touch loose ends in §3, if phones are in scope at all.
-5. Reconcile the performance budget in `CONTRACT.md` with what is actually
-   being measured.
+1. **`LICENSE`.** Everything else is optional; this one is the gate. **Still
+   open after R10** — see `LICENSING.md`, which is the decision written down.
+2. **Pick a host, deploy, and put the address in the README.** **Still open
+   after R10**, and still the only other thing between this and an audience.
+3. ~~The two silent degradations in §2~~ — done, R3.
+4. ~~The touch loose ends in §3~~ — done, R5.
+5. ~~Reconcile the performance budget in `CONTRACT.md`~~ — done, R10:
+   measured over three loads, **13 of 19 chapters over the 130,000 triangle
+   line**, worst chapter 2.02 ms of a 16.67 ms frame against a 5.5 ms budget.
