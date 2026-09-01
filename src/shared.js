@@ -1967,10 +1967,10 @@ export const TASKS = [
   { id: 'to-pasto',        text: 'Emigrate (somehow)',                    chapter: 2 },
   { id: 'steal-empanada',  text: 'Steal an empanada',                     chapter: 2 },
   { id: 'market-chaos',    text: 'Bring down a market stall',             chapter: 2 },
-  { id: 'whistle-condor',  text: 'Call down a condor',                 chapter: 2 },
-  { id: 'condor-ride',     text: 'Grab its talons and hold on',           chapter: 2, wow: 'GALERAS' },
-  { id: 'thermal-peak',    text: 'Ride a thermal to the crater rim',      chapter: 2 },
-  { id: 'crater-drop',     text: 'Post something into the crater',        chapter: 2 },
+  { id: 'whistle-condor',  text: 'Call down a condor',                 chapter: 2, act: 2 },
+  { id: 'condor-ride',     text: 'Grab its talons and hold on',           chapter: 2, act: 2, wow: 'GALERAS' },
+  { id: 'thermal-peak',    text: 'Ride a thermal to the crater rim',      chapter: 2, act: 3 },
+  { id: 'crater-drop',     text: 'Post something into the crater',        chapter: 2, act: 3 },
   { id: 'ruana-thief',     text: 'Make off with a ruana',                 chapter: 2 },
   { id: 'church-bell',     text: 'Ring the church bell (badly)',          chapter: 2 },
   { id: 'coffee-scatter',  text: 'Scatter the coffee harvest',            chapter: 2 },
@@ -2533,7 +2533,17 @@ export const CHAPTERS = [
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
     hint: '2 527 m up, and a condor',                 open: 'be a menace.', way: 'the crater on Galeras',
-    keep: 'a condor’s flight feather' },
+    keep: 'a condor’s flight feather', win: 3,
+    // ---- THE SECOND CHAPTER HAD NO SHAPE (R8) --------------------------
+    // Pasto is a town, then a bird, then a mountain — the geography says so
+    // and the task list already sorted that way — and it was served as one
+    // flat eleven-row list, which is the shape a player meets in chapter 1 and
+    // then again in chapter 2. Nothing is gated: see the `act` note above.
+    acts: [
+      { kick: 'PASTO', line: 'be a menace.' },
+      { kick: 'SOMETHING ENORMOUS', line: 'it has been circling since you got here.' },
+      { kick: 'GALERAS', line: 'the mountain is live, and the only way up is the bird.' },
+    ] },
   { n: 3, biome: 'quay',    name: 'Circular Quay',   sub: 'she sails when you say she sails',
     arrive: 'to-quay',    far: 1600, tall: false, pal: 2,
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
@@ -3009,6 +3019,24 @@ export const RECORDS = {
   'yacht-race':    { label: 'threaded', unit: ' of the six', better: 'higher', dp: 0, par: 5 },
   'dolphin-escort':{ label: 'they stayed', unit: ' s', better: 'higher', dp: 1, par: 20 },
   'thermal-peak':  { label: 'carried up to', unit: ' m', better: 'higher', dp: 0 },
+  // ---- AND A THIRD FOR THE SECOND CHAPTER (R8) ---------------------------
+  // Pasto's two numbers were both on the condor, so the whole town half of the
+  // chapter had nothing to come back for. The task says 'Ring the church bell
+  // (badly)' and it ticked on the first stroke, which is the least bad way to
+  // ring a bell.
+  //
+  // It is the ANGLE and not a count of strokes, because a count measured
+  // exactly backwards: see THE SWING in pasto.js, where one strike and walking
+  // away scored 17 and working the rope scored 6. Strikes add to the swing in
+  // its direction of travel, so this rewards timing, and a pendulum only ever
+  // loses amplitude on its own.
+  //
+  // MEASURED: one strike and hands off reaches 39.5 degrees and stays there
+  // for thirty seconds; a scripted puller working the rope takes it to 179.6,
+  // which is the bell all but over the top and the ceiling. Ninety is the bell
+  // horizontal — mouth sideways, well past anything one blow can do, and a
+  // thing you can see from the plaza.
+  'church-bell':   { label: 'swung it to', unit: ' degrees', better: 'higher', dp: 0, par: 90 },
   'seagull-chips': { label: 'put up', unit: ' gulls at once', better: 'higher', dp: 0, par: 6 },
   // …and the chapter's mini. Twelve seconds on the roof ticks it; the number
   // is how far you actually rode, which is a different and much better

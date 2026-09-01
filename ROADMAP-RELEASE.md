@@ -470,7 +470,89 @@ records claimed (`rialto-crossing`, calli span). Pars measured by scripted
 runs, never guessed (see `capy3-the-second-hour`: a par below the machine floor
 is unreachable by anybody).
 
-**Batch R8 — the second chapter.** Pasto depth: an ambience bed with an
+**Batch R8 — the second chapter. Done, 2 Sep 2026.** Pasto was the weakest
+chapter on every axis at once, and it is the second place anybody sees.
+
+| | before | after |
+|---|---|---|
+| ambient lines | **1** — a pitched-down `hiss` every 11–24 s | 23 calls over 6 positional branches |
+| bespoke voices | 0 | 2 — `frailejon`, `banda` |
+| sfx call sites in `pasto.js` | **4** | **15** (quay 30, cali 26, kowloon 36) |
+| records | 2, both on the condor | 3 |
+| acts | none — one flat 11-row list | 3 |
+
+**The bed.** Pasto publishes seven zones already, so it is positional on them,
+which is the harbour's rule and Kyoto's. Two new voices carry it. `sfxFrailejon`
+is the páramo: at 2 527 m the wind never stops and what it is going through is
+frailejones — chest-high rosettes of thick furry leaves — and that fur is why
+the páramo does not whistle, it hushes, with a long low moan under it. A three-
+to-six-second swell whose attack is nearly as long as its decay, which is what
+stops it reading as a door opening. `sfxBanda` is the Carnaval de Negros y
+Blancos, which is a brass band and a bombo for a week: four notes of a major
+phrase on detuned saws, hard-lowpassed so it is always a block away, and
+deliberately never in the score's key — it is somebody else's band, round a
+corner, which is what makes a plaza a plaza rather than a room with music in it.
+
+Measured with `hud.ambAudit()`, 26 s pinned in each zone, all six reporting
+`inZone: true`:
+
+| zone | heard |
+|---|---|
+| plaza | bark, chime, vendor |
+| market | vendor ×3, **banda** |
+| church | bark, vendor, **banda** |
+| coffee | **frailejon**, rustle ×2, gull |
+| páramo | **frailejon**, hiss |
+| street | horn ×2, bark |
+
+**Three objects in the chapter made a noise and none of them did.** A market
+stall came down as one mono `thud` from nowhere — the same finding the bell's
+own comment records, on the noisier object — and is now three sounds in the
+order the thing falls: the frame on the cobbles, the crates after it, then the
+man whose stall it was. The carroza is a lorry with a brass band on the back of
+it and rolled up and down the plaza in silence; the band plays from the deck, so
+it is the one thing in Pasto you can hear moving. And Galeras is an active
+volcano, the destination of two tasks, and was silent from every distance: the
+vent rumbles now, near 30 far 420, because that is what a mountain clearing its
+throat does. Plus the nave's harmonium and the coffee bushes.
+
+**The third record was measured twice, and the first cut was exactly backwards.**
+`church-bell` ticked on the first stroke, which is the least bad way to ring a
+bell. The first design counted rings — and `av` is a magnitude, a pendulum's is
+zero at both ends of every swing, so the hysteresis re-arms twice a period and a
+freely decaying bell rings itself: **one strike and thirty seconds of walking
+away scored 17, while a player working the rope scored 6**, because re-striking
+holds the bell above the re-arm floor and suppresses the crossings. A record you
+get by leaving the room is not a record. It is the swing ANGLE instead, which is
+what "badly" means: strikes add in the direction of travel so it rewards timing,
+and a pendulum only ever loses amplitude on its own. Measured: one strike
+reaches **39.5°** and holds it flat for thirty seconds; a scripted puller reaches
+**179.6°**. Par is 90 — the bell horizontal, mouth sideways, well past anything
+one blow can do and visible from the plaza.
+
+**Three acts**: the town, then the bird, then the mountain. The geography says
+so and the task list already sorted that way. Nothing is gated — `completeTask`
+has never heard of an act — and verified: in Pasto the card shows `PASTO` and
+three act-1 rows with the condor and crater rows hidden.
+
+**The verification instrument is noisy and it is worth saying so.** `qa/r8-eng.js`
+(45 s of random free play per chapter) moved Pasto from 10 voices / 41
+place-sounds to 13 / 58 — but on the same pair of runs **cali went 41 → 0 on a
+change that did not touch cali**, because the random walker happened not to
+reach the water. The countable facts in the table above are the claim; the
+free-play instrument is corroboration, not proof.
+
+Also added: `hud.ambAudit()`. The bed is the one audio channel with no way in
+from outside — it goes through the module-private `sfx`, not `game.sfx` — so a
+probe that hooks the public call sees every object in the chapter and none of
+its soundscape, which is exactly backwards for the two batches whose subject is
+the soundscape. R9 uses it too.
+
+**One probe artefact worth recording:** reading `.capyui-todo.textContent` shows
+every row in the DOM, hidden ones included, so the act staging looked broken —
+the card appeared to list all nineteen chapters. Measure the rendered rects.
+
+Original scope: Pasto depth: an ambience bed with an
 identity (páramo wind through frailejones, distant plaza band, the carroza),
 positional sfx to at least the quay/cali floor (~20 calls), one act or second
 mini, records to 3. Verify: `qa/eng-rate.js` free-play instrument (the one

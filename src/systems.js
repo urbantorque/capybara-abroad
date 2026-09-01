@@ -8856,6 +8856,105 @@ export function createSystems(game) {
     }
   }
 
+  // ---- AND TWO FOR THE SECOND CHAPTER (R8) ---------------------------------
+  // Pasto is the second place a player ever sees and it had ONE ambient line —
+  // a pitched-down `hiss` every eleven to twenty-four seconds — over a páramo,
+  // a market, a plaza, a church and a live volcano. It is the same finding the
+  // seventeen voices above were written for, on the one chapter that missed
+  // that pass. These two are what Pasto actually sounds like.
+
+  /**
+   * THE PÁRAMO. Two and a half thousand metres up, the wind is thin and it
+   * never stops, and what it is going through is frailejones: rosettes of
+   * thick furry leaves, chest high, in stands of thousands. That fur is why
+   * the páramo does not whistle. It hushes, with a long low moan under it.
+   *
+   * A slow swell rather than a gust — three to six seconds, attack almost as
+   * long as the decay, which is what stops it reading as a door opening.
+   */
+  function sfxFrailejon(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.88, 1.14) * pitch;
+    const dur = rand(3.0, 6.0);
+    // the hush: wide noise, band-limited to the range fur passes
+    const ns = noiseWideSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(rand(380, 520) * v, t);
+    bp.frequency.linearRampToValueAtTime(rand(620, 900) * v, t + dur * 0.55);
+    bp.frequency.linearRampToValueAtTime(rand(330, 480) * v, t + dur);
+    bp.Q.value = 0.75;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(rand(0.075, 0.135) * vol, t + dur * 0.42);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    ns.connect(bp); bp.connect(g); g.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.1);
+    // the moan under it, a fifth of the level and an octave and a half down
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(rand(58, 74) * v, t);
+    o.frequency.linearRampToValueAtTime(rand(48, 66) * v, t + dur);
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(rand(0.016, 0.030) * vol, t + dur * 0.5);
+    og.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.connect(og); og.connect(acMaster);
+    o.start(t); o.stop(t + dur + 0.1);
+  }
+
+  /**
+   * THE BAND, FROM WHEREVER YOU ARE STANDING.
+   *
+   * Pasto is the Carnaval de Negros y Blancos, which is a brass band and a bass
+   * drum for a week, and the chapter has a carroza rolling up the plaza with
+   * nothing coming off it. Four notes of a bright major phrase on a pair of
+   * detuned saws, hard-lowpassed so it is always a block or two away, over a
+   * bombo on the one and the three.
+   *
+   * It is deliberately never in the score's key. It is not the score; it is
+   * somebody else's band, round a corner, and that is what makes a plaza a
+   * plaza rather than a room with music in it.
+   */
+  function sfxBanda(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.94, 1.08) * pitch;
+    const beat = rand(0.30, 0.38);
+    // A major triad walked up and back — the shape of every band in the
+    // Andes, and legible through a lowpass at eight hundred hertz.
+    const PHRASE = [0, 4, 7, 4, 7, 12, 7, 4];
+    const off = randInt(0, 3);
+    const root = rand(196, 262) * v;                 // G3..C4, a brass register
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = rand(680, 980); lp.Q.value = 0.4;
+    const bus = ac.createGain(); bus.gain.value = 1;
+    lp.connect(bus); bus.connect(acMaster);
+    const n = randInt(4, 6);
+    for (let i = 0; i < n; i++) {
+      const st = t + i * beat + rand(-0.012, 0.012);
+      const hz = root * Math.pow(2, PHRASE[(i + off) % PHRASE.length] / 12);
+      for (let k = 0; k < 2; k++) {
+        const o = ac.createOscillator(); o.type = 'sawtooth';
+        o.frequency.value = hz;
+        o.detune.value = k ? rand(8, 22) : rand(-22, -8);
+        const g = ac.createGain();
+        env(g, st, rand(0.030, 0.055) * vol, 0.035, beat * 0.72);
+        o.connect(g); g.connect(lp);
+        o.start(st); o.stop(st + beat + 0.1);
+      }
+      // the bombo, on the one and the three
+      if (i % 2 === 0) {
+        const d = ac.createOscillator(); d.type = 'sine';
+        d.frequency.setValueAtTime(rand(88, 112), st);
+        d.frequency.exponentialRampToValueAtTime(rand(44, 56), st + 0.09);
+        const dg = ac.createGain();
+        env(dg, st, rand(0.055, 0.095) * vol, 0.004, 0.16);
+        d.connect(dg); dg.connect(acMaster);
+        d.start(st); d.stop(st + 0.22);
+      }
+    }
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -12492,6 +12591,8 @@ export function createSystems(game) {
     pigeons: sfxPigeons, lap: sfxLap, campanile: sfxCampanile,
     vendor: sfxVendor, bowls: sfxBowls,
     cicada: sfxCicada, magpie: sfxMagpie, lorikeet: sfxLorikeet,
+    // ...and the two the second chapter never had. See sfxFrailejon.
+    frailejon: sfxFrailejon, banda: sfxBanda,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -12521,6 +12622,10 @@ export function createSystems(game) {
     pigeons: 3.0, lap: 4.5, campanile: 9.0,
     vendor: 2.5, bowls: 2.0,
     cicada: 5.0, magpie: 3.0, lorikeet: 2.5,
+    // Both are LONG voices — the páramo swell runs up to six seconds and the
+    // band's phrase to two — so both gaps sit past their own length, which is
+    // the rule stated above.
+    frailejon: 7.0, banda: 5.0,
   };
 
   function sfx(name, opts) {
@@ -12648,7 +12753,21 @@ export function createSystems(game) {
    * positional and they stay exactly as they were.
    */
   const sysAmbAt = { x: 0, y: 0, z: 0 };
+  // See sysAmb. A ring of the last hundred and twenty things a place has said.
+  const sysAMB_LOG = 120;
+  const sysAmbLog = new Array(sysAMB_LOG);
+  let sysAmbLogN = 0;
   function sysAmb(name, opts) {
+    // ---- WHAT THE PLACE JUST SAID (R8) -----------------------------------
+    // The bed is the one audio channel with no way in from outside: it goes
+    // through the module-private `sfx`, not `game.sfx`, so a probe that hooks
+    // the public call sees every object in the chapter and none of its
+    // soundscape — which is exactly backwards for the two batches (R8, R9)
+    // whose whole subject is the soundscape. A ring buffer, drained by
+    // hud.ambAudit(). Nothing in src reads it.
+    sysAmbLog[sysAmbLogN % sysAMB_LOG] =
+      (game.biome ? game.biome.current : '?') + ':' + name;
+    sysAmbLogN++;
     if (opts && (opts.at || typeof opts.x === 'number')) { sfx(name, opts); return; }
     const c = game.capy && game.capy.position;
     const a = Math.random() * 6.283185;
@@ -21663,6 +21782,24 @@ export function createSystems(game) {
     /** Is the camera out, and how many pictures has it taken. */
     photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
     /**
+     * WHAT THE PLACE HAS BEEN SAYING — the ambient bed, which is the one audio
+     * channel a probe cannot otherwise see, because it goes through the
+     * module-private `sfx` and not `game.sfx`. Tallied per biome:voice, newest
+     * hundred and twenty. `reset` empties the ring, so a run can be measured
+     * from a known point. Nothing in src reads this. See sysAmb.
+     */
+    ambAudit: function (reset) {
+      const tally = Object.create(null);
+      let n = 0;
+      for (let i = 0; i < sysAMB_LOG; i++) {
+        const v = sysAmbLog[i];
+        if (!v) continue;
+        tally[v] = (tally[v] || 0) + 1; n++;
+      }
+      if (reset) { for (let i = 0; i < sysAMB_LOG; i++) sysAmbLog[i] = undefined; sysAmbLogN = 0; }
+      return { n: n, total: sysAmbLogN, tally: tally };
+    },
+    /**
      * WHAT IS ON THE BOARD, AND WHAT IS BEING SET RIGHT NOW.
      *
      * The only way in from outside was to flush the save and read `recs` out of
@@ -24141,8 +24278,62 @@ export function createSystems(game) {
         if (ambTimer <= 0) {
           const bio = game.biome && game.biome.current;
           if (bio === 'pasto') {
-            sysAmb('hiss', { volume: rand(0.10, 0.20), pitch: rand(0.55, 0.75) });
-            ambTimer = rand(11, 24);
+            // ---- THE SECOND CHAPTER HAD ONE LINE (R8) --------------------
+            // A pitched-down hiss every eleven to twenty-four seconds, over a
+            // páramo at 2 527 m, a covered market, a plaza with a Carnaval
+            // float rolling up it, a church with a bronze bell in it and a
+            // live volcano. This is the second place anybody sees.
+            //
+            // Positional, on the zones the chapter already publishes — the
+            // harbour's rule and Kyoto's. The two voices it is built on are
+            // new: see sfxFrailejon and sfxBanda.
+            const pp = capy && capy.position;
+            const pk = game.pasto;
+            const zn = function (n) { return !!(pk && pp && pk.inZone && pk.inZone(n, pp.x, pp.z)); };
+            const r = Math.random();
+            if (zn('paramo') || zn('crater')) {
+              // Above the treeline it is wind and almost nothing else, and the
+              // gaps are long because that is what makes it high.
+              if (r < 0.62) sysAmb('frailejon', { volume: rand(0.55, 1.0), pitch: rand(0.9, 1.15) });
+              else if (r < 0.86) sysAmb('hiss', { volume: rand(0.07, 0.13), pitch: rand(0.5, 0.7) });
+              // ...and once in a while the mountain, which is not asleep.
+              else sysAmb('thunder', { volume: rand(0.05, 0.10), pitch: rand(0.35, 0.5) });
+              ambTimer = rand(7, 15);
+            } else if (zn('plaza') || zn('church')) {
+              // The band is somewhere behind the church and it never stops.
+              if (r < 0.40) sysAmb('banda', { volume: rand(0.5, 0.9), pitch: rand(0.94, 1.08) });
+              else if (r < 0.62) sysAmb('vendor', { volume: rand(0.06, 0.12), pitch: rand(0.9, 1.1) });
+              else if (r < 0.80) sysAmb('bark', { volume: rand(0.05, 0.10), pitch: rand(0.8, 1.1) });
+              else if (r < 0.92) sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(2.0, 2.4) });
+              else sysAmb('chime', { volume: rand(0.05, 0.09), pitch: rand(0.5, 0.62) });
+              ambTimer = rand(4, 9);
+            } else if (zn('market')) {
+              // Under the awnings: people, crates, a radio, and a dog.
+              if (r < 0.34) sysAmb('vendor', { volume: rand(0.08, 0.15), pitch: rand(0.85, 1.15) });
+              else if (r < 0.56) sysAmb('thud', { volume: rand(0.05, 0.10), pitch: rand(0.5, 0.8) });
+              else if (r < 0.74) sysAmb('bark', { volume: rand(0.06, 0.11), pitch: rand(0.85, 1.2) });
+              else if (r < 0.90) sysAmb('banda', { volume: rand(0.3, 0.55), pitch: rand(0.9, 1.05) });
+              else sysAmb('rustle', { volume: rand(0.06, 0.11), pitch: rand(0.9, 1.3) });
+              ambTimer = rand(3.5, 8);
+            } else if (zn('coffee')) {
+              // A finca on the slope: leaves, and the birds that live in them.
+              if (r < 0.44) sysAmb('rustle', { volume: rand(0.07, 0.13), pitch: rand(1.0, 1.4) });
+              else if (r < 0.76) sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(2.1, 2.5) });
+              else sysAmb('frailejon', { volume: rand(0.3, 0.55), pitch: rand(1.1, 1.35) });
+              ambTimer = rand(5, 11);
+            } else if (zn('street')) {
+              if (r < 0.36) sysAmb('bark', { volume: rand(0.06, 0.12), pitch: rand(0.8, 1.15) });
+              else if (r < 0.60) sysAmb('horn', { volume: rand(0.05, 0.09), pitch: rand(1.1, 1.45) });
+              else if (r < 0.84) sysAmb('banda', { volume: rand(0.28, 0.5), pitch: rand(0.92, 1.06) });
+              else sysAmb('vendor', { volume: rand(0.05, 0.10), pitch: rand(0.9, 1.1) });
+              ambTimer = rand(5, 11);
+            } else {
+              // Between the town and the mountain: the wind wins.
+              if (r < 0.58) sysAmb('frailejon', { volume: rand(0.4, 0.75), pitch: rand(0.95, 1.2) });
+              else if (r < 0.82) sysAmb('gull', { volume: rand(0.05, 0.10), pitch: rand(2.0, 2.4) });
+              else sysAmb('banda', { volume: rand(0.18, 0.34), pitch: rand(0.9, 1.04) });
+              ambTimer = rand(8, 16);
+            }
           } else if (bio === 'quay') {
             // THE ONE CHAPTER THAT HAD NO SOUNDSCAPE AT ALL. Circular Quay fell
             // through every rung of this ladder to the bare `sysAmb('gull')` at the

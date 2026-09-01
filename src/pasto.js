@@ -1635,6 +1635,11 @@ let pastoBellLastPull = -99;
 let pastoBellSwinging = false;
 const pastoBELL_RING_HI = 0.95;   // hysteresis: ring on the way up...
 const pastoBELL_RING_LO = 0.40;   // ...and re-arm only once it has calmed down
+// How long the attempt stays open after a ring. A big bell is slow, so this is
+// generous — but it is finite, and it is what closes the number when the rope
+// is let go. See THE SWING in pastoUpdateBell.
+const pastoBELL_RUN_GAP = 6.0;
+let pastoBellSwing = 0, pastoBellRunT = 0;
 const pastoBellPos = new THREE.Vector3(pastoBELL_PIVX, pastoBELL_Y, pastoTW_Z);
 
 function pastoBuildBell(game, root) {
@@ -1718,6 +1723,10 @@ function pastoBellSound() {
   // which is the whole point of ringing it.
   if (g.sfx) g.sfx('chime', { at: pastoBellPos, volume: 0.95, pitch: 0.55, near: 9, far: 150 });
   if (g.completeTask) g.completeTask('church-bell');
+
+  // See THE SWING, below: a ring holds the attempt open, and the number is the
+  // angle rather than the count.
+  pastoBellRunT = pastoBELL_RUN_GAP;
 }
 
 // =============================================================== THE SWIFTS ==
@@ -1854,6 +1863,46 @@ function pastoUpdateBell(dt) {
   const av = Math.abs(b.angularVelocity.x);
   if (!pastoBellSwinging && av > pastoBELL_RING_HI) { pastoBellSwinging = true; pastoBellSound(); }
   else if (pastoBellSwinging && av < pastoBELL_RING_LO) pastoBellSwinging = false;
+
+  // ---- THE SWING (R8) ----------------------------------------------------
+  // The task is 'Ring the church bell (badly)' and it ticked on the first
+  // stroke, which is the least bad way to ring a bell. Pasto's two numbers were
+  // both on the condor, so the whole town half of the chapter had nothing to
+  // come back for.
+  //
+  // THE FIRST CUT COUNTED RINGS AND IT WAS EXACTLY BACKWARDS. `av` is a
+  // magnitude and a pendulum's is zero at both ends of every swing, so the
+  // hysteresis re-arms twice a period and a freely decaying bell rings on its
+  // own: measured, ONE strike and thirty seconds of walking away scored 17,
+  // while a player working the rope scored 6 — because re-striking holds `av`
+  // above the re-arm floor and suppresses the crossings. A record you get by
+  // leaving the room is not a record.
+  //
+  // So it is the ANGLE, which is the thing 'badly' actually means. Strikes add
+  // to the swing IN ITS DIRECTION OF TRAVEL (see pastoBellStrike), so this
+  // rewards timing rather than mashing, it cannot climb while nobody is there
+  // because a pendulum only ever loses amplitude on its own, and it is legible:
+  // a bell rung properly swings in a controlled arc, and this one will not be.
+  const q = b.quaternion;
+  let ang = Math.abs(2 * Math.atan2(q.x, q.w));
+  if (ang > Math.PI) ang = Math.PI * 2 - ang;
+  const deg = ang * 57.2957795;
+  if (pastoBellRunT > 0) {
+    if (deg > pastoBellSwing) pastoBellSwing = deg;
+    pastoBellRunT -= dt;
+    const g0 = pastoGame;
+    if (g0 && g0.recordLive && pastoBellSwing > 8) g0.recordLive('church-bell', pastoBellSwing);
+    // Filed ONCE, when the bell is left to die — `record` toasts on every
+    // improvement, and an amplitude improving on itself on every swing is a
+    // personal-best card a second for one rope.
+    if (pastoBellRunT <= 0) {
+      if (g0 && pastoBellSwing > 8 && typeof g0.record === 'function') {
+        g0.record('church-bell', pastoBellSwing);
+      }
+      if (g0 && typeof g0.recordEnd === 'function') g0.recordEnd('church-bell');
+      pastoBellSwing = 0;
+    }
+  }
 
   // Yanking the rope. Cheap squared-distance test, no allocation.
   const g = pastoGame;
@@ -2021,7 +2070,21 @@ function pastoCollapseStall(st) {
   const g = pastoGame;
   if (g) {
     if (g.events) g.events.emit('pasto:stall-collapse', { stall: st, position: st.mesh ? st.mesh.position : null });
-    if (g.sfx) g.sfx('thud');
+    // ---- A MARKET STALL CAME DOWN AND IT WENT 'thud', MONO, FROM NOWHERE ---
+    // Same finding as the bell's twenty lines up, on the noisier object. It is
+    // three sounds and they arrive in the order the thing actually falls: the
+    // frame hitting the cobbles, the crates and the produce going after it, and
+    // then the man whose stall it was.
+    const at = st.mesh ? st.mesh.position : null;
+    if (g.sfx) {
+      g.sfx('thud', { at: at, volume: 0.95, pitch: rand(0.6, 0.78), near: 6, far: 70 });
+      setTimeout(function () {
+        if (g.sfx) g.sfx('clink', { at: at, volume: 0.55, pitch: rand(0.8, 1.15), near: 5, far: 55 });
+      }, 110);
+      setTimeout(function () {
+        if (g.sfx) g.sfx('vendor', { at: at, volume: 0.7, pitch: rand(0.86, 1.06), near: 5, far: 60 });
+      }, 520);
+    }
     if (g.shake) g.shake(0.5);
     if (g.completeTask) g.completeTask('market-chaos');
   }
@@ -2082,6 +2145,7 @@ let pastoCarRideM = 0;        // metres of plaza covered on this one ride
 let pastoCarRideT = 0;
 let pastoCarRode = false;
 let pastoCarCheerT = 0;
+let pastoCarBandT = 2.0;      // the band on the deck — see pastoUpdateCarroza
 let pastoCarWaiting = false;  // held for a capybara standing in the lane
 const pastoCarPos = new THREE.Vector3();
 const pastoCarTmp = new THREE.Vector3();
@@ -2212,6 +2276,22 @@ function pastoCarBlocked(capy) {
   return ahead > -pastoCAR_HZ && ahead < pastoCAR_HZ + 1.25;
 }
 
+/**
+ * SHE HAS REACHED AN END AND IS ABOUT TO GO BACK. The one moment in the
+ * float's circuit that is an event rather than a state, and the boarding window
+ * opens on it — so it is worth hearing from anywhere in the plaza, which is
+ * what the horn's far radius is for.
+ */
+function pastoCarTurn(game) {
+  if (!game || !game.sfx) return;
+  game.sfx('horn', { at: pastoCarPos, volume: 0.5, pitch: rand(1.15, 1.4),
+                     near: 8, far: 110 });
+  setTimeout(function () {
+    if (game.sfx) game.sfx('cheer', { at: pastoCarPos, volume: 0.32, pitch: rand(1.0, 1.2),
+                                      near: 7, far: 70 });
+  }, 380);
+}
+
 function pastoUpdateCarroza(game, dt) {
   const b = pastoCarBody;
   if (!b || dt <= 0) { if (b) b.velocity.setZero(); return; }
@@ -2223,8 +2303,20 @@ function pastoUpdateCarroza(game, dt) {
     pastoCarDwell -= dt;
   } else if (!pastoCarWaiting) {
     pastoCarZ += pastoCAR_SPEED * dt * pastoCarDir;
-    if (pastoCarZ >= pastoCAR_Z1) { pastoCarZ = pastoCAR_Z1; pastoCarDir = -1; pastoCarDwell = pastoCAR_DWELL; }
-    else if (pastoCarZ <= pastoCAR_Z0) { pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL; }
+    if (pastoCarZ >= pastoCAR_Z1) { pastoCarZ = pastoCAR_Z1; pastoCarDir = -1; pastoCarDwell = pastoCAR_DWELL; pastoCarTurn(game); }
+    else if (pastoCarZ <= pastoCAR_Z0) { pastoCarZ = pastoCAR_Z0; pastoCarDir = 1; pastoCarDwell = pastoCAR_DWELL; pastoCarTurn(game); }
+  }
+  // ---- THE FLOAT HAS A BAND ON IT (R8) -----------------------------------
+  // A carroza is a lorry with a brass band and a bombo on the back of it, and
+  // this one rolled up and down the plaza for the whole chapter in silence —
+  // in a chapter whose only ambient line was a hiss. The band plays from the
+  // DECK, so it walks up the plaza with the float and is the one thing in
+  // Pasto you can hear moving.
+  pastoCarBandT -= dt;
+  if (pastoCarBandT <= 0 && game.sfx) {
+    pastoCarBandT = pastoCarDwell > 0 ? rand(6.5, 10) : rand(4.0, 7.0);
+    game.sfx('banda', { at: pastoCarPos, volume: 0.85, pitch: rand(0.95, 1.06),
+                        near: 7, far: 95 });
   }
   // Kinematic, moved by VELOCITY and taken FROM THE TARGET — the same rule the
   // ferry and the ice cream van are on, and the only one cannon will carry a
@@ -2245,7 +2337,13 @@ function pastoUpdateCarroza(game, dt) {
   pastoCarCheerT -= dt;
   if (aboard && pastoCarDwell <= 0 && pastoCarCheerT <= 0) {
     pastoCarCheerT = 4.2;
-    if (game.sfx) game.sfx('cheer', { volume: 0.5, pitch: 1.1 });
+    // ...FROM THE PLAZA, not from inside the player's head. The crowd is on
+    // the cobbles either side of the lane, so the cheer comes off the float's
+    // own position, which is where they are looking.
+    if (game.sfx) {
+      game.sfx('cheer', { at: pastoCarPos, volume: 0.55, pitch: rand(1.02, 1.2),
+                          near: 6, far: 80 });
+    }
   }
   // …AND HOW FAR. The plaza is twenty-eight and a half metres end to end and
   // she turns round at both ends, so "how far did you ride in one go" is a
@@ -2288,6 +2386,65 @@ let pastoTalcData = null;
 let pastoTalcCur = 0;
 let pastoTalcT = 0;
 let pastoTalcLive = false;
+
+// ============================================================ THE VOICES ====
+// R8. THREE OBJECTS IN THIS CHAPTER MAKE A NOISE AND NONE OF THEM DID.
+//
+// The ambience ladder in systems.js is the BED — it plays from a random bearing
+// around the player and says where you are. These are different: they are
+// attached to things, they come from where the thing is, and they are the
+// reason walking towards something in Pasto now sounds like walking towards
+// something. The bell has had this since it was written; it was the only one.
+const pastoVENT_GAP = [9, 19];        // s between rumbles out of the vent
+const pastoNAVE_GAP = [13, 26];       // s between organ phrases inside the church
+let pastoVentT = 5, pastoNaveT = 4, pastoBushT = 0;
+const pastoVentAt = { x: 0, y: 0, z: 0 };
+const pastoNaveAt = { x: 0, y: 6, z: 42 };
+
+function pastoUpdateVoices(game, dt) {
+  const capy = game.capy;
+  if (!capy || !capy.position || !game.sfx) return;
+  const p = capy.position;
+
+  // ---- THE VENT ----------------------------------------------------------
+  // Galeras is an ACTIVE volcano and the chapter draws a plume coming out of
+  // it. It is the largest object in the place, it is the destination of two
+  // tasks, and it was silent from every distance. Low, long, and it carries a
+  // very long way, because that is what a mountain clearing its throat does.
+  pastoVentT -= dt;
+  if (pastoVentT <= 0) {
+    pastoVentT = rand(pastoVENT_GAP[0], pastoVENT_GAP[1]);
+    pastoVentAt.x = pastoGAL_X; pastoVentAt.z = pastoGAL_Z;
+    pastoVentAt.y = pastoHeight(pastoGAL_X, pastoGAL_Z) + 4;
+    game.sfx('thunder', { at: pastoVentAt, volume: 0.55, pitch: rand(0.30, 0.44),
+                          near: 30, far: 420 });
+  }
+
+  // ---- THE NAVE ----------------------------------------------------------
+  // There is a harmonium in every one of these churches and it is never not
+  // being played. Only from inside the precinct, and only when the bell is not
+  // already going — two big sounds out of one building at once is a mess.
+  pastoNaveT -= dt;
+  if (pastoNaveT <= 0) {
+    pastoNaveT = rand(pastoNAVE_GAP[0], pastoNAVE_GAP[1]);
+    if (pastoInZone('church', p.x, p.z) && !pastoBellSwinging) {
+      game.sfx('organ', { at: pastoNaveAt, volume: 0.42, pitch: rand(0.62, 0.8),
+                          near: 6, far: 46 });
+    }
+  }
+
+  // ---- THE BUSHES --------------------------------------------------------
+  // Chest-high coffee, planted in rows, and you can run straight through it.
+  // Gated on actually MOVING, or standing in a finca is a rattle.
+  pastoBushT -= dt;
+  const v = capy.body ? capy.body.velocity : null;
+  const spd = v ? Math.sqrt(v.x * v.x + v.z * v.z) : 0;
+  if (pastoBushT <= 0 && spd > 1.6 && pastoInZone('coffee', p.x, p.z)) {
+    pastoBushT = rand(0.42, 0.72);
+    game.sfx('rustle', { at: p, volume: clamp(0.10 + spd * 0.035, 0.10, 0.32),
+                         pitch: rand(1.05, 1.45), near: 2, far: 22 });
+  }
+}
 
 function pastoBuildTalc() {
   const g = new THREE.OctahedronGeometry(0.085, 0);
@@ -2928,6 +3085,7 @@ export function createPasto(game) {
       pastoUpdateCarroza(game, dt);
       pastoUpdateTalc(game, dt);
       pastoUpdateSwifts(game, dt);
+      pastoUpdateVoices(game, dt);
     },
   };
   game.pasto = api;
@@ -2984,6 +3142,14 @@ function pastoBuild(game) {
       pastoCarRideT = 0;
       pastoCarRideM = 0;
       pastoCarCheerT = 0;
+      // ...and the three voices, on the same argument as the talc above: a
+      // timer that ran down while the player was in Iceland fires on the first
+      // frame back, so the mountain rumbles as you land.
+      pastoCarBandT = rand(1.5, 3.5);
+      pastoVentT = rand(4, 10);
+      pastoNaveT = rand(4, 12);
+      pastoBushT = 0;
+      pastoBellSwing = 0; pastoBellRunT = 0;
       if (!pastoBellHinge) return;
       if (game.world.constraints.indexOf(pastoBellHinge) < 0) game.world.addConstraint(pastoBellHinge);
       // A freshly re-added hinge snaps its bodies into place on the first solve,
