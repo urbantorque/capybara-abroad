@@ -3666,6 +3666,11 @@ const sysLEGEND_TOUCH = [
   ['WHEEK', 'WHEEK'],
   ['drag  ·  pinch', 'look around  ·  zoom'],
   ['STUCK (held)', 'put me back'],
+  // The row that closes the scheme (R5). The keyboard table spends four rows on
+  // M / N / [ / ] for the audio alone and still needs Escape and Tab elsewhere;
+  // a thumb has one button for all of it, because R4 put pause, the three
+  // faders, the journal and the way back to the title on one card.
+  ['MENU', 'pause  ·  sound  ·  the journey  ·  the title'],
 ];
 /** True on a device driven by a finger rather than a mouse — the same test the
  *  touch layer itself switches on, so the legend and the buttons can never
@@ -3673,6 +3678,29 @@ const sysLEGEND_TOUCH = [
 function sysIsTouch() {
   return !!(window.matchMedia &&
             window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+}
+
+/**
+ * THE SAME SENTENCE IN THE SCHEME THE PLAYER HAS (R5).
+ *
+ * §3 of ROADMAP.md rewrote thirty-nine hint clues that named a key, and then
+ * left five strings that do the same thing in the modals' own furniture:
+ * `ESC to close`, `ESC to stay`, `esc to resume`. Every card in the game closes
+ * on a tap on its surround — the ledger and the album always did, and R5 gave
+ * the journal the same — so on a phone the gesture exists and only the sentence
+ * was wrong, which is the most confusing kind of wrong: the player believes it,
+ * looks for a key that is not there, and concludes the card is stuck.
+ *
+ * Asked at the moment the string is built rather than cached, because the
+ * journal's foot is rewritten on every open and the ledger's on every show.
+ *
+ * NOT `sysSay`, which is the §3 hint SUBSTITUTOR just below and takes one
+ * string: this picks between two written sentences, because "ESC to close" has
+ * no key in it to substitute and the honest touch wording names a gesture
+ * rather than a control. The first name collided and `node --check` caught it.
+ */
+function sysScheme(keyWords, touchWords) {
+  return sysIsTouch() ? touchWords : keyWords;
 }
 
 // ---- AND THE HINTS NAME KEYS TOO ------------------------------------------
@@ -3748,8 +3776,21 @@ function sysFillLegend(el, which) {
  * own key. That is not a legend, it is the same information twice with the
  * useful copy taken away, and it blinked.
  */
-function sysTitleFoot(rows, note) {
+function sysTitleFoot(rows, note, touchNote) {
   const el = sysEl('div', 'capyui-foot');
+  // ---- A KEYCAP IS A PROMISE, AND ON A PHONE IT IS A FALSE ONE (R5) -------
+  // The rail is the last thing on the title card and it was four keycaps —
+  // ENTER, →, M, N — every one of which names a key a phone does not have.
+  // Nothing down here is unreachable by a thumb (the primary action beside it
+  // is a real button, and the picker's tiles are real buttons), so this is not
+  // a missing control: it is the front of the game telling a stranger to press
+  // things that are not there, which is the one sin §3 of ROADMAP.md was
+  // written about. On touch the caps are simply not drawn, and whatever the
+  // page wanted to say in words is said instead.
+  if (sysIsTouch()) {
+    if (touchNote) el.appendChild(sysEl('span', 'capyui-footnote', touchNote));
+    return el;
+  }
   for (let i = 0; i < rows.length; i++) {
     const s = sysEl('span');
     const caps = rows[i][0];
@@ -5913,6 +5954,32 @@ function sysBuildCSS() {
   'text-transform:uppercase;touch-action:manipulation;}',
 '.capyui-pauseaskrow button:focus{outline:none;}',
 '.capyui-pauseaskrow button:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+/* ---- AND ALL OF IT UNDER A THUMB (R5) ------------------------------------
+   R4's card was designed and measured on a 1280x720 desktop, where 33 px rows
+   read correctly and a mouse hits a 16 px checkbox first time. Measured at
+   390x844 with touch emulation, ELEVEN of its controls were under 44 px — the
+   four menu rows at 33, the three faders at 24, the three mutes at 31x27, and
+   the calm checkbox at 16x16. 44 px is the floor in Apple's guidelines, 48 dp
+   in Android's, and 44 is WCAG 2.2's AAA target size; a 16 px checkbox on a
+   phone is a control you hit on the third try.
+
+   Only the HIT AREA grows, and only on touch. The slider's box goes to 44 and
+   its track stays 4 px, so nothing about the drawing changes — the thumb gains
+   five pixels because a thing you drag should be findable, and that is the one
+   visible difference. The card already carries max-height:92vh and overflow,
+   so the ~130 px this adds is scrolled rather than clipped in landscape. */
+'@media (hover:none) and (pointer:coarse){',
+  '.capyui-pausebtn{padding-top:14px;padding-bottom:14px;}',
+  '.capyui-setrow{gap:11px;margin-bottom:2px;}',
+  '.capyui-setrange{height:44px;}',
+  '.capyui-setrange::-webkit-slider-thumb{width:20px;height:20px;margin-top:-8px;}',
+  '.capyui-setrange::-moz-range-thumb{width:20px;height:20px;}',
+  '.capyui-setmute{width:44px;height:44px;}',
+  '.capyui-setmute svg{width:20px;height:20px;}',
+  '.capyui-setcalm{min-height:44px;gap:11px;margin-top:4px;}',
+  '.capyui-setcalm input{width:24px;height:24px;}',
+  '.capyui-pauseaskrow button{padding-top:14px;padding-bottom:14px;}',
+'}',
 /* ---- AND THE SWITCH HAS TO REACH THE SHEET (R4) --------------------------
    The rule at the top of this file is inside `@media (prefers-reduced-motion:
    reduce)`, which asks the OPERATING SYSTEM and cannot be told anything by a
@@ -6253,6 +6320,18 @@ function sysBuildCSS() {
   'background:' + sysRgba(PALETTE.sail, 0.42) + ';border-style:dashed;',
   'border-color:' + sysRgba(PALETTE.ibisHead, 0.34) + ';box-shadow:none;opacity:.62;}',
 '.capyui-back.press{opacity:1;}',
+/* The menu (R5). Same right-hand column as the chart and STUCK — the things you
+   read rather than aim at — and directly under STUCK, offset by its own height
+   plus the same 12px of air. It is NOT dashed like STUCK: a rescue should be
+   hard to find by accident and this is the opposite, the only door on a phone
+   to pause, volume, the journal, the ledger, the album, the records and the
+   title. Solid edge, full opacity, same 58px so the column reads as a column. */
+'.capyui-menu{right:calc(12px + env(safe-area-inset-right,0px));',
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px) + 70px);',
+  'width:58px;height:58px;font-size:10px;',
+  'background:' + sysRgba(PALETTE.sail, 0.78) + ';',
+  'border-color:' + sysRgba(PALETTE.ibisHead, 0.28) + ';opacity:.9;}',
+'.capyui-menu.press{opacity:1;}',
 
 /* Phone: tighter leading and smaller tick boxes. Five rows fit anywhere, so the
    card no longer needs a scroll of its own at any size. */
@@ -12836,7 +12915,9 @@ export function createSystems(game) {
     [['→'], 'choose a place'],
     [['M'], 'sound'],
     [['N'], 'music'],
-  ]));
+  ], null,
+    (jrFileCount > 0 ? 'tap to carry on' : 'tap to begin') +
+    '  ·  sound and settings are behind MENU, once you are in'));
 
   // ---- PAGE TWO: NOTHING BUT THE PICKER ----------------------------------
   const p2Head = sysEl('div', 'capyui-p2head');
@@ -13282,7 +13363,8 @@ export function createSystems(game) {
     [['←', '→', '↑', '↓'], 'look around the shelf'],
     [['Enter'], 'go there'],
     [['Esc'], 'back'],
-  ], 'every place has its own key, printed on the corner of its picture'));
+  ], 'every place has its own key, printed on the corner of its picture',
+     'tap a picture to go there'));
   titleEl.appendChild(cardEl);
   hudRoot.appendChild(titleEl);
 
@@ -13557,7 +13639,8 @@ export function createSystems(game) {
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
     'kept on this machine, not in the journey.'));
   pauseCard.appendChild(pauseSet);
-  pauseCard.appendChild(sysEl('div', 'capyui-pausefoot', 'esc to resume'));
+  pauseCard.appendChild(sysEl('div', 'capyui-pausefoot',
+    sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card')));
   pauseEl.appendChild(pauseCard);
   pauseEl.inert = true;
   hudRoot.appendChild(pauseEl);
@@ -14686,7 +14769,8 @@ export function createSystems(game) {
   const albTitle = sysEl('h2', null, 'THE ALBUM');
   const albSub = sysEl('div', 'capyui-ledsub', '');
   const albGrid = sysEl('div', 'capyui-albgrid');
-  const albHint = sysEl('div', 'capyui-ledhint', 'ESC to close');
+  const albHint = sysEl('div', 'capyui-ledhint',
+    sysScheme('ESC to close', 'tap outside the card to close'));
   albEl.appendChild(albTitle);
   albEl.appendChild(albSub);
   albEl.appendChild(albGrid);
@@ -15059,8 +15143,9 @@ export function createSystems(game) {
     // ONLY thing you could do with the end of this game, and a sandbox whose
     // ending throws the sandbox away has the ending the wrong way round.
     ledHint.textContent = ledFinal
-      ? 'tap or press Enter to cause it all again  ·  ESC to stay'
-      : 'ESC to close';
+      ? sysScheme('tap or press Enter to cause it all again  ·  ESC to stay',
+               'tap the card to cause it all again  ·  tap outside to stay')
+      : sysScheme('ESC to close', 'tap outside the card to close');
     ledBuild();
     ledEl.inert = false;
     ledEl.classList.add('show');
@@ -15083,7 +15168,18 @@ export function createSystems(game) {
   }
   ledEl.addEventListener('pointerdown', function (e) {
     // At the true end, a tap anywhere still does what it always did.
-    if (ledFinal) { location.reload(); return; }
+    // AT THE TRUE END, "STAY" HAS TO HAVE A GESTURE TOO (R5). On a keyboard it
+    // is Escape and a tap anywhere still does what it always did. On a phone
+    // there is no Escape, so tap-anywhere-reloads left the ledger's own promise
+    // — "ESC to stay" — impossible to keep: every gesture available threw the
+    // world away. The surround becomes "stay" there, which is the gesture every
+    // other card in the game already means by it, and the card itself keeps the
+    // celebratory one. Desktop behaviour is untouched.
+    if (ledFinal) {
+      if (sysIsTouch() && e.target === ledEl) { ledHide(); return; }
+      location.reload();
+      return;
+    }
     // Otherwise only the surround closes it — the leaves are there to be read
     // and a card that shuts when you touch it cannot be scrolled on a phone.
     if (e.target === ledEl) ledHide();
@@ -15460,8 +15556,10 @@ export function createSystems(game) {
       r.row.setAttribute('aria-current', r.n === here ? 'true' : 'false');
     }
     jrFoot.textContent = jrDepart
-      ? 'pick a place, or press the key beside it  ·  ESC to stay'
-      : 'ESC to close  ·  three wheeks at the way out of a chapter to travel';
+      ? sysScheme('pick a place, or press the key beside it  ·  ESC to stay',
+               'pick a place  ·  tap outside the card to stay')
+      : sysScheme('ESC to close  ·  three wheeks at the way out of a chapter to travel',
+               'tap outside to close  ·  three wheeks at the way out of a chapter to travel');
   }
 
   let jrReturnFocus = null;
@@ -15489,6 +15587,23 @@ export function createSystems(game) {
       try { hereRow.row.scrollIntoView({ block: 'nearest' }); } catch (e) { /* old engine */ }
     }
   }
+  // ---- THE ONE MODAL WITH NO WAY OUT OF IT (R5) --------------------------
+  // The ledger and the album have both closed on a tap on their surround since
+  // the day they were built. This card never did, and it is the one that a
+  // phone player can actually REACH: three wheeks at the way out opens it as
+  // the departures board, its own foot said "ESC to stay", and a phone has no
+  // ESC. Measured under touch emulation before the fix — the board opens, the
+  // world is paused behind it, a tap on the surround does nothing, and there is
+  // no close control of any kind. The only exits were to travel, which is a
+  // real and irreversible move the player did not ask for, or to reload the
+  // page, which on a three-hour game is the worst button in the building.
+  //
+  // Same rule as the ledger's, for the same reason: only the SURROUND, never
+  // the card, because thirteen rows have to be scrollable with a thumb.
+  jrEl.addEventListener('pointerdown', function (e) {
+    if (e.target === jrEl) jrHide();
+  });
+
   function jrHide() {
     if (!jrShown) return;
     jrShown = false;
@@ -19485,11 +19600,25 @@ export function createSystems(game) {
   // a thumb will not find it by accident in the middle of a chase and where it
   // is nowhere near the three buttons a player is actually aiming at.
   const backBtn = sysEl('div', 'capyui-btn capyui-back', 'STUCK');
+  // ---- AND THE SIXTH, WHICH IS THE WHOLE OF R5 --------------------------
+  // A phone player could not pause, could not reach a volume, could not open
+  // the journal, the ledger, the album or the records, and could not get back
+  // to the title — every one of those was a keyboard letter or Escape. R4 put
+  // all of them on one card; this is the only thing that was needed to hand a
+  // thumb the same card, and it is why R5 is one button and not a second UI.
+  //
+  // In the right-hand column with the chart and STUCK, which is where the
+  // things you READ live, and never in the fan: the fan is aimed at during a
+  // chase and a menu is the last thing that should be under a wild thumb.
+  const menuBtn = sysEl('div', 'capyui-btn capyui-menu', 'MENU');
+  menuBtn.setAttribute('role', 'button');
+  menuBtn.setAttribute('aria-label', 'pause, settings and the journey');
   touchLayer.appendChild(wheekBtn);
   touchLayer.appendChild(grabBtn);
   touchLayer.appendChild(hopBtn);
   touchLayer.appendChild(slideBtn);
   touchLayer.appendChild(backBtn);
+  touchLayer.appendChild(menuBtn);
   hudRoot.appendChild(touchLayer);
 
   // Touchscreen laptops driven by mouse+keyboard must NOT get the stick zone —
@@ -19576,6 +19705,33 @@ export function createSystems(game) {
   bindBtn(slideBtn, function () { touchSlide = true; }, function () { touchSlide = false; });
   // Also held: the rescue reads sysBACK_HOLD seconds of it, exactly as R does.
   bindBtn(backBtn, function () { touchBack = true; }, function () { touchBack = false; });
+  // NOT bindBtn. Every other button in the fan is a VERB — it writes a held
+  // flag that update() reads, and it fires on press because a thumb on a verb
+  // wants the frame it pressed on. A menu is neither: it fires once, on
+  // RELEASE, so a thumb that lands on it by accident can slide off and cost
+  // nothing, and it must not leave a held flag behind when the card takes the
+  // pointer away from it and no pointerup ever arrives.
+  menuBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    audioUnlock();
+    menuBtn.classList.add('press');
+  });
+  const menuOff = function (e) {
+    if (e) e.preventDefault();
+    menuBtn.classList.remove('press');
+  };
+  menuBtn.addEventListener('pointerup', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    menuOff();
+    // The same rule the stick and the fan follow: before the game has started,
+    // anything you touch carries on rather than starting over. See startResume.
+    if (!started) { startResume(); return; }
+    pauseToggle();
+  });
+  menuBtn.addEventListener('pointercancel', menuOff);
+  menuBtn.addEventListener('pointerleave', menuOff);
 
   // ---- THE PAD, POLLED ----------------------------------------------------
   // See the sysPAD_* block. Called once at the top of update(). Writes the held

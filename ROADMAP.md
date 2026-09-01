@@ -129,13 +129,23 @@ player was shown, and told to use, a scheme they did not have.
   delta from the last position rather than `movementX`, which is a mouse concept
   and is not reliably filled in for touch pointers.
 
-**Still to do**
+**Still to do** — *both closed by R5, 1 Sep 2026; see `ROADMAP-RELEASE.md`*
 
-- The title card's *foot rail* still shows `ENTER` / `→` / `M` / `N` keycaps on
-  touch. The primary action next to it is a real button, so nothing is
-  unreachable — it is just noise.
-- **No touch route to the journal.** Travel is reachable (three wheeks opens the
-  board), but the album, the ledger and the records are behind `Tab` only.
+- ~~The title card's *foot rail* still shows `ENTER` / `→` / `M` / `N` keycaps on
+  touch.~~ On touch the caps are no longer drawn; the rail says what the page
+  wants in words instead.
+- ~~**No touch route to the journal.** Travel is reachable (three wheeks opens the
+  board), but the album, the ledger and the records are behind `Tab` only.~~
+  One MENU button opens R4's pause card, and the journal, the ledger, the album
+  and the records are all behind it.
+
+  R5 also found the thing this list had missed, which was worse than either of
+  them: **the departures board was a trap on touch.** Three wheeks at the way
+  out opens it, it pauses the world, it had no pointerdown listener at all —
+  the ledger and the album have both closed on a tap on their surround since
+  they were built — and its own foot said "ESC to stay" to a device with no
+  ESC. The only ways out were to travel, which is a real and irreversible move
+  nobody asked for, or to reload a three-hour game.
 - Decide honestly how far this should go. This is a nineteen-chapter, hours-long
   3-D physics game with a two-stick ferry helm, six-control condor flight and a
   beat-matching dance floor. **It is not a phone game and should not pretend to

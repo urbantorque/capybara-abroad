@@ -275,7 +275,44 @@ mutes on it; a calm-motion toggle that works at runtime; settings persisted in
 a fourth key (`capy3.prefs.v1` — not the journey file). Gamepad Start opens
 it. Verify: settings survive reload; sliders audibly move each bus.
 
-**Batch R5 — touch parity.** A pause/menu HUD target on touch (opens R4's
+**Batch R5 — touch parity.** ✅ **done 1 Sep 2026.** One `MENU` button on the
+touch layer, in the right-hand column with the chart and STUCK — the things you
+read rather than aim at — never in the fan, which is what a thumb stabs at
+during a chase. It opens R4's card, and that one button is the whole batch:
+pause, the three faders and their mutes, the journal, the ledger, the album,
+the records and the way back to the title were every one of them a keyboard
+letter or Escape. The touch legend gained the row that says so; the title
+foot rail no longer draws four keycaps naming keys a phone does not have.
+
+**The find this batch existed to catch was not on the list: the departures
+board was a trap.** Three wheeks at the way out opens it, it pauses the world,
+and `.capyui-jr` had no pointerdown listener at all — the ledger and the album
+have both closed on a tap on their surround since the day they were built, and
+the one card a phone player can actually reach had not. Its own foot said "ESC
+to stay". Measured before the fix: open, paused, surround tap does nothing, no
+close control of any kind, and the only exits were to travel — an irreversible
+move nobody asked for — or to reload a three-hour game. It now closes on its
+surround like the other two, and five furniture strings that named ESC
+(`sysScheme`) say the gesture instead. At the true ending, where a tap
+anywhere reloaded, the surround becomes "stay" on touch so the ledger's own
+promise can be kept; desktop behaviour is untouched.
+
+**And R4's card was designed at 1280×720.** Measured at 390×844 with touch
+emulation, **eleven of its controls were under 44 px** — four menu rows at 33,
+three faders at 24, three mutes at 31×27 and the calm checkbox at 16×16. 44 px
+is the floor in Apple's guidelines, 48 dp in Android's, and WCAG 2.2's AAA
+target size. One touch-only media block grows the hit areas and nothing else;
+all thirteen targets now clear 44.
+
+Probe: `qa/r5-touch.js` under CDP media emulation (`page.emulateMedia` cannot
+reach `hover`/`pointer`; `setViewportSize` moves pixels and nothing else), plus
+`qa/r5-shot.js` → `qa/r5-hud.png`, `qa/r5-pause.png`. R1–R4 all re-run green on
+desktop. **The probe had to be rewritten once:** it started the game with
+`Digit1`, and the first real keydown removes the touch layer by design — it
+reported the MENU button as a 0×0 box at the origin, with correct CSS and a
+`display:none` parent. Everything in it is now done with a finger.
+
+Original scope: A pause/menu HUD target on touch (opens R4's
 card, which gives touch pause, travel, journal, mute in one move); touch
 legend audio row; foot-rail keycaps hidden on touch; the `ROADMAP.md` §3 loose
 ends. Verify under mobile emulation: pause, mute, travel, journal all
