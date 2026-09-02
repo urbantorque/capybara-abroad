@@ -6,7 +6,8 @@ import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
-         leafTick, rimInfo, calmOn, calmSet, calmPreference } from './shared.js';
+         leafTick, rimInfo, calmOn, calmSet, calmPreference,
+         shadeEnable, skyOccTick, shadeInfo } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -210,12 +211,58 @@ const sysTEXEL_Y      = (sysSHADOW_TOP + sysSHADOW_HALF) / sysSHADOW_RES;
 // volcano would read as cardboard. These four track the live box so the texel snap
 // in sunFollow stays honest when the box resizes.
 let sysShadowHalf = sysSHADOW_HALF;
+// The chapter's own width, which is the FLOOR shadowFitAlt opens out from. Two
+// separate questions sharing one variable is how a wide chapter would snap back
+// to 22 the first time the animal left the ground.
+let sysShadowHalfBase = sysSHADOW_HALF;
 let sysShadowTop  = sysSHADOW_TOP;
 let sysTexelX     = sysTEXEL_X;
 let sysTexelY     = sysTEXEL_Y;
 const sysSHADOW_HALF_MAX = 64;
 const sysSHADOW_ALT_K    = 0.78;   // metres of box per metre of altitude
 const sysSHADOW_HYST     = 1.5;    // only refit past this much drift (projection rebuild)
+// ...and the box's width is also per-CHAPTER, which is a different question
+// from per-altitude. 22 is a 44 m box centred on the animal and it is the right
+// tight box for a chapter whose subject is on the ground in front of you. Two
+// chapters put their shadow-casting subject further out than that: Rio's
+// parasols and towel line run the width of the beach, and Venice's colonnade
+// runs the long side of the piazza — in both, the thing that should be laying a
+// shadow across the frame is outside the frustum and lays nothing.
+//
+// The cost is texel size: 2048 over 88 m instead of 44 is 4.3 cm rather than
+// 2.15, so the contact edge softens by about two centimetres. That is a trade
+// the two chapters that need it can make and the other seventeen do not.
+//
+// BOTH NUMBERS ARE MEASURED FROM THE FRAME rather than from the layout. At 34
+// Rio gains the near parasol and nothing else; only at 44 do all four ellipses
+// and the bathers' own shadows appear (qa/d1-rio.png against qa/d1-rio-44.png).
+// Venice wants 34 and no more — the campanile is the caster that matters there
+// and it arrives at 34.
+const sysBIO_SH_HALF = { rio: 44, venice: 34 };
+// ---------------------------------------------------------------------------
+// HOW MUCH SKY SURVIVES IN THE SHADE — see the block above _RIM_FS_COMMON in
+// shared.js for what this number does and why the shadow needed it.
+//
+// It is "the fraction of the hemisphere's light still reaching a fragment the
+// sun cannot see". 1.0 is the game as it was before the term existed, and the
+// rows that keep it are the ones where that is already correct:
+//
+//   - kyoto is rain: an overcast sky IS the light source and there is no
+//     second one to occlude.
+//   - the cave has no sky at all; its light is six point lights and a shaft.
+//   - iceland, antarctic: flat overcast, and both are already near the top of
+//     the exposure range where any extra darkening reads as a bruise.
+//   - drift is above the weather with nothing to cast onto.
+//
+// The rest are open-sky daylight rows and take 0.55 — a building blocks most
+// of the sky as well as the sun, which is the whole physical excuse for this.
+// The four evening and low-sun rows take a softer number because their shadows
+// are already long, already coloured, and were tuned as they stand.
+const sysSHADOW_SKY_DEF = 0.45;
+const sysSHADOW_SKY = {
+  kyoto: 1.0, cave: 1.0, iceland: 1.0, antarctic: 1.0, drift: 1.0,
+  goreme: 0.72, kowloon: 0.84, monaco: 0.76, hanoi: 0.74,
+};
 
 // Goose-game framing: tight, steep, capybara sitting ~40% up from the bottom of
 // the frame with the world it is walking into filling the upper two thirds.
@@ -1489,7 +1536,37 @@ const sysSkyTopC    = new THREE.Color(PALETTE.skyTop);
 const sysSkyTopWant = new THREE.Color(PALETTE.skyTop);
 let   sysSkyMesh    = null;
 let   sysSkyT       = null;   // per-vertex 0 (horizon) .. 1 (zenith)
+let   sysSkyD       = null;   // per-vertex unit x,z — the AZIMUTH the ramp lacked
 let   sysSkyCol     = null;
+// Repaint even though the two colours have not moved. The gate at the call site
+// watches the horizon and zenith colours only, and the sun's BEARING is the
+// third input to the paint — it changes once per chapter, inside the white.
+let   sysSkyDirty   = true;
+// ---------------------------------------------------------------------------
+// THE SKY WAS TWO COLOURS AND NO DIRECTION (D1).
+//
+// sysSkyPaint read one number per vertex: normalised Y. So the sky was
+// identical on every bearing — no warm lobe where the sun is, no horizon band,
+// nothing to tell you which way you were facing. In rv-palawan.png and
+// rv-rio.png the sea and the sky arrive at the same value and the horizon is
+// simply gone. The top quarter of most frames in this game was empty.
+//
+// Two vertex terms, no draw calls, no shader, repainted only when something
+// changes — which is a handful of times a chapter:
+//
+//   LOBE. Toward the sun the sky takes some of the sun's own colour, on a
+//   broad power. Broad, not tight: the dome is 32 segments around, so eleven
+//   degrees per quad, and anything sharper than this aliases into a polygon.
+//   A sun DISC would need its own geometry and is not this.
+//
+//   BAND. The first ten degrees above the horizon lift toward white, which is
+//   the aerial perspective the fog already draws on the ground and the sky
+//   never joined in with. This is what puts the horizon back.
+// ---------------------------------------------------------------------------
+const sysSKY_LOBE   = 0.20;   // fraction of the way to the sun's colour, at the sun
+const sysSKY_LOBE_P = 2.4;    // how fast it falls off with angle
+const sysSKY_BAND_Y = 0.175;  // sin(elevation) the band has faded out by: ~10 deg
+const sysSKY_BAND_K = 0.24;   // how far the band lifts toward white
 const sysSkyLastA   = new THREE.Color();
 const sysSkyLastB   = new THREE.Color();
 
@@ -6691,6 +6768,7 @@ function sysInstallShadowFilter(T) {
     // rather than sixteen to say so.
     '  if ( capyBN < 0.5 ) {',
     '    shadow = 1.0;',
+    '    capyShadowV = 1.0;',
     '  } else {',
     '    float capyPen = capyRec - capyBSum / capyBN;',
     '    float capyR = clamp( capyPen * shadowRadius * ' + f(sysPEN_K) + ', ' +
@@ -6702,10 +6780,27 @@ function sysInstallShadowFilter(T) {
            f(o[0]) + ', ' + f(o[1]) + ' ) * capyStep, capyRec );';
   })).concat([
     '    shadow = capyS * ( 1.0 / ' + R.length.toFixed(1) + ' );',
+    '    capyShadowV = shadow;',
     '  }',
   ]).join('\n') + '\n';
-  T.ShaderChunk.shadowmap_pars_fragment = ch.slice(0, i) + body + ch.slice(j);
+  // ...AND THE SUN VISIBILITY GOES SOMEWHERE THE REST OF THE SHADER CAN SEE IT.
+  //
+  // `getShadow` returns into an expression inside <lights_fragment_begin> that
+  // multiplies the DIRECT light and is then gone; nothing downstream can ask
+  // whether this fragment is in shade. shared.js's sky-occlusion term needs
+  // exactly that, so the branch above also writes it to a fragment-global
+  // declared here — in the one chunk every lit material includes, so a material
+  // that never gets the rim hook still compiles.
+  //
+  // Declared OUTSIDE the chunk's own #if ladder on purpose: the ladder is about
+  // how many shadow-casting lights there are, and the declaration has to exist
+  // whether the answer is one or none.
+  T.ShaderChunk.shadowmap_pars_fragment =
+    'float capyShadowV;\n' + ch.slice(0, i) + body + ch.slice(j);
   sysShadowFilterDone = true;
+  // Both halves of the term are armed by this one line: if we returned early
+  // above, shared.js never injects the fragment that reads capyShadowV.
+  shadeEnable();
 }
 
 // ---------------------------------------------------------------------------
@@ -6759,9 +6854,24 @@ export function createSystems(game) {
   function shadowFitBiome(i, name) {
     sc.near = Math.max(1, sysSUN_DIST - sysBIO_SC_NEAR[i]);
     sc.far = sysSUN_DIST + sysBIO_SC_FAR[i];
+    // The WIDTH, per chapter — sysBIO_SH_HALF. This has to go through the same
+    // four live variables shadowFitAlt writes, or the texel snap in sunFollow
+    // is snapping to a grid the projection no longer has and every shadow edge
+    // crawls as the animal walks.
+    sysShadowHalfBase = sysBIO_SH_HALF[name] || sysSHADOW_HALF;
+    sysShadowHalf = sysShadowHalfBase;
+    sysShadowTop = sysShadowHalf + 22;
+    sc.left = -sysShadowHalf; sc.right = sysShadowHalf;
+    sc.top = sysShadowTop;    sc.bottom = -sysShadowHalf;
+    sysTexelX = (sysShadowHalf * 2) / sysSHADOW_RES;
+    sysTexelY = (sysShadowTop + sysShadowHalf) / sysSHADOW_RES;
     sc.updateProjectionMatrix();
     sun.shadow.radius = sysBIO_SH_RAD[i];
     sun.shadow.normalBias = sysBIO_SH_NB[i];
+    // How much sky the shade keeps. Set BEFORE the first frame of the chapter
+    // is drawn, which is why it is here and not in the update loop: the four
+    // 1.0 rows have to be 1.0 on frame one or the cave darkens and comes back.
+    skyOccTick(sysSHADOW_SKY[name] !== undefined ? sysSHADOW_SKY[name] : sysSHADOW_SKY_DEF);
     // ...and the star itself changes. This is the other half of the plaza fix: a
     // 61-degree sun throws half the shadow a 41-degree one does. Swapped inside the
     // white hold of the biome fade, so nothing on screen ever sees it move.
@@ -6786,6 +6896,9 @@ export function createSystems(game) {
     sysLightOff.copy(sysAxDir).multiplyScalar(sysSUN_DIST);
     sysAxRight.crossVectors(sysWorldUp, sysAxDir).normalize();
     sysAxUp.crossVectors(sysAxDir, sysAxRight).normalize();
+    // The dome's lobe is drawn around this vector, and the gate at the paint's
+    // call site cannot see that it moved.
+    sysSkyDirty = true;
   }
 
   // The box's WIDTH is per-altitude. On the ground it stays the tight 44-unit box
@@ -6793,7 +6906,8 @@ export function createSystems(game) {
   // player can actually see is still inside the shadow frustum. Hysteresis keeps
   // this to a handful of projection rebuilds per flight instead of one per frame.
   function shadowFitAlt(alt) {
-    const half = clamp(sysSHADOW_HALF + alt * sysSHADOW_ALT_K, sysSHADOW_HALF, sysSHADOW_HALF_MAX);
+    const half = clamp(sysShadowHalfBase + alt * sysSHADOW_ALT_K,
+                       sysShadowHalfBase, sysSHADOW_HALF_MAX);
     if (Math.abs(half - sysShadowHalf) < sysSHADOW_HYST) return;
     sysShadowHalf = half;
     sysShadowTop = half + 22;
@@ -6841,6 +6955,15 @@ export function createSystems(game) {
   }
 
   sunAxes(sysSUN_DIR);
+  // ...AND THE BOOT CHAPTER NEVER FIRES `biome:enter`.
+  //
+  // Every constant above is Sydney's, so the frustum, the star and the softness
+  // have always been right on frame one by construction — and the moment a
+  // per-chapter number arrived that was NOT already spelled out in a constant,
+  // chapter one silently kept the neutral one. Measured: `shade.sky` read 1.00
+  // in Sydney and 0.55 everywhere else, which is the term switched off in the
+  // chapter the player sees first and in no other.
+  skyOccTick(sysSHADOW_SKY.sydney !== undefined ? sysSHADOW_SKY.sydney : sysSHADOW_SKY_DEF);
 
   function sunFollow(px, py, pz) {
     // Quantise the shadow-camera centre to whole texels in light space so the
@@ -7266,8 +7389,13 @@ export function createSystems(game) {
     const g = new THREEx.SphereGeometry(sysSKY_R, 32, 18);
     const pos = g.attributes.position;
     sysSkyT = new Float32Array(pos.count);
+    sysSkyD = new Float32Array(pos.count * 2);   // unit x and z; y is sysSkyT
     sysSkyCol = new Float32Array(pos.count * 3);
-    for (let i = 0; i < pos.count; i++) sysSkyT[i] = pos.getY(i) / sysSKY_R;
+    for (let i = 0; i < pos.count; i++) {
+      sysSkyT[i] = pos.getY(i) / sysSKY_R;
+      sysSkyD[i * 2] = pos.getX(i) / sysSKY_R;
+      sysSkyD[i * 2 + 1] = pos.getZ(i) / sysSKY_R;
+    }
     g.setAttribute('color', new THREEx.BufferAttribute(sysSkyCol, 3));
     const m = mat(0xffffff, { vertexColors: true, side: THREEx.BackSide }).clone();
     m.fog = false;
@@ -7300,16 +7428,40 @@ export function createSystems(game) {
    * pitched down over an edge.
    */
   function sysSkyPaint(hz, top) {
-    const c = sysSkyCol, tArr = sysSkyT;
+    const c = sysSkyCol, tArr = sysSkyT, dArr = sysSkyD;
     const hr = hz.r, hg = hz.g, hb = hz.b;
     const tr = top.r, tg = top.g, tb = top.b;
+    // The lobe's colour is the sun's own, which atmosApply has already warmed
+    // for the time of day — so golden hour reddens the sky where the sun is
+    // and not the half of it behind the camera.
+    const sr = sun.color.r, sg = sun.color.g, sb = sun.color.b;
+    const ax = sysAxDir.x, ay = sysAxDir.y, az = sysAxDir.z;
+    // The band lifts the horizon colour toward white rather than to a colour of
+    // its own: a second hue here reads as a bank of cloud, and the thing being
+    // drawn is distance.
+    const br = hr + (1 - hr) * sysSKY_BAND_K;
+    const bg = hg + (1 - hg) * sysSKY_BAND_K;
+    const bb = hb + (1 - hb) * sysSKY_BAND_K;
     for (let i = 0, n = tArr.length; i < n; i++) {
       const y = tArr[i], o = i * 3;
       if (y >= 0) {
         const k = Math.pow(y, 0.62);
-        c[o] = hr + (tr - hr) * k;
-        c[o + 1] = hg + (tg - hg) * k;
-        c[o + 2] = hb + (tb - hb) * k;
+        let cr = hr + (tr - hr) * k;
+        let cg = hg + (tg - hg) * k;
+        let cb = hb + (tb - hb) * k;
+        // ---- the band: strongest at the horizon, gone by ~10 degrees --------
+        if (y < sysSKY_BAND_Y) {
+          const u = 1 - y / sysSKY_BAND_Y;
+          const w = u * u * (3 - 2 * u);        // smoothstep, so there is no line
+          cr += (br - cr) * w; cg += (bg - cg) * w; cb += (bb - cb) * w;
+        }
+        // ---- the lobe: toward the sun's bearing AND its altitude ------------
+        const d = dArr[i * 2] * ax + y * ay + dArr[i * 2 + 1] * az;
+        if (d > 0) {
+          const w = Math.pow(d, sysSKY_LOBE_P) * sysSKY_LOBE;
+          cr += (sr - cr) * w; cg += (sg - cg) * w; cb += (sb - cb) * w;
+        }
+        c[o] = cr; c[o + 1] = cg; c[o + 2] = cb;
       } else {
         const k = 1 + y * 0.20;
         c[o] = hr * k; c[o + 1] = hg * k; c[o + 2] = hb * k;
@@ -7318,6 +7470,7 @@ export function createSystems(game) {
     sysSkyMesh.geometry.attributes.color.needsUpdate = true;
     sysSkyLastA.copy(hz);
     sysSkyLastB.copy(top);
+    sysSkyDirty = false;
   }
 
   // =========================================================================
@@ -21386,7 +21539,7 @@ export function createSystems(game) {
       // transition this runs every frame and once it has settled it runs never.
       const d1 = Math.abs(hz.r - sysSkyLastA.r) + Math.abs(hz.g - sysSkyLastA.g) + Math.abs(hz.b - sysSkyLastA.b);
       const d2 = Math.abs(sysColA.r - sysSkyLastB.r) + Math.abs(sysColA.g - sysSkyLastB.g) + Math.abs(sysColA.b - sysSkyLastB.b);
-      if (d1 + d2 > 0.0025) sysSkyPaint(hz, sysColA);
+      if (d1 + d2 > 0.0025 || sysSkyDirty) sysSkyPaint(hz, sysColA);
     }
 
     // ---- the grade --------------------------------------------------------
@@ -23044,7 +23197,8 @@ export function createSystems(game) {
      */
     canopyAudit: function () {
       const out = { biome: game.biome && game.biome.current, meshes: 0, hits: 0,
-                    nearest: -1, rim: rimInfo(), list: [] };
+                    nearest: -1, rim: rimInfo(), shade: shadeInfo(),
+                    shadowHalf: sysShadowHalf, list: [] };
       const capy = game.capy;
       // COUNTED BEFORE THE EARLY RETURNS, because nine chapters register no
       // foliage at all and those are exactly the ones where "did the animal's

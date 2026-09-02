@@ -1598,11 +1598,73 @@ export function spillTick(list, n) {
   _spillN.value = n < _SPILL_N ? n : _SPILL_N;
 }
 
+// ---------------------------------------------------------------------------
+// THE SKY OCCLUSION TERM — WHY A SHADOW IN THIS GAME WAS A TINT (D1).
+//
+// MEASURED (qa/rv-shadow.js: render, switch sun.castShadow off, render again,
+// diff): the fraction of the resting frame that is cast shadow, and how deep
+// it is in levels of 255 —
+//
+//     sydney 10.9% / 29.4    kyoto 42.0% / 26.9
+//     venice 13.0% / 25.2    sahara  6.1% / 31.1
+//
+// Twenty-nine levels on a 152-level lawn is a 19 per cent drop. The lighting
+// comment in systems.js promises "fully lit ~1.2 albedo, open shade ~0.47",
+// which is 60 per cent, and the shadow machinery is not what is wrong: 2048
+// square, contact-hardened, texel-snapped. The RATIO is wrong, because a
+// shadow can only ever remove the SUN's share of the light and the other three
+// sources — hemi at 1.35, ambient at 0.12 and the fill — are unshadowed by
+// construction. Turning the hemisphere down would darken the lit half too and
+// take the whole picture with it.
+//
+// So: scale the INDIRECT irradiance by how much sun the fragment can see.
+// Physically it is a cheat (the sun being blocked says nothing about the sky
+// being blocked) and pictorially it is exactly right, because the thing that
+// blocks the sun on a street is a building, and a building blocks most of the
+// sky too. One number per chapter says how much of the sky survives in shade,
+// so an overcast chapter — where the sun is already a rumour — can opt out
+// with 1.0 and be bit-for-bit what it was.
+//
+// It rides the rim's injection because the rim is already on essentially every
+// opaque material in the game (mat, matOwn, matSelf, and grain/sway compose on
+// top of it), so this reaches the whole picture without a second program and
+// without a second hook to forget.
+// ---------------------------------------------------------------------------
+const _skyOcc = { value: 1 };
+let _shadeOn = false;
+/**
+ * Armed by systems.js AFTER its shadow-chunk override has actually installed —
+ * that override is what declares `capyShadowV` and writes the sun visibility
+ * into it. If three ever restructures the chunk the override bails, and this
+ * stays false so the fragment below is never injected: both halves of the term
+ * are switched by one flag, because half of it is a shader that will not link.
+ */
+export function shadeEnable() { _shadeOn = true; }
+/**
+ * How much of the SKY's light survives where the sun does not, 0..1. Called on
+ * biome change from sysSHADOW_SKY; 1.0 is "no change from before this existed".
+ */
+export function skyOccTick(v) { _skyOcc.value = v > 0 ? (v < 1 ? v : 1) : 0; }
+/** For a probe: the live value, and whether the shader half is actually in. */
+export function shadeInfo() { return { sky: _skyOcc.value, on: _shadeOn }; }
+
+// `irradiance` is the accumulated indirect (ambient + light probes + every
+// hemisphere light); lights_fragment_END is what hands it to RE_IndirectDiffuse,
+// so scaling it here — after the include, before the end — is the whole term.
+// capyShadowV is reset on the line BEFORE the include because a material with
+// receiveShadow off never enters the branch that writes it.
+const _RIM_FS_SHADE = `capyShadowV = 1.0;
+#include <lights_fragment_begin>
+#if defined( RE_IndirectDiffuse )
+  irradiance *= mix(1.0, uShadowSky, 1.0 - capyShadowV);
+#endif`;
+
 const _RIM_FS_COMMON = `#include <common>
 varying vec3 vRimW;
 varying vec3 vRimN;
 uniform float uRimK;
 uniform vec3 uRimC;
+uniform float uShadowSky;
 uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
@@ -1681,6 +1743,7 @@ function _rimInjectWith(kU, cU) {
   return function (shader) {
     shader.uniforms.uRimK = kU;
     shader.uniforms.uRimC = cU;
+    shader.uniforms.uShadowSky = _skyOcc;
     shader.uniforms.uSpillP = _spillP;
     shader.uniforms.uSpillC = _spillC;
     shader.uniforms.uSpillOn = _spillOn;
@@ -1691,6 +1754,10 @@ function _rimInjectWith(kU, cU) {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', _RIM_FS_COMMON)
       .replace('#include <opaque_fragment>', _RIM_FS_OUT);
+    if (_shadeOn) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <lights_fragment_begin>', _RIM_FS_SHADE);
+    }
   };
 }
 const _rimInject = _rimInjectWith(_rimK, _rimC);
@@ -1913,7 +1980,11 @@ export function mat(color, opts) {
   _matCache.set(key, m);
   return m;
 }
-function _rimKey() { return 'rim2'; }
+// The key has to move with the shade term or a session that armed it late
+// would share a program compiled without it. `_shadeOn` is set once at boot,
+// before anything renders, so in practice every material agrees — this is the
+// honest spelling of that, not a case anybody will hit.
+function _rimKey() { return _shadeOn ? 'rim2s' : 'rim2'; }
 
 // ---------------------------------------------------------------------------
 // matOwn — A RIMMED MATERIAL THAT NOBODY ELSE SHARES.

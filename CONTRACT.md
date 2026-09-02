@@ -3058,6 +3058,139 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## DEPTH — D1 (3 Sep 2026)
+
+The first batch of `ROADMAP-DELIGHT.md`. Two numbers opened that roadmap and
+this section is both of them answered.
+
+### A shadow could only ever remove the sun's share
+
+`qa/rv-shadow.js` is a paired A/B inside one JS turn: render the resting frame,
+read the pixels, switch `sun.castShadow` off, render, read again. The fraction
+of the frame that changed is how much of it is cast shadow; the mean lift where
+it changed is how deep that shadow is, in levels of 255.
+
+| chapter | frame in shadow | depth, before | depth, after |
+|---|---|---|---|
+| sydney | 10.9 % → 11.7 % | 29.4 | **39.6** |
+| venice | 13.0 % → 23.3 % | 25.2 | **44.5** |
+| sahara | 6.1 % → 9.4 % | 31.1 | **34.3** |
+| kyoto (control) | 42.0 % → 43.7 % | 26.9 | **27.2** |
+
+Twenty-nine levels on a 152-level lawn is a 19 per cent drop where the lighting
+comment in `systems.js` promises 60 ("fully lit ~1.2 albedo, open shade ~0.47").
+The machinery was never the problem — 2048², contact-hardened, texel-snapped.
+The RATIO was, because `hemi` at 1.35, `amb` at 0.12 and the fill are unshadowed
+by construction and a shadow can only take away the sun's share of the light.
+
+**The term.** `shared.js` scales the indirect irradiance by how much sun the
+fragment can see: `irradiance *= mix(1.0, uShadowSky, 1.0 - capyShadowV)`,
+injected after `#include <lights_fragment_begin>` and before `lights_fragment_end`
+hands it to `RE_IndirectDiffuse`. It rides the RIM's injection, because the rim
+is already on essentially every opaque material in the game (`mat`, `matOwn`,
+`matSelf`, and `grain`/`sway` compose on top of it) — so it reaches the whole
+picture without a second program and without a second hook to forget.
+
+**How the shadow gets out of `getShadow`.** It could not: the function returns
+into an expression that multiplies the direct light and is then gone. So
+`sysInstallShadowFilter` — which already owns a global override of the
+`shadowmap_pars_fragment` chunk for the contact-hardening — declares
+`float capyShadowV;` at the top of that chunk and writes the sun visibility into
+it from both exits of its branch. The declaration is OUTSIDE the chunk's own
+`#if` ladder deliberately: the ladder is about how many shadow-casting lights
+there are and the declaration has to exist whether the answer is one or none.
+Both halves are armed by one line — the override calls `shadeEnable()` on
+success, and if three ever restructures the chunk it bails and shared.js never
+injects a fragment that reads a name nothing declares.
+
+**`sysSHADOW_SKY`** is one number per chapter: how much of the sky's light
+survives where the sun does not. The default is 0.45 and five rows keep 1.0,
+which is bit-for-bit the game as it was — kyoto (rain: the overcast sky IS the
+light and there is no second source to occlude), the cave (no sky at all),
+iceland and antarctic (flat overcast, both already near the top of the exposure
+range where more darkening reads as a bruise), and the drift (above the weather,
+nothing to cast onto). Four low-sun rows sit between: göreme 0.72, kowloon 0.84,
+monaco 0.76, hanoi 0.74.
+
+**The 45–60 the roadmap asked for is not reachable with this lever and the
+arithmetic says so.** At 0.45 Sydney gains 10.2 levels; the whole indirect share
+of that frame, measured by the same A/B, is about 15.6 levels — so even 0.0,
+which would be a shadow with no sky in it at all, tops out near 45. The grade's
+S-curve and the airlight sit downstream and eat the rest. What shipped is the
+number where the picture reads and nothing crushes, and the ceiling is written
+down here rather than chased.
+
+**The one lever left, not taken.** `fill` is bounce light and bounce light is
+the sky, but it is a `DirectionalLight` and reaches the fragment through
+`RE_Direct` where its contribution cannot be told from the sun's. Moving it
+into the indirect path is a shader change with nineteen chapters downstream of
+it and it is not a D1-sized job.
+
+### The boot chapter never fires `biome:enter`
+
+Every shadow and sun constant in `systems.js` is Sydney's, so frame one has
+always been right by construction — and the moment a per-chapter number arrived
+that was NOT already spelled out in a constant, chapter one silently kept the
+neutral one. Measured as `shade.sky` reading 1.00 in Sydney and 0.45 in all
+eighteen others: the term switched off in the chapter the player sees first and
+in no other. `skyOccTick` is now called once at construction beside
+`sunAxes(sysSUN_DIR)`. **Any future per-chapter light state has this hole.**
+
+### The shadow box is 44 m wide and two chapters need more
+
+`sysBIO_SH_HALF` swaps the WIDTH in `shadowFitBiome` beside the depth, and
+`shadowFitAlt` opens out from the chapter's own width rather than from the
+global 22 — two separate questions that were sharing one variable, which is how
+a wide chapter would have snapped back to 22 the first time the animal left the
+ground. Both numbers are measured from the frame: at 34 Rio gains the near
+parasol and nothing else, and only at 44 do all four ellipses and the bathers'
+own shadows appear. Venice wants 34 and no more — the campanile is the caster
+that matters there and it arrives at 34. The cost is texel size: 4.3 cm rather
+than 2.15, about two centimetres of extra softness on a contact edge, and
+`sysTexelX/Y` are recomputed from the row or the snap in `sunFollow` shimmers.
+
+### The sky was two colours and no direction
+
+`sysSkyPaint` read one number per vertex — normalised Y — so the sky was
+identical on every bearing: no warm lobe where the sun is, no horizon band, and
+in `rv-palawan.png` and `rv-rio.png` the sea and the sky arrived at the same
+value and the horizon was simply gone.
+
+Two vertex terms on the dome that already exists, no shader, no draw call,
+repainted only on change:
+
+- **LOBE**, toward the sun, on `pow(dot, 2.4) * 0.20` of the way to the sun's
+  own colour — which `atmosApply` has already warmed for the time of day, so
+  golden hour reddens the half of the sky the sun is in and not the other.
+  Broad, not tight: the dome is 32 segments around, eleven degrees a quad, and
+  anything sharper aliases into a polygon. A sun DISC needs its own geometry.
+- **BAND**, the first ten degrees above the horizon lifted 24 % toward white —
+  the aerial perspective the fog draws on the ground and the sky never joined
+  in with.
+
+Measured off the dome's own vertex colours (`qa/d1-sky.js`), in linear luma:
+the band is +0.108 to +0.230 against mid-sky in all five chapters sampled, and
+the lobe is +0.018 (venice, whose sky is already pale enough to have nowhere to
+go) to +0.067 (rio, manly) at the sun's own elevation.
+
+**`sysSkyDirty`.** The paint's call site gates on the horizon and zenith colours
+having moved, and the sun's BEARING is now a third input that changes once per
+chapter, inside the white of the crossing. `sunAxes` sets the flag.
+
+**Four chapters own their sky** (`sysSKY_OWN`: sydney, drift, göreme, cave) and
+none of this reaches them. Sydney is the chapter a player sees first; its dome
+is `environment.js`'s and giving it the same two terms is spill, not done.
+
+### Two harness traps this batch paid for
+
+1. **The dome's rings sit at ten degrees of POLAR angle** — y = 1, 0.985, 0.940
+   … 0.174, 0. There is nothing at all between y = 0 and y = 0.174, so a band
+   sampled at "0.02 < y < 0.06" reads no vertices and reports null rather than
+   nothing.
+2. **A lobe has to be compared at the sun's own elevation.** Sampled in a band
+   low in the sky it measures the vertical ramp instead and reports a tenth of
+   the number.
+
 ## UNDER THE HOOD — P8 (3 Sep 2026)
 
 ### The comment strip, and why it is a scanner

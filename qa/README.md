@@ -64,6 +64,8 @@ permanent feature rather than a one-off change:
 | `p7-impact.js` | the landing ring, the dust pool, and the hit flash's two edges |
 | `p7-css.js` | computed radius and shadow on eight surfaces; zero empty declarations |
 | `p7-cross.js` | the crossing, which the chapter picker skips |
+| `rv-shots.js` | the delight review's baseline: title, twelve resting frames through the picker key, a run, a wheek, the pause card |
+| `rv-shadow.js` | paired shadow A/B in one JS turn: fraction of the frame in shadow and its depth in levels, four chapters |
 
 ## The rest
 
@@ -94,3 +96,10 @@ worth re-reading; the four that have cost the most time in this repo:
    white.
 4. **The mean of a crowd is not in the crowd.** Nor, usually, is the densest
    neighbourhood outside a wall. Render several bearings and post all of them.
+
+D1 added two, and one of them replaced a guess with a number:
+
+| file | what it answers |
+|---|---|
+| `d1-sky.js` | the dome's lobe and horizon band, read off its own vertex colours |
+| `d1-shots.js` | six resting frames with the live `shade` and shadow-half in each row |
