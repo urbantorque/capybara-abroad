@@ -28,7 +28,12 @@ const physBARGE_DV  = 1.9;       // m/s — the hard ceiling on what a barge gra
 const physBARGE_UP  = 0.34;      // of that, upward, so a tall prop goes over
 const physTIP_COS = 0.5;         // cos(60°) — bin considered toppled
 const physHOLD_LAMBDA = 26;      // mouth snap ~0.12s
-const physDUST_MAX = 30;
+// 30 was the whole game's dust: a landing wanted six of it, a run scuffed one
+// per stride, a dig took a handful and Pasto's ash column shares the same
+// pool. A sprint into a hard landing therefore arrived with a pool that was
+// already three quarters spent, and the landing — the one moment that is
+// SUPPOSED to look like an impact — got whatever was left over.
+const physDUST_MAX = 60;
 const physFOAM_MAX = 8;
 const physRUBBISH_MAX = 18;
 const physWATER_FALLBACK = -0.5;
@@ -1234,6 +1239,67 @@ const physSQ_GIVE  = { soft: 1.0, straw: 0.8, paper: 1.0, plastic: 0.55,
                        hollow: 0.4, timber: 0.22, ceramic: 0.10, glass: 0.08, metal: 0.06 };
 
 /** Kick a prop's squash spring. `speed` is the impact along the normal. */
+// ===========================================================================
+// THE HIT FLASH (P7)
+//
+// A prop hitting something got a squash, a thud and a camera tap, and the
+// squash is 8% of a scale on a box six metres away. The one thing that reads
+// at that distance is VALUE, and nothing about an impact changed the value of
+// anything.
+//
+// It is a MATERIAL SWAP, not an emissive write, and that is forced: `mat()`
+// caches one material per colour, so every crate in the chapter shares one,
+// and writing emissive on it would flash all of them. One shared flash
+// material, swapped in and swapped back — the prop loses its own colour for
+// sixty milliseconds, which at sixty milliseconds is exactly what a flash is.
+//
+// SIXTY MILLISECONDS IS THREE FRAMES AT SIXTY HERTZ and two at thirty, which
+// is the floor: one frame is a dropped-frame artefact rather than a flash.
+// The clock is wall time, not frames, so it is the same length everywhere.
+const physFLASH_MS = 60;
+const physFLASH_MIN = 3.2;      // m/s — a bump that is worth marking
+let physFlashMat = null;
+const physFlashing = [];        // props mid-flash; almost always 0 or 1 long
+function physFlashMaterial() {
+  if (!physFlashMat) {
+    // Near-white rather than white, and emissive rather than merely bright:
+    // a Lambert at full white still takes the sun's angle, so a crate hit on
+    // its shaded side would flash darker than one hit in the light.
+    physFlashMat = new THREE.MeshLambertMaterial({
+      color: PALETTE.sail, emissive: PALETTE.sail, emissiveIntensity: 0.85,
+      flatShading: true,
+    });
+  }
+  return physFlashMat;
+}
+function physFlash(prop, speed) {
+  if (!prop || !prop.mesh || speed < physFLASH_MIN) return;
+  const m = prop.mesh;
+  // An InstancedMesh shares one material across every instance of it, so a
+  // swap there flashes the whole flock. Skip them: they are the scenery
+  // props, and the ones the player throws are not instanced.
+  if (m.isInstancedMesh || Array.isArray(m.material)) return;
+  if (prop.flashT > 0) { prop.flashT = physFLASH_MS; return; }
+  prop.flashWas = m.material;
+  prop.flashT = physFLASH_MS;
+  m.material = physFlashMaterial();
+  physFlashing.push(prop);
+}
+/** Wall-clock, so a flash is the same length at 30 fps and at 144. */
+function physFlashStep(dtMs) {
+  for (let i = physFlashing.length - 1; i >= 0; i--) {
+    const p = physFlashing[i];
+    p.flashT -= dtMs;
+    if (p.flashT > 0) continue;
+    p.flashT = 0;
+    // ...and put back what was THERE, not what the type says it should be:
+    // a prop may have been wetted, stained or shaded since it was built.
+    if (p.mesh && p.flashWas) p.mesh.material = p.flashWas;
+    p.flashWas = null;
+    physFlashing.splice(i, 1);
+  }
+}
+
 function physSquashHit(prop, speed) {
   const def = physTYPES[prop.type];
   if (!def) return;
@@ -1390,7 +1456,12 @@ export function createProps(game) {
   // past 5.5 m/s of descent, so a walk off a kerb costs nothing.
   game.events.on('capy:land', function (e) {
     const p = e && e.position;
-    if (p) physDust3(p.x, p.y - 0.30, p.z, 6);
+    // ...and how MUCH of it is how hard it was. Six particles for every
+    // landing meant a step off a crate and a forty-metre arrival threw the
+    // same cloud, which is the same flatness the landing ring fixes above
+    // the ground. `fall` is on the payload; older senders may not carry it.
+    const v = (e && e.fall) || 6;
+    if (p) physDust3(p.x, p.y - 0.30, p.z, Math.round(clamp(4 + v * 0.7, 4, 16)));
   });
   // ...and a run kicks up a scuff behind every other stride. One particle, so a
   // sustained sprint costs a couple of matrix writes a second and nothing else.
@@ -1988,6 +2059,10 @@ function physKeepOut(place) {
 
 function physRemoveProp(prop) {
   if (!prop || prop.removed) return;
+  // ...and if it is mid-flash, take it off that list and give it its material
+  // back first. A prop removed on the frame it was hit would otherwise sit in
+  // physFlashing for ever, and the list is walked every frame.
+  if (prop.flashT > 0) { prop.flashT = 0.0001; physFlashStep(1); }
   const arr = physGame.props;
   const i = arr.indexOf(prop);
   if (i >= 0) arr.splice(i, 1);
@@ -2796,6 +2871,7 @@ function physOnCollide(prop, e) {
   physImpactPayload.speed = speed;
   physStampVoice(prop);
   physSquashHit(prop, speed);
+  physFlash(prop, speed);
   physImpactPayload.position.set(prop.body.position.x, prop.body.position.y, prop.body.position.z);
   // Presentation (thud + shake) belongs to systems.js's 'prop:impact' handler —
   // firing it here too double-shakes and flanges the sample.
@@ -4906,6 +4982,11 @@ function physUpdate(dt) {
     if (physGame.state.time === physLastTick) return;
     physLastTick = physGame.state.time;
   }
+  // The hit flash is on a WALL clock and its own list, because a prop that has
+  // come to rest is skipped past the per-prop loop below — so a crate that
+  // was hit and settled in the same second would keep the flash material for
+  // ever. See THE HIT FLASH.
+  physFlashStep(dt * 1000);
   // ---- biome gate ---------------------------------------------------------
   // Props are tagged with the biome they were born into (main.js auto-tags
   // everything added at runtime). A detached biome's bodies are out of the

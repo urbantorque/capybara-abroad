@@ -565,7 +565,10 @@ const capyMovePayload = { position: capyPosition, speed: 0 };
 // `soft` is THE SOFT WHEEK — see capyWHEEK_CALM_T. It is always a boolean, from
 // the first frame, so no listener ever reads `undefined` off this payload.
 const capyWheekPayload = { position: capyPosition, soft: false };
-const capyDigPayload = { position: capyPosition };
+// `fall` is m/s of descent and is read by props.js to size the dust cloud.
+// It is on the payload rather than recomputed there because the only place
+// that knows how hard the arrival was is the frame that ended it.
+const capyDigPayload = { position: capyPosition, fall: 0 };
 const capySfxOpts = { pitch: 1, volume: 1, wet: 0 };   // reused — update() may not allocate
 // The same thing, with a place. `at` is a permanent reference to the position
 // mirror, which is rewritten in place every frame, so this object is built once
@@ -577,6 +580,14 @@ const capySfxAt = { pitch: 1, volume: 1, at: capyPosition };
 // for the wheek's shockwave — see the fx block in update().
 const capyRING_COUNT = 3;
 let capyWheekRing = 0, capyWheekX = 0, capyWheekY = 0, capyWheekZ = 0;
+// ---- THE LANDING RING (P7) ---------------------------------------------
+// A hard arrival threw six particles of dust and shook the camera, and the
+// dust is behind the animal by the time you look at it. The ring is the one
+// mark that says WHERE — the same argument, and the same instanced mesh, as
+// the wheek ring above it. `capyLandRing` is the clock and `capyLandK` is
+// how hard it was, so a five-metre drop and a forty-metre one do not draw
+// the same circle.
+let capyLandRing = 0, capyLandK = 0, capyLandX = 0, capyLandY = 0, capyLandZ = 0;
 const capyRingLife = new Float32Array(capyRING_COUNT);
 const capyRingX = new Float32Array(capyRING_COUNT);
 const capyRingY = new Float32Array(capyRING_COUNT);
@@ -1518,6 +1529,12 @@ const capyGAZE_YAW    = 0.55;       // rad — the neck's honest limit
 const capyGAZE_PITCH  = 0.35;
 const capyGAZE_CONE   = 1.30;       // rad off the nose past which nothing is looked at
 const capyGAZE_PROP   = 3.5;        // m — a little past the grab path's own reach
+// MEASURED against the fall speeds this animal actually reaches: a step off
+// a kerb is under 3, a bench is about 4.5, the dust threshold is 5.5, and a
+// forty-metre arrival is past 25. 3.2 puts a ring under anything that felt
+// like a drop and under nothing that felt like a step.
+const capyLAND_RING_V = 3.2;        // m/s of descent that earns a ring
+const capyLAND_RING_RATE = 4.2;     // 1/s — about a quarter of a second
 const capyGAZE_SPEAK  = 14;         // m — how far off a line still turns the head
 const capySNIFF_R     = 2.6;        // m — close enough that a smell is the reason
 const capySNIFF_DUR   = 0.34;       // s — a sniff, not a yawn
@@ -2262,7 +2279,10 @@ export function createCapybara(game) {
   const capyRingMesh = new THREE.InstancedMesh(
     capyGeoRing,
     mat(PALETTE.foam, { side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false }),
-    capyRING_COUNT + 1
+    // +2: the wheek's ring and the landing's. Two more matrix writes on a
+    // mesh that is already drawn, which is the whole reason both of them
+    // live here rather than being meshes of their own.
+    capyRING_COUNT + 2
   );
   capyRingMesh.frustumCulled = false;
   capyRingMesh.castShadow = false;
@@ -2271,7 +2291,7 @@ export function createCapybara(game) {
   capyRingP.set(0, -999, 0);
   capyRingS.set(0.0001, 0.0001, 0.0001);
   capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
-  for (let i = 0; i <= capyRING_COUNT; i++) capyRingMesh.setMatrixAt(i, capyRingM4);
+  for (let i = 0; i <= capyRING_COUNT + 1; i++) capyRingMesh.setMatrixAt(i, capyRingM4);
   capyRingMesh.instanceMatrix.needsUpdate = true;
   scene.add(capyRingMesh);
 
@@ -3795,7 +3815,19 @@ export function createCapybara(game) {
         if (fall > 7) capyPunch(game, clamp((fall - 7) * 0.02, 0, 0.12));
         // a hard arrival kicks up dust, which is what tells you it was hard
         capyDigPayload.position = capyPosition;
+        capyDigPayload.fall = fall;
         if (fall > 5.5) game.events.emit('capy:land', capyDigPayload);
+        // ...and the mark on the ground. Its own threshold, LOWER than the
+        // dust's: a two-metre hop off a bench is worth a ring and is not
+        // worth a cloud, and the whole point of the ring is that it is the
+        // cheap one. See THE LANDING RING.
+        if (fall > capyLAND_RING_V) {
+          capyLandRing = 1;
+          capyLandK = clamp((fall - capyLAND_RING_V) / 9, 0.28, 1);
+          capyLandX = capyPosition.x;
+          capyLandY = capyPosition.y - 0.30;
+          capyLandZ = capyPosition.z;
+        }
       }
       capyStallT = 0; capyStepUsed = 0;
       capyFallV = 0;
@@ -3989,6 +4021,9 @@ export function createCapybara(game) {
         if (capyPop > -0.14) capyPop = -0.14;
         if (capyPopVel > -2.4) capyPopVel = -2.4;
         capyDigPayload.position = capyPosition;
+        // a SKID is not a fall: it borrows this event for the puff and must not
+        // borrow a forty-metre arrival's cloud with it.
+        capyDigPayload.fall = 3;
         game.events.emit('capy:land', capyDigPayload);
         capySfxOpts.volume = 0.30; capySfxOpts.pitch = 1.5;
         game.sfx('rustle', capySfxOpts);
@@ -5118,6 +5153,23 @@ export function createCapybara(game) {
       capyRingQ.set(0, 0, 0, 1);
       capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
       capyRingMesh.setMatrixAt(capyRING_COUNT, capyRingM4);
+      capyRingMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // ---- fx: the landing ring (P7) -----------------------------------
+    // Flatter and faster than the wheek's: a pressure wave goes OUT and a
+    // landing goes DOWN, so this one opens quickly and dies rather than
+    // easing out, and its height term is a third of the wheek's.
+    if (capyLandRing > 0) {
+      capyLandRing -= dt * capyLAND_RING_RATE;
+      if (capyLandRing < 0) capyLandRing = 0;
+      const a = 1 - capyLandRing;
+      const s = 0.30 + Math.sqrt(a) * (1.6 + capyLandK * 3.4);
+      capyRingP.set(capyLandX, capyLandY, capyLandZ);
+      capyRingS.set(s, capyLandRing * capyLandK * 0.5, s);
+      capyRingQ.set(0, 0, 0, 1);
+      capyRingM4.compose(capyRingP, capyRingQ, capyRingS);
+      capyRingMesh.setMatrixAt(capyRING_COUNT + 1, capyRingM4);
       capyRingMesh.instanceMatrix.needsUpdate = true;
     }
 

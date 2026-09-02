@@ -3058,6 +3058,108 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE DRAWN PAYOFF — P7 (3 Sep 2026)
+
+### An impact is a value change, not a scale change
+
+A prop hitting something got a squash, a thud and a camera tap, and the squash
+is eight per cent of a scale on a box six metres away. The one thing that reads
+at that distance is VALUE, and nothing about an impact changed the value of
+anything.
+
+**It has to be a material SWAP.** `mat()` caches one material per colour, so
+every crate in a chapter shares one — writing `emissive` on it flashes all of
+them. One shared flash material, swapped in and swapped back, and the prop
+loses its own colour for sixty milliseconds, which at sixty milliseconds is
+exactly what a flash is.
+
+- 60 ms is three frames at 60 Hz and two at 30. That is the floor: one frame is
+  a dropped-frame artefact rather than a flash. The clock is WALL time, so it is
+  the same length at 30 fps and at 144.
+- It restores `prop.flashWas`, not the type's colour: a prop may have been
+  wetted, stained or shaded since it was built.
+- It skips `InstancedMesh` outright, for the same reason as the emissive.
+- Its own list, stepped from `physUpdate`, because a prop that has come to rest
+  is skipped past the per-prop loop — a crate hit and settled in the same second
+  would otherwise keep the flash material for ever.
+
+### A landing needs a mark on the ground
+
+The dust is behind the animal by the time you look at it. The ring is the thing
+that says WHERE, and it is the same instanced mesh as the wheek's, so it costs
+two matrix writes. It is FLATTER and FASTER than the wheek's: a pressure wave
+goes out and a landing goes down.
+
+Both scale with the fall: MEASURED ring scale 5.30 for an eleven-metre drop
+against 3.55 for a step off a bench, and the dust cloud is 4 to 16 particles
+rather than a flat 6. `fall` goes on the payload, because the only place that
+knows how hard the arrival was is the frame that ended it — and a SKID borrows
+the same event for its puff and must not borrow a forty-metre arrival's cloud
+with it.
+
+The pool went 30 to 60 because thirty was the whole game's dust: a landing, a
+run scuff every stride, a dig, and Pasto's ash column all draw from it, so a
+sprint into a hard landing arrived with it three quarters spent.
+
+### A design system is how many answers the CSS gives
+
+Not a document. `qa/p7-tokens.cjs` counts them, and before this pass one HUD
+gave **thirteen** answers to "what is a corner", **twenty-six** to "what is a
+shadow" and **seventy-two** to "what size is this". That is a hundred and
+eleven separate decisions, and it is why a card and a button and a leaf never
+quite looked related.
+
+- **Four radii.** 2 and 3 px were the same corner; so were 4 and 5, 6 and 7,
+  and 9 and 14 — nobody can see a one-pixel difference in a corner, which is
+  precisely how thirteen of them accumulated. `999px` and `50%` stay: they are
+  SHAPES, not radii.
+- **Three shadow scales**, and they are the card's own documented recipe —
+  contact, lift, room. Compound shadows carrying a focus RING keep theirs: a
+  ring is not an elevation and must not be quantised with one.
+- **A clamp whose floor and ceiling are the same number is a constant wearing a
+  clamp.** There were five spellings of 11px and eight of them once the plain
+  number was counted. Merging them changed not one rendered pixel.
+- **The remaining 59 type sizes were left alone deliberately.** Every one was
+  measured against a specific element at a specific viewport; P2 was an entire
+  batch about this card on a phone. Rounding them onto six steps would undo
+  measured work to make a number smaller.
+
+**Verify tokens by COMPUTED style.** A malformed token does not throw: the
+browser drops the whole declaration and the element silently loses its corner.
+`qa/p7-css.js` reads back the computed radius and shadow of eight surfaces and
+counts elements whose radius computed to empty. Zero.
+
+### The most repeated moment in the game had never been tested
+
+1.28 s of blank paper: every chapter change, every ferry, every line off the
+departures board. The postcard in it appeared at 8%, sat perfectly still, and
+left — a still image on a still ground for the exact length of time the player
+has nothing else to look at, which reads as a loading screen.
+
+It rises now, four per cent of the frame, decelerating, brightening as it goes,
+with the name following half as far and a beat later — the only thing that
+stops the two reading as one lump sliding up the screen.
+
+**Two traps, both of which make the animation silently not happen:**
+
+1. **A transition needs a start state that was laid out.** Adding `trip` and
+   `rise` in the same frame sets the end state before the element has ever been
+   rendered with the start state, and the transition does not run: the card
+   simply appears where it was going. Two nested `requestAnimationFrame`s.
+2. **The chapter picker's digit keys call `biomeGo` directly** and skip the
+   crossing entirely. Every probe in this repo jumps chapters that way, which
+   is why nobody had noticed. `hud.cross(biome)` exists now so it can be
+   driven, and the first run of the probe sampled three and a half seconds of
+   an element with no class on it and reported nothing wrong.
+
+### Two items measured as already done
+
+All nineteen chapters plus `environment` already pass `broad` and `broadM` to
+`grain()`, tuned per place, over a shader that already runs two near octaves, a
+domain warp, per-octave footprint fades and a broad octave that moves a hue
+rather than a level. And paper has zero ink-coloured borders, and had zero
+before. **A roadmap written before a pass shipped will ask for the pass again.**
+
 ## THE THROUGH-LINE — P6 (3 Sep 2026)
 
 Nineteen chapters and about a hundred and thirty people, and the only thing in

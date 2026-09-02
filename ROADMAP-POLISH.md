@@ -758,6 +758,65 @@ a token pass (4 radii, 6 type steps, one shadow scale, paper never gets ink
 borders); one vendored display face; photo-mode poses and a self-timer; a
 minimap underlay per chapter.
 
+**Done, 3 Sep 2026.** Five items landed; two were already built, and one is the
+owner's. The two that measured as nothing to do are recorded, because a batch
+that quietly skips them looks the same as one that never checked.
+
+- **The impact cluster.** The dust pool is 60, not 30 — a landing wanted six of
+  it, a run scuffs one per stride, a dig takes a handful and Pasto's ash column
+  shares the same pool, so a sprint into a hard landing arrived with three
+  quarters of it already spent. A landing now also draws a RING, on the same
+  instanced mesh as the wheek's, scaled by how hard the arrival was: measured
+  5.30 for an eleven-metre drop against 3.55 for a step off a bench. And a prop
+  hitting something FLASHES for 60 ms, by material swap rather than an emissive
+  write, because `mat()` caches one material per colour and writing emissive on
+  it would flash every crate in the chapter at once.
+- **The token pass.** Counted first: thirteen distinct corner radii, twenty-six
+  distinct shadows and seventy-two distinct type sizes in one HUD. Now four
+  radii (plus `999px` and `50%`, which are shapes rather than radii), three
+  shadow scales plus the rings and insets that are not elevations, and a named
+  six-step type scale. Eight different spellings of "11px" — four of them
+  clamps whose floor and ceiling were the same number — collapsed to one.
+  Radii 13 to 4, shadows 26 to 3 plus 8 special cases, type 72 to 59. Paper
+  never had an ink border: zero, and zero before.
+- **The crossing.** The postcard in the white was a decal — it appeared at 8%,
+  sat still for a second and a quarter and left, which for the most repeated
+  moment in the game reads as a loading screen. It now rises four per cent of
+  the frame, decelerating, brightening as it goes, with the name following half
+  as far and a beat later. Measured off computed style: opacity 0.02 to 0.085,
+  transform 30.4 px to none, 16 distinct states across one crossing.
+
+**Already built, so not re-done:**
+
+- **The two-tone macro per ground.** All nineteen chapters plus `environment`
+  already pass `broad` and `broadM` to `grain()`, each tuned to its own place,
+  and the shader already runs two near octaves, a domain warp, per-octave
+  footprint fades and a broad octave that moves a hue rather than a level. The
+  roadmap line predates the depth pass. Halving the fine grain on top of a
+  tuned nineteen-chapter table on the say-so of a stale note would be undoing
+  measured work.
+- **Paper with ink borders.** Zero of them, and zero before.
+
+**Not landed, and why:**
+
+- **Speed streaks, the touch fan as paper coins, photo-mode poses and a
+  self-timer, a minimap underlay per chapter.** Four new features rather than
+  four corrections. Each is most of a day on its own, and none of them is a
+  defect in what is already there.
+- **One vendored display face.** A licence decision before it is a design one:
+  a bundled font is a redistributed work, and this repo's own licence is still
+  open (see `LICENSING.md`). Choosing and embedding one is not mine to do.
+- **Type is 59 sizes, not 6.** Every remaining clamp was measured against a
+  specific element at a specific viewport — P2 was an entire batch about this
+  card on a phone — and rounding them onto six steps would undo that work to
+  make a number smaller. What landed is the scale existing, named, and used by
+  everything that was already sharing a value.
+
+**Found on the way:** the chapter picker's digit keys call `biomeGo` directly,
+so they skip the crossing entirely. Every probe in this repo jumps between
+chapters that way, which means the 1.28 s of white had never once been driven
+by a test. `hud.cross(biome)` now exists so that it can be.
+
 **P8 — under the hood** (area 7, ~14 h). `fps` from `rawDt` against the
 observed refresh ceiling; chapter eviction two hops behind with a soak; the
 comment strip in `build.mjs` (tokeniser-aware — the `$'` incident is the

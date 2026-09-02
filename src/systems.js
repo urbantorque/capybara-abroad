@@ -5005,6 +5005,44 @@ function sysBuildCSS() {
   const veil    = sysRgba(PALETTE.fog, 0.78);
   const veil2   = sysRgba(PALETTE.skyBottom, 0.92);
   const water   = sysHex(PALETTE.water);
+
+  // ---- THE SHAPE TOKENS (P7) --------------------------------------------
+  // Counted before this existed: THIRTEEN distinct corner radii, twenty-six
+  // distinct shadows and seventy-two distinct type sizes, across one HUD.
+  // That is not a style, it is a hundred and eleven separate decisions, and
+  // the reason a card and a button and a leaf never quite looked related is
+  // that no two of them had been asked the same question.
+  //
+  // Four radii. 2px and 3px were the same corner; so were 4 and 5, 6 and 7,
+  // and 9 and 14 — nobody can see a one-pixel difference in a corner, which
+  // is precisely why thirteen of them accumulated. 999px and 50% are not
+  // radii, they are SHAPES (a pill, a dot) and stay as they are.
+  const rSm = '3px';         // a chip, a tick box, a small inset
+  const rMd = '5px';         // a row, a button, a leaf
+  const rLg = '7px';         // a card
+  const rXl = '12px';        // the big cards, and anything that reads as a sheet
+
+  // ...and ONE shadow scale. The card's own recipe is the right one and it is
+  // already written down beside it: a tight shadow is the CONTACT with the
+  // surface, the middle one is the lift, and the wide faint one is the room.
+  // Everything that was a single arbitrary blur now names which of the three
+  // it is. Compound shadows that carry a focus RING keep theirs — a ring is
+  // not an elevation and must not be quantised with one.
+  const shSm = '0 1px 2px ' + shadow;
+  const shMd = '0 1px 3px ' + shadow + ',0 6px 16px ' + shadow;
+  const shLg = '0 1px 3px ' + shadow + ',0 8px 20px ' + shadow + ',0 20px 46px ' + shadow2;
+
+  // ...and six type steps. These are the sizes that were already used more
+  // than once; the one-offs are NOT snapped onto them, because every one of
+  // those clamps was measured against a specific element at a specific
+  // viewport — P2 was an entire batch about this card on a phone — and
+  // rounding them to a scale would undo that work to make a number smaller.
+  const tXs = 'clamp(7.5px,1.15vw,9.5px)';   // a caption, a stamp
+  const tSm = 'clamp(8.5px,1.7vw,10.5px)';   // a label
+  const tMd = 'clamp(11px,1.9vw,11px)';      // body: the size most of the HUD is
+  const tLg = 'clamp(13px,2.4vw,15px)';      // a lead line
+  const tXl = 'clamp(17px,3.4vw,25px)';      // a card's name
+  const tHu = 'clamp(24px,7.4vw,60px)';      // the title
   const sand    = sysHex(PALETTE.sand);
 
   return [
@@ -5028,16 +5066,16 @@ function sysBuildCSS() {
   'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
   'transition:opacity .28s ease;padding:14px;}',
 '.capyui-jr.show{opacity:1;pointer-events:auto;}',
-'.capyui-jrcard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
-  'box-shadow:0 18px 40px ' + shadow2 + ';padding:clamp(16px,3vw,28px) clamp(18px,3.4vw,36px);',
+'.capyui-jrcard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
+  'box-shadow:' + shLg + ';padding:clamp(16px,3vw,28px) clamp(18px,3.4vw,36px);',
   'transform:rotate(-.5deg);max-width:660px;width:100%;max-height:92vh;overflow:auto;',
   'overscroll-behavior:contain;}',
 '.capyui-jrcard h2{font-size:clamp(15px,3vw,21px);color:' + ink + ';font-weight:700;letter-spacing:-.01em;}',
-'.capyui-jrsub{font-size:clamp(11px,2vw,11px);letter-spacing:.3em;text-transform:uppercase;',
+'.capyui-jrsub{font-size:' + tMd + ';letter-spacing:.3em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;margin-top:3px;}',
 // A real <button>, so it is reset back to looking like a row of a list.
 '.capyui-jrrow{display:grid;grid-template-columns:46px 1fr auto;gap:3px 10px;align-items:center;',
-  'padding:7px 8px;border-radius:4px;margin-top:2px;border:1px solid transparent;',
+  'padding:7px 8px;border-radius:' + rMd + ';margin-top:2px;border:1px solid transparent;',
   'width:100%;text-align:left;background:none;font:inherit;color:inherit;',
   'touch-action:manipulation;}',
 '.capyui-jrrow.go{cursor:pointer;}',
@@ -5050,11 +5088,11 @@ function sysBuildCSS() {
 '.capyui-jrrow.here{border-color:' + accent + ';}',
 '.capyui-jrrow.locked{opacity:.36;}',
 '.capyui-jrn{position:relative;display:block;width:44px;height:26px;}',
-'.capyui-jrmark{position:absolute;inset:0;display:block;overflow:hidden;border-radius:3px;',
+'.capyui-jrmark{position:absolute;inset:0;display:block;overflow:hidden;border-radius:' + rSm + ';',
   'border:1px solid ' + rule + ';}',
 '.capyui-jrmark svg{display:block;width:100%;height:100%;}',
 '.capyui-jrkey{position:absolute;left:1px;top:1px;z-index:1;',
-  'min-width:12px;height:12px;padding:0 2px;border-radius:2px;',
+  'min-width:12px;height:12px;padding:0 2px;border-radius:' + rSm + ';',
   'display:flex;align-items:center;justify-content:center;',
   'background:' + sysRgba(PALETTE.stoneDark, 0.84) + ';color:' + paper + ';',
   // 9px, and it stays 9px: this is the chapter NUMBER inside a 12px chip on
@@ -5068,18 +5106,18 @@ function sysBuildCSS() {
   'font-variant-numeric:tabular-nums;}',
 '.capyui-jrsub{font-variant-numeric:tabular-nums;}',
 '.capyui-jrtally.full{color:' + tick + ';}',
-'.capyui-jrrec{grid-column:2 / 4;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-jrrec{grid-column:2 / 4;font-size:' + tMd + ';color:' + inkSoft + ';',
   'font-style:italic;margin-top:1px;}',
-'.capyui-jrbar{grid-column:1 / 4;height:3px;border-radius:2px;background:' + inkFaint + ';margin-top:5px;}',
-'.capyui-jrbar i{display:block;height:100%;border-radius:2px;background:' + tick + ';}',
-'.capyui-jrfoot{margin-top:12px;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-jrbar{grid-column:1 / 4;height:3px;border-radius:' + rSm + ';background:' + inkFaint + ';margin-top:5px;}',
+'.capyui-jrbar i{display:block;height:100%;border-radius:' + rSm + ';background:' + tick + ';}',
+'.capyui-jrfoot{margin-top:12px;font-size:' + tMd + ';color:' + inkSoft + ';',
   'font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:center;}',
 /* the controls, folded away under the board. A <details>, so the fold, the
    keyboard, the focus ring and the aria wiring all come for free. */
 '.capyui-jrkeys{margin-top:12px;border-top:1px solid ' + inkFaint + ';padding-top:9px;}',
 '.capyui-jrkeys summary{cursor:pointer;list-style:none;text-align:center;',
-  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
-  'letter-spacing:.12em;text-transform:uppercase;border-radius:3px;padding:2px 0;',
+  'font-size:' + tMd + ';color:' + inkSoft + ';font-weight:700;',
+  'letter-spacing:.12em;text-transform:uppercase;border-radius:' + rSm + ';padding:2px 0;',
   'touch-action:manipulation;}',
 /* The default disclosure triangle is hidden because it does not belong in this
    typography — so one has to be drawn back, or the row reads as a caption and
@@ -5137,7 +5175,7 @@ function sysBuildCSS() {
   'color:' + sysRgba(PALETTE.cloth1, 0) + ';',
   'background:radial-gradient(62% 62% at 50% 44%,currentColor,transparent 76%);',
   'transition:color 1.1s ease;}',
-'.capyui-card{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:7px;',
+'.capyui-card{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rLg + ';',
   /* a printed sheet: a warm rake of light across it and the faintest laid
      texture, both pure CSS — the aesthetic law forbids an image file, not a
      gradient */
@@ -5176,10 +5214,10 @@ function sysBuildCSS() {
    z-index:-1 inside the card's own stacking context (it has z-index:1), so it
    paints behind the card's paper and in front of the glow wash. */
 '.capyui-card:not(.two):before{content:"";position:absolute;z-index:-1;',
-  'left:8px;right:-6px;top:10px;bottom:-8px;border-radius:7px;',
+  'left:8px;right:-6px;top:10px;bottom:-8px;border-radius:' + rLg + ';',
   'background:' + sysRgba(PALETTE.sailShade, 0.94) + ';',
   'border:1px solid ' + sysRgba(PALETTE.stoneDark, 0.3) + ';',
-  'transform:rotate(1.25deg);box-shadow:0 8px 20px ' + shadow + ';}',
+  'transform:rotate(1.25deg);box-shadow:' + shMd + ';}',
 '@media (max-width:520px){.capyui-card:not(.two):before{left:5px;right:-4px;',
   'transform:rotate(.9deg);}}',
 '.capyui-card h1{font-size:clamp(24px,6.2vw,46px);line-height:1.05;color:' + ink + ';',
@@ -5231,12 +5269,12 @@ function sysBuildCSS() {
   'letter-spacing:.1em;text-transform:uppercase;}',
 '.capyui-foot span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}',
 '.capyui-foot kbd{display:inline-flex;align-items:center;justify-content:center;',
-  'min-width:19px;height:19px;padding:0 5px;border-radius:4px;font:inherit;',
-  'font-size:11px;letter-spacing:0;color:' + ink + ';background:' + paper2 + ';',
+  'min-width:19px;height:19px;padding:0 5px;border-radius:' + rMd + ';font:inherit;',
+  'font-size:' + tMd + ';letter-spacing:0;color:' + ink + ';background:' + paper2 + ';',
   'border:1px solid ' + rule + ';box-shadow:0 1px 0 ' + rule + ';}',
 /* the shelf's own "there is more of this" control — see picksFade() */
 '.capyui-more2{display:block;margin:6px auto 0;padding:3px 12px 4px;border-radius:999px;',
-  'font:inherit;font-size:clamp(8.5px,1.7vw,10.5px);font-weight:700;letter-spacing:.14em;',
+  'font:inherit;font-size:' + tSm + ';font-weight:700;letter-spacing:.14em;',
   'text-transform:uppercase;cursor:pointer;pointer-events:auto;touch-action:manipulation;',
   'background:' + paper2 + ';border:1px solid ' + rule + ';color:' + inkSoft + ';',
   'transition:color .16s ease,border-color .16s ease,transform .16s ease;}',
@@ -5250,7 +5288,7 @@ function sysBuildCSS() {
    rule — because the loud controls here are the seventeen that CARRY ON. */
 '.capyui-over{margin:clamp(10px,2.4vw,16px) auto 0;padding-top:clamp(8px,2vw,12px);',
   'border-top:1px solid ' + inkFaint + ';text-align:center;max-width:520px;}',
-'.capyui-overbtn{font:inherit;font-size:clamp(8.5px,1.7vw,10.5px);font-weight:700;',
+'.capyui-overbtn{font:inherit;font-size:' + tSm + ';font-weight:700;',
   'letter-spacing:.14em;text-transform:uppercase;color:' + inkSoft + ';background:none;',
   'border:1px solid transparent;border-radius:999px;padding:3px 12px 4px;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
@@ -5262,7 +5300,7 @@ function sysBuildCSS() {
 '.capyui-overline{font-size:clamp(9.5px,1.9vw,12px);line-height:1.4;color:' + ink + ';',
   'font-style:italic;max-width:44ch;margin:0 auto 8px;text-wrap:balance;}',
 '.capyui-overrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}',
-'.capyui-overyes,.capyui-overno{font:inherit;font-size:clamp(11px,1.8vw,11px);font-weight:700;',
+'.capyui-overyes,.capyui-overno{font:inherit;font-size:' + tMd + ';font-weight:700;',
   'letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:5px 14px 6px;',
   'cursor:pointer;pointer-events:auto;touch-action:manipulation;',
   'transition:transform .16s ease,border-color .16s ease,color .16s ease;}',
@@ -5278,7 +5316,7 @@ function sysBuildCSS() {
   'font-size:.95em;opacity:.8;font-style:italic;}',
 '@media (max-height:770px){.capyui-foot{margin-top:8px;padding-top:7px;',
   'gap:4px clamp(8px,1.8vw,14px);}}',
-'.capyui-rule{height:2px;background:' + rule + ';border-radius:2px;margin:clamp(14px,3vw,22px) auto;',
+'.capyui-rule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:clamp(14px,3vw,22px) auto;',
   'width:64%;transform:rotate(.4deg);}',
 '.capyui-legend{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;text-align:left;',
   'align-items:start;',
@@ -5295,7 +5333,7 @@ function sysBuildCSS() {
   '.capyui-card h1{font-size:clamp(20px,4.4vw,32px);}',
   '.capyui-rule{margin:clamp(7px,1.4vw,11px) auto;}',
   '.capyui-sub{letter-spacing:.3em;}',
-  '.capyui-legend{gap:2px 12px;font-size:clamp(11px,2vw,11px);}}',
+  '.capyui-legend{gap:2px 12px;font-size:' + tMd + ';}}',
 '.capyui-legend kbd{color:' + ink + ';font-weight:700;white-space:nowrap;',
 'font-family:inherit;font-size:inherit;background:none;border:0;padding:0;}',
 /* .capyui-begin is gone: both pages ended in one line of blinking uppercase,
@@ -5335,7 +5373,7 @@ function sysBuildCSS() {
 '.capyui-p2head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;',
   'gap:clamp(6px,1.6vw,14px);}',
 '.capyui-p2stat{grid-column:3;justify-self:end;text-align:right;',
-  'font-size:clamp(8.5px,1.7vw,10.5px);letter-spacing:.14em;text-transform:uppercase;',
+  'font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;',
   'font-weight:700;color:' + inkSoft + ';line-height:1.35;}',
 '.capyui-p2stat b{display:block;color:' + accent + ';font-variant-numeric:tabular-nums;}',
 '@media (max-width:560px){.capyui-p2head{grid-template-columns:auto 1fr;}',
@@ -5350,7 +5388,7 @@ function sysBuildCSS() {
   'gap:7px 14px;font-size:clamp(11px,2.4vw,14px);margin-top:clamp(6px,1.4vw,10px);}',
 '@media (min-width:560px){.capyui-legbig{grid-template-columns:auto 1fr auto 1fr!important;',
   'gap:7px 16px;}}',
-'.capyui-legbig kbd{display:inline-block;padding:2px 7px;border-radius:4px;',
+'.capyui-legbig kbd{display:inline-block;padding:2px 7px;border-radius:' + rMd + ';',
   'background:' + paper2 + ';border:1px solid ' + rule + ';',
   'box-shadow:0 1px 0 ' + rule + ';font-size:.92em;}',
 '.capyui-legsplit{grid-column:1 / -1;margin-top:7px;padding-top:6px;',
@@ -5359,8 +5397,8 @@ function sysBuildCSS() {
 /* the extras, folded. Same disclosure furniture as the journal's own fold. */
 '.capyui-more{margin-top:clamp(7px,1.5vw,11px);text-align:center;}',
 '.capyui-more summary{cursor:pointer;list-style:none;display:inline-block;',
-  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
-  'letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:4px;',
+  'font-size:' + tMd + ';color:' + inkSoft + ';font-weight:700;',
+  'letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:' + rMd + ';',
   'touch-action:manipulation;}',
 '.capyui-more summary::-webkit-details-marker{display:none;}',
 '.capyui-more summary::marker{content:"";}',
@@ -5376,7 +5414,7 @@ function sysBuildCSS() {
    reads nothing else on this card can still not fail to find this. */
 '.capyui-go{display:flex;flex-direction:column;align-items:center;gap:2px;',
   'width:100%;margin-top:clamp(12px,2.4vw,18px);padding:clamp(9px,1.8vw,13px) 18px;',
-  'border-radius:6px;border:1px solid ' + accent + ';background:' + accent + ';',
+  'border-radius:' + rLg + ';border:1px solid ' + accent + ';background:' + accent + ';',
   /* A FILLED SLAB OF ONE COLOUR IS A COLOUR SWATCH. Everything else on this
      card is a printed thing with light on it — the paper has a rake, the
      pictures now have a sun — and the one control the whole page is built
@@ -5391,10 +5429,10 @@ function sysBuildCSS() {
   'transition:transform .18s cubic-bezier(.21,.86,.32,1.18),box-shadow .18s ease,',
   'filter .16s ease;}',
 '.capyui-go b{font-size:clamp(13px,2.7vw,17px);font-weight:700;letter-spacing:.01em;}',
-'.capyui-go i{font-style:normal;font-size:clamp(11px,1.9vw,11px);opacity:.82;',
+'.capyui-go i{font-style:normal;font-size:' + tMd + ';opacity:.82;',
   'letter-spacing:.08em;text-transform:uppercase;font-weight:700;}',
 '.capyui-go:hover{transform:translateY(-2px);filter:brightness(1.06);',
-  'box-shadow:0 7px 18px ' + shadow2 + ';}',
+  'box-shadow:' + shMd + ';}',
 '.capyui-go:active{transform:translateY(0);}',
 '.capyui-go:focus-visible{outline:2px solid ' + ink + ';outline-offset:3px;}',
 '.capyui-go.alt{background:none;color:' + accent + ';box-shadow:none;',
@@ -5409,7 +5447,7 @@ function sysBuildCSS() {
   'padding:4px 12px 4px 8px;border-radius:999px;font:inherit;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
   'background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';',
-  'font-size:clamp(11px,1.9vw,11px);font-weight:700;letter-spacing:.12em;',
+  'font-size:' + tMd + ';font-weight:700;letter-spacing:.12em;',
   'text-transform:uppercase;transition:color .16s ease,border-color .16s ease;}',
 '.capyui-back:before{content:"\\2190";margin-right:7px;}',
 '.capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
@@ -5440,7 +5478,7 @@ function sysBuildCSS() {
   'padding:2px;margin-left:-2px;margin-right:-2px;',
   'scrollbar-width:thin;scrollbar-color:' + rule + ' transparent;}',
 '.capyui-picks::-webkit-scrollbar{width:7px;}',
-'.capyui-picks::-webkit-scrollbar-thumb{background:' + rule + ';border-radius:4px;}',
+'.capyui-picks::-webkit-scrollbar-thumb{background:' + rule + ';border-radius:' + rMd + ';}',
 '.capyui-picks::-webkit-scrollbar-track{background:transparent;}',
 /* ---- A CUT ROW MUST LOOK CUT ON PURPOSE ---------------------------------
    The shelf scrolls, which is right, and the row at the fold was sliced off
@@ -5533,8 +5571,8 @@ function sysBuildCSS() {
 '.capyui-pick{display:flex;flex-direction:column;height:100%;position:relative;',
   'cursor:pointer;pointer-events:auto;width:100%;text-align:left;overflow:hidden;',
   'font:inherit;color:inherit;touch-action:manipulation;',
-  'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:7px;',
-  'padding:0;box-shadow:0 1px 2px ' + shadow + ';',
+  'background:' + paper2 + ';border:1px solid ' + rule + ';border-radius:' + rLg + ';',
+  'padding:0;box-shadow:' + shSm + ';',
   /* A LIFT SHOULD ARRIVE, NOT SLIDE. Three pixels on a linear ease is a tile
      that moves; the same three on a curve that overshoots by a hair is a tile
      that is PICKED UP. It is four numbers and it is the difference between a
@@ -5633,11 +5671,11 @@ function sysBuildCSS() {
 '.capyui-pickkey{position:absolute;top:6px;left:6px;',
   'display:flex;align-items:center;justify-content:center;',
   'min-width:clamp(17px,3.3vw,20px);height:clamp(17px,3.3vw,20px);padding:0 3px;',
-  'border-radius:4px;background:' + sysRgba(PALETTE.sail, 0.92) + ';',
+  'border-radius:' + rMd + ';background:' + sysRgba(PALETTE.sail, 0.92) + ';',
   'border:1px solid ' + sysRgba(PALETTE.ibisHead, 0.22) + ';',
-  'color:' + ink + ';font-weight:700;box-shadow:0 1px 3px ' + shadow + ';',
+  'color:' + ink + ';font-weight:700;box-shadow:' + shSm + ';',
   'transition:background .16s ease,color .16s ease,border-color .16s ease;',
-  'font-size:clamp(11px,1.9vw,11px);font-variant-numeric:tabular-nums;}',
+  'font-size:' + tMd + ';font-variant-numeric:tabular-nums;}',
 '.capyui-pick:hover .capyui-pickkey,.capyui-pick:focus-visible .capyui-pickkey{',
   'background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
 /* ---- HOW FAR THROUGH THIS PLACE YOU ARE, WITHOUT READING A NUMBER --------
@@ -5667,21 +5705,21 @@ function sysBuildCSS() {
    with a floor under the body, every tile in the grid is the same object. */
 '.capyui-pick i{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;',
   'overflow:hidden;margin-top:2px;font-style:normal;line-height:1.25;',
-  'font-size:clamp(8.5px,1.7vw,10.5px);color:' + sysRgba(PALETTE.ibisHead, 0.86) + ';}',
+  'font-size:' + tSm + ';color:' + sysRgba(PALETTE.ibisHead, 0.86) + ';}',
 '.capyui-picks .capyui-pickbody{min-height:clamp(40px,7vw,48px);}',
 '.capyui-pick.hero i{-webkit-line-clamp:3;}',
 '.capyui-pick.hero i{font-size:clamp(10px,2vw,12.5px);margin-top:3px;}',
 '.capyui-pickrec{display:block;margin-top:3px;font-style:normal;font-weight:700;',
-  'font-size:clamp(8.5px,1.7vw,10.5px);color:' + accent + ';',
+  'font-size:' + tSm + ';color:' + accent + ';',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-pickfirst{display:block;margin-top:6px;font-style:normal;font-weight:700;',
-  'font-size:clamp(11px,1.8vw,11px);letter-spacing:.1em;text-transform:uppercase;',
+  'font-size:' + tMd + ';letter-spacing:.1em;text-transform:uppercase;',
   'color:' + accent + ';}',
 /* the tally rides the bottom-right corner of the scene, clear of the words */
 '.capyui-picktally{position:absolute;top:6px;right:6px;',
   'font-size:clamp(8.5px,1.7vw,10px);color:' + paper + ';',
   'background:' + sysRgba(PALETTE.ibisHead, 0.62) + ';border-radius:999px;padding:1.5px 6px;',
-  'box-shadow:0 1px 3px ' + shadow + ';',
+  'box-shadow:' + shSm + ';',
   'font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}',
 '.capyui-picktally.full{background:' + tick + ';}',
 /* A FINISHED PLACE WEARS WHAT YOU TOOK OUT OF IT (v18). Bottom-left of the
@@ -5689,8 +5727,8 @@ function sysBuildCSS() {
    picker is the only screen in the game where seventeen places are compared
    against each other, so it is where a shelf reads best. */
 '.capyui-pickkeep{position:absolute;left:5px;bottom:5px;width:20px;height:20px;',
-  'border-radius:3px;padding:2px;display:block;',
-  'background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:0 1px 3px ' + shadow + ';}',
+  'border-radius:' + rSm + ';padding:2px;display:block;',
+  'background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:' + shSm + ';}',
 '.capyui-pickkeep svg{display:block;width:100%;height:100%;}',
 '.capyui-pick.hero .capyui-pickkeep{width:28px;height:28px;left:7px;bottom:7px;}',
 /* The short-screen budget for the scenes, and it MUST live after the rules it
@@ -5717,7 +5755,7 @@ function sysBuildCSS() {
 '.capyui-carry{display:flex;align-items:center;justify-content:space-between;gap:12px;',
   'width:100%;margin-top:clamp(10px,2vw,15px);cursor:pointer;pointer-events:auto;',
   'font:inherit;text-align:left;touch-action:manipulation;',
-  'background:' + accent + ';border:1px solid ' + accent + ';border-radius:4px;',
+  'background:' + accent + ';border:1px solid ' + accent + ';border-radius:' + rMd + ';',
   'padding:clamp(7px,1.5vw,11px) clamp(10px,2vw,15px);',
   'transition:transform .12s ease,filter .12s ease;}',
 '.capyui-carry:hover,.capyui-carry:focus-visible{transform:translateY(-1px);',
@@ -5727,10 +5765,10 @@ function sysBuildCSS() {
 '.capyui-carryl b{display:block;font-size:clamp(13px,2.6vw,17px);font-weight:700;',
   'color:' + paper + ';line-height:1.15;}',
 '.capyui-carryl i{display:block;margin-top:1px;font-style:normal;',
-  'font-size:clamp(11px,1.8vw,11px);color:' + paper + ';opacity:.82;}',
+  'font-size:' + tMd + ';color:' + paper + ';opacity:.82;}',
 '.capyui-carryn{font-size:clamp(12px,2.3vw,15px);font-weight:700;color:' + paper + ';',
   'font-variant-numeric:tabular-nums;white-space:nowrap;}',
-'.capyui-label{margin-top:clamp(9px,1.8vw,14px);font-size:clamp(8.5px,1.7vw,10.5px);',
+'.capyui-label{margin-top:clamp(9px,1.8vw,14px);font-size:' + tSm + ';',
   'letter-spacing:.2em;text-transform:uppercase;color:' + accent + ';font-weight:700;',
   'text-align:left;}',
 /* ---------- P: the furniture off the window ----------
@@ -5794,7 +5832,7 @@ function sysBuildCSS() {
 '.capyui-phint{position:absolute;left:0;right:0;top:0;height:9vh;max-height:88px;',
   'display:flex;align-items:center;justify-content:center;text-align:center;',
   'padding:env(safe-area-inset-top,0px) 14px 0;',
-  'color:' + sysRgba(PALETTE.sail, 0.55) + ';font-size:clamp(11px,1.6vw,11px);',
+  'color:' + sysRgba(PALETTE.sail, 0.55) + ';font-size:' + tMd + ';',
   'letter-spacing:.24em;text-transform:uppercase;}',
 /* the shutter. One white sheet, one frame long, on its own layer above the
    frame so it flashes the PICTURE and not the furniture.
@@ -5814,13 +5852,13 @@ function sysBuildCSS() {
 
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
-  'background:' + paper + ';border-radius:3px;padding:10px 12px 12px;transform:rotate(-1.7deg);',
-  'box-shadow:0 8px 18px ' + shadow + ';border:1px solid ' + paper2 + ';',
+  'background:' + paper + ';border-radius:' + rSm + ';padding:10px 12px 12px;transform:rotate(-1.7deg);',
+  'box-shadow:' + shMd + ';border:1px solid ' + paper2 + ';',
   'transition:opacity .5s ease;opacity:0;}',
 '.capyui-todo.show{opacity:1;}',
 '.capyui-todo:before{content:"";position:absolute;left:14%;right:14%;top:-7px;height:14px;',
-  'background:' + sand + ';opacity:.85;transform:rotate(-1.2deg);border-radius:2px;',
-  'box-shadow:0 2px 4px ' + shadow + ';}',
+  'background:' + sand + ';opacity:.85;transform:rotate(-1.2deg);border-radius:' + rSm + ';',
+  'box-shadow:' + shSm + ';}',
 '.capyui-todo.grow{animation:capyui-grow .7s cubic-bezier(.2,1.5,.35,1);}',
 '@keyframes capyui-grow{0%{transform:rotate(-1.7deg) scale(1)}',
   '35%{transform:rotate(-1.1deg) scale(1.045)}100%{transform:rotate(-1.7deg) scale(1)}}',
@@ -5870,13 +5908,13 @@ function sysBuildCSS() {
    only ever animate the fold. */
 '.capyui-task{transition:max-height .5s cubic-bezier(.4,0,.3,1),opacity .3s ease;}',
 '.capyui-box{flex:0 0 auto;width:1.05em;height:1.05em;margin-top:.06em;border:1.6px solid ' + inkFaint + ';',
-  'border-radius:3px;position:relative;transform:rotate(-2deg);}',
+  'border-radius:' + rSm + ';position:relative;transform:rotate(-2deg);}',
 '.capyui-box:after{content:"\\2713";position:absolute;left:50%;top:48%;',
   'transform:translate(-50%,-50%) scale(0) rotate(-8deg);color:' + tick + ';',
   'font-size:1.35em;font-weight:700;line-height:1;}',
 '.capyui-txt{position:relative;display:inline-block;}',
 '.capyui-txt:after{content:"";position:absolute;left:-2px;right:-3px;top:52%;height:2px;',
-  'background:' + ink + ';border-radius:2px;transform:scaleX(0) rotate(-1.1deg);',
+  'background:' + ink + ';border-radius:' + rSm + ';transform:scaleX(0) rotate(-1.1deg);',
   'transform-origin:left center;opacity:.75;}',
 '.capyui-task.done{color:' + inkSoft + ';}',
 '.capyui-task.done .capyui-box{border-color:' + tick + ';}',
@@ -5886,7 +5924,7 @@ function sysBuildCSS() {
   '100%{transform:translate(-50%,-50%) scale(1) rotate(-8deg)}}',
 '@keyframes capyui-strike{0%{transform:scaleX(0) rotate(-1.1deg)}',
   '100%{transform:scaleX(1) rotate(-1.1deg)}}',
-'.capyui-count{margin-top:8px;font-size:clamp(11px,1.4vw,11px);letter-spacing:.16em;',
+'.capyui-count{margin-top:8px;font-size:' + tMd + ';letter-spacing:.16em;',
   'color:' + inkSoft + ';text-transform:uppercase;}',
 /* ---------- the record you are setting, while you are setting it (v32) ------ */
 /* Under the tally, on the same paper, and `display:none` unless an attempt is
@@ -5956,7 +5994,7 @@ function sysBuildCSS() {
   'display:flex;flex-direction:column;align-items:center;gap:6px;width:min(88vw,460px);}',
 '.capyui-toast{background:' + paper + ';color:' + ink + ';border:1px solid ' + paper2 + ';',
   'border-radius:999px;padding:7px 18px;font-size:clamp(11px,2.4vw,15px);font-weight:700;',
-  'box-shadow:0 8px 18px ' + shadow + ';opacity:0;transform:translateY(16px) rotate(-.6deg);',
+  'box-shadow:' + shMd + ';opacity:0;transform:translateY(16px) rotate(-.6deg);',
   'transition:opacity .3s ease,transform .3s cubic-bezier(.2,1.5,.4,1);text-align:center;}',
 '.capyui-toast.in{opacity:1;transform:translateY(0) rotate(-.6deg);}',
 '.capyui-toast.out{opacity:0;transform:translateY(-10px) rotate(-.6deg);}',
@@ -5974,13 +6012,13 @@ function sysBuildCSS() {
    bigger toast. */
 '.capyui-moment{position:absolute;left:50%;top:36%;transform:translate(-50%,10px) rotate(-.7deg);',
   'z-index:57;pointer-events:none;text-align:center;background:' + paper + ';color:' + ink + ';',
-  'border:1px solid ' + paper2 + ';border-radius:14px;padding:11px 26px 13px;',
-  'width:max-content;max-width:min(86vw,520px);box-shadow:0 14px 30px ' + shadow + ';',
+  'border:1px solid ' + paper2 + ';border-radius:' + rXl + ';padding:11px 26px 13px;',
+  'width:max-content;max-width:min(86vw,520px);box-shadow:' + shLg + ';',
   'opacity:0;transition:opacity .45s ease,transform .45s cubic-bezier(.2,1.3,.4,1);}',
 '.capyui-moment.show{opacity:1;transform:translate(-50%,0) rotate(-.7deg);}',
 '.capyui-momentkick{font-size:clamp(11px,2vw,12px);letter-spacing:.3em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
-'.capyui-momentrule{height:2px;width:min(22vw,110px);border-radius:2px;background:' + rule + ';',
+'.capyui-momentrule{height:2px;width:min(22vw,110px);border-radius:' + rSm + ';background:' + rule + ';',
   'margin:5px auto 6px;transform:rotate(.6deg);}',
 '.capyui-momenttext{font-size:clamp(14px,3.6vw,25px);font-weight:700;line-height:1.12;',
   'letter-spacing:.02em;}',
@@ -5988,7 +6026,7 @@ function sysBuildCSS() {
 /* ---------- perf ---------- */
 '.capyui-perf{position:absolute;right:10px;top:10px;background:' + sysRgba(PALETTE.ibisHead, 0.72) + ';',
   'color:' + sysHex(PALETTE.sail) + ';font:11px/1.5 ui-monospace,Consolas,monospace;padding:6px 9px;',
-  'border-radius:5px;display:none;white-space:pre;letter-spacing:.02em;}',
+  'border-radius:' + rMd + ';display:none;white-space:pre;letter-spacing:.02em;}',
 '.capyui-perf.show{display:block;}',
 
 /* ---------- THE SHELF (v18) ----------
@@ -5997,7 +6035,7 @@ function sysBuildCSS() {
    can see that there is a shape in the box and not what it is, which is the
    difference between a promise and a spoiler. */
 '.capyui-shelf{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:2px 0 5px;}',
-'.capyui-slot{position:relative;width:30px;height:30px;border-radius:4px;padding:3px;',
+'.capyui-slot{position:relative;width:30px;height:30px;border-radius:' + rMd + ';padding:3px;',
   'border:1px dashed ' + inkFaint + ';background:none;font:inherit;color:inherit;',
   'display:flex;align-items:center;justify-content:center;opacity:.3;',
   '-webkit-tap-highlight-color:transparent;',
@@ -6010,13 +6048,13 @@ function sysBuildCSS() {
 '@media (hover:hover){.capyui-slot.have:hover{transform:translateY(-2px);}}',
 '.capyui-slot:focus{outline:none;}',
 '.capyui-slot:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
-'.capyui-shelfcap{text-align:center;font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';',
+'.capyui-shelfcap{text-align:center;font-size:' + tMd + ';color:' + inkSoft + ';',
   'font-style:italic;min-height:1.3em;margin-bottom:2px;}',
 /* the way into the ledger, sat between the board and the controls. Styled off
    the controls' own summary so the card has two of one thing, not one of two. */
 '.capyui-jrled{display:block;width:100%;margin-top:12px;border:1px solid ' + rule + ';',
-  'border-radius:3px;padding:5px 0;background:none;font:inherit;cursor:pointer;',
-  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-weight:700;',
+  'border-radius:' + rSm + ';padding:5px 0;background:none;font:inherit;cursor:pointer;',
+  'font-size:' + tMd + ';color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.12em;text-transform:uppercase;touch-action:manipulation;',
   '-webkit-tap-highlight-color:transparent;}',
 '@media (hover:hover){.capyui-jrled:hover{background:' + veil2 + ';color:' + ink + ';}}',
@@ -6039,11 +6077,11 @@ function sysBuildCSS() {
   'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
   'transition:opacity .22s ease;padding:14px;}',
 '.capyui-pause.show{opacity:1;pointer-events:auto;}',
-'.capyui-pausecard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
-  'box-shadow:0 18px 40px ' + shadow2 + ';padding:clamp(15px,2.8vw,26px) clamp(17px,3.2vw,32px);',
+'.capyui-pausecard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
+  'box-shadow:' + shLg + ';padding:clamp(15px,2.8vw,26px) clamp(17px,3.2vw,32px);',
   'transform:rotate(.6deg);max-width:430px;width:100%;max-height:92vh;overflow:auto;',
   'overscroll-behavior:contain;}',
-'.capyui-pausecard h2{font-size:clamp(17px,3.4vw,25px);color:' + ink + ';font-weight:700;',
+'.capyui-pausecard h2{font-size:' + tXl + ';color:' + ink + ';font-weight:700;',
   'letter-spacing:.04em;text-align:center;}',
 '.capyui-pausesub{font-size:clamp(10px,1.9vw,11px);letter-spacing:.24em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;text-align:center;margin-top:4px;',
@@ -6053,7 +6091,7 @@ function sysBuildCSS() {
    nothing on it may be a 20 px target in a row of four. */
 '.capyui-pausemenu{display:flex;flex-direction:column;gap:6px;',
   'margin-top:clamp(11px,2.2vw,16px);}',
-'.capyui-pausebtn{display:block;width:100%;border:1px solid ' + rule + ';border-radius:4px;',
+'.capyui-pausebtn{display:block;width:100%;border:1px solid ' + rule + ';border-radius:' + rMd + ';',
   'padding:clamp(8px,1.7vw,11px) 13px;background:none;font:inherit;cursor:pointer;',
   'font-size:clamp(11px,2vw,12.5px);color:' + ink + ';font-weight:700;text-align:left;',
   'letter-spacing:.1em;text-transform:uppercase;touch-action:manipulation;',
@@ -6080,12 +6118,12 @@ function sysBuildCSS() {
    layer already knows what to do with. Only its skin is ours. */
 '.capyui-setrange{flex:1 1 auto;min-width:0;height:22px;background:none;',
   'appearance:none;-webkit-appearance:none;cursor:pointer;touch-action:manipulation;}',
-'.capyui-setrange::-webkit-slider-runnable-track{height:4px;border-radius:2px;',
+'.capyui-setrange::-webkit-slider-runnable-track{height:4px;border-radius:' + rSm + ';',
   'background:' + inkFaint + ';}',
-'.capyui-setrange::-moz-range-track{height:4px;border-radius:2px;background:' + inkFaint + ';}',
+'.capyui-setrange::-moz-range-track{height:4px;border-radius:' + rSm + ';background:' + inkFaint + ';}',
 '.capyui-setrange::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;',
   'width:15px;height:15px;margin-top:-5.5px;border-radius:50%;background:' + accent + ';',
-  'border:1px solid ' + paper + ';box-shadow:0 1px 2px ' + shadow2 + ';}',
+  'border:1px solid ' + paper + ';box-shadow:' + shSm + ';}',
 '.capyui-setrange::-moz-range-thumb{width:15px;height:15px;border-radius:50%;',
   'background:' + accent + ';border:1px solid ' + paper + ';}',
 '.capyui-setrange:focus{outline:none;}',
@@ -6093,7 +6131,7 @@ function sysBuildCSS() {
 /* The per-bus mute, which is a button and not a checkbox: it has two states and
    a picture, and the picture is the whole point of it at this size. */
 '.capyui-setmute{flex:0 0 auto;width:31px;height:27px;border:1px solid ' + rule + ';',
-  'border-radius:4px;background:none;font:inherit;line-height:0;padding:0;',
+  'border-radius:' + rMd + ';background:none;font:inherit;line-height:0;padding:0;',
   'display:flex;align-items:center;justify-content:center;',
   'color:' + ink + ';cursor:pointer;touch-action:manipulation;',
   '-webkit-tap-highlight-color:transparent;}',
@@ -6118,12 +6156,12 @@ function sysBuildCSS() {
   'font-size:clamp(9.5px,1.8vw,10.5px);letter-spacing:.14em;text-transform:uppercase;',
   'color:' + inkSoft + ';font-weight:700;}',
 /* ---- quit: the one destructive control, so it asks ---- */
-'.capyui-pauseask{margin-top:6px;border:1px solid ' + accent + ';border-radius:4px;',
+'.capyui-pauseask{margin-top:6px;border:1px solid ' + accent + ';border-radius:' + rMd + ';',
   'padding:9px 11px;background:' + veil2 + ';}',
 '.capyui-pauseask[hidden]{display:none;}',
 '.capyui-pauseaskline{font-size:clamp(10.5px,1.9vw,11.5px);color:' + ink + ';line-height:1.45;}',
 '.capyui-pauseaskrow{display:flex;gap:7px;margin-top:8px;}',
-'.capyui-pauseaskrow button{flex:1 1 0;border:1px solid ' + rule + ';border-radius:4px;',
+'.capyui-pauseaskrow button{flex:1 1 0;border:1px solid ' + rule + ';border-radius:' + rMd + ';',
   'padding:7px 6px;background:' + paper + ';font:inherit;cursor:pointer;color:' + ink + ';',
   'font-size:clamp(10px,1.8vw,11px);font-weight:700;letter-spacing:.08em;',
   'text-transform:uppercase;touch-action:manipulation;}',
@@ -6179,14 +6217,14 @@ function sysBuildCSS() {
 '.capyui-keep{position:absolute;left:50%;top:50%;z-index:53;',
   'transform:translate(-50%,-46%) rotate(-1.1deg) scale(.95);opacity:0;pointer-events:none;',
   'transition:opacity .42s ease,transform .55s cubic-bezier(.2,.9,.3,1);',
-  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:5px;',
-  'box-shadow:0 14px 34px ' + shadow2 + ';padding:15px 30px 14px;text-align:center;}',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
+  'box-shadow:' + shLg + ';padding:15px 30px 14px;text-align:center;}',
 '.capyui-keep.show{opacity:1;transform:translate(-50%,-50%) rotate(-1.1deg) scale(1);}',
 '.capyui-keepart{width:78px;height:78px;margin:0 auto 9px;display:block;}',
 '.capyui-keepart svg{display:block;width:100%;height:100%;}',
-'.capyui-keepkick{font-size:clamp(11px,1.7vw,11px);letter-spacing:.34em;text-transform:uppercase;',
+'.capyui-keepkick{font-size:' + tMd + ';letter-spacing:.34em;text-transform:uppercase;',
   'color:' + accent + ';font-weight:700;}',
-'.capyui-keeprule{height:2px;background:' + rule + ';border-radius:2px;margin:6px auto;width:44px;}',
+'.capyui-keeprule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:6px auto;width:44px;}',
 '.capyui-keeptext{font-size:clamp(13px,2.9vw,18px);color:' + ink + ';font-weight:700;}',
 
 /* ---------- the chapter card, at the end of a place ----------
@@ -6199,18 +6237,18 @@ function sysBuildCSS() {
 '.capyui-done{position:absolute;left:50%;top:44%;z-index:59;pointer-events:none;',
   'transform:translate(-50%,-46%) rotate(-.9deg) scale(.96);opacity:0;',
   'transition:opacity .5s ease,transform .62s cubic-bezier(.2,.95,.3,1);',
-  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:6px;',
-  'box-shadow:0 20px 46px ' + shadow2 + ';padding:14px 14px 16px;text-align:center;',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rLg + ';',
+  'box-shadow:' + shLg + ';padding:14px 14px 16px;text-align:center;',
   'width:min(84vw,420px);}',
 '.capyui-done.show{opacity:1;transform:translate(-50%,-50%) rotate(-.9deg) scale(1);}',
 /* the postcard, at the aspect it is authored in (64 x 40) */
-'.capyui-doneart{width:100%;aspect-ratio:64 / 40;border-radius:4px;overflow:hidden;',
+'.capyui-doneart{width:100%;aspect-ratio:64 / 40;border-radius:' + rMd + ';overflow:hidden;',
   'border:1px solid ' + rule + ';display:block;}',
 /* aspect-ratio is not universal; a height floor keeps the picture a picture on
    an engine that ignores it rather than collapsing it to nothing. */
 '@supports not (aspect-ratio:1/1){.capyui-doneart{height:clamp(90px,26vw,170px);}}',
 '.capyui-doneart svg{display:block;width:100%;height:100%;}',
-'.capyui-donekick{margin-top:10px;font-size:clamp(11px,1.7vw,11px);letter-spacing:.34em;',
+'.capyui-donekick{margin-top:10px;font-size:' + tMd + ';letter-spacing:.34em;',
   'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
 '.capyui-donename{font-size:clamp(19px,4.6vw,32px);color:' + ink + ';font-weight:700;',
   'letter-spacing:.05em;line-height:1.06;margin-top:3px;text-wrap:balance;}',
@@ -6220,7 +6258,7 @@ function sysBuildCSS() {
    more of those would have been a fourth label rather than a line to read. */
 '.capyui-donenote{font-size:clamp(12px,2.4vw,15px);color:' + inkSoft + ';font-style:italic;',
   'line-height:1.4;margin:7px auto 0;max-width:min(78vw,30em);text-wrap:balance;}',
-'.capyui-donerule{height:2px;background:' + rule + ';border-radius:2px;margin:8px auto 7px;',
+'.capyui-donerule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:8px auto 7px;',
   'width:min(30vw,140px);transform:rotate(.5deg);}',
 '.capyui-donesub{font-size:clamp(9.5px,2vw,12px);letter-spacing:.16em;font-weight:700;',
   'text-transform:uppercase;color:' + inkSoft + ';font-variant-numeric:tabular-nums;',
@@ -6277,12 +6315,12 @@ function sysBuildCSS() {
    random, because a random rake re-rolls on every rebuild and the grid appears
    to twitch when a new picture is added. */
 '.capyui-albshot{margin:0;background:' + paper + ';border:1px solid ' + paper2 + ';',
-  'border-radius:3px;padding:6px 6px 4px;transform:rotate(-.7deg);',
+  'border-radius:' + rSm + ';padding:6px 6px 4px;transform:rotate(-.7deg);',
   'box-shadow:0 2px 7px rgba(0,0,0,.16);}',
 '.capyui-albshot:nth-child(even){transform:rotate(.8deg);}',
 '.capyui-albshot img{display:block;width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;',
-  'border-radius:2px;background:' + paper2 + ';}',
-'.capyui-albshot figcaption{font-size:clamp(11px,1.5vw,11px);color:' + accentInk + ';',
+  'border-radius:' + rSm + ';background:' + paper2 + ';}',
+'.capyui-albshot figcaption{font-size:' + tMd + ';color:' + accentInk + ';',
   'font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px;',
   'text-align:center;font-variant-numeric:tabular-nums;}',
 '.capyui-albnone{grid-column:1/-1;text-align:center;color:' + ink + ';opacity:.75;',
@@ -6291,11 +6329,11 @@ function sysBuildCSS() {
    stagger is right: the ledger is READ, top to bottom, and arriving all at
    once makes seventeen rows look like a table rather than a journey. */
 '.capyui-ledrow{display:grid;grid-template-columns:58px 1fr auto;gap:2px 11px;align-items:center;',
-  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:4px;padding:7px 10px;',
+  'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';padding:7px 10px;',
   'opacity:0;transform:translateY(10px) rotate(-.3deg);',
   'animation:capyui-ledin .5s cubic-bezier(.2,.9,.3,1) forwards;}',
 '@keyframes capyui-ledin{to{opacity:1;transform:translateY(0) rotate(-.3deg);}}',
-'.capyui-ledmark{grid-row:1 / 3;position:relative;width:56px;height:35px;border-radius:3px;',
+'.capyui-ledmark{grid-row:1 / 3;position:relative;width:56px;height:35px;border-radius:' + rSm + ';',
   'overflow:hidden;border:1px solid ' + rule + ';}',
 '.capyui-ledmark svg{display:block;width:100%;height:100%;}',
 '.capyui-ledname{font-size:clamp(12px,2.5vw,15px);color:' + ink + ';font-weight:700;}',
@@ -6304,7 +6342,7 @@ function sysBuildCSS() {
 /* min-width:0 on both, or a long chain of records — Venice holds three — makes
    the flex row refuse to shrink and pushes the tally off the card. */
 '.capyui-ledline{grid-column:2 / 4;display:flex;align-items:center;gap:6px;min-width:0;',
-  'font-size:clamp(11px,1.9vw,11px);color:' + inkSoft + ';font-style:italic;',
+  'font-size:' + tMd + ';color:' + inkSoft + ';font-style:italic;',
   'white-space:pre-line;line-height:1.35;}',
 '.capyui-ledline span{min-width:0;overflow-wrap:anywhere;}',
 '.capyui-ledname{overflow-wrap:anywhere;}',
@@ -6312,7 +6350,7 @@ function sysBuildCSS() {
    a record is how well you did what you were asked, a find is a thing nobody
    asked about at all. The bullet is drawn rather than typed so it lines up. */
 '.capyui-ledfind{grid-column:2 / 4;margin-top:2px;display:flex;flex-direction:column;gap:1px;',
-  'font-size:clamp(11px,1.85vw,11px);color:' + accent + ';min-width:0;}',
+  'font-size:' + tMd + ';color:' + accent + ';min-width:0;}',
 '.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
 '.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
   'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
@@ -6343,24 +6381,45 @@ function sysBuildCSS() {
    step. `trip` is the gate: backRescue flashes this same element for 120 ms as
    a blink and must stay a blink, with nothing in it. */
 '.capyui-fademark,.capyui-fadename{display:none;}',
+/* ...AND IT MOVES. 1.28 s of blank paper is the single most repeated moment
+   in this game — every chapter change, every ferry, every line off the
+   departures board — and the postcard in it was a decal: it appeared at 8%,
+   sat perfectly still for a second and a quarter, and left. A still image on
+   a still ground for the exact length of time the player has nothing else to
+   look at reads as a loading screen.
+
+   It now comes UP through the white, four per cent of the frame, decelerating
+   the whole way, and brightens as it goes. Two properties, on their own
+   transition rather than the parent's opacity, because the parent's is an
+   ease and this wants a decelerate — a card that arrives at constant speed
+   and stops dead is a card being dragged.
+
+   The name under it rises HALF as far and a beat later, which is the only
+   thing that stops the two reading as one lump sliding up the screen. */
 '.capyui-fade.trip .capyui-fademark{display:block;width:min(58vw,520px);',
-  'aspect-ratio:64 / 40;opacity:.08;}',
+  'aspect-ratio:64 / 40;opacity:.02;transform:translateY(4vh) scale(.965);',
+  'transition:opacity 1.05s ease-out,transform 1.15s cubic-bezier(.16,.86,.28,1);}',
+'.capyui-fade.trip.rise .capyui-fademark{opacity:.085;transform:none;}',
 '@supports not (aspect-ratio:1/1){.capyui-fade.trip .capyui-fademark{',
   'height:min(36vh,325px);}}',
 '.capyui-fademark svg{display:block;width:100%;height:100%;}',
 '.capyui-fade.trip .capyui-fadename{display:block;font-size:clamp(11px,2.2vw,13px);',
   'letter-spacing:.4em;text-transform:uppercase;font-weight:700;text-align:center;',
-  'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';}',
+  'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0) + ';',
+  'transform:translateY(2vh);',
+  'transition:color .95s ease-out .14s,transform 1.1s cubic-bezier(.16,.86,.28,1) .14s;}',
+'.capyui-fade.trip.rise .capyui-fadename{color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';',
+  'transform:none;}',
 '.capyui-place{position:absolute;left:0;right:0;top:31%;z-index:58;display:flex;',
   'flex-direction:column;align-items:center;gap:7px;pointer-events:none;text-align:center;',
   'padding:0 18px;opacity:0;transform:translateY(12px);',
   'transition:opacity .9s ease,transform .9s cubic-bezier(.2,1,.4,1);}',
 '.capyui-place.show{opacity:1;transform:translateY(0);}',
-'.capyui-place h2{font-size:clamp(24px,7.4vw,60px);color:' + ink + ';font-weight:700;',
+'.capyui-place h2{font-size:' + tHu + ';color:' + ink + ';font-weight:700;',
   'letter-spacing:.09em;line-height:1.02;transform:rotate(-1.2deg);}',
 '.capyui-placesub{font-size:clamp(11px,2.4vw,14px);letter-spacing:.34em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
-'.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:2px;background:' + rule + ';',
+'.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:' + rSm + ';background:' + rule + ';',
   'transform:rotate(.5deg);margin:2px 0;}',
 
 /* ---------- flight readout ---------- */
@@ -6369,7 +6428,7 @@ function sysBuildCSS() {
    centre / top right on a phone) and the whole touch fan (bottom right). */
 '.capyui-fly{position:absolute;right:12px;top:50%;transform:translateY(-50%) rotate(1.1deg);',
   'width:clamp(94px,17vw,126px);background:' + paper + ';border:1px solid ' + paper2 + ';',
-  'border-radius:3px;padding:8px 10px 9px;box-shadow:0 8px 18px ' + shadow + ';',
+  'border-radius:' + rSm + ';padding:8px 10px 9px;box-shadow:' + shMd + ';',
   'opacity:0;pointer-events:none;transition:opacity .45s ease;}',
 '.capyui-fly.show{opacity:1;}',
 '.capyui-flyk{font-size:clamp(7.5px,1.15vw,9px);letter-spacing:.24em;text-transform:uppercase;',
@@ -6378,12 +6437,12 @@ function sysBuildCSS() {
   'font-variant-numeric:tabular-nums;}',
 '.capyui-flyv small{font-size:.5em;letter-spacing:.1em;color:' + inkSoft + ';margin-left:3px;',
   'font-weight:700;}',
-'.capyui-flybar{height:5px;border-radius:3px;background:' + inkFaint + ';margin:5px 0 8px;',
+'.capyui-flybar{height:5px;border-radius:' + rSm + ';background:' + inkFaint + ';margin:5px 0 8px;',
   'overflow:hidden;}',
-'.capyui-flybar i{display:block;height:100%;width:0%;background:' + tick + ';border-radius:3px;',
+'.capyui-flybar i{display:block;height:100%;width:0%;background:' + tick + ';border-radius:' + rSm + ';',
   'transition:width .16s linear;}',
 /* the thermal tell: a breathing arrow, never a klaxon */
-'.capyui-therm{margin-top:8px;font-size:clamp(7.5px,1.15vw,9.5px);letter-spacing:.18em;',
+'.capyui-therm{margin-top:8px;font-size:' + tXs + ';letter-spacing:.18em;',
   'text-transform:uppercase;font-weight:700;color:' + tick + ';opacity:0;transition:opacity .25s ease;}',
 '.capyui-therm.on{opacity:1;animation:capyui-lift 1.15s ease-in-out infinite;}',
 '@keyframes capyui-lift{0%,100%{opacity:.42;transform:translateY(1.5px)}',
@@ -6398,8 +6457,8 @@ function sysBuildCSS() {
    it is still furniture rather than a screen, and every mark on it is half
    again as legible. */
 '.capyui-map{position:absolute;right:16px;bottom:16px;width:clamp(118px,18vw,164px);',
-  'aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:' + paper + ';',
-  'border:1px solid ' + paper2 + ';box-shadow:0 6px 16px ' + shadow + ';',
+  'aspect-ratio:1/1;border-radius:' + rXl + ';overflow:hidden;background:' + paper + ';',
+  'border:1px solid ' + paper2 + ';box-shadow:' + shMd + ';',
   'opacity:0;transition:opacity .5s ease;pointer-events:none;transform:rotate(.4deg);}',
 '.capyui-map.show{opacity:.95;}',
 '.capyui-map canvas{display:block;width:100%;height:100%;}',
@@ -6410,7 +6469,7 @@ function sysBuildCSS() {
    inset shadows: it has to be its own layer rather than a shadow on .capyui-map,
    because the canvas is a child and would paint straight over an inset shadow
    set on its parent. */
-'.capyui-mapv{position:absolute;inset:0;pointer-events:none;border-radius:9px;',
+'.capyui-mapv{position:absolute;inset:0;pointer-events:none;border-radius:' + rXl + ';',
   'box-shadow:inset 0 0 10px ' + sysRgba(PALETTE.screenShadow, 0.30) + ',',
   'inset 0 0 0 1px ' + sysRgba(PALETTE.sail, 0.55) + ';}',
 '.capyui-mapn{position:absolute;left:50%;top:1px;transform:translateX(-50%);',
@@ -6447,7 +6506,7 @@ function sysBuildCSS() {
    is information. */
 '.capyui-stam{position:absolute;left:16px;bottom:16px;width:clamp(96px,17vw,148px);',
   'height:7px;border-radius:999px;background:' + sysRgba(PALETTE.ibisHead, 0.20) + ';',
-  'box-shadow:0 2px 6px ' + shadow + ';overflow:hidden;opacity:0;pointer-events:none;',
+  'box-shadow:' + shMd + ';overflow:hidden;opacity:0;pointer-events:none;',
   'transition:opacity .35s ease;}',
 '.capyui-stam.show{opacity:1;}',
 '.capyui-stam i{display:block;height:100%;width:100%;border-radius:999px;',
@@ -6459,7 +6518,7 @@ function sysBuildCSS() {
 '.capyui-home{position:absolute;left:50%;bottom:clamp(18px,5vh,44px);',
   'transform:translateX(-50%) rotate(-.5deg);display:flex;align-items:center;gap:10px;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;padding:6px 15px;',
-  'box-shadow:0 6px 14px ' + shadow + ';color:' + ink + ';font-weight:700;white-space:nowrap;',
+  'box-shadow:' + shMd + ';color:' + ink + ';font-weight:700;white-space:nowrap;',
   'font-size:clamp(11px,2vw,13px);opacity:0;pointer-events:none;transition:opacity .4s ease;}',
 '.capyui-home.show{opacity:1;}',
 '.capyui-dots{display:flex;gap:5px;}',
@@ -6477,11 +6536,11 @@ function sysBuildCSS() {
   'opacity:0;transition:opacity .18s ease;}',
 '.capyui-base.on{opacity:.95;}',
 '.capyui-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;',
-  'border-radius:50%;background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:0 3px 8px ' + shadow + ';}',
+  'border-radius:50%;background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:' + shMd + ';}',
 '.capyui-btn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;',
   'display:flex;align-items:center;justify-content:center;font-weight:700;color:' + ink + ';',
   'background:' + sysRgba(PALETTE.sail, 0.86) + ';border:2px solid ' + sysRgba(PALETTE.ibisHead, 0.18) + ';',
-  'box-shadow:0 4px 12px ' + shadow + ';letter-spacing:.08em;transition:transform .09s ease;}',
+  'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ease;}',
 '.capyui-btn.press{transform:scale(.9);background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
 '.capyui-wheek{right:18px;bottom:26px;width:96px;height:96px;font-size:15px;}',
 '.capyui-grab{right:120px;bottom:96px;width:74px;height:74px;font-size:13px;}',
@@ -6489,7 +6548,7 @@ function sysBuildCSS() {
 '.capyui-hop{right:132px;bottom:22px;width:68px;height:68px;font-size:12px;}',
 /* Fourth: the slide, closing the arc above GRAB. The whistle is NOT a fifth —
    it folded into the wheek — and the two below are not verbs. */
-'.capyui-slide{right:60px;bottom:174px;width:64px;height:64px;font-size:11px;}',
+'.capyui-slide{right:60px;bottom:174px;width:64px;height:64px;font-size:' + tMd + ';}',
 /* The rescue. Not part of the fan and styled so it does not read as one: barely
    any fill, a dashed edge, and parked in the TOP right directly under the chart.
    Not bottom-left, which is where it went first and which is wrong twice over —
@@ -6526,7 +6585,7 @@ function sysBuildCSS() {
   'width:clamp(150px,44vw,210px);}',
   '.capyui-todo h2{margin:3px 0 5px;letter-spacing:.22em;}',
   '.capyui-todo ul{gap:1px;}',
-  '.capyui-task{font-size:11px;line-height:1.16;padding:0;gap:5px;}',
+  '.capyui-task{font-size:' + tMd + ';line-height:1.16;padding:0;gap:5px;}',
   '.capyui-box{width:.95em;height:.95em;border-width:1.4px;}',
   '.capyui-count{margin-top:5px;}',
   '.capyui-task.capyui-fold{margin-top:-1px;}',
@@ -21996,6 +22055,14 @@ export function createSystems(game) {
     fadeName.textContent = title || (cdef ? cdef.name.toUpperCase() : '');
     fadeEl.classList.add('trip');
     fadeEl.classList.add('on');
+    // ...and ONE FRAME LATER, so the browser has a start state to animate
+    // FROM. Adding the two classes together sets the end state before the
+    // element has ever been laid out with the start state, and a transition
+    // with nothing to leave from does not run: the postcard simply appears
+    // where it was going, which is what it did before any of this.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { fadeEl.classList.add('rise'); });
+    });
     // ---- and the sound of leaving ------------------------------------------
     musCross(-1);
     setTimeout(function () {
@@ -22015,6 +22082,7 @@ export function createSystems(game) {
         setTimeout(function () {
           if (transBusy) return;             // another crossing has started
           fadeEl.classList.remove('trip');
+          fadeEl.classList.remove('rise');
           while (fadeMark.firstChild) fadeMark.removeChild(fadeMark.firstChild);
           fadeName.textContent = '';
         }, sysFADE_OUT + 60);
@@ -23170,6 +23238,15 @@ export function createSystems(game) {
     // ...and the ledger, which is otherwise only reachable through a button
     // press on a card that a probe has to find first.
     ledger: function () { ledShow(false); },
+    // ...and the CROSSING, which nothing could reach. The chapter picker's
+    // digit keys call biomeGo directly — they are a debug jump, not a
+    // journey — so the 1.28 s of white that every probe in this repo has run
+    // past for six months had never once been driven by a test. The real
+    // route in is three wheeks at the exit zone.
+    cross: function (biome, title, sub) {
+      const d = chapterDef(chapterOf(biome));
+      biomeFadeTo(biome, title || (d ? d.name.toUpperCase() : ''), sub || (d ? d.sub : ''));
+    },
     isTaskDone: function (id) { return !!(taskRec[id] && taskRec[id].done); },
     tasksDone: function () { return doneCount; },
     setMuted: setMuted,
