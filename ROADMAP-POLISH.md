@@ -560,7 +560,58 @@ harness trap 10); PNG of the score card and of a paper row with its par.
 **Trap:** a RECORDS key must be a TASK id or the row is invisible; measure
 pars machine-floor first if any new one is added.
 
-**Batch P4 — the punctuation.** Area 4.
+**Batch P4 — the punctuation. Done, 2 Sep 2026.** The last batch. Measured
+under `playwright-cli` throughout, because every claim is about a real
+AudioContext on a real clock.
+
+**One bell was doing the work of seven things.** `chime` was the payoff for a
+mini, an act break, a record at par, a personal best, a near miss, a find, an
+incident, a chapter finished and the finale — at nine pitches — and it is also
+an ambient bell in five chapters. `musSting` plays a short figure built from the
+sounding chord through `musLiftNote`, so a record in Kyoto is a koto and in
+Hanoi a dan bau. **No new voices**, which is why it cannot be out of tune.
+Three shapes that say what the events are: record two notes up, act two notes
+down and low, done three notes falling to the root. `chime` keeps the find, the
+mini, the incident, the finale and every ambient bell.
+
+**Four payoffs were silent** — the souvenir, the costume, the chase onset and
+beating your own ghost. The chase is the one worth naming: it only ever moved
+`musChaseT`, which the pad follows over seconds, so the score got tenser some
+time after a chase began and nothing marked the moment. It is now a term in the
+one expression that writes the bass gain, not a second writer on it.
+
+**The band did not notice the pause card.** Measured off the graph: music filter
+20000 → 1102 → 20000 Hz, duck gain 1 → 0.34 → 1.0.
+
+**There was no underwater state at all**, in a game whose chapter-12 marquee is
+"be under when the water lights up". One low-pass on everything that is not the
+score, one on the score taken less far down because nobody in the lagoon is
+playing it, and a longer room. Measured diving in Palawan: world 20000 → 620 Hz,
+score 20000 → 1400, room send 0.05 → 0.27, all three back on surfacing.
+
+**And a room is not always a chapter.** The basilica, the casino salon and the
+deep end of Son Doong all played in their chapter's outdoor room, and two of
+them have a comment in `sysROOMS` itself saying the chapter has two rooms.
+Chapters can now name one: venice 0.199 → basilica 0.338, cave 0.417 →
+deepcave 0.515, monaco 0.189 → salon 0.030 — the quietest send in the game,
+because a casino is built so nobody hears the next table.
+
+**Three probe defects, all mine.** A picker key is a one-based index and it bit
+twice in one run: `Comma` is Antarctica and `Period` is Monte Carlo, so two room
+tests measured the wrong chapters — caught only because the audit reports the
+room key, which read `antarctic` under a heading that said monaco. The casino
+floor is 28 m up, so teleporting to a point that had just passed the zone test
+dropped the animal into the harbour. And the first sweep for the casino looked
+between x −80 and 80 when it sits at 118.
+
+**Left as spill:** flight and slide air, `sfxPurr` on the loaf, the Drift's
+two-line ladder, and the `force`/volume-1.0 audit. All four are additions to a
+mix that now has the structure they would sit in; none is a defect.
+
+Verified: `audio2` green in 13 chapters with the score running and no errors;
+19/19 soak clean with 0 NaN, 0 errors and 0 record orphans; build 9182.8 KB.
+
+*Original scope:*
 *Must land:* (a) Three stingers on `musLiftNote` that read the live chord —
 `record` (two-note rise), `act` (low cadence), `done` (three-note resolve) —
 and `chime` handed back to the world; the finale keeps its own. (b) The silent

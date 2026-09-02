@@ -4437,6 +4437,15 @@ export function createCave(game) {
     isOverWater: cavIsOverWater,
     waterHeightAt: cavWaterHeightAt,
     inZone: cavInZone,
+    // ---- AND THE CAVE HAS TWO ROOMS TOO (P4) ----------------------------
+    // Everything from the mouth to the doline has daylight and a forest in it;
+    // past the wall there is neither, and the chapter's whole second half is
+    // bare rock in every direction. The one room for the whole chapter was
+    // tuned for the first half, which is the half with the trees in it.
+    room() {
+      const p = cavGame && cavGame.capy && cavGame.capy.position;
+      return (p && p.z < cavWALL.z) ? 'deepcave' : null;
+    },
     navBlocked: cavNavBlocked,
     surfacePitch: cavSurfacePitch,
     SPAWN: cavSPAWN,

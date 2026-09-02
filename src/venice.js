@@ -5277,6 +5277,18 @@ export function createVenice(game) {
     isOverWater: venIsOverWater,
     waterHeightAt: venWaterHeightAt,
     inZone: venInZone,
+    // ---- WHICH ROOM THE EAR IS IN (P4) ----------------------------------
+    // The basilica closes the east end of the piazza and the chapter's own
+    // header calls the square "a lagoon with a basilica on the end of it" — and
+    // walking into it changed nothing about the sound at all. Radius rather
+    // than a rectangle because the building is a cluster of domes and the
+    // interesting acoustic starts under the porch, not at the door.
+    room() {
+      const p = venGame && venGame.capy && venGame.capy.position;
+      if (!p) return null;
+      const dx = p.x - venBASILICA.x, dz = p.z - venBASILICA.z;
+      return (dx * dx + dz * dz < 15 * 15) ? 'basilica' : null;
+    },
     navBlocked: venNavBlocked,
     surfacePitch: venSurfacePitch,
     SPAWN: venSPAWN,

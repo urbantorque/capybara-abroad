@@ -778,6 +778,28 @@ const sysIR_ER_REF   = 3.0;     // s of tail the base span is quoted at...
 const sysIR_ER_BASE  = 0.020;   // ...and the span there
 const sysIR_ER_K     = 0.028;   // s of extra span per second of tail
 const sysIR_BUILD    = 0.34;    // ...and how dense the diffuse tail is on arrival
+// ---- UNDER THE WATER (P4) --------------------------------------------------
+// There was no submerged state in the mix at all. Palawan's marquee is "be
+// UNDER when the water lights up", the dive is a property of every body of
+// water in the game since v19, and going under changed the picture, the camera
+// and the controls and left the sound exactly where it was — a beach heard from
+// two metres below the surface of a lagoon.
+//
+// A first-order low-pass is the whole model, and it is enough: what water does
+// to sound above it is take the top off. 20 kHz is transparent (the filter is
+// in the path whether or not anybody dives, so its open state has to be a
+// no-op); 620 Hz is muffled without being a pillow — below about 400 the
+// wheek stops being recognisable, which is the one sound that must survive
+// because the cave uses it as a torch.
+//
+// The score is taken LESS far down than the world is. It is not diegetic —
+// nobody in the lagoon is playing it — so pulling it as far under as the
+// splashes reads as a fault rather than as a place.
+const sysSUB_OPEN  = 20000;   // Hz — transparent, and the resting value
+const sysSUB_SFX   = 620;     // Hz — the world, heard through water
+const sysSUB_MUS   = 1400;    // Hz — the score, which is not in the water
+const sysSUB_WET   = 0.22;    // how much extra room send a submerged head gets
+const sysSUB_LAM   = 3.4;     // how fast it closes and opens
 const sysROOMS = {
   // Open, grassy, nothing to reflect off but the Opera House.
   sydney:    { size: 1.4, decay: 2.8, wet: 0.06 },
@@ -824,6 +846,24 @@ const sysROOMS = {
   // game and it is also the most crowded, which is what makes it a wall of
   // noise rather than an echo.
   hanoi:     { size: 1.4, decay: 4.4, wet: 0.24 },
+  // ---- THE THREE INTERIORS (P4) -----------------------------------------
+  // A room used to be keyed by CHAPTER, so the basilica, the casino salon and
+  // the deep end of Son Doong all played in their chapter's outdoor room — the
+  // three spaces in the game that most obviously are not one. A biome may now
+  // publish `room()` and name one of these instead; the key must be a row here
+  // or it falls back to the chapter, so a typo cannot invent a space.
+  //
+  // These are not "more reverb": each one is a shape. The basilica is enormous
+  // and soft — gold mosaic over brick, five domes, and it swallows the top end,
+  // so it is the longest decay in the game after the cave and nothing like as
+  // bright. The salon is the opposite and the joke is the same one the chapter
+  // makes: a low ceiling, heavy carpet, curtains, and the quietest send
+  // anywhere, because a casino is built so nobody hears the next table. The
+  // deep cave is the cave, further in: past the doline the daylight and the
+  // vegetation stop and it is bare rock in every direction.
+  basilica:  { size: 4.2, decay: 1.8, wet: 0.34 },
+  salon:     { size: 0.9, decay: 3.8, wet: 0.03 },
+  deepcave:  { size: 7.0, decay: 1.4, wet: 0.52 },
 };
 
 // --- AND THE AMBIENCE HAS TO COME FROM SOMEWHERE -----------------------------
@@ -7362,6 +7402,8 @@ export function createSystems(game) {
   // ambient bed and the four weather voices. Three names on the card, three
   // gains in the graph, and no fourth thing quietly outside all of them.
   let acSfxBus = null;
+  // P4: the water, on everything that is not the score. See sysSubSet.
+  let acSubLP = null;
   /** The master's target, which is the ceiling scaled — never replaced. */
   function sysMasterGain() { return muted ? 0.0001 : sysVOL_CEIL * sysVolMaster; }
   function sysSfxGain() { return sysMuteSfx ? 0.0001 : sysVolSfx; }
@@ -7412,8 +7454,19 @@ export function createSystems(game) {
     try {
       acSfxBus = ac.createGain();
       acSfxBus.gain.value = sysSfxGain();
-      acSfxBus.connect(acMaster);
-    } catch (e) { acSfxBus = null; }
+      // ---- ...AND THE WATER GOES OVER EVERYTHING THAT IS NOT THE SCORE ----
+      // One low-pass between the sfx bus and the master, so it catches the dry
+      // sounds, the room's wet return, the ambient bed and the weather voices
+      // in one place — everything a head underwater would muffle. Wide open at
+      // sysSUB_OPEN, which is transparent, so a game that never dives pays a
+      // single biquad and hears no difference. See sysSubSet.
+      acSubLP = ac.createBiquadFilter();
+      acSubLP.type = 'lowpass';
+      acSubLP.Q.value = 0.5;
+      acSubLP.frequency.value = sysSUB_OPEN;
+      acSfxBus.connect(acSubLP);
+      acSubLP.connect(acMaster);
+    } catch (e) { acSfxBus = null; acSubLP = null; }
     // ---- THE ROOM, AND IT IS FOUR NODES -----------------------------------
     //
     //   every sfx synth -> [panner] -> acSfxIn --+--> acSfxBus        (dry)
@@ -9421,15 +9474,68 @@ export function createSystems(game) {
    * cut off mid-decay is a click. sysROOM_LAM is roughly the fog's own rate,
    * which is what everything else in this file crosses at.
    */
+  /**
+   * WHICH ROOM WE ARE IN, and it is not always the chapter (P4).
+   *
+   * `sysROOMS` is keyed by biome, so San Marco's basilica, the casino salon and
+   * the deep end of Son Doong all played in their chapter's outdoor room — the
+   * three interiors in the game that most obviously are not one. A biome may
+   * publish `room()` returning a key into sysROOMS; anything it returns that is
+   * not a row falls back to the chapter, so a chapter cannot name a room into
+   * existence by typo.
+   */
+  function sysRoomKey() {
+    const live = (game.biome && game.biome.current) || 'sydney';
+    const api = sysLiveBiomeApi(game);
+    if (api && typeof api.room === 'function') {
+      let k;
+      try { k = api.room(); } catch (e) { k = null; }
+      if (k && sysROOMS[k]) return k;
+    }
+    return live;
+  }
   function sysRoomSet(dt) {
     if (!ac || !acRoomSend) return;
-    const live = (game.biome && game.biome.current) || 'sydney';
+    const live = sysRoomKey();
     const R = sysROOMS[live] || sysROOM_DEF;
     const want = acRoomFor === live ? R.wet : 0;
     acRoomWet = damp(acRoomWet, want, sysROOM_LAM * (want > 0 ? 1 : 2.6), dt);
-    acRoomSend.gain.setTargetAtTime(Math.max(0.0001, acRoomWet), ac.currentTime, 0.12);
+    // ...plus whatever the water is adding. Under the surface a room gets
+    // LONGER and duller, which is the half of "underwater" a filter alone
+    // cannot do — see sysSubSet for the other half.
+    acRoomSend.gain.setTargetAtTime(Math.max(0.0001, acRoomWet + audSub * sysSUB_WET),
+                                    ac.currentTime, 0.12);
     // Down to nothing, and only then is it a different place.
     if (acRoomFor !== live && acRoomWet < 0.006) sysRoomLoad(live);
+  }
+
+  // ---- HOW FAR UNDER WE ARE, 0..1, and what it does to the graph (P4) ----
+  // Driven by the same fact the camera and the controls use — capy.diving —
+  // rather than by a depth threshold: `diving` is the state the player asked
+  // for and is already the thing every other system agrees on. Damped, because
+  // a head breaking the surface is a slide and not a switch.
+  let audSub = 0;
+  function sysSubSet(dt) {
+    const capy = game.capy;
+    // The greater of the two, and they are two different facts: subT is the
+    // LENS under the surface (which is what the picture is graded on, and is
+    // null in the chapters with no sysSUB row) and capy.diving is the VERB. A
+    // dive in a chapter with no underwater grade still has to sound like one.
+    const want = Math.max(subT || 0, capy && capy.diving ? 1 : 0);
+    audSub = damp(audSub, want, sysSUB_LAM, dt);
+    if (!ac || ac.state !== 'running') return;
+    const t = ac.currentTime;
+    // Exponential in the frequency domain: a linear ramp from 20 kHz spends
+    // most of its travel in an octave nobody can hear, so it sounds like
+    // nothing at all and then closes all at once at the end.
+    const f = sysSUB_OPEN * Math.pow(sysSUB_SFX / sysSUB_OPEN, audSub);
+    let m = sysSUB_OPEN * Math.pow(sysSUB_MUS / sysSUB_OPEN, audSub);
+    // ...and the pause card's lid, in the same expression, because two writers
+    // on one AudioParam is how an effect gets undone a frame after it lands.
+    // Whichever wants it lower wins: a pause underwater is still underwater.
+    if (pauseShown && m > sysDUCK_HZ) m = sysDUCK_HZ;
+    if (acSubLP) acSubLP.frequency.setTargetAtTime(f, t, 0.08);
+    if (musOutLP) musOutLP.frequency.setTargetAtTime(m, t, pauseShown ? sysDUCK_TAU : 0.08);
   }
 
   // =========================================================================
@@ -9441,6 +9547,8 @@ export function createSystems(game) {
   // =========================================================================
   let musVol = null, musDry = null, musSend = null, musWet = null, musConv = null;
   let musPlaceLP = null, musPlacePan = null, musPlaceGain = null;
+  // P4: the pause duck and the water, one node each. See musicStart.
+  let musDuckG = null, musOutLP = null;
   let musPad = null, musFilt = null, musBassGain = null, musPluckDry = null;
   // The ensemble bus — everything SUSTAINED goes through it. See musicStart.
   let musWide = null;
@@ -9450,6 +9558,13 @@ export function createSystems(game) {
   // bracket keys were controls whose effect ended with the tab.
   let musMuted = sysMuteMusic, musLevel = sysVolMusic;
   let musIntensity = 0, musChaseT = 0, musApplyT = 0;
+  // P4: the chase ONSET, decayed per frame in the same block that reads it.
+  // Separate from musChaseT, which is how long the chase lasts — this is the
+  // moment it began, and it is over in about a second and a half.
+  let musChaseHit = 0;
+  // P4: which costume the animal was wearing last frame, so putting one ON is
+  // an event and the nineteen frames a chapter where it is unchanged are not.
+  let capyWornLast = null;
   // What a hot place is worth to the mix. See the note at the musWant line.
   const sysHEAT_HOLD = 0.70;   // how far full heat slows the chase tail: 2.5 s → 8.3
   const sysHEAT_MUS  = 0.25;   // …and the floor it puts under the intensity
@@ -9906,6 +10021,102 @@ export function createSystems(game) {
   // in sysMUS_PAL is missing a `lift` — a table cannot be missing a rung — but
   // this keeps musSwell total rather than conditional.
   const musLIFT_DEF = { shape: 'up', n: sysMUS_LIFT_ARP, gap: sysMUS_LIFT_GAP, oct: 0, vel: 1 };
+
+  // =======================================================================
+  // ONE BELL WAS DOING THE WORK OF SEVEN THINGS (P4)
+  //
+  // `chime` was the payoff for a mini task, an act break, a record at par, a
+  // personal best, a near miss, a find, an incident, a chapter finished AND the
+  // finale — at nine different pitches, which is a spreadsheet, not a
+  // vocabulary. It is also an AMBIENT BELL in five chapters' ladders. So a
+  // personal best and a bell tolling over a plaza were the same sound, and the
+  // player had no way to learn what any of them meant.
+  //
+  // Three stingers instead, and they are figures rather than samples: built
+  // from `musCurChord` through `musLiftNote`, exactly as the lift is, so each
+  // one is in the key of the place by construction and played on that place's
+  // own lead instrument. A record in Kyoto is a koto; in Hanoi it is a dan
+  // bau. Nothing here is a new voice — that is the whole point, and it is why
+  // this costs no new synths and cannot be out of tune.
+  //
+  // `deg` indexes the sounding chord, so 0 is its root. The shapes say what the
+  // three events ARE:
+  //   record — two notes UP. A question answered upward: you did better.
+  //   act    — two notes DOWN, low and quiet. A cadence. Something closed.
+  //   done   — three notes falling to the root. A resolve, and the only one of
+  //            the three that ends where the harmony started.
+  // The two payoffs P4 also un-silenced ride the same table.
+  const sysMUS_STING = {
+    record: { deg: [0, 2],       gap: 0.115, oct: 12, vel: 1.20, pan: 0.24 },
+    act:    { deg: [1, 0],       gap: 0.200, oct: -12, vel: 0.80, pan: 0.18 },
+    done:   { deg: [4, 2, 0],    gap: 0.150, oct: 12, vel: 1.30, pan: 0.26 },
+    keep:   { deg: [2, 1, 0],    gap: 0.135, oct: 12, vel: 0.95, pan: 0.22 },
+    wear:   { deg: [0, 3],       gap: 0.120, oct: 12, vel: 0.85, pan: 0.20 },
+  };
+  let musStingAt = 0;
+  // ---- THE BAND DID NOT NOTICE THE PAUSE CARD (P4) ------------------------
+  // `pauseShow` sets `paused`, which gates the sfx and floors the weather bed
+  // — but `musTick` is gated only on `ac.state`, so the pad, the bands and the
+  // lift went on at full level behind a stopped game. Silence everywhere except
+  // a salsa band at full tilt reads as a music menu rather than as a pause.
+  //
+  // Not a mute: a score that stops is a score the player notices stopping, and
+  // the card is a place you sit for a moment rather than a door. A third of the
+  // way down and a lid on the top, over a quarter of a second, which is long
+  // enough not to click and short enough to feel like the card doing it.
+  const sysDUCK_G   = 0.34;
+  const sysDUCK_HZ  = 1100;
+  const sysDUCK_TAU = 0.10;
+  function musDuck(on) {
+    if (!ac || ac.state !== 'running') return;
+    const t = ac.currentTime;
+    if (musDuckG) musDuckG.gain.setTargetAtTime(on ? sysDUCK_G : 1, t, sysDUCK_TAU);
+    // The filter half is NOT written here. `musOutLP.frequency` has exactly one
+    // writer — sysSubSet, which runs every frame including while the game is
+    // paused — so a lid set from this function would be lifted again on the
+    // very next frame. The pause is a term in that one expression instead, the
+    // same rule the chase pulse follows on the bass gain.
+  }
+  /**
+   * A short figure in the key that is sounding. `k` scales it, 1 by default.
+   *
+   * Deliberately does NOT touch musLift/musLiftT: a sting is punctuation and a
+   * swell is a held moment, and the two are asked for on the same frames (a
+   * `wow` tick pays both). Sharing the envelope would make every record blur
+   * the marquee it happened during.
+   */
+  function musSting(kind, k) {
+    const s = sysMUS_STING[kind];
+    if (!s) return 0;
+    if (!ac || !musVol || ac.state !== 'running' || musMuted) return 0;
+    const chord = musCurChord;
+    if (!chord || !chord.length) return 0;
+    const now = ac.currentTime;
+    // Two of these on one frame is mud, and the events that pay them do
+    // overlap — finishing a chapter closes an act. First one wins.
+    if (now < musStingAt) return 0;
+    musStingAt = now + 0.30;
+    const inst = (musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck';
+    const when = now + 0.03;
+    const g = clamp(typeof k === 'number' ? k : 1, 0, 2);
+    let t = 0;
+    for (let i = 0; i < s.deg.length; i++) {
+      const d = s.deg[i];
+      const idx = ((d % chord.length) + chord.length) % chord.length;
+      // Same fold as the lift, and for the same reason: the chord tables run
+      // from MIDI 33 to 82 and an unfolded +12 puts the top of Cappadocia into
+      // a register nothing else in the mix occupies. See musSwell.
+      const midi = musFold(chord[idx] + 12 * Math.floor(d / chord.length) + s.oct,
+                           sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+      // 0.115 is the lift's own note velocity. AUTHORED AGAINST THAT and not
+      // against these envelopes on their own — the mistake R9 made with six
+      // ambient voices, which were written five to ten times too loud because
+      // each was judged by itself rather than against the table it was joining.
+      musLiftNote(inst, when + t, midi, (i % 2 ? s.pan : -s.pan), 0.115 * s.vel * g, s.gap);
+      t += s.gap;
+    }
+    return s.deg.length;
+  }
 
   function musSwell(k) {
     const s = clamp(typeof k === 'number' ? k : 1, 0, 1);
@@ -12525,7 +12736,26 @@ export function createSystems(game) {
     musVol.connect(musPlaceLP);
     if (musPlacePan) { musPlaceLP.connect(musPlacePan); musPlacePan.connect(musPlaceGain); }
     else musPlaceLP.connect(musPlaceGain);
-    musPlaceGain.connect(acMaster);
+    // ---- TWO MORE NODES ON THE WAY OUT, AND WHY THEY ARE NEW ONES (P4) ----
+    //
+    //   musPlaceGain -> musDuckG -> musOutLP -> acMaster
+    //
+    // `musDuckG` is the pause duck and `musOutLP` is the water. Both could in
+    // principle have been done by leaning on nodes that already exist — musVol
+    // for the duck, musFilt for the muffle — and both would have been wrong for
+    // the same reason: musVol is the PLAYER'S fader and musFilt has exactly one
+    // writer on a shared expression. Two writers on one AudioParam is how a
+    // setting ends up fighting an effect, and this file has paid for that
+    // before. A node each, one writer each, and the graph says what it does.
+    musDuckG = ac.createGain();
+    musDuckG.gain.value = 1;
+    musOutLP = ac.createBiquadFilter();
+    musOutLP.type = 'lowpass';
+    musOutLP.Q.value = 0.5;
+    musOutLP.frequency.value = sysSUB_OPEN;
+    musPlaceGain.connect(musDuckG);
+    musDuckG.connect(musOutLP);
+    musOutLP.connect(acMaster);
 
     // ---- THE SCORE WAS IN THE SAME ROOM IN ALL NINETEEN PLACES (v41) ------
     //
@@ -14194,6 +14424,7 @@ export function createSystems(game) {
     pauseEl.inert = false;
     pauseEl.classList.add('show');
     game.state.paused = true;
+    musDuck(true);
     pauseReturnFocus = document.activeElement;
     try { pauseGo.focus(); } catch (e) {}
     // ---- LET GO OF EVERYTHING (the blur handler's argument, indoors) ------
@@ -14214,6 +14445,7 @@ export function createSystems(game) {
     pauseShown = false;
     pauseEl.classList.remove('show');
     pauseEl.inert = true;
+    musDuck(false);
     pauseAskShut();
     if (pauseReturnFocus && pauseReturnFocus.focus) {
       try { pauseReturnFocus.focus(); } catch (e) {}
@@ -15342,6 +15574,15 @@ export function createSystems(game) {
     if (g) keepArt.appendChild(g);
     keepText.textContent = def.keep;
     keepEl.classList.add('show');
+    // ---- THE SOUVENIR WAS SILENT (P4) ------------------------------------
+    // The one card in the game that says you are taking something away from a
+    // place, and it made no sound at all: nineteen of them across a journey,
+    // each arriving with a picture and nothing else. A short fall through the
+    // chord — the same shape as `done` and quieter, because this is the card
+    // AFTER the one that means finished and must not compete with it — over a
+    // soft pop, which is the paper.
+    sfx('pop', { volume: 0.30, pitch: 0.92 });
+    musSting('keep', 0.95);
     if (keepTimer) clearTimeout(keepTimer);
     keepTimer = setTimeout(function () { keepEl.classList.remove('show'); }, sysKEEP_CARD);
   }
@@ -17488,7 +17729,8 @@ export function createSystems(game) {
         // cards are the same card.
         if (showPlaceLast === ad.kick) return;
         showPlace(ad.kick, ad.line);
-        sfx('chime', { volume: 0.42, pitch: 0.82 });
+        // P4: the act cadence, in key, instead of the ninth pitch of one bell.
+        if (!musSting('act')) sfx('chime', { volume: 0.42, pitch: 0.82 });
       }, sysACT_CARD_WAIT);
     }
   }
@@ -17765,10 +18007,13 @@ export function createSystems(game) {
     // cannot make it happen twice.
     if (!parWas && recAtPar(def, value)) {
       toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
-      sfx('chime', { volume: 0.6, pitch: 1.62 });
+      // P4: two notes up, on the chapter's own lead. See sysMUS_STING.
+      if (!musSting('record', 1.15)) sfx('chime', { volume: 0.6, pitch: 1.62 });
     } else if (prev !== undefined) {
       toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
-      sfx('chime', { volume: 0.55, pitch: 1.45 });
+      // The same figure a shade quieter: beating your own ghost is the same
+      // KIND of event as reaching par, and the two must not need telling apart.
+      if (!musSting('record', 0.92)) sfx('chime', { volume: 0.55, pitch: 1.45 });
     }
     return true;
   }
@@ -19512,7 +19757,10 @@ export function createSystems(game) {
     // ceremony fires 1.1 s after a tick that has already finished and there is
     // nothing left happening for the world to hold still for.
     musSwell(1);
-    sfx('chime', { volume: 1.0, pitch: 1.2 });
+    // P4: the resolve — three notes falling to the root of whatever is
+    // sounding. The cheer still lands half a second later; what changed is that
+    // the thing under it is now the only sound in the game that means FINISHED.
+    if (!musSting('done', 1.25)) sfx('chime', { volume: 1.0, pitch: 1.2 });
     setTimeout(function () { sfx('cheer', { volume: 0.8 }); }, 520);
     // ---- TWO BURSTS, AND NEITHER OF THEM IS BIGGER THAN THE RING ----------
     // This asked for 34 scraps out of a pool of sysCONF_MAX (26) and confHead
@@ -22052,7 +22300,14 @@ export function createSystems(game) {
       // Drain the wall-clock time that piled up while the tab was backgrounded
       // so the first live frame gets a normal dt instead of a multi-second jump.
       if (game.clock && game.clock.getDelta) game.clock.getDelta();
-      if (started && ac && ac.state === 'suspended' && ac.resume) {
+      // ---- ...AND ON THE TITLE CARD TOO (P4) -----------------------------
+      // `started` gated this, so a tab backgrounded while the title card was up
+      // came back with a suspended context and no way to resume it: the picker
+      // previews its palettes on hover, the card has its own key, and all of it
+      // was silent until the player pressed something. The context only exists
+      // at all after a gesture, so resuming one that is already there costs a
+      // player who has never made a sound exactly nothing.
+      if (ac && ac.state === 'suspended' && ac.resume) {
         const pr = ac.resume(); if (pr && pr.catch) pr.catch(function () {});
       }
     }
@@ -22711,9 +22966,38 @@ export function createSystems(game) {
       out.len = len;
       return out;
     },
+    /**
+     * WHAT THE MIX IS DOING, off the graph rather than off the flags (P4).
+     *
+     * Every one of P4's four mix changes is a number on an AudioParam, and a
+     * probe that asserts on `pauseShown` or `capy.diving` proves the game knows
+     * what is happening and not that anything reached the sound. `.value` is
+     * the scheduled value, so it is read after the ramp has landed. Null before
+     * the first gesture, when there is no AudioContext at all.
+     */
+    mixAudit: function () {
+      if (!ac) return null;
+      return {
+        state: ac.state,
+        sub: audSub,
+        sfxHz: acSubLP ? acSubLP.frequency.value : null,
+        musHz: musOutLP ? musOutLP.frequency.value : null,
+        duck: musDuckG ? musDuckG.gain.value : null,
+        roomSend: acRoomSend ? acRoomSend.gain.value : null,
+        chase: musChaseHit,
+        bass: musBassGain ? musBassGain.gain.value : null,
+      };
+    },
+    /**
+     * FIRE ONE STINGER AND SAY HOW MANY NOTES IT ASKED FOR. Nothing in src
+     * calls this; it exists because the only thing observable about a Web Audio
+     * figure from outside is the node graph it builds, and a figure that never
+     * reaches musLiftNote builds none. See sysMUS_STING.
+     */
+    stingAudit: function (kind) { return musSting(kind, 1); },
     /** ...and which room the sfx bus is in. See sysROOMS. */
     roomAudit: function () {
-      return { biome: acRoomFor, wet: acRoomWet,
+      return { biome: acRoomFor, wet: acRoomWet, key: sysRoomKey(),
                conv: !!(acRoomConv && acRoomConv.buffer),
                secs: acRoomConv && acRoomConv.buffer ? acRoomConv.buffer.duration : 0,
                bus: !!acSfxIn };
@@ -23223,7 +23507,16 @@ export function createSystems(game) {
   }
 
   // Music reacts to a chase: the pad ducks and opens up, plucks thicken slightly.
-  game.events.on('npc:chase', function () { musChaseT = 7; });
+  game.events.on('npc:chase', function () {
+    // ---- SOMEBODY IS AFTER YOU, AND THE BAND KNEW BUT DID NOT SAY (P4) ----
+    // A chase only ever moved `musChaseT`, which feeds musIntensity, which the
+    // pad and the filter follow over SECONDS. So the score got tenser some time
+    // after the chase started and nothing marked the moment it did — the one
+    // event in the game with an obvious musical answer. Latched, not added: a
+    // second person joining a chase already under way is the same chase.
+    if (musChaseT <= 0) musChaseHit = 1;
+    musChaseT = 7;
+  });
   game.events.on('npc:calm', function () { musChaseT = Math.min(musChaseT, 1.2); });
 
   // --- the emigration ------------------------------------------------------
@@ -23425,6 +23718,16 @@ export function createSystems(game) {
         if (r && r.done) put = w.wear;
         break;                          // one chapter, one row, one answer
       }
+      // ---- AND PUTTING IT ON WAS SILENT TOO (P4) -------------------------
+      // Ten costumes, each earned by a specific task, and the animal simply
+      // WAS wearing one on the next frame. Only on the frame it changes, and
+      // only when something is being put ON — taking a costume off happens on
+      // every chapter change and is not an event.
+      if (put && put !== capyWornLast) {
+        sfx('rustle', { volume: 0.34, pitch: 1.15 });
+        musSting('wear', 0.85);
+      }
+      capyWornLast = put;
       game.capy.wear(put);
     }
 
@@ -24953,6 +25256,8 @@ export function createSystems(game) {
     // same breath. See sysROOMS. Twice, because since v41 the score has a room
     // of its own built out of the same table — a longer, wetter version of the
     // same place, because a chord wants a tail that a footstep does not.
+    // BEFORE the room, because the room's send reads how far under we are.
+    sysSubSet(dt);
     sysRoomSet(dt);
     musRoomSet(dt);
     musBreathStep(dt);
@@ -26139,6 +26444,13 @@ export function createSystems(game) {
       musBondHeat = damp(musBondHeat, bh, bh > musBondHeat ? 5.0 : 0.55, dt);
     }
     if (musChaseT > 0) musChaseT -= dt * (1 - musHeat * sysHEAT_HOLD);
+    // ...and the onset itself, which is a stab and not a state. On the RAW
+    // clock: a chase that starts during a hitstop is still a chase that started
+    // now, and the one thing this must not do is stretch under slow motion.
+    if (musChaseHit > 0) {
+      musChaseHit -= (game.state.rawDt || dt) * 1.6;
+      if (musChaseHit < 0) musChaseHit = 0;
+    }
     // The flow leans the band in beside the chaos, on the same writer and for
     // the opposite reason: chaos is the score reacting to trouble, the flow is
     // the score going WITH you. It is deliberately the smallest of the three
@@ -26189,8 +26501,14 @@ export function createSystems(game) {
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
         musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT),
         nowA, lift > 0.02 ? 0.7 : 1.4);
+      // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
+      // the moment somebody starts after you. A TERM in the one expression that
+      // writes this gain, not a second writer — musBassGain already has exactly
+      // one and it runs on a 1.5 s constant, so a pulse written separately
+      // would be dragged back before it was heard. See the npc:chase handler.
       musBassGain.gain.setTargetAtTime((musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
-        musIntensity * 0.08 + lift * 0.05) * musBreath, nowA, 1.5);
+        musIntensity * 0.08 + lift * 0.05 + musChaseHit * 0.30) * musBreath,
+        nowA, musChaseHit > 0.02 ? 0.28 : 1.5);
       // the thickening layer: silent at zero tasks, a shimmer at all of them
       if (musShimGain) musShimGain.gain.setTargetAtTime(0.0001 + musProg * 0.85, nowA, 2.5);
       // ---- THE AURORA'S CHOIR ------------------------------------------

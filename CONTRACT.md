@@ -3058,6 +3058,130 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE PUNCTUATION — P4 (2 Sep 2026)
+
+The fourth batch of `ROADMAP-POLISH.md`, and the last. Measured under
+`playwright-cli` throughout, because every claim here is about a real
+AudioContext on a real clock — a hand-driven tick loop never unlocks one.
+
+### ONE BELL WAS DOING THE WORK OF SEVEN THINGS
+
+`chime` was the payoff for a mini task, an act break, a record at par, a
+personal best, a near miss, a find, an incident, a chapter finished AND the
+finale, at nine pitches — and it is an AMBIENT BELL in five chapters' ladders.
+So a personal best and a bell tolling over a plaza were the same sound, and
+nothing about which was which could be learnt.
+
+`musSting(kind, k)` plays a short figure built from `musCurChord` through
+`musLiftNote`, exactly as the lift is: in the key of the place by construction,
+on that place's own lead instrument. A record in Kyoto is a koto; in Hanoi it is
+a dan bau. **No new voices** — that is the point, and it is why this cannot be
+out of tune and costs nothing to carry.
+
+| | shape | what it means |
+|---|---|---|
+| `record` | two notes UP | you did better |
+| `act` | two notes DOWN, low and quiet | something closed |
+| `done` | three notes falling to the root | the only resolve in the set |
+| `keep` | a short fall, quieter | the souvenir, which was silent |
+| `wear` | two notes | the costume, which was silent |
+
+Velocities are authored at `0.115 * vel` — **the lift's own note velocity**, not
+against these envelopes alone. That is the mistake R9 made with six ambient
+voices, which were written five to ten times too loud because each was judged by
+itself rather than against the table it was joining.
+
+`chime` keeps the find, the mini, the incident, the near miss, the finale and
+every ambient bell. Every sting falls back to the old chime if there is no chord
+sounding, so a muted or not-yet-started score sounds exactly as it did.
+
+### FOUR PAYOFFS WERE SILENT
+
+The souvenir card (nineteen of them in a journey, each arriving with a picture
+and no sound), the costume grant (the animal simply WAS wearing one on the next
+frame), the chase onset, and beating your own ghost.
+
+The chase is the interesting one. It only ever moved `musChaseT`, which feeds
+`musIntensity`, which the pad and the filter follow over SECONDS — so the score
+got tenser some time after a chase began and nothing marked the moment. It is
+now a term in the ONE expression that writes `musBassGain`, decayed on the raw
+clock. Not a second writer: that gain runs on a 1.5 s constant and a pulse
+written separately would be dragged back before it was heard.
+
+Beating your ghost is the `record` figure a shade quieter. It is the same KIND
+of event as reaching par and must not need telling apart.
+
+### THE BAND DID NOT NOTICE THE PAUSE CARD
+
+`pauseShow` sets `paused`, which gates the sfx and floors the weather bed — and
+`musTick` is gated only on `ac.state`, so the pad, the bands and the lift ran at
+full level behind a stopped game. Silence everywhere except a salsa band at full
+tilt reads as a music menu rather than as a pause.
+
+Measured off the graph, not off the flags: music filter **20000 → 1102 → 20000
+Hz**, duck gain **1 → 0.34 → 1.0**.
+
+### THERE WAS NO UNDERWATER STATE AT ALL
+
+Palawan's marquee is "be UNDER when the water lights up", the dive has been a
+property of every body of water since v19, and going under changed the picture,
+the camera and the controls and left the sound exactly where it was.
+
+One low-pass between `acSfxBus` and the master catches the dry sounds, the
+room's wet return, the ambient bed and the weather voices in one place. The
+score gets its own, taken LESS far down — it is not diegetic, nobody in the
+lagoon is playing it, and pulling it as far under as the splashes reads as a
+fault rather than as a place. The room send rises too, because water makes a
+space longer as well as duller.
+
+Measured, diving in Palawan: `sub` 0 → 1, world **20000 → 620 Hz**, score
+**20000 → 1400 Hz**, room send **0.05 → 0.27**, and all three back on surfacing.
+
+Driven by `max(subT, capy.diving)` — the LENS under the surface (which is what
+the picture is graded on, and is null in chapters with no `sysSUB` row) and the
+VERB. A dive in a chapter with no underwater grade still has to sound like one.
+
+### AND A ROOM IS NOT ALWAYS A CHAPTER
+
+`sysROOMS` was keyed by biome, so San Marco's basilica, the casino salon and the
+deep end of Son Doong all played in their chapter's OUTDOOR room — the three
+spaces in the game that most obviously are not one, and two of them have a
+comment in that very table saying the chapter has two rooms in it.
+
+A biome may publish `room()` returning a key into `sysROOMS`; anything that is
+not a row falls back to the chapter, so a typo cannot invent a space. Three
+authored: `basilica` (enormous and soft — gold mosaic over brick swallows the
+top end), `salon` (the quietest send in the game, because a casino is built so
+nobody hears the next table) and `deepcave` (past the wall the daylight and the
+vegetation stop).
+
+Measured: venice `venice 0.199 → basilica 0.338`, cave `cave 0.417 → deepcave
+0.515`, monaco `monaco 0.189 → salon 0.030`.
+
+### TWO NEW AUDITS, AND WHY
+
+`hud.mixAudit()` reads the four AudioParams off the graph — a probe that asserts
+on `pauseShown` or `capy.diving` proves the game knows what is happening and not
+that anything reached the sound. `hud.stingAudit(kind)` fires one figure and
+reports how many notes it asked for; with the AudioContext prototype patched to
+count node creations, that is the only thing about a Web Audio figure observable
+from outside. All five build real graphs.
+
+### THREE PROBE DEFECTS
+
+**A picker key is a one-based index and it is easy to get wrong** — trap 15, and
+it bit twice in one run: `Comma` is Antarctica and `Period` is Monte Carlo, so
+the Monaco and cave room tests measured the wrong chapters entirely. The only
+reason it was caught is that `roomAudit` reports the room KEY, which read
+`antarctic` under a heading that said monaco.
+
+**The casino floor is at y 28.** Teleporting to a point that had just passed
+`inZone('casino')` at ground height dropped the animal into the harbour, so the
+zone test that had passed at search time was false on arrival.
+
+**And a search box has to contain the thing.** `monCASINO` sits at x 118; the
+first sweep looked between −80 and 80 and reported no zone at all.
+
 ## THE CHASE — P3 (2 Sep 2026)
 
 The third batch of `ROADMAP-POLISH.md`. Every system in this section already

@@ -4391,6 +4391,15 @@ export function createMonaco(game) {
     groundSlip: monGroundSlip,
     surfacePitch: monSurfacePitch,
     inZone: monInZone,
+    // ---- THE SALON IS A DIFFERENT ROOM FROM THE HARBOUR (P4) ------------
+    // sysROOMS already carries two comments about this chapter having two
+    // rooms in it and only ever had the outside one. The salon is the quietest
+    // send in the game on purpose: a casino is built so that nobody hears the
+    // next table, which is the same joke the chapter makes everywhere else.
+    room() {
+      const p = monGame && monGame.capy && monGame.capy.position;
+      return (p && monInCasino(p.x, p.z)) ? 'salon' : null;
+    },
     navBlocked: monNavBlocked,
     randomPointIn: monRandomPointIn,
     SPAWN: monSPAWN,
