@@ -483,7 +483,61 @@ Sydney → wharf → board → close → pause → fader moved → journal → q
 hooking a public name shows what the chapters say and none of what the game
 says). A keydown soak with Ctrl held proving S/D are cancelled.
 
-**Batch P3 — the chase.** Area 5, plus the two single-line fixes from 6.
+**Batch P3 — the chase. Done, 2 Sep 2026.** Every system in this batch already
+existed and was invisible.
+
+**Sixty of the 231 tasks are measured and the paper never said which**, because
+the record board only appears once a chapter is finished — so for the whole of
+a first pass a player could not tell which tasks were races, and by the time
+they could, the cheap first attempt was spent. There is a glyph on the row now
+and the par on the clue, in three sentences because there are three cases
+(never raced with a par, raced, and measured with no par — which is thirteen of
+the sixty). Cross-checked statically: **231 tasks, 60 timed, 60 records, 0 keys
+that are not task ids.** The picker's record line came out from behind the
+100 % guard: that guard's argument holds for the souvenir, which is a thing you
+get for finishing, and not for a number you have already set.
+
+**Nine tasks wait on a clock nobody could see.** A biome may now publish
+`nextIn(taskId)` — seconds until the window, 0 while it is open, −1 for "not a
+clock" — wired in the six cycle chapters and rendered as "next in 40 s".
+Measured live: iceland 8.8 s, hanoi 23.6, palawan 40.7, goreme 58.9, kowloon
+68.6, venice 86.0, each returning −1 for an id it does not own; and on the paper
+"next in 6 s" became "next in 2 s" four seconds later. Iceland's is the
+interesting one — its clock runs faster near the pier head, so the number gets
+shorter when the player does what the chapter wants.
+
+**The incident was the only repeatable reward and was never counted.** Per
+chapter now, additive on the save. Verified by causing one: 21 people watching,
+eight props dropped, `inc {"1":1}` and `scn {"1":1}` on the file, both still
+there after a reload. DONE HERE became a score card off four facts that were
+already on the file and shown nowhere, photographed at Circular Quay as `0:08
+here · 0 of 3 timed`, and record rows with a ghost stored carry a replay mark.
+
+**Four smaller things.** Ghost storage 8 → 24, because eight against sixty rows
+meant a completionist's Kyoto ghost was evicted around Iceland by the act of
+playing the chapters in between. Hanoi's fold stopped being a rising edge on a
+damped value sampled once every 96 s — verified by arriving three seconds late
+and ticking. The condor's wingbeat is taught, through a new `game.say` so a pad
+reads B and a phone reads WHEEK. And Pasto stopped saying GALERAS twice three
+seconds apart.
+
+**Two probe defects, both of which reported a working thing as broken.** The
+incident test used `page.addInitScript` to clear storage, which fires on EVERY
+navigation — so the reload that was meant to prove the save survives wiped the
+file it was checking, and reported `inc: null` on a run that had just written
+`inc: {1:1}`. That is harness trap 10, in the exact shape the trap is written
+down in. And the first attempt to cause an incident stood the animal on the
+lawn: the chain is gated on somebody having seen it, `findPeople` returned 0,
+and eight thrown props counted for nothing — correctly.
+
+**Left as spill:** the second lawn ring for all-pars/all-finds, and the
+place-heat tier card. Both are new authored beats rather than exposures of
+existing state, which is what the rest of this batch was.
+
+Verified: R1 green, 19/19 soak clean with 0 NaN, 0 errors and 0 record orphans,
+no page or console errors in any run, build 9163.3 KB.
+
+*Original scope:*
 *Must land:* (a) A "measured" glyph and the par on the paper row itself for any
 task with a `RECORDS` row (the row already renders a hint line four times a
 second) and the record line in the picker/DONE HERE outside the 100 % guard.

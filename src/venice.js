@@ -5252,6 +5252,23 @@ export function createVenice(game) {
   const api = {
     built() { return venBuilt; },
     terrainHeight: venTerrain,
+    // ---- TWO HUNDRED AND FIVE SECONDS OF TIDE (P3) -----------------------
+    // The longest clock in the game, and the two rows that ride it are the two
+    // the chapter is named for. `mirror-swim` needs enough water over the
+    // paving to swim thirty metres of it, which is the top of the tide, and
+    // `flooded-cafe` wants the water over the floor — so both are asking the
+    // same question: how long until it is high.
+    //
+    // Zero from venTIDE_RISE1 to venTIDE_FALL0, which is the plateau: the tide
+    // is not a moment here, it is most of a minute, and reporting a countdown
+    // through it would be counting down to something already true.
+    nextIn(id) {
+      if (id !== 'mirror-swim' && id !== 'flooded-cafe') return -1;
+      if (venPhase >= venTIDE_RISE1 && venPhase < venTIDE_FALL0) return 0;
+      let d = venTIDE_RISE1 - venPhase;
+      if (d < 0) d += 1;
+      return d * venTIDE_PERIOD;
+    },
     slopeAt: venSlope,
     // MUTATED EVERY FRAME. capybara.js reads waterLevel as a property, which is
     // exactly what a tide needs: one number, written here, and the swim

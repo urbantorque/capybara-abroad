@@ -4960,6 +4960,20 @@ export function createGoreme(game) {
   const api = {
     built() { return gorBuilt; },
     terrainHeight: gorTerrain,
+    // ---- HOW LONG THE GROUND IS GOING TO LAST (P3) ----------------------
+    // The window that ticks `sunrise` is gorPhase 0.5235..0.5804 — about
+    // eleven seconds of a hundred and fifty-six — and the comment on that gate
+    // calls it "cruel to anyone still on the ground", because a full-burn climb
+    // from the field to the 55 m this needs measures thirty-two seconds. The
+    // paper never said how long there was. This is that number, and it is the
+    // same one the burners already synchronise to.
+    nextIn(id) {
+      if (id !== 'sunrise') return -1;
+      if (gorSun > 0.465 && gorSun < 0.96) return 0;         // it is happening
+      let d = gorSUN_P - gorPhase;
+      if (d < 0) d += 1;                                     // it is next time round
+      return d * gorCYCLE;
+    },
     slopeAt: gorSlope,
     waterLevel: -400,                       // there is no water in Cappadocia
     isOverWater: gorIsOverWater,

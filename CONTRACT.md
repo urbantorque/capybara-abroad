@@ -3058,6 +3058,106 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE CHASE — P3 (2 Sep 2026)
+
+The third batch of `ROADMAP-POLISH.md`. Every system in this section already
+existed and was invisible.
+
+### SIXTY TASKS ARE MEASURED AND THE PAPER NEVER SAID WHICH
+
+The record board only appears once a chapter is FINISHED, so for the whole of a
+first pass through every chapter a player could not tell which of its tasks were
+races — and by the time they could, the cheap first attempt was spent.
+
+- **A glyph on the row.** `capyui-meas` on any task with a `RECORDS` entry.
+  Cross-checked statically (`qa/p3-glyph.mjs`): 231 tasks, 60 timed, 60 RECORDS
+  rows, **0 keys that are not task ids**.
+- **The par on the clue**, via `todoParLine`. Three sentences, because there are
+  three cases: never raced and there is a par ("timed · a good one is 32.0 s"),
+  raced ("your best 29.4 s · a good one is 32.0 s"), and measured with no par at
+  all — which is thirteen of the sixty, and a silent row there would make the
+  glyph a promise the paper does not keep.
+- The clue needed `white-space:pre-line` and a taller clamp. Without the first
+  the newline collapses and the par runs into the end of the clue as one
+  sentence; without the second a clue that already wrapped clipped the par off
+  under `overflow:hidden` — the same fault the record board had before v51, and
+  invisible unless you read the rendered element rather than its textContent.
+- **The picker's record line came out from behind the 100 % guard.** The
+  argument for that guard holds for the SOUVENIR — a thing you get for finishing
+  — and not for a number the player has already set in a chapter they are
+  halfway through. The picker is the only screen where sixteen places are
+  compared side by side.
+
+### NINE TASKS WAIT ON A CLOCK NOBODY COULD SEE — `nextIn`
+
+The whale every 54 s, the train every 96, the bloom every 124, the Symphony
+every 152, the sunrise every 156, the tide every 205. Cappadocia's own comment
+calls its eleven-second window "cruel to anyone still on the ground" and the
+paper never said how long the ground was going to last.
+
+A biome may publish `nextIn(taskId)`: seconds until the window opens, 0 while it
+is OPEN, -1 for "not a clock" — the same optional-hook shape as `camFloor` and
+`localWater`, so a chapter with no opinion costs one failed lookup. Wired in six
+chapters. Rendered as "next in 40 s" on the clue, rounded to whole seconds so
+the element is rewritten once a second rather than four times.
+
+Measured live: iceland 8.8 s, hanoi 23.6, palawan 40.7, goreme 58.9, kowloon
+68.6, venice 86.0, all returning -1 for an id they do not own; and on the paper,
+"next in 6 s" became "next in 2 s" four seconds later.
+
+Iceland's is the interesting one: `iceWhaleT` counts down FASTER within
+`iceWHALE_CALL_R` of the pier head, so the number gets shorter when the player
+does the thing the chapter wants. That is the whole reason to show it.
+
+### THE ONLY REPEATABLE REWARD WAS NEVER COUNTED
+
+Three witnessed things in one place is AN INCIDENT, five is A SCENE. It produced
+a card, a chime and confetti and then forgot: nothing counted it, nothing saved
+it, nothing showed it again. `jrChapInc` and `jrChapScene` are per chapter,
+additive on the save exactly like `chapms`, `finds`, `fin` and `slid`, and the
+version does not move for them. Counted at the line that decides a card is owed,
+not at the top of the function — the chain counts every witnessed thing, and
+what a player would call an incident is the moment it pays out.
+
+Verified by causing one: 21 people within 16 m, eight props dropped on the
+forecourt, `inc {"1":1}` and `scn {"1":1}` on the file, and both still there
+after a reload.
+
+### DONE HERE IS A SCORE CARD
+
+Four facts that were all on the file and shown nowhere: how long the chapter took
+(`jrChapMs`, saved since v18 and read only by the ledger), how many of its
+measured rows carry a figure, how many beat their par, and the incidents and
+scenes caused in it. Above the rows, because it is the summary of them.
+Photographed at Circular Quay: `0:08 here · 0 of 3 timed`.
+
+Record rows that have a ghost stored now carry `⟲`. A ghost is replayed when the
+attempt reopens and nothing said which rows had one, so the feature that makes a
+number worth going back for was discoverable only by going back.
+
+### AND FOUR SMALLER THINGS
+
+- **`sysGHOST_KEEP` 8 -> 24.** Eight, against sixty measured rows: a
+  completionist's Kyoto ghost was evicted around Iceland, silently, by the act
+  of playing the chapters in between. 24 is what the store can afford — a long
+  run is ~36 KB of JSON, so under a megabyte worst case against a 5 MB budget.
+- **Hanoi's fold was a rising edge.** `was < 0.5 && hanFoldK >= 0.5 && inAlley`,
+  on a value damped at 1.4/s, once every 96 s: walk in two seconds after the horn
+  and nothing ticks for a minute and a half, with no way to know that. It is a
+  STATE now — being in the alley at any point while the street is shut. Exactly
+  the shape kowloon.js removed from the Symphony. Verified: the train arrives
+  while the animal is 90 m away, it walks in three seconds late, and it ticks.
+- **The condor's wingbeat is taught.** `wantFlap` reads `input.honkPressed` and
+  the comment beside it says THE PLAYER PRESSES IT; nothing ever told them. Said
+  on the second beat after 'hold on', through the new `game.say` so a pad reads
+  B and a phone reads WHEEK — the first line outside systems.js to name a
+  control. R6 measured what it is worth: not the difference between failing and
+  clearing, but between one ride and two.
+- **Pasto said GALERAS twice, three seconds apart.** `condor-ride` carries
+  `wow: 'GALERAS'` and act three opens with `kick: 'GALERAS'`, and the act
+  curtain fires 2.9 s after a tick while the place card is up for 3.6 s.
+  `showPlaceLast` is what the curtain checks.
+
 ## THE PAD AND THE CARD — P2 (2 Sep 2026)
 
 The second batch of `ROADMAP-POLISH.md`. Measured with a synthetic pad

@@ -2229,10 +2229,24 @@ function hanUpdateTrain(game, dt) {
   const want = (hanTrainS >= 0) ? 1 : (hanTrainT <= hanTRAIN_WARN ? 1 : 0);
   const was = hanFoldK;
   hanFoldK = damp(hanFoldK, want, 1.4, dt);
-  if (was < 0.5 && hanFoldK >= 0.5 && inAlley && !hanFoldDone) {
+  // ---- THE MARQUEE IS THE STREET BEING FOLDED, NOT THE FRAME IT CROSSES ----
+  // This was `was < 0.5 && hanFoldK >= 0.5 && inAlley`: a rising EDGE, and the
+  // fold is damped at 1.4/s, so the crossing lasts a few frames and happens
+  // once every hanTRAIN_GAP2 — ninety-six seconds. Walk into the alley two
+  // seconds after the horn and the street has already folded; nothing ticks,
+  // and the next chance is a minute and a half away with no way to know that.
+  //
+  // Exactly the shape kowloon.js removed from the Symphony ("the marquee is the
+  // show, not the first frame of it"): the thing to be present for is the
+  // street being SHUT, which is a state that lasts as long as the train is
+  // coming and passing. Being in the alley at any point while it holds is
+  // having seen it.
+  if (hanFoldK >= 0.5 && inAlley && !hanFoldDone) {
     hanFoldDone = true;
     hanTask('fold-the-street');
-    hanToast('every table on this street has just gone indoors.');
+    hanToast(was < 0.5
+      ? 'every table on this street has just gone indoors.'
+      : 'every table on this street is already indoors. it knew before you did.');
   }
   for (let i = 0; i < hanFolders.length; i++) {
     const f = hanFolders[i];
@@ -3412,6 +3426,17 @@ export function createHanoi(game) {
   const api = {
     built() { return hanBuilt; },
     terrainHeight: hanTerrain,
+    // ---- NINETY-SIX SECONDS, AND THE PAPER NEVER SAID (P3) ---------------
+    // Both of act three's rows are the same event: the street folds because the
+    // train is coming, and then the train comes. `hanTrainS >= 0` is it being
+    // here, which is the window for both — so while it is running these report
+    // 0 and the paper says "now" rather than counting down to something that is
+    // already past the window's start.
+    nextIn(id) {
+      if (id !== 'the-train' && id !== 'fold-the-street') return -1;
+      if (hanTrainS >= 0) return 0;
+      return hanTrainT > 0 ? hanTrainT : 0;
+    },
     slopeAt: hanSlope,
     waterLevel: hanWATER,
     isOverWater: hanIsOverWater,

@@ -5868,6 +5868,15 @@ function sysBuildCSS() {
 /* ---------- the hint on the top row ---------- */
 /* A bearing and a distance for whatever is next, plus one line naming the verb.
    Only ever on the first open row, so the card stays a to-do list and not a HUD. */
+// THE TIMED MARK. Before the aim in the flex row so `margin-left:auto` on the
+// aim still pushes the bearing to the far edge and this sits tight against the
+// text. Soft ink and small: it is a property of the row, not a call to action,
+// and a row that shouts about being measured competes with the thing the row
+// actually asks you to do. Struck through with the row when it is ticked, by
+// inheriting the same opacity the text does.
+'.capyui-meas{flex:0 0 auto;margin-left:5px;align-self:center;color:' + inkSoft + ';',
+  'font-size:clamp(7.5px,1.1vw,9.5px);line-height:1;opacity:.72;}',
+'.capyui-task.done .capyui-meas{opacity:.3;}',
 '.capyui-aim{flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:4px;',
   'align-self:center;color:' + accent + ';font-weight:700;white-space:nowrap;',
   'font-size:clamp(8.5px,1.35vw,11px);font-variant-numeric:tabular-nums;opacity:0;',
@@ -5877,8 +5886,16 @@ function sysBuildCSS() {
 '.capyui-arrow{width:0;height:0;border-left:.34em solid transparent;',
   'border-right:.34em solid transparent;border-bottom:.56em solid ' + accent + ';',
   'transform-origin:50% 62%;transition:transform .12s linear;}',
+// P3: `pre-line` and a taller clamp, because the clue can now carry a second
+// line — what a good one is, for the sixty measured tasks. Without the
+// white-space rule the newline collapses to a space and the par runs on into
+// the end of the clue as one sentence; without the extra height a clue that
+// already wrapped to two lines clipped the par off under `overflow:hidden`,
+// which is the same fault the record board had before v51 and is invisible
+// unless somebody reads the rendered element rather than its textContent.
 '.capyui-clue{font-size:clamp(8.5px,1.4vw,11px);line-height:1.25;color:' + inkSoft + ';',
-  'font-style:italic;padding:1px 0 2px 1.75em;max-height:3.2em;overflow:hidden;',
+  'font-style:italic;padding:1px 0 2px 1.75em;max-height:5em;overflow:hidden;',
+  'white-space:pre-line;',
   'transition:max-height .3s ease,opacity .3s ease;}',
 '.capyui-clue.off{max-height:0;opacity:0;padding:0;}',
 /* the record board a finished chapter turns into: one number per line, and the
@@ -13514,12 +13531,9 @@ export function createSystems(game) {
       // unattached in the top right of an empty field of paper.
       art.appendChild(tally);
     }
-    // A FINISHED PLACE STILL HAS A REASON TO GO BACK, and this is where it has
-    // to be said, because the picker is the only screen where a returning
-    // player compares sixteen places against each other. "Cali, 8 of 8" says
-    // the place is spent; "8 of 8, longest run 14 on the beat" says there is a
-    // number in there with your name on it. Only ever shown once the list is
-    // done, so it cannot crowd a chapter you are still working through.
+    // AND WHAT A FINISHED PLACE GAVE YOU. The record line that used to live in
+    // here with it has moved out — see the P3 block below for why the two are
+    // not the same kind of fact.
     if (done >= ids.length && ids.length) {
       // ...AND WHAT YOU TOOK OUT OF IT. The souvenir is a projection of the
       // ticks — see CHAPTERS.keep — so the title card can draw it off the file
@@ -13533,6 +13547,23 @@ export function createSystems(game) {
         if (cd && cd.keep) kw.title = cd.keep;
         art.appendChild(kw);
       }
+    }
+    // ---- A NUMBER YOU HOLD IS A REASON TO GO BACK WHETHER OR NOT THE LIST
+    // IS FINISHED (P3) -------------------------------------------------------
+    // This was inside the `done >= ids.length` block above, with an argument
+    // that only holds for the SOUVENIR: "only ever shown once the list is done,
+    // so it cannot crowd a chapter you are still working through". A souvenir
+    // is a thing you get for finishing, so gating it on finishing is right. A
+    // record is not — it is a number the player has already set, in a chapter
+    // they are halfway through, and hiding it until the last task is ticked
+    // means the one screen where sixteen places are compared side by side
+    // cannot show the single most comparable thing about any of them.
+    //
+    // Measured against the same worry: a tile shows this line only where a
+    // figure actually EXISTS, so a chapter nobody has raced anything in looks
+    // exactly as it did, and the line replaces nothing — it is the third row of
+    // a body that already has room for it.
+    {
       const fileRecs = (jrFile && jrFile.recs) || {};
       let bestId = '';
       for (let k = 0; k < ids.length; k++) {
@@ -14231,6 +14262,24 @@ export function createSystems(game) {
       li.appendChild(sysEl('span', 'capyui-box'));
       const txt = sysEl('span', 'capyui-txt', '');
       li.appendChild(txt);
+      // ---- THIS ONE IS TIMED (P3) ------------------------------------------
+      // Sixty of the two hundred and thirty-one tasks are measured, and until
+      // now a player could not tell WHICH from anywhere except the record board
+      // — which only appears once a chapter is finished. So the one system in
+      // the game built to be replayed was invisible for the whole of the first
+      // pass through every chapter, and a player raced a number without knowing
+      // there was one until after they had stopped being able to improve on it
+      // cheaply.
+      //
+      // A glyph and not a sentence: the row is already text, an aim, an arrow
+      // and a distance, and a second sentence per row turns a to-do list into a
+      // spreadsheet. It carries its own aria-label because a bare mark is a
+      // decoration to a screen reader.
+      if (RECORDS[ids[i]]) {
+        const rm = sysEl('span', 'capyui-meas', '◷');
+        rm.setAttribute('aria-label', 'this one is timed');
+        li.appendChild(rm);
+      }
       // bearing + distance, filled in only while this is the top open row
       const aim = sysEl('span', 'capyui-aim');
       const arrow = sysEl('i', 'capyui-arrow');
@@ -15362,12 +15411,86 @@ export function createSystems(game) {
   placeEl.appendChild(placeSub);
   hudRoot.appendChild(placeEl);
   let placeTimer = 0;
+  // The headline of the card that is up, or '' once it has faded. Read by the
+  // act curtain so a chapter whose act kick and whose marquee are the same word
+  // does not say it twice — see the note at that call site.
+  let showPlaceLast = '';
+  /**
+   * THE CLUE, PLUS WHAT A GOOD ONE IS (P3).
+   *
+   * The live attempt line already says "a good one is 8.0 s" — but only once
+   * the attempt is OPEN, which is to say once the player is already running.
+   * That is the wrong moment to learn a task was a race: by then the first
+   * attempt is spent, and it was the cheap one. The par belongs on the clue,
+   * where it is read while deciding what to do next.
+   *
+   * Three cases, and they are three different sentences:
+   *   - never raced, and there is a par     -> what to beat
+   *   - raced, and this is what you hold    -> your number, and beat it
+   *   - measured, but nobody set a par      -> that it is measured, and no more
+   *
+   * The third exists because thirteen of the sixty rows carry no `par`, and a
+   * silent row would make the glyph on the task a promise the paper does not
+   * keep. See RECORDS.
+   */
+  /**
+   * WHEN THE NEXT ONE IS (P3).
+   *
+   * Nine tasks in this game are "be there when X happens", and X is on a clock
+   * the player cannot see: the whale every 54 s, the train every 96, the bloom
+   * every 124, the Symphony every 152, the sunrise every 156, the tide every
+   * 205. Cappadocia's own comment calls its eleven-second window "cruel to
+   * anyone still on the ground" — and the paper never said how long the ground
+   * was going to last. Waiting on an unstated clock is the least interesting
+   * thing this game asks anybody to do, and it asks nine times.
+   *
+   * A biome may publish `nextIn(taskId)` returning seconds until that task's
+   * window opens next, 0 while it is OPEN, or -1 for "not a clock" — the same
+   * optional-hook shape as camFloor, camCeil and localWater, so a chapter with
+   * no opinion costs one failed property lookup and gets nothing.
+   */
+  function todoNextIn(id) {
+    if (!id) return -1;
+    const api = sysLiveBiomeApi(game);
+    if (!api || typeof api.nextIn !== 'function') return -1;
+    let s;
+    try { s = api.nextIn(id); } catch (e) { return -1; }
+    return (typeof s === 'number' && s === s && s >= 0) ? s : -1;
+  }
+  function todoParLine(id, clue) {
+    const base = clue || '';
+    // Rounded to whole seconds so the element is rewritten once a second and
+    // not four times: this string is compared against the live one on every
+    // hint tick, and a countdown at one decimal place would fail that
+    // comparison every time it ran.
+    const nx = todoNextIn(id);
+    const when = nx < 0 ? '' : (nx < 1 ? 'now' : 'next in ' + Math.ceil(nx) + ' s');
+    const def = id ? RECORDS[id] : null;
+    if (!def) return when ? (base ? base + '\n' + when : when) : base;
+    const mine = jrRecs[id];
+    let line;
+    if (mine !== undefined) {
+      line = 'your best  ' + mine.toFixed(def.dp) + def.unit +
+             (def.par !== undefined ? '  ·  a good one is ' + def.par.toFixed(def.dp) + def.unit : '');
+    } else if (def.par !== undefined) {
+      line = 'timed  ·  a good one is ' + def.par.toFixed(def.dp) + def.unit;
+    } else {
+      line = 'timed  ·  no par set on this one';
+    }
+    if (when) line = when + '  ·  ' + line;
+    return base ? base + '\n' + line : line;
+  }
+
   function showPlace(title, sub) {
     placeH.textContent = title;
     placeSub.textContent = sub;
     placeEl.classList.add('show');
+    showPlaceLast = title;
     if (placeTimer) clearTimeout(placeTimer);
-    placeTimer = setTimeout(function () { placeEl.classList.remove('show'); }, sysFADE_CARD);
+    placeTimer = setTimeout(function () {
+      placeEl.classList.remove('show');
+      showPlaceLast = '';
+    }, sysFADE_CARD);
   }
 
   // --- the moment card: the payoff for a `mini` task ---------------------
@@ -17148,8 +17271,8 @@ export function createSystems(game) {
       hintT = 0;                                   // resolve on the next frame
       const h = top ? sysHINTS[top] : null;
       const clue = sysSay(h ? (typeof h.clue === 'function' ? h.clue() : h.clue) : '');
-      clueEl.textContent = clue || '';
-      clueEl.classList.toggle('off', !clue);
+      clueEl.textContent = todoParLine(top, clue);
+      clueEl.classList.toggle('off', !clueEl.textContent);
     }
     for (const id in taskRec) {
       const r = taskRec[id];
@@ -17216,10 +17339,18 @@ export function createSystems(game) {
     // nothing moves when the last row folds away.
     if (done >= rec.ids.length && rec.ids.length) {
       let best = '';
+      // ---- WHICH OF THESE YOU CAN RACE YOURSELF ON (P3) -------------------
+      // A ghost is stored per record id and replayed when the attempt reopens,
+      // and nothing anywhere said which rows had one — so the feature that
+      // makes a number worth going back for was discoverable only by going
+      // back. One mark on the row, off the store itself, so it cannot go stale.
+      let ghosts = null;
+      try { ghosts = ghAll(); } catch (e) { ghosts = null; }
       for (let i = 0; i < rec.ids.length; i++) {
         const id = rec.ids[i];
+        const gh = ghosts && ghosts[id] ? '  ⟲' : '';
         const t = recText(id);
-        if (t) { best += (best ? '\n' : '') + t; continue; }
+        if (t) { best += (best ? '\n' : '') + t + gh; continue; }
         // ---- AND THE ONES YOU HAVE NOT PUT A FIGURE ON YET (v51) ----------
         // The board was built out of `recText`, which is empty for a row with
         // no stored figure — so a chapter you finished without ever racing
@@ -17240,6 +17371,44 @@ export function createSystems(game) {
       // a distance, which a sentence cannot — so the board says the other half,
       // which is the verb. Said as guidance and never as a nudge: there is no
       // clock on it and nothing about it changes if it is ignored.
+      // ---- ...AND WHAT THE PLACE COST YOU AND GAVE YOU (P3) --------------
+      // The board was a list of numbers with no summary on it, which is odd
+      // for the one card whose whole job is "you are finished here". Four
+      // facts, one line, and every one of them was already on the file and
+      // shown nowhere: how long this chapter took (jrChapMs, saved since v18
+      // and read only by the ledger), how many of its measured rows carry a
+      // figure, how many of those beat their par, and the incidents and scenes
+      // caused in it — the loop that until P3 was never counted at all.
+      //
+      // Above the rows rather than below, because it is the summary OF them,
+      // and it is the line a player reads first when the card arrives.
+      {
+        const ms = jrChapMs[n];
+        const bits = [];
+        if (typeof ms === 'number' && ms > 0) bits.push(sysFmtTime(ms) + ' here');
+        let held = 0, met = 0, measured = 0;
+        for (let i = 0; i < rec.ids.length; i++) {
+          const rd = RECORDS[rec.ids[i]];
+          if (!rd) continue;
+          measured++;
+          const v = jrRecs[rec.ids[i]];
+          if (v === undefined) continue;
+          held++;
+          if (rd.par !== undefined &&
+              (rd.better === 'lower' ? v <= rd.par : v >= rd.par)) met++;
+        }
+        if (measured) bits.push(held + ' of ' + measured + ' timed' +
+                                (met ? '  ·  ' + met + ' past par' : ''));
+        let fn = 0;
+        for (let i = 0; i < FINDS.length; i++) {
+          if (findDone[FINDS[i].id] && findWhere[FINDS[i].id] === n) fn++;
+        }
+        if (fn) bits.push(fn + (fn === 1 ? ' find' : ' finds'));
+        const ic = jrChapInc[n] || 0, sc = jrChapScene[n] || 0;
+        if (ic) bits.push(ic + (ic === 1 ? ' incident' : ' incidents'));
+        if (sc) bits.push(sc + (sc === 1 ? ' scene' : ' scenes'));
+        if (bits.length) best = bits.join('  ·  ') + (best ? '\n' + best : '');
+      }
       if (wayOn) best = wayClue() + (best ? '\n' + best : '');
       else if (cdef && cdef.way) best += (best ? '\n' : '') + 'the way on: ' + cdef.way;
       // ---- AND WHAT YOU ARE TAKING WITH YOU (v18) -------------------------
@@ -17308,6 +17477,16 @@ export function createSystems(game) {
         // opening is nonsense once there is nothing left in the chapter, and
         // it would land on top of the ceremony's own card.
         if (!ad || todoChapter() !== n || todoActShown !== to || chapComplete(n)) return;
+        // ---- ...AND NOT THE HEADLINE THAT IS ALREADY ON SCREEN (P3) ------
+        // A `wow` row raises a banner through the same showPlace, and Pasto
+        // has the act kick and the marquee on the SAME WORD: `condor-ride`
+        // carries `wow: 'GALERAS'` and act three opens with `kick: 'GALERAS'`.
+        // Ride the bird and the card says GALERAS, then says GALERAS again
+        // 2.9 s later — which reads as the game stuttering rather than as two
+        // things happening. The wait exists precisely so a tick's own card is
+        // not stepped on; this is the same argument for the case where the two
+        // cards are the same card.
+        if (showPlaceLast === ad.kick) return;
         showPlace(ad.kick, ad.line);
         sfx('chime', { volume: 0.42, pitch: 0.82 });
       }, sysACT_CARD_WAIT);
@@ -17458,6 +17637,8 @@ export function createSystems(game) {
         v: 1, tasks: tasks, seen: seen, recs: jrRecs,
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
+        // Additive, like everything below it. See jrChapInc.
+        inc: jrChapInc, scn: jrChapScene,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -17845,7 +18026,21 @@ export function createSystems(game) {
   const sysGHOST_KEY   = 'capy3.ghosts.v1';
   const sysGHOST_HZ    = 10;      // samples a second. A capybara is not fast.
   const sysGHOST_MAX_S = 150;     // s of one attempt that will be kept
-  const sysGHOST_KEEP  = 8;       // how many runs the store holds, oldest out
+  // ---- HOW MANY RUNS THE STORE HOLDS, OLDEST OUT (P3: 8 -> 24) ------------
+  // Eight, against SIXTY measured rows. A completionist's Kyoto ghost was
+  // evicted somewhere around Iceland — silently, and by the very act of playing
+  // the chapters in between — so the one feature in the game that lets a player
+  // race themselves quietly emptied itself over the course of the journey, and
+  // the further in they got the less of it there was.
+  //
+  // 24 is the number the store can afford rather than a round one: a run is
+  // sysGHOST_HZ x sysGHOST_MAX_S samples of four floats, written as JSON, which
+  // measures at roughly 36 KB for a long one — so twenty-four is under a
+  // megabyte in the worst case and typically a third of that, against a 5 MB
+  // localStorage budget shared with a journey file of a few kilobytes. It is
+  // also more than a third of the rows, which is the point: a player who races
+  // one number per chapter now keeps every ghost they set.
+  const sysGHOST_KEEP  = 24;      // how many runs the store holds, oldest out
   const sysGHOST_MIN_M = 8;       // m the animal must cover for it to be a run
   const sysGHOST_FADE  = 0.6;     // s the ghost takes to arrive and to leave
   const sysGHOST_N     = sysGHOST_HZ * sysGHOST_MAX_S;
@@ -19034,6 +19229,21 @@ export function createSystems(game) {
   // wants and the only one of the two worth keeping across a session. The
   // running total above is derivable from it and is not saved.
   const jrChapMs = Object.create(null);
+  // ---- HOW MANY OF THEM YOU HAVE CAUSED, AND WHERE (P3) ------------------
+  // The incident chain is the only repeatable reward in the game — three
+  // witnessed things in one place is AN INCIDENT, five is A SCENE — and it
+  // produced a card, a chime and confetti and then forgot entirely. Nothing
+  // counted it, nothing saved it and nothing ever showed it again, so a loop
+  // the player is meant to chase had no number on it anywhere: you could cause
+  // forty and the game would look exactly as it does having caused none.
+  //
+  // Per chapter, because that is the unit every other surface in this file
+  // uses, and because "eleven scenes, and four of them in Hong Kong" is a
+  // sentence about the journey while "eleven scenes" is a statistic. Additive
+  // on the save exactly like `chapms`, `finds`, `fin` and `slid`, and the
+  // version does not move for it.
+  const jrChapInc = Object.create(null);      // chapter -> incidents caused
+  const jrChapScene = Object.create(null);    // chapter -> ...of which scenes
 
   /**
    * The end of a place. Deliberately built out of the pieces that already exist
@@ -19543,6 +19753,9 @@ export function createSystems(game) {
       jrCarriedMs = typeof jrFile.ms === 'number' ? jrFile.ms : 0;
       const cms = jrFile.chapms || {};
       for (const k in cms) if (typeof cms[k] === 'number') jrChapMs[k] = cms[k];
+      const inc = jrFile.inc || {}, scn = jrFile.scn || {};
+      for (const k in inc) if (typeof inc[k] === 'number') jrChapInc[k] = inc[k];
+      for (const k in scn) if (typeof scn[k] === 'number') jrChapScene[k] = scn[k];
       const fnd = jrFile.finds || [];
       for (let i = 0; i < fnd.length; i++) foundFind(fnd[i], true);
       const fat = jrFile.foundAt || {};
@@ -22620,6 +22833,16 @@ export function createSystems(game) {
       return out;
     },
     toast: toast,
+    // ---- A LINE THAT NAMES A CONTROL (P3) ---------------------------------
+    // `game.toast` takes a finished sentence and shows it, which is right for
+    // the several hundred chapter lines that name no control at all. The few
+    // that DO — the condor's wingbeat is the first — have to be said in the
+    // scheme the player is holding, and `sysSay` lives in this file with the
+    // three tables it chooses between. Not folded into `toast` itself: that
+    // would run every string in the game through eleven regexes four hundred
+    // times a session for the sake of a handful, and a chapter that has already
+    // composed its own wording should be able to say so.
+    say: function (s) { toast(sysSay(s)); },
     completeTask: completeTask,
     isTaskDone: function (id) { return !!(taskRec[id] && taskRec[id].done); },
     tasksDone: function () { return doneCount; },
@@ -22946,6 +23169,21 @@ export function createSystems(game) {
     // when the chain ENDS. See incTick.
     if (incCool > 0) return;
     incCarded = tier;
+    // ---- AND IT IS COUNTED (P3). See jrChapInc -----------------------------
+    // Here and not at the top of the function, because this is the line that
+    // decides a card is owed: the chain counts every witnessed thing, and what
+    // the player would call "an incident" is the moment it pays out. A tier-2
+    // chain has already been counted as a tier-1 one — the card climbs through
+    // both — so a scene increments only the scene tally and the incident tally
+    // keeps the count of chains that reached at least three.
+    {
+      const cn = game.biome ? chapterOf(game.biome.current) : 0;
+      if (cn > 0) {
+        if (tier === 2) jrChapScene[cn] = (jrChapScene[cn] || 0) + 1;
+        else jrChapInc[cn] = (jrChapInc[cn] || 0) + 1;
+        saveSoon();
+      }
+    }
     const pool = tier === 2 ? sysINC_SAY2 : sysINC_SAY;
     // Half a lift and a chime, which is the mini's own weight — see the `mini`
     // branch in completeTask. Not the banner's: a chapter's marquee happens
@@ -24056,7 +24294,7 @@ export function createSystems(game) {
         // Rewritten BEFORE the comparison, not after: comparing the raw clue
         // against the rewritten text on screen is never equal, and this runs
         // four times a second.
-        const clue = sysSay(typeof h.clue === 'function' ? h.clue() : h.clue);
+        const clue = todoParLine(todoTopId, sysSay(typeof h.clue === 'function' ? h.clue() : h.clue));
         if (clue !== clueEl.textContent) {
           clueEl.textContent = clue || '';
           clueEl.classList.toggle('off', !clue);

@@ -1156,6 +1156,27 @@ function condorMount() {
     if (shotHost && typeof shotHost.condorShot === 'function') shotHost.condorShot();
   }
   if (typeof game.toast === 'function') game.toast('hold on');
+  // ---- AND THE ONE CONTROL THE FLIGHT HAS, WHICH WAS NEVER TAUGHT (P3) ----
+  // `wantFlap` reads `input.honkPressed` and the comment beside it says THE
+  // PLAYER PRESSES IT — and nothing in nineteen chapters ever told them. The
+  // only lines in the whole flight are 'hold on' and 'whistle again to bring it
+  // down'; the thermal-peak clue says 'steer into the rising air off the
+  // volcano'. R6's four scripted pilots measured what that costs: a naive pilot
+  // who never flaps clears the crater on the SECOND ride and an average one who
+  // does clears on the first, because the flight model flaps for you below
+  // 5.4 m/s of airspeed. So the key is not the difference between failing and
+  // clearing — it is the difference between one ride and two, and between a
+  // verb you own and a save that arrives without you knowing why.
+  //
+  // Said on the second beat, after 'hold on' has landed, because the first
+  // second of a condor is not a moment anybody reads a second sentence in. Via
+  // game.say, so a pad reads B and a phone reads WHEEK — this is the first line
+  // in the game outside systems.js that names a control.
+  if (typeof game.say === 'function') {
+    setTimeout(function () {
+      if (condorConstraint) game.say('press Q to beat the wings. it climbs.');
+    }, 2400);
+  }
   return true;
 }
 

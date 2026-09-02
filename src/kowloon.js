@@ -4604,6 +4604,18 @@ export function createKowloon(game) {
   const api = {
     built() { return hkBuilt; },
     terrainHeight: hkTerrain,
+    // ---- A HUNDRED AND FIFTY-TWO SECONDS OF EVENING (P3) ----------------
+    // The Symphony runs hkSHOW_ON..hkSHOW_OFF of the cycle, which is a quarter
+    // of it — generous, and still a wait nobody could see the end of. Zero
+    // while it is on: the whole show is the window, which is the point v51
+    // made when it widened this from the first frame of it.
+    nextIn(id) {
+      if (id !== 'symphony') return -1;
+      if (hkPhase > hkSHOW_ON && hkPhase < hkSHOW_OFF) return 0;
+      let d = hkSHOW_ON - hkPhase;
+      if (d < 0) d += 1;
+      return d * hkCYCLE;
+    },
     slopeAt: hkSlope,
     waterLevel: -0.5,
     isOverWater: hkIsOverWater,

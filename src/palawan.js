@@ -4292,6 +4292,17 @@ export function createPalawan(game) {
   const api = {
     built() { return palBuilt; },
     terrainHeight: palTerrain,
+    // ---- THE BLOOM IS ON A HUNDRED AND TWENTY-FOUR SECOND CLOCK (P3) ----
+    // `the-bloom` is the chapter marquee and it wants the player UNDER the
+    // water when the plankton light up. Being under is a breath and a swim, so
+    // knowing whether that is worth starting now is the whole question.
+    nextIn(id) {
+      if (id !== 'the-bloom') return -1;
+      if (palPhase > palBLOOM_ON && palPhase < palBLOOM_OFF) return 0;
+      let d = palBLOOM_ON - palPhase;
+      if (d < 0) d += 1;
+      return d * palCYCLE;
+    },
     slopeAt: palSlope,
     waterLevel: palWATER,
     isOverWater: palIsOverWater,

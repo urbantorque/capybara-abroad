@@ -4409,6 +4409,17 @@ export function createIceland(game) {
   const api = {
     built() { return iceBuilt; },
     terrainHeight: iceTerrain,
+    // ---- FIFTY-FOUR SECONDS, OR SOONER IF YOU GO AND STAND ON THE PIER ----
+    // `iceWhaleT` counts down at `k`, which is faster inside iceWHALE_CALL_R of
+    // the pier head — so this is not a constant clock and the number the player
+    // reads gets shorter when they do the thing the chapter wants. That is the
+    // whole reason to show it. Zero while the animal is up: the pass IS the
+    // window, and it lasts as long as the breach does. (P3)
+    nextIn(id) {
+      if (id !== 'the-whale') return -1;
+      if (iceWhalePhase !== 0) return 0;
+      return iceWhaleT > 0 ? iceWhaleT : 0;
+    },
     // Built from the static boxes themselves — see makeSolidIndex in shared.js.
     navBlocked(x, z, r) { return iceSolids.blocked(x, z, r, iceTerrain); },
     slopeAt: iceSlope,
