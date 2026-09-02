@@ -1,10 +1,14 @@
 // Minimal zero-dependency static server for local playtesting.
 //   node server.mjs   ->  http://localhost:5173
 import { createServer } from 'node:http';
+import { gzip as gzipCb } from 'node:zlib';
+import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { join, extname, normalize, sep } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const gzip = promisify(gzipCb);
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 5173;
@@ -61,8 +65,36 @@ const srv = createServer(async (req, res) => {
   }
   try {
     const buf = await readFile(file);
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream',
-                         'Cache-Control': 'no-store' });
+    const type = TYPES[extname(file)] || 'application/octet-stream';
+    // ---- GZIP, FOR THE ONE FILE THAT NEEDS IT ---------------------------
+    // The built artefact is a single 5.5 MB HTML file and it is almost all
+    // JavaScript, which compresses to about a fifth of that. A dev server
+    // does not have to care — but this is also the only server in the repo,
+    // it is what anybody trying the game will run, and the difference
+    // between a five megabyte download and a one megabyte one over a phone
+    // is the difference between somebody playing it and not.
+    //
+    // TEXT ONLY, and only when the client actually asked. An image or a font
+    // is already compressed and gzipping it costs CPU to make it very
+    // slightly larger; a client that did not send Accept-Encoding may not be
+    // sent an encoding it did not ask for.
+    //
+    // Vary: Accept-Encoding is not optional even here. Without it a cache in
+    // front of this — a browser's own, a corporate proxy — is entitled to
+    // serve the gzipped bytes to a client that cannot read them.
+    const wantsGz = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+    const compressible = /^(text\/|application\/(javascript|json))/.test(type);
+    if (wantsGz && compressible && buf.length > 1024) {
+      const gz = await gzip(buf, { level: 6 });
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store',
+                           'Content-Encoding': 'gzip',
+                           'Vary': 'Accept-Encoding',
+                           'Content-Length': gz.length });
+      res.end(gz);
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store',
+                         'Vary': 'Accept-Encoding' });
     res.end(buf);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' });

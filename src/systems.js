@@ -22420,7 +22420,28 @@ export function createSystems(game) {
   // Where the surf starts drowning everything else in Rio. One number, named,
   // because it is read from the ambience ladder and nowhere else.
   const rioAmbSurfZ = -14;
-  let fpsAcc = 0, fpsFrames = 0, fps = 60, perfAcc = 0;
+  // ---- FPS IS A WALL-CLOCK MEASUREMENT (P8) ----------------------------
+  // It was accumulated from `dt`, which is the SCALED clock — everything in
+  // this game runs on one multiplier so a freeze or a slow-motion beat is one
+  // multiplication rather than twenty-three modules opting in. Which means
+  // that during slow motion the accumulator crawled while the frame count did
+  // not, and fps read HIGH; during a hitstop, dt is zero, so the accumulator
+  // stopped entirely and the next reading was whatever number a divide by
+  // nearly nothing produces.
+  //
+  // That number drives adaptive resolution. So the one moment the game most
+  // wanted to shed pixels — a marquee, which is when slow motion fires and
+  // when the most is on screen — is the moment it decided it had headroom and
+  // put the resolution back up. rawDt is the unscaled frame time and is
+  // published on game.state for exactly this kind of reader.
+  //
+  // `fpsCeil` is the best rate this machine has been seen to hit. 50 and 58
+  // were 60 Hz written as constants: on a 50 Hz panel the game could never
+  // reach 58 and would never restore its resolution, and on 120 Hz a real
+  // halving to 60 read as perfectly healthy. Fractions of the observed
+  // ceiling instead — and on the 60 Hz case they come out at 50.4 and 58.2,
+  // so the common machine behaves exactly as it did.
+  let fpsAcc = 0, fpsFrames = 0, fps = 60, fpsCeil = 60, perfAcc = 0;
   let ambTimer = rand(5, 12);
   // THE CALM (see the block at the top of this file). One number and one list;
   // the list is appended to at build time by whichever chapters have something
@@ -26703,17 +26724,24 @@ export function createSystems(game) {
     confettiStep(dt);
 
     // ---- perf readout ----
-    fpsAcc += dt; fpsFrames++;
+    const fpsDt = game.state.rawDt || dt;
+    fpsAcc += fpsDt; fpsFrames++;
     if (fpsAcc >= 0.5) {
       fps = fpsFrames / fpsAcc;
       fpsAcc = 0; fpsFrames = 0;
+      // The ceiling rises fast and falls very slowly: it is a property of the
+      // DISPLAY, not of the scene, and one heavy chapter must not teach the
+      // game that this machine is a slow one for the rest of the session.
+      if (fps > fpsCeil) fpsCeil = Math.min(fps, 240);
+      else fpsCeil += (fps - fpsCeil) * 0.02;
     }
     // adaptive resolution — trade pixels for frames on weak integrated GPUs
     dprT += dt;
     if (dprT > 2) {
       dprT = 0;
-      if (fps < 50 && dprScale > 0.7) { dprScale -= 0.15; applyDPR(); }
-      else if (fps > 58 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); applyDPR(); }
+      const low = fpsCeil * 0.84, high = fpsCeil * 0.97;
+      if (fps < low && dprScale > 0.7) { dprScale -= 0.15; applyDPR(); }
+      else if (fps > high && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); applyDPR(); }
     }
     if (perfOn) {
       perfAcc += dt;

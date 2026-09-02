@@ -539,6 +539,17 @@ node server.mjs
 
 Then open <http://localhost:5173>. `PORT=5188 node server.mjs` to move it.
 
+```bash
+npm test        # everything that can be answered without a browser
+npm run build   # dist/untitled-capybara-game.html, one file, no server
+npm run soak    # nineteen chapters in a real browser; needs npm start first
+```
+
+`npm test` runs the static audits and the comment stripper's own tests, and
+distinguishes checks that ASSERT from ones that only report — see
+[qa/README.md](qa/README.md), which also says which thirty of the four
+thousand files in that directory are live.
+
 Your progress is kept in the browser's own storage, per browser and per machine.
 Nothing is uploaded anywhere, because there is nowhere to upload it to.
 
@@ -546,8 +557,11 @@ Nothing is uploaded anywhere, because there is nowhere to upload it to.
 while — it is a folder of static files with no server-side anything, so any host
 that serves files and compresses them will do (GitHub Pages, Netlify, itch.io),
 and either the unbundled tree or `dist/` can be the thing served. Two numbers
-for whoever picks: **9.1 MB raw, ~2.6 MB gzipped** for the single file; 7.7 MB
-over 27 requests for the tree. Any real host compresses.
+for whoever picks, measured 3 September 2026: **5.4 MB raw, 1.27 MB gzipped**
+for the single file; 9.0 MB over 27 requests for the tree. The build strips
+comments — 46% of this source is comment, and it is the point of the source
+and dead weight in the artefact — and `server.mjs` gzips text, so a local run
+sends the same 1.27 MB a real host would. Any real host compresses.
 
 **Licence: none yet, which means all rights reserved.** You may play a copy you
 were handed; you do not have permission to fork, modify or redistribute it. The

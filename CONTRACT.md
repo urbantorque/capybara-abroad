@@ -3058,6 +3058,125 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## UNDER THE HOOD — P8 (3 Sep 2026)
+
+### The comment strip, and why it is a scanner
+
+46% of this source is whole-line comment — 3.5 MB — and the comments are the
+point of the source and dead weight in the artefact, which is one file a player
+downloads or opens off a memory stick.
+
+**A slash is two things in JavaScript.** Given `/https:\/\//`, `a / b` and
+`'not // a comment'`, any pattern that hunts for a double slash finds the wrong
+one, and the file still parses afterwards with something missing out of the
+middle of it. `strip-comments.mjs` is a four-state scanner: code, string,
+template (brace-depth counted, because a substitution can contain another
+template), and regex-or-division, decided the way every tokeniser decides it —
+by the last significant token, with a keyword list so that `return /re/` and
+`typeof /re/` are regexes.
+
+Two deliberate conservatisms, both in the safe direction:
+
+- **A template literal is copied out verbatim, comments and all.** Keeping a
+  comment costs bytes; getting the brace depth wrong inside a substitution ends
+  the template early and takes the rest of the file with it.
+- **Every newline a comment contained is re-emitted**, then runs of three or
+  more collapse to two. ASI needs at least one newline and never more.
+
+**And it is guarded.** `build.mjs` parses each stripped body with `vm.Script`
+before accepting it and falls back to the file's own text if it will not parse,
+printing which. A bug in the stripper must cost BYTES, never correctness — the
+same rule as `replaceOnce` and the dollar-apostrophe note beside it.
+
+Which, for the record, bit again while this was being written: the script that
+inserted the comment ABOUT that bug passed its replacement as a string, the
+comment contained a dollar-apostrophe, and `build.mjs` was spliced into the
+middle of itself and came out 526 lines long. The fix is the one already
+documented in the file: pass a replacer function.
+
+### What a player downloads
+
+| | before | after |
+|---|---|---|
+| bundle | 9 245.9 KB | 5 528.8 KB |
+| over the wire | 5 660 430 B | 1 331 741 B |
+
+`server.mjs` gzips text only, only when the client asked, and always sends
+`Vary: Accept-Encoding` — not optional even on a dev server, because without it
+a cache in front is entitled to hand the gzipped bytes to a client that cannot
+read them. Images and fonts are already compressed and are left alone.
+
+### fps was measured on the wrong clock
+
+`fpsAcc += dt` used the SCALED clock — the one multiplier the whole game runs
+on so that a freeze is one multiplication rather than twenty-three modules
+opting in. So under slow motion the accumulator crawled while the frame count
+did not and fps read HIGH; under a hitstop, `dt` is zero and the next reading
+was whatever a divide by nearly nothing produces.
+
+**That number drives adaptive resolution.** The one moment the game most wanted
+to shed pixels is a marquee — which is exactly when slow motion fires and when
+the most is on screen — and it was the moment the game decided it had headroom.
+MEASURED after the fix: 55 fps at `timeScale` 0.25, where the old expression
+would have said about 212.
+
+`< 50` and `> 58` were 60 Hz written as constants: on a 50 Hz panel the game
+could never restore its resolution, and on 120 Hz a real halving to 60 read as
+perfectly healthy. Fractions of the observed ceiling instead — and on 60 Hz they
+come out at 50.4 and 58.2, so the common machine behaves exactly as it did.
+
+### Ninety bodies the sanity pass was skipping
+
+`mainSaneWorld` began `if (b.mass <= 0 || ...) continue`, and `mass <= 0` is
+every kinematic body: the ferry, the lifts, the floes, the chiva, the balloon
+basket, the raft. **Ninety of them in chapter one alone.** Those are the bodies
+the capybara stands ON, so a NaN in one does not merely mislocate a crate — it
+goes into the platform frame and comes out the other side as the animal's
+position.
+
+They get a DIFFERENT treatment from a dynamic body, and the difference is the
+point: a dynamic body's position belongs to the solver and may be rolled back,
+whereas a kinematic body's position is authored every frame by whichever chapter
+owns it. Repair a NaN, clamp a runaway, never touch a finite position — a second
+writer here would be the exact bug this function exists to prevent.
+
+### A test that cannot fail is a report
+
+`npm test` runs everything answerable without a browser and separates the two.
+Four of the seven static audits that predate the runner print their findings and
+exit 0 whatever they find. Both kinds run; only the asserting ones turn the exit
+code red, and `qa/README.md` says which is which — along with which thirty of
+the four thousand files in that directory are live, and that the rest are
+documents rather than tests.
+
+### Two things that had never been tested at all
+
+1. **The built artefact.** The soak always ran against the dev server's
+   unbundled source. That is a different program from `dist/`, and after a pass
+   that rewrites every file on the way into the bundle it is the only one that
+   matters. It runs against `dist/` now: 19/19, 0 NaN, 0 errors.
+2. **The chapter picker's digit keys only work from the title card.** Every
+   probe here does a fresh `page.goto` before its key, which is why nobody had
+   noticed — the first run of the memory walk pressed nineteen keys in one
+   session and got nineteen readings of Sydney. `hud.cross()` is the in-game
+   route and goes through the crossing a player takes.
+
+### What a full journey costs, measured at last
+
+Nineteen chapters through the real crossing: geometries 99 → 2013, scene
+objects 429 → 5776, meshes 345 → 4509, JS heap 96 → 216 MB, and returning to
+chapter one releases none of it.
+
+This is **not a leak**. `main.js` states the trade out loud: detaching sets
+`visible = false` and geometry stays resident so re-entry is instant. What had
+never happened is anybody taking the number.
+
+Eviction is not built here, and the reason is specific: `mat()` caches
+materials by colour ACROSS chapters, so a dispose pass has to tell a shared
+material from an owned one. A pass that gets that wrong does not cost memory,
+it takes out chapters that are still in use — which is why the roadmap sized it
+as its own batch, with its own soak.
+
 ## THE DRAWN PAYOFF — P7 (3 Sep 2026)
 
 ### An impact is a value change, not a scale change

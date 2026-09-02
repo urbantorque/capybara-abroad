@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "node qa/run.mjs",
+    "soak": "npx playwright-cli -s=soak run-code --filename=qa/r10-soak.js"
   },
   "engines": {
     "node": ">=18"

@@ -826,6 +826,69 @@ big-ship turn measures a drift; a kinematic velocity clamp in `mainSaneWorld`;
 says which of 1,452 files are live; the docs drift; Pasto's timers onto the
 frame clock.
 
+**Done, 3 Sep 2026.** Six items landed, one is measured and deliberately not
+built, and two are left.
+
+- **The comment strip.** 46% of this source is whole-line comment and the
+  artefact is one file a player downloads. `strip-comments.mjs` is a scanner
+  with four states, not a regex, because a slash is two things in JavaScript
+  and a pattern that hunts for a double slash finds the wrong one silently.
+  **Guarded**: every stripped body is parsed before it is accepted and a file
+  that will not parse falls back to its own text, so a bug in the stripper
+  costs bytes and never correctness. 16 tokeniser tests plus all 27 source
+  files re-parsed, in `npm test`. Bundle 9245.9 KB to 5528.8 KB.
+- **gzip in `server.mjs`.** Text only, only when asked, with `Vary:
+  Accept-Encoding`, which is not optional even on a dev server — without it a
+  cache in front is entitled to hand the gzipped bytes to a client that cannot
+  read them. Measured 5 660 430 to 1 331 741 bytes, and a PNG correctly gets no
+  encoding. With the strip, what a player downloads went from 9.2 MB to 1.27 MB.
+- **`npm test`, `npm run soak`, and `qa/README.md`.** The runner separates
+  checks that ASSERT from ones that only REPORT — four of the seven static
+  audits that predate it exit 0 whatever they find, which means they cannot
+  fail a build and are not tests. The README says which thirty of the four
+  thousand files in `qa/` are live, and that the rest are documents.
+- **`fps` from `rawDt`.** It was accumulated from the SCALED clock, so during
+  slow motion it read high and during a hitstop it read whatever a divide by
+  nearly nothing produces — and it drives adaptive resolution. The one moment
+  the game most wanted to shed pixels is a marquee, which is exactly when slow
+  motion fires. Measured: 55 fps at `timeScale` 0.25, where the old expression
+  would have reported about 212.
+- **The refresh ceiling.** `< 50` and `> 58` were 60 Hz written as constants.
+  Fractions of the best rate the machine has been observed to hit instead —
+  and on 60 Hz they come out at 50.4 and 58.2, so the common case is unchanged.
+- **A kinematic velocity clamp in `mainSaneWorld`.** `mass <= 0` was skipped
+  outright, and those are the ferry, the lifts, the floes, the chiva, the
+  basket, the raft — 90 of them in chapter one alone — which is to say every
+  body the capybara ever stands on. A NaN in one goes into the platform frame
+  and out the other side as the animal's position. They get a different
+  treatment from a dynamic body: repair a NaN, clamp a runaway, and never touch
+  a finite position, because a kinematic body's position is authored every
+  frame by whoever owns it and a second writer here is the bug this file exists
+  to prevent.
+
+**Measured, and deliberately not built: chapter eviction.** Walking all
+nineteen chapters through the real crossing: geometries 99 to 2013, scene
+objects 429 to 5776, meshes 345 to 4509, JS heap 96 MB to 216 MB, and returning
+to chapter one releases none of it. This is not a leak — `main.js` states the
+trade out loud ("geometry stays resident so re-entry is instant") — but the
+number had never been taken. It is not built here because `mat()` caches
+materials by colour ACROSS chapters, so a dispose pass has to tell a shared
+material from an owned one, and a pass that gets that wrong takes out chapters
+that are still in use. That is a batch with its own soak, which is how this
+roadmap sized it.
+
+**Left:** ω×r on carrier frames (conditional on measuring a drift on the big
+ship turn, which has not been measured) and Pasto's timers onto the frame
+clock.
+
+**Found on the way:** the chapter picker's digit keys only work from the title
+card. Every probe in this repo does a fresh `page.goto` before its key, which
+is why nobody had noticed — and the first run of the memory walk pressed
+nineteen keys in one session and got nineteen readings of Sydney. `hud.cross()`
+is the in-game route. And until this batch, the built artefact had never been
+soaked: the soak always ran against the dev server's unbundled source, which is
+a different program. It runs against `dist/` now, and passes 19/19.
+
 **Still the owner's, unchanged since R10:** the LICENSE (`LICENSING.md`) and
 the host. Both are decisions, and the wiring for both is done.
 

@@ -1901,7 +1901,40 @@ function mainBoot() {
     const bodies = game.world.bodies;
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i];
-      if (b.mass <= 0 || b.sleepState === 2) continue;
+      // ---- KINEMATIC BODIES GET CHECKED TOO (P8) ------------------------
+      // `mass <= 0` was skipped outright, and those are the ferry, the lifts,
+      // the floes, the chiva, the balloon basket, the raft — every carrier in
+      // the game, which is to say every body the capybara ever stands ON. A
+      // NaN in one of those does not merely mislocate a crate: it goes into
+      // the platform frame, and out the other side as the animal's position.
+      //
+      // What they get is NOT the same treatment. A dynamic body's position is
+      // the solver's and may be rolled back; a kinematic body's position is
+      // AUTHORED, every frame, by whichever chapter owns it — rewriting it
+      // here would be a second writer fighting the first, which is the bug
+      // this file exists to prevent rather than cause. So: repair a NaN,
+      // clamp a runaway, and never touch a finite position.
+      if (b.mass <= 0) {
+        const kp = b.position, kv = b.velocity;
+        if (!(kp.x === kp.x && kp.y === kp.y && kp.z === kp.z)) {
+          kp.copy(b.previousPosition);
+          kv.set(0, 0, 0);
+          b.interpolatedPosition.copy(kp);
+          game.state.solverSaves = (game.state.solverSaves || 0) + 1;
+        } else if (!(kv.x === kv.x && kv.y === kv.y && kv.z === kv.z)) {
+          kv.set(0, 0, 0);
+          game.state.solverSaves = (game.state.solverSaves || 0) + 1;
+        } else {
+          const ks2 = kv.x * kv.x + kv.y * kv.y + kv.z * kv.z;
+          if (ks2 > MAIN_V_CAP * MAIN_V_CAP) {
+            const ks = MAIN_V_CAP / Math.sqrt(ks2);
+            kv.x *= ks; kv.y *= ks; kv.z *= ks;
+            game.state.solverSaves = (game.state.solverSaves || 0) + 1;
+          }
+        }
+        continue;
+      }
+      if (b.sleepState === 2) continue;
       const p = b.position, v = b.velocity;
       if (!(p.x === p.x && p.y === p.y && p.z === p.z) ||
           !(v.x === v.x && v.y === v.y && v.z === v.z)) {

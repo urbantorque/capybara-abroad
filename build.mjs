@@ -9,6 +9,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
+import { stripComments } from './strip-comments.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
@@ -86,9 +88,41 @@ function strip(file, src) {
   return out.trim();
 }
 
+// ---- COMMENTS ARE THE POINT OF THE SOURCE AND DEAD WEIGHT IN THE BUNDLE --
+// 46% of this repo's source is whole-line comment — 3.5 MB of it — and the
+// artefact is one file that a player downloads or opens off a memory stick.
+// strip-comments.mjs is a scanner rather than a regex, for the reason its own
+// header gives at length: a slash is two things in JavaScript, and a pattern
+// that hunts for a double slash finds the wrong one, silently.
+//
+// AND IT IS GUARDED. Each stripped body is parsed before it is accepted; a
+// file that will not parse falls back to its own unstripped text and the
+// build says which. A bug in the stripper must cost BYTES, never
+// correctness — the same rule as the dollar-apostrophe note further down and
+// as replaceOnce.
+//
+// vm.Script rather than a module parse, because the bodies have already had
+// their imports and exports removed by strip(), which is exactly the form
+// that goes into the bundle.
+let strippedIn = 0, strippedOut = 0, stripFail = 0;
+function stripBody(f, src) {
+  const plain = strip(f, src);
+  let lean;
+  try {
+    lean = strip(f, stripComments(src));
+    new vm.Script(lean);
+  } catch (e) {
+    console.error('  strip skipped for ' + f + ': ' + e.message);
+    stripFail++;
+    return plain;
+  }
+  strippedIn += plain.length;
+  strippedOut += lean.length;
+  return lean;
+}
 const bodies = ORDER.map(f => {
   const src = readFileSync(join(ROOT, f), 'utf8');
-  return `\n/* ======================= ${f} ======================= */\n` + strip(f, src) + '\n';
+  return `\n/* ======================= ${f} ======================= */\n` + stripBody(f, src) + '\n';
 });
 
 // Collision check: two modules declaring the same top-level function name would silently
@@ -290,3 +324,6 @@ writeFileSync(outPath, bundled, 'utf8');
 
 const kb = (Buffer.byteLength(bundled, 'utf8') / 1024).toFixed(1);
 console.log(`OK  ${outPath}  (${kb} KB, ${seen.size} top-level declarations, no collisions)`);
+console.log(`    comments stripped: ${(strippedIn / 1024).toFixed(0)} KB source -> ` +
+            `${(strippedOut / 1024).toFixed(0)} KB` +
+            (stripFail ? `, ${stripFail} file(s) kept whole` : ''));
