@@ -1648,19 +1648,92 @@ const _RIM_FS_OUT = `{
   }
 }
 #include <opaque_fragment>`;
-function _rimInject(shader) {
-  shader.uniforms.uRimK = _rimK;
-  shader.uniforms.uRimC = _rimC;
-  shader.uniforms.uSpillP = _spillP;
-  shader.uniforms.uSpillC = _spillC;
-  shader.uniforms.uSpillOn = _spillOn;
-  shader.uniforms.uSpillN = _spillN;
-  shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', _RIM_VS_COMMON)
-    .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
-  shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', _RIM_FS_COMMON)
-    .replace('#include <opaque_fragment>', _RIM_FS_OUT);
+// ---------------------------------------------------------------------------
+// ...AND THE ANIMAL GETS ITS OWN, ON THE SAME PROGRAM (P1)
+//
+// The block above reasons that what makes a rim visible is its contrast against
+// the ANIMAL'S OWN INTERIOR, and it is right — but it is answering a different
+// question from the one that matters here, which is whether you can find the
+// capybara in the frame at all. MEASURED 2 Sep, all nineteen chapters, at the
+// resting boom: render the frame, hide the animal, render again, and take the
+// mean luma of every pixel that changed against what was behind it. That number
+// is the silhouette contrast, and it is not the same in every chapter:
+//
+//   palawan 81 · pasto 78 · quay 57 · sahara 55 · venice 42 · sydney 41
+//   manly 38 · iceland 32 · rio 30 · antarctic 25 · kowloon 23
+//   kyoto 18 · goreme 17 · cave 14 · drift 13 · hanoi 12 · pantanal 12
+//   monaco 8 · CALI 4.5
+//
+// Cali is four and a half levels of grey. A brown animal, a green lawn, a green
+// awning over it and a grade that pulls both toward the same value: the
+// silhouette is not dark against light or light against dark, it is the
+// background with a different hue. Eight chapters sit under twenty.
+//
+// A SECOND RIM WOULD BE THE WRONG ANSWER and so would a second program: the
+// term is already compiled into essentially every material in the game and
+// reports one cache key so they share it. What the capybara needs is not
+// another term, it is DIFFERENT NUMBERS in the one it already has — so the
+// injection is factored to take its uniform objects as arguments, `matSelf`
+// binds the animal's pair instead of the world's, and the program is bit for
+// bit the one every wall in the chapter is already using. The capybara does not
+// gain a rim here. It stops sharing the scenery's.
+function _rimInjectWith(kU, cU) {
+  return function (shader) {
+    shader.uniforms.uRimK = kU;
+    shader.uniforms.uRimC = cU;
+    shader.uniforms.uSpillP = _spillP;
+    shader.uniforms.uSpillC = _spillC;
+    shader.uniforms.uSpillOn = _spillOn;
+    shader.uniforms.uSpillN = _spillN;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', _RIM_VS_COMMON)
+      .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', _RIM_FS_COMMON)
+      .replace('#include <opaque_fragment>', _RIM_FS_OUT);
+  };
+}
+const _rimInject = _rimInjectWith(_rimK, _rimC);
+const _selfK = { value: 0 };
+const _selfC = { value: new THREE.Color(1, 1, 1) };
+const _selfInject = _rimInjectWith(_selfK, _selfC);
+/**
+ * How hard the rim is ON THE ANIMAL, and in what colour. systems.js calls this
+ * from the same place it calls rimTick, off the same hemisphere — see sysSELF.
+ */
+export function selfRimTick(k, color) {
+  _selfK.value = k > 0 ? (k < 2 ? k : 2) : 0;
+  if (color) _selfC.value.copy(color);
+}
+/**
+ * Both rims, for an audit. A material whose hook silently failed to bind still
+ * DRAWS — it is simply the one thing in the chapter with no rim on it, which is
+ * matOwn's own warning and is not something a frame-mean metric can see. This
+ * is how a probe tells "the animal has its own rim" from "the animal has none".
+ */
+export function rimInfo() {
+  return { world: _rimK.value, self: _selfK.value,
+           worldC: [_rimC.value.r, _rimC.value.g, _rimC.value.b],
+           selfC: [_selfC.value.r, _selfC.value.g, _selfC.value.b] };
+}
+/**
+ * A PRIVATE material that reads the animal's rim rather than the world's.
+ *
+ * Uncached and never shared, for matOwn's reason and one more: `mat()` caches
+ * by colour, and PALETTE.capy is not unique to the capybara — handing the cache
+ * a self-rimmed material under that key would put the animal's rim on whatever
+ * else happens to be the same brown. Same cache key as every other rimmed
+ * material on purpose: same source, same program, different uniforms.
+ */
+export function matSelf(color, opts) {
+  const m = new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: true }, opts || {}));
+  if (_rimWants(opts)) {
+    m.onBeforeCompile = _selfInject;
+    m.customProgramCacheKey = _rimKey;
+    if (!m.userData) m.userData = {};
+    m.userData.capySelf = true;   // so canopyAudit can count what actually bound
+  }
+  return m;
 }
 /** True where a rim would be wrong on principle rather than merely subtle. */
 function _rimWants(opts) {
@@ -1783,6 +1856,30 @@ export function leaf(m, k) {
   g.customProgramCacheKey = function () {
     return 'leaf1' + (prevKey ? '|' + prevKey.call(this) : '');
   };
+  // ---- THE MARKER, AND WHAT IT IS FOR NOW (P1) --------------------------
+  // Kept from a feature that was measured and then removed. P1 built a
+  // dissolve on this material — a cone from the lens to the animal, so a
+  // canopy between the two thinned out of the way — because the camera in
+  // the gardens had been photographed with two fig crowns on the eye-to-
+  // capybara line and the animal nowhere in frame.
+  //
+  // IT WAS THE WRONG DIAGNOSIS AND THE MEASUREMENT SAID SO. Paired A/B in one
+  // session (cut on and off, same frame, same camera): 24 yaws at each of four
+  // stations plus thirty legs of a walk through the grove — 84,479 px of
+  // capybara with the dissolve off and 84,627 with it on, a fifth of one per
+  // cent, with as many yaws worse as better. The frame that started it was
+  // real, and it was the LOOK RAISE (see sysLOOK_RAISE's block in systems.js):
+  // the boom had been cut to 0.16 by a pine trunk and the target was still
+  // aiming 1.6 m over the animal's head, so she was off the bottom of the
+  // screen. Fix the raise and the foliage is beside her, not in front.
+  //
+  // The marker stays because `hud.canopyAudit()` walks for it, and that is how
+  // the above was measured. If somebody rebuilds the dissolve, measure the
+  // paired pixel count first — a zero-width ray reports "nothing in the way"
+  // for a cone that is plainly changing the picture, and that instrument is
+  // the reason this took three passes.
+  if (!g.userData) g.userData = {};
+  g.userData.capyLeaf = true;
   g.needsUpdate = true;
   _leafCache.set(key, g);
   return g;

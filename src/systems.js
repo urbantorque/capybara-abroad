@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
-         rimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
-         leafTick, calmOn, calmSet, calmPreference } from './shared.js';
+         rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         leafTick, rimInfo, calmOn, calmSet, calmPreference } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -276,6 +276,9 @@ const sysCAM_CLEAR_MIN = 1.9;   // m — the shortest the boom may ever be cut t
 // instead of 5 cm inside it.
 const sysCAM_CLEAR_PAD = 0.70;  // m of daylight kept between the lens and the wall
 const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
+// m up the animal that hud.canopyAudit() aims its ray at: the shoulder, which
+// is what a lens is actually trying to see past a hedge.
+const sysAUDIT_SHOULDER = 0.45;
 // Subtle speed dolly — the camera eases out at a run so running reads as fast.
 // `camDolly` is 0..1 (the damped fraction of the run speed) and these two are
 // what it buys: a metre and a bit of boom, and THIRTEEN DEGREES OF PITCH.
@@ -1107,6 +1110,73 @@ const sysRIM = {
   kowloon: 0.085, palawan: 0.048, goreme: 0.075, manly: 0.062, pantanal: 0.085,
   cave: 0.100, antarctic: 0.040, monaco: 0.090, hanoi: 0.085,
 };
+// ---- ...AND THE SAME TABLE FOR THE ANIMAL, OFF A MEASUREMENT (P1) ---------
+// sysRIM is tuned so the rim reads the same against every chapter's LIGHT. This
+// one is tuned against a different fact: how far the capybara's own silhouette
+// is from what is behind it. Measured in all nineteen at the resting boom —
+// render, hide the animal, render again, and take the mean luma of the pixels
+// that changed against what replaced them (qa/p1-see.js, and it is the same
+// instrument that reports whether a canopy is in the way):
+//
+//   palawan 81 · pasto 78 · quay 57 · sahara 55 · venice 42 · sydney 41
+//   manly 38 · iceland 32 · rio 30 · antarctic 25 · kowloon 23 · kyoto 18
+//   goreme 17 · cave 14 · drift 13 · hanoi 12 · pantanal 12 · monaco 8 · cali 4.5
+//
+// THE FIRST CUT OF THIS TABLE WAS BUILT ON THAT LIST ALONE — lift the rim
+// hardest where the silhouette is faintest — AND IT WAS WRONG IN TEN CHAPTERS.
+// A rim is LIGHT. It can only ever move the edge of the animal toward white,
+// so it separates her from a background she is already brighter than, and it
+// closes the gap on one she is darker than. Measured, paired, the term switched
+// off and on in the same session and the same frame (qa/p1-rim.js, and the
+// switch it uses is game.state.noSelfRim), as the change in mean silhouette
+// contrast:
+//
+//   animal BRIGHTER than its ground        animal DARKER than its ground
+//     antarctic  +9.2                        venice    -4.2   sydney  -4.1
+//     drift      +8.9                        hanoi     -3.2   sahara  -2.9
+//     pantanal   +8.3                        pasto     -2.8   quay    -2.5
+//     iceland    +8.1                        palawan   -2.3   goreme  -2.0
+//     cave       +6.6                        rio       -1.3   manly   -0.2
+//     kowloon    +4.6
+//     cali +1.3 · monaco +0.8 · kyoto +0.5  (the three where the two are level)
+//
+// Nineteen chapters, no exceptions, and the sign of the change is the sign of
+// the contrast every single time. So the table is the measurement: the nine
+// that gained keep the number they gained at, and the ten that lost are handed
+// the SCENERY's number — which is what they had before any of this, and is the
+// honest answer for a chapter where a brighter edge is the wrong tool. What
+// those ten want is a darker edge, and that is a different feature (a contact
+// occlusion term) rather than this one with a minus sign on it.
+//
+// It must never become a line. CONTRACT.md forbids outlines, and 0.26 is where
+// these were photographed.
+const sysSELF_DEF = 0.14;
+const sysSELF = {
+  // gained: the animal reads brighter than what is behind her here
+  antarctic: 0.18, drift: 0.24, pantanal: 0.24, iceland: 0.16,
+  cave: 0.24, kowloon: 0.18,
+  // level, and a small gain that held across both runs
+  cali: 0.26, monaco: 0.26,
+  // lost: these are sysRIM's own numbers, deliberately — the animal goes back
+  // to wearing the scenery's rim, which is what it wore before P1.
+  //
+  // KYOTO IS HERE BECAUSE IT COULD NOT MAKE ITS MIND UP: +0.5 on the first
+  // paired run and -2.7 on the second, at the same strength, because the animal
+  // stands on a road whose traffic and people are not in the same places twice.
+  // A number that changes sign between two runs of the same experiment is a
+  // number nobody measured, and the rule this table is built on is that a
+  // chapter keeps the lift only if it earned it twice.
+  venice: 0.055, sydney: 0.075, hanoi: 0.085, sahara: 0.070, pasto: 0.080,
+  quay: 0.075, palawan: 0.048, goreme: 0.075, rio: 0.075, manly: 0.062,
+  kyoto: 0.085,
+};
+// How far the animal's rim is pushed past the sky's own hue toward white. The
+// scenery's rim keeps 60% of the hemisphere's chroma (see sysRIM_WHITE's use
+// above); the animal's keeps less, because the one thing that must not happen
+// is the capybara taking the colour of the place it is standing in — which is
+// the entire complaint this table exists to answer.
+const sysSELF_WHITE = 0.62;
+const sysColS = new THREE.Color();
 const sysDAY_SUN_MIX = 0.62;   // how far the sun colour is allowed to travel
 const sysDAY_SKY_MIX = 0.30;
 const sysDAY_GND_MIX = 0.52;
@@ -9942,9 +10012,37 @@ export function createSystems(game) {
   // NOT the beat clock. `musBarAnchor` and `musBeatLen` are untouched: the
   // dance floor in Cali and the towers in Kowloon are scored against the BAR,
   // and the bar is exactly where it always was. Only the notes move.
+  // ---- THE HUMANISING JITTER MAY NOT SCHEDULE THE PAST (P1) ---------------
+  // FOUND BY P1's OWN SWEEP, on the unmodified tree, in two chapters and at two
+  // different voices:
+  //
+  //   Uncaught RangeError: Failed to execute 'setValueAtTime' on 'AudioParam':
+  //   Time must be a finite non-negative number: -0.000127775
+  //
+  // -0.000128 s is not a clock problem, it is the size of THIS FUNCTION's own
+  // jitter: `spread` is in milliseconds and the term is symmetric, so a note
+  // asked for at t = 0 comes back at t = ±2 ms, and half of those are negative.
+  //
+  // t = 0 is reachable, and it is reachable on the first tick every time. The
+  // band schedulers re-anchor with `if (musBarAt < now)`, `musSetPalette` parks
+  // `musBarAt` at 0, and `musStart` calls `musTick()` SYNCHRONOUSLY on the line
+  // it creates the graph — at which point `ac.currentTime` is still exactly 0,
+  // so `0 < 0` is false, the anchor is left at zero and the first bar of the
+  // chapter is scheduled around the origin. Whether it throws is then a coin
+  // toss per note, which is why nineteen chapters of soak reported a clean
+  // console: the R10 run read `state.lastError` and console messages, and an
+  // uncaught RangeError out of a setInterval callback is neither.
+  //
+  // Clamped to `ac.currentTime` rather than to 0: a time in the past is legal
+  // and plays immediately, so 0 would have been enough to stop the throw — but
+  // a note scheduled at 0 while the clock reads 12 is a note the whole band has
+  // to catch up with. Six band schedulers and every voice in the file go
+  // through here, so this is the one place it can be guaranteed.
   function musFeel(t, spread, bias) {
-    return t + bias * 0.001 +
-           (Math.random() + Math.random() - 1) * spread * 0.001;
+    const j = t + bias * 0.001 +
+              (Math.random() + Math.random() - 1) * spread * 0.001;
+    const now = ac ? ac.currentTime : 0;
+    return j > now ? j : now;
   }
   function musVel(v) {
     return v * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
@@ -20312,6 +20410,17 @@ export function createSystems(game) {
       sysColR.lerp(sysRIM_WHITE, 0.40);
     }
     rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
+    // ...and the animal's, off the same hemisphere and one step further toward
+    // white. See sysSELF.
+    //
+    // `noSelfRim` is the `noLeaf` channel again, and it is here for the reason
+    // that channel exists: the only way to know what a term is worth is to take
+    // it away in the SAME session and read the same pixels back, because two
+    // runs of this game do not have the people, the props or the carriers in
+    // the same places. Nothing in src writes it.
+    sysColS.copy(sysColR).lerp(sysRIM_WHITE, sysSELF_WHITE);
+    selfRimTick(game.state.noSelfRim ? 0
+                : (sysSELF[name] === undefined ? sysSELF_DEF : sysSELF[name]), sysColS);
     // ---- and the light coming THROUGH things ------------------------------
     // See the leaf block in shared.js. The direction is the live sun axis —
     // sunAxes() rebuilds it on every biome change, so a chapter with a 61
@@ -20796,6 +20905,15 @@ export function createSystems(game) {
                   sysAnchor.z + Math.cos(camYaw) * cpp * camDist);
     camera.position.copy(sysCamPos);
     camDolly = 0;
+    // ---- ...AND THE BOOM ARRIVES UNCUT (P1) -------------------------------
+    // Everything else the rig carries is reset on this line or the ones around
+    // it, and `camClearF` was the one that was not — so a chapter left from
+    // inside somewhere tight handed its cut to the next one. It is a damped
+    // value that only ever eases OUT (sysCAM_CLEAR_OUT), so leaving the souk,
+    // a stairwell or the cave with the boom at 0.2 opened the next chapter with
+    // the eye against the animal and about a second of it walking back. The
+    // arrival is the one frame every player of a chapter sees.
+    camClearF = 1;
     // ...and the eye comes back down across a hemisphere. An arrival is a shot
     // and it is the chapter's to compose, not the last chapter's key press.
     skyEyeT = 0;
@@ -21123,6 +21241,32 @@ export function createSystems(game) {
     const b = res.body;
     if (!b || b.mass > 0 || b.isTrigger) return;
     if (b === sysCamSkipA || b === sysCamSkipB || b === sysCamSkipC) return;
+    // ---- PEOPLE ARE NOT WALLS, AND NEITHER IS A PASSING TRAM (P1) --------
+    // The block above this function has said "static geometry only" since it
+    // was written, and it has never been true. `mass > 0` catches a bin and a
+    // crate; it does not catch a person, because a walker is a mass-0
+    // KINEMATIC box (npc.js's `userData.npc`) and a standing stallholder is a
+    // mass-0 STATIC one (`userData.local`). Both fell straight through to the
+    // shape test and were treated as masonry.
+    //
+    // What that costs is not a cut, it is a PUMP. The boom is cut on the frame
+    // the ray hits and let back out at sysCAM_CLEAR_OUT — 3.2/s — so one
+    // person crossing behind you for half a second buys about a second of the
+    // eye walking back out. Standing still in a crowd is that on a loop, and
+    // the crowds are Circular Quay, the souk, Mong Kok, San Marco and the
+    // casino floor: five of the six chapters with the most people in them.
+    //
+    // The same argument disposes of every other kinematic body. Twelve of them
+    // are carriers — a ferry hull, a tram, a floe, a gondola, a basket — and
+    // the three that matter under your own feet are already skipped by name
+    // above (carriedBy, rideBody). The rest are traffic: Hanoi's train, Monaco's
+    // cars, Rio's trams, Venice's boats. A vehicle passing BEHIND the animal is
+    // not something the lens should flinch at, and a lens that flinches at
+    // every one of them in a chapter whose subject is traffic is a lens that
+    // never sits still. This is the same ignore list capyClimbRayHit keeps, for
+    // the same reason and in the same order.
+    if (b.userData && (b.userData.npc || b.userData.local)) return;
+    if (b.type !== undefined && CANNON.Body && b.type !== CANNON.Body.STATIC) return;
     const t = res.shape && res.shape.type;
     if (t === sysSHAPE_HEIGHTFIELD || t === sysSHAPE_PLANE) return;
     const f = res.distance / sysCamLen;
@@ -21933,6 +22077,71 @@ export function createSystems(game) {
         out.critters.push({ biome: c.biome, r: c.r, near: c.near,
                             bold: c.bold, appr: c.appr, live: c.biome === live });
       }
+      return out;
+    },
+    /**
+     * WHAT IS BETWEEN THE LENS AND THE ANIMAL, and how much of it is foliage.
+     *
+     * The one question P1 exists to answer, and before this there was no way to
+     * ask it: `camInfo.clear` reports the PHYSICS ray, so in the gardens it
+     * reads 0.80 and unobstructed while two fig canopies sit on the line and
+     * the capybara is not on screen. A canopy has no body; it is only ever a
+     * mesh, and it is usually an InstancedMesh shared by every tree of its kind
+     * in the chapter — which is why `leaf` stamps `material.userData.capyLeaf`
+     * and why this walks for that rather than guessing at geometry or colour.
+     * See [[capy3-headless-qa-harness]] trap 11 for what guessing costs.
+     *
+     * THE RAYCASTER IS GIVEN A LIST, NEVER `scene.children`: a departed chapter
+     * is hidden with `visible = false` and three's Raycaster does not honour
+     * it, so a scene walk in Sydney answers with Venice's plane trees.
+     */
+    canopyAudit: function () {
+      const out = { biome: game.biome && game.biome.current, meshes: 0, hits: 0,
+                    nearest: -1, rim: rimInfo(), list: [] };
+      const capy = game.capy;
+      // COUNTED BEFORE THE EARLY RETURNS, because nine chapters register no
+      // foliage at all and those are exactly the ones where "did the animal's
+      // rim bind" still has to be answerable. The first cut of this audit put
+      // it after, and reported `undefined` for the nine.
+      let self = 0, world = 0;
+      if (capy && capy.group) {
+        capy.group.traverse(function (o) {
+          if (!o.isMesh || !o.material) return;
+          if (o.material.userData && o.material.userData.capySelf) self++;
+          else world++;
+        });
+      }
+      out.animal = { self: self, other: world };
+      if (!capy || !capy.position) return out;
+      const live = [];
+      scene.traverse(function (o) {
+        if (!o.visible || !o.isMesh) return;
+        const m = o.material;
+        if (!m || !m.userData || !m.userData.capyLeaf) return;
+        // A hidden chapter's ROOT is what carries visible=false, and traverse
+        // does not stop there — so ask every ancestor, not just the mesh.
+        let a = o.parent, ok = true;
+        while (a) { if (!a.visible) { ok = false; break; } a = a.parent; }
+        if (ok) live.push(o);
+      });
+      out.meshes = live.length;
+      if (!live.length) return out;
+      const to = new THREE.Vector3(capy.position.x, capy.position.y + sysAUDIT_SHOULDER, capy.position.z);
+      const from = camera.position;
+      const dir = to.clone().sub(from);
+      const len = dir.length();
+      if (!(len > 0.05)) return out;
+      dir.normalize();
+      const rc = new THREE.Raycaster(from, dir, 0, len);
+      const hits = rc.intersectObjects(live, false);
+      out.hits = hits.length;
+      out.nearest = hits.length ? hits[0].distance : -1;
+      for (let i = 0; i < hits.length && i < 8; i++) {
+        out.list.push({ d: hits[i].distance,
+                        frac: hits[i].distance / len,
+                        geo: hits[i].object.geometry && hits[i].object.geometry.type });
+      }
+      out.len = len;
       return out;
     },
     /** ...and which room the sfx bus is in. See sysROOMS. */
@@ -22880,8 +23089,38 @@ export function createSystems(game) {
     // and only the deliberate lead (below) is allowed to lag.
     const lookL = lerp(5, 7, flyT);
     sysLook.x = damp(sysLook.x, lx, lookL, dt);
-    sysLook.y = damp(sysLook.y, r.y + lerp(lerp(lerp(sysLOOK_RAISE, sysSKY_RAISE, skyT),
-                                                sysSAIL_RAISE, sailT), sysFLY_RAISE, flyT), 4, dt);
+    // ---- THE RAISE IS CUT WITH THE BOOM (P1) ------------------------------
+    // A RAISE IS AN ANGLE, NOT A HEIGHT, and this line had only ever been
+    // written for the distance the boom is when nothing is in the way.
+    //
+    // The occlusion ray below shortens the boom and moves nothing else, so the
+    // eye comes in while the target stays 0.6-1.6 m above the animal's feet —
+    // and the closer the eye gets, the larger that same offset is in degrees.
+    // MEASURED at twenty-one stations, as the fraction of the frame height the
+    // animal sits below centre against how hard the boom was cut:
+    //
+    //   clear 1.00  ->  -0.21   (sixteen chapters, and it is the right frame)
+    //   clear 0.54  ->  -0.39   Manly
+    //   clear 0.26  ->  -0.78   Antarctica, on the edge of the picture
+    //   clear 0.16  ->  -1.40   under a Norfolk pine: OFF THE BOTTOM OF THE
+    //                           SCREEN, and the measured pixel count of the
+    //                           capybara in that frame is zero
+    //
+    // So the tightest places in the game — the souk, the stairwell, the cave
+    // passage, the colonnade, anywhere the ray has to work — are exactly the
+    // places the animal slides out of shot, and the harder the rig tries the
+    // worse it gets. Cutting the raise in the same proportion as the boom is
+    // the whole fix: the ratio of raise to distance is what sets the angle, so
+    // holding it constant holds the composition, and at clear = 1 this line is
+    // arithmetically what it was before.
+    //
+    // `camClearF` here is LAST frame's, because the ray for this one has not
+    // run yet — which is correct rather than merely acceptable: it is already a
+    // damped quantity that only eases outward, and reading it here means the
+    // target and the eye are cut by the same number on the same frame.
+    sysLook.y = damp(sysLook.y, r.y + camClearF *
+                                lerp(lerp(lerp(sysLOOK_RAISE, sysSKY_RAISE, skyT),
+                                          sysSAIL_RAISE, sailT), sysFLY_RAISE, flyT), 4, dt);
     sysLook.z = damp(sysLook.z, lz, lookL, dt);
 
     // Speed dolly: in close at a waddle, eased out and DOWN at a full run. In

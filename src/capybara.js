@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -1651,12 +1651,21 @@ export function createCapybara(game) {
   //   mBelly = capyLight  -> belly underside ONLY
   //   mDark  = capyDark   -> legs, jaw, ears, tail
   //   mNose / mEye        -> tiny accents (nose pad, mouth interior, eyes)
-  const mFur = mat(PALETTE.capy);
-  const mFurWet = mat(PALETTE.capyDark);
-  const mBelly = mat(PALETTE.capyLight);
-  const mBellyWet = mat(PALETTE.capy);
-  const mDark = mat(PALETTE.capyDark);
-  const mDarkWet = mat(PALETTE.capyNose);
+  // THE SIX THAT MAKE THE SILHOUETTE TAKE THE ANIMAL'S OWN RIM (P1). matSelf is
+  // mat() with the rim's uniforms swapped for the capybara's pair — same
+  // program, different numbers — because the scenery's rim is tuned to sculpt
+  // the scenery and the animal's job is to be findable against it. Measured, the
+  // silhouette is 4.5 levels of grey against Cali's lawn. See sysSELF.
+  //
+  // The two accents stay on mat(): the nose pad and the eyes are interior
+  // detail a centimetre across, they are never on the outline, and a private
+  // material each would be two more clones for nothing.
+  const mFur = matSelf(PALETTE.capy);
+  const mFurWet = matSelf(PALETTE.capyDark);
+  const mBelly = matSelf(PALETTE.capyLight);
+  const mBellyWet = matSelf(PALETTE.capy);
+  const mDark = matSelf(PALETTE.capyDark);
+  const mDarkWet = matSelf(PALETTE.capyNose);
   const mNose = mat(PALETTE.capyNose);
   const mEye = mat(PALETTE.capyEye);
   const wetParts = [];

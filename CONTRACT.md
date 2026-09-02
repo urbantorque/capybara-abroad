@@ -3058,6 +3058,131 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE SUBJECT — P1 (2 Sep 2026)
+
+The first batch of `ROADMAP-POLISH.md`. Everything here is one measurement:
+render the frame, hide the capybara, render again, count the pixels that
+changed. That is how much of the animal you can see, with nothing classified;
+the mean luma of those pixels against what replaced them is the silhouette
+contrast. `qa/p1-see.js`.
+
+### A RAISE IS AN ANGLE, NOT A HEIGHT — `sysLOOK_RAISE` (load-bearing)
+
+The occlusion ray shortens the boom and moves nothing else, so the eye came in
+while the look target stayed 0.6–1.6 m above the animal's feet — and the closer
+the eye gets, the larger that offset is in degrees. Measured at 21 stations, as
+how far below centre the animal sits:
+
+| boom cut to | animal at | |
+|---|---|---|
+| 1.00 | −0.21 | sixteen chapters; the frame the rig was designed for |
+| 0.54 | −0.39 | Manly |
+| 0.26 | −0.78 | Antarctica, on the edge of the picture |
+| 0.16 | **−1.40** | under a Norfolk pine: off screen, **0 px of capybara** |
+
+`sysLook.y`'s raise is now multiplied by `camClearF`. Holding raise/distance
+constant holds the composition; at `clear = 1` the line is arithmetically what
+it was, and the sixteen unaffected chapters are unchanged to two decimals.
+Under the pine: **0 px → 57,412 px**, −1.40 → +0.07. It reads LAST frame's
+`camClearF` on purpose — already damped, eases outward only, and it means the
+target and the eye are cut by the same number on the same frame.
+
+`camClearF` is also reset in `teleportCapy`: it only ever eases outward, so a
+chapter left from somewhere tight handed its cut to the next one's arrival.
+
+### THE ANIMAL'S OWN RIM — `matSelf`, `sysSELF`
+
+`matSelf` binds the capybara's six body materials to their own rim uniforms.
+Same source, same `customProgramCacheKey`, so it is the same program every wall
+in the chapter already uses — the animal does not gain a rim, it stops sharing
+the scenery's. The nose pad and the eyes stay on `mat()`; they are never on the
+outline.
+
+**A RIM IS LIGHT, AND THAT DECIDES THE WHOLE TABLE.** It separates the animal
+from a background she is brighter than and closes the gap on one she is darker
+than. Paired A/B (`game.state.noSelfRim`, both reads in one frame), and the sign
+of the change is the sign of the contrast in all nineteen:
+
+| animal brighter — gained | animal darker — lost |
+|---|---|
+| antarctic +9.2 · drift +8.9 · pantanal +8.3 | venice −4.2 · sydney −4.1 · hanoi −3.2 |
+| iceland +8.1 · cave +6.6 · kowloon +4.6 | sahara −2.9 · pasto −2.8 · quay −2.5 |
+| cali +1.3 · monaco +0.8 | palawan −2.3 · goreme −2.0 · rio −1.3 |
+
+`sysSELF` is that measurement. Eight chapters keep a lift that held across TWO
+paired runs; the other eleven carry `sysRIM`'s own number, which is what they
+had before. Kyoto is among them because it returned +0.5 then −2.7 at the same
+strength — a number that changes sign between two runs is a number nobody
+measured. What the darker-animal chapters want is a DARKER edge, which is a
+contact-occlusion term and not this one with a minus sign on it.
+
+### PEOPLE ARE NOT WALLS — `sysCamRayHit`
+
+The block above that function has claimed "static geometry only" since it was
+written and it was never true: a walker is a mass-0 KINEMATIC box
+(`userData.npc`) and a stallholder is a mass-0 STATIC one (`userData.local`),
+and both fell through to the shape test. It now keeps the same ignore list
+`capyClimbRayHit` does, plus every kinematic body that is not the deck underfoot
+(traffic: Hanoi's train, Monaco's cars, Rio's trams, Venice's boats).
+
+**Measured, and it bought nothing**: four crowd stations, 25 s standing still,
+10–32 people, `clear` 1.000 before and after with zero dips. The boom sits ~8 m
+up and 12 m back and passes over people's heads. Kept as a contract alignment,
+recorded as a no-op.
+
+### THE CANOPY DISSOLVE WAS BUILT AND REMOVED
+
+A cone from the lens to the animal, dithered discard injected in `leaf()` so it
+reached every plant in the game through the one material they share. It worked.
+It bought nothing: paired on/off in one session, 24 yaws at each of four
+stations plus 30 legs of a walk through the Sydney grove — **84,479 px of
+capybara with it off, 84,627 with it on**, as many yaws worse as better, and the
+animal never once badly hidden. The frame that motivated it was the look raise
+above, not the leaves. `material.userData.capyLeaf` survives because
+`hud.canopyAudit()` walks for it.
+
+**If anybody rebuilds it: a zero-width ray is the wrong detector for a volume.**
+`canopyAudit`'s raycast reported "nothing in the way" in 17 Göreme frames where
+the dissolve was plainly changing the picture, because the cone is 1.7 m across.
+Measure the paired pixel count.
+
+### THE SCORE MAY NOT SCHEDULE THE PAST — `musFeel`
+
+Found by P1's sweep on the unmodified tree, in two chapters at two voices:
+`RangeError: setValueAtTime … Time must be a finite non-negative number:
+-0.000127775`. That is the size of `musFeel`'s own jitter. `musStart` calls
+`musTick()` synchronously on the line that builds the graph, `ac.currentTime` is
+still exactly 0 there, the re-anchor guard is `musBarAt < now` so `0 < 0` leaves
+the anchor at zero, and half the first bar's notes land before the origin.
+Whether it throws is a coin toss per note — which is why nineteen chapters of
+R10 soak reported a clean console: that run read `state.lastError` and console
+messages, and an uncaught RangeError out of a `setInterval` callback is neither.
+`musFeel` clamps to `ac.currentTime`: one place, six band schedulers, every
+voice in the file.
+
+### THE VEIL, MEASURED AND LEFT ALONE
+
+Full-frame luma, centre crop, ranked by lifted blacks (`p05`): venice 133,
+sydney 118, palawan 117, sahara 117 … monaco 59, kowloon 58, **kyoto 57**,
+drift 54, iceland 48. Venice and Marrakech do sit high; Kyoto, which the review
+called milky from a screenshot, has among the deepest blacks in the game. The
+range is continuous from 48 to 133 with no gap to cut a class along, and the
+narrowest two (the Drift and the cave, both span90 44) are night chapters that
+are meant to be narrow. Not acted on.
+
+### AUDIT
+
+`hud.canopyAudit()` — foliage registered in the live chapter, what is on the
+eye-to-animal ray, `cutInfo`-style rim strengths for both rims, and how many of
+the animal's meshes actually bound to its own rim (a hook that silently fails to
+bind still draws a perfectly good capybara with no rim at all). Nothing in `src`
+reads it.
+
+**TWO RUNS OF THIS GAME ARE NOT COMPARABLE.** People, props and carriers are not
+in the same places twice, and cross-run silhouette-contrast differences of ±20
+levels are ordinary. Every verdict in this section is a paired A/B inside one
+session, toggling the term between two reads of the same pixels.
+
 ## THE FRONT DOOR (v52 — 31 Aug 2026)
 
 Fifty-one versions of content, picture, feel and audio, and **the review that
