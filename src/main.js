@@ -1848,6 +1848,11 @@ function mainBoot() {
     game.placeHeat = npcs.placeHeat;
     game.forceHeat = npcs.forceHeat;
     game.heatSites = npcs.heatSites;
+    // What every face in the live chapter is doing, read off the nodes. A
+    // test hook, like forceHeat — see FACES in npc.js.
+    game.faceAudit = npcs.faceAudit;
+    // ...and who is mid-sentence, which the capybara gaze reads.
+    game.npcSpeaker = npcs.speaker;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

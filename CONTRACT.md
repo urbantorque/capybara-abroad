@@ -3058,6 +3058,138 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## FACES AND BODIES — P5 (2 Sep 2026)
+
+Everybody in this game was a box with a nose on it, and the nose was doing the
+whole job. It is there for one stated reason — without it a figure turning to
+watch you is a cube rotating — and it worked, but it meant the cast could be
+startled, cornered, robbed, chased off, praised, guarded against and rained on
+and their expression never changed, because they had not got one.
+
+### The face is four nodes and no per-person geometry
+
+`npcFace(f, mood, blink)` in npc.js. `mood` runs −1 (angry) through 0 to +1
+(wide); `blink` is 0..1. Everything it does is a MATRIX — a scale on the eye
+pair, a rotation and a centimetre of lift on each brow — which is why one
+function drives both the hand-built locals and the two instanced crowds.
+
+**The signs are the whole thing.** A figure faces +z and `rotation.z` takes +x
+toward +y. The left brow sits at x < 0, so its INNER end is its +x end and a
+positive rz lifts it; the right brow is the mirror. Angry is inner-ends-DOWN,
+wide is inner-ends-slightly-up with the pair raised. One sign wrong and a
+furious market trader is drawn looking mildly delighted.
+
+- **`f.upK`** exists because a local's fringe sits 1.2 cm above their brow and
+  the roster's does not. Same lift, different heads.
+- **Instanced crowds cost two draw calls, not five.** Both eyes are ONE
+  geometry (nothing in this game winks). Both brows are one BUFFER at 2N
+  instances indexed `idx*2` — the trick `pLlamaL` already uses for four legs —
+  because a brow must rotate independently of its twin, and a shared geometry
+  cannot do that but a shared buffer can.
+- **A local is not instanced**, so every box is a draw call: the eye pair is
+  one merged geometry there too, 3 meshes per person rather than 4.
+- The brow is the HAIR colour, so a blond and a black-haired man read
+  differently at range with no extra state.
+
+### Mood comes from state that already existed
+
+`npcMoodOf(rec)` for the crowds — `alarm` plus the state names; wide covers
+surprise AND delight, because a tourist lining up a photograph of a capybara has
+the same eyes as one who has just been barged into. For a local it is the flinch
+spring, the guard that goes up when the square is hot, an errand to pick their
+own crate up off the floor, and the huddle in the rain — the huddle counts as
+CROSS at a third weight, and it is the one mood input in the game that has
+nothing to do with the capybara.
+
+A face comes on fast (λ 15) and goes off slowly (λ 3.2). A symmetric damp reads
+as a mask being swapped rather than as a person.
+
+MEASURED, `game.faceAudit()`: roster at rest mood 0.00 / eye 1.00 / brow 0.00
+across 32; after a wheek mood 1.00 / eye 1.55 / brow −0.15; forced to `chase`
+mood −1.00 / brow +0.36 with the brow 17 mm down. Venice locals: rest −0.02,
+`forceHeat(1)` → −0.70 and brow +0.25, a direct flinch kick → +0.56 and eye
+1.31. Pasto's thirteen reach −1.00 and +0.36 off their own state machine.
+Blinks: 27 shut samples in 2 880, minimum eye scale 0.13.
+
+### Three builds, and some of them are children
+
+Forty-five people were forty-five copies of one skeleton at 0.93–1.08 scale: a
+15 cm spread on height and NOTHING on shape. Three archetypes now, picked once,
+costing a scale on nodes that already exist — plus a fourth for children.
+
+- `bGirth` goes on `bob`, which carries torso, hips and the arm ROOTS, so a
+  heavy build is a wider stance; the head divides it back out, because a wide
+  man does not have a wide skull.
+- `bLeg` may NOT be a second write on `legL.scale.y` — `animHuman` owns that
+  line for the crouch — so it multiplies in there, and `bob` rides up with it
+  or a tall-thin man has his hips inside his own waistband.
+- **A child is a build, not a role.** One in seven TOURISTS. A child gardener is
+  not a joke, it is a mistake. `npcCHILD_HEAD 1.22`: scaling a person down
+  uniformly makes a scale model of an adult, which reads as a distant adult —
+  the head is the proportion that says how old somebody is. Children are
+  excluded from the harbour plunge.
+- **The stride is now the person's, not the rig's.** `npcLEG_L` is a constant
+  and everybody is scaled; gait frequency is derived from stride precisely so
+  the feet do not ice-skate, and with four builds the constant was wrong by up
+  to a third. It is defaulted (`rec.bLeg || 1`) because `paMove` also carries
+  the llamas and the street dogs.
+
+MEASURED head-above-feet in Sydney: 0.86 m to 1.47 m, arch counts [7, 9, 14, 2].
+
+### The animal got a face too
+
+Whiskers (three a side, deliberately oversized — a 2 mm whisker is sub-pixel at
+six metres), a sniff that swells the nose pad and flicks them forward, ears that
+TURN toward whatever just happened, and a gaze that finally answers "who is
+speaking" and not only "who has noticed me".
+
+- `npcSpeaker()` is published from `sayBubble` and read as gaze priority 1b.
+  The grabbable branch had to be gated on `!found` — without it the entry is
+  written and overwritten on the same call, which is a priority list with no
+  priority in it.
+- `capyHeardFrom` uses **sin(bearing)**, not the angle: it saturates at ninety
+  degrees and comes back for anything behind, which is right — an ear cannot
+  point further round than side-on. The gaze cannot be reused for this, because
+  the gaze refuses to answer for anything behind you and that is the case an ear
+  is for. MEASURED 0.40 rad at eight metres off the flank, 0.007 at forty.
+
+### A bubble is paper
+
+The speech bubble was the third UI dialect: a 13 px white pill, a
+`sandstoneDark` hairline, bold near-black text and one soft drop shadow, beside
+a to-do card that is `sail` under a warm rake and a laid texture, `sailShade` at
+the edge, `ibisHead` ink, a 7 px corner and three shadows. It is now the card's
+own recipe with the tail left on — the tail is what makes it speech; the pill
+was never doing that job. The tail's colour is COMPUTED from the bottom of the
+box's gradient (`npcCssMix`), because a rotated 10 px square cannot sample it
+and a guess at solid sandstone is 34% too dark.
+
+### What it cost
+
+Paired A/B, eight bearings, same probe both halves:
+
+| chapter | draw calls/frame | triangles/frame |
+|---|---|---|
+| Sydney | 139.3 → 147.0 | 84 160 → 85 746 |
+| Venice | 116.3 → 132.3 | 151 569 → 151 802 |
+| Sahara | 152.3 → 170.8 | 134 030 → 134 294 |
+
+Scene mesh deltas are exactly predicted: 3 per hand-built local plus the six
+whiskers. Median frame time sits on the 16.6 ms vsync cap both ways.
+
+### One event that had to be rationed
+
+`npc:startled` was emitted by the Sydney roster and nothing else, so the
+ear-turn it drives was a two-chapter feature in a nineteen-chapter game. It is
+now emitted from `localsReact` too — but ONCE per bang, for whoever jumped
+hardest, because systems.js answers that event with a gasp, +0.06 chaos and a
+2.5 s chase window, and a crate landing beside five people would have been five
+simultaneous gasps and a third of the chaos bar.
+
+It goes through `emit()`, whose payload shape is `{ npc: rec }`. The existing
+`npc:chase` listener took the argument as the person and then used none of it,
+so the shape was never wrong until something read it.
+
 ## THE PUNCTUATION — P4 (2 Sep 2026)
 
 The fourth batch of `ROADMAP-POLISH.md`, and the last. Measured under

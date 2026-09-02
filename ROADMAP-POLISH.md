@@ -651,6 +651,49 @@ ear yaw on `npc:*` events, a sniff pulse on `mNose`. Speech bubbles as paper.
 This is the single largest lift to the comedy and it does not fit a 3 h
 batch honestly; that is why it is here and not in P3.
 
+**Done, 2 Sep 2026.** Landed: faces on all three casts, three builds plus a
+child build, the capybara's own face, and the bubble as paper.
+
+- **Faces.** `npcFace(f, mood, blink)` — a matrix on four nodes, so one
+  function drives the hand-built locals and both instanced crowds. Two extra
+  draw calls per instanced crowd (one geometry for the eye pair, one buffer at
+  2N instances for the two brows), three extra meshes per hand-built local.
+  Mood comes entirely from state that already existed and was never drawn above
+  the neck: `alarm` and the state names for the crowds; the flinch spring, the
+  hot-square guard, the retrieval errand and the huddle for a local.
+- **Builds.** Three archetypes on `bGirth`/`bLeg`/`bH`, plus a fourth for
+  children — one in seven TOURISTS only, with a head 22% too big for the body,
+  and kept out of the harbour plunge. Measured head-above-feet in Sydney is now
+  0.86 m to 1.47 m against a flat 1.44 before.
+- **The animal.** Whiskers, a sniff on the nose pad, ears that turn toward
+  whatever just happened, and a gaze that answers "who is speaking" and not
+  only "who has noticed me".
+- **The bubble.** Now the to-do card's own recipe with the tail left on.
+
+Measured, `game.faceAudit()`: roster rest 0.00 / eye 1.00, wheek 1.00 / eye
+1.55, chase −1.00 / brow +0.36; Venice locals rest −0.02, hot −0.70 / brow
++0.25, flinch +0.56 / eye 1.31; Pasto −1.00 / +0.36 off its own state machine.
+Ear turn 0.40 rad at eight metres and 0.007 at forty. Cost, paired A/B: +8
+draw calls in Sydney, +16 to +19 in a locals chapter, +250 to +1 600 triangles;
+frame time on the 16.6 ms cap both ways. 19/19 soak clean, audio green across
+13 chapters, build 9 214.5 KB.
+
+**Found on the way, and fixed:** `npc:startled` was emitted by the Sydney
+roster and nothing else, so the ear-turn was a two-chapter feature — now
+emitted from `localsReact` as well, but ONCE per bang, because systems.js
+answers it with a gasp, +0.06 chaos and a 2.5 s chase window. And the gait
+frequency is derived from stride so the feet do not ice-skate, but it used the
+`npcLEG_L` CONSTANT while everybody is scaled — wrong by up to a third once
+four builds exist, and it had to be defaulted because `paMove` also carries the
+llamas and the street dogs.
+
+**Not landed:** children in Rio and Manly. Those chapters' people are locals —
+hand-placed behind specific counters and stalls — so a child there is a
+placement and a script decision per person, not a build, and it is the one
+clause of P5 that is content rather than system. The Sydney and Quay crowd has
+them.
+
+
 **P6 — the through-line** (area 6, ~12 h, almost no code). One journal
 sentence per chapter in the finds' voice on the ledger leaf and the departure
 card; the Pantanal's souvenir and door line made the exception they should be

@@ -37,6 +37,16 @@ function npcDampAngle(cur, tgt, lambda, dt) {
 }
 /** PALETTE integer -> CSS colour string, for the DOM speech bubbles. */
 function npcCssHex(c) { return '#' + ('000000' + c.toString(16)).slice(-6); }
+// The tail is a rotated square and cannot sample the box's own gradient, so
+// the colour at the bottom of that gradient is computed here instead. A guess
+// (solid sandstone) is 34% too dark and reads as a differently coloured pip.
+function npcCssMix(a, b, k) {
+  const m = (s) => Math.round(((a >> s) & 255) * (1 - k) + ((b >> s) & 255) * k);
+  return 'rgb(' + m(16) + ',' + m(8) + ',' + m(0) + ')';
+}
+function npcCssRgba(c, a) {
+  return 'rgba(' + ((c >> 16) & 255) + ',' + ((c >> 8) & 255) + ',' + (c & 255) + ',' + a + ')';
+}
 
 /**
  * A DWELL DRAWN ONCE, NOT REDRAWN EVERY TICK.
@@ -551,6 +561,14 @@ const npcEDGE_STOP = -9.55;     // toes on the coping, still on the pavement
 const npcWATER_Z = -10.6;       // committed: past here you are swimming
 const npcSWIM_ZMIN = -16.0;     // how far out a flailing tourist can drift
 const npcPLUNGE_ODDS = 1 / 6;   // "roughly one in six", per contract brief
+// A child is a build, not a role — see THREE BUILDS in buildHuman.
+const npcCHILD_ODDS = 1 / 7;    // ...of TOURISTS, which is about two per crowd
+// MEASURED, not assumed: at 0.70 the head centre came out 0.86 m above the
+// feet, which is a 1.00 m child — a toddler. The rig's nominal 1.72 m is the
+// figure it was drawn to and not the figure it measures; the crown is nearer
+// 1.60. 0.82 puts the crown at 1.18 m, which is six or seven years old.
+const npcCHILD_H    = 0.82;
+const npcCHILD_HEAD = 1.22;     // ...with a head too big for it, which is the tell
 const npcSWIM_YOFF = -1.05;     // hips at the waterline, head plainly clear
 const npcSEA_BIAS = 0.80;       // how hard a bad startle is bent seaward
 // The fall itself is integrated, not damped: an ease-out is fastest at the
@@ -670,6 +688,73 @@ const npcPA_DOG_COOL = 12.0;    // …and then he is off duty for a while
 const npcPAcond = { ok: false, state: 'gone', mounted: false, x: 0, y: 0, z: 0, low: false };
 
 // ===========================================================================
+// FACES (v54).
+//
+// Everybody in this game was a box with a nose on it. The nose was put there
+// for one reason and it is written down at the line that adds it: without it
+// a figure turning to watch you is a cube rotating. It works — but it is the
+// whole face, and it means the cast can be startled, cornered, robbed, chased
+// off, praised and rained on and their expression never changes, because they
+// have not got one.
+//
+// Three states out of four nodes and no new geometry per person:
+//
+//   mood  -1 angry ......... 0 neutral ......... +1 wide
+//   blink  0 open ........................... 1 shut
+//
+// Everything below is a MATRIX — a scale on the eye pair, a rotation and a
+// centimetre of lift on each brow. That is deliberate: it costs the same on a
+// local's Object3D as on an instanced crowd's node, so one function drives
+// thirty hand-built figures and forty-five instanced ones.
+//
+// The signs are the whole thing and they are easy to get backwards. A figure
+// faces +z. rotation.z takes +x toward +y. The left brow sits at x < 0, so
+// its INNER end is its +x end and a positive rz lifts it; the right brow is
+// the mirror. Angry is inner-ends-DOWN (a V), wide is inner-ends-slightly-up
+// and the whole pair raised. Get one sign wrong and a furious market trader
+// is drawn looking mildly delighted, which is funny once.
+const npcEYE_WIDE  = 1.55;   // how much taller a wide eye is
+const npcEYE_SHUT  = 0.12;   // ...and how flat a shut one is
+const npcBROW_UP   = 0.032;  // m the brow lifts when the eyes go wide
+const npcBROW_DN   = 0.017;  // ...and drops when they narrow
+const npcBROW_TILT = 0.36;   // rad of inner-end-down at full anger
+const npcBROW_LIFT = 0.15;   // ...and of inner-end-up at full surprise
+const npcBLINK_MIN = 2.6;    // s between blinks
+const npcBLINK_MAX = 6.4;
+const npcBLINK_DUR = 0.11;   // ...and how long one takes. Two frames is a bug.
+/**
+ * @param f  {eyeN, browL, browR, browY} — browY is the rest height, because
+ *           the brow node is the thing being moved and cannot also be the
+ *           thing that remembers where it started.
+ */
+function npcFace(f, mood, blink) {
+  if (!f) return;
+  const up = mood > 0 ? mood : 0;
+  const dn = mood < 0 ? -mood : 0;
+  const open = (1 + up * (npcEYE_WIDE - 1)) * (1 - blink * (1 - npcEYE_SHUT));
+  // a wide eye is a little wider as well as taller, or it reads as a slot
+  f.eyeN.scale.set(1 + up * 0.16, open, 1);
+  // `upK` exists for one reason: a local's fringe sits 1.2 cm above their brow
+  // and the roster's does not, so the same lift that reads as astonishment on
+  // a tourist pushes a market trader's eyebrows inside their own hair.
+  const y = f.browY + up * npcBROW_UP * (f.upK || 1) - dn * npcBROW_DN;
+  f.browL.position.y = y;
+  f.browR.position.y = y;
+  const tilt = dn * npcBROW_TILT - up * npcBROW_LIFT;
+  f.browL.rotation.z = -tilt;
+  f.browR.rotation.z = tilt;
+}
+/** The blink clock. Returns 0..1 closed; call it once per person per frame. */
+function npcBlink(rec, dt) {
+  rec.blinkT -= dt;
+  if (rec.blinkT <= -npcBLINK_DUR) rec.blinkT = rand(npcBLINK_MIN, npcBLINK_MAX);
+  if (rec.blinkT > 0) return 0;
+  // a triangle, not a step: shut in half the window and open again in the rest
+  const k = -rec.blinkT / npcBLINK_DUR;
+  return k < 0.5 ? k * 2 : (1 - k) * 2;
+}
+
+// ===========================================================================
 export function createNPCs(game) {
   const scene = game.scene;
   const THREE_ = game.THREE || THREE;
@@ -689,6 +774,21 @@ export function createNPCs(game) {
     { w: 0.35, h: 0.13, d: 0.34, y: 0.30 },
     { w: 0.30, h: 0.18, d: 0.10, y: 0.17, z: -0.15 },
   ]);
+  // ---- THE FACE (v54) ---------------------------------------------------
+  // Both eyes in ONE geometry, because nothing in this game ever winks: that
+  // is one InstancedMesh for the pair instead of two. Both BROWS are one mesh
+  // too, at 2N instances indexed idx*2 — the same trick pLlamaL uses for four
+  // legs — because a brow has to rotate independently of its twin and a
+  // shared geometry cannot do that, but a shared BUFFER can.
+  //
+  // Geometry is centred on the origin so the instance matrix scales about the
+  // eye, not about the neck: an eye node offset inside its own geometry would
+  // slide down the face when it blinks.
+  const gEyes = npcMakeGeo([
+    { w: 0.058, h: 0.044, d: 0.02, x: -0.072 },
+    { w: 0.058, h: 0.044, d: 0.02, x: 0.072 },
+  ]);
+  const gBrow = npcMakeGeo([{ w: 0.092, h: 0.020, d: 0.022 }]);
   const gArm = npcMakeGeo([
     { w: 0.12, h: 0.48, d: 0.12, y: -0.24 },
     { w: 0.13, h: 0.13, d: 0.13, y: -0.53 },           // hand
@@ -774,6 +874,10 @@ export function createNPCs(game) {
   const iLegL  = mkInst(gLeg, HUMANS);
   const iLegR  = mkInst(gLeg, HUMANS);
   const iHat   = mkInst(gHat, HUMANS);
+  // the face: one instance for the pair of eyes, two for the brows (see
+  // FACES). Two extra draw calls buys an expression for thirty-two people.
+  const iEyes  = mkInst(gEyes, HUMANS);
+  const iBrow  = mkInst(gBrow, HUMANS * 2);
   const iCam   = mkInst(gCam, HUMANS);
   const iTool  = mkInst(gTool, HUMANS);
   const iCone  = mkInst(gCone, HUMANS);
@@ -864,20 +968,46 @@ export function createNPCs(game) {
   // Pure DOM, in the HUD layer: no textures, no extra GPU state, crisp text.
   const BUB = 4;
   const bubbles = [];
+  // ---- A BUBBLE IS PAPER (v54) -------------------------------------------
+  // This was the third UI dialect in the game. The to-do card, the journal,
+  // the pause card and the title are one printed sheet — PALETTE.sail under a
+  // warm rake and a laid texture, PALETTE.sailShade at the edge, ibisHead ink,
+  // a 7 px corner and three shadows, of which the tight one is the contact
+  // with the surface. A speech bubble was a 13 px white pill with a
+  // sandstoneDark hairline, bold near-black text and one soft drop shadow: a
+  // different paper, a different edge, a different ink and a different corner,
+  // from a different game.
+  //
+  // Everything below is the card's own recipe with the tail left on. The tail
+  // is what makes it speech; the pill was never doing that job.
+  const bubPaper = npcCssHex(PALETTE.sail);
+  const bubEdge = npcCssHex(PALETTE.sailShade);
   const BUB_CSS =
     'position:absolute;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;' +
     'display:none;opacity:0;white-space:nowrap;' +
     'font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;' +
-    'font-weight:700;font-size:15px;line-height:1.15;padding:7px 13px 8px;border-radius:13px;' +
-    'background:' + npcCssHex(PALETTE.sail) + ';color:' + npcCssHex(PALETTE.capyEye) + ';' +
-    'border:1.5px solid ' + npcCssHex(PALETTE.sandstoneDark) + ';' +
-    'box-shadow:0 6px 14px ' + npcCssHex(PALETTE.stoneDark) + '55;' +
+    'font-weight:600;font-size:15px;line-height:1.15;padding:7px 13px 8px;border-radius:7px;' +
+    'background:' + bubPaper + ';color:' + npcCssHex(PALETTE.ibisHead) + ';' +
+    'background-image:linear-gradient(158deg,' + npcCssRgba(PALETTE.sail, 1) + ' 0%,' +
+    npcCssRgba(PALETTE.sandstone, 0.34) + ' 100%),' +
+    'repeating-linear-gradient(92deg,' + npcCssRgba(PALETTE.stoneDark, 0.05) + ' 0 1px,' +
+    'transparent 1px 4px);' +
+    'border:1px solid ' + bubEdge + ';' +
+    // the card's three: contact, lift, and the wide one that puts it in a room
+    'box-shadow:0 1px 2px ' + npcCssRgba(PALETTE.screenShadow, 0.16) + ',' +
+    '0 4px 9px ' + npcCssRgba(PALETTE.screenShadow, 0.16) + ',' +
+    '0 14px 30px ' + npcCssRgba(PALETTE.screenShadow, 0.10) + ';' +
     'transform-origin:50% 100%;will-change:transform,opacity;';
+  // The tail carries the SOLID paper, not the gradient: a 10 px square with a
+  // 158-degree rake across it samples one flat colour anyway, and the top-left
+  // end of that gradient does not match the bottom edge of the box it hangs
+  // off — so it reads as a differently coloured pip rather than as the same
+  // sheet coming to a point.
   const TAIL_CSS =
     'position:absolute;left:50%;bottom:-6px;width:10px;height:10px;margin-left:-5px;' +
-    'transform:rotate(45deg);background:' + npcCssHex(PALETTE.sail) + ';' +
-    'border-right:1.5px solid ' + npcCssHex(PALETTE.sandstoneDark) + ';' +
-    'border-bottom:1.5px solid ' + npcCssHex(PALETTE.sandstoneDark) + ';';
+    'transform:rotate(45deg);background:' + npcCssMix(PALETTE.sail, PALETTE.sandstone, 0.34) + ';' +
+    'border-right:1px solid ' + bubEdge + ';' +
+    'border-bottom:1px solid ' + bubEdge + ';';
   for (let i = 0; i < BUB; i++) {
     const el = document.createElement('div');
     el.style.cssText = BUB_CSS;
@@ -887,6 +1017,16 @@ export function createNPCs(game) {
     const txt = document.createElement('span');
     el.appendChild(txt);
     bubbles.push({ el, txt, mounted: false, owner: null, t: 0, life: 0, shown: false, ox: 0 });
+  }
+
+  // The live speaker, for the capybara gaze. One object, rewritten in place:
+  // the gaze asks for it every capyGAZE_TICK and an allocation per line would
+  // be an allocation per line for ever.  is on it because locals are
+  // shared space and a Venetian must not be looked at from a glacier.
+  const npcSpeak = { x: 0, y: 0, z: 0, t: 0, biome: '' };
+  function npcSpeaker() {
+    return npcSpeak.t > 0 && npcSpeak.biome === (game.biome ? game.biome.current : '')
+      ? npcSpeak : null;
   }
 
   function sayBubble(npcRec, text) {
@@ -904,6 +1044,19 @@ export function createNPCs(game) {
     slot.t = 0;
     slot.ox = 0;
     slot.life = 1.7 + text.length * 0.05;
+    // ---- SOMEBODY IS TALKING TO YOU (v54) --------------------------------
+    // Published for the capybara's gaze, which had a list of things worth
+    // looking at that did not include a person mid-sentence: the animal would
+    // turn to somebody who had NOTICED it and ignore somebody who was actually
+    // speaking. This is a bare read of the owner's position at the moment the
+    // line lands, plus a clock, so nothing has to walk the bubble list.
+    const og = npcRec && (npcRec.group ? npcRec.group.position
+                          : (npcRec.anchor && npcRec.anchor.group ? npcRec.anchor.group.position : null));
+    if (og && og.x === og.x) {
+      npcSpeak.x = og.x; npcSpeak.y = og.y; npcSpeak.z = og.z;
+      npcSpeak.t = slot.life;
+      npcSpeak.biome = game.biome ? game.biome.current : '';
+    }
     slot.txt.textContent = text;
     // ---- AND MEASURE IT, ONCE, HERE ------------------------------------
     // The size is needed every frame to keep the box on screen, and
@@ -974,6 +1127,11 @@ export function createNPCs(game) {
     if (!m) { m = new THREE_.MeshLambertMaterial({ color: hex }); npcLocMats[hex] = m; }
     return m;
   }
+  // built once for every local in the game — see buildLocalFigure
+  const npcLocEyeGeo = npcMakeGeo([
+    { w: 0.050, h: 0.038, d: 0.018, x: -0.058 },
+    { w: 0.050, h: 0.038, d: 0.018, x: 0.058 },
+  ]);
   function npcLocPart(w, h, d, hex, x, y, z) {
     const m = new THREE_.Mesh(new THREE_.BoxGeometry(w, h, d), npcLocMat(hex));
     m.position.set(x, y, z);
@@ -992,6 +1150,16 @@ export function createNPCs(game) {
     const shirt = o.shirt || npcLOC_SHIRT[randInt(0, npcLOC_SHIRT.length - 1)];
     const legs = o.legs || npcLOC_LEG[randInt(0, npcLOC_LEG.length - 1)];
     const g = new THREE_.Group();
+    // ---- THREE BUILDS (v54) ----------------------------------------------
+    // A group scale, not a rebuild: the figure's origin is between its feet,
+    // so scaling here changes the person and never lifts them off the floor.
+    // The spread is deliberately smaller than the roster's — a local is placed
+    // by hand behind a specific counter and a 15 cm change of height would put
+    // some of them chin-deep in their own stall.
+    const arch = randInt(0, 2);
+    const bH = [0.955, 1.0, 1.045][arch] * rand(0.99, 1.01);
+    const bGirth = [1.13, 1.0, 0.91][arch] * rand(0.99, 1.01);
+    g.scale.set(bGirth, bH, bGirth);
     g.add(npcLocPart(0.17, 0.78, 0.19, legs, -0.12, 0.39, 0));
     g.add(npcLocPart(0.17, 0.78, 0.19, legs, 0.12, 0.39, 0));
     g.add(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0));
@@ -1000,11 +1168,37 @@ export function createNPCs(game) {
     const headN = new THREE_.Object3D();
     headN.position.set(0, 1.42, 0);
     headN.add(npcLocPart(0.26, 0.30, 0.25, skin, 0, 0.15, 0));
-    headN.add(npcLocPart(0.28, 0.10, 0.27, hair, 0, 0.29, -0.01));
+    // 1.5 cm higher than it used to sit, so a brow at full surprise clears
+    // the fringe instead of vanishing into it. Still 4.5 cm of overlap with
+    // the skull, so there is no gap between hair and head at any angle.
+    headN.add(npcLocPart(0.28, 0.10, 0.27, hair, 0, 0.305, -0.01));
     // the nose. One box, 4 cm, and it is the only reason the head has a FRONT
     // - without it a figure turning to watch you is a cube rotating.
     headN.add(npcLocPart(0.05, 0.05, 0.05, skin, 0, 0.15, 0.14));
     if (o.hat) headN.add(npcLocPart(0.42, 0.05, 0.42, o.hat, 0, 0.35, 0));
+    // ---- ...AND THE REST OF THE FACE (v54) -------------------------------
+    // The nose has been carrying this on its own since the locals were built.
+    // Two eyes and two brows on nodes of their own — the boxes hang off the
+    // node at the origin so the node's scale is about the eye, not the neck.
+    // Head front face is z = +0.125; 4 mm proud so nothing z-fights at range.
+    // ONE mesh for the pair, not two. A local is a hand-built Group and every
+    // box in it is its own draw call — the roster gets its faces for two calls
+    // total because it is instanced, and these do not. Nothing ever winks, so
+    // the two eyes are one merged geometry and the count goes 4 -> 3 per
+    // person, which across eight locals in a chapter is eight calls saved for
+    // no loss at all.
+    const eyeN = new THREE_.Object3D();
+    eyeN.position.set(0, 0.176, 0.129);
+    const eyeM = new THREE_.Mesh(npcLocEyeGeo, npcLocMat(PALETTE.capyEye));
+    eyeM.castShadow = true;
+    eyeN.add(eyeM);
+    const browL = new THREE_.Object3D();
+    const browR = new THREE_.Object3D();
+    browL.position.set(-0.062, 0.230, 0.129);
+    browR.position.set(0.062, 0.230, 0.129);
+    browL.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
+    browR.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
+    headN.add(eyeN); headN.add(browL); headN.add(browR);
     g.add(headN);
     const armL = new THREE_.Object3D(); armL.position.set(-0.30, 1.32, 0);
     const armR = new THREE_.Object3D(); armR.position.set(0.30, 1.32, 0);
@@ -1013,7 +1207,10 @@ export function createNPCs(game) {
     armL.add(npcLocPart(0.12, 0.13, 0.13, skin, 0, -0.60, 0));
     armR.add(npcLocPart(0.12, 0.13, 0.13, skin, 0, -0.60, 0));
     g.add(armL); g.add(armR);
-    return { group: g, head: headN, armL: armL, armR: armR };
+    return { group: g, head: headN, armL: armL, armR: armR,
+             face: { eyeN: eyeN, browL: browL, browR: browR,
+                     browY: 0.228, upK: 0.6 },
+             arch: arch };
   }
 
   // =======================================================================
@@ -1423,6 +1620,11 @@ export function createNPCs(game) {
       // what the other sixty-odd people use.
       onTask: o.onTask || null, praise: o.praise || null,
       fig: fig, gest: 0,
+      // the face (see FACES). `mood` is damped here rather than recomputed,
+      // because the things that drive it — the flinch spring, the guard, a
+      // prop of theirs on the floor — are three separate clocks and a face
+      // that switched between them instantly would strobe.
+      blinkT: rand(0, npcBLINK_MAX), mood: 0,
       // What they say when the world does something to them. All optional; a
       // local that names none of them falls back on npcLOC_SAY, so every
       // person already registered in every chapter gets the whole vocabulary
@@ -1649,6 +1851,8 @@ export function createNPCs(game) {
               * (1 + npcHeatAt(x, z) * (npcHEAT_LOOK - 1));
     const r2 = r * r;
     const s = clamp(strength === undefined ? 1 : strength, 0, 1);
+    // who jumped hardest — see the emit after the loop
+    let loud = null, loudK = 0;
     // ---- WAS THIS YOU? (v19) ---------------------------------------------
     // Wariness is a memory of what the ANIMAL did, so it may only be set by an
     // event the animal was standing next to. localsReact is also how a chapter
@@ -1677,6 +1881,12 @@ export function createNPCs(game) {
       if (kick > 0.06) {
         L.flV -= kick * 21;
         L.flYaw = Math.atan2(dx, dz);          // they turn TOWARD the bang
+        // ...and the loudest reaction is remembered so ONE npc:startled can
+        // be emitted after the loop. Not here: systems.js answers that event
+        // with a gasp, +0.06 chaos and a two-and-a-half second chase window,
+        // so emitting per person would make a crate landing beside five
+        // people five simultaneous gasps and a third of the chaos bar.
+        if (kick > loudK) { loudK = kick; loud = L; }
         // ...and they remember it was you, for about half a minute.
         if (mine) L.wary = Math.min(1, (L.wary || 0) + kick);
       }
@@ -1699,6 +1909,13 @@ export function createNPCs(game) {
     // its own bang — a crate off a barrow, a gate, a wave — may not make the
     // square cross with the animal that was nowhere near it.
     if (mine) npcHeatBump(x, z, 'react:' + kind);
+    // ---- ...AND THE CAPYBARA HEARS IT (v54) -----------------------------
+    // npc:startled was emitted by the Sydney roster and by nothing else, so
+    // the ear-turn it drives was a two-chapter feature in a nineteen-chapter
+    // game. A local being made to jump is the same event. ONE of them, for
+    // the person who jumped hardest, through emit() so the payload has the
+    // { npc } shape every other listener already unwraps.
+    if (loud) emit('npc:startled', loud);
   }
 
   // =======================================================================
@@ -3321,6 +3538,20 @@ export function createNPCs(game) {
                                        - hold * 0.20 - fold * 0.34, armR, dt);
           r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z,
                                        f * 0.4 + fold * 0.34, armL, dt);
+          // ---- THE FACE (v54) ---------------------------------------------
+          // Every input here already existed and none of it was drawn above
+          // the neck: the flinch spring, the guard that goes up when the
+          // square is hot, the errand that has them crossing the square to
+          // pick their own crate up off the floor, and the huddle in the rain.
+          //
+          // The huddle counts as CROSS, at a third weight. Somebody caught in
+          // a shower is not angry, but the eyes narrow the same way, and it is
+          // the one mood input in this game that is nothing to do with the
+          // capybara — which is exactly why it is worth having.
+          const cross = Math.max(r.own ? 0.85 : 0, r.grd * 0.7, r.hud * 0.35);
+          const mTgt = f > cross ? f : -cross;
+          r.mood = damp(r.mood, mTgt, Math.abs(mTgt) > Math.abs(r.mood) ? 15 : 3.2, dt);
+          npcFace(r.fig.face, r.mood, npcBlink(r, dt));
         }
       }
       // ---- and they say something the first time you arrive -------------
@@ -3622,9 +3853,16 @@ export function createNPCs(game) {
     const legR = new THREE_.Object3D();
     const holdN = new THREE_.Object3D();   // guitar / waiter's tray, carried on the chest
 
+    // the face — see npcFace. Three nodes, no geometry: the two eyes are one
+    // instance and the two brows are two instances of the same buffer.
+    const eyeN = new THREE_.Object3D();
+    const browL = new THREE_.Object3D();
+    const browR = new THREE_.Object3D();
+
     root.add(bob); root.add(legL); root.add(legR);
     bob.add(head); bob.add(armL); bob.add(armR);
     head.add(hatN);
+    head.add(eyeN); head.add(browL); head.add(browR);
     armR.add(handR); handR.add(camN); handR.add(toolN); handR.add(coneN);
     bob.add(holdN);
     holdN.position.set(0.02, 1.02, 0.20);
@@ -3639,13 +3877,58 @@ export function createNPCs(game) {
     coneN.position.set(0, -0.02, 0.12);
     legL.position.set(-0.13, 0.62, 0);
     legR.position.set(0.13, 0.62, 0);
+    // gHead is 0.32 deep centred at y 0.16, so the face is the z = +0.155
+    // plane. 3 mm proud of it, or the brow z-fights the forehead at range.
+    eyeN.position.set(0, 0.192, 0.158);
+    browL.position.set(-0.072, 0.253, 0.158);
+    browR.position.set(0.072, 0.253, 0.158);
     hatN.scale.setScalar(0);
     camN.scale.setScalar(0);
     toolN.scale.setScalar(0);
     coneN.scale.setScalar(0);
 
-    const build = kind === 'ibis' ? 1 : rand(0.93, 1.08);
-    root.scale.setScalar(build);
+    // ---- THREE BUILDS (v54) ---------------------------------------------
+    // A crowd of forty-five people was forty-five copies of one skeleton at
+    // 0.93 to 1.08 scale, which is a 15 cm spread on height and NOTHING on
+    // shape: from six metres they read as one man printed forty-five times in
+    // different shirts. Three archetypes, picked once, cost nothing — they are
+    // a scale on nodes that already exist.
+    //
+    // `bGirth` goes on `bob`, which carries the torso, the hips and the arm
+    // ROOTS, so a heavy build is also a wider stance — and the head is
+    // divided back out, because a wide man does not have a wide skull.
+    // `bLeg` cannot be a second write on legL.scale.y: animHuman already owns
+    // that line for the crouch, so it multiplies INTO it there.
+    // The height spread is SMALL because bLeg already carries some of it: the
+    // hip pivot goes up, and the torso goes up with it or the feet leave the
+    // ground. Short-stout ends up about 1.58 m and tall-thin about 1.83 m.
+    const arch = kind === 'ibis' ? 1 : randInt(0, 2);
+    // ---- ...AND SOME OF THEM ARE CHILDREN (v54) -------------------------
+    // A fourth build rather than a fourth ROLE. Everything a small person in
+    // a crowd needs is already here — they wander, they queue, they startle,
+    // they take photographs — and giving them a state machine of their own
+    // would be nineteen new behaviours to keep working for one silhouette.
+    // What a child is, mechanically, is a 1.20 m tourist with short legs and
+    // a big head who takes quicker steps, and that is four numbers.
+    //
+    // TOURISTS ONLY, and one in seven of those. A child gardener is not a
+    // joke, it is a mistake; and a crowd that is a third children reads as a
+    // school trip, which Sydney is not.
+    const child = kind === 'tourist' && Math.random() < npcCHILD_ODDS;
+    const bH = kind === 'ibis' ? 1
+      : child ? npcCHILD_H * rand(0.96, 1.04)
+      : [0.95, 1.0, 1.03][arch] * rand(0.98, 1.02);
+    const bGirth = kind === 'ibis' ? 1
+      : child ? 1.10 : [1.16, 1.0, 0.89][arch] * rand(0.98, 1.02);
+    const bLeg = kind === 'ibis' ? 1 : child ? 0.86 : [0.90, 1.0, 1.09][arch];
+    root.scale.setScalar(bH);
+    bob.scale.set(bGirth, 1, bGirth);
+    // ...and a child's head is BIGGER relative to the body, not smaller.
+    // Scaling a whole person down uniformly makes a scale model of an
+    // adult, which reads as a distant adult and not as a child at all —
+    // the head is the one proportion that says how old somebody is.
+    const headK = child ? npcCHILD_HEAD : 1;
+    head.scale.set(headK / bGirth, headK, headK / bGirth);
 
     const rec = {
       id: 'npc' + idx,
@@ -3657,7 +3940,14 @@ export function createNPCs(game) {
       target: new THREE_.Vector3(),
       heldProp: null,
       idx,
-      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, legL, legR, holdN },
+      nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, legL, legR, holdN,
+               eyeN, browL, browR },
+      // the face pack npcFace() takes, and the two clocks that drive it
+      face: { eyeN: eyeN, browL: browL, browR: browR, browY: 0.253 },
+      blinkT: rand(0, npcBLINK_MAX), mood: 0,
+      // build (see THREE BUILDS above). bLeg is read by animHuman, which is
+      // the only place allowed to touch legL.scale.y.
+      bH: bH, bGirth: bGirth, bLeg: bLeg, arch: child ? 3 : arch, child: child,
       yaw: rand(-Math.PI, Math.PI),
       speed: 0,
       wantSpeed: 0,
@@ -3723,6 +4013,8 @@ export function createNPCs(game) {
     iLegL.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
     iLegR.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
     iHat.setColorAt(rec.idx, npcColor.setHex(rec.cHat).multiplyScalar(k));
+    iBrow.setColorAt(rec.idx * 2, npcColor.setHex(rec.cHr).multiplyScalar(1 - wet * 0.30));
+    iBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(rec.cHr).multiplyScalar(1 - wet * 0.30));
     rec.wetShade = wet;
     colorDirty = true;
   }
@@ -3740,6 +4032,12 @@ export function createNPCs(game) {
     iLegL.setColorAt(rec.idx, npcColor.setHex(cHips));
     iLegR.setColorAt(rec.idx, npcColor.setHex(cHips));
     iHat.setColorAt(rec.idx, npcColor.setHex(cHat));
+    // The brow is the HAIR colour, which is why it never needed a palette
+    // entry of its own and why a blond and a black-haired man read
+    // differently at range with no extra state.
+    iEyes.setColorAt(rec.idx, npcColor.setHex(PALETTE.capyEye));
+    iBrow.setColorAt(rec.idx * 2, npcColor.setHex(cHair));
+    iBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(cHair));
     iCam.setColorAt(rec.idx, npcColor.setHex(cCam));
     iTool.setColorAt(rec.idx, npcColor.setHex(PALETTE.wood));
     iCone.setColorAt(rec.idx, npcColor.setHex(PALETTE.cloth6));
@@ -4105,6 +4403,8 @@ export function createNPCs(game) {
   iLegL.instanceColor.needsUpdate = true;
   iLegR.instanceColor.needsUpdate = true;
   iHat.instanceColor.needsUpdate = true;
+  iEyes.instanceColor.needsUpdate = true;
+  iBrow.instanceColor.needsUpdate = true;
   iCam.instanceColor.needsUpdate = true;
   iTool.instanceColor.needsUpdate = true;
   iCone.instanceColor.needsUpdate = true;
@@ -4325,7 +4625,21 @@ export function createNPCs(game) {
       // gait frequency derived from the stride the legs actually produce, so the
       // feet stay locked to the ground instead of ice-skating.
       const gAmp = clamp(rec.speed / 1.7, 0, 1.15);
-      const stride = 2 * npcLEG_L * Math.sin(0.72 * gAmp);
+      // THE STRIDE IS THIS PERSON'S, not the rig's. npcLEG_L is a constant and
+      // every one of these people is scaled: with three builds and a child in
+      // the crowd the same constant is wrong by up to a third, and the whole
+      // point of deriving gait frequency from stride is that the feet stay
+      // locked to the ground instead of ice-skating. bLeg is the leg, bH is
+      // the scale on the root, and the speed being divided into it is in world
+      // metres — so both belong here.
+      // ...DEFAULTED, because paMove also carries the llamas and the street
+      // dogs, and paBuildBeast has no build fields on it. Undefined does not
+      // throw here, it makes stride NaN, NaN > 0.02 is false, and every animal
+      // in Pasto quietly falls through to the idle 0.4 rad/s and stops moving
+      // its legs in time with the ground. A silent gait regression on two
+      // species is exactly the shape this file keeps finding.
+      const bl = rec.bLeg || 1, bh = rec.bH || 1;
+      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp);
       if (stride > 0.02) rec.walkPhase += (Math.PI * rec.speed / stride) * dt + dt * 0.4;
       else rec.walkPhase += dt * 0.4;
     } else {
@@ -4860,7 +5174,11 @@ export function createNPCs(game) {
     const l2 = Math.sqrt(dx * dx + dz * dz) || 1;
     dx /= l2; dz /= l2;
     // Only a seaward retreat can end in the drink, and only one in six does.
-    rec.plunge = (dz < -0.3) && (Math.random() < npcPLUNGE_ODDS);
+    // NOT THE CHILDREN. One in six badly startled Sydneysiders backs off
+    // the sea wall into the harbour, which is funny about an adult in a
+    // suit and is not funny at all about a seven year old. They stop at
+    // the coping and flail like everybody else who does not go in.
+    rec.plunge = (dz < -0.3) && !rec.child && (Math.random() < npcPLUNGE_ODDS);
     rec.zMin = rec.plunge ? npcSWIM_ZMIN : npcEDGE_STOP;
     rec.target.set(
       clamp(rec.group.position.x + dx * 12, npcBOUND_X0, npcBOUND_X1), 0,
@@ -5857,6 +6175,31 @@ export function createNPCs(game) {
     animHuman(rec, dt);
   }
 
+  // ---- WHAT A FACE IS FOR ------------------------------------------------
+  // The states were all already here; not one of them was drawn above the
+  // neck. `alarm` is the startle level and damps out on its own, so it does
+  // the work for anything sudden; the state names do the rest.
+  //
+  // Wide is surprise AND delight — a tourist lining up a photograph of a
+  // capybara has the same eyes as one who has just been barged into, and that
+  // is right: the joke is that the animal is the biggest thing happening to
+  // any of these people all day.
+  const npcMOOD_WIDE = { startled: 1, cornered: 1, plunge: 1, swim: 0.75,
+                         fluster: 0.85, flee: 0.9, photo: 0.6 };
+  const npcMOOD_CROSS = { chase: 1, shoo: 0.9, retrieve: 0.7 };
+  function npcMoodOf(rec) {
+    const s = rec.state;
+    const cross = npcMOOD_CROSS[s] || 0;
+    if (cross > 0) return -cross;
+    // a grudge (Pasto) or a thing of theirs on the floor (Sydney) is a scowl
+    // that outlives the state that caused it
+    const sour = Math.max(rec.grudge > 0 ? 0.65 : 0,
+                          rec.dejected > 0 && rec.dejectStage === 0 ? 0.5 : 0);
+    const wide = Math.max(npcMOOD_WIDE[s] || 0, rec.alarm * 0.85);
+    if (wide > sour) return wide;
+    return -sour;
+  }
+
   function animHuman(rec, dt) {
     const n = rec.nodes;
     // hop (startle)
@@ -5882,10 +6225,15 @@ export function createNPCs(game) {
     const seatK = rec.seatPose * npcSEAT_LEG;
     n.legL.rotation.x = s * amp * 0.72 + seatK;
     n.legR.rotation.x = -s * amp * 0.72 + seatK;
-    // legs live on the root, so they have to follow the hips down by hand
-    const legK = 1 + rec.poseCrouch / npcLEG_L;
-    n.legL.position.y = npcLEG_L + rec.poseCrouch;
-    n.legR.position.y = npcLEG_L + rec.poseCrouch;
+    // legs live on the root, so they have to follow the hips down by hand.
+    // `bLeg` is the build (see THREE BUILDS in buildHuman) and multiplies IN
+    // here rather than being a second write on scale.y from the builder —
+    // two writers on one scale is the trap this file has hit before, and the
+    // one that wins is whichever ran last.
+    const hipY = npcLEG_L * rec.bLeg + rec.poseCrouch;
+    const legK = hipY / npcLEG_L;
+    n.legL.position.y = hipY;
+    n.legR.position.y = hipY;
     n.legL.scale.y = legK;
     n.legR.scale.y = legK;
     n.armL.rotation.x = rec.poseArmL - s * amp * 0.58 * maskL;
@@ -5937,7 +6285,10 @@ export function createNPCs(game) {
     // bob sits at the feet, so compensate the lean back to a hip-height pivot —
     // otherwise a bending gardener swings his head a metre out in front of him.
     const cl = Math.cos(rec.poseLean), sl = Math.sin(rec.poseLean);
-    n.bob.position.y = rec.poseCrouch + breathe + Math.abs(c) * 0.05 * amp + npcHIP_Y - npcHIP_Y * cl;
+    // ...and the torso rides UP with a long-legged build, or a tall-thin man
+    // is drawn with his hips six centimetres inside his own waistband.
+    n.bob.position.y = rec.poseCrouch + breathe + Math.abs(c) * 0.05 * amp + npcHIP_Y - npcHIP_Y * cl
+                       + npcLEG_L * (rec.bLeg - 1);
     n.bob.position.x = (1 - amp) * Math.sin(game.state.time * 0.5 + rec.idlePhase) * 0.03;
     n.bob.position.z = -npcHIP_Y * sl;
     n.bob.rotation.x = rec.poseLean;
@@ -5963,6 +6314,21 @@ export function createNPCs(game) {
       : (rec.state === 'work' ? 0.2 : (rec.dejectStage === 0 && rec.dejected > 0 ? 0.55 : 0));
     rec.headPitch = damp(rec.headPitch, pitchTgt - rec.poseLean * 0.8, 7, dt);
     n.head.rotation.x = rec.headPitch;
+
+    // ---- THE FACE (v54) --------------------------------------------------
+    // Both crowds come through here, so this is the only place either of them
+    // gets an expression. It goes BEFORE updateMatrixWorld because the eye and
+    // brow nodes are children of the head and the instance push reads their
+    // world matrices — set after the update and every face is one frame late,
+    // which on a startle is exactly the frame that matters.
+    //
+    // A face comes on fast and goes off slowly. Somebody who has just had a
+    // capybara go past at seven metres a second does not relax over the same
+    // interval they tensed over, and a symmetric damp reads as a mask being
+    // swapped rather than as a person.
+    const mTgt = npcMoodOf(rec);
+    rec.mood = damp(rec.mood, mTgt, Math.abs(mTgt) > Math.abs(rec.mood) ? 15 : 3.2, dt);
+    npcFace(rec.face, rec.mood, npcBlink(rec, dt));
 
     rec.group.updateMatrixWorld(true);
 
@@ -6045,6 +6411,7 @@ export function createNPCs(game) {
   let paCursor = 0;
   let paLlamaMade = 0, paDogMade = 0;
   let pTorso = null, pHips = null, pHead = null, pHair = null, pArmL = null, pArmR = null;
+  let pEyes = null, pBrow = null;
   let pLegL = null, pLegR = null, pHat = null, pTool = null, pBroom = null;
   let pLlamaB = null, pLlamaN = null, pLlamaL = null, pLlamaT = null;
   let pDogB = null, pDogH = null, pDogL = null, pDogT = null;
@@ -6384,7 +6751,21 @@ export function createNPCs(game) {
       rec.group.position.z = nz;
       rec.yaw = npcDampAngle(rec.yaw, Math.atan2(rec.moveX, rec.moveZ), 7, dt);
       const gAmp = clamp(rec.speed / 1.7, 0, 1.15);
-      const stride = 2 * npcLEG_L * Math.sin(0.72 * gAmp);
+      // THE STRIDE IS THIS PERSON'S, not the rig's. npcLEG_L is a constant and
+      // every one of these people is scaled: with three builds and a child in
+      // the crowd the same constant is wrong by up to a third, and the whole
+      // point of deriving gait frequency from stride is that the feet stay
+      // locked to the ground instead of ice-skating. bLeg is the leg, bH is
+      // the scale on the root, and the speed being divided into it is in world
+      // metres — so both belong here.
+      // ...DEFAULTED, because paMove also carries the llamas and the street
+      // dogs, and paBuildBeast has no build fields on it. Undefined does not
+      // throw here, it makes stride NaN, NaN > 0.02 is false, and every animal
+      // in Pasto quietly falls through to the idle 0.4 rad/s and stops moving
+      // its legs in time with the ground. A silent gait regression on two
+      // species is exactly the shape this file keeps finding.
+      const bl = rec.bLeg || 1, bh = rec.bH || 1;
+      const stride = 2 * npcLEG_L * bl * bh * Math.sin(0.72 * gAmp);
       if (stride > 0.02) rec.walkPhase += (Math.PI * rec.speed / stride) * dt + dt * 0.4;
       else rec.walkPhase += dt * 0.4;
     } else {
@@ -7206,6 +7587,9 @@ export function createNPCs(game) {
     pLegL.setColorAt(rec.idx, npcColor.setHex(cH));
     pLegR.setColorAt(rec.idx, npcColor.setHex(cH));
     pHat.setColorAt(rec.idx, npcColor.setHex(cHat));
+    pEyes.setColorAt(rec.idx, npcColor.setHex(PALETTE.capyEye));
+    pBrow.setColorAt(rec.idx * 2, npcColor.setHex(cHr));
+    pBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(cHr));
     pTool.setColorAt(rec.idx, npcColor.setHex(cTool));
     pBroom.setColorAt(rec.idx, npcColor.setHex(cTool));
     paColorDirty = true;
@@ -7342,6 +7726,8 @@ export function createNPCs(game) {
     pLegL = mkInst(gLeg, PA_H);
     pLegR = mkInst(gLeg, PA_H);
     pHat = mkInst(gHat, PA_H);
+    pEyes = mkInst(gEyes, PA_H);
+    pBrow = mkInst(gBrow, PA_H * 2);
     pTool = mkInst(gTool, PA_H);
     pBroom = mkInst(gBroom, PA_H);
     pLlamaB = mkInst(gLlamaBody, PA_LL);
@@ -7551,6 +7937,8 @@ export function createNPCs(game) {
     pLegL.instanceColor.needsUpdate = true;
     pLegR.instanceColor.needsUpdate = true;
     pHat.instanceColor.needsUpdate = true;
+    pEyes.instanceColor.needsUpdate = true;
+    pBrow.instanceColor.needsUpdate = true;
     pTool.instanceColor.needsUpdate = true;
     pBroom.instanceColor.needsUpdate = true;
   }
@@ -7563,6 +7951,9 @@ export function createNPCs(game) {
       pHead.setMatrixAt(i, n.head.matrixWorld);
       pHair.setMatrixAt(i, n.head.matrixWorld);
       pHat.setMatrixAt(i, n.hatN.matrixWorld);
+      pEyes.setMatrixAt(i, n.eyeN.matrixWorld);
+      pBrow.setMatrixAt(i * 2, n.browL.matrixWorld);
+      pBrow.setMatrixAt(i * 2 + 1, n.browR.matrixWorld);
       pArmL.setMatrixAt(i, n.armL.matrixWorld);
       pArmR.setMatrixAt(i, n.armR.matrixWorld);
       pLegL.setMatrixAt(i, n.legL.matrixWorld);
@@ -7575,6 +7966,8 @@ export function createNPCs(game) {
     pHead.instanceMatrix.needsUpdate = true;
     pHair.instanceMatrix.needsUpdate = true;
     pHat.instanceMatrix.needsUpdate = true;
+    pEyes.instanceMatrix.needsUpdate = true;
+    pBrow.instanceMatrix.needsUpdate = true;
     pArmL.instanceMatrix.needsUpdate = true;
     pArmR.instanceMatrix.needsUpdate = true;
     pLegL.instanceMatrix.needsUpdate = true;
@@ -7792,6 +8185,8 @@ export function createNPCs(game) {
       npcV2.project(game.camera);
       if (npcV2.z < 1) { capyNX = npcV2.x; capyNY = npcV2.y; }
     }
+    // the speaker clock, run once rather than per bubble — see npcSpeaker
+    if (npcSpeak.t > 0) npcSpeak.t -= dt;
     for (let i = 0; i < BUB; i++) {
       const b = bubbles[i];
       if (!b.owner) continue;
@@ -8320,6 +8715,48 @@ export function createNPCs(game) {
     }
   }
 
+  /**
+   * Every face in the live chapter, from both crowds and the locals, as what
+   * the geometry is actually doing. `browT` is the tilt in radians read back
+   * off the node: positive is inner-end-DOWN, which is the scowl.
+   */
+  function npcFaceAudit() {
+    const out = [];
+    const live = game.biome ? game.biome.current : '';
+    const take = (id, kind, rec, f, mood, st, headN, foot) => {
+      if (!f) return;
+      let hd = 0, fy = 0;
+      if (headN && foot) { headN.getWorldPosition(npcV1); hd = npcV1.y; fy = foot.position.y; }
+      out.push({ id: id, kind: kind, state: st || '', mood: Math.round(mood * 100) / 100,
+                 eyeY: Math.round(f.eyeN.scale.y * 100) / 100,
+                 eyeX: Math.round(f.eyeN.scale.x * 100) / 100,
+                 browY: Math.round((f.browL.position.y - f.browY) * 1000) / 1000,
+                 browT: Math.round(-f.browL.rotation.z * 100) / 100,
+                 arch: rec.arch === undefined ? -1 : rec.arch,
+                 // HEAD ABOVE THE FEET, in world metres. Not group.scale.y
+                 // times a nominal 1.72: bLeg lifts the torso as well as the
+                 // hip, so the scale on the root is not the height. A build
+                 // has to be a measurement of the thing that gets drawn.
+                 h: hd ? Math.round((hd - fy) * 100) / 100 : -1 });
+    };
+    if (biomeLive()) {
+      for (let i = 0; i < humans.length; i++) {
+        const r = humans[i];
+        take(r.id, 'roster', r, r.face, r.mood, r.state, r.nodes.head, r.group);
+      }
+    }
+    for (let i = 0; i < paHumans.length; i++) {
+      const r = paHumans[i];
+      take(r.id, 'pasto', r, r.face, r.mood, r.state, r.nodes.head, r.group);
+    }
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.fig) continue;
+      take('local' + i, 'local', r.fig, r.fig.face, r.mood, '', r.fig.head, r.fig.group);
+    }
+    return out;
+  }
+
   function pushInstances() {
     for (let i = 0; i < humans.length; i++) {
       const n = humans[i].nodes;
@@ -8328,6 +8765,9 @@ export function createNPCs(game) {
       iHead.setMatrixAt(i, n.head.matrixWorld);
       iHair.setMatrixAt(i, n.head.matrixWorld);
       iHat.setMatrixAt(i, n.hatN.matrixWorld);
+      iEyes.setMatrixAt(i, n.eyeN.matrixWorld);
+      iBrow.setMatrixAt(i * 2, n.browL.matrixWorld);
+      iBrow.setMatrixAt(i * 2 + 1, n.browR.matrixWorld);
       iArmL.setMatrixAt(i, n.armL.matrixWorld);
       iArmR.setMatrixAt(i, n.armR.matrixWorld);
       iLegL.setMatrixAt(i, n.legL.matrixWorld);
@@ -8341,6 +8781,8 @@ export function createNPCs(game) {
     iHead.instanceMatrix.needsUpdate = true;
     iHair.instanceMatrix.needsUpdate = true;
     iHat.instanceMatrix.needsUpdate = true;
+    iEyes.instanceMatrix.needsUpdate = true;
+    iBrow.instanceMatrix.needsUpdate = true;
     iArmL.instanceMatrix.needsUpdate = true;
     iArmR.instanceMatrix.needsUpdate = true;
     iLegL.instanceMatrix.needsUpdate = true;
@@ -8741,5 +9183,13 @@ export function createNPCs(game) {
            // every person in the game and checks somebody answers. Twenty-six
            // of them across twelve chapters is exactly the sort of list that
            // goes stale the moment a chapter moves a stall four metres.
-           locals: locals };
+           locals: locals,
+           // ---- THE FACES (v54) ----
+           // What a face is doing, read off the NODES rather than off the
+           // state that was supposed to drive them. A mood that damps
+           // correctly and a brow that never moves is the exact failure this
+           // is here to catch, and it is invisible from a state dump.
+           faceAudit: npcFaceAudit,
+           // ...and who is mid-sentence, for the gaze. See sayBubble.
+           speaker: npcSpeaker };
 }

@@ -601,6 +601,19 @@ let capyPopVel = 0;
 let capyEarTimer = 2;
 let capyEarFlick = 0;
 let capyBlink = 0;
+// ---- THE EARS POINT AT THINGS, AND THE NOSE WORKS (v54) ------------------
+// `capyEarTurn` is a SIGNED bearing, -1 (hard left) to +1 (hard right), and
+// it decays to zero on its own: an ear that stays cocked is a stuck pose, not
+// a reaction. It is set by the npc:* events, which all carry the person the
+// noise came from, so the animal turns its ears toward whoever just shouted
+// before its head catches up — which is what ears are for and is the only
+// part of this animal that can react to something behind it.
+//
+// `capySniff` is a one-shot 0..1 that pulses the nose pad and flicks the
+// whiskers forward. It fires near something worth smelling and on a slow idle
+// timer, so a capybara standing still is never completely inert.
+let capyEarTurn = 0;
+let capySniff = 0, capySniffT = 3;
 // ---- STANDING STILL IS ALSO A PERFORMANCE ---------------------------------
 // Stop moving in this game and the animal stops entirely: a breath on the
 // barrel, an ear flick every few seconds, and otherwise a capybara standing to
@@ -1505,6 +1518,9 @@ const capyGAZE_YAW    = 0.55;       // rad — the neck's honest limit
 const capyGAZE_PITCH  = 0.35;
 const capyGAZE_CONE   = 1.30;       // rad off the nose past which nothing is looked at
 const capyGAZE_PROP   = 3.5;        // m — a little past the grab path's own reach
+const capyGAZE_SPEAK  = 14;         // m — how far off a line still turns the head
+const capySNIFF_R     = 2.6;        // m — close enough that a smell is the reason
+const capySNIFF_DUR   = 0.34;       // s — a sniff, not a yawn
 const capyGAZE_NPC    = 8.0;        // m — somebody who has noticed you, at talking range
 const capyGAZE_HEAT   = 0.15;       // alarm/wary at or under this is not "raised"
 const capyGAZE_HOLD_P = 0.12;       // rad of downward glance at a thing in your mouth
@@ -1528,9 +1544,27 @@ function capyGazeResolve(game, capy, hx, hy, hz, yaw) {
   //    gaze would walk away from centre and take the prop with it.
   if (capy.heldProp) { capyGazeWantP = capyGAZE_HOLD_P; return; }
   let tx = 0, ty = 0, tz = 0, found = false;
+  // 1b. SOMEBODY IS TALKING. This outranks a loose bottle, and it is the
+  //    entry that was missing: the list below answers "who has NOTICED me",
+  //    which is a different question from "who is speaking" and gets the
+  //    wrong person whenever a shopkeeper says something from behind a
+  //    counter without being startled by anything. npcSpeaker() is already
+  //    gated on the live biome, so this needs no gate of its own.
+  if (typeof game.npcSpeaker === 'function') {
+    const sp = game.npcSpeaker();
+    if (sp) {
+      const dx = sp.x - hx, dz = sp.z - hz;
+      if (dx * dx + dz * dz < capyGAZE_SPEAK * capyGAZE_SPEAK) {
+        tx = sp.x; ty = sp.y + capyGAZE_EYE_H; tz = sp.z; found = true;
+      }
+    }
+  }
   // 2. SOMETHING YOU COULD PICK UP. The grab path already asks this question.
   const ph = game.physics;
-  if (ph && typeof ph.nearestGrabbable === 'function') {
+  // ...and only if nobody is speaking. Without this guard the entry above is
+  // written and then overwritten on the same call, which is a priority list
+  // that has no priority in it.
+  if (!found && ph && typeof ph.nearestGrabbable === 'function') {
     const p = ph.nearestGrabbable(capy.position, capyGAZE_PROP);
     const src = p && (p.body || p.mesh);
     const pos = src && src.position;
@@ -1762,6 +1796,46 @@ export function createCapybara(game) {
   head.add(eyeSockR);
   const eyeR = capyAddPart(eyeSockR, capyGeoBead, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
   capyAddPart(eyeR, capyGeoBead, mBelly, -0.15, 0.45, 0.62, 0.30, 0.30, 0.30);
+
+  // WHISKERS (v54).
+  //
+  // The muzzle carried a nose pad, two nostril pricks and nothing else, and it
+  // is the part of this animal the camera is pointed at for most of the game.
+  //
+  // They are DELIBERATELY oversized — 8 mm square and 19 cm long, where a real
+  // capybara's are hair. A 2 mm whisker is sub-pixel at the six metres this is
+  // played at, and an accurate one would be a thing that exists in the file and
+  // nowhere on the screen. Same decision as the 5 cm nose cube on a person.
+  //
+  // Three a side on a node of their own so they can be swept as a set: the
+  // sniff flicks them forward, and the head's own motion is enough to make
+  // them read as attached to something alive.
+  const whiskL = new THREE.Group();
+  whiskL.position.set(0.150, -0.010, 0.430);
+  head.add(whiskL);
+  const whiskR = new THREE.Group();
+  whiskR.position.set(-0.150, -0.010, 0.430);
+  head.add(whiskR);
+  for (let i = 0; i < 3; i++) {
+    // fanned: the top one sweeps up and back, the bottom one down and back
+    const pitch = 0.16 - i * 0.19;
+    const len = 0.19 - i * 0.022;
+    for (const [g, sgn] of [[whiskL, 1], [whiskR, -1]]) {
+      // A PIVOT, not a rotated box. The box is built along +x and has to be
+      // pushed out by half its length to hang off the muzzle rather than
+      // through it — and doing that on the box ITSELF, after rotating it,
+      // swings the root end away from the face by the sine of the sweep.
+      // Rotate the pivot, offset the box inside it, and the root stays put.
+      const pv = new THREE.Object3D();
+      pv.position.y = i * 0.012;
+      pv.rotation.set(0, sgn * -0.42, sgn * pitch);
+      const w = new THREE.Mesh(new THREE.BoxGeometry(len, 0.008, 0.008), mDark);
+      w.position.x = sgn * len * 0.5;
+      w.castShadow = false;               // an 8 mm stick is not a shadow
+      pv.add(w);
+      g.add(pv);
+    }
+  }
 
   // ears are a capyDark accent — at this size the dark cup IS the whole ear
   const earL = new THREE.Group();
@@ -2628,7 +2702,40 @@ export function createCapybara(game) {
   game.capy = capy;
 
   // ears snap on the beat the gardener shouts
-  game.events.on('npc:chase', function () { capyEarFlick = 1; capyEarTimer = rand(1.4, 3.0); });
+  /**
+   * WHICH WAY THE NOISE CAME FROM (v54).
+   *
+   * Every npc:* event carries the person it happened to, so the bearing is
+   * free. It is resolved into the animal's own frame and stored signed, which
+   * is the only form the ear pose can use — and it is why this cannot simply
+   * reuse the gaze: the gaze has a 100-degree cone and refuses to answer for
+   * anything behind you, which is exactly the case an ear is for.
+   *
+   * `soft` events (somebody calming down) get a smaller turn than a shout.
+   */
+  function capyHeardFrom(p, k) {
+    capyEarFlick = 1;
+    capyEarTimer = rand(1.4, 3.0);
+    // THE PAYLOAD IS { npc: rec }, not the rec. npc.js wraps every one of
+    // these in emit(), and the existing npc:chase listener took the argument
+    // as the person and then used none of it — so the shape was never wrong
+    // until something read it. Unwrapped defensively: some callers pass a
+    // bare position and there is no reason to make them all agree.
+    const rec = (p && p.npc) || p;
+    const g = rec && (rec.group ? rec.group.position : rec.position);
+    if (!g || !(g.x === g.x)) return;
+    const dx = g.x - capyPosition.x, dz = g.z - capyPosition.z;
+    if (dx * dx + dz * dz > 900) return;          // 30 m: out of earshot
+    const local = capyWrapAngle(Math.atan2(dx, dz) - capyYaw);
+    // sin, not the angle: it saturates at ninety degrees and comes back for
+    // anything behind, which is right — an ear cannot point further round than
+    // side-on, and a noise directly astern turns both ears equally, not one.
+    const want = Math.sin(local) * k;
+    if (Math.abs(want) > Math.abs(capyEarTurn)) capyEarTurn = want;
+  }
+  game.events.on('npc:chase', function (rec) { capyHeardFrom(rec, 1); });
+  game.events.on('npc:startled', function (rec) { capyHeardFrom(rec, 0.85); });
+  game.events.on('npc:calm', function (rec) { capyHeardFrom(rec, 0.35); });
   // ...and the jaw works when a bite is actually taken out of something. The
   // event is props.js's — this module owns the model and nothing else does, so
   // the animation for the game's newest verb lives here and the rule for WHEN
@@ -4927,10 +5034,56 @@ export function createCapybara(game) {
                     (capySwimming ? 0.2 : 0) + capyIdleEar * 0.25;
     const flick = Math.sin(t * 34) * capyEarFlick * 0.5;
     const earDown = capyIdleEar * 0.34;
+    // ...and they TURN toward whatever just happened (see capyHeardFrom).
+    // BOTH swing the same way, which cups the near ear toward the sound and
+    // turns the far one away from it — that asymmetry is what makes a pair of
+    // ears read as listening rather than as two flaps on a timer. MEASURED at
+    // 0.40 rad, 23 degrees, for a startle eight metres off the flank, and 0.007
+    // for one at forty metres, which is out of earshot and must do nothing.
+    // It decays here, so a single event is a turn and a return rather than a
+    // pose the animal is left holding.
+    capyEarTurn = damp(capyEarTurn, 0, 1.1, dt);
+    const turn = capyEarTurn * 0.55;
     earL.rotation.x = -earBack;
     earR.rotation.x = -earBack;
-    earL.rotation.z = -0.18 - flick - earDown;
-    earR.rotation.z = 0.18 + flick + earDown;
+    earL.rotation.y = turn;
+    earR.rotation.y = turn;
+    earL.rotation.z = -0.18 - flick - earDown + turn * 0.35;
+    earR.rotation.z = 0.18 + flick + earDown + turn * 0.35;
+
+    // ---- THE NOSE (v54) --------------------------------------------------
+    // A capybara standing still was completely inert above the neck except for
+    // a blink. The sniff is a one-shot: the pad swells, the whiskers come
+    // forward, and it is over in a third of a second.
+    //
+    // It fires on a slow idle clock and, faster, when there is something in
+    // reach worth smelling — which is a question the grab path already asks,
+    // so it costs one call it was making anyway.
+    capySniffT -= dt;
+    if (capySniffT <= 0 && !capySwimming && !capyDiving) {
+      const ph = game.physics;
+      let close = false;
+      if (!capy.heldProp && ph && typeof ph.nearestGrabbable === 'function') {
+        const p = ph.nearestGrabbable(capyPosition, capySNIFF_R);
+        close = !!p;
+      }
+      capySniffT = close ? rand(1.6, 3.4) : rand(5.0, 11.0);
+      capySniff = 1;
+    }
+    if (capySniff > 0) {
+      capySniff -= dt / capySNIFF_DUR;
+      if (capySniff < 0) capySniff = 0;
+    }
+    // a half-sine, so it swells and settles instead of popping and easing
+    const sn = capySniff > 0 ? Math.sin(capySniff * Math.PI) : 0;
+    nosePad.scale.set(1 + sn * 0.16, 1 + sn * 0.16, 0.30 + sn * 0.10);
+    // ...and the whiskers come forward with it. Two terms: the sniff, and a
+    // slow drift that runs all the time so they never look welded on.
+    const wDrift = Math.sin(t * 1.7) * 0.05;
+    whiskL.rotation.y = -sn * 0.34 + wDrift;
+    whiskR.rotation.y = sn * 0.34 + wDrift;
+    whiskL.rotation.z = sn * 0.20;
+    whiskR.rotation.z = -sn * 0.20;
 
     // blink
     capyBlink = capyBlink > 0 ? capyBlink - dt : 0;
