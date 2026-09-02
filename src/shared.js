@@ -4233,15 +4233,34 @@ export function placeCue(o, x, y, z, far) {
 // it names and silently leaves the fifth — here, two hundred tumbling petals
 // and a pulsing ring in the corner — running at full tilt.
 //
-// One channel. `calmSys` is what the machine asked for, read once. `calmPref`
-// is what the player asked for, and `null` — the default — means "whatever the
-// machine said", which is bit-for-bit the behaviour every one of those three
-// consts had. Everything decorative that loops for ever calls calmOn().
+// One channel. `calmSysNow` is what the machine asks for, kept up to date.
+// `calmPref` is what the player asked for, and `null` — the default — means
+// "whatever the machine said", which is bit-for-bit the behaviour every one of
+// those three consts had. Everything decorative that loops for ever, and
+// everything that stops time, calls calmOn().
 // ===========================================================================
-export const calmSys = !!(typeof window !== 'undefined' && window.matchMedia &&
-                          window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+// ---- ...AND THE MACHINE IS ALLOWED TO CHANGE ITS MIND (P2) ---------------
+// `calmSys` was a const read once at load, so a player who turns reduced-motion
+// on in the OS while the game is open got nothing until they reloaded — and the
+// place they are most likely to do that is halfway through the chapter that
+// made them want it. `matchMedia` fires `change` for exactly this; it is two
+// lines and it costs nothing when nobody ever touches the setting.
+//
+// `calmSysNow` and not a reassigned export: a live binding that other modules
+// read through `calmOn()` is the whole point of there being one channel, and
+// nothing outside this file has ever needed the raw system answer.
+let calmSysNow = !!(typeof window !== 'undefined' && window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+try {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onCalm = function (e) { calmSysNow = !!e.matches; };
+    if (mq.addEventListener) mq.addEventListener('change', onCalm);
+    else if (mq.addListener) mq.addListener(onCalm);      // Safari < 14
+  }
+} catch (e) { /* a browser with no matchMedia at all keeps the boot answer */ }
 let calmPref = null;
-export function calmOn() { return calmPref === null ? calmSys : !!calmPref; }
+export function calmOn() { return calmPref === null ? calmSysNow : !!calmPref; }
 /** null follows the system; true/false override it. Returns the live answer. */
 export function calmSet(v) {
   calmPref = (v === null || v === undefined) ? null : !!v;

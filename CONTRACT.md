@@ -3058,6 +3058,130 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE PAD AND THE CARD — P2 (2 Sep 2026)
+
+The second batch of `ROADMAP-POLISH.md`. Measured with a synthetic pad
+(`qa/p2-pad.js` installs one over `navigator.getGamepads`), because a controller
+is the one input surface a headless run cannot otherwise reach.
+
+### A PAD COULD OPEN EVERY CARD AND OPERATE NONE
+
+Measured before any of this existed. Three wheeks at the wharf raise the
+departures board and the world pauses behind it — and then **all seventeen
+buttons and both sticks in eight directions leave it exactly where it is**.
+Start does not close it; it stacks the pause card ON TOP. On the pause card,
+focus never left `resume`: the d-pad did nothing, A pressed nothing, the three
+faders read 100/100/100 throughout, and B closed nothing.
+
+That is R5's touch trap with a pad in place of a thumb, and worse: the board
+pauses the world, so the only exits were to travel somewhere nobody asked to go
+or to reload a three-hour game.
+
+`sysPadCard(g, dt)` drives the DOM rather than reimplementing four menus —
+d-pad walks `focus()`, A `click()`s the focused control, B is Escape, left/right
+step a focused fader, and Start on a card means what B means. It runs BEFORE the
+verbs and the camera and returns early, because A is both `hop` and `press this`
+and the d-pad is both `walk` and `move down the list`. After: the board closes on
+B, its rows walk, and A travels.
+
+**Three bugs found while building it, all in the driver:**
+
+1. **The button that opens a card is still down on the next frame.** A wheek is
+   130 ms and a frame is 16, so a zeroed edge state reads the tail of the
+   opening press as a fresh one — the board opened on the third wheek and closed
+   itself on the very next frame, which looks exactly like three wheeks no
+   longer working. The state is seeded from what is held, so every button must
+   be RELEASED before the driver acts on it.
+2. **`button:not([disabled])` matches a button whatever its tabIndex.** The
+   journal sets `tabIndex = -1` on all nineteen souvenir slots, with a comment
+   saying why. The pad walked the shelf: four presses of d-pad down on the
+   departures board moved between souvenirs and never reached a destination.
+   The rule the feature is built on is that the pad reaches exactly what the
+   keyboard reaches, so the filter reads `el.tabIndex < 0`.
+3. **The quit question is a card inside a card.** While it is up the four
+   buttons behind it are still visible and focusable, so a list taken over the
+   whole pause card walks out of the question onto `resume` — measured, one
+   press down from "stay here" landed on a volume slider. `sysPadTopCard`
+   returns `pauseAsk` when it is open, which is the order Escape already uses.
+
+### THE SLIDE WAS CTRL, AND CTRL+W CLOSES THE TAB
+
+Not "opens a dialog the page can cancel": Chrome and Firefox both reserve
+Ctrl+W and a page cannot `preventDefault` it. The chord fires whenever W is
+pressed while Ctrl is already down, which is precisely "hold slide, then push
+forward" — and the game's own teaching line said to do exactly that. A
+three-hour journey, gone, with no confirm.
+
+**Slide is `G`.** Ctrl is not kept as an alias, because there is no safe way to
+keep it and an unreleased game has no muscle memory to protect. G because every
+alternative is taken by something it would be worse to move: C is the camera
+recentre (documented, and four probes press it), X and Z turn the camera, V
+raises the eye, F re-aims, R is the rescue. One stretch of the index finger from
+WASD, and no browser chord in any engine.
+
+### A THIRD VOCABULARY — `sysPAD_WORDS`
+
+The touch table exists because telling a phone to press E is the most confusing
+thing a hint can do. A pad player was in the same position: with a controller in
+both hands the first four Sydney clues read `press Q, anywhere`, `grab it off
+their head with E`, `hold Shift and barge them`, `hold E on the soil to dig`.
+Names are the FACE LABELS, not the W3C button numbers. Touch wins over pad — a
+phone with a controller paired to it is still a phone, and the buttons the
+player can SEE are the ones the sentence should name.
+
+Checked statically the way R5's table was (`qa/p2-clues.mjs`): **191 clue
+literals, 39 rewritten, and zero clues contain any other lone capital**, so the
+bare-letter rules cannot eat prose. Adding `G` changed no count, because no clue
+names the slide — the only teaching line for it is a toast.
+
+The connect toast named three of nine bindings, had no slide, no run, no pause
+and no way back to the paper, and fired only on `gamepadconnected` — which
+browsers do not dispatch for a pad that was already plugged in at load, so a
+player who started the game pad-in-hand was told nothing at all. `padSayHello()`
+is said from whichever of the two happens first, once per session.
+
+**BACK is a tap and a hold.** The tap hides the paper as it always has; the hold
+is the stuck-rescue, which the pad could not reach at all — R5 found the
+identical hole on touch. Resolved on RELEASE so the two cannot both fire.
+Measured: held, the animal moves 21.9 m back; tapped, the paper still toggles.
+
+### TAB STAYS IN THE CARD — `sysFocusWrap`
+
+The pause card's own comment said `inert` on the rest of the HUD kept the walk
+inside it, and **nothing ever set that**. Measured, fourteen presses of Tab:
+four buttons, then BODY, then round again — the walk left the card on every
+cycle. `aria-modal` was declared on all four cards and the DOM does not honour
+it. One wrap, used by all four, sharing the pad's focusable list so the two
+schemes cannot disagree about what is reachable. It ALWAYS cancels the browser's
+own walk and does the whole move itself: the half-and-half version is wrong for
+the ledger and album, which preventDefault first for other reasons and would
+leave focus pinned. After: **0 of 12 presses leave the card.**
+
+### THE CALM SWITCH REACHES THE FREEZE
+
+`main.js` read `prefers-reduced-motion` once at boot into a private `calm`, and
+`hitstop`/`slowmo` gated on that — so R4's "less motion" switch moved the shake
+and the FOV kick and left the two things that stop time altogether. Both now
+call `calmOn()`, the one channel. `padRumble` does too: a player who asks for
+less motion is not asking to keep the thing that shakes in their hands. And
+`calmSys` was a const read once, so an OS change mid-session did nothing —
+`matchMedia`'s `change` event now keeps it live.
+
+Measured end to end, driving the card's own checkbox: calm off, a freeze applies
+`scale` **0.08**; calm on, it stays **1**.
+
+**The freeze cannot be read while the card is open**, because the card pauses
+the world and a paused world runs no time step — the first cut of that
+measurement read `scale` 120 ms into a 350 ms hitstop with the settings still up
+and got 1.0 both ways, which reads exactly like a freeze that never fires.
+
+### AND THE CEREMONY STOPPED NAMING A KEY NOBODY HAS
+
+`no picture of X yet · K, then Enter` was unconditional. The touch layer has no
+camera button and calls `photoSet` from nowhere, and a pad has no camera either
+— so the game finished a chapter by asking for a key that does not exist. Said
+only to the scheme that has one.
+
 ## THE SUBJECT — P1 (2 Sep 2026)
 
 The first batch of `ROADMAP-POLISH.md`. Everything here is one measurement:
@@ -4401,7 +4525,7 @@ Read-only. Nothing outside systems.js may write it.
 
 ### 2. THE SLIDE — `input.slide`, `capy.sliding`
 
-**Ctrl held**, or the pad's left trigger. Held, not latched: a slide is a state.
+**G held**, or the pad's left trigger. Held, not latched: a slide is a state. It was Ctrl until P2; Ctrl+W closes the tab and cannot be cancelled.
 
 **It is not a new movement model.** A slide is being slippery on purpose, and
 capybara.js already has a solved, measured model of slippery ground — the

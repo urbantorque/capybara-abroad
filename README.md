@@ -564,7 +564,7 @@ is already done.
 | `Space` | **Hop.** Tap it for a kerb; hold it for a ledge — 1.4 m, which is the Opera House podium. Costs stamina. |
 | `E` / `Numpad0` / left click | Grab · press again to throw. Hold while still on soil to **dig**. Grab the condor's talons. Take the ship's wheel. |
 | `Q` | **WHEEK.** One mouth, one button. It startles everyone nearby, it is the ferry's horn, it flaps the condor's wings, it calls a condor down if one is up there — and three of them at a departure point is the ticket to the next place. |
-| `Ctrl` (held) | **Slide.** The seventh verb, and the only one that is a state rather than a press — down a glacier, down a dune, down a wet street. |
+| `G` (held) | **Slide.** The seventh verb, and the only one that is a state rather than a press — down a glacier, down a dune, down a wet street. |
 | `R` (held) | **Put me back.** Wedged in a gap you cannot get out of? Hold it for half a second and you are back where you were standing four seconds ago, on your feet. Nothing is undone — no task, no record, no clock — because being stuck is not a mistake anybody should be charged for. |
 | `F` · `Shift+F` | Point the arrow at another task |
 | `Z` / `X`, right-drag | Orbit camera |
@@ -575,7 +575,7 @@ is already done.
 | `P` | Hide the paper — the checklist, the chart and the hint, for a screenshot or for the view |
 | `M` · `N` · `[` `]` | Mute · music on/off · music volume |
 | `` ` `` · `\` | Perf overlay · debug biome swap |
-| **Gamepad** | Left stick moves, right stick looks, click it to recentre. `A` hop · `X` grab · `B` WHEEK · `RT` run. |
+| **Gamepad** | Left stick moves, right stick looks, click it to recentre. `A` hop · `X` grab · `B` WHEEK · `RT` run · `LT` slide · `START` pause · `BACK` hides the paper, held it gets you unstuck. Every card in the game is driven from the pad: the d-pad walks it, `A` presses, `B` goes back. |
 | **Touch** | A stick in the bottom-left — push it all the way to run — and WHEEK, GRAB and HOP under the right thumb. |
 | `Tab` | **The journal.** The shelf of souvenirs, everywhere you have been, everything you have done, every record you hold — and, from the way out of a chapter, everywhere you can go next. It is also the way into **the ledger**: the whole journey, laid out. |
 | `1`..`0`, then `–  =  [  ]  ;  '  ,  .  /` | On the title card: pick a place. Ten digits and nineteen chapters, so the last nine are the keys after them — and every row on the card wears its own key, so none of it has to be guessed. The table runs to twenty. In the journal: travel there. |

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, clamp, spillSlots, spillUniforms } from './shared.js';
+import { PALETTE, clamp, spillSlots, spillUniforms, calmOn } from './shared.js';
 import { createEnvironment } from './environment.js';
 import { createPhysicsWorld, createProps } from './props.js';
 import { createCapybara } from './capybara.js';
@@ -121,15 +121,22 @@ function mainMakeTime(game) {
   let holdT = 0, holdS = 1;      // hitstop: seconds left, and how close to stopped
   let slowT = 0, slowS = 1;      // slow-motion: seconds left, and its target
   let slowNow = 1;               // ...eased, so it never snaps
-  let calm = false;
-  try {
-    calm = !!(typeof window !== 'undefined' && window.matchMedia &&
-              window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  } catch (e) { calm = false; }
+  // ---- THE CALM SWITCH HAS TO BE LIVE, AND THIS ONE WAS NOT (P2) ---------
+  // It was read once at boot into a private `calm`, so the freeze and the held
+  // beat asked the OPERATING SYSTEM and never the player. R4 put a "less
+  // motion" switch on the pause card and routed it through shared.js's one
+  // channel; the shake and the FOV kick honour that channel, and these two —
+  // the two that stop time altogether — did not. A player who turned calm on
+  // still got every impact freeze in the game, which is the most physical thing
+  // on the list and the one most likely to be why they asked.
+  //
+  // `calmOn()` is that channel: the player's preference where they have set
+  // one, the OS media query where they have not. Asked per call, so the switch
+  // works the moment it is flipped and an OS change mid-session lands too.
 
   const time = {
     /** True when the player has asked the OS for less motion. Read-only. */
-    calm: calm,
+    get calm() { return calmOn(); },
     /** What was actually applied on the last frame. 1 = real time. */
     scale: 1,
     /**
@@ -155,7 +162,7 @@ function mainMakeTime(game) {
      * rather than as two stutters.
      */
     hitstop(dur, scale) {
-      if (calm || !(dur > 0)) return;
+      if (calmOn() || !(dur > 0)) return;
       const d = dur < MAIN_HOLD_MAX ? dur : MAIN_HOLD_MAX;
       const s = clamp(scale === undefined ? 0.08 : scale, MAIN_TIME_FLOOR, 1);
       if (holdT <= 0 || s < holdS) holdS = s;
@@ -170,7 +177,7 @@ function mainMakeTime(game) {
      * nobody able to say why.
      */
     slowmo(scale, dur) {
-      if (calm || !(dur > 0)) return;
+      if (calmOn() || !(dur > 0)) return;
       slowT = dur < MAIN_SLOW_MAX ? dur : MAIN_SLOW_MAX;
       slowS = clamp(scale === undefined ? 0.45 : scale, MAIN_TIME_FLOOR, 1);
     },

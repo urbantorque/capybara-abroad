@@ -3679,7 +3679,7 @@ const sysLEGEND = [
   // this table's own rule has to be read carefully: the fold is for things that
   // are not verbs the capybara has. A slide is a verb the capybara has. It is
   // the seventh of six, and the six were never a target.
-  ['Ctrl (held)', 'slide'],
+  ['G (held)', 'slide'],
   ['E / left click', 'grab, dig, hold on'],
   // THE DIVE, which was on no legend anywhere — not the title card, not the
   // journal, not the touch fan. It is the eighth of six by the same argument
@@ -3749,6 +3749,16 @@ function sysIsTouch() {
   return !!(window.matchMedia &&
             window.matchMedia('(hover: none) and (pointer: coarse)').matches);
 }
+// ---- HAS A PAD EVER BEEN HELD (P2) ----------------------------------------
+// Module scope, because the two things that need the answer — sysSay and
+// sysScheme — are built out here beside the tables they choose between, and
+// `padSeen` lives inside createSystems' closure with the rest of the input.
+// One writer (padPoll, on the frame it first sees a pad) and it never goes back
+// to false: a controller put down on the sofa mid-session has not stopped being
+// the thing the player is using, and a sentence that changed vocabulary every
+// time a pad went to sleep would be worse than one that is occasionally early.
+let sysPadSeenN = false;
+function sysPadSeen() { return sysPadSeenN; }
 
 /**
  * THE SAME SENTENCE IN THE SCHEME THE PLAYER HAS (R5).
@@ -3769,8 +3779,14 @@ function sysIsTouch() {
  * no key in it to substitute and the honest touch wording names a gesture
  * rather than a control. The first name collided and `node --check` caught it.
  */
-function sysScheme(keyWords, touchWords) {
-  return sysIsTouch() ? touchWords : keyWords;
+function sysScheme(keyWords, touchWords, padWords) {
+  if (sysIsTouch()) return touchWords;
+  // A pad variant is optional: the five furniture strings this began as are all
+  // about closing a card, and on a pad that gesture is B — but a caller with
+  // nothing pad-specific to say should get the keyboard sentence rather than a
+  // blank, because a pad player still has a keyboard in front of them.
+  if (padWords !== undefined && sysPadSeen()) return padWords;
+  return keyWords;
 }
 
 // ---- AND THE HINTS NAME KEYS TOO ------------------------------------------
@@ -3792,19 +3808,51 @@ const sysTOUCH_WORDS = [
   [/\bpress Q\b/g,    'tap WHEEK'],
   [/\bpress E\b/g,    'tap GRAB'],
   [/\bhold E\b/g,     'hold GRAB'],
+  [/\bhold G\b/g,     'hold SLIDE'],
   [/\bQ\b/g,          'WHEEK'],
   [/\bE\b/g,          'GRAB'],
   [/\bSpace\b/g,      'HOP'],
   [/\bShift\b/g,      'the stick, all the way'],
-  [/\bCtrl\b/g,       'SLIDE'],
+  [/\bG\b/g,          'SLIDE'],
 ];
-/** A line of guidance, in the control scheme the player actually has. */
+// ---- AND A THIRD SCHEME, BECAUSE A PAD IS NOT A KEYBOARD EITHER (P2) ------
+// The touch table above exists because telling a phone to press E is the most
+// confusing thing a hint can do. A pad player is in exactly the same position
+// and had been left in it: with a controller in both hands the first four
+// Sydney clues read `press Q, anywhere`, `grab it off their head with E`,
+// `hold Shift and barge them` and `hold E on the soil to dig`, and not one of
+// those keys is on the thing they are holding.
+//
+// The names are the FACE LABELS and not the button numbers, because a player
+// looks at their thumb and not at the W3C standard mapping. Longest first, and
+// checked the same way the touch table was: against every clue string, so no
+// lone capital is rewritten by accident.
+const sysPAD_WORDS = [
+  [/\bhold Shift\b/g, 'hold RT'],
+  [/\bhold R\b/g,     'hold BACK'],
+  [/\bpress Q\b/g,    'press B'],
+  [/\bpress E\b/g,    'press X'],
+  [/\bhold E\b/g,     'hold X'],
+  [/\bhold G\b/g,     'hold LT'],
+  [/\bQ\b/g,          'B'],
+  [/\bE\b/g,          'X'],
+  [/\bSpace\b/g,      'A'],
+  [/\bShift\b/g,      'RT'],
+  [/\bG\b/g,          'LT'],
+];
+/**
+ * A line of guidance, in the control scheme the player actually has.
+ *
+ * Touch wins over pad: a phone with a controller paired to it is still a phone,
+ * the fan is still on screen, and the buttons the player can SEE are the ones
+ * the sentence should name.
+ */
 function sysSay(s) {
-  if (!s || !sysIsTouch()) return s;
+  if (!s) return s;
+  const table = sysIsTouch() ? sysTOUCH_WORDS : (sysPadSeen() ? sysPAD_WORDS : null);
+  if (!table) return s;
   let o = s;
-  for (let i = 0; i < sysTOUCH_WORDS.length; i++) {
-    o = o.replace(sysTOUCH_WORDS[i][0], sysTOUCH_WORDS[i][1]);
-  }
+  for (let i = 0; i < table.length; i++) o = o.replace(table[i][0], table[i][1]);
   return o;
 }
 
@@ -19317,6 +19365,15 @@ export function createSystems(game) {
       if (ledShown || albShown || jrShown || pauseShown) return;
       if (!game.biome || chapterOf(game.biome.current) !== n) return;
       if (albBest(def.biome)) return;
+      // ---- ...AND ONLY WHERE THE CAMERA CAN BE REACHED (P2) --------------
+      // This named two keys unconditionally. The touch layer has no camera
+      // button at all — WHEEK, GRAB, HOP, SLIDE, STUCK and MENU, and nothing
+      // calls photoSet — so on a phone the game finished a chapter by asking
+      // for a key that does not exist and an action that cannot be performed,
+      // which is the exact fault §3 of ROADMAP.md rewrote thirty-nine hint
+      // clues to remove. A pad has no camera either. Said only to the scheme
+      // that has one; the others simply do not hear about it.
+      if (sysIsTouch() || sysPadSeen()) return;
       toast('no picture of ' + def.name + ' yet · K, then Enter');
     }, sysKEEP_WAIT + sysKEEP_CARD + 3200);
   }
@@ -19412,6 +19469,9 @@ export function createSystems(game) {
   // poll; the four edges are queued here and published at the very END of
   // update(), because that is the only place they can be published from.
   let padOn = false, padIdx = -1, padSeen = false;
+  // Back's two meanings: how long it has been held, and whether that hold is
+  // currently long enough to count as the rescue. See the padBackHold reader.
+  let padBackT = 0, padBackHold = false;
   let padX = 0, padZ = 0, padRun = false, padSlide = false;
   let padHonk = false, padAction = false, padJump = false;
   let padWasHonk = false, padWasAction = false, padWasJump = false;
@@ -19697,9 +19757,12 @@ export function createSystems(game) {
         e.preventDefault(); location.reload(); return;
       }
       // Tab would otherwise walk the browser's own focus order straight out of
-      // the back of a modal and into the HUD underneath it. The ledger has
-      // nothing focusable inside it, so focus simply stays where it is put.
-      if (c === 'Tab') e.preventDefault();
+      // the back of a modal and into the HUD underneath it. P2: WRAPPED rather
+      // than swallowed — the ledger grew controls (the album's own rows reach
+      // it) and eating Tab outright meant a keyboard player could not touch
+      // them. With nothing focusable inside, the wrap finds an empty list and
+      // this is exactly the old behaviour.
+      if (c === 'Tab') { sysFocusWrap(ledEl, e); }
       return;
     }
     // ...and so does the album, for the same reason and by the same rules. It
@@ -19708,7 +19771,7 @@ export function createSystems(game) {
     // actually on top may answer a key.
     if (albShown) {
       if (c === 'Escape') { e.preventDefault(); albHide(); return; }
-      if (c === 'Tab') e.preventDefault();
+      if (c === 'Tab') { sysFocusWrap(albEl, e); }
       return;
     }
     // ---- AND SO DOES THE PAUSE CARD (R4), WITH ONE DIFFERENCE -------------
@@ -19728,7 +19791,22 @@ export function createSystems(game) {
         if (!pauseAskShut()) pauseHide();
         return;
       }
-      if (c === 'Tab') return;
+      // ---- ...AND TAB STAYS IN IT (P2) ---------------------------------
+      // The comment above says `inert` on everything else in the HUD keeps the
+      // walk inside the card, and nothing ever set it: only the four card
+      // elements manage their own `inert`, so the HUD's own buttons stayed in
+      // the tab order behind the modal. Measured, fourteen presses of Tab from
+      // the card: four buttons, then BODY, then round again — the walk leaves
+      // the card on every cycle, which on a page whose HUD has focusable
+      // controls (the touch MENU, the paper's own buttons) is a keyboard player
+      // silently operating the game underneath the pause screen.
+      //
+      // `aria-modal` is already declared on all four and the DOM does not
+      // honour it; this is the half that makes it true.
+      // Scoped to the quit question while it is open, for the reason
+      // sysPadTopCard gives: Tab out of a two-button question onto the four
+      // buttons it is covering is the same leak one layer in.
+      if (c === 'Tab') { sysFocusWrap(pauseAsk.hidden ? pauseEl : pauseAsk, e); return; }
       // The four audio keys keep working while the card that owns them is up —
       // they are the same four settings, and a player who knows M should not
       // have to close the settings to use it. The card follows, through the
@@ -19756,6 +19834,12 @@ export function createSystems(game) {
       return;
     }
     if (jrShown && c === 'Escape') { jrHide(); return; }
+    // ...and once it is open, Tab walks it and stays in it (P2). The comment
+    // above is still right that Tab must not TOGGLE the board — that made the
+    // one key for moving between destinations close them instead — but handing
+    // it "straight back to the browser" walks focus out of a modal that has
+    // paused the world, which is the same leak the pause card had.
+    if (jrShown && c === 'Tab') { sysFocusWrap(jrEl, e); return; }
     // ESCAPE IS THE PAUSE KEY IN EVERY GAME EVER MADE, and here it did nothing
     // at all unless the board was already open — so the one key a player reaches
     // for when the doorbell goes left the capybara stood in traffic. It used to
@@ -20126,9 +20210,30 @@ export function createSystems(game) {
     // The one moment the scheme is actually wanted. The journal's fold has it
     // too, but a player who has just picked a pad up is not going to go and
     // open a card to find out which button wheeks.
-    toast('pad:  A hop  ·  X grab  ·  B WHEEK');
+    padSayHello();
   });
   addEventListener('gamepaddisconnected', function () { padIdx = -1; padOn = false; });
+
+  // ---- WHAT THE PAD ACTUALLY DOES, SAID ONCE (P2) -------------------------
+  // The connect toast named three of nine bindings. It had no slide — which is
+  // a verb four chapters lean on — no run, no pause, and no way back to the
+  // paper; and it fired only on `gamepadconnected`, which browsers do not
+  // dispatch for a controller that was already plugged in when the page
+  // loaded. A player who starts the game pad-in-hand was told nothing at all.
+  // Now it is said from whichever of the two happens first, once per session.
+  //
+  // Two lines rather than one long one: the first is the verbs, which is what
+  // a player wants in the first ten seconds, and the second is the furniture.
+  // Both fit the toast's own width at the size the card draws it.
+  let padSaidHello = false;
+  function padSayHello() {
+    if (padSaidHello) return;
+    padSaidHello = true;
+    toast('pad:  A hop  ·  X grab  ·  B WHEEK  ·  RT run  ·  LT slide');
+    setTimeout(function () {
+      toast('...START pauses  ·  BACK hides the paper, hold it to get unstuck');
+    }, 2600);
+  }
 
   /** Radial deadzone, rescaled so the first millimetre of travel is not a jump. */
   function padAxis2(ax, ay, dead, out) {
@@ -20146,6 +20251,217 @@ export function createSystems(game) {
     return typeof b === 'object' ? (b.pressed || b.value > sysPAD_TRIG) : b > sysPAD_TRIG;
   }
 
+  // ---------------------------------------------------------------------
+  // A PAD CAN OPEN EVERY CARD IN THIS GAME AND OPERATE NONE OF THEM (P2)
+  //
+  // R4 gave Start the pause card and R5 gave a thumb the same card, and both
+  // stopped at OPENING it. Measured before this existed, with a synthetic pad
+  // (`qa/p2-pad.js`): three wheeks at the wharf raise the departures board, the
+  // world pauses behind it — and then all seventeen buttons and both sticks in
+  // eight directions leave it exactly where it is. Start does not close it; it
+  // stacks the pause card ON TOP of it. The card is four buttons, three faders
+  // and a switch, and focus never moved off `resume`: d-pad did nothing, A
+  // pressed nothing, the faders read 100/100/100 throughout, and B did not
+  // close anything.
+  //
+  // That is the R5 trap again — the one card a player can reach is the one with
+  // no way out — with a pad in place of a thumb, and it is worse here, because
+  // the board pauses the world and the only remaining exits are to travel
+  // somewhere nobody asked to go or to reload a three-hour game.
+  //
+  // THE CARDS ARE ALREADY REAL BUTTONS, so this drives the DOM rather than
+  // reimplementing four menus: d-pad walks `focus()`, A `click()`s whatever is
+  // focused, B is Escape, and left/right step a focused fader. Everything it
+  // does, a keyboard could already do — which is the whole design, and why the
+  // board's rows and any control added to any of these cards later are reached
+  // by this for free.
+  const sysPAD_REPEAT_1 = 0.42;   // s before a held direction starts repeating
+  const sysPAD_REPEAT_N = 0.13;   // s between repeats after that
+  let padCardWas = 0, padCardT = 0, padCardLast = 0;
+  const sysPadFocusSel =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
+    'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  /**
+   * KEEP TAB INSIDE THE CARD (P2).
+   *
+   * The same focusable list the pad walks, so the two schemes cannot disagree
+   * about what is reachable — which is the bug this pair of features exists to
+   * stop, one input surface at a time. Only acts at the two ends of the list:
+   * everywhere in the middle the browser's own order is better than anything
+   * this could impose, and taking it over would break the shift-Tab a keyboard
+   * player already knows.
+   */
+  function sysFocusWrap(card, e) {
+    // ALWAYS cancels the browser's own walk and does the whole move itself.
+    // The half-and-half version — cancel only at the ends, let the browser
+    // handle the middle — reads as tidier and is wrong for the two cards that
+    // must also swallow Tab for other reasons: they preventDefault first, so
+    // the browser never moves focus, and a wrap that only acts at the ends
+    // leaves it pinned wherever it was. One rule for all four.
+    e.preventDefault();
+    const list = sysPadFocusables(card);
+    if (!list.length) return;        // nothing to focus: a trap, and that is all
+    const a = document.activeElement;
+    let i = list.indexOf(a);
+    if (i < 0) i = e.shiftKey ? 0 : -1;   // focus was outside: come in at an end
+    let n = i + (e.shiftKey ? -1 : 1);
+    if (n < 0) n = list.length - 1;
+    if (n >= list.length) n = 0;
+    try { list[n].focus(); } catch (err) {}
+    if (list[n].scrollIntoView) { try { list[n].scrollIntoView({ block: 'nearest' }); } catch (err) {} }
+  }
+  /** The card that is actually on top, innermost first. Null when none is up. */
+  function sysPadTopCard() {
+    if (albShown) return albEl;
+    if (ledShown) return ledEl;
+    // THE QUIT QUESTION IS A CARD INSIDE A CARD, and it has to be scoped like
+    // one: while it is up, the four buttons behind it are still visible and
+    // still focusable, so a list taken over the whole pause card walks out of
+    // the question onto `resume` — and A there answers a question the player
+    // was not asked. Measured: from "stay here", one press down landed on a
+    // volume slider. Escape already treats these as two layers (pauseAskShut
+    // before pauseHide); this is the same order, for the same reason.
+    if (pauseShown) return pauseAsk.hidden ? pauseEl : pauseAsk;
+    if (jrShown) return jrEl;
+    return null;
+  }
+  /** Close the topmost thing, in the order Escape already closes them. */
+  function sysPadBack() {
+    if (albShown) { albHide(); return; }
+    if (ledShown) { ledHide(); return; }
+    if (pauseShown) { if (!pauseAskShut()) pauseHide(); return; }
+    if (jrShown) { jrHide(); return; }
+  }
+  function sysPadFocusables(card) {
+    const all = card.querySelectorAll(sysPadFocusSel);
+    const out = [];
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      // ---- tabIndex -1 IS A DECISION SOMEBODY ALREADY MADE (P2) ----------
+      // `button:not([disabled])` matches a button whatever its tabIndex, and
+      // the journal sets `tabIndex = -1` on all nineteen souvenir slots with a
+      // comment saying why: "the rows underneath are the ones a keyboard player
+      // is trying to reach, and seventeen non-destinations in front of them is
+      // a worse card". Measured before this line existed, the pad walked the
+      // shelf — four presses of d-pad down on the departures board moved
+      // between souvenirs and never reached a destination at all.
+      //
+      // The rule this whole feature is built on is that the pad reaches exactly
+      // what the keyboard reaches. Reading `el.tabIndex` rather than the
+      // attribute catches the programmatic case, which is the one used here.
+      if (el.tabIndex < 0) continue;
+      // `hidden` is how the quit question and its button swap places, and an
+      // offsetParent of null is anything scrolled out of a collapsed fold or
+      // sitting under `display:none`. Neither may take focus.
+      if (el.hidden || el.disabled) continue;
+      if (!el.offsetParent && el !== document.body) continue;
+      let p = el, gone = false;
+      while (p && p !== card) { if (p.hidden) { gone = true; break; } p = p.parentElement; }
+      if (!gone) out.push(el);
+    }
+    return out;
+  }
+  function sysPadStep(card, dir) {
+    const list = sysPadFocusables(card);
+    if (!list.length) return;
+    let i = list.indexOf(document.activeElement);
+    if (i < 0) i = dir > 0 ? -1 : 0;
+    let n = i + dir;
+    if (n < 0) n = list.length - 1;
+    if (n >= list.length) n = 0;
+    const el = list[n];
+    try { el.focus(); } catch (e) {}
+    // A thirteen-row board is taller than the card. Walking focus off the
+    // bottom of it has to bring the row with it or the pad appears to stop.
+    if (el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+  }
+  /** Nudge a focused slider. Range inputs do not move on click, only on keys. */
+  function sysPadRange(dir) {
+    const el = document.activeElement;
+    if (!el || el.tagName !== 'INPUT' || el.type !== 'range') return false;
+    const step = parseFloat(el.step) || 1;
+    const min = parseFloat(el.min), max = parseFloat(el.max);
+    let v = parseFloat(el.value) + dir * step;
+    if (v < min) v = min;
+    if (v > max) v = max;
+    if (v === parseFloat(el.value)) return true;
+    el.value = String(v);
+    // BOTH events, and in this order. The faders listen on `input`; `change` is
+    // what a screen reader and the prefs debounce expect to see at the end of a
+    // drag. Firing only `input` left the settings file one step behind.
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  /**
+   * Drive the open card. Returns true when it took the frame, in which case
+   * padPoll does not also hand the pad to the capybara — a card is up, the
+   * world is held, and a stick that still steered would bank edges that fire
+   * the moment it closes.
+   */
+  function sysPadCard(g, dt) {
+    const card = sysPadTopCard();
+    if (!card) { padCardWas = -1; padCardT = 0; padCardLast = -1; return false; }
+    const up = padBtn(g, 12), dn = padBtn(g, 13);
+    const lf = padBtn(g, 14), rt = padBtn(g, 15);
+    // The left stick walks the card too, because half the people who pick up a
+    // pad never touch the d-pad. Deadzoned hard: this is a menu, not a steer.
+    const ay = g.axes && g.axes[1] || 0, ax = g.axes && g.axes[0] || 0;
+    const sUp = ay < -0.6, sDn = ay > 0.6, sLf = ax < -0.6, sRt = ax > 0.6;
+    const dir = (up || sUp) ? 1 : (dn || sDn) ? 2 : (lf || sLf) ? 3 : (rt || sRt) ? 4 : 0;
+    // ---- THE BUTTON THAT OPENED THE CARD IS STILL DOWN (P2) --------------
+    // The first frame with a card up is the frame AFTER the press that raised
+    // it, and that press is very often still held: a wheek is 130 ms and a
+    // frame is 16. Starting the edge state at zero therefore reads the tail of
+    // the opening press as a fresh one — measured, the departures board opened
+    // on the third wheek and closed itself on the very next frame, which looked
+    // exactly like three wheeks no longer working. The state is seeded from
+    // what is actually held, so every button must be RELEASED before this
+    // driver will act on it. Same for the d-pad, or a stick still deflected
+    // from walking to the door scrolls the board on arrival.
+    if (padCardWas < 0) {
+      padCardWas = (padBtn(g, 0) ? 1 : 0) | (padBtn(g, 1) ? 2 : 0);
+      padCardLast = dir;
+      padCardT = 0;
+      return true;
+    }
+    // One repeat clock for all four directions: press, hold, and it repeats,
+    // which is what every menu on every console does and what makes a
+    // nineteen-row board bearable.
+    let fire = false;
+    if (dir !== padCardLast) { padCardT = 0; fire = dir !== 0; }
+    else if (dir !== 0) {
+      padCardT += dt;
+      const gap = padCardT > sysPAD_REPEAT_1 ? sysPAD_REPEAT_N : Infinity;
+      if (gap !== Infinity && padCardT - sysPAD_REPEAT_1 >= 0) {
+        padCardT = sysPAD_REPEAT_1 - sysPAD_REPEAT_N + (padCardT - sysPAD_REPEAT_1) % sysPAD_REPEAT_N;
+        fire = true;
+      }
+    }
+    padCardLast = dir;
+    if (fire) {
+      if (dir === 3 || dir === 4) {
+        // Left/right is the fader first and a focus walk second, so a pad can
+        // reach the mutes beside them without the sliders swallowing every
+        // sideways press.
+        if (!sysPadRange(dir === 4 ? 1 : -1)) sysPadStep(card, dir === 4 ? 1 : -1);
+      } else {
+        sysPadStep(card, dir === 2 ? 1 : -1);
+      }
+    }
+    // A presses what is focused; B goes back. Edges only — a held button must
+    // not fire nineteen times.
+    const a = padBtn(g, 0), b = padBtn(g, 1);
+    const mask = (a ? 1 : 0) | (b ? 2 : 0);
+    if (a && !(padCardWas & 1)) {
+      const el = document.activeElement;
+      if (el && card.contains(el) && el.click) { try { el.click(); } catch (e) {} }
+    }
+    if (b && !(padCardWas & 2)) sysPadBack();
+    padCardWas = mask;
+    return true;
+  }
+
   function padPoll(dt) {
     let pads = null;
     try { pads = navigator.getGamepads ? navigator.getGamepads() : null; } catch (e) { pads = null; }
@@ -20161,6 +20477,31 @@ export function createSystems(game) {
       return;
     }
     padOn = true;
+
+    // ---- A CARD TAKES THE PAD BEFORE THE CAPYBARA DOES (P2) ---------------
+    // Before the verbs, the camera and Start, because every one of those would
+    // otherwise fight the menu: A is both `hop` and `press this button`, B is
+    // both `wheek` and `go back`, and the d-pad is both `walk` and `move down
+    // the list`. The world is already held while a card is up, so nothing is
+    // lost by handing the pad over whole — and the edges are cleared on the way
+    // out so closing a card does not fire the verb that closed it.
+    if (sysPadCard(g, dt)) {
+      padX = 0; padZ = 0; padRun = false; padSlide = false;
+      padHonk = padAction = padJump = false;
+      padWasJump = padBtn(g, 0);
+      padWasHonk = padBtn(g, 1) || padBtn(g, 3);
+      padWasAction = padBtn(g, 2);
+      padWasSnap = padBtn(g, 11);
+      // START STILL HAS TO WORK, and on a card it means the same thing B does.
+      // A player who opened the pause card with Start and cannot close it with
+      // Start has been handed the board's own bug one card along.
+      const st0 = padBtn(g, 9), bk0 = padBtn(g, 8);
+      if (st0 && !padWasStart) sysPadBack();
+      padWasStart = st0; padWasBack = bk0;
+      if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); touchLayer.classList.remove('on'); }
+      return;
+    }
+
     const a = g.axes;
 
     // ---- move: left stick, and the d-pad, which must work identically -----
@@ -20228,14 +20569,22 @@ export function createSystems(game) {
       if (!started) { startResume(); }
       else pauseToggle();
     }
-    if (back && !padWasBack && started) {
+    // BACK IS A TAP AND A HOLD (P2). The tap hides the paper, as it always
+    // has; the hold is the stuck-rescue, which the pad could not reach at all.
+    // Resolved on RELEASE so the two cannot both fire: a press shorter than
+    // sysBACK_HOLD is a tap, and one longer has already been spent on the
+    // rescue by the block that reads padBackHold.
+    padBackHold = back && started;
+    if (back && !padWasBack) padBackT = 0;
+    if (back && started) padBackT += dt;
+    if (!back && padWasBack && started && padBackT < sysBACK_HOLD) {
       if (photoOn) photoSet(false);      // same door as KeyP, same reason
       hudBare = !hudBare;
       hudRoot.classList.toggle('bare', hudBare);
     }
     padWasStart = start; padWasBack = back;
 
-    if (!padSeen && padOn) { padSeen = true; touchLayer.classList.remove('on'); }
+    if (!padSeen && padOn) { padSeen = true; sysPadSeenN = true; padSayHello(); touchLayer.classList.remove('on'); }
   }
 
   /**
@@ -20246,6 +20595,11 @@ export function createSystems(game) {
    * throwing on some Linux builds, and unavailable in an insecure context.
    */
   function padRumble(a) {
+    // CALM MEANS THE PAD TOO (P2). The switch is worded "less motion" and a
+    // player who asks for it because motion makes them ill is not asking to
+    // keep the thing that shakes in their hands. Same channel as the freeze,
+    // the shake and the FOV kick.
+    if (sysCalmOn()) return;
     if (!padOn || padIdx < 0 || a < sysPAD_RUM_MIN) return;
     if (padRumbleT > 0) return;                    // never queue them up
     padRumbleT = 0.22;
@@ -22784,13 +23138,28 @@ export function createSystems(game) {
     input.action = started && (!!keys.KeyE || mouseAction || touchAction || padAction);
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
     input.jump = started && (!!keys.Space || touchJump || padJump);
-    // ---- THE SLIDE (v44) --------------------------------------------------
-    // Ctrl, held. It is a HELD state and not a latched edge, because a slide is
-    // a thing you are doing and not a thing you did — the same shape as `run`
-    // and for the same reason. On the pad it is the LEFT trigger, opposite the
-    // right one that runs, which is the only pair of buttons on a controller
-    // that reads as "faster" and "lower" without being told.
-    input.slide = started && (!!keys.ControlLeft || !!keys.ControlRight || padSlide || touchSlide);
+    // ---- THE SLIDE (v44; moved off Ctrl in P2) ----------------------------
+    // Held, not a latched edge, because a slide is a thing you are doing and
+    // not a thing you did — the same shape as `run`. On the pad it is the LEFT
+    // trigger, opposite the right one that runs, which is the only pair of
+    // buttons on a controller that reads as "faster" and "lower" without being
+    // told.
+    //
+    // IT WAS CTRL, AND CTRL+W CLOSES THE TAB. Not "opens a dialog the page can
+    // cancel" — Chrome and Firefox both reserve Ctrl+W and a page cannot
+    // preventDefault it. The chord fires whenever W is pressed while Ctrl is
+    // already down, which is precisely "hold slide, then push forward": the
+    // natural way to start a slide from standing, and the game's own teaching
+    // line said to do it. A three-hour journey, gone, with no confirm — and on
+    // an unreleased game there is no muscle memory to protect, so Ctrl is not
+    // kept as an alias. There is no safe way to keep it.
+    //
+    // G because the alternatives are all taken by things it would be worse to
+    // move: C is the camera recentre (documented, and four probes press it), X
+    // and Z turn the camera, V raises the eye, F re-aims, R is the rescue.
+    // G is free, it is one stretch of the index finger from WASD, and it
+    // carries no browser chord in any engine.
+    input.slide = started && (!!keys.KeyG || padSlide || touchSlide);
 
     // ---- THE WARDROBE -------------------------------------------------------
     // One row per costume, and the whole rule is: you are in the chapter, and
@@ -22875,7 +23244,20 @@ export function createSystems(game) {
       backVoid(dt);
       // The touch button holds exactly as the key does — same sysBACK_HOLD, so
       // a thumb brushing it in a panic cannot fire it either.
-      if ((keys.KeyR || touchBack) && !jrShown && !ended) {
+      //
+      // ---- ...AND SO DOES THE PAD'S BACK BUTTON (P2) ---------------------
+      // R exists precisely so a three-hour game never has a state whose only
+      // answer is F5, and on a pad it had one anyway: `padBack` toggled the
+      // bare HUD and nothing on the controller reached the rescue. R5 found the
+      // identical hole on touch and answered it with a quiet held button parked
+      // away from the action fan; this is the same answer on the same button.
+      //
+      // A HOLD, on a button whose TAP already means something. That is not a
+      // collision, it is the pattern the touch layer already uses — and the tap
+      // is resolved on RELEASE below sysBACK_HOLD, so hiding the paper still
+      // costs one press and the rescue costs a deliberate 1.4 s. Nothing a
+      // thumb does by accident lands on either.
+      if ((keys.KeyR || touchBack || padBackHold) && !jrShown && !ended) {
         backHold += dt;
         if (backHold >= sysBACK_HOLD && !backBusy) { backBusy = 1; backRescue(); }
       } else { backHold = 0; backBusy = 0; }
@@ -24467,7 +24849,7 @@ export function createSystems(game) {
         slidT += dt;
         if (slidT > 1.2) {
           slidSaid = true;
-          toast(sysSay('hold Ctrl while you are running. put your belly on it.'));
+          toast(sysSay('hold G while you are running. put your belly on it.'));
         }
       } else slidT = 0;
     }

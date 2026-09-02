@@ -405,7 +405,62 @@ count logged; the 19 rest shots re-taken through the picker. **Trap:**
 raycaster's path — `Raycaster` does not honour `visible`. Enter through the
 picker for every picture, and filter the ray by the registry, never the scene.
 
-**Batch P2 — the pad and the card.** Area 2.
+**Batch P2 — the pad and the card. Done, 2 Sep 2026.** Measured with a
+synthetic pad installed over `navigator.getGamepads`, because a controller is
+the one input surface a headless run cannot otherwise reach.
+
+**The baseline, and it is worse than the review said.** Three wheeks at the
+wharf raise the departures board and the world pauses behind it — and then all
+**seventeen buttons and both sticks in eight directions** leave it exactly
+where it is. Start does not close it; it stacks the pause card on top. On that
+card focus never left `resume`: d-pad did nothing, A pressed nothing, the three
+faders read 100/100/100 throughout, B closed nothing. R5's touch trap with a
+pad in place of a thumb, and worse, because the only exits were to travel
+somewhere nobody asked to go or to reload a three-hour game.
+
+**What landed.** `sysPadCard` drives the DOM rather than reimplementing four
+menus — d-pad walks focus, A clicks, B is Escape, left/right step a fader,
+Start on a card means what B means. It runs before the verbs, because A is both
+`hop` and `press this`. A full pad-only journey now works end to end: title →
+Sydney → wharf → board → walk the rows → **travel to Pasto** → pause → settings
+→ fader moved (master bus 0.85 → 0.81, read off the graph) → quit → confirm.
+Slide moved to **G**; `Ctrl` is unbound, because Ctrl+W closes the tab and no
+page can cancel it. A third vocabulary rewrites clues for a pad (`press Q,
+anywhere` → `press B, anywhere`), checked statically: 191 clue literals, 39
+rewritten, zero other lone capitals. BACK gained a hold for the stuck-rescue
+(21.9 m back, measured) while its tap still hides the paper. `sysFocusWrap`
+took Tab from **3 of 14 presses leaving the pause card to 0 of 12**. And calm
+now reaches the freeze: driving the card's own checkbox, a hitstop applies
+`scale` 0.08 with calm off and 1 with it on.
+
+**Three bugs in my own driver, each of which looked like a game bug.** The
+button that opens a card is still down on the next frame, so a zeroed edge
+state closed the board on the frame it opened — which reads exactly like three
+wheeks no longer working. `button:not([disabled])` matches a button whatever
+its tabIndex, so the pad walked the nineteen souvenir slots the journal had
+deliberately taken out of the tab order, and never reached a destination. And
+the quit question is a card inside a card: one press down from "stay here"
+landed on a volume slider.
+
+**And two probe defects worth recording.** Matching `/Pasto/` against
+`activeElement.textContent` matched on the first press, because the card itself
+takes focus when the board opens and its text contains every chapter name in
+the game — every later step then ran with the board still up, and four separate
+assertions failed for that one reason. And the freeze cannot be read while a
+card is open, because the card pauses the world and a paused world runs no time
+step: the first calm measurement read `scale` 120 ms into a 350 ms hitstop with
+the settings still up and got 1.0 both ways, which reads exactly like a freeze
+that never fires.
+
+**Left as spill, deliberately:** the HUD text floors (8.5 px clue, 9.5 px task,
+8–10 px on the phone block). Raising them is one CSS block and a phone
+screenshot pass, and it belongs with the other type work in P7 rather than
+half-done here.
+
+Verified: R1, R4 and R5 re-run green, 19/19 soak clean with 0 NaN, 0 errors and
+0 record orphans, no page or console errors in any pad run, build 9143.6 KB.
+
+*Original scope:*
 *Must land:* (a) The board: Start or B while `jrShown` closes it; d-pad walks
 its rows, A travels. (b) One `sysPadCard(dt)` that, while any of the four cards
 is up, maps d-pad up/down to synthetic Tab/Shift-Tab within the card, A to
