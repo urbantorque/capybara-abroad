@@ -5186,6 +5186,19 @@ function sahBuild(game) {
     // BESIDE THE BASKET, NOT IN IT — and where the drawn figure has always
     // stood, which is 1.9 m west of it. The old record put an invisible person
     // and a solid box in the middle of the thing the task asks you to sit in.
+    // ---- ...AND THE SAME PERSON, TWO CHAPTERS LATER (P6) ---------------
+    // See THE TRAVELLER in npc.js. Two chapters and half a world on, and
+    // they are the first person in the game to notice that you are also
+    // somewhere you were not before.
+    if (typeof game.addTraveller === 'function') {
+      game.addTraveller({ biome: 'sahara', x: sahSNAKE.x + 3.6, y: 0, z: sahSNAKE.z - 2.2,
+        face: 2.4,
+        lines: ['Hold on. I know you. Sydney. The gardens.',
+                'You are a long way from those gardens.',
+                'How are you getting about? Genuinely. How.',
+                { t: 'I have been on four buses. You have been on none.', after: 'to-sahara' }],
+        wheek: ['Yes. That is the noise. That is definitely the noise.'] });
+    }
     sahLocSnake = game.addLocal({ biome: 'sahara', x: sahSNAKE.x - 1.9, y: 0, z: sahSNAKE.z + 0.4,
       near: 6, face: 1.78,
       figure: { shirt: PALETTE.cloth7, skin: PALETTE.skin3 },

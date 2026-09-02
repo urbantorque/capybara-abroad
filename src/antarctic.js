@@ -3432,7 +3432,8 @@ function antBuildLocals(game) {
              'That is going to unsettle them for an hour.'],
     startled: ANT_STARTLED, splash: ANT_SPLASH, thief: ANT_THIEF,
     rush: ['Not through the middle! Not through the MIDDLE —',
-           'You will have them off their nests!', 'Careful! It is all ice under that!'],
+           'You will have them off their nests!',
+           'I had a number. I had an actual number.'],
   });
   // ---- THREE MORE, and the chapter has three PLACES it had nobody in -----
   // A base is not a village, which is why there were only ever three — but
@@ -3468,7 +3469,8 @@ function antBuildLocals(game) {
              'A hundred years and you are the first one to do that.'],
     startled: ANT_STARTLED, splash: ANT_SPLASH,
     thief: ['That is a historic artefact. It is also a bit of a barrel.',
-            'Put it — no. Fine. It is fine.', 'Everything down here belongs to whoever is holding it.'],
+            'Put it — no. Fine. It is fine.',
+            'Somebody left that in 1911 and you are the first to move it.'],
     rush: ANT_RUSH,
   });
   // 5 — the glaciologist, on the moraine at the toe, watching a stake
@@ -3534,12 +3536,13 @@ function antBuildLocals(game) {
     praise: ['That is worth a drink. Everything is worth a drink.',
              'Go on then. Tell me about it. I have got nowhere to be.',
              'You are the most interesting thing that has happened since the resupply.'],
-    startled: ['Nothing behind the bar is breakable any more. It is all been broken.',
-               'Ha! Do that again.', 'The wind does worse. Every night.'],
+    startled: ['Nothing behind the bar is breakable any more. It has all been broken.',
+               'That is the second glass this season. The first one was me.',
+               'Do that again and it goes on the board.'],
     splash: ANT_SPLASH,
-    thief: ['Take it. Nine of us and two hundred of everything.',
+    thief: ['Help yourself. Everybody else does.',
             'That is coming out of your tab. You do not have a tab.',
-            'Oh, we are looting now. Fine.'],
+            'I will put it under shrinkage. We have a column for shrinkage.'],
     rush: ANT_RUSH,
   });
 

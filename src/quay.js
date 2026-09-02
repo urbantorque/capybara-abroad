@@ -5422,6 +5422,19 @@ function quayBuild(game) {
               { t: 'Alongside at Manly, first go. Thirty years I have been watching people not do that.', after: 'manly-voyage' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['That is the horn, near enough.'] });
+    // ---- AND ONE PERSON YOU WILL SEE AGAIN (P6) -------------------------
+    // On the wharf with a pack on, waiting for a boat, which is where a
+    // person who is about to be in three more chapters ought to start. They
+    // do not know you yet — every line here is what you say to a stranger —
+    // and that is the whole of the setup.
+    if (typeof game.addTraveller === 'function') {
+      game.addTraveller({ biome: 'quay', x: -4.5, y: 0.20, z: 21, face: 0.5,
+        lines: ['Six months. I have got six months and a very bad map.',
+                'Everybody says start here and go west. So. West.',
+                { t: 'Is that boat going anywhere? Is anybody driving it?', before: 'take-helm' },
+                { t: 'Somebody IS driving it. That is somehow worse.', after: 'take-helm' }],
+        wheek: ['Was that you? That was you.'] });
+    }
     // ...AND HE WAS STANDING INSIDE HIS OWN SHOP. (quayMANLY.x, quayMANLY.z-30)
     // is the exact centre of the chip shop's footprint, walls, roof and all —
     // an eleven-metre building with a man in the middle of it. He belongs at

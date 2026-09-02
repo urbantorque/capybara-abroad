@@ -2981,9 +2981,27 @@ function hanBuildLocals(game) {
     }
     o.biome = 'hanoi';
     o.x = x; o.z = z; o.y = h;
+    // ...through addTraveller if this is the one who keeps turning up, so
+    // the terrain probe above still runs for them. See THE TRAVELLER.
+    if (o.trav && typeof game.addTraveller === 'function') {
+      delete o.trav;
+      return game.addTraveller(o);
+    }
+    delete o.trav;
     return game.addLocal(o);
   };
 
+  // ---- ...AND THE LAST TIME (P6). See THE TRAVELLER in npc.js. ---------
+  // Four chapters and about six months of their life. The joke only pays
+  // here, and it only pays if the three before it were quiet about it.
+  put(9, 19, {
+    face: -2.6,
+    trav: true,
+    lines: ['Right. I am not even going to say it.',
+            'Four countries. Four. I have counted.',
+            'Are you following me or am I following you?',
+            { t: 'Whatever you did in that cave, I heard about it in Laos.', after: 'to-cave' }],
+    wheek: ['Yeah. All right. Yeah.'] });
   hanLocPho = put(12, 14, {
     figure: { shirt: PALETTE.hanWash1, hat: PALETTE.hanConical }, face: -2.2, near: 8,
     // ---- AND WHAT THEY SAY CHANGES (v30) -------------------------------

@@ -707,6 +707,48 @@ traveller who is in Sydney's chatter pool and turns up in three later chapters
 having seen you before; the two typos and two diacritics. Read from `CHAPTERS`
 in the two places the sub is hard-coded a second time.
 
+**Done, 3 Sep 2026.** Almost no code, as advertised, and the exception is the
+one place that needed a mechanism rather than sentences.
+
+- **Nine chapters got acts** (4, 5, 6, 9, 11, 12, 13, 14, 15), read off the
+  geography the task list was already sorted by — 56 tasks tagged, no task
+  moved. Four of them run to two movements rather than three, because
+  inventing a third for a chapter that has two is how a structure stops meaning
+  anything. Chapter 1 keeps its flat list on purpose: the point of chapter 2
+  having a shape is that chapter 1 did not.
+- **Eight `open` lines** stopped being act one's line said twice.
+- **A `note` per chapter** — one sentence in the FINDS' voice, on the closing
+  card above the rule and on the ledger leaf of a place that is finished. It is
+  the only line on either that is not arithmetic.
+- **Eleven arrivals** stopped saying "Turn up in X", which is a label, not a
+  task, and was the first row a player read in eleven of nineteen chapters.
+- **`npcPLACE_SAY`** — a chapter layer between a person's own lines and the
+  chapter-neutral pools, with `wary` and `incident` authored for all seventeen
+  chapters that have locals. The neutral pools are unchanged and stay the
+  fallback; the resolver is general, so any kind can be given a chapter row.
+- **The Pantanal souvenir** is now the exception it should have been: "nothing.
+  it was yours already.", and `keepNone` suppresses the drawn object, so the
+  card holds up the sentence and an empty frame.
+- **Six door toasts** that named a direction or a road now name a departure.
+- **The traveller** — one person, one palette, in Circular Quay, Marrakech,
+  Cappadocia and Hanoi, whose lines are gated on what you have finished. The
+  look is fixed in `game.addTraveller` rather than copied into four files.
+- Five bespoke line pools across three chapters were two thirds the chapter's
+  shared array; `Río Cali` and `Long Biên` got their diacritics; and the ferry
+  card stopped writing chapter 3's name and subtitle out a second time.
+
+Verified: `qa/p6-static.cjs` (7 table invariants) passes; act headings live in
+Palawan, Manly and Rio; the note reaches both the closing card and the leaf;
+`sayAudit` reports `layer: place` for wary and incident in Venice and Kowloon
+and `neutral` for startled; the traveller measures as ONE person — shirt
+`a8c4a2` and hat `faf6ec` in all four chapters, `y === terrainHeight` in all
+four, reachable within 2.2–4.1 m. 19/19 soak clean, build 9 234.4 KB.
+
+**Known and left:** chapter 3's act three has one task in it (`manly-pine`),
+which the static audit warns about and which is the chapter's own coda, not a
+regression. The typo sweep found one real slip, not two.
+
+
 **P7 — the drawn payoff** (from area 1's picture half, ~12 h). Dust pool 30 →
 60; a ring decal on `capy:land`; a 60 ms emissive flash on `prop:impact`;
 speed streaks at full run only; the chapter crossing carries the picker's

@@ -3058,6 +3058,106 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE THROUGH-LINE — P6 (3 Sep 2026)
+
+Nineteen chapters and about a hundred and thirty people, and the only thing in
+the game that knew the chapters were in an ORDER was the souvenir shelf.
+
+### An act is a boundary the geography already had
+
+Nine chapters gained acts. Not one task moved: the lists were already sorted by
+where you are, so every act boundary is a place you travel to, and the `wow`
+task sits at the end of the movement that earns it. Four chapters run to two
+movements rather than three — inventing a third for a chapter that has two is
+how a structure stops meaning anything.
+
+**Chapter 1 keeps its flat list on purpose.** The Pasto note has said so since
+R8: the point of chapter 2 having a shape is that chapter 1 did not.
+
+`qa/p6-static.cjs` holds the invariants, and they are worth stating because
+each one is a way an act silently does nothing:
+
+1. every declared act has at least one task in it (an empty act never becomes
+   the live act, so its heading can never be seen);
+2. no task points at an act its chapter does not declare;
+3. no act has exactly one task (a curtain going up on one row reads as a bug);
+4. the arrival row is always act 1 — it is the first thing a player reads and
+   cannot be behind a movement they have not opened;
+5. `open` is never act one's line.
+
+### The open line and the act line are two lines, not one
+
+`open` is the arrival toast, thrown 700 ms after the title card. The act kick
+heads the to-do paper at the same moment. Eight chapters said the same sentence
+in both places, spending two of the four or five sentences a chapter gets on
+one thought. The open is now the chapter's PREMISE; the act line is the
+instruction for the movement you are in.
+
+### The note
+
+One sentence per chapter, in the FINDS' voice — second person, past tense,
+about something nobody asked you to do — on the closing card above the rule and
+on the ledger leaf of a place that is FINISHED. It may not name a number,
+because the numbers are on the row underneath it.
+
+Only on a finished leaf: the note is past tense about a chapter that is over,
+and putting it on a row with four tasks left would be the ledger telling the
+player how a place they are still in turned out.
+
+### Three layers of dialogue, not two
+
+`npcLOC_SAY` is written to a rule its own comments state four times: no season,
+no country, no building. That rule is correct AND it is why a Venetian, a
+Hongkonger and an Antarctic diesel mechanic all said "You again." in the same
+words.
+
+`npcPLACE_SAY` is a chapter layer between a person's own lines and the neutral
+pool. It is free to break the rule because it only ever plays in the chapter it
+is written for. `wary` and `incident` are authored for all seventeen chapters
+that have locals; the resolver `npcSay(r, kind)` is general, so any kind can be
+given a chapter row later.
+
+**`sayAudit` returns the LAYER, not just the lines.** Asserting that a Venetian
+says something Venetian does not prove the chapter row was reached rather than a
+neutral pool that happens to sit in front of it.
+
+### The exception that makes the other eighteen a rule
+
+Eighteen chapters hand you an object on the way out. The Pantanal is the one
+you are FROM, and a souvenir of home is a contradiction — so `keep` is
+"nothing. it was yours already." and `keepNone` suppresses the drawn object on
+both the card and the leaf. The empty frame beside Sydney's hat is the point.
+
+### The traveller
+
+One person, in Circular Quay, Marrakech, Cappadocia and Hanoi. **A figure in
+this game IS its palette** — there is no other way to be recognised at six
+metres — so the palette is fixed once in `game.addTraveller` rather than copied
+into four chapter files, where one of the four would eventually drift and the
+joke would quietly stop working. Everything else is the chapter's: where they
+stand, what they say, and which finished task gates it.
+
+MEASURED: one instance per chapter, shirt `a8c4a2` and hat `faf6ec` in all
+four, `y === terrainHeight` in all four, and the animal settles 2.2–4.1 m away
+against an 8 m talking radius.
+
+### Two audits worth keeping
+
+- **Cross-file repeated sentences.** Caught a line said verbatim by a Rio kiosk
+  man and a Marrakech snake charmer, and the ferry card writing chapter 3's
+  name and subtitle out a second time three hundred lines from the only other
+  place that draws them. It agreed. Nothing made it.
+- **Within-file repeated sentences.** Caught five people who were given their
+  own three-line pool and then filled two of the three from the chapter's
+  shared array — the arrangement that makes somebody look as though they have a
+  voice while guaranteeing they mostly do not.
+
+### The line-ending trap
+
+The nineteen chapter files are CRLF; `shared.js`, `systems.js` and `npc.js` are
+LF. A multi-line anchor written with `\n` matches nothing in a CRLF file, and
+that reads exactly like a stale anchor. Normalise the anchor to the file.
+
 ## FACES AND BODIES — P5 (2 Sep 2026)
 
 Everybody in this game was a box with a nose on it, and the nose was doing the

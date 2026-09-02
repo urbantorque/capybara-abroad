@@ -5462,6 +5462,16 @@ function gorBuild(game) {
     // is at any given point in it: the flattening is a smoothstep with a
     // radius, so ten metres out from the middle it has only got two thirds of
     // the way there. Ask the function.
+    // ---- ...AND AGAIN (P6). See THE TRAVELLER in npc.js. ---------------
+    if (typeof game.addTraveller === 'function') {
+      gorLocals.trav = game.addTraveller({ biome: 'goreme',
+        x: gorPLAZA.x + 3.2, y: gorPLAZA.y, z: gorPLAZA.z - 5.5, face: 0.4,
+        lines: ['Of course. Of course you are here.',
+                'I have stopped asking. I have genuinely stopped asking.',
+                'I booked this three months ago. You just turned up.',
+                { t: 'You were in the balloon, were you not. I saw a shape.', after: 'sunrise' }],
+        wheek: ['There it is. Every time.'] });
+    }
     gorLocals.tea = game.addLocal({ biome: 'goreme', x: gorPLAZA.x - 8.4,
       y: gorTerrain(gorPLAZA.x - 8.4, gorPLAZA.z + 6.2), z: gorPLAZA.z + 6.2,
       near: 7,

@@ -6214,6 +6214,12 @@ function sysBuildCSS() {
   'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
 '.capyui-donename{font-size:clamp(19px,4.6vw,32px);color:' + ink + ';font-weight:700;',
   'letter-spacing:.05em;line-height:1.06;margin-top:3px;text-wrap:balance;}',
+/* The sentence, above the rule. Italic and at reading size, because it is
+   the only thing on this card that is a sentence rather than a label — the
+   kick, the name and the numbers are all set in tracked-out caps, and one
+   more of those would have been a fourth label rather than a line to read. */
+'.capyui-donenote{font-size:clamp(12px,2.4vw,15px);color:' + inkSoft + ';font-style:italic;',
+  'line-height:1.4;margin:7px auto 0;max-width:min(78vw,30em);text-wrap:balance;}',
 '.capyui-donerule{height:2px;background:' + rule + ';border-radius:2px;margin:8px auto 7px;',
   'width:min(30vw,140px);transform:rotate(.5deg);}',
 '.capyui-donesub{font-size:clamp(9.5px,2vw,12px);letter-spacing:.16em;font-weight:700;',
@@ -6310,6 +6316,12 @@ function sysBuildCSS() {
 '.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
 '.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
   'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
+/* ...and the one line on a leaf that is not a number. Same column as the
+   finds, no bullet: a find is one of a list and this is the last word about
+   the place, so it reads as a caption under the row rather than as another
+   entry in it. */
+'.capyui-lednote{grid-column:2 / 4;margin-top:3px;font-size:clamp(11px,1.9vw,12px);',
+  'color:' + inkSoft + ';font-style:italic;line-height:1.38;overflow-wrap:anywhere;}',
 '.capyui-ledkeep{flex:0 0 auto;width:19px;height:19px;display:block;}',
 '.capyui-ledkeep svg{display:block;width:100%;height:100%;}',
 '.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
@@ -15570,8 +15582,12 @@ export function createSystems(game) {
     const def = chapterDef(n);
     if (!def || !def.keep) return;
     while (keepArt.firstChild) keepArt.removeChild(keepArt.firstChild);
-    const g = sysBuildKeep(def.biome);
+    // ...unless there is nothing to draw. See keepNone in shared.js: the
+    // one chapter you are FROM does not hand you an object, and an empty
+    // frame over the sentence is the point of it.
+    const g = def.keepNone ? null : sysBuildKeep(def.biome);
     if (g) keepArt.appendChild(g);
+    keepArt.hidden = !g;
     keepText.textContent = def.keep;
     keepEl.classList.add('show');
     // ---- THE SOUVENIR WAS SILENT (P4) ------------------------------------
@@ -15596,10 +15612,19 @@ export function createSystems(game) {
   const doneEl = sysEl('div', 'capyui-done');
   const doneArt = sysEl('div', 'capyui-doneart');
   const doneName = sysEl('div', 'capyui-donename', '');
+  // ---- THE SENTENCE (P6) -------------------------------------------------
+  // The card that closes a place said its name and then three numbers, and the
+  // numbers are the same three numbers on every one of the nineteen. It is the
+  // last thing a chapter ever says and it had nothing to say. `note` is one
+  // sentence in the FINDS' voice — what the place was like, now that it is
+  // over — and it goes ABOVE the rule, because the rule is what separates the
+  // sentence from the arithmetic. See CHAPTERS.note in shared.js.
+  const doneNote = sysEl('div', 'capyui-donenote', '');
   const doneSub = sysEl('div', 'capyui-donesub', '');
   doneEl.appendChild(doneArt);
   doneEl.appendChild(sysEl('div', 'capyui-donekick', 'that is the whole place'));
   doneEl.appendChild(doneName);
+  doneEl.appendChild(doneNote);
   doneEl.appendChild(sysEl('div', 'capyui-donerule'));
   doneEl.appendChild(doneSub);
   hudRoot.appendChild(doneEl);
@@ -15615,6 +15640,8 @@ export function createSystems(game) {
     const g = sysBuildMark(def.biome);
     if (g) doneArt.appendChild(g);
     doneName.textContent = def.name.toUpperCase();
+    doneNote.textContent = def.note || '';
+    doneNote.hidden = !def.note;
     doneSub.textContent = sub || '';
     doneEl.classList.add('show');
     if (doneTimer) clearTimeout(doneTimer);
@@ -15879,7 +15906,7 @@ export function createSystems(game) {
       // number the place got out of you.
       const line = sysEl('div', 'capyui-ledline');
       const held = keepHeld(n);
-      if (held) {
+      if (held && !def.keepNone) {
         const kg = sysEl('span', 'capyui-ledkeep');
         const g = sysBuildKeep(def.biome);
         if (g) kg.appendChild(g);
@@ -15910,6 +15937,15 @@ export function createSystems(game) {
         fl.appendChild(sysEl('span', null, f.where || f.text));
       }
       if (fl) row.appendChild(fl);
+      // ---- ...AND WHAT THE PLACE WAS LIKE (P6) ---------------------------
+      // Only on a leaf for a place that is FINISHED. The note is written in
+      // the past tense about a chapter that is over — "you stopped minding
+      // somewhere over the third island" — and putting it on a row with four
+      // tasks left in it would be the ledger telling the player how a place
+      // they are still in turned out. It is also, deliberately, the one line
+      // on a leaf that is not a number: nineteen rows of arithmetic is a
+      // receipt, and a ledger is supposed to be read.
+      if (full && def.note) row.appendChild(sysEl('div', 'capyui-lednote', def.note));
       ledList.appendChild(row);
     }
     const noticed = findCount();
@@ -23128,6 +23164,12 @@ export function createSystems(game) {
     // composed its own wording should be able to say so.
     say: function (s) { toast(sysSay(s)); },
     completeTask: completeTask,
+    // The ids of one chapter, so a probe can finish a place without a table
+    // of nineteen literals that goes stale the moment a task is renamed.
+    taskIds: function (n) { const r = chapRec[n]; return r ? r.ids.slice() : []; },
+    // ...and the ledger, which is otherwise only reachable through a button
+    // press on a card that a probe has to find first.
+    ledger: function () { ledShow(false); },
     isTaskDone: function (id) { return !!(taskRec[id] && taskRec[id].done); },
     tasksDone: function () { return doneCount; },
     setMuted: setMuted,
@@ -23530,7 +23572,13 @@ export function createSystems(game) {
   game.events.on('ferry:departed', function () {
     completeTask('ferry-ride');
     sfx('horn');
-    biomeFadeTo('quay', 'CIRCULAR QUAY', 'she sails when you say she sails');
+    // READ OFF CHAPTERS, not typed again. This was the chapter 3 name and
+    // subtitle written out a second time, three hundred lines from the only
+    // other place that draws them — so the picker tile, the ledger leaf, the
+    // title card and the departures board all said one thing and the ferry
+    // said whatever this line happened to say. It agreed. Nothing made it.
+    const qd = chapterDef(chapterOf('quay'));
+    biomeFadeTo('quay', qd.name.toUpperCase(), qd.sub);
   });
 
   // Sun, sky, fog and the shadow frustum are all biome state. The colours glide
@@ -25536,23 +25584,23 @@ export function createSystems(game) {
         homeHinted = true;
         toast(atSyd ? 'everything that leaves this city leaves off this wharf.'
             : atManly ? 'there is a boat here that goes a very long way.'
-            : atUji ? 'the river goes a long way south.'
+            : atUji ? 'the boats off this bridge go down to the sea, and then anywhere.'
             : atCali ? 'somebody down there is going to Sydney.'
             : atRio ? 'that ocean goes all the way to Sydney.'
             : atIce ? 'the boats out of here go a very long way south.'
             : atSah ? 'somebody at this fire knows a man with a truck.'
-            : atDri ? 'shout from up here and something will come and get you.'
+            : atDri ? 'shout from up here and something enormous comes and takes you somewhere.'
             : atVen ? 'boats have left from these two columns for a thousand years.'
             : atHk ? 'the ferries out of here go further than across.'
             : atPal ? 'everything that has ever left this island left from here.'
             : atGor ? 'these crews drive to seven countries. ask one.'
-            : atMan ? 'the people in the yellow caps can get anybody anywhere.'
-            : atPan ? 'this road goes north for a hundred and forty kilometres.'
-            : atCav ? 'there is a way on through there, and it is the only one.'
+            : atMan ? 'the surf club runs boats to places that are not on the timetable.'
+            : atPan ? 'the road north is there when you want it. nobody here is going to mention it.'
+            : atCav ? 'the porters walk out through there and they always come back with post.'
             : atAnt ? 'the ship that dropped you here comes back past at eight.'
             : atMon ? 'somebody on these steps can get anybody anywhere. that is the point of them.'
             : atHan ? 'everything has left this city over this bridge since nineteen hundred and two.'
-            : 'the wind here goes south.');
+            : 'something leaves from here. it always has.');
       }
       if (input.whistlePressed) {
         homeSet(homeCount + 1);

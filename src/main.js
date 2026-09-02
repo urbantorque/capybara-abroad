@@ -1836,6 +1836,8 @@ function mainBoot() {
   // are none - every one of them is lazy).
   if (npcs && typeof npcs.addLocal === 'function') {
     game.addLocal = npcs.addLocal;
+    // ...and the one person who is in four of them. See THE TRAVELLER.
+    game.addTraveller = npcs.addTraveller;
     game.addExchange = npcs.addExchange;
     game.say = npcs.say;
     game.locals = npcs.locals;
@@ -1853,6 +1855,8 @@ function mainBoot() {
     game.faceAudit = npcs.faceAudit;
     // ...and who is mid-sentence, which the capybara gaze reads.
     game.npcSpeaker = npcs.speaker;
+    // Which line pool a chapter resolves to. A test hook — see sayAudit.
+    game.sayAudit = npcs.sayAudit;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

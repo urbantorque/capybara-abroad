@@ -3190,8 +3190,9 @@ function cavBuildCamp(game, root) {
     praise: ['That is one way of doing it.', 'Rope would have been easier.',
              'You are not going to use the rope at all, are you.'],
     startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF,
-    rush: ['Walk! It is all holes!', 'You have got no rope on!',
-           'Nobody runs in here. Nobody.'],
+    rush: ['You have got no rope on!',
+           'I cannot belay something moving at that speed!',
+           'That is a forty metre drop and you cannot see it.'],
   }, false);
   // 4 — the porter at the boulder choke, who is not carrying anything at the
   //     moment and would like that noted

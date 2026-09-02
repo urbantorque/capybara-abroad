@@ -1312,6 +1312,138 @@ export function createNPCs(game) {
                'It is doing it on purpose.', 'Is anybody going to stop it?',
                'I have been watching this the whole time.'],
   };
+  // =======================================================================
+  // WHERE THEY ARE (P6)
+  //
+  // Every pool above is written to a stated rule, repeated four times in its
+  // own comments: no season, no country, no building, nothing that assumes
+  // what you did. That rule is correct AND it is the reason a person in
+  // Venice, a person in Mong Kok and a person on an Antarctic jetty all say
+  // 'You again.' in the same words — seventeen chapters of local colour and
+  // the two lines a person says ABOUT YOU were the same everywhere.
+  //
+  // A per-chapter pool is free to break the rule, because it only ever plays
+  // in the chapter it is written for. The neutral pools stay exactly as they
+  // are and remain the fallback, so a chapter with no row here loses nothing.
+  //
+  // Two kinds are authored, and they are the two worth it: `wary` — said to
+  // somebody who has already had a go at them — and `incident`, said when
+  // three things happen in one place inside twelve seconds. Both are ABOUT
+  // the animal rather than about an event, which is what makes them the
+  // lines a place should say in its own voice. The one rule that survives
+  // from the neutral pools is the incident rule: none of these may name what
+  // was done, because the same three lines are spoken over a stolen hat, a
+  // shattered bowl and a bicycle in a canal.
+  //
+  // The resolver is general — any kind may be given a chapter row later —
+  // and only these two are written, because 17 chapters of a pool nobody can
+  // tell apart from the neutral one is work that buys nothing.
+  const npcPLACE_SAY = {
+    quay: {
+      wary:     ['You again, mate.', 'Yeah, I know you.', 'Not on this wharf.'],
+      incident: ['That is three off this wharf.', 'Righto. That is a pattern.',
+                 'Somebody wants to ring somebody.'],
+    },
+    kyoto: {
+      wary:     ['Ah. You.', 'I remember.', 'Please. Not again.'],
+      incident: ['Three times now.', 'Everyone is being very polite about this.',
+                 'It is not confused. It has decided.'],
+    },
+    cali: {
+      wary:     ['Otra vez vos.', 'I know you now.', 'Ay, no. Not you.'],
+      incident: ['Tres. Three of them.', 'Somebody is going to have to say something.',
+                 'That one is enjoying itself.'],
+    },
+    rio: {
+      wary:     ['Ah, e voce.', 'I know that one.', 'Not on my stretch.'],
+      incident: ['Tres! Three!', 'It is still going and nobody is stopping it.',
+                 'The whole beach saw that.'],
+    },
+    iceland: {
+      wary:     ['You. Again.', 'I know what you are now.', 'Not this time.'],
+      incident: ['Three, in one hour.', 'That was deliberate.',
+                 'There is nobody else out here to blame.'],
+    },
+    sahara: {
+      wary:     ['You. Again.', 'I have seen you before.', 'Not at this cart.'],
+      incident: ['Three times in this square.', 'Everybody saw that.',
+                 'It is not lost. It is choosing.'],
+    },
+    drift: {
+      wary:     ['Oh. It is you.', 'I remember you from lower down.', 'Careful. This time.'],
+      incident: ['Three. Even up here.', 'Nothing up here is safe from it.',
+                 'It has worked out how this place works.'],
+    },
+    venice: {
+      wary:     ['Ancora tu.', 'I know you now, signore.', 'Not in my calle.'],
+      incident: ['Three. In one campo.', 'This one is not the water.',
+                 'Somebody is going to have to fish that out.'],
+    },
+    kowloon: {
+      wary:     ['You again, ah.', 'I know your face.', 'Not on my street.'],
+      incident: ['Three already.', 'Aiyah. Again and again and again.',
+                 'Whole street saw that one.'],
+    },
+    palawan: {
+      wary:     ['Ay, ikaw na naman.', 'I know this one.', 'Not the boat. Please.'],
+      incident: ['Three, and it is still morning.', 'It is going down the whole beach.',
+                 'Somebody watch the bangka.'],
+    },
+    goreme: {
+      wary:     ['Sen yine.', 'I remember you from the valley.', 'Not the ropes again.'],
+      incident: ['Three. Before sunrise.', 'Everything it goes near goes over.',
+                 'The crews have started watching it.'],
+    },
+    manly: {
+      wary:     ['You again, mate.', 'Yeah, I remember you.', 'Not on my beach.'],
+      incident: ['Three. That is three.', 'Righto, that is a habit.',
+                 'Half the beach just watched that.'],
+    },
+    // The Pantanal is the one place that does not mind you, and its whole
+    // premise is that nobody looks up. So its wariness is not wariness and
+    // its incident lines are people declining to treat it as one. It is the
+    // exception, and it only reads as one because the sixteen above it are
+    // not exceptions.
+    pantanal: {
+      wary:     ['Ha. You again.', 'Still here, then.', 'You are no trouble.'],
+      incident: ['Third one. Nobody minds.', 'That is just what they do.',
+                 'Leave it. It will sort itself out.'],
+    },
+    cave: {
+      wary:     ['You. Again.', 'I heard you coming this time.', 'Stay where I can hear you.'],
+      incident: ['Three. Down HERE.', 'Nothing down here is replaceable.',
+                 'That echoed for a long time.'],
+    },
+    antarctic: {
+      wary:     ['You. Again.', 'I know that shape now.', 'Not the boat. Not again.'],
+      incident: ['Three. On a station of nine people.', 'Nobody is going to believe this.',
+                 'I am writing this one down.'],
+    },
+    monaco: {
+      wary:     ['You. Again.', 'I have your face now.', 'Not in here.'],
+      incident: ['That is three, sir.', 'Three is when we stop being polite.',
+                 'Somebody has been counting since you came in.'],
+    },
+    hanoi: {
+      wary:     ['Lai la ban.', 'I know you now.', 'Not my stool. Not again.'],
+      incident: ['Three. In ten minutes.', 'It is not the traffic. It is that.',
+                 'Everybody on this corner saw it.'],
+    },
+  };
+  /**
+   * WHICH POOL A PERSON DRAWS FROM: theirs, then their chapter's, then the
+   * neutral one. Three layers and the general case is the middle one being
+   * absent, which is why it is a lookup and not a merge.
+   */
+  function npcSay(r, kind) {
+    const own = r && r.says && r.says[kind];
+    if (own && own.length) return own;
+    const live = game.biome && game.biome.current;
+    const row = live && npcPLACE_SAY[live];
+    const here = row && row[kind];
+    if (here && here.length) return here;
+    return npcLOC_SAY[kind];
+  }
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
   const npcLOC_BOB = 0.014;     // metres of breathing
@@ -1589,6 +1721,27 @@ export function createNPCs(game) {
    *   near   metres. 7 by default, which is about a conversation.
    *   face   base yaw to return to when nobody is about
    */
+  // ---- ONE PERSON WHO IS IN FOUR CHAPTERS (P6) -------------------------
+  // See THE TRAVELLER. addLocal with the figure fixed: same shirt, same
+  // trousers, same hair, same hat, in Circular Quay, Marrakech, Cappadocia
+  // and Hanoi. A figure in this game IS its palette — there is no other way
+  // to be recognised at six metres — so the palette is written once here
+  // instead of four times in four chapter files, where one of the four
+  // would eventually drift and the whole point would quietly stop working.
+  //
+  // Everything else is the chapter's: where they stand, what they say, and
+  // which task gates it. They are not a system, they are a person who keeps
+  // turning up.
+  const npcTRAV_FIG = { shirt: PALETTE.cloth4, legs: PALETTE.khaki,
+                        hair: PALETTE.hair2, skin: PALETTE.skin2,
+                        hat: PALETTE.sail };
+  function addTraveller(o) {
+    if (!o) return null;
+    o.figure = npcTRAV_FIG;
+    if (o.near === undefined) o.near = 8;
+    return addLocal(o);
+  }
+
   function addLocal(o) {
     if (!o || !o.biome) return null;
     let g = o.group || null;
@@ -1823,7 +1976,7 @@ export function createNPCs(game) {
       const famAns = soft && kind === 'wheek' && r.fam > npcFAM_HEAT &&
                      (r.wary || 0) <= npcWARY_HEAT;
       r.cd = r.cool * rand(0.7, 1.3) * (r.fam > npcFAM_HEAT ? npcFAM_COOL : 1);
-      localLine(r, famAns ? (r.says.fam || npcLOC_SAY.fam)
+      localLine(r, famAns ? npcSay(r, 'fam')
                           : (kind === 'wheek' && r.wheekLines) ? r.wheekLines : r.lines);
       said++;
     }
@@ -1891,7 +2044,7 @@ export function createNPCs(game) {
         if (mine) L.wary = Math.min(1, (L.wary || 0) + kick);
       }
       if (said < npcLOC_REACT_N && L.cd <= 0) {
-        const arr = L.says[kind] || npcLOC_SAY[kind];
+        const arr = npcSay(L, kind);
         if (arr && arr.length) {
           L.cd = L.cool * rand(0.7, 1.3);
           localReactLine(L, arr);
@@ -2843,7 +2996,7 @@ export function createNPCs(game) {
     localsReact('thief', b.position.x, b.position.z, 0.8, 6.5);
     // ...AND WHOEVER IT BELONGS TO COMES AND GETS IT.
     const own = localOwnerOf(pr);
-    if (own) localOwnStart(own, pr, own.says.thief || npcLOC_SAY.thief);
+    if (own) localOwnStart(own, pr, npcSay(own, 'thief'));
     // ...and the two chapters with no `locals` get the same event through the
     // witness chain, which is the one of the three chains that ports (v33).
     // The radius is the produce one: this is 'that happened right here'.
@@ -2862,7 +3015,7 @@ export function createNPCs(game) {
     const pr = p.prop;
     if (!pr || pr.held) return;
     const own = localOwnerOf(pr);
-    if (own) localOwnStart(own, pr, own.says.startled || npcLOC_SAY.startled);
+    if (own) localOwnStart(own, pr, npcSay(own, 'startled'));
   });
   // ---- EATING SOMEBODY'S STOCK IN FRONT OF THEM ---------------------------
   // `capy:graze` fires once per bite and carries the prop, and until now it was
@@ -3213,7 +3366,7 @@ export function createNPCs(game) {
       const waryBar = npcWARY_HEAT * (1 - hHere * npcHEAT_SOON);
       const nearNow = near && (r.wary || 0) > waryBar;
       if (nearNow && !r.waryWas && r.cd <= 0) {
-        const arr = r.says.wary || npcLOC_SAY.wary;
+        const arr = npcSay(r, 'wary');
         if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
       }
       r.waryWas = nearNow;
@@ -3238,7 +3391,7 @@ export function createNPCs(game) {
       // somebody who is watching you has not decided you are all right.
       const famNow = near && r.fam > npcFAM_HEAT && (r.wary || 0) <= npcWARY_HEAT;
       if (famNow && !r.famWas && !nearNow && r.cd <= 0) {
-        const arr = r.says.fam || npcLOC_SAY.fam;
+        const arr = npcSay(r, 'fam');
         if (arr && arr.length) { r.cd = r.cool * rand(1.1, 1.9); localLine(r, arr); }
       }
       r.famWas = famNow;
@@ -3251,7 +3404,7 @@ export function createNPCs(game) {
         r.flV -= 9.5;   // scaled with the react kick above
         r.flYaw = Math.atan2(dx, dz);
         if (r.cd <= 0) {
-          const arr = r.says.rush || npcLOC_SAY.rush;
+          const arr = npcSay(r, 'rush');
           if (arr && arr.length) { r.cd = r.cool * rand(0.8, 1.4); localLine(r, arr); }
         }
       }
@@ -3294,7 +3447,7 @@ export function createNPCs(game) {
           // not also remark on the leaves.
           if (wxMotes && !wxRain && r.cd <= 0 && Math.random() < 0.34) {
             r.cd = r.cool * rand(0.9, 1.6);
-            localLine(r, r.says.drift || npcLOC_SAY.drift);
+            localLine(r, npcSay(r, 'drift'));
           }
         }
         const looking = wxMotes && r.lookT <= 0 && wxRain < 0.25;
@@ -3309,8 +3462,7 @@ export function createNPCs(game) {
         r.wetWas = raining;
         if (r.cd <= 0 && Math.random() < 0.5) {
           r.cd = r.cool * rand(0.8, 1.5);
-          localLine(r, raining ? (r.says.drizzle || npcLOC_SAY.drizzle)
-                               : (r.says.clearing || npcLOC_SAY.clearing));
+          localLine(r, npcSay(r, raining ? 'drizzle' : 'clearing'));
         }
       }
       const chilly = wxCold > 0 && wxGustS > npcLOC_CHILL_G;
@@ -3318,7 +3470,7 @@ export function createNPCs(game) {
         r.chillWas = chilly;
         if (chilly && r.cd <= 0 && Math.random() < 0.3) {
           r.cd = r.cool * rand(1.0, 1.8);
-          localLine(r, r.says.chill || npcLOC_SAY.chill);
+          localLine(r, npcSay(r, 'chill'));
         }
       }
       // ---- the flinch, which is a spring ---------------------------------
@@ -9172,7 +9324,8 @@ export function createNPCs(game) {
   }
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
-           addLocal: addLocal, addExchange: addExchange, say: sayAt, heat: npcHeat,
+           addLocal: addLocal, addTraveller: addTraveller,
+           addExchange: addExchange, say: sayAt, heat: npcHeat,
            // ---- THE PLACE, rather than the person (v33) ----
            // `placeHeat` is what the music and the finds read; `forceHeat` is
            // the differential lever and is a test hook, not a feature.
@@ -9190,6 +9343,19 @@ export function createNPCs(game) {
            // correctly and a brow that never moves is the exact failure this
            // is here to catch, and it is invisible from a state dump.
            faceAudit: npcFaceAudit,
+           // ---- WHICH POOL A PERSON IS DRAWING FROM (P6) ----
+           // Returns the LAYER as well as the lines. Asserting that a
+           // Venetian says something Venetian is not the same as asserting
+           // that npcSay reached the chapter row rather than the neutral one
+           // that happens to be in front of it, and only the layer says so.
+           sayAudit: function (kind, biome) {
+             const live = biome || (game.biome && game.biome.current);
+             const row = npcPLACE_SAY[live];
+             const here = row && row[kind];
+             const arr = (here && here.length) ? here : npcLOC_SAY[kind];
+             return { biome: live, layer: (here && here.length) ? 'place' : 'neutral',
+                      n: arr ? arr.length : 0, first: arr && arr.length ? arr[0] : null };
+           },
            // ...and who is mid-sentence, for the gaze. See sayBubble.
            speaker: npcSpeaker };
 }

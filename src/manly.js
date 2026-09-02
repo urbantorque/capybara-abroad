@@ -1101,7 +1101,7 @@ function manBuild(game) {
                'Was that a serve? I am counting that as a serve.',
                'You are on my team. You do not get a say.'],
       onTask: { 'sandcastle': ['Straight through it. That is a spike. That is technically a spike.'],
-                'move-flags': ['We are inside the flags now. We have never been inside the flags.'] } });
+                'move-flags': ['You have moved the flags. You cannot just move the flags.'] } });
 
     // ---- THE OTHER HALF OF THE VOLLEYBALL GAME ------------------------
     //
