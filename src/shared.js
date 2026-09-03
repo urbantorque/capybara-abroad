@@ -4628,6 +4628,360 @@ export function placeCue(o, x, y, z, far) {
 }
 
 // ===========================================================================
+// THE EXIT BOARD — THE DOOR, AS AN OBJECT (D6)
+//
+// Every chapter has exactly one way out of it. `CHAPTERS.way` has carried the
+// SENTENCE describing that door since the departures board was built, and D6's
+// first session put a mark for it on the chart and an arrow on the paper — so
+// by the end of it the exit existed in three places, all of them ON THE GLASS.
+// In the WORLD it was an empty patch of jetty, or of crater rim, or of sand
+// between two flags, indistinguishable from the forty metres either side of it.
+// Nineteen chapters of hand-built scenery and the single most important object
+// in each of them was drawn by the HUD.
+//
+// So: a board. It stands at the door, it is the thing the arrow points at, and
+// three wheeks in front of it opens the card that IS it — see sysBoard* in
+// systems.js for the camera move that ties the two together.
+//
+// FOUR THINGS IT IS DELIBERATELY NOT:
+//
+//  - It is not a switch. Nothing is gated on touching it, reading it or even
+//    finding it; the exit zone is exactly where it always was and the board
+//    stands BESIDE that zone rather than in it. A player who never looks at one
+//    loses nothing at all.
+//  - It is not a sign with words on it. This game has no text in the world and
+//    is not about to grow a font atlas: it is a DEPARTURES BOARD, six rows of
+//    split-flap tiles with a colour chip at the head of each, and the colour is
+//    the destination's own — `sysMARKS[biome].tint`, the same wash that backs
+//    that chapter's tile on the picker. Somebody who has been to Venice knows
+//    the colour of the Venice row before they can read anything.
+//  - It is not nineteen models. One builder, three MOUNTS — a pair of posts, a
+//    stone stele, a hanging beam — and a per-chapter dressing, because a timber
+//    noticeboard on the rim of an active volcano is a joke and a carved stone
+//    marker at the head of a Hong Kong ferry pier is a different one.
+//  - It is not a moving thing that demands attention. See tick(): one tile
+//    turns over about every 2.4 s, only while somebody is near enough to see
+//    it, never under calm, and it makes no noise of its own — the clack is
+//    systems.js's, rationed and placed. That is rule 1 of the ambient movers.
+//
+// FOUR DRAW CALLS, whatever the dressing: the mount, the frame and the face are
+// one merged mesh; the flaps are one InstancedMesh of `rows * BOARD_FLAPS`; the
+// chips are another; and the lamp, where a chapter is dark enough to need one,
+// is the fourth.
+// ===========================================================================
+export const BOARD_ROWS  = 6;     // destinations shown. Six fits 1.06 m of face.
+export const BOARD_FLAPS = 5;     // tiles per row — a time, at a glance
+const _BD_PANEL_H = 1.46;         // m, the face
+const _BD_PANEL_W = 2.60;         // m, before o.w
+const _BD_FLIP    = 0.26;         // s a tile takes to turn over
+const _BD_EVERY   = 2.40;         // s between turns, on average
+const _BD_JITTER  = 1.60;         // s of scatter on that, so it is not a metronome
+// The two tones a tile alternates between. A row for a chapter you have
+// finished flips between the paper white and the gold; one for a chapter you
+// have not flips between two slates, so a board read at a glance says how much
+// of the journey is behind you without saying anything at all.
+const _BD_LIT_A   = 0xfaf6ec;
+const _BD_LIT_B   = 0xe0b64f;
+// ...AND THE DIM PAIR IS NOT NEARLY AS DIM AS IT WANTS TO BE. At 0x4a4a48 on
+// a 0x2f2a24 face the rows had almost no contrast against the board, and since
+// a fresh save has nothing finished, EVERY row on EVERY board was dim: the
+// nineteen photographs came back with a black rectangle in a frame on a post
+// in fourteen of them. A split-flap board that is off is still a grid of pale
+// tiles; it is the CHARACTERS that are dark.
+const _BD_DIM_A   = 0x8b867c;
+const _BD_DIM_B   = 0x6d685e;
+
+const _bBox = new THREE.BoxGeometry(1, 1, 1);
+const _bM4  = new THREE.Matrix4();
+const _bQ   = new THREE.Quaternion();
+const _bE   = new THREE.Euler();
+const _bP   = new THREE.Vector3();
+const _bS   = new THREE.Vector3();
+
+// The twentieth copy of this merger in the repo, and the first one in shared.js.
+// It is here rather than in a chapter because the board belongs to no chapter.
+function _bMerger() {
+  const pos = [], nor = [], col = [], idx = [];
+  const c = new THREE.Color();
+  const M = {
+    n: 0,
+    add(geo, color) {
+      const g = geo.clone();
+      g.applyMatrix4(_bM4);
+      const p = g.attributes.position.array, nm = g.attributes.normal.array;
+      c.set(color);
+      const start = M.n;
+      for (let i = 0; i < p.length; i += 3) {
+        pos.push(p[i], p[i + 1], p[i + 2]);
+        nor.push(nm[i], nm[i + 1], nm[i + 2]);
+        col.push(c.r, c.g, c.b);
+      }
+      const vc = p.length / 3;
+      if (g.index) {
+        const ia = g.index.array;
+        for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]);
+      } else {
+        for (let i = 0; i < vc; i++) idx.push(start + i);
+      }
+      M.n += vc;
+      g.dispose();
+    },
+    box(x, y, z, w, h, d, color, rx, ry, rz) {
+      _bE.set(rx || 0, ry || 0, rz || 0);
+      _bM4.compose(_bP.set(x, y, z), _bQ.setFromEuler(_bE), _bS.set(w, h, d));
+      M.add(_bBox, color);
+    },
+    build() {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeBoundingSphere();
+      return g;
+    }
+  };
+  return M;
+}
+
+/**
+ * BUILD ONE. Local space: the face looks down +Z and the foot sits at y = 0, so
+ * the caller places it with position and rotation.y and nothing else.
+ *
+ *   style   'post' | 'stele' | 'hang' — the mount
+ *   w       face width, default 2.60
+ *   wood    the mount's own colour, and the frame's
+ *   woodDk  its shadow side
+ *   face    the board face — dark, in every dressing, because that is what
+ *           makes a pale flap read as a character rather than as a tile
+ *   trim    the header strip
+ *   lamp    a colour, or nothing: a hooded strip over the face, over-white so
+ *           it survives to the bright pass (see EMIT_OVER)
+ *   mat     the material to draw the merged part with. The CALLER's, so the
+ *           board picks up the chapter's own grain, shore and wet terms.
+ *   chips   BOARD_ROWS colours, head of each row
+ *   lit     BOARD_ROWS booleans — is that chapter finished
+ */
+export function exitBoard(o) {
+  const opt = o || {};
+  const style = opt.style === 'stele' ? 'stele' : opt.style === 'hang' ? 'hang' : 'post';
+  const W = opt.w > 0 ? opt.w : _BD_PANEL_W;
+  const H = _BD_PANEL_H;
+  const wood = opt.wood !== undefined ? opt.wood : PALETTE.wood;
+  const woodDk = opt.woodDk !== undefined ? opt.woodDk : PALETTE.woodDark;
+  const face = opt.face !== undefined ? opt.face : 0x2f2a24;
+  const trim = opt.trim !== undefined ? opt.trim : PALETTE.gold;
+  const group = new THREE.Group();
+  const S = _bMerger();
+
+  // ---- the mount ---------------------------------------------------------
+  // PB is where the face begins. A stele holds it low and a hanging beam holds
+  // it high, which is most of what makes the three read as different objects.
+  // ...AND ONE DOOR IN THE GAME HAS A ROOF OVER IT. Sydney's exit zone is the
+  // footprint of the wharf shelter, so the board has to fit UNDER a 2.7 m
+  // soffit — which is where a ferry timetable actually lives. `pb` drops the
+  // face and `hood: false` takes off the pitched cap it does not need indoors.
+  const PB = typeof opt.pb === 'number' ? opt.pb
+           : style === 'stele' ? 0.95 : style === 'hang' ? 1.30 : 1.05;
+  const hood = opt.hood !== false;
+  const px = W * 0.5 - 0.14;
+  if (style === 'stele') {
+    // A cut block, tapered, on a plinth: the shape a marker takes in a place
+    // that has no timber in it — a crater rim, a piazza, a plain of tuff.
+    S.box(0, 0.11, 0, W * 0.86, 0.22, 0.72, woodDk);
+    S.box(0, PB * 0.5 + 0.10, 0, W * 0.70, PB - 0.10, 0.52, wood);
+    S.box(0, PB + H + 0.20, 0, W + 0.30, 0.20, 0.60, woodDk);
+  } else {
+    const top = PB + H + (style === 'hang' ? 0.55 : 0.16);
+    for (let s = -1; s <= 1; s += 2) {
+      S.box(s * px, top * 0.5, 0, 0.15, top, 0.15, wood);
+      S.box(s * px, 0.09, 0, 0.30, 0.18, 0.30, woodDk);
+    }
+    if (style === 'hang') {
+      // the beam, and the two links the board swings from
+      S.box(0, top - 0.09, 0, W + 0.60, 0.18, 0.18, woodDk);
+      for (let s = -1; s <= 1; s += 2) {
+        S.box(s * (W * 0.32), PB + H + 0.30, 0, 0.07, 0.44, 0.07, PALETTE.metal);
+      }
+    } else if (hood) {
+      // a pitched hood, because everything else in this game that faces the
+      // weather has one and a flat-topped board photographs as a slab
+      for (let e = -1; e <= 1; e += 2) {
+        S.box(0, PB + H + 0.26, e * 0.16, W + 0.36, 0.09, 0.42, woodDk, e * 0.42, 0, 0);
+      }
+    }
+  }
+
+  // ---- the frame, the face, the header ------------------------------------
+  const cy = PB + H * 0.5;
+  S.box(0, cy, 0, W + 0.16, H + 0.16, 0.12, wood);
+  S.box(0, cy, 0.068, W, H, 0.03, face);
+  S.box(0, PB + H - 0.15, 0.088, W - 0.14, 0.20, 0.02, trim);
+  // three marks on the header, in the postcards' dialect: a chevron pointing
+  // the way out, and two rules. It says "onward" and does not say it in words.
+  const hy = PB + H - 0.15;
+  S.box(-W * 0.5 + 0.30, hy, 0.102, 0.11, 0.11, 0.02, face, 0, 0, Math.PI * 0.25);
+  S.box(W * 0.5 - 0.46, hy, 0.102, 0.44, 0.035, 0.02, face);
+  S.box(W * 0.5 - 0.46, hy - 0.07, 0.102, 0.30, 0.035, 0.02, face);
+
+  const solid = new THREE.Mesh(S.build(), opt.mat || mat(0xffffff, { vertexColors: true }));
+  solid.castShadow = true;
+  solid.receiveShadow = true;
+  group.add(solid);
+
+  // ---- the rows ------------------------------------------------------------
+  // Top row at the top of the face, under the header, reading down: the order
+  // is the journey's, so the row nearest the header is the next place.
+  const rowTop = PB + H - 0.38;
+  const rowPitch = 0.1766;
+  const chipX = -W * 0.5 + 0.20;
+  const flapX0 = -W * 0.5 + 0.61;
+  const flapStep = (W - 0.86) / (BOARD_FLAPS - 1);
+
+  const chipGeo = new THREE.BoxGeometry(0.15, 0.125, 0.03);
+  const chips = new THREE.InstancedMesh(chipGeo, opt.mat || mat(0xffffff, { vertexColors: true }),
+                                        BOARD_ROWS);
+  chips.castShadow = false;
+  chips.receiveShadow = true;
+  const flapGeo = new THREE.BoxGeometry(flapStep - 0.06, 0.125, 0.025);
+  const flaps = new THREE.InstancedMesh(flapGeo, opt.mat || mat(0xffffff, { vertexColors: true }),
+                                        BOARD_ROWS * BOARD_FLAPS);
+  flaps.castShadow = false;
+  flaps.receiveShadow = true;
+  // Neither pool is ever frustum-culled on its own bounds: an InstancedMesh
+  // computes them from the geometry and not from the instances, so a board seen
+  // edge-on from twenty metres pops its own tiles out.
+  chips.frustumCulled = false;
+  flaps.frustumCulled = false;
+
+  const fx = new Float32Array(BOARD_ROWS * BOARD_FLAPS);
+  const fy = new Float32Array(BOARD_ROWS * BOARD_FLAPS);
+  const col = new THREE.Color();
+  const ident = new THREE.Matrix4();
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    const y = rowTop - r * rowPitch;
+    ident.makeTranslation(chipX, y, 0.10);
+    chips.setMatrixAt(r, ident);
+    chips.setColorAt(r, col.set(0x808080));
+    for (let k = 0; k < BOARD_FLAPS; k++) {
+      const i = r * BOARD_FLAPS + k;
+      fx[i] = flapX0 + k * flapStep;
+      fy[i] = y;
+      ident.makeTranslation(fx[i], fy[i], 0.10);
+      flaps.setMatrixAt(i, ident);
+      flaps.setColorAt(i, col.set(_BD_DIM_A));
+    }
+  }
+  chips.instanceMatrix.needsUpdate = true;
+  flaps.instanceMatrix.needsUpdate = true;
+  group.add(chips);
+  group.add(flaps);
+
+  // ---- the lamp -------------------------------------------------------------
+  let lamp = null;
+  if (opt.lamp !== undefined && opt.lamp !== null) {
+    const lm = matEmit(opt.lamp, 1);
+    lamp = new THREE.Mesh(new THREE.BoxGeometry(W - 0.30, 0.07, 0.10), lm);
+    lamp.position.set(0, PB + H + 0.04, 0.22);
+    lamp.castShadow = false;
+    lamp.receiveShadow = false;
+    group.add(lamp);
+  }
+
+  // ---- the turning over ------------------------------------------------------
+  const tone = new Uint8Array(BOARD_ROWS * BOARD_FLAPS);   // which of the pair
+  const litRow = new Uint8Array(BOARD_ROWS);
+  let flipI = -1, flipT = 0, flipNext = _BD_EVERY * 0.5, flipHalf = false;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const one = new THREE.Vector3(1, 1, 1);
+  const at = new THREE.Vector3();
+
+  function paint(i) {
+    const r = (i / BOARD_FLAPS) | 0;
+    const a = litRow[r] ? _BD_LIT_A : _BD_DIM_A;
+    const b = litRow[r] ? _BD_LIT_B : _BD_DIM_B;
+    flaps.setColorAt(i, col.set(tone[i] ? b : a));
+    if (flaps.instanceColor) flaps.instanceColor.needsUpdate = true;
+  }
+
+  /**
+   * `chipColors` and `done` are both BOARD_ROWS long. Called on build and again
+   * whenever the journey moves under a board that is already standing.
+   */
+  function sync(chipColors, done) {
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      chips.setColorAt(r, col.set(chipColors && chipColors[r] !== undefined
+                                  ? chipColors[r] : 0x807a70));
+      litRow[r] = done && done[r] ? 1 : 0;
+    }
+    if (chips.instanceColor) chips.instanceColor.needsUpdate = true;
+    for (let i = 0; i < BOARD_ROWS * BOARD_FLAPS; i++) {
+      // A deterministic scatter, not Math.random: a board rebuilt on a return
+      // visit that dealt itself a different pattern would read as a different
+      // object standing in the same place.
+      tone[i] = ((i * 7 + ((i / BOARD_FLAPS) | 0) * 3) % 5) < 2 ? 1 : 0;
+      paint(i);
+    }
+  }
+
+  /**
+   * `near` is the caller's answer to "is anybody close enough for this to be
+   * worth a matrix write", and it is the whole cost control: away from the
+   * door this does nothing but count down a float.
+   */
+  function tick(dt, near) {
+    if (flipI >= 0) {
+      flipT += dt;
+      const u = flipT / _BD_FLIP;
+      if (!flipHalf && u >= 0.5) {
+        // The tile changes at the moment it is edge-on, which is the only
+        // moment the change cannot be seen. That is what a split-flap does.
+        flipHalf = true;
+        tone[flipI] = tone[flipI] ? 0 : 1;
+        paint(flipI);
+      }
+      const a = u >= 1 ? 0 : Math.PI * (u < 0.5 ? u * 2 : 2 - u * 2);
+      e.set(-a, 0, 0);
+      m4.compose(at.set(fx[flipI], fy[flipI], 0.10), q.setFromEuler(e), one);
+      flaps.setMatrixAt(flipI, m4);
+      flaps.instanceMatrix.needsUpdate = true;
+      if (u >= 1) { flipI = -1; flipT = 0; flipHalf = false; }
+      return -1;
+    }
+    if (!near || calmOn()) return -1;
+    flipNext -= dt;
+    if (flipNext > 0) return -1;
+    flipNext = _BD_EVERY + Math.random() * _BD_JITTER;
+    flipI = (Math.random() * BOARD_ROWS * BOARD_FLAPS) | 0;
+    flipT = 0; flipHalf = false;
+    return flipI;                       // the caller rations the clack
+  }
+
+  function dispose() {
+    solid.geometry.dispose();
+    chipGeo.dispose();
+    flapGeo.dispose();
+    chips.dispose();
+    flaps.dispose();
+    if (lamp) lamp.geometry.dispose();
+  }
+
+  sync(null, null);
+  return {
+    group, sync, tick, dispose,
+    /** local y of the middle of the face — what a camera should be looking at */
+    faceY: cy,
+    /** local y of the top of the whole object, mount included */
+    topY: PB + H + (style === 'stele' ? 0.30 : style === 'hang' ? 0.85 : hood ? 0.36 : 0.16),
+    /** half-extents of the one collider this is worth giving, in local axes */
+    hx: W * 0.5 + 0.10, hz: 0.30
+  };
+}
+
+
+// ===========================================================================
 // LESS MOTION, AND ONE PLACE THAT KNOWS (R4)
 //
 // THREE MODULES HAD THREE COPIES OF THE SAME MEDIA QUERY. systems.js read it

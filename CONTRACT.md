@@ -3342,13 +3342,157 @@ All three cost a run and all three are now written into `qa/d6-frame.js`.
 reports a silent frame against a frame that is not silent. `game.hud.uiSfxAudit()`
 is the counter it needs.
 
-### What is left: D6's second half
 
-The **diegetic exit board**, where `way` points, and the departures card
-opening *from* it — the one element in area 6 that is not on the paper at all.
-It is unstarted and it stays on the shelf in `ROADMAP-DELIGHT.md`, sized as it
-always was: nothing in this section touches the world, and that item is a
-nineteen-chapter world-building job with a camera move on the end of it.
+## THE DOOR IS AN OBJECT — D6, SECOND HALF (3 Sep 2026)
+
+The tenth item of area 6, and the only one in it that is not on the paper: an
+**exit board** standing at each chapter's `way`, and the departures card
+opening **out of it** rather than over the top of it.
+
+D6's first session ended with the exit better signposted than anything else in
+the game — a mark on the chart, an arrow and a beacon on the paper, a sentence
+under the row — and every one of those is ON THE GLASS. In the world the door
+out of nineteen hand-built places was an empty patch of jetty, indistinguishable
+from the forty metres either side of it except by a translucent cylinder the HUD
+drew on the ground.
+
+Instruments: `qa/d6-board.js` (the sweep and the nineteen photographs),
+`qa/d6-probe.js` (every collider surface at a door), `qa/d6-open.js` (the four
+frames of the door opening), `qa/d6-sheet.cjs` (the contact sheet).
+
+### The object — `exitBoard()` in shared.js
+
+One builder, three **mounts** — a pair of posts, a stone stele, a hanging beam
+— and a per-chapter dressing in `sysBOARD_DRESS`. It is a DEPARTURES board:
+six rows of split-flap tiles with a colour chip at the head of each, and the
+colour is the destination's own — `sysMARKS[biome].tint`, the same wash that
+backs that chapter's tile on the picker, so somebody who has been to Venice
+knows the colour of the Venice row before they can read anything.
+
+There is no text in this world and this does not grow a font atlas.
+
+**Four draw calls whatever the dressing**: the mount, frame and face are one
+merged mesh on one material shared by all nineteen boards (so the colours are
+in the vertices and nineteen dressings are one program); the flaps are one
+`InstancedMesh` of 30 with `instanceColor`; the chips are another of 6; the
+lamp, in the five chapters dark enough to need one, is the fourth. Both pools
+are `frustumCulled = false` — an `InstancedMesh` computes its bounds from the
+geometry and not from the instances, so a board seen edge-on pops its own tiles.
+
+**A tile turns over about every 2.4 s**, only while somebody is inside 26 m,
+never while a card is up, never under calm, and the clack is rationed and
+placed (`clamp(0.15 - far*0.007, 0.02, 0.15)` inside 15 m). That is rule 1 of
+the ambient movers, and the board obeys it because it is one.
+
+Four things it deliberately is not: a switch (nothing is gated on it and the
+exit zone is exactly where it was), a sign with words on it, nineteen models,
+or a thing that demands attention.
+
+### Planted from `way`, and never from a new constant
+
+`boardFrame` watches `game.biome.current` rather than the `biome:enter` event,
+for two reasons the codebase has already paid for: six of the nineteen doors
+resolve through a getter on the biome's own published api and are not
+answerable on the frame the event fires (it retries four times a second), and
+**the boot chapter never fires `biome:enter` at all**. It owns its collider and
+removes it at the border; the R10 soak reports `orphans: []`.
+
+### The floor at a door is not the terrain, and there is no rule for it
+
+The first plant used `sysGroundY`. Measured by dropping the animal at each door
+(`qa/d6-probe.js`), that was wrong in six of nineteen and wrong by METRES in
+four — the doors are the one place in this game where the floor is a built
+thing: a wharf deck, a bridge over a river, a jetty over water, a made street.
+
+Two rules were tried and both fail, in opposite directions, one chapter apart:
+
+| rule | Uji (bridge deck 3.16, river bed -3.87) | Sydney (deck 0.17, shelter roof 3.04) |
+|---|---|---|
+| lowest surface at/above terrain | **the river** | correct |
+| highest surface | correct | **the shelter roof** |
+
+So `boardFloor` is the first rule — right on the open ground it was written for
+— and the **eight built doors carry their deck height as a measured number**
+(`floorY` in `sysBOARD_DRESS`). Not one of them could be derived.
+
+**A board must also stand on the same floor as the door**, which is a different
+question from the one above. "2.2 m to the right of the door" at Manly is two
+and a half metres up the side of a dune: the board photographed buried to its
+header while the drop test at the door reported a perfect score, because both
+were true. The door's floor is the anchor and four candidate spots — right,
+left, in, out — are tried for one that is level with it.
+
+### Nineteen chapters, and what the pictures found
+
+Every placement override in the table was a photograph before it was a number.
+Three that the numbers could not have found:
+
+1. **The Corso's door is inside a building.** `way` for chapter 3 is the literal
+   (118, -586); a 28 m grid of downward rays says the street is the corridor
+   x 110..126 and a chip shop sits across the middle of it at x 114..122,
+   z -584..-590. The arrow has pointed through a wall since the chart was drawn
+   and nothing could see it, because the exit ZONE is the whole Corso. The
+   board is on the open street; the chart's mark is left alone, because moving
+   it is a different batch.
+2. **It stood on the roof of a surf shop for one round.** The drop test read the
+   door's floor by dropping from three metres above the BOARD, and three metres
+   up on the Corso is above the awnings — so it landed on the shopfronts and
+   reported 5.65 with total confidence. Nothing in the numbers said otherwise;
+   the wide shot did.
+3. **Sydney's door has a roof over it.** The exit zone is the footprint of the
+   wharf shelter. Inside it the board's header went through a 2.70 m soffit;
+   outside it the camera turned onto a shelter roof with the board behind it.
+   It is under the shelter now, on the low mount (`pb: 0.72`) with no hood —
+   2.37 m under a 2.70 m soffit, which is exactly where a ferry timetable lives
+   on a real wharf, and the one dressing in the table that is a shape rather
+   than a colour.
+
+Two boards stand further from their door than the 2.2 m the rest do — Hong
+Kong's at 15.9 m and Antarctica's at 22.6 m — because the published point is
+four metres past the end of the pontoon in one and at the seaward head of a
+2.6 m-wide jetty in the other. Both are inside the zone the three wheeks are
+answered in, which is what "at the door" means here.
+
+### And the card comes out of it
+
+Three wheeks buys a beat of camera — `game.frameShot`, the same request every
+marquee makes, killed by a hand on the lens like any other — and then the card
+grows out of the board's own position on the screen: `jrShowFrom` sets
+`transform-origin` on the card in client pixels and `.capyui-jr.from` scales it
+from .12.
+
+**The turn has to COMPLETE before the card comes.** It was 0.52 s, chosen so
+the card would arrive while the lens was still travelling; measured, the
+framing weight at 0.52 s is 0.455, so the rig is still mostly the 41-degree
+gameplay lens and the photograph at Sydney's wharf is the top of the shelter
+roof. 0.86 s is `sysSHOT_IN` plus a beat, and the board is in the middle of the
+frame when the card lands on it.
+
+**The origin has to follow the board.** Written once at the open, it was 298 px
+adrift by the time the card had finished growing — the camera is still swinging
+and the world's pause does not stop the rig. One style write a frame for 0.62 s
+holds it: measured 27 px, at rest, on a 1280-wide frame.
+
+It degrades all the way down. No board, a board behind the lens, a board more
+than 15 m away, calm switched on, or the card opened any other way (Tab, which
+measures `from: false` and the default origin), and this is exactly the card it
+has always been.
+
+### Measured
+
+19/19 planted, each with a collider, each in its own dressing. Fourteen doors
+level with their board to within 0.1 m; the rest are slopes and steps. 0
+un-named curves and 7 un-named durations, unchanged (`qa/p7-tokens.cjs`). The
+opening: framing 0.424 at the wheek, `from: true`, origin 28 px from the board,
+`depart: true`. Tiles: 30, turning. R10 soak 19/19, 0 NaN, no console errors,
+no orphaned bodies.
+
+### Two things the drop test cannot measure, and they are in the table above
+
+Manly's door reads 2.03 because the drop lands on a flag pole, and the Corso's
+reads 47.15 because the animal bounces off a shopfront and is rescued. Both
+numbers are the probe, not the game; both chapters are correct in the
+photographs. A drop test finds floors and only a photograph finds furniture.
 
 
 ## THE WATER'S EDGE — D5 (3 Sep 2026)

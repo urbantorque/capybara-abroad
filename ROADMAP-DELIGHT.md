@@ -619,16 +619,68 @@ improvement on a bar that used to land in the gap between two but is not the
 same as one strike per line box.
 
 
+### Batch D6b — the door is an object (area 6, second of two sessions)
+
+**LANDED 3 Sep 2026.** The tenth item, and the only one in area 6 that was not
+on the paper. Contract section **THE DOOR IS AN OBJECT — D6, SECOND HALF**;
+instruments `qa/d6-board.js`, `qa/d6-probe.js`, `qa/d6-open.js`,
+`qa/d6-sheet.cjs`.
+
+- **There is something standing at the door now, in all nineteen.** One builder
+  in `shared.js`, three mounts — posts, a stone stele, a hanging beam — and a
+  table of nineteen dressings in `systems.js`, planted from `way` rather than
+  from nineteen new constants, because the door already knew where it was. Four
+  draw calls whatever the dressing; one material for all nineteen, so the
+  colours are in the vertices and nineteen boards are one program.
+- **It is a departures board and it has no words on it.** Six rows of
+  split-flap tiles with a colour chip at the head of each, and the chip is that
+  destination's own `sysMARKS[biome].tint` — the same wash that backs its tile
+  on the picker. A row for a place you have finished flips between the paper
+  white and the gold; one for a place you have not flips between two slates.
+- **A tile turns over about every 2.4 s**, only within 26 m, never behind a
+  card, never under calm, with the clack rationed by distance inside 15 m.
+- **The card comes out of it.** Three wheeks buys 0.86 s of camera — the same
+  `frameShot` every marquee asks for, killed by a hand on the lens — and the
+  departures card then grows from the board's own position on the screen, with
+  the origin following the board while it grows. Measured: 28 px, at rest.
+  Everything about it degrades to the card as it was: no board, a board behind
+  the lens or more than 15 m off, calm on, or Tab.
+
+**Three things the numbers could not have found, and the photographs did.**
+
+1. **The Corso's door is inside a building.** Chapter 3's `way` is the literal
+   (118, -586) and a grid of downward rays says there is a chip shop on it. The
+   arrow has pointed through a wall since the chart was drawn and nothing could
+   see it, because the exit ZONE is the whole street. The board stands on the
+   open Corso; the chart's own mark is left alone.
+2. **The board stood on the roof of a surf shop for one round.** The drop test
+   read the door's floor by dropping from three metres above the board, which
+   on the Corso is above the awnings. It reported 5.65 with total confidence.
+3. **Sydney's door has a roof over it** — the exit zone is the footprint of the
+   wharf shelter. The board is under it now, on a low mount with no hood, 2.37 m
+   beneath a 2.70 m soffit, which is where a ferry timetable lives on a real
+   wharf.
+
+**And the thing this batch is really about: there is no general answer to
+"what is the floor here".** Two rules, opposite failures, one chapter apart —
+*lowest surface at or above the terrain* puts the Uji board in the river,
+*highest surface* puts the Sydney board on the shelter roof. Fourteen of the
+nineteen doors are a built thing rather than ground, so the automatic rule
+holds the open ground it was written for and the eight built doors carry their
+deck height as a measured number.
+
+**Known and left:** two boards stand further from their door than the 2.2 m the
+rest do — Hong Kong's at 15.9 m and Antarctica's at 22.6 m — because the
+published point is past the end of the pontoon in one and at the seaward head
+of a 2.6 m-wide jetty in the other; both are inside the zone the three wheeks
+are answered in. And the drop test cannot see furniture: Manly reads 2.03
+because it lands on a flag pole and the Corso reads 47.15 because the animal
+bounces off a shopfront and is rescued. Both are correct in the photographs.
+
+
 ---
 
 ## The shelf — sized, not scheduled
-
-**D6 — the frame, second session** (area 6, ~5 h). The nine items of the
-first session landed on 3 Sep 2026; see the batch above. What is left is the
-one thing in area 6 that is not on the paper at all: the **diegetic exit
-board** where `way` points — the Kyoto machiya already builds real signboards
-and leaves them blank — with the departures card opening *from* it rather
-than over it. Nineteen chapters of world building and one camera move.
 
 **D7 — world life, the systems** (area 3, ~15 h). `hung` in `props.js` — a
 single-bone damped pendulum on a fixed anchor, driven by `gust()` at rest and

@@ -3,11 +3,12 @@ import * as THREE from 'three';
 // world, it does not build in it. The camera's occlusion ray does: one Vec3 pair
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
+import { PALETTE, mat, grain, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
-         shadeEnable, skyOccTick, shadeInfo } from './shared.js';
+         shadeEnable, skyOccTick, shadeInfo,
+         exitBoard, BOARD_ROWS, BOARD_FLAPS } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -5466,6 +5467,153 @@ const sysMAP_WORLDS = {
   ] },
 };
 
+// ---------------------------------------------------------------------------
+// ...AND WHAT IS STANDING THERE — the exit board (D6, second session)
+//
+// `way` above is a point and a sentence. D6's first session gave it a mark on
+// the chart and an arrow and a beacon on the paper, and that made the exit the
+// best-signposted thing in the game ON THE GLASS and still nothing at all IN
+// THE WORLD: the door out of nineteen hand-built places was an empty patch of
+// jetty, and the only thing that distinguished it from the forty metres either
+// side was a translucent cylinder the HUD drew on it.
+//
+// So there is an object there now. `exitBoard` in shared.js builds it — one
+// builder, three mounts, four draw calls; this table is the nineteen dressings,
+// and the block inside the closure below plants it, turns it to face the way
+// you came, gives it a collider and takes it away again at the border.
+//
+// It is planted from `way` and NOT from a new per-chapter constant, which is
+// the whole reason nineteen chapters cost one table: the door already knew
+// where it was. Two chapters overrule the automatic placement (`at`) and four
+// overrule the automatic facing (`yaw`) — see the comments on those rows, all
+// of which were photographs before they were numbers.
+const sysBOARD_SIDE  = 2.20;  // m to one side of the door. Never IN the doorway.
+const sysBOARD_LEVEL = 0.80;  // m a candidate spot may differ from the door's floor
+const sysBOARD_NEAR  = 26;    // m inside which a tile may turn over
+const sysBOARD_CLACK = 15;    // m inside which one can be heard
+// The camera's beat on the board before the card opens over it.
+//
+// IT WAS 0.52 AND IT HAD TO BE LONGER THAN sysSHOT_IN, NOT SHORTER. The first
+// number was chosen so the card would arrive "while the lens is still
+// travelling toward the thing the card is", which reads well and means the
+// shot never lands: measured at 0.52 s the framing weight is 0.455, so the rig
+// is still mostly the 41-degree gameplay lens and the photograph at Sydney's
+// wharf is the top of the shelter roof. The move has to COMPLETE, and then the
+// card comes. 0.86 is sysSHOT_IN plus a beat.
+const sysBOARD_TURN  = 0.86;
+const sysBOARD_DIST  = 8.6;   // m the shot pulls back to
+const sysBOARD_PITCH = 0.20;  // rad, ~11 deg down — a board is read level
+const sysBOARD_RAISE = 1.4;   // m the look point rides up, onto the face
+// The default dressing is Sydney's: a timber noticeboard of the kind that
+// stands at the head of every wharf in the harbour.
+const sysBOARD_DEF = { style: 'post', wood: PALETTE.wood, woodDk: PALETTE.woodDark,
+                       face: 0x2f2a24, trim: PALETTE.gold };
+const sysBOARD_DRESS = {
+  // THE ONE DOOR IN THE GAME THAT ALREADY HAD A ROOF OVER IT. Sydney's exit
+  // zone is the seaward third of the wharf deck, which is exactly the 5.6 x 6.4
+  // footprint of the wharf shelter — so the automatic spot put the board inside
+  // it with its header through the soffit, and moving it out onto the open deck
+  // only meant the camera turned onto a shelter roof with the board behind it.
+  // It goes UNDER the shelter, on the low mount with no hood, against the
+  // western posts: 2.37 m under a 2.70 m soffit, which is exactly where a ferry
+  // timetable lives on a real wharf. The one dressing in the table that is a
+  // shape rather than a colour.
+  sydney:  { at: { x: -41.5, z: -21.5 }, pb: 0.72, hood: false,
+             shot: { dist: 5.2, pitch: 0.06, raise: 1.05 } },
+  // The Corso, ashore at Manly. Same timber, and the one red the surf club
+  // paints everything it owns.
+  //
+  // IT CARRIED A `floorY` OF 5.65 FOR ONE ROUND AND 5.65 IS A SHOP ROOF. The
+  // drop test read the door's floor by dropping the animal from three metres
+  // above the BOARD, and on the Corso three metres up is above the awnings —
+  // so it landed on the shopfronts, reported a floor of 5.65 with total
+  // confidence, and the board stood on the roof of a surf shop for a round.
+  // Nothing in the numbers said so; the wide shot did. Nineteen photographs
+  // are not a formality in this batch, they are the instrument.
+  //
+  // AND THE CORSO'S DOOR IS INSIDE A BUILDING. `way` for this chapter is the
+  // literal (118, -586), and a 28 m grid of downward rays says that point has
+  // a chip shop on it: the street is the corridor x 110..126 and the shop sits
+  // across the middle of it at x 114..122, z -584..-590. The arrow has pointed
+  // through a wall since the chart was drawn and nothing could see it, because
+  // the exit ZONE is the whole Corso and standing anywhere on it works. The
+  // board is on the open street two metres west of the shop; the chart's own
+  // mark is left exactly as it was, because moving it is a different batch.
+  quay:    { trim: PALETTE.manFlagRed, at: { x: 112.0, z: -586.0 } },
+  // The rim of a live volcano at 4 276 m. There is no timber up there and there
+  // never has been: a cut stone marker, which is what is actually on that
+  // crater, facing back down the ash slope you came up.
+  pasto:   { style: 'stele', wood: PALETTE.stoneDark, woodDk: PALETTE.stone },
+  // Uji, and every shopfront on that street already hangs its sign from a beam.
+  // It stands on the BRIDGE DECK, seven metres above the bed of the river the
+  // bridge crosses — the first plant put it in the river. Every floorY in this
+  // table came off qa/d6-probe.js, which lists every collider surface at a
+  // door; not one of them could be derived (see boardFloor).
+  kyoto:   { style: 'hang', wood: PALETTE.templeWood, woodDk: PALETTE.templeWoodDk,
+             floorY: 3.16 },
+  cali:    { wood: PALETTE.caliChiva, woodDk: PALETTE.caliChivaTrim,
+             trim: PALETTE.caliChivaGrn, floorY: 1.06 },
+  // The end of the pier, in a chapter that never gets properly dark and is
+  // never properly light either. The first of the five that carry a lamp.
+  iceland: { wood: PALETTE.iceHull, woodDk: PALETTE.iceHullBlue,
+             face: 0x2e3136, trim: PALETTE.iceWindow, lamp: PALETTE.iceWindow,
+             floorY: 1.40 },
+  // The fire at the desert camp, after dark. Cedar, brass, and a lamp.
+  sahara:  { style: 'hang', wood: PALETTE.sahCedar, woodDk: PALETTE.sahCedarDk,
+             face: 0x3a2f28, trim: PALETTE.sahBrass, lamp: PALETTE.sahLamp },
+  // The lantern plinth, and the chapter's whole light is lanterns.
+  drift:   { style: 'stele', wood: PALETTE.driStone, woodDk: PALETTE.driRockDark,
+             face: 0x241c3d, trim: PALETTE.driLamp, lamp: PALETTE.driLampGlow },
+  // The two columns on the Molo. A stone stele beside two stone columns, in
+  // Istrian stone, which is the only material that square is made of.
+  venice:  { style: 'stele', wood: PALETTE.venStone, woodDk: PALETTE.venStoneDark,
+             face: 0x2b2723, trim: PALETTE.venGold },
+  // The published pier point is four metres PAST the end of the pontoon, out
+  // over the harbour — the arrow has always pointed at a spot you have to swim
+  // to — so this one is placed rather than offset: on the concrete apron at
+  // the landward end of the zone, off the walking line down the pontoon.
+  kowloon: { wood: PALETTE.hkPoleSteel, woodDk: PALETTE.hkConcreteDk,
+             face: 0x2f2c2a, trim: PALETTE.hkNeonGold, lamp: PALETTE.hkNeonCyan,
+             at: { x: 6.5, z: -59.5 }, floorY: 0.05 },
+  // On the jetty itself, at the shore end, on the centreline: the deck is
+  // 4.8 m wide and the board is 2.8, so you walk round it rather than past it.
+  palawan: { style: 'hang', wood: PALETTE.palBamboo, woodDk: PALETTE.palBambooDk,
+             face: 0x4a453a, trim: PALETTE.palThatch,
+             at: { x: 6.0, z: 16.6 }, floorY: 1.15 },
+  goreme:  { style: 'stele', wood: PALETTE.gorTuff, woodDk: PALETTE.gorTuffDk,
+             face: 0x3d3634, trim: PALETTE.gorDoor },
+  rio:     { wood: PALETTE.rioTramWood, woodDk: PALETTE.rioTramDk,
+             face: 0x3a352f, trim: PALETTE.rioTileYellow },
+  manly:   { wood: PALETTE.manPole, woodDk: PALETTE.manClubTrim,
+             face: 0x3a3a38, trim: PALETTE.manFlagYel },
+  pantanal:{ wood: PALETTE.panIpe, woodDk: PALETTE.panTrunkDk,
+             face: 0x35392c, trim: PALETTE.panMacawYel },
+  // Nine kilometres in, at the slot of daylight. The one board in the game that
+  // has to be legible with no sun on it at all, so it is the expedition's own
+  // gear: a hung panel, rigged rope, and the lamp doing all the work.
+  cave:    { style: 'hang', wood: PALETTE.cavRope, woodDk: PALETTE.cavRockDk,
+             face: 0x2a2a26, trim: PALETTE.cavGlow, lamp: PALETTE.cavGlow },
+  // Beside the SHORE end of the jetty and on land, because that jetty is
+  // 2.6 m wide and a board on it is a wall across the only way off the boat.
+  antarctic:{ wood: PALETTE.antTimber, woodDk: PALETTE.antHullDk,
+             face: 0x2c2c30, trim: PALETTE.antHutRed,
+             at: { x: 2.4, z: 41.5 } },
+  // The top of the Casino steps. Marble and gilt, because everything within
+  // three hundred metres of that door is marble and gilt.
+  monaco:  { style: 'stele', wood: PALETTE.monMarble, woodDk: PALETTE.monMarbleDk,
+             face: 0x232227, trim: PALETTE.monGold, floorY: 28.63 },
+  hanoi:   { wood: PALETTE.hanOchre, woodDk: PALETTE.hanShopDk,
+             face: 0x2b2320, trim: PALETTE.hanTarpRed, floorY: 5.66 },
+};
+/** The colour of a chapter's row on the board: its own tile's wash. */
+function sysBoardChip(n) {
+  const def = CHAPTERS[n - 1];
+  const m = def && sysMARKS[def.biome];
+  const c = m && PALETTE[m.tint];
+  return c !== undefined ? c : PALETTE.stone;
+}
+
+
 function sysBuildCSS() {
   const paper   = sysHex(PALETTE.sail);
   const paper2  = sysHex(PALETTE.sailShade);
@@ -5626,6 +5774,16 @@ function sysBuildCSS() {
   'transform:rotate(-.5deg) translateY(10px) scale(.985);opacity:0;',
   'transition:opacity ' + dMed + ' ease,transform ' + dSlow + ' ' + mGlide + ';}',
 '.capyui-jr.show .capyui-jrcard{opacity:1;transform:rotate(-.5deg) translateY(0) scale(1);}',
+  /* ---- ...AND WHEN IT IS THE BOARD, IT COMES OUT OF THE BOARD (D6) ----
+     `from` is set by jrShowFrom with a transform-origin in client pixels on
+     the card itself, which is the exit board's own position on the screen —
+     so the card is dealt from the object in the world that it IS, rather than
+     appearing over the top of it. .12 rather than 0: a card that grows from
+     nothing reads as a pop, and .12 of 660px is about the width of the board's
+     face at the distance the shot leaves it at. */
+'.capyui-jr.from .capyui-jrcard{transform:rotate(-.5deg) scale(.12);',
+  'transition:opacity ' + dFast + ' ease,transform ' + dSlow + ' ' + mGlide + ';}',
+'.capyui-jr.from.show .capyui-jrcard{opacity:1;transform:rotate(-.5deg) scale(1);}',
 '.capyui-jrcard h2{font-size:clamp(15px,3vw,21px);color:' + ink + ';font-weight:700;letter-spacing:-.01em;}',
 '.capyui-jrsub{font-size:' + tMd + ';letter-spacing:.3em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;margin-top:3px;}',
@@ -17503,6 +17661,11 @@ export function createSystems(game) {
     if (!jrShown) return;
     jrShown = false;
     jrEl.classList.remove('show');
+    // The card belongs to the board only for the opening it came out of. Left
+    // on, the NEXT Tab press would grow the journal from a point on the screen
+    // where a board in another hemisphere used to be.
+    jrEl.classList.remove('from');
+    jrCard.style.transformOrigin = '';
     jrEl.inert = true;
     if (jrReturnFocus && jrReturnFocus.focus) { try { jrReturnFocus.focus(); } catch (e) {} }
     jrReturnFocus = null;
@@ -18432,6 +18595,345 @@ export function createSystems(game) {
     return 'three wheeks when you get there, and the board opens';
   }
   sysHINTS[sysWAY_ID] = { clue: wayClue, where: wayPoint };
+
+  // ---- ...AND SOMETHING TO STAND AT (D6) ---------------------------------
+  //
+  // The board. See sysBOARD_DRESS above for what it is and why it is planted
+  // from `way` rather than from nineteen new constants.
+  //
+  // FOUR THINGS THIS BLOCK IS CAREFUL ABOUT, three of them lessons this repo
+  // has already paid for:
+  //
+  //  1. IT IS PLANTED LAZILY, NOT ON `biome:enter`. Six of the nineteen doors
+  //     are a getter on the biome's own published api, and on the frame the
+  //     event fires the biome may not have published it yet — so a plant on
+  //     the event silently missed those six and left the chapters that matter
+  //     most (a cave mouth, a jetty in Antarctica) with no board. It retries
+  //     four times a second until the door answers.
+  //  2. THE BOOT CHAPTER NEVER FIRES `biome:enter` AT ALL, which is the trap
+  //     the sky occlusion term was already caught by twenty lines above.
+  //     Watching `game.biome.current` rather than the event covers Sydney for
+  //     free, and it is the only construction that does.
+  //  3. IT OWNS ITS OWN COLLIDER AND REMOVES IT. Nothing else in systems.js
+  //     puts a body in the world; a board left behind at a border would be an
+  //     invisible plank in the middle of the next chapter, which is precisely
+  //     the shared-space leak this codebase has paid for more than once.
+  //  4. ONE MATERIAL FOR ALL NINETEEN, so nineteen dressings are one program.
+  //     The colours are in the vertices.
+  let boardMat = null;
+  let boardObj = null, boardBody = null, boardFor = '', boardTry = 0;
+  let boardX = 0, boardY = 0, boardZ = 0, boardYaw = 0;
+  // Its own cue object. `sysSpatial` is one shared object with a live `at`
+  // pointer in it, and borrowing it here would leave a board's position behind
+  // for the next thing that only meant to set a volume — see placeCue.
+  const boardCue = { volume: 1, pitch: 1, at: { x: 0, y: 0, z: 0 }, near: 30, far: 70 };
+
+  // ---- THE FLOOR AT A DOOR IS USUALLY NOT THE TERRAIN --------------------
+  //
+  // The first plant put every board at `sysGroundY`, which is the biome's own
+  // analytic terrain, and measured by a drop test beside it (qa/d6-board.js)
+  // that was wrong in SIX of the nineteen and wrong by metres in four: the
+  // Corso is 4.7 m of built-up hill, Antarctica's jetty is a deck over water,
+  // Hanoi's door is the head of a BRIDGE, and Son Doong's is a cave floor
+  // nine hundred metres inside a mountain and a long way BELOW its terrain.
+  // Every one of those had a board buried to the header or hanging in the air.
+  //
+  // The doors are the one place in this game where that is the norm rather
+  // than the exception, because a door is a built thing: fourteen of the
+  // nineteen stand on a wharf, a pier, a jetty, a bridge, a deck or a step.
+  //
+  // THE LOWEST SURFACE AT OR ABOVE THE TERRAIN, and every word of that is
+  // load-bearing.
+  //
+  //  - Not `raycastClosest` downward from three metres up: three metres does
+  //    not reach a bridge deck, so Kyoto's board sank to the bed of the Uji
+  //    and photographed as a post sticking out of a river.
+  //  - Not `raycastClosest` from thirty metres up either, which is the obvious
+  //    fix and is worse: the FIRST thing a downward ray meets at Sydney's
+  //    wharf is the shelter ROOF, and a board on the roof of the shelter is a
+  //    funnier bug than a board under it.
+  //  - So: every hit on the way down (`raycastAll`), and the LOWEST one that
+  //    is not below the terrain. At the wharf that is the deck and not the
+  //    roof; on the Uji it is the bridge and not the bed; on open ground it is
+  //    the terrain itself and this whole function is a no-op.
+  //
+  // `skipBackfaces` is TRUE here and false in the camera's occlusion ray two
+  // thousand lines up, and the difference is the point: that ray starts inside
+  // things on purpose, this one wants tops. With backfaces on, a slab reports
+  // its underside as well and the lowest hit is the wrong side of the deck.
+  const boardRayA = new CANNON.Vec3();
+  const boardRayB = new CANNON.Vec3();
+  const boardRayO = { collisionFilterMask: 1, skipBackfaces: true };
+  function boardFloor(x, z, w) {
+    const t = sysGroundY(x, z);
+    const base = (w && typeof w.y === 'number' && w.y === w.y) ? Math.max(t, w.y) : t;
+    if (!game.world || !game.world.raycastAll) return base;
+    boardRayA.set(x, base + 34, z);
+    boardRayB.set(x, base - 34, z);
+    let best = Infinity;
+    try {
+      game.world.raycastAll(boardRayA, boardRayB, boardRayO, function (r) {
+        if (!r.hasHit) return;
+        const y = r.hitPointWorld.y;
+        if (y >= t - 0.60 && y < best) best = y;
+      });
+    } catch (e) { return base; }
+    return best < Infinity ? best : base;
+  }
+
+  function boardDrop() {
+    if (boardObj) {
+      scene.remove(boardObj.group);
+      boardObj.dispose();
+      boardObj = null;
+    }
+    if (boardBody) {
+      try { game.world.removeBody(boardBody); } catch (e) { /* already gone */ }
+      boardBody = null;
+    }
+  }
+
+  /**
+   * The six rows: the next six places in the journey's own order, wrapping past
+   * the end, with the chapters you have finished lit. Not "the six nearest" and
+   * not "everywhere" — a board with a row for the place you are standing in is
+   * a map, and this is a departures board.
+   */
+  function boardRows(here) {
+    const n = chapterCount();
+    const chips = [], lit = [];
+    for (let i = 0; i < BOARD_ROWS; i++) {
+      const c = ((here + i) % n) + 1;
+      chips.push(sysBoardChip(c));
+      lit.push(chapComplete(c));
+    }
+    return { chips: chips, lit: lit };
+  }
+
+  function boardPlant() {
+    const bio = game.biome && game.biome.current;
+    const spec = bio && sysMAP_WORLDS[bio];
+    if (!spec || !spec.way) return false;
+    const w = wayPoint();
+    if (!w) return false;
+    const dress = sysBOARD_DRESS[bio] || null;
+    // The board faces the way you CAME: from the middle of the chart toward the
+    // door. Every world already carries its own bounds for the minimap, so this
+    // is a real per-chapter number and not a guess — and four of the nineteen
+    // overrule it because their door is not approached across open ground.
+    const cx = (spec.x0 + spec.x1) * 0.5, cz = (spec.z0 + spec.z1) * 0.5;
+    let dx = cx - w.x, dz = cz - w.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d > 0.001) { dx /= d; dz /= d; } else { dx = 0; dz = 1; }
+    // ---- IT HAS TO BE ON THE SAME FLOOR AS THE DOOR ----------------------
+    // The first rule was "2.2 m to the right of the door", and 2.2 m to the
+    // right of the door at Manly is two and a half metres up the side of a
+    // dune: the board photographed buried to its header, with the drop test at
+    // the door reporting a perfect score, because both were true. The floor at
+    // the door and the floor two metres away are not the same question.
+    //
+    // So the door's own floor is the ANCHOR, and the four places a board could
+    // stand — right, left, in toward the chapter, out past the door — are
+    // tried in that order for one that is level with it. A door on open ground
+    // takes the first; one on a dune, a crater rim or a flight of steps takes
+    // whichever of the four is on the flat. Nothing else moves.
+    const anchor = (dress && typeof dress.floorY === 'number')
+      ? dress.floorY : boardFloor(w.x, w.z, w);
+    const at = dress && dress.at;
+    const side = (dress && typeof dress.side === 'number') ? dress.side : sysBOARD_SIDE;
+    if (at) {
+      boardX = at.x; boardZ = at.z;
+      boardY = (dress && typeof dress.floorY === 'number') ? dress.floorY
+             : boardFloor(at.x, at.z, w);
+    } else {
+      const ux = [dz, -dz, dx, -dx], uz = [-dx, dx, dz, -dz];
+      boardX = w.x + ux[0] * side; boardZ = w.z + uz[0] * side; boardY = anchor;
+      for (let i = 0; i < 4; i++) {
+        const x = w.x + ux[i] * side, z = w.z + uz[i] * side;
+        const y = boardFloor(x, z, w);
+        if (Math.abs(y - anchor) <= sysBOARD_LEVEL) { boardX = x; boardZ = z; boardY = y; break; }
+      }
+    }
+    boardYaw = (dress && typeof dress.yaw === 'number') ? dress.yaw : Math.atan2(dx, dz);
+    if (!boardMat) {
+      boardMat = grain(mat(0xffffff, { vertexColors: true }),
+                       { scale: 0.5, amount: 0.075, warp: 0.4, near: 0.30, nearScale: 8,
+                         contact: 1 });
+    }
+    const o = Object.assign({ mat: boardMat }, sysBOARD_DEF, dress || {});
+    boardObj = exitBoard(o);
+    boardObj.group.position.set(boardX, boardY, boardZ);
+    boardObj.group.rotation.y = boardYaw;
+    const here = chapterOf(bio);
+    const rows = boardRows(here);
+    boardObj.sync(rows.chips, rows.lit);
+    scene.add(boardObj.group);
+    // One box, round the frame and the mount, so it is a thing you bump into
+    // rather than a thing you walk through. Half-extents: shared.js's helpers
+    // are not all one convention (see the solid-or-drawn audit) so exitBoard
+    // hands back its own, in its own local axes, and they are rotated here.
+    const hy = boardObj.topY * 0.5;
+    boardBody = new CANNON.Body({ mass: 0, material: (game.mats && game.mats.ground) || undefined });
+    boardBody.addShape(new CANNON.Box(new CANNON.Vec3(boardObj.hx, hy, boardObj.hz)));
+    boardBody.position.set(boardX, boardY + hy, boardZ);
+    boardBody.quaternion.setFromEuler(0, boardYaw, 0);
+    boardBody.previousPosition.copy(boardBody.position);
+    boardBody.interpolatedPosition.copy(boardBody.position);
+    boardBody.previousQuaternion.copy(boardBody.quaternion);
+    boardBody.interpolatedQuaternion.copy(boardBody.quaternion);
+    game.world.addBody(boardBody);
+    return true;
+  }
+
+  function boardFrame(dt) {
+    const bio = (game.biome && game.biome.current) || '';
+    if (bio !== boardFor) { boardDrop(); boardFor = bio; boardTry = 0; }
+    if (!boardObj) {
+      if (!bio || !started) return;
+      boardTry -= dt;
+      if (boardTry > 0) return;
+      boardTry = 0.25;
+      boardPlant();
+      return;
+    }
+    const p = game.capy && game.capy.position;
+    if (!p) return;
+    const dx = p.x - boardX, dz = p.z - boardZ;
+    const dd = dx * dx + dz * dz;
+    // A tile turns over only while somebody is close enough to see it turn, and
+    // never while the world is paused behind a card — a board clacking away
+    // behind an open journal is the exact thing the sfx gate above exists for.
+    const near = dd < sysBOARD_NEAR * sysBOARD_NEAR && !game.state.paused && !document.hidden;
+    // ---- THE ORIGIN FOLLOWS THE BOARD WHILE THE CARD GROWS --------------
+    // The card opens WHILE the camera is still swinging onto the board — that
+    // is the whole point of the move — so the board's position on the screen
+    // is not the same at the end of the entrance as it was at the start of it.
+    // Measured on Sydney's wharf: the origin was written once, at the open,
+    // and by the time the card had finished growing the board had travelled
+    // 298 px out from under it. A card anchored to an object has to follow the
+    // object; one style write a frame for half a second is what that costs.
+    if (boardOriginT > 0) {
+      boardOriginT -= dt;
+      if (jrShown && jrEl.classList.contains('from')) {
+        const s = boardScreen();
+        const r = s && jrCard.getBoundingClientRect();
+        if (r) {
+          jrCard.style.transformOrigin = (s.x - r.left).toFixed(1) + 'px ' +
+                                         (s.y - r.top).toFixed(1) + 'px';
+        }
+      } else {
+        boardOriginT = 0;
+      }
+    }
+    const flipped = boardObj.tick(dt, near);
+    if (flipped >= 0 && dd < sysBOARD_CLACK * sysBOARD_CLACK) {
+      const far = Math.sqrt(dd);
+      boardCue.volume = clamp(0.15 - far * 0.007, 0.02, 0.15);
+      boardCue.pitch = 1.55 + Math.random() * 0.2;
+      boardCue.at.x = boardX; boardCue.at.y = boardY + boardObj.faceY; boardCue.at.z = boardZ;
+      sfx('tick', boardCue);
+    }
+  }
+
+  /**
+   * WHERE THE BOARD IS ON THE SCREEN, in client pixels, or null. The card grows
+   * out of this point — see boardOpen.
+   */
+  function boardScreen() {
+    if (!boardObj) return null;
+    sysV3.set(boardX, boardY + boardObj.faceY, boardZ).project(camera);
+    if (sysV3.z > 1) return null;                       // behind the lens
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + (sysV3.x * 0.5 + 0.5) * r.width,
+             y: r.top + (0.5 - sysV3.y * 0.5) * r.height };
+  }
+  /** The live board's numbers, for the harness. Nothing in src reads it. */
+  game.exitBoard = function () {
+    if (!boardObj) return null;
+    const s = boardScreen();
+    return { biome: boardFor, x: boardX, y: boardY, z: boardZ, yaw: boardYaw,
+             faceY: boardObj.faceY, topY: boardObj.topY, hx: boardObj.hx, hz: boardObj.hz,
+             rows: BOARD_ROWS, flaps: BOARD_FLAPS,
+             body: !!boardBody, screen: s };
+  };
+
+  // ---- ...AND THE CARD COMES OUT OF IT -----------------------------------
+  //
+  // Three wheeks at the door has opened the departures card since the board was
+  // built, and the card arrived the way every card arrives: over the top of
+  // whatever the player happened to be looking at, from the middle of the
+  // screen, with no relationship at all to the object in the world that IS the
+  // departures board. The two halves of the same idea, in the same second, with
+  // nothing joining them.
+  //
+  // So the third wheek buys half a second of camera first — the lens swings
+  // round onto the board — and the card then grows out of the board's own
+  // position on the screen. It is not a cutscene: `frameShot` is the same
+  // request every marquee makes, the animal keeps walking, and touching the
+  // camera kills it. And it degrades all the way down: no board, a board behind
+  // the lens, a board twenty metres away, calm switched on, or a card opened
+  // any other way, and this is exactly the card it always was.
+  let boardOpenT = 0, boardOriginT = 0;
+  function boardOpen() {
+    const s = boardObj ? boardScreen() : null;
+    const p = game.capy && game.capy.position;
+    if (!s || !p) { jrShow(true); return; }
+    const dx = p.x - boardX, dz = p.z - boardZ;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < 0.6 || d > sysBOARD_CLACK) { jrShow(true); return; }
+    // Half a second of camera IS motion, and somebody who has asked for less of
+    // it gets the card and not the move. They still get it out of the board.
+    if (calmOn()) { jrShowFrom(s); return; }
+    // `yaw` is the bearing from the animal to the CAMERA, so the camera goes on
+    // the far side of the animal from the board — which is the direction board
+    // -> capybara — and the board ends up in the middle of the frame.
+    // ...AND A DOOR WITH A ROOF OVER IT NEEDS A DIFFERENT LENS. At 8.6 m and
+    // 11 degrees down the eye sits at about 3.1 m, and Sydney's wharf shelter
+    // has a 2.70 m soffit: the turn framed the top of the shelter with the
+    // board underneath it, in the first chapter of the game. A chapter may say
+    // where the camera has to be to see its own board.
+    const dress = sysBOARD_DRESS[boardFor];
+    const sh = dress && dress.shot;
+    game.frameShot({ yaw: Math.atan2(dx / d, dz / d),
+                     dist: (sh && sh.dist) || sysBOARD_DIST,
+                     pitch: (sh && sh.pitch !== undefined) ? sh.pitch : sysBOARD_PITCH,
+                     raise: (sh && sh.raise !== undefined) ? sh.raise : sysBOARD_RAISE,
+                     hold: sysBOARD_TURN + 1.6 });
+    boardOpenT = sysBOARD_TURN;
+  }
+  function boardOpenTick(dt) {
+    if (boardOpenT <= 0) return;
+    // A card that arrived some other way, a border crossing or the end of the
+    // run all cancel it. Half a second of camera is owed nothing.
+    if (jrShown || transBusy || !started) { boardOpenT = 0; return; }
+    boardOpenT -= dt;
+    if (boardOpenT > 0) return;
+    boardOpenT = 0;
+    jrShowFrom(boardScreen());
+  }
+  /**
+   * Open the departures card growing out of a point in client pixels.
+   *
+   * The card is already laid out when this runs — `.capyui-jr` is inset:0 with
+   * a flex centre and only its OPACITY is zero — so the rect is real and the
+   * origin can be computed before the transition it belongs to has started.
+   * Reading it after `.show` would be a frame late and the card would grow from
+   * the middle: getComputedStyle and getBoundingClientRect on the frame a class
+   * lands are the trap the entrance probe was already caught by in D6's first
+   * session.
+   */
+  function jrShowFrom(s) {
+    if (!s) { jrShow(true); return; }
+    const r = jrCard.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) { jrShow(true); return; }
+    jrCard.style.transformOrigin = (s.x - r.left).toFixed(1) + 'px ' +
+                                   (s.y - r.top).toFixed(1) + 'px';
+    jrEl.classList.add('from');
+    boardOriginT = 0.62;   // see boardFrame: the origin follows the board
+    jrShow(true);
+  }
+
+
 
   let hintT = 0, hintHas = false, hintX = 0, hintZ = 0, hintY = NaN;
   let todoTopId = '';
@@ -26973,7 +27475,10 @@ export function createSystems(game) {
           // it used to pick for you.
           homeSet(0); homeT = 0;
           homeEl.classList.remove('show'); homeShown = false;
-          jrShow(true);
+          // ...and it opens OUT OF the board that is standing there, after half
+          // a second of camera. See boardOpen — every failure of which is this
+          // line as it was.
+          boardOpen();
         }
       }
     } else if (homeCount || homeT > 0) {
@@ -26983,6 +27488,10 @@ export function createSystems(game) {
     // down on the same frame instead of letting it flash once behind the white-out.
     const homeVis = homeOk && !transBusy;
     if (homeVis !== homeShown) { homeShown = homeVis; homeEl.classList.toggle('show', homeVis); }
+
+    // The door, as an object: planted, turned over and heard. See sysBOARD_DRESS.
+    boardFrame(dt);
+    boardOpenTick(dt);
 
     // The postcard's caption, while the camera is out. Once a second, because
     // the only thing in it that moves is a clock that counts in seconds — and
