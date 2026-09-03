@@ -396,7 +396,23 @@ function quayMerger() {
  */
 function quayVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14 });
+               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14,
+                 // THE WATER'S EDGE (D5). `grep -c foam` read six here, all of
+                 // them the ferry's wake — the harbour itself met seven hundred
+                 // metres of sandstone at a polygon join. Circular Quay has no
+                 // beach in it: every metre of this shoreline is a vertical
+                 // wall, a pontoon or a hull, so the lace is a LINE and not a
+                 // wash — which is what a harbour has.
+                 //
+                 // ...AND THE SOAK IS THE HALF THAT READS HERE. The apron sits
+                 // 70 cm above the water and the wall between them is the one
+                 // surface in the chapter the term can reach; 45 cm of splash
+                 // zone up a sandstone wall is a TIDE MARK, which is the thing
+                 // you actually see at Circular Quay and which a 30 cm band
+                 // measured as almost nothing (0.16 % of the frame at the east
+                 // wharves, against 0.71 with this row).
+                 shore: 0.38, shoreBand: 0.34, shoreWet: 0.45, shoreDark: 0.78,
+                 shoreScale: 1.9, shoreColor: PALETTE.foam });
 }
 
 function quayInstance(root, geo, color, list, cast, recv) {

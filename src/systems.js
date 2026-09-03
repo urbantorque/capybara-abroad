@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick,
+         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo } from './shared.js';
@@ -1664,7 +1664,14 @@ const sysGRADES = {
   // a lower one would fog the entire beach.
   palawan: sysGrade(0.30, 1.04, 1.15, 0.11, 1.04, 0.13, 0.66, 1.000, 1.000, 1.002),
   // Twenty minutes before sunrise, and then the ridge lets go.
-  goreme:  sysGrade(0.55, 0.46, 1.30, 0.16, 1.06, 0.26, 0.52, 1.008, 1.000, 0.994),
+  // ...AND THE THRESHOLD WENT UP WHEN THE LAMPS WENT OVER WHITE (D5). 0.46 was
+  // the number that found four bulbs and a brazier in a valley twenty minutes
+  // before dawn, and it also found the pale tuff, the road and the whole
+  // eastern sky: D45-13 is a photograph of a chapter blooming everything it
+  // has. The emitters render past 1.0 now (EMIT_OVER in shared.js), so the
+  // threshold has stopped having to go looking for them and sits where nothing
+  // but a light can reach it.
+  goreme:  sysGrade(0.55, 0.78, 1.30, 0.16, 1.06, 0.26, 0.52, 1.008, 1.000, 0.994),
   // Manly. THE THRESHOLD IS THE ARGUMENT, exactly as it was in Venice and for
   // the opposite reason: the brightest thing in this chapter is foam, foam is
   // very nearly white, and it is supposed to glare. So the threshold sits just
@@ -1757,7 +1764,11 @@ const sysLENS = {
   palawan:   [0.38, 0.018, 0.026],
   // The ridge event ADDS bloom, and `wide` multiplies the sum — at 0.70 the
   // moment the sun clears the rock veiled the cobbles it is supposed to light.
-  goreme:    [0.58, 0.034, 0.030],
+  // 0.42 (D5): the wide octave is the halo AROUND a source, and with the
+  // threshold at 0.78 the sources are four bulbs and a brazier rather than
+  // half the valley — a halo sized for a whole sky is a fog when it is
+  // carrying five lamps.
+  goreme:    [0.42, 0.034, 0.030],
   manly:     [0.55, 0.028, 0.024],
   pantanal:  [0.32, 0.020, 0.022],
   cave:      [0.80, 0.022, 0.026],
@@ -21617,6 +21628,25 @@ export function createSystems(game) {
     // sparkle is a decorative loop that never stops and never asks; the specks
     // stay where they are and the water still reads as water.
     grainTick(sysCalmOn() ? 12.5 : game.state.time);
+    // ---- ...AND ONE MORE, AND THE LAND MEETS THE WATER (D5) ---------------
+    // Where the live chapter's waterline is, in metres. See `shore` in
+    // grain(): every shored fragment already carries its own world height, so
+    // this one float is the entire per-frame cost of a foam lace, a wet band
+    // and a depth tint on every coast in the game.
+    //
+    // It is the biome's `waterLevel` and nothing cleverer — which is already a
+    // TIDE in Venice, because that chapter rewrites the property every frame,
+    // so the acqua alta climbing 2.25 m over the piazza carries the lace up
+    // the walls and across the square without a second channel. See sysShoreY
+    // for why it is not the local surface function.
+    //
+    // `sysShoreOver` is the instrument's hand on this same wire, and it is null
+    // in every frame the game plays. See game.shoreAudit: an A/B that moved
+    // `waterLevel` instead also moves buoyancy, the swim threshold and the
+    // underwater camera, and the first run of one read 0.42 % of the frame in
+    // MANLY — a chapter with no shore term in it at all. That is what a
+    // contaminated instrument looks like: it was measuring floating props.
+    shoreTick(sysShoreOver === null ? sysShoreY() : sysShoreOver);
     // ...and twelve vec4s, and everything in the live chapter stops floating.
     // Same deal as the sparkle clock: the pool is a shared uniform block, so
     // this is the entire per-frame cost of contact on every grained surface in
@@ -22670,6 +22700,38 @@ export function createSystems(game) {
    * does not, and exactly one of the seventeen does not (Sydney, which is flat
    * at zero by contract and keeps the constant floor it was tuned with).
    */
+  /**
+   * WHERE THE SHORE TERM'S WATERLINE IS (D5).
+   *
+   * Not `sysWaterY(x, z)`, and the difference matters: that one answers "is
+   * the lens under it" at a point and rides Iceland's swell and Manly's
+   * surface function, and a shore that rode a local swell would pump the
+   * ENTIRE coastline up and down together — every metre of it in phase, which
+   * is the one thing a real waterline never does. The lace does its own
+   * travelling surge in the shader off two sines with a world-space term in
+   * them; what this has to supply is the STILL level the chapter is at.
+   *
+   * So it is `waterLevel` and nothing else — the still level, which Venice and
+   * Kyoto both already rewrite every frame and which is therefore a tide where
+   * there is one for free. -9999 where a chapter has no water at all, which
+   * shoreTick reads as "off" and which is what the two desert rows return.
+   *
+   * THE ONE TRAP IF THIS EVER GROWS A THIRD CUSTOMER: Kyoto's `waterLevel` is
+   * not a level, it is an ANSWER ABOUT WHERE THE ANIMAL IS STANDING — the pond
+   * and the river are 45 cm apart and it returns whichever one the capybara is
+   * in. A shored Kyoto would have its whole waterline jump 45 cm as you walked
+   * between them. It has no shored material today; the day it wants one, it
+   * needs a still level of its own and not this.
+   */
+  function sysShoreY() {
+    const api = sysLiveBiomeApi(game);
+    if (!api) return -9999;
+    const w = api.waterLevel;
+    return (typeof w === 'number' && w === w) ? w : -9999;
+  }
+  // The instrument's override. See the call site in sysDressFrame.
+  let sysShoreOver = null;
+
   function sysHasRelief() {
     const api = sysLiveBiomeApi(game);
     return !!(api && typeof api.terrainHeight === 'function');
@@ -22917,6 +22979,23 @@ export function createSystems(game) {
   game.shakeNow = function () { return shakeAmt; };
   /** ...and the same for the landing dip, in metres of look-target drop. */
   game.camDip = function () { return camDip; };
+  /**
+   * THE WATERLINE, AND A HAND ON IT (D5). Nothing in src reads this either.
+   *
+   *   game.shoreAudit()      -> { y, over }   what the shore term is drawing at
+   *   game.shoreAudit(-9999) -> the same, with the band parked under the world
+   *   game.shoreAudit(null)  -> give it back
+   *
+   * It is a RENDER override and touches nothing else: buoyancy, the swim
+   * threshold, the underwater camera and every floating prop go on reading
+   * `waterLevel` exactly as they did. That is the entire point of it — see the
+   * note at the call site in sysDressFrame for the run that proved a probe
+   * without it measures the props instead of the picture.
+   */
+  game.shoreAudit = function (y) {
+    if (arguments.length > 0) sysShoreOver = (typeof y === 'number' && y === y) ? y : null;
+    return { y: shoreY(), over: sysShoreOver };
+  };
   // The three channels at once. Same 0..1 magnitude shake() takes, so a caller
   // moves over by changing four letters and nothing has to be re-tuned.
   game.punch = punch;

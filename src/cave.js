@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
+import { PALETTE, mat, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 16 — SƠN ĐOÒNG. AND THE ONLY LIGHT IS THE ONE YOU MAKE.
@@ -339,7 +339,7 @@ function cavVCG() {
  * 16 has the lowest threshold in the game.
  */
 function cavGlow(color, intensity, opacity) {
-  const o = { emissive: color, emissiveIntensity: intensity === undefined ? 1 : intensity };
+  const o = { emissive: color, emissiveIntensity: (intensity === undefined ? 1 : intensity) * EMIT_OVER };
   if (opacity !== undefined) { o.transparent = true; o.opacity = opacity; o.depthWrite = false; }
   return mat(color, o);
 }
@@ -3945,7 +3945,7 @@ function cavUpdateWorms(dt) {
   // a dimmer switch; a hard drop and a long climb is an ANIMAL.
   cavWormDim = cavWormDim > 0.5 ? damp(cavWormDim, 0, 1.6, dt) : damp(cavWormDim, 0, 0.14, dt);
   const k = 1 - cavWormDim;
-  cavWormMat.emissiveIntensity = 0.06 + k * 1.84;
+  emitSet(cavWormMat, 0.06 + k * 1.84);
   cavCol.set(PALETTE.cavGlowDim).lerp(cavColB.set(PALETTE.cavGlow), k);
   cavWormMat.emissive.copy(cavCol);
   cavWormMat.color.copy(cavCol);
@@ -4379,7 +4379,7 @@ function cavUpdateTasks(game, dt) {
   if (cavWallLamp) {
     const k = 0.72 + 0.28 * Math.pow(Math.max(0, Math.sin(cavTime * 1.15)), 3);
     cavWallLamp.intensity = 2.2 * k;
-    if (cavWallLampMesh) cavWallLampMesh.material.emissiveIntensity = 1.8 + k * 1.4;
+    if (cavWallLampMesh) emitSet(cavWallLampMesh.material, 1.8 + k * 1.4);
   }
   // ---- and the stove is a FLAME, which means it is never the same twice --
   // Three sines that do not share a period, so it never repeats audibly to the

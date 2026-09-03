@@ -3071,6 +3071,224 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE WATER'S EDGE — D5 (3 Sep 2026)
+
+Area 5 of `ROADMAP-DELIGHT.md`, whose opening number is `grep -c foam`: Manly
+34, Rio 15, the Quay 6, and **Palawan, Venice, Antarctica and Iceland zero**.
+Four chapters about a coastline in which the land and the water were two flat
+sheets that happened to intersect. Instruments: `qa/d5-shore.js`,
+`qa/d5-glow.js`, `qa/d5-wet.js`; plus `game.shoreAudit()` and
+`weather.ringAudit()`.
+
+### `shore` — the waterline is a height, and grain() already had it
+
+A new option on `grain()` in `shared.js`, beside `sparkle` and `contact`, and
+it is uniforms on materials that already exist: no mesh, no draw call, no
+triangle. Every grained fragment carries `vGrainW`, its own world position; a
+chapter's waterline is one float in one shared uniform (`shoreTick`, written
+once a frame by `sysDressFrame` from the live biome's `waterLevel`). So
+`uShoreY - vGrainW.y` is the depth of THIS fragment below the surface, free,
+and three things fall out of it:
+
+- **the soak** — a band above the line and everything below it, darkened;
+- **the depth tint** — a `smoothstep` below the line, multiplying the albedo
+  rather than mixing toward a colour, because depth takes the red out of what
+  is down there rather than painting it blue. Off unless a chapter asks;
+  Palawan is the only one that does, because it is the only sea you can see
+  through (opacity 0.45);
+- **the lace** — two octaves of value noise through a narrow ramp, drifting on
+  `grainTick`, inside a band whose CENTRE surges on two sines. One is global
+  and one carries a world-space term, so the edge advances and retreats along
+  the shore instead of every metre of it pulsing together.
+
+**It is the generalisation of something that already shipped.** `venWet` in
+`venice.js` had run `uVenWaterY - vVenW.y` through a wet band and a *static*
+0.11 m rim line since chapter 10 — one chapter's private copy of this, with a
+second varying, a second uniform, a second program cache key, an anchor on
+`<emissivemap_fragment>` because grain() had taken `<color_fragment>`, and no
+animation in it. A waterline that does not move is a contour, which is why the
+`foam` count read zero in the chapter that had one. Venice keeps its numbers
+(`shoreDark` 0.72, `shoreWet` 0.40) and loses its copy, and the acqua alta
+drives the shared uniform through `waterLevel`, which that module already
+rewrote every frame.
+
+**Measured** (`qa/d5-shore.js`) — a paired A/B in one JS turn at a station on
+each shoreline: render, park the waterline under the world with
+`game.shoreAudit(-9999)`, render again, diff. The per-cent is the fraction of
+the frame the term paints; `mats` is how many VISIBLE materials in that
+chapter carry it.
+
+| chapter | shored materials | frame painted | A/A noise |
+|---|---|---|---|
+| palawan | 22 | **42.7 %** | 0.00 |
+| iceland | 24 | **9.9 %** | 0.00 |
+| venice (low tide) | 21 | **1.9 %** | 0.00 |
+| venice (acqua alta) | 21 | **21.5 %** | — |
+| quay | 30 | **0.75 %** | 0.00 |
+| antarctic | 5 | **0.40 %** | 0.00 |
+| **manly (control)** | **0** | **0.00 %** | 0.00 |
+| **sydney (control)** | **0** | **0.00 %** | 0.00 |
+
+Venice's tide carries the line: 61 distinct values from -1.30 to +0.95 over one
+cycle, which is the lace climbing the walls of the Piazzetta and crossing the
+square.
+
+Programs: 107 in Palawan, Antarctica and Venice — the same number in all three,
+because the term compiles into materials that were already being compiled.
+
+### Three things the shore term measured wrong first
+
+**The distance fade was switching the effect off at the range you look at a
+coast from.** The band dies on `fwidth(sd)` — how many metres of height one
+pixel covers — for the sparkle's reason: a sub-pixel band does not shimmer, it
+crawls. At a coefficient of 1.0 it reached nothing the moment one pixel covered
+one band, and in Antarctica, where the beach falls at about one in one and a
+half, the shoreline twenty metres from the lens is already there: the lace was
+present in the close shot and simply GONE in the wide one. It fades over 1.8
+bands now, so a distant shore keeps a dim continuous line, which is what
+distant foam is.
+
+**A thresholded value-noise field is a quilt, not foam.** Photographed on the
+black sand at Reynisfjara the first build was a row of white rectangles a metre
+across — smoothstep has zero derivative at a cell boundary, so every cell of
+the lattice shows its own edge. It is the same failure the Botanic Gardens had
+at `near` 0.36 and it has the same fix: warp the sample by `gn`, which is
+already computed a few lines up and is free, and turn the second octave a
+radian so it shares no boundary with the first.
+
+**In Antarctica the waterline is the DARK half, and that cost two tunings.**
+The first build gave it the same bright lace as everywhere else and, settled,
+at the jetty, it was not there at all. It is the albedo ceiling this chapter
+has been hitting since the fourth pass: the beach is snow, the grade's
+threshold is the highest in the game (1.10) so that a world of white things
+does not bloom into one sheet of paper, and a white line added to a white
+surface under a flat overcast has nowhere left to go. What reads at an
+Antarctic shoreline is the wet — dark slush, dark ice — so the soak is deep
+(0.55 m down to 0.70) and the lace is a whisper on top of it. It is still the
+weakest row in the table and that is written down rather than chased.
+
+### Rain lands now — the contact rings (`weather.js`)
+
+Three hundred and forty streaks fell through the frame, the ground went dark
+and picked up a sheen, the score gained a rain bed, `splash()` told the
+footfall to sound wet — and nothing in nineteen chapters drew a single drop
+ARRIVING. `splash()`'s only consumer was the audio bus.
+
+Twelve rings, one instanced open cylinder (props.js's water-entry foam shape,
+ten sides rather than eight because these are drawn a couple of metres from the
+lens), one draw call, and it only exists while it is raining. Emitted in a
+6 m disc around the ANIMAL rather than around the lens — a streak is something
+you look through and a ring is something you look at — uniform over the AREA of
+the disc, at `6 + 4·rainT` a second. Each one lands on whatever the biome says
+is under that point: the live water surface where it is over water, the terrain
+otherwise, and the ANIMAL'S OWN FOOT HEIGHT where it is standing more than
+40 cm above the terrain, which is how a ring lands on a ferry deck rather than
+in the water underneath one.
+
+Measured at `rainT` 0.69 in four chapters: **9.0 rings a second**, 5 of 12
+alive, and every live ring +0.030 m above its own surface — the offset it is
+given and nothing else.
+
+### A wet floor stretches a light toward the eye
+
+`qa/rv-kowloon.png`: the chapter whose entire subject is neon on wet asphalt
+had no vertical smear in it. The reflections under the signs are PAINTED
+ELLIPSES — geometry the chapter lays on the road — and the spill that actually
+lights that road was a circle.
+
+The spill's falloff measures an ANISOTROPIC distance now: the component of the
+offset along the view azimuth is divided by `1 + 2.4·wet`, which makes the pool
+of light reach that much further toward and away from the lens and not one
+centimetre further to either side. On a ground plane that reads as a vertical
+streak, which is what a reflection in a wet floor is. Nothing is added and
+nothing is brightened; the same light is a different shape.
+
+Three things hold it to its own lane. It lives in the rim's injection, so it
+reaches the ground, the stalls and the animal on the program they already
+share. The whole block is behind `if (uWetK > 0.001)` — a uniform, so one
+coherent branch, and the eighteen chapters that are not being rained on pay
+nothing. And when the wetness is zero the arithmetic is exactly the `length()`
+it replaces, because `sVA` is a unit vector and `a² + |perp|² + y²` is `|sD|²`
+at k = 1.
+
+`uWetK` is grain()'s own `_grainWet` under a second name, and the second name
+is not cosmetic: grain() injects `uniform float uGrainWet;` at
+`#include <common>` and then calls the rim hook, which replaces the same
+include again. Two declarations of one name is a compile error and the material
+would have gone black rather than warned.
+
+It is `shine()` — wetness ABOVE a chapter's baseline — so Kowloon's
+permanently damp asphalt reads zero at rest by design and the smear arrives
+with the shower. `qa/d5-wet-kowloon-dry.png` against `-wet.png` is the pair,
+and the rings are in the same frame.
+
+### The emitters render past white, and Göreme's threshold went up for it
+
+The bright pass takes one THRESHOLD per chapter and a threshold is one number
+asked two questions at once: *which pixels are lamps* and *which pixels are
+merely pale*. In a chapter with a lantern over a limestone street those are not
+separable. `D45-13` and `D45-11` are both photographs of a threshold set low
+enough to find the lamps and therefore low enough to find the road.
+
+`EMIT_OVER` (1.45) with `matEmit()` and `emitSet()` in `shared.js`. A lamp
+renders above 1.0 — the scene target is HalfFloat, so it survives to the bright
+pass — and any threshold at or below white finds it while nothing that is
+merely white can follow it up there. It is a HEADROOM, not a brightness:
+everything downstream runs through the grade's shoulder, which has always
+compressed the top. `sparkle` has been exploiting exactly this since v13; its
+own comment says so.
+
+Six chapters had written the same emitter constructor character for character
+(antarctic, cave, göreme, hanoi, kowloon, palawan): four of them now call
+`matEmit`, and the two whose helper also takes an opacity keep their own literal
+with `EMIT_OVER` in it.
+`emitSet` is for the ones that MOVE — a lamp coming on at dusk, a brazier, a
+bulb pulsing — which write `emissiveIntensity` every frame and would otherwise
+walk straight past the factor on the first frame after construction; the nine
+such writers in göreme, kowloon and the cave go through it.
+
+**Göreme: threshold 0.46 → 0.78, `wide` 0.58 → 0.42.** The paired frames are
+`qa/d5-goreme-before.png` and `qa/d5-goreme-after.png` and the difference is
+not subtle: before, the whole cobbled square, the balloon envelopes and the far
+valley sit under a milky veil and the paving slabs bleed into one another;
+after, the individual slabs read, the envelope's facets are distinct, the
+distant chimneys are visible, and the two street lamps still carry a halo.
+
+Numerically (`qa/d5-glow.js`, differential against `git stash push -- src`),
+the fraction of the frame above 0.90 luma in Göreme goes 0.07 % → 0.22 % while
+the fraction above 0.75 goes 0.23 % → 0.24 %. That is the trade stated exactly:
+the same amount of the frame is bright, and it has moved onto the sources.
+Sydney, which has nothing switched on in it, is the control and does not move
+(7.87 % → 7.33 % lit, mean luma 0.6130 → 0.6115).
+
+**And that instrument cannot hold a line in two chapters.** Hanoi read 21.24 %,
+then 8.75 %, then 19.39 % lit across three runs, and Monte Carlo 13.59, 12.31 and
+4.42 — and the last two of those three runs are the SAME CODE. At a fixed 0.75
+cut a chapter with a large flat sky sitting near that value flips tens of
+thousands of pixels on a cloud. Göreme held 0.22 / 0.24 across every run after
+the change, which is the row the threshold actually moved in; believe that one
+and believe the pictures everywhere else.
+
+### Manly is untouched, and it is the control
+
+Nothing in `manly.js` changed. It reports zero shored materials and a 0.00 %
+A/B, which is what a control is for: the first version of the shore probe moved
+`waterLevel` instead of the render override and read **0.42 % of the frame in
+Manly**, because moving the water level also moves buoyancy, the swim
+threshold, the underwater camera and every floating prop. It was measuring the
+props. `game.shoreAudit(y)` exists so that it cannot.
+
+### A harness note this batch had to learn twice
+
+**`biome.switchTo` does not arrive at a chapter, it starts arriving.** The
+grade, the airlight and the hemisphere all damp in over about eight seconds,
+and a probe that settles for three measures the PREVIOUS chapter's atmosphere.
+It looks exactly like a feature decaying: twelve consecutive A/B samples in
+Antarctica, camera and animal both stationary, read 0.88, 0.73, 0.66, 0.57,
+0.43, 0.32, 0.18, 0.08, 0.03, 0.01, 0.01, 0.02. Every station in `d5-shore.js`
+settles for ten seconds.
+
+
 ## HOUSEKEEPING — D9 (3 Sep 2026)
 
 The shelf item from `ROADMAP-DELIGHT.md`: nine small things the previous three

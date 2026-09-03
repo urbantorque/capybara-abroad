@@ -488,17 +488,74 @@ reason that is written next to it; the freeze is a hitstop, not a timescale.
 And `capy:land` is also borrowed by the skid (`payoff-and-hood` in memory) —
 the skid must pass a small `fall` or the lens dips on every slide.
 
+### Batch D5 — the water's edge (area 5)
+
+**LANDED 3 Sep 2026.** All five items. Contract section **THE WATER'S EDGE —
+D5**; instruments `qa/d5-shore.js`, `qa/d5-glow.js`, `qa/d5-wet.js`, plus
+`game.shoreAudit()` and `weather.ringAudit()`.
+
+- **`shore` is an option on `grain()`**, not a mesh: every grained fragment
+  already carries its world position and a chapter's waterline is one shared
+  float, so `uShoreY - vGrainW.y` buys a soak, a depth tint and an animated
+  lace for no draw call and no new program (107 in Palawan, Antarctica and
+  Venice, the same in all three). Measured as the fraction of the frame it
+  paints, against an A/A noise floor: **palawan 42.7 %, iceland 9.9 %, venice
+  1.9 % at low tide and 21.5 % under the acqua alta, quay 0.75 %, antarctic
+  0.40 %** — and **manly and sydney 0.00 % with zero shored materials**, which
+  is what the controls are for.
+- **It is `venWet` generalised.** Venice had run this exact difference through
+  a wet band and a STATIC 0.11 m rim since chapter 10 — its own private hook,
+  varying, uniform and cache key — and the review still counted its `foam` at
+  zero, because a waterline that does not move is a contour. Same numbers, one
+  hook, and the tide drives it through the `waterLevel` that module already
+  rewrote every frame: 61 distinct values from −1.30 to +0.95.
+- **The rain lands.** Twelve rings on one instanced cylinder in `weather.js`,
+  one draw call and only while it is raining: 6–10 a second in a 6 m disc round
+  the ANIMAL, measured at **9.0/s** at `rainT` 0.69, each on the live water
+  surface, the terrain, or the animal's own foot height when it is standing on
+  a deck.
+- **A wet floor stretches a light toward the eye.** The spill's falloff
+  measures an anisotropic distance — the component along the view azimuth
+  divided by `1 + 2.4·wet` — so Mong Kok's neon smears vertically instead of
+  pooling. Behind one uniform branch, and bit-for-bit the old `length()` when
+  dry (`qa/d5-wet-kowloon-dry.png` against `-wet.png`).
+- **`EMIT_OVER` 1.45**, with `matEmit`/`emitSet` replacing the same emitter
+  constructor six chapters had each written out. Göreme's threshold 0.46 →
+  **0.78** and its `wide` 0.58 → **0.42**: `qa/d5-goreme-before.png` is a
+  square under a milky veil and `-after.png` has its paving slabs back with the
+  lamps still glowing. Above-0.90 luma 0.07 → 0.22 %, above-0.75 0.23 → 0.24 %
+  — the same amount of frame is bright and it has moved onto the sources.
+  Sydney, the control, does not move.
+- **Manly untouched**, to the character.
+
+**Four things this batch found rather than fixed.**
+
+1. **`biome.switchTo` does not arrive at a chapter, it starts arriving** — the
+   grade, the airlight and the hemisphere damp in over about eight seconds. A
+   probe that settles for three measures the previous chapter's atmosphere, and
+   it looks exactly like a feature decaying: twelve consecutive samples in
+   Antarctica with nothing moving read 0.88 down to 0.01. Every station in
+   `d5-shore.js` settles for ten seconds now, and every future picture probe in
+   this repository should.
+2. **A shore probe that moves `waterLevel` is measuring the props.** It also
+   moves buoyancy, the swim threshold and the underwater camera, and the first
+   run read 0.42 % of the frame in MANLY, which has no shore term in it.
+   `game.shoreAudit(y)` is a render-only override so that it cannot.
+3. **The `blown`/`lit` luma metric cannot hold a line in a chapter with a big
+   flat sky.** Hanoi read 21.2 %, then 8.8 %, then 19.4 % lit across three runs
+   and Monte Carlo 13.6, 12.3 and 4.4 — the last two runs being the same code.
+   At a fixed 0.75 cut a sky sitting near that value flips tens of thousands of
+   pixels on a passing cloud. Göreme held 0.22 / 0.24 across every run after the
+   change, which is the only row the threshold moved in.
+4. **In Antarctica the waterline is the dark half.** A white lace on snow under
+   the highest bright-pass threshold in the game is invisible — the albedo
+   ceiling, again — so it is a deep soak with a whisper of lace on top, and it
+   is still the weakest row in the table. Written down rather than chased.
+
+
 ---
 
 ## The shelf — sized, not scheduled
-
-**D5 — the water's edge** (area 5, ~10 h). `shore()` beside `sparkle` in
-`shared.js`: a thresholded, `grainTick`-animated lace where
-`waterY − groundY < 0.35`, a `smoothstep` depth tint on the same difference;
-Palawan, Antarctica, Venice, Iceland, the Quay. Rain rings on P7's pool at
-6–10/s within 6 m, rate ∝ `wxRain`. Anisotropic spill on wet ground. Emissive
-over-white on lantern and neon materials; Göreme's threshold up and its `wide`
-octave down. Manly untouched — it is the reference.
 
 **D6 — the frame** (area 6, ~12 h across two sessions). The boot card in the
 paper recipe with the ornament breathing where the spinner is; four named

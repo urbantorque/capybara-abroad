@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -378,7 +378,7 @@ function hanVCF() {
   return grain(mat(0xffffff, { vertexColors: true }), { scale: 0.08, amount: 0.055, warp: 1.0 });
 }
 function hanGlow(color, intensity) {
-  return mat(color, { emissive: color, emissiveIntensity: intensity === undefined ? 1 : intensity });
+  return matEmit(color, intensity === undefined ? 1 : intensity);
 }
 
 function hanSyncBody(b) {

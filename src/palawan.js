@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -339,13 +339,35 @@ function palMerger() {
  */
 function palVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.28, nearScale: 9, contact: 1 });
+               { scale: 0.45, amount: 0.085, warp: 0.55, near: 0.28, nearScale: 9, contact: 1,
+                 // The karst feet and the boat hulls. A wall gets the line and
+                 // nothing else: no soak worth seeing on wet limestone, and no
+                 // depth tint, because there is no sand down there to tint.
+                 shore: 0.26, shoreBand: 0.24, shoreWet: 0.22, shoreDark: 0.88,
+                 shoreScale: 1.9, shoreColor: PALETTE.foam });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function palVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1, broad: 0.11, broadM: 18 });
+               { scale: 0.55, amount: 0.15, warp: 0, near: 0.62, nearScale: 9, contact: 1, broad: 0.11, broadM: 18,
+                 // THE WATER'S EDGE (D5), and Palawan is the chapter with the
+                 // most of it: the beach shelves at about one in twelve, so a
+                 // 0.42 m band is five metres of sand wide and the lace has
+                 // room to be a lace rather than a line. `grep -c foam` read
+                 // ZERO here before this — a white beach met a transparent sea
+                 // at a straight polygon join in the chapter whose postcard is
+                 // that exact meeting.
+                 //
+                 // AND IT IS THE ONE CHAPTER THAT GETS THE DEPTH TINT, because
+                 // it is the one chapter whose sea you can see through (0.45).
+                 // Saturating at five metres rather than the default: past that
+                 // the seabed already has the caustic's own depth death and the
+                 // chapter's underwater fog on it, and a third term stacked on
+                 // those two makes the reef black instead of deep.
+                 shore: 0.40, shoreBand: 0.42, shoreWet: 0.55, shoreDark: 0.78,
+                 shoreScale: 1.35, shoreColor: PALETTE.foam,
+                 shoreTint: 0.34, shoreDeep: 5.0, shoreTintColor: PALETTE.palShallow });
 }
 
 /**
@@ -358,7 +380,7 @@ function palVCG() {
  * the bloom's intensity is written every frame.
  */
 function palGlowMat(color, intensity, opacity) {
-  const o = { emissive: color, emissiveIntensity: intensity || 1 };
+  const o = { emissive: color, emissiveIntensity: (intensity || 1) * EMIT_OVER };
   if (opacity !== undefined) { o.transparent = true; o.opacity = opacity; o.depthWrite = false; }
   return mat(color, o).clone();
 }
@@ -1868,7 +1890,7 @@ function palUpdateFish(game, dt) {
       m.emissive.copy(palBloomC);
       // ...and it flares when they bolt, because a school of forty thousand
       // turning at once is the single brightest thing that bay ever does
-      m.emissiveIntensity = palBloom * (0.55 + palFishBolt * 1.5);
+      emitSet(m, palBloom * (0.55 + palFishBolt * 1.5));
     }
   }
 }
@@ -3044,7 +3066,7 @@ function palUpdateBloom(game, dt) {
   }
   palMoteMesh.instanceMatrix.needsUpdate = true;
   if (palMoteMat) {
-    palMoteMat.emissiveIntensity = 0.10 + palBloom * 2.1;
+    emitSet(palMoteMat, 0.10 + palBloom * 2.1);
     palMoteMat.opacity = 0.32 + palBloom * 0.58;
     // and silt is not plankton-coloured until the plankton arrives
     palMoteMat.color.copy(palSiltC).lerp(palBloomC, palBloom);
@@ -3141,7 +3163,7 @@ function palUpdateBubbles(game, dt) {
   palBubMesh.instanceMatrix.needsUpdate = true;
   palBubMesh.visible = live > 0;
   // and during the bloom they carry the plankton up with them
-  if (palBubMat) palBubMat.emissiveIntensity = 0.25 + palBloom * 1.6;
+  if (palBubMat) emitSet(palBubMat, 0.25 + palBloom * 1.6);
 }
 
 // ============================================================== THE DIVER ===
@@ -3732,7 +3754,7 @@ function palUpdateClock(game, dt) {
   }
   if (palShaftMats) {
     for (let i = 0; i < palShaftMats.length; i++) {
-      palShaftMats[i].emissiveIntensity = 0.42 + Math.sin(palTime * 0.6 + i) * 0.10 + palBloom * 0.3;
+      emitSet(palShaftMats[i], 0.42 + Math.sin(palTime * 0.6 + i) * 0.10 + palBloom * 0.3);
     }
   }
   // THE POOL BREATHES WITH ITS OWN SHAFT. A beam through moving water is being
@@ -4454,7 +4476,7 @@ export function createPalawan(game) {
         const wm = palWaterMesh.material;
         if (wm && wm.emissive) {
           wm.emissive.copy(palBloomC);
-          wm.emissiveIntensity = palBloom * 0.42;
+          emitSet(wm, palBloom * 0.42);
         }
       }
     },

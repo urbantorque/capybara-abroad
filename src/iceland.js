@@ -379,13 +379,38 @@ function iceMerger() {
  */
 function iceVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.42, amount: 0.075, warp: 0.55, near: 0.34, nearScale: 8, contact: 1 });
+               { scale: 0.42, amount: 0.075, warp: 0.55, near: 0.34, nearScale: 8, contact: 1,
+                 // THE WATER'S EDGE (D5). The sea and the lagoon are the same
+                 // level here (see the note beside waterHeightAt), so one band
+                 // puts a waterline on the hulls in the old harbour, the piles
+                 // under the jetty AND every berg on Jökulsárlón — which are
+                 // the three things in this chapter that are IN water rather
+                 // than beside it.
+                 //
+                 // AND IT IS THE DIMMEST LACE IN THE GAME, on purpose: it is
+                 // half past eleven at night, the grade's threshold is 0.40 —
+                 // the second lowest — and a foam white that reads correctly at
+                 // noon in Palawan would be the brightest thing in Reykjavik
+                 // and bloom like a streetlight.
+                 shore: 0.16, shoreBand: 0.24, shoreWet: 0.26, shoreDark: 0.84,
+                 shoreScale: 1.9, shoreColor: PALETTE.iceSteam });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function iceVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7, contact: 1, broad: 0.1, broadM: 18 });
+               { scale: 0.5, amount: 0.12, warp: 0, near: 0.80, nearScale: 7, contact: 1, broad: 0.1, broadM: 18,
+                 // Reynisfjara: black sand at one in five, so the band is a
+                 // metre of beach rather than five. Wetter than the ice rows —
+                 // black basalt sand is the most obviously wet ground in the
+                 // game and the soak is most of what says so.
+                 // ...and it is the DIMMEST of the two rows here for a third
+                 // reason on top of the hour: black sand is the darkest ground
+                 // in the game, so a lace tuned against white sand arrives on
+                 // it at four times the contrast. Photographed at 0.20 it was
+                 // a row of white slabs; 0.13 is a wash.
+                 shore: 0.13, shoreBand: 0.26, shoreWet: 0.48, shoreDark: 0.72,
+                 shoreScale: 1.5, shoreColor: PALETTE.iceSteam });
 }
 function icePush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function iceInstance(root, geo, color, list, cast, recv, twoSided) {

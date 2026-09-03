@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -368,7 +368,7 @@ function gorVCOwn() {
                   { scale: 0.42, amount: 0.09, warp: 0.55 });
 }
 function gorGlowMat(color, intensity) {
-  return mat(color, { emissive: color, emissiveIntensity: intensity || 1 }).clone();
+  return matEmit(color, intensity || 1).clone();
 }
 /**
  * THE TRAVERSE THAT UNDOES EVERY `castShadow = false` IN THIS FILE.
@@ -2456,7 +2456,7 @@ function gorUpdateFieldBurners(dt) {
     const on = u >= 0 ? gorSmooth(u / 0.27) * gorSmooth((1 - u) / 0.32) : 0;
     if (e.mat && e.mat.emissive) {
       e.mat.emissive.copy(gorBurnerC);
-      e.mat.emissiveIntensity = on * 0.80 * (1 + Math.sin(gorTime * 21 + i) * 0.16);
+      emitSet(e.mat, on * 0.80 * (1 + Math.sin(gorTime * 21 + i) * 0.16));
     }
     const lit = on > 0.35;
     if (lit && !e.was) {
@@ -2859,7 +2859,7 @@ function gorUpdateSky() {
   const y = lerp(-120, 300, gorSmooth(gorSun));
   gorSunMesh.position.set(760, y, -70);
   gorSunGlow.position.set(760, y, -70);
-  if (gorSunMat) gorSunMat.emissiveIntensity = 0.9 + gorSun * 1.4;
+  if (gorSunMat) emitSet(gorSunMat, 0.9 + gorSun * 1.4);
   if (gorGlowMat2) {
     for (let k = 0; k < gorGlowMat2.length; k++) {
       gorGlowMat2[k].opacity = (0.16 + gorDawnLit * 0.22) * gorGlowMat2[k].userData.base;
@@ -2880,7 +2880,7 @@ function gorUpdateSky() {
     // Anatolia in August does not have on it. Half the drive, and the colour
     // survives all the way to the top of the ramp.
     gorRimMat.opacity = clamp(pre + k * 0.44, 0, 1);
-    gorRimMat.emissiveIntensity = 0.45 + k * 0.95;
+    emitSet(gorRimMat, 0.45 + k * 0.95);
   }
   if (gorCirrus) gorCirrus.rotation.y = gorTime * 0.0014;
   // AND SOMEBODY TURNS THE TEA HOUSE OFF. A string of bulbs is a thing that is
@@ -2889,8 +2889,8 @@ function gorUpdateSky() {
   // ridge, and the last one of them goes as the valley floor comes up. It is
   // two lines and it is the difference between a lighting rig and a morning.
   if (gorBulbMat) {
-    gorBulbMat.emissiveIntensity = 1.25 * (1 - gorSmooth(clamp((gorSun - 0.30) / 0.55, 0, 1)))
-                                 * (0.94 + Math.sin(gorTime * 3.1) * 0.06);
+    emitSet(gorBulbMat, 1.25 * (1 - gorSmooth(clamp((gorSun - 0.30) / 0.55, 0, 1)))
+                      * (0.94 + Math.sin(gorTime * 3.1) * 0.06));
   }
 }
 
@@ -4151,7 +4151,7 @@ function gorUpdateBalloon(game, dt) {
       const s = 0.7 + gorBalBurn * 2.3 + Math.sin(gorTime * 22) * 0.16 * gorBalBurn;
       const w = 0.86 + gorBalBurn * 0.34 + Math.sin(gorTime * 31) * 0.06 * gorBalBurn;
       flame.scale.set(w, s, w);
-      flame.material.emissiveIntensity = 1.0 + gorBalBurn * 2.4;
+      emitSet(flame.material, 1.0 + gorBalBurn * 2.4);
     }
     // ---- AND THE ENVELOPE LIGHTS UP FROM THE INSIDE --------------------
     // THE picture of that valley, and the chapter did not have it. A four-
@@ -4174,7 +4174,7 @@ function gorUpdateBalloon(game, dt) {
       // plain dome. A lantern is a lantern because you can still see what it
       // is made of; it is the FLAME that should be the bright thing, and that
       // is where the extra went (see the scale below).
-      envM.material.emissiveIntensity = gorBalBurn * 0.50 * flick;
+      emitSet(envM.material, gorBalBurn * 0.50 * flick);
     }
   }
 

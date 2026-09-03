@@ -498,9 +498,54 @@ const wxFOLLOW_LAM = 6.0;    // how hard the field chases the camera
 // streaks to see two hundred. Pushed forward by a third of its own radius, the
 // same instance count reads about twice as heavy and costs the same.
 const wxAHEAD      = 0.55;
+// --- the contact -----------------------------------------------------------
+// RAIN WAS DRAWN IN THE AIR AND NEVER LANDED (D5). Three hundred and forty
+// streaks fall through the frame, the ground goes dark and picks up a sheen,
+// the score gains a rain bed and `splash()` tells the footfall to sound wet —
+// and nothing anywhere in nineteen chapters draws a single drop ARRIVING.
+// A shower with no contact reads as a filter over the picture rather than as
+// weather in the world, and it is the one half of this module the player is
+// closest to: the ground three metres in front of the animal.
+//
+// TWELVE RINGS, WHICH IS TWO MORE THAN THE PEAK RATE CAN HAVE ALIVE. At ten a
+// second and 0.52 s of life there are 5.2 up at any moment; the pool is sized
+// for the wrap never to steal a ring that is still expanding, which is the
+// mistake `confettiAt` made with sysCONF_MAX and which shows up as a ring
+// vanishing mid-life rather than as a shortage.
+const wxRING_MAX   = 12;
+const wxRING_R     = 6.0;    // m — the disc around the animal they land in
+const wxRING_RATE0 = 6.0;    // /s at the first of a shower...
+const wxRING_RATE1 = 10.0;   // ...and at the top of one
+const wxRING_LIFE  = 0.52;   // s
+const wxRING_R0    = 0.06;   // m at birth...
+const wxRING_R1    = 0.34;   // ...and at death
+// A RING NEEDS A FLOOR AND THE ANIMAL IS THE ONLY THING THAT KNOWS WHERE IT
+// IS. It is capybara.js's own capyFOOT_Y, copied rather than imported because
+// the contract allows a named import from `./shared.js` and from nowhere else,
+// and a chapter's constant is not shared. It is the distance from the body
+// centre to the ground under it, and it is how a ring lands on a ferry deck, a
+// jetty or a bridge rather than in the water underneath one.
+const wxFOOT_Y     = 0.34;
+// ...and how far above the terrain the animal has to be before this module
+// believes it is standing ON something rather than merely on a slope its own
+// sample missed. Below this the per-ring terrain height wins, which is what
+// keeps a ring on a shelving beach out of the sand.
+const wxDECK_UP    = 0.40;
 const wxFwd = new THREE.Vector3();
 const wxZAX = new THREE.Vector3(0, 0, 1);
 const wxFall = new THREE.Vector3();
+/**
+ * THE LIVE BIOME'S API — capybara.js's and props.js's resolution rule, third
+ * copy, and it is a copy on purpose: `game.env` is Sydney's and it stays
+ * RESIDENT abroad, so asking it for a terrain height in Venice gets a
+ * confident answer about a harbour seven thousand miles away.
+ */
+function wxApiOf(g) {
+  const bm = g && g.biome;
+  const n = bm && bm.current;
+  if (!n) return g ? g.env : null;
+  return n === 'sydney' ? g.env : (g[n] || null);
+}
 
 export function createWeather(game) {
   const THREEx = game.THREE || THREE;
@@ -591,6 +636,36 @@ export function createWeather(game) {
   const rainMesh = wxBuildField(new THREEx.BoxGeometry(1, 1, 1), wxRAIN_MAX, 0.35, 0.5);
   let moteMesh = moteQuad;          // whichever geometry the live row wants
 
+  // ---- THE CONTACT RINGS (D5). See the block above wxRING_MAX. ------------
+  // The SAME shape props.js's water-entry foam uses — an open-ended cylinder
+  // five centimetres tall, which from any camera in this game reads as a ring
+  // lying on the surface and, unlike a flat disc, does not disappear when you
+  // look along it. Ten sides rather than eight because these are drawn a
+  // couple of metres from the lens where a foam ring never is.
+  const ringMesh = new THREEx.InstancedMesh(
+    new THREEx.CylinderGeometry(1, 1, 0.05, 10, 1, true),
+    mat(PALETTE.foam, { transparent: true, opacity: 0.42, depthWrite: false,
+                        side: THREEx.DoubleSide }),
+    wxRING_MAX);
+  ringMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
+  ringMesh.frustumCulled = false;
+  ringMesh.castShadow = false;
+  ringMesh.receiveShadow = false;
+  ringMesh.renderOrder = 5;
+  ringMesh.count = 0;
+  scene.add(ringMesh);
+  const ringLife = new Float32Array(wxRING_MAX);
+  const ringX = new Float32Array(wxRING_MAX);
+  const ringY = new Float32Array(wxRING_MAX);
+  const ringZ = new Float32Array(wxRING_MAX);
+  let ringHead = 0, ringDue = 0, ringAny = false;
+  // A LIFETIME COUNT, for the audit and for nothing else. The rate is the one
+  // number in this block a screenshot cannot settle, and counting births from
+  // outside by watching lives reset does not work: a ring is born at 0.52 and
+  // is at 0.503 by the next sample, so the first probe that tried it read a
+  // rate of zero against a pool that was visibly working.
+  let ringBorn = 0;
+
   // Per-instance state. Allocated once, at max, for both fields.
   const mx = new Float32Array(wxMOTE_MAX), my = new Float32Array(wxMOTE_MAX),
         mz = new Float32Array(wxMOTE_MAX), mph = new Float32Array(wxMOTE_MAX),
@@ -653,6 +728,12 @@ export function createWeather(game) {
     wet = row.wet;
     thunderAt = 0;
     rainMesh.count = 0;
+    // ...and the rings, for the reason the shower itself is reset: a ring
+    // expanding on a canal in Venice must not finish its life over a dune.
+    for (let i = 0; i < wxRING_MAX; i++) ringLife[i] = 0;
+    ringMesh.count = 0;
+    ringDue = 0;
+    ringAny = false;
     wxFieldTo(row);
     // The field must not be dragged across the world from wherever it was.
     const cam = game.camera;
@@ -948,6 +1029,108 @@ export function createWeather(game) {
       rainMesh.instanceMatrix.needsUpdate = true;
       rainMesh.material.opacity = clamp(0.16 + rainT * 0.34, 0, 0.50);
     }
+
+    // ---- ...AND WHERE IT LANDS (D5) --------------------------------------
+    wxStepRings(dt);
+  }
+
+  /**
+   * WHERE A DROP ARRIVES. See the block above wxRING_MAX.
+   *
+   * Around the ANIMAL and not around the lens, which is the one placement
+   * decision in here. The rain field itself follows the camera because a
+   * streak is something you look THROUGH; a ring is something you look AT, and
+   * the thing the player is looking at is three metres in front of a capybara.
+   * A six-metre disc centred on the eye would put a third of them behind the
+   * boom and the rest at the top of the frame.
+   */
+  function wxStepRings(dt) {
+    const capy = game.capy;
+    const p = capy && capy.position;
+    // No animal (the title card, a crossing) and no rain: nothing to do, and
+    // the pool is left exactly as the last frame drew it — count 0.
+    if (rainT > 0.02 && p) {
+      ringDue -= dt * (wxRING_RATE0 + (wxRING_RATE1 - wxRING_RATE0) * clamp(rainT, 0, 1));
+      // A WHILE, NOT AN IF: at ten a second a 30 ms frame owes 0.3 of a ring
+      // and a 300 ms hitch owes three, and an `if` silently caps the rate at
+      // one per frame — which is the same rate at 60 Hz and a quarter of it
+      // during the physics catch-up after a chapter loads.
+      while (ringDue <= 0) {
+        ringDue += 1;
+        wxRingAt(p.x, p.z, capy);
+      }
+    }
+    if (!ringAny) return;
+    // Cleared here and set again by any ring that is still alive below, so the
+    // frame AFTER the last one dies writes the parked matrices once and then
+    // this function costs a compare for the rest of the chapter.
+    ringAny = false;
+    for (let i = 0; i < wxRING_MAX; i++) {
+      if (ringLife[i] <= 0) {
+        // Parked a mile down rather than scaled to nothing: a zero-scale
+        // instance still has a matrix and three still transforms it, and a
+        // degenerate one at the origin is a black speck in the middle of
+        // Sydney Cove the day a driver decides 0 * inf is a NaN.
+        wxV1.set(0, -900, 0);
+        wxS1.set(0.0001, 0.0001, 0.0001);
+        wxM1.compose(wxV1, wxQ1.set(0, 0, 0, 1), wxS1);
+        ringMesh.setMatrixAt(i, wxM1);
+        continue;
+      }
+      ringLife[i] -= dt;
+      ringAny = true;
+      const t = clamp(1 - ringLife[i] / wxRING_LIFE, 0, 1);
+      // SQUARE-ROOT, not linear. A ring on water is fast out of the impact and
+      // then slows, and a linear expansion reads as a circle being drawn
+      // rather than as something arriving.
+      const r = wxRING_R0 + (wxRING_R1 - wxRING_R0) * Math.sqrt(t);
+      wxV1.set(ringX[i], ringY[i], ringZ[i]);
+      wxS1.set(r, 1, r);
+      wxM1.compose(wxV1, wxQ1.set(0, 0, 0, 1), wxS1);
+      ringMesh.setMatrixAt(i, wxM1);
+    }
+    ringMesh.count = ringAny ? wxRING_MAX : 0;
+    ringMesh.instanceMatrix.needsUpdate = true;
+    // The whole pool fades with the shower rather than each ring fading on its
+    // own clock: one opacity write against twelve instance colours, and a ring
+    // that is still bright when the last drop falls is the tell that this was
+    // bolted on to the rain rather than driven by it.
+    ringMesh.material.opacity = clamp(0.10 + rainT * 0.34, 0, 0.44);
+  }
+
+  /** One ring, somewhere in the disc, on whatever surface is under that point. */
+  function wxRingAt(cx, cz, capy) {
+    // Uniform over the AREA — a uniform radius piles two thirds of them into
+    // the middle ninth of the disc, which reads as a puddle rather than rain.
+    const a = rand(0, 6.28318), rr = Math.sqrt(rand(0, 1)) * wxRING_R;
+    const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
+    const api = wxApiOf(game);
+    let y;
+    // WATER FIRST, and its live surface rather than its still level: a ring
+    // pinned to waterLevel in Manly or Iceland spends a third of its life
+    // inside the swell, which is the bug physFoamRing's own comment records.
+    if (api && typeof api.isOverWater === 'function' && api.isOverWater(x, z)) {
+      y = (typeof api.waterHeightAt === 'function') ? api.waterHeightAt(x, z) : api.waterLevel;
+    } else if (api && typeof api.terrainHeight === 'function') {
+      y = api.terrainHeight(x, z);
+    } else {
+      y = 0;                          // Sydney, which is flat at zero by contract
+    }
+    if (typeof y !== 'number' || y !== y) y = 0;
+    // ...AND IF THE ANIMAL IS STANDING ON SOMETHING, SO IS THE RAIN. A deck, a
+    // jetty, a bridge and a raft are all rigid bodies the terrain function has
+    // never heard of, and without this the whole field lands in the water
+    // underneath the ferry you are riding.
+    if (capy.grounded) {
+      const foot = capy.position.y - wxFOOT_Y;
+      if (foot - y > wxDECK_UP) y = foot;
+    }
+    const i = ringHead;
+    ringHead = (ringHead + 1) % wxRING_MAX;
+    ringX[i] = x; ringY[i] = y + 0.03; ringZ[i] = z;
+    ringLife[i] = wxRING_LIFE;
+    ringBorn++;
+    ringAny = true;
   }
 
   const api = {
@@ -958,6 +1141,33 @@ export function createWeather(game) {
     /** For the QA harness and for nothing else: what the table says about a
      *  place without having to be standing in it. */
     rowOf(n) { return wxMOOD[n] || wxBASE; },
+    /**
+     * ...and the same for the contact rings (D5). How many are alive, what the
+     * pool is drawing, and each live ring's height ABOVE the surface the biome
+     * says is under it — which is the one number that says whether a ring
+     * landed on the ferry deck or in the water beneath it, and is not
+     * something a screenshot of a shower can settle.
+     */
+    ringAudit() {
+      const rows = [];
+      const api = wxApiOf(game);
+      for (let i = 0; i < wxRING_MAX; i++) {
+        if (ringLife[i] <= 0) continue;
+        let s = 0;
+        if (api && typeof api.isOverWater === 'function' && api.isOverWater(ringX[i], ringZ[i])) {
+          s = (typeof api.waterHeightAt === 'function')
+            ? api.waterHeightAt(ringX[i], ringZ[i]) : api.waterLevel;
+        } else if (api && typeof api.terrainHeight === 'function') {
+          s = api.terrainHeight(ringX[i], ringZ[i]);
+        }
+        if (typeof s !== 'number' || s !== s) s = 0;
+        rows.push({ life: +ringLife[i].toFixed(3), y: +ringY[i].toFixed(3),
+                    over: +(ringY[i] - s).toFixed(3) });
+      }
+      return { alive: rows.length, born: ringBorn, count: ringMesh.count, max: wxRING_MAX,
+               opacity: +ringMesh.material.opacity.toFixed(3), rainT: +rainT.toFixed(3),
+               rings: rows };
+    },
     update: update,
   };
   game.weather = api;

@@ -1547,6 +1547,14 @@ for (let i = 0; i < _SPILL_N; i++) {
 // bounce, and a pure lambert term on a fake light reads as a hard edge running
 // down every column. A third of the light arrives regardless of facing.
 const _spillWRAP = 0.34;
+// HOW FAR A WET FLOOR STRETCHES A SOURCE TOWARD THE LENS, at full wetness and
+// on a face pointing straight up. See the block in _RIM_FS_OUT: the reach
+// along the view azimuth is multiplied by 1 + this, and across it by nothing
+// at all. 2.4 is where a lamp on Mong Kok's road reads as a smear rather than
+// as a puddle of light with a slightly oval edge, and it is the highest number
+// that does not run the reflection off the bottom of the frame at the resting
+// boom, where the ground nearest the lens is four metres from the animal.
+const _spillANISO = 2.4;
 /** How many slots the pool has. systems.js ranks into this many. */
 export function spillSlots() { return _SPILL_N; }
 /**
@@ -1668,7 +1676,8 @@ uniform float uShadowSky;
 uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
-uniform float uSpillN;`;
+uniform float uSpillN;
+uniform float uWetK;`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
 // brighter version of the thing rather than light on it. Added at the end it is
@@ -1689,16 +1698,56 @@ const _RIM_FS_OUT = `{
   // they pay for this exactly nothing.
   if (uSpillOn > 0.5) {
     vec3 sAcc = vec3(0.0);
+    // ---- ...AND WET GROUND STRETCHES IT TOWARD THE EYE (D5) ---------------
+    // MEASURED (qa/rv-kowloon.png): the chapter whose entire subject is neon
+    // on wet asphalt has no vertical smear in it — the reflections under the
+    // signs are PAINTED ELLIPSES, geometry laid on the road by the chapter,
+    // and the spill that actually lights that road is a circle. A reflection
+    // in a wet floor is not a circle. It is the source stretched along the
+    // line between it and the viewer, because a horizontal mirror moves the
+    // image AWAY from you rather than sideways, and on screen that reads as a
+    // vertical streak.
+    //
+    // So the falloff measures an ANISOTROPIC distance: the component of the
+    // offset along the view azimuth is divided by k, which makes the pool of
+    // light reach k times further toward and away from the lens and not one
+    // centimetre further to either side. Nothing is added and nothing is
+    // brightened; the same light is a different shape.
+    //
+    // THE WHOLE BLOCK IS BEHIND A UNIFORM. uWetK is grain()'s own wetness —
+    // weather.js's shine(), wetness ABOVE the chapter's baseline, for the
+    // reason stated there — so the eighteen chapters that are not being
+    // rained on take one coherent branch and pay nothing, and when it is zero
+    // the arithmetic below is exactly the length() it replaces (sVA is a unit
+    // vector, so a² + |perp|² + y² is |sD|² when k is 1).
+    float sStretch = 0.0;
+    vec2 sVA = vec2(0.0, 1.0);
+    if (uWetK > 0.001) {
+      // GATED ON WHICH WAY THE FACE POINTS, exactly as the wet sheen is and
+      // for the same reason: water lies on top of things. A wall beside a sign
+      // is wet and does not mirror it downward.
+      sStretch = uWetK * clamp(rN.y, 0.0, 1.0);
+      vec2 sVv = vRimW.xz - cameraPosition.xz;
+      float sVl = length(sVv);
+      if (sVl > 0.0001) sVA = sVv / sVl;
+    }
     for (int si = 0; si < ${_SPILL_N}; si++) {
       if (float(si) >= uSpillN) break;
       vec3 sD = uSpillP[si].xyz - vRimW;
       float sL = length(sD);
+      float sLa = sL;
+      if (sStretch > 0.001) {
+        float sAx = dot(sD.xz, sVA);
+        vec2 sPe = sD.xz - sVA * sAx;
+        float sK = 1.0 + ${_spillANISO.toFixed(2)} * sStretch;
+        sLa = sqrt(sAx * sAx / (sK * sK) + dot(sPe, sPe) + sD.y * sD.y);
+      }
       // Reach, not inverse-square. A physical falloff on a fake light either
       // blows out at the source or dies before it reaches the floor, and the
       // thing being modelled here is a SIGN CLUSTER several metres across
       // rather than a point. A smooth ramp to nothing at the stated reach is
       // also what lets a source leave the pool without a visible edge.
-      float sAt = 1.0 - smoothstep(uSpillP[si].w * 0.12, uSpillP[si].w, sL);
+      float sAt = 1.0 - smoothstep(uSpillP[si].w * 0.12, uSpillP[si].w, sLa);
       float sNd = max(dot(rN, sD / max(sL, 0.0001)), 0.0);
       sAcc += uSpillC[si] * sAt * (${_spillWRAP.toFixed(2)} + ${(1 - _spillWRAP).toFixed(2)} * sNd);
     }
@@ -1748,6 +1797,13 @@ function _rimInjectWith(kU, cU) {
     shader.uniforms.uSpillC = _spillC;
     shader.uniforms.uSpillOn = _spillOn;
     shader.uniforms.uSpillN = _spillN;
+    // The SAME uniform object grain() binds as uGrainWet, under a second name
+    // — and the second name is not cosmetic. grain() injects its own
+    // `uniform float uGrainWet;` at `#include <common>` and then calls this
+    // hook, which replaces the same include again; two declarations of one
+    // name in one shader is a compile error, and the material would have gone
+    // black rather than warned.
+    shader.uniforms.uWetK = _grainWet;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', _RIM_VS_COMMON)
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
@@ -2012,6 +2068,59 @@ export function matOwn(color, opts) {
     m.customProgramCacheKey = _rimKey;
   }
   return m;
+}
+
+// ---------------------------------------------------------------------------
+// OVER-WHITE — A THING THAT MAKES LIGHT SHOULD BE BRIGHTER THAN A THING THAT
+// DOES NOT, AND FOR EIGHT CHAPTERS IT WAS NOT (D5).
+//
+// The bright pass takes one THRESHOLD per chapter (`sysGRADES`), and a
+// threshold is a single number asked to answer two different questions at
+// once: "which pixels are lamps" and "which pixels are merely pale". In a
+// chapter with a lantern over a limestone street those are not separable —
+// D45-13 (Göreme) and D45-11 (Mong Kok) are both a picture of a threshold set
+// low enough to find the lamps and therefore low enough to find the road
+// markings, the paving and half the sky.
+//
+// The fix is not a better threshold. It is to stop asking the threshold to do
+// it: a lamp should RENDER above 1.0, so that any threshold at or below white
+// finds it and nothing that is merely white can follow it up there. The scene
+// target is HalfFloat (see main.js) so values over 1.0 survive the whole way
+// to the bright pass, and `sparkle` has been exploiting exactly this since
+// v13 — its own comment says the amount "is deliberately allowed to exceed
+// 1.0, because the composite pass blooms anything over the biome's threshold".
+// This is that argument applied to the things that are actually lights.
+//
+// 1.45, and it is a HEADROOM rather than a brightness. An emitter that was
+// rendering at 0.90 of white now renders at 1.31 — visually almost unchanged,
+// because everything downstream of the bright pass runs through the grade's
+// shoulder, which is a tone curve and has always compressed the top. What
+// changes is that it is now unambiguously ON THE LAMP SIDE of any threshold a
+// chapter cares to set. Higher than this and a lamp starts to bloom as a
+// disc rather than as a source.
+export const EMIT_OVER = 1.45;
+/**
+ * A LANTERN, A NEON TUBE, A LIT WINDOW — the emitter constructor the chapters
+ * were each writing their own copy of (antarctic, cave, göreme, hanoi,
+ * kowloon and palawan all had one, character for character).
+ *
+ * `k` is the intensity a chapter would have written by hand; the over-white
+ * is applied here so that the number in a chapter goes on meaning what it
+ * meant and there is one place to change how far past white an emitter goes.
+ */
+export function matEmit(color, k, opts) {
+  return mat(color, Object.assign({ emissive: color,
+                                    emissiveIntensity: (k === undefined ? 1 : k) * EMIT_OVER },
+                                  opts || {}));
+}
+/**
+ * ...and the same for the ones that MOVE, which is most of the interesting
+ * ones: a lamp coming on at dusk, a brazier flickering, a bulb pulsing.
+ * Those write `emissiveIntensity` every frame and would otherwise walk
+ * straight past matEmit's factor on the first frame after construction.
+ */
+export function emitSet(m, k) {
+  if (m) m.emissiveIntensity = (k > 0 ? k : 0) * EMIT_OVER;
 }
 
 // ---------------------------------------------------------------------------
@@ -3522,6 +3631,57 @@ const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
 const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
 
 // ---------------------------------------------------------------------------
+// SHORE — WHERE THE LAND MEETS THE WATER, AND IT DID NOT (D5).
+//
+// MEASURED (`grep -c foam`): Manly 34, Rio 15, the Quay 6, and Palawan,
+// Venice, Antarctica and Iceland ZERO. Four chapters whose whole subject is a
+// coastline draw the land and the water as two flat sheets that happen to
+// intersect, and the tell is `qa/rv-antarctic.png`: the floes sit ON a grey
+// wash rather than IN it, because nothing anywhere says where the surface
+// crosses them.
+//
+// THE HEIGHT IS THE WHOLE TRICK, AND grain() ALREADY HAS IT. Every grained
+// fragment carries `vGrainW`, its own world position, and a chapter's
+// waterline is one float. So `uShoreY - vGrainW.y` is the depth of THIS
+// fragment below the surface, for free, on materials that already exist —
+// which is the difference between this and a foam mesh per shoreline, and
+// the reason it can go on nineteen chapters' worth of merged world geometry
+// without a single new draw call.
+//
+// It reaches three things that all wanted it and none of which are the sea:
+//
+//   THE BEACH        a wide band where the sand shelves, so the water's edge
+//                    is a lace of foam instead of a straight polygon join;
+//   A WALL OR A FLOE the same band on a near-vertical face, which is a
+//                    horizontal line at the waterline — the one mark that
+//                    puts a floe IN the water rather than on it;
+//   THE SEABED       everything below the line, tinted with depth, which is
+//                    what a transparent sea (Palawan at 0.45) was missing.
+//
+// AND IT IS THE GENERALISATION OF SOMETHING THAT ALREADY SHIPPED. `venWet` in
+// venice.js has run `uVenWaterY - vVenW.y` through a wet band and a static
+// 0.11 m rim line since chapter 10, on the acqua alta's moving waterline —
+// one chapter's private copy of exactly this term, with no animation in it.
+// Venice keeps its numbers and loses its copy.
+const _shoreY = { value: -9999 };
+/**
+ * WHERE THE WATERLINE IS, for every shored material in the live chapter.
+ * systems.js calls this once per frame off the biome's own `shoreY()` hook,
+ * or its `waterLevel` where it has none.
+ *
+ * The default is -9999 and that matters: a chapter with no water at all — or
+ * one whose module never publishes a level — puts the band a mile under the
+ * world and every shored fragment takes the `sd < 0` branch, which is the
+ * picture exactly as it was. A missing hook is a no-op, never a black band.
+ */
+export function shoreTick(y) {
+  _shoreY.value = (typeof y === 'number' && y === y) ? y : -9999;
+}
+/** What the shore term is reading, for an audit that wants to know whether a
+ *  chapter is wired at all rather than merely whether it looks right. */
+export function shoreY() { return _shoreY.value; }
+
+// ---------------------------------------------------------------------------
 // CONTACT — THE OTHER HALF OF THE RIM, AND THE REASON NOTHING IN THIS GAME
 // LOOKED LIKE IT WAS RESTING ON ANYTHING.
 //
@@ -4026,6 +4186,30 @@ export function grain(m, opts) {
   // term already uses it. The wet-only build is props.js's one shared material
   // and its whole invariant is "the wet gate and nothing else".
   const cont = (wetOnly || spark > 0 || o.contact === undefined) ? 0 : o.contact;
+  // SHORE — see the block above _shoreY. Off unless a call site asks, and off
+  // on a sea and on the wet-only build for the same two reasons `contact` is:
+  // `spark > 0` is this helper's marker for "this material IS the water", and
+  // a waterline drawn on the water is a line drawn on itself; and props.js's
+  // one shared material is the wet gate and nothing else.
+  const shore = (wetOnly || spark > 0 || o.shore === undefined) ? 0 : o.shore;
+  // The band, in METRES, and it is a height rather than a multiple of `scale`
+  // for the reason `broadM` is: how far up a wall the water slaps is a fact
+  // about water, not about how coarse a chapter's ground grain is.
+  const shoreBand = o.shoreBand === undefined ? 0.35 : o.shoreBand;
+  // How dark a soaked surface goes, and over what height it gets there. The
+  // pair of them are venWet's `mix(1.0, 0.72, smoothstep(-0.40, 0.03, vd))`
+  // with the numbers named: a chapter that wants Venice's wet stone asks for
+  // Venice's numbers and gets Venice's picture.
+  const shoreDark = o.shoreDark === undefined ? 0.80 : o.shoreDark;
+  const shoreWet = o.shoreWet === undefined ? 0.40 : o.shoreWet;
+  // DEPTH. How far down the tint saturates, and how far toward the tint colour
+  // it goes there. Only visible through a transparent sea, so it is zero by
+  // default and Palawan is the chapter that asks.
+  const shoreDeep = o.shoreDeep === undefined ? 3.5 : o.shoreDeep;
+  const shoreTint = o.shoreTint === undefined ? 0 : o.shoreTint;
+  const shoreTintC = o.shoreTintColor === undefined ? 0x2a6f86 : o.shoreTintColor;
+  const shoreCol = o.shoreColor === undefined ? 0xffffff : o.shoreColor;
+  const shoreScale = o.shoreScale === undefined ? 1.6 : o.shoreScale;
   // BOTH CACHES COME OFF THIS ONE STRING — the material cache below and
   // customProgramCacheKey at the bottom of the hook — so a new option that is
   // not in it gets two call sites sharing one compiled program, and which one
@@ -4033,7 +4217,9 @@ export function grain(m, opts) {
   // for; `broad` and `broadScale` change the source, so they are in it.
   const key = m.uuid + '|' + scale + '|' + amount + '|' + warp + '|' + near + '|' + nearScale + '|' +
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
-              '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM;
+              '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM +
+              '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
+              '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -4048,13 +4234,16 @@ export function grain(m, opts) {
                   m.blending === THREE.NormalBlending && m.depthWrite !== false &&
                   !(m.emissive && (m.emissive.r > 0.001 || m.emissive.g > 0.001 || m.emissive.b > 0.001));
   const sc = new THREE.Color(sparkCol);
+  const shc = new THREE.Color(shoreCol);
+  const shtc = new THREE.Color(shoreTintC);
   // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
   // existing and only marker for "this material is a sea", and darkening a sea
   // because it is raining on it is nonsense twice over — it is already water,
   // and it already has the sparkle doing the same job better.
   const wet = spark <= 0;
   g.onBeforeCompile = function (shader) {
-    if (spark > 0) shader.uniforms.uGrainT = _grainTime;
+    if (spark > 0 || shore > 0) shader.uniforms.uGrainT = _grainTime;
+    if (shore > 0) shader.uniforms.uShoreY = _shoreY;
     if (wet) {
       shader.uniforms.uGrainWet = _grainWet;
       shader.uniforms.uGrainWetC = _grainWetC;
@@ -4083,7 +4272,8 @@ export function grain(m, opts) {
         wet ? 'varying vec3 vGrainN;' : '',
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
-        spark > 0 ? 'uniform float uGrainT;' : '',
+        (spark > 0 || shore > 0) ? 'uniform float uGrainT;' : '',
+        shore > 0 ? 'uniform float uShoreY;' : '',
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcOn;' : '',
@@ -4182,6 +4372,80 @@ export function grain(m, opts) {
           '    diffuseColor.rgb += wK * wF * ' + _wetSHEEN.toFixed(4) + ' * uGrainWetC;',
           '  }',
         ].join('\n') : '',
+        shore > 0 ? [
+          // ---- THE WATER'S EDGE ------------------------------------------
+          // `sd` is metres BELOW the waterline: positive under, negative above.
+          // See the block above _shoreY for why this is free.
+          '  {',
+          '    float sd = uShoreY - vGrainW.y;',
+          // 1. THE SOAK, and it is venWet's band with its numbers named. It
+          //    runs from `shoreWet` metres ABOVE the line (spray and the last
+          //    wave) down through it, so a beach is dark for a stride before
+          //    the water starts rather than at a polygon join.
+          '    float sWet = smoothstep(' + (-shoreWet).toFixed(3) + ', 0.03, sd);',
+          '    diffuseColor.rgb *= mix(1.0, ' + shoreDark.toFixed(3) + ', sWet);',
+          // 2. DEPTH. Only ever visible through a transparent sea, so it is
+          //    off unless a chapter asks — and it MULTIPLIES the albedo rather
+          //    than mixing toward a flat colour, because what depth does is
+          //    take the red out of what is down there, not paint it blue.
+          shoreTint > 0 ? '    float sDep = smoothstep(0.0, ' + shoreDeep.toFixed(3) + ', sd);' : '',
+          shoreTint > 0 ? '    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(' +
+                          shtc.r.toFixed(4) + ', ' + shtc.g.toFixed(4) + ', ' + shtc.b.toFixed(4) +
+                          '), sDep * ' + shoreTint.toFixed(3) + ');' : '',
+          // 3. THE LACE, and the surge is what stops it being a contour line.
+          //    Two slow sines — one global, one that travels across the world
+          //    — move the CENTRE of the band a few centimetres up and down, so
+          //    the edge advances and retreats along the whole shore instead of
+          //    every metre of it pulsing together.
+          '    float sSur = sin(uGrainT * 0.63) * 0.055',
+          '              + sin(uGrainT * 0.29 + vGrainW.x * 0.058 + vGrainW.z * 0.041) * 0.075;',
+          '    float sBand = 1.0 - smoothstep(0.0, ' + shoreBand.toFixed(4) + ', abs(sd - sSur));',
+          // SQUARED, so the band has a soft shoulder and a bright middle. A
+          // linear ramp over a third of a metre reads as a gradient, and foam
+          // is not a gradient.
+          '    sBand *= sBand;',
+          // ...AND IT DIES WHEN IT STOPS BEING RESOLVABLE. `fwidth(sd)` is how
+          // many metres of height one pixel covers here, which on a shelving
+          // beach is millimetres and on a sea wall a hundred metres off is more
+          // than the band is tall. Past that there is nothing honest left to
+          // draw and a sub-pixel band does not shimmer, it crawls — the
+          // sparkle's own lesson, one field over.
+          //
+          // 0.55, NOT 1.0, AND THE FIRST BUILD USED 1.0 AND WAS WRONG. A fade
+          // that reaches nothing the moment one pixel covers one band is a fade
+          // that switches the effect OFF at the range you actually look at a
+          // coastline from: measured in Antarctica, where the beach falls at
+          // about one in one-and-a-half, the shoreline twenty metres from the
+          // lens has fwidth(sd) ≈ 0.18 against a 0.22 band, and the lace was
+          // simply GONE in the wide shot and present in the close one. It goes
+          // out over 1.8 bands instead, so a distant shore keeps a dim
+          // continuous line — which is what distant foam is — and only stops
+          // when there is genuinely nothing left.
+          '    sBand *= clamp(1.0 - fwidth(sd) * ' + (0.55 / shoreBand).toFixed(4) + ', 0.0, 1.0);',
+          '    vec2 slq = vGrainW.xz * ' + shoreScale.toFixed(4) +
+            ' + vec2(uGrainT * 0.11, uGrainT * -0.07);',
+          // WARPED, AND ROTATED, AND BOTH FOR THE REASON THE NEAR OCTAVE IS.
+          // Value noise sits on a square lattice and smoothstep has zero
+          // derivative at a cell boundary, so a THRESHOLDED field of it does
+          // not read as foam, it reads as a quilt: photographed on the black
+          // sand at Reynisfjara the first build was a row of white rectangles
+          // a metre across, which is the same failure the Botanic Gardens had
+          // at `near` 0.36. `gn` is already computed a few lines up and is
+          // free; it bends the whole lattice into slow curves. The second
+          // octave is then turned a radian as well, so it shares no boundary
+          // anywhere with the first.
+          '    slq += gn * 2.2;',
+          '    vec2 slq2 = vec2(slq.x * 0.5403 - slq.y * 0.8415,',
+          '                     slq.x * 0.8415 + slq.y * 0.5403) * 2.31 + 5.71;',
+          '    float sln = grNoise(slq) * 0.62 + grNoise(slq2) * 0.38;',
+          // A NARROW RAMP, for the sparkle's reason: foam is a thresholded
+          // thing with holes in it, and a wide ramp turns it into a wash.
+          '    float sLace = smoothstep(0.46, 0.68, sln) * sBand;',
+          '    sLace *= clamp(1.0 - max(fwidth(slq.x), fwidth(slq.y)) * 0.30, 0.0, 1.0);',
+          '    diffuseColor.rgb += sLace * ' + shore.toFixed(4) +
+            ' * vec3(' + shc.r.toFixed(4) + ', ' + shc.g.toFixed(4) + ', ' + shc.b.toFixed(4) + ');',
+          '  }',
+        ].join('\n') : '',
         spark > 0 ? [
           '  vec2 sq = (vGrainW.xz + vec2(uGrainT * ' + sparkSpeed.toFixed(3) + ',',
           '                               uGrainT * ' + (-sparkSpeed * 0.62).toFixed(3) + '))',
@@ -4262,6 +4526,13 @@ export function grain(m, opts) {
   // ungrained variant of the same material config, and which one you get
   // depends on draw order.
   g.customProgramCacheKey = function () { return 'grain' + key + (rimHere ? '|r' : ''); };
+  // FOR THE AUDIT, AND FOR THE REASON rimInfo() EXISTS. A material whose shore
+  // option was dropped on the way through a clone still DRAWS — it is simply
+  // the one thing on the coastline with no waterline on it, which is not
+  // something a frame-mean metric can see. This is how `qa/d5-shore.js` tells
+  // "this chapter is wired" from "this chapter looks about right".
+  if (!g.userData) g.userData = {};
+  g.userData.grainShore = shore;
   g.needsUpdate = true;
   _grainCache.set(key, g);
   return g;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -312,7 +312,7 @@ function hkVC() {
  * Not cached — several of these have their intensity written every frame.
  */
 function hkGlowMat(color, intensity) {
-  const m = mat(color, { emissive: color, emissiveIntensity: intensity || 1 }).clone();
+  const m = matEmit(color, intensity || 1).clone();
   return m;
 }
 function hkSyncBody(b) {
@@ -1441,7 +1441,7 @@ function hkNeonMat(color) {
   // cloned: emissiveIntensity is written every frame, and mat() caches by
   // colour and options, so mutating the shared one would set fire to whatever
   // else in the game asked for the same literal
-  return mat(color, { emissive: color, emissiveIntensity: 1 }).clone();
+  return matEmit(color, 1).clone();
 }
 function hkBuildNeon(game, root) {
   const lists = [];
@@ -1654,7 +1654,7 @@ function hkNeonBreathe(dt) {
     // there is always exactly one failing tube on a street like this.
     const slow = 0.86 + Math.sin(hkTime * (0.4 + i * 0.17) + hkSignPhase[i]) * 0.14;
     const flick = i === 3 ? (Math.sin(hkTime * 19.3) > 0.82 ? 0.35 : 1) : 1;
-    m.material.emissiveIntensity = (slow * flick) * (0.85 + hkShow * 0.5);
+    emitSet(m.material, (slow * flick) * (0.85 + hkShow * 0.5));
   }
   if (hkSignFace) {
     hkSignFace.material.emissiveIntensity =
@@ -3225,7 +3225,7 @@ function hkUpdateJunk(dt) {
   // player and the far shore, so a kilometre of coloured light landing on
   // eighteen metres of red canvas is the cheapest thing in this chapter that
   // makes the Symphony feel like it is happening to the whole harbour.
-  if (hkJunkSailMat) hkJunkSailMat.emissiveIntensity = 0.24 + hkShow * 0.62;
+  if (hkJunkSailMat) emitSet(hkJunkSailMat, 0.24 + hkShow * 0.62);
   if (hkJunkWake) hkJunkWake.material.opacity = 0.10 + hkShow * 0.05;
 }
 
@@ -3581,7 +3581,7 @@ function hkUpdateShow(game, dt) {
       // 0.72, not 1: at full emission a tower is a flat coloured card with no
       // faces on it. Leaving a quarter of the Lambert shading in keeps the
       // corners and gives the skyline depth while it is lit.
-      hkTowers[i].material.emissiveIntensity = hkTowerLit[i] * 0.72;
+      emitSet(hkTowers[i].material, hkTowerLit[i] * 0.72);
     }
     // the light on the water, one strip per tower, brought up with its own
     // emission — so the show walks toward the player across the harbour

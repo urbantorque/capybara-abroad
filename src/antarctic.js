@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 17 — THE ANTARCTIC PENINSULA
@@ -415,11 +415,36 @@ function antVC() {
  * cave.js grew for exactly the same reason.
  */
 function antGlow(color, intensity) {
-  return mat(color, { emissive: color, emissiveIntensity: intensity === undefined ? 1 : intensity });
+  return matEmit(color, intensity === undefined ? 1 : intensity);
 }
 function antVCI() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34, contact: 1, broad: 0.09, broadM: 22 });
+               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34, contact: 1, broad: 0.09, broadM: 22,
+                 // THE WATER'S EDGE (D5), AND THIS IS THE CHAPTER THE REVIEW
+                 // NAMED. `qa/rv-antarctic.png`: fifteen floes sitting ON a
+                 // flat grey wash rather than IN it, because a floe is a slab
+                 // with vertical sides and nothing anywhere said where the
+                 // surface crossed them. The band is a horizontal LINE round
+                 // every floe, every rock and the shelving beach, at the one
+                 // height the sea is — and because this material is the ground
+                 // AND the floes, the fifteen that drift get it for free and it
+                 // travels with them.
+                 //
+                 // AND IN THIS CHAPTER THE WATERLINE IS THE DARK HALF, WHICH
+                 // COST TWO TUNINGS TO ACCEPT. The first build gave Antarctica
+                 // the same bright lace as everywhere else — 0.34 of foam white
+                 // on `antFoam` — and photographed at the jetty, settled, it
+                 // was not there at all. It is the albedo ceiling this chapter
+                 // has been hitting since the fourth pass: the beach is snow,
+                 // the grade's threshold is the highest in the game (1.10) so
+                 // that a world of white things does not bloom into one sheet
+                 // of paper, and a white line added to a white surface under a
+                 // flat overcast has nowhere left to go. What reads at an
+                 // Antarctic shoreline is the WET: dark slush and dark ice
+                 // where the sea has been over it. So the soak is deep (0.55 m
+                 // and down to 0.70) and the lace is a whisper on top of it.
+                 shore: 0.22, shoreBand: 0.34, shoreWet: 0.55, shoreDark: 0.70,
+                 shoreScale: 2.1, shoreColor: PALETTE.antFoam });
 }
 
 function antSyncBody(b) {

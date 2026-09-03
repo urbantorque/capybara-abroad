@@ -392,7 +392,7 @@ function venMerger() {
 // arcades, the campanile and the basilica at once — so the flood arrives
 // everywhere in the frame instead of only underfoot.
 // ---------------------------------------------------------------------------
-const venWaterUni = { value: venTIDE_LOW };
+
 // ---------------------------------------------------------------------------
 // THE WATER HAS TO MOVE, AND GEOMETRY CANNOT AFFORD TO DO IT.
 //
@@ -440,53 +440,56 @@ function venWaves(g) {
   g.needsUpdate = true;
   return g;
 }
-function venWet(g) {
-  const prevHook = g.onBeforeCompile;
-  const prevKey = g.customProgramCacheKey;
-  g.onBeforeCompile = function (shader) {
-    if (prevHook) prevHook.call(this, shader);
-    shader.uniforms.uVenWaterY = venWaterUni;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vVenW;')
-      .replace('#include <begin_vertex>',
-               '#include <begin_vertex>\nvVenW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    // ANCHORED ON emissivemap_fragment, NOT color_fragment: grain() has already
-    // taken that one, and two hooks fighting over the same include is how you
-    // get a material that silently loses half of itself.
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>',
-               '#include <common>\nvarying vec3 vVenW;\nuniform float uVenWaterY;')
-      .replace('#include <emissivemap_fragment>', [
-        '#include <emissivemap_fragment>',
-        '{',
-        '  float vd = uVenWaterY - vVenW.y;',
-        '  float wetB = smoothstep(-0.40, 0.03, vd);',
-        '  diffuseColor.rgb *= mix(1.0, 0.72, wetB);',
-        '  float rim = smoothstep(0.11, 0.0, abs(vd - 0.02));',
-        '  diffuseColor.rgb += rim * vec3(0.15, 0.16, 0.14);',
-        '}',
-      ].join('\n'));
-  };
-  g.customProgramCacheKey = function () {
-    return 'venwet|' + (prevKey ? prevKey.call(this) : g.uuid);
-  };
-  g.needsUpdate = true;
-  return g;
-}
+// ---------------------------------------------------------------------------
+// `venWet` USED TO LIVE HERE, AND IT IS `shore` IN grain() NOW (D5).
+//
+// It was a second hook on these two materials — its own varying, its own
+// uniform, its own program cache key and its own anchor on
+// `<emissivemap_fragment>` because grain() had already taken
+// `<color_fragment>` — and what it computed was
+//
+//     float vd = uVenWaterY - vVenW.y;
+//     diffuseColor.rgb *= mix(1.0, 0.72, smoothstep(-0.40, 0.03, vd));
+//     diffuseColor.rgb += smoothstep(0.11, 0.0, abs(vd - 0.02)) * vec3(0.15, 0.16, 0.14);
+//
+// which is the shared shore term with `shoreDark` 0.72, `shoreWet` 0.40 and a
+// STATIC rim line — the one thing about it that was wrong. A waterline that
+// does not move is a contour, and the review counted `grep -c foam` at ZERO in
+// this chapter because a contour is not foam.
+//
+// So: the same numbers, on one hook instead of two, one program cache key
+// instead of two, and the rim replaced by the animated lace. Nothing else in
+// the chapter changes — the tide still drives the line, through the
+// `waterLevel` this module already rewrites every frame (`api.waterLevel =
+// venWaterY`, at the bottom of the update) rather than through `venWaterUni`.
+// It is the same float arriving at the same shader through a channel every
+// other chapter already had.
+//
 // ONE INSTANCE EACH, and they are private (grainOwn, not grain): these carry a
 // uniform and a hook, and mat()/grain() both hand back cached objects that some
 // other chapter may already be drawing with.
 let venWallMat = null, venGroundMat = null;
+const venSHORE = { shore: 0.26, shoreBand: 0.24, shoreWet: 0.40, shoreDark: 0.72,
+                   shoreScale: 1.8, shoreColor: PALETTE.venFoam };
 function venVC() {
-  if (!venWallMat) venWallMat = venWet(grainOwn(mat(0xffffff, { vertexColors: true }),
-    { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 8, contact: 1 }));
+  if (!venWallMat) venWallMat = grainOwn(mat(0xffffff, { vertexColors: true }),
+    Object.assign({ scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 8, contact: 1 },
+                  venSHORE));
   return venWallMat;
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function venVCG() {
-  if (!venGroundMat) venGroundMat = venWet(grainOwn(mat(0xffffff, { vertexColors: true }),
-    { scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1, broad: 0.08, broadM: 15 }));
+  if (!venGroundMat) venGroundMat = grainOwn(mat(0xffffff, { vertexColors: true }),
+    Object.assign({ scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1,
+                    broad: 0.08, broadM: 15 },
+                  // THE ACQUA ALTA IS THE ONE PLACE THE BAND IS WIDE. The tide
+                  // climbs 2.25 m over a piazza that is flat to within a few
+                  // centimetres, so the waterline crosses the whole square in
+                  // about four seconds of tide — and a narrow band there is a
+                  // hard edge sweeping across the stone. Half a metre of band
+                  // on the ground turns that edge into a wash arriving.
+                  venSHORE, { shoreBand: 0.50, shoreScale: 1.4 }));
   return venGroundMat;
 }
 function venPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
@@ -4732,7 +4735,9 @@ function venUpdateTide(game, dt) {
   const target = venTideY(venPhase);
   // damped rather than assigned, so a frame hitch cannot step the sea 40 cm
   venWaterY = damp(venWaterY, target, 6, dt);
-  venWaterUni.value = venWaterY;   // and the city knows where the line is
+  // ...and the city knows where the line is through the biome API's shoreY()
+  // hook, which systems.js reads once a frame into the shared shore uniform.
+  // venWaterUni is gone with venWet — see the block above venVC.
   venWaveUni.value = venTime;
 
   // ---- THE SIREN ----------------------------------------------------------
