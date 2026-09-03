@@ -553,21 +553,82 @@ D5**; instruments `qa/d5-shore.js`, `qa/d5-glow.js`, `qa/d5-wet.js`, plus
    is still the weakest row in the table. Written down rather than chased.
 
 
+### Batch D6 — the frame (area 6, first of two sessions)
+
+**LANDED 3 Sep 2026 — nine of the ten items.** The tenth, the diegetic exit
+board, is the second session and stays on the shelf below. Contract section
+**THE FRAME — D6, FIRST HALF**; instruments `qa/d6-frame.js` and
+`qa/p7-tokens.cjs`, which grew a motion column and now reads `index.html`.
+
+- **Motion is a token.** 13 un-named curves across 18 uses and 37 durations
+  across 102 → **four named curves and three durations**, with the rule that
+  decides which things get one: *a curve is a claim about mass*, so colour and
+  opacity stay on plain `ease` and anything that MOVES takes one of the four.
+  Measured after: **0 un-named curves**, 7 un-named durations at or under .55s
+  (a touch press, two delays, a linear knob, the picker's stagger), and 13
+  story beats over .55s listed separately and deliberately left.
+- **The journal and the pause card are dealt**, on `mGlide`, each keeping its
+  own rotation. They were the two most-opened cards in the game and the only
+  two with no entrance at all.
+- **The pen moves.** The tick is a stroked path on `pathLength=1`, measured
+  1px → 0.559 → 0 through a tick landing; the strike is a clip inset, 90 ms
+  behind it, at constant weight on any row width, anchored half a line down so
+  it strikes the first line rather than the gap between two.
+- **Nine glyphs, one dialect.** `chev` (four rotations: `▸ ▾ ← →` and every
+  arrow keycap), `clock`, `speaker` + crossed, and the six verbs that were
+  words in circles. Measured live: **0 Unicode used as a picture** in the HUD
+  and on the title card, 74 glyphs drawn, 0 stroked icons that are not the pen.
+- **`toast(text, kind)`** with `say` (the default — 140 of the call sites are a
+  sentence somebody would say), `note` and `last`. Stack capped at **3**, and
+  the ledger takes the last word: six toasts leave 3, opening the ledger leaves
+  0, two raised over it leave 0.
+- **Four UI sounds** from four existing synths — `pop`, `rustle`, `tick`,
+  `clink` — on one delegated listener, detents on a step rather than a pixel
+  (11 over a full sweep), gated on calm (0 played, 2 suppressed).
+- **The pause card keeps its native controls** and loses the Material speaker
+  and the platform's `accent-color` checkbox.
+- **The boot card is the title card's paper**, with the ornament breathing
+  where the spinner was — and `p7-tokens` reads `index.html` now so the
+  hand-copied recipe cannot drift: 2 radii, 5 type sizes, 2 shadows, 0 colours
+  that are not the card's.
+- **The masthead is cut**: fifteen letters on a 2.6-stem grid, 65 shapes, 0
+  strokes, still an `<h1>` with the words in it.
+
+**Four things this batch found rather than fixed.**
+
+1. **`vector-effect:non-scaling-stroke` moves the dash pattern into screen
+   units and bypasses `pathLength`.** `stroke-dasharray:1` then means one
+   PIXEL, and every unticked task in the chapter was wearing a dotted line. It
+   measured clean — `getComputedStyle(...).strokeDashoffset` is the DECLARED
+   value and says `1px` whatever the renderer did with it — and the
+   phone-width screenshot is what caught it.
+2. **`getComputedStyle` on the frame a class lands returns the OLD value.** The
+   entrance check read `dealt:false` on three cards that are all dealt.
+3. **`document.querySelector('button')` in a probe finds the boot card's *Try
+   again*, whose handler is `location.reload()`.** The run died on "Execution
+   context was destroyed" three sections later and it read as a harness fault.
+   Scope every selector to `#hud`.
+4. **The title card is torn out of the DOM when the game starts**, so anything
+   measured about the masthead or its footer must be measured before the first
+   chapter key.
+
+**Known and left:** the seven un-named short durations above are each a
+measured one-off and are reported rather than snapped; and the strike crosses
+the FIRST line of a wrapped row rather than every line, which is a strict
+improvement on a bar that used to land in the gap between two but is not the
+same as one strike per line box.
+
+
 ---
 
 ## The shelf — sized, not scheduled
 
-**D6 — the frame** (area 6, ~12 h across two sessions). The boot card in the
-paper recipe with the ornament breathing where the spinner is; four named
-curves and three durations beside the radii, and the journal and pause cards
-dealt like the done card; the tick and the strike as stroked SVG paths
-(`pathLength=1`, dashoffset 1→0); four UI sounds from synths that exist,
-gated on calm; `toast(text, kind)` with `say` / `note` / `last`, the stack
-capped at 3 and suppressed under the ledger; the pause card re-skinned around
-its native inputs; one nine-glyph sheet in the marks' dialect replacing the
-Unicode and the six words in circles; the SVG masthead. Then, on its own: the
-diegetic exit board where `way` points, the departures card opening *from*
-it. `qa/p7-tokens.cjs` grows a motion column and reads `index.html`.
+**D6 — the frame, second session** (area 6, ~5 h). The nine items of the
+first session landed on 3 Sep 2026; see the batch above. What is left is the
+one thing in area 6 that is not on the paper at all: the **diegetic exit
+board** where `way` points — the Kyoto machiya already builds real signboards
+and leaves them blank — with the departures card opening *from* it rather
+than over it. Nineteen chapters of world building and one camera move.
 
 **D7 — world life, the systems** (area 3, ~15 h). `hung` in `props.js` — a
 single-bone damped pendulum on a fixed anchor, driven by `gust()` at rest and

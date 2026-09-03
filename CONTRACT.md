@@ -3071,6 +3071,286 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE FRAME — D6, FIRST HALF (3 Sep 2026)
+
+Area 6 of `ROADMAP-DELIGHT.md`, whose sentence is *the paper is right; the
+marks on it, the controls in it and the silence around it are not yet the same
+product.* Instruments: `qa/d6-frame.js` and `qa/p7-tokens.cjs`, which now
+counts motion and reads `index.html` as well.
+
+The batch was sized at two sessions and this is the first of them. The second
+is named at the bottom.
+
+### Motion is a token now, and a curve is a claim about mass
+
+Counted before this existed: **thirteen distinct `cubic-bezier`s across
+eighteen uses** — five of them overshoots differing in the second control point
+by a tenth (`.2,1.3,.4,1` / `.2,1.5,.35,1` / `.2,1.5,.4,1` / `.2,1.7,.4,1` /
+`.2,1.8,.35,1`), which nobody alive can tell apart on a 400 ms transform — and
+**thirty-seven distinct durations across a hundred and two uses**. It is the
+same accumulation the radii had before P7, in the axis that is hardest to look
+at directly, and it is why two things that ought to feel related never quite
+did.
+
+Four curves, and each is a different physical claim:
+
+| token | curve | what it means |
+|---|---|---|
+| `mSnap` | `.2,.9,.3,1` | it responds — a hover, a press, a fold |
+| `mGlide` | `.16,1,.3,1` | it arrives under its own weight — a sheet |
+| `mSpring` | `.2,1.5,.4,1` | it lands and settles — a tick, a stamp, a pill |
+| `mHold` | `.4,0,.3,1` | it starts AND stops — a height, a crossfade |
+
+...and three durations — `dFast` .16s, `dMed` .3s, `dSlow` .5s — which are the
+three the sheet was already using most (16, 11 and 6 uses).
+
+**And the rule that decides what gets one, because "tokenise the motion"
+applied literally would have rewritten every fade in the file: A CURVE IS A
+CLAIM ABOUT MASS.** Colour and opacity have none — a thing fading has no
+weight, no overshoot and nothing to settle — so they stay on plain `ease`.
+Anything that MOVES (transform, height, width) takes one of the four.
+
+Measured after (`qa/p7-tokens.cjs`): **zero un-named curves**, and seven
+un-named durations at or under .55s — a touch press at .09s, two 140 ms
+delays, the knob's .12s linear follow, the picker's 34 ms/120 ms stagger.
+Thirteen more over .55s are listed separately and deliberately left: the
+title's .75s, the glow's 1.1s crossfade and the ornament's five-second breath
+were each measured against a specific moment, and rounding them to a scale
+would undo that work to make a number smaller. That is the type scale's own
+argument, applied one axis over.
+
+### The two most-opened cards had no entrance at all
+
+The journal and the pause card: the veil behind them faded and the paper was
+simply already there, at full size, in the middle of it — while the souvenir
+card, the moment card, the done card, the ledger and every tile of the picker
+are dealt. Both are dealt now, on `mGlide` over `dSlow`, each keeping its own
+rotation (they tilt opposite ways, because two sheets on a table do not lie
+parallel).
+
+Measured as the computed transform of the card with its parent closed and then
+open: **different in all three rows**, the done card included as the control.
+
+### The pen moves — 231 tasks, and it never had
+
+The mark that says a task is done was `content:"\2713"` scaled from zero — a
+Unicode tick, in whatever face the platform has, popping into existence at full
+size — with a `<div>` bar growing sideways through the words. Both APPEARED.
+Nothing was ever drawn.
+
+The tick is a stroked SVG path on `pathLength="1"`, which is the attribute that
+makes this cheap: it renormalises the path's own arc length to 1 whatever its
+real geometry is, so `stroke-dasharray:1` is one dash covering the whole path
+and `stroke-dashoffset` animating 1 → 0 draws it end to end at an even speed.
+Measured through a tick landing: **1px → 0.559px → 0px**. It overshoots its box
+top-right on purpose — a tick made inside the lines is a checkbox.
+
+**A stroke, in a game whose aesthetic law forbids outlines, and it is not an
+exception.** The law is about SILHOUETTES: a drawn edge round a thing is a lie
+about a shape. This is a pen mark. A tick IS a stroke; there is no
+filled-polygon version of somebody crossing something off, and the marks'
+dialect is filled precisely because it is drawing OBJECTS.
+
+**The strike could not use the same mechanism, and finding out cost a
+screenshot.** Its box is stretched to the row's width
+(`preserveAspectRatio="none"`), so without `vector-effect:non-scaling-stroke` a
+long task is crossed out with a fatter pen than a short one — and
+`non-scaling-stroke` moves the DASH PATTERN into screen units too.
+`stroke-dasharray:1` then means one PIXEL, `pathLength` normalisation is
+bypassed entirely, and **every unticked task in the chapter was wearing a 1 px
+dotted line**. It measured clean, because the probe was reading
+`getComputedStyle(...).strokeDashoffset` — the DECLARED value, which says
+`1px` whatever the renderer did with it. The phone-width screenshot is what
+caught it. The strike is revealed by a clip inset from the right instead: a pen
+moving left to right at a constant weight, at any row width, 90 ms behind the
+tick, which is the order a hand does it in and the only reason the two read as
+one gesture.
+
+...and the strike is anchored **half a line down from the top of the wrapper**
+rather than at 52 % of it. A task row wraps to two lines on a phone, and the
+bar this replaces was at `top:52%` of a box that is then two lines tall, which
+put it in the GAP BETWEEN them, striking nothing at all. Verified across 232
+rows: **no row that is not done carries a mark.**
+
+### One dialect, not four
+
+The HUD spoke in four picture languages at once: the marks (nineteen postcards
+and nineteen souvenirs — flat filled polygons, no strokes); a stroked Material
+speaker on the pause card; Unicode `✓ ▸ ▾ ← ◷ ▲ → ↑ ↓ ✔ ·`; and the touch fan,
+which was **six words in circles** — a phone player's entire vocabulary of
+verbs set in tracked-out capitals, which is what a lift button looks like and
+is the one part of this game that could be any game.
+
+**Nine glyphs** (`sysGLYPHS`), in dialect one, cover all of it:
+
+- **chev** — a solid triangle. It is `▸`, and rotated it is `▾ ← →` and every
+  arrow keycap in the legend: one shape, four jobs, which is what having a
+  dialect means.
+- **clock** — the mark on a task that is timed.
+- **speaker** and its crossed variant — the pause card's three faders.
+- **wheek · grab · hop · slide · stuck · menu** — the six words in circles.
+  Every one keeps its word as an `aria-label`, because a picture is a
+  decoration to a screen reader and these are the only controls a thumb has.
+
+Two fills and no more: everything is `currentColor`, so a glyph is ink on
+paper, accent on a hover and paper on the one button that inverts. Shapes
+marked `o` take the background (`--capyui-gbg`) instead, which is how a solid
+disc gets a clock's hands cut out of it without a stroke, a mask or a second
+path.
+
+Measured live: **0 Unicode used as a picture** in the HUD and 0 on the title
+card, **74 glyphs drawn**, and **0 stroked icons** that are not the pen.
+
+The last two were in a TOAST — a middle dot on a find and a heavy check on a
+tick — which is why the DOM sweep never saw them: a pill is up for two seconds
+and the sweep runs after. They are words now (`found · …`, `ticked · …`),
+because a `note` pill already reads as the game talking about itself and what
+it was missing was WHICH of the two things had happened.
+
+### One pill, six meanings — and now three
+
+`.capyui-toast` carried a task tick, a find, a door line, a control hint, an
+autosave notice and the last three sentences of the game, all in the same bold
+paper pill. The tell is `qa/p7-ledger.png`: **four pills stacked over the
+ledger**, which is the card that is supposed to be the last word.
+
+- **say** — a line in the game's voice. Italic, reading size. It is the
+  DEFAULT, because about a hundred and forty of the call sites in this
+  repository are a sentence somebody would say.
+- **note** — a label the game is showing you about itself. Tracked caps,
+  quieter, smaller; the seventeen calls in `systems.js` pass it explicitly.
+- **last** — the closing sentences. A `say` that is HELD (5.2s against 2.6),
+  and it arrives alone: it clears the stack, because the end of an eight-hour
+  game should not be read over the top of an autosave notice.
+
+The split is the one the card recipe already draws everywhere else — see
+`.capyui-donenote`, *"the only thing on this card that is a SENTENCE rather
+than a label"*.
+
+The stack is **three**, not five. And nothing speaks over the ledger: a toast
+raised while it is up is dropped, and the ones already up are pushed out the
+way their own timers would have. Measured: six toasts in one turn leave **3**;
+opening the ledger leaves **0**; two raised over it leave **0**.
+
+### The frame was silent
+
+Measured before: **zero UI sound** in the whole HUD. No tile press, no card
+opening, no detent on a fader, no note under a focus move — while the world
+behind it has ninety-odd voices.
+
+Four sounds, four synths, and not one new one, because P4's lesson is that one
+chime doing seven jobs is the same failure as one pill carrying six meanings:
+
+| | synth | when |
+|---|---|---|
+| press | `pop` | a fingertip on paper — a tile, a button, a row |
+| open | `rustle` | a sheet being dealt — a card arriving, and only that |
+| detent | `tick` | a fader crossing a mark |
+| focus | `clink` | a pen touching down — keyboard and pad only |
+
+One delegated `click` listener on the HUD root rather than sixty bindings, so a
+keyboard player and a pad player get the same sound as a thumb without a second
+code path; the touch fan is divs with a captured pointer and is wired at its
+own `pointerdown`. The focus sound asks `:focus-visible` rather than tracking
+the last input device by hand, so a mouse click does not make two noises.
+
+**On a STEP, not on a pixel:** the range fires for every unit of a hundred, so
+a sound per event is a hundred clicks across one drag. Every tenth is ten marks
+across the travel, which is what a detent is. Measured over a full sweep:
+**11**.
+
+Gated on calm, with everything else this HUD freezes. Measured: **0 sounds
+under calm, 2 suppressed** — a counter that ticks `muted` rather than simply
+not ticking, so a gate that is silently doing nothing does not read the same as
+one that is working.
+
+### The pause card keeps its native controls and loses somebody else's skin
+
+The speaker was four 1.9 px stroked paths — a Material icon, character for
+character — on hand-drawn cream paper. It is two glyphs now, filled, and the
+class swap that shows the crossed one is the swap the arcs already used.
+
+The calm switch was a real `<input type=checkbox>` wearing `accent-color`,
+which paints the PLATFORM's box: a system-blue rounded square with the
+operating system's own tick in it, four millimetres from three faders that had
+already been re-skinned. It is still a real checkbox — keyboard operable,
+announced, label-wrapped so the whole row is a hit target — and it now wears
+the same square, the same 1.6 px ink rule, the same corner and the same
+two-degree tilt as the task list's tick boxes, with the same drawn pen inside
+it. The pause card and the to-do list agree about what a checked box looks
+like, which they never have.
+
+### The boot card is the same piece of paper
+
+It was a self-contained mini design system with its own colours, its own type
+scale and a rotating ring spinner — and on a slow connection it is the ONLY
+screen a player sees. It is the title card's recipe now: the paper, the rake of
+light, the laid texture, the three shadows, the second sheet behind it, the
+subtitle in the accent, and the masthead device breathing where the spinner
+was. A rotating ring is the one shape in this product that says *framework*.
+
+**Hand-copied, and that is the point rather than an apology.** This markup runs
+before `main.js`, before the import map resolves, before a single module is
+fetched: nothing in `src/` can reach it, and a boot screen that depends on the
+thing it is waiting for is not a boot screen. `qa/p7-tokens.cjs` reads
+`index.html` now so the copy cannot drift silently — measured: **2 radii, 5
+type sizes, 2 shadows, 0 colours that are not the card's.**
+
+### The masthead is cut, not set
+
+Nineteen jobs in this HUD are done by one system face at 400 and 700, including
+the biggest piece of type in the product. A vendored face is a licence decision
+before it is a design one and is on the owner's list, so the masthead is CUT:
+fifteen letters on a grid, every stem 2.6 wide, every cap from y=2 to y=14,
+every bar 2.6 deep, and the curves not drawn at all — a C is three bars, a D is
+a chamfered bowl, a G is a C with a shelf. **65 shapes, 0 strokes**, a viewBox
+of 255.2 × 16 sized by width alone.
+
+Set in caps, which is a decision rather than a shortcut: lower case needs a
+second set of proportions, three overshoot curves and a descender depth, none
+of which this grid has.
+
+**And the D was an O until it was photographed.** Cut the way every other
+letter is — a stem, a top bar, a bottom bar and a right stem — it is a
+rectangle with a rectangular hole in it. At 46 px the masthead read UNTITLEO.
+It is one chamfered polygon now, and it is the only letter in the set that
+needed anything but bars.
+
+It stays an `<h1>` and it keeps the words: the mark is `aria-hidden` and the
+heading carries a clipped copy of the title, so the document still has a
+level-one heading with the game's name in it. A wordmark that costs a page its
+`<h1>` is a picture where a heading was.
+
+### Three ways a probe of a user interface lies to you
+
+All three cost a run and all three are now written into `qa/d6-frame.js`.
+
+1. **`getComputedStyle` on the frame a class lands returns the OLD value.** The
+   entrance check toggled `.show` and read the transform in the same turn, and
+   reported `dealt:false` on three cards that are all dealt.
+2. **`document.querySelector('button')` finds the boot card's *Try again*,**
+   whose click handler is `location.reload()`. The run died on "Execution
+   context was destroyed" three sections later and it looked like a harness
+   fault. It was the probe pressing reload. Scope every selector to `#hud`.
+3. **The title card is torn out of the DOM when the game starts.** Anything
+   measured about the masthead or its footer has to be measured before the
+   first chapter key, or the probe reports a wordmark that is not there against
+   one that is.
+
+...and a fourth that is not about probes: **`uiSfx` calls the closure-local
+`sfx()`**, so a probe that wraps `game.sfx` sees none of the four UI voices and
+reports a silent frame against a frame that is not silent. `game.hud.uiSfxAudit()`
+is the counter it needs.
+
+### What is left: D6's second half
+
+The **diegetic exit board**, where `way` points, and the departures card
+opening *from* it — the one element in area 6 that is not on the paper at all.
+It is unstarted and it stays on the shelf in `ROADMAP-DELIGHT.md`, sized as it
+always was: nothing in this section touches the world, and that item is a
+nineteen-chapter world-building job with a camera move on the end of it.
+
+
 ## THE WATER'S EDGE — D5 (3 Sep 2026)
 
 Area 5 of `ROADMAP-DELIGHT.md`, whose opening number is `grep -c foam`: Manly

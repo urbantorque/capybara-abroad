@@ -4070,10 +4070,27 @@ function sysTitleFoot(rows, note, touchNote) {
     if (touchNote) el.appendChild(sysEl('span', 'capyui-footnote', touchNote));
     return el;
   }
+  // ---- AN ARROW KEY IS THE ONE CAP WHOSE LABEL IS A SHAPE (D6) --------
+  // Four of the caps in this rail are `← → ↑ ↓`, which is a
+  // picture of a key drawn in whatever face the platform happens to have —
+  // and the last Unicode-as-picture in the HUD. The chevron glyph does the
+  // same job in the sheet's own dialect, at four rotations, and the cap
+  // keeps the character as its aria-label so a screen reader still says
+  // 'right arrow' rather than nothing at all.
+  const ARROWS = { '→': '', '↓': 'd', '←': 'l', '↑': 'u' };
   for (let i = 0; i < rows.length; i++) {
     const s = sysEl('span');
     const caps = rows[i][0];
-    for (let k = 0; k < caps.length; k++) s.appendChild(sysEl('kbd', null, caps[k]));
+    for (let k = 0; k < caps.length; k++) {
+      const rot = ARROWS[caps[k]];
+      if (rot === undefined) { s.appendChild(sysEl('kbd', null, caps[k])); continue; }
+      const cap = sysEl('kbd');
+      cap.appendChild(sysGlyphEl('chev', rot));
+      cap.setAttribute('aria-label', caps[k] === '→' ? 'right arrow'
+        : caps[k] === '←' ? 'left arrow'
+        : caps[k] === '↑' ? 'up arrow' : 'down arrow');
+      s.appendChild(cap);
+    }
     s.appendChild(document.createTextNode(rows[i][1]));
     el.appendChild(s);
   }
@@ -4670,6 +4687,363 @@ function sysBuildCapyMark() {
   return sysDrawShapes(sysCAPY_MARK, sysCAPY_VB, 'xMidYMid meet');
 }
 
+
+// ---------------------------------------------------------------------------
+// THE GLYPH SHEET — ONE ICONOGRAPHIC DIALECT, NOT THREE (D6)
+//
+// MEASURED before this existed, the HUD spoke in three different picture
+// languages at once:
+//
+//   1. the marks     — the nineteen postcards and the nineteen souvenirs:
+//                      flat filled polygons in PALETTE, hand-cut, no strokes,
+//                      no curves that are not a circle. This is the game.
+//   2. a UI kit      — the pause card's speaker, which is a 1.9 px stroked
+//                      Material icon with two arcs on it, on cream paper, in
+//                      a game whose entire aesthetic law forbids an outline.
+//   3. Unicode       — `◷ ▸ ▾ ✓ ←`, which are whatever face the platform
+//                      happens to have and are a different weight, a
+//                      different colour temperature and a different century
+//                      from everything around them.
+//
+// ...and a fourth, which is that the touch fan is SIX WORDS IN CIRCLES. A
+// phone player's whole vocabulary of verbs is set in tracked-out capitals,
+// which is what a lift button looks like and is the one part of this game
+// that could be any game.
+//
+// NINE GLYPHS, in dialect 1, and they cover all of it:
+//
+//   chev    a solid triangle. It is `▸`, and rotated it is `▾ ← →` and every
+//           arrow keycap in the legend — one shape, four jobs, which is what
+//           having a dialect MEANS.
+//   clock   `◷`, the mark on a task that is timed.
+//   speaker the pause card's three faders, and its own crossed variant.
+//   wheek · grab · hop · slide · stuck · menu   the six words in circles.
+//
+// TWO FILLS AND NO MORE. Everything is `currentColor`, so a glyph is ink on
+// paper, accent on a hover and paper on the one button that inverts — the
+// same trick the drawn speaker already used and the reason it was the only
+// part of the old sheet worth keeping. Shapes marked `o` take the BACKGROUND
+// instead (`--capyui-gbg`), which is how a solid disc gets a clock's hands cut
+// out of it without a stroke, a mask or a second path.
+// ---------------------------------------------------------------------------
+const sysGLYPH_VB = '0 0 24 24';
+const sysGLYPHS = {
+  /* `▸`. Rotated by CSS for `▾ ← →`; see .capyui-g.d/.l/.u. */
+  chev: [['p', '8.5,4 18,12 8.5,20']],
+  /* a stopwatch. The crown, the disc, and two hands cut back out of it. */
+  clock: [
+    ['r', 9.8, 2.0, 4.4, 2.2],
+    ['r', 11.0, 3.8, 2.0, 2.2],
+    ['c', 12, 13.6, 8.2],
+    ['r', 11.2, 7.8, 1.6, 6.2, 'o'],
+    ['r', 12.0, 12.8, 4.8, 1.6, 'o'],
+  ],
+  /* the box, the cone, and two solid arcs. No stroke anywhere. */
+  speaker: [
+    ['r', 2.6, 9.4, 4.4, 5.2],
+    ['p', '7,9.4 12,5.2 12,18.8 7,14.6'],
+    ['p', '14.2,9.0 16.6,12 14.2,15.0 15.5,16.0 18.9,12 15.5,8.0'],
+    ['p', '17.6,6.6 21.2,12 17.6,17.4 18.9,18.4 22.9,12 18.9,5.6'],
+  ],
+  /* ...and the same box and cone with the arcs struck out. */
+  speakerOff: [
+    ['r', 2.6, 9.4, 4.4, 5.2],
+    ['p', '7,9.4 12,5.2 12,18.8 7,14.6'],
+    ['p', '15.0,8.7 16.2,7.5 22.0,13.3 20.8,14.5'],
+    ['p', '20.8,7.5 22.0,8.7 16.2,14.5 15.0,13.3'],
+  ],
+  /* WHEEK. The animal itself, shouting — head, muzzle, one ear, and the
+     noise coming off it. It is four shapes out of sysCAPY_MARK's eleven. */
+  wheek: [
+    ['c', 8.4, 13.6, 5.8],
+    ['e', 13.4, 14.0, 3.0, 2.3],
+    ['c', 6.0, 8.4, 2.1],
+    ['p', '15.6,7.2 18.0,4.6 19.4,5.9 17.0,8.5'],
+    ['p', '17.4,10.4 21.0,9.4 21.5,11.2 17.9,12.2'],
+  ],
+  /* GRAB. A bite: two jaws and the thing between them. */
+  grab: [
+    ['p', '2.5,4.5 21.5,4.5 21.5,8.6 12,10.2 2.5,8.6'],
+    ['p', '2.5,19.5 21.5,19.5 21.5,15.4 12,13.8 2.5,15.4'],
+    ['r', 10.4, 10.8, 3.2, 2.4],
+  ],
+  /* HOP. Three steps of a trajectory over the ground it left. */
+  hop: [
+    ['c', 4.2, 15.6, 1.9],
+    ['c', 12.0, 7.4, 2.1],
+    ['c', 19.8, 15.6, 1.9],
+    ['r', 1.6, 19.6, 20.8, 2.2],
+  ],
+  /* SLIDE. A slope, and three bars of speed coming down it. */
+  slide: [
+    ['p', '1.6,21 22.4,21 22.4,7.4'],
+    ['r', 1.6, 4.0, 8.4, 1.7],
+    ['r', 3.6, 7.6, 8.4, 1.7],
+    ['r', 5.6, 11.2, 8.4, 1.7],
+  ],
+  /* STUCK. Lifted back out, and put down on something solid. */
+  stuck: [
+    ['p', '12,2.4 18.6,10.2 5.4,10.2'],
+    ['r', 9.9, 9.6, 4.2, 7.0],
+    ['r', 2.6, 18.6, 18.8, 2.6],
+  ],
+  /* MENU. Three rules, which is the one icon in the world nobody has to be
+     taught, and the only reason it is in the sheet at all. */
+  menu: [
+    ['r', 3.4, 5.2, 17.2, 2.6],
+    ['r', 3.4, 10.7, 17.2, 2.6],
+    ['r', 3.4, 16.2, 17.2, 2.6],
+  ],
+};
+/**
+ * One glyph as an <svg>, in the current ink.
+ *
+ * Not sysDrawShapes: that one looks a PALETTE key up per shape, which is
+ * exactly right for a postcard (nineteen hand-picked colours) and exactly
+ * wrong for a mark that has to be ink on paper here, accent on a hover there
+ * and paper on the button that inverts. A glyph has no colours of its own.
+ */
+function sysBuildGlyph(name) {
+  const def = sysGLYPHS[name];
+  if (!def) return null;
+  const svg = document.createElementNS(sysMARK_NS, 'svg');
+  svg.setAttribute('viewBox', sysGLYPH_VB);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  for (let i = 0; i < def.length; i++) {
+    const sh = def[i];
+    let n;
+    if (sh[0] === 'r') {
+      n = document.createElementNS(sysMARK_NS, 'rect');
+      n.setAttribute('x', sh[1]); n.setAttribute('y', sh[2]);
+      n.setAttribute('width', sh[3]); n.setAttribute('height', sh[4]);
+    } else if (sh[0] === 'c') {
+      n = document.createElementNS(sysMARK_NS, 'circle');
+      n.setAttribute('cx', sh[1]); n.setAttribute('cy', sh[2]); n.setAttribute('r', sh[3]);
+    } else if (sh[0] === 'e') {
+      n = document.createElementNS(sysMARK_NS, 'ellipse');
+      n.setAttribute('cx', sh[1]); n.setAttribute('cy', sh[2]);
+      n.setAttribute('rx', sh[3]); n.setAttribute('ry', sh[4]);
+    } else {
+      n = document.createElementNS(sysMARK_NS, 'polygon');
+      n.setAttribute('points', sh[1]);
+    }
+    n.setAttribute('fill', sh[sh.length - 1] === 'o'
+      ? 'var(--capyui-gbg,#faf6ec)' : 'currentColor');
+    svg.appendChild(n);
+  }
+  return svg;
+}
+/**
+ * A glyph wrapped in the inline box the sheet styles: `<i class="capyui-g …">`.
+ * `mod` is the rotation class for the chevron (`d` down, `l` left, `u` up) or
+ * a size class; everything else about it comes off the CSS.
+ */
+function sysGlyphEl(name, mod) {
+  const i = document.createElement('i');
+  i.className = 'capyui-g' + (mod ? ' ' + mod : '');
+  const g = sysBuildGlyph(name);
+  if (g) i.appendChild(g);
+  return i;
+}
+
+// ---------------------------------------------------------------------------
+// THE PEN — THE ONE MARK THIS GAME MAKES TWO HUNDRED AND THIRTY-ONE TIMES (D6)
+//
+// `pathLength="1"` is the whole trick and it is worth stating once. It tells
+// the renderer to pretend the path is one unit long WHATEVER its real
+// geometry is, so `stroke-dasharray:1` is exactly one dash covering the whole
+// path and `stroke-dashoffset` animating 1 -> 0 draws it end to end at an even
+// speed. Without it a tick 14 units long and a strike 96 units long drawn with
+// the same keyframes would move at seven times the speed, and the strike would
+// draw at a different speed on every task in the game because every task is a
+// different number of words wide.
+//
+// A STROKE, in a game whose aesthetic law forbids outlines. It is the one
+// exception and it is not one: the law is about SILHOUETTES — a drawn edge
+// round a thing is a lie about a shape — and this is a pen mark. A tick IS a
+// stroke; there is no filled-polygon version of somebody crossing something
+// off, and the marks' dialect is filled precisely because it is drawing
+// OBJECTS. See the header of sysGLYPHS for the other side of the same rule.
+// ---------------------------------------------------------------------------
+function sysPenPath(d, w) {
+  const n = document.createElementNS(sysMARK_NS, 'path');
+  n.setAttribute('d', d);
+  n.setAttribute('pathLength', '1');
+  n.setAttribute('fill', 'none');
+  n.setAttribute('stroke', 'currentColor');
+  n.setAttribute('stroke-width', String(w));
+  n.setAttribute('stroke-linecap', 'round');
+  n.setAttribute('stroke-linejoin', 'round');
+  return n;
+}
+/** The tick box: the square, and the tick waiting inside it undrawn. */
+function sysMarkBox() {
+  const box = document.createElement('span');
+  box.className = 'capyui-box';
+  const svg = document.createElementNS(sysMARK_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  // Overshooting the box on purpose, top right: a tick made inside the lines
+  // is a checkbox and a tick made by a hand is not.
+  svg.appendChild(sysPenPath('M4.5 12.6 L10 18.4 L20.5 3.6', 3.4));
+  box.appendChild(svg);
+  return box;
+}
+/** The strike, stretched over the words. */
+function sysMarkStrike() {
+  const svg = document.createElementNS(sysMARK_NS, 'svg');
+  svg.setAttribute('class', 'capyui-strike');
+  svg.setAttribute('viewBox', '0 0 96 8');
+  // NOT `none`, and this is the one that would have been silently wrong:
+  // stretching a 96x8 box across an eleven-word row would scale the stroke
+  // WIDTH with it, so a long task would be crossed out with a fatter pen than
+  // a short one. Nothing preserved and vector-effect on the stroke is the
+  // combination that keeps the line the same weight at every row width.
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  // Not a straight line. A ruled bar is a strikethrough in a word processor;
+  // a hand drawing through a line of text starts a little low, rises, and
+  // runs off the end.
+  const p = sysPenPath('M1 5.6 C 24 3.4, 62 5.2, 95 2.6', 1.9);
+  // ---- AND THE STRIKE IS REVEALED BY A CLIP, NOT BY THE DASH ----------
+  // The tick is drawn with `stroke-dashoffset` on a pathLength=1 path and
+  // that is the right mechanism for it. The strike CANNOT use it, and the
+  // reason took a screenshot to find: this box is stretched to the row's
+  // width (preserveAspectRatio=none), so the stroke would get fatter on a
+  // long task than on a short one — hence non-scaling-stroke — and
+  // `vector-effect:non-scaling-stroke` moves the DASH PATTERN into screen
+  // units as well. `stroke-dasharray:1` then means one PIXEL, pathLength
+  // normalisation is bypassed entirely, and every unticked task in the
+  // chapter was wearing a 1px dotted line. It measured clean — the probe
+  // was reading `getComputedStyle(...).strokeDashoffset`, which is the
+  // DECLARED value and says '1px' whatever the renderer did with it — and
+  // it took the phone-width screenshot to see it.
+  //
+  // A clip inset from the right does the same job with none of that: it is
+  // a pen moving left to right at a constant weight, at any row width.
+  p.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(p);
+  return svg;
+}
+
+// ---------------------------------------------------------------------------
+// THE MASTHEAD, CUT RATHER THAN SET (D6)
+//
+// Nineteen jobs in this HUD are done by ONE system face at 400 and 700 —
+// Trebuchet, or whatever the platform hands over instead — including the
+// biggest piece of type in the product, the three words on the front of the
+// card. That is a game with no typographic identity at all, and the fix is
+// not a webfont: a vendored face is a licence decision before it is a design
+// one, and it is on the owner's list rather than this one.
+//
+// So the masthead is CUT, in the same dialect as the nineteen postcards and
+// the nineteen souvenirs — filled polygons and rectangles, no strokes, no
+// curve that is not a circle — which is the one kind of lettering this game
+// can make that is unarguably its own. It costs no file, no request, no
+// licence and about sixty shapes.
+//
+// THE LETTERS ARE ON A GRID AND THAT IS THE WHOLE STYLE. Every stem is 2.6
+// wide, every cap runs from y=2 to y=14, every bar is 2.6 deep, and the
+// curves are not drawn — a C is three bars, a D is a rectangle, a G is a C
+// with a shelf. It is a stencil face, which is what you get when you cut
+// letters out of the same vocabulary the postcards are cut from, and it is
+// the reason it belongs next to the capybara underneath it.
+//
+// Set in CAPS, and that is a decision rather than a shortcut: lower case
+// needs a second set of proportions, three overshoot curves and a descender
+// depth, none of which this grid has, and a stencil lower case cut on a cap
+// grid reads as a mistake. A masthead in caps reads as a masthead.
+// ---------------------------------------------------------------------------
+const sysMARK_STEM = 2.6;
+const sysMARK_TRACK = 1.2;   // between letters
+const sysMARK_SPACE = 4.6;   // between words
+const sysMARK_H = 16;        // cap 2..14, with two units of air above and below
+/** [advance, ...shapes] — 'r' x y w h, 'p' points. */
+const sysLETTERS = {
+  U: [11.6, ['r', 1, 2, 2.6, 9.6], ['r', 7.4, 2, 2.6, 9.6], ['r', 1, 11.4, 9, 2.6]],
+  N: [11.6, ['r', 1, 2, 2.6, 12], ['r', 7.4, 2, 2.6, 12], ['p', '1,2 3.6,2 10,14 7.4,14']],
+  T: [11.6, ['r', 0.4, 2, 10.2, 2.6], ['r', 4.2, 2, 2.6, 12]],
+  I: [4.2, ['r', 0.6, 2, 2.6, 12]],
+  L: [10.4, ['r', 1, 2, 2.6, 12], ['r', 1, 11.4, 8.2, 2.6]],
+  E: [10.6, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 8.4, 2.6],
+      ['r', 1, 6.7, 7.2, 2.4], ['r', 1, 11.4, 8.4, 2.6]],
+  // D — AND IT WAS AN O UNTIL IT WAS PHOTOGRAPHED. Cut the way every other
+  // letter here is cut — a stem, a top bar, a bottom bar and a right stem —
+  // it is a rectangle with a rectangular hole in it, which is an O. At 46 px
+  // the masthead read UNTITLEO. The bowl is one chamfered polygon instead,
+  // which is what a stencil D actually is and which is the only letter in the
+  // set that needed anything but bars.
+  D: [12.6, ['r', 1, 2, 2.6, 12],
+      ['p', '3.6,2 9,2 11.4,4.4 11.4,11.6 9,14 3.6,14 3.6,11.4 8.2,11.4 ' +
+            '9,10.6 9,5.4 8.2,4.6 3.6,4.6']],
+  C: [11, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 8.6, 2.6], ['r', 1, 11.4, 8.6, 2.6]],
+  A: [11.8, ['p', '0.2,14 2.8,14 6.9,2 4.8,2'], ['p', '10.8,14 8.2,14 4.1,2 6.2,2'],
+      ['r', 2.7, 9.1, 5.6, 2.3]],
+  P: [10.6, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 7.6, 2.6],
+      ['r', 7, 2, 2.6, 6.6], ['r', 1, 6.2, 7.6, 2.4]],
+  Y: [11.8, ['p', '0.2,2 2.8,2 6.8,8.4 4.2,8.4'], ['p', '10.8,2 8.2,2 4.2,8.4 6.8,8.4'],
+      ['r', 4.2, 7.6, 2.6, 6.4]],
+  B: [10.6, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 7.2, 2.6], ['r', 1, 6.7, 7.2, 2.4],
+      ['r', 1, 11.4, 7.2, 2.6], ['r', 6.8, 2, 2.6, 7.1], ['r', 6.8, 6.7, 2.6, 7.3]],
+  R: [11.4, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 7.2, 2.6], ['r', 6.8, 2, 2.6, 6.7],
+      ['r', 1, 6.4, 7.2, 2.4], ['p', '5.4,8.4 8.2,8.4 10.6,14 7.8,14']],
+  G: [11, ['r', 1, 2, 2.6, 12], ['r', 1, 2, 8.6, 2.6], ['r', 1, 11.4, 8.6, 2.6],
+      ['r', 7, 7.4, 2.6, 6.6], ['r', 5, 7.4, 4.6, 2.3]],
+  M: [12.4, ['r', 0.6, 2, 2.6, 12], ['r', 8.4, 2, 2.6, 12],
+      ['p', '0.6,2 3.2,2 6.7,9.6 4.9,9.6'], ['p', '11,2 8.4,2 4.9,9.6 6.7,9.6']],
+};
+/**
+ * A word or three, cut. Returns an <svg> whose viewBox is exactly the mark's
+ * own extent, so the caller sizes it by WIDTH and the height follows — which
+ * is what a wordmark is and is why there is no font-size anywhere near it.
+ *
+ * Anything not in sysLETTERS is set as a word space, so a caller cannot get a
+ * hole in the middle of the masthead by asking for a letter nobody cut.
+ */
+function sysBuildWordmark(text) {
+  const svg = document.createElementNS(sysMARK_NS, 'svg');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  let x = 0;
+  const up = String(text).toUpperCase();
+  for (let i = 0; i < up.length; i++) {
+    const ch = up.charAt(i);
+    const def = sysLETTERS[ch];
+    if (!def) { x += sysMARK_SPACE + sysMARK_TRACK; continue; }
+    for (let k = 1; k < def.length; k++) {
+      const sh = def[k];
+      let n;
+      if (sh[0] === 'r') {
+        n = document.createElementNS(sysMARK_NS, 'rect');
+        n.setAttribute('x', (sh[1] + x).toFixed(2)); n.setAttribute('y', sh[2]);
+        n.setAttribute('width', sh[3]); n.setAttribute('height', sh[4]);
+      } else {
+        n = document.createElementNS(sysMARK_NS, 'polygon');
+        // The points are authored at the origin and moved here rather than
+        // being wrapped in a <g transform>: a translate per letter is twenty
+        // more nodes in the tree for arithmetic that is free at build time.
+        const pts = sh[1].split(' ');
+        for (let q = 0; q < pts.length; q++) {
+          const c = pts[q].split(',');
+          pts[q] = (parseFloat(c[0]) + x).toFixed(2) + ',' + c[1];
+        }
+        n.setAttribute('points', pts.join(' '));
+      }
+      n.setAttribute('fill', 'currentColor');
+      svg.appendChild(n);
+    }
+    x += def[0] + sysMARK_TRACK;
+  }
+  svg.setAttribute('viewBox', '0 0 ' + Math.max(1, x - sysMARK_TRACK).toFixed(2) +
+                              ' ' + sysMARK_H);
+  return svg;
+}
+
 /** One souvenir as an <svg>, or null for a chapter with none authored. */
 function sysBuildKeep(biome) {
   const def = sysKEEPS[biome];
@@ -5164,11 +5538,63 @@ function sysBuildCSS() {
   const tLg = 'clamp(13px,2.4vw,15px)';      // a lead line
   const tXl = 'clamp(17px,3.4vw,25px)';      // a card's name
   const tHu = 'clamp(24px,7.4vw,60px)';      // the title
+
+  // ---- AND THE ONE AXIS P7 DID NOT TOKENISE: MOTION (D6) -----------------
+  // Counted before this existed: THIRTEEN distinct cubic-beziers across
+  // eighteen uses and thirty-seven distinct durations across a hundred and
+  // two, in one HUD. Five of the thirteen were overshoots differing in the
+  // second control point by a tenth — .2,1.3,.4,1 / .2,1.5,.35,1 /
+  // .2,1.5,.4,1 / .2,1.7,.4,1 / .2,1.8,.35,1 — and nobody alive can tell
+  // those apart on a 400 ms transform. It is the same accumulation the radii
+  // had, in the axis that is hardest to look at directly, and it is why two
+  // things that ought to feel related never quite did.
+  //
+  // FOUR CURVES, and each of them is a different physical claim:
+  const mSnap  = 'cubic-bezier(.2,.9,.3,1)';    // it responds. a hover, a press, a fold
+  const mGlide = 'cubic-bezier(.16,1,.3,1)';    // it arrives under its own weight. a sheet
+  const mSpring= 'cubic-bezier(.2,1.5,.4,1)';   // it lands and settles. a tick, a stamp, a pill
+  const mHold  = 'cubic-bezier(.4,0,.3,1)';     // it starts AND stops. a height, a crossfade
+  // AND THE RULE THAT DECIDES WHICH THINGS GET ONE, because "tokenise the
+  // motion" applied literally would have rewritten every fade in the sheet:
+  //
+  //   A CURVE IS A CLAIM ABOUT MASS. Colour and opacity have none — a thing
+  //   fading has no weight, no overshoot and nothing to settle — so they stay
+  //   on plain `ease`, which is what they have always been and what they
+  //   should be. Anything that MOVES (transform, height, width) takes one of
+  //   the four, because that is where a curve is a statement about a physical
+  //   object and where two different beziers on two related elements is the
+  //   thing you can feel without being able to name.
+  // ...and three durations, which are the three the sheet was already using
+  // most (16 x .16s, 11 x .3s, 6 x .5s). The LONG ones are not snapped onto
+  // these and must not be, for the type scale's reason: the title's .75s, the
+  // glow's 1.1s crossfade and the ornament's five-second breath were each
+  // measured against a specific moment, and rounding them to a scale would
+  // undo that work to make a number smaller.
+  const dFast = '.16s';   // a colour, a hover, a press — under the eye's notice
+  const dMed  = '.3s';    // a fold, a fade, a small card
+  const dSlow = '.5s';    // a sheet arriving, a veil, the ledger
   const sand    = sysHex(PALETTE.sand);
 
   return [
 '.capyui *{box-sizing:border-box;}',
 '.capyui-font{font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;}',
+/* ---------- the glyph sheet (D6) ----------
+   An inline box that behaves like a letter: it sits on the text baseline, it
+   is sized in EM so it tracks whatever it is next to, and it takes its ink
+   from currentColor. Everything that used to be a Unicode character in this
+   HUD is one of these now — see sysGLYPHS. */
+'.capyui-g{display:inline-block;width:1em;height:1em;vertical-align:-.14em;',
+  'flex:0 0 auto;line-height:0;--capyui-gbg:' + paper + ';}',
+'.capyui-g svg{display:block;width:100%;height:100%;}',
+/* ONE SHAPE, FOUR DIRECTIONS. The chevron is authored pointing right and the
+   other three are the same glyph turned, which is why the sheet is nine and
+   not twelve. */
+'.capyui-g.d svg{transform:rotate(90deg);}',
+'.capyui-g.l svg{transform:rotate(180deg);}',
+'.capyui-g.u svg{transform:rotate(-90deg);}',
+/* A glyph standing on its own as a button's whole content wants to be bigger
+   than a letter and centred rather than on a baseline. */
+'.capyui-g.big{width:1.6em;height:1.6em;vertical-align:middle;}',
 /* ---------- prefers-reduced-motion ----------
    Everything in this HUD that moves is a transition or a keyframe on opacity
    and transform, and all of it is decoration: the paper stamping itself, the
@@ -5185,12 +5611,21 @@ function sysBuildCSS() {
 '.capyui-jr{position:absolute;inset:0;z-index:62;display:flex;align-items:center;',
   'justify-content:center;pointer-events:none;opacity:0;background:' + veil + ';',
   'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
-  'transition:opacity .28s ease;padding:14px;}',
+  'transition:opacity ' + dMed + ' ease;padding:14px;}',
 '.capyui-jr.show{opacity:1;pointer-events:auto;}',
 '.capyui-jrcard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
   'box-shadow:' + shLg + ';padding:clamp(16px,3vw,28px) clamp(18px,3.4vw,36px);',
-  'transform:rotate(-.5deg);max-width:660px;width:100%;max-height:92vh;overflow:auto;',
-  'overscroll-behavior:contain;}',
+  'max-width:660px;width:100%;max-height:92vh;overflow:auto;',
+  'overscroll-behavior:contain;',
+  /* ---- IT IS DEALT NOW, LIKE EVERY OTHER CARD IN THE GAME (D6) --------
+     The two most-opened cards in the HUD — the journal and the pause card —
+     were the only two with NO ENTRANCE AT ALL: the veil behind them faded
+     and the paper was simply already there, at full size, in the middle of
+     it. The souvenir card, the moment card, the done card, the ledger and
+     every tile of the picker are dealt; these two appeared. */
+  'transform:rotate(-.5deg) translateY(10px) scale(.985);opacity:0;',
+  'transition:opacity ' + dMed + ' ease,transform ' + dSlow + ' ' + mGlide + ';}',
+'.capyui-jr.show .capyui-jrcard{opacity:1;transform:rotate(-.5deg) translateY(0) scale(1);}',
 '.capyui-jrcard h2{font-size:clamp(15px,3vw,21px);color:' + ink + ';font-weight:700;letter-spacing:-.01em;}',
 '.capyui-jrsub{font-size:' + tMd + ';letter-spacing:.3em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;margin-top:3px;}',
@@ -5245,9 +5680,9 @@ function sysBuildCSS() {
    nobody presses it. It rotates on open, on transform alone. */
 '.capyui-jrkeys summary::-webkit-details-marker{display:none;}',
 '.capyui-jrkeys summary::marker{content:"";}',
-'.capyui-jrkeys summary:before{content:"\\25B8";display:inline-block;margin-right:7px;',
-  'transition:transform .18s ease;transform-origin:50% 50%;}',
-'.capyui-jrkeys[open] summary:before{transform:rotate(90deg);}',
+'.capyui-jrkeys summary .capyui-g{margin-right:7px;',
+  'transition:transform ' + dFast + ' ' + mSnap + ';transform-origin:50% 50%;}',
+'.capyui-jrkeys[open] summary .capyui-g{transform:rotate(90deg);}',
 '.capyui-jrkeys summary:hover{color:' + accent + ';}',
 /* a ring, not a colour: a colour change alone is not a focus state */
 '.capyui-jrkeys summary:focus-visible{color:' + accent + ';outline:2px solid ' + accent + ';',
@@ -5273,7 +5708,7 @@ function sysBuildCSS() {
   sysRgba(PALETTE.fog, 0.62) + ' 38%,' + sysRgba(PALETTE.skyBottom, 0.84) + ' 100%);',
   'overflow-y:auto;overscroll-behavior:contain;',
   'backdrop-filter:blur(5px) saturate(1.08);-webkit-backdrop-filter:blur(5px) saturate(1.08);',
-  'transition:opacity .75s ease,transform .75s ease;padding:18px;}',
+  'transition:opacity .75s ease,transform .75s ' + mGlide + ';padding:18px;}',
 '.capyui-title.gone{opacity:0;transform:scale(1.06);pointer-events:none;}',
 /* ---- THE PLACE YOU ARE LOOKING AT WARMS THE WHOLE SCREEN ----------------
    One soft wash behind the card, in the palette of whichever chapter the
@@ -5316,7 +5751,7 @@ function sysBuildCSS() {
   'position:relative;z-index:1;',
   'transform:rotate(-.8deg);max-width:880px;width:100%;text-align:center;',
   /* centred when it fits, scrolled from the top when it does not */
-  'margin:auto;transition:max-width .3s ease,transform .3s ease;}',
+  'margin:auto;transition:max-width ' + dMed + ' ' + mHold + ',transform ' + dMed + ' ' + mHold + ';}',
 /* THE PICKER IS NOT A NOTE PINNED TO A BOARD. Page one is a title card and the
    tilt is its signature; page two is a grid of seventeen rectangles, and a
    grid on the skew reads as a mistake rather than as charm. */
@@ -5341,9 +5776,19 @@ function sysBuildCSS() {
   'transform:rotate(1.25deg);box-shadow:' + shMd + ';}',
 '@media (max-width:520px){.capyui-card:not(.two):before{left:5px;right:-4px;',
   'transform:rotate(.9deg);}}',
-'.capyui-card h1{font-size:clamp(24px,6.2vw,46px);line-height:1.05;color:' + ink + ';',
-  'text-wrap:balance;',
-  'font-weight:700;letter-spacing:-.01em;}',
+/* ---- THE MASTHEAD (D6) ----------------------------------------------------
+   Sized by WIDTH and nothing else: a wordmark has an aspect and a font-size
+   is a claim about a face's own metrics, which this has none of. 78 % of the
+   card so it sits inside the margins the subtitle and the rule already use,
+   with a floor so it does not vanish on a phone in landscape. */
+'.capyui-mast{display:flex;justify-content:center;color:' + ink + ';}',
+'.capyui-mast svg{display:block;width:min(78%,560px);height:auto;}',
+/* The words themselves, for the document and for a screen reader. Clipped to
+   a pixel rather than display:none, which would take them out of the
+   accessibility tree along with the picture and leave the page with an <h1>
+   nobody can read. */
+'.capyui-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;',
+  'overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;}',
 '.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
   'text-transform:uppercase;color:' + accentInk + ';font-weight:700;}',
 /* ---------- the ornament ----------
@@ -5398,8 +5843,8 @@ function sysBuildCSS() {
   'font:inherit;font-size:' + tSm + ';font-weight:700;letter-spacing:.14em;',
   'text-transform:uppercase;cursor:pointer;pointer-events:auto;touch-action:manipulation;',
   'background:' + paper2 + ';border:1px solid ' + rule + ';color:' + inkSoft + ';',
-  'transition:color .16s ease,border-color .16s ease,transform .16s ease;}',
-'.capyui-more2:after{content:"  \\25BE";}',
+  'transition:color ' + dFast + ' ease,border-color ' + dFast + ' ease,transform ' + dFast + ' ' + mSnap + ';}',
+'.capyui-more2 .capyui-g{margin-left:5px;}',
 '.capyui-more2:hover{color:' + accent + ';border-color:' + accent + ';transform:translateY(1px);}',
 '.capyui-more2:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-more2[hidden]{display:none;}',
@@ -5413,7 +5858,7 @@ function sysBuildCSS() {
   'letter-spacing:.14em;text-transform:uppercase;color:' + inkSoft + ';background:none;',
   'border:1px solid transparent;border-radius:999px;padding:3px 12px 4px;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
-  'transition:color .16s ease,border-color .16s ease;}',
+  'transition:color ' + dFast + ' ease,border-color ' + dFast + ' ease;}',
 '.capyui-overbtn:hover{color:' + ink + ';border-color:' + rule + ';}',
 '.capyui-overbtn:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-overbtn[hidden]{display:none;}',
@@ -5424,7 +5869,7 @@ function sysBuildCSS() {
 '.capyui-overyes,.capyui-overno{font:inherit;font-size:' + tMd + ';font-weight:700;',
   'letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:5px 14px 6px;',
   'cursor:pointer;pointer-events:auto;touch-action:manipulation;',
-  'transition:transform .16s ease,border-color .16s ease,color .16s ease;}',
+  'transition:transform ' + dFast + ' ' + mSnap + ',border-color ' + dFast + ' ease,color ' + dFast + ' ease;}',
 '.capyui-overyes{background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';}',
 '.capyui-overyes:hover{color:' + ink + ';border-color:' + ink + ';}',
 /* KEEP IT is the filled one. The card should look like it wants you to say no. */
@@ -5523,9 +5968,9 @@ function sysBuildCSS() {
   'touch-action:manipulation;}',
 '.capyui-more summary::-webkit-details-marker{display:none;}',
 '.capyui-more summary::marker{content:"";}',
-'.capyui-more summary:before{content:"\\25B8";display:inline-block;margin-right:7px;',
-  'transition:transform .18s ease;}',
-'.capyui-more[open] summary:before{transform:rotate(90deg);}',
+'.capyui-more summary .capyui-g{margin-right:7px;',
+  'transition:transform ' + dFast + ' ' + mSnap + ';}',
+'.capyui-more[open] summary .capyui-g{transform:rotate(90deg);}',
 '.capyui-more summary:hover{color:' + accent + ';}',
 '.capyui-more summary:focus-visible{color:' + accent + ';outline:2px solid ' + accent + ';',
   'outline-offset:2px;}',
@@ -5547,8 +5992,8 @@ function sysBuildCSS() {
   'color:' + paper + ';font:inherit;cursor:pointer;pointer-events:auto;',
   'touch-action:manipulation;box-shadow:0 4px 14px ' + shadow2 + ',',
   '0 1px 0 ' + sysRgba(0xffffff, 0.32) + ' inset;',
-  'transition:transform .18s cubic-bezier(.21,.86,.32,1.18),box-shadow .18s ease,',
-  'filter .16s ease;}',
+  'transition:transform ' + dFast + ' ' + mSpring + ',box-shadow ' + dFast + ' ease,',
+  'filter ' + dFast + ' ease;}',
 '.capyui-go b{font-size:clamp(13px,2.7vw,17px);font-weight:700;letter-spacing:.01em;}',
 '.capyui-go i{font-style:normal;font-size:' + tMd + ';opacity:.82;',
   'letter-spacing:.08em;text-transform:uppercase;font-weight:700;}',
@@ -5569,8 +6014,8 @@ function sysBuildCSS() {
   'pointer-events:auto;touch-action:manipulation;',
   'background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';',
   'font-size:' + tMd + ';font-weight:700;letter-spacing:.12em;',
-  'text-transform:uppercase;transition:color .16s ease,border-color .16s ease;}',
-'.capyui-back:before{content:"\\2190";margin-right:7px;}',
+  'text-transform:uppercase;transition:color ' + dFast + ' ease,border-color ' + dFast + ' ease;}',
+'.capyui-back .capyui-g{margin-right:7px;}',
 '.capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
 '.capyui-back:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* The short-screen shelf budget USED TO LIVE HERE and did nothing at all: it
@@ -5671,7 +6116,7 @@ function sysBuildCSS() {
   'width:clamp(28px,4vw,38px);height:clamp(28px,4vw,38px);border-radius:50%;',
   'border:1px solid ' + rule + ';color:' + accent + ';',
   'font-size:clamp(13px,2.2vw,17px);font-weight:700;line-height:1;',
-  'transition:transform .2s ease,background .2s ease,border-color .2s ease,color .2s ease;}',
+  'transition:transform ' + dFast + ' ' + mSnap + ',background ' + dFast + ' ease,border-color ' + dFast + ' ease,color ' + dFast + ' ease;}',
 '.capyui-pick.hero:hover .capyui-pickarrow,.capyui-pick.hero:focus-visible .capyui-pickarrow{',
   'background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
   'transform:translateY(-50%) translateX(3px);}',
@@ -5698,8 +6143,8 @@ function sysBuildCSS() {
      that moves; the same three on a curve that overshoots by a hair is a tile
      that is PICKED UP. It is four numbers and it is the difference between a
      shelf that responds and a shelf that feels like paper. */
-  'transition:border-color .16s ease,transform .2s cubic-bezier(.21,.86,.32,1.18),',
-  'box-shadow .2s ease;}',
+  'transition:border-color ' + dFast + ' ease,transform ' + dFast + ' ' + mSpring + ',',
+  'box-shadow ' + dFast + ' ease;}',
 '.capyui-pick:hover,.capyui-pick:focus-visible{border-color:' + accent + ';',
   'transform:translateY(-4px);box-shadow:0 11px 24px ' + shadow2 + ',',
   '0 2px 5px ' + shadow + ';}',
@@ -5724,7 +6169,7 @@ function sysBuildCSS() {
 '.capyui-shot{position:absolute;inset:0;width:100%;height:100%;display:block;',
   'object-fit:cover;border-radius:inherit;}',
 '.capyui-pickart svg{display:block;width:100%;height:100%;',
-  'transition:transform .45s cubic-bezier(.16,1,.3,1);}',
+  'transition:transform ' + dSlow + ' ' + mSnap + ';}',
 '.capyui-pick:hover .capyui-pickart svg,.capyui-pick:focus-visible .capyui-pickart svg{',
   'transform:scale(1.065);}',
 /* ---- LIGHT IN THE POSTCARDS (v38) --------------------------------------
@@ -5783,7 +6228,7 @@ function sysBuildCSS() {
 '@media (prefers-reduced-motion: no-preference){',
   '.capyui-pick:hover:after,.capyui-pick:focus-visible:after{opacity:1;',
   'transform:translateX(330%) rotate(13deg);',
-  'transition:transform .66s cubic-bezier(.22,.61,.36,1),opacity .1s ease;}}',
+  'transition:transform .66s ' + mGlide + ',opacity .1s ease;}}',
 /* the key badge sits ON the scene, so the eye can still run straight down it */
 /* A PRINTED STUB, NOT A SYSTEM CHIP. Dark grey on every scene made seventeen
    identical blobs march down the left edge in a colour belonging to none of
@@ -5795,7 +6240,7 @@ function sysBuildCSS() {
   'border-radius:' + rMd + ';background:' + sysRgba(PALETTE.sail, 0.92) + ';',
   'border:1px solid ' + sysRgba(PALETTE.ibisHead, 0.22) + ';',
   'color:' + ink + ';font-weight:700;box-shadow:' + shSm + ';',
-  'transition:background .16s ease,color .16s ease,border-color .16s ease;',
+  'transition:background ' + dFast + ' ease,color ' + dFast + ' ease,border-color ' + dFast + ' ease;',
   'font-size:' + tMd + ';font-variant-numeric:tabular-nums;}',
 '.capyui-pick:hover .capyui-pickkey,.capyui-pick:focus-visible .capyui-pickkey{',
   'background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
@@ -5808,7 +6253,7 @@ function sysBuildCSS() {
 '.capyui-pickbar{position:absolute;left:0;right:0;bottom:0;height:4px;',
   'background:' + sysRgba(PALETTE.ibisHead, 0.14) + ';}',
 '.capyui-pickbar i{display:block;height:100%;background:' + accent + ';',
-  'border-radius:0 2px 2px 0;transition:width .3s ease;}',
+  'border-radius:0 2px 2px 0;transition:width ' + dMed + ' ' + mHold + ';}',
 '.capyui-pickbar.full i{background:' + tick + ';border-radius:0;}',
 '.capyui-pick.hero .capyui-pickbar{height:5px;}',
 '.capyui-pickbody{min-width:0;flex:1 1 auto;',
@@ -5868,7 +6313,7 @@ function sysBuildCSS() {
    --i is set per tile in the picker loop. Wrapped in no-preference, and the
    whole thing is a plain end-state under reduced motion. */
 '@media (prefers-reduced-motion: no-preference){',
-  '.capyui-pick{opacity:0;animation:capyui-deal .42s cubic-bezier(.16,1,.3,1) forwards;',
+  '.capyui-pick{opacity:0;animation:capyui-deal ' + dSlow + ' ' + mGlide + ' forwards;',
   'animation-delay:calc(var(--i,0) * 34ms + 120ms);}}',
 '@keyframes capyui-deal{from{opacity:0;transform:translateY(9px) scale(.985);}',
   'to{opacity:1;transform:none;}}',
@@ -5878,7 +6323,7 @@ function sysBuildCSS() {
   'font:inherit;text-align:left;touch-action:manipulation;',
   'background:' + accent + ';border:1px solid ' + accent + ';border-radius:' + rMd + ';',
   'padding:clamp(7px,1.5vw,11px) clamp(10px,2vw,15px);',
-  'transition:transform .12s ease,filter .12s ease;}',
+  'transition:transform ' + dFast + ' ' + mSnap + ',filter ' + dFast + ' ease;}',
 '.capyui-carry:hover,.capyui-carry:focus-visible{transform:translateY(-1px);',
   'filter:brightness(1.08);}',
 '.capyui-carry:focus-visible{outline:2px solid ' + ink + ';outline-offset:2px;}',
@@ -5917,7 +6362,7 @@ function sysBuildCSS() {
    taken by the player, and it is the only image in the game that did not exist
    before somebody chose to make it. */
 '.capyui-photo{position:absolute;inset:0;z-index:44;pointer-events:none;',
-  'opacity:0;transition:opacity .38s ease;}',
+  'opacity:0;transition:opacity ' + dMed + ' ease;}',
 '.capyui-photo.show{opacity:1;}',
 /* the bars. 3:2, which is the shape a postcard actually is, held with vh so a
    letterbox on a tall phone is not the whole screen. */
@@ -5965,7 +6410,7 @@ function sysBuildCSS() {
    file down. The shutter SOUND and the punch still fire, so the camera still
    answers the button; it simply does not strobe. */
 '.capyui-pflash{position:absolute;inset:0;z-index:56;background:' + sysHex(PALETTE.sail) + ';',
-  'opacity:0;pointer-events:none;transition:opacity .42s ease;}',
+  'opacity:0;pointer-events:none;transition:opacity ' + dSlow + ' ease;}',
 '.capyui-pflash.show{opacity:0.92;transition:none;}',
 '@media (prefers-reduced-motion:reduce){.capyui-pflash,.capyui-pflash.show{',
   'opacity:0 !important;transition:none !important;}',
@@ -5975,16 +6420,16 @@ function sysBuildCSS() {
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
   'background:' + paper + ';border-radius:' + rSm + ';padding:10px 12px 12px;transform:rotate(-1.7deg);',
   'box-shadow:' + shMd + ';border:1px solid ' + paper2 + ';',
-  'transition:opacity .5s ease;opacity:0;}',
+  'transition:opacity ' + dSlow + ' ease;opacity:0;}',
 '.capyui-todo.show{opacity:1;}',
 '.capyui-todo:before{content:"";position:absolute;left:14%;right:14%;top:-7px;height:14px;',
   'background:' + sand + ';opacity:.85;transform:rotate(-1.2deg);border-radius:' + rSm + ';',
   'box-shadow:' + shSm + ';}',
-'.capyui-todo.grow{animation:capyui-grow .7s cubic-bezier(.2,1.5,.35,1);}',
+'.capyui-todo.grow{animation:capyui-grow .7s ' + mSpring + ';}',
 '@keyframes capyui-grow{0%{transform:rotate(-1.7deg) scale(1)}',
   '35%{transform:rotate(-1.1deg) scale(1.045)}100%{transform:rotate(-1.7deg) scale(1)}}',
 /* the card takes the hit when a task lands — a stamp, not a wobble */
-'.capyui-todo.stamp{animation:capyui-stamp .44s cubic-bezier(.2,1.8,.35,1);}',
+'.capyui-todo.stamp{animation:capyui-stamp ' + dSlow + ' ' + mSpring + ';}',
 '@keyframes capyui-stamp{0%{transform:rotate(-1.7deg) scale(1)}',
   '18%{transform:rotate(-.4deg) scale(1.075)}',
   '46%{transform:rotate(-2.3deg) scale(.986)}100%{transform:rotate(-1.7deg) scale(1)}}',
@@ -6019,7 +6464,7 @@ function sysBuildCSS() {
    cancels the flex gap the collapsing row is still holding open. */
 '.capyui-task.capyui-fold{max-height:0 !important;opacity:0;padding-top:0;padding-bottom:0;',
   'overflow:hidden;pointer-events:none;margin-top:-3px;',
-  'transition:max-height .5s cubic-bezier(.4,0,.3,1),opacity .3s ease;}',
+  'transition:max-height ' + dSlow + ' ' + mHold + ',opacity ' + dMed + ' ease;}',
 /* ...AND THE SAME TRANSITION ON THE ROW ITSELF, WHICH IS WHAT MAKES THE ROW
    ARRIVE RATHER THAN APPEAR. A transition is read off the state being moved
    TO, so with this declared only on `.capyui-fold` the roll-up animated and
@@ -6027,24 +6472,36 @@ function sysBuildCSS() {
    transition at all and the height snapped. Declared here it is symmetric, and
    nothing else on a task row ever moves max-height or opacity, so this can
    only ever animate the fold. */
-'.capyui-task{transition:max-height .5s cubic-bezier(.4,0,.3,1),opacity .3s ease;}',
+'.capyui-task{transition:max-height ' + dSlow + ' ' + mHold + ',opacity ' + dMed + ' ease;}',
 '.capyui-box{flex:0 0 auto;width:1.05em;height:1.05em;margin-top:.06em;border:1.6px solid ' + inkFaint + ';',
-  'border-radius:' + rSm + ';position:relative;transform:rotate(-2deg);}',
-'.capyui-box:after{content:"\\2713";position:absolute;left:50%;top:48%;',
-  'transform:translate(-50%,-50%) scale(0) rotate(-8deg);color:' + tick + ';',
-  'font-size:1.35em;font-weight:700;line-height:1;}',
-'.capyui-txt{position:relative;display:inline-block;}',
-'.capyui-txt:after{content:"";position:absolute;left:-2px;right:-3px;top:52%;height:2px;',
-  'background:' + ink + ';border-radius:' + rSm + ';transform:scaleX(0) rotate(-1.1deg);',
-  'transform-origin:left center;opacity:.75;}',
+  'border-radius:' + rSm + ';position:relative;transform:rotate(-2deg);',
+  'color:' + tick + ';line-height:0;}',
+/* The tick overflows its box on purpose — see sysMarkBox. */
+'.capyui-box svg{position:absolute;left:-18%;top:-30%;width:136%;height:136%;',
+  'overflow:visible;stroke-dasharray:1;stroke-dashoffset:1;}',
+/* the wrapper the strike is measured against, and the words inside it */
+'.capyui-tw{position:relative;display:inline-block;}',
+'.capyui-txt{display:inline;}',
+/* ANCHORED IN EM FROM THE TOP, NOT AT A PERCENTAGE OF THE WRAPPER. A task
+   row wraps to two lines on a phone, and the bar this replaces was at
+   `top:52%` of a box that is then two lines tall — which put it in the GAP
+   BETWEEN them, striking nothing at all. Half a line down from the top of the
+   first line is the first line's middle whatever the row does below it. */
+'.capyui-strike{position:absolute;left:-3px;top:.30em;height:.66em;',
+  'width:calc(100% + 7px);pointer-events:none;color:' + ink + ';opacity:.72;',
+  'clip-path:inset(-4px 100% -4px 0);overflow:visible;}',
 '.capyui-task.done{color:' + inkSoft + ';}',
 '.capyui-task.done .capyui-box{border-color:' + tick + ';}',
-'.capyui-task.done .capyui-box:after{animation:capyui-tick .42s cubic-bezier(.2,1.7,.4,1) forwards;}',
-'.capyui-task.done .capyui-txt:after{animation:capyui-strike .34s ease-out .07s forwards;}',
-'@keyframes capyui-tick{0%{transform:translate(-50%,-50%) scale(0) rotate(-24deg)}',
-  '100%{transform:translate(-50%,-50%) scale(1) rotate(-8deg)}}',
-'@keyframes capyui-strike{0%{transform:scaleX(0) rotate(-1.1deg)}',
-  '100%{transform:scaleX(1) rotate(-1.1deg)}}',
+/* ---- AND THE PEN DRAWS THEM (D6) ------------------------------------------
+   dashoffset 1 -> 0 on a pathLength=1 path. The tick goes first and the strike
+   follows it by 90 ms, which is the order a hand does it in and the only
+   reason the two read as ONE gesture rather than as two animations that
+   happened to start at the same time. Both are `forwards`, so a row that was
+   already ticked when the card was built stays drawn. */
+'.capyui-task.done .capyui-box svg path{animation:capyui-pen ' + dMed + ' ' + mSnap + ' forwards;}',
+'.capyui-task.done .capyui-strike{animation:capyui-nib ' + dMed + ' ease-out .09s forwards;}',
+'@keyframes capyui-pen{to{stroke-dashoffset:0;}}',
+'@keyframes capyui-nib{to{clip-path:inset(-4px -4px -4px 0);}}',
 '.capyui-count{margin-top:8px;font-size:' + tMd + ';letter-spacing:.16em;',
   'color:' + inkSoft + ';text-transform:uppercase;}',
 /* ---------- the record you are setting, while you are setting it (v32) ------ */
@@ -6079,7 +6536,7 @@ function sysBuildCSS() {
 '.capyui-aim{flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:4px;',
   'align-self:center;color:' + accent + ';font-weight:700;white-space:nowrap;',
   'font-size:clamp(8.5px,1.35vw,11px);font-variant-numeric:tabular-nums;opacity:0;',
-  'transition:opacity .3s ease;}',
+  'transition:opacity ' + dMed + ' ease;}',
 '.capyui-aim.on{opacity:1;}',
 /* a paper chevron, drawn rather than typed so no font can fail to have it */
 '.capyui-arrow{width:0;height:0;border-left:.34em solid transparent;',
@@ -6095,7 +6552,7 @@ function sysBuildCSS() {
 '.capyui-clue{font-size:clamp(8.5px,1.4vw,11px);line-height:1.25;color:' + inkSoft + ';',
   'font-style:italic;padding:1px 0 2px 1.75em;max-height:5em;overflow:hidden;',
   'white-space:pre-line;',
-  'transition:max-height .3s ease,opacity .3s ease;}',
+  'transition:max-height ' + dMed + ' ' + mHold + ',opacity ' + dMed + ' ease;}',
 '.capyui-clue.off{max-height:0;opacity:0;padding:0;}',
 /* the record board a finished chapter turns into: one number per line, and the
    numbers line up under each other because they are what is being compared */
@@ -6116,9 +6573,23 @@ function sysBuildCSS() {
 '.capyui-toast{background:' + paper + ';color:' + ink + ';border:1px solid ' + paper2 + ';',
   'border-radius:999px;padding:7px 18px;font-size:clamp(11px,2.4vw,15px);font-weight:700;',
   'box-shadow:' + shMd + ';opacity:0;transform:translateY(16px) rotate(-.6deg);',
-  'transition:opacity .3s ease,transform .3s cubic-bezier(.2,1.5,.4,1);text-align:center;}',
+  'transition:opacity ' + dMed + ' ease,transform ' + dMed + ' ' + mSpring + ';text-align:center;}',
 '.capyui-toast.in{opacity:1;transform:translateY(0) rotate(-.6deg);}',
 '.capyui-toast.out{opacity:0;transform:translateY(-10px) rotate(-.6deg);}',
+/* ---- ...AND THREE OF THEM (D6). See toast() for what each one means. ----
+   The distinction is the one the card recipe already draws everywhere else:
+   a SENTENCE is italic and set at reading size, a LABEL is tracked-out caps
+   and quieter. Nothing here changes the pill's shape, its paper or its
+   entrance — a toast is still one object, said three ways. */
+'.capyui-toast.say{font-style:italic;font-weight:700;letter-spacing:0;}',
+'.capyui-toast.note{font-style:normal;font-weight:700;color:' + inkSoft + ';',
+  'font-size:clamp(9.5px,1.9vw,11.5px);letter-spacing:.14em;text-transform:uppercase;',
+  'padding:6px 16px;box-shadow:' + shSm + ';}',
+/* The closing sentences. Held five seconds rather than two and a half, one
+   step up in size, and it arrives on its own — see toast(). It is the only
+   pill in the game that is allowed to be the biggest thing on screen. */
+'.capyui-toast.last{font-style:italic;font-size:clamp(13px,3vw,19px);padding:9px 24px;',
+  'box-shadow:' + shLg + ';}',
 
 /* ---------- the moment card (a `mini` task) ---------- */
 /* THE MIDDLE RUNG. A toast is a rounded pill at the bottom of the screen and a
@@ -6135,7 +6606,7 @@ function sysBuildCSS() {
   'z-index:57;pointer-events:none;text-align:center;background:' + paper + ';color:' + ink + ';',
   'border:1px solid ' + paper2 + ';border-radius:' + rXl + ';padding:11px 26px 13px;',
   'width:max-content;max-width:min(86vw,520px);box-shadow:' + shLg + ';',
-  'opacity:0;transition:opacity .45s ease,transform .45s cubic-bezier(.2,1.3,.4,1);}',
+  'opacity:0;transition:opacity ' + dSlow + ' ease,transform ' + dSlow + ' ' + mSpring + ';}',
 '.capyui-moment.show{opacity:1;transform:translate(-50%,0) rotate(-.7deg);}',
 '.capyui-momentkick{font-size:clamp(11px,2vw,12px);letter-spacing:.3em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
@@ -6160,7 +6631,7 @@ function sysBuildCSS() {
   'border:1px dashed ' + inkFaint + ';background:none;font:inherit;color:inherit;',
   'display:flex;align-items:center;justify-content:center;opacity:.3;',
   '-webkit-tap-highlight-color:transparent;',
-  'transition:opacity .35s ease,border-color .35s ease,background .35s ease,transform .2s ease;',
+  'transition:opacity ' + dMed + ' ease,border-color ' + dMed + ' ease,background ' + dMed + ' ease,transform ' + dFast + ' ' + mSnap + ';',
   'touch-action:manipulation;cursor:default;}',
 '.capyui-slot svg{display:block;width:100%;height:100%;filter:grayscale(1);}',
 '.capyui-slot.have{opacity:1;border-style:solid;border-color:' + rule + ';background:' + veil2 + ';',
@@ -6196,12 +6667,18 @@ function sysBuildCSS() {
 '.capyui-pause{position:absolute;inset:0;z-index:64;display:flex;align-items:center;',
   'justify-content:center;pointer-events:none;opacity:0;background:' + veil + ';',
   'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
-  'transition:opacity .22s ease;padding:14px;}',
+  'transition:opacity ' + dFast + ' ease;padding:14px;}',
 '.capyui-pause.show{opacity:1;pointer-events:auto;}',
 '.capyui-pausecard{background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
   'box-shadow:' + shLg + ';padding:clamp(15px,2.8vw,26px) clamp(17px,3.2vw,32px);',
-  'transform:rotate(.6deg);max-width:430px;width:100%;max-height:92vh;overflow:auto;',
-  'overscroll-behavior:contain;}',
+  'max-width:430px;width:100%;max-height:92vh;overflow:auto;',
+  'overscroll-behavior:contain;',
+  /* Dealt, like the journal beside it (D6). The pause card tilts the OTHER
+     way and always has — two sheets on a table do not lie parallel — so its
+     entrance keeps that rotation rather than sharing the journal's. */
+  'transform:rotate(.6deg) translateY(10px) scale(.985);opacity:0;',
+  'transition:opacity ' + dMed + ' ease,transform ' + dSlow + ' ' + mGlide + ';}',
+'.capyui-pause.show .capyui-pausecard{opacity:1;transform:rotate(.6deg) translateY(0) scale(1);}',
 '.capyui-pausecard h2{font-size:' + tXl + ';color:' + ink + ';font-weight:700;',
   'letter-spacing:.04em;text-align:center;}',
 '.capyui-pausesub{font-size:clamp(10px,1.9vw,11px);letter-spacing:.24em;text-transform:uppercase;',
@@ -6216,7 +6693,7 @@ function sysBuildCSS() {
   'padding:clamp(8px,1.7vw,11px) 13px;background:none;font:inherit;cursor:pointer;',
   'font-size:clamp(11px,2vw,12.5px);color:' + ink + ';font-weight:700;text-align:left;',
   'letter-spacing:.1em;text-transform:uppercase;touch-action:manipulation;',
-  '-webkit-tap-highlight-color:transparent;transition:background .18s ease;}',
+  '-webkit-tap-highlight-color:transparent;transition:background ' + dFast + ' ease;}',
 '@media (hover:hover){.capyui-pausebtn:hover{background:' + veil2 + ';}}',
 '.capyui-pausebtn:focus{outline:none;}',
 '.capyui-pausebtn:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
@@ -6256,9 +6733,14 @@ function sysBuildCSS() {
   'display:flex;align-items:center;justify-content:center;',
   'color:' + ink + ';cursor:pointer;touch-action:manipulation;',
   '-webkit-tap-highlight-color:transparent;}',
-'.capyui-setmute svg{display:block;width:16px;height:16px;}',
+'.capyui-spk{display:block;line-height:0;}',
+'.capyui-setmute .capyui-g{width:16px;height:16px;vertical-align:middle;}',
 '.capyui-setmute .cross{display:none;}',
-'.capyui-setmute.off{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';}',
+/* Inverted: ink becomes paper and paper becomes the accent, so the glyph's
+   own `o` shapes — the ones that are the BACKGROUND rather than the ink —
+   follow the button instead of staying cream on coral. */
+'.capyui-setmute.off{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
+  '--capyui-gbg:' + accent + ';}',
 '.capyui-setmute.off .wave{display:none;}',
 '.capyui-setmute.off .cross{display:inline;}',
 '.capyui-setmute:focus{outline:none;}',
@@ -6269,8 +6751,42 @@ function sysBuildCSS() {
 '.capyui-setcalm{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer;',
   'font-size:clamp(10.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.06em;touch-action:manipulation;}',
-'.capyui-setcalm input{width:16px;height:16px;flex:0 0 auto;accent-color:' + accent + ';',
-  'cursor:pointer;}',
+/* ---- THE ONE NATIVE CONTROL THAT STILL LOOKED NATIVE (D6) ---------------
+   It is a real <input type=checkbox> and it stays one — it is keyboard
+   operable, it announces itself, a pad layer knows what it is and the label
+   wrapping it makes the whole row a hit target, none of which a div can do.
+   What it was wearing was `accent-color`, which paints the PLATFORM's box:
+   a system-blue rounded square with the operating system's own tick in it,
+   on hand-drawn cream paper, four millimetres from three faders that had
+   already been re-skinned. It was the last piece of somebody else's UI on
+   this card.
+   Re-skinned, not replaced: appearance:none and then the same square, the
+   same 1.6px ink rule, the same rSm corner and the same two-degree tilt the
+   task list's tick boxes have carried since v13, with the same drawn pen
+   inside it. The pause card and the to-do list now agree about what a
+   checked box looks like, which they never have. */
+'.capyui-setcalm input{width:16px;height:16px;flex:0 0 auto;cursor:pointer;',
+  'appearance:none;-webkit-appearance:none;margin:0;position:relative;',
+  'border:1.6px solid ' + inkFaint + ';border-radius:' + rSm + ';background:none;',
+  'transform:rotate(-2deg);color:' + tick + ';}',
+'.capyui-setcalm input:checked{border-color:' + tick + ';}',
+'.capyui-setcalm input:after{content:"";position:absolute;left:-18%;top:-30%;',
+  'width:136%;height:136%;',
+  /* The same tick, and it has to be a background image rather than an inline
+     <svg>: a checkbox is a replaced element and may not have children. It is
+     the sysMarkBox path, traced, at 3.4 units in a 24 box — the two are the
+     same drawing and there is nowhere to share it from, so if either ever
+     moves, move both. */
+  'background:no-repeat center/100% 100% url("data:image/svg+xml;utf8,',
+  '%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E',
+  '%3Cpath d=\'M4.5 12.6L10 18.4L20.5 3.6\' fill=\'none\' stroke=\'%23',
+  sysHex(PALETTE.leafC).slice(1),
+  '\' stroke-width=\'3.4\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E");',
+  'opacity:0;transform:scale(.7);',
+  'transition:opacity ' + dFast + ' ease,transform ' + dFast + ' ' + mSpring + ';}',
+'.capyui-setcalm input:checked:after{opacity:1;transform:scale(1);}',
+'.capyui-setcalm input:focus{outline:none;}',
+'.capyui-setcalm input:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-setnote{font-size:clamp(9.5px,1.7vw,10.5px);color:' + inkSoft + ';font-style:italic;',
   'margin-top:7px;line-height:1.4;}',
 '.capyui-pausefoot{margin-top:clamp(9px,1.8vw,13px);text-align:center;',
@@ -6309,7 +6825,7 @@ function sysBuildCSS() {
   '.capyui-setrange::-webkit-slider-thumb{width:20px;height:20px;margin-top:-8px;}',
   '.capyui-setrange::-moz-range-thumb{width:20px;height:20px;}',
   '.capyui-setmute{width:44px;height:44px;}',
-  '.capyui-setmute svg{width:20px;height:20px;}',
+  '.capyui-setmute .capyui-g{width:20px;height:20px;}',
   '.capyui-setcalm{min-height:44px;gap:11px;margin-top:4px;}',
   '.capyui-setcalm input{width:24px;height:24px;}',
   '.capyui-pauseaskrow button{padding-top:14px;padding-bottom:14px;}',
@@ -6337,7 +6853,7 @@ function sysBuildCSS() {
    because the picture IS the point of it. */
 '.capyui-keep{position:absolute;left:50%;top:50%;z-index:53;',
   'transform:translate(-50%,-46%) rotate(-1.1deg) scale(.95);opacity:0;pointer-events:none;',
-  'transition:opacity .42s ease,transform .55s cubic-bezier(.2,.9,.3,1);',
+  'transition:opacity ' + dSlow + ' ease,transform .55s ' + mGlide + ';',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';',
   'box-shadow:' + shLg + ';padding:15px 30px 14px;text-align:center;}',
 '.capyui-keep.show{opacity:1;transform:translate(-50%,-50%) rotate(-1.1deg) scale(1);}',
@@ -6357,7 +6873,7 @@ function sysBuildCSS() {
    ledger (66) and the crossing (70). */
 '.capyui-done{position:absolute;left:50%;top:44%;z-index:59;pointer-events:none;',
   'transform:translate(-50%,-46%) rotate(-.9deg) scale(.96);opacity:0;',
-  'transition:opacity .5s ease,transform .62s cubic-bezier(.2,.95,.3,1);',
+  'transition:opacity ' + dSlow + ' ease,transform .62s ' + mGlide + ';',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rLg + ';',
   'box-shadow:' + shLg + ';padding:14px 14px 16px;text-align:center;',
   'width:min(84vw,420px);}',
@@ -6452,7 +6968,7 @@ function sysBuildCSS() {
 '.capyui-ledrow{display:grid;grid-template-columns:58px 1fr auto;gap:2px 11px;align-items:center;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:' + rMd + ';padding:7px 10px;',
   'opacity:0;transform:translateY(10px) rotate(-.3deg);',
-  'animation:capyui-ledin .5s cubic-bezier(.2,.9,.3,1) forwards;}',
+  'animation:capyui-ledin ' + dSlow + ' ' + mGlide + ' forwards;}',
 '@keyframes capyui-ledin{to{opacity:1;transform:translateY(0) rotate(-.3deg);}}',
 '.capyui-ledmark{grid-row:1 / 3;position:relative;width:56px;height:35px;border-radius:' + rSm + ';',
   'overflow:hidden;border:1px solid ' + rule + ';}',
@@ -6519,7 +7035,7 @@ function sysBuildCSS() {
    thing that stops the two reading as one lump sliding up the screen. */
 '.capyui-fade.trip .capyui-fademark{display:block;width:min(58vw,520px);',
   'aspect-ratio:64 / 40;opacity:.02;transform:translateY(4vh) scale(.965);',
-  'transition:opacity 1.05s ease-out,transform 1.15s cubic-bezier(.16,.86,.28,1);}',
+  'transition:opacity 1.05s ease-out,transform 1.15s ' + mGlide + ';}',
 '.capyui-fade.trip.rise .capyui-fademark{opacity:.085;transform:none;}',
 '@supports not (aspect-ratio:1/1){.capyui-fade.trip .capyui-fademark{',
   'height:min(36vh,325px);}}',
@@ -6528,13 +7044,13 @@ function sysBuildCSS() {
   'letter-spacing:.4em;text-transform:uppercase;font-weight:700;text-align:center;',
   'padding:0 18px;color:' + sysRgba(PALETTE.ibisHead, 0) + ';',
   'transform:translateY(2vh);',
-  'transition:color .95s ease-out .14s,transform 1.1s cubic-bezier(.16,.86,.28,1) .14s;}',
+  'transition:color .95s ease-out .14s,transform 1.1s ' + mGlide + ' .14s;}',
 '.capyui-fade.trip.rise .capyui-fadename{color:' + sysRgba(PALETTE.ibisHead, 0.26) + ';',
   'transform:none;}',
 '.capyui-place{position:absolute;left:0;right:0;top:31%;z-index:58;display:flex;',
   'flex-direction:column;align-items:center;gap:7px;pointer-events:none;text-align:center;',
   'padding:0 18px;opacity:0;transform:translateY(12px);',
-  'transition:opacity .9s ease,transform .9s cubic-bezier(.2,1,.4,1);}',
+  'transition:opacity .9s ease,transform .9s ' + mGlide + ';}',
 '.capyui-place.show{opacity:1;transform:translateY(0);}',
 '.capyui-place h2{font-size:' + tHu + ';color:' + ink + ';font-weight:700;',
   'letter-spacing:.09em;line-height:1.02;transform:rotate(-1.2deg);}',
@@ -6550,7 +7066,7 @@ function sysBuildCSS() {
 '.capyui-fly{position:absolute;right:12px;top:50%;transform:translateY(-50%) rotate(1.1deg);',
   'width:clamp(94px,17vw,126px);background:' + paper + ';border:1px solid ' + paper2 + ';',
   'border-radius:' + rSm + ';padding:8px 10px 9px;box-shadow:' + shMd + ';',
-  'opacity:0;pointer-events:none;transition:opacity .45s ease;}',
+  'opacity:0;pointer-events:none;transition:opacity ' + dSlow + ' ease;}',
 '.capyui-fly.show{opacity:1;}',
 '.capyui-flyk{font-size:clamp(7.5px,1.15vw,9px);letter-spacing:.24em;text-transform:uppercase;',
   'color:' + accent + ';font-weight:700;}',
@@ -6561,10 +7077,10 @@ function sysBuildCSS() {
 '.capyui-flybar{height:5px;border-radius:' + rSm + ';background:' + inkFaint + ';margin:5px 0 8px;',
   'overflow:hidden;}',
 '.capyui-flybar i{display:block;height:100%;width:0%;background:' + tick + ';border-radius:' + rSm + ';',
-  'transition:width .16s linear;}',
+  'transition:width ' + dFast + ' linear;}',
 /* the thermal tell: a breathing arrow, never a klaxon */
 '.capyui-therm{margin-top:8px;font-size:' + tXs + ';letter-spacing:.18em;',
-  'text-transform:uppercase;font-weight:700;color:' + tick + ';opacity:0;transition:opacity .25s ease;}',
+  'text-transform:uppercase;font-weight:700;color:' + tick + ';opacity:0;transition:opacity ' + dMed + ' ease;}',
 '.capyui-therm.on{opacity:1;animation:capyui-lift 1.15s ease-in-out infinite;}',
 '@keyframes capyui-lift{0%,100%{opacity:.42;transform:translateY(1.5px)}',
   '50%{opacity:1;transform:translateY(-1.5px)}}',
@@ -6580,7 +7096,7 @@ function sysBuildCSS() {
 '.capyui-map{position:absolute;right:16px;bottom:16px;width:clamp(118px,18vw,164px);',
   'aspect-ratio:1/1;border-radius:' + rXl + ';overflow:hidden;background:' + paper + ';',
   'border:1px solid ' + paper2 + ';box-shadow:' + shMd + ';',
-  'opacity:0;transition:opacity .5s ease;pointer-events:none;transform:rotate(.4deg);}',
+  'opacity:0;transition:opacity ' + dSlow + ' ease;pointer-events:none;transform:rotate(.4deg);}',
 '.capyui-map.show{opacity:.95;}',
 '.capyui-map canvas{display:block;width:100%;height:100%;}',
 /* The paper edge. A chart printed on the same stock as the to-do card and the
@@ -6616,7 +7132,7 @@ function sysBuildCSS() {
   'padding:1px 6px;border-radius:999px;background:' + sysRgba(PALETTE.sail, 0.86) + ';',
   'font-size:9px;font-weight:700;line-height:1.5;color:' + ink + ';',
   'font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;',
-  'text-overflow:ellipsis;opacity:0;transition:opacity .3s ease;}',
+  'text-overflow:ellipsis;opacity:0;transition:opacity ' + dMed + ' ease;}',
 '.capyui-mapdist.show{opacity:1;}',
 '.capyui-mapdist i{flex:0 0 auto;width:6px;height:6px;border-radius:50%;',
   'background:' + accent + ';text-decoration:none;}',
@@ -6628,10 +7144,10 @@ function sysBuildCSS() {
 '.capyui-stam{position:absolute;left:16px;bottom:16px;width:clamp(96px,17vw,148px);',
   'height:7px;border-radius:999px;background:' + sysRgba(PALETTE.ibisHead, 0.20) + ';',
   'box-shadow:' + shMd + ';overflow:hidden;opacity:0;pointer-events:none;',
-  'transition:opacity .35s ease;}',
+  'transition:opacity ' + dMed + ' ease;}',
 '.capyui-stam.show{opacity:1;}',
 '.capyui-stam i{display:block;height:100%;width:100%;border-radius:999px;',
-  'background:' + tick + ';transform-origin:0 50%;transition:background .25s ease;}',
+  'background:' + tick + ';transform-origin:0 50%;transition:background ' + dMed + ' ease;}',
 '.capyui-stam.low i{background:' + accent + ';}',
 '.capyui-stam.blown{animation:capyui-blink 0.9s ease-in-out infinite;}',
 
@@ -6640,11 +7156,11 @@ function sysBuildCSS() {
   'transform:translateX(-50%) rotate(-.5deg);display:flex;align-items:center;gap:10px;',
   'background:' + paper + ';border:1px solid ' + paper2 + ';border-radius:999px;padding:6px 15px;',
   'box-shadow:' + shMd + ';color:' + ink + ';font-weight:700;white-space:nowrap;',
-  'font-size:clamp(11px,2vw,13px);opacity:0;pointer-events:none;transition:opacity .4s ease;}',
+  'font-size:clamp(11px,2vw,13px);opacity:0;pointer-events:none;transition:opacity ' + dSlow + ' ease;}',
 '.capyui-home.show{opacity:1;}',
 '.capyui-dots{display:flex;gap:5px;}',
 '.capyui-dots i{width:8px;height:8px;border-radius:50%;border:1.6px solid ' + inkFaint + ';',
-  'transition:background .2s ease,border-color .2s ease;}',
+  'transition:background ' + dFast + ' ease,border-color ' + dFast + ' ease;}',
 '.capyui-dots i.on{background:' + tick + ';border-color:' + tick + ';}',
 
 /* ---------- touch layer ---------- */
@@ -6654,14 +7170,14 @@ function sysBuildCSS() {
   'touch-action:none;}',
 '.capyui-base{position:absolute;width:118px;height:118px;margin:-59px 0 0 -59px;border-radius:50%;',
   'border:2px solid ' + sysRgba(PALETTE.sail, 0.7) + ';background:' + sysRgba(PALETTE.water, 0.16) + ';',
-  'opacity:0;transition:opacity .18s ease;}',
+  'opacity:0;transition:opacity ' + dFast + ' ease;}',
 '.capyui-base.on{opacity:.95;}',
 '.capyui-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;',
   'border-radius:50%;background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:' + shMd + ';}',
 '.capyui-btn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;',
   'display:flex;align-items:center;justify-content:center;font-weight:700;color:' + ink + ';',
   'background:' + sysRgba(PALETTE.sail, 0.86) + ';border:2px solid ' + sysRgba(PALETTE.ibisHead, 0.18) + ';',
-  'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ease;}',
+  'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ' + mSnap + ';}',
 '.capyui-btn.press{transform:scale(.9);background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
 '.capyui-wheek{right:18px;bottom:26px;width:96px;height:96px;font-size:15px;}',
 '.capyui-grab{right:120px;bottom:96px;width:74px;height:74px;font-size:13px;}',
@@ -13862,7 +14378,19 @@ export function createSystems(game) {
   const p2El = sysEl('div', 'capyui-page capyui-p2');
   cardEl.appendChild(p1El);
   cardEl.appendChild(p2El);
-  p1El.appendChild(sysEl('h1', null, 'Untitled Capybara Game'));
+  {
+    // ---- THE MASTHEAD IS CUT, NOT SET (D6). See sysBuildWordmark. --------
+    // It stays an <h1> and it keeps the words: the mark is aria-hidden and
+    // the heading carries a visually-hidden copy of the title, so the
+    // document still has a level-one heading with the game's name in it and
+    // a screen reader still reads three words rather than announcing a
+    // graphic. A wordmark that costs a page its <h1> is not a wordmark, it
+    // is a picture where a heading was.
+    const h1 = sysEl('h1', 'capyui-mast');
+    h1.appendChild(sysBuildWordmark('Untitled Capybara Game'));
+    h1.appendChild(sysEl('span', 'capyui-sr', 'Untitled Capybara Game'));
+    p1El.appendChild(h1);
+  }
   p1El.appendChild(sysEl('div', 'capyui-sub',
     'one capybara, ' + CHAPTERS.length + ' places, no supervision'));
   {
@@ -13925,7 +14453,9 @@ export function createSystems(game) {
     // click at (400, 400) on a 1280x720 window did nothing at all. Only the
     // summary is a control; only the summary should eat a click.
     const more = sysEl('details', 'capyui-more');
-    const sum = sysEl('summary', null, 'and a few extras');
+    const sum = sysEl('summary');
+    sum.appendChild(sysGlyphEl('chev'));
+    sum.appendChild(document.createTextNode('and a few extras'));
     sum.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
     more.appendChild(sum);
     const moreLeg = sysFillLegend(sysEl('div', 'capyui-legend'), 'more');
@@ -13972,7 +14502,8 @@ export function createSystems(game) {
   const p2Head = sysEl('div', 'capyui-p2head');
   const backEl = sysEl('button', 'capyui-back');
   backEl.type = 'button';
-  backEl.textContent = 'back';
+  backEl.appendChild(sysGlyphEl('chev', 'l'));
+  backEl.appendChild(document.createTextNode('back'));
   backEl.setAttribute('aria-label', 'back to the front of the card');
   backEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
   backEl.addEventListener('click', function (e) {
@@ -14112,7 +14643,11 @@ export function createSystems(game) {
         ids.length + ' things to do, and nobody watching'));
     }
     el.appendChild(body);
-    if (hero) el.appendChild(sysEl('span', 'capyui-pickarrow', '→'));
+    if (hero) {
+      const ar = sysEl('span', 'capyui-pickarrow');
+      ar.appendChild(sysGlyphEl('chev'));
+      el.appendChild(ar);
+    }
     // ---- THE RAIL ALONG THE FOOT ------------------------------------------
     // Same rule as the tally: only for a place that has actually been visited.
     if ((done > 0 || jrFileSeen[d.n]) && ids.length) {
@@ -14289,7 +14824,11 @@ export function createSystems(game) {
     }
     picksEl.classList.toggle('more', below);
     picksEl.classList.toggle('up', over > 4 && picksEl.scrollTop > 4);
-    moreEl.textContent = n ? n + ' more below' : '';
+    moreEl.textContent = '';
+    if (n) {
+      moreEl.appendChild(document.createTextNode(n + ' more below '));
+      moreEl.appendChild(sysGlyphEl('chev', 'd'));
+    }
     moreEl.hidden = !n;
   }
   picksEl.addEventListener('scroll', picksFade, { passive: true });
@@ -14510,7 +15049,9 @@ export function createSystems(game) {
   // that matter); H, ? or the summary itself opens it, and it STAYS open once
   // opened, so a player who needed it once does not have to find it twice.
   const jrKeys = sysEl('details', 'capyui-jrkeys');
-  const jrKeysSum = sysEl('summary', null, 'the controls');
+  const jrKeysSum = sysEl('summary');
+  jrKeysSum.appendChild(sysGlyphEl('chev'));
+  jrKeysSum.appendChild(document.createTextNode('the controls'));
   jrKeys.appendChild(jrKeysSum);
   jrKeys.appendChild(sysFillLegend(sysEl('div', 'capyui-legend'), 'all'));
   const jrFoot = sysEl('div', 'capyui-jrfoot', '');
@@ -14614,29 +15155,24 @@ export function createSystems(game) {
    * an ARIA role, and is already understood by every assistive layer and every
    * browser's own pad mapping. Only its skin is ours.
    */
-  /** The cone, the two arcs and the cross. The arcs and the cross are the only
-   *  parts that move, so both are drawn once and shown by a class. */
+  /** ---- THE SPEAKER IS A MARK NOW, NOT A UI KIT (D6) ---------------------
+   *
+   * It was four 1.9 px stroked paths — a Material speaker, character for
+   * character — on hand-drawn cream paper in a game whose aesthetic law says
+   * in its second line that there are no outlines. It was the only stroked
+   * thing in the HUD and it read as somebody else's icon set, which is what
+   * it was. Two glyphs out of sysGLYPHS instead: the same shape, filled, in
+   * the sheet's own dialect, and the class swap that shows the crossed one is
+   * exactly the swap the arcs already used.
+   */
   function pauseSpeaker() {
-    const s = document.createElementNS(sysMARK_NS, 'svg');
-    s.setAttribute('viewBox', '0 0 24 24');
-    s.setAttribute('aria-hidden', 'true');
-    s.setAttribute('focusable', 'false');
-    const path = function (d, cls) {
-      const n = document.createElementNS(sysMARK_NS, 'path');
-      n.setAttribute('d', d);
-      n.setAttribute('fill', 'none');
-      n.setAttribute('stroke', 'currentColor');
-      n.setAttribute('stroke-width', '1.9');
-      n.setAttribute('stroke-linecap', 'round');
-      n.setAttribute('stroke-linejoin', 'round');
-      if (cls) n.setAttribute('class', cls);
-      s.appendChild(n);
-    };
-    path('M4 9.4h3.4L12 5.6v12.8L7.4 14.6H4z');   // the box and the cone
-    path('M15.6 9.6a3.4 3.4 0 0 1 0 4.8', 'wave');
-    path('M18 7.2a6.8 6.8 0 0 1 0 9.6', 'wave');
-    path('M16.4 9.6l5 4.8M21.4 9.6l-5 4.8', 'cross');
-    return s;
+    const w = document.createElement('span');
+    w.className = 'capyui-spk';
+    const on = sysGlyphEl('speaker', 'wave');
+    const off = sysGlyphEl('speakerOff', 'cross');
+    w.appendChild(on);
+    w.appendChild(off);
+    return w;
   }
   function pauseFader(name, get, getMute, set, setMute) {
     const row = sysEl('div', 'capyui-setrow');
@@ -14659,7 +15195,18 @@ export function createSystems(game) {
     // `input`, not `change`: a fader that only moves the bus when you LET GO is
     // a fader you cannot hear yourself setting, which is the whole job of it.
     // Quiet, because the card is the feedback — see the note on setMuted.
-    rng.addEventListener('input', function () { set(+rng.value / 100, true); });
+    // ---- AND IT HAS DETENTS NOW (D6) -----------------------------------
+    // ON A STEP, NOT ON A PIXEL. The input fires for every unit of a
+    // hundred, so a sound per event is a hundred clicks across one drag and
+    // a machine-gun on a touchscreen. Every tenth is ten marks across the
+    // travel, which is what a detent IS — and the fader itself is still
+    // continuous, so nothing about what the player can SET has changed.
+    let rngDetent = -1;
+    rng.addEventListener('input', function () {
+      set(+rng.value / 100, true);
+      const d = Math.round(+rng.value / 10);
+      if (d !== rngDetent) { rngDetent = d; uiSfx('detent'); }
+    });
     rng.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     mute.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     mute.addEventListener('click', function (e) {
@@ -14797,6 +15344,7 @@ export function createSystems(game) {
     pauseSync();
     pauseEl.inert = false;
     pauseEl.classList.add('show');
+    uiSfx('open');
     game.state.paused = true;
     musDuck(true);
     pauseReturnFocus = document.activeElement;
@@ -14865,9 +15413,31 @@ export function createSystems(game) {
       const li = sysEl('li', 'capyui-task capyui-hidden');
       const tilt = 'rotate(' + rand(-0.6, 0.6).toFixed(2) + 'deg)';
       li.style.transform = tilt;
-      li.appendChild(sysEl('span', 'capyui-box'));
+      // ---- THE PEN MOVES NOW (D6) ---------------------------------------
+      // Two hundred and thirty-one tasks, and the mark that says one is
+      // done was `content:"\2713"` scaled from zero — a Unicode tick,
+      // in whatever face the platform has, popping into existence at full
+      // size — with a <div> bar growing sideways through the words. Both
+      // of them APPEARED. Nothing was ever drawn.
+      //
+      // They are stroked SVG paths now, on `pathLength=1`, which is the
+      // one SVG attribute that makes this cheap: it renormalises the
+      // path's own arc length to 1 whatever its real geometry is, so a
+      // dash of 1 and an offset animating 1 -> 0 draws ANY path end to
+      // end at an even speed. The strike is 96 units wide and the row is
+      // whatever width the words are; without pathLength the strike would
+      // draw at a different speed on every task in the game.
+      li.appendChild(sysMarkBox());
+      // The strike is a SIBLING of the words and not a child of them:
+      // `r.txt.textContent = ...` further down wipes whatever is inside
+      // that span, so a path parked in there is deleted the moment the
+      // row is given its sentence. The wrapper is what the strike is
+      // measured against.
+      const tw = sysEl('span', 'capyui-tw');
       const txt = sysEl('span', 'capyui-txt', '');
-      li.appendChild(txt);
+      tw.appendChild(txt);
+      tw.appendChild(sysMarkStrike());
+      li.appendChild(tw);
       // ---- THIS ONE IS TIMED (P3) ------------------------------------------
       // Sixty of the two hundred and thirty-one tasks are measured, and until
       // now a player could not tell WHICH from anywhere except the record board
@@ -14882,7 +15452,8 @@ export function createSystems(game) {
       // spreadsheet. It carries its own aria-label because a bare mark is a
       // decoration to a screen reader.
       if (RECORDS[ids[i]]) {
-        const rm = sysEl('span', 'capyui-meas', '◷');
+        const rm = sysEl('span', 'capyui-meas');
+        rm.appendChild(sysGlyphEl('clock'));
         rm.setAttribute('aria-label', 'this one is timed');
         li.appendChild(rm);
       }
@@ -14926,8 +15497,10 @@ export function createSystems(game) {
   // of every count, and nothing can ever complete it.
   {
     const li = sysEl('li', 'capyui-task capyui-way capyui-hidden');
+    const tw = sysEl('span', 'capyui-tw');
     const txt = sysEl('span', 'capyui-txt', '');
-    li.appendChild(txt);
+    tw.appendChild(txt);
+    li.appendChild(tw);
     const aim = sysEl('span', 'capyui-aim');
     const arrow = sysEl('i', 'capyui-arrow');
     const dist = sysEl('span', null, '');
@@ -15272,7 +15845,10 @@ export function createSystems(game) {
   flyAirEl.appendChild(flyAirN);
   flyAirEl.appendChild(sysEl('small', null, 'm/s'));
   flyEl.appendChild(flyAirEl);
-  const flyThermEl = sysEl('div', 'capyui-therm', '▲ thermal');
+  // The last Unicode picture in the HUD (D6): the chevron, turned up.
+  const flyThermEl = sysEl('div', 'capyui-therm');
+  flyThermEl.appendChild(sysGlyphEl('chev', 'u'));
+  flyThermEl.appendChild(document.createTextNode(' thermal'));
   flyEl.appendChild(flyThermEl);
   hudRoot.appendChild(flyEl);
 
@@ -15897,6 +16473,7 @@ export function createSystems(game) {
     albBuild();
     albEl.inert = false;
     albEl.classList.add('show');
+    uiSfx('open');
     albEl.scrollTop = 0;
     game.state.paused = true;
     albReturnFocus = document.activeElement;
@@ -16143,48 +16720,168 @@ export function createSystems(game) {
     momentTimer = setTimeout(function () { momentEl.classList.remove('show'); }, sysMOMENT_CARD);
   }
 
-  function toast(text) {
+  // ---- THE FRAME WAS SILENT (D6) -----------------------------------------
+  //
+  // MEASURED before this existed: ZERO UI sound in the whole HUD. No tile
+  // press, no card opening, no detent on a fader, no note under a focus move.
+  // The world has ninety-odd voices in it and the thing the player touches
+  // most — the paper — made none of them, so every menu in an eight-hour game
+  // happened in silence while a tram dinged somewhere behind it.
+  //
+  // FOUR SOUNDS, FOUR SYNTHS, AND NOT ONE NEW ONE. P4's lesson was that one
+  // chime doing seven jobs is the same failure as one pill carrying six
+  // meanings, so these are four DIFFERENT voices out of the table rather than
+  // one voice at four pitches:
+  //
+  //   press   `pop`     — a fingertip on paper. A tile, a button, a row.
+  //   open    `rustle`  — a sheet being dealt. A card arriving, and only that.
+  //   detent  `tick`    — a fader crossing a mark. The only one on a loop, so
+  //                       it is the quietest and it fires on a STEP, not on a
+  //                       pixel: see pauseFader.
+  //   focus   `clink`   — a pen touching down. Keyboard and pad only; a mouse
+  //                       already knows where it is.
+  //
+  // `ui: true` on every one of them, because the sound a menu makes about
+  // itself is the one thing that must still be audible when the world behind
+  // it is paused — which is exactly when a menu is open.
+  //
+  // GATED ON CALM. A player who has asked for less has asked for less of
+  // this too: `sysCalmOn()` already freezes the sparkle, the wind and every
+  // card's entrance, and a UI click is the same kind of thing. It is NOT
+  // gated on the sfx mute, which the bus handles on its own.
+  const sysUI_SFX = {
+    press:  ['pop',    0.20, 1.55],
+    open:   ['rustle', 0.30, 1.10],
+    detent: ['tick',   0.13, 2.00],
+    focus:  ['clink',  0.07, 2.30],
+  };
+  // Counted for the audit and for nothing else — see game.hud.uiSfxAudit.
+  // A probe cannot see these from outside: uiSfx calls the closure-local
+  // sfx(), so wrapping `game.sfx` reads zero and looks exactly like four
+  // sounds that were never wired.
+  const sysUiSfxN = { press: 0, open: 0, detent: 0, focus: 0, muted: 0 };
+  function uiSfx(kind) {
+    if (sysCalmOn()) { sysUiSfxN.muted++; return; }
+    if (sysUiSfxN[kind] !== undefined) sysUiSfxN[kind]++;
+    const r = sysUI_SFX[kind];
+    if (!r) return;
+    // `force` so a run of them — tabbing down a menu, dragging a fader — is
+    // not eaten by the per-name throttle, which is sized for a bin cascade
+    // and would drop every second detent.
+    sfx(r[0], { volume: r[1], pitch: r[2], ui: true, force: true });
+  }
+  // ---- ...AND ONE LISTENER RATHER THAN SIXTY -----------------------------
+  // Delegated on the HUD root, because there are about sixty pressable things
+  // in this UI across seven cards and wiring each one is sixty chances to
+  // forget the sixty-first. `click` and not `pointerdown`: a real <button>
+  // fires click on Enter and on Space as well, so a keyboard player and a pad
+  // player get the same sound as a thumb without a second code path.
+  //
+  // The selector is the real controls only. A card is a big div and the
+  // player will press its background to close it; that is a dismissal, not a
+  // press, and it must not click.
+  const sysPRESS_SEL = 'button,summary,input[type=checkbox],.capyui-pick,.capyui-jrrow.go';
+  hudRoot.addEventListener('click', function (e) {
+    const t = e.target && e.target.closest ? e.target.closest(sysPRESS_SEL) : null;
+    if (t) uiSfx('press');
+  }, true);
+  // ---- THE PEN TOUCHING DOWN, AND ONLY WHEN NOBODY IS AIMING -------------
+  // A focus sound on every focusin is a sound on every mouse click as well,
+  // which is one press making two noises. `:focus-visible` is exactly this
+  // rule and the browser already computes it — so ask it, rather than
+  // tracking the last input device by hand and getting it wrong on a pad.
+  hudRoot.addEventListener('focusin', function (e) {
+    const t = e.target;
+    if (!t || !t.matches) return;
+    let vis = false;
+    try { vis = t.matches(':focus-visible'); } catch (err) { vis = false; }
+    if (vis) uiSfx('focus');
+  });
+
+  // ---- ONE PILL, SIX MEANINGS — AND NOW THREE (D6) -----------------------
+  //
+  // `.capyui-toast` carried a task tick, a find, a door line, a control hint,
+  // an autosave notice and the last three sentences of the game, all in the
+  // same bold paper pill. Six different things in one voice is not a style, it
+  // is an absence of one, and the tell is `qa/p7-ledger.png`: FOUR PILLS
+  // STACKED OVER THE LEDGER, which is the card that is supposed to be the last
+  // word.
+  //
+  // Three kinds, and the split is one the card recipe already uses everywhere
+  // else — see `.capyui-donenote`, "the only thing on this card that is a
+  // SENTENCE rather than a label":
+  //
+  //   say    a line in the game's voice. Italic, reading size. This is what a
+  //          chapter means when it calls game.toast(), which is why it is the
+  //          DEFAULT: a hundred and forty of the hundred and fifty-odd call
+  //          sites in this repository are a sentence somebody would say.
+  //   note   a label the game is showing you about itself — a tick, a record,
+  //          an autosave, a control hint. Tracked caps, quieter, smaller. The
+  //          seventeen calls in this file pass it explicitly.
+  //   last   the closing sentences. It is a `say` that is HELD, and it arrives
+  //          alone: it clears whatever is on the stack, because the end of the
+  //          game should not be read over the top of an autosave notice.
+  //
+  // ...and the stack is THREE, not five. Four pills is a column of paper 40 %
+  // of the way up the screen and the fifth was already pushing the first one
+  // off; three is the most that can be read before the first one goes.
+  const sysTOAST_MAX = 3;
+  const sysTOAST_HOLD = { say: 2600, note: 2200, last: 5200 };
+  function toast(text, kind) {
     if (text == null) return;
-    const el = sysEl('div', 'capyui-toast', String(text));
+    // ---- AND NOTHING SPEAKS OVER THE LEDGER --------------------------------
+    // The end card is the last word by construction now rather than by
+    // whoever happens to fire last. A toast raised while it is up is DROPPED,
+    // not queued: it is an autosave notice or a record, and the run is over.
+    if (ledShown) return;
+    const k = (kind === 'note' || kind === 'last') ? kind : 'say';
+    // A closing sentence arrives alone. Same exit every other pill gets — the
+    // pills already up are pushed, not deleted, which is the lesson the
+    // fifth-toast bug left behind two paragraphs down.
+    if (k === 'last') sysToastPush(toastWrap.children.length);
+    const el = sysEl('div', 'capyui-toast ' + k, String(text));
     toastWrap.appendChild(el);
-    // ...unless it has already been pushed off the top by four more toasts
-    // landing in the same turn, in which case it is on its way out and must
-    // not be told to arrive.
+    // ...unless it has already been pushed off the top by more toasts landing
+    // in the same turn, in which case it is on its way out and must not be
+    // told to arrive.
     requestAnimationFrame(function () { if (!el.dataset.going) el.classList.add('in'); });
     setTimeout(function () {
       el.classList.remove('in');
       el.classList.add('out');
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
-    }, 2200);
-    // ---- AND THE FIFTH TOAST LETS THE FIRST ONE GO, RATHER THAN DELETING IT --
+    }, sysTOAST_HOLD[k]);
+    // ---- AND THE FOURTH TOAST LETS THE FIRST ONE GO, RATHER THAN DELETING IT
     // This was `while (children.length > 4) removeChild(firstChild)`: the
     // oldest pill was torn out of the document mid-frame with no `.out` on it,
     // so on a busy moment — a streak of ticks, or an arrival that says three
     // things at once — the top of the stack vanished between frames while the
-    // four under it slid up. Every other exit in this HUD is eased and this
+    // ones under it slid up. Every other exit in this HUD is eased and this
     // was the one that was not.
-    //
-    // It is given the same 400 ms it would have got if its own timer had come
-    // round, and it is taken out of the flow immediately so the stack collapses
-    // on the same beat rather than waiting for the animation. `going` is the
-    // latch: a pill can be pushed out only once, however many toasts land
-    // while it is leaving.
-    // Counted over the LIVE pills only. A pill that is already on its way out
-    // is out of the flow and out of the stack, so counting it would push a
-    // second one for every one that was leaving and the stack would empty
-    // itself two toasts at a time.
+    sysToastPush(sysTOAST_MAX);
+  }
+  /**
+   * Push live pills out until at most `keep` of them are left, easing every
+   * one of them the way its own timer would have.
+   *
+   * Counted over the LIVE pills only. A pill that is already on its way out is
+   * out of the flow and out of the stack, so counting it would push a second
+   * one for every one that was leaving and the stack would empty itself two
+   * toasts at a time. `going` is the latch: a pill can be pushed out only
+   * once, however many toasts land while it is leaving.
+   */
+  function sysToastPush(keep) {
     let live = 0;
     for (let i = 0; i < toastWrap.children.length; i++) {
       if (!toastWrap.children[i].dataset.going) live++;
     }
-    for (let i = 0; live > 4 && i < toastWrap.children.length; i++) {
+    for (let i = 0; live > keep && i < toastWrap.children.length; i++) {
       const old = toastWrap.children[i];
       if (old.dataset.going) continue;
       old.dataset.going = '1';
       live--;
       old.classList.remove('in');
       old.classList.add('out');
-      // Out of the flow at once, so the four below it slide up on the same
+      // Out of the flow at once, so the ones below it slide up on the same
       // frame instead of waiting out the fade. The wrapper is positioned, so
       // this leaves the pill exactly where it already was.
       old.style.position = 'absolute';
@@ -16337,8 +17034,15 @@ export function createSystems(game) {
                'tap the card to cause it all again  ·  tap outside to stay')
       : sysScheme('ESC to close', 'tap outside the card to close');
     ledBuild();
+    // ...AND THE PILLS GO (D6). `qa/p7-ledger.png` is four toasts stacked over
+    // this card — an autosave notice, a record and two sentences, on top of the
+    // one screen in the game that is supposed to be the last word. toast()
+    // drops anything raised from here on; this is the ones that were already
+    // up, pushed out the way their own timers would have.
+    sysToastPush(0);
     ledEl.inert = false;
     ledEl.classList.add('show');
+    uiSfx('open');
     ledEl.scrollTop = 0;
     game.state.paused = true;
     ledReturnFocus = document.activeElement;
@@ -16762,6 +17466,7 @@ export function createSystems(game) {
     // an invisible row eight items down, and the next Space press activates it.
     jrEl.inert = false;
     jrEl.classList.add('show');
+    uiSfx('open');
     game.state.paused = true;
     jrReturnFocus = document.activeElement;
     jrCard.focus();
@@ -18304,7 +19009,7 @@ export function createSystems(game) {
       // progress is safe when it demonstrably is not is the worst of both.
       if (!saveTold) {
         saveTold = true;
-        toast('saved — you can close this and come back');
+        toast('saved — you can close this and come back', 'note');
       }
     } catch (e) {
       // ...AND IF IT THREW, THE PLAYER IS OWED THE OPPOSITE SENTENCE (R3).
@@ -18404,11 +19109,11 @@ export function createSystems(game) {
     // from the stored figure, so nothing new is saved to know it, and a reload
     // cannot make it happen twice.
     if (!parWas && recAtPar(def, value)) {
-      toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
+      toast('that is a good one  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
       // P4: two notes up, on the chapter's own lead. See sysMUS_STING.
       if (!musSting('record', 1.15)) sfx('chime', { volume: 0.6, pitch: 1.62 });
     } else if (prev !== undefined) {
-      toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit);
+      toast('personal best  ·  ' + def.label + ' ' + value.toFixed(def.dp) + def.unit, 'note');
       // The same figure a shade quieter: beating your own ghost is the same
       // KIND of event as reaching par, and the two must not need telling apart.
       if (!musSting('record', 0.92)) sfx('chime', { volume: 0.55, pitch: 1.45 });
@@ -18539,7 +19244,7 @@ export function createSystems(game) {
     if (gap > band) return;
     recNearCool = sysNEAR_COOL;
     const dp = Math.max(def.dp || 0, gap < 1 ? 1 : 0);
-    toast('so close  ·  ' + gap.toFixed(dp) + recGapUnit(def) + ' off your best');
+    toast('so close  ·  ' + gap.toFixed(dp) + recGapUnit(def) + ' off your best', 'note');
     sfx('chime', { volume: 0.34, pitch: 1.06 });
   }
 
@@ -19640,7 +20345,15 @@ export function createSystems(game) {
     findDone[id] = true;
     if (silent) return true;
     const def = sysFindDef(id);
-    toast('·  ' + (def ? def.text : id));
+    // WORDS, NOT A MARK (D6). This was a middle dot and the tick below was
+    // a Unicode heavy check — the last two pictures-made-of-characters in
+    // the game, and the DOM sweep in qa/d6-frame.js never saw either of
+    // them because a pill is up for two seconds and the sweep runs after.
+    // A `note` pill is already tracked caps and already reads as the game
+    // talking about itself; what it was missing was WHICH of the two
+    // things had happened, and the mark was never going to say that as
+    // well as the word does.
+    toast('found  ·  ' + (def ? def.text : id), 'note');
     sfx('chime', { volume: 0.42, pitch: 1.62 });
     const cp = game.capy && game.capy.position;
     if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, 6);
@@ -19822,7 +20535,7 @@ export function createSystems(game) {
       punch(0.09);
     } else {
       if (cp) confettiBurst(cp.x, cp.y + 0.45, cp.z, taskStreak > 0 ? 16 : 12);
-      toast('✔  ' + (r.def ? r.def.text : id));
+      toast('ticked  ·  ' + (r.def ? r.def.text : id), 'note');
       punch(0.06);
     }
     todoEl.classList.remove('stamp');
@@ -20110,7 +20823,7 @@ export function createSystems(game) {
     saveSoon();
     try { sfx('chime'); } catch (e) {}
     musSwell(1);
-    toast('and that is the lot.');
+    toast('and that is the lot.', 'last');
     // THEN the ledger — after the line has been read, and never before the
     // player has stopped moving, which by construction they have.
     //
@@ -20259,7 +20972,7 @@ export function createSystems(game) {
       // clues to remove. A pad has no camera either. Said only to the scheme
       // that has one; the others simply do not hear about it.
       if (sysIsTouch() || sysPadSeen()) return;
-      toast('no picture of ' + def.name + ' yet · K, then Enter');
+      toast('no picture of ' + def.name + ' yet · K, then Enter', 'note');
     }, sysKEEP_WAIT + sysKEEP_CARD + 3200);
   }
 
@@ -21000,6 +21713,19 @@ export function createSystems(game) {
   }, { passive: false });
 
   // --- touch layer ---
+  /**
+   * ONE OF THE FAN. A div and not a <button> because it captures the pointer
+   * and must not take focus off the canvas mid-chase (see bindBtn), so it
+   * carries the role and the label by hand — which is what the MENU button
+   * has always done and what the other five never did.
+   */
+  function sysTouchBtn(cls, glyph, label) {
+    const el = sysEl('div', 'capyui-btn ' + cls);
+    el.appendChild(sysGlyphEl(glyph, 'big'));
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', label);
+    return el;
+  }
   const touchLayer = sysEl('div', 'capyui-touch');
   const zoneEl = sysEl('div', 'capyui-zone');
   const baseEl = sysEl('div', 'capyui-base');
@@ -21007,18 +21733,25 @@ export function createSystems(game) {
   baseEl.appendChild(knobEl);
   zoneEl.appendChild(baseEl);
   touchLayer.appendChild(zoneEl);
-  const wheekBtn = sysEl('div', 'capyui-btn capyui-wheek', 'WHEEK');
-  const grabBtn = sysEl('div', 'capyui-btn capyui-grab', 'GRAB');
-  const hopBtn = sysEl('div', 'capyui-btn capyui-hop', 'HOP');
+  // ---- SIX WORDS IN CIRCLES, AND NOW SIX MARKS (D6) --------------------
+  // A phone player's entire vocabulary of verbs was set in tracked-out
+  // capitals on a cream disc, which is what a lift button looks like and is
+  // the one part of this game that could have been any game. They are marks
+  // in the sheet's own dialect now — see sysGLYPHS — and every one of them
+  // keeps its word as the aria-label, because a picture is a decoration to
+  // a screen reader and these are the only controls a thumb has.
+  const wheekBtn = sysTouchBtn('capyui-wheek', 'wheek', 'wheek');
+  const grabBtn = sysTouchBtn('capyui-grab', 'grab', 'grab');
+  const hopBtn = sysTouchBtn('capyui-hop', 'hop', 'hop');
   // The fourth verb of the fan. SLIDE completes the arc above GRAB rather than
   // going outboard of it, because it is held — the thumb rests on it — and the
   // outboard positions are where the taps are.
-  const slideBtn = sysEl('div', 'capyui-btn capyui-slide', 'SLIDE');
+  const slideBtn = sysTouchBtn('capyui-slide', 'slide', 'slide');
   // And the fifth thing, which is deliberately NOT one of the fan. It is a
   // rescue, not a verb: smaller, quieter, off on its own above the stick, where
   // a thumb will not find it by accident in the middle of a chase and where it
   // is nowhere near the three buttons a player is actually aiming at.
-  const backBtn = sysEl('div', 'capyui-btn capyui-back', 'STUCK');
+  const backBtn = sysTouchBtn('capyui-back', 'stuck', 'put me back');
   // ---- AND THE SIXTH, WHICH IS THE WHOLE OF R5 --------------------------
   // A phone player could not pause, could not reach a volume, could not open
   // the journal, the ledger, the album or the records, and could not get back
@@ -21029,9 +21762,7 @@ export function createSystems(game) {
   // In the right-hand column with the chart and STUCK, which is where the
   // things you READ live, and never in the fan: the fan is aimed at during a
   // chase and a menu is the last thing that should be under a wild thumb.
-  const menuBtn = sysEl('div', 'capyui-btn capyui-menu', 'MENU');
-  menuBtn.setAttribute('role', 'button');
-  menuBtn.setAttribute('aria-label', 'pause, settings and the journey');
+  const menuBtn = sysTouchBtn('capyui-menu', 'menu', 'pause, settings and the journey');
   touchLayer.appendChild(wheekBtn);
   touchLayer.appendChild(grabBtn);
   touchLayer.appendChild(hopBtn);
@@ -21096,6 +21827,10 @@ export function createSystems(game) {
       audioUnlock();
       if (!started) { startResume(); return; }
       el.classList.add('press');
+      // The fan is divs with a captured pointer, not <button>s, so it never
+      // reaches the delegated click listener that gives every other control
+      // in the HUD its press. D6: it gets the same one here.
+      uiSfx('press');
       down();
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     });
@@ -21184,9 +21919,9 @@ export function createSystems(game) {
   function padSayHello() {
     if (padSaidHello) return;
     padSaidHello = true;
-    toast('pad:  A hop  ·  X grab  ·  B WHEEK  ·  RT run  ·  LT slide');
+    toast('pad:  A hop  ·  X grab  ·  B WHEEK  ·  RT run  ·  LT slide', 'note');
     setTimeout(function () {
-      toast('...START pauses  ·  BACK hides the paper, hold it to get unstuck');
+      toast('...START pauses  ·  BACK hides the paper, hold it to get unstuck', 'note');
     }, 2600);
   }
 
@@ -23743,6 +24478,14 @@ export function createSystems(game) {
     // ...and the ledger, which is otherwise only reachable through a button
     // press on a card that a probe has to find first.
     ledger: function () { ledShow(false); },
+    /**
+     * THE FOUR UI VOICES, COUNTED (D6). Nothing in src reads this; the
+     * harness does. `uiSfx` calls the closure-local `sfx()`, so a probe that
+     * wraps `game.sfx` sees none of them and reports a silent frame against a
+     * frame that is not silent — which is exactly what the first run of
+     * `qa/d6-frame.js` did. `muted` is how many were suppressed by calm.
+     */
+    uiSfxAudit: function () { return Object.assign({}, sysUiSfxN); },
     // ...and the CROSSING, which nothing could reach. The chapter picker's
     // digit keys call biomeGo directly — they are a debug jump, not a
     // journey — so the 1.28 s of white that every probe in this repo has run

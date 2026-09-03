@@ -18,12 +18,66 @@
   body { font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
   canvas { display:block; width:100%; height:100%; touch-action:none; }
   #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }
-  #boot { position:fixed; inset:0; background:#cfe8ef; display:flex; align-items:center;
-          justify-content:center; flex-direction:column; gap:14px; z-index:50;
-          transition:opacity .6s ease; color:#5c6b52; padding:24px; text-align:center; }
-  #boot h1 { font-size:clamp(22px,4vw,40px); letter-spacing:.02em; font-weight:700; color:#6b7c5e; }
-  #boot .sub { font-size:14px; opacity:.7; }
+  /* ---- THE BOOT CARD IS THE SAME PIECE OF PAPER NOW (D6) -----------------
+     It was a self-contained mini design system: its own colours, its own type
+     scale, a rotating ring spinner, and no relationship to the card the game
+     opens with three hundred milliseconds later. On a slow connection it is
+     the ONLY screen a player sees, and it looked like a different product's
+     loading page.
+     It is the title card's own recipe, hand-copied — and hand-copied is the
+     point rather than an apology. This markup runs BEFORE main.js, before the
+     import map resolves, before a single module is fetched: nothing in
+     src/ can reach it, and a boot screen that depends on the thing it is
+     waiting for is not a boot screen. The numbers below are the ones in
+     sysBuildCSS (.capyui-card and .capyui-orn); if either moves, move both. */
+  #boot { position:fixed; inset:0; display:flex; align-items:center;
+          justify-content:center; flex-direction:column; z-index:50;
+          transition:opacity .6s ease; padding:24px; text-align:center;
+          background:linear-gradient(180deg,rgba(207,232,239,.34) 0%,
+            rgba(207,232,239,.62) 38%,rgba(223,242,242,.84) 100%),#cfe8ef; }
+  #boot .sheet { position:relative; background:#faf6ec;
+          background-image:linear-gradient(158deg,#faf6ec 0%,rgba(228,211,173,.34) 100%),
+            repeating-linear-gradient(92deg,rgba(181,171,151,.05) 0 1px,transparent 1px 4px);
+          border:1px solid #e6dfcd; border-radius:7px;
+          /* three shadows: the contact, the form and the room */
+          box-shadow:0 2px 5px rgba(0,0,0,.13),0 10px 22px rgba(0,0,0,.16),
+            0 34px 70px rgba(0,0,0,.28),0 2px 0 rgba(250,246,236,.9) inset,
+            0 0 0 1px rgba(181,171,151,.22);
+          padding:clamp(20px,4vw,40px) clamp(22px,5vw,54px);
+          transform:rotate(-.8deg); max-width:520px; width:100%; }
+  /* ...and the second sheet under it. A single sheet with a shadow is a dialog
+     box with a rotation on it; two is a stack, and a stack is an object. */
+  #boot .sheet:before { content:""; position:absolute; z-index:-1;
+          left:8px; right:-6px; top:10px; bottom:-8px; border-radius:7px;
+          background:rgba(230,223,205,.94); border:1px solid rgba(181,171,151,.3);
+          transform:rotate(1.25deg);
+          box-shadow:0 1px 3px rgba(0,0,0,.16),0 6px 16px rgba(0,0,0,.16); }
+  #boot h1 { font-size:clamp(24px,6.2vw,46px); line-height:1.05; color:#3a332c;
+          font-weight:700; letter-spacing:-.01em; text-wrap:balance; }
+  #boot .sub { margin-top:6px; font-size:clamp(11px,2.4vw,14px); letter-spacing:.42em;
+          text-transform:uppercase; color:#9e5f53; font-weight:700; }
   #boot.hidden { opacity:0; pointer-events:none; }
+
+  /* ---- THE SPINNER IS THE ORNAMENT, BREATHING ---------------------------
+     A rotating ring is the one shape in this whole product that says
+     "framework". The title card's masthead device is a capybara between two
+     hairline rules, breathing at five seconds a cycle — one and a half pixels,
+     under the threshold at which anybody would call it an animation and well
+     over the one at which a still drawing of an animal starts to feel like an
+     animal. That is what a player should be looking at while they wait, and it
+     is the same eleven shapes sysCAPY_MARK draws. */
+  #boot .orn { display:flex; align-items:center; justify-content:center;
+          gap:clamp(8px,2vw,14px); margin-top:clamp(9px,1.8vw,14px); }
+  #boot .orn:before, #boot .orn:after { content:""; height:1px; flex:1 1 0;
+          max-width:160px; background:linear-gradient(90deg,transparent,rgba(58,51,44,.42)); }
+  #boot .orn:after { background:linear-gradient(270deg,transparent,rgba(58,51,44,.42)); }
+  #boot .orn svg { display:block; width:clamp(44px,9vw,64px); height:auto;
+          transform-origin:50% 100%; }
+  @media (prefers-reduced-motion: no-preference) {
+    #boot .orn svg { animation:capyboot-breathe 5s ease-in-out infinite; }
+  }
+  @keyframes capyboot-breathe { 0%,100% { transform:translateY(0) scaleY(1); }
+                                50% { transform:translateY(-1px) scaleY(1.035); } }
 
   /* ---- THE SCREEN A STRANGER GETS WHEN IT DOES NOT START -------------------
      Three different failures — no WebGL, a dependency that never arrived, a
@@ -36,25 +90,23 @@
      This is the same card in the same palette, and it says which of the three
      it was and what to do about it. */
   #boot.failed { transition:none; }
-  #boot .fail { display:none; max-width:34em; }
+  #boot .fail { display:none; max-width:34em; margin:0 auto; }
+  /* the failure is a wider sheet: it is three sentences and a list */
+  #boot.failed .sheet { max-width:640px; transform:rotate(-.4deg); }
   #boot.failed .fail { display:block; }
-  #boot.failed .sub, #boot.failed .spin { display:none; }
-  #boot .fail p { font-size:15px; line-height:1.65; opacity:.85; margin:0 0 10px; }
+  #boot.failed .sub, #boot.failed .orn { display:none; }
+  #boot .fail p { font-size:15px; line-height:1.65; color:#3a332c; margin:14px 0 10px; }
   #boot .fail ul { text-align:left; display:inline-block; margin:2px 0 14px; padding-left:1.1em;
-                   font-size:14px; line-height:1.7; opacity:.75; }
-  #boot .fail button { font:inherit; font-size:14px; font-weight:700; cursor:pointer;
-          color:#fff; background:#e08a7d; border:0; border-radius:9px; padding:10px 22px;
-          box-shadow:0 3px 9px rgba(60,70,55,.22); letter-spacing:.03em; }
-  #boot .fail button:hover { background:#d97b6c; }
-  #boot .fail .detail { font:12px/1.5 ui-monospace,Consolas,monospace; opacity:.5;
-          margin-top:14px; word-break:break-word; }
+                   font-size:14px; line-height:1.7; color:rgba(58,51,44,.7); }
+  /* the card's own accent, its own radius and its own three shadows */
+  #boot .fail button { font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+          color:#faf6ec; background:#e98b7a; border:1px solid #e98b7a; border-radius:5px;
+          padding:10px 22px; letter-spacing:.1em; text-transform:uppercase;
+          box-shadow:0 1px 3px rgba(0,0,0,.16),0 6px 16px rgba(0,0,0,.16); }
+  #boot .fail button:hover { filter:brightness(1.06); }
+  #boot .fail .detail { font:12px/1.5 ui-monospace,Consolas,monospace;
+          color:rgba(58,51,44,.5); margin-top:14px; word-break:break-word; }
 
-  /* The waiting animation, so a slow connection reads as progress rather than
-     as the same frozen card the failures produce. */
-  .spin { width:34px; height:34px; border-radius:50%; border:3px solid rgba(107,124,94,.22);
-          border-top-color:#6b7c5e; animation:spin 1s linear infinite; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spin { animation:none; } }
 
   #err { position:fixed; left:0; right:0; bottom:0; max-height:45%; overflow:auto; z-index:99;
          background:#3a3229; color:#ffd9a0; font:12px/1.5 ui-monospace,Consolas,monospace;
@@ -68,14 +120,32 @@
 </head>
 <body>
 <div id="boot">
-  <h1>Untitled Capybara Game</h1>
-  <div class="spin" aria-hidden="true"></div>
-  <div class="sub">warming up the harbour…</div>
-  <div class="fail" role="alert">
-    <p id="failmsg"></p>
-    <ul id="failtips"></ul>
-    <div><button type="button" id="failgo">Try again</button></div>
-    <div class="detail" id="faildetail"></div>
+  <div class="sheet">
+    <h1>Untitled Capybara Game</h1>
+    <div class="sub">warming up the harbour</div>
+    <!-- The masthead device: the same eleven shapes as sysCAPY_MARK in
+         systems.js, inline because this markup has to draw before a single
+         module has been fetched. -->
+    <div class="orn" aria-hidden="true">
+      <svg viewBox="0 0 34 22" preserveAspectRatio="xMidYMid meet" focusable="false">
+        <ellipse cx="15" cy="13.5" rx="11" ry="6.2" fill="#b0784a"/>
+        <ellipse cx="6.5" cy="15.5" rx="3.2" ry="4.2" fill="#94603a"/>
+        <rect x="8" y="17" width="2.4" height="4" fill="#94603a"/>
+        <rect x="19" y="17.5" width="2.4" height="3.5" fill="#94603a"/>
+        <circle cx="25" cy="9.5" r="5.4" fill="#c79063"/>
+        <ellipse cx="29.6" cy="9.6" rx="2.6" ry="2.2" fill="#b0784a"/>
+        <circle cx="22.4" cy="5.2" r="1.9" fill="#8a5a37"/>
+        <circle cx="27.2" cy="5" r="1.9" fill="#8a5a37"/>
+        <circle cx="26.6" cy="8.4" r="1.1" fill="#2f2118"/>
+        <circle cx="31.2" cy="10.2" r="1" fill="#5f3d29"/>
+      </svg>
+    </div>
+    <div class="fail" role="alert">
+      <p id="failmsg"></p>
+      <ul id="failtips"></ul>
+      <div><button type="button" id="failgo">Try again</button></div>
+      <div class="detail" id="faildetail"></div>
+    </div>
   </div>
 </div>
 <div id="hud"></div>
