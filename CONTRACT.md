@@ -3343,6 +3343,179 @@ reports a silent frame against a frame that is not silent. `game.hud.uiSfxAudit(
 is the counter it needs.
 
 
+## THE BODY, SECOND HALF — D8 (3 Sep 2026)
+
+Area 2's five remaining items, and every one of them is a channel that was
+already written down and never drawn.
+
+Instruments: `qa/d8-body.js` (all five, measured), `qa/d8-shots.js`,
+`qa/d8-climbshot.js`, `qa/d8-herdshot.js`, `qa/d8-faceshot.js`,
+`qa/d8-gestshot.js` (the pictures), and `qa/crop.cjs` — a dependency-free PNG
+crop-and-magnify, which exists because two of the things this batch added are
+seven centimetres long.
+
+### The climb has a pose
+
+`capyClingT` was declared *"s spent on the current hold, for the pose"* in v31
+and never read by anything. What a clinging animal actually got was **the air
+tuck** — because clinging sets `grounded = false`, and not-grounded is what the
+tuck means everywhere else in the file. So the one verb in this game that is
+about holding on to a wall was drawn as the one pose that is definitely not
+touching anything.
+
+`capyClimbPose` is a fourth answer on the same cross-fade as the walk, the tuck
+and the loaf, and it beats all three, because a wall is the least ambiguous
+thing an animal can be touching. Fronts reach up the face and both diagonals
+reach on one cycle out of `capyClingT`; rears trail under; elbows out, which is
+what makes it read as GRIPPING rather than as standing. The body pitches 0.85
+rad (49°) nose-up, on OUTSIDE the lean filter beside the terrain pitch and the
+slide, for the reason those two are outside it — it has its own clock and
+running it through the lean's as well would make getting onto a wall take a
+second and a half. The head looks up it.
+
+Measured: fronts −1.14/−0.90 against the tuck's −1.04/−1.04, rears +0.46/+0.22
+against +0.85/+0.85, and the pitch −0.85 against −0.05.
+
+### ...and the carry has three of them
+
+`carried` used to mean one thing: fourteen radians a second of four-legged
+flail, for ever. That is correct for the two seconds a Sydney gardener has hold
+of you and wrong for both of the other carriers in this game — the condor,
+which has you in its talons for up to a minute, and **Palawan's manta, which
+you are riding**. A capybara pedalling the open water on the back of a ray was
+the tell that this branch had never known who was holding it.
+
+A carrier publishes `hold` and capybara.js reads it:
+
+| hold | who | what it draws |
+|---|---|---|
+| `arms` | the gardener | the flail, for as long as it lasts |
+| `talons` | the condor | 1.2 s of flail, then trailing legs and a 0.31 Hz sway |
+| `ride` | the manta | no flail at all: four legs braced out, gripping |
+
+**AND THE FLAIL HAS NEVER FLAILED.** It ran on `capyLegPhase` — the GAIT's
+phase — and forty lines above it the gait, seeing an animal that is not moving,
+damps that same variable back toward zero at λ 6 every frame. Two writers on one
+channel, and the fixed point of `+14·dt` against `−6·w·dt` is a CONSTANT:
+w = 14/6 = 2.33 rad. Measured on a carry, the four legs reach 0.45, −0.21,
+−0.68, −0.52 within half a second and then never move again. Nineteen versions
+of a perfectly rigid capybara being carried off at a slight angle, under a
+comment that reads *"flail, don't stand serenely"*. It has its own variable now,
+and the gait cannot reach it.
+
+### The face
+
+The crowd got one in P5 and the star did not: one static brow box, and a stack
+of authored state — the whiffed reach, the refused hop, the wheek, the loaf and
+the fall — drawn nowhere above the neck.
+
+Two brow bars, one per eye, **in the eye sockets** so each inherits its eye's
+outward yaw for free and is over that eye from every angle, which two bars
+parented to the skull are not once the head turns. `capyMood` is one number in
+−1..1 and ALARM WINS over cross-and-sleepy, which is the crowd's own rule
+(`mTgt = f > cross ? f : -cross`) for the crowd's own reason: an animal falling
+forty metres while it happens to be tired is not sleepy.
+
+    the wheek       +0.85
+    the fall        +0..0.9   off the ACTUAL descent, not off the jump key
+    the whiff       −0.70
+    the refusal     −0.55
+    the loaf        −0.50
+
+Deliberately the same constants as `npcFace` — a capybara and a tourist
+surprised by the same thing should be surprised by the same amount — and
+deliberately NOT the same function: the crowd has one eye node and a fringe,
+this has two beads in two rotated sockets, and forcing one routine to draw both
+would be four branches in a per-frame path for the sake of not writing twelve
+lines twice. Same argument `localsChat` makes about `chatStep`.
+
+Asymmetric, and that is the whole of why a mood reads as a reaction: 15 into it
+(~70 ms) and 3.2 out of it (~300 ms). Measured: rest −0.497 (the loaf), +0.549
+a tenth of a second after a wheek, back to −0.5 a second and a half later, +0.9
+falling.
+
+**And the blink was a step.** `capyBlink` counted down from 110 ms with the eye
+a flat plate for the whole of it — seven frames of a dead-looking animal and no
+frames of an eyelid moving. It is a triangle now, which is what `npcBlink` has
+done for the crowd since P5.
+
+**Siting a 7 cm bar takes a magnifier.** 0.064 above the eye bead puts them on
+the crest of the brow ridge level with the ear roots; 0.050 overlaps a 9 cm
+bead. 0.060 clears its top edge and lands inside the brow mass, which spans
+0.05..0.19 and is the shelf a brow belongs on. `qa/crop.cjs` exists because of
+this decision.
+
+### The crowd's talking arm
+
+Every local in the game gestures while they speak and not one of the fifty-odd
+people in Sydney and Pasto ever had: `rec.gest` was written by `localLine` and
+read by the locals' pose stack, and the roster's rig — a real state machine,
+drawn as instanced boxes — had no equivalent at all. So a crowd of tourists
+talked to each other for nineteen versions with their hands by their sides.
+
+It is set in `sayBubble`, which is the one place every line in this file goes
+through, and it is set to **the bubble's own life** — so the arm cannot get out
+of step with the words, which is exactly what a second hand-tuned constant
+beside this one would eventually do. On the right arm only, masked by whatever
+the pose already asked that arm for, so somebody holding a camera up or
+pointing keeps doing that: the state machine's answer wins.
+
+Measured in Sydney: 32 in the cast, up to ten of them talking at once, and a
+right arm up to 1.06 rad off where the pose alone would have put it.
+
+### The Pantanal herd has legs
+
+Nine capybaras were one merged instanced mesh — four leg cylinders welded to
+the torso — with a fixed 8 rad/s bob. The chapter's own marquee shot is a line
+of your own kind following you into a river, and it was nine loaves sliding
+across the flood.
+
+Two more instanced meshes, one per PAIR, each with its origin at that pair's hip
+line so the whole pair swings about it. Two rather than four because at the six
+metres this chapter is played at a trot and a walk are the same silhouette, and
+four would be four draw calls to say it. The pairs are half a cycle apart, which
+on a pair-per-mesh rig is a trot, and a trot is what a capybara does. All three
+meshes share one `instanceColor` buffer, so a young one's legs are a young one's
+colour.
+
+**And the cadence is D2's law, applied here.** Half a stride is 2 · hip · sin
+(swing); the phase rate that walks it at this speed is π·v/stride. A fixed
+8 rad/s is right at exactly one speed, and these animals range from 1.05 m/s
+grazing to 8.5 m/s catching up. **The bob is on the same clock**, which is the
+whole point: a body that rises and falls on a different beat from the feet is
+what sliding actually looks like.
+
+Cost: two draw calls, in one chapter, nine instances each.
+
+### Measured
+
+| | before | after |
+|---|---|---|
+| clinging: body pitch | −0.05 rad (the air tuck) | **−0.85** |
+| clinging: front legs | −1.04, −1.04 | **−1.14, −0.90**, alternating |
+| clinging: rear legs | +0.85, +0.85 | **+0.46, +0.22** |
+| carried by a gardener, front leg over 3 s | 0.45 → 0.45 → 0.45 (frozen) | **0.23 → −0.62 → −0.41 → 0.51** |
+| carried by talons, at 3.2 s | the same flail as everything else | legs **0.34/−0.26**, sway **0.98** |
+| carried by a manta | a four-legged flail | **0.62 on all four**, braced, no flail |
+| the star's mood | there was no channel | rest −0.50, wheek **+0.55** in 100 ms, back to −0.50 in 1.5 s, falling **+0.90** |
+| the crowd's talking arm | 0 | up to **1.06 rad**, ten people at once |
+| herd legs | welded to the torso | two pair meshes, **4.21 footfalls/s** at 1.05 m/s |
+
+The blink: four in twelve seconds, and each one is now a triangle rather than
+110 ms of a flat plate.
+
+**Regression.** `qa/r10-soak.js`: 19 rows, 0 NaN, no console errors,
+`orphans: []`. `qa/p7-tokens.cjs` unchanged.
+
+### One number that is a tautology, and is not reported as one
+
+The herd's audit does NOT report a skate ratio. D2's skate — ground covered
+over ground the stride claims — is the right measurement for the player, whose
+speed comes from a solver; here the cadence is DERIVED from the speed, so the
+ratio is 1.000 by construction and proves nothing at all. `footHz` is reported
+instead, because it is a number a person can hold against the 8 rad/s it
+replaced.
+
 ## WORLD LIFE — D7 (3 Sep 2026)
 
 Area 3's five remaining systems, and the roadmap was wrong about one of them

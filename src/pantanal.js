@@ -84,6 +84,17 @@ let panTime = 0;
 // the herd
 const panHERD_N = 9;
 let panHerdMesh = null;
+// One InstancedMesh per LEG PAIR  see THE LEGS COME OFF THE BODY.
+let panHerdLegF = null, panHerdLegR = null;
+// panHERD_LEG  the numbers the split needs. HIP is where the pairs pivot (the
+// top of a 0.34 m leg whose foot is at 0.01 below the ground plane), FZ/RZ are
+// where the two pairs sit fore and aft, and the two SWINGs are the amplitude
+// at a graze and flat out. See THE GAIT.
+const panHERD_HIP = 0.33;
+const panHERD_FZ = 0.36;
+const panHERD_RZ = -0.34;
+const panHERD_SWING0 = 0.34;
+const panHERD_SWING1 = 0.70;
 const panHerd = [];                   // {x,z,yaw,st,order,ph,vy}
 let panFollowing = 0, panBestString = 0;
 let panHerdChat = 4;                  // the contact call a line of them keeps up
@@ -224,6 +235,11 @@ const panQ = new THREE.Quaternion();
 const panE = new THREE.Euler();
 const panSc = new THREE.Vector3();
 const panM = new THREE.Matrix4();
+// A second matrix, for a thing hung off the first one: the leg pairs are the
+// bodys transform times an offset-and-swing of their own.
+const panM2 = new THREE.Matrix4();
+const panLegV = new THREE.Vector3();
+const panOne = new THREE.Vector3(1, 1, 1);
 const panCol = new THREE.Color();
 const panCol2 = new THREE.Color();
 const panSfx = { volume: 1, pitch: 1 };
@@ -2436,13 +2452,38 @@ function panBuildHerd(root) {
   M.box(0, 0.70, 0.86, 0.30, 0.20, 0.22, PALETTE.panCapyDk);
   M.sph(-0.20, 0.76, 0.60, 0.09, 0.09, 0.09, PALETTE.panCapyDk, 6);
   M.sph(0.20, 0.76, 0.60, 0.09, 0.09, 0.09, PALETTE.panCapyDk, 6);
-  for (let i = 0; i < 4; i++) {
-    M.cyl((i < 2 ? -0.26 : 0.26), 0.16, (i % 2 ? -0.34 : 0.36), 0.09, 0.34, PALETTE.panCapyDk, 0, 0, 0, 4);
+  // ---- THE LEGS COME OFF THE BODY (D8) -----------------------------------
+  // They used to be four more cylinders merged into the mesh above, which means
+  // they were welded to the torso and could never move: the whole animation of
+  // nine capybaras was a fixed 8 rad/s bob, so the chapter's own marquee shot —
+  // a line of your own kind following you into a river — was nine loaves
+  // sliding across the flood. The roadmap called them legless and it was right
+  // about what they read as.
+  //
+  // Two more instanced meshes, one per PAIR, each with its origin at that
+  // pair's hip line so the whole pair swings about it. Two rather than four
+  // because at the six metres this chapter is played at a trot and a walk are
+  // the same silhouette, and four would be four draw calls to say it.
+  //
+  // Cost: two draw calls in one chapter, nine instances each.
+  const LF = panMerger(), LR = panMerger();
+  for (let s = -1; s <= 1; s += 2) {
+    // Local origin is the hip: the cylinder hangs from y 0 down to -0.34.
+    LF.cyl(s * 0.26, -0.17, 0, 0.09, 0.34, PALETTE.panCapyDk, 0, 0, 0, 4);
+    LR.cyl(s * 0.26, -0.17, 0, 0.09, 0.34, PALETTE.panCapyDk, 0, 0, 0, 4);
   }
   panHerdMesh = new THREE.InstancedMesh(M.build(), panVC(), panHERD_N);
   panHerdMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   panHerdMesh.castShadow = true;
   panHerdMesh.frustumCulled = false;
+  panHerdLegF = new THREE.InstancedMesh(LF.build(), panVC(), panHERD_N);
+  panHerdLegR = new THREE.InstancedMesh(LR.build(), panVC(), panHERD_N);
+  for (const m of [panHerdLegF, panHerdLegR]) {
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.castShadow = true;
+    m.frustumCulled = false;
+    root.add(m);
+  }
   const ca = new Float32Array(panHERD_N * 3);
   panHerd.length = 0;
   // Scattered where the first thing you meet coming down the road is four of
@@ -2464,6 +2505,11 @@ function panBuildHerd(root) {
     ca[i * 3] = panCol.r; ca[i * 3 + 1] = panCol.g; ca[i * 3 + 2] = panCol.b;
   }
   panHerdMesh.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
+  // The SAME array on the legs. instanceColor multiplies the vertex colour, so
+  // three meshes sharing one tint is the only way a young one's legs stay the
+  // same animal as its body — and it costs nothing, because it is one buffer.
+  panHerdLegF.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
+  panHerdLegR.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
   root.add(panHerdMesh);
 }
 
@@ -3159,7 +3205,10 @@ function panUpdateHerd(game, dt) {
       r.x += dx * k; r.z += dz * k;
       r.yaw = dampAngle(r.yaw, Math.atan2(dx, dz), 8, dt);
       r.moving = 1;
-    } else r.moving = 0;
+      // ...and how fast, published, because the legs need it and it was
+      // previously thrown away at the end of this block. See panHERD_LEG.
+      r.sp = sp;
+    } else { r.moving = 0; r.sp = 0; }
     // ---- the answer, and the look that goes with it ----------------------
     if (r.reply > 0) {
       r.reply -= dt;
@@ -3209,7 +3258,27 @@ function panUpdateHerd(game, dt) {
       r.rip -= dt;
       if (r.rip <= 0) { r.rip = rand(0.9, 1.5); panRipple(r.x, r.z, 0.30 + Math.random() * 0.14); }
     }
-    let bob = r.moving ? Math.abs(Math.sin(panTime * 8 + r.ph)) * 0.055 : Math.sin(panTime * 1.3 + r.ph) * 0.02;
+    // ---- THE GAIT (D8) ---------------------------------------------------
+    // Cadence from the STRIDE, which is D2's law for the player's own legs
+    // applied here: half a stride is 2 · hip height · sin(swing), and the
+    // phase rate that walks that stride at this speed is π·v/stride. A fixed
+    // 8 rad/s — which is what the bob ran at — is right at exactly one speed
+    // and skates at every other, and these animals range from 1.05 m/s
+    // grazing to 8.5 m/s catching up.
+    const swing = clamp(panHERD_SWING0 + r.sp * 0.045, panHERD_SWING0, panHERD_SWING1);
+    const stride = Math.max(0.22, 2 * panHERD_HIP * Math.sin(swing));
+    r.legPh = (r.legPh || 0) + (r.moving ? Math.PI * r.sp / stride : -0) * dt;
+    if (!r.moving) {
+      // unwind by the shortest arc, so a herd that stops does not rewind a
+      // whole stride to get its feet together
+      let w = r.legPh % (Math.PI * 2);
+      if (w > Math.PI) w -= Math.PI * 2;
+      r.legPh = damp(w, 0, 6, dt);
+    }
+    // ...and the BOB is on the same clock, which is the whole point: a body
+    // that rises and falls on a different beat from the feet is what "sliding"
+    // actually looks like.
+    let bob = r.moving ? Math.abs(Math.sin(r.legPh)) * 0.055 : Math.sin(panTime * 1.3 + r.ph) * 0.02;
     const sc = (i === 6 || i === 8) ? 0.72 : 1;
     // ...and on the far bank they all shake, each on its own beat
     let roll = 0;
@@ -3221,8 +3290,22 @@ function panUpdateHerd(game, dt) {
     panM.compose(panV3.set(r.x, r.y + bob, r.z),
                  panQ.setFromEuler(panE.set(0, r.yaw, roll)), panSc.set(sc, sc, sc));
     panHerdMesh.setMatrixAt(i, panM);
+    // Each pair is the body's own transform (scale included, so a young one's
+    // legs are a young one's size) times an offset to its hip and a rotation
+    // about that hip. The two pairs are half a cycle apart, which on a pair-
+    // per-mesh rig is a trot — and a trot is what a capybara does.
+    panM2.compose(panLegV.set(0, panHERD_HIP, panHERD_FZ),
+                  panQ.setFromEuler(panE.set(Math.sin(r.legPh) * swing, 0, 0)), panOne);
+    panM2.premultiply(panM);
+    panHerdLegF.setMatrixAt(i, panM2);
+    panM2.compose(panLegV.set(0, panHERD_HIP, panHERD_RZ),
+                  panQ.setFromEuler(panE.set(-Math.sin(r.legPh) * swing, 0, 0)), panOne);
+    panM2.premultiply(panM);
+    panHerdLegR.setMatrixAt(i, panM2);
   }
   panHerdMesh.instanceMatrix.needsUpdate = true;
+  panHerdLegF.instanceMatrix.needsUpdate = true;
+  panHerdLegR.instanceMatrix.needsUpdate = true;
   if (panShakeT > 0) panShakeT -= dt;
   // ---- AND A LINE OF THEM IS NOT SILENT --------------------------------
   // A capybara herd on the move keeps up a running conversation — a soft
@@ -4812,6 +4895,36 @@ export function createPantanal(game) {
     bank: { x: panCROSS.x, z: panRIVER.z1 + 3 },
     sandbar: { x: panSANDBAR.x, z: panSANDBAR.z },
 
+    /**
+     * WHAT THE NINE ARE DOING WITH THEIR LEGS, read-only (D8).
+     *
+     * The skate is the same measurement D2 made on the player and it cannot be
+     * taken from a screenshot: a leg swinging at the wrong rate and a leg not
+     * swinging at all are the same still frame. `skate` is the ratio the whole
+     * argument turns on — ground covered over ground the stride claims — and it
+     * is 1.000 when the feet are locked. Nothing in src reads this.
+     */
+    herdAudit() {
+      const rows = [];
+      for (let i = 0; i < panHerd.length; i++) {
+        const r = panHerd[i];
+        const swing = clamp(panHERD_SWING0 + (r.sp || 0) * 0.045, panHERD_SWING0, panHERD_SWING1);
+        const stride = Math.max(0.22, 2 * panHERD_HIP * Math.sin(swing));
+        const rate = r.moving ? Math.PI * (r.sp || 0) / stride : 0;
+        rows.push({ st: r.st, moving: !!r.moving, sp: +(r.sp || 0).toFixed(3),
+                    legPh: +(r.legPh || 0).toFixed(3), swing: +swing.toFixed(3),
+                    stride: +stride.toFixed(3), rate: +rate.toFixed(3),
+                    // FOOTFALLS A SECOND, which is a number a person can judge
+                    // against the one this replaced. A "skate" ratio here would
+                    // be a tautology — the rate is DERIVED from the speed, so
+                    // it is 1.000 by construction and proves nothing. Two
+                    // pairs, so two footfalls per cycle.
+                    footHz: +(rate / Math.PI).toFixed(2) });
+      }
+      return { n: panHerd.length,
+               legs: !!(panHerdLegF && panHerdLegR),
+               rows: rows };
+    },
     /** They MOVE — ask, never cache. */
     herd() {
       // the nearest one that is not already following, which is the one the

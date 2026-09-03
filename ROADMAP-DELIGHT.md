@@ -767,17 +767,64 @@ feature.
 
 ---
 
-## The shelf — sized, not scheduled
+### Batch D8 — the body, second half (area 2, second of two sessions)
 
-**D8 — the body, second half** (area 2, ~12 h). The climb pose on
-`capyClingT`; the condor hang (flail 1.2 s, then trailing legs and a slow
-sway on `carriedBy.hold`); the capybara's face — two brow boxes and a
-`capyMood` with the crowd's asymmetric damping, driven by whiff, refuse, wheek,
-loaf and the fall; `rec.gest` read by `animHuman` so the instanced crowds
-gesture when they speak; the Pantanal herd split into body and two leg-pair
-instanced meshes.
+**LANDED 3 Sep 2026.** All five. Contract section **THE BODY, SECOND HALF —
+D8**; instruments `qa/d8-body.js`, `qa/d8-shots.js`, `qa/d8-climbshot.js`,
+`qa/d8-herdshot.js`, `qa/d8-faceshot.js`, `qa/d8-gestshot.js`, and
+`qa/crop.cjs` — a dependency-free PNG magnifier, because two of the things this
+batch added are seven centimetres long.
 
-**D9 — housekeeping** (area 7, ~4 h). **LANDED 3 Sep 2026**, all nine.
+- **The climb has a pose.** `capyClingT` was declared "for the pose" in v31 and
+  never read by anything: what a clinging animal got was the AIR TUCK, because
+  clinging sets `grounded = false` and that is what not-grounded means
+  everywhere else in the file. Fronts reach up the face on a cycle out of
+  `capyClingT`, rears trail under, elbows out, the body pitched 49° nose-up and
+  the head looking up the wall.
+- **A carry knows who is doing the carrying.** `carriedBy.hold` is `arms`,
+  `talons` or `ride`, and the three draw three different animals: the
+  gardener's two-second flail, the condor's 1.2 s of kicking and then a hang
+  with a 0.31 Hz sway, and — on Palawan's manta, which you are ON TOP OF — no
+  flail at all, four legs braced. Until this batch, riding a manta ray drew a
+  capybara pedalling the open water.
+- **The star has a face.** Two brow bars in the eye sockets and a `capyMood`
+  driven by the wheek, the fall, the whiffed reach, the refused hop and the
+  loaf — the same constants and the same asymmetric damping the crowd got in
+  P5, because a capybara and a tourist surprised by the same thing should be
+  surprised by the same amount. And the blink is a triangle rather than 110 ms
+  of a flat plate.
+- **The crowd gestures when it speaks.** `rec.gest` is set in `sayBubble` — the
+  one place every line goes through — to the BUBBLE'S OWN LIFE, so the arm
+  cannot get out of step with the words. Fifty-odd people in Sydney and Pasto
+  had talked to each other for nineteen versions with their hands by their
+  sides.
+- **The Pantanal herd has legs.** Two more instanced meshes, one per pair,
+  pivoting at their own hip line, half a cycle apart — and the cadence is D2's
+  law applied here: π·v/stride out of the animal's own speed, with the bob on
+  the same clock, because a body rising and falling on a different beat from
+  the feet is what sliding actually looks like.
+
+**AND THE FLAIL HAS NEVER FLAILED.** The carry ran on `capyLegPhase` — the
+GAIT's phase — and forty lines above it the gait, seeing an animal that is not
+moving, damps that same variable toward zero at λ 6 every frame. Two writers on
+one channel, and the fixed point of +14·dt against −6·w·dt is a CONSTANT:
+w = 14/6 = 2.33 rad. Measured on a carry, the four legs reach 0.45, −0.21,
+−0.68, −0.52 within half a second and never move again — a perfectly rigid
+capybara being carried off at a slight angle, for nineteen versions, under a
+comment that reads "flail, don't stand serenely". It has its own variable now.
+
+**Three ways a probe lied, and all three were about the camera.** `frameShot`
+always looks at the ANIMAL, so a picture of a person means standing the
+capybara PAST them; the first climb shot was taken after the probe had released
+the key and photographed a capybara standing on a bin; and `input.camYaw` — the
+bearing from the animal TO the camera — has to be read from the audit, because
+nothing published it.
+
+---
+
+### Batch D9 — housekeeping (area 7)
+
+**LANDED 3 Sep 2026**, all nine.
 Contract section **HOUSEKEEPING — D9**; instruments `qa/d9-clock.js`,
 `qa/d9-audio.js`, `qa/d9-rush.js`.
 
@@ -804,6 +851,14 @@ Contract section **HOUSEKEEPING — D9**; instruments `qa/d9-clock.js`,
   both documents; `package.json` 0.60.0; and a note at the top of `CONTRACT.md`
   saying how to read a number in a dated section, because most of the remaining
   "seventeen"s are true sentences about August.
+
+---
+
+## The shelf — sized, not scheduled
+
+**Empty.** D1 through D9 have all landed, the last of them on 3 Sep 2026.
+Everything this review found and did not build is in the two sections below,
+and both of them are decisions rather than a queue.
 
 ---
 

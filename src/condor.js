@@ -510,6 +510,12 @@ export function createCondor(game) {
   const api = {
     active: false,
     mounted: false,
+    // ---- HOW THIS ONE HOLDS YOU (D8) --------------------------------------
+    // capybara.js draws a carry three different ways and cannot tell a bird
+    // from a gardener without being told. This is hung by the middle in a pair
+    // of talons, for up to a minute — so the flail is a BEAT and what follows
+    // it is a hang. See WHO IS HOLDING YOU in capybara.js.
+    hold: 'talons',
     state: 'gone',
     group: null,
     body: null,

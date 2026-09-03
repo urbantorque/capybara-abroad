@@ -1871,6 +1871,8 @@ function mainBoot() {
     // Who has a job in this chapter and whether they are doing it. See A
     // PERSON WITH A JOB in npc.js.
     game.beatAudit = npcs.beatAudit;
+    // ...and whether the instanced crowd gestures when it speaks. See D8.
+    game.gestAudit = npcs.gestAudit;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

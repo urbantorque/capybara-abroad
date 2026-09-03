@@ -898,6 +898,77 @@ let capyStallT = 0;                 // s spent blocked with the stick down
 let capyStepUsed = 0;               // m of step assist spent on this blockage
 let capyStepX = 0, capyStepZ = 0;   // where this blockage started
 let capyAirPose = 0;                // 0..1 render blend into the tuck
+// ---- THE CLIMB HAS A POSE NOW (D8) ---------------------------------------
+// `capyClingT` was declared "for the pose" in v31 and never read by anything,
+// and the pose a clinging animal got was THE AIR TUCK — because clinging sets
+// grounded = false, and the tuck is what not-grounded means everywhere else in
+// this file. So the one verb in the game that is about holding on to a wall
+// was drawn as the one thing that is definitely not touching anything.
+//
+// Same shape as capyAirPose and blended on top of it, because they are two
+// answers to the same question and the wall's is the right one: a cross-fade
+// rather than a branch, so a hold that flickers at the top of a lattice cannot
+// snap the legs.
+let capyClimbPose = 0;              // 0..1 render blend into the climb
+const capyCLIMB_LAM   = 12;         // how fast the pose commits. ~0.25 s.
+const capyCLIMB_RATE  = 3.6;        // rad/s of the reach cycle, both diagonals
+const capyCLIMB_PITCH = 0.85;       // rad of nose-up. 49 deg: belly to the wall.
+const capyCLIMB_F     = -1.02;      // front legs, reached up the face
+const capyCLIMB_R     = 0.34;       // ...and rears, trailing under
+const capyCLIMB_SWING = 0.40;       // rad of reach either side of those
+const capyCLIMB_SPLAY_F = 0.30;     // rad of elbow-out, which is what makes it
+const capyCLIMB_SPLAY_R = 0.18;     // read as GRIPPING rather than as standing
+// ---- ...AND THE CARRY HAS THREE OF THEM (D8) -----------------------------
+// `carried` used to mean one thing: fourteen radians a second of four-legged
+// flail, for ever. It is correct for the two seconds a Sydney gardener has
+// hold of you and wrong for both of the other carriers in this game — the
+// condor, which has you in its talons for up to a minute, and Palawan's manta,
+// which you are RIDING. A capybara pedalling the air on the back of a manta
+// ray is the tell that this branch never knew who was holding it.
+//
+// So a carrier publishes `hold` and this reads it. See capyCarryHold.
+let capyCarryT = 0;                 // s in the current carry
+let capyCarrier = null;             // ...and who by, to notice a change
+let capyHangSway = 0;               // the slow swing under the talons
+let capyCarryPh = 0;                // the flail's OWN phase — see AND THE FLAIL
+const capyHANG_FLAIL = 1.2;         // s of kicking before it gives up
+const capyHANG_LAM   = 1.9;         // ...and how fast it settles after that
+const capyHANG_F     = 0.34;        // trailing legs: fronts forward of vertical
+const capyHANG_R     = -0.26;       // ...rears behind it
+const capyHANG_SWAY  = 0.13;        // rad of body roll, at 0.31 Hz
+const capyRIDE_LEG   = 0.62;        // gripping a manta: legs out and braced
+const capyRIDE_SPLAY = 0.34;
+// ---- THE FACE (D8) --------------------------------------------------------
+// The crowd got one in P5 and the star did not: one static brow box, and a
+// stack of authored state — the whiffed reach, the refused hop, the wheek, the
+// loaf and the fall — drawn nowhere above the neck.
+//
+// Same law as npcFace, and deliberately the same numbers, because a capybara
+// and a tourist being surprised by the same thing should be surprised by the
+// same amount. What is NOT shared is the function: the crowd has one eye node
+// and a fringe, this has two beads in two rotated sockets, and forcing one
+// routine to draw both would be four branches in a per-frame path for the sake
+// of not writing twelve lines twice. (Same argument localsChat makes.)
+let capyMood = 0;                   // -1 cross/sleepy .. +1 wide-eyed
+const capyEYE_WIDE  = 1.55;         // how much taller a wide eye is
+const capyEYE_SHUT  = 0.12;         // ...and how flat a shut one is
+const capyBROW_UP   = 0.030;        // m the brow lifts when the eyes go wide
+const capyBROW_DN   = 0.016;        // ...and drops when they narrow
+const capyBROW_TILT = 0.40;         // rad of inner-end-down at full cross
+const capyBROW_LIFT = 0.17;         // ...and of inner-end-up at full surprise
+// ASYMMETRIC, and it is the whole of why a mood reads as a reaction: 15 into
+// it (about 70 ms) and 3.2 out of it (about 300 ms). A symmetric filter makes
+// every expression a slow swell, which reads as the animal thinking rather
+// than as the animal being startled.
+const capyMOOD_IN   = 15;
+const capyMOOD_OUT  = 3.2;
+const capyBLINK_DUR = 0.11;         // s, and it is a TRIANGLE — see capyFacePose
+// PHOTOGRAPHED AT SEVEN TIMES, WHICH IS THE ONLY WAY TO SITE A 7 CM BAR.
+// 0.064 sits them on the crest of the brow ridge, level with the ear roots;
+// 0.050 overlaps the eye, which is a 9 cm bead. 0.060 clears its top edge and
+// still lands inside the brow mass (which spans 0.05..0.19 and is the shelf a
+// brow belongs on). qa/crop.cjs exists because of this decision.
+const capyBROW_Y    = 0.060;        // m above the eye bead, at rest
 let capyLand = 0, capyLandVel = 0;  // the landing absorb spring (render only)
 let capyFallV = 0;                  // fastest descent of the current flight, m/s
 let capyStepPhase = 0;              // which half gait-cycle the last footfall was in
@@ -1876,6 +1947,65 @@ export function createCapybara(game) {
   const eyeR = capyAddPart(eyeSockR, capyGeoBead, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
   capyAddPart(eyeR, capyGeoBead, mBelly, -0.15, 0.45, 0.62, 0.30, 0.30, 0.30);
 
+  // ---- BROWS (D8) ---------------------------------------------------------
+  // Two bars, one per eye, IN THE SOCKETS — so each one inherits its eye's
+  // outward yaw for free and is over that eye from every angle, which two bars
+  // parented to the skull are not once the head turns.
+  //
+  // A capybara does not have eyebrows and this is not an attempt at one: it is
+  // the same 5 cm nose cube decision the crowd's faces are built on. At the six
+  // metres this game is played at the ONLY channels above the neck that read
+  // are the eye's aperture and a dark bar's angle, and the bar has to be big
+  // enough to be a bar. 7.4 cm long on a 37 cm skull.
+  //
+  // `capyBROW_Y` is the rest height and lives here because the node being moved
+  // cannot also be the thing that remembers where it started — npcFace's own
+  // note, and the reason its `f` carries `browY`.
+  const browL = capyAddPart(eyeSockL, capyGeoBead, mNose, 0, capyBROW_Y, 0.058,
+                            0.074, 0.019, 0.030);
+  const browR = capyAddPart(eyeSockR, capyGeoBead, mNose, 0, capyBROW_Y, 0.058,
+                            0.074, 0.019, 0.030);
+  /**
+   * THE ONE WRITER ON THE EYES AND THE BROWS. See THE FACE.
+   *
+   * `mood` is -1..1 and `blink` is 0..1 closed. Called from exactly two places
+   * — the main pose and the helm pose — because two functions writing one
+   * scale is the trap this repo has paid for twice already, and the helm's
+   * answer is simply mood 0.
+   *
+   * The brows sit in the eye SOCKETS, which are rotated ±0.62 about y and are
+   * therefore mirror images of one another: a mirror maps a local rotation
+   * about z by +φ to −φ, so the two ends want opposite signs to read
+   * symmetrically. Same line npcFace ends on, for a different reason.
+   */
+  function capyFacePose(mood, blink) {
+    const up = mood > 0 ? mood : 0;
+    const dn = mood < 0 ? -mood : 0;
+    const open = (1 + up * (capyEYE_WIDE - 1)) * (1 - blink * (1 - capyEYE_SHUT));
+    // a wide eye is a little wider as well as taller, or it reads as a slot
+    const w = 0.046 * (1 + up * 0.16);
+    eyeL.scale.set(w, 0.050 * open, 0.042);
+    eyeR.scale.set(w, 0.050 * open, 0.042);
+    const y = capyBROW_Y + up * capyBROW_UP - dn * capyBROW_DN;
+    browL.position.y = y;
+    browR.position.y = y;
+    const tilt = dn * capyBROW_TILT - up * capyBROW_LIFT;
+    browL.rotation.z = -tilt;
+    browR.rotation.z = tilt;
+  }
+  /**
+   * A TRIANGLE, NOT A STEP. The blink was a two-state flag — the eye was a flat
+   * plate for the whole 110 ms and then a bead again — which at 60 Hz is seven
+   * frames of a dead-looking animal and no frames of an eyelid moving. Shut in
+   * half the window and open again in the rest, which is what npcBlink has done
+   * for the crowd since P5.
+   */
+  function capyBlinkK() {
+    if (capyBlink <= 0) return 0;
+    const k = 1 - capyBlink / capyBLINK_DUR;
+    return k < 0.5 ? k * 2 : (1 - k) * 2;
+  }
+
   // WHISKERS (v54).
   //
   // The muzzle carried a nose pad, two nostril pricks and nothing else, and it
@@ -2846,7 +2976,25 @@ export function createCapybara(game) {
                pop: capyPop, popVel: capyPopVel,
                lean: capyLean, leanTarget: capyLeanTgt, accel: capyAccelSm,
                land: capyLand, airPose: capyAirPose, earLag: capyEarLag,
-               grounded: capy.grounded, vy: body.velocity.y };
+               grounded: capy.grounded, vy: body.velocity.y,
+               // ---- D8 ----
+               // The five channels area 2's second half added, and every one of
+               // them is invisible in a still: a climb pose and an air tuck are
+               // the same silhouette for the first tenth of a second, a hang
+               // and a flail are the same silhouette between kicks, and a mood
+               // is 70 ms wide. See qa/d8-body.js.
+               climbing: capyClinging, climbPose: capyClimbPose, clingT: capyClingT,
+               carry: !!capy.carriedBy,
+               hold: (capy.carriedBy && capy.carriedBy.hold) || '',
+               carryT: capyCarryT, hangSway: capyHangSway,
+               mood: capyMood, blink: capyBlinkK(),
+               // Which way it is POINTING. Published because frameShot takes a
+               // bearing from the animal to the camera, so a probe that wants
+               // to look at the face needs this and there was no way to get it.
+               yaw: capyYaw,
+               legX: [legs[0].rotation.x, legs[1].rotation.x,
+                      legs[2].rotation.x, legs[3].rotation.x],
+               pitch: capyModel.rotation.x, roll: capyModel.rotation.z };
     },
     update: capyUpdate,
   };
@@ -3071,12 +3219,14 @@ export function createCapybara(game) {
     earL.rotation.x = -back; earR.rotation.x = -back;
     earL.rotation.z = -0.18 - Math.sin(t * 9) * 0.05 * st;
     earR.rotation.z = 0.18 + Math.sin(t * 9) * 0.05 * st;
+    // The face goes through the same one writer the main pose uses, at mood 0:
+    // somebody at a helm is concentrating, not startled, and two functions
+    // writing one scale is the trap this file has already paid for.
     capyBlink = capyBlink > 0 ? capyBlink - dt : 0;
-    const eo = capyBlink > 0 ? 0.010 : 0.050;
-    eyeL.scale.set(0.046, eo, 0.042);
-    eyeR.scale.set(0.046, eo, 0.042);
+    capyMood = damp(capyMood, 0, capyMOOD_OUT, dt);
+    capyFacePose(capyMood, capyBlinkK());
     capyEarTimer -= dt;
-    if (capyEarTimer <= 0) { capyEarTimer = rand(2.2, 5.5); capyBlink = 0.11; }
+    if (capyEarTimer <= 0) { capyEarTimer = rand(2.2, 5.5); capyBlink = capyBLINK_DUR; }
 
     if (game.input.honkPressed) capyWheek();
     if (capyWheekHold > 0) capyWheekHold -= dt;
@@ -4892,13 +5042,54 @@ export function createCapybara(game) {
     // which is longer than any contact hiccup and shorter than the shortest hop.
     capyAirPose = damp(capyAirPose, (!grounded && !capySwimming && !carried &&
                                      capyAirTime > 0.06) ? 1 : 0, 13, dt);
+    // ...and the CLIMB is the fourth answer on the same channel. It has to be
+    // computed here rather than inside the loop because the body's own pitch
+    // reads it too. See THE CLIMB HAS A POSE NOW.
+    capyClimbPose = damp(capyClimbPose, capyClinging ? 1 : 0, capyCLIMB_LAM, dt);
     if (carried) {
-      // dangling from the gardener's arms: flail, don't stand serenely
-      capyLegPhase += 14 * dt;
-      for (let i = 0; i < 4; i++) {
-        legs[i].rotation.x = Math.sin(capyLegPhase + i) * 0.7;
-        legs[i].rotation.z = damp(legs[i].rotation.z, 0, 8, dt);
+      // ---- WHO IS HOLDING YOU, AND HOW (D8) ------------------------------
+      // Three carriers, three holds. `capyCarryT` restarts whenever the carrier
+      // changes, which is what makes the flail a BEAT rather than a state: it
+      // is the first second and a bit of every carry and then it is over.
+      const carrier = capy.carriedBy;
+      if (carrier !== capyCarrier) {
+        capyCarrier = carrier; capyCarryT = 0; capyHangSway = 0; capyCarryPh = 0;
       }
+      capyCarryT += dt;
+      const holdKind = (carrier && carrier.hold) || 'arms';
+      // 1 while it is still kicking, 0 once it has given up. Arms never do.
+      const flail = holdKind === 'ride' ? 0
+                  : holdKind === 'arms' ? 1
+                  : clamp(1 - (capyCarryT - capyHANG_FLAIL) * capyHANG_LAM, 0, 1);
+      // ---- AND THE FLAIL HAS NEVER FLAILED ---------------------------------
+      // It ran on `capyLegPhase`, which is the GAIT's phase — and forty lines
+      // above this the gait, seeing an animal that is not moving, damps that
+      // same variable back toward zero at λ 6 every frame. Two writers on one
+      // channel, and the fixed point of `+14·dt` against `−6·w·dt` is a
+      // CONSTANT: w = 14/6 = 2.33 rad. Measured on the carry, the four legs
+      // reach 0.45, −0.21, −0.68, −0.52 within half a second and then never
+      // move again — so a capybara being carried off by a gardener has been
+      // held rigid, in one pose, at a slight angle, for nineteen versions,
+      // under a comment that says "flail, don't stand serenely".
+      //
+      // Its own variable. The gait cannot reach this one.
+      capyCarryPh += 14 * dt;
+      if (capyCarryPh > Math.PI * 2) capyCarryPh -= Math.PI * 2;
+      for (let i = 0; i < 4; i++) {
+        // The pose it settles INTO: hung by the middle, legs trailing — or, on
+        // a manta, braced out sideways with all four, because you are on top of
+        // this one and not underneath it.
+        const rest = holdKind === 'ride' ? capyRIDE_LEG
+                   : (i < 2 ? capyHANG_F : capyHANG_R);
+        legs[i].rotation.x = lerp(rest, Math.sin(capyCarryPh + i) * 0.7, flail);
+        const splay = holdKind === 'ride'
+          ? (i % 2 === 0 ? 1 : -1) * capyRIDE_SPLAY * (1 - flail) : 0;
+        legs[i].rotation.z = damp(legs[i].rotation.z, splay, 8, dt);
+      }
+      // ...and a thing hanging off a bird swings. Not a flail — a slow lean
+      // either side of vertical, at about a third of a hertz, which is the
+      // period of a 1.45 m tether and is why it is written as one.
+      capyHangSway = damp(capyHangSway, holdKind === 'talons' ? 1 - flail : 0, 2.2, dt);
     } else {
       for (let i = 0; i < 4; i++) {
         if (digging && i < 2) {
@@ -4925,9 +5116,22 @@ export function createCapybara(game) {
           // has been on the ground and doing nothing for capyLOAF_T, and the
           // first frame off the ground zeroes capyRestT, so capyAirPose and
           // capyLoaf cannot both be up.
-          legs[i].rotation.x = lerp(lerp(walk, tuck, capyAirPose),
-                                    i < 2 ? capyLOAF_LEG_F : capyLOAF_LEG_R, capyLoaf);
-          legs[i].rotation.z = damp(legs[i].rotation.z, 0, 8, dt);
+          // ...and the CLIMB is the fourth, and it beats all three of them,
+          // because a wall is the least ambiguous thing an animal can be
+          // touching. Both diagonals reach on the same cycle out of
+          // capyClingT — which is what that variable was declared for in v31
+          // and has never once been read.
+          const climb = (i < 2 ? capyCLIMB_F : capyCLIMB_R)
+                      + Math.sin(capyClingT * capyCLIMB_RATE +
+                                 ((i === 0 || i === 3) ? 0 : Math.PI)) * capyCLIMB_SWING;
+          legs[i].rotation.x = lerp(lerp(lerp(walk, tuck, capyAirPose),
+                                         i < 2 ? capyLOAF_LEG_F : capyLOAF_LEG_R, capyLoaf),
+                                    climb, capyClimbPose);
+          // Elbows out. A leg reaching straight forward is an animal falling
+          // face first; a leg reaching forward AND out is one holding on.
+          const climbZ = (i % 2 === 0 ? 1 : -1) *
+                         (i < 2 ? capyCLIMB_SPLAY_F : capyCLIMB_SPLAY_R) * capyClimbPose;
+          legs[i].rotation.z = damp(legs[i].rotation.z, climbZ, 8, dt);
         }
       }
     }
@@ -5126,8 +5330,13 @@ export function createCapybara(game) {
     capyPoseLift = damp(capyPoseLift, capyPoseRise * capyPoseTrust, capyPOSE_LAMBDA, dt);
     capyModel.position.y += capyPoseLift;
 
+    // ...and the roll, where the carry now has TWO answers rather than one.
+    // The 0.12 off the flail phase is the gardener wrestling with something
+    // that does not want to be carried; capyHangSway is what is left once the
+    // kicking stops, and it is a third of a hertz rather than seven.
     capyModel.rotation.z = (carried
-      ? Math.sin(capyLegPhase * 0.5) * 0.12
+      ? Math.sin(capyCarryPh * 0.5) * 0.12 * (1 - capyHangSway) +
+        Math.sin(t * 1.95) * capyHANG_SWAY * capyHangSway
       : clamp(capyYawRate * 0.075, -0.34, 0.34) * (running ? 1.35 : 1)) + capyIdleRoll + capyPoseRoll;
     // Nose down on the way down, nose up on the way back — read off the actual
     // vertical velocity rather than off the key, so a dive that has hit the
@@ -5172,7 +5381,12 @@ export function createCapybara(game) {
     // pitch, for the reason the comment above gives: capySlideW is already
     // damped on its own clock and running it through this one as well would
     // make getting down take half a second.
-    capyModel.rotation.x = capyLean + capyPosePitch - capySLIDE_TILT * capySlideW;
+    // ...and the climb rides on OUTSIDE the lean filter, beside the terrain
+    // pitch and the slide, for the reason those two are outside it: it has its
+    // own clock (capyCLIMB_LAM) and running it through the lean's as well
+    // would make getting onto a wall take a second and a half.
+    capyModel.rotation.x = capyLean + capyPosePitch - capySLIDE_TILT * capySlideW
+                           - capyCLIMB_PITCH * capyClimbPose;
     const sqY = 1 + capyPop * 0.38;
     const sqXZ = 1 - capyPop * 0.19;
     capySquash.scale.set(sqXZ, sqY, sqXZ);
@@ -5192,6 +5406,10 @@ export function createCapybara(game) {
     // head: dips to grab / dig, tips up to wheek
     let headTarget = 0;
     if (carried) headTarget = -0.3;
+    // ...and on a wall it looks UP it, which is where you are going and is the
+    // one thing a climbing animal is unambiguously doing. It sits above the
+    // grab and the whiff because both of those are reaches at the GROUND.
+    else if (capyClinging) headTarget = -0.30;
     else if (digging) headTarget = 0.62 + Math.sin(t * 13) * 0.09;
     else if (capyGrabTimer > 0) headTarget = 0.62;
     // a reach that found nothing is still a reach: a short dip on the same
@@ -5251,7 +5469,7 @@ export function createCapybara(game) {
     // down and out by the shiver beat — which is the same thing the locals do
     // in the cold chapters, and which the animal itself had never done.
     capyEarTimer -= dt;
-    if (capyEarTimer <= 0) { capyEarTimer = rand(2.2, 5.5); capyEarFlick = 1; capyBlink = 0.11; }
+    if (capyEarTimer <= 0) { capyEarTimer = rand(2.2, 5.5); capyEarFlick = 1; capyBlink = capyBLINK_DUR; }
     capyEarFlick = damp(capyEarFlick, 0, 7, dt);
     // ON THE TWO, on the way out. Render-only and nothing in src reads it yet:
     // it is published so a chapter or the card can answer a beat-landed hop
@@ -5326,11 +5544,34 @@ export function createCapybara(game) {
     whiskL.rotation.z = sn * 0.20 - earWhip * 0.2;
     whiskR.rotation.z = -sn * 0.20 + earWhip * 0.2;
 
-    // blink
+    // ---- THE FACE (D8) ---------------------------------------------------
+    // Five authored states, one number, and the whole of what the eyes and the
+    // brows are for. Positive is alarm and negative is cross-or-sleepy, and the
+    // rank matters: ALARM WINS. An animal falling forty metres while it happens
+    // to be tired is not sleepy, and the crowd's own face makes the same choice
+    // (`mTgt = f > cross ? f : -cross`) for the same reason.
+    //
+    //   the wheek       +0.85  the mouth is open and so are the eyes
+    //   the fall        +0..1  off the ACTUAL descent, not off the jump key, so
+    //                          a dive that has levelled out stops looking scared
+    //   the whiff       -0.70  a reach that found nothing
+    //   the refusal     -0.55  a hop the legs would not give
+    //   the loaf        -0.50  sat down, and the eyes go with it
+    let moodUp = 0, moodDn = 0;
+    if (capyWheekHold > 0) moodUp = 0.85;
+    if (!grounded && !capySwimming && body.velocity.y < -6) {
+      const f = clamp((-body.velocity.y - 6) / 10, 0, 1) * 0.9;
+      if (f > moodUp) moodUp = f;
+    }
+    if (capyWhiffT > 0) moodDn = 0.70;
+    if (capyRefuseT > 0 && moodDn < 0.55) moodDn = 0.55;
+    if (capyLoaf * 0.50 > moodDn) moodDn = capyLoaf * 0.50;
+    const moodTgt = moodUp > moodDn ? moodUp : -moodDn;
+    capyMood = damp(capyMood, moodTgt,
+                    Math.abs(moodTgt) > Math.abs(capyMood) ? capyMOOD_IN : capyMOOD_OUT, dt);
+    capy.mood = capyMood;
     capyBlink = capyBlink > 0 ? capyBlink - dt : 0;
-    const eo = capyBlink > 0 ? 0.010 : 0.050;
-    eyeL.scale.set(0.046, eo, 0.042);
-    eyeR.scale.set(0.046, eo, 0.042);
+    capyFacePose(capyMood, capyBlinkK());
 
     // wet fur darkening (hysteresis so it doesn't strobe at the threshold)
     const wantDark = capyWetLevel > (capyWetDark ? 0.28 : 0.42);

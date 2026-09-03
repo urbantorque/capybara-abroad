@@ -2191,7 +2191,11 @@ let palMantaTold = false;
 const palMantaPos = new THREE.Vector3(palMANTA.x, palMANTA_Y, palMANTA.z);
 const palMantaQ2 = new THREE.Quaternion();
 const palMantaOff = new THREE.Vector3();
-const palMantaApi = { what: 'manta' };  // the token capy.carriedBy holds
+// The token capy.carriedBy holds — and, since D8, how it holds you: this is
+// the one carrier in the game you are ON TOP OF rather than dangling under, so
+// the four-legged flail every carry used to draw was a capybara pedalling the
+// open water on the back of a ray. See WHO IS HOLDING YOU in capybara.js.
+const palMantaApi = { what: 'manta', hold: 'ride' };
 
 function palBuildManta(root) {
   const M = palMerger();

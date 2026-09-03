@@ -1044,6 +1044,21 @@ export function createNPCs(game) {
     slot.t = 0;
     slot.ox = 0;
     slot.life = 1.7 + text.length * 0.05;
+    // ---- ...AND THEIR ARM KNOWS ABOUT IT (D8) ----------------------------
+    // Every local in the game gestures while they speak and not one of the
+    // fifty-odd people in Sydney and Pasto ever has: `rec.gest` was written by
+    // localLine and read by the locals' pose stack, and the roster's rig — a
+    // real state machine, drawn as instanced boxes — had no equivalent at all.
+    // So a crowd of tourists talked to each other for nineteen versions with
+    // their hands by their sides.
+    //
+    // It is set HERE, in the one place every line in this file goes through,
+    // and it is set to the BUBBLE'S OWN LIFE — so the arm cannot get out of
+    // step with the words, which is exactly what a second hand-tuned constant
+    // beside this one would eventually do. A local's `anchor` also comes
+    // through here and harmlessly takes the property: localLine has already
+    // set the real record's own.
+    npcRec.gest = slot.life;
     // ---- SOMEBODY IS TALKING TO YOU (v54) --------------------------------
     // Published for the capybara's gaze, which had a list of things worth
     // looking at that did not include a person mid-sentence: the animal would
@@ -4454,6 +4469,15 @@ export function createNPCs(game) {
       // the reply and the exchange would be one person talking to a llama.
       chatty: true,
       chatCd: rand(3, 22),   // …and when they last had one. NOT talkCd — see chatStep.
+      // HOW THIS ONE HOLDS YOU (D8). Only the gardener ever does, and he does
+      // it in his arms for about two seconds — so this is the one carry in the
+      // game where the flail is the WHOLE animation and not the first beat of
+      // one. See WHO IS HOLDING YOU in capybara.js.
+      hold: 'arms',
+      // ...and how long they have been talking, for the gesture. Written in
+      // sayBubble, which is the one place every line in this file goes
+      // through, so the arm cannot get out of step with the bubble.
+      gest: 0,
       speak(t) { sayBubble(rec, t); },
       update(dt) { stepHuman(rec, dt); },
     };
@@ -6698,10 +6722,22 @@ export function createNPCs(game) {
     n.legR.position.y = hipY;
     n.legL.scale.y = legK;
     n.legR.scale.y = legK;
+    // ---- THE TALKING ARM (D8) --------------------------------------------
+    // One arm, on its own clock, while the bubble is up. Deliberately the same
+    // shape the locals have had since P5 — up half a radian and oscillating at
+    // 7.5 rad/s — because it is the same gesture and two different ones would
+    // read as two different species of person standing in the same square.
+    //
+    // ON THE RIGHT ONLY, and masked by whatever the pose already asked that
+    // arm for: somebody carrying a coffee, holding a camera up or pointing is
+    // already using that arm and the state machine's answer wins. That is the
+    // same `mask` the walk swing takes, one line up, for the same reason.
+    if (rec.gest > 0) { rec.gest -= dt; rec.gestT = (rec.gestT || 0) + dt; }
+    const talk = rec.gest > 0 ? (0.5 + Math.sin(rec.gestT * 7.5) * 0.22) * maskR : 0;
     n.armL.rotation.x = rec.poseArmL - s * amp * 0.58 * maskL;
-    n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * maskR;
+    n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * maskR - talk;
     n.armL.rotation.z = 0.09 + rec.poseArmL * 0.06;
-    n.armR.rotation.z = -0.09 - rec.poseArmR * 0.06;
+    n.armR.rotation.z = -0.09 - rec.poseArmR * 0.06 - talk * 0.7;
 
     // ---- ...AND THIS CAST FEELS THE WEATHER TOO, WITHIN LIMITS -----------
     // Sydney's and Pasto's people are a richer rig than a local — a real state
@@ -9707,6 +9743,41 @@ export function createNPCs(game) {
                            calm: +(r.beatCalm || 0).toFixed(2), why: r.beatWhy || '' });
              }
              return { biome: live, withJob: rows.length, running: running, rows: rows };
+           },
+           /**
+            * IS THE CROWD GESTURING WHEN IT SPEAKS (D8)?
+            *
+            * `gest` is written in sayBubble and read in animHuman, and neither
+            * is reachable from outside — so a crowd whose arms never move and a
+            * crowd nobody happens to be speaking in are the same screenshot.
+            * `talking` is how many people in the live chapter have a bubble
+            * clock running; `armMax` is the largest deviation of a right arm
+            * from where the pose alone would have put it. Nothing in src reads
+            * this. See qa/d8-body.js.
+            */
+           gestAudit: function () {
+             const live = game.biome && game.biome.current;
+             const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+             let talking = 0, armMax = 0, n = 0, at = null;
+             if (cast) for (let i = 0; i < cast.length; i++) {
+               const r = cast[i];
+               n++;
+               if ((r.gest || 0) > 0) {
+                 talking++;
+                 const a = Math.abs((r.nodes && r.nodes.armR ? r.nodes.armR.rotation.x : 0)
+                                    - (r.poseArmR || 0));
+                 if (a > armMax) {
+                   armMax = a;
+                   // ...and WHERE, because a gesture is 0.6 s long and a probe
+                   // that has to find the one person doing it by walking the
+                   // square will not get there in time.
+                   const p = r.group ? r.group.position : null;
+                   at = p ? { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2),
+                              gest: +r.gest.toFixed(2) } : null;
+                 }
+               }
+             }
+             return { biome: live, cast: n, talking: talking, armMax: +armMax.toFixed(3), at: at };
            },
            reactAudit: function () {
              const live = game.biome && game.biome.current;
