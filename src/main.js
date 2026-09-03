@@ -1857,6 +1857,9 @@ function mainBoot() {
     game.npcSpeaker = npcs.speaker;
     // Which line pool a chapter resolves to. A test hook — see sayAudit.
     game.sayAudit = npcs.sayAudit;
+    // ...and whether the world is answering at all: flinches, second-order
+    // looks and the chain counters, in one read. A test hook — see reactAudit.
+    game.reactAudit = npcs.reactAudit;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

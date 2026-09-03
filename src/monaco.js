@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 18 — MONTE CARLO
@@ -3110,6 +3110,15 @@ function monBuildPalms(root) {
   for (let i = 0; i < 8; i++) put(-70 - i * 5, -6 + i * 3);
   while (n < monPALM_N) put(rand(60, 150), rand(58, 92));
   m.count = n;
+  // ---- AND THEY MOVE (D3) ------------------------------------------------
+  // `grep -c sway` in this file was 0. Fifty palms along the harbour front of
+  // a chapter set on the Riviera in the evening, all of them rigid. This is
+  // the cheapest of the five because the instance's local geometry is one palm
+  // standing on its own origin, so `auto` windows 0 to the crown and every
+  // instance gets it right whatever it was scaled or turned to.
+  //
+  // A palm's frond is a leaf on a stick and moves further than a pine's whorl.
+  swayMesh(m, { leaf: 0.45, amount: 0.22, axis: 'y', auto: true, stiff: 2.2, hz: 0.52 });
   monPalmMesh = m;
   root.add(m);
 }

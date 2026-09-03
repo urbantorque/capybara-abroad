@@ -114,3 +114,20 @@ D2 added one, and it is the only probe here that drives the animal:
 sprinted from wherever the walk had ended up, and the sprint row read 1.76 m/s
 because the animal was against a fence. A probe that does not reload has
 measured the fence.
+
+D3 added two:
+
+| file | what it answers |
+|---|---|
+| `d3-react.js` | drives the animal into the nearest person in eight chapters and counts `npc:barge` events, the flinch spring and the second-order looks |
+| `d3-shots.js` | which meshes in a chapter actually carry a sway program, by cache key, plus draw calls and triangles inside the scene pass |
+
+Two things `d3-react.js` had to learn, both of which had it reporting a live
+feature as dead:
+
+1. **A barge is an ARRIVAL at speed.** In Pasto the nearest person is 1.3 m
+   from the spawn, so the animal starts pressed against them and never closes
+   at the threshold. The probe backs off and turns round first.
+2. **Count the event, not a symptom.** The flinch spring is driven by a dozen
+   things; subscribing to `npc:barge` is the only reading that cannot be
+   confused by something else in the chapter reacting at the same moment.

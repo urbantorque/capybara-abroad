@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 3 — SYDNEY HARBOUR: CIRCULAR QUAY TO MANLY
@@ -2181,6 +2181,13 @@ function quayBuildPines(game, root) {
   m.name = 'quayPines';
   m.castShadow = true;
   m.receiveShadow = true;
+  // The Manly wharf pines are the one stand of trees in this chapter the
+  // player walks past, and `grep -c sway` in this file was 0 (D3). The
+  // headland woods across the water are deliberately NOT swayed: they are
+  // fifty to two hundred metres off the fairway, they are instanced spheres
+  // whose local origin is their own centre, and nothing at that distance
+  // resolves a leaf moving.
+  swayMesh(m, { leaf: 0.35, amount: 0.13, axis: 'y', auto: true, stiff: 2.6, hz: 0.44 });
   root.add(m);
 }
 

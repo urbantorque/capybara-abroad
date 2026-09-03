@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -1465,6 +1465,16 @@ function manBuildTown(game, root) {
   }
   const pines = new THREE.Mesh(trunkM.build(), manVC());
   pines.castShadow = true;
+  // ---- AND THEY MOVE (D3) ------------------------------------------------
+  // Manly is one of the windiest rows in `wxMOOD` and `grep -c sway` in this
+  // file was 0: a nor'-easter coming across the ocean beach and eleven rigid
+  // Norfolk pines standing in it. The window comes off the geometry — every
+  // one of these is grown from manPROM_Y, so the merged mesh's own extent is
+  // the right window and the trunk feet stay planted.
+  //
+  // 0.13 rather than the 0.20 the bamboo takes: a Norfolk pine is a mast with
+  // whorls on it and the thing that moves is the tip, not the whole tree.
+  swayMesh(pines, { leaf: 0.35, amount: 0.13, axis: 'y', auto: true, stiff: 2.6, hz: 0.44 });
   root.add(pines);
 
   // ---- a bin, a bubbler, a bike rack: the promenade needs to be furnished or

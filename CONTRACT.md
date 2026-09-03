@@ -164,7 +164,7 @@ that.** The question is `sysHasRelief()` — does the live biome answer
 ## Events bus (exact names)
 
 Emitted by capybara.js: `capy:wheek {position}`, `capy:grab {prop}`, `capy:drop {prop}`,
-`capy:move {position, speed}`, `capy:dig {position}`
+`capy:move {position, speed}`, `capy:dig {position}`, `npc:barge {rec, speed, x, z}`
 Emitted by props.js: `prop:impact {prop, speed, position}`, `prop:water {prop}`, `prop:destroy {prop}`
 Emitted by npc.js: `npc:startled {npc}`, `npc:chase {npc}`, `npc:photo {npc}`, `npc:calm {npc}`
 Anyone: `task:complete {id}`, `hud:toast {text}`
@@ -3057,6 +3057,121 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 0.88 ms, the largest in the game — and it was not taken because a terrain with genuine
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
+
+## THE WORLD ANSWERS — D3 (3 Sep 2026)
+
+The third batch of `ROADMAP-DELIGHT.md`. Instrument: `game.reactAudit()` and
+`qa/d3-react.js`, which drives the animal INTO people rather than teleporting it
+next to them — the whole feature is a contact, so a probe that writes a position
+has tested nothing.
+
+### A person was a wall, and it was measured the other way round
+
+The roadmap said barging somebody produced "no sound, no punch, no flinch". It
+produced all three, of the wrong kind: a walker's collider is mass-0 KINEMATIC
+and a local's is plain mass-0 static, so BOTH of them arrived in the STATIC
+branch of capybara.js's collide listener and got the wall treatment — the same
+stone thud, the same punch curve, the same bounce off a face. **Walking into a
+person was indistinguishable from walking into a building, and the person it
+happened to did not react at all.**
+
+A person now takes its own branch ahead of the wall, with three differences:
+
+- **less speed.** A wall needs `capyBONK_V` (3.9 m/s) before it is worth a
+  noise, because at a walk you are leaning on it. Shouldering somebody at a
+  walking pace is the entire joke, so `capyBARGE_V` is 1.30 — a third of it.
+- **softer.** Half the punch, half the bounce, a lower and quieter voice,
+  because a person gives and a wall does not.
+- **an event.** `npc:barge {rec, speed, x, z}` carries the record the collider
+  was already holding, so the handler does not have to search for who it was —
+  which matters, because the nearest person to the animal is not necessarily
+  the one it hit.
+
+`npc.js` answers it with the flinch spring driven **away** from the animal —
+the whole difference between this and `localsReact`, where a bang makes you
+turn TOWARD it — a gasp on the person's own voice with a position and a volume,
+a `startled` line about half the time (the neutral pool already opens with '!',
+'Whoa —', 'Careful!' and 'Do you mind?', and every chapter that wrote its own
+`startled` row gets its own voice for free), and half a wariness bump.
+Deliberately no chase, no task and no heat of its own: being shouldered is rude,
+not a crime.
+
+### ...AND THE TWO OLDEST CHAPTERS CANNOT BE BARGED THROUGH PHYSICS AT ALL
+
+Measured: driven into the nearest cast member, the animal reached **0.3 m and
+0.2 m** of the collider's centre in Sydney and Pasto with **zero** barge events,
+while the same drive in Circular Quay, Kyoto and Venice fired one every time.
+
+The reason is thirty lines from the top of `npc.js` and it is deliberate:
+`npcPlaceBody` HOLDS any body carrying `userData.npc` off the animal by
+`npcBODY_CLEAR` (1.30 m) every frame, so a walker cannot shove the player — and
+the comment says plainly that the DRAWN figure is not moved with it. In the two
+chapters that use that path **you walk through the person**.
+
+So the cast is barged on proximity to the FIGURE instead, which is what the
+player sees anyway: `npcBargeSweep` runs once per frame over the live cast,
+inside `npcBARGE_R` (1.05 m, inside the hold-off), above `npcBARGE_V`, and only
+when the animal is actually going AT them — `npcBARGE_CLOSE` is the cosine
+between its course and the person, because without it threading between two
+people at a run barges both. Its throttle is 0.90 s against the collider
+version's 0.40, because proximity is a much easier trigger and Sydney has 32
+people on one lawn.
+
+Measured after: a barge fires in every chapter the probe can reach a person in,
+and in Sydney it arms the witness chain — 25 cast members holding a look at
+once on the best run, 5 to 9 typically.
+
+### The witness chain: already built, and the roadmap had it backwards
+
+The roadmap's second must-land was "`npcWitnessChain` opens with
+`if (live !== 'sydney' && live !== 'pasto') return 0` … one person jumps and the
+next one turns to look, in two of nineteen chapters". That function is the CAST
+chain and it was ported TO those two BECAUSE they have no `locals` — the other
+seventeen have had their own since v30: `localReactLine` arms
+`locChainFrom`/`locChainT`, and `localsStep` resolves it before its per-person
+loop so the answer is chosen by distance rather than by array order.
+
+Measured in the live game rather than read: `reactAudit().looking` counts locals
+holding a second-order look, and it reads 1 in Venice, 2 in Manly and 2 in
+Monte Carlo off a single reaction. **Not rebuilt.** What was missing was an
+event that arms it outside a spoken line, and that is the barge.
+
+### Five chapters had nothing that moves in the wind, and one of them still has
+
+`grep -c sway`: Venice 0, the Quay 0, Monte Carlo 0, Manly 0, Son Doong 0.
+Manly is one of the windiest rows in `wxMOOD` and its Norfolk pines were rigid.
+
+- **Manly** and **the Quay** get their Norfolk pines, both merged meshes grown
+  from one datum so the geometry's own extent is the right window and the trunk
+  feet stay planted. 0.13 rather than the bamboo's 0.20: a Norfolk pine is a
+  mast with whorls on it and what moves is the tip.
+- **Monte Carlo** gets its fifty harbour-front palms — the cheapest of the
+  five, because the instance's local geometry is one palm standing on its own
+  origin, so `auto` windows it correctly whatever each instance was scaled or
+  turned to. 0.22: a frond is a leaf on a stick and moves further than a whorl.
+- **Son Doong** gets the phytokarst and nothing else. A cave has no weather and
+  a swaying stalagmite is a bug; the phytokarst is the exception for the reason
+  it exists at all — it grows only where the doline lets daylight in, which is
+  the same hole the draught comes down.
+- **Venice has nothing to sway and keeps nothing.** It is a stone piazza: no
+  trees, no potted plants, and the only cloth in the chapter is the three flags
+  on the piazzetta, which have had `venUpdateFlags` driving them since it was
+  built. Recorded rather than faked.
+
+Verified by asking each material for its own program cache key rather than by
+eye — a hook that silently failed to bind still DRAWS, it is simply the one
+batch in the chapter that does not move. Every chapter carries three swaying
+meshes from the always-resident weather rig, so the deltas are: Quay +1 (1 240
+triangles), Manly +1 (3 239), Monte Carlo +1 (99, instanced 50 times), Son Doong
++1 (59). Draw calls unchanged in all four.
+
+### The probe's own findings
+
+- **Hanoi's nearest person is 87.6 m from the spawn.** No probe walks that far
+  and nor does a player who has just arrived.
+- Monte Carlo's nearest local is 7.4 m away and behind something: the animal
+  stops at 2.3 m on most runs. It barges other people there, so the feature is
+  fine and the placement is worth a look.
 
 ## THE BODY — D2 (3 Sep 2026)
 

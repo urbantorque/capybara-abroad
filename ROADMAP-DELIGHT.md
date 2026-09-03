@@ -359,6 +359,40 @@ dust rate key off cadence too) — grep it before the constant goes; and
 
 ### Batch D3 — the world answers: the barge and the witness (area 3)
 
+**LANDED 3 Sep 2026**, and two of the three must-lands were not the thing the
+roadmap described. Contract section **THE WORLD ANSWERS — D3**; instruments
+`game.reactAudit()` and `qa/d3-react.js`.
+
+1. **The barge.** Not silent — *identical to a wall*. Both record shapes carry
+   a mass-0 collider, so both landed in the STATIC branch and got the stone
+   thud, the wall punch and the bounce off a face, while the person did
+   nothing. Now its own branch at a third of the speed floor, half the punch,
+   its own event, and a flinch driven AWAY from the animal.
+   **And the two cast chapters cannot be barged through physics at all**:
+   `npcPlaceBody` holds any `userData.npc` body off the animal by 1.30 m every
+   frame so a walker cannot shove the player, and the drawn figure is not moved
+   with it — measured, the animal reached 0.3 m of a Sydney collider's centre
+   with zero events. They are barged on proximity to the figure instead.
+
+2. **The witness chain was already built for the seventeen**, and the roadmap
+   had it backwards: `npcWitnessChain` is the CAST chain, ported TO Sydney and
+   Pasto *because* they have no `locals`; the other seventeen have had
+   `locChainFrom` since v30. Measured live — `reactAudit().looking` reads 1 in
+   Venice and 2 in Manly and Monte Carlo off one reaction. **Not rebuilt.**
+   What was missing was an event that arms it outside a spoken line, which is
+   item 1.
+
+3. **Sway** in the Quay, Manly, Monte Carlo and Son Doong — verified by asking
+   each material for its own program cache key, not by eye. **Venice keeps
+   nothing**: it is a stone piazza with no foliage, and its only cloth is the
+   three flags that `venUpdateFlags` has always driven.
+
+Two placement findings for the owner: **Hanoi's nearest person is 87.6 m from
+the spawn**, and Monte Carlo's nearest local is behind something the animal
+stops 2.3 m short of.
+
+Spill, unchanged: `placeHeat` fan-out; `game.lifeAudit(60)`.
+
 **Must land.**
 1. `npc:barge`: in `capybara.js`'s bonk, the `mass === 0` branch gets a
    sibling for `userData.npc`/`userData.local` — emit with speed and the

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, swayMesh } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 16 — SƠN ĐOÒNG. AND THE ONLY LIGHT IS THE ONE YOU MAKE.
@@ -2258,6 +2258,15 @@ function cavBuildPhyto(game, root) {
   cavPhyBlades.castShadow = true;
   cavPhyBlades.receiveShadow = true;
   cavPhyBlades.frustumCulled = false;
+  // ---- AND THE ONE PLACE IN THIS CHAPTER WHERE AIR MOVES (D3) ------------
+  // `grep -c sway` in this file was 0, and mostly that is correct: a cave has
+  // no weather and a stalagmite that swayed would be a bug. The phytokarst is
+  // the exception and it is the exception for the reason it exists at all —
+  // it grows only where the doline lets daylight in, which is the same hole
+  // the draught comes down. Small, and slow: this is a draught, not a breeze,
+  // and `swayTick`'s field is near zero underground anyway, so what this buys
+  // is that the one lit room in the chapter is not a photograph.
+  swayMesh(cavPhyBlades, { amount: 0.10, axis: 'y', auto: true, stiff: 3.2, hz: 0.31 });
   cavPhyD = new Float32Array(cavPHY_N * 6);   // x, y, z, yaw, scale, phase
   let n = 0;
   let bP = cavPoolBody(game), nP = 0;

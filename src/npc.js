@@ -2967,6 +2967,115 @@ export function createNPCs(game) {
     if (sp < npcLOC_BANG) return;
     localsReact('startled', p.position.x, p.position.z, clamp((sp - npcLOC_BANG) / 9, 0.25, 1));
   });
+  // ---- SOMEBODY JUST WALKED INTO YOU (D3) --------------------------------
+  //
+  // In a goose game the barge IS the verb, and for nineteen chapters walking
+  // into a person did the same thing as walking into a building: capybara.js's
+  // collide listener gates on `other.mass === 0`, and BOTH of this module's
+  // record shapes carry a mass-0 collider — a walker's is KINEMATIC, a local's
+  // is plain static. So the animal got a stone thud and the person got nothing.
+  //
+  // The event now arrives with the record the collider was carrying, so this
+  // handler does not have to search for who it was — which matters, because
+  // the nearest person to the animal is not necessarily the one it hit.
+  //
+  // Three answers, and deliberately no fourth: no chase, no task, no wariness
+  // beyond what the flinch already writes. Being shouldered is rude, not a
+  // crime, and the mischief economy is a separate accounting.
+  const npcBARGE_KICK = 15;     // the flinch spring, against localsReact's 21
+  const npcBARGE_SAY = 0.55;    // ...and how often it is worth a line as well
+  // ---- ...AND THE TWO CAST CHAPTERS CANNOT BE BARGED THROUGH PHYSICS -----
+  //
+  // MEASURED (qa/d3-react.js): the animal was driven into the nearest cast
+  // member in Sydney and Pasto and reached 0.3 m and 0.2 m of the collider's
+  // centre with ZERO barge events, while the same drive in Circular Quay,
+  // Kyoto and Venice fired one every time. The reason is thirty lines from the
+  // top of this file and it is deliberate: `npcPlaceBody` HOLDS a body
+  // carrying `userData.npc` off the animal by npcBODY_CLEAR every frame, so a
+  // walker cannot shove the player — and the drawn figure is not moved with
+  // it. In the two chapters that use that path you walk THROUGH the person.
+  //
+  // So the cast is barged on PROXIMITY TO THE FIGURE instead, which is what
+  // the player sees anyway. Same event, same handler, one extra gate: the
+  // animal has to be moving, because standing in a crowd is not a barge and
+  // the collider hold-off means it is a thing that happens constantly.
+  const npcBARGE_R    = 1.05;   // m from the drawn figure. Inside npcBODY_CLEAR.
+  const npcBARGE_V    = 1.30;   // m/s — capyBARGE_V, the same number
+  const npcBARGE_GAP  = 0.90;   // s between them, so a walk through a crowd is
+                                // a series of encounters and not a drum roll.
+                                // Longer than the collider version's 0.40,
+                                // because proximity is a much easier trigger
+                                // than a contact and Sydney has 32 people on
+                                // one lawn.
+  const npcBARGE_CLOSE = 0.55;  // cos of the angle between the animal's course
+                                // and the person: walking PAST somebody at
+                                // arm's length is not barging them.
+  let npcBargeCd = 0;
+  const npcBargePayload = { rec: null, speed: 0, x: 0, z: 0 };
+  function npcBargeSweep(dt, cast) {
+    if (npcBargeCd > 0) { npcBargeCd -= dt; return; }
+    const capy = game.capy;
+    if (!capy || !capy.position || !capy.velocity) return;
+    if (capy.carriedBy || capy.atHelm) return;
+    const sp = Math.hypot(capy.velocity.x, capy.velocity.z);
+    if (sp < npcBARGE_V) return;
+    const cx = capy.position.x, cz = capy.position.z;
+    let best = null, bd = npcBARGE_R * npcBARGE_R;
+    for (let i = 0; i < cast.length; i++) {
+      const r = cast[i];
+      if (!r || !r.group || !r.group.visible) continue;
+      const dx = r.group.position.x - cx, dz = r.group.position.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= bd) continue;
+      // ...AND WE HAVE TO BE GOING AT THEM. Without this, threading between
+      // two people at a run barges both of them.
+      const d = Math.sqrt(d2) || 1e-4;
+      if ((capy.velocity.x * dx + capy.velocity.z * dz) / (d * sp) < npcBARGE_CLOSE) continue;
+      bd = d2; best = r;
+    }
+    if (!best) return;
+    npcBargeCd = npcBARGE_GAP;
+    npcBargePayload.rec = best;
+    npcBargePayload.speed = sp;
+    npcBargePayload.x = cx;
+    npcBargePayload.z = cz;
+    game.events.emit('npc:barge', npcBargePayload);
+  }
+  game.events.on('npc:barge', function (e) {
+    const rec = e && e.rec;
+    if (!rec) return;
+    const live = game.biome && game.biome.current;
+    if (!live) return;
+    const sp = typeof e.speed === 'number' ? e.speed : 1.5;
+    const k = clamp(0.45 + sp * 0.14, 0.45, 1.0);
+    // AWAY from the animal, which is the whole difference between this and
+    // localsReact: a bang makes you turn TOWARD it, a shoulder does not. The
+    // flinch spring drives lean, arms and head off one number, so the yaw is
+    // what decides which way the person is knocked.
+    const px = e.x, pz = e.z;
+    if (rec.flV !== undefined) {
+      // a local
+      if (rec.biome !== live) return;
+      rec.flV -= npcBARGE_KICK * k;
+      rec.flYaw = Math.atan2(rec.x - px, rec.z - pz);
+      rec.wary = Math.min(1, (rec.wary || 0) + k * 0.5);
+      sfx('gasp', rec, npcSFX_VOL * (0.55 + k * 0.45), 1.0 + k * 0.10);
+      if (rec.cd <= 0 && Math.random() < npcBARGE_SAY) {
+        rec.cd = rec.cool * rand(0.8, 1.4);
+        // `startled` and not a pool of its own: the neutral pool already opens
+        // with '!', 'Whoa —', 'Careful!', 'Do you mind?' and 'I felt that',
+        // which is exactly what being shouldered is worth, and every chapter
+        // that has written its own startled row gets its own voice for free.
+        localReactLine(rec, npcSay(rec, 'startled'));
+      }
+    } else if (rec.group) {
+      // a member of one of the two old casts — same idea, their own channels
+      rec.alarm = Math.max(rec.alarm || 0, 0.55 + k * 0.35);
+      rec.lookX = px; rec.lookZ = pz;
+      sfx('gasp', rec, npcSFX_VOL * (0.55 + k * 0.45), 1.0 + k * 0.10);
+      npcWitnessChain(rec);
+    }
+  });
   game.events.on('prop:water', function (p) {
     if (!p || !p.position) return;
     // A splash is heard further than it is felt, so it is a wider circle and a
@@ -9176,12 +9285,14 @@ export function createNPCs(game) {
       // used to sit below the Sydney gate, which is why a bubble was a thing
       // that could only happen on one lawn in the world.
       if (paLive()) chatStep(dt, paCast);
+      if (paLive()) npcBargeSweep(dt, paHumans);
       localsStep(dt);
       localsChat(dt);
       npcExStep(dt);
       updateBubbles(dt);
       return;
     }
+    npcBargeSweep(dt, humans);
     localsStep(dt);
     npcExStep(dt);
 
@@ -9355,6 +9466,40 @@ export function createNPCs(game) {
              const arr = (here && here.length) ? here : npcLOC_SAY[kind];
              return { biome: live, layer: (here && here.length) ? 'place' : 'neutral',
                       n: arr ? arr.length : 0, first: arr && arr.length ? arr[0] : null };
+           },
+           // ---- IS THE WORLD ANSWERING? (D3) ----
+           // The reaction layer's three second-order effects are all springs
+           // and timers on records nothing else reads, so from outside a
+           // chapter where the chain is dead and one where nobody happened to
+           // be near look identical. This is one read of the live chapter:
+           // how many people are mid-flinch, how many are holding a look at
+           // somebody else, and the two counters the cast chain keeps.
+           //
+           // `looking` is the whole point. It counts SECOND-ORDER attention —
+           // a local whose `chatT` is running is one who turned because
+           // somebody else reacted, which is the thing a still cannot show and
+           // a state dump does not name.
+           reactAudit: function () {
+             const live = game.biome && game.biome.current;
+             let n = 0, flinch = 0, looking = 0, wary = 0;
+             for (let i = 0; i < locals.length; i++) {
+               const r = locals[i];
+               if (r.biome !== live) continue;
+               n++;
+               if (Math.abs(r.fl) > 0.02) flinch++;
+               if ((r.chatT || 0) > 0) looking++;
+               if ((r.wary || 0) > 0.02) wary++;
+             }
+             const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+             let castLook = 0;
+             if (cast) for (let i = 0; i < cast.length; i++) {
+               if ((cast[i].witT || 0) > 0) castLook++;
+             }
+             const st = game.state || {};
+             return { biome: live, locals: n, flinching: flinch, looking: looking,
+                      wary: wary, castWitnessing: castLook,
+                      chainArmed: !!locChainFrom, witCalls: st.witCalls || 0,
+                      witLast: st.witLast || 0, witSpoke: st.witSpoke || 0 };
            },
            // ...and who is mid-sentence, for the gaze. See sayBubble.
            speaker: npcSpeaker };

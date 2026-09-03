@@ -57,6 +57,10 @@ const capySKID_V = 5.2;             // m/s above which letting go LOOKS like a s
 const capyBONK_V   = 3.9;           // m/s along the contact normal
 const capyBONK_NY  = 0.45;          // |n.y| above this is a floor or a ramp
 const capyBONK_GAP = 0.40;          // s between bonks
+// ...and a PERSON is not a wall — see the barge branch of the collide listener.
+// A third of the wall's floor, because shouldering somebody at a walking pace
+// is the joke and 3.9 m/s is nearly a run.
+const capyBARGE_V  = 1.30;          // m/s along the contact normal
 // --- THE RUN-UP. See the hop, and read the note there before touching either.
 // The floor is a shade over the walk (4.2), so a walking hop is untouched and
 // only a genuine run leaps; the push ramps in over the 1.6 m/s above it rather
@@ -621,6 +625,12 @@ const capyWheekPayload = { position: capyPosition, soft: false };
 // It is on the payload rather than recomputed there because the only place
 // that knows how hard the arrival was is the frame that ended it.
 const capyDigPayload = { position: capyPosition, fall: 0 };
+// The barge. One object, reused, like every other payload in this file: the
+// collide listener can fire several times a second and a fresh literal per
+// contact is garbage in the hot path. `rec` is whichever of npc.js's two
+// record shapes the collider carried — a cast member or a local — and npc.js
+// is the only thing that reads it.
+const capyBargePayload = { rec: null, speed: 0, x: 0, z: 0 };
 const capySfxOpts = { pitch: 1, volume: 1, wet: 0 };   // reused — update() may not allocate
 // The same thing, with a place. `at` is a permanent reference to the position
 // mirror, which is rewritten in place every frame, so this object is built once
@@ -2411,6 +2421,53 @@ export function createCapybara(game) {
     //
     //   and it is THROTTLED, because a compound of three spheres against a flat
     //   collider produces several contact points on the same frame.
+    // ---- ...AND A PERSON IS NOT A WALL (D3) -------------------------------
+    //
+    // A walker's collider is mass-0 KINEMATIC and a local's is mass 0, so both
+    // of them arrive in the STATIC branch below and get the wall treatment:
+    // the same stone thud, the same punch, the same bounce back off a face.
+    // Measured, and it is the shape of the finding rather than the absence the
+    // roadmap expected — barging somebody was not silent, it was
+    // indistinguishable from walking into a building, and the person it
+    // happened to did not react at all.
+    //
+    // In a goose game the barge IS the verb. Three differences from a wall:
+    //
+    //   IT TAKES LESS SPEED. A wall needs capyBONK_V (3.9 m/s) before it is
+    //   worth a noise, because at a walk you are leaning on it. Shouldering
+    //   somebody at a walking pace is the entire joke, so the floor is a
+    //   third of it.
+    //   IT IS SOFTER. Less punch, a lower and quieter voice, and half the
+    //   bounce, because a person gives and a wall does not.
+    //   IT IS AN EVENT. npc.js answers `npc:barge` — see the handler there.
+    const ud = other.userData;
+    const who = ud && (ud.npc || ud.local);
+    if (who && other.mass === 0) {
+      const nv = Math.abs(c.getImpactVelocityAlongNormal());
+      if (nv < capyBARGE_V) return;
+      if (Math.abs(c.ni.y) > capyBONK_NY) return;
+      const nowB = game.state.time;
+      if (nowB - capyBonkAt < capyBONK_GAP) return;
+      if (capySwimming || capyClinging || capy.carriedBy || capy.atHelm) return;
+      capyBonkAt = nowB;
+      capyPunch(game, clamp((nv - capyBARGE_V) * 0.018, 0.02, 0.09));
+      capySfxAt.volume = clamp(nv * 0.070, 0.14, 0.46);
+      capySfxAt.pitch = clamp(0.78 - nv * 0.020, 0.52, 0.78);
+      game.sfx('thud', capySfxAt);
+      if (capyPop > -0.14) capyPop = -0.14;
+      if (capyPopVel > -2.2) capyPopVel = -2.2;
+      const bsB = clamp(nv * 0.08, 0.25, 1.1);
+      const bsignB = (body === c.bi) ? 1 : -1;
+      capyShove.x += c.ni.x * bsB * bsignB;
+      capyShove.z += c.ni.z * bsB * bsignB;
+      capyEarFlick = 1;
+      capyBargePayload.rec = who;
+      capyBargePayload.speed = nv;
+      capyBargePayload.x = capyPosition.x;
+      capyBargePayload.z = capyPosition.z;
+      game.events.emit('npc:barge', capyBargePayload);
+      return;
+    }
     if (other.mass === 0) {
       const nv = Math.abs(c.getImpactVelocityAlongNormal());
       if (nv < capyBONK_V) return;
