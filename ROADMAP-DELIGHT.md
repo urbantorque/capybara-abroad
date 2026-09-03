@@ -304,6 +304,30 @@ uniform exists, or the cave goes black on the first frame.
 
 ### Batch D2 — the body: stride, crouch, lean (area 2)
 
+**LANDED 3 Sep 2026.** All three must-lands, `capy.animAudit()` first.
+Contract section **THE BODY — D2**; instrument `qa/d2-skate.js`.
+
+The skate was **0.457 m per step at 1 m/s**, 0.144 at a walk and zero only at a
+sprint — the constant was right at the one speed the game is loudest at. The
+ceiling had to move with it: the derived cadence asks 41.2 rad/s at a sprint
+against the old clamp of 34, so `capyGAIT_MAX` is 48. Cost: footfalls 6.8 → 8.8
+per second at a walk and 10.8 → 13.1 at a sprint, and `sfx()` still has no voice
+cap (D9). Lean rides +0.214 flat out (unchanged) and reaches **−0.109 for
+0.61 s** on a stop. The ears whip 8.5° off a 4.94 m/s difference.
+
+**The crouch is a frame and a half at 60 Hz and one spring cannot do better** —
+the zero crossing wants a small seed velocity and the stretch peak wants a large
+one, and ζ = 0.26 takes 40 % off whatever the algebra promises (8.0 was measured
+after the closed form said 6.8 and the rig drew 0.238). A true anticipation
+means delaying the impulse, which is 50 ms of jump latency; not bought.
+
+**The tail is measured, not built** — it is a 5.5 cm blob pivoting on its own
+centre, so rotating it moves nothing at nine metres. Off the spill list.
+
+Spill, unchanged: the dig and carried branches onto a damped weight in the leg
+lerp chain; `capyHelmPose` standing down the sniff, ear turn, whiskers and nose
+pad.
+
 **Must land.**
 1. Stride from the swing, not a constant: hoist `swingAmp` above the cadence
    block and `stride = 2 · capyLEG_R · sin(swingAmp)` with `paMove`'s small

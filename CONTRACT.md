@@ -3058,6 +3058,105 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE BODY — D2 (3 Sep 2026)
+
+The second batch of `ROADMAP-DELIGHT.md`: contact, anticipation and
+follow-through, which are the three things a procedural rig can do for free and
+this one was not doing. `capy.animAudit()` went in first and is the instrument
+for all three — `{speed, legPhase, gaitRate, swingAmp, stride, pop, popVel,
+lean, leanTarget, accel, land, airPose, earLag, grounded, vy}`, a test hook that
+nothing in the game calls.
+
+### CONTACT: the cadence was computed from a stride the legs do not take
+
+`capySTRIDE = 0.62` claimed to be "metres of ground per half gait cycle (~= foot
+arc)". The foot arc is `2 * capyLEG_R * sin(swingAmp)` and `swingAmp` is
+`0.12 + speed * 0.19` — so the constant was right at a sprint and wrong
+everywhere else, and the two numbers lived fifty lines apart, which is how they
+came to disagree. Measured on the ramp out of a standstill (`qa/d2-skate.js`),
+metres of slip per step under the old formula:
+
+| speed | legs produce | old formula claimed | slip per step |
+|---|---|---|---|
+| 1.0 | 0.163 | 0.620 | **0.457** |
+| 1.6 | 0.264 | 0.620 | 0.356 |
+| 2.5 | 0.338 | 0.620 | 0.282 |
+| 3.4 | 0.412 | 0.620 | 0.208 |
+| 4.2 (walk) | 0.476 | 0.620 | 0.144 |
+| 7.2 (sprint) | 0.548 | 0.548 | 0.000 |
+
+Worst at the creep-up-on-a-picnic speed, which is the speed most of the mischief
+in this game happens at and the only one no key produces — it is on the ramp out
+of a standstill, which is why a probe that holds W and reads a mean never sees
+it. `npc.js` has derived a person's cadence from their own swing since the crowd
+got three builds and a child in it; this is that arithmetic brought back to the
+animal the camera is pointed at.
+
+`swingAmp` is hoisted above the cadence block, `stride` is derived from it, and
+the footfall sfx, `capy:step` and the flow's dust all ride the same phase and get
+correct timing for nothing. **The ceiling moved**: `capyGAIT_MAX` is 48 rad/s
+because the derived cadence asks for 41.2 at a sprint and the old 34 was a
+ceiling under the old stride — leaving it would have put the skate back at the
+top end only. The floor (2.6 rad/s) is gone in favour of `paMove`'s
+`stride > 0.02`.
+
+**What it costs.** Footfalls are 8.8/s at a walk (was 6.8) and 13.1/s at a
+sprint (was 10.8, clamped). That is the honest cadence for a 0.55 m foot arc at
+7.2 m/s and it is a 21 % rise in step-sfx density; `sfx()` still has no global
+voice cap (D9).
+
+### ANTICIPATION: "stretch out of the crouch", and there was no crouch
+
+Takeoff seeded `capyPop = +0.30, capyPopVel = 5` — the animal got taller on the
+frame it left the ground. It now seeds `-0.26` with `+8.0`, which puts the
+compression INSIDE the existing k=300 spring: measured at 120 Hz, one drawn
+frame at −0.127 (a 5 % squash), the next through zero, and a stretch peak of
+0.277 against the 0.34 it had before.
+
+**A frame and a half is what a compression that happens ON the input frame
+costs, and one spring cannot do better.** The zero crossing is
+`atan(x0·ω/v)/ω` and the stretch peak wants a large `v`; they pull opposite
+ways, and the damping (ζ = 0.26) takes another 40 % off whatever the algebra
+promises — 8.0 was measured, not solved, after the closed form said 6.8 and the
+rig drew 0.238. A true anticipation would have to delay the impulse, and 50 ms
+of jump latency is a gameplay regression the picture does not get to buy.
+
+The guard is unchanged in policy: a bigger stretch already in flight (a wheek)
+still wins.
+
+### FOLLOW-THROUGH: lean was speed, and the ears were welded on
+
+`leanTarget = gaitSpeed * k`, so a stop merely faded and a deck accelerating
+under the animal moved a statue. Two derivatives now feed it:
+
+- **the animal's own**, off `capySpeedSm` — already smoothed and already what
+  the gait rides, so it is the honest one; the raw ground speed steps with
+  every contact and differentiating that is a lean that shivers. Clamped to
+  ±25 m/s², because a solver spike is not an acceleration.
+- **the deck's**, off `capy.frameVX/VZ` — taken in world axes, differentiated at
+  λ 6, and only then rotated into the model's yaw, because a deck can accelerate
+  sideways and the lean is a pitch.
+
+Measured on a sprint→stop: lean rides at **+0.214** flat out (unchanged — the
+speed term is untouched), passes through zero as the animal plants, and reaches
+**−0.109** for 0.61 s before settling. Peak deceleration −21.3 m/s².
+
+**The ears lag** on the same principle: `capyEarLag` damps toward
+`body.velocity.y` at λ 14 and what is drawn is the DIFFERENCE — zero whenever
+the two agree, so walking, standing and a steady fall leave the term at nothing
+and only a CHANGE of vertical motion shows. Peak on a hop is 4.94 m/s of
+difference, 8.5° of ear. A fifth of it goes into the whiskers, which is what
+stops the two reading as one hinged plate.
+
+### The tail: measured, not built
+
+The roadmap has "the tail is built and never rotated by anything" on the D2
+spill list. It is `capyGeoBlob` scaled to **0.055 × 0.06 × 0.05** — a five-
+centimetre nub — parented straight to `capySquash` with its pivot at its own
+centre. Rotating it about its own centre moves nothing a camera nine metres away
+can see, and giving it a pivot at the body join is a rig change, not two lines.
+Left alone, and the reason recorded so it is not re-proposed.
+
 ## DEPTH — D1 (3 Sep 2026)
 
 The first batch of `ROADMAP-DELIGHT.md`. Two numbers opened that roadmap and

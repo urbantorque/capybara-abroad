@@ -103,3 +103,14 @@ D1 added two, and one of them replaced a guess with a number:
 |---|---|
 | `d1-sky.js` | the dome's lobe and horizon band, read off its own vertex colours |
 | `d1-shots.js` | six resting frames with the live `shade` and shadow-half in each row |
+
+D2 added one, and it is the only probe here that drives the animal:
+
+| file | what it answers |
+|---|---|
+| `d2-skate.js` | metres of foot slip per step at six speeds, the hop's crouch at 120 Hz, and the lean through a sprint-to-stop |
+
+**Every locomotion run reloads.** The first cut of `d2-skate.js` walked, then
+sprinted from wherever the walk had ended up, and the sprint row read 1.76 m/s
+because the animal was against a fence. A probe that does not reload has
+measured the fence.

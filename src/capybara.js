@@ -240,7 +240,11 @@ const capyDIVE_FLOOR  = 0.55;       // how far off the seabed the animal levels 
 const capyDIVE_MIN_D  = 1.75;
 const capyRISE_MAX    = 3.60;       // cap on the buoyancy spring — see the note by it
 const capySTAM_BREATH = 0.0620;     // per second under water -> about sixteen seconds
-const capySTRIDE = 0.62;            // metres of ground per half gait cycle (~= foot arc)
+// GONE (D2). It said "metres of ground per half gait cycle (~= foot arc)" and
+// it was a constant, while the foot arc it claimed to equal is 2 * capyLEG_R *
+// sin(swingAmp) and swingAmp is speed-dependent — so it was right at a sprint
+// and three times too long at a creep. The stride is derived where the swing
+// is now; see the D2 block above capyLEG_R.
 // --- solver-friendly tuning (velocity space only — we never write position) --
 const capyGROUND_KP = 9;            // floor recovery gain, metres of gap -> m/s
 const capyGROUND_SLOP = 0.02;       // penetration we simply ignore (real contacts own it)
@@ -548,6 +552,54 @@ function capyPoseFit(hB, h0, hF, L) {
 let capyLean = 0;                   // the SPEED lean, kept on its own variable
                                     // so the terrain pitch can be added beside
                                     // it rather than damped into it
+// ---------------------------------------------------------------------------
+// CONTACT, ANTICIPATION, FOLLOW-THROUGH (D2) — and the numbers behind them.
+//
+// Three faults, all of them invisible in a still and all of them one number:
+//
+//   CONTACT. `capySTRIDE` was a CONSTANT 0.62 m of ground per half cycle, and
+//   the swing amplitude that actually moves the feet is speed-dependent — so
+//   the constant was only ever right at a sprint. At 1 m/s the legs produce
+//   about 0.18 m of arc and the cadence was being computed as though they
+//   produced 0.62, which is three times too slow and about 0.4 m of skate per
+//   step. npc.js has derived a person's cadence from their own swing since the
+//   crowd got three builds and a child in it; this is that arithmetic brought
+//   back to the animal the camera is pointed at.
+//
+//   ANTICIPATION. Takeoff seeded a positive pop — the comment even said
+//   "stretch out of the crouch" and there was no crouch. A negative seed with
+//   a positive velocity puts the compression INSIDE the existing k=300 spring:
+//   it passes back through zero in about 23 ms and overshoots to the same
+//   stretch peak it always had, so the hop gains an anticipation and loses
+//   nothing. Nothing about the collider or the arc changes.
+//
+//   FOLLOW-THROUGH. The lean was `speed * k`, so a stop merely faded and a deck
+//   turning under the animal moved a statue. Speed says where the body IS;
+//   acceleration says what it is DOING, and it is the second one that reads as
+//   weight.
+// ---------------------------------------------------------------------------
+const capyLEG_R    = 0.30;    // hip pivot to the sole — see capyGeoLeg and the foot
+const capyGAIT_MAX = 48;      // rad/s. The old 34 was a ceiling under the old
+                              // stride; the derived one asks for 42 at a sprint.
+const capyGAIT_MIN_STRIDE = 0.02;   // paMove's floor, for paMove's reason
+const capyHOP_CROUCH = -0.26; // the anticipation dip: 10 % of the body height
+const capyHOP_VEL    = 8.0;   // ...and the kick out of it. MEASURED at 120 Hz
+                              // rather than solved: the spring is damped (zeta
+                              // 0.26), so the peak is about 72 % of the
+                              // undamped amplitude and the closed form is a
+                              // third too generous. 8.0 puts the stretch peak
+                              // at 0.35, which is where takeoff always had it.
+const capyHOP_POP    = 0.30;  // an in-progress stretch this big or bigger wins
+const capyACCEL_CLAMP = 25;   // m/s^2 — a contact spike is not an acceleration
+const capyACCEL_LEAN  = 0.010;
+const capyDECK_LEAN   = 0.012;
+const capyEAR_LAG_L   = 14;   // how fast the ears catch up with the body
+const capyEAR_LAG_K   = 0.030;// rad per m/s of the difference
+const capyEAR_LAG_MAX = 0.34;
+let capyGaitRate = 0, capySwingAmp = 0, capyStride = 0;
+let capySpeedPrev = 0, capyAccelSm = 0, capyLeanTgt = 0;
+let capyDeckVX = 0, capyDeckVZ = 0, capyDeckAX = 0, capyDeckAZ = 0;
+let capyEarLag = 0;
 
 
 const capyMouthLocal = new THREE.Vector3();
@@ -2717,6 +2769,28 @@ export function createCapybara(game) {
       capyShove.x = clamp(capyShove.x + dvx, -capySHOVE_MAX, capySHOVE_MAX);
       capyShove.z = clamp(capyShove.z + dvz, -capySHOVE_MAX, capySHOVE_MAX);
     },
+    /**
+     * EVERY NUMBER THE RIG IS POSED FROM, in one read. A test hook, like
+     * forceHeat and faceAudit — nothing in the game calls it.
+     *
+     * It exists because the three faults D2 fixes are all invisible from
+     * outside: a foot that skates is a cadence that disagrees with a stride, a
+     * hop with no anticipation is a spring that never went negative, and a lean
+     * that is speed rather than acceleration looks identical in a still. Each
+     * one is two of these numbers put next to each other, sampled fast.
+     *
+     * `stride` is the metres of ground ONE half cycle of the legs is worth at
+     * the current swing — so `speed / (stride * gaitRate / PI)` is 1.000 when
+     * the feet are locked to the ground and anything else is skate.
+     */
+    animAudit: function () {
+      return { speed: capySpeedSm, legPhase: capyLegPhase, gaitRate: capyGaitRate,
+               swingAmp: capySwingAmp, stride: capyStride,
+               pop: capyPop, popVel: capyPopVel,
+               lean: capyLean, leanTarget: capyLeanTgt, accel: capyAccelSm,
+               land: capyLand, airPose: capyAirPose, earLag: capyEarLag,
+               grounded: capy.grounded, vy: body.velocity.y };
+    },
     update: capyUpdate,
   };
   game.capy = capy;
@@ -3606,8 +3680,15 @@ export function createCapybara(game) {
       capyJumpArm = !capySwimming;
       capyAirTime = capyCOYOTE;          // the coyote window is spent, not doubled
       grounded = false;
-      capyPop = capyPop < 0.30 ? 0.30 : capyPop;   // stretch out of the crouch
-      capyPopVel = 5;
+      // ...AND NOW THERE IS A CROUCH TO STRETCH OUT OF (D2). The comment on
+      // this line said "stretch out of the crouch" for eighteen chapters and
+      // seeded a positive pop, so the animal simply got taller on the frame it
+      // left the ground. Seeding the spring NEGATIVE with a positive velocity
+      // is the anticipation: it passes back through zero in about 23 ms — a
+      // frame and a half, which is exactly as long as a compression should read
+      // — and overshoots to the same 0.42 peak it always had. The policy on the
+      // guard is unchanged: a bigger stretch already in flight (a wheek) wins.
+      if (capyPop < capyHOP_POP) { capyPop = capyHOP_CROUCH; capyPopVel = capyHOP_VEL; }
       capyEarFlick = 1;
       capySfxOpts.pitch = capySwimming ? 0.9 : 1.35;
       capySfxOpts.volume = 0.45;
@@ -4666,7 +4747,21 @@ export function createCapybara(game) {
     // cadence is a stuttering leg even under perfect interpolation.
     capySpeedSm = damp(capySpeedSm, groundSpeed, capySPEED_LAMBDA, dt);
     const gaitSpeed = capySpeedSm;
-    const gaitRate = capySwimming ? 7.5 : clamp(Math.PI * gaitSpeed / capySTRIDE, 2.6, 34);
+    // ---- THE STRIDE IS WHAT THE LEGS ACTUALLY DO ------------------------
+    // Hoisted from fifty lines below, where it used to live: the swing is the
+    // input to the cadence and not a separate decision, and having the two
+    // apart is exactly how they came to disagree. See capyLEG_R.
+    //
+    // Deriving the cadence rather than asserting it also means the footfall
+    // sfx, `capy:step` and the flow's dust all get their timing corrected for
+    // free — they all ride this phase.
+    const swingAmp = capySwimming ? 0.42 : clamp(0.12 + gaitSpeed * 0.19, 0, 1.15);
+    const stride = capySwimming ? 0 : 2 * capyLEG_R * Math.sin(swingAmp);
+    const gaitRate = capySwimming ? 7.5
+      : (stride > capyGAIT_MIN_STRIDE
+          ? clamp(Math.PI * gaitSpeed / stride, 0, capyGAIT_MAX)
+          : 0.4);
+    capySwingAmp = swingAmp; capyStride = stride; capyGaitRate = gaitRate;
     const moving = gaitSpeed > 0.35 || capySwimming;
     if (moving) {
       capyLegPhase += gaitRate * dt;
@@ -4722,9 +4817,9 @@ export function createCapybara(game) {
       capyLegPhase = damp(w, 0, 6, dt);
     }
 
-    // stride amplitude has to read at a ~9.5 unit camera: ~53 deg at a walk,
-    // ~66 deg flat out. Anything smaller vanishes at this distance.
-    const swingAmp = capySwimming ? 0.42 : clamp(0.12 + gaitSpeed * 0.19, 0, 1.15);
+    // (`swingAmp` — stride amplitude, which has to read at a ~9.5 unit camera:
+    // ~53 deg at a walk, ~66 deg flat out, anything smaller vanishes at this
+    // distance — is computed with the cadence it feeds, fifty lines up.)
     // 0 on the floor, 1 in the air — 0.14 s of airtime before the pose commits,
     // which is longer than any contact hiccup and shorter than the shortest hop.
     capyAirPose = damp(capyAirPose, (!grounded && !capySwimming && !carried &&
@@ -4969,9 +5064,38 @@ export function createCapybara(game) {
     // Nose down on the way down, nose up on the way back — read off the actual
     // vertical velocity rather than off the key, so a dive that has hit the
     // bottom and levelled out LOOKS level.
+    // ---- LEAN IS ACCELERATION, NOT ONLY SPEED (D2) -----------------------
+    // Speed says where the body is; acceleration says what it is doing, and it
+    // is the second one that reads as weight. Two sources, both differentiated
+    // here and nowhere else:
+    //
+    //   THE ANIMAL'S OWN. `capySpeedSm` is already smoothed and already the
+    //   thing the gait rides, so its derivative is the honest one — the raw
+    //   ground speed steps with every contact and differentiating THAT is a
+    //   lean that shivers. Clamped hard: a solver spike is not an acceleration.
+    //
+    //   THE DECK'S. Three chapters move the floor and `frameVX/VZ` has carried
+    //   it since the ferry — a ferry pulling away used to move a statue. Taken
+    //   in world axes, differentiated, and only then rotated into the model's
+    //   yaw, because the deck can accelerate sideways and the lean is a pitch.
+    const accelRaw = dt > 0.0001 ? (capySpeedSm - capySpeedPrev) / dt : 0;
+    capySpeedPrev = capySpeedSm;
+    capyAccelSm = damp(capyAccelSm, clamp(accelRaw, -capyACCEL_CLAMP, capyACCEL_CLAMP), 12, dt);
+    capyDeckAX = damp(capyDeckAX, dt > 0.0001 ? clamp((capy.frameVX - capyDeckVX) / dt,
+                      -capyACCEL_CLAMP, capyACCEL_CLAMP) : 0, 6, dt);
+    capyDeckAZ = damp(capyDeckAZ, dt > 0.0001 ? clamp((capy.frameVZ - capyDeckVZ) / dt,
+                      -capyACCEL_CLAMP, capyACCEL_CLAMP) : 0, 6, dt);
+    capyDeckVX = capy.frameVX; capyDeckVZ = capy.frameVZ;
+    // the model's forward is +z rotated by the yaw, so this is the component of
+    // the deck's acceleration the animal would feel through its own nose
+    const deckFwd = capyDeckAX * Math.sin(capyYaw) + capyDeckAZ * Math.cos(capyYaw);
     const leanTarget = capyDiving || (capySwimming && capy.depth > 0.6)
                        ? clamp(-body.velocity.y * 0.16, -0.42, 0.42)
-                       : capySwimming ? -0.05 : gaitSpeed * (running ? 0.030 : 0.013);
+                       : capySwimming ? -0.05
+                       : gaitSpeed * (running ? 0.030 : 0.013)
+                         + capyAccelSm * capyACCEL_LEAN
+                         + clamp(deckFwd * capyDECK_LEAN, -0.20, 0.20);
+    capyLeanTgt = leanTarget;
     // The speed lean damps on its OWN variable. Damping capyModel.rotation.x
     // toward the lean while the terrain pitch is also written into it would
     // feed the hill back into its own filter every frame.
@@ -5079,8 +5203,19 @@ export function createCapybara(game) {
     // pose the animal is left holding.
     capyEarTurn = damp(capyEarTurn, 0, 1.1, dt);
     const turn = capyEarTurn * 0.55;
-    earL.rotation.x = -earBack;
-    earR.rotation.x = -earBack;
+    // ---- ...AND THEY LAG BEHIND THE BODY (D2) ----------------------------
+    // The follow-through. An ear is a flap on a hinge and it does not know the
+    // animal has jumped until the animal has: on the way up they trail, at the
+    // apex they catch up, on the way down they lift. What is drawn is the
+    // DIFFERENCE between the body's vertical velocity and a damped copy of it,
+    // which is zero whenever the two agree — so walking, standing and a steady
+    // fall all leave this term at nothing and only a change of vertical motion
+    // shows. Clamped, because a solver spike is not a jump.
+    capyEarLag = damp(capyEarLag, body.velocity.y, capyEAR_LAG_L, dt);
+    const earWhip = clamp((body.velocity.y - capyEarLag) * capyEAR_LAG_K,
+                          -capyEAR_LAG_MAX, capyEAR_LAG_MAX);
+    earL.rotation.x = -earBack - earWhip;
+    earR.rotation.x = -earBack - earWhip;
     earL.rotation.y = turn;
     earR.rotation.y = turn;
     earL.rotation.z = -0.18 - flick - earDown + turn * 0.35;
@@ -5117,8 +5252,11 @@ export function createCapybara(game) {
     const wDrift = Math.sin(t * 1.7) * 0.05;
     whiskL.rotation.y = -sn * 0.34 + wDrift;
     whiskR.rotation.y = sn * 0.34 + wDrift;
-    whiskL.rotation.z = sn * 0.20;
-    whiskR.rotation.z = -sn * 0.20;
+    // ...and a fifth of the ears' whip, on the same difference (D2). A whisker
+    // is lighter than an ear, so it lags less and settles sooner; a fifth is
+    // what stops the two reading as one hinged plate.
+    whiskL.rotation.z = sn * 0.20 - earWhip * 0.2;
+    whiskR.rotation.z = -sn * 0.20 + earWhip * 0.2;
 
     // blink
     capyBlink = capyBlink > 0 ? capyBlink - dt : 0;
