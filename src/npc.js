@@ -1549,6 +1549,53 @@ export function createNPCs(game) {
   const npcLOC_STEP_GAP = 15;    // s between shuffles, jittered hard per person
   const npcLOC_STEP_BOB = 0.020; // m of step bob while actually moving
 
+  // =========================================================================
+  // A PERSON WITH A JOB — `beat` on addLocal.
+  // =========================================================================
+  // Every one of the hundred and fifty-odd locals in this game is standing
+  // perfectly still. They breathe, they shuffle half a metre every fifteen
+  // seconds, they turn their head when you go past, they flinch at a bang and
+  // they put an umbrella up in the rain — and in between all of that they are
+  // doing NOTHING, for ever, in a chapter that has told you exactly what they
+  // are there for. The fishmonger has a cleaver. The woman at the pho stall has
+  // a ladle. Neither of them has ever moved it.
+  //
+  // A beat is one small repeated action on a slow, jittered clock: an arm goes
+  // up and comes down, or two go up and hold, or a person shifts their weight.
+  // Three shapes, and three is enough — everything a person does standing in
+  // one place for an hour is one of them with a different sound on it.
+  //
+  //   work   one arm up and then down through the bottom, hard. A cleaver, a
+  //          hammer, a broom, a paddle, a whisk. The sound is at the bottom.
+  //   reach  both arms up, a hold, and down. Hanging washing, stacking a
+  //          shelf, pegging a net. The sound is at the top, if there is one.
+  //   rock   a shift of weight from one foot to the other, and no sound at
+  //          all. Waiting, cold, listening, humming.
+  //
+  // FOUR RULES, and they are the ambient movers' rules with a fourth on top:
+  //
+  //  1. IT IS OUTRANKED BY EVERYTHING. Talking, flinching, guarding stock,
+  //     going to fetch a prop back, holding an umbrella and walking all beat
+  //     it, and it does not resume mid-swing — it starts the next one clean.
+  //     A person who is startled mid-chop must not go on chopping.
+  //  2. IT NEVER SPEAKS AT RANGE. The action always runs; the SOUND is placed
+  //     at the person and dies with the distance law like every other sound
+  //     they make (see A SOUND A PERSON MAKES).
+  //  3. THE CLOCK IS JITTERED PER PERSON AND STRETCHED BY THE CALM. Six people
+  //     in a market on a five-second beat is a factory; the jitter is what
+  //     makes it a market. The calm stretch is the same one the ambience
+  //     ladder takes, for the same reason.
+  //  4. ONLY A PERSON THIS MODULE BUILT. The same gate the shuffle and the
+  //     umbrella take, and here it is absolute: a chapter that handed over its
+  //     own Group may have merged that person into a stall, a boat or a jetty,
+  //     and there are no arms on the end of a jetty to raise.
+  const npcBEAT_LAM   = 9;      // damping on the arm — fast enough to read as a swing
+  const npcBEAT_UP    = 0.42;   // fraction of the action spent going up
+  const npcBEAT_ARM   = 1.55;   // rad the working arm reaches at the top
+  const npcBEAT_THRU  = 0.40;   // ...and rad past vertical it goes at the bottom
+  const npcBEAT_ROCK  = 0.055;  // rad of lean, the whole of what `rock` is
+  const npcBEAT_VOL   = 0.20;   // default level, well under a spoken line
+
   // ---- ...AND NOBODY IN FIFTEEN CHAPTERS EVER SPOKE TO ANYBODY ELSE -------
   // chatStep — two people turning to each other and having four seconds of
   // conversation that is not about you — is the best thing the Sydney crowd
@@ -1773,6 +1820,12 @@ export function createNPCs(game) {
       // what the other sixty-odd people use.
       onTask: o.onTask || null, praise: o.praise || null,
       fig: fig, gest: 0,
+      // ---- WHAT THIS PERSON IS DOING (D7) ----
+      // See A PERSON WITH A JOB. `beat` is the definition the chapter gave;
+      // `beatT` counts down to the next one and starts jittered so that two
+      // people put down by the same loop never fall into step; `beatP` is 0..1
+      // through the action itself and -1 between them.
+      beat: o.beat || null, beatT: rand(0.6, 4.5), beatP: -1,
       // the face (see FACES). `mood` is damped here rather than recomputed,
       // because the things that drive it — the flinch spring, the guard, a
       // prop of theirs on the floor — are three separate clocks and a face
@@ -3786,11 +3839,48 @@ export function createNPCs(game) {
         // legs are a merged mesh with no joints in them, so weight going up
         // and down is the only honest way to draw somebody taking a step, and
         // at the six metres this game is played at it is enough.
+        // ---- ...AND WHAT THEY ARE ACTUALLY DOING (D7) --------------------
+        // See A PERSON WITH A JOB. It runs HERE rather than down in the arm
+        // block because one of the three shapes — `rock` — is a shift of
+        // weight and not an arm at all, and the body's own two writes are
+        // these. Rule 1 lives on `beatBusy`: talking, flinching, guarding,
+        // fetching, holding an umbrella and walking all stop the job, and the
+        // job is the only thing in this pose stack that yields to the rest
+        // rather than adding to them.
+        //
+        // ...and `rock` is exempt from the two that are ARM conflicts, because
+        // it is not an arm. A person can shift their weight while they are
+        // talking to you and while they are holding an umbrella; they cannot
+        // chop with the same arm they are gesturing with. This matters more
+        // than it sounds: walking up to somebody makes them greet you, a line
+        // is two to four seconds of `gest`, and the clock is four — so without
+        // this exemption the job is least visible at exactly the moment
+        // somebody is standing there looking at it.
+        const armJob = r.beat && r.beat.kind !== 'rock';
+        const beatBusy = f > 0.02 || r.grd > 0.05 || !!r.own || r.moving > 0 ||
+                         (armJob && (r.gest > 0 || r.umb > 0.05));
+        // ...and WHICH of the six, for beatAudit. A beat that is not happening
+        // is either waiting or suppressed, and a suppressed one has six
+        // possible reasons that are indistinguishable from outside.
+        if (r.beat) {
+          r.beatWhy = !beatBusy ? ''
+            : f > 0.02 ? 'flinch' : r.grd > 0.05 ? 'guard' : r.own ? 'fetch'
+            : r.moving > 0 ? 'walk' : r.gest > 0 ? 'talk' : 'umbrella';
+        }
+        const beat = (r.beat && r.fig)
+          ? localBeatStep(r, dt, beatBusy,
+                          typeof game.calm === 'function' ? game.calm(r.x, r.z) : 0)
+          : 0;
+        // `rock` is a lean and nothing else — one sine over the action, so it
+        // is a weight shift and back rather than a lurch.
+        const rock = (r.beat && r.beat.kind === 'rock' && r.beatP >= 0)
+          ? Math.sin(r.beatP * 6.283185) * npcBEAT_ROCK : 0;
         r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB
                              + r.mv * Math.abs(Math.sin(r.t * 7.4)) * npcLOC_STEP_BOB
                              - f * 0.045 - r.hud * 0.035;
         r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06
                              - r.mv * 0.035;
+        r.group.rotation.z = rock;
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
@@ -3837,11 +3927,17 @@ export function createNPCs(game) {
           // toward the centre line, which on two boxes with no elbows is the
           // only crossed-arms available and reads correctly from six metres.
           const fold = r.hud;
+          // The LEFT arm joins in only on a `reach`, because a reach is two
+          // hands and a work stroke is one. That asymmetry is the whole
+          // difference between somebody chopping and somebody surrendering.
+          const beatL = (r.beat && r.beat.kind === 'reach') ? beat : 0;
           r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
-                                       sway - guard - fold * 0.42, armL, dt);
+                                       sway - guard - fold * 0.42 + beatL,
+                                       r.beatP >= 0 ? npcBEAT_LAM : armL, dt);
           r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
                                        -sway - talk * (1 - hold) - guard
-                                       - hold * npcLOC_UMB_ARM - fold * 0.42, armR, dt);
+                                       - hold * npcLOC_UMB_ARM - fold * 0.42
+                                       + beat, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
           r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
                                        -talk * 0.7 * (1 - hold) - f * 0.4
                                        - hold * 0.20 - fold * 0.34, armR, dt);
@@ -4056,6 +4152,63 @@ export function createNPCs(game) {
     if (doneTasks[id] || !npcTASK_IDS[id]) return;
     doneTasks[id] = true;
     try { game.completeTask(id); } catch (e) { /* systems may not be up yet */ }
+  }
+  /**
+   * ONE TICK OF SOMEBODY'S JOB. Returns the arm angle, 0 when idle.
+   *
+   * `busy` is rule 1: everything else this person could be doing, folded into
+   * one flag by the caller. A beat that is interrupted is ABANDONED rather
+   * than paused — the arm damps home and the clock starts again — because a
+   * person who is startled halfway through a chop and then finishes the chop
+   * is worse than one who never chopped.
+   */
+  function localBeatStep(r, dt, busy, calm) {
+    const b = r.beat;
+    if (!b) return 0;
+    // Published for beatAudit and read by nothing else: a beat that is not
+    // happening is either waiting (a long clock) or suppressed (rule 1), and
+    // those two are the same zero from outside.
+    r.beatBz = busy; r.beatCalm = calm;
+    if (busy) {
+      if (r.beatP >= 0) { r.beatP = -1; r.beatT = (b.every || 5) * rand(0.5, 1.1); }
+      return 0;
+    }
+    if (r.beatP < 0) {
+      r.beatT -= dt * (1 - calm * 0.35);
+      if (r.beatT > 0) return 0;
+      r.beatP = 0;
+      return 0;
+    }
+    const dur = b.dur > 0.1 ? b.dur : 0.85;
+    const was = r.beatP;
+    r.beatP += dt / dur;
+    if (b.kind === 'rock') {
+      if (r.beatP >= 1) { r.beatP = -1; r.beatT = (b.every || 5) * rand(0.65, 1.5);
+                          r.beatN = (r.beatN || 0) + 1; }
+      return 0;
+    }
+    // The sound sits at the moment of contact, which is the bottom of a work
+    // stroke and the top of a reach — and it is a rising edge on the phase, so
+    // a frame long enough to skip past it still gets exactly one.
+    const at = b.kind === 'reach' ? npcBEAT_UP : 0.72;
+    if (was < at && r.beatP >= at && b.sfx && !(game.state && game.state.paused)) {
+      sfx(b.sfx, r, b.volume === undefined ? npcBEAT_VOL : b.volume,
+          (b.pitch || 1) * rand(0.94, 1.07));
+    }
+    if (r.beatP >= 1) { r.beatP = -1; r.beatT = (b.every || 5) * rand(0.65, 1.5);
+                        r.beatN = (r.beatN || 0) + 1; return 0; }
+    const p = r.beatP;
+    if (b.kind === 'reach') {
+      // up, hold, down — the hold is what makes it a reach and not a wave
+      const k = p < npcBEAT_UP ? p / npcBEAT_UP
+              : p < 0.68 ? 1
+              : 1 - (p - 0.68) / 0.32;
+      return -k * npcBEAT_ARM * 0.78;
+    }
+    // work: up slowly, down through the bottom fast, and a little recovery
+    if (p < npcBEAT_UP) return -(p / npcBEAT_UP) * npcBEAT_ARM;
+    const q = (p - npcBEAT_UP) / (1 - npcBEAT_UP);
+    return -npcBEAT_ARM * (1 - q) + npcBEAT_THRU * Math.min(1, q * 1.6) * (1 - q * 0.4);
   }
   function emit(name, npcRec) {
     try { game.events.emit(name, { npc: npcRec }); } catch (e) { /* bus optional */ }
@@ -9527,6 +9680,34 @@ export function createNPCs(game) {
            // a local whose `chatT` is running is one who turned because
            // somebody else reacted, which is the thing a still cannot show and
            // a state dump does not name.
+           /**
+            * WHO IN THIS CHAPTER HAS A JOB AND WHETHER THEY ARE DOING IT.
+            *
+            * A beat is a slow, jittered clock and the action is under a second
+            * long, so at any given instant almost nobody is mid-swing — which
+            * means a screenshot cannot tell "nobody has a beat" from "nobody
+            * happens to be swinging". `swings` is the count since the last
+            * reset and is the only honest answer. Nothing in src reads it.
+            * See qa/d7-beat.js.
+            */
+           beatAudit: function (reset) {
+             const live = game.biome && game.biome.current;
+             const rows = [];
+             let running = 0;
+             for (let i = 0; i < locals.length; i++) {
+               const r = locals[i];
+               if (r.biome !== live || !r.beat) continue;
+               if (r.beatP >= 0) running++;
+               if (reset) r.beatN = 0;
+               rows.push({ kind: r.beat.kind, sfx: r.beat.sfx || '',
+                           every: r.beat.every || 5,
+                           x: +r.x.toFixed(1), z: +r.z.toFixed(1),
+                           p: +r.beatP.toFixed(2), swings: r.beatN || 0,
+                           t: +(r.beatT || 0).toFixed(1), busy: !!r.beatBz,
+                           calm: +(r.beatCalm || 0).toFixed(2), why: r.beatWhy || '' });
+             }
+             return { biome: live, withJob: rows.length, running: running, rows: rows };
+           },
            reactAudit: function () {
              const live = game.biome && game.biome.current;
              let n = 0, flinch = 0, looking = 0, wary = 0;

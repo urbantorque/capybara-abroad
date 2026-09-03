@@ -8,7 +8,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, chapterCount, rand, randInt
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -965,6 +965,103 @@ const sysAMB_R1   = 34;   // ...and furthest
 const sysAMB_NEAR = 40;   // > R1, so the gain multiplier is 1 for every spot
 const sysAMB_UP   = 6;    // m of height jitter, mostly upward: birds and bells
 
+// ===========================================================================
+// THE BELL COMES OFF THE CAMPANILE — sysAMB_AT.
+//
+// sysAmb puts the ambience on a ring fourteen to thirty-four metres from the
+// animal at a random bearing, which is exactly right for the things a place
+// says about itself that have no source: a gull, a dog, a radio, wind in
+// something. It is exactly wrong for the ones that HAVE one. San Marco has a
+// campanile in it and the bell came from nowhere in particular; the Jemaa
+// el-Fnaa has a minaret at the end of it and the call to prayer arrived over
+// the player's shoulder from an empty patch of square; the Long Biên line runs
+// through chapter 19 and `kyoUpdateBell`/`hanUpdateTrain` draw both of them.
+//
+// So: one row per chapter, one entry per voice, and the entry is either a
+// literal {x, y, z} or a KEY ON THE CHAPTER'S OWN PUBLISHED API — the same
+// resolution `way` uses for the exit board, for the same reason. A tower that
+// moves (Marrakech's cart, the Drift's lantern) is followed rather than
+// copied, and nothing here can drift out of step with where the thing is,
+// because it is not a second copy of where the thing is.
+//
+// `dy` lifts the point off whatever the api returns, which is almost always
+// the base of the thing: a bell is at the top of the campanile and a muezzin
+// is at the top of the minaret.
+//
+// AN ANCHORED VOICE IS AT A REAL DISTANCE, AND THAT IS THE WHOLE CHANGE.
+// The ring is deliberately inside `near` so that the ladder's ninety-odd
+// hand-tuned volumes come out of audioPlace at a gain of exactly 1 (see the
+// note on sysAMB_R0). An anchor cannot work that way — a bell four hundred
+// metres up the valley that is as loud as a bell in the next street is not a
+// bell in a valley — so an anchored rung takes a wide `near` and a long `far`
+// and is quieter, and further, and off to one side. That side is the payoff:
+// you hear it over your left shoulder and there is a tower over your left
+// shoulder.
+//
+// WHAT IS DELIBERATELY NOT IN HERE: everything that has no source. A gull, a
+// dog, a moped, a door, a radio, rustling, wind, a distant crowd. Anchoring
+// those would not be more truthful, it would just be a shorter list of places
+// a sound may come from — and the ring is what makes a place sound wide.
+const sysAMB_AT = {
+  // The mountain, and the church. Galeras hisses and grumbles from Galeras;
+  // the banda is behind the church and the church is where the bell is.
+  pasto:     { hiss: { get: 'craterCentre', dy: 40 }, thunder: { get: 'craterCentre', dy: 40 },
+               banda: { get: 'bell' }, chime: { get: 'bell' } },
+  // A ship's horn on the harbour comes off the harbour bridge, which is the
+  // one thing in chapter 3 you can see from everywhere in it.
+  quay:      { horn: { get: 'bridge', dy: 40 } },
+  // The bonshō is the great bell — the chapter has one, on a rope, and pulling
+  // it is a task. The shishi-odoshi is the deer-scarer in the zen garden.
+  kyoto:     { bonsho: { get: 'bell', dy: 3 }, shishi: { get: 'zen' },
+               splash: { get: 'pond' } },
+  // The cheer is the dance floor, and the horn is the road over the river.
+  cali:      { cheer: { get: 'floor', dy: 1 }, horn: { get: 'bridge', dy: 1 } },
+  // A cheer on Copacabana is a volleyball point; the bell is on the mountain.
+  rio:       { cheer: { get: 'volei' }, chime: { get: 'corcovado', dy: 20 } },
+  // Strokkur goes off every few minutes whether anybody is watching or not,
+  // and it is the loudest thing in Iceland by a distance.
+  iceland:   { splash: { get: 'strokkur', dy: 2 }, hiss: { get: 'strokkur', dy: 2 },
+               gull: { get: 'cliff', dy: 10 } },
+  // The far bell is the one under the crown, which is the island you can see
+  // from the shelf and cannot reach yet.
+  drift:     { farbell: { get: 'crown', dy: 4 } },
+  // The two the chapter is named for. `campanile` is a voice AND a place.
+  venice:    { campanile: { get: 'campanile', dy: 55 }, pigeons: { get: 'piazza' },
+               lap: { get: 'molo' } },
+  // A cleaver and a mahjong tile are both a market; a ship's horn is the pier.
+  kowloon:   { cleaver: { get: 'market' }, mahjong: { get: 'market', dy: 8 },
+               horn: { get: 'pier' } },
+  // The reef breaks where the reef is.
+  palawan:   { splash: { get: 'reef' } },
+  // Twenty burners in a field before dawn, and they are the only sound and the
+  // only light in the valley.
+  goreme:    { burner: { get: 'field', dy: 6 }, bark: { get: 'town' } },
+  // THE ONE THIS TABLE WAS WRITTEN FOR. The Koutoubia's minaret is 77 m of
+  // sandstone at the end of the square and the call came from a random bearing.
+  sahara:    { muezzin: { get: 'koutoubia', dy: 62 }, cart: { get: 'cart' } },
+  // The whistle is a lifesaver's and the lifesavers are at the flags.
+  manly:     { whistle: { get: 'flags' }, corso: { get: 'club', dy: 3 } },
+  // A dog is at the fazenda, because there is nowhere else for a dog to be.
+  pantanal:  { bark: { get: 'fazenda', dy: 1 } },
+  // Ten thousand of them, all in one place, all shouting.
+  antarctic: { bark: { get: 'colony' }, hiss: { get: 'glacierToe', dy: 12 },
+               splash: { get: 'berg' } },
+  // The market, the pho stall, and the line the train comes down.
+  hanoi:     { vendor: { get: 'market' }, bowls: { get: 'pho' }, tick: { get: 'rails' } },
+  // The rooms, and a cork on a boat.
+  monaco:    { roulette: { get: 'casino', dy: 8 }, clink: { get: 'casino', dy: 8 },
+               pop: { get: 'yacht', dy: 3 } },
+  // Water in a cave is the river, and it is the only thing down there that is
+  // going anywhere.
+  cave:      { splash: { get: 'river' } },
+};
+// An anchored voice's distance law. NEAR is wide because the things in this
+// table are landmarks and a landmark is not a footstep; FAR is long because
+// four hundred metres is a normal distance to a mountain and the alternative
+// is a volcano that stops existing when you walk up the valley.
+const sysAMB_ANCH_NEAR = 55;
+const sysAMB_ANCH_FAR  = 520;
+
 // --- THE POSTCARD -----------------------------------------------------------
 // How far photo mode is allowed to lean on the chapter's own grade. Small on
 // purpose: the picture the player is taking has to be the picture the game was
@@ -1917,6 +2014,104 @@ const sysAIRLIT = {
 const sysAIRLIT_DEF = 0;
 
 // ===========================================================================
+// THE HOUR MOVES — sysACT_LIGHT, a chapter's light walked by its own acts.
+//
+// Eighteen chapters declare acts (see `act` in shared.js) and the light in
+// every one of them is a constant: the row in sysGRADES above is the whole of
+// what a chapter looks like, from the arrival to the last task. A chapter that
+// opens at twenty past eight in Monte Carlo is still at twenty past eight
+// three movements later, and Sơn Đoòng — whose three acts are literally the
+// mouth, the middle and the far end of nine kilometres of unlit cave — has
+// exactly as much daylight in the last of them as in the first.
+//
+// AN ACT ROW IS A DELTA, NOT A SECOND GRADE. Two full rows per chapter would
+// be two numbers to retune every time one of them moved, and the second copy
+// is the one that would go stale — the same argument as everywhere else in
+// this file. A delta also inherits every key it does not name, which matters
+// here because sysLENS writes `wide`/`splitW`/`splitC` into these rows AFTER
+// the table is built: a hand-written second row would silently lose a
+// chapter's lens.
+//
+// `airlit` is the one non-grade term, and it is here rather than in sysAIRLIT
+// for the same reason: the light in the air over a street is a fact about the
+// hour, and the hour is what an act moves.
+//
+// ONE-WAY, AND SLOWER THAN THE GRADE'S OWN DAMP. sysACT_LAMBDA is a fifth of
+// sysGRADE_LAMBDA, so an act change is about six seconds of light rather than
+// half a second of it — a change you notice having happened, not a change you
+// watch happen. It never walks back: the act index cannot fall (a finished
+// task stays finished), and the clamp below is what guarantees it anyway.
+//
+// ELEVEN CHAPTERS HAVE NO ROW, AND THAT IS THE ARGUMENT AND NOT AN OMISSION.
+// Two reasons, and both of them are about not being the second writer:
+//
+//   - Four chapters already animate their own hour. Göreme runs a clock and a
+//     sunrise (`gorUpdateClock`, `dawn`, `sunUp`), Marrakech runs a dusk and a
+//     sandstorm, Palawan's second act is UNDER — the dive owns the grade down
+//     there — and the Pantanal turns over into its own dusk. A delta on top of
+//     any of those is two things writing one look.
+//   - Seven chapters' acts are about PLACE and not about time. Cali's three
+//     movements are a city, a bus and a ridge; Rio's are a beach, an avenue
+//     and a mountain. Moving the light because the player walked somewhere
+//     else is a weather report on the task list.
+//
+// The seven that have one all pass the same test: the chapter's own text says
+// the hour is going somewhere.
+const sysACT_LIGHT = {
+  // Twenty past eight, and it gets later. The port is still blue, the rooms
+  // are lit and by the time the circuit matters it is night over the harbour —
+  // so the bloom comes up, the threshold comes down to find the lamps, the
+  // colour comes off a little and the corners close in.
+  // MEASURED AND THEN DOUBLED. The first draft moved bloom, threshold and the
+  // corners by about a tenth each and the A/B (qa/d7-diff.cjs) came back at
+  // 3.90 of 255 across the frame and −3.73 in the corners — a per cent and a
+  // half, which is under the threshold at which anybody could name it, which
+  // is right for a term meant to be invisible and wrong for a chapter getting
+  // an hour later. The two levers that actually carry "it went dark" in a
+  // chapter that was ALREADY dark are the corners and the colour: blue hour is
+  // the one time of day genuinely more colourful than noon, and the thing that
+  // ends it is that colour draining out.
+  monaco:    { bloom: 0.18, threshold: -0.16, radius: 0.12, saturation: -0.11,
+               contrast: 0.05, vignette: 0.13, vigStart: -0.09,
+               tintR: -0.010, tintB: 0.016, airlit: 0.014 },
+  // Nine kilometres in. THE MOUTH still has the doline over it; by THE FAR
+  // SIDE the only light is the one you make, so the contrast falls away (there
+  // is nothing to contrast with), the corners come right in, and the air
+  // thickens — there is genuinely mist in there and it is what the lantern
+  // draws on.
+  cave:      { bloom: 0.10, threshold: -0.10, contrast: -0.04, saturation: -0.05,
+               vignette: 0.10, vigStart: -0.08, airlit: 0.012 },
+  // MONG KOK, then UP, then THE HARBOUR: the same night from the bottom of it
+  // and then from above it. More air to catch the neon and more of the sign
+  // wall in the bright pass.
+  kowloon:   { bloom: 0.08, threshold: -0.06, radius: 0.08, vignette: 0.05,
+               airlit: 0.012 },
+  // LOW WATER, then ACQUA ALTA. A flooded piazza is a mirror: the glare goes
+  // up, the corners open (there is a sheet of sky on the ground now) and the
+  // whole square goes a shade cooler and a shade less saturated.
+  venice:    { bloom: 0.10, threshold: -0.05, saturation: -0.05, vignette: -0.03,
+               tintB: 0.006, tintR: -0.004 },
+  // THE THIRTY-SIX STREETS in the afternoon; by THE LINE it is evening and the
+  // shopfronts are the light.
+  hanoi:     { bloom: 0.12, threshold: -0.12, radius: 0.08, saturation: -0.03,
+               vignette: 0.07, airlit: 0.010 },
+  // THE STATION, THE ICE, THE PACK — out of a place with objects in it into a
+  // place with none. The contrast comes off because there is nothing left to
+  // put it on, and the vignette opens because closing the corners of a white
+  // world only makes it look like a photograph of one.
+  antarctic: { contrast: -0.05, saturation: -0.04, vignette: -0.05, vigStart: 0.05,
+               bloom: 0.06 },
+  // REYKJAVÍK, OUT OF TOWN, AND THEN SIT STILL. The last movement of chapter 7
+  // is being still under an aurora, and the town is behind you: the threshold
+  // goes down onto the sky, the corners come in hard, and the air over an
+  // empty lava field is thinner than the air over a lit street.
+  iceland:   { bloom: 0.10, threshold: -0.08, saturation: 0.03, vignette: 0.06,
+               vigStart: -0.05, airlit: -0.008 },
+};
+// A fifth of sysGRADE_LAMBDA: ~6 s of light for a change of movement.
+const sysACT_LAMBDA = 0.45;
+
+// ===========================================================================
 // THE DEPTH — one row per chapter, and the only place a chapter says how DEEP
 // it wants to look. See THE DEPTH PASS in CONTRACT.md and the header over
 // MAIN_POST_COC in main.js.
@@ -2095,7 +2290,39 @@ const sysDepthV = new THREE.Vector3();
 
 const sysGRADE_LAMBDA = 2.2;
 const sysGradeCur = sysGrade(0.20, 1.00, 1.00, 0.10, 1.05, 0.20, 0.58, 1, 1, 1);
-let   sysGradeWant = sysGRADES.sydney;
+// ---- THE TARGET IS NOW A SCRATCH ROW (see sysACT_LIGHT) -------------------
+// It used to BE the chapter's row out of sysGRADES, which is exactly why the
+// look of a chapter could not change while you were in it: the target was a
+// shared constant and writing to it would have retuned the chapter for good.
+// `sysGradeBase` is that constant, `sysGradeDelta` is the act row if the
+// chapter has one, and sysGradeWant is what the two of them come to.
+const sysGradeWant = sysGrade(0.20, 1.00, 1.00, 0.10, 1.05, 0.14, 0.66, 1, 1, 1);
+let   sysGradeBase = sysGRADES.sydney;
+let   sysGradeDelta = null;
+let   sysActK = 0;         // 0..1 — how far through the chapter's acts the light is
+let   sysActSnap = true;   // the next frame lands on the act rather than walking to it
+/**
+ * A NEW CHAPTER: take its row, take its act delta, and LAND on the act rather
+ * than walking to it. A restored save can arrive in a chapter's third movement
+ * and the six-second walk would then play out over the arrival, which is the
+ * one moment in a chapter when the light is supposed to be settled.
+ */
+function sysActSetBiome(name) {
+  sysGradeBase = sysGRADES[name] || sysGRADES.sydney;
+  sysGradeDelta = sysACT_LIGHT[name] || null;
+  sysActK = 0;
+  sysActSnap = true;
+  sysActGradeFill();
+}
+/** Fill the target from the chapter's row and its act delta. Never allocates. */
+function sysActGradeFill() {
+  const b = sysGradeBase, d = sysGradeDelta, k = sysActK;
+  for (let i = 0; i < sysGRADE_KEYS.length; i++) {
+    const key = sysGRADE_KEYS[i];
+    const dv = d && d[key];
+    sysGradeWant[key] = dv ? b[key] + dv * k : b[key];
+  }
+}
 
 // ===========================================================================
 // THE FILL — one dim directional light from the anti-sun side.
@@ -14369,10 +14596,27 @@ export function createSystems(game) {
     // soundscape — which is exactly backwards for the two batches (R8, R9)
     // whose whole subject is the soundscape. A ring buffer, drained by
     // hud.ambAudit(). Nothing in src reads it.
+    const anch = !(opts && (opts.at || typeof opts.x === 'number')) && sysAmbAnchor(name);
     sysAmbLog[sysAmbLogN % sysAMB_LOG] =
-      (game.biome ? game.biome.current : '?') + ':' + name;
+      (game.biome ? game.biome.current : '?') + ':' + name + (anch ? '@' : '');
     sysAmbLogN++;
     if (opts && (opts.at || typeof opts.x === 'number')) { sfx(name, opts); return; }
+    // ---- ...OR IT COMES OFF THE THING THAT MAKES IT (D7) ------------------
+    // See sysAMB_AT. A voice with an anchor in the live chapter is played AT
+    // the anchor, at a real distance, with its own wide `near` and long `far`
+    // — so the campanile is a bell four hundred metres away and up, and
+    // everything without an anchor goes on coming off the ring exactly as it
+    // always has.
+    if (anch) {
+      if (!opts) opts = sysAmbBare;
+      opts.at = sysAmbAt;
+      opts.near = sysAMB_ANCH_NEAR;
+      opts.far = sysAMB_ANCH_FAR;
+      sfx(name, opts);
+      opts.at = null;
+      opts.far = 0;
+      return;
+    }
     const c = game.capy && game.capy.position;
     const a = Math.random() * 6.283185;
     const d = rand(sysAMB_R0, sysAMB_R1);
@@ -14390,7 +14634,82 @@ export function createSystems(game) {
     // hoisted to a shared object this is what stops it inheriting a stale spot.
     opts.at = null;
   }
-  const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0 };
+  const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0, far: 0 };
+  /**
+   * WHERE THIS VOICE COMES FROM IN THIS CHAPTER, or nothing. See sysAMB_AT.
+   *
+   * Writes sysAmbAt and returns true; returns false for every voice with no
+   * row, which is most of them and is the point.
+   *
+   * FOUR WAYS AN ANCHOR SILENTLY FAILS, and all four end up here as `false`
+   * rather than as a sound in the wrong place or an exception in the audio
+   * path — a soundscape is the last thing in this game that should be able to
+   * throw, because the ladder runs inside the ambient bed's own timer and a
+   * throw there stops the place speaking for the rest of the session:
+   *
+   *   1. the chapter is not live (a detached biome answers happily — the
+   *      shared-space leak this repo has paid for more than once), so the api
+   *      is taken from sysLiveBiomeApi and never from game[name];
+   *   2. the key is not published under that name at all (a table written from
+   *      a chapter's source can name a local and not an export);
+   *   3. it is published, and it is a getter that needs an argument, or a
+   *      number, or an array of stalls — anything that is not a point;
+   *   4. it is a point and it is NaN, which is what an api that depends on a
+   *      thing the chapter has not built yet returns.
+   */
+  function sysAmbAnchor(name) {
+    const bio = game.biome && game.biome.current;
+    const row = bio && sysAMB_AT[bio];
+    const a = row && row[name];
+    if (!a) return false;
+    let p = a;
+    if (a.get) {
+      const api = sysLiveBiomeApi(game);
+      if (!api) return false;
+      const v = api[a.get];
+      if (v === undefined || v === null) return false;
+      if (typeof v === 'function') {
+        try { p = v.call(api); } catch (e) { return false; }
+      } else p = v;
+      if (!p || typeof p !== 'object') return false;
+      // ...and some of them publish a THING rather than a point. Pasto's bell
+      // is `{ position, ropePosition, ring(), body }`, which is the shape half
+      // the objects in this game have — one hop, and then the same NaN test as
+      // everything else.
+      if (typeof p.x !== 'number' && p.position) p = p.position;
+    }
+    const x = p.x, y = p.y, z = p.z;
+    if (typeof x !== 'number' || x !== x || typeof z !== 'number' || z !== z) return false;
+    sysAmbAt.x = x;
+    sysAmbAt.z = z;
+    sysAmbAt.y = (typeof y === 'number' && y === y ? y : sysGroundY(x, z)) + (a.dy || 0);
+    return true;
+  }
+  /**
+   * WHAT IS ANCHORED IN THIS CHAPTER AND WHERE IT RESOLVES TO, read-only.
+   *
+   * A table of api keys written from nineteen chapters' source is a table with
+   * typos in it, and a typo here is silent by design (see the four failures
+   * above) — so the only honest way to ship it is an instrument that resolves
+   * every row in the live chapter and says which ones came back with a point.
+   * Nothing in src reads it. See qa/d7-anchor.js.
+   */
+  game.ambAnchors = function () {
+    const bio = game.biome && game.biome.current;
+    const row = bio && sysAMB_AT[bio];
+    const out = { biome: bio, rows: [] };
+    if (!row) return out;
+    const c = game.capy && game.capy.position;
+    for (const k in row) {
+      const ok = sysAmbAnchor(k);
+      out.rows.push({ voice: k, key: row[k].get || 'literal', ok: ok,
+                      x: ok ? +sysAmbAt.x.toFixed(1) : null,
+                      y: ok ? +sysAmbAt.y.toFixed(1) : null,
+                      z: ok ? +sysAmbAt.z.toFixed(1) : null,
+                      d: ok && c ? +Math.hypot(sysAmbAt.x - c.x, sysAmbAt.z - c.z).toFixed(1) : null });
+    }
+    return out;
+  };
 
   /**
    * THE THREE FADERS AND THE THREE MUTES (R4).
@@ -18681,7 +19000,135 @@ export function createSystems(game) {
     return best < Infinity ? best : base;
   }
 
+  // ===========================================================================
+  // ...AND SOMETHING HANGS OFF IT — sysBOARD_HANG.
+  //
+  // THINGS THAT HANG (props.js) is a pendulum with nothing to swing until a
+  // chapter hands it something, and the cost of handing it something is not the
+  // object: it is the ANCHOR. A hanging thing needs a point in the air that is
+  // attached to a built structure, level, not inside a wall, and not forty
+  // metres from anywhere the player goes — and finding nineteen of those by
+  // hand is the whole of what D6b cost, twice over (see THE DOOR IS AN OBJECT:
+  // there is no general answer to "what is the floor here", and there is no
+  // general answer to "what is over your head here" either).
+  //
+  // There is already exactly one point in every chapter that has all four
+  // properties and has been photographed nineteen times: THE HEADER OF THE EXIT
+  // BOARD. It is planted from the door the game already knew about, its floor
+  // was measured chapter by chapter, its top is `topY` and its facing is
+  // `boardYaw`. So the first nineteen things in this game that hang, hang off
+  // it — a lamp on a signpost, a chime under a beam, a windsock at a station —
+  // and the placement cost is one row of a table each and no new measurement
+  // at all.
+  //
+  // It is hung at the END of the header rather than in front of the face, so it
+  // never crosses the flaps: the board is a thing you read and the marquee turn
+  // in boardOpen puts it in the middle of the frame.
+  //
+  // FIVE OF THE NINETEEN ARE LONG ENOUGH TO WALK THROUGH. `strand` reaches
+  // about two metres down, which puts the bottom of it under a capybara's chin;
+  // the other fourteen are a shout and the weather only. That split is
+  // deliberate — a chapter where everything jangles when you go past is a
+  // chapter with a bead curtain problem — and `hit` is what says which.
+  const sysBOARD_HANG = {
+    // A ferry wharf, under a roof: barely any air gets to it.
+    sydney:    { kind: 'sign',    len: 0.72, mat: 'timber',  wind: 0.35 },
+    // Paper flags over the market, and the páramo comes down the street.
+    pasto:     { kind: 'strand',  len: 2.05, mat: 'straw',   wind: 1.0 },
+    // A burgee at the ferry steps, and chapter 3 is seven hundred metres of
+    // open water throwing weather at you.
+    quay:      { kind: 'sock',    len: 0.95, mat: 'soft',    wind: 1.4 },
+    // A chōchin under the beam. The board here is already the hanging mount.
+    kyoto:     { kind: 'lantern', len: 1.05, mat: 'timber',  wind: 0.7 },
+    // Banderines, which is what every street in Cali has across it.
+    cali:      { kind: 'strand',  len: 2.10, mat: 'paper',   wind: 1.0 },
+    // A beach flag.
+    rio:       { kind: 'sock',    len: 1.00, mat: 'soft',    wind: 1.2 },
+    // A storm lamp, at half past eleven at night, in a wind.
+    iceland:   { kind: 'lantern', len: 0.85, mat: 'metal',   wind: 1.5 },
+    // Pierced brass, over a square with no shade in it.
+    sahara:    { kind: 'lantern', len: 1.15, mat: 'metal',   wind: 0.9 },
+    // THE ONE CHAPTER THAT IS ABOUT AIR. Glass, and it is allowed to speak.
+    drift:     { kind: 'chime',   len: 0.80, mat: 'glass',   wind: 1.6, chime: true },
+    // An iron bracket sign, on a stone stele, in a piazza with no wind in it.
+    venice:    { kind: 'sign',    len: 0.90, mat: 'metal',   wind: 0.6 },
+    // A hanging shop sign, which is the entire visual language of the chapter.
+    kowloon:   { kind: 'sign',    len: 1.05, mat: 'metal',   wind: 0.8 },
+    // Shells on a line. The second thing in the game allowed to speak.
+    palawan:   { kind: 'strand',  len: 2.00, mat: 'ceramic', wind: 1.0, chime: true },
+    // Nazar beads and dried peppers, which is what hangs off everything in
+    // Cappadocia.
+    goreme:    { kind: 'strand',  len: 2.05, mat: 'ceramic', wind: 1.1 },
+    // The windiest row in wxMOOD.
+    manly:     { kind: 'sock',    len: 1.05, mat: 'soft',    wind: 1.8 },
+    // Bamboo, over water, and almost no air moving at all.
+    pantanal:  { kind: 'chime',   len: 0.78, mat: 'timber',  wind: 0.8 },
+    // THERE IS NO WIND IN A CAVE, and that is the point: this is the one hung
+    // thing in the game that can only ever be moved by shouting at it or by
+    // walking into it. Nine kilometres in, that is worth more than a breeze.
+    cave:      { kind: 'lantern', len: 0.95, mat: 'metal',   wind: 0 },
+    // A windsock at a station, which is a real thing at a real station and the
+    // strongest air in the game.
+    antarctic: { kind: 'sock',    len: 1.20, mat: 'soft',    wind: 2.0 },
+    // A quay lamp at twenty past eight.
+    monaco:    { kind: 'lantern', len: 0.88, mat: 'metal',   wind: 0.5 },
+    // A string of them over the alley.
+    hanoi:     { kind: 'strand',  len: 2.05, mat: 'paper',   wind: 0.7 },
+  };
+  let boardHangG = null;
+  let boardHangRec = null;
+  /** Hang this chapter's thing off the board's header. See sysBOARD_HANG. */
+  function boardHangPlant(bio) {
+    const row = sysBOARD_HANG[bio];
+    if (!row || !boardObj || typeof game.hang !== 'function') return;
+    const dress = sysBOARD_DRESS[bio] || null;
+    const g = hangThing(row.kind, {
+      a: (dress && dress.trim) || sysBOARD_DEF.trim,
+      b: (dress && dress.lamp) || (dress && dress.wood) || sysBOARD_DEF.wood,
+      c: (dress && dress.woodDk) || sysBOARD_DEF.woodDk,
+      len: row.len, yaw: boardYaw,
+    });
+    // The end of the header, in the board's own axes, turned into the world —
+    // and CLEAR OF THE BOARD'S OWN COLLIDER, which is the thing that nearly
+    // made the five walk-through strands unwalk-throughable. The board is one
+    // box of half-extents (hx, topY/2, 0.30) and a strand hung at the header's
+    // end with no forward offset hangs INSIDE it: the animal is stopped by the
+    // board half a metre before it ever reaches the thing dangling in front of
+    // its face. 0.45 m forward along the board's own facing is past hz and
+    // still reads as hanging off a bracket over the face.
+    const lx = boardObj.hx - 0.14;
+    const lz = 0.45;
+    const s = Math.sin(boardYaw), c = Math.cos(boardYaw);
+    const wx = boardX + lx * c + lz * s;
+    const wz = boardZ - lx * s + lz * c;
+    const wy = boardY + boardObj.topY - 0.10;
+    g.position.set(wx, wy, wz);
+    scene.add(g);
+    boardHangG = g;
+    boardHangRec = game.hang({ biome: bio, group: g, x: wx, y: wy, z: wz, len: row.len,
+                mat: row.mat, wind: row.wind, chime: !!row.chime,
+                r: row.kind === 'strand' ? 0.7 : 0.5,
+                // A strand reaches the ground and is meant to be pushed
+                // through; everything else is above a capybara and is the
+                // weather's and the wheek's.
+                hit: row.kind === 'strand' ? row.len : row.len * 0.55 });
+  }
+  function boardHangDrop() {
+    if (boardHangRec && typeof game.hangRemove === 'function') {
+      game.hangRemove(boardHangRec);
+      boardHangRec = null;
+    }
+    if (boardHangG) {
+      scene.remove(boardHangG);
+      boardHangG.traverse(function (o) {
+        if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+      });
+      boardHangG = null;
+    }
+  }
+
   function boardDrop() {
+    boardHangDrop();
     if (boardObj) {
       scene.remove(boardObj.group);
       boardObj.dispose();
@@ -18782,6 +19229,8 @@ export function createSystems(game) {
     boardBody.previousQuaternion.copy(boardBody.quaternion);
     boardBody.interpolatedQuaternion.copy(boardBody.quaternion);
     game.world.addBody(boardBody);
+    // ...and whatever this chapter hangs off its header. See sysBOARD_HANG.
+    boardHangPlant(bio);
     return true;
   }
 
@@ -19025,6 +19474,82 @@ export function createSystems(game) {
   // Rows put into the flow folded this refresh, waiting for their unfold. See
   // the note at the bottom of the visibility loop: one array so the whole card
   // costs one forced reflow rather than one per row.
+  /**
+   * WHICH MOVEMENT OF A CHAPTER IS LIVE — the one implementation.
+   *
+   * The live act is the LOWEST one with anything still open in it, not a
+   * counter that advances: order does not matter, doing an act-3 thing early
+   * does not skip act 2, and a restored save lands on the right movement
+   * without anything about the act being written to the file.
+   *
+   * It was four lines inside todoRefresh, which was right while the card was
+   * the only thing that cared. sysACT_LIGHT is the second reader and a second
+   * copy of this loop is a second thing to keep in step with the first, so it
+   * is a function and the card calls it too.
+   *
+   * A chapter with no acts is act 1 of 1 and every branch below reads that as
+   * "no movements", which is the same answer it has always given.
+   */
+  function sysActNow(n) {
+    const cdef = chapterDef(n);
+    const acts = (cdef && cdef.acts) || null;
+    const rec = chapRec[n];
+    if (!acts || !rec) return 1;
+    let act = acts.length;
+    for (let i = 0; i < rec.ids.length; i++) {
+      const r = taskRec[rec.ids[i]];
+      if (!r || r.done) continue;
+      const a = (r.def && r.def.act) || 1;
+      if (a < act) act = a;
+    }
+    return act;
+  }
+  function sysActCount(n) {
+    const c = chapterDef(n);
+    return (c && c.acts) ? c.acts.length : 0;
+  }
+  /**
+   * ...AND THE LIGHT WALKS TOWARD IT. See sysACT_LIGHT.
+   *
+   * Three things this deliberately is not:
+   *
+   *  - It is not read every frame. The act can only change when a task ticks,
+   *    which is an event; four times a second is already sixty times more often
+   *    than it can move, and the read is a walk over a chapter's task list.
+   *  - It never walks BACK. The act index cannot fall by itself, but a probe,
+   *    a reset or a save restored mid-chapter can move it, and a chapter whose
+   *    light brightened again because a task list was rebuilt would read as a
+   *    bug in the weather. Only sysActSetBiome — a new chapter — may lower it.
+   *  - It is not the grade's own damp. sysACT_LAMBDA is a fifth of it, so this
+   *    is about six seconds of light and not half a second of it.
+   */
+  let sysActWant = 0;
+  let sysActT = 0;
+  function sysActStep(dt) {
+    sysActT -= dt;
+    // ...and ALWAYS on the frame after a chapter swap. `sysActWant` is a
+    // quarter of a second stale by design, and a snap that read a stale one
+    // would land the new chapter's light on the LAST chapter's act — a bug
+    // that only shows up travelling from a finished chapter into a fresh one,
+    // which is every single journey in this game.
+    if (sysActT <= 0 || sysActSnap) {
+      sysActT = 0.25;
+      const n = todoChapter();
+      const m = sysActCount(n);
+      sysActWant = m > 1 ? clamp((sysActNow(n) - 1) / (m - 1), 0, 1) : 0;
+    }
+    if (sysActSnap) {
+      sysActSnap = false;
+      sysActK = sysActWant;
+    } else {
+      // One-way: the target is never allowed below where the light has got to.
+      const want = sysActWant > sysActK ? sysActWant : sysActK;
+      if (want === sysActK) return;
+      sysActK += (want - sysActK) * (1 - Math.exp(-sysACT_LAMBDA * dt));
+      if (want - sysActK < 0.0005) sysActK = want;
+    }
+    sysActGradeFill();
+  }
   const todoEntering = [];
   function todoRefresh() {
     const n = todoChapter();
@@ -19042,25 +19567,15 @@ export function createSystems(game) {
       else openIds.push(rec.ids[i]);
     }
     // ---- WHICH MOVEMENT OF THE CHAPTER THIS IS (v18) ---------------------
-    // See the `act` note in shared.js. Eleven chapters declare no acts and
-    // take the first branch of everything below at a cost of one property
-    // miss; the six that do are the only reason any of this exists.
+    // See the `act` note in shared.js, and sysActNow — which is where the four
+    // lines that used to be here now live, because the paper stopped being the
+    // only reader of them the moment the LIGHT started reading them too.
+    // (The comment this replaces said eleven chapters declare no acts and six
+    // do. Eighteen do; Sydney is the one that does not.)
     const cdef = chapterDef(n);
     const win = (cdef && cdef.win > 0) ? cdef.win : sysTODO_WINDOW;
     const acts = (cdef && cdef.acts) || null;
-    // The live act is the LOWEST one with anything still open in it — not a
-    // counter that advances. Order does not matter, doing an act-3 thing early
-    // does not skip act 2, and a restored save lands on the right movement
-    // without anything about the act being written to the file.
-    let actNow = 1;
-    if (acts) {
-      actNow = acts.length;
-      for (let i = 0; i < openIds.length; i++) {
-        const d = taskRec[openIds[i]].def;
-        const a = (d && d.act) || 1;
-        if (a < actNow) actNow = a;
-      }
-    }
+    const actNow = sysActNow(n);
 
     // A pin only survives while it is still open and still in this chapter.
     // It may sit in ANY act: F and a tap reach the whole open list, which is
@@ -23045,6 +23560,10 @@ export function createSystems(game) {
     }
 
     // ---- the grade --------------------------------------------------------
+    // The hour first: which movement of the chapter this is, and how far the
+    // light has got toward it. Before the early return, so a session with the
+    // post chain switched off does not come back to a snap. See sysACT_LIGHT.
+    sysActStep(dt);
     const post = game.post;
     if (!post || !post.enabled) return;
 
@@ -23273,8 +23792,15 @@ export function createSystems(game) {
                 : (sysEXPOSURE[name] === undefined ? sysEXP_DEF : sysEXPOSURE[name]);
     // ...and the light in the air. Same rule: not cross-faded, cut by its
     // switch, and zero in the fifteen chapters that do not ask for it.
+    // ...and this one term DOES move inside a chapter, because the amount of
+    // light in the air is a fact about the hour and the hour is what an act
+    // moves (sysACT_LIGHT). Clamped at zero: a negative row — Iceland, walking
+    // out of a lit town onto an empty lava field — must be able to reach none
+    // and must never go past it into a term with no meaning.
     pp.airLight = game.state.noAirLight ? 0
-                : (sysAIRLIT[name] === undefined ? sysAIRLIT_DEF : sysAIRLIT[name]);
+                : Math.max(0, (sysAIRLIT[name] === undefined ? sysAIRLIT_DEF : sysAIRLIT[name])
+                              + (sysGradeDelta && sysGradeDelta.airlit
+                                 ? sysGradeDelta.airlit * sysActK : 0));
     // ---- AND THE DEPTH ---------------------------------------------------
     // Three more switches on the same terms: cut, never faded.
     //
@@ -23365,7 +23891,7 @@ export function createSystems(game) {
     // damped focus distance carried across a biome swap opens the new chapter
     // pulling focus from where the last one's animal was standing.
     sysDofDist = sysDOF_FALLBACK;
-    sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
+    sysActSetBiome(name);
     for (let i = 0; i < sysGRADE_KEYS.length; i++) {
       const key = sysGRADE_KEYS[i];
       sysGradeCur[key] = sysGradeWant[key];
@@ -24229,6 +24755,27 @@ export function createSystems(game) {
    * note at the call site in sysDressFrame for the run that proved a probe
    * without it measures the props instead of the picture.
    */
+  /**
+   * WHICH MOVEMENT THIS IS AND WHAT THE LIGHT HAS DONE ABOUT IT.
+   *
+   * The act index has never been readable from outside — it is computed inside
+   * the todo card's refresh and used to draw a curtain — and sysACT_LIGHT is
+   * the first thing that makes the answer visible in the picture rather than
+   * on the paper. Without this an A/B is "screenshot the chapter, do three
+   * tasks, screenshot it again", which measures the tasks as much as the light.
+   * Nothing in src reads it.
+   */
+  game.actLight = function () {
+    const n = todoChapter();
+    return { chapter: n, biome: game.biome && game.biome.current,
+             act: sysActNow(n), acts: sysActCount(n),
+             k: +sysActK.toFixed(4), want: +sysActWant.toFixed(4),
+             row: !!sysGradeDelta,
+             bloom: +sysGradeWant.bloom.toFixed(4),
+             threshold: +sysGradeWant.threshold.toFixed(4),
+             vignette: +sysGradeWant.vignette.toFixed(4),
+             airLight: game.post ? +(game.post.params.airLight || 0).toFixed(4) : 0 };
+  };
   game.shoreAudit = function (y) {
     if (arguments.length > 0) sysShoreOver = (typeof y === 'number' && y === y) ? y : null;
     return { y: shoreY(), over: sysShoreOver };
@@ -24431,6 +24978,270 @@ export function createSystems(game) {
   const herdPt = { x: 0, z: 0 };
   const herdV = { x: 0, y: 0, z: 0 };
   const herdSfx = { volume: 1, pitch: 1 };
+  // =========================================================================
+  // THE FLOCK — birds that answer, and the first thing in this game that
+  // follows food.
+  // =========================================================================
+  // Wildlife in these nineteen chapters divides cleanly in two. Three or four
+  // flocks REACT — a St Mark's pigeon goes up when you run through it, four
+  // hundred Cappadocian rock doves come off a cliff when you shout — and the
+  // rest DECORATE: they wheel, they perch, they preen, and there is no input in
+  // the game they can tell from any other. And not one bird in any chapter has
+  // ever noticed a dropped chip, in a game with a chip shop in it, a task about
+  // chips, and thirty silver gulls standing on the shopfront above it.
+  //
+  // TWO CHANNELS, AND THEY ARE INDEPENDENT ON PURPOSE.
+  //
+  //   `scare`   the chapter's own take-off, called when the animal comes
+  //             through at a RUN. A flock that has one gets scattering and
+  //             nothing else changes about how it flies.
+  //   `at`/`put` the herd's contract, verbatim — a chapter that already wrote
+  //             those three functions for THE HERD passes the same three here
+  //             and gets the food drift for one line. It is the same contract
+  //             because it is the same question ("where is animal i, and put
+  //             it here"), and a second shape for it would be a second thing
+  //             to keep in step.
+  //
+  // A flock may offer either, or both. Cappadocia has a take-off and no
+  // addressable per-bird position, so it scatters and does not eat; a chapter
+  // with positions and no take-off would eat and not scatter.
+  //
+  // WHAT THE BIRDS DO NOT DO IS EAT IT. They come, they stand round it, they
+  // peck at it, and they lose interest — the prop is untouched. Half the
+  // edible props in this game are somebody's task, and a system that quietly
+  // destroys a task object because a pigeon was nearby is a system that has to
+  // be explained in a bug report rather than watched.
+  const flockRUN      = 4.0;    // m/s of animal before a flock reads it as a threat
+  const flockGAP      = 7.0;    // s before the same flock may be put up again
+  const flockSCAN     = 0.5;    // s between food scans — a dropped chip is not urgent
+  const flockFOOD_R   = 15;     // m a dropped edible is noticed from
+  const flockFOOD_N   = 7;      // most birds that will come to one thing
+  const flockFOOD_V   = 1.35;   // m/s they close at. A walk, and a fast one.
+  const flockFOOD_RING = 0.85;  // m they stand off it, in a ring
+  const flockFOOD_HOLD = 14;    // s of interest in one thing before it is over
+  const flockFOOD_BORED = 22;   // ...and how long before that thing is interesting again
+  const flockPECK     = 1.3;    // s between one bird's pecks
+  const flockKinds = [];
+  const flockAt = { x: 0, y: 0, z: 0 };
+  const flockSfx = { volume: 1, pitch: 1, at: { x: 0, y: 0, z: 0 }, near: 8 };
+  /**
+   * OFFER A CHAPTER'S BIRDS TO THE FLOCK.
+   *
+   *   game.flockOffer({
+   *     biome: 'venice', kind: 'pigeon', voice: 'pigeons', fleeR: 6.5,
+   *     count: () => venPIGEON_N,
+   *     at:  (i, o) => { o.x = ...; o.y = ...; o.z = ...; },
+   *     put: (i, x, z, yaw) => { ...the chapter's own writer... },
+   *     scare: (x, z, r, force) => venPigeonScare(x, z, r, force),
+   *   })
+   *
+   * Everything except `biome` is optional; a flock with neither `scare` nor a
+   * complete at/put pair is registered and does nothing, which is deliberate —
+   * a chapter should be able to declare its birds before it has decided what
+   * they answer.
+   */
+  game.flockOffer = function (o) {
+    if (!o) return null;
+    const rec = {
+      biome: o.biome || (game.biome && game.biome.current) || 'sydney',
+      kind: o.kind || 'bird',
+      voice: o.voice || null,
+      pitch: o.pitch || 1,
+      fleeR: o.fleeR > 0 ? o.fleeR : 6.5,
+      count: typeof o.count === 'function' ? o.count : null,
+      at: typeof o.at === 'function' ? o.at : null,
+      put: typeof o.put === 'function' ? o.put : null,
+      scare: typeof o.scare === 'function' ? o.scare : null,
+      // ...and the OPPOSITE of scare, which is the one this batch did not expect
+      // to need. Manly's gulls spend most of the chapter on a shop parapet and
+      // `put` correctly refuses to drag an airborne bird anywhere, so the food
+      // drift reached nothing at all: the chapter already had a come-down state
+      // — on a random twenty-six-second timer, with the comment "they come down
+      // for the chips" over it — and it had never once been connected to an
+      // actual chip. `land` is that connection, called once when a flock finds
+      // something, and it is a no-op in a chapter whose birds are on the floor.
+      land: typeof o.land === 'function' ? o.land : null,
+      cool: 0, scanT: rand(0, flockSCAN), lands: 0,
+      food: null, foodT: 0, bored: null, boredT: 0,
+      st: [], puts: 0, scares: 0, pecks: 0,
+    };
+    flockKinds.push(rec);
+    return rec;
+  };
+  /**
+   * Hand every bird back to its chapter. Called the moment a flock stops caring
+   * about a thing: `go` is what says "the flock owns this bird's position", so
+   * leaving it set means the chapter never gets its own birds back — they would
+   * stand in a ring round a sandwich that was picked up forty seconds ago, with
+   * nothing on screen to explain it.
+   */
+  function flockRelease(rec) {
+    for (let i = 0; i < rec.st.length; i++) if (rec.st[i]) rec.st[i].go = 0;
+  }
+  function flockState(rec, i) {
+    let s = rec.st[i];
+    if (!s) s = rec.st[i] = { go: 0, a: Math.random() * 6.283185, peck: 0 };
+    return s;
+  }
+  /** The nearest un-held edible on the ground in this chapter, or null. */
+  function flockFoodNear(live, x, z) {
+    const arr = game.props;
+    const typeOf = game.physics && game.physics.typeOf;
+    if (!arr) return null;
+    let best = null, bd = flockFOOD_R * flockFOOD_R;
+    for (let i = 0; i < arr.length; i++) {
+      const p = arr[i];
+      if (p.removed || p.hidden || p.held || p.owner) continue;
+      if (p.biome && p.biome !== live) continue;
+      // The prop record carries a `type`, not its row: the TYPE TABLE is
+      // asked, which is the same channel qa uses and the reason a thirty-ninth
+      // edible added tomorrow is noticed by the birds without a list here.
+      const d = typeOf ? typeOf(p.type) : null;
+      if (!d || !d.edible) continue;
+      const b = p.body;
+      const dx = b.position.x - x, dz = b.position.z - z;
+      const dd = dx * dx + dz * dz;
+      if (dd < bd) { bd = dd; best = p; }
+    }
+    return best;
+  }
+  function flockStep(dt) {
+    if (!flockKinds.length) return;
+    const live = game.biome && game.biome.current;
+    const capy = game.capy;
+    const cp = capy && capy.position;
+    const cv = capy && capy.velocity;
+    const sp = cv ? Math.sqrt(cv.x * cv.x + cv.z * cv.z) : 0;
+    for (let k = 0; k < flockKinds.length; k++) {
+      const rec = flockKinds[k];
+      if (rec.biome !== live) continue;
+      if (rec.cool > 0) rec.cool -= dt;
+      if (rec.boredT > 0) { rec.boredT -= dt; if (rec.boredT <= 0) rec.bored = null; }
+      const n = rec.count ? rec.count() : 0;
+      // ---- 1. THE RUN ----------------------------------------------------
+      // The chapter's own take-off, and the ONLY thing this adds is the
+      // trigger: coming through at a run rather than merely being close. A
+      // walk still gets whatever the chapter already did about a walk.
+      if (rec.scare && cp && sp > flockRUN && rec.cool <= 0) {
+        const got = rec.scare(cp.x, cp.z, rec.fleeR, clamp((sp - flockRUN) / 4, 0.2, 1));
+        if (got > 0) {
+          rec.cool = flockGAP;
+          rec.scares++;
+          if (rec.voice) {
+            flockSfx.at.x = cp.x; flockSfx.at.y = cp.y + 1.2; flockSfx.at.z = cp.z;
+            flockSfx.volume = clamp(0.10 + got * 0.02, 0.10, 0.42);
+            flockSfx.pitch = rec.pitch * rand(0.94, 1.1);
+            sfx(rec.voice, flockSfx);
+          }
+        }
+      }
+      // ---- 2. THE FOOD ---------------------------------------------------
+      if (!rec.at || !rec.put || !n) continue;
+      rec.scanT -= dt;
+      if (rec.scanT <= 0) {
+        rec.scanT = flockSCAN;
+        if (!rec.food) {
+          // Scanned from the ANIMAL rather than from the flock, because the
+          // only way an edible gets onto the ground in this game is that the
+          // player put it there — and a scan per bird is a hundred and eighty
+          // scans for one answer.
+          const f = cp ? flockFoodNear(live, cp.x, cp.z) : null;
+          if (f && f !== rec.bored) {
+            rec.food = f; rec.foodT = flockFOOD_HOLD; rec.lands++;
+            if (rec.land) rec.land();
+          }
+        }
+      }
+      const f = rec.food;
+      if (!f) continue;
+      if (f.removed || f.held || f.owner) { rec.food = null; flockRelease(rec); continue; }
+      rec.foodT -= dt;
+      if (rec.foodT <= 0) {
+        // Bored of THIS one, for a while, so a chip left on the paving is not
+        // a permanent pigeon magnet.
+        rec.bored = f; rec.boredT = flockFOOD_BORED; rec.food = null;
+        flockRelease(rec); continue;
+      }
+      const fx = f.body.position.x, fz = f.body.position.z;
+      let taken = 0;
+      for (let i = 0; i < n && taken < flockFOOD_N; i++) {
+        rec.at(i, flockAt);
+        const s = flockState(rec, i);
+        if (!s.go) {
+          const dx = fx - flockAt.x, dz = fz - flockAt.z;
+          if (dx * dx + dz * dz > flockFOOD_R * flockFOOD_R) continue;
+          // ---- THE WALK OWNS THE POSITION FROM HERE (and this is the trap) --
+          // The first cut stepped from whatever `at` reported and put the
+          // result back — an INCREMENTAL walk, two centimetres a frame, against
+          // a chapter that damps its own birds toward their own targets every
+          // frame. Manly's gulls came down for a chip and then made no progress
+          // at all: measured, 4 424 puts over ten seconds and not one bird ever
+          // arrived, because the chapter's damp home was faster than 1.35 m/s
+          // out. THE HERD does not have this problem because it writes an
+          // ABSOLUTE point (a spot on the player's trail) rather than a nudge,
+          // and systems.js runs last so an absolute write always wins.
+          //
+          // So the flock keeps its own copy of where the bird has got to,
+          // seeded from the chapter once, and writes THAT.
+          s.go = 1; s.x = flockAt.x; s.z = flockAt.z;
+        }
+        taken++;
+        const tx = fx - Math.sin(s.a) * flockFOOD_RING;
+        const tz = fz - Math.cos(s.a) * flockFOOD_RING;
+        const ax = tx - s.x, az = tz - s.z;
+        const ad = Math.sqrt(ax * ax + az * az);
+        if (ad > 0.06) {
+          const step = Math.min(ad, flockFOOD_V * dt);
+          s.x += ax / ad * step;
+          s.z += az / ad * step;
+          rec.put(i, s.x, s.z, Math.atan2(ax, az));
+          rec.puts++;
+        } else {
+          // Arrived. It pecks, and that is the whole of what it gets: the prop
+          // is not touched. See the note above.
+          s.peck -= dt;
+          if (s.peck <= 0) {
+            s.peck = flockPECK * rand(0.6, 1.8);
+            rec.pecks++;
+            if (rec.voice && Math.random() < 0.22) {
+              flockSfx.at.x = s.x; flockSfx.at.y = flockAt.y + 0.2;
+              flockSfx.at.z = s.z;
+              flockSfx.volume = 0.10;
+              flockSfx.pitch = rec.pitch * rand(1.0, 1.25);
+              sfx(rec.voice, flockSfx);
+            }
+          }
+          rec.put(i, s.x, s.z, Math.atan2(fx - s.x, fz - s.z));
+          rec.puts++;
+        }
+      }
+    }
+  }
+  /**
+   * WHAT IS REGISTERED, WHAT IT HAS ANSWERED, AND WHAT IT IS EATING.
+   *
+   * Two of the three things this system does are invisible in a screenshot: a
+   * flock that never scattered and a flock with no `scare` look the same, and
+   * so do a flock walking toward a chip and a flock that happens to be facing
+   * that way. Counters are the only honest answer. Nothing in src reads it.
+   * See qa/d7-flock.js.
+   */
+  game.flockDebug = function (reset) {
+    const live = game.biome && game.biome.current;
+    const out = { biome: live, kinds: [] };
+    for (let k = 0; k < flockKinds.length; k++) {
+      const r = flockKinds[k];
+      if (r.biome !== live) continue;
+      out.kinds.push({ kind: r.kind, n: r.count ? r.count() : 0,
+                       canScare: !!r.scare, canFeed: !!(r.at && r.put),
+                       scares: r.scares, puts: r.puts, pecks: r.pecks, lands: r.lands,
+                       food: r.food ? r.food.name || r.food.type : null,
+                       cool: +r.cool.toFixed(2) });
+      if (reset) { r.scares = 0; r.puts = 0; r.pecks = 0; r.lands = 0; }
+    }
+    return out;
+  };
+
   /**
    * OFFER A CHAPTER'S ANIMALS TO THE HERD.
    *
@@ -25482,7 +26293,7 @@ export function createSystems(game) {
     // The dome's zenith and the lens's grade are biome state exactly the way
     // the fog and the shadow frustum are. Both cross-fade; only the dome's
     // OWNERSHIP is a hard swap, because two domes cannot both be the sky.
-    sysGradeWant = sysGRADES[name] || sysGRADES.sydney;
+    sysActSetBiome(name);
     // The whole cast has just been replaced. A patch left holding a slot would
     // fade out over the Piazzetta from a position in the Botanic Gardens —
     // the shared-space leak this repo has paid for more than once.
@@ -26467,6 +27278,8 @@ export function createSystems(game) {
     // already moved the animal and wins for that frame. Give a chapter the
     // herd and it goes on drawing its animals exactly as it did.
     herdUpdate(dt);
+    // ...and the birds, which is a different mechanic on the same contract.
+    flockStep(dt);
     // The live record line, on the same raw clock and for a third version of
     // the same reason: an attempt does not stop being open because a `wow` put
     // the world at 0.45x, and sysREC_STALE is a wall-clock promise.

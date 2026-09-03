@@ -1802,6 +1802,14 @@ function mainBoot() {
   if (game.physics && typeof game.physics.addCrowdBodies === 'function') {
     game.addCrowdBodies = game.physics.addCrowdBodies;
   }
+  // ...and the same for the three verbs of THINGS THAT HANG, for the same
+  // reason and with the same ordering trap: they are wired here, AFTER
+  // createProps has run, and never in the block above it.
+  if (game.physics && typeof game.physics.hang === 'function') {
+    game.hang = game.physics.hang;
+    game.hangRemove = game.physics.hangRemove;
+    game.hangAudit = game.physics.hangAudit;
+  }
   const capy    = mainSafe('capybara',    () => createCapybara(game));
   const npcs    = biome.capture('sydney', () => mainSafe('npc',         () => createNPCs(game)));
   const condor  = mainSafe('condor',      () => createCondor(game));
@@ -1860,6 +1868,9 @@ function mainBoot() {
     // ...and whether the world is answering at all: flinches, second-order
     // looks and the chain counters, in one read. A test hook — see reactAudit.
     game.reactAudit = npcs.reactAudit;
+    // Who has a job in this chapter and whether they are doing it. See A
+    // PERSON WITH A JOB in npc.js.
+    game.beatAudit = npcs.beatAudit;
   }
 
   // Runtime spawns (props, NPCs) land in whichever biome is currently live.

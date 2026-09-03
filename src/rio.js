@@ -4489,6 +4489,8 @@ function rioBuild(game) {
     rioLocKiosk = game.addLocal({ biome: 'rio', x: rioKIOSK.x - 3.3, y: rioTerrain(rioKIOSK.x - 3.3, rioKIOSK.z - 1.5),
       z: rioKIOSK.z - 1.5, near: 6, face: Math.PI,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth3 },
+      // a machete into the top of a coconut
+      beat: { kind: 'work', every: 5.4, dur: 0.8, sfx: 'thud', volume: 0.13, pitch: 1.15 },
       lines: ['Agua de coco? No? Suit yourself.',
               { t: 'You are dripping on my counter.',
                 when: function () { return !!(rioGame && rioGame.capy && (rioGame.capy.wet || 0) > 0.4); } },
@@ -4536,6 +4538,8 @@ function rioBuild(game) {
     rioLocSel = game.addLocal({ biome: 'rio', x: rioSELARON.x + 4.6, y: rioTerrain(rioSELARON.x + 4.6, rioSELARON.z - 1),
       z: rioSELARON.z - 1, near: 7,
       figure: { shirt: PALETTE.rioTileBlue, legs: PALETTE.rioPaveDark },
+      // two hundred and fifteen steps, one tile at a time
+      beat: { kind: 'work', every: 4.0, dur: 0.85, sfx: 'clink', volume: 0.09, pitch: 1.3 },
       lines: ['Two hundred and fifteen. He did them one at a time, for twenty years.',
               'Every tile came from somewhere else. Go on, find your country.',
               { t: 'People run up these. He would have hated that. Probably.', before: 'selaron-steps' },

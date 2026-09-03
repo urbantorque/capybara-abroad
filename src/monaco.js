@@ -3887,6 +3887,8 @@ function monBuildLocals(game) {
   });
   monLocQuay = put(-58, -30, {
     figure: { shirt: PALETTE.monCrowdD, hat: PALETTE.monCrowdE }, face: 1.2, near: 8,
+    // and he has not moved either
+    beat: { kind: 'rock', every: 7.0, dur: 2.6 },
     lines: ['Nothing in this water since Tuesday.',
             'They put a boat in there once. Cost more than the country.',
             'Everybody looks up the hill. Nobody looks down here.',
@@ -3922,6 +3924,8 @@ function monBuildLocals(game) {
   });
   monLocBar = put(monCASINO.x + monCASINO.w * 0.5 - 7.5, monFRONT_Z + 6, {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: -1.5708, near: 8,
+    // the shaker, twice a minute, all evening
+    beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'clink', volume: 0.10, pitch: 1.25 },
     lines: ['Change, sir? Madam? I shall guess.',
             'The wheel does not stop. It has not stopped since nineteen-ten.',
             'Green pays eight. Green does not happen.',
@@ -3933,6 +3937,8 @@ function monBuildLocals(game) {
   }, monFLOOR_Y);
   monLocCroup = put(monWHEEL.x - 3.4, monWHEEL.z - 1.2, {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: 1.4, near: 8,
+    // the ball, and it goes round for a long time
+    beat: { kind: 'work', every: 8.0, dur: 0.9, sfx: 'roulette', volume: 0.10 },
     lines: ['Rien ne va plus.', 'Faites vos jeux. Or do not. It is all the same to me.',
             'Something has to go IN it. That is how it works.',
             { t: 'The wheel is for the ball. I mention it in case.', before: 'the-wheel' },

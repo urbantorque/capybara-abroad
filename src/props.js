@@ -1505,6 +1505,13 @@ export function createProps(game) {
     typeOf: function (t) { return physTYPES[t] || null; },
     spill: physSpill,
     dust: physDust3,
+    // ---- THINGS THAT HANG (D7) ----
+    // Published on `game` as well (below), because a chapter calls it at build
+    // time and game.physics is the long way round for one verb — the same
+    // argument addCrowdBodies made.
+    hang: physHang,
+    hangRemove: physHangRemove,
+    hangAudit: physHangAudit,
     foam: physFoamRing,
     // A CROWD YOU CANNOT WALK THROUGH. See the block above physAddCrowdBodies
     // for the two shapes it takes and the four things that are easy to get
@@ -3052,6 +3059,9 @@ function physOnWheek(e) {
   const pos = e && e.position;
   if (!pos || !physGame || !physGame.props) return;
   const scale = (e && e.soft === true) ? physWHEEK_SOFT : 1;
+  // ...and everything on a string, which is the one class of thing in this
+  // game that a shout SHOULD move and that has no rigid body to be moved.
+  physHangWheek(pos, scale);
   const live = physLiveBiome();
   const arr = physGame.props;
   const r2 = physWHEEK_R * physWHEEK_R;
@@ -4978,6 +4988,354 @@ function physBarge(prop, speed) {
   physDust3(b.position.x, b.position.y, b.position.z, 3);
 }
 
+// ===========================================================================
+// THINGS THAT HANG — game.hang().
+//
+// This game has a wind field, a gust that swings its heading, a wake shader, a
+// sway term on every plant in fourteen chapters and a prop system with
+// buoyancy and aerodynamics in it, and until now there was NOTHING SUSPENDED
+// anywhere in nineteen worlds for any of it to act on. No shop sign, no wind
+// chime, no lamp on a bracket, no washing line, no bell rope. Every object in
+// the game is either bolted to the ground or lying on it.
+//
+// A hung thing is a SINGLE-BONE DAMPED PENDULUM and deliberately not a rigid
+// body: cannon has no cheap revolute joint here, a real constraint on a 200 g
+// lantern jitters at this solver's iteration count, and the one thing a
+// pendulum has to do — hang still, then swing, then settle — is four lines of
+// arithmetic. Two angles about a fixed anchor, gravity as the restoring term,
+// linear damping, and three things that can push it:
+//
+//   THE AIR      the real one, un-floored — see physAirNow and the note there;
+//   A WHEEK      the signature verb, which already moves every prop in reach;
+//   A CONTACT    the animal walking into it, which is the joke.
+//
+// The mesh is the CALLER'S and the contract is one line long: the group's
+// ORIGIN is the pivot and everything hangs below it in local -Y. This module
+// writes rotation.x and rotation.z on that group and touches nothing else, so
+// there is exactly one writer on the transform (the trap this repo has paid
+// for twice on mesh.scale).
+//
+// It is not a physics body, it does not collide, and nothing can be gated on
+// it. It is scenery that answers — which is the whole of area 3.
+const physHANG_G      = 9.81;    // the restoring term. NOT the biome's gravity: a
+                                 // chime hangs off a beam in air, and the Drift's
+                                 // thin gravity is a fact about falling, not about
+                                 // what a string does.
+const physHANG_C      = 0.55;    // 1/s of angular damping at wind: 1
+const physHANG_WIND_K = 0.055;   // rad/s² per (m/s)² of air, at wind: 1
+const physHANG_WIND_MAX = 3.2;   // rad/s² — a squall does not put a sign over the top
+const physHANG_MAX    = 1.15;    // rad — a hard stop just past 65°, so nothing inverts
+const physHANG_SLEEP  = 0.004;   // rad/s below which, with no air, it is parked
+const physHANG_FAR    = 70;      // m past which a hung thing is not integrated at all
+// 5.5 put the Son Doong lantern to 0.90 rad — fifty-two degrees, from one
+// shout at five metres, which is a thing being HIT rather than a thing being
+// shouted at. 3.2 gives about twenty-five degrees at that range and still
+// reaches the clamp point blank.
+const physHANG_WHEEK  = 3.2;     // rad/s of swing a wheek at zero distance grants
+// ---- ...AND ITS OWN RADIUS, LARGER THAN A PROP'S -------------------------
+// physWHEEK_R is 5.0 m and it is small ON PURPOSE: a shout that could walk a
+// prop off a ledge it was deliberately left on breaks a puzzle. None of that
+// applies to a thing on a string, which cannot be displaced at all — only
+// turned — and 5 m turns out not even to REACH most of them: measured, the
+// lantern at the end of Son Doong's exit board is 5.44 m from a capybara
+// standing in front of the board, so the one chapter with no air in it, where
+// the shout is the ONLY thing that can move it, was the one chapter where the
+// shout did nothing. The whole sweep read 0.0000 and looked like a dead system.
+const physHANG_WHEEK_R = 9.0;    // m — how far a shout swings something hung
+const physHANG_HIT_V  = 0.55;    // m/s of animal before a brush counts as a knock
+const physHANG_HIT_K  = 1.35;    // rad/s of swing per m/s of animal
+const physHANG_HIT_MAX = 4.2;    // ...and the ceiling on it
+const physHANG_COOL   = 0.30;    // s between two sounds out of one hung thing
+const physHANG_CHIME  = 0.62;    // rad/s through the bottom before a chime speaks
+const physHANG_CHIME_GAP = 1.15; // s — and no more often than this
+const physHangs = [];
+const physHangSfx = { volume: 1, pitch: 1, at: { x: 0, y: 0, z: 0 }, near: 5 };
+
+/**
+ * ...AND THE AIR A PENDULUM FEELS IS NOT THE AIR A PROP FEELS.
+ *
+ * physWindNow subtracts physGUST_MIN before it hands anything over, because a
+ * permanent 1.5 m/s breeze in Sydney would walk a ferry ticket off the quay
+ * while nobody was touching a key — and "a prop stays exactly where the player
+ * put it" is worth more than a moving ticket. That floor makes NINE CHAPTERS
+ * read exactly 0.000, which is the correct answer for a ticket and the wrong
+ * one for a wind chime: a thing on a string is the one object in the game
+ * whose entire job is to show you air you cannot otherwise see, and a chime
+ * that only moves in the four squall chapters is a chime that is broken in
+ * fifteen.
+ *
+ * So this is the raw sum — the biome's own wind() plus the whole gust, floor
+ * and all — and a hung thing cannot be displaced by it, only turned.
+ */
+const physAirOut = { x: 0, z: 0 };
+let physAirTick = -1;
+function physAirNow() {
+  const t = physGame.state ? physGame.state.time : 0;
+  if (t === physAirTick) return physAirOut;
+  physAirTick = t;
+  let wx = 0, wz = 0;
+  const api = physBiomeApi();
+  if (api && typeof api.wind === 'function') {
+    const w = api.wind();
+    if (w) {
+      if (typeof w.x === 'number' && w.x === w.x) wx = clamp(w.x, -12, 12);
+      if (typeof w.z === 'number' && w.z === w.z) wz = clamp(w.z, -12, 12);
+    }
+  }
+  const wxr = physGame.weather;
+  if (wxr && typeof wxr.gust === 'function') {
+    const g = wxr.gust();
+    if (g) {
+      if (typeof g.x === 'number' && g.x === g.x) wx += g.x;
+      if (typeof g.z === 'number' && g.z === g.z) wz += g.z;
+    }
+  }
+  physAirOut.x = clamp(wx, -14, 14);
+  physAirOut.z = clamp(wz, -14, 14);
+  return physAirOut;
+}
+
+/**
+ * HANG SOMETHING.
+ *
+ *   game.hang({ biome: 'kyoto', group: lantern, len: 0.55,
+ *               mat: 'timber', wind: 1.1, r: 0.6, hit: 1.2 })
+ *
+ *   biome  which chapter it belongs to. Nothing outside the live one is
+ *          integrated, pushed or heard — the shared-space rule.
+ *   group  an Object3D whose ORIGIN IS THE PIVOT. Required.
+ *   len    m from the pivot to the middle of what hangs. It is the ONLY thing
+ *          that sets the period (T = 2*pi*sqrt(len/g)), so a 0.25 m chime
+ *          ticks and a 2.5 m sign swings, out of one number.
+ *   mat    a physVOICE key — what it sounds like when something touches it.
+ *   wind   how much air gets to it, 0..2. A lantern under an eave is 0.5, a
+ *          sign on an open corner is 1.4, something inside is 0.
+ *   r      m — the horizontal radius the animal has to come within.
+ *   hit    m — how far BELOW the pivot the animal can reach. Default len+0.3;
+ *          set it above the animal's head to make a thing that only the wheek
+ *          and the weather can move.
+ *   axis   'free' (default), 'x' or 'z' — a sign on a bracket swings one way.
+ *   chime  true if it should speak on its own in the wind. Off by default:
+ *          nineteen chapters of scenery that makes a noise unprompted is how
+ *          an ambient mover becomes an irritation (rule 1 of the movers).
+ */
+function physHang(o) {
+  if (!o || !o.group) return null;
+  const g = o.group;
+  const len = o.len > 0.05 ? o.len : 0.6;
+  const rec = {
+    biome: o.biome || (physGame.biome && physGame.biome.current) || 'sydney',
+    group: g, len: len,
+    x: o.x !== undefined ? o.x : g.position.x,
+    y: o.y !== undefined ? o.y : g.position.y,
+    z: o.z !== undefined ? o.z : g.position.z,
+    voice: physVOICE[o.mat] || physVOICE.timber,
+    wind: o.wind === undefined ? 1 : clamp(o.wind, 0, 2),
+    r: o.r > 0 ? o.r : 0.6,
+    reach: o.hit > 0 ? o.hit : len + 0.3,
+    axis: o.axis === 'x' ? 'x' : o.axis === 'z' ? 'z' : 'free',
+    chime: o.chime === true,
+    gain: o.gain === undefined ? 1 : clamp(o.gain, 0, 2),
+    ax: 0, az: 0, vx: 0, vz: 0,     // the two angles and their rates
+    cool: 0, chimeT: 0, wasIn: false, asleep: false,
+  };
+  // Whatever the caller left on the group, the pendulum owns from here.
+  g.rotation.x = 0;
+  g.rotation.z = 0;
+  physHangs.push(rec);
+  return rec;
+}
+
+/** One sound out of one hung thing, placed and rationed. */
+function physHangVoice(rec, k) {
+  if (rec.cool > 0) return;
+  rec.cool = physHANG_COOL;
+  const v = rec.voice;
+  physHangSfx.at.x = rec.x;
+  physHangSfx.at.y = rec.y - rec.len * 0.5;
+  physHangSfx.at.z = rec.z;
+  physHangSfx.volume = clamp(v.gain * k * 0.5 * rec.gain, 0.02, 0.9);
+  physHangSfx.pitch = v.pitch * (0.9 + Math.random() * 0.2);
+  physGame.sfx(v.sfx, physHangSfx);
+}
+
+/** The wheek reaches everything hanging, exactly as it reaches every prop. */
+function physHangWheek(pos, scale) {
+  const live = physLiveBiome();
+  for (let i = 0; i < physHangs.length; i++) {
+    const h = physHangs[i];
+    if (h.biome !== live) continue;
+    const dx = h.x - pos.x, dy = (h.y - h.len) - pos.y, dz = h.z - pos.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d > physHANG_WHEEK_R) continue;
+    const fall = 1 - d / physHANG_WHEEK_R;
+    if (fall <= 0.02) continue;
+    // Radially AWAY from the animal in the horizontal plane, which for a
+    // pendulum means about the axis at right angles to that direction: a
+    // shout pushes a lantern away from you, not sideways past you.
+    //
+    // AND THE SIGNS ARE NOT FREE. The bob of a group rotated by (ax, az) sits
+    // at (+len*sin az, -len*cos, -len*sin ax): +X wants az UP and +Z wants ax
+    // DOWN. Written the intuitive way round — vx from dz, vz from dx, both
+    // positive — every one of the three pushes in this file was exactly
+    // inverted and self-consistently so, which is the worst kind: the lantern
+    // leaned INTO the wind and swung TOWARD the animal that shouted at it, and
+    // it did all of that smoothly.
+    const hd = Math.sqrt(dx * dx + dz * dz) || 1;
+    const k = physHANG_WHEEK * fall * scale / Math.max(0.35, h.len);
+    h.vx += -(dz / hd) * k;
+    h.vz += (dx / hd) * k;
+    h.asleep = false;
+    physHangVoice(h, fall * 0.8);
+  }
+}
+
+/**
+ * The pendulum, the air, the animal walking into it, and the sound.
+ *
+ * THREE THINGS THAT ARE DELIBERATELY NOT HERE, and all three are the ambient
+ * movers' rules (see THINGS THAT ARE SIMPLY THERE):
+ *
+ *  1. It never speaks unprompted unless it was asked to (`chime`), and even
+ *     then only through the bottom of a swing and no more than once a second.
+ *  2. It goes to sleep. With no air and no push the integration stops, so
+ *     nineteen chapters of scenery cost nothing on a still frame.
+ *  3. It cannot be seen from far enough away for any of this to matter, so
+ *     past physHANG_FAR it is not integrated at all — and it is PARKED first,
+ *     because a thing that stops mid-swing and is still there when you turn
+ *     round is worse than one that was never moving.
+ */
+function physHangStep(dt, live) {
+  if (!physHangs.length) return;
+  const capy = physGame.capy;
+  const cp = capy && capy.position;
+  const cv = capy && capy.velocity;
+  const air = physAirNow();
+  const aw = Math.sqrt(air.x * air.x + air.z * air.z);
+  for (let i = 0; i < physHangs.length; i++) {
+    const h = physHangs[i];
+    if (h.biome !== live) continue;
+    if (h.cool > 0) h.cool -= dt;
+    if (h.chimeT > 0) h.chimeT -= dt;
+    if (cp) {
+      const fx = h.x - cp.x, fz = h.z - cp.z;
+      if (fx * fx + fz * fz > physHANG_FAR * physHANG_FAR) {
+        if (!h.asleep) {
+          h.asleep = true; h.ax = 0; h.az = 0; h.vx = 0; h.vz = 0;
+          h.group.rotation.x = 0; h.group.rotation.z = 0;
+        }
+        continue;
+      }
+    }
+    // ---- the animal, on its way through -----------------------------------
+    // Measured against where the thing IS, not where it hangs from: something
+    // already swung out of the way cannot be hit again until it comes back,
+    // which is what makes pushing through a row of them feel like anything.
+    if (cp && cv) {
+      const bx = h.x + Math.sin(h.az) * h.len;
+      const bz = h.z - Math.sin(h.ax) * h.len;
+      const dx = bx - cp.x, dz = bz - cp.z;
+      const near = dx * dx + dz * dz < h.r * h.r &&
+                   cp.y < h.y + 0.25 && cp.y > h.y - h.reach - 0.35;
+      if (near) {
+        const sp = Math.sqrt(cv.x * cv.x + cv.z * cv.z);
+        if (!h.wasIn && sp > physHANG_HIT_V) {
+          const k = Math.min(physHANG_HIT_MAX, sp * physHANG_HIT_K) / Math.max(0.35, h.len);
+          h.vx += -(cv.z / (sp || 1)) * k;
+          h.vz += (cv.x / (sp || 1)) * k;
+          h.asleep = false;
+          physHangVoice(h, clamp(sp / 4, 0.25, 1));
+        }
+        h.wasIn = true;
+      } else h.wasIn = false;
+    }
+    // ---- the air ----------------------------------------------------------
+    // Quadratic, like every other aerodynamic term in this file, and applied
+    // as an angular acceleration about the two axes at right angles to the
+    // heading — so a wind out of the north swings a lantern south and the
+    // gust's own heading swing is what makes it wander rather than hold.
+    let awx = 0, awz = 0;
+    if (h.wind > 0 && aw > 0.05) {
+      const k = Math.min(physHANG_WIND_MAX, physHANG_WIND_K * aw * aw * h.wind)
+                / Math.max(0.35, h.len);
+      awx = -(air.z / aw) * k;
+      awz = (air.x / aw) * k;
+    }
+    if (h.asleep && !awx && !awz) continue;
+    // ---- the pendulum -----------------------------------------------------
+    const gl = physHANG_G / h.len;
+    const c = physHANG_C * (0.6 + h.wind * 0.4);
+    h.vx += (-gl * Math.sin(h.ax) - c * h.vx + awx) * dt;
+    h.vz += (-gl * Math.sin(h.az) - c * h.vz + awz) * dt;
+    h.ax += h.vx * dt;
+    h.az += h.vz * dt;
+    if (h.axis === 'x') { h.az = 0; h.vz = 0; }
+    else if (h.axis === 'z') { h.ax = 0; h.vx = 0; }
+    if (h.ax > physHANG_MAX) { h.ax = physHANG_MAX; if (h.vx > 0) h.vx = -h.vx * 0.3; }
+    if (h.ax < -physHANG_MAX) { h.ax = -physHANG_MAX; if (h.vx < 0) h.vx = -h.vx * 0.3; }
+    if (h.az > physHANG_MAX) { h.az = physHANG_MAX; if (h.vz > 0) h.vz = -h.vz * 0.3; }
+    if (h.az < -physHANG_MAX) { h.az = -physHANG_MAX; if (h.vz < 0) h.vz = -h.vz * 0.3; }
+    // ---- and, if it was asked to, it speaks through the bottom -------------
+    // THROUGH THE BOTTOM, not at the top: a pendulum is fastest and quietest at
+    // the bottom of its arc and a chime that rang at the extremes would ring in
+    // time with the swing, which is a metronome. The angle test is what makes it
+    // the bottom; the speed test is what stops a dying swing ticking for a
+    // minute; the gap is what stops a gale being a fire alarm.
+    if (h.chime && h.chimeT <= 0 &&
+        Math.abs(h.ax) + Math.abs(h.az) < 0.06) {
+      const sw = Math.abs(h.vx) + Math.abs(h.vz);
+      if (sw > physHANG_CHIME) {
+        h.chimeT = physHANG_CHIME_GAP * (0.8 + Math.random() * 0.6);
+        physHangVoice(h, clamp(sw * 0.28, 0.1, 0.7));
+      }
+    }
+    h.group.rotation.x = h.ax;
+    h.group.rotation.z = h.az;
+    h.asleep = Math.abs(h.vx) + Math.abs(h.vz) < physHANG_SLEEP &&
+               Math.abs(h.ax) + Math.abs(h.az) < physHANG_SLEEP;
+  }
+}
+
+/**
+ * WHAT IS HANGING IN THIS CHAPTER AND WHETHER IT IS MOVING, read-only.
+ *
+ * A pendulum that is not moving and a pendulum that is not being integrated
+ * look identical in a screenshot, and both look identical to one that was
+ * never registered. Nothing in src reads this. See qa/d7-hang.js.
+ */
+function physHangAudit() {
+  const live = physLiveBiome();
+  const air = physAirNow();
+  const out = { biome: live, air: +Math.sqrt(air.x * air.x + air.z * air.z).toFixed(3),
+                total: physHangs.length, here: 0, rows: [] };
+  for (let i = 0; i < physHangs.length; i++) {
+    const h = physHangs[i];
+    if (h.biome !== live) continue;
+    out.here++;
+    out.rows.push({ x: +h.x.toFixed(1), y: +h.y.toFixed(1), z: +h.z.toFixed(1),
+                    len: h.len, wind: h.wind, voice: h.voice.key,
+                    a: +(Math.abs(h.ax) + Math.abs(h.az)).toFixed(4),
+                    v: +(Math.abs(h.vx) + Math.abs(h.vz)).toFixed(4),
+                    asleep: h.asleep });
+  }
+  return out;
+}
+
+/**
+ * TAKE ONE DOWN. The record game.hang() handed back, and nothing else.
+ *
+ * The first version of this took a BIOME and dropped everything that chapter
+ * had hung, which is a footgun rather than an api: the exit board replants
+ * itself every time you enter a chapter, so a board that took its own lantern
+ * down that way would take down anything the chapter itself had hung as well,
+ * silently, on the second visit. One record in, one record out.
+ */
+function physHangRemove(rec) {
+  if (!rec) return;
+  const i = physHangs.indexOf(rec);
+  if (i >= 0) physHangs.splice(i, 1);
+}
+
 function physUpdate(dt) {
   if (!physGame || !physGame.world) return;
   // game.physics.update is contract-published AND returned to main.js's updater
@@ -5001,6 +5359,10 @@ function physUpdate(dt) {
   const sydneyLive = physGame.biome ? physGame.biome.isActive('sydney') : true;
   const arr = physGame.props;
   const capy = physGame.capy;
+  // Everything on a string, before the props: it is not a body, it takes no
+  // part in the solver, and it is the one thing in this file that runs off the
+  // UN-floored air. See THINGS THAT HANG.
+  physHangStep(dt, live);
   for (let i = 0; i < arr.length; i++) {
     const p = arr[i];
     if (p.removed || p.hidden) continue;      // hidden = parked off-map, awaiting restock

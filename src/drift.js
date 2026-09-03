@@ -2616,6 +2616,8 @@ const driTRAVELLERS = [
   { id: 'jetty', x: driJETTY.x - 1.6, y: 30, z: driJETTY.z - 1.2, face: -2.2, near: 8,
     kit: 'rod',
     figure: { shirt: PALETTE.driPaperDim, legs: PALETTE.driTimber },
+    // eleven years of nothing on the end of it
+    beat: { kind: 'rock', every: 6.5, dur: 2.6 },
     lines: ['There is nothing down there. I have been at it eleven years.',
             'It is not about the fish. There are no fish. It is about the sitting.',
             'Lamp is my grandfather’s. It has not gone out. Nobody knows why.',
@@ -2669,6 +2671,8 @@ const driTRAVELLERS = [
   { id: 'winch', x: -35.2, y: 41.5, z: -49.6, face: 0.6, near: 8,
     kit: 'coil',
     figure: { shirt: PALETTE.driLamp, legs: PALETTE.driSoil },
+    // and every so often he gives it a pull
+    beat: { kind: 'work', every: 5.0, dur: 0.9, sfx: 'rustle', volume: 0.09, pitch: 1.1 },
     lines: ['Something is on the end of this. Has been for a while.',
             'Do not lean on the frame. The frame is the newest thing here.',
             { t: 'Up the column when it comes. It will not ask twice.', before: 'updraft' },
@@ -5474,7 +5478,7 @@ function driBuild(game) {
       const t = driTRAVELLERS[i];
       driTravRecs[t.id] = game.addLocal({
         biome: 'drift', x: t.x, y: t.y, z: t.z, near: t.near, face: t.face,
-        figure: t.figure, lines: t.lines, wheek: t.wheek });
+        figure: t.figure, lines: t.lines, wheek: t.wheek, beat: t.beat });
     }
   }
 

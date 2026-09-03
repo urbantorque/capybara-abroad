@@ -4815,6 +4815,8 @@ function hkBuild(game) {
                 'symphony': ['You watched it from up THERE? I have lived here forty years.'] } });
     hkFishRec = game.addLocal({ biome: 'kowloon', x: hkMARKET.x - 2, y: 0, z: hkMARKET.z, near: 7,
       figure: { shirt: PALETTE.cloth2, legs: PALETTE.stoneDark },
+      // the cleaver, which is the sound of the market
+      beat: { kind: 'work', every: 3.1, dur: 0.7, sfx: 'cleaver', volume: 0.14 },
       lines: ['Grouper still swimming. You can see it is swimming.',
               { t: 'Do not put your face in the tank.', before: 'wet-market' },
               { t: 'You did not put your face in the tank. You emptied it.', after: 'wet-market' },
@@ -4913,6 +4915,8 @@ function hkBuild(game) {
                 'symphony': ['Told you it was the reason. Nobody ever believes me.'] } });
     hkLaundryRec = game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: 20.5, near: 6, face: 1.5,
       figure: { shirt: PALETTE.cloth5 },
+      // forty years of it, on a pole
+      beat: { kind: 'reach', every: 6.0, dur: 1.3, sfx: 'rustle', volume: 0.09 },
       lines: ['Forty years I have hung washing over that road.',
               'It dries in an hour up here. Smells of the street, but it dries.',
               { t: 'If a shirt comes down, it belongs to whoever is under it.',
@@ -4968,6 +4972,8 @@ function hkBuild(game) {
     hkCookRec = game.addLocal({ biome: 'kowloon', x: hkDPD.x + 2.6, y: 0, z: hkDPD.z - 2.6,
       near: 6, face: -1.5,
       figure: { shirt: PALETTE.hkLaundry, legs: PALETTE.hkGrille },
+      // the wok, and the fire under it
+      beat: { kind: 'work', every: 2.9, dur: 0.65, sfx: 'hiss', volume: 0.10, pitch: 1.3 },
       lines: ['Wok hei. You cannot get it off a domestic hob. Not enough fire.',
               'Sit anywhere. If somebody is already there, sit there anyway.',
               'Beef and ho fun, and I am not writing it down.',

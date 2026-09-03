@@ -3502,6 +3502,8 @@ function antBuildLocals(game) {
   put(antGLAC.xToe - 10, antBLUE.z1 + 26, {
     near: 10, face: 1.1, kit: 'stake',
     figure: { shirt: PALETTE.antHull, legs: PALETTE.antHutRoof, hat: PALETTE.antHutRed },
+    // a stake, and a number written down
+    beat: { kind: 'rock', every: 6.5, dur: 2.4 },
     lines: ['Eleven metres this year. It was four when I started.',
             'The blue is the old stuff. All the air has been squeezed out of it.',
             'The dark lines are holes. The white lines are water. Learn the difference.',
@@ -3534,6 +3536,8 @@ function antBuildLocals(game) {
   const antLocBar = put(antHUTS.x + 0.4, antHUTS.z - 6.1, {
     near: 7, face: 0.05, kit: 'mug',
     figure: { shirt: PALETTE.antHutRed, legs: PALETTE.antTimber },
+    // the bar, and it is open
+    beat: { kind: 'work', every: 6.0, dur: 0.85, sfx: 'clink', volume: 0.11, pitch: 1.1 },
     lines: ['We open at six. It is always six somewhere. It is six.',
             'Rule one: you bring something to hang on the wall. Rule two: no rule two.',
             'Nine of us, one bar, two hundred days. You do the arithmetic.',

@@ -816,6 +816,8 @@ function panBuild(game) {
     put('peao', panFAZENDA.x - 22 + 13.6, panFAZENDA.z + 1.5, {
       face: 3.4, near: 8,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.panFence, legs: PALETTE.denim, skin: PALETTE.skin4 },
+      // counting them again
+      beat: { kind: 'rock', every: 6.0, dur: 2.4 },
       lines: ['Eleven in the pen. Six out there somewhere. Six is optimistic.',
               'Cattle first, road second, everything else whenever.',
               { t: 'You are the wrong shape to help and the right shape to watch.', before: 'gather' },
@@ -869,6 +871,8 @@ function panBuild(game) {
     put('crew', panRoadX(panBRIDGES[1].z) + 4.6, panBRIDGES[1].z + 5, {
       face: 3.1, near: 8,
       figure: { shirt: PALETTE.cloth5, hat: PALETTE.khaki, skin: PALETTE.skin4 },
+      // a hammer, on the hundred and twentieth bridge
+      beat: { kind: 'work', every: 3.6, dur: 0.8, sfx: 'thud', volume: 0.13, pitch: 0.85 },
       lines: ['One plank. I have had one plank on order since February.',
               { t: 'You can jump it. The truck cannot jump it.', before: 'missing-plank' },
               'A hundred and twenty-two bridges on this road. This is number sixty.',

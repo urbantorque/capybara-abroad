@@ -4495,6 +4495,8 @@ function caliBuild(game) {
       z: caliMirLife.kz - caliMirLife.oz * 1.25, near: 9,
       face: Math.atan2(caliMirLife.ox, caliMirLife.oz),
       figure: { shirt: PALETTE.caliWall1, legs: PALETTE.denim, hat: PALETTE.caliWall2 },
+      // the knife on the board
+      beat: { kind: 'work', every: 4.8, dur: 0.75, sfx: 'tick', volume: 0.10, pitch: 1.2 },
       lines: ['Chontaduro con miel y sal. Do not argue, just eat it.',
               'Everybody comes up on the chiva and everybody says the same thing.',
               { t: 'Wait for the lights. Another ten minutes. It is worth ten minutes.',
@@ -4515,6 +4517,8 @@ function caliBuild(game) {
       y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
       z: caliFLOOR.z + caliFLOOR.r + 1.4, near: 7, face: Math.PI,
       figure: { shirt: PALETTE.caliWall4, skin: PALETTE.skin4 },
+      // pouring, and he does not measure it
+      beat: { kind: 'reach', every: 7.0, dur: 1.2, sfx: 'clink', volume: 0.10 },
       lines: ['Aguardiente or nothing. There is no third thing.',
               'They started at ten. They will still be here at six.',
               { t: 'You want to dance? Watch the feet. Never watch the face.', before: 'salsa-dance' },

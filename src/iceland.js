@@ -5429,6 +5429,8 @@ function iceBuild(game) {
     // boards reads 1.0. Some floors are drawn, and you have to ask the drawing.
     iceLocPier = game.addLocal({ biome: 'iceland', x: icePIER.x - 1.6, y: 1.4, z: icePIER.z + 4, near: 8,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
+      // standing in it, and shifting
+      beat: { kind: 'rock', every: 5.5, dur: 2.2 },
       lines: ['Weather is coming. Weather is always coming.',
               'If you are getting on, get on.',
               'Sky does that most nights. Still worth stopping for.',
@@ -5560,6 +5562,8 @@ function iceBuild(game) {
     iceLocRack = game.addLocal({ biome: 'iceland', x: iceRACK[0][0] - 4,
       y: iceTerrain(iceRACK[0][0] - 4, iceRACK[0][1] - 3), z: iceRACK[0][1] - 3, near: 8,
       figure: { shirt: PALETTE.iceHull, legs: PALETTE.iceBasaltDk },
+      // turning the shark in the drying shed
+      beat: { kind: 'reach', every: 8.0, dur: 1.3, sfx: 'rustle', volume: 0.09, pitch: 0.8 },
       lines: ['Six weeks in the wind and it will keep for three years.',
               'You can smell it from the church. That is how you know it is working.',
               'No, you cannot have one.',

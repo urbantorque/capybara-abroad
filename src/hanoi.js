@@ -3008,6 +3008,8 @@ function hanBuildLocals(game) {
     // Chapter 19 shipped with no conditional line in it at all. `onTask`
     // fires once and is gone, so the woman who watched you put your whole
     // face in her pho greeted you afterwards exactly as she had before.
+    // the ladle, into the bowl, all morning
+    beat: { kind: 'work', every: 4.4, dur: 0.85, sfx: 'bowls', volume: 0.11 },
     lines: ['Sit. There is a stool. There is always a stool.',
             'You are in the way of the bikes. Everybody is in the way of the bikes.',
             'It is beef. It is always beef before eleven.',
@@ -3020,6 +3022,8 @@ function hanBuildLocals(game) {
   });
   hanLocBia = put(hanBIA.x - 4.5, hanBIA.z + 3.5, {
     figure: { shirt: PALETTE.hanWash3 }, face: -0.7, near: 9,
+    // the tap, and the glass under it
+    beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'pop', volume: 0.09, pitch: 1.2 },
     lines: ['Four thousand a glass. It has been four thousand since 1994.',
             'Do not knock the stools over. Everybody knocks the stools over.',
             'That corner has been like this since my grandmother.',
@@ -3043,6 +3047,8 @@ function hanBuildLocals(game) {
   });
   hanLocFlower = put(-8, -7.5, {
     figure: { shirt: PALETTE.hanWash4, hat: PALETTE.hanConical }, face: 0.4, near: 8,
+    // tying them, which is two hands
+    beat: { kind: 'reach', every: 6.4, dur: 1.2 },
     lines: ['Lotus in the morning, chrysanthemum after. Nothing after four.',
             'The whole shop is on the bicycle. It has to be.',
             'Do not lean on it. Please do not lean on it.',
@@ -3053,6 +3059,8 @@ function hanBuildLocals(game) {
   });
   hanLocBarber = put(hanBARBER.x + 2.6, hanBARBER.z + 1.2, {
     figure: { shirt: PALETTE.hanShirtW }, face: -1.6, near: 7,
+    // the scissors, on the pavement, in a mirror on a wall
+    beat: { kind: 'work', every: 2.4, dur: 0.6, sfx: 'tick', volume: 0.08, pitch: 1.5 },
     lines: ['Sit. Twenty minutes. You will look completely different.',
             'The mirror has been on that tree for thirty-one years.',
             'I do not do animals. I have never been asked.',
@@ -3074,6 +3082,8 @@ function hanBuildLocals(game) {
   });
   hanLocMarket = put(hanMARKET.x + 19, hanMARKET.z - 2, {
     figure: { shirt: PALETTE.hanWash3, hat: PALETTE.hanConical }, face: -1.5708, near: 9,
+    // the cleaver, and it is six in the morning somewhere
+    beat: { kind: 'work', every: 3.4, dur: 0.7, sfx: 'cleaver', volume: 0.12, pitch: 0.95 },
     lines: ['Everything here was alive at six. Some of it still is.',
             'Herbs at the front, fish at the back. Follow your nose.',
             'You are the largest thing in this market and you are not for sale.',

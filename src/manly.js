@@ -1029,6 +1029,8 @@ function manBuild(game) {
     manLocals.chips = game.addLocal({ biome: 'manly', x: -13.5, y: manPROM_Y, z: manSHOP_Z - 0.5, near: 7.5,
       face: Math.PI,
       figure: { shirt: PALETTE.manClub, hat: PALETTE.manFlagRed, legs: PALETTE.cloth1 },
+      // the basket, out and in
+      beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'rustle', volume: 0.10, pitch: 1.35 },
       lines: ['Flake and chips, minimum chips, and no I will not do half a scoop.',
               'The seagulls have worked out the awning. Do not sit under it.',
               'Everything is fried. That is the menu. That is the whole menu.',
@@ -1061,6 +1063,8 @@ function manBuild(game) {
     manLocals.fish = game.addLocal({ biome: 'manly', x: manPOINT_X + 4.6, y: manTerrain(manPOINT_X + 4.6, -12),
       z: -12, near: 7, face: 1.6,
       figure: { shirt: PALETTE.manScrub, hat: PALETTE.manSand },
+      // and he is not going anywhere
+      beat: { kind: 'rock', every: 6.8, dur: 2.5 },
       lines: ['Been here since five. Two bites. Both of them crabs.',
               'Do not stand there. That is the ledge that gets you.',
               { t: 'Groper comes past about now. Do not tell anyone.', before: 'blue-groper' },
@@ -2706,6 +2710,37 @@ function manUpdateGulls(game, dt) {
           if (manGullData[q + 1] > manPROM_Y + 0.6) return;   // airborne: leave it
           manGullData[q] = x; manGullData[q + 2] = z;
         },
+      });
+    }
+    // ---- ...AND THIS IS THE CHAPTER WITH THE CHIP SHOP IN IT -------------
+    // See THE FLOCK in systems.js. Thirty silver gulls have stood on the
+    // parapet above a chip shop for twenty versions, in a chapter whose second
+    // task is about chips, and not one of them has ever noticed a dropped one.
+    // Same three functions as the herd, because it is the same question.
+    //
+    // `scare` is the chapter's own take-off written as a call: putting them up
+    // was reachable by standing near them or by wheeking, and never by running
+    // through them, which is the one thing that ought to.
+    if (typeof game.flockOffer === 'function') {
+      game.flockOffer({
+        biome: 'manly', kind: 'silver gull', voice: 'gull', pitch: 1.5, fleeR: 7.5,
+        count: function () { return manGULL_N; },
+        at: function (i, o) {
+          const q = i * 7;
+          o.x = manGullData[q]; o.y = manGullData[q + 1]; o.z = manGullData[q + 2];
+        },
+        put: function (i, x, z) {
+          const q = i * 7;
+          if (manGullData[q + 1] > manPROM_Y + 0.6) return;
+          manGullData[q] = x; manGullData[q + 2] = z;
+        },
+        scare: function () {
+          if (manGullUp > 0.5) return 0;
+          manGullUp = 1;
+          return manGULL_N;
+        },
+        // The come-down above, called by something that is actually a chip.
+        land: function () { if (manGullUp < 0.02) manGullUp = 0.35; },
       });
     }
   }

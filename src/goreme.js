@@ -2101,8 +2101,39 @@ function gorUpdateGroundSound(game, dt) {
   }
 }
 
+// ---- ...AND A RUN ALONG THE FOOT OF THE CLIFF PUTS THEM UP TOO (D7) -------
+// See THE FLOCK in systems.js. Four hundred rock doves came off this cliff for
+// a wheek and for nothing else — so a player who sprinted the length of it
+// went past four hundred birds that did not move. `scare` is the same block
+// the wheek path uses, and this chapter offers no at/put: its pigeons live in
+// a Float32Array of velocities and there is no such thing as a Göreme pigeon
+// standing on the ground for a chip to be dropped in front of. A flock may
+// offer either channel, and this one is scatter and nothing else.
+let gorFlockOffered = false;
+function gorPigeonScare(x, z) {
+  if (!gorPigeonData || gorPigeonOut >= 0.5) return 0;
+  const cd = Math.hypot(x - (gorCLIFF.x + 6), z - (gorCLIFF.z0 + gorCLIFF.z1) * 0.5);
+  // Half the wheek's hundred metres: a shout carries and a capybara does not.
+  if (cd > 50) return 0;
+  gorPigeonOut = 1;
+  for (let i = 0; i < gorPIGEON_N; i++) {
+    const o = i * 10;
+    gorPigeonData[o + 3] = rand(3, 11);
+    gorPigeonData[o + 4] = rand(2, 8);
+    gorPigeonData[o + 5] = rand(-5, 5);
+  }
+  return gorPIGEON_N;
+}
+
 function gorUpdatePigeons(dt) {
   if (!gorPigeonMesh) return;
+  if (!gorFlockOffered && typeof gorGame === 'object' && gorGame &&
+      typeof gorGame.flockOffer === 'function') {
+    gorFlockOffered = true;
+    gorGame.flockOffer({ biome: 'goreme', kind: 'rock dove', voice: 'rustle',
+                         pitch: 1.1, fleeR: 50,
+                         scare: function (x, z) { return gorPigeonScare(x, z); } });
+  }
   // THE FLOCK LANDS AGAIN. Fourteen seconds of wheeling — which is about what
   // a real one does — and then eight of coming back in to the same holes.
   // Below 0.35 they are steering home rather than climbing, and at 0 they are
@@ -5476,6 +5507,8 @@ function gorBuild(game) {
       y: gorTerrain(gorPLAZA.x - 8.4, gorPLAZA.z + 6.2), z: gorPLAZA.z + 6.2,
       near: 7,
       figure: { shirt: PALETTE.gorEnvE, legs: PALETTE.gorTuffDk, skin: PALETTE.skin2 },
+      // pouring it from a height, because that is how
+      beat: { kind: 'reach', every: 7.0, dur: 1.2, sfx: 'clink', volume: 0.09, pitch: 1.2 },
       lines: ['Sit. There is tea. There is always tea.',
               'We are here at five because they go up at five. Every day of my life.',
               { t: 'Two glasses. Then I go and look at the sky like everybody else.', before: 'sunrise' },
@@ -5491,6 +5524,8 @@ function gorBuild(game) {
 
     gorLocals.potter = game.addLocal({ biome: 'goreme', x: 19, y: gorTerrain(19, 40.4), z: 40.4, near: 7,
       figure: { shirt: PALETTE.gorPot, legs: PALETTE.gorBasaltDk, skin: PALETTE.skin2 },
+      // the wheel, and a hand coming down on it
+      beat: { kind: 'work', every: 3.4, dur: 0.9, sfx: 'thud', volume: 0.10, pitch: 0.9 },
       lines: ['Avanos clay. Red as the valley, because it IS the valley.',
               'Seventeen out of the kiln, fourteen came through. Good week.',
               'Do not lean on that one. It is Thursday’s.',
@@ -5557,6 +5592,8 @@ function gorBuild(game) {
     gorLocals.dovecote = game.addLocal({
       biome: 'goreme', x: gorCLIFF.x + 9, y: gorTerrain(gorCLIFF.x + 9, -30), z: -30, near: 9,
       figure: { shirt: PALETTE.gorPigeon, legs: PALETTE.gorTuffDk, hat: PALETTE.gorBasaltDk },
+      // four hundred holes, one chisel
+      beat: { kind: 'work', every: 2.9, dur: 0.75, sfx: 'tick', volume: 0.10, pitch: 0.7 },
       lines: ['Four hundred holes. My grandfather cut about eighty of them.',
               'Nobody eats the birds. It was never about the birds.',
               'You want to know why the grapes grow in a valley made of ash? That is why.',

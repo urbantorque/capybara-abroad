@@ -5270,6 +5270,8 @@ function sahBuild(game) {
     sahLocDyer = game.addLocal({ biome: 'sahara', x: sahSOUK_X0 + 3.5 * sahSOUK_CELL,
       y: 0, z: sahSOUK_Z0 + 1.0 * sahSOUK_CELL, near: 7, face: 0,
       figure: { shirt: PALETTE.sahDye2, skin: PALETTE.skin3 },
+      // lifting a hank out of the vat
+      beat: { kind: 'work', every: 4.4, dur: 0.9, sfx: 'thud', volume: 0.09, pitch: 0.7 },
       lines: ['Saffron, indigo, cochineal. And one of them is beetroot.',
               'Do not touch. It takes a week to come off.',
               'You would look very good in blue. Everyone does.',
@@ -5303,6 +5305,8 @@ function sahBuild(game) {
     sahLocMaalem = game.addLocal({ biome: 'sahara', x: sahCAMP.x - 4.6,
       y: sahTerrain(sahCAMP.x - 4.6, sahCAMP.z + 3.2), z: sahCAMP.z + 3.2, near: 9,
       figure: { shirt: PALETTE.sahTileWhite, skin: PALETTE.skin4, legs: PALETTE.sahTent },
+      // three strings, and it has never needed a fourth
+      beat: { kind: 'work', every: 3.8, dur: 0.85, sfx: 'strum', volume: 0.12, pitch: 0.9 },
       lines: ['Three strings. That is all it has ever needed.',
               'We play until it is finished. It is never finished.',
               'Sit by the fire. Everything east of here is colder than it looks.',

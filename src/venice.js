@@ -2776,6 +2776,33 @@ function venUpdatePigeons(game, dt) {
         },
       });
     }
+    // ---- ...AND THEY WILL COME FOR A DROPPED ANYTHING (see THE FLOCK) ----
+    // The same three functions, and they are the same three ON PURPOSE: the
+    // question a herd asks an animal and the question a flock asks one are the
+    // same question. `scare` is venPigeonScare, which the square already had
+    // and which nothing but a walk through the middle of them could reach —
+    // the flock is what puts a RUN on the other end of it.
+    //
+    // Corn is forbidden in this square since 2008. Nobody said anything about
+    // a dropped sandwich.
+    if (typeof game.flockOffer === 'function') {
+      game.flockOffer({
+        biome: 'venice', kind: 'pigeon', voice: 'pigeons', pitch: 1.0, fleeR: 7.0,
+        count: function () { return venPIGEON_N; },
+        at: function (i, o) {
+          const q = i * 10;
+          o.x = venPigeonData[q]; o.z = venPigeonData[q + 1];
+          o.y = venCITY_Y + venPigeonData[q + 5];
+        },
+        put: function (i, x, z, yaw) {
+          const q = i * 10;
+          if (venPigeonData[q + 3] > 0) return;
+          venPigeonData[q] = x; venPigeonData[q + 1] = z;
+          venPigeonData[q + 2] = yaw;
+        },
+        scare: function (x, z, r, force) { return venPigeonScare(x, z, r, force); },
+      });
+    }
   }
   venFlockX = -4 + Math.sin(venTime * 0.11) * 5.0;
   venFlockZ = -34 + Math.sin(venTime * 0.073 + 1.1) * 12.0;
@@ -5546,6 +5573,8 @@ function venBuild(game) {
                 'passerelle': ['End to end without going in. That is more than the mayor managed.'] } });
     venGondRec = game.addLocal({ biome: 'venice', x: 4, y: venTerrain(4, 11), z: 11, near: 7,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth3 },
+      // waiting, in the way a man waits all day
+      beat: { kind: 'rock', every: 6.0, dur: 2.3 },
       lines: ['Gondola, gondola? Fifty minutes, eighty euro.',
               { t: 'Stand at the front if you like. Everybody stands at the front.',
                 before: 'gondola-ride' },
@@ -5599,6 +5628,8 @@ function venBuild(game) {
                 'volo': ['That is the Flight of the Angel, and that is a rodent doing it.'] } });
     venCrewRec = game.addLocal({ biome: 'venice', x: -8.5, y: venTerrain(-8.5, 10.0), z: 10.0, near: 7, face: 2.6,
       figure: { shirt: PALETTE.venBriccolaR, hat: PALETTE.cloth3 },
+      // stacking the passerelle, two hands
+      beat: { kind: 'reach', every: 6.2, dur: 1.2, sfx: 'thud', volume: 0.11, pitch: 0.9 },
       lines: ['Passerelle. Six hundred metres of them, and they all live in a shed.',
               { t: 'One metre ten, the forecast says. That is the square and half the calli.',
                 when: venDry },
@@ -5640,6 +5671,8 @@ function venBuild(game) {
                                  'Nine years I have been trying to do that by accident.'] } });
     game.addLocal({ biome: 'venice', x: -50, y: venTerrain(-50, -35), z: -35, near: 6, face: 1.6,
       figure: { shirt: PALETTE.venMosaic, legs: PALETTE.hair2 },
+      // fourteen layers, and the nose takes a day
+      beat: { kind: 'work', every: 3.6, dur: 0.85, sfx: 'rustle', volume: 0.09, pitch: 1.2 },
       lines: ['Papier mâché. Fourteen layers. The nose takes a day on its own.',
               'The plague doctor sells. I hate the plague doctor.',
               'A face like yours does not need one of these.',

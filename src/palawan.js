@@ -4701,6 +4701,8 @@ function palBuild(game) {
     // village, and this chapter had the second-emptiest cast in the game.
     palLocals.netman = game.addLocal({ biome: 'palawan', x: -4.5, y: palTerrain(-4.5, 52), z: 52, near: 7,
       figure: { shirt: PALETTE.palBangkaTrim, skin: PALETTE.skin3, hat: PALETTE.palThatch },
+      // mending it, for as long as there is light
+      beat: { kind: 'work', every: 4.6, dur: 0.9, sfx: 'rustle', volume: 0.08, pitch: 1.25 },
       lines: ['Net has a hole in it. Net always has a hole in it.',
               'Two hundred fish in that bay and every one of them knows me.',
               'You are standing on the good end. Move up.',
@@ -4739,6 +4741,8 @@ function palBuild(game) {
 
     palLocals.painter = game.addLocal({ biome: 'palawan', x: 22, y: palTerrain(22, 49), z: 49, near: 7,
       figure: { shirt: PALETTE.palWeed, skin: PALETTE.skin3, hat: PALETTE.palBamboo },
+      // every dry season, and this is one
+      beat: { kind: 'work', every: 2.8, dur: 0.8, sfx: 'rustle', volume: 0.09, pitch: 0.8 },
       lines: ['Scrape her, paint her, scrape her again. Every dry season.',
               'She has been out to the island eleven thousand times.',
               'Bamboo, not fibreglass. Bamboo bends. Fibreglass argues.',

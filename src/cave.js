@@ -3139,6 +3139,8 @@ function cavBuildCamp(game, root) {
   const cavLocMap = put(cx - 1.4, cz - 5.4, {
     face: 1.0, kit: 'pot',
     figure: { shirt: PALETTE.cavJungleLt, legs: PALETTE.cavRockWarm, hat: PALETTE.cavRope },
+    // the pot, and a lid going back on it
+    beat: { kind: 'work', every: 5.2, dur: 0.85, sfx: 'clink', volume: 0.10, pitch: 0.8 },
     lines: ['Boil it. Everything. Even in here. Especially in here.',
             'Twenty of us carried this camp in. I carried the stove.',
             'Sleep with your boots inside the tent. Crickets.',
@@ -3170,6 +3172,8 @@ function cavBuildCamp(game, root) {
   put(12, 33, {
     face: 3.3, near: 10, kit: 'rope',
     figure: { shirt: PALETTE.cavTent, hat: PALETTE.cavRockDk, legs: PALETTE.cavRockDk },
+    // coiling it, which is his whole job and he said so
+    beat: { kind: 'work', every: 4.5, dur: 0.9, sfx: 'rustle', volume: 0.10, pitch: 1.0 },
     lines: ['Rope is good. Rope is always good. That is my whole job.',
             'From here it is dark for four hundred metres. Genuinely dark.',
             'Eighty metres down and the river is still going. It started somewhere.',

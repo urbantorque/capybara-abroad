@@ -3343,6 +3343,288 @@ reports a silent frame against a frame that is not silent. `game.hud.uiSfxAudit(
 is the counter it needs.
 
 
+## WORLD LIFE — D7 (3 Sep 2026)
+
+Area 3's five remaining systems, and the roadmap was wrong about one of them
+before a line was written.
+
+Instruments: `qa/d7-life.js` (the baseline: people, herds, ambience and
+instanced meshes per chapter), `qa/d7-anchor.js` (every row of the ambient
+anchor table, resolved live), `qa/d7-hang.js` (nineteen photographs and the
+peak swing at each), `qa/d7-beat.js` (who has a job and whether they do it),
+`qa/d7-flock.js` (both flock channels, counted), `qa/d7-act.js` (the light,
+measured and photographed at each movement).
+
+### There are no one-person chapters
+
+D7's line asked for `addLocal({beat})` "for the five one-person chapters".
+Measured first (`qa/d7-life.js`), the smallest cast in the game is **six**
+(Antarctica) and the largest is thirteen (Kyoto); the only two chapters with no
+`locals` at all are Sydney and Pasto, which have the two `humans` casts instead.
+That line was written against a state of the world that P5 had already fixed.
+
+What is true is bigger and worse: **every one of the hundred and fifty-odd
+people in this game is standing perfectly still.** They breathe, they shuffle
+half a metre every fifteen seconds, they turn their heads, they flinch, and
+between all of that they do nothing, for ever, in chapters that have already
+told you exactly what they are for. The fishmonger has a cleaver. The woman at
+the pho stall has a ladle. Neither had ever moved it.
+
+### `beat` — a person with a job (npc.js)
+
+Three shapes, and three is enough, because everything a person does standing in
+one place for an hour is one of them with a different sound on it:
+
+| kind | what it is | the sound |
+|---|---|---|
+| `work` | one arm up and down through the bottom, hard | at the bottom |
+| `reach` | both arms up, a hold, and down | at the top |
+| `rock` | a shift of weight, and no arms at all | none, ever |
+
+**Forty-three people in seventeen chapters**, each chosen because the chapter's
+own line already said what they were doing. Four rules, and the first three are
+the ambient movers' rules:
+
+1. **It is outranked by everything.** Talking, flinching, guarding stock,
+   fetching a prop back, holding an umbrella and walking all beat it — and an
+   interrupted beat is ABANDONED, not paused. A person startled halfway through
+   a chop who then finishes the chop is worse than one who never chopped.
+2. **The clock is jittered per person and stretched by the calm.** Six people in
+   a market on a five-second beat is a factory; the jitter is what makes it a
+   market.
+3. **It never speaks at range.** The action always runs; the sound goes through
+   `sfxAt` like every other noise a person makes.
+4. **Only a person npc.js built.** The same gate the shuffle and the umbrella
+   take, and here it is absolute: a chapter that handed over its own Group may
+   have merged that person into a stall or a jetty, and there are no arms on the
+   end of a jetty.
+
+**And a table is not an argument.** `beat:` written into a chapter's local table
+only reaches `addLocal` if that chapter hands the whole option object over.
+Sixteen chapters do; the Drift builds the call field by field out of
+`driTRAVELLERS`, so two beats were dropped in silence and read exactly like a
+feature that does not work. `game.beatAudit()` per chapter is the only thing
+that can see it.
+
+### `hang` — things that hang (props.js)
+
+This game has a wind field, a gust that swings its heading, a wake shader, a
+sway term on the foliage of fourteen chapters and a prop system with buoyancy
+and aerodynamics in it, and nothing was suspended anywhere in nineteen worlds
+for any of it to act on.
+
+A hung thing is a **single-bone damped pendulum**, not a rigid body: two angles
+about a fixed anchor, gravity restoring, linear damping, and three things that
+can push it — the air, a wheek, and the animal walking into it. The contract is
+one line: **the group's origin is the pivot**, everything hangs below in local
+-Y, and this module writes `rotation.x`/`rotation.z` on it and nothing else.
+
+**The air a pendulum feels is not the air a prop feels.** `physWindNow`
+subtracts `physGUST_MIN` before it hands anything over, because a permanent
+1.5 m/s breeze would walk a ferry ticket off the quay — and that floor makes
+nine chapters read exactly 0.000. Correct for a ticket; wrong for a wind chime,
+which is the one object in the game whose whole job is to show you air you
+cannot otherwise see. `physAirNow` is the raw sum, and a hung thing cannot be
+displaced by it, only turned.
+
+**THE SIGNS ARE NOT FREE.** The bob of a group rotated by (ax, az) sits at
+(+len·sin az, −len·cos, −len·sin ax): +X wants az UP and +Z wants ax DOWN.
+Written the intuitive way round, all three pushes were exactly inverted and
+self-consistently so — the lantern leaned INTO the wind and swung TOWARD the
+animal that shouted at it, smoothly, and looked like a feature.
+
+### ...and they hang off the exit board
+
+The cost of a hanging thing is not the object, it is the ANCHOR: a point in the
+air, attached to a built structure, level, not inside a wall, and not forty
+metres from anywhere the player goes. Finding nineteen of those by hand is what
+D6b cost, twice over.
+
+There is already exactly one point per chapter with all four properties and it
+has been photographed nineteen times: **the header of the exit board**. So the
+first nineteen things in this game that hang, hang off it — a lamp on a
+signpost, a chime under a beam, a windsock at a station — at the END of the
+header so they never cross the flaps, and the placement cost is one row of
+`sysBOARD_HANG` each and no new measurement at all.
+
+Five kinds (`hangThing` in shared.js), one merged geometry and one draw call
+each, on the material every vertex-coloured mesh in the game already shares.
+**Five of the nineteen are `strand`s that reach two metres down**, which puts
+the bottom under a capybara's chin; the other fourteen are the weather's and the
+wheek's. A chapter where everything jangles as you go past is a chapter with a
+bead-curtain problem.
+
+Two of them are allowed to speak on their own — the Drift's glass chime and
+Palawan's shells — and only through the BOTTOM of a swing, no more than once a
+second. A chime that rang at the extremes would ring in time with the swing,
+which is a metronome. **Göreme has no wind at all in its row and the cave's is
+zero**: the cave's lantern is the one hung thing in the game that can only ever
+be moved by shouting at it or walking into it, and nine kilometres in that is
+worth more than a breeze.
+
+### `sysAMB_AT` — the bell comes off the campanile
+
+`sysAmb` puts the ambience on a ring 14–34 m from the animal at a random
+bearing, which is right for everything a place says that has no source and wrong
+for everything that has one. San Marco has a campanile in it and the bell came
+from nowhere; the Jemaa el-Fnaa has a 77 m minaret at the end of it and the call
+to prayer arrived over your shoulder from an empty patch of square.
+
+**Forty rows, seventeen chapters, and not one new coordinate**: an entry is a
+key on the chapter's own published api, resolved through `sysLiveBiomeApi` the
+way `way` is, so a thing that moves is followed rather than copied.
+
+**An anchored voice is at a real distance, and that is the whole change.** The
+ring is deliberately inside `near` so the ladder's ninety-odd hand-tuned volumes
+come out of `audioPlace` at a gain of exactly 1. An anchor cannot work that way,
+so it takes a wide `near` (55) and a long `far` (520) and is quieter, and
+further, and off to one side. That side is the payoff.
+
+**A wrong key is silent by design** — four ways an anchor fails, all of them
+ending in `false` rather than in a sound in the wrong place or a throw in the
+audio path — so the only honest way to ship the table is an instrument that
+resolves every row live. `game.ambAnchors()`, and it earned itself twice: it
+caught `antarctic.pack` (a getter that returns a NUMBER — how much pack ice the
+boat is in) and `pasto.bell` (a getter that returns a THING, `{position, ...}`,
+rather than a point — which is the shape half the objects in this game have, and
+is now one hop in the resolver).
+
+Deliberately not anchored: gulls, dogs, mopeds, doors, radios, rustling, wind, a
+distant crowd. Anchoring those would not be more truthful, it would just be a
+shorter list of places a sound may come from, and the ring is what makes a place
+sound wide.
+
+### `flockOffer` — and the first thing in this game that follows food
+
+Wildlife divides cleanly in two: three or four flocks REACT and the rest
+DECORATE. And not one bird in any chapter had ever noticed a dropped chip, in a
+game with a chip shop in it, a task about chips, and thirty silver gulls
+standing on the shopfront above it.
+
+Two channels, independent on purpose. `scare` is the chapter's own take-off,
+called when the animal comes through at a RUN. `at`/`put` is **the herd's
+contract, verbatim** — a chapter that already wrote those three functions for
+THE HERD passes the same three here, because it is the same question, and a
+second shape for it would be a second thing to keep in step.
+
+**The birds do not eat it.** They come, they stand round it in a ring, they peck
+at it, and they lose interest; the prop is untouched. Half the edible props in
+this game are somebody's task, and a system that quietly destroys a task object
+because a pigeon was nearby is a system that has to be explained in a bug report
+rather than watched.
+
+**`land` is the callback this batch did not expect to need.** Manly's gulls
+spend the chapter on a shop parapet, and `put` correctly refuses to drag an
+airborne bird anywhere — so the food drift reached nothing at all. The chapter
+already had a come-down state, on a random twenty-six-second timer, with the
+comment *"they come down for the chips"* over it, and it had never once been
+connected to an actual chip.
+
+### `sysACT_LIGHT` — the hour moves
+
+Eighteen chapters declare acts and the light in every one of them was a
+constant. Monte Carlo opens at twenty past eight and is still at twenty past
+eight three movements later; Sơn Đoòng, whose three acts are the mouth, the
+middle and the far end of nine kilometres of unlit cave, had exactly as much
+daylight in the last of them as in the first.
+
+**An act row is a DELTA, not a second grade.** Two full rows per chapter would
+be two numbers to retune every time one moved, and the copy is the one that goes
+stale. A delta also inherits every key it does not name — which matters here
+because `sysLENS` writes `wide`/`splitW`/`splitC` into these rows AFTER the
+table is built, so a hand-written second row would silently lose a chapter's
+lens.
+
+One-way, and a fifth of the grade's own damp: about six seconds of light for a
+change of movement, and it never walks back. `sysActNow` is now a function
+rather than four lines inside the todo card's refresh, because the paper stopped
+being the only reader of it.
+
+**Seven chapters have a row and eleven do not, and that is the argument.** Four
+already animate their own hour (Göreme runs a clock and a sunrise, Marrakech a
+dusk and a sandstorm, Palawan's second act is UNDER and the dive owns the grade
+down there, the Pantanal turns over into its own dusk) — a delta on top of any
+of those is two writers on one look. The other seven chapters' acts are about
+PLACE and not about time: Cali's three movements are a city, a bus and a ridge,
+and moving the light because the player walked somewhere else is a weather
+report on the task list.
+
+**And the snap has to re-read the act first.** `sysActWant` is a quarter of a
+second stale by design; a snap on a chapter swap that read the stale one would
+land the new chapter's light on the LAST chapter's act, which is every single
+journey in this game.
+
+
+### Measured
+
+**The hung things** (`qa/d7-hang.js`, 19 chapters, one page load each). 19/19
+planted. The three pushes, in radians of total swing:
+
+| | range | note |
+|---|---|---|
+| the air, over 8 s | 0.009 – 0.464 | Antarctica 0.464, Marrakech 0.409, Manly 0.371, Reykjavík 0.314; Sơn Đoòng 0.000 |
+| one wheek | 0.087 – 0.486 | reaches all nineteen, the cave included, at 0.132 |
+| walking through one | 0.77 – 0.78 | Cappadocia and Cali, from 0.001 and 0.040, at 0.53 m |
+
+The cave's row is the argument for the whole feature: no air, and the only two
+things that can move it are a shout and a shoulder.
+
+**The beats** (`qa/d7-beat.js`, 45 s parked per chapter). **43 people with a
+job across 17 chapters** — two to five each, and none in Sydney or Pasto, which
+have no `locals` at all. **174 completed strokes**, 4 to 26 per chapter, and
+the spread is not noise: it is the per-chapter `every` plus rule 1, and rule 1
+was measured rather than assumed (`qa/d7-beat2.js`, `qa/d7-beat3.js`).
+
+That measurement is what bought the `rock` exemption. In the first run Kyoto
+came back at 4 strokes and 76% busy, and 111 of 183 of those samples were
+`umbrella`: it was raining, and a person holding one over their head cannot
+also sweep a step. Correct — but the same chapter on another run was 0%
+umbrella and 14 strokes, so before that was attributed the number looked like a
+broken feature rather than like weather. It is the two ARM conflicts that a
+weight shift is now exempt from, and nothing else.
+
+**The flock** (`qa/d7-flock.js`). Venice: a sandwich in the piazza, 3 703
+position writes and 6 pecks in nine seconds, then a run through the middle of
+them and one take-off. Manly: a bag of chips, one `land`, 4 445 writes and 12
+pecks — the gulls came down off the shopfront and got there. Cappadocia: one
+scatter off the cliff on a run, and no food channel at all, which is the shape
+of a flock that offers one channel and not the other.
+
+**The anchors** (`qa/d7-anchor.js`). 40 rows in 17 chapters, 40/40 resolving to
+a point, at 1 m (the water at the molo, which is where you are standing) to
+470 m (a berg calving across the bay). Two of the forty only resolve because
+the instrument caught them first.
+
+**The act light** (`qa/d7-act.js`, `qa/d7-diff.cjs`). `k` walks 0 → 0.496 →
+0.996 across three movements in both test chapters, and every term moves
+monotonically with it. In the picture, subtracting the first frame from the
+last at the same station:
+
+| | frame | corners |
+|---|---|---|
+| Monte Carlo, THE PORT → THE CIRCUIT | 6.08 abs / −3.42 | 8.34 abs / −7.55 |
+| Sơn Đoòng, THE MOUTH → THE FAR SIDE | 17.34 abs / −16.28 | 18.70 abs / −16.89 |
+
+of 255. **The first draft of Monte Carlo's row measured 3.90 and −3.73** — a
+per cent and a half, which is under the threshold at which anybody could name
+it. That is the right size for a term meant to be invisible and the wrong size
+for a chapter getting an hour later, and the two levers that carry it in a
+chapter that was already dark are the corners and the colour.
+
+**Regression.** `qa/r10-soak.js`: 19 rows, 0 NaN, no console errors, `orphans:
+[]`. `qa/p7-tokens.cjs` unchanged: hud radii 5, type 58, shadows 11, curves 0,
+durations 7, ink-borders 0, unicode 0.
+
+### One picture this batch could not take
+
+There is no clean photograph here of somebody mid-stroke, and the reason is
+rule 1. `frameShot` always looks at the ANIMAL, so getting a person into the
+frame means standing the capybara next to them — and standing next to somebody
+makes them greet you, and a greeting is two to four seconds of `gest` on a
+four-second clock. The camera arrives and the job stops. `rock` is exempt from
+that (a shift of weight is not an arm, and neither is holding an umbrella in
+your other hand), which is the one change the failed photograph bought.
+
 ## THE DOOR IS AN OBJECT — D6, SECOND HALF (3 Sep 2026)
 
 The tenth item of area 6, and the only one in it that is not on the paper: an

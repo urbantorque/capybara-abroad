@@ -680,16 +680,94 @@ bounces off a shopfront and is rescued. Both are correct in the photographs.
 
 ---
 
-## The shelf — sized, not scheduled
+### Batch D7 — world life, the systems (area 3, second of two sessions)
 
-**D7 — world life, the systems** (area 3, ~15 h). `hung` in `props.js` — a
-single-bone damped pendulum on a fixed anchor, driven by `gust()` at rest and
-a capybara impulse on contact, one sfx per material; `sysFlock` — chapters
-register their existing bird meshes with `{home, r, fleeR}` and one update does
-land/take-off, scatter on `capy:run`, drift toward food; `sysEvent` anchors so
-the bell comes off the campanile and the train off the line; `addLocal({beat})`
-for the five one-person chapters; `sysActLight` — a one-way lerp of a
-chapter's grade/airlight row to a second, driven by act index, Monaco first.
+**LANDED 3 Sep 2026.** All five, and the roadmap was wrong about one of them
+before a line was written. Contract section **WORLD LIFE — D7**; instruments
+`qa/d7-life.js`, `qa/d7-anchor.js`, `qa/d7-hang.js`, `qa/d7-beat.js`,
+`qa/d7-flock.js`, `qa/d7-act.js`.
+
+- **Nothing in this game hung off anything.** `game.hang()` in `props.js` — a
+  single-bone damped pendulum on a fixed anchor, pushed by the air, by a wheek
+  and by the animal walking into it, with the material's own voice on contact.
+  Five shapes in `shared.js` (a chime, a lantern, a sign, a strand, a windsock),
+  one draw call each, and **one hanging off the header of every one of the
+  nineteen exit boards** — because the board is the only point in every chapter
+  that is already measured, already level, already attached to something and
+  already photographed. Five of the nineteen reach far enough down to walk
+  through; the other fourteen belong to the weather and the shout.
+- **The air a pendulum feels is not the air a prop feels.** The props' wind has
+  a 2.8 m/s floor under it so that a ferry ticket stays where the player put it,
+  and that floor reads exactly 0.000 in nine chapters. A wind chime that only
+  moves in the four squall chapters is a chime that is broken in fifteen, so
+  `physAirNow` is the raw sum — and a hung thing can be turned by it and never
+  displaced.
+- **The bell comes off the campanile.** `sysAMB_AT`: forty rows across
+  seventeen chapters, every one of them a key on that chapter's own published
+  api rather than a new coordinate, so the muezzin is at the top of the
+  Koutoubia, the burners are in the balloon field, Galeras hisses from Galeras
+  and the far bell in the Drift is under the crown you cannot reach yet. An
+  anchored voice is at a REAL distance — a wide near and a long far instead of
+  the ring's guaranteed gain of 1 — which is the whole point: it is quieter,
+  and further, and off to one side, and there is a tower on that side.
+- **Everybody in this game was standing perfectly still.** `beat` on
+  `addLocal`: three shapes (a work stroke, a two-handed reach, a shift of
+  weight), forty-three people in seventeen chapters, each one chosen because
+  the chapter's own line already said what they were doing — the cleaver, the
+  ladle, the broom, the potter's wheel, the barber's scissors, the chisel, the
+  net. Outranked by everything, jittered per person, stretched by the calm, and
+  abandoned rather than paused when something interrupts it.
+- **Something follows food now.** `game.flockOffer` — two independent channels
+  on the herd's own `count`/`at`/`put` contract, because it is the same
+  question. A dropped edible pulls up to seven birds into a ring round it; a
+  RUN through a flock puts it up. Venice, Manly and Cappadocia, and Manly is
+  the one that matters: a chapter with a chip shop, a task about chips and
+  thirty gulls on the parapet above it, in which no gull had ever noticed one.
+- **The hour moves.** `sysACT_LIGHT` — a one-way lerp of a chapter's grade and
+  airlight toward a second row as its acts go by, over about six seconds, in
+  seven chapters. Monte Carlo gets later; Sơn Đoòng gets darker and mistier as
+  you go in; Venice goes flat and silver as the water comes up; Reykjavík walks
+  out of a lit town onto an empty lava field under an aurora.
+
+**Four things that were not what the roadmap said.**
+
+1. **There are no five one-person chapters.** Measured first: the smallest cast
+   in the game is six and the largest is thirteen, and the only two chapters
+   with no `locals` at all are the two with a `humans` cast instead. That line
+   was written against a state P5 had already fixed. What is true is bigger:
+   every one of a hundred and fifty people was doing nothing at all.
+2. **The train was already off the line.** Hanoi's horn and Kyoto's bell were
+   both already positional through their chapters' own cue helpers; what had no
+   source was the AMBIENT ladder over the top of them, which is what
+   `sysAMB_AT` is.
+3. **Eleven chapters must not get an act light, and four of them for a reason
+   that would have broken something.** Göreme runs its own clock and sunrise,
+   Marrakech its own dusk and storm, Palawan's second act is underwater where
+   the dive owns the grade, and the Pantanal turns over into its own evening —
+   a delta on top of any of those is two writers on one look. The other seven
+   chapters' acts are about place and not about time.
+4. **A chapter that builds its `addLocal` call field by field drops anything
+   new you put in its table.** The Drift does, so two beats were dropped in
+   silence and read exactly like a system that does not work.
+
+**Measured.** 19/19 hung things planted; the air moves them 0.009 to 0.464 rad
+over eight seconds, one wheek 0.087 to 0.486, and walking through one 0.77.
+Forty-three people with a job in seventeen chapters, and 174 completed strokes
+over a 45 s park in each. Forty ambient anchors, 40 of 40 resolving to a point.
+The act light walks 0 → 0.496 → 0.996 across three movements, and the corners
+of Monte Carlo move 7.6 of 255 between its first act and its last, Sơn Đoòng's
+16.9. R10 soak: 19 rows, 0 NaN, no console errors, no orphaned bodies.
+
+**One inverted sign, three times.** The bob of a group rotated by (ax, az) sits
+at (+len·sin az, −len·cos, −len·sin ax), so +X wants az up and +Z wants ax
+down. Written the intuitive way round, the wind, the wheek and the contact were
+all exactly inverted and all of them self-consistently: the lantern leaned into
+the wind and swung towards whatever shouted at it, smoothly, and looked like a
+feature.
+
+---
+
+## The shelf — sized, not scheduled
 
 **D8 — the body, second half** (area 2, ~12 h). The climb pose on
 `capyClingT`; the condor hang (flail 1.2 s, then trailing legs and a slow

@@ -5465,6 +5465,8 @@ function quayBuild(game) {
     game.addLocal({ biome: 'quay', x: quayCHIPS.x + 1.5, y: quayWATER_Y + 1.125,
       z: quayCHIPS.z + 1.6, near: 8, face: Math.PI,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth6 },
+      // the fryer basket, every few seconds
+      beat: { kind: 'work', every: 6.5, dur: 0.8, sfx: 'rustle', volume: 0.11, pitch: 1.35 },
       lines: ['Chips are two minutes. They are always two minutes.',
               { t: 'Do not feed the seagulls. Do not even look at them.', before: 'manly-pine' },
               { t: 'You came the whole way across for chips. Respect.', after: 'manly-voyage' },
@@ -5498,6 +5500,8 @@ function quayBuild(game) {
     game.addLocal({ biome: 'quay', x: quayWHARF_X[0] - 1.4, y: quayWHARF_Y + 0.07, z: -3.0,
       near: 6, face: Math.PI,
       figure: { shirt: PALETTE.cloth5, hat: PALETTE.khaki },
+      // four hours on a rail and nothing on the line
+      beat: { kind: 'rock', every: 7.5, dur: 2.4 },
       lines: ['Yellowtail, mostly. Sometimes a bream that has made a mistake.',
               'Been coming here since before the tunnel. Water is cleaner now.',
               'You will scare them. …ah, they were not biting anyway.',
@@ -5514,6 +5518,8 @@ function quayBuild(game) {
     // the busker under the arcade, who is the reason the concourse has a sound
     game.addLocal({ biome: 'quay', x: 34, y: 0.20, z: quayAPRON_Z1 - 3.4, near: 7, face: -0.4,
       figure: { shirt: PALETTE.cloth7, hat: PALETTE.hair1 },
+      // the busker, and he never stops
+      beat: { kind: 'work', every: 4.2, dur: 0.9, sfx: 'strum', volume: 0.13 },
       lines: ['Four hours a day, six days. The acoustics under here are free.',
               'Everybody stops for the last eight bars and nobody stops for the first.',
               'You are the second capybara this month. The first one had a hat.',

@@ -4744,6 +4744,120 @@ function _bMerger() {
   return M;
 }
 
+// ===========================================================================
+// SOMETHING ON A STRING — hangThing().
+//
+// The five shapes the pendulum in props.js is given to swing (see THINGS THAT
+// HANG). One builder, one merged geometry per call, one draw call each, and
+// the CONTRACT IS THE ORIGIN: everything is built hanging in local -Y from
+// (0, 0, 0), because props.js writes rotation.x/z on the group it is handed
+// and a pendulum whose pivot is not its origin swings like a thrown brick.
+//
+// There is no rope drawn above y = 0 either: whatever the caller hangs this
+// from is already there and a second cord over the top of it is z-fighting.
+//
+// Five shapes, and they are five because that is how many kinds of hanging
+// thing there turn out to be in nineteen places: something that rings,
+// something that glows, something that says a word, a row of small things on a
+// line, and a piece of cloth that shows you the wind. Anything else is one of
+// those with a different colour on it.
+export const HANG_KINDS = ['chime', 'lantern', 'sign', 'strand', 'sock'];
+
+/**
+ * @param kind one of HANG_KINDS
+ * @param o    { a, b, c, len }  three colours and how far down it reaches.
+ *             `a` is the body, `b` the trim, `c` the cord/fittings.
+ * @returns    a Group with ONE child mesh, origin at the pivot.
+ */
+export function hangThing(kind, o) {
+  const a = (o && o.a) || PALETTE.wood;
+  const b = (o && o.b) || PALETTE.gold;
+  const c = (o && o.c) || PALETTE.woodDark;
+  const len = (o && o.len > 0.15) ? o.len : 0.55;
+  const M = _bMerger();
+  const cord = 0.028;
+  if (kind === 'chime') {
+    // A cap, and five tubes of four different lengths under it. The odd count
+    // and the uneven lengths are the whole of why it reads as a chime and not
+    // as a bundle of dowel.
+    const drop = len * 0.30;
+    M.box(0, -drop * 0.5, 0, cord, drop, cord, c);
+    M.box(0, -drop, 0, 0.20, 0.035, 0.20, b);
+    const tn = 5;
+    for (let i = 0; i < tn; i++) {
+      const ang = (i / tn) * 6.283185;
+      const rr = 0.075;
+      const tl = len * (0.44 + ((i * 3) % 4) * 0.09);
+      M.box(Math.cos(ang) * rr, -drop - tl * 0.5 - 0.02, Math.sin(ang) * rr,
+            0.032, tl, 0.032, i % 2 ? b : a);
+    }
+    // the sail, which is what a chime actually catches the air with
+    M.box(0, -len * 0.94, 0, 0.14, 0.16, 0.012, a);
+  } else if (kind === 'lantern') {
+    const drop = len * 0.16;
+    const h = len * 0.62;
+    M.box(0, -drop * 0.5, 0, cord, drop, cord, c);
+    M.box(0, -drop - 0.02, 0, 0.20, 0.05, 0.20, c);            // the cap
+    // Four ribs and a belly: an octagon costs eight boxes and reads no
+    // better than four at the six metres this game is played at.
+    M.box(0, -drop - h * 0.5 - 0.04, 0, 0.26, h, 0.26, a);
+    M.box(0, -drop - h * 0.5 - 0.04, 0, 0.28, h * 0.24, 0.28, b);
+    M.box(0, -drop - h - 0.06, 0, 0.16, 0.04, 0.16, c);        // the base
+    const tas = len - drop - h - 0.10;
+    if (tas > 0.04) M.box(0, -drop - h - 0.08 - tas * 0.5, 0, 0.05, tas, 0.05, b);
+  } else if (kind === 'sign') {
+    // Two short chains and a board, hung EDGE ON to its own swing: a shop sign
+    // is a plate and the whole point of one is that it turns.
+    const drop = len * 0.22;
+    for (let s = -1; s <= 1; s += 2) {
+      M.box(s * 0.16, -drop * 0.5, 0, cord, drop, cord, c);
+    }
+    const h = len - drop - 0.02;
+    M.box(0, -drop - h * 0.5, 0, 0.46, h, 0.05, a);
+    M.box(0, -drop - h * 0.5, 0.032, 0.40, h * 0.72, 0.012, b);
+    M.box(0, -drop - 0.02, 0, 0.50, 0.04, 0.07, c);
+  } else if (kind === 'sock') {
+    // A pennant: a sleeve that gets narrower, with a band round the mouth. It
+    // hangs limp and lifts on the swing, which is the honest way to draw a
+    // windsock without a cloth simulation.
+    const drop = len * 0.12;
+    M.box(0, -drop * 0.5, 0, cord, drop, cord, c);
+    M.box(0, -drop - 0.03, 0, 0.20, 0.05, 0.20, c);
+    const seg = 4;
+    const sl = (len - drop - 0.06) / seg;
+    for (let i = 0; i < seg; i++) {
+      const w = 0.19 - i * 0.035;
+      M.box(0, -drop - 0.06 - sl * (i + 0.5), 0, w, sl * 0.98, w, i % 2 ? a : b);
+    }
+  } else {
+    // 'strand' — a row of small things on a line, and the one kind that is
+    // built to be walked through: it reaches nearly the whole way down.
+    const n = 7;
+    const step = len / (n + 0.6);
+    M.box(0, -0.02, 0, cord * 1.4, 0.05, cord * 1.4, c);
+    for (let i = 0; i < n; i++) {
+      const y = -0.06 - step * i;
+      const w = 0.075 - (i % 3) * 0.012;
+      M.box(0, y - step * 0.5, 0, cord, step, cord, c);
+      M.box(0, y - step, 0, w, w * 0.9, w * 0.55, i % 3 === 1 ? b : a);
+    }
+  }
+  const g = M.build();
+  const mesh = new THREE.Mesh(g, mat(0xffffff, { vertexColors: true }));
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  // THE YAW GOES ON THE CHILD, not on the group. props.js writes rotation.x and
+  // rotation.z on the group to swing it, and a yaw on that same object would
+  // put those two angles in the object's own turned frame — so a sign facing
+  // north-east would swing north-east, which is not what a thing on a string
+  // does. One node of indirection, and the two rotations cannot interfere.
+  mesh.rotation.y = (o && o.yaw) || 0;
+  const grp = new THREE.Group();
+  grp.add(mesh);
+  return grp;
+}
+
+
 /**
  * BUILD ONE. Local space: the face looks down +Z and the foot sits at y = 0, so
  * the caller places it with position and rotation.y and nothing else.
