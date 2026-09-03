@@ -3343,6 +3343,66 @@ reports a silent frame against a frame that is not silent. `game.hud.uiSfxAudit(
 is the counter it needs.
 
 
+## THE NINETEEN-CHAPTER CHECK — D7 AND D8, EVERYWHERE (3 Sep 2026)
+
+D7 and D8 were each measured where they were *built*: the hang in Sơn Đoòng and
+Sydney, the flock in the piazza, the beat in Kyoto, the act light in Monaco, the
+gesture in Sydney, the herd in the Pantanal. Almost every named bug in this
+repository's history is the same shape — **a system verified in one chapter and
+dead in eighteen** — so this asks all six questions of all nineteen.
+
+Instruments: `qa/d10-cover.js` (six channels × 19 chapters, ten seconds each),
+`qa/d10-hang2.js` (the same pendulum measured from six metres instead of from
+the spawn), `qa/d10-clear.js` (does anything hang through the floor).
+
+**Nothing is dead.** Every hung thing swings, every registered flock answers,
+every chapter with a beat runs one, all seven act-light rows apply and every
+anchored ambient voice in the table resolves — 40 of 40, in all 17 chapters that
+have any. No chapter reported an error over the sweep.
+
+### ...but two instruments said otherwise, and both were fixed
+
+**`hangAudit` could not tell a dead pendulum from a distant one.** The first
+sweep stood at each chapter's spawn and **eleven of nineteen read 0.0000** —
+including Marrakech under 3.6 units of wind, and the Quay under 3.1. That is
+`physHANG_FAR` doing exactly its job: 70 m, and an exit board is rarely within
+70 m of the door you arrived by. Göreme's is **122.2 m** away. Standing six
+metres from each one instead, all nineteen swing on their own weather (0.0095 –
+0.7236 rad) and all nineteen answer a shout (0.0681 – 0.4848), Sơn Đoòng's chime
+included: `wind: 0` inside a mountain is correct, and 0.0927 rad off a wheek is
+the whole argument for the feature.
+
+The audit now reports `d` and `far` alongside `asleep`, because those three
+together are the difference between "this is broken" and "you are standing 122
+metres away".
+
+**`flockDebug` reported a legitimate registration as an empty one.** Göreme
+offers the *scare* channel alone — its four hundred cliff pigeons are a single
+scalar `gorPigeonOut`, not four hundred records, so there is nothing for
+`count`, `at` and `put` to address. That read as `n: 0`, which is
+indistinguishable from a chapter whose birds have gone. It reports `scareOnly`
+now.
+
+### Nothing hangs through the floor
+
+Clearance is `topY − 0.10 − len` over the door's own measured floor, and it had
+never been checked. All nineteen are positive; the minimum is **0.55 m**
+(Göreme). The four tightest — Göreme 0.55, Pasto 0.61, Cali 0.64, Hanoi 0.69 —
+are four of the five **strands**, which are the ones deliberately long enough to
+walk through, so a bottom edge at a capybara's head is the specification rather
+than a fault. The other fourteen clear a standing capybara by 0.96 m to 2.02 m.
+
+### And two negative results worth writing down
+
+- **Only three carriers exist.** `carriedBy` is written in exactly three places
+  — `condor.js`, `npc.js`, `palawan.js` — and D8 wired a `hold` on all three, so
+  there is no fourth carrier still drawing the gardener's flail. The manta bug
+  was the only one of its kind.
+- **Sydney and Pasto have no beats and no anchored ambience, and that is not a
+  gap in the table.** `beatAudit` walks `locals`, and those two chapters have
+  none: their people are the instanced rosters. Giving a roster person a job is
+  a different rig, not a missing row.
+
 ## THE BODY, SECOND HALF — D8 (3 Sep 2026)
 
 Area 2's five remaining items, and every one of them is a channel that was

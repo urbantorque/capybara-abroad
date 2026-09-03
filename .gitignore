@@ -13,3 +13,10 @@ node_modules/
 # the author's disk; they are simply not the repository's problem. See
 # REVIEW-2026-08-31.md.
 qa/**/*.png
+
+# Scratch that reached the root and dodged `qa/**/*.png` by not being in qa/.
+# Same call as the hero shots above: a 120 KB screenshot from 24 Aug and a
+# P6 duplicate-finder named `.tmp` are on the author's disk and are not the
+# repository's problem. Nothing in the tree referenced either.
+dp-top.png
+*.tmp.cjs

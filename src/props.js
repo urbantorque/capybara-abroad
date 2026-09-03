@@ -5306,16 +5306,28 @@ function physHangStep(dt, live) {
 function physHangAudit() {
   const live = physLiveBiome();
   const air = physAirNow();
+  const cp = physGame.capy && physGame.capy.position;
   const out = { biome: live, air: +Math.sqrt(air.x * air.x + air.z * air.z).toFixed(3),
                 total: physHangs.length, here: 0, rows: [] };
   for (let i = 0; i < physHangs.length; i++) {
     const h = physHangs[i];
     if (h.biome !== live) continue;
     out.here++;
+    // THE DISTANCE AND THE CULL, because without them this audit cannot tell a
+    // dead pendulum from a working one you are standing too far away from.
+    // physHangStep skips anything past physHANG_FAR and zeroes it on the way
+    // out, so a sweep taken at the nineteen chapter SPAWNS reads 0.0000 in
+    // eleven of them and looks like a system that was never wired. It is
+    // wired; an exit board is simply not near the door you arrived by.
+    // Measured 3 Sep 2026, from six metres: all nineteen swing on their own
+    // weather and all nineteen answer a shout. See qa/d10-hang2.js.
+    const d = cp ? Math.hypot(h.x - cp.x, h.z - cp.z) : null;
     out.rows.push({ x: +h.x.toFixed(1), y: +h.y.toFixed(1), z: +h.z.toFixed(1),
                     len: h.len, wind: h.wind, voice: h.voice.key,
                     a: +(Math.abs(h.ax) + Math.abs(h.az)).toFixed(4),
                     v: +(Math.abs(h.vx) + Math.abs(h.vz)).toFixed(4),
+                    d: d === null ? null : +d.toFixed(1),
+                    far: d !== null && d > physHANG_FAR,
                     asleep: h.asleep });
   }
   return out;

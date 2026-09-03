@@ -25232,7 +25232,14 @@ export function createSystems(game) {
     for (let k = 0; k < flockKinds.length; k++) {
       const r = flockKinds[k];
       if (r.biome !== live) continue;
+      // `n: 0` USED TO MEAN TWO DIFFERENT THINGS, and one of them is fine.
+      // A chapter may register the SCARE channel alone — Göreme's four hundred
+      // cliff pigeons are a single scalar `gorPigeonOut`, not four hundred
+      // records, so there is nothing for `count`, `at` and `put` to address.
+      // That is a legitimate registration and it read as a dead one in the
+      // 3 Sep sweep. `scareOnly` says which it is.
       out.kinds.push({ kind: r.kind, n: r.count ? r.count() : 0,
+                       scareOnly: !r.count,
                        canScare: !!r.scare, canFeed: !!(r.at && r.put),
                        scares: r.scares, puts: r.puts, pecks: r.pecks, lands: r.lands,
                        food: r.food ? r.food.name || r.food.type : null,
