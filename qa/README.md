@@ -131,3 +131,15 @@ feature as dead:
 2. **Count the event, not a symptom.** The flinch spring is driven by a dozen
    things; subscribing to `npc:barge` is the only reading that cannot be
    confused by something else in the chapter reacting at the same moment.
+
+D4 added one:
+
+| file | what it answers |
+|---|---|
+| `d4-payoff.js` | the freeze on a marquee and a chapter close, the shake at five distances, the landing dip at five descent speeds, and the ceremony's own camera |
+
+**Sample `game.state.timeScale`, never `game.time.slow`.** `slow` is the
+slow-motion component alone — the lens leans in on it and a hitstop must not
+narrow the lens, so a freeze does not appear in it at all. The first run of
+`d4-payoff.js` read the marquee's existing slow motion and would have reported
+a missing feature as present.

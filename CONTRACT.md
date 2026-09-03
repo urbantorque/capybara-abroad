@@ -3058,6 +3058,121 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
 
+## THE PAYOFF — D4 (3 Sep 2026)
+
+The fourth batch of `ROADMAP-DELIGHT.md`, and the last of its scheduled four.
+Everything here is a wire between two things that already existed. Instrument:
+`qa/d4-payoff.js`, plus `game.shakeNow()` and `game.camDip()`.
+
+### The two events the comment names did not freeze
+
+`sysPUNCH_MIN` is a FRACTION of `sysSHAKE_MAX`, so the floor in the units
+callers actually pass is 0.187 — and the paragraph above it says "a chapter's
+marquee (0.14) and a ceremony (0.18) do stop the world". 0.14 is m = 0.41 and
+0.18 is m = 0.53. Neither cleared it. **The only thing in nineteen chapters
+that has ever stopped the world is Hanoi's passing train at 0.32.**
+
+The floor is NOT lowered — it was tuned against the bin cascade, which is
+several impacts a second in a busy market, and 0.53 would put a stutter under
+every third crate. `punch(a, freeze)` takes a NUMBER now: an explicit hold in
+seconds that bypasses the threshold, so the two events that deserve a freeze
+are known by name at the call site rather than by being loud enough.
+`chapterCeremony` asks for 60 ms, the `wow` branch for 40. Every existing
+`punch(x)` and `punch(x, false)` means exactly what it meant.
+
+Measured at 120 Hz through a whole chapter, one task at a time: `opera-stage`
+(Sydney's marquee) and the ceremony after `whippy-run` both reach
+**timeScale 0.10**, seven frames of it on the ceremony. Before this batch,
+neither had a sub-1.0 sample.
+
+**The probe had to be corrected first, and it is the interesting part.**
+`game.time.slow` is the SLOW-MOTION component only — the lens leans in on it
+and a hitstop must not narrow the lens, so a freeze does not appear in it at
+all. The first run read the marquee's existing slow motion (min 0.55 for 960 ms)
+and would have reported a missing feature as present. `game.state.timeScale` is
+the total.
+
+### A bang had no place, and it is not the camera that decides
+
+`prop:impact` punched on any prop over 4.5 m/s **anywhere in the world**, so a
+crate cascade behind a building shook the lens and rumbled the pad of a player
+who could not see it. The sound had been spatialised for eighteen versions; the
+picture never was.
+
+`punchAt(a, x, z, r)` is `punch(a * clamp(1 - d/r, 0, 1)²)` — squared, because
+a linear falloff is still audible at three quarters of the reach and this has to
+be silent at the rim or it is the same bug with a bigger number. `prop:impact`
+at 22 m, `prop:water` at 30 m (that channel had no lens response at all;
+`sysPUNCH_SPLASH` is a third of a bin going over).
+
+**Measured from the CAMERA, every reading came back zero.** The resting boom is
+9.5 to 12 m BEHIND the subject, so a crate five metres in front of the animal is
+fifteen from the eye and had already fallen under `sysSHAKE_MIN` before it got
+there. "Near me" is a fact about the animal, which is also what the frame is
+composed around. From the animal, a 9 m/s impact reads 0.029 at 5 m and nothing
+at 12 — the reach scales with the size of the bang, which is the right shape:
+a hard one still carries.
+
+### The most repeated verb in the game had no lens response
+
+`capy:land` had exactly one listener — props.js's dust — and fired only past
+5.5 m/s of descent because that listener is the only thing that had ever wanted
+it. The event now fires on EVERY landing and the old threshold moved onto the
+payload as `dust`, so each listener decides for itself. The skid, which borrows
+this event for a puff and is not a fall at all, sets it true at a `fall` of 3.
+
+`camDip` is the `fovKick` integrator one term over: critically damped at k=190
+(ω 13.8 rad/s), seeded on the VELOCITY rather than the position, because
+writing the displacement directly is a pop and the whole point of a spring is
+the approach.
+
+**It moves the look target, not the eye.** Dropping the eye would go through
+the two ground-clearance clamps thirty lines up and fight them; dropping what
+the lens is pointed at pitches the frame down and back, which is the same
+gesture and cannot interact with anything. Through a scratch vector, not by
+writing `sysLook.y`, which is damped toward its target every frame and would
+hold a write for a second.
+
+| descent | drop | pitch | settled |
+|---|---|---|---|
+| 4.0 m/s | 0 | 0.0° | — |
+| 6.0 m/s (a flat hop) | 0 | **0.0°** | — |
+| 8.0 m/s | 0.162 m | 1.0° | 296 ms |
+| 10.8 m/s (a 6 m fall) | 0.468 m | **2.8°** | 312 ms |
+| 16.0 m/s | 0.790 m | 4.8° | 320 ms |
+
+`sysDIP_V0` is 6.5 m/s because a flat hop lands at about 6.3: an ordinary hop
+is untouched and a hop off SOMETHING dips. **`sysDIP_K` is measured, not
+solved** — the seed aims at `v/(ω·e)`, the closed form for a critically damped
+spring started at rest, and the semi-implicit integration this file uses
+everywhere damps harder than that, so the rig draws 57 % of what the algebra
+promises.
+
+### The ceremony was ten seconds of paper with the lens parked
+
+The card, the lift, the sting, the cheer and two bursts of confetti, and the
+camera sat exactly where it had been for the last hour. The rig can already do
+better: `frameShot` lerps distance, pitch and raise on `shotW`, yields to the
+player's hand in a third of a second and expires on its own envelope. It had
+nineteen obvious callers and none of them.
+
+A pull-back and a flatter lens: 9.5 → **15.5 m** measured, 41° → 19°, the look
+target two metres above the animal. That puts the PLACE in the frame rather
+than the animal, which is the right subject for a card that says you have
+finished it — in Sydney the frame gains the sails, the bridge and the harbour.
+
+And `chapter:done` is a new event, because nothing in `npc.js` listened for a
+chapter closing: the one moment in an eight-hour game when the place you have
+been annoying for an hour has a reason to look at you. Everybody within 30 m
+turns to face the animal for three seconds — **11 people, measured** — on the
+head aim that has been there since P5. Attention and nothing else, the same
+discipline `npcCastWitnessAt` takes: nobody moves, nobody speaks, no state
+machine is entered, no wariness is written. Thirty metres is wider than any
+other look in the file (a witness chain is 20, a reaction is 13) because this is
+not a bang somebody heard, it is a room noticing. Locals take `chatYaw`/`chatT`
+and not the flinch spring — driving that here would make a whole square jump at
+the moment the game is congratulating you.
+
 ## THE WORLD ANSWERS — D3 (3 Sep 2026)
 
 The third batch of `ROADMAP-DELIGHT.md`. Instrument: `game.reactAudit()` and

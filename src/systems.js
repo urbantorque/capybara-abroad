@@ -584,6 +584,39 @@ const sysFOV_EPS     = 0.03;   // degrees of change worth rebuilding the project
 const sysPUNCH_MIN   = 0.55;   // fraction of the shake cap below which nothing freezes
 const sysPUNCH_HOLD  = 0.055;  // s of freeze at a full-magnitude event
 const sysPUNCH_SCALE = 0.10;   // how close to stopped
+// ---- ...AND THE TWO EVENTS THE PARAGRAPH ABOVE NAMES ASK EXPLICITLY (D4) ---
+// They did not clear the floor — see the note inside punch(). A ceremony is
+// nineteen events in an eight-hour game and a marquee is one per chapter, so
+// they are named at the call site rather than measured. 60 ms and 40 ms: three
+// and a half frames, and two and a half.
+const sysFREEZE_DONE = 0.060;  // s — a chapter closing
+const sysFREEZE_WOW  = 0.040;  // s — the one moment the chapter is for
+// How far a bang carries to the LENS. The sound has been spatialised for
+// eighteen versions; the picture never was. See punchAt.
+const sysPUNCH_R_HIT = 22;     // m — a little past the far edge of the frame
+const sysPUNCH_R_WET = 30;     // m — a splash is heard, and felt, further
+const sysPUNCH_SPLASH = 0.045; // ...and it is a third of a bin going over
+// ---- THE LANDING DIP (D4) --------------------------------------------------
+// Critically damped: c = 2*sqrt(k). At k = 190 that is omega 13.8 rad/s, which
+// puts the peak about 70 ms after the impact and the whole thing back inside
+// 0.45 s — long enough to read as weight, short enough not to be a camera move.
+const sysDIP_SPRING = 190;
+const sysDIP_OMEGA  = 13.784;  // sqrt(sysDIP_SPRING)
+const sysDIP_DAMP   = 27.568;  // 2 * omega
+const sysDIP_V0     = 6.5;     // m/s of descent below which nothing happens
+const sysDIP_K      = 0.19;    // metres of look-target drop per m/s over it.
+const sysDIP_MAX    = 1.40;    // ...and the cap, which is about eight degrees
+// sysDIP_K IS MEASURED, NOT SOLVED. The seed below aims at a peak of
+// v/(omega*e), which is the closed form for a critically damped spring started
+// at rest — and the semi-implicit integration this file uses everywhere damps
+// harder than that, so the rig draws 57 per cent of what the algebra promises.
+// 0.19 puts a six-metre drop (10.8 m/s) at 2.8 degrees of pitch, which is the
+// middle of the 2-4 the batch was aiming at.
+// ---- THE CEREMONY'S SHOT (D4). See chapterCeremony. ------------------------
+const sysDONE_DOLLY = 6.0;     // m back from the resting boom
+const sysDONE_PITCH = 0.34;    // rad — 19 degrees against the resting 41
+const sysDONE_RAISE = 2.0;     // m above the animal the look target goes
+const sysDONE_HOLD  = 3.4;     // s at full weight, under a card that is up for ten
 // The marquee beat. Long enough to register as deliberate, short enough that
 // nobody has time to try to steer out of it. Only `wow` may ask.
 const sysWOW_SLOW    = 0.55;
@@ -19651,7 +19684,9 @@ export function createSystems(game) {
       // the type is sized for. The task text is a sentence and would be 60 px of
       // wrapped headline in the other order.
       showPlace(wow, r.def ? r.def.text : id);
-      punch(0.14);
+      // EXPLICIT (D4). 0.14 is m = 0.41 against a floor of 0.55, so the marquee
+      // the whole chapter is built round has never once stopped the world.
+      punch(0.14, sysFREEZE_WOW);
       // THE ONE MOMENT THE CHAPTER IS FOR gets the fourth channel. The banner,
       // the lift, the crowd and the paper all say "that was the big one" AFTER
       // the fact — the beat is the only one of the five that says it while it
@@ -20020,7 +20055,34 @@ export function createSystems(game) {
     // moment deserves and the one it was reaching for.
     confettiAt(0.6, sysCONF_MAX);
     setTimeout(function () { confettiAt(0.6, sysCONF_MAX); }, sysCONF_REFILL);
-    punch(0.18);
+    // EXPLICIT (D4), and it is the one place in the game a freeze is exactly
+    // right: the card is up, the score has lifted, the confetti is airborne and
+    // nothing is asking the player to steer. 0.18 is m = 0.53 against a floor
+    // of 0.55, so a chapter closing has never stopped the world either.
+    punch(0.18, sysFREEZE_DONE);
+    // ---- AND THE CAMERA DOES SOMETHING (D4) -------------------------------
+    // The ceremony was ten seconds of paper and audio: the card, the lift, the
+    // sting, the cheer, two bursts of confetti — and the lens sat exactly where
+    // it had been for the last hour. The biggest moment in a chapter has to be
+    // the biggest thing the camera does in it, and the rig can already do this:
+    // `frameShot` lerps distance, pitch and raise on `shotW`, yields to the
+    // player's hand in a third of a second, and expires on its own envelope.
+    // Nothing new is built; the channel simply had nineteen obvious callers
+    // that never used it.
+    //
+    // A PULL-BACK, and a flatter lens. The resting rig is 9.5 m at 41 degrees
+    // looking slightly down at an animal in the near third of the frame; this
+    // steps back to 15.5 and lifts the look to the animal's shoulder height
+    // plus two, which puts the PLACE in the frame rather than the animal — the
+    // right subject for a card that says you have finished it.
+    if (typeof game.frameShot === 'function') {
+      game.frameShot({ dist: sysCAM_DEF + sysDONE_DOLLY, pitch: sysDONE_PITCH,
+                       raise: sysDONE_RAISE, hold: sysDONE_HOLD });
+    }
+    // ...AND THE PEOPLE LOOK UP. npc.js answers this; nothing in that module
+    // listened for a chapter closing, and the head aim it needs has been there
+    // since P5.
+    game.events.emit('chapter:done', { chapter: n, name: def && def.biome });
     saveSoon();
     // ---- AND THEN WHAT ----------------------------------------------------
     // The ceremony was a full stop. It said what you had done, how long it took
@@ -20194,6 +20256,24 @@ export function createSystems(game) {
   let fovSpeed = 0;              // damped, 0..1 of the live rig's reference speed
   let fovKick = 0, fovKickV = 0; // the punch spring, in degrees
   let fovLast = sysFOV_BASE;
+  // ---- THE LANDING DIP (D4). Metres the look target drops, and its rate. ---
+  let camDip = 0, camDipV = 0;
+  // `capy:land` carries `fall` as a DESCENT SPEED, not a height — the dust and
+  // the ring both read it that way. A flat hop lands at about 6.3 m/s, so the
+  // floor is just above that: the ordinary hop is untouched and a hop off
+  // something, or a real fall, dips. Measured against the resting boom, where
+  // the look point is about nine and a half metres from the eye, so a metre of
+  // drop is six degrees of pitch.
+  game.events.on('capy:land', function (e) {
+    const f = (e && e.fall) || 0;
+    if (f <= sysDIP_V0 || sysCalmOn()) return;
+    const peak = clamp((f - sysDIP_V0) * sysDIP_K, 0, sysDIP_MAX);
+    // Seeded on the VELOCITY, not the position: writing the displacement
+    // directly is a pop, and the whole point of a spring is the approach. For
+    // a critically damped spring started at rest the peak is v/(omega*e), so
+    // this is the seed that reaches `peak` and no more.
+    camDipV -= peak * sysDIP_OMEGA * Math.E;
+  });
 
   function shake(a) {
     if (!(a > sysSHAKE_MIN)) return;
@@ -20226,9 +20306,58 @@ export function createSystems(game) {
     if (!sysCalmOn()) fovKickV += sysFOV_KICK_D * m * 12;
     // The fourth channel, and the only one the player feels in their hands.
     padRumble(a);
+    // ---- ...AND THE TWO EVENTS THE COMMENT ABOVE NAMES DID NOT FREEZE (D4)
+    //
+    // "A chapter's marquee (0.14) and a ceremony (0.18) do." Arithmetic:
+    // sysPUNCH_MIN is a FRACTION of sysSHAKE_MAX (0.34), so the floor in the
+    // units callers actually pass is 0.187 — and 0.14 gives m = 0.41 and 0.18
+    // gives m = 0.53. Both under it. The only thing in nineteen chapters that
+    // has ever stopped the world is Hanoi's passing train at 0.32.
+    //
+    // The floor is NOT lowered: it was tuned against the bin cascade, which is
+    // several impacts a second in a busy market, and dropping it to 0.53 would
+    // put a stutter under every third crate. A ceremony asks EXPLICITLY
+    // instead, in seconds, which is also the honest spelling — the two events
+    // that deserve a freeze are known by name at the call site and not by
+    // being loud enough.
+    if (typeof freeze === 'number') {
+      if (freeze > 0 && game.time) game.time.hitstop(freeze, sysPUNCH_SCALE);
+      return;
+    }
     if (freeze !== false && m > sysPUNCH_MIN && game.time) {
       game.time.hitstop(sysPUNCH_HOLD * (m - sysPUNCH_MIN) / (1 - sysPUNCH_MIN), sysPUNCH_SCALE);
     }
+  }
+  // ---- ...AND A BANG HAS A PLACE (D4) --------------------------------------
+  //
+  // `prop:impact` punched on ANY prop over 4.5 m/s anywhere in the world, so a
+  // crate cascade behind a building shook the lens and rumbled the pad of a
+  // player who could not see it. Distance is the missing term and it is one
+  // line: squared falloff to nothing at `r`, because a linear one is still
+  // audible at three quarters of the reach and this has to be silent at the
+  // rim or it is the same bug with a bigger number.
+  //
+  // Only the two prop channels are wired through it. The ~100 hand-rolled
+  // shake() sites elsewhere are a shelf item; the four that already reason
+  // about distance stay as they are, as the default's proof.
+  const sysPUNCH_AT_MIN = 0.012;   // below this it is not worth the arithmetic
+  function punchAt(a, x, z, r, freeze) {
+    if (!(a > 0)) return;
+    // FROM THE ANIMAL, NOT FROM THE LENS. Measured with the camera as the
+    // origin and every reading came back zero: the resting boom is 9.5 to 12 m
+    // BEHIND the subject, so a crate five metres in front of the capybara is
+    // fifteen from the eye and a 22 m reach had already fallen under
+    // sysSHAKE_MIN before it got there. "Near me" is a fact about the animal,
+    // which is also what the frame is composed around.
+    const cp = (game.capy && game.capy.position) || (game.camera && game.camera.position);
+    if (!cp || !(r > 0)) { punch(a, freeze); return; }
+    const dx = cp.x - x, dz = cp.z - z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d >= r) return;
+    const k = 1 - d / r;
+    const out = a * k * k;
+    if (out < sysPUNCH_AT_MIN) return;
+    punch(out, freeze);
   }
 
   /** `where` is 'sydney' (default) or 'pasto' — whichever the player picked. */
@@ -22673,6 +22802,15 @@ export function createSystems(game) {
   game.recordEnd = recordEnd;
   game.toast = toast;
   game.shake = shake;
+  /**
+   * HOW MUCH SHAKE IS LIVE, 0..sysSHAKE_MAX. Nothing in src reads it; the
+   * harness does. It exists because D4 gave `prop:impact` a distance term and
+   * "a bang forty metres away is quieter than one at five" is not a claim a
+   * screenshot can settle — it is one number sampled three times.
+   */
+  game.shakeNow = function () { return shakeAmt; };
+  /** ...and the same for the landing dip, in metres of look-target drop. */
+  game.camDip = function () { return camDip; };
   // The three channels at once. Same 0..1 magnitude shake() takes, so a caller
   // moves over by changing four letters and nothing has to be re-tuned.
   game.punch = punch;
@@ -23544,7 +23682,17 @@ export function createSystems(game) {
     const s = (p && typeof p.speed === 'number') ? p.speed : 2;
     if (s < 1.5) return;
     // Only a genuinely hard bonk earns a shake — everything softer is sfx only.
-    if (s >= sysSHAKE_HIT) punch(clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16));
+    // ...AND IT HAS TO BE NEAR ENOUGH TO SEE (D4). This punched on any prop
+    // anywhere in the world: a cascade behind a building shook the lens and
+    // rumbled the pad of a player who could not see it. The sound was already
+    // spatialised four lines down; the picture was not. 22 m is a little past
+    // the far edge of the frame at the resting boom, so a bang you can see is
+    // one you feel and one you cannot is silent.
+    if (s >= sysSHAKE_HIT) {
+      const pa = clamp((s - sysSHAKE_HIT) * 0.02, 0, 0.16);
+      if (p && p.position) punchAt(pa, p.position.x, p.position.z, sysPUNCH_R_HIT);
+      else punch(pa);
+    }
     // WHAT IT IS MADE OF, ON TOP OF HOW HARD IT WAS HIT. props.js stamps a
     // voice, a pitch and a gain onto the payload from its material table; the
     // speed-derived figures below are unchanged, so a hard hit is still louder
@@ -23573,6 +23721,12 @@ export function createSystems(game) {
     sysSpatial.at = (p && p.position) || null;
     sfx('splash', sysSpatial);
     sysSpatial.at = null;
+    // A SPLASH YOU ARE STANDING NEXT TO (D4). This channel had no lens
+    // response at all. Deliberately small and on a wide reach: at the source
+    // it is a third of a bin going over, and the squared falloff plus
+    // sysPUNCH_AT_MIN mean it is silent past about fifteen metres — which
+    // matters in the eight chapters where things go in the water all day.
+    if (p && p.position) punchAt(sysPUNCH_SPLASH, p.position.x, p.position.z, sysPUNCH_R_WET);
     // Something went in the drink, and it counts if it was yours to put there.
     const wp = p && p.prop, wb = wp && wp.body;
     if (wp && wp.disturbed && wb) {
@@ -24805,8 +24959,29 @@ export function createSystems(game) {
         camera.updateProjectionMatrix();
       }
     }
+    // ---- THE LANDING DIP (D4) ---------------------------------------------
+    // `capy:land` had exactly one listener — props.js's dust — so the most
+    // repeated verb in the game arrived with no lens response at all. This is
+    // the fovKick integrator's shape, one term over: a critically damped spring
+    // seeded on the frame of the impact and settled inside half a second.
+    //
+    // IT MOVES THE LOOK TARGET, NOT THE EYE. Dropping the eye would go through
+    // the two ground-clearance clamps thirty lines up and fight them; dropping
+    // what the lens is pointed at pitches the frame down and back, which is the
+    // same gesture and cannot interact with anything. Applied through a scratch
+    // vector rather than by writing sysLook.y, because sysLook is damped toward
+    // its target every frame and a write here would leak into that filter and
+    // take a second to come back out.
+    if (camDip !== 0 || camDipV !== 0) {
+      camDipV += (-sysDIP_SPRING * camDip - sysDIP_DAMP * camDipV) * dt;
+      camDip += camDipV * dt;
+      if (Math.abs(camDip) < 0.004 && Math.abs(camDipV) < 0.03) { camDip = 0; camDipV = 0; }
+    }
     // The look target is never shaken — only the eye moves.
-    camera.lookAt(sysLook);
+    if (camDip !== 0) {
+      sysV1.copy(sysLook); sysV1.y += camDip;
+      camera.lookAt(sysV1);
+    } else camera.lookAt(sysLook);
     game.state.chaos = damp(game.state.chaos, 0, 0.3, dt);
 
     // ---- shadows follow the capybara ----

@@ -3954,7 +3954,15 @@ export function createCapybara(game) {
         // a hard arrival kicks up dust, which is what tells you it was hard
         capyDigPayload.position = capyPosition;
         capyDigPayload.fall = fall;
-        if (fall > 5.5) game.events.emit('capy:land', capyDigPayload);
+        // ---- EVERY LANDING, NOT ONLY THE HARD ONES (D4) ------------------
+        // This fired only past 5.5 m/s of descent because its one listener was
+        // the dust, and a walk off a kerb should not throw a cloud. The lens
+        // wants the same event at a lower threshold, so the THRESHOLD moves
+        // onto the payload and each listener decides for itself: `dust` is the
+        // old gate spelled out, and the skid — which borrows this event for a
+        // puff and is not a fall at all — sets it true at a `fall` of 3.
+        capyDigPayload.dust = fall > 5.5;
+        game.events.emit('capy:land', capyDigPayload);
         // ...and the mark on the ground. Its own threshold, LOWER than the
         // dust's: a two-metre hop off a bench is worth a ring and is not
         // worth a cloud, and the whole point of the ring is that it is the
@@ -4160,8 +4168,11 @@ export function createCapybara(game) {
         if (capyPopVel > -2.4) capyPopVel = -2.4;
         capyDigPayload.position = capyPosition;
         // a SKID is not a fall: it borrows this event for the puff and must not
-        // borrow a forty-metre arrival's cloud with it.
+        // borrow a forty-metre arrival's cloud with it — nor, since D4, its dip.
+        // `fall` 3 is under sysDIP_V0 so the lens is untouched either way; the
+        // flag is what keeps the puff.
         capyDigPayload.fall = 3;
+        capyDigPayload.dust = true;
         game.events.emit('capy:land', capyDigPayload);
         capySfxOpts.volume = 0.30; capySfxOpts.pitch = 1.5;
         game.sfx('rustle', capySfxOpts);

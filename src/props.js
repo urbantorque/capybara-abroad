@@ -1455,6 +1455,10 @@ export function createProps(game) {
   // A hard landing throws up whatever it lands on. capybara.js only fires this
   // past 5.5 m/s of descent, so a walk off a kerb costs nothing.
   game.events.on('capy:land', function (e) {
+    // D4: the event now fires on EVERY landing so the lens can answer it, and
+    // the old `fall > 5.5` gate came with it on the payload. A walk off a kerb
+    // still costs nothing.
+    if (e && e.dust === false) return;
     const p = e && e.position;
     // ...and how MUCH of it is how hard it was. Six particles for every
     // landing meant a step off a crate and a forty-metre arrival threw the

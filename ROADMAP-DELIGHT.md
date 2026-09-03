@@ -427,6 +427,31 @@ the counter; skip the kick when `flV` would cross a prop.
 
 ### Batch D4 — the payoff the code promises (area 4)
 
+**LANDED 3 Sep 2026.** All four must-lands. Contract section **THE PAYOFF —
+D4**; instrument `qa/d4-payoff.js`, plus `game.shakeNow()` and `game.camDip()`.
+
+- **The freeze.** `punch(a, seconds)` — explicit, the floor untouched. The
+  marquee and the ceremony both reach **timeScale 0.10** now; neither had a
+  sub-1.0 sample before. The probe had to be fixed first: `game.time.slow` is
+  the slow-motion component only and a hitstop deliberately does not appear in
+  it, so the first run read the marquee's existing slowmo and would have
+  reported a missing feature as present.
+- **The distance term.** `punchAt`, squared falloff, `prop:impact` at 22 m and
+  `prop:water` at 30. **Measured from the camera it read zero at every range** —
+  the boom is 9.5–12 m behind the subject, so a crate five metres in front of
+  the animal is fifteen from the eye. It measures from the animal.
+- **The landing dip.** `capy:land` fires on every landing now (the old
+  `fall > 5.5` gate moved onto the payload as `dust`). A 6 m fall dips **2.8°**
+  and is back inside 312 ms; a flat hop is **0.000**, because a flat hop lands
+  at 6.3 m/s and the floor is 6.5. `sysDIP_K` is measured, not solved: the
+  semi-implicit integration draws 57 % of what the closed form promises.
+- **The ceremony.** 9.5 → **15.5 m**, 41° → 19°, and `chapter:done` turns
+  **11 people** to face the animal for three seconds. In Sydney the frame gains
+  the sails, the bridge and the harbour (`qa/d4-ceremony.png`).
+
+Spill, unchanged: the arrival dolly; the title orbit; camera roll on
+`flyT`/`capySlideW`.
+
 **Must land.**
 1. The ceremony freeze: `punch(a, { freeze })` — explicit, and the two
    ceremonial callers pass it (`chapterCeremony` 60 ms at 0.10, the `wow`

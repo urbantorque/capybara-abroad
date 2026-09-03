@@ -3076,6 +3076,54 @@ export function createNPCs(game) {
       npcWitnessChain(rec);
     }
   });
+  // ---- A CHAPTER CLOSING, AND NOBODY WAS WATCHING (D4) --------------------
+  //
+  // Nothing in this module listened for a chapter close. The one moment in an
+  // eight-hour game when the place you have been annoying for an hour has a
+  // reason to look at you, and the ceremony was paper, audio and confetti with
+  // the whole cast facing whatever they happened to be facing.
+  //
+  // ATTENTION AND NOTHING ELSE, which is the same discipline npcCastWitnessAt
+  // takes: nobody moves, nobody says anything, no state machine is entered and
+  // no wariness is written. Thirty metres is wider than any other look in the
+  // file — a witness chain is 20 and a reaction is 13 — because this is not a
+  // bang somebody heard, it is a room noticing.
+  const npcDONE_R    = 30;
+  const npcDONE_LOOK = 3.0;    // s, and it is re-asserted after the state
+                               // machines have run, exactly as witT is
+  game.events.on('chapter:done', function () {
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    const live = game.biome && game.biome.current;
+    if (!live) return;
+    const cx = capy.position.x, cz = capy.position.z;
+    const r2 = npcDONE_R * npcDONE_R;
+    let n = 0;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.group) continue;
+      const dx = cx - r.x, dz = cz - r.z;
+      if (dx * dx + dz * dz > r2) continue;
+      // `chatYaw`/`chatT` and not `flYaw`: this is a look, not a flinch, and
+      // driving the flinch spring here would make a whole square jump at the
+      // moment the game is congratulating you.
+      r.chatYaw = Math.atan2(dx, dz);
+      r.chatT = npcDONE_LOOK;
+      n++;
+    }
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (cast) for (let i = 0; i < cast.length; i++) {
+      const r = cast[i];
+      if (!r || !r.group || !r.group.visible) continue;
+      if (r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
+      const dx = cx - r.group.position.x, dz = cz - r.group.position.z;
+      if (dx * dx + dz * dz > r2) continue;
+      r.lookX = cx; r.lookZ = cz;
+      r.witX = cx; r.witZ = cz; r.witT = npcDONE_LOOK;
+      n++;
+    }
+    try { game.state.doneLook = n; } catch (e) { /* optional */ }
+  });
   game.events.on('prop:water', function (p) {
     if (!p || !p.position) return;
     // A splash is heard further than it is felt, so it is a wider circle and a
