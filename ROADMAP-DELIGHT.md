@@ -529,12 +529,33 @@ loaf and the fall; `rec.gest` read by `animHuman` so the instanced crowds
 gesture when they speak; the Pantanal herd split into body and two leg-pair
 instanced meshes.
 
-**D9 — housekeeping** (area 7, ~4 h). The `sfx()` comment (31, not eleven);
-a `nextIn` default and an audit for the six; ω×r measured on the big ship's
-turn before it is built; Pasto's three `setTimeout`s onto the frame clock; the
-flight/slide wind bed off `airspeed`; a global voice cap in `sfx()`; the README
-module table to 27; `CONTRACT.md`'s stale "seventeen"s read one by one;
-`package.json` to 0.60.0.
+**D9 — housekeeping** (area 7, ~4 h). **LANDED 3 Sep 2026**, all nine.
+Contract section **HOUSEKEEPING — D9**; instruments `qa/d9-clock.js`,
+`qa/d9-audio.js`, `qa/d9-rush.js`.
+
+- The `sfx()` comment said eleven `force: true` and there are 31. Corrected,
+  and not restated as a number.
+- **The `nextIn` audit exists**, and it found the two missing hooks: Sydney's
+  ferry and Pasto's carroza — the two OLDEST chapters, and `ferry-ride` is the
+  first task in the game that asks you to wait. Both now count down and hold at
+  0 through the window. There is no sensible "default": a window is a fact
+  about a chapter's own machinery.
+- **ω×r measured and NOT built.** Every mass-0 body big enough to stand on, in
+  seven chapters, 900 samples each: **every reading 0.000**. The decks in this
+  game translate along a path and their colliders never turn. The only mass-0
+  bodies that rotate at all are three in Monte Carlo (2.27 rad/s) and nobody
+  stands on those. Do not re-propose without a carrier that turns.
+- Pasto's three `setTimeout`s are on the frame clock.
+- **The rush bed** is the weather bed's fifth voice, off the animal's own
+  velocity: 0.831 at 23.1 m/s falling in the Drift, and 0.031 — 0.0001 of gain
+  — sprinting across a lawn. Its floor is 9.0 and 6.5 was measured as too low.
+- **The voice ceiling**: twelve starts in 165 ms, below the per-name throttle
+  and below the distance cull. One drop in the first minute of chapter one, ten
+  of twenty on a synthetic cascade.
+- README module table 13 → 27; the journal shelf's "seventeen" corrected in
+  both documents; `package.json` 0.60.0; and a note at the top of `CONTRACT.md`
+  saying how to read a number in a dated section, because most of the remaining
+  "seventeen"s are true sentences about August.
 
 ---
 

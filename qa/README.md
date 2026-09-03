@@ -143,3 +143,19 @@ slow-motion component alone — the lens leans in on it and a hitstop must not
 narrow the lens, so a freeze does not appear in it at all. The first run of
 `d4-payoff.js` read the marquee's existing slow motion and would have reported
 a missing feature as present.
+
+D9 added three:
+
+| file | what it answers |
+|---|---|
+| `d9-clock.js` | which chapters publish `nextIn` and for which of their own tasks, plus the yaw rate of every deck you can stand on |
+| `d9-audio.js` | the two new clocks counting down, the rush bed on the ground, and the voice ceiling on a cascade |
+| `d9-rush.js` | the rush bed at the top of its range, measured by walking off an island in the Drift |
+
+Two more traps, both of which had a probe reporting a live feature as dead:
+
+1. **`input.x/z` are rebuilt from the key state every frame.** A single write
+   before a loop moves the animal 0.6 m/s. Write them every tick.
+2. **The per-name throttle sits above the voice ceiling.** Ten names fired
+   three times each is not a cascade — twenty of the thirty are thrown away
+   before the ceiling ever sees them. Use distinct names.

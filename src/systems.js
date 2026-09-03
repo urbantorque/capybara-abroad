@@ -9608,6 +9608,30 @@ export function createSystems(game) {
   // =========================================================================
   let wxBedBus = null, wxBedRain = null, wxBedWind = null, wxBedChirp = null, wxBedRustle = null;
   let wxBedWindLP = null, wxBedRainBP = null;
+  // ---- THE FIFTH VOICE: AIR GOING PAST YOU (D9) ---------------------------
+  //
+  // The four above are all facts about the WEATHER — how hard it is raining
+  // where you are standing. None of them is a fact about how fast YOU are
+  // going, and this game has a minute-long condor flight, a dune slide, a
+  // forty-metre drop and a bus roof, all of which are silent. It is the same
+  // voice as `wxBedWind` one layer over: noise through a filter whose cutoff
+  // moves rather than whose level does, because moving the level is a fan
+  // being switched on and moving the cutoff is air going round something.
+  //
+  // ITS OWN GAIN NODE, and not a second writer on wxBedWind's. Two writers on
+  // one AudioParam is the trap P4 wrote down after the duck and the fader
+  // fought over the music bus for two versions.
+  let sysBedRush = null, sysBedRushBP = null, sysRushNow = 0;
+  // MEASURED, and 6.5 was not enough. A sprint is 7.4 m/s on the flat, but the
+  // gait leaves the ground between strides and the total velocity carries the
+  // bob with it: at a floor of 6.5 a capybara running across a lawn drove this
+  // to 0.073 — inaudible at k squared, and still a term that should read
+  // exactly zero. 9.0 is above anything the ground can produce.
+  const sysRUSH_V0  = 9.0;    // m/s
+  const sysRUSH_V1  = 26;     // m/s — a condor on a full glide
+  const sysRUSH_MAX = 0.115;  // ...against the rain's 0.62 and the wind's 0.50
+  const sysRUSH_F0  = 300;    // Hz at the floor
+  const sysRUSH_F1  = 1500;   // ...and flat out
   let wxDripAt = 0;
   const sysWX_BED_MAX  = 0.19;   // ceiling on the whole bus, against a 0.85 master
   const sysWX_BED_TAU  = 0.85;   // seconds. Slow: weather does not step.
@@ -9686,6 +9710,19 @@ export function createSystems(game) {
     sn.connect(shp); shp.connect(slp); slp.connect(ssway); ssway.connect(wxBedRustle);
     wxBedRustle.connect(wxBedBus);
     sn.start(); slfo.start();
+
+    // ---- the rush. See sysBedRush. Bandpass rather than the wind's lowpass:
+    // air moving PAST you has a centre to it — the note a car window makes at
+    // a crack — where weather is broadband and mostly below it.
+    sysBedRush = ac.createGain(); sysBedRush.gain.value = 0.0001;
+    const rusn = noiseWideSrc();
+    sysBedRushBP = ac.createBiquadFilter();
+    sysBedRushBP.type = 'bandpass';
+    sysBedRushBP.frequency.value = sysRUSH_F0; sysBedRushBP.Q.value = 0.62;
+    const ruhp = ac.createBiquadFilter(); ruhp.type = 'highpass'; ruhp.frequency.value = 150;
+    rusn.connect(sysBedRushBP); sysBedRushBP.connect(ruhp); ruhp.connect(sysBedRush);
+    sysBedRush.connect(wxBedBus);
+    rusn.start();
   }
 
   /** Drive the bed from weather.js's levels. Four gain writes and no more. */
@@ -9708,6 +9745,34 @@ export function createSystems(game) {
     // is the difference between a shower arriving and a volume knob turning.
     wxBedRainBP.frequency.setTargetAtTime(1250 + b.rain * 1400, t, sysWX_BED_TAU);
     wxBedWindLP.frequency.setTargetAtTime(230 + b.wind * 460, t, sysWX_BED_TAU);
+
+    // ---- ...AND HOW FAST YOU ARE GOING THROUGH IT (D9) -------------------
+    // Off the animal's own velocity, not off a rig flag: a condor glide, a
+    // dune slide, a bus roof and a forty-metre drop are four different systems
+    // and one fact. Gated on being OFF THE GROUND or sliding, because a
+    // sprint is 7.4 m/s and a capybara running across a lawn does not whistle.
+    //
+    // Silent under water on purpose — there is a whole bus down there for
+    // that, and air rushing past is the one thing that is definitely not
+    // happening.
+    if (sysBedRush) {
+      const cy = game.capy;
+      let air = 0;
+      if (playing && cy && cy.velocity && !(cy.depth > 0.05)) {
+        const off = !cy.grounded || cy.sliding || !!cy.carriedBy;
+        if (off) air = Math.sqrt(cy.velocity.x * cy.velocity.x +
+                                 cy.velocity.y * cy.velocity.y +
+                                 cy.velocity.z * cy.velocity.z);
+      }
+      const k = clamp((air - sysRUSH_V0) / (sysRUSH_V1 - sysRUSH_V0), 0, 1);
+      // squared, so the bottom of the range stays out of the way and only a
+      // genuine fall or a glide is loud
+      sysBedRush.gain.setTargetAtTime(Math.max(0.0001, k * k * sysRUSH_MAX * duck),
+                                      t, sysWX_BED_TAU * 0.5);
+      sysBedRushBP.frequency.setTargetAtTime(sysRUSH_F0 + k * (sysRUSH_F1 - sysRUSH_F0),
+                                             t, sysWX_BED_TAU * 0.5);
+      sysRushNow = k;
+    }
 
     // ---- and the drip, which is the one voice that must NOT be continuous.
     // Water coming off a roof is a discrete event with a long gap; smeared
@@ -13441,6 +13506,15 @@ export function createSystems(game) {
     corso: 4.0, roulette: 3.0, burner: 2.6, farbell: 9.0,
   };
 
+  // The voice ceiling — see the block inside sfx(). Twelve starts inside a
+  // sixth of a second is well above anything ordinary play produces (a sprint
+  // is 13 footfalls a SECOND, so about two per window) and well below the
+  // dozen-plus a bin cascade throws at once.
+  const sysVOICE_N = 16;
+  const sysVOICE_MAX = 12;
+  const sysVOICE_WIN = 0.165;
+  const sysVoiceAt = new Float64Array(sysVOICE_N);
+  let sysVoiceHead = 0, sysVoiceDrop = 0;
   function sfx(name, opts) {
     if (muted) return;
     // ---- THE WORLD IS ONLY ALLOWED TO SPEAK WHILE IT IS BEING PLAYED ------
@@ -13475,8 +13549,15 @@ export function createSystems(game) {
     // payoff can land inside somebody else's ambient cheer and be dropped
     // silently — which is the worst possible failure for the one sound in the
     // chapter that the player was owed. `force` is for that case and no other:
-    // it is never on a timer, never in an update loop, and there are eleven of
-    // them in the whole game.
+    // it is never on a timer and never in an update loop.
+    //
+    // THE COUNT IN THIS COMMENT SAID ELEVEN AND THERE ARE THIRTY-ONE (D9).
+    // `grep -c "force: true" src/*.js`: palawan 6, systems 6, sahara 4,
+    // venice 4, kowloon 3, antarctic 2, and one each in the drift, Göreme,
+    // Iceland, Kyoto, the Quay and Rio. The rule is still obeyed — every one
+    // of them is a payoff, none is on a timer — but a number in a comment is
+    // a claim, and this one had been wrong for about twelve chapters. It is
+    // not restated as a number again: what matters is the rule.
     const gap = sfxGap[name] || 0.05;
     const force = !!(opts && opts.force);
     let vol = opts && opts.volume !== undefined ? clamp(opts.volume, 0, 2) : 1;
@@ -13510,6 +13591,31 @@ export function createSystems(game) {
       pan = sysSfxPan;
     }
     if (!force && lastPlay[name] !== undefined && now - lastPlay[name] < gap) return;
+    // ---- AND A GLOBAL CEILING ON HOW MANY VOICES START AT ONCE (D9) -------
+    //
+    // Every throttle above this line is PER NAME, so twenty DIFFERENT sounds
+    // arriving in the same tenth of a second all pass. That is a real state: a
+    // bin cascade is a dozen thuds and clinks out of props.js, plus the
+    // footfall, plus whatever the ambience was about to say — and D2 raised
+    // the footfall from 10.8 to 13.1 a second at a sprint. Each voice is
+    // several oscillators, a filter and a gain, and the failure mode is not a
+    // crash, it is mud.
+    //
+    // A ring of START TIMES, not a count of live voices: the synths schedule
+    // and stop themselves and there is no registry to consult, and what makes
+    // mud is a burst of starts rather than a long tail. `force` and `ui` are
+    // exempt, because the whole point of both is that they arrive.
+    //
+    // BELOW THE THROTTLE AND BELOW THE DISTANCE CULL, on purpose: a sound
+    // about to be dropped for either reason must not spend a slot, which is
+    // the same argument the cull's own comment makes about `lastPlay`.
+    if (!force && !(opts && opts.ui)) {
+      let live = 0;
+      for (let i = 0; i < sysVOICE_N; i++) if (now - sysVoiceAt[i] < sysVOICE_WIN) live++;
+      if (live >= sysVOICE_MAX) { sysVoiceDrop++; return; }
+    }
+    sysVoiceAt[sysVoiceHead] = now;
+    sysVoiceHead = (sysVoiceHead + 1) % sysVOICE_N;
     lastPlay[name] = now;
 
     // ---- ONE SWAP, SEVENTEEN SYNTHS ---------------------------------------
@@ -23403,6 +23509,13 @@ export function createSystems(game) {
         roomSend: acRoomSend ? acRoomSend.gain.value : null,
         chase: musChaseHit,
         bass: musBassGain ? musBassGain.gain.value : null,
+        // D9: how many sfx the voice ceiling has refused this session. A cap
+        // that never fires is a cap nobody can tell is there, and one that
+        // fires in ordinary play is eating the game's own sounds — the number
+        // is the only way to know which of the two you have built.
+        voiceDrops: sysVoiceDrop,
+        // ...and the fifth bed voice, 0..1. See sysBedRush.
+        rush: sysRushNow,
       };
     },
     /**

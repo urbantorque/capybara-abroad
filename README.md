@@ -440,7 +440,8 @@ you are done here, before the line that tells you where the door is — and it i
 drawn, like the sixteen postcards, out of a dozen flat polygons in that place's own
 colours.
 
-There are seventeen slots at the top of the journal and there are always seventeen.
+There is one slot at the top of the journal for every chapter — nineteen — and
+there are always all of them.
 The ones you have not earned are drawn grey and nearly out, so you can see that there
 is a shape in the box and not what it is. A finished postcard on the title card wears
 its souvenir in the corner. And you hold one exactly when the chapter is finished,
@@ -744,13 +745,44 @@ src/cali.js         Cali: the Rio Cali, El Gato de Tejada, La Ermita, San Antoni
 src/rio.js          Rio: Copacabana and its wave pavement, Arpoador, Sugarloaf and a
                     working cable car, the Lapa arches, the Selaron steps, Santa
                     Teresa — and the avenue the bateria comes down
+src/iceland.js      Iceland: Reykjavik, the Blue Lagoon, the geyser field, the
+                    glacier tongue and the aurora
+src/sahara.js       Marrakech & the Erg: the medina, the souks, the camp, the dunes
+                    and the storm that comes over them
+src/drift.js        The Drift: floating islands, a different gravity, and the wind
+                    as a frame you are standing in
+src/venice.js       Venice: San Marco, the calli, the canals, the gondolas and the
+                    acqua alta
+src/kowloon.js      Hong Kong: Mong Kok at night, the wet market, the open-top bus,
+                    the neon and the Symphony of Lights
+src/palawan.js      Palawan: the beach, the jetty, the bangka, the reef and what is
+                    under it
+src/goreme.js       Cappadocia: the fairy chimneys, the cave hotel, the launch field
+                    and fifty balloons at dawn
+src/manly.js        Manly: the ocean beach, the flags, the promenade, the Norfolk
+                    pines and the swell
+src/pantanal.js     The Pantanal: the river, the raft, the herd and the sundown
+src/cave.js         Son Doong: the passage, the doline, the phytokarst, the camp and
+                    the dark between them
+src/antarctic.js    Antarctica: the ice shelf, the floes, the colony, the ship and
+                    the orca
+src/monaco.js       Monte Carlo: the port, the yachts, the circuit, the casino and
+                    the band
+src/hanoi.js        Hanoi: the Old Quarter, the traffic as a medium, the train street
+                    and Long Bien
+src/weather.js      biome-neutral micro-weather: rain, wind, gusts, wetness
 src/props.js        cannon world + 30 prop types, grab/throw, buoyancy, stall collapse
 src/capybara.js     mesh, rig, movement, grab/dig/wheek/swim
 src/condor.js       condor mesh, summon, talon mount, aerodynamics, thermals
-src/npc.js          Sydney tourists/gardeners/ibis and Pasto vendors/abuelas/llamas — FSMs
+src/npc.js          two instanced casts, ~30 hand-built locals, the reaction layer
 src/systems.js      lighting, cameras, input, HUD, WebAudio synth, biome transitions
-qa/                 screenshots captured during live browser QA
+qa/                 the live probes (see qa/README.md) and the sediment of forty
+                    batches of one-shot ones
 ```
+
+That is all twenty-seven of them. The nineteen chapter modules are one file each
+and never import one another; everything they share goes through `game` and
+`shared.js`. See **File ownership** in `CONTRACT.md`.
 
 Modules only talk through the `game` object and the event bus defined in `CONTRACT.md`. The
 bundler enforces the contract: it fails the build on illegal imports, `export default`,

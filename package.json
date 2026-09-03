@@ -1,6 +1,6 @@
 {
   "name": "untitled-capybara-game",
-  "version": "0.52.0",
+  "version": "0.60.0",
   "private": true,
   "description": "A physics sandbox where a mischievous capybara terrorises nineteen places.",
   "type": "module",

@@ -3415,6 +3415,49 @@ export function createEnvironment(game) {
 
   const api = {
     group: root,
+    /**
+     * WHEN THE FERRY IS NEXT ALONGSIDE (D9).
+     *
+     * `ferry-ride` is a "be there when X happens" task and the ferry is on a
+     * circuit the player cannot see: six nodes, five legs of five to seven
+     * seconds, and a twenty-second dwell at the wharf. systems.js has had the
+     * `nextIn` hook since P3 and six chapters publish it — this chapter,
+     * chapter ONE, was not one of them, which meant the very first task in the
+     * game that asks you to wait was also the only kind of waiting the paper
+     * never explained.
+     *
+     * Returns 0 while she is alongside, otherwise the seconds until she is.
+     * Summed off the node table rather than tracked, so it cannot drift out of
+     * step with envUpdateFerry: `NODES[n*5+2]` is the DURATION of the leg into
+     * node n and `NODES[n*5+3]` is the dwell once it is reached.
+     *
+     * It is an ESTIMATE while the animal is standing in the berth — the ferry
+     * waits rather than shoves, exactly as the carroza does, and a stalled boat
+     * makes any countdown wrong. That is the right trade: the number is there
+     * to tell you whether to run, and the case where it is wrong is the case
+     * where you are already standing on the spot.
+     */
+    nextIn(id) {
+      if (id !== 'ferry-ride') return -1;
+      if (envFerryDocked) return 0;
+      const N = envFERRY_N;
+      let s = 0, leg = envFerryLeg;
+      if (envFerryDwell > 0) {
+        s += envFerryDwell;
+      } else {
+        s += Math.max(0, envFERRY_NODES[leg * 5 + 2] - envFerryT);
+        if (leg === 0) return s;
+        s += envFERRY_NODES[leg * 5 + 3];
+        leg = (leg + 1) % N;
+      }
+      for (let k = 0; k < N; k++) {
+        s += envFERRY_NODES[leg * 5 + 2];
+        if (leg === 0) break;
+        s += envFERRY_NODES[leg * 5 + 3];
+        leg = (leg + 1) % N;
+      }
+      return s;
+    },
     // ---- WHERE THE WORLD ACTUALLY STOPS -----------------------------------
     // MEASURED: drop the animal at z = 200, or at x = ±140, and it does not
     // fall and it is never rescued — it stands at y = 0.18 on capybara.js's

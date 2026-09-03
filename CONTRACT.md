@@ -3,6 +3,17 @@
 **Do not deviate.** Every developer agent writes exactly ONE file. Any change to this contract
 must be requested from the Coordinator, not made unilaterally.
 
+> **How to read a number in this file (D9).** Most sections below are a dated
+> record of one batch, and a count inside one is the count ON THAT DATE. This
+> game had sixteen chapters, then seventeen, and now has nineteen, so "all
+> seventeen worlds" in a section headed *v13* is a true sentence about August
+> and not a claim about today. Numbers that are load-bearing NOW — the ones a
+> reader would act on — are written against `CHAPTERS.length` or spelled out
+> with the date, and the two that had gone stale as claims (the journal shelf,
+> and the count of `force: true` in `sfx()`) were corrected rather than
+> re-dated. Rewriting the rest would be rewriting the record of what was true
+> when a decision was made, which is the thing this file is for.
+
 ## Aesthetic law (Untitled Goose Game benchmark)
 
 - Low-poly. Every mesh is built from `BoxGeometry`, `CylinderGeometry`, `SphereGeometry`
@@ -1772,9 +1783,11 @@ no per-item payoff at all before:
 - the chapter ceremony's **second beat** — the souvenir card, `sysKEEP_WAIT`
   after the DONE card, no lift and no confetti because the ceremony has just
   spent all three channels;
-- **the shelf** at the top of the journal — seventeen slots, always all
-  seventeen, the unearned ones drawn greyscale at 0.30 so you can see there is a
-  shape in the box and not what it is;
+- **the shelf** at the top of the journal — ONE SLOT PER CHAPTER, always all of
+  them (nineteen at the time of writing; it was seventeen when this section was
+  written and the loop has always been over `CHAPTERS`, not over a number), the
+  unearned ones drawn greyscale at 0.30 so you can see there is a shape in the
+  box and not what it is;
 - **the title card**, bottom-left of a finished place's postcard;
 - **the ledger**, below.
 
@@ -3057,6 +3070,144 @@ It is the only remaining lever with a real millisecond behind it — kyoto's sha
 0.88 ms, the largest in the game — and it was not taken because a terrain with genuine
 relief (Iceland 91 m, Cali 49 m, Kyoto 39 m) casts shadows a player can see. It is eleven
 separate picture decisions and not one rule, and it needs a screenshot each.
+
+## HOUSEKEEPING — D9 (3 Sep 2026)
+
+The shelf item from `ROADMAP-DELIGHT.md`: nine small things the previous three
+roadmaps left behind, seven of which are a wrong number or a wrong clock rather
+than a missing feature. Instruments: `qa/d9-clock.js`, `qa/d9-audio.js`,
+`qa/d9-rush.js`.
+
+### `nextIn` had no audit, and the two chapters that most needed it had no hook
+
+The hook has existed since P3 and there was no way to tell "this chapter has no
+task on a clock" from "this chapter has one and forgot the hook" —
+`todoNextIn` answers −1 for both. `qa/d9-clock.js` now asks all nineteen
+chapters for all of their own task ids. Six published it, for seven tasks:
+`the-whale`, `mirror-swim`, `symphony`, `the-bloom`, `sunrise`,
+`fold-the-street`, `the-train`.
+
+The comment above the hook says NINE tasks in this game are "be there when X
+happens". The two that were missing are the two oldest chapters:
+
+- **Sydney's ferry.** Six nodes, five legs of five to seven seconds, and a
+  twenty-second dwell at the wharf. `ferry-ride` is the FIRST task in the game
+  that asks the player to wait, and it was the only kind of waiting the paper
+  never explained.
+- **Pasto's carroza.** `pastoCAR_DWELL` calls itself "the boarding window" in
+  its own comment. The task pays out for riding her UP the plaza, so the window
+  is the dwell at the SOUTH end and nowhere else — boarding at the north end
+  gets you a ride back down and nothing on the paper.
+
+Both are derived from the live position and direction rather than tracked on a
+second timer, because a second clock is a second thing to keep in step. Both are
+ESTIMATES while the vehicle is blocked — each waits rather than shoves, and a
+stalled procession makes any countdown wrong. That is the right trade: the
+number exists to tell you whether to run, and the case where it is wrong is the
+case where you are already standing on the spot.
+
+Measured over forty seconds each: the ferry counts 35.5 → 0 and holds at 0 for
+the dwell; the carroza counts 30.3 → 0, holds ~8 s, and resets to 33.7. Both
+answer −1 for every other task id in their chapter.
+
+### ω×r: measured, and it is worth nothing
+
+The reference-frame channel carries a deck's LINEAR velocity and not its
+angular one, so a passenger standing off the centreline of something turning is
+carried as though the deck were going straight. Whether that is worth building
+depends on a number nobody had taken.
+
+**Measured by differencing the quaternion** — not by reading `angularVelocity`,
+which is zero on these bodies because they are kinematic and most are turned by
+writing a quaternion. Seven chapters, every mass-0 body big enough to stand on,
+900 samples each:
+
+> **Every reading was 0.000.** The ferry, the boat, the raft, the floes and the
+> bangka translate along a path and their box colliders never turn at all.
+
+Widened to every mass-0 body in three chapters: Circular Quay 0 of 93, Manly
+0 of 86, Monte Carlo **3 of 26** at up to 2.27 rad/s — the race cars, which
+nobody stands on. So ω×r is not built, and the number a future turning carrier
+has to beat is here. The related defect worth naming: a MESH that turns while
+its collider does not (3 in the Quay, 5 in Manly, 17 in Monte Carlo — birds,
+wheels and cars, all correct as they stand).
+
+### `sfx()` said eleven and there are thirty-one
+
+`force: true` is the one thing allowed past the per-name throttle, for the case
+where a once-a-chapter payoff would otherwise land inside somebody else's
+ambient cheer. The comment claimed eleven call sites. `grep -c`: palawan 6,
+systems 6, sahara 4, venice 4, kowloon 3, antarctic 2, and one each in the
+drift, Göreme, Iceland, Kyoto, the Quay and Rio. The RULE is still obeyed —
+every one is a payoff and none is on a timer — but a number in a comment is a
+claim. It is not restated as a number.
+
+### A global voice ceiling
+
+Every throttle in `sfx()` is PER NAME, so twenty DIFFERENT sounds inside the
+same tenth of a second all pass. A bin cascade is a dozen thuds and clinks out
+of props.js plus the footfall plus whatever the ambience was about to say — and
+D2 raised the footfall from 10.8 to 13.1 a second at a sprint. The failure mode
+is not a crash, it is mud.
+
+A ring of twelve START TIMES inside 165 ms, not a count of live voices: the
+synths schedule and stop themselves and there is no registry to consult, and
+what makes mud is a burst of starts rather than a long tail. `force` and `ui`
+are exempt. **Below the per-name throttle and below the distance cull**, so a
+sound about to be dropped for either reason does not spend a slot.
+
+Measured (`mixAudit().voiceDrops`): **one** drop in the first minute of chapter
+one, and **ten of twenty** on a synthetic cascade of twenty distinct names.
+
+### The fifth bed voice: air going past you
+
+The weather bed's four voices are all facts about the weather — how hard it is
+raining where you are standing. None is a fact about how fast YOU are going, and
+this game has a minute-long condor flight, a dune slide, a forty-metre drop and
+a bus roof, all of them silent.
+
+Same construction as `wxBedWind` one layer over — noise through a filter whose
+CUTOFF moves rather than whose level does — but bandpass rather than lowpass,
+because air moving past you has a centre to it (the note a car window makes at a
+crack) where weather is broadband and mostly below it. **Its own gain node**,
+not a second writer on `wxBedWind`'s: two writers on one AudioParam is the trap
+P4 wrote down.
+
+Driven off the animal's own velocity and not off a rig flag, because a glide, a
+slide, a bus roof and a drop are four systems and one fact. Silent under water
+on purpose — there is a whole bus down there and air rushing past is the one
+thing definitely not happening.
+
+**The floor is 9.0 m/s and 6.5 was not enough.** A sprint is 7.4 on the flat,
+but the gait leaves the ground between strides and the total velocity carries
+the bob: at 6.5 a capybara running across a lawn drove the term to 0.073. At 9.0
+it reads 0.031 on the same run, which through the squared curve is 0.0001 of
+gain — the squaring is what makes the bottom of the range genuinely silent
+rather than merely quiet. Measured at the top: **0.831 at 23.1 m/s**, falling
+between islands in the Drift.
+
+### Three timers off the wall clock
+
+Pasto scheduled the crates after the stall frame, the vendor after the crates
+and the cheer after the float's horn with `setTimeout`. Right idea, wrong
+clock: those sounds did not know about a hitstop, about slow motion, about the
+pause card, or about the player having left the chapter between the horn and
+the cheer. One array and four lines, counted down on the same `dt` as
+everything else in the file, and emptied outright when the chapter is not live.
+
+### And the documents
+
+- `README.md`'s module table listed **13 of 27** files. All twenty-seven now.
+- The journal shelf was documented as "seventeen slots, always all seventeen"
+  in both `README.md` and here. The loop has always been over `CHAPTERS`; it is
+  nineteen.
+- `package.json` 0.52.0 → 0.60.0.
+- **A note at the top of this file** on how to read a number in it: most
+  sections are a dated record of one batch, and a count inside one is the count
+  on that date. "All seventeen worlds" in a section headed *v13* is a true
+  sentence about August. Only the claims a reader would act on today were
+  corrected; rewriting the rest would be rewriting the record of what was true
+  when a decision was made, which is what this file is for.
 
 ## THE PAYOFF — D4 (3 Sep 2026)
 

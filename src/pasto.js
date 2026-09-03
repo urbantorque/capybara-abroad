@@ -2078,12 +2078,12 @@ function pastoCollapseStall(st) {
     const at = st.mesh ? st.mesh.position : null;
     if (g.sfx) {
       g.sfx('thud', { at: at, volume: 0.95, pitch: rand(0.6, 0.78), near: 6, far: 70 });
-      setTimeout(function () {
-        if (g.sfx) g.sfx('clink', { at: at, volume: 0.55, pitch: rand(0.8, 1.15), near: 5, far: 55 });
-      }, 110);
-      setTimeout(function () {
-        if (g.sfx) g.sfx('vendor', { at: at, volume: 0.7, pitch: rand(0.86, 1.06), near: 5, far: 60 });
-      }, 520);
+      // On the FRAME clock — see pastoSfxIn. These two used to be setTimeouts
+      // and went on falling through a hitstop and a pause card.
+      pastoSfxIn(0.110, 'clink',
+                 { at: at, volume: 0.55, pitch: rand(0.8, 1.15), near: 5, far: 55 });
+      pastoSfxIn(0.520, 'vendor',
+                 { at: at, volume: 0.7, pitch: rand(0.86, 1.06), near: 5, far: 60 });
     }
     if (g.shake) g.shake(0.5);
     if (g.completeTask) g.completeTask('market-chaos');
@@ -2282,14 +2282,42 @@ function pastoCarBlocked(capy) {
  * opens on it — so it is worth hearing from anywhere in the plaza, which is
  * what the horn's far radius is for.
  */
+// ---------------------------------------------------------------------------
+// A SOUND THAT ARRIVES A MOMENT LATER, ON THE FRAME CLOCK (D9).
+//
+// Three sounds in this chapter were scheduled with `setTimeout`: the crates
+// after the stall frame, the vendor after the crates, and the cheer after the
+// float's horn. They are the right idea — a stall coming down is three sounds
+// in the order the thing actually falls — and the wrong clock. setTimeout is
+// the WALL clock, so those sounds do not know about a hitstop, about slow
+// motion, about the pause card, or about the player having left the chapter
+// between the horn and the cheer.
+//
+// One array and four lines. `t` counts down on the same dt everything else in
+// the file gets, so a freeze holds the crates exactly as it holds the stall,
+// and the queue is emptied outright when the chapter is not live.
+const pastoSfxQ = [];
+function pastoSfxIn(t, name, opts) {
+  if (pastoSfxQ.length > 24) return;   // a stall is three sounds, not a queue
+  pastoSfxQ.push({ t: t, name: name, opts: opts });
+}
+function pastoSfxStep(game, dt) {
+  if (!pastoSfxQ.length) return;
+  for (let i = pastoSfxQ.length - 1; i >= 0; i--) {
+    const e = pastoSfxQ[i];
+    e.t -= dt;
+    if (e.t > 0) continue;
+    pastoSfxQ.splice(i, 1);
+    if (game.sfx) game.sfx(e.name, e.opts);
+  }
+}
+
 function pastoCarTurn(game) {
   if (!game || !game.sfx) return;
   game.sfx('horn', { at: pastoCarPos, volume: 0.5, pitch: rand(1.15, 1.4),
                      near: 8, far: 110 });
-  setTimeout(function () {
-    if (game.sfx) game.sfx('cheer', { at: pastoCarPos, volume: 0.32, pitch: rand(1.0, 1.2),
-                                      near: 7, far: 70 });
-  }, 380);
+  pastoSfxIn(0.380, 'cheer', { at: pastoCarPos, volume: 0.32, pitch: rand(1.0, 1.2),
+                               near: 7, far: 70 });
 }
 
 function pastoUpdateCarroza(game, dt) {
@@ -2965,6 +2993,35 @@ export function createPasto(game) {
   const api = {
     built() { return pastoBuilt; },
     /**
+     * WHEN THE FLOAT IS NEXT AT THE SOUTH END (D9).
+     *
+     * `carroza` pays out for riding her UP the plaza, so the window is the
+     * dwell at the SOUTH end and nowhere else — boarding at the north end gets
+     * you a ride back down and nothing on the paper. pastoCAR_DWELL calls
+     * itself "the boarding window" in its own comment and the paper never said
+     * when it opened.
+     *
+     * Derived from the position and the direction rather than tracked, for
+     * envFerryNextIn's reason: a second clock is a second thing to keep in
+     * step. An ESTIMATE while she is blocked — she waits rather than shoves,
+     * and a stalled procession makes any countdown wrong.
+     */
+    nextIn(id) {
+      if (id !== 'carroza') return -1;
+      const span = (pastoCAR_Z1 - pastoCAR_Z0) / pastoCAR_SPEED;
+      // At the south end with the window open. `pastoCarDir` flips the moment
+      // an end is reached, so at the south end it is already +1.
+      if (pastoCarDwell > 0 && pastoCarDir > 0) return 0;
+      let s = pastoCarDwell > 0 ? pastoCarDwell : 0;
+      if (pastoCarDir > 0) {
+        // heading north: the rest of the way up, the dwell there, then back
+        s += (pastoCAR_Z1 - pastoCarZ) / pastoCAR_SPEED + pastoCAR_DWELL + span;
+      } else {
+        s += (pastoCarZ - pastoCAR_Z0) / pastoCAR_SPEED;
+      }
+      return s;
+    },
+    /**
      * FRAME THE LAUNCH — chapter 2's marquee, GALERAS.
      *
      * v27 built `over: true` for exactly two chapters, naming both in its own
@@ -3077,7 +3134,8 @@ export function createPasto(game) {
 
     update(dt) {
       if (!pastoBuilt) return;
-      if (!game.biome.isActive('pasto')) return;       // biome not live: early out
+      if (!game.biome.isActive('pasto')) { pastoSfxQ.length = 0; return; }  // biome not live
+      pastoSfxStep(game, dt);
       pastoUpdateSmoke(dt);
       pastoUpdateMotes(dt);
       pastoUpdateBell(dt);
