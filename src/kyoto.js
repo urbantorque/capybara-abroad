@@ -444,7 +444,15 @@ function kyoBuildGroundBody(game) {
   // solver's floor sat metres away from the drawn one anywhere with relief,
   // which in a valley with a 34 m shrine hill in it is most of the ground worth
   // walking on.
-  const NX = 68, NZ = 88;
+  // ...and "the same span" has to be ARITHMETIC, not a comment. NZ was 88,
+  // which at 5 m covers 440 m of a 460 m picture: the northernmost 20 m of
+  // drawn Kyoto — the full 340 m width of it, up at z 210..230 — had no
+  // collision floor at all. The animal does not fall through, because
+  // capyGroundY rides the analytic terrainHeight as a backstop, and that is
+  // exactly what hides this class of bug until a PROP is dropped up there and
+  // sinks out of the world. Same fault the pantanal and manly bodies carry
+  // notes about. NX * EL = 340 and NZ * EL = 460 now, both exact.
+  const NX = 68, NZ = 92;
   const X0 = -170, Z0 = -230;
   const EL = 5;
   const Z1 = Z0 + NZ * EL;
