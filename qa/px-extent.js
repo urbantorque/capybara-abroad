@@ -33,15 +33,23 @@ async page => {
       x >= H.X0 && x <= H.X0 + H.NX * H.EL && z <= H.Z1 && z >= H.Z1 - H.NZ * H.EL)
     const ray = new THREE.Raycaster(); ray.far = 400
     const WATER = /water|sea\b|river|lake|canal|pool|surf|swell|harbour|lagoon|ocean|tide|wave|foam|wake|marsh|spring/i
+    // EVERY hit down the column, not just the topmost. The first thing a ray
+    // from 220 m meets is whatever scenery stands on the ground - a fairy
+    // chimney at Goreme's centre is 16.7 m over the law - so a probe that
+    // takes hit[0] and asks "is this the ground?" answers no in the middle of
+    // a chapter that is plainly drawn. Ask instead whether ANY hit in the
+    // column is near the law; that one is the ground, whatever is stacked
+    // above it.
     const drawnAt = (x, z) => {
       ray.set(new THREE.Vector3(x, 220, z), new THREE.Vector3(0, -1, 0))
       const roots = g.scene.children.filter(c => c.visible && c !== g.capy.group)
+      const ys = []
       for (const h of ray.intersectObjects(roots, true)) {
         let o = h.object, ok = true
         while (o) { if (!o.visible || (o.name && WATER.test(o.name))) { ok = false; break } o = o.parent }
-        if (ok) return +h.point.y.toFixed(2)
+        if (ok) ys.push(+h.point.y.toFixed(2))
       }
-      return null
+      return ys
     }
     const res = new CANNON.RaycastResult()
     const physAt = (x, z) => {
@@ -51,17 +59,18 @@ async page => {
     }
     const rows = []
     for (const [x, z, tag] of pts) {
-      const d = drawnAt(x, z), p = physAt(x, z)
+      const ys = drawnAt(x, z), p = physAt(x, z)
       const th = api && api.terrainHeight ? +api.terrainHeight(x, z).toFixed(2) : null
-      // A DRAWN HIT ONLY COUNTS AS "THE PICTURE" IF IT IS NEAR THE LAW. Cali and
-      // Kowloon both hang a deep skirt off the edge of the world, so the first
-      // ray hit past the drawn ground comes back at y -141 and -177 against a
-      // law of 0 — which read as "the picture is there" and hid the very strips
-      // this probe exists to find. Anything more than 3 m under the law is not
-      // ground you could be standing on.
-      const nearLaw = d !== null && th !== null && Math.abs(d - th) <= 3
-      const seen = d !== null && (th === null || nearLaw)
-      rows.push({ x, z, tag, drawn: d, phys: p, hf: inHF(x, z), law: th, nearLaw,
+      // ...and a hit only counts as GROUND if it is near the law. Cali and
+      // Kowloon both hang a deep skirt off the edge of the world, so out in
+      // their strips the column does contain a hit - at y -141 and -177
+      // against a law of 0 - and counting it read as "the picture is there",
+      // hiding the very strips this probe exists to find.
+      const near = th === null ? ys.slice(0, 1)
+                               : ys.filter(y => Math.abs(y - th) <= 3)
+      const seen = near.length > 0
+      rows.push({ x, z, tag, hits: ys.length, ground: seen ? near[0] : null,
+                  top: ys.length ? ys[0] : null, phys: p, hf: inHF(x, z), law: th,
                   verdict: (seen && !inHF(x, z)) ? 'DRAWN-NO-COLLIDER'
                          : (!seen && inHF(x, z)) ? 'COLLIDER-NO-PICTURE' : 'ok' })
     }
