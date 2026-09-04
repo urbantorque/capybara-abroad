@@ -5138,13 +5138,28 @@ export function createCapybara(game) {
 
     // squash & stretch spring — stiff and under-damped, so a wheek is a sharp
     // pop with an elastic overshoot instead of a gentle swell.
-    // Sub-stepped: at k=300 explicit Euler is only marginally stable at a 60Hz
-    // dt and outright wrong on a long frame, which read as a hitch in the pop.
-    const popSteps = dt > 1 / 240 ? (dt * 240 > 8 ? 8 : Math.ceil(dt * 240)) : 1;
-    const popH = dt / popSteps;
-    for (let s = 0; s < popSteps; s++) {
-      capyPopVel += (-capyPop * 300 - capyPopVel * 9) * popH;
-      capyPop += capyPopVel * popH;
+    //
+    // SUB-STEPPED, AND THE LANDING ABSORB BELOW SHARES THE SUB-STEP. Explicit
+    // Euler on a stiff spring is stable only while the step is short. At k=300
+    // the pop is only marginally stable at a 60 Hz dt and outright wrong on a
+    // long frame, which read as a hitch in the pop. The landing absorb fails
+    // the same way for a different reason: its damping term is `-c*v*h`, so for
+    // h > 2/c = 0.074 s the correction overshoots zero and flips the velocity
+    // with a LARGER magnitude every step. `game.tick` clamps a frame at 0.1 s
+    // (main.js, the tab-switch guard), which is deep inside that band — so on
+    // any frame slower than 13.5 fps the landing spring rang instead of
+    // settling. Measured at rdt 0.1: the model's local Y alternating between
+    // -0.05 and -0.81 m, 0.76 m peak to peak, in nine chapters. It looks
+    // exactly like the animal sinking into the ground, and it is why it did.
+    //
+    // 240 Hz target, at most 8 inner steps, so the longest step either spring
+    // can ever take is 0.1/8 = 0.0125 s: the pop's k*h^2 is 0.047 and the
+    // absorb's c*h is 0.34, both a long way inside their limits.
+    const sprSteps = dt > 1 / 240 ? (dt * 240 > 8 ? 8 : Math.ceil(dt * 240)) : 1;
+    const sprH = dt / sprSteps;
+    for (let s = 0; s < sprSteps; s++) {
+      capyPopVel += (-capyPop * 300 - capyPopVel * 9) * sprH;
+      capyPop += capyPopVel * sprH;
     }
     if (capyPop > 1.15) { capyPop = 1.15; if (capyPopVel > 0) capyPopVel = 0; }
     else if (capyPop < -0.5) { capyPop = -0.5; if (capyPopVel < 0) capyPopVel = 0; }
@@ -5161,9 +5176,15 @@ export function createCapybara(game) {
     // spring, on the MODEL only — the collider is untouched, so nothing about
     // the physics, the ledge you just cleared or the task you just triggered can
     // be changed by it. Critically damped on the way back up so it never bounces.
-    capyLandVel += (-capyLand * capyLAND_K - capyLandVel * capyLAND_C) * dt;
-    capyLand += capyLandVel * dt;
-    if (capyLand < -0.30) { capyLand = -0.30; if (capyLandVel < 0) capyLandVel = 0; }
+    // Sub-stepped on the shared sprSteps/sprH above — see the note there for
+    // what this spring did on a long frame before it was. The bottom-out clamp
+    // is INSIDE the loop because it is a hard stop: the leg reaches the end of
+    // its travel during the step, not after the whole frame's worth of it.
+    for (let s = 0; s < sprSteps; s++) {
+      capyLandVel += (-capyLand * capyLAND_K - capyLandVel * capyLAND_C) * sprH;
+      capyLand += capyLandVel * sprH;
+      if (capyLand < -0.30) { capyLand = -0.30; if (capyLandVel < 0) capyLandVel = 0; }
+    }
     // ...and the slide, which is the animal getting DOWN. Model only, like the
     // landing spring above it and for the same reason: the collider is three
     // spheres and a shorter capybara would fall through eighteen chapters of
