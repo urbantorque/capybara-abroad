@@ -3284,6 +3284,12 @@ function gorBuildField(game, root) {
       }
       M.box(cr.x + Math.sin(ry) * 8.2, gy + 0.5, cr.z + Math.cos(ry) * 8.2,
             2.4, 1.0, 2.4, PALETTE.gorBasket, 0, ry);
+      // A BASKET IS A SOLID OBJECT. This builder carried one collider — the
+      // truck — for five crews' worth of kit, so all five baskets were walked
+      // through. The ENVELOPES stay open on purpose: `the-mouth` is a task
+      // about standing inside one while it fills.
+      gorStaticBox(game, cr.x + Math.sin(ry) * 8.2, gy + 0.5, cr.z + Math.cos(ry) * 8.2,
+                   2.4, 1.0, 2.4, ry);
     } else if (cr.state === 1) {
       // half up: a bag on its side with a fan blowing cold air into the mouth.
       //
@@ -3316,6 +3322,10 @@ function gorBuildField(game, root) {
             3.9, 1.9, 2.9, PALETTE.gorEnvC, 8);
       M.box(cr.x + Math.sin(ry) * 6.0, gy + 0.5, cr.z + Math.cos(ry) * 6.0,
             2.4, 1.0, 2.4, PALETTE.gorBasket, 0, ry);
+      // ...and this one is six metres from the throat, at the far end from the
+      // mouth, so it cannot get in the way of the task.
+      gorStaticBox(game, cr.x + Math.sin(ry) * 6.0, gy + 0.5, cr.z + Math.cos(ry) * 6.0,
+                   2.4, 1.0, 2.4, ry);
       M.cyl(cr.x - Math.sin(ry) * 8.2, gy + 0.9, cr.z - Math.cos(ry) * 8.2,
             0.95, 0.55, PALETTE.gorSteel, 0, ry, Math.PI * 0.5, 8);
       M.box(cr.x - Math.sin(ry) * 8.2, gy + 0.25, cr.z - Math.cos(ry) * 8.2,
@@ -3340,6 +3350,9 @@ function gorBuildField(game, root) {
       M.cone(cr.x, gy + 2.7, cr.z, 1.3, 2.1, PALETTE.gorEnvC, Math.PI, 0, 0, 8);
       M.box(cr.x, gy + 0.55, cr.z, 2.4, 1.1, 2.4, PALETTE.gorBasket, 0, ry);
       M.box(cr.x, gy + 1.15, cr.z, 2.6, 0.12, 2.6, PALETTE.gorBasketDk, 0, ry);
+      // The one with a pilot standing in it. 1.1 m is a deliberate hop, so
+      // making it solid also makes it something you can get up onto.
+      gorStaticBox(game, cr.x, gy + 0.55, cr.z, 2.4, 1.1, 2.4, ry);
       for (let s = 0; s < 4; s++) {
         M.cyl(cr.x + (s & 1 ? 0.8 : -0.8), gy + 1.9, cr.z + (s & 2 ? 0.8 : -0.8),
               0.045, 1.8, PALETTE.gorSteel, 0, 0, 0, 4);
