@@ -3773,6 +3773,7 @@ export function createNPCs(game) {
               r.body.position.y = by;
               r.body.previousPosition.y = by;
               r.body.interpolatedPosition.y = by;
+              r.body.aabbNeedsUpdate = true;   // static: see the note below
             }
           }
           r.group.position.x = r.x;
@@ -3789,6 +3790,24 @@ export function createNPCs(game) {
             r.body.position.x = r.x; r.body.position.z = r.z;
             r.body.previousPosition.x = r.x; r.body.previousPosition.z = r.z;
             r.body.interpolatedPosition.x = r.x; r.body.interpolatedPosition.z = r.z;
+            // ...AND THE BROADPHASE HAS TO BE TOLD, or the person is solid at
+            // their SPAWN POINT for the rest of the chapter and walk-through
+            // everywhere they actually go.
+            //
+            // A local is `mass: 0` with no `type`, which cannon defaults to
+            // STATIC. `aabbNeedsUpdate` is raised inside Body.integrate
+            // (vendor/cannon-es.js:3932) and integrate returns early for
+            // anything not DYNAMIC or KINEMATIC (:3892), so a static body moved
+            // by a position write NEVER refreshes its AABB — and SAP only
+            // recomputes one when this flag is up (:5506). Writing the three
+            // position fields moves the collider and leaves the box the
+            // broadphase tests against sitting where the person used to stand.
+            //
+            // Measured: a Hanoi local in the `own` state let the animal pass
+            // clean through — closest approach 0.24 m, and 0.88 m out the far
+            // side — while every stationary local in the same chapter stopped
+            // it at 0.60-0.92 m. Retrieval sends them up to nine metres.
+            r.body.aabbNeedsUpdate = true;
           }
         } else r.moving = 0;
       }
