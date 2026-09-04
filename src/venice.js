@@ -3745,7 +3745,7 @@ function venBuildGroundBody(game) {
 // =============================================================== FAR THINGS =
 /** San Giorgio Maggiore, out in the Bacino. Decor: no collision, and it is a
  *  long way off, which is exactly what it is in life. */
-function venBuildFar(root) {
+function venBuildFar(game, root) {
   const M = venMerger();
   const gx = 40, gz = 108;
   M.box(gx, 2, gz, 46, 4, 26, PALETTE.venStone);
@@ -3762,6 +3762,21 @@ function venBuildFar(root) {
   M.cyl(-86, 11, 46, 11, 12, PALETTE.venStone, 0, 0, 0, 8);
   M.sph(-86, 20, 46, 12.5, 9.5, 12.5, PALETTE.venStoneWet);
   M.cyl(-86, 29, 46, 1.4, 4.0, PALETTE.venStone, 0, 0, 0, 6);
+  // ...AND THE SALUTE IS IN THE WORLD. The block above it at (40, 108) is past
+  // the z bound and is honest backdrop, but this one stands at x -86, z 46 —
+  // inside the ground plane, and Venice publishes no bounds(), and the animal
+  // SWIMS. Thirty metres of stone base with a twenty-two metre dome on it, and
+  // you could paddle straight through the middle of it. Base and drum only:
+  // the dome is over five metres up and nothing can reach it. venStaticBox
+  // takes FULL extents.
+  // ...AND THE BASE HAS TO REACH THE BED, not just match the drawn box. The
+  // lagoon floor here is -3.8, the waterline is -1.3, and the drawn base spans
+  // y 0..6 — so the Salute floats 1.3 m clear of the water on nothing, and a
+  // collider that only covers the picture lets a SWIMMER straight underneath
+  // it. Measured that way first: the animal ended 9.22 m from the centre, six
+  // metres inside a base it should have stopped 15 m out from. Down to -4.
+  venStaticBox(game, -86, 1, 46, 30, 10, 30);
+  venStaticBox(game, -86, 11, 46, 22, 12, 22);
   const mesh = new THREE.Mesh(M.build(), venVC());
   mesh.castShadow = true;
   root.add(mesh);
@@ -5462,7 +5477,7 @@ function venBuild(game) {
   }
   venBuildCrowd(game, venRoot);
   venBuildFlotsam(venRoot);
-  venBuildFar(venRoot);
+  venBuildFar(game, venRoot);
   venBuildWater(venRoot);
   // ---- and the things the flood carries ----------------------------------
   // Registered by hand rather than derived, because a reflection is anchored to

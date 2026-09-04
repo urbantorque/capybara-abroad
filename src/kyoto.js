@@ -619,9 +619,17 @@ function kyoBuildTorii(game, root) {
   T.box(sx, sy + 3.2, sz, 8.6, 0.5, 7.6, PALETTE.kawara);
   T.box(sx, sy + 3.7, sz, 6.0, 0.6, 5.2, PALETTE.kawaraDark);
   T.box(sx, sy + 1.4, sz + 3.1, 3.4, 2.6, 0.24, PALETTE.torii);
+  // AND THE SHRINE ITSELF IS SOLID. This builder carries the collider line for
+  // the forty-four gates (kyoStaticPair, legs solid and the doorway open) and
+  // then draws a seven-by-six-metre building at the top of the path with
+  // nothing behind it — the same shape as gorBuildField's one truck among five
+  // crews. It is what the whole torii tunnel walks you to. kyoStaticBox takes
+  // HALF extents, unlike gorStaticBox and venStaticBox, so these are halves.
+  kyoStaticBox(game, sx, sy + 1.75, sz, 3.5, 1.75, 3.0);
   for (let s = -1; s <= 1; s += 2) {
     const fx = sx + s * 4.4, fz = sz + 4.6, fy = kyoTerrain(fx, fz);
     T.box(fx, fy + 0.45, fz, 1.0, 0.9, 1.0, PALETTE.granite);
+    kyoStaticBox(game, fx, fy + 0.45, fz, 0.5, 0.45, 0.5);
     T.sph(fx, fy + 1.35, fz, 0.34, 0.44, 0.62, PALETTE.gravelZen);
     T.cone(fx, fy + 1.95, fz - 0.15, 0.22, 0.5, PALETTE.gravelZen);
     T.box(fx, fy + 1.55, fz + 0.5, 0.30, 0.24, 0.36, PALETTE.gravelZen);
