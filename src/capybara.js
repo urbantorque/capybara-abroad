@@ -2992,6 +2992,16 @@ export function createCapybara(game) {
       capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
       capyRideBody = null; capyRideT = 0; capy.rideBody = null;
       capyLaunchT = capyLAUNCH_HOLD;
+      // ...AND SPEND THE COYOTE WINDOW, which the jump block does and this
+      // forgot. `effGround` stays true for capyCOYOTE after the feet leave the
+      // floor, and while it is true the idle grip runs at lambda 60 and the
+      // snap zeroes anything under 0.9 m/s. So for seven frames after a GROUND
+      // launch the horizontal component was being deleted: measured off
+      // Strokkur, fire-frame velocity [1.19, 0] -> [0, 0] five frames later,
+      // 0.04 m of landing drift from a 2.23 s flight. Everybody came off the
+      // geyser going perfectly straight up, which is the exact symptom launch()
+      // was written to cure. Vertical always survived because nothing damps it.
+      capyAirTime = capyCOYOTE;
       body.position.y += capyLAUNCH_LIFT;
       body.previousPosition.copy(body.position);
       body.interpolatedPosition.copy(body.position);
@@ -3641,6 +3651,25 @@ export function createCapybara(game) {
       const flow = capyFlowAt(game, px, pz);
       platVX += flow.x; platVZ += flow.z;
     }
+    // ---- AND A SHOVE, ONCE THE FEET ARE OFF THE FLOOR --------------------
+    // A sustained push is a LEAN while you are standing in it and a CURRENT of
+    // air once you are not, and the two need different channels. Added to the
+    // velocity (which is what happens below, on the ground) it compounds while
+    // airborne: the whole live shove goes on every frame, the velocity already
+    // carries last frame's, the cap is widened by the shove's own size, and the
+    // only thing opposing it is the airborne bleed at 2.1. Marrakech measured a
+    // standing hop leaving at 7 m/s, peaking at 23.3 and landing 22 m downwind.
+    //
+    // IT HAS TO JOIN THE FRAME HERE, above the line that derives vx, and not at
+    // the shove site further down. Added after that line it is just a one-frame
+    // offset: body.velocity is rebuilt as vx + platVX at the end, platVX starts
+    // from zero next frame, and the push is back inside vx accumulating exactly
+    // as it did before. Measured that way round it still peaked at 22.85 m/s.
+    // Here, vx is the speed THROUGH THE AIR, the bleed damps toward the air
+    // rather than the ground, and the hop drifts with the wind and no faster.
+    if (!grounded && !capySwimming && !capy.carriedBy && !capy.atHelm) {
+      platVX += capyShove.x; platVZ += capyShove.z;
+    }
     capy.frameVX = platVX; capy.frameVZ = platVZ;
 
     // ---- soft floor, in VELOCITY SPACE ------------------------------
@@ -4262,14 +4291,23 @@ export function createCapybara(game) {
     // rather than a run, and switched off wherever the ground is already
     // sliding: on ice the slip model owns the speed and the two would fight.
     capyGrade = 0;
-    if (effGround && !capySwimming && !capyClinging && mag > 0.02 && slipG < 0.35) {
+    if (effGround && !capySwimming && !capyClinging && mag > 0.02) {
       const ah = capyGroundY(game, px + dx * capyGRADE_LOOK, pz + dz * capyGRADE_LOOK);
       const here = capyGroundY(game, px, pz);
       if (ah === ah && here === here) {
         const g = clamp((ah - here) / capyGRADE_LOOK, -1.2, 1.2);
         capyGrade = g;
-        const tob = Math.exp(-3.5 * Math.abs(g + 0.05)) / capyGRADE_FLAT;
-        topSpeed *= clamp(tob, capyGRADE_MIN, capyGRADE_MAX);
+        // The slip gate used to switch this off ENTIRELY above slipG 0.35, on
+        // the grounds that the slide owns the speed and the two would fight.
+        // True going down, and nonsense going up: it made a glacier the one
+        // hill in the game that costs nothing to climb, and with the old
+        // steering target that added up to sprinting UP eighteen degrees of ice
+        // at 19.6 m/s. Downhill on slip the slide still owns it; uphill, a hill
+        // is a hill whatever it is made of.
+        if (slipG < 0.35 || g > 0) {
+          const tob = Math.exp(-3.5 * Math.abs(g + 0.05)) / capyGRADE_FLAT;
+          topSpeed *= clamp(tob, capyGRADE_MIN, capyGRADE_MAX);
+        }
       }
     }
 
@@ -4297,9 +4335,33 @@ export function createCapybara(game) {
       // forward down a glacier and you would slow to a jog. Raising it by the
       // same factor as the cap makes the stick steer and never brake, which is
       // the difference between sliding and being dragged.
-      const slipSpeed = topSpeed * (1 + slip * capySLIP_CAP);
-      const tx = dx * slipSpeed * (0.74 + 0.26 * align);
-      const tz = dz * slipSpeed * (0.74 + 0.26 * align);
+      // ...BUT RAISING THE TARGET MADE THE STICK AN ENGINE. The target used to
+      // be `topSpeed * (1 + slip * capySLIP_CAP)` — the same number as the cap —
+      // and because this block STEERS BY PULLING VELOCITY TOWARD THE TARGET,
+      // that is a motor pointing wherever the stick points, on the flat and
+      // uphill as readily as down. Measured on one held key: Antarctic blue ice
+      // 10.6 m/s walking and 19.0 running against 4.2 and 7.4 on paving; snow at
+      // slip 0.18 beat dry pavement by 30 %; and the Iceland glacier could be
+      // SPRINTED UP at 19.6 m/s, 89 m of eighteen-degree ice in five seconds.
+      //
+      // The target is now the honest topSpeed, and the no-braking property the
+      // comment above is really asking for is bought directly instead: resolve
+      // the error along the stick and across it, and on slip refuse to let the
+      // ALONG component brake. A slide still cannot be slowed by pressing into
+      // it, the ceiling is still capySLIP_CAP wide, and gravity can still take
+      // the animal well past topSpeed — but the stick can no longer manufacture
+      // speed the hill did not give it. At slip 0 the arithmetic below is
+      // algebraically identical to what it replaced.
+      // dx/dz carry the ANALOGUE MAGNITUDE (a half-deflected pad is a half
+      // target), so the direction has to be normalised out before anything is
+      // resolved along it and the magnitude put back into the target.
+      const ux = dx / mag, uz = dz / mag;
+      const T = topSpeed * mag * (0.74 + 0.26 * align);
+      const along = vx * ux + vz * uz;
+      let dAlong = T - along;
+      if (dAlong < 0) dAlong *= (1 - slip);   // slip 1: never brake along the stick
+      const tx = (along + dAlong) * ux;
+      const tz = (along + dAlong) * uz;
       // ---- ch7 · THE CARVE --------------------------------------------------
       // A glacier takes 80% of the steering away (capySLIP_CTRL) and that is
       // correct: sliding is supposed to be sliding. What Iceland teaches by the
@@ -4477,8 +4539,15 @@ export function createCapybara(game) {
     // external shoves ride ON TOP of the solved velocity, so a rolling bin
     // actually knocks the capybara sideways instead of being eaten by the
     // controller.
-    vx += capyShove.x;
-    vz += capyShove.z;
+    //
+    // ON THE GROUND ONLY. Airborne, the shove has already been folded into the
+    // reference frame further up (see "AND A SHOVE, ONCE THE FEET ARE OFF THE
+    // FLOOR") — adding it here as well would be the compounding this batch
+    // exists to remove, counted twice.
+    if (grounded || capySwimming || capy.carriedBy || capy.atHelm) {
+      vx += capyShove.x;
+      vz += capyShove.z;
+    }
     capyShove.x = damp(capyShove.x, 0, 4, dt);
     capyShove.z = damp(capyShove.z, 0, 4, dt);
 
