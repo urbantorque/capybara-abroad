@@ -558,7 +558,9 @@ function gorSlope(x, z) {
   const e = 1.2;
   const dx = gorTerrain(x + e, z) - gorTerrain(x - e, z);
   const dz = gorTerrain(x, z + e) - gorTerrain(x, z - e);
-  return Math.atan(Math.sqrt(dx * dx + dz * dz) / (2 * e));
+  // RISE OVER RUN, not radians. See slopeAt in CONTRACT.md: this used to
+  // return an angle, and twelve of the seventeen publishers return a gradient.
+  return Math.sqrt(dx * dx + dz * dz) / (2 * e);
 }
 function gorIsOverWater() { return false; }
 

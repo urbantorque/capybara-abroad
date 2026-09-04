@@ -1,0 +1,1221 @@
+{
+ "legs": [
+  {
+   "leg": "first",
+   "rows": [
+    {
+     "t": 0.11,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.31,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.22,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 27.24,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.32,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 27.07,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.41,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.29,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.51,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.08,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.61,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.21,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.71,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.37,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.81,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.28,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.9,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 25.98,
+     "lag": 0.06,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.01,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 25.92,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.11,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.18,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.2,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.52,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.3,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.16,
+     "lag": 0.06,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.41,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.2,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.51,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.35,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.61,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.18,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.7,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.4,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.81,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.25,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 1.9,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.07,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 2.01,
+     "carV": 26,
+     "frame": 26,
+     "capyV": 25.58,
+     "lag": 0.07,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 26
+    },
+    {
+     "t": 2.11,
+     "carV": 24.5,
+     "frame": 24.5,
+     "capyV": 23.4,
+     "lag": 0.09,
+     "dy": 1.71,
+     "riding": 1,
+     "rideSpd": 24.5
+    },
+    {
+     "t": 2.21,
+     "carV": 23,
+     "frame": 23,
+     "capyV": 22.17,
+     "lag": 0.11,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 23
+    },
+    {
+     "t": 2.31,
+     "carV": 21.5,
+     "frame": 21.5,
+     "capyV": 20.49,
+     "lag": 0.14,
+     "dy": 1.71,
+     "riding": 1,
+     "rideSpd": 21.5
+    },
+    {
+     "t": 2.4,
+     "carV": 20,
+     "frame": 20,
+     "capyV": 19.85,
+     "lag": 0.17,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 20
+    },
+    {
+     "t": 2.51,
+     "carV": 18.49,
+     "frame": 18.49,
+     "capyV": 18.84,
+     "lag": 0.2,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 18.49
+    },
+    {
+     "t": 2.61,
+     "carV": 17,
+     "frame": 17,
+     "capyV": 16.46,
+     "lag": 0.22,
+     "dy": 1.69,
+     "riding": 1,
+     "rideSpd": 17
+    },
+    {
+     "t": 2.71,
+     "carV": 16.33,
+     "frame": 16.33,
+     "capyV": 16.39,
+     "lag": 0.24,
+     "dy": 1.69,
+     "riding": 1,
+     "rideSpd": 16.33
+    },
+    {
+     "t": 2.8,
+     "carV": 16.33,
+     "frame": 16.33,
+     "capyV": 16.62,
+     "lag": 0.24,
+     "dy": 1.69,
+     "riding": 1,
+     "rideSpd": 16.33
+    },
+    {
+     "t": 2.91,
+     "carV": 16.61,
+     "frame": 16.61,
+     "capyV": 17.15,
+     "lag": 0.15,
+     "dy": 1.69,
+     "riding": 1,
+     "rideSpd": 16.61
+    },
+    {
+     "t": 3.01,
+     "carV": 17.46,
+     "frame": 17.46,
+     "capyV": 17.86,
+     "lag": 0.16,
+     "dy": 1.67,
+     "riding": 1,
+     "rideSpd": 17.46
+    },
+    {
+     "t": 3.11,
+     "carV": 18.31,
+     "frame": 18.31,
+     "capyV": 18.52,
+     "lag": 0.14,
+     "dy": 1.68,
+     "riding": 1,
+     "rideSpd": 18.31
+    },
+    {
+     "t": 3.21,
+     "carV": 19.16,
+     "frame": 19.16,
+     "capyV": 18.65,
+     "lag": 0.11,
+     "dy": 1.68,
+     "riding": 1,
+     "rideSpd": 19.16
+    },
+    {
+     "t": 3.31,
+     "carV": 20.01,
+     "frame": 20.01,
+     "capyV": 20.1,
+     "lag": 0.11,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 20.01
+    },
+    {
+     "t": 3.4,
+     "carV": 20.86,
+     "frame": 20.86,
+     "capyV": 20.85,
+     "lag": 0.09,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 20.86
+    },
+    {
+     "t": 3.51,
+     "carV": 21.71,
+     "frame": 21.71,
+     "capyV": 21.97,
+     "lag": 0.08,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 21.71
+    },
+    {
+     "t": 3.61,
+     "carV": 22.56,
+     "frame": 22.56,
+     "capyV": 22.83,
+     "lag": 0.06,
+     "dy": 1.7,
+     "riding": 1,
+     "rideSpd": 22.56
+    },
+    {
+     "t": 3.71,
+     "carV": 23.41,
+     "frame": 23.41,
+     "capyV": 23.38,
+     "lag": 0.05,
+     "dy": 1.71,
+     "riding": 1,
+     "rideSpd": 23.41
+    },
+    {
+     "t": 3.81,
+     "carV": 24.26,
+     "frame": 24.26,
+     "capyV": 24.3,
+     "lag": 0.04,
+     "dy": 1.71,
+     "riding": 1,
+     "rideSpd": 24.26
+    },
+    {
+     "t": 3.9,
+     "carV": 25.11,
+     "frame": 25.11,
+     "capyV": 24.5,
+     "lag": 0.02,
+     "dy": 1.71,
+     "riding": 1,
+     "rideSpd": 25.11
+    },
+    {
+     "t": 4,
+     "carV": 25.96,
+     "frame": 25.96,
+     "capyV": 25.78,
+     "lag": 0.02,
+     "dy": 1.72,
+     "riding": 1,
+     "rideSpd": 25.96
+    }
+   ]
+  },
+  {
+   "leg": "second",
+   "rows": [
+    {
+     "t": 0.11,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.44,
+     "lag": 0.29,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.21,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.48,
+     "lag": 0.29,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.3,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.48,
+     "lag": 0.29,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.41,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.49,
+     "lag": 0.3,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.51,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.49,
+     "lag": 0.3,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.61,
+     "carV": 26.5,
+     "frame": 26.5,
+     "capyV": 26.49,
+     "lag": 0.3,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 26.5
+    },
+    {
+     "t": 0.7,
+     "carV": 25.99,
+     "frame": 25.99,
+     "capyV": 26.23,
+     "lag": 0.3,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 25.99
+    },
+    {
+     "t": 0.8,
+     "carV": 24.49,
+     "frame": 24.49,
+     "capyV": 24.73,
+     "lag": 0.3,
+     "dy": 1.33,
+     "riding": 1,
+     "rideSpd": 24.49
+    },
+    {
+     "t": 0.91,
+     "carV": 23,
+     "frame": 23,
+     "capyV": 23.24,
+     "lag": 0.3,
+     "dy": 1.32,
+     "riding": 1,
+     "rideSpd": 23
+    },
+    {
+     "t": 1,
+     "carV": 21.49,
+     "frame": 21.49,
+     "capyV": 21.73,
+     "lag": 0.29,
+     "dy": 1.32,
+     "riding": 1,
+     "rideSpd": 21.49
+    },
+    {
+     "t": 1.11,
+     "carV": 19.99,
+     "frame": 19.99,
+     "capyV": 20.22,
+     "lag": 0.29,
+     "dy": 1.31,
+     "riding": 1,
+     "rideSpd": 19.99
+    },
+    {
+     "t": 1.22,
+     "carV": 19.31,
+     "frame": 19.31,
+     "capyV": 19.3,
+     "lag": 0.3,
+     "dy": 1.31,
+     "riding": 1,
+     "rideSpd": 19.31
+    },
+    {
+     "t": 1.31,
+     "carV": 19.31,
+     "frame": 19.31,
+     "capyV": 19.3,
+     "lag": 0.3,
+     "dy": 1.31,
+     "riding": 1,
+     "rideSpd": 19.31
+    },
+    {
+     "t": 1.4,
+     "carV": 19.31,
+     "frame": 19.31,
+     "capyV": 19.3,
+     "lag": 0.3,
+     "dy": 1.31,
+     "riding": 1,
+     "rideSpd": 19.31
+    },
+    {
+     "t": 1.5,
+     "carV": 19.02,
+     "frame": 19.02,
+     "capyV": 19.28,
+     "lag": 0.3,
+     "dy": 1.31,
+     "riding": 1,
+     "rideSpd": 19.31
+    },
+    {
+     "t": 1.61,
+     "carV": 20.16,
+     "frame": 20.16,
+     "capyV": 20.16,
+     "lag": 0.39,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 20.16
+    },
+    {
+     "t": 1.7,
+     "carV": 21.02,
+     "frame": 21.02,
+     "capyV": 22.79,
+     "lag": 0.4,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 21.02
+    },
+    {
+     "t": 1.81,
+     "carV": 21.87,
+     "frame": 21.87,
+     "capyV": 23.02,
+     "lag": 0.38,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 21.87
+    },
+    {
+     "t": 1.9,
+     "carV": 22.72,
+     "frame": 22.72,
+     "capyV": 22.72,
+     "lag": 0.36,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 22.72
+    },
+    {
+     "t": 2,
+     "carV": 23.56,
+     "frame": 23.56,
+     "capyV": 24.01,
+     "lag": 0.37,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 23.56
+    },
+    {
+     "t": 2.1,
+     "carV": 24.41,
+     "frame": 24.41,
+     "capyV": 25.72,
+     "lag": 0.37,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 24.41
+    },
+    {
+     "t": 2.21,
+     "carV": 25.26,
+     "frame": 25.26,
+     "capyV": 26.24,
+     "lag": 0.33,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 25.26
+    },
+    {
+     "t": 2.31,
+     "carV": 24.94,
+     "frame": 24.94,
+     "capyV": 25.65,
+     "lag": 0.32,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 24.94
+    },
+    {
+     "t": 2.41,
+     "carV": 23.43,
+     "frame": 23.43,
+     "capyV": 22.49,
+     "lag": 0.31,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 23.43
+    },
+    {
+     "t": 2.51,
+     "carV": 21.94,
+     "frame": 21.94,
+     "capyV": 19.48,
+     "lag": 0.33,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 21.94
+    },
+    {
+     "t": 2.61,
+     "carV": 20.44,
+     "frame": 20.44,
+     "capyV": 17.45,
+     "lag": 0.35,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 20.44
+    },
+    {
+     "t": 2.71,
+     "carV": 18.93,
+     "frame": 18.93,
+     "capyV": 15.95,
+     "lag": 0.37,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 18.93
+    },
+    {
+     "t": 2.81,
+     "carV": 17.2,
+     "frame": 17.2,
+     "capyV": 17.38,
+     "lag": 0.38,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 17.2
+    },
+    {
+     "t": 2.91,
+     "carV": 15.94,
+     "frame": 15.94,
+     "capyV": 16.14,
+     "lag": 0.39,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 15.94
+    },
+    {
+     "t": 3.02,
+     "carV": 15.88,
+     "frame": 15.88,
+     "capyV": 15.73,
+     "lag": 0.39,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 15.88
+    },
+    {
+     "t": 3.11,
+     "carV": 15.88,
+     "frame": 15.88,
+     "capyV": 15.83,
+     "lag": 0.39,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 15.88
+    },
+    {
+     "t": 3.21,
+     "carV": 16.03,
+     "frame": 16.03,
+     "capyV": 13.48,
+     "lag": 0.44,
+     "dy": 1.29,
+     "riding": 1,
+     "rideSpd": 16.03
+    },
+    {
+     "t": 3.3,
+     "carV": 16.87,
+     "frame": 16.87,
+     "capyV": 17,
+     "lag": 0.51,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 16.87
+    },
+    {
+     "t": 3.41,
+     "carV": 17.72,
+     "frame": 17.72,
+     "capyV": 17.43,
+     "lag": 0.49,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 17.72
+    },
+    {
+     "t": 3.51,
+     "carV": 18.57,
+     "frame": 18.57,
+     "capyV": 18.43,
+     "lag": 0.49,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 18.57
+    },
+    {
+     "t": 3.61,
+     "carV": 19.42,
+     "frame": 19.42,
+     "capyV": 19.33,
+     "lag": 0.49,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 19.42
+    },
+    {
+     "t": 3.71,
+     "carV": 20.27,
+     "frame": 20.27,
+     "capyV": 20.22,
+     "lag": 0.48,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 20.27
+    },
+    {
+     "t": 3.81,
+     "carV": 21.12,
+     "frame": 21.12,
+     "capyV": 21.07,
+     "lag": 0.47,
+     "dy": 1.35,
+     "riding": 1,
+     "rideSpd": 21.12
+    },
+    {
+     "t": 3.91,
+     "carV": 20.8,
+     "frame": 20.8,
+     "capyV": 21.07,
+     "lag": 0.46,
+     "dy": 1.34,
+     "riding": 1,
+     "rideSpd": 20.8
+    },
+    {
+     "t": 4.01,
+     "carV": 19.3,
+     "frame": 19.3,
+     "capyV": 19.81,
+     "lag": 0.45,
+     "dy": 1.34,
+     "riding": 1,
+     "rideSpd": 19.3
+    }
+   ]
+  },
+  {
+   "leg": "third",
+   "rows": [
+    {
+     "t": 0.11,
+     "carV": 25.75,
+     "frame": 25.75,
+     "capyV": 25.82,
+     "lag": 0.2,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 25.75
+    },
+    {
+     "t": 0.2,
+     "carV": 24.25,
+     "frame": 24.25,
+     "capyV": 24.42,
+     "lag": 0.21,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 24.25
+    },
+    {
+     "t": 0.3,
+     "carV": 22.74,
+     "frame": 22.74,
+     "capyV": 22.78,
+     "lag": 0.23,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 22.74
+    },
+    {
+     "t": 0.4,
+     "carV": 21.25,
+     "frame": 21.25,
+     "capyV": 21.29,
+     "lag": 0.24,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 21.25
+    },
+    {
+     "t": 0.5,
+     "carV": 19.74,
+     "frame": 19.74,
+     "capyV": 19.92,
+     "lag": 0.26,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 19.74
+    },
+    {
+     "t": 0.6,
+     "carV": 18.63,
+     "frame": 18.63,
+     "capyV": 18.48,
+     "lag": 0.27,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 18.63
+    },
+    {
+     "t": 0.7,
+     "carV": 18.63,
+     "frame": 18.63,
+     "capyV": 18.57,
+     "lag": 0.27,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 18.63
+    },
+    {
+     "t": 0.81,
+     "carV": 18.63,
+     "frame": 18.63,
+     "capyV": 18.58,
+     "lag": 0.28,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 18.63
+    },
+    {
+     "t": 0.9,
+     "carV": 18.39,
+     "frame": 18.39,
+     "capyV": 18.57,
+     "lag": 0.28,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 18.63
+    },
+    {
+     "t": 1,
+     "carV": 19.48,
+     "frame": 19.48,
+     "capyV": 19.24,
+     "lag": 0.34,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 19.48
+    },
+    {
+     "t": 1.1,
+     "carV": 20.34,
+     "frame": 20.34,
+     "capyV": 20.1,
+     "lag": 0.35,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 20.34
+    },
+    {
+     "t": 1.2,
+     "carV": 21.18,
+     "frame": 21.18,
+     "capyV": 20.95,
+     "lag": 0.36,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 21.18
+    },
+    {
+     "t": 1.31,
+     "carV": 22.03,
+     "frame": 22.03,
+     "capyV": 21.8,
+     "lag": 0.37,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 22.03
+    },
+    {
+     "t": 1.4,
+     "carV": 22.89,
+     "frame": 22.89,
+     "capyV": 22.65,
+     "lag": 0.38,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 22.89
+    },
+    {
+     "t": 1.5,
+     "carV": 23.74,
+     "frame": 23.74,
+     "capyV": 23.5,
+     "lag": 0.39,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 23.74
+    },
+    {
+     "t": 1.6,
+     "carV": 22.63,
+     "frame": 22.63,
+     "capyV": 22.81,
+     "lag": 0.4,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 22.63
+    },
+    {
+     "t": 1.7,
+     "carV": 21.12,
+     "frame": 21.12,
+     "capyV": 21.31,
+     "lag": 0.4,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 21.12
+    },
+    {
+     "t": 1.8,
+     "carV": 19.64,
+     "frame": 19.64,
+     "capyV": 19.82,
+     "lag": 0.41,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 19.64
+    },
+    {
+     "t": 1.9,
+     "carV": 18.14,
+     "frame": 18.14,
+     "capyV": 18.32,
+     "lag": 0.42,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 18.14
+    },
+    {
+     "t": 2,
+     "carV": 16.63,
+     "frame": 16.63,
+     "capyV": 16.82,
+     "lag": 0.42,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 16.63
+    },
+    {
+     "t": 2.1,
+     "carV": 15.12,
+     "frame": 15.12,
+     "capyV": 15.32,
+     "lag": 0.43,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 15.12
+    },
+    {
+     "t": 2.2,
+     "carV": 13.63,
+     "frame": 13.63,
+     "capyV": 13.82,
+     "lag": 0.44,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 13.63
+    },
+    {
+     "t": 2.3,
+     "carV": 13.39,
+     "frame": 13.39,
+     "capyV": 13.31,
+     "lag": 0.45,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 13.39
+    },
+    {
+     "t": 2.4,
+     "carV": 13.39,
+     "frame": 13.39,
+     "capyV": 13.31,
+     "lag": 0.45,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 13.39
+    },
+    {
+     "t": 2.5,
+     "carV": 13.39,
+     "frame": 13.39,
+     "capyV": 13.31,
+     "lag": 0.46,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 13.39
+    },
+    {
+     "t": 2.6,
+     "carV": 13.53,
+     "frame": 13.53,
+     "capyV": 20.04,
+     "lag": 0.59,
+     "dy": 1.34,
+     "riding": 2,
+     "rideSpd": 13.53
+    },
+    {
+     "t": 2.7,
+     "carV": 14.38,
+     "frame": 14.38,
+     "capyV": 14.34,
+     "lag": 0.91,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 14.38
+    },
+    {
+     "t": 2.8,
+     "carV": 15.23,
+     "frame": 15.23,
+     "capyV": 15.36,
+     "lag": 0.9,
+     "dy": 1.35,
+     "riding": 2,
+     "rideSpd": 15.23
+    },
+    {
+     "t": 2.9,
+     "carV": 16.08,
+     "frame": 16.08,
+     "capyV": 17.89,
+     "lag": 0.82,
+     "dy": 1.32,
+     "riding": 2,
+     "rideSpd": 16.08
+    },
+    {
+     "t": 3,
+     "carV": 16.93,
+     "frame": 16.93,
+     "capyV": 16.81,
+     "lag": 0.75,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 16.93
+    },
+    {
+     "t": 3.1,
+     "carV": 17.78,
+     "frame": 17.78,
+     "capyV": 18.29,
+     "lag": 0.74,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 17.78
+    },
+    {
+     "t": 3.2,
+     "carV": 18.63,
+     "frame": 18.63,
+     "capyV": 19.09,
+     "lag": 0.73,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 18.63
+    },
+    {
+     "t": 3.3,
+     "carV": 19.48,
+     "frame": 19.48,
+     "capyV": 20.22,
+     "lag": 0.72,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 19.48
+    },
+    {
+     "t": 3.4,
+     "carV": 20.33,
+     "frame": 20.33,
+     "capyV": 20.55,
+     "lag": 0.7,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 20.33
+    },
+    {
+     "t": 3.5,
+     "carV": 21.18,
+     "frame": 21.18,
+     "capyV": 21.5,
+     "lag": 0.68,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 21.18
+    },
+    {
+     "t": 3.6,
+     "carV": 22.03,
+     "frame": 22.03,
+     "capyV": 22.48,
+     "lag": 0.67,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 22.03
+    },
+    {
+     "t": 3.7,
+     "carV": 22.88,
+     "frame": 22.88,
+     "capyV": 23.21,
+     "lag": 0.66,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 22.88
+    },
+    {
+     "t": 3.8,
+     "carV": 23.73,
+     "frame": 23.73,
+     "capyV": 23.44,
+     "lag": 0.63,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 23.73
+    },
+    {
+     "t": 3.9,
+     "carV": 24.59,
+     "frame": 24.59,
+     "capyV": 26.17,
+     "lag": 0.63,
+     "dy": 1.29,
+     "riding": 2,
+     "rideSpd": 24.59
+    },
+    {
+     "t": 4.01,
+     "carV": 24.68,
+     "frame": 24.68,
+     "capyV": 24.91,
+     "lag": 0.6,
+     "dy": 1.28,
+     "riding": 2,
+     "rideSpd": 24.68
+    }
+   ]
+  }
+ ],
+ "biome": "monaco",
+ "vmax": 3
+}

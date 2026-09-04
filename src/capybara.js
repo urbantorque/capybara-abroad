@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
 
 // ===========================================================================
 // AGENT B — THE CAPYBARA
@@ -342,7 +342,31 @@ const capyPLAT_MIN_MASS = 4;        // lighter dynamic bodies are not platforms
 const capyPLAT_COYOTE = 0.18;       // hold the platform frame through a contact blip
 const capyPLAT_AIR    = 1.20;       // s of it held through an actual jump
 const capyPLAT_FADE   = 3.2;        // 1/s the held frame bleeds away afterwards
-const capyPLAT_VMAX = 12;           // sanity clamp on inherited platform speed
+// ---- A SANITY CLAMP MUST BE ABOVE THE FASTEST HONEST CARRIER (X8) ---------
+// This was 12, and Monte Carlo's cars do 26.5. So the roof of a car on the
+// pit straight handed its passenger a frame of 12 while the roof itself did
+// 26.5, and the animal left over the back at fourteen and a half metres a
+// second — which is a car length every sixth of a second.
+//
+// It did not read as broken, and that is the interesting part: the ride mostly
+// SURVIVED, because monBuildCars puts four sixteen-centimetre rails round the
+// cockpit and the solver simply shoved the animal along against the back one.
+// A declared frame that is short by 14.5 m/s was being made up by penetration
+// recovery. Measured, three legs of four seconds each, before and after:
+//
+//   clamp 12   leg 1 held  8/40 samples   mean speed deficit 6.40 m/s
+//              leg 2 held 40/40                              1.95
+//              leg 3 held 40/40                              0.68
+//   clamp 30   leg 1 held 40/40                              0.16
+//              leg 2 held 40/40                              0.09
+//              leg 3 held 40/40                             -0.32
+//
+// 30 is a sanity clamp again rather than a speed limit: qa/px-carriers.js
+// walked all nineteen chapters and the fastest moving kinematic body in the
+// game is Monaco's 26.5, with the next fastest — Circular Quay's ferry — at
+// 8.6. Nothing legitimate is within three and a half metres a second of this
+// number, and main.js's 90 m/s cap is still the guard against a real runaway.
+const capyPLAT_VMAX = 30;           // sanity clamp on inherited platform speed
 // --- BEING THROWN ----------------------------------------------------------
 // How long the controller refuses to believe it is standing on anything after
 // capy.launch(). Without it a throw off a MOVING platform is silently deleted,
@@ -1377,13 +1401,20 @@ function capyWindAt(game) {
  * runaway here would launch a swimming capybara out of the world, which is
  * precisely the class of thing main.js's velocity cap exists to catch and which
  * should never get that far.
+ *
+ * THE THIRD ARGUMENT IS WHOSE DEPTH IT IS (X8). Manly's bore is a surface
+ * thing and an animal that is UNDER it gets almost none of the push — but that
+ * has to be asked as "how deep is the body being pushed", not read off the
+ * player from inside the chapter, because props.js calls the same hook for
+ * every floating prop on that beach. See manFlowAt.
  */
 const capyFlowOut = { x: 0, z: 0 };
 function capyFlowAt(game, x, z) {
   capyFlowOut.x = 0; capyFlowOut.z = 0;
   const api = capyBiomeApi(game);
   if (!api || typeof api.flow !== 'function') return capyFlowOut;
-  const f = api.flow(x, z);
+  const capy = game && game.capy;
+  const f = api.flow(x, z, capy ? (capy.depth || 0) : 0);
   if (!f) return capyFlowOut;
   if (typeof f.x === 'number' && f.x === f.x) capyFlowOut.x = clamp(f.x, -12, 12);
   if (typeof f.z === 'number' && f.z === f.z) capyFlowOut.z = clamp(f.z, -12, 12);
@@ -1491,23 +1522,26 @@ function capyCanDive(game, x, z) {
  * Venice moved the waterline in TIME. Manly moves it in SPACE — a swell is a
  * surface with a metre and a half of relief on it travelling at eight metres a
  * second, and no single scalar can describe that. A biome may therefore
- * declare `localWater: true`, and this asks `waterHeightAt(x, z)` instead.
+ * declared `localWater: true`, and this asked `waterHeightAt(x, z)` instead.
+ *
+ * ---- AND THE FLAG IS GONE (X8) -------------------------------------------
+ * The gate was the bug. Four chapters that never set it — Kyoto, Monte Carlo,
+ * Circular Quay and Cali — have a waterHeightAt that differs from their
+ * waterLevel by up to 63 cm, so the animal solved against a datum the props
+ * floating beside it were not using. Kyoto had already worked around it by
+ * rewriting its own published waterLevel every frame. One resolver now, in
+ * shared.js, with no flag in it: see waterYAt.
  *
  * Built exactly the way slip, wind, the current, the climb and the dive were
- * built: ONE flag from the biome, the solve stays here, and the fourteen
- * chapters that do not publish it cost one property miss and are untouched to
- * the last decimal. Everything that already reads this — the swim threshold,
+ * built: the solve stays here, and a chapter with no swell answers its own
+ * waterLevel from waterHeightAt, so the two paths are identical to the last
+ * decimal. Everything that already reads this — the swim threshold,
  * the float target, the clamber ceiling, the wake rings — becomes correct on a
  * wave for free, because all five were already expressed as offsets from
  * "wherever the water is" rather than as world heights.
  */
 function capyWaterY(env, x, z) {
-  if (env && env.localWater === true && typeof env.waterHeightAt === 'function') {
-    const y = env.waterHeightAt(x, z);
-    if (typeof y === 'number' && y === y) return y;
-  }
-  const w = env && env.waterLevel;
-  return (typeof w === 'number' && w === w) ? w : -0.5;
+  return waterYAt(env, x, z, -0.5);
 }
 
 /**

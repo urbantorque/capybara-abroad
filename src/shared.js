@@ -3510,6 +3510,64 @@ export function makeSolidIndex() {
 export function rand(a, b) { return a + Math.random() * (b - a); }
 export function randInt(a, b) { return Math.floor(a + Math.random() * (b - a + 1)); }
 export function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+/**
+ * WHERE THE WATER IS AT A POINT, and there is now exactly one answer to that.
+ *
+ * ---- THE ASYMMETRY THIS REPLACES (X8) ------------------------------------
+ * Five modules needed the live waterline and they asked for it two different
+ * ways. props.js, weather.js and npc.js called `waterHeightAt` unconditionally.
+ * capybara.js and systems.js called it ONLY when the chapter also set
+ * `localWater: true` — a flag three chapters out of nineteen set — and
+ * otherwise took the flat `waterLevel` datum.
+ *
+ * That was written down as "harmless today, and a trap for the fourth chapter
+ * that adds a swell". It was not harmless. Measured over a 24 x 24 grid inside
+ * bounds() in every chapter (qa/px-hooks.js), four chapters that do NOT set the
+ * flag disagree with themselves:
+ *
+ *   kyoto   0.577 m     monaco  0.627 m
+ *   quay    0.289 m     cali    0.100 m
+ *
+ * So in four chapters a prop floated on the visible surface while the animal
+ * beside it solved its swim threshold, its float target, its clamber ceiling
+ * and its wake rings against a datum up to 63 cm away — and the camera decided
+ * whether the frame was underwater against that same wrong datum.
+ *
+ * Kyoto had already noticed and worked around it the only way the gate allowed:
+ * it REWROTE its own published `waterLevel` every frame from the animal's
+ * position, so that a chapter with two waters 45 cm apart could get the right
+ * one. That is the tell. A published datum that changes because the player
+ * walked somewhere is not a datum, and everything else reading it — the
+ * minimap, a prop's rest height on a still day — got the swing for free.
+ *
+ * There is no flag here, because there never needed to be one: a chapter with
+ * no swell returns its own waterLevel from waterHeightAt and the two answers
+ * are identical. `localWater` is kept as documentation of which chapters have a
+ * surface with shape in it; nothing branches on it any more.
+ *
+ * Returns `miss` where the chapter has no water at all — capybara.js wants
+ * -0.5 there and systems.js wants -Infinity, so neither gets a special case.
+ */
+export function waterYAt(api, x, z, miss) {
+  if (api) {
+    if (typeof api.waterHeightAt === 'function') {
+      // Guarded, because npc.js has always guarded it and was right to: a
+      // chapter that has been registered but not built can throw out of any of
+      // its published hooks, and a waterline is asked for on frames where that
+      // is true.
+      try {
+        // No sentinel test: a dry chapter publishes -400 from BOTH of these
+        // (goreme, sahara), so the two paths agree and nothing needs a threshold.
+        const y = api.waterHeightAt(x, z);
+        if (typeof y === 'number' && y === y) return y;
+      } catch (e) { /* fall through to the datum */ }
+    }
+    const w = api.waterLevel;
+    if (typeof w === 'number' && w === w) return w;
+  }
+  return miss;
+}
 export function lerp(a, b, t) { return a + (b - a) * t; }
 /** Frame-rate independent exponential smoothing. */
 export function damp(current, target, lambda, dt) {

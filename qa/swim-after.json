@@ -1,0 +1,124 @@
+{
+ "rows": [
+  {
+   "biome": "quay",
+   "at": [
+    7.1,
+    14.4
+   ],
+   "y": -0.21,
+   "datum": -0.5,
+   "live": -0.222,
+   "aboveLive": 0.012,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "kyoto",
+   "at": [
+    8.3,
+    10
+   ],
+   "y": -0.428,
+   "datum": -0.45,
+   "live": -0.473,
+   "aboveLive": 0.045,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "cali",
+   "at": [
+    -13.4,
+    -7.9
+   ],
+   "y": -1.545,
+   "datum": -1.5,
+   "live": -1.589,
+   "aboveLive": 0.044,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "monaco",
+   "at": [
+    31,
+    -76.8
+   ],
+   "y": 1.412,
+   "datum": -0.6,
+   "live": -0.634,
+   "aboveLive": 2.046,
+   "swimming": false,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "cave",
+   "at": [
+    -12,
+    36.8
+   ],
+   "y": -7.356,
+   "datum": -7.4,
+   "live": -7.4,
+   "aboveLive": 0.044,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "iceland",
+   "at": [
+    0,
+    136.1
+   ],
+   "y": -1.074,
+   "datum": -1,
+   "live": -1.165,
+   "aboveLive": 0.09,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  },
+  {
+   "biome": "rio",
+   "at": [
+    -5.2,
+    -20.7
+   ],
+   "y": -1.016,
+   "datum": -1,
+   "live": -1.004,
+   "aboveLive": -0.012,
+   "swimming": true,
+   "diving": false,
+   "depth": 0.012,
+   "err": null
+  },
+  {
+   "biome": "venice",
+   "at": [
+    1.7,
+    18.9
+   ],
+   "y": -1.247,
+   "datum": -1.3,
+   "live": -1.3,
+   "aboveLive": 0.053,
+   "swimming": true,
+   "diving": false,
+   "depth": 0,
+   "err": null
+  }
+ ]
+}

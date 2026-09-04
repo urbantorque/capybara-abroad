@@ -8,7 +8,7 @@ import { PALETTE, mat, grain, TASKS, tasksInChapter, chapterCount, rand, randInt
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
-         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing } from './shared.js';
+         exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // AGENT E — SYSTEMS: lighting, follow camera, input, HUD, WebAudio, perf.
@@ -24558,14 +24558,7 @@ export function createSystems(game) {
    * camera under it" is false without a special case anywhere.
    */
   function sysWaterY(x, z) {
-    const api = sysLiveBiomeApi(game);
-    if (!api) return -Infinity;
-    if (api.localWater === true && typeof api.waterHeightAt === 'function') {
-      const y = api.waterHeightAt(x, z);
-      if (typeof y === 'number' && y === y) return y;
-    }
-    const w = api.waterLevel;
-    return (typeof w === 'number' && w === w) ? w : -Infinity;
+    return waterYAt(sysLiveBiomeApi(game), x, z, -Infinity);
   }
 
   /**

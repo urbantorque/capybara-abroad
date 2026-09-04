@@ -2577,7 +2577,7 @@ const quayMOOR_FIELD = [
   { x: 176, z: -262, rx: 30, rz: 34, n: 11, yaw: -0.25 },
   { x: -64, z: -330, rx: 26, rz: 22, n: 9, yaw: 0.2 },
 ];
-function quayBuildMoorings(root) {
+function quayBuildMoorings(game, root) {
   const H = quayMerger();
   // a small yacht: hull, cabin, mast, boom — no sails, because she is moored
   H.box(0, 0.10, 0, 1.55, 0.72, 5.6, PALETTE.hullCream);
@@ -2605,8 +2605,44 @@ function quayBuildMoorings(root) {
     for (let k = 0; k < f.n; k++) {
       const a = (k / f.n) * Math.PI * 2;
       const rr = 0.35 + 0.65 * ((k * 7) % f.n) / f.n;
-      const px = f.x + Math.cos(a) * f.rx * rr + rand(-4, 4);
-      const pz = f.z + Math.sin(a) * f.rz * rr + rand(-4, 4);
+      // ---- AND EVERY ONE OF THEM IS ON WATER (X8) -----------------------
+      // Two of these three ellipses are not. Sampled 20 x 20 across each
+      // field's own extent (qa/px-moor4.js): field 1 is 247 cells of 400 DRY
+      // with terrain up to 26 m, field 2 is 74 of 400 dry, field 3 is clean.
+      // So thirteen yachts were drawn at the waterline twenty-one metres
+      // inside a headland and eleven more were part-buried in another — and
+      // nobody had ever seen it, because a boat inside a hill is a boat you
+      // cannot see. It only surfaced when the hulls grew colliders and an
+      // animal put down on one came to rest at y 21.34.
+      //
+      // The fields are NOT moved. Their centres are a composition — a mooring
+      // field belongs tucked against a headland, off the fairway — and the wet
+      // part of each ellipse is exactly the cove the author was aiming at.
+      // What changes is that a boat now has to find water: up to twenty
+      // candidates round its own arc, scored by how much clear water is at a
+      // hull's length in four directions, so a hull is never half in a
+      // hillside either. Ties break toward the field centre.
+      let px = 0, pz = 0, best = -1e9;
+      for (let t = 0; t < 20; t++) {
+        const wob = t === 0 ? 0 : 1 + t * 0.25;   // widen the search, don't move the field
+        const cx = f.x + Math.cos(a + t * 0.31) * f.rx * rr + rand(-4 * (1 + wob), 4 * (1 + wob));
+        const cz = f.z + Math.sin(a + t * 0.31) * f.rz * rr + rand(-4 * (1 + wob), 4 * (1 + wob));
+        if (!quayIsOverWater(cx, cz)) continue;
+        // how much clear water is round her — four probes at a hull's length,
+        // so a boat is never wedged against a bank she is drawn floating off
+        let room = 0;
+        for (let d = 0; d < 4; d++) {
+          const th = d * Math.PI / 2;
+          if (quayIsOverWater(cx + Math.cos(th) * 7, cz + Math.sin(th) * 7)) room++;
+        }
+        const score = room - Math.hypot(cx - f.x, cz - f.z) * 0.01;
+        if (score > best) { best = score; px = cx; pz = cz; }
+        if (room === 4) break;                    // good enough; stop rolling
+      }
+      if (best <= -1e8) {                         // no water anywhere in this arc
+        px = f.x + Math.cos(a) * f.rx * rr;
+        pz = f.z + Math.sin(a) * f.rz * rr;
+      }
       quayMoorData[i * 4] = px;
       quayMoorData[i * 4 + 1] = pz;
       // ALL LYING THE SAME WAY. Boats on moorings point into the tide, and a
@@ -2617,6 +2653,25 @@ function quayBuildMoorings(root) {
       // the mooring buoy she is lying to, a few metres off the bow
       quayPush9(buoy, px + Math.sin(f.yaw) * 5.2, quayWATER_Y + 0.1, pz + Math.cos(f.yaw) * 5.2,
                 0, 0, 0, 0.5, 0.5, 0.5);
+      // ---- AND SHE IS A HULL, NOT A PICTURE OF ONE (X8) -----------------
+      // Thirty-three boats and not one of them was in the world: you swam
+      // through them and you steered the ferry through them. The argument for
+      // making them scenery was that they are off the fairway — but "off the
+      // fairway" is not "out of the chapter", and every one of these fields is
+      // deep inside bounds(), which is the published statement of where a
+      // player is allowed to go. The berthed ferries two hundred lines down
+      // already carry this exact reasoning and already have their boxes.
+      //
+      // The hull is 1.55 across and 7.1 long including the fore and aft
+      // extensions, so those are the half-extents, and the box sits low enough
+      // to stop a SWIMMER (whose head is at the waterline) as well as a boat.
+      const yaw = quayMoorData[i * 4 + 2];
+      quayStaticBox(game, px, quayWATER_Y + 0.30, pz, 0.85, 0.62, 3.60, yaw);
+      // ...and one circle each for the hull test, not one for the field: a
+      // single circle round a 34 m cove is 34 m WIDE and would push the boat
+      // further out than thirteen yachts ever could. Same shape argument as
+      // the three discs down the berthed ferries.
+      quayHARD.push({ x: px, z: pz, r: 3.6 + quayBOAT_HX, name: 'mooring' });
       i++;
     }
   }
@@ -5375,7 +5430,7 @@ function quayBuild(game) {
   quayBuildPines(game, quayRoot);
   quayBuildCockatoos(quayRoot);
   quayBuildApronDress(game, quayRoot);
-  quayBuildMoorings(quayRoot);
+  quayBuildMoorings(game, quayRoot);
   quayBuildSurf(quayRoot);
   quayBuildBuoys(quayRoot);
   quayBuildFleet(quayRoot);
@@ -5874,6 +5929,23 @@ export function createQuay(game) {
     terrainHeight: quayGroundY,
     // Built from the static boxes themselves — see makeSolidIndex in shared.js.
     navBlocked(x, z, r) { return quaySolids.blocked(x, z, r, quayGroundY); },
+    /**
+     * WHAT WOULD STOP THE HULL AT THIS POINT, by name, or null. Harness only —
+     * nothing in the game reads it, and quayShore does its own sweep because it
+     * needs the push direction as well as the answer.
+     *
+     * It exists because the mooring fields grew hard circles in X8 and there
+     * was no way to ask whether the FAIRWAY had changed width as a result. A
+     * hull test that nothing can query is a hull test nobody can regress.
+     */
+    hardAt(x, z) {
+      for (let i = 0; i < quayHARD.length; i++) {
+        const o = quayHARD[i];
+        const dx = x - o.x, dz = z - o.z;
+        if (dx * dx + dz * dz < o.r * o.r) return o.name || 'hard';
+      }
+      return null;
+    },
     SPAWN: { x: 4, y: 1.0, z: 26 },
     MANLY: quayMANLY,
     // The Bridge, as a fixture: the deck's centre, how far it reaches and how

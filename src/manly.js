@@ -251,6 +251,7 @@ const manCol = new THREE.Color();
 const manCol2 = new THREE.Color();
 const manWave = { y: 0, amp: 0, face: 0, foam: 0, push: 0, depth: 0, brk: 0, ground: 0, f: 0 };
 const manFlow = { x: 0, z: 0 };
+const manFoamFlow = { x: 0, z: 0 };   // the foam loop, never the api's object
 const manSfx = { volume: 1, pitch: 1 };
 
 function manXform(x, y, z, rx, ry, rz, sx, sy, sz) {
@@ -836,15 +837,27 @@ function manIsOverWater(x, z) {
  *
  * AND THE UNDERTOW, which is what makes the duck-dive work: the bore is the
  * top metre of the column and nothing else, so an animal that is DOWN gets
- * almost none of the push and a little of the backwash. capybara.js publishes
- * `depth`; this asks it.
+ * almost none of the push and a little of the backwash.
+ *
+ * ---- AND WHOSE DEPTH IT IS, IS AN ARGUMENT (X8) ---------------------------
+ * This used to read `manGame.capy.depth` off the global, which made the
+ * undertow a property of THE PLAYER rather than of the point being asked
+ * about. props.js's physFlowAt calls the same hook for every floating prop in
+ * the chapter, so a thong bobbing forty metres up the beach lost its shoreward
+ * push the instant the player duck-dived somewhere else entirely — and got it
+ * back when they surfaced. The foam had the same problem and solved it by
+ * keeping a whole second copy of the field (`manFlowAtStatic`), which is the
+ * tell: the depth belonged in the signature, not in the body.
+ *
+ * `dep` is how deep THE THING BEING PUSHED is. Omit it and you get the surface
+ * field, which is the right answer for a prop, for the foam, and for anything
+ * that floats.
  */
-function manFlowAt(x, z, out) {
+function manFlowAt(x, z, out, dep) {
   manWaveAt(x, z, manTime, manWave);
   let vz = manWave.push;
   let vx = 0;
-  const capy = manGame && manGame.capy;
-  const dep = capy ? (capy.depth || 0) : 0;
+  dep = (typeof dep === 'number' && dep === dep) ? dep : 0;
   if (dep > 0.55) {
     // under the surface. The bore is a surface thing.
     const k = clamp(1 - (dep - 0.55) / 1.1, 0, 1);
@@ -3223,9 +3236,19 @@ function manUpdateSurface(dt) {
 function manUpdateFoam(dt) {
   if (!manFoamMesh) return;
   for (let i = 0; i < manFOAM_N; i++) {
-    manFlowAtStatic(manFoamX[i], manFoamZ[i], manFlow);
-    manFoamX[i] += manFlow.x * dt;
-    manFoamZ[i] += manFlow.z * dt;
+    // Foam floats: the surface field, which is manFlowAt with no depth. It used
+    // to be a whole second copy of the field (manFlowAtStatic); now it is the
+    // same function with the argument left off.
+    //
+    // ...ON ITS OWN SCRATCH, though, because `manFlow` is the object api.flow()
+    // hands out, and pantanal.js's panRaftFlow carries the note: a shared vector
+    // returned from an API is a trap this game has paid for twice. It was safe
+    // here only because the two readers never interleave, and calling the
+    // published function from inside the chapter is exactly how that stops
+    // being true.
+    manFlowAt(manFoamX[i], manFoamZ[i], manFoamFlow);
+    manFoamX[i] += manFoamFlow.x * dt;
+    manFoamZ[i] += manFoamFlow.z * dt;
     manWaveAt(manFoamX[i], manFoamZ[i], manTime, manWave);
     // a streak lives while there is white water under it and fades where
     // there is not, so the field IS the break rather than a decoration near it
@@ -3246,24 +3269,6 @@ function manUpdateFoam(dt) {
     manFoamMesh.setMatrixAt(i, manM);
   }
   manFoamMesh.instanceMatrix.needsUpdate = true;
-}
-/** The flow field WITHOUT the capybara's depth term — for foam, which has none. */
-function manFlowAtStatic(x, z, out) {
-  manWaveAt(x, z, manTime, manWave);
-  let vz = manWave.push;
-  let vx = 0;
-  if (z < 18 && z > -44) {
-    const rk = manRipK(x);
-    const gate = manSmooth((20 - z) / 8) * manSmooth((z + 42) / 14);
-    vz -= rk * manRIP_V * gate;
-    const dxr = x - manRIP_X;
-    if (Math.abs(dxr) < 42 && z > -20) {
-      const fk = (1 - rk) * manSmooth((22 - z) / 16) * clamp(1 - Math.abs(dxr) / 42, 0, 1);
-      vx -= Math.sign(dxr) * fk * 1.5;
-    }
-  }
-  out.x = vx; out.z = vz;
-  return out;
 }
 
 /**
@@ -4459,8 +4464,9 @@ export function createManly(game) {
     waterLevel: manWATER,
     isOverWater: manIsOverWater,
     waterHeightAt: manSurfY,
-    /** THE WATER IS GOING SOMEWHERE. The Uji's channel, on a beach. */
-    flow(x, z) { return manFlowAt(x, z, manFlow); },
+    /** THE WATER IS GOING SOMEWHERE. The Uji's channel, on a beach. `dep` is
+     *  how deep the thing being pushed is; omit it and you get the surface. */
+    flow(x, z, dep) { return manFlowAt(x, z, manFlow, dep); },
     /**
      * THE SECOND CHAPTER TO PUBLISH IT, and here it is not a sightseeing verb
      * but the answer to a specific question: what do you do about two hundred

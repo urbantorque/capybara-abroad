@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE, mat, rand, clamp, damp, calmOn } from './shared.js';
+import { PALETTE, mat, rand, clamp, damp, calmOn, waterYAt } from './shared.js';
 
 // ===========================================================================
 // THE GLOBAL ENVIRONMENT — a biome's mood is FIXED, and it breathes anyway.
@@ -1110,7 +1110,7 @@ export function createWeather(game) {
     // pinned to waterLevel in Manly or Iceland spends a third of its life
     // inside the swell, which is the bug physFoamRing's own comment records.
     if (api && typeof api.isOverWater === 'function' && api.isOverWater(x, z)) {
-      y = (typeof api.waterHeightAt === 'function') ? api.waterHeightAt(x, z) : api.waterLevel;
+      y = waterYAt(api, x, z, 0);
     } else if (api && typeof api.terrainHeight === 'function') {
       y = api.terrainHeight(x, z);
     } else {
@@ -1155,8 +1155,7 @@ export function createWeather(game) {
         if (ringLife[i] <= 0) continue;
         let s = 0;
         if (api && typeof api.isOverWater === 'function' && api.isOverWater(ringX[i], ringZ[i])) {
-          s = (typeof api.waterHeightAt === 'function')
-            ? api.waterHeightAt(ringX[i], ringZ[i]) : api.waterLevel;
+          s = waterYAt(api, ringX[i], ringZ[i], 0);
         } else if (api && typeof api.terrainHeight === 'function') {
           s = api.terrainHeight(ringX[i], ringZ[i]);
         }

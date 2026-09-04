@@ -596,7 +596,9 @@ function palSlope(x, z) {
   const e = 1.2;
   const dx = palTerrain(x + e, z) - palTerrain(x - e, z);
   const dz = palTerrain(x, z + e) - palTerrain(x, z - e);
-  return Math.atan(Math.sqrt(dx * dx + dz * dz) / (2 * e));
+  // RISE OVER RUN, not radians. See slopeAt in CONTRACT.md: this used to
+  // return an angle, and twelve of the seventeen publishers return a gradient.
+  return Math.sqrt(dx * dx + dz * dz) / (2 * e);
 }
 function palIsOverWater(x, z) { return palTerrain(x, z) < palWATER - 0.05; }
 function palWaterHeightAt() { return palWATER; }

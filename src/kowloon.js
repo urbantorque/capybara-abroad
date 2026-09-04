@@ -342,10 +342,94 @@ function hkTerrain(x, z) {
   const t = clamp((hkPIER_Z - z) / 5, 0, 1);
   return lerp(0, hkHARBOUR_Y, t * t * (3 - 2 * t));
 }
+// ---- THE STAIR IS PLAYED FROM INSIDE A SIGNBOARD (X8) ---------------------
+//
+// Found in X7 and shelved there: walking A off the spawn, the frame is one dark
+// awning and the animal is not in it. `sysCamClear` cannot help, because it rays
+// the PHYSICS world and the thing over the west pavement is drawn only — and
+// there is no point giving it a shell, because Mong Kok is ONE merged mesh
+// 57 x 49 x 110 m and "which object is in the way" has a single useless answer.
+// Measured (qa/px-hk-awn.js): 16 of 36 frames occluded, 15 of them by a mesh the
+// physics ray reports as `physHit: null`.
+//
+// So it is camCeil, exactly as the Marrakech souk does it — the chapter that
+// knows where its roofs are says so. Mapped on a 2 m grid the length of the
+// street (qa/px-hk-awn3.js), the cover is not a scatter of awnings but one
+// continuous first-floor overhang along the WEST shopfronts:
+//
+//     x:  -18   -16   -14   -12   -10    -8    -6    -4    -2     0     2
+//         inside the buildings    |   4.8   4.8    open sky, the whole length
+//
+// — running the whole length from z -40 to 60 over exactly the west pavement
+// (-hkFACE to -hkST_HALF, which is where the measured strip lands to the metre).
+// The east pavement is open except over the dai pai dong, whose valance hangs at
+// 2.42 and which is a stall you walk under rather than a street you walk along.
+//
+// The two blocks below are the two things the souk never had to get right: WHICH
+// height, and WHOSE position. Both were wrong first. The margin is the souk's
+// 35 cm either way — see sahCamCeil.
+// ---- ...AND IT IS THE SIGHT LINE THAT HAS TO CLEAR, NOT THE LENS ----------
+// systems.js evaluates camCeil at `sysDesired`, which is the CAMERA, and for
+// the souk that is enough because the souk is three hundred square metres and
+// the camera is inside it too. A dai pai dong is seven metres by ten. Measured
+// with the animal put down at its tables: the lens sat at 6.80 out on the
+// carriageway — nowhere near the stall, so nothing fired — and the frame was
+// the whole green awning with no capybara in it at all.
+//
+// So both ends are asked and the LOWER answer wins: a cover over either the
+// eye or the animal is a cover across the line between them. Reading the
+// animal's position from inside a chapter hook is the same move monaco's
+// `room()` makes.
+// ---- AND THE NUMBER IS THE LOWEST BAND, NOT THE COMMONEST -------------
+// 4.80 was the reading on a 2 m grid and it left the frame at (-8.5, 20) as
+// one red awning. On a 1 m grid over the whole strip (qa/px-hk-awn4.js, 1 070
+// cells, 813 of them covered) the cover is banded, not flat:
+//
+//     4.5-5.0 m  463 cells      3.0-3.5   27
+//     3.5-4.0    102            2.0-3.0   13
+//     5.5+        78            1.0-2.0   20   (min 1.18 at -9.5, 24)
+//
+// So the ceiling goes under the 3.5 band at 3.15 and clears 565 of the 813.
+// The two dozen cells lower than that are individual shopfront awnings at head
+// height and no lens height survives them without being under the animal;
+// sysCamClear's boom cut is the thing for those, when they are solid.
+const hkAWN_Y = 3.50 - 0.35;
+const hkDPD_AWN_Y = 2.42 - 0.35;
+function hkCoverAt(x, z) {
+  // the first-floor overhang along the west shopfronts, the length of the street
+  if (z > hkST_Z0 - 6 && z < hkST_Z1 + 6 &&
+      x > -hkFACE - 1 && x < -hkST_HALF + 0.5) return hkAWN_Y;
+  const dx = x - hkDPD.x, dz = z - hkDPD.z;
+  if (dx > -5.4 && dx < 2.2 && dz > -5.0 && dz < 5.0) return hkDPD_AWN_Y;
+  return Infinity;
+}
+function hkCamCeil(x, z) {
+  const p = hkGame && hkGame.capy && hkGame.capy.position;
+  // ---- AND IT STOPS AT THE BOARDS, BECAUSE THIS CHAPTER GOES UP ---------
+  // hkSCAF stands at x = -hkFACE with its top at 34.8, which is INSIDE the
+  // covered strip: without this line, climbing the scaffold — the thing the
+  // chapter is about — would hold the lens at 3.15 while the animal went to
+  // thirty-four metres, and the frame would be the pavement. Nothing is over
+  // your head once you are above the awnings, so nothing clamps.
+  if (p && p.y > hkAWN_Y) return Infinity;
+  let c = hkCoverAt(x, z);
+  if (p) { const q = hkCoverAt(p.x, p.z); if (q < c) c = q; }
+  return c;
+}
+
+/**
+ * RISE OVER RUN, BOTH AXES. This was the odd one out of the seventeen twice:
+ * it returned an ANGLE where twelve chapters return a gradient, and it
+ * differenced only z, so a street running north-south read as flat no matter
+ * how steeply it climbed east. Hong Kong is the chapter whose entire premise is
+ * that up is a direction, which makes it the worst place in the game to have a
+ * slope function that only looks one way. See slopeAt in CONTRACT.md.
+ */
 function hkSlope(x, z) {
   const e = 1.2;
+  const dx = hkTerrain(x + e, z) - hkTerrain(x - e, z);
   const dz = hkTerrain(x, z + e) - hkTerrain(x, z - e);
-  return Math.atan(Math.abs(dz) / (2 * e));
+  return Math.hypot(dx, dz) / (2 * e);
 }
 /**
  * THE PIERS ARE NOT THE HARBOUR.
@@ -4617,6 +4701,8 @@ export function createKowloon(game) {
       return d * hkCYCLE;
     },
     slopeAt: hkSlope,
+    /** The west pavement is roofed for its whole length. See hkCamCeil. */
+    camCeil: hkCamCeil,
     waterLevel: -0.5,
     isOverWater: hkIsOverWater,
     waterHeightAt: hkWaterHeightAt,

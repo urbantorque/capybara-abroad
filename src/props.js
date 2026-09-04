@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, grain } from './shared.js';
+import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, grain, waterYAt } from './shared.js';
 
 // ===========================================================================
 // AGENT C — world physics + interactive props.
@@ -3192,14 +3192,10 @@ function physOverWater(x, z) {
   if (api && typeof api.isOverWater === 'function') return !!api.isOverWater(x, z);
   return false;                       // a biome with no water publishes nothing
 }
-/** Surface height of the live biome's water at (x, z) — swell included, if modelled. */
+/** Surface height of the live biome's water at (x, z) — swell included, if
+ *  modelled. One resolver, shared with capybara.js and systems.js since X8. */
 function physWaterHeightAt(x, z) {
-  const api = physBiomeApi();
-  if (api && typeof api.waterHeightAt === 'function') {
-    const h = api.waterHeightAt(x, z);
-    if (typeof h === 'number' && h === h) return h;
-  }
-  return physWaterLevel();
+  return waterYAt(physBiomeApi(), x, z, physWATER_FALLBACK);
 }
 /** Terrain height under (x, z) in the live biome, or NaN where none is published. */
 function physTerrainAt(x, z) {
@@ -3216,6 +3212,12 @@ function physFlowAt(x, z) {
   physFlowOut.x = 0; physFlowOut.z = 0;
   const api = physBiomeApi();
   if (api && typeof api.flow === 'function') {
+    // NO DEPTH ARGUMENT, AND THAT IS THE STATEMENT (X8). A prop in this solver
+    // is a FLOATING thing by construction — physBuoyancy is the only caller —
+    // so it gets the surface field. Manly used to read the PLAYER's depth from
+    // inside its own flow(), which meant a thong bobbing forty metres up the
+    // beach lost its shoreward push whenever the player duck-dived somewhere
+    // else entirely.
     const f = api.flow(x, z);
     if (f) {
       if (typeof f.x === 'number' && f.x === f.x) physFlowOut.x = clamp(f.x, -12, 12);
@@ -3729,12 +3731,24 @@ function physSpawnRubbish(x, y, z) {
   slot.mesh.rotation.set(slot.rx, slot.ry, slot.rz);
 }
 
-const physRUB_G = 24;            // matches the world gravity in main.js
+// GRAVITY IS NOT A CONSTANT IN THIS GAME, and this was written as though it
+// were: 24 is main.js's number and the Drift runs at 0.36 g. So every scrap
+// knocked off a table up there fell at nearly three times the rate of the thing
+// that knocked it, in the one chapter whose entire premise is that it does not.
+// The buoyancy solver forty lines up already reads the live number
+// (`-physGame.world.gravity.y`); this is the same read, hoisted to once per
+// frame rather than once per scrap.
+function physRubG() {
+  const w = physGame && physGame.world;
+  const g = w && w.gravity ? -w.gravity.y : 24;
+  return (typeof g === 'number' && g === g && g > 0) ? g : 24;
+}
 const physRUB_BOUNCE = 0.34;
 const physRUB_SKID = 0.55;       // horizontal speed kept through a bounce
 const physRUB_REST_V = 0.55;     // m/s below which a grounded scrap gives up
 
 function physRubbishUpdate(dt, live) {
+  const rubG = physRubG();          // once per frame, not once per scrap
   for (let i = 0; i < physRubbish.length; i++) {
     const r = physRubbish[i];
     if (!r.active) continue;
@@ -3752,7 +3766,7 @@ function physRubbishUpdate(dt, live) {
     if (r.life < 0.8) r.mesh.scale.setScalar(clamp(r.life / 0.8, 0.02, 1));
     if (r.rest) continue;              // settled: nothing left to integrate
 
-    r.vy -= physRUB_G * dt;
+    r.vy -= rubG * dt;
     r.x += r.vx * dt;
     r.y += r.vy * dt;
     r.z += r.vz * dt;

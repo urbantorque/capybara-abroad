@@ -461,6 +461,40 @@ biome and nobody else, for the same reason: `game.drift` stays resident when the
 detached, and a thirty-eight-second gale still blowing across the Botanic Gardens would be a
 very hard bug to find.
 
+### THE WATERLINE HAS ONE RESOLVER, AND NO FLAG (X8)
+
+`shared.js` exports `waterYAt(api, x, z, miss)`. Everything that needs the live waterline goes
+through it — capybara.js, systems.js, props.js, weather.js, npc.js — and it asks
+`waterHeightAt(x, z)` first, falling back to the flat `waterLevel` datum.
+
+There is **no `localWater` gate** any more. There used to be: capybara.js and systems.js only
+consulted `waterHeightAt` when the chapter also set `localWater: true`, and the other three asked
+unconditionally. Measured over a 24 × 24 grid inside `bounds()` in every chapter
+(`qa/px-hooks.js`), four chapters that never set the flag disagree with themselves — Monte Carlo
+0.627 m, Kyoto 0.577, Circular Quay 0.289, Cali 0.100 — so in those four the animal solved its
+swim threshold, float target, clamber ceiling and wake rings against a datum the props floating
+beside it were not using, and the camera decided whether the frame was underwater against the
+same wrong number. Kyoto had already worked around it by rewriting its own published
+`waterLevel` every frame from the animal's position, which broke the datum for everyone else.
+
+`localWater` survives as documentation of which chapters have a surface with shape in it.
+Nothing branches on it. A chapter with no swell returns its own `waterLevel` from
+`waterHeightAt` and the two paths are identical to the last decimal.
+
+### `slopeAt(x, z)` IS RISE OVER RUN, AND NOTHING READS IT (X8)
+
+Seventeen chapters publish it and no runtime code has ever called one — capybara.js derives its
+own SIGNED grade along the direction of travel (Tobler needs a sign; `slopeAt` is a magnitude),
+and npc.js's chase does the same. It is a harness hook and the QA suite uses it heavily.
+
+It is kept, and it is now one hook rather than four. Twelve publishers returned rise over run;
+Cappadocia, Palawan and Venice returned `atan()` of it — an angle in radians — and Hong Kong
+returned an angle differenced along **z only**, so a street that climbed east read as flat in the
+one chapter whose premise is that up is a direction. Those four now match the twelve. The Drift
+still returns a constant 0 against terrain that differs from it by 0.72 on average; that is a
+stub and it is noted rather than fixed, because the Drift's relief is drawn, not walked.
+
+
 ## Chapter 5 — Cali (v6)
 
 A fifth biome, `cali`. `src/cali.js`, prefix `cali`, `export function createCali(game)`.
@@ -2043,21 +2077,46 @@ Nine of the thirteen minis are things that carry the animal, so this is written 
 
 1. `mass: 0`, `type: CANNON.Body.KINEMATIC`, `allowSleep = false` (a sleeping body is skipped in
    narrowphase, and a floor that stops existing is the worst bug in this game).
-2. **Move it with `velocity`, and NEVER by assigning `position`.** A body whose position is
-   assigned every frame is a body cannon never integrates: the contact under the passenger is
-   remade from scratch each step, there is no relative velocity for friction to act on, and the
-   passenger slides off on the first corner. Measured on Cali's barrow, every run.
+2. **Always write `velocity`. Writing `position` as well is fine, and seven of the fifteen
+   kinds of carrier in the game do.** The rule here used to read "move it with velocity and NEVER by assigning
+   position", with three named exceptions. That was measured on Cali's barrow and it drew the
+   wrong line: what threw the barrow's passenger off was a **zero** velocity, not a written
+   position. A kinematic body with zero velocity is SOLID GROUND to capybara.js's contact sweep,
+   so the controller pins the animal's world velocity while a hand carry drags the body, and the
+   two fight. rio.js's cabin carries the definitive note ("it does not move it twice") and the
+   measurement behind it: the animal creeps 1.43 m forward in four seconds, is out of the car by
+   the fifth, and `bondinho` cannot be completed at all.
+
+   cannon integrates a kinematic body from its velocity INSIDE `world.step`, and a module update
+   runs afterwards — so a position written there is authoritative, and the velocity is read only
+   by the contact solver, which is exactly who needs it.
+
+   Censused across all nineteen chapters (`qa/px-carriers.js`, `qa/px-carriers2.js`, X8), the
+   moving kinematic bodies split two ways and BOTH are correct:
+
+   | pattern | carriers | note |
+   |---|---|---|
+   | velocity only | Monaco's 3 cars, Antarctica's 15 floes, Venice ×2, Kowloon ×2, Sydney's ferry, Pasto's chiva, Rio ×2, the cave log | conforms as written; accumulates a permanent step per hitch longer than five substeps, because the next frame's velocity is differenced from the target and never from the error |
+   | velocity **and** position | Quay's big ferry, Iceland's snowcat, Palawan's bangka, Cappadocia's trailer, Marrakech's caravan, the Drift's 3 wanderers, Rio's cabin and its 2 parade floats | self-correcting: the write erases the hitch |
+
+   So prefer writing both. The three "exceptions" this rule used to name were not exceptions.
+
 3. **Difference against the PREVIOUS TARGET, not against the body's own position** — cannon
-   integrates kinematic bodies inside `world.step`, which runs before every module update.
+   integrates kinematic bodies inside `world.step`, which runs before every module update. This
+   is the rule that makes the velocity-only pattern accumulate: the error is in the body, and the
+   body is the one thing rule 3 forbids you to look at. Writing the position as well is how you
+   get rule 3 and no accumulation at the same time.
 4. Yaw goes through `angularVelocity`; pitch and roll go on the MESH only. Rate-integrating three
    axes to hold a body on a switchback is a lot of machinery to tilt a collision box eight degrees,
    and the box is what the passenger is standing in.
 5. Render from `interpolatedPosition`, never from `position`.
 
-The two carriers that break rule 2 on purpose are the player's own ferry and the balloon basket,
-and both park their passenger by hand for exactly that reason. Palawan's manta is the third and
-it is not a precedent to reach for: it rolls its passenger through a full revolution under water,
-where there is no floor and no contact to have.
+The carriers that park their passenger BY HAND rather than leaving it to the contact are the
+player's own ferry and the balloon basket. Palawan's manta is the third and it is not a precedent
+to reach for: it rolls its passenger through a full revolution under water, where there is no
+floor and no contact to have. (These three used to be described here as "the carriers that break
+rule 2", which conflated writing a position with hand-carrying a passenger. They are separate
+choices and only the second one is rare.)
 
 6. **DO NOT ASSIGN THE PASSENGER'S VELOCITY UNLESS THE CARRIER RISES AS FAST AS THE ANIMAL DOES.**
    Venice's Volo was written the way the balloon is written — `carryFrame()` for the horizontal

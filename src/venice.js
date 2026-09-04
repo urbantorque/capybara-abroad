@@ -733,7 +733,8 @@ function venSlope(x, z) {
   const e = 1.4;
   const dx = venTerrain(x + e, z) - venTerrain(x - e, z);
   const dz = venTerrain(x, z + e) - venTerrain(x, z - e);
-  return Math.atan(Math.hypot(dx, dz) / (2 * e));
+  // RISE OVER RUN, not radians. See slopeAt in CONTRACT.md.
+  return Math.hypot(dx, dz) / (2 * e);
 }
 
 // =================================================================== WATER ==

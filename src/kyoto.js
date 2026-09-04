@@ -4059,9 +4059,11 @@ export function createKyoto(game) {
       kyoBellWind = -1; kyoBellRing = 0; kyoBellWave = 0; kyoBellPulse = 0; kyoKoiSpeed = 1;
       kyoBellTick = 0; kyoBellSaid = 0;
       if (kyoBellGroup) { kyoBellGroup.scale.set(1, 1, 1); kyoBellGroup.rotation.z = 0; }
-      // the first frame of a re-entry must not solve against the water you left
-      const kp = game.capy && game.capy.position;
-      if (game.kyoto) game.kyoto.waterLevel = (kp && kyoInRiverAt(kp.x, kp.z)) ? kyoRIVER_Y : kyoWATER_Y;
+      // The re-entry half of the same workaround, deleted with it in X8: the
+      // datum no longer depends on where the animal is standing, so there is
+      // no wrong water to arrive solving against. `kyoWaterHeightAt` answers
+      // per point and capybara.js asks it on the first frame like every other.
+      if (game.kyoto) game.kyoto.waterLevel = kyoWATER_Y;
     },
 
     onExit() {
@@ -4218,15 +4220,21 @@ export function createKyoto(game) {
       if (!game.biome.isActive('kyoto')) return;
       kyoTime += dt;
 
-      // THE WATERLINE FOLLOWS THE ANIMAL, the Venice idiom. capybara.js solves
-      // buoyancy and the swim threshold against `waterLevel` alone — it never
-      // consults waterHeightAt — and this chapter has two waters 45 cm apart:
-      // the mirror pond at -0.45 and the Uji at -0.90. Published as the pond's
-      // for both, the animal floated 19 cm clear of the river for the whole of
-      // the Uji run, which is this chapter's one marquee task, and started
-      // swimming a metre above the surface on the way in.
-      const kcp = game.capy && game.capy.position;
-      api.waterLevel = (kcp && kyoInRiverAt(kcp.x, kcp.z)) ? kyoRIVER_Y : kyoWATER_Y;
+      // ---- THE WATERLINE USED TO FOLLOW THE ANIMAL, AND NOW IT DOES NOT ----
+      // This chapter has two waters 45 cm apart — the mirror pond at -0.45 and
+      // the Uji at -0.90 — and capybara.js solved buoyancy and the swim
+      // threshold against `waterLevel` alone, because asking waterHeightAt was
+      // gated on a `localWater` flag this chapter does not set. Published as
+      // the pond's for both, the animal floated 19 cm clear of the river for
+      // the whole of the Uji run, which is this chapter's one marquee task.
+      //
+      // The workaround was this line: rewrite the published datum every frame
+      // from the ANIMAL'S position. It fixed the swim and broke the datum —
+      // everything else reading waterLevel (a prop's rest height on a still
+      // day, the minimap) got a number that swung 45 cm because the player had
+      // walked to the river. X8 removed the gate instead, so `waterLevel` is a
+      // constant again and `kyoWaterHeightAt` answers per point, which is what
+      // it was always for. See waterYAt in shared.js.
 
       kyoRipT += dt;
 

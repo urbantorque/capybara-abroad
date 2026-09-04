@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp } from './shared.js';
+import { PALETTE, mat, matOwn, TASKS, rand, randInt, clamp, damp, lerp, waterYAt } from './shared.js';
 
 // ===========================================================================
 // AGENT D — NPC AI.  Sydneysiders: tourists, gardeners, joggers, bin chickens.
@@ -5653,16 +5653,8 @@ export function createNPCs(game) {
     }
     return z < npcEDGE_Z;
   }
-  function envWaterY(x, z) {
-    const e = game.env;
-    if (e && typeof e.waterHeightAt === 'function') {
-      try {
-        const y = e.waterHeightAt(x, z);
-        if (isFinite(y)) return y;
-      } catch (err) { /* fall through */ }
-    }
-    return (e && isFinite(e.waterLevel)) ? e.waterLevel : -0.5;
-  }
+  /** One resolver since X8 — see waterYAt in shared.js. */
+  function envWaterY(x, z) { return waterYAt(game.env, x, z, -0.5); }
 
   /**
    * A badly startled Sydneysider does not run somewhere sensible — he backs
