@@ -1268,6 +1268,28 @@ function quayBuildBridge(game, root) {
   //
   // See quayABUT: the deck now runs from bluff to bluff instead of stopping
   // 25 m outboard of each pylon and hanging there over open water.
+  //
+  // ---- THE DECK IS DRAWN AND NOT SOLID, AND THAT IS CORRECT (X8) ---------
+  // Deliberately checked, because thirty-eight cars and a three-carriage train
+  // run along it and the last shelf item asked whether they should be colliders.
+  // Measured (qa/px-bridge.js, qa/px-bridge5.js):
+  //
+  //   - the physics world holds NOTHING at deck height between u -150 and +150.
+  //     Only the abutments answer, from |u| 168 out. Put the animal on the deck
+  //     at u 0, 60 or 120 and it falls 26.4 m into the harbour and swims.
+  //   - and it cannot get up there. Swimming at the landfall bluff, at a pylon
+  //     and at an approach pier, from open water, on both keys, the highest it
+  //     reaches against any of them is 2.20 m against a deck at 25. It is never
+  //     grounded and never stops swimming: every face is sheer from the water.
+  //   - this chapter publishes no `climbHold`. Only Hong Kong, Cappadocia and
+  //     Son Doong do, so there is no climb verb here to find a way up with.
+  //
+  // So by the rule the moorings were done under — collide what a player can
+  // reach — the deck needs no floor and the traffic needs no bodies.
+  //
+  // IF THAT EVER CHANGES, THIS IS THE FIRST THING THAT BREAKS. A bluff that
+  // becomes climbable turns 300 m of drawn carriageway into a hole with cars
+  // driving through it. Re-run qa/px-bridge5.js before adding any way up.
   const APPROACH = [105, 139];             // viaduct piers along the deck, per side
   const DECK_HALF = quayDECK_HALF;
   place(0, D - 1.4, 0, DECK_HALF * 2, 1.5, 12.0, PALETTE.stoneDark);

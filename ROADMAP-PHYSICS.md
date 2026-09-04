@@ -777,26 +777,100 @@ up to twenty candidates round its own arc, scored by how much clear water is at
 a hull's length in four directions. After: **33 of 33 hulls over water, max
 terrain under a hull 0, and 31 of 33 with all four probes clear.**
 
+#### 9 · Sydney's ferries and the bridge traffic — the shelf's last item
+
+Two structures, one rule — collide what a player can reach — and the two of them
+land on opposite sides of it. Both answers are now measured rather than assumed,
+which is the whole of what this item asked for.
+
+**Sydney's harbour traffic is reachable, and is now solid.** `envBuildTraffic`
+carried the claim in its own comment: nine sails and two small ferries, "all of
+them beyond z = -46 so they are scenery and nothing else: no colliders … no way
+for the player to reach them". The chapter's own `bounds()` disagrees — the
+harbour rectangle is x ±140, z −150..−8, and the comment on THAT says "the seabed
+body under it is wider still, so swimming to the far shore stays legal". All
+eleven boats sit inside it, from z −47.7 to −128.6.
+
+Measured (`qa/px-syd-traf.js`): put down at z −140 the animal swims, is not
+outside, and the rescue does not fire; and swimming north from the sea wall on
+one held key for twenty seconds it reaches z −66.8 and passes within **6.8 m of
+a hull**. They are about half a minute's swim from the shore.
+
+So the eleven get hulls — kinematic, one box each matched to the drawn hull and
+scaled per instance, writing velocity AND position for the reason X8 wrote into
+rule 2. Verified: every drawn instance has a body exactly on it (worst offset
+**0.000 m over 440 samples** across four seconds of sailing); a physics ray
+across each beam stops at 3.30 m from centre for a sail and 6.93 for a ferry,
+which are the half-extents to the centimetre; Sydney goes 149 → 160 bodies and
+43 → 54 kinematic, and Pasto and Circular Quay carry **zero** traffic hulls, so
+they detach with the chapter as they must.
+
+And they carry. The decks sit 0.58 m over the waterline — the Quay moorings
+measured the same clamber at 0.42 — so climbing onto a passing yacht is now
+something a player can do by accident. Twenty-five seconds aboard each of the
+two ferries and the widest-ranging sail: **250 of 250 frames on board, zero
+frames outside the world.**
+
+That last number needed a fix of its own. **Both ferry legs ran to x ±150 and the
+player's harbour is x ±140**, so each of them turned round ten metres outside the
+world — which did not matter while they were scenery and matters entirely once
+they are things you can stand on: a ride to the end of the leg carries the animal
+out of bounds and into the rescue, and being teleported off your own boat is a
+worse bug than swimming through it was. Found by accident, by a probe that put
+the animal at a ferry's centre and got back seven frames of "outside" and a
+rescue instead of a collision. The two legs and one sail that touched −140 are
+now ±138; at forty to a hundred metres out, twelve metres of turn is not a
+picture.
+
+**The Harbour Bridge deck is NOT reachable, so nothing on it is collided — and
+the deck itself has no floor, which is correct.** Thirty-eight cars and a
+three-carriage train run along it at 18.5–28.6 m/s and 15.1 m/s. Reading
+`quayBuildBridge` first: the pylons, the eight approach piers and the two
+abutments all take a `quayStaticBox` and the deck takes none. Measured
+(`qa/px-bridge.js`):
+
+- the physics world holds **nothing at deck height between u −150 and +150**.
+  Only the abutments answer, from |u| 168 outboard.
+- put the animal on the deck at u 0, 60 or 120 and it falls **26.4 m** into the
+  harbour and swims. At u 175 it stands, because that is the abutment.
+
+Then whether anyone can get there. Swimming at the landfall bluff, at a pylon and
+at an approach pier, from open water, on both keys (`qa/px-bridge5.js`) and then
+at the bluff from all four sides on all four keys with Bradleys Head as a control
+(`qa/px-bridge6.js`) — **thirty-two legs, and the highest the animal reaches
+against any of them is 2.28 m against a deck at 25.** It is never grounded and
+never stops swimming. Every face is sheer from the water, and this chapter
+publishes no `climbHold`: only Hong Kong, Cappadocia and Sơn Đoòng do, so there
+is no climb verb here to find a way up with.
+
+The control is the useful half. `quayBuildLand` carries a comment about Bradleys
+Head — "the one you can actually swim to: the animal stands on the rim at 21 m
+with four metres of hill over its head" — which if true would mean a headland can
+be got onto and the bluff test was too narrow. It cannot: Bradleys Head measures
+2.07–2.29 m from all four sides, exactly like the bluff. **That comment was
+written from a probe that teleported**, which is the same mistake the first two
+versions of this item's own probe made.
+
+So the deck needs no floor and the traffic needs no bodies. The finding is
+written into `quayBuildBridge` next to the deck, with the note that a bluff which
+ever becomes climbable turns 300 m of drawn carriageway into a hole with cars
+driving through it — and which probe to re-run first.
+
 #### What X8 did not do
 
-Sydney's ferries and the Harbour Bridge traffic, the ninth shelf item. The
-moorings answered the reachability question for things on water; the bridge deck
-is a different question and nobody has shown that a player can get onto it. It
-stays on the shelf with that written down.
-
-And the four still-open items from the X7 write-up are still open: the X5
-walk-into-the-face confirmation, the camera audit's write-up, the Drift's
-`slopeAt` stub, and the fact that no chapter has been played end to end by a
-person.
+The shelf is empty; all nine are done. What is still open is the four things the
+X7 write-up listed and this batch did not touch: the batch X5 walk-into-the-face
+confirmation, the camera audit's write-up, the Drift's `slopeAt` stub, and the
+fact that no chapter has been played end to end by a person. Everything above is
+instrumented.
 
 ---
 
 ## The shelf — sized, not scheduled
 
-**Eight of the nine were cleared by batch X8 on 5 Sep 2026, and the entries are
-kept below with what they turned out to be, because three of them were wrong
-about their own subject and that is the useful part.** Only the last one is
-still open.
+**All nine were cleared by batch X8 on 5 Sep 2026, and the entries are kept below
+with what they turned out to be, because four of them were wrong about their own
+subject and that is the useful part.** Nothing on this list is open.
 
 - ~~**`slopeAt` has seventeen publishers and no runtime consumer.** Either delete
   it or have the animal and the NPCs read it instead of differencing
@@ -834,10 +908,16 @@ still open.
   nothing to attach to. Occluded frames 16/36 → 4/37. See X8 §7.
 - ~~**Quay's moored yachts** are drawn and not solid.~~ **Reachable by
   `bounds()`, and thirteen of them were buried in a headland.** See X8 §8.
-- **Sydney's ferries and the Harbour Bridge traffic** are drawn and not solid.
-  Both are on a deck whose reachability is unproven — the moorings settled the
-  question for things on water, and the bridge deck is a different one. Confirm
-  reachability first; collide only what a player can reach. STILL OPEN.
+- ~~**Sydney's ferries and the Harbour Bridge traffic** are drawn and not solid.
+  All are on water or on a deck whose reachability is unproven. Confirm
+  reachability first; collide only what a player can reach.~~ **The two answers
+  are opposite, and both are now measured.** Sydney's eleven are half a minute's
+  swim from the sea wall and inside the chapter's own `bounds()`, so they have
+  hulls — and carry, which needed both ferry legs pulling inside the world.
+  The bridge deck is unreachable: thirty-two swim legs against the bluff, a pylon
+  and a pier top out at 2.28 m against a deck at 25, the chapter has no
+  `climbHold`, and Bradleys Head measures the same as a control — so the deck
+  keeps no floor and the traffic keeps no bodies. See X8 §9.
 
 ## Already clean, so not touched
 
@@ -935,6 +1015,38 @@ which is now all of them.
   under it, per chapter. One consistent number across chapters is the assertion;
   it wants deep water, because `isOverWater` is true over Monte Carlo's jetty and
   the animal lands on the pier two metres up and never swims.
+- `qa/px-bridge.js` … `-bridge6.js` (X8) — the reachability suite, and the best
+  worked example in this file of a probe lying four times before it told the
+  truth. `-bridge` rays the physics world along the carriageway and drops the
+  animal on the deck; `-bridge5` swims at the bluff, a pylon and a pier from
+  open water on both keys; `-bridge6` does all four sides and all four keys with
+  Bradleys Head as a control. **Read the four failures before writing another
+  reachability test**: `-bridge` placed the animal at bluff.z + 34 when the bluff
+  radius is 42, so it started INSIDE the rock and read the solver's ejection as
+  a 25 m climb; `-bridge2` proved that by logging the first sample (already y
+  25.34, grounded); `-bridge3` then looked for water with
+  `terrainHeight < waterLevel` and found none anywhere, because Quay reports
+  terrain 0 over open water against a waterLevel of −0.5; and its first swim
+  held the wrong key, because which of W and S faces a target depends on the
+  camera's yaw and had been assumed. Only `-bridge5` onward — start in water the
+  chapter agrees is water, run every key, keep the leg that closes the distance —
+  is worth a number.
+- `qa/px-syd-traf.js` … `-traf5.js` (X8) — Sydney's harbour traffic, before and
+  after it had hulls. `-traf` tests the reachability claim in the chapter's own
+  comment against the chapter's own `bounds()`; `-traf2` checks every drawn
+  instance has a body on it (worst offset over 440 samples, which is the test
+  that catches a carrier drifting from its picture); `-traf3` rays each beam,
+  and its standoff column reads the half-extents back to the centimetre; `-traf4`
+  is the unkind one — the animal placed inside a hull and left in the path of
+  one; `-traf5` rides each ferry for twenty-five seconds and counts frames
+  outside the world. **`-traf2`'s own failure is worth keeping**: it tried to
+  shove the animal with a velocity write, and capybara.js owns the animal's
+  velocity every frame, so the shove was gone before the next step. Drive it
+  with keys or do not drive it.
+- `qa/px-syd-detach.js` (X8) — three chapters, and whether a body added by one of
+  them is gone in the other two. `game.env` is Sydney's and stays resident, so
+  anything given to it has to be shown to detach; the signature is the shape's
+  own half-extents, which is cheaper than tagging.
 - `qa/surf-a.js` … `surf-c.js` — the force-channel probes behind batch X4's
   tables: slip speed per surface, the geyser launch, the storm.
 

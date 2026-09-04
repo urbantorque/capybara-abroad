@@ -1855,13 +1855,41 @@ function envWaterY(x, z) {
 // of the busiest stretches of water in the southern hemisphere.
 //
 // Nine sails and two small ferries, on slow independent reaches, all of them
-// beyond z = -46 so they are scenery and nothing else: no colliders, no
-// wakes to write, no way for the player to reach them, and nothing that has to
-// be reset when the biome sleeps. Two instanced draws for the lot.
+// beyond z = -46, and no wakes to write. Two instanced draws for the lot.
+//
+// ---- "NO WAY FOR THE PLAYER TO REACH THEM" WAS NOT TRUE (X8) -------------
+// That is what this comment used to say, and it is what justified drawing
+// eleven hulls with no colliders in them. The chapter's own `bounds()` says
+// otherwise: the harbour rectangle is x +/-140, z -150..-8, and the comment on
+// THAT says "the seabed body under it is wider still, so swimming to the far
+// shore stays legal". Every one of the eleven is inside it.
+//
+// Measured (qa/px-syd-traf.js): put down at z -140 the animal swims, is not
+// out of bounds and the rescue does not fire; and swimming north from the sea
+// wall on one held key for twenty seconds it reaches z -66.8 and passes within
+// 6.8 m of a hull. So they are reachable in about the time it takes to get
+// there, and a boat you can swim through is the failure the solid audit exists
+// to catch.
+//
+// They are KINEMATIC and they write velocity AND position: velocity because
+// that is the only thing cannon's friction carries a passenger with, position
+// because the drawn instance is placed analytically from envTime and a
+// velocity-only body drifts away from its own picture on any frame longer than
+// five substeps. See A KINEMATIC CARRIER in CONTRACT.md.
 //
 // The periods are deliberately co-prime-ish and none of them is a multiple of
 // another, so the fleet never lines up into a pattern the eye can catch —
 // the same rule the ambience is on.
+// ---- AND NO LEG LEAVES THE WORLD (X8) ------------------------------------
+// The two ferries ran from x -150 to +150 and the harbour the player is allowed
+// in is x +/-140, so both of them turned round 10 m outside it — which did not
+// matter while they were scenery and matters the moment they are things you can
+// climb onto: a ride to the end of that leg carries the animal out of bounds and
+// into the rescue, and being teleported off your own boat is a worse bug than
+// swimming through it. Found by a probe that put the animal at the ferry's
+// centre and got back seven frames of "outside" and a rescue rather than a
+// collision (qa/px-syd-traf4.js). 138, twice, and one sail that touched -140.
+// At forty to a hundred metres out, twelve metres of turn is not a picture.
 const envTRAF = [
   //  x0     z0     x1     z1   period  kind (0 sail, 1 ferry)
   [-108, -58,  -18, -74,  96, 0],
@@ -1869,16 +1897,36 @@ const envTRAF = [
   [  72, -92,  -46, -80, 128, 0],
   [-120, -96,   16, -108, 104, 0],
   [  34, -104, 132, -88,  88, 0],
-  [-140, -120, -20, -114, 146, 0],
+  [-138, -120, -20, -114, 146, 0],
   [ 118, -122,  -8, -130, 158, 0],
   [ -74, -46,   26, -52,  74, 0],
   [  92, -64,  -60, -68, 134, 0],
-  [-150, -84,  150, -78, 172, 1],
-  [ 150, -110, -150, -100, 196, 1],
+  [-138, -84,  138, -78, 172, 1],
+  [ 138, -110, -138, -100, 196, 1],
 ];
 let envTrafHull = null, envTrafSail = null;
+// One kinematic hull per instance, plus the PREVIOUS TARGET each velocity is
+// differenced against — never the body's own position, which cannon has already
+// integrated by the time this module runs. Rule 3.
+const envTrafBody = [];
+const envTrafPX = [], envTrafPZ = [], envTrafYaw = [];
+// The drawn hull is 1.6 x 0.66 x 6.6 at local y 0.10, with a boot down to -0.37
+// and a deck up to 0.50 — so one box over local -0.37..0.50 is the whole of
+// what a swimmer can meet. Scaled per instance exactly as the drawing is.
+const envTRAF_HX = 0.80, envTRAF_HY = 0.435, envTRAF_HZ = 3.30, envTRAF_CY = 0.065;
+const envTrafEu = new THREE.Euler();
+const envTrafQt = new THREE.Quaternion();
+/** The house idiom — monSyncBody, driSyncBody, quaySyncBody. A body whose
+ *  position is written by hand must have its interpolation pair written too,
+ *  or anything reading interpolatedPosition lerps from a stale previous. */
+function envSyncBody(b) {
+  b.previousPosition.copy(b.position);
+  b.interpolatedPosition.copy(b.position);
+  b.previousQuaternion.copy(b.quaternion);
+  b.interpolatedQuaternion.copy(b.quaternion);
+}
 
-function envBuildTraffic(root, material) {
+function envBuildTraffic(game, root, material) {
   const n = envTRAF.length;
   // the hull: one shape, scaled per instance so a ferry is simply a bigger,
   // squarer version of the same silhouette at this distance
@@ -1906,10 +1954,30 @@ function envBuildTraffic(root, material) {
   envTrafSail.castShadow = false;
   envTrafSail.frustumCulled = false;
   root.add(envTrafSail);
-  envTrafStep();
+
+  // ---- eleven hulls, one body each ---------------------------------------
+  // allowSleep false, because a sleeping body is skipped in narrowphase and a
+  // hull that stops existing under a swimmer is the worst version of this bug
+  // rather than a fix for it. Rule 1.
+  for (let i = 0; i < n; i++) {
+    const sc = envTRAF[i][5] === 1 ? 2.1 : 1;
+    const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
+                                material: envGroundPhysMat });
+    b.allowSleep = false;
+    b.addShape(new CANNON.Box(new CANNON.Vec3(envTRAF_HX * sc,
+                                              envTRAF_HY * sc * 0.9,
+                                              envTRAF_HZ * sc)));
+    b.position.set(envTRAF[i][0], -0.42, envTRAF[i][1]);
+    game.world.addBody(b);
+    envTrafBody.push(b);
+    envTrafPX.push(envTRAF[i][0]);
+    envTrafPZ.push(envTRAF[i][1]);
+    envTrafYaw.push(0);
+  }
+  envTrafStep(game, 0);
 }
 
-function envTrafStep() {
+function envTrafStep(game, dt) {
   if (!envTrafHull) return;
   const n = envTRAF.length;
   for (let i = 0; i < n; i++) {
@@ -1924,12 +1992,35 @@ function envTrafStep() {
     const yaw = Math.atan2((T[2] - T[0]) * dir, (T[3] - T[1]) * dir);
     const roll = Math.sin(envTime * 0.7 + i) * (ferry ? 0.02 : 0.06);
     const sc = ferry ? 2.1 : 1;
-    envTrafHull.setMatrixAt(i, envXform(x, -0.42 + Math.sin(envTime * 0.6 + i * 2.1) * 0.06, z,
-                                        0, yaw, roll, sc, sc * 0.9, sc));
+    const hy = -0.42 + Math.sin(envTime * 0.6 + i * 2.1) * 0.06;
+    envTrafHull.setMatrixAt(i, envXform(x, hy, z, 0, yaw, roll, sc, sc * 0.9, sc));
     // a ferry has no sails: park them under the water rather than branching
     envTrafSail.setMatrixAt(i, ferry
       ? envXform(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001)
       : envXform(x, -0.2, z, 0, yaw, roll * 1.6, 1, 1, 1));
+
+    // ---- and the hull the swimmer meets, on the same numbers -------------
+    // Position written as well as velocity, so the body cannot walk away from
+    // the instance it is standing in for: the drawing above is analytic in
+    // envTime and would not follow a body that had lost ground on a hitch.
+    // Roll is NOT given to the body (rule 4): it is two degrees of theatre and
+    // the box is what a passenger is standing on.
+    const b = envTrafBody[i];
+    if (b && dt > 1e-5) {
+      const cy = hy + envTRAF_CY * sc * 0.9;
+      b.velocity.set(clamp((x - envTrafPX[i]) / dt, -9, 9), 0,
+                     clamp((z - envTrafPZ[i]) / dt, -9, 9));
+      let dyaw = yaw - envTrafYaw[i];
+      while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+      while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+      b.angularVelocity.set(0, clamp(dyaw / dt, -2.0, 2.0), 0);
+      b.position.set(x, cy, z);
+      envTrafEu.set(0, yaw, 0, 'YXZ');
+      envTrafQt.setFromEuler(envTrafEu);
+      b.quaternion.set(envTrafQt.x, envTrafQt.y, envTrafQt.z, envTrafQt.w);
+      envSyncBody(b);
+      envTrafPX[i] = x; envTrafPZ[i] = z; envTrafYaw[i] = yaw;
+    }
   }
   envTrafHull.instanceMatrix.needsUpdate = true;
   envTrafSail.instanceMatrix.needsUpdate = true;
@@ -3281,7 +3372,7 @@ export function createEnvironment(game) {
   // so adding it cannot walk the shared seed and move a single palm or a
   // single block of the far skyline. See envBuildLorikeets.
   envBuildLorikeets(root);
-  envBuildTraffic(root, matVC);
+  envBuildTraffic(game, root, matVC);
   root.add(envBuildGlitter());
 
   // ------------------------------------------------------- nav: the harbour
@@ -3351,6 +3442,13 @@ export function createEnvironment(game) {
       envAsleep = true;
       if (envFerryBody) { envFerryBody.velocity.setZero(); envFerryBody.angularVelocity.setZero(); }
       if (envVanBody) { envVanBody.velocity.setZero(); envVanBody.angularVelocity.setZero(); }
+      // ...and the eleven hulls, for exactly the same reason. Every biome
+      // shares one coordinate space, so a boat left with a velocity in it is a
+      // boat still sailing across whichever country the player travelled to.
+      for (let i = 0; i < envTrafBody.length; i++) {
+        envTrafBody[i].velocity.setZero();
+        envTrafBody[i].angularVelocity.setZero();
+      }
       // The stage weight must fall to zero on the way OUT, not hold whatever it
       // was when the player left. Every biome shares one coordinate space, so
       // the podium rectangle exists as bare ground in all seventeen of the
@@ -3371,7 +3469,7 @@ export function createEnvironment(game) {
     envVanStep(game, dt);
     envPlaneStep(game, dt);
     envLoriStep(game, dt);
-    envTrafStep();
+    envTrafStep(game, dt);
     envGlitStep(game);
     envSprayStep(game, dt);
     // harbour ripple — 30 Hz is plenty and halves the per-frame buffer upload
