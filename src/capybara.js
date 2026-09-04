@@ -272,6 +272,27 @@ const capyVOID_Y = -3;              // below this we genuinely fell out of the w
 const capySTUCK_GAP = 0.22;         // m below the floor before we start counting
 const capySTUCK_MOVE = 0.05;        // m of vertical travel that says it is not stuck
 const capySTUCK_T = 0.45;           // s of not moving before we put it back
+// ...and two corrections to the above, both measured (qa/px-stuck.js, and the
+// 168-point settle scan in qa/px-stuck-scan.js).
+//
+// THE MOVEMENT TEST HAS TO BE LOW-PASSED, because the failure it is watching
+// for OSCILLATES. Under the Pasto plaza the backstop and the contact push trade
+// blows at 0.159 m per frame pair — three times capySTUCK_MOVE — so the frame
+// delta reset the timer on EVERY frame and the animal walked nine metres under
+// the cobbles with the safety net never once arming. A one-pole filter at this
+// lambda converges on the mean of a two-frame square wave to about 4 mm, while
+// still tracking any genuine climb or descent inside the 0.45 s window.
+const capySTUCK_LP = 6;             // 1/s, the filter on body Y
+// AND THE GAP ALONE CANNOT TELL THE TWO FAILURES APART. Standing under a plaza
+// and standing on a riverbank whose lattice disagrees with its law both read as
+// "below the floor, on a contact, not moving". The settle scan says the honest
+// disagreement is small — p95 0.038 m, p99 0.157 m over 168 points in six
+// chapters — so capySTUCK_GAP at 0.22 is not the problem and does not need
+// raising. What separates them is whether anything is OVERHEAD; see
+// capyLidAbove. Past this depth we stop asking, because no lattice error in the
+// game is a metre and something has gone properly wrong.
+const capySTUCK_DEEP = 1.0;         // m under the law that is stuck whatever is above
+const capySTUCK_LID = 2.6;          // m of headroom the lid ray looks through
 // --- THE HOP THAT ATE THE MOVEMENT -----------------------------------------
 // The contact equation does not merely stop the body, it pushes accumulated
 // penetration out — and at contactEquationStiffness 1e7 that push-out arrives as
@@ -662,7 +683,7 @@ let capyYawRate = 0;
 let capyBodyYaw = 0;
 let capyLegPhase = 0;
 let capySpeedSm = 0;                // smoothed ground speed — drives the whole gait
-let capyStuckT = 0, capyStuckY = 0; // see capySTUCK_T: the under-the-floor stalemate
+let capyStuckT = 0, capyStuckY = 0, capyStuckLP = 0; // see capySTUCK_T: the under-the-floor stalemate
 // THE SLIDE. `capySlideT` is how long this one has run, `capySlideAir` how long
 // we have forgiven being off the ground, `capySlideCool` the lockout after one
 // ends, and `capySlideW` the 0..1 the pose and the readers are damped on.
@@ -1081,6 +1102,50 @@ function capyFreeSpot(game, x, z, n, out) {
   return out;
 }
 const capyFreeXZ = { x: 0, z: 0 };
+
+/**
+ * IS THERE A LID OVER THIS ANIMAL? The one thing that separates being wedged
+ * under a building from standing on ground the terrain law disagrees with.
+ *
+ * Both look identical to every cheaper test, and this was measured rather than
+ * guessed (qa/px-stuck.js). Under the Pasto plaza the animal has THREE upward
+ * static contacts on every frame, `grounded` is true throughout, and a downward
+ * ray finds floor at its feet — while it sits 0.49-0.75 m under the analytic
+ * terrain, walking around beneath the cobbles. So a contact test says "fine", a
+ * downward ray says "fine", and both would switch off the rescue that case
+ * exists for. On the Uji bank the animal is ALSO standing on a real collider
+ * with the law well above it, and there the same signals are telling the truth.
+ *
+ * The difference is overhead: a plaza has a slab over it and a riverbank has
+ * sky. One upward ray, and only ever cast on the frames the law already thinks
+ * we are under the floor, so it costs nothing the rest of the time.
+ *
+ * Skips the ground itself (heightfield and plane), triggers, anything dynamic,
+ * and people — walking under someone is not being trapped.
+ */
+const capyLidFrom = new CANNON.Vec3(), capyLidTo = new CANNON.Vec3();
+const capyLidOpts = { skipBackfaces: false };
+let capyLidGot = false, capyLidSelf = null;
+function capyLidRayHit(res) {
+  if (!res.hasHit || capyLidGot) return;
+  const b = res.body;
+  if (!b || b.mass > 0 || b.isTrigger || b === capyLidSelf) return;
+  if (b.type !== undefined && CANNON.Body && b.type !== CANNON.Body.STATIC) return;
+  if (b.userData && (b.userData.npc || b.userData.local)) return;
+  const t = res.shape && res.shape.type;
+  if (t === capySHAPE_HEIGHTFIELD || t === capySHAPE_PLANE) return;
+  capyLidGot = true;
+}
+function capyLidAbove(game, body, reach) {
+  const w = game.world;
+  if (!w || typeof w.raycastAll !== 'function') return false;
+  capyLidGot = false; capyLidSelf = body;
+  capyLidFrom.set(body.position.x, body.position.y + 0.05, body.position.z);
+  capyLidTo.set(body.position.x, body.position.y + reach, body.position.z);
+  try { w.raycastAll(capyLidFrom, capyLidTo, capyLidOpts, capyLidRayHit); }
+  catch (e) { return false; }
+  return capyLidGot;
+}
 
 /**
  * HOW SLIPPERY THE GROUND IS UNDER (x, z), 0..1.
@@ -3619,10 +3684,15 @@ export function createCapybara(game) {
       // height somewhere else is excluded: a carrier, a wheel, a climb and a
       // dive all put the body where the terrain is not, on purpose.
       capyStuckAge += dt;
+      // Under the law, and not somewhere that puts the body off the terrain on
+      // purpose — then ask the one question that separates a plaza from a
+      // riverbank: is there anything over our head? See capySTUCK_LP.
       if (gap > capySTUCK_GAP && !capy.carriedBy && !capy.rideBody &&
-          !capy.atHelm && !capy.climbing && !capy.diving) {
-        if (Math.abs(body.position.y - capyStuckY) > capySTUCK_MOVE) {
-          capyStuckY = body.position.y;
+          !capy.atHelm && !capy.climbing && !capy.diving &&
+          (gap > capySTUCK_DEEP || capyLidAbove(game, body, capySTUCK_LID))) {
+        capyStuckLP = damp(capyStuckLP, body.position.y, capySTUCK_LP, dt);
+        if (Math.abs(capyStuckLP - capyStuckY) > capySTUCK_MOVE) {
+          capyStuckY = capyStuckLP;
           capyStuckT = 0;
         } else {
           capyStuckT += dt;
@@ -3630,6 +3700,7 @@ export function createCapybara(game) {
       } else {
         capyStuckT = 0;
         capyStuckY = body.position.y;
+        capyStuckLP = body.position.y;
       }
       // last resort: genuinely fell out of the world, or wedged under it. Both
       // ARE teleports, so the interpolation history has to be rewritten with it.
@@ -3651,6 +3722,7 @@ export function createCapybara(game) {
         grounded = true;
         capyStuckT = 0;
         capyStuckY = body.position.y;
+        capyStuckLP = body.position.y;   // the filter has to move with the animal
       }
     }
 
