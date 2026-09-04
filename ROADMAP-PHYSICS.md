@@ -188,28 +188,106 @@ must still read 1.37 m / 0.717 s in seventeen chapters and Drift 4.51 / 2.083.
 not flatten it. Measure the dip depth after a 2 m drop at 60 Hz before and
 after; it should stay at about 0.155 m.
 
-### Batch X2 — one lattice, and the ground ends where the picture does (area 1)
+**LANDED 4 Sep 2026, and the trap fired the other way round.** Differential on
+`qa/px-spring.js`, same 2 m drop, identical −9.56 m/s landing velocity in both
+runs: the 60 fps dip went from 0.085 m to **0.132 m**. It did not flatten, it
+DEEPENED — the old single step was losing a third of the squash to integration
+error, and 0.132 is what `capyLAND_SCALE` has been asking for all along. Kept,
+deliberately: every landing in the game is now visibly deeper, and the one-line
+undo if that is ever regretted is `capyLAND_SCALE` 0.022 → 0.0142.
 
-**Must land.**
-1. For the eight chapters in the table above, build the ground plane over
-   `NX·EL` from the corner and translate, so the drawn mesh and the
-   `CANNON.Heightfield` share one set of `X0/Z0/NX/NZ/EL` constants. This is the
-   fix integrity block 10 applied to the cave and Monaco; copy it.
-2. Kowloon and Cali: make the heightfield stop where the drawn plane stops, and
-   have `boundsOf()` derive from the drawn ground wherever a chapter has one.
-3. Re-point `capyGroundY` at the facet rather than the law wherever the two
-   disagree by more than the pose can absorb — or, cheaper and safer, leave
-   `capyGroundY` alone and fix the disagreement at source in (1).
+The stability result, which is the point of the batch: at 12 and 10 fps the old
+spring sat in a permanent limit cycle against its own clamp
+(`+0.096, −0.300, +0.096, −0.300 …`, 20 and 17 zero crossings, never settling);
+after, it decays monotonically to zero with no crossings and never touches the
+clamp at any of 60, 20, 12 or 10 fps. Nine chapters, twelve targets: mean
+model-Y swing 0.477 m → 0.056 m, worst 0.811 → 0.121. Iceland is the row that
+proves it is not a quieter machine — its after run was SLOWER (rdt 0.100 vs
+0.096) and its swing still fell tenfold.
 
-**Verify.** `qa/px-ground-b3.js` in all nineteen: walkable ground over 15 cm
-must drop below 1 % in the eight, and the drawn-above share with it. Kowloon's
-mean signed error must move from −15.7 m to under 0.05 m once the strip is gone.
-Re-shoot `qa/px-ground-*-slope.png` at the same stations.
+Item 2 resolved by inspection: only two channels in the animal hand-roll an
+integrator and both are now sub-stepped; everything else goes through `damp()`,
+which is `1 − exp(−λ·dt)` and unconditionally stable. `npc.js`'s flinch spring
+(k 34, c 11.7) has a limit of 0.171 s against a worst frame of 0.1 and is fine.
+Item 3 was dropped rather than built: the time scale never exceeds 1
+(`main.js`) and the frame is already clamped at 0.1, so the sub-step bounds the
+inner step at 0.0125 s on its own. A second clamp would only change how a hitch
+looks, which is a design choice with no defect behind it.
 
-**Trap.** The residue after this is triangulation — `PlaneGeometry` and
-`CANNON.Heightfield` split each quad on opposite diagonals, which on a cell that
-rises as much as it is wide differs by metres. It only matters on cliffs, where
-nothing stands. Do not chase it, and do not "fix" it by shrinking EL.
+**And what it does not fix.** Four of the twelve targets got WORSE in the
+worst-sole column (pasto slope −0.637 → −0.803, manly −0.382 → −0.708) while
+six improved sharply (cali −0.334 → −0.035, rio −0.369 → −0.074). The
+oscillation had been half-cancelling a steady sink that is still there. That
+residue is real and it belongs to X2 and X3.
+
+### Batch X2 — the ground ends where the picture does (area 1)
+
+**REWRITTEN 4 Sep 2026, after reading all eight chapters.** The original batch
+said to copy integrity block 10's "one lattice" fix to eight chapters. That
+instruction was wrong, and building it as written would have damaged three
+chapters and paid for nothing in the other five. What was actually there:
+
+**Three of the eight warp their ground on purpose and can never share a
+lattice.** Rio, Iceland and Göreme push their vertices through a warp function
+(`rioWarp`, `iceWarp`, `gorWarp`) to spend triangles where the chapter happens
+— Rio's note says 11 200 triangles instead of 17 200, and ~2.4 m cells through
+the beach and the avenue instead of 4.0. A `CANNON.Heightfield` is uniform by
+construction. There is no lattice these two can share, at any element size.
+
+**The other five are not block 10's bug.** Block 10's defect was a span that
+did not divide by its own *intended* element size — one lattice, wrongly
+computed. Here the picture is drawn at 2.5–4.3 m and the collider built at
+4–5 m *deliberately*, and both sample the same analytic terrain function. The
+disagreement is interpolation error between two honest approximations at
+different resolutions. Closing it means either a visibly coarser picture or
+1.7–2.6× the collision cells (kyoto 9 936 vs 5 984, manly 9 265 vs 3 604).
+That is a cost/quality trade to be decided on its merits, not a defect to fix.
+
+**What IS a bug is the extents, and one was worse than this review knew.**
+Measured live with `qa/px-extent.js`, which tests both failure modes per
+chapter:
+
+| chapter | picture | collider | fault |
+|---|---|---|---|
+| kyoto | z −230..230 | z −230..**210** | 20 × 340 m of drawn ground with NO collider |
+| cali | z −220..**150** | z −220..170 | 20 × 420 m of invisible floor |
+| kowloon | z −220..**100** | z −220..120 | 20 × 300 m of invisible floor |
+| göreme | x −**140**..180, z −**190**..130 | x −160..180, z −200..130 | 20 m west + 10 m south of invisible floor |
+| antarctic | x −212..212 | x −212..**213** | a 1 m sliver; left alone |
+
+**LANDED.** Kyoto's collider extended to cover its picture (`NZ` 88 → 92);
+Cali's, Kowloon's and Göreme's pictures extended to cover their colliders.
+Extending rather than trimming was the call, because trimming turns standable
+ground into void unless the world bounds move with it, and 14 chapters publish
+no `bounds()` at all. Göreme needed its warp halves moved with the extent
+(160 → 170/165): `gorWarp` maps [−half, +half] onto itself, so leaving the
+half alone collapses every new vertex onto the old edge.
+
+**Still open, and now correctly sized.**
+1. The resolution trade above. Needs a frame-cost measurement before it is
+   worth anyone's opinion. Rio, Iceland and Göreme are excluded by construction.
+2. `capyGroundY` answers with the analytic law while the body rests on the
+   heightfield facet and the player looks at the drawn mesh — three surfaces,
+   three answers. X3 depends on which one the rescues should trust; do that
+   thinking there, not here.
+
+**Verify.** `qa/px-extent.js` must report zero non-ok rows outside
+Antarctica's sliver. `qa/px-ground-b3.js` in all nineteen: Kowloon's mean
+signed error must move off −15.7 m, which was never a lattice number — it was
+a ray falling past the edge of the picture onto the harbour skirt 177 m down.
+
+**Trap, and it cost two runs here.** `qa/px-extent.js` lied in both directions
+before its control points caught it. A ray from above hits the world-edge
+skirt at −141 m and reads as "the picture is there"; filtering to hits near the
+law then reads the *topmost* hit, which is whatever scenery stands on the
+ground, and declares the centre of Göreme undrawn because a fairy chimney is
+16.7 m up. Test the whole column and ask whether ANY hit is near the law. Put a
+control point in the middle of every chapter or you will not know.
+
+**Second trap.** The residue after all this is triangulation — `PlaneGeometry`
+and `CANNON.Heightfield` split each quad on opposite diagonals, which on a cell
+that rises as much as it is wide differs by metres. It only matters on cliffs,
+where nothing stands. Do not chase it, and do not "fix" it by shrinking EL.
 
 ### Batch X3 — the rescues measure the right thing (area 5)
 

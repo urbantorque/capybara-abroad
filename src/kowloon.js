@@ -4704,9 +4704,16 @@ function hkBuild(game) {
   game.scene.add(hkRoot);
 
   // the ground: flat, one plane, and a ramp into the harbour
-  const g = new THREE.PlaneGeometry(300, 320, 60, 80);
+  //
+  // 340 LONG, NOT 320, BECAUSE THE COLLIDER IS 340. The heightfield below runs
+  // z -220..120 and this plane used to stop at 100, so the last 20 x 300 m of
+  // Kowloon was floor you could stand on with nothing drawn under it - and the
+  // b3 ground probe read that strip as a 15.7 m mean error, which is not a
+  // lattice fault at all, just a ray falling past the edge of the picture to
+  // the harbour skirt 177 m down. Same 4 m step as before (340/85).
+  const g = new THREE.PlaneGeometry(300, 340, 60, 85);
   g.rotateX(-Math.PI / 2);
-  g.translate(0, 0, -60);
+  g.translate(0, 0, -50);
   const p = g.attributes.position.array;
   const col = new Float32Array(p.length);
   const c = new THREE.Color();

@@ -449,8 +449,14 @@ function caliSlope(x, z) {
 }
 
 function caliBuildGroundMesh() {
-  const X0 = -210, X1 = 210, Z0 = -220, Z1 = 150;
-  const NX = 96, NZ = 88;
+  // Z1 IS THE HEIGHTFIELD'S Z1, NOT A ROUND NUMBER. The collider runs to 170
+  // (caliBuildGroundBody: Z0 -220 + NZ 78 * EL 5) and the picture used to stop
+  // at 150, leaving a 20 x 420 m shelf of invisible floor you could walk out
+  // onto and stand on with nothing drawn under you. Extended rather than
+  // trimmed, because trimming turns standable ground into void unless the
+  // world bounds move with it. 93 segments keeps the ~4.2 m step it had.
+  const X0 = -210, X1 = 210, Z0 = -220, Z1 = 170;
+  const NX = 96, NZ = 93;
   const g = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, NX, NZ);
   g.rotateX(-Math.PI / 2);
   g.translate((X0 + X1) * 0.5, 0, (Z0 + Z1) * 0.5);

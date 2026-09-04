@@ -5158,14 +5158,27 @@ function gorBuild(game) {
 
   // ---- the ground ---------------------------------------------------------
   {
-    const g = new THREE.PlaneGeometry(320, 320, 100, 100);
+    // SIZED TO THE COLLIDER, WHICH IS BIGGER THAN THE PICTURE WAS. The
+    // heightfield covers x -160..180 and z -200..130; this plane was 320 x 320
+    // about (20, -30), i.e. x -140..180 and z -190..130, so a 20 m band down
+    // the west side and a 10 m band along the south were floor with nothing
+    // drawn over them. Now 340 x 330 about (10, -35), which is exactly the
+    // field.
+    //
+    // gorWarp maps [-half, +half] onto itself (s = +-1 gives back +-half), so
+    // the half HAS to move with the extent - leave it at 160 and every new
+    // vertex clamps onto the old edge, collapsing the margin to a crease. The
+    // heights still come from gorTerrain(x, z), so this is the same surface
+    // sampled at slightly different points; the only visible effect is that
+    // the detail the warp concentrates sits ~6 % differently across the valley.
+    const g = new THREE.PlaneGeometry(340, 330, 106, 103);
     g.rotateX(-Math.PI / 2);
-    g.translate(20, 0, -30);
+    g.translate(10, 0, -35);
     const p = g.attributes.position.array;
     // ...and it is pulled toward the middle, where the valley is. See gorWarp.
     for (let i = 0; i < p.length; i += 3) {
-      p[i] = gorWarp(p[i] - 20, 160) + 20;
-      p[i + 2] = gorWarp(p[i + 2] + 30, 160) - 30;
+      p[i] = gorWarp(p[i] - 10, 170) + 10;
+      p[i + 2] = gorWarp(p[i + 2] + 35, 165) - 35;
     }
     const col = new Float32Array(p.length);
     const dust = new THREE.Color(PALETTE.gorSoil);
