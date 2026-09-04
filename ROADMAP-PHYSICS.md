@@ -158,6 +158,26 @@ the invisible-floor strips of area 1. The `±0.30` alternation in every sole
 measurement is the landing spring of number 2, not a picture of the ground. And
 `audit-solid.js` still moves ±5 between runs unless the clock is pinned.
 
+**Three more, measured in X7.**
+
+`px-cam-walls.js` **does not hold a line and cannot resolve a camera change.**
+Run twice against builds differing by one clamp, its aggregate over six chapters
+moved `occ` 108 → 127 and `inside` 28 → 16 — and on the legs where the boom was
+never cut at all, where the change under test provably cannot act, `occ` moved
+78 → 92 and `inside` 15 → 4. The animal walks a different distance each run and
+ends up beside a different wall. Use it to FIND a bad leg; use a pinned-position
+probe like `qa/px-boom.js` to measure one.
+
+`px-cam-controls`'s **`wheek?`, `slide`, `walk` and `run` columns are all
+spawn-local and all move between runs.** Between two runs of the same build:
+cali run 4.94 → 1.37, antarctic run 3.11 → 5.11, pasto's "dead" X yaw −0.17 →
+−1.83, and five chapters swapped in and out of "SLIDE did not fire". Its stable
+columns are the V block, `clearMin` and `err`.
+
+**And the sfx window is four.** `row.wheek = sfx.slice(-4)` reads as "this
+chapter's wheek is silent" in any chapter with a busy ambience. It cost X7 a
+probe to disprove in Hanoi. Log the whole list and search it.
+
 ---
 
 ## The batches
@@ -403,6 +423,92 @@ stuck on their own furniture.
    spawn rather than a bug. Do not fix any of them until it reproduces away from
    the spawn point.
 
+**LANDED 4 Sep 2026. Item 4 was four false alarms, and item 2 was not the
+minimum boom.**
+
+**1. Rio's bird now flies behind the bird's own rig.** Three lines in
+systems.js asked for Pasto by NAME and all three were the same mistake:
+`inPasto && game.condor.mounted` (the rig), `inPasto ? p.y - groundY` (the
+altitude the shadow box and the altimeter are both read off) and
+`thermalAt`'s `game.pasto.thermals` (the THERMAL lamp). condor.js publishes
+`hosted()` — its own `condorHost()`, as a predicate — and systems.js asks that
+instead. Differential on `qa/px-rig.js`, the same walk and the same mount:
+
+| | reach | pitch | altimeter at 95 m up | HUD | thermal lamp in a column |
+|---|---|---|---|---|---|
+| pasto, before | 24 | 22° | 99 m | on | — |
+| **rio, before** | **10.7** | **23°** | **0 m** | **never shown** | **never lit** |
+| pasto, after | 24 | 22° | 99 m | on | lit |
+| **rio, after** | **24** | **22°** | **96 m** | **on** | **lit** |
+
+Rio was flying a 20 m/s glide behind the WALKING rig, with the flight panel
+hidden and the altitude pegged at the 26 m relief cap. The two chapters are now
+byte-identical in every column. Pasto is unchanged, which is the point.
+
+**2. The Venice boom: the 1.9 m floor is honest and was never what was wrong.**
+It is not a calle either — the leg `px-cam-walls` stops on is the San Marco
+ARCADE, and the picture (`qa/px-boom-venice-*.png`) shows the capybara entirely
+behind a colonnade column with `clear` reading 0.18 the whole time. The cut was
+firing correctly and the frame was a photograph of a pillar, because **the cut
+is computed on the desired point and the frame is drawn from the spring.**
+`camClearF` takes its new value on the frame the ray finds the wall — "in,
+immediately", as the block says — and then hands the boom to a lambda-7 spring
+that needs a third of a second to travel the metres just removed. The cut asked
+for 1.87 m of boom; the rendered eye sat at 3.37 with a column 0.14 m in front
+of the lens.
+
+Fixed with a RADIAL clamp under the spring, the same shape as the second relief
+clamp that already exists forty lines down and for exactly the same reason. The
+eye may lag in bearing as much as it likes; it may not sit further out along the
+boom than the ray said was safe. Damped rather than snapped — a hard clamp moved
+the Kowloon boom 8.54 m between two samples, which is a cut and not a camera —
+and `sysCAM_CUT_LAMBDA` was swept in the arcade:
+
+| | frames with a solid thing between lens and animal | worst boom travel in 100 ms |
+|---|---|---|
+| before | 6 / 28 | 3.09 m |
+| clamp (instant) | 1 / 28 | 6.58 m |
+| lambda 21 | 2 / 28 | 6.58 m |
+| lambda 16 | 1 / 28 | 5.97 m |
+| **lambda 12** | **1 / 28** | **5.32 m** |
+
+Rising instead of closing was considered and rejected: a rise over an arcade or
+a calle puts the eye above the roof looking down at it, which is precisely the
+Marrakech souk failure `camCeil` exists to prevent.
+
+**3. The eye-raise has three hands now.** Touch gets a seventh button — the
+right-hand column under MENU, held like the slide, with a new `look` glyph in
+the sheet. The pad gets R3's HOLD: every button on a standard pad was already
+spoken for, so the only free gesture left on the camera hand was the stick
+click's second meaning, and it is the same tap-and-hold shape Back already
+carries. The tap still recentres on the press edge — a recentre is a reflex and
+may not wait 0.20 s to find out whether the thumb is staying down. All three
+write the one `eyeAsk` channel; none is a second rig. Measured (`qa/px-eye.js`),
+all three identical, sky 0.55 → 0.69 and pitch 25.4° → 20.8°, and the pad TAP
+moves the yaw and leaves the pitch alone.
+
+**4. All four "anomalies" are the instrument or the terrain. Nothing fixed, and
+that is the finding.** (`qa/px-anom.js` — four points per chapter, four compass
+directions each, walk and run measured separately at every one.)
+
+- **Antarctica 1.76 / 3.11 is Tobler's law, exactly.** `capyGRADE_MIN` is 0.42;
+  4.2 × 0.42 = 1.764 and 7.4 × 0.42 = 3.108. The spawn sits on a 20.2° slope
+  and three of the four directions off it hit the grade floor. The fourth — 
+  across the contour — runs at **8.20 m/s**, full speed. Six points measured,
+  every one of them on 18–32° of hill. The chapter is a hill.
+- **Cali 4.94 was one blocked direction.** At the spawn, W gives 1.88 and
+  A/S/D give 7.77 / 7.46 / 7.87. Thirty metres away, all four give 7.40.
+- **Monaco 3.62 did not reproduce at all**, at the spawn or away from it: 7.40
+  to 8.44 in every direction at every point.
+- **Hanoi's silent wheek is `qa/sum-controls.js` keeping only the last FOUR
+  sfx.** Hanoi's traffic fires barks and ticks continuously, so the wheek is
+  pushed out of the window before the probe reads it. Logged in full, every
+  Hanoi row contains `wheek`. The re-run sweep now reports Hanoi as `Y`.
+
+**Also found, not fixed** (both on the shelf below): Kowloon's stair walk plays
+inside a drawn-only awning that `sysCamClear` cannot see, and `px-cam-walls.js`
+does not hold a line.
+
 ---
 
 ## The shelf — sized, not scheduled
@@ -426,6 +532,15 @@ stuck on their own furniture.
   because cannon integrates them for `STEP` per substep and the velocity is
   derived from the frame `dt`. The carriers that also write `position.set` every
   frame are self-correcting; enumerate the ones that do not. 0.5 h each.
+- **Kowloon's stair is played from inside a signboard.** Walking A off the Mong
+  Kok spawn, the frame is one dark awning and the animal is not in it — before
+  and after X7's radial clamp, identically, because the awning is DRAWN-ONLY and
+  `sysCamClear` rays the physics world. The boom cut fires (`clear` 0.18) against
+  something else entirely. It is the limitation the controls audit already
+  recorded — "drawn-only geometry never occludes" — and Kowloon is where it
+  costs a picture. Either give the awnings a `collisionResponse: false` shell the
+  camera ray can see, or publish `camCeil` for the arcades the way the souk does.
+  1.5 h.
 - **Sydney's ferries, Quay's moored yachts and the bridge traffic** are drawn
   and not solid. All are on water or on a deck whose reachability is unproven.
   Confirm reachability first; collide only what a player can reach.
@@ -461,6 +576,24 @@ which is now all of them.
   `qa/px-cam-fly.js`, `qa/px-cam-ride.js`, `qa/px-cam-water.js` cover the other
   three rigs.
 - `qa/px-npc-walk.js` — walk into a person, with their state machine logged.
+- `qa/px-anom.js` (X7) — put the animal down at N points in a chapter and walk
+  and run it in all four compass directions at each, with the resting slope, the
+  grounded fraction and the FULL sfx list per point. The instrument that turns
+  "this chapter's run is capped" into "this chapter is a hill" or "this one
+  direction is blocked".
+- `qa/px-boom.js` (X7) — the pinned-position camera probe: one place, one route,
+  per-sample boom length, clear fraction, whether a solid thing is between the
+  lens and the animal, and the animal's screen-space height and centre. Three
+  screenshots through the walk. Use this rather than `px-cam-walls.js` to
+  measure a camera change.
+- `qa/px-rig.js` (X7) — mount the flier deterministically (press on every frame
+  the reach test is true) and read reach, pitch, the altimeter and the thermal
+  lamp on the ground, in the air, 90 m up and inside a column.
+- `qa/px-eye.js` / `-eye2.js` (X7) — the eye-raise on all three schemes: the key,
+  a synthesised touch pointer on the fan button, and a stubbed `getGamepads`
+  driving R3 as a tap and as a hold. `-eye2` is the 390 × 844 layout check.
+- `qa/px-glyph.js` (X7) — every touch glyph blown up to 78 px on one sheet. A
+  mark that reads at 24 px is not a thing numbers can tell you.
 - `qa/surf-a.js` … `surf-c.js` — the force-channel probes behind batch X4's
   tables: slip speed per surface, the geyser launch, the storm.
 

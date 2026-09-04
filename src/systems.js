@@ -324,6 +324,24 @@ const sysCAM_CLEAR_MIN = 1.9;   // m — the shortest the boom may ever be cut t
 // instead of 5 cm inside it.
 const sysCAM_CLEAR_PAD = 0.70;  // m of daylight kept between the lens and the wall
 const sysCAM_CLEAR_OUT = 3.2;   // how fast it lets the boom back out once clear
+// ...and how fast it pulls the RENDERED eye in to the radius the cut asked for
+// (X7). Faster than the boom spring's own 7, because the spring is smoothing a
+// picture and this is getting the lens out of a wall — and FINITE rather than a
+// hard clamp, because an instant 8 m is a cut and not a camera move.
+//
+// Swept in the San Marco arcade, the same walk each time, counting frames with
+// a solid thing between the lens and the animal and the worst boom travel in
+// one 100 ms sample:
+//
+//     clamp (instant)  1/28 occluded   6.6 m
+//     lambda 21        2/28            6.6 m
+//     lambda 16        1/28            6.0 m
+//     lambda 12        1/28            5.3 m       <- and the walk itself is 3.1
+//
+// 12 buys the whole of the fix and the least of the lurch; above it nothing
+// gets less occluded and the boom simply moves faster. Most of the 5.3 is the
+// desired point rounding the column and would be there anyway.
+const sysCAM_CUT_LAMBDA = 12;
 // m up the animal that hud.canopyAudit() aims its ray at: the shoulder, which
 // is what a lens is actually trying to see past a hedge.
 const sysAUDIT_SHOULDER = 0.45;
@@ -648,6 +666,11 @@ const sysPAD_TRIG    = 0.55;   // analogue trigger travel that counts as pressed
 const sysPAD_YAW     = 2.6;    // rad/s at full right-stick deflection
 const sysPAD_ZOOM    = 7.0;    // m/s of dolly at full right-stick vertical
 const sysPAD_LOOKD   = 0.18;   // the right stick's own deadzone — it is a camera, be gentle
+// How long R3 has to stay down before it is the eye-raise as well as the
+// recentre (X7). Well past a click — measured, a deliberate stick click is 60
+// to 110 ms — and short enough that a player who means it never wonders whether
+// it worked. See padEyeT.
+const sysPAD_EYE_HOLD = 0.20;  // s
 const sysPAD_RUMBLE  = 0.10;   // s of buzz at a full-magnitude event
 const sysPAD_RUM_MIN = 0.12;   // ...below this magnitude the pad stays still
 // Galeras' summit. Doubles as the altimeter's full-scale and the reference for how
@@ -4088,7 +4111,11 @@ const sysLEGEND_MORE = [
   // The fourth key of the camera row, and it goes in the FOLD by the same rule
   // as the other three: it is furniture, not a verb the capybara has, and
   // nothing about it is needed to play. See sysEYE_RAISE_W.
-  ['V (held)', 'raise the eye  ·  look at the sky'],
+  // Three schemes on one row (X7), because it is one control and a reader who
+  // has a pad in their hands should not have to work out that the keyboard row
+  // above is also about them. The stick click is R3's hold; its tap is the
+  // recentre named one row up.
+  ['V  ·  R3 (held)', 'raise the eye  ·  look at the sky'],
   ['F  ·  Shift+F', 'aim at another task'],
   ['R (held)', 'put me back'],
   ['Tab  ·  Esc', 'the journal  ·  close'],
@@ -4101,9 +4128,13 @@ const sysLEGEND_MORE = [
   ['M  ·  N  ·  [  ]', 'mute  ·  music  ·  volume'],
   // The pad belongs in the fold and not on the front of the game, by the same
   // argument as everything else down here: it is not a thing you have to know
-  // first, it is a thing you go and look up once. Two rows, because that is
-  // the whole scheme — a stick, three face buttons and a shoulder.
+  // first, it is a thing you go and look up once. Three rows, because that is
+  // the whole scheme — a stick, three face buttons, a shoulder, and the one
+  // gesture X7 had to invent because every button was already spoken for.
+  // NOT in the connect toast, by the same rule that keeps V off the title
+  // card: the toast is the verbs and the furniture, and the eye is neither.
   ['pad  ·  sticks', 'move  ·  look, and click to recentre'],
+  ['pad  ·  R3 held', 'raise the eye'],
   ['pad  ·  A  X  B', 'hop  ·  grab  ·  WHEEK   (RT runs)'],
 ];
 // ---- AND THE SAME TABLE FOR SOMEBODY WITH NO KEYBOARD ---------------------
@@ -4124,6 +4155,9 @@ const sysLEGEND_TOUCH = [
   ['GRAB (held) in water', 'dive  ·  deep water'],
   ['WHEEK', 'WHEEK'],
   ['drag  ·  pinch', 'look around  ·  zoom'],
+  // The eye (X7). Next to the other two camera rows rather than among the
+  // verbs, which is where it sits on the screen as well.
+  ['LOOK (held)', 'raise the eye  ·  the sky'],
   ['STUCK (held)', 'put me back'],
   // The row that closes the scheme (R5). The keyboard table spends four rows on
   // M / N / [ / ] for the audio alone and still needs Escape and Tab elsewhere;
@@ -5014,6 +5048,21 @@ const sysGLYPHS = {
     ['p', '12,2.4 18.6,10.2 5.4,10.2'],
     ['r', 9.9, 9.6, 4.2, 7.0],
     ['r', 2.6, 18.6, 18.8, 2.6],
+  ],
+  /* LOOK. The eye-raise (X7). An eye in the sheet's own dialect — one filled
+     almond with the pupil cut back out of it — TILTED twenty-two degrees up to
+     the right, because the tilt is the whole word. It is the only glyph here
+     that is not a verb, and it is the only one drawn as a POSTURE.
+
+     It was a triangle over a ground rule first and that was wrong twice: the
+     rendered mark read as a tent, and a rule with something above it is
+     already HOP's shape and an arrow over a rule is already STUCK's. The
+     column has to be legible at 24 px in a 58 px button, so a new mark there
+     may not borrow either. */
+  look: [
+    ['p', '2.7,15.8 6,10.5 10.3,7.7 15.3,6.8 21.3,8.3 18,13.5 13.7,16.3 8.7,17.2'],
+    ['c', 14.8, 10.9, 2.6, 'o'],
+    ['c', 14.8, 10.9, 1.25],
   ],
   /* MENU. Three rules, which is the one icon in the world nobody has to be
      taught, and the only reason it is in the sheet at all. */
@@ -7559,7 +7608,11 @@ function sysBuildCSS() {
 '.capyui-base.on{opacity:.95;}',
 '.capyui-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;',
   'border-radius:50%;background:' + sysRgba(PALETTE.sail, 0.88) + ';box-shadow:' + shMd + ';}',
+// `-webkit-tap-highlight-color` is set deliberately and to nothing: every one of
+// these seven already answers a press with its own `.press` scale, and iOS's
+// grey flash on top of that is two acknowledgements of one tap.
 '.capyui-btn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;',
+  '-webkit-tap-highlight-color:transparent;',
   'display:flex;align-items:center;justify-content:center;font-weight:700;color:' + ink + ';',
   'background:' + sysRgba(PALETTE.sail, 0.86) + ';border:2px solid ' + sysRgba(PALETTE.ibisHead, 0.18) + ';',
   'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ' + mSnap + ';}',
@@ -7600,6 +7653,37 @@ function sysBuildCSS() {
   'background:' + sysRgba(PALETTE.sail, 0.78) + ';',
   'border-color:' + sysRgba(PALETTE.ibisHead, 0.28) + ';opacity:.9;}',
 '.capyui-menu.press{opacity:1;}',
+/* The eye (X7). Third in the same column, under the menu, offset by the same
+   58 + 12. Solid like the menu rather than dashed like STUCK — it is a control
+   you are meant to find — but a shade quieter than it, because a menu is a door
+   and this is a lens. Same 58px, so the column stays a column. */
+'.capyui-look{right:calc(12px + env(safe-area-inset-right,0px));',
+  'top:calc(32px + env(safe-area-inset-top,0px) + clamp(92px,24vw,124px) + 140px);',
+  'width:58px;height:58px;font-size:10px;',
+  'background:' + sysRgba(PALETTE.sail, 0.68) + ';',
+  'border-color:' + sysRgba(PALETTE.ibisHead, 0.24) + ';opacity:.82;}',
+'.capyui-look.press{opacity:1;background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
+/* ---------- A PHONE ON ITS SIDE HAS NO COLUMN (X7) ----------
+   Measured at 844x390 and 740x360. The right-hand column is chart (124) + three
+   58px buttons + their gaps = 300px of a 390px screen, and the WHEEK — 96px at
+   bottom:26px — starts at 268. So MENU has been sitting ON TOP of the wheek in
+   landscape since R5, and adding the eye put a second button there.
+
+   Below 520px of height the column becomes a ROW along the top edge, left of the
+   chart: 58px tall instead of 300, three buttons in 198px of a screen that has
+   844 to spare. It is the same three controls in the same corner and it costs a
+   landscape player nothing — the whole reason they were stacked is that portrait
+   has height and no width, and this is the other case.
+
+   Right-hand offsets are 12 (edge) + 12 (gap) + the chart, then 70 apiece, which
+   is the same 58 + 12 the column used vertically. */
+'@media (max-height:520px){',
+  '.capyui-back{top:calc(12px + env(safe-area-inset-top,0px));',
+    'right:calc(24px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}',
+  '.capyui-menu{top:calc(12px + env(safe-area-inset-top,0px));',
+    'right:calc(94px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}',
+  '.capyui-look{top:calc(12px + env(safe-area-inset-top,0px));',
+    'right:calc(164px + env(safe-area-inset-right,0px) + clamp(92px,24vw,124px));}}',
 
 /* Phone: tighter leading and smaller tick boxes. Five rows fit anywhere, so the
    card no longer needs a scroll of its own at any size. */
@@ -15836,7 +15920,7 @@ export function createSystems(game) {
     for (const k in keys) keys[k] = false;
     mouseAction = false; dragId = -1;
     sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-    touchSlide = false; touchBack = false;
+    touchSlide = false; touchBack = false; touchLook = false;
     sysBufClearAll();
   }
   function pauseHide() {
@@ -22042,6 +22126,15 @@ export function createSystems(game) {
   // precisely so that a three-hour game would not have a state whose only
   // answer is F5 (see sysBACK_HOLD), and on touch it had one anyway.
   let touchSlide = false, touchBack = false;
+  // ---- ...AND THE THIRD, WHICH IS NOT A VERB AT ALL (X7) ------------------
+  // The eye-raise shipped on V and only on V. Measured across all nineteen
+  // chapters, it is the control that opens the frame: the horizon sits 18.8
+  // degrees above the top edge at a standstill in eighteen of them, so the sky
+  // dome, the grade, the aurora, a kilometre of Kowloon's tower lights and a
+  // hundred and fifty balloons over the Goreme ridge are things a keyboard
+  // player can look at and a phone or pad player cannot. Held, like the key and
+  // like the slide, because it is a posture and not a press.
+  let touchLook = false;
   let stickX = 0, stickZ = 0, stickActive = false;
   // The fingers currently down on the canvas, and the last distance between
   // them. See the pinch block in the canvas pointermove handler.
@@ -22088,6 +22181,19 @@ export function createSystems(game) {
   // currently long enough to count as the rescue. See the padBackHold reader.
   let padBackT = 0, padBackHold = false;
   let padX = 0, padZ = 0, padRun = false, padSlide = false;
+  // ---- R3'S SECOND MEANING (X7) -------------------------------------------
+  // Every button on a pad was already spoken for — A hop, B and Y wheek, X
+  // grab, LT slide, RT and L3 run, LB/RB yaw, R3 recentre, Start pause, Back
+  // paper/rescue, and the whole d-pad walks — so the eye-raise goes on a stick
+  // click's HOLD, which is the same tap-and-hold shape Back already carries and
+  // the only free gesture left on the camera hand.
+  //
+  // The tap is untouched and stays on the PRESS edge: a recentre is a reflex
+  // and it may not wait 0.18 s to find out whether the thumb is going to stay
+  // down. So the two do not exclude one another — a long press recentres AND
+  // raises, which is a coherent sentence ("put the camera behind me and let me
+  // look at this") rather than a collision.
+  let padEyeT = 0, padEye = false;
   let padHonk = false, padAction = false, padJump = false;
   let padWasHonk = false, padWasAction = false, padWasJump = false;
   let padWasStart = false, padWasBack = false, padWasSnap = false;
@@ -22647,7 +22753,7 @@ export function createSystems(game) {
     // the two fingers would still be "down" on the way back and the next single
     // touch would read as the second half of a pinch.
     sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-    touchSlide = false; touchBack = false;
+    touchSlide = false; touchBack = false; touchLook = false;
     // rAF stops while the tab is hidden, so a buffered press taken half a
     // second before an alt-tab would still be 0.02 s old on the way back and
     // would fire by itself. A press does not survive leaving the window.
@@ -22780,12 +22886,20 @@ export function createSystems(game) {
   // things you READ live, and never in the fan: the fan is aimed at during a
   // chase and a menu is the last thing that should be under a wild thumb.
   const menuBtn = sysTouchBtn('capyui-menu', 'menu', 'pause, settings and the journey');
+  // ---- AND THE SEVENTH, WHICH IS THE EYE (X7) ---------------------------
+  // Third in the right-hand column rather than fifth in the fan, and the
+  // reasoning is the fan's own: the fan is aimed at during a chase and this is
+  // the one control you press because you have STOPPED. It is also not a verb —
+  // nothing in the world changes while it is held — and the column is where the
+  // things that are not verbs live.
+  const lookBtn = sysTouchBtn('capyui-look', 'look', 'look up');
   touchLayer.appendChild(wheekBtn);
   touchLayer.appendChild(grabBtn);
   touchLayer.appendChild(hopBtn);
   touchLayer.appendChild(slideBtn);
   touchLayer.appendChild(backBtn);
   touchLayer.appendChild(menuBtn);
+  touchLayer.appendChild(lookBtn);
   hudRoot.appendChild(touchLayer);
 
   // Touchscreen laptops driven by mouse+keyboard must NOT get the stick zone —
@@ -22876,6 +22990,9 @@ export function createSystems(game) {
   bindBtn(slideBtn, function () { touchSlide = true; }, function () { touchSlide = false; });
   // Also held: the rescue reads sysBACK_HOLD seconds of it, exactly as R does.
   bindBtn(backBtn, function () { touchBack = true; }, function () { touchBack = false; });
+  // ...and the eye. Held, and on exactly the channel V writes to, so there is
+  // one implementation of the raise and three ways to ask for it.
+  bindBtn(lookBtn, function () { touchLook = true; }, function () { touchLook = false; });
   // NOT bindBtn. Every other button in the fan is a VERB — it writes a held
   // flag that update() reads, and it fires on press because a thumb on a verb
   // wants the frame it pressed on. A menu is neither: it fires once, on
@@ -23181,6 +23298,7 @@ export function createSystems(game) {
       padOn = false; padX = 0; padZ = 0; padRun = false; padSlide = false;
       padHonk = padAction = padJump = false;
       padWasHonk = padWasAction = padWasJump = false;
+      padEye = false; padEyeT = 0;
       return;
     }
     padOn = true;
@@ -23195,6 +23313,9 @@ export function createSystems(game) {
     if (sysPadCard(g, dt)) {
       padX = 0; padZ = 0; padRun = false; padSlide = false;
       padHonk = padAction = padJump = false;
+      // A card owns the pad whole, and that includes the lens: R3 held while
+      // the departures board is up is a scroll, not a look at the sky.
+      padEye = false; padEyeT = 0;
       padWasJump = padBtn(g, 0);
       padWasHonk = padBtn(g, 1) || padBtn(g, 3);
       padWasAction = padBtn(g, 2);
@@ -23263,6 +23384,9 @@ export function createSystems(game) {
       const cg = game.capy && game.capy.group;
       if (cg) { camYawTarget = cg.rotation.y; camHandT = 0; camIdleT = 0; }
     }
+    // ...and KEEPING it down is the eye-raise, exactly as V is. See padEyeT.
+    padEyeT = snap ? padEyeT + dt : 0;
+    padEye = started && padEyeT >= sysPAD_EYE_HOLD;
     padWasSnap = snap;
 
     // ---- and the two cards ------------------------------------------------
@@ -24500,9 +24624,19 @@ export function createSystems(game) {
     return !!(api && typeof api.terrainHeight === 'function');
   }
 
+  /**
+   * THE THIRD LAMP ON THE FLIGHT PANEL, and the third thing that was Pasto's
+   * by name (X7). `game.pasto.thermals` is the right list in one chapter and
+   * an undefined in the other eighteen, so the fragata flew a whole chapter
+   * with the THERMAL lamp dark — including the four columns it is steered by.
+   *
+   * Asked of the LIVE chapter, and the same two shapes condorHostThermals
+   * accepts: an array, or a getter for a chapter whose columns move.
+   */
   function thermalAt(x, y, z) {
-    const pa = game.pasto;
-    const list = pa && pa.thermals;
+    const pa = sysLiveBiomeApi(game);
+    let list = pa && pa.thermals;
+    if (typeof list === 'function') { try { list = list(); } catch (e) { list = null; } }
     if (!list || !list.length) return false;
     for (let i = 0; i < list.length; i++) {
       const th = list[i];
@@ -24609,7 +24743,7 @@ export function createSystems(game) {
       // Same reason as the blur handler: a held touch button or half a pinch
       // cannot produce its own release while the tab is in the background.
       sysPinchPts.clear(); sysPinchD = 0; sysDragLastX = null;
-      touchSlide = false; touchBack = false;
+      touchSlide = false; touchBack = false; touchLook = false;
       if (ac && ac.suspend && ac.state === 'running') {
         const pz = ac.suspend(); if (pz && pz.catch) pz.catch(function () {});
       }
@@ -26605,7 +26739,23 @@ export function createSystems(game) {
     // ---- ground rig <-> flight rig -----------------------------------------
     // One blend drives everything below: distance, pitch, look lead and which yaw
     // the rig orbits on. Mounting and dropping are the same move played backwards.
-    const mounted = !!(inPasto && game.condor && game.condor.mounted);
+    // ---- ...AND THE BIRD IS NOT PASTO'S ANY MORE (X7) --------------------
+    // This read `inPasto && game.condor.mounted`, which was the same question
+    // as "is there a bird" for exactly as long as one chapter had one. Rio has
+    // had a fragata since the second flier landed — same 2,500 lines of
+    // aerodynamics, same talons, same minute in the air — and every one of them
+    // was flown behind the WALKING rig: 9.5 m of boom at 26 degrees, no FOV
+    // reference, no altimeter, the yaw orbiting the animal instead of the
+    // flight path. Measured at 20 m/s over Botafogo.
+    //
+    // `hosted()` is condor.js's own host test, published for this line. It is
+    // belt and braces next to `mounted` — a mounted bird can only exist in a
+    // host chapter — and it is here because the ALTITUDE lines below have to
+    // ask the same question about a chapter with no passenger on the bird, and
+    // two different spellings of "does this place have a flier" is how this
+    // paragraph came to be written in the first place.
+    const flightHost = !!(game.condor && game.condor.hosted());
+    const mounted = !!(flightHost && game.condor.mounted);
     flyT = damp(flyT, mounted ? 1 : 0, sysFLY_LAMBDA, dt);
     const sp = Math.hypot(v.x, v.z);
 
@@ -26790,7 +26940,10 @@ export function createSystems(game) {
     // hand is on the key, and while the blend is still coming back afterwards,
     // this runs at sysEYE_LAMBDA. A biome asking on its own still gets its
     // three-second ease.
-    const eyeAsk = (started && !!keys.KeyV) ? sysEYE_RAISE_W : 0;
+    // Three hands, one voice (X7). V, R3 held, and the touch column's eye — all
+    // of them write this one 0..1 ask and none of them is a second rig, which
+    // is the rule the whole block above is built on.
+    const eyeAsk = (started && (keys.KeyV || padEye || touchLook)) ? sysEYE_RAISE_W : 0;
     const eyeLive = eyeAsk > 0 || skyEyeT > 0.002;
     skyEyeT = damp(skyEyeT, eyeAsk, sysEYE_LAMBDA, dt);
     if (skyEyeT > skyWant) skyWant = skyEyeT;
@@ -27129,6 +27282,51 @@ export function createSystems(game) {
     sysCamPos.x = damp(sysCamPos.x, sysDesired.x, 7, dt);
     sysCamPos.y = damp(sysCamPos.y, sysDesired.y, 6.5, dt);
     sysCamPos.z = damp(sysCamPos.z, sysDesired.z, 7, dt);
+    // ---- THE CUT IS ON THE DESIRED POINT; THE FRAME IS DRAWN FROM THE SPRING
+    //
+    // (X7.) The block above says "in, immediately: a frame spent inside a wall
+    // is a frame the player cannot play", and it means it — `camClearF` takes
+    // the new value on the frame the ray finds the wall. And then the boom is
+    // handed to a damped spring at lambda 7, which needs about a third of a
+    // second to travel the metres the cut just removed, so for that third of a
+    // second THE EYE IS EXACTLY WHERE THE CUT SAID IT MUST NOT BE.
+    //
+    // Measured in the San Marco arcade, walking the colonnade: the cut asked
+    // for 1.87 m of boom and the rendered eye sat at 3.37, one of the columns
+    // 0.14 m in front of the lens and the capybara entirely behind it — the
+    // frame is a photograph of a pillar. `clear` read 0.18 the whole way, so
+    // the instrument was reporting a feature that was working while the picture
+    // showed one that was not. Eighteen of twenty-eight frames were cut and six
+    // of them had a solid column between the lens and the animal.
+    //
+    // RADIUS ONLY. The spring may lag in direction as much as it likes — that
+    // is the smoothing, and a snapped bearing is the lurch this file spends
+    // three comments avoiding — but it may never sit FURTHER out along the boom
+    // than the ray said was safe. Coming back out costs nothing: camClearF
+    // eases to 1 at sysCAM_CLEAR_OUT, so the ceiling this imposes opens at that
+    // rate and the eye follows it smoothly.
+    //
+    // The same shape as the second relief clamp forty lines down, and for the
+    // same reason it exists: a clamp applied to where the eye WANTS to be is
+    // not applied to the eye.
+    if (camClearF < 0.999) {
+      const wx = sysDesired.x - sysAnchor.x, wy = sysDesired.y - sysAnchor.y, wz = sysDesired.z - sysAnchor.z;
+      const ex = sysCamPos.x - sysAnchor.x, ey = sysCamPos.y - sysAnchor.y, ez = sysCamPos.z - sysAnchor.z;
+      const want = Math.sqrt(wx * wx + wy * wy + wz * wz);
+      const have = Math.sqrt(ex * ex + ey * ey + ez * ez);
+      if (have > want && have > 1e-4) {
+        // NOT a snap, and the first version of this WAS one. A hard clamp is
+        // right in principle — the eye simply may not be out there — and
+        // measured on the Kowloon stair it moved the rendered boom 8.54 m
+        // between two samples against 1.72 before, which is not a camera move,
+        // it is a CUT. Same radius, approached at sysCAM_CUT_LAMBDA, which is
+        // swept there: the overshoot is 90 % gone in about a fifth of a second,
+        // so the lens is behind the wall for a tenth of the time it was and
+        // what the player sees is a whip rather than a jump.
+        const s = damp(have, want, sysCAM_CUT_LAMBDA, dt) / have;
+        sysCamPos.set(sysAnchor.x + ex * s, sysAnchor.y + ey * s, sysAnchor.z + ez * s);
+      }
+    }
     if (sysCamPos.y < camFloorY) sysCamPos.y = camFloorY;
     camera.position.copy(sysCamPos);
 
@@ -27258,7 +27456,16 @@ export function createSystems(game) {
     // their measured curves; everywhere else gets the same 'how far up am I'
     // figure Pasto uses, which is 0 in the sixteen frames a chapter where the
     // animal is stood on something.
-    const agl = inPasto ? Math.max(0, p.y - groundY)
+    //
+    // ...AND THE UNCAPPED ARM IS A FLIER'S, NOT PASTO'S (X7). 26 m is the right
+    // ceiling for a hop off a chimney and the wrong one for a bird: Galeras'
+    // columns top out at 190 m and Rio's at 170, so a capped `agl` puts the
+    // shadow box back on the datum for the whole of a flight and pegs the
+    // altimeter — which is read off this very number, see flyAltN — at 26 for
+    // the whole minute. Pasto got the uncapped arm by name; the second host
+    // silently got the cap. It is `flightHost` now, so a chapter that publishes
+    // thermals gets the flier's altitude and everybody else keeps the hop's.
+    const agl = flightHost ? Math.max(0, p.y - groundY)
               : inDri ? clamp(p.y * 0.35, 0, 26)
               : relief ? clamp(p.y - groundY, 0, 26) : 0;
     // The box rides the ANIMAL's height wherever there is relief. This was the

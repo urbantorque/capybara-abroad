@@ -531,6 +531,21 @@ export function createCondor(game) {
      */
     talonInReach() { return condorTalonInReach(); },
     /**
+     * DOES THE LIVE CHAPTER HAVE A FLIER? The same question condorHost() asks,
+     * published because systems.js has to ask it too and was asking a different
+     * one — `inPasto`. The flight rig, the altimeter's altitude and the shadow
+     * box's altitude were all gated on the chapter NAME, written when one
+     * chapter had a bird; Rio has had one since the second flier landed, so
+     * riding the fragata put a 20 m/s glide behind the ground rig, pegged the
+     * altimeter at the 26 m relief cap and left the shadow box on the datum
+     * under an animal a hundred metres above it.
+     *
+     * A predicate and not the host object, deliberately: nothing outside this
+     * file has any business reaching into a chapter's flier contract, and a
+     * boolean cannot be held past the frame it was asked on. Allocation-free.
+     */
+    hosted() { return !!condorHost(); },
+    /**
      * LET GO OF THE PASSENGER, FROM OUTSIDE. The only caller is the void
      * rescue in systems.js: a rescue that teleports the capybara while the
      * constraint is still live drags it straight back to the talons, so
