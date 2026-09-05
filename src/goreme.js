@@ -4090,7 +4090,7 @@ function gorUpdateBalloon(game, dt) {
     gorAboardT = 0;
     if (!gorToldBurner) {
       gorToldBurner = true;
-      gorToast('hold E for the burner. let go and it comes down. the stick does nothing.');
+      gorSay('hold E for the burner. let go and it comes down. the stick does nothing.');
     }
   }
   if (gorAboard) gorAboardT += dt; else gorAboardT = 0;
@@ -4693,6 +4693,18 @@ function gorToast(t) {
   const g = gorGame;
   if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
 }
+/**
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
+ *
+ * Two sentences in this chapter hand over a control — the burner, which is the
+ * only thing you can do in a balloon, and the callback to Hong Kong's climb on
+ * the soft rock. Both named a key.
+ */
+function gorSay(t) {
+  const g = gorGame;
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  else gorToast(t);
+}
 function gorSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
@@ -4832,7 +4844,7 @@ function gorUpdateTasks(game, dt) {
       if (Math.hypot(p.x - c.x, p.z - c.z) < c.rb + 3.5 && p.y < c.base + 3) {
         if (!gorToldChimney) {
           gorToldChimney = true;
-          gorToast('hold E against the soft rock. you have done this before.');
+          gorSay('hold E against the soft rock. you have done this before.');
         }
         break;
       }

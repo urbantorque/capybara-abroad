@@ -3809,6 +3809,12 @@ function monUpdateTunnel(game, dt) {
 // ============================================================= THE CHICANE ===
 // Five cones out of the Nouvelle Chicane, and the harbour is nine metres away.
 const monChicaneProps = [];
+// ---- WHOSE SHOVE IT WAS (F1) ---------------------------------------------
+// One flag per cone, set the moment the capybara is close enough to have moved
+// it. See monUpdateChicane and the `prop:water` handler: the task is "put the
+// chicane in the harbour", and until this existed the harbour part was checked
+// and the you part was not.
+const monChicaneMine = [];
 function monSpawnChicane(game) {
   if (!game.physics || typeof game.physics.spawnProp !== 'function') return;
   monInitTrack();
@@ -3820,9 +3826,45 @@ function monSpawnChicane(game) {
     monTrackAt(monTrackLen[14] - 6 + i * 3.2, monTrackTmp);
     const nx = Math.cos(monTrackTmp.yaw), nz = -Math.sin(monTrackTmp.yaw);
     const o = (i % 2 ? 1 : -1) * 2.6;
+    // ---- ...AND THEY REST ON THE ROAD, NOT HALF A METRE OVER IT (F1) ----
+    // The fourth argument is `restY` — the SURFACE a prop is laid on, not a
+    // clearance — and `monCAR_HY = 0` says in as many words that a track
+    // sample's y IS the road. The `+ 0.5` therefore told props.js the tarmac
+    // was half a metre higher than it is, so all five were placed in the air,
+    // dropped, bounced and rolled — measured at 3.98 m/s a second and a half
+    // after the chapter goes live, all five at once, which is a fall and not
+    // a car. Some of them rolled onto the racing line, where a car doing
+    // 26.5 m/s put one in the basin without the player having arrived.
     const pr = game.physics.spawnProp('cone', monTrackTmp.x + nx * o,
-                                      monTrackTmp.z + nz * o, monTrackTmp.y + 0.5);
-    if (pr) monChicaneProps.push(pr);
+                                      monTrackTmp.z + nz * o, monTrackTmp.y);
+    if (pr) { monChicaneProps.push(pr); monChicaneMine.push(false); }
+  }
+}
+
+// ---- ...AND THE TASK IS ONE YOU DID (F1) ---------------------------------
+// `prop:water` is the right event and it was the whole test: any chicane cone
+// reaching the basin ticked the row, whoever put it there. Measured on a clean
+// arrival with no key ever pressed — `chicane` done at 9.5 s, the toast up, the
+// paper stamped, the animal still standing on its spawn thirty metres away.
+//
+// The gate is proximity rather than a grab, because the row is a SHOVE: the
+// clue says "the harbour is nine metres that way. shove." and the honest way
+// to do it is to walk into a cone at a run. 1.6 m is the animal's own body plus
+// the cone's plus a little, so anything close enough to have moved it counts,
+// and being carried counts outright.
+const monCHIC_REACH = 1.6;
+function monUpdateChicane(game) {
+  if (monChicaneDone || !monChicaneProps.length) return;
+  const p = game.capy && game.capy.position;
+  if (!p) return;
+  for (let i = 0; i < monChicaneProps.length; i++) {
+    if (monChicaneMine[i]) continue;
+    const pr = monChicaneProps[i];
+    if (!pr || !pr.body) continue;
+    if (pr.held) { monChicaneMine[i] = true; continue; }
+    const b = pr.body.position;
+    if (Math.hypot(p.x - b.x, p.z - b.z) < monCHIC_REACH &&
+        Math.abs(p.y - b.y) < 2.2) monChicaneMine[i] = true;
   }
 }
 
@@ -4318,7 +4360,11 @@ export function createMonaco(game) {
   // it, so there is nothing to poll and nothing to get wrong about which cone.
   game.events.on('prop:water', function (e) {
     if (monChicaneDone || !e || !e.prop) return;
-    if (monChicaneProps.indexOf(e.prop) < 0) return;
+    const i = monChicaneProps.indexOf(e.prop);
+    if (i < 0) return;
+    // ...and it has to have been YOURS. A cone a car put in the basin is the
+    // marshals' problem and not an achievement. See monUpdateChicane.
+    if (!monChicaneMine[i]) return;
     monChicaneDone = true;
     monTask('chicane');
     if (typeof game.punch === 'function') game.punch(0.28);
@@ -4579,6 +4625,7 @@ export function createMonaco(game) {
       }
       monUpdateSea(dt);
       monUpdateBoats(dt);
+      monUpdateChicane(game);
       monUpdateCars(game, dt);
       monUpdateTunnel(game, dt);
       monUpdateEye(game, dt);

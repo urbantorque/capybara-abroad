@@ -4474,7 +4474,7 @@ function venUpdateVolo(game, dt) {
     const p = capy.position;
     if (Math.hypot(p.x - venVOLO_A.x, p.z - venVOLO_A.z) < 11) {
       venVoloTold = true;
-      venToast('stand in it. it goes on its own, or press E and it goes now.');
+      venSay('stand in it. it goes on its own, or press E and it goes now.');
     }
   }
 }
@@ -4655,6 +4655,14 @@ function venTask(id) {
 function venToast(t) {
   const g = venGame;
   if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+}
+/**
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
+ */
+function venSay(t) {
+  const g = venGame;
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  else venToast(t);
 }
 function venSfx(n, o) {
   const g = venGame;

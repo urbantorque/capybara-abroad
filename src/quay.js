@@ -4823,7 +4823,15 @@ function quayTakeHelm() {
   // deck you are steering is a floor; say so. See sysCamClear.
   if (g.capy) { g.capy.atHelm = true; g.capy.rideBody = quayBoatBody; }
   if (typeof g.sfx === 'function') g.sfx('chime', { volume: 0.7 });
-  if (typeof g.toast === 'function') g.toast('W/S throttle · A/D wheel · E to step away');
+  // ---- IN THE SCHEME THE PLAYER IS HOLDING (F1) -------------------------
+  // The ferry's whole control scheme, said once, at the wheel — and it was
+  // three keycaps a phone does not have and a pad does not have either. The
+  // helm reads `input.x` and `input.z`, which is the abstract stick every
+  // scheme fills, so the CONTROL was always right on all three and only the
+  // sentence was wrong. `game.say` runs systems.js's substitution table, which
+  // now carries rows for W/S and A/D.
+  if (typeof g.say === 'function') g.say('W/S throttle · A/D wheel · E to step away');
+  else if (typeof g.toast === 'function') g.toast('W/S throttle · A/D wheel · E to step away');
   quayTask('take-helm');
 }
 

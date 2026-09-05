@@ -392,7 +392,18 @@ function mainMakeBiomes(game) {
     // berth, 30 m below and out. The three huts are off the frame to starboard:
     // the paragraph asks for both and the geometry cannot give both, and the
     // BOAT is the sentence the chapter is built on.
-    ANTARCTIC_SPAWN: { x: 0, y: 7.1, z: 52, yaw: -0.1194 },
+    //
+    // FOUR METRES DOWN THE HILL FROM WHERE IT SHIPPED (F1). At z 52 the rock
+    // the animal stands on is directly behind it on the arrival bearing, so
+    // `sysCamClear` cut the boom to a QUARTER — measured 3.68 m of an 11.44 m
+    // reach, three runs, clear 0.25 — and the first frame of the chapter was a
+    // translucent capybara half-swallowed by a grey slab with the jetty off the
+    // top edge. Everything the paragraph above asks for was behind the camera.
+    // At z 48 the same bearing has 11.9 m of clean boom (clear 1.00, three
+    // runs), the animal lands dead centre at 55 px of a 900 px frame, and the
+    // jetty, the man on it, the orange boat, the signpost, the drums and the
+    // pack ice are all in shot. The heading is unchanged; only the hill is.
+    ANTARCTIC_SPAWN: { x: 0, y: 5.7, z: 48, yaw: -0.1194 },
     // Monte Carlo: on the west quay at the bottom, looking east across the
     // basin at a hundred and thirty feet of somebody else's money, with the
     // terrace and the Casino lit up above it. Deliberately at the BOTTOM and

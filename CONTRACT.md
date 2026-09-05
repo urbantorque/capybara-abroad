@@ -14,6 +14,116 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FINISH, BATCH ONE — THE FIRST TEN MINUTES AND THE ARRIVAL (F1 — 6 Sep 2026)
+
+**LANDED.** All nine must-items of `ROADMAP-FINISH.md` batch F1. The theme is
+that eighteen chapters were composed and the nineteenth — the one every new
+player starts in — was not, and that four rules from the D6 glyph pass were
+sizing things off values that no longer existed.
+
+**THE ARRIVAL IS COMPOSED AT THE SPAWN'S DISTANCE, NOT THE LAST CHAPTER'S.**
+`teleportCapy` reset nine pieces of rig state and not `camDist`, which is the
+number the first frame is built from four lines later. Measured: one wheel-out
+in Sydney to 14.85 m put Manly, Antarctica, Rio and Kowloon all on a 14.85 m
+boom, and Manly's composed arrival became a third of a frame of empty sea.
+The fix is deliberately NOT the roadmap's `camDist = camDistTarget = …`:
+`camDistTarget` is the player's own wheel and a zoom is a preference, not a
+leftover. The CURRENT distance is composed (`arriveDist`, the spawn's `dist`
+or `sysCAM_DEF`), the same number is handed to `frameShot` so the hold keeps
+it for the length of the place card, and the TARGET is untouched — so the shot
+is composed and, when the hold expires, the rig damps back to the zoom the
+player chose. Measured after: reach is 9.5 at 3 s in every chapter under both
+default and zoomed-out, and back to the player's 11.94 / 14.87 at 12 s.
+
+**ANTARCTICA'S SPAWN MOVED FOUR METRES DOWN THE HILL** (z 52 → 48). The rock
+the animal stands on sat directly behind it on the arrival bearing, so
+`sysCamClear` cut the boom to a quarter: 3.68 m of an 11.44 m reach and
+`clear` 0.25, three runs, with the jetty and the boat off the top edge. At
+z 48: 11.9 m, `clear` 1.00, three runs, the animal dead centre at 55 px of a
+900 px frame, and everything the spawn's own paragraph asks for in shot. The
+heading is unchanged.
+
+**CHAPTER ONE SAYS ITS NAME.** `showPlace` lives inside `if (landed)`, so the
+one chapter that is never travelled to was the one chapter that never
+announced itself; "Sydney / the gardens, unsupervised" is authored and was
+reachable only as a 10 px label at the foot of the paper. Held back by the
+same `sysFADE_CARD_LAG` a travelled arrival uses, so it rises through the end
+of the title card's fade. Measured order now: paper 0.21 s, place card 0.59 s,
+`be a menace.` 0.91 s.
+
+**MONTE CARLO'S CHICANE IS ONE YOU DID.** `prop:water` ticked the task for any
+chicane cone reaching the basin, whoever put it there — measured done at 9.5 s
+on a clean arrival with no key ever pressed. Two causes and both are fixed:
+the cones were spawned with `restY = road + 0.5`, and `restY` is the SURFACE a
+prop is laid on, so all five were placed in the air, dropped (3.98 m/s, all
+five at once — a fall, not a car) and rolled onto the racing line; and the
+handler had no owner test. `monChicaneMine[]` arms per cone from real
+proximity (1.6 m, or being carried). Proven both ways: a cone driven into the
+basin with the animal 32.6 m away does not tick, and one that goes in after
+the animal has stood beside it does.
+
+**`to-quay` IS CIRCULAR QUAY'S TO TICK.** `jrTravel` completed `def.arrive`
+inside the fade, so the row — "Cast off from the Quay", clue "take her out
+past the wharf" — was crossed off before the player saw the paper, and
+`quay.js`'s own implementation at `quayCastOff` could never run. `arrive` is
+dropped from `CHAPTERS[3]` alone; the other eighteen are true turnings-up and
+keep theirs. Verified: false on arrival, true after taking the wheel and
+running her off the wall.
+
+**THE WORLD'S SPEECH IS UNDER THE GAME'S.** npc.js mounts its bubble pool into
+the HUD root at runtime, so all eight came after the paper, the chart, the
+toasts and the touch fan in DOM order — and with no z-index on either side,
+DOM order was the paint order. The persistent furniture takes one rung at 40
+and the pool declares 30.
+
+**SEVEN TEACHING TOASTS GO THROUGH `game.say`.** The first-encounter sentence
+for the dive, the climb, the burner, the soft rock, the traghetto and both
+helms named keyboard keys and bypassed the substitution table. Each chapter
+gains a thin `*Say` beside its `*Toast` — used at the teaching sites only, for
+the reason `game.say`'s own comment gives — and `sysTOUCH_WORDS`/`sysPAD_WORDS`
+grow rows for `W/S` and `A/D`, which both helms need and neither table had.
+Both helms read `input.x`/`input.z`, so the CONTROL always worked on every
+device and only the sentence was wrong.
+
+**ESCAPE IS NAMED.** The fold said `Tab · Esc — the journal · close`, which
+has been untrue since R4: Escape with nothing open opens the pause card, the
+only route to the three faders, the journey and the title. Two rows now, in
+the same words the touch table uses for the same card. The title card's
+footnote said "behind MENU" to every player, and MENU is a button that exists
+only on touch — it is `sysScheme`'d to Esc / MENU / START. And the touch table
+gains `tap a row — aim at another task`, a gesture that has been bound since it
+was built and written down nowhere. F is NOT promoted to the front legend: the
+front of that card is the six verbs and re-aiming a pointer is not one.
+
+**FOUR D6 GLYPH RULES.** `.capyui-setmute.off .cross` was `display:inline`,
+which discards the 16 px sizing two rules up, so the crossed speaker filled its
+own button the moment anything was muted. `toast(…, 'last')` called
+`sysToastPush(children.length)` and `sysToastPush` loops `while (live > keep)`
+with `children.length >= live` by construction — so the one sentence written to
+arrive alone never did; it is `sysToastPush(0)`. `--capyui-gbg` is the card's
+paper and painted cream discs on seven translucent touch buttons; the token is
+now transparent ON THE GLYPH, because `.capyui-g` declares it on itself and a
+rule on the button would have been silently overridden. And the touch column's
+marks were `1.6em` of a `font-size:10px` chosen for the words they replaced, so
+the `look` glyph — whose own comment says the column has to be legible at 24 px
+— rendered at 16.
+
+**`capyui-back` IS TWO CONTROLS AND THE LEAK RAN BOTH WAYS.** The card's rule
+is scoped to `.capyui-p2head` now, which was putting a 7 px right margin and
+four pixels of asymmetric padding on the touch STUCK mark inside a centred
+flex box: measured −2.00 px off centre against MENU and LOOK at 0.00, now
+0.00. The other direction is RECORDED AND NOT FIXED: the touch block is still
+bare and eight of its declarations reach the card's back button, so the pill
+that rule describes has never been drawn. Restoring it is a visual decision on
+a card with three dedicated passes behind it, not a bug fix; it is on the
+shelf with the method for making it pixel-neutral.
+
+**Verified:** `npm test` 10/10; 19/19 driven soak, 0 NaN, 0 errors, frame time
+16.6–17.2 ms against a 16.5–17.0 baseline; the build clean at 5609.2 KB.
+Instruments: `qa/f1-before.js`, `f1-cam.js`, `f1-ant.js`, `f1-ant2.js`,
+`f1-ant3.js`, `f1-mon.js`, `f1-after.js`, `f1-gate.js`, `f1-gate2.js`,
+`f1-touch.js`, `f1-soak.js`.
+
 ## THE TITLE, BATCH THREE — THE HERO AND THE TURN (T3 — 5 Sep 2026)
 
 **LANDED.** Both must-lands of `ROADMAP-TITLE.md` batch T3, and one bug found

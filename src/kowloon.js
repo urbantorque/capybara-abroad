@@ -4366,6 +4366,19 @@ function hkToast(t) {
   const g = hkGame;
   if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
 }
+/**
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
+ *
+ * The climb is the first genuinely new verb in eleven chapters and this is the
+ * only sentence that hands it over, so it is the worst one in the game to name
+ * a key with: a phone player is told to hold E against a bamboo scaffold and
+ * has nothing to hold.
+ */
+function hkSay(t) {
+  const g = hkGame;
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  else hkToast(t);
+}
 function hkSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
@@ -4534,7 +4547,7 @@ function hkUpdateTasks(game, dt) {
   }
   if (!hkClimbTold && hkInZone('scaffold', p.x, p.z) && p.y < 3) {
     hkClimbTold = true;
-    hkToast('hold E against the bamboo and push toward it.');
+    hkSay('hold E against the bamboo and push toward it.');
   }
 
   // ---- the laundry poles ---------------------------------------------------

@@ -491,6 +491,18 @@ function antToast(s) {
   const g = antGame;
   if (g && typeof g.toast === 'function') g.toast(s);
 }
+/**
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
+ *
+ * The tiller line is the whole control scheme of the only vehicle in a chapter
+ * whose subtitle is "and you are not walking anywhere", so it is the single
+ * worst string in the game to write in keycaps a device may not have.
+ */
+function antSay(s) {
+  const g = antGame;
+  if (g && typeof g.say === 'function') g.say(s);
+  else antToast(s);
+}
 function antSfx(name, opts) {
   const g = antGame;
   if (g && typeof g.sfx === 'function') g.sfx(name, opts);
@@ -3683,7 +3695,7 @@ function antTakeHelm() {
   // the tender's own coaming. See capy.rideBody and sysCamClear.
   if (g.capy) { g.capy.atHelm = true; g.capy.rideBody = antBoatBody; }
   antSfx('chime', { volume: 0.7 });
-  antToast('W/S throttle · A/D tiller · Q to call · E to step off');
+  antSay('W/S throttle · A/D tiller · Q to call · E to step off');
   antTask('take-tiller');
 }
 

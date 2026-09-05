@@ -4173,7 +4173,19 @@ const sysLEGEND_MORE = [
   ['V  ·  R3 (held)', 'raise the eye  ·  look at the sky'],
   ['F  ·  Shift+F', 'aim at another task'],
   ['R (held)', 'put me back'],
-  ['Tab  ·  Esc', 'the journal  ·  close'],
+  // ---- ESCAPE'S REAL JOB, SAID SOMEWHERE (F1) ---------------------------
+  // This row read `Tab · Esc — the journal · close`, which was true before R4
+  // and has not been since: Escape with nothing open opens the PAUSE CARD, and
+  // that card is the only way to the three faders, the journey and the way back
+  // to the title. So the one door a keyboard player most needs was named
+  // nowhere at all — the front legend has no row for it, this row described it
+  // as a way of closing something, and the title card's own footnote sent them
+  // to MENU, which is a button that exists only on a phone. Every card in the
+  // game already says "esc to close" on its own foot, so that half needs no
+  // row up here; the door does. Two rows, in the same words the touch table
+  // uses for the same card, so the two schemes cannot describe it differently.
+  ['Esc', 'pause  ·  sound  ·  the journey  ·  the title'],
+  ['Tab', 'the journal'],
   ['P', 'hide the paper'],
   // Photo mode goes in the FOLD and not on the front, by the rule the fold
   // exists for: it is not a verb the capybara has and nothing is needed to
@@ -4214,6 +4226,15 @@ const sysLEGEND_TOUCH = [
   // verbs, which is where it sits on the screen as well.
   ['LOOK (held)', 'raise the eye  ·  the sky'],
   ['STUCK (held)', 'put me back'],
+  // ---- THE ONE GESTURE THAT WAS NOWHERE (F1) ---------------------------
+  // Every list in this game has a task on it you cannot do yet, which is what
+  // `todoStep`/`todoPinTo` are for — and a thumb's way in has been bound since
+  // it was built (a `pointerdown` on the row, with the aria-label to match) and
+  // written down in no legend. The keyboard's F is one fold away on the same
+  // card; this was not anywhere. It is a row on the touch table rather than a
+  // promotion of F to the front, because the front of this card is the six
+  // verbs and re-aiming a pointer is not one.
+  ['tap a row', 'aim at another task'],
   // The row that closes the scheme (R5). The keyboard table spends four rows on
   // M / N / [ / ] for the audio alone and still needs Escape and Tab elsewhere;
   // a thumb has one button for all of it, because R4 put pause, the three
@@ -4226,6 +4247,26 @@ const sysLEGEND_TOUCH = [
 function sysIsTouch() {
   return !!(window.matchMedia &&
             window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+}
+/**
+ * TRUE WHERE A PROBE IS DRIVING, and false in every distributable.
+ *
+ * The single-file build opens from `file://` (hostname is the empty string) and
+ * a host serves it from a real name; the harness in `qa/` is localhost without
+ * exception. `?dev` is the escape hatch for anybody debugging a deployed copy.
+ * Used to gate the one binding that can move the player between chapters with
+ * no ceremony at all — see the Backslash key.
+ */
+function sysDevHost() {
+  try {
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') return true;
+    // Read rather than pattern-matched: a regex for a query key is a string
+    // containing `dev(`, which `qa/xmodule.mjs` correctly cannot tell from a
+    // call to an undeclared function. Same ambiguity the comment stripper is
+    // a four-state scanner for.
+    return new URLSearchParams(location.search).has('dev');
+  } catch (e) { return false; }
 }
 // ---- HAS A PAD EVER BEEN HELD (P2) ----------------------------------------
 // Module scope, because the two things that need the answer — sysSay and
@@ -4281,6 +4322,15 @@ function sysScheme(keyWords, touchWords, padWords) {
 // `\bE\b` and `\bQ\b` rules at the end are safe here and would not be safe on
 // arbitrary prose.
 const sysTOUCH_WORDS = [
+  // ---- THE TWO HELMS (F1) ------------------------------------------------
+  // The ferry and the Antarctic tender both read `input.x` and `input.z` — the
+  // abstract stick every scheme fills — so the CONTROL has always worked on a
+  // phone and only the sentence was wrong: "W/S throttle · A/D wheel" names
+  // four keys a thumb does not have, and it is the only line either vehicle
+  // ever gives. First in the table because these are the longest patterns and
+  // the bare rules below would otherwise get inside them.
+  [/\bW\/S\b/g,       'stick up/down'],
+  [/\bA\/D\b/g,       'stick left/right'],
   [/\bhold Shift\b/g, 'push the stick all the way'],
   [/\bhold R\b/g,     'hold STUCK'],
   [/\bpress Q\b/g,    'tap WHEEK'],
@@ -4306,6 +4356,11 @@ const sysTOUCH_WORDS = [
 // checked the same way the touch table was: against every clue string, so no
 // lone capital is rewritten by accident.
 const sysPAD_WORDS = [
+  // The two helms, as above. A pad steers both of them with the LEFT stick —
+  // the same one that walks the animal — because that is the stick `input.x`
+  // and `input.z` come from, so the row names a stick and not an axis pair.
+  [/\bW\/S\b/g,       'stick up/down'],
+  [/\bA\/D\b/g,       'stick left/right'],
   [/\bhold Shift\b/g, 'hold RT'],
   [/\bhold R\b/g,     'hold BACK'],
   [/\bpress Q\b/g,    'press B'],
@@ -6605,15 +6660,30 @@ function sysBuildCSS() {
 '.capyui-go.alt:focus-visible{outline-color:' + accent + ';}',
 '.capyui-go.alt i{opacity:.7;color:' + inkSoft + ';}',
 /* ---------- page two: the way back ---------- */
-'.capyui-back{grid-column:1;justify-self:start;',
+/* ---- SCOPED TO THIS CARD, BECAUSE THE NAME IS TAKEN TWICE (F1) --------
+   `capyui-back` is two unrelated controls: this one, the page-two way back,
+   and the touch layer's STUCK rescue in the right-hand column. Every
+   declaration below was reaching both. Most of it was harmless — the later
+   touch rule re-states the background, the border colour and the font size,
+   and `grid-column`/`justify-self` mean nothing outside a grid — but
+   `padding:4px 12px 4px 8px` is asymmetric by four pixels and survived, so the
+   mark inside a `justify-content:center` 58px disc sat 2px left of centre.
+   Measured before this: STUCK offX -2.00 against MENU and LOOK at 0.00.
+   Scoping the rule rather than patching the symptom, because the next
+   declaration added here would leak the same way. */
+'.capyui-p2head .capyui-back{grid-column:1;justify-self:start;',
   'padding:4px 12px 4px 8px;border-radius:999px;font:inherit;cursor:pointer;',
   'pointer-events:auto;touch-action:manipulation;',
   'background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';',
   'font-size:' + tMd + ';font-weight:700;letter-spacing:.12em;',
   'text-transform:uppercase;transition:color ' + dFast + ' ease,border-color ' + dFast + ' ease;}',
-'.capyui-back .capyui-g{margin-right:7px;}',
-'.capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
-'.capyui-back:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
+/* Scoped to the CARD (F1). `capyui-back` is two unrelated controls — this
+   button, and the touch rescue in the right-hand column — so an unscoped
+   descendant rule put 7px of right margin on the STUCK mark inside a
+   `justify-content:center` flex box and shifted it 3.5px off centre. */
+'.capyui-p2head .capyui-back .capyui-g{margin-right:7px;}',
+'.capyui-p2head .capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
+'.capyui-p2head .capyui-back:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* The short-screen shelf budget USED TO LIVE HERE and did nothing at all: it
    is the same specificity as the base .capyui-picks rule forty lines below,
    so source order decided it and the base rule won every time. Measured at
@@ -7078,6 +7148,21 @@ function sysBuildCSS() {
   'opacity:0 !important;transition:none !important;}',
   '.capyui-photo{transition:none;}}',
 
+/* ---- THE FURNITURE SITS ABOVE THE WORLD'S SPEECH (F1) -----------------
+   Every card in this HUD carries a rung — place 58, done 59, title 60,
+   journal 62, pause 64, ledger and album 66, the white 70 — and the PERSISTENT
+   furniture carried none at all, because until now nothing competed with it.
+   npc.js mounts its speech-bubble pool into this same root at RUNTIME, so all
+   eight bubbles come after the paper, the chart, the toasts and the touch fan
+   in DOM order; with no z-index on either side, DOM order IS the paint order.
+   Measured: "Reckon it'll rain." written across row four of the Sydney list on
+   the first frame of a new journey, and "Busy?" over the Monte Carlo header.
+
+   One rung for the lot, below every card above and above the pool's own 30.
+   The pool is where it belongs — a bubble is the world talking and the paper
+   is the game talking, and the game is on top of the glass. */
+'.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-fly,',
+  '.capyui-home,.capyui-moment,.capyui-touch{z-index:40;}',
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
   'background:' + paper + ';border-radius:' + rSm + ';padding:10px 12px 12px;transform:rotate(-1.7deg);',
@@ -7404,7 +7489,15 @@ function sysBuildCSS() {
 '.capyui-setmute.off{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
   '--capyui-gbg:' + accent + ';}',
 '.capyui-setmute.off .wave{display:none;}',
-'.capyui-setmute.off .cross{display:inline;}',
+/* ---- ...AND `inline` IS NOT A SIZE (F1) ------------------------------
+   `.wave` and `.cross` used to be classes on <path> elements inside one <svg>,
+   where a `display` of any kind is meaningless and this line was harmless. D6
+   moved them onto the HTML wrappers, and `display:inline` on a box DISCARDS
+   the `width`/`height` two rules up — so the inner `svg{width:100%}` resolved
+   against `.capyui-spk` instead and the crossed speaker rendered at roughly
+   the whole 31x27 button the moment anything was muted. It is the same
+   inline-block every other glyph in the sheet is. */
+'.capyui-setmute.off .cross{display:inline-block;}',
 '.capyui-setmute:focus{outline:none;}',
 '.capyui-setmute:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-setval{flex:0 0 34px;text-align:right;font-size:clamp(10px,1.8vw,11px);',
@@ -7845,6 +7938,26 @@ function sysBuildCSS() {
   'background:' + sysRgba(PALETTE.sail, 0.86) + ';border:2px solid ' + sysRgba(PALETTE.ibisHead, 0.18) + ';',
   'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ' + mSnap + ';}',
 '.capyui-btn.press{transform:scale(.9);background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
+/* ---- A MARK ON A TRANSLUCENT DISC IS NOT ON PAPER (F1) ----------------
+   `--capyui-gbg` is the card's paper, which is right everywhere the sheet is
+   used on a card and wrong on all seven of these: the buttons are a
+   translucent sail over the live world, so the glyphs' `o` shapes — the ones
+   that are the BACKGROUND rather than the ink — painted cream discs on them.
+   The pause card's `.off` state already re-declares this token for exactly
+   this reason; a translucent button's answer is to let the button through. */
+/* ...ON THE GLYPH AND NOT ON THE BUTTON. `.capyui-g` declares this token on
+   ITSELF, and a custom property set on an element always beats one inherited
+   from an ancestor — so a rule on `.capyui-btn` would be silently overridden
+   by the very elements it is meant to reach. */
+'.capyui-btn .capyui-g{--capyui-gbg:transparent;}',
+/* ---- ...AND THE MARKS ARE SIZED OFF THE WORDS THEY REPLACED (F1) ------
+   `.capyui-g.big` is 1.6em, and these three still carry the `font-size:10px`
+   that was chosen for the words STUCK / MENU / LOOK before D6 turned them
+   into marks — so the `look` glyph, whose own comment says the column has to
+   be legible at 24px in a 58px button, rendered at 16. The four fan buttons
+   are left alone: their font sizes track their own diameters (96/74/68/64)
+   and their marks were never wrong. */
+'.capyui-btn.capyui-back .capyui-g,.capyui-btn.capyui-menu .capyui-g,.capyui-btn.capyui-look .capyui-g{width:24px;height:24px;}',
 '.capyui-wheek{right:18px;bottom:26px;width:96px;height:96px;font-size:15px;}',
 '.capyui-grab{right:120px;bottom:96px;width:74px;height:74px;font-size:13px;}',
 /* third button of the fan, outboard of GRAB — the hop. */
@@ -7860,6 +7973,26 @@ function sysBuildCSS() {
    other thing you read rather than press, and no thumb arrives by accident.
    The offset tracks the chart's own clamp so the two cannot overlap at any
    width, and clears a notch the same way the chart does. */
+/* ---- AND THIS RULE REACHES THE TITLE CARD TOO (F1, recorded not fixed) --
+   `capyui-back` is two controls, and the leak runs BOTH ways. The card's own
+   rule is scoped now, so nothing it declares reaches this button — but this
+   block is still bare, and eight of its declarations land on the card's back
+   button: width and height 58px, font-size 10px, the 0.42 sail, the dashed
+   border, box-shadow none and opacity .62. (`right`/`top` are no-ops there:
+   `position:absolute` comes from `.capyui-btn`, which the card's button does
+   not carry.) So the pill the card's rule describes — content-sized, a 1px
+   solid edge, tMd type, full opacity — has never once been drawn; what the
+   title card shows is a faint dashed 58px disc.
+
+   NOT changed here. It is the appearance three title passes were designed
+   around and signed off against, and quietly restoring a rule nobody has seen
+   render is a visual decision, not a bug fix. Scoping this block to
+   `.capyui-btn.capyui-back` and copying those eight declarations onto the
+   card's own rule makes the collision impossible with no pixel changing — a
+   half-hour with a before/after — and it is on the shelf in ROADMAP-FINISH.md.
+   What F1 fixed is the half that was measurably wrong: the 7px glyph margin
+   and the asymmetric padding, which between them put the STUCK mark 2px off
+   the centre of its own disc. */
 '.capyui-back{right:calc(12px + env(safe-area-inset-right,0px));',
   // 12px to clear the notch + the chart's own height + 20px of air. The chart
   // carries a distance pill on its bottom edge, so a gap sized to the chart
@@ -15336,8 +15469,18 @@ export function createSystems(game) {
   // The sentence is passed as BOTH the note and the touch note: with no rows
   // left, sysTitleFoot's touch branch returns before it reaches `note`, so a
   // phone would have got an empty rule under the fold.
+  //
+  // ---- ...AND IT NAMED A BUTTON A DESKTOP DOES NOT HAVE (F1) ------------
+  // MENU is `menuBtn`, which lives inside `touchLayer` and is `display:none`
+  // unless the layer is `.on` — set only when `sysIsTouch()`, and removed on
+  // the first keydown. So the last sentence on the front of the game sent
+  // every keyboard player looking for a control that cannot exist for them,
+  // which is the one sin ROADMAP.md §3 was written about, committed by the
+  // line that was supposed to answer it. Same door, three names for it.
   p1El.appendChild(sysTitleFoot([],
-    'sound and settings are behind MENU, once you are in',
+    sysScheme('sound and settings are behind Esc, once you are in',
+              'sound and settings are behind MENU, once you are in',
+              'sound and settings are behind START, once you are in'),
     'sound and settings are behind MENU, once you are in'));
 
   // ---- PAGE TWO: NOTHING BUT THE PICKER ----------------------------------
@@ -17802,7 +17945,13 @@ export function createSystems(game) {
     // A closing sentence arrives alone. Same exit every other pill gets — the
     // pills already up are pushed, not deleted, which is the lesson the
     // fifth-toast bug left behind two paragraphs down.
-    if (k === 'last') sysToastPush(toastWrap.children.length);
+    // ...and `keep` is 0, not the child count (F1). `sysToastPush` counts the
+    // LIVE pills — the ones not already on their way out — and loops
+    // `while (live > keep)`; `children.length` is by construction never less
+    // than `live`, so the condition could not be met and the one sentence in
+    // the game written to arrive alone never did. `sysToastPush(0)` is the
+    // call the other site makes for the same reason.
+    if (k === 'last') sysToastPush(0);
     const el = sysEl('div', 'capyui-toast ' + k, String(text));
     toastWrap.appendChild(el);
     // ...unless it has already been pushed off the top by more toasts landing
@@ -22818,6 +22967,27 @@ export function createSystems(game) {
       // LAWN can be reached through. A restored file with all nineteen chapters
       // done that opens straight into Sydney comes in exactly here.
       sysFinaleCheck();
+      // ---- ...AND IT IS THE ONE CHAPTER THAT NEVER SAID ITS NAME (F1) ----
+      //
+      // `showPlace` is four lines up, inside `if (landed)`, so eighteen of
+      // nineteen chapters announce themselves on arrival and the one every new
+      // player starts in does not. `name` and `sub` are authored for all
+      // nineteen — "Sydney", "the gardens, unsupervised" — and chapter one's
+      // pair was the only one a player could not be shown: it survived in the
+      // 10px chapter label at the foot of the paper and nowhere else. A
+      // stranger's first sixty seconds were four task rows and "be a menace.",
+      // with nothing anywhere naming the place they are standing in.
+      //
+      // Held back by the same `sysFADE_CARD_LAG` a travelled arrival uses. It
+      // is the same situation and the same constant: the screen is clearing —
+      // the title card fades over .75 s and is removed at 900 ms — and the
+      // card should rise THROUGH the end of that rather than under a sheet
+      // that is still opaque. The 700 ms opening toast is unchanged and sits
+      // at the foot of the screen, which is where a travelled arrival's is
+      // while its own place card is up.
+      setTimeout(function () {
+        showPlace(cdef.name.toUpperCase(), cdef.sub);
+      }, sysFADE_CARD_LAG);
       // ...and it is the one chapter that is never TRAVELLED to, so it is the
       // one chapter whose arrival shot cannot come from biomeGo. Chapter 1 is
       // also the arrival more players see than any other. Same call, same
@@ -23148,7 +23318,18 @@ export function createSystems(game) {
     // AND put a traffic cone in their mouth.
     if ((c === 'Enter' || c === 'NumpadEnter') && photoOn) photoShoot();
     // QA hotkey: hard-cut between biomes, no fade, no ceremony, no task ticks.
-    if (c === 'Backslash' && !transBusy) {
+    //
+    // ---- ...AND IT IS NOT A KEY A PLAYER MAY FIND (F1) ------------------
+    // Backslash is a PRINTED PICKER KEY — it is in `sysPICK_EXTRA`, on the
+    // corner of a tile on the title card — so a player who learns the picker
+    // and presses the same key in chapter fourteen was thrown to the other
+    // side of the world with no white, no card, no confirm and no way back
+    // except the departures board. Everything else in this game that moves the
+    // player between places is a ceremony you can see coming; this is the one
+    // binding that could silently unmake an hour, and it exists for probes.
+    // Gated on the dev server rather than removed: every harness in `qa/` runs
+    // against localhost and nothing shipped ever will.
+    if (c === 'Backslash' && !transBusy && sysDevHost()) {
       const to = (game.biome && game.biome.isActive('pasto')) ? 'sydney' : 'pasto';
       if (biomeGo(to)) toast(to);
     }
@@ -24519,6 +24700,27 @@ export function createSystems(game) {
       if (typeof capy.face === 'function') capy.face(sp.yaw + Math.PI);
     }
 
+    // ---- ...AND THE BOOM IS THE SPAWN'S, NOT THE LAST CHAPTER'S (F1) -----
+    //
+    // `camDistTarget` is the player's own wheel, and it is the one piece of rig
+    // state that legitimately survives a border: a zoom is a preference, not a
+    // leftover. `camDist` is not. It is what the FIRST FRAME is composed with,
+    // four lines below — so eighteen composed arrivals were being framed at
+    // whatever the player happened to be zoomed to in the chapter they left.
+    // Measured: one wheel-out in Sydney to 14.85 m puts Manly, Antarctica, Rio
+    // and Kowloon all on a 14.85 m boom, and Manly's arrival — a crossing, a
+    // bin, the surf club behind it — becomes a third of a frame of empty sea.
+    //
+    // So the CURRENT distance is composed and the TARGET is left alone: this
+    // line fixes frame one, the `frameShot` below holds it for the length of
+    // the place card, and when that hold expires the rig damps back to the
+    // zoom the player chose. The shot is composed and nobody's preference is
+    // deleted. Same argument as `camYaw` twenty lines up, which has always
+    // overridden where the player was looking for exactly this reason.
+    const arriveDist = (typeof sp.dist === 'number' && sp.dist === sp.dist)
+      ? clamp(sp.dist, sysCAM_MIN, sysCAM_MAX) : sysCAM_DEF;
+    camDist = arriveDist;
+
     // The camera rig would otherwise spring across the world for two seconds.
     sysAnchor.set(sp.x, sp.y + 1.0, sp.z);
     sysLook.set(sp.x, sp.y + sysLOOK_RAISE, sp.z);
@@ -24574,7 +24776,10 @@ export function createSystems(game) {
         typeof game.frameShot === 'function') {
       game.frameShot({
         yaw: sp.yaw,
-        dist:  typeof sp.dist  === 'number' ? sp.dist  : undefined,
+        // ...and the distance is always named now, so the hold keeps the
+        // composition against a player zoom that is damping back in behind it.
+        // See `arriveDist` above: a spawn that says nothing gets sysCAM_DEF.
+        dist:  arriveDist,
         pitch: typeof sp.pitch === 'number' ? sp.pitch : sysARRIVE_PITCH,
         raise: typeof sp.raise === 'number' ? sp.raise : sysARRIVE_RAISE,
         hold: sysARRIVE_HOLD,
@@ -26827,6 +27032,18 @@ export function createSystems(game) {
     // the moment, and a framing left running into a teleport would fight the
     // arrival yaw the spawn sets two lines later. Same rule as shake and time.
     shotReq = null; shotW = 0; shotAge = 0; shotKill = 0;
+    // ---- ...AND SO DOES THE ROW THE SCORE WAS PLAYING (F1) ---------------
+    // `chaos` is the largest term in `musWant` and it decays at lambda 0.3 —
+    // about seven seconds to half — so a chapter left mid-riot scored the
+    // first fifteen seconds of the NEXT chapter's arrival with the last one's
+    // panic. `musChaseT` is the same shape and has a seven-second life of its
+    // own. Both belong to the square they were earned in, exactly as the
+    // breadcrumbs, the ghost, the record and the incident chain above do.
+    // `musIntensity` is deliberately NOT touched: it is a damp over these two,
+    // so with the sources cleared it falls on its own and the score settles
+    // instead of cutting.
+    game.state.chaos = 0;
+    musChaseT = 0;
     // (recordEnd() was called here, eighteen lines after recLiveId was cleared
     // by hand above — and it opens `if (!recLiveId) return false`, so it had
     // never once done anything. The block above already says why the clear is

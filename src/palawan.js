@@ -3990,6 +3990,23 @@ function palToast(t) {
   const g = palGame;
   if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
 }
+/**
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1).
+ *
+ * `palToast` takes a finished sentence, which is right for every line in this
+ * chapter that names no control. The one that hands over a VERB has to go
+ * through `game.say`, which runs systems.js's substitution table over it —
+ * otherwise the moment this chapter introduces the dive, the eleventh new verb
+ * and the only one gated on deep water, it tells a phone to hold a key it does
+ * not have. Used at the teaching site and nowhere else, for the reason
+ * `game.say`'s own comment gives: this is not a filter to put every string in
+ * the game through.
+ */
+function palSay(t) {
+  const g = palGame;
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  else palToast(t);
+}
 function palSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
@@ -4042,7 +4059,7 @@ function palUpdateTasks(game, dt) {
   if (!palToldDive && !palDiveDone && capy.depth !== undefined &&
       palIsOverWater(p.x, p.z) && p.y < 0.6 && palTerrain(p.x, p.z) < -2.2) {
     palToldDive = true;
-    palToast('hold E. you have gills in all but name.');
+    palSay('hold E. you have gills in all but name.');
   }
 
   // ---- going under, and how far -------------------------------------------

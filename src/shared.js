@@ -2824,7 +2824,23 @@ export const CHAPTERS = [
       { kick: 'GALERAS', line: 'the mountain is live, and the only way up is the bird.' },
     ] },
   { n: 3, biome: 'quay',    name: 'Circular Quay',   sub: 'she sails when you say she sails',
-    arrive: 'to-quay',    far: 1600, tall: false, pal: 2,
+    // ---- NO `arrive`, AND IT IS THE ONE CHAPTER THAT SHOULD NOT HAVE ONE (F1)
+    //
+    // `arrive` means "tick this the instant the white clears", and for the
+    // seventeen chapters whose first row is a turning-up it is honest. Chapter
+    // three's first row is not a turning-up: it is `to-quay`, "Cast off from
+    // the Quay", clue "take her out past the wharf" — and quay.js has always
+    // implemented it properly, at `quayCastOff`, once the wheel is yours and
+    // she is 26 m off the apron. That code could never run. `jrTravel` ticked
+    // the row inside `biomeFadeTo`'s callback, so the task was done before the
+    // player could see the paper, and the clue described an action the game
+    // had just credited them with.
+    //
+    // The consequence was the chapter's shape: act one is declared as THE QUAY
+    // (2 rows) and arrived with one of the two already crossed off. It now
+    // reads as written — find the wheel, then take her out — and the eighteen
+    // other free arrival ticks stay as they are, because theirs are true.
+    far: 1600, tall: false, pal: 2,
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
     keep: 'an unpunched ferry ticket', win: 3,
     note: 'You took a boat off a man who had been driving it for eleven years, and he watched you dock it.',

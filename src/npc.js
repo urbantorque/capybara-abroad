@@ -984,6 +984,14 @@ export function createNPCs(game) {
   const bubEdge = npcCssHex(PALETTE.sailShade);
   const BUB_CSS =
     'position:absolute;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;' +
+    // ---- AND IT IS UNDER THE PAPER (F1) --------------------------------
+    // This pool is mounted into the HUD root at runtime, so it lands after
+    // every piece of furniture systems.js built at boot and, with nothing
+    // carrying a z-index on either side, painted over all of it — the to-do
+    // card most visibly. The furniture is one explicit rung up at 40; this is
+    // the rung the two rules were arguing about, written down. A bubble is the
+    // world talking and the paper is the game talking.
+    'z-index:30;' +
     'display:none;opacity:0;white-space:nowrap;' +
     'font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;' +
     'font-weight:600;font-size:15px;line-height:1.15;padding:7px 13px 8px;border-radius:7px;' +

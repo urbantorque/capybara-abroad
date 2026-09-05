@@ -20,3 +20,9 @@ qa/**/*.png
 # repository's problem. Nothing in the tree referenced either.
 dp-top.png
 *.tmp.cjs
+
+# A D6b contact sheet: one <style> and nineteen <figure>s pointing at
+# `qa/d6b-*.png`, which the rule above already excludes — so in a clean
+# checkout it renders nineteen broken images. Same call as `dp-top.png`: a
+# scratch viewer on the author's disk, referenced by nothing in the tree.
+qa/sheet.html
