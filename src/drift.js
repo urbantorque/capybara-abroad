@@ -598,7 +598,28 @@ function driTerrain(x, z) {
   const s = driIslandAt(x, z);
   return s ? (s.def ? s.def.y : s.y) : driCLOUD_Y;
 }
-/** Flat decks, all of them. Nothing in this chapter slides. */
+/**
+ * Flat decks, all of them. Nothing in this chapter slides.
+ *
+ * AND THE CONSTANT IS MEASURED, not assumed. X8 filed this as the one publisher
+ * of `slopeAt` that stubs the answer, on the strength of `qa/px-hooks.js`
+ * differencing `driTerrain` and getting 0.72 where this returns 0. That
+ * difference is an artefact of the instrument. `driTerrain` is
+ * piecewise-constant — one deck height per island, `driCLOUD_Y` over the void —
+ * so a central difference of it is 0 in an island's interior and a STEP at its
+ * rim, and the quotient at a rim is not a gradient but the cliff height over the
+ * sample spacing, which grows without bound as the spacing shrinks.
+ *
+ * Split that way (`qa/px-dri-slope.js`), over 298 ground samples and 21 distinct
+ * deck heights: 275 interior samples give a mean AND a maximum gradient of
+ * exactly 0, and all of the disagreement sits in 23 rim samples averaging 67.97
+ * and peaking at 130.8 — 89 degrees, which is the cliff. The aggregate is also
+ * not a number: halving the sample spacing walks it 5.31 → 5.25 → 5.11 → 6.27
+ * instead of converging, which is the tell that it was never a gradient.
+ *
+ * So 0 is the honest answer everywhere a capybara can stand, and a central
+ * difference here would publish a cliff as a walkable grade.
+ */
 function driSlope() { return 0; }
 
 /**

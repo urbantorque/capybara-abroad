@@ -1,6 +1,15 @@
 # Controls + camera audit (read-only) — capy3, 2026-09-04
 
-Status: IN PROGRESS. Code inventory done; measurements pending.
+Status: SUPERSEDED 5 Sep 2026. The write-up is batch X9 item 2 in
+ROADMAP-PHYSICS.md. Read that first: of the inventory below, the flight-rig gate
+and "V is KEYBOARD ONLY" were both fixed in X7, the `camCeil` census is out of
+date (four publishers now, not two), and the one measurement this file left
+pending — whether V does anything underwater — is made in `qa/px-cam-v.js`. It
+does not: 5.05 degrees of pitch on land, 4.71 swimming, and a boom that moves
+0.000 m submerged.
+
+The inventory is kept verbatim below as the historical record. Do not quote its
+numbers without checking them against the source.
 
 ## Code inventory notes (raw, to be condensed)
 

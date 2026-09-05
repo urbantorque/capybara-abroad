@@ -178,6 +178,40 @@ columns are the V block, `clearMin` and `err`.
 chapter's wheek is silent" in any chapter with a busy ambience. It cost X7 a
 probe to disprove in Hanoi. Log the whole list and search it.
 
+**Four more from X9, and all three of the items it closed were instrument faults
+rather than code faults. That is the batch's whole result.**
+
+**A closing paragraph carried forward is a false comment with the widest blast
+radius in the file.** "What this review did not finish" was written on 4 Sep
+about that session; X8 copied it into "what is still open" without checking, and
+by then X5 had shipped four commits against the first item and X7 had closed
+half of the second. It set a whole batch's agenda from a stale sentence.
+**Re-derive an open list from the repo before working it**, the same way a
+reachability claim gets re-measured rather than re-read.
+
+**A central difference of a piecewise-constant function is not a gradient.**
+`px-hooks.js` differenced the Drift's terrain, got 0.72 against a published 0,
+and that number went into the roadmap as a defect. Split by island, the interior
+gradient is exactly 0 over 275 samples and all of the disagreement is 23 rim
+samples averaging 67.97 — cliffs. **The refinement test is the cheap tell:
+halve the sample spacing and see whether the answer converges.** This one walks
+5.31 → 5.25 → 5.11 → 6.27, so it was never a gradient at all.
+
+**The drawn ray never learnt what fault 4 taught the physics ray.** The solver
+ray skips HEIGHTFIELD and PLANE because you walk up a slope rather than stopping
+at it. The drawn ray — the half that NOMINATES candidates — has no such filter,
+so every hillside, road ribbon and merged relief mesh reads to it as a wall at
+chest height, and so does the underside of any overhang. **Take the world normal
+and cast at three heights** (`px-x5-norm.js`): a wall is the same distance at
+ankle, chest and head with `ny` near 0. Göreme's top candidate reads `ny −0.98`,
+which is a ceiling.
+
+**A probe that settles the animal must re-read where it settled.** `px-x5-walk4`
+dropped the animal, let it slide for 30 ticks, and then cast from the ORIGINAL
+x/z with the SETTLED y. It is why a control could be chosen with a face at
+0.8–2.0 m and re-measure as `phys: null` one call later, and it is most of why
+two chapters were written off as "control did not stop".
+
 **Four more from X8, and these are the batch's OWN probes, caught before they were believed.**
 
 **A digit key only travels from the TITLE CARD.** Pressed in a running game it does
@@ -914,6 +948,160 @@ confirmation, the camera audit's write-up, the Drift's `slopeAt` stub, and the
 fact that no chapter has been played end to end by a person. Everything above is
 instrumented.
 
+**All four were taken up by X9, and three of them are now closed. See below.**
+
+---
+
+### Batch X9 — the four that were left, and a list that was stale
+
+**LANDED 5 Sep 2026.** Three of the four closed. **Not one of them was the job it
+was written down as**, and the reason is the same in all three: each was recorded
+from an instrument nobody had audited, and auditing the instrument changed the
+answer. No colliders were added, one comment was corrected, and the roadmap's own
+closing paragraph turned out to be the most wrong thing in the file.
+
+**THE LIST ITSELF WAS STALE, AND THAT IS THE FIRST FINDING.** "What this review
+did not finish" was written by the 4 Sep review about its own session, and X8
+copied it forward verbatim as "what is still open" without checking it against
+the repo. In between, **batch X5 shipped four commits of walk confirmation**
+(`d7d1922`, `bb03e7e`, `418238e`, `313d43d`) and X7 landed the eye-raise
+bindings. A closing paragraph that is carried forward instead of re-measured is a
+false comment with a wider blast radius than any of the ones the X8c sweep
+found — it sets the next batch's whole agenda. **Re-derive an open list from the
+repo before working it.**
+
+#### 1. The X5 walk confirmation, finished — and the candidate list is empty
+
+X5 left three things unresolved: fault 5 named and not fixed, Venice and Cali
+untrusted because their controls never stopped, and two Göreme faces confirmed as
+walk-through whose builder was never identified. `qa/px-x5-walk5.js` fixes fault 5
+and a sixth nobody had noticed; `qa/px-x5-norm.js` adds the test that decides the
+rest. **Every remaining candidate is disqualified, each for a different reason,
+and nothing needed colliding.**
+
+**Fault 5, fixed, and it changes an answer.** `place()` put the animal at
+`terrainHeight + 0.34`, and terrain is the SEABED under any pier, deck or
+pontoon. Dropping from 3 m and ticking until it settles, Kowloon's `(5, −65)`
+lands at y **1.30 against a terrain of −4.20 — 5.16 m of built ground under it**,
+which is the pontoon deck it was supposed to be standing on all along. From
+there, no drawn face within 2.6 m at all. Kowloon's withdrawal was right and is
+now proved with the animal in the right place rather than inferred.
+
+**Fault 6, new: it cast its rays from where the animal was PUT, not from where
+it ended up.** walk4 settled for 30 ticks and then called both rays with the
+original x/z and the settled y. On any slope the animal slides during those
+ticks, so the rays start somewhere it is not standing — which is how a control
+could be selected with a physics face at 0.8–2.0 m and re-measure as `phys: null`
+in the very next call. That single bug is most of why Venice's and Cali's
+controls "did not stop": they were never walked from where they were chosen.
+
+**Fault 7, and it is the one that mattered: the DRAWN ray had never been taught
+what fault 4 taught the physics ray.** Fault 4 made the solver ray skip
+HEIGHTFIELD and PLANE, because a horizontal ray at chest height on a slope hits
+terrain and you do not stop at a slope, you walk up it. Nothing ever applied that
+to the drawn ray — and the drawn ray is the half that NOMINATES candidates. So
+every hillside, road ribbon and merged relief mesh in the game reads to it as a
+wall. The test that separates them is the world normal of the hit face, checked
+at ankle, chest and head:
+
+| where | ankle | chest | head | what it is |
+|---|---|---|---|---|
+| kowloon (−30, −46) — the control that STOPS | 1.50 / ny 0 | 1.50 / ny 0 | 1.50 / ny 0 | a wall |
+| göreme (−8, 10) | — | 2.49 / **ny −0.98** | 0.03 / ny −0.43 | an overhang, 3 cm over its head |
+| göreme (−27, 0) | — | — | — | nothing there, three reps |
+| göreme (−70, −46) — its "control" | 0.98 / ny −0.4 | 1.00 / ny 0.4 | 1.36 / ny 0.03 | a slope; never was a wall |
+| cali (−12, −5) | — | 1.70 / ny 0 | 1.70 / ny 0 | vertical, and correct — see below |
+
+A wall reads the same distance at all three heights with a horizontal normal.
+Göreme's first candidate has a normal of **−0.98**: that is a face pointing
+straight DOWN, the underside of something the animal is standing beneath. You do
+not walk into a ceiling. Its second returns nothing on three consecutive reps,
+so whatever walk4 saw at 1.52 m had moved — a cat or a person, which is X6's
+subject and not a wall. And its control was a hillside, which is the whole
+explanation for "the control did not stop".
+
+**Cali's is real geometry, correctly not solid, and colliding it would wall off
+the bridge.** The face at 1.70 m is at x −10.3, and `caliBRIDGE_X` is −6 with the
+arch cylinders running x −10.3…−1.7: it is the end cap of the drawn arch under
+the bridge, met by an animal standing on the river bed at y −2.68. walk5 already
+records that animal travelling 10.27 m in +x — straight under the bridge, which
+is the way through. Same shape as X5's balloon envelopes: **an audit that
+collided everything it flagged would have made a shipped route impossible.**
+
+#### 2. The camera audit's write-up
+
+`qa/audit-2026-09-04/audit-controls-camera.md` has read "Status: IN PROGRESS.
+Code inventory done; measurements pending" since 4 Sep. Checked against the
+source rather than reprinted, **two of its findings are already fixed, one census
+is out of date, and its one open measurement is now made.**
+
+| the audit's claim | now |
+|---|---|
+| flight rig gated `inPasto && game.condor.mounted`, so Rio flies on the ground rig | **fixed in X7**, systems.js:26736 records the change |
+| V is KEYBOARD ONLY — no pad or touch | **fixed in X7**: `keys.KeyV \|\| padEye \|\| touchLook` |
+| `camCeil` published by cave.js and sahara.js | **four now** — environment.js, kowloon.js (X8), sahara.js, cave.js |
+| `camFloor` published by cave.js and palawan.js | still two, correct |
+| no keyboard zoom at all | correct; the wheel and the right stick zoom, the keyboard does not |
+| "V underwater is largely overridden by the dive rig — to measure" | **measured, and it is not `largely`** |
+
+**The eye raise is worth 5° on land and nothing underwater** (`qa/px-cam-v.js`,
+Palawan, one pinned animal, V held against V not held):
+
+| state | Δ pitch | Δ eye height | Δ boom |
+|---|---|---|---|
+| standing on land | **+5.05°** | −0.55 m | +0.47 m |
+| swimming at the surface | **+4.71°** | −0.53 m | +0.36 m |
+| submerged, depth 1.61 | **−0.47°** | +0.04 m | **0.000 m** |
+
+Submerged, the boom does not move by a single millimetre and the pitch change is
+half a degree in the wrong direction, which is noise. The underwater rig owns the
+lens completely — it has already pulled the boom from 11.90 m to 5.25 m and the
+eye from 5.71 m over the animal to 1.57 — and V is inert inside it. **Stated
+honestly: `capy.diving` stayed false through this, so what is measured is
+SUBMERGED and not the dive verb.** The rig that overrides V was demonstrably
+engaged, which is the thing the audit asked about, but the verb itself is
+untested and a probe that drives E to a real dive is still owed.
+
+**And the wall probe is still the one that cannot hold a line.** X7 measured
+`px-cam-walls.js` moving `occ` 78 → 92 on legs where the change under test
+provably could not act. Nothing here rehabilitates it. Use it to FIND a bad leg;
+use a pinned-position probe — `px-boom.js`, `px-hk-spots.js`, `px-cam-v.js` — to
+measure one. Every number in the table above comes from a pinned animal.
+
+#### 3. The Drift's `slopeAt` stub is correct, and the instrument was wrong
+
+`drift.js` publishes `function driSlope() { return 0; }`, and X8 filed it as the
+one publisher that stubs its answer because `qa/px-hooks.js` differenced
+`driTerrain` and got 0.72 where it returns 0. **That difference is an artefact.**
+`driTerrain` is piecewise-constant — one deck height per island, `driCLOUD_Y`
+over the void — so a central difference of it is 0 in an island's interior and a
+STEP at its rim, and the quotient at a rim is not a gradient but the cliff height
+over the sample spacing.
+
+Split that way (`qa/px-dri-slope.js`), over 298 ground samples and 21 distinct
+deck heights:
+
+- **275 interior samples: mean gradient 0, maximum gradient 0.** Exactly flat.
+- **23 rim samples: mean 67.97, peak 130.8** — 89 degrees, which is the cliff.
+- The aggregate is not a number either: halving the sample spacing walks it
+  **5.31 → 5.25 → 5.11 → 6.27** instead of converging. A real gradient is stable
+  under refinement; a step is not, and that is the tell.
+
+So 0 is the honest answer everywhere a capybara can stand, and a central
+difference here would publish a cliff as a walkable grade. The code is unchanged;
+the comment above `driSlope` now carries the measurement, so the next pass does
+not re-open it.
+
+#### 4. No chapter has been played end to end by a person — and I cannot close this
+
+This one stays open and it stays open honestly. Everything in this file was
+established by instrumentation: probes that pin a position, drive keys, read the
+solver and post JSON. An instrumented end-to-end pass is not a substitute and
+must never be written up as one — it shares every blind spot with the probes
+above, which is precisely how a 0.72 that was a cliff, a control that was a
+hillside and an animal on the harbour bed all survived review. **It needs a
+person, and it is the owner's to do.**
+
 ---
 
 ## The shelf — sized, not scheduled
@@ -1107,13 +1295,54 @@ which is now all of them.
 - `qa/surf-a.js` … `surf-c.js` — the force-channel probes behind batch X4's
   tables: slip speed per surface, the geyser launch, the storm.
 
+- `qa/px-x5-walk5.js` (X9) — the X5 walk rig with faults 5 and 6 out of it. It
+  DROPS the animal from 3 m and ticks until it settles, and it reports `onBuilt`,
+  the height of the surface it landed on above the terrain datum: Kowloon's
+  `(5, −65)` reads 5.16, which is the pontoon deck the old rig walked 3.6 m
+  underneath. Both rays now originate at the settled position.
+- `qa/px-x5-id.js` (X9) — what the drawn face actually IS: the hit object's full
+  ancestor chain, geometry type, material colour and world bounding box. It is
+  what turns "belongs to some other builder, still unidentified" into a name.
+- `qa/px-x5-norm.js` (X9) — **the wall test.** Casts at ankle, chest and head and
+  reports the world normal of each hit. A wall is the same distance at all three
+  with `ny` near 0; a slope runs further at head height; an overhang reads
+  `ny −0.98`. Repeated three times per point, because a face that moves between
+  reps is a person and belongs to X6.
+- `qa/px-cam-v.js` (X9) — the eye raise, pinned, in three states. The only way to
+  read a camera change is to stop the animal moving; this is the shape to copy.
+  It reports Δpitch, Δeye-height and Δboom between V held and V not held.
+- `qa/px-dri-slope.js` (X9) — the Drift's terrain gradient, split into island
+  interiors and island rims, plus the same aggregate at four sample spacings.
+  The refinement column is the point: a gradient converges, a step does not.
+
 The five findings files this review produced are in `qa/audit-2026-09-04/`.
 
 ## What this review did not finish
 
-Said plainly, because the next pass should not assume otherwise. The
+**Written 4 Sep 2026, about that session. Batches X5 and X7 closed most of it and
+X9 closed the rest; it is kept here as written, with what happened, because
+carrying this paragraph forward unchecked is itself the mistake X9 found.**
+
+Said plainly, because the next pass should not assume otherwise. ~~The
 walk-into-the-face confirmation for the batch X5 candidates never ran — the
-page timed out and the session ended. The camera audit produced its code
-inventory and its wall probe but never its write-up, so its findings here are
-drawn from the raw probe output rather than from an analysed table. And no
-chapter was played end to end by a person; everything above is instrumented.
+page timed out and the session ended.~~ **It ran, over four X5 commits and again
+in X9; the candidate list is empty and nothing needed colliding.** ~~The camera
+audit produced its code inventory and its wall probe but never its write-up, so
+its findings here are drawn from the raw probe output rather than from an
+analysed table.~~ **Written up in X9; two of its claims were already fixed and its
+one open measurement is made.** And no chapter was played end to end by a person;
+everything above is instrumented. **That one is still true, and it is the only
+one of the four that is.**
+
+## What X9 did not finish
+
+One thing, and it cannot be done by an agent: **no chapter has been played end to
+end by a person.** See batch X9 item 4.
+
+Two smaller debts it created rather than closed. `px-cam-v.js` measures the lens
+SUBMERGED, not diving — `capy.diving` never became true, so the dive verb itself
+is still unmeasured even though the rig that overrides V was engaged. And
+`px-x5-norm.js`'s wall test (three heights, world normal) is the filter the drawn
+ray should always have had, but it is only applied to the six points X5 left
+open; **the audit's full candidate list was never re-ranked through it**, so the
+hit counts in area 2 above still count hillsides as walls.
