@@ -856,6 +856,56 @@ written into `quayBuildBridge` next to the deck, with the note that a bluff whic
 ever becomes climbable turns 300 m of drawn carriageway into a hole with cars
 driving through it — and which probe to re-run first.
 
+### The reachability-claim sweep (X8c, 5 Sep 2026)
+
+The Bradleys Head note turned out to have been written from a probe that put the
+animal on the rim, and Sydney's harbour traffic carried the same mistake with the
+sign flipped ("no way for the player to reach them"). Two in one batch is a
+class, so `src/` was swept for every comment that asserts the player can, or
+cannot, get to a named place, and each was measured with a leg that starts where
+the chapter itself agrees there is legal ground or legal water.
+
+**Five claims. Two false, both already fixed; three true and now checked.**
+
+| where | the claim | verdict |
+|---|---|---|
+| `quay.js` `quayBuildLand` | Bradleys Head is "the one you can actually swim to: the animal stands on the rim at 21 m" | **FALSE** — 2.07–2.29 m from four sides, never grounded |
+| `environment.js` `envBuildTraffic` | the eleven boats are beyond z −46 with "no way for the player to reach them" | **FALSE** — all inside `bounds()`; 6.8 m from a hull in twenty seconds |
+| `quay.js` `quayIsOverWater` | Bennelong Point is "a podium you can swim to and climb out on" | TRUE — grounds at 2.96 above a 2.60 podium, from the south |
+| `antarctic.js` `antGroundSlip` | the whalers' beach is why "the wreck is somewhere you can climb on" | TRUE — grounds 0.87 m up onto the hull, photographed |
+| `drift.js` `driBuildArch` | "the ring is over four metres up and out of reach" | TRUE in substance — first uncollided stone at 3.9, jump clears 3.08 |
+
+The two that are true and interesting are true for a reason worth keeping.
+**Bennelong works because of its steps** — nine of them, from the podium at 2.60
+down to 0.20, which is the waterline — and the north, east and west faces of the
+same podium behave exactly like Bradleys Head, topping out at 1.4–2.3 and never
+grounding. A headland is a box from the seabed to its crown and has no such
+thing anywhere on it. That is the whole difference between the two sentences,
+and it is why one of them was safe to write and the other was not.
+
+**And the Drift's number was loose where its conclusion was sound.** The leg
+collider runs AY+0.3 to AY+3.9 (`driStaticGroup.add` takes full extents) against
+a drawn shaft stopping at AY+3.6, so the first ring stone with nothing in it is
+at 3.9 rather than "over four metres"; a standing jump clears 2.53–3.08. Clear
+by 0.8 m at worst, so the ring is right to be drawn and not collided.
+
+#### Two ways this sweep's own instruments lied
+
+**Measure the apex over the ground UNDER THE ANIMAL, never over a fixed datum.**
+The first Drift run reported a 4.54 m jump and the second reported 0.74–2.73 from
+the same start, which is not a measurement. Both were taking `capy.y` minus the
+terrain height at the arch centre while the animal ran somewhere else — off the
+lip of the island in three legs of four, at which point the subtraction is
+meaningless. Against the ground beneath it, the standing jump is 2.53–3.08 twice
+over and the running legs disqualify themselves by leaving the island.
+
+**"The lowest drawn thing overhead" is not stable where anything moves.** The
+same grid over the arch returned a lowest drawn surface of 2.91 m on one run and
+1.42 m on the next: `driBuildRoosts` sits birds along the ring and on the lip
+posts, and they were what the ray kept finding. Read the geometry from the
+constants that build it when the constants exist, and use the ray to confirm
+rather than to discover.
+
 #### What X8 did not do
 
 The shelf is empty; all nine are done. What is still open is the four things the
@@ -1043,6 +1093,13 @@ which is now all of them.
   shove the animal with a velocity write, and capybara.js owns the animal's
   velocity every frame, so the shove was gone before the next step. Drive it
   with keys or do not drive it.
+- `qa/px-claims.js` / `-claims2.js`, `qa/px-drift-hop.js`, `qa/px-drift-arch.js`,
+  `qa/px-ant-wreck.js` (X8c) — the reachability-claim sweep. Each takes one
+  sentence out of a comment and measures it from legal ground or legal water on
+  every key. `px-drift-hop` is the one to copy for a JUMP: it takes the
+  clearance over the ground under the animal at every sample and counts the
+  samples that left the island, because the first version measured against a
+  fixed datum and reported 4.54 m and 0.74 m for the same jump.
 - `qa/px-syd-detach.js` (X8) — three chapters, and whether a body added by one of
   them is gone in the other two. `game.env` is Sydney's and stays resident, so
   anything given to it has to be shown to detach; the signature is the shape's

@@ -5700,6 +5700,14 @@ function quayIsOverWater(x, z) {
   // that is drawn, and the paving that is drawn is `quayLAND_*`.
   if (z >= quayAPRON_Z && z <= quayLAND_Z1 && Math.abs(x) <= quayLAND_HX) return false;
   // ...and Bennelong Point, which is a podium you can swim to and climb out on.
+  // VERIFIED in X8, because the same sentence about Bradleys Head turned out to
+  // have been written from a teleport: swimming at this point from all four
+  // sides on all four keys, the south approach grounds the animal at 2.96 —
+  // above the podium's own 2.60 — while the north, east and west legs top out
+  // at 1.4-2.3 and never ground. The difference is the nine steps: they run
+  // from the podium at 2.60 down to 0.20, which is the waterline, so there is
+  // somewhere to come out. A headland is a box from the seabed to its crown and
+  // there is not.
   if (Math.abs(x - quayBEN.x) <= quayBEN.hx && Math.abs(z - quayBEN.z) <= quayBEN.hz) return false;
   if (z >= quayWHARF_Z0 && z < quayAPRON_Z) {
     for (let w = 0; w < quayWHARF_X.length; w++) {

@@ -3231,7 +3231,21 @@ function driBuildArch(game, root) {
     driAddBeacon(driARCH_MARK[i], driARCH_MARK[i + 1], driARCH_MARK[i + 2], true);
   }
 
-  // the arch legs are solid; the ring is over four metres up and out of reach
+  // The arch legs are solid; the ring above them is out of reach, so it is
+  // drawn and not collided. CHECKED in X8 rather than assumed, because this is
+  // the same shape of claim as the one quayBuildLand got wrong about Bradleys
+  // Head: the leg collider below runs AY+0.3 to AY+3.9 (driStaticGroup.add
+  // takes FULL extents), the drawn shaft stops at AY+3.6, so the first stone
+  // with nothing in it is the voussoir at 3.9. A standing jump on this island
+  // clears 2.53-3.08 m over the ground under the animal — measured four times,
+  // qa/px-drift-hop.js — so the ring is clear by 0.8 m at worst.
+  //
+  // "Over four metres up" is what this line used to say and it is 3.9, near
+  // enough; the reach is the half that matters and it holds. Two cautions if it
+  // is ever re-measured: take the clearance over the ground UNDER THE ANIMAL and
+  // not over a fixed datum, because a run off the lip of this island otherwise
+  // reports a 4.5 m jump; and do not trust "the lowest drawn thing overhead",
+  // because the roosting birds sit along this ring and move.
   // THE COLLIDER HAS TO COVER THE PLINTH, NOT THE SHAFT. Each leg stands on a
   // 1.6 x 2.0 base and the body was sized from the 1.1 x 1.5 shaft above it —
   // so twenty-five centimetres of stone stuck out all the way round at exactly
