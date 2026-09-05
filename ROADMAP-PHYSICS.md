@@ -99,15 +99,60 @@ measures against the law, the camera and the shadow use the law, and the animal
 stands on the facet.
 
 ### 2. Things you can walk through
+**RE-RANKED IN X9, AND THE NAMED LIST BELOW DID NOT SURVIVE IT. Read the X9
+paragraph after this one before using any number here.**
+
 The chest-height ray differential (drawn hit, no physics hit within 2.5 m,
 height ≥ 1.6 m, origins inside a collider skipped) leaves a residue that is
 mostly instanced vegetation, which is deliberate. What is left after
-classification is small and specific — see batch X5. The highest-count
+classification is small and specific — see batch X5. ~~The highest-count
 non-vegetation hits are Kowloon at (±5, −65), a Venice block at x −77…−37, the
-Göreme town mesh, three Sahara meshes, `palBeach`, and two Cali structures.
+Göreme town mesh, three Sahara meshes, `palBeach`, and two Cali structures.~~
 Separately, **ten Göreme cliff samples are "recessed"**: the drawn face is at
 0.95 m and the collider at 2.30 m, so you walk 1.35 m into a cliff before it
 stops you.
+
+**X9's re-rank: 99 samples, 14 wall-shaped, and the ranking was wrong at the
+top.** Every non-vegetation sample the audit recorded was put through the wall
+test — settle, cast at ankle/chest/head, take the world normal
+(`qa/px-x5-rerank.js`, 15 chapters, `err` null):
+
+| verdict | n | what it is |
+|---|---|---|
+| gone | 59 | nothing there on repeat casts |
+| **WALL** | **17** | vertical at every height it exists at |
+| ground | 9 | drawn terrain rising ahead, normal near-vertical |
+| low | 6 | nothing at head height |
+| overhang | 5 | normal points DOWN — a ceiling |
+| slope | 3 | runs further at head height than at ankle |
+
+**Of the 40 samples that still have geometry in front of them, 23 are not walls.**
+Tightening the rule (normal within ±0.2 of horizontal, same distance at every
+height) leaves **14**, and no sample landed on top of the structure it was facing,
+so `gone` is not a placement artefact — max `onBuilt` across all 59 is 0.41 m.
+
+Named (`qa/px-x5-name14.js`), the fourteen are mostly *not* defects:
+
+| what | n | verdict |
+|---|---|---|
+| Cali's bridge arch end cap, x −10.3 at `caliBRIDGE_X` −6 | 2 | correct — the arch is the route through |
+| Drift instanced **Plane** geometry ×7038 and ×136, green | 2 | foliage the audit's veg filter missed |
+| Cali instanced cylinders ×8, `PALETTE.caliCaneStem` | 2 | cane stems — vegetation |
+| Palawan (−48, 40), drawn face 0.10 m away | 1 | the animal is INSIDE it; the audit's own filter 2 |
+| Göreme (−37, 20), the 135 × 37 × 124 valley mesh | 1 | relief, already disqualified above |
+| **Pasto's bunting posts** | 2 | real, and a judgement call |
+| **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18** | 2 | real, builder not yet identified |
+| **Cave's 32 × 15.6 m slab at z −200** | 1 | real, builder not yet identified |
+| Cali (67, −30) | 1 | no hit on the naming pass — moving |
+
+**The one with a name is the one worth arguing about.** `pastoBuildBunting` hangs
+six runs across the plaza on twelve posts, each `pastoBox(...0.11, hy*0.5, 0.11)`
+— **22 cm square and 11.6 m tall**, drawn and not solid, because `pastoBox` is a
+merger push that cannot take a collider. Same class as X5's balloon baskets. It
+is left open deliberately here rather than fixed: 22 cm is thin, the plaza is the
+chapter's main play space, and this project's own precedent cuts both ways —
+Göreme's baskets were collided at 2.4 m, its 1.9 m fan was left open because a
+task runs through it. **That is the owner's call, not a probe's.**
 
 ### 3. People are not solid, and it is one line
 `addLocal` (npc.js) builds each talking local as a `CANNON.Body` with mass 0 and
@@ -205,6 +250,21 @@ chest height, and so does the underside of any overhang. **Take the world normal
 and cast at three heights** (`px-x5-norm.js`): a wall is the same distance at
 ankle, chest and head with `ny` near 0. Göreme's top candidate reads `ny −0.98`,
 which is a ceiling.
+
+**A before/after pair around a key press, taken while the subject is moving,
+measures the movement.** The first controlled dive read +7.65° of pitch with V
+held and nearly went into this file as "V works better diving than on land" — a
+reversal of X9's own finding. A diving animal is descending, so the lens is
+moving anyway. The same dive run twice on the same clock, once with V and once
+without, attributes **−0.09°** to the key. **Any measurement of a control needs a
+leg where the control is not pressed**, and it needs the two legs to start
+identically: both of these reach 1.72 m of descent between the samples, which is
+what says the legs are comparable at all.
+
+**`page.keyboard.press` can be missed entirely.** It sends down and up about 10 ms
+apart, against a 16.7 ms frame, and an input flag assembled once per tick may
+never see it. E read as "the dive does not latch" until it was HELD for 800 ms.
+Hold the key, and poll for the state rather than sampling once after it.
 
 **A probe that settles the animal must re-read where it settled.** `px-x5-walk4`
 dropped the animal, let it slide for 30 ticks, and then cast from the ORIGINAL
@@ -1056,11 +1116,29 @@ Palawan, one pinned animal, V held against V not held):
 Submerged, the boom does not move by a single millimetre and the pitch change is
 half a degree in the wrong direction, which is noise. The underwater rig owns the
 lens completely — it has already pulled the boom from 11.90 m to 5.25 m and the
-eye from 5.71 m over the animal to 1.57 — and V is inert inside it. **Stated
-honestly: `capy.diving` stayed false through this, so what is measured is
-SUBMERGED and not the dive verb.** The rig that overrides V was demonstrably
-engaged, which is the thing the audit asked about, but the verb itself is
-untested and a probe that drives E to a real dive is still owed.
+eye from 5.71 m over the animal to 1.57 — and V is inert inside it.
+
+**AND NOW FOR A REAL DIVE.** The table above was measured SUBMERGED: `capy.diving`
+stayed false throughout, because the probe pinned the body at depth every 16 ms
+and a pinned body never satisfies `capySwimming && capyCanDive() && input.action`.
+`qa/px-cam-dive.js` floats the animal, HOLDS E — a 10 ms `press` against a 16.7 ms
+frame can be missed entirely by an input flag assembled once per tick — and
+asserts `capy.diving` before believing anything. The dive latches, and the
+conclusion holds:
+
+| leg | Δ pitch | Δ eye | Δ boom | Δ depth |
+|---|---|---|---|---|
+| diving, V held | +7.49° | −1.055 m | −0.826 m | 1.72 m |
+| diving, no V (control) | +7.58° | −1.065 m | −0.822 m | 1.72 m |
+| **attributable to V** | **−0.09°** | **0.01 m** | **−0.004 m** | 0 |
+
+**The control leg is the entire point, and without it this reads as a reversal.**
+The first pass measured +7.65° with V held and nearly went into this file as "V
+works better diving than on land". A diving animal is DESCENDING, so the lens is
+moving anyway; a before/after pair around a key press measures the descent. Run
+the same dive twice on the same clock, once with V and once without, and the
+difference of the differences is −0.09°. **V is inert underwater, dive or no
+dive.**
 
 **And the wall probe is still the one that cannot hold a line.** X7 measured
 `px-cam-walls.js` moving `occ` 78 → 92 on legs where the change under test
@@ -1311,6 +1389,17 @@ which is now all of them.
 - `qa/px-cam-v.js` (X9) — the eye raise, pinned, in three states. The only way to
   read a camera change is to stop the animal moving; this is the shape to copy.
   It reports Δpitch, Δeye-height and Δboom between V held and V not held.
+- `qa/px-x5-rerank.js` (X9) — **the whole candidate list through the wall test.**
+  99 non-vegetation samples from `audit-solid.md` over 15 chapters, each settled
+  and classified wall / ground / slope / overhang / low / gone. This is the shape
+  to re-run whenever the solid audit is re-run; the audit's own instrument
+  nominates four different things and calls them all walls.
+- `qa/px-x5-name14.js` (X9) — names the survivors: ancestor chain, geometry type,
+  instance count, material colour and world bounding box. A list of coordinates
+  is raw probe output, which is the criticism X9 levelled at the camera audit.
+- `qa/px-cam-dive.js` (X9) — the eye raise during a REAL dive, with a control leg
+  that runs the same dive without the key. Holds E rather than pressing it, and
+  asserts `capy.diving` before believing a number.
 - `qa/px-dri-slope.js` (X9) — the Drift's terrain gradient, split into island
   interiors and island rims, plus the same aggregate at four sample spacings.
   The refinement column is the point: a gradient converges, a step does not.
@@ -1339,10 +1428,21 @@ one of the four that is.**
 One thing, and it cannot be done by an agent: **no chapter has been played end to
 end by a person.** See batch X9 item 4.
 
-Two smaller debts it created rather than closed. `px-cam-v.js` measures the lens
-SUBMERGED, not diving — `capy.diving` never became true, so the dive verb itself
-is still unmeasured even though the rig that overrides V was engaged. And
-`px-x5-norm.js`'s wall test (three heights, world normal) is the filter the drawn
-ray should always have had, but it is only applied to the six points X5 left
-open; **the audit's full candidate list was never re-ranked through it**, so the
-hit counts in area 2 above still count hillsides as walls.
+~~Two smaller debts it created rather than closed.~~ **Both closed the same day.**
+The dive is measured with a control leg (`px-cam-dive.js`) and the answer is
+unchanged: V is inert underwater. The full candidate list is re-ranked
+(`px-x5-rerank.js`, `px-x5-name14.js`) and area 2 above carries the result.
+
+What that leaves is **three named faces and one decision**, all small, none
+urgent, and none of them safe for a probe to settle on its own:
+
+- **Pasto's twelve bunting posts** are drawn and not solid, at 22 cm square.
+  Collide them or write down that thin plaza furniture stays open — either is
+  defensible, and the contract should say which.
+- **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19** and **the Cave's
+  32 × 15.6 m slab at z −200** are wall-shaped, unsolid, and their builders are
+  not identified. The Cave one matters most: a 32 m face at the end of a chamber
+  that is not solid is a way out of the mountain.
+- The audit's `recessed` category was never re-measured at all. Pasto (−23, 40)
+  shows the shape — drawn face at 0.39 m, collider at 3.60 — and X9 only noticed
+  it in passing.
