@@ -526,6 +526,64 @@ const sysCAM_IDLE_T  = 1.1;   // seconds stood still before the rig tidies itsel
 const sysCAM_HAND_T  = 1.6;   // seconds the player keeps the rig after touching it
 const sysCAM_KEY_RATE = 2.4;  // rad/s on Q/R — was 1.9, which read as sticky
 
+// ---- THE TITLE POSE (T1) --------------------------------------------------
+// The rig before the game starts was the PLAY rig: 41 degrees down, 9.5 m back,
+// yaw 0. That is the right lens for driving a capybara and it is a photograph
+// of the lawn, which is what the front of this game had behind its card —
+// measured 5 Sep 2026, camera [0, 7.6, 29.2] with the animal at [0, 0.3, 22],
+// directly underneath the card and therefore invisible. Fifty passes of world
+// and the title screen was showing none of it.
+//
+// A poster is a lower, longer lens: dropping the pitch puts the horizon in the
+// frame (at 41 degrees there is no horizon at all, only ground), and stepping
+// back makes room for the card to sit beside the animal rather than on it.
+// The yaw was chosen by shooting the eight cardinal bearings and looking at
+// them — see qa/title-yaw.js and the qa/TY-*.png set.
+const sysTITLE_YAW   = 0.52;                 // rad; the bearing FROM the animal TO the eye
+const sysTITLE_DIST  = 13.5;                 // m — inside sysCAM_MAX, so no clamp argument
+const sysTITLE_PITCH = 16.5 * Math.PI / 180; // vs the play rig's 41
+const sysTITLE_RAISE = 2.35;                 // m above the animal the lens aims
+// ---- WHERE THE ANIMAL STANDS IN THE FRAME, AND WHY IT IS NOT A DISTANCE --
+// The look target slides sideways to move the animal out from behind the
+// card. The first version said "4.6 metres" and that is the wrong KIND of
+// number: a fixed world offset projects to wherever the aspect ratio happens
+// to put it. Measured at 4.6 m — NDC x +0.42 at 1920, +0.47 at 1440, +0.42 at
+// 1280 (behind the card, which is exactly half the screen there) and **+1.64
+// at 390**, which is two thirds of a screen past the right edge: on a phone
+// the one thing the title screen advertises was not in the picture at all.
+//
+// So the target is stated in the frame, and the metres are solved for it. The
+// clearance is measured against the CARD, whose width is known without asking
+// the DOM (sysCARD_W, capped by the viewport) — so the animal steps aside by
+// however much this particular window needs, rather than by a number chosen
+// on one monitor.
+const sysTITLE_NX_PAD = 0.06;  // NDC beyond the card's edge
+const sysTITLE_NX_MIN = 0.30;  // ...but never crowd the middle
+// ...and never past this, or it leaves the frame on a phone, where the card is
+// the whole width and no offset can clear it. There the animal is behind the
+// card and the harbour reads over the top of it, which is the honest ceiling
+// on a 390 px screen rather than a composition.
+const sysTITLE_NX_MAX = 0.60;
+// Page one's sheet, in CSS pixels. Read by .capyui-card's max-width and by the
+// title pose, which is the whole reason it is a constant and not a literal.
+const sysCARD_W = 640;
+// The card sits inside .capyui-title's 18 px padding on each side.
+const sysCARD_PAD = 36;
+/** Viewport width in CSS px, refreshed on resize. See the note by applyDPR. */
+let sysVW = 1440;
+// How the pose LETS GO. Only ever used when nothing else composes the first
+// frame — a spawn zeroes it outright, see the reset list in teleportCapy.
+const sysTITLE_OUT_L = 1.6;
+// ---- ...AND IT IS NOT A STILL -------------------------------------------
+// A title screen that is a frozen 3D frame reads as a bug in the renderer. The
+// drift is under a tenth of a degree a second and nobody will ever consciously
+// see it move; what it buys is that the picture is alive before the animal in
+// it does anything. Period is prime-ish against nothing in particular — it
+// simply must not beat against the 5 s breath on the card's ornament.
+const sysTITLE_DRIFT_T = 41;    // s, full cycle
+const sysTITLE_DRIFT_Y = 0.045; // rad of yaw, either side
+const sysTITLE_DRIFT_D = 0.34;  // m of boom, either side
+
 // --- FLIGHT CAMERA ----------------------------------------------------------
 // Hanging off a condor is a different film to waddling round a plaza: the rig
 // pulls back and up, flattens its pitch so the horizon opens, and stops orbiting
@@ -6138,10 +6196,40 @@ function sysBuildCSS() {
    harbour readable and still gives the card something quiet to sit on. */
 '.capyui-title{position:absolute;inset:0;z-index:60;display:flex;align-items:flex-start;',
   'justify-content:center;pointer-events:auto;cursor:pointer;',
-  'background:linear-gradient(180deg,' + sysRgba(PALETTE.fog, 0.34) + ' 0%,',
-  sysRgba(PALETTE.fog, 0.62) + ' 38%,' + sysRgba(PALETTE.skyBottom, 0.84) + ' 100%);',
+/* ---- THE WASH IS A TINT, NOT A LID (T1) --------------------------------
+   It was a single linear gradient from 34 % fog at the top to 84 % skyBottom
+   at the foot, over a 5 px blur. Eighty-four per cent is not a wash: the
+   bottom half of the screen was the gradient, and the world behind it — the
+   thing fifty passes of this project went into — survived as a smear of
+   colour with a bench in it. The card needs SEPARATION from the world, which
+   is a local problem around the card, and the old rule solved it globally.
+
+   Three layers, painted in this order (first is on top):
+     1. a scrim pooled under the card, so its three shadows have something to
+        fall on and its edge is not cut against a fig tree;
+     2. a vignette, which is the composite pass's own move borrowed one layer
+        up — it makes the card the brightest thing on screen without dimming
+        the world to do it;
+     3. the tint proper, at an eighth rather than five eighths.
+   AND THE BLUR IS GONE, WHICH IS NOT WHAT THIS PASS EXPECTED. A/B at 0, 2 and
+   5 px (qa/TW-0/2/5.png plus the corner clips): at 5 the Opera House is a
+   white smudge and the bridge is a grey arc — the lid again, wearing a
+   different hat. At 2 the sails are soft. At 0 they are sails, the ice-cream
+   van is a van, and the people are people. The card's separation was never
+   coming from the blur: it comes from its own three shadows, from the scrim
+   they fall on and from the vignette, all of which are local to the card and
+   none of which cost the world its detail. The corner clips settle it — the
+   card's edge reads exactly as well against a crisp pine as against a soft
+   one. Removing the property outright also takes a full-screen convolution
+   off every frame the title card is up. */
+  'background:',
+  'radial-gradient(56% 62% at 50% 50%,' + sysRgba(PALETTE.fog, 0.42) + ' 0%,',
+  sysRgba(PALETTE.fog, 0.20) + ' 54%,transparent 78%),',
+  'radial-gradient(82% 86% at 50% 46%,transparent 42%,' +
+  sysRgba(PALETTE.screenShadow, 0.20) + ' 100%),',
+  'linear-gradient(180deg,' + sysRgba(PALETTE.fog, 0.12) + ' 0%,',
+  sysRgba(PALETTE.fog, 0.15) + ' 58%,' + sysRgba(PALETTE.skyBottom, 0.22) + ' 100%);',
   'overflow-y:auto;overscroll-behavior:contain;',
-  'backdrop-filter:blur(5px) saturate(1.08);-webkit-backdrop-filter:blur(5px) saturate(1.08);',
   'transition:opacity .75s ease,transform .75s ' + mGlide + ';padding:18px;}',
 '.capyui-title.gone{opacity:0;transform:scale(1.06);pointer-events:none;}',
 /* ---- THE PLACE YOU ARE LOOKING AT WARMS THE WHOLE SCREEN ----------------
@@ -6352,7 +6440,11 @@ function sysBuildCSS() {
    screen in this game with nothing on it that has to be scanned. Page two is a
    picker and wants every pixel it can get, so the card widens for it. */
 '.capyui-p1{gap:0;}',
-'.capyui-card{max-width:640px;}',
+/* ONE NUMBER, TWO READERS. The camera's title pose has to know how wide this
+   sheet is to step the animal clear of it (see sysTITLE_NX_PAD), and a literal
+   here plus a literal there is two numbers that agree until somebody widens
+   the card. */
+'.capyui-card{max-width:' + sysCARD_W + 'px;}',
 /* Wider than it was. Seventeen pictures in a scroll region is a shop window,
    and a shop window wants the glass: at 880 the shelf showed two and a half
    rows of four and the tiles were 200 px, which is smaller than the thing they
@@ -22152,6 +22244,10 @@ export function createSystems(game) {
   // flight rig: blend 0..1, the heading the rig is chasing, and its damped follow
   let flyT = 0, flyYaw = 0, flyYawT = 0, flyWas = false;
   let sailT = 0, sailWas = false;      // helm rig blend, and its rising edge
+  // 0..1, how far the TITLE pose is in. Starts at 1 so the first frame the
+  // player ever sees is already composed, and it is one-way: nothing revives
+  // it, because the card cannot come back without a reload.
+  let titleT = 1, titleDriftT = 0;
   let rigT = 0;                        // 0..1, how far a biome's own lens is in
   let altOpen = 0;                       // damped 0..1 climb, opens the fog
   let flyHudT = 0, flyHudOn = false, flyThermOn = false;
@@ -24132,6 +24228,15 @@ export function createSystems(game) {
     // ...and the eye comes back down across a hemisphere. An arrival is a shot
     // and it is the chapter's to compose, not the last chapter's key press.
     skyEyeT = 0;
+    // ...NOR THE TITLE CARD'S (T1). Same argument, one screen earlier: the
+    // title pose is a 16-degree lens 13.5 m back, and easing out of it over a
+    // second and a half would lay it over the first second of whichever
+    // chapter was chosen — eighteen composed arrivals, corrupted by the front
+    // door. A teleport is the signal that somebody else is composing this
+    // frame, so the pose is gone by the time they do. The only start that does
+    // NOT come through here is a restore into Sydney, which composes nothing
+    // and is the one case the damp was written for.
+    titleT = 0;
     shakeAmt = 0;
     sunFollow(sp.x, sp.y, sp.z);
 
@@ -24700,6 +24805,15 @@ export function createSystems(game) {
   }
   applyDPR();
   addEventListener('resize', applyDPR);
+  // ---- THE VIEWPORT WIDTH, CACHED ---------------------------------------
+  // The title pose needs it to work out how far the animal has to step to
+  // clear the card (sysTITLE_NX_PAD), and the camera update runs inside the
+  // render loop: `window.innerWidth` can force a layout flush, and a forced
+  // flush per frame is exactly what the note on `offsetTop` in buildPick was
+  // written about. It changes on resize and at no other time, so it is read
+  // where every other size in this file is read.
+  sysVW = window.innerWidth || sysVW;
+  addEventListener('resize', function () { sysVW = window.innerWidth || sysVW; });
   // ---- AND THE OTHER HALF OF IT (R3) --------------------------------------
   // `pagehide` is the one that fires on a real navigation away and on a bfcache
   // freeze, which `visibilitychange` does not reliably precede on every engine;
@@ -26781,13 +26895,22 @@ export function createSystems(game) {
     // camYaw is the bearing FROM the capybara TO the camera, so behind is + PI.
     let rideYaw = NaN;
     if (inCali && game.cali && typeof game.cali.rideYaw === 'function') rideYaw = game.cali.rideYaw();
-    // ---- A FRAMED SHOT OWNS THE BEARING, ON FOOT ONLY (v26) -------------
-    // First in the chain, because a shot is the most deliberate thing said
-    // about this camera — but NOT over the helm, a ride or a condor, whose
-    // whole point is that the rig belongs behind the vehicle. Those keep it.
-    // The lambda is scaled by the envelope so the swing eases in with the shot
-    // rather than snapping the instant it is asked for.
-    if (shotW > 0.002 && shotReq && shotReq.yaw !== null && camHandT <= 0 &&
+    // ---- THE TITLE OWNS THE BEARING BEFORE THE GAME OWNS ANYTHING (T1) ---
+    // Ahead of the shot rung, because nothing below can legitimately be asking
+    // for this camera yet: there is no chapter running, no vehicle, no marquee
+    // and no player. Written to camYaw as well as to the target rather than
+    // damped toward it — the pose is not easing IN from anywhere, it is where
+    // the game opens, and a damp here would spend the first second of the
+    // title screen swinging away from a bearing nobody chose.
+    if (!started) {
+      // calmOn() is the same switch that stops the card's ornament breathing
+      // and the shelf dealing itself in; a camera that never stops moving is
+      // the same promise to the same player, one layer down.
+      titleDriftT = calmOn() ? 0 : titleDriftT + dt;
+      camYawTarget = sysTITLE_YAW +
+        Math.sin(titleDriftT * Math.PI * 2 / sysTITLE_DRIFT_T) * sysTITLE_DRIFT_Y;
+      camYaw = camYawTarget;
+    } else if (shotW > 0.002 && shotReq && shotReq.yaw !== null && camHandT <= 0 &&
         (shotReq.over || (!mounted && !sailing && !(rideYaw === rideYaw)))) {
       camYawTarget = sysDampAngle(camYawTarget, shotReq.yaw, sysSHOT_YAW_L * shotW, dt);
     } else if (sailing && camHandT <= 0 && capy && capy.group) {
@@ -27078,6 +27201,63 @@ export function createSystems(game) {
         if (shotReq.pitch !== null) camPitch  = lerp(camPitch,  shotReq.pitch, sw);
         if (shotReq.raise !== null) sysLook.y = lerp(sysLook.y, r.y + shotReq.raise, sw);
       }
+    }
+    // ---- ...AND THE TITLE SITS OUTSIDE ALL OF IT (T1) --------------------
+    // Last, because while the card is up none of the layers above is entitled
+    // to an opinion: there is no biome rig, no dive, no marquee and no player.
+    // It is written as a blend rather than an assignment for one reason only —
+    // the way it LEAVES. See the reset list in teleportCapy: a chapter that
+    // composes its own arrival zeroes this outright and gets its first frame
+    // uncorrupted, and the only case that reaches the damp below is a restore
+    // into Sydney, where nothing is composed and nothing is teleported and the
+    // player is simply handed back the animal they left standing there.
+    if (started && titleT > 0.0005) titleT = damp(titleT, 0, sysTITLE_OUT_L, dt);
+    else if (started) titleT = 0;
+    if (titleT > 0.002) {
+      const dr = calmOn() ? 0
+        : Math.sin(titleDriftT * Math.PI * 2 / sysTITLE_DRIFT_T + 1.1) * sysTITLE_DRIFT_D;
+      camReach = lerp(camReach, sysTITLE_DIST + dr, titleT);
+      camPitch = lerp(camPitch, sysTITLE_PITCH, titleT);
+      sysLook.y = lerp(sysLook.y, r.y + sysTITLE_RAISE, titleT);
+      // ---- ...AND THE ANIMAL IS NOT IN THE MIDDLE (T1) ------------------
+      // The rig aims at the capybara, which is exactly right when the frame
+      // belongs to the player and exactly wrong when a 640 px card is sitting
+      // in the middle of it: measured, the animal projected to NDC x 0.000,
+      // and the card spans -0.44 to +0.44. The one thing the title screen is
+      // advertising was the one thing the title screen was covering up.
+      //
+      // The look target slides along the camera's own right vector, so the
+      // animal moves the other way and lands in the clear right third. It is
+      // the look and not the eye that moves: shifting the eye would swing the
+      // bearing off the harbour, which is the whole reason for the yaw.
+      //
+      // LERPED TO AN ABSOLUTE TARGET, never subtracted from sysLook. The first
+      // version took the offset off the look point each frame, after the damp
+      // above had already pulled it back toward the animal — so it removed
+      // eight per cent of the previous frame's offset and added a whole one,
+      // and the thing converged at about twelve times what it was asked for.
+      // Measured: 2.2 m of slide projected the animal to NDC x 2.73, which is
+      // two and a half screens off the right edge. Every other term in this
+      // block is a lerp toward an absolute for exactly this reason.
+      //
+      // Solved from the frame, not chosen in metres. A lateral world offset s
+      // at boom distance d projects to NDC x = (s / d) / tan(hHalf), and
+      // tan(hHalf) = tan(fov / 2) * aspect — so the metres that put the animal
+      // at a given place on screen fall straight out, and they are different
+      // metres on every window. Only ever evaluated while the card is up.
+      const vw = Math.max(1, sysVW);
+      // NDC spans 2 across the frame, so a sheet w px wide on a vw px window
+      // reaches w / vw either side of centre — NOT w / 2 / vw, which is the
+      // screen FRACTION and is the version this was first written with. It
+      // put every window under the 0.30 floor and parked the animal in the
+      // middle of the card at all four sizes, which is the bug it exists to
+      // fix, arrived at from the other direction.
+      const cardHalf = Math.min(sysCARD_W, Math.max(0, vw - sysCARD_PAD)) / vw;
+      const nxWant = clamp(cardHalf + sysTITLE_NX_PAD, sysTITLE_NX_MIN, sysTITLE_NX_MAX);
+      const side = nxWant * sysTITLE_DIST *
+        Math.tan(camera.fov * Math.PI / 360) * camera.aspect;
+      sysLook.x = lerp(sysLook.x, lx - Math.cos(useYaw) * side, titleT);
+      sysLook.z = lerp(sysLook.z, lz + Math.sin(useYaw) * side, titleT);
     }
 
     const cp = Math.cos(camPitch), sn = Math.sin(camPitch);

@@ -14,6 +14,105 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE TITLE, BATCH ONE — THE WORLD BEHIND THE CARD (T1 — 5 Sep 2026)
+
+**LANDED.** All three must-lands of `ROADMAP-TITLE.md` batch T1. What a player
+saw on first launch was a small tilted card in the middle of a blurred green
+smear, with three speech bubbles leaking through it, and the animal the game is
+about parked directly underneath the card where nobody could see it. Fifty
+passes of world, and the front door showed none of it.
+
+**THE POSE.** `sysTITLE_*` beside the other camera constants, applied as
+`titleT` LAST in the camera chain — after the biome rig, the dive and the
+framing layer, because while the card is up none of those is entitled to an
+opinion. Measured, title screen, before and after:
+
+| | before | after |
+|---|---|---|
+| pitch | 41.0 deg | 16.5 deg |
+| boom | 9.5 m | 13.5 m, drifting +/-0.34 |
+| animal at NDC x | 0.000 (dead behind the card) | 0.384 @1920, 0.494 @1440, 0.551 @1280 |
+| bubbles on the title screen | peak 3, **14 distinct lines** in 30 s | **0, and 0** |
+| median frame | 16.7 ms | 16.7 ms |
+
+The yaw (`0.52`) was chosen by shooting the eight cardinal bearings and looking
+at them (`qa/title-yaw.js`, the `qa/TY-*.png` set), then refined against four
+more. It puts the Harbour Bridge and the Opera House sails in the clear sky
+ABOVE the card, which is the whole reason the pitch came down.
+
+**HOW IT LETS GO, AND WHY THAT IS THE INTERESTING PART.** `titleT = 0` sits in
+`teleportCapy`'s reset list beside `camClearF` and `skyEyeT`. A teleport is the
+signal that somebody else is composing this frame, so the pose is gone before
+they do — otherwise a 1.6 s ease out of a 16-degree lens would have been laid
+over all eighteen composed chapter arrivals. Proved by differential (T1 backed
+out with `git checkout`, same probe, same session): Sydney's and Marrakech's
+arrival trails match the baseline to within 0.4 degrees of pitch and 0.03 m of
+boom at every 200 ms sample. The ONE start that does not teleport is a restore
+into Sydney, which composes nothing; that is the case the damp exists for and
+it measures as a settle from 16.5 to 30 degrees over 0.6 s, with no cut.
+
+**THREE THINGS THAT MEASURED WRONG FIRST, ALL IN THE SAME TWO LINES.**
+
+1. **A delta subtracted from a damped value integrates.** The lateral look
+   offset was written as `sysLook.x -= cos(yaw) * side` AFTER the rig's own
+   `damp(sysLook.x, lx, 5, dt)`. The damp removes about eight per cent of last
+   frame's offset and the line adds a whole new one, so it converged at roughly
+   twelve times what was asked: 2.2 m of slide projected the animal to NDC x
+   **2.73**, two and a half screens off the right edge. Every other term in the
+   pose is `lerp(value, absoluteTarget, titleT)` and this one has to be too.
+2. **NDC spans 2, not 1.** `cardHalf` was `w / 2 / vw` — the screen FRACTION —
+   so every window fell under the 0.30 floor and the animal was parked in the
+   middle of the card at all four sizes: the bug the offset exists to fix,
+   reached from the other side. It is `w / vw`.
+3. **A fixed world offset is the wrong KIND of number.** 4.6 m projected to NDC
+   x 0.42 at 1920 and **1.64 at 390**, because a narrow aspect shrinks the
+   horizontal field and throws the same metres further out. The target is now
+   stated in the frame and the metres solved for it:
+   `side = nx * dist * tan(fov / 2) * aspect`. On a phone the card is the whole
+   width, no offset can clear it, and the clamp at `sysTITLE_NX_MAX` keeps the
+   animal on screen behind the card rather than off it.
+
+**THE WASH WAS A LID.** `.capyui-title` was one gradient from 34 % fog to 84 %
+`skyBottom` over `blur(5px)`; the bottom half of the screen WAS the gradient.
+It is now three layers — a scrim pooled under the card so its three shadows
+have something to fall on, a vignette at 0.20, and a tint at 0.12 to 0.22 — and
+**no `backdrop-filter` at all**. That last part is not what this pass expected:
+A/B at 0, 2 and 5 px (`qa/TW-*.png` plus the corner clips) shows the card's
+edge reads exactly as well against a crisp pine as a soft one, because the
+separation was never coming from the blur. It comes from the card's own
+shadows, the scrim and the vignette, all of which are local. Removing it also
+takes a full-screen convolution off every frame the card is up.
+
+**NOBODY TALKS OVER THE TITLE CARD.** One line at the top of `sayBubble` in
+`npc.js` — the one door every line in the game goes through, and the door
+before any state is taken, so no slot is claimed, no `gest` is written on
+somebody about to gesture at nothing, and `npcSpeak` (which the capybara's
+gaze follows) is not pointed at a silent person. The world goes on living. The
+gate opens on `game.state.started`: 26 distinct lines in the 35 s after Enter.
+
+**REDUCED MOTION IS FREE HERE.** The drift is gated on `calmOn()`, which
+already follows `prefers-reduced-motion` when the player has set no preference
+of their own. Measured: 0.48 m of camera movement over 7 s normally, **exactly
+0** under `reducedMotion: reduce`, holding the pose at exactly 13.5.
+
+**ONE NUMBER, TWO READERS.** `sysCARD_W` (640) is now read by
+`.capyui-card`'s `max-width` and by the pose, which needs it to know how far
+the animal must step. `sysVW` caches the viewport width on resize: the camera
+update runs inside the render loop and `window.innerWidth` can force a layout
+flush, which is the same argument the note on `offsetTop` in `buildPick` makes.
+
+**Instruments.** `qa/title-audit.js` (both pages, four sizes, `AUD-*.png`;
+the before set is kept as `AUDBEFORE-*.png`), `qa/title-measure.js`,
+`qa/title-yaw.js`, `qa/title-side.js`, `qa/title-blur.js`, `qa/title-verify.js`,
+`qa/title-bubbles.js`, `qa/title-calm.js`, `qa/title-restore.js`,
+`qa/title-dist.js`. The shipped bundle was re-checked from `file://` with the
+network off: booted, 159 bodies, pitch 16.5, animal at 0.495, 0 bubbles,
+`backdrop-filter: none`.
+
+**Left for T2 and T3.** The card is still centred and still capped at 640 px,
+so at 1280 the animal clears it by 30 px and on a phone not at all; T2's offset
+is what finishes this composition. See `ROADMAP-TITLE.md`.
+
 ## Aesthetic law (Untitled Goose Game benchmark)
 
 - Low-poly. Every mesh is built from `BoxGeometry`, `CylinderGeometry`, `SphereGeometry`

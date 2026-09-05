@@ -1030,6 +1030,20 @@ export function createNPCs(game) {
   }
 
   function sayBubble(npcRec, text) {
+    // ---- NOBODY TALKS OVER THE TITLE CARD (T1) ---------------------------
+    // The locals do not know the game has not started. Measured 5 Sep 2026 at
+    // 1920x1080: three bubbles standing in the wash behind the title card,
+    // one of them the ice-cream van's departure — a punchline delivered to
+    // somebody who has not pressed a key yet, and the only legible text on
+    // the screen that is not on the card.
+    //
+    // Gated HERE rather than in updateBubbles, because this is the one door
+    // every line in this file goes through and it is the door before any
+    // state is taken: no slot is claimed, no `gest` is written on somebody
+    // who is about to be told to gesture at nothing, and `npcSpeak` — which
+    // the capybara's gaze follows — is not pointed at a silent person. The
+    // world goes on living; it just does not narrate itself to an empty room.
+    if (!game.state.started) return;
     let slot = null;
     for (let i = 0; i < BUB; i++) {
       if (bubbles[i].owner === npcRec) { slot = bubbles[i]; break; }
