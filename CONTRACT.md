@@ -14,6 +14,109 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FINISH, BATCH THREE — THE SOUND OVER AN HOUR, AND THE SAFETY NET (F3 — 6 Sep 2026)
+
+**LANDED.** Seven of the nine must-items in full and two in part; what is
+partial is named at the bottom rather than left to be discovered.
+
+**EVERY ONE-SHOT NOISE VOICE STOPS BEING THE SAME 45 MILLISECONDS.**
+`noiseMake` has always set `loopStart`, `loopEnd` and `playbackRate` per
+source, and **no caller ever passed an offset to `start()`** — forty-three
+sites, `.start(t)` at all of them. With playback beginning at sample zero and
+every one-shot 45 to 220 ms long, the loop window is never reached, so the
+whole mechanism was dead for exactly the sounds that needed it: the footstep
+(~10 000 a session), the caixa (8.8 strokes a second for a whole Rio), the
+snare, the hats, the thud, the splash. The ear locks onto a repeated
+micro-transient long before it can name it, and a shaker stops being a roll
+and becomes a buzz. `start` is rebound inside `noiseMake`, because the right
+offset is a property of that source's window and no call site knows it; a
+caller that passes its own still wins. Measured: eight footsteps, eight
+distinct offsets, zero nulls, node count unchanged.
+
+**THE RIG CANNOT BE LOST, AND TWO MODULES CAN NEVER BE DROPPED.** `camYaw` and
+`camDist` are damped and `damp` is a lerp, so one non-finite frame latched for
+the rest of the session and the renderer drew nothing — two `isFinite` calls
+in thirty thousand lines and neither on the camera. There is a last-known-good
+rollback at the head of the camera block now, with `game.state.camSaves` as
+its counter. And main.js spliced out any module that threw four frames
+running, four lines under a comment saying systems.js must never stop: one
+non-finite value reaching one of the thirty `setTargetAtTime` calls in its
+tick is a RangeError, `clamp` is NaN-transparent, and four frames later the
+HUD, the camera and the pause gate were gone with the world still stepping.
+`systems` and `capybara` are exempt, kept striking, with the log rate-limited
+to once every four seconds. `sysAudioSet` is the other half: the six mix-block
+writes refuse a non-finite value rather than throwing, leaving the parameter
+where it was. Measured with a deliberate poison: `camSaves` 1, the rig finite
+on the next frame, no error.
+
+**THE DEPARTURES BOARD STOPS LEAKING A COLLIDER PER RE-ENTRY.** It is the one
+thing in the game built per ENTRY rather than per build, and it went in
+through the intercepted `scene.add` and `world.addBody`, which tag into the
+live chapter's capture set — while `boardDrop` removed it from the scene and
+the world and not from those arrays, so `attach()` put every dropped collider
+back on the next visit. Mounted loose now, the same idiom props.js has used
+for its particle pools since they were written. **Measured: 160 bodies flat
+over six Sydney↔Quay round trips, against 160 → 166 before.**
+
+**A ROLLBACK IS AN ARRIVAL TOO.** A chapter that fails to build re-entered the
+old one through `onEnter` alone, so all seven `biome:enter` subscribers
+skipped: you landed back where you started with the other chapter's shadow
+box, far plane, weather and possibly a live carry.
+
+**AND NOBODY STAYS FRIGHTENED FOR TWO HOURS.** npc's `biome:enter` reset the
+bubbles, the gather and a frozen carry, and left `wary` and `alarm` untouched
+— and the only thing that decays them is biome-gated, so a crowd left
+mid-panic was frozen there and re-arrived hostile onto the one frame every
+player of a chapter sees. The PLACE's memory is deliberately kept: heat is
+biome-tagged and decays on the real clock.
+
+**THE CROSSING TOUCHES THE MIX.** 820 ms of white came up with the band at
+full level and the palette swapped underneath it. `musDuckG` had two callers,
+both the pause card, so the crossing is a TERM in the one expression that
+writes that gain rather than a second writer — the same rule the pause's
+filter half and the chase pulse follow. Measured: 1.000 before, **0.302
+mid-white**, 1.000 after, and released on `biome:enter` as well so a cancelled
+travel cannot park the score at a quarter.
+
+**THE BAND MAKES ROOM FOR THE LIFT.** `musDrum` was set once at 0.62 and never
+written again while every other bus in the 0.3 s block answered `lift`,
+`calmLean` and `musBreath` — so in the six chapters with a band the
+once-a-chapter lift, three voices summing to 0.118, arrived under an unchanged
+0.62 of bateria.
+
+**THE PARADINHA.** `musBreathStep` is gated `!musPal.band`, so the six
+chapters with the SHORTEST repetition period had no macro shape at all. Rio
+now drops the surdo and the bass for the sixteenth bar of every phrase and
+keeps the caixa, which is what a bateria actually does. It is a suppressed
+VOICE and not a suppressed bar: `musBarAt`, `musBarAnchor` and `musBeatLen`
+are untouched. Measured over bars 10 to 30 — `beats()` never threw, never went
+backwards and never skipped, which is the thing Rio's whole floor is scored
+against.
+
+**THE SLIDE STOPS GALLOPING.** `capySliding` was not in the footfall gate and
+the animal is `grounded` throughout a slide, so every slide in the game — the
+dune, the Uji run, the glacier, and every hill that will take it — played four
+running feet under a capybara on its stomach.
+
+**AND THE ORGAN IS IN THE RIGHT BUILDING.** Its reverb send went to `musSend`,
+the SCORE's convolver, alone among the whole sfx table: muting the music took
+the church away, muting effects left the tail playing, and the tail obeyed the
+music's underwater lid rather than the world's.
+
+**PARTIAL, AND NAMED:** the slide has no scrape yet (the gate is fixed; the
+sustained filtered-noise voice is not built), the paradinha is Rio only (Cali's
+salsa bar is untouched), and band scheduling is still not suppressed under
+`transBusy` — the duck makes the tempo overlap much less audible and
+suppressing the scheduler is a change to the clock that Cali's and Rio's floors
+read. All three are on `ROADMAP-FINISH.md`'s shelf.
+
+**Verified:** `npm test` 10/10; 19/19 driven soak, 0 faults; the controlled
+standing A/B in Sydney is 19.3 ms fresh against 18.6 ms after the whole tour,
+i.e. no measurable cost — the run-to-run drift of the headless clock is larger
+than anything here. Instruments: `qa/f3-check.js`, `f3-beat.js`, and
+`rv-board.js` re-baselined. Two new hooks, both harness-only: `game.musAudit()`
+and `game.forceCamNaN()`.
+
 ## THE FINISH, BATCH TWO — THE WORLD ANSWERS (F2 — 6 Sep 2026)
 
 **LANDED.** All nine must-items of `ROADMAP-FINISH.md` batch F2. The theme is

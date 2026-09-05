@@ -5181,7 +5181,17 @@ export function createCapybara(game) {
       const halfCycle = Math.floor(capyLegPhase / Math.PI);
       if (halfCycle !== capyStepPhase) {
         capyStepPhase = halfCycle;
-        if (!capySwimming && grounded && !carried) {
+        // ---- ...AND NOT WHILE THE BELLY IS ON THE GROUND (F3) -----------
+        // `capySliding` was not in this gate and the animal is `grounded`
+        // throughout a slide — the state sets no flag this block reads and
+        // `capyLegPhase` advances unconditionally in the `if (moving)` above —
+        // so every slide in the game played a GALLOP. Four chapters lean on
+        // the verb (the dune, the Uji run, the glacier, and every hill that
+        // will take it) and all four had four feet running underneath a
+        // capybara lying on its stomach. The slide has its own voice: a
+        // `rustle` on entry and the shared air-rush layer, both correct and
+        // both unchanged.
+        if (!capySwimming && grounded && !carried && !capySliding) {
           capySfxOpts.pitch = capySurfacePitch(game, env, px, pz, body.position.y);
           // a walk whispers, a run carries — and the very first stride out of
           // a standstill is quiet rather than a slap

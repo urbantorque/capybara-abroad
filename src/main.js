@@ -680,6 +680,19 @@ function mainMakeBiomes(game) {
           biome.attach(from, true);
           if (fromSet && fromSet.api && fromSet.api.onEnter) { try { fromSet.api.onEnter(); } catch (e) { console.error(e); } }
           captureTag = from;
+          // ---- ...AND THE ROLLBACK IS AN ARRIVAL TOO (F3) ---------------
+          // This path is careful about the scene and the world and then
+          // re-entered the old chapter through `onEnter` ALONE — so the seven
+          // `biome:enter` subscribers all skipped: the shadow box and
+          // `camera.far` stayed on the chapter that failed to build, weather
+          // never re-primed, a carry was never released, the incident chain
+          // and the breadcrumbs kept the other chapter's coordinates, and
+          // `game.time.clear()` never ran. You landed back where you started
+          // wearing the other place's sky.
+          //
+          // `from` is where the player now is and `to` is where they were
+          // trying to go, which is the same shape every other emit here uses.
+          game.events.emit('biome:enter', { name: from, from: to });
           return false;
         }
         toSet.built = true;          // only once it actually built
@@ -1902,6 +1915,8 @@ function mainBoot() {
                         'props', 'capybara', 'condor', 'npc', 'systems'];
   all.forEach((m, i) => { if (m) m.__name = updaterNames[i]; });
   const updaters = all.filter(m => m && typeof m.update === 'function');
+  // The two the loop may never give up on. See the strike handler in tick().
+  const MAIN_NEVER_DROP = { systems: 1, capybara: 1 };
 
   addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -2051,9 +2066,34 @@ function mainBoot() {
         if (m.__strikes <= 3) {
           console.error('[update ' + (m.__name || i) + ' strike ' + m.__strikes + ']', e);
           game.state.lastError = (e && e.message) || String(e);
-        } else if (m.__strikes === 4) {
+        } else if (m.__strikes === 4 && !MAIN_NEVER_DROP[m.__name]) {
           console.error('[update ' + (m.__name || i) + '] failing every frame — dropped', e);
           updaters.splice(i, 1); i--;
+        } else if (m.__strikes === 4) {
+          // ---- ...AND TWO MODULES MAY NEVER BE DROPPED (F3) --------------
+          // The comment eighteen lines above this says systems.js MUST keep
+          // running, because it owns the HUD, the camera and the line that
+          // decides whether the game is paused at all — and then the splice
+          // four lines down had no exemption for it. One non-finite value
+          // reaching one of the thirty `setTargetAtTime` calls in its tick
+          // throws a RangeError, and `clamp` is NaN-transparent so a NaN in a
+          // damped value is permanent: four frames later the HUD, the camera
+          // and the pause gate are gone with the world still stepping. That is
+          // a session ending with nothing in the console but one line.
+          //
+          // capybara.js is on the list for the same reason at one remove: the
+          // animal stops being simulated and every module that reads its
+          // position goes on running against a corpse.
+          //
+          // They keep striking rather than being dropped, and the log is rate
+          // limited to once every few seconds — a module throwing sixty times
+          // a second would otherwise bury the very stack that explains it.
+          const nowS = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+          if (!m.__loudAt || nowS - m.__loudAt > 4) {
+            m.__loudAt = nowS;
+            console.error('[update ' + (m.__name || i) + '] failing every frame — KEPT (never dropped)', e);
+          }
+          m.__strikes = 3;                       // ...so this rung is reached again
         }
       }
     }

@@ -9291,12 +9291,59 @@ export function createSystems(game) {
     s.loopStart = rand(0, sysNOISE_SECS * 0.42);
     s.loopEnd = rand(sysNOISE_SECS * 0.72, sysNOISE_SECS);
     s.playbackRate.value = rand(0.9, 1.1);
+    // ---- ...AND IT HAS TO BE STARTED INSIDE THAT WINDOW (F3) -------------
+    //
+    // The three lines above are the whole mechanism for "no two of these are
+    // the same sound", and until this they did nothing whatever for the one
+    // family that needed them most. `start(when)` with no offset begins at
+    // SAMPLE ZERO and only wraps when it reaches `loopEnd` — and every
+    // one-shot in this table is 45 to 220 ms long, so the loop window is
+    // never reached and every source plays the identical opening transient.
+    // Forty-three call sites, `.start(t)` at all of them, `.start(t, offset)`
+    // at none. So the footstep — roughly ten thousand of them in a session —
+    // the caixa, at 8.8 strokes a second for a whole Rio, the snare, the hats,
+    // the thud and the splash were all the same 45 ms of noise, every time,
+    // and the ear locks onto a repeated micro-transient long before it can
+    // name it: a samba shaker stops being a roll and becomes a buzz.
+    //
+    // Rebound here rather than fixed at forty-three sites, because the right
+    // offset is a property of THIS SOURCE'S window and nothing at a call site
+    // knows it. A caller that passes its own offset still wins.
+    const rawStart = s.start.bind(s);
+    s.start = function (when, offset, dur) {
+      const lo = s.loopStart, hi = Math.max(lo + 0.05, s.loopEnd - 0.6);
+      const off = (typeof offset === 'number' && offset === offset) ? offset : rand(lo, hi);
+      return dur === undefined ? rawStart(when, off) : rawStart(when, off, dur);
+    };
     return s;
   }
   /** Mono, and it must stay mono: everything that says where it is. */
   function noiseSrc() { noiseBuild(); return noiseMake(acNoise); }
   /** Stereo. The beds, which are not anywhere. */
   function noiseWideSrc() { noiseBuild(); return noiseMake(acNoiseW); }
+  /**
+   * A SCHEDULED WRITE THAT CANNOT TAKE THE GAME DOWN (F3).
+   *
+   * `setTargetAtTime` throws a RangeError on a non-finite value, and the 0.3 s
+   * mix block below feeds it eight expressions built out of `musIntensity`,
+   * `lift`, `calmLean`, `musBreath` and `musProg` — every one of them damped,
+   * and `damp` is a lerp, so a single NaN reaching any of them is PERMANENT.
+   * `clamp` does not help: it is `v < a ? a : v > b ? b : v`, which passes NaN
+   * straight through. main.js used to drop a module that threw four frames
+   * running, so one bad value ended the session with the world still stepping;
+   * it now keeps systems.js alive instead, and this is the other half — the
+   * write itself refuses rather than throwing.
+   *
+   * A dropped write leaves the parameter where it was, which is exactly right:
+   * the score holds its last good level instead of stopping.
+   */
+  function sysAudioSet(param, v, t, tau) {
+    if (!param) return false;
+    if (!(v === v) || v === Infinity || v === -Infinity) return false;
+    if (!(t === t) || !(tau === tau) || tau <= 0) return false;
+    param.setTargetAtTime(v, t, tau);
+    return true;
+  }
   function env(node, t, peak, atk, dec) {
     const g = node.gain;
     g.setValueAtTime(0.0001, t);
@@ -11801,10 +11848,30 @@ export function createSystems(game) {
   const sysDUCK_G   = 0.34;
   const sysDUCK_HZ  = 1100;
   const sysDUCK_TAU = 0.10;
+  // ---- ...AND THE OTHER THING THAT DUCKS THE SCORE (F3) -------------------
+  // The crossing. 820 ms of white came up with the band at FULL level and the
+  // palette swapped underneath it, so Cali into Rio was a 100 bpm salsa
+  // hard-cutting to a 132 bpm bateria with the picture saying "you are
+  // leaving" and the mix saying nothing at all. `musDuck` had two callers, the
+  // pause card's show and hide, and this is the third thing with an opinion
+  // about the same gain — so it is a TERM in the one expression that writes
+  // it, exactly as the pause's filter half is a term in `sysSubSet` and the
+  // chase pulse is a term in the bass gain. Two writers on one AudioParam is
+  // the trap this file has avoided for thirty thousand lines.
+  const sysCROSS_DUCK   = 0.25;   // where the score sits while the white is up
+  const sysCROSS_TAU_O  = 0.17;   // ~0.5 s down, going out
+  const sysCROSS_TAU_I  = 0.40;   // ~1.2 s back, coming in
+  let musDuckPause = false, musDuckCross = 0;
+  function musDuckApply(tau) {
+    if (!ac || ac.state !== 'running' || !musDuckG) return;
+    const g = (musDuckPause ? sysDUCK_G : 1) *
+              (1 - musDuckCross * (1 - sysCROSS_DUCK));
+    musDuckG.gain.setTargetAtTime(g, ac.currentTime, tau);
+  }
   function musDuck(on) {
     if (!ac || ac.state !== 'running') return;
-    const t = ac.currentTime;
-    if (musDuckG) musDuckG.gain.setTargetAtTime(on ? sysDUCK_G : 1, t, sysDUCK_TAU);
+    musDuckPause = on;
+    musDuckApply(sysDUCK_TAU);
     // The filter half is NOT written here. `musOutLP.frequency` has exactly one
     // writer — sysSubSet, which runs every frame including while the game is
     // paused — so a lid set from this function would be lifted again on the
@@ -11960,6 +12027,11 @@ export function createSystems(game) {
    */
   function musCross(dir) {
     if (!ac || !musVol || ac.state !== 'running' || musMuted) return;
+    // The mix leaves with the picture and comes back with it (F3). Set before
+    // the early-out below, because a chapter with no chord sounding still has
+    // a score to duck. See musDuckApply.
+    musDuckCross = dir < 0 ? 1 : 0;
+    musDuckApply(dir < 0 ? sysCROSS_TAU_O : sysCROSS_TAU_I);
     const chord = musCurChord;
     if (!chord || !chord.length) return;
     const inst = (musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck';
@@ -13216,7 +13288,7 @@ export function createSystems(game) {
 
   /** One 2/4 bar of the bateria. `half` alternates so the two-bar figures
    *  (the tamborim, the bass anticipation) know which half they are in. */
-  function musSambaBar(t0, half) {
+  function musSambaBar(t0, half, brk) {
     const chord = (t0 < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
     if (!chord) return;
     const S = sysMUS_SAMBA_16;
@@ -13225,6 +13297,23 @@ export function createSystems(game) {
     const nextRoot = musPal.roots[musPal.next[musIdx][0]];
 
     // --- the surdo. The chapter, in two strokes.
+    // ---- ...EXCEPT ONE BAR IN SIXTEEN (F3) ------------------------------
+    // A PARADINHA: the bateria's own way of ending a phrase, and the most
+    // characteristic thing a bateria does. The surdo and the tumbao stop, the
+    // caixa keeps running, and the section comes back in on the next
+    // downbeat. It exists here because `musBreathStep` — the only long-form
+    // phrase structure in this score — is gated `!musPal.band`, so the SIX
+    // chapters with the shortest repetition period were the six with no macro
+    // shape at all: Rio is a four-chord turnaround every 7.27 s over a
+    // 1.818 s rhythm cycle, and it ran unchanged for a whole chapter.
+    //
+    // A break rather than a fade, because that is what the instrument does —
+    // and it is deliberately a SUPPRESSED VOICE and not a suppressed bar: the
+    // bar still marches, `musBarAt`, `musBarAnchor` and `musBeatLen` are
+    // untouched, so `game.music.beats()` goes on ticking through it. Rio's
+    // whole floor is scored against that clock and the samba is in 2/4 on the
+    // two; a break that moved the beat would break the chapter's marquee.
+    if (!brk)
     for (let i = 0; i < sysMUS_SURDO.length; i++) {
       const u = sysMUS_SURDO[i];
       musSurdo(musFeel(t0 + u.t * S, sysMUS_F_KICK.s, sysMUS_F_KICK.b), u.k, musVel(u.v * lvl));
@@ -13245,7 +13334,8 @@ export function createSystems(game) {
       const a = sysMUS_AGOGO[i];
       musAgogo(musFeel(t0 + a.t * S, sysMUS_F_HAND.s, sysMUS_F_HAND.b), a.h, musVel(a.v * lvl));
     }
-    // --- bass, with the surdo
+    // --- bass, with the surdo — and it stops with the surdo (see `brk`)
+    if (!brk)
     for (let i = 0; i < sysMUS_SAMBA_BASS.length; i++) {
       const b = sysMUS_SAMBA_BASS[i];
       const useNext = b.a && half === 1;
@@ -14426,7 +14516,12 @@ export function createSystems(game) {
       }
       guard = 0;
       while (musBarAt < now + sysMUS_RHY_LOOK && guard++ < 6) {
-        musSambaBar(musBarAt, musBarIndex & 1);
+        // ...and the sixteenth bar of every phrase is a paradinha. On an ODD
+        // index so it lands at the end of a two-bar teleco-teco rather than
+        // through the middle of one, and the bar after it is index 0 of the
+        // next phrase, which is where the section comes back in. See the
+        // `brk` argument in musSambaBar.
+        musSambaBar(musBarAt, musBarIndex & 1, (musBarIndex % 16) === 15);
         musBarAt += barLen;
         musBarIndex++;
       }
@@ -14851,8 +14946,16 @@ export function createSystems(game) {
     ns.connect(bp); bp.connect(ng); ng.connect(out);
     ns.start(t); ns.stop(t + 0.35);
     out.connect(acMaster);
-    // and the building it is in
-    if (musSend) { const w = ac.createGain(); w.gain.value = 0.55; out.connect(w); w.connect(musSend); }
+    // ---- AND THE BUILDING IT IS IN, ON THE RIGHT BUS (F3) ---------------
+    // This was `musSend`, the SCORE's convolver — the only voice in the table
+    // routed there. Three things followed from it and all three are wrong:
+    // muting the music took the church away and left a dry organ; muting
+    // effects left the organ's tail playing on; and the tail obeyed the
+    // MUSIC's underwater filter rather than the world's, so going under in a
+    // basilica damped the room by the wrong lid. `acRoomSend` is the room
+    // every other placed sound in the game is in.
+    const send = acRoomSend || musSend;
+    if (send) { const w = ac.createGain(); w.gain.value = 0.55; out.connect(w); w.connect(send); }
   }
 
   const sfxTable = {
@@ -19914,7 +20017,24 @@ export function createSystems(game) {
     const here = chapterOf(bio);
     const rows = boardRows(here);
     boardObj.sync(rows.chips, rows.lit);
-    scene.add(boardObj.group);
+    // ---- MOUNTED LOOSE, BECAUSE IT IS REBUILT PER ENTRY (F3) ------------
+    //
+    // `scene.add` and `world.addBody` are both intercepted by main.js and tag
+    // whatever they are given into the LIVE CHAPTER'S capture set, which is
+    // exactly right for everything a chapter builds once. The board is the one
+    // thing in the game built per ENTRY: `boardFrame` drops and re-plants it
+    // whenever the biome changes. `boardDrop` removes it from the scene and
+    // the world, and nothing removes it from those two arrays — so `attach()`
+    // walked the set on the next visit and put every previously-dropped
+    // collider back. MEASURED: 160 bodies rising to 166 over six Sydney to
+    // Quay round trips, one per re-entry, for ever. Static boxes at the same
+    // coordinates, so nothing looked wrong; `mainSaneWorld` walks that list
+    // every frame and the orphaned groups hold their geometry alive.
+    //
+    // props.js has had `physSceneAddLoose`/`physWorldAddLoose` for exactly
+    // this since the particle pools were written. Same idiom, spelled out here
+    // because those two are module-private over there.
+    THREE.Object3D.prototype.add.call(scene, boardObj.group);
     // One box, round the frame and the mount, so it is a thing you bump into
     // rather than a thing you walk through. Half-extents: shared.js's helpers
     // are not all one convention (see the solid-or-drawn audit) so exitBoard
@@ -19928,7 +20048,7 @@ export function createSystems(game) {
     boardBody.interpolatedPosition.copy(boardBody.position);
     boardBody.previousQuaternion.copy(boardBody.quaternion);
     boardBody.interpolatedQuaternion.copy(boardBody.quaternion);
-    game.world.addBody(boardBody);
+    CANNON.World.prototype.addBody.call(game.world, boardBody);   // loose — see above
     // ...and whatever this chapter hangs off its header. See sysBOARD_HANG.
     boardHangPlant(bio);
     return true;
@@ -22758,6 +22878,11 @@ export function createSystems(game) {
   let sysPinchD = 0, sysDragLastX = null;
   let camYaw = 0, camYawTarget = 0, camHandT = 0, camIdleT = 0;
   let camDist = sysCAM_DEF, camDistTarget = sysCAM_DEF;
+  // The rig's last finite frame, and how many times it has been handed back.
+  // See the sanity check at the head of the camera block. `sysCamSaves` is the
+  // camera's answer to `solverSaves`: nothing in src reads it, the harness does.
+  let sysCamOkYaw = 0, sysCamOkDist = sysCAM_DEF, sysCamSaves = 0;
+  const sysCamOk = new THREE.Vector3(0, sysCAM_DEF, sysCAM_DEF);
   let shotReq = null, shotAge = 0, shotW = 0, shotKill = 0;
   let camDolly = 0;             // 0..1 of the run speed, damped. See sysCAM_DOLLY_P.
   let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
@@ -25651,6 +25776,39 @@ export function createSystems(game) {
   };
   /** What the framing layer is doing, 0..1. Nothing in src reads it; the harness does. */
   game.framing = function () { return shotW; };
+  /**
+   * THE MIX, AS NUMBERS (F3). Nothing in src reads it; the harness does.
+   *
+   * Every gain in the 0.3 s block is scheduled with `setTargetAtTime`, which
+   * means the only way to know whether a duck actually happened is to read the
+   * param back — and until this there was no way in at all, so the crossing
+   * duck, the band's lift duck and the pause duck were three claims nobody
+   * could check. `.value` on an AudioParam is the current, post-ramp figure.
+   */
+  game.musAudit = function () {
+    const v = (p) => (p && typeof p.value === 'number') ? +p.value.toFixed(4) : null;
+    return {
+      duck: musDuckG ? v(musDuckG.gain) : null,
+      duckPause: musDuckPause, duckCross: musDuckCross,
+      drum: musDrum ? v(musDrum.gain) : null,
+      pad: musPad ? v(musPad.gain) : null,
+      bass: musBassGain ? v(musBassGain.gain) : null,
+      breath: +musBreath.toFixed(3), intensity: +musIntensity.toFixed(3),
+      band: (musPal && musPal.band) || null, bar: musBarIndex,
+    };
+  };
+  /**
+   * POISON THE RIG, ONCE. A TEST HOOK, and never a verb — the same rule and
+   * the same wording as `forceHeat` in npc.js.
+   *
+   * The camera sanity check at the head of the camera block is a safety net
+   * for a failure that ends a session, and `camYaw`/`camDist`/`sysCamPos` are
+   * all closure-local — so from outside there was no way to make the net
+   * catch anything, and an untestable safety net is one you find out about in
+   * production. Poisoning `camera.position` from a probe proves nothing: it is
+   * overwritten from `sysCamPos` on the next frame whatever happens.
+   */
+  game.forceCamNaN = function () { camYaw = NaN; sysCamPos.set(NaN, NaN, NaN); };
   /** The camera rig's own numbers, one frame old. See sysCamInfo. */
   game.camInfo = sysCamInfo;
   game.sfx = sfx;
@@ -27108,6 +27266,10 @@ export function createSystems(game) {
     // instead of cutting.
     game.state.chaos = 0;
     musChaseT = 0;
+    // ...and the crossing's own duck is released here as well as by musCross's
+    // second half (F3), so a travel that is cancelled or whose target chapter
+    // fails to build cannot leave the score parked at a quarter for ever.
+    musDuckCross = 0; musDuckApply(sysCROSS_TAU_I);
     // (recordEnd() was called here, eighteen lines after recLiveId was cleared
     // by hand above — and it opens `if (!recLiveId) return false`, so it had
     // never once done anything. The block above already says why the clear is
@@ -27365,6 +27527,29 @@ export function createSystems(game) {
       shotW = shotKill ? damp(shotW, 0, sysSHOT_KILL, raw) : want;
       if (shotW < 0.002 && (shotKill || outW <= 0)) { shotReq = null; shotW = 0; shotAge = 0; }
     } else if (shotW !== 0) shotW = 0;
+    // ---- THE RIG CANNOT BE LOST (F3) -------------------------------------
+    //
+    // `mainSaneWorld` is thorough about every body in the world — dynamic and
+    // kinematic, position, velocity, angular velocity — and there has never
+    // been an equivalent for the camera, which is the one object in the game
+    // whose failure is total: `camYaw` and `camDist` are damped, `damp` is a
+    // lerp, so ONE non-finite frame latches for the rest of the session and
+    // the renderer draws nothing at all. Two `isFinite` calls in thirty
+    // thousand lines and neither of them is on the rig.
+    //
+    // Last known good, rolled back rather than zeroed: a camera snapped to the
+    // origin is a different kind of broken. `sysCamPos` is repaired too,
+    // because it is what `camera.position` is copied from.
+    if (camYaw === camYaw && camDist === camDist &&
+        sysCamPos.x === sysCamPos.x && sysCamPos.y === sysCamPos.y && sysCamPos.z === sysCamPos.z) {
+      sysCamOkYaw = camYaw; sysCamOkDist = camDist; sysCamOk.copy(sysCamPos);
+    } else {
+      camYaw = sysCamOkYaw; camYawTarget = sysCamOkYaw;
+      camDist = sysCamOkDist; camDistTarget = sysCamOkDist;
+      sysCamPos.copy(sysCamOk);
+      sysCamSaves++;
+      game.state.camSaves = sysCamSaves;
+    }
     camYaw = damp(camYaw, camYawTarget, 9, dt);
     camDist = damp(camDist, camDistTarget, 6, dt);
 
@@ -30202,10 +30387,10 @@ export function createSystems(game) {
       // filter down WITH it, which is the one combination none of the others
       // make and is the difference between quieter and further away.
       const br = 1 - musBreath;              // 0 normally, up to 1-DIP at the bottom
-      musPad.gain.setTargetAtTime(musPal.bus * (1 - musIntensity * 0.3) *
+      sysAudioSet(musPad.gain, musPal.bus * (1 - musIntensity * 0.3) *
         (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath,
         nowA, lift > 0.02 ? 0.6 : 1.2);
-      musFilt.frequency.setTargetAtTime(Math.max(180,
+      sysAudioSet(musFilt.frequency, Math.max(180,
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
         musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT),
         nowA, lift > 0.02 ? 0.7 : 1.4);
@@ -30214,18 +30399,38 @@ export function createSystems(game) {
       // writes this gain, not a second writer — musBassGain already has exactly
       // one and it runs on a 1.5 s constant, so a pulse written separately
       // would be dragged back before it was heard. See the npc:chase handler.
-      musBassGain.gain.setTargetAtTime((musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
+      sysAudioSet(musBassGain.gain, (musPal.bass * (1 - clamp(calmLean, 0, 1.9) * 0.30) +
         musIntensity * 0.08 + lift * 0.05 + musChaseHit * 0.30) * musBreath,
         nowA, musChaseHit > 0.02 ? 0.28 : 1.5);
+      // ---- ...AND THE BAND MAKES ROOM FOR THE LIFT (F3) -----------------
+      //
+      // Every other bus in this block answers `lift`, `calmLean` and
+      // `musBreath`, and the drums answered NONE of them: `musDrum` was set
+      // once at 0.62 and never written again, so its only dynamic was the
+      // `lvl` term inside each bar function. The consequence is worst in the
+      // six chapters that most need it — Rio, Cali, Hong Kong, Marrakech,
+      // Venice and Monte Carlo are the ones with a band — where the
+      // once-a-chapter lift is three voices summing to 0.118 (sysMUS_LIFT_L)
+      // arriving UNDER an unchanged 0.62 of bateria.
+      //
+      // A term in the one expression that writes this gain, which is the rule
+      // this whole block keeps: `musBreath` is folded in here as well so the
+      // drums breathe with everything else instead of being the one thing
+      // that does not. 0.35 is a duck and not a mute — a paradinha is the
+      // band stopping, and that is a different idea from the band making room.
+      if (musDrum) {
+        sysAudioSet(musDrum.gain, 0.62 * (1 - lift * 0.35) * musBreath,
+          nowA, lift > 0.02 ? 0.5 : 1.2);
+      }
       // the thickening layer: silent at zero tasks, a shimmer at all of them
-      if (musShimGain) musShimGain.gain.setTargetAtTime(0.0001 + musProg * 0.85, nowA, 2.5);
+      if (musShimGain) sysAudioSet(musShimGain.gain, 0.0001 + musProg * 0.85, nowA, 2.5);
       // ---- THE AURORA'S CHOIR ------------------------------------------
       // One number, one gain, and a two-and-a-half second time constant so it
       // arrives the way the sky does. Everywhere but under an Icelandic aurora
       // this target is zero and the four voices cost nothing but their phase.
       if (musChoirGain) {
         const want = inIce ? auroraT * auroraT * 0.62 : 0;
-        musChoirGain.gain.setTargetAtTime(0.0001 + want, nowA, 2.5);
+        sysAudioSet(musChoirGain.gain, 0.0001 + want, nowA, 2.5);
       }
       // ---- AND THE LIFT ------------------------------------------------
       // Written here rather than in musSwell so that ONE gain node is ever

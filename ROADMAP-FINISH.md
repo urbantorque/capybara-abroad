@@ -506,6 +506,22 @@ rewritten strings. Frame time within 0.5 ms.
 
 ### Batch F2 — the world answers (gap 2, and the two people-sounds from gap 3)
 
+> **DONE, 6 Sep 2026.** All nine must-items; `CONTRACT.md` carries the F2
+> paragraph. One correction worth carrying forward:
+>
+> - **Item 1's "pin the watchers' target to that car" is wrong as written.**
+>   Pinning outright drops every watcher beyond the existing 90 m gate to
+>   their idle phase, so a lap at the far end of the circuit leaves forty
+>   spectators facing nothing — measured: watchers facing their nearest car
+>   fell from 1.00 to 0.07. The ridden car is PREFERRED where it is visible
+>   and everyone else goes on watching the race, which measures 1.000 of the
+>   watchers who can see the animal facing it at 0.001 rad.
+>
+> Also: `sayAudit` reimplemented `npcSay`'s lookup, so item 4 would have been
+> invisible to its own verification. Both go through one helper now.
+>
+> **Not built, and deliberately:** the whole "if the clock allows" list below.
+
 **Must.**
 
 1. **Monte Carlo's crowd watches the rider.** When `monRider >= 0`, pin the
@@ -559,6 +575,32 @@ before and after (startles, chains). Node creations per bubble = the pulse
 count. 19/19 soak clean.
 
 ### Batch F3 — the sound over an hour, and the safety net (gap 3, the rest of gap 5)
+
+> **DONE, 6 Sep 2026** — seven of the nine must-items in full, two in part.
+> `CONTRACT.md` carries the F3 paragraph. What is partial, so that nobody has
+> to find out by looking:
+>
+> - **Item 3 is half.** `capySliding` is in the footfall gate, so the slide has
+>   stopped galloping. The sustained scrape — a filtered noise loop riding
+>   `gsp` and `capySurfacePitch` — is not built; the slide still has its entry
+>   `rustle` and the shared air-rush layer, both correct.
+> - **Item 2 is Rio only.** The paradinha is in `musSambaBar`; Cali's
+>   `musSalsaBar` is untouched. Samba is the acute case (a 1.818 s rhythm
+>   cycle against salsa's 4.8 s) and the shape ports directly — suppress the
+>   tumbao and the campana, keep the clave and the congas.
+> - **Item 5 is half.** The crossing ducks the score, which is the audible
+>   part. Band scheduling is still not suppressed under `transBusy`: that is a
+>   change to the clock `game.music.beats()` publishes, which Cali's and Rio's
+>   floors are scored against, and the duck already takes most of the sting
+>   out of the tempo overlap.
+>
+> Two harness-only hooks were added because the things they observe were
+> otherwise unverifiable: `game.musAudit()` (every mix gain read back, since
+> `setTargetAtTime` means the only proof a duck happened is the param itself)
+> and `game.forceCamNaN()` (the rig is closure-local, and an untestable safety
+> net is one you find out about in production).
+>
+> **Not built, and deliberately:** the whole "if the clock allows" list below.
 
 **Must.**
 

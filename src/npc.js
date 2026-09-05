@@ -8676,6 +8676,28 @@ export function createNPCs(game) {
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
     }
+    // ---- ...AND NOBODY STAYS FRIGHTENED FOR TWO HOURS (F3) --------------
+    //
+    // This handler reset the bubbles, the gather and a frozen carry, and left
+    // `wary` and `alarm` exactly as they were. The only thing that decays
+    // `wary` is `stepHuman`, which is biome-gated — so a crowd left mid-panic
+    // is FROZEN at that panic for however long the player spends in the other
+    // eighteen chapters, and re-arrives hostile. It self-heals over npcWARY_T
+    // once the chapter is live again, which means the wrongness lands on the
+    // one frame every player of a chapter sees: its arrival shot.
+    //
+    // The PLACE's memory is deliberately not touched: `npcHeatSites` is
+    // biome-tagged and decays on the real clock, and a square being cross with
+    // you is exactly the sort of thing that should survive a walk round the
+    // block. It is the individual people who should not still be mid-flinch.
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (L) { L.wary = 0; L.alarm = 0; }
+    }
+    for (let i = 0; i < game.npcs.length; i++) {
+      const r = game.npcs[i];
+      if (r) { r.wary = 0; r.alarm = 0; }
+    }
     // A carry frozen by a mid-carry departure must not resume on re-entry:
     // the first stepHuman frame would teleport the capybara from the spawn
     // point straight back into the gardener's hands across the map.
