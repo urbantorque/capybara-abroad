@@ -553,10 +553,12 @@ const sysTITLE_RAISE = 2.35;                 // m above the animal the lens aims
 // the one thing the title screen advertises was not in the picture at all.
 //
 // So the target is stated in the frame, and the metres are solved for it. The
-// clearance is measured against the CARD, whose width is known without asking
-// the DOM (sysCARD_W, capped by the viewport) — so the animal steps aside by
+// clearance is measured against the CARD's own right edge, which titleFit()
+// publishes on resize and on a page turn — so the animal steps aside by
 // however much this particular window needs, rather than by a number chosen
-// on one monitor.
+// on one monitor. T1 derived that edge from sysCARD_W and the viewport, which
+// held for exactly as long as the card was 640 px wide and centred; T2 gave it
+// a zoom and moved it off centre, so the rig now asks instead of assuming.
 const sysTITLE_NX_PAD = 0.06;  // NDC beyond the card's edge
 const sysTITLE_NX_MIN = 0.30;  // ...but never crowd the middle
 // ...and never past this, or it leaves the frame on a phone, where the card is
@@ -564,13 +566,8 @@ const sysTITLE_NX_MIN = 0.30;  // ...but never crowd the middle
 // card and the harbour reads over the top of it, which is the honest ceiling
 // on a 390 px screen rather than a composition.
 const sysTITLE_NX_MAX = 0.60;
-// Page one's sheet, in CSS pixels. Read by .capyui-card's max-width and by the
-// title pose, which is the whole reason it is a constant and not a literal.
+/** Page one's sheet, in CSS pixels, before --ui scales it. */
 const sysCARD_W = 640;
-// The card sits inside .capyui-title's 18 px padding on each side.
-const sysCARD_PAD = 36;
-/** Viewport width in CSS px, refreshed on resize. See the note by applyDPR. */
-let sysVW = 1440;
 // How the pose LETS GO. Only ever used when nothing else composes the first
 // frame — a spawn zeroes it outright, see the reset list in teleportCapy.
 const sysTITLE_OUT_L = 1.6;
@@ -6272,8 +6269,35 @@ function sysBuildCSS() {
   'padding:clamp(20px,4vw,40px) clamp(22px,5vw,54px);',
   'position:relative;z-index:1;',
   'transform:rotate(-.8deg);max-width:880px;width:100%;text-align:center;',
+  /* ---- THE SHEET HAS A SIZE, AND IT IS NOT ALWAYS 640 (T2) -------------
+     Every type size on this card is a clamp() on vw that reaches its ceiling
+     a long way before 1920, and the card itself was capped at 640 — so on a
+     27-inch monitor the front of the game was a 647 px dialog box taking a
+     third of the width, with a 414 px wordmark. `zoom` is the one property
+     that scales a layout AND its text without touching a single rule inside
+     it; --ui is written by titleFit() off the viewport, floors at 1 so no
+     small screen is ever shrunk, and ceilings at 1.35 so a television does
+     not get a poster. */
+  'zoom:var(--ui,1);',
   /* centred when it fits, scrolled from the top when it does not */
   'margin:auto;transition:max-width ' + dMed + ' ' + mHold + ',transform ' + dMed + ' ' + mHold + ';}',
+/* ---- ...AND IT SITS BESIDE THE WORLD RATHER THAN ON IT (T2) -------------
+   T1 put the harbour, the bridge and the animal behind this card and then
+   left the card in the middle of them. The animal stands on the RIGHT (that
+   was T1's decision to make and it is recorded in the contract), so the sheet
+   goes left and the world gets the two thirds it is worth.
+
+   Page one only: page two is a shelf of nineteen pictures, the shelf IS the
+   content, and a shop window belongs in the middle of the frame. Wide
+   landscape only, for the obvious reason — below 1280, or in portrait, there
+   is no room to give away and the card stays centred.
+
+   margin, not justify-content or padding: an auto margin on the far side
+   absorbs the slack, so the rule is two declarations and the container is not
+   touched. It is deliberately NOT in the card's transition list; see the note
+   there. */
+'@media (min-width:1280px) and (min-aspect-ratio:3/2){',
+  '.capyui-card:not(.two){margin-left:clamp(48px,7vw,140px);margin-right:auto;}}',
 /* THE PICKER IS NOT A NOTE PINNED TO A BOARD. Page one is a title card and the
    tilt is its signature; page two is a grid of seventeen rectangles, and a
    grid on the skew reads as a mistake rather than as charm. */
@@ -6311,8 +6335,12 @@ function sysBuildCSS() {
    nobody can read. */
 '.capyui-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;',
   'overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;}',
+/* text-wrap:balance, because at 390 this broke as "...NO / SUPERVISION" and
+   left one word on a line of its own under a wordmark. Three lines is the
+   spec's limit for balancing and this is never more than two. */
 '.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
-  'text-transform:uppercase;color:' + accentInk + ';font-weight:700;}',
+  'text-transform:uppercase;color:' + accentInk + ';font-weight:700;',
+  'text-wrap:balance;}',
 /* ---------- the ornament ----------
    A hairline rule broken in the middle by the animal the game is about. It is
    doing one job and it is not decoration for its own sake: the masthead had a
@@ -6453,7 +6481,7 @@ function sysBuildCSS() {
 /* the page-two heading, which is an h1 doing an h2's job so the card still has
    exactly one top-level heading on whichever page is showing */
 '.capyui-h2{font-size:clamp(16px,3.4vw,26px)!important;text-align:center;',
-  'grid-column:2;margin:0;}',
+  'grid-column:2;margin:0;text-wrap:balance;}',
 /* ---------- page two: a masthead of its own ----------
    The back button used to be a chip floating above a centred heading, so the
    top of the picker was two left-aligned pixels and a lot of nothing. Three
@@ -6804,9 +6832,16 @@ function sysBuildCSS() {
 '.capyui-pickrec{display:block;margin-top:3px;font-style:normal;font-weight:700;',
   'font-size:' + tSm + ';color:' + accent + ';',
   'font-variant-numeric:tabular-nums;}',
-'.capyui-pickfirst{display:block;margin-top:6px;font-style:normal;font-weight:700;',
-  'font-size:' + tMd + ';letter-spacing:.1em;text-transform:uppercase;',
-  'color:' + accent + ';}',
+/* ---- THE HERO'S LAST LINE IS A VOICE, NOT A LABEL (T2) -----------------
+   It was small caps, letter-spaced, in the accent — a fourth uppercase label
+   on a page that had four already, saying something that is not a label at
+   all. The words are good and they stay; what goes is the shouting. It is now
+   the tile's own hint voice one step quieter, so the hero reads eyebrow,
+   name, hint, aside — four lines in three different weights instead of two
+   competing sets of capitals. */
+'.capyui-pickfirst{display:block;margin-top:5px;font-style:italic;font-weight:400;',
+  'font-size:' + tMd + ';letter-spacing:.01em;text-transform:none;',
+  'color:' + sysRgba(PALETTE.ibisHead, 0.72) + ';}',
 /* the tally rides the bottom-right corner of the scene, clear of the words */
 '.capyui-picktally{position:absolute;top:6px;right:6px;',
   'font-size:clamp(8.5px,1.7vw,10px);color:' + paper + ';',
@@ -6860,6 +6895,23 @@ function sysBuildCSS() {
   'font-size:' + tMd + ';color:' + paper + ';opacity:.82;}',
 '.capyui-carryn{font-size:clamp(12px,2.3vw,15px);font-weight:700;color:' + paper + ';',
   'font-variant-numeric:tabular-nums;white-space:nowrap;}',
+/* ---- THE LABEL IS A ROW OF THE LEGEND, NOT A BLOCK ABOVE IT (T2) ------
+   It is the only label left on page one and it belongs to the block under it.
+   With .capyui-legbig gone the grid is back to its own 360/520 max-width and
+   centred inside the card, so a full-width label sat 43 px to the left of the
+   first key it was labelling.
+
+   Matching the two by hand does not work and the way it fails is worth
+   writing down: .capyui-p1 is a FLEX COLUMN, and an auto margin on the cross
+   axis of a flex item cancels the default stretch — so `margin:0 auto` does
+   not centre a full-width block, it shrinks the block to its own text and
+   centres that. Measured: the label went from 676 px wide and flush left to
+   212 px wide and floating in the middle, which is further from aligned than
+   it started.
+
+   So it is a cell of the same grid, spanning every column. Two boxes cannot
+   drift apart when there is only one box. */
+'.capyui-label{grid-column:1 / -1;}',
 '.capyui-label{margin-top:clamp(9px,1.8vw,14px);font-size:' + tSm + ';',
   'letter-spacing:.2em;text-transform:uppercase;color:' + accent + ';font-weight:700;',
   'text-align:left;}',
@@ -15062,6 +15114,11 @@ export function createSystems(game) {
   if (jrFile && jrFile.tasks) {
     for (let i = 0; i < jrFile.tasks.length; i++) jrFileDone[jrFile.tasks[i]] = true;
   }
+  // The card's primary control, whichever it turns out to be: Carry on with a
+  // file, Begin without one. Read by titlePage when the page turns back, which
+  // used to hand focus to "choose a place" — the outline button, and now never
+  // the primary one.
+  let titleFirstEl = null;
   const jrFileSeen = Object.create(null);
   if (jrFile && jrFile.seen) {
     for (let i = 0; i < jrFile.seen.length; i++) jrFileSeen[jrFile.seen[i]] = true;
@@ -15089,14 +15146,75 @@ export function createSystems(game) {
       startGame(jrFile.biome || 'sydney', true);
     });
     p1El.appendChild(el);
+    titleFirstEl = el;
   }
 
-  // ---- PAGE ONE: THE CONTROLS, AND ONE DOOR OUT OF IT --------------------
-  // The six verbs, at the size of something meant to be read rather than the
-  // size of a footnote, and then one button. The furniture is a fold: there
-  // for the player who wants it, and costing the other one nothing.
-  p1El.appendChild(sysEl('div', 'capyui-label', 'how to be a capybara'));
-  p1El.appendChild(sysFillLegend(sysEl('div', 'capyui-legend capyui-legbig')));
+  // ---- PAGE ONE: TWO DOORS, THEN THE REFERENCE ---------------------------
+  const goEl = sysEl('button', 'capyui-go alt');
+  goEl.type = 'button';
+  // 'Start somewhere fresh' was the only place the card ever said the word
+  // fresh, and it did not mean it: this button turns the page, and it was the
+  // TILE on the far side of it that quietly wiped the file. The page turns; the
+  // label now says so, and starting over is its own control on page two.
+  goEl.appendChild(sysEl('b', null,
+    jrFileCount > 0 ? 'Go somewhere else' : 'Choose a place'));
+  // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL, and as of T2
+  // this one is ALWAYS the outline: on a fresh file the filled button above it
+  // is Begin, and on a file it is Carry on. There is no longer a state in
+  // which turning the page is the thing the card most wants you to do.
+  // The subline ("19 of them, in any order") is gone with it — the subtitle
+  // four lines up already says nineteen places in any order, and this was the
+  // second of the three places that sentence appeared.
+  // ...AND THIS IS WHERE THE MUSIC COMES IN. A browser will not hand out a
+  // running AudioContext until a real gesture, and this press is the one
+  // gesture on the front of the game that does NOT start the game — so it is
+  // the first moment the card is allowed to make a sound. On the press rather
+  // than the click, so the score is already fading up as the page turns.
+  goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
+  goEl.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    titlePage(2);
+  });
+  // ---- THE DECISION SITS ABOVE THE REFERENCE (T2) ------------------------
+  // What this page led with was an eight-row key legend — the largest block on
+  // the sheet — and the action that actually starts the game had no button at
+  // all: it was Enter, or a click on the backdrop, or a 10 px footnote saying
+  // "tap to begin". The earlier decision that promoted the legend to the body
+  // of the card was right against what it replaced (the same legend as a
+  // footnote) and wrong against a title screen, where the biggest control
+  // should be the thing most players want.
+  //
+  // Fresh file:  BEGIN (filled) then Choose a place (outline).
+  // With a file: Carry on (filled, above) then Go somewhere else (outline).
+  // Never two filled — that is what .alt was written for.
+  if (jrFileCount === 0) {
+    const beginEl = sysEl('button', 'capyui-go');
+    beginEl.type = 'button';
+    beginEl.appendChild(sysEl('b', null, 'Begin'));
+    beginEl.addEventListener('pointerdown', function (e) {
+      e.stopPropagation(); titleAudio();
+    });
+    beginEl.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      // The same door Enter and the backdrop already used, so there is exactly
+      // one way into chapter one and it cannot drift from the other two.
+      startResume();
+    });
+    p1El.appendChild(beginEl);
+    titleFirstEl = beginEl;
+  }
+  p1El.appendChild(goEl);
+  // ...AND THE LEGEND COMES DOWN ONE SIZE to pay for the button above it. It
+  // is reference now rather than the content of the page, and the card still
+  // has to fit a 1280x720 laptop with its footer above the fold.
+  // The label goes INSIDE the grid as a spanning first row — see the note by
+  // .capyui-label for why aligning it from outside cannot work here.
+  {
+    const leg = sysFillLegend(sysEl('div', 'capyui-legend'));
+    leg.insertBefore(sysEl('div', 'capyui-label', 'how to be a capybara'),
+                     leg.firstChild);
+    p1El.appendChild(leg);
+  }
   {
     // THE GUARD GOES ON THE SUMMARY, NOT ON THE DETAILS.
     // A <details> is a block: at the card's width that is a 640 px strip across
@@ -15116,40 +15234,19 @@ export function createSystems(game) {
     more.appendChild(moreLeg);
     p1El.appendChild(more);
   }
-  const goEl = sysEl('button', 'capyui-go');
-  goEl.type = 'button';
-  // 'Start somewhere fresh' was the only place the card ever said the word
-  // fresh, and it did not mean it: this button turns the page, and it was the
-  // TILE on the far side of it that quietly wiped the file. The page turns; the
-  // label now says so, and starting over is its own control on page two.
-  goEl.appendChild(sysEl('b', null,
-    jrFileCount > 0 ? 'Go somewhere else' : 'Choose a place'));
-  goEl.appendChild(sysEl('i', null, CHAPTERS.length + ' of them, in any order'));
-  // TWO FILLED ACCENT BUTTONS ON ONE CARD IS NO HIERARCHY AT ALL. With a
-  // journey on file the primary action is carrying on with it, and this one
-  // steps back to an outline so the eye is told which of the two the card
-  // thinks you want. On a fresh file there is nothing to compete with and it
-  // stays the filled one.
-  if (jrFileCount > 0) goEl.classList.add('alt');
-  // ...AND THIS IS WHERE THE MUSIC COMES IN. A browser will not hand out a
-  // running AudioContext until a real gesture, and this press is the one
-  // gesture on the front of the game that does NOT start the game — so it is
-  // the first moment the card is allowed to make a sound. On the press rather
-  // than the click, so the score is already fading up as the page turns.
-  goEl.addEventListener('pointerdown', function (e) { e.stopPropagation(); titleAudio(); });
-  goEl.addEventListener('click', function (e) {
-    e.preventDefault(); e.stopPropagation();
-    titlePage(2);
-  });
-  p1El.appendChild(goEl);
-  p1El.appendChild(sysTitleFoot([
-    [['Enter'], jrFileCount > 0 ? 'carry on' : 'begin'],
-    [['→'], 'choose a place'],
-    [['M'], 'sound'],
-    [['N'], 'music'],
-  ], null,
-    (jrFileCount > 0 ? 'tap to carry on' : 'tap to begin') +
-    '  ·  sound and settings are behind MENU, once you are in'));
+  // ---- THE RAIL STOPS NAMING KEYS THAT ARE NOW BUTTONS (T2) -------------
+  // It said "ENTER begin · → choose a place · M sound · N music". The first
+  // two are the two buttons directly above it, so the card was printing a
+  // keyboard shortcut for a control the eye had just passed; the last two are
+  // settings, and settings on this card belong in the fold with the other
+  // furniture. What is left is the one thing the rail is for: the sentence a
+  // player needs before they press anything, said once.
+  // The sentence is passed as BOTH the note and the touch note: with no rows
+  // left, sysTitleFoot's touch branch returns before it reaches `note`, so a
+  // phone would have got an empty rule under the fold.
+  p1El.appendChild(sysTitleFoot([],
+    'sound and settings are behind MENU, once you are in',
+    'sound and settings are behind MENU, once you are in'));
 
   // ---- PAGE TWO: NOTHING BUT THE PICKER ----------------------------------
   const p2Head = sysEl('div', 'capyui-p2head');
@@ -15184,10 +15281,14 @@ export function createSystems(game) {
       st.appendChild(sysEl('b', null, jrFileCount + ' of ' + TASKS.length + ' done'));
       st.appendChild(document.createTextNode(
         placesSeen + ' of ' + CHAPTERS.length + ' places seen'));
-    } else {
-      st.appendChild(sysEl('b', null, CHAPTERS.length + ' places'));
-      st.appendChild(document.createTextNode('in any order'));
     }
+    // ...AND ON A FRESH FILE IT SAYS NOTHING (T2). It used to say "19 PLACES /
+    // IN ANY ORDER", which is the third printing of a sentence the page-one
+    // subtitle already carries — over a shelf of nineteen pictures that is
+    // itself the evidence. The SPAN still goes in: .capyui-p2head is a
+    // three-column grid whose outer columns are equal so the heading is
+    // optically centred, and removing the third column pushes the question
+    // left. An empty column holds the heading where it is.
     p2Head.appendChild(st);
   }
   p2El.appendChild(p2Head);
@@ -15285,7 +15386,9 @@ export function createSystems(game) {
     // where it is, or the biggest thing on the card is just a bigger tile.
     if (hero) {
       body.appendChild(sysEl('em', 'capyui-pickeyebrow',
-        done > 0 ? 'chapter one' : 'chapter one  ·  start here'));
+        // Single spaces round the dot. The double-spaced ` · ` was doing a
+        // job on a rail of unrelated chips and is just a wide gap here.
+        done > 0 ? 'chapter one' : 'chapter one · start here'));
     }
     body.appendChild(sysEl('b', null, d.name));
     body.appendChild(sysEl('i', null, d.hint));
@@ -15421,9 +15524,11 @@ export function createSystems(game) {
   const heroEl = buildPick(pickDefs[0], 0, true);
   p2El.appendChild(heroEl);
 
-  p2El.appendChild(sysEl('div', 'capyui-label',
-    'or go straight somewhere else'));
-
+  // ---- NO LABEL OVER THE SHELF (T2) -------------------------------------
+  // It said "OR GO STRAIGHT SOMEWHERE ELSE" — a fourth line of small caps on a
+  // page that had four, explaining a relationship the layout has already made:
+  // a hero that says START HERE, and eighteen other places under it. A label
+  // whose whole content is the word "or" is a label the design does not need.
   // ---- THE SHELF --------------------------------------------------------
   const picksEl = sysEl('div', 'capyui-picks');
   // A SCROLL REGION, not a taller card. Fifteen tiles is three rows; thirty
@@ -15456,6 +15561,51 @@ export function createSystems(game) {
     e.preventDefault(); e.stopPropagation();
     picksEl.scrollTop += Math.max(60, picksEl.clientHeight - 40);
   });
+  // ---- HOW BIG THE SHEET IS, AND WHERE IT IS (T2) ------------------------
+  // Three things that all depend on the window and on nothing else, so they
+  // are written together, on resize and on a page turn, and never per frame.
+  //
+  //   --ui      the card's scale. min of the two axes so a short wide window
+  //             does not get a card taller than it; floored at 1 because
+  //             shrinking the card on a small screen is what the clamps in
+  //             here already do properly, and ceilinged at 1.35 because past
+  //             that it stops being a card on a table and becomes a poster.
+  //   glow      the wash behind the card follows the card, or the one thing
+  //             on the screen that is meant to be noticed peripherally sits
+  //             six hundred pixels away from the thing it belongs to.
+  //   titleCardR the card's right edge in NDC, which the CAMERA needs: the
+  //             title pose slides the animal until it is clear of this. It is
+  //             published rather than recomputed because the camera must not
+  //             know about zoom, media queries or margins, and a second copy
+  //             of this arithmetic in the rig is a second copy that goes
+  //             stale the first time the card changes width.
+  let titleCardR = 0.44;
+  function titleFit() {
+    const vw = Math.max(1, window.innerWidth || 1);
+    const vh = Math.max(1, window.innerHeight || 1);
+    // ---- THE TWO PAGES DO NOT TAKE THE SAME SCALE ------------------------
+    // One factor for both was measured and it cannot satisfy either end: sized
+    // so page two fits a 1080 window, page one's wordmark comes out at 25.9 %
+    // of the width when it wants 26-30; sized for page one, page two's card
+    // ends 24 px past the bottom of the screen and takes its footer with it.
+    // They are different shapes — page one is five short blocks, page two is a
+    // scrolling shelf that already spends every vertical pixel it is given —
+    // so the height each is measured against is different. The width term is
+    // shared, because the wordmark's job is the same on both.
+    const two = cardEl.classList.contains('two');
+    const ui = Math.max(1, Math.min(1.35,
+      Math.min(vw / 1440, vh / (two ? 1010 : 820))));
+    cardEl.style.setProperty('--ui', ui.toFixed(3));
+    // ONE read, and it is after the write above so the rect is the zoomed one.
+    const r = cardEl.getBoundingClientRect();
+    if (r.width > 0) {
+      glowEl.style.left = (r.left + r.width / 2).toFixed(1) + 'px';
+      titleCardR = (r.right / vw) * 2 - 1;
+    }
+  }
+  /** The card's right edge in NDC, for the title camera pose. See titleFit. */
+  function titleCardEdge() { return titleCardR; }
+
   function picksFade() {
     // EVERY READ, THEN EVERY WRITE. This runs on scroll, and a class toggle
     // between two getBoundingClientRect() calls invalidates the layout the
@@ -15535,6 +15685,13 @@ export function createSystems(game) {
   }
   // The shelf has no layout until it is in the flow, so the first measurement
   // has to wait for the page to turn — see titlePage.
+  // titleFit BEFORE picksFade, and listeners fire in registration order: the
+  // fade counts how many tiles are below the fold, and under a changed --ui
+  // they are a different size, so measuring first and rescaling second counts
+  // the old layout. Two listeners rather than one call inside picksFade,
+  // because picksFade also runs on every scroll notch and the scale cannot
+  // change on a scroll.
+  addEventListener('resize', titleFit);
   addEventListener('resize', picksFade);
 
   p2El.appendChild(moreEl);
@@ -15643,13 +15800,21 @@ export function createSystems(game) {
     // The front of the card is nowhere in particular; the picker is wherever
     // the first tile is. Both the colour and the key follow.
     if (n === 1) titleLeanHome();
-    try { (n === 2 ? (heroEl || backEl) : goEl).focus(); }
+    try { (n === 2 ? (heroEl || backEl) : (titleFirstEl || goEl)).focus(); }
     catch (e) { /* focus is a nicety, never a crash */ }
+    // The card is a different WIDTH on the two pages and, on a wide screen, in
+    // a different place; both the wash behind it and the camera's idea of
+    // where its edge is have to move with it. Before picksFade, which measures.
+    titleFit();
     // The shelf has no scrollHeight until it is in the flow, so this is the
     // first moment the fade can be measured at all.
     if (n === 2) picksFade();
   }
   p2El.hidden = true;
+  // ...and once at boot, so the first frame the player sees is already scaled,
+  // the wash is already behind the card and the camera already knows where the
+  // card's edge is rather than assuming the 640 px centred default.
+  titleFit();
 
   // --- the journal ---------------------------------------------------------
   // One card that answers the three questions a rolling window of four rows
@@ -22522,6 +22687,7 @@ export function createSystems(game) {
     // for the rest of the session every time the window is dragged.
     titleLeanCancel();
     removeEventListener('resize', picksFade);
+    removeEventListener('resize', titleFit);
     setTimeout(function () { if (titleEl.parentNode) titleEl.parentNode.removeChild(titleEl); }, 900);
     setTimeout(function () {
       toast((landed && cdef.open) || 'be a menace.');
@@ -24805,15 +24971,6 @@ export function createSystems(game) {
   }
   applyDPR();
   addEventListener('resize', applyDPR);
-  // ---- THE VIEWPORT WIDTH, CACHED ---------------------------------------
-  // The title pose needs it to work out how far the animal has to step to
-  // clear the card (sysTITLE_NX_PAD), and the camera update runs inside the
-  // render loop: `window.innerWidth` can force a layout flush, and a forced
-  // flush per frame is exactly what the note on `offsetTop` in buildPick was
-  // written about. It changes on resize and at no other time, so it is read
-  // where every other size in this file is read.
-  sysVW = window.innerWidth || sysVW;
-  addEventListener('resize', function () { sysVW = window.innerWidth || sysVW; });
   // ---- AND THE OTHER HALF OF IT (R3) --------------------------------------
   // `pagehide` is the one that fires on a real navigation away and on a bfcache
   // freeze, which `visibilitychange` does not reliably precede on every engine;
@@ -27245,15 +27402,20 @@ export function createSystems(game) {
       // tan(hHalf) = tan(fov / 2) * aspect — so the metres that put the animal
       // at a given place on screen fall straight out, and they are different
       // metres on every window. Only ever evaluated while the card is up.
-      const vw = Math.max(1, sysVW);
-      // NDC spans 2 across the frame, so a sheet w px wide on a vw px window
-      // reaches w / vw either side of centre — NOT w / 2 / vw, which is the
-      // screen FRACTION and is the version this was first written with. It
-      // put every window under the 0.30 floor and parked the animal in the
-      // middle of the card at all four sizes, which is the bug it exists to
-      // fix, arrived at from the other direction.
-      const cardHalf = Math.min(sysCARD_W, Math.max(0, vw - sysCARD_PAD)) / vw;
-      const nxWant = clamp(cardHalf + sysTITLE_NX_PAD, sysTITLE_NX_MIN, sysTITLE_NX_MAX);
+      // ---- ASK THE CARD WHERE ITS EDGE IS (T2) ------------------------
+      // T1 computed this from sysCARD_W and the viewport, which was true for
+      // exactly as long as the card was 640 px wide and centred. T2 gave it a
+      // zoom and, on a wide screen, moved it off centre — and a second copy of
+      // the layout's arithmetic living in the camera is a copy that goes stale
+      // the first time the layout changes. titleFit() publishes the measured
+      // edge on resize and on a page turn; the rig reads a number and knows
+      // nothing about media queries.
+      //
+      // (The T1 note that earned its place: NDC spans 2, so a sheet w px wide
+      // on a vw px window reaches w / vw either side of centre, not w / 2 / vw.
+      // That is now titleFit's problem and it does it with a rect.)
+      const nxWant = clamp(titleCardEdge() + sysTITLE_NX_PAD,
+                           sysTITLE_NX_MIN, sysTITLE_NX_MAX);
       const side = nxWant * sysTITLE_DIST *
         Math.tan(camera.fov * Math.PI / 360) * camera.aspect;
       sysLook.x = lerp(sysLook.x, lx - Math.cos(useYaw) * side, titleT);

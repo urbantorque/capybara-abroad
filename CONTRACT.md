@@ -14,6 +14,92 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE TITLE, BATCH TWO — THE SHEET ON THE TABLE (T2 — 5 Sep 2026)
+
+**LANDED.** All three must-lands of `ROADMAP-TITLE.md` batch T2, plus the
+spill. T1 put the harbour, the bridge and the animal behind the card and then
+left a 647 px card sitting in the middle of them, with the manual as the
+largest block on it and no button for the verb most players want.
+
+| | before T2 | after |
+|---|---|---|
+| card at 1920x1080 | 647 px, 33.7 % of the width, centred | 852 px, 44.4 %, offset left |
+| wordmark at 1920 | 21.5 % of the width | **28.4 %** (target 26-30) |
+| page-one buttons | one, "Choose a place", below the legend | **Begin** (filled) then **Choose a place** (outline), above it |
+| uppercase labels, page one | 3 | **2** |
+| uppercase labels, page two | 4 | **1** |
+| "19 places, in any order" | said 3 times | said **once** |
+| page-two card at 390 | 858 px tall, footer 21 px below the fold | 838 px, footer **1 px** below |
+
+**`zoom`, AND THE TWO PAGES DO NOT TAKE THE SAME SCALE.** `--ui` is written by
+`titleFit()` and applied as `zoom` on the card: it is the one property that
+scales a layout AND its text without touching a rule inside it. It floors at 1
+(no small screen is ever shrunk — the clamps in the sheet already do that
+properly) and ceilings at 1.35. One factor for both pages was measured and
+satisfies neither end: sized so page two fits a 1080 window, page one's
+wordmark comes out at 25.9 % when it wants 26-30; sized for page one, page
+two's card ends 24 px past the bottom of the screen and takes its footer with
+it. Page one is measured against 820 px of height and page two against 1010;
+the width term is shared, because the wordmark's job is the same on both.
+
+**THE CARD MOVED LEFT, AND THE CAMERA STOPPED GUESSING WHERE IT IS.** Offset by
+`margin-left:clamp(48px,7vw,140px)` with an auto margin on the far side, on
+page one only, above 1280 px and in landscape. Page two stays centred: the
+shelf is a shop window and it IS the content. The consequence for T1: the pose
+computed the card's edge from `sysCARD_W` and the viewport, which held for
+exactly as long as the card was 640 px wide and centred. `titleFit()` now
+publishes the measured edge and the rig reads a number, knowing nothing about
+zoom, media queries or margins. `sysVW` and `sysCARD_PAD` died with it. The
+animal's offset fell from NDC 0.49 to 0.30 — the floor — because with the card
+out of the middle it no longer has to run to the corner to be seen.
+
+**THE DECISION SITS ABOVE THE REFERENCE.** Fresh file: Begin (filled) then
+Choose a place (outline). With a file: Carry on (filled) then Go somewhere
+else (outline). Never two filled, which is what `.alt` was written for and it
+is now unconditional. The legend comes down one size (`.capyui-legend`
+metrics, not `.capyui-legbig`) to pay for the button above it. Begin calls
+`startResume()` — the same door the backdrop press and Enter already used, so
+there is one way into chapter one and it cannot drift. Verified: tab order
+Begin, Choose a place, "and a few extras"; exactly one filled control; Choose
+turns the page without starting; Escape returns and focuses **Begin**, not the
+outline button it used to.
+
+**AN AUTO MARGIN ON A FLEX ITEM CANCELS THE STRETCH, AND THAT IS NOT WHAT IT
+LOOKS LIKE.** With `.capyui-legbig` gone the legend went back to its own
+520 px max-width, centred — so "HOW TO BE A CAPYBARA" sat 43 px to the left of
+the first key it labelled. Giving the label the same max-width and
+`margin:0 auto` made it **worse**, and the reason is worth keeping:
+`.capyui-p1` is a **flex column**, and an auto margin on the cross axis cancels
+the default stretch. The label did not centre at full width; it shrank to its
+own text (676 px to 212 px) and floated in the middle. The fix is that it is
+now a cell of the same grid spanning every column: two boxes cannot drift
+apart when there is only one box. Measured left edges: label 317, first
+keycap 317.
+
+**THE RAIL STOPS NAMING KEYS THAT ARE NOW BUTTONS.** It said "ENTER begin ·
+→ choose a place · M sound · N music". The first two are the two buttons
+directly above it; the last two were already in the extras fold. What is left
+is the one sentence a stranger needs, and it is passed as both `note` and
+`touchNote` — with no rows left, `sysTitleFoot`'s touch branch returns before
+it reaches `note`, so a phone would have got an empty rule under the fold.
+
+**Contrast unchanged**: `qa/uicontrast.js`, all 19 rows pass, worst subtitle
+5.16 (The Drift) — the same number v38 measured.
+
+**Two targets not met, both stated rather than fudged.** The card exceeds the
+roadmap's 46 %-of-width bar at 1280 (50.4 %) and 1366 (47.3 %), because `--ui`
+floors at 1 and the card is its designed 640 px there; the number was written
+before the offset existed, and at those sizes the card sits at x=105 with
+630 px of world beside it, which is what the bar was a proxy for. And page two
+at 390x844 still ends 1 px past the fold — it was 21 px before T2, and the
+title container has always scrolled there.
+
+**Instruments.** `qa/title-fit.js` (eight viewports: scale, card and wordmark
+percentages, footer, overflow, uppercase leaves), `qa/title-buttons.js` (tab
+order, filled/outline, both doors), `qa/title-legend.js`, `qa/title-p2phone.js`
+(the differential that proved the 390 footer was not a regression), plus the
+T1 set re-run: pose, bubbles and arrivals unchanged, 16.7 ms, 0 errors.
+
 ## THE TITLE, BATCH ONE — THE WORLD BEHIND THE CARD (T1 — 5 Sep 2026)
 
 **LANDED.** All three must-lands of `ROADMAP-TITLE.md` batch T1. What a player
