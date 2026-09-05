@@ -6464,6 +6464,48 @@ function sysBuildCSS() {
    long as it was before the split. */
 '.capyui-page{display:flex;flex-direction:column;}',
 '.capyui-page[hidden]{display:none;}',
+/* ---- THE CARD IS DEALT, AND THE PAGE IS TURNED (T3) --------------------
+   The exit was the only transition on this screen: a 0.75 s fade and scale as
+   the game starts, and it is good. The two moments before it were cuts — the
+   card was simply THERE on boot, and pressing "choose a place" swapped one
+   page for the other in a single frame. A sheet of paper that is dealt onto a
+   table arrives; this one blinked into existence.
+
+   All of it is fill-mode BACKWARDS and none of it has a `to` keyframe, for
+   the reason written at length over @keyframes capyui-deal: a `forwards` fill
+   goes on overriding the element's own style for ever, and this card's own
+   style includes a rotation that differs between its two pages and a hover
+   lift on every control. An animation that ends and gets out of the way is
+   the only kind that can be layered onto a screen that already moves. */
+'@media (prefers-reduced-motion: no-preference){',
+  '.capyui-card{animation:capyui-arrive ' + dSlow + ' ' + mGlide + ' backwards;}',
+  /* the second sheet lands just after the one on top of it, which is the
+     whole reason there are two of them */
+  '.capyui-card:not(.two):before{animation:capyui-arrive2 ' + dSlow + ' ' +
+    mGlide + ' 90ms backwards;}',
+  /* and the contents arrive down the page. --j is written once per child by
+     titleDeal(); the shelf's own tiles use --i and are untouched by this. */
+  '.capyui-p1 > *{animation:capyui-deal ' + dSlow + ' ' + mGlide + ' backwards;',
+  'animation-delay:calc(var(--j,0) * 50ms + 150ms);}',
+'}',
+/* Only a from-keyframe: the implicit to is the element's own computed value,
+   so the card lands on whichever rotation its page calls for and the second
+   sheet lands on its own. */
+'@keyframes capyui-arrive{from{opacity:0;transform:translateY(14px) rotate(-2.2deg);}}',
+'@keyframes capyui-arrive2{from{opacity:0;transform:translateY(10px) rotate(3.4deg);}}',
+/* ---- THE TURN ----------------------------------------------------------
+   NOT a crossfade. Both pages in the flow at once is the exact thing the note
+   over .capyui-page[hidden] was written about — the card becomes as tall as
+   both of them for a frame — and pulling the outgoing page out with
+   position:absolute means giving it a height it no longer has. So it is two
+   halves of 130 ms with the swap between them: the page that is leaving goes
+   first, then the flags change, then the page that is arriving comes in from
+   the other side. The card's own max-width transition runs across both halves
+   and covers the size change. */
+'.capyui-page{transition:opacity .13s ease,transform .13s ' + mGlide + ';}',
+'.capyui-p1.capyui-turn{opacity:0;transform:translateX(-9px);}',
+'.capyui-p2.capyui-turn{opacity:0;transform:translateX(9px);}',
+'@media (prefers-reduced-motion: reduce){.capyui-page{transition:none;}}',
 /* Page one is a column of five things and it should breathe: it is the only
    screen in this game with nothing on it that has to be scanned. Page two is a
    picker and wants every pixel it can get, so the card widens for it. */
@@ -6653,12 +6695,26 @@ function sysBuildCSS() {
    empty paper beside four lines of text. A letterbox is what this panel is,
    and now it says so rather than inheriting it from a fixed height that had
    to be maintained by hand. */
-'.capyui-pick.hero .capyui-pickart{width:40%;flex:0 0 40%;aspect-ratio:64 / 25;',
+/* ---- 40 % WAS RIGHT WHEN THE CARD WAS 880 (T3) -------------------------
+   The hero was widened with the card to 1140 and its picture stayed at two
+   fifths, so at 1920 the row is a 411 px postcard beside 617 px of paper with
+   four short lines pinned to the left of it and an arrow 500 px away on the
+   far edge. The picture is the reason this row is twice the size of every
+   other tile; it gets the space. 57 % also puts the word panel near 36ch,
+   which is a column you read rather than a field you scan across. */
+'.capyui-pick.hero .capyui-pickart{width:57%;flex:0 0 57%;aspect-ratio:64 / 25;',
   'border-bottom:0;border-right:1px solid ' + rule + ';}',
 '.capyui-pick.hero .capyui-pickbody{display:flex;flex-direction:column;justify-content:center;',
   'padding:clamp(10px,1.9vw,16px) clamp(12px,2.2vw,20px);min-height:0;',
-  /* room for the arrow that lives on the right-hand edge */
-  'padding-right:clamp(46px,7vw,74px);}',
+  /* room for the arrow that lives on the right-hand edge. Relaxed with the
+     panel now that the panel is 43 % rather than 60 % of the row: the arrow
+     no longer has half a card of empty paper to sit in. */
+  'padding-right:clamp(38px,5vw,58px);}',
+/* ...and the four lines are a COLUMN, not a field. Left where they were; the
+   cap simply stops the hint and the aside running the full width of a panel
+   that is still 520 px at 1920. */
+'.capyui-pick.hero .capyui-pickbody b,.capyui-pick.hero .capyui-pickbody i,',
+'.capyui-pick.hero .capyui-pickbody em{max-width:36ch;}',
 /* ---- THE HERO IS A DOOR AND IT SHOULD LOOK LIKE ONE ---------------------
    Widened to 1140, the hero's word side is six hundred pixels of paper with
    four short lines pinned to the left of it. An arrow on the far edge is the
@@ -6769,6 +6825,17 @@ function sysBuildCSS() {
    argument for having drawn nineteen pictures in the first place.
    `--pt` is set per tile from the same sysMarkTint the picture uses. */
 '.capyui-pickbody{background:linear-gradient(180deg,var(--pt,transparent) 0%,transparent 76%);}',
+/* ---- ...AND ON THE HERO THE LIGHT COMES FROM THE SIDE (T3) -------------
+   The 180deg wash is right on a 150 px tile, where the picture sits ABOVE the
+   words and the colour runs down out of it. On the hero the picture is BESIDE
+   them, so the same gradient starts at the top of a 617 px panel and fades
+   downward across a diagonal paper rake — which reads as a stain rather than
+   as light. Turned through ninety degrees it does on the hero what it does on
+   every other tile: the place's colour spilling out of its own picture. */
+'.capyui-pick.hero .capyui-pickbody{',
+  'background:linear-gradient(90deg,var(--pt,transparent) 0%,transparent 32%);}',
+'@media (max-width:520px){.capyui-pick.hero .capyui-pickbody{',
+  'background:linear-gradient(180deg,var(--pt,transparent) 0%,transparent 76%);}}',
 /* ---- ...AND THE WHOLE TICKET CATCHES THE LIGHT WHEN YOU TOUCH IT -------
    One narrow band swept diagonally across the tile on hover. The oldest trick
    there is, and the right one here: these tiles are PAPER — it is what the
@@ -6873,11 +6940,28 @@ function sysBuildCSS() {
    there are THIRTEEN of them rather than reading the first one and clicking it.
    --i is set per tile in the picker loop. Wrapped in no-preference, and the
    whole thing is a plain end-state under reduced motion. */
+/* ---- forwards PINS THE PROPERTY IT ANIMATED, AND IT KILLED THE LIFT (T3)
+   This was `opacity:0` in the rule plus `... forwards`, which is the obvious
+   way to write a deal-in and has a consequence nobody looked for: a finished
+   animation with fill-mode forwards goes on applying its last keyframe for
+   ever, and an animation's value OUTRANKS a normal declaration. The last
+   keyframe said `transform:none`, so `.capyui-pick:hover{transform:
+   translateY(-4px)}` — the v38 lift, four numbers of spring easing, "the
+   difference between a shelf that responds and a shelf that feels like
+   paper" — has done nothing since the day the deal-in was added. Measured:
+   hover a tile, computed transform before `matrix(1,0,0,1,0,0)`, after
+   `matrix(1,0,0,1,0,0)`. Its `:active` press was dead for the same reason.
+   The sheen and the border still worked, which is why it read as fine.
+
+   `backwards` is the fill this wanted all along: the from-keyframe applies
+   during the DELAY, and once the animation is over the element is back under
+   normal CSS control. The `to` keyframe goes with it — an omitted one means
+   "whatever this element's own style says", which is exactly the intent.
+   No `opacity:0` in the rule either, or the tile would return to invisible. */
 '@media (prefers-reduced-motion: no-preference){',
-  '.capyui-pick{opacity:0;animation:capyui-deal ' + dSlow + ' ' + mGlide + ' forwards;',
+  '.capyui-pick{animation:capyui-deal ' + dSlow + ' ' + mGlide + ' backwards;',
   'animation-delay:calc(var(--i,0) * 34ms + 120ms);}}',
-'@keyframes capyui-deal{from{opacity:0;transform:translateY(9px) scale(.985);}',
-  'to{opacity:1;transform:none;}}',
+'@keyframes capyui-deal{from{opacity:0;transform:translateY(9px) scale(.985);}}',
 /* ---- carry on: the one accented control on the card ---- */
 '.capyui-carry{display:flex;align-items:center;justify-content:space-between;gap:12px;',
   'width:100%;margin-top:clamp(10px,2vw,15px);cursor:pointer;pointer-events:auto;',
@@ -15069,8 +15153,16 @@ export function createSystems(game) {
   // flow at a time. Page one is short enough to read; page two is nothing but
   // the picker and can have all the room it wants. titlePage(n) is the whole
   // of the state, and it is a class plus two hidden flags rather than a
-  // rebuild, so the shelf keeps its scroll position and the deal-in animation
-  // can never run twice.
+  // rebuild, so the shelf keeps its scroll position.
+  //
+  // (It used to add "and the deal-in animation can never run twice", which is
+  // not true and never was: an element coming back out of display:none starts
+  // its descendants' CSS animations again, so the shelf has always dealt
+  // itself out afresh on every visit to page two. Measured in T3 — 260 ms
+  // after the second turn, tile six is at opacity 0 with a running animation,
+  // exactly as on the first. The behaviour is left alone because it reads
+  // well: the drawer is opened, the tickets are dealt. Only the claim was
+  // wrong.)
   const titleEl = sysEl('div', 'capyui-title');
   // The wash behind the card, which takes the colour of whichever place the
   // cursor is resting on. Appended FIRST so it is under the card in paint
@@ -15787,30 +15879,84 @@ export function createSystems(game) {
   // keyboard player who pressed the button that turned it is left focused on
   // an element that is no longer on the screen.
   let titlePageN = 1;
+  /**
+   * Is motion off? calmOn() is the game's own switch and it already follows
+   * prefers-reduced-motion when the player has expressed no preference — but
+   * the CSS rule at the top of this sheet is keyed on the MEDIA QUERY alone,
+   * so a player who has turned calm off on a system that asks for less motion
+   * gets collapsed transitions and would get the JS half of the turn waiting
+   * 130 ms for a transition that already finished. Both, or the two halves of
+   * one feature disagree.
+   */
+  function titleStill() {
+    if (calmOn()) return true;
+    try {
+      return !!(window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+  let titleTurnT = 0;
   function titlePage(n) {
     if (n === titlePageN || started) return;
+    const from = titlePageN === 1 ? p1El : p2El;
     titlePageN = n;
-    cardEl.classList.toggle('two', n === 2);
-    p1El.hidden = n !== 1;
-    p2El.hidden = n !== 2;
-    // Back to the top of the card: page two is a great deal taller than page
-    // one, and coming back to a masthead scrolled out of view reads as the
-    // card having been replaced rather than turned.
-    if (titleEl.scrollTop) titleEl.scrollTop = 0;
-    // The front of the card is nowhere in particular; the picker is wherever
-    // the first tile is. Both the colour and the key follow.
-    if (n === 1) titleLeanHome();
-    try { (n === 2 ? (heroEl || backEl) : (titleFirstEl || goEl)).focus(); }
-    catch (e) { /* focus is a nicety, never a crash */ }
-    // The card is a different WIDTH on the two pages and, on a wide screen, in
-    // a different place; both the wash behind it and the camera's idea of
-    // where its edge is have to move with it. Before picksFade, which measures.
-    titleFit();
-    // The shelf has no scrollHeight until it is in the flow, so this is the
-    // first moment the fade can be measured at all.
-    if (n === 2) picksFade();
+    if (titleTurnT) { clearTimeout(titleTurnT); titleTurnT = 0; }
+    from.classList.remove('capyui-turn');
+    p1El.classList.remove('capyui-turn');
+    p2El.classList.remove('capyui-turn');
+    function swap() {
+      titleTurnT = 0;
+      from.classList.remove('capyui-turn');
+      cardEl.classList.toggle('two', n === 2);
+      p1El.hidden = n !== 1;
+      p2El.hidden = n !== 2;
+      const to = n === 1 ? p1El : p2El;
+      if (!titleStill()) {
+        // Put the arriving page at its start pose, let the browser see that
+        // style in a frame of its own, then release it. Without the pause an
+        // element coming out of display:none has no old value to transition
+        // FROM and simply appears — one rAF is the usual advice and two is
+        // the one that survives a slow first frame.
+        to.classList.add('capyui-turn');
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { to.classList.remove('capyui-turn'); });
+        });
+      }
+      // Back to the top of the card: page two is a great deal taller than page
+      // one, and coming back to a masthead scrolled out of view reads as the
+      // card having been replaced rather than turned.
+      if (titleEl.scrollTop) titleEl.scrollTop = 0;
+      // The front of the card is nowhere in particular; the picker is wherever
+      // the first tile is. Both the colour and the key follow.
+      if (n === 1) titleLeanHome();
+      try { (n === 2 ? (heroEl || backEl) : (titleFirstEl || goEl)).focus(); }
+      catch (e) { /* focus is a nicety, never a crash */ }
+      // The card is a different WIDTH on the two pages and, on a wide screen, in
+      // a different place; both the wash behind it and the camera's idea of
+      // where its edge is have to move with it. Before picksFade, which measures.
+      titleFit();
+      // The shelf has no scrollHeight until it is in the flow, so this is the
+      // first moment the fade can be measured at all.
+      if (n === 2) picksFade();
+    }
+    // The turn is two halves of 130 ms with the swap between them, so the two
+    // pages are never in the flow together. A timer and not `transitionend`:
+    // the outgoing page carries a transition on two properties and would fire
+    // twice, and a page that never transitions at all (a tab in the
+    // background, a collapsed duration) would never fire it once.
+    if (titleStill()) { swap(); return; }
+    from.classList.add('capyui-turn');
+    titleTurnT = setTimeout(swap, 130);
   }
   p2El.hidden = true;
+  // ---- THE ORDER THE PAGE ARRIVES IN (T3) --------------------------------
+  // One index per child, written once, because the number of children is not
+  // fixed: a file adds the carry-on row and takes the Begin button away.
+  // nth-child in the sheet would be the same rule stated six times and wrong
+  // the moment the card grows a seventh block.
+  for (let i = 0; i < p1El.children.length; i++) {
+    p1El.children[i].style.setProperty('--j', String(i));
+  }
   // ...and once at boot, so the first frame the player sees is already scaled,
   // the wash is already behind the card and the camera already knows where the
   // card's edge is rather than assuming the 640 px centred default.

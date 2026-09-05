@@ -14,6 +14,97 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE TITLE, BATCH THREE — THE HERO AND THE TURN (T3 — 5 Sep 2026)
+
+**LANDED.** Both must-lands of `ROADMAP-TITLE.md` batch T3, and one bug found
+on the way that is older and larger than the batch.
+
+**THE HERO'S PICTURE WAS SIZED FOR AN 880 px CARD.** It was widened to 1140 in
+an earlier pass and its picture stayed at two fifths, so at 1920 the chapter-one
+row was a 411 px postcard beside 617 px of paper carrying four short lines and
+an arrow 500 px away on the far edge. The picture is the reason that row is
+twice the size of every other tile, so it gets the space: **57 %** (measured
+56.9), which also brings the word panel to 442 px — a column you read rather
+than a field you scan. The `--pt` wash turns through ninety degrees on the
+hero only: the 180deg version is right on a 150 px tile where the picture sits
+ABOVE the words, and on a row where it sits BESIDE them the same gradient runs
+down 617 px of paper across a diagonal rake and reads as a stain. The 520 px
+single-column layout keeps the vertical wash, because there the picture is
+above the words again.
+
+**`animation-fill-mode: forwards` PINS THE PROPERTY IT ANIMATED, AND IT HAD
+KILLED THE SHELF'S LIFT.** This is the find of the batch and it predates it by
+several passes. The tile deal-in was written the obvious way — `opacity:0` in
+the rule plus `animation: capyui-deal … forwards` — and a finished animation
+with `forwards` goes on applying its last keyframe for ever, at a cascade level
+that **outranks a normal declaration**. The last keyframe said
+`transform:none`. So `.capyui-pick:hover{transform:translateY(-4px)}` — the
+v38 lift, four numbers of spring easing, described in its own comment as "the
+difference between a shelf that responds and a shelf that feels like paper" —
+did nothing from the day the deal-in was added, and `:active` was dead with
+it. Measured: hover a tile, computed transform before `matrix(1,0,0,1,0,0)`,
+after `matrix(1,0,0,1,0,0)`. The sheen, the border and the picture's own scale
+all still worked, because none of them is a transform on the tile itself,
+which is why it read as fine for four passes.
+
+**`backwards` is the fill this always wanted**, and it is now the rule for
+every animation on this card: the from-keyframe applies during the DELAY, and
+the moment the animation is over the element is back under normal CSS control.
+The `to` keyframe goes with it — an omitted one means "whatever this element's
+own style says", which is what a deal-in means and it is also what lets one
+keyframe serve a card that is rotated `-0.8deg` on page one and `none` on page
+two. After: hover before `none`, after `matrix(1,0,0,1,0,-4)`.
+
+**THE CARD IS DEALT.** `capyui-arrive` on the card, `capyui-arrive2` on the
+second sheet 90 ms behind it, and page one's children staggered 50 ms apart on
+a `--j` written once per child in JS (the number of children is not fixed — a
+file adds the carry-on row and takes Begin away, so `nth-child` in the sheet
+would be the same rule six times and wrong the moment the card grows a seventh
+block). Measured from the frame the card first exists: card opacity 0.60 to
+1.00 over ~330 ms, then eight children cascading, all settled by 800 ms.
+
+**THE TURN IS TWO HALVES, NOT A CROSSFADE.** Both pages in the flow at once is
+the exact thing the note over `.capyui-page[hidden]` was written about — the
+card becomes as tall as both — and lifting the outgoing page out with
+`position:absolute` means giving it a height it no longer has. So: 130 ms out,
+the swap, 130 ms in, page one always leaving and entering to the left and page
+two to the right, so one pair of classes serves both directions. The card's own
+`max-width` transition runs across both halves and covers the size change.
+A timer and not `transitionend`, because the outgoing page transitions two
+properties and would fire twice, and a page that never transitions at all (a
+background tab, a collapsed duration) would never fire once. Measured, turning
+back: p2 1.00 → 0.86 → 0.19, swap at ~164 ms, p1 0 → 0.42 → 0.97 → 1.00, and
+**`both pages in the flow: false` at every sample**.
+
+**MOTION IS GATED IN BOTH HALVES OR IT IS GATED IN NEITHER.** The CSS collapse
+at the top of this sheet is keyed on the media query alone; `calmOn()` is the
+player's switch and only follows the media query when they have expressed no
+preference. A player who turned calm off on a system asking for less motion
+would have got collapsed transitions AND a JS half still waiting 130 ms for a
+transition that had already finished — a blank card for two frames. `titleStill()`
+is both. Measured under `reducedMotion: reduce`: card opacity 1 and all eight
+children at 1 on the first sample, and the turn showing page two visible at
+opacity 1 within 260 ms.
+
+**A COMMENT THAT WAS WRONG, AND STILL IS NOT A BUG.** `titlePage`'s note
+claimed the deal-in "can never run twice". It always could: an element coming
+back out of `display:none` restarts its descendants' CSS animations, so the
+shelf has dealt itself out afresh on every visit to page two since the two-page
+split. Measured 260 ms after the second turn: tile six at opacity 0 with a
+running animation, exactly as on the first. The behaviour is left alone — the
+drawer is opened, the tickets are dealt — and only the claim was corrected.
+
+**Unchanged by this batch**, re-measured: title pose 16.5 deg, animal clear of
+the card at 1920/1440/1280, **0 bubbles** on the title screen against 24 lines
+once playing, 16.7 ms median frame, 0 console errors, and `dist/` booting from
+`file://` with the network off (159 bodies, `backdrop-filter: none`).
+
+**Instruments.** `qa/title-turn.js` (arrival, lift, hero proportions, the turn
+sampled at 45 ms, the reduced-motion end state), `qa/title-arrive.js` (a rAF
+sampler installed BEFORE the card is built — the first version waited 4.2 s
+and read a finished animation, which is the same family as harness trap 18),
+`qa/title-hoverlift.js`, `qa/title-redeal.js`.
+
 ## THE TITLE, BATCH TWO — THE SHEET ON THE TABLE (T2 — 5 Sep 2026)
 
 **LANDED.** All three must-lands of `ROADMAP-TITLE.md` batch T2, plus the

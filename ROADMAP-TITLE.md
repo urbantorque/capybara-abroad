@@ -411,6 +411,28 @@ or the middle state has a card with two filled buttons.
 
 ### Batch T3: the hero and the turn (opportunities 5, 6)
 
+**LANDED 5 Sep 2026.** Both must-lands, no spill needed. Hero picture 40 % to
+**56.9 %**, its wash turned through ninety degrees, the word panel down to
+442 px. The card is dealt (opacity 0.60 to 1 over 330 ms, eight children
+staggered 50 ms apart, settled by 800 ms) and the page turn is two halves of
+130 ms with the swap between them, so the two pages are never in the flow
+together at any sample. Contract section **THE TITLE, BATCH THREE (T3)**.
+
+**The find is older and bigger than the batch: `animation-fill-mode: forwards`
+had killed the shelf's hover lift.** A finished animation with `forwards` goes
+on applying its last keyframe for ever, and an animation outranks a normal
+declaration — so `transform:none` in the deal-in's last keyframe beat
+`.capyui-pick:hover{transform:translateY(-4px)}`, the v38 lift, from the day
+the deal-in was added. Measured before: hover changes the computed transform
+not at all. `backwards` is the fill it always wanted, and it is now the rule
+for every animation on this card. After: `matrix(1,0,0,1,0,-4)`.
+
+Also corrected rather than changed: `titlePage`'s comment claimed the deal-in
+"can never run twice". It always could — an element leaving `display:none`
+restarts its descendants' animations — so the shelf has re-dealt on every
+visit to page two since the two-page split. It reads well, so only the claim
+moved.
+
 **Must land.**
 1. The hero's proportions and its turned wash.
 2. The arrival and the page turn, with the reduced-motion end state proven.
