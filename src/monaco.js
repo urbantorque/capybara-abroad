@@ -382,6 +382,13 @@ let monBoatData = null;
 let monPalmMesh = null;
 let monLampMesh = null;           // ...and a hundred and fifty-three street lamps
 const monWatchN = 46;             // the crowd on the fence, and in the stand
+// The middle of the grandstand — seven rows of four at x −16…+20, z −99…−106 —
+// which is where the cheer comes from when somebody boards a car (F2). A fixed
+// point rather than a centroid of all forty-six, because the other eighteen are
+// strung along the harbour barrier and a mean of the two groups is a place
+// nobody is standing. It is deliberately NOT the animal's own position: a crowd
+// is a thing you hear from over there, and the distance law is what sells it.
+const monWATCH_MID = { x: 2, y: 5.2, z: -102.2 };
 let monWatchMesh = null;
 let monWatchPh = null;
 
@@ -2718,6 +2725,20 @@ function monUpdateRide(game, dt) {
       monRideDist = 0;
       monToast('hold on.');
       monCue('thud', p.x, p.y, p.z, 0.35, 1.4);
+      // ---- ...AND THE STAND SEES IT (F2) --------------------------------
+      // One cheer, on the frame the ride starts, from the grandstand rather
+      // than from the animal — so it arrives from across the track, which is
+      // the whole point of it. It is the other half of monUpdateWatchers'
+      // rider pin: the heads come round AND the noise happens, which is what
+      // makes forty-six instanced boxes read as a crowd rather than as
+      // scenery that turns.
+      //
+      // No `force`, and that is checked rather than assumed: 'cheer' is on a
+      // 3 s throttle because three chapters fire one from their AMBIENCE, and
+      // this chapter is not one of them — `grep "'cheer'" src/monaco.js` is
+      // this line alone. A flag that is not needed is a flag that stops
+      // meaning anything.
+      monCue('cheer', monWATCH_MID.x, monWATCH_MID.y, monWATCH_MID.z, 0.5, 1);
     }
     // ...AND THE RECORD IS FILED WHEN YOU GET OFF, not while you are on.
     // game.record() toasts, and a record written every frame of a
@@ -3201,6 +3222,33 @@ function monUpdateWatchers(dt) {
     const ph = monWatchPh[i * 4 + 3];
     // the nearest car, and they all turn to it
     let bd = 1e9, bx = x, bz = z + 1;
+    // ---- ...UNLESS THERE IS A CAPYBARA ON ONE OF THEM (F2) --------------
+    //
+    // Forty-six people are paid to watch this road, `monRider` has been module
+    // state since the ride was built, and the two had never been introduced.
+    // Act three of this chapter is the-hairpin and the-tunnel — a lap on the
+    // roof of a Formula car, past a grandstand — and the grandstand registered
+    // a car. The funniest thing in chapter eighteen had an audience of
+    // forty-six who were looking at the bodywork.
+    //
+    // PREFERRED, NOT PINNED, and the difference is measured. Pinning the whole
+    // stand to the ridden car outright reads well when it is in front of them
+    // and is wrong everywhere else: the 90 m gate below then drops every
+    // watcher who cannot see it back to their idle phase, so a lap at the far
+    // end of the circuit left forty spectators facing nothing while a car went
+    // past their knees. Measured that way: watchers facing their nearest car
+    // fell from 1.00 to 0.07 with nothing to show for it.
+    //
+    // So the ridden car wins only where it is actually visible, and everyone
+    // else goes on watching the race. That is also the better picture: the
+    // heads that come round are the ones the animal is arriving in front of.
+    if (monRider >= 0 && monCarG[monRider]) {
+      const rg = monCarG[monRider];
+      const dx = rg.position.x - x, dz = rg.position.z - z;
+      const d = dx * dx + dz * dz;
+      if (d < 90 * 90) { bd = d; bx = rg.position.x; bz = rg.position.z; }
+    }
+    if (bd >= 90 * 90)
     for (let c = 0; c < monCarG.length; c++) {
       const g = monCarG[c];
       const dx = g.position.x - x, dz = g.position.z - z;

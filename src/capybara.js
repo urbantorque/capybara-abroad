@@ -1007,6 +1007,14 @@ const capyBROW_LIFT = 0.17;         // ...and of inner-end-up at full surprise
 // than as the animal being startled.
 const capyMOOD_IN   = 15;
 const capyMOOD_OUT  = 3.2;
+// ---- THE ONE THING THE FACE HAS AN OPINION ABOUT (F2) ---------------------
+// See the face block in the tick. 1.2 s is a beat and not a state: long enough
+// to land under a bubble that is 1.7 s at its shortest, short enough that a
+// square full of chases does not pin the face open. Under the wheek's 0.85 on
+// purpose — this is the animal noticing what it has done, not doing it.
+const capyMOOD_SMUG = 0.60;
+const capySMUG_DUR  = 1.2;         // s
+let capySmugT = 0;
 const capyBLINK_DUR = 0.11;         // s, and it is a TRIANGLE — see capyFacePose
 // PHOTOGRAPHED AT SEVEN TIMES, WHICH IS THE ONLY WAY TO SITE A 7 CM BAR.
 // 0.064 sits them on the crest of the brow ridge, level with the ear roots;
@@ -3141,9 +3149,13 @@ export function createCapybara(game) {
     const want = Math.sin(local) * k;
     if (Math.abs(want) > Math.abs(capyEarTurn)) capyEarTurn = want;
   }
-  game.events.on('npc:chase', function (rec) { capyHeardFrom(rec, 1); });
+  game.events.on('npc:chase', function (rec) { capyHeardFrom(rec, 1); capySmugT = capySMUG_DUR; });
   game.events.on('npc:startled', function (rec) { capyHeardFrom(rec, 0.85); });
   game.events.on('npc:calm', function (rec) { capyHeardFrom(rec, 0.35); });
+  // ...and the face answers the two events that mean the mischief landed. The
+  // ears already answer all three above; this is deliberately only the two.
+  // See capyMOOD_SMUG.
+  game.events.on('capy:incident', function () { capySmugT = capySMUG_DUR; });
   // ...and the jaw works when a bite is actually taken out of something. The
   // event is props.js's — this module owns the model and nothing else does, so
   // the animation for the game's newest verb lives here and the rule for WHEN
@@ -3359,6 +3371,8 @@ export function createCapybara(game) {
     capyLoaf = 0; capy.loaf = 0; capy.loafAsk = 0;   // ...and the loaf. See THE LOAF.
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
+    // ...and the face's one opinion belongs to the square it was earned in (F2).
+    capySmugT = 0;
     capyIdleAct = -1; capyIdleT = 0;
     capyIdleRoll = 0; capyIdleYaw = 0; capyIdlePitch = 0;
     capyIdleCrouch = 0; capyIdleEar = 0; capyIdleChew = 0; capyIdleBreath = 0;
@@ -5067,6 +5081,7 @@ export function createCapybara(game) {
     }
     if (capyWhiffCool > 0) capyWhiffCool -= dt;
     if (capyWhiffT > 0) capyWhiffT -= dt;
+    if (capySmugT > 0) capySmugT -= dt;
 
     // =================================================================
     // ANIMATION
@@ -5762,6 +5777,28 @@ export function createCapybara(game) {
     if (capyWhiffT > 0) moodDn = 0.70;
     if (capyRefuseT > 0 && moodDn < 0.55) moodDn = 0.55;
     if (capyLoaf * 0.50 > moodDn) moodDn = capyLoaf * 0.50;
+    // ---- ...AND ONE OF THEM IS ABOUT SOMEBODY ELSE (F2) ------------------
+    //
+    // All five states above are things that happen to the ANIMAL'S OWN BODY —
+    // its voice, its fall, its reach, its legs, its weight. So the face had no
+    // opinion whatever about the only subject this game is about. It already
+    // LOOKS at the joke: the gaze finds whoever is speaking and whoever has
+    // noticed you, and the ears turn to a startle. It just had nothing to say
+    // when it got there.
+    //
+    // Two events and no third. `capy:incident` is the game's own definition of
+    // "that was three things in a row and somebody counted", and `npc:chase`
+    // is the moment it stops being funny for the other party — between them
+    // they are the mischief actually landing. Not `npc:startled`: that fires
+    // several times a minute in a busy square and a face pinned wide for the
+    // whole of Venice is not a reaction, it is a setting.
+    //
+    // 0.6 sits under the wheek's 0.85 on purpose. The wheek is the animal
+    // doing something; this is the animal noticing what it has done, and the
+    // ranking says so. It goes through the same asymmetric damp as everything
+    // else here — fast in, slow out — so it reads as a beat rather than a
+    // switch.
+    if (capySmugT > 0 && moodUp < capyMOOD_SMUG) moodUp = capyMOOD_SMUG;
     const moodTgt = moodUp > moodDn ? moodUp : -moodDn;
     capyMood = damp(capyMood, moodTgt,
                     Math.abs(moodTgt) > Math.abs(capyMood) ? capyMOOD_IN : capyMOOD_OUT, dt);

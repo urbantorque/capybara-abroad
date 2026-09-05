@@ -1105,6 +1105,22 @@ export function createNPCs(game) {
     // instead (bw === 0 falls back to a sane guess there).
     slot.bw = 0; slot.bh = 0;
     if (slot.shown) { slot.bw = slot.el.offsetWidth; slot.bh = slot.el.offsetHeight; }
+    // ---- ...AND YOU CAN HEAR THAT SOMEBODY SAID IT (F2) ------------------
+    //
+    // Fired HERE, for the same reason `gest` and `npcSpeak` are: this is the
+    // one door every line in this file goes through, so the sound cannot get
+    // out of step with the words the way a second call beside each of the
+    // thirty sites eventually would. Two or three pulses — see sfxBlip — and
+    // the count comes from the LENGTH OF THE LINE, so "Do not." is shorter
+    // than "I said we should have gone to Bondi."
+    //
+    // It goes through this file's own `sfx`, which means it is positional (a
+    // person across the square is quieter than one beside you), it is cut by
+    // the distance law before it can spend a throttle slot, and it carries the
+    // speaker's `vpitch` — so the blip and the gasp are recognisably the same
+    // person. Below the default level, because a line is punctuation under the
+    // bubble rather than an event in its own right.
+    sfx('blip', npcRec, 0.26, 1, text.length < 22 ? 2 : 3);
   }
 
   // =========================================================================
@@ -1472,14 +1488,44 @@ export function createNPCs(game) {
    * neutral one. Three layers and the general case is the middle one being
    * absent, which is why it is a lookup and not a merge.
    */
+  // ---- ...AND FOR TWO KINDS IT IS A MERGE (F2) ---------------------------
+  //
+  // Giving every chapter its own voice SHRANK its vocabulary, which is the
+  // opposite of what P6 was for. `npcPLACE_SAY` authors exactly three `wary`
+  // and three `incident` lines per chapter; the neutral pools carry seven of
+  // each — and because this resolver is first-hit-wins, those seven became
+  // unreachable in all seventeen chapters that have locals. The two chapters
+  // that still reach them, Sydney and Pasto, register no locals at all.
+  //
+  // It matters most for exactly these two kinds. `npcHEAT_SOON` drops the
+  // wary bar to 0.14 in a square that is already cross with you, so a player
+  // being a menace hears the wary pool more often than any other line in the
+  // game — and it was three lines deep.
+  //
+  // Only wary and incident, and deliberately not the general case: the other
+  // six kinds are a chapter SPEAKING FOR ITSELF where it has something better
+  // than the neutral line, and replacement is right there. Cached per
+  // (chapter, kind) because this is called inside localsReact's loop and a
+  // concat per person per bang is garbage on the hot path.
+  const npcSAY_MERGE = {};
+  /** The two lower layers for a chapter, with the merge rule. See npcSay. */
+  function npcSayFor(live, kind) {
+    const row = live && npcPLACE_SAY[live];
+    const here = row && row[kind];
+    if (!here || !here.length) return npcLOC_SAY[kind];
+    if (kind !== 'wary' && kind !== 'incident') return here;
+    const neutral = npcLOC_SAY[kind];
+    if (!neutral || !neutral.length) return here;
+    const key = live + '|' + kind;
+    // The bag in localLine is keyed on `pool.length + pool[0]`, so a pool that
+    // grows from three to ten produces a new signature and refills — which is
+    // the behaviour that comment describes and the reason this is safe.
+    return npcSAY_MERGE[key] || (npcSAY_MERGE[key] = here.concat(neutral));
+  }
   function npcSay(r, kind) {
     const own = r && r.says && r.says[kind];
     if (own && own.length) return own;
-    const live = game.biome && game.biome.current;
-    const row = live && npcPLACE_SAY[live];
-    const here = row && row[kind];
-    if (here && here.length) return here;
-    return npcLOC_SAY[kind];
+    return npcSayFor(game.biome && game.biome.current, kind);
   }
   const locals = [];
   const npcLOC_TURN = 3.4;      // rad/s the body swings to face the animal
@@ -1876,7 +1922,29 @@ export function createNPCs(game) {
         startled: o.startled || null, splash: o.splash || null,
         thief: o.thief || null, rush: o.rush || null,
         produce: o.produce || null, chain: o.chain || null,
+        // ---- ...AND THE TWO HALVES OF A CONVERSATION (F2) ---------------
+        // `localsChat` is the most-heard dialogue in the game — every 11 to
+        // 28 seconds, in every chapter — and it was the one pool that went
+        // straight to `localLine` rather than through `npcSay`, so a
+        // gondolier, a Mong Kok cook and an Antarctic scientist all said
+        // "Same again tomorrow." out of the same ten shared lines. Routing it
+        // through the resolver is the code half; these two keys are what
+        // makes the mechanism REACHABLE, so a chapter or a person can be
+        // given their own without another edit here. Authoring the rows is
+        // on the shelf; nothing declares them today and the shared pool is
+        // still the fallback, so this changes no line until one is written.
+        chatOpen: o.chatOpen || null, chatBack: o.chatBack || null,
       },
+      // ---- A VOICE OF THEIR OWN (F2) -------------------------------------
+      // Every person in the game gasped at pitch 1.0, so a crowd startling in
+      // Venice was the same sound six times 0.12 s apart. Props have had this
+      // since v16 — `physVOICE` gives each one a `vpitch` and a `vgain` so a
+      // crate and a bin do not sound alike — and people were simply skipped.
+      // One number, stamped once, multiplied into every call this file makes
+      // through its own `sfx`. The band is deliberately narrower than the
+      // props' one: a human voice that ranges more than about a fifth either
+      // side stops reading as a person.
+      vpitch: rand(0.82, 1.22),
       fl: 0, flV: 0,            // the flinch spring
       flYaw: 0,                 // ...and which way to turn while it runs
       rushWas: false,
@@ -2152,6 +2220,23 @@ export function createNPCs(game) {
     // its own bang — a crate off a barrow, a gate, a wave — may not make the
     // square cross with the animal that was nowhere near it.
     if (mine) npcHeatBump(x, z, 'react:' + kind);
+    // ---- ...AND THE CHAIN ARMS OFF THE LOUDEST, NOT OFF ARRAY ORDER (F2) --
+    //
+    // `locChainFrom` was set only inside `localReactLine`, which is reached in
+    // `locals` order behind a per-person cooldown — so the person the square
+    // then turns to look at was the SECOND array-order local with a free
+    // mouth, and if every nearby mouth happened to be cooling down, nobody
+    // looked at the person who had just jumped out of their skin at all. The
+    // loudest reactor has been computed four lines up since v54 and was used
+    // for one `npc:startled` and nothing else. D3 asked for exactly this: the
+    // loudest hands the look on. The answerer was fixed to `nearest` then; the
+    // SOURCE never was.
+    //
+    // After the loop and after `loud` is final, so it cannot be overwritten by
+    // a quieter person later in the array. The chain's own single-answer rule
+    // is untouched, so this makes the look land on the right person rather
+    // than making more of them.
+    if (loud) { locChainFrom = loud; locChainT = npcCHAIN_WIN; }
     // ---- ...AND THE CAPYBARA HEARS IT (v54) -----------------------------
     // npc:startled was emitted by the Sydney roster and by nothing else, so
     // the ear-turn it drives was a two-chapter feature in a nineteen-chapter
@@ -3421,7 +3506,14 @@ export function createNPCs(game) {
     // They turn round for it, which is what makes it read from across a square.
     best.flV -= 5.5;
     best.flYaw = Math.atan2(cp.x - best.x, cp.z - best.z);
-    localLine(best, arr);
+    // ---- ...AND IT ARMS THE CHAIN (F2) -----------------------------------
+    // This was `localLine`, the quiet door, so finishing a task in front of a
+    // square moved exactly one head — at the one moment a chapter is FOR, and
+    // the one the game stages in the largest open space it has (npcLOC_WOW_R
+    // is 40 m for that reason). Every other reaction in the file that is worth
+    // a second look goes through `localReactLine`; this is the reaction most
+    // worth one.
+    localReactLine(best, arr);
   });
 
   // =======================================================================
@@ -4052,7 +4144,7 @@ export function createNPCs(game) {
         // the same rule chatStep landed on for the same reason.
         if (b.biome === (game.biome && game.biome.current) && b.fl > -0.02) {
           b.cd = b.cool * rand(0.7, 1.2);
-          localLine(b, npcLOC_CHAT.back);
+          localLine(b, npcSay(b, 'chatBack') || npcLOC_CHAT.back);
         }
       }
       return;
@@ -4083,7 +4175,11 @@ export function createNPCs(game) {
         a.chatYaw = Math.atan2(b.x - a.x, b.z - a.z); a.chatT = npcLOC_CHAT_LOOK;
         b.chatYaw = Math.atan2(a.x - b.x, a.z - b.z); b.chatT = npcLOC_CHAT_LOOK;
         a.cd = a.cool * rand(0.9, 1.5);
-        localLine(a, npcLOC_CHAT.open);
+        // Through the resolver now (F2). `npcSay` answers `undefined` for a
+        // kind no layer declares, so the shared pool is still the fallback and
+        // no line changes until a chapter or a person is given one — see the
+        // `chatOpen`/`chatBack` keys in addLocal.
+        localLine(a, npcSay(a, 'chatOpen') || npcLOC_CHAT.open);
         locChatRec = b;
         locChatWhen = rand(1.4, 2.3);
         locChatT = rand(11, 28);     // ...and now the long one, so it is not a chorus
@@ -4300,11 +4396,17 @@ export function createNPCs(game) {
    * capable of playing at 1.0 by omission any more.
    */
   const npcSFX_VOL = 0.34;
-  function sfx(n, rec, vol, pitch) {
+  function sfx(n, rec, vol, pitch, streak) {
     const p = rec && rec.group && rec.group.position;
     const v = typeof vol === 'number' ? vol : npcSFX_VOL;
-    if (p) { sfxAt(n, p.x, p.z, v, pitch || 1); return; }
-    try { game.sfx(n, { volume: v, pitch: pitch || 1 }); }
+    // ...and WHOSE voice it is (F2). See `vpitch` on the three record
+    // constructors: one number per person, folded in here so every call site
+    // in this file gets it without one of them being touched. A caller with no
+    // record — the handful that play to nobody in particular — is unchanged.
+    const vp = (rec && typeof rec.vpitch === 'number' && rec.vpitch === rec.vpitch)
+      ? rec.vpitch : 1;
+    if (p) { sfxAt(n, p.x, p.z, v, (pitch || 1) * vp, streak); return; }
+    try { game.sfx(n, { volume: v, pitch: (pitch || 1) * vp, streak: streak }); }
     catch (e) { /* optional */ }
   }
 
@@ -4466,6 +4568,12 @@ export function createNPCs(game) {
       // build (see THREE BUILDS above). bLeg is read by animHuman, which is
       // the only place allowed to touch legL.scale.y.
       bH: bH, bGirth: bGirth, bLeg: bLeg, arch: child ? 3 : arch, child: child,
+      // ---- A VOICE OF THEIR OWN (F2). See the same field on addLocal ------
+      // ...and a child's is higher, which is the one place in the game where a
+      // build and a voice have to agree: P5 gave one tourist in seven a head
+      // 22% too big for its body, and a 1.20 m person gasping at 0.85 is the
+      // sort of thing you notice without being able to say why.
+      vpitch: child ? rand(1.16, 1.36) : rand(0.82, 1.22),
       yaw: rand(-Math.PI, Math.PI),
       speed: 0,
       wantSpeed: 0,
@@ -5636,8 +5744,11 @@ export function createNPCs(game) {
       if (typeof game.toast === 'function') game.toast('the bin chickens have found it');
     }
   }
-  function sfxAt(name, x, z, vol, pitch) {
-    try { game.sfx(name, { volume: vol, pitch: pitch, at: { x: x, y: 0.6, z: z }, near: 7, far: 70 }); }
+  function sfxAt(name, x, z, vol, pitch, streak) {
+    try {
+      game.sfx(name, { volume: vol, pitch: pitch, at: { x: x, y: 0.6, z: z }, near: 7, far: 70,
+                       streak: streak });
+    }
     catch (e) { /* optional */ }
   }
 
@@ -6318,7 +6429,21 @@ export function createNPCs(game) {
             spd = 1.6;
           }
           // reached the face of the wall — start hauling himself out
-          if (rec.group.position.z > npcEDGE_Z + 0.15) {
+          //
+          // ---- ...OR TWELVE SECONDS, WHICHEVER COMES FIRST (F2) ----------
+          // Every other steering state in this file has a ceiling — flee 3.5,
+          // cornered 5.0, resit 9, retrieve 12, queue 26, gather 30 — and this
+          // one had none: its only exit is arriving at the sea wall, and
+          // `moveRec`'s seaward branch turns OFF nav rejection for it, so a
+          // swimmer held off the coping by anything at all paddles for the
+          // rest of the session. Twelve seconds is `retrieve`'s figure and is
+          // four times the crossing: measured, the paddle from the far side of
+          // the ferry berth is under three. The cost of the ceiling is that a
+          // genuinely stuck swimmer glides the last stretch to the wall over
+          // the climb's own 0.62 s rather than swimming it — visible once, in
+          // a case that today should never happen, against a state that
+          // otherwise never ends.
+          if (rec.group.position.z > npcEDGE_Z + 0.15 || rec.swimT > 12) {
             rec.climbT = 0;
             rec.climbZ0 = rec.group.position.z;
           }
@@ -8188,6 +8313,9 @@ export function createNPCs(game) {
       heldProp: null,
       idx,
       nodes: { bodyN, neckN, tailN, l0, l1, l2, l3 },
+      // A voice of their own (F2), and the llamas get one too — they go
+      // through the same `sfx(name, rec, …)` door as the people do.
+      vpitch: rand(0.82, 1.22),
       yaw: rand(-Math.PI, Math.PI),
       speed: 0, wantSpeed: 0,
       walkPhase: rand(0, 6.28), idlePhase: rand(0, 6.28),
@@ -9729,12 +9857,21 @@ export function createNPCs(game) {
            // Venetian says something Venetian is not the same as asserting
            // that npcSay reached the chapter row rather than the neutral one
            // that happens to be in front of it, and only the layer says so.
+           // ---- THROUGH THE RESOLVER, NOT BESIDE IT (F2) ------------------
+           // This reimplemented npcSay's lookup, which is fine right up until
+           // the lookup changes — F2 made `wary` and `incident` a MERGE and
+           // this audit would have gone on reporting the old three-line pool
+           // with total confidence. It calls the same function the game calls
+           // now, so the two cannot disagree about anything ever again.
            sayAudit: function (kind, biome) {
              const live = biome || (game.biome && game.biome.current);
              const row = npcPLACE_SAY[live];
              const here = row && row[kind];
-             const arr = (here && here.length) ? here : npcLOC_SAY[kind];
-             return { biome: live, layer: (here && here.length) ? 'place' : 'neutral',
+             const arr = npcSayFor(live, kind);
+             const merged = !!(here && here.length && arr && arr.length > here.length);
+             return { biome: live,
+                      layer: merged ? 'place+neutral'
+                           : (here && here.length) ? 'place' : 'neutral',
                       n: arr ? arr.length : 0, first: arr && arr.length ? arr[0] : null };
            },
            // ---- IS THE WORLD ANSWERING? (D3) ----

@@ -14,6 +14,88 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FINISH, BATCH TWO — THE WORLD ANSWERS (F2 — 6 Sep 2026)
+
+**LANDED.** All nine must-items of `ROADMAP-FINISH.md` batch F2. The theme is
+that the premise of this game is people reacting to a capybara, and most of
+the machinery for that was built, correct, and wired to the wrong end.
+
+**EVERY BUBBLE IN THE GAME MAKES A SOUND NOW.** `sayBubble` is the one door
+every line in this file goes through — it sets the slot, the arm, and the gaze
+— and it fired no audio at all, so speech was the one channel of the four with
+no sound half. `sfxBlip` is two or three short filtered pulses, and the COUNT
+comes from `text.length` at the same place the words are set, so it cannot
+drift from them the way a call beside each of the thirty sites eventually
+would. Measured through the real door: 7 characters → 5 nodes (2 pulses), 46
+characters → 7 nodes (3 pulses). Peak 0.055 against `sfxTick`'s 0.09 and
+`sfxHiss`'s 0.13 — authored against the ladder, which is the trap R9 paid for
+with six voices at five to ten times the band.
+
+**AND EVERYBODY HAS THEIR OWN VOICE.** `sfx(n, rec, …)` defaulted `pitch || 1`,
+so a crowd startling in Venice was the same gasp six times 0.12 s apart. One
+`vpitch` per person, stamped in the three record constructors and folded in at
+the single call site, so all thirty-odd call sites in the file got it without
+being touched. Props have had exactly this since v16 and people were skipped.
+Measured: 40 people, 38 distinct pitches, 0.845 to 1.341, no NaN. A child's
+band is higher (1.16–1.36) — P5 gave one tourist in seven a 1.20 m build, and
+a small person gasping at 0.85 is wrong in a way you notice without being able
+to say why.
+
+**MONTE CARLO'S STAND WATCHES THE RIDER.** `monRider` has been module state
+since the ride was built and the forty-six watchers took their heading from
+the nearest CAR, so act three — a lap on the roof of a Formula car past a
+grandstand — had an audience registering the bodywork. It is PREFERRED, not
+pinned, and that distinction is measured: pinning the whole stand outright
+drops every watcher beyond the 90 m gate to their idle phase, so a lap at the
+far end of the circuit left forty spectators facing nothing (watchers facing
+their nearest car fell 1.00 → 0.07). Preferred-where-visible measures
+**1.000 of the watchers who can see the animal facing it, mean error 0.001
+rad**, with the rest still at 1.000 on their nearest car. One `cheer` from the
+grandstand on the boarding frame, without `force` — checked rather than
+assumed: this chapter fires no other.
+
+**THE CHAIN ARMS OFF THE LOUDEST REACTOR.** `locChainFrom` was set inside
+`localReactLine`, reached in `locals` order behind a cooldown — so the person
+the square turned to look at was the second array-order local with a free
+mouth, and if every nearby mouth was cooling down, nobody looked at the person
+who had just jumped. `loud` has been computed since v54 and used for one
+`npc:startled`. D3 asked for this; the answerer was fixed to nearest then, the
+source never was. And **`task:complete` goes through `localReactLine`** — the
+one moment a chapter is FOR was the only reaction in the file using the quiet
+door.
+
+**A CHAPTER'S OWN VOICE STOPPED SHRINKING ITS VOCABULARY.** `npcSay` is
+first-hit-wins, and `npcPLACE_SAY` authors three `wary` and three `incident`
+lines per chapter against seven neutral ones — so P6 made the neutral pools
+unreachable in all seventeen chapters that have locals. Merged for those two
+kinds only, cached per (chapter, kind) because this is called inside
+`localsReact`'s loop. Measured: 10 lines, layer `place+neutral`, in Venice,
+Kowloon, Monaco and Antarctica; `startled` and `splash` unchanged at 9 and 6.
+**And `sayAudit` now calls the resolver instead of reimplementing it** — it
+would have gone on reporting the old three-line pool with complete confidence.
+
+**`localsChat` GOES THROUGH THE RESOLVER.** The most-heard dialogue in the
+game — every 11 to 28 seconds, in every chapter — was the one pool that
+bypassed `npcSay`, so a gondolier, a Mong Kok cook and an Antarctic scientist
+shared ten lines. Code only: `chatOpen`/`chatBack` are accepted keys now and
+the shared pool is still the fallback, so no line changes until one is written.
+
+**THE ANIMAL HAS AN OPINION.** All five face states were about the animal's own
+body — its voice, its fall, its reach, its legs, its weight — so it looked at
+the joke and had nothing to say. `capy:incident` and `npc:chase` latch
+`capyMOOD_SMUG` 0.60 for 1.2 s through the existing asymmetric damp. Not
+`npc:startled`: that fires several times a minute in a busy square, and a face
+pinned wide for the whole of Venice is a setting rather than a reaction.
+
+**AND `swim` HAS A CEILING.** It was the only steering state in the file
+without one — flee 3.5, cornered 5.0, resit 9, retrieve 12, queue 26, gather
+30 — and its only exit is arriving at the sea wall, with nav rejection turned
+off for it.
+
+**Verified:** `npm test` 10/10; 19/19 driven soak, 0 faults, frame time
+16.5–16.7 ms. Instruments: `qa/f2-check.js`, `f2-blip.js`, `f2-blip2.js`,
+`f2-mon.js`, `f2-mon2.js`, `f2-mon3.js`.
+
 ## THE FINISH, BATCH ONE — THE FIRST TEN MINUTES AND THE ARRIVAL (F1 — 6 Sep 2026)
 
 **LANDED.** All nine must-items of `ROADMAP-FINISH.md` batch F1. The theme is

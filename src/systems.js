@@ -9403,6 +9403,61 @@ export function createSystems(game) {
     ns.start(t); ns.stop(t + 0.24);
   }
 
+  // ---- THE BLIP — WHAT A PERSON SOUNDS LIKE WHEN THEY SAY SOMETHING (F2) --
+  //
+  // Every bubble in this game has been silent since the first one was drawn.
+  // Fifty-odd people across nineteen chapters open a paper bubble, gesture,
+  // turn the capybara's head with `npcSpeak`, and make no sound at all — so
+  // speech was the one channel of the four that had no audio half. The
+  // vocalisations that do exist (gasp, pop, whistle) are separate events fired
+  // at about thirty sites; none of them is attached to a LINE.
+  //
+  // Deliberately not speech. Two or three short filtered pulses, which is the
+  // oldest trick there is for "somebody is talking over there" and the only
+  // one that cannot age badly, mispronounce a place name, or need a hundred
+  // and ninety-one recordings. `n` is the pulse count and comes from the
+  // caller (see `streak` in sfx(): the fourth channel, whose only other reader
+  // is the footfall) so that a long line sounds like more words than a short
+  // one — the count is derived from `text.length` in sayBubble, where the
+  // words are, exactly as `gest` is, so the two can never drift apart.
+  //
+  // Level: the peak is 0.055 against `sfxTick`'s 0.09 and `sfxHiss`'s 0.13.
+  // Authored against the ladder rather than against its own envelope, which is
+  // the trap R9 paid for with six voices at five to ten times the band — and
+  // this one is the most-heard new sound in the game after the footfall, so it
+  // has to sit UNDER the things it punctuates rather than beside them.
+  //
+  // The band is 520–1150 Hz through a gentle lowpass: high enough to be a
+  // mouth rather than a knock, low enough to sit behind the score. `pitch`
+  // arrives already multiplied by the speaker's own `vpitch` (npc.js), so two
+  // people in a Venetian queue do not blip in unison.
+  function sfxBlip(vol, pitch, n) {
+    const t = ac.currentTime;
+    const cnt = clamp(Math.round(n || 2), 1, 4);
+    const base = 640 * clamp(pitch, 0.5, 2.2);
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(clamp(base * 3.2, 400, 4200), t);
+    lp.Q.setValueAtTime(0.6, t);
+    lp.connect(acMaster);
+    for (let i = 0; i < cnt; i++) {
+      const at = t + i * rand(0.052, 0.075);
+      // Every pulse is a different note of the same voice — a monotone reads
+      // as a machine — and the last one falls, which is what makes a run of
+      // three sound like the end of a sentence rather than an interruption.
+      const fall = i === cnt - 1 ? 0.82 : 1;
+      const f = base * rand(0.9, 1.14) * fall;
+      const o = ac.createOscillator();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(f, at);
+      o.frequency.linearRampToValueAtTime(f * rand(0.94, 1.06), at + 0.042);
+      const g = ac.createGain();
+      env(g, at, 0.055 * vol, 0.008, 0.038);
+      o.connect(g); g.connect(lp);
+      o.start(at); o.stop(at + 0.07);
+    }
+  }
+
   function sfxPop(vol, pitch) {
     const t = ac.currentTime;
     const v = rand(0.9, 1.14) * pitch;
@@ -14825,6 +14880,8 @@ export function createSystems(game) {
     frailejon: sfxFrailejon, banda: sfxBanda,
     // ...and one each for the four rows still on pitch-shifted generics.
     corso: sfxCorso, roulette: sfxRoulette, burner: sfxBurner, farbell: sfxFarbell,
+    // ...and the one every line in the game goes through. See sfxBlip.
+    blip: sfxBlip,
   };
   const sfxGap = {
     wheek: 0.16, thud: 0.05, splash: 0.12, gasp: 0.12, pop: 0.05, rustle: 0.08, whistle: 0.2,
@@ -14837,6 +14894,13 @@ export function createSystems(game) {
     // a flat-out run is ~7 strides a second; the throttle must sit under that or
     // it starts eating every other footfall and the gait audibly limps
     step: 0.055,
+    // ---- THE BLIP'S GAP IS A REAL ONE (F2) -----------------------------
+    // A bubble is 1.7 s plus 50 ms a character, so one person cannot fire this
+    // faster than about every two seconds — but a square does not speak in
+    // turns: `localsReact` says two lines on one bang, the chain answers a
+    // third, and Sydney's roster has its own chatter on top. 0.18 lets a pair
+    // of reactions read as two people and stops six of them becoming a chord.
+    blip: 0.18,
     // The same gap 'thud' has, and for the same reason: clink is the other half
     // of the impact channel, so a tumbling stack of bowls has to be allowed to
     // sound like a tumbling stack of bowls.
