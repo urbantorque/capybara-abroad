@@ -1733,11 +1733,37 @@ function quayBuildLand(game, root) {
     // ---- AND THE TOP IS A DOME, NOT A TABLE ------------------------------
     // The cliff ring is only the SKIRT of a headland: above it the drawn mesh
     // carries a scrub cap to h*1.07 and a peak to h*1.20, and the collider
-    // stopped dead at h. So the whole crown of every hill in the chapter was
-    // rock you stood inside — measured at Bradleys Head, which is the one you
-    // can actually swim to: the animal stands on the rim at 21 m with four
-    // metres of hill over its head. Two more tiers, matched to what is drawn
-    // and to what quayGroundY answers, and the hill is a hill.
+    // stopped dead at h. So the top fifth of every hill in the chapter was
+    // drawn and not solid — at Bradleys Head, a collider ending at 21 under a
+    // peak drawn to 25.2, four metres of hill with nothing in it. Two more
+    // tiers, matched to the drawn cap and to what quayGroundY answers, and the
+    // hill is a hill.
+    //
+    // ---- WHAT THIS NOTE USED TO CLAIM, AND WHY IT WAS WRONG (X8) ---------
+    // It said Bradleys Head is "the one you can actually swim to: the animal
+    // stands on the rim at 21 m with four metres of hill over its head". The
+    // four metres is arithmetic and stands. The animal standing there does not:
+    // a swimmer cannot get onto any headland in this chapter. Measured
+    // (qa/px-bridge6.js) from all four sides on all four keys, at Bradleys Head
+    // and at the bridge's landfall bluff, the highest it ever reaches is
+    // 2.07-2.29 m, and it is never grounded and never stops swimming — every
+    // face here is sheer from the water and Circular Quay publishes no
+    // `climbHold`. The boat cannot land one either; quayShore turns the hull
+    // away at a*1.16 + the half-beam, outside the collider.
+    //
+    // So that sentence was written from a probe that PUT the animal on the rim,
+    // which is the mistake this project keeps paying for and paid for again in
+    // X8: three versions of the bridge probe reported a 25 m climb, no water
+    // anywhere, and a swim in the wrong direction before one of them was worth
+    // a number. A reachability claim needs a leg that starts where the chapter
+    // agrees there is water.
+    //
+    // The tiers stay regardless, for the reason at the top and not for the one
+    // that was written down: a collider four metres short of its own drawing is
+    // wrong whether or not anything is standing on it. Two things read this
+    // hill without a passenger — quayGroundY answers through quayHeadTop, which
+    // is built from the same quayHEAD_TIER table these shapes are, and
+    // sysCamClear's occlusion ray tests the collider and never the drawing.
     for (let t = 0; t < quayHEAD_TIER.length; t++) {
       const ta = a * quayHEAD_TIER[t][0], ty = hd.h * quayHEAD_TIER[t][1];
       const tcy = (y0 + ty) * 0.5, thy = (ty - y0) * 0.5;
