@@ -3245,7 +3245,33 @@ const sysMUS_BREATH_GAP_A = 78;    // s between them
 const sysMUS_BREATH_GAP_B = 146;
 const sysMUS_BREATH_MAXI  = 0.22;  // musIntensity above which there is no breath
 const sysMUS_BREATH_CUT   = 690;   // Hz the pad's filter closes by at the bottom
-const sysMUS_BREATH_WET   = 0.34;  // ...and how far the room opens, as a fraction
+const sysMUS_BREATH_WET   = 0.34;
+// ---- WHAT THE WEATHER DOES TO THE SCORE (A5) -------------------------------
+// Small on purpose, all three of them. weather.js's rule is that a mood may
+// make an hour WEATHER and may not make it a different hour, and the score is
+// held to the same line: this should be a thing a player notices having felt,
+// not a thing they notice happening.
+const sysMUS_SKY_CUT = 180;   // Hz the pad's filter closes by in full rain...
+const sysMUS_SKY_BUS = 0.12;  // ...while the pad itself comes UP by this much
+const sysMUS_SKY_VEL = 0.08;  // and the velocity a struck note loses to cloud
+// ---- THE PLACE WARMS TO YOU (A6) -------------------------------------------
+// Minute one and minute thirty of a chapter sounded identical. F4 already made
+// musProg per-CHAPTER for the shimmer, which is the hard half of this and was
+// done for a different reason; what was still missing is something a player can
+// actually name. The shimmer is a texture and textures are deniable.
+//
+// So: a SECOND VOICE that is not there at the start and is there at the end. It
+// answers the pluck a chord tone below, a beat later, on an instrument the
+// palette names out of the fifty this file already has - so it is a new idea
+// and not a new synth, and it is in key by construction because it reads
+// musCurChord like everything else.
+//
+// It is deliberately an ANSWER and not a harmony. Two voices together are a
+// thicker pad; a voice that replies is a second musician, and the difference
+// between those two is the whole of what this is for.
+const sysMUS_2ND_AT   = 0.33;  // chapter progress the answer starts at
+const sysMUS_2ND_GAIN = 0.62;  // its velocity against the pluck it answers
+const sysMUS_2ND_TIGHT = 0.20; // how far progress shortens the pluck spacing  // ...and how far the room opens, as a fraction
 // ---- THE FEEL (v41; see musFeel). Milliseconds, and they are small. -------
 // One sigma of scatter, and the pocket, per role. The pulse-keepers barely
 // move: they are the grid the rest of the band is early or late against.
@@ -3857,6 +3883,68 @@ const sysMUS_NEXT_T  = [[1, 2, 3], [2, 3, 0], [3, 0], [0, 1]];
 /** Index of the title row in sysMUS_PAL — appended, so no chapter's `pal` moves. */
 const sysMUS_PAL_TITLE = 18;
 
+// ---- WHAT ANSWERS THE PLUCK, PER PALETTE (A6) ------------------------------
+// null is not an oversight: the five band palettes already HAVE a second voice
+// and it is the band. A reply on top of a bateria is a fourteenth percussionist.
+const sysMUS_2ND = [
+  { inst: 'glass',     gapA: 0.8, gapB: 1.4, oct: 12,  vel: 0.55 },  // 0  Sydney
+  { inst: 'pluck',     gapA: 0.5, gapB: 0.9, oct: 0,   vel: 0.60 },  // 1  Pasto
+  { inst: 'pluck',     gapA: 0.7, gapB: 1.2, oct: 0,   vel: 0.50 },  // 2  Quay
+  { inst: 'mallet',    gapA: 0.9, gapB: 1.6, oct: 0,   vel: 0.50 },  // 3  under way
+  { inst: 'koto',      gapA: 2.0, gapB: 4.0, oct: -12, vel: 0.50 },  // 4  Kyoto
+  null,                                                              // 5  Cali
+  null,                                                              // 6  Rio
+  { inst: 'bow',       gapA: 3.0, gapB: 6.0, oct: -12, vel: 0.50 },  // 7  Iceland
+  null,                                                              // 8  Marrakech
+  { inst: 'glass',     gapA: 3.0, gapB: 5.0, oct: -12, vel: 0.45 },  // 9  the Drift
+  null,                                                              // 10 Venice
+  null,                                                              // 11 Hong Kong
+  { inst: 'glass',     gapA: 1.4, gapB: 2.6, oct: 12,  vel: 0.40 },  // 12 Palawan
+  { inst: 'pluck',     gapA: 2.0, gapB: 3.4, oct: -12, vel: 0.45 },  // 13 Cappadocia
+  { inst: 'pluck',     gapA: 0.8, gapB: 1.4, oct: 0,   vel: 0.50 },  // 14 Manly
+  { inst: 'bow',       gapA: 2.0, gapB: 3.6, oct: 0,   vel: 0.50 },  // 15 the Pantanal
+  { inst: 'glass',     gapA: 3.0, gapB: 6.0, oct: 12,  vel: 0.40 },  // 16 Son Doong
+  { inst: 'bow',       gapA: 3.0, gapB: 5.0, oct: -12, vel: 0.45 },  // 17 Antarctica
+  null,                                                              // 18 the title card
+  null,                                                              // 19 Monte Carlo
+  { inst: 'danbau',    gapA: 2.5, gapB: 4.0, oct: -12, vel: 0.50 },  // 20 Hanoi
+];
+// ---- HOW THE ARRIVAL PHRASE IS SAID HERE (A4) ------------------------------
+// The rhythm and the contour are the same in all twenty-one; this is only the
+// accent. A band palette must name its own voice because its `lead` is 'none',
+// and the slow palettes need a longer gap or four notes on a ney read as one
+// chord rather than as a sentence.
+const sysMUS_PHRASE = [
+  null,                                        // 0  Sydney: the plain statement
+  { gap: 1.6 },                                // 1  Pasto
+  { oct: 12 },                                 // 2  Quay, an octave up. NOT a tone:
+                                               //    `oct` here is SEMITONES, and the
+                                               //    Quay lift row means something else
+                                               //    by the same key. phraseAudit caught it.
+  null,                                        // 3  under way
+  { gap: 1.5 },                                // 4  Kyoto
+  { inst: 'mallet', gap: 0.6 },                // 5  Cali
+  { inst: 'pluck', gap: 0.5, oct: 12 },        // 6  Rio
+  { gap: 2.2 },                                // 7  Iceland, the slowest here
+  { inst: 'mallet', gap: 0.75 },               // 8  Marrakech
+  { gap: 2.0 },                                // 9  the Drift
+  { inst: 'violin', gap: 1.65 },               // 10 Venice
+  { inst: 'pluck', gap: 0.5, oct: 12 },        // 11 Hong Kong
+  null,                                        // 12 Palawan
+  { gap: 1.8 },                                // 13 Cappadocia
+  null,                                        // 14 Manly
+  { gap: 1.6 },                                // 15 the Pantanal
+  { gap: 1.8, oct: 12 },                       // 16 Son Doong
+  { gap: 1.6 },                                // 17 Antarctica
+  { vel: 0.6 },                                // 18 the title card, quieter
+  { inst: 'twang', gap: 0.8 },                 // 19 Monte Carlo
+  { inst: 'danbau', gap: 2.0 },                // 20 Hanoi
+];
+// ---- AND THE TWO PALETTES THE RAIN TERM CANNOT HAVE (A5) -------------------
+// Iceland's filter is already the darkest in the game at 470 and taking 180 off
+// it would put the pad under its own fundamental. Son Doong has no sky at all,
+// which is the entire argument of the chapter.
+const sysMUS_SKYCUT = { 7: 60, 16: 0 };
 const sysMUS_PAL = [
   // 0 — Sydney. Felt mallets over a wide, slow pad: a hot afternoon in a public
   // garden where nothing is in a hurry.
@@ -12465,6 +12553,11 @@ export function createSystems(game) {
   // pluck scheduler needs (by reference — a chapter change swaps the palette out
   // from under the indices, so indices alone would point at the wrong chords).
   let musPal = sysMUS_PAL[0];
+  // WHICH ROW IS SOUNDING. The three tables above are keyed by index rather
+  // than folded into the palette, so the index has to be kept as well as the
+  // object — and it has to move on the same line the object does or a chapter
+  // gets the previous one's answering voice for a bar.
+  let musPalN = 0;
   let musShakuAt = 0, musBuoyAt = 0;   // the slow voices keep their own clocks
   let musTranhAt = 0, musLoanAt = 0;   // ...and so do chapter 19's two
   let musBendirAt = 0;                 // ...and Cappadocia's frame drum
@@ -12811,6 +12904,7 @@ export function createSystems(game) {
     const pal = sysMUS_PAL[n] || sysMUS_PAL[0];
     if (musPal === pal) return;
     musPal = pal;
+    musPalN = sysMUS_PAL.indexOf(pal);
     // The index must move with the pointer even when the context is suspended:
     // the band palettes' next-tables are shorter than the pad palettes', so a
     // stale musIdx indexes past the end and musTick throws on every interval.
@@ -12931,6 +13025,25 @@ export function createSystems(game) {
     done:   { deg: [4, 2, 0],    gap: 0.150, oct: 12, vel: 1.30, pan: 0.26 },
     keep:   { deg: [2, 1, 0],    gap: 0.135, oct: 12, vel: 0.95, pan: 0.22 },
     wear:   { deg: [0, 3],       gap: 0.120, oct: 12, vel: 0.85, pan: 0.20 },
+    // ---- THE ARRIVAL PHRASE (A4) -----------------------------------------
+    // Twenty-one palettes and not one melodic idea that travels between them.
+    // The arrival - 3.6 s of framed shot under a place card, the ONE moment
+    // every player of every chapter is guaranteed to see - was musically a key
+    // glide. The place said its name on paper and not in sound.
+    //
+    // A RHYTHM IS THE THING THAT SURVIVES A KEY CHANGE. A fixed pitch sequence
+    // is in the wrong key in twenty of twenty-one places, which is the whole
+    // reason this score has never had a stinger; but long-short-short-long is
+    // the same sentence in all of them. So the phrase is a RHYTHM and a
+    // CONTOUR - up two steps of the chord and back - built from musCurChord
+    // exactly as the lift and the other five stings are, and played on the
+    // palette's own lead. It cannot be out of key by construction, and it is a
+    // koto in Kyoto and glass in the Drift with no per-place code at all.
+    //
+    // `dur` is the only new idea in this table and it is a multiplier on the
+    // gap rather than a second clock.
+    arrive: { deg: [0, 1, 2, 1], dur: [2, 1, 1, 3],
+              gap: 0.19, oct: 0, vel: 0.70, pan: 0.18 },
   };
   let musStingAt = 0;
   // ---- THE BAND DID NOT NOTICE THE PAUSE CARD (P4) ------------------------
@@ -12995,9 +13108,16 @@ export function createSystems(game) {
     // overlap — finishing a chapter closes an act. First one wins.
     if (now < musStingAt) return 0;
     musStingAt = now + 0.30;
-    const inst = (musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck';
+    // A palette may name its own voice and its own spacing for the phrase. The
+    // five band palettes carry a lead of 'none' and would otherwise all answer
+    // on the same generic pluck, and a ney or a bowed cello needs about twice
+    // the gap a koto does before a phrase stops being a chord.
+    const ph = (kind === 'arrive') ? sysMUS_PHRASE[musPalN] : null;
+    const inst = (ph && ph.inst) ? ph.inst
+               : ((musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck');
     const when = now + 0.03;
-    const g = clamp(typeof k === 'number' ? k : 1, 0, 2);
+    let g = clamp(typeof k === 'number' ? k : 1, 0, 2);
+    if (ph && ph.vel > 0) g *= ph.vel;
     let t = 0;
     for (let i = 0; i < s.deg.length; i++) {
       const d = s.deg[i];
@@ -13005,14 +13125,17 @@ export function createSystems(game) {
       // Same fold as the lift, and for the same reason: the chord tables run
       // from MIDI 33 to 82 and an unfolded +12 puts the top of Cappadocia into
       // a register nothing else in the mix occupies. See musSwell.
-      const midi = musFold(chord[idx] + 12 * Math.floor(d / chord.length) + s.oct,
+      const midi = musFold(chord[idx] + 12 * Math.floor(d / chord.length) +
+                           s.oct + (ph && ph.oct ? ph.oct : 0),
                            sysMUS_LIFT_LO, sysMUS_LIFT_HI);
       // 0.115 is the lift's own note velocity. AUTHORED AGAINST THAT and not
       // against these envelopes on their own — the mistake R9 made with six
       // ambient voices, which were written five to ten times too loud because
       // each was judged by itself rather than against the table it was joining.
-      musLiftNote(inst, when + t, midi, (i % 2 ? s.pan : -s.pan), 0.115 * s.vel * g, s.gap);
-      t += s.gap;
+      const step = s.gap * (ph && ph.gap > 0 ? ph.gap : 1) *
+                   (s.dur ? s.dur[i % s.dur.length] : 1);
+      musLiftNote(inst, when + t, midi, (i % 2 ? s.pan : -s.pan), 0.115 * s.vel * g, step);
+      t += step;
     }
     return s.deg.length;
   }
@@ -13224,8 +13347,14 @@ export function createSystems(game) {
     const now = ac ? ac.currentTime : 0;
     return j > now ? j : now;
   }
+  // A5: an overcast afternoon is a SOFTER TOUCH, not a quieter mix, so cloud
+  // is folded in here rather than onto a bus. Every struck note in the file
+  // comes through this one function, which is what makes that possible at all.
+  // Published on musAudit for the same reason musBreath is: a term that is
+  // small, slow and weather-dependent is one nobody can prove is alive.
+  let musSkyVel = 1, skyRainNow = 0, skyCutNow = 0;
   function musVel(v) {
-    return v * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
+    return v * musSkyVel * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
   }
 
   function musPluck(when, midi, panv, vel) {
@@ -15448,7 +15577,36 @@ export function createSystems(game) {
           }
         }
       }
-      musPluckAt += rand(musPal.pluckA, musPal.pluckB) * (1 - musIntensity * 0.32);
+      // ---- ...AND THE PLACE ANSWERS, ONCE YOU HAVE BEEN HERE A WHILE (A6)
+      // Below sysMUS_2ND_AT nothing happens at all and the palette is bit for
+      // bit the one it has always been. Above it the answer fades in with the
+      // chapter, so it arrives the way the place fills in rather than switching
+      // on at a threshold a player could locate.
+      const sec = sysMUS_2ND[musPalN];
+      if (sec && musProg > sysMUS_2ND_AT && musCurChord && musCurChord.length) {
+        const k = clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1);
+        // Not every pluck gets an answer, and which ones do is a coin weighted
+        // by how far in you are. A reply to every single note is a delay line.
+        if (Math.random() < 0.35 + k * 0.5) {
+          const ch = musCurChord;
+          // A CHORD TONE BELOW the note just played, folded into the same
+          // register the lift uses, so it can never collide with the bass or
+          // disappear over the top of the pad.
+          const bi = randInt(0, ch.length - 1);
+          const m2 = musFold(ch[bi] + (sec.oct || 0), sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+          const gap2 = rand(sec.gapA === undefined ? 0.6 : sec.gapA,
+                            sec.gapB === undefined ? 1.2 : sec.gapB);
+          musLiftNote(sec.inst || 'pluck', musPluckAt + gap2, m2,
+                      -pan * 0.8,
+                      musVel(0.115 * (sec.vel === undefined ? 1 : sec.vel) *
+                             sysMUS_2ND_GAIN * (0.55 + k * 0.45)),
+                      gap2);
+        }
+      }
+      musPluckAt += rand(musPal.pluckA, musPal.pluckB) *
+                    (1 - musIntensity * 0.32) *
+                    (1 - (sec ? clamp((musProg - sysMUS_2ND_AT) /
+                          (1 - sysMUS_2ND_AT), 0, 1) * sysMUS_2ND_TIGHT : 0));
     }
     // ---- the sparse voices: one phrase, a long way apart --------------------
     // These are ATMOSPHERE, not melody. The gap between them is doing as much
@@ -26700,6 +26858,25 @@ export function createSystems(game) {
         raise: typeof sp.raise === 'number' ? sp.raise : sysARRIVE_RAISE,
         hold: sysARRIVE_HOLD,
       });
+      // ---- ...AND THE PLACE SAYS ITS NAME (A4) --------------------------
+      // At the TOP of the shot rather than on the frame of the teleport: the
+      // palette is set by the biome:enter handler, and a figure fired on this
+      // line would be built out of the chord of the chapter being LEFT. Half a
+      // second in, the pad has the destination's key and musCurChord is the
+      // harmony the player is about to be standing in.
+      //
+      // `arrive` is the gate and it is already the right one: it is what
+      // separates walking into Venice from the stuck-rescue putting you back on
+      // the road, and a rescue that played a fanfare would be congratulating
+      // somebody for having been stuck.
+      setTimeout(function () {
+        try {
+          // Never over a marquee. The lift is a held moment and this is
+          // punctuation; an arrival cannot be both.
+          if (musLift * musLiftEnv() > 0.02) return;
+          musSting('arrive', 1);
+        } catch (e) {}
+      }, 550);
     }
   }
 
@@ -27522,6 +27699,12 @@ export function createSystems(game) {
       pad: musPad ? v(musPad.gain) : null,
       bass: musBassGain ? v(musBassGain.gain) : null,
       breath: +musBreath.toFixed(3), intensity: +musIntensity.toFixed(3),
+      // M1. All three are invisible by design and therefore need a way out:
+      // a sky term that quietly stops moving, a second voice that never enters
+      // and a phrase that fires into the wrong key are all silent failures.
+      pal: musPalN, chapProg: +musProg.toFixed(3),
+      skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
+      second: !!sysMUS_2ND[musPalN], skyVel: +musSkyVel.toFixed(4),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
       // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
       // published "there is no pulse" that game.music.beats() answers -1 to,
@@ -28275,6 +28458,43 @@ export function createSystems(game) {
       c.key = 'audit:' + Math.random();
       sysWingLast = -99;
       return sysWingburst(x, y, z, c);
+    },
+    /**
+     * IS THE ARRIVAL PHRASE IN KEY IN THIS PALETTE (A4).
+     *
+     * "It cannot be out of key by construction" is a claim, and a claim about
+     * twenty-one tables is exactly the sort of thing that is true when it is
+     * written and false four palettes later. This computes the same MIDI notes
+     * musSting would and checks every one against the chord that is actually
+     * sounding, WITHOUT playing anything — so it can sweep all twenty-one in a
+     * few hundred milliseconds instead of four minutes of chapter switching.
+     */
+    phraseAudit: function (n) {
+      musSetPalette(n, false);
+      const ch = musCurChord;
+      if (!ch || !ch.length) return { pal: musPalN, chord: null, ok: false };
+      const sh = sysMUS_STING.arrive;
+      const ph = sysMUS_PHRASE[musPalN];
+      const pcs = {};
+      for (let i = 0; i < ch.length; i++) pcs[((ch[i] % 12) + 12) % 12] = 1;
+      const notes = [];
+      let ok = true;
+      for (let i = 0; i < sh.deg.length; i++) {
+        const d = sh.deg[i];
+        const idx = ((d % ch.length) + ch.length) % ch.length;
+        const midi = musFold(ch[idx] + 12 * Math.floor(d / ch.length) +
+                             sh.oct + (ph && ph.oct ? ph.oct : 0),
+                             sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+        notes.push(midi);
+        // A FOLD MAY CHANGE THE OCTAVE AND MAY NEVER CHANGE THE NOTE, so the
+        // test is on pitch class. Anything else would be testing musFold.
+        if (!pcs[((midi % 12) + 12) % 12]) ok = false;
+        if (midi < sysMUS_LIFT_LO || midi > sysMUS_LIFT_HI) ok = false;
+      }
+      return { pal: musPalN, chord: ch.slice(), notes: notes, ok: ok,
+               inst: (ph && ph.inst) ? ph.inst
+                     : ((musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck'),
+               second: sysMUS_2ND[musPalN] ? sysMUS_2ND[musPalN].inst : null };
     },
     moverAudit: function () {
       const rows = [];
@@ -32339,12 +32559,34 @@ export function createSystems(game) {
       // filter down WITH it, which is the one combination none of the others
       // make and is the difference between quieter and further away.
       const br = 1 - musBreath;              // 0 normally, up to 1-DIP at the bottom
+      // ---- ...AND THE SKY, WHICH IT HAD NEVER ONCE READ (A5) -----------
+      // weather.js has carried seventeen authored moods since it shipped and
+      // the score was identical in Neon Rain and in Harbour Midday.
+      //
+      // RAIN CLOSES THE FILTER AND RAISES THE PAD, which is the one combination
+      // none of the other four terms make, and it is the difference between
+      // gloomy and COSY: rain is intimacy, so the room gets smaller rather than
+      // sadder. A palette may cap the cut - Iceland is already at 470 and
+      // cannot lose 180 - or zero it, because there is no sky in a cave.
+      let skyRain = 0, skyCloud = 0;
+      if (game.weather && typeof game.weather.bed === 'function') {
+        const wb = game.weather.bed();
+        skyRain = clamp(wb ? wb.rain : 0, 0, 1);
+        skyCloud = clamp(typeof game.weather.cloud === 'function' ? game.weather.cloud() : 0, 0, 1);
+      }
+      const skyCut = skyRain * (sysMUS_SKYCUT[musPalN] === undefined
+                                ? sysMUS_SKY_CUT : sysMUS_SKYCUT[musPalN]);
+      skyRainNow = skyRain; skyCutNow = skyCut;
+      // Read by musVel, which is the one place a struck note's velocity is
+      // decided: an overcast afternoon is a softer touch, not a quieter mix.
+      musSkyVel = 1 - skyCloud * sysMUS_SKY_VEL;
       sysAudioSet(musPad.gain, musPal.bus * (1 - musIntensity * 0.3) *
-        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath,
+        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
+        (1 + skyRain * sysMUS_SKY_BUS),
         nowA, lift > 0.02 ? 0.6 : 1.2);
       sysAudioSet(musFilt.frequency, Math.max(180,
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
-        musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT),
+        musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT - skyCut),
         nowA, lift > 0.02 ? 0.7 : 1.4);
       // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
       // the moment somebody starts after you. A TERM in the one expression that

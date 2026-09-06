@@ -14,6 +14,90 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE SOUND PASS — THE PHRASE, THE SKY, AND THE SECOND VOICE (M1 — 7 Sep 2026)
+
+**LANDED.** The last batch of `ROADMAP-AUDIO.md`. A4, A5 and A6, which closes
+the roadmap: every item on it is built.
+
+### THE ARRIVAL PHRASE (A4)
+
+Twenty-one palettes and not one melodic idea that travelled between them. The
+arrival — 3.6 s of framed shot under a place card, **the one moment every player
+of every chapter is guaranteed to see** — was musically a key glide. The place
+said its name on paper and not in sound.
+
+**A RHYTHM IS THE THING THAT SURVIVES A KEY CHANGE.** A fixed pitch sequence is
+in the wrong key in twenty of twenty-one places, which is the whole reason this
+score has never had a stinger. Long–short–short–long is the same sentence in all
+of them. So the phrase is a rhythm and a CONTOUR — up two steps of the chord and
+back — built from `musCurChord` exactly as the lift and the five stings are, and
+played on the palette's own lead. It is a koto in Kyoto, a violin in Venice, a
+đàn bầu in Hanoi and glass in the Drift **with no per-place code at all**.
+
+It fires at the TOP of the shot and not on the frame of the teleport: the
+palette is set by the `biome:enter` handler, so a figure fired on that line is
+built out of the chord of the chapter being LEFT. `arrive` is the gate, and it
+is already the right one — it is what separates walking into Venice from the
+stuck-rescue putting you back on the road, and **a rescue that played a fanfare
+would be congratulating somebody for having been stuck.**
+
+### THE SCORE READS THE SKY (A5)
+
+`weather.js` has carried seventeen authored moods since it shipped and the score
+was identical in Neon Rain and in Harbour Midday. Three terms in the one writer.
+**Rain closes the filter and raises the pad**, which is the one combination none
+of the other four terms make, and it is the difference between gloomy and COSY:
+rain is intimacy, so the room gets smaller rather than sadder. Cloud is folded
+into `musVel` rather than onto a bus, because an overcast afternoon is a softer
+TOUCH and not a quieter mix — and `musVel` is the single function every struck
+note in the file passes through, which is what makes that a one-line change.
+
+### THE PLACE WARMS TO YOU (A6)
+
+Minute one and minute thirty of a chapter sounded identical. F4 had already made
+`musProg` per-chapter for the shimmer — the hard half, done for a different
+reason — but a shimmer is a texture and textures are deniable. A **second voice**
+answers the pluck a chord tone below, a beat later, on an instrument the palette
+names out of the fifty this file already has. It is an ANSWER and not a harmony:
+two voices together are a thicker pad, a voice that replies is a second
+musician, and that difference is the whole of what this is for. Fourteen
+palettes have one; the five bands and the title card get `null`, because a band
+already IS the second voice and a reply on top of a bateria is a fourteenth
+percussionist.
+
+**THREE THIN TABLES, NOT TWENTY-ONE NEW KEYS.** `sysMUS_2ND`, `sysMUS_PHRASE`
+and `sysMUS_SKYCUT` are keyed by palette INDEX and sit above `sysMUS_PAL` rather
+than inside it. That table is the composition and is read as one; keeping these
+separate puts the whole of "what answers what" on one screen instead of across
+four hundred lines, and **not one chapter's `pal` number moved**.
+
+### MEASURED
+
+| | |
+|---|---|
+| the phrase, all 21 palettes | **0 out of key**, by pitch class, against the chord actually sounding |
+| voices carrying it | **12 distinct** — mallet, quena, pluck, koto, bow, glass, violin, kulintang, ney, caipira, twang, đàn bầu |
+| palettes with a second voice | **14 of 21**, the other seven `null` on purpose |
+| cloud → `musVel` | live and exact: cloud 0.277 gives 0.9776 against a predicted 0.9778 |
+| `npm test` | 10/10 |
+| `qa/audio2.js` | 13 chapters, **0 errors** |
+
+**AND THE ONE THE PROBE CAUGHT, WHICH IS WHY IT WAS WRITTEN.** The Quay's phrase
+was authored `oct: 2` — copied from that palette's own `lift` row, which means a
+TONE by it. In the sting table `oct` is **semitones**, so a tone up put every one
+of the four notes outside the chord: 1 of 21 palettes failed the sweep, and the
+other twenty passed, which is exactly the shape of error that survives a listen.
+`hud.phraseAudit(n)` computes the notes without playing them and checks pitch
+class, so all twenty-one can be swept in a few hundred milliseconds rather than
+four minutes of chapter switching.
+
+**NOT PROVEN: THE RAIN HALF OF A5.** `bed().rain` read 0.000 in all five sampled
+chapters even with `weather.set` forcing `odds: 1` and an eleven-second wait, so
+the filter and pad terms are wired and were never observed above zero. The cloud
+term is measured, and it is read out of the same object on the same frame in the
+same block — but that is an argument, not a measurement, and it is recorded here
+as one.
+
 ## THE SOUND PASS — THE REST OF THE WORLD, AND THE FLOCK (S1b + S2 — 6 Sep 2026)
 
 **LANDED.** The second half of batch S1 (six more movers and four beds) and the
