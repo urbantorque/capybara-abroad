@@ -1099,10 +1099,15 @@ const sysAMB_AT = {
   // Strokkur goes off every few minutes whether anybody is watching or not,
   // and it is the loudest thing in Iceland by a distance.
   iceland:   { splash: { get: 'strokkur', dy: 2 }, hiss: { get: 'strokkur', dy: 2 },
-               gull: { get: 'cliff', dy: 10 } },
+               gull: { get: 'cliff', dy: 10 },
+               // ...and the two that are the chapter's own (F4). The geyser IS
+               // Strokkur; a berg groans on the lagoon and nowhere else.
+               geyser: { get: 'strokkur', dy: 2 }, berg: { get: 'lagoon' } },
   // The far bell is the one under the crown, which is the island you can see
-  // from the shelf and cannot reach yet.
-  drift:     { farbell: { get: 'crown', dy: 4 } },
+  // from the shelf and cannot reach yet — and the crown is also the biggest
+  // thing up here hanging off nothing, so it is what groans (F4). The fluff is
+  // deliberately NOT in this table: it goes past your ear, not past the crown.
+  drift:     { farbell: { get: 'crown', dy: 4 }, groan: { get: 'crown', dy: 4 } },
   // The two the chapter is named for. `campanile` is a voice AND a place.
   venice:    { campanile: { get: 'campanile', dy: 55 }, pigeons: { get: 'piazza' },
                lap: { get: 'molo' } },
@@ -5562,6 +5567,10 @@ function sysInOpera(x, y, z) { return sysOperaClear(x, y, z) > 0; }
 // each biome's published API rather than copied here, so they cannot drift out
 // of date when a world moves something.
 const sysMAP_PX = 104;              // baked resolution — deliberately soft
+// The chart is a canvas, so it cannot inherit `.capyui-font` and has to be
+// told. Kept identical to that rule, and beside it in the file so the two
+// cannot drift: the label on the door is HUD type and must read as HUD type.
+const sysMAP_FONT = '"Trebuchet MS","Segoe UI",system-ui,sans-serif';
 const sysMAP_HZ = 12;               // redraws a second
 const sysMAP_TRAIL = 64;            // breadcrumbs kept
 const sysMAP_TRAIL_D = 3.0;         // metres between them — distance, not time
@@ -11017,6 +11026,226 @@ export function createSystems(game) {
     }
   }
 
+  // ---- THE TWO QUIETEST CHAPTERS BORROWED EVERY VOICE THEY HAD (F4) -------
+  //
+  // Iceland's whole ambience was `hiss`, `splash` and `gull`, and the Drift's
+  // was `hiss` and `farbell`. Those two chapters have the LONGEST gaps between
+  // sounds in the game — 13 to 28 seconds in Iceland, 15 to 32 in the Drift —
+  // which is exactly the design, and it is also what makes a borrowed voice
+  // unmissable: when a place speaks four times a minute, all four had better
+  // be about that place. Two each, and each one is the thing the chapter is
+  // actually built around rather than a generic pitched down.
+
+  /**
+   * STROKKUR. The one thing in Iceland that is louder than everything else put
+   * together, and it goes off every few minutes whether anybody is watching.
+   *
+   * A geyser is THREE sounds and the order is the whole character: the ground
+   * rumbles for about half a second while the column is still underneath you,
+   * then the burst — which is water, not an explosion, so it is broadband but
+   * ROUNDED — and then two and a half seconds of steam falling away. Get the
+   * order wrong and it is a firework. `hiss` had been doing the entire job.
+   */
+  function sfxGeyser(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.12) * pitch;
+    const lead = rand(0.38, 0.62);
+    // 1. the ground, before anything is visible
+    const rn = noiseSrc();
+    const rlp = ac.createBiquadFilter(); rlp.type = 'lowpass';
+    rlp.frequency.setValueAtTime(90 * v, t);
+    rlp.frequency.linearRampToValueAtTime(190 * v, t + lead);
+    rlp.Q.value = 1.4;
+    const rg = ac.createGain();
+    rg.gain.setValueAtTime(0.0001, t);
+    rg.gain.linearRampToValueAtTime(0.09 * vol, t + lead * 0.9);
+    rg.gain.exponentialRampToValueAtTime(0.0001, t + lead + 0.18);
+    rn.connect(rlp); rlp.connect(rg); rg.connect(acMaster);
+    rn.start(t); rn.stop(t + lead + 0.25);
+    // 2. the burst. A BANDPASS and not a bare noise burst: water leaving a
+    //    hole has a throat, and the throat is what stops it being a gunshot.
+    const bn = noiseWideSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(420 * v, t + lead);
+    bp.frequency.exponentialRampToValueAtTime(1350 * v, t + lead + 0.13);
+    bp.Q.value = 0.55;
+    const bg = ac.createGain();
+    env(bg, t + lead, 0.34 * vol, 0.035, 0.55);
+    bn.connect(bp); bp.connect(bg); bg.connect(acMaster);
+    bn.start(t + lead); bn.stop(t + lead + 0.7);
+    // 3. the steam, which is most of the length of it
+    const sn = noiseWideSrc();
+    const shp = ac.createBiquadFilter(); shp.type = 'highpass';
+    shp.frequency.setValueAtTime(900 * v, t + lead);
+    shp.frequency.exponentialRampToValueAtTime(2600 * v, t + lead + 2.4);
+    const sg = ac.createGain();
+    sg.gain.setValueAtTime(0.0001, t + lead + 0.02);
+    sg.gain.linearRampToValueAtTime(0.13 * vol, t + lead + 0.22);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + lead + 2.6);
+    sn.connect(shp); shp.connect(sg); sg.connect(acMaster);
+    sn.start(t + lead + 0.02); sn.stop(t + lead + 2.7);
+  }
+
+  /**
+   * A BERG ON THE LAGOON. Two lumps of ice touching, and then one of them
+   * complaining about it for two seconds.
+   *
+   * `thud` was doing this and a thud is the wrong physics: ice is HARD, so the
+   * contact is bright and over in twenty milliseconds, and then — because a
+   * berg is a tonne of something with a resonance and a crack in it — it
+   * GROANS, a low note that bends DOWN as the stress goes out of it. The bend
+   * is the whole tell. A dull low thump is a crate; a bright tick followed by
+   * a falling groan is ice.
+   */
+  function sfxBerg(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.86, 1.18) * pitch;
+    // the contact
+    const cn = noiseSrc();
+    const chp = ac.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 1600 * v;
+    const cg = ac.createGain();
+    env(cg, t, 0.16 * vol, 0.003, 0.045);
+    cn.connect(chp); chp.connect(cg); cg.connect(acMaster);
+    cn.start(t); cn.stop(t + 0.07);
+    // the groan: two partials a hair apart, both bending down, so the note
+    // beats slowly the way a big cold thing does
+    const dur = rand(1.6, 2.6);
+    const f0 = rand(86, 132) * v;
+    for (let i = 0; i < 2; i++) {
+      const o = ac.createOscillator(); o.type = i ? 'triangle' : 'sine';
+      const f = f0 * (i ? 1.994 : 1) * rand(0.996, 1.004);
+      o.frequency.setValueAtTime(f, t + 0.01);
+      o.frequency.exponentialRampToValueAtTime(f * rand(0.72, 0.84), t + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t + 0.01);
+      g.gain.linearRampToValueAtTime(rand(0.05, 0.085) * vol / (1 + i * 1.6), t + 0.09);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(acMaster);
+      o.start(t + 0.01); o.stop(t + dur + 0.05);
+    }
+  }
+
+  /**
+   * THE COLUMN, MOVING. The Drift is islands of rock hanging in air with
+   * nothing holding them up, and the chapter never once acknowledged it.
+   *
+   * Almost entirely SUB — the point is that you feel it before you decide you
+   * heard it — with a thin band of grit dragged over the top, because stone on
+   * stone is not a pure tone and a pure tone down there is a mains hum. Slow
+   * in, slow out, five seconds: nothing up here is in a hurry.
+   */
+  function sfxGroan(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.1) * pitch;
+    const dur = rand(3.6, 5.4);
+    const f = rand(34, 52) * v;
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.linearRampToValueAtTime(f * rand(0.86, 1.14), t + dur);
+    const og = ac.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(0.13 * vol, t + dur * 0.35);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(og); og.connect(acMaster);
+    o.start(t); o.stop(t + dur + 0.1);
+    // the grit
+    const n = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(rand(210, 330) * v, t);
+    bp.frequency.linearRampToValueAtTime(rand(150, 260) * v, t + dur);
+    bp.Q.value = 2.6;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.linearRampToValueAtTime(0.030 * vol, t + dur * 0.45);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(bp); bp.connect(ng); ng.connect(acMaster);
+    n.start(t); n.stop(t + dur + 0.1);
+  }
+
+  /**
+   * SEED-FLUFF, GOING PAST YOUR EAR. The fluff is the only reason the Drift's
+   * wind is legible at all — the chapter says so in its own header — and it
+   * had no sound, so the one thing the player is being asked to READ was the
+   * one thing they could not hear.
+   *
+   * Deliberately the QUIETEST voice in the game. Three or four dry ticks over
+   * a third of a second, high-passed to nothing but air, no tone at all. If it
+   * is ever loud enough to identify on its own it is wrong; it should only
+   * ever be noticed as "something went past".
+   */
+  function sfxFluff(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.15) * pitch;
+    const n = 2 + ((Math.random() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * rand(0.055, 0.115);
+      const src = noiseSrc();
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass';
+      hp.frequency.value = rand(2600, 4400) * v;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.value = rand(7000, 11000) * v;
+      const g = ac.createGain();
+      env(g, at, rand(0.012, 0.026) * vol, 0.004, rand(0.03, 0.06));
+      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(acMaster);
+      src.start(at); src.stop(at + 0.09);
+    }
+  }
+
+  /**
+   * THE PURR. The one sound in this game the animal makes about ITSELF.
+   *
+   * Every other voice it has is addressed to somebody — the wheek startles,
+   * calls a condor, buys a ferry ticket; the gasp and the footfall are things
+   * that happen TO it. There was nothing for the state the whole calm layer
+   * was built to reward: sat down, nothing to do, content. The score already
+   * leans in on `sysLoafNow` (see calmLean), the pose already drops, and the
+   * animal itself said nothing at all.
+   *
+   * A purr is not a tone, it is a tone being INTERRUPTED — the amplitude is
+   * chopped at around twenty-five hertz and that chopping is the entire
+   * character. Done with an LFO on a gain rather than by scheduling pulses,
+   * because the pulses have to be seamless and a scheduler at 25 Hz is a
+   * buzz with a grid in it. Two octaves of it so it has a body, through a
+   * low-pass that takes off anything that would read as a growl.
+   */
+  function sfxPurr(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.09) * pitch;
+    const dur = rand(1.1, 1.7);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 420 * v; lp.Q.value = 0.7;
+    // the chop, shared by both partials so they interrupt together
+    const chop = ac.createGain(); chop.gain.value = 0.52;
+    const lfo = ac.createOscillator(); lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(rand(23, 28) * v, t);
+    // ...and it SLOWS as the breath goes out, which is what stops a purr
+    // sounding like a machine
+    lfo.frequency.linearRampToValueAtTime(rand(18, 22) * v, t + dur);
+    const lg = ac.createGain(); lg.gain.value = 0.46;
+    lfo.connect(lg); lg.connect(chop.gain);
+    // the envelope, slow at both ends: a purr fades up, it does not start
+    const out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.11 * vol, t + dur * 0.30);
+    out.gain.linearRampToValueAtTime(0.09 * vol, t + dur * 0.70);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const f0 = rand(52, 68) * v;
+    for (let i = 0; i < 2; i++) {
+      const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle';
+      o.frequency.value = f0 * (i ? 2.01 : 1);
+      const g = ac.createGain(); g.gain.value = i ? 0.34 : 1;
+      o.connect(g); g.connect(chop);
+      o.start(t); o.stop(t + dur + 0.06);
+    }
+    chop.connect(lp); lp.connect(out); out.connect(acMaster);
+    lfo.start(t); lfo.stop(t + dur + 0.06);
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -15140,6 +15369,11 @@ export function createSystems(game) {
     frailejon: sfxFrailejon, banda: sfxBanda,
     // ...and one each for the four rows still on pitch-shifted generics.
     corso: sfxCorso, roulette: sfxRoulette, burner: sfxBurner, farbell: sfxFarbell,
+    // ...and two each for the two chapters that had borrowed every voice they
+    // had. See the block above sfxGeyser.
+    geyser: sfxGeyser, berg: sfxBerg, groan: sfxGroan, fluff: sfxFluff,
+    // ...and the one the animal makes about itself. See sfxPurr.
+    purr: sfxPurr,
     // ...and the one every line in the game goes through. See sfxBlip.
     blip: sfxBlip,
   };
@@ -15185,6 +15419,15 @@ export function createSystems(game) {
     // The wheel is the short one and the far bell is the long one; both sit
     // past their own length, same rule.
     corso: 4.0, roulette: 3.0, burner: 2.6, farbell: 9.0,
+    // Same rule again — each past its own length. The geyser is ~3.5 s of
+    // sound and Strokkur goes off every few minutes, so its gap is a fence and
+    // not a throttle; the fluff's is the only short one here, because a gust
+    // of seed-heads IS several of them and one every four seconds would be a
+    // metronome rather than weather.
+    geyser: 14.0, berg: 6.0, groan: 11.0, fluff: 1.4,
+    // Past its own length, and the loaf timer never asks anywhere near this
+    // often — the gap is there so a second caller can never stack two.
+    purr: 2.4,
   };
 
   // The voice ceiling — see the block inside sfx(). Twelve starts inside a
@@ -17646,6 +17889,80 @@ export function createSystems(game) {
         g2.beginPath();
         g2.arc(wx, wz, 1.15 * u, 0, 6.284);
         g2.fill();
+        // ---- AND IT SAYS WHAT IT IS (F4) ---------------------------------
+        // Every mark in sysMAP_WORLDS carries a `t` — 'the ferry wharf', 'up
+        // the Corso', 'the lantern plinth' — and until now the ONLY thing that
+        // ever read one was `mapMarkAudit`, a test hook. Nineteen chapters of
+        // authored labels, none of them ever drawn.
+        //
+        // ONLY THE DOOR GETS ONE, and that is the whole design rather than a
+        // shortcut. This chart is 104 baked pixels; captioning eight landmarks
+        // would leave nothing visible but captions, and the marks are meant to
+        // be recognised from the shape of the coast around them. The door is
+        // the exception because it is the one mark that is not a thing to go
+        // and look at — a hollow ring with a gap in it is a doorway, but it
+        // does not say WHICH doorway, and "the way out of here" is exactly the
+        // question a player asks the chart without having a landmark in mind.
+        //
+        // Placed BELOW the ring, clamped inside the canvas on both axes so a
+        // door in the corner of a world does not caption off the edge, and
+        // stroked in the paper colour underneath so it stays legible over the
+        // dark half of a chart without needing a box drawn round it.
+        const wt = wm.t;
+        if (wt) {
+          // IT IS THE DISTANCE PILL, NOT A NEW THING. `.capyui-mapdist` is
+          // already text on this chart — 9 px, 700, ink on 86% sail, fully
+          // rounded — so the door's label is that component drawn on the
+          // canvas rather than a second treatment invented beside it. The
+          // first cut was stroked text with a sand halo and measured exactly
+          // as badly as that sounds: invisible over sand, and cramped against
+          // the shoreline in Sydney.
+          //
+          // The canvas is DPR-scaled, so the size is derived from the ratio
+          // rather than from `u` — a token in CSS pixels has to be converted,
+          // not re-guessed.
+          const s = w / Math.max(1, cssW);
+          const fs = Math.max(8, Math.round(9 * s));
+          g2.font = '700 ' + fs + 'px ' + sysMAP_FONT;
+          g2.textAlign = 'center';
+          g2.textBaseline = 'middle';
+          const tw = g2.measureText(wt).width;
+          const padX = 6 * s, padY = 3 * s, edge = 3 * s;
+          const bw = tw + padX * 2, bh = fs + padY * 2;
+          const tx = clamp(wx, bw * 0.5 + edge, w - bw * 0.5 - edge);
+          // BELOW the door normally; ABOVE it whenever the door is in the
+          // lower third, because the bottom centre of this chart is where the
+          // distance readout lives and two pills on top of each other is
+          // worse than a label on the wrong side of a ring.
+          let below = wz < w * 0.66;
+          const off = 5.2 * u + bh * 0.5;
+          const place = (b) => clamp(wz + (b ? 1 : -1) * off, bh * 0.5 + edge, w - bh * 0.5 - edge);
+          let ty = place(below);
+          // ---- AND IT NEVER COVERS WHERE YOU ARE ---------------------------
+          // MEASURED in Venice, where the molo is about twenty metres from the
+          // spawn: the pill landed squarely on the you-are-here marker. The
+          // door being near you is the common case at the start and end of
+          // every chapter, so this is not an edge. The live markers are the
+          // most important things on the chart and a static annotation gives
+          // way to them — flipped to the other side of the ring, and only if
+          // that side is clear, because a label that jitters between two
+          // positions as the animal walks is worse than one that overlaps.
+          const hits = (y) => Math.abs(tx - px) < bw * 0.5 + 3.4 * u &&
+                              Math.abs(y - pz) < bh * 0.5 + 3.4 * u;
+          if (hits(ty)) {
+            const alt = place(!below);
+            if (!hits(alt)) { below = !below; ty = alt; }
+          }
+          g2.fillStyle = sysRgba(PALETTE.sail, 0.86);
+          g2.beginPath();
+          if (g2.roundRect) g2.roundRect(tx - bw * 0.5, ty - bh * 0.5, bw, bh, bh * 0.5);
+          else g2.rect(tx - bw * 0.5, ty - bh * 0.5, bw, bh);
+          g2.fill();
+          g2.fillStyle = mapC.ink;
+          g2.fillText(wt, tx, ty + fs * 0.06);
+          g2.textAlign = 'start';
+          g2.textBaseline = 'alphabetic';
+        }
       }
     }
 
@@ -21422,8 +21739,29 @@ export function createSystems(game) {
     return ghStore;
   }
 
+  // ---- AND IT IS DEBOUNCED, FOR THE REASON THE SAVE IS (F4) --------------
+  //
+  // `ghWrite` serialises the WHOLE store — up to sysGHOST_KEEP (24) runs, each
+  // a flat array of four numbers ten times a second — and `ghKeep` called it
+  // SYNCHRONOUSLY on the frame a record was set. That is the single worst
+  // frame in the game to do a blocking `localStorage.setItem` on: a record is
+  // what fires the marquee, and the note above the `savePending` drain in the
+  // frame loop is a measured account of that exact frame being the slowest one
+  // a chapter has. The save layer has been debounced since R3 and the ghost
+  // store — which is bigger — was still writing straight through.
+  //
+  // Same idiom, same debounce, same two flush points (`pagehide` and
+  // `visibilitychange`), so there is no route out of the page that loses a
+  // ghost. Nothing else about the store changes: `ghKeep` still updates the
+  // in-memory copy and still hands the run straight back as the next attempt's
+  // ghost, so the FEATURE is synchronous and only the file write is not.
+  let ghPending = false, ghT = 0;
+  function ghSoon() { ghPending = true; ghT = 0; }
+  function ghFlush() { if (ghPending) ghWrite(); }
+
   /** Oldest-out until it fits. Silent on failure: a ghost is a nicety. */
   function ghWrite() {
+    ghPending = false; ghT = 0;
     const all = ghAll();
     for (let guard = 0; guard < sysGHOST_KEEP + 2; guard++) {
       try {
@@ -21528,7 +21866,8 @@ export function createSystems(game) {
     all[id] = flat;
     const ks = Object.keys(all);
     while (ks.length > sysGHOST_KEEP) { delete all[ks.shift()]; }
-    ghWrite();
+    ghSoon();                     // debounced — see the note over ghWrite
+
     // The run just filed becomes the ghost for the NEXT attempt, not this one.
     ghPlay = flat; ghPlayN = ghRecN;
     return true;
@@ -22456,6 +22795,42 @@ export function createSystems(game) {
   }
   const findCtx = { n: 1, name: 'sydney', capy: null, p: null, sp: 0, dt: 0, rain: 0, cold: 0 };
 
+  /**
+   * THE SHIMMER IS ABOUT THIS PLACE, NOT ABOUT THE SAVE FILE (F4).
+   *
+   * `musProg` drives one gain — the thickening upper layer, silent at zero and
+   * a shimmer at full — and it was `doneCount / TASKS.length`: two hundred and
+   * thirty-one rows across nineteen chapters. So it moved by about a
+   * twentieth over a whole chapter, on a two-and-a-half second time constant,
+   * which is not a thing a player can hear. What it actually said was "you
+   * have played a lot of this game", spread so thin that nobody could ever
+   * connect it to an act.
+   *
+   * Per CHAPTER it says the thing the layer was built to say: the place fills
+   * in as you work through it, and the shimmer fills in with it. It also means
+   * the layer RESETS on arrival, which is the point rather than a cost —
+   * arriving somewhere new should not sound like the middle of somewhere else,
+   * and it gives the score the same shape the act machinery and the paradinha
+   * give it.
+   *
+   * Cheap and called rarely: once per tick and once per arrival, over one
+   * chapter's ids. `chapRec` is the same table the ledger counts with.
+   */
+  function musProgSet() {
+    let p = 0;
+    const n = game.biome ? chapterOf(game.biome.current) : 0;
+    const rec = n > 0 ? chapRec[n] : null;
+    if (rec && rec.ids && rec.ids.length) {
+      let d = 0;
+      for (let i = 0; i < rec.ids.length; i++) {
+        const r = taskRec[rec.ids[i]];
+        if (r && r.done) d++;
+      }
+      p = d / rec.ids.length;
+    }
+    musProg = clamp(p, 0, 1);
+  }
+
   function completeTask(id, silent) {
     const r = taskRec[id];
     if (!r || r.done) return false;
@@ -22463,7 +22838,7 @@ export function createSystems(game) {
     r.li.classList.add('done');
     doneCount++;
     game.state.score = doneCount;
-    musProg = doneCount / TASKS.length;
+    musProgSet();
     // ---- restoring a save is not the same act as doing the thing ----------
     // Reloading into a half-finished journey must not fire forty toasts, forty
     // ticks, forty confetti bursts and six chapter ceremonies in the first
@@ -25675,7 +26050,7 @@ export function createSystems(game) {
   // pass through a flush. NOT `beforeunload`: it is unreliable on mobile, it is
   // ignored inside a bfcache, and adding a listener for it disqualifies the page
   // from the bfcache on some browsers — a real cost for a worse guarantee.
-  addEventListener('pagehide', function () { saveFlush(); prefsFlush(); });
+  addEventListener('pagehide', function () { saveFlush(); prefsFlush(); ghFlush(); });
   document.addEventListener('visibilitychange', function () {
     // The journal/departures board paused the game itself — coming back to the
     // tab must not unpause the world behind an open modal.
@@ -25691,6 +26066,7 @@ export function createSystems(game) {
       // the file gets: on every desktop and every phone, "backgrounded" is the
       // state a tab is in when it is closed, discarded or killed for memory.
       saveFlush();
+      ghFlush();                // the ghost store is debounced too — see ghSoon
       // ...AND THE SETTINGS FILE ON THE SAME TERMS. prefsSoon() is a 250 ms
       // timer and a backgrounded tab is the state a tab is killed in, so a
       // slider moved with the card still open — the one window pauseHide does
@@ -26791,6 +27167,13 @@ export function createSystems(game) {
         scrape: sysScrapeNow,
         scrapeG: sysBedScrape ? sysBedScrape.gain.value : null,
         scrapeF: sysBedScrapeLP ? sysBedScrapeLP.frequency.value : null,
+        // ...and the thickening layer, which is now a fact about the live
+        // CHAPTER (F4). Both numbers: `prog` is what musProgSet decided and
+        // `shim` is what the gain actually reached, and the whole point of the
+        // change is that the first one now moves far enough for the second to
+        // follow it audibly. See musProgSet.
+        prog: +musProg.toFixed(4),
+        shim: musShimGain ? +musShimGain.gain.value.toFixed(4) : null,
       };
     },
     /**
@@ -27065,7 +27448,24 @@ export function createSystems(game) {
   game.events.on('task:complete', function (p) { if (p && p.id) completeTask(p.id); });
   game.events.on('hud:toast', function (p) { toast(p && p.text !== undefined ? p.text : p); });
   // A wheek is not an earthquake: the barest tap, below which shake() ignores it.
-  game.events.on('capy:wheek', function () { shake(0.03); sfx('wheek'); sysEchoCast(); });
+  // ---- AND THIS HANDLER NO LONGER SPEAKS FOR THE ANIMAL (F4) -------------
+  //
+  // It used to call `sfx('wheek')` — plain, mono, volume 1 — and it runs on
+  // the EMIT, which capybara.js does five lines BEFORE its own
+  // `game.sfx('wheek', capySfxAt)`. `sfxGap.wheek` is 0.16 s, so the second
+  // call landed inside the first one's throttle and was dropped every single
+  // time. MEASURED: the capybara's call creates **0 audio nodes**, on both the
+  // calm and the moving path.
+  //
+  // Which means two features had never once been audible. The soft wheek —
+  // quieter and a semitone down after 1.2 s of stillness, which is the whole
+  // "the animal is settled" beat and carries its own comment saying nothing
+  // outside capybara.js owns that voice — was thrown away by a line in
+  // systems.js. And so was `at`: every wheek in the game was mono and centred,
+  // in a mix where everything else the animal does is placed.
+  //
+  // capybara.js owns the animal's voice. This owns the lens and the room.
+  game.events.on('capy:wheek', function () { shake(0.03); sysEchoCast(); });
   game.events.on('capy:grab', function (e) {
     const pr = e && e.prop;
     if (pr && pr.type === 'sandwich') completeTask('picnic-thief');
@@ -27389,6 +27789,10 @@ export function createSystems(game) {
     const name = (p && p.name) || 'sydney';
     jrSeen[chapterOf(name)] = 1;
     saveSoon();
+    // The shimmer is a fact about THIS place, so arriving in one recomputes it
+    // — including on the rollback path, which emits this event as of F3. See
+    // musProgSet.
+    musProgSet();
     // Everything a returning player has already earned, put back into the
     // world once. See sysKeepsRestore.
     sysKeepsRestore();
@@ -29891,10 +30295,18 @@ export function createSystems(game) {
             // The quietest soundscape in the game, and it should be: wind off
             // the ice, water on the harbour wall, and once in a very long while
             // a bird. Anything busier and the point of the place is gone.
+            //
+            // ...AND TWO OF THE FOUR ARE NOW ITS OWN (F4). The berg is the
+            // common one because the lagoon is the middle of the chapter and
+            // you walk round it for minutes; Strokkur is RARE on purpose — it
+            // goes off every few minutes in life and the whole reason it is
+            // the loudest thing here is that you have been waiting for it.
             const r = Math.random();
-            if (r < 0.55) sysAmb('hiss', { volume: rand(0.09, 0.17), pitch: rand(0.35, 0.5) });
-            else if (r < 0.8) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.6) });
-            else sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(1.3, 1.7) });
+            if (r < 0.30) sysAmb('hiss', { volume: rand(0.09, 0.17), pitch: rand(0.35, 0.5) });
+            else if (r < 0.60) sysAmb('berg', { volume: rand(0.10, 0.20), pitch: rand(0.85, 1.15) });
+            else if (r < 0.74) sysAmb('splash', { volume: rand(0.05, 0.10), pitch: rand(0.4, 0.6) });
+            else if (r < 0.88) sysAmb('gull', { volume: rand(0.06, 0.11), pitch: rand(1.3, 1.7) });
+            else sysAmb('geyser', { volume: rand(0.13, 0.22), pitch: rand(0.92, 1.10) });
             ambTimer = rand(13, 28);
           } else if (bio === 'drift') {
             // The emptiest soundscape in the game, emptier even than Iceland's:
@@ -29905,8 +30317,28 @@ export function createSystems(game) {
             const dr = game.drift;
             const w = dr ? dr.windSpeed() : 0;
             if (w > 1.5) {
-              sysAmb('hiss', { volume: clamp(0.05 + w * 0.045, 0.05, 0.20), pitch: rand(0.30, 0.46) });
+              // ---- AND WHAT THE WIND IS CARRYING (F4) ------------------
+              // The chapter's own header says the seed-fluff is "the only
+              // reason [the wind] is legible at all" — and it was silent, so
+              // the one thing the player is being asked to READ was the one
+              // thing they could not hear. It rides the same wind gate as the
+              // hiss and gets more likely the harder it is blowing, because
+              // that is what is happening: there is more of it going past.
+              if (Math.random() < clamp(0.22 + w * 0.10, 0.22, 0.62)) {
+                sysAmb('fluff', { volume: rand(0.5, 1.0), pitch: rand(0.85, 1.25) });
+              } else {
+                sysAmb('hiss', { volume: clamp(0.05 + w * 0.045, 0.05, 0.20), pitch: rand(0.30, 0.46) });
+              }
               ambTimer = rand(5, 11);
+            } else if (Math.random() < 0.34) {
+              // ---- THE ISLANDS ARE HANGING OFF NOTHING (F4) ------------
+              // Nine chapters of ground, and the tenth is rocks in mid-air
+              // that the soundscape never once acknowledged. Only in the
+              // CALM: a column shifting is a thing you notice because there
+              // is nothing else to notice, and under the wind it would just
+              // be more low end.
+              sysAmb('groan', { volume: rand(0.55, 1.0), pitch: rand(0.88, 1.14) });
+              ambTimer = rand(18, 36);
             } else {
               // ---- THE BELL NOBODY IS RINGING (R9) ----------------------
               // The line above this one has claimed exactly that since the
@@ -30655,6 +31087,13 @@ export function createSystems(game) {
     if (savePending) {
       saveT += (game.state.rawDt || dt) * 1000;
       if (saveT >= sysSAVE_DEBOUNCE) saveWrite();
+    }
+    // ...and the ghost store on the same clock, one debounce later so the two
+    // biggest writes in the game can never land on the same frame — which they
+    // otherwise always would, both being triggered by the same record.
+    if (ghPending) {
+      ghT += (game.state.rawDt || dt) * 1000;
+      if (ghT >= sysSAVE_DEBOUNCE * 2) ghWrite();
     }
     if (jrShown) jrTick();
 

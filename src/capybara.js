@@ -827,6 +827,11 @@ let capyWhiffPend = false;          // a grab attempt found nothing THIS frame
 let capyStillT = 0;                 // s settled, mouth EMPTY — see capyWHEEK_CALM_T
 let capyRestT  = 0;                 // ...and the same with something in it. See THE CALM.
 let capyLoaf   = 0;                 // 0..1 sat down. See THE LOAF.
+// THE PURR (F4). Fires while the animal is actually sat, not while it is on
+// its way down: 0.6 is past the point the pose has committed, so the sound and
+// the picture agree. See sfxPurr in systems.js.
+const capyPURR_AT = 0.6;
+let capyPurrT = 3;                  // s to the next one; rewound on standing up
 // ---- THE LOAF -------------------------------------------------------------
 // 6.5 s, which is under sysCALM_FULL (8.0) on purpose: the animal sits down a
 // beat BEFORE the world goes quiet around it, so the sitting reads as the cause
@@ -3217,6 +3222,11 @@ export function createCapybara(game) {
   // gets the loud one, every time, so every listener written against the old
   // wheek keeps exactly the content it was written for.
   const capyWHEEK_CALM_T = 1.2;
+  // Over this much `game.state.chaos` the wheek is a keyed-up one. Half, and
+  // deliberately: chaos decays on its own, so a number much higher than this
+  // would only ever be reached during a chase — which is the state the loud
+  // row is FOR, but not the only one that earns it.
+  const capyWHEEK_KEYED = 0.5;
 
   function capyWheek() {
     // POP, not a swell: jump the squash value instantly so the stretch is
@@ -3240,14 +3250,33 @@ export function createCapybara(game) {
                                capyStillT >= capyWHEEK_CALM_T);
     game.events.emit('capy:wheek', capyWheekPayload);
     // The event, the ring, the pop, the shake and the task are all unchanged —
-    // the only thing softness touches here is the voice itself, because nothing
-    // outside this module owns that.
-    if (capyWheekPayload.soft) {
-      capySfxAt.volume = 0.62; capySfxAt.pitch = 0.94;
-      game.sfx('wheek', capySfxAt);
-    } else {
-      game.sfx('wheek');
-    }
+    // the only thing state touches here is the voice itself, because nothing
+    // outside this module owns that. (It said "softness" and meant it: until
+    // F4 there were two variants and systems.js's `capy:wheek` handler ate
+    // both of them inside sfxGap. See the note on that handler.)
+    //
+    // ---- FOUR THINGS ONE MOUTH CAN SAY (F4) ----------------------------
+    // ONE call, one options object, and the state picks the row. The order is
+    // a priority and it is physical, not editorial:
+    //
+    //  1. BLOWN wins outright. `capyStamBlown` means there is no air left —
+    //     the animal cannot produce a full wheek whatever else is going on,
+    //     and it is the one row that is a fact about the body rather than a
+    //     mood. Down a whole tone and thin.
+    //  2. KEYED next. Chaos is the game's own measure of how much is going
+    //     on; over half, the animal is not making a remark, it is joining in.
+    //     Up and loud.
+    //  3. SOFT, the existing calm row: 1.2 s settled, grounded, empty-mouthed.
+    //  4. ...and the plain one, unchanged, which is still most wheeks.
+    //
+    // `at` on every row, which is also new: the wheek was the one thing the
+    // animal does that arrived mono and centred.
+    const chaos = (game.state && game.state.chaos) || 0;
+    if (capyStamBlown)               { capySfxAt.volume = 0.52; capySfxAt.pitch = 0.80; }
+    else if (chaos > capyWHEEK_KEYED) { capySfxAt.volume = 1.00; capySfxAt.pitch = 1.13; }
+    else if (capyWheekPayload.soft)   { capySfxAt.volume = 0.62; capySfxAt.pitch = 0.94; }
+    else                              { capySfxAt.volume = 0.85; capySfxAt.pitch = 1.00; }
+    game.sfx('wheek', capySfxAt);
     game.completeTask('wheek');
     game.shake(0.14);
     // a wheek from centre stage is the joke — the player earns the task.
@@ -5019,6 +5048,30 @@ export function createCapybara(game) {
     if (capyLoaf < 0.0015 && loafWant === 0) capyLoaf = 0;
     capy.loaf = capyLoaf;
 
+    // ---- ...AND IT SAYS SO (F4) -----------------------------------------
+    // The whole calm layer — the pose drop, the pad coming up, the filter
+    // closing, `calmLean` widening on sysLoafNow — rewards sitting down, and
+    // the animal itself was silent through all of it. See sfxPurr.
+    //
+    // RARE AND JITTERED, in the ambience ladder's idiom rather than on a
+    // rhythm: the point of the loaf is that nothing is happening, and a noise
+    // that arrives on a beat is something happening. The timer is only wound
+    // while the animal is actually sat, and it is reset the moment it stands,
+    // so getting up and sitting down again does not fire one instantly.
+    if (capyLoaf > capyPURR_AT) {
+      capyPurrT -= dt;
+      if (capyPurrT <= 0) {
+        capyPurrT = rand(4.5, 9.0);
+        if (typeof game.sfx === 'function') {
+          capySfxAt.volume = rand(0.55, 0.85) * capyLoaf;
+          capySfxAt.pitch = rand(0.94, 1.08);
+          game.sfx('purr', capySfxAt);
+        }
+      }
+    } else {
+      capyPurrT = rand(2.0, 4.5);
+    }
+
     if (input.honkPressed) capyWheek();
 
     // The action key is shared with the condor, and condor.js runs AFTER this
@@ -5258,6 +5311,28 @@ export function createCapybara(game) {
               game.physics && typeof game.physics.dust === 'function') {
             game.physics.dust(px, body.position.y - 0.26, pz, 1 + Math.round(fl * 3));
           }
+        }
+        // ---- AND THE OTHER HALF OF THIS GATE WAS SILENT (F4) -----------
+        // `capySwimming` forces `moving` true and pins `gaitRate` at 7.5, so
+        // the leg phase and this half-cycle have ALWAYS been running while
+        // the animal swims — and the only thing on the far side of them was a
+        // gate that begins `!capySwimming`. A capybara is a swimming animal,
+        // the game has a dive verb, two chapters are mostly water, and the
+        // one place the stroke was already being counted made no sound at
+        // all.
+        //
+        // Not `step` with a wet flag: a stroke is not a footfall on water, it
+        // is a paddle UNDER it, and `splash` is the voice for that. Every
+        // other stroke, because the phase is two per cycle and a capybara
+        // paddles diagonally — the same couplet the walk uses — so one per
+        // cycle is the pair that actually breaks the surface.
+        //
+        // Silent while DIVING: underwater there is no surface to break, and
+        // the dive has its own bus.
+        else if (capySwimming && !capyDiving && !carried && capyStepPhase % 2 === 0) {
+          capySfxAt.volume = rand(0.28, 0.42);
+          capySfxAt.pitch = rand(0.9, 1.25);
+          game.sfx('splash', capySfxAt);
         }
       }
     } else {

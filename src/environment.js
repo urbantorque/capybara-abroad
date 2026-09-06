@@ -3536,6 +3536,17 @@ export function createEnvironment(game) {
      * where you are already standing on the spot.
      */
     nextIn(id) {
+      // ---- AND THE OTHER THING IN THIS CHAPTER THAT MAKES YOU WAIT (F4) --
+      // `whippy-run` is measured in METRES RIDDEN IN ONE GO, and metres only
+      // accrue while she is actually driving (see the `envVanDwell <= 0` gate
+      // on the ride). So a player who does the hard part — getting onto the
+      // roof — at the wrong moment stands on a stationary van for up to
+      // eleven seconds with the counter frozen and nothing anywhere saying
+      // why. That is the same complaint the ferry hook below was written for,
+      // in the same chapter, about the row directly under it.
+      //
+      // Zero while she is rolling: the window IS the leg.
+      if (id === 'whippy-run') return envVanDwell > 0 ? envVanDwell : 0;
       if (id !== 'ferry-ride') return -1;
       if (envFerryDocked) return 0;
       const N = envFERRY_N;

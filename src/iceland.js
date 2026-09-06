@@ -4512,6 +4512,12 @@ export function createIceland(game) {
      *  sending a player straight up a frictionless twenty-degree slope is a joke
      *  that stops being funny the second time. */
     glacierTop: { x: iceMOR_X0 + 6, z: iceGL_Z1 + 22 },
+    /** THE MIDDLE OF THE LAGOON, for the ambience anchor table in systems.js.
+     *  A berg groaning is the one sound in this chapter that must come from
+     *  somewhere specific and is not Strokkur — the lagoon is 52 m of water
+     *  with ice on it and the player walks all the way round it, so an
+     *  unanchored groan would follow them onto the lava field. See sysAMB_AT. */
+    lagoon: { x: 0, z: (iceLAG_Z0 + iceLAG_Z1) * 0.5 },
 
     /** 0..1 — read by systems.js, which grows the score a choir on it. */
     aurora() { return iceAurora; },

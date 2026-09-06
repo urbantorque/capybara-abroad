@@ -5319,6 +5319,44 @@ export function createVenice(game) {
     // is not a moment here, it is most of a minute, and reporting a countdown
     // through it would be counting down to something already true.
     nextIn(id) {
+      // ---- THE OTHER TWO TIDE TASKS WERE NOT IN HERE (F4) ---------------
+      // Four of this chapter's rows are "be somewhere when the water does
+      // something" and only two of them answered. The two that did not are
+      // the ones the chapter is actually about: the marquee, and the run.
+      //
+      // `acqua-alta` is NOT the same question as `mirror-swim`. Those two ask
+      // when the tide is HIGH — the plateau at venTIDE_RISE1 — and the
+      // marquee fires on the frame the square first goes UNDER, which is
+      // partway up the ramp and a good deal earlier. Answering RISE1 for it
+      // would have counted down past the only moment it can be earned.
+      if (id === 'acqua-alta') {
+        // Open now, including the eighteen-second grace after the crossing.
+        if (venFloodWin > 0 || venIsOverWater(0, -34)) return 0;
+        // Walk the phase forward through venTideY ITSELF rather than solving
+        // the smoothstep for the crossing: the ramp is authored there and a
+        // second copy of it here would go stale the first time somebody moved
+        // venTIDE_HIGH. 400 steps over a 205 s cycle is half-second
+        // resolution, which is finer than a countdown on paper can show.
+        const gate = venTerrain(0, -34) + 0.22;
+        for (let i = 1; i <= 400; i++) {
+          let ph = venPhase + i / 400;
+          if (ph >= 1) ph -= 1;
+          if (venTideY(ph) > gate) return (i / 400) * venTIDE_PERIOD;
+        }
+        return -1;                      // no crossing in a whole cycle
+      }
+      // The boards are the other half of the same clock, and they are OUT for
+      // most of it: from the siren at venTIDE_WARN until the water has gone.
+      // `venBoardOut` rather than the phase alone, because they rise on a
+      // damper and standing under one that has not arrived is not a run.
+      if (id === 'passerelle') {
+        if (venBoardOut > 0.7) return 0;
+        let d = venTIDE_WARN - venPhase;
+        if (d < 0) d += 1;
+        // ...plus the second or so they take to come up, which is the whole
+        // reason this row cannot be attempted the instant the siren goes.
+        return d * venTIDE_PERIOD + 1.0;
+      }
       if (id !== 'mirror-swim' && id !== 'flooded-cafe') return -1;
       if (venPhase >= venTIDE_RISE1 && venPhase < venTIDE_FALL0) return 0;
       let d = venTIDE_RISE1 - venPhase;
