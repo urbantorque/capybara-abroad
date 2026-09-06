@@ -2920,6 +2920,62 @@ const sysPREFS_KEY = 'capy3.prefs.v1';
 const sysVOL_CEIL = 0.85;
 let sysVolMaster = 1, sysVolMusic = 1, sysVolSfx = 1;
 let sysMuteMaster = false, sysMuteMusic = false, sysMuteSfx = false;
+// ---- THE LENS, AND WHO IS DRIVING IT (F4) ---------------------------------
+//
+// `sysLookK` scales EVERY yaw input in the game and `sysLookInv` flips it.
+// There are six sites — a mouse or a finger dragging, a pad's right stick, its
+// two shoulder buttons, and Z and X — and until now the sensitivity of each
+// was a constant chosen once, so a player for whom the camera was too fast had
+// no move except to stop turning. It is the single most-asked-for setting in
+// any third-person game and the one this card did not have.
+//
+// ONE MULTIPLIER AT THE SITES, not a divisor on the damper: `camYawTarget` is
+// what these write and `camYaw` chases it, so scaling the TARGET's deltas
+// changes how far a gesture goes and leaves the feel of the chase — which is
+// tuned, and which "less motion" and the rigs also read — completely alone.
+//
+// 25% to 200%. The bottom is a player who wants to nudge the camera and the
+// top is one who wants to whip it round; wider than that in either direction
+// stops being a preference and becomes a different game.
+const sysLOOK_MIN = 0.25, sysLOOK_MAX = 2.0;
+let sysLookK = 1, sysLookInv = false;
+/** The signed multiplier every yaw input site applies. One reader, one rule. */
+function sysLookMul() { return sysLookInv ? -sysLookK : sysLookK; }
+// ...and the field of view, which is the other half of "how does this look to
+// me". It reuses `sysFOV_MIN`/`sysFOV_MAX` — 41 and 61, already declared up at
+// the sysFOV_* block and already the clamp the speed, flow and dive terms are
+// held inside. The roadmap asked for a fader "clamped 41-61" and the numbers
+// were already in the file under those exact names; a second pair here would
+// have been two sources of truth for one range.
+let sysFovPref = sysFOV_BASE;
+// ...and the HUD's type scale. A multiplier on one custom property rather than
+// a second set of sizes: every size in this sheet is already a clamp() in
+// px and vw, so one factor moves all of them and keeps every relationship
+// between them exactly as it was drawn.
+const sysTEXT_STOPS = [0.9, 1, 1.15];
+let sysTextK = 1;
+// ---- HOLD TO TOGGLE (F4) --------------------------------------------------
+// Off by default and deliberately: holding is the right default feel for both
+// verbs, and this is an access setting rather than a mode. See sysLatch.
+let sysHoldToggle = false;
+let sysRunLatch = false, sysSlideLatch = false, sysRunWas = false, sysSlideWas = false;
+/**
+ * A held boolean, turned into a toggled one, on the PRESS edge.
+ *
+ * Edge-triggered rather than level-triggered, which is the whole of it: a
+ * level test would flip the latch on every frame the key is down and the verb
+ * would buzz at sixty hertz. `was` remembers the previous frame per name so
+ * one function serves both verbs without either of them knowing.
+ */
+function sysLatch(which, held) {
+  const run = which === 'run';
+  const was = run ? sysRunWas : sysSlideWas;
+  if (held && !was) {
+    if (run) sysRunLatch = !sysRunLatch; else sysSlideLatch = !sysSlideLatch;
+  }
+  if (run) sysRunWas = held; else sysSlideWas = held;
+  return run ? sysRunLatch : sysSlideLatch;
+}
 let sysPrefsOff = false;           // storage refused us — say so once, like R3
 function sysPrefsNum(v, d) {
   return (typeof v === 'number' && v === v) ? clamp(v, 0, 1) : d;
@@ -2934,6 +2990,17 @@ function sysPrefsRead() {
   sysVolMaster = sysPrefsNum(o.m, 1);
   sysVolMusic  = sysPrefsNum(o.u, 1);
   sysVolSfx    = sysPrefsNum(o.s, 1);
+  // ---- THE LENS AND THE TYPE (F4) --------------------------------------
+  // Grown ADDITIVELY, which is what the note at the foot of this function
+  // requires: `v` stays 1, every new field is optional, and a file written by
+  // an older build simply arrives without them and gets the defaults. Each is
+  // clamped on the way in for the same reason the volumes are — a hand-edited
+  // file must degrade to a default and never to a NaN in a camera.
+  if (typeof o.lk === 'number' && o.lk === o.lk) sysLookK = clamp(o.lk, sysLOOK_MIN, sysLOOK_MAX);
+  sysLookInv = !!o.li;
+  if (typeof o.fv === 'number' && o.fv === o.fv) sysFovPref = clamp(o.fv, sysFOV_MIN, sysFOV_MAX);
+  if (typeof o.tk === 'number' && o.tk === o.tk) sysTextK = clamp(o.tk, 0.9, 1.15);
+  sysHoldToggle = !!o.ht;
   sysMuteMaster = !!o.mm;
   sysMuteMusic  = !!o.um;
   sysMuteSfx    = !!o.sm;
@@ -2952,6 +3019,8 @@ function sysPrefsWrite() {
       m: sysVolMaster, u: sysVolMusic, s: sysVolSfx,
       mm: sysMuteMaster ? 1 : 0, um: sysMuteMusic ? 1 : 0, sm: sysMuteSfx ? 1 : 0,
       c: calmPreference(),
+      lk: sysLookK, li: sysLookInv ? 1 : 0, fv: sysFovPref, tk: sysTextK,
+      ht: sysHoldToggle ? 1 : 0,
     }));
   } catch (e) { sysPrefsOff = true; }
 }
@@ -5221,6 +5290,38 @@ const sysGLYPHS = {
  * wrong for a mark that has to be ink on paper here, accent on a hover there
  * and paper on the button that inverts. A glyph has no colours of its own.
  */
+/**
+ * EVERY TYPE SIZE IN THE HUD, TIMES ONE NUMBER (F4).
+ *
+ * The sheet has seventy-two `font-size` declarations and every one of them is
+ * either a `clamp(px, vw, px)` or a bare px — which is the right way to have
+ * written them (the relationships between them are drawn, and a vw term keeps
+ * them honest across a phone and a 1440 desktop) and is exactly what makes a
+ * text-size preference hard: there is no root size to scale.
+ *
+ * So the sheet is rewritten ONCE, at the moment it is built, and every size
+ * becomes `calc(<what it was> * var(--capyui-t, 1))`. Three things recommend
+ * doing it here rather than by hand at seventy-two sites: it cannot go stale
+ * when somebody adds a rule, it keeps every clamp readable as the number it
+ * was authored as, and the default of 1 means the produced sheet is
+ * arithmetically identical to the old one for anybody who never touches the
+ * setting.
+ *
+ * DELIBERATELY TYPE ONLY. `zoom` on the root would have been one line and
+ * would also have scaled the chart, the touch fan and the stamina bar — which
+ * is a different setting ("make everything bigger") that this game's HUD, laid
+ * out in absolute corners, is not built to survive.
+ */
+function sysScaleType(css) {
+  return css.replace(/font-size:(clamp\([^()]*\)|[0-9.]+px)/g,
+                     'font-size:calc($1 * var(--capyui-t,1))');
+}
+/** Publish the multiplier. One custom property, on the HUD root. */
+function sysTextApply() {
+  const el = document.getElementById('hud');
+  if (el) el.style.setProperty('--capyui-t', String(sysTextK));
+}
+
 function sysBuildGlyph(name) {
   const def = sysGLYPHS[name];
   if (!def) return null;
@@ -7526,6 +7627,18 @@ function sysBuildCSS() {
   'border:1px solid ' + paper + ';box-shadow:' + shSm + ';}',
 '.capyui-setrange::-moz-range-thumb{width:15px;height:15px;border-radius:50%;',
   'background:' + accent + ';border:1px solid ' + paper + ';}',
+/* ---- THE SECOND HALF OF THE CARD (F4) --------------------------------
+   A rule with a word on it, in the same shape `.capyui-legsplit` uses inside
+   the journal's legend — the one place this HUD already had to say "and now a
+   different kind of thing". Reused rather than reinvented for the reason the
+   rows below are: this card may not grow a third vocabulary. */
+'.capyui-setsplit{display:flex;align-items:center;gap:8px;margin:11px 0 8px;',
+  'font-size:clamp(9px,1.6vw,10px);letter-spacing:.06em;text-transform:lowercase;',
+  'color:' + inkSoft + ';opacity:.75;}',
+'.capyui-setsplit::after{content:"";flex:1 1 auto;height:1px;background:' + inkFaint + ';}',
+/* A value with no mute button beside it takes that column too, so the numbers
+   in both halves of the card sit on one right edge. */
+'.capyui-setval.wide{flex:0 0 72px;}',
 '.capyui-setrange:focus{outline:none;}',
 '.capyui-setrange:focus-visible{outline:2px solid ' + accent + ';outline-offset:3px;}',
 /* The per-bus mute, which is a button and not a checkbox: it has two states and
@@ -7959,7 +8072,18 @@ function sysBuildCSS() {
 '.capyui-stam i{display:block;height:100%;width:100%;border-radius:999px;',
   'background:' + tick + ';transform-origin:0 50%;transition:background ' + dMed + ' ease;}',
 '.capyui-stam.low i{background:' + accent + ';}',
-'.capyui-stam.blown{animation:capyui-blink 0.9s ease-in-out infinite;}',
+/* ---- BLOWN IS HOLLOW, NOT BLINKING (F4) ------------------------------
+   It was `animation: capyui-blink infinite` — a bar flashing once a second for
+   as long as the animal has no puff, which is the loudest thing on the screen
+   at the one moment the player is already in trouble, and an infinite
+   animation that "less motion" never switched off.
+   A hollow capsule says the same thing and says it at a glance: the track goes
+   to nothing, the fill goes to nothing, and what is left is an accent ring
+   where a full bar used to be. Empty is a SHAPE, and it does not need to move
+   to be read. */
+'.capyui-stam.blown{background:transparent;',
+  'box-shadow:inset 0 0 0 1.5px ' + accent + ',' + shMd + ';animation:none;}',
+'.capyui-stam.blown i{background:transparent;}',
 
 /* ---------- the way home ---------- */
 '.capyui-home{position:absolute;left:50%;bottom:clamp(18px,5vh,44px);',
@@ -15871,8 +15995,9 @@ export function createSystems(game) {
   const hudRoot = document.getElementById('hud');
   hudRoot.classList.add('capyui', 'capyui-font');
   const styleTag = sysEl('style');
-  styleTag.textContent = sysBuildCSS();
+  styleTag.textContent = sysScaleType(sysBuildCSS());
   document.head.appendChild(styleTag);
+  sysTextApply();
 
   // --- title card ----------------------------------------------------------
   // ELEVEN PLACES DO NOT FIT IN A ROW OF TORN TICKETS.
@@ -16977,6 +17102,107 @@ export function createSystems(game) {
     prefsSoon();
   });
   pauseSet.appendChild(pauseCalm);
+
+  // ---- THE LENS, THE TYPE, AND HOW A BUTTON BEHAVES (F4) ----------------
+  //
+  // Four more controls, and every one of them is the same two components this
+  // card already has: `pauseFader`'s row for anything with a range, and
+  // `pauseCalm`'s label-and-checkbox for anything with two states. Nothing new
+  // is drawn — a settings card that grows a third vocabulary for its fourth
+  // setting is a settings card nobody can scan.
+  //
+  // ONE SEPARATOR between the mix and the rest, because they are two different
+  // kinds of question: the three faders above are about this room, and these
+  // are about this player.
+  pauseSet.appendChild(sysEl('div', 'capyui-setsplit', 'and how it handles'));
+
+  /** A fader over an arbitrary range, formatted by its own function. */
+  function pauseRange(name, aria, lo, hi, step, get, set, fmt) {
+    const row = sysEl('div', 'capyui-setrow');
+    row.appendChild(sysEl('div', 'capyui-setname', name));
+    const rng = document.createElement('input');
+    rng.type = 'range';
+    rng.className = 'capyui-setrange';
+    rng.min = String(lo); rng.max = String(hi); rng.step = String(step);
+    rng.setAttribute('aria-label', aria);
+    const val = sysEl('div', 'capyui-setval', '');
+    const sync = function () {
+      const v = get();
+      rng.value = String(v);
+      // The VALUE is the thing a player reads back, so it is the human number
+      // and not the internal one — 150%, not 1.5, and 52° and not 52.
+      val.textContent = fmt(v);
+      rng.setAttribute('aria-valuetext', fmt(v));
+    };
+    // `input`, not `change`, for the reason the volume faders give: a setting
+    // you cannot see yourself setting is a setting you set twice.
+    rng.addEventListener('input', function () {
+      set(+rng.value);
+      sync();
+      prefsSoon();
+    });
+    rng.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    row.appendChild(rng);
+    // No mute button on these three, so the value takes the mute's column as
+    // well and the numbers still line up with the three above.
+    val.classList.add('wide');
+    row.appendChild(val);
+    pauseSet.appendChild(row);
+    sync();
+    return { rng: rng, sync: sync };
+  }
+  /** A checkbox row, in `less motion`'s shape. */
+  function pauseSwitch(label, get, set) {
+    const el = sysEl('label', 'capyui-setcalm');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = !!get();
+    el.appendChild(box);
+    el.appendChild(document.createTextNode(label));
+    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    box.addEventListener('change', function () { set(box.checked); prefsSoon(); });
+    pauseSet.appendChild(el);
+    return { box: box, sync: function () { box.checked = !!get(); } };
+  }
+
+  const pauseLook = pauseRange('look', 'camera sensitivity', 25, 200, 5,
+    function () { return Math.round(sysLookK * 100); },
+    function (v) { sysLookK = clamp(v / 100, sysLOOK_MIN, sysLOOK_MAX); },
+    function (v) { return v + '%'; });
+  const pauseFov = pauseRange('view', 'field of view', sysFOV_MIN, sysFOV_MAX, 1,
+    function () { return Math.round(sysFovPref); },
+    function (v) { sysFovPref = clamp(v, sysFOV_MIN, sysFOV_MAX); },
+    function (v) { return v + '°'; });
+  // THE TYPE ROW IS THREE STOPS, NOT A FADER. Type has sizes, not a continuum:
+  // a slider here invites somebody to sit between two of them and get a
+  // half-pixel rounding on every clamp in the sheet. See sysTEXT_STOPS.
+  const pauseText = pauseRange('text', 'text size', 0, sysTEXT_STOPS.length - 1, 1,
+    function () {
+      let best = 1;
+      for (let i = 0; i < sysTEXT_STOPS.length; i++) {
+        if (Math.abs(sysTEXT_STOPS[i] - sysTextK) < Math.abs(sysTEXT_STOPS[best] - sysTextK)) best = i;
+      }
+      return best;
+    },
+    function (v) { sysTextK = sysTEXT_STOPS[clamp(Math.round(v), 0, sysTEXT_STOPS.length - 1)]; sysTextApply(); },
+    function (v) { return ['small', 'normal', 'large'][clamp(Math.round(v), 0, 2)]; });
+  const pauseInv = pauseSwitch('invert turning',
+    function () { return sysLookInv; },
+    function (v) { sysLookInv = !!v; });
+  // HOLD-TO-TOGGLE, and it wraps RUN AND SLIDE ONLY. Those are the two verbs
+  // in this game that are held for a long time — a sprint across a chapter, a
+  // slide down a glacier — and holding a key for a minute is the one input
+  // this game asks for that some hands cannot give. Everything else here is a
+  // tap already, and a toggle on a tap is just a bug.
+  const pauseHold = pauseSwitch('hold to toggle run and slide',
+    function () { return sysHoldToggle; },
+    function (v) {
+      sysHoldToggle = !!v;
+      // Leaving the setting must not leave a latch on.
+      sysRunLatch = false; sysSlideLatch = false;
+    });
+  void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold;
+
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
     'kept on this machine, not in the journey.'));
   pauseCard.appendChild(pauseSet);
@@ -24222,7 +24448,8 @@ export function createSystems(game) {
       dx = (sysDragLastX === null) ? 0 : (e.clientX - sysDragLastX);
       sysDragLastX = e.clientX;
     }
-    if (dx) { camYawTarget -= dx * 0.005; camHandT = sysCAM_HAND_T; }
+    // Every yaw input in the game goes through sysLookMul(). See sysLookK.
+    if (dx) { camYawTarget -= dx * 0.005 * sysLookMul(); camHandT = sysCAM_HAND_T; }
   });
   function endPointer(e) {
     if (e.pointerType === 'mouse' && e.button === 0) mouseAction = false;
@@ -24809,12 +25036,12 @@ export function createSystems(game) {
     // Z and X are a 2.4 rad/s ramp with no middle. A stick has a middle.
     padAxis2(a[2] || 0, a[3] || 0, sysPAD_LOOKD, padR);
     if (padR.x || padR.y) {
-      if (padR.x) { camYawTarget -= padR.x * sysPAD_YAW * dt; camHandT = sysCAM_HAND_T; }
+      if (padR.x) { camYawTarget -= padR.x * sysPAD_YAW * dt * sysLookMul(); camHandT = sysCAM_HAND_T; }
       if (padR.y) camDistTarget = clamp(camDistTarget + padR.y * sysPAD_ZOOM * dt, sysCAM_MIN, sysCAM_MAX);
     }
     // The shoulders nudge the rig too — the same job the keyboard's Z and X do.
-    if (padBtn(g, 4)) { camYawTarget += dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
-    if (padBtn(g, 5)) { camYawTarget -= dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
+    if (padBtn(g, 4)) { camYawTarget += dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
+    if (padBtn(g, 5)) { camYawTarget -= dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
     // Right stick click: put the rig behind me, exactly as C does.
     const snap = padBtn(g, 11);
     if (snap && !padWasSnap && started) {
@@ -28061,8 +28288,9 @@ export function createSystems(game) {
     }
     input.x = ix;
     input.z = iz;
-    input.run = !!(keys.ShiftLeft || keys.ShiftRight) || padRun ||
-                (stickActive && Math.hypot(stickX, stickZ) > 0.86);
+    const runHeld = !!(keys.ShiftLeft || keys.ShiftRight) || padRun ||
+                    (stickActive && Math.hypot(stickX, stickZ) > 0.86);
+    input.run = sysHoldToggle ? sysLatch('run', runHeld) : runHeld;
     input.honk = started && (!!keys.KeyQ || touchHonk || padHonk);
     input.action = started && (!!keys.KeyE || mouseAction || touchAction || padAction);
     input.whistle = input.honk;          // one mouth, one button — see the keydown note
@@ -28088,7 +28316,18 @@ export function createSystems(game) {
     // and Z turn the camera, V raises the eye, F re-aims, R is the rescue.
     // G is free, it is one stretch of the index finger from WASD, and it
     // carries no browser chord in any engine.
-    input.slide = started && (!!keys.KeyG || padSlide || touchSlide);
+    const slideHeld = started && (!!keys.KeyG || padSlide || touchSlide);
+    // ---- HOLD TO TOGGLE (F4) -------------------------------------------
+    // Wrapped around RUN and SLIDE and nothing else, because those are the two
+    // verbs here that are held for a long time — a sprint across a chapter, a
+    // slide down a hundred and thirty metres of glacier — and holding a key
+    // for a minute is the one thing this game asks for that some hands cannot
+    // give. Everything else is a tap already, and a toggle on a tap is a bug.
+    //
+    // The latch is edge-triggered inside sysLatch, so the whole feature is one
+    // wrapper at each of the two sites and no other reader changes: capybara.js
+    // still sees a plain held boolean and cannot tell which way it was made.
+    input.slide = sysHoldToggle ? sysLatch('slide', slideHeld) : slideHeld;
 
     // ---- THE WARDROBE -------------------------------------------------------
     // One row per costume, and the whole rule is: you are in the chapter, and
@@ -28205,8 +28444,8 @@ export function createSystems(game) {
     if (started) {
       // Z/X rather than Q/R: an adjacent pair reads as an axis, the left one
       // turns left, and Q is now the voice. The mouse is still the real camera.
-      if (keys.KeyZ) { camYawTarget += dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
-      if (keys.KeyX) { camYawTarget -= dt * sysCAM_KEY_RATE; camHandT = sysCAM_HAND_T; }
+      if (keys.KeyZ) { camYawTarget += dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
+      if (keys.KeyX) { camYawTarget -= dt * sysCAM_KEY_RATE * sysLookMul(); camHandT = sysCAM_HAND_T; }
     }
     if (camHandT > 0) camHandT -= dt;
     // ---- THE FRAMING ENVELOPE (v26) -----------------------------------
@@ -28556,7 +28795,15 @@ export function createSystems(game) {
     restIdleT = (Math.abs(ix) + Math.abs(iz) >= 0.02) ? 0
               : clamp(restIdleT + (camIdle ? dt : -dt * sysREST_FORGET),
                       0, sysREST_T + 0.5);
-    const restAsk = (started && !mounted &&
+    // ---- ...AND NOT IF YOU ASKED FOR LESS MOTION (F4) -------------------
+    // This is the rest lens: stand still long enough and the camera opens out
+    // and lifts on its own. It is one of the nicest things in the game and it
+    // is also the single largest piece of camera movement the player did not
+    // ask for — which is the exact definition of what "less motion" is for,
+    // and it was the one motion system in the file that had never read the
+    // switch. Every other term in this block already does (`breathe` on the
+    // field of view, the shake, the sway, the bob).
+    const restAsk = (started && !mounted && !sysCalmOn() &&
                      camHandT <= 0 && restIdleT >= sysREST_T) ? sysREST_W : 0;
     skyRestT = damp(skyRestT, restAsk,
                     restAsk > 0 ? sysREST_LAMBDA : sysREST_DROP, dt);
@@ -29050,8 +29297,14 @@ export function createSystems(game) {
       // breaks — which is what makes a long run feel different from a fast one.
       // Both are on the same `breathe` gate, so a player who asked the system
       // for less motion gets neither. See THE FLOW.
-      const fovWant = clamp(sysFOV_BASE + (fovSpeed * sysFOV_SPEED + sysFlowNow * sysFLOW_FOV
-                                           + fovKick - slow * sysFOV_SLOW) * breathe,
+      // ...and the BASE is the player's now (F4). It replaces sysFOV_BASE in
+      // this one expression and nowhere else: every term above is a delta ON a
+      // base and none of them cares what that base is, so a preference here
+      // moves the whole lens without touching what speed, flow or a hitstop do
+      // to it. Defaults to sysFOV_BASE exactly, so a player who never opens the
+      // card gets the frame this game was composed in, to the degree.
+      const fovWant = clamp(sysFovPref + (fovSpeed * sysFOV_SPEED + sysFlowNow * sysFLOW_FOV
+                                          + fovKick - slow * sysFOV_SLOW) * breathe,
                             sysFOV_MIN, sysFOV_MAX);
       // updateProjectionMatrix rebuilds a matrix and dirties the frustum, so it
       // is only called when a viewer could tell.
