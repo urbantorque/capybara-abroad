@@ -14,6 +14,105 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FINISH, THE SHELF (F4 — 6 Sep 2026)
+
+**LANDED.** The three "if the clock allows" lists and most of the shelf, in six
+commits. `ROADMAP-FINISH.md` carries the remainder under **STILL OPEN AFTER
+F4** — the split of "less motion", the touch camera/paper, "do this place
+again", the contrast instrument, one QA probe, and the objectives block.
+
+**THREE FEATURES HAD NEVER ONCE RUN.** Every one of them was written, correct,
+and unreachable, which is the pattern this whole roadmap keeps finding:
+
+- **The wheek variant.** systems.js's `capy:wheek` handler ran on the EMIT and
+  played a plain `sfx('wheek')` five lines before capybara.js's own placed,
+  variant-chosen call — which then landed inside `sfxGap.wheek` and was
+  dropped. MEASURED: the capybara's call created **0 audio nodes**, on both
+  paths. So the soft wheek (quieter, a semitone down, after 1.2 s settled) had
+  never been audible and every wheek in the game was mono in a mix where
+  everything else the animal does is placed. There are four rows now — blown,
+  keyed, calm, plain — and the handler keeps the lens and the room.
+- **condor.js's teaching line.** `game.say` is npc.js's `sayAt(x, y, z, text)`
+  and it was called with one string; `sayAt` begins `if (!text) return`.
+  MEASURED: returns undefined, adds neither a bubble nor a toast. `game.hud.say`
+  is the one that takes a sentence, and it is the only caller of `sysSay` — the
+  substitution that turns "press Q" into "tap WHEEK" on a phone, written for
+  patterns like this one and never handed this string.
+- **Every `t` in `sysMAP_WORLDS`.** Nineteen authored labels — 'the ferry
+  wharf', 'up the Corso', 'the lantern plinth' — and the only thing that had
+  ever read one was a test hook.
+
+**THE CHART SAYS WHICH DOOR, THE PAPER SAYS WHAT A ROW IS.** Only the way mark
+gets a label: the chart is 104 baked pixels and the landmarks are meant to be
+read off the coastline. Drawn as the distance pill that is already text on this
+chart, clamped inside the canvas, and flipped to the other side of the ring
+when it would cover where you are — measured in Venice, where it did. On the
+paper, a four-point sparkle for a marquee and the same shape smaller for the
+middle rung: nineteen rows are marquees and thirty-two are the middle tier, and
+the card showed one flat list of equal chores.
+
+**SYDNEY GETS A SHAPE.** The last flat list in the first third of the game, in
+the chapter every player opens on, with the longest row count anywhere. Three
+acts over the existing rows — the gardens, the forecourt, the promenade — which
+is how the place is already laid out. `win: 4` rather than the 3 the other act
+chapters use, because act one is ten rows and this is also the chapter teaching
+a player what the paper is.
+
+**THE FRAME AND THE OPTIONS.** Six new controls and not one new component. A
+LOOK fader (25–200%) and INVERT TURNING feeding six yaw input sites through one
+multiplier applied to the target's deltas, never to the damper — measured 0.30
+/ 0.97 / 2.13 rad for two identical presses at 25 / 100 / 200%. A VIEW fader
+reusing `sysFOV_MIN`/`MAX`, which were already declared with exactly the 41 and
+61 the roadmap asked for. A TEXT row of three stops, done by rewriting the
+sheet ONCE as it is built so every `font-size` becomes
+`calc(<what it was> * var(--capyui-t,1))` — seventy-two declarations, none of
+which can go stale, and arithmetically identical at the default. HOLD TO TOGGLE
+wrapping run and slide only. And the whole card is reachable from the title
+now, in a smaller state, because the one screen where somebody is deciding
+whether to play at all was the one screen with no settings on it.
+
+**THE REST LENS READS THE MOTION SWITCH**, and the stamina bar is HOLLOW rather
+than blinking — an infinite one-second flash at the moment the player is
+already in trouble, and an animation "less motion" never switched off.
+
+**THE CROWDS LOOK UP.** Venice's gawpers and the Quay's stopped commuters turn
+to the animal inside twelve metres. PICKED, not lerped: two bearings blended by
+weight go the long way round whenever the pair straddles ±π. Venice's best
+third measured 0.29 / 0.07 / 0.32 rad from three positions round the same
+people; the Quay reads nothing until the probe is sited at a route ENDPOINT,
+because people there only ever pause at the two ends of their line.
+
+**THE OWNER CARRIES IT BACK**, and `physRescue` DOES NOT RESTORE A BODY TYPE —
+it repositions and nothing else, so leaving the un-pinning to it would have
+left every retrieved prop kinematic for the session: immovable, un-grabbable,
+unable to fall. The type is remembered rather than assumed and restored on
+every path out, including the chapter change, which is the one path
+`localOwnStep` cannot see. Measured: kinematic props 9 before, 8 after, 8 after
+a round trip.
+
+**TWO MEASUREMENTS THAT CHANGED THE DESIGN.** A four-point sparkle at outer 10
+against inner 3.2 renders as a **plus sign** at the ten pixels it is actually
+used at; and the off-screen speaker toast, working exactly as written, put
+**twenty-six pills in twenty seconds** while standing in Sydney's crowd. Fat
+arms, and a nine-second fence: 1 in twenty seconds now.
+
+**AND A SOURCE FILE THAT DOES NOT PARSE NOW FAILS THE BUILD.** `qa/strip-test.
+mjs` is the only thing in the suite that parses `src` at all, and when the
+BASELINE parse failed it printed a parenthetical and continued — so `npm test`
+reported "10 checks, 0 failed" on a `systems.js` with a hard syntax error in
+it. Proved by breaking `condor.js` on purpose and watching it go red. It did
+not catch the other failure of the same session — a `sed` that collapsed its
+own newlines and left a `const` inside a comment, which parses and fails at
+runtime — and nothing static can; `game.state.lastError` in a probe is what
+found that one.
+
+**Verified:** `npm test` 10/10; the 19-chapter driven soak with `KeyG` in the
+driver, 39 rows, 0 faults, frame time flat at 16.5–16.8 ms, Sydney at 160
+bodies on all three visits; build clean at 5640 KB. Instruments: `qa/f4-*.js`
+(wheek, audio, place, map, card, glyph, acts, heads, heads2, carry, carry2,
+say, touch, touch2, set, hud, pre, hear, hear2). Two harness hooks added:
+`game.forceErrand(prop)` and `game.hud.mixAudit()`'s `prog`/`shim`.
+
 ## THE FINISH, THE THREE HALVES (F3b — 6 Sep 2026)
 
 **LANDED.** The three items F3 shipped in part, finished. Nothing on

@@ -679,6 +679,21 @@ chapters. Count node creations per footstep before and after the offset: equal.
 
 ## The shelf — sized, not scheduled
 
+> **F4, 6 Sep 2026 — MOST OF THIS IS DONE.** The three "if the clock allows"
+> lists above and the shelf below were worked through in one session after F3b,
+> in six commits (`d2b29db`, `2b6856b`, `15b6a11`, `220a22f`, `e990750`,
+> `ee74a52`). CONTRACT.md carries the F4 section. What is left is named at the
+> foot of this file under **STILL OPEN AFTER F4** — and nothing else in this
+> document is outstanding.
+>
+> **Two items in these lists were already built and are recorded as stale
+> rather than done:** the second convolver and the room crossfade (v41 built
+> it, `musRoomLoad` has been crossfading two slots over `sysMUS_ROOM_XF` since
+> then) and the `document.hidden` early-return in `musTick` (the context is
+> `suspend()`ed on `visibilitychange` and `musTick`'s first line already
+> returns on a non-running context, so the guard would be a third gate on the
+> same fact).
+
 Gap 4 in full, and the objective-design items that need authoring more than
 code. If there is a fourth and fifth session, this is the order.
 
@@ -841,3 +856,46 @@ sink as `qa/<name>.json.png`.
 - `npm test` green; the 19/19 soak clean on both laps; frame time within
   0.5 ms of today in every chapter; `web-design-guidelines` run against the
   changed HUD block; `playwright-cli close-all` run last.
+
+---
+
+## STILL OPEN AFTER F4 (6 Sep 2026)
+
+Everything else in this document is done. This is the whole remainder, and each
+line says why it was not taken rather than only that it was not.
+
+**From gap 4 — the frame and the options.**
+
+- **Split "less motion" into three rows** (~2 h of the 3 h item). The gate on
+  the auto-recentre and the field-of-view fader — the two substantive halves of
+  that item — are done. The split itself is bigger than the row count suggests:
+  `sysCalmOn()` is read across six files and by a dozen separate motion terms,
+  and splitting it means every one of those readers deciding which KIND of
+  motion it is. That is a design pass over the calm system, not a settings row.
+- **Camera and paper on the pause card for touch; re-aim as a tap on the row**
+  (2 h). The re-aim half already exists — every task row is a `role="button"`
+  with a `pointerdown` that calls `todoPinTo` (`systems.js:17233`). What is
+  missing is the photo mode and the journal on the card for a thumb.
+- **"Do this place again" with the in-paper confirm** (3 h). Untouched. It is
+  the only item in gap 4 that can DESTROY something — it un-ticks a chapter's
+  rows — and it wants the confirm pattern `pauseAsk` already has, wired to a
+  per-chapter reset that nothing in the save layer currently offers.
+- **`qa/uicontrast.js` generalised to the in-play HUD at 1440 and 390** (2 h).
+  The instrument exists for the title card only. F4 added a settings block, a
+  chart label, a tier mark and a type multiplier, all of which it should be
+  measuring and none of which it can see.
+
+**Objectives (~30 h, mostly authoring).** Untouched in full. It is the one
+block on this shelf that is not code: eleven pars, dynamic clues for three
+chapters, an audit rule for marquee placement, records on Sydney's rows, world
+beats on `chapter:done`, beat rows, a person-reaction row in each of the twelve
+silent chapters, positional confiscation, and the eighteen free arrival ticks.
+F4 did the two `nextIn` rows named in the F1 list (Venice's `acqua-alta` and
+`passerelle`, Sydney's `whippy-run`) and Sydney's three acts, which are the
+parts of this block that were also on a batch list.
+
+**One F2 item.** `qa/npchealth.js` driven through the crowd and sweeping
+`game.locals` (1 h). The other four F2 optional items are done.
+
+**Two items that were already built** and are recorded as stale rather than
+done — see the note at the head of the shelf.
