@@ -7989,10 +7989,21 @@ function sysBuildCSS() {
 // grey flash on top of that is two acknowledgements of one tap.
 '.capyui-btn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;',
   '-webkit-tap-highlight-color:transparent;',
+  /* THE UA'S OWN BUTTON, TURNED OFF (F4). These became real <button>s and a
+     button arrives with padding, a 13px Arial, an appearance and a system
+     background — all of which the <div> was getting for free and none of which
+     the rules below re-state. `font:inherit` also keeps the letter-spacing
+     below meaning what it says. */
+  '-webkit-appearance:none;appearance:none;padding:0;margin:0;font:inherit;',
+  /* A ring only when a keyboard put it there. A tapped button keeping a focus
+     ring for the rest of the chase is the thing that makes people reach for
+     `outline:none` and take the ring away from everybody. */
+  'outline:none;',
   'display:flex;align-items:center;justify-content:center;font-weight:700;color:' + ink + ';',
   'background:' + sysRgba(PALETTE.sail, 0.86) + ';border:2px solid ' + sysRgba(PALETTE.ibisHead, 0.18) + ';',
   'box-shadow:' + shMd + ';letter-spacing:.08em;transition:transform .09s ' + mSnap + ';}',
 '.capyui-btn.press{transform:scale(.9);background:' + sysRgba(PALETTE.cloth1, 0.9) + ';}',
+'.capyui-btn:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* ---- A MARK ON A TRANSLUCENT DISC IS NOT ON PAPER (F1) ----------------
    `--capyui-gbg` is the card's paper, which is right everywhere the sheet is
    used on a card and wrong on all seven of these: the buttons are a
@@ -24237,10 +24248,41 @@ export function createSystems(game) {
    * carries the role and the label by hand — which is what the MENU button
    * has always done and what the other five never did.
    */
+  /**
+   * ONE OF THE SEVEN CONTROLS A THUMB HAS.
+   *
+   * ---- AND IT IS A `<button>` NOW (F4) ----------------------------------
+   * All seven were `<div role="button">` with a good `aria-label` and no
+   * `tabindex`, which is the shape the interface guidelines call out: a div
+   * with a handler on it, announced correctly but not operable by anything
+   * except a pointer. F1's guidelines pass found it and left it, correctly,
+   * because these carry `touch-action:none` and take a POINTER CAPTURE for the
+   * stick — a change here has to be measured against the drag handling rather
+   * than typed.
+   *
+   * Measured, and it is safe, for three reasons that are worth writing down
+   * because none of them is obvious:
+   *
+   *   1. `bindBtn` listens to `pointerdown`/`pointerup` and nothing else, so
+   *      the synthetic `click` a focused button fires on Space or Enter reaches
+   *      no handler. There is no double-fire, which was the real risk: Space is
+   *      HOP and Enter starts the game.
+   *   2. `.capyui-touch` is `display:none` without `.on`, so on a desktop these
+   *      elements are not rendered and cannot be focused at all.
+   *   3. Tab is bound to the journal globally and preventDefault'd, so nothing
+   *      can tab INTO the fan either. Which is exactly why this is a semantics
+   *      fix and not an operability one — the honest claim is that a screen
+   *      reader and an accessibility tree now see a control instead of a group,
+   *      not that a keyboard can suddenly play the game with the touch layer.
+   *
+   * `type="button"` because a bare <button> inside a form is a submit, and the
+   * UA's own padding, font and appearance are neutralised in `.capyui-btn` —
+   * every one of which the div was getting for free.
+   */
   function sysTouchBtn(cls, glyph, label) {
-    const el = sysEl('div', 'capyui-btn ' + cls);
+    const el = sysEl('button', 'capyui-btn ' + cls);
+    el.type = 'button';
     el.appendChild(sysGlyphEl(glyph, 'big'));
-    el.setAttribute('role', 'button');
     el.setAttribute('aria-label', label);
     return el;
   }
