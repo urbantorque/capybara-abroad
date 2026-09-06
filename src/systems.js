@@ -1181,6 +1181,22 @@ const sysSpatial    = { volume: 1, pitch: 1, at: null };
 const sysEar        = new THREE.Vector3();
 const sysEarRight   = new THREE.Vector3();
 const sysEarTo      = new THREE.Vector3();
+// ---- ...AND THE TWO AXES THE PAN DOES NOT HAVE (A2) ------------------------
+// The pan is the component along the camera's right and nothing else, so a
+// gull directly overhead, one twenty metres ahead and one twenty metres behind
+// are the same sound at the same lateral offset. `sysEarFwd` is the camera's
+// own forward, FLATTENED — a rig that looks down at 41 degrees would otherwise
+// read anything overhead as behind it, which is the opposite of the truth.
+// `sysEarVel` is how fast the head itself is going, and it exists for exactly
+// one reason: half of a Doppler is the listener's own movement, and running at
+// a parked van is a real pitch shift.
+const sysEarFwd     = new THREE.Vector3();
+const sysEarVel     = new THREE.Vector3();
+const sysEarPrev    = new THREE.Vector3();
+// m/s past which a frame's movement is a CUT and not a move. A border crossing
+// teleports the animal hundreds of metres in one frame; the fastest thing this
+// game has ever measured is 23.1 m/s falling between islands in the Drift.
+const sysEAR_VMAX   = 45;
 
 // --- THE CALM ---------------------------------------------------------------
 // This game has had a MAYHEM input since version two. `game.state.chaos` rises
@@ -9195,6 +9211,7 @@ export function createSystems(game) {
   let acSfxIn = null, acRoomSend = null, acRoomConv = null, acRoomOut = null;
   let acRoomFor = '', acRoomWet = 0;
   let acEarAt = -1;        // the frame the listener was last resolved on
+  let acEarPrevT = -1;     // ...and the one before it, for the ear's own speed
   // FROM THE PREFERENCES FILE, NOT FROM ZERO (R4). This was a session `let`
   // initialised false, which is why the mute key was a thing you did to a tab
   // rather than a setting: every reload came back at full volume.
@@ -9347,6 +9364,27 @@ export function createSystems(game) {
     // normalised, and it is recomputed for the render anyway.
     const e = camera.matrixWorld.elements;
     sysEarRight.set(e[0], e[1], e[2]);
+    // Column 2 is the camera's +z and a camera looks down its own -z, so
+    // forward is the negative of it. Flattened and renormalised: see the note
+    // on sysEarFwd — the front/back cue is a compass bearing, not a look
+    // direction, or every rig in this game reads its own pitch as "behind me".
+    let fx = -e[8], fz = -e[10];
+    const fl = Math.sqrt(fx * fx + fz * fz);
+    if (fl > 0.0001) { fx /= fl; fz /= fl; } else { fx = 0; fz = -1; }
+    sysEarFwd.set(fx, 0, fz);
+    // ---- how fast the head is going (A2) --------------------------------
+    // On the game clock, which is the clock this is memoised against. A jump
+    // over sysEAR_VMAX is a teleport, a chapter change or a stuck-rescue, and
+    // the one thing it must not do is hand the movers a Doppler slam.
+    const dtE = acEarPrevT >= 0 ? acEarAt - acEarPrevT : 0;
+    if (dtE > 0.0005 && dtE < 0.5) {
+      sysEarVel.set((sysEar.x - sysEarPrev.x) / dtE,
+                    (sysEar.y - sysEarPrev.y) / dtE,
+                    (sysEar.z - sysEarPrev.z) / dtE);
+      if (sysEarVel.lengthSq() > sysEAR_VMAX * sysEAR_VMAX) sysEarVel.set(0, 0, 0);
+    } else sysEarVel.set(0, 0, 0);
+    sysEarPrev.copy(sysEar);
+    acEarPrevT = acEarAt;
   }
 
   /**
@@ -9356,6 +9394,10 @@ export function createSystems(game) {
    * far field used to build a full oscillator graph to be inaudible with.
    */
   let sysSfxPan = 0;
+  // The other two axes, written by the same call and read by the movers (A1)
+  // and, from S2, by the one-shots. 0..1 both: `back` is 1 dead astern, `up`
+  // is 1 directly overhead or underfoot. See sysEarFwd.
+  let sysSfxBack = 0, sysSfxUp = 0;
   function audioPlace(x, y, z, near, far) {
     audioEar();
     const n = near > 0 ? near : sysSFX_NEAR;
@@ -9375,6 +9417,17 @@ export function createSystems(game) {
       ? clamp((sysEarTo.x * sysEarRight.x + sysEarTo.y * sysEarRight.y +
                sysEarTo.z * sysEarRight.z) / d * sysSFX_PAN_K, -1, 1) * sysSFX_PAN
       : 0;
+    // ---- ...AND WHETHER IT IS BEHIND YOU, OR OVER YOU (A2) --------------
+    // Both are free here — the vector and its length are already computed —
+    // and neither changes a single level. `back` is taken on the HORIZONTAL
+    // bearing alone (see sysEarFwd); `up` is the share of the distance that
+    // is vertical, so a gull at 30 m altitude directly above reads 1 and the
+    // same gull 30 m along the ground reads 0.
+    const hx = sysEarTo.x, hz = sysEarTo.z;
+    const hd = Math.sqrt(hx * hx + hz * hz);
+    sysSfxBack = hd > 0.001
+      ? clamp(-(hx * sysEarFwd.x + hz * sysEarFwd.z) / hd, 0, 1) : 0;
+    sysSfxUp = d > 0.001 ? clamp(Math.abs(sysEarTo.y) / d, 0, 1) : 0;
     return g;
   }
   function audioUnlock() {
@@ -11755,6 +11808,504 @@ export function createSystems(game) {
         wxDripAt = rand(0.35, 1.9) / clamp(b.drip, 0.05, 1);
         sfx('drip', { volume: 0.18 + b.drip * 0.5 });
       }
+    }
+  }
+
+  // ===========================================================================
+  // THE MOVER — A SOUND THAT KEEPS ITS PLACE (A1; see ROADMAP-AUDIO.md)
+  //
+  // Every sound in this game until now has been a ONE-SHOT whose pan was set
+  // once, at the instant it started, and never touched again: sfx() builds a
+  // StereoPannerNode, writes pan.value, runs the synth and forgets it. There is
+  // no handle, no stop(), and no way to move a sound after it has begun — and
+  // `playbackRate` appears exactly once in the whole audio tree, as noiseMake's
+  // window randomiser, so there has never been a Doppler shift anywhere in
+  // nineteen chapters.
+  //
+  // What that costs is not subtle. A vehicle going past you is a ROW OF
+  // SEPARATE SOUNDS, each panned from wherever the vehicle happened to be when
+  // that one fired, with silence in between. Hanoi is a chapter whose medium IS
+  // traffic — two hundred and forty scooters, and sysROOMS describes its alley
+  // as "a hundred and fifty engines in it" — and it had the room and no
+  // engines. Monte Carlo's silver car is the one object in this game that would
+  // sell a pitch shift, and it made a sound only for its passenger.
+  //
+  // THE MODEL IS NOT NEW, AND THAT IS THE POINT. musPlaceTick has done exactly
+  // this for the Cali band since the band was written: gain by distance, a
+  // low-pass that closes with distance BEFORE the level does, pan taken across
+  // the screen rather than off world x, all of it on setTargetAtTime so that
+  // nothing steps. It had one customer. This is that placer generalised, with
+  // two things added — the ear's own movement, and a Doppler — and one thing
+  // discovered: A MOVER THAT DOES NOT MOVE IS A BED. A shoreline, a river and a
+  // colony are the same object as a van with its velocity left at zero, and
+  // that is how this game finally gets a sound you can walk toward.
+  //
+  // FIVE THINGS THAT ARE DELIBERATE:
+  //
+  //   1. FOUR AT A TIME, BY DELIVERED GAIN. Not by distance and not by who
+  //      asked first: the number that decides whether a mover is worth a graph
+  //      is the one the player would actually hear. Everything else parks at
+  //      sysMOVER_PARK rather than stopping, so coming back into range has no
+  //      attack on it, and a mover parked for half a minute has its nodes freed
+  //      and rebuilt on demand.
+  //   2. A DISCRETE MOVER IS IN THE ROOM AND A BED IS NOT. An engine in a Hanoi
+  //      alley is exactly the thing that should reverberate, so it goes in at
+  //      acSfxIn like every one-shot. A bed is a noise field with no transient
+  //      in it to reflect, and — the v41 lesson — sustained input into a long
+  //      tail sums far more of its own history than a footstep does, so surf
+  //      into Son Doong's five and a half seconds would be a wall. Beds take
+  //      sysSfxOut(), which is what the weather bed has always done, for the
+  //      same reason and with the same fader over it.
+  //   3. AN OSCILLATOR'S FREQUENCY IS THE THROTTLE'S AND ITS DETUNE IS THE
+  //      DOPPLER'S. One writer per AudioParam is the rule this file has kept
+  //      since P4, and a pitch shift on top of a rev is the obvious place to
+  //      break it. They are different parameters and they sum in cents.
+  //   4. A MOVER IS SILENT OUTSIDE ITS OWN CHAPTER, without being told. It
+  //      records the biome it was made in; anywhere else its target gain is
+  //      zero. Nineteen chapters have found nineteen ways to forget to clean
+  //      something up, and this is the one that would be audible in the wrong
+  //      country.
+  //   5. THE HANDLE OUTLIVES THE GRAPH. `sfxMover` returns the same handle for
+  //      the same key for the life of the page, so a chapter re-entered ten
+  //      times has one van and not ten. The nodes come and go underneath it.
+  // ---------------------------------------------------------------------------
+  const sysMOVER_MAX    = 4;        // live graphs at once, by delivered gain
+  const sysMOVER_TAU    = 0.12;     // s — gain, pan and the distance low-pass
+  const sysMOVER_RTAU   = 0.08;     // s — the Doppler, which is faster than level
+  const sysMOVER_C      = 343;      // m/s. It is the speed of sound and not a knob.
+  const sysMOVER_DOPP   = 0.12;     // clamp on the rate: ±12%, about two semitones
+  const sysMOVER_PARK   = 0.0001;   // gain while out of budget. Not zero: no attack.
+  const sysMOVER_STOP   = 30;       // s parked before the nodes are freed
+  const sysMOVER_FLAT   = 8;        // m inside which distance takes nothing off the top
+  const sysMOVER_LPSPAN = 62;       // ...and the metres over which it takes it all
+  const sysMOVER_LPMIN  = 780;      // Hz it closes to. The Cali placer's own number.
+  const sysMOVER_BACKLP = 15500;    // Hz the A2 back-cue takes off the ceiling
+  const sysMOVER_CALM   = 0.35;     // how far a BED thins when the world settles
+  const sysMovers = [];
+  let sysMoverBuilds = 0;           // graphs built this session, for the harness
+
+  /** A noise voice inside a recipe. Mono — a placed source must be able to pan
+   *  (v41: StereoPannerNode uses a different law for a stereo input) — and its
+   *  playbackRate belongs to the Doppler, so nothing else may write it. */
+  function sysMoverNoise(m, out, type, hz, q, gain) {
+    const n = noiseSrc();
+    const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = hz; f.Q.value = q;
+    const g = ac.createGain(); g.gain.value = gain;
+    n.connect(f); f.connect(g); g.connect(out);
+    n.start();
+    m.src.push(n);
+    // noiseMake gives every source its own rate so that no two are the same
+    // sound. Keep that as the BASE and multiply the Doppler onto it, or a pitch
+    // shift would quietly cost the decorrelation the buffer was built for.
+    m.rate.push({ p: n.playbackRate, base: n.playbackRate.value, osc: false });
+    return { n: n, f: f, g: g };
+  }
+  /** A tone inside a recipe. `frequency` belongs to the throttle and `detune`
+   *  belongs to the Doppler — see note 3 above. */
+  function sysMoverOsc(m, out, type, hz, detune, gain) {
+    const o = ac.createOscillator(); o.type = type;
+    o.frequency.value = hz; o.detune.value = detune || 0;
+    const g = ac.createGain(); g.gain.value = gain;
+    o.connect(g); g.connect(out);
+    o.start();
+    m.src.push(o);
+    m.rate.push({ p: o.detune, base: o.detune.value, osc: true });
+    return { o: o, g: g };
+  }
+  /** An amplitude modulator. The LFO is CONNECTED to the gain's param and the
+   *  base is its intrinsic value, so the two sum instead of fighting — which is
+   *  the one place in Web Audio where two writers are the design. A second
+   *  incommensurate LFO is what stops a swell becoming a metronome; it is the
+   *  same trick musWide plays on the ensemble's delays. */
+  function sysMoverAM(m, out, base, hz, depth, hz2) {
+    const am = ac.createGain(); am.gain.value = base;
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = hz;
+    const lg = ac.createGain(); lg.gain.value = depth;
+    lfo.connect(lg); lg.connect(am.gain); lfo.start(); m.src.push(lfo);
+    if (hz2) {
+      const l2 = ac.createOscillator(); l2.type = 'sine'; l2.frequency.value = hz2;
+      const g2 = ac.createGain(); g2.gain.value = depth * 0.55;
+      l2.connect(g2); g2.connect(am.gain); l2.start(); m.src.push(l2);
+    }
+    am.connect(out);
+    return { am: am, lfo: lfo, lg: lg };
+  }
+  /** The crowd/colony body: two noise streams through four resonant bands, each
+   *  wandering on a slow LFO. Shared, because a penguin colony and a carnival
+   *  crowd are the same object at different pitches. */
+  const sysMOVER_BANDG = [0.30, 0.24, 0.14, 0.11];
+  function sysMoverVoiced(m, out, hz, q) {
+    m.bands = [];
+    const n1 = sysMoverNoise(m, out, 'bandpass', hz[0], q, sysMOVER_BANDG[0]);
+    const n2 = sysMoverNoise(m, out, 'bandpass', hz[1], q, sysMOVER_BANDG[1]);
+    m.bands.push(n1, n2);
+    for (let i = 2; i < hz.length; i++) {
+      const f = ac.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = hz[i]; f.Q.value = q;
+      const g = ac.createGain(); g.gain.value = sysMOVER_BANDG[i];
+      (i % 2 ? n1 : n2).n.connect(f); f.connect(g); g.connect(out);
+      m.bands.push({ f: f, g: g });
+    }
+    // Two slow walks shared across the four. An independent LFO per band is
+    // four more nodes for a difference nobody could name.
+    for (let i = 0; i < 2; i++) {
+      const lfo = ac.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 0.31 + i * 0.27;
+      const lg = ac.createGain(); lg.gain.value = 0.07;
+      lfo.connect(lg);
+      lg.connect(m.bands[i].g.gain);
+      lg.connect(m.bands[i + 2].g.gain);
+      lfo.start(); m.src.push(lfo);
+    }
+  }
+  function sysMoverVoicedSet(m, k, now) {
+    if (!m.bands) return;
+    for (let i = 0; i < m.bands.length; i++) {
+      sysAudioSet(m.bands[i].g.gain, Math.max(0.0001, sysMOVER_BANDG[i] * k), now, 0.9);
+    }
+  }
+
+  // ---- THE TEN VOICES (SD1) -------------------------------------------------
+  // `level` is the authored peak, delivered anywhere inside `near`, against an
+  // 0.85 master. 0.05–0.20 is the ambience ladder's own band; a mover is allowed
+  // 0.22 because it is the thing you are looking at, and the v8 is allowed 0.24
+  // because the chapter it is in is a joke that does not work quietly.
+  // `bed: true` means it has no velocity, takes no room, and thins with the calm.
+  const sysMOVERS = {
+    // A single-engine floatplane. The PROP BEAT is the identity of this sound
+    // and the exhaust is not: a plane with no flutter in it is a lawnmower.
+    prop: { level: 0.20, near: 20, far: 400,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 900; vlp.Q.value = 0.7;
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 42, -7, 0.50);
+        m.o2 = sysMoverOsc(m, vlp, 'square', 84, 7, 0.22);
+        m.am = sysMoverAM(m, out, 0.70, 24, 0.30, 0);
+        vlp.connect(m.am.am);
+        m.ex = sysMoverNoise(m, out, 'bandpass', 2200, 1.1, 0.15);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.o1.o.frequency, 42 * (0.9 + 0.5 * k), now, 0.18);
+        sysAudioSet(m.o2.o.frequency, 84 * (0.9 + 0.5 * k), now, 0.18);
+        sysAudioSet(m.vlp.frequency, 700 + 1400 * k, now, 0.18);
+        sysAudioSet(m.am.lfo.frequency, 24 * (0.78 + 0.44 * k), now, 0.25);
+        sysAudioSet(m.ex.g.gain, 0.15 * (0.35 + 0.65 * k), now, 0.20);
+      } },
+    // A small diesel: a van, a ferry, a bus. The LOPE is the character — an
+    // idling diesel is not a tone, it is a tone being interrupted about six
+    // times a second — and it speeds up with the revs, which is most of what
+    // makes a pull-away read as one.
+    diesel: { level: 0.22, near: 12, far: 70,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 520; vlp.Q.value = 0.9;
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 33, -5, 0.55);
+        m.o2 = sysMoverOsc(m, vlp, 'sawtooth', 66, 6, 0.26);
+        m.am = sysMoverAM(m, out, 0.75, 6.5, 0.25, 0);
+        vlp.connect(m.am.am);
+        m.rr = sysMoverNoise(m, out, 'lowpass', 400, 0.8, 0.40);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.o1.o.frequency, 33 * (0.95 + 0.35 * k), now, 0.16);
+        sysAudioSet(m.o2.o.frequency, 66 * (0.95 + 0.35 * k), now, 0.16);
+        sysAudioSet(m.vlp.frequency, 420 + 900 * k, now, 0.16);
+        sysAudioSet(m.am.lfo.frequency, 6.5 + 4 * k, now, 0.20);
+        sysAudioSet(m.rr.g.gain, 0.40 * (0.5 + 0.5 * k), now, 0.20);
+      } },
+    // A scooter. The ring-ding is a hard, fast gate rather than a smooth swell,
+    // which is what separates a two-stroke from everything else on a street,
+    // and there is a great deal of top on it because there is no silencer worth
+    // the name on any of the two hundred and forty of them.
+    twostroke: { level: 0.16, near: 8, far: 60,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 2600; vlp.Q.value = 1.2;
+        // A pulse, made the cheap way: two saws an octave apart, one inverted.
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 110, 0, 0.42);
+        m.o2 = sysMoverOsc(m, vlp, 'sawtooth', 220, -11, -0.24);
+        m.am = sysMoverAM(m, out, 0.62, 13, 0.40, 0);
+        vlp.connect(m.am.am);
+        m.ex = sysMoverNoise(m, out, 'bandpass', 3400, 1.6, 0.35);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        const hz = 90 + 160 * k;
+        sysAudioSet(m.o1.o.frequency, hz, now, 0.12);
+        sysAudioSet(m.o2.o.frequency, hz * 2, now, 0.12);
+        sysAudioSet(m.vlp.frequency, 1600 + 3200 * k, now, 0.12);
+        sysAudioSet(m.am.lfo.frequency, 13 + 9 * k, now, 0.14);
+        sysAudioSet(m.ex.g.gain, 0.35 * (0.4 + 0.6 * k), now, 0.14);
+      } },
+    // The silver car. Four saws is a crossplane V8's uneven firing order heard
+    // as a stack of harmonics, and the intake is the half that arrives BEFORE
+    // the exhaust does.
+    v8: { level: 0.24, near: 12, far: 220,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 1600; vlp.Q.value = 2.0;
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 55, -6, 0.42);
+        m.o2 = sysMoverOsc(m, vlp, 'sawtooth', 110, 5, 0.30);
+        m.o3 = sysMoverOsc(m, vlp, 'sawtooth', 165, -9, 0.16);
+        m.o4 = sysMoverOsc(m, vlp, 'sawtooth', 220, 8, 0.10);
+        m.am = sysMoverAM(m, out, 0.82, 9, 0.16, 0);
+        vlp.connect(m.am.am);
+        m.ik = sysMoverNoise(m, out, 'highpass', 4000, 0.7, 0.12);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        const r = 0.6 + 2.4 * k;
+        sysAudioSet(m.o1.o.frequency, 55 * r, now, 0.10);
+        sysAudioSet(m.o2.o.frequency, 110 * r, now, 0.10);
+        sysAudioSet(m.o3.o.frequency, 165 * r, now, 0.10);
+        sysAudioSet(m.o4.o.frequency, 220 * r, now, 0.10);
+        sysAudioSet(m.vlp.frequency, 900 + 4000 * k, now, 0.10);
+        sysAudioSet(m.am.lfo.frequency, 9 * r, now, 0.12);
+        sysAudioSet(m.ik.g.gain, 0.12 * (0.2 + 0.8 * k), now, 0.12);
+      } },
+    // Steel on steel. The rumble is the car and the SQUEAL is the curve — a
+    // flange only sings where the track bends, so it is driven off `bend()`
+    // rather than off the throttle and is silent on the straight, which is the
+    // whole tell of a tram.
+    rail: { level: 0.18, near: 10, far: 90,
+      build: function (m, out) {
+        m.ru = sysMoverNoise(m, out, 'bandpass', 240, 4.0, 0.55);
+        m.sq = sysMoverNoise(m, out, 'bandpass', 3800, 8.0, 0.0001);
+        m.cl = sysMoverNoise(m, out, 'lowpass', 900, 0.8, 0.12);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.ru.g.gain, 0.55 * (0.5 + 0.5 * k), now, 0.18);
+        sysAudioSet(m.ru.f.frequency, 200 + 140 * k, now, 0.18);
+        sysAudioSet(m.sq.g.gain, Math.max(0.0001, 0.08 * (m.curve || 0) * k), now, 0.22);
+        sysAudioSet(m.cl.g.gain, Math.max(0.0001, 0.12 * k), now, 0.18);
+      } },
+    // A shoreline. The whole of a break is its PERIOD, and a period that
+    // repeats is a machine — so two incommensurate swells, whose beat wanders
+    // and never comes round, exactly as the ensemble's delays do.
+    surf: { level: 0.14, near: 40, far: 220, bed: true,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.42, 0.11, 0.45, 0.083);
+        m.lo = sysMoverNoise(m, m.am.am, 'lowpass', 1100, 0.6, 0.75);
+        m.hi = sysMoverNoise(m, m.am.am, 'bandpass', 2400, 0.5, 0.16);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.am.lg.gain, 0.30 + 0.25 * k, now, 1.2);
+        sysAudioSet(m.hi.g.gain, 0.10 + 0.14 * k, now, 1.2);
+      } },
+    // Moving water, which is a BAND and not a hiss: the top of it is the
+    // surface and the bottom is the volume of it, and the centre wanders
+    // because a river is never doing the same thing twice in the same place.
+    river: { level: 0.12, near: 20, far: 120, bed: true,
+      build: function (m, out) {
+        m.mid = sysMoverNoise(m, out, 'bandpass', 1400, 0.6, 0.70);
+        m.low = sysMoverNoise(m, out, 'bandpass', 380, 0.9, 0.30);
+        const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.4;
+        const lg = ac.createGain(); lg.gain.value = 200;
+        lfo.connect(lg); lg.connect(m.mid.f.frequency); lfo.start(); m.src.push(lfo);
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.mid.g.gain, Math.max(0.0001, 0.70 * k), now, 0.9);
+        sysAudioSet(m.low.g.gain, Math.max(0.0001, 0.30 * k), now, 0.9);
+      } },
+    // A lot of people, none of whom you can make out. A crowd is not a level,
+    // it is a thing that keeps almost arriving somewhere.
+    crowd: { level: 0.12, near: 30, far: 180, bed: true,
+      build: function (m, out) { sysMoverVoiced(m, out, [300, 600, 1200, 2400], 3.0); },
+      throttle: function (m, k, now) { sysMoverVoicedSet(m, k, now); } },
+    // A street with everything on it at once. Three saws at non-harmonic
+    // spacings, so it reads as many engines rather than as one big one.
+    traffic: { level: 0.14, near: 30, far: 160, bed: true,
+      build: function (m, out) {
+        const vlp = ac.createBiquadFilter();
+        vlp.type = 'lowpass'; vlp.frequency.value = 900; vlp.Q.value = 0.8;
+        m.o1 = sysMoverOsc(m, vlp, 'sawtooth', 90, 0, 0.16);
+        m.o2 = sysMoverOsc(m, vlp, 'sawtooth', 103, 9, 0.13);
+        m.o3 = sysMoverOsc(m, vlp, 'sawtooth', 118, -7, 0.10);
+        m.am = sysMoverAM(m, out, 0.74, 3.1, 0.22, 2.3);
+        vlp.connect(m.am.am);
+        m.rr = sysMoverNoise(m, out, 'lowpass', 600, 0.7, 0.30);
+        m.vlp = vlp;
+      },
+      throttle: function (m, k, now) {
+        sysAudioSet(m.vlp.frequency, 700 + 900 * k, now, 0.9);
+        sysAudioSet(m.rr.g.gain, Math.max(0.0001, 0.30 * (0.4 + 0.6 * k)), now, 0.9);
+        sysAudioSet(m.am.lg.gain, 0.14 + 0.14 * k, now, 0.9);
+      } },
+    // Ten thousand birds. The crowd graph an octave and a half up, with a
+    // flutter on it, because a colony is a crowd that never takes a breath.
+    colony: { level: 0.12, near: 40, far: 300, bed: true,
+      build: function (m, out) {
+        m.am = sysMoverAM(m, out, 0.78, 4.3, 0.25, 3.1);
+        sysMoverVoiced(m, m.am.am, [700, 1400, 2100, 2800], 3.4);
+      },
+      throttle: function (m, k, now) { sysMoverVoicedSet(m, k, now); } },
+  };
+
+  /**
+   * ASK FOR A MOVER. Returns a handle that is safe to hold for the life of the
+   * page and safe to call with no audio context, a suspended one or a muted bus
+   * — sound is a reward and never a requirement.
+   *
+   *   const h = game.sfxMover('diesel', { key: 'env:van', near: 12, far: 70 });
+   *   h.at(x, y, z); h.vel(vx, vy, vz); h.set(throttle01);
+   *
+   * `key` is what makes it idempotent: ask twice and you get the same handle,
+   * so a chapter that is re-entered has one van and not six. Everything else
+   * defaults off the recipe.
+   */
+  function sfxMover(kind, opts) {
+    const rec = sysMOVERS[kind];
+    if (!rec) return sysMoverNull;
+    const key = (opts && opts.key) || kind;
+    for (let i = 0; i < sysMovers.length; i++) {
+      if (sysMovers[i].key === key) return sysMovers[i].h;
+    }
+    const m = {
+      key: key, kind: kind, rec: rec,
+      x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, k: 0, curve: 0, amp: 1,
+      near: (opts && opts.near) || rec.near,
+      far: (opts && opts.far) || rec.far,
+      level: (opts && opts.level !== undefined) ? opts.level : rec.level,
+      bed: (opts && opts.bed !== undefined) ? !!opts.bed : !!rec.bed,
+      // '' means everywhere; anything else is silent outside its own chapter.
+      biome: (opts && opts.biome !== undefined) ? opts.biome
+             : ((game.biome && game.biome.current) || ''),
+      src: [], rate: [], bands: null, g: null, pan: null, lp: null,
+      want: 0, wantPan: 0, wantBack: 0, wantUp: 0, d: 9999, rateNow: 1,
+      parkedT: 0, live: false, dead: false,
+    };
+    m.h = {
+      at: function (x, y, z) {
+        if (x === x && y === y && z === z) { m.x = x; m.y = y; m.z = z; }
+      },
+      vel: function (vx, vy, vz) {
+        if (vx === vx && vy === vy && vz === vz) { m.vx = vx; m.vy = vy; m.vz = vz; }
+      },
+      set: function (k) { m.k = clamp(k === k ? k : 0, 0, 1); },
+      /**
+       * HOW MUCH OF IT THERE IS, 0..1, and it is not the throttle.
+       *
+       * `set` says how hard the thing is working and moves frequencies and
+       * filters; it deliberately does NOT gate the level, because a diesel at a
+       * bus stop is the most diesel thing there is and an idle that fades out
+       * is a van that has been switched off. But an engine CAN be switched off
+       * — a floatplane at its mooring is not idling, it is silent — and that is
+       * a different question with a different answer. At zero the mover falls
+       * under the cull, gives its slot back, and lets go of its nodes half a
+       * minute later, so silence is free.
+       */
+      amp: function (a) { m.amp = clamp(a === a ? a : 0, 0, 1); },
+      /** How hard the thing is turning, 0..1. Only `rail` reads it. */
+      bend: function (c) { m.curve = clamp(c === c ? c : 0, 0, 1); },
+      /** The Doppler this mover is under right now, as a playback ratio. A
+       *  figure the chapter schedules itself — the van's chime, a tram bell —
+       *  multiplies its own pitch by this and shifts with the thing carrying
+       *  it, without a second system that would have to be kept in step. */
+      rate: function () { return m.rateNow; },
+      /** What the player is actually getting, 0..1. For the harness. */
+      gain: function () { return m.live ? m.want : 0; },
+      stop: function () { m.dead = true; m.k = 0; },
+      resume: function () { m.dead = false; },
+    };
+    sysMovers.push(m);
+    return m.h;
+  }
+  const sysMoverNull = {
+    at: function () {}, vel: function () {}, set: function () {},
+    bend: function () {}, rate: function () { return 1; },
+    gain: function () { return 0; }, stop: function () {}, resume: function () {},
+  };
+
+  function sysMoverBuild(m) {
+    // The tail every recipe shares: [recipe] → distance LP → pan → gain.
+    m.lp = ac.createBiquadFilter();
+    m.lp.type = 'lowpass'; m.lp.frequency.value = 20000; m.lp.Q.value = 0.4;
+    m.pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    m.g = ac.createGain(); m.g.gain.value = sysMOVER_PARK;
+    if (m.pan) { m.lp.connect(m.pan); m.pan.connect(m.g); } else m.lp.connect(m.g);
+    // See note 2: the room is for the things with a transient in them.
+    m.g.connect(m.bed ? sysSfxOut() : (acSfxIn || sysSfxOut()));
+    m.src.length = 0; m.rate.length = 0; m.bands = null;
+    m.rec.build(m, m.lp);
+    m.rec.throttle(m, m.k, ac.currentTime);
+    sysMoverBuilds++;
+  }
+  function sysMoverTear(m) {
+    for (let i = 0; i < m.src.length; i++) {
+      try { m.src[i].stop(); } catch (e) {}
+      try { m.src[i].disconnect(); } catch (e) {}
+    }
+    try { if (m.lp) m.lp.disconnect(); } catch (e) {}
+    try { if (m.pan) m.pan.disconnect(); } catch (e) {}
+    try { if (m.g) m.g.disconnect(); } catch (e) {}
+    m.src.length = 0; m.rate.length = 0;
+    m.g = null; m.pan = null; m.lp = null; m.bands = null;
+    m.live = false; m.parkedT = 0;
+  }
+  function sysMoverCmp(a, b) { return b.want - a.want; }
+
+  function sysMoverTick(dt) {
+    if (!sysMovers.length || !ac || ac.state !== 'running') return;
+    const now = ac.currentTime;
+    const playing = game.state.started && !game.state.paused && !document.hidden && !muted;
+    const live = (game.biome && game.biome.current) || '';
+    audioEar();
+    // ---- 1. what each one WOULD deliver, before any graph work ------------
+    for (let i = 0; i < sysMovers.length; i++) {
+      const m = sysMovers[i];
+      if (!playing || m.dead || (m.biome && m.biome !== live)) { m.want = 0; m.d = 9999; continue; }
+      m.want = audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
+      // A bed thins as the world settles, because it IS the world; a vehicle
+      // going past does not, because a scooter does not get quieter when you
+      // sit down. (G6, and the two halves are genuinely different questions.)
+      if (m.bed) m.want *= (1 - sysMOVER_CALM * sysCalmNow);
+      m.wantPan = sysSfxPan; m.wantBack = sysSfxBack; m.wantUp = sysSfxUp;
+      m.d = sysEarTo.length();
+    }
+    // ---- 2. the four loudest get a graph ---------------------------------
+    sysMovers.sort(sysMoverCmp);
+    for (let i = 0; i < sysMovers.length; i++) {
+      const m = sysMovers[i];
+      const on = i < sysMOVER_MAX && m.want > sysSFX_CULL;
+      if (on && !m.g) { try { sysMoverBuild(m); } catch (e) { sysMoverTear(m); continue; } }
+      m.live = on && !!m.g;
+      if (!m.g) continue;
+      // ---- 3. the Doppler ------------------------------------------------
+      // The RELATIVE velocity along the line between them, which is both halves
+      // in one term: the source coming at you and you going at the source are
+      // the same fact. APPROACHING IS POSITIVE AND RAISES THE PITCH — that sign
+      // is the thing every first cut of a Doppler in history has got backwards.
+      let r = 1;
+      if (!m.bed && m.d > 0.5 && m.d < 9000) {
+        const ux = (sysEar.x - m.x) / m.d, uy = (sysEar.y - m.y) / m.d, uz = (sysEar.z - m.z) / m.d;
+        const vr = (m.vx - sysEarVel.x) * ux + (m.vy - sysEarVel.y) * uy +
+                   (m.vz - sysEarVel.z) * uz;
+        r = clamp(sysMOVER_C / (sysMOVER_C - clamp(vr, -60, 60)),
+                  1 - sysMOVER_DOPP, 1 + sysMOVER_DOPP);
+      }
+      m.rateNow = r;
+      // ---- 4. distance takes the top before it takes the level -----------
+      const over = Math.max(0, Math.min(m.d, 400) - sysMOVER_FLAT);
+      const t = clamp(over / sysMOVER_LPSPAN, 0, 1);
+      let hz = sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - t) * (1 - t);
+      // ...and A2: something behind you is duller than the same thing in front.
+      hz = Math.min(hz, 20000 - m.wantBack * sysMOVER_BACKLP);
+      sysAudioSet(m.g.gain, Math.max(sysMOVER_PARK, m.live ? m.want : sysMOVER_PARK),
+                  now, sysMOVER_TAU);
+      sysAudioSet(m.lp.frequency, Math.max(200, hz), now, sysMOVER_TAU);
+      // Something overhead is less lateralised than the same thing on the
+      // ground, which is the honest half of an elevation cue in two channels.
+      if (m.pan) sysAudioSet(m.pan.pan, m.wantPan * (1 - 0.55 * m.wantUp), now, sysMOVER_TAU);
+      for (let j = 0; j < m.rate.length; j++) {
+        const rp = m.rate[j];
+        sysAudioSet(rp.p, rp.osc ? rp.base + 1200 * Math.log2(r) : rp.base * r,
+                    now, sysMOVER_RTAU);
+      }
+      m.rec.throttle(m, m.live ? m.k : 0, now);
+      // ---- 5. park, then let go ------------------------------------------
+      m.parkedT = m.live ? 0 : m.parkedT + dt;
+      if (m.parkedT > sysMOVER_STOP) sysMoverTear(m);
     }
   }
 
@@ -26782,6 +27333,8 @@ export function createSystems(game) {
   /** The camera rig's own numbers, one frame old. See sysCamInfo. */
   game.camInfo = sysCamInfo;
   game.sfx = sfx;
+  /** A sound that keeps its place. See THE MOVER. */
+  game.sfxMover = sfxMover;
   /**
    * HOW SETTLED THE WORLD IS AT A POINT, 0..1. See THE CALM above.
    *
@@ -27477,7 +28030,42 @@ export function createSystems(game) {
     audioProbe: function (x, y, z, near, far) {
       const g = audioPlace(x, y, z, near, far);
       return { gain: g, pan: g > 0 ? sysSfxPan : 0,
-               ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z } };
+               // A2's two axes. They are computed whether or not anything reads
+               // them, and a probe that could not see them is how a cue that
+               // quietly stops being overhead goes unnoticed.
+               back: g > 0 ? +sysSfxBack.toFixed(3) : 0,
+               up: g > 0 ? +sysSfxUp.toFixed(3) : 0,
+               ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z },
+               earVel: { x: +sysEarVel.x.toFixed(2), y: +sysEarVel.y.toFixed(2),
+                         z: +sysEarVel.z.toFixed(2) } };
+    },
+    /**
+     * WHAT THE MOVERS ARE DOING. The only way to see any of this from outside:
+     * a Web Audio graph is write-only, so a Doppler that is backwards, a budget
+     * that never lets the fourth voice in, or a mover left running in the wrong
+     * chapter are all completely silent failures to a screenshot.
+     *
+     * `rate` is the Doppler as a ratio — greater than one is approaching, and
+     * that is the assertion `qa/mover-pass.js` is built on.
+     */
+    moverAudit: function () {
+      const rows = [];
+      let liveN = 0;
+      for (let i = 0; i < sysMovers.length; i++) {
+        const m = sysMovers[i];
+        if (m.live) liveN++;
+        rows.push({
+          key: m.key, kind: m.kind, bed: !!m.bed, biome: m.biome || '*',
+          live: !!m.live, built: !!m.g,
+          gain: +m.want.toFixed(4), pan: +m.wantPan.toFixed(3),
+          back: +m.wantBack.toFixed(3), up: +m.wantUp.toFixed(3),
+          rate: +m.rateNow.toFixed(4), d: +m.d.toFixed(2),
+          k: +m.k.toFixed(3), amp: +m.amp.toFixed(3), parkedT: +m.parkedT.toFixed(1),
+        });
+      }
+      return { biome: (game.biome && game.biome.current) || '', live: liveN,
+               max: sysMOVER_MAX, n: sysMovers.length, builds: sysMoverBuilds,
+               rows: rows };
     },
     /**
      * WHAT THE CALM IS DOING TO THE ANIMALS, for the harness. Same argument as
@@ -30169,6 +30757,11 @@ export function createSystems(game) {
     // picture, because it is the other half of the same state: the shower that
     // just took a third of the sun is the shower you can now hear.
     sysWxBedSet(dt);
+    // ...and the things that are somewhere and going somewhere (A1). Same
+    // family as the bed above and the same breath: both are continuous voices
+    // driven off facts the world has already published this frame, and the
+    // biomes have all set their positions by now — systems.js runs last.
+    sysMoverTick(dt);
     // ...and so is the room it is all heard in, for the same reason and in the
     // same breath. See sysROOMS. Twice, because since v41 the score has a room
     // of its own built out of the same table — a longer, wetter version of the

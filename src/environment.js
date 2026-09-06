@@ -118,6 +118,9 @@ let envFerryVoyage = false;   // 'ferry:departed' already emitted for this trip
 const envVAN_ROUTE = [-2.0, 7.6, -9.0, 7.0, -15.0, 4.2, -20.5, 0.4, -26.0, -2.6,
                       -34.0, -4.6, -44.0, -5.4, -54.0, -4.6, -61.0, -3.3];
 const envVAN_SPEED = 3.15;    // m/s. A van on a footpath, not a getaway.
+// Her engine (A1), and the damped throttle behind it — she has no gearbox, so
+// the ramp between parked and rolling is made here or it does not exist.
+let envVanMover = null, envVanThr = 0;
 // s parked at each end. EIGHT WAS TOO SHORT FOR THE THING IT IS FOR. The
 // boarding window is the whole point of the stop — you have to get round to
 // the port side, up onto the counter and onto the roof from a standing start —
@@ -1289,6 +1292,25 @@ function envVanStep(game, dt) {
   envVanGroup.quaternion.set(b.interpolatedQuaternion.x, b.interpolatedQuaternion.y,
                              b.interpolatedQuaternion.z, b.interpolatedQuaternion.w);
   envVanPos.copy(envVanGroup.position);
+  // ---- ...AND SHE HAS AN ENGINE (A1) -------------------------------------
+  // Chapter one's van has had a chime since the day it was written and has
+  // never had a motor, so the one thing on the promenade that MOVES was a bell
+  // sliding along a path with nothing under it. `b.velocity` is already the
+  // world-space metres a second this kinematic body is driven on — see the
+  // note above it — so the Doppler costs nothing to feed.
+  if (!envVanMover && game.sfxMover) {
+    envVanMover = game.sfxMover('diesel', { key: 'env:van', near: 12, far: 70 });
+  }
+  if (envVanMover) {
+    envVanMover.at(envVanPos.x, envVanPos.y + 0.9, envVanPos.z);
+    envVanMover.vel(b.velocity.x, 0, b.velocity.z);
+    // She has no gearbox and no speed ramp — she is doing 3.15 or she is
+    // parked — so the throttle is damped HERE rather than derived from a speed
+    // that steps. It never reaches zero: a diesel at a stop is the most diesel
+    // thing there is, and an idle that fades out is a van switched off.
+    envVanThr = damp(envVanThr, envVanDwell > 0 ? 0.16 : 1, 2.4, dt);
+    envVanMover.set(envVanThr);
+  }
   // the cone leans out of the corner, and shivers on the paving
   if (envVanCone) {
     envVanCone.rotation.z = damp(envVanCone.rotation.z,
@@ -1312,8 +1334,12 @@ function envVanStep(game, dt) {
       // of you sounded identical — and the ceiling was loud enough that a
       // chime every 5.4 s was competing with the score. Riding on the roof is
       // the one case that stays big, because then you ARE the ice cream van.
+      // ...and it shifts with her, because it is ON her. The gates, the level
+      // law and the roof case are exactly as they were — the only new thing is
+      // that a chime coming toward you is a slightly higher chime, which is the
+      // half of an ice cream van everybody can hear and nobody can name.
       game.sfx('chime', { volume: riding ? 0.50 : clamp(0.30 - far * 0.004, 0.05, 0.30),
-                          pitch: 1.32,
+                          pitch: 1.32 * (envVanMover ? envVanMover.rate() : 1),
                           at: { x: envVanPos.x, y: 1.6, z: envVanPos.z },
                           near: 12, far: 70 });
     } else {
@@ -1389,6 +1415,7 @@ let envPlaneT = 0, envPlaneEng = 0;
 // frame), and while the aeroplane was also teleporting 45 m at the same instant
 // nobody could see it. Fix the path and the snap is all that is left.
 let envPlaneYawS = Math.PI, envPlanePitchS = 0, envPlaneRollS = 0;
+let envPlaneMover = null;                      // her engine (A1)
 let envPlaneAttInit = false;
 const envPlanePos = new THREE.Vector3();
 
@@ -1547,6 +1574,33 @@ function envPlaneStep(game, dt) {
     envPlaneRollS = damp(envPlaneRollS, roll, 3.0, dt);
   }
   envPlaneGroup.rotation.set(envPlanePitchS, envPlaneYawS, envPlaneRollS, 'YXZ');
+  // ---- ...AND SHE HOLDS A NOTE NOW (A1) ----------------------------------
+  // The four rationed notes below are the right answer to the wrong problem: a
+  // one-shot repeated on a timer is a pulse whatever you do to the gap, and the
+  // thing an aeroplane actually does is hold ONE note and move it past you.
+  //
+  // The velocity is derived, because this phase machine computes an absolute
+  // point every frame and stores no velocity at all — so it must be taken
+  // BEFORE envPlanePos is overwritten on the next line, and it must be thrown
+  // away when it is absurd: every phase boundary is a step change in the path
+  // and a 45 m jump over one frame is not an aeroplane doing 2,700 m/s.
+  if (!envPlaneMover && game.sfxMover) {
+    envPlaneMover = game.sfxMover('prop', { key: 'env:plane', near: 20, far: 400 });
+  }
+  if (envPlaneMover) {
+    let vx = 0, vy = 0, vz = 0;
+    if (dt > 0.0005) {
+      vx = (x - envPlanePos.x) / dt; vy = (y - envPlanePos.y) / dt; vz = (z - envPlanePos.z) / dt;
+      if (vx * vx + vy * vy + vz * vz > 6400) { vx = 0; vy = 0; vz = 0; }
+    }
+    envPlaneMover.at(x, y, z);
+    envPlaneMover.vel(vx, vy, vz);
+    envPlaneMover.set(clamp(rpm, 0, 1));
+    // At the mooring the engine is OFF, which is not the same as idling and is
+    // what the note below has always claimed. `amp` is the switch; `set` is the
+    // throttle. See THE MOVER.
+    envPlaneMover.amp(envPlanePhase === 0 ? 0 : 1);
+  }
   envPlanePos.set(x, y, z);
   if (envPlaneProp) envPlaneProp.rotation.z += (2 + rpm * 26) * dt;
 
@@ -1568,16 +1622,16 @@ function envPlaneStep(game, dt) {
   // overhead she is a machine you can hear working, and from the far side of
   // the gardens she is a sound you notice twice and then forget. Four notes in
   // fourteen seconds close in, one at the edge of earshot.
-  envPlaneEng -= dt;
-  if (envPlaneEng <= 0) {
-    const cp = game.capy && game.capy.position;
-    const far = cp ? Math.hypot(cp.x - x, cp.z - z) : 999;
-    envPlaneEng = 2.4 + clamp(far / 22, 0, 5.5);
-    if (rpm > 0.4 && far < 85) {
-      envPlaneSfx(game, 'hiss', { volume: clamp(0.24 - far * 0.0022, 0.03, 0.24),
-                             pitch: 0.34 + rpm * 0.16 });
-    }
-  }
+  //
+  // ...AND THE MOVER ABOVE MADE THE WHOLE OF IT UNNECESSARY (A1). Every number
+  // in the paragraph above is a workaround for the same missing thing: there
+  // was no way to say "this engine is running" and so the gap between notes had
+  // to carry the distance, the phase and the level at once. A continuous voice
+  // says it directly, and the rationing that was protecting the player from a
+  // pulse is protecting them from nothing now. The one-shot is gone; keeping it
+  // under the mover would be the plane twice, and the four-note pulse is the
+  // half a listener would notice.
+  envPlaneEng = 0;
 }
 
 // ================================================================ LORIKEETS ==
