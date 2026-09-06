@@ -887,6 +887,36 @@ const sysSFX_FADE   = 45;     // m of taper up to FAR, so it stops without a cli
 const sysSFX_CULL   = 0.012;  // below this the graph is never built at all
 const sysSFX_PAN    = 0.82;   // never hard left/right — that reads as a broken mix
 const sysSFX_PAN_K  = 1.35;   // widen the middle: 45 degrees off axis is well panned
+// ---- BEHIND YOU, AND OVER YOU (A2, S2) -------------------------------------
+// The pan above is one axis and there are three. A gull directly overhead, one
+// twenty metres ahead and one twenty metres behind, at the same lateral offset,
+// were the same sound — and the one direction a player most needs to be able to
+// tell is something scattering OVER them.
+//
+// Two cues, and neither of them changes a level:
+//
+//   BEHIND is DULLER. A head is in the way, and the shape of that in a stereo
+//   mix is a gentle lowpass. Nothing else — a level drop behind you is what a
+//   game does when it has no cue and wants one, and it fights the distance law.
+//   ONE filter node, and only past sysSFX_BACK_T, so a sound in front of you
+//   builds exactly the graph it built before this existed.
+//
+//   ABOVE is WIDER and BRIGHTER. Elevation is the axis two speakers cannot
+//   carry at all, so it is faked the way film has faked it since the seventies:
+//   narrow the pan (a thing overhead is not to your left) and lift the top
+//   (nothing is between you and it). +2 dB is small on purpose — this is a hint
+//   and not an effect, and the moment it is audible AS an effect it is wrong.
+//
+// The pan narrowing is applied to EVERY placed sound because it costs no node
+// and a threshold on it would put a step in the middle of a gull's flight. The
+// ambience ring tops out at 6 m of lift over a 14–34 m radius, so the ladder
+// sees at most a nine per cent narrowing and its ninety-odd tuned volumes are
+// untouched — which is the same promise sysAmb was built on.
+const sysSFX_BACK_T  = 0.15;   // `back` past which a one-shot is given a filter
+const sysSFX_BACK_LP = 15500;  // Hz taken off the ceiling when fully astern
+const sysSFX_UP_T    = 0.20;   // `up` past which it gets the shelf instead
+const sysSFX_UP_DB   = 2.0;    // dB of 6 kHz shelf when directly overhead
+const sysSFX_UP_PAN  = 0.55;   // share of the pan width elevation takes away
 
 // --- ...AND THE PLACE HAS A SHAPE AS WELL AS A DIRECTION ---------------------
 // The pan above tells you WHERE a sound is. Nothing has ever told you what it
@@ -11879,7 +11909,6 @@ export function createSystems(game) {
   const sysMOVER_FLAT   = 8;        // m inside which distance takes nothing off the top
   const sysMOVER_LPSPAN = 62;       // ...and the metres over which it takes it all
   const sysMOVER_LPMIN  = 780;      // Hz it closes to. The Cali placer's own number.
-  const sysMOVER_BACKLP = 15500;    // Hz the A2 back-cue takes off the ceiling
   const sysMOVER_CALM   = 0.35;     // how far a BED thins when the world settles
   const sysMovers = [];
   let sysMoverBuilds = 0;           // graphs built this session, for the harness
@@ -12296,7 +12325,7 @@ export function createSystems(game) {
       const t = clamp(over / sysMOVER_LPSPAN, 0, 1);
       let hz = sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - t) * (1 - t);
       // ...and A2: something behind you is duller than the same thing in front.
-      hz = Math.min(hz, 20000 - m.wantBack * sysMOVER_BACKLP);
+      hz = Math.min(hz, 20000 - m.wantBack * sysSFX_BACK_LP);
       sysAudioSet(m.g.gain, Math.max(sysMOVER_PARK, m.live ? m.want : sysMOVER_PARK),
                   now, sysMOVER_TAU);
       sysAudioSet(m.lp.frequency, Math.max(200, hz), now, sysMOVER_TAU);
@@ -16241,7 +16270,7 @@ export function createSystems(game) {
     if (at && typeof at.x === 'number' && at.x === at.x) { px = at.x; py = at.y || 0; pz = at.z || 0; placed = true; }
     else if (opts && typeof opts.x === 'number' && opts.x === opts.x) { px = opts.x; py = opts.y || 0; pz = opts.z || 0; placed = true; }
 
-    let pan = 0;
+    let pan = 0, back = 0, up = 0;
     if (placed) {
       const g = audioPlace(px, py, pz, opts.near, opts.far);
       // THE CULL IS THE POINT, AND IT COMES BEFORE THE THROTTLE. A gull four
@@ -16251,7 +16280,12 @@ export function createSystems(game) {
       // actually have heard. Silence must not consume the throttle.
       if (g <= 0) return;
       vol *= g;
-      pan = sysSfxPan;
+      // A2: narrow the image by elevation here, where it costs nothing, and
+      // carry the other two numbers to the graph below. They must be READ NOW —
+      // they live on the module and the next audioPlace call overwrites them.
+      up = sysSfxUp;
+      back = sysSfxBack;
+      pan = sysSfxPan * (1 - sysSFX_UP_PAN * up);
     }
     if (!force && lastPlay[name] !== undefined && now - lastPlay[name] < gap) return;
     // ---- AND A GLOBAL CEILING ON HOW MANY VOICES START AT ONCE (D9) -------
@@ -16308,7 +16342,30 @@ export function createSystems(game) {
       try {
         node = c.createStereoPanner();
         node.pan.value = pan;
-        node.connect(bus);
+        // ---- ...AND WHICH SIDE OF YOU IT IS ON (A2) ----------------------
+        // One filter, and only when there is something to say: in front of you
+        // and level with you this branch is not taken and the graph is the one
+        // this game has built since v16, to the node.
+        //
+        // BACK WINS WHEN BOTH APPLY. A biquad is one thing at a time, and of
+        // the two cues the lowpass is the load-bearing one — something behind
+        // you is a fact about the world, where the shelf is a hint about a
+        // dimension two speakers do not have. A gull that is both above and
+        // behind is a gull behind you.
+        let tail = node;
+        if (back > sysSFX_BACK_T) {
+          const f = c.createBiquadFilter();
+          f.type = lowpass;
+          f.frequency.value = 20000 - back * sysSFX_BACK_LP;
+          node.connect(f); tail = f;
+        } else if (up > sysSFX_UP_T) {
+          const f = c.createBiquadFilter();
+          f.type = highshelf;
+          f.frequency.value = 6000;
+          f.gain.value = sysSFX_UP_DB * up;
+          node.connect(f); tail = f;
+        }
+        tail.connect(bus);
         acMaster = node;
       } catch (e) { node = null; acMaster = bus; }
     } else acMaster = bus;
@@ -16386,6 +16443,157 @@ export function createSystems(game) {
     opts.at = null;
   }
   const sysAmbBare = { volume: 1, pitch: 1, at: null, near: 0, far: 0 };
+
+  // ===========================================================================
+  // THE FLOCK — MOTION OUT OF MANY ONE-SHOTS (A3; ROADMAP-AUDIO.md)
+  //
+  // Sydney's lorikeet flush is the right EVENT and has been since the day it was
+  // fixed: a rising edge on arrival, always on a wheek, birds that have been put
+  // up do not get put up again by an animal that has not moved. And it is two
+  // one-shots at the canopy. Nothing rises, nothing crosses the frame, nothing
+  // lands over your shoulder. Pasto's twenty-eight vencejos scatter when the
+  // bell goes and are silent; Venice's pigeons are one anchored rung; Antarctica
+  // has ten thousand birds and a single `bark`.
+  //
+  // A FLOCK IS THE ONE THING IN THIS GAME THAT IS PURE MOVEMENT, and it does not
+  // need the mover to say so. The trick is that the motion is not IN a voice, it
+  // is the DIFFERENCE BETWEEN VOICES: eight wing-claps at eight instants, each
+  // placed where the birds actually were at that instant, is a flock going up
+  // and over. One panner per flap, no handle, nothing to update, nothing to
+  // clean up — and it costs ONE voice slot rather than eight, because what makes
+  // mud is a burst of unrelated starts and these are one gesture.
+  //
+  // THREE THINGS THAT ARE DELIBERATE:
+  //
+  //   1. IT SPENDS ONE SLOT AND ONE THROTTLE, at the front, like sfx(). The
+  //      distance cull comes first so an inaudible flock two hundred metres away
+  //      does not stamp the throttle and swallow the audible one behind it —
+  //      the same argument, and the same bug, as the gull over the Bacino.
+  //   2. THE SIDE IS CHOSEN AWAY FROM THE ANIMAL. Birds break away from what
+  //      startled them, and the animal is what startled them. Across the
+  //      camera's right rather than across world x, so it agrees with the frame.
+  //   3. THE CRIES ARE SCHEDULED AND THE FLAPS ARE NOT. A wing-clap is noise and
+  //      can be built ahead of time; a cry is the existing `gull` voice, which
+  //      starts at ac.currentTime like every synth in the table, so it goes out
+  //      on a timer and re-checks the chapter when it lands. A gull scheduled in
+  //      Sydney must not arrive in Venice.
+  const sysWING_DUR   = 1.40;   // s the whole burst takes to cross
+  const sysWING_RISE  = 6.0;    // m it climbs over that
+  const sysWING_SIDE  = 14.0;   // ...and across the frame
+  const sysWING_FWD   = 4.0;    // ...and away
+  const sysWING_N     = [6, 14];      // flaps in a burst
+  const sysWING_VOL   = [0.10, 0.20]; // per flap, which is the ladder's own band
+  const sysWING_BP    = [600, 1400];  // Hz — the band a wing moves air in
+  const sysWING_JIT   = 0.25;   // share of the gap a flap may wander by
+  const sysWING_DEC   = [0.070, 0.110];
+  const sysWING_CRY   = [0.30, 0.90]; // s into the burst
+  const sysWING_GAP   = 4.0;    // s between any two flocks anywhere
+  const sysWING_SRC   = 12.0;   // ...and between two from the SAME source
+  const sysWingAt = {};         // per-source last time
+  let sysWingLast = -99;
+  const sysWingV = new THREE.Vector3();
+
+  /**
+   * PUT A FLOCK UP. Returns the number of flaps scheduled, 0 if it was culled,
+   * throttled, or there is no audio — so a caller can assert on it and a probe
+   * can count it. Safe from anywhere, at any time, with no context.
+   *
+   *   game.wingburst(x, y, z, { key: 'syd:fig4', n: 10 })
+   *
+   * `key` is the SOURCE — one tree, one tower, one colony — and is what the
+   * twelve-second gate is kept per. A `spread` of 0 makes it a single bird
+   * flapping where it stands, which is what a heron leaving a pond is.
+   */
+  function sysWingburst(x, y, z, opts) {
+    if (muted) return 0;
+    if (!game.state.started || game.state.paused || document.hidden) return 0;
+    if (!ac || !acMaster || ac.state !== 'running') return 0;
+    if (!(x === x && y === y && z === z)) return 0;
+    const o = opts || sysAmbBare;
+    const now = ac.currentTime;
+    // ---- the cull FIRST, so silence never spends a throttle ---------------
+    const near = o.near > 0 ? o.near : 10;
+    const far = o.far > 0 ? o.far : 90;
+    const g0 = audioPlace(x, y, z, near, far);
+    if (g0 <= 0) return 0;
+    if (now - sysWingLast < sysWING_GAP) return 0;
+    const key = o.key || 'flock';
+    if (now - (sysWingAt[key] === undefined ? -99 : sysWingAt[key]) < sysWING_SRC) return 0;
+    // ---- one slot, not one per flap ---------------------------------------
+    let liveN = 0;
+    for (let i = 0; i < sysVOICE_N; i++) if (now - sysVoiceAt[i] < sysVOICE_WIN) liveN++;
+    if (liveN >= sysVOICE_MAX) { sysVoiceDrop++; return 0; }
+    sysVoiceAt[sysVoiceHead] = now;
+    sysVoiceHead = (sysVoiceHead + 1) % sysVOICE_N;
+    sysWingLast = now;
+    sysWingAt[key] = now;
+
+    const n = Math.round(o.n > 0 ? o.n : rand(sysWING_N[0], sysWING_N[1]));
+    const dur = o.dur > 0 ? o.dur : sysWING_DUR;
+    const spread = o.spread === undefined ? 1 : clamp(o.spread, 0, 2);
+    const pitch = o.pitch > 0 ? o.pitch : 1;
+    const vol = o.volume > 0 ? o.volume : 1;
+    const bus = acSfxIn || sysSfxOut();
+    // ---- which way do they break ------------------------------------------
+    // Away from whatever put them up, across the SCREEN so it agrees with the
+    // picture, and the camera's own right is the only vector that knows that.
+    audioEar();
+    const capy = game.capy && game.capy.position;
+    let side = 1;
+    if (capy) {
+      const dx = x - capy.x, dz = z - capy.z;
+      if (dx * sysEarRight.x + dz * sysEarRight.z < 0) side = -1;
+    }
+    const rx = sysEarRight.x * sysWING_SIDE * side * spread;
+    const rz = sysEarRight.z * sysWING_SIDE * side * spread;
+    const fx = sysEarFwd.x * sysWING_FWD * spread, fz = sysEarFwd.z * sysWING_FWD * spread;
+    let made = 0;
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) : 0;
+      const when = now + t * dur + rand(-1, 1) * (dur / Math.max(n, 2)) * sysWING_JIT;
+      if (when < now) continue;
+      // where the birds are at THAT instant, which is the whole mechanism
+      const bx = x + rx * t, by = y + sysWING_RISE * t * spread, bz = z + rz * t;
+      const gp = audioPlace(bx + fx * t, by, bz + fz * t, near, far);
+      if (gp <= 0) continue;
+      const p = sysSfxPan * (1 - sysSFX_UP_PAN * sysSfxUp);
+      const src = noiseSrc();
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = rand(sysWING_BP[0], sysWING_BP[1]) * pitch;
+      bp.Q.value = 1.2;
+      const gn = ac.createGain();
+      const pn = ac.createStereoPanner ? ac.createStereoPanner() : null;
+      src.connect(bp); bp.connect(gn);
+      if (pn) { pn.pan.value = clamp(p, -1, 1); gn.connect(pn); pn.connect(bus); }
+      else gn.connect(bus);
+      const dec = rand(sysWING_DEC[0], sysWING_DEC[1]);
+      env(gn, when, rand(sysWING_VOL[0], sysWING_VOL[1]) * gp * vol, 0.012, dec);
+      src.start(when);
+      src.stop(when + 0.012 + dec + 0.03);
+      made++;
+    }
+    // ---- and two or three of them say something ---------------------------
+    // The existing gull, on the path, through the ordinary dispatcher — so it
+    // gets the room, the faders, the water and its own distance law for free.
+    // The chapter is re-checked on arrival: a timer is the one thing in this
+    // file that can outlive the place that started it.
+    if (o.cries !== false) {
+      const bio = (game.biome && game.biome.current) || '';
+      for (let ci = 0; ci < sysWING_CRY.length; ci++) {
+        const ct = sysWING_CRY[ci] * (dur / sysWING_DUR);
+        const tt = ct / dur;
+        const cx = x + rx * tt + fx * tt, cy = y + sysWING_RISE * tt * spread, cz = z + rz * tt + fz * tt;
+        setTimeout(function () {
+          if (((game.biome && game.biome.current) || '') !== bio) return;
+          sysWingV.set(cx, cy, cz);
+          sfx('gull', { at: sysWingV, near: near, far: far,
+                        volume: rand(0.14, 0.24) * vol, pitch: rand(1.55, 1.92) * pitch });
+        }, ct * 1000);
+      }
+    }
+    return made;
+  }
   /**
    * WHERE THIS VOICE COMES FROM IN THIS CHAPTER, or nothing. See sysAMB_AT.
    *
@@ -27341,6 +27549,8 @@ export function createSystems(game) {
   game.sfx = sfx;
   /** A sound that keeps its place. See THE MOVER. */
   game.sfxMover = sfxMover;
+  /** Put a flock up. Returns the flaps scheduled. See THE FLOCK. */
+  game.wingburst = sysWingburst;
   /**
    * HOW SETTLED THE WORLD IS AT A POINT, 0..1. See THE CALM above.
    *
@@ -28054,6 +28264,18 @@ export function createSystems(game) {
      * `rate` is the Doppler as a ratio — greater than one is approaching, and
      * that is the assertion `qa/mover-pass.js` is built on.
      */
+    /** Fire one flock and say how many flaps it actually scheduled. The only
+     *  thing about a burst of Web Audio one-shots observable from outside. */
+    wingburstAudit: function (x, y, z, o) {
+      const c = { n: 10 };
+      if (o) { for (const k in o) c[k] = o[k]; }
+      // A fresh key and a cleared global gate every time: the audit is asking
+      // "can this build a burst", not "is the throttle working", and the
+      // throttle has its own test.
+      c.key = 'audit:' + Math.random();
+      sysWingLast = -99;
+      return sysWingburst(x, y, z, c);
+    },
     moverAudit: function () {
       const rows = [];
       let liveN = 0;
@@ -31637,6 +31859,19 @@ export function createSystems(game) {
                 // most recognisable sound in the chapter — which is exactly why
                 // it carries the longest gap in the whole ladder.
                 sysAmb('muezzin', { volume: rand(0.09, 0.16), pitch: rand(0.94, 1.08) });
+                // ---- ...AND THE STORKS COME OFF THE PARAPET (A3) --------
+                // The five that wheel the Koutoubia are the one thing in that
+                // chapter that wants nothing from you, and they were drawn in
+                // silence. It goes HERE rather than in sahara.js because the
+                // event is here — the anchor table has already resolved the
+                // minaret's own point into sysAmbAt for the call, so the birds
+                // leave from the tower they are actually drawn on and there is
+                // no second copy of where it is to fall out of step.
+                if (sysAmbAnchor('muezzin')) {
+                  sysWingburst(sysAmbAt.x, sysAmbAt.y, sysAmbAt.z,
+                               { key: 'sah:storks', near: 40, far: 340, n: 9,
+                                 spread: 1.1, pitch: 0.74, volume: 0.8, cries: false });
+                }
                 ambTimer = rand(48, 95);
               } else if (r < 0.44) {
                 sysAmb('darbuka', { volume: rand(0.07, 0.13), pitch: rand(0.85, 1.20) });

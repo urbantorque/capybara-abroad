@@ -3386,6 +3386,7 @@ let quayBigSmoke = null;
 let quayBigU = 0;                         // 0..1 along A -> B
 let quayBigDir = 1;
 let quayBigDwell = quayBIG_DWELL;
+let quayBigMover = null, quayBigThr = 0;   // her engine, and its ramp (A1)
 let quayBigYaw = 0;
 let quayBigPX = 0, quayBigPZ = 0;
 let quayBigAnswerT = -1;                  // counting down to her reply
@@ -3648,6 +3649,24 @@ function quayUpdateBigFerry(game, dt) {
   quayBigGroup.position.copy(b.position);
   quayBigGroup.quaternion.set(quayQ.x, quayQ.y, quayQ.z, quayQ.w);
   quayBigPos.copy(quayBigGroup.position);
+  // ---- ...AND YOU CAN HEAR HER COMING (A1) -------------------------------
+  // The other ferry is the one thing in chapter three that crosses the whole
+  // harbour, and she did it in silence: a hull, a wake and a horn at the
+  // terminus. `quayBigBody.velocity` is already the world-space metres a second
+  // she is driven on, differenced against the previous TARGET, so it is exactly
+  // the number the Doppler wants.
+  if (!quayBigMover && game.sfxMover) {
+    quayBigMover = game.sfxMover('diesel', { key: 'quay:freshwater', near: 14, far: 260 });
+  }
+  if (quayBigMover) {
+    quayBigMover.at(quayBigPos.x, quayBigPos.y + 1.6, quayBigPos.z);
+    quayBigMover.vel(quayBigBody.velocity.x, 0, quayBigBody.velocity.z);
+    // She is at 8.6 or she is alongside — the position integration has no ramp
+    // in it, so putting one in the throttle would only desync it from `vel`.
+    // Damped here, and never to zero: a ferry at a wharf is idling.
+    quayBigThr = damp(quayBigThr, quayBigDwell > 0 ? 0.22 : 1, 1.6, dt);
+    quayBigMover.set(quayBigThr);
+  }
 
   // ---- the answer ---------------------------------------------------------
   if (quayBigAnswerT >= 0) {

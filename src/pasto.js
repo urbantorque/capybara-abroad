@@ -1790,6 +1790,17 @@ function pastoUpdateSwifts(game, dt) {
 
   // THE BELL SCATTERS THEM. pastoUpdateBell already owns the ring; all this
   // needs is to notice, and then take fifteen seconds to forgive it.
+  // ---- ...AND UNTIL A3 THE SCATTER WAS SILENT ---------------------------
+  // Twenty-eight birds leaving a tower at once, drawn since the day they were
+  // added and never once audible. The rising edge is the same one the gyre
+  // reads, so there is no second piece of state to keep in step: the frame the
+  // swell begins is the frame the wings go. Off the tower top, not the bell —
+  // they are on the parapet, and the bell is inside it.
+  if (pastoBellSwinging && pastoSwiftScatter < 0.5 && typeof game.wingburst === 'function') {
+    game.wingburst(pastoTW_X, pastoBELL_PIVY + 4.0, pastoTW_Z,
+                   { key: 'pas:swifts', near: 22, far: 240, n: 14,
+                     spread: 1.35, pitch: 1.42, volume: 0.85 });
+  }
   if (pastoBellSwinging && pastoSwiftScatter < 0.5) pastoSwiftScatter = 1;
   if (pastoSwiftScatter > 0) pastoSwiftScatter = Math.max(0, pastoSwiftScatter - dt / 15);
 

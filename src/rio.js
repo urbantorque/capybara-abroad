@@ -2954,7 +2954,9 @@ const rioBONDE_ROOF = 2.95;
 const rioBONDE_RIDE = 11.0;        // s aboard and moving that count on their own
 let rioBondeDeckY = 0;             // filled in at build: the top of the aqueduct
 let rioBondeNodes = null, rioBondeLen = null;
-const rioBonde = [null, null];     // { group, body, u, dir, dwell, pu, pyaw }
+const rioBonde = [null, null];
+const rioBondeMover = [null, null];   // steel on steel (A1)
+let rioCrowdMover = null;             // the column, as a place (A1)     // { group, body, u, dir, dwell, pu, pyaw }
 const rioCabinFrame = { x: 0, z: 0 };
 let rioBondeRideT = 0, rioBondeDone = false, rioBondePassed = false;
 let rioBondeTold = false, rioBondeBell = 0;
@@ -3204,6 +3206,23 @@ function rioUpdateBonde(game, dt) {
     // both, so turning it round at the terminus would be four lines of sign
     // handling in exchange for a picture nobody could tell apart.
     t.group.rotation.set(0, 0, rioBondePt.grade, 'YXZ');
+    // ---- ...AND THEY MAKE THE NOISE A TRAM MAKES (A1) ------------------
+    // The bonde had a sound and it came from the wrong place: an ambient
+    // `tram` rung fired from a random bearing on the 14-34 m ring, so the tram
+    // you could see going up the hill and the tram you could hear were two
+    // different trams. This is the rumble, from the car, and the flange squeal
+    // is driven off the GRADE — steel only sings where the track bends, and
+    // silence on the straight is the whole tell of one.
+    if (!rioBondeMover[k] && game.sfxMover) {
+      rioBondeMover[k] = game.sfxMover('rail', { key: 'rio:bonde' + k, near: 10, far: 90 });
+    }
+    if (rioBondeMover[k]) {
+      const bg = t.group.position;
+      rioBondeMover[k].at(bg.x, bg.y + 1.4, bg.z);
+      rioBondeMover[k].vel(t.body.velocity.x, t.body.velocity.y, 0);
+      rioBondeMover[k].set(t.dwell > 0 ? 0 : 1);
+      rioBondeMover[k].bend(clamp(Math.abs(rioBondePt.grade) * 3.2, 0, 1));
+    }
     if (capy && rioOnBonde(k, capy.position)) aboard = k;
   }
   rioBondePos.copy(rioBonde[0].body.position);
@@ -3544,6 +3563,20 @@ function rioUpdateParade(game, dt) {
   // doing, because a band acknowledging somebody does not wait for the two.
   if (rioSalute > 0) { rioSalute -= dt; beatPhase = Math.max(beatPhase, 0.85); }
   rioBateriaPulse = damp(rioBateriaPulse, beatPhase, 14, dt);
+  // ---- ...AND THE COLUMN IS SOMEWHERE (A1) -----------------------------
+  // The desfile walks the avenue whether or not anybody is watching, and the
+  // only thing that said so was the score. A crowd bed on the head of the
+  // column means you can hear which way it has got to from three streets
+  // away — and because it is a BED it thins as the world settles, which a
+  // parade genuinely does not do, so it is the one place in this batch where
+  // that rule is a small lie told for the player's benefit.
+  if (!rioCrowdMover && game.sfxMover) {
+    rioCrowdMover = game.sfxMover('crowd', { key: 'rio:desfile', near: 30, far: 180 });
+  }
+  if (rioCrowdMover) {
+    rioCrowdMover.at(rioBateriaX, rioTerrain(rioBateriaX, rioAVE_Z) + 1.4, rioAVE_Z);
+    rioCrowdMover.set(clamp(0.6 + rioBateriaPulse * 0.4, 0, 1));
+  }
 
   if (rioBateriaGroup) {
     const y = rioTerrain(rioBateriaX, rioAVE_Z);

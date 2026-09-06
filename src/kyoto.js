@@ -1395,6 +1395,18 @@ function kyoUpdateHeron(game, dt) {
       // A heron's alarm call is a single harsh bark and it is genuinely the
       // ugliest noise in this garden, which is the point of putting one here.
       if (game.sfx) game.sfx('gull', { volume: 0.55, pitch: 0.44 });
+      // ---- ...AND THE WINGS THAT GO WITH IT (A3) ------------------------
+      // ONE BIRD, so `spread` is 0: this is not a flock crossing the frame, it
+      // is four slow heavy beats where it stood. The garden's own note says the
+      // wings are their own group and are hidden while it stands — "two boards
+      // sticking out of a bird that is not using them" — and this is the sound
+      // of them coming out. No cries: it has already made the only noise a
+      // heron makes, on the line above.
+      if (typeof game.wingburst === 'function') {
+        game.wingburst(kyoHeronWadeX, kyoWATER_Y + 1.1, kyoHeronWadeZ,
+                       { key: 'kyo:heron', near: 12, far: 110, n: 4, dur: 1.05,
+                         spread: 0, pitch: 0.62, volume: 1.05, cries: false });
+      }
     }
     return;
   }
@@ -2611,6 +2623,7 @@ let kyoMillWheel = null, kyoMillSpin = 0;
 const kyoAheadOut = { x: 0, z: 0 };
 let kyoRunT = -1, kyoRunBest = 0, kyoRunDone = false;
 let kyoRunOutT = 0, kyoInRiver = false, kyoRunFlow = 0;
+let kyoRiverMover = null;                  // the Uji, as a place (A1)
 const kyoBARREL_N = 14;
 
 /** Build the centreline: resample, smooth, measure, and cache the widths. */
@@ -3338,6 +3351,22 @@ function kyoUpdateRun(game, dt) {
   const wet = nr.d < nr.w * kyoRUN_HZ_OUT && p.y < kyoRIVER_Y + 1.4;
   kyoInRiver = wet;
   kyoRunFlow = wet ? clamp(kyoFlowAt(p.x, p.z).speed / kyoFLOW_MAX, -0.3, 1) : 0;
+  // ---- ...AND THE RIVER IS AUDIBLE FROM THE BANK (A1) -------------------
+  // The Uji run is the chapter's marquee and the water made no sound at all
+  // unless you were in it. `nr` is the nearest point on the centreline, which
+  // this function has already computed for its own purposes — so the bed sits
+  // on the water nearest you and gets louder as you walk down to it, which is
+  // the whole of what a river does.
+  if (!kyoRiverMover && game.sfxMover) {
+    kyoRiverMover = game.sfxMover('river', { key: 'kyo:uji', near: 20, far: 120 });
+  }
+  if (kyoRiverMover && nr) {
+    const seg = kyoRiverSeg(nr.s);
+    kyoRiverMover.at(seg.x, kyoRIVER_Y + 0.3, seg.z);
+    // Wider water is louder water: the half-width table runs 5.5 to 15 m and
+    // the mill end is the noisy end.
+    kyoRiverMover.set(clamp(0.45 + (seg.w - 5.5) / 19, 0.35, 1));
+  }
 
   // --- the gates, for the toast and for nothing else ---
   // They are not required and they are not counted against you. A gate you have

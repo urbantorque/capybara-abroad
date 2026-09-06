@@ -3013,6 +3013,17 @@ function venUpdatePigeons(game, dt) {
     }
   }
 
+  // ---- ...AND THE SQUARE LIFTS (A3) -------------------------------------
+  // One hundred and eighty birds leaving the most famous paving in Europe, and
+  // the only sound was a rustle cued off the clatter counter. The edge is the
+  // one this function already computes: `scare` is "the animal is moving fast
+  // enough to put them up", and the test is on the RISE, so standing in the
+  // middle of a square full of pigeons is not a flush on every frame.
+  if (up > wasUp + 12 && scare && typeof game.wingburst === 'function') {
+    game.wingburst(venFlockX, venTerrain(venFlockX, venFlockZ) + 1.4, venFlockZ,
+                   { key: 'ven:piazza', near: 16, far: 150, n: 14,
+                     spread: 1.4, pitch: 1.06, volume: 1.0 });
+  }
   venPigeonUp = up;
   // ONLY WHAT YOU PUT UP. The pigeons also take off because the paving is
   // going under (`wet`, above), and at high water that is all one hundred and

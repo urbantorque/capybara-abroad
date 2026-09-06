@@ -3798,6 +3798,7 @@ const hkBUS_RIDE = 14.0;               // s up top that count as 'down Nathan Ro
 let hkBusGroup = null, hkBusBody = null, hkBusLit = null;
 let hkBusZ = hkBUS_Z0, hkBusDir = -1;
 let hkBusDwell = hkBUS_END;
+let hkBusMover = null, hkBusThr = 0;   // her engine, and its ramp (A1)
 let hkBusStop = -1;                    // index of the stop being served
 let hkBusPZ = hkBUS_Z0;
 let hkBusRideT = 0;
@@ -3954,6 +3955,20 @@ function hkUpdateBus(game, dt) {
   hkBusPZ = hkBusZ;
   hkBusGroup.position.copy(b.interpolatedPosition);
   hkBusPos.copy(hkBusGroup.position);
+  // ---- ...AND SHE HAS AN ENGINE (A1) ------------------------------------
+  // A double-decker on Nathan Road, in the chapter with the hardest and
+  // shortest room in the game, and the only sounds she made were her doors.
+  // The room is most of why this one matters: a diesel in a street canyon four
+  // and a half metres wide is the sound of the PLACE, not of the bus.
+  if (!hkBusMover && game.sfxMover) {
+    hkBusMover = game.sfxMover('diesel', { key: 'hk:bus', near: 10, far: 80 });
+  }
+  if (hkBusMover) {
+    hkBusMover.at(hkBusPos.x, hkBusPos.y + 1.2, hkBusPos.z);
+    hkBusMover.vel(0, 0, b.velocity.z);
+    hkBusThr = damp(hkBusThr, hkBusDwell > 0 ? 0.20 : 1, 2.0, dt);
+    hkBusMover.set(hkBusThr);
+  }
   hkBusGroup.rotation.y = hkBusDir < 0 ? Math.PI : 0;
   b.quaternion.setFromEuler(0, hkBusGroup.rotation.y, 0);
   b.previousQuaternion.copy(b.quaternion);

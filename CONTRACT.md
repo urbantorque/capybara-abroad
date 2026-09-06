@@ -14,6 +14,107 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE SOUND PASS — THE REST OF THE WORLD, AND THE FLOCK (S1b + S2 — 6 Sep 2026)
+
+**LANDED.** The second half of batch S1 (six more movers and four beds) and the
+whole of batch S2 (the flock, and the two axes for one-shots). With this,
+`ROADMAP-AUDIO.md`'s A1, A2 and A3 are complete and only M1 is open.
+
+**FOUR PLACED BEDS, AND THEY EXIST BECAUSE OF ONE SENTENCE IN S1a:** a mover
+that does not move is a bed. Manly's break, the Uji, the Antarctic colony and
+Rio's parade column are the same object as the Whippy van with the velocity
+left at zero, so they cost no new system at all. Manly is the one that matters
+most — the driest room in the game, on a beach, where the surf was one-shots on
+a 1.25–1.85 s throttle, so the sea got BUSIER as it got louder instead of
+getting NEARER. **A shoreline you can walk toward is the most legible spatial
+cue an open world has and nineteen of them had none.**
+
+**SIX MORE MOVERS.** The Freshwater (`diesel`) — the one thing in chapter three
+that crosses the whole harbour, and it did it in silence. Both bondes (`rail`),
+which replaces an ambient `tram` rung fired from a random bearing on the 14–34 m
+ring: *the tram you could see and the tram you could hear were two different
+trams.* The flange squeal is driven off the GRADE, because steel only sings
+where the track bends and silence on the straight is the whole tell of one. And
+the Kowloon bus (`diesel`), which matters for the room it is in more than for
+itself: a diesel in a street canyon four and a half metres wide is the sound of
+the place, not of the bus.
+
+**A BED THINS WITH THE CALM AND A VEHICLE DOES NOT**, and Rio's crowd is the one
+place that rule is a small lie told for the player's benefit: a parade does not
+get quieter because you sat down. It is kept because the alternative is a
+special case, and a special case in the calm field is how that field goes wrong.
+
+### THE FLOCK (A3) — MOTION OUT OF MANY ONE-SHOTS
+
+Sydney's lorikeet flush has been the right EVENT since it was fixed — a rising
+edge on arrival, always on a wheek — and it was **two one-shots at the canopy**.
+Nothing rose, nothing crossed the frame, nothing landed over your shoulder.
+
+**The motion is not IN a voice, it is the DIFFERENCE BETWEEN VOICES.** Eight to
+fourteen wing-claps at eight to fourteen instants, each placed where the birds
+actually are at that instant, is a flock going up and over. One panner per flap,
+no handle, nothing to update, nothing to clean up.
+
+**IT COSTS ONE VOICE SLOT AND NOT FOURTEEN.** What makes mud is a burst of
+UNRELATED starts, and these are one gesture. Measured: three bursts of twelve
+flaps in immediate succession, **0 voice drops**.
+
+Six sources: Sydney's figs, Pasto's twenty-eight vencejos on the bell (drawn
+since the day they were added and never once audible), Venice's pigeons on the
+rising edge the chapter already computes, Marrakech's storks — wired at the
+muezzin rung in this file rather than in `sahara.js`, **because the anchor table
+has already resolved the minaret's own point and a second copy of where it is
+is a second thing to fall out of step** — Antarctica's colony on `antColonyCall`,
+and Kyoto's heron, which is ONE bird and therefore `spread: 0`: four slow heavy
+beats where it stood, and no cries, because it has already made the only noise a
+heron makes.
+
+**A CULLED FLOCK MUST NOT SPEND A THROTTLE.** The distance test comes before
+both gates, which is the same rule — and the same bug — as the gull over the
+Bacino. Measured at 600 m: **0 flaps, 0 nodes.**
+
+**`game.flock` WAS THE OBVIOUS NAME AND IT WAS TAKEN.** `flockOffer`,
+`flockSfx`, `flockKinds` and `flockAt` are the HERD — capybaras that follow you
+— and a bird burst called `flock` beside them is a trap for the next reader. It
+is `game.wingburst`.
+
+### THE TWO AXES REACH THE ONE-SHOTS (A2)
+
+`sfx()` now inserts **one** filter, and only when there is something to say:
+past `sysSFX_BACK_T` a lowpass, else past `sysSFX_UP_T` a 6 kHz shelf. In front
+of you and level with you the branch is not taken and the graph is the one this
+game has built since v16, to the node. **Back wins when both apply** — a biquad
+is one thing at a time, and of the two cues the lowpass is the load-bearing one.
+
+**The pan narrowing is applied to every placed sound**, because it costs no node
+and a threshold on it would put a step in the middle of a gull's flight. The
+ambience ring tops out at 6 m of lift over a 14–34 m radius, so the ladder sees
+at most a nine per cent narrowing and its ninety-odd hand-tuned volumes are
+untouched.
+
+### MEASURED
+
+| | |
+|---|---|
+| a ten-flap burst | **10 flaps, 40 nodes, 4.00 per flap** — one source, one filter, one gain, one panner |
+| the same burst at 600 m | **0 flaps, 0 nodes** |
+| three bursts of twelve | 35 flaps, 140 nodes, **0 voice drops** |
+| the A2 filter | **0 extra biquads ahead, 1 behind, 1 above** |
+| the axes | ahead `back` 0.000; astern **1.000** and pan −0.005; overhead `up` **1.000**, pan 0.000 |
+| nine chapters, fourteen movers | **0 missing, 0 page errors, 0 `lastError`** |
+| the budget | Hanoi 4 live of 4; every other chapter 1–3 |
+| `npm test` | 10/10 |
+
+**ONE THING THE PROBE COULD NOT SEE.** The Freshwater was 321 m away for the
+whole of its sample, which is past her own 260 m `far`, so she is correctly
+silent and **has never actually been heard under test**. The mechanism is
+proven by the other eight; her levels are not.
+
+**AND A HARNESS TRAP THAT COST A RUN.** `biome.switchTo` does not reload
+modules, so a page opened before an edit reports every new mover as missing —
+six chapters of confident false failures. The tell is `builds` not moving.
+Reload between editing a chapter file and probing it.
+
 ## THE SOUND PASS, BATCH ONE — THE MOVER (S1a — 6 Sep 2026)
 
 **LANDED.** The first half of `ROADMAP-AUDIO.md`'s batch S1: the spatial

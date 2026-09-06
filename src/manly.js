@@ -238,6 +238,7 @@ let manBigNear = 0;                  // 0..1 — how close the wave of the set i
 // the sound of the beach, which is a property of the BREAK and not of the
 // wave the animal happens to be standing in. See the bed in manUpdateSurfTasks.
 let manSurfBed = 0, manSurfT = 0, manSetToldT = 0;
+let manSurfMover = null;             // the break, as a place (A1)
 let manRideEndT = 0;                 // s of the tail after a ride that made the sand
 
 // scratch (contract: zero allocation in update)
@@ -4336,6 +4337,27 @@ function manUpdateSurfTasks(game, dt) {
     // ...and it is LOUDER AND CLOSER when you are in it, which is the only
     // thing that says being out the back is a different place.
     manSurfBed = damp(manSurfBed, loud, 1.4, dt);
+    // ---- ...AND THE BREAK IS SOMEWHERE (A1) ---------------------------
+    // The driest room in the game, on a beach, and the surf was one-shots on a
+    // 1.25-1.85 s throttle — so the sea got BUSIER as it got louder instead of
+    // getting NEARER. A shoreline you can walk toward is the most legible
+    // spatial cue an open world has, and nineteen of them had none.
+    //
+    // The bank is single-valued in x, so the nearest point on it is directly
+    // offshore of wherever you are standing; the +6 m is the same offset the
+    // loop above already uses to sit in the white water rather than on the
+    // crest. A bed has no velocity — the sea is not going past you.
+    if (!manSurfMover && game.sfxMover) {
+      manSurfMover = game.sfxMover('surf', { key: 'man:break', near: 40, far: 220 });
+    }
+    if (manSurfMover) {
+      const sx = clamp(p.x, manBEACH_X0 + 4, manPOINT_X - 4);
+      manSurfMover.at(sx, manWATER + 0.5, manBankZ(sx) + 6);
+      // The SET clock, not the foam under your feet: what a break does is
+      // swell and fall on its own period, and manBigNear is that period as a
+      // number the chapter already trusts.
+      manSurfMover.set(clamp(0.45 + manBigNear * 0.55, 0, 1));
+    }
     manSurfT -= dt;
     if (manSurfT <= 0 && manSurfBed > 0.06) {
       manSurfT = rand(1.25, 1.85);

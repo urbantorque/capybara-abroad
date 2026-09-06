@@ -280,6 +280,8 @@ let antToldPack = false, antToldSlip = false, antToldNeutral = false, antToldCol
 
 // what the wheek does on LAND, which for the chapter's whole life was nothing
 let antColonyCall = 0, antSkuaFlush = 0, antPetrelScat = 0, antEchoT = -1;
+let antColonyBurst = 0;                   // s of lockout on the wing burst (A3)
+let antColonyMover = null;                // ten thousand of them, as a place (A1)
 // ---------------------------------------------------------------------------
 // ...AND THE CHORUS IS A WAVE, WHICH IS THE ONLY THING THAT MAKES IT A CHORUS.
 //
@@ -4484,6 +4486,32 @@ function antUpdatePenguins(game, dt) {
     const r = 20 * (1 + (antColonyCrit ? antColonyCrit.appr : 0) * 0.6);
     return r * r;
   })();
+  // ---- ...AND THE NEAR EDGE OF IT GOES UP (A3) --------------------------
+  // antColonyCall has been the colony's answer to a wheek since it was written
+  // and it has driven nothing audible but a level. On the rising edge — the
+  // frame antWheek sets it to 1 — the birds nearest the noise actually leave
+  // the ground. The ones on nests do not, which is correct and is why this is a
+  // burst at the colony rather than the whole rookery going up.
+  if (antColonyCall > 0.92 && antColonyBurst <= 0 && typeof game.wingburst === 'function') {
+    antColonyBurst = 6.0;
+    game.wingburst(antCOLONY.x, antTerrain(antCOLONY.x, antCOLONY.z) + 1.2, antCOLONY.z,
+                   { key: 'ant:colony', near: 30, far: 320, n: 13,
+                     spread: 1.2, pitch: 0.88, volume: 0.95 });
+  }
+  if (antColonyBurst > 0) antColonyBurst -= dt;
+  // ---- ...AND THE ROOKERY IS A PLACE YOU WALK TOWARD (A1) --------------
+  // A hundred and thirty-two birds on nests, ten thousand implied, and one
+  // anchored `bark` rung between them. A colony is the loudest thing in
+  // Antarctica and it is loud CONTINUOUSLY — which is exactly the thing this
+  // game had no way to say until there were beds.
+  if (!antColonyMover && game.sfxMover) {
+    antColonyMover = game.sfxMover('colony', { key: 'ant:colony-bed', near: 40, far: 300 });
+  }
+  if (antColonyMover) {
+    antColonyMover.at(antCOLONY.x, antTerrain(antCOLONY.x, antCOLONY.z) + 1.0, antCOLONY.z);
+    // It answers a wheek like everything else down here does.
+    antColonyMover.set(clamp(0.7 + antColonyCall * 0.3, 0, 1));
+  }
   antColonyCall = damp(antColonyCall, 0, 0.9, dt);
   // ---- AND THE FRONT MOVES OUTWARD. See antCALL_SPD ---------------------
   if (antCallR >= 0) {

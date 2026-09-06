@@ -1744,9 +1744,30 @@ function envFlushTree(game, t, loud) {
     // when it is YOUR wheek that put them up (`loud`); what it stops being is
     // a thing that happens at full volume in the middle of your skull while
     // you are forty metres away doing nothing.
+    // ...AND NOW THEY ACTUALLY GO SOMEWHERE (A3).
+    // Everything above is still true and none of it changes: the event is
+    // right, the arrival edge is right, the levels are right. What was missing
+    // is that a flush is MOVEMENT — the two sounds happened AT the tree and
+    // then it was over, so the one thing a scattering flock is for, telling you
+    // which way something went, was the one thing it could not say. The burst
+    // puts a wing-clap at eight instants along the arc the birds take, each one
+    // placed where they actually are at that instant, and the cries ride the
+    // same path. `spread` is smaller when it was not your wheek: birds that
+    // went up because you wandered past do not clear the garden.
     const at = { x: T[t * 5], y: T[t * 5 + 2], z: T[t * 5 + 1] };   // x, canopy y, z
-    game.sfx('gull', { volume: loud ? 0.34 : 0.20, pitch: rand(1.62, 1.86),
-                       at: at, near: 10, far: 90 });
+    const flaps = typeof game.wingburst === 'function'
+      ? game.wingburst(at.x, at.y, at.z, { key: 'syd:fig' + t, near: 10, far: 90,
+                                           n: loud ? 12 : 8, spread: loud ? 1 : 0.7,
+                                           volume: loud ? 1 : 0.7, pitch: 1.18 })
+      : 0;
+    // The rustle stays and the gull does not: the burst carries its own cries
+    // along the path, and the leaves are the one part of this that is genuinely
+    // still at the tree. If the burst was culled or throttled, the old pair is
+    // exactly what plays — silence is never the fallback for a payoff.
+    if (!flaps) {
+      game.sfx('gull', { volume: loud ? 0.34 : 0.20, pitch: rand(1.62, 1.86),
+                         at: at, near: 10, far: 90 });
+    }
     game.sfx('rustle', { volume: loud ? 0.28 : 0.17, pitch: rand(1.1, 1.35),
                          at: at, near: 10, far: 90 });
   }
