@@ -5179,6 +5179,32 @@ const sysGLYPHS = {
     ['c', 14.8, 10.9, 2.6, 'o'],
     ['c', 14.8, 10.9, 1.25],
   ],
+  /* THE MARQUEE. A four-point sparkle — the one shape that means "this is the
+     big one" without meaning anything else. A five-point star was the obvious
+     choice and is wrong twice: the chart already uses a filled triangle-ish
+     star for a landmark, and a five-point star at nine pixels is a smudge,
+     because its points are at five different angles and only two of them land
+     on the pixel grid. Four points, on the axes, stay four points all the way
+     down.
+
+     `mini` IS THE SAME SHAPE SMALLER, and deliberately not a different one.
+     They are two rungs of one ladder — the marquee and the middle tier — so
+     they have to read as the same KIND of thing at different weights. A second
+     unrelated mark beside the clock would be a third vocabulary on a row that
+     is already text, a mark, an arrow and a distance.
+
+     AND THE ARMS ARE FAT. The first cut was outer 10 against inner 3.2 and
+     rendered at its real size — nine or ten CSS pixels on the card — it was a
+     PLUS SIGN. A concavity that reads as a sparkle at 64 px reads as
+     arithmetic at 10, because there is not enough width left in the arm for
+     the eye to see it taper. Inner 4.8 keeps the star and survives the size
+     it is actually used at, which is the only size it is ever used at. */
+  wow: [
+    ['p', '12,1.5 15.39,8.61 22.5,12 15.39,15.39 12,22.5 8.61,15.39 1.5,12 8.61,8.61'],
+  ],
+  mini: [
+    ['p', '12,5.2 14.19,9.81 18.8,12 14.19,14.19 12,18.8 9.81,14.19 5.2,12 9.81,9.81'],
+  ],
   /* MENU. Three rules, which is the one icon in the world nobody has to be
      taught, and the only reason it is in the sheet at all. */
   menu: [
@@ -5571,6 +5597,14 @@ const sysMAP_PX = 104;              // baked resolution — deliberately soft
 // told. Kept identical to that rule, and beside it in the file so the two
 // cannot drift: the label on the door is HUD type and must read as HUD type.
 const sysMAP_FONT = '"Trebuchet MS","Segoe UI",system-ui,sans-serif';
+// How much slip counts as "there is no grip here". The same 0.3 the pose
+// ladder in capybara.js already uses for the ice stance, named here because
+// the sentence and the picture must agree about when the ground has gone.
+const sysSLIP_SAY = 0.3;
+// Seconds of stalled journey before the paper repeats itself. Long on purpose:
+// two and a half minutes is the game noticing, and ninety seconds would be the
+// game nagging. See THE NUDGE.
+const sysNUDGE_T = 150;
 const sysMAP_HZ = 12;               // redraws a second
 const sysMAP_TRAIL = 64;            // breadcrumbs kept
 const sysMAP_TRAIL_D = 3.0;         // metres between them — distance, not time
@@ -7289,6 +7323,18 @@ function sysBuildCSS() {
 '.capyui-meas{flex:0 0 auto;margin-left:5px;align-self:center;color:' + inkSoft + ';',
   'font-size:clamp(7.5px,1.1vw,9.5px);line-height:1;opacity:.72;}',
 '.capyui-task.done .capyui-meas{opacity:.3;}',
+/* THE TIER MARK (F4). Same box and the same rhythm as the clock beside it, and
+   in INK — not in accent, which was the first cut and was wrong for a reason
+   worth writing down: the accent on this card belongs to the AIM, and the aim
+   sits immediately to the right of these two marks. Drawn in the same colour,
+   the tier mark read as part of "▲ 20 m" rather than as a fact about the row.
+   The two marks that describe a row are ink; the one thing that describes
+   where you are going is accent. Full ink for the marquee against the clock's
+   soft, so the ladder is legible without a legend. */
+'.capyui-tier{flex:0 0 auto;margin-left:5px;align-self:center;color:' + ink + ';',
+  'font-size:clamp(7.5px,1.1vw,9.5px);line-height:1;opacity:.85;}',
+'.capyui-tier.mini{color:' + inkSoft + ';opacity:.66;}',
+'.capyui-task.done .capyui-tier{opacity:.3;}',
 '.capyui-aim{flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:4px;',
   'align-self:center;color:' + accent + ';font-weight:700;white-space:nowrap;',
   'font-size:clamp(8.5px,1.35vw,11px);font-variant-numeric:tabular-nums;opacity:0;',
@@ -17080,6 +17126,14 @@ export function createSystems(game) {
   const chapMax = chapterCount();
   function chapLabel(n) { const d = CHAPTERS[n - 1]; return d ? d.name : ('Chapter ' + n); }
   const chapRec = [];   // chapRec[n], 1-based
+  // id -> TASKS entry, built once. `taskRec[id].def` is the same thing but it
+  // is not filled until the pass AFTER every row is built, and the tier mark
+  // has to be decided while the row is being made. One object rather than a
+  // linear scan per row: 133 rows against 231 tasks is 30 000 comparisons at
+  // boot, on the one frame the title card is trying to appear in.
+  const taskDefById = Object.create(null);
+  for (let i = 0; i < TASKS.length; i++) taskDefById[TASKS[i].id] = TASKS[i];
+  function taskDefOf(id) { return taskDefById[id] || null; }
   for (let n = 1; n <= chapMax; n++) {
     const ids = tasksInChapter(n);
     chapRec[n] = { n: n, ids: ids };
@@ -17125,6 +17179,25 @@ export function createSystems(game) {
       // and a distance, and a second sentence per row turns a to-do list into a
       // spreadsheet. It carries its own aria-label because a bare mark is a
       // decoration to a screen reader.
+      // ---- AND THIS ONE IS A SET PIECE (F4) --------------------------------
+      // The same argument the clock's note above makes, about the other axis.
+      // Nineteen rows in this game are marquees and thirty-two are the middle
+      // rung, and a player could not tell which from the paper at all: they
+      // read as one flat list of a hundred and thirty-three equal chores, and
+      // the difference between "knock over a bin" and "take the stage at the
+      // Opera House" was discoverable only by doing it.
+      //
+      // BEFORE the clock, because it is the bigger fact about a row, and the
+      // two are orthogonal — a marquee is often also timed and gets both.
+      const tdef = taskDefOf(ids[i]);
+      const tier = tdef && tdef.wow ? 'wow' : (tdef && tdef.mini ? 'mini' : '');
+      if (tier) {
+        const tm = sysEl('span', 'capyui-tier ' + tier);
+        tm.appendChild(sysGlyphEl(tier));
+        tm.setAttribute('aria-label', tier === 'wow' ? 'the big one here'
+                                                     : 'a set piece');
+        li.appendChild(tm);
+      }
       if (RECORDS[ids[i]]) {
         const rm = sysEl('span', 'capyui-meas');
         rm.appendChild(sysGlyphEl('clock'));
@@ -21307,6 +21380,8 @@ export function createSystems(game) {
         // slide; a file written before it existed simply has none, which is the
         // right history for a player who was never taught.
         slid: slidEver ? 1 : 0,
+        // ...and the slip, on the same terms (F4). See sysSLIP_SAY.
+        slip: slipEver ? 1 : 0,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -22837,6 +22912,7 @@ export function createSystems(game) {
     r.done = true;
     r.li.classList.add('done');
     doneCount++;
+    nudgeT = 0;                   // anything ticked empties the bank. See THE NUDGE.
     game.state.score = doneCount;
     musProgSet();
     // ---- restoring a save is not the same act as doing the thing ----------
@@ -23444,6 +23520,14 @@ export function createSystems(game) {
   // the slide to be a real option, and `slidSaid` stops the prompt repeating
   // inside one session for a player who is ignoring it.
   let slidEver = false, slidT = 0, slidSaid = false;
+  // ...and the same pair for the slip, which is the other half of the same
+  // idea: the slide is a verb the player is given and the slip is one the
+  // ground takes away. Saved beside it. See sysSLIP_SAY.
+  let slipEver = false, slipT = 0;
+  // THE NUDGE. Banked seconds since anything was ticked, and whether this
+  // chapter has already had its one. Deliberately NOT on the save: it is about
+  // the last few minutes, and a journey resumed tomorrow is not stalled.
+  let nudgeT = 0, nudgeSaid = false;
   // put me back — a short trail of places the animal was demonstrably able to
   // walk out of, and the hold that returns it to the oldest of them
   const backRing = [];
@@ -23629,6 +23713,7 @@ export function createSystems(game) {
       // ...and a journey that has already been taught the slide is not taught
       // it again. See THE SLIDE, ASKED FOR ONCE.
       slidEver = !!jrFile.slid;
+      slipEver = !!jrFile.slip;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -27793,6 +27878,7 @@ export function createSystems(game) {
     // — including on the rollback path, which emits this event as of F3. See
     // musProgSet.
     musProgSet();
+    nudgeT = 0; nudgeSaid = false;   // a new place gets its own one. See THE NUDGE.
     // Everything a returning player has already earned, put back into the
     // world once. See sysKeepsRestore.
     sysKeepsRestore();
@@ -29855,6 +29941,65 @@ export function createSystems(game) {
           toast(sysSay('hold G while you are running. put your belly on it.'));
         }
       } else slidT = 0;
+    }
+
+    // ---- AND THE ONE VERB THE GROUND TAKES AWAY (F4) --------------------
+    // The slide, the wheek, the grab and the hop are all things the player
+    // DOES, and every one of them is taught. `groundSlip` is the opposite —
+    // something the world does to the animal — and it is the biggest change to
+    // how the game handles in the whole journey: on Iceland's glacier the
+    // capybara becomes a toboggan that steers badly, and a hundred and thirty
+    // metres of tongue is the longest single thing in the game. Six chapters
+    // publish slip and NONE of them says a word about it, so the first minute
+    // on ice reads as the controls having broken.
+    //
+    // ONCE PER JOURNEY, latched on the save beside the slide's, because it is
+    // the same kind of fact: something you learn about the world rather than
+    // something you can be reminded of usefully. Not a hint and not an
+    // instruction — there is nothing to press. It just names what is
+    // happening, which is the whole difference between a mechanic and a bug.
+    //
+    // 0.3 is the threshold the rest of the file already uses for "this ground
+    // is slippery" (see the pose ladder), and MOVING is required because a
+    // capybara standing still on ice is not being told anything by it.
+    if (started && capy && !slipEver && !capy.swimming && !capy.carriedBy &&
+        capy.grounded && capy.slip > sysSLIP_SAY && Math.sqrt(v.x * v.x + v.z * v.z) > 2.0) {
+      slipT += dt;
+      if (slipT > 0.8) {
+        slipEver = true;
+        saveSoon();
+        toast('no grip at all. steer early — it will not stop when you do.');
+      }
+    } else slipT = 0;
+
+    // ---- AND IF NOTHING HAS HAPPENED IN A WHILE, SAY THE CLUE AGAIN (F4)
+    //
+    // The clue under the top row is written once, when the row becomes top,
+    // and then it sits there. A player who has read it, gone somewhere else,
+    // and lost the thread has to go and LOOK at the paper again — which is
+    // exactly the state where they are least likely to think of it.
+    //
+    // A BANKED TIMER in restIdleT's idiom, not a wall clock: it fills while
+    // the journey is genuinely stalled and it is emptied by a tick. Two and a
+    // half minutes is deliberately long — this is the game noticing, not the
+    // game nagging — and it is said ONCE PER CHAPTER, because a nudge that can
+    // arrive twice is a nudge the player learns to ignore.
+    //
+    // At `note` weight, which is the quiet pill: it is not news, it is the
+    // thing you were already told. And gated hard on the world being live and
+    // unoccupied — nothing here may speak over a crossing, a modal, a
+    // finished chapter, or a chapter whose top row has nothing to say.
+    if (started && !transBusy && !jrShown && !ledShown && !albShown && !pauseShown &&
+        !game.state.paused && todoTopId && todoTopId !== sysWAY_ID && !nudgeSaid) {
+      nudgeT += dt;
+      if (nudgeT > sysNUDGE_T) {
+        nudgeSaid = true;
+        const txt = clueEl.textContent;
+        // Only if there is a clue AND it is still the row it was written for:
+        // `clueEl` carries the par line too, and an empty one means this
+        // chapter's top row was never given one.
+        if (txt) toast(txt, 'note');
+      }
     }
 
     // ---- the way home: three whistles, stood in the crater ----

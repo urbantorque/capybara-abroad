@@ -80,8 +80,19 @@ for (const f of readdirSync('src').filter((x) => x.endsWith('.js'))) {
   bytesIn += before.length;
   bytesOut += after.length;
   files++;
+  // ---- A SOURCE FILE THAT DOES NOT PARSE FAILS THE BUILD (F4) ------------
+  // This was a `console.log` of a parenthetical and a `continue`. The reasoning
+  // was sound as far as it went — the stripper must not be blamed for a file
+  // that was already broken — but the consequence was that NOTHING failed:
+  // `npm test` reported "10 checks, 0 failed" on a systems.js with a hard
+  // syntax error in it, and the only thing that ever said otherwise was the
+  // browser console, two probes and twenty minutes later.
+  //
+  // This loop is the only place in the suite that parses the source at all, so
+  // it is the only place that can answer the question. It answers it now.
   try { new vm.Script(before); } catch (e) {
-    console.log('  (baseline ' + f + ' does not parse as a script: ' + e.message + ')');
+    console.log('FAIL  ' + f + ' DOES NOT PARSE: ' + e.message);
+    fail++; broke++;
     continue;
   }
   try { new vm.Script(after); } catch (e) {

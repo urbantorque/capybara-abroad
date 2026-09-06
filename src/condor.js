@@ -1193,9 +1193,21 @@ function condorMount() {
   // second of a condor is not a moment anybody reads a second sentence in. Via
   // game.say, so a pad reads B and a phone reads WHEEK — this is the first line
   // in the game outside systems.js that names a control.
-  if (typeof game.say === 'function') {
+  // ---- ...AND IT WAS THE WRONG `say` (F4) --------------------------------
+  // `game.say` is npc.js's `sayAt(x, y, z, text)` — a speech bubble at a POINT
+  // — and this called it with one string. `sayAt` begins `if (!text) return;`,
+  // so the whole thing was a silent no-op: no bubble, no toast, no throw.
+  // MEASURED: `game.say('...')` returns undefined and adds neither a bubble
+  // nor a toast to the document. The comment above is a true and careful
+  // account of a line that has never once been said.
+  //
+  // `game.hud.say(s)` is the one that takes a sentence — it is the only
+  // caller of `sysSay`, which is what turns "press Q" into "tap WHEEK" on a
+  // phone and into the pad's word on a pad. That substitution was written FOR
+  // patterns like this one; it had simply never been handed this string.
+  if (game.hud && typeof game.hud.say === 'function') {
     setTimeout(function () {
-      if (condorConstraint) game.say('press Q to beat the wings. it climbs.');
+      if (condorConstraint) game.hud.say('press Q to beat the wings. it climbs.');
     }, 2400);
   }
   return true;

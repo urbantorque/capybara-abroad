@@ -2219,23 +2219,37 @@ export const TASKS = [
   { id: 'dig-flower',   text: 'Dig up the gardener’s prize rose',       chapter: 1 },
   { id: 'chased',       text: 'Get chased by the gardener',             chapter: 1 },
   { id: 'photo-op',     text: 'Get your photo taken',                   chapter: 1 },
-  { id: 'opera-stage',  text: 'Take the stage at the Opera House',      chapter: 1, wow: 'SYDNEY' },
-  { id: 'ball-harbour', text: 'Put the beach ball in the harbour',      chapter: 1 },
-  { id: 'swim',         text: 'Have a dignified swim',                  chapter: 1 },
-  { id: 'hat-harbour',  text: 'Drop the stolen hat in the harbour',     chapter: 1 },
+  // ---- ACT TWO: THE FORECOURT (F4) --------------------------------------
+  // Sydney was the last flat list in the first third of the game and the one
+  // where a shape matters most: it is the chapter every player opens on, it
+  // has nineteen rows — the longest list anywhere — and it is laid out as
+  // three obvious places you walk between. The gardens, the forecourt, the
+  // promenade. All the acts do is put the paper in the one you are standing
+  // in; nothing is gated, and F still reaches every row (see the two rules
+  // above).
+  { id: 'opera-stage',  text: 'Take the stage at the Opera House',      chapter: 1, act: 2, wow: 'SYDNEY' },
+  { id: 'ball-harbour', text: 'Put the beach ball in the harbour',      chapter: 1, act: 2 },
+  { id: 'swim',         text: 'Have a dignified swim',                  chapter: 1, act: 2 },
+  { id: 'hat-harbour',  text: 'Drop the stolen hat in the harbour',     chapter: 1, act: 2 },
   // The quay is Sydney: same biome, same coordinates, a walk up the promenade
   // from the Opera House forecourt. It is not a chapter of its own — a chapter
   // is a PLACE you have to travel to, and there are two of those.
-  { id: 'cafe-table',    text: 'Stand on a café table',                 chapter: 1 },
-  { id: 'busker-hat',    text: 'Rob the busker mid-song',               chapter: 1 },
+  // ---- ACT THREE: THE PROMENADE. The café, the busker, the chip shop, the
+  // van and the wharf are all the walk north from the forecourt — and the
+  // ferry is the door out of the chapter, so the last movement ends where the
+  // chapter does. `dog-loose` and `sprinkler` stay in act one: both are on the
+  // lawn, and both are things you do to somebody having a nice afternoon,
+  // which is what act one IS.
+  { id: 'cafe-table',    text: 'Stand on a café table',                 chapter: 1, act: 3 },
+  { id: 'busker-hat',    text: 'Rob the busker mid-song',               chapter: 1, act: 3 },
   { id: 'dog-loose',     text: 'Let the dog off its lead',              chapter: 1 },
-  { id: 'seagull-chips', text: 'Introduce the seagulls to the chips',   chapter: 1 },
+  { id: 'seagull-chips', text: 'Introduce the seagulls to the chips',   chapter: 1, act: 3 },
   { id: 'sprinkler',     text: 'Soak a tourist with the sprinkler',     chapter: 1 },
-  { id: 'ferry-ride',    text: 'Stow away on the ferry',                chapter: 1 },
+  { id: 'ferry-ride',    text: 'Stow away on the ferry',                chapter: 1, act: 3 },
   // The mini. Sydney had exactly one moving thing in it and it was forty metres
   // offshore; this one comes past you, twice a minute, ringing.
   { id: 'whippy-run',    text: 'Ride the ice cream van down the promenade', chapter: 1,
-    mini: 'MR WHIPPY' },
+    act: 3, mini: 'MR WHIPPY' },
 
   // ---- Chapter 2: Pasto, Nariño — the Galeras volcano ----
   // 'to-pasto' ticks itself the moment you arrive, so the window the player
@@ -2807,6 +2821,20 @@ export const CHAPTERS = [
     arrive: '',           far: 400,  tall: false, pal: 0,
     hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry wharf at the Quay',
     keep: 'a tourist’s hat',
+    // ---- THE FIRST CHAPTER HAD NO SHAPE EITHER (F4) --------------------
+    // Nineteen rows — the longest list in the game — offered four at a time in
+    // author order, in the one chapter every player opens on. `win: 4` rather
+    // than the three Pasto and the Quay use, because act one is ten rows and
+    // this is also the chapter that is teaching a player what the paper IS:
+    // four is enough to read as a menu of choices and still short enough to
+    // finish. The three movements are three PLACES, which is how this chapter
+    // is actually laid out and how anybody walks it.
+    win: 4,
+    acts: [
+      { kick: 'THE GARDENS', line: 'nobody here has met one of you before.' },
+      { kick: 'THE FORECOURT', line: 'the white sails, and the water under them.' },
+      { kick: 'THE PROMENADE', line: 'north, past the buskers. the ferry goes from the end.' },
+    ],
     note: 'Nobody in these gardens had ever had to think about a rodent this size. Several of them do now.' },
   { n: 2, biome: 'pasto',   name: 'Pasto, Nariño',   sub: '2 527 metres up, and no better behaved',
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
