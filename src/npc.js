@@ -1967,6 +1967,9 @@ export function createNPCs(game) {
       // both ceilings read; `ownCool` is what stops one person spending the
       // whole chapter chasing you.
       own: null, ownT: 0, ownBack: false, ownCool: 0, ownSay: 0,
+      // ...and the thing itself, once they have picked it up (F4). `carryW`
+      // is the 0..1 the carrying arm is damped on, the same shape `umb` has.
+      carry: null, carryW: 0,
       // ---- HEAT (see the block below the chains) ----
       // `gd` is where their stock is, re-read on `gdT`; `grd` is how far the
       // guard pose has come up. `watching` is not read by anything in here —
@@ -2995,7 +2998,11 @@ export function createNPCs(game) {
   }
 
   /** End it, whatever state it is in, and point them home. */
-  function localOwnEnd(rec) {
+  function localOwnEnd(rec, home) {
+    // ...and whatever they were carrying goes down (F4). THE ONLY WAY OUT of
+    // the errand, so it is the only place the pin has to be released — see
+    // localOwnDrop. `home` is true only when they actually got back.
+    if (rec.carry) localOwnDrop(rec, !!home);
     rec.own = null;
     rec.ownT = 0;
     rec.ownBack = false;
@@ -3044,6 +3051,93 @@ export function createNPCs(game) {
     return !!npcOWN_RAY_R.hasHit;
   }
 
+  // ---- THE ERRAND'S LAST LEG, CARRIED (F4) -------------------------------
+  //
+  // Three functions and one rule: THE PIN IS RELEASED ON EVERY PATH OUT. A
+  // prop left kinematic with `owner` set is a prop nothing can pick up and
+  // nothing can knock over, for the rest of the session — the exact shape of
+  // failure the carrier work has paid for before (see the note on rule 2 in
+  // monaco.js and the ferry's passenger). So `localOwnDrop` is called from
+  // `localOwnEnd`, which is the ONLY way this errand can finish: the arrival,
+  // the give-up ceiling, the leash, a chapter change, and the prop being
+  // removed all funnel through it.
+  const npcOWN_CARRY = { x: 0.26, y: 1.02, z: 0.20 };   // beside the hip, held
+
+  /** Take it off the ground. Same pin `reclaim` uses for the roster. */
+  function localOwnTake(rec, p) {
+    if (!p || !p.body || p.held) return;
+    rec.carry = p;
+    // WHAT IT WAS BEFORE, remembered rather than assumed. `physRescue` does
+    // NOT restore a body type — it repositions and nothing else — so the type
+    // is this function's to put back, and putting back a guessed DYNAMIC would
+    // quietly un-plant anything that was static.
+    rec.carryType = p.body.type;
+    p.owner = rec;
+    p.body.type = CANNON.Body.KINEMATIC;
+    p.body.updateMassProperties();
+    p.body.allowSleep = false;
+    p.body.collisionResponse = false;      // it must not barge its own owner
+    p.body.velocity.set(0, 0, 0);
+    p.body.angularVelocity.set(0, 0, 0);
+    p.body.wakeUp();
+  }
+
+  /** Put it back where it lives, and un-pin it whatever happens. */
+  function localOwnDrop(rec, home) {
+    const p = rec.carry;
+    rec.carry = null;
+    rec.carryW = 0;
+    const was = rec.carryType;
+    rec.carryType = undefined;
+    if (!p) return;
+    if (p.owner === rec) p.owner = null;
+    // THE PIN COMES OFF FIRST, ON EVERY PATH, and before anything else can
+    // return early. `physRescue` repositions and does not touch the type, so
+    // if this were left to it a retrieved hat would be kinematic — immovable,
+    // un-grabbable, and unable to fall — for the rest of the session. That is
+    // the failure this whole block is shaped around.
+    if (p.body && !p.held) {
+      p.body.type = (was === undefined) ? CANNON.Body.DYNAMIC : was;
+      p.body.updateMassProperties();
+      p.body.collisionResponse = true;
+      p.body.allowSleep = true;
+      p.body.wakeUp();
+    }
+    if (home && !p.removed && !p.held &&
+        game.physics && typeof game.physics.rescue === 'function') {
+      game.physics.rescue(p);
+      if (typeof game.physics.puff === 'function') {
+        game.physics.puff(p.homeX, p.homeY + 0.35, p.homeZ, 3);
+      }
+    }
+  }
+
+  /** One frame of it riding along. Called from the local's draw. */
+  function localOwnCarry(rec, dt) {
+    const p = rec.carry;
+    if (!p) { if (rec.carryW > 0) rec.carryW = Math.max(0, rec.carryW - dt * 4); return; }
+    // The animal grabbing it back beats everything: props.js owns `held`.
+    if (p.held || p.removed || p.owner !== rec) { localOwnDrop(rec, false); return; }
+    rec.carryW = Math.min(1, rec.carryW + dt * 5);
+    const g = rec.group;
+    if (!g) return;
+    const c = Math.cos(rec.yaw), s = Math.sin(rec.yaw);
+    const wx = g.position.x + npcOWN_CARRY.x * c + npcOWN_CARRY.z * s;
+    const wz = g.position.z - npcOWN_CARRY.x * s + npcOWN_CARRY.z * c;
+    const wy = g.position.y + npcOWN_CARRY.y;
+    if (p.body) {
+      npcPlaceBody(p.body, wx, wy, wz);
+      npcQ1.setFromEuler(npcE1.set(0, rec.yaw, 0));
+      npcPlaceQuat(p.body, npcQ1.x, npcQ1.y, npcQ1.z, npcQ1.w);
+      p.body.velocity.set(0, 0, 0);
+      p.body.angularVelocity.set(0, 0, 0);
+    }
+    if (p.mesh) {
+      p.mesh.position.set(wx, wy, wz);
+      p.mesh.quaternion.setFromEuler(npcE1.set(0, rec.yaw, 0));
+    }
+  }
+
   /** One frame of somebody going to get their thing back. */
   function localOwnStep(rec, dt) {
     const p = rec.own;
@@ -3051,9 +3145,13 @@ export function createNPCs(game) {
     // ---- the tear-downs, in order of how little they trust the world -------
     if (!p || p.removed || p.hidden || game.biome.current !== rec.biome) { localOwnEnd(rec); return; }
     if (rec.ownBack) {
-      // home, or the clock. Either way this ends.
+      // home, or the clock. Either way this ends — and only the first of the
+      // two puts the thing back on its peg (F4). Running out of patience
+      // halfway across a square leaves it where they were standing, which is
+      // the honest outcome and is also what makes the walk worth watching.
       const dh = Math.hypot(rec.ax - rec.x, rec.az - rec.z);
-      if (dh < 0.5 || rec.ownT > npcOWN_BACK_T) { localOwnEnd(rec); return; }
+      if (dh < 0.5) { localOwnEnd(rec, true); return; }
+      if (rec.ownT > npcOWN_BACK_T) { localOwnEnd(rec, false); return; }
       rec.tx = rec.ax; rec.tz = rec.az;
       return;
     }
@@ -3097,13 +3195,25 @@ export function createNPCs(game) {
         rec.flYaw = Math.atan2(px - rec.x, pz - rec.z);
         return;                              // ...and they pick it up next frame
       }
-      // It is loose and they are standing over it. Put it back where it lives.
+      // ---- THEY PICK IT UP AND CARRY IT (F4) ---------------------------
+      // It used to TELEPORT: the moment somebody stood over their own hat, the
+      // hat vanished and reappeared on its peg forty metres away, with a puff
+      // of dust to cover the join. Every other carrier in this game is a real
+      // one — the ferry, the chiva, the condor, the tender — and the one that
+      // happens most often, in seventeen chapters, was a cut.
+      //
+      // The whole point of the errand is watching somebody walk over, pick
+      // their thing up, and take it back, muttering. Half of that was mimed.
+      //
+      // Pinned exactly the way `reclaim` pins one for the roster, and carried
+      // the way the umbrella is carried — at a fixed offset on `rec.group`
+      // rather than welded to a hand, because a local's arm is a single box
+      // with no elbow and anything parented to it swings through the figure's
+      // own ribs. The arm comes up to meet it, on the same term the umbrella
+      // uses. See localOwnCarry.
       rec.gest = 1.2;
-      if (game.physics && typeof game.physics.rescue === 'function') game.physics.rescue(p);
-      if (game.physics && typeof game.physics.puff === 'function') {
-        game.physics.puff(p.homeX, p.homeY + 0.35, p.homeZ, 3);
-      }
       if (typeof game.sfx === 'function') game.sfx('rustle', { volume: 0.35 });
+      localOwnTake(rec, p);
       rec.ownBack = true; rec.ownT = 0;
       rec.tx = rec.ax; rec.tz = rec.az;
       return;
@@ -4070,7 +4180,13 @@ export function createNPCs(game) {
           // goes up and it stays there; the talking gesture is suppressed on
           // that side for as long as there is something in the hand, which is
           // what stops a person waving a canopy about while they speak.
-          const hold = r.umb;
+          // ...and carrying a retrieved prop uses the same raised right arm as
+          // the umbrella (F4), at half the throw: a hat held at the hip is not
+          // a canopy held over the head. `max` rather than a sum, because they
+          // are two reasons for ONE arm to be up and adding them would put it
+          // through the shoulder in the rain.
+          localOwnCarry(r, dt);
+          const hold = Math.max(r.umb, r.carryW * 0.5);
           // ...and the huddle folds BOTH arms in across the body: rotation.z
           // toward the centre line, which on two boxes with no elbows is the
           // only crossed-arms available and reads correctly from six metres.
@@ -7063,6 +7179,10 @@ export function createNPCs(game) {
   const paHumans = [];      // vendor / abuela / farmer / churchgoer
   const paBeasts = [];      // streetdog / llama
   let paBuiltCast = false;
+  // An empanada taken while nobody was looking, still owed a witness (F4).
+  // Cleared the moment it is eaten, dropped or the row is ticked, so it cannot
+  // survive into a chapter where there is no market to be seen in.
+  let paEmpWanted = false;
   let paColorDirty = false;
   let paCursor = 0;
   let paLlamaMade = 0, paDogMade = 0;
@@ -8693,6 +8813,15 @@ export function createNPCs(game) {
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
       if (L) { L.wary = 0; L.alarm = 0; }
+      // ...AND ANYTHING THEY WERE CARRYING GOES DOWN (F4). `localOwnStep` is
+      // the only other place that releases the pin and it does not run in a
+      // chapter that is not live — so a local halfway home with somebody's hat
+      // when the white came up would leave that hat KINEMATIC for the rest of
+      // the session: it could not be picked up, knocked over or made to fall,
+      // in a chapter the player comes back to. Dropped where they stood, which
+      // is also true: they put it down when they stopped walking.
+      if (L && L.carry) localOwnDrop(L, false);
+      if (L) { L.own = null; L.ownBack = false; L.ownT = 0; }
     }
     for (let i = 0; i < game.npcs.length; i++) {
       const r = game.npcs[i];
@@ -8775,9 +8904,36 @@ export function createNPCs(game) {
         if (paDistToCapy(rec) < rec.alertR && paSeeCapy(rec) > 0.2) paStartChase(rec);
       }
     }
-    if (prop.type === 'empanada') finish('steal-empanada');
-    else if (prop.type === 'ruana') finish('ruana-thief');
+    // ---- THE JOKE IS BEING SEEN DOING IT (F4) --------------------------
+    // 'Steal an empanada' ticked whether or not a single person in the market
+    // had their eyes open — which makes it "pick up a pastry", and Pasto is a
+    // chapter whose whole cast is built around watching you. Every piece of
+    // machinery for this already existed and none of it was consulted:
+    // `paSeeCapy` is a real vision test and the loop directly above already
+    // uses it to decide who joins the chase.
+    //
+    // BUT IT IS NOT A GATE, IT IS A DEFERRAL, and that distinction is the
+    // whole safety argument. A condition that can simply fail would leave a
+    // row uncompletable for a player who happened to rob an empty stall — the
+    // one thing a task in this game may never be. So an unseen theft ARMS the
+    // row instead: keep hold of it, walk back into the market, and it ticks
+    // the moment anybody clocks what you are carrying. There is no way to be
+    // stuck, and the row now means what it says.
+    if (prop.type === 'empanada') {
+      if (paAnyoneSaw()) finish('steal-empanada');
+      else paEmpWanted = true;
+    } else if (prop.type === 'ruana') finish('ruana-thief');
   });
+
+  /** Is anybody in the market actually looking at the animal right now? */
+  function paAnyoneSaw() {
+    for (let i = 0; i < paHumans.length; i++) {
+      const rec = paHumans[i];
+      if (rec.kind === 'churchgoer') continue;
+      if (paDistToCapy(rec) < rec.alertR && paSeeCapy(rec) > 0.2) return true;
+    }
+    return false;
+  }
 
   /** Something heavy landing in the market is a vendor's problem immediately. */
   game.events.on('prop:impact', (p) => {
@@ -8827,6 +8983,17 @@ export function createNPCs(game) {
     }
     for (let i = 0; i < paHumans.length; i++) paStepHuman(paHumans[i], dt);
     for (let i = 0; i < paBeasts.length; i++) paStepBeast(paBeasts[i], dt);
+    // ---- the empanada, still in its mouth, in front of a witness --------
+    // See the deferral in the prop:steal handler. Checked here rather than on
+    // an event because "somebody notices" is a continuous fact about where the
+    // animal is standing, and there is no event for walking back into view.
+    // Costs one vision test per person on the frames the flag is up and
+    // nothing at all on every other frame of the game.
+    if (paEmpWanted) {
+      const held = game.capy && game.capy.heldProp;
+      if (!held || held.type !== 'empanada') paEmpWanted = false;
+      else if (paAnyoneSaw()) { paEmpWanted = false; finish('steal-empanada'); }
+    }
     paPush();
     if (paColorDirty) { paFlushColors(); paColorDirty = false; }
     // NOT updateBubbles(dt) — the only caller of paUpdate already ages the
@@ -9862,6 +10029,24 @@ export function createNPCs(game) {
            // the differential lever and is a test hook, not a feature.
            placeHeat: npcHeatAt,
            forceHeat: function (v) { npcHeatForce = (typeof v === 'number') ? v : -1; },
+           /**
+            * SEND THE OWNER AFTER IT, NOW. A TEST HOOK, and never a verb — the
+            * same rule and the same wording as forceHeat above.
+            *
+            * The retrieval errand can only be started by the player taking
+            * somebody's thing, which is minutes of driving to reach and is not
+            * reliably reproducible; and it now PINS the prop to the walker
+            * (F4), which is the class of change that fails silently and
+            * permanently. A probe that set `rec.own` by hand would be skipping
+            * `localOwnStart`'s bookkeeping and grading its own homework, so it
+            * goes through the real entry point and returns what that returned.
+            */
+           forceErrand: function (prop) {
+             const rec = prop ? localOwnerOf(prop) : null;
+             if (!rec) return false;
+             rec.ownCool = 0;
+             return localOwnStart(rec, prop, null);
+           },
            heatSites: npcHeatSites,
            // The register itself, for the audit that walks the capybara up to
            // every person in the game and checks somebody answers. Twenty-six

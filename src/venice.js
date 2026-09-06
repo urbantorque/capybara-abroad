@@ -237,6 +237,12 @@ let venWasFlooded = false;
 // How long the marquee stays claimable after the water crosses the square.
 // See the long note in venUpdateTide — this is the difference between a set
 // piece and a coin toss.
+// How close the animal has to be for a gawper to look at it instead of at the
+// campanile (F4). Twelve metres is about the width of the walkable strip in
+// front of the basilica, so it is "in the same part of the square as me"
+// rather than "anywhere I can see" — a whole piazza turning at once would be
+// the Volo, and the Volo is a different beat.
+const venLOOK_R = 12;
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
 let venBoardRunT = -1, venBoardFrom = 0, venBoardOff = 0;
@@ -6098,9 +6104,31 @@ function venUpdateCrowd(game, dt) {
         // something the player is standing IN is the entire reason to build a
         // crowd — the mini stops being a ride and becomes a thing that is
         // happening to a square full of people.
-        const at = venVoloWatch ? venVoloPos : venCAMPANILE;
+        // ---- ...AND A CAPYBARA BEATS A BELL TOWER (F4) ------------------
+        // Forty-eight people standing in a square with their heads back, and
+        // an enormous rodent walks between them, and not one of them looks.
+        // The gawp is already a head turn on a damper — the only thing missing
+        // was a second thing worth turning at.
+        //
+        // PICKED, not lerped between: two bearings blended by weight go the
+        // long way round every time the pair straddles ±π, which is a crowd
+        // whipping its heads through half a circle on one frame. The weight
+        // goes on the TURN RATE instead, so somebody the animal is standing
+        // next to snaps round and somebody at eleven metres drifts — which is
+        // also what actually happens.
+        //
+        // The Volo needs no special case: it is the player's own set piece, so
+        // when the cradle is up the animal IS the cradle and both agree.
+        let at = venVoloWatch ? venVoloPos : venCAMPANILE;
+        let look = 0;
+        if (cp) {
+          const lx = cp.x - x, lz = cp.z - z;
+          const ld = Math.hypot(lx, lz);
+          if (ld < venLOOK_R) { look = clamp(1 - ld / venLOOK_R, 0, 1); at = cp; }
+        }
         const wy = Math.atan2(at.x - x, at.z - z);
-        yaw = yaw + ((wy - yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) * clamp(dt * 2.4, 0, 1);
+        yaw = yaw + ((wy - yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) *
+              clamp(dt * (2.4 + look * 4.2), 0, 1);
       } else {
         const dx = venCrowdData[o + 6] - x, dz = venCrowdData[o + 7] - z;
         const d = Math.hypot(dx, dz);

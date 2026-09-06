@@ -3384,7 +3384,29 @@ function monEject(game) {
       game.capy && game.capy.heldProp) game.physics.release(null);
   if (typeof game.punch === 'function') game.punch(0.34);
   monSfx('gasp', { volume: 0.6 });
-  monToast('two hands under the forelegs. very politely.');
+  // ---- ...AND THE CHIPS STAY ON THE TABLE (F4) -------------------------
+  // The stack only ever went UP. Every one of the thirty-seven pockets pays,
+  // so 'leave the table ten up' was a measure of patience and `chip-stack`'s
+  // record — par twenty — was a measure of more patience. A number that cannot
+  // fall is not a stack, it is a clock.
+  //
+  // The cost goes HERE, on the ejection, and not on a losing pocket, which was
+  // the other half of the same idea and is the worse half for this chapter:
+  // the room already has a mechanic about being noticed, five sweeping wedges
+  // of light that the player is already reading, and hanging the risk on that
+  // makes the two systems one system. Stay at the wheel and it grows; stay too
+  // long in front of a croupier and you walk out with nothing.
+  //
+  // IT DENIES NOTHING, which is this chapter's own rule three paragraphs up.
+  // `monStackBest` is a MAX and is untouched, so a record already set can
+  // never be taken back; `monStackDone` is untouched, so a row already ticked
+  // stays ticked; and you may walk straight back in and start again.
+  if (monStack > 0) {
+    monStack = 0;
+    monToast('two hands under the forelegs. very politely. the chips stay.');
+  } else {
+    monToast('two hands under the forelegs. very politely.');
+  }
 }
 
 /**

@@ -1881,6 +1881,8 @@ function mainBoot() {
     // to prove nothing was made harder; it is a test hook, not a verb.
     game.placeHeat = npcs.placeHeat;
     game.forceHeat = npcs.forceHeat;
+    // ...and the errand's own test hook. See forceErrand in npc.js.
+    game.forceErrand = npcs.forceErrand;
     game.heatSites = npcs.heatSites;
     // What every face in the live chapter is doing, read off the nodes. A
     // test hook, like forceHeat — see FACES in npc.js.

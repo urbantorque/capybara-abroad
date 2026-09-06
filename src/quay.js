@@ -4544,9 +4544,18 @@ function quayCrowdFoot(i, out) {
   return true;
 }
 
+// How close the animal has to be before somebody standing on the apron turns
+// to look at it (F4). Twelve metres, the same figure Venice's gawpers use, and
+// for the same reason: it is "in my bit of the concourse", not "anywhere I
+// could see", and a whole terminal turning at once is a different beat.
+const quayLOOK_R = 12;
+
 function quayUpdateCrowd(dt) {
   if (!quayCrowd) return;
   const GY = 0.20;                    // the top of the apron
+  // Read once, not per person: fifty-two hypots is fine, fifty-two property
+  // lookups through two objects is not the shape this loop is written in.
+  const cpQ = quayGame && quayGame.capy ? quayGame.capy.position : null;
   for (let i = 0; i < quayCROWD_N; i++) {
     const o = i * 6;
     const r = quayCROWD_ROUTE[quayCrowdData[o] | 0];
@@ -4568,8 +4577,34 @@ function quayUpdateCrowd(dt) {
     }
     const u = quayCrowdData[o + 1];
     const px = lerp(r[0], r[2], u), pz = lerp(r[1], r[3], u);
-    const yaw = Math.atan2((r[2] - r[0]) * quayCrowdData[o + 2],
-                           (r[3] - r[1]) * quayCrowdData[o + 2]);
+    let yaw = Math.atan2((r[2] - r[0]) * quayCrowdData[o + 2],
+                         (r[3] - r[1]) * quayCrowdData[o + 2]);
+    // ---- AND THE ONES STANDING ABOUT LOOK AT IT (F4) --------------------
+    // A third of this concourse is stopped at any moment — that is the whole
+    // point of the dwell above — and every one of them went on facing down
+    // their own route while a capybara walked past. The busiest square in the
+    // chapter, and nobody in it had ever noticed the animal.
+    //
+    // ONLY WHILE STOPPED. There is no separate head here: the yaw drives the
+    // legs, so turning a walker would have it walking sideways across its own
+    // route. Somebody standing still can face wherever they like.
+    //
+    // A STATELESS SHORTEST-ARC BLEND, because `quayCrowdData` is six floats a
+    // person with no spare for a damped yaw — and it wants no damper anyway.
+    // The weight moves smoothly with the distance, so the head turns smoothly
+    // as the animal approaches and follows it faster when it is running, which
+    // is what a damper would have been trying to imitate. The `% 2π` is the
+    // whole reason this is a subtraction rather than a lerp of two bearings: a
+    // pair that straddles ±π lerps the long way round, every time.
+    if (!moving && cpQ) {
+      const lx = cpQ.x - px, lz = cpQ.z - pz;
+      const ld = Math.hypot(lx, lz);
+      if (ld < quayLOOK_R && ld > 0.4) {
+        const w = clamp(1 - ld / quayLOOK_R, 0, 1);
+        const want = Math.atan2(lx, lz);
+        yaw += ((want - yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) * w;
+      }
+    }
     quayCrowdData[o + 4] += dt * quayCrowdData[o + 3] * 4.6 * moving;
     const ph = quayCrowdData[o + 4];
     const swing = moving ? Math.sin(ph) * 0.62 : Math.sin(quayTime * 0.9 + i) * 0.03;
