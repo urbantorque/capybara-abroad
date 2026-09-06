@@ -14,6 +14,100 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE SOUND PASS, BATCH ONE — THE MOVER (S1a — 6 Sep 2026)
+
+**LANDED.** The first half of `ROADMAP-AUDIO.md`'s batch S1: the spatial
+primitive, the two axes it reads, ten voice recipes, and four wirings across
+three chapters. The second half — the ferry, the bonde, the bus and the four
+placed beds — is S1b.
+
+**THE FINDING THAT FRAMES IT.** v41 produced the SCORE and the WORLD still
+stood still. Every sound in this game was a one-shot whose `StereoPannerNode`
+value was written once, at the instant it started, and never touched again:
+no handle, no `stop()`, and `playbackRate` appearing exactly once in the whole
+audio tree as `noiseMake`'s window randomiser. **There was no Doppler
+anywhere.** A vehicle going past was a row of separate sounds, each panned
+from wherever it was when that one fired. Hanoi — a chapter whose medium is
+traffic, whose room `sysROOMS` describes as "a hundred and fifty engines in
+it" — had the room and no engines.
+
+**`game.sfxMover(kind, opts) → handle`.** `at`, `vel`, `set` (throttle),
+`amp` (how much of it there is), `bend` (only `rail` reads it), `rate` (the
+live Doppler, for a figure the chapter schedules itself), `gain`, `stop`,
+`resume`. It is `musPlaceTick` generalised — the Cali band's placer has had
+the right model since it was written and had one customer. Five things are
+deliberate and are in the header comment: four live at a time by DELIVERED
+GAIN; a discrete mover is in the room and a bed is not; an oscillator's
+`frequency` is the throttle's and its `detune` is the Doppler's; a mover is
+silent outside its own chapter without being told; and the handle outlives the
+graph, so a chapter re-entered ten times has one van and not ten.
+
+**A MOVER THAT DOES NOT MOVE IS A BED**, which is how a shoreline, a river and
+a colony become things you can walk toward. That was not the plan and it is
+the most useful thing the batch found.
+
+**`set` IS NOT `amp`, AND THE VAN IS WHY.** The throttle moves frequencies and
+filters and deliberately does not gate the level: a diesel at a bus stop is
+the most diesel thing there is, and an idle that fades out is a van that has
+been switched off. But an engine *can* be switched off — a floatplane at its
+mooring is not idling — so that is a second, separate number. At zero the
+mover falls under the cull, gives its slot back, and lets go of its nodes half
+a minute later.
+
+**THE DOPPLER IS ONE TERM, NOT TWO.** The relative velocity along the line
+between them: `vr = dot(srcVel − earVel, unit(ear − src))`, `rate =
+c / (c − vr)`, clamped ±12 %. The source coming at you and you going at the
+source are the same fact, and writing it as one dot product is what makes the
+sign impossible to get wrong. `sysEarVel` is new and is why running at a
+parked van is a real pitch shift; it is thrown away above `sysEAR_VMAX`
+(45 m/s), because a border crossing teleports the animal hundreds of metres in
+one frame and the fastest thing ever measured here is 23.1 m/s falling between
+islands in the Drift.
+
+**TWO MORE AXES (A2), AND THEY CHANGE NO LEVEL.** `audioPlace` now also writes
+`sysSfxBack` and `sysSfxUp`. **`back` is taken on the HORIZONTAL bearing
+alone** — a rig that looks down at 41 degrees would otherwise read anything
+overhead as behind it, which is the opposite of the truth. Measured on the
+ring: 1.000 dead astern, 0.712 and 0.702 at 45 degrees either side of astern,
+0.007 and 0.000 abeam, 0 across the whole front half. Directly overhead reads
+`up` 1.000 and `back` 0. The movers read both today; the one-shots get their
+filter in S2.
+
+**WIRED (4).** Sydney's van — she has had a chime since the day she was
+written and never a motor, so the one thing on the promenade that moves was a
+bell sliding along a path; **the chime now takes the mover's own `rate()`, so
+it shifts with her**, and every gate and level around it is untouched.
+Sydney's floatplane — the four rationed notes are deleted, because they were
+the right answer to the wrong problem and a continuous voice says it directly.
+Hanoi — three movers follow the three NEAREST scooters and one `traffic` bed
+carries the other two hundred and thirty-seven. Monte Carlo's silver car, on
+`v8`, muffled by the chapter's own `monTunnelK2` inside the bore.
+
+**THE SLOT SWAP IS THE ONLY REAL DIFFICULTY, AND IT IS HANOI'S.** Re-pointing
+a mover at a different scooter mid-pass moves it several metres in one frame,
+which is a click and a chirp. A candidate must be a clear six metres nearer
+than the bike being held, the question is asked twice a second, and the
+handover is faded over 150 ms through `amp` rather than cut.
+
+**MEASURED** (`qa/mover-pass.js`, `qa/mover-chapters.js`):
+
+| | |
+|---|---|
+| the van's pass | pan sweeps **−0.391 → 0 → +0.820** monotonically |
+| the Doppler's sign | rate crosses **1.0000 at the closest approach**, to the sample: 1.0007 at d 9.03 m, 0.9999 at d 9.01 m |
+| the van's shift | ±0.93 % at 3.15 m/s. 3.15/343 is 0.918 %. |
+| the car's shift | **0.9299 … 1.0668** at up to 26.5 m/s — the largest in the game |
+| the budget | Hanoi **4 live of 4**, never more; Monte Carlo 1 |
+| node churn | **9 graph builds** across Sydney → Hanoi → Monte Carlo → Sydney, which is every mover built once plus Sydney's two rebuilt after the 30 s park expired while away |
+| the biome gate | Sydney's van and plane **0 of 71 samples live** while in Hanoi; no foreign mover audible on return |
+| the level | the van peaks at **0.2200**, which is its authored level exactly |
+| errors | `npm test` 10/10; `qa/audio2.js` 13 chapters, 0 errors, 0 page errors |
+
+**`hud.moverAudit()`** is the only way to see any of this: a Web Audio graph is
+write-only, so a backwards Doppler, a budget that never lets the fourth voice
+in, and a mover left running in the wrong chapter are all completely silent
+failures to a screenshot.
+
 ## THE FINISH, THE SHELF (F4 — 6 Sep 2026)
 
 **LANDED.** The three "if the clock allows" lists and most of the shelf, in six

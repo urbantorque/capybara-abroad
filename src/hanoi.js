@@ -1447,6 +1447,125 @@ function hanBikeAt(i, out) {
   return out;
 }
 
+// ============================================================== THE ENGINES ==
+// HANOI IS A CHAPTER WHOSE MEDIUM IS TRAFFIC AND IT HAD NO ENGINES IN IT.
+//
+// Two hundred and forty scooters, a room described in sysROOMS as "a street
+// four and a half metres wide with six-storey walls both sides and a hundred
+// and fifty engines in it", and the only sounds this file has ever made are a
+// dog, a horn, a whistle, a stool and the pho stall. The reason was structural
+// rather than an oversight: until A1 there was no way to say "this thing is
+// running", only "this thing just happened", and an engine is not an event.
+//
+// TWO LAYERS, AND THEY ANSWER DIFFERENT QUESTIONS. Three movers follow the
+// three NEAREST bikes, because those are the ones the ear can actually track
+// and the ones that go past you; one bed sits on the nearest street and carries
+// the other two hundred and thirty-seven, because a wall of traffic is a place
+// and not a list of vehicles.
+//
+// THE SLOT SWAP IS THE WHOLE DIFFICULTY. Re-pointing a mover at a different
+// scooter mid-pass moves it several metres in one frame, which is a click and a
+// chirp. So a candidate has to be a clear six metres nearer than the bike being
+// held before it may steal the slot, the question is only asked twice a second,
+// and the handover is faded rather than cut.
+const hanBIKE_MOVERS = 3;
+const hanBIKE_REPICK = 0.5;    // s between "who is nearest" questions
+const hanBIKE_SWAP   = 6;      // m nearer a candidate must be to take a slot
+const hanBIKE_FADE   = 0.15;   // s of duck across the handover
+const hanTRAF_R      = 40;     // m the bed counts bikes inside
+const hanTRAF_FULL   = 26;     // ...and how many of them is a full street
+const hanBikeMoverH = [null, null, null];
+const hanBikeMoverI = [-1, -1, -1];   // the bike each slot is following
+const hanBikeMoverP = [-1, -1, -1];   // ...the one it is about to follow
+const hanBikeMoverA = [1, 1, 1];      // ...and the fade between them
+let hanBikeRepickT = 0, hanTrafficH = null;
+// Its own scratch: hanBikeAt writes hanTmp2 and hanLaneAtS is called by both,
+// so borrowing either would have this reading a lane point that a bike had
+// already overwritten. The shared-scratch bug this repo has paid for twice.
+const hanMovTmp = { x: 0, z: 0, yaw: 0 };
+const hanMovV3 = new THREE.Vector3();
+
+function hanUpdateTraffic(game, dt, p) {
+  if (!game.sfxMover || !hanBikeN) return;
+  // ---- who is nearest, asked twice a second ------------------------------
+  hanBikeRepickT -= dt;
+  if (hanBikeRepickT <= 0 && p) {
+    hanBikeRepickT = hanBIKE_REPICK;
+    const ni = [-1, -1, -1], nd = [1e9, 1e9, 1e9];
+    for (let i = 0; i < hanBikeN; i++) {
+      hanBikeAt(i, hanMovV3);
+      const d = Math.hypot(hanMovV3.x - p.x, hanMovV3.z - p.z);
+      if (d < nd[0]) { nd[2] = nd[1]; ni[2] = ni[1]; nd[1] = nd[0]; ni[1] = ni[0]; nd[0] = d; ni[0] = i; }
+      else if (d < nd[1]) { nd[2] = nd[1]; ni[2] = ni[1]; nd[1] = d; ni[1] = i; }
+      else if (d < nd[2]) { nd[2] = d; ni[2] = i; }
+    }
+    for (let j = 0; j < hanBIKE_MOVERS; j++) {
+      const held = hanBikeMoverI[j];
+      if (held < 0 || held >= hanBikeN) { hanBikeMoverI[j] = ni[j]; continue; }
+      if (ni[j] === held || ni[j] < 0) continue;
+      // A bike another slot is already following is not a candidate, or two
+      // movers would end up on one scooter and the third on nothing.
+      if (ni[j] === hanBikeMoverI[0] || ni[j] === hanBikeMoverI[1] ||
+          ni[j] === hanBikeMoverI[2]) continue;
+      hanBikeAt(held, hanMovV3);
+      const dHeld = Math.hypot(hanMovV3.x - p.x, hanMovV3.z - p.z);
+      if (dHeld - nd[j] >= hanBIKE_SWAP) hanBikeMoverP[j] = ni[j];
+    }
+  }
+  // ---- the three that are near you ---------------------------------------
+  for (let j = 0; j < hanBIKE_MOVERS; j++) {
+    if (!hanBikeMoverH[j]) {
+      hanBikeMoverH[j] = game.sfxMover('twostroke', { key: 'han:bike' + j, near: 8, far: 60 });
+    }
+    const h = hanBikeMoverH[j];
+    if (!h) continue;
+    if (hanBikeMoverP[j] >= 0) {
+      hanBikeMoverA[j] -= dt / hanBIKE_FADE;
+      if (hanBikeMoverA[j] <= 0) {
+        hanBikeMoverA[j] = 0;
+        hanBikeMoverI[j] = hanBikeMoverP[j];
+        hanBikeMoverP[j] = -1;
+      }
+    } else if (hanBikeMoverA[j] < 1) {
+      hanBikeMoverA[j] = Math.min(1, hanBikeMoverA[j] + dt / hanBIKE_FADE);
+    }
+    const bi = hanBikeMoverI[j];
+    if (bi < 0 || bi >= hanBikeN) { h.amp(0); continue; }
+    const o = bi * hanBIKE_STRIDE;
+    const L = hanBikeData[o] | 0, dir = hanBikeData[o + 2], v = hanBikeData[o + 5];
+    hanBikeAt(bi, hanMovV3);
+    h.at(hanMovV3.x, hanMovV3.y, hanMovV3.z);
+    // Analytic, not a delta: the lane tangent at the bike's own arclength is
+    // exactly the direction it is travelling, and a differenced position would
+    // spike every time the swerve damper moved it sideways.
+    hanLaneAtS(L, hanBikeData[o + 1], hanMovTmp);
+    h.vel(Math.sin(hanMovTmp.yaw) * v * dir, 0, Math.cos(hanMovTmp.yaw) * v * dir);
+    h.set(clamp(v / hanBIKE_V[1], 0, 1));
+    h.amp(hanBikeMoverA[j]);
+  }
+  // ---- ...and the other two hundred and thirty-seven ---------------------
+  if (!hanTrafficH) {
+    hanTrafficH = game.sfxMover('traffic', { key: 'han:traffic', near: 30, far: 160 });
+  }
+  if (hanTrafficH && p) {
+    hanLaneAt(p.x, p.z);
+    if (hanLaneI >= 0) {
+      hanLaneAtS(hanLaneI, hanLaneS, hanMovTmp);
+      hanTrafficH.at(hanMovTmp.x, hanGROUND + 1.2, hanMovTmp.z);
+      // Every third one, times three. An estimate is the right shape here: the
+      // answer feeds a filter cutoff on a nine-tenths-of-a-second constant and
+      // nobody can hear the difference between twenty-four bikes and twenty-six.
+      let n = 0;
+      for (let i = 0; i < hanBikeN; i += 3) {
+        hanBikeAt(i, hanMovV3);
+        if (Math.abs(hanMovV3.x - p.x) < hanTRAF_R &&
+            Math.abs(hanMovV3.z - p.z) < hanTRAF_R) n += 3;
+      }
+      hanTrafficH.set(clamp(n / hanTRAF_FULL, 0.15, 1));
+    }
+  }
+}
+
 function hanUpdateBikes(game, dt) {
   if (!hanBikeN || dt <= 0) return;
   const capy = game.capy;
@@ -1590,6 +1709,7 @@ function hanUpdateBikes(game, dt) {
     }
   }
   hanSyncBikes();
+  hanUpdateTraffic(game, dt, p);
 
   // ---- the clip ---------------------------------------------------------
   if (clipped >= 0 && hanBumpT <= 0 && p && capy && hanRider < 0) {

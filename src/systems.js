@@ -12254,7 +12254,13 @@ export function createSystems(game) {
     // ---- 1. what each one WOULD deliver, before any graph work ------------
     for (let i = 0; i < sysMovers.length; i++) {
       const m = sysMovers[i];
-      if (!playing || m.dead || (m.biome && m.biome !== live)) { m.want = 0; m.d = 9999; continue; }
+      if (!playing || m.dead || (m.biome && m.biome !== live)) {
+        // Clear the bearing with the gain. It changes no sound — the gain is
+        // zero — but a mover parked in another chapter that goes on reporting
+        // the pan it had when you left is a number a probe will one day believe.
+        m.want = 0; m.d = 9999; m.wantPan = 0; m.wantBack = 0; m.wantUp = 0;
+        continue;
+      }
       m.want = audioPlace(m.x, m.y, m.z, m.near, m.far) * m.level * m.amp;
       // A bed thins as the world settles, because it IS the world; a vehicle
       // going past does not, because a scooter does not get quieter when you

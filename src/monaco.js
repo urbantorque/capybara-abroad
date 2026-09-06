@@ -320,6 +320,7 @@ const monCarTY = [];
 const monCarYaw = [];
 let monCarRoot = null;
 let monRider = -1;                // which car the animal is standing on, or -1
+let monCarMover = null;           // the silver one, heard from outside it (A1)
 let monRideT = 0;                 // ...and for how long
 let monTunnelIn = -1;             // metres-along at which the rider entered the bore
 let monTunnelBest = 0;            // the fastest pass this visit
@@ -2681,6 +2682,33 @@ function monUpdateCars(game, dt) {
     if (bm) {
       const k = Math.max(monTunnelK2(tx, tz), 0.30);
       bm.material.opacity = 0.035 + k * 0.075;
+    }
+    // ---- ...AND IT MAKES A NOISE FOR SOMEBODY WHO IS NOT ON IT (A1) ------
+    // The one object in this game that would sell a Doppler, and until now it
+    // made a sound only for its passenger — `monCue('hiss')` at monUpdateRide,
+    // fired while you ride it. Somebody standing at the hairpin watching a car
+    // come out of the tunnel at twenty-six and a half metres a second heard
+    // nothing at all, which is the chapter's whole joke going past in silence.
+    //
+    // ONE CAR, NOT THREE. `api.car()` answers whichever is nearest and that is
+    // right for a cue and wrong for a continuous voice — a mover that hops
+    // between cars is a car that teleports. Index 0 is the silver one
+    // (monCAR_COL[0]), it is the one the chapter is about, and the other two
+    // are carried by the room.
+    if (i === 0) {
+      if (!monCarMover && game.sfxMover) {
+        monCarMover = game.sfxMover('v8', { key: 'mon:car', near: 12, far: 220 });
+      }
+      if (monCarMover) {
+        monCarMover.at(g.position.x, g.position.y + 0.8, g.position.z);
+        monCarMover.vel(b.velocity.x, b.velocity.y, b.velocity.z);
+        monCarMover.set(clamp(monCarV[i] / monCAR_VMAX, 0, 1));
+        // The bore is the loudest place on the circuit and the quietest one to
+        // stand outside of. monTunnelK2 is already the chapter's own answer to
+        // "how much of this point is under the rock" and the beam above reads
+        // it two lines up; a car inside it is heard through a hillside.
+        monCarMover.amp(1 - 0.55 * clamp(monTunnelK2(tx, tz), 0, 1));
+      }
     }
   }
   monUpdateRide(game, dt);
