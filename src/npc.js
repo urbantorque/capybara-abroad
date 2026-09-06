@@ -136,6 +136,42 @@ function npcPlaceQuat(b, qx, qy, qz, qw) {
  * carrying a white vertex-colour attribute (so per-instance colours multiply
  * cleanly on every three.js build).  Setup-time only.
  */
+// ---------------------------------------------------------------------------
+// THE SECOND COLOUR (R6). A part may carry `c`, a multiplier written into the
+// `color` attribute for that part's vertices instead of the 1.0 fill every
+// vertex used to get. It costs NOTHING: the attribute is already there, the
+// material already has `vertexColors`, and the same buffer is still one draw
+// call for forty-five people. The final albedo is
+//
+//     material colour (sail)  x  this  x  the per-instance colour
+//
+// so a shoe can be darker than the trouser it hangs off while both of them
+// still take that person's own trouser colour.
+//
+// `c` IS LINEAR, because the multiply is. Two helpers name the space at the
+// call site rather than leaving a bare number to be guessed at, and they are
+// the same pair capybara.js's coat uses for the same reason:
+//
+//   npcSRGB(0.88)                 a number a person reasons about ("0.88 of
+//                                 the shirt"), converted to the linear
+//                                 multiplier that renders as it
+//   npcOf(capyEye, sail)          the honest ratio of two palette colours,
+//                                 taken through THREE.Color so it uses the
+//                                 REAL sRGB transfer and not a power of 2.4,
+//                                 which is 1.65x out at the dark end
+// ---------------------------------------------------------------------------
+function npcSRGB(m) {
+  const k = Math.pow(m, 2.4);
+  return [k, k, k];
+}
+function npcSRGB3(r, g, b) {
+  return [Math.pow(r, 2.4), Math.pow(g, 2.4), Math.pow(b, 2.4)];
+}
+/** `hex` as a multiplier ON `ofHex`: what to write so the part renders AS hex. */
+function npcOf(hex, ofHex) {
+  const a = new THREE.Color(hex), b = new THREE.Color(ofHex);
+  return [a.r / b.r, a.g / b.g, a.b / b.b];
+}
 function npcMakeGeo(parts) {
   const chunks = [];
   let total = 0;
@@ -162,10 +198,17 @@ function npcMakeGeo(parts) {
     const c = chunks[i];
     pos.set(c.attributes.position.array, off * 3);
     nor.set(c.attributes.normal.array, off * 3);
+    // the part's own multiplier, or 1 for the parts that do not want one
+    const n = c.attributes.position.count, m = parts[i].c;
+    const r = m === undefined ? 1 : (typeof m === 'number' ? m : m[0]);
+    const gg = m === undefined ? 1 : (typeof m === 'number' ? m : m[1]);
+    const bb = m === undefined ? 1 : (typeof m === 'number' ? m : m[2]);
+    for (let v = 0; v < n; v++) {
+      col[(off + v) * 3] = r; col[(off + v) * 3 + 1] = gg; col[(off + v) * 3 + 2] = bb;
+    }
     off += c.attributes.position.count;
     c.dispose();
   }
-  col.fill(1);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
@@ -771,17 +814,22 @@ export function createNPCs(game) {
   // ---------------------------------------------------------------- geometry
   const gTorso = npcMakeGeo([
     { w: 0.50, h: 0.60, d: 0.30, y: 1.02 },
-    { w: 0.62, h: 0.14, d: 0.32, y: 1.24 },            // shoulders
+    // The shoulders slab is where a shirt has a seam and a person has a
+    // collarbone, and it is the only horizontal on the torso: 0.88 turns it
+    // from a step in the outline into a step in the GARMENT.
+    { w: 0.62, h: 0.14, d: 0.32, y: 1.24, c: npcSRGB(0.88) },   // shoulders
   ]);
   const gHips = npcMakeGeo([{ w: 0.46, h: 0.26, d: 0.32, y: 0.68 }]);
   const gHead = npcMakeGeo([
     { w: 0.32, h: 0.32, d: 0.31, y: 0.16 },
-    { w: 0.07, h: 0.06, d: 0.06, y: 0.14, z: 0.17 },   // nose
-    { w: 0.16, h: 0.14, d: 0.12, y: 0.00 },            // neck
+    { w: 0.07, h: 0.06, d: 0.06, y: 0.14, z: 0.17, c: npcSRGB(0.94) },  // nose
+    // ...and the neck, which is the one that stops a head being a box
+    // BALANCED on a box: 0.86 is a head sitting on something.
+    { w: 0.16, h: 0.14, d: 0.12, y: 0.00, c: npcSRGB(0.86) },           // neck
   ]);
   const gHair = npcMakeGeo([
     { w: 0.35, h: 0.13, d: 0.34, y: 0.30 },
-    { w: 0.30, h: 0.18, d: 0.10, y: 0.17, z: -0.15 },
+    { w: 0.30, h: 0.18, d: 0.10, y: 0.17, z: -0.15, c: npcSRGB(0.92) },  // hair has a part
   ]);
   // ---- THE FACE (v54) ---------------------------------------------------
   // Both eyes in ONE geometry, because nothing in this game ever winks: that
@@ -793,9 +841,35 @@ export function createNPCs(game) {
   // Geometry is centred on the origin so the instance matrix scales about the
   // eye, not about the neck: an eye node offset inside its own geometry would
   // slide down the face when it blinks.
+  //
+  // ---- AND THE EYES HAVE WHITES (R6) ------------------------------------
+  // A pale box BEHIND each pupil, 6 mm proud of it on every side, in the same
+  // merged geometry: still one buffer, still one draw call for the pair, for
+  // thirty-two people. It is what turns a face from two dots into a face.
+  //
+  // THE ROADMAP HAD THIS THE WRONG WAY ROUND AND THE ARITHMETIC SAYS SO. Its
+  // plan was to keep `capyEye` as the per-instance colour and write 2.3 on the
+  // white, "which clamps to the pale the face wants". It does not: the albedo
+  // is sail x capyEye x c, and capyEye is 0.027 of full in LINEAR, so 2.3
+  // lands at 0.06 and even 7.3 (which is what 2.3 means as an sRGB intent)
+  // lands at 0.19 - a mid brown. Reaching `sail` from there needs a multiplier
+  // of 37 on red and 115 on blue.
+  //
+  // So it is inverted: the INSTANCE colour is white, which makes the eye white
+  // the material's own `sail`, and the PUPIL carries the dark multiplier. Every
+  // multiplier in this file is then at or below 1, which is the direction that
+  // cannot clip, and the pupil is derived from the palette rather than written
+  // out twice. See iEyes.setColorAt.
   const gEyes = npcMakeGeo([
-    { w: 0.058, h: 0.044, d: 0.02, x: -0.072 },
-    { w: 0.058, h: 0.044, d: 0.02, x: 0.072 },
+    // WIDER THAN THE ROADMAP SAID, and only the render showed why. At its
+    // 0.070 x 0.052 the pale stands 6 mm proud at the sides and 4 mm at the
+    // top, which is a uniform BORDER: it reads as a pair of spectacles, not as
+    // an eye. An eye is a wide white with a dark iris somewhere in the middle,
+    // so the ring has to be three times wider at the sides than above.
+    { w: 0.088, h: 0.050, d: 0.016, x: -0.072, z: -0.004 },   // the white
+    { w: 0.088, h: 0.050, d: 0.016, x: 0.072, z: -0.004 },
+    { w: 0.058, h: 0.044, d: 0.02, x: -0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
+    { w: 0.058, h: 0.044, d: 0.02, x: 0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
   ]);
   const gBrow = npcMakeGeo([{ w: 0.092, h: 0.020, d: 0.022 }]);
   const gArm = npcMakeGeo([
@@ -804,10 +878,20 @@ export function createNPCs(game) {
   ]);
   const gLeg = npcMakeGeo([
     { w: 0.15, h: 0.60, d: 0.16, y: -0.30 },
-    { w: 0.17, h: 0.10, d: 0.24, y: -0.57, z: 0.04 },  // shoe
+    // A SHOE IS THE CHEAPEST COLOUR ON A PERSON. It is at the bottom of the
+    // silhouette, where the eye starts, it is already its own box, and it is
+    // the one edge every real garment has. Slightly blue, because leather is.
+    { w: 0.17, h: 0.10, d: 0.24, y: -0.57, z: 0.04,
+      c: npcSRGB3(0.55, 0.55, 0.58) },                 // shoe
   ]);
+  // THE BRIM IS TWO CYLINDERS NOW, and only so that its UNDERSIDE can be dark
+  // (R6): a part is the smallest thing `c` can address, and a brim that is one
+  // cylinder cannot have a lit top and a shaded bottom. Split at y 0.317, same
+  // 0.305 to 0.335 the single one occupied, so the hat's silhouette is
+  // unchanged and the only new thing in the frame is the shadow a brim throws.
   const gHat = npcMakeGeo([
-    { k: 'cyl', rt: 0.36, rb: 0.36, h: 0.03, seg: 8, y: 0.32 },
+    { k: 'cyl', rt: 0.36, rb: 0.36, h: 0.012, seg: 8, y: 0.311, c: npcSRGB(0.72) },
+    { k: 'cyl', rt: 0.36, rb: 0.36, h: 0.018, seg: 8, y: 0.326 },
     { k: 'cyl', rt: 0.16, rb: 0.19, h: 0.16, seg: 8, y: 0.41 },
   ]);
   const gCam = npcMakeGeo([
@@ -942,7 +1026,7 @@ export function createNPCs(game) {
   ]);
   const gDogHead = npcMakeGeo([
     { w: 0.22, h: 0.20, d: 0.22 },
-    { w: 0.13, h: 0.11, d: 0.17, y: -0.03, z: 0.17 },  // snout
+    { w: 0.13, h: 0.11, d: 0.17, y: -0.03, z: 0.17, c: npcSRGB(0.85) },  // snout
     { w: 0.06, h: 0.03, d: 0.05, y: -0.05, z: 0.26 },  // nose
     { w: 0.07, h: 0.13, d: 0.05, x: -0.10, y: 0.12, z: -0.02, rz: 0.3 },
     { w: 0.07, h: 0.13, d: 0.05, x: 0.10, y: 0.12, z: -0.02, rz: -0.3 },
@@ -1191,9 +1275,38 @@ export function createNPCs(game) {
     return m;
   }
   // built once for every local in the game — see buildLocalFigure
+  //
+  // ---- THE LOCALS GET WHITES TOO (R6) ----------------------------------
+  // Same four boxes as the roster's `gEyes` and the same inversion: the pale
+  // is the material's own `sail` and the pupil carries the dark multiplier.
+  // The material has to change with it — `npcLocMat` builds plain Lambert and
+  // a `color` attribute on a material without `vertexColors` is SILENTLY
+  // IGNORED, which is the quiet half of this mechanism's failure mode (the
+  // loud half is the reverse, which renders black). It is the roster's own
+  // material, and it is free: `mat` is cached on colour plus options, so
+  // asking for it again hands back the instance the forty-five instanced
+  // people are already drawn with. Still one mesh and one call per local.
+  const npcLocEyeMat = mat(PALETTE.sail, { vertexColors: true });
   const npcLocEyeGeo = npcMakeGeo([
-    { w: 0.050, h: 0.038, d: 0.018, x: -0.058 },
-    { w: 0.050, h: 0.038, d: 0.018, x: 0.058 },
+    { w: 0.078, h: 0.044, d: 0.014, x: -0.058, z: -0.004 },   // the white
+    { w: 0.078, h: 0.044, d: 0.014, x: 0.058, z: -0.004 },
+    { w: 0.050, h: 0.038, d: 0.018, x: -0.058, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
+    { w: 0.050, h: 0.038, d: 0.018, x: 0.058, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
+  ]);
+  // ---- ...AND THEIR HAT IS A HAT (R6) -----------------------------------
+  // It was `npcLocPart(0.42, 0.05, 0.42, ...)`: a 42 cm square PLATE, 5 cm
+  // thick, lying on the head. The roster has had a brim and a crown since it
+  // was built and the locals staff fifteen chapters, so the people the player
+  // spends most of the game looking at were the ones wearing a paving slab.
+  //
+  // ONE MERGED GEOMETRY, so it is still the one draw call the plate was. The
+  // colour attribute npcMakeGeo writes is ignored here (npcLocMat has no
+  // vertexColors) and that is fine: a local's hat is one colour, and the
+  // attribute costs three floats a vertex on a buffer built once for the
+  // whole game.
+  const npcLocHatGeo = npcMakeGeo([
+    { k: 'cyl', rt: 0.30, rb: 0.30, h: 0.030, seg: 8 },
+    { k: 'cyl', rt: 0.14, rb: 0.17, h: 0.150, seg: 8, y: 0.090 },
   ]);
   function npcLocPart(w, h, d, hex, x, y, z) {
     const m = new THREE_.Mesh(new THREE_.BoxGeometry(w, h, d), npcLocMat(hex));
@@ -1238,7 +1351,12 @@ export function createNPCs(game) {
     // the nose. One box, 4 cm, and it is the only reason the head has a FRONT
     // - without it a figure turning to watch you is a cube rotating.
     headN.add(npcLocPart(0.05, 0.05, 0.05, skin, 0, 0.15, 0.14));
-    if (o.hat) headN.add(npcLocPart(0.42, 0.05, 0.42, o.hat, 0, 0.35, 0));
+    if (o.hat) {
+      const hat = new THREE_.Mesh(npcLocHatGeo, npcLocMat(o.hat));
+      hat.position.set(0, 0.350, 0);
+      hat.castShadow = true;
+      headN.add(hat);
+    }
     // ---- ...AND THE REST OF THE FACE (v54) -------------------------------
     // The nose has been carrying this on its own since the locals were built.
     // Two eyes and two brows on nodes of their own — the boxes hang off the
@@ -1252,7 +1370,7 @@ export function createNPCs(game) {
     // no loss at all.
     const eyeN = new THREE_.Object3D();
     eyeN.position.set(0, 0.176, 0.129);
-    const eyeM = new THREE_.Mesh(npcLocEyeGeo, npcLocMat(PALETTE.capyEye));
+    const eyeM = new THREE_.Mesh(npcLocEyeGeo, npcLocEyeMat);
     eyeM.castShadow = true;
     eyeN.add(eyeM);
     const browL = new THREE_.Object3D();
@@ -4796,7 +4914,11 @@ export function createNPCs(game) {
     // The brow is the HAIR colour, which is why it never needed a palette
     // entry of its own and why a blond and a black-haired man read
     // differently at range with no extra state.
-    iEyes.setColorAt(rec.idx, npcColor.setHex(PALETTE.capyEye));
+    // WHITE, not capyEye (R6). The pupil's darkness moved into the geometry's
+    // own colour attribute so that the white beside it could be the material's
+    // `sail`; see gEyes. Nothing per-person varies about an eye, so this is a
+    // constant either way.
+    iEyes.setColorAt(rec.idx, npcColor.setRGB(1, 1, 1));
     iBrow.setColorAt(rec.idx * 2, npcColor.setHex(cHair));
     iBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(cHair));
     iCam.setColorAt(rec.idx, npcColor.setHex(cCam));
@@ -8485,7 +8607,7 @@ export function createNPCs(game) {
     const gLlamaNeck = npcMakeGeo([
       { k: 'cyl', rt: 0.15, rb: 0.20, h: 0.84, seg: 6, y: 0.42 },
       { w: 0.24, h: 0.26, d: 0.30, y: 0.90, z: 0.05 },
-      { w: 0.15, h: 0.13, d: 0.20, y: 0.84, z: 0.22 },
+      { w: 0.15, h: 0.13, d: 0.20, y: 0.84, z: 0.22, c: npcSRGB(0.82) },   // the face
       { w: 0.05, h: 0.21, d: 0.05, x: -0.09, y: 1.10, z: -0.02, rz: 0.16 },
       { w: 0.05, h: 0.21, d: 0.05, x: 0.09, y: 1.10, z: -0.02, rz: -0.16 },
     ]);

@@ -62,6 +62,34 @@ export const PALETTE = {
   capyNose:     0x5f3d29,
   capyEye:      0x2f2118,
   capyEar:      0x8a5a37,
+  // ---- THE COAT (R1). Not three more materials: these are the three STOPS of
+  // the vertex gradient painted over `capy`, and they live here because the
+  // contract says colours live in the palette and because the next person to
+  // re-time the animal's brown needs to see all four of these move together.
+  // A real capybara's guard hair is near-black along the midline, warm
+  // red-brown on the flank and yellow-brown at the throat where the skin shows
+  // through, and the gradient is VERTICAL, not front-to-back.
+  //
+  //   capyFlank  = capy x 1.077                most of the animal
+  //   capySpine  = capyFlank x (0.80 0.74 0.70)  the dorsal midline
+  //   capyThroat = capyFlank x (1.12 1.08 1.00)  under the jaw
+  //
+  // WHY THE FLANK IS NOT `capy` ITSELF, which is the obvious thing and was the
+  // first thing: the gradient is one wide darkening against two small
+  // brightenings, so hung off `capy` it does not redistribute the animal's
+  // light, it REMOVES 4.6% of it. Free contrast on Sydney's lawn; a quarter of
+  // Cali's silhouette gone, and Cali is the weakest silhouette in the game.
+  // The 1.077 is the number that puts the mean back — measured across four
+  // chapters, not chosen (qa/coat-silh.js). The animal's identity value is
+  // still `capy`: it is what the material carries and what the whole gradient
+  // is quoted against.
+  //
+  // All three are clear of the two costumes that could be confused with the
+  // animal (capyLeather 0x453729, capyParka 0xc4453d) — the wardrobe rule is
+  // that a costume the colour of the animal is a lump.
+  capyFlank:    0xbe8150,
+  capySpine:    0x985f38,
+  capyThroat:   0xd58b50,
   // ---- BLACK TIE. What the animal has on after chapter 18's dinner jacket.
   // Midnight blue rather than black, which is what a dinner jacket actually is
   // and which is the only reason it reads as a garment at blue hour instead of

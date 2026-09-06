@@ -481,7 +481,14 @@ const capyRAIN_WET = 0.85;
 // --- shared geometry (built once) -----------------------------------------
 const capyGeoBlob = new THREE.SphereGeometry(1, 8, 6);
 const capyGeoBead = new THREE.SphereGeometry(1, 6, 4);
-const capyGeoLeg = new THREE.CylinderGeometry(0.078, 0.10, 0.32, 6);
+// How far up the shin the ankle band reaches. It is a GEOMETRY number as well
+// as a shading one: the shin carries a vertex ring at exactly this height so
+// the band has an edge to end on, and the coat reads the same constant back.
+const capyANKLE_H = 0.06;
+// The shin, hand-authored (R4) rather than a CylinderGeometry: same 6 sides,
+// same taper, same 0.32, plus the one extra ring 6 cm off the sole that the
+// ankle band needs somewhere to live. See capyLegGeo.
+const capyGeoLeg = capyLegGeo(0.100, 0.068, 0.29, 6, capyANKLE_H);
 const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
 // The wardrobe's three. A unit disc (hat brims, bands, lenses), a unit dome
 // (crowns, hoods, helmets) and a unit box are between them every costume in the
@@ -490,9 +497,734 @@ const capyGeoRing = new THREE.CylinderGeometry(1, 1, 0.05, 8, 1, true);
 const capyGeoDisc = new THREE.CylinderGeometry(1, 1, 1, 12);
 const capyGeoDome = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.52);
 const capyGeoBox = new THREE.BoxGeometry(1, 1, 1);
-// ...and the foot IS the unit box, under a name that says what it is being used
-// for. It was a second identical BoxGeometry until the wardrobe wanted one too.
-const capyGeoFoot = capyGeoBox;
+// The two feet (R4). The foot WAS the unit box, scaled — the same 0.145 x 0.05
+// x 0.175 these keep — and the front and the hind one differ in exactly one
+// thing, which is the number of toes: four in front, three behind, which is the
+// real animal. See capyFootGeo.
+const capyFOOT_W = 0.145, capyFOOT_H = 0.05, capyFOOT_D = 0.175;
+const capyGeoFootF = capyFootGeo(capyFOOT_W, capyFOOT_H, capyFOOT_D, 4, 0.012, 0.022);
+const capyGeoFootR = capyFootGeo(capyFOOT_W, capyFOOT_H, capyFOOT_D, 3, 0.012, 0.022);
+
+// ---------------------------------------------------------------------------
+// THE HULL (R2) — ONE BODY, NOT A STACK OF SEVEN BALLS.
+//
+// The animal was a barrel, a saddle, a rump and four shoulder blobs. Seven
+// ellipsoids, and from the side the top line was three arcs with two creases in
+// them, where a capybara has ONE line rising from the withers to the highest
+// point of the animal, which is over the HIPS and not over the ribs. That line
+// is the species read at playing distance; the stack read as a bag of oranges,
+// and no amount of shading fixes a shape.
+//
+// `capyHULL` is that line as a table of stations. Each row is one slice across
+// the animal; each slice is `capyHULL_D`, a flattened D — flat along the top,
+// widest a third of the way down, tucked under. Twelve sides, and no more on
+// purpose: a smooth section is a smooth animal and this game does not have one.
+//
+// Three things ride on it being a TABLE and not a mesh:
+//
+//   1. The wardrobe's shells are built from the same table, inflated
+//      (`capyHullFit`), so a jacket cannot quietly stop being proud of a body
+//      whose shape has changed. Before this, both shells were ellipsoids fitted
+//      by hand to the barrel, and the hull's hip — 1 cm higher than the saddle
+//      ever was — came straight through the back of the dinner jacket.
+//   2. The coat (R1) is a function of MODEL-SPACE POSITION, so the hull's
+//      vertices are painted by the same `capyCoatAt` as everything else and not
+//      one number of the gradient had to be re-authored for a new shape.
+//   3. The stations are readable. The proportions of this animal are now five
+//      rows of four numbers instead of seven ellipsoids' worth of centres and
+//      radii that only compose in the render.
+//
+// Model space, feet at y = 0. The geometry is authored about a PIVOT low in the
+// body (`capyHULL_PIVOT`) so the idle breath scales it the way a chest actually
+// expands: up and out, not down through the ribs and into the floor.
+const capyHULL = [
+  // z,     half-width, top y, bottom y
+  [0.46, 0.15, 0.580, 0.370],   // chest, closed off INSIDE the skull box
+  [0.34, 0.27, 0.660, 0.220],   // shoulder front; buries the skull's rear face
+  [0.10, 0.32, 0.700, 0.170],   // deepest station — this one is the barrel
+  [-0.15, 0.31, 0.720, 0.180],  // the top line is still rising here
+  [-0.38, 0.28, 0.735, 0.240],  // over the hips: the HIGHEST point of the animal
+  [-0.55, 0.19, 0.615, 0.355],  // the rump, closing...
+  [-0.60, 0.105, 0.545, 0.410]  // ...onto the tail, BLUNTLY. See the note.
+];
+const capyHULL_PIVOT = [0, 0.20, -0.05];
+// The right half of the section, from top centre round to bottom centre. `u` is
+// the fraction of the half-width, `v` the fraction of the height from the
+// station's bottom to its top. The left half is this walked backwards, so the
+// ring closes on itself and the winding is the same all the way round.
+const capyHULL_D = [
+  [0.00, 1.000],
+  [0.55, 0.975],
+  [0.93, 0.850],
+  [1.00, 0.600],   // widest a third of the way down
+  [0.80, 0.240],
+  [0.35, 0.030],
+  [0.00, 0.000]
+];
+const capyHULL_N = (capyHULL_D.length - 1) * 2;
+
+/** One station, interpolated along the table. Clamped at both ends. */
+function capyHullAt(z) {
+  const t = capyHULL;
+  if (z >= t[0][0]) return t[0].slice();
+  const n = t.length;
+  if (z <= t[n - 1][0]) return t[n - 1].slice();
+  for (let i = 1; i < n; i++) {
+    if (z < t[i][0]) continue;
+    const a = t[i - 1], b = t[i];
+    const k = (a[0] - z) / (a[0] - b[0]);
+    return [z, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k,
+            a[3] + (b[3] - a[3]) * k];
+  }
+  return t[n - 1].slice();
+}
+
+/**
+ * The stations between two z, with both ends interpolated onto the table. This
+ * is how a costume shell gets the body's own shape: take the slice of the
+ * animal the garment covers, inflate it, and it is proud everywhere by
+ * construction rather than everywhere the author happened to check.
+ */
+function capyHullFit(zFrom, zTo) {
+  const rows = [capyHullAt(zFrom)];
+  for (let i = 0; i < capyHULL.length; i++) {
+    const z = capyHULL[i][0];
+    if (z < zFrom && z > zTo) rows.push(capyHULL[i].slice());
+  }
+  rows.push(capyHullAt(zTo));
+  return rows;
+}
+
+/**
+ * Rows of stations into a flat-shaded body.
+ *
+ * NON-INDEXED, so `computeVertexNormals` gives every triangle its own face
+ * normal — which is not only the flat-shaded look. The rim in shared.js is a
+ * Fresnel on an INTERPOLATED normal, so a shared vertex normal that points
+ * somewhere between two faces makes both of them rim as though they were edge
+ * on. That is measurable, it is what made the old nose pad render pale, and a
+ * per-face normal is immune to it.
+ *
+ * `dw` / `dTop` / `dBot` inflate the section: outward, upward, and up-from-
+ * underneath — a jacket rides ABOVE the belly, so its bottom is raised rather
+ * than dropped.
+ */
+function capyHullGeo(rows, dw, dTop, dBot) {
+  const R = rows.length, N = capyHULL_N;
+  const px = capyHULL_PIVOT[0], py = capyHULL_PIVOT[1], pz = capyHULL_PIVOT[2];
+  const ring = [], mid = [];
+  for (let r = 0; r < R; r++) {
+    const st = rows[r];
+    const hw = st[1] + (dw || 0), top = st[2] + (dTop || 0), bot = st[3] + (dBot || 0);
+    const a = [];
+    for (let i = 0; i < N; i++) {
+      const j = i < capyHULL_D.length ? i : N - i;
+      const s = i < capyHULL_D.length ? 1 : -1;
+      const d = capyHULL_D[j];
+      a.push(s * d[0] * hw - px, bot + d[1] * (top - bot) - py, st[0] - pz);
+    }
+    ring.push(a);
+    mid.push([-px, (top + bot) * 0.5 - py, st[0] - pz]);
+  }
+  const tris = (R - 1) * N * 2 + N * 2;
+  const pos = new Float32Array(tris * 9);
+  let o = 0;
+  function put(a, i, b, j, c, k) {
+    pos[o++] = a[i * 3]; pos[o++] = a[i * 3 + 1]; pos[o++] = a[i * 3 + 2];
+    pos[o++] = b[j * 3]; pos[o++] = b[j * 3 + 1]; pos[o++] = b[j * 3 + 2];
+    pos[o++] = c[k * 3]; pos[o++] = c[k * 3 + 1]; pos[o++] = c[k * 3 + 2];
+  }
+  for (let r = 0; r < R - 1; r++) {
+    const a = ring[r], b = ring[r + 1];
+    for (let i = 0; i < N; i++) {
+      const n = (i + 1) % N;
+      put(a, i, a, n, b, i);
+      put(a, n, b, n, b, i);
+    }
+  }
+  // The two ends. Fanned from the station's mid-height, which is inside the D
+  // at every station because the widest point is below it.
+  const f = ring[0], bk = ring[R - 1], cf = mid[0], cb = mid[R - 1];
+  for (let i = 0; i < N; i++) {
+    const n = (i + 1) % N;
+    put(cf, 0, f, n, f, i);      // front: outward is +z
+    put(cb, 0, bk, i, bk, n);    // back: outward is -z
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * THE MUZZLE (R3) — THE SAME BRICK, WITH THE LIGHT PUT BACK ON IT.
+ *
+ * The snout was a plain box 0.325 x 0.20 x 0.26 and the single biggest species
+ * tell on the animal, and a plain box has exactly two values on it from any
+ * angle: a lit top and a shaded front. A real muzzle is deep and blunt and the
+ * interesting thing about it is the EDGE where those two meet, which is where
+ * the light changes. So: the same footprint, a 3.5 cm chamfer at 30 degrees
+ * along the top front edge, and 2.5 cm off the two front vertical edges.
+ *
+ * The underside stays square, and that is load-bearing rather than tidy: the
+ * jaw is a solid box tucked flush under this one and inset 1.25 cm a side, and
+ * a chamfer that ran to the bottom would put the jaw's front corners OUTSIDE
+ * the muzzle and open a seam in a closed mouth. The corner cut therefore ramps
+ * in over the first 3.5 cm above the underside.
+ *
+ * Built as four horizontal rings rather than a solved polyhedron, because every
+ * feature here is a function of height: the corner cut ramps in with y and the
+ * top chamfer pulls the front face back with y. Forty-four triangles, four of
+ * them degenerate where the corner cut is still zero.
+ */
+function capyMuzzleGeo(w, h, d, cham, bevel, ramp) {
+  const X = w * 0.5, Y = h * 0.5, Z = d * 0.5;
+  const drop = cham * Math.tan(Math.PI / 6);       // 30 degrees off the top face
+  const rows = [
+    [-Y, 0, Z],                  // the underside: square, for the jaw
+    [-Y + ramp, bevel, Z],       // ...and the corner cut is fully in by here
+    [Y - drop, bevel, Z],
+    [Y, bevel, Z - cham]         // the top face, pulled back by the chamfer
+  ];
+  const N = 6, R = rows.length;
+  const ring = [];
+  for (let r = 0; r < R; r++) {
+    const y = rows[r][0], c = rows[r][1], zf = rows[r][2];
+    ring.push([-X, y, -Z, X, y, -Z, X, y, zf - c, X - c, y, zf,
+               -(X - c), y, zf, -X, y, zf - c]);
+  }
+  const tris = (R - 1) * N * 2 + (N - 2) * 2;
+  const pos = new Float32Array(tris * 9);
+  let o = 0;
+  function put(a, i, b, j, c, k) {
+    pos[o++] = a[i * 3]; pos[o++] = a[i * 3 + 1]; pos[o++] = a[i * 3 + 2];
+    pos[o++] = b[j * 3]; pos[o++] = b[j * 3 + 1]; pos[o++] = b[j * 3 + 2];
+    pos[o++] = c[k * 3]; pos[o++] = c[k * 3 + 1]; pos[o++] = c[k * 3 + 2];
+  }
+  for (let r = 0; r < R - 1; r++) {
+    const a = ring[r], b = ring[r + 1];
+    for (let i = 0; i < N; i++) {
+      const n = (i + 1) % N;
+      put(a, i, b, i, a, n);
+      put(a, n, b, i, b, n);
+    }
+  }
+  const lo = ring[0], hi = ring[R - 1];
+  for (let i = 1; i < N - 1; i++) {
+    put(lo, 0, lo, i, lo, i + 1);          // underside: outward is -y
+    put(hi, 0, hi, i + 1, hi, i);          // top face: outward is +y
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * THE NOSE PAD (R3) — AND WHY THE OLD ONE RENDERED PALE.
+ *
+ * MEASURED (`qa/pad-why.js`, in-frame A/B on the pad's own visibility, so the
+ * "muzzle" sample is literally the pixels the pad was covering):
+ *
+ *   albedo, pad against muzzle .......... 0.256
+ *   RENDERED, from the resting lens ..... 1.120   — the pad is BRIGHTER
+ *   fraction of the pad's pixel that is
+ *     ADDED after the albedo ............ 0.731   (the muzzle's is 0.049)
+ *
+ * Three quarters of a dark brown nose was light the shader ADDS — the rim in
+ * shared.js, which goes onto `outgoingLight` and therefore does not care how
+ * dark the material under it is. The pad collected so much of it because it was
+ * a four-sided TAPERED cylinder squashed to 0.30 in z: a four-segment cylinder
+ * puts its vertex normals on the CORNERS, 45 degrees off the face they belong
+ * to, and the squash levers them further round still, so the rim's Fresnel saw
+ * every face as near edge-on and lit the lot. A colour cannot fix that. Nothing
+ * in the palette can: at that additive fraction, black renders at 69 grey
+ * levels.
+ *
+ * So the pad is now a hand-authored plate wrapping the muzzle's front-top edge,
+ * non-indexed and flat, with HONEST face normals — and on `matSelf`, so it is
+ * inside the animal's own rim budget rather than the scenery's, and with
+ * `vertexColors` so its top run can be taken down the 0.70 that answers the
+ * extra sun an up-facing surface gets. The profile is authored in the (y, z)
+ * plane and extruded across; `d` is how far it stands off the muzzle.
+ */
+function capyPadGeo(prof, w) {
+  const n = prof.length;
+  const tris = n * 2 + (n - 2) * 2;
+  const pos = new Float32Array(tris * 9);
+  const col = new Float32Array(tris * 9);
+  let o = 0;
+  function v(s, i) {
+    // sRGB intent in the table, linear in the buffer — the same conversion
+    // every other number in the coat goes through. See capyCoatK.
+    const k = capyCoatK(prof[i][2] === undefined ? 1 : prof[i][2]);
+    col[o] = k; col[o + 1] = k; col[o + 2] = k;
+    pos[o++] = s * w; pos[o++] = prof[i][0]; pos[o++] = prof[i][1];
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    v(1, i); v(1, j); v(-1, i);
+    v(1, j); v(-1, j); v(-1, i);
+  }
+  for (let i = 1; i < n - 1; i++) {
+    v(1, 0); v(1, i + 1); v(1, i);
+    v(-1, 0); v(-1, i); v(-1, i + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * THE FOOT (R4) — THE SAME FOOTPRINT, WITH TOES CUT INTO IT.
+ *
+ * A foot was `capyGeoBox` scaled to 0.145 x 0.05 x 0.175: a slab, twelve
+ * triangles, and from every camera in the game a rectangle. In the loaf — the
+ * pose the animal spends most of its life in and the one it is most often
+ * photographed in — the four feet are the closest parts of the animal to the
+ * lens and the only ones at eye level, so a slab there is the most visible
+ * missing detail on the model.
+ *
+ * Built in PLAN and extruded, because everything this shape has to say is in
+ * plan: the outline is a polygon in x/z with the front edge notched, and the
+ * only thing that happens in y is the chamfer along the top rear edge, where
+ * the foot meets the shin. `toes` tips and `toes - 1` valleys between them, the
+ * outer two tips being the corners — so four toes needs three notches and not
+ * four, which is the count a foot actually has between its toes.
+ *
+ * Front feet four toes, hind three; that is the real animal, and it is the
+ * cheapest species tell left on the model. Thirty-two triangles on a front
+ * foot, twenty-four on a hind one.
+ *
+ * NON-INDEXED, per-face normals, for the reason THE HULL's comment gives: the
+ * rim is a Fresnel on an interpolated normal and a shared vertex normal at the
+ * point of a toe would rim the whole toe as though it were edge on.
+ */
+function capyFootGeo(w, h, d, toes, notch, cham) {
+  const X = w * 0.5, Y = h * 0.5, Z = d * 0.5;
+  // The plan outline, wound front-left -> front-right -> rear-right ->
+  // rear-left, which is +x then -z: that order fans to a +y normal (see below).
+  const plan = [];
+  for (let i = 0; i < toes * 2 - 1; i++) {
+    // Even i is a toe tip at the full length, odd i a valley cut back by
+    // `notch`. The tips are spread evenly across the width and the outer two
+    // ARE the corners, because a foot's outer toes are its edges.
+    const k = i * 0.5;
+    plan.push(i % 2 ? [-X + w * (k / (toes - 1)), Z - notch]
+                    : [-X + w * (k / (toes - 1)), Z]);
+  }
+  plan.push([X, -Z], [-X, -Z]);
+  const P = plan.length;
+  // ...and the top ring is the same outline with the two rear corners pulled
+  // forward, which is the chamfer: a foot's top rear edge is where the shin
+  // lands on it, and a square corner there is a step in the silhouette.
+  const lo = [], hi = [];
+  for (let i = 0; i < P; i++) {
+    const rear = i >= P - 2;
+    lo.push(plan[i][0], -Y, plan[i][1]);
+    hi.push(plan[i][0], Y, plan[i][1] + (rear ? cham : 0));
+  }
+  const tris = (P - 2) * 2 + P * 2;
+  const pos = new Float32Array(tris * 9);
+  let o = 0;
+  function put(a, i, b, j, c, k) {
+    pos[o++] = a[i * 3]; pos[o++] = a[i * 3 + 1]; pos[o++] = a[i * 3 + 2];
+    pos[o++] = b[j * 3]; pos[o++] = b[j * 3 + 1]; pos[o++] = b[j * 3 + 2];
+    pos[o++] = c[k * 3]; pos[o++] = c[k * 3 + 1]; pos[o++] = c[k * 3 + 2];
+  }
+  for (let i = 1; i < P - 1; i++) {
+    put(lo, 0, lo, i + 1, lo, i);          // the sole: outward is -y
+    put(hi, 0, hi, i, hi, i + 1);          // the top: outward is +y
+  }
+  for (let i = 0; i < P; i++) {
+    const n = (i + 1) % P;
+    put(lo, i, lo, n, hi, n);
+    put(lo, i, hi, n, hi, i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * THE SHIN (R4) — AND WHY THE ANKLE BAND NEEDED A NEW ONE.
+ *
+ * The band R4 asks for is six centimetres of darker fur at the bottom of a
+ * shin, painted through the coat's `color` attribute. A `CylinderGeometry`
+ * CANNOT CARRY IT: with `heightSegments` 1 it has vertex rings at its two ends
+ * and nowhere else, so a vertex colour that is meant to change 6 cm off the
+ * ground has no vertex to change at and the band comes out as a full-length
+ * gradient up the whole leg. Raising `heightSegments` to get one ring adds
+ * three more nobody wants (6 radial segments x 8 extra bands = 48 triangles a
+ * leg, for one line).
+ *
+ * So: a tapered tube with EXACTLY the rings it needs — the sole, the ankle, and
+ * the top — and no top cap, because the top of a shin is 11 cm inside the hull
+ * and has never been drawn. Twenty-eight triangles against the cylinder's
+ * twenty-four, and the same 6 sides. Per-face normals, which the cylinder did
+ * not have either: a 6-segment cylinder's vertex normals sit on its corners,
+ * 30 degrees off the faces, and rim accordingly.
+ *
+ * AND THE TAPER TURNED ROUND. It was 0.078 at the top and 0.10 at the BOTTOM —
+ * a leg that flares at the ankle, and an ankle 20 cm across on a foot 14.5 cm
+ * wide. With the foot a slab that was invisible; with a foot that has toes cut
+ * into it, the shin's bottom cap swallowed them from behind and dug into the
+ * ground beside them. 0.100 to 0.068, which is the way round a leg goes, puts
+ * the ankle INSIDE the footprint. The shin is 0.29 rather than 0.32 for the
+ * same reason: it now stops 2 cm inside the top of the foot instead of ending
+ * flush with the sole, where it was coplanar with it.
+ */
+function capyLegGeo(rTop, rBot, h, seg, split) {
+  const ys = [-h * 0.5, -h * 0.5 + split, h * 0.5];
+  const ring = ys.map(y => {
+    const t = (y + h * 0.5) / h, r = rBot + (rTop - rBot) * t, a = [];
+    for (let i = 0; i < seg; i++) {
+      const th = (i / seg) * Math.PI * 2;
+      a.push(-Math.sin(th) * r, y, Math.cos(th) * r);
+    }
+    return a;
+  });
+  const tris = (ring.length - 1) * seg * 2 + (seg - 2);
+  const pos = new Float32Array(tris * 9);
+  let o = 0;
+  function put(a, i, b, j, c, k) {
+    pos[o++] = a[i * 3]; pos[o++] = a[i * 3 + 1]; pos[o++] = a[i * 3 + 2];
+    pos[o++] = b[j * 3]; pos[o++] = b[j * 3 + 1]; pos[o++] = b[j * 3 + 2];
+    pos[o++] = c[k * 3]; pos[o++] = c[k * 3 + 1]; pos[o++] = c[k * 3 + 2];
+  }
+  for (let r = 0; r < ring.length - 1; r++) {
+    const a = ring[r], b = ring[r + 1];
+    for (let i = 0; i < seg; i++) {
+      const n = (i + 1) % seg;
+      put(a, i, b, i, a, n);
+      put(a, n, b, i, b, n);
+    }
+  }
+  const sole = ring[0];
+  for (let i = 1; i < seg - 1; i++) put(sole, 0, sole, i, sole, i + 1);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// THE COAT (R1) — WHERE THE ANIMAL IS DARK AND WHERE IT IS PALE.
+//
+// The subject of this game was ONE flat brown from every angle. Nine meshes
+// carrying `PALETTE.capy`, six carrying `capyDark`, three carrying `capyLight`,
+// and nothing between them but the facet lighting — so from the playing camera
+// the animal read as a brown mass with a lighter line under it, and the only
+// thing separating its back from its flank was which way the facet happened to
+// face the sun. A real capybara is not one colour: the guard hair along the
+// midline is near-black, the flank is a warm red-brown, and the throat and
+// belly are yellow-brown where the skin shows through. The gradient is
+// VERTICAL, not front-to-back.
+//
+// This is the cheapest possible way to buy that, and it is the way the crowd
+// has been drawn since P5: a `color` attribute on the geometry and
+// `vertexColors: true` on the material. No texture (the contract forbids one),
+// no second material, no second mesh, NO NEW DRAW CALL — the same meshes are
+// submitted, carrying three more floats per vertex. The one real cost is one
+// extra shader program: `vertexColors` is part of three's own program cache
+// key, so the animal's six materials stop sharing the scenery's compiled
+// program and compile one of their own, once, at boot. That is a compile, not
+// a draw, and the rim is untouched — same `matSelf`, same uniform pair, same
+// `customProgramCacheKey`.
+//
+// FOUR THINGS ABOUT HOW.
+//
+//  1. IT IS A FUNCTION OF MODEL-SPACE POSITION, not hand-painted vertices.
+//     Every vertex is transformed up into `capyModel`'s frame (feet at y = 0,
+//     +z forward) and asked where it is on the animal. That is the whole
+//     reason it is written this way, and R2 collected on it: seven blobs
+//     became one hand-authored hull and the hull got the same coat by calling
+//     the same function, with no number in this block re-authored.
+//  2. THE GEOMETRY HAS TO BE CLONED FIRST. `capyGeoBlob` is shared by the
+//     the belly, the tail, the ears and both cheeks — a colour attribute
+//     written on the shared buffer would paint the ears with the belly's
+//     gradient. Cloned per part, once, at create. Same for the shin and the
+//     two feet, which are one buffer each for two legs.
+//  3. THE NUMBERS ARE sRGB AND THE MULTIPLY IS LINEAR. The vertex colour
+//     multiplies the material's albedo in the LINEAR working space, and "0.80
+//     of the brown" is a number a person reasons about in sRGB. 0.80 handed
+//     straight to the shader renders as 0.90 — a change nobody can see, and
+//     the exact shape of a polish task that measures as nothing. The three
+//     gradient stops are converted through THREE.Color, which does that
+//     conversion for a living; the three multipliers that have no single base
+//     colour (they land on `capy`, `capyLight` AND `capyDark`) go through the
+//     same transfer written as a power.
+//  4. EVERY MESH WEARING A FUR MATERIAL MUST GET THE ATTRIBUTE. `vertexColors`
+//     with no `color` attribute is not a warning and not a fallback: WebGL
+//     hands the shader the default generic attribute, which is BLACK. So the
+//     pass is a traverse that finds meshes by MATERIAL, rather than a list of
+//     names that the next person to add a whisker will forget to join.
+// ---------------------------------------------------------------------------
+
+// A gradient stop as a linear multiplier on the fur. Derived from the palette
+// rather than written out twice: the spine renders AS `capySpine`.
+function capyCoatOf(hex) {
+  const a = new THREE.Color(hex), b = new THREE.Color(PALETTE.capy);
+  return [a.r / b.r, a.g / b.g, a.b / b.b];
+}
+/** An sRGB-intent multiplier as the linear one that renders as it. See 3. */
+function capyCoatK(m) { return Math.pow(m, 2.4); }
+function capyCoat3(a, r, g, b) {
+  return [a[0] * capyCoatK(r), a[1] * capyCoatK(g), a[2] * capyCoatK(b)];
+}
+
+// ---------------------------------------------------------------------------
+// A COAT REDISTRIBUTES LIGHT. IT DOES NOT REMOVE IT — and the first version of
+// this one did, which is a P1 regression and not a shading opinion.
+//
+// The obvious build is: the flank is `capy` unchanged, and the gradient hangs
+// off it. But the gradient is ONE WIDE DARKENING (the whole dorsal surface,
+// which from a camera 35 degrees above and behind is most of the animal)
+// against two small brightenings — a belly half hidden under the animal and a
+// throat 4 cm across. Its area-weighted mean is well below 1, so it does not
+// redistribute the animal's light, it removes 4.6% of it. Measured, coat off
+// to on, mean luminance over the animal's own pixels:
+//
+//     sydney 104.6 -> 100.2    cali 106.5 -> 101.2
+//     sahara 121.1 -> 115.1    antarctic 124.3 -> 119.2
+//
+// Against a bright ground that is free contrast (Sydney's lawn 41.1 -> 45.8,
+// the Sahara 55.0 -> 61.4). Against a DARK one it is the animal walking toward
+// the background: Cali 23.5 -> 17.9, and Cali is the weakest silhouette in the
+// game. P1's whole subject is that the animal must be findable on the ground
+// it is standing on, and no gradient is worth a quarter of that.
+//
+// No shape of gradient raises contrast in every chapter — a darker animal
+// helps on light ground and hurts on dark, and the reverse — so the target is
+// not "better everywhere", it is NEUTRAL: change the variance, leave the mean.
+// `capyFlank` is `capy` warmed by the 7.7% that does that, and every stop is
+// quoted against IT rather than against `capy`. See qa/coat-silh.js, which
+// measures both states in one frame, in one chapter, under one sun.
+const capyCOAT_FLANK = capyCoatOf(PALETTE.capyFlank);    // capy x 1.077
+const capyCOAT_SPINE = capyCoatOf(PALETTE.capySpine);    // flank x 0.80 0.74 0.70
+const capyCOAT_THROAT = capyCoatOf(PALETTE.capyThroat);  // flank x 1.12 1.08 1.00
+const capyCOAT_BELLY = capyCoat3(capyCOAT_FLANK, 1.10, 1.06, 0.98);  // underside
+const capyCOAT_NOOK = capyCoat3(capyCOAT_FLANK, 0.78, 0.74, 0.72);   // creases
+const capyCOAT_EAR = capyCoat3(capyCOAT_FLANK, 0.70, 0.66, 0.64);    // ear cup
+const capyCOAT_ANKLE = capyCoat3(capyCOAT_FLANK, 0.82, 0.82, 0.82);  // the ankle
+
+function capyCoat01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+function capyCoatMix(out, to, w) {
+  if (w <= 0) return;
+  if (w > 1) w = 1;
+  out[0] += (to[0] - out[0]) * w;
+  out[1] += (to[1] - out[1]) * w;
+  out[2] += (to[2] - out[2]) * w;
+}
+
+/**
+ * A BAND (R6): an annulus segment with a rectangular section, swept from
+ * `from` to `to` about the local z axis. It is the shape a collar, a cuff or a
+ * hood's ruff actually is, and the game had no way to draw one: `capyGeoRing`
+ * is an OPEN TUBE, which from dead ahead is edge on and renders as a hairline,
+ * and `capyGeoDisc` is solid and would cover the face it is meant to frame.
+ *
+ * It takes an angular range because the one place that wants it has to keep a
+ * gap: a ruff that runs the whole way round crosses the jaw.
+ *
+ * Non-indexed with per-face normals, for the rim's sake (see THE HULL). The
+ * winding was checked before it was drawn rather than after, by summing the
+ * signed volume of the closed mesh: 0.0054745 against an analytic 0.0059020
+ * for the true annulus segment, the 7% being what eight flat segments lose.
+ */
+function capyBandGeo(rIn, rOut, depth, seg, from, to) {
+  const D = depth * 0.5;
+  const prof = [[rOut, D], [rOut, -D], [rIn, -D], [rIn, D]];
+  const S = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = from + (to - from) * (i / seg), ca = Math.cos(a), sa = Math.sin(a);
+    const ring = [];
+    for (let k = 0; k < 4; k++) ring.push(ca * prof[k][0], sa * prof[k][0], prof[k][1]);
+    S.push(ring);
+  }
+  const tris = seg * 8 + 4;
+  const pos = new Float32Array(tris * 9);
+  let o = 0;
+  function put(a, i, b, j, c, k) {
+    pos[o++] = a[i * 3]; pos[o++] = a[i * 3 + 1]; pos[o++] = a[i * 3 + 2];
+    pos[o++] = b[j * 3]; pos[o++] = b[j * 3 + 1]; pos[o++] = b[j * 3 + 2];
+    pos[o++] = c[k * 3]; pos[o++] = c[k * 3 + 1]; pos[o++] = c[k * 3 + 2];
+  }
+  for (let i = 0; i < seg; i++) {
+    const a = S[i], b = S[i + 1];
+    for (let k = 0; k < 4; k++) {
+      const n = (k + 1) % 4;
+      put(a, k, b, n, b, k);
+      put(a, k, a, n, b, n);
+    }
+  }
+  const f = S[0], e = S[seg];
+  put(f, 0, f, 1, f, 2); put(f, 0, f, 2, f, 3);      // the two cut ends
+  put(e, 0, e, 2, e, 1); put(e, 0, e, 3, e, 2);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * THE COAT, at one point in model space. `limb` drops the two terms that
+ * belong to the body's underside — a shin runs from y 0.00 to 0.32 and would
+ * otherwise come out paler in the middle than at either end, which is the one
+ * thing a leg must never do.
+ */
+function capyCoatAt(x, y, z, limb, out) {
+  const ax = x < 0 ? -x : x;
+  out[0] = capyCOAT_FLANK[0]; out[1] = capyCOAT_FLANK[1]; out[2] = capyCOAT_FLANK[2];
+  if (!limb) {
+    // THE UNDERSIDE, as a BAND and not a ramp: it comes in below y 0.30 and is
+    // released again below y 0.16, because under the belly there is no belly.
+    capyCoatMix(out, capyCOAT_BELLY,
+                capyCoat01((0.30 - y) / 0.10) * capyCoat01((y - 0.10) / 0.06));
+    // THE THROAT — the palest 4 cm on the animal, under the jaw's front.
+    capyCoatMix(out, capyCOAT_THROAT,
+                capyCoat01((z - 0.50) / 0.10) * capyCoat01((0.40 - y) / 0.08));
+    // THE LEG ROOTS. R1 hung this crease on the four shoulder blobs, through
+    // the `nook` mechanism, because four blobs is what there was. R2 dissolved
+    // them into the hull and the crease came here instead — which is where it
+    // always belonged, because it is a fact about a PLACE on the animal and not
+    // about a part. Four soft wells low under the body where a leg goes in, and
+    // the belly's own four corners pick them up for free.
+    //
+    // `limb` skips it: a shin's top already takes the same shade from its own
+    // nook, and two writers on one crevice is twice as dark as either meant.
+    const rx = ax - 0.15;
+    for (let i = 0; i < 2; i++) {
+      const rz = z - (i ? -0.28 : 0.28);
+      capyCoatMix(out, capyCOAT_NOOK,
+                  capyCoat01((0.19 - Math.sqrt(rx * rx + rz * rz)) / 0.11) *
+                  capyCoat01((0.44 - y) / 0.12));
+    }
+  }
+  // THE SPINE. Full within 10 cm of the dorsal centreline, gone by 20. The
+  // roadmap said 6 cm and 10, and both numbers were wrong for the same reason,
+  // which only the render showed:
+  //
+  //  - AT 10 IT IS A SEAM, NOT A BAND. The body puts its next vertex line in
+  //    from the centre at |x| 0.18 (capyHULL_D's second row, on a 0.32 half
+  //    width; it was an 8x6 sphere's |x| 0.11 when this was measured), so a
+  //    band that ends at 0.10 has one vertex line inside it at most and reads
+  //    as a crease in the model rather than a marking on the animal.
+  //  - AND IT LEAVES THE HEAD BEHIND. The skull is a BOX: the only vertices on
+  //    its top face are the four corners at |x| 0.18. A band that stops at 0.17
+  //    darkens the back and cannot touch the skull, and the head comes out a
+  //    brighter block sitting in front of a darker back — which is the exact
+  //    two-tone the coat is supposed to remove. 0.20 catches those corners at a
+  //    quarter weight, and the z term below turns that into a gradient that
+  //    fades away toward the muzzle.
+  //
+  // The peak is unchanged by either; only the width is. Only on the back
+  // (y 0.52 up) and only BEHIND the shoulder (gone by z 0.35), so it dies out
+  // across the skull rather than running down the face — a capybara's face is
+  // uniform, and a stripe between the eyes is a badger.
+  capyCoatMix(out, capyCOAT_SPINE,
+              capyCoat01((0.20 - ax) / 0.10) * capyCoat01((y - 0.52) / 0.10) *
+              capyCoat01((0.35 - z) / 0.25));
+}
+
+/**
+ * THE CREVICE SHADE. One mechanism, three uses: the inner face of a shoulder
+ * blob, the top of a shin and the cup of an ear are all a surface that faces
+ * INTO something and therefore never sees the sky. `nook` is that direction in
+ * the part's own local frame; the weight is the squared cosine, because a
+ * crevice is a crevice and not half the part.
+ */
+function capyCoatNook(out, dx, dy, dz, nook, to) {
+  const d = dx * nook[0] + dy * nook[1] + dz * nook[2];
+  if (d <= 0) return;
+  capyCoatMix(out, to, d * d);
+}
+
+/**
+ * THE ANKLE BAND (R4). The bottom of a shin, in the SHIN'S OWN frame and not
+ * the animal's — which is the whole reason it is a tag and not another term in
+ * capyCoatAt. A leg swings: model-space y at the foot end of a shin is 0.32 at
+ * rest, 0.19 in the loaf and anything at all mid-stride, so a band written as a
+ * height on the animal would slide up and down the leg as the animal walked.
+ * A band written as a height on the LEG cannot.
+ *
+ * It is a hard edge and not a ramp — an ankle is a joint, not a gradient — and
+ * the shin carries a vertex ring at exactly `capyANKLE_H` so it has one.
+ */
+function capyCoatAnkle(out, y, band) {
+  capyCoatMix(out, band.to || capyCOAT_ANKLE,
+              capyCoat01((band.y - y) / (band.fade || 0.004)));
+}
+
+// Shared buffers: anything in here has to be cloned before it can carry a coat.
+// The two feet are here for the same reason the shin is — two legs each — even
+// though nothing outside the animal uses them.
+const capyGeoShared = new Set([capyGeoBlob, capyGeoBead, capyGeoLeg,
+                               capyGeoRing, capyGeoDisc, capyGeoDome,
+                               capyGeoBox, capyGeoFootF, capyGeoFootR]);
+const _coatM4 = new THREE.Matrix4();
+const _coatV = new THREE.Vector3();
+const _coatRGB = [1, 1, 1];
+
+/**
+ * Paint the coat into every mesh under `root` whose material is one of the fur
+ * set. Returns the number of meshes painted, so a probe can tell "the coat is
+ * subtle" from "the coat never ran".
+ *
+ * Per-part intent rides on `mesh.userData.coat`, set at the point the part is
+ * built because that is where the reader is: `{ flat: true }` for the handful
+ * of fur-material parts that are not fur (a whisker, an eye's catchlight),
+ * `{ limb: true }` for the legs, `{ nook: [x, y, z], to: [...] }` for a crease.
+ */
+function capyPaintCoat(root, furMats) {
+  let painted = 0;
+  root.traverse(function (o) {
+    if (!o.isMesh || !o.geometry || !furMats.has(o.material)) return;
+    if (capyGeoShared.has(o.geometry)) o.geometry = o.geometry.clone();
+    const pos = o.geometry.attributes.position;
+    if (!pos) return;
+    const tag = o.userData.coat || null;
+    const col = new Float32Array(pos.count * 3);
+    // model space, NOT the mesh's own: walk the rest-pose transforms up to root
+    _coatM4.identity();
+    for (let n = o; n && n !== root; n = n.parent) {
+      n.updateMatrix();
+      _coatM4.premultiply(n.matrix);
+    }
+    for (let i = 0, o3 = 0; i < pos.count; i++, o3 += 3) {
+      if (tag && tag.flat) { col[o3] = 1; col[o3 + 1] = 1; col[o3 + 2] = 1; continue; }
+      _coatV.fromBufferAttribute(pos, i);
+      // The local direction is the crevice's axis. Every coated part is a
+      // sphere, a cylinder or a box centred on its own origin, so the
+      // normalised local position is the outward direction on all three.
+      let dx = _coatV.x, dy = _coatV.y, dz = _coatV.z;
+      const L = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      dx /= L; dy /= L; dz /= L;
+      _coatV.applyMatrix4(_coatM4);
+      capyCoatAt(_coatV.x, _coatV.y, _coatV.z, tag && tag.limb, _coatRGB);
+      if (tag && tag.nook) {
+        capyCoatNook(_coatRGB, dx, dy, dz, tag.nook, tag.to || capyCOAT_NOOK);
+      }
+      // ...and the band is read off the part's own LOCAL y, before the matrix
+      // above touched it, which is why it is taken from `pos` again rather than
+      // from _coatV.
+      if (tag && tag.band) capyCoatAnkle(_coatRGB, pos.getY(i), tag.band);
+      col[o3] = _coatRGB[0]; col[o3 + 1] = _coatRGB[1]; col[o3 + 2] = _coatRGB[2];
+    }
+    o.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    painted++;
+  });
+  return painted;
+}
 
 // --- scratch (NEVER allocate inside update) --------------------------------
 const capyThrow = new THREE.Vector3();
@@ -840,8 +1572,75 @@ const capyLOAF_T     = 6.5;    // s of rest before it sits
 const capyLOAF_LAM   = 2.2;    // damp lambda settling in; ×6 getting up
 const capyLOAF_DROP  = 0.145;  // m the model sinks as the barrel meets the ground
 const capyLOAF_PITCH = -0.05;  // rad of nose-up, because the front end goes down
-const capyLOAF_LEG_F = -1.05;  // front legs folded under
-const capyLOAF_LEG_R = 0.85;   // ...and the rears tucked forward alongside
+// THE LEG ANGLES IN THE LOAF, RE-DERIVED (R4) AGAINST THE DRAWN GROUND.
+// They were -1.05 and 0.85, and qa/r4-pre.js measured what that draws: the
+// front feet 0.9 cm under the ground (fine — that is a foot resting on it) and
+// THE REAR FEET 14.6 cm UNDER IT, with 13.4 cm of shin under it as well. The
+// loaf drops the model 14.5 cm and the rear legs trail back and down into the
+// hole it makes. Both angles now put the SOLE on the ground: with the ankle
+// below holding the foot level, the sole sits 0.175 m under the hip, and
+//     0.295·cos a + 0.03·sin a = 0.15
+// solves at -0.837 forward and 1.234 back. See THE LOAF SITS ON ITS HOCKS.
+const capyLOAF_LEG_F = -0.837; // front legs folded under, soles down
+const capyLOAF_LEG_R = 1.234;  // ...and the rears stretched back onto the hock
+const capyLOAF_TUCK_Z = 0.05;  // m the rear hips walk forward, so the feet tuck
+
+// ---------------------------------------------------------------------------
+// BREATH, SETTLE AND TAIL (R5) - THE THREE THINGS AN ANIMAL DOES WHEN IT IS
+// DOING NOTHING.
+//
+// THE BREATH MOVED NODE (R2 left it on the hull and said so). It is one term
+// in the writer that already owns the body's scale, rather than a second
+// writer on a child of it, and that is not tidiness: capySquash's origin is
+// the FOOT PLANE (capyModel puts the soles at y = 0), so a scale there is a
+// scale about the ground. The feet cannot leave it, the whole outline moves,
+// and the head and the back rise together the way a ribcage makes them.
+// On the hull it was about the belly line and only the barrel moved.
+//
+// Rates are Hz here and integrated as rad/s below, because the RATE CHANGES
+// (idle act 4 slows it, the loaf slows it further) and sin(t * rate) with a
+// moving rate is a phase jump the size of the session. See capyBreathPh.
+const capyBREATH_HZ      = 0.28;   // at rest on its feet
+const capyBREATH_HZ_LOAF = 0.20;   // ...and slower once it has sat down
+const capyBREATH_Y       = 0.010;  // of the animal's height, on the y scale
+const capyBREATH_Y_LOAF  = 0.016;  // ...deeper in the loaf, which is the point
+const capyBREATH_X       = 0.006;  // a chest goes up more than it goes out
+// m/s of gait at which the breath is fully gone. The old gate was the binary
+// `moving` (0.35 m/s), which is a step; this is the (1 - speed) the hand-off
+// asked for, normalised, so it fades out over the first stride instead.
+const capyBREATH_STILL   = 1.20;
+let capyBreath = 0;                 // published on animAudit
+
+// THE SETTLE. Not a second trigger on the landing: it is a LAGGED FOLLOWER of
+// the absorb spring the model already runs, which is what makes it arrive
+// after that spring bottoms out rather than with it (measured: 86 ms after).
+// Its own variable, added to head.rotation.x: capyHeadPitch belongs to the
+// gaze and the pose, and a nod written there would be fought by the damp on
+// the next frame.
+//
+// THE GAIN IS AGAINST THE LANDING THE PLAYER ACTUALLY MAKES. capyLand's clamp
+// is -0.30 m, and 0.20 rad/m off that clamp is the hand-off's 0.06 rad, but a
+// plain hop from standing only takes the spring to -0.09: measured, that gain
+// draws a nod of 0.6 degrees, which is nothing on the one landing this game
+// makes a hundred times an hour. 0.60 rad/m puts the ordinary hop AT 0.06 rad
+// AT 0.06 rad DRAWN, which is not the same as 0.06 rad asked for: this is a
+// LAGGED follower and a lambda-9 filter never reaches a target that is gone in
+// 80 ms. Measured, 0.60 rad/m draws 0.033 and 1.10 draws the 0.06. The cap is
+// on the TARGET and keeps a forty-metre arrival from snapping the head down.
+const capyNOD_K   = 1.10;
+const capyNOD_MAX = 0.16;   // rad
+const capyNOD_LAM = 9;
+let capyHeadNod = 0;
+
+// THE TAIL. 0.7 Hz of sway on the same rest weight as the breath, and a flick
+// on the wheek. See the pivot in the rig: a 5 cm sphere centred on itself
+// cannot be flicked at all.
+const capyTAIL_HZ    = 0.7;
+const capyTAIL_SWAY  = 0.05;   // rad
+const capyTAIL_KICK  = 0.25;   // rad, on the wheek
+const capyTAIL_LAM   = 6;      // ...decaying at
+let capyTailFlick = 0;
+let capyTail = 0;              // published on animAudit
 let capyWakeT = 0;
 let capyBreathAmt = 0;
 let capyStageTime = 0;
@@ -1944,6 +2743,21 @@ function capyAddPart(parent, geo, material, px, py, pz, sx, sy, sz) {
   return m;
 }
 
+/**
+ * A part cut from the BODY'S OWN TABLE (R2) — the animal itself, and both of
+ * the two costume shells that have to stay proud of it. `dw` / `dTop` / `dBot`
+ * are the margin: out, up, and up from underneath. Always at the hull's pivot,
+ * so a shell and the body it covers share one origin and cannot drift.
+ */
+function capyHullPart(parent, material, rows, dw, dTop, dBot) {
+  const m = new THREE.Mesh(capyHullGeo(rows, dw, dTop, dBot), material);
+  m.position.set(capyHULL_PIVOT[0], capyHULL_PIVOT[1], capyHULL_PIVOT[2]);
+  m.castShadow = true;
+  m.receiveShadow = false;
+  parent.add(m);
+  return m;
+}
+
 export function createCapybara(game) {
   const scene = game.scene;
 
@@ -1951,10 +2765,10 @@ export function createCapybara(game) {
   // MATERIALS (flat Lambert via mat(); dry/wet pairs for the swim soak)
   // -------------------------------------------------------------------
   // TWO VALUES PLUS ACCENTS (Goose Game rule):
-  //   mFur   = capy       -> barrel, rump, dorsal ridge, head, snout, shoulders
+  //   mFur   = capy       -> the hull, the head, the muzzle, the brow, cheeks
   //   mBelly = capyLight  -> belly underside ONLY
   //   mDark  = capyDark   -> legs, jaw, ears, tail
-  //   mNose / mEye        -> tiny accents (nose pad, mouth interior, eyes)
+  //   mNose / mEye        -> tiny accents (mouth interior, brows, eyes)
   // THE SIX THAT MAKE THE SILHOUETTE TAKE THE ANIMAL'S OWN RIM (P1). matSelf is
   // mat() with the rim's uniforms swapped for the capybara's pair — same
   // program, different numbers — because the scenery's rim is tuned to sculpt
@@ -1964,14 +2778,35 @@ export function createCapybara(game) {
   // The two accents stay on mat(): the nose pad and the eyes are interior
   // detail a centimetre across, they are never on the outline, and a private
   // material each would be two more clones for nothing.
-  const mFur = matSelf(PALETTE.capy);
-  const mFurWet = matSelf(PALETTE.capyDark);
-  const mBelly = matSelf(PALETTE.capyLight);
-  const mBellyWet = matSelf(PALETTE.capy);
-  const mDark = matSelf(PALETTE.capyDark);
-  const mDarkWet = matSelf(PALETTE.capyNose);
+  //
+  // ALL SIX CARRY THE COAT (R1), and all six have to: the soak swaps a mesh
+  // from its dry material to its wet twin, and a twin without `vertexColors`
+  // would drop the gradient the moment the animal got in the water — while a
+  // twin WITH it and a mesh without the attribute would render black. The
+  // pairing is the invariant, not the individual flag. `_rimWants` is true for
+  // this option set, so the animal keeps its own rim; and these are built, not
+  // cloned, because a clone loses the rim hook.
+  const mFur = matSelf(PALETTE.capy, { vertexColors: true });
+  const mFurWet = matSelf(PALETTE.capyDark, { vertexColors: true });
+  const mBelly = matSelf(PALETTE.capyLight, { vertexColors: true });
+  const mBellyWet = matSelf(PALETTE.capy, { vertexColors: true });
+  const mDark = matSelf(PALETTE.capyDark, { vertexColors: true });
+  const mDarkWet = matSelf(PALETTE.capyNose, { vertexColors: true });
   const mNose = mat(PALETTE.capyNose);
   const mEye = mat(PALETTE.capyEye);
+  // ...AND A SEVENTH, FOR THE NOSE PAD ALONE (R3). The note above says the two
+  // accents stay on `mat()` because they are never on the outline, and for the
+  // eyes that is still true. It was wrong about the pad, and measurably so: the
+  // rim is a Fresnel on the normal, not a thing that happens at the silhouette,
+  // and 73% of the old pad's pixel was rim added on top of its albedo — off the
+  // SCENERY's rim, which is not tuned for a 9 cm feature on the subject. Same
+  // program as the other six (same cache key, `vertexColors` and all), so this
+  // is a uniform change and not a draw call. Deliberately NOT in `capyFurMats`:
+  // the pad carries its own authored colours and the coat must not paint over
+  // them. See capyPadGeo.
+  const mNosePad = matSelf(PALETTE.capyNose, { vertexColors: true });
+  // The set the coat pass finds its meshes by. See capyPaintCoat, note 4.
+  const capyFurMats = new Set([mFur, mFurWet, mBelly, mBellyWet, mDark, mDarkWet]);
   const wetParts = [];
 
   // -------------------------------------------------------------------
@@ -1993,20 +2828,36 @@ export function createCapybara(game) {
   const capySquash = new THREE.Group();
   capyModel.add(capySquash);
 
-  // --- barrel body ---------------------------------------------------
-  const barrel = capyAddPart(capySquash, capyGeoBlob, mFur, 0, 0.42, -0.02, 0.32, 0.26, 0.42);
-  wetParts.push({ m: barrel, dry: mFur, wet: mFurWet });
-  const rump = capyAddPart(capySquash, capyGeoBlob, mFur, 0, 0.40, -0.40, 0.29, 0.25, 0.17);
-  wetParts.push({ m: rump, dry: mFur, wet: mFurWet });
-  // dorsal ridge — same base value as the barrel on purpose. It exists for the
-  // SILHOUETTE (a higher, straighter back line) not for a colour break.
-  const saddle = capyAddPart(capySquash, capyGeoBlob, mFur, 0, 0.48, -0.04, 0.30, 0.245, 0.38);
-  wetParts.push({ m: saddle, dry: mFur, wet: mFurWet });
+  // --- the body: ONE hull (R2) ----------------------------------------
+  // What used to be five meshes here and four more at the legs. See THE HULL.
+  // Positioned at the table's pivot rather than the origin, because the idle
+  // breath scales this node and a chest expands upward from the belly line, not
+  // symmetrically about the middle of the animal and down into the floor.
+  const hull = new THREE.Mesh(capyHullGeo(capyHULL, 0, 0, 0), mFur);
+  hull.name = 'capyHull';   // named for the probes; nothing in src reads it
+  hull.position.set(capyHULL_PIVOT[0], capyHULL_PIVOT[1], capyHULL_PIVOT[2]);
+  hull.castShadow = true;
+  capySquash.add(hull);
+  wetParts.push({ m: hull, dry: mFur, wet: mFurWet });
   // the ONLY capyLight on the animal: the belly underside. Narrow enough that
   // it emerges as a low band along the underside instead of a mottled patch.
   const belly = capyAddPart(capySquash, capyGeoBlob, mBelly, 0, 0.245, -0.04, 0.245, 0.105, 0.30);
   wetParts.push({ m: belly, dry: mBelly, wet: mBellyWet });
-  const tail = capyAddPart(capySquash, capyGeoBlob, mDark, 0, 0.44, -0.55, 0.055, 0.06, 0.05);
+  // THE TAIL HAS A PIVOT NOW (R5), and it needs one before it can have a
+  // writer: this nub is a 5 cm sphere that was centred on itself, and rotating
+  // a sphere about its own centre moves nothing but which way its facets face.
+  //
+  // THE PIVOT IS INSIDE THE BODY, which is where a tail's root joint is and
+  // also the only place it can be and still show. On the rear cap the arm is
+  // 3.9 cm and the hand-off's 0.25 rad moves the nub 9.7 mm, which is nothing;
+  // at z -0.50, inside the hull (whose section there runs y 0.32 to 0.65), the
+  // arm is 11.7 cm and the same 0.25 rad moves it 29 mm. The nub's own
+  // position in the animal is unchanged either way: 0.520 - 0.020 and
+  // -0.500 - 0.115.
+  const tailPivot = new THREE.Group();
+  tailPivot.position.set(0, 0.520, -0.500);
+  capySquash.add(tailPivot);
+  const tail = capyAddPart(tailPivot, capyGeoBlob, mDark, 0, -0.020, -0.115, 0.050, 0.055, 0.045);
 
   // --- head: no neck, squared-off snout, eyes+ears high and far back --
   const head = new THREE.Group();
@@ -2022,8 +2873,12 @@ export function createCapybara(game) {
   head.add(skullBox);
   wetParts.push({ m: skullBox, dry: mFur, wet: mFurWet });
 
-  // blunt brick muzzle, 90% of skull width — the single biggest species tell
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.325, 0.20, 0.26), mFur);
+  // blunt bevelled muzzle, 90% of skull width — the single biggest species
+  // tell, and the same 0.325 x 0.20 x 0.26 footprint it has always had. See
+  // capyMuzzleGeo for what the three chamfers are and which one is structural.
+  const snout = new THREE.Mesh(
+    capyMuzzleGeo(0.325, 0.20, 0.26, 0.035, 0.025, 0.035), mFur);
+  snout.name = 'capyMuzzle';
   snout.position.set(0, -0.045, 0.37);
   snout.castShadow = true;
   head.add(snout);
@@ -2039,16 +2894,34 @@ export function createCapybara(game) {
   // (wide at the top lip, narrower at the bottom), 39% of the muzzle width and
   // 21% of its height, sitting high on the muzzle front. The top face stands
   // 0.005 proud of the snout, the bottom edge is flush-to-inset.
-  const nosePadGeo = new THREE.CylinderGeometry(0.0905, 0.0622, 0.042, 4);
-  nosePadGeo.rotateY(Math.PI * 0.25);           // flats face front/back/sides
-  const nosePad = new THREE.Mesh(nosePadGeo, mNose);
-  nosePad.scale.set(1, 1, 0.30);                // flatten it onto the muzzle
-  nosePad.position.set(0, 0.020, 0.4858);
+  // THE PROFILE, in the pad's own space (the pivot is INSIDE the muzzle, at
+  // head 0, 0.02, 0.34, so the sniff swells the pad outward from under the skin
+  // instead of sliding a slab off the face). Rows are [y, z, sRGB multiplier]:
+  // down the muzzle's front face, round the 30 degree chamfer, back along the
+  // top — and then the two inner points that close it against the muzzle.
+  //
+  // The multiplier is the answer to the up-facing surfaces taking the sun
+  // square on: the run over the top is 0.70, the chamfer 0.88, the front 1.00.
+  const nosePad = new THREE.Mesh(capyPadGeo([
+    [-0.045, 0.166, 1.00],   // the front face, bottom of the pad
+    [0.005, 0.166, 1.00],    // ...up to just under the chamfer
+    [0.020, 0.163, 0.88],    // onto the chamfer
+    [0.0402, 0.128, 0.72],   // ...and over its top edge
+    [0.041, 0.086, 0.70],    // back along the top face
+    [0.034, 0.086, 0.70],    // inner: on the top face
+    [-0.045, 0.159, 1.00]    // inner: on the front face
+  ], 0.064), mNosePad);
+  nosePad.name = 'capyPad';
+  nosePad.position.set(0, 0.02, 0.34);
   nosePad.castShadow = true;
   head.add(nosePad);
-  // two nostril pricks, barely proud of the pad
-  capyAddPart(head, capyGeoBead, mEye, 0.030, 0.026, 0.4995, 0.013, 0.011, 0.009);
-  capyAddPart(head, capyGeoBead, mEye, -0.030, 0.026, 0.4995, 0.013, 0.011, 0.009);
+  // TWO NOSTRIL PRICKS, AND THEY ARE ON TOP (R3). They were on the front face,
+  // which is the one place a capybara's are not: the nostrils sit on the top
+  // surface with the eyes and the ears in the same plane above them, which is
+  // why an animal that is swimming shows those three things and nothing else.
+  // It is also the read the game actually gets — the resting lens looks DOWN.
+  capyAddPart(head, capyGeoBead, mEye, 0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
+  capyAddPart(head, capyGeoBead, mEye, -0.036, 0.062, 0.445, 0.018, 0.010, 0.014);
 
   // EYES — dark beads set into the outer-front corners of the brow, angled
   // outward-and-forward so BOTH catch the light from a three-quarter front
@@ -2058,14 +2931,43 @@ export function createCapybara(game) {
   eyeSockL.position.set(0.128, 0.128, 0.265);
   eyeSockL.rotation.y = 0.62;
   head.add(eyeSockL);
-  const eyeL = capyAddPart(eyeSockL, capyGeoBead, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
-  capyAddPart(eyeL, capyGeoBead, mBelly, 0.15, 0.45, 0.62, 0.30, 0.30, 0.30);
+  // 8x6, not the 6x4 bead (R3). At the contract's cap and no further, and the
+  // reason is the catchlight below rather than the eye itself: a 6x4 sphere's
+  // top band is FOUR facets, so a highlight put on the upper front of it lands
+  // on one facet and switches between two as the head turns. It is also the one
+  // part of this animal the lens is on at every arrival.
+  const eyeL = capyAddPart(eyeSockL, capyGeoBlob, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
+  // A catchlight is not fur. It borrows mBelly for the value and must not
+  // borrow the coat with it, or the palest thing on the animal picks up the
+  // throat's lift and stops reading as a highlight.
+  //
+  // MOVED, not enlarged (R3). The roadmap asked for 0.42 of the eye, up on its
+  // front-upper shoulder. The direction was the good half of that and the size
+  // was not: at 0.42 a 6x4 bead is a visible polyhedron standing a quarter of
+  // the eye's radius off it, and it renders as a pale SPIKE between the brow
+  // and the eye instead of a highlight on one. So: the same 0.30 and the same
+  // 6% of protrusion the old one had, swung round onto the upper front where
+  // the resting lens can see it. The old highlight was visible from the front
+  // and from nowhere else, and the front is not where this game is played.
+  capyAddPart(eyeL, capyGeoBead, mBelly, 0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
+    .userData.coat = { flat: true };
   const eyeSockR = new THREE.Group();
   eyeSockR.position.set(-0.128, 0.128, 0.265);
   eyeSockR.rotation.y = -0.62;
   head.add(eyeSockR);
-  const eyeR = capyAddPart(eyeSockR, capyGeoBead, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
-  capyAddPart(eyeR, capyGeoBead, mBelly, -0.15, 0.45, 0.62, 0.30, 0.30, 0.30);
+  const eyeR = capyAddPart(eyeSockR, capyGeoBlob, mEye, 0, 0, 0.056, 0.046, 0.050, 0.042);
+  capyAddPart(eyeR, capyGeoBead, mBelly, -0.135, 0.452, 0.597, 0.30, 0.30, 0.30)
+    .userData.coat = { flat: true };
+
+  // THE CHEEK (R3). One small mass under and behind each eye, and it does two
+  // things a bigger change could not. It gives the eye a LOWER EDGE to sit on —
+  // a bead on a flat plane is a dot, a bead on a ledge is an eye — and in
+  // profile it breaks what was a dead straight line from the ear to the end of
+  // the muzzle into a skull and a snout, which is the shape of a head.
+  const cheekL = capyAddPart(head, capyGeoBlob, mFur, 0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
+  const cheekR = capyAddPart(head, capyGeoBlob, mFur, -0.150, 0.045, 0.235, 0.048, 0.050, 0.090);
+  wetParts.push({ m: cheekL, dry: mFur, wet: mFurWet });
+  wetParts.push({ m: cheekR, dry: mFur, wet: mFurWet });
 
   // ---- BROWS (D8) ---------------------------------------------------------
   // Two bars, one per eye, IN THE SOCKETS — so each one inherits its eye's
@@ -2159,6 +3061,9 @@ export function createCapybara(game) {
       pv.position.y = i * 0.012;
       pv.rotation.set(0, sgn * -0.42, sgn * pitch);
       const w = new THREE.Mesh(new THREE.BoxGeometry(len, 0.008, 0.008), mDark);
+      // 8 mm of stick that happens to wear the fur material. It sits right in
+      // the throat's band and would come out pale; a whisker is not a throat.
+      w.userData.coat = { flat: true };
       w.position.x = sgn * len * 0.5;
       w.castShadow = false;               // an 8 mm stick is not a shadow
       pv.add(w);
@@ -2171,11 +3076,15 @@ export function createCapybara(game) {
   earL.position.set(0.135, 0.17, -0.05);
   head.add(earL);
   const earMeshL = capyAddPart(earL, capyGeoBlob, mDark, 0.02, 0.03, 0, 0.072, 0.078, 0.036);
+  // The cup. -z is the face the playing camera actually sees from behind and
+  // above, and it is the one that never sees the sky either way.
+  earMeshL.userData.coat = { nook: [0, 0, -1], to: capyCOAT_EAR };
   wetParts.push({ m: earMeshL, dry: mDark, wet: mDarkWet });
   const earR = new THREE.Group();
   earR.position.set(-0.135, 0.17, -0.05);
   head.add(earR);
   const earMeshR = capyAddPart(earR, capyGeoBlob, mDark, -0.02, 0.03, 0, 0.072, 0.078, 0.036);
+  earMeshR.userData.coat = { nook: [0, 0, -1], to: capyCOAT_EAR };
   wetParts.push({ m: earMeshR, dry: mDark, wet: mDarkWet });
 
   // --- jaw ------------------------------------------------------------
@@ -2209,23 +3118,44 @@ export function createCapybara(game) {
 
   // --- four stumpy legs with shoulder / hip blobs and blunt feet ------
   const legs = [];
+  const feet = [];   // R4: the loaf keeps the soles flat, which is an ANKLE
   const legX = [0.15, -0.15, 0.15, -0.15];
   const legZ = [0.28, 0.28, -0.28, -0.28];
-  for (let i = 0; i < 4; i++) {
-    // shoulder / hip blobs are BODY, so they carry the body's one base value
-    const blob = capyAddPart(capySquash, capyGeoBlob, mFur, legX[i] * 0.82, 0.335, legZ[i] * 0.92, 0.115, 0.115, 0.135);
-    wetParts.push({ m: blob, dry: mFur, wet: mFurWet });
-  }
+  // The four shoulder / hip blobs are GONE (R2): they are inside the hull now,
+  // and a ball stuck on the outside of a body to suggest a shoulder is the
+  // thing the hull exists to stop. Their crease survives them — it moved into
+  // capyCoatAt, where it is a function of position and paints the hull and the
+  // belly's corners instead of four spheres. See THE LEG ROOTS.
   for (let i = 0; i < 4; i++) {
     const g = new THREE.Group();
     g.position.set(legX[i], 0.32, legZ[i]);
     capySquash.add(g);
-    const shin = capyAddPart(g, capyGeoLeg, mDark, 0, -0.16, 0);
-    const foot = capyAddPart(g, capyGeoFoot, mDark, 0, -0.295, 0.03, 0.145, 0.05, 0.175);
+    const shin = capyAddPart(g, capyGeoLeg, mDark, 0, -0.145, 0);
+    // Four toes in front and three behind (R4), and the foot is authored at its
+    // own size now, so there is no scale on it: a scaled non-uniform box was
+    // what made the old nose pad rim as though it were edge on.
+    const foot = capyAddPart(g, i < 2 ? capyGeoFootF : capyGeoFootR, mDark,
+                             0, -0.295, 0.03);
+    // `limb` so the belly's pale band does not run across the middle of a leg;
+    // the shin takes the crease at its top, where it goes up under the blob,
+    // and the ankle band at its bottom, in the shin's OWN frame — see
+    // capyCoatAnkle for why that has to be a tag and not a place on the animal.
+    shin.userData.coat = { limb: true, nook: [0, 1, 0],
+                           band: { y: -0.145 + capyANKLE_H } };
+    foot.userData.coat = { limb: true };
     wetParts.push({ m: shin, dry: mDark, wet: mDarkWet });
     wetParts.push({ m: foot, dry: mDark, wet: mDarkWet });
     legs.push(g);
+    feet.push(foot);
   }
+
+  // ---- AND NOW THE COAT GOES ON (R1) --------------------------------------
+  // Here, and not inside each part, for note 4's reason: a traverse that finds
+  // its meshes by material cannot miss one, and a mesh on a `vertexColors`
+  // material with no `color` attribute renders BLACK rather than warning. Run
+  // once, at create, over the whole animal in its rest pose — the wardrobe is
+  // built below and wears `mat()` materials, so it is correctly skipped.
+  const capyCoated = capyPaintCoat(capyModel, capyFurMats);
 
   // ===================================================================
   // THE WARDROBE — ten costumes, one per chapter that earns one.
@@ -2318,24 +3248,51 @@ export function createCapybara(game) {
     const mShade = mat(PALETTE.capyShade);
     const mRim = mat(PALETTE.capyShadeRim);
     const o = capyCostume('black-tie');
-    // the jacket: a shell over the barrel and the shoulders, 1.5 cm proud of it
-    // on every axis except the front, where it stops short so the animal's own
-    // chest is what the collar opens onto
-    capyAddPart(o.body, capyGeoBlob, mTux, 0, 0.455, -0.075, 0.335, 0.268, 0.395);
-    // ...and the skirt of it over the rump. Deliberately SHORTER than the rump:
-    // a jacket that reaches the tail is a horse blanket.
-    capyAddPart(o.body, capyGeoBlob, mTux, 0, 0.430, -0.375, 0.300, 0.252, 0.150);
-    for (let s = -1; s <= 1; s += 2) {
-      const lapel = capyAddPart(o.body, capyGeoBox, mSatin, s * 0.150, 0.455, 0.290,
-                                0.075, 0.235, 0.065);
-      lapel.rotation.z = s * 0.20;
-      const shoulder = capyAddPart(o.body, capyGeoBox, mSatin, s * 0.270, 0.505, 0.115,
-                                   0.065, 0.075, 0.30);
-      shoulder.rotation.z = s * -0.30;
-    }
+    // the jacket: a shell over the body, 1.5 cm proud of it on every axis
+    // except the front, where it stops short so the animal's own chest is what
+    // the collar opens onto — and except underneath, where it is raised 3.2 cm,
+    // because a jacket that wraps the belly is a onesie.
+    //
+    // IT IS THE HULL'S OWN SHAPE (R2), inflated. It was an ellipsoid fitted by
+    // hand to the barrel, and an ellipsoid peaks in the middle where this animal
+    // now peaks over the hips: the hull came 11 cm through the back of it. A
+    // shell cut from the body's own table cannot go out of date that way.
+    capyHullPart(o.body, mTux, capyHullFit(0.30, -0.30), 0.015, 0.015, 0.032);
+    // ...and the skirt of it over the rump, standing proud of the jacket so the
+    // step reads. Deliberately SHORT of the tail: a jacket that reaches it is a
+    // horse blanket.
+    capyHullPart(o.body, mTux, capyHullFit(-0.26, -0.52), 0.030, 0.028, 0.055);
+    // THE LAPELS MOVED UP 18 cm, AND HAD TO (R2). They sat at y 0.455, which
+    // was 2.6 cm proud of the old barrel and clear of the old jacket ellipsoid
+    // entirely — the collar hanging in the opening. The hull is 11 cm taller at
+    // the shoulder than the barrel was, on purpose, so both lapels ended up
+    // INSIDE the animal: measured at 6 and 0 changed pixels across six bearings
+    // (qa/wear-parts.js). That probe is the only reason this was caught; a
+    // costume that is drawn and invisible costs exactly what a visible one does.
+    // ...AND THEN THEY BECAME ONE COLLAR (R6), which is the same lesson Rio
+    // already wrote down: "a RING round the base of the skull, not two slabs on
+    // the shoulders: the first version was a pair of boxes and from three-
+    // quarter front they read as one gold shard sticking out of the animal side".
+    // Four satin boxes on a black jacket read as four pale FLECKS, and the
+    // render is the only place that shows it - qa/wear-parts.js says all four
+    // are drawing, which is a different question from whether they read.
+    //
+    // One annulus with the front left open, so the collar opens onto the chest
+    // the way the shell below already stops short for. Tilted so it follows the
+    // shoulder line: a horizontal ring on an animal whose back rises toward the
+    // hips is buried at the back and floating at the front.
+    const COLLAR_GAP = 1.30;
+    const collar = new THREE.Mesh(
+      capyBandGeo(0.168, 0.272, 0.055, 8,
+                  Math.PI * 0.5 + COLLAR_GAP * 0.5,
+                  Math.PI * 0.5 - COLLAR_GAP * 0.5 + Math.PI * 2), mSatin);
+    collar.position.set(0, 0.688, 0.165);
+    collar.rotation.x = -Math.PI * 0.5 - 0.26;
+    collar.castShadow = true;
+    o.body.add(collar);
     // a pocket square, because a capybara in a dinner jacket is a joke and a
     // joke needs a detail nobody asked for
-    capyAddPart(o.body, capyGeoBox, mShirt, 0.268, 0.500, 0.020, 0.050, 0.028, 0.012);
+    capyAddPart(o.body, capyGeoBox, mShirt, 0.290, 0.648, 0.020, 0.050, 0.028, 0.012);
     // the wing collar: a BAND and not a bib — it exists so the black bow in
     // front of it has something to be black against
     capyAddPart(o.head, capyGeoBox, mShirt, 0, -0.248, 0.342, 0.160, 0.052, 0.092);
@@ -2548,8 +3505,9 @@ export function createCapybara(game) {
 
   // ---- ch17 · ANTARCTICA · the expedition hood -----------------------------
   // Run with the pod, and the bottom of the world lends you a coat. The RUFF is
-  // the whole costume — eleven beads on a ring around the face opening, which
-  // is the one shape that says parka from any angle including behind, and the
+  // the whole costume — a band round the face opening with four beads on it
+  // (R6; it was eleven beads and no band), which is the one shape that says
+  // parka from any angle including behind, and the
   // only piece of the wardrobe that frames the animal's face rather than
   // covering part of it.
   {
@@ -2557,20 +3515,41 @@ export function createCapybara(game) {
     const mPkDk = mat(PALETTE.capyParkaDk);
     const mFur = mat(PALETTE.capyFur);
     const o = capyCostume('parka');
-    capyAddPart(o.body, capyGeoBlob, mPk, 0, 0.455, -0.090, 0.338, 0.270, 0.390);
-    capyAddPart(o.body, capyGeoBlob, mPk, 0, 0.430, -0.380, 0.302, 0.254, 0.155);
-    capyAddPart(o.body, capyGeoBox, mPkDk, 0, 0.470, 0.010, 0.560, 0.070, 0.240);
+    // Same two shells as the dinner jacket and 3 mm fatter, because a parka is
+    // a parka. Cut from the hull's table for the same reason. See THE HULL.
+    capyHullPart(o.body, mPk, capyHullFit(0.30, -0.30), 0.018, 0.018, 0.030);
+    capyHullPart(o.body, mPk, capyHullFit(-0.26, -0.52), 0.033, 0.031, 0.055);
+    // the yoke seam across the shoulders. It is 3 cm PROUD of the parka rather
+    // than 0.560 wide and inside it, which is what it was: a 56 cm bar on a
+    // 67 cm shell, buried, drawn in every Antarctic frame and visible in none.
+    capyAddPart(o.body, capyGeoBox, mPkDk, 0, 0.706, 0.010, 0.400, 0.050, 0.210);
     // the hood shell, behind and over the skull
     capyAddPart(o.head, capyGeoBlob, mPk, 0, 0.040, -0.120, 0.250, 0.245, 0.230);
     // ...and the ruff, on a ring about the face. SYMMETRIC, with the gap at the
     // bottom where the jaw is: an arc that simply stops after 86% of a circle
     // leaves a bald quarter on one side and the hood looks knocked askew.
+    //
+    // IT IS ONE BAND NOW (R6). It was eleven beads laid round that arc, which
+    // is ELEVEN DRAW CALLS and 396 triangles to say "there is fur round the
+    // hood"; the band says it in one call and 68, over exactly the same arc,
+    // at the same radius, keeping the same gap. The two beads that remain are
+    // its cut ends, where a real ruff bunches because that is where it stops.
     const GAP = 0.95;                       // radians of ring left open, at the jaw
-    for (let i = 0; i < 11; i++) {
-      const a = -Math.PI * 0.5 + GAP * 0.5 + (i / 10) * (Math.PI * 2 - GAP);
+    const A0 = -Math.PI * 0.5 + GAP * 0.5, A1 = A0 + (Math.PI * 2 - GAP);
+    const ruff = new THREE.Mesh(capyBandGeo(0.207, 0.269, 0.075, 8, A0, A1), mFur);
+    ruff.position.set(0, 0.040, 0.090);
+    ruff.castShadow = true;
+    o.head.add(ruff);
+    // FOUR BEADS, NOT THE TWO THE HAND-OFF ASKED FOR, and the render is why.
+    // A band alone is a smooth rim and reads as moulded plastic; the eleven
+    // beads it replaced read as fur because their outline was LUMPY. Two at the
+    // cut ends leave the top of the arc smooth, which is the half of it the
+    // player sees. Four is five meshes against eleven and keeps the outline.
+    for (const k of [0, 0.30, 0.70, 1]) {
+      const a = A0 + (A1 - A0) * k;
       capyAddPart(o.head, capyGeoBead, mFur,
                   Math.cos(a) * 0.238, 0.040 + Math.sin(a) * 0.238, 0.090,
-                  0.062, 0.062, 0.070);
+                  0.076, 0.076, 0.082);
     }
   }
 
@@ -3087,6 +4066,47 @@ export function createCapybara(game) {
       capyShove.z = clamp(capyShove.z + dvz, -capySHOVE_MAX, capySHOVE_MAX);
     },
     /**
+     * THE COAT, COUNTED (R1). A test hook; nothing in the game calls it.
+     *
+     * The failure this exists for is silent in both directions. A coat that
+     * never ran is an animal that looks exactly like the one before it, and a
+     * mesh that took `vertexColors` without an attribute renders BLACK — so
+     * `painted` (how many meshes carry a coat) and `bare` (how many wear a fur
+     * material and do NOT) are the two halves of the same question. `bare`
+     * must be 0. `range` is the darkest and palest multiplier actually written,
+     * which is what tells a probe the gradient has a span rather than being one
+     * flat number applied everywhere.
+     */
+    coatAudit: function () {
+      let painted = 0, bare = 0, lo = 9, hi = 0;
+      capyModel.traverse(function (o) {
+        if (!o.isMesh || !o.geometry || !capyFurMats.has(o.material)) return;
+        const c = o.geometry.attributes.color;
+        if (!c) { bare++; return; }
+        painted++;
+        for (let i = 0; i < c.count; i++) {
+          const v = (c.getX(i) + c.getY(i) + c.getZ(i)) / 3;
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
+      });
+      // THE SOAK'S HALF OF IT, which no picture of a dry animal can show. The
+      // swap sets `mesh.material` and never touches the geometry, so the coat
+      // survives getting wet if and ONLY if every twin also carries
+      // `vertexColors` — and a twin without it would not merely lose the
+      // gradient, it would ignore an attribute the mesh is still handing it.
+      // Reported per material rather than sampled from one, because the pairing
+      // is the invariant.
+      const mats = [], rims = [];
+      for (const m of capyFurMats) {
+        mats.push(m.vertexColors === true);
+        rims.push(!!(m.userData && m.userData.capySelf));
+      }
+      return { painted, bare, built: capyCoated, range: [lo, hi],
+               vertexColors: mats.every(Boolean), selfRim: rims.every(Boolean),
+               mats: mats.length };
+    },
+    /**
      * EVERY NUMBER THE RIG IS POSED FROM, in one read. A test hook, like
      * forceHeat and faceAudit — nothing in the game calls it.
      *
@@ -3106,6 +4126,11 @@ export function createCapybara(game) {
                pop: capyPop, popVel: capyPopVel,
                lean: capyLean, leanTarget: capyLeanTgt, accel: capyAccelSm,
                land: capyLand, airPose: capyAirPose, earLag: capyEarLag,
+               // ---- R5 ----
+               // The three channels breath and weight added. Every one is a
+               // fraction of a centimetre in a still and none of them can be
+               // read off a screenshot: see qa/r5-body.js.
+               breath: capyBreath, tail: capyTail, headNod: capyHeadNod,
                grounded: capy.grounded, vy: body.velocity.y,
                // ---- D8 ----
                // The five channels area 2's second half added, and every one of
@@ -3235,6 +4260,7 @@ export function createCapybara(game) {
     capyPopVel = 9;
     capyWheekHold = 0.42;
     capyEarFlick = 1;
+    capyTailFlick = 1;
     // the shockwave, on the ground, right here
     capyWheekRing = 1;
     capyWheekX = capyPosition.x;
@@ -5443,6 +6469,27 @@ export function createCapybara(game) {
       }
     }
 
+    // ---- THE LOAF SITS ON ITS HOCKS (R4) ---------------------------------
+    // Two terms that belong to the loaf and to nothing else, written HERE and
+    // not inside the pose branches above for the reason those branches exist:
+    // the legs are drawn by five writers (gait, air, loaf, climb, and whatever
+    // is carrying the animal) and a loaf-only term repeated in each of them is
+    // five chances to forget one. Both are cross-faded on `capyLoaf`, so at
+    // rest they are the whole pose and everywhere else they are exactly zero.
+    for (let i = 0; i < 4; i++) {
+      // THE Z TUCK. The rear hips walk forward as the animal settles, which is
+      // what puts the feet under the edge of the rump instead of off the back
+      // of it. Fronts do not move: they are already out in front, which is
+      // where a loafing capybara puts them.
+      legs[i].position.z = legZ[i] + (i < 2 ? 0 : capyLOAF_TUCK_Z * capyLoaf);
+      // THE ANKLE, and it is not optional now that the foot has toes cut into
+      // it. A leg folded to 1.14 rad with the foot rigid to it is an animal
+      // standing on its heel with its toes in the air. The foot takes the
+      // leg's own loaf rotation straight back off, so the sole stays flat on
+      // the ground through the whole fold — which is what an ankle is.
+      feet[i].rotation.x = -legs[i].rotation.x * capyLoaf;
+    }
+
     // squash & stretch spring — stiff and under-damped, so a wheek is a sharp
     // pop with an elastic overshoot instead of a gentle swell.
     //
@@ -5492,6 +6539,14 @@ export function createCapybara(game) {
       capyLand += capyLandVel * sprH;
       if (capyLand < -0.30) { capyLand = -0.30; if (capyLandVel < 0) capyLandVel = 0; }
     }
+    // ...and the HEAD SETTLES AFTER IT (R5). A damped follower of the absorb,
+    // not a second trigger on the landing, so it peaks after the spring has
+    // bottomed out rather than with it. capyLand is negative going down and
+    // head.rotation.x is positive nose-down, hence the sign: the body drops,
+    // and a moment later the head does.
+    capyHeadNod = damp(capyHeadNod,
+                       clamp(-capyLand * capyNOD_K, -capyNOD_MAX, capyNOD_MAX),
+                       capyNOD_LAM, dt);
     // ...and the slide, which is the animal getting DOWN. Model only, like the
     // landing spring above it and for the same reason: the collider is three
     // spheres and a shorter capybara would fall through eighteen chapters of
@@ -5715,22 +6770,51 @@ export function createCapybara(game) {
     // would make getting onto a wall take a second and a half.
     capyModel.rotation.x = capyLean + capyPosePitch - capySLIDE_TILT * capySlideW
                            - capyCLIMB_PITCH * capyClimbPose;
-    const sqY = 1 + capyPop * 0.38;
-    const sqXZ = 1 - capyPop * 0.19;
+    // ---- THE BREATH (R5), and it is the FOURTH TERM IN THIS WRITER --------
+    // ON ITS OWN PHASE, not on `t`, because the rate changes three ways (idle
+    // act 4 slows it, the loaf slows it further, and both can be part way in):
+    // sin(t * rate) with a moving rate is a phase jump the size of the elapsed
+    // session, and integrating the rate is continuous by construction.
+    //
+    // The weight is what the hand-off asked for and it replaces a step with a
+    // ramp. It was `moving ? 0 : 1`, a binary on a 0.35 m/s threshold; it is
+    // now zero in the air (capyAirPose) and faded out over the first stride,
+    // so an animal creeping up on a picnic still breathes.
+    capyBreathAmt = damp(capyBreathAmt,
+                         clamp(1 - gaitSpeed / capyBREATH_STILL, 0, 1), 4, dt);
+    // ...and the AIR GATE MULTIPLIES, it does not go through that filter. Put
+    // inside it, the breath is still 36% alive at the top of a hop (measured:
+    // -0.0036 against a resting 0.010), because lambda 4 is a quarter-second
+    // time constant and a hop is shorter than that. capyAirPose is ALREADY a
+    // damped channel, at 13, so this is still a cross-fade and not a step.
+    const restW = capyBreathAmt * (1 - capyAirPose);
+    capyBreathPh += lerp(capyBREATH_HZ, capyBREATH_HZ_LOAF, capyLoaf) *
+                    (1 - capyIdleBreath * 0.44) * Math.PI * 2 * dt;
+    if (capyBreathPh > Math.PI * 2) capyBreathPh -= Math.PI * 2;
+    // Deeper when it has sat down, and deeper again on idle act 4, which is
+    // the only readout the stamina system has. Both were already true; the
+    // numbers are the hand-off's.
+    capyBreath = Math.sin(capyBreathPh) * restW *
+                 lerp(capyBREATH_Y, capyBREATH_Y_LOAF, capyLoaf) *
+                 (1 + capyIdleBreath);
+    // x and z share one number here because the squash does: `set(sqXZ, sqY,
+    // sqXZ)` is one term for both, and 0.6% of fore-and-aft on a body that is
+    // rising 1% is not something a person can see. Splitting them would cost a
+    // second scale channel to say nothing.
+    const sqY = 1 + capyPop * 0.38 + capyBreath;
+    const sqXZ = 1 - capyPop * 0.19 + capyBreath * (capyBREATH_X / capyBREATH_Y);
     capySquash.scale.set(sqXZ, sqY, sqXZ);
 
-    // idle breathing on the barrel only — cross-faded so it never pops.
-    // ON ITS OWN PHASE, not on `t`, because idle act 4 SLOWS IT: sin(t * rate)
-    // with a rate that changes is a phase jump the size of the elapsed session,
-    // and integrating the rate instead is continuous by construction. With
-    // capyIdleBreath at zero this is 1.7 rad/s and 0.02 of amplitude, which is
-    // what it always was, offset by a constant nobody can see.
-    capyBreathAmt = damp(capyBreathAmt, moving ? 0 : 1, 4, dt);
-    capyBreathPh += (1.7 - capyIdleBreath * 0.75) * dt;
-    if (capyBreathPh > Math.PI * 2) capyBreathPh -= Math.PI * 2;
-    const breath = Math.sin(capyBreathPh) * (0.02 + capyIdleBreath * 0.020) * capyBreathAmt;
-    barrel.scale.set(0.32 + breath * 0.4, 0.26 + breath * 0.7, 0.42);
-
+    // ---- THE TAIL (R5) ---------------------------------------------------
+    // It had no writer at all. A sway on the same rest weight the breath uses,
+    // so the two agree about what resting is, and a flick on the wheek that
+    // decays on its own. 0.25 rad on a 3.9 cm arm is 1 cm of nub: this reads at
+    // arm's length and nowhere else, which is the honest size of a capybara's
+    // tail and the reason it is two lines rather than a rig.
+    capyTailFlick = damp(capyTailFlick, 0, capyTAIL_LAM, dt);
+    capyTail = Math.sin(t * capyTAIL_HZ * Math.PI * 2) * capyTAIL_SWAY * restW
+               + capyTailFlick * capyTAIL_KICK;
+    tailPivot.rotation.x = capyTail;
     // head: dips to grab / dig, tips up to wheek
     let headTarget = 0;
     if (carried) headTarget = -0.3;
@@ -5767,7 +6851,9 @@ export function createCapybara(game) {
     capyGazeYaw = damp(capyGazeYaw, capyGazeWantY, capyGAZE_LAMBDA, dt);
     capyGazePitch = damp(capyGazePitch, capyGazeWantP, capyGAZE_LAMBDA, dt);
     // ADDED to the pose, never in place of it — see the gaze block up top.
-    head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch;
+    // ...plus the landing settle (R5), which is the fourth term on this line
+    // and the only one that is not a want: it is what the body just did.
+    head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod;
     head.rotation.z = clamp(-capyYawRate * 0.05, -0.2, 0.2);
     // the look-around (see the idle beat) plus whatever is worth looking at.
     // Nothing else writes the head's yaw, and the mouth anchor is derived from
@@ -5860,7 +6946,11 @@ export function createCapybara(game) {
     }
     // a half-sine, so it swells and settles instead of popping and easing
     const sn = capySniff > 0 ? Math.sin(capySniff * Math.PI) : 0;
-    nosePad.scale.set(1 + sn * 0.16, 1 + sn * 0.16, 0.30 + sn * 0.10);
+    // The pad's pivot is inside the muzzle now (R3), so the z term is a much
+    // smaller number for the same motion: the old 0.30 -> 0.40 on a 6.4 cm half
+    // depth pushed the nose forward 6 mm, and 0.036 about a pivot 17 cm behind
+    // the pad's face is the same 6 mm.
+    nosePad.scale.set(1 + sn * 0.16, 1 + sn * 0.16, 1 + sn * 0.036);
     // ...and the whiskers come forward with it. Two terms: the sniff, and a
     // slow drift that runs all the time so they never look welded on.
     const wDrift = Math.sin(t * 1.7) * 0.05;
