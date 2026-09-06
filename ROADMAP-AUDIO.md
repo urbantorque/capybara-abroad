@@ -3,9 +3,10 @@
 > **CLOSED, 7 Sep 2026.** All six items are built, across three commits:
 > `5c010c5` (A1 the mover, A2 for movers), `3ec97d6` (A1 the rest, A2 for
 > one-shots, A3 the flock) and `33795ba` (A4 the arrival phrase, A5 the sky,
-> A6 the second voice). See CONTRACT.md for what each one measured, and for
-> the two things that are wired but unproven: the Freshwater's levels and the
-> rain half of A5.
+> A6 the second voice). See CONTRACT.md for what each one measured. The two
+> things left wired-but-unproven at close — the Freshwater's levels and the rain
+> half of A5 — were both measured on 7 Sep and both came out right; in each case
+> the earlier zero was the probe's own doing, not the code's.
 
 6 Sep 2026. Written from the audio director's chair after the character pass
 landed (`ee4a0b2`). Scope: the score, the effects, the ambience ladder, the

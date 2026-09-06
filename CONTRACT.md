@@ -91,12 +91,26 @@ other twenty passed, which is exactly the shape of error that survives a listen.
 class, so all twenty-one can be swept in a few hundred milliseconds rather than
 four minutes of chapter switching.
 
-**NOT PROVEN: THE RAIN HALF OF A5.** `bed().rain` read 0.000 in all five sampled
-chapters even with `weather.set` forcing `odds: 1` and an eleven-second wait, so
-the filter and pad terms are wired and were never observed above zero. The cloud
-term is measured, and it is read out of the same object on the same frame in the
-same block — but that is an argument, not a measurement, and it is recorded here
-as one.
+**THE RAIN HALF OF A5 — PROVEN 7 SEP, AND THE PROBE WAS THE BUG.** It was
+recorded here as never observed above zero: `bed().rain` read 0.000 in all five
+sampled chapters even with `weather.set` forcing `odds: 1`. **The rain path was
+never dead — `hold: 90` was.** `wxEnvelope`'s `rise` is 0.22 of the WHOLE hold,
+so a ninety-second shower has a twenty-second attack, and the probe glanced at it
+four seconds in and read a zero it had built itself. Re-run with `hold: 14` and a
+sampler instead of a glance (`qa/rain.js`), the whole term resolves exactly:
+
+| chapter | cloud | `skyVel` | `1 − 0.08·cloud` | `skyRain` | `skyCut` | `180·rain` |
+|---|---|---|---|---|---|---|
+| Sydney | 0.487 | **0.9611** | 0.9610 | 0.278 | **50.0** | 50.0 |
+| Kyoto | 0.371 | **0.9703** | 0.9703 | 0.389 | **70.0** | 70.0 |
+| Kowloon | 0.041 | **0.9967** | 0.9967 | 0.486 | **87.5** | 87.5 |
+
+...and the trace has the envelope's own shape — a three-second rise, an
+eleven-second decay, a one-second gap, then a second shower. **A5 is measured on
+both halves.** The general lesson is the one `qa/wx-fuzz.js` already paid for
+once and this paid for again from the other end: forcing a stochastic system on
+is only half of it — **the forcing parameters are part of the experiment**, and a
+long hold is a slow attack.
 
 ## THE SOUND PASS — THE REST OF THE WORLD, AND THE FLOCK (S1b + S2 — 6 Sep 2026)
 
@@ -189,10 +203,32 @@ untouched.
 | the budget | Hanoi 4 live of 4; every other chapter 1–3 |
 | `npm test` | 10/10 |
 
-**ONE THING THE PROBE COULD NOT SEE.** The Freshwater was 321 m away for the
-whole of its sample, which is past her own 260 m `far`, so she is correctly
-silent and **has never actually been heard under test**. The mechanism is
-proven by the other eight; her levels are not.
+**ONE THING THE PROBE COULD NOT SEE — SINCE MEASURED, 7 SEP.** The Freshwater was
+321 m away for the whole of that sample, past her own 260 m `far`, so she was
+correctly silent and her levels had never been heard. `qa/freshwater.js` stands
+the ear off at a ladder of ranges and `qa/freshwater3.js` waits until she is
+underway and parks 200 m up her own track. Both halves come out right:
+
+| range | 298 | 239 | 161 | 99 | 60 | 30 | 16 | 11 |
+|---|---|---|---|---|---|---|---|---|
+| `gain` | **0** | 0.015 | 0.047 | 0.070 | 0.103 | 0.156 | 0.211 | **0.220** |
+
+Zero outside the far plane, monotonic inside it, and peaking at 0.22 — a
+four-hundred-tonne ferry at eleven metres, and quieter than a footstep at one.
+The Doppler is right in all three regimes and it is right in MAGNITUDE, not just
+in sign: underway at 8.32 m/s she reads **1.0256** closing and **0.9756** leaving,
+against 343/(343∓8.32) = 1.0249 / 0.9763. **And she reads exactly 1.0000 while
+she sits at the wharf**, which is the part worth having — it says the term is
+driven by real relative velocity and not by a proxy for "is a vehicle nearby".
+At ferry speed that is 2.6% of a semitone-and-a-half, well inside the ±12% clamp,
+which is the intended size: audible as movement, never as a pitch change.
+
+**AND A TRAP IN PROBING HER SPECIFICALLY, WHICH TOOK TWO GOES.** She is on a route
+with STOPS. Deriving her heading from one short sample catches her dwelling at a
+wharf perhaps a third of the time, hands back speed 0 and a fallback bearing, and
+parks the ear two hundred metres up a track she was never on — which produces a
+clean, plausible, entirely wrong flyby with no approach in it. Poll until
+`speed > 2` before deciding where to stand.
 
 **AND A HARNESS TRAP THAT COST A RUN.** `biome.switchTo` does not reload
 modules, so a page opened before an edit reports every new mover as missing —
