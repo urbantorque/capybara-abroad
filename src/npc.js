@@ -499,6 +499,15 @@ const npcCHECK_R = 1.45;      // generous enough that contact actually happens
 const npcFLUSTER_R = 6.0;     // inside this, a drink-carrier dithers, never sprints
 const npcDRINK = { coffee: 1, icecream: 1 };
 // Speech bubbles at the closer (~9.5) camera.
+// How far away somebody can be and still be READ OUT when their bubble is off
+// the frame (F4). Twenty-five metres: the same order as the ambience ring, and
+// well inside the ninety the crowd is drawn at, so it is "somebody the camera
+// swung past" and not "every conversation in the chapter, as text".
+const npcSAY_HEAR = 25;
+// ...and no more than one of them every this many seconds. See the measurement
+// in updateBubbles: without a fence it is twenty-six pills in twenty seconds.
+const npcSAY_HEAR_GAP = 9;
+let npcHeardT = 0;
 const npcBUB_AVOID_X = 0.20;  // NDC half-width of the capybara's no-fly zone
 const npcBUB_AVOID_Y = 0.34;
 // ---- ...AND THE PAPER IS ALSO IN THE WAY (v34) --------------------------
@@ -1065,6 +1074,7 @@ export function createNPCs(game) {
     slot.owner = npcRec;
     slot.t = 0;
     slot.ox = 0;
+    slot.said = false;              // this line has not been read out yet (F4)
     slot.life = 1.7 + text.length * 0.05;
     // ---- ...AND THEIR ARM KNOWS ABOUT IT (D8) ----------------------------
     // Every local in the game gestures while they speak and not one of the
@@ -9015,6 +9025,7 @@ export function createNPCs(game) {
   let npcBubPanelT = 0;
 
   function updateBubbles(dt) {
+    if (npcHeardT > 0) npcHeardT -= dt;
     npcBubPanelT -= dt;
     if (npcBubPanelT <= 0) {
       npcBubPanelT = npcBUB_PANEL_T;
@@ -9109,7 +9120,46 @@ export function createNPCs(game) {
         b.el.style.transform = 'translate(-50%,-100%) scale(' + sc.toFixed(3) + ')';
         b.el.style.opacity = a;
         if (!b.shown) { b.el.style.display = 'block'; b.shown = true; }
-      } else if (b.shown) { b.el.style.display = 'none'; b.shown = false; }
+      } else {
+        // ---- SAID BEHIND YOU (F4) ---------------------------------------
+        // A bubble whose speaker is off the frame is DISPLAY:NONE and always
+        // was — which is right, a caption pinned to the edge of the screen for
+        // somebody you cannot see is worse than nothing. But the line is still
+        // gone, and this is the channel the game uses to say that somebody
+        // noticed you: a gardener shouting at your back while you run away is
+        // exactly the sentence most worth hearing, and it was the one most
+        // reliably lost.
+        //
+        // WITHIN npcSAY_HEAR METRES ONLY. The point is a person you could
+        // plausibly hear — somebody the camera happens to have swung past — and
+        // not every conversation in the chapter arriving as text. Twenty-five
+        // metres is the same order as the ambience ring and well inside the
+        // 90 m the crowd is drawn at.
+        //
+        // ONCE PER LINE, on the frame it turns up, latched on the slot: this
+        // runs every frame the speaker is off-screen and a toast a frame would
+        // be a wall of paper. At `note` weight, which is the quiet pill — it is
+        // not news, it is something you would have read if you had been looking.
+        // ---- AND IT IS ON A LONG FENCE (F4) -----------------------------
+        // MEASURED, standing in the middle of Sydney's crowd: TWENTY-SIX lines
+        // routed to the toast in twenty seconds. Which is the feature working
+        // exactly as written and completely unusable — more than one a second,
+        // a wall of paper, and the note weight makes it quieter rather than
+        // rarer. In a crowd most speakers are off-frame most of the time; that
+        // is not a bug in the test, it is the normal case.
+        //
+        // So it is not "every line you could have heard", it is "once in a
+        // while, something behind you" — one every npcSAY_HEAR_GAP seconds,
+        // whoever gets there first. A shout at your back is worth a pill; the
+        // fourth remark about the price of coffee is not.
+        if (!b.said && b.t < 0.5 && dist < npcSAY_HEAR && npcHeardT <= 0 &&
+            game.hud && typeof game.hud.say === 'function') {
+          b.said = true;
+          npcHeardT = npcSAY_HEAR_GAP;
+          try { game.hud.say(b.el.textContent); } catch (e) { /* never fatal */ }
+        }
+        if (b.shown) { b.el.style.display = 'none'; b.shown = false; }
+      }
       if (b.t >= b.life) {
         b.owner = null;
         b.el.style.display = 'none';

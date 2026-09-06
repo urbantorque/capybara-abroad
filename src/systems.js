@@ -7592,6 +7592,7 @@ function sysBuildCSS() {
    nothing on it may be a 20 px target in a row of four. */
 '.capyui-pausemenu{display:flex;flex-direction:column;gap:6px;',
   'margin-top:clamp(11px,2.2vw,16px);}',
+'.capyui-pausebtn[hidden]{display:none;}',
 '.capyui-pausebtn{display:block;width:100%;border:1px solid ' + rule + ';border-radius:' + rMd + ';',
   'padding:clamp(8px,1.7vw,11px) 13px;background:none;font:inherit;cursor:pointer;',
   'font-size:clamp(11px,2vw,12.5px);color:' + ink + ';font-weight:700;text-align:left;',
@@ -16944,7 +16945,8 @@ export function createSystems(game) {
   pauseCard.setAttribute('aria-modal', 'true');
   pauseCard.setAttribute('aria-label', 'Paused');
   pauseCard.tabIndex = -1;
-  pauseCard.appendChild(sysEl('h2', null, 'Paused'));
+  const pauseHead = sysEl('h2', null, 'Paused');
+  pauseCard.appendChild(pauseHead);
   const pauseSub = sysEl('div', 'capyui-pausesub', '');
   pauseCard.appendChild(pauseSub);
 
@@ -16962,7 +16964,7 @@ export function createSystems(game) {
   }
   const pauseGo = pauseBtn('go', 'resume', function () { pauseHide(); });
   const pauseSetBtn = pauseBtn('', 'settings', function () { pauseSetToggle(); });
-  pauseBtn('', 'the journey so far', function () {
+  const pauseJrBtn = pauseBtn('', 'the journey so far', function () {
     // Same order as the journal's own ledger button, and for the same reason
     // (see the note there): capture the focused control BEFORE anything blurs
     // it, or a keyboard player who opens the board from here and closes it
@@ -17206,12 +17208,15 @@ export function createSystems(game) {
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
     'kept on this machine, not in the journey.'));
   pauseCard.appendChild(pauseSet);
-  pauseCard.appendChild(sysEl('div', 'capyui-pausefoot',
-    sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card')));
+  const pauseFoot = sysEl('div', 'capyui-pausefoot',
+    sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card'));
+  pauseCard.appendChild(pauseFoot);
   pauseEl.appendChild(pauseCard);
   pauseEl.inert = true;
   hudRoot.appendChild(pauseEl);
   let pauseShown = false, pauseReturnFocus = null;
+  // Opened from the title card rather than from a journey (F4). See pauseShow.
+  let pausePre = false;
 
   /**
    * PUT THE CALM SWITCH ON THE DOCUMENT.
@@ -17287,22 +17292,63 @@ export function createSystems(game) {
     pauseCalmBox.checked = calmOn();
   }
 
-  function pauseShow() {
+  /**
+   * OPEN THE CARD.  is true when the game has not started (F4).
+   *
+   * ---- SETTINGS BEFORE YOU PLAY ----------------------------------------
+   * This card is where the volume, the calm switch and now the lens and the
+   * type live, and it was reachable only from inside a running journey — so a
+   * player who wanted the sound down, larger text or a slower camera had to
+   * start the game, be dropped into Sydney, and change it there. The one
+   * screen where somebody is deciding whether to play at all was the one
+   * screen with no settings on it.
+   *
+   * The same card, in a smaller state: three of the four buttons are about a
+   * journey that does not exist yet, so RESUME becomes BACK and the other two
+   * are hidden. The settings block opens with it, because settings are the
+   * only reason to be here.
+   */
+  function pauseShow(pre) {
     if (pauseShown) return;
     pauseShown = true;
+    pausePre = !!pre;
+    pauseGo.textContent = pausePre ? 'back' : 'resume';
+    pauseHead.textContent = pausePre ? 'Settings' : 'Paused';
+    // ...and the footer names the button that is actually there: BACK, not
+    // RESUME, because there is nothing yet to resume.
+    pauseFoot.textContent = pausePre
+      ? sysScheme('esc to go back', 'tap BACK, or anywhere outside the card')
+      : sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card');
+    pauseCard.setAttribute('aria-label', pausePre ? 'Settings' : 'Paused');
+    pauseJrBtn.hidden = pausePre;
+    pauseQuitBtn.hidden = pausePre;
+    if (pausePre && !pauseSetOpen) pauseSetToggle();
     // WHERE AM I AND HOW LONG HAVE I BEEN HERE. The two questions a pause card
     // is opened with, and the clock is frozen at the moment of opening because
     // the world is: a counter running behind a paused game is the one thing on
     // this card that could be actively wrong.
-    const d = game.biome ? chapterDef(chapterOf(game.biome.current)) : null;
-    const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
-    pauseSub.textContent = (d ? d.name : '') + '  ·  ' + sysFmtTime(total);
+    if (pausePre) {
+      // No place and no clock: neither exists yet, and a card that says
+      // 'SYDNEY · 0:00' before a journey has begun is stating something false
+      // about a save the player has not made.
+      pauseSub.textContent = 'before you set off';
+    } else {
+      const d = game.biome ? chapterDef(chapterOf(game.biome.current)) : null;
+      const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+      pauseSub.textContent = (d ? d.name : '') + '  ·  ' + sysFmtTime(total);
+    }
     pauseAskShut();
     pauseSync();
     pauseEl.inert = false;
     pauseEl.classList.add('show');
     uiSfx('open');
-    game.state.paused = true;
+    // ---- ...BUT A CARD OPENED BEFORE THE GAME DOES NOT PAUSE IT (F4) ----
+    // MEASURED: this line ran for the pre-start card too, and     // correctly refused to clear a pause it had not set — so opening the
+    // settings from the title and closing them again left  true,
+    // and the game then STARTED paused. The title screen has a live world
+    // behind it and owns whether it is running; this card is a sheet of paper
+    // over it, not a pause.
+    if (!pausePre) game.state.paused = true;
     musDuck(true);
     pauseReturnFocus = document.activeElement;
     try { pauseGo.focus(); } catch (e) {}
@@ -17332,7 +17378,11 @@ export function createSystems(game) {
     pauseReturnFocus = null;
     // The same clause the other three modals use: this card is not the only
     // thing that can be holding the world still.
-    if (!document.hidden && !jrShown && !ledShown && !albShown) game.state.paused = false;
+    // ...and a card opened before the game began leaves  exactly as it
+    // was: nothing was running to un-pause, and clearing it here would be this
+    // card telling the title screen that a journey is live (F4).
+    if (!pausePre && !document.hidden && !jrShown && !ledShown && !albShown) game.state.paused = false;
+    pausePre = false;
   }
   function pauseToggle() { if (pauseShown) pauseHide(); else pauseShow(); }
   // A press on the veil is a press on "not the card", which is resume. The
@@ -24096,7 +24146,14 @@ export function createSystems(game) {
     if (started) audioUnlock(); else titleAudio();
     const c = e.code;
     if (c === 'Space' || c === 'ArrowUp' || c === 'ArrowDown' || c === 'ArrowLeft' || c === 'ArrowRight') e.preventDefault();
-    if (!started) {
+    // ---- AND THE CARD OWNS THE KEYBOARD WHENEVER IT IS UP (F4) --------
+    //  is reachable from the title now, so this branch can no
+    // longer assume "not started" means "the title card has the keyboard": a
+    // digit pressed behind an open settings card would start a chapter under
+    // it. Falling through to the  block below rather than
+    // returning here is the point — that block is what wraps Tab inside the
+    // card and what closes it on Escape, and the pre-start card wants both.
+    if (!started && !pauseShown) {
       // ENTER AND SPACE BELONG TO WHATEVER IS FOCUSED, IF ANYTHING IS.
       // The chapter buttons are real buttons, so the browser turns Enter and
       // Space on a focused one into a click — and the two reflex shortcuts
@@ -24126,7 +24183,15 @@ export function createSystems(game) {
       // every player already tries when a screen has gone somewhere they did
       // not mean, and it did nothing at all on this card until now.
       if (c === 'Escape') {
-        if (titlePageN === 2) { e.preventDefault(); titlePage(1); }
+        e.preventDefault();
+        // Back out of the innermost thing first, which is the same rule the
+        // pause card follows in play: page two goes back to page one, and on
+        // page one there is nothing left to back out of — so it opens the
+        // settings (F4). The first cut of this put the new branch further down
+        // the handler and it was UNREACHABLE, because this one already
+        // returns; the probe caught it as a card that never appeared.
+        if (titlePageN === 2) { titlePage(1); return; }
+        pauseShow(true);
         return;
       }
       if (titlePageN === 1 && (c === 'ArrowRight' || c === 'ArrowDown')) {
@@ -24677,9 +24742,16 @@ export function createSystems(game) {
     e.preventDefault();
     e.stopPropagation();
     menuOff();
-    // The same rule the stick and the fan follow: before the game has started,
-    // anything you touch carries on rather than starting over. See startResume.
-    if (!started) { startResume(); return; }
+    // ---- ...EXCEPT THIS ONE, WHICH IS THE SETTINGS BUTTON (F4) --------
+    // The stick and the fan follow "before the game has started, anything you
+    // touch carries on rather than starting over" — and that was right for
+    // six of the seven controls and wrong for this one. MENU is the only
+    // control on the touch layer that MEANS settings, it is visible over the
+    // title card, and tapping it started the game. On a phone the card behind
+    // it is the only place the volume and the text size live, so the button
+    // that looks like a way in was the one that skipped it. The Begin button
+    // is still what begins.
+    if (!started) { pauseShow(true); return; }
     pauseToggle();
   });
   menuBtn.addEventListener('pointercancel', menuOff);
@@ -25061,7 +25133,11 @@ export function createSystems(game) {
       // and a pad player could not reach a volume, a calm switch or the title
       // from anywhere at all, because all four of those were keyboard letters.
       // The board is still one press away, on the card.
-      if (!started) { startResume(); }
+      // ...and before it starts, START opens the same card the keyboard's
+      // Escape now opens (F4): a pad player deciding whether to play had no
+      // way to a volume or a text size, which is exactly the complaint the
+      // comment above this one is about.
+      if (!started) { pauseShow(true); }
       else pauseToggle();
     }
     // BACK IS A TAP AND A HOLD (P2). The tap hides the paper, as it always
