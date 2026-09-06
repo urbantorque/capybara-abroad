@@ -11091,6 +11091,48 @@ export function createSystems(game) {
   const sysRUSH_MAX = 0.115;  // ...against the rain's 0.62 and the wind's 0.50
   const sysRUSH_F0  = 300;    // Hz at the floor
   const sysRUSH_F1  = 1500;   // ...and flat out
+  // ---- THE SIXTH VOICE: A BELLY ON THE GROUND (F3b) -----------------------
+  //
+  // The slide is the only verb in the game with a DURATION and no sustained
+  // sound of its own. F3 took the gallop off it — `capySliding` went into the
+  // footfall gate, because a slide that plays a four-beat trot is an animal
+  // running along on its back — and what that left behind was a verb you can
+  // hold down for three seconds that makes one noise at the start and then
+  // nothing. Silence is a worse answer than the wrong footstep: it reads as
+  // the slide having already ended.
+  //
+  // Same construction as the rush directly above, one layer nearer the
+  // ground: noise through a filter whose CUTOFF moves and whose level follows
+  // it. A scrape and air going past are the same physics — a broadband hiss
+  // shaped by what it is passing over — and the two are deliberately built
+  // the same way so that a fall out of a slide crossfades between them
+  // instead of stacking two unrelated ideas.
+  //
+  // ITS OWN GAIN NODE, for the third time in this file and the same reason.
+  let sysBedScrape = null, sysBedScrapeLP = null, sysScrapeNow = 0;
+  // The floor is capySLIDE_OUT (1.55): the speed at which the animal gets back
+  // up, so the scrape reaches zero exactly as the slide ends and there is no
+  // frame where a stationary capybara is scraping. The ceiling is a sprint
+  // plus capySLIDE_KICK, rounded up — downhill goes past it and clamps.
+  const sysSCR_V0   = 1.55;   // m/s
+  const sysSCR_V1   = 8.6;    // m/s
+  // AUTHORED AGAINST THE TABLE ABOVE, not against its own envelope (the R9
+  // trap). On this bus rain is 0.62 and the rush is 0.115; 0.40 through the
+  // bus ceiling of 0.19 is 0.076, which lands beside the 0.064 peak of the
+  // `rustle` this voice is continuing — the entry transient and the sustain
+  // are then one gesture rather than a bang followed by a different sound.
+  const sysSCR_MAX  = 0.40;
+  const sysSCR_TAU  = 0.055;  // s — a belly lands and leaves; it does not glide
+  // s off the ground before the belly counts as airborne. Deliberately well
+  // inside capySLIDE_AIR (0.45): a slide survives a kerb, but the SOUND of one
+  // should stop before the slide does, or a jump out of a lip scrapes in mid
+  // air. See the gate below for what reading `grounded` here measured as.
+  const sysSCR_AIR  = 0.12;
+  // Cutoff from the SURFACE first and the speed second, because that is the
+  // order of the two facts: sand and boardwalk are different sounds, and going
+  // faster over either of them is the same sound brighter. capySurfacePitch
+  // answers ~0.82 soft, 1.0 stone, 1.22 hollow timber.
+  const sysSCR_F_LO = 220, sysSCR_F_HI = 2600;
   let wxDripAt = 0;
   const sysWX_BED_MAX  = 0.19;   // ceiling on the whole bus, against a 0.85 master
   const sysWX_BED_TAU  = 0.85;   // seconds. Slow: weather does not step.
@@ -11182,6 +11224,21 @@ export function createSystems(game) {
     rusn.connect(sysBedRushBP); sysBedRushBP.connect(ruhp); ruhp.connect(sysBedRush);
     sysBedRush.connect(wxBedBus);
     rusn.start();
+
+    // ---- the scrape. See sysBedScrape. LOWPASS rather than the rush's
+    // bandpass, and with a little Q on it: air past an obstacle has a centre
+    // note, but a body dragging over a surface is everything under a ceiling
+    // — the ceiling being how coarse what you are on is. The high-pass keeps
+    // it out of the sub, which has a whole bus of its own.
+    sysBedScrape = ac.createGain(); sysBedScrape.gain.value = 0.0001;
+    const scn = noiseWideSrc();
+    sysBedScrapeLP = ac.createBiquadFilter();
+    sysBedScrapeLP.type = 'lowpass';
+    sysBedScrapeLP.frequency.value = sysSCR_F_LO; sysBedScrapeLP.Q.value = 1.15;
+    const schp = ac.createBiquadFilter(); schp.type = 'highpass'; schp.frequency.value = 120;
+    scn.connect(sysBedScrapeLP); sysBedScrapeLP.connect(schp); schp.connect(sysBedScrape);
+    sysBedScrape.connect(wxBedBus);
+    scn.start();
   }
 
   /** Drive the bed from weather.js's levels. Four gain writes and no more. */
@@ -11231,6 +11288,50 @@ export function createSystems(game) {
       sysBedRushBP.frequency.setTargetAtTime(sysRUSH_F0 + k * (sysRUSH_F1 - sysRUSH_F0),
                                              t, sysWX_BED_TAU * 0.5);
       sysRushNow = k;
+    }
+
+    // ---- ...AND WHAT IS UNDER YOU WHILE YOU DO (F3b) ---------------------
+    // CONTACT is the whole gate that separates this from the rush above, and
+    // it is `slideAir`, NOT `grounded`. The first cut read `grounded` and
+    // measured as a tremolo: at 7.4 m/s a sliding body reports contact on
+    // every other frame, so the gain was commanded between 0.26 and 0.0001
+    // thirty times a second. capybara.js publishes the accumulator its own
+    // slide forgives that chatter with; sysSCR_AIR is well inside its 0.45 s.
+    //
+    // So the two voices hand over across a real lip and not across a physics
+    // frame: the belly leaves the sand, the scrape falls away over
+    // sysSCR_TAU, the rush comes up over its own much slower one, and the
+    // landing puts it back. Neither writes the other's param and both read
+    // the same published facts.
+    //
+    // Silent under water for the reason the rush is: there is a bus for that.
+    if (sysBedScrape) {
+      const cy = game.capy;
+      let sp = 0, surf = 0.82;
+      const air = (cy && typeof cy.slideAir === 'number' && cy.slideAir === cy.slideAir)
+        ? cy.slideAir : 0;
+      if (playing && cy && cy.sliding && air < sysSCR_AIR && cy.velocity && !(cy.depth > 0.05)) {
+        sp = Math.sqrt(cy.velocity.x * cy.velocity.x + cy.velocity.z * cy.velocity.z);
+        const s = cy.slideSurf;
+        if (typeof s === 'number' && s === s) surf = clamp(s, 0.5, 1.6);
+      }
+      // NOT squared, unlike the rush. The rush is squared to keep the bottom
+      // of a 9-to-26 m/s range out of the way; this range starts at the speed
+      // the slide itself ends at, so every part of it is a real slide and the
+      // quiet end of it should still be heard. The 0.3 floor is the same
+      // point: a slide that has nearly stopped is still a body on the ground.
+      const k = sp > 0 ? clamp((sp - sysSCR_V0) / (sysSCR_V1 - sysSCR_V0), 0, 1) : 0;
+      const g = sp > 0 ? sysSCR_MAX * (0.3 + 0.7 * k) : 0;
+      sysBedScrape.gain.setTargetAtTime(Math.max(0.0001, g * duck), t, sysSCR_TAU);
+      // Surface sets the ceiling, speed opens it further. Held at its last
+      // value while silent rather than snapped home, so a second slide on the
+      // same ground does not sweep the filter up from nothing on every entry.
+      if (sp > 0) {
+        sysBedScrapeLP.frequency.setTargetAtTime(
+          clamp(300 + (surf - 0.8) * 1200 + k * 900, sysSCR_F_LO, sysSCR_F_HI),
+          t, sysSCR_TAU);
+      }
+      sysScrapeNow = sp > 0 ? k : 0;
     }
 
     // ---- and the drip, which is the one voice that must NOT be continuous.
@@ -13237,7 +13338,7 @@ export function createSystems(game) {
    * this bar is, because the clave is the only thing here that does not repeat
    * every bar and everything else is placed against it.
    */
-  function musSalsaBar(t0, half) {
+  function musSalsaBar(t0, half, brk) {
     const chord = (t0 < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
     if (!chord) return;
     const E = sysMUS_SALSA_EIGHTH;
@@ -13259,12 +13360,34 @@ export function createSystems(game) {
       musConga(musFeel(t0 + c.t * E, sysMUS_F_HAND.s, sysMUS_F_HAND.b), c.k, musVel(c.v * lvl));
     }
     // --- campana on the quarters, accented on 1 and 3
+    // ---- ...EXCEPT ONE BAR IN EIGHT (F3b) ---------------------------------
+    // THE SAME BREAK AS RIO'S, ported (see musSambaBar). The campana IS the
+    // timekeeper of a salsa band — the bell on the quarters is what everybody
+    // else is playing against — so dropping it and the tumbao together is the
+    // whole break; the clave and the congas carry the bar, and the montuno
+    // vamps over them exactly as a piano does when a section drops out.
+    //
+    // EIGHT bars, not Rio's sixteen, and the unit is TIME rather than bars:
+    // a salsa bar here is 2.4 s against samba's 0.909, so sixteen would put
+    // 38 s between breaks. Eight is 19.2 s against Rio's 14.5 — the same
+    // order — and it is a whole montuno phrase, four two-bar chord cells, so
+    // it lands where a section would actually stop. `7 & 1 === 1` keeps it on
+    // the 2-side of the clave, where a break belongs, exactly as Rio's odd
+    // index keeps it at the end of a teleco-teco.
+    //
+    // A SUPPRESSED VOICE, NOT A SUPPRESSED BAR, and for the reason written out
+    // over musSambaBar: `musBarAt`, `musBarAnchor` and `musBeatLen` are
+    // untouched, so `game.music.beats()` runs straight through it. Cali's
+    // `salsa-dance` is scored on `game.music.off()` (capybara.js:4015) and a
+    // break that moved the clock would fail the chapter's own task.
+    if (!brk)
     for (let e = 0; e < sysMUS_SALSA_BAR; e += 2) {
       musCampana(musFeel(t0 + e * E, sysMUS_F_PULSE.s, sysMUS_F_PULSE.b),
                  musVel((e % 4 === 0 ? 0.9 : 0.55) * lvl));
     }
     // --- tumbao. The beat-4 note anticipates the next chord, which is the
-    //     entire feel of a salsa bassline.
+    //     entire feel of a salsa bassline — and it stops with the campana.
+    if (!brk)
     for (let i = 0; i < sysMUS_TUMBAO.length; i++) {
       const b = sysMUS_TUMBAO[i];
       const useNext = b.a && half === 1;
@@ -14401,6 +14524,38 @@ export function createSystems(game) {
       }
     }
     // ---- rhythm section, on its own much shorter horizon --------------------
+    //
+    // ...AND NOT AT ALL WHILE THE WHITE IS UP (F3b). The crossing swaps the
+    // palette INSIDE the held white, and the rhythm scheduler runs off a grid
+    // — `musBarAt`, `musBarAnchor`, `musBarIndex` — that the swap does not
+    // touch. So the destination's band used to inherit the departure's bar
+    // line and its phase: leaving Cali's 100 bpm 4/4 for Rio's 132 bpm 2/4
+    // put the bateria's first bars on the salsa grid, two tempos on one
+    // anchor, until something happened to make `musBarAt` fall behind `now`.
+    //
+    // Holding the scheduler for the ~1.28 s of the crossing fixes both halves
+    // at once: nothing new is queued from the palette that is leaving, and
+    // `musBarAt = 0` guarantees the `musBarAt < now` re-anchor below fires on
+    // the first tick after the white clears — which is the only place a new
+    // band may set its own anchor. Without that write the grid can be up to a
+    // bar and a look-ahead in the future (2.4 + 0.7 s in salsa) and would
+    // survive the whole crossing.
+    //
+    // `musBeatLen = 0` is the honest answer to `game.music.beats()` while
+    // there is no band: it publishes -1, and every consumer of the clock
+    // already gates on `music.playing` (cali.js:2218, capybara.js:4014) or
+    // watches for a stalled clock and falls back to wall time
+    // (kowloon.js:3579). A clock left ticking off a stale anchor through a
+    // chapter change is the thing that would be wrong.
+    //
+    // Notes already scheduled inside the 0.7 s look-ahead still play out under
+    // the white. They are one-shots with absolute times and cannot be recalled;
+    // the crossing's duck (see musDuckApply) is what covers them.
+    if (transBusy) {
+      musBarAt = 0;
+      musBeatLen = 0;
+      return;
+    }
     if (musPal.band === 'salsa') {
       const barLen = sysMUS_SALSA_BAR * sysMUS_SALSA_EIGHTH;
       if (musBarAt < now) {
@@ -14416,7 +14571,9 @@ export function createSystems(game) {
       }
       guard = 0;
       while (musBarAt < now + sysMUS_RHY_LOOK && guard++ < 4) {
-        musSalsaBar(musBarAt, musBarIndex & 1);
+        // ...and the eighth bar of every phrase is the break. See the `brk`
+        // argument in musSalsaBar for why eight here and sixteen in Rio.
+        musSalsaBar(musBarAt, musBarIndex & 1, (musBarIndex % 8) === 7);
         musBarAt += barLen;
         musBarIndex++;
       }
@@ -25795,6 +25952,13 @@ export function createSystems(game) {
       bass: musBassGain ? v(musBassGain.gain) : null,
       breath: +musBreath.toFixed(3), intensity: +musIntensity.toFixed(3),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
+      // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
+      // published "there is no pulse" that game.music.beats() answers -1 to,
+      // and `barAt` 0 is the flag that makes the next tick re-anchor: a probe
+      // that only watched `band` could not tell a held scheduler from a
+      // running one, because the palette is what the crossing changes.
+      beatLen: +musBeatLen.toFixed(4), barAt: +musBarAt.toFixed(3),
+      busy: transBusy,
     };
   };
   /**
@@ -26621,6 +26785,12 @@ export function createSystems(game) {
         voiceDrops: sysVoiceDrop,
         // ...and the fifth bed voice, 0..1. See sysBedRush.
         rush: sysRushNow,
+        // ...and the sixth, which is the only one driven by a VERB. See
+        // sysBedScrape. The gain and the cutoff go with it because
+        // setTargetAtTime means the param is the only proof either moved.
+        scrape: sysScrapeNow,
+        scrapeG: sysBedScrape ? sysBedScrape.gain.value : null,
+        scrapeF: sysBedScrapeLP ? sysBedScrapeLP.frequency.value : null,
       };
     },
     /**

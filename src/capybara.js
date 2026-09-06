@@ -713,6 +713,14 @@ let capyStuckT = 0, capyStuckY = 0, capyStuckLP = 0; // see capySTUCK_T: the und
 // ends, and `capySlideW` the 0..1 the pose and the readers are damped on.
 let capySliding = false, capySlideT = 0, capySlideAir = 0, capySlideCool = 0, capySlideW = 0;
 let capySlideSpray = 0;             // s to the next puff off the belly
+// WHAT THE BELLY IS ON, published for the scrape (F3b). capySurfacePitch is a
+// handful of rectangle tests and is cheap, but it was written to run on a
+// FOOTFALL — seven times a second at a sprint — and the scrape needs it every
+// frame, which is an order of magnitude more. So it is sampled on a slow timer
+// instead: a slide that crosses from sand onto boardwalk takes far longer than
+// capySLIDE_SURF_T to do it, and nothing else can change the answer.
+const capySLIDE_SURF_T = 0.2;       // s between samples while sliding
+let capySlideSurf = 0.82, capySlideSurfT = 0;
 let capyStuckN = 0, capyStuckAge = 9; // consecutive rescues, and s since the last one
 let capyPop = 0;
 let capyPopVel = 0;
@@ -3533,8 +3541,13 @@ export function createCapybara(game) {
         const inv = gsp > 0.001 ? capySLIDE_KICK / gsp : 0;
         body.velocity.x += body.velocity.x * inv;
         body.velocity.z += body.velocity.z * inv;
+        // Sampled here and not inside the sfx guard below: the scrape reads it
+        // whether or not there is an audio context to play the entry rustle on,
+        // and a build with sfx stubbed out must still publish a sane number.
+        capySlideSurf = capySurfacePitch(game, env, px, pz, py);
+        capySlideSurfT = capySLIDE_SURF_T;
         if (typeof game.sfx === 'function') {
-          capySfxAt.pitch = capySurfacePitch(game, env, px, pz, py);
+          capySfxAt.pitch = capySlideSurf;
           capySfxAt.volume = 0.8;
           game.sfx('rustle', capySfxAt);
         }
@@ -3568,8 +3581,27 @@ export function createCapybara(game) {
             game.physics.dust(px, py - 0.28, pz, 2);
           }
         }
+        capySlideSurfT -= dt;
+        if (capySlideSurfT <= 0) {
+          capySlideSurfT = capySLIDE_SURF_T;
+          capySlideSurf = capySurfacePitch(game, env, px, pz, py);
+        }
       }
       capy.sliding = capySliding;
+      // For sysBedScrape. Published unconditionally so a reader never has to
+      // ask whether the last slide left a stale value behind it — while
+      // `sliding` is false these numbers simply are not read.
+      capy.slideSurf = capySlideSurf;
+      // ...AND HOW LONG THE BELLY HAS BEEN OFF THE GROUND, which is NOT the
+      // same question as `grounded` and is the one a sustained sound has to
+      // ask. Measured: a capybara sliding at 7.4 m/s across a flat podium
+      // reports `grounded` false on every OTHER frame — a body dragging over
+      // a collider mesh loses contact constantly — so a voice gated on raw
+      // contact is commanded to silence thirty times a second and comes out
+      // as a tremolo. That chatter is the whole reason capySLIDE_AIR exists;
+      // this publishes the accumulator the slide already forgives it with, so
+      // one answer serves both and a reader cannot re-introduce the bug.
+      capy.slideAir = capySlideAir;
     }
     // The published figure is what the FLOOR is doing to the animal, ground and
     // belly together, because that is the question every reader of it asks.

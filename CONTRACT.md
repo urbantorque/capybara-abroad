@@ -14,6 +14,74 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FINISH, THE THREE HALVES (F3b — 6 Sep 2026)
+
+**LANDED.** The three items F3 shipped in part, finished. Nothing on
+`ROADMAP-FINISH.md`'s F1/F2/F3 must-lists is outstanding after this.
+
+**THE SLIDE HAS A SOUND WHILE IT LASTS.** F3 took the gallop off the slide —
+`capySliding` went into the footfall gate, because a slide that plays a
+four-beat trot is an animal running along on its back — and what that left was
+the only verb in the game with a DURATION and no sustained voice: one `rustle`
+on entry and then nothing, which reads as the slide having already ended.
+`sysBedScrape` is the sixth voice on the weather bed, built deliberately like
+the rush directly above it so that falling out of a slide crossfades between
+two versions of one idea instead of stacking two: wide noise, a lowpass whose
+**cutoff comes from the surface first and the speed second**, its own gain
+node, one writer. capybara.js publishes `slideSurf` — `capySurfacePitch` was
+written to run on a FOOTFALL, so it is sampled on a 0.2 s timer rather than
+per frame — and `slideAir`. Level authored against the bed table and not its
+own envelope: 0.40 through the bus ceiling of 0.19 is 0.076, beside the 0.064
+peak of the `rustle` it continues, so entry and sustain are one gesture.
+
+**AND THE GATE IS `slideAir`, NOT `grounded`.** The first cut read `grounded`
+and measured as a **tremolo**: at 7.4 m/s a sliding body reports contact on
+every other frame, so the gain was commanded between 0.26 and 0.0001 thirty
+times a second. Measured over four real slides — on flat lawn `slideAir` is
+**0 for every frame of the slide**, and the only non-zero airtimes (0.10, 0.13,
+0.27 s) were the run that crossed the Opera House podium edge, which is a real
+hop. `sysSCR_AIR` is 0.12 s: above the floor, below a step, and well inside
+capySLIDE_AIR's 0.45 so the SOUND of a slide stops before the slide does.
+**That chatter is the whole reason capySLIDE_AIR exists**; publishing the
+accumulator rather than the flag means a reader cannot re-introduce the bug.
+
+**CALI GETS THE BREAK TOO.** `musSalsaBar` takes the same `brk` argument as
+`musSambaBar` and drops the **campana and the tumbao** on it — the campana IS
+the timekeeper of a salsa band — with the clave and congas carrying and the
+montuno vamping over them, which is what a piano does when a section drops
+out. **Every eight bars, not Rio's sixteen, because the unit is TIME:** a
+salsa bar is 2.4 s against samba's 0.909, so sixteen would be 38 s between
+breaks; eight is 19.2 s against Rio's 14.5 and it is a whole montuno phrase.
+A suppressed VOICE and not a suppressed bar, for the reason written over
+`musSambaBar`. **Measured over 16 bars: 36–39.5 nodes a bar for bars 0–6 and
+29 on bar 7, zero clock reversals**, and Rio re-measured over 44 bars at
+54 against 44.3 on bar 15 — unchanged.
+
+**THE BAND STOPS FOR THE CROSSING.** The real defect was not the tempo overlap
+the roadmap named, it was the GRID: `musTick`'s rhythm scheduler runs off
+`musBarAt`/`musBarAnchor`/`musBarIndex` and the crossing's palette swap does
+not touch them, so the destination's band inherited the departure's bar line
+and phase — Rio's bateria opening on Cali's 100 bpm 4/4 anchor. The scheduler
+is held outright while `transBusy`, and writes `musBarAt = 0` and
+`musBeatLen = 0`. **The first because without it the grid can be a bar plus a
+look-ahead in the future (2.4 + 0.7 s in salsa) and would survive the whole
+crossing** — that write is what guarantees the re-anchor. The second because
+`game.music.beats()` publishing -1 is the honest answer while there is no
+band, and every consumer already gates on `music.playing` (cali.js:2218,
+capybara.js:4014) or watches for a stalled clock (kowloon.js:3579). It is
+bit-for-bit what the no-rhythm path at the end of `musTick` already did.
+**Measured across Cali→Rio, the two palettes furthest apart in tempo and
+metre: held at 152 ms with `beatLen` 0 and `beats()` -1, still held through the
+palette swap at 1220 ms, re-anchored at 1591 ms on samba's own 0.4546 —
+no samba bar ever scheduled on the salsa grid.**
+
+**Verified:** `npm test` 10/10; 19/19 driven soak with `KeyG` added to the
+driver so every chapter actually slides. Instruments: `qa/f3b-scrape.js`,
+`f3b-air.js`, `f3b-break.js`, `f3b-break-rio.js`, `f3b-cross.js`, `f3b-soak.js`.
+`game.hud.mixAudit()` gained `scrape`/`scrapeG`/`scrapeF` and `game.musAudit()`
+gained `beatLen`/`barAt`/`busy`, both because `setTargetAtTime` and a held
+scheduler are invisible from outside except through the parameter itself.
+
 ## THE FINISH, BATCH THREE — THE SOUND OVER AN HOUR, AND THE SAFETY NET (F3 — 6 Sep 2026)
 
 **LANDED.** Seven of the nine must-items in full and two in part; what is
@@ -103,12 +171,10 @@ the SCORE's convolver, alone among the whole sfx table: muting the music took
 the church away, muting effects left the tail playing, and the tail obeyed the
 music's underwater lid rather than the world's.
 
-**PARTIAL, AND NAMED:** the slide has no scrape yet (the gate is fixed; the
-sustained filtered-noise voice is not built), the paradinha is Rio only (Cali's
-salsa bar is untouched), and band scheduling is still not suppressed under
-`transBusy` — the duck makes the tempo overlap much less audible and
-suppressing the scheduler is a change to the clock that Cali's and Rio's floors
-read. All three are on `ROADMAP-FINISH.md`'s shelf.
+**PARTIAL WHEN THIS WAS WRITTEN, AND FINISHED THE SAME DAY:** the slide had no
+scrape, the paradinha was Rio only, and band scheduling was not suppressed
+under `transBusy`. All three are done — see the F3b section at the top of this
+file. Nothing on F3 is outstanding.
 
 **Verified:** `npm test` 10/10; 19/19 driven soak, 0 faults; the controlled
 standing A/B in Sydney is 19.3 ms fresh against 18.6 ms after the whole tour,

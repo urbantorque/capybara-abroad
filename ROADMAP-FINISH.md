@@ -577,22 +577,42 @@ count. 19/19 soak clean.
 ### Batch F3 — the sound over an hour, and the safety net (gap 3, the rest of gap 5)
 
 > **DONE, 6 Sep 2026** — seven of the nine must-items in full, two in part.
-> `CONTRACT.md` carries the F3 paragraph. What is partial, so that nobody has
-> to find out by looking:
+> `CONTRACT.md` carries the F3 paragraph.
 >
-> - **Item 3 is half.** `capySliding` is in the footfall gate, so the slide has
->   stopped galloping. The sustained scrape — a filtered noise loop riding
->   `gsp` and `capySurfacePitch` — is not built; the slide still has its entry
->   `rustle` and the shared air-rush layer, both correct.
-> - **Item 2 is Rio only.** The paradinha is in `musSambaBar`; Cali's
->   `musSalsaBar` is untouched. Samba is the acute case (a 1.818 s rhythm
->   cycle against salsa's 4.8 s) and the shape ports directly — suppress the
->   tumbao and the campana, keep the clave and the congas.
-> - **Item 5 is half.** The crossing ducks the score, which is the audible
->   part. Band scheduling is still not suppressed under `transBusy`: that is a
->   change to the clock `game.music.beats()` publishes, which Cali's and Rio's
->   floors are scored against, and the duck already takes most of the sting
->   out of the tempo overlap.
+> **THE THREE PARTIAL HALVES WERE FINISHED THE SAME DAY (F3b).** They are
+> struck through below with what was actually built; nothing on this batch is
+> outstanding now except the "if the clock allows" list.
+>
+> - ~~**Item 3 is half.**~~ **DONE (F3b).** `sysBedScrape` is the sixth voice
+>   on the weather bed, built like the rush directly above it: noise through a
+>   lowpass whose cutoff comes from the surface first and the speed second.
+>   capybara.js publishes `slideSurf` (sampled on a 0.2 s timer, not per frame)
+>   and `slideAir`. **The gate is `slideAir`, NOT `grounded`** — see the F3b
+>   note below.
+> - ~~**Item 2 is Rio only.**~~ **DONE (F3b).** `musSalsaBar` takes the same
+>   `brk` argument and drops the campana and the tumbao on it, clave and congas
+>   carrying. Every eight bars, not Rio's sixteen: the unit is TIME, and a
+>   salsa bar is 2.4 s against samba's 0.909, so sixteen would be 38 s between
+>   breaks. Eight is 19.2 s against Rio's 14.5, and it is a whole montuno
+>   phrase.
+> - ~~**Item 5 is half.**~~ **DONE (F3b).** `musTick` holds the rhythm
+>   scheduler outright while `transBusy`, and writes `musBarAt = 0` /
+>   `musBeatLen = 0` — the second because `game.music.beats()` should publish
+>   -1 while there is no band (every consumer already gates on
+>   `music.playing`), and the FIRST because without it the grid can be a bar
+>   plus a look-ahead in the future and would survive the whole crossing. That
+>   was the actual defect: the destination's band inherited the departure's bar
+>   line and phase.
+>
+> **AND ONE THING THAT MEASURED WRONG (F3b).** The scrape's first cut gated on
+> `capy.grounded` and came out as a tremolo — at 7.4 m/s a sliding body reports
+> contact on **every other frame**, so the gain was commanded between 0.26 and
+> 0.0001 thirty times a second. Measured over four real slides: on flat lawn
+> `slideAir` is **0 for every frame of the slide** (the chatter is entirely in
+> `grounded`), and the only airtimes above zero — 0.10, 0.13, 0.27 s — were the
+> run that crossed the Opera House podium edge, which is a real hop. So
+> `sysSCR_AIR` at 0.12 s is above the floor and below a genuine step, and the
+> gate reads the accumulator the slide already forgives its own chatter with.
 >
 > Two harness-only hooks were added because the things they observe were
 > otherwise unverifiable: `game.musAudit()` (every mix gain read back, since
