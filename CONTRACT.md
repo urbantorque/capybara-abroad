@@ -14,6 +14,103 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH SIX — READING THE TABLE (B6 — 7 Sep 2026)
+
+**LANDED.** B6 was "the other half of the gags · re-run first-five, read the
+table". B5 measured the gag half away — sixteen of nineteen rings already arm
+the chain and the two that never will are the two chapters with nobody in them —
+so this is the reading, plus the one thing the reading found.
+
+### THE INSTRUMENT HAD TO BE FIXED BEFORE THE TABLE WAS WORTH READING
+
+B4 measured that the driver never pressed E, and that three of the six chapters
+which "tick nothing" in ninety seconds — Iceland, Marrakech, Hong Kong — have
+their first row inside 12 m and every one of those rows is a THEFT. The
+instrument was reporting a fact about itself.
+
+`qa/first-five.js` now runs **both settings in one session**: `wander` (B1's
+driver exactly, so the column stays comparable) and `wander + E + Shift`. Shift
+matters as much as E: `physBarge` needs 3.2 m/s, so a walking driver cannot
+knock anybody's coffee over however close it stands. The save is cleared between
+passes, or the second arrives with every row the first ticked already crossed
+off.
+
+### THE TABLE — nineteen chapters, ninety seconds each
+
+|  | first tick ≤ 30 s | marquee seen at all | rows ticked | signpost up |
+|---|---|---|---|---|
+| wander | 11 / 19 | 7 / 19 | 27 | **19 / 19** |
+| wander + verbs | **15 / 19** | 8 / 19 | 35 | **19 / 19** |
+
+**B4's diagnosis is confirmed exactly.** The three chapters it named as
+verb-limited rather than distance-limited all tick once E is pressed: Iceland
+never → **1.0 s**, Marrakech never → **6.5 s**, Hong Kong never → **54 s**. Cali
+too, never → 30 s.
+
+**And the honest caveat, which matters more than the improvement.** Three runs
+of the SAME wander driver have now given **13, 10 and 11** for "first tick
+≤ 30 s". That is ±3 of run-to-run noise on a nineteen-chapter sample, from
+scatter placement and a random walk. The verbs pass at 15 is above all three
+wander runs, which is suggestive — but it is **one sample against a metric that
+moves by three**, and it should not be quoted as a measured improvement. The
+same is true of `tSee`: 6, 7, 7 wander, 8 verbs, which is inside the noise
+entirely. **What the two columns establish is the driver's blind spot, not the
+size of it.**
+
+The signpost is the one number that is not noisy: **19/19 in both passes**, and
+in every run since B1.
+
+`wowAt` also says something small and cheerful: a wandering player lands the
+chapter's marquee by accident in three of nineteen — Pasto at 30 s (the condor),
+Palawan at 48.5 s (the bloom), Sơn Đoòng at 82 s (the doline). Those are the
+three whose marquee is a place you can blunder into rather than a thing you must
+do.
+
+### THE ONE REPRODUCIBLE FAILURE — KYOTO
+
+Kyoto ticks **nothing in ninety seconds, under both drivers, in four consecutive
+runs**. It is the only chapter that does.
+
+Measured from its spawn, every act-one row: the lantern **19 m**, the rock
+garden 47, the golden pond 72, the stepping stones 76, the river 79, the torii
+**98**, the bamboo **118**. That is the most spread-out act one in the game — and
+the paper offers rows in AUTHOR ORDER, so **the top row on arrival was
+`torii-run`, the second-furthest thing in the chapter**, while the nearest thing
+to do sat under it.
+
+Fixed by moving one line. `lantern-topple` is listed before `torii-run` now.
+**Nothing moves in the world**: the lantern was always nineteen metres away, it
+was simply listed under a hundred-metre walk. `torii-run` keeps its `mini` and
+its place in the chapter one row down, and the marquee line from B1 is what says
+the chapter is about the river — which is the job the first row was doing badly.
+
+Verified at the paper (`qa/first-rows.js`, Kyoto only): the rendered rows are
+now `Get off the train at Kyoto` / `Topple a stone lantern` (19 m) /
+`Run the whole torii tunnel` (98.5 m). The change is a reorder of static data
+and its effect is the top row's distance, which is measured directly; it has not
+been re-soaked, and saying so is cheaper than an hour of wall clock that would
+land inside the noise band above anyway.
+
+### `qa/p8-spawn.cjs` — B5's LESSON AS ARITHMETIC
+
+B5 found Hanoi's spawn ring empty with a nineteen-chapter browser sweep, and it
+did not have to: `physBIOME_SCATTER`'s annuli and main.js's `*_SPAWN` constants
+are both static, and the distance between them is arithmetic. This runs on every
+build and would have caught Hanoi's 88 m and 154 m clusters.
+
+**A REPORT AND NEVER A BLOCKER, and it says why in its own output:** it cannot
+see props a chapter builds itself. Marrakech is the measured example — 40 m by
+this arithmetic, six loose props at 7 m in the live world, because sahara.js
+builds its own square. `qa/gag-ring.js` is the authority; this is the cheap thing
+that runs unattended. A report that cries wolf without saying so is one people
+learn to ignore.
+
+### MEASURED
+
+`npm test` 11/11 (the new report included). Zero page errors across thirty-eight
+chapter entries — nineteen chapters, twice — which is the `pan` fix from B1 and
+the witness fix from B5 both holding under a full soak.
+
 ## THE FUN PASS, BATCH FIVE — THE WITNESSES WERE GHOSTS (B5 — 7 Sep 2026)
 
 **LANDED.** B5 was "place the nineteen gags, half of them". Measuring the

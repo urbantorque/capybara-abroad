@@ -2321,6 +2321,20 @@ export const TASKS = [
   // several hundred years. Uji is the matcha town down the river, and the
   // chapter ends there, because the tea is the point.
   { id: 'to-kyoto',       text: 'Get off the train at Kyoto',            chapter: 4 },
+  // ---- THE NEAREST THING FIRST, AND ONLY IN THIS CHAPTER (B6) ----------
+  // Kyoto is the one chapter that ticks NOTHING in ninety seconds, under both
+  // drivers, in four consecutive runs of `qa/first-five.js`. Its act one is the
+  // most spread-out in the game — measured from the spawn: the lantern 19 m,
+  // the rock garden 47, the pond 72, the stepping stones 76, the river 79, the
+  // torii 98, the bamboo 118 — and the paper offers rows in AUTHOR ORDER, so
+  // the top row on arrival was the second-furthest thing in the chapter.
+  //
+  // Nothing moves in the world. The lantern was always nineteen metres away;
+  // it was simply listed under a hundred-metre walk. `torii-run` keeps its
+  // mini and its place in the chapter, one row down, and the marquee line (B1)
+  // is what says the chapter is about the river now — which is the job the
+  // first row used to be doing badly.
+  { id: 'lantern-topple', text: 'Topple a stone lantern',                chapter: 4 },
   // THE SECOND MINI, and the chapter had room for it: forty-four gates up a
   // mountain of sugi is the shot everybody who has ever heard of this place has
   // in their head, and it was paying out with a tick and a line of text — the
@@ -2329,7 +2343,6 @@ export const TASKS = [
   // half-lift and the moment card, not a bigger toast.
   { id: 'torii-run',      text: 'Run the whole torii tunnel',            chapter: 4,
     mini: 'SENBON TORII' },
-  { id: 'lantern-topple', text: 'Topple a stone lantern',                chapter: 4 },
   { id: 'zen-ruin',       text: 'Redesign the rock garden',              chapter: 4 },
   { id: 'golden-swim',    text: 'Swim in the golden pond',               chapter: 4 },
   // The pond's other half. The six granite stones out to the island have been

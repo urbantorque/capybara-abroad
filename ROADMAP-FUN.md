@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B5 ARE BUILT, 7 Sep 2026.**
+> **B1-B6 ARE BUILT, 7 Sep 2026.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -34,6 +34,15 @@
 > genuine bug: the witness test walked `game.npcs` with no chapter filter, so
 > **twenty-seven of Sydney's thirty-eight counted as witnesses in the Drift**
 > on a run that never went to Sydney. `game.peopleNear` now answers it.
+>
+> **B6**: the table, read. The driver now runs two passes — wander, and
+> wander with E and Shift — and the second confirms B4 exactly: Iceland,
+> Marrakech and Hong Kong all tick once the verb is pressed. **But the same
+> driver gives 13, 10 and 11 across three runs, so the wander column carries
+> +/-3 of noise and single-run comparisons of it are not evidence.** Kyoto is
+> the one reproducible failure — four runs, both drivers, nothing ticked — and
+> it was ORDERING: its nearest act-one row is 19 m and the paper offered the
+> 98 m one first. One line moved; nothing in the world did.
 >
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
@@ -577,6 +586,22 @@ moves these numbers or does not.
 | 17 Antarctica | 2.0 s | never | 0 | 88.0 s |
 | 18 Monte Carlo | 2.5 s | never | 0 | 88.5 s |
 | 19 Hanoi | 26.5 s | never | 0 | 35.0 s |
+
+**B6 re-ran this with two drivers. Read the note under the table before quoting
+any row of it.**
+
+| | first tick ≤ 30 s | marquee seen | rows ticked | signpost |
+|---|---|---|---|---|
+| B1, wander | 13 / 19 | 6 / 19 | — | 19 / 19 |
+| post-B2, wander | 10 / 19 | 7 / 19 | — | 19 / 19 |
+| B6, wander | 11 / 19 | 7 / 19 | 27 | 19 / 19 |
+| **B6, wander + E + Shift** | **15 / 19** | 8 / 19 | 35 | 19 / 19 |
+
+**Three runs of the SAME driver gave 13, 10 and 11.** That is ±3 of run-to-run
+noise on a nineteen-chapter sample, and it means the verbs column at 15 —
+above all three, but a single sample — is *suggestive and not measured*. What
+the two columns establish is the driver's blind spot, not the size of it. The
+only row here that is not noisy is the signpost, at 19/19 in every run since B1.
 
 - **The signpost is up in 19 of 19.** Item 1b is done and it is done everywhere.
 - **The marquee is seen at all in 6 of 19.** In thirteen chapters it is never
