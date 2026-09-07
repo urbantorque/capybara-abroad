@@ -718,6 +718,24 @@ function physBuildDango(g) {
   physAdd(g, physSphG(0.062), PALETTE.petalWhite,  0, 0.062, 0);
   physAdd(g, physSphG(0.062), PALETTE.matchaPale,  0, 0.062, -0.115);
 }
+// ---- THE ONE THING IN THIS GAME THAT IS GIVEN TO YOU (B8) ------------------
+// A folded pastry in a twist of paper. It is deliberately the ONLY new edible
+// and deliberately not any nation's: ROADMAP-FUN asks for one per chapter's
+// palette — a mochi, an arepa, a rice cake, a melon — and ten new prop types
+// with ten build functions is a batch of its own, while a bun that reads
+// plausibly in Reykjavik, Marrakech, Venice, Göreme, Manly, Monte Carlo and
+// on an Antarctic jetty ships the mechanic today. The per-chapter versions are
+// authoring, and the shelf is where they belong until somebody wants them.
+//
+// The paper is what makes it read as GIVEN rather than dropped: a thing in a
+// wrapper is a thing somebody was holding.
+function physBuildSnack(g) {
+  physAdd(g, physBoxG(0.15, 0.075, 0.11), PALETTE.bread, 0, 0.055, 0, 0, 0, 0.06);
+  physAdd(g, physBoxG(0.115, 0.045, 0.085), PALETTE.empanada, 0, 0.095, 0.008, 0, 0, 0.04);
+  // the twist of paper under it, wider than the bun and turned a few degrees
+  physAdd(g, physBoxG(0.19, 0.012, 0.15), PALETTE.petalWhite, 0, 0.016, -0.01, 0, 0.22, 0);
+  physAdd(g, physBoxG(0.055, 0.03, 0.05), PALETTE.petalWhite, -0.105, 0.03, -0.035, 0, 0.5, 0.35);
+}
 function physBuildMaiz(g) {
   physAdd(g, physCylG(0.095, 0.085, 0.42), PALETTE.maiz, 0, 0.1, 0, Math.PI * 0.5, 0, 0);
   physAdd(g, physConeG(0.09, 0.15), PALETTE.maiz, 0, 0.1, 0.27, -Math.PI * 0.5, 0, 0);
@@ -872,6 +890,10 @@ const physTYPES = {
   arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, edible: true, grazeSfx: 'rustle', build: physBuildArepa },
   dango:      { name: 'hanami dango',   mass: 0.16, hy: 0.07, shape: ['box', 0.08, 0.07, 0.24], hold: [0, 0.01, 0.09], spin: 1.7, edible: true, grazeSfx: 'pop',    build: physBuildDango },
   maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, edible: true, grazeSfx: 'tick', build: physBuildMaiz },
+  // See physBuildSnack. Nothing SCATTERS one of these: it exists only because
+  // somebody handed it to you, which is what makes it the first gift in the
+  // game rather than the eleventh thing on the pavement.
+  snack:      { name: 'somebody’s snack', mass: 0.22, hy: 0.09, shape: ['box', 0.16, 0.09, 0.13], hold: [0, 0.01, 0.08], spin: 1.4, edible: true, grazeSfx: 'rustle', build: physBuildSnack },
   plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, edible: true, grazeSfx: 'rustle', build: physBuildPlantain },
   ruana:      { name: 'ruana',          mass: 1.3,  hy: 0.13, shape: ['box', 0.34, 0.13, 0.27], hold: [0, 0.05, 0.32], spin: 0.45, receive: true, build: physBuildRuana },
   coffeesack: { name: 'sack of coffee', mass: 18,  hy: 0.34, shape: ['box', 0.3, 0.34, 0.3],   hold: [0, 0.1, 0.42],  spin: 0.35, receive: true, build: physBuildCoffeesack, spill: physBuildSackBurst, spillSfx: 'rustle' },
@@ -1155,6 +1177,11 @@ const physRHO = {
   handbag:   880,
   arepa:     900,
   dango:     980,    // three rice-flour rounds on a bamboo skewer; it sinks
+  // ...and this one FLOATS, which is the trap ROADMAP-FUN names for it. Eight
+  // of the ten chapters it exists for have water in them, and a gift that goes
+  // straight to the bottom of the lagoon the moment it is thrown to a swimming
+  // capybara is a gift that reads as a bug. Bread and air, in paper.
+  snack:     420,
   frisbee:   930,    // polyethylene, and it floats by a whisker — as it does
   coffee:    930,    // a full cup floats brim-deep, then fills
   plantain:  970,

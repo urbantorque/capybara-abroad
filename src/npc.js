@@ -2047,6 +2047,14 @@ export function createNPCs(game) {
       // unison the first time you sit down), `yaw0` is the bearing they turned
       // to, so the flash leaves the right hand and not the middle of them.
       snapT: 0, snapped: false, photoCd: rand(0, npcPHOTO_FIRST), yaw0: 0,
+      // B8: the gift. `giftCd` starts at zero — unlike the photo's jitter, this
+      // one is already gated behind a quarter-minute of `fam`, and jittering it
+      // as well would mean the first person to warm to you is also the one who
+      // has to wait longest.
+      giftT: 0, gifted: false, giftCd: 0,
+      // B8: the pat. Nothing is scored and nothing is saved; it is the one
+      // thing in item 3 that pays in the moment and not on the ledger.
+      patT: 0, patted: false, patCd: 0,
       // What they say when the world does something to them. All optional; a
       // local that names none of them falls back on npcLOC_SAY, so every
       // person already registered in every chapter gets the whole vocabulary
@@ -2070,7 +2078,7 @@ export function createNPCs(game) {
         // B7. Authorable per person and per chapter like every other key here;
         // nothing declares one yet and `npcLOC_PHOTO` is the fallback, so this
         // adds the vocabulary without touching a biome file.
-        photo: o.photo || null,
+        photo: o.photo || null, gift: o.gift || null, pat: o.pat || null,
       },
       // ---- A VOICE OF THEIR OWN (F2) -------------------------------------
       // Every person in the game gasped at pitch 1.0, so a crowd startling in
@@ -3677,6 +3685,52 @@ export function createNPCs(game) {
     'Look at it. Just look at it.', 'One picture. One.',
     'It is not even bothered.', 'That is going on the internet.',
     'My sister will not believe me.', 'It has been there ten minutes.'];
+  // ---- SOMEBODY GIVES YOU SOMETHING (B8, item 3) -------------------------
+  //
+  // THE FIRST GIFT IN THE GAME. Everything else a person does to the capybara
+  // is a reaction to something it did; this is the only thing anybody hands it.
+  //
+  // MEASURED FIRST: ten of the nineteen chapters build NO edible prop at all —
+  // Iceland, Marrakech, the Drift, Venice, Palawan, Cappadocia, Manly, Sơn
+  // Đoòng, Antarctica and Monte Carlo — so `graze`, and the produce reaction
+  // behind it, were unreachable in more than half the game. (The item guessed
+  // "eleven, or 6 of 17", two different numbers in one sentence; it is ten.)
+  //
+  // And the gate is reachable, which a gift hung off an unreachable number
+  // would not be: `qa/fam-reach.js` puts `fam` past 0.45 in about fifteen
+  // seconds of standing about in Venice and Cappadocia, and about twenty-five
+  // in Marrakech, whose calm sits at 0.53 and halves the rise exactly as the
+  // arithmetic says it should.
+  const npcGIFT_FAM   = 0.45;   // = npcFAM_HEAT: the bar for "somebody I know"
+  const npcGIFT_NEAR  = 2.2;    // m — closer than this and it lands behind you
+  const npcGIFT_FAR   = 9.0;    // m — further and it is a throw, not a gift
+  const npcGIFT_COOL  = 150;    // s per person. A gift that repeats is feeding.
+  const npcGIFT_ARM   = 1.15;   // rad — the underarm lob
+  const npcGIFT_HOLD  = 1.25;   // s of gesture
+  const npcGIFT_LET   = 0.55;   // s in, it leaves the hand
+  const npcGIFT_UP    = 3.1;    // m/s of loft. It arcs; it is not thrown at you.
+  const npcLOC_GIFT = ['Here. Go on.', 'You have earned that.',
+    'Do not tell anybody.', 'Go on then. Have it.',
+    'It was going spare.', 'You have been very good.',
+    'Do not make a habit of this.', 'That is the last one.'];
+  // ---- THE PAT (B8, item 3) ---------------------------------------------
+  // The smallest of the three and the only one that is not counted anywhere,
+  // which is the item's own instruction: *nothing is scored*. Stand close to
+  // somebody who knows you, do nothing for four seconds, and they reach down.
+  //
+  // The ear flick the item also asks for is NOT here: capybara.js publishes no
+  // ear, and adding one to reach it is a rig change for a fifth of a second of
+  // motion. Written down rather than quietly dropped.
+  const npcPAT_FAM   = 0.45;
+  const npcPAT_REST  = 4.0;    // s — shorter than the photo's: you are already there
+  const npcPAT_R     = 1.9;    // m — arm's length over a counter
+  const npcPAT_COOL  = 45;
+  const npcPAT_HOLD  = 1.6;
+  const npcPAT_ARM   = 0.62;   // rad DOWN, which on this rig is positive
+  const npcLOC_PAT = ['There. Good.', 'All right. All right.',
+    'You are a very large animal.', 'Yes. Hello.',
+    'Do not get comfortable.', 'Look at the state of you.',
+    'Right. That is enough of that.'];
   const npcLOC_PRAISE = ['…was that deliberate?', 'Well. That happened.',
                          'Nobody asked you to do that.', 'Hm. Yes. Good.',
                          'I saw that.', 'You are pleased with yourself.',
@@ -3872,6 +3926,49 @@ export function createNPCs(game) {
   // One photograph at a time per chapter (B7). Six people pointing a phone at a
   // rodent in unison is a press conference; the joke is that it is ordinary.
   let locPhotoLive = 0;
+
+  /**
+   * LOB A SNACK TO THE CAPYBARA (B8). Returns the prop, or null.
+   *
+   * A real dynamic prop and not an effect: the whole point is that the thing
+   * lands, sits there, can be eaten, kicked, carried off or dropped in the
+   * canal — `graze` and the produce reaction were unreachable in ten of the
+   * nineteen chapters because those chapters build nothing edible at all.
+   *
+   * Thrown from the HAND and not from the person's origin, and thrown UNDERARM:
+   * the vertical term is what makes it read as a gift rather than as something
+   * being got rid of. `physRHO.snack` is 420, so the eight chapters with water
+   * in them get one that floats.
+   */
+  function giveSnack(rec, tx, tz) {
+    if (!game.physics || typeof game.physics.spawnProp !== 'function') return null;
+    const yaw = rec.yaw0 || 0;
+    // Out of the hand: forward of the chest and off to the throwing side.
+    const hx = rec.x + Math.sin(yaw) * 0.34 + Math.cos(yaw) * 0.20;
+    const hz = rec.z + Math.cos(yaw) * 0.34 - Math.sin(yaw) * 0.20;
+    let p = null;
+    // `restY` keeps it out of the floor on a deck or a jetty; the body is made
+    // dynamic immediately below, so the resting height is only a starting point.
+    try { p = game.physics.spawnProp('snack', hx, hz, rec.y + 1.15); } catch (e) { p = null; }
+    if (!p || !p.body) return null;
+    const dx = tx - rec.x, dz = tz - rec.z;
+    const d = Math.hypot(dx, dz) || 1;
+    // Enough forward speed to cover the gap in about the time the arc takes.
+    // Not aimed AT the animal: a gift that hits you is a projectile, so it is
+    // thrown to land just short and roll the rest of the way.
+    const v = Math.min(6.5, d * 0.9);
+    p.body.wakeUp();
+    p.body.velocity.set(dx / d * v, npcGIFT_UP, dz / d * v);
+    p.body.angularVelocity.set(rand(-2, 2), rand(-2, 2), rand(-2, 2));
+    // It is NOT theirs once it has left the hand. `owner` is what makes
+    // somebody come and fetch a thing back, and the one object in this game
+    // that is given away must not be the one they chase you for.
+    p.owner = null;
+    p.disturbed = true;
+    emit('npc:gift', rec);
+    sfx('rustle', rec, 0.5);
+    return p;
+  }
 
   function localsStep(dt) {
     if (!locals.length) return;
@@ -4077,8 +4174,76 @@ export function createNPCs(game) {
           localLine(r, npcSay(r, 'photo') || npcLOC_PHOTO);
         }
       }
+      // ---- ...AND SOMEBODY GIVES YOU SOMETHING (B8) ------------------------
+      // Same shape as the photograph and the same gates, plus `fam`: this one
+      // is not for a stranger who thinks you are funny, it is for somebody who
+      // has had you standing about for a quarter of a minute and decided.
+      if (r.giftT > 0) {
+        r.giftT -= dt;
+        if (!r.gifted && r.giftT <= npcGIFT_HOLD - npcGIFT_LET) {
+          r.gifted = true;
+          giveSnack(r, cx, cz);
+        }
+        if (r.giftT <= 0) { r.giftT = 0; r.gifted = false; }
+      } else if (r.giftCd > 0) {
+        r.giftCd -= dt;
+      } else if (r.fig && capyOk && r.snapT <= 0 &&
+                 (r.fam || 0) >= npcGIFT_FAM &&
+                 capyRest >= npcPHOTO_REST &&
+                 d2 > npcGIFT_NEAR * npcGIFT_NEAR &&
+                 d2 < npcGIFT_FAR * npcGIFT_FAR &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 !r.own && !r.heldProp && r.gest <= 0 && (r.fl || 0) > -0.02) {
+        r.giftT = npcGIFT_HOLD;
+        r.gifted = false;
+        r.giftCd = npcGIFT_COOL * rand(0.9, 1.3);
+        r.chatYaw = Math.atan2(cx - r.x, cz - r.z);
+        r.yaw0 = r.chatYaw;
+        r.chatT = npcGIFT_HOLD + 1.2;
+        if (r.cd <= 0) {
+          r.cd = r.cool * rand(0.8, 1.4);
+          localLine(r, npcSay(r, 'gift') || npcLOC_GIFT);
+        }
+      }
+      // ---- ...AND THE PAT (B8) --------------------------------------------
+      // Closer than the gift and shorter than the photo, and it happens INSIDE
+      // the other two's dead zones — `npcGIFT_NEAR` is 2.2 m and the photo's
+      // band starts at 3.0, so standing right beside somebody is the one place
+      // neither of those can fire. That is deliberate: the three of them tile
+      // the distance from nought to eleven metres and never overlap.
+      if (r.patT > 0) {
+        r.patT -= dt;
+        if (!r.patted && r.patT <= npcPAT_HOLD * 0.5) {
+          r.patted = true;
+          sfx('rustle', r, 0.28, 0.8);
+        }
+        if (r.patT <= 0) { r.patT = 0; r.patted = false; }
+      } else if (r.patCd > 0) {
+        r.patCd -= dt;
+      } else if (r.fig && capyOk && r.snapT <= 0 && r.giftT <= 0 &&
+                 (r.fam || 0) >= npcPAT_FAM && capyRest >= npcPAT_REST &&
+                 d2 < npcPAT_R * npcPAT_R &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 !r.own && r.gest <= 0 && (r.fl || 0) > -0.02) {
+        r.patT = npcPAT_HOLD;
+        r.patted = false;
+        r.patCd = npcPAT_COOL * rand(0.9, 1.3);
+        r.chatYaw = Math.atan2(cx - r.x, cz - r.z);
+        r.chatT = npcPAT_HOLD + 0.9;
+        if (r.cd <= 0) {
+          r.cd = r.cool * rand(0.8, 1.4);
+          localLine(r, npcSay(r, 'pat') || npcLOC_PAT);
+        }
+      }
+      // ---- ...AND A CROSS PLACE IS SLOWER TO WARM TO YOU (B8) -------------
+      // The other half of the interlock. `wary` already stops the rise dead —
+      // that is the PERSON remembering — and this is the PLACE: a square that
+      // has had four minutes of you warms at half rate even from somebody who
+      // personally saw nothing. It is a multiplier and not a gate, so nothing
+      // is ever blocked, which is the rule item 3 sets for both economies.
+      const famRate = hHere >= npcPHOTO_HEAT ? 0.5 : 1;
       if (near && calmNow > 0.25 && (r.wary || 0) < npcWARY_HEAT) {
-        r.fam += (dt / npcFAM_T) * calmNow;
+        r.fam += (dt / npcFAM_T) * calmNow * famRate;
         if (r.fam > 1) r.fam = 1;
       } else if (r.fam > 0) {
         // Being wary of somebody takes it away faster than time does. It does
@@ -4461,14 +4626,34 @@ export function createNPCs(game) {
           const snapK = r.snapT > 0
             ? Math.min(1, Math.min(npcPHOTO_HOLD - r.snapT, r.snapT) / (npcPHOTO_HOLD * 0.3))
             : 0;
+          // ...and the gift is the same envelope on ONE arm (B8): an underarm
+          // lob is one hand, and using both would be a person throwing a ball
+          // in from the boundary. `Math.max` and not a sum — a photograph and
+          // a gift cannot happen at once (the gift's own gate refuses while
+          // `snapT` is running) but the two terms share a limb and adding them
+          // would put it through the shoulder if that ever changed.
+          const giftK = r.giftT > 0
+            ? Math.min(1, Math.min(npcGIFT_HOLD - r.giftT, r.giftT) / (npcGIFT_HOLD * 0.35))
+            : 0;
+          // The photo is TWO hands and the lob is ONE, which is the whole
+          // difference between holding something up and throwing something.
           const snap = snapK * npcPHOTO_ARM;
+          const snapR = Math.max(snap, giftK * npcGIFT_ARM);
+          // ...and the pat goes the OTHER WAY. Down and forward is positive on
+          // this rig, which is why it is added where the other two are taken
+          // away — a reach and a raise are the same limb doing opposite things
+          // and writing them as one signed term would hide that.
+          const patK = r.patT > 0
+            ? Math.min(1, Math.min(npcPAT_HOLD - r.patT, r.patT) / (npcPAT_HOLD * 0.35))
+            : 0;
+          const pat = patK * npcPAT_ARM;
           r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
-                                       sway - guard - fold * 0.42 + beatL - snap,
+                                       sway - guard - fold * 0.42 + beatL - snap + pat,
                                        r.beatP >= 0 ? npcBEAT_LAM : armL, dt);
           r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
                                        -sway - talk * (1 - hold) - guard
                                        - hold * npcLOC_UMB_ARM - fold * 0.42
-                                       + beat - snap, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
+                                       + beat - snapR + pat, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
           r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
                                        -talk * 0.7 * (1 - hold) - f * 0.4
                                        - hold * 0.20 - fold * 0.34, armR, dt);

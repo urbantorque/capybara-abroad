@@ -14,6 +14,133 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH EIGHT — THE FIRST GIFT IN THE GAME (B8 — 7 Sep 2026)
+
+**LANDED, all four bullets.** The snack, the pat, the other half of the heat
+interlock, and `pho`/`fed` on the save. Item 3 is finished.
+
+### THE MEASUREMENT — TEN CHAPTERS WITH NOTHING TO EAT
+
+The item says the snack "makes `graze` reachable in the eleven chapters with no
+edible prop (6 of 17 measured in the mischief-radii memory)" — two different
+numbers in one sentence, and neither checkable from source, because ten
+`physTYPES` carry `edible: true` but what matters is how many a chapter BUILDS.
+
+`qa/edibles.js`, live, per chapter, filtered on `q.biome === live` (B5's rule):
+**ten chapters build no edible prop at all** — Iceland, Marrakech, the Drift,
+Venice, Palawan, Cappadocia, Manly, Sơn Đoòng, Antarctica and Monte Carlo. So
+`graze`, and the produce reaction behind it, were unreachable in more than half
+the game.
+
+And the gate is reachable, which is the other half of the question — a gift hung
+off an unreachable number is a dead feature, and this session has found four of
+those. `qa/fam-reach.js`: `fam` passes 0.45 in about **fifteen seconds** of
+standing about in Venice and Cappadocia, and about twenty-five in Marrakech,
+whose `calm` sits at 0.53 and halves the rise **exactly as the arithmetic says
+it should**. Manly reaches zero, because Manly has nobody within fourteen
+metres of its spawn.
+
+### THE SNACK
+
+One new `physTYPE`: `snack`, a folded pastry in a twist of paper. **Deliberately
+the only new edible.** The item asks for one per chapter's palette — a mochi, an
+arepa, a rice cake, a melon — and ten new types with ten build functions is a
+batch of its own, where a bun that reads plausibly in Reykjavík, Marrakech,
+Venice, Göreme, Manly, Monte Carlo and on an Antarctic jetty ships the mechanic
+today. The paper is what makes it read as GIVEN rather than dropped: a thing in
+a wrapper is a thing somebody was holding.
+
+`giveSnack` lobs it from the HAND, underarm, aimed to land short and roll —
+a gift that hits you is a projectile. Two things that would have been wrong:
+
+  - **`physRHO.snack` is 420, so it floats.** Eight of the ten chapters it
+    exists for have water in them, and a gift that goes straight to the bottom
+    of the lagoon reads as a bug. This is the trap the item names.
+  - **`owner` is cleared the moment it leaves the hand.** `owner` is what makes
+    somebody walk over and take a thing back, and the one object in this game
+    that is given away must never be the one they chase you for.
+
+Nothing scatters a `snack`. It exists only because somebody handed it to you.
+
+### THE PAT, AND THE THREE DISTANCES
+
+Loaf within 1.9 m of somebody who knows you and they reach down — a positive
+rotation on this rig, where the photo and the lob are both negative, so a reach
+and a raise are written as opposite terms rather than as one signed number.
+Scored nowhere, which is the item's own instruction.
+
+**The three gestures tile the distance and never overlap:** the pat under
+1.9 m, the gift 2.2–9 m, the photograph 3–11 m. Standing right beside somebody
+is the one place the other two cannot fire, which is what makes the pat the
+close-range answer rather than a fourth thing competing for the same moment.
+
+The ear flick the item also asks for is **not** built: capybara.js publishes no
+ear, and adding one to reach it is a rig change for a fifth of a second of
+motion. Written down rather than quietly dropped.
+
+### THE INTERLOCK, AND `pho`/`fed`
+
+B7 gated the photograph on `placeHeat < 0.5`. B8 adds the other half: `fam`
+earns at **half rate** while the place is at or over that. A multiplier and not
+a gate, so nothing is ever blocked — the rule item 3 sets for both economies.
+
+`jrChapPho` and `jrChapFed`, beside `jrChapInc`/`jrChapScene`, additive on the
+save, no version bump, and an older file reads zero of each because it has
+neither key. `game.hud.charmAudit()` is the way out: both channels are things
+that HAPPEN TO YOU rather than things you do, so a player who never saw one and
+a build where neither fires look identical from outside.
+
+### MEASURED
+
+`qa/the-snack.js`, in the two chapters that build no edible of their own:
+
+| | Venice | Cappadocia |
+|---|---|---|
+| gifts thrown | 1 | 2 |
+| best `fam` | 0.95 | 0.76 |
+| snack in the world, `owner` null | yes | yes |
+| resting height | 1.06 (ground 1.0) | 7.05 (ground 6.8) |
+
+`charmAudit` after both: `photos 5, gifts 3`, by chapter `{10: 2/1, 13: 3/2}`.
+Written to the save as `pho`/`fed` and **identical after a reload** — done
+without an `addInitScript`, which is trap 10 and would have wiped the store it
+was meant to be testing.
+
+`qa/the-pat.js`: fires in both, `armR` **+0.43** and **+0.03** (into the
+ease-in), at 0.6 m and 1.2 m, `fam` 0.46 and 0.45.
+
+`qa/fam-heat.js`, four forty-second stretches in one settled world:
+
+| | fam after 40 s | heat | calm |
+|---|---|---|---|
+| cold | **1.000** (saturated) | 0 | 1.0 |
+| hot | **0.588** | 1 | 1.0 |
+| hot again | **0.588** | 1 | 1.0 |
+| cold again | 0.283 | 0 | 0.88 |
+
+Half rate for 40 s is `40/34 × 1.0 × 0.5 = 0.588`, and full rate is 1.176,
+capped at 1. **Both hot stretches land on the closed form to three decimals.**
+The fourth stretch reads 0.283 and I have not established why — it is recorded
+rather than explained, and the two identical hot runs against a saturated cold
+one are what the claim rests on.
+
+`npm test` 11/11.
+
+### THE THING THAT MEASURED WRONG FIRST — AN ORDER EFFECT
+
+The first cut of `qa/fam-heat.js` ran the cold stretch immediately after the
+crossing and got **cold 0.493 against hot 0.575** — the wrong way round, which
+reads exactly like a multiplier that is not wired. It was the probe: `game.calm()`
+is still climbing out of the arrival for the first half-minute, and the `fam`
+rise is MULTIPLIED by it, so the two stretches were not comparable — one of them
+began in a world that had just been built. Thirty seconds of settling, and both
+orders run, and the number resolved to the closed form exactly.
+
+**Same family as trap 18 (a probe must be faster than the decay it measures) and
+trap 35 (the forcing parameters are part of the experiment): here it was the
+ORDER that was part of the experiment.** An A/B where A runs first in a world
+that is still starting up is not an A/B.
+
 ## THE FUN PASS, BATCH SEVEN — SIT, AND BE NOTICED (B7 — 7 Sep 2026)
 
 **LANDED, WITHOUT THE APPROACH.** Item 3's first bullet asks for: loaf → the

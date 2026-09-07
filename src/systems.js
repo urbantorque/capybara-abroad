@@ -22858,6 +22858,8 @@ export function createSystems(game) {
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         // Additive, like everything below it. See jrChapInc.
         inc: jrChapInc, scn: jrChapScene,
+        // ...and the other economy (B8). See jrChapPho.
+        pho: jrChapPho, fed: jrChapFed,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -24557,6 +24559,26 @@ export function createSystems(game) {
   // version does not move for it.
   const jrChapInc = Object.create(null);      // chapter -> incidents caused
   const jrChapScene = Object.create(null);    // chapter -> ...of which scenes
+  // ---- ...AND THE OTHER ECONOMY, COUNTED THE SAME WAY (B8) ---------------
+  // `inc` and `scn` are what the place remembers about you being a menace.
+  // These two are what it remembers about you being a capybara: how often
+  // somebody photographed you, and how often somebody gave you something.
+  // Additive on the save exactly like the other two, no version bump, and
+  // nothing reads them to gate anything — item 6's notoriety line is where
+  // they are going, and until then they are the record that the other economy
+  // happened at all.
+  const jrChapPho = Object.create(null);      // chapter -> times photographed
+  const jrChapFed = Object.create(null);      // chapter -> gifts received
+  game.events.on('npc:photo', function () {
+    const cn = todoChapter();
+    if (cn > 0) jrChapPho[cn] = (jrChapPho[cn] || 0) + 1;
+    saveSoon();
+  });
+  game.events.on('npc:gift', function () {
+    const cn = todoChapter();
+    if (cn > 0) jrChapFed[cn] = (jrChapFed[cn] || 0) + 1;
+    saveSoon();
+  });
 
   /**
    * The end of a place. Deliberately built out of the pieces that already exist
@@ -25234,6 +25256,11 @@ export function createSystems(game) {
       const inc = jrFile.inc || {}, scn = jrFile.scn || {};
       for (const k in inc) if (typeof inc[k] === 'number') jrChapInc[k] = inc[k];
       for (const k in scn) if (typeof scn[k] === 'number') jrChapScene[k] = scn[k];
+      // ...and the other economy (B8). An older file has neither key and reads
+      // as zero of each, which is what it was.
+      const pho = jrFile.pho || {}, fed = jrFile.fed || {};
+      for (const k in pho) if (typeof pho[k] === 'number') jrChapPho[k] = pho[k];
+      for (const k in fed) if (typeof fed[k] === 'number') jrChapFed[k] = fed[k];
       const fnd = jrFile.finds || [];
       for (let i = 0; i < fnd.length; i++) foundFind(fnd[i], true);
       const fat = jrFile.foundAt || {};
@@ -29350,6 +29377,20 @@ export function createSystems(game) {
     },
     isTaskDone: function (id) { return !!(taskRec[id] && taskRec[id].done); },
     tasksDone: function () { return doneCount; },
+    /**
+     * THE OTHER ECONOMY, AS NUMBERS (B8). Nothing in src reads this; the
+     * harness does — and it has to, because both channels are things that
+     * happen to you rather than things you do, so a player who never saw one
+     * and a build where neither fires look exactly alike from outside. Same
+     * argument as `noticed` and `musAudit().secondN`.
+     */
+    charmAudit: function () {
+      const pho = {}, fed = {};
+      let p = 0, f = 0;
+      for (const k in jrChapPho) { pho[k] = jrChapPho[k]; p += jrChapPho[k]; }
+      for (const k in jrChapFed) { fed[k] = jrChapFed[k]; f += jrChapFed[k]; }
+      return { photos: p, gifts: f, byChapterPho: pho, byChapterFed: fed };
+    },
     setMuted: setMuted,
     setMusicMuted: setMusicMuted,
     setMusicVolume: setMusicVolume,

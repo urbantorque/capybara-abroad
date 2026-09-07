@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B7 ARE BUILT, 7 Sep 2026.**
+> **B1-B8 ARE BUILT, 7 Sep 2026. ITEMS 1 AND 2 ARE CLOSED; ITEM 3 IS CLOSED.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -51,6 +51,13 @@
 > refused**: a local never writes its own x/z, they are fixed by design, and
 > walking a hundred and fifty hand-placed people is not a three-hour batch.
 >
+> **B8**: the snack, the pat, the other half of the interlock, and `pho`/`fed`.
+> **Ten chapters build no edible prop at all**, so `graze` was unreachable in
+> more than half the game; somebody who knows you now throws you one. One new
+> type and not ten — the per-chapter palette is authoring, and the shelf is
+> where it belongs. The three gestures tile the distance and never overlap: pat
+> under 1.9 m, gift 2.2–9 m, photo 3–11 m.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
@@ -60,7 +67,9 @@
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
-> needing to be moved in nineteen chapters (five). **Measure the premise
+> needing to be moved in nineteen chapters (five), the chart marking no marquee
+> (it marks thirteen at 0 m), and the count of chapters with no edible prop
+> (ten, stated as both "eleven" and "6 of 17"). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -410,23 +419,40 @@ square they have made angry.
   *approaches* — the first time anybody in fifteen chapters walks toward you
   for a nice reason — crouches at 1.5 m, and takes the photo the `photo` state
   already knows how to take. One per person per 90 s; two at once at most.
-- **Somebody gives you something.** At `fam ≥ npcFAM_HEAT` (0.45), the person
+- **Somebody gives you something. BUILT (B8).** Measured: **ten** chapters
+  build no edible prop at all (the item guessed "eleven, or 6 of 17" — two
+  numbers in one sentence). ONE new type and not ten: the per-chapter palette
+  is authoring. It floats (physRHO 420, and eight of the ten have water) and
+  its `owner` is cleared on release, or the one thing given away would be the
+  one they chase you for.
+- ~~**Somebody gives you something.**~~ At `fam ≥ npcFAM_HEAT` (0.45), the person
   who has warmed to you tosses a **snack**: one new `edible` type per chapter's
   palette (a chip, a mochi, an arepa, a rice cake, melon), lobbed from the
   hand. The first gift in the game; it makes `graze` — and the produce reaction
   behind it — reachable in the eleven chapters with no edible prop (6 of 17
   measured in the mischief-radii memory); and it is the moment a casual player
   screenshots without being asked.
-- **The pat.** Loaf beside a *familiar* person for 4 s and they reach down:
+- **The pat. BUILT (B8), without the ear flick.** capybara.js publishes no ear;
+  adding one is a rig change for a fifth of a second of motion. The three
+  gestures tile the distance and never overlap: pat under 1.9 m, gift 2.2-9 m,
+  photo 3-11 m.
+- ~~**The pat.**~~ Loaf beside a *familiar* person for 4 s and they reach down:
   the `reach` beat as a hand on the head, the wheek's calm row at a whisper,
   an ear flick. Nothing is scored.
-- **Charm and mischief share the crowd.** Nobody approaches while `npcHeat` at
+- **Charm and mischief share the crowd. BUILT (B7 + B8).** Nobody photographs
+  you over heat 0.5, and `fam` earns at half rate above it — measured at 0.588
+  against a saturated 1.000, which is the closed form to three decimals.
+- ~~**Charm and mischief share the crowd.**~~ Nobody approaches while `npcHeat` at
   your position is over 0.5, and a hot person's `fam` earns at half rate. A
   player who caused a SCENE cannot be adored until it cools — and *can* cool it
   faster by sitting still in full view, which the finds already reward. Heat
   spends only on attention; charm spends only on approach. Neither blocks a
   task.
-- **It is counted where notoriety is.** `pho`/`fed` beside `inc`/`scn` on the
+- **It is counted where notoriety is. BUILT (B8).** `pho`/`fed` on the save
+  beside `inc`/`scn`, additive, no version bump, and `game.hud.charmAudit()` is
+  the way out — both channels are things that HAPPEN TO YOU, so a build where
+  neither fires looks identical from outside to a player who never saw one.
+- ~~**It is counted where notoriety is.**~~ `pho`/`fed` beside `inc`/`scn` on the
   save, per chapter; item 6's arrival line gets a twin.
 
 *Traps.* An approaching person takes the owner-retrieval's blocked-step ray
