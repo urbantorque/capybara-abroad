@@ -68,7 +68,20 @@ async page => {
   await page.keyboard.press('Digit0')
   await page.waitForTimeout(7000)
 
-  const rows = []
+  const out = { wander: [], verbs: [], errs: errs, seconds: SECONDS }
+  for (const VERBS of [false, true]) {
+  const rows = VERBS ? out.verbs : out.wander
+  // A clean save between the two passes, or the second one arrives with every
+  // row the first one ticked already crossed off and reports nineteen chapters
+  // of nothing to do. This is trap 8 in the harness notes, and the two-pass
+  // shape is exactly the case it was written for.
+  await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
+  await page.reload()
+  await page.waitForTimeout(5000)
+  await page.mouse.click(400, 400)
+  await page.waitForTimeout(900)
+  await page.keyboard.press('Digit0')
+  await page.waitForTimeout(7000)
   for (const b of ORDER) {
     await page.evaluate((n) => { window.__capy.hud.cross(n) }, b)
     // 1.28 s of white and then the 3.60 s arrival shot. The clock starts when
@@ -79,6 +92,7 @@ async page => {
       const THREE = g.THREE
       const S = { t0: performance.now(), tick0: -1, see0: -1, seeN: 0, n: 0,
                   ticks0: g.hud.tasksDone(), lastTick: 0, gapMax: 0, wowAt: -1,
+                  ticksAt0: g.hud.tasksDone(),
                   marqOn: null, marqSay: '', point: null, dist0: -1, occl: '' }
       window.__ff = S
       window.__ffWow = arg.wow
@@ -140,19 +154,43 @@ async page => {
       }, arg.ms)
     }, { ms: SAMPLE, wow: WOW[b] })
 
-    // Drive: a random walk, re-aimed every 1.5 s. Held keys, real ones.
+    // ---- THE DRIVER, AND WHY IT HAS TWO SETTINGS (B6) --------------------
+    //
+    // B1's driver held WASD and pressed Space and Q. It never pressed E, and
+    // B4 measured what that costs: of the six chapters where ninety seconds
+    // "ticks nothing", three — Iceland, Marrakech, Hong Kong — have their first
+    // row inside 12 m, and every one of those rows is a THEFT. The instrument
+    // was reporting a fact about itself.
+    //
+    // `VERBS` adds the two inputs a real player has and this did not: E, which
+    // is grab and throw and six other things by context, and Shift, which is
+    // the difference between walking past a bin and barging it (`physBarge`
+    // needs 3.2 m/s). Both settings are run so the two columns can be compared
+    // in one session — a driver change makes a table incomparable with the one
+    // before it, and B1's numbers are the ones this batch exists to move.
     const KEYS = ['KeyW', 'KeyW', 'KeyW', 'KeyA', 'KeyD', 'KeyS']
     const t1 = Date.now() + SECONDS * 1000
     let k = 'KeyW'
+    if (VERBS) await page.keyboard.down('ShiftLeft')
     while (Date.now() < t1) {
       await page.keyboard.up(k).catch(() => {})
       k = KEYS[(Math.random() * KEYS.length) | 0]
       await page.keyboard.down(k)
       if (Math.random() < 0.25) await page.keyboard.press('Space')
       if (Math.random() < 0.2) await page.keyboard.press('KeyQ')
-      await page.waitForTimeout(1500)
+      // E twice a leg: once mid-stride, which is a grab at whatever is in
+      // reach, and once at the end, which throws whatever the first one got.
+      if (VERBS) {
+        await page.keyboard.press('KeyE')
+        await page.waitForTimeout(750)
+        await page.keyboard.press('KeyE')
+        await page.waitForTimeout(750)
+      } else {
+        await page.waitForTimeout(1500)
+      }
     }
     await page.keyboard.up(k).catch(() => {})
+    if (VERBS) await page.keyboard.up('ShiftLeft').catch(() => {})
 
     const r = await page.evaluate((arg) => {
       const g = window.__capy
@@ -173,18 +211,22 @@ async page => {
         tSee: S.see0 < 0 ? null : +S.see0.toFixed(1),
         seePct: S.n ? +(S.seeN / S.n).toFixed(3) : 0,
         gapMax: +S.gapMax.toFixed(1),
-        ticks: g.hud.tasksDone(),
+        // Rows ticked IN THIS CHAPTER. tasksDone() is the running total for
+        // the session and reads as a chapter having done well simply for
+        // coming late in the list.
+        ticks: g.hud.tasksDone() - S.ticksAt0,
         marqOn: S.marqOn, marqSay: S.marqSay,
         point: S.point, dist0: S.dist0, occl: S.occl,
         err: g.state.lastError || null
       }
     }, { b: b })
     rows.push(r)
-    await page.screenshot({ path: 'qa/FF-' + b + '.png' })
+    await page.screenshot({ path: 'qa/FF-' + (VERBS ? 'v-' : '') + b + '.png' })
+  }
   }
 
   await page.evaluate((o) => {
     const s = btoa(unescape(encodeURIComponent(JSON.stringify(o))))
     return fetch('/shot?name=first-five.json', { method: 'POST', body: s })
-  }, { rows: rows, errs: errs, seconds: 90 })
+  }, out)
 }

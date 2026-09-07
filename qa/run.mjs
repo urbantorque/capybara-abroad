@@ -28,6 +28,7 @@ const REPORTS = [
   ['qa/p2-clues.mjs',     'every task has a clue and a place'],
   ['qa/p3-glyph.mjs',     'the measured-task glyph'],
   ['qa/p7-tokens.cjs',    'the HUD vocabulary: radii, type steps, shadows'],
+  ['qa/p8-spawn.cjs',     'is there anything loose where the player lands'],
 ];
 
 function run(file) {
