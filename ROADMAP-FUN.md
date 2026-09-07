@@ -48,9 +48,9 @@ Measured against what is there:
   `wow` row sits in act 2 or 3 in **eighteen** of them — counted properly in B1,
   where "at least fifteen" was an estimate; only chapter 4's `uji-run` is in act
   one, and `qa/p6-static.cjs` now prints the split. So a player who picks
-  Cappadocia from the title because
-  they want to fly a balloon sees a card, three rows about pigeons, and no
-  balloon. The arrival card's second line (`showPlace(title, sub)`) says where
+  Cappadocia from the title because they want to fly a balloon sees a card,
+  three rows about pigeons, and no balloon.
+  The arrival card's second line (`showPlace(title, sub)`) says where
   you are, not what it is for. The chart marks landmarks (`sysMARKS`) but not
   the marquee. **The one thing every chapter was built around is the one thing
   the interface does not point at.**
@@ -393,7 +393,7 @@ decays.
 | batch | item | hours | one commit each |
 |---|---|---|---|
 | 0 | watch somebody play two places from the picker; rewrite 1–2 from what they tried | 2 | notes only |
-| B1 | 1f `qa/first-five.js` · 1b the marquee line · `marquee:` points for all nineteen, arrival frames rendered and looked at | 3 | |
+| B1 | 1f `qa/first-five.js` · 1b the marquee line · `marquee:` points for all nineteen, arrival frames rendered and looked at | 3 | `5060f0a` |
 | B2 | 1a the glimpse · 1c the nine clocks phased | 3 | |
 | B3 | 1d `lead:` on every wow, the arrow, the stuck timer · 1e mini marks | 2.5 | |
 | B4 | 2 the arrival tick earned · the pips · seeded people for the first rows | 3 | |
