@@ -733,7 +733,7 @@ decays.
 | B11 | 4e the stagger and the sit (the drop and the plunge **refused**) · 5d animals startle people | 3 | `f5f751d` |
 | B12 | 5a the tool and the broken beat (**ten** locals, **five** chapters) | 3 | `e3691f2` |
 | B13 | 5c blame · 5e **already built** · 5b **refused** | 3 | `5e2bae6` |
-| B14 | 6 the number, the headline, the ledger | 3 | |
+| B14 | 6 the number, the headline, the ledger (+ "the ending reads it") | 3 | `76b3e2b` |
 | B15 | 6 gossip pools + the poster | 3 | |
 
 Every batch is verified the way this repository verifies: a paired A/B in one
