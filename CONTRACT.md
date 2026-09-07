@@ -14,6 +14,147 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH TEN — THE CHARGED THROW (B10 — 7 Sep 2026)
+
+**Item 4b landed. Item 4c REFUSED, both halves, with the measurements.** This
+is the first batch of the pass where more was refused than shipped, and the
+refusals cost more measuring than the thing that shipped.
+
+### TWO PREMISES IN 4b, AND BOTH CHANGED THE BUILD
+
+**"Pitch from the camera's elevation" cannot be built.** `game.input` carries
+`x, z, run, action, actionPressed, honk, honkPressed, whistle, whistlePressed,
+jump, jumpPressed, slide, camYaw` and four input buffers — **no pitch of any
+kind**. The player orbits the boom in yaw and can never raise or lower it, and
+the resting elevation sampled over eight seconds is **29.3 to 29.8 degrees**:
+half a degree of breathing. Reading the launch angle off it would read a
+constant. `frameShot`'s `pitch` is a scripted camera move, not an input.
+
+So the charge sets the RANGE, the facing sets the bearing, and the thing that
+makes it aimable is a mark on the ground rather than an angle. Which is also
+the answer to 4b's other clause — "a faint arc drawn as the hint arrow is". The
+hint arrow is a CSS `rotate()` on a DOM glyph on the paper. **There is no drawn
+line anywhere in this game to imitate**, and an arc would be drawing an angle
+nobody can change.
+
+**"5-11 m/s" was written without the gravity.** `world.gravity.y` is **-24**,
+three times earth. The existing tap-throw already leaves at **7.091 m/s** (5.12
+across, 4.90 up — a 43.7 degree launch, near enough the optimum) and lands a
+sun hat at 1.65 m. Eleven metres a second at this gravity is a five-metre
+throw. The charge therefore scales the whole launch vector, both terms, so the
+angle is the same at every charge and only the range moves — scaling the
+horizontal alone would flatten the arc as it got stronger, and the apex is how
+a player reads where a thrown thing is going.
+
+### WHAT IS BUILT
+
+**A tap throws; a hold does the considered version.** Putting it in the bin if
+you are standing still beside one (B9), a charged throw everywhere else. That
+is a simpler rule than B9's — which deferred the press only where a put-down
+existed — rather than a stranger one. What moved is that a tap now leaves on
+the key-up; the impulse did not.
+
+| hold | charge | launch | apex | mark | landed |
+|---|---|---|---|---|---|
+| 90 ms | 0 | **7.091** | 0.51 | — | 1.81 |
+| 600 ms | 0.63 | 12.62 | 1.11 | 1.89 | 2.29 |
+| 1400 ms | 1.00 | **14.70** | 1.48 | **2.56** | **2.65** |
+
+**7.091 is identical to three decimals to the same measurement taken before any
+of this was built.** Three times the apex at a full charge.
+
+**The mark knows about the air.** The vacuum-ballistic range for a fully
+charged hat is 9.30 m; the hat lands at 3.05. Drag is quadratic and takes two
+thirds of the strongest throw, so a mark placed by arithmetic would have been
+most wrong exactly where the player was looking hardest at it.
+`physPredictLanding` integrates the real drag law — 80 forward-Euler steps
+using the prop's own `aeroK` and the world's own gravity — **in the file that
+owns both**, which is the same rule `sayNear`, `peopleNear` and `castReact`
+were each written for. At full charge it predicts 2.56 against a measured 2.65,
+which is 3%, inside the ring's own radius.
+
+It is per-prop, and it has to be: a fully charged camera's mark is at 6.10 m
+against the hat's 2.56, off a LOWER launch speed (10.21 vs 11.02), because a
+camera is dense and small and a sun hat is light and wide.
+
+**Judged from the render, twice, and it failed the first time.** A 0.05 m open
+cylinder in petalYellow at 0.55 opacity, seen from 29 degrees, is a scratch on
+the grass: it was in the frame and it did not read as anything. Three times
+taller, `binRed` at 0.78, and the inner disc made FLAT (a circle, not a second
+wall) so filling it reads as filling. The fill was also at −0.06 relative to a
+group sitting 0.03 above the ground — **three centimetres under the grass**.
+And the mark now needs 0.22 of charge before it is drawn, because below that a
+hat's mark lands 1.2 m out, which from this camera is behind the animal's own
+body.
+
+### WHAT IS REFUSED, AND WHY
+
+**THE NUDGE.** 4c says props are bulldozed below the barge threshold and asks
+for "a steady push so a ball rolls". The first probe agreed emphatically — ball
+0.34 m of coast, hat 0.30, basket 0.26 — and **it could not reproduce itself**:
+the same probe on the same unmodified build later returned 3.88, 3.96 and 3.92
+for the ball. The three-pass A/B against HEAD:
+
+| | before | after |
+|---|---|---|
+| ball | 3.88 · 3.96 · 3.92 | 4.38 · 4.38 · 0.33 |
+| cone | 1.66 · 0.35 · 2.47 | 0.38 · 0.22 · 0.89 |
+| bin | 3.20 · 2.49 · 0.20 | 0.70 · 2.39 · 0.82 |
+
+The built version made things **slower**, and the reason is arithmetic: capping
+a prop at 0.8 × the closing speed is less than the solver was already handing
+it while the animal leaned on it. (It had to be capped: the first cut granted
+1.25 × capped at 5.0, which sent a 9 kg bin 3.2 m **from a walk** — more than
+the barge grants for a full run, which inverts the point of having two verbs.)
+Reverted.
+
+One thing was learnt on the way and is worth keeping: **the nudge could never
+have gone in `physOnCollide`.** That handler reads
+`c.getImpactVelocityAlongNormal()`, which for two bodies already in resting
+contact is near zero, and it carries a 0.12 s per-prop cooldown. A sustained
+push arrives there as nothing at all. A steady push is a state, not an event.
+
+**THE RIDEABLE PROP.** Built as a 6 kg flat trolley with a 0.30 m deck, over
+`capyPLAT_MIN_MASS`, in three chapters. It half worked, and the half that
+worked is the half everything else gets wrong:
+
+| | Quay | Kowloon | Monte Carlo |
+|---|---|---|---|
+| animal stands on it | yes | yes | yes |
+| `dy` on the deck | 0.66 | 0.66 | 0.66 |
+| carried when it moves | 0.37/0.37 | 0.03/0.04 | 0.31/0.38 |
+| ever dropped through | no | no | no |
+
+**But the trolley does not move.** Given 5 m/s with the animal on it, it
+travelled **four centimetres in 2.2 seconds**. Its own ground friction was
+0.04 and its damping 0.012. Zeroing the capy↔trolley friction — the same
+argument `physPair(ground, capy, 0.00, 0.00)` already makes in this file, and
+for the same reason — did not move it either.
+
+**capybara.js owns horizontal motion outright and damps to a stop every frame,
+and a contact underneath that is a second controller fighting the first — and
+it wins from ABOVE as well as from below.** Every working carrier in this game
+(the ferry, the raft, the floe, the tender, the bus roof) is KINEMATIC, and
+that is not a coincidence or a convenience: it is the only kind of body the
+controller cannot brake. **A rideable prop is a chapter set piece, not a prop.**
+Reverted rather than shipped as a box with wheels drawn on it.
+
+`npm test` 11/11. Console clean. `qa/B10-aim-full.png`.
+
+### THE THING THAT MEASURED WRONG FIRST
+
+**AN INSTRUMENT THAT CANNOT REPRODUCE ITSELF WILL AGREE WITH WHATEVER YOU
+BUILT.** `qa/nudge-coast.js` gave a beach ball 0.34 m and then 3.9 m on the
+same build, and the 0.34 was what motivated three hours of work. The tell was
+available and was not read: **three different shapes and masses moved 1.62,
+1.63 and 1.57 m while being pushed** — agreement to six centimetres between a
+beach ball, a sun hat and a picnic basket is not physics, it is one number (the
+distance the animal walked) wearing three hats. A quantity that does not vary
+with the thing it is supposed to be about is not measuring that thing.
+
+Same family as [[capy3-instruments-that-cannot-hold-a-line]], and the fourth
+instrument in this repository to join it.
+
 ## THE FUN PASS, BATCH NINE — A THING INSIDE A THING (B9 — 7 Sep 2026)
 
 **LANDED.** Item 4a (put it down, put it IN), item 4d (more things break and

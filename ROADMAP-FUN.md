@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B9 ARE BUILT, 7 Sep 2026. ITEMS 1, 2 AND 3 ARE CLOSED; ITEM 4 IS OPEN.**
+> **B1-B10 ARE BUILT, 7 Sep 2026. ITEMS 1, 2 AND 3 ARE CLOSED; ITEM 4 IS OPEN.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -68,12 +68,21 @@
 > unchanged to three decimals (7.09 m/s) because the press is deferred only
 > where the put-down exists.
 >
+> **B10**: the charged throw. Two of item 4b's numbers moved on measurement —
+> there is no camera pitch to read a launch angle off, and gravity is −24, so
+> "5–11 m/s" is a five-metre throw. What shipped is a charge that scales the
+> whole launch vector 2.15× and a mark on the ground that **integrates the real
+> drag law**, because the vacuum range for a fully charged hat is 9.30 m and the
+> hat lands at 3.05. Item 4c was built twice and **refused twice**: the nudge
+> made props slower than the solver already does, and a rideable prop cannot
+> exist while the animal's own controller brakes anything it stands on.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Nine of its
-> claims have now been checked and failed** (ten with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Eleven of its
+> claims have now been checked and failed** (twelve with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -81,7 +90,9 @@
 > (it marks thirteen at 0 m), and the count of chapters with no edible prop
 > (ten, stated as both "eleven" and "6 of 17"), `receive:` being a
 > container flag (it is `receiveShadow`), and a spill being a witnessed event
-> (it is heard by one listener in one chapter). **Measure the premise
+> (it is heard by one listener in one chapter), the camera having an
+> elevation the player can change (it has none), and the hint arrow being a
+> drawn thing to imitate (it is a CSS rotate on a DOM glyph). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -494,13 +505,33 @@ jobs by context.
   something publishes them. A prop placed *in* another
   travels with it (one level of the `capyRideBody` frame). The Goose's bucket.
   *B9: built, Sydney and Venice measured end to end.*
-- **4b. Aim and charge the throw.** Hold `E` *while moving* = charge, a faint
-  arc drawn as the hint arrow is; release at 5–11 m/s with pitch from the
-  camera's elevation. Tap throw unchanged to the decimal.
-- **4c. The nudge, and three rideable props.** Below `physBarge`'s 3.2 m/s, a
-  steady push so a ball rolls and a trolley starts down a slope. Then a
-  shopping trolley, a wheelbarrow and a loose crate on water become passive
-  carriers with weak steering — the mini set pieces' own contract.
+- **4b. Aim and charge the throw.** Hold `E` = charge, ~~a faint
+  arc drawn as the hint arrow is~~ a MARK on the ground; release at ~~5–11 m/s~~
+  2.15× the tap's launch vector ~~with pitch from the camera's elevation~~ at
+  the same angle. **TWO FAILED PREMISES (8 and 9).** `game.input` has **no
+  pitch of any kind** — the player orbits the boom in yaw and can never raise
+  or lower it, and the resting elevation measured over eight seconds is
+  29.3–29.8°, so the launch angle would be read off a constant. And the hint
+  arrow is a CSS `rotate()` on a DOM glyph: **there is no drawn line in this
+  game to imitate**, and an arc would be drawing an angle nobody can change.
+  "5–11 m/s" was written without the gravity, which is **−24**: eleven metres a
+  second here is a five-metre throw, and the existing tap already leaves at
+  7.09. Tap throw unchanged to the decimal — **measured at 7.091 before and
+  after, identical to three decimals**. *B10: built.*
+- ~~**4c. The nudge, and three rideable props.**~~ **BOTH HALVES REFUSED ON
+  MEASUREMENT (B10).** ~~Below `physBarge`'s 3.2 m/s, a steady push so a ball
+  rolls~~ — built, A/B'd three passes a side against HEAD, and it made props
+  **slower**: cone 1.66/0.35/2.47 before against 0.38/0.22/0.89 after. The
+  solver already hands a walked-into prop its momentum; the instrument that
+  said otherwise gave a beach ball 0.34 m and then 3.9 m **on the same build**.
+  Reverted. ~~Then a shopping trolley, a wheelbarrow and a loose crate on water
+  become passive carriers with weak steering.~~ Built as a 6 kg trolley: the
+  animal stands on it and is carried exactly, never dropped — **and the trolley
+  given 5 m/s with the animal on it moves four centimetres.** capybara.js owns
+  horizontal motion and damps to a stop every frame, so a contact under it is a
+  second controller and it wins from above as well as below. Every working
+  carrier in this game is KINEMATIC for that reason. **A rideable prop is a
+  chapter set piece, not a prop.** Reverted.
 - **4d. More things break and spill.** `fragile:` on ~~ten~~ five more types,
   `spill:` on five more; ~~each is already a witnessed event~~. **FAILED
   PREMISE (7), and it is the one that had to be fixed before any flag was
@@ -612,7 +643,7 @@ decays.
 | B7 | 3 sit-and-be-noticed: ~~approach,~~ crouch, photo | 3 | `40db53c` |
 | B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | `fe953b3` |
 | B9 | 4a put down + `vessel` · 4d breakables and spills · the witness fix under both | 3 | `5efe5d6` |
-| B10 | 4b aimed throw · 4c nudge + one rideable prop | 3 | |
+| B10 | 4b the charged throw and its mark · 4c measured and **refused**, both halves | 3 | `ecb6937` |
 | B11 | 4e people have bodies · 5d animals startle people | 3 | |
 | B12 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
 | B13 | 5c blame · 5e the Traveller's arc · 5b one denial (Monaco) | 3 | |
