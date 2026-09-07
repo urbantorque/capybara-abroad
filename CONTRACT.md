@@ -14,6 +14,137 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH ELEVEN — A PERSON HAS A BODY (B11 — 7 Sep 2026)
+
+**Item 4e's two buildable clauses and item 5d.** Item 4 is closed.
+
+### THE MEASUREMENT, AND IT DECIDED WHAT GOT BUILT
+
+`qa/bodies-animals.js`, all nineteen chapters, live-filtered on
+`q.biome === live`. Two of 4e's three clauses turn on facts about the local
+record — the chapter-neutral cast, which is the cast in seventeen of nineteen
+chapters — and the record answers both:
+
+- **"drops what they hold via `physBarge`" — no local anywhere holds anything.**
+  `heldProp` is not a field on the record and the probe reads **zero holders in
+  all nineteen chapters**. Sydney's `humans` and Pasto's `paHumans` do hold
+  things and have dropped them since v19 (`npcFumble`, at the `npcDRINK` gate),
+  so the half of that clause that can exist already does, in the two chapters
+  where it can. It is not faked for the other seventeen.
+- **"fall in (stumble at a quay edge → `plunge`)" is reachable and is still
+  refused.** Ten chapters have at least one local standing at a water edge:
+  Quay 9, Kowloon 8, Kyoto 5, Manly 5, the Pantanal 5, Rio 4, Iceland 4,
+  Palawan 3, Venice 1, Sơn Đoòng 1. The reason is B7's, unchanged: **a local
+  never writes its own x/z — they are fixed by design** — and a plunge is a
+  state machine that moves a person, on a cast that deliberately has none.
+  Building it would mean giving every local in the game a position it owns,
+  which is a different batch and probably a different answer.
+
+And for 5d, `game.herdDebug()` across nineteen: **eight chapters have a herd
+animal at all.**
+
+| chapter | animals | nearest person to one |
+|---|---|---|
+| Venice | 180 pigeons | 5.1 m |
+| Antarctica | 42 gentoos | 35 m |
+| Manly | 30 silver gulls | 9.5 m |
+| Iceland | 14 sheep | 18–20 m |
+| the Pantanal | 13 cows | 56 m |
+| Cappadocia | 9 cats | **3.2 m** |
+| Sydney | 6 ibises | (Sydney's cast is `humans`; not counted here) |
+| Kyoto | 1 heron | 70.9 m |
+
+Three of the eight keep their animals a long way from anybody. That is a fact
+about those chapters, not a reason not to build it.
+
+### WHAT IS BUILT
+
+**The stagger and the sit**, on the chapter-neutral cast, as additive terms on
+channels that already existed — no new node, no new group, nothing to keep in
+step with the flinch spring. A local's figure publishes `group`, `head`, `armL`,
+`armR` and a face, and **no legs and no torso**, so a sit is the whole person
+dropping 0.34 m and leaning back 0.42 rad. At this scale and this camera angle
+that is what a sit looks like, and the render agrees: the same person, same
+camera, standing and then sitting against a plinth in San Marco.
+
+**A sit is a barge ON TOP OF a startle**, which is the item's own rule and is
+what makes it rare — you have to make somebody jump and then walk into them
+while they are still jumping. "Already startled" is read off the flinch spring's
+own depth rather than off a flag somebody has to remember to set, and the
+cooldown is the item's own 40 s per person.
+
+**`game.startlePeople`** — the first caller of `castReact` from outside npc.js.
+`localsReact` has never been published and could not be: it only knows `locals`,
+and Sydney's people are `humans`. systems.js owns the herd registry, sixteen
+chapters register into it, and the animals live in sixteen different files — so
+one hook, called from the one loop that already walks every animal in the game,
+replaces editing sixteen biome files.
+
+**Only a LED animal, and only while it is moving.** An idle pigeon standing in a
+Venetian doorway all afternoon must not make that person jump every eight
+seconds; a line of fourteen sheep coming round the corner behind a capybara is
+the joke. So the event fires because of something the player did. Throttled to
+one call every 1.15 s, because Venice has a hundred and eighty pigeons and this
+runs inside a per-animal loop at 60 Hz.
+
+Nobody takes your photograph, hands you a snack, reaches down to pat you or
+carries on hammering while sitting on the floor.
+
+### MEASURED
+
+`qa/bodies.js`, four charges at the nearest person, peak-sampled at 20 Hz
+because a stagger spring settles in about a second and one sample at the end of
+the window would read zero:
+
+| | Venice | Cappadocia | Kowloon |
+|---|---|---|---|
+| `sat` peak (of 2.1 s) | 1.53 | 1.52 | 1.55 |
+| body down (m) | **0.36** | 0.359 | 0.339 |
+| `satCd` after | 37.3 | 37.1 | 37.2 |
+| stagger roll (rad) | 0.068 → **0.117** | 0.068 | (blocked) |
+
+Kowloon staggered once and then the animal could not reach the person again —
+Mong Kok is the densest street in the game and the run was blocked by the
+scenery. A chapter fact, recorded rather than tuned around.
+
+`qa/animals-scare.js`, the same drive with and without a recruited herd:
+
+| chapter | followers | hook calls | startled WITH | startled WITHOUT |
+|---|---|---|---|---|
+| Iceland | 4 sheep | 6 | **1** | **0** |
+| Cappadocia | 2 cats | 6 | **6** | **0** |
+| Venice | 14 pigeons | 6 | **6** | **0** |
+
+Zero in every chapter without a herd. Iceland gets one rather than six because
+its nearest person is twenty metres from where the sheep start and the line
+trails behind you.
+
+**And one thing worth writing down about when this is visible at all:** the
+herd skill is earned in chapter 15, and `sysSKILLS` rewrites it from the task
+table every frame — so 5d does not exist for a player until the Pantanal. The
+probe wraps `capy.can` rather than `capy.learn` for that reason, and everything
+downstream of the gate (recruiting, the obey tiers, the trail, the line) runs
+exactly as it does in a real game.
+
+`npm test` 11/11. Console clean. `qa/B11-sat.png` against `qa/B11-standing.png`.
+
+### THE THING THAT MEASURED WRONG FIRST
+
+**A SPRING KICKED IN BOTH THE VALUE AND THE VELOCITY COLLAPSES INSTEAD OF
+SWINGING.** The stagger was written as `stum = min(1, stum + k)` *and*
+`stumV -= 9.5 * k`, which starts the spring at 0.6 with 5.7 of negative
+velocity: it crosses zero in a tenth of a second and the measured peak roll was
+**0.025 rad — 1.4 degrees**. Kicked from rest, the way the flinch spring beside
+it has always been driven, it peaks at 0.26.
+
+And then 0.26 was **still not enough**: 0.26 × 0.26 is 0.068 rad, 3.9 degrees,
+and the note above `localsReact`'s own kick says in so many words that 3.7
+degrees "is under the threshold at which anybody can tell a person reacted at
+all". That note is four versions old and it was measured; reading it saved
+shipping a second invisible feature in the same afternoon. Raised to 6.7
+degrees — over the flinch's 3.6 and under the 8.6 of a crate landing at
+point-blank range, which is the right place for being shouldered.
+
 ## THE FUN PASS, BATCH TEN — THE CHARGED THROW (B10 — 7 Sep 2026)
 
 **Item 4b landed. Item 4c REFUSED, both halves, with the measurements.** This

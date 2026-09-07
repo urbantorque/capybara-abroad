@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B10 ARE BUILT, 7 Sep 2026. ITEMS 1, 2 AND 3 ARE CLOSED; ITEM 4 IS OPEN.**
+> **B1-B11 ARE BUILT, 7 Sep 2026. ITEMS 1-4 ARE CLOSED; ITEM 5 IS HALF OPEN.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -77,12 +77,20 @@
 > made props slower than the solver already does, and a rideable prop cannot
 > exist while the animal's own controller brakes anything it stands on.
 >
+> **B11**: people have bodies. A local's figure publishes a head and two arms
+> and **no legs and no torso**, so a sit is the whole person dropping 0.34 m and
+> leaning back — measured at 0.36 m in three chapters, and judged against the
+> same person standing. The drop is unreachable (**no local in the game holds
+> anything**) and the plunge is refused for B7's reason. And the animals: with a
+> herd recruited, 1/6/6 startles in Iceland, Cappadocia and Venice against
+> **0/0/0 without one**. Item 4 is closed.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Eleven of its
-> claims have now been checked and failed** (twelve with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Twelve of its
+> claims have now been checked and failed** (thirteen with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -92,7 +100,8 @@
 > container flag (it is `receiveShadow`), and a spill being a witnessed event
 > (it is heard by one listener in one chapter), the camera having an
 > elevation the player can change (it has none), and the hint arrow being a
-> drawn thing to imitate (it is a CSS rotate on a DOM glyph). **Measure the premise
+> drawn thing to imitate (it is a CSS rotate on a DOM glyph), and a local dropping what
+> they hold (no local in the game holds anything). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -548,10 +557,18 @@ jobs by context.
   139/87 before and 127/99 after and `startled` at 111/100 against 101/70.
   Only `spilt` separated (0, 0 → 2, 2). The evidence is the reachability
   count and the forced-event differential instead. *B9: built.*
-- **4e. People have bodies.** *Stumble* (barged ≥3.2 m/s, drops what they hold
-  via `physBarge`), *sit down hard* (barged while startled, or walked through a
-  spill), *fall in* (stumble at a quay edge → `plunge`). Gate on `r.fig`; once
-  per person per 40 s.
+- **4e. People have bodies.** *Stumble* (barged ≥3.2 m/s, ~~drops what they hold
+  via `physBarge`~~), *sit down hard* (barged while startled~~, or walked through
+  a spill~~), ~~*fall in* (stumble at a quay edge → `plunge`)~~. Gate on `r.fig`;
+  once per person per 40 s. **THE DROP IS UNREACHABLE FOR THIS CAST (failed
+  premise 10):** `heldProp` is not a field on the local record and the probe
+  reads **zero locals holding anything in all nineteen chapters**. Sydney's and
+  Pasto's rosters do hold things and have dropped them since v19, so the half
+  that can exist already does. **THE PLUNGE IS REACHABLE AND REFUSED:** ten
+  chapters have a local at a water edge, and B7's reason stands — a local never
+  writes its own x/z, they are fixed by design, and a plunge is a state machine
+  that moves a person on a cast that deliberately has none.
+  *B11: the stagger and the sit built, chapter-neutral.*
 
 *Traps.* The hop arc is untouchable (`capyHOP_VEL`); the trolley is a carrier,
 not a launch. Never snap a put-down to a container the animal is standing in.
@@ -575,7 +592,13 @@ that people were *doing something*, and now they cannot. All five hooks exist.
   `addExchange` pair's next exchange into an accusation of the wrong person.
   ~12 neutral pairs, no line naming what was done.
 - **5d. Animals startle people.** Route every flock, dog and `herdOffer` flush
-  through `localsReact` with the animal as source; the witness chain counts it.
+  through ~~`localsReact`~~ `game.startlePeople` with the animal as source; the
+  witness chain counts it. `localsReact` could not be published — it only knows
+  `locals` and Sydney's people are `humans`. And not "every flush": **only a LED
+  animal, and only while it is moving**, or an idle pigeon in a doorway makes
+  the same person jump all afternoon. Measured: **eight of nineteen chapters
+  have a herd animal at all**, and with a herd recruited Iceland/Cappadocia/
+  Venice give 1/6/6 startles against **0/0/0 without one**. *B11: built.*
 - **5e. The Traveller becomes a character.** Six chapters, one arc, lines that
   know where they have seen you (`seen[]`).
 
@@ -644,7 +667,7 @@ decays.
 | B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | `fe953b3` |
 | B9 | 4a put down + `vessel` · 4d breakables and spills · the witness fix under both | 3 | `5efe5d6` |
 | B10 | 4b the charged throw and its mark · 4c measured and **refused**, both halves | 3 | `ecb6937` |
-| B11 | 4e people have bodies · 5d animals startle people | 3 | |
+| B11 | 4e the stagger and the sit (the drop and the plunge **refused**) · 5d animals startle people | 3 | `f5f751d` |
 | B12 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
 | B13 | 5c blame · 5e the Traveller's arc · 5b one denial (Monaco) | 3 | |
 | B14 | 6 the number, the headline, the ledger | 3 | |
