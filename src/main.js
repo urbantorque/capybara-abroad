@@ -1872,6 +1872,11 @@ function mainBoot() {
     game.addTraveller = npcs.addTraveller;
     game.addExchange = npcs.addExchange;
     game.say = npcs.say;
+    // ...and the version that puts the line over a PERSON rather than at a
+    // bare point. Only npc.js knows which of its three arrays a chapter's
+    // people are in — see saySomebodyNear, and the measurement that says why
+    // a caller cannot work it out for itself.
+    game.sayNear = npcs.sayNear;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.

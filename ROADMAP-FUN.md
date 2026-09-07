@@ -15,8 +15,25 @@
 > shipped in its place is the half of it nobody had noticed — the countdown, on
 > the signpost. Both items' claims are corrected in place below.
 >
-> See CONTRACT.md for what each measured and the six things that measured wrong
-> first. **B0 — sitting a stranger in front of the title card — has not been
+> **B3**: item 1e, measured and **refused as written** — the chart already
+> marks the marquee at 0 m in 13 of 19 and 26 of the 30 minis are already
+> within 40 m of a mark. What shipped instead is the one thing that was true
+> underneath it: a ring round the mark the chapter is FOR. And half of 1d — the
+> 150 s nudge is said by the nearest person now, through `game.sayNear`.
+> `lead:` is deferred with a reason.
+>
+> See CONTRACT.md for what each measured and the seven things that measured
+> wrong first.
+>
+> **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
+> systems, not from measurement, and it says so at the top. Five of its claims
+> have now been checked and failed: the count of marquees in act 2+, the
+> phasing of the clocks, the existence of a stuck timer, the chart not marking
+> the marquee, and the minis having no chart presence. **Measure the premise
+> before building the item.** Every correction is made in place below rather
+> than deleted, so a later batch inherits the correction and not the guess.
+>
+> **B0 — sitting a stranger in front of the title card — has not been
 > done and no batch below replaces it.**
 
 6 Sep 2026, revised twice the same day. Written after the character pass
@@ -176,7 +193,17 @@ already there.
   **on the clue under the top row, which is exactly the row a clocked marquee
   is never**, because it sits in act two or three. The countdown is on the
   signpost now, after the distance. That shipped as B2.
-- **1d. Lead, do not push.** When nothing on the paper is pinned, the hint
+- **1d. HALF BUILT (B3).** The 150 s nudge is **said by the nearest person**
+  now, through `game.sayNear` — which lives in npc.js, because the first cut
+  lived in systems.js and filtered `game.npcs` on `r.biome`/`r.fig`, fields
+  those records do not have, so it was dead in all nineteen chapters while
+  looking alive. The toast stays as the fallback and is not a lesser one:
+  Sơn Đoòng has nobody in it at all. **`lead:` is deferred** — the acts already
+  order every chapter toward its marquee (this item says so itself), and a
+  second ordering system on top of the act machinery is two writers of one
+  decision. Build it when B0's stranger stalls with the arrow pointing
+  somewhere unhelpful, and not before.
+- ~~**1d. Lead, do not push.**~~ When nothing on the paper is pinned, the hint
   arrow (`hintTarget`) points at the next row *on the road to the marquee* —
   `lead:` on the `wow` row, an ordered list of the rows that get you there
   (whistle the condor → the rim → the talons; find the scaffold → climb → the
@@ -192,7 +219,17 @@ already there.
   tick; never while a marquee's clock reads 0 (the show is on — the hint is to
   look up). **Check what is built before building it; two of the four things
   in this item already were.**
-- **1e. The minis are the second signpost.** Thirty~~-two~~ (**30**) `mini` set pieces
+- **1e. NOT BUILT AS WRITTEN, AND SHOULD NOT BE (B3).** Measured first
+  (`qa/chart-gaps.js`): **the chart already marks the marquee** — its nearest
+  existing mark is 0.0 m away in 13 of 19 chapters and inside 30 m in 16 — and
+  **26 of the 30 minis are already inside 40 m of a mark, sixteen of them at
+  0.0 m**, where the mark simply IS the mini under another name. Thirty more
+  marks would bury a 104-pixel chart to repeat what it says. What was true
+  underneath: every mark is drawn the same, so the chart never said WHICH ONE
+  THE CHAPTER IS FOR. That shipped — one ring, one mark, per chart, with a
+  triangle inside it in the six chapters where the nearest mark is 20–52 m off,
+  and gone the moment the marquee is ticked.
+- ~~**1e. The minis are the second signpost.**~~ Thirty~~-two~~ (**30**) `mini` set pieces
   already carry the smaller sparkle on the paper. Give each a chart mark on
   the minimap in the same glyph, so a player who is not ready for the marquee
   can see the next-best thing from anywhere. Reads `sysHINTS[id].where`;

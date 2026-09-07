@@ -10193,9 +10193,77 @@ export function createNPCs(game) {
     return n;
   }
 
+  /**
+   * SOMEBODY NEAR THIS POINT SAYS IT. True if anybody did (B3, item 1d).
+   *
+   * `sayAt` puts a bubble at a bare point, which is the world narrating; this
+   * puts one over a PERSON, which is somebody telling you. The difference is
+   * the whole of item 1d's second half.
+   *
+   * IT LIVES HERE AND NOT IN systems.js, and that is the point rather than
+   * tidiness. The first cut of the nudge was written in systems.js against
+   * `game.npcs` with the same `r.biome !== live || !r.fig` test the owner
+   * search uses — and measured, in Sydney, **every one of those two conditions
+   * rejects every record**: `game.npcs` entries carry neither `biome` nor
+   * `fig`. Those are LOCALS' fields. The cast and the locals are two different
+   * shapes in two different arrays and only this file knows which is which, so
+   * only this file can answer the question. It is the Pasto-by-name family: a
+   * consumer written against one collection is silently dead in the rest.
+   *
+   * Three refusals, each one a way for this to be worse than saying nothing:
+   *   - ANIMALS DO NOT SPEAK. `game.npcs` mixes six ibises in with eleven
+   *     tourists, and their `speak` is a comment — 'bin chickens do not speak.
+   *     they judge.' A no-op would swallow the line in silence, and the caller
+   *     would believe it had been said.
+   *   - nobody mid-sentence, and nobody who has just spoken: `talkCd` is how
+   *     this file stops two people answering at once.
+   *   - nobody in a chapter you have left. Every biome stays resident.
+   */
+  function saySomebodyNear(x, z, radius, text) {
+    if (!text || !game.state.started) return false;
+    const live = game.biome && game.biome.current;
+    if (!live) return false;
+    const r2 = (radius > 0 ? radius : 12) * (radius > 0 ? radius : 12);
+    let best = null, bestD = r2, bestSay = null;
+    // The steering cast: Sydney's and Pasto's people, and only the PEOPLE —
+    // `humans`/`paHumans` are the human sub-arrays, so the ibises, the llamas
+    // and the street dog are excluded by construction rather than by a list of
+    // kinds that would go stale the next time an animal is added.
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (cast) {
+      for (let i = 0; i < cast.length; i++) {
+        const h = cast[i];
+        if (!h || !h.group || !h.group.visible || (h.talkCd || 0) > 0) continue;
+        if (h.state === 'flee' || h.state === 'plunge' || h.state === 'swim') continue;
+        const dx = h.group.position.x - x, dz = h.group.position.z - z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < bestD) { bestD = d2; best = h; bestSay = h; }
+      }
+    }
+    // ...and the locals, who are the only people standing in the other
+    // seventeen chapters. A local's voice hangs off `anchor`, because a fixed
+    // local has no head node to put a bubble on.
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (!L || L.biome !== live || !L.fig || (L.talkCd || 0) > 0) continue;
+      if (!L.anchor || typeof L.anchor.speak !== 'function') continue;
+      const dx = L.x - x, dz = L.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD) { bestD = d2; best = L; bestSay = L.anchor; }
+    }
+    if (!best || !bestSay || typeof bestSay.speak !== 'function') return false;
+    best.talkCd = rand(10, 22);
+    // ...and they look at you while they say it, which is the same two numbers
+    // the witness chain writes and the reason a line reads as addressed to
+    // somebody rather than muttered at the pavement.
+    best.lookX = x; best.lookZ = z;
+    try { bestSay.speak(text); } catch (e) { return false; }
+    return true;
+  }
+
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
            addLocal: addLocal, addTraveller: addTraveller,
-           addExchange: addExchange, say: sayAt, heat: npcHeat,
+           addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
            // ---- THE PLACE, rather than the person (v33) ----
            // `placeHeat` is what the music and the finds read; `forceHeat` is
            // the differential lever and is a test hook, not a feature.

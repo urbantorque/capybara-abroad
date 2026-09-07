@@ -14,6 +14,124 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH THREE — WHICH ONE, AND WHO SAYS SO (B3 — 7 Sep 2026)
+
+**LANDED.** Items 1e and the half of 1d that was not already built. Both items'
+premises were measured before anything was written, which is now the standing
+rule on this roadmap: **three of its claims had already failed on measurement
+before this batch started, and both of this batch's failed too.**
+
+### ITEM 1e AS WRITTEN IS NOT BUILT, AND SHOULD NOT BE
+
+1e asks for a chart mark per `mini` set piece, on the premise (from the
+headline) that "the chart marks landmarks but not the marquee". `qa/chart-gaps.js`
+measured it, and:
+
+  - **the chart already marks the marquee.** Its nearest existing mark is
+    **0.0 m away in thirteen of nineteen chapters** and inside 30 m in sixteen.
+    The six that are not: Kyoto 52 m, Rio 47 m, Manly 45 m, Cappadocia 28 m,
+    Venice 20 m, Antarctica 1.9 m.
+  - **the minis are already on it too.** All 30 resolve a hint target, and 26 of
+    the 30 are inside 40 m of an existing mark — **sixteen of them at 0.0 m**,
+    which is to say the mark IS the mini under another name (`the carroza`,
+    `the Great Wall`, `the hairpin`, `the bia hoi`). Only four are further than
+    40 m: `take-a-wave` 60 m, `o-bonde` 52 m, `floe-drift` 45 m, `take-off` 45 m.
+
+Thirty new marks on charts that carry five to nine would bury the chart in order
+to repeat what it already says, and the note under the door says so in advance:
+*this chart is 104 baked pixels.* The item is not built and the reason is
+written into the source at the draw site.
+
+### WHAT WAS TRUE UNDERNEATH IT — ONE RING
+
+Every mark on the chart is drawn the same, so the chart has always said WHERE
+the interesting places are and never WHICH ONE THE CHAPTER IS FOR. `marqChartPoint()`
+puts one ring round one mark per chart.
+
+  - **a ring, not a seventh shape.** The chart already spends five shapes on
+    landmarks and a sixth on the door; a seventh would need a legend. A ring
+    says "this one" about whatever is under it.
+  - **with a triangle inside it where the chart has nothing of its own.** In the
+    six chapters whose nearest mark is 20–52 m off, an empty ring is a ring
+    round a patch of water. `bare` is resolved once per chapter, not per draw.
+  - **gone once the marquee is ticked**, because the signpost on the paper
+    stands down then and this is the same fact drawn somewhere else. Verified
+    before and after (`qa/RINGD-before.png`, `qa/RINGD-after.png`).
+
+`mapMarkAudit()` now returns the resolved `pts` as well as the labels. It could
+say whether every mark still resolves — the question a stale getter asks — and
+could not say anything about WHERE they ended up, which is why 1e's premise had
+never been checkable.
+
+### THE NUDGE IS SAID BY A PERSON (1d)
+
+`sysNUDGE_T` — 150 s banked, emptied by a tick, once per chapter — has re-said
+the top row's clue as a toast since F4. Item 1d asks for the nearest local to
+say it instead: the difference between the interface helping and the world
+helping, in a game with ninety voices in it.
+
+**`game.sayNear(x, z, r, text)`, and it lives in npc.js.** That is the finding,
+not the feature. The first cut was written in systems.js against `game.npcs`,
+using the same `r.biome !== live || !r.fig` test npc.js's own owner search uses
+— and measured in Sydney, **both halves of that condition reject every record**:
+`game.npcs` entries carry neither `biome` nor `fig`. Those are the LOCALS'
+fields, and npc.js keeps its people in two completely different shapes in two
+different arrays (`humans`/`paHumans`, and `locals`, whose voice hangs off
+`anchor` because a fixed local has no head node). The gate was dead in all
+nineteen chapters and the toast fell through every time — a feature that looks
+exactly like a feature that works.
+
+Three refusals, each a way for it to be worse than saying nothing: no animals
+(the six ibises in `game.npcs` publish a `speak` that is a comment — *'bin
+chickens do not speak. they judge.'* — and a no-op would swallow the line in
+silence); nobody mid-sentence (`talkCd`); nobody in a chapter you have left.
+The speaker also turns to look at you, which is what makes a line read as
+addressed rather than muttered.
+
+**The toast stays as the fallback and is not a lesser one.** Sixteen chapters
+have stretches with nobody in them and Sơn Đoòng has nobody at all; a nudge that
+only arrives where there is a crowd goes missing exactly where a player is most
+lost.
+
+### `lead:` IS DEFERRED, AND HERE IS WHY
+
+The other half of 1d — `lead:` on the `wow` row, an ordered list of the rows
+that get you there, so the arrow points along the road — is not built. The acts
+already order every chapter toward its marquee; that is what F4 and R8 built
+them for, and the item says so itself ("the acts already stage most of this").
+A second ordering system on top of the act machinery is two writers of one
+decision, which is the failure this repository has written up more times than
+any other. It should be built when there is evidence a player stalls with the
+arrow pointing somewhere unhelpful — which is B0's job, and B0 has not been
+done.
+
+### MEASURED
+
+  - `qa/chart-gaps.js`: the nineteen charts, the marquee's nearest mark, and all
+    30 minis' nearest marks. Zero unresolved marks.
+  - `qa/saynear.js`: `sayNear` across both collections — Sydney and Pasto (cast),
+    Venice and Monte Carlo (locals) all return true with a bubble rendered; Sơn
+    Đoòng returns **false** and renders none, which is the case the caller's
+    fallback exists for and the case a probe that only tested where it works
+    would have missed.
+  - `qa/nudge-spoken.js`: 155 s standing still, both channels watched — the
+    `speak` methods wrapped on the records, and a `MutationObserver` on the
+    toast rail because `toast()` is closure-local. Sơn Đoòng's nudge arrived as
+    the toast, on the clue, at 150 s.
+  - The ring, photographed in four chapters and before/after a tick.
+
+`npm test` 10/10.
+
+### ONE MORE THING THAT MEASURED WRONG FIRST
+
+**A FIELD THAT EXISTS ON ONE OF A MODULE'S COLLECTIONS DOES NOT EXIST ON THE
+OTHERS.** `r.biome` and `r.fig` are real, are used correctly inside npc.js, and
+are absent from `game.npcs` entirely — so a filter copied out of that file into
+another one silently matched nothing. The tell was a probe reporting **`people:
+0` in Sydney**, which has thirty-eight of them. The fix is not a better filter;
+it is that the question belongs to the module that owns the collections, and the
+caller should ask rather than reimplement.
+
 ## THE FUN PASS, BATCH TWO — THE GLIMPSE, AND A CLOCK THAT WAS ALREADY RIGHT (B2 — 7 Sep 2026)
 
 **LANDED.** Item 1a (the arrival looks at the marquee) and item 1c, which

@@ -19170,6 +19170,47 @@ export function createSystems(game) {
     return back;
   }
 
+  // ---- THE CHART'S OWN VIEW OF THE MARQUEE (B3) --------------------------
+  // How near an existing mark has to be before the ring is treated as being
+  // ROUND that mark rather than round an empty patch. Eight metres is inside
+  // the radius of the ring itself at every chart scale in the game, so a mark
+  // any nearer is already under it.
+  const sysMQ_ON_MARK = 8;
+  let marqChartId = '', marqChartN = 0, marqChartBare = false;
+  /**
+   * Where the ring goes, or null. Called at the chart's 12 Hz, so the two
+   * things that cannot change between frames — which row is the marquee, and
+   * whether the chart has a mark of its own under it — are worked out once per
+   * chapter and not per draw. `sysMarqueePoint` itself is cheap and MOVES (the
+   * condor), so that part is asked every time.
+   */
+  function marqChartPoint() {
+    const n = todoChapter();
+    if (n !== marqChartN) {
+      marqChartN = n;
+      const w = wowOfChapter(n);
+      marqChartId = w ? w.id : '';
+      marqChartBare = true;
+      const p0 = marqChartId ? sysMarqueePoint() : null;
+      const spec = mapSpec;
+      if (p0 && spec && spec.marks) {
+        for (let i = 0; i < spec.marks.length; i++) {
+          const q = mapMarkPos(spec.marks[i]);
+          if (!q) continue;
+          const dx = q.x - p0.x, dz = q.z - p0.z;
+          if (dx * dx + dz * dz <= sysMQ_ON_MARK * sysMQ_ON_MARK) { marqChartBare = false; break; }
+        }
+      }
+    }
+    if (!marqChartId) return null;
+    const r = taskRec[marqChartId];
+    if (!r || r.done) return null;
+    const p1 = sysMarqueePoint();
+    if (!p1) return null;
+    p1.bare = marqChartBare;
+    return p1;
+  }
+
   function mapDraw(p, yaw, camYawNow, goal) {
     const cssW = mapEl.clientWidth;
     if (!cssW) return;
@@ -19237,6 +19278,25 @@ export function createSystems(game) {
     g2.closePath(); g2.fill();
 
     // ---- landmarks ----
+    // ---- ...AND WHICH OF THEM IS THE ONE (B3, item 1e) -------------------
+    //
+    // MEASURED FIRST, because item 1e's premise is that "the chart marks
+    // landmarks but not the marquee", and two of this roadmap's premises had
+    // already failed on measurement. It fails too, and comprehensively:
+    // `qa/chart-gaps.js` reports the marquee's nearest existing chart mark at
+    // 0.0 m in THIRTEEN of nineteen chapters and inside 30 m in sixteen. The
+    // item also asks for a mark per `mini` — and 26 of the 30 minis are already
+    // inside 40 m of a mark, SIXTEEN of them at 0.0 m, so thirty new marks on
+    // charts that carry five to nine would bury the chart to say what it
+    // already says. It is not built, and the note under the door explains why
+    // in advance: this chart is 104 baked pixels.
+    //
+    // What was true underneath the premise is smaller and worth doing. Every
+    // mark is drawn the same, so the chart says WHERE the interesting places
+    // are and never WHICH ONE THE CHAPTER IS FOR — and in the six chapters
+    // where the nearest mark is 20-52 m off the marquee, it does not mark it at
+    // all. One ring, on one mark, per chart.
+    const mq = marqChartPoint();
     const marks = mapSpec.marks;
     for (let i = 0; i < marks.length; i++) {
       const m = marks[i];
@@ -19257,6 +19317,43 @@ export function createSystems(game) {
         g2.fillStyle = m.k === 'faint' ? mapC.faint : m.k === 'leaf' ? sysHex(PALETTE.leafB)
                      : m.k === 'water' ? mapC.deep : mapC.soft;
         g2.beginPath(); g2.arc(mx, mz, (m.k === 'faint' ? 1.7 : 2.1) * u, 0, 6.284); g2.fill();
+      }
+    }
+
+    // ---- ...AND A RING ROUND THE ONE THE CHAPTER IS FOR (B3) --------------
+    //
+    // A RING AND NOT A NEW SHAPE. The chart already spends five shapes on the
+    // landmarks and a sixth on the door, and a seventh would need a legend.
+    // A ring says "this one" about whatever is under it — a star in Sydney, a
+    // dot in the Pantanal, nothing at all in Kyoto, where the marquee is 52 m
+    // from the nearest mark and the ring is the only thing there.
+    //
+    // GONE ONCE IT IS DONE. The signpost on the paper stands down when its row
+    // is ticked and this is the same fact drawn in a different place; a ring
+    // still circling the Opera House after you have taken the stage is the
+    // chart disagreeing with the paper about what is left to do.
+    //
+    // Drawn AFTER the landmarks so it sits over them, and BEFORE the door,
+    // which is the one mark on this chart entitled to be on top of everything.
+    if (mq) {
+      const qx = PX(mq.x), qz = PZ(mq.z);
+      g2.strokeStyle = mapC.ink;
+      g2.lineWidth = 1.25 * u;
+      g2.beginPath();
+      g2.arc(qx, qz, 5.0 * u, 0, 6.284);
+      g2.stroke();
+      // ...and something inside it where the chart has nothing of its own. In
+      // the six chapters whose nearest mark is 20-52 m away an empty ring is a
+      // ring round a patch of water; the same triangle a `star` uses keeps the
+      // chart's own vocabulary rather than inventing a shape for one case.
+      if (mq.bare) {
+        g2.fillStyle = mapC.ink;
+        const r = 2.6 * u;
+        g2.beginPath();
+        g2.moveTo(qx, qz - r);
+        g2.lineTo(qx + r * 0.92, qz + r * 0.72);
+        g2.lineTo(qx - r * 0.92, qz + r * 0.72);
+        g2.closePath(); g2.fill();
       }
     }
 
@@ -24867,6 +24964,35 @@ export function createSystems(game) {
   // chapter has already had its one. Deliberately NOT on the save: it is about
   // the last few minutes, and a journey resumed tomorrow is not stalled.
   let nudgeT = 0, nudgeSaid = false;
+  // How near somebody has to be standing to be the one who says it. Twelve
+  // metres is the distance a line is legible at in this game's lens and it is
+  // the radius npc.js's own witness chain uses to pick a speaker.
+  const sysNUDGE_EAR = 12;
+  /**
+   * THE NUDGE, SAID BY SOMEBODY (item 1d). True if a person actually said it.
+   *
+   * ASKED OF npc.js AND NOT WORKED OUT HERE. The first cut of this walked
+   * `game.npcs` with the `r.biome !== live || !r.fig` test npc.js's own owner
+   * search uses, and MEASURED IN SYDNEY, both halves of that condition reject
+   * every record: `game.npcs` entries carry neither `biome` nor `fig`, because
+   * those are the LOCALS' fields and the locals are a different array. The gate
+   * was dead in all nineteen chapters and the toast fell through every time,
+   * which is a feature that looks exactly like a feature that works. See
+   * saySomebodyNear.
+   *
+   * The clue is said as it is written. It is already a short sentence in the
+   * second person — 'grab it off their head with E', 'north, then ease off
+   * alongside' — which is how somebody standing next to you would put it.
+   */
+  function nudgeSpoken(txt) {
+    const cp = game.capy && game.capy.position;
+    if (!cp || typeof game.sayNear !== 'function') return false;
+    // One line, not a par line: the clue element carries the record's
+    // 'timed · a good one is …' on a second line and nobody says that out loud.
+    const say = String(txt).split('\n')[0];
+    if (!say) return false;
+    try { return !!game.sayNear(cp.x, cp.z, sysNUDGE_EAR, say); } catch (e) { return false; }
+  }
   // put me back — a short trail of places the animal was demonstrably able to
   // walk out of, and the hold that returns it to the oldest of them
   const backRing = [];
@@ -28738,10 +28864,19 @@ export function createSystems(game) {
   function mapMarkAudit() {
     const spec = mapSpec;
     if (!spec) return { biome: mapBakedFor, ok: [], missing: ['NO MAP AT ALL'] };
-    const ok = [], missing = [];
+    const ok = [], missing = [], pts = [];
     for (let i = 0; i < spec.marks.length; i++) {
       const m = spec.marks[i];
-      (mapMarkPos(m) ? ok : missing).push(m.t + (m.get ? ' <' + m.get + '>' : ''));
+      const q = mapMarkPos(m);
+      (q ? ok : missing).push(m.t + (m.get ? ' <' + m.get + '>' : ''));
+      // ---- ...AND WHERE IT ENDED UP (B3) ---------------------------------
+      // The audit answered "does every mark resolve", which is the question a
+      // stale getter asks. It could not answer "does the chart say anything
+      // about the thing this chapter is FOR" — that needs the resolved point,
+      // not the label — so item 1e's premise ("the chart marks landmarks but
+      // not the marquee") could not be checked at all, and it is a premise
+      // this document has already been wrong about twice.
+      if (q) pts.push({ t: m.t, k: m.k, x: +q.x.toFixed(1), z: +q.z.toFixed(1) });
     }
     // The way out is a mark like any other and is audited like one — it is the
     // one on the chart that would be worst to be silently missing.
@@ -28749,7 +28884,7 @@ export function createSystems(game) {
       const w = spec.way;
       (mapMarkPos(w) ? ok : missing).push('WAY OUT: ' + w.t + (w.get ? ' <' + w.get + '>' : ''));
     }
-    return { biome: mapBakedFor, ok: ok, missing: missing };
+    return { biome: mapBakedFor, ok: ok, missing: missing, pts: pts };
   }
 
   game.hud = {
@@ -31806,7 +31941,16 @@ export function createSystems(game) {
         // Only if there is a clue AND it is still the row it was written for:
         // `clueEl` carries the par line too, and an empty one means this
         // chapter's top row was never given one.
-        if (txt) toast(txt, 'note');
+        // ---- ...AND SOMEBODY SAYS IT, IF ANYBODY IS THERE (B3, item 1d) ---
+        // The nudge has always been a toast, which is the game leaning over
+        // and telling you. Item 1d asks for the nearest local in earshot to
+        // say a version of it instead — the difference between the interface
+        // helping and the WORLD helping, and this game has ninety voices in it
+        // already. The toast stays as the fallback and is not a lesser one:
+        // sixteen chapters have stretches with nobody in them, Sơn Đoòng has
+        // nobody at all, and a nudge that only arrives where there is a crowd
+        // is a nudge that goes missing exactly where a player is most lost.
+        if (txt && !nudgeSpoken(txt)) toast(txt, 'note');
       }
     }
 
