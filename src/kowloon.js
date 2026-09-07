@@ -5037,7 +5037,7 @@ function hkBuild(game) {
     hkLaundryRec = game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: 20.5, near: 6, face: 1.5,
       figure: { shirt: PALETTE.cloth5 },
       // forty years of it, on a pole
-      beat: { kind: 'reach', every: 6.0, dur: 1.3, sfx: 'rustle', volume: 0.09 },
+      beat: { kind: 'reach', every: 6.0, dur: 1.3, sfx: 'rustle', volume: 0.09, tool: 'basket' },  // B12: forty years of it, on a pole, into a basket
       lines: ['Forty years I have hung washing over that road.',
               'It dries in an hour up here. Smells of the street, but it dries.',
               { t: 'If a shirt comes down, it belongs to whoever is under it.',
@@ -5094,7 +5094,7 @@ function hkBuild(game) {
       near: 6, face: -1.5,
       figure: { shirt: PALETTE.hkLaundry, legs: PALETTE.hkGrille },
       // the wok, and the fire under it
-      beat: { kind: 'work', every: 2.9, dur: 0.65, sfx: 'hiss', volume: 0.10, pitch: 1.3 },
+      beat: { kind: 'work', every: 2.9, dur: 0.65, sfx: 'hiss', volume: 0.10, pitch: 1.3, tool: 'chips' },  // B12: what comes out of the wok
       lines: ['Wok hei. You cannot get it off a domestic hob. Not enough fire.',
               'Sit anywhere. If somebody is already there, sit there anyway.',
               'Beef and ho fun, and I am not writing it down.',

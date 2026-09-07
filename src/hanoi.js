@@ -3129,7 +3129,7 @@ function hanBuildLocals(game) {
     // fires once and is gone, so the woman who watched you put your whole
     // face in her pho greeted you afterwards exactly as she had before.
     // the ladle, into the bowl, all morning
-    beat: { kind: 'work', every: 4.4, dur: 0.85, sfx: 'bowls', volume: 0.11 },
+    beat: { kind: 'work', every: 4.4, dur: 0.85, sfx: 'bowls', volume: 0.11, tool: 'phobowl' },  // B12: the ladle needs a bowl at the end of it
     lines: ['Sit. There is a stool. There is always a stool.',
             'You are in the way of the bikes. Everybody is in the way of the bikes.',
             'It is beef. It is always beef before eleven.',
@@ -3143,7 +3143,7 @@ function hanBuildLocals(game) {
   hanLocBia = put(hanBIA.x - 4.5, hanBIA.z + 3.5, {
     figure: { shirt: PALETTE.hanWash3 }, face: -0.7, near: 9,
     // the tap, and the glass under it
-    beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'pop', volume: 0.09, pitch: 1.2 },
+    beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'pop', volume: 0.09, pitch: 1.2, tool: 'coffee' },  // B12: the tap, and the glass under it
     lines: ['Four thousand a glass. It has been four thousand since 1994.',
             'Do not knock the stools over. Everybody knocks the stools over.',
             'That corner has been like this since my grandmother.',
@@ -3168,7 +3168,7 @@ function hanBuildLocals(game) {
   hanLocFlower = put(-8, -7.5, {
     figure: { shirt: PALETTE.hanWash4, hat: PALETTE.hanConical }, face: 0.4, near: 8,
     // tying them, which is two hands
-    beat: { kind: 'reach', every: 6.4, dur: 1.2 },
+    beat: { kind: 'reach', every: 6.4, dur: 1.2, tool: 'flowers' },  // B12: tying them, and they are the thing being tied
     lines: ['Lotus in the morning, chrysanthemum after. Nothing after four.',
             'The whole shop is on the bicycle. It has to be.',
             'Do not lean on it. Please do not lean on it.',

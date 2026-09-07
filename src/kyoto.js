@@ -4532,7 +4532,7 @@ function kyoBuild(game) {
       z: kyoGION_Z - 3.8, near: 6, face: 1.6,
       figure: { shirt: PALETTE.templeWood, legs: PALETTE.stoneDark },
       // sixty years of the same broom
-      beat: { kind: 'work', every: 3.4, dur: 0.95, sfx: 'rustle', volume: 0.10, pitch: 0.85 },
+      beat: { kind: 'work', every: 3.4, dur: 0.95, sfx: 'rustle', volume: 0.10, pitch: 0.85, tool: 'basket' },  // B12: sixty years of the same broom, and the basket it goes into
       lines: ['Sixty years my family has swept this step. It is a good step.',
               'The lanterns go up at four. They have gone up at four since my grandfather.',
               { t: 'You are wet. Everything you have touched is now also wet.',
@@ -4641,7 +4641,7 @@ function kyoBuild(game) {
       z: kyoUJI.z + 4.6, near: 6, face: 3.14,
       figure: { shirt: PALETTE.templeWood, legs: PALETTE.stoneDark, hat: PALETTE.shoji },
       // the mill wheel, by hand
-      beat: { kind: 'work', every: 2.7, dur: 0.8, sfx: 'tick', volume: 0.09, pitch: 0.6 },
+      beat: { kind: 'work', every: 2.7, dur: 0.8, sfx: 'tick', volume: 0.09, pitch: 0.6, tool: 'cuencobowl' },  // B12: the bowl under the mill wheel
       lines: ['Ours is stone-ground. Theirs is ground by a machine that is also stone.',
               'Do not buy from the shop with the big sign. That is all I will say.',
               'Sencha in the morning, gyokuro when somebody is watching.',
@@ -4656,7 +4656,7 @@ function kyoBuild(game) {
         near: 8, face: -1.6,
         figure: { shirt: PALETTE.indigo, legs: PALETTE.indigo, hat: PALETTE.shoji },
         // picking, which is two hands
-        beat: { kind: 'reach', every: 5.0, dur: 1.1 },
+        beat: { kind: 'reach', every: 5.0, dur: 1.1, tool: 'basket' },  // B12: you pick INTO something
         lines: ['Two leaves and a bud. Only ever two leaves and a bud.',
                 'Under the black cloth for twenty days. That is what makes it sweet.',
                 'My grandmother picked this row. So did hers. It is a long row.',

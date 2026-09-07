@@ -1434,6 +1434,15 @@ export function createNPCs(game) {
     // Venetian quay, so 'that was a full cup' is a line that is wrong two
     // times in three. What is left is what people say about a mess, which is
     // mostly about the floor.
+    // ---- B12: SOMEBODY HAS TAKEN THE THING I WORK WITH ------------------
+    // Chapter-neutral to the same standard as the rest of this table, and the
+    // hard rule here is that it may not name the tool: this pool is said by a
+    // tea picker without a basket, a mask painter without a paint pot and a
+    // woman who ladles pho without a bowl. What is left is what anybody says
+    // when they reach for the thing and it is not there.
+    notool:   ['It was just here.', 'Where has that gone?', 'I put it down. Right there.',
+               'Well, I cannot do it like this.', 'Has anybody — no. Never mind.',
+               'That is the only one I have.'],
     mess:     ['Oh, that is everywhere.', 'Someone will have to do that.',
                'All over the floor.', 'Well. That is that.', 'Straight down.',
                'Look at the state of it.', 'That will stain.'],
@@ -2067,6 +2076,14 @@ export function createNPCs(game) {
       // the whole person dropping and leaning back, which at this scale and
       // this camera angle is what a sit looks like anyway.
       stum: 0, stumV: 0, sat: 0, satCd: 0,
+      // B12: the tool a beat names. `toolMade` is a once-only latch (the prop
+      // is spawned lazily, on the first tick in the live chapter, because a
+      // local is registered at build time and props.js may not have a world
+      // yet); `toolOut` is recomputed every tick rather than flagged, so a
+      // tool kicked into a canal counts exactly like a stolen one; `toolFail`
+      // counts empty strokes, which is the only thing about this mechanic
+      // that is visible from outside.
+      tool: null, toolMade: false, toolOut: false, toolFail: 0, toolSaid: false,
       // B8: the gift. `giftCd` starts at zero — unlike the photo's jitter, this
       // one is already gated behind a quarter-minute of `fam`, and jittering it
       // as well would mean the first person to warm to you is also the one who
@@ -2220,7 +2237,7 @@ export function createNPCs(game) {
     return !!(id && game && typeof game.taskDone === 'function' && game.taskDone(id));
   }
   /** Flatten a pool to the strings that are true RIGHT NOW. Never allocates. */
-  function localResolve(arr) {
+  function localResolve(arr, rec) {
     let src = arr;
     if (typeof src === 'function') { try { src = src(); } catch (e) { src = null; } }
     npcRESOLVED.length = 0;
@@ -2231,6 +2248,18 @@ export function createNPCs(game) {
       if (!e || !e.t) continue;
       if (e.after && !npcTaskDone(e.after)) continue;
       if (e.before && npcTaskDone(e.before)) continue;
+      // ---- B12: THE THIRD CONDITION, and it is about the SPEAKER --------
+      // `before` and `after` ask the task table, which is global; `tool`
+      // asks whether THIS person's tool is to hand, which is why the record
+      // had to be threaded through. 'gone' is a line said while it is
+      // missing, 'here' one that only makes sense while it is not. A pool
+      // entry that names it on a person with no tool at all resolves to
+      // false rather than to true: a line about a missing cleaver in the
+      // mouth of somebody who never had one is worse than no line.
+      if (e.tool) {
+        if (!rec || !rec.beat || !rec.beat.tool) continue;
+        if ((e.tool === 'gone') !== !!rec.toolOut) continue;
+      }
       if (e.when) { let ok = false; try { ok = !!e.when(); } catch (err) { ok = false; } if (!ok) continue; }
       npcRESOLVED.push(e.t);
     }
@@ -2246,7 +2275,7 @@ export function createNPCs(game) {
    * is the next thing they say.
    */
   function localLine(rec, arr) {
-    const pool = localResolve(arr);
+    const pool = localResolve(arr, rec);
     if (!pool.length) return;
     const sig = pool.length + '' + pool[0];
     let bag = rec.bags[sig];
@@ -4699,6 +4728,20 @@ export function createNPCs(game) {
             : f > 0.02 ? 'flinch' : r.grd > 0.05 ? 'guard' : r.own ? 'fetch'
             : r.moving > 0 ? 'walk' : r.gest > 0 ? 'talk' : 'umbrella';
         }
+        // ---- B12: IS THE TOOL STILL THERE ------------------------------
+        // Spawned lazily and asked every tick. Both are cheap and both have
+        // to be here: a local is registered while its chapter is being built,
+        // which is before props.js has a world to put anything in.
+        if (r.beat && r.beat.tool) {
+          if (!r.toolMade) localToolMake(r);
+          const wasOut = r.toolOut;
+          r.toolOut = localToolGone(r);
+          // Coming back is the edge that re-arms the remark, and it is also
+          // the whole of "put it back and they resume": nothing else has to
+          // happen, because everything downstream asks `toolOut` every tick
+          // rather than remembering a state.
+          if (wasOut && !r.toolOut) r.toolSaid = false;
+        }
         // ...and nobody carries on hammering while they are sitting on the
         // floor. The beat is the one thing a local does that has its own
         // clock, and it is the one that would look worst underneath a sit.
@@ -4759,9 +4802,18 @@ export function createNPCs(game) {
           // opposite. Both lose to the flinch, which is already the rule for
           // the dip and is right for the same reason: a person reacting to a
           // bang is not also admiring the blossom.
+          // ---- B12: A LOOK AT THE HAND ---------------------------------
+          // Positive is DOWN on this rig (the dip is positive), and a person
+          // checking an empty hand looks down at it — so this is added, like
+          // the dip and unlike the flinch. Only during the stroke, so it is a
+          // glance at the thing that did not happen rather than a person who
+          // has become permanently sad. It loses to the flinch for the same
+          // reason everything else does.
+          const hand = (r.toolOut && r.beatP >= 0)
+            ? Math.sin(Math.min(1, r.beatP) * Math.PI) * npcTOOL_LOOK : 0;
           r.fig.head.rotation.x = damp(r.fig.head.rotation.x,
                                        dip - f * npcLOC_FL_HEAD
-                                       - r.look * 0.62 + r.hud * 0.22,
+                                       - r.look * 0.62 + r.hud * 0.22 + hand,
                                        f > 0.02 ? 14 : 5, dt);
           // arms: a slow shift of weight, and one of them comes up while they
           // are actually talking — and BOTH come up, fast, on a flinch.
@@ -4970,7 +5022,7 @@ export function createNPCs(game) {
   function pickLine(npcRec, key) {
     const raw = npcLINES[key];
     if (!raw) return;
-    const arr = localResolve(raw);
+    const arr = localResolve(raw, npcRec);
     if (!arr.length) return;
     let i = randInt(0, arr.length - 1);
     for (let k = 0; k < 3 && arr.length > 2 &&
@@ -5068,6 +5120,65 @@ export function createNPCs(game) {
    * person who is startled halfway through a chop and then finishes the chop
    * is worse than one who never chopped.
    */
+  // =======================================================================
+  // A ROUTINE THAT CAN BE BROKEN (B12, ROADMAP-FUN item 5a)
+  // =======================================================================
+  //
+  // Forty-four beats across seventeen chapters, and until now every one of
+  // them was weather: a person hammered, poured, swept or picked on a clock,
+  // and there was nothing in the world that could stop them. The comedy of the
+  // Goose Game is not that people react — it is that people were DOING
+  // something and now they cannot.
+  //
+  // WHAT WAS ALREADY THERE, and the item was right about it. `localOwnerOf`
+  // gives a prop to whoever is standing nearest to where it LIVES (homeX/homeZ,
+  // inside npcOWN_R), and `capy:grab` already sets `localOwnStart` on that
+  // person — so a tool put down at somebody's bench is theirs, they come and
+  // get it, and none of that had to be written. Measured by reading it and
+  // then by taking one.
+  //
+  // WHAT WAS NOT. A local holds nothing (B11 measured zero holders in all
+  // nineteen chapters) and no beat named an object, so there was nothing to
+  // take. `tool:` on a beat names a prop TYPE; one is spawned at the person's
+  // own anchor the first time their chapter is live, and from then on the beat
+  // asks whether it is still there.
+  const npcTOOL_R    = 3.2;    // m from the anchor: past this it is not to hand
+  const npcTOOL_LOOK = 0.55;   // rad the head drops to the empty hand
+  const npcTOOL_ARM  = 0.55;   // × the full stroke — a mime, not a swing
+
+  /** Spawn the tool a beat names, once, at the person's own anchor. */
+  function localToolMake(r) {
+    const b = r.beat;
+    if (!b || !b.tool || r.toolMade) return;
+    const ph = game.physics;
+    if (!ph || typeof ph.spawnProp !== 'function') return;
+    r.toolMade = true;      // once, whether or not it worked — see below
+    // Half a metre in front of them, on the side the working arm is.
+    const fx = Math.sin(r.face), fz = Math.cos(r.face);
+    const p = ph.spawnProp(b.tool, r.ax + fx * 0.55 + 0.18, r.az + fz * 0.55, r.y + 0.05);
+    if (!p) return;
+    r.tool = p;
+    // The prop's HOME is what ownership reads, and spawnProp has just set it
+    // to where it landed — which is what we want, because that is the bench.
+  }
+
+  /**
+   * Is the tool to hand? True the moment it is in the animal's mouth, and
+   * true while it is anywhere but home. Deliberately NOT a flag set by the
+   * grab: a tool kicked into a canal is just as gone as a stolen one, and a
+   * flag would have to know about every way a prop can leave.
+   */
+  function localToolGone(r) {
+    const p = r.tool;
+    if (!p) return false;
+    if (p.removed || p.hidden || p.spilled) return true;
+    if (p.held) return true;
+    const b = p.body;
+    if (!b) return true;
+    const dx = b.position.x - r.ax, dz = b.position.z - r.az;
+    return (dx * dx + dz * dz) > npcTOOL_R * npcTOOL_R;
+  }
+
   function localBeatStep(r, dt, busy, calm) {
     const b = r.beat;
     if (!b) return 0;
@@ -5097,24 +5208,50 @@ export function createNPCs(game) {
     // stroke and the top of a reach — and it is a rising edge on the phase, so
     // a frame long enough to skip past it still gets exactly one.
     const at = b.kind === 'reach' ? npcBEAT_UP : 0.72;
-    if (was < at && r.beatP >= at && b.sfx && !(game.state && game.state.paused)) {
+    if (was < at && r.beatP >= at && b.sfx && !r.toolOut &&
+        !(game.state && game.state.paused)) {
       sfx(b.sfx, r, b.volume === undefined ? npcBEAT_VOL : b.volume,
           (b.pitch || 1) * rand(0.94, 1.07));
+    }
+    // ---- B12: THE BEAT WITH NOTHING IN IT --------------------------------
+    // The silence above is half of it and the stroke is the other half. A
+    // person whose cleaver has gone still starts the movement — that is what
+    // a routine IS — and it dies on the way down, because there is nothing at
+    // the bottom of it. Short, and no sound, and the head goes to the hand
+    // (see the pose). One failed beat per absence, counted, so `beatAudit`
+    // can tell a broken routine from a person who has simply not come round
+    // to their next one.
+    if (r.toolOut && was < at && r.beatP >= at) {
+      r.toolFail = (r.toolFail || 0) + 1;
+      // ...and they say so, on the FIRST empty stroke of an absence and not on
+      // every one of them. `toolSaid` is cleared when the tool comes back, so
+      // taking it twice gets two remarks and standing there watching somebody
+      // fail at their job for a minute gets one. The pool is chapter-neutral
+      // and may not name the tool — see npcLOC_SAY.notool.
+      if (!r.toolSaid && r.cd <= 0) {
+        r.toolSaid = true;
+        r.cd = r.cool * rand(0.7, 1.2);
+        localReactLine(r, npcSay(r, 'notool'));
+      }
     }
     if (r.beatP >= 1) { r.beatP = -1; r.beatT = (b.every || 5) * rand(0.65, 1.5);
                         r.beatN = (r.beatN || 0) + 1; return 0; }
     const p = r.beatP;
+    // A mime is a fraction of a swing: the arm starts the movement and gives
+    // up on it, which reads as "that did not work" rather than as a smaller
+    // person doing the same job.
+    const tk = r.toolOut ? npcTOOL_ARM : 1;
     if (b.kind === 'reach') {
       // up, hold, down — the hold is what makes it a reach and not a wave
       const k = p < npcBEAT_UP ? p / npcBEAT_UP
               : p < 0.68 ? 1
               : 1 - (p - 0.68) / 0.32;
-      return -k * npcBEAT_ARM * 0.78;
+      return -k * npcBEAT_ARM * 0.78 * tk;
     }
     // work: up slowly, down through the bottom fast, and a little recovery
-    if (p < npcBEAT_UP) return -(p / npcBEAT_UP) * npcBEAT_ARM;
+    if (p < npcBEAT_UP) return -(p / npcBEAT_UP) * npcBEAT_ARM * tk;
     const q = (p - npcBEAT_UP) / (1 - npcBEAT_UP);
-    return -npcBEAT_ARM * (1 - q) + npcBEAT_THRU * Math.min(1, q * 1.6) * (1 - q * 0.4);
+    return (-npcBEAT_ARM * (1 - q) + npcBEAT_THRU * Math.min(1, q * 1.6) * (1 - q * 0.4)) * tk;
   }
   function emit(name, npcRec) {
     try { game.events.emit(name, { npc: npcRec }); } catch (e) { /* bus optional */ }
@@ -10924,13 +11061,28 @@ export function createNPCs(game) {
                const r = locals[i];
                if (r.biome !== live || !r.beat) continue;
                if (r.beatP >= 0) running++;
-               if (reset) r.beatN = 0;
+               if (reset) { r.beatN = 0; r.toolFail = 0; }
                rows.push({ kind: r.beat.kind, sfx: r.beat.sfx || '',
                            every: r.beat.every || 5,
                            x: +r.x.toFixed(1), z: +r.z.toFixed(1),
                            p: +r.beatP.toFixed(2), swings: r.beatN || 0,
                            t: +(r.beatT || 0).toFixed(1), busy: !!r.beatBz,
-                           calm: +(r.beatCalm || 0).toFixed(2), why: r.beatWhy || '' });
+                           calm: +(r.beatCalm || 0).toFixed(2), why: r.beatWhy || '',
+                           // ---- B12: THE TOOL ----
+                           // Four columns rather than one flag, because the
+                           // four failures are different: a beat that names no
+                           // tool, one whose tool was never spawned, one whose
+                           // tool is sitting exactly where it lives, and one
+                           // that has been robbed. A single boolean cannot
+                           // tell the second from the third, and the second is
+                           // the one that ships silently.
+                           tool: (r.beat && r.beat.tool) || '',
+                           toolMade: !!r.tool, toolOut: !!r.toolOut,
+                           toolFail: r.toolFail || 0,
+                           toolAt: r.tool && r.tool.body
+                             ? +Math.hypot(r.tool.body.position.x - r.ax,
+                                           r.tool.body.position.z - r.az).toFixed(2)
+                             : null });
              }
              return { biome: live, withJob: rows.length, running: running, rows: rows };
            },

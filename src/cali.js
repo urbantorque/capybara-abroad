@@ -4502,7 +4502,7 @@ function caliBuild(game) {
       face: Math.atan2(caliMirLife.ox, caliMirLife.oz),
       figure: { shirt: PALETTE.caliWall1, legs: PALETTE.denim, hat: PALETTE.caliWall2 },
       // the knife on the board
-      beat: { kind: 'work', every: 4.8, dur: 0.75, sfx: 'tick', volume: 0.10, pitch: 1.2 },
+      beat: { kind: 'work', every: 4.8, dur: 0.75, sfx: 'tick', volume: 0.10, pitch: 1.2, tool: 'cuencobowl' },  // B12: chontaduro con miel y sal, and the bowl it is served in
       lines: ['Chontaduro con miel y sal. Do not argue, just eat it.',
               'Everybody comes up on the chiva and everybody says the same thing.',
               { t: 'Wait for the lights. Another ten minutes. It is worth ten minutes.',

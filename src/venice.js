@@ -5751,7 +5751,7 @@ function venBuild(game) {
     game.addLocal({ biome: 'venice', x: -50, y: venTerrain(-50, -35), z: -35, near: 6, face: 1.6,
       figure: { shirt: PALETTE.venMosaic, legs: PALETTE.hair2 },
       // fourteen layers, and the nose takes a day
-      beat: { kind: 'work', every: 3.6, dur: 0.85, sfx: 'rustle', volume: 0.09, pitch: 1.2 },
+      beat: { kind: 'work', every: 3.6, dur: 0.85, sfx: 'rustle', volume: 0.09, pitch: 1.2, tool: 'cuencobowl' },  // B12: fourteen layers of paint come out of a pot
       lines: ['Papier mâché. Fourteen layers. The nose takes a day on its own.',
               'The plague doctor sells. I hate the plague doctor.',
               'A face like yours does not need one of these.',
