@@ -377,7 +377,6 @@ export function createPhysicsWorld(game) {
   const npc = new CANNON.Material('npc');
   physBallMat = new CANNON.Material('ball');
   physLightMat = new CANNON.Material('light');
-
   game.mats = { ground, prop, capy, npc };
 
   physPair(world, ground, prop, 0.35, 0.34);
@@ -1633,6 +1632,10 @@ export function createProps(game) {
     // `putIn` when the hold completes. Nothing else in the game calls either.
     vesselNear: physVesselNear,
     putIn: physPutIn,
+    // ---- B10: where a throw lands (item 4b) ----
+    // capybara.js owns the launch vector; this file owns the drag and the
+    // gravity. One caller, on the frames a charge is being held.
+    predictLanding: physPredictLanding,
     dust: physDust3,
     // ---- THINGS THAT HANG (D7) ----
     // Published on `game` as well (below), because a chapter calls it at build
@@ -2714,6 +2717,51 @@ function physScatterQuay() {
       }
     }
   }
+}
+
+/**
+ * WHERE A THROWN PROP ACTUALLY LANDS (B10, item 4b).
+ *
+ * capybara.js draws a mark on the ground at full charge and the first cut put
+ * it at the vacuum-ballistic range, which for a sun hat leaving at 11.0 m/s
+ * across and 9.7 up under g = 24 is 9.30 m. **The hat lands at 3.05 m.** Air
+ * drag takes two thirds of the throw, and it is quadratic, so the error grows
+ * with the charge — the mark would have been most wrong exactly where a player
+ * was looking hardest at it.
+ *
+ * So the predictor is here, in the file that owns the drag law and the
+ * gravity, rather than as a copy of `physAERO_AMAX` and the aero terms in
+ * capybara.js. Same rule as `sayNear` and `peopleNear`: a question about a
+ * module's physics is answered by that module.
+ *
+ * Forward Euler at a fixed 40 Hz for at most two seconds of flight. It is the
+ * same integration the solver does, at a third of the rate, and it costs about
+ * eighty multiplies on the frames a charge is being held.
+ */
+function physPredictLanding(prop, vx, vy, vz, x, y, z, groundY) {
+  const g = physGame.world ? -physGame.world.gravity.y : 24;
+  const m = (prop && prop.mass > 0) ? prop.mass : 0.5;
+  const k = (prop && prop.aeroK > 0) ? prop.aeroK : 0;
+  const h = 1 / 40;
+  let px = x, py = y, pz = z;
+  for (let i = 0; i < 80; i++) {
+    // The air is not moving in this prediction. A gust is a surprise, and a
+    // mark that jittered with the wind would be unreadable — the wind is what
+    // makes the throw funny rather than what makes it aimable.
+    const sp2 = vx * vx + vy * vy + vz * vz;
+    if (k > 0 && sp2 > 0.36) {
+      const sp = Math.sqrt(sp2);
+      let f = k * sp;
+      const fCap = (physAERO_AMAX * m) / sp;
+      if (f > fCap) f = fCap;
+      const a = (f / m) * h;
+      vx -= a * vx; vy -= a * vy; vz -= a * vz;
+    }
+    vy -= g * h;
+    px += vx * h; py += vy * h; pz += vz * h;
+    if (py <= groundY) break;
+  }
+  return { x: px, y: py, z: pz };
 }
 
 function physScatter() {
@@ -5749,6 +5797,7 @@ function physUpdate(dt) {
         if (sp > 3.2) physBarge(p, sp);
       }
     }
+
 
     // Escaped the world (tunnelled, or was ejected out of a static box): put it
     // back on its scatter point. Checked BEFORE the sleep gate, or a body that

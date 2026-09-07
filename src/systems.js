@@ -9281,6 +9281,47 @@ export function createSystems(game) {
   beaconGroup.frustumCulled = false;
   scene.add(beaconGroup);
 
+  // ---- B10: WHERE THE THROW WOULD LAND (item 4b) -------------------------
+  //
+  // Item 4b asks for "a faint arc drawn as the hint arrow is". The hint arrow
+  // is a CSS `rotate()` on a DOM glyph sitting on the paper — there is no
+  // drawn line anywhere in this game to imitate, and the only thing in the
+  // world that points at a place is the beacon four lines above. So the aim is
+  // a MARK and not an arc, which is also the honest answer to the other
+  // measurement: `game.input` has no pitch, so the launch angle is fixed and
+  // the only thing a charge can aim is the DISTANCE. A ring on the spot says
+  // the distance exactly; an arc would be drawing an angle nobody can change.
+  //
+  // Two rings rather than one: the outer holds still at the landing point and
+  // the inner closes on it as the charge fills, so the charge is legible
+  // without a bar, in the same way the incident pips are.
+  // JUDGED FROM THE RENDER, and the first cut failed it. A 0.05 m open
+  // cylinder in petalYellow at 0.55 opacity, seen from the resting boom's 29
+  // degrees, is a scratch on the grass — it was in the frame and it did not
+  // read as anything. The wall is three times taller, the colour is the one in
+  // this palette that separates from grass, sand, stone and snow alike, and
+  // the inner disc is FLAT (a circle, not another wall) so that filling it
+  // reads as filling rather than as a second ring.
+  const aimGroup = new THREEx.Group();
+  aimGroup.visible = false;
+  const aimMat = mat(PALETTE.binRed, { transparent: true, opacity: 0.78, depthWrite: false });
+  const aimFillMat = mat(PALETTE.binRed, { transparent: true, opacity: 0.38, depthWrite: false });
+  const aimRing = new THREEx.Mesh(
+    new THREEx.CylinderGeometry(0.62, 0.62, 0.16, 18, 1, true), aimMat);
+  aimRing.castShadow = false; aimRing.receiveShadow = false;
+  aimGroup.add(aimRing);
+  const aimFill = new THREEx.Mesh(new THREEx.CircleGeometry(0.60, 18), aimFillMat);
+  aimFill.rotation.x = -Math.PI / 2;
+  // ABOVE the group origin, not below it: the group sits 0.03 m over the
+  // ground and the first cut put the disc at -0.06, which is 3 cm UNDER the
+  // grass. It rendered as nothing and read as a fill that does not work.
+  aimFill.position.y = 0.02;
+  aimFill.castShadow = false; aimFill.receiveShadow = false;
+  aimGroup.add(aimFill);
+  aimGroup.frustumCulled = false;
+  scene.add(aimGroup);
+  let sysAimOn = false;
+
   // =========================================================================
   // 1c. CONFETTI — the visible half of a task landing.
   // Torn paper in the palette's own cloth colours, thrown from the capybara and
@@ -31323,6 +31364,28 @@ export function createSystems(game) {
         topRec.dist.textContent = '';
       }
       if (beaconGroup.visible) beaconGroup.visible = false;
+    }
+
+    // ---- B10: THE AIM MARK -------------------------------------------------
+    // capybara.js owns the ballistics and writes `capy.aim`; this end owns the
+    // scene and draws it. Nothing is allocated and the group is hidden the
+    // moment the key comes up, so it costs one visibility write per throw.
+    {
+      const am = game.capy && game.capy.aim;
+      if (am) {
+        const ay = sysGroundY(am.x, am.z);
+        aimGroup.position.set(am.x, ay + 0.03, am.z);
+        // The disc FILLS the ring as the charge fills. It is the same idea as
+        // the incident pips: a quantity the game already keeps, shown where
+        // the player is already looking, with no bar and no number.
+        const c = clamp(game.capy.charge || 0, 0, 1);
+        const k = 0.14 + c * 0.86;
+        aimFill.scale.set(k, k, 1);
+        aimGroup.rotation.y = game.state.time * 1.4;
+        if (!sysAimOn) { sysAimOn = true; aimGroup.visible = true; }
+      } else if (sysAimOn) {
+        sysAimOn = false; aimGroup.visible = false;
+      }
     }
 
     // ---- atmosphere: time of day x biome x altitude ----

@@ -211,8 +211,38 @@ const capyGRAB_WINDUP = 0.10;
 // tap and found to be shorter than one. Anything under about a quarter of a
 // second here would make ordinary throws into put-downs.
 const capyPUT_HOLD  = 0.35;
-// ...and "while stationary". Walking speed is ~3 m/s, so this is a shuffle.
+// ...and "while stationary". Walking speed is 4.2 m/s (measured — the authored
+// figure in the friction note), so this is a shuffle.
 const capyPUT_STILL = 0.9;   // m/s
+
+// ---- B10: CHARGE THE THROW, item 4b ---------------------------------------
+//
+// MEASURED FIRST, and two of item 4b's three numbers moved.
+//
+// "Pitch from the camera's elevation" cannot be built: `game.input` carries
+// x, z, run, action, honk, whistle, jump, slide and camYaw, and NO PITCH OF
+// ANY KIND. The player can orbit the boom and never raise or lower it, and the
+// resting elevation measured over eight seconds is 29.3-29.8 degrees — half a
+// degree of breathing. Reading the throw's pitch off it would read a constant.
+// So the charge sets the RANGE and the facing sets the bearing, and the thing
+// that makes it aimable is the mark on the ground rather than an angle.
+//
+// "5-11 m/s" was written without the gravity. `world.gravity.y` is -24, three
+// times earth, and the present tap-throw leaves at 7.09 m/s (5.12 across, 4.90
+// up — a 43.7 degree launch, near enough the optimum) and lands a sun hat at
+// 1.65 m. Eleven metres a second at this gravity is a five-metre throw. The
+// charge therefore scales the whole launch vector, and the top of the range is
+// set by the distance it has to reach rather than by a speed somebody guessed.
+const capyCHG_TIME  = 0.85;   // s of holding to reach a full charge
+const capyCHG_MIN   = 0.18;   // s before it is a charge at all rather than a tap
+const capyCHG_MAX_K = 2.15;   // × the tap's launch vector at full charge
+// The mark is drawn by systems.js, which owns the scene overlay and the beacon
+// this borrows its shape from; capybara.js owns the ballistics and publishes
+// the point. See capy.aim.
+// 0.22 and not 0.10, judged from the render: below about a fifth of a charge
+// a sun hat's mark lands 1.2 m out, which from the resting boom's 29 degrees
+// is BEHIND THE ANIMAL'S OWN BODY. It was drawn, and it was not visible.
+const capyCHG_MARK_MIN = 0.22;  // charge below which no mark is drawn
 
 const capyDIG_TIME = 0.34;
 const capyWET_DECAY = 1 / 8;
@@ -3910,6 +3940,14 @@ export function createCapybara(game) {
     depth: 0,                        // metres below the live waterline, 0 on land
     diveTime: 0,                     // s this breath has lasted
     threwAt: -1,
+    // ---- B10: THE CHARGED THROW (item 4b) ----
+    // `charge` is 0..1 while the action key is held with something in the
+    // mouth; `aim` is where it would land at that charge, or null. Written
+    // by capyPutStep and read by systems.js, which owns the scene overlay and
+    // draws the ring. The ballistics live here because the launch vector does.
+    charge: 0,
+    aim: null,
+
     /**
      * THE GHOST — see the block above. Two verbs, and systems.js is the only
      * caller: it owns the trace and this file owns the animal.
@@ -4341,7 +4379,12 @@ export function createCapybara(game) {
     }
   }
 
-  function capyTryRelease() {
+  /**
+   * `k` is the charge multiplier on the launch vector, 1 for an uncharged
+   * throw — which is every throw the game had before B10, and which is
+   * therefore still the number this function computes when nobody passes one.
+   */
+  function capyTryRelease(k) {
     const p = capy.heldProp;
     if (!p) return;
     // EAT THE BUFFER (see capyBUF_WINDOW). The press has been spent on the
@@ -4353,9 +4396,15 @@ export function createCapybara(game) {
     // leaves the mouth at the same arc regardless of how heavy it is.
     const m = Math.max(0.15, p.mass || 0.5);
     const spin = (p.spin === undefined || p.spin === null) ? 1 : p.spin;
-    const power = (5.0 + (game.input.run ? 2.0 : 0)) * (0.8 + spin * 0.15);
+    // THE CHARGE SCALES THE WHOLE VECTOR, both terms, so the 43.7 degree
+    // launch angle is the same at every charge and only the range changes.
+    // Scaling the horizontal alone would flatten the arc as it got stronger,
+    // which is the one thing a thrown object must not do — the apex is how a
+    // player reads where it is going.
+    const kk = (typeof k === 'number' && k > 1) ? k : 1;
+    const power = (5.0 + (game.input.run ? 2.0 : 0)) * (0.8 + spin * 0.15) * kk;
     capyThrow.set(Math.sin(capyYaw), 0, Math.cos(capyYaw)).multiplyScalar(power * m);
-    capyThrow.y = 4.2 * m;
+    capyThrow.y = 4.2 * m * kk;
     // props.js owns the held-state transition, the 'capy:drop' event and the sfx
     if (game.physics && typeof game.physics.release === 'function') game.physics.release(capyThrow);
     capyJawOpen = 1;
@@ -4388,15 +4437,64 @@ export function createCapybara(game) {
    * is spent on a throw, because a press that quietly does nothing is worse
    * than either.
    */
+  /** 0 at a tap, 1 at a full charge. */
+  function capyChargeNow() {
+    if (capyPutT < capyCHG_MIN) return 0;
+    return clamp((capyPutT - capyCHG_MIN) / (capyCHG_TIME - capyCHG_MIN), 0, 1);
+  }
+
+  /**
+   * Where the held prop would land at the present charge, written into
+   * `capy.aim` for systems.js to put a ring on. The ballistics are the ones
+   * capyTryRelease uses: a launch of (power, 4.2) × the charge, from the mouth,
+   * against the world's own gravity — which is -24, not -9.8, and getting that
+   * from `game.world` rather than from a constant is the whole reason this can
+   * be trusted in the Drift, where gravity is not Sydney's.
+   */
+  function capyAimPoint(chg) {
+    const p = capy.heldProp;
+    if (!p) return null;
+    const spin = (p.spin === undefined || p.spin === null) ? 1 : p.spin;
+    const kk = 1 + (capyCHG_MAX_K - 1) * chg;
+    const vh = (5.0 + (game.input.run ? 2.0 : 0)) * (0.8 + spin * 0.15) * kk;
+    const vy = 4.2 * kk + 0.7;    // physRelease's own set-down lift, see props.js
+    const gy = capyGroundY(game, capyPosition.x, capyPosition.z);
+    const ph = game.physics;
+    if (!ph || typeof ph.predictLanding !== 'function') return null;
+    // THE AIR IS PART OF THE THROW. The vacuum range for a fully charged sun
+    // hat is 9.30 m and the hat lands at 3.05: drag is quadratic and takes two
+    // thirds of the strongest throw, so a mark placed by arithmetic would have
+    // been most wrong exactly where the player was looking hardest. props.js
+    // owns the drag law and integrates it.
+    const hit = ph.predictLanding(p, Math.sin(capyYaw) * vh, vy, Math.cos(capyYaw) * vh,
+                                  capyPosition.x, capyPosition.y, capyPosition.z, gy);
+    const d = Math.hypot(hit.x - capyPosition.x, hit.z - capyPosition.z);
+    return { x: hit.x, z: hit.z, d: d };
+  }
+
   function capyPutStep(dt) {
-    if (capyPutT < 0) return;
-    if (!capy.heldProp) { capyPutT = -1; capyPutTgt = null; return; }
-    if (!game.input.action) {          // released early: a tap, so throw
-      capyPutT = -1; capyPutTgt = null;
-      capyTryRelease();
+    if (capyPutT < 0) { capy.aim = null; return; }
+    if (!capy.heldProp) { capyPutT = -1; capyPutTgt = null; capy.aim = null; return; }
+    capyPutT += dt;
+    // ---- THE CHARGE, AND WHY EVERY THROW IS NOW ON THE RELEASE ----------
+    // B9 deferred the press only where a put-down existed, precisely so the
+    // other thirty readers of the action key kept their timing. 4b needs the
+    // hold as well, and the rule that comes out is simpler than the one it
+    // replaces rather than stranger: A TAP THROWS, A HOLD DOES THE CONSIDERED
+    // VERSION — which is putting it in the bin if you are standing still
+    // beside one, and a charged throw everywhere else. The impulse of a tap is
+    // unchanged to the decimal; what moved is that it leaves on the key-up.
+    const chg = capyChargeNow();
+    capy.charge = chg;
+    capy.aim = (chg >= capyCHG_MARK_MIN && !capyPutTgt) ? capyAimPoint(chg) : null;
+    if (!game.input.action) {          // released
+      capyPutT = -1; capyPutTgt = null; capy.aim = null; capy.charge = 0;
+      capyTryRelease(1 + (capyCHG_MAX_K - 1) * chg);
       return;
     }
-    capyPutT += dt;
+    // A put-down only happens where one was armed — a hold with no vessel in
+    // reach is a charge and must not be cut short at capyPUT_HOLD.
+    if (!capyPutTgt) return;
     if (capyPutT < capyPUT_HOLD) return;
     // ---- THE ARM IS RE-TESTED ONCE, AT THE END, AND NOT EVERY FRAME ------
     // "Standing still next to a bin" is a property of the PRESS. Re-running
@@ -6208,13 +6306,14 @@ export function createCapybara(game) {
     // re-arming on it restarts the 0.35 s clock — so a one-second hold could
     // end with 0.2 s on the timer and come out as a throw. It read as a
     // put-down that works in one chapter and not the next one.
-    if (input.actionPressed && !talonsHere && capyPutT < 0 &&
-        capy.heldProp && capyPutFind()) {
+    if (input.actionPressed && !talonsHere && capyPutT < 0 && capy.heldProp) {
       capyPutT = 0;
-      capyPutN++;
+      // capyPutFind sets capyPutTgt, and a null target is not a refusal — it
+      // is the other half of the rule: no vessel in reach (or not standing
+      // still) means the hold is a CHARGE instead of a put-down.
+      if (capyPutFind()) capyPutN++;
     } else if (input.actionPressed && !talonsHere) {
-      if (capy.heldProp) capyTryRelease();
-      else capyTryGrabStart();
+      capyTryGrabStart();
     } else if (!talonsHere && !capy.heldProp && capyGrabTimer <= 0 &&
                capyBuffered(input, 'actionBuf')) {
       // THE PRESS IS NEVER LOST, the grab side of it (see capyBUF_WINDOW). A
