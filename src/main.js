@@ -1909,6 +1909,9 @@ function mainBoot() {
     // Who has a job in this chapter and whether they are doing it. See A
     // PERSON WITH A JOB in npc.js.
     game.beatAudit = npcs.beatAudit;
+    // B13: the exchange pairs and the accusations they have been handed.
+    game.exAudit = npcs.exAudit;
+    game.forceBlame = npcs.forceBlame;
     // ...and whether the instanced crowd gestures when it speaks. See D8.
     game.gestAudit = npcs.gestAudit;
   }

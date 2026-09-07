@@ -2434,6 +2434,12 @@ export function createNPCs(game) {
     // is untouched, so this makes the look land on the right person rather
     // than making more of them.
     if (loud) { locChainFrom = loud; locChainT = npcCHAIN_WIN; }
+    // ---- B13: ...AND SOMEBODY GETS THE BLAME FOR IT (item 5c) -----------
+    // `mine` and not merely `loud`: a chapter announcing its own bang — a
+    // crate off a barrow, a gate, a wave — must not start an argument about
+    // an animal that was nowhere near it. Same gate the wariness write takes,
+    // for the same reason. See localBlameArm.
+    if (mine && loud) localBlameArm(x, z);
     // ---- ...AND THE CAPYBARA HEARS IT (v54) -----------------------------
     // npc:startled was emitted by the Sydney roster and by nothing else, so
     // the ear-turn it drives was a two-chapter feature in a nineteen-chapter
@@ -4067,7 +4073,101 @@ export function createNPCs(game) {
     npcEX.push(rec);
     return rec;
   }
+  // =======================================================================
+  // BLAME (B13, ROADMAP-FUN item 5c)
+  // =======================================================================
+  //
+  // The joke is not that they saw you. It is that they did not see WHO, and
+  // the nearest two people are now having an argument about it while the
+  // actual culprit stands there watching.
+  //
+  // ARMED FROM `localsReact` AND NOT FROM `npcWitnessChain`, which is where
+  // the item points. `npcWitnessChain` opens with
+  // `if (live !== 'sydney' && live !== 'pasto') return 0` — it is a
+  // two-chapter function, and blame armed there would have been a two-chapter
+  // feature. `localsReact` is the chapter-neutral one, it already computes
+  // `mine` (was the animal near enough for this to be its doing), and it
+  // already picks out the loudest reactor. Fifth time this pass that the
+  // published-looking hook was the narrow one.
+  //
+  // Measured first: **thirty-three `addExchange` pairs across sixteen
+  // chapters**, so there is somebody to blame somebody else nearly
+  // everywhere.
+  //
+  // NO LINE HERE NAMES WHAT WAS DONE, and none of them names the animal.
+  // Every pair has to work over a smashed bowl, a spilled sack, a bin on its
+  // side and a flock going up — which rules out naming any of those, and what
+  // is left is what people actually say when something has happened and
+  // nobody will admit to it. The accusation is always of the WRONG PERSON:
+  // that is the whole of the item.
+  const npcBLAME = [
+    ['That was you.',                        'That was not me.'],
+    ['You did that.',                        'I have been standing here.'],
+    ['I saw you.',                           'You saw nothing.'],
+    ['Was that you?',                        'Why would it be me?'],
+    ['It was somebody.',                     'It was not this somebody.'],
+    ['You were nearest.',                    'Nearest is not the same as guilty.'],
+    ['Do not look at me.',                   'I am looking at you.'],
+    ['Somebody is going to have to own up.', 'Somebody is.'],
+    ['Well, that was not me.',               'Nobody said it was.'],
+    ['I know what I saw.',                   'You do not.'],
+    ['Right. Whose was that?',               'Not mine.'],
+    ['You are going to blame me for that.',  'I am considering it.'],
+  ];
+  const npcBLAME_R    = 22;   // m from the event to a pair, either member
+  const npcBLAME_COOL = 26;   // s before another pair can be armed anywhere
+  const npcBLAME_SOON = 3.5;  // s — the argument starts while it is still fresh
+  const npcBLAME_KEEP = 22;   // s an armed accusation waits before it is dropped
+  let npcBlameCool = 0;
+  let npcBlameN = 0;      // accusations made, for exAudit
+
+  /**
+   * Give the nearest exchange pair something to argue about. Once, and the
+   * next thing they say is the accusation — `X.blame` is consumed by
+   * npcExStep rather than pushed into the bag, so it cannot come round again
+   * later out of context.
+   */
+  function localBlameArm(x, z) {
+    if (npcBlameCool > 0 || !npcEX.length) return false;
+    const live = game.biome && game.biome.current;
+    if (!live) return false;
+    let best = null, bd = npcBLAME_R * npcBLAME_R;
+    for (let i = 0; i < npcEX.length; i++) {
+      const X = npcEX[i];
+      if (X.biome !== live || X.blame) continue;
+      const da = (X.a.x - x) * (X.a.x - x) + (X.a.z - z) * (X.a.z - z);
+      const db = (X.b.x - x) * (X.b.x - x) + (X.b.z - z) * (X.b.z - z);
+      const d2 = Math.min(da, db);
+      if (d2 < bd) { bd = d2; best = X; }
+    }
+    if (!best) return false;
+    best.blame = npcBLAME[randInt(0, npcBLAME.length - 1)];
+    // Brought forward: an accusation half a minute later is a non sequitur.
+    if (best.t > npcBLAME_SOON) best.t = rand(1.2, npcBLAME_SOON);
+    // ...AND THEIR MOUTHS ARE CLEARED, which is the difference between a
+    // mechanic that works and one a player will ever hear. MEASURED: the
+    // arming fired in five chapters of five and the accusation was SAID in
+    // one, because the same event that armed it had just made one of the pair
+    // say 'Whoa —' through localsReact, and npcExStep will not start an
+    // exchange while either mouth is on its cooldown — which is `cool`, and
+    // `cool` defaults to thirteen seconds. Whatever they were going to say
+    // next matters less than the argument they are about to have.
+    best.a.cd = 0; best.b.cd = 0;
+    // ...and it does not keep. An accusation that finds its window ninety
+    // seconds later is attached to nothing, and the player has walked off.
+    best.blameT = npcBLAME_KEEP;
+    npcBlameCool = npcBLAME_COOL;
+    return true;
+  }
+
   function npcExStep(dt) {
+    if (npcBlameCool > 0) npcBlameCool -= dt;
+    for (let i = 0; i < npcEX.length; i++) {
+      const X = npcEX[i];
+      if (!X.blame) continue;
+      X.blameT -= dt;
+      if (X.blameT <= 0) { X.blame = null; X.blameDrop = (X.blameDrop || 0) + 1; }
+    }
     if (!npcEX.length) return;
     const live = game.biome && game.biome.current;
     const cp = game.capy && game.capy.position;
@@ -4086,10 +4186,50 @@ export function createNPCs(game) {
         continue;
       }
       if (X.t > 0 || !cp) continue;
-      if (X.a.cd > 0 || X.b.cd > 0) { X.t = rand(2, 5); continue; }
       const da = Math.hypot(cp.x - X.a.x, cp.z - X.a.z);
       const db = Math.hypot(cp.x - X.b.x, cp.z - X.b.z);
       const near = Math.min(da, db);
+      // ---- AN ACCUSATION IGNORES THE FLOOR AND THE MOUTHS (B13) --------
+      // MEASURED, and it is the difference between a mechanic that works and
+      // one nobody will ever hear: the arming fired in five chapters of five
+      // and the accusation was said in ONE, and the audit's gate columns say
+      // why — `near` was 3.2, 5.3 and 3.9 m against npcEX_MIN's 6.
+      //
+      // npcEX_MIN exists so an ordinary exchange is never mistaken for being
+      // about the player ("nearer than this and it is about you"). An
+      // accusation IS about the player, and the whole joke is that it happens
+      // while they are standing there. The ceiling still applies — you have to
+      // be able to read the bubbles — and so does the pair's own clock. The
+      // mouths do not: whatever either of them was going to say next matters
+      // less than the argument they are about to have.
+      if (X.blame) {
+        if (near > npcEX_MAX) { X.t = rand(2, 5); }
+        else {
+        // ---- B13: THE ACCUSATION JUMPS THE BAG -------------------------
+        // Consumed here rather than pushed into the bag, so it is said once,
+        // now, and can never come round again three minutes later attached to
+        // nothing. `blameN` is the only thing about this that is visible from
+        // outside — see exAudit.
+        {
+          X.said = X.blame;
+          X.blame = null;
+          X.blameN = (X.blameN || 0) + 1;
+          npcBlameN++;
+          X.a.cd = X.a.cool * rand(0.6, 1.1);
+          localLine(X.a, [X.said[0]]);
+          // ...and they turn to each other, exactly as an ordinary exchange
+          // does. That is the tell that this is two people arguing and not two
+          // people addressing the animal — which matters more here than
+          // anywhere else in the file, because the animal did it.
+          X.a.flYaw = Math.atan2(X.b.x - X.a.x, X.b.z - X.a.z); X.a.flV -= 2.2;
+          X.b.flYaw = Math.atan2(X.a.x - X.b.x, X.a.z - X.b.z); X.b.flV -= 2.2;
+          X.step = 1;
+          X.t = 1.6 + X.said[0].length * 0.035;
+        }
+        }
+        continue;
+      }
+      if (X.a.cd > 0 || X.b.cd > 0) { X.t = rand(2, 5); continue; }
       if (near < npcEX_MIN || near > npcEX_MAX) { X.t = rand(2, 5); continue; }
       // a bag, for the same reason the lines are: you hear all of them first
       if (!X.bag.length) {
@@ -10997,6 +11137,47 @@ export function createNPCs(game) {
              if (typeof x !== 'number' || x !== x) return;
              castReact('startled', x, z, s === undefined ? 0.5 : s, r);
            },
+           /**
+            * B13: WHAT THE EXCHANGE PAIRS ARE DOING, and how many of them
+            * have been handed an accusation. An exchange is two people
+            * talking to each other with the player eavesdropping from six to
+            * twenty-six metres away, so from outside there is no way to tell
+            * a pair that never fired from a pair the player never stood near
+            * — and blame is a rewrite of something that already only happens
+            * sometimes, which is two coats of invisibility.
+            */
+           exAudit: function (reset) {
+             const live = game.biome && game.biome.current;
+             const rows = [];
+             for (let i = 0; i < npcEX.length; i++) {
+               const X = npcEX[i];
+               if (X.biome !== live) continue;
+               // WHICH GATE REFUSED. npcExStep has four of them — the
+               // pair's own clock, both mouths, and a distance window with a
+               // FLOOR as well as a ceiling — and "the accusation was armed
+               // and never said" is the same sentence for all four. The first
+               // cut reported only `armed` and `said`, and a fix aimed at the
+               // wrong gate measured as no change at all.
+               const cp2 = game.capy && game.capy.position;
+               const da = cp2 ? Math.hypot(cp2.x - X.a.x, cp2.z - X.a.z) : -1;
+               const db = cp2 ? Math.hypot(cp2.x - X.b.x, cp2.z - X.b.z) : -1;
+               rows.push({ armed: !!X.blame, said: X.blameN || 0,
+                           dropped: X.blameDrop || 0,
+                           t: +(X.t || 0).toFixed(1), step: X.step,
+                           near: +Math.min(da, db).toFixed(1),
+                           inWindow: Math.min(da, db) >= npcEX_MIN &&
+                                     Math.min(da, db) <= npcEX_MAX,
+                           aCd: +(X.a.cd || 0).toFixed(1), bCd: +(X.b.cd || 0).toFixed(1),
+                           ax: +X.a.x.toFixed(1), az: +X.a.z.toFixed(1) });
+               if (reset) { X.blameN = 0; X.blameDrop = 0; }
+             }
+             const r = { biome: live, pairs: rows.length, total: npcBlameN,
+                         cool: +npcBlameCool.toFixed(1), rows: rows };
+             if (reset) npcBlameN = 0;
+             return r;
+           },
+           /** A test hook, never a verb — the same rule as forceHeat. */
+           forceBlame: function (x, z) { return localBlameArm(x, z); },
            heatSites: npcHeatSites,
            // The register itself, for the audit that walks the capybara up to
            // every person in the game and checks somebody answers. Twenty-six
