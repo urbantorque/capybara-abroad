@@ -3,7 +3,7 @@
 > **B1-B15 ARE BUILT, 8 Sep 2026. ALL SIX ITEMS ARE CLOSED.** The only thing
 > on this document that has not been done is **B0**, which is not code: sit a
 > stranger in front of the title card and watch them play two places. Nothing
-> below replaces it, and after sixteen of this document's claims failed on
+> below replaces it, and after eighteen of this document's claims failed on
 > measurement it is the cheapest hour left in the project.
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
@@ -766,7 +766,7 @@ decays.
 | B12 | 5a the tool and the broken beat (**ten** locals, **five** chapters) | 3 | `e3691f2` |
 | B13 | 5c blame · 5e **already built** · 5b **refused** | 3 | `5e2bae6` |
 | B14 | 6 the number, the headline, the ledger (+ "the ending reads it") | 3 | `76b3e2b` |
-| B15 | 6 gossip pools + the poster | 3 | |
+| B15 | 6 gossip pools + the poster (the photograph **refused**) | 3 | `ba30f2e` |
 
 Every batch is verified the way this repository verifies: a paired A/B in one
 session, a rendered PNG judged by eye, `npm test` green, the 19-chapter soak at
