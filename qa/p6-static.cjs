@@ -19,6 +19,10 @@ const chaps = parts.map((p) => {
     keep: (p.match(/keep: '([^']*)'/) || [])[1] || '',
     keepNone: /keepNone: true/.test(p),
     acts: acts,
+    marquee: (function () {
+      const m = p.match(/marquee: \{ x: (-?[\d.]+), z: (-?[\d.]+), up: (-?[\d.]+), say: '([^']*)' \}/);
+      return m ? { x: +m[1], z: +m[2], up: +m[3], say: m[4] } : null;
+    })(),
   };
 });
 
@@ -82,7 +86,57 @@ for (const t of turn) fail.push('arrival still says: ' + t);
 const none = chaps.filter((c) => c.keepNone);
 if (none.length !== 1) fail.push('keepNone is on ' + none.length + ' chapters, expected exactly 1');
 
+// 8. THE MARQUEE, WHICH IS THE ONE THING EVERY CHAPTER MUST HAVE (B1).
+//    `sysMarqueePoint` degrades to the wow row's hint target when a chapter
+//    says nothing, and a hint target is where you must GO rather than what you
+//    look at — so a missing `marquee` is a chapter that quietly gets a worse
+//    answer instead of an error. It is exactly the kind of hole this file
+//    exists to close.
+const wowActs = [];
+{
+  // ONE RECORD AT A TIME, NOT ONE REGEX ACROSS THE TABLE. A row in TASKS is up
+  // to four lines and the fields a marquee needs — `chapter`, `act`, `wow` —
+  // are spread over them, so a single `[\s\S]{0,400}?` pattern happily pairs
+  // one row's id with the NEXT row's wow. Measured: it reported `to-pasto` as
+  // chapter two's marquee (it is `condor-ride`) and `take-helm` as chapter
+  // three's (it is `manly-voyage`), and it did it while still counting exactly
+  // one per chapter, so the count looked right and every id under it was
+  // wrong. Split on the record boundary first.
+  const recs = tseg.split(/\n  \{ id: /).slice(1);
+  const wows = [];
+  for (const r of recs) {
+    const body = r.slice(0, r.indexOf('\n  { id: ') >= 0 ? r.indexOf('\n  { id: ') : r.length);
+    const w = body.match(/wow: '([^']*)'/);
+    if (!w) continue;
+    const id = (body.match(/^'([a-z0-9-]+)'/) || [])[1];
+    const ch = (body.match(/chapter: (\d+)/) || [])[1];
+    wows.push({ id: id, chapter: +ch, wow: w[1],
+                act: +((body.match(/act: (\d)/) || [])[1] || 1) });
+  }
+  for (const c of chaps) {
+    const mine = wows.filter((w) => w.chapter === c.n);
+    if (mine.length !== 1) fail.push('ch' + c.n + ' has ' + mine.length + ' wow rows, the law is exactly 1');
+    if (mine.length === 1) wowActs.push(mine[0].act);
+    if (!c.marquee) { fail.push('ch' + c.n + ' (' + c.biome + ') has no marquee'); continue; }
+    // `up` is metres above the ground and a negative one is a point underneath
+    // it; the only chapter allowed near zero is one whose subject is the water.
+    if (!(c.marquee.up >= 0)) fail.push('ch' + c.n + ' marquee up is ' + c.marquee.up);
+    if (!c.marquee.say) fail.push('ch' + c.n + ' marquee has no `say`');
+    // WHERE TO LOOK, NEVER WHICH BUTTON. `sysHINTS[id].clue` already teaches
+    // the verb and a second copy of it here would make the signpost a tutorial.
+    if (/press |hold |\bwith E\b|\bwith Q\b|Shift/.test(c.marquee.say || '')) {
+      fail.push('ch' + c.n + ' marquee `say` names a key: ' + c.marquee.say);
+    }
+    // ...and it is not the `way` line wearing a different hat: the way out and
+    // the reason you came are different sentences about different places.
+    if (c.marquee.say === c.open) fail.push('ch' + c.n + ' marquee `say` duplicates `open`');
+  }
+}
+
 console.log('chapters ' + chaps.length + ', tasks ' + tasks.length);
+console.log('marquees: ' + chaps.filter((c) => c.marquee).length + '/' + chaps.length +
+  ', wow in act 1: ' + wowActs.filter((a) => a === 1).length +
+  ', act 2+: ' + wowActs.filter((a) => a > 1).length);
 console.log('acts per chapter: ' + chaps.map((c) => c.n + ':' + c.acts.length).join(' '));
 for (const w of warn) console.log('warn  ' + w);
 for (const f of fail) console.log('FAIL  ' + f);

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // world, it does not build in it. The camera's occlusion ray does: one Vec3 pair
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, grain, TASKS, tasksInChapter, chapterCount, rand, randInt, clamp, damp, lerp,
+import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
          rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
@@ -7463,6 +7463,36 @@ function sysBuildCSS() {
 /* Five rows at the very most (see sysTODO_WINDOW), so the card is small enough
    to never need a scrollbar and never reach the touch stick. No max-height, no
    overflow, no scroll position to keep honest. */
+/* ---------- the marquee line (B1) ----------
+   Above the list and OUTSIDE the <ul>, because it is not a row and must never
+   be counted as one. Its own register: the sparkle at the size of the words
+   rather than at the row marks' 9.5px, the sentence in full ink, and the
+   where-to-look under it in the clue's soft italic. A dashed rule underneath
+   is what separates "the reason you are here" from "the four things you could
+   do about it" without a second heading.
+
+   `display:grid` and not flex: the say line has to sit under the TEXT and
+   line up with it, not under the sparkle, and a two-column grid says that in
+   one declaration where a flex row needs a wrapper element. Collapsed to
+   nothing — including its margin and its rule — when there is no marquee to
+   name, so a chapter whose marquee is already on the paper loses the whole
+   block and not just its contents. */
+'.capyui-marq{display:none;grid-template-columns:auto 1fr;gap:1px 7px;',
+  'margin:4px 0 8px;padding:0 0 8px;border-bottom:1px dashed ' + paper2 + ';}',
+'.capyui-marq.on{display:grid;}',
+'.capyui-marqtier{grid-column:1;grid-row:1;align-self:center;color:' + ink + ';',
+  'font-size:clamp(9.5px,1.55vw,13px);line-height:1;}',
+/* `min-width:0` on both text cells: a `1fr` track is `minmax(auto, 1fr)` and
+   an auto minimum is the widest unbreakable word, so one long place name in a
+   `say` would push the card wider rather than wrap inside it. `text-wrap:
+   pretty` keeps a two-line sentence off a one-word last line, which on a card
+   this narrow is most of them. */
+'.capyui-marqtxt{grid-column:2;grid-row:1;font-size:clamp(9.5px,1.55vw,13px);',
+  'line-height:1.28;color:' + ink + ';font-weight:700;',
+  'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
+'.capyui-marqsay{grid-column:2;grid-row:2;font-size:clamp(8.5px,1.4vw,11px);',
+  'line-height:1.25;color:' + inkSoft + ';font-style:italic;',
+  'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
 '.capyui-todo ul{list-style:none;display:flex;flex-direction:column;gap:3px;}',
 /* max-height is stated even at rest so the roll-up has something to animate FROM
    — a transition out of `none` is a snap. 4.2em clears a two-line row comfortably. */
@@ -8376,6 +8406,10 @@ function sysBuildCSS() {
 '@media (max-width:560px){.capyui-todo{left:8px;top:8px;padding:8px 10px 9px;',
   'width:clamp(150px,44vw,210px);}',
   '.capyui-todo h2{margin:3px 0 5px;letter-spacing:.22em;}',
+  /* The signpost keeps its size on a phone — it is the one line on this card a
+     player must be able to read at arm's length — and gives back the space
+     from its own margins instead. */
+  '.capyui-marq{margin:2px 0 6px;padding:0 0 6px;gap:0 5px;}',
   '.capyui-todo ul{gap:1px;}',
   '.capyui-task{font-size:' + tMd + ';line-height:1.16;padding:0;gap:5px;}',
   '.capyui-box{width:.95em;height:.95em;border-width:1.4px;}',
@@ -13353,6 +13387,9 @@ export function createSystems(game) {
   // Published on musAudit for the same reason musBreath is: a term that is
   // small, slow and weather-dependent is one nobody can prove is alive.
   let musSkyVel = 1, skyRainNow = 0, skyCutNow = 0;
+  // Notes the second voice (A6) has actually scheduled this session. Nothing in
+  // src reads it; the harness does. See the note at its call site.
+  let musSecondN = 0;
   function musVel(v) {
     return v * musSkyVel * (1 + (Math.random() + Math.random() - 1) * sysMUS_VEL_H);
   }
@@ -15491,10 +15528,30 @@ export function createSystems(game) {
     const brK = musBreath < 0.995
       ? clamp((musBreath - sysMUS_BREATH_DIP) / (1 - sysMUS_BREATH_DIP), 0, 1) : 1;
     while (musPluckAt < horizon && guard++ < 12) {
+      // ---- THE PAN OF THE NOTE THIS PASS PLAYED, AND WHETHER IT PLAYED ONE
+      //
+      // A6's answer is panned AGAINST the pluck it is answering (`-pan * 0.8`)
+      // and its block sits out here, one level above the `if (ch)` that used to
+      // declare `pan` — so every time the second voice fired it threw
+      // `ReferenceError: pan is not defined` inside the scheduler, before
+      // `musLiftNote` was reached. Which means A6 HAS NEVER PLAYED A NOTE: it
+      // shipped in M1 as landed and measured, and what was measured was
+      // `sysMUS_2ND[musPalN]` — the TABLE having a row — rather than the voice
+      // entering. Found on 7 Sep from the game's own error banner, on screen,
+      // in Sơn Đoòng, during an unrelated soak.
+      //
+      // `played` is the second half of the fix and not tidiness: the answer is
+      // a reply to a pluck ("not every pluck gets an answer" is its own
+      // comment), and an iteration that thinned the pluck away under `brK`
+      // has nothing to reply to. Without this the voice would answer silence
+      // at pan 0, which is the one place in the stereo field the pad is.
+      let pan = 0;
+      let played = false;
       if (Math.random() < 0.7 * brK) {
         const ch = (musPluckAt < musChordStart && musPrevChord) ? musPrevChord : musCurChord;
         if (ch) {
-          const pan = rand(-0.75, 0.75);
+          pan = rand(-0.75, 0.75);
+          played = true;
           const v = rand(0.028, 0.075) * (0.75 + musIntensity * 0.5);
           if (lead === 'quena') {
             musQuena(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
@@ -15583,7 +15640,7 @@ export function createSystems(game) {
       // chapter, so it arrives the way the place fills in rather than switching
       // on at a threshold a player could locate.
       const sec = sysMUS_2ND[musPalN];
-      if (sec && musProg > sysMUS_2ND_AT && musCurChord && musCurChord.length) {
+      if (played && sec && musProg > sysMUS_2ND_AT && musCurChord && musCurChord.length) {
         const k = clamp((musProg - sysMUS_2ND_AT) / (1 - sysMUS_2ND_AT), 0, 1);
         // Not every pluck gets an answer, and which ones do is a coin weighted
         // by how far in you are. A reply to every single note is a delay line.
@@ -15601,6 +15658,12 @@ export function createSystems(game) {
                       musVel(0.115 * (sec.vel === undefined ? 1 : sec.vel) *
                              sysMUS_2ND_GAIN * (0.55 + k * 0.45)),
                       gap2);
+          // COUNTED, because `second` in musAudit is the TABLE and not the
+          // VOICE — it reports that this palette has a second row, which stayed
+          // true for the whole time the voice was throwing. A flag that says a
+          // feature is configured is not a way out for a feature that is
+          // invisible by design; only a count of notes actually scheduled is.
+          musSecondN++;
         }
       }
       musPluckAt += rand(musPal.pluckA, musPal.pluckB) *
@@ -18317,7 +18380,52 @@ export function createSystems(game) {
   // --- to-do list ---
   const todoEl = sysEl('div', 'capyui-todo');
   const todoHeadEl = sysEl('h2', null, 'To do');
+
+  // ---- ...AND ABOVE ALL OF IT, THE REASON YOU ARE HERE (B1) --------------
+  //
+  // ALL nineteen chapters carry `acts` now, and the paper offers the lowest act
+  // with anything open — so in the fifteen chapters whose `wow` sits in act two
+  // or three, THE ONE THING THE CHAPTER WAS BUILT AROUND IS THE ONE THING THE
+  // INTERFACE NEVER MENTIONS. A player who picked Cappadocia off the title card
+  // because they wanted to fly a balloon arrived to a card, three rows about
+  // pigeons and no balloon. The picker is ungated, so every one of the nineteen
+  // is somebody's first place, and every one of them was doing this.
+  //
+  // NOT A ROW, for the same three reasons the way-on row is not a task: it must
+  // not count towards `win`, `chapComplete` or the act derivation, or Sydney's
+  // act one grows to eleven and every act after it opens early. It is a
+  // SIGNPOST — the sparkle the marquee row already wears (F4) at full size, the
+  // sentence, and one line saying WHERE TO LOOK rather than which button.
+  //
+  // It goes away the moment the marquee row is genuinely on the paper — the row
+  // itself carries the same sparkle, and two of the same thing on one card
+  // reads as a bug rather than as emphasis. So it is on while the marquee is
+  // still a rumour, and off once it is a task.
+  //
+  // ABOVE THE HEADING and not under it. `todoHeadEl` is the live ACT's kicker —
+  // THE VALLEY, MONG KOK, OUT THE BACK — so a marquee belonging to act three
+  // sitting underneath act one's name is a claim about which movement it is in,
+  // and it is the wrong one. The card reads top to bottom as: what this place
+  // is for, which movement you are in, and what is open in it.
+  const marqEl = sysEl('div', 'capyui-marq');
+  const marqTierEl = sysEl('span', 'capyui-marqtier');
+  marqTierEl.appendChild(sysGlyphEl('wow'));
+  // `role="img"` and not a bare label. `aria-label` on a generic element with
+  // no role is discarded by most screen readers, so the sparkle — the whole
+  // difference between this line and any other sentence on the card — would
+  // have been announced as nothing at all. The glyph's own <svg> is already
+  // aria-hidden inside sysBuildGlyph, so the label is the only thing said.
+  marqTierEl.setAttribute('role', 'img');
+  marqTierEl.setAttribute('aria-label', 'the big one here');
+  const marqTxtEl = sysEl('span', 'capyui-marqtxt', '');
+  const marqSayEl = sysEl('span', 'capyui-marqsay', '');
+  marqEl.appendChild(marqTierEl);
+  marqEl.appendChild(marqTxtEl);
+  marqEl.appendChild(marqSayEl);
+  todoEl.appendChild(marqEl);
   todoEl.appendChild(todoHeadEl);
+  let marqId = '';
+  let marqSay = '';    // the authored sentence, before the metres are added
 
   const listEl = sysEl('ul');
   const taskRec = Object.create(null);
@@ -22200,6 +22308,27 @@ export function createSystems(game) {
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
     }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
+    // ---- THE MARQUEE LINE (B1) --------------------------------------------
+    // Computed AFTER `show` is filled and BEFORE anything is written, so the
+    // "is the marquee row already on the paper" test reads the window that is
+    // about to be drawn rather than the one that was drawn last time — a frame
+    // of both the signpost and the row is exactly the duplicate this is
+    // supposed to prevent, and it would have appeared on the one frame the act
+    // opens, which is the frame a player is looking at the card.
+    const wowDef = wowOfChapter(n);
+    const wowRec = wowDef ? taskRec[wowDef.id] : null;
+    const marqOn = !!(wowDef && wowRec && !wowRec.done && !show[wowDef.id] && !wayOn);
+    if (marqOn && marqId !== wowDef.id) {
+      marqId = wowDef.id;
+      marqTxtEl.textContent = wowDef.text;
+      const mq = cdef && cdef.marquee;
+      marqSay = sysSay((mq && mq.say) || '');
+      marqSayEl.textContent = marqSay;
+    } else if (!marqOn) {
+      marqId = '';
+      marqSay = '';
+    }
+    marqEl.classList.toggle('on', marqOn);
     if (top !== todoTopId) {
       // clear the aim off whoever used to be top
       const old = taskRec[todoTopId];
@@ -27264,6 +27393,55 @@ export function createSystems(game) {
   }
 
   /**
+   * WHAT THIS PLACE IS FOR, AS A POINT IN IT (B1). See CHAPTERS' `marquee`.
+   *
+   * Answers for the LIVE chapter and for no other, which is not a limitation
+   * but the contract: `up` is metres above the ground and `sysGroundY` reads
+   * the live biome's own terrainHeight, so a point resolved for a chapter that
+   * is not loaded would be `up` metres above the datum of whichever world
+   * happens to be resident — the identical family of bug as the Pasto-by-name
+   * consumers and the detached-biome traverse. Three sources, in order:
+   *
+   *   1. `api.marqueeAt()` — the chapter's own live subject, for a marquee
+   *      that MOVES. Pasto publishes it: the condor is the thing you are here
+   *      for and it is only in the sky after you have whistled, so the static
+   *      point is the mountain it circles and the hook takes over once the
+   *      bird is up.
+   *   2. `marquee` on CHAPTERS — the authored composition point.
+   *   3. `hintTarget(wow)` — where the card would point. Last, deliberately:
+   *      a hint target is where you must GO, and those are not the same thing
+   *      (Hong Kong's is a rooftop 34 m up; what you look at is the towers
+   *      across the water).
+   *
+   * Null if the chapter has no marquee at all, which nothing in the game is
+   * allowed to be: `qa/p6-static.cjs` fails the build on a chapter with no
+   * `marquee` and on a chapter with anything other than exactly one `wow`.
+   */
+  function sysMarqueePoint() {
+    const api = sysLiveBiomeApi(game);
+    if (api && typeof api.marqueeAt === 'function') {
+      let p = null;
+      try { p = api.marqueeAt(); } catch (e) { p = null; }
+      if (p && typeof p.x === 'number' && p.x === p.x &&
+          typeof p.y === 'number' && p.y === p.y &&
+          typeof p.z === 'number' && p.z === p.z) {
+        return { x: p.x, y: p.y, z: p.z, live: true };
+      }
+    }
+    const cdef = chapterDef(todoChapter());
+    const m = cdef && cdef.marquee;
+    if (m && typeof m.x === 'number' && typeof m.z === 'number') {
+      return { x: m.x, y: sysGroundY(m.x, m.z) + (m.up || 0), z: m.z, live: false };
+    }
+    const w = wowOfChapter(todoChapter());
+    const h = w ? game.hintTarget(w.id) : null;
+    if (h) return { x: h.x, y: (h.y === h.y ? h.y : sysGroundY(h.x, h.z) + 2), z: h.z, live: false };
+    return null;
+  }
+  /** …and out, for the glimpse, the paper and the instrument. */
+  game.marqueePoint = sysMarqueePoint;
+
+  /**
    * WHERE THE LIVE WATERLINE IS at a point — capybara.js's capyWaterY, on this
    * side of the fence, because the picture now has to know too: what makes a
    * frame read as underwater is decided by where the LENS is, and the lens is
@@ -27704,7 +27882,8 @@ export function createSystems(game) {
       // and a phrase that fires into the wrong key are all silent failures.
       pal: musPalN, chapProg: +musProg.toFixed(3),
       skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
-      second: !!sysMUS_2ND[musPalN], skyVel: +musSkyVel.toFixed(4),
+      second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
+      skyVel: +musSkyVel.toFixed(4),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
       // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
       // published "there is no pulse" that game.music.beats() answers -1 to,
@@ -30523,6 +30702,37 @@ export function createSystems(game) {
     hintT -= dt;
     if (hintT <= 0) {
       hintT = sysHINT_TICK;
+      // ---- ...AND HOW FAR THE MARQUEE IS (B1) ----------------------------
+      // On the signpost's own line, in the clue's soft italic and NOT in the
+      // aim's accent: the accent on this card means "this is where the arrow
+      // is pointing" and the arrow is not pointing here. It answers the one
+      // question the sentence cannot — do I go now or later — and it is why
+      // the marquee point is a point and not just a sentence.
+      //
+      // Rounded to ten metres beyond fifty, because a signpost that counts
+      // down metre by metre is a HUD, and the four-times-a-second write is
+      // change-guarded for the same reason every other write on this card is.
+      if (marqId) {
+        const mp = sysMarqueePoint();
+        let line = marqSay;
+        if (mp) {
+          const md = Math.sqrt((mp.x - p.x) * (mp.x - p.x) + (mp.z - p.z) * (mp.z - p.z));
+          // A NON-BREAKING SPACE in the figure. `.capyui-marqsay` is a wrapping
+          // sentence and not the aim's `white-space:nowrap` chip, so an
+          // ordinary space lets "40" end one line and "m" start the next.
+          const mtxt = md < 12 ? 'you are here'
+                     : md < 50 ? md.toFixed(0) + ' m'
+                     : md < 950 ? (Math.round(md / 10) * 10) + ' m' : 'a long way';
+          // ...AND THE MIDDOT IS BOUND TO THE SENTENCE, not to the figure.
+          // Ordinary spaces on both sides orphan the separator and the
+          // figure onto a line of their own on a narrow card (measured, in
+          // qa/MF-sydney.png), and binding it forward instead would do the
+          // same thing one character later. This way the sentence ends
+          // with the middot and only the figure wraps.
+          line = marqSay + '\u00a0·  ' + mtxt;
+        }
+        if (marqSayEl.textContent !== line) marqSayEl.textContent = line;
+      }
       hintHas = false;
       const h = started && todoTopId ? sysHINTS[todoTopId] : null;
       if (h && typeof h.where === 'function') {

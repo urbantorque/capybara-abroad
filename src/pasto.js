@@ -3004,6 +3004,23 @@ export function createPasto(game) {
   const api = {
     built() { return pastoBuilt; },
     /**
+     * THE ONE MARQUEE IN THE GAME THAT MOVES (B1). See CHAPTERS' `marquee`.
+     *
+     * Chapter two is the only place whose `wow` is an ANIMAL, and it is not in
+     * the sky until you have whistled for it — so the authored point is the
+     * crater it circles, which is the honest answer for the first minute, and
+     * this takes over the moment the bird is actually up there. Null and not
+     * an old position while it is down: a glimpse aimed at where a condor used
+     * to be is a shot of a hillside, and the static point is the better
+     * fallback in exactly that case.
+     */
+    marqueeAt() {
+      const c = game.condor;
+      if (!c || !c.active || !c.group) return null;
+      const p = c.group.position;
+      return (p && p.x === p.x) ? { x: p.x, y: p.y, z: p.z } : null;
+    },
+    /**
      * WHEN THE FLOAT IS NEXT AT THE SOUTH END (D9).
      *
      * `carroza` pays out for riding her UP the plaza, so the window is the

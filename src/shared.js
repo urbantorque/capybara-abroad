@@ -2844,11 +2844,42 @@ export const TASKS = [
 //   win     OPTIONAL. How many open rows the paper shows at once here. Default
 //           is sysTODO_WINDOW (4). A chapter that wants to be a corridor rather
 //           than a menu sets 2; one that wants to be a sprawl sets 6.
+//
+// ---- AND ONE THAT SAYS WHAT THE CHAPTER IS FOR (B1) -----------------------
+//
+//   marquee THE THING THIS PLACE EXISTS FOR, AS A POINT AND AS A SENTENCE.
+//           `{ x, z, up, say }`. Every chapter has exactly one `wow` row and
+//           the game has always known which — but the interface pointed at it
+//           NOWHERE: the arrival card names the place, the paper offers the
+//           lowest act with anything open, and in EIGHTEEN of the nineteen the
+//           `wow` sits in act two or three — every chapter but Kyoto, whose
+//           `uji-run` is the only marquee in act one. So a player who picked
+//           Cappadocia off the title card because they wanted to fly a balloon
+//           arrived to three rows about pigeons. `qa/p6-static.cjs` prints the
+//           split, so that eighteen cannot go stale in silence.
+//
+//           `up` is metres ABOVE THE GROUND at (x, z), not an absolute height,
+//           and that is the whole reason this is four numbers rather than
+//           three: a marquee point is a composition — the middle of the sails,
+//           the shaft of daylight, the crest of the dune — and it has to stay
+//           the middle of the thing when the terrain under it is retuned. The
+//           ground is sampled off the live biome's own terrainHeight, so a
+//           chapter with no relief (Sydney) reads zero and `up` is absolute
+//           there by construction.
+//
+//           `say` is WHERE TO LOOK and never HOW TO DO IT — the row already
+//           names the verb and `sysHINTS[id].clue` already teaches the button.
+//           It is the same register as `way`.
+//
+//           A chapter whose marquee MOVES publishes `marqueeAt()` on its own
+//           api (pasto.js does, for the condor) and that wins while it answers.
+//           See sysMarqueePoint.
 export const CHAPTERS = [
   { n: 1, biome: 'sydney',  name: 'Sydney',          sub: 'the gardens, unsupervised',
     arrive: '',           far: 400,  tall: false, pal: 0,
     hint: 'the gardens, unsupervised',                open: 'be a menace.', way: 'the ferry wharf at the Quay',
     keep: 'a tourist’s hat',
+    marquee: { x: 0, z: 2.5, up: 11, say: 'the white sails, at the far end of the gardens' },
     // ---- THE FIRST CHAPTER HAD NO SHAPE EITHER (F4) --------------------
     // Nineteen rows — the longest list in the game — offered four at a time in
     // author order, in the one chapter every player opens on. `win: 4` rather
@@ -2868,6 +2899,7 @@ export const CHAPTERS = [
     arrive: 'to-pasto',   far: 900,  tall: true,  pal: 1,
     hint: '2 527 m up, and a condor',                 open: 'two thousand five hundred metres up, and nobody told them.', way: 'the crater on Galeras',
     keep: 'a condor’s flight feather', win: 3,
+    marquee: { x: -40, z: -70, up: 26, say: 'the bird, and the mountain it has been circling' },
     note: 'The bird was up there the whole time you were stealing potatoes.',
     // ---- THE SECOND CHAPTER HAD NO SHAPE (R8) --------------------------
     // Pasto is a town, then a bird, then a mountain — the geography says so
@@ -2899,6 +2931,7 @@ export const CHAPTERS = [
     far: 1600, tall: false, pal: 2,
     hint: 'a boat, and Manly somewhere north',        open: 'find the wheel.', way: 'up the Corso at Manly',
     keep: 'an unpunched ferry ticket', win: 3,
+    marquee: { x: 6.6, z: 6, up: 4, say: 'she is at the wharf, and Manly is an hour north' },
     note: 'You took a boat off a man who had been driving it for eleven years, and he watched you dock it.',
     acts: [
       { kick: 'THE QUAY', line: 'she is yours. find the wheel.' },
@@ -2909,6 +2942,7 @@ export const CHAPTERS = [
     arrive: 'to-kyoto',   far: 700,  tall: false, pal: 4,
     hint: 'ten thousand gates and a lot of tea',      open: 'four hundred years of arrangement, and you.', way: 'the bridge at Uji',
     keep: 'a tea whisk, slightly chewed',
+    marquee: { x: 4, z: 128, up: 3, say: 'an hour down the river, where the water runs fast' },
     note: 'Ten thousand gates, and for one afternoon the loudest thing in Kyoto was you.',
     acts: [
       { kick: 'KYOTO', line: 'everything here has been arranged very carefully for a very long time.' },
@@ -2918,6 +2952,7 @@ export const CHAPTERS = [
     arrive: 'to-cali',    far: 1000, tall: false, pal: 5,
     hint: 'the salsa capital of the world',           open: 'listen first.', way: 'the bridge over the Río Cali',
     keep: 'a stick of sugarcane',
+    marquee: { x: 30, z: 40, up: 3, say: 'the party bus. it goes up the hill and it does not wait' },
     note: 'You got the timing right some while before you understood what you were counting.',
     acts: [
       { kick: 'THE CITY', line: 'listen first. everything here is on top of the same beat.' },
@@ -2928,6 +2963,7 @@ export const CHAPTERS = [
     arrive: 'to-rio',     far: 1400, tall: false, pal: 6,
     hint: 'a bateria, and it is not waiting for you', open: 'follow the drums.', way: 'the rock at Arpoador',
     keep: 'a tile off Selarón’s steps',
+    marquee: { x: -47.8, z: 46, up: 4, say: 'the avenue, and the drums are already on it' },
     note: 'The bateria did not slow down for you, and you did not ask it to.',
     acts: [
       { kick: 'COPACABANA', line: 'four kilometres of pavement with a pattern in it.' },
@@ -2938,6 +2974,7 @@ export const CHAPTERS = [
     arrive: 'to-iceland', far: 1200, tall: true,  pal: 7,
     hint: 'dark, and the ground does not hold',       open: 'it will not get properly dark. plan accordingly.', way: 'the end of the pier',
     keep: 'a piece of the glacier',
+    marquee: { x: -40, z: -10, up: 60, say: 'the whole sky, out past the last of the town lights' },
     note: 'It never got properly dark, so nothing you did here was ever quite unobserved.',
     acts: [
       { kick: 'REYKJAVÍK', line: 'nobody is out. that is the good news.' },
@@ -2948,6 +2985,7 @@ export const CHAPTERS = [
     arrive: 'to-sahara',  far: 1600, tall: true,  pal: 8,
     hint: 'a maze, and then no maze at all',          open: 'a thousand people in this square and every one of them is working.', way: 'the fire at the desert camp',
     keep: 'an orange off the cart',
+    marquee: { x: 276, z: 10, up: 4, say: 'east, past where the maze stops. the big one' },
     note: 'By the second evening the square knew your face.',
     acts: [
       { kick: 'JEMAA EL-FNAA', line: 'do not rob anybody yet. or do.' },
@@ -2958,6 +2996,7 @@ export const CHAPTERS = [
     arrive: 'to-drift',   far: 1500, tall: true,  pal: 9,
     hint: 'no ground to speak of, and a wind',        open: 'nobody is entirely sure how you got up here, you included.', way: 'the lantern plinth, once it is lit',
     keep: 'a seed-head, still trying to leave',
+    marquee: { x: 36, z: -190, up: 8, say: 'the plinth at the top of the world, and it is unlit' },
     note: 'There was no floor, and you stopped minding somewhere over the third island.',
     acts: [
       { kick: 'NO GROUND', line: 'nothing here is nailed down. step off something and find out.' },
@@ -2967,6 +3006,7 @@ export const CHAPTERS = [
     arrive: 'to-venice',  far: 900,  tall: false, pal: 10,
     hint: 'the floor is negotiable',                  open: 'the ground here is a negotiation with the sea, and the sea is early.', way: 'the two columns on the Molo',
     keep: 'a pigeon feather from the Piazza',
+    marquee: { x: -4, z: -35, up: 7, say: 'this square, and the sea is coming up through it' },
     note: 'The water came up over the paving and everybody carried on doing what they were doing.',
     acts: [
       { kick: 'LOW WATER', line: 'the tide is early. mind the paving.' },
@@ -2976,6 +3016,11 @@ export const CHAPTERS = [
     arrive: 'to-kowloon', far: 1300, tall: true,  pal: 11,
     hint: 'a wall of light, and a way up it',         open: 'seven million people on a piece of rock, and they all went upwards.', way: 'the end of the Star Ferry pier',
     keep: 'a length of scaffold bamboo',
+    // up 34 and not 45: `symphony`'s own hint target is a roof at 34.6 m, and a
+    // point eleven metres over it is eleven metres of empty sky — measured, in
+    // qa/MF-kowloon.png, which framed black. The subject is the roof you have
+    // to be standing on and the wall of neon under it, not the air above both.
+    marquee: { x: -19.1, z: 0, up: 34, say: 'the roof at the top of the scaffold, and the whole wall of light from up there' },
     note: 'You spent most of this chapter above the people who live in it.',
     acts: [
       { kick: 'MONG KOK', line: 'nothing on this street is at ground level.' },
@@ -2986,6 +3031,7 @@ export const CHAPTERS = [
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
     hint: 'twelve chapters of paddling. enough.',     open: 'you have been paddling about on the top of the water for eleven chapters.', way: 'the end of the bamboo jetty',
     keep: 'a pearl out of the giant clam',
+    marquee: { x: 0, z: -70, up: 1, say: 'out past the reef, and then straight down' },
     note: 'Eleven chapters of paddling about on the surface, and the whole thing was underneath.',
     acts: [
       { kick: 'THE ISLAND', line: 'a beach, a jetty, and a boat that goes out to the good part.' },
@@ -2996,6 +3042,7 @@ export const CHAPTERS = [
     arrive: 'to-cappadocia', far: 2200, tall: true, pal: 13,
     hint: 'no steering. only up and down.',           open: 'the wind goes a different way at every height. that is the whole game.', way: 'the landing plain, once you have flown',
     keep: 'a scrap of balloon envelope',
+    marquee: { x: 0, z: -40, up: 12, say: 'the launch field. eighty of them go up at first light' },
     note: 'You could not steer, and it turned out that was never the problem.',
     acts: [
       { kick: 'THE VALLEY', line: 'soft rock, and everybody who ever lived here dug into it.' },
@@ -3006,6 +3053,7 @@ export const CHAPTERS = [
     arrive: 'to-manly',   far: 1500, tall: false, pal: 14,
     hint: 'the sea has a shape here',                 open: 'this is the side of the peninsula that faces the whole Pacific.', way: 'between the red and yellow flags',
     keep: 'a Norfolk pine cone',
+    marquee: { x: 0, z: -23.8, up: 1, say: 'out the back, where the sets come from' },
     note: 'The sea here has a shape, and it took you a while to stop arguing with it.',
     acts: [
       { kick: 'THE BEACH', line: 'a kilometre of sand and nobody in charge of any of it.' },
@@ -3016,6 +3064,7 @@ export const CHAPTERS = [
     arrive: 'to-pantanal', far: 1300, tall: false, pal: 15,
     hint: 'you are not the strangest thing here',     open: 'you are, as far as anybody here is concerned, from round here.', way: 'the last bridge on the Transpantaneira',
     keep: 'nothing. it was yours already.',
+    marquee: { x: -34, z: -53, up: 2, say: 'the river, and the whole herd has to be on the far side of it' },
     // ...and no picture of it, which is the whole exception. Eighteen cards
     // hold up a drawn object; this one holds up the sentence and nothing
     // else, and the empty frame is what makes the sentence land.
@@ -3029,6 +3078,7 @@ export const CHAPTERS = [
     arrive: 'to-cave',    far: 800,  tall: false, pal: 16,
     hint: 'no light in here but yours',               open: 'nine kilometres of it, and no light that you did not bring.', way: 'the slot of daylight at the far end',
     keep: 'a cave pearl', win: 2,
+    marquee: { x: 4, z: -48, up: 40, say: 'there is a hole in the roof of this mountain' },
     note: 'You made the only light there was, and it went out every few seconds.',
     acts: [
       { kick: 'THE MOUTH', line: 'wheek. it is the only way to see anything.' },
@@ -3039,6 +3089,7 @@ export const CHAPTERS = [
     arrive: 'to-antarctic', far: 2000, tall: true, pal: 17,
     hint: 'too cold to walk. take the boat.',         open: 'the orange boat at the end of the jetty. that is the chapter.', way: 'the head of the station jetty',
     keep: 'the station’s enamel mug', win: 3,
+    marquee: { x: 14.3, z: -169.5, up: 2, say: 'out in the channel, wherever the blows are' },
     note: 'Nothing on this continent had any opinion about you whatsoever.',
     acts: [
       { kick: 'THE STATION', line: 'too cold to walk. take the boat.' },
@@ -3050,6 +3101,7 @@ export const CHAPTERS = [
     hint: 'the first place that minds you being here', open: 'somewhere in this town is the first person who will mind.',
     way: 'the steps of the Casino',
     keep: 'a mother-of-pearl plaque', win: 3,
+    marquee: { x: 152, z: -12, up: 4, say: 'the tunnel under the hotel, and they go through it flat out' },
     note: 'The first place in the world that asked what you thought you were doing.',
     acts: [
       { kick: 'THE PORT', line: 'it is twenty past eight. everything is switched on.' },
@@ -3061,6 +3113,7 @@ export const CHAPTERS = [
     hint: 'the road is not going to stop',            open: 'seven million people and six million of them are on a moped.',
     way: 'the head of the Long Biên bridge',
     keep: 'a plastic stool, slightly cracked', win: 3,
+    marquee: { x: -82, z: 46, up: 3, say: 'an alley the exact width of a train' },
     note: 'You crossed six lanes without stopping and the road never noticed you were there.',
     acts: [
       { kick: 'THE THIRTY-SIX STREETS', line: 'do not wait for a gap. there is no gap.' },
@@ -3510,6 +3563,22 @@ export function chapterCount() {
   let n = 1;
   for (let i = 0; i < TASKS.length; i++) if ((TASKS[i].chapter || 1) > n) n = TASKS[i].chapter;
   return n;
+}
+
+/**
+ * THE ONE ROW A CHAPTER IS FOR, or null. See TASKS' `wow` note and CHAPTERS'
+ * `marquee` note.
+ *
+ * The marquee law is one `wow` per chapter and nothing enforces it, so this
+ * answers the FIRST — a second one in a chapter would be a mistake somebody
+ * has to see rather than a silently different answer depending on which
+ * reader asked.
+ */
+export function wowOfChapter(n) {
+  for (let i = 0; i < TASKS.length; i++) {
+    if ((TASKS[i].chapter || 1) === n && TASKS[i].wow) return TASKS[i];
+  }
+  return null;
 }
 
 /** Task ids for a chapter, in list order. */

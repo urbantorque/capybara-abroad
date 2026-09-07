@@ -14,6 +14,247 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH ONE — WHAT THE PLACE IS FOR (B1 — 7 Sep 2026)
+
+**LANDED.** The first batch of `ROADMAP-FUN.md`: item 1b (the marquee line on
+the paper), the `marquee:` channel all nineteen chapters now publish, and item
+1f (`qa/first-five.js`), which is the instrument every later batch on that
+roadmap is judged against.
+
+### THE PROBLEM, MEASURED FIRST
+
+Every chapter has exactly one `wow` row and the game has always known which.
+**Eighteen of the nineteen sit in act two or three** (`qa/p6-static.cjs` prints
+the split; only chapter four's `uji-run` is in act one), and the paper offers
+the lowest act with anything open — so the one thing a chapter was built around
+was the one thing the interface never mentioned. The title picker is ungated
+(`pickDefs` maps all of `CHAPTERS`; only the in-game departures board reads
+`jrOpen`), so every one of the nineteen is somebody's first place, and every
+one of them was doing this.
+
+Measured before the batch, on the arrival frame itself — the one shot every
+player of a chapter sees — with the composition still pinned: the marquee's
+point was inside the frustum in EIGHT of nineteen, and in most of those eight
+it was in the top tenth of the frame or beyond the far plane.
+
+### `marquee:` ON CHAPTERS
+
+`{ x, z, up, say }`, one per chapter, all nineteen authored.
+
+  - `up` is metres ABOVE THE GROUND at (x, z) and not an absolute height. That
+    is the whole reason it is four numbers rather than three: a marquee point
+    is a composition — the middle of the sails, the shaft of daylight, the
+    crest of the dune — and it has to stay the middle of the thing when the
+    terrain under it is retuned. The ground comes off `sysGroundY`, so the one
+    chapter with no relief reads zero and `up` is absolute there by
+    construction.
+  - `say` is WHERE TO LOOK and never HOW TO DO IT. `sysHINTS[id].clue` already
+    teaches the button; a second copy of it on the signpost would make it a
+    tutorial, which is the thing the touch pass spent a batch removing.
+    `qa/p6-static.cjs` fails the build on a `say` that names a key.
+
+### `sysMarqueePoint()` — THREE SOURCES, IN ORDER
+
+`game.marqueePoint()`. Answers for the LIVE chapter and no other, which is the
+contract rather than a limitation: `up` is resolved against the live biome's
+terrainHeight, so a point resolved for a chapter that is not loaded would be
+`up` metres above the datum of whichever world happens to be resident.
+
+  1. `api.marqueeAt()` — the chapter's own live subject, for a marquee that
+     MOVES. **Pasto is the only publisher** and it is the reason the hook
+     exists: chapter two's `wow` is an ANIMAL, and it is not in the sky until
+     you have whistled for it. The static point is the crater it circles, which
+     is the honest answer for the first minute; the hook takes over once the
+     bird is actually up, and returns null rather than a stale position while
+     it is down — a glimpse aimed at where a condor used to be is a shot of a
+     hillside, and the static point is the better answer in exactly that case.
+  2. `marquee` on `CHAPTERS`.
+  3. `hintTarget(wow)`. LAST, deliberately: a hint target is where you must GO,
+     and that is not what you look at — Hong Kong's is a rooftop 34 m up; the
+     subject is the towers across the water.
+
+### THE MARQUEE LINE (1b)
+
+A signpost above the act heading on the to-do card: the `wow` sparkle at the
+size of the words rather than at the row marks' 9.5 px, the sentence in full
+ink, and `say` plus the live distance under it in the clue's soft italic.
+
+**NOT A ROW**, for the three reasons the way-on row is not a task: outside the
+`<ul>`, not in `taskRec`, so it cannot touch `win`, `chapComplete` or the act
+derivation. Sydney's act one is ten rows and adding an eleventh would open
+every act after it early.
+
+**ABOVE THE HEADING and not under it.** `todoHeadEl` is the live ACT's kicker —
+THE GARDENS, MONG KOK, OUT THE BACK — so a marquee belonging to act three
+sitting underneath act one's name is a claim about which movement it is in, and
+it is the wrong one. The card reads top to bottom as: what this place is for,
+which movement you are in, and what is open in it.
+
+**IT STANDS DOWN once the marquee row is genuinely on the paper** — the row
+already carries the same sparkle (F4), and two of the same thing on one card
+reads as a bug rather than as emphasis. The test is `show[wowId]` computed
+inside `todoRefresh` AFTER the window is filled and BEFORE anything is written,
+so the duplicate never appears even on the single frame the act opens.
+
+The distance is on the signpost's own line, in the clue's soft italic and NOT
+in the aim's accent: the accent on this card means "this is where the arrow is
+pointing" and the arrow is not pointing here. Rounded to ten metres beyond
+fifty, because a signpost that counts down metre by metre is a HUD.
+
+### THE INSTRUMENT (1f)
+
+`qa/first-five.js`. Fifty-odd passes have measured the picture, the sound, the
+physics and the paper, and none of them had ever measured what happens in the
+first minute of a chapter. Per chapter, entered through `hud.cross` and driven
+by a random walk: time to the first tick, time to the first unoccluded sight of
+the marquee, the fraction of frames it was visible in, the longest gap between
+ticks, and whether the signpost was up.
+
+Two companions: `qa/arrive-see.js` (is the marquee in the ARRIVAL frame — the
+number item 1a has to move) and `qa/marq-frame.js` (put the lens on all
+nineteen points and write a PNG, because a composition is only ever judged by
+eye).
+
+### MEASURED
+
+**The instrument's own baseline**, `qa/first-five.js`, nineteen chapters, ninety
+seconds each, entered through `hud.cross`, driven by a random walk. This is the
+table every later batch of ROADMAP-FUN is judged against:
+
+| ch | first tick | first sight of the marquee | seen in | longest gap | signpost |
+|---|---|---|---|---|---|
+| Sydney | 11.0 s | 0.5 s | 4.9 % | 51.0 s | on |
+| Pasto | 5.0 s | 25.0 s | 71.7 % | 65.0 s | on |
+| Quay | never | 3.5 s | 15.6 % | 90.0 s | on |
+| Kyoto | never | never | 0 | 91.5 s | on |
+| Cali | 28.5 s | never | 0 | 62.0 s | on |
+| Rio | 0.6 s | never | 0 | 75.5 s | on |
+| Iceland | never | never | 0 | 90.5 s | on |
+| Marrakech | never | never | 0 | 90.0 s | on |
+| the Drift | 0.7 s | never | 0 | 70.5 s | on |
+| Venice | 18.0 s | 0.5 s | 2.2 % | 60.5 s | on |
+| Hong Kong | never | never | 0 | 90.0 s | on |
+| Palawan | never | never | 0 | 91.0 s | on |
+| Cappadocia | 9.5 s | never | 0 | 74.0 s | on |
+| Manly | 26.0 s | 26.5 s | 4.9 % | 42.5 s | on |
+| the Pantanal | 16.0 s | 0.5 s | 23.6 % | 75.0 s | on |
+| Sơn Đoòng | 22.5 s | never | 0 | 31.0 s | on |
+| Antarctica | 2.0 s | never | 0 | 88.0 s | on |
+| Monte Carlo | 2.5 s | never | 0 | 88.5 s | on |
+| Hanoi | 26.5 s | never | 0 | 35.0 s | on |
+
+Read against the three numbers ROADMAP-FUN is betting on:
+
+  - **the signpost is up in 19 of 19.** Item 1b works everywhere, on the frame
+    the card appears.
+  - **the marquee is seen at all in 6 of 19** inside ninety seconds of
+    wandering, and in thirteen chapters it is never on screen once.
+  - **the first tick lands inside 30 s in 13 of 19**, and in six chapters —
+    the Quay, Kyoto, Iceland, Marrakech, Hong Kong and Palawan — a player who
+    wanders for ninety seconds ticks NOTHING. That is item 2's number and it is
+    worse than the roadmap guessed.
+  - **the longest quiet run is 31–91.5 s.** Twelve chapters have a gap over a
+    minute.
+
+**The arrival frame**, `qa/arrive-see.js`, sampled 2.2 s into the 3.60 s arrival
+shot with the composition still pinned: **the marquee point is inside the
+frustum in 8 of 19 and actually unoccluded in 2** — Venice and the Pantanal,
+and no others. That is the number item 1a (the glimpse, B2) exists to move, and
+it is the honest starting line.
+
+**All nineteen points, framed and looked at**, `qa/marq-frame.js` +
+`qa/MF-*.png`. Seventeen of nineteen resolved into frame under the probe's own
+lens; the two that did not (Iceland, Marrakech) are the probe's pitch formula
+running out at a 55 m rise and a 276 m throw, not the points. One point was
+WRONG and the picture is the only thing that could have said so: **Hong Kong's
+was eleven metres of empty sky above the roof** its own `wow` row asks you to
+stand on, and `qa/MF-kowloon.png` framed black. It is `up: 34` now.
+
+**On a phone** (390 x 844): the card is 178 x 225 with the signpost 57 px of
+it, its bottom edge at 231 px, no horizontal overflow, and the distance wraps
+attached to the sentence rather than orphaned onto a line of its own.
+
+`npm test` 10/10. Nineteen-chapter soak: 0 NaN, and the only two errors it
+recorded are the subject of the next section.
+
+### ...AND THE SOAK FOUND SOMETHING ELSE (a fix, not a feature)
+
+`ReferenceError: pan is not defined`, thrown by the score's scheduler, on the
+game's own error banner, in Sơn Đoòng, during the baseline run. **Not from this
+batch: it is on HEAD, from M1's second voice (`33795ba`), shipped yesterday.**
+
+`musTick`'s A6 block reads `-pan * 0.8` to pan the answer against the pluck it
+answers, and `pan` is `const`-declared one level in, inside the `if (ch)` that
+schedules the pluck. So every time the second voice fired it threw before
+`musLiftNote` was reached. **A6 has never played a note**, in any of the
+thirteen chapters whose palette has a second voice, since it shipped.
+
+It went unnoticed because the voice only enters above `sysMUS_2ND_AT` = 0.33 of
+a chapter's TASKS — a fresh chapter is at zero, and every audio probe in this
+repo opens a fresh chapter — and because the way out that was built for it,
+`musAudit().second`, reports `sysMUS_2ND[musPalN]`: **the table having a row**,
+which stayed true throughout. A flag that says a feature is configured is not a
+way out for a feature that is invisible by design. `musAudit()` now carries
+`secondN`, a count of notes actually scheduled.
+
+Measured as a differential, `qa/second-voice.js`, same session, Sydney ticked to
+0.526 progress, forty-five seconds:
+
+| | `second` | `secondN` | thrown |
+|---|---|---|---|
+| HEAD | true | absent | 18 |
+| fixed | true | 2 and 4 over two runs | 0 |
+
+`played` is the second half of the fix: the answer is a reply to a pluck, and an
+iteration that thinned the pluck away under the breath has nothing to reply to.
+
+**What is NOT established:** whether the throw also degraded the melody. It
+happens before `musPluckAt += …`, so reading the code says the pluck horizon
+cannot advance — but the measurement does not support that claim. Oscillator
+creations per twenty seconds went 146 → 166 across the threshold on HEAD and
+188 → 141 on the fix; the count is dominated by ambience and sfx, and it moves
+±25 % between runs with nothing changed. It joins the list of instruments that
+cannot hold a line. What IS established is that the exception is gone and the
+voice that had never once run now runs.
+
+### FOUR THINGS THAT MEASURED WRONG FIRST
+
+1. **`biome.switchTo` DOES NOT MOVE THE ANIMAL.** The first probe of this batch
+   read the spawn in all nineteen chapters and got Sydney's grass in all
+   nineteen — Hanoi reported (5.6, 1.5, 25.1) against a `HANOI_SPAWN` of
+   (-60, 2.4, -78). `switchTo` swaps the world; `biomeGo` is what teleports, and
+   `hud.cross` is the only honest arrival. Every distance in the first table was
+   measured from the wrong place.
+
+2. **A TRAVERSE THAT READS `o.visible` CANNOT SEE A DETACHED BIOME.** A
+   detached chapter's ROOT is hidden and every child of it keeps
+   `visible === true`, so the occlusion ray named `pastoChurch` as the thing in
+   the way in Palawan, Cappadocia and Antarctica, and `palBackRooms` in Monaco.
+   Walk the parents. (This is the D7 note about `mesh.visible`, from the other
+   end: it cannot see a detach when it is COUNTING, and it cannot see one when
+   it is RAYCASTING either.)
+
+3. **ONE REGEX ACROSS A TABLE PAIRS ONE ROW'S ID WITH THE NEXT ROW'S FIELD.**
+   A row in `TASKS` is up to four lines and `chapter`, `act` and `wow` are
+   spread over them, so `\{ id: '([a-z0-9-]+)',[\s\S]{0,400}?wow: '...'` matched
+   happily and wrongly: it reported `to-pasto` as chapter two's marquee (it is
+   `condor-ride`) and `take-helm` as chapter three's (it is `manly-voyage`) —
+   and it did that while still counting EXACTLY ONE PER CHAPTER, so the count
+   looked right and every id under it was wrong. Split on the record boundary
+   first.
+
+4. **A FEATURE MISSING FROM AN END-OF-RUN SCREENSHOT SUPPORTS TWO OPPOSITE
+   READINGS.** Sydney, Pasto and Venice all showed the card WITHOUT the marquee
+   line after ninety seconds of random walking, which reads exactly like the
+   line decaying — and a quarter of an hour went into that hypothesis. The
+   Drift, in the same run, showed it intact. It is the correct behaviour: three
+   of nineteen marquees fall to a random walk inside ninety seconds, and the
+   signpost stands down when its row is ticked. `qa/first-five.js` now reports
+   `marqEnd` and `wowAt` alongside `marqOn`, so the two readings can never look
+   alike again. **The general rule: a probe that samples a state at one end of a
+   window must sample it at BOTH ends, or its own screenshot becomes evidence
+   for whichever story you thought of first.**
+
 ## THE SOUND PASS — THE PHRASE, THE SKY, AND THE SECOND VOICE (M1 — 7 Sep 2026)
 
 **LANDED.** The last batch of `ROADMAP-AUDIO.md`. A4, A5 and A6, which closes

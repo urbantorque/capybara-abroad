@@ -1,56 +1,71 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-6 Sep 2026, revised the same day. Written after the character pass (`ee4a0b2`)
-and the sound review (`8bfce6f`), from the design chair rather than the art or
-audio one. Scope: not "what is broken" — fifty-odd passes have answered that —
-but **"what would make a casual player laugh in the first minute, stay for the
-first hour, and come back tomorrow"**. Three read-only surveys of the tree (the
-verbs and props; the people; the meta loop), the README, CONTRACT.md, every
-previous roadmap and the design memory. Every claim below names the symbol it
-hangs on; line numbers move by the thousand between batches, so grep the name.
+> **B1 IS BUILT, 7 Sep 2026.** `marquee:` on all nineteen chapters,
+> `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
+> (1f, `qa/first-five.js`) with its two companions `qa/arrive-see.js` and
+> `qa/marq-frame.js`. `qa/p6-static.cjs` now fails the build on a chapter with
+> no marquee, a `say` that names a key, or anything but exactly one `wow`. See
+> CONTRACT.md for what it measured and the four things that measured wrong
+> first. **B0 — sitting a stranger in front of the title card — has not been
+> done and no batch below replaces it.**
+
+6 Sep 2026, revised twice the same day. Written after the character pass
+(`ee4a0b2`) and the sound review (`8bfce6f`), from the design chair rather than
+the art or audio one. Scope: not "what is broken" — fifty-odd passes have
+answered that — but **"what would make a casual player laugh in the first
+minute of any place, stay for the first five, and come back tomorrow"**. Three
+read-only surveys of the tree (the verbs and props; the people; the meta loop),
+the README, CONTRACT.md, every previous roadmap and the design memory. Every
+claim below names the symbol it hangs on; line numbers move by the thousand
+between batches, so grep the name.
 
 **How this was reviewed, honestly.** It is a reading of the systems, not a
 playtest with strangers. Nobody has yet timed a chapter or watched a first-time
 player (v53 said so, and it is still true). Item 0 below is the one thing this
 document cannot do for you.
 
-**What this revision changed.** The first draft's items 4–6 (a second lap, a
-shareable postcard, a companion capybara) were about the *end* of the game and
-the player who has already finished it. They are gone. Everything that replaced
-them is about the first ten minutes of a place and the first hour of the game,
-because that is where a casual player is won or lost, and nothing in fifty
-passes has measured it.
+**What the revisions changed.** The first draft's items 4–6 (a second lap, a
+shareable postcard, a companion capybara) were about the player who has
+finished; they are gone. The second draft's item 1 opened chapter doors early —
+but the title card's picker is already ungated (`pickDefs` maps all of
+`CHAPTERS`; only the in-game departures board reads `jrOpen`), so **a player
+can start in any of the nineteen places**, and the real problem is not the door
+out but the road *in*: in most chapters the reason the place exists is not on
+the paper when you arrive. Items 1 and 2 are now about that, **for every world,
+not just Sydney** — because every world is somebody's first.
 
 ---
 
 ## THE HEADLINE
 
 **The game is a magnificent reactive diorama with a checklist in front of it —
-and a wall at the end of every chapter after the first.**
+and in most places the checklist hides the best thing in the room.**
 
 Measured against what is there:
 
-- **Every chapter from Pasto on is a 100 % wall.** `jrOpen(n)` opens Sydney,
-  anything already seen, and *the lowest incomplete chapter*; `chapComplete` is
-  every row ticked. So a player may leave Sydney unfinished (and is never told
-  so), but must finish all eleven rows of Pasto before the harbour exists, all
-  eight of the Quay before Kyoto, and so on for eighteen doors. `def.win` is a
-  paper window size, not a threshold. **Nothing is optional, ever, and the best
-  things in the game — the condor, the ferry, the tide — sit behind a chore
-  list.** For a casual player this is the whole retention problem in one rule.
-- **Nobody has measured the first ten minutes.** Time to the first tick, to the
-  first lift, to the first door, and where a new player stalls — none of it
-  exists. `qa/eng-rate.js` counts toasts and startles over 45 s of driven play
-  and is the nearest thing; it cannot see a stall. There is no stuck timer
-  anywhere: a player who has not ticked anything for two minutes gets exactly
-  what a player who is flying gets.
+- **The marquee is not on the paper on arrival.** All nineteen chapters carry
+  `acts:` now, and the paper shows *the lowest act with anything open*. The
+  `wow` row sits in act 2 or 3 in **eighteen** of them — counted properly in B1,
+  where "at least fifteen" was an estimate; only chapter 4's `uji-run` is in act
+  one, and `qa/p6-static.cjs` now prints the split. So a player who picks
+  Cappadocia from the title because
+  they want to fly a balloon sees a card, three rows about pigeons, and no
+  balloon. The arrival card's second line (`showPlace(title, sub)`) says where
+  you are, not what it is for. The chart marks landmarks (`sysMARKS`) but not
+  the marquee. **The one thing every chapter was built around is the one thing
+  the interface does not point at.**
+- **Nobody has measured the first five minutes of any place.** Time to the first
+  tick, to the first *sight* of the marquee, to the marquee itself, and where a
+  player stalls — none of it exists. There is no stuck timer anywhere. Nine
+  "be there when" marquees ride clocks of 54–205 s (`nextIn` is wired in seven
+  chapters) and **none of those clocks is phased to your arrival**: you can walk
+  into Venice thirty seconds after the water went down and wait three minutes
+  for the chapter's whole argument.
 - **There is one economy and it is destructive.** Mischief is witnessed
   (`npcHeat`, the incident chain) and paid. Being a *capybara* — the calmest,
-  most-photographed animal on the internet — pays nothing: `fam` exists, takes
-  34 s of calm proximity to earn, and buys a warmer line pool and a shorter
-  cooldown. Tourists have a `photo` state. **No NPC in the game ever gives the
-  player anything.** A casual player who sits down in front of a crowd, which is
-  the first thing most of them will do, gets a line.
+  most-photographed animal on the internet — pays nothing: `fam` takes 34 s of
+  calm proximity to earn and buys a warmer line pool. Tourists have a `photo`
+  state. **No NPC in the game ever gives the player anything.**
 - **Fourteen verbs on six inputs, and most of them are states the world puts you
   in.** The player *chooses* four: move, hop, grab/throw, wheek. Throw is one
   fixed impulse (`capyTryRelease`: `5.0 + (run ? 2.0 : 0)` along `capyYaw`, no
@@ -69,281 +84,307 @@ Measured against what is there:
 Two things already right that nothing below may touch: **the incident chain**
 (three witnessed things in 12 s → AN INCIDENT; five → A SCENE) is the one
 unscripted reward loop and it is good; and **the marquee law** (one `wow` per
-chapter) is what makes the payoffs worth anything. Every item feeds the first
-and obeys the second. And **nothing can kill you** stays: item 1 removes a wall,
-it does not add a fail state.
+chapter, sixteen lifts in the game) is what makes the payoffs worth anything.
+Item 1 *points at* the marquee; it does not add a second one. And **nothing can
+kill you** stays.
 
 ---
 
 ## 0. FIRST, WATCH SOMEBODY PLAY (2 h, no code)
 
-Before any of the six: sit one person who has never seen it in front of Sydney,
-say nothing, and take notes for twenty minutes. Then Pasto. Write down the first
-thing they try that does nothing, the first time they look at the paper for
-instructions, the first laugh, and the first sigh. Items 1–3 are *predictions*
-of that list; the session either confirms them or replaces them, and either is
-worth more than the prediction.
+Before any of the six: sit one person who has never seen it in front of the
+title card, let them pick a place, say nothing, and take notes for ten minutes.
+Then a second place. Write down the first thing they try that does nothing, the
+first time they read the paper for instructions, whether they ever *see* the
+marquee, the first laugh and the first sigh. Items 1–3 are *predictions* of
+that list; the session either confirms them or replaces them.
 
 ---
 
 ## THE SIX
 
-Ordered casual-first: 1–3 are cheap, structural, and pay in the first ten
+Ordered casual-first: 1–3 are cheap, structural, and pay in the first five
 minutes of every place; 4–6 are the deeper toys that make the hours after that
-funnier. Read the hours as batches of 2–3 h, one commit each, as this repository
-works.
+funnier. Read the hours as batches of 2–3 h, one commit each.
 
-### 1. OPEN THE DOOR EARLY (≈2 batches, 4–5 h)
+### 1. THE ROAD TO THE MARQUEE — say what the place is for, then lead there (≈3 batches, 7–8 h)
 
-*The argument.* The condor is eleven rows into chapter two. A casual player who
-has enjoyed six of them and is bored by the seventh should be *on the harbour*,
-not on the paper. Completion is the collector's layer and should stay one; the
-door should open when the chapter has *paid*, not when it is *empty*.
+*The argument.* Every chapter has exactly one line that is the reason it
+exists, and the game already knows which (`wow:`). A casual player should
+*see* it in the first thirty seconds, *know* it is the point by the first
+minute, and be *on the way* by the third — without a tutorial, and without
+touching the marquee law. Four mechanisms, all reading the `wow` row that is
+already there.
 
-- **The threshold.** `chapOpen(n)` = the chapter's `wow` ticked **and** at least
-  half its rows (per-chapter override `open:` on `CHAPTERS` for the two or three
-  where the wow is late — Iceland's aurora is act 3 and should not be the gate).
-  `jrOpen` reads `chapOpen` for the frontier and `chapComplete` for nothing but
-  the record board, the clean-sheet edge and the finale. Sydney's rule — always
-  leavable — becomes every chapter's rule, *said out loud*: the departures board
-  already lists what is left per row.
-- **The door is announced.** The moment `chapOpen` flips, one toast in the
-  place-card voice — *"The ferry wharf will take you on whenever you like."* —
-  and the way mark's label on the chart (`sysMAP_WORLDS.t`, wired in F4) gains a
-  small open glyph. The paper's footer counter reads *7 / 11 · the door is
-  open* rather than a bare fraction.
-- **The stuck timer.** There is none. Add one: if the top open row has not
-  changed and no tick has landed for 75 s of unpaused play, the clue on the
-  paper gains its `nextIn` or the hint arrow's distance (`todoParLine` already
-  renders three cases; this is a fourth), and at 150 s the nearest local within
-  earshot says a version of the clue through the existing `sysSay` substitution
-  (so it reads WHEEK on a phone). Reset on any tick. **Never on a marquee whose
-  clock is running** — `nextIn` returning 0 means the show is on and the hint is
-  to look up.
-- **The resume card.** The title card shows the album postcard; make it also say
-  where you are and *the next row* — *"Pasto · 7 of 11 · the condor is waiting
-  on the rim"* — read from the save and the paper's own top-row logic. A player
-  who closes the tab mid-chapter should open it to a sentence, not a shelf.
-- **The instrument that does not exist.** `qa/first-ten.js`: the closed-loop
-  driver plays each chapter from spawn following the paper's top row, and reports
-  time-to-first-tick, time-to-wow, time-to-door, and the longest gap between
-  ticks. Nobody has timed a chapter; this times all nineteen in one soak and
-  becomes the number every later batch is judged against.
+- **1a. The glimpse.** The arrival lens (`RV-arrive-*` frames, the F1 batch)
+  looks at the animal. For three seconds it should look at *the marquee first*
+  and pull back to the animal: the condor circling the crater, the sails, the
+  scaffold going up the side of the street, the balloons inflating at the
+  launch field, the water sitting in the square. Each chapter publishes one
+  point — `marquee: {x, y, z}` on `CHAPTERS`, or a `get:` like `way` uses —
+  and the arrival dolly frames it, then the animal. Where the marquee is a
+  *time* rather than a place (the aurora, the bloom, the Symphony), the glimpse
+  is the sky, the water, the far shore, and 1c does the rest. No new camera
+  code: the rig already dollies for the crossing and the ceremony.
+- **1b. The marquee line on the paper.** A row that is not a row: above act
+  one, the `wow` in its own register — the F4 sparkle at full size, the text,
+  and *no checkbox* until its act opens. It is the reason you are here and it
+  reads that way. Under it, one clue: not how to do it, but *where to look* —
+  *"it is circling the crater"*, *"the wharf at the end of the promenade"*.
+  Reads `sysHINTS[wow].where` and the `act`; costs nothing on the save.
+  Sydney's act one is ten rows and the sparkle is the only thing on that paper
+  that says "there is more than this".
+- **1c. Phase the clocks to the arrival.** For the nine "be there when"
+  marquees, set the cycle's phase on *first* `biome:enter` so the first window
+  opens at an authored 150–210 s after arrival — long enough to reach the
+  place, short enough that a player who wandered still catches it. Venice's
+  siren, the Symphony, Strokkur, the bloom, the sunrise, Hanoi's fold. `nextIn`
+  already publishes the countdown; the marquee line (1b) shows it. The rule
+  "nothing may be missable for ever" stays true; this adds "and the first one
+  is never missed by accident". Chapters keyed to the audio clock (the
+  Symphony is one tower per beat) phase the *show*, not the music.
+- **1d. Lead, do not push.** When nothing on the paper is pinned, the hint
+  arrow (`hintTarget`) points at the next row *on the road to the marquee* —
+  `lead:` on the `wow` row, an ordered list of the rows that get you there
+  (whistle the condor → the rim → the talons; find the scaffold → climb → the
+  roof). The acts already stage most of this; `lead:` makes it explicit so the
+  arrow can read it. The stuck timer that does not exist: after 75 s with no
+  tick and the top row unchanged, the clue gains its `nextIn` or distance
+  (`todoParLine` renders three cases; this is a fourth); at 150 s the nearest
+  local in earshot says a version of it through `sysSay`. Reset on any tick;
+  never while a marquee's clock reads 0 (the show is on — the hint is to look
+  up).
+- **1e. The minis are the second signpost.** Thirty-two `mini` set pieces
+  already carry the smaller sparkle on the paper. Give each a chart mark on
+  the minimap in the same glyph, so a player who is not ready for the marquee
+  can see the next-best thing from anywhere. Reads `sysHINTS[id].where`;
+  drawn at chart build, not ticked.
+- **1f. The instrument that does not exist.** `qa/first-five.js`: the
+  closed-loop driver enters every chapter *from the title picker*, and reports
+  time-to-first-tick, time-to-first-sight-of-the-marquee (its point inside the
+  frustum and unoccluded — the visibility-metrics memory says judge this from
+  the PNG, so the probe also saves the frame), time-to-wow, and the longest
+  gap between ticks. Nobody has timed a chapter; this times nineteen in one
+  soak and is the number every later batch is judged against.
 
-*Traps.* A chapter left at 60 % must still stage its souvenir only on
-`chapComplete` (`keep` is a projection of ticks and must stay one). The finale
-gate is `chapComplete` for all nineteen and must not read `chapOpen`. The
-departures board caches on open (the "not a live view" comment above `jrOpen`);
-the open glyph is drawn at build, not ticked. `jrOpen`'s loop must still find
-the *lowest* open frontier or a player could hold two open doors and the
-progression memory's "always three whistles" contract breaks.
+*Traps.* A marquee point behind a hill on arrival is a glimpse of a hill:
+render every one of the nineteen arrival frames and look (the third-pass
+memories are full of marquees that were "built and not seen"). The marquee
+line must not count as a row for `win`, `chapComplete` or the act derivation,
+or Sydney's paper grows by one and every act opens early. A phased clock must
+not re-phase on a *second* entry (a player who leaves and returns should find
+the cycle where it was) — latch on `seen[]`. The arrival dolly must respect
+`camFloor`/`camCeil` and the exit-board floor, and underwater the four camera
+rules are wrong (the water memory) — Palawan's glimpse is from the surface.
 
-### 2. THE FIRST LAUGH IN EVERY PLACE (≈2 batches, 5–6 h, half authoring)
+### 2. THE FIRST FIVE MINUTES, IN EVERY WORLD (≈3 batches, 8–9 h, half authoring)
 
-*The argument.* The first thirty seconds of a place decide whether a casual
-player explores it. Today a chapter arrives on a card and a paper; the nearest
-prop is 13–26 m off (v51 fixed the spawn ring for *count*, not for *comedy*),
-and the eighteen free arrival ticks are a tick for having walked through a door.
+*The argument.* Because the picker is free, each of the nineteen places is the
+first place for somebody, and each must earn the next five minutes on its own.
+Today a chapter arrives on a card and a paper; the nearest prop is 13–26 m off
+(v51 fixed the spawn ring for *count*, not for *comedy*); the free arrival tick
+is a tick for having walked through a door; and the incident chain, which is
+the one goal that is not the paper, is invisible until it pays.
 
-- **One authored gag in the spawn ring, per chapter.** Reachable inside ten
-  seconds without reading anything: a stack of fragile things at the edge of the
-  path (Cali's paint tins, Monaco's champagne pyramid, a pile of Hanoi's
-  conical hats); a person doing something with a tool six metres away (item 5's
-  hook, but the *placement* is this item); a flock that goes up if you run at
-  it (Venice already has one; Sydney's ibis, Antarctica's gentoo, the Quay's
-  gulls can be sited nearer). Written as a row in `physBIOME_SCATTER`'s `also`
-  annulus with a `gag:` marker so the probe can find it. **Every one must be a
-  witnessed event** so the incident chain arms from the first thing you touch.
-- **The free arrival ticks become the first action.** `ROADMAP-FINISH` already
-  lists this (2–8 h). The `arrive:` row on `CHAPTERS` ticks on `biome:enter`
-  today; make it tick on the *first disturbed prop or startled person in the
-  chapter*, and let its text say what you did — *"Made an entrance"*. Same tick,
-  same paper scraps, but earned, and now the first tick in every chapter lands
-  in the first thirty seconds by construction.
-- **The chain is visible.** The incident chain ticks on the way up and pays at
-  three; between, a casual player has no idea a meter exists. Three small pips
-  beside the stamina bar that fill with `incN` and drain on the same clock the
-  chain uses. Nothing new is counted; the number that already decides a card is
-  simply on screen. This gives the casual player *a goal that is not the paper*
-  from minute one in every chapter: fill the pips.
-- **Sydney's first ninety seconds specifically.** The three rows a new player
-  sees first are the hat, the flat white and the sandwich. The props are within
-  20 m (9 measured); the *people* are wherever the walker put them. At boot,
-  guarantee one hat-wearer and one coffee-holder inside 12 m of spawn, facing
-  away — a seeded placement, not a script. And the very first wheek startles
-  the whole park: make sure at least four people are in `physWHEEK_R` of the
-  spawn so that first Q is a *picture* (heads turn, a hat comes off) and not a
-  sound.
+**The loop, the same shape in all nineteen** — a table, one row per chapter,
+each cell reachable without reading anything:
 
-*Traps.* A gag that repeats is an irritation (the ambient-movers rule): the
-fragile stack does not restock, the flock re-arms on the flock's own timer. The
-pips must not become a fourth writer on the stamina bar's element — sibling
-node, own class, and the `less motion` switch stops their fill animation. The
-seeded placement must go through `physSpotOk` or a coffee-holder will be
-placed inside the kiosk.
+| within | what | mechanism |
+|---|---|---|
+| 10 s | a **gag** you can trip over from the spawn | one authored placement in the spawn ring |
+| 30 s | the **first tick** | the arrival tick, *earned* by the first disturbed prop or startled person |
+| 60 s | the **first sight of the marquee** | item 1a |
+| 3 min | a **ride, a move, or a mini** — the chapter's second-best thing | placement or a phased clock |
+| 5 min | the **pips** have filled once, or the marquee's window has opened | the incident chain on screen; item 1c |
+
+- **The gag, per chapter.** Written as a `gag:` row in `physBIOME_SCATTER`'s
+  `also` annulus so the probe can find it, and **every one is a witnessed
+  event** so the chain arms from the first thing you touch. Authored below.
+- **The arrival tick is earned.** `ROADMAP-FINISH` already lists this. The
+  `arrive:` row on `CHAPTERS` ticks on `biome:enter` today; tick it on the
+  first disturbed prop or startled person instead, with text that says what
+  you did — *"Made an entrance"*. Now the first tick lands in the first thirty
+  seconds of every chapter by construction.
+- **The chain is visible.** Three small pips beside the stamina bar, filled by
+  `incN` and drained on the chain's own clock. Nothing new is counted; the
+  number that already decides a card is on screen. A goal that is not the
+  paper, from minute one, everywhere.
+- **The people are where the first rows need them.** At boot, per chapter,
+  guarantee that the *first two rows of act one* have their subject inside 12 m
+  of spawn, facing away — a seeded placement through `physSpotOk`, not a
+  script. Sydney: a hat-wearer and a coffee-holder. Pasto: a vendor with fruit
+  on the counter. Venice: the pigeons on this side of the square.
+
+**The nineteen gags** (first draft; B3 places them, B0's stranger corrects
+them):
+
+| ch | place | the gag in the ring | the second-best thing by 3 min |
+|---|---|---|---|
+| 1 | Sydney | a hat-wearer and a flat white in reach; the first wheek turns four heads | Mr Whippy passes the spawn on his first lap |
+| 2 | Pasto | a pyramid of `cuencobowl`s on the market's end stall (the one fragile type, finally used) | the street dog orbits you inside 20 s; the condor is overhead from the spawn |
+| 3 | Quay | the apron gulls flush if you run at them | the ferry horn at the wharf; the busker mid-song |
+| 4 | Kyoto | a stack of tea bowls on the terrace rail | the bonshō, the torii tunnel's mouth visible from spawn |
+| 5 | Cali | paint tins at the foot of the painted street | the band is audible from spawn; the chiva passes |
+| 6 | Rio | a beach ball among bathers who react (item 4e) | the surdo audible; frigatebirds overhead |
+| 7 | Iceland | three sheep to wheek into a line (obey 1, already wired) | Strokkur's first warning phased to 120 s |
+| 8 | Marrakech | the orange cart is the gag *and* the chase — put it 8 m from spawn | the acrobats |
+| 9 | the Drift | the first gap is the gag: 4 m, off the spawn island's lip, wind behind you | the weathervane swings; a lampfly finds you |
+| 10 | Venice | two hundred pigeons on *this* side of the square | the siren's four tones phased to 150 s |
+| 11 | Hong Kong | a laundry pole low enough to knock a shirt off | the scaffold's foot 10 m from spawn; the first climb |
+| 12 | Palawan | the reef edge two strokes off the beach; a crab that scuttles | the clam; `first-dive` teaches the verb |
+| 13 | Cappadocia | a crew's basket you can climb into on the launch field | a balloon leaves; the burner is audible |
+| 14 | Manly | gulls on the chips | the first set of the swell; a surfer wipes out |
+| 15 | Pantanal | the capybara family in view; one wheek and a pup looks up | a cow to herd; a caiman surfaces |
+| 16 | Sơn Đoòng | the dark itself: the first wheek lights the wall | a drip, a bat, the first daylight shaft |
+| 17 | Antarctica | six gentoo on the rock, herdable on one wheek | the orange boat at the jetty, engine running |
+| 18 | Monte Carlo | a champagne pyramid on the terrace | a Grand Prix car passes the steps; the doorman speaks |
+| 19 | Hanoi | the road is the spawn: 240 bikes, the first step onto it | the pho; the flower bicycle |
+
+*Traps.* A gag that repeats is an irritation (the ambient-movers rule): fragile
+stacks do not restock; flocks re-arm on the flock's own timer. The pips must
+not be a fourth writer on the stamina bar's element — sibling node, own class,
+`less motion` stops the fill animation. The seeded placement must go through
+`physSpotOk` or the coffee-holder is inside the kiosk. A gag must never sit on
+the road to the marquee (1d) or the arrow points at a stack of bowls.
 
 ### 3. CHARM — THE OTHER ECONOMY (≈3 batches, 7–8 h)
 
 *The argument.* Half the people who open a capybara game do not want to steal
 a hat; they want to be a capybara. The game should pay that from the first
-minute in Sydney, with the same crowd the mischief economy uses — so the two
-loops *interlock* rather than coexist, and being cute is the casual player's
-way out of a square they have made angry.
+minute in any place, with the same crowd the mischief economy uses — so the
+two loops *interlock*, and being cute is the casual player's way out of a
+square they have made angry.
 
-- **Sit, and be noticed.** Loaf (`capyRestT` already gates the loaf at 6.5 s)
-  within 8 m of people whose `wary` is low: the nearest one turns (the F4 head
-  turn), then *approaches* — the first time anybody in fifteen chapters walks
-  toward you for a nice reason — crouches at 1.5 m, and takes the photo the
-  `photo` state already knows how to take. One per person per 90 s; two people
-  at most at once, so it never becomes a crowd scene (that is item 6's job).
+- **Sit, and be noticed.** Loaf (`capyRestT` gates it at 6.5 s) within 8 m of
+  people whose `wary` is low: the nearest one turns (the F4 head turn), then
+  *approaches* — the first time anybody in fifteen chapters walks toward you
+  for a nice reason — crouches at 1.5 m, and takes the photo the `photo` state
+  already knows how to take. One per person per 90 s; two at once at most.
 - **Somebody gives you something.** At `fam ≥ npcFAM_HEAT` (0.45), the person
-  who has warmed to you tosses a **snack**: one new `edible` prop type per
-  chapter's palette (a chip, a mochi, an arepa, a rice cake, a piece of melon),
-  spawned from their hand on a lob, `physKEEPS`-less so it is eaten or lost.
-  This is the first gift in the game, it makes `graze` — and the produce
-  reaction that hangs off it — reachable in the eleven chapters that have no
-  edible prop at all (the mischief-radii memory measured 6 of 17), and it is
-  the one moment a casual player will screenshot without being asked.
-- **The pat.** Loaf beside a *familiar* person for 4 s and they reach down: a
-  hand on the head from the existing `reach` beat, the wheek's calm row at a
-  whisper, and the animal's ear flick. Nothing is scored. It is there because
-  it is the thing the animal is famous for.
+  who has warmed to you tosses a **snack**: one new `edible` type per chapter's
+  palette (a chip, a mochi, an arepa, a rice cake, melon), lobbed from the
+  hand. The first gift in the game; it makes `graze` — and the produce reaction
+  behind it — reachable in the eleven chapters with no edible prop (6 of 17
+  measured in the mischief-radii memory); and it is the moment a casual player
+  screenshots without being asked.
+- **The pat.** Loaf beside a *familiar* person for 4 s and they reach down:
+  the `reach` beat as a hand on the head, the wheek's calm row at a whisper,
+  an ear flick. Nothing is scored.
 - **Charm and mischief share the crowd.** Nobody approaches while `npcHeat` at
-  your position is over 0.5, and a hot person's `fam` earns at half rate. So a
-  player who has caused a SCENE cannot be adored until it has cooled — and *can*
-  cool it faster by sitting still in full view, which is a thing the finds
-  already reward ("did nothing for a full minute"). The heat field spends only
-  on attention (proved by the guard-shuffle measurement); charm spends only on
-  approach. Neither may block a task.
-- **It shows up where notoriety does.** Item 6's tier line on the arrival card
-  and the ledger has a twin: *photographed by 31 people · fed 9 times*. Counted
-  into the save beside `inc`/`scn` as `pho`/`fed`, additive per chapter.
+  your position is over 0.5, and a hot person's `fam` earns at half rate. A
+  player who caused a SCENE cannot be adored until it cools — and *can* cool it
+  faster by sitting still in full view, which the finds already reward. Heat
+  spends only on attention; charm spends only on approach. Neither blocks a
+  task.
+- **It is counted where notoriety is.** `pho`/`fed` beside `inc`/`scn` on the
+  save, per chapter; item 6's arrival line gets a twin.
 
-*Traps.* A person who approaches must go through the same blocked-step ray as
-the owner's retrieval (start it 1.20 m out — most people who could give you
-something are behind a counter). A snack that is a physics body in the water
-must float (`physRHO`) or Venice's gift is a sinking mochi. The photo pose must
-not fire during a chase, a shoo or an `own` errand — `npcREACH_ST` already
-lists the states that override; add `photo` and `give` below all of them. And
-the approach must never bring a person between the shoulder camera and the
-animal: stop them at 1.5 m *and* off the camera's axis (the souvenir-ring
-lesson — radius is a composition number).
+*Traps.* An approaching person takes the owner-retrieval's blocked-step ray
+(start it 1.20 m out — most people who could give you something are behind a
+counter). A snack in water must float (`physRHO`). `photo` and `give` sit below
+every state in `npcREACH_ST`. Stop the approach at 1.5 m *and* off the camera's
+axis (radius is a composition number).
 
 ### 4. THE TOYBOX — give the four chosen verbs depth (≈4 batches, 10–12 h)
 
-*The argument.* A slapstick physics game is only as funny as the worst thing you
-can do with an object, and right now the worst thing you can do is throw it five
-metres in the direction you are facing. Nothing here needs a new key; `E`
-already does six jobs by context.
+*The argument.* A slapstick physics game is only as funny as the worst thing
+you can do with an object, and right now the worst thing you can do is throw it
+five metres in the direction you are facing. No new key; `E` already does six
+jobs by context.
 
 - **4a. Put it down, and put it IN.** Tap `E` = throw as now; *hold* `E` past
-  ~0.35 s while stationary = set it down (zero impulse, snapped to the nearest
-  `receive` prop within 1.2 m). Make `receive` mean something: a bin, a basket,
-  a boat, a fountain, a pram, a gondola, a bowl of pho. A prop placed *in*
-  another travels with it (one level of the `capyRideBody` frame trick). This is
-  the Goose's bucket, and a whole class of rows nothing can express today.
-- **4b. Aim and charge the throw.** Hold `E` past the put-down threshold *while
-  moving* = charge, with a faint arc drawn the way the hint arrow is; release at
-  5–11 m/s with pitch from the camera's elevation. Tap throw unchanged to the
-  decimal — verify on the `throw-in-canal` class of rows.
+  ~0.35 s while stationary = set it down, snapped to the nearest `receive` prop
+  within 1.2 m. Make `receive` mean something: a bin, a basket, a boat, a
+  fountain, a pram, a gondola, a bowl of pho. A prop placed *in* another
+  travels with it (one level of the `capyRideBody` frame). The Goose's bucket.
+- **4b. Aim and charge the throw.** Hold `E` *while moving* = charge, a faint
+  arc drawn as the hint arrow is; release at 5–11 m/s with pitch from the
+  camera's elevation. Tap throw unchanged to the decimal.
 - **4c. The nudge, and three rideable props.** Below `physBarge`'s 3.2 m/s, a
-  steady push along the heading so a ball rolls and a trolley starts down a
-  slope. Then a shopping trolley (Sydney/Quay), a wheelbarrow (Pasto) and a
-  loose crate on water become passive carriers with weak steering — the mini
-  set pieces' own contract. A capybara in a trolley on the Selarón steps is the
-  screenshot this game does not have.
+  steady push so a ball rolls and a trolley starts down a slope. Then a
+  shopping trolley, a wheelbarrow and a loose crate on water become passive
+  carriers with weak steering — the mini set pieces' own contract.
 - **4d. More things break and spill.** `fragile:` on ten more types, `spill:`
-  on five more. Each is already a witnessed event (`physShatter`, `physSpill` →
-  `disturbed`), so this is the cheapest way to make INCIDENTs reachable
-  everywhere: measure `qa/eng-rate.js` incidents-per-45 s per chapter before and
-  after, target ≥1 from the spawn ring in all nineteen.
-- **4e. People have bodies.** Not ragdoll: *stumble* (barged ≥3.2 m/s, drops
-  what they hold via the `physBarge` path), *sit down hard* (barged while
-  startled, or walked through a spill), *fall in* (stumble at a quay edge →
-  `plunge`, which exists). Gate on `r.fig`. Once per person per 40 s.
+  on five more; each is already a witnessed event. Measure `qa/eng-rate.js`
+  incidents per 45 s per chapter before and after.
+- **4e. People have bodies.** *Stumble* (barged ≥3.2 m/s, drops what they hold
+  via `physBarge`), *sit down hard* (barged while startled, or walked through a
+  spill), *fall in* (stumble at a quay edge → `plunge`). Gate on `r.fig`; once
+  per person per 40 s.
 
 *Traps.* The hop arc is untouchable (`capyHOP_VEL`); the trolley is a carrier,
-not a launch. A put-down must never snap to a container the animal is standing
-in. The nudge must skip `planted` and kinematic props or you will push a jetty.
-Check `physShatter`'s shard-pool cap before adding ten fragile types.
+not a launch. Never snap a put-down to a container the animal is standing in.
+The nudge skips `planted` and kinematic props. Check `physShatter`'s shard-pool
+cap before adding ten fragile types.
 
 ### 5. PEOPLE WITH JOBS YOU CAN RUIN (≈3 batches, 8–10 h, half authoring)
 
 *The argument.* The comedy of the Goose Game is not that people react — it is
-that people were *doing something*, and now they cannot. This game has the
-reaction; it needs the something. All five hooks exist.
+that people were *doing something*, and now they cannot. All five hooks exist.
 
-- **5a. A routine that can be broken.** `beat` gets a `tool:` — the prop the
-  person works with (cleaver, guitar, trowel, brush; ~40 locals already stand
-  beside one). Take it and the beat *fails*: the arm comes down on nothing, the
-  person looks at their hand, the pool switches (`before:`/`after:` already
-  resolves a condition; `tool:` is a third). Put it back (4a) and they resume.
-  The retrieval (`localOwnStart`) already makes them *come and get it*.
-- **5b. Wariness finally denies something.** Once per chapter: Monaco's doorman
-  steps into the doorway (`monLocDoor` + `npcREACH_ST`) while `npcHeat` at the
-  steps is over 0.6; the Cali bandleader stops the band at a third knocked-over
-  instrument; the Kyoto tea lady closes the shutter. **Denial is a wait, not a
-  loss** — and item 3 gives the casual player the way to end it. Never on a
-  marquee.
-- **5c. Blame.** `npcWitnessHold` knows who saw what. When a witnessed event has
-  a person within 3 m of the prop, rewrite the nearest `addExchange` pair's next
-  exchange into an accusation of the wrong person — ~12 neutral pairs, no line
-  naming what was done. Humans arguing about the goose.
-- **5d. Animals startle people.** Route the Venice flock, Murray, the Pasto dog
-  and every `herdOffer` flush through `localsReact(kind, x, z, strength,
-  radius)` with the animal as source. Two hundred pigeons going up should make
-  a square flinch, and the witness chain then counts it.
+- **5a. A routine that can be broken.** `beat` gets a `tool:`; take it and the
+  beat *fails* — arm on nothing, a look at the hand, the pool switches (`tool:`
+  as a third `before:`/`after:` condition). Put it back (4a) and they resume;
+  `localOwnStart` already makes them come and get it.
+- **5b. Wariness finally denies something.** Once per chapter, a wait not a
+  loss: Monaco's doorman in the doorway (`monLocDoor` + `npcREACH_ST`) while
+  `npcHeat` at the steps is over 0.6; the Cali band stopping; the Kyoto
+  shutter. Item 3 is the way to end it. Never on a marquee.
+- **5c. Blame.** `npcWitnessHold` knows who saw what; rewrite the nearest
+  `addExchange` pair's next exchange into an accusation of the wrong person.
+  ~12 neutral pairs, no line naming what was done.
+- **5d. Animals startle people.** Route every flock, dog and `herdOffer` flush
+  through `localsReact` with the animal as source; the witness chain counts it.
 - **5e. The Traveller becomes a character.** Six chapters, one arc, lines that
-  know where they have seen you (reads `seen[]`, already saved).
+  know where they have seen you (`seen[]`).
 
-*Traps.* A failed beat plays once, then the person stands and looks (a beat
-that fails every 3 s is a metronome). Every gated door has a clock and never
-covers a `wow`. Blame pairs must face each other or the joke has no subject.
+*Traps.* A failed beat plays once. Every gated door has a clock and never
+covers a `wow`. Blame pairs must face each other.
 
 ### 6. NOTORIETY — the thread that crosses chapters (≈2 batches, 5–6 h)
 
-*The argument.* Eight hours, nineteen places, and the only thing you carry
-between them is a box. Consequence should travel — without one new save field,
-because it is a projection of counts already there, exactly as `keep` is a
-projection of ticks.
+*The argument.* Nineteen places, and the only thing you carry between them is
+a box. Consequence should travel — as a projection of counts already saved,
+exactly as `keep` is a projection of ticks.
 
 - **The number.** `notoriety = f(Σ jrChapInc, Σ jrChapScene, records beaten,
-  finds)` — one derived scalar, five tiers (*a rumour · a nuisance · a menace ·
-  a legend · a natural disaster*), on the departures board and the ledger
-  header. Item 3's `pho`/`fed` is its twin, shown beside it.
-- **The arrival card knows.** From tier 2 the card's second line is a headline:
-  *"SIGHTINGS OF A LARGE RODENT REPORTED IN PASTO"*. One line per tier per
-  chapter (the expensive part; ship tiers 2 and 4 if short).
-- **Gossip.** `npcPLACE_SAY` gets a `heard:` pool, three lines per chapter about
-  the *previous* place, chosen by whether you actually did anything there.
-- **The poster.** From tier 3, one grabbable `wanted-poster` prop per chapter
-  near the spawn ring, textured with the player's own album thumbnail from the
-  previous chapter (288×180 JPEG, already texture-sized). Stealing it is an
-  unlisted find. Fall back to the chapter's `sysMARKS` glyph when the album is
-  empty or the read throws (declare the read above the constructor).
-- **The ending reads it.** The ledger's last line is the tier; the lawn
-  ceremony's crowd line is chosen by it.
+  finds)`, five tiers (*a rumour · a nuisance · a menace · a legend · a natural
+  disaster*), on the departures board and the ledger; item 3's `pho`/`fed`
+  beside it.
+- **The arrival card knows.** From tier 2, a headline as the card's second
+  line: *"SIGHTINGS OF A LARGE RODENT REPORTED IN PASTO"*. Ship tiers 2 and 4
+  if authoring time is short.
+- **Gossip.** `npcPLACE_SAY` gets a `heard:` pool about the *previous* place,
+  chosen by whether you did anything there.
+- **The poster.** From tier 3, one grabbable `wanted-poster` per chapter near
+  the spawn ring, textured with the player's own album thumbnail; stealing it
+  is an unlisted find. Fall back to the `sysMARKS` glyph when the album read
+  throws (declare the read above the constructor).
+- **The ending reads it.**
 
-*Traps.* Notoriety spends only on attention, never on access — item 5b's denial
-reads *heat*, which decays, not notoriety, which does not.
+*Traps.* Notoriety spends only on attention; 5b's denial reads *heat*, which
+decays.
 
 ---
 
 ## WHAT THIS DOES NOT PROPOSE, AND WHY
 
+- **Opening chapter doors early.** The second draft proposed a threshold on
+  `jrOpen`. Dropped: the title picker already opens every place, and a player
+  inside a chapter is better led to its marquee (item 1) than let out of it.
+  If B0's stranger asks to leave a place before finishing it, revisit.
 - **More chapters.** Nineteen is plenty; every hour here is worth more than a
   twentieth city.
-- **A fail state, a score, or a timer on the screen.** Item 1 removes a wall;
-  nothing adds one. The pips in item 2 show a number the game already keeps.
-- **A tutorial.** Item 2's gags and item 1's stuck timer teach by placement and
-  by a person speaking; a card that says "press E" is the thing the touch pass
-  spent a batch removing.
-- **A second lap, a shareable postcard, a companion.** All three are real and
-  all three are for the player who has finished. Written down in the first
-  draft of this file (`git show 6f04afd:ROADMAP-FUN.md`) for when the first
-  hour is measured and right.
-- **More payoff spectacle.** The lift, the acts, the cards and the mix are done
-  and measured. Another celebration would devalue the sixteen that exist.
+- **A fail state, a score, or a timer on the screen.** The pips show a number
+  the game already keeps; `nextIn` is a countdown the paper already had.
+- **A tutorial.** Item 1 leads by a camera move, a sparkle and a person
+  speaking; item 2 teaches by placement. A card that says "press E" is the
+  thing the touch pass spent a batch removing.
+- **A second lap, a shareable postcard, a companion.** All three are for the
+  player who has finished; written down in `git show 6f04afd:ROADMAP-FUN.md`
+  for when the first five minutes are measured and right.
+- **A second marquee per chapter.** The law stands. Item 1e points at the minis
+  because they are already there.
 
 ---
 
@@ -351,31 +392,82 @@ reads *heat*, which decays, not notoriety, which does not.
 
 | batch | item | hours | one commit each |
 |---|---|---|---|
-| 0 | watch somebody play; rewrite items 1–3 from what they tried | 2 | notes only |
-| B1 | 1 `chapOpen` + `jrOpen` + the door announced · `qa/first-ten.js` | 3 | |
-| B2 | 1 the stuck timer · the resume card | 2.5 | |
-| B3 | 2 the spawn-ring gag in all nineteen · the arrival tick earned | 3 | |
-| B4 | 2 the pips · Sydney's first ninety seconds · re-run first-ten | 2.5 | |
-| B5 | 3 sit-and-be-noticed: approach, crouch, photo | 3 | |
-| B6 | 3 the snack (one edible per chapter) · the pat · heat interlock | 3 | |
-| B7 | 4a put down + receive · 4d breakables and spills · eng-rate A/B | 3 | |
-| B8 | 4b aimed throw · 4c nudge + one rideable prop | 3 | |
-| B9 | 4e people have bodies · 5d animals startle people | 3 | |
-| B10 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
-| B11 | 5c blame · 5e the Traveller's arc · 5b one denial (Monaco) | 3 | |
-| B12 | 6 the number, the arrival headline, the ledger, `pho`/`fed` | 3 | |
-| B13 | 6 gossip pools + the poster | 3 | |
+| 0 | watch somebody play two places from the picker; rewrite 1–2 from what they tried | 2 | notes only |
+| B1 | 1f `qa/first-five.js` · 1b the marquee line · `marquee:` points for all nineteen, arrival frames rendered and looked at | 3 | |
+| B2 | 1a the glimpse · 1c the nine clocks phased | 3 | |
+| B3 | 1d `lead:` on every wow, the arrow, the stuck timer · 1e mini marks | 2.5 | |
+| B4 | 2 the arrival tick earned · the pips · seeded people for the first rows | 3 | |
+| B5 | 2 the nineteen gags placed, half of them | 3 | |
+| B6 | 2 the other half · re-run first-five, read the table | 3 | |
+| B7 | 3 sit-and-be-noticed: approach, crouch, photo | 3 | |
+| B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | |
+| B9 | 4a put down + receive · 4d breakables and spills · eng-rate A/B | 3 | |
+| B10 | 4b aimed throw · 4c nudge + one rideable prop | 3 | |
+| B11 | 4e people have bodies · 5d animals startle people | 3 | |
+| B12 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
+| B13 | 5c blame · 5e the Traveller's arc · 5b one denial (Monaco) | 3 | |
+| B14 | 6 the number, the headline, the ledger | 3 | |
+| B15 | 6 gossip pools + the poster | 3 | |
 
 Every batch is verified the way this repository verifies: a paired A/B in one
 session, a rendered PNG judged by eye, `npm test` green, the 19-chapter soak at
 0 errors / 0 NaN, frame time flat at 16.5–16.8 ms. The instruments that matter
-here are `qa/first-ten.js` (B1 builds it: time-to-first-tick, time-to-wow,
-time-to-door, longest gap, per chapter — the retention proxy), `qa/eng-rate.js`
-(incidents and startles per 45 s of free play — the fun-per-minute proxy), and,
-for anything that toasts, a `MutationObserver` on `.capyui-toasts` rather than a
+here are `qa/first-five.js` (B1 builds it: first tick, first sight of the
+marquee, time-to-wow, longest gap — per chapter, entered from the picker),
+`qa/eng-rate.js` (incidents and startles per 45 s — fun-per-minute), and, for
+anything that toasts, a `MutationObserver` on `.capyui-toasts` rather than a
 wrapped `toast()` (module-local; sees nothing).
 
-**The two numbers this whole document is betting on**, to be read off
-`qa/first-ten.js` after B4: the first tick in every chapter under 30 s, and the
-first door in Sydney under twelve minutes. If B0's stranger disagrees with the
-driver about where they stalled, the stranger is right.
+**The three numbers this document is betting on**, read off `qa/first-five.js`
+after B6, for all nineteen chapters entered from the picker: the marquee in
+frame inside 60 s, the first tick inside 30 s, and the marquee's window open or
+its road begun inside five minutes. If B0's stranger disagrees with the driver
+about where they stalled, the stranger is right.
+
+---
+
+## THE STARTING LINE (measured in B1, 7 Sep 2026)
+
+`qa/first-five.js`, nineteen chapters, ninety seconds each, entered through
+`hud.cross`, driven by a random walk. A floor and not a forecast — but it is
+the first time anybody has timed a chapter of this game, and every batch below
+moves these numbers or does not.
+
+| ch | first tick | first sight of the marquee | seen in | longest gap |
+|---|---|---|---|---|
+| 1 Sydney | 11.0 s | 0.5 s | 4.9 % | 51.0 s |
+| 2 Pasto | 5.0 s | 25.0 s | 71.7 % | 65.0 s |
+| 3 Quay | **never** | 3.5 s | 15.6 % | 90.0 s |
+| 4 Kyoto | **never** | never | 0 | 91.5 s |
+| 5 Cali | 28.5 s | never | 0 | 62.0 s |
+| 6 Rio | 0.6 s | never | 0 | 75.5 s |
+| 7 Iceland | **never** | never | 0 | 90.5 s |
+| 8 Marrakech | **never** | never | 0 | 90.0 s |
+| 9 the Drift | 0.7 s | never | 0 | 70.5 s |
+| 10 Venice | 18.0 s | 0.5 s | 2.2 % | 60.5 s |
+| 11 Hong Kong | **never** | never | 0 | 90.0 s |
+| 12 Palawan | **never** | never | 0 | 91.0 s |
+| 13 Cappadocia | 9.5 s | never | 0 | 74.0 s |
+| 14 Manly | 26.0 s | 26.5 s | 4.9 % | 42.5 s |
+| 15 the Pantanal | 16.0 s | 0.5 s | 23.6 % | 75.0 s |
+| 16 Sơn Đoòng | 22.5 s | never | 0 | 31.0 s |
+| 17 Antarctica | 2.0 s | never | 0 | 88.0 s |
+| 18 Monte Carlo | 2.5 s | never | 0 | 88.5 s |
+| 19 Hanoi | 26.5 s | never | 0 | 35.0 s |
+
+- **The signpost is up in 19 of 19.** Item 1b is done and it is done everywhere.
+- **The marquee is seen at all in 6 of 19.** In thirteen chapters it is never
+  once on screen in ninety seconds of wandering. That is item 1a's number.
+- **On the arrival frame itself** (`qa/arrive-see.js`, sampled inside the
+  3.60 s shot): the marquee point is in the frustum in **8 of 19** and
+  unoccluded in **2** — Venice and the Pantanal. Nothing else.
+- **The first tick lands inside 30 s in 13 of 19** — and in six chapters (the
+  Quay, Kyoto, Iceland, Marrakech, Hong Kong, Palawan) a wandering player ticks
+  NOTHING in ninety seconds. **This is worse than the headline guessed**, and it
+  moves item 2 up in importance: those six are chapters whose first row cannot
+  be tripped over.
+- **The longest quiet run is 31–91.5 s**, over a minute in twelve chapters.
+
+One thing the baseline changed about the plan: the arrival tick being *earned*
+(item 2) was written as a polish item. In six chapters it is the difference
+between a first minute with something in it and a first minute with nothing.
