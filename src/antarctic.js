@@ -205,6 +205,12 @@ let antSpyTold = false;   // the toast is once per spy-hop, not once per frame o
 
 let antWinLight = [], antWinPane = [];   // the lit windows. See antBuildStation
 let antPengMesh = null, antPengData = null, antPengScale = null;
+// THE HERD and THE PERCH (N1), for the birds past antPENG_COL only — the ones
+// the herd offer addresses. `held` takes a bird off the penguin highway;
+// `perch` is the re-asked timer that says it is on the capybara's back.
+const antPengHeld  = new Float32Array(64);
+const antPengPerch = new Float32Array(64);
+const antPengPerchY = new Float32Array(64);
 // ...and where the nests are, written by antBuildStation and read by
 // antBuildPenguins, so that every bird in the colony is standing on one.
 const antNests = [];
@@ -4464,18 +4470,50 @@ function antUpdatePenguins(game, dt) {
     // reports only the ones standing about — which is also the third of the
     // colony that is genuinely at a loose end.
     if (typeof game.herdOffer === 'function') {
+      // ---- THIS OFFER HAD NEVER WORKED, AND IT MEASURED AS FORTY-TWO ------
+      //
+      // MEASURED 8 Sep 2026 (`qa/n1-herd-y.js`, all nineteen chapters):
+      // `herdDebug()` reported `{ kind: 'gentoo', n: 42 }` here and gave the
+      // first one's position as **x 0, z 0** — the origin, out in the bay,
+      // fifty to ninety metres from where any of them are drawn. Every other
+      // chapter that offers an animal reported a live position.
+      //
+      // The cause is in the update above. The forty-two birds this offer
+      // addresses are the ones past `antPENG_COL`, whose `mode` is 1 or 2 —
+      // the penguin highway — and that branch computes x and z into LOCALS off
+      // `antHIGH` and the walk parameter, and writes neither back. So the pair
+      // this offer reads has been zero since the chapter was built, and the
+      // pair it writes is read by nothing. A wheek near the spawn recruited
+      // birds at the origin and dragged nothing; the herd soak saw no error
+      // because there was none to see.
+      //
+      // Two lines fix it: the highway branch now stores the position it drew
+      // at (which is what the rookery branch has always done), and a led or
+      // perched bird is taken OFF the highway rather than being teleported
+      // back onto it every frame. See antPengHeld.
       game.herdOffer({
         biome: 'antarctic', kind: 'gentoo', obey: 1, voice: 'gull', pitch: 1.35,
         count: function () { return Math.max(0, antPENG_N - antPENG_COL); },
         at: function (i, o) {
           const q = (i + antPENG_COL) * antPENG_S;
           o.x = antPengData[q]; o.z = antPengData[q + 1];
-          o.y = antWATER + antFLOE_TOP;
+          o.y = antLandOnly(antPengData[q], antPengData[q + 1]);
         },
         put: function (i, x, z, yaw) {
           const q = (i + antPENG_COL) * antPENG_S;
+          antPengHeld[i] = 0.25;                             // off the highway
           antPengData[q] = x; antPengData[q + 1] = z; antPengData[q + 2] = yaw;
           antPengData[q + 6] = x; antPengData[q + 7] = z;   // ...and its own target
+        },
+        // A GENTOO, ON A CAPYBARA, ON AN ORCA. Two seats — a gentoo is 75 cm
+        // and stands upright, so one seat would have it filling the frame from
+        // the shoulder. See THE PERCH in systems.js.
+        span: 2,
+        lift: function (i, y) {
+          const q = (i + antPENG_COL) * antPENG_S;
+          antPengHeld[i] = 0.25;
+          antPengPerch[i] = 0.25;      // re-asked every frame — see antUpdatePeng
+          antPengPerchY[i] = y;
         },
       });
     }
@@ -4648,6 +4686,30 @@ function antUpdatePenguins(game, dt) {
         if (Math.random() < dt * want) antPengData[o + 4] = rand(1.1, 1.9);
       }
     } else {
+      // ---- THE HIGHWAY, AND THE TWO WAYS OFF IT (N1) --------------------
+      // `hi` is the index this bird has in the herd offer, which addresses the
+      // birds past antPENG_COL. A HELD bird — one following you, or one riding
+      // on you — is off the highway for as long as systems.js goes on saying
+      // so, and its position is whatever it was last put at. Everything else
+      // walks the polyline exactly as before.
+      const hi = i - antPENG_COL;
+      const held = hi >= 0 && antPengHeld[hi] > 0;
+      if (held) {
+        antPengHeld[hi] = Math.max(0, antPengHeld[hi] - dt);
+        x = antPengData[o]; z = antPengData[o + 1];
+        yaw = antPengData[o + 2];
+        if (antPengPerch[hi] > 0) {
+          antPengPerch[hi] = Math.max(0, antPengPerch[hi] - dt);
+          // ON THE BACK. No toboggan, no waddle roll, no ground: a rider's
+          // height comes from systems.js and the little rock-in-place is what
+          // stops it reading as a statue glued on.
+          y = antPengPerchY[hi];
+          roll = Math.sin(antTime * 1.7 + i * 0.9) * 0.08;
+        } else {
+          y = antLandOnly(x, z) - 0.42;
+          roll = Math.sin(antTime * 7 + i) * 0.22;
+        }
+      } else {
       antPengData[o + 4] += antPengData[o + 5] * dt * (mode === 2 ? 1 : 0.5);
       if (antPengData[o + 4] > 1) { antPengData[o + 4] = 1; antPengData[o + 5] *= -1; }
       if (antPengData[o + 4] < 0) { antPengData[o + 4] = 0; antPengData[o + 5] *= -1; }
@@ -4666,6 +4728,10 @@ function antUpdatePenguins(game, dt) {
       // is a penguin water-skiing.
       if (mode === 2) { pitch = 1.35; y -= 0.22; }
       else roll = Math.sin(antTime * 7 + i) * 0.22;
+      // THE ONE LINE THE OFFER NEEDED. `at` reads this pair and it had never
+      // been written for these birds; see the note on the herd offer below.
+      antPengData[o] = x; antPengData[o + 1] = z; antPengData[o + 2] = yaw;
+      }
     }
     // ...at ITS OWN SIZE, because a quarter of the birds standing between the
     // nests are chicks (see antPENG_COL) and the only difference between a

@@ -602,6 +602,29 @@ const capyHULL_D = [
 ];
 const capyHULL_N = (capyHULL_D.length - 1) * 2;
 
+// ---- THE SEATS (N1) --------------------------------------------------------
+//
+// The single most-shared fact about this species is that other animals sit on
+// it, and until now the one animal in this game nothing sat on was the
+// capybara. `capy.back(i, out)` is where a passenger goes; systems.js owns who
+// is sitting there (see THE PERCH) and every chapter goes on drawing its own
+// animal exactly as it did.
+//
+// THREE SEATS, ALL AFT OF THE EARS. The ears reach 0.278 and the skull top is
+// 0.18 above the muzzle line, so anything forward of about z = 0.25 is a hat
+// and not a passenger — and a hat is the wardrobe's job. These three sit along
+// the top line of the hull between the shoulder and the hips, which is the one
+// part of this animal that reads from every bearing including the resting
+// lens's own three-quarter rear.
+//
+// THE HEIGHTS ARE READ OFF `capyHULL`, NOT AUTHORED. A seat written as a
+// number goes inside the animal the first time somebody changes its shape —
+// which has happened once already this month (R2 raised the shoulder 11 cm and
+// buried both lapels of a costume that had been fitted by hand). `+ capySEAT_H`
+// is the only authored part: how far a foot stands off the fur.
+const capySEAT_Z = [0.06, -0.16, -0.38];
+const capySEAT_H = 0.015;         // m a passenger's feet stand off the coat
+
 /** One station, interpolated along the table. Clamped at both ends. */
 function capyHullAt(z) {
   const t = capyHULL;
@@ -1427,6 +1450,7 @@ const capyPosition = new THREE.Vector3(capySPAWN.x, capySPAWN.y, capySPAWN.z);
 const capyVelocity = new THREE.Vector3();
 // RENDER transform — interpolated + lightly filtered. Never used for gameplay.
 const capyRenderPos = new THREE.Vector3(capySPAWN.x, capySPAWN.y, capySPAWN.z);
+const capyBackV = new THREE.Vector3();   // scratch for capy.back() — see THE SEATS
 const capyUpLocal = new CANNON.Vec3(0, 1, 0);
 const capyUpWorld = new CANNON.Vec3();
 const capyRingM4 = new THREE.Matrix4();
@@ -4002,6 +4026,43 @@ export function createCapybara(game) {
      * one nobody may claim. `force` bypasses the grab-key gate, which a probe
      * with no keyboard could never satisfy.
      */
+    /**
+     * WHERE A PASSENGER SITS. See THE SEATS above and THE PERCH in systems.js.
+     *
+     * `i` is the seat, 0 at the shoulder and `capy.seats - 1` at the hips;
+     * `out` is any object with x/y/z and is returned. World space, feet-on-fur,
+     * and it already carries everything the animal is doing: the loaf drop, the
+     * breath, the lean, the squash, the render smoothing. That is the whole
+     * reason it lives here — every one of those is a local number in this file
+     * and a reader outside it would be re-deriving five of them and drifting
+     * from all five.
+     *
+     * Read off the SQUASH node, which is where the breath and the stretch are.
+     * The note by capySquash says nothing needing a clean world quaternion may
+     * live under it, and nothing here does: this returns a point and never an
+     * orientation. A passenger takes its heading from `capy.group.rotation.y`,
+     * which is the render yaw and is free; `animAudit()` also reports it and
+     * allocates an object doing so, which is fine for a probe and not for a
+     * thing three animals ask sixty times a second.
+     *
+     * Safe before the first frame and safe every frame — one parent-chain
+     * matrix update, no children, for at most three calls.
+     */
+    get seats() { return capySEAT_Z.length; },
+    back(i, out) {
+      const o = out || {};
+      // FRACTIONAL ON PURPOSE. An animal that takes two seats sits at 0.5 or
+      // 1.5, between them, and a rounded index would put a heron's feet in the
+      // same place as a pigeon's.
+      const k = clamp(i || 0, 0, capySEAT_Z.length - 1);
+      const a = Math.floor(k), b = Math.min(a + 1, capySEAT_Z.length - 1);
+      const z = capySEAT_Z[a] + (capySEAT_Z[b] - capySEAT_Z[a]) * (k - a);
+      const st = capyHullAt(z);          // [z, half-width, top y, bottom y]
+      capySquash.updateWorldMatrix(true, false);
+      capyBackV.set(0, st[2] + capySEAT_H, z).applyMatrix4(capySquash.matrixWorld);
+      o.x = capyBackV.x; o.y = capyBackV.y; o.z = capyBackV.z;
+      return o;
+    },
     climbAt(x, y, z, yaw) {
       const was = capyYaw;
       if (typeof yaw === 'number' && yaw === yaw) capyYaw = yaw;

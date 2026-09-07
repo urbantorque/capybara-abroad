@@ -29224,6 +29224,16 @@ export function createSystems(game) {
    * `obey` is clamped to 1..3 — see rule 2, and there is deliberately no way to
    * ask for a fourth. `put` is only ever called for animals that are following;
    * everything else the chapter goes on doing exactly as it did.
+   *
+   * ---- ...AND TWO MORE FIELDS, BOTH FOR THE PERCH (N1) --------------------
+   *
+   *   lift: function (i, y) {}   this animal may ride ON the capybara, and
+   *                              this is how the chapter is told what height
+   *                              to draw it at. Omit it and the kind simply
+   *                              cannot be perched, which is the honest answer
+   *                              for a cow. See THE PERCH below.
+   *   span: 1 | 2                how many of the three seats it fills. A
+   *                              pigeon is 1, a heron is 2.
    */
   game.herdOffer = function (o) {
     if (!o || typeof o.count !== 'function' || typeof o.at !== 'function' ||
@@ -29235,6 +29245,8 @@ export function createSystems(game) {
       voice: o.voice || null,
       pitch: o.pitch || 1,
       count: o.count, at: o.at, put: o.put,
+      lift: typeof o.lift === 'function' ? o.lift : null,
+      span: clamp(Math.round(o.span || 1), 1, 3),
       st: [],
     };
     herdKinds.push(rec);
@@ -29242,7 +29254,16 @@ export function createSystems(game) {
   };
   function herdState(rec, i) {
     let s = rec.st[i];
-    if (!s) { s = rec.st[i] = { heard: 0, heardT: 0, hold: 0, led: false, look: 0, order: 0 }; }
+    if (!s) {
+      s = rec.st[i] = { heard: 0, heardT: 0, hold: 0, led: false, look: 0, order: 0,
+                        // THE PERCH's own five, on the same record because
+                        // riding is a state of following and not a second
+                        // relationship: `on` is "it is on the back", `seat` is
+                        // which one, `mt` is 0..1 of the climb, `fx/fy/fz` is
+                        // where it climbed FROM and `err` is how far the
+                        // chapter has since moved it from where it was put.
+                        on: false, seat: -1, mt: 0, err: 0, fx: 0, fy: 0, fz: 0 };
+    }
     return s;
   }
   /** How many animals are following right now. The card and the record ask. */
@@ -29389,6 +29410,13 @@ export function createSystems(game) {
       for (let i = 0; i < n; i++) {
         const s = rec.st[i];
         if (!s || (!s.led && s.look <= 0)) continue;
+        // ---- ...UNLESS IT IS ON YOUR BACK (N1) --------------------------
+        // A passenger is still `led` — it is on the herd's clock and gets down
+        // when the company runs out — but it is not walking the trail, and
+        // leaving it in this loop meant two writers for one animal every
+        // frame AND a startlePeople call from a bird that had not moved a
+        // centimetre. THE PERCH writes it, after this, on the same frame.
+        if (s.on) continue;
         herdV.x = herdV.y = herdV.z = 0;
         rec.at(i, herdV);
         if (!s.led) {
@@ -29424,6 +29452,311 @@ export function createSystems(game) {
       }
     }
   }
+
+  // =========================================================================
+  // THE PERCH (N1) — everything sits on the capybara.
+  // =========================================================================
+  // The single most-shared fact about this species is that other animals use it
+  // as furniture, and the one animal in this game nothing sat on was the
+  // capybara. This is the herd with a vertical: sit still next to something
+  // that is already following you and it climbs on, and then you can stand up
+  // and walk off with it.
+  //
+  // WHY IT IS NOT A CARRIER. Every other thing in this game that carries the
+  // capybara is a kinematic BODY, and capybara.js damps whatever it is standing
+  // on to a stop — which is the whole seven-ways-to-drop-a-passenger problem.
+  // A perched animal is not a body and never touches the solver: it is a POSE,
+  // written once a frame from `capy.back()`, exactly the way a led animal's
+  // ground position is written. So the carrier problem cannot arise, and the
+  // thing to measure instead is position ERROR against the seat.
+  //
+  // FOUR RULES, and the first two are the herd's own:
+  //
+  //  1. IT MUST ALREADY BE FOLLOWING YOU. The obey ladder is the gate — a
+  //     pigeon will climb on for one wheek, a cat wants two, the heron three —
+  //     so the perch costs nothing to author and inherits a tier system that
+  //     is already tuned. Nothing climbs on an animal it has not been asked to
+  //     follow.
+  //  2. IT IS ON THE HERD'S OWN CLOCK. A passenger whose `hold` runs out gets
+  //     down, like any other member of the line. Nothing is collected.
+  //  3. YOU HAVE TO BE STILL. `capy.loaf` is the ask — the one gesture in this
+  //     game that is earned by doing nothing — and it is held for perchWAIT
+  //     before the first one climbs, so a player who sits down for a second
+  //     does not find a heron on them.
+  //  4. NOT EVERY ANIMAL MAY. A chapter opts in by writing `lift` on its herd
+  //     offer, and two of the eight deliberately do not: an Icelandic ewe and
+  //     a Pantanal cow both outweigh the capybara several times over, and the
+  //     joke is a small animal riding a large calm one, not a slapstick
+  //     stack. See THE REFUSALS at the bottom of this block.
+  //
+  // THE OFFER GROWS ONE OPTIONAL FUNCTION and nothing else changes:
+  //
+  //   lift: function (i, y) { ...put animal i's feet at world height y... }
+  //
+  // It is called EVERY FRAME while that animal is riding and never otherwise,
+  // which makes it the same re-asked-per-frame shape as `capy.loafAsk`: the
+  // chapter sets a short timer from it and suppresses its own wander, flee and
+  // gravity for that animal while the timer runs, and a perch that stops being
+  // written cannot leave an animal stuck in the air. `put` is still called on
+  // the same frame with the seat's x/z and the animal's yaw, first, so a
+  // chapter that stores x, z and y in three places gets all three.
+  const perchREACH  = 2.30;   // m the animal must be within to climb on
+  const perchWAIT   = 2.20;   // s of loaf before the first one does
+  const perchGAP    = 0.70;   // s between two of them climbing on
+  const perchRISE   = 0.55;   // s of the climb itself
+  const perchLOAF   = 0.80;   // 0..1 of the loaf that counts as sat down
+  const perchBARGE  = 3.20;   // m/s of impact that shakes everybody off — physBARGE_MIN
+  const perchAIR    = 0.14;   // s off the ground before they let go
+  const perchYAW    = [0.22, -0.31, 0.13];   // rad each seat sits off the animal's line
+  const perchSeat = { x: 0, y: 0, z: 0 };
+  const perchFrom = { x: 0, y: 0, z: 0 };
+  const perchSfx  = { volume: 1, pitch: 1 };
+  let perchLoafT = 0;     // s the animal has been sat down, for rule 3
+  let perchGapT  = 0;     // s until the next one may climb
+  let perchAirT  = 0;     // s the animal has been off the ground
+  let perchShake = false; // a barge happened this frame: everybody off
+  let perchMost  = 0;     // most on at once this visit — the record's number
+  /** How many are on the back right now. The card, the record and QA ask. */
+  game.perchCount = function () {
+    let n = 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (s && s.on) n++;
+      }
+    }
+    return n;
+  };
+  /**
+   * WHAT IS ON THE BACK AND WHAT COULD BE, read-only.
+   *
+   * Same reason `herdDebug` exists: the state is closure-local, the animals
+   * live in six other files, and a mechanic with a dwell timer, a reach and
+   * three seats that cannot be asked "is anything on, could anything get on,
+   * and how far is the nearest one" is a mechanic that gets tuned by guessing.
+   * `err` is the metres between where the seat is and where the animal was
+   * last put — the one number that says whether a pose-written passenger keeps
+   * up with a running animal, which is the whole premise of this block.
+   */
+  game.perchDebug = function () {
+    const live = game.biome && game.biome.current;
+    const capy = game.capy;
+    const out = { biome: live, on: game.perchCount(), most: perchMost,
+                  loafT: +perchLoafT.toFixed(2), seats: capy ? capy.seats : 0,
+                  kinds: [] };
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live) continue;
+      const n = rec.count() | 0;
+      let on = 0, led = 0, near = 1e9, err = 0;
+      for (let i = 0; i < n; i++) {
+        const s = rec.st[i];
+        if (s && s.led) led++;
+        if (s && s.on) {
+          on++;
+          if (s.err > err) err = s.err;
+        }
+        if (capy && capy.position) {
+          perchFrom.x = perchFrom.y = perchFrom.z = 0;
+          rec.at(i, perchFrom);
+          const d = Math.hypot(perchFrom.x - capy.position.x, perchFrom.z - capy.position.z);
+          if (d < near) near = d;
+        }
+      }
+      out.kinds.push({ kind: rec.kind, obey: rec.obey, n: n, led: led, on: on,
+                       rider: typeof rec.lift === 'function',
+                       span: rec.span,
+                       near: near > 1e8 ? null : +near.toFixed(2),
+                       err: +err.toFixed(3) });
+    }
+    return out;
+  };
+  /** Everything down, now, and say why. Nothing else clears `on`. */
+  function perchAllOff(why) {
+    let n = 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (!s || !s.on) continue;
+        s.on = false; s.mt = 0; s.seat = -1; s.err = 0;
+        n++;
+      }
+    }
+    if (n > 0 && why !== 'quiet') {
+      perchSfx.volume = 0.20 + n * 0.05;
+      perchSfx.pitch = 1.0;
+      sfx('rustle', perchSfx);
+    }
+    return n;
+  }
+  // A BARGE SHAKES THEM OFF. `prop:impact` carries the closing speed and does
+  // not say who caused it, so the test is the barge threshold AND the prop
+  // being within arm's length of the animal — which between them is exactly
+  // "you ran into something". A crate falling off a roof forty metres away is
+  // not a reason for a heron to get down.
+  game.events.on('prop:impact', function (e) {
+    if (!e || !(e.speed >= perchBARGE)) return;
+    const capy = game.capy, p = capy && capy.position;
+    if (!p || !e.position) return;
+    const dx = e.position.x - p.x, dz = e.position.z - p.z;
+    if (dx * dx + dz * dz > 9) return;      // 3 m
+    perchShake = true;
+  });
+  function perchUpdate(dt) {
+    const capy = game.capy;
+    const p = capy && capy.position;
+    const live = game.biome && game.biome.current;
+    const can = !!(capy && typeof capy.can === 'function' && capy.can('herd'));
+    // ---- the four ways everybody gets down ------------------------------
+    // A hop, a dive, a slide and a barge, plus the two that are not gestures
+    // at all: losing the skill and changing chapter. Swimming is deliberately
+    // NOT on the list — a pigeon on the head of a swimming capybara is the
+    // picture this whole block exists for.
+    let off = null;
+    if (!capy || !p || !can) off = 'quiet';
+    else if (perchShake) off = 'barge';
+    else if (capy.diving || capy.sliding || capy.climbing) off = 'move';
+    else {
+      // The hop needs a little patience: `grounded` is false for a frame at the
+      // top of a step on rough ground, and three passengers leaving because a
+      // kerb went past is not a mechanic, it is a fault.
+      const airborne = !capy.grounded && !capy.swimming && !capy.carriedBy;
+      perchAirT = airborne ? perchAirT + dt : 0;
+      if (perchAirT > perchAIR) off = 'hop';
+    }
+    perchShake = false;
+    if (off) { perchAllOff(off); perchLoafT = 0; if (off !== 'quiet') perchGapT = perchGAP; }
+    // ---- rule 3: you have to be still ------------------------------------
+    const sat = !!(capy && capy.loaf >= perchLOAF);
+    perchLoafT = sat ? perchLoafT + dt : 0;
+    if (perchGapT > 0) perchGapT -= dt;
+    // ---- who is on, and which seats are free -----------------------------
+    const seats = (capy && capy.seats) || 0;
+    if (!seats) return;
+    const taken = perchTaken;
+    for (let i = 0; i < taken.length; i++) taken[i] = false;
+    let onN = 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (!s || !s.on) continue;
+        // A PASSENGER WHOSE COMPANY HAS RUN OUT GETS DOWN — rule 2. `led` is
+        // cleared by herdUpdate on the same frame, so this is read and never
+        // written here.
+        if (!s.led || rec.biome !== live) { s.on = false; s.seat = -1; s.mt = 0; continue; }
+        for (let q = 0; q < rec.span; q++) {
+          const t = s.seat + q;
+          if (t >= 0 && t < taken.length) taken[t] = true;
+        }
+        onN++;
+      }
+    }
+    // ---- ...and one more climbs on ---------------------------------------
+    if (perchLoafT >= perchWAIT && perchGapT <= 0 && onN < seats) {
+      let best = null, bestD = perchREACH * perchREACH;
+      for (let k = 0; k < herdKinds.length; k++) {
+        const rec = herdKinds[k];
+        if (rec.biome !== live || typeof rec.lift !== 'function') continue;
+        const n = rec.count() | 0;
+        for (let i = 0; i < n; i++) {
+          const s = rec.st[i];
+          if (!s || !s.led || s.on) continue;
+          perchFrom.x = perchFrom.y = perchFrom.z = 0;
+          rec.at(i, perchFrom);
+          const dx = perchFrom.x - p.x, dz = perchFrom.z - p.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 > bestD) continue;
+          const seat = perchFreeSeat(taken, rec.span, seats);
+          if (seat < 0) continue;
+          bestD = d2; best = { rec: rec, i: i, s: s, seat: seat };
+        }
+      }
+      if (best) {
+        const s = best.s;
+        s.on = true; s.seat = best.seat; s.mt = 0; s.err = 0;
+        s.fx = perchFrom.x; s.fy = perchFrom.y; s.fz = perchFrom.z;
+        // the climb starts from where it was actually standing, and `perchFrom`
+        // holds the LAST animal scanned rather than the winner — re-ask.
+        best.rec.at(best.i, perchFrom);
+        s.fx = perchFrom.x; s.fy = perchFrom.y; s.fz = perchFrom.z;
+        for (let q = 0; q < best.rec.span; q++) {
+          const t = best.seat + q;
+          if (t < taken.length) taken[t] = true;
+        }
+        onN++;
+        perchGapT = perchGAP;
+        if (best.rec.voice) {
+          perchSfx.volume = 0.26 + Math.random() * 0.10;
+          perchSfx.pitch = best.rec.pitch * (0.98 + Math.random() * 0.10);
+          sfx(best.rec.voice, perchSfx);
+        }
+      }
+    }
+    if (onN > perchMost) perchMost = onN;
+    // ---- and every one of them is put on its seat, every frame -----------
+    if (!onN) return;
+    const yaw = (capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live || typeof rec.lift !== 'function') continue;
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (!s || !s.on) continue;
+        capy.back(s.seat + (rec.span - 1) * 0.5, perchSeat);
+        let x = perchSeat.x, y = perchSeat.y, z = perchSeat.z;
+        // THE CLIMB. Not a teleport: it arcs from where the animal was standing
+        // up onto the back over perchRISE, and the arc is what reads as
+        // climbing rather than as a bird changing coordinate systems.
+        if (s.mt < 1) {
+          s.mt = Math.min(1, s.mt + dt / perchRISE);
+          const t = s.mt * s.mt * (3 - 2 * s.mt);
+          x = s.fx + (x - s.fx) * t;
+          z = s.fz + (z - s.fz) * t;
+          y = s.fy + (y - s.fy) * t + Math.sin(t * Math.PI) * 0.22;
+        }
+        const yw = yaw + perchYAW[s.seat % perchYAW.length] * (1 - s.mt * 0.6);
+        rec.put(i, x, z, yw);
+        rec.lift(i, y);
+        // WHAT THE CHAPTER ACTUALLY DID WITH IT. A `put` that is overwritten by
+        // the chapter's own wander on the next frame is the exact failure this
+        // system is most likely to have, and it is invisible from here unless
+        // somebody asks. One `at` per passenger, once it has finished climbing.
+        if (s.mt >= 1) {
+          perchFrom.x = perchFrom.y = perchFrom.z = 0;
+          rec.at(i, perchFrom);
+          s.err = Math.hypot(perchFrom.x - x, perchFrom.z - z);
+        }
+      }
+    }
+  }
+  const perchTaken = [false, false, false, false];
+  /** The lowest run of `span` free seats, or -1. */
+  function perchFreeSeat(taken, span, seats) {
+    for (let a = 0; a + span <= seats; a++) {
+      let ok = true;
+      for (let q = 0; q < span; q++) if (taken[a + q]) { ok = false; break; }
+      if (ok) return a;
+    }
+    return -1;
+  }
+  // A NEW CHAPTER IS A NEW BACK. `most` is per visit — it is the number a
+  // record will be taken from — and the herd drops everything across a border
+  // anyway, so this is the same rule stated once more rather than a new one.
+  game.events.on('biome:enter', function () {
+    perchAllOff('quiet');
+    perchMost = 0; perchLoafT = 0; perchGapT = 0; perchAirT = 0; perchShake = false;
+  });
+  // ---- THE REFUSALS --------------------------------------------------------
+  // Two of the eight chapters that offer an animal are not given `lift`, and
+  // the reason is the same for both: an Icelandic ewe is 45 kg and a Pantanal
+  // cow is half a tonne, against a 55 kg capybara. The joke this whole block
+  // is built on is a SMALL animal riding a large calm one — a heron looking
+  // faintly embarrassed, three ibis in a row — and it inverts the moment the
+  // passenger is bigger than the mount. They stay in the herd, where a line of
+  // fourteen sheep behind you is already the right gag for that animal.
 
   game.registerShadowTarget = registerShadowTarget;
   // The modules that call registerShadowTarget ran before systems existed and hit
@@ -31741,6 +32074,10 @@ export function createSystems(game) {
     // already moved the animal and wins for that frame. Give a chapter the
     // herd and it goes on drawing its animals exactly as it did.
     herdUpdate(dt);
+    // ...and THE PERCH after it, for the same reason one more time: a
+    // passenger's seat has to be written after the trail walk that would
+    // otherwise have put it on the ground behind you.
+    perchUpdate(dt);
     // ...and the birds, which is a different mechanic on the same contract.
     flockStep(dt);
     // The live record line, on the same raw clock and for a third version of

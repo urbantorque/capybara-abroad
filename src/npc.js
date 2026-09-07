@@ -6080,6 +6080,7 @@ export function createNPCs(game) {
       walkPhase: rand(0, 6.28), idlePhase: rand(0, 6.28),
       avoidAng: 0, avoidT: 0, avoidStuck: false, moveX: 0, moveZ: 1,
       stateT: 0, peck: 0, lastLine: '',
+      perch: 0,                        // THE PERCH (N1) — see stepIbis
       speak() { /* bin chickens do not speak. they judge. */ },
       update(dt) { stepIbis(rec, dt); },
     };
@@ -8088,6 +8089,25 @@ export function createNPCs(game) {
 
   function stepIbis(rec, dt) {
     rec.stateT += dt;
+    // ---- ...UNLESS IT IS ON THE CAPYBARA (N1) ---------------------------
+    // A perched ibis has no target to steer at, no hop to bob with and no
+    // ground under it — `rec.group.position.y = hop` below is the one line that
+    // would put it back on the lawn. systems.js has already written x, y, z and
+    // yaw; this keeps the neck and legs alive and leaves the rest alone.
+    // `rec.perch` is re-asked every frame by `lift` on the herd offer, so an
+    // ibis cannot be stranded up there. See THE PERCH in systems.js.
+    if (rec.perch > 0) {
+      rec.perch = Math.max(0, rec.perch - dt);
+      rec.speed = 0;
+      rec.peck = damp(rec.peck, 0, 4, dt);
+      rec.nodes.neckN.rotation.x = rec.peck * 0.35 - 0.15;
+      rec.nodes.bodyN.rotation.x = 0.16;
+      rec.nodes.legA.rotation.x = 0;
+      rec.nodes.legB.rotation.x = 0;
+      rec.group.rotation.y = rec.yaw;
+      rec.group.updateMatrixWorld(true);
+      return;
+    }
     let spd = 0;
     if (rec.state === 'flee') spd = 3.4;
     else if (rec.state === 'work') spd = 1.7;
@@ -10915,6 +10935,16 @@ export function createNPCs(game) {
           r.target.set(x, r.group.position.y, z);
           r.yaw = yaw;
           r.state = 'wander';
+        },
+        // THREE IBIS IN A ROW DOWN THE BACK. One seat each, obey 1, and six of
+        // them in the first chapter of the game — which is where this mechanic
+        // has to be discoverable at all. See THE PERCH in systems.js.
+        span: 1,
+        lift: function (n, y) {
+          const r = ibises[n];
+          if (!r) return;
+          r.perch = 0.25;              // re-asked every frame — see stepIbis
+          r.group.position.y = y;
         },
       });
     }

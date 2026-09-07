@@ -208,6 +208,14 @@ let venBoardBodies = null;
 let venPigeonMesh = null;
 let venPigeonData = null;           // x,z,phase,up,vy,y,vx,vz per bird
 let venPigeonUp = 0, venPigeonPeak = 0, venPigeonHold = 0;
+// ---- THE PERCH (N1) --------------------------------------------------------
+// One short timer per bird, re-asked every frame by `lift` on the herd offer —
+// the same shape as `capy.loafAsk`, and for the same reason: a perch that stops
+// being written must not be able to leave a pigeon standing in mid-air over the
+// piazza. While it is up, this bird is out of the flee test, out of the little
+// idle clock and out of the paving-bounds clamp, and its height is whatever
+// systems.js last said. See THE PERCH in systems.js.
+const venPigeonPerch = new Float32Array(venPIGEON_N);
 // The clatter ladder. Counts, not fractions, so they survive a resize of the
 // flock. See the note at the bottom of venUpdatePigeons.
 const venPIGEON_RUNGS = [18, 45, 90, 140];
@@ -2777,9 +2785,24 @@ function venUpdatePigeons(game, dt) {
         },
         put: function (i, x, z, yaw) {
           const q = i * 10;
-          if (venPigeonData[q + 3] > 0) return;      // in the air: leave it alone
+          // ...unless it is ON the capybara, in which case it is airborne in
+          // the only sense that matters and this is the writer.
+          if (venPigeonData[q + 3] > 0 && venPigeonPerch[i] <= 0) return;
           venPigeonData[q] = x; venPigeonData[q + 1] = z;
           venPigeonData[q + 2] = yaw;
+        },
+        // A ST MARK'S PIGEON ON A CAPYBARA'S HEAD is the joke this whole
+        // mechanic was written for, it obeys on one wheek, and there are a
+        // hundred and eighty of them. See THE PERCH in systems.js.
+        span: 1,
+        lift: function (i, y) {
+          const q = i * 10;
+          venPigeonPerch[i] = 0.25;
+          venPigeonData[q + 3] = 0;                 // not flying: being carried
+          venPigeonData[q + 4] = 0;
+          // the draw is `venTerrain + 0.16 + y + bob`, so this is the height
+          // stored as an offset over whatever paving is under the animal now.
+          venPigeonData[q + 5] = y - venTerrain(venPigeonData[q], venPigeonData[q + 1]) - 0.16;
         },
       });
     }
@@ -2828,6 +2851,22 @@ function venUpdatePigeons(game, dt) {
     // a flooded square has no pigeons standing in it, which is also true
     const wet = venWaterY > gy + 0.05;
     const pr = venPigeonCrit ? venPigeonCrit.near : venPIGEON_R;
+    // ---- A BIRD ON YOUR BACK IS NOT IN THE SQUARE (N1) ------------------
+    // It is inside the flee radius by definition, it is over water half the
+    // time, and both of those put it up. Everything below is skipped and
+    // systems.js writes x, z, yaw and y after this module has run.
+    if (venPigeonPerch[i] > 0) {
+      venPigeonPerch[i] = Math.max(0, venPigeonPerch[i] - dt);
+      const py = venTerrain(x, z) + 0.16 + y;
+      const yw = venPigeonData[o + 2];
+      const PS0 = 0.88;
+      venPigeonMesh.body.setMatrixAt(i, venXform(x, py, z, 0, yw, 0, PS0, PS0, PS0));
+      venPigeonMesh.head.setMatrixAt(i, venXform(x + Math.sin(yw) * 0.15 * PS0,
+        py + 0.15 * PS0, z + Math.cos(yw) * 0.15 * PS0, 0, yw, 0, PS0, PS0, PS0));
+      venPigeonMesh.wingR.setMatrixAt(i, venXform(x, py + 0.05, z, 0, yw, 0, 1e-4, 1e-4, 1e-4));
+      venPigeonMesh.wingL.setMatrixAt(i, venXform(x, py + 0.05, z, 0, yw, 0, 1e-4, 1e-4, 1e-4));
+      continue;
+    }
     if (air <= 0 && (wet || (scare && p &&
         (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z) < pr * pr))) {
       air = 1;

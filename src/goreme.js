@@ -1340,6 +1340,7 @@ function gorBuildCats(root) {
     const cz = (i < 6 ? P.z : P.z + 6.2) + Math.sin(a) * rr;
     gorCats.push({ x: cx, z: cz, hx: cx, hz: cz, tx: cx, tz: cz,
                    yaw: a, look: 0, st: i % 3 === 2 ? 'flop' : 'sit',
+                   perch: 0, py: 0,          // THE PERCH (N1) — see gorUpdateCats
                    t: rand(2, 16), sc: rand(0.86, 1.12), col: i % gorCAT_COL.length });
     gorCol.set(gorCAT_COL[i % gorCAT_COL.length]);
     m.setColorAt(i, gorCol);
@@ -1385,6 +1386,18 @@ function gorUpdateCats(game, dt) {
           c.tx = x; c.tz = z;                 // ...and stop it walking off
           if (c.st === 'walk') { c.st = 'sit'; c.t = 3; }
         },
+        // A CAT ASLEEP ON A CAPYBARA is the picture, and Göreme is the one
+        // chapter in the game with cats in it. Two seats, because a cat is
+        // most of the length of this animal's back and the pose it rides in
+        // is the flop. See THE PERCH in systems.js.
+        span: 2,
+        lift: function (i, y) {
+          const c = gorCats[i];
+          if (!c) return;
+          c.perch = 0.25;                     // re-asked every frame — see below
+          c.py = y;
+          c.st = 'flop'; c.t = 6;             // a cat that has got up there stays
+        },
       });
     }
   }
@@ -1392,6 +1405,22 @@ function gorUpdateCats(game, dt) {
   const catAppr = gorCatCrit ? (gorCatCrit.appr || 0) : 0;
   for (let i = 0; i < gorCAT_N; i++) {
     const c = gorCats[i];
+    // ---- ...UNLESS IT IS ON THE CAPYBARA (N1) ---------------------------
+    // Everything below assumes a cat on the paving: it flees a capybara at two
+    // and a half metres, it walks to a target, and it is drawn at the height of
+    // the terrain under it. A passenger is none of those. `c.perch` is re-asked
+    // every frame by `lift` on the herd offer, so a cat cannot be left stranded
+    // in the air by a system that stopped writing. See THE PERCH in systems.js.
+    if (c.perch > 0) {
+      c.perch = Math.max(0, c.perch - dt);
+      if (c.look > 0) c.look -= dt;
+      const br = Math.sin(gorTime * 1.6 + i * 2.1) * 0.006;
+      gorM.compose(gorV3.set(c.x, c.py + br, c.z),
+                   gorQ.setFromEuler(gorEu.set(0, c.yaw, 1.35, 'YXZ')),
+                   gorSc.set(c.sc, c.sc * 0.90, c.sc));
+      gorCatMesh.setMatrixAt(i, gorM);
+      continue;
+    }
     // ---- a capybara at two and a half metres is a reason to be elsewhere ---
     if (p) {
       const dx = c.x - p.x, dz = c.z - p.z;

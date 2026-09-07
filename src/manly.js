@@ -2618,6 +2618,11 @@ function manBuildDolphins(root) {
  */
 const manGULL_N = 30;
 let manGullMesh = null, manGullData = null;
+// THE HERD and THE PERCH (N1): two short re-asked timers per gull. `held` is
+// "this bird is following you, so it is on the ground and not up on its own
+// awning"; `perch` is "it is on the capybara". Both see manUpdateGulls.
+const manGullHeld  = new Float32Array(manGULL_N);
+const manGullPerch = new Float32Array(manGULL_N);
 let manGullUp = 0, manGullNext = 14;
 const manGULL_HOME = { x: -13.5, z: 47.0 };
 const manGULL_NEAR = 7;             // m — walk inside this and they go up
@@ -2719,10 +2724,43 @@ function manUpdateGulls(game, dt) {
           const q = i * 7;
           o.x = manGullData[q]; o.y = manGullData[q + 1]; o.z = manGullData[q + 2];
         },
+        // ---- THE HEIGHT TEST WAS THE WRONG QUESTION, AND THIS FILE SAYS SO
+        //
+        // MEASURED 8 Sep 2026 (`qa/n1-perch.js`): ten gulls recruited on two
+        // wheeks and then stood on their parapets for the whole run, `near`
+        // 30.9 m and never falling. `manGullData[q + 1] > manPROM_Y + 0.6` is
+        // TRUE for every gull on an awning — that is what an awning is — so
+        // `put` returned early for all of them and a led gull could not be
+        // moved a centimetre. The herd registered, the birds joined, and
+        // nothing walked.
+        //
+        // The note forty lines below, on the draw, already had the answer:
+        // "A PERCHED GULL IS FIVE METRES UP. Testing height for 'is it flying'
+        // makes every bird on a shop parapet flap on the spot for ever; the
+        // state is `up`, and the state is what has to be asked." The draw
+        // learnt it; these two writers did not.
+        // ...AND A PASSENGER IS NOT PART OF THE TAKE-OFF. `manGullUp` goes to 1
+        // whenever the animal comes near the Corso, which during a walk is most
+        // of the time — measured 8 Sep, a perched gull's position error climbed
+        // 1.35 m, 3.35, 5.35, 7.35, 9.35 over four seconds of walking, at
+        // exactly the walking speed, because `put` was refusing to write it
+        // while `lift` went on writing its height. A gull on your back is not
+        // in the wheel.
         put: function (i, x, z) {
+          if (manGullUp > 0.5 && manGullPerch[i] <= 0) return;   // flying: leave it
           const q = i * 7;
-          if (manGullData[q + 1] > manPROM_Y + 0.6) return;   // airborne: leave it
+          manGullHeld[i] = 0.25;                    // ...and off the awning
           manGullData[q] = x; manGullData[q + 2] = z;
+        },
+        // A SILVER GULL ON A CAPYBARA, outside a chip shop, is the most
+        // Australian frame in this game. One seat: it is a small bird.
+        // See THE PERCH in systems.js.
+        span: 1,
+        lift: function (i, y) {
+          const q = i * 7;
+          manGullHeld[i] = 0.25;
+          manGullPerch[i] = 0.25;      // re-asked every frame — see manUpdateGulls
+          manGullData[q + 1] = y;
         },
       });
     }
@@ -2743,9 +2781,13 @@ function manUpdateGulls(game, dt) {
           const q = i * 7;
           o.x = manGullData[q]; o.y = manGullData[q + 1]; o.z = manGullData[q + 2];
         },
+        // Same wrong question as the herd's, above, and the same answer: a bird
+        // on an awning is not flying, it is five metres up. Nothing had ever
+        // walked to a dropped chip either.
         put: function (i, x, z) {
+          if (manGullUp > 0.5) return;
           const q = i * 7;
-          if (manGullData[q + 1] > manPROM_Y + 0.6) return;
+          manGullHeld[i] = 0.25;
           manGullData[q] = x; manGullData[q + 2] = z;
         },
         scare: function () {
@@ -2782,8 +2824,32 @@ function manUpdateGulls(game, dt) {
   for (let i = 0; i < manGULL_N; i++) {
     const o = i * 7;
     const ph = manGullData[o + 6];
+    // ---- ...UNLESS IT IS ON THE CAPYBARA (N1) ---------------------------
+    // Every branch below damps this bird toward a target — a parapet, a wheel
+    // over the Corso, a spot on the sand — and a passenger has no target but
+    // the animal's back. Skipped entirely; systems.js has already written x, y
+    // and z. `manGullPerch` is re-asked every frame by `lift` on the herd
+    // offer. See THE PERCH in systems.js.
+    if (manGullPerch[i] > 0) {
+      manGullPerch[i] = Math.max(0, manGullPerch[i] - dt);
+      manM.compose(manV3.set(manGullData[o], manGullData[o + 1], manGullData[o + 2]),
+                   manQ.setFromEuler(manE.set(0, Math.sin(manTime * 0.4 + ph) * 0.5, 0)),
+                   manSc.set(1, 1, 1));
+      manGullMesh.setMatrixAt(i, manM);
+      continue;
+    }
     let tx, ty, tz;
-    if (up > 0.5) {
+    // ---- A LED GULL IS ON THE GROUND (N1) -------------------------------
+    // With the height test out of `put` (see the herd offer above) a recruited
+    // gull's x and z are written every frame — and every branch below would
+    // still be damping its Y back up onto the awning it started on, which is a
+    // bird walking behind you eight metres in the air. `manGullHeld` is set by
+    // `put` and re-asked every frame, exactly like the perch timer.
+    if (manGullHeld[i] > 0) {
+      manGullHeld[i] = Math.max(0, manGullHeld[i] - dt);
+      tx = manGullData[o]; tz = manGullData[o + 2];
+      ty = manTerrain(tx, tz) + 0.06;
+    } else if (up > 0.5) {
       // a loose wheel over the Corso, each bird on its own radius
       const a = manTime * (0.7 + (i % 5) * 0.09) + ph;
       const r = 7 + (i % 7) * 2.4;

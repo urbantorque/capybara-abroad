@@ -1234,6 +1234,8 @@ let kyoHeronGroup = null, kyoHeronWing = null;
 // other one's answer. That exact bug cost time in Göreme — see gorV3b.
 const kyoV3h = new THREE.Vector3();
 let kyoHeronPhase = 0;                     // 0 standing, 1 up, 2 round, 3 down
+let kyoHeronPerch = 0, kyoHeronPerchY = 0; // THE PERCH (N1) — see kyoUpdateHeron
+let kyoHeronHeld = 0;                      // ...and "it is following you"
 let kyoHeronSpooked = 0;                   // 1 if the bonsho is what moved it
 let kyoHeronCrit = null;                   // the calm-aware radius. See THE CALM.
 let kyoHeronT = 0;
@@ -1305,6 +1307,23 @@ function kyoUpdateHeron(game, dt) {
   const to = kyoHeronAt ? kyoHERON_A : kyoHERON_B;
   const standY = kyoWATER_Y + 0.86;
 
+  // ---- THE PERCH (N1) ----------------------------------------------------
+  // A GREY HERON STANDING ON A CAPYBARA is the best single frame this mechanic
+  // can produce and the hardest one to earn: three wheeks from twelve metres,
+  // then sit down and wait. Everything below assumes a bird in a pond — it
+  // wades, it flushes when you are near, and it goes up on its own rest clock
+  // after kyoHERON_REST whatever you are doing — and every one of those would
+  // take a passenger off the animal's back for no reason the player could see.
+  // `kyoHeronPerch` is re-asked every frame by `lift` on the herd offer, so a
+  // bird cannot be stranded up there by a system that stopped writing.
+  if (kyoHeronPerch > 0) {
+    kyoHeronPerch = Math.max(0, kyoHeronPerch - dt);
+    kyoHeronT = 0;                       // the rest clock does not run up there
+    kyoHeronWing.visible = false;
+    kyoHeronGroup.position.y = kyoHeronPerchY;
+    kyoHeronGroup.rotation.set(-0.06, kyoHeronStalk, 0, 'YXZ');
+    return;
+  }
   if (kyoHeronPhase === 0) {
     // ---- ...AND IF YOU SIT DOWN IT COMES OVER (v23) --------------------
     // THE REGISTRY INVERTS. Past the loaf threshold systems.js publishes
@@ -1371,11 +1390,21 @@ function kyoUpdateHeron(game, dt) {
           },
           put: function (i, x, z, yaw) {
             if (kyoHeronPhase !== 0 || !kyoHeronGroup) return;
+            kyoHeronHeld = 0.25;         // re-asked every frame — see above
             kyoHeronWadeX = x; kyoHeronWadeZ = z;
             kyoHeronGroup.position.x = x;
             kyoHeronGroup.position.z = z;
             kyoHeronStalk = kyoWrapY(yaw);
             kyoHeronGroup.rotation.set(0, kyoHeronStalk, 0);
+          },
+          // TWO SEATS. A grey heron is a metre tall with a metre and a half of
+          // leg and neck; one seat would have it standing on a capybara's
+          // shoulder like a budgerigar. See THE PERCH in systems.js.
+          span: 2,
+          lift: function (i, y) {
+            kyoHeronPerch = 0.25;        // re-asked every frame — see above
+            kyoHeronPerchY = y;
+            if (kyoHeronGroup) kyoHeronGroup.position.y = y;
           },
         });
       }
@@ -1390,6 +1419,24 @@ function kyoUpdateHeron(game, dt) {
     // the bark together, which is the joke.
     if (near && kyoDryCrossing()) near = false;
     if (kyoDrySpook) { kyoDrySpook = 0; near = true; }
+    // ---- A BIRD THAT HAS AGREED TO FOLLOW YOU IS NOT FRIGHTENED OF YOU (N1)
+    //
+    // MEASURED 8 Sep 2026 (`qa/n1-perch.js`): the heron joins on the third
+    // wheek from twelve metres and then walks the trail INTO its own nine-metre
+    // flush radius, which puts it up; and if it survives that, `kyoHERON_REST`
+    // is 26 s against a recruitment that takes fifteen and a loaf that takes
+    // another ten. Measured `led: 1` at t=0 and `led: 0` by t=18, every run,
+    // with nothing ever getting onto the animal's back. The heron was
+    // unperchable by arithmetic.
+    //
+    // Both are suppressed while it is HELD — `kyoHeronHeld` is re-asked by the
+    // herd's own `put`, so it is only ever up while systems.js is actively
+    // walking this bird — and neither is weakened for one frame otherwise. The
+    // dry-crossing suppression above deliberately leaves the rest clock alone
+    // "so the moment can never be locked out"; this cannot lock it out either,
+    // because the herd's own hold is 21 s and the clock resumes the instant the
+    // bird stops following.
+    if (kyoHeronHeld > 0) { kyoHeronHeld = Math.max(0, kyoHeronHeld - dt); near = false; kyoHeronT = 0; }
     if (near || kyoHeronT > kyoHERON_REST) {
       kyoHeronPhase = 1; kyoHeronT = 0;
       // A heron's alarm call is a single harsh bark and it is genuinely the
