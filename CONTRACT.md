@@ -14,6 +14,104 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH SEVEN — SIT, AND BE NOTICED (B7 — 7 Sep 2026)
+
+**LANDED, WITHOUT THE APPROACH.** Item 3's first bullet asks for: loaf → the
+nearest person turns → **approaches** → crouches at 1.5 m → takes a photo. Three
+of those five are built and one is refused with an argument.
+
+### THE MEASUREMENT — ONE CHAPTER OF NINETEEN, THREE PEOPLE
+
+The item cites the `photo` state as evidence the machinery exists, and it does:
+`hasCamera && photoCd <= 0 && d > 3.0 && d < 11 && vis > 0.42 && capySpd < 0.35`
+— a still capybara, in view, three to eleven metres away, gets photographed, and
+it ticks `photo-op`.
+
+But **`hasCamera` is assigned in exactly one place**, to at most three records
+with `kind === 'tourist'`, and that roster is built by a loop that pushes eleven
+tourists — **Sydney's**. So the one channel in this game that pays a player for
+being a calm animal rather than a menace existed in **one chapter of nineteen,
+on three people**, and in the other eighteen nobody has ever looked up.
+
+### THE APPROACH IS REFUSED, AND THIS IS WHY
+
+**A local never writes its own `x` or `z`.** They are fixed, deliberately, and
+npc.js says so in its own comment: *"a local is placed by hand behind a specific
+counter"* — which is also why a fixed local carries an `anchor` for its speech
+bubble instead of a head node. The people standing in seventeen of the nineteen
+chapters have no locomotion at all.
+
+So "the first time anybody in fifteen chapters walks toward you for a nice
+reason" is not a three-hour batch. It is a walk system for a hundred and fifty
+hand-placed people, each of whom is standing where they are *because* that is
+where their stall is — and half a walk (a slide, a turn-and-drift) is worse than
+none. It is not built and the reason is in the source at the gate.
+
+**What a fixed person can do, they now do, everywhere.** They turn to you, both
+arms come up, the flash leaves the right hand, and they say something if their
+mouth is free.
+
+### THE THREE GATES, AND THE ONE THAT IS THE POINT
+
+  - **the loaf.** `capy.restT` is capybara.js's own clock — the calm's list with
+    `heldProp` taken out of it — so a capybara standing still holding somebody's
+    hat is not photographed for it. 6.5 s.
+  - **the band.** 3–11 m, the tourists' own numbers, so the two paths agree.
+  - **the heat.** Nobody photographs you while `placeHeat` here is over 0.50.
+    **This is the interlock item 3 is actually about:** a player who caused A
+    SCENE cannot be adored until it cools, and can cool it by doing precisely
+    what earns the photo, which is nothing at all.
+
+One at a time per chapter (`locPhotoLive`) — six people photographing a rodent
+in unison is a press conference, and the joke is that it is ordinary. Ninety
+seconds per person, jittered at birth.
+
+The arm pose is a subtraction in the locals' existing additive stack, below the
+flinch, the guard and the umbrella, so **a person startled mid-photograph puts
+their hands up instead** — which is the right picture, and is item 3's "`photo`
+sits below every state in `npcREACH_ST`" expressed in the pose stack the locals
+actually have rather than in a state machine they do not.
+
+### MEASURED — `qa/be-noticed.js`
+
+Four chapters, three conditions each:
+
+| | Venice | Monte Carlo | Hong Kong | Cappadocia |
+|---|---|---|---|---|
+| people within 16 m | 2 | 1 | 1 | 3 |
+| **still**, 20 s | **2** | 0 | 0 | **2** |
+| **moving**, 20 s | 0 | 0 | 0 | 0 |
+| **hot** (`forceHeat(1)`), 20 s | 0 | 0 | 0 | 0 |
+
+It fires where there are people to fire, never while the animal is moving, and
+never while the square is cross. Monte Carlo and Hong Kong have exactly one
+local within sixteen metres of the spawn and it is not inside the 3–11 m band —
+a placement fact, not a gate. Photographed at `snapT` 1.22, `armR` −1.45 rad,
+6.4 m, in `qa/PHOTO-goreme.png`.
+
+### TWO THINGS THAT MEASURED WRONG FIRST, AND ONE WAS A TIME BOMB
+
+1. **A `const` REFERENCED BEFORE ITS DECLARATION, HIDDEN BY `&&`.** The gate
+   read `f < 0.02` for the flinch — and `const f = -r.fl` is declared a hundred
+   lines below, inside the `if (r.fig)` pose block. That is a ReferenceError in
+   a temporal dead zone, and **the `&&` chain short-circuited on `r.cd <= 0`
+   before ever reaching it**, so the first run threw nothing and simply reported
+   zero photographs everywhere. It would have fired the first time somebody's
+   mouth was free. The tell was a feature that produced *exactly* zero rather
+   than *nearly* zero — the same tell as the weather probe's 0.000.
+2. **A 0.05 THRESHOLD ON A VALUE THAT SITS AT 0.051 ALL DAY.** The gate also
+   required `r.hud < 0.05`; `hud` is the cold huddle and Venice holds it at
+   **0.051**, so every person in the chapter was permanently the wrong side of
+   it. There is no `hud` term now: somebody slightly hunched against the cold
+   can still hold up a phone.
+
+Also removed: `r.cd <= 0`. `cd` is the SPEECH cooldown and sits at 8–13 s for
+most of a local's life, because they chat every 11 to 28 seconds — coupling the
+gesture to it made the photograph a rare accident. The picture is taken either
+way; only the LINE waits for a free mouth.
+
+`npm test` 11/11.
+
 ## THE FUN PASS, BATCH SIX — READING THE TABLE (B6 — 7 Sep 2026)
 
 **LANDED.** B6 was "the other half of the gags · re-run first-five, read the

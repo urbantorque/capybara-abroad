@@ -2042,6 +2042,11 @@ export function createNPCs(game) {
       // prop of theirs on the floor — are three separate clocks and a face
       // that switched between them instantly would strobe.
       blinkT: rand(0, npcBLINK_MAX), mood: 0,
+      // B7: the photo. `snapT` runs the gesture, `photoCd` is the per-person
+      // cooldown (jittered at birth so a square does not photograph you in
+      // unison the first time you sit down), `yaw0` is the bearing they turned
+      // to, so the flash leaves the right hand and not the middle of them.
+      snapT: 0, snapped: false, photoCd: rand(0, npcPHOTO_FIRST), yaw0: 0,
       // What they say when the world does something to them. All optional; a
       // local that names none of them falls back on npcLOC_SAY, so every
       // person already registered in every chapter gets the whole vocabulary
@@ -2062,6 +2067,10 @@ export function createNPCs(game) {
         // on the shelf; nothing declares them today and the shared pool is
         // still the fallback, so this changes no line until one is written.
         chatOpen: o.chatOpen || null, chatBack: o.chatBack || null,
+        // B7. Authorable per person and per chapter like every other key here;
+        // nothing declares one yet and `npcLOC_PHOTO` is the fallback, so this
+        // adds the vocabulary without touching a biome file.
+        photo: o.photo || null,
       },
       // ---- A VOICE OF THEIR OWN (F2) -------------------------------------
       // Every person in the game gasped at pitch 1.0, so a crowd startling in
@@ -3636,6 +3645,38 @@ export function createNPCs(game) {
   // or per person (`praise: [...]`), and everything falls back to a
   // chapter-neutral pool that has to work in a Kyoto garden and on an
   // Antarctic jetty alike: nothing here names a place, a task or an object.
+  // ---- SIT, AND BE NOTICED (B7, item 3) ---------------------------------
+  //
+  // MEASURED FIRST, and it moved the item: the `photo` state exists and it
+  // works — a still capybara 3 to 11 m away, in view, gets photographed — but
+  // `hasCamera` is set on **at most three `kind === 'tourist'` records and
+  // nowhere else in the game**, and that roster is Sydney's. So the one channel
+  // that pays a player for being a calm animal rather than a menace existed in
+  // ONE chapter of nineteen, on three people.
+  //
+  // What item 3 asks for and this deliberately does NOT do is the APPROACH.
+  // A local never writes its own `x`/`z` — locals are fixed, on purpose, and
+  // this file says why: "a local is placed by hand behind a specific counter".
+  // Walking them is a locomotion system, not a three-hour batch, and half a
+  // walk is worse than none. They turn, they raise the camera, they take the
+  // picture. See CONTRACT.md for the cost of the other half.
+  const npcPHOTO_REST  = 6.5;   // s of loafing before anybody reaches for a phone
+  const npcPHOTO_NEAR  = 3.0;   // m — inside this you are too close to frame
+  const npcPHOTO_FAR   = 11.0;  // m — the tourists' own band
+  const npcPHOTO_COOL  = 90;    // s per person
+  // ...and the jitter at birth, so a square does not photograph you in unison
+  // the first time you sit down. It was half the cooldown, which is up to
+  // forty-five seconds of nobody noticing a capybara that has plainly sat
+  // down — long enough to read as the feature not existing.
+  const npcPHOTO_FIRST = 12;
+  const npcPHOTO_HOLD  = 1.9;   // s the whole gesture lasts
+  const npcPHOTO_SNAP  = 0.85;  // s in, the flash — the tourists' timing
+  const npcPHOTO_ARM   = 1.55;  // rad the arms come up. A phone, not a salute.
+  const npcPHOTO_HEAT  = 0.50;  // over this the square is too cross to admire you
+  const npcLOC_PHOTO = ['Hold still. Hold still.', 'Nobody is going to believe this.',
+    'Look at it. Just look at it.', 'One picture. One.',
+    'It is not even bothered.', 'That is going on the internet.',
+    'My sister will not believe me.', 'It has been there ten minutes.'];
   const npcLOC_PRAISE = ['…was that deliberate?', 'Well. That happened.',
                          'Nobody asked you to do that.', 'Hm. Yes. Good.',
                          'I saw that.', 'You are pleased with yourself.',
@@ -3828,6 +3869,10 @@ export function createNPCs(game) {
     }
   }
 
+  // One photograph at a time per chapter (B7). Six people pointing a phone at a
+  // rodent in unison is a press conference; the joke is that it is ordinary.
+  let locPhotoLive = 0;
+
   function localsStep(dt) {
     if (!locals.length) return;
     const capy = game.capy;
@@ -3840,6 +3885,13 @@ export function createNPCs(game) {
     const cv = capy && capy.velocity;
     const csp = cv ? Math.sqrt(cv.x * cv.x + cv.z * cv.z) : 0;
     const rushing = csp > npcLOC_RUSH_V;
+    // ---- B7: how long the animal has been doing nothing ------------------
+    // `capy.restT` is capybara.js's own loaf clock — the same list as the calm
+    // with `heldProp` taken out of it — so a capybara standing still holding
+    // somebody's hat does not get photographed for it.
+    const capyOk = !!(capy && capy.position);
+    const capyRest = capy ? (capy.restT || 0) : 0;
+    if (locPhotoLive > 0) locPhotoLive -= dt;
     const wxRain = npcWxRain, wxGustS = npcWxGustS, wxGustX = npcWxGustX;
     const wxGustZ = npcWxGustZ, wxMotes = npcWxMotes, wxCold = npcWxCold;
     // Read ONCE for the whole population, for the same reason the weather is:
@@ -3954,6 +4006,77 @@ export function createNPCs(game) {
       // most of a minute of genuinely standing about and cannot be farmed by
       // running laps. The fall is a long slow linear fade, because this is the
       // half of a memory that ought to outlast the other half.
+      // ---- ...AND SOMEBODY TAKES A PICTURE (B7) ---------------------------
+      //
+      // The whole of "sit, and be noticed" that a fixed person can do. Ordered
+      // below everything: a flinch, a guard, an errand and a conversation all
+      // win, which is the rule item 3 asks for ("`photo` sits below every state
+      // in `npcREACH_ST`") expressed in the locals' own additive pose stack
+      // rather than in a state machine they do not have.
+      //
+      // The heat gate is the interlock the item is really about: **nobody
+      // photographs you while the square is cross**, so a player who caused a
+      // SCENE cannot be adored until it cools — and can cool it by doing
+      // exactly what earns the photo, which is nothing at all.
+      if (r.snapT > 0) {
+        r.snapT -= dt;
+        // The flash leaves the RIGHT HAND, which is where the arms have just
+        // put the phone — not the head, and not the feet.
+        if (!r.snapped && r.snapT <= npcPHOTO_HOLD - npcPHOTO_SNAP) {
+          r.snapped = true;
+          fireFlash(r.x + Math.sin(r.yaw0 || 0) * 0.3, r.y + 1.28,
+                    r.z + Math.cos(r.yaw0 || 0) * 0.3);
+          emit('npc:photo', r);
+          // The RECORD and not a point: npc.js's own `sfx` reads
+          // `rec.group.position` and stamps the speaker's `vpitch`, so a bare
+          // `{x, y, z}` would place the shutter nowhere and give every person
+          // in the game the same voice. Nothing listens to `npc:photo` today —
+          // both emitters are in this file — so this is the only observable.
+          sfx('pop', r);
+        }
+        if (r.snapT <= 0) { r.snapT = 0; r.snapped = false; }
+      } else if (r.photoCd > 0) {
+        r.photoCd -= dt;
+      // `r.fl` and NOT `f`: the flinch is read as `const f = -r.fl` a hundred
+      // lines below this, inside the `if (r.fig)` pose block, so naming `f`
+      // here is a ReferenceError in a temporal dead zone — one that the `&&`
+      // chain hid completely, because `r.cd <= 0` short-circuited before ever
+      // reaching it. It would have fired the first time somebody's mouth was
+      // free. Measured as a gate that never opened; found by reading the gates
+      // one at a time when the probe returned zero everywhere.
+      //
+      // No `r.hud` term either. The huddle is a POSTURE — Venice sits at 0.051
+      // all day, which put every person in the chapter permanently the wrong
+      // side of a 0.05 threshold — and somebody slightly hunched against the
+      // cold can still hold up a phone.
+      //
+      // And `cd` is not in here: `cd` is the SPEECH cooldown, it is 8-13 s for
+      // most of a local's life because they chat every 11 to 28 seconds, and
+      // coupling the gesture to it made the photograph a rare accident. The
+      // picture is taken either way; only the LINE waits for a free mouth.
+      } else if (r.fig && capyOk && locPhotoLive <= 0 &&
+                 capyRest >= npcPHOTO_REST &&
+                 d2 > npcPHOTO_NEAR * npcPHOTO_NEAR &&
+                 d2 < npcPHOTO_FAR * npcPHOTO_FAR &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 !r.own && r.gest <= 0 && (r.fl || 0) > -0.02) {
+        // One at a time in a chapter. Six people photographing a rodent at once
+        // is a press conference, and the joke is that it is ordinary.
+        locPhotoLive = npcPHOTO_HOLD + 0.4;
+        r.snapT = npcPHOTO_HOLD;
+        r.snapped = false;
+        r.photoCd = npcPHOTO_COOL * rand(0.85, 1.25);
+        r.chatYaw = Math.atan2(cx - r.x, cz - r.z);
+        r.yaw0 = r.chatYaw;
+        r.chatT = npcPHOTO_HOLD + 0.8;
+        // The line only if the mouth is free. A photograph taken in silence is
+        // a person taking a photograph; a line that jumps the speech queue is
+        // this feature talking over the chapter's own dialogue.
+        if (r.cd <= 0) {
+          r.cd = r.cool * rand(0.8, 1.4);
+          localLine(r, npcSay(r, 'photo') || npcLOC_PHOTO);
+        }
+      }
       if (near && calmNow > 0.25 && (r.wary || 0) < npcWARY_HEAT) {
         r.fam += (dt / npcFAM_T) * calmNow;
         if (r.fam > 1) r.fam = 1;
@@ -4323,13 +4446,29 @@ export function createNPCs(game) {
           // hands and a work stroke is one. That asymmetry is the whole
           // difference between somebody chopping and somebody surrendering.
           const beatL = (r.beat && r.beat.kind === 'reach') ? beat : 0;
+          // ---- B7: BOTH ARMS UP, HOLDING A PHONE -------------------------
+          // A subtraction like the guard and the umbrella, because on this
+          // rig negative rotation.x is forward and up. It eases in over the
+          // first third of the gesture and out over the last, so the picture
+          // is taken at the top of a movement rather than at the start of one
+          // — the flash fires at npcPHOTO_SNAP, which is inside that hold.
+          //
+          // It LOSES to everything: `f` (the flinch), `guard` and `hold` are
+          // all still in the sum and all still larger, so a person who is
+          // startled mid-photograph puts their hands up instead, which is the
+          // right picture. That is the "below every state" rule the item asks
+          // for, in the additive stack the locals actually have.
+          const snapK = r.snapT > 0
+            ? Math.min(1, Math.min(npcPHOTO_HOLD - r.snapT, r.snapT) / (npcPHOTO_HOLD * 0.3))
+            : 0;
+          const snap = snapK * npcPHOTO_ARM;
           r.fig.armL.rotation.x = damp(r.fig.armL.rotation.x,
-                                       sway - guard - fold * 0.42 + beatL,
+                                       sway - guard - fold * 0.42 + beatL - snap,
                                        r.beatP >= 0 ? npcBEAT_LAM : armL, dt);
           r.fig.armR.rotation.x = damp(r.fig.armR.rotation.x,
                                        -sway - talk * (1 - hold) - guard
                                        - hold * npcLOC_UMB_ARM - fold * 0.42
-                                       + beat, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
+                                       + beat - snap, r.beatP >= 0 ? npcBEAT_LAM : armR, dt);
           r.fig.armR.rotation.z = damp(r.fig.armR.rotation.z,
                                        -talk * 0.7 * (1 - hold) - f * 0.4
                                        - hold * 0.20 - fold * 0.34, armR, dt);

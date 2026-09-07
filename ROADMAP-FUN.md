@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B6 ARE BUILT, 7 Sep 2026.**
+> **B1-B7 ARE BUILT, 7 Sep 2026.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -43,6 +43,13 @@
 > the one reproducible failure — four runs, both drivers, nothing ticked — and
 > it was ORDERING: its nearest act-one row is 19 m and the paper offered the
 > 98 m one first. One line moved; nothing in the world did.
+>
+> **B7**: sit and be noticed. The `photo` state existed and worked — on **at
+> most three Sydney tourists and nowhere else**, one chapter of nineteen. The
+> locals take the picture now, in all nineteen, gated on the loaf and on heat
+> (a square you have made cross does not admire you). **The APPROACH is
+> refused**: a local never writes its own x/z, they are fixed by design, and
+> walking a hundred and fifty hand-placed people is not a three-hour batch.
 >
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
@@ -387,7 +394,18 @@ minute in any place, with the same crowd the mischief economy uses — so the
 two loops *interlock*, and being cute is the casual player's way out of a
 square they have made angry.
 
-- **Sit, and be noticed.** Loaf (`capyRestT` gates it at 6.5 s) within 8 m of
+- **Sit, and be noticed. BUILT WITHOUT THE APPROACH (B7).** The `photo` state
+  was real and worked — and `hasCamera` is set on **at most three
+  `kind === 'tourist'` records, a roster only Sydney has**, so it lived in one
+  chapter of nineteen on three people. Locals photograph a loafing capybara in
+  all nineteen now: they turn, both arms come up, the flash leaves the hand, and
+  they say something if their mouth is free. Gated on `capy.restT`, on the
+  3–11 m band, and on `placeHeat < 0.5` — which is the interlock this item is
+  really about. **The approach is refused**: a local never writes its own `x` or
+  `z`, they are placed by hand behind specific counters, and giving a hundred
+  and fifty of them locomotion is not three hours. Half a walk is worse than
+  none.
+- ~~**Sit, and be noticed.**~~ Loaf (`capyRestT` gates it at 6.5 s) within 8 m of
   people whose `wary` is low: the nearest one turns (the F4 head turn), then
   *approaches* — the first time anybody in fifteen chapters walks toward you
   for a nice reason — crouches at 1.5 m, and takes the photo the `photo` state
