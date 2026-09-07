@@ -28863,7 +28863,31 @@ export function createSystems(game) {
     }
   }
   game.events.on('capy:wheek', herdOnWheek);
+  // ---- B11 (item 5d): ANIMALS STARTLE PEOPLE -------------------------------
+  //
+  // MEASURED FIRST, `game.herdDebug()` across all nineteen: **eight chapters
+  // have a herd animal at all** — Sydney (6 ibises), Kyoto (1 heron), Iceland
+  // (14 sheep), Venice (180 pigeons), Cappadocia (9 cats), Manly (30 gulls),
+  // the Pantanal (13 cows) and Antarctica (42 gentoos). Three of those keep
+  // their animals a long way from anybody (Kyoto's heron is 70.9 m from the
+  // nearest person, the cows 56 m, the gentoos 35 m), which is a fact about
+  // those chapters and not a reason not to build this.
+  //
+  // ONLY A LED ANIMAL, and that is the whole design. An idle pigeon standing
+  // beside a Venetian doorway all afternoon must not be making that person
+  // jump every eight seconds; a line of fourteen sheep coming round the corner
+  // behind a capybara is the joke. So the event fires where the LINE is, which
+  // means it fires because of something the player did.
+  //
+  // Throttled hard: Venice has a hundred and eighty pigeons and this runs
+  // inside a per-animal loop at 60 Hz. One call, then a cooldown, and the
+  // cooldown is longer than the flinch spring's own settle so the same person
+  // is not held permanently mid-jump.
+  const herdSCARE_CD = 1.15;   // s between any two of these, anywhere
+  const herdSCARE_S  = 0.52;   // strength — under a bang, over a spill
+  let herdScareCd = 0;
   function herdUpdate(dt) {
+    if (herdScareCd > 0) herdScareCd -= dt;
     const capy = game.capy;
     const p = capy && capy.position;
     const can = !!(capy && typeof capy.can === 'function' && capy.can('herd'));
@@ -28917,6 +28941,15 @@ export function createSystems(game) {
           const step = Math.min(1, (sp * dt) / d);
           nx += dx * step; nz += dz * step;
           yaw = Math.atan2(dx, dz);
+          // ...and somebody standing where it is going has to notice. Inside
+          // the moving branch, because an animal that has caught up and
+          // stopped is not the thing that makes a person jump — see the note
+          // above herdUpdate for why this is throttled and why it is only
+          // ever a LED animal.
+          if (herdScareCd <= 0 && typeof game.startlePeople === 'function') {
+            herdScareCd = herdSCARE_CD;
+            game.startlePeople(nx, nz, herdSCARE_S);
+          }
         } else {
           yaw = s.look > 0 ? Math.atan2(p.x - nx, p.z - nz) : Math.atan2(dx, dz);
         }

@@ -2058,6 +2058,15 @@ export function createNPCs(game) {
       // unison the first time you sit down), `yaw0` is the bearing they turned
       // to, so the flash leaves the right hand and not the middle of them.
       snapT: 0, snapped: false, photoCd: rand(0, npcPHOTO_FIRST), yaw0: 0,
+      // ---- B11: A PERSON HAS A BODY (item 4e) ----
+      // `stum` is a stagger — a lean and a sideways wobble that decays, on top
+      // of the flinch rather than instead of it. `sat` is the seconds left of
+      // sitting down hard, and `satCd` is the once-per-person clock the item
+      // asks for. Both are on the group's own channels: a local's figure
+      // publishes a head and two arms and NO LEGS AND NO TORSO, so a sit is
+      // the whole person dropping and leaning back, which at this scale and
+      // this camera angle is what a sit looks like anyway.
+      stum: 0, stumV: 0, sat: 0, satCd: 0,
       // B8: the gift. `giftCd` starts at zero — unlike the photo's jitter, this
       // one is already gated behind a quarter-minute of `fam`, and jittering it
       // as well would mean the first person to warm to you is also the one who
@@ -3494,6 +3503,41 @@ export function createNPCs(game) {
   // crime, and the mischief economy is a separate accounting.
   const npcBARGE_KICK = 15;     // the flinch spring, against localsReact's 21
   const npcBARGE_SAY = 0.55;    // ...and how often it is worth a line as well
+  // ---- B11: THE STAGGER AND THE SIT (item 4e) ------------------------------
+  //
+  // WHAT 4e ASKS FOR AND WHAT IS ACTUALLY THERE. The item's first clause is
+  // "stumble (barged >= 3.2 m/s, DROPS WHAT THEY HOLD via physBarge)" and it
+  // is measured false for this cast: `heldProp` is not a field on the local
+  // record in any of the nineteen chapters, and `qa/bodies-animals.js` reads
+  // **zero locals holding anything, everywhere**. Sydney's and Pasto's
+  // rosters do hold things and have dropped them since v19 (see npcFumble) —
+  // so the half of that clause that can exist already does, in the two
+  // chapters where it can, and the half that cannot is not faked here.
+  //
+  // The stagger is a spring like the flinch, on the same critically-damped
+  // shape, but SIDEWAYS: the flinch is a lean back and this is a wobble
+  // across, which is what stops the two reading as one bigger flinch.
+  const npcSTUM_KICK = 9.5;     // impulse into the stagger spring
+  const npcSTUM_K    = 26;      // ...and its spring constant
+  const npcSTUM_C    = 9.0;     // ...and its damping, a little looser than the
+                                // flinch, so a stagger takes about a second
+  // MEASURED AND RAISED. At 0.26 the spring's peak of 0.26 gave 0.068 rad —
+  // 3.9 degrees — and the note above localsReact's own kick says 3.7 degrees
+  // is under the threshold at which anybody can tell a person reacted at all.
+  // 0.45 puts the peak at 6.7 degrees: over the flinch's 3.6 and under the
+  // 8.6 of a crate landing at point-blank range, which is the right place for
+  // being shouldered.
+  const npcSTUM_ROLL = 0.45;    // rad of sideways lean at full stagger
+  const npcSTUM_DIP  = 0.10;    // m the person drops while off balance
+  // A SIT IS A BARGE ON TOP OF A STARTLE. Both numbers are deliberately mean:
+  // it should happen to a player two or three times in a chapter, not twice a
+  // minute.
+  const npcSIT_FL    = 0.22;    // flinch already at least this deep
+  const npcBARGE_HARD = 3.2;    // m/s — physBARGE_MIN, the same number
+  const npcSIT_HOLD  = 2.1;     // s on the ground
+  const npcSIT_COOL  = 40;      // s per person, which is the item's own figure
+  const npcSIT_DROP  = 0.34;    // m the body goes down
+  const npcSIT_LEAN  = 0.42;    // rad it goes back
   // ---- ...AND THE TWO CAST CHAPTERS CANNOT BE BARGED THROUGH PHYSICS -----
   //
   // MEASURED (qa/d3-react.js): the animal was driven into the nearest cast
@@ -3569,6 +3613,33 @@ export function createNPCs(game) {
       rec.flV -= npcBARGE_KICK * k;
       rec.flYaw = Math.atan2(rec.x - px, rec.z - pz);
       rec.wary = Math.min(1, (rec.wary || 0) + k * 0.5);
+      // ---- B11: AND THEY HAVE A BODY (item 4e) --------------------------
+      //
+      // Two of the item's three events, and the third is written down below
+      // rather than half-built. Sydney's and Pasto's rosters have had a
+      // `stumble` since v19; the chapter-neutral cast — which is the cast in
+      // seventeen of nineteen chapters — has never had one.
+      //
+      // A SIT IS A BARGE ON TOP OF A STARTLE, which is the item's own rule and
+      // is what makes it rare: you have to make somebody jump and then walk
+      // into them while they are still jumping. `npcSIT_FL` is read off the
+      // flinch spring, so "already startled" is a measurement rather than a
+      // flag somebody has to remember to set.
+      const already = (-(rec.fl || 0)) > npcSIT_FL;
+      if (already && rec.sat <= 0 && rec.satCd <= 0 && sp >= npcBARGE_HARD) {
+        rec.sat = npcSIT_HOLD;
+        rec.satCd = npcSIT_COOL;
+        rec.stum = 0; rec.stumV = 0;      // a sit replaces a stagger
+        sfx('gasp', rec, npcSFX_VOL * 0.95, 0.86);
+      } else if (rec.sat <= 0) {
+        // ONLY THE VELOCITY, which is how the flinch spring beside it is
+        // driven and is not a stylistic choice. The first cut also set the
+        // value — `stum = min(1, stum + k)` — and a spring started at 0.6 with
+        // 5.7 of negative velocity crosses zero in a tenth of a second: the
+        // measured peak roll was 0.025 rad, which is 1.4 degrees, which is
+        // nothing. Kicked from rest it peaks near 0.45 and reads as a stagger.
+        rec.stumV -= npcSTUM_KICK * k;
+      }
       sfx('gasp', rec, npcSFX_VOL * (0.55 + k * 0.45), 1.0 + k * 0.10);
       if (rec.cd <= 0 && Math.random() < npcBARGE_SAY) {
         rec.cd = rec.cool * rand(0.8, 1.4);
@@ -4242,7 +4313,7 @@ export function createNPCs(game) {
                  capyRest >= npcPHOTO_REST &&
                  d2 > npcPHOTO_NEAR * npcPHOTO_NEAR &&
                  d2 < npcPHOTO_FAR * npcPHOTO_FAR &&
-                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT && r.sat <= 0 &&
                  !r.own && r.gest <= 0 && (r.fl || 0) > -0.02) {
         // One at a time in a chapter. Six people photographing a rodent at once
         // is a press conference, and the joke is that it is ordinary.
@@ -4279,7 +4350,7 @@ export function createNPCs(game) {
                  capyRest >= npcPHOTO_REST &&
                  d2 > npcGIFT_NEAR * npcGIFT_NEAR &&
                  d2 < npcGIFT_FAR * npcGIFT_FAR &&
-                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT && r.sat <= 0 &&
                  !r.own && !r.heldProp && r.gest <= 0 && (r.fl || 0) > -0.02) {
         r.giftT = npcGIFT_HOLD;
         r.gifted = false;
@@ -4310,7 +4381,7 @@ export function createNPCs(game) {
       } else if (r.fig && capyOk && r.snapT <= 0 && r.giftT <= 0 &&
                  (r.fam || 0) >= npcPAT_FAM && capyRest >= npcPAT_REST &&
                  d2 < npcPAT_R * npcPAT_R &&
-                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT &&
+                 (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT && r.sat <= 0 &&
                  !r.own && r.gest <= 0 && (r.fl || 0) > -0.02) {
         r.patT = npcPAT_HOLD;
         r.patted = false;
@@ -4628,7 +4699,10 @@ export function createNPCs(game) {
             : f > 0.02 ? 'flinch' : r.grd > 0.05 ? 'guard' : r.own ? 'fetch'
             : r.moving > 0 ? 'walk' : r.gest > 0 ? 'talk' : 'umbrella';
         }
-        const beat = (r.beat && r.fig)
+        // ...and nobody carries on hammering while they are sitting on the
+        // floor. The beat is the one thing a local does that has its own
+        // clock, and it is the one that would look worst underneath a sit.
+        const beat = (r.beat && r.fig && r.sat <= 0)
           ? localBeatStep(r, dt, beatBusy,
                           typeof game.calm === 'function' ? game.calm(r.x, r.z) : 0)
           : 0;
@@ -4636,12 +4710,37 @@ export function createNPCs(game) {
         // is a weight shift and back rather than a lurch.
         const rock = (r.beat && r.beat.kind === 'rock' && r.beatP >= 0)
           ? Math.sin(r.beatP * 6.283185) * npcBEAT_ROCK : 0;
+        // ---- B11: THE STAGGER AND THE SIT (item 4e) ---------------------
+        // Integrated here, beside the pose that reads them, and both are
+        // additive terms on channels that already existed — no new node, no
+        // new group, nothing to keep in step with the flinch.
+        if (r.satCd > 0) r.satCd -= dt;
+        if (r.sat > 0) {
+          r.sat -= dt;
+          if (r.sat < 0) r.sat = 0;
+          r.stum = 0; r.stumV = 0;
+        } else if (r.stum > 0.001 || Math.abs(r.stumV) > 0.001) {
+          // Critically-damped, same shape as the flinch spring above it.
+          r.stumV += (-npcSTUM_K * r.stum - npcSTUM_C * r.stumV) * dt;
+          r.stum += r.stumV * dt;
+          if (Math.abs(r.stum) < 0.004 && Math.abs(r.stumV) < 0.02) { r.stum = 0; r.stumV = 0; }
+        }
+        // The sit eases in fast and out slowly: going down is a fall and
+        // getting up is a decision. `1 - x²` on the way out reads as somebody
+        // pushing themselves back to their feet rather than being winched.
+        const satK = r.sat > 0
+          ? (r.sat > npcSIT_HOLD - 0.18
+             ? (npcSIT_HOLD - r.sat) / 0.18
+             : Math.min(1, r.sat / (npcSIT_HOLD * 0.55)))
+          : 0;
+        const stumA = Math.abs(r.stum);
         r.group.position.y = r.baseY + Math.sin(r.t * 1.15) * npcLOC_BOB
                              + r.mv * Math.abs(Math.sin(r.t * 7.4)) * npcLOC_STEP_BOB
-                             - f * 0.045 - r.hud * 0.035;
+                             - f * 0.045 - r.hud * 0.035
+                             - stumA * npcSTUM_DIP - satK * npcSIT_DROP;
         r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06
-                             - r.mv * 0.035;
-        r.group.rotation.z = rock;
+                             - r.mv * 0.035 - satK * npcSIT_LEAN;
+        r.group.rotation.z = rock + r.stum * npcSTUM_ROLL;
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
@@ -10745,6 +10844,21 @@ export function createNPCs(game) {
              if (!rec) return false;
              rec.ownCool = 0;
              return localOwnStart(rec, prop, null);
+           },
+           /**
+            * B11 (item 5d): MAKE THE PEOPLE NEAR HERE JUMP.
+            *
+            * `localsReact` has never been published and could not be — it only
+            * knows `locals`, and Sydney's people are `humans`. `castReact` is
+            * the one that asks both, and this is the first caller from outside
+            * npc.js: systems.js owns the herd registry, sixteen chapters
+            * register animals into it, and the animals themselves live in
+            * sixteen different files. One hook, called from the one loop that
+            * already walks every animal in the game.
+            */
+           startlePeople: function (x, z, s, r) {
+             if (typeof x !== 'number' || x !== x) return;
+             castReact('startled', x, z, s === undefined ? 0.5 : s, r);
            },
            heatSites: npcHeatSites,
            // The register itself, for the audit that walks the capybara up to
