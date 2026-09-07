@@ -14,6 +14,175 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH NINE — A THING INSIDE A THING (B9 — 7 Sep 2026)
+
+**LANDED.** Item 4a (put it down, put it IN), item 4d (more things break and
+spill), and the thing that had to come first: **making either of them something
+a person can see.**
+
+### TWO PREMISES, BOTH FAILED, AND THE SECOND ONE MATTERED
+
+**`receive:` is `receiveShadow`.** Item 4a reads "make `receive` mean something:
+a bin, a basket, a boat, a fountain, a pram, a gondola" — and in props.js the
+flag is passed into `physInstGroupFor` as its fourth argument and read nowhere
+else. Ten types carry it and the list gives it away: a traffic cone, a sign, a
+ruana and a dinner jacket. Measured live, `qa/toybox-stock.js`: **Monte Carlo
+has eighteen props with `receive: true` in it and nine of them are cones.**
+
+**A spill is not a witnessed event.** `physSpill` emits `prop:impact` with
+`speed === 0`, and every consumer of that event gates on speed — `npcLOC_BANG`
+4.2, `npcOWN_BANG` 6.0, a bare `> 3` in Pasto's vendor handler, and systems.js's
+own `if (s < 1.5) return`, which is the line `incAdd` sits below. The one
+listener with no speed gate is hardcoded to `coffee` and `icecream` and sits
+behind Sydney's `biomeLive()`. `physShatter` emits `prop:destroy`, which exactly
+one handler in the game hears; it counts an incident and startles nobody.
+
+`qa/witness-break.js`, four forced events at the feet of the nearest person:
+
+| | spill startled | spill card | break startled | break card |
+|---|---|---|---|---|
+| Sydney (7–11 people within 30 m) — before | **0** | **0** | **0** | 2 |
+| Sydney — after | **3** | **1** | **6** | — |
+| Venice (3–4) — before | **0** | **0** | 2 | 2 |
+| Venice — after | **4** | **1** | **4** | — |
+
+(The break's card column reads 0 after, and it is not a regression: the spill
+now pays out a card of its own at the start of the run and `incCool` is still
+running when the break sequence begins four seconds later. The two halves of
+the probe stopped being independent the moment the fix worked.)
+
+**So 4d proposed to multiply a mechanic that reached one listener in one
+chapter.** The witness came first; the flags came second.
+
+### WHAT IS BUILT
+
+**`vessel:`** on `bin`, `basket` and `esky` — the three types that are a thing
+you can put a thing in. A boat, a fountain and a gondola are chapter scenery
+rather than props, and a hook for them that no chapter implements is a feature
+published and never asked, which this pass has now found four times.
+
+Hold `E` while stationary within 1.2 m of one and the held prop goes in and
+**rides** it: kinematic, out of the collision set, its transform written from
+the vessel's every frame. Carried rather than contained, because every collider
+in props.js is a SOLID box — a bin is a 0.4 × 0.56 × 0.4 block, not a shell —
+so "drop it in and let the solver hold it" puts the sandwich on the lid.
+
+It leaves on five things: the vessel picked up, tipped past 0.62 rad, hidden,
+destroyed or spilled — or the contents taken back out, which `physGrab` does
+for all four of its call sites.
+
+**The tap is a throw and is unchanged.** The action key is read at about thirty
+call sites across the chapters and its meaning is a context, so the press is
+deferred ONLY when the animal is standing still with something in its mouth and
+a vessel actually in reach. Everywhere else — including every throw made while
+walking — `capyTryRelease` still fires on the frame the press arrives.
+Measured, release speed sampled on the `capy:drop` event: **7.09 m/s away from
+a vessel in all three test chapters**, against 6.90–7.28 beside one.
+
+**`fragile:`** on `camera`, `sunglasses`, `winebottle`, `mug` and `phobowl`;
+**`spill:`** on `chips`, `handbag`, `flowers`, `plantain` and `maiz`, with five
+new spill decals. Five and not ten: the five that are left would have to be a
+beach towel or a thong.
+
+`qa/toybox-stock.js`, all nineteen chapters, live-filtered on `q.biome === live`:
+
+| | before | after |
+|---|---|---|
+| chapters with something that breaks | 6 | **17** |
+| chapters with something that spills | 10 | **13** |
+| **chapters with either** | **14** | **19** |
+| chapters with a vessel | — | 18 (Pasto has none) |
+
+Nearest vessel to the spawn: 0.8 m in Monte Carlo, 3.1 m in Hanoi, 26.2 m in
+Sơn Đoòng.
+
+**The shard pool was 8** and a break throws five or six, so two breaks in the
+same second recycled the ring and the first one's shards vanished in mid-air.
+Survivable while one type in the game was fragile; not survivable with six.
+Twenty, and a third shard material, so a camera does not break into pottery.
+
+### MEASURED — THE PUT-DOWN
+
+`qa/put-in.js`, Sydney and Venice end to end:
+
+| | Sydney | Venice |
+|---|---|---|
+| in the vessel | yes | yes |
+| `putAudit` armed / done | 1 / 1 | 2 / 2 |
+| vessel moved / contents moved (m) | 3.61 / 3.61 | 3.58 / 3.55 |
+| gap after the move (m) | **0.000** | **0.027** |
+| tipped past 0.62 rad → out, dynamic again | yes | yes |
+
+Hanoi's `done` increments and the hat is out of the bin 400 ms later, which is
+Hanoi: the bin stands on a road with traffic on it.
+
+### THE eng-rate A/B, AND WHY IT IS NOT THE EVIDENCE
+
+`qa/eng-rate6.js` — six chapters, four 45-second random-input laps, two on each
+side of the change, same seeds:
+
+| | before A | before B | after A | after B |
+|---|---|---|---|---|
+| broke | 0 | 1 | 6 | 0 |
+| spilt | 0 | 0 | **2** | **2** |
+| startled | 111 | 100 | 101 | 70 |
+| bang | 139 | 87 | 127 | 99 |
+
+**Only `spilt` separates.** `bang` moves 1.6× between two runs of the SAME
+build, `startled` tracks it, and `broke` is 6 in one after-lap and 0 in the
+other — the masher throws hard enough to shatter (`physSHATTER_MIN` 6.0 m/s
+against a 7.09 m/s throw) only when it happens to be holding something at the
+time, and in one lap Venice produced literally nothing at all. This is the
+third instrument in this repository to fail the same way; see
+[[capy3-instruments-that-cannot-hold-a-line]]. The claim rests on the
+reachability count and the forced-event differential, both of which are
+deterministic.
+
+`npm test` 11/11.
+
+### THE THINGS THAT MEASURED WRONG FIRST
+
+**A KEYDOWN REPEATS, AND A HOLD TIMER THAT RE-ARMS ON IT NEVER FINISHES.** The
+first cut re-armed the put-down on every `actionPressed`, so a player holding
+the key got a second press about half a second in that restarted the 0.35 s
+clock — and a one-second hold could end with 0.2 s on the timer and come out as
+a throw. It read as a feature that works in one chapter and not the next one.
+The guard is `capyPutT < 0` in the arming test.
+
+**A HEIGHT TEST FOR "STANDING IN IT" REJECTS A BIN ON A QUAY.** The trap item 4
+names is never snapping a put-down to a container the animal is standing in,
+and the obvious test — is the animal above the vessel's mouth — is wrong,
+because `capy.position` is the body's CENTRE, about 0.4 m above its feet.
+Venice's bin has its mouth at 1.35 and the animal standing beside it sits at
+1.54, so the put-down was refused in the chapter it was tested in. The test is
+the vessel's own FOOTPRINT and no height at all: inside it you are on it or in
+it, outside it you are beside it, whatever the heights are doing.
+
+**THE ARM MAY NOT BE RE-TESTED EVERY FRAME.** "Standing still next to a bin" is
+a property of the press. Re-running the whole arming test each frame let a
+single frame of drift — the animal settling on a quay — cancel a hold that was
+three quarters done, and the press then came out as a throw.
+
+**AND THE PROBE COULD NOT KEEP THE ANIMAL STILL.** Three chapters, three ways:
+it slid a metre down a Hanoi road during the settle and ended 1.84 m from the
+bin (outside `physPUT_R` by 0.64), it drifted out of reach between two samples
+on a Venetian quay, and in two runs the ownership walk — which is
+chapter-neutral, and a prop spawned beside a local belongs to that local — had
+somebody come and take the hat out of its mouth before the key went down. A
+teleport is also motion: correcting the position 0.4 m in one frame reads as
+tens of metres per second for the next few. The probe pins the body twenty
+times a second for the length of the test and re-grabs if the prop has gone.
+**Same family as trap 18 and trap 35: a probe is part of the experiment**, and
+here it was the probe's own inability to stand still that looked like a
+mechanic that only works in Sydney.
+
+**AND ONE FOR THE THIRD TIME IN THIS PASS.** `localsReact` opens with
+`if (!locals.length) return`, and Sydney's people are `humans` — a different
+array with a different record shape. The first cut of the two new handlers
+startled four people in Venice and NOBODY in Sydney, from three metres, in the
+chapter with the most people in it. `castReact` asks both. See `sayNear` and
+`peopleNear`, which exist for exactly the same reason.
+
 ## THE FUN PASS, BATCH EIGHT — THE FIRST GIFT IN THE GAME (B8 — 7 Sep 2026)
 
 **LANDED, all four bullets.** The snack, the pat, the other half of the heat

@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B8 ARE BUILT, 7 Sep 2026. ITEMS 1 AND 2 ARE CLOSED; ITEM 3 IS CLOSED.**
+> **B1-B9 ARE BUILT, 7 Sep 2026. ITEMS 1, 2 AND 3 ARE CLOSED; ITEM 4 IS OPEN.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -58,18 +58,30 @@
 > where it belongs. The three gestures tile the distance and never overlap: pat
 > under 1.9 m, gift 2.2–9 m, photo 3–11 m.
 >
+> **B9**: the first batch of item 4. `receive:` is `receiveShadow` and always
+> was — a traffic cone carries it — so the container flag is new. And **a
+> spill was not a witnessed event anywhere in the game**: physSpill emits at
+> speed 0 and every consumer of that event gates on speed, so four forced
+> spills at the feet of ten people in Sydney and three in Venice startled
+> NOBODY and counted for nothing. Fixed before a single flag was added.
+> Chapters with something that breaks or spills: **14 -> 19**. Tap-throw is
+> unchanged to three decimals (7.09 m/s) because the press is deferred only
+> where the put-down exists.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Seven of its
-> claims have now been checked and failed** (eight with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Nine of its
+> claims have now been checked and failed** (ten with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
 > needing to be moved in nineteen chapters (five), the chart marking no marquee
 > (it marks thirteen at 0 m), and the count of chapters with no edible prop
-> (ten, stated as both "eleven" and "6 of 17"). **Measure the premise
+> (ten, stated as both "eleven" and "6 of 17"), `receive:` being a
+> container flag (it is `receiveShadow`), and a spill being a witnessed event
+> (it is heard by one listener in one chapter). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -469,10 +481,19 @@ five metres in the direction you are facing. No new key; `E` already does six
 jobs by context.
 
 - **4a. Put it down, and put it IN.** Tap `E` = throw as now; *hold* `E` past
-  ~0.35 s while stationary = set it down, snapped to the nearest `receive` prop
-  within 1.2 m. Make `receive` mean something: a bin, a basket, a boat, a
-  fountain, a pram, a gondola, a bowl of pho. A prop placed *in* another
+  ~0.35 s while stationary = set it down, snapped to the nearest ~~`receive`~~
+  `vessel` prop within 1.2 m. ~~Make `receive` mean something: a bin, a basket,
+  a boat, a fountain, a pram, a gondola, a bowl of pho.~~ **FAILED PREMISE (6),
+  and the list gives it away.** `receive:` in props.js is `receiveShadow` — it
+  is passed into `physInstGroupFor` and read nowhere else. Ten types carry it
+  and they include a traffic cone, a sign, a ruana and a dinner jacket;
+  measured live, Monte Carlo has eighteen props with `receive: true` in it and
+  **nine of them are traffic cones**. B9 adds `vessel:` instead, on the three
+  types that are a thing you can put a thing in — and a boat, a fountain and a
+  gondola are chapter scenery, not props, so they are out of scope until
+  something publishes them. A prop placed *in* another
   travels with it (one level of the `capyRideBody` frame). The Goose's bucket.
+  *B9: built, Sydney and Venice measured end to end.*
 - **4b. Aim and charge the throw.** Hold `E` *while moving* = charge, a faint
   arc drawn as the hint arrow is; release at 5–11 m/s with pitch from the
   camera's elevation. Tap throw unchanged to the decimal.
@@ -480,9 +501,22 @@ jobs by context.
   steady push so a ball rolls and a trolley starts down a slope. Then a
   shopping trolley, a wheelbarrow and a loose crate on water become passive
   carriers with weak steering — the mini set pieces' own contract.
-- **4d. More things break and spill.** `fragile:` on ten more types, `spill:`
-  on five more; each is already a witnessed event. Measure `qa/eng-rate.js`
-  incidents per 45 s per chapter before and after.
+- **4d. More things break and spill.** `fragile:` on ~~ten~~ five more types,
+  `spill:` on five more; ~~each is already a witnessed event~~. **FAILED
+  PREMISE (7), and it is the one that had to be fixed before any flag was
+  worth adding.** `physSpill` emits `prop:impact` with `speed === 0`, and every
+  consumer of that event gates on speed — so a spill was heard by exactly one
+  listener in the game, hardcoded to `coffee` and `icecream` behind Sydney's
+  `biomeLive()`. Measured, four forced events at the feet of the nearest
+  person: **spill 0 startled and 0 incidents in both Sydney and Venice; a
+  break 0 startled in Sydney from 4.7 m.** Ten was also the wrong number —
+  five types are defensibly breakable and they reach seventeen chapters;
+  the other five would have to be a beach towel or a thong. ~~Measure
+  `qa/eng-rate.js` incidents per 45 s per chapter before and after.~~ **The
+  masher cannot hold a line**: four laps over six chapters put `bang` at
+  139/87 before and 127/99 after and `startled` at 111/100 against 101/70.
+  Only `spilt` separated (0, 0 → 2, 2). The evidence is the reachability
+  count and the forced-event differential instead. *B9: built.*
 - **4e. People have bodies.** *Stumble* (barged ≥3.2 m/s, drops what they hold
   via `physBarge`), *sit down hard* (barged while startled, or walked through a
   spill), *fall in* (stumble at a quay edge → `plunge`). Gate on `r.fig`; once
@@ -577,7 +611,7 @@ decays.
 | B6 | 2 the other half · re-run first-five, read the table | 3 | `13bd69e` `f3bae00` |
 | B7 | 3 sit-and-be-noticed: ~~approach,~~ crouch, photo | 3 | `40db53c` |
 | B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | `fe953b3` |
-| B9 | 4a put down + receive · 4d breakables and spills · eng-rate A/B | 3 | |
+| B9 | 4a put down + `vessel` · 4d breakables and spills · the witness fix under both | 3 | `5efe5d6` |
 | B10 | 4b aimed throw · 4c nudge + one rideable prop | 3 | |
 | B11 | 4e people have bodies · 5d animals startle people | 3 | |
 | B12 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
