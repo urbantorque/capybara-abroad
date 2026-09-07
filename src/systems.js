@@ -26977,7 +26977,26 @@ export function createSystems(game) {
     // than standing height — see MONACO_SPAWN.
     if (arrive && typeof sp.yaw === 'number' && sp.yaw === sp.yaw &&
         typeof game.frameShot === 'function') {
-      game.frameShot({
+      // ---- ...AND IT LOOKS AT WHAT THE PLACE IS FOR (B2, item 1a) --------
+      //
+      // MEASURED before this, on the arrival frame itself with the composition
+      // still pinned (qa/arrive-see.js): the marquee's point was inside the
+      // frustum in EIGHT of nineteen and unoccluded in TWO — Venice and the
+      // Pantanal, and nothing else. F1 composed all nineteen of these frames,
+      // and it composed them at the ANIMAL, which is the right subject for the
+      // shot and the wrong one for the question "why am I here".
+      //
+      // So the shot turns. Frame one is still the authored spawn heading —
+      // `camYaw` is set to `sp.yaw` on the line above and the rig damps toward
+      // a request rather than snapping to it — and over the next second the
+      // lens swings onto the marquee and holds it for the length of the place
+      // card. You land on the place and it shows you the reason.
+      //
+      // SURGICAL, AND THAT IS THE POINT: where the authored heading already
+      // frames the marquee the shot is left exactly as F1 wrote it. A chapter
+      // that was right does not get re-composed to prove a mechanism.
+      const gl = sysGlimpseShot(sp, arriveDist);
+      game.frameShot(gl || {
         yaw: sp.yaw,
         // ...and the distance is always named now, so the hold keeps the
         // composition against a player zoom that is damping back in behind it.
@@ -27440,6 +27459,142 @@ export function createSystems(game) {
   }
   /** …and out, for the glimpse, the paper and the instrument. */
   game.marqueePoint = sysMarqueePoint;
+
+  // ---- HOW WIDE THE GLIMPSE STANDS OFF, AND HOW FAR ROUND IT WILL TURN ----
+  // 20 degrees is the half-angle inside which the authored heading is treated
+  // as ALREADY framing the marquee and the arrival is left alone: the lens is
+  // a 24-degree half-FOV, so a subject 20 degrees off the axis is on screen
+  // with room around it, and turning for it would be re-composing a frame that
+  // works. Venice and the Pantanal are the two chapters this exempts, and they
+  // are exactly the two that passed the measurement.
+  const sysGL_KEEP = 20 * Math.PI / 180;
+  // ...AND THE SAME TEST FOR THE OTHER AXIS, in the units the shot is written
+  // in. A bearing-only gate exempted Sydney, Pasto and Sơn Đoòng — whose
+  // marquees are dead ahead and 11, 71 and 42 metres UP — and they measured at
+  // NDC y 1.04, 1.95 and 2.12, which is off the top of the screen. Sixteen
+  // hundred millimetres of look point at the boom's distance is about six and
+  // a half degrees — and that turned out to be far too generous, because the
+  // eye is not where the arithmetic puts it: `sysCAM_FLOOR` clamps the camera's
+  // HEIGHT, which tilts the real axis down relative to the model and carries
+  // the subject up the frame. Sydney's sails needed 3.46 m of look point
+  // against the arrival's 2.0, passed a 1.6 m gate by a hair, and measured at
+  // NDC y 1.04 — off the top edge. 0.8 m is the figure that puts them back on
+  // the screen, and it is set from that measurement rather than from the
+  // geometry, because the geometry is the thing that was wrong.
+  const sysGL_KEEP_RAISE = 0.8;
+  // Below this there is nothing to point at — you are standing in it.
+  const sysGL_NEAR = 9;
+  // A near-level lens. The play rig is 41 degrees down and the arrival 16; a
+  // landmark wants neither, and a NEGATIVE pitch would only be eaten by
+  // sysCAM_FLOOR, which clamps the eye's height rather than its angle.
+  const sysGL_PITCH = 0.07;
+  // The look point may ride this far above the animal and no further. Sixteen
+  // metres is Galeras' plume and Sơn Đoòng's roof; past that the frame is sky.
+  const sysGL_RAISE_MAX = 16;
+  // How far along the sight line the clearance question is asked, and how clear
+  // it has to come back. 0.85 keeps the ray out of the subject's own collider;
+  // 0.9 allows a railing or a lamp post in the way and refuses a wall. The boom
+  // is judged more loosely (0.7): the rig cuts it for a living and a shortened
+  // boom is a normal frame, where a boom cut to its floor is a shop window.
+  const sysGL_SEE_T = 0.85;
+  const sysGL_SEE_MIN = 0.90;
+  const sysGL_BOOM_MIN = 0.70;
+  const sysGlV1 = new THREE.Vector3();
+  const sysGlV2 = new THREE.Vector3();
+
+  /**
+   * THE GLIMPSE (item 1a). A `frameShot` request that puts the chapter's
+   * marquee on the optical axis, or null to leave the arrival as it is.
+   *
+   * The arithmetic, once, because getting it by eye costs a soak each time.
+   * The rig puts the eye at horizontal `cos(p) * dist` from the animal on the
+   * far side from `yaw`, and `sin(p) * dist` above it; the look point is the
+   * animal plus `raise`. So for a target `rise` metres up and `D` metres out
+   * along the view direction, the axis passes through it when
+   *
+   *     raise = s + c * (rise - s) / (D + c),    s = sin(p)*dist, c = cos(p)*dist
+   *
+   * which is just "the look point sits on the line from the eye to the thing".
+   * Solved rather than tuned: a constant raise frames a 20 m opera house and a
+   * 210 m cave roof at wildly different places on the screen, and the third
+   * pass memories are full of marquees that were built and never seen.
+   *
+   * Returns null — and the arrival keeps F1's composition, untouched — in six
+   * cases: the player has asked for less motion; the chapter publishes no
+   * marquee; the marquee is close enough to be underfoot; the authored heading
+   * already frames it on BOTH axes; the sight line to it is blocked; or the
+   * eye would have to stand inside something. The last two are the difference
+   * between this and a lens that turns to face a wall.
+   */
+  function sysGlimpseShot(sp, arriveDist) {
+    if (calmOn()) return null;
+    const m = sysMarqueePoint();
+    if (!m) return null;
+    const dx = m.x - sp.x, dz = m.z - sp.z;
+    const D = Math.sqrt(dx * dx + dz * dz);
+    if (!(D > sysGL_NEAR)) return null;
+    // The bearing from the animal TO the marquee, and the bearing the authored
+    // frame is LOOKING along — `sp.yaw` is animal-to-camera, so the view runs
+    // the other way. Getting this round the wrong way is the documented way to
+    // measure a camera mechanic as dead in this repo.
+    const toM = Math.atan2(dx, dz);
+    let d = toM - (sp.yaw + Math.PI);
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    // A spawn that asked for a wider or higher lens asked for a reason; the
+    // glimpse keeps its distance and only re-aims. See MONACO_SPAWN.
+    const dist = clamp(typeof sp.dist === 'number' ? sp.dist : arriveDist,
+                       sysCAM_MIN, sysSHOT_DIST_MAX);
+    const p = sysGL_PITCH;
+    const s = Math.sin(p) * dist, c = Math.cos(p) * dist;
+    const rise = m.y - (sp.y + sysLOOK_RAISE);
+    const raise = clamp(s + c * (rise - s) / (D + c), 0.6, sysGL_RAISE_MAX);
+    // BOTH AXES, or a marquee dead ahead and seventy metres up reads as
+    // "already framed". See sysGL_KEEP_RAISE.
+    const raiseAuth = typeof sp.raise === 'number' ? sp.raise : sysARRIVE_RAISE;
+    if (Math.abs(d) <= sysGL_KEEP && Math.abs(raise - raiseAuth) <= sysGL_KEEP_RAISE) {
+      return null;
+    }
+    // ---- ...AND ONLY IF THERE IS ANYTHING TO SEE (the third-pass trap) ----
+    //
+    // A GLIMPSE OF A MARQUEE BEHIND A BUILDING IS A GLIMPSE OF A BUILDING.
+    // Measured, in qa/AS-kyoto.png, before these two rays existed: the Uji is
+    // seventy-eight metres away behind a row of shopfronts, the lens dutifully
+    // swung round onto it, and the first frame of chapter four was a shop
+    // window at three metres with the capybara filling the bottom of it. The
+    // authored heading it replaced was a street with the town at the end of it.
+    //
+    // TWO rays and not one, because there are two ways to compose a wall:
+    //   - the SIGHT LINE from the animal to the marquee. Pulled 15 % short, so
+    //     the question is "is the way there clear" and not "is the surface of
+    //     the thing solid" — a point authored at the middle of the sails is
+    //     inside the sails.
+    //   - the BOOM, from the animal to where the eye would have to stand. It
+    //     is on the OPPOSITE side from the marquee, so a clear view forward
+    //     says nothing at all about it, and `camClearF` cutting the boom to
+    //     its floor is what put the lens inside that shop window.
+    //
+    // Both use the rig's own occlusion ray, which already skips the animal,
+    // whatever is carrying it and whatever deck it is standing on.
+    const eye = sysGlV1.set(sp.x, sp.y + sysLOOK_RAISE, sp.z);
+    const look = sysGlV2.set(sp.x + (m.x - sp.x) * sysGL_SEE_T,
+                             sp.y + sysLOOK_RAISE + (m.y - sp.y - sysLOOK_RAISE) * sysGL_SEE_T,
+                             sp.z + (m.z - sp.z) * sysGL_SEE_T);
+    if (sysCamClear(eye, look) < sysGL_SEE_MIN) return null;
+    const back = toM + Math.PI;
+    const boom = sysGlV2.set(sp.x + Math.sin(back) * c,
+                             sp.y + sysLOOK_RAISE + s,
+                             sp.z + Math.cos(back) * c);
+    if (sysCamClear(eye, boom) < sysGL_BOOM_MIN) return null;
+    return {
+      // `back`, the same bearing the boom ray was just cast along: the eye goes
+      // on the far side of the animal from the marquee, so the marquee ends up
+      // in the middle of the frame. One expression, so the shot and the ray
+      // that cleared it can never disagree about where the eye is going.
+      yaw: back,
+      dist: dist, pitch: p, raise: raise, hold: sysARRIVE_HOLD,
+    };
+  }
 
   /**
    * WHERE THE LIVE WATERLINE IS at a point — capybara.js's capyWaterY, on this
@@ -30715,6 +30870,30 @@ export function createSystems(game) {
       if (marqId) {
         const mp = sysMarqueePoint();
         let line = marqSay;
+        // ---- ...AND WHEN, WHERE THERE IS A WHEN (B2, item 1c) -------------
+        //
+        // Nine rows in this game are "be there when", and the countdown that
+        // answers them has existed since P3 — `nextIn`, published by seven
+        // chapters, rendered by `todoParLine` on the clue under the TOP row.
+        // Which is exactly the row a clocked marquee is not: it sits in act two
+        // or three, so the one number that says whether to start walking now
+        // was on a line the player could not see until they were already doing
+        // it. The signpost is the right place for it and it costs nothing.
+        //
+        // ROADMAP-FUN's item 1c asked for these clocks to be PHASED to the
+        // arrival, on the premise that none of them was. All five marquee
+        // clocks already are, each with an authored constant and a comment
+        // saying why: Venice `venTIDE_START` 0.055 (the siren 50 s in),
+        // Cappadocia `gorPhase` 0.06 (64 s), Hong Kong `hkPhase` 0.06 (74 s),
+        // Palawan `palPhase` 0.10 (46 s) and Hanoi `hanTRAIN_GAP2 * 0.30`
+        // (29 s). They are phased SOONER than the roadmap's 150-210 s target,
+        // not later, and every one of them re-phases on every entry rather
+        // than latching on `seen[]` — which is the better rule and is written
+        // down in all five chapters as "a chapter you come back to opens the
+        // way it opened the first time". Nothing was changed. What was missing
+        // was any way for the player to know.
+        const nx = todoNextIn(marqId);
+        const when = nx < 0 ? '' : (nx < 1 ? 'happening now' : Math.ceil(nx) + ' s');
         if (mp) {
           const md = Math.sqrt((mp.x - p.x) * (mp.x - p.x) + (mp.z - p.z) * (mp.z - p.z));
           // A NON-BREAKING SPACE in the figure. `.capyui-marqsay` is a wrapping
@@ -30731,6 +30910,13 @@ export function createSystems(game) {
           // with the middot and only the figure wraps.
           line = marqSay + '\u00a0·  ' + mtxt;
         }
+        // The clock goes LAST and it is the only part of this line that
+        // moves once a second, so it is also the only part that has to be
+        // rounded to a whole second: the element is compared against the
+        // live one on every hint tick and a decimal place would fail that
+        // comparison four times a second for ever. Same argument as
+        // todoParLine's, one card element over.
+        if (when) line += '\u00a0·  ' + when;
         if (marqSayEl.textContent !== line) marqSayEl.textContent = line;
       }
       hintHas = false;

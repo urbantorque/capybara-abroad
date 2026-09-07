@@ -1,11 +1,21 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1 IS BUILT, 7 Sep 2026.** `marquee:` on all nineteen chapters,
+> **B1 AND B2 ARE BUILT, 7 Sep 2026.**
+>
+> **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
-> (1f, `qa/first-five.js`) with its two companions `qa/arrive-see.js` and
+> (1f, `qa/first-five.js`) with its companions `qa/arrive-see.js` and
 > `qa/marq-frame.js`. `qa/p6-static.cjs` now fails the build on a chapter with
-> no marquee, a `say` that names a key, or anything but exactly one `wow`. See
-> CONTRACT.md for what it measured and the four things that measured wrong
+> no marquee, a `say` that names a key, or anything but exactly one `wow`.
+>
+> **B2**: item 1a, the glimpse — the arrival lens swings onto the marquee and
+> holds it, and declines where the marquee cannot be seen from the spawn. The
+> marquee is in the arrival frame in 14 of 19 now, against 8 before. Item 1c
+> turned out to be **built already and wrong about its own premise**; what
+> shipped in its place is the half of it nobody had noticed — the countdown, on
+> the signpost. Both items' claims are corrected in place below.
+>
+> See CONTRACT.md for what each measured and the six things that measured wrong
 > first. **B0 — sitting a stranger in front of the title card — has not been
 > done and no batch below replaces it.**
 
@@ -56,11 +66,18 @@ Measured against what is there:
   the interface does not point at.**
 - **Nobody has measured the first five minutes of any place.** Time to the first
   tick, to the first *sight* of the marquee, to the marquee itself, and where a
-  player stalls — none of it exists. There is no stuck timer anywhere. Nine
+  player stalls — none of it exists (**built in B1: `qa/first-five.js`, and the
+  starting line is at the foot of this document**). ~~There is no stuck timer
+  anywhere.~~ **There is: `sysNUDGE_T`, a banked 150 s timer that says the top
+  row's clue again, once per chapter, at `note` weight.** What it does not do is
+  the rest of 1d — see there. Nine
   "be there when" marquees ride clocks of 54–205 s (`nextIn` is wired in seven
-  chapters) and **none of those clocks is phased to your arrival**: you can walk
-  into Venice thirty seconds after the water went down and wait three minutes
-  for the chapter's whole argument.
+  chapters) and ~~none of those clocks is phased to your arrival~~ — **wrong,
+  and measured in B2: all five chapters whose MARQUEE rides a clock re-phase it
+  in their own `onEnter()`, against an authored constant, and the first window
+  opens 32–81 s after you land.** What was missing was any way to KNOW: `nextIn`
+  is rendered on the clue under the top row, and a clocked marquee is never the
+  top row. See 1c below, and the B1/B2 timings in `qa/first-five.js`.
 - **There is one economy and it is destructive.** Mischief is witnessed
   (`npcHeat`, the incident chain) and paid. Being a *capybara* — the calmest,
   most-photographed animal on the internet — pays nothing: `fam` takes 34 s of
@@ -116,7 +133,14 @@ minute, and be *on the way* by the third — without a tutorial, and without
 touching the marquee law. Four mechanisms, all reading the `wow` row that is
 already there.
 
-- **1a. The glimpse.** The arrival lens (`RV-arrive-*` frames, the F1 batch)
+- **1a. The glimpse. BUILT (B2).** `sysGlimpseShot`. It turned out to need four
+  gates, not one — the bearing, the look-point RAISE (a bearing-only gate sent
+  three chapters' marquees off the top of the screen), the sight line to the
+  marquee and the sight line to the boom. The last two are what stop it: without
+  them the frustum count is better (18/19 against 14) and Kyoto's first frame is
+  a shop window at three metres. **The frustum count is not the metric; the PNG
+  is.** Text below as written, for the record.
+- ~~**1a. The glimpse.**~~ The arrival lens (`RV-arrive-*` frames, the F1 batch)
   looks at the animal. For three seconds it should look at *the marquee first*
   and pull back to the animal: the condor circling the crater, the sails, the
   scaffold going up the side of the street, the balloons inflating at the
@@ -134,27 +158,41 @@ already there.
   Reads `sysHINTS[wow].where` and the `act`; costs nothing on the save.
   Sydney's act one is ten rows and the sparkle is the only thing on that paper
   that says "there is more than this".
-- **1c. Phase the clocks to the arrival.** For the nine "be there when"
+- **1c. Phase the clocks to the arrival.** ~~For the nine "be there when"
   marquees, set the cycle's phase on *first* `biome:enter` so the first window
-  opens at an authored 150–210 s after arrival — long enough to reach the
-  place, short enough that a player who wandered still catches it. Venice's
-  siren, the Symphony, Strokkur, the bloom, the sunrise, Hanoi's fold. `nextIn`
-  already publishes the countdown; the marquee line (1b) shows it. The rule
-  "nothing may be missable for ever" stays true; this adds "and the first one
-  is never missed by accident". Chapters keyed to the audio clock (the
-  Symphony is one tower per beat) phase the *show*, not the music.
+  opens at an authored 150–210 s after arrival.~~ **BUILT ALREADY, and this
+  item was wrong about its own premise (B2).** Every one of the five chapters
+  whose marquee rides a clock re-phases it in its own `onEnter()`, against an
+  authored constant, with a comment explaining it: Venice `venTIDE_START`
+  0.055, Cappadocia `gorPhase` 0.06, Hong Kong `hkPhase` 0.06, Palawan
+  `palPhase` 0.10, Hanoi `hanTRAIN_GAP2 × 0.30`. Measured off the live
+  countdown, the first window opens 81 / 67 / 76 / 48 / 32 s after arrival —
+  **sooner than this item's target, not later.** And all five re-phase on
+  EVERY entry rather than latching on `seen[]` as this item asked, which is
+  the better rule and is written down in all five chapters. Nothing was
+  changed.
+  What was genuinely missing is the half of this item nobody had noticed:
+  `nextIn` has published the countdown since P3 and `todoParLine` renders it —
+  **on the clue under the top row, which is exactly the row a clocked marquee
+  is never**, because it sits in act two or three. The countdown is on the
+  signpost now, after the distance. That shipped as B2.
 - **1d. Lead, do not push.** When nothing on the paper is pinned, the hint
   arrow (`hintTarget`) points at the next row *on the road to the marquee* —
   `lead:` on the `wow` row, an ordered list of the rows that get you there
   (whistle the condor → the rim → the talons; find the scaffold → climb → the
   roof). The acts already stage most of this; `lead:` makes it explicit so the
-  arrow can read it. The stuck timer that does not exist: after 75 s with no
-  tick and the top row unchanged, the clue gains its `nextIn` or distance
-  (`todoParLine` renders three cases; this is a fourth); at 150 s the nearest
-  local in earshot says a version of it through `sysSay`. Reset on any tick;
-  never while a marquee's clock reads 0 (the show is on — the hint is to look
-  up).
-- **1e. The minis are the second signpost.** Thirty-two `mini` set pieces
+  arrow can read it. ~~The stuck timer that does not exist:~~ **it exists —
+  `sysNUDGE_T`, 150 s, banked and emptied by a tick, once per chapter, and it
+  re-toasts the top row's clue.** And `todoParLine` ALREADY renders `nextIn`
+  and the distance for the top row, so the "fourth case" this item asks for at
+  75 s is two of the three cases it already has. What is genuinely left of 1d
+  is: `lead:` and the arrow, and turning the 150 s toast into **the nearest
+  local in earshot saying a version of it** through `sysSay` — which is the
+  half that would make it the world talking rather than the UI. Reset on any
+  tick; never while a marquee's clock reads 0 (the show is on — the hint is to
+  look up). **Check what is built before building it; two of the four things
+  in this item already were.**
+- **1e. The minis are the second signpost.** Thirty~~-two~~ (**30**) `mini` set pieces
   already carry the smaller sparkle on the paper. Give each a chart mark on
   the minimap in the same glyph, so a player who is not ready for the marquee
   can see the next-best thing from anywhere. Reads `sysHINTS[id].where`;

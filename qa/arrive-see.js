@@ -56,7 +56,21 @@ async page => {
         for (let i = 0; i < hits.length; i++) {
           const o = hits[i].object
           if (!o.isMesh || !o.material || !drawn(o)) continue
-          if (o.material.transparent && o.material.opacity < 0.5) continue
+          const mt = o.material
+          // ---- WHAT IS NOT A WALL --------------------------------------
+          // The first cut of this counted every mesh the ray touched and
+          // reported seventeen of nineteen chapters as occluded, naming
+          // `palCaustics` in Palawan — a light EFFECT drawn on the seabed.
+          // A thing you can see through is not a thing in the way:
+          //   - anything blended additively or multiplicatively is light,
+          //     not matter;
+          //   - `depthWrite: false` is this repo's own mark for a decal, a
+          //     sheet or a sprite that is deliberately see-through;
+          //   - BackSide is a shell you are already inside.
+          if (mt.transparent && mt.opacity < 0.75) continue
+          if (mt.blending !== undefined && mt.blending !== 1) continue  // 1 = Normal
+          if (mt.depthWrite === false) continue
+          if (mt.side === 1) continue                                   // 1 = BackSide
           const bs = o.geometry && o.geometry.boundingSphere
           if (bs && bs.radius > 400) continue
           blocked = (o.name || o.type) + '@' + hits[i].distance.toFixed(0)

@@ -3020,7 +3020,7 @@ export const CHAPTERS = [
     // point eleven metres over it is eleven metres of empty sky — measured, in
     // qa/MF-kowloon.png, which framed black. The subject is the roof you have
     // to be standing on and the wall of neon under it, not the air above both.
-    marquee: { x: -19.1, z: 0, up: 34, say: 'the roof at the top of the scaffold, and the whole wall of light from up there' },
+    marquee: { x: -19.1, z: 0, up: 34, say: 'the roof at the top of the scaffold, and the towers from up there' },
     note: 'You spent most of this chapter above the people who live in it.',
     acts: [
       { kick: 'MONG KOK', line: 'nothing on this street is at ground level.' },

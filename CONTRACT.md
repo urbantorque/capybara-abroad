@@ -14,6 +14,150 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH TWO — THE GLIMPSE, AND A CLOCK THAT WAS ALREADY RIGHT (B2 — 7 Sep 2026)
+
+**LANDED.** Item 1a (the arrival looks at the marquee) and item 1c, which
+turned out to be built already — so what shipped in its place is the one part
+of it that genuinely was not: the countdown, on the signpost.
+
+### THE GLIMPSE (1a)
+
+F1 composed all nineteen arrival frames, and it composed them AT THE ANIMAL,
+which is the right subject for a shot and the wrong one for the question "why
+am I here". Measured on the arrival frame with the composition still pinned
+(`qa/arrive-see.js`): the marquee's point was inside the frustum in **8 of 19**.
+
+`sysGlimpseShot(sp, arriveDist)` returns a `frameShot` request that puts the
+marquee on the optical axis, or null to leave F1's composition exactly as it is.
+Frame one is still the authored spawn heading — `camYaw` is assigned on the
+teleport line and the rig damps toward a request rather than snapping to it — so
+the lens swings onto the marquee over the first second and holds it for the
+length of the place card. You land on the place, and it shows you the reason.
+
+**The arithmetic, solved rather than tuned.** The rig puts the eye at
+`cos(p)·dist` from the animal on the far side from `yaw` and `sin(p)·dist` above
+it, and aims at the animal plus `raise`. For a target `rise` up and `D` out:
+
+    raise = s + c·(rise − s)/(D + c),   s = sin(p)·dist,  c = cos(p)·dist
+
+A constant raise frames a 20 m opera house and a 210 m cave roof at completely
+different places on the screen, which is how a marquee gets built and never
+seen.
+
+**Four gates, and each one is a frame that was measured and rejected:**
+
+  - **the bearing** (20°): inside it the authored heading already frames the
+    marquee and is left alone. Venice and the Pantanal — the two chapters that
+    passed the original measurement — are exactly the two this exempts.
+  - **the raise** (0.8 m of look point): a bearing-only gate exempted Sydney,
+    Pasto and Sơn Đoòng, whose marquees are dead ahead and 11, 71 and 42 metres
+    UP, and they measured at NDC y 1.04, 1.95 and 2.12 — off the top edge. The
+    figure is 0.8 and not the 1.6 the geometry suggested because the geometry is
+    wrong: `sysCAM_FLOOR` clamps the eye's HEIGHT, which tilts the real axis
+    down and carries the subject up the frame.
+  - **the sight line**, pulled 15 % short so the question is "is the way there
+    clear" and not "is the surface of the thing solid" — a point authored at the
+    middle of the sails is inside the sails.
+  - **the boom.** Two rays and not one, because there are two ways to compose a
+    wall. The eye stands on the OPPOSITE side from the marquee, so a clear view
+    forward says nothing about it.
+
+The two rays are what stops the trap the third-pass memories are full of.
+Measured, in `qa/AS-kyoto.png` before they existed: the Uji is 78 m away behind
+a row of shopfronts, the lens dutifully swung onto it, and the first frame of
+chapter four was **a shop window at three metres with the capybara filling the
+bottom of it** — in place of a street with the town at the end of it.
+
+### THE COUNTDOWN (what 1c turned into)
+
+Item 1c asked for the nine "be there when" clocks to be phased to the arrival,
+on the stated premise that **"none of those clocks is phased to your arrival"**.
+That is false, and it is false in every one of the five chapters whose MARQUEE
+rides a clock. Each already re-phases in its own `onEnter()`, against an
+authored constant, with a comment saying why:
+
+| chapter | constant | its marquee's first window |
+|---|---|---|
+| Venice | `venTIDE_START` 0.055 | 81 s after arrival |
+| Cappadocia | `gorPhase` 0.06 | 67 s |
+| Hong Kong | `hkPhase` 0.06 | 76 s |
+| Palawan | `palPhase` 0.10 | 48 s |
+| Hanoi | `hanTRAIN_GAP2 × 0.30` | 32 s |
+
+(measured off the countdown itself, `qa/marq-when.js`, not read off the source.)
+
+They are phased SOONER than the roadmap's 150–210 s target, not later. And all
+five re-phase on EVERY entry rather than latching on `seen[]` as item 1c asked —
+which is the better rule, is written down in all five chapters as "a chapter you
+come back to opens the way it opened the first time", and was not overturned.
+
+What genuinely did not exist was any way for the player to know. `nextIn` has
+published the countdown since P3 and `todoParLine` renders it — on the clue
+under the TOP row, which is precisely the row a clocked marquee is never: it
+sits in act two or three. So the one number that says whether to start walking
+now was on a line you could not see until you were already doing it. It is on
+the signpost now, after the distance, rounded to the second for the same reason
+`todoParLine` rounds: the element is compared against the live one four times a
+second.
+
+### MEASURED
+
+`qa/arrive-see.js`, all nineteen, sampled 2.2 s into the 3.60 s arrival shot:
+
+| | in the frustum | unoccluded |
+|---|---|---|
+| before B2 | 8 / 19 | 2 / 19 |
+| after B2 | **14 / 19** | 4 / 19 |
+
+The five that still miss — Kyoto, Rio, Iceland, Hong Kong, Hanoi — are the ones
+where the glimpse **declines**, because the marquee genuinely cannot be seen
+from the spawn. That is the correct answer and it is a finding: those five are
+carried by the signpost, the countdown and item 1d, not by the camera.
+
+An intermediate run without the two rays reached 18/19 in the frustum, and four
+of those four extra frames were walls. **The frustum count is not the metric;
+the PNG is.** Nineteen frames were rendered and looked at. Sydney's sails now
+stand whole and high in frame where they were cropped by the title before;
+Marrakech's is the best of the set — the whole square, the stalls and the gate
+east through the wall — and its marquee is 276 m away and not individually
+legible, which is why a distance ceiling was considered and rejected.
+
+`npm test` 10/10. Nineteen-chapter soak: 0 errors, 0 NaN.
+
+**`qa/first-five.js` re-run after B2**, same driver, same ninety seconds:
+the marquee is seen at all in **7 of 19** against 6, and where it is seen it
+is seen AT ONCE — Pasto went from 25.0 s to 0.5 s, and Sydney, Venice and the
+Pantanal all now read 0.5-1.0 s. Rio, which had never shown it, shows it at
+68 s.
+
+That 6 -> 7 is the honest figure and it is much smaller than the arrival
+measurement's 8 -> 14, for a reason worth stating: **a random walk leaves the
+arrival frame inside two seconds**, so `tSee` mostly measures whether the
+wandering happened to face the thing, not whether the arrival showed it. The
+two instruments answer different questions and the arrival one is 1a's.
+
+The re-run also carries the two columns B1 added after its own baseline, and
+they close the ambiguity B1 spent a quarter of an hour on: `wowAt` 38.5 s in
+Pasto and 79 s in Venice, and `marqEnd` false in exactly those two chapters
+and no others. The signpost stands down because its row was ticked.
+
+Zero page errors across the nineteen, which is the `pan` fix from B1 holding.
+
+### TWO THINGS THAT MEASURED WRONG FIRST
+
+1. **A GATE ON ONE AXIS IS NOT A GATE.** The "already framed" test started as a
+   bearing test alone, which is the natural way to think about a camera turning
+   — and it exempted the three chapters whose marquee is straight ahead and a
+   long way UP. All three measured off the top of the screen. The tell was three
+   NDC y values greater than 1 in a column where every other row was 0.2.
+
+2. **"IN THE FRUSTUM" IS NOT "YOU CAN SEE IT", AND THE BETTER NUMBER WAS THE
+   WORSE FRAME.** Removing the occlusion gates took the frustum count from 14 to
+   18 and produced Kyoto's shop window. The visibility-metrics rule from August
+   says judge camera framing from the rendered PNG; this is the same rule from
+   the other side — an instrument that only counts can be improved by making the
+   game worse, and it will report the improvement.
+
 ## THE FUN PASS, BATCH ONE — WHAT THE PLACE IS FOR (B1 — 7 Sep 2026)
 
 **LANDED.** The first batch of `ROADMAP-FUN.md`: item 1b (the marquee line on
