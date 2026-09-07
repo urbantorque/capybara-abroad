@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1 AND B2 ARE BUILT, 7 Sep 2026.**
+> **B1, B2 AND B3 ARE BUILT, 7 Sep 2026.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -78,9 +78,12 @@ Measured against what is there:
   Cappadocia from the title because they want to fly a balloon sees a card,
   three rows about pigeons, and no balloon.
   The arrival card's second line (`showPlace(title, sub)`) says where
-  you are, not what it is for. The chart marks landmarks (`sysMARKS`) but not
-  the marquee. **The one thing every chapter was built around is the one thing
-  the interface does not point at.**
+  you are, not what it is for. ~~The chart marks landmarks (`sysMARKS`) but not
+  the marquee.~~ **Wrong twice over, and measured in B3: `sysMARKS` is the TITLE
+  PICKER's postcards, the chart is `sysMAP_WORLDS[biome].marks`, and its nearest
+  mark to the marquee is 0.0 m in thirteen of nineteen chapters. What it did not
+  do was say WHICH mark; it does now.** **The one thing every chapter was built
+  around is the one thing the interface did not point at.**
 - **Nobody has measured the first five minutes of any place.** Time to the first
   tick, to the first *sight* of the marquee, to the marquee itself, and where a
   player stalls — none of it exists (**built in B1: `qa/first-five.js`, and the
