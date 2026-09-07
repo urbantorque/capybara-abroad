@@ -503,7 +503,7 @@ decays.
 | B1 | 1f `qa/first-five.js` · 1b the marquee line · `marquee:` points for all nineteen, arrival frames rendered and looked at | 3 | `5060f0a` |
 | B2 | 1a the glimpse · 1c the nine clocks phased | 3 | `a91a725` |
 | B3 | 1d `lead:` on every wow, the arrow, the stuck timer · 1e mini marks | 2.5 | `ecec89c` |
-| B4 | 2 the arrival tick earned · the pips · seeded people for the first rows | 3 | |
+| B4 | 2 the arrival tick earned · the pips · seeded people for the first rows | 3 | `d1f5e82` |
 | B5 | 2 the nineteen gags placed, half of them | 3 | |
 | B6 | 2 the other half · re-run first-five, read the table | 3 | |
 | B7 | 3 sit-and-be-noticed: approach, crouch, photo | 3 | |
