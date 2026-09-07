@@ -1426,6 +1426,17 @@ export function createNPCs(game) {
                'That was not nothing.', 'I felt that.', 'Was that necessary?'],
     splash:   ['In it goes.', 'Well. It is gone now.', 'Was that on purpose?', 'Lovely.',
                'That is not coming back.', 'Hope it floats.'],
+    // ---- ...AND ONE FOR SOMETHING ON THE FLOOR (B9) ----------------------
+    // Held to the same chapter-neutral standard as the four around it: no
+    // season, no country, no building, and — the harder rule here — NOTHING
+    // THAT NAMES WHAT WAS SPILT. This pool is said over a burst sack of coffee
+    // in Pasto, a cup on a Reykjavík pavement and a handbag emptied across a
+    // Venetian quay, so 'that was a full cup' is a line that is wrong two
+    // times in three. What is left is what people say about a mess, which is
+    // mostly about the floor.
+    mess:     ['Oh, that is everywhere.', 'Someone will have to do that.',
+               'All over the floor.', 'Well. That is that.', 'Straight down.',
+               'Look at the state of it.', 'That will stain.'],
     thief:    ['That is not yours.', 'Excuse me?', 'Put that down.', 'Oh, wonderful.',
                'You are just taking that, are you.', 'Right. Yes. Fine.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
@@ -3397,6 +3408,75 @@ export function createNPCs(game) {
     if (sp < npcLOC_BANG) return;
     localsReact('startled', p.position.x, p.position.z, clamp((sp - npcLOC_BANG) / 9, 0.25, 1));
   });
+  // ---- ...AND THE TWO THAT WERE NOT NOTICED BY ANYBODY (B9) ---------------
+  //
+  // MEASURED before writing this, four forced events at the feet of the
+  // nearest person, in Sydney (ten people within 30 m) and in Venice (three):
+  //
+  //     spill    0 startled  ·  0 incidents   in BOTH chapters
+  //     shatter  0 startled  ·  4 incidents   (Sydney, 4.7 m away)
+  //
+  // The incident column is systems.js's 'prop:destroy' hook, which has always
+  // been there. The startle column is the whole of what this game is FOR — the
+  // delight is not the mischief, it is being witnessed doing it — and neither
+  // of the two mechanics item 4 wants to multiply reached a single person.
+  //
+  // A break and a spill are different events and are answered differently. A
+  // break is a bang: it carries at the full reaction radius and gets the
+  // `startled` pool. A spill is quiet — nobody three shops away hears a cup go
+  // over — so it takes two thirds of the radius and a pool of its own about
+  // the floor.
+  const npcLOC_BREAK  = 0.72;   // strength of the flinch when something breaks
+  const npcLOC_MESS   = 0.42;   // ...and when something goes everywhere
+  const npcLOC_MESS_R = 0.66;   // × npcLOC_REACT_R — a spill is not loud
+  const npcCAST_REACT_N = 2;    // ...and no more of Sydney's roster than speak
+
+  /**
+   * TWO CASTS, AND `localsReact` KNOWS ABOUT ONE OF THEM. It opens with
+   * `if (!locals.length) return`, and Sydney's people are `humans` — a
+   * different array, built at boot, with a different record shape. So the
+   * first cut of the two handlers below startled four people in Venice and
+   * NOBODY in Sydney, from three metres, in the chapter with the most people
+   * in it. That is the third time in this pass that a question about npc.js's
+   * collections has been answered with one of them: see `sayNear` and
+   * `peopleNear`, which exist for the same reason.
+   *
+   * Not fixed by widening `localsReact`, which has a dozen callers and whose
+   * flinch spring is written against the local record's fields. Sydney's
+   * roster has its own reaction — `startle` — and this is the one place that
+   * asks for both.
+   */
+  function castReact(kind, x, z, s, radius) {
+    localsReact(kind, x, z, s, radius);
+    if (!biomeLive()) return;   // `humans` is Sydney's roster and nowhere else's
+    const r = radius > 0 ? radius : npcLOC_REACT_R;
+    const r2 = r * r;
+    let n = 0;
+    for (let i = 0; i < humans.length && n < npcCAST_REACT_N; i++) {
+      const rec = humans[i];
+      if (!rec || !rec.group || rec.dejected > 0) continue;
+      if (rec.state === 'chase' || rec.state === 'swim' || rec.state === 'plunge') continue;
+      const dx = rec.group.position.x - x, dz = rec.group.position.z - z;
+      if (dx * dx + dz * dz > r2) continue;
+      startle(rec, x, z);
+      rec.reactMode = 1;
+      n++;
+    }
+  }
+
+  game.events.on('prop:destroy', function (p) {
+    const b = p && p.prop && p.prop.body;
+    if (!b) return;
+    castReact('startled', b.position.x, b.position.z, npcLOC_BREAK);
+  });
+  game.events.on('prop:impact', function (p) {
+    // props.js stamps this flag on the shared payload for physSpill and clears
+    // it in physStampVoice; speed is 0 here, which is why every gate in this
+    // file used to drop it.
+    if (!p || !p.spill || !p.position) return;
+    castReact('mess', p.position.x, p.position.z, npcLOC_MESS,
+              npcLOC_REACT_R * npcLOC_MESS_R);
+  });
   // ---- SOMEBODY JUST WALKED INTO YOU (D3) --------------------------------
   //
   // In a goose game the barge IS the verb, and for nineteen chapters walking
@@ -3598,7 +3678,14 @@ export function createNPCs(game) {
   game.events.on('prop:impact', function (p) {
     if (!p) return;
     const sp = typeof p.speed === 'number' ? p.speed : 0;
-    if (sp < npcOWN_BANG) return;
+    // A SPILL IS WORTH GETTING OFF YOUR STOOL FOR TOO (B9). The gate is about
+    // how hard a thing hit and a spill arrives at speed 0, so the one person
+    // in the world with a reason to care — whoever it belonged to — was the
+    // one person who never heard about it. Sydney has had this reaction since
+    // v23 and it is hardcoded to `coffee` and `icecream` behind biomeLive();
+    // this is the chapter-neutral half, and it reads the flag rather than a
+    // list of types, so it holds for every type 4d adds.
+    if (sp < npcOWN_BANG && !p.spill) return;
     const pr = p.prop;
     if (!pr || pr.held) return;
     const own = localOwnerOf(pr);

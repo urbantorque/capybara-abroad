@@ -226,7 +226,33 @@ const physCRATER_STILL = 0.4;    // s without descending before the wall shrugs 
 const physCRATER_DESCEND = 0.25; // m of drop that counts as "still on its way down"
 const physCRATER_GIVEUP = 9;     // shoves before the mountain just takes it anyway
 const physPUFF_MAX = 24;
-const physSHARD_MAX = 8;
+// ---- PUTTING A THING IN A THING (B9, item 4a) -----------------------------
+//
+// `vessel:` and NOT `receive:`. Item 4a reads "make `receive` mean something:
+// a bin, a basket, a boat, a fountain, a pram, a gondola" — and `receive` in
+// this file is `receiveShadow`, passed straight into physInstGroupFor and
+// nothing else. Ten types carry it, and they include a traffic cone, a sign,
+// a ruana and a dinner jacket. Measured live: Monte Carlo has eighteen props
+// with `receive: true` in it, NINE OF WHICH ARE TRAFFIC CONES.
+//
+// So the container flag is new, and it goes on the three types that are
+// actually a thing you could put a thing in. Measured across all nineteen
+// chapters: eighteen of them build at least one, the nearest sits 2.5 m from
+// the spawn in Monte Carlo and 26.8 m away in Sơn Đoòng, and Pasto — whose
+// props are all food, cloth and pottery — has none at all.
+const physPUT_R      = 1.2;      // m — how far a put-down will reach for a vessel
+const physPUT_UP     = 0.10;     // m of clearance above the vessel's mouth
+const physPUT_TIP    = 0.62;     // rad the vessel may lean before its contents leave
+// ---- ...AND THE POOL HAS TO HOLD MORE THAN ONE BREAK (B9) -----------------
+// This was 8, and a shatter throws five or six — so TWO breaks in the same
+// second recycled the ring and the first one's shards vanished mid-air. That
+// was survivable while exactly one type in the game was fragile; it is not
+// survivable now that six are, and Monte Carlo can have a wine bottle, a
+// camera and a pair of sunglasses go over in the same cascade. Twenty is three
+// clear breaks. The cost is twelve more bodies that sleep, never leave the
+// world and carry `collisionResponse = false` until they are thrown — the
+// pool was built once and never removed for exactly this reason.
+const physSHARD_MAX = 20;
 const physSHARD_LIFE = 6;
 const physHIDE_BOWL = 9;         // s before a shattered bowl is quietly restocked
 const physHIDE_CRATER = 7;
@@ -262,8 +288,17 @@ const physPM4 = new THREE.Matrix4();
 // of — see physVOICE. They are OPTIONAL on the payload: a listener that has
 // never heard of them (and every listener outside systems.js has not) reads
 // prop, speed and position exactly as it always did.
+// `spill` is the B9 flag and it exists because of a measurement: physSpill
+// emits this event with speed === 0, and EVERY consumer of it gates on speed —
+// npcLOC_BANG, npcOWN_BANG, a bare `> 3`, and systems.js's own
+// `if (s < 1.5) return`, which is the line incAdd sits below. So a spill was
+// heard by exactly one listener in the game, hardcoded to `coffee` and
+// `icecream` and behind Sydney's biomeLive(). Measured, four forced spills at
+// the feet of ten people in Sydney and three in Venice: 0 startles, 0
+// incidents, in both. Raising the speed instead would have let a spill through
+// four gates that are about how HARD a thing hit, which is not what a spill is.
 const physImpactPayload = { prop: null, speed: 0, position: new THREE.Vector3(),
-                            voice: 'thud', vpitch: 1, vgain: 1 };
+                            voice: 'thud', vpitch: 1, vgain: 1, spill: false };
 const physWaterPayload = { prop: null };
 const physDestroyPayload = { prop: null };
 const physGrabPayload = { prop: null, from: null };
@@ -822,6 +857,63 @@ function physBuildCoffeesack(g) {
   physAdd(g, physBoxG(0.24, 0.16, 0.02), PALETTE.coffeeLeaf, 0, 0.33, 0.3);
   physAdd(g, physSphG(0.07), PALETTE.coffeeCherry, 0, 0.33, 0.32);
 }
+// ---- FIVE MORE THINGS THAT GO EVERYWHERE (B9, item 4d) --------------------
+//
+// Same shape as the three that already existed: a flat decal of whatever was
+// inside, plus the wreck of the container lying beside it, so the thing on the
+// ground still reads as the thing it used to be. Each one replaces the prop's
+// geometry in place (physGetSpillGeo) and the body is frozen flat, so they
+// cost one geometry each and nothing per frame.
+function physBuildChipsSpill(g) {
+  physAdd(g, physConeG(0.16, 0.36), PALETTE.cloth6, -0.22, 0.05, 0.04, 0, 0.4, Math.PI * 0.5);
+  physAdd(g, physCylG(0.34, 0.3, 0.02), PALETTE.cloth1, 0.1, 0.01, 0.02);
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9;
+    physAdd(g, physBoxG(0.05, 0.04, 0.2), i % 2 ? PALETTE.petalYellow : PALETTE.bread,
+      0.1 + Math.cos(a) * 0.24, 0.02, 0.02 + Math.sin(a) * 0.2, 0, a * 1.7, 0);
+  }
+}
+function physBuildHandbagSpill(g) {
+  // Open, on its side, with the contents in a fan. The clasp is what makes it
+  // read as a handbag rather than a heap of cloth.
+  physAdd(g, physBoxG(0.34, 0.1, 0.24), PALETTE.cloth5, -0.16, 0.05, 0, 0, 0.3, 0);
+  physAdd(g, physBoxG(0.3, 0.03, 0.2), PALETTE.cloth7, -0.1, 0.1, 0.02, 0, 0.3, 0.35);
+  physAdd(g, physBoxG(0.07, 0.03, 0.05), PALETTE.petalYellow, -0.02, 0.11, 0.05);
+  physAdd(g, physBoxG(0.12, 0.02, 0.09), PALETTE.cloth1, 0.16, 0.01, 0.1, 0, 0.6, 0);
+  physAdd(g, physBoxG(0.09, 0.02, 0.07), PALETTE.cloth6, 0.3, 0.01, -0.06, 0, -0.4, 0);
+  physAdd(g, physCylG(0.035, 0.035, 0.02), PALETTE.metal, 0.22, 0.01, -0.18);
+  physAdd(g, physCylG(0.035, 0.035, 0.02), PALETTE.metal, 0.36, 0.01, 0.12);
+}
+function physBuildFlowersSpill(g) {
+  physAdd(g, physCylG(0.05, 0.06, 0.22, 6), PALETTE.hanLeafDk, -0.2, 0.03, 0, 0, 0, Math.PI * 0.5);
+  for (let i = 0; i < 9; i++) {
+    const a = i * 0.8;
+    physAdd(g, physSphG(0.07), i % 2 ? PALETTE.hanFlow1 : PALETTE.hanFlow4,
+      0.08 + Math.cos(a) * 0.26, 0.03, Math.sin(a) * 0.22).scale.set(1, 0.4, 1);
+  }
+  physAdd(g, physBoxG(0.22, 0.02, 0.1), PALETTE.hanLeaf, 0.02, 0.01, 0.2, 0, 0.9, 0);
+  physAdd(g, physBoxG(0.2, 0.02, 0.09), PALETTE.hanLeaf, 0.24, 0.01, -0.16, 0, -0.5, 0);
+}
+function physBuildPlantainSpill(g) {
+  for (let i = 0; i < 4; i++) {
+    const a = -0.7 + i * 0.5;
+    physAdd(g, physCylG(0.05, 0.06, 0.3), PALETTE.plantain,
+      Math.cos(a) * 0.2, 0.04, Math.sin(a) * 0.18, Math.PI * 0.5, a * 1.6, 0);
+  }
+  physAdd(g, physCylG(0.26, 0.22, 0.02), PALETTE.maiz, 0.02, 0.01, 0.02);
+  physAdd(g, physCylG(0.05, 0.055, 0.14), PALETTE.coffeeLeaf, -0.26, 0.03, -0.14,
+          Math.PI * 0.5, 0.6, 0);
+}
+function physBuildMaizSpill(g) {
+  physAdd(g, physCylG(0.09, 0.08, 0.38), PALETTE.maiz, -0.08, 0.05, 0.02, Math.PI * 0.5, 0.3, 0);
+  physAdd(g, physConeG(0.085, 0.13), PALETTE.maiz, 0.2, 0.05, 0.12, -Math.PI * 0.5, 0, 0);
+  for (let i = 0; i < 8; i++) {
+    const a = i * 0.86;
+    physAdd(g, physBoxG(0.05, 0.03, 0.05), i % 3 ? PALETTE.maiz : PALETTE.empanada,
+      0.06 + Math.cos(a) * 0.28, 0.015, Math.sin(a) * 0.24, 0, a, 0);
+  }
+  physAdd(g, physBoxG(0.13, 0.02, 0.28), PALETTE.coffeeLeaf, -0.26, 0.01, -0.12, 0, 0.5, 0);
+}
 function physBuildSackBurst(g) {
   physAdd(g, physCylG(0.34, 0.4, 0.26), PALETTE.potatoSack, -0.05, 0.13, 0, 0.2, 0, 0.55);
   physAdd(g, physCylG(0.15, 0.2, 0.1), PALETTE.potatoSack, 0.3, 0.06, 0.1, 0, 0, 1.35);
@@ -856,15 +948,15 @@ const physTYPES = {
   coffee:    { name: 'flat white',   mass: 0.5,  hy: 0.17, shape: ['box', 0.12, 0.17, 0.12], hold: [0, 0.02, 0.07],  spin: 1.0, build: physBuildCoffee, spill: physBuildCoffeeSpill },
   sandwich:  { name: 'sandwich',     mass: 0.45, hy: 0.13, shape: ['box', 0.18, 0.13, 0.16], hold: [0, 0.0, 0.06],   spin: 1.2, edible: true, grazeSfx: 'rustle', build: physBuildSandwich },
   ball:      { name: 'beach ball',   mass: 0.22, hy: 0.38, shape: ['sph', 0.38],             hold: [0, 0.06, 0.2],   spin: 2.0, bouncy: true, build: physBuildBall },
-  bin:       { name: 'rubbish bin',  mass: 9.0,  hy: 0.56, shape: ['box', 0.4, 0.56, 0.4],   hold: [0, 0.12, 0.42],  spin: 0.4, grabbable: false, receive: true, build: physBuildBin },
+  bin:       { name: 'rubbish bin',  mass: 9.0,  hy: 0.56, shape: ['box', 0.4, 0.56, 0.4],   hold: [0, 0.12, 0.42],  spin: 0.4, grabbable: false, receive: true, vessel: { r: 0.62 }, build: physBuildBin },
   deckchair: { name: 'deck chair',   mass: 2.6,  hy: 0.45, shape: ['box', 0.36, 0.45, 0.36], hold: [0, 0.1, 0.34],   spin: 0.7, receive: true, build: physBuildDeckchair },
   flower:    { name: 'prize rose',   mass: 4.5,  hy: 0.4,  shape: ['box', 0.19, 0.4, 0.19],  hold: [0, 0.06, 0.16],  spin: 1.0, planted: true, edible: true, grazeSfx: 'rustle', build: physBuildFlower },
-  esky:      { name: 'esky',         mass: 4.2,  hy: 0.26, shape: ['box', 0.37, 0.26, 0.24], hold: [0, 0.08, 0.3],   spin: 0.6, receive: true, build: physBuildEsky },
+  esky:      { name: 'esky',         mass: 4.2,  hy: 0.26, shape: ['box', 0.37, 0.26, 0.24], hold: [0, 0.08, 0.3],   spin: 0.6, receive: true, vessel: { r: 0.55 }, build: physBuildEsky },
   thong:     { name: 'thong',        mass: 0.12, hy: 0.05, shape: ['box', 0.16, 0.05, 0.07], hold: [0, 0.0, 0.06],   spin: 2.2, build: physBuildThong },
   frisbee:   { name: 'frisbee',      mass: 0.18, hy: 0.05, shape: ['box', 0.3, 0.05, 0.3],   hold: [0, 0.0, 0.1],    spin: 2.6, build: physBuildFrisbee },
-  basket:    { name: 'picnic basket',mass: 1.2,  hy: 0.2,  shape: ['box', 0.32, 0.2, 0.32],  hold: [0, 0.06, 0.22],  spin: 0.9, receive: true, build: physBuildBasket },
+  basket:    { name: 'picnic basket',mass: 1.2,  hy: 0.2,  shape: ['box', 0.32, 0.2, 0.32],  hold: [0, 0.06, 0.22],  spin: 0.9, receive: true, vessel: { r: 0.52 }, build: physBuildBasket },
   cone:      { name: 'traffic cone', mass: 4.5,  hy: 0.4,  shape: ['box', 0.28, 0.4, 0.28],  hold: [0, 0.08, 0.24],  spin: 1.1, receive: true, build: physBuildCone },
-  handbag:   { name: 'handbag',      mass: 1.0,  hy: 0.2,  shape: ['box', 0.18, 0.2, 0.1],   hold: [0, 0.04, 0.16],  spin: 1.2, build: physBuildHandbag },
+  handbag:   { name: 'handbag',      mass: 1.0,  hy: 0.2,  shape: ['box', 0.18, 0.2, 0.1],   hold: [0, 0.04, 0.16],  spin: 1.2, build: physBuildHandbag, spill: physBuildHandbagSpill, spillSfx: 'rustle' },
   icecream:  { name: 'ice cream',    mass: 0.3,  hy: 0.3,  shape: ['box', 0.15, 0.3, 0.15],  hold: [0, 0.04, 0.1],   spin: 1.4, edible: true, grazeSfx: 'pop', build: physBuildIcecream, spill: physBuildIcecreamSpill },
   sign:      { name: 'sign',         mass: 3.2,  hy: 0.8,  shape: ['box', 0.46, 0.8, 0.1],   hold: [0, 0.14, 0.5],   spin: 0.5, receive: true, build: physBuildSign },
   towel:     { name: 'beach towel',  mass: 0.5,  hy: 0.12, shape: ['box', 0.46, 0.12, 0.3],  hold: [0, 0.02, 0.14],  spin: 1.0, build: physBuildTowel },
@@ -875,12 +967,12 @@ const physTYPES = {
   // `shape` and `hy` are re-derived from the baked geometry at bake time
   // (physFitDef), so the numbers below are only a starting guess.
   // `splash` scales the entry sfx / foam / shake on top of the prop's mass.
-  chips:      { name: 'hot chips',      mass: 0.3,  hy: 0.22, shape: ['box', 0.17, 0.22, 0.17], hold: [0, 0.02, 0.09], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildChips },
-  camera:     { name: 'tourist camera', mass: 1.5,  hy: 0.13, shape: ['box', 0.16, 0.13, 0.11], hold: [0, 0.03, 0.13], spin: 1.0, splash: 1.8, build: physBuildCamera },
-  sunglasses: { name: 'sunglasses',     mass: 0.1,  hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.07],  spin: 2.4, build: physBuildSunglasses },
+  chips:      { name: 'hot chips',      mass: 0.3,  hy: 0.22, shape: ['box', 0.17, 0.22, 0.17], hold: [0, 0.02, 0.09], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildChips, spill: physBuildChipsSpill, spillSfx: 'rustle' },
+  camera:     { name: 'tourist camera', mass: 1.5,  hy: 0.13, shape: ['box', 0.16, 0.13, 0.11], hold: [0, 0.03, 0.13], spin: 1.0, splash: 1.8, fragile: true, shard: 2, build: physBuildCamera },
+  sunglasses: { name: 'sunglasses',     mass: 0.1,  hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.07],  spin: 2.4, fragile: true, shard: 2, build: physBuildSunglasses },
   ticket:     { name: 'ferry ticket',   mass: 0.008, hy: 0.09, shape: ['box', 0.17, 0.09, 0.09], hold: [0, 0.0, 0.06],  spin: 2.8, build: physBuildTicket },
   menu:       { name: 'menu board',     mass: 2.6,  hy: 0.5,  shape: ['box', 0.33, 0.5, 0.2],   hold: [0, 0.12, 0.38], spin: 0.6, receive: true, build: physBuildMenu },
-  winebottle: { name: 'wine bottle',    mass: 0.9,  hy: 0.3,  shape: ['box', 0.095, 0.3, 0.095],hold: [0, 0.04, 0.11], spin: 1.1, build: physBuildWinebottle },
+  winebottle: { name: 'wine bottle',    mass: 0.9,  hy: 0.3,  shape: ['box', 0.095, 0.3, 0.095],hold: [0, 0.04, 0.11], spin: 1.1, fragile: true, shard: 2, build: physBuildWinebottle },
 
   // ---- Pasto market (chapter 2) ----
   // `fragile` shatters into pooled shards past physSHATTER_MIN. Pasto has no
@@ -889,17 +981,17 @@ const physTYPES = {
   empanada:   { name: 'empanada',       mass: 0.28, hy: 0.11, shape: ['box', 0.3, 0.11, 0.19],  hold: [0, 0.01, 0.07], spin: 1.5, edible: true, grazeSfx: 'rustle', build: physBuildEmpanada },
   arepa:      { name: 'arepa',          mass: 0.42, hy: 0.09, shape: ['box', 0.25, 0.09, 0.25], hold: [0, 0.01, 0.08], spin: 1.3, edible: true, grazeSfx: 'rustle', build: physBuildArepa },
   dango:      { name: 'hanami dango',   mass: 0.16, hy: 0.07, shape: ['box', 0.08, 0.07, 0.24], hold: [0, 0.01, 0.09], spin: 1.7, edible: true, grazeSfx: 'pop',    build: physBuildDango },
-  maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, edible: true, grazeSfx: 'tick', build: physBuildMaiz },
+  maiz:       { name: 'cob of maize',   mass: 0.36, hy: 0.1,  shape: ['box', 0.12, 0.1, 0.28],  hold: [0, 0.01, 0.09], spin: 1.6, edible: true, grazeSfx: 'tick', build: physBuildMaiz, spill: physBuildMaizSpill, spillSfx: 'tick' },
   // See physBuildSnack. Nothing SCATTERS one of these: it exists only because
   // somebody handed it to you, which is what makes it the first gift in the
   // game rather than the eleventh thing on the pavement.
   snack:      { name: 'somebody’s snack', mass: 0.22, hy: 0.09, shape: ['box', 0.16, 0.09, 0.13], hold: [0, 0.01, 0.08], spin: 1.4, edible: true, grazeSfx: 'rustle', build: physBuildSnack },
-  plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, edible: true, grazeSfx: 'rustle', build: physBuildPlantain },
+  plantain:   { name: 'plantains',      mass: 0.9,  hy: 0.11, shape: ['box', 0.2, 0.11, 0.22],  hold: [0, 0.02, 0.12], spin: 1.1, edible: true, grazeSfx: 'rustle', build: physBuildPlantain, spill: physBuildPlantainSpill, spillSfx: 'rustle' },
   ruana:      { name: 'ruana',          mass: 1.3,  hy: 0.13, shape: ['box', 0.34, 0.13, 0.27], hold: [0, 0.05, 0.32], spin: 0.45, receive: true, build: physBuildRuana },
   coffeesack: { name: 'sack of coffee', mass: 18,  hy: 0.34, shape: ['box', 0.3, 0.34, 0.3],   hold: [0, 0.1, 0.42],  spin: 0.35, receive: true, build: physBuildCoffeesack, spill: physBuildSackBurst, spillSfx: 'rustle' },
   cuencobowl: { name: 'painted bowl',   mass: 0.8,  hy: 0.13, shape: ['box', 0.29, 0.13, 0.29], hold: [0, 0.02, 0.12], spin: 1.2, fragile: true, build: physBuildCuencobowl },
   // ---- Antarctica (chapter 17) ----
-  mug:        { name: 'enamel mug',     mass: 0.42, hy: 0.16, shape: ['box', 0.2, 0.16, 0.17], hold: [0, 0.02, 0.09], spin: 1.3, build: physBuildMug },
+  mug:        { name: 'enamel mug',     mass: 0.42, hy: 0.16, shape: ['box', 0.2, 0.16, 0.17], hold: [0, 0.02, 0.09], spin: 1.3, fragile: true, build: physBuildMug },
   sombrero:   { name: 'Nariño hat',     mass: 0.4,  hy: 0.16, shape: ['box', 0.46, 0.16, 0.46], hold: [0, 0.04, 0.1],  spin: 1.7, build: physBuildSombrero },
 
   // ---- Monte Carlo (chapter 18) ----
@@ -913,9 +1005,9 @@ const physTYPES = {
   // ---- Hanoi (chapter 19) ----
   // A bowl of pho is the largest edible thing in the game and it is meant to
   // be: the task is to get a whole FACE in it.
-  phobowl:    { name: 'bowl of pho',    mass: 0.9,  hy: 0.14, shape: ['box', 0.30, 0.14, 0.30], hold: [0, 0.02, 0.11], spin: 1.0, edible: true, grazeSfx: 'splash', build: physBuildPhobowl },
+  phobowl:    { name: 'bowl of pho',    mass: 0.9,  hy: 0.14, shape: ['box', 0.30, 0.14, 0.30], hold: [0, 0.02, 0.11], spin: 1.0, edible: true, grazeSfx: 'splash', fragile: true, build: physBuildPhobowl },
   // ...and a bunch of lotus off the back of somebody's bicycle.
-  flowers:    { name: 'bunch of lotus', mass: 0.35, hy: 0.20, shape: ['box', 0.24, 0.20, 0.24], hold: [0, 0.04, 0.14], spin: 1.4, build: physBuildFlowers },
+  flowers:    { name: 'bunch of lotus', mass: 0.35, hy: 0.20, shape: ['box', 0.24, 0.20, 0.24], hold: [0, 0.04, 0.14], spin: 1.4, build: physBuildFlowers, spill: physBuildFlowersSpill, spillSfx: 'rustle' },
 };
 
 // ===========================================================================
@@ -1388,6 +1480,10 @@ function physStampVoice(prop) {
   physImpactPayload.voice = v ? v.sfx : 'thud';
   physImpactPayload.vpitch = v ? v.pitch : 1;
   physImpactPayload.vgain = v ? v.gain : 1;
+  // One payload object is shared by four emit sites, so a flag set at one of
+  // them is still set at the next three. Cleared here because every site
+  // stamps a voice, and physSpill sets it back to true after this call.
+  physImpactPayload.spill = false;
 }
 function physVoiceOf(def, type) {
   if (def.voice) return def.voice;
@@ -1531,6 +1627,12 @@ export function createProps(game) {
     // chapter has no food in it because the food is called `pylsa`.
     typeOf: function (t) { return physTYPES[t] || null; },
     spill: physSpill,
+    // ---- B9: a thing inside a thing (item 4a) ----
+    // capybara.js asks `vesselNear` on the frame the action key goes down, to
+    // decide whether the press is a throw or the start of a put-down, and
+    // `putIn` when the hold completes. Nothing else in the game calls either.
+    vesselNear: physVesselNear,
+    putIn: physPutIn,
     dust: physDust3,
     // ---- THINGS THAT HANG (D7) ----
     // Published on `game` as well (below), because a chapter calls it at build
@@ -1968,6 +2070,11 @@ function physMakeProp(type, x, z, variant, yaw, restY, loose) {
       : physAERO_CD_BOX * (4 * (s[1] * s[2] + s[2] * s[3] + s[1] * s[3]) / 3)),
     splash: def.splash || 1,
     spillArmed: false,
+    // ---- B9: a thing inside a thing. `contents` is what this prop is
+    // carrying; `inVessel` is what is carrying this prop. One each way.
+    contents: null,
+    inVessel: null,
+    vesselOff: null,
     wasStolen: false,
     stolenFrom: null,
     lastImpact: -1,
@@ -2642,6 +2749,11 @@ function physScatter() {
 // ===========================================================================
 function physGrab(prop) {
   if (!prop || prop.removed || prop.held || !prop.grabbable) return false;
+  // TAKING IT BACK OUT (B9). Done here rather than at the call site because
+  // there are four of those and every one of them would have to know about
+  // vessels; the ride ends the moment the thing is in the mouth, which is the
+  // same rule the owner-retrieval and the theft both take.
+  if (prop.inVessel) physVesselEject(prop.inVessel, 'taken');
   const capy = physGame.capy;
   const anchor = capy && capy.mouthAnchor;
   if (!anchor) return false;
@@ -2778,6 +2890,164 @@ function physRelease(impulse) {
   // event was never fired at all, leaving npc.js and systems.js listening forever.
   physDropPayload.prop = prop;
   physGame.events.emit('capy:drop', physDropPayload);
+}
+
+// ===========================================================================
+// A THING INSIDE A THING (B9, item 4a)
+// ===========================================================================
+//
+// The colliders in this file are SOLID BOXES — a bin is a 0.4 × 0.56 × 0.4
+// block, not a shell — so "drop it in and let the solver hold it there" puts
+// the sandwich on the bin's lid and nothing else. A vessel's contents are
+// therefore carried rather than contained: one prop per vessel, its body
+// kinematic and out of the collision set, its transform written from the
+// vessel's every frame. That is the same one level of frame the roadmap asks
+// for, and it is what makes "a prop placed in another travels with it" free —
+// pick the basket up and the thing in it comes too, because it was never
+// resting on anything.
+//
+// It leaves on any of five things, which is the whole of the contract:
+// the vessel is picked up by somebody, tipped past physPUT_TIP, hidden,
+// destroyed or spilled; or the contents are taken back out.
+
+/** The nearest thing you could put something IN, or null. */
+function physVesselNear(pos, r, exclude) {
+  const arr = physGame.props;
+  const live = physLiveBiome();
+  let best = null, bd = (r || physPUT_R) * (r || physPUT_R);
+  for (let i = 0; i < arr.length; i++) {
+    const q = arr[i];
+    if (!q || q === exclude || q.removed || q.hidden || q.held || q.spilled) continue;
+    if (q.biome && q.biome !== live) continue;
+    const def = physTYPES[q.type];
+    if (!def || !def.vessel) continue;
+    if (q.contents) continue;                 // one at a time
+    const b = q.body;
+    const dx = b.position.x - pos.x, dz = b.position.z - pos.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= bd) continue;
+    // NEVER SNAP TO A CONTAINER THE ANIMAL IS STANDING IN — the trap item 4
+    // names. The test is the vessel's own FOOTPRINT and not a height, and the
+    // reason is measured: the first cut refused the put-down when the animal's
+    // position was above the vessel's mouth, which is true of a Venetian bin
+    // standing on a quay (mouth 1.35, animal 1.54) because `capy.position` is
+    // the body's CENTRE, about 0.4 m above its feet. It read as a feature that
+    // works in one chapter of three. Inside the footprint you are on it or in
+    // it; outside it you are beside it, whatever the heights are doing.
+    const half = Math.max(0.30, Math.max(def.shape[1] || 0, def.shape[3] || 0) * 1.05);
+    if (d2 < half * half) continue;
+    bd = d2; best = q;
+  }
+  return best;
+}
+
+/** Set the held prop down INTO `vessel`. Returns false if it could not. */
+function physPutIn(vessel) {
+  const capy = physGame.capy;
+  const prop = capy && capy.heldProp;
+  if (!prop || !vessel || vessel === prop || vessel.contents) return false;
+  const def = physTYPES[vessel.type];
+  if (!def || !def.vessel) return false;
+  // physRelease owns every other part of the held-state transition — the
+  // reparent, the `capy:drop` emit, the sfx, clearing `owner`. Calling it with
+  // no impulse gives a set-down (which is also why a cup put down gently does
+  // not arm its spill), and the ride is attached immediately afterwards, in
+  // the same frame, so nothing ever sees the prop loose on the ground.
+  physRelease(null);
+  physVesselTake(vessel, prop);
+  physSfxOpts.volume = 0.5;
+  physStampVoice(prop);
+  physSfxOpts.at = null;
+  physGame.sfx('thud', physSfxOpts);
+  return true;
+}
+
+function physVesselTake(vessel, prop) {
+  const b = prop.body;
+  vessel.contents = prop;
+  prop.inVessel = vessel;
+  // The offset is in the VESSEL'S frame, so the contents lean with it rather
+  // than hovering upright over a tipping bin.
+  prop.vesselOff = {
+    y: vessel.originY + physPUT_UP + prop.originY,
+  };
+  b.type = CANNON.Body.KINEMATIC;
+  b.updateMassProperties();
+  b.collisionResponse = false;
+  b.velocity.set(0, 0, 0);
+  b.angularVelocity.set(0, 0, 0);
+  b.wakeUp();
+  prop.grabbable = physTYPES[prop.type].grabbable !== false;
+  physVesselSync(prop);
+}
+
+/** Hand the contents back to the simulation. `why` is for the caller's sake. */
+function physVesselEject(vessel, why) {
+  const prop = vessel && vessel.contents;
+  if (!prop) return null;
+  vessel.contents = null;
+  prop.inVessel = null;
+  prop.vesselOff = null;
+  const b = prop.body;
+  b.type = CANNON.Body.DYNAMIC;
+  b.updateMassProperties();
+  b.collisionResponse = true;
+  b.collisionFilterMask = -1;
+  // Inherit the vessel's motion, or a bin kicked down a hill leaves its
+  // contents standing in the air where the bin used to be. A vessel that has
+  // been removed outright still has a body; one day something will call this
+  // without one, and 0.4 up is the same set-down every other path uses.
+  const vb = vessel.body;
+  if (vb) b.velocity.set(vb.velocity.x, Math.max(vb.velocity.y, 0.4), vb.velocity.z);
+  else b.velocity.set(0, 0.4, 0);
+  b.angularVelocity.set(rand(-3, 3), rand(-3, 3), rand(-3, 3));
+  physStampTouch(prop);
+  prop.releaseTime = physGame.state ? physGame.state.time : 0;
+  b.wakeUp();
+  // A thing coming back out of a bin is a thing that was thrown, for the
+  // purposes of the one flag that decides whether a cup gives up its coffee.
+  if (why === 'tip' && physTYPES[prop.type].spill && !prop.spilled) prop.spillArmed = true;
+  return prop;
+}
+
+function physVesselSync(prop) {
+  const v = prop.inVessel;
+  if (!v) return;
+  const vb = v.body;
+  const b = prop.body;
+  physQ1.set(vb.quaternion.x, vb.quaternion.y, vb.quaternion.z, vb.quaternion.w);
+  physV1.set(0, prop.vesselOff.y, 0).applyQuaternion(physQ1);
+  b.position.set(vb.position.x + physV1.x, vb.position.y + physV1.y, vb.position.z + physV1.z);
+  b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+  physSyncBodyTransform(b);
+  prop.mesh.position.set(b.position.x, b.position.y, b.position.z);
+  prop.mesh.quaternion.copy(physQ1);
+}
+
+function physUpdateInVessel(prop, dt) {
+  const v = prop.inVessel;
+  if (!v || v.removed || v.hidden || v.spilled) { physVesselEject(v || { contents: prop }, 'gone'); return; }
+  if (v.held || v.owner) {
+    // Somebody has picked the vessel up. The contents keep riding — that is
+    // the joke — but physUpdateHeld drives the vessel's MESH and leaves the
+    // body behind, so the ride is taken off the mesh's world transform here.
+    v.mesh.getWorldPosition(physV2);
+    v.mesh.getWorldQuaternion(physQ2);
+    physQ1.copy(physQ2);
+    physV1.set(0, prop.vesselOff.y, 0).applyQuaternion(physQ1);
+    const b = prop.body;
+    b.position.set(physV2.x + physV1.x, physV2.y + physV1.y, physV2.z + physV1.z);
+    b.quaternion.set(physQ1.x, physQ1.y, physQ1.z, physQ1.w);
+    physSyncBodyTransform(b);
+    prop.mesh.position.set(b.position.x, b.position.y, b.position.z);
+    prop.mesh.quaternion.copy(physQ1);
+    return;
+  }
+  // TIPPED. `physUp` rotated by the vessel's quaternion, against straight up.
+  physQ1.set(v.body.quaternion.x, v.body.quaternion.y, v.body.quaternion.z, v.body.quaternion.w);
+  physV1.set(0, 1, 0).applyQuaternion(physQ1);
+  if (physV1.y < Math.cos(physPUT_TIP)) { physVesselEject(v, 'tip'); return; }
+  physVesselSync(prop);
 }
 
 /** Lets npc.js hand a carried prop back to the simulation. */
@@ -3049,6 +3319,7 @@ function physSpill(prop) {
   physImpactPayload.prop = prop;
   physImpactPayload.speed = 0;
   physStampVoice(prop);
+  physImpactPayload.spill = true;   // see the payload's declaration
   physImpactPayload.position.set(b.position.x, b.position.y, b.position.z);
   physGame.events.emit('prop:impact', physImpactPayload);
   physSfxOpts.volume = 0.8;
@@ -4523,7 +4794,10 @@ function physShatter(prop) {
   const x = b.position.x;
   const y = b.position.y;
   const z = b.position.z;
-  physThrowShards(x, y, z, randInt(5, 6), 0);
+  // A camera and a pair of sunglasses do not break into pottery: `shard:`
+  // on the type picks the material, and defaults to the ceramic sliver that
+  // was the only one there was.
+  physThrowShards(x, y, z, randInt(5, 6), (physTYPES[prop.type] || {}).shard || 0);
   physPuff3(x, y + 0.05, z, 4);
   physSfxOpts.volume = 0.95;
   physGame.sfx('pop', physSfxOpts);
@@ -4659,7 +4933,14 @@ function physPuffUpdate(dt) {
 // a break costs zero allocations and zero body churn.
 function physShardGeo(kind) {
   const g = new THREE.Group();
-  if (kind === 0) {
+  if (kind === 2) {
+    // ---- B9: GLASS AND DARK PLASTIC ------------------------------------
+    // Kind 0 is a white ceramic sliver, which is right for a bowl, a mug and
+    // a bowl of pho and wrong for the three new fragile types that are made
+    // of glass and camera body. A `shard:` on the type picks this instead.
+    physAdd(g, physBoxG(0.09, 0.02, 0.07), PALETTE.glass, 0, 0.04, 0, 0.5, 0.3, 0.2);
+    physAdd(g, new THREE.TetrahedronGeometry(0.07), PALETTE.stoneDark, 0.03, 0.07, 0.02);
+  } else if (kind === 0) {
     physAdd(g, new THREE.TetrahedronGeometry(0.11), PALETTE.churchWhite, 0, 0.06, 0);
     physAdd(g, physBoxG(0.11, 0.03, 0.05), PALETTE.awning1, 0.02, 0.09, 0.01, 0.4, 0.6, 0.2);
   } else {
@@ -4672,7 +4953,7 @@ function physShardGeo(kind) {
 
 function physInitShards() {
   if (physShards.length) return;
-  physShardGeos.push(physShardGeo(0), physShardGeo(1));
+  physShardGeos.push(physShardGeo(0), physShardGeo(1), physShardGeo(2));
   for (let i = 0; i < physSHARD_MAX; i++) {
     const mesh = new THREE.Mesh(physShardGeos[0], physPropMat);
     mesh.castShadow = true;
@@ -4703,7 +4984,7 @@ function physInitShards() {
 
 function physThrowShards(x, y, z, count, kind) {
   if (!physShards.length) return;
-  const geo = physShardGeos[kind === 1 ? 1 : 0];
+  const geo = physShardGeos[kind === 1 ? 1 : kind === 2 ? 2 : 0];
   const n = count || 5;
   for (let k = 0; k < n; k++) {
     const s = physShards[physShardHead];
@@ -5448,8 +5729,11 @@ function physUpdate(dt) {
     // — and a KEEPSAKE has no biome at all and is simulated everywhere, which
     // is the whole of what makes it a keepsake. See physKEEPS.
     if (p.biome && p.biome !== live && !p.held) continue;
-    physSetSolo(p, p.held || p.spilled || p.owner !== null);
+    physSetSolo(p, p.held || p.spilled || p.owner !== null || !!p.inVessel);
     if (p.held) { physUpdateHeld(p, dt); continue; }
+    // A prop riding in a bin is driven by the bin, not by the solver. See
+    // A THING INSIDE A THING.
+    if (p.inVessel) { physUpdateInVessel(p, dt); continue; }
     if (p.frozen) continue;
     // if something reparented the mesh (an NPC carrying it) that owner drives it
     if (p.mesh.parent !== physGame.scene) continue;

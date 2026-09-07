@@ -205,6 +205,15 @@ const capyCLIMB_KICKY = 5.60;       // and up
 const capyCLIMB_COOL  = 0.34;       // s before the wall will take you back
 const capyGRAB_RADIUS = 1.6;
 const capyGRAB_WINDUP = 0.10;
+// ---- B9: hold to put it down, item 4a ------------------------------------
+// 0.35 s, which is the number item 4a asks for and is comfortably longer than
+// a click — the grab wind-up above is 0.10 s and was measured against a 60 ms
+// tap and found to be shorter than one. Anything under about a quarter of a
+// second here would make ordinary throws into put-downs.
+const capyPUT_HOLD  = 0.35;
+// ...and "while stationary". Walking speed is ~3 m/s, so this is a shuffle.
+const capyPUT_STILL = 0.9;   // m/s
+
 const capyDIG_TIME = 0.34;
 const capyWET_DECAY = 1 / 8;
 // --- the waterline, and everything measured from it -------------------------
@@ -1532,6 +1541,11 @@ let capyHeadPitch = 0;
 let capyJawOpen = 0;
 let capyWheekHold = 0;
 let capyGrabTimer = 0;
+let capyPutN = 0;             // presses armed for a put-down
+let capyPutDone = 0;          // ...and the ones that ended in a vessel
+let capyPutT = -1;            // >= 0 while the action key is being held for a put-down
+let capyPutTgt = null;        // the vessel it was armed against
+
 let capyDigTimer = 0;
 let capyAirTime = 0;
 let capySwimming = false;
@@ -4120,6 +4134,17 @@ export function createCapybara(game) {
      * the current swing — so `speed / (stride * gaitRate / PI)` is 1.000 when
      * the feet are locked to the ground and anything else is skate.
      */
+    /**
+     * B9. Two counts, because a put-down is invisible from outside: a press
+     * that armed and then came out as a throw and a press that was never a
+     * put-down at all look identical in the world, and the difference is the
+     * whole of what item 4a bought. `armed` counts presses that found a vessel
+     * to aim at; `done` counts the ones that ended with something in it.
+     */
+    putAudit: function () {
+      return { armed: capyPutN, done: capyPutDone, holdT: capyPutT,
+               target: capyPutTgt ? capyPutTgt.type : null };
+    },
     animAudit: function () {
       return { speed: capySpeedSm, legPhase: capyLegPhase, gaitRate: capyGaitRate,
                swingAmp: capySwingAmp, stride: capyStride,
@@ -4338,6 +4363,64 @@ export function createCapybara(game) {
     // by which point heldProp is already null — can tell a bomb release from a
     // dismount on the same key press.
     capy.threwAt = game.state.time;
+  }
+
+  /**
+   * The vessel a put-down would go into, or null. Also the arming test: the
+   * animal has to be holding something, standing still, and within reach of a
+   * container that is not already carrying something.
+   */
+  function capyPutFind() {
+    const ph = game.physics;
+    if (!ph || typeof ph.vesselNear !== 'function') return null;
+    if (!capy.heldProp) return null;
+    const v = capy.velocity;
+    if (v && Math.hypot(v.x, v.z) > capyPUT_STILL) return null;
+    capyPutTgt = ph.vesselNear(capyPosition, undefined, capy.heldProp);
+    return capyPutTgt;
+  }
+
+  /**
+   * Resolve an armed press. Three ways out, and the first two are the point:
+   * the key comes back up before the hold is done and it was a throw after
+   * all; the hold completes and the thing goes in; or the vessel is no longer
+   * there — the animal walked off, or somebody took the bin — and the press
+   * is spent on a throw, because a press that quietly does nothing is worse
+   * than either.
+   */
+  function capyPutStep(dt) {
+    if (capyPutT < 0) return;
+    if (!capy.heldProp) { capyPutT = -1; capyPutTgt = null; return; }
+    if (!game.input.action) {          // released early: a tap, so throw
+      capyPutT = -1; capyPutTgt = null;
+      capyTryRelease();
+      return;
+    }
+    capyPutT += dt;
+    if (capyPutT < capyPUT_HOLD) return;
+    // ---- THE ARM IS RE-TESTED ONCE, AT THE END, AND NOT EVERY FRAME ------
+    // "Standing still next to a bin" is a property of the PRESS. Re-running
+    // the whole arming test every frame made a single frame of drift — the
+    // animal settling on a Venetian quay — cancel a hold that was already
+    // three quarters done, and the press then came out as a throw. What has
+    // to still be true at the end is only that there is somewhere to put it:
+    // the vessel armed against, if it is still in reach, and otherwise
+    // whatever is.
+    let tgt = capyPutTgt;
+    const ph = game.physics;
+    if (tgt && (tgt.removed || tgt.hidden || tgt.held || tgt.contents)) tgt = null;
+    if (!tgt && ph && typeof ph.vesselNear === 'function') {
+      tgt = ph.vesselNear(capyPosition, undefined, capy.heldProp);
+    }
+    capyPutT = -1; capyPutTgt = null;
+    capyEatBuf(game.input, 'clearActionBuf');
+    if (tgt && ph && typeof ph.putIn === 'function' && ph.putIn(tgt)) {
+      capyJawOpen = 1;
+      capy.threwAt = game.state.time;
+      capyPutDone++;
+    } else {
+      capyTryRelease();
+    }
   }
 
   function capyTryGrabStart() {
@@ -6107,7 +6190,29 @@ export function createCapybara(game) {
     // reachable by air, and taking to the air emptied your mouth. Defer.
     const talonsHere = !!(game.condor && typeof game.condor.talonInReach === 'function' &&
                           game.condor.talonInReach());
-    if (input.actionPressed && !talonsHere) {
+    // ---- TAP THROWS; HOLD PUTS IT DOWN (B9, item 4a) --------------------
+    //
+    // AND THE THROW IS ONLY DEFERRED WHERE THE PUT-DOWN EXISTS. `E` is read by
+    // about thirty call sites across the chapters and its meaning is a
+    // context; a tap/hold split that deferred every press would move all of
+    // them by the length of a click. So the press is armed ONLY when the
+    // animal is standing still with something in its mouth and a vessel
+    // actually within reach — which is a bin, a basket or an esky, and nothing
+    // else. Everywhere else in the game, including every throw made while
+    // walking, the press still fires capyTryRelease on the frame it arrives.
+    //
+    // capyPutT is the elapsed hold; capyPutTgt is the vessel it was armed
+    // against, and losing it is what cancels the arm.
+    // capyPutT < 0 in the test because a keydown REPEATS. A player who holds
+    // the key gets a second `actionPressed` about half a second in, and
+    // re-arming on it restarts the 0.35 s clock — so a one-second hold could
+    // end with 0.2 s on the timer and come out as a throw. It read as a
+    // put-down that works in one chapter and not the next one.
+    if (input.actionPressed && !talonsHere && capyPutT < 0 &&
+        capy.heldProp && capyPutFind()) {
+      capyPutT = 0;
+      capyPutN++;
+    } else if (input.actionPressed && !talonsHere) {
       if (capy.heldProp) capyTryRelease();
       else capyTryGrabStart();
     } else if (!talonsHere && !capy.heldProp && capyGrabTimer <= 0 &&
@@ -6130,6 +6235,8 @@ export function createCapybara(game) {
     // click it" simply did not work; the coffee sack in Pasto (and every other
     // prop) could only be picked up by someone who happened to hold the button.
     // The wind-up is animation, not a charge meter: once it starts it fires.
+
+    capyPutStep(dt);
 
     if (capyGrabTimer > 0) {
       capyGrabTimer -= dt;

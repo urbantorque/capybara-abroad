@@ -29526,6 +29526,19 @@ export function createSystems(game) {
   game.events.on('prop:impact', function (p) {
     // speed 0 is props.js signalling a spill, not a bonk — do not coerce it to 2.
     const s = (p && typeof p.speed === 'number') ? p.speed : 2;
+    // ---- A SPILL IS NOT A BANG, AND IT IS STILL SOMETHING YOU DID (B9) ----
+    // props.js emits this with speed 0 for a spill, so the gate below — which
+    // is about how HARD a thing hit — dropped it, and a cup of coffee going
+    // over in front of ten people counted for nothing anywhere in the game.
+    // Handled here and returned, rather than by loosening the gate: physSpill
+    // plays its own splash and its own dust, and letting a speed-0 event fall
+    // through would put a thud and a shake on top of them.
+    if (p && p.spill) {
+      if (p.prop && p.prop.disturbed && p.position) {
+        incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type);
+      }
+      return;
+    }
     if (s < 1.5) return;
     // Only a genuinely hard bonk earns a shake — everything softer is sfx only.
     // ...AND IT HAS TO BE NEAR ENOUGH TO SEE (D4). This punched on any prop
