@@ -40,7 +40,7 @@
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
 > systems, not from measurement, and it says so at the top. **Seven of its
-> claims have now been checked and failed**: the count of marquees in act 2+,
+> claims have now been checked and failed** (eight with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -520,7 +520,7 @@ decays.
 | B2 | 1a the glimpse · 1c the nine clocks phased | 3 | `a91a725` |
 | B3 | 1d `lead:` on every wow, the arrow, the stuck timer · 1e mini marks | 2.5 | `ecec89c` |
 | B4 | 2 the arrival tick earned · the pips · seeded people for the first rows | 3 | `d1f5e82` |
-| B5 | 2 the nineteen gags placed, half of them | 3 | |
+| B5 | 2 the nineteen gags placed, half of them | 3 | `76e13ec` |
 | B6 | 2 the other half · re-run first-five, read the table | 3 | |
 | B7 | 3 sit-and-be-noticed: approach, crouch, photo | 3 | |
 | B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | |
