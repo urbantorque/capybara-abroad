@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B4 ARE BUILT, 7 Sep 2026.**
+> **B1-B5 ARE BUILT, 7 Sep 2026.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -27,6 +27,13 @@
 > tick is **refused** (F1 decided it in writing and the argument still holds),
 > and the seeded-placement bullet is **three chapters and a city, not
 > nineteen**.
+>
+> **B5**: the gags, measured — **sixteen of nineteen spawn rings already arm
+> the incident chain**, and the two that never will are the two chapters with
+> nobody in them. Hanoi was the one real hole and is fixed. Underneath it, a
+> genuine bug: the witness test walked `game.npcs` with no chapter filter, so
+> **twenty-seven of Sydney's thirty-eight counted as witnesses in the Drift**
+> on a run that never went to Sydney. `game.peopleNear` now answers it.
 >
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
@@ -283,7 +290,16 @@ each cell reachable without reading anything:
 | 3 min | a **ride, a move, or a mini** — the chapter's second-best thing | placement or a phased clock |
 | 5 min | the **pips** have filled once, or the marquee's window has opened | the incident chain on screen; item 1c |
 
-- **The gag, per chapter.** Written as a `gag:` row in `physBIOME_SCATTER`'s
+- **The gag, per chapter. MOSTLY ALREADY TRUE (B5).** A gag is two conditions —
+  something loose within reach AND somebody within 16 m to see it, because
+  `incAdd` refuses outright when nobody does. Measured (`qa/gag-ring.js`):
+  **sixteen of nineteen rings already meet both**, 2-10 armable props, nearest
+  0.7-15 m. The Pantanal and Sơn Đoòng never will and should not — they have
+  nobody in them by design, exactly as the Drift does. **Hanoi was the one hole**
+  (0 props, 0 people; its clusters are 88 m and 154 m from the spawn) and is
+  fixed. What is left of this bullet is authored COMEDY, and this document says
+  of its own table: first draft, B0's stranger corrects them.
+- ~~**The gag, per chapter.**~~ Written as a `gag:` row in `physBIOME_SCATTER`'s
   `also` annulus so the probe can find it, and **every one is a witnessed
   event** so the chain arms from the first thing you touch. Authored below.
 - **The arrival tick is earned. REFUSED (B4), with the argument.** F1 examined

@@ -14,6 +14,117 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH FIVE — THE WITNESSES WERE GHOSTS (B5 — 7 Sep 2026)
+
+**LANDED.** B5 was "place the nineteen gags, half of them". Measuring the
+premise found that sixteen of nineteen spawn rings already do what a gag is for,
+one has a real hole — and that the rule deciding all of it was reading people
+who are not in the world.
+
+### THE MEASUREMENT — `qa/gag-ring.js`
+
+A gag is not "a loose prop near the spawn". Item 2 says **"every one is a
+witnessed event so the chain arms from the first thing you touch"**, and that is
+two conditions: something loose within reach, AND somebody within `sysINC_SEE`
+(16 m) of it. `incAdd` refuses outright when nobody sees — it is why the chain's
+own comment says the Drift "can never produce one of these however much is
+thrown off how many islands". B4 counted props and people separately, which
+cannot answer it. This pairs them.
+
+Result: **sixteen of nineteen rings arm already**, with 2–10 armable props and
+the nearest between 0.7 m and 15 m. Three did not:
+
+  - **the Pantanal and Sơn Đoòng**, which have nobody in them BY DESIGN, exactly
+    as the Drift does. Nothing to fix; the chain is not for those chapters.
+  - **Hanoi**, which is a genuine hole and the only one.
+
+### HANOI
+
+Zero loose props within 16 m of the spawn and nobody within 26 — in a city whose
+own arrival line is *"seven million people and six million of them are on a
+moped"*. Its two scatter clusters are **88 m and 154 m** from `HANOI_SPAWN`, its
+nearest local is ninety-odd metres round the lake, and the two hundred and forty
+bikes are an instanced crowd, so not one of them can witness anything. The
+incident chain was dead for the whole walk in.
+
+Fixed with a third scatter annulus on the lake wall (`also` takes a list now;
+one was enough for the fourteen chapters that wanted a second cluster) and two
+locals sitting on it, facing the road — which is the thing the chapter is about
+and the thing the player is looking at over their shoulder on the arrival frame.
+After: **10 armable props, nearest 2.7 m, two people in range.** Seventeen of
+nineteen now, and the two that remain are the two that should.
+
+### ...AND THE RULE UNDERNEATH IT WAS WRONG
+
+`findPeople` — the witness gate for the chain, and the population test for three
+finds — filtered `game.locals` by chapter and walked **`game.npcs` with no
+chapter test at all**. `game.npcs` is Sydney's cast. It is built at boot whether
+the player goes to Sydney or not, it stays in the array for the session, at its
+Sydney coordinates, and **nearly every spawn in this game is near the origin**.
+
+MEASURED (`qa/quiet-corner.js`), in the Drift, on a run that went **straight
+there from the title card and never visited Sydney**: `game.npcs` held 38
+records and **27 of them were within 55 m of the spawn**. In Venice, the raw walk
+counts 38 where the chapter really has 5.
+
+Two readers, both wrong about a place:
+
+  - **the incident chain** could arm off people who are not in this world. It
+    happens not to at the Drift, Pantanal, Sơn Đoòng, Antarctic or Hanoi spawns
+    — measured, `qa/witness-ghosts.js`, all five refused — because those spawns
+    are more than 16 m from Sydney's crowd. It is a loaded gun rather than a
+    fired one, and the twentieth chapter placed near the origin would fire it.
+  - **`quiet-corner`**, whose own comment says it must be "a real corner of a
+    populated place and not a free tick in the Drift", requires nobody within
+    55 m. Those 27 ghosts make that **almost unsatisfiable anywhere near the
+    origin** — so the find was failing, in the chapters it was written for, for
+    the opposite of its stated reason.
+
+`game.peopleNear(x, z, r)` in npc.js, mapping the cast the way `npcHeat`
+already does internally, and `findPeople` asks it. Same layering argument, and
+the same fix, as B3's `sayNear`: only npc.js knows which of its three arrays a
+chapter's people are in.
+
+**Proved both ways** (`qa/witness-fix.js`), because a stricter gate can break
+the thing it protects:
+
+| chapter | people really near (16 m / 55 m) | raw `game.npcs` < 55 m | chain arms |
+|---|---|---|---|
+| Sydney | 5 / 31 | 37 | **yes** |
+| Venice | 2 / 5 | 38 | **yes** |
+| the Drift | 0 / 1 | 31 | no |
+| Sơn Đoòng | 0 / 1 | 12 | no |
+
+### TWO HARNESS TRAPS, AND THE FIRST ONE ATE A WHOLE RUN
+
+1. **`game.props` ACCUMULATES, AND EVERY SPAWN IS NEAR THE ORIGIN.** After one
+   crossing it held 49 Sydney props and 17 Pantanal ones; the detached ones keep
+   their world coordinates, and those coordinates are where the next chapter
+   puts the player. An unfiltered spawn-ring count therefore reports the props
+   of every chapter visited so far. **The tell was two chapters returning
+   byte-identical prop lists** — Sơn Đoòng reporting the Pantanal's beach
+   towels, Cappadocia reporting Manly's thongs. Filter on `q.biome === live`
+   AND `q.body.world`, which is the same question asked of the physics world.
+2. **THE SAME IS TRUE OF `game.npcs`, AND THERE IS NO `biome` ON THE RECORD TO
+   FILTER BY** — which is what put the bug above into the game in the first
+   place. The answer is not a cleverer filter in the caller; it is that the
+   question belongs to npc.js.
+
+### WHAT B5 DID NOT DO
+
+The gag table's nineteen rows are not placements, they are **jokes** — "a
+pyramid of `cuencobowl`s on the market's end stall", "two hundred pigeons on
+this side of the square", "gulls on the chips". The measurement says the
+mechanical job those rows were costed for is already done in sixteen chapters,
+so what is left is authored comedy, and the roadmap says of its own table:
+*"first draft; B0's stranger corrects them"*. Writing nineteen jokes against a
+list nobody has watched a player fail is the one thing this document says it
+cannot do for you.
+
+`npm test` 10/10. Note that the scatter is randomised per boot, so the ring
+counts move by one or two between runs; the zero/non-zero answer is the one that
+holds.
+
 ## THE FUN PASS, BATCH FOUR — THE CHAIN, ON SCREEN (B4 — 7 Sep 2026)
 
 **LANDED.** The pips, and the instrument that re-scopes the rest of item 2.

@@ -10261,7 +10261,55 @@ export function createNPCs(game) {
     return true;
   }
 
+  /**
+   * HOW MANY PEOPLE ARE NEAR THIS POINT, IN THIS CHAPTER (B5).
+   *
+   * systems.js has had a `findPeople` since the finds were written, and it
+   * walks `game.npcs` WITHOUT a chapter test while filtering `game.locals`
+   * with one. `game.npcs` is Sydney's cast, it is built at boot whether or not
+   * the player ever goes there, and it stays in the array for the session at
+   * its Sydney coordinates — which nearly every chapter's spawn is a few tens
+   * of metres from, because nearly every spawn is near the origin.
+   *
+   * MEASURED, in the Drift, which the incident chain's own comment calls "a
+   * chapter with nobody in it": **twenty-seven of Sydney's thirty-eight are
+   * within fifty-five metres of the spawn**, on a run that went straight there
+   * from the title card and never visited Sydney at all.
+   *
+   * Two things read that number and both were wrong about a place because of
+   * it. The incident chain's witness gate could arm off people who are not in
+   * this world; and `quiet-corner` — a find whose comment says it must be "a
+   * real corner of a populated place and not a free tick in the Drift" —
+   * requires nobody within 55 m, which those ghosts make almost unsatisfiable
+   * anywhere near the origin.
+   *
+   * The cast mapping is `npcHeat`'s, exactly: only two chapters have a
+   * steering cast and everybody else's people are locals.
+   */
+  function peopleNear(x, z, r) {
+    const live = game.biome && game.biome.current;
+    const r2 = r * r;
+    let n = 0;
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (cast) {
+      for (let i = 0; i < cast.length; i++) {
+        const h = cast[i];
+        if (!h || !h.group) continue;
+        const dx = h.group.position.x - x, dz = h.group.position.z - z;
+        if (dx * dx + dz * dz < r2) n++;
+      }
+    }
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (!L || L.biome !== live) continue;
+      const dx = L.x - x, dz = L.z - z;
+      if (dx * dx + dz * dz < r2) n++;
+    }
+    return n;
+  }
+
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
+           peopleNear: peopleNear,
            addLocal: addLocal, addTraveller: addTraveller,
            addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
            // ---- THE PLACE, rather than the person (v33) ----

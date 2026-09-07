@@ -23456,18 +23456,38 @@ export function createSystems(game) {
   let findChap = -1;                        // the chapter the scratch belongs to
 
   /** Everybody this game owns, near a point: both crowds, one number. */
+  /**
+   * HOW MANY PEOPLE ARE NEAR THIS POINT. Asked of npc.js (B5).
+   *
+   * This used to walk `game.npcs` here, with no chapter test, while filtering
+   * `game.locals` with one — and `game.npcs` is SYDNEY'S CAST, built at boot
+   * whether the player goes there or not, left in the array for the session,
+   * at its Sydney coordinates. Nearly every spawn in the game is near the
+   * origin, so nearly every chapter inherited thirty-eight invisible witnesses.
+   *
+   * MEASURED (`qa/quiet-corner.js`), in the Drift, on a run that went straight
+   * there from the title card and never visited Sydney: **twenty-seven of them
+   * within fifty-five metres of the spawn**, in the chapter the incident
+   * chain's own comment names as the one that "can never produce one of these"
+   * because nobody is there.
+   *
+   * Both readers were wrong about a place because of it. The chain could arm
+   * off people who are not in this world; and `quiet-corner`, whose comment
+   * says it must be "a real corner of a populated place and not a free tick in
+   * the Drift", needs nobody within 55 m — which those ghosts make almost
+   * unsatisfiable anywhere near the origin, so the find was failing for the
+   * opposite of its stated reason.
+   *
+   * npc.js answers it now, because only npc.js knows which of its three arrays
+   * a chapter's people are in. Same argument, and the same fix, as `sayNear`.
+   * The local fallback is kept for the one frame before main.js has wired it.
+   */
   function findPeople(x, z, r) {
+    if (typeof game.peopleNear === 'function') {
+      try { return game.peopleNear(x, z, r); } catch (e) { /* fall through */ }
+    }
     const r2 = r * r;
     let n = 0;
-    const arr = game.npcs;
-    if (arr) {
-      for (let i = 0; i < arr.length; i++) {
-        const q = arr[i];
-        if (!q || !q.group) continue;
-        const dx = q.group.position.x - x, dz = q.group.position.z - z;
-        if (dx * dx + dz * dz < r2) n++;
-      }
-    }
     const loc = game.locals;
     const live = game.biome && game.biome.current;
     if (loc) {

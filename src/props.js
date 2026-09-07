@@ -2451,7 +2451,26 @@ const physBIOME_SCATTER = {
     // Second cluster: the local at (-8, -7), between the lake walk you arrive
     // on and the bia hoi corner — seventy-four metres from the corner, and the
     // whole of the walk in had nothing on it.
-    also: { x: -8, z: -7, r0: 4, r1: 16, props: [['basket', 2], ['bin', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 1], ['coffee', 1]] },
+    // ---- AND A THIRD, WHERE THE PLAYER ACTUALLY LANDS (B5) --------------
+    // MEASURED: Hanoi is the only chapter in the game with NOTHING loose
+    // within sixteen metres of its spawn and nobody within twenty-six — in a
+    // city whose own arrival line is "seven million people and six million of
+    // them are on a moped". The two clusters above are 88 m and 154 m from
+    // HANOI_SPAWN (-60, -78); its locals are ninety-odd metres away; and the
+    // two hundred and forty bikes are an instanced crowd, so not one of them
+    // can witness anything. The incident chain — the one repeatable reward in
+    // the game — was dead for the whole walk in.
+    //
+    // The lake wall is where people sit, so this is what they leave on it. The
+    // flower bicycle's own row is at the far end of the chapter; these are the
+    // things that make the FIRST thing you knock over count.
+    also: [
+      { x: -8, z: -7, r0: 4, r1: 16, props: [['basket', 2], ['bin', 1], ['cone', 1], ['sign', 1], ['phobowl', 2], ['flowers', 1], ['coffee', 1]] },
+      // The chapter's own list, and nothing invented: `stool` is not a
+      // physTYPE — the ninety-six on the bia hoi terrace are hanoi.js's own
+      // and belong to `the-stools`, which is a set piece and not scatter.
+      { x: -58, z: -74, r0: 3, r1: 13, props: [['phobowl', 2], ['basket', 2], ['flowers', 2], ['bin', 1], ['coffee', 1], ['cone', 1], ['sign', 1]] },
+    ],
   },
 };
 const physBiomeScattered = {};   // biome name -> true, so re-entry never doubles up
@@ -2522,7 +2541,13 @@ function physScatterBiome(name) {
   if (!def || physBiomeScattered[name]) return;
   physBiomeScattered[name] = true;
   let placed = physScatterRing(def);
-  if (def.also) placed += physScatterRing(def.also);
+  // `also` may be one annulus or a list of them (B5). It was one because one
+  // was enough for the fourteen chapters that wanted a second cluster; Hanoi
+  // wants a third, because its two are 88 m and 154 m from the spawn and the
+  // place you actually land has nothing loose in it at all.
+  if (Array.isArray(def.also)) {
+    for (let i = 0; i < def.also.length; i++) placed += physScatterRing(def.also[i]);
+  } else if (def.also) placed += physScatterRing(def.also);
   // Placed resting on their own surface, so there is nothing to solve.
   const arr = physGame.props;
   for (let i = 0; i < arr.length; i++) {

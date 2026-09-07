@@ -3213,6 +3213,39 @@ function hanBuildLocals(game) {
     wheek: ['Yes yes. Everybody has an opinion.'],
   });
 
+  // ---- ...AND TWO ON THE LAKE WALL, WHERE THE PLAYER LANDS (B5) ----------
+  //
+  // MEASURED: Hanoi was the only chapter in the game with nobody within
+  // twenty-six metres of its spawn and nothing loose within sixteen. Every
+  // local above is ninety-odd metres away round the lake, and the two hundred
+  // and forty bikes are an instanced crowd — not one of them can witness
+  // anything. So the incident chain, which refuses outright when nobody sees,
+  // was dead for the whole walk in, in a chapter whose arrival line is "seven
+  // million people and six million of them are on a moped".
+  //
+  // The lake wall is where Hanoi sits down, so that is what these two are
+  // doing. They face the ROAD, which is the thing the chapter is about and the
+  // thing the player is looking at over their shoulder on the arrival frame.
+  put(-56, -71, {
+    figure: { shirt: PALETTE.hanWash2, hat: PALETTE.hanConical }, face: 1.9, near: 9,
+    // the fan, all morning, because it is that kind of morning
+    beat: { kind: 'idle', every: 5.2, dur: 1.1 },
+    lines: ['Sit down. Everybody sits down here. It is the only flat thing.',
+            'You are watching the road. Everybody watches the road.',
+            'Do not run at it. Running is how you get hit.',
+            { t: 'Go on then. Walk. Do not stop.', before: 'cross-the-road' },
+            { t: 'You walked it. You did not even look. Very good.', after: 'cross-the-road' }],
+    wheek: ['Yes. Loud. We heard.'],
+  });
+  put(-63, -73.5, {
+    figure: { shirt: PALETTE.hanWash1 }, face: 2.4, near: 8,
+    lines: ['Tea. It is always tea. It is too hot for tea and it is always tea.',
+            'That is a lot of animal for one stool.',
+            'The lake is that way and it is green. That is all the lake does.',
+            { t: 'The pho is round the other side. Follow the smell, not me.', before: 'pho-raid' }],
+    wheek: ['Ha. All right.'],
+  });
+
   if (typeof game.addExchange === 'function' && hanLocPho && hanLocBia) {
     game.addExchange({ biome: 'hanoi', a: hanLocPho, b: hanLocBia, gap: 28, lines: [
       ['There is a very large rodent on the pavement.', 'There is a very large rodent on every pavement.'],

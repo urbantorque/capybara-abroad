@@ -1877,6 +1877,10 @@ function mainBoot() {
     // people are in — see saySomebodyNear, and the measurement that says why
     // a caller cannot work it out for itself.
     game.sayNear = npcs.sayNear;
+    // ...and how many people are near a point IN THIS CHAPTER. systems.js's
+    // own count walked `game.npcs` with no chapter test, and that array is
+    // Sydney's cast, built at boot and never removed. See peopleNear.
+    game.peopleNear = npcs.peopleNear;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.
