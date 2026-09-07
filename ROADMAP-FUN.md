@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B11 ARE BUILT, 7 Sep 2026. ITEMS 1-4 ARE CLOSED; ITEM 5 IS HALF OPEN.**
+> **B1-B13 ARE BUILT, 7 Sep 2026. ITEMS 1-5 ARE CLOSED; ITEM 6 REMAINS.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -85,12 +85,22 @@
 > herd recruited, 1/6/6 startles in Iceland, Cappadocia and Venice against
 > **0/0/0 without one**. Item 4 is closed.
 >
+> **B12+B13**: the routine and the blame. Forty-four beats were weather until
+> now — nothing in the world could stop one. A `tool:` on a beat makes it
+> breakable, and the retrieval errand the item said was already there really
+> was. Then blame: thirty-three exchange pairs, and the nearest one now argues
+> about who did it. It was **armed in 5 chapters of 5 and SAID in 1** until the
+> audit grew columns for the four gates that all produce the same silence — the
+> refusing one was `npcEX_MIN`, which exists so an exchange is never mistaken
+> for being about you, and an accusation IS about you. **Said 5 of 5.** 5e was
+> already built; 5b is refused for the reason B11 and B7 were.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Twelve of its
-> claims have now been checked and failed** (thirteen with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Fourteen of its
+> claims have now been checked and failed** (fifteen with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -101,7 +111,9 @@
 > (it is heard by one listener in one chapter), the camera having an
 > elevation the player can change (it has none), and the hint arrow being a
 > drawn thing to imitate (it is a CSS rotate on a DOM glyph), and a local dropping what
-> they hold (no local in the game holds anything). **Measure the premise
+> they hold (no local in the game holds anything), `npcWitnessHold` being
+> the place to arm blame from (it is Sydney and Pasto only), and the Traveller
+> needing to be written at all (four chapters of it already exist). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -583,14 +595,27 @@ that people were *doing something*, and now they cannot. All five hooks exist.
 - **5a. A routine that can be broken.** `beat` gets a `tool:`; take it and the
   beat *fails* — arm on nothing, a look at the hand, the pool switches (`tool:`
   as a third `before:`/`after:` condition). Put it back (4a) and they resume;
-  `localOwnStart` already makes them come and get it.
-- **5b. Wariness finally denies something.** Once per chapter, a wait not a
-  loss: Monaco's doorman in the doorway (`monLocDoor` + `npcREACH_ST`) while
-  `npcHeat` at the steps is over 0.6; the Cali band stopping; the Kyoto
-  shutter. Item 3 is the way to end it. Never on a marquee.
-- **5c. Blame.** `npcWitnessHold` knows who saw what; rewrite the nearest
-  `addExchange` pair's next exchange into an accusation of the wrong person.
-  ~12 neutral pairs, no line naming what was done.
+  `localOwnStart` already makes them come and get it — **and it does: measured,
+  and in two chapters of five the tool was back at the bench before the probe
+  could sample the absence.** Authored on **ten locals across five chapters**
+  and not twelve across four: the prop table has almost nothing that reads as a
+  tool, and a tourist camera in a barber's hand is worse than an unbroken beat.
+  *B12: built, all five chapters take-and-resume clean.*
+- ~~**5b. Wariness finally denies something.**~~ **REFUSED (B13), and it is the
+  same refusal as B11's plunge and B7's approach.** A denial needs somebody to
+  physically be IN THE WAY, and **a local never writes its own x/z — they are
+  fixed points by design.** Without movement a denial is a line, and a line is
+  not a denial. Three unbuilt things across items 3 and 5, one architectural
+  cause: anything that wants a local to MOVE is a different batch.
+- **5c. Blame.** ~~`npcWitnessHold` knows who saw what~~ — but
+  `npcWitnessChain` opens `if (live !== 'sydney' && live !== 'pasto') return 0`
+  and blame armed there would have been a two-chapter feature; `localsReact` is
+  the chapter-neutral one and already computes `mine`. **Fifth time this pass
+  that the named hook was the narrow one.** Rewrite the nearest `addExchange`
+  pair's next exchange into an accusation of the wrong person — **thirty-three
+  pairs across sixteen chapters** — 12 neutral pairs, no line naming what was
+  done. *B13: built, said in 5 of 5 chapters (it was 1 of 5 until the audit's
+  gate columns showed `npcEX_MIN` refusing it).*
 - **5d. Animals startle people.** Route every flock, dog and `herdOffer` flush
   through ~~`localsReact`~~ `game.startlePeople` with the animal as source; the
   witness chain counts it. `localsReact` could not be published — it only knows
@@ -599,8 +624,14 @@ that people were *doing something*, and now they cannot. All five hooks exist.
   the same person jump all afternoon. Measured: **eight of nineteen chapters
   have a herd animal at all**, and with a herd recruited Iceland/Cappadocia/
   Venice give 1/6/6 startles against **0/0/0 without one**. *B11: built.*
-- **5e. The Traveller becomes a character.** Six chapters, one arc, lines that
-  know where they have seen you (`seen[]`).
+- ~~**5e. The Traveller becomes a character.** Six chapters, one arc, lines that
+  know where they have seen you (`seen[]`).~~ **ALREADY BUILT (B13), in FOUR
+  chapters, and the four is deliberate.** `npcTRAV_FIG` fixes the figure in one
+  place so they are recognisable at six metres; the arc runs Circular Quay →
+  Marrakech → Cappadocia → Hanoi and its lines are gated on tasks done in OTHER
+  chapters, which is what "lines that know where they have seen you" means.
+  hanoi.js already says why it is not six: **"the joke only pays here, and it
+  only pays if the three before it were quiet about it."**
 
 *Traps.* A failed beat plays once. Every gated door has a clock and never
 covers a `wow`. Blame pairs must face each other.
@@ -668,8 +699,8 @@ decays.
 | B9 | 4a put down + `vessel` · 4d breakables and spills · the witness fix under both | 3 | `5efe5d6` |
 | B10 | 4b the charged throw and its mark · 4c measured and **refused**, both halves | 3 | `ecb6937` |
 | B11 | 4e the stagger and the sit (the drop and the plunge **refused**) · 5d animals startle people | 3 | `f5f751d` |
-| B12 | 5a the tool and the broken beat (12 locals, four chapters) | 3 | |
-| B13 | 5c blame · 5e the Traveller's arc · 5b one denial (Monaco) | 3 | |
+| B12 | 5a the tool and the broken beat (**ten** locals, **five** chapters) | 3 | `e3691f2` |
+| B13 | 5c blame · 5e **already built** · 5b **refused** | 3 | `5e2bae6` |
 | B14 | 6 the number, the headline, the ledger | 3 | |
 | B15 | 6 gossip pools + the poster | 3 | |
 

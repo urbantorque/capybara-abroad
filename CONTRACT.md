@@ -14,6 +14,137 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCHES TWELVE AND THIRTEEN — THE ROUTINE, AND THE BLAME (B12+B13 — 7 Sep 2026)
+
+**Item 5a and 5c built. 5e measured as already built. 5b refused.** Item 5's
+three unbuilt things all have the same cause, which is the finding of the pair.
+
+### B12 — A ROUTINE THAT CAN BE BROKEN (5a)
+
+Forty-four beats across seventeen chapters, and until now every one of them was
+weather: a person hammered, poured, swept or picked on a clock and there was
+nothing in the world that could stop them.
+
+**WHAT WAS ALREADY THERE, and the item was right about it.** `localOwnerOf`
+gives a prop to whoever stands nearest to where it LIVES (`homeX`/`homeZ`,
+inside `npcOWN_R`), and `capy:grab` already runs `localOwnStart` on that person.
+So a tool at somebody's bench is theirs and they come and get it, and none of
+that had to be written. Measured twice over: the errand fires, and **in two
+chapters of five the tool was back at the bench before the probe could sample
+the absence** — which is the mechanic working, and is why the probe now keeps it
+in the animal's mouth.
+
+**WHAT WAS NOT.** A local holds nothing (B11) and no beat named an object, so
+there was nothing to take.
+
+- `tool:` on a beat names a prop TYPE; one is spawned at the person's own anchor
+  the first time their chapter is live — lazily, because a local is registered
+  while its chapter is being built, which is before props.js has a world.
+- **`toolOut` is recomputed every tick, not flagged by the grab.** A tool kicked
+  into a canal is as gone as a stolen one, and a flag would have to know every
+  way a prop can leave.
+- The beat still STARTS — that is what a routine is — and dies on the way down:
+  no sfx, the arm at 55 % of the stroke, and the head drops 0.55 rad to the
+  empty hand at the top of the movement.
+- **`tool: 'gone' | 'here'` is a third line condition beside `before:` and
+  `after:`, and it is the first one that is about the SPEAKER** rather than the
+  global task table, so `localResolve` now takes the record. A line naming it in
+  the mouth of somebody with no tool resolves FALSE: a remark about a missing
+  cleaver from a man who never had one is worse than no remark.
+- `notool`, chapter-neutral to the same standard as the rest of that table, and
+  it **may not name the tool** — it is said by a tea picker with no basket, a
+  mask painter with no paint pot and a woman ladling pho with no bowl.
+
+**AUTHORED: ten locals across five chapters** (Kyoto 3, Hanoi 3, Kowloon 2,
+Venice 1, Cali 1), against the item's "12 locals, four chapters". Ten and not
+twelve because **the prop table has almost nothing that reads as a tool**, and
+forcing a tourist camera into a barber's hand is worse than leaving the beat
+alone. Every one uses a type its own chapter already scatters.
+
+`qa/the-tool.js`, all five chapters:
+
+| chapter | tools | spawned | broken: out/fails/said | back: out | resumed |
+|---|---|---|---|---|---|
+| Kyoto | 3 | 3 | 1 / 0 / no | 0 | yes |
+| Venice | 1 | 1 | 1 / 2 / **yes** | 0 | yes |
+| Hanoi | 3 | 3 | 1 / 2 / **yes** | 0 | yes |
+| Kowloon | 2 | 2 | 1 / 0 / no | 0 | yes |
+| Cali | 1 | 1 | 1 / 2 / no | 0 | yes |
+
+All ten spawn within **0.46–1.58 m** of their owner's anchor. The take/return
+cycle is clean in all five. `beatAudit` grew four columns rather than one flag,
+because *names no tool*, *never spawned*, *sitting where it lives* and *robbed*
+are four different failures and **only the second ships silently**.
+
+### B13 — BLAME (5c)
+
+**Thirty-three `addExchange` pairs across sixteen chapters**, so there is
+somebody to blame somebody else nearly everywhere. When anybody reacts to
+something the animal did, the nearest pair's next exchange is replaced with an
+accusation — of each other, never of the capybara.
+
+Twelve neutral pairs, and the hard rule is that **none of them names what was
+done**: every one has to work over a smashed bowl, a burst sack, a bin on its
+side and a flock going up.
+
+**ARMED FROM `localsReact`, NOT `npcWitnessChain`.** The item points at
+`npcWitnessHold`/`npcWitnessChain`, and `npcWitnessChain` opens with
+`if (live !== 'sydney' && live !== 'pasto') return 0` — a two-chapter function,
+and blame armed there would have been a two-chapter feature. **Fifth time in
+this pass that the hook the roadmap names is the narrow one.**
+
+### AND IT MEASURED WRONG TWICE, THE SAME SHAPE BOTH TIMES
+
+| | armed | said |
+|---|---|---|
+| first cut | **5 / 5** | **1 / 5** |
+| after clearing the pair's mouths on arming | 5 / 5 | **1 / 5** |
+| after the gate columns said which gate | 5 / 5 | **5 / 5** |
+
+"Armed and never said" is the same sentence for four different gates — the
+pair's own clock, both mouths, a distance ceiling and a distance FLOOR — and a
+fix aimed at the wrong one measures as no change at all. Adding `near`,
+`inWindow`, `aCd` and `bCd` to `exAudit` answered it in one run: **`near` was
+3.2, 5.3 and 3.9 m against `npcEX_MIN`'s 6.**
+
+`npcEX_MIN` exists so an ordinary exchange is never mistaken for being about the
+player — *"nearer than this and it is about you"*. **An accusation IS about the
+player, and the whole joke is that it happens while they are standing there.**
+It now ignores the floor and the mouths; the ceiling and the pair's own clock
+still apply. An armed accusation also expires after 22 s, because one that finds
+its window ninety seconds later is attached to nothing.
+
+### 5e — THE TRAVELLER WAS ALREADY BUILT
+
+Four chapters, not the item's six, and the four is deliberate. `npcTRAV_FIG`
+fixes the shirt, trousers, hair, skin and hat in one place *"instead of four
+times in four chapter files, where one of the four would eventually drift and
+the whole point would quietly stop working"*. The arc runs Circular Quay ("six
+months and a very bad map") → Marrakech ("Hold on. I know you. Sydney. The
+gardens.") → Cappadocia ("I have stopped asking. I have genuinely stopped
+asking.") → Hanoi ("Four countries. Four. I have counted."), and its lines are
+gated on tasks done in OTHER chapters — Hanoi's *"Whatever you did in that cave,
+I heard about it in Laos"* fires because of `to-cave`. That is what "lines that
+know where they have seen you" means, and hanoi.js already says why it is four:
+**"the joke only pays here, and it only pays if the three before it were quiet
+about it."** Fourth item in this pass that turned out to be built.
+
+### 5b — THE DENIAL, AND THE ONE CAUSE BEHIND THREE REFUSALS
+
+Refused. A denial needs somebody to physically be in the way, and **a local
+never writes its own x/z — they are fixed points by design.** Without movement a
+denial is a line, and a line is not a denial.
+
+That is the same refusal as **B11's plunge** (ten chapters have a local at a
+water edge and none of them can be knocked into it) and **B7's approach** (a
+hundred and fifty hand-placed people, none of whom can walk). Three unbuilt
+things across item 3 and item 5, one architectural cause. Anything that wants a
+local to MOVE is a different batch, and probably a different answer: give the
+chapter-neutral cast a position it owns, or accept that they are scenery that
+talks.
+
+`npm test` 11/11 for both. Console clean.
+
 ## THE FUN PASS, BATCH ELEVEN — A PERSON HAS A BODY (B11 — 7 Sep 2026)
 
 **Item 4e's two buildable clauses and item 5d.** Item 4 is closed.
