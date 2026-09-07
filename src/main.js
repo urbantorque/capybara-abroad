@@ -1884,6 +1884,11 @@ function mainBoot() {
     // B11 (5d): the one way to make the people near a point jump, from
     // outside npc.js. systems.js's herd loop is the only caller.
     game.startlePeople = npcs.startlePeople;
+    // B15 (item 6): the rumour from the place you have just left. systems.js
+    // owns the counters that decide whether there is anything to repeat and is
+    // the only caller; npc.js owns the pool, the earshot and the waiting.
+    game.rumourArm = npcs.rumourArm;
+    game.rumourAudit = npcs.rumourAudit;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.

@@ -631,6 +631,64 @@ function physBuildSign(g) {
   physAdd(g, physBoxG(0.62, 0.08, 0.09), PALETTE.cloth2, -0.1, 1.2, 0);
   physAdd(g, physBoxG(0.4, 0.06, 0.4), PALETTE.metal, 0, 0.03, 0);
 }
+// ===========================================================================
+// THE POSTER (item 6, B15) — AND WHY IT IS NOT A PHOTOGRAPH
+//
+// The item asks for "one grabbable wanted-poster per chapter, textured with
+// the player's own album thumbnail". That was built far enough to look at and
+// then refused, on three measurements:
+//
+//  1. THE ALBUM HOLDS POSTCARDS, NOT MUGSHOTS. A shot is a 288x180 blit of
+//     the whole frame — `albAdd` draws the canvas, not the animal — so what
+//     comes back is the place, with a capybara about twenty pixels tall
+//     somewhere in it. Rendered on a plane in front of the camera and looked
+//     at (`qa/poster-tex.png`): you cannot tell what it is a picture of. A
+//     wanted poster whose portrait is unreadable is not a wanted poster.
+//  2. IT COMES OUT DOUBLE-GRADED. The shot already has the composite's tone
+//     map and airlight baked into it, and then renders THROUGH them again —
+//     visibly paler and flatter than the world it is standing in.
+//  3. IT WOULD BE THE FIRST TEXTURE IN THE GAME. One grep of src: a single
+//     1x1 black DataTexture in main.js, a post-processing fallback. Nineteen
+//     chapters of hand-built scenery and not one image on a surface — and the
+//     exit board, the most important object in every one of them, is six rows
+//     of split-flap colour chips for exactly this reason, in its own words:
+//     "this game has no text in the world and is not about to grow a font
+//     atlas."
+//
+// So it is drawn the way everything else in this file is drawn. A pinned
+// sheet, a dark rodent shape on it, and three bars where the writing would be
+// — which is a wanted poster by convention, at any distance, in any of the
+// nineteen palettes, with no image and no letters. The bars are the same joke
+// the departures board makes: the shape of writing, never the writing.
+//
+// The silhouette is the animal's own darkest colour rather than black: at 0.6
+// m the eye reads the shape, and the family of the colour is what says it is
+// about YOU rather than about a dog.
+function physBuildPoster(g) {
+  // post and foot
+  physAdd(g, physBoxG(0.07, 0.78, 0.07), PALETTE.trunkDark, 0, 0.39, 0);
+  physAdd(g, physBoxG(0.40, 0.06, 0.34), PALETTE.trunkDark, 0, 0.03, 0);
+  // the board behind the paper, so the sheet reads as pinned to something
+  physAdd(g, physBoxG(0.62, 0.72, 0.045), PALETTE.sandstoneDark, 0, 1.06, 0);
+  physAdd(g, physBoxG(0.56, 0.66, 0.05), PALETTE.sail, 0, 1.06, 0.006);
+  // ---- the animal ----
+  // A loaf, a head, a snout and one ear: the same four parts the capybara's
+  // own silhouette reads as at distance, flattened.
+  const S = PALETTE.capyNose;
+  physAdd(g, physBoxG(0.30, 0.155, 0.02), S, -0.02, 1.16, 0.034);
+  physAdd(g, physBoxG(0.125, 0.115, 0.02), S, 0.165, 1.20, 0.034);
+  physAdd(g, physBoxG(0.06, 0.055, 0.02), S, 0.245, 1.185, 0.034);
+  physAdd(g, physBoxG(0.045, 0.045, 0.02), S, 0.145, 1.272, 0.034);
+  physAdd(g, physBoxG(0.045, 0.06, 0.02), S, -0.10, 1.055, 0.034);
+  physAdd(g, physBoxG(0.045, 0.06, 0.02), S, 0.06, 1.055, 0.034);
+  // ---- and where the writing would be ----
+  physAdd(g, physBoxG(0.34, 0.032, 0.02), PALETTE.stoneDark, 0, 0.955, 0.034);
+  physAdd(g, physBoxG(0.24, 0.024, 0.02), PALETTE.stoneDark, -0.04, 0.905, 0.034);
+  physAdd(g, physBoxG(0.29, 0.024, 0.02), PALETTE.stoneDark, 0.01, 0.865, 0.034);
+  // two pins, because a sheet with no fixings reads as painted on
+  physAdd(g, physCylG(0.018, 0.018, 0.02), PALETTE.metal, -0.22, 1.35, 0.04, Math.PI * 0.5, 0, 0);
+  physAdd(g, physCylG(0.018, 0.018, 0.02), PALETTE.metal, 0.22, 1.35, 0.04, Math.PI * 0.5, 0, 0);
+}
 function physBuildTowel(g) {
   physAdd(g, physBoxG(0.94, 0.1, 0.62), PALETTE.towel, 0, 0.05, 0);
   physAdd(g, physBoxG(0.9, 0.09, 0.32), PALETTE.cloth6, 0.01, 0.14, -0.1, 0, 0.05, 0);
@@ -959,6 +1017,9 @@ const physTYPES = {
   icecream:  { name: 'ice cream',    mass: 0.3,  hy: 0.3,  shape: ['box', 0.15, 0.3, 0.15],  hold: [0, 0.04, 0.1],   spin: 1.4, edible: true, grazeSfx: 'pop', build: physBuildIcecream, spill: physBuildIcecreamSpill },
   sign:      { name: 'sign',         mass: 3.2,  hy: 0.8,  shape: ['box', 0.46, 0.8, 0.1],   hold: [0, 0.14, 0.5],   spin: 0.5, receive: true, build: physBuildSign },
   towel:     { name: 'beach towel',  mass: 0.5,  hy: 0.12, shape: ['box', 0.46, 0.12, 0.3],  hold: [0, 0.02, 0.14],  spin: 1.0, build: physBuildTowel },
+  // B15. Chapter-neutral: systems.js puts one near the spawn from tier 3 and
+  // nothing scatters it, so it appears in no chapter's own table.
+  poster:    { name: 'wanted poster', mass: 2.2,  hy: 0.7,  shape: ['box', 0.32, 0.7, 0.09],  hold: [0, 0.16, 0.46],  spin: 0.5, receive: true, build: physBuildPoster },
 
   // ---- Circular Quay (chapter 1) ----
   // Buoyancy is not authored here. Each type's material density lives in

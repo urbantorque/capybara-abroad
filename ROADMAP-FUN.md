@@ -1,7 +1,10 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B14 ARE BUILT, 8 Sep 2026. ITEMS 1-5 ARE CLOSED. ITEM 6 HAS ONE BATCH
-> LEFT — B15, the gossip pools and the poster.**
+> **B1-B15 ARE BUILT, 8 Sep 2026. ALL SIX ITEMS ARE CLOSED.** The only thing
+> on this document that has not been done is **B0**, which is not code: sit a
+> stranger in front of the title card and watch them play two places. Nothing
+> below replaces it, and after sixteen of this document's claims failed on
+> measurement it is the cheapest hour left in the project.
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -110,12 +113,23 @@
 > minutes, and the ceiling is structural — `sysINC_COOL` is 50 s, so the
 > number cannot run away from anybody.
 >
+> **B15**: gossip and the poster. `biome:enter` has carried `from` since F3
+> and **nothing had ever read it** — the game did not know where you had come
+> from. The line is ARMED rather than said, because said-on-arrival lands in
+> only 14 of 19 (four chapters have nobody within sixteen metres of the spawn
+> and all four have six to eight people elsewhere). The poster's photograph is
+> **refused**: the album blits the whole frame at 288x180, so a shot is the
+> PLACE with a twenty-pixel capybara in it, and it would be the first texture
+> in a game that has one. It is drawn instead — a sheet, a rodent shape, three
+> bars where the writing would be, which is the departures board's own answer
+> to the same question. 18 of 19 chapters get one and all 18 stand up.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Sixteen of its
-> claims have now been checked and failed** (seventeen with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Eighteen of its
+> claims have now been checked and failed** (nineteen with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -131,7 +145,10 @@
 > needing to be written at all (four chapters of it already exist), and
 > notoriety's four terms (two of them are completion, not consequence, and the
 > one that makes it a thread is not in the list), and "the card's second line"
-> being free (it is `CHAPTERS.sub`, nineteen authored phrases). **Measure the premise
+> being free (it is `CHAPTERS.sub`, nineteen authored phrases), and gossip
+> belonging in the per-chapter table (the variable is where you have BEEN),
+> and the album holding a picture of the ANIMAL (it blits the whole frame:
+> the capybara is twenty pixels tall in it). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -679,12 +696,27 @@ exactly as `keep` is a projection of ticks.
   `CHAPTERS.sub`, one authored phrase per chapter and the only thing that
   gives a chapter its own voice on the way in. A rumour about the player there
   would trade nineteen written lines for five.
-- **Gossip.** `npcPLACE_SAY` gets a `heard:` pool about the *previous* place,
-  chosen by whether you did anything there.
-- **The poster.** From tier 3, one grabbable `wanted-poster` per chapter near
-  the spawn ring, textured with the player's own album thumbnail; stealing it
-  is an unlisted find. Fall back to the `sysMARKS` glyph when the album read
-  throws (declare the read above the constructor).
+- **Gossip. BUILT (B15), in the neutral table and ARMED.** Two pools,
+  `heardBad` and `heardGood`, with the previous chapter's name interpolated;
+  systems.js decides (it owns the counters), npc.js speaks (it owns `sayNear`).
+- ~~`npcPLACE_SAY` gets a `heard:` pool~~ — per-chapter is the wrong axis: the
+  variable is where you have BEEN, so nineteen rows would be nineteen ways of
+  saying one sentence, which the note above `npcPLACE_SAY` has already ruled
+  on. And it may not be said ON ARRIVAL: measured, that lands in **14 of 19**,
+  because four chapters have nobody within sixteen metres of the spawn and all
+  four have six to eight people somewhere else. It waits for somebody instead.
+- **The poster. BUILT (B15) — and the photograph is REFUSED.** One goes up
+  near the spawn from tier 3, in every chapter, and taking it is a find. 18 of
+  19 chapters have somewhere flat enough; Antarctica does not.
+- ~~textured with the player's own album thumbnail~~ — three measurements
+  against it. `albAdd` blits the WHOLE FRAME at 288x180, so a shot is the
+  place with a twenty-pixel capybara in it and you cannot tell what it is a
+  picture of; it renders double-graded, having the tone map baked in already;
+  and it would be **the first texture in the game** (one grep of src: a 1x1
+  black DataTexture in main.js). Drawn instead — a sheet, a rodent shape,
+  three bars where the writing would be — which is the departures board's own
+  answer to the same question: *"this game has no text in the world and is not
+  about to grow a font atlas."*
 - **The ending reads it. BUILT (B14).** The final ledger's foot: *"3:15:15 on
   the road · you leave as a legend"*, and the subtitle's chip drops out there
   so the card does not say it twice. One ternary, once the number existed.

@@ -3277,6 +3277,14 @@ export const FINDS = [
   { id: 'quiet-corner',   text: 'Found the one part of this place with nobody in it' },
   { id: 'long-drop',      text: 'Fell twenty-five metres and walked away from it' },
 
+  // ---- ...AND THE ONE THE PLACE PUT UP ABOUT YOU (B15) ------------------
+  // From notoriety tier 3 the chapter you arrive in has a poster of you near
+  // the spawn — see physBuildPoster. Taking it is the only find in this table
+  // that is about a thing the game only makes once you have earned it, which
+  // is the point: it cannot be gone looking for, and a player who never
+  // causes any trouble will never see one.
+  { id: 'took-the-poster', text: 'Took the poster of yourself down off its post' },
+
   // ---- AND THE ONES THAT BELONG TO A PLACE (v20) -------------------------
   // Two per chapter, thirty-four in all, and every one of them is about a
   // thing that world had already drawn and had never once asked after. They

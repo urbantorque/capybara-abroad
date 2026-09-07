@@ -14,6 +14,177 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH FIFTEEN — GOSSIP, AND THE POSTER (B15 — 8 Sep 2026)
+
+**Item 6's last two bullets, and the last batch of ROADMAP-FUN.** The gossip
+half is built as asked with one axis moved; the poster is built and the
+photograph in it is **refused, with three measurements**.
+
+### GOSSIP — WHAT THIS PLACE HEARD ABOUT THE LAST ONE
+
+`biome:enter` has carried `{ name, from }` since F3 and **nothing had ever
+read `from`** — nineteen chapters and the game did not know where you had come
+from. Two pools, `heardBad` and `heardGood`, with the previous chapter's name
+interpolated; systems.js decides whether there is anything to repeat because it
+owns the counters, npc.js owns the voice. The same split `sayNear` already
+uses.
+
+**THE POOL IS IN THE NEUTRAL TABLE, NOT `npcPLACE_SAY`.** The item asks for a
+per-chapter row and per-chapter is the wrong axis: the variable in this line is
+where you have BEEN, so nineteen `heard` rows would be nineteen ways of saying
+one sentence. The note above `npcPLACE_SAY` has already ruled on this once, in
+its own words — *"17 chapters of a pool nobody can tell apart from the neutral
+one is work that buys nothing."* The resolver still allows a chapter to author
+its own.
+
+**IT IS ARMED, NOT SAID.** The obvious build says the line on arrival.
+MEASURED across all nineteen, that lands in **fourteen**:
+
+| within | 6 m | 10 m | 16 m | 24 m |
+|---|---|---|---|---|
+| chapters with anybody | 6 | 11 | 14 | 15 |
+
+Four chapters have nobody within sixteen metres of where you spawn — the
+Drift, the Pantanal, Sơn Đoòng and Antarctica — and every one of them has six
+to eight people somewhere else in it. Pasto counts eight through `peopleNear`
+four seconds after a crossing and has nobody eligible to SPEAK yet. Both
+failures vanish if the line waits: armed on the way in, spent the first time
+somebody is close enough, dropped on the next crossing said or not.
+
+**THE THRESHOLDS ARE MEASURED.** One incident in a place is enough to travel.
+The charm side is cheap and was nearly set at three: ninety seconds of
+standing still among Cappadocia's people is **3 photographs and 2 gifts**, so
+at three the good line would have armed on very nearly every crossing a quiet
+player makes. Six is a couple of minutes of actually being liked somewhere.
+
+### THE POSTER, AND WHY IT IS NOT A PHOTOGRAPH
+
+The item asks for one "textured with the player's own album thumbnail". Built
+far enough to render and look at (`qa/poster-tex.png`), then refused:
+
+1. **The album holds postcards, not mugshots.** `albAdd` blits the whole
+   frame at 288x180 — so a shot is the PLACE, with a capybara about twenty
+   pixels tall somewhere in it. On a plane in front of the camera you cannot
+   tell what it is a picture of. A wanted poster whose portrait is unreadable
+   is not a wanted poster.
+2. **It comes out double-graded.** The shot already has the composite's tone
+   map and airlight baked in and then renders through them again — visibly
+   paler and flatter than the world it stands in.
+3. **It would be the first texture in the game.** One grep of src: a single
+   1x1 black DataTexture in main.js, a post-processing fallback. Nineteen
+   chapters of hand-built scenery and not one image on a surface — and the
+   exit board, the most important object in every one of them, is six rows of
+   split-flap colour chips for exactly this reason, in its own words: *"this
+   game has no text in the world and is not about to grow a font atlas."*
+
+So it is drawn the way everything else in props.js is drawn: a pinned sheet, a
+dark rodent shape in the animal's own darkest colour, and three bars where the
+writing would be. A wanted poster by convention, at any distance, in any of
+the nineteen palettes, with no image and no letters — the same joke the
+departures board makes, which is the shape of writing and never the writing.
+
+One goes up near the spawn on arrival from tier 3 (*a menace*), in every
+chapter, for as long as you are one. Taking it is a find.
+
+### WHERE IT STANDS, AND THE FOUR THINGS THAT WENT WRONG
+
+**"IS THE NUMBER FINITE" IS NOT A FLOOR TEST.** The first cut took the first
+of four bearings whose floor was a number. Venice put the poster **in a
+canal** — `boardFloor` returns the canal bed quite happily, 1.4 m under the
+pavement — and Antarctica put it on the ice slope, face-down in the snow by
+the time the shot was taken. The exit board answered this first and its answer
+is right: the door's own floor is the anchor and a candidate must be level
+with it. Reused with the spawn as the anchor.
+
+**LEVEL WITH THE SPAWN IS NOT FLAT UNDER THE FOOT.** With the level test alone
+**four of nineteen were face-down after thirteen seconds** — Marrakech,
+Palawan, Cappadocia, Antarctica: sand, beach, tuff and ice, all of which can
+sit within 0.80 m of the spawn's height at ten metres and still be a slope.
+Four samples at the corners of the 0.40 x 0.34 foot, spread under 0.10 m.
+
+**AND THEN IT IS PUT TO SLEEP WHERE IT WAS PUT.** `physScatterBiome` ends with
+exactly that loop over everything it has just placed — *"resting on their own
+surface, so there is nothing to solve"* — and a poster spawned from a
+`biome:enter` handler is the one prop in the game that never went through it.
+Which ones fell **moved between runs**, because nothing was pushing them: they
+were being solved over in the first few frames. With the sleep:
+
+| | posters up | still standing |
+|---|---|---|
+| level test only | 19 / 19 | 15 |
+| + flatness | 18 / 19 | 17 |
+| + sleep | **18 / 19** | **18** |
+
+Antarctica gets none: nothing within 6, 10 or 14 m of the jetty head is flat
+enough, which is an honest answer for an ice shelf and better than a board
+lying in the snow.
+
+**IT STACKED ON RE-ENTRY, AND THAT WOULD HAVE SHIPPED.** kyoto, venice, kyoto,
+venice, kyoto, venice — and the third arrival in Kyoto had **three posters and
+three live bodies**. A chapter's props are detached on the way out and
+re-attached on the way back, so one put up per arrival is one more for ever.
+Idempotent per place now, which is the contract `physSpawnKeep` already states
+for the souvenirs, and which also reads correctly: the place has already got
+one up, and a player who took theirs away is not handed a fresh one.
+
+### THE NAME COLLISION THAT BROKE A FEATURE ELEVEN HUNDRED LINES AWAY
+
+The gossip timer was called `npcHeardT`. **`npcHeardT` already exists**, at the
+top of npc.js: it is the fence that lets at most one OVERHEARD line become a
+HUD pill every nine seconds. A `let npcHeardT` inside `createNPCs` shadows it
+for the whole factory body, including the three places that fence is read and
+written.
+
+Invisible by inspection and found by arithmetic: the six-second wait drained in
+three, **at a ratio of exactly 2.01 against the wall clock**, and the timer
+later rose to 8.9 having been armed at 6. Both were the pill fence — one
+decrement a frame from `updateBubbles` on top of this one's, and
+`npcHeardT = npcSAY_HEAR_GAP` when somebody was overheard. The pill fence was
+equally broken in the other direction and nothing said so.
+
+**The build's collision check counts top-level declarations across modules and
+cannot see a shadow inside one function**, so it reported no collisions. The
+B15 names are `npcRum*`.
+
+### THE OTHER THINGS THAT MEASURED WRONG FIRST
+
+**FOUR BIOME IDS THAT DO NOT EXIST.** The first earshot sweep used
+`marrakech`, `reef`, `balloon` and `raft` — which are what those chapters are
+CALLED. The ids are `sahara`, `palawan`, `goreme` and `pantanal`, and
+`hud.cross` on a name that is not an id rolls straight back into the chapter
+you were already in. Four rows of 0 locals and 38 Sydney ghosts, which reads
+exactly like four chapters with nobody in them.
+
+**A PROBE THAT DID NOT SET UP ITS OWN PREMISE.** The "a quiet place says
+nothing" case armed *"you are on a wall in Cali"* anyway: `forceNoto` wrote
+`inc` and `scn` and left `pho` and `fed` alone, and fifty-seven photographs
+had piled up over the session. A hook that puts the counters where you say has
+to put ALL of them there; it takes five arguments now.
+
+**AND THE FRAMING TRAP AGAIN, IN BOTH DIRECTIONS.** `frameShot`'s yaw is the
+bearing from the subject to the CAMERA. The first poster shots stood the
+animal in front of the poster and then put the camera on its far side — which
+is to say behind the lens — and came back as photographs of a souk and a
+carpet stall. Corrected the other way it photographs the poster's back. The
+two renders that answer the question are Venice and Manly.
+
+### THE INSTRUMENTS
+
+`qa/gossip-premise.js` (earshot at the spawn, all nineteen), `qa/gossip-cast.js`
+(who is in a chapter at all), `qa/pasto-mute.js`, `qa/the-gossip.js` (both
+pools, the quiet case, and armed-but-not-said), `qa/gossip-why.js` and
+`qa/gossip-why2.js` (the shadowed timer), `qa/poster-premise.js` (the texture,
+rendered), `qa/the-poster.js`, `qa/poster-sweep.js`, `qa/poster-return.js`,
+`qa/b15-shots.js`, `qa/b15-clean.js`.
+
+`game.rumourArm(place, kind)` and `game.rumourAudit()` are new;
+`game.hud.forceNoto` takes `pho` and `fed`. No new DOM or CSS in this batch —
+the poster is world geometry and the gossip is dialogue, so there is no
+interface surface for the guidelines pass to read.
+
+`npm test` 11/11. Console 0 errors / 0 warnings across five chapters with
+posters going up and one taken.
+
 ## THE FUN PASS, BATCH FOURTEEN — THE NUMBER (B14 — 8 Sep 2026)
 
 **Item 6's first three bullets built: the number, the arrival headline, the

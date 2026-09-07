@@ -1448,6 +1448,41 @@ export function createNPCs(game) {
                'Look at the state of it.', 'That will stain.'],
     thief:    ['That is not yours.', 'Excuse me?', 'Put that down.', 'Oh, wonderful.',
                'You are just taking that, are you.', 'Right. Yes. Fine.'],
+    // ---- ...AND TWO ABOUT SOMEWHERE ELSE (B15) ---------------------------
+    //
+    // The only pools in this table that break the chapter-neutral rule, and
+    // they break it in the one direction that is safe: they name the place you
+    // CAME FROM, not the place you are standing in. `{P}` is filled with the
+    // previous chapter's name by npcRumArm.
+    //
+    // IN THE NEUTRAL TABLE RATHER THAN npcPLACE_SAY, which is where item 6
+    // asks for them. Per-chapter is the wrong axis: the variable in this line
+    // is where you have BEEN, and a `heard` row in all nineteen chapters would
+    // be nineteen ways of saying the same sentence — which the note above
+    // npcPLACE_SAY has already ruled on once, in its own words: "17 chapters
+    // of a pool nobody can tell apart from the neutral one is work that buys
+    // nothing." A chapter that wants its own may still author one; the
+    // resolver has always allowed it.
+    //
+    // The incident rule holds: NONE OF THEM NAMES WHAT WAS DONE. The same
+    // line is said after a smashed bowl in Kyoto, a flock put up in Iceland
+    // and a barrow tipped into a canal, so all any of them can be about is
+    // that word travelled.
+    heardBad: ['They are still talking about {P}.',
+               'We heard what happened in {P}.',
+               'Word came up from {P}. About you.',
+               'You are the one from {P}, then.',
+               'Somebody in {P} has been telling everybody.',
+               'They said you had gone to {P}. They were right.'],
+    // ...and the other economy's version of it (B8's `pho` and `fed`). A
+    // player who was photographed and fed in the last place gets a different
+    // sentence, because arriving somewhere that has heard only good things is
+    // the half of this the mischief pool cannot say.
+    heardGood: ['Somebody in {P} was very taken with you.',
+                'You are on a wall in {P}, I hear.',
+                'They said you were no trouble at all in {P}. Were you?',
+                'Word from {P} is that you are all right.',
+                'They fed you in {P}, did they.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
                'Slow down!', 'It has somewhere to be.'],
     // ---- AND ONE MORE, FOR SOMEBODY WHO REMEMBERS YOU (v19) --------------
@@ -10818,6 +10853,9 @@ export function createNPCs(game) {
       for (let i = 0; i < npcHeatSites.length; i++) if (npcHeatSites[i].biome === liveB) hn++;
       game.state.heatN = hn;
     } catch (e) { /* optional */ }
+    // ...and the rumour from the last place, which is looking for anybody at
+    // all and therefore belongs above the gate with the heat. See npcRumArm.
+    npcRumStep(dt);
 
     // --- biome gate ------------------------------------------------------
     // In Pasto every Sydneysider is detached from the scene and the physics
@@ -11048,6 +11086,90 @@ export function createNPCs(game) {
     return true;
   }
 
+  // =========================================================================
+  // GOSSIP — WHAT THIS PLACE HEARD ABOUT THE LAST ONE (item 6, B15)
+  //
+  // `biome:enter` has carried `{ name, from }` since F3 and nothing has ever
+  // read `from`. systems.js owns the counters that say whether the last place
+  // has anything to talk about; this owns the voice, which is the same split
+  // `sayNear` and the 150-second nudge already use.
+  //
+  // IT IS ARMED, NOT SAID. The obvious build says the line on arrival, and
+  // MEASURED across all nineteen that lands in fourteen: four chapters have
+  // nobody within sixteen metres of where you spawn (the Drift, the Pantanal,
+  // Sơn Đoòng, Antarctica — all of which have six to eight people somewhere
+  // else in them), and Pasto's cast is counted by `peopleNear` four seconds
+  // after a crossing but is not yet eligible to speak. Both failures vanish
+  // if the line waits for somebody instead of requiring somebody to be
+  // standing at the door: it is armed on the way in and spent the first time
+  // a person is close enough, which in a chapter with people in it is a
+  // question of walking rather than of luck.
+  //
+  // ONE LINE PER ARRIVAL, and it is dropped on the next crossing whether it
+  // was said or not — a rumour about two places ago is not gossip, it is a
+  // filing system.
+  // NAMED npcRum*, AND THE FIRST CUT WAS NAMED npcHeard*. `npcHeardT` is
+  // already declared at the top of this module — it is the fence that lets at
+  // most one OVERHEARD line become a HUD pill every nine seconds (see
+  // npcSAY_HEAR_GAP and updateBubbles) — and a `let npcHeardT` inside
+  // createNPCs shadows it for the whole factory body, including the three
+  // places that fence is read and written eleven hundred lines above here.
+  //
+  // MEASURED, because it is invisible by inspection: the six-second wait
+  // drained in three, at a ratio of exactly 2.01 against the wall clock, and
+  // the timer later rose to 8.9 having armed at 6. Both were the pill fence —
+  // one decrement a frame from updateBubbles on top of this one's, and
+  // `npcHeardT = npcSAY_HEAR_GAP` when somebody was overheard. The pill fence
+  // was equally broken in the other direction and nothing said so.
+  //
+  // The build's collision check counts TOP-LEVEL declarations across modules
+  // and cannot see a shadow inside one function, so it reported no collisions.
+  const npcRUM_R    = 16;    // m of earshot. Measured: see the table in CONTRACT
+  const npcRUM_WAIT = 6.0;   // s after arrival before the first attempt. The
+                               // place card is up for 3.6 of them and a rumour
+                               // over the top of the chapter's own name is two
+                               // things at once.
+  const npcRUM_TRY  = 1.5;   // s between attempts, so a walk toward somebody
+                               // pays inside a couple of steps of arriving
+  let npcRumLine = '';
+  let npcRumT = 0;
+  /**
+   * Arm the line for this arrival. `place` is the previous chapter's NAME —
+   * "Kyoto & Uji" — and `kind` is which pool, decided by whoever knows what
+   * happened there. Returns the line it will say, for the audit.
+   */
+  // ONE WRITER, AND IT IS CALLED ON EVERY CROSSING. Clearing the old line
+  // inside this module's own `biome:enter` handler would have been the obvious
+  // place and is a race: handlers run in registration order, and if systems.js
+  // arms before npc.js clears, the arm is wiped by a handler for the same
+  // event. So the contract is that systems.js calls this on EVERY arrival, and
+  // passes no place when the last one has nothing worth repeating — which
+  // clears it here, in the one function that writes it.
+  function npcRumArm(place, kind) {
+    npcRumLine = '';
+    npcRumT = npcRUM_WAIT;
+    if (!place) return '';
+    const pool = npcLOC_SAY[kind === 'good' ? 'heardGood' : 'heardBad'];
+    if (!pool || !pool.length) return '';
+    npcRumLine = pool[randInt(0, pool.length - 1)].split('{P}').join(place);
+    return npcRumLine;
+  }
+  /** The armed line and its clock, for the harness. Nothing in src reads it. */
+  function npcRumAudit() {
+    return { line: npcRumLine, t: +npcRumT.toFixed(2), r: npcRUM_R };
+  }
+  function npcRumStep(dt) {
+    if (!npcRumLine || !game.state.started) return;
+    npcRumT -= dt;
+    if (npcRumT > 0) return;
+    npcRumT = npcRUM_TRY;
+    const p = game.capy && game.capy.position;
+    if (!p) return;
+    // A line that lands is spent; one that finds nobody is kept and tried
+    // again, which is the whole point of arming it.
+    if (saySomebodyNear(p.x, p.z, npcRUM_R, npcRumLine)) npcRumLine = '';
+  }
+
   /**
    * HOW MANY PEOPLE ARE NEAR THIS POINT, IN THIS CHAPTER (B5).
    *
@@ -11099,6 +11221,13 @@ export function createNPCs(game) {
            peopleNear: peopleNear,
            addLocal: addLocal, addTraveller: addTraveller,
            addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
+           // ---- THE RUMOUR FROM THE LAST PLACE (B15) ----
+           // `heardArm` is the whole interface and systems.js is its only
+           // caller — it owns the counters that decide whether there is
+           // anything to say. `heardAudit` is the harness's window, for the
+           // same reason charmAudit and notoAudit exist: an armed line that
+           // never finds a speaker is invisible from outside.
+           rumourArm: npcRumArm, rumourAudit: npcRumAudit,
            // ---- THE PLACE, rather than the person (v33) ----
            // `placeHeat` is what the music and the finds read; `forceHeat` is
            // the differential lever and is a test hook, not a feature.

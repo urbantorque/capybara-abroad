@@ -23884,6 +23884,7 @@ export function createSystems(game) {
     // ...and the opposite, which is braver: take it anyway, off somebody who
     // is already looking straight at you. Set by the grab listener below.
     'red-handed':    function () { return !!findS.redHanded; },
+    'took-the-poster': function () { return !!findS.tookPoster; },
 
     // ---- what you did with the time --------------------------------------
     'perfectly-still': function (c) {
@@ -24442,6 +24443,15 @@ export function createSystems(game) {
     // Somebody has to be watching, and it has to be near enough to be brazen.
     if (findHeat(cp.x, cp.z, 9) > 0) { findS.redHanded = true; }
   });
+  // ...and the other grab that is an edge rather than a state (B15). Its own
+  // listener rather than a second branch in the one above, because that one
+  // returns early once red-handed is done — which would have made the poster
+  // unfindable for every player who had already been caught stealing, which
+  // is most of the players who ever reach tier 3.
+  game.events.on('capy:grab', function (p) {
+    const pr = p && p.prop;
+    if (pr && pr.type === 'poster') findS.tookPoster = true;
+  });
 
   function findTick(dt) {
     if (!started || game.state.paused) return;
@@ -24838,6 +24848,191 @@ export function createSystems(game) {
    * span — the structure has one writer and it stays that way.
    */
   function notoChip() { return notoName().replace(/ /g, '\u00a0'); }
+
+  // ---- GOSSIP: WHAT THIS PLACE HEARD ABOUT THE LAST ONE (item 6, B15) ----
+  //
+  // `biome:enter` has carried `{ name, from }` since F3 and NOTHING has ever
+  // read `from` \u2014 nineteen chapters and the game did not know where you had
+  // come from. This is the whole use of it.
+  //
+  // The split is the one npc.js already uses for `sayNear`: this decides
+  // WHETHER there is anything to repeat, because it owns the counters; npc.js
+  // decides who says it and waits until somebody is close enough. Called on
+  // EVERY crossing, with no place when there is nothing \u2014 see the note on
+  // npcHeardArm for why the clear cannot live on npc.js's own handler.
+  //
+  // NOT GATED ON THE TIER, deliberately, though gossip is item 6's bullet.
+  // The tier is about the journey and this is about ONE PLACE: somebody who
+  // caused a scene in Kyoto and nothing anywhere else should hear about Kyoto
+  // in Cali, and making them earn a global 11 first would push the one part
+  // of item 6 that plays in the first hour into the third.
+  //
+  // TROUBLE BEATS CHARM when a place has both, because item 6 is about
+  // consequence and because "we heard what happened" is a funnier thing to be
+  // greeted with than "we heard you were good".
+  const sysHEARD_BAD = 1;   // one incident in a place is enough to travel
+  // ...but the charm side is CHEAP, and it was measured rather than guessed:
+  // ninety seconds of standing still among Cappadocia's people is 3
+  // photographs and 2 gifts. At a threshold of 3 the good line would arm on
+  // very nearly every crossing a quiet player makes, which is how a line
+  // becomes wallpaper. Six is a couple of minutes of actually being liked
+  // somewhere, and it is unreachable in a chapter you walked through.
+  const sysHEARD_GOOD = 6;
+  game.events.on('biome:enter', function (p) {
+    if (typeof game.rumourArm !== 'function') return;
+    let place = '', kind = '';
+    // A ROLLBACK ARRIVES HERE TOO, with `from` set to the chapter that failed
+    // to build \u2014 one the player has never stood in. It needs no guard of its
+    // own: a chapter you have not been in has no counts, so it says nothing.
+    const fn = (p && p.from) ? chapterOf(p.from) : 0;
+    if (fn > 0 && (!p || p.from !== p.name)) {
+      const bad = (jrChapInc[fn] || 0) + (jrChapScene[fn] || 0);
+      const good = (jrChapPho[fn] || 0) + (jrChapFed[fn] || 0);
+      if (bad >= sysHEARD_BAD) { kind = 'bad'; }
+      else if (good >= sysHEARD_GOOD) { kind = 'good'; }
+      if (kind) {
+        const d = chapterDef(fn);
+        place = (d && d.name) || '';
+      }
+    }
+    try { game.rumourArm(place, kind); } catch (e) { /* older npc.js */ }
+    posterPut();
+  });
+
+  // ---- THE POSTER (item 6, B15) -----------------------------------------
+  //
+  // From tier 3 — a menace — the place you arrive in has put one up near
+  // where you land. Every chapter, every arrival, for as long as you are one:
+  // the joke is that they keep going up, so it is deliberately NOT latched on
+  // the find. Taking it is a find you get once; seeing them is the notoriety.
+  //
+  // Placed like the exit board rather than scattered: nothing in a chapter's
+  // own prop table knows about it, because it is not the chapter's, it is
+  // yours. Ten metres out on a random bearing, which is far enough not to
+  // land on the arrival shot's subject and near enough to be walked past.
+  const sysPOSTER_TIER = 3;
+  const sysPOSTER_RS = [10, 6, 14];   // m from the spawn, tried in this order
+  const sysPOSTER_FOOT = 0.34;   // m, half the diagonal of the poster's base
+  const sysPOSTER_FLAT = 0.10;   // m of relief the base may span and still stand
+  /**
+   * IS THIS SPOT FLAT UNDER THE FOOT, not merely level with the spawn?
+   *
+   * MEASURED, after the level test alone left four of nineteen face-down
+   * thirteen seconds after arrival: Marrakech, Palawan, Cappadocia and
+   * Antarctica — sand, beach, tuff and ice, all of which can be within 0.80 m
+   * of the spawn's height at ten metres and still be a slope. The board is
+   * 1.4 m over a 0.40 x 0.34 foot and it does not need much of one.
+   *
+   * Four samples at the corners of that foot; the spread has to be under a
+   * hand's width. Thirty-two raycasts across the eight candidates, once per
+   * arrival, which is the same order as one boardPlant.
+   */
+  function posterFlat(x, z, y, w) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.5708 + 0.7854;
+      const h = boardFloor(x + Math.cos(a) * sysPOSTER_FOOT,
+                           z + Math.sin(a) * sysPOSTER_FOOT, w);
+      if (!(h === h)) return false;
+      if (h < lo) lo = h;
+      if (h > hi) hi = h;
+    }
+    return (hi - lo) <= sysPOSTER_FLAT && Math.abs(y - lo) <= sysPOSTER_FLAT * 2;
+  }
+  function posterPut() {
+    if (notoTier() < sysPOSTER_TIER) return;
+    const ph = game.physics;
+    if (!ph || typeof ph.spawnProp !== 'function') return;
+    // ---- IDEMPOTENT PER PLACE, and it was not ---------------------------
+    //
+    // MEASURED: kyoto, venice, kyoto, venice, kyoto, venice — and the third
+    // arrival in Kyoto had THREE posters standing in it, with three live
+    // bodies in the world. A chapter's props are detached on the way out and
+    // re-attached on the way back, so one put up on every arrival is one more
+    // every time, for ever.
+    //
+    // The same contract physSpawnKeep already states for the souvenirs, in
+    // its own words: "a chapter can only be finished once, but the save
+    // restores a finished chapter and systems.js is entitled to ask again,
+    // and two copies of the same souvenir is a bug you can pick up."
+    //
+    // It also reads correctly: the place has already got one up. A player who
+    // takes theirs away and comes back is not handed a fresh one, which is
+    // the right answer to what they did.
+    const live = game.biome && game.biome.current;
+    const arr = game.props || [];
+    for (let i = 0; i < arr.length; i++) {
+      const p = arr[i];
+      if (p && p.type === 'poster' && !p.removed && p.biome === live) return;
+    }
+    const bm = game.biome;
+    const sp = (bm && typeof bm.spawnOf === 'function') ? bm.spawnOf(bm.current) : null;
+    const cp = game.capy && game.capy.position;
+    const x0 = sp ? sp.x : (cp ? cp.x : 0);
+    const z0 = sp ? sp.z : (cp ? cp.z : 0);
+    // ---- IT HAS TO BE ON THE SAME FLOOR AS THE SPAWN --------------------
+    //
+    // "Is the number finite" is not a floor test, and the first cut used it.
+    // MEASURED: Venice put the poster in a canal — `boardFloor` cheerfully
+    // returns the canal bed, which is 1.4 m under the pavement — and
+    // Antarctica put it on the ice slope, where a 1.4 m board on a small foot
+    // was face-down in the snow by the time the shot was taken. Both are
+    // visible in one glance at qa/b15-poster-venice.png.
+    //
+    // The exit board answered this question first and its answer is the right
+    // one: the DOOR'S OWN FLOOR is the anchor, and a candidate is only a
+    // candidate if it is level with it. Reused here with the spawn as the
+    // anchor and sysBOARD_LEVEL as the tolerance, which also solves the
+    // toppling: a spot level with the spawn is a spot that is not a slope.
+    //
+    // Eight bearings rather than the board's four, because this one has no
+    // per-chapter override to fall back on — and if none of the eight is
+    // level, the chapter gets NO POSTER. A place that has nowhere flat to put
+    // one is better with none than with one lying face-down in the snow.
+    const anchor = boardFloor(x0, z0, sp || { x: x0, z: z0 });
+    const a0 = Math.random() * 6.283;
+    // Ten metres first, then in, then out. The ring is a preference and not a
+    // rule: with one radius Antarctica had nowhere flat and got no poster at
+    // all, and the ice shelf is a slope wherever you stand ten metres from
+    // the jetty head — six is on the boards.
+    for (let ri = 0; ri < sysPOSTER_RS.length; ri++) {
+      const R = sysPOSTER_RS[ri];
+      for (let i = 0; i < 8; i++) {
+        const a = a0 + i * 0.7854;
+        const x = x0 + Math.cos(a) * R;
+        const z = z0 + Math.sin(a) * R;
+        const y = boardFloor(x, z, sp || { x: x0, z: z0 });
+        if (!(y === y) || Math.abs(y - anchor) > sysBOARD_LEVEL) continue;
+        if (!posterFlat(x, z, y, sp || { x: x0, z: z0 })) continue;
+        // ...and it faces the way you will be coming from, which is the spawn.
+        const yaw = Math.atan2(x0 - x, z0 - z);
+        try {
+          const pr = ph.spawnProp('poster', x, z, y, yaw);
+          if (pr) {
+            // ...AND IT IS PUT TO SLEEP WHERE IT WAS PUT.
+            //
+            // physScatterBiome ends with exactly this loop over everything it
+            // has just placed — "resting on their own surface, so there is
+            // nothing to solve" — and a poster spawned from here is the one
+            // prop in the game that never went through it. MEASURED without
+            // it: 15 to 17 of nineteen still standing thirteen seconds after
+            // arrival, and which ones fell moved between runs, because a 1.4 m
+            // board on a 0.40 x 0.34 foot topples on the first few frames of
+            // solver jitter over sand, tuff or ice. Nothing in the world is
+            // pushing it; it is being solved over.
+            if (pr.body) {
+              pr.body.velocity.set(0, 0, 0);
+              pr.body.angularVelocity.set(0, 0, 0);
+              pr.body.force.set(0, 0, 0);
+              pr.body.torque.set(0, 0, 0);
+              if (pr.body.sleep) pr.body.sleep();
+            }
+            return;
+          }
+        } catch (e) { /* a chapter that will not take one simply has none */ }
+      }
+    }
+  }
 
   // ---- THE ARRIVAL KNOWS (item 6, second bullet) -------------------------
   //
@@ -29759,12 +29954,27 @@ export function createSystems(game) {
      * play for an hour. Writes the counters directly and saves, which is what
      * an hour of causing trouble would have left behind.
      */
-    forceNoto: function (inc, scn, chapters) {
+    // ...AND IT SETS ALL FOUR COUNTERS, NOT TWO (B15). The first cut wrote
+    // `inc` and `scn` and left `pho` and `fed` alone, which is fine while
+    // the only reader is the tier — and wrong the moment gossip reads the
+    // charm side too: a probe that had cleared the mischief counters still
+    // armed "you are on a wall in Cali", because fifty-seven photographs had
+    // piled up over the session. A hook that puts the counters where you say
+    // has to put ALL of them there.
+    forceNoto: function (inc, scn, chapters, pho, fed) {
       const c = Math.max(1, Math.min(chapMax, chapters | 0 || 1));
-      for (let n = 1; n <= chapMax; n++) { delete jrChapInc[n]; delete jrChapScene[n]; }
+      for (let n = 1; n <= chapMax; n++) {
+        delete jrChapInc[n]; delete jrChapScene[n];
+        delete jrChapPho[n]; delete jrChapFed[n];
+      }
+      const share = function (total, n) {
+        return Math.floor((total | 0) / c) + (n <= (total | 0) % c ? 1 : 0);
+      };
       for (let n = 1; n <= c; n++) {
-        jrChapInc[n] = Math.floor((inc | 0) / c) + (n <= (inc | 0) % c ? 1 : 0);
-        jrChapScene[n] = Math.floor((scn | 0) / c) + (n <= (scn | 0) % c ? 1 : 0);
+        jrChapInc[n] = share(inc, n);
+        jrChapScene[n] = share(scn, n);
+        jrChapPho[n] = share(pho, n);
+        jrChapFed[n] = share(fed, n);
       }
       saveSoon();
       return this.notoAudit();
