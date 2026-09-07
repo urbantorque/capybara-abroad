@@ -1,6 +1,6 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1, B2 AND B3 ARE BUILT, 7 Sep 2026.**
+> **B1-B4 ARE BUILT, 7 Sep 2026.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -22,14 +22,22 @@
 > 150 s nudge is said by the nearest person now, through `game.sayNear`.
 > `lead:` is deferred with a reason.
 >
-> See CONTRACT.md for what each measured and the seven things that measured
-> wrong first.
+> **B4**: the pips — the chain is legible while it is open, and invisible when
+> it is not. Item 2's other two bullets are corrected in place: the arrival
+> tick is **refused** (F1 decided it in writing and the argument still holds),
+> and the seeded-placement bullet is **three chapters and a city, not
+> nineteen**.
+>
+> See CONTRACT.md for what each measured and the things that measured wrong
+> first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. Five of its claims
-> have now been checked and failed: the count of marquees in act 2+, the
-> phasing of the clocks, the existence of a stuck timer, the chart not marking
-> the marquee, and the minis having no chart presence. **Measure the premise
+> systems, not from measurement, and it says so at the top. **Seven of its
+> claims have now been checked and failed**: the count of marquees in act 2+,
+> the phasing of the clocks, the existence of a stuck timer, the chart not
+> marking the marquee, the minis having no chart presence, the incident chain
+> being invisible (it has had a rising note since v51), and the first rows
+> needing to be moved in nineteen chapters (five). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -278,16 +286,37 @@ each cell reachable without reading anything:
 - **The gag, per chapter.** Written as a `gag:` row in `physBIOME_SCATTER`'s
   `also` annulus so the probe can find it, and **every one is a witnessed
   event** so the chain arms from the first thing you touch. Authored below.
-- **The arrival tick is earned.** `ROADMAP-FINISH` already lists this. The
+- **The arrival tick is earned. REFUSED (B4), with the argument.** F1 examined
+  this and decided it in writing: it removed chapter 3's `arrive` because its
+  first row is not a turning-up, and kept the other eighteen because **theirs
+  are true** — you did emigrate. This item also replaces eighteen authored row
+  texts with one generic *Made an entrance*, and ticking "Get off the train at
+  Kyoto" on the frame you barge a bin is a row that no longer describes what
+  happened. The complaint underneath — the first tick teaches that ticks are
+  free — is real, and is better answered by putting something worth tripping
+  over in the spawn ring, which is the gag pass.
+- ~~**The arrival tick is earned.**~~ `ROADMAP-FINISH` already lists this. The
   `arrive:` row on `CHAPTERS` ticks on `biome:enter` today; tick it on the
   first disturbed prop or startled person instead, with text that says what
   you did — *"Made an entrance"*. Now the first tick lands in the first thirty
   seconds of every chapter by construction.
-- **The chain is visible.** Three small pips beside the stamina bar, filled by
+- **The chain is visible. BUILT (B4)** — five pips, not three (`sysINC_N2`),
+  with the third ringed while unlit because it is the one that makes a card,
+  and a window bar that drains with `incT`. **Nothing at rest**: v51 already
+  gave the chain a rising note per event and said in its own comment that it
+  adds no HUD, so the pips appear when a chain opens and go when it closes.
+  What a note cannot carry is HOW MANY and HOW LONG; that is all this adds.
+- ~~**The chain is visible.**~~ Three small pips beside the stamina bar, filled by
   `incN` and drained on the chain's own clock. Nothing new is counted; the
   number that already decides a card is on screen. A goal that is not the
   paper, from minute one, everywhere.
-- **The people are where the first rows need them.** At boot, per chapter,
+- **The people are where the first rows need them. MUCH SMALLER THAN THIS (B4).**
+  Measured (`qa/first-rows.js`): **thirteen of eighteen first rows are already
+  inside 30 m**, median about 18 m. Five are not — Hanoi 117.8 m, Kyoto 98.5 m,
+  Cappadocia 96.1 m, Venice 48 m, Palawan 35.6 m — and **Hanoi has zero props
+  within 14 m of its spawn**. That is the list, and it is three chapters and a
+  city, not nineteen.
+- ~~**The people are where the first rows need them.**~~ At boot, per chapter,
   guarantee that the *first two rows of act one* have their subject inside 12 m
   of spawn, facing away — a seeded placement through `physSpotOk`, not a
   script. Sydney: a hat-wearer and a coffee-holder. Pasto: a vendor with fruit
@@ -541,9 +570,11 @@ moves these numbers or does not.
   unoccluded in **2** — Venice and the Pantanal. Nothing else.
 - **The first tick lands inside 30 s in 13 of 19** — and in six chapters (the
   Quay, Kyoto, Iceland, Marrakech, Hong Kong, Palawan) a wandering player ticks
-  NOTHING in ninety seconds. **This is worse than the headline guessed**, and it
-  moves item 2 up in importance: those six are chapters whose first row cannot
-  be tripped over.
+  NOTHING in ninety seconds. **B4 qualifies this and it should not be quoted
+  bare:** only two of the six are distance problems. Iceland's first row is
+  8.0 m away, Marrakech's 11.4 m and Hong Kong's 12.0 m — what those three need
+  is a VERB (they are thefts) and **the random walk never presses E**. The
+  number is as much a fact about the driver as about the game.
 - **The longest quiet run is 31–91.5 s**, over a minute in twelve chapters.
 
 One thing the baseline changed about the plan: the arrival tick being *earned*

@@ -14,6 +14,114 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH FOUR — THE CHAIN, ON SCREEN (B4 — 7 Sep 2026)
+
+**LANDED.** The pips, and the instrument that re-scopes the rest of item 2.
+Item 2 has three bullets; one is built, one is measured and much smaller than
+it claimed, and one is refused because it contradicts a decision F1 wrote down
+on purpose.
+
+### THE PIPS — THE CHAIN, WHILE IT IS OPEN
+
+The incident chain is the one repeatable reward in this game. Item 2 says it is
+"invisible until it pays". **That is half true and the half matters:** v51
+already gave it a rising note per witnessed event, for exactly the reason item 2
+gives ("a reward you cannot AIM at is a lottery, not a loop") — and v51's own
+comment says, deliberately, that it *"adds no HUD, names nothing, lists nothing
+and gates nothing, so the finds' three laws hold"*.
+
+So the question is not "is the chain silent" but "what can a note not carry".
+Two things: **HOW MANY, and HOW LONG.** "Something is being counted" and "you
+have four seconds to knock over one more" are different sentences and only one
+of them can be played.
+
+`incPaint`, five pips over the stamina bar:
+
+  - **nothing at rest.** `display:none` until a chain opens, gone when it
+    closes. This is not a counter sitting on screen for eight hours; it is the
+    chain making itself legible for the twelve seconds it exists. That keeps
+    v51's condition rather than overturning it.
+  - **`sysINC_N2` of them, made on the first paint** and not at build time,
+    because that constant is declared with the rest of the chain and would be
+    in its temporal dead zone. One `const` read per session, and it cannot go
+    out of step with the rule the way a hardcoded five would.
+  - **the third carries a ring, and only while it is unlit.** It is the one
+    that makes a card, and a threshold you can see coming is a threshold you
+    can play for. Kept after lighting it would make that pip read as a
+    different KIND of pip rather than as a threshold passed.
+  - **the window bar is the part the sound cannot do at all.** It shortens with
+    `incT`, on a LINEAR transition, because it is a clock and every other bar on
+    this HUD eases — easing a countdown makes it lie. Quantised to a fortieth
+    so a per-frame transform is not a style recalculation that never stops.
+  - gated on the same "the world is the player's" condition the nudge and the
+    toasts use, and it goes with the paper under the postcard key.
+
+Measured (`qa/pips.js`): absent at rest; on from the first counted thing; one
+pip per thing 1→5; the gate mark on index 2, which is `sysINC_N - 1`; the window
+draining to `scaleX(0)`; the row gone once the window closes. **The witness gate
+is not bypassed** — the probe emits the same `prop:destroy` props.js emits, and
+`incAdd` still has to get an answer from `findPeople`, which is the half of the
+rule a fake event could quietly skip.
+
+### THE FIRST ROWS, MEASURED — `qa/first-rows.js`
+
+Item 2's third bullet asks to "guarantee that the first two rows of act one have
+their subject inside 12 m of spawn". Measured on the arrival frame, per chapter,
+the distance from the spawn to the first open rows' hint targets:
+
+  - **thirteen of eighteen are already inside 30 m** (median about 18 m), and
+    five are not: **Hanoi 117.8 m** (`pho-raid`), **Kyoto 98.5 m** (`torii-run`),
+    **Cappadocia 96.1 m** (`chimney-top`), Venice 48 m, Palawan 35.6 m.
+  - **Hanoi has ZERO props within 14 m of its spawn**, and Hanoi, the Pantanal
+    and Sơn Đoòng have zero people there. Hanoi is the one that reads as a
+    fault: its own arrival line is *"seven million people and six million of
+    them are on a moped"*.
+
+**And it corrects the B1 baseline's most alarming number.** B1 found six
+chapters in which ninety seconds of wandering ticks nothing — the Quay, Kyoto,
+Iceland, Marrakech, Hong Kong and Palawan. Only two of those six are distance
+problems. Iceland's first row is 8.0 m away, Marrakech's 11.4 m and Hong Kong's
+12.0 m: what those three need is a VERB (they are thefts), and **the random walk
+never presses E.** That number is as much a fact about the driver as about the
+game, and it should not be quoted as though a player would meet it.
+
+So the third bullet is not nineteen chapters of seeded placement. It is three
+chapters with a first row a hundred metres off and one city with an empty spawn
+ring — which is the gag pass's job (B5/B6), with a much shorter list than the
+roadmap's table assumes.
+
+### THE ARRIVAL TICK IS NOT MADE "EARNED", AND HERE IS WHY
+
+The `arrive:` row does tick the instant the white clears — confirmed at both
+call sites, `jrGo`'s fade callback and the title-start `landed` branch. But F1
+already examined exactly this and decided against it in writing: it removed
+chapter three's `arrive` because *"chapter three's first row is not a
+turning-up"*, and kept the other eighteen because **"theirs are true"** — you
+did emigrate.
+
+Item 2's proposal also replaces eighteen authored row texts ("Emigrate
+(somehow)", "Get off the train at Kyoto") with one generic *"Made an entrance"*,
+and ticking a row that says "Get off the train at Kyoto" on the frame you barge
+a bin is a row that no longer describes what happened. The complaint underneath
+— that the chapter's first tick teaches the player that ticks are free — is real
+and is better answered by putting something worth tripping over in the spawn
+ring, which is the gag pass, than by making an honest row dishonest.
+
+Deferred with the argument written down, not silently skipped.
+
+### ...AND ONE THING THE INSTRUMENT FOUND ON ITS WAY PAST
+
+**`hud.cross(biome)` does not tick the arrival row.** It calls `biomeFadeTo`
+without the callback that `jrGo` passes, so every probe in this repo that
+crosses with it measures a chapter whose arrival row is still open. No player
+route is affected — the departures board and the title picker both tick — but
+any probe reading "the first open row" through `hud.cross` is reading one row
+earlier than a player would, and this file's own table is offset that way. It is
+noted here rather than changed: making the harness's crossing tick would make
+the harness less like the thing it is standing in for, not more.
+
+`npm test` 10/10.
+
 ## THE FUN PASS, BATCH THREE — WHICH ONE, AND WHO SAYS SO (B3 — 7 Sep 2026)
 
 **LANDED.** Items 1e and the half of 1d that was not already built. Both items'

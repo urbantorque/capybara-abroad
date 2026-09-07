@@ -7354,6 +7354,9 @@ function sysBuildCSS() {
    that could swallow its own marquee moment would be a trap rather than a
    feature. Opacity and a transition, so it is a fade rather than a flicker. */
 '#hud.bare .capyui-todo,#hud.bare .capyui-map,#hud.bare .capyui-stam,',
+/* the pips go with the bar they sit over — the postcard key takes the paper
+   off the window and a row of counters is paper. */
+'#hud.bare .capyui-pips,',
 '#hud.bare .capyui-fly,#hud.bare .capyui-perf,#hud.bare .capyui-home{',
   'opacity:0 !important;pointer-events:none !important;}',
 /* the on-screen stick is display-driven and its children opt back into the
@@ -7439,7 +7442,7 @@ function sysBuildCSS() {
    One rung for the lot, below every card above and above the pool's own 30.
    The pool is where it belongs — a bubble is the world talking and the paper
    is the game talking, and the game is on top of the glass. */
-'.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-fly,',
+'.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-pips,.capyui-fly,',
   '.capyui-home,.capyui-moment,.capyui-touch{z-index:40;}',
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
@@ -8249,6 +8252,41 @@ function sysBuildCSS() {
 '.capyui-stam.blown{background:transparent;',
   'box-shadow:inset 0 0 0 1.5px ' + accent + ',' + shMd + ';animation:none;}',
 '.capyui-stam.blown i{background:transparent;}',
+
+/* ---------- the chain, while it is open (B4) ----------
+   Five pips over the stamina bar, one per witnessed thing, with the third
+   carrying the mark of the first card. NOTHING AT REST: the row is
+   `display:none` until a chain opens and goes again when it closes, so this
+   adds no permanent HUD — which is the condition v51 set on itself when it
+   gave the chain its rising note and deliberately gave it no picture. The
+   sound says a thing was counted; only this can say HOW MANY and HOW LONG.
+
+   The window bar under them is the part the sound cannot do at all. It
+   shortens with `incT` — twelve seconds from the last thing that counted —
+   and it is the difference between "something is being counted" and "you have
+   four seconds to knock over one more". Scaled on a transform so the drain
+   costs no layout, and its transition is time-linear because it IS a clock;
+   every other bar on this HUD eases, and easing a countdown makes it lie. */
+'.capyui-pips{position:absolute;left:16px;bottom:29px;display:none;',
+  'flex-direction:column;gap:3px;width:clamp(96px,17vw,148px);pointer-events:none;}',
+'.capyui-pips.on{display:flex;}',
+'.capyui-pips u{display:flex;gap:4px;align-items:center;text-decoration:none;}',
+'.capyui-pips b{flex:1 1 0;height:5px;border-radius:999px;font-weight:400;',
+  'background:' + sysRgba(PALETTE.ibisHead, 0.20) + ';box-shadow:' + shSm + ';',
+  'transition:background ' + dMed + ' ease;}',
+'.capyui-pips b.lit{background:' + accent + ';}',
+/* the third is the one that makes a card, so it is the one that is drawn
+   differently BEFORE it is lit rather than after — a threshold you can see
+   coming is a threshold you can play for. */
+'.capyui-pips b.gate{box-shadow:inset 0 0 0 1.5px ' + sysRgba(PALETTE.ibisHead, 0.55) + ',' + shSm + ';}',
+/* ...and the ring comes OFF once it is lit. It is there to say "this is the
+   one that makes a card" while the pip is still empty; kept afterwards it
+   makes the third pip read as a different KIND of pip rather than as a
+   threshold that has been passed, which is the opposite of what it is for. */
+'.capyui-pips b.gate.lit{box-shadow:' + shSm + ';}',
+'.capyui-pips s{display:block;height:2px;border-radius:999px;text-decoration:none;',
+  'background:' + sysRgba(PALETTE.ibisHead, 0.30) + ';transform-origin:0 50%;',
+  'transition:transform .1s linear;}',
 
 /* ---------- the way home ---------- */
 '.capyui-home{position:absolute;left:50%;bottom:clamp(18px,5vh,44px);',
@@ -19594,6 +19632,22 @@ export function createSystems(game) {
   hudRoot.appendChild(stamEl);
   let stamShown = false, stamLow = false, stamBlownCls = false, stamFullT = 0;
 
+  // --- the chain, while it is open (B4) ---
+  // See THE INCIDENT. Built once and hidden; `incPaint` is the only writer.
+  // The bars themselves are made on the first paint and not here: how many
+  // there are is `sysINC_N2`, which is declared with the rest of the chain a
+  // long way below this line and would be in its temporal dead zone. One
+  // `const` read at the first paint costs nothing and cannot go out of step
+  // with the rule the way a hardcoded five would.
+  const pipsEl = sysEl('div', 'capyui-pips');
+  const pipsRow = sysEl('u');
+  const pipsBars = [];
+  const pipsWin = sysEl('s');
+  pipsEl.appendChild(pipsRow);
+  pipsEl.appendChild(pipsWin);
+  hudRoot.appendChild(pipsEl);
+  let pipsOn = false, pipsLit = -1, pipsW = -1;
+
   // --- the way home: three whistles, stood in the crater ---
   const homeEl = sysEl('div', 'capyui-home');
   // The words are not fixed, and there is exactly one reason: the prompt now
@@ -29682,6 +29736,56 @@ export function createSystems(game) {
         else if (incN >= sysINC_N - 1) sfx('tick', { volume: 0.11, pitch: 0.70 });
         incN = 0; incCarded = 0;
       }
+    }
+    incPaint();
+  }
+
+  /**
+   * THE CHAIN, ON SCREEN, WHILE IT IS OPEN (B4, item 2).
+   *
+   * The chain is the one repeatable reward in this game and until v51 it was
+   * completely silent until it paid out. v51 gave it a rising note per event
+   * and said, in its own comment, that it adds no HUD — and that was the right
+   * call for what a note can carry. A note cannot carry two things: HOW MANY,
+   * and HOW LONG. "Something is being counted" and "you have four seconds to
+   * knock over one more" are different sentences and only one of them can be
+   * played.
+   *
+   * So: nothing at rest, and no permanent element. The row appears when a
+   * chain opens and goes when it closes, which keeps v51's condition — this is
+   * not a counter sitting on the screen for eight hours, it is the chain
+   * making itself legible for the twelve seconds it exists.
+   *
+   * Every write is change-guarded. This is called from `incTick`, once a
+   * frame, for the whole session.
+   */
+  function incPaint() {
+    if (!pipsBars.length) {
+      for (let i = 0; i < sysINC_N2; i++) {
+        const b = sysEl('b', i === sysINC_N - 1 ? 'gate' : null);
+        pipsBars.push(b);
+        pipsRow.appendChild(b);
+      }
+    }
+    // Open, and only while the world is the player's: the same gate the nudge
+    // and the toasts use. A row of pips over a pause card is furniture.
+    const on = started && incT > 0 && !transBusy && !jrShown && !ledShown &&
+               !albShown && !pauseShown && !game.state.paused;
+    if (on !== pipsOn) { pipsOn = on; pipsEl.classList.toggle('on', on); }
+    if (!on) { pipsLit = -1; pipsW = -1; return; }
+    const lit = Math.min(incN, sysINC_N2);
+    if (lit !== pipsLit) {
+      pipsLit = lit;
+      for (let i = 0; i < pipsBars.length; i++) {
+        pipsBars[i].classList.toggle('lit', i < lit);
+      }
+    }
+    // Quantised to a fortieth, because this is a transform written every frame
+    // and a float that never repeats is a style recalculation that never stops.
+    const w = Math.max(0, Math.round((incT / sysINC_T) * 40) / 40);
+    if (w !== pipsW) {
+      pipsW = w;
+      pipsWin.style.transform = 'scaleX(' + w + ')';
     }
   }
 
