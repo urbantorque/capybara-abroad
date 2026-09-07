@@ -14,6 +14,190 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH ONE — THE PERCH (N1 — 8 Sep 2026)
+
+**ROADMAP-NEXT item 2, first batch.** The single most-shared fact about this
+species is that other animals use it as furniture, and the one animal in this
+game nothing sat on was the capybara. Sit still next to something that is
+already following you and it climbs on; stand up and walk and it stays there.
+
+Built as pitched, with **two pre-existing bugs found on the way in** and **one
+design change to a chapter's own animal**, all three measured before a line of
+the feature was written.
+
+### WHAT THE PERCH IS, AND WHY IT IS NOT A CARRIER
+
+The herd with a vertical. Every other thing in this game that carries the
+capybara is a kinematic BODY, and capybara.js damps whatever it is standing on
+to a stop — that is the seven-ways-to-drop-a-passenger problem the toybox and
+the mini tier both paid for. **A perched animal is not a body and never touches
+the solver.** It is a pose, written once a frame from `capy.back()`, exactly the
+way a led animal's ground position is written. So the carrier problem cannot
+arise, and the thing worth measuring instead is position ERROR against the seat:
+**0.000 m through four seconds of walking, in all six chapters** (`err` in
+`game.perchDebug()`, which is the chapter's own `at` re-read after the `put`).
+
+**FOUR RULES, and the first two are the herd's own.**
+
+ 1. **It must already be following you.** The obey ladder is the gate, so the
+    perch costs nothing to author and inherits a tier system that is tuned: a
+    pigeon climbs on for one wheek, a cat for two, the heron for three.
+ 2. **It is on the herd's clock.** `herdHOLD` is 21 s; a passenger whose
+    company runs out gets down like anybody else in the line. Nothing is
+    collected, and the verb stays in use.
+ 3. **You have to be still.** `capy.loaf >= perchLOAF` (0.80) held for
+    `perchWAIT` (2.2 s), on top of `capyLOAF_T`'s own 6.5. Measured end to end:
+    a passenger arrives 6 to 9 s after the animal sits down.
+ 4. **Not every animal may.** See THE REFUSALS.
+
+**THE OFFER GROWS TWO OPTIONAL FIELDS AND NOTHING ELSE CHANGES.**
+
+    lift: function (i, y) {}    this animal may ride, and this is how the
+                                chapter is told what height to draw it at
+    span: 1 | 2                 how many of the three seats it fills
+
+`lift` is called EVERY FRAME while that animal is riding and never otherwise,
+which makes it the same re-asked-per-frame shape as `capy.loafAsk`: the chapter
+sets a short timer from it and suppresses its own wander, flee and gravity for
+that animal while the timer runs, and **a perch that stops being written cannot
+leave an animal stuck in the air.** `put` is still called first on the same
+frame with the seat's x/z and a yaw, so a chapter that keeps x, z and y in three
+places gets all three.
+
+### THE SEATS ARE READ OFF THE HULL, NOT AUTHORED
+
+`capy.back(i, out)` (capybara.js) is the world point of seat `i`, fractional so
+a two-seat animal sits between two of them. Three seats at model z = 0.06,
+−0.16, −0.38, all aft of the ears (the ears reach 0.278; anything forward of
+about z = 0.25 is a hat and the wardrobe's job), and their heights come from
+`capyHullAt` plus 15 mm of standing-off. **A seat written as a number goes
+inside the animal the first time somebody changes its shape**, which happened
+once already this month — R2 raised the shoulder 11 cm and buried both lapels of
+a costume that had been fitted by hand.
+
+Read off `capySquash`'s world matrix, so the returned point already carries the
+loaf drop, the breath, the lean, the squash and the render smoothing. Measured
+seat height over the feet: **0.72 m standing, 0.57 m loafing** (the 0.145 loaf
+drop). The note by `capySquash` says nothing needing a clean world quaternion
+may live under it, and nothing here does — `back` returns a point and never an
+orientation; a passenger takes its heading from `capy.group.rotation.y`.
+
+### THE SIX, AND THE REFUSALS
+
+Wired, all measured mounting and riding through a walk: **Sydney's ibis**
+(span 1), **Venice's pigeon** (1, and three fit), **Göreme's cat** (2, and it
+rides flopped), **Kyoto's heron** (2), **Manly's silver gull** (1),
+**Antarctica's gentoo** (2).
+
+**Iceland's sheep and the Pantanal's cows are refused, with a reason.** A ewe is
+45 kg and a cow half a tonne against a 55 kg capybara. The joke is a small
+animal riding a large calm one and it inverts the moment the passenger is
+bigger than the mount. They stay in the herd, where a line of fourteen sheep
+behind you is already the right gag for that animal.
+
+### AND THE HERON IS PERCHABLE FROM THE WATER, WHICH IS A NICER FACT THAN THE PLAN
+
+Both of the heron's wade points are inside `kyoPOND` (68 m by 44), so the
+nearest dry ground to it is 12–14 m and the herd's earshot is 15. A
+twenty-four-candidate dry-land ring round the bird found **nothing**, and the
+loaf's own busy list has swimming on it — so `loaf: 0` for thirty seconds with
+the bird standing there led. **The heron can only be perched by an animal that
+has learnt to float**, which is the Pantanal's skill, ten chapters later. That
+is not a gate anybody wrote and it is the best thing in this batch: the place
+that teaches you to sit still in water is what buys you a heron.
+
+### TWO PRE-EXISTING BUGS, BOTH OF WHICH MEASURED AS A WORKING FEATURE
+
+**1. ANTARCTICA'S GENTOO OFFER HAD NEVER WORKED, AND IT REPORTED FORTY-TWO.**
+`qa/n1-herd-y.js`, all nineteen chapters: `herdDebug()` gave
+`{ kind: 'gentoo', n: 42 }` and the first one's position as **x 0, z 0** — the
+origin, out in the bay, fifty to ninety metres from where any of them are
+drawn. Every other chapter that offers an animal reported a live position.
+
+The forty-two the offer addresses are the birds past `antPENG_COL`, whose mode
+is 1 or 2 — the penguin highway — and **that branch computes x and z into
+locals off `antHIGH` and writes neither back.** So `at` read a pair that had
+been zero since the chapter was built and `put` wrote a pair nothing reads. A
+wheek near the spawn recruited birds at the origin and dragged nothing. The
+herd soak saw no error because there was none to see: the offer registered, the
+count was right, and the mechanic was dead. Same family as the api-key
+mismatch that seated five diners on thin air.
+
+**2. MANLY'S GULLS COULD BE RECRUITED AND NEVER MOVED.** Ten joined on two
+wheeks and then stood on their parapets for the whole run, `near` 30.9 m and
+never falling. `put` refused whenever `manGullData[q + 1] > manPROM_Y + 0.6`,
+which is true of every gull on an awning — that is what an awning is. **The
+note forty lines below it, on the draw, already had the answer:** "A PERCHED
+GULL IS FIVE METRES UP. Testing height for 'is it flying' makes every bird on a
+shop parapet flap on the spot for ever; the state is `up`, and the state is
+what has to be asked." The draw learnt it in an earlier batch and the two
+writers did not. The flock's `put` had the same line and the same defect, so
+nothing had ever walked to a dropped chip either.
+
+Fixing it needed a second timer: with the height test gone the bird's x and z
+are written every frame and every branch of the draw was still damping its Y
+back up onto the awning — a gull walking behind you eight metres in the air.
+`manGullHeld` is "this bird is following you, so it is on the ground".
+
+**AND ONE MORE, FOUND BY THE PERCH ITSELF.** `manGullUp` goes to 1 whenever the
+animal comes near the Corso, which during a walk is most of the time, and `put`
+refuses while the flock is up. A perched gull's error climbed **1.35, 3.35,
+5.35, 7.35, 9.35 m over four seconds** — at exactly walking speed, because
+`put` had stopped writing it while `lift` went on writing its height. A gull on
+your back is not in the wheel.
+
+### THE DESIGN CHANGE: A BIRD THAT HAS AGREED TO FOLLOW YOU IS NOT FRIGHTENED OF YOU
+
+The heron was **unperchable by arithmetic**. It joins on the third wheek from
+twelve metres and then walks the trail INTO its own nine-metre flush radius,
+which puts it up; and if it survives that, `kyoHERON_REST` is 26 s against a
+recruitment that takes fifteen and a loaf that takes another ten. Measured
+`led: 1` at t=0 and `led: 0` by t=18, every run, with nothing ever reaching the
+animal's back.
+
+Both the proximity flush and the rest clock are suppressed while the bird is
+**held** — `kyoHeronHeld` is re-asked by the herd's own `put`, so it is only
+ever up while systems.js is actively walking this bird — and neither is
+weakened for one frame otherwise. The dry-crossing suppression above it
+deliberately leaves the rest clock alone "so the moment can never be locked
+out"; this cannot lock it out either, because the herd's own hold is 21 s and
+the clock resumes the instant the bird stops following.
+
+### THE DISMOUNTS
+
+Everybody off on a hop (`perchAIR` 0.14 s of not-grounded, because `grounded`
+is false for a frame at the top of a step on rough ground and three passengers
+leaving because a kerb went past is a fault, not a mechanic), a dive, a slide,
+a climb, and a barge — `prop:impact` at or over `physBARGE_MIN` within 3 m,
+which between them is exactly "you ran into something". **Swimming is
+deliberately not on the list**: a pigeon on the head of a swimming capybara is
+the picture this whole block exists for, and the heron needs it.
+
+### WHAT IS NOT IN THIS BATCH, AND ONE THING THAT CANNOT BE
+
+The passenger book, the per-chapter record, the stowaway and the people's
+reaction are N2. **The record cannot be built the way the roadmap assumes:** a
+`RECORDS` key has to be a TASK id — the chapter board and the picker both look
+it up as `RECORDS[taskId]` — and there is no task called "most on at once". It
+needs either a task per chapter or a different surface, and that is a decision
+for N2 rather than a bodge here.
+
+### INSTRUMENTS, AND WHAT THEY COST TO GET RIGHT
+
+`qa/n1-herd-y.js` (nineteen chapters, what each offer's `at` actually
+reports), `qa/n1-perch.js` (six chapters: recruit → loaf → mount → walk → hop),
+`qa/n1-shots.js` (the pictures, `qa/N1-*.png` and `qa/N1c-*.png`).
+`qa/herdsoak.js` after: nineteen chapters, 0 errors, 0 NaN.
+
+**THE PROBE WAS THE EXPERIMENT, TWICE.** A forty-eight-candidate dry-land ring
+at eighty ticks each is sixty-four seconds of world time: it flooded the
+Venetian square, walked the Manly gulls out of earshot and bled every heard
+counter to zero, and five of six chapters reported a mechanic that had worked
+the run before. Only Kyoto needs one, so only Kyoto pays for one. And the first
+version pinned the body's Y as well as its X and Z, which leaves the animal off
+the ground — `capyBusy` never clears, `restT` stays at 0.00 and the loaf never
+comes, against a loaf that is fine. Both are trap 40's family.
+
 ## THE FUN PASS, BATCH FIFTEEN — GOSSIP, AND THE POSTER (B15 — 8 Sep 2026)
 
 **Item 6's last two bullets, and the last batch of ROADMAP-FUN.** The gossip
