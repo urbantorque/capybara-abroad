@@ -576,7 +576,7 @@ decays.
 | B5 | 2 the nineteen gags placed, half of them | 3 | `76e13ec` |
 | B6 | 2 the other half · re-run first-five, read the table | 3 | `13bd69e` `f3bae00` |
 | B7 | 3 sit-and-be-noticed: ~~approach,~~ crouch, photo | 3 | `40db53c` |
-| B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | |
+| B8 | 3 the snack · the pat · heat interlock · `pho`/`fed` | 3 | `fe953b3` |
 | B9 | 4a put down + receive · 4d breakables and spills · eng-rate A/B | 3 | |
 | B10 | 4b aimed throw · 4c nudge + one rideable prop | 3 | |
 | B11 | 4e people have bodies · 5d animals startle people | 3 | |
