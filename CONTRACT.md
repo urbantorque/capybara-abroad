@@ -14,6 +14,199 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE FUN PASS, BATCH FOURTEEN — THE NUMBER (B14 — 8 Sep 2026)
+
+**Item 6's first three bullets built: the number, the arrival headline, the
+ledger — and "the ending reads it", which was the fifth bullet and turned out
+to be one ternary once the other four were done.** The formula is NOT the one
+the item proposes, and the reason is the finding of the batch.
+
+### WHAT WAS THERE BEFORE
+
+Four per-chapter counters on the save — `inc` and `scn` since P3, `pho` and
+`fed` since B8 — and **nothing in the game had ever read one of them.** They
+were written, saved, restored, and shown nowhere. jrChapInc's own note says it
+is per chapter so that "eleven scenes, and four of them in Hong Kong" can be
+said; up to this batch nothing said it.
+
+### THE FORMULA, AND WHY IT IS NOT THE ITEM'S
+
+Item 6 asks for `notoriety = f(Σ inc, Σ scn, records beaten, finds)`. Two of
+those four terms are wrong for this number and one is missing:
+
+- **RECORDS BEATEN and FINDS are completion, not consequence.** There are 60
+  of each, and a player collects them by being thorough — which is the
+  opposite of what this number is about, and which the tally and the shelf
+  already count twice between them. A notoriety that climbs because you
+  noticed twenty quiet things is a headline in the wrong voice.
+- **A scene is already worth two incidents, for free.** A five-chain cards AN
+  INCIDENT on the way through three and A SCENE at five, and the counting
+  block increments BOTH tallies, so `inc + scn` weights them 2:1 by
+  construction. Measured rather than assumed: four chains that stopped at
+  three and two chains that went all the way both score 5.
+- **SPREAD is the term the item is missing**, and it is the one that makes
+  this a thread rather than a counter. The counters are per chapter, so "how
+  many places have heard of you" costs nothing to compute. Three scenes in one
+  city is a bad afternoon in Hong Kong; one incident in twelve cities is a
+  reputation — and *consequence should travel* is the item's own argument for
+  scoring the second one higher.
+
+`score = Σinc + Σscn + spread`, five tiers, and it is a PROJECTION — computed
+from the save on every card refresh, with no field of its own, nothing to
+migrate, and no way to be a legend on a file without the incidents behind it.
+Exactly the contract `keep` has, which is the analogy the item itself draws.
+
+### WHERE THE TIERS COME FROM
+
+The item names five tiers and not one boundary. **A tier table calibrated on
+nothing is a guess dressed as a number**, so both ends were measured first.
+
+`qa/noto-premise.js` — a random masher, 90 s a chapter, four chapters:
+
+| | sydney | venice | hanoi | kowloon |
+|---|---|---|---|---|
+| incident cards | 1 | 1 | 0 | 0 |
+| scene cards | 0 | 1 | 0 | 0 |
+
+Six minutes of continuous random input across four chapters: **2 incidents,
+1 scene.** A masher is the wrong instrument, though — it holds keys at random
+and almost never picks something up and throws it, which after B9 and B10 is
+what causing trouble IS.
+
+`qa/noto-ceiling.js` — DIRECTED: grab the nearest loose prop, throw it at the
+nearest person, every 0.9 s, four minutes a chapter:
+
+| | props | people | throws | startled | inc | scn |
+|---|---|---|---|---|---|---|
+| Sydney | 49 | 0 | 132 | 38 | **3** | **2** |
+| Venice | 68 | 8 | 128 | 139 | 1 | 1 |
+| Hanoi | 106 | 10 | 131 | 50 | 1 | 1 |
+
+Five cards in Sydney's four minutes is THREE CHAINS, two of which reached
+five — one about every eighty seconds. **The ceiling is structural, not
+behavioural: `sysINC_COOL` is 50 s**, so the game will not pay out a second
+card inside a minute however chaotic the world gets. That is what makes a tier
+table possible at all — the number cannot run away from a player who finds an
+exploit, because the exploit was measured and it turns out to be a clock.
+
+Twelve minutes of the most determined trouble the game can be made to produce
+came to a score of **17**. Set against that: a three-and-a-quarter-hour journey
+played AS a masher is worth about 115, an engaged player who likes causing
+trouble lands nearer 55–70, and somebody who came for the tasks and knocked
+things over on the way past is under 30.
+
+| tier | name | at |
+|---|---|---|
+| 0 | *(no name, on purpose)* | 0 |
+| 1 | a rumour | 3 |
+| 2 | a nuisance | 11 |
+| 3 | a menace | 26 |
+| 4 | a legend | 48 |
+| 5 | a natural disaster | 82 |
+
+**Spread is worth one, not two.** At two it is 38 points for visiting nineteen
+places and knocking one thing over in each — most of the way to the top tier
+for what is really a completion score, which is the exact failure the formula
+exists to avoid.
+
+### THE ARRIVAL HEADLINE, AND THE SECOND LINE THAT WAS ALREADY TAKEN
+
+From tier 2 up, the place card says what the place has heard —
+`SIGHTINGS OF A LARGE RODENT REPORTED IN {P}` through to `IT IS IN {P}`, four
+pools of three, escalating in what the place has DONE about it rather than in
+how loudly it says so.
+
+**It is a FOURTH element, not the card's second line.** The item asks for "a
+headline as the card's second line" and that line is already spoken for:
+`CHAPTERS.sub` is one authored phrase per chapter — *the gardens,
+unsupervised* — and it is the only thing that gives a chapter its own voice on
+the way in. Spending it on a rumour about the player would have traded
+nineteen written lines for five.
+
+All four tiers were authored rather than the two the item allows for if
+authoring time is short: a headline is one line of text and the tiers are the
+only part of this feature a player can feel, so shipping half of them would
+have been saving the cheapest part of the batch.
+
+### WHAT THE GUIDELINES PASS FOUND
+
+Three, and the first is the interesting one:
+
+- **`opacity: .85` on `accentInk` undoes the one constant that exists for
+  this.** accentInk is `#9e5f53` because that is 4.62:1 on the paper, where
+  the game's own accent is 2.31:1 — the split is documented where the two are
+  declared. Eighty-five per cent of a colour picked to clear 4.5:1 does not
+  clear it. The line recedes by being the finds' size and carrying no bullet,
+  which was doing the work anyway.
+- **The place card has never once been announced.** Older than B14: it says an
+  arrival, an act break, a marquee banner and the finale, and it is a plain
+  div. The white it rises through is deliberately `aria-hidden` on the grounds
+  that the name is "said out loud a moment later" — and the card that was
+  supposed to be saying it was silent. It is a live region now; unlike the
+  to-do clue it changes about four times a chapter rather than four times a
+  second, so it needs no `recs`-class trick.
+- `.capyui-placenews` interpolates a chapter name and had no `overflow-wrap`.
+
+### THE THINGS THAT MEASURED WRONG FIRST
+
+**`physRelease` TAKES A VECTOR, AND A SCALAR THROWS 1094 AUDIO ERRORS.** The
+first ceiling run passed B10's launch multiplier — `release(2.15)` — where the
+function wants an impulse. `physCV1.set(impulse.x, impulse.y, impulse.z)` on a
+number is `set(undefined, undefined, undefined)`, the body goes NaN, and the
+placed-sound path throws non-finite AudioParam errors for four minutes. **The
+console was full of a defect that did not exist**; the clean re-run is 0 page
+errors. A probe is part of the experiment.
+
+**A PROBE THAT ASKS THE SAME IMMOVABLE THING 260 TIMES THROWS ONCE.** Sydney's
+first directed lap: 1 throw in 240 s against Venice's 128. The grab loop
+retried its nearest prop forever. Skipping a prop that refuses took Sydney to
+132 throws and the highest card count of the three.
+
+**A SAVE FIXTURE CANNOT BE WRITTEN FROM A RUNNING GAME.** `pagehide` flushes
+the save (see the listener beside `applyDPR`) and `page.reload()` fires
+`pagehide` — so writing a complete 231-tick fixture and reloading writes the
+LIVE state straight back over it. Measured twice: `notoAudit` came back at zero
+on a file carrying 55, and `tasksDone` came back as the previous probe's ten.
+The fixture has to be written from a page that has not started a game.
+**`qa/pf2-finale.js` does not click the middle of the screen for this reason,
+and that click is the first line of every other probe in this repo** — on the
+title card it presses *start a new journey*.
+
+**"ARMED AND NEVER SAID" AGAIN, IN A NEW COSTUME.** The first arithmetic probe
+reported that a scene is worth nothing: four incident chains scored 5 and two
+scene chains scored 5. Both sides were right and the DIFFERENTIAL was wrong —
+those are four chains against two. Holding the chain count fixed and upgrading
+some of them gives 5 / 7 / 9, which is the 2:1 the formula claims.
+
+**THE FINAL LEDGER SAID IT TWICE.** `19 KEPT · A LEGEND` over `3:15:15 on the
+road · you leave as a legend` — three words twice inside one card, which reads
+as the card stuttering rather than as emphasis. The chip drops out when
+`ledFinal`; the sentence is the better of the two and it is the last thing the
+game ever says.
+
+**A TIER NAME MAY NOT BE BROKEN ACROSS A LINE.** Measured on a 390 px phone:
+`19 KEPT · A / NATURAL DISASTER`. Both surfaces that print it are single
+strings — jrCount is rebuilt from two halves every frame by jrTick and compared
+against the live text — so the fix is a non-breaking space rather than a span.
+**As an escape, never the character**: a literal U+00A0 in the source is
+invisible in every editor and survives a copy-paste as an ordinary space.
+
+### THE INSTRUMENTS
+
+`qa/noto-premise.js` (the rate, and what the surfaces are), `qa/noto-ceiling.js`
+(the top of the table), `qa/the-number.js` (every boundary, the arithmetic, the
+two cards through their own buttons, the headline), `qa/the-number2.js` (the
+right differential, and the clear-down), `qa/the-number3.js` (the ending, from
+a complete save), `qa/b14-shots.js`, `qa/b14-clean.js`.
+
+`game.hud.notoAudit()` returns `inc, scn, spread, score, tier, name, next,
+tiers`. `game.hud.forceNoto(inc, scn, chapters)` is a test hook and never a
+verb: tier 5 is 82 points and the fastest the game pays them out is 1.25 a
+minute, so looking at the top of the table would otherwise take an hour.
+
+`npm test` 11/11. Console 0 errors / 0 warnings across three tiers, three
+chapters, both cards opened and closed.
+
 ## THE FUN PASS, BATCHES TWELVE AND THIRTEEN — THE ROUTINE, AND THE BLAME (B12+B13 — 7 Sep 2026)
 
 **Item 5a and 5c built. 5e measured as already built. 5b refused.** Item 5's

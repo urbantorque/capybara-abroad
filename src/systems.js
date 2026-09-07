@@ -8082,6 +8082,20 @@ function sysBuildCSS() {
 '.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
 '.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
   'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
+/* ...and what the place remembers about YOU (B14). The finds' column, the
+   finds' size, no bullet: four counts that only some leaves carry, and on a
+   leaf that carries all four it must read as a footnote to the row rather
+   than compete with the records above it.
+
+   NOT WITH AN OPACITY ON IT. The first cut set opacity:.85 to make it recede,
+   which is the one thing this colour may not have done to it: accentInk is
+   #9e5f53 because that is 4.62:1 on the paper, where the game's own accent is
+   2.31:1 — see the note where the two are declared. Eighty-five per cent of a
+   colour chosen to clear 4.5:1 does not clear it. It recedes by being the
+   finds' size and carrying no bullet, which was doing the work anyway. */
+'.capyui-lednoto{grid-column:2 / 4;margin-top:2px;font-size:' + tMd + ';',
+  'color:' + accentInk + ';font-variant-numeric:tabular-nums;',
+  'overflow-wrap:anywhere;}',
 /* ...and the one line on a leaf that is not a number. Same column as the
    finds, no bullet: a find is one of a list and this is the last word about
    the place, so it reads as a caption under the row rather than as another
@@ -8147,6 +8161,13 @@ function sysBuildCSS() {
   'letter-spacing:.09em;line-height:1.02;transform:rotate(-1.2deg);}',
 '.capyui-placesub{font-size:clamp(11px,2.4vw,14px);letter-spacing:.34em;font-weight:700;',
   'text-transform:uppercase;color:' + accent + ';}',
+/* The rumour, under the chapter's own line. Deliberately the smallest and
+   palest thing on the card — it is a piece of gossip about the player, not the
+   name of the place, and it must never out-shout the two lines above it. Wider
+   measure than the sub because these are sentences and that is a phrase. */
+'.capyui-placenews{font-size:clamp(10px,2.05vw,12.5px);letter-spacing:.2em;font-weight:700;',
+  'text-transform:uppercase;color:' + accentInk + ';overflow-wrap:anywhere;',
+  'max-width:min(84vw,520px);line-height:1.5;text-wrap:balance;}',
 '.capyui-placerule{height:2px;width:min(38vw,190px);border-radius:' + rSm + ';background:' + rule + ';',
   'transform:rotate(.5deg);margin:2px 0;}',
 
@@ -19941,12 +19962,40 @@ export function createSystems(game) {
   fadeEl.appendChild(fadeName);
   hudRoot.appendChild(fadeEl);
   const placeEl = sysEl('div', 'capyui-place');
+  // ---- ...AND SOMEBODY SHOULD SAY IT (B14) --------------------------------
+  // Found by the guidelines pass over B14's fourth line, and it is older than
+  // B14: this card announces an arrival, an act break, a marquee banner and
+  // the finale, and NOTHING has ever read one of them out. The white it rises
+  // through is deliberately aria-hidden — see the note on fadeEl above, which
+  // says the name is "said out loud a moment later" — and the card that was
+  // supposed to be saying it is a plain div.
+  //
+  // Safe as a live region in a way the to-do clue was not: that element is
+  // rewritten four times a second by the hint tick and needed the `recs`
+  // class trick to stop a screen reader reading a doorway forever. This one
+  // changes about four times a chapter, and every one of those changes is an
+  // event a player would want told about.
+  placeEl.setAttribute('aria-live', 'polite');
   const placeH = sysEl('h2', null, '');
   const placeRule = sysEl('div', 'capyui-placerule');
   const placeSub = sysEl('div', 'capyui-placesub', '');
+  // ---- WHAT THE PLACE HAS HEARD ABOUT YOU (item 6, B14) -----------------
+  // A FOURTH element rather than a second use of the sub. The item asks for
+  // "a headline as the card's second line" and the card's second line is
+  // already spoken for: `CHAPTERS.sub` is one authored phrase per chapter —
+  // "the gardens, unsupervised" — and it is the only place in the game that
+  // gives a chapter its own voice on the way in. Spending it on a rumour
+  // about the player would trade nineteen written lines for five.
+  //
+  // Below the sub, quieter than it, and hidden whenever it is empty, so the
+  // eighteen calls to showPlace that are not arrivals — act breaks, wow
+  // banners, the finale — are the card they always were.
+  const placeNews = sysEl('div', 'capyui-placenews', '');
+  placeNews.hidden = true;
   placeEl.appendChild(placeH);
   placeEl.appendChild(placeRule);
   placeEl.appendChild(placeSub);
+  placeEl.appendChild(placeNews);
   hudRoot.appendChild(placeEl);
   let placeTimer = 0;
   // The headline of the card that is up, or '' once it has faded. Read by the
@@ -20019,9 +20068,14 @@ export function createSystems(game) {
     return base ? base + '\n' + line : line;
   }
 
-  function showPlace(title, sub) {
+  function showPlace(title, sub, news) {
     placeH.textContent = title;
     placeSub.textContent = sub;
+    // Cleared on EVERY call, not only when one is passed: this card is reused
+    // by four different events and a headline left on it from an arrival
+    // would turn up again under the next act break.
+    placeNews.textContent = news || '';
+    placeNews.hidden = !news;
     placeEl.classList.add('show');
     showPlaceLast = title;
     if (placeTimer) clearTimeout(placeTimer);
@@ -20333,6 +20387,27 @@ export function createSystems(game) {
         fl.appendChild(sysEl('span', null, f.where || f.text));
       }
       if (fl) row.appendChild(fl);
+      // ---- ...AND WHAT THE PLACE REMEMBERS ABOUT YOU (B14) --------------
+      // The four counters have been written to the save since P3 and B8 and
+      // NOTHING had ever read one of them. This is the per-chapter surface —
+      // "eleven scenes, and four of them in Hong Kong" is the sentence
+      // jrChapInc's own note says it exists to make possible — so the two
+      // mischief counts and the two charm counts belong on the leaf, and the
+      // tier they add up to belongs on the subtitle below.
+      //
+      // Only the counts that are non-zero: a leaf reading "0 incidents · 0
+      // scenes · 0 photographs" for a place you walked quietly through is
+      // three facts about nothing, and it would be on most of the rows.
+      {
+        const nb = [];
+        const ic = jrChapInc[n] || 0, sc = jrChapScene[n] || 0;
+        const ph = jrChapPho[n] || 0, fd = jrChapFed[n] || 0;
+        if (ic) nb.push(ic + (ic === 1 ? ' incident' : ' incidents'));
+        if (sc) nb.push(sc + (sc === 1 ? ' scene' : ' scenes'));
+        if (ph) nb.push('photographed ' + (ph === 1 ? 'once' : ph + ' times'));
+        if (fd) nb.push(fd === 1 ? 'given something' : 'given ' + fd + ' things');
+        if (nb.length) row.appendChild(sysEl('div', 'capyui-lednoto', nb.join('  ·  ')));
+      }
       // ---- ...AND WHAT THE PLACE WAS LIKE (P6) ---------------------------
       // Only on a leaf for a place that is FINISHED. The note is written in
       // the past tense about a chapter that is over — "you stopped minding
@@ -20345,10 +20420,30 @@ export function createSystems(game) {
       ledList.appendChild(row);
     }
     const noticed = findCount();
+    // ...and the one thing on this card that is not a count of how much of
+    // the game you have consumed (B14). Below tier 1 it says nothing at all —
+    // "nobody has heard of you" printed on a ledger is a scolding, and the
+    // player who has caused no trouble has not done anything wrong.
+    const noto = notoChip();
     ledSub.textContent = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
       ' places  ·  ' + kept + ' kept' +
-      (noticed ? '  ·  ' + noticed + ' noticed' : '');
-    ledFoot.textContent = sysFmtTime(jrTotalMs()) + ' on the road';
+      (noticed ? '  ·  ' + noticed + ' noticed' : '') +
+      // ...but NOT on the final one, where the foot says it as a sentence two
+      // lines below. Measured on the real ending: "19 kept · a legend" over
+      // "3:15:15 on the road · you leave as a legend" is the same three words
+      // twice inside one card, which reads as the card stuttering rather than
+      // as emphasis — the same argument the act curtain makes about a kick
+      // that is also a marquee.
+      ((noto && !ledFinal) ? '  ·  ' + noto : '');
+    // ---- AND THE ENDING READS IT (item 6, last bullet) -----------------
+    // The final ledger is the last thing this game ever says. It said a clock,
+    // and the clock is the least interesting true fact about a journey that
+    // has just finished. The tier is said here as a SENTENCE rather than as
+    // the chip above, because this is the one time it is a verdict.
+    const road = sysFmtTime(jrTotalMs()) + ' on the road';
+    ledFoot.textContent = (ledFinal && noto)
+      ? road + '  ·  you leave as ' + notoName()
+      : road;
     // A journey of nowhere is still a card, and it should say something.
     if (!rows) {
       const row = sysEl('div', 'capyui-ledrow');
@@ -20704,7 +20799,12 @@ export function createSystems(game) {
     // card that moves while it is open — see jrTick.
     jrCountPre = done + ' of ' + TASKS.length + '  ·  ' + places + ' of ' + chapMax +
       ' places  ·  ';
-    jrCountPost = (nf ? '  ·  ' + nf + ' noticed' : '');
+    // ...and the tier, on the same terms as the finds: nothing at all until
+    // there is something to say (B14). This is the card the player opens to
+    // decide where to go next, which is the one moment "somewhere else has
+    // heard about this" is worth knowing.
+    const noto = notoChip();
+    jrCountPost = (nf ? '  ·  ' + nf + ' noticed' : '') + (noto ? '  ·  ' + noto : '');
     jrCountLast = jrCountPre + sysFmtTime(total) + jrCountPost;
     jrCount.textContent = jrCountLast;
     const here = game.biome ? chapterOf(game.biome.current) : 1;
@@ -24621,6 +24721,169 @@ export function createSystems(game) {
     saveSoon();
   });
 
+  // =========================================================================
+  // NOTORIETY — THE THREAD THAT CROSSES CHAPTERS (item 6, B14)
+  //
+  // Nineteen places and the only thing that crossed a boundary between two of
+  // them was the shelf. The four counters above are the raw material for the
+  // other half of that — what the places remember about you rather than what
+  // you carried out of them — and until now nothing read a single one of them.
+  //
+  // A PROJECTION, NOT A FIELD. Same contract as `keep` (see keepHeld): it is
+  // computed from the save every time it is asked for, so there is nothing to
+  // migrate, nothing that can desync, and no way to be a legend on a file that
+  // does not have the incidents behind it.
+  //
+  // ---- THE FORMULA IS NOT THE ONE THE ITEM PROPOSES, AND HERE IS WHY -----
+  //
+  // Item 6 asks for `f(Σ inc, Σ scn, records beaten, finds)`. Two of those four
+  // terms are wrong for this number and the third is free:
+  //
+  //  - RECORDS BEATEN and FINDS are COMPLETION, not consequence. There are 60
+  //    of each and a player collects them by being thorough, which is the
+  //    opposite of the thing this number is about; the tally and the shelf
+  //    already count thoroughness twice. A notoriety that climbs because you
+  //    noticed twenty quiet things is a headline in the wrong voice.
+  //  - A SCENE IS ALREADY WORTH TWO INCIDENTS and costs nothing to weight: a
+  //    five-chain cards AN INCIDENT on its way through three and A SCENE at
+  //    five, incrementing both tallies (see the counting block in incBump), so
+  //    a plain sum of the two weights it 2:1 by construction. Measured on a
+  //    real file: two incident cards and one scene card came back as inc 2,
+  //    scn 1.
+  //  - SPREAD IS THE TERM THE ITEM IS MISSING, and it is the one that makes
+  //    this a thread rather than a counter. `jrChapInc` is per chapter, so
+  //    "how many places have heard of you" is free. Three scenes in one city
+  //    is a bad afternoon in Hong Kong; one incident in twelve cities is a
+  //    reputation, and the item's own argument — *consequence should travel* —
+  //    is an argument for the second one scoring higher.
+  //
+  // ---- WHERE THE TIERS COME FROM ----------------------------------------
+  //
+  // The item names five tiers and not one boundary. MEASURED before they were
+  // written, because a tier table calibrated on nothing is a guess dressed as
+  // a number (`qa/noto-premise.js`, `qa/noto-ceiling.js`):
+  //
+  //   a random masher, six minutes across four chapters ....  2 inc, 1 scn
+  //   a DIRECTED troublemaker — grab the nearest prop, throw it at the
+  //     nearest person, every 0.9 s, four minutes a chapter:
+  //
+  //       Sydney   132 throws    38 startled   3 inc  2 scn
+  //       Venice   128 throws   139 startled   1 inc  1 scn
+  //       Hanoi    131 throws    50 startled   1 inc  1 scn
+  //
+  // Five cards in Sydney's four minutes is THREE CHAINS, two of which reached
+  // five — one about every eighty seconds, which is the cooldown plus the time
+  // a chain takes to build. The fastest anyone can earn this is therefore
+  // about 1.25 points a minute, and twelve minutes of the most determined
+  // trouble the game can be made to produce came to a score of 17.
+  //
+  // The ceiling is STRUCTURAL rather than behavioural: `sysINC_COOL` is 50 s,
+  // so the game will not hand out a second card inside a minute however
+  // chaotic the world gets. That is what makes a tier table possible at all —
+  // the number cannot run away from a player who finds an exploit, because
+  // the exploit was measured and it turns out to be a clock.
+  //
+  // Set against the two brackets: three and a quarter hours played AS a masher
+  // is worth about 115, an engaged player who likes causing trouble lands
+  // nearer 55-70, and somebody who came for the tasks and knocked things over
+  // on the way past is under 30. Tier 5 is reachable and is not reached by
+  // accident, which is the whole job of the table.
+  // =========================================================================
+  // ...and SPREAD IS WORTH ONE, not two. At two it is 38 points for visiting
+  // nineteen places and knocking one thing over in each — most of the way to
+  // the top tier for what is really a completion score, which is the exact
+  // failure this formula exists to avoid. At one it rewards travelling without
+  // ever outweighing the trouble itself.
+  const sysNOTO_SPREAD = 1;    // a place that has heard of you at all
+  const sysNOTO_TIERS = [
+    { at:  0, name: '' },
+    { at:  3, name: 'a rumour' },
+    { at: 11, name: 'a nuisance' },
+    { at: 26, name: 'a menace' },
+    { at: 48, name: 'a legend' },
+    { at: 82, name: 'a natural disaster' },
+  ];
+  /**
+   * The number, and its parts. Cheap enough to call from a card refresh — it
+   * walks two objects with at most nineteen keys between them.
+   */
+  function notoScore() {
+    let inc = 0, scn = 0, spread = 0;
+    for (const k in jrChapInc) inc += jrChapInc[k] || 0;
+    for (const k in jrChapScene) scn += jrChapScene[k] || 0;
+    for (let n = 1; n <= chapMax; n++) {
+      if ((jrChapInc[n] || 0) > 0 || (jrChapScene[n] || 0) > 0) spread++;
+    }
+    return { inc: inc, scn: scn, spread: spread,
+             score: inc + scn + spread * sysNOTO_SPREAD };
+  }
+  /** 0-5. Zero is "nobody has heard of you", and it has no name on purpose. */
+  function notoTier(score) {
+    const s = (typeof score === 'number') ? score : notoScore().score;
+    let t = 0;
+    for (let i = 0; i < sysNOTO_TIERS.length; i++) if (s >= sysNOTO_TIERS[i].at) t = i;
+    return t;
+  }
+  function notoName(t) {
+    const r = sysNOTO_TIERS[(t === undefined) ? notoTier() : t];
+    return r ? r.name : '';
+  }
+  /**
+   * The same name, as a CHIP on a line of other chips — which is to say with
+   * its spaces hard. Measured on a 390 px phone: the ledger's subtitle wraps
+   * at "19 KEPT · A / NATURAL DISASTER", and a tier broken across two lines
+   * stops reading as one name. Both surfaces that print it are single-string
+   * (jrCount is rebuilt from two halves every frame by jrTick and compared
+   * against the live text), so this is a non-breaking space rather than a
+   * span — the structure has one writer and it stays that way.
+   */
+  function notoChip() { return notoName().replace(/ /g, '\u00a0'); }
+
+  // ---- THE ARRIVAL KNOWS (item 6, second bullet) -------------------------
+  //
+  // From tier 2 up, the place card says what the place has heard. Four pools
+  // rather than the two the item allows for ("ship tiers 2 and 4 if authoring
+  // time is short") — a headline is one line of text and the tiers are the
+  // only thing in this feature a player can actually FEEL, so shipping half
+  // of them would have been saving the cheapest part of the batch.
+  //
+  // WRITTEN AS RUMOUR, NOT AS A SCORE. Every one of them is a sentence some
+  // body in the place might have said before you got there, and none of them
+  // names a number — the tier is on the two cards for the player who wants
+  // the arithmetic, and this is the half that is supposed to be funny. They
+  // escalate in what the place has DONE about it, which is the only way a
+  // reader can tell tier 3 from tier 5 without being told.
+  //
+  // `{P}` is the chapter's own name. Kept out of the tier-1 pool on purpose:
+  // a rumour that has reached the next city is not a rumour.
+  const sysNOTO_NEWS = [
+    null, null,
+    // 2 — a nuisance
+    ['SIGHTINGS OF A LARGE RODENT REPORTED IN {P}',
+     'A LARGE RODENT IS SAID TO BE HEADING FOR {P}',
+     '{P}: RESIDENTS DESCRIBE A VERY CALM ANIMAL'],
+    // 3 — a menace
+    ['{P} ASKED TO SECURE ITS BINS',
+     'THE RODENT IS NOW WANTED IN SEVERAL PLACES',
+     '{P} ADVISED TO WATCH ITS FRUIT'],
+    // 4 — a legend
+    ['{P} HAS BEEN EXPECTING YOU',
+     'THE RODENT ARRIVES IN {P}',
+     '{P} CLEARS ITS TABLES'],
+    // 5 — a natural disaster
+    ['{P} BRACES',
+     'IT IS IN {P}',
+     '{P}: EVERYTHING HAS BEEN PUT AWAY'],
+  ];
+  /** The headline for arriving in chapter n, or '' below tier 2. */
+  function notoHeadline(n) {
+    const pool = sysNOTO_NEWS[notoTier()];
+    if (!pool || !pool.length) return '';
+    const def = chapterDef(n);
+    return pool[randInt(0, pool.length - 1)]
+      .replace('{P}', (def ? def.name : '').toUpperCase());
+  }
+
   /**
    * The end of a place. Deliberately built out of the pieces that already exist
    * — a card, the confetti, the lift, the chime — rather than a new screen,
@@ -25370,7 +25633,7 @@ export function createSystems(game) {
     if (landed) {
       // You did emigrate. Somehow.
       if (cdef.arrive) completeTask(cdef.arrive);
-      showPlace(cdef.name.toUpperCase(), cdef.sub);
+      showPlace(cdef.name.toUpperCase(), cdef.sub, notoHeadline(cdef.n));
       // Idempotent (it latches), and biomeGo's own biome:enter may well have
       // fired before `started` was true. See sysEndSayHome.
       sysEndSayHome();
@@ -25399,7 +25662,10 @@ export function createSystems(game) {
       // at the foot of the screen, which is where a travelled arrival's is
       // while its own place card is up.
       setTimeout(function () {
-        showPlace(cdef.name.toUpperCase(), cdef.sub);
+        // A first-ever session is tier 0 and this is '' — the stranger's very
+        // first card is the one it always was. A player coming back to Sydney
+        // three hours in is the case this line exists for.
+        showPlace(cdef.name.toUpperCase(), cdef.sub, notoHeadline(cdef.n));
       }, sysFADE_CARD_LAG);
       // ...and it is the one chapter that is never TRAVELLED to, so it is the
       // one chapter whose arrival shot cannot come from biomeGo. Chapter 1 is
@@ -27513,7 +27779,13 @@ export function createSystems(game) {
         // where it used to be: .capyui-place rises over 900 ms and the white
         // is opaque for the first 460 of them, so the arrival that the card is
         // supposed to BE was performed entirely behind a sheet of paper.
-        if (title) setTimeout(function () { showPlace(title, sub || ''); }, sysFADE_CARD_LAG);
+        // ...and what the place you have arrived in has heard (B14). Computed
+        // HERE rather than at the top of the crossing, because the incident
+        // that tipped you into a tier may have been the one you caused on the
+        // way to the door.
+        if (title) setTimeout(function () {
+          showPlace(title, sub || '', notoHeadline(chapterOf(name)));
+        }, sysFADE_CARD_LAG);
         // and the art goes with the white, once it has finished leaving
         setTimeout(function () {
           if (transBusy) return;             // another crossing has started
@@ -29464,6 +29736,38 @@ export function createSystems(game) {
       for (const k in jrChapPho) { pho[k] = jrChapPho[k]; p += jrChapPho[k]; }
       for (const k in jrChapFed) { fed[k] = jrChapFed[k]; f += jrChapFed[k]; }
       return { photos: p, gifts: f, byChapterPho: pho, byChapterFed: fed };
+    },
+    /**
+     * THE NUMBER, AS NUMBERS (B14). Same argument as charmAudit above: the
+     * tier is a projection of four counters that take hours to move, so a
+     * build where the projection is wrong and a player who simply has not
+     * caused any trouble look identical from outside. Also the only way to
+     * check the boundaries without playing to each of them.
+     */
+    notoAudit: function () {
+      const a = notoScore();
+      const t = notoTier(a.score);
+      return { inc: a.inc, scn: a.scn, spread: a.spread, score: a.score,
+               tier: t, name: notoName(t),
+               next: sysNOTO_TIERS[t + 1] ? sysNOTO_TIERS[t + 1].at : null,
+               tiers: sysNOTO_TIERS.map(function (r) { return [r.at, r.name]; }) };
+    },
+    /**
+     * A TEST HOOK, NEVER A VERB. Tier 5 is 82 points and the fastest the game
+     * will pay them out is 1.25 a minute (see the note above sysNOTO_TIERS),
+     * so a probe that wanted to look at the top of the table would have to
+     * play for an hour. Writes the counters directly and saves, which is what
+     * an hour of causing trouble would have left behind.
+     */
+    forceNoto: function (inc, scn, chapters) {
+      const c = Math.max(1, Math.min(chapMax, chapters | 0 || 1));
+      for (let n = 1; n <= chapMax; n++) { delete jrChapInc[n]; delete jrChapScene[n]; }
+      for (let n = 1; n <= c; n++) {
+        jrChapInc[n] = Math.floor((inc | 0) / c) + (n <= (inc | 0) % c ? 1 : 0);
+        jrChapScene[n] = Math.floor((scn | 0) / c) + (n <= (scn | 0) % c ? 1 : 0);
+      }
+      saveSoon();
+      return this.notoAudit();
     },
     setMuted: setMuted,
     setMusicMuted: setMusicMuted,

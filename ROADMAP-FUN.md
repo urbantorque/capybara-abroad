@@ -1,6 +1,7 @@
 # ROADMAP-FUN.md — the fun review, and six things that would lift the game a notch
 
-> **B1-B13 ARE BUILT, 7 Sep 2026. ITEMS 1-5 ARE CLOSED; ITEM 6 REMAINS.**
+> **B1-B14 ARE BUILT, 8 Sep 2026. ITEMS 1-5 ARE CLOSED. ITEM 6 HAS ONE BATCH
+> LEFT — B15, the gossip pools and the poster.**
 >
 > **B1** (`5060f0a`): `marquee:` on all nineteen chapters,
 > `game.marqueePoint()`, the marquee line on the paper (1b), and the instrument
@@ -95,12 +96,26 @@
 > for being about you, and an accusation IS about you. **Said 5 of 5.** 5e was
 > already built; 5b is refused for the reason B11 and B7 were.
 >
+> **B14**: item 6's number, its arrival headline, its ledger — and "the ending
+> reads it", which was a fifth bullet and turned out to be one ternary once the
+> other four were done. Four per-chapter counters have been on the save since
+> P3 and B8 and **nothing in the game had ever read one of them**. The FORMULA
+> is corrected in place below: records and finds are completion rather than
+> consequence and are out, a scene is already worth two incidents by
+> construction, and SPREAD — how many places have heard of you — is the term
+> the item is missing and the one that makes this a thread. The five tiers are
+> calibrated on two measured brackets rather than guessed: a random masher
+> earns 2 incidents and 1 scene in six minutes, a directed troublemaker
+> throwing something at somebody every 0.9 s earns three chains in four
+> minutes, and the ceiling is structural — `sysINC_COOL` is 50 s, so the
+> number cannot run away from anybody.
+>
 > See CONTRACT.md for what each measured and the things that measured wrong
 > first.
 >
 > **A STANDING NOTE ON THIS DOCUMENT.** It was written from a reading of the
-> systems, not from measurement, and it says so at the top. **Fourteen of its
-> claims have now been checked and failed** (fifteen with the gags): the count of marquees in act 2+,
+> systems, not from measurement, and it says so at the top. **Sixteen of its
+> claims have now been checked and failed** (seventeen with the gags): the count of marquees in act 2+,
 > the phasing of the clocks, the existence of a stuck timer, the chart not
 > marking the marquee, the minis having no chart presence, the incident chain
 > being invisible (it has had a rising note since v51), and the first rows
@@ -113,7 +128,10 @@
 > drawn thing to imitate (it is a CSS rotate on a DOM glyph), and a local dropping what
 > they hold (no local in the game holds anything), `npcWitnessHold` being
 > the place to arm blame from (it is Sydney and Pasto only), and the Traveller
-> needing to be written at all (four chapters of it already exist). **Measure the premise
+> needing to be written at all (four chapters of it already exist), and
+> notoriety's four terms (two of them are completion, not consequence, and the
+> one that makes it a thread is not in the list), and "the card's second line"
+> being free (it is `CHAPTERS.sub`, nineteen authored phrases). **Measure the premise
 > before building the item.** Every correction is made in place below rather
 > than deleted, so a later batch inherits the correction and not the guess.
 >
@@ -642,20 +660,34 @@ covers a `wow`. Blame pairs must face each other.
 a box. Consequence should travel — as a projection of counts already saved,
 exactly as `keep` is a projection of ticks.
 
-- **The number.** `notoriety = f(Σ jrChapInc, Σ jrChapScene, records beaten,
-  finds)`, five tiers (*a rumour · a nuisance · a menace · a legend · a natural
-  disaster*), on the departures board and the ledger; item 3's `pho`/`fed`
-  beside it.
-- **The arrival card knows.** From tier 2, a headline as the card's second
-  line: *"SIGHTINGS OF A LARGE RODENT REPORTED IN PASTO"*. Ship tiers 2 and 4
-  if authoring time is short.
+- **The number. BUILT (B14), with a different formula.** `score = Σ jrChapInc
+  + Σ jrChapScene + spread`, where spread is how many chapters have any of
+  either. The five names are the item's. On the departures card's subtitle and
+  the ledger's, as a non-breaking chip; item 3's `pho`/`fed` on the ledger's
+  per-chapter LEAF, which is where a per-chapter count belongs. Boundaries
+  3 / 11 / 26 / 48 / 82, measured — see CONTRACT.
+- ~~**The number.** `notoriety = f(Σ jrChapInc, Σ jrChapScene, records beaten,
+  finds)`~~ — records and finds are **completion, not consequence**: 60 of each,
+  collected by being thorough, and the tally and the shelf already count
+  thoroughness twice. A scene needs no weight of its own — a five-chain
+  increments both tallies, so a plain sum is already 2:1. And the term that
+  makes this a THREAD is missing from the list: **spread**.
+- **The arrival card knows. BUILT (B14), as a fourth line.** Four pools of
+  three, tiers 2-5, not the two the item allows for — a headline is one line
+  of text and the tiers are the only part of this a player can feel.
+- ~~a headline as the card's second line~~ — the second line is
+  `CHAPTERS.sub`, one authored phrase per chapter and the only thing that
+  gives a chapter its own voice on the way in. A rumour about the player there
+  would trade nineteen written lines for five.
 - **Gossip.** `npcPLACE_SAY` gets a `heard:` pool about the *previous* place,
   chosen by whether you did anything there.
 - **The poster.** From tier 3, one grabbable `wanted-poster` per chapter near
   the spawn ring, textured with the player's own album thumbnail; stealing it
   is an unlisted find. Fall back to the `sysMARKS` glyph when the album read
   throws (declare the read above the constructor).
-- **The ending reads it.**
+- **The ending reads it. BUILT (B14).** The final ledger's foot: *"3:15:15 on
+  the road · you leave as a legend"*, and the subtitle's chip drops out there
+  so the card does not say it twice. One ternary, once the number existed.
 
 *Traps.* Notoriety spends only on attention; 5b's denial reads *heat*, which
 decays.
