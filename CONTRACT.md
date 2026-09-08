@@ -14,6 +14,140 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH FIVE — SLEEP ON IT (N5 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 3, second batch: the mode.** N4 built the animal. This is
+what happens around it — the lens drifting, a photograph every ninety seconds,
+and somebody telling you what you missed.
+
+The item's own first instruction was to measure the orbit before building one,
+and that measurement changed the design twice.
+
+### THE ORBIT, MEASURED BEFORE IT EXISTED
+
+`qa/n5-orbit.js`, twenty-four bearings in all nineteen chapters, reading the
+rig's own `camInfo.clear` (1 is a clear line to the animal; under 1 is the boom
+being cut short by something solid):
+
+| | cut bearings | mean clear | worst |
+|---|---|---|---|
+| Rio | **19 of 24** | 0.646 | 0.257 |
+| Venice | 11 | 0.822 | 0.257 |
+| Circular Quay | 7 | 0.901 | 0.257 |
+| Cali | 3 | 0.957 | 0.314 |
+| Kyoto | 11 | 0.963 | 0.780 |
+| …and nine chapters | 0 | 1.000 | 1.000 |
+
+**That is the cut doing its job, not a fault.** The eye stops at the first solid
+thing and the animal stays on screen. What it says about the design is that a
+nap orbit in a tight chapter is a series of close-ups with the boom pumping, so
+the drift is slow enough for the cut's own damp to keep up.
+
+Then the same measurement on the built thing — three minutes of real sleeping in
+the three worst chapters (`qa/n5-rio.js`): Rio 45% of frames cut, worst 0.153,
+**the eye never once inside a metre of the animal**, and 115 m of eye travel.
+Venice and the Quay 21%. Sydney 0%.
+
+### ONE NUMBER, NOT A SECOND CAMERA
+
+The loaf already eases the boom out and settles the pitch as two additions to
+`camReach` and `camPitch`, gated off the three rigs that own the lens outright.
+The nap is the same shape plus a drift of **`camYawTarget`** — the rig's own
+INPUT — so it is damped, clamped, boom-cut and NaN-rolled-back by every guard
+the player's own mouse gets, and needs none of its own. A separate nap camera
+would be a second thing that could put the eye inside a wall.
+
+`camHandT` is the whole of the consent: one touch of the mouse, Z/X or the right
+stick stops the drift dead, exactly as it kills a marquee shot.
+
+**AND THIS ONE IS GATED ON REDUCED MOTION**, where the rest lens forty lines
+above it deliberately is not. That block's own line is that rig BLENDS are
+un-gated and involuntary OSCILLATIONS are gated; a lens that turns all the way
+round on its own, for minutes, with no input, is the largest involuntary motion
+in the game and is on the wrong side of it. Everything else about the nap still
+happens.
+
+### THE DRIFT WAS WRITTEN AND ERASED FORTY LINES LATER, IN THE SAME FUNCTION
+
+**MEASURED: twelve minutes of writing `camYawTarget` every frame, and the
+rendered lens turned 0.003 rad and moved 4 cm.**
+
+The cause is the **yaw tidy-up** — the "put the camera behind the animal once
+the player has stopped" term that has been in the rig since it was written. It
+and the orbit are the same feature at two tiers, they fire off the same trigger
+(`camIdleT`), they write the same number, and the tidy-up runs first. A damper
+against a constant drift does not lose: it wins at a fixed offset, which is a
+lens that looks very slightly wrong and never moves.
+
+So the deeper tier takes the target and the tidy-up stands down (`sysNapNow <
+0.5`). Not both, not a blend, and **not the orbit written into `camYaw` behind
+the tidy-up's back** — that would be a second writer on the rig's own input,
+which is the thing this file has spent four passes taking out. After: 2.77 m of
+eye travel in ten seconds, and 71 to 131 m over three minutes in four chapters.
+
+### THE PHOTOGRAPH, AND THE TWO THINGS THAT MADE IT ONE
+
+Every ninety seconds, into the album, tagged. It **renders before it reads, in
+one JS turn**, exactly as `photoShoot` does — without `preserveDrawingBuffer` a
+canvas read on any other turn comes back blank, and six chapters once wrote six
+byte-identical PNGs of nothing this way. One extra render every ninety seconds.
+
+**1. IT COMPOSES THE SHOT BEFORE IT TAKES IT.** `albAdd` blits at 288×180, and a
+sleeping capybara from the nap lens — which has just pulled the boom two metres
+further out than a walk — is the brown oval the item warned about. So the frame
+is requested 1.8 s early through `frameShot` and held while the rig eases in.
+Measured through the compose window: `shotW` 0 → 1 in 0.6 s, the eye 6.2 m →
+3.18 m, `clear` 0.555 → 0.996, all with a second to spare before the shutter.
+
+**2. A FRAMED SHOT MAY NOW COME CLOSER THAN A PLAYER MAY ZOOM.** `sysCAM_MIN` is
+7 m and it is an INTERACTIVE floor — chosen so a hand on the zoom key cannot put
+the lens inside the animal — and a photograph is not an interaction. This is the
+exact argument `sysSHOT_DIST_MAX` already makes from the other end. `near: true`
+opts one shot down to `sysSHOT_DIST_MIN` (3 m). Nothing else is affected: no
+caller in the game asks for less than 9.5 m, and the rig already renders at 1.9
+routinely — that is `sysCAM_CLEAR_MIN`, the floor the boom CUT uses every time
+the eye meets a wall, which in Rio is nineteen bearings of twenty-four.
+
+**AND THEN A RAISE IS AN ANGLE, NOT A HEIGHT — P1's lesson, again.** With the
+boom at 3.18 m and `shotW` at 1 with a second to spare, the animal was still
+**half out of the bottom of the frame**. The rig looks at a point above the
+animal and the height of that point is chosen for a nine-metre boom; at 3.6 m the
+same offset is three times the angle. `raise` is the channel for exactly this
+and **no shot in the game had ever passed one**. `raise: 0.10` with the pitch
+down from 0.46 to 0.30 centres it.
+
+### THE ALBUM MAY NOT LOSE A PICTURE THE PLAYER TOOK
+
+Two rules in `albAdd`, and between them a hand-taken shot is safe by
+construction: tagged rows have their own cap (`sysALB_TAG_MAX`, 8), and when the
+album is over its global 36 the oldest TAGGED row goes first and an untagged one
+only when there are none.
+
+**MEASURED, twenty-eight minutes of continuous sleeping (`qa/n5-cap.js`, split
+across seven evaluates because one longer than ~30 s dies):** 18 shots taken,
+the album settles at 8 and never grows, 53 KB stored. Before the tag it would
+have been 18 rows and climbing, and at an hour it would have started eating the
+player's own.
+
+### AND SOMEBODY TELLS YOU WHAT YOU MISSED
+
+`game.sayNear` on waking, for a sleep over 22 s, on a 45 s cooldown, from a pool
+that reads what actually happened — how long you were out, whether the game has
+been photographing you, whether something is still sat on you. Measured firing:
+*"Somebody has been taking pictures of you."*
+
+The other half was free. The loaf's own photograph gesture (B7) fires at a
+sleeping capybara exactly as it does at a sitting one, so the frames behind the
+album card are full of people saying *"That's the most relaxed animal I've ever
+seen"* and *"Do you want to sit down for a bit?"* — which is the item's "the
+regular comes to the counter's edge and says nothing", already built.
+
+### WHAT IS NOT HERE
+
+The paper does not show the frames yet — the album card does, and it is one
+keypress away. The marquee lens turning to its window when it opens during a
+nap is the glimpse's own dolly and belongs with whichever batch next touches it.
+
 ## THE NEXT PASS, BATCH FOUR — THE NAP (N4 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 3, first batch: the animal.** The mode it opens — the

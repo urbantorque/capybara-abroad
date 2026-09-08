@@ -312,6 +312,31 @@ that is furniture to every other species.
 > - **The helm refusal is inherited, not restated** — and measured anyway:
 >   forcing `atHelm` takes the loaf and the nap to zero in half a second.
 >   Swimming is deliberately not refused; that is the hot spring.
+>
+> **BUILT, the mode, 9 Sep 2026 (N5).** The lens, the photograph and the line.
+> The item's instruction to measure the orbit first changed the design twice:
+>
+> - **The orbit needed no new clipping protection.** Twenty-four bearings in
+>   all nineteen: the boom is cut in ten chapters, worst 0.257 in Rio, Venice
+>   and the Quay — which is the CUT working, not a fault. Three minutes of real
+>   sleeping in the three worst: 45% of frames cut in Rio and the eye never once
+>   inside a metre of the animal.
+> - **The drift was written and erased forty lines later by the yaw tidy-up**,
+>   which is the same feature at a shallower tier, off the same trigger, on the
+>   same number. Measured: twelve minutes of writing, and the lens turned 0.003
+>   rad. The deeper tier takes the target and the tidy-up stands down.
+> - **A framed shot may now come closer than a player may zoom** (`near`), which
+>   is `sysSHOT_DIST_MAX`'s own argument from the other end — and then the
+>   animal was still half out of the bottom of the frame, because a raise is an
+>   angle and not a height, and no shot in the game had ever passed one.
+> - **The album needed a tag before it needed anything else.** 18 nap shots in
+>   twenty-eight minutes settle at 8 and never grow; a hand-taken picture is
+>   safe by construction rather than by arithmetic.
+> - The people reacting to a sleeping capybara was **already built** — B7's
+>   photograph fires at a nap exactly as it does at a loaf.
+>
+> Still open from this item: the paper showing the nap frames (the album card
+> does, one keypress away), and the marquee lens turning to its window mid-nap.
 
 **Concept.** Leave the capybara alone. After the calm and the loaf (6.5 s),
 at about twenty seconds of no input, it **falls asleep** — the loaf tucks, the

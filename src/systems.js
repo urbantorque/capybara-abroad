@@ -297,6 +297,8 @@ const sysCAM_MAX   = 16;
 // half-fov — and silently got 16, which is the frame it was written to fix.
 // Cappadocia asks 17. Everything else in the game asks for 16 or less.
 const sysSHOT_DIST_MAX = 30;
+// ...and the floor a shot may ask for with `near`. See frameShot.
+const sysSHOT_DIST_MIN = 3.0;
 const sysCAM_DEF   = 9.5;
 // How far back ALONG THE TORII PATH the eye rides. 5.2 m is three gates: near
 // enough to keep the animal large, far enough that the gates read as a tunnel.
@@ -1288,6 +1290,32 @@ const sysCALM_MUS   = 0.30;   // ...and how far the score is allowed to lean
 // and not the field, and the field goes on doing what it did.
 const sysLOAF_DOLLY = 1.15;   // m the camera eases back
 const sysLOAF_PITCH = 0.035;  // rad it settles down with it
+// ---- THE NAP LENS (N5) ----------------------------------------------------
+//
+// THE ORBIT, AND WHY IT IS ONE NUMBER AND NOT A SECOND CAMERA. The loaf already
+// eases the boom out and settles the pitch, and it does it as two additions to
+// `camReach` and `camPitch`, gated off the three rigs that own the lens
+// outright. The nap is the same shape with one more term: a slow, continuous
+// drift of `camYawTarget`, which is the rig's own INPUT and is therefore
+// damped, clamped, boom-cut and rolled back by every guard the player's own
+// mouse gets. A separate nap camera would be a second thing that could put the
+// eye inside a wall, and there is exactly one of those in this file for a
+// reason.
+//
+// MEASURED FIRST, before a line of this was written (`qa/n5-orbit.js`,
+// twenty-four bearings in all nineteen chapters): the boom is cut on at least
+// one bearing in TEN of the nineteen, and the worst is 0.257 — a quarter of the
+// boom — in Rio, Venice and the Quay. Rio is cut on NINETEEN bearings of
+// twenty-four, mean 0.646. That is the cut doing its job rather than a fault:
+// the eye stops at the first solid thing and the animal stays on screen. What
+// it means for this is that a nap orbit in a tight chapter is a series of
+// close-ups with the boom pumping, so the drift is slow enough for the cut's
+// own damp (sysCAM_CLEAR_OUT) to keep up with it, and the dolly is small.
+const sysNAP_DOLLY = 1.05;    // m, on top of the loaf's own 1.15
+const sysNAP_PITCH = 0.030;   // rad more of settle
+const sysNAP_YAW   = 0.055;   // rad/s of drift — a full circle in under two
+                              // minutes, which is slower than anything else in
+                              // this file moves the lens on its own.
 const sysLOAF_MUS   = 0.26;   // ...and how much further the score is allowed to lean
 // ---- ...AND THE ANIMALS TURN ROUND ---------------------------------------
 // Past this much loaf a critter's registry entry stops answering "how close may
@@ -18849,6 +18877,11 @@ export function createSystems(game) {
   const sysALB_W = 288, sysALB_H = 180;   // 16:10, legible at the 150 px the grid uses
   const sysALB_Q = 0.72;
   const sysALB_MAX = 36;                  // ~0.5-0.7 MB of characters at worst
+  // ...of which this many may be shots the GAME took rather than the player.
+  // Eight is about a quarter of an hour of napping, which is the most any one
+  // sleep is worth keeping, and it leaves twenty-eight for the player however
+  // long the animal is left running. See albAdd.
+  const sysALB_TAG_MAX = 8;
 
   function albAll() {
     if (albShots) return albShots;
@@ -18883,7 +18916,7 @@ export function createSystems(game) {
    * (the chapter, weather.label(), the clock) and none of it can be recovered
    * an hour later.
    */
-  function albAdd(place, cap) {
+  function albAdd(place, cap, tag) {
     try {
       if (!albCan) {
         albCan = document.createElement('canvas');
@@ -18895,8 +18928,31 @@ export function createSystems(game) {
       const u = albCan.toDataURL('image/jpeg', sysALB_Q);
       if (!u || u.length < 64) return false;
       const arr = albAll();
-      arr.push({ u: u, place: place, cap: cap, n: photoShots });
-      while (arr.length > sysALB_MAX) arr.shift();
+      arr.push({ u: u, place: place, cap: cap, n: photoShots, tag: tag || 0 });
+      // ---- A TAGGED SHOT MAY NEVER EVICT A HAND-TAKEN ONE (N5) ---------
+      // THE NAP takes a photograph every ninety seconds and the album is
+      // thirty-six deep, so a capybara left asleep for an hour would quietly
+      // push out every picture the player took themselves — and the ledger,
+      // the title card and the shelf are all built out of this array. Two
+      // rules, and between them a hand-taken shot is safe by construction:
+      //
+      //   1. Tagged rows have their OWN cap (sysALB_TAG_MAX) and the oldest
+      //      tagged row goes when a new one arrives.
+      //   2. When the album is over its global cap, the oldest TAGGED row is
+      //      dropped first, and an untagged one only when there are none.
+      if (tag) {
+        let seen = 0;
+        for (let i = arr.length - 1; i >= 0; i--) {
+          if (arr[i].tag !== tag) continue;
+          seen++;
+          if (seen > sysALB_TAG_MAX) arr.splice(i, 1);
+        }
+      }
+      while (arr.length > sysALB_MAX) {
+        let k = -1;
+        for (let i = 0; i < arr.length; i++) if (arr[i].tag) { k = i; break; }
+        arr.splice(k >= 0 ? k : 0, 1);
+      }
       return albWrite();
     } catch (e) { return false; }
   }
@@ -28646,6 +28702,7 @@ export function createSystems(game) {
   // (see toSet.built in main.js) and its animals outlive every visit.
   let sysCalmNow = 0;
   let sysLoafNow = 0;      // capy.loaf, read once a frame. See THE LOAF.
+  let sysNapNow  = 0;      // ...and capy.nap, the same way. See THE NAP LENS.
   const sysCritters = [];
   // THE FLOW (see the block at the top of this file). `sysFlowT` is the streak
   // in seconds, `sysFlowNow` the damped 0..1 the readers use, `sysFlowAir` how
@@ -28793,7 +28850,23 @@ export function createSystems(game) {
     if (!o) { shotReq = null; shotAge = 0; return; }
     shotReq = {
       yaw:   typeof o.yaw   === "number" && o.yaw === o.yaw ? o.yaw : null,
-      dist:  typeof o.dist  === "number" && o.dist === o.dist ? clamp(o.dist, sysCAM_MIN, sysSHOT_DIST_MAX) : null,
+      // ---- ...AND ONE MAY COME CLOSER THAN A PLAYER MAY ZOOM (N5) ------
+      // The exact argument sysSHOT_DIST_MAX makes, from the other end.
+      // `sysCAM_MIN` is 7 m and it is an INTERACTIVE floor, chosen so a hand
+      // on the zoom key cannot put the lens inside the animal. A framed shot
+      // is not an interaction, and one of them is a PHOTOGRAPH: the album
+      // blits at 288 by 180, and a sleeping capybara at 7 m in a 41-degree
+      // lens is 41 pixels by 26 — the brown oval the item warned about.
+      //
+      // Nothing else is affected. No caller in the game asks for less than
+      // 9.5 m, and the rig already renders at 1.9 routinely: that is
+      // `sysCAM_CLEAR_MIN`, the floor the boom CUT uses every time the eye
+      // meets a wall, which happens on nineteen bearings of twenty-four in
+      // Rio. So 3 m is a distance this camera has drawn thousands of times.
+      // `near` is opt-in per shot so it stays that way.
+      dist:  typeof o.dist  === "number" && o.dist === o.dist
+               ? clamp(o.dist, o.near ? sysSHOT_DIST_MIN : sysCAM_MIN, sysSHOT_DIST_MAX)
+               : null,
       pitch: typeof o.pitch === "number" && o.pitch === o.pitch ? o.pitch : null,
       raise: typeof o.raise === "number" && o.raise === o.raise ? o.raise : null,
       hold:  typeof o.hold  === "number" && o.hold  > 0 ? o.hold : sysSHOT_HOLD,
@@ -30109,6 +30182,107 @@ export function createSystems(game) {
              // like a stowaway that does not work.
              canStow: canStow, on: onNow, seated: climbed, err: stowErr || null };
   };
+  // =========================================================================
+  // SLEEP ON IT (N5) — the photograph nobody took, and the line on the way out
+  // =========================================================================
+  // THE NAP (capybara.js) is the animal; this is the mode it opens. A player
+  // who leaves the game running gets the diorama it always was underneath —
+  // the lens drifting (see THE NAP LENS), the ambient movers on their
+  // circuits, the marquee clock still counting — and every ninety seconds the
+  // game takes a picture into the album. The album is what the ledger is made
+  // of, so a player who has never pressed K comes back to a sleeping capybara
+  // in every place they have been.
+  //
+  // IT COMPOSES THE SHOT BEFORE IT TAKES IT. `albAdd` blits at 288 by 180, and
+  // a sleeping capybara at that size from the nap lens — which has just pulled
+  // the boom two metres further out than a walk — is a brown oval on a lawn.
+  // So the frame is requested first, held for sysNAP_COMPOSE while the rig
+  // eases into it, and only then read. `frameShot` is the same channel a
+  // marquee uses and it obeys the same rules: one touch of the mouse
+  // (camHandT) kills it, which is correct here too.
+  //
+  // AND IT RENDERS BEFORE IT READS, in one JS turn, exactly as photoShoot
+  // does. Without `preserveDrawingBuffer` a canvas read on any other turn
+  // comes back blank — six chapters once wrote six byte-identical PNGs of
+  // nothing this way. One extra render every ninety seconds is the price.
+  const sysNAP_SHOT    = 90;    // s between nap photographs
+  const sysNAP_COMPOSE = 1.8;   // s the frame is held before the shutter
+  const sysNAP_FULL    = 0.92;  // of the nap that counts as properly asleep
+  const sysNAP_TELL    = 22;    // s asleep before anybody mentions it
+  let napShotT = sysNAP_SHOT;
+  let napSlept = 0;             // s of THIS sleep, for the line on the way out
+  let napShots = 0;             // ...and how many were taken during it
+  let napWasOn = false;
+  let napTold = 0;              // s of cooldown on the wake line
+  /** Render, then read, in this turn. See the note above. */
+  function napShoot() {
+    const place = (game.biome && game.biome.current) || "sydney";
+    try {
+      if (game.post && game.post.enabled) game.post.render();
+      else renderer.render(scene, camera);
+      if (albAdd(place, "asleep", 1)) { napShots++; return true; }
+    } catch (e) { /* an album that will not write is not worth a crash */ }
+    return false;
+  }
+  function napUpdate(dt) {
+    const capy = game.capy;
+    const on = !!(capy && capy.nap >= sysNAP_FULL) && !game.state.paused;
+    if (napTold > 0) napTold -= dt;
+    if (!on) {
+      // ---- ...AND SOMEBODY TELLS YOU WHAT YOU MISSED --------------------
+      // The joke is that the world was busy while you were not and it has
+      // opinions. It is said by whoever is nearest, on the same channel as
+      // every other remark in the game, and only for a sleep long enough to
+      // be worth mentioning — a player who dozes for four seconds between
+      // two tasks is not owed a line about it.
+      if (napWasOn && napSlept > sysNAP_TELL && napTold <= 0 &&
+          typeof game.sayNear === "function" && capy && capy.position) {
+        napTold = 45;
+        const mins = napSlept >= 120 ? Math.round(napSlept / 60) + " minutes"
+                   : Math.round(napSlept) + " seconds";
+        const pool = ["You were out for " + mins + ".",
+                      "Nothing happened. You did not miss anything.",
+                      "I did wonder if you were all right."];
+        if (napShots > 1) pool.push("Somebody has been taking pictures of you.");
+        if (game.perchCount() > 0) pool.push("It has been sat on you the whole time.");
+        const line = pool[(Math.random() * pool.length) | 0];
+        try { game.sayNear(capy.position.x, capy.position.z, 20, line); } catch (e) {}
+      }
+      napWasOn = false; napSlept = 0; napShots = 0; napShotT = sysNAP_SHOT;
+      return;
+    }
+    napWasOn = true;
+    napSlept += dt;
+    napShotT -= dt;
+    // the frame is asked for on the way down through the compose window, once
+    if (napShotT <= sysNAP_COMPOSE && napShotT + dt > sysNAP_COMPOSE) {
+      // ---- A RAISE IS AN ANGLE, NOT A HEIGHT (P1, again) ---------------
+      // MEASURED: the boom came in to 3.18 m and `shotW` reached 1 with a
+      // second to spare, and the animal was still HALF OUT OF THE BOTTOM OF
+      // THE FRAME. The rig looks at a point above the animal, and the height
+      // of that point is chosen for a nine-metre boom: at 3.6 m the same
+      // offset is three times the angle and it throws the subject off the
+      // bottom edge. `raise` is the channel for exactly this and no shot in
+      // the game had ever passed one.
+      //
+      // 0.10 m puts the look line just over a sleeping animal's back, and
+      // the pitch comes down with it: at this distance 26 degrees is a
+      // photograph of the lawn in front of it.
+      game.frameShot({ dist: 3.6, near: true, pitch: 0.30, raise: 0.10,
+                       hold: sysNAP_COMPOSE + 0.6, w: 1 });
+    }
+    if (napShotT <= 0) { napShotT = sysNAP_SHOT; napShoot(); }
+  }
+  /** What the nap mode is doing. The harness asks; nothing in src does. */
+  game.napDebug = function () {
+    const capy = game.capy;
+    return { nap: capy ? +(capy.nap || 0).toFixed(3) : 0,
+             on: napWasOn, slept: +napSlept.toFixed(1), shots: napShots,
+             nextIn: +Math.max(0, napShotT).toFixed(1),
+             album: albAll().length,
+             tagged: albAll().filter(function (r) { return r.tag; }).length };
+  };
+
   // ---- THE REFUSALS --------------------------------------------------------
   // Two of the eight chapters that offer an animal are not given `lift`, and
   // the reason is the same for both: an Icelandic ewe is 45 kg and a Pantanal
@@ -31679,7 +31853,22 @@ export function createSystems(game) {
       camYawTarget = sysDampAngle(camYawTarget, capy.group.rotation.y + Math.PI, sysSAIL_YAW_L, dt);
     } else if (rideYaw === rideYaw && camHandT <= 0) {
       camYawTarget = sysDampAngle(camYawTarget, rideYaw + Math.PI, sysSAIL_YAW_L, dt);
-    } else if (started && !mounted && camHandT <= 0 && camIdleT > sysCAM_IDLE_T && capy && capy.group) {
+    // ---- ...AND THE TIDY-UP STANDS DOWN FOR THE ORBIT (N5) -------------
+    // MEASURED: the nap drift below was written into `camYawTarget` every
+    // frame for twelve minutes and the rendered lens turned **0.003 rad** and
+    // moved **4 cm**. This line is why. The tidy-up and the orbit are the same
+    // feature at two tiers — "the player has stopped, so compose the shot" —
+    // they fire off the same trigger, they write the same number, and this one
+    // runs forty lines earlier in the same function. A damper against a
+    // constant drift does not lose: it wins at a fixed offset, which is a lens
+    // that looks very slightly wrong and never moves.
+    //
+    // So the deeper tier takes the target. Not both, not a blend, and not the
+    // orbit written into `camYaw` behind this one's back — that would be a
+    // second writer on the rig's own input, which is the thing this file has
+    // spent four passes taking OUT.
+    } else if (started && !mounted && camHandT <= 0 && camIdleT > sysCAM_IDLE_T &&
+               sysNapNow < 0.5 && capy && capy.group) {
       // BEHIND THE ANIMAL, WHICH IS HALF A TURN FROM WHERE IT IS LOOKING.
       // camYaw is the direction FROM the capybara TO the camera, and the mesh's
       // nose points along +z at rotation zero — so a capybara that has just
@@ -31872,6 +32061,30 @@ export function createSystems(game) {
       const lw = sysLoafNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
       camReach += sysLOAF_DOLLY * lw;
       camPitch += sysLOAF_PITCH * lw;
+    }
+    // ---- ...AND THE NAP TAKES IT ONE STEP FURTHER, AND TURNS (N5) --------
+    // See the sysNAP_* block. The same two additions as the loaf's, gated off
+    // the same three rigs for the same reason, plus the drift — which is
+    // written into `camYawTarget` rather than into `camYaw`, so it goes through
+    // the player's own damper, the player's own boom cut and the rig's own
+    // NaN rollback, and needs none of its own.
+    //
+    // THE HAND GATE IS THE WHOLE OF THE CONSENT. `camHandT` is 1.6 s from the
+    // mouse, from Z/X and from the right stick, and it is already what kills a
+    // frameShot — a drift that ignored it would be the camera arguing with
+    // somebody who is holding it.
+    //
+    // ...AND THIS ONE IS GATED ON REDUCED MOTION, where the rest lens forty
+    // lines up is deliberately not. The line that block draws is that rig
+    // BLENDS are un-gated and involuntary OSCILLATIONS are gated; a lens that
+    // turns all the way round on its own, for minutes, with no input, is the
+    // largest involuntary motion in the game and it is on the wrong side of
+    // that line. Everything else about the nap still happens.
+    if (sysNapNow > 0.001) {
+      const nw = sysNapNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
+      camReach += sysNAP_DOLLY * nw;
+      camPitch += sysNAP_PITCH * nw;
+      if (camHandT <= 0 && !sysCalmOn()) camYawTarget += sysNAP_YAW * nw * dt;
     }
     // ---- ...AND THE FLOW EASES IT BACK THE OTHER WAY --------------------
     // The loaf pulls the boom out because the animal has stopped and there is
@@ -32438,6 +32651,10 @@ export function createSystems(game) {
     // passenger's seat has to be written after the trail walk that would
     // otherwise have put it on the ground behind you.
     perchUpdate(dt);
+    // ...and SLEEP ON IT (N5), which is the mode the nap opens. Raw dt: a
+    // ninety-second promise is a wall-clock promise, and a marquee that puts
+    // the world at 0.45x must not make the album wait three minutes.
+    napUpdate(game.state.rawDt || dt);
     // ...and THE STOWAWAY, which is drawn by nobody else — the chapter that
     // owns this animal is detached. Outside perchUpdate because that function
     // returns early on every frame with nothing on the back, and a stowaway is
@@ -34397,6 +34614,10 @@ export function createSystems(game) {
       }
       musCalm = sysCalmNow;
       sysLoafNow = loafNow;
+      // ...and THE NAP (N5), read on the same beat and for the same reason:
+      // one read per frame of a published number, so nothing downstream asks
+      // capybara.js the same question four times.
+      sysNapNow = (capy && typeof capy.nap === "number") ? capy.nap : 0;
     }
 
     // ---- THE ECHO comes back --------------------------------------------
