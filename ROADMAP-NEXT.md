@@ -167,8 +167,30 @@ be friends with, finally with somebody who *is*.
 >   nothing is the failure mode this whole contract keeps producing.
 > - **The per-chapter record cannot be built as written.** A `RECORDS` key has
 >   to be a task id, and "most on at once" is not a task. N2's problem.
-> - Still open for N2: the passenger book, the record, the stowaway, and the
->   people's reaction to a capybara with a bird on it.
+> **BUILT, second half, 8 Sep 2026 (N2).** Three finds, the number the place
+> keeps, and the people's reaction. What the measurement changed:
+>
+> - **"Stand up and walk and they stay on" was false, everywhere but a lawn.**
+>   The median carry was **3.5 metres**, and every one of fifteen dismounts was
+>   the hop rule firing on a kerb. `!grounded` is not a hop — the animal is off
+>   the floor for 51 to 100 per cent of a normal walk. Nor is upward velocity:
+>   something in the walk cycle is worth 2.9 m/s. The test is the jump INPUT.
+>   After: fourteen of fifteen legs held the passenger for the whole walk.
+> - **A pebble was reading as a barge.** `prop:impact` also fires when a prop
+>   LANDS, so a stone the animal scuffed a second earlier unseated its
+>   passenger. A barge is now something you did, at speed, at arm's length.
+> - **The passenger book is not a grid.** Every ridable animal exists in exactly
+>   one chapter, so nineteen places by six species is six cells and thirteen
+>   blank rows. The honest surface is the ledger leaf, one line per place, which
+>   is where the four counters that answer the same question already live.
+> - **The record is not a `RECORDS` row.** See above; it is `pas` on the save.
+> - The reaction is B7's photograph with a different pool and a quarter of the
+>   wait, not a new gesture — and it needed no new cast, no new timer and no
+>   new event.
+>
+> Still open: **the stowaway** (one animal crossing a border), which is the one
+> part of this item that asks the herd to break its own rule, and the passenger
+> COUNT as a shareable number, which belongs with item 5.
 
 
 **Concept.** Loaf for a few seconds within earshot of the chapter's animals

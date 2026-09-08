@@ -3913,6 +3913,36 @@ export function createNPCs(game) {
     'Look at it. Just look at it.', 'One picture. One.',
     'It is not even bothered.', 'That is going on the internet.',
     'My sister will not believe me.', 'It has been there ten minutes.'];
+  // ---- ...AND THE ONE FOR WHEN SOMETHING IS SITTING ON IT (N2) -----------
+  //
+  // THE PERCH is the best frame this game composes and the people in it had
+  // exactly one thing to say about a capybara with a heron on its back, which
+  // was the same eight lines they say about a capybara. This is not a new
+  // gesture — it is the same photograph, with a different caption and a
+  // shorter wait, because the picture is ALREADY THERE and nobody stands
+  // around for six and a half seconds waiting for a bird to still be on a
+  // rodent. See npcPHOTO_REST_ON.
+  //
+  // The lines are about the passenger and never about the capybara: what is
+  // funny is that the animal is not reacting, which is the one thing this
+  // whole game has been consistent about.
+  const npcLOC_PERCH = ['There is something on it.', 'Does it know?',
+    'It has not moved. Neither has that.', 'How long has that been there?',
+    'That is not its. That belongs to somebody.',
+    'They are just going to stay like that, are they.',
+    'I have so many questions.', 'Neither of them is bothered.'];
+  // 6.5 s for a plain loaf, and a quarter of that when something is riding.
+  const npcPHOTO_REST_ON = 1.6;
+  /**
+   * IS SOMETHING RIDING ON THE ANIMAL. Guarded because this module is created
+   * BEFORE systems.js is (…npcs → systems), which is the same lazy-null-check
+   * `addCritter` and `herdOffer` both need — a straight call here is a
+   * TypeError on the first frame, and the herd offer was silently skipped for
+   * a whole version for exactly this reason.
+   */
+  function npcPerchOn() {
+    return typeof game.perchCount === 'function' && game.perchCount() > 0;
+  }
   // ---- SOMEBODY GIVES YOU SOMETHING (B8, item 3) -------------------------
   //
   // THE FIRST GIFT IN THE GAME. Everything else a person does to the capybara
@@ -4514,7 +4544,7 @@ export function createNPCs(game) {
       // coupling the gesture to it made the photograph a rare accident. The
       // picture is taken either way; only the LINE waits for a free mouth.
       } else if (r.fig && capyOk && locPhotoLive <= 0 &&
-                 capyRest >= npcPHOTO_REST &&
+                 capyRest >= (npcPerchOn() ? npcPHOTO_REST_ON : npcPHOTO_REST) &&
                  d2 > npcPHOTO_NEAR * npcPHOTO_NEAR &&
                  d2 < npcPHOTO_FAR * npcPHOTO_FAR &&
                  (r.wary || 0) < npcWARY_HEAT && hHere < npcPHOTO_HEAT && r.sat <= 0 &&
@@ -4533,7 +4563,10 @@ export function createNPCs(game) {
         // this feature talking over the chapter's own dialogue.
         if (r.cd <= 0) {
           r.cd = r.cool * rand(0.8, 1.4);
-          localLine(r, npcSay(r, 'photo') || npcLOC_PHOTO);
+          // A passenger overrides the chapter's own photo pool, and that is
+          // deliberate: a Venetian's line about a capybara is written about a
+          // capybara, and there is a bird on it.
+          localLine(r, npcPerchOn() ? npcLOC_PERCH : (npcSay(r, 'photo') || npcLOC_PHOTO));
         }
       }
       // ---- ...AND SOMEBODY GIVES YOU SOMETHING (B8) ------------------------

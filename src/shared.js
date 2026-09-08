@@ -3270,6 +3270,15 @@ export const FINDS = [
   { id: 'nothing-left',   text: 'Ran until there was nothing left in you' },
   { id: 'own-beat',       text: 'Moved on the beat for eight bars, with nobody scoring it' },
   { id: 'scenic-route',   text: 'Walked a kilometre in one place' },
+  // ---- ...AND WHAT SAT ON YOU WHILE YOU DID IT (N1/N2) ------------------
+  // THE PERCH's discovery channel. Nobody is told a heron will stand on them:
+  // you find out by sitting still for long enough beside one, which is the
+  // obey ladder's own lesson taught upward. Three, and they are the three
+  // stages of the mechanic — it happened, you walked off with it, you got the
+  // whole back full — so the second and third are questions the first asks.
+  { id: 'sat-on',         text: 'Held still long enough that something climbed on you' },
+  { id: 'carried-on',     text: 'Walked fifty metres with a passenger' },
+  { id: 'full-house',     text: 'Had three of them on your back at once' },
 
   // ---- WHERE YOU WENT ---------------------------------------------------
   { id: 'high-point',     text: 'Stood on the highest ground there is here' },

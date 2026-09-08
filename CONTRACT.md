@@ -14,6 +14,148 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH TWO — WHAT THE PERCH IS WORTH (N2 — 8 Sep 2026)
+
+**ROADMAP-NEXT item 2, second batch.** N1 built a mechanic and told nobody. This
+is the half that makes it legible: three finds, a number the place keeps, and
+the people in it having something to say about a capybara with a bird on it.
+
+It is also **the batch in which the dismount rule turned out to be wrong**, and
+that was only visible because somebody measured how far you can actually carry
+one rather than whether one gets on.
+
+### THE HOP WAS NOT A HOP, AND IT COST THE HALF OF THE MECHANIC THAT MATTERS
+
+N1's dismount was `!capy.grounded` held for `perchAIR`, with a note beside it
+saying "three passengers leaving because a kerb went past is not a mechanic, it
+is a fault". Then `qa/n2-carry.js` measured it — three attempts in five
+chapters, walk until it falls off:
+
+| | median carry | dismount cause |
+|---|---|---|
+| **N1, `!grounded`** | **3.5 m** | `hop`, 15 of 15 |
+| after the fix | **the 40 s cap**, 14 of 15 | — |
+
+Manly 3.1, Göreme 2.6, Antarctica 2.9, Venice 3.5. Only Sydney's open lawn ever
+reached 74 m. **A capybara walking over ordinary ground leaves the floor
+constantly** — the probe measured `airPct` at 51 to 100 per cent of a normal
+walk — so "stand up and walk off with it", which is the whole second half of the
+item, was a lie everywhere but a lawn.
+
+**The second attempt was wrong too, and it is the more interesting failure.**
+Reading the upward velocity instead looked exact: `capyJUMP_V` is 6.0 m/s and a
+kerb is worth a fraction of that. But **something in the ordinary walk cycle is
+worth 2.9 m/s upward**, and it appeared to two decimal places in nine of the
+fifteen legs. A threshold above 2.9 and below 6.0 exists; picking one is
+guessing at a number nobody authored.
+
+**The honest test is the input.** `input.jumpPressed` is the edge the player
+made, and systems.js runs after capybara.js has already applied it — a kerb
+cannot press a key. The second half is the world throwing you: `launch()` sets a
+vy no gait produces (`perchTHROW_V`, 5.4). A plain FALL off a ledge is
+deliberately neither, and neither of them is bothered, which is the joke.
+
+### ...AND A PEBBLE WAS NOT A BARGE
+
+Same measurement, second cause. `physBARGE_MIN` is 3.2 m/s, which a walk through
+the Antarctic rookery clears on every loose stone it scuffs — and `prop:impact`
+also fires when a prop LANDS, so a pebble the animal kicked a second ago coming
+down two metres away read as a charge. Two of three Antarctic legs lost the
+passenger to `barge` at fifteen metres with the animal never leaving the ground.
+
+Three tightenings, all of which say the same thing: **a barge is something you
+did.** 4.6 m/s of impact, within 2 m, and the capybara itself over
+`physBARGE_MIN` at that instant.
+
+### THE THREE FINDS
+
+`sat-on` (something climbed on you), `carried-on` (fifty metres with a
+passenger) and `full-house` (three at once). They are the mechanic's only
+discovery channel — nothing in this game tells you a heron will stand on you —
+and they are the three stages of it, so the second and third are questions the
+first asks. All three read `perchCount()` rather than an event, because a perch
+is a state and not a moment.
+
+`full-house` is only reachable where the ridable animal takes ONE seat, which is
+Sydney, Venice and Manly. That is a property of the animals and not a gap.
+
+### THE NUMBER, AND WHY IT IS NOT A RECORD
+
+`jrChapPerch` — most on your back at once, per chapter, ever. On the save as
+`pas`, additive, no version bump, in the exact shape `pho`/`fed` use.
+
+**It is not a `RECORDS` row and it cannot be.** A RECORDS key has to be a TASK
+id — the chapter board and the picker both look it up as `RECORDS[taskId]` — and
+"most on at once" is not a task in any chapter. Filing it there would have made a
+number nothing could ever show, which is the api-key mismatch that seated five
+diners on thin air. It goes on the **ledger leaf**, beside the four counts that
+are already there: *carried 3 at once*. Six of nineteen rows can ever have one,
+and the silence on the other thirteen is how a player finds out which places
+have an animal that will.
+
+Measured end to end (`qa/n2-leaf.js`): three pigeons in Venice → `pas: {10: 3}`
+on the file → a real reload → the leaf renders `carried 3 at once` at 529 px.
+
+### THE PEOPLE HAVE SOMETHING TO SAY ABOUT IT
+
+`npcLOC_PERCH`, eight lines, and **it is not a new gesture** — it is B7's
+photograph with a different caption and a shorter wait. `npcPHOTO_REST` is 6.5 s
+of loafing before anybody reaches for a phone; `npcPHOTO_REST_ON` is 1.6,
+because the picture is ALREADY THERE and nobody stands about for six and a half
+seconds waiting to see whether a bird is still on a rodent.
+
+The lines are about the passenger and never about the capybara — what is funny
+is that the animal is not reacting, which is the one thing this game has been
+consistent about. A passenger overrides the chapter's own photo pool, and that
+is deliberate: a Venetian's line about a capybara is written about a capybara,
+and there is a bird on it.
+
+Measured as an A/B with the count stubbed (`qa/n2-said2.js`): Göreme,
+`perchCount() = 0` → **0 perch lines** in 120 s with 4 photographs; the same run
+with it forced to 1 → **2 perch lines** in 2 photographs. The control is the
+half that matters.
+
+### FIVE PROBE FAILURES, AND FOUR OF THEM WERE THE PROBE
+
+Verifying that one line took five attempts, and every failure looked exactly
+like a dead feature.
+
+1. **`body.velocity` is not walking.** capybara.js's idle grip runs at lambda 60
+   while grounded and the snap zeroes anything under 0.9 m/s, so a per-frame
+   velocity write moved a loafing capybara **1.5 m in forty seconds** and
+   `carried-on` read as unreachable. A key event dispatched on `window` is the
+   only honest input.
+2. **A pin is right beside an ANIMAL and wrong beside a PERSON.** Trap 40 says
+   pin the body for the length of the test. npc.js shoves the capybara out of a
+   local's personal space every frame, and a pin that snaps it back turns that
+   shove into a position delta the gait reads as walking: `restT` measured
+   **0.0 for a hundred seconds in four chapters**, which reads as a loaf that
+   cannot happen next to people and is a probe fighting a separation.
+3. **The locals are not in `game.npcs`.** They are their own cast with their own
+   array (`game.locals`), and `r.fig` is the photograph's first gate — so a
+   probe standing in the densest crowd of `game.npcs` was twenty metres from
+   the nearest person allowed to take one. Photographs went from 0 to 4 per two
+   minutes on that one line.
+4. **A local's last line is `rec.last`, not `rec.lastLine`.** `lastLine` exists,
+   on the ibis. The scan reported zero lines of ANY kind for two runs, which is
+   a tell worth recognising: a control that is also empty is a broken
+   instrument, not a clean result.
+5. **`rec.last` survives a chapter change**, so a later run reads the previous
+   run's line. Only the first run of a sequence is a clean control.
+
+And one that was the game and is filed above: the first four runs of
+`qa/n2-carry.js` reported `why: barge` on legs where the passenger was still
+on, because `perchDebug().off` is the last reason EVER. It now carries `offAt`
+so a probe can ask whether the reason belongs to the leg it is measuring.
+
+### INSTRUMENTS
+
+`qa/n2-book.js` (the finds and the save), `qa/n2-carry.js` (how far you can
+actually carry one, three legs in five chapters, with the jump checked at the
+end of every leg), `qa/n2-leaf.js` (write, reload, read the rendered leaf),
+`qa/n2-said.js` and `qa/n2-said2.js` (the reaction, A/B). `game.perchDebug()`
+grew `off` and `offAt`.
+
 ## THE NEXT PASS, BATCH ONE — THE PERCH (N1 — 8 Sep 2026)
 
 **ROADMAP-NEXT item 2, first batch.** The single most-shared fact about this

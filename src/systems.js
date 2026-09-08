@@ -20406,6 +20406,13 @@ export function createSystems(game) {
         if (sc) nb.push(sc + (sc === 1 ? ' scene' : ' scenes'));
         if (ph) nb.push('photographed ' + (ph === 1 ? 'once' : ph + ' times'));
         if (fd) nb.push(fd === 1 ? 'given something' : 'given ' + fd + ' things');
+        // ---- ...AND WHAT RODE ON YOU HERE (N2) --------------------------
+        // THE PERCH's only surface. Six of the nineteen have an animal that
+        // can ride at all, so this is on a third of the rows at most and it is
+        // silent everywhere else — which is also how a player finds out that
+        // this place has one and that one did not.
+        const pa = jrChapPerch[n] || 0;
+        if (pa) nb.push(pa === 1 ? 'carried a passenger' : 'carried ' + pa + ' at once');
         if (nb.length) row.appendChild(sysEl('div', 'capyui-lednoto', nb.join('  ·  ')));
       }
       // ---- ...AND WHAT THE PLACE WAS LIKE (P6) ---------------------------
@@ -23001,6 +23008,8 @@ export function createSystems(game) {
         inc: jrChapInc, scn: jrChapScene,
         // ...and the other economy (B8). See jrChapPho.
         pho: jrChapPho, fed: jrChapFed,
+        // ...and THE PERCH's high-water mark (N2). See jrChapPerch.
+        pas: jrChapPerch,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -23886,6 +23895,20 @@ export function createSystems(game) {
     'red-handed':    function () { return !!findS.redHanded; },
     'took-the-poster': function () { return !!findS.tookPoster; },
 
+    // ---- ...and what sat on you while you did it (N2) --------------------
+    // THE PERCH's discovery channel, and the only one it has: nothing in this
+    // game tells you a heron will stand on you. All three read `perchCount()`
+    // rather than an event, because the perch is a state and not a moment —
+    // and `carried-on` is the one that says the mechanic is not just a pose:
+    // you have to get up and take it somewhere.
+    'sat-on':        function () { return game.perchCount() > 0; },
+    'carried-on':    function (c) {
+      if (game.perchCount() < 1 || !c.capy.grounded) { findS.rodeM = 0; return false; }
+      findS.rodeM = (findS.rodeM || 0) + c.sp * c.dt;
+      return findS.rodeM > 50;
+    },
+    'full-house':    function () { return game.perchCount() >= 3; },
+
     // ---- what you did with the time --------------------------------------
     'perfectly-still': function (c) {
       if (c.sp > 0.15 || !c.capy.grounded || c.capy.carriedBy) { findS.stillT = 0; return false; }
@@ -24720,6 +24743,19 @@ export function createSystems(game) {
   // happened at all.
   const jrChapPho = Object.create(null);      // chapter -> times photographed
   const jrChapFed = Object.create(null);      // chapter -> gifts received
+  // ---- ...AND THE THIRD, WHICH IS A HIGH-WATER MARK AND NOT A COUNT (N2) --
+  // THE PERCH's number: the most animals that have been on your back at once
+  // in this place, ever. Additive on the save on the same terms as the four
+  // above, no version bump, and a file written before it existed reads as
+  // nobody having ridden — which is the correct history.
+  //
+  // IT IS NOT A `RECORDS` ROW AND IT CANNOT BE. A RECORDS key has to be a TASK
+  // id — the chapter board and the picker both look it up as
+  // `RECORDS[taskId]` — and "most on at once" is not a task in any chapter.
+  // Filing it there would have made a number nothing could ever show, which is
+  // the api-key mismatch that seated five diners on thin air. It lives on the
+  // ledger leaf instead, beside the four counts that are already there.
+  const jrChapPerch = Object.create(null);    // chapter -> most on at once
   game.events.on('npc:photo', function () {
     const cn = todoChapter();
     if (cn > 0) jrChapPho[cn] = (jrChapPho[cn] || 0) + 1;
@@ -25760,6 +25796,9 @@ export function createSystems(game) {
       const pho = jrFile.pho || {}, fed = jrFile.fed || {};
       for (const k in pho) if (typeof pho[k] === 'number') jrChapPho[k] = pho[k];
       for (const k in fed) if (typeof fed[k] === 'number') jrChapFed[k] = fed[k];
+      // ...and THE PERCH's mark (N2), on exactly the same terms.
+      const pas = jrFile.pas || {};
+      for (const k in pas) if (typeof pas[k] === 'number') jrChapPerch[k] = pas[k];
       const fnd = jrFile.finds || [];
       for (let i = 0; i < fnd.length; i++) foundFind(fnd[i], true);
       const fat = jrFile.foundAt || {};
@@ -29505,8 +29544,16 @@ export function createSystems(game) {
   const perchGAP    = 0.70;   // s between two of them climbing on
   const perchRISE   = 0.55;   // s of the climb itself
   const perchLOAF   = 0.80;   // 0..1 of the loaf that counts as sat down
-  const perchBARGE  = 3.20;   // m/s of impact that shakes everybody off — physBARGE_MIN
-  const perchAIR    = 0.14;   // s off the ground before they let go
+  // ...AND A PEBBLE IS NOT A BARGE. physBARGE_MIN is 3.2 m/s, which a walk
+  // through the Antarctic rookery clears on every loose stone it scuffs —
+  // measured, a passenger lost every 11 to 22 m to 'barge' there with the
+  // animal never leaving the ground. This is the speed of a DELIBERATE charge
+  // into something, at arm's length, which is what the rule means.
+  const perchBARGE  = 4.60;   // m/s of impact that shakes everybody off
+  const perchBARGE_R2 = 4.0;  // ...within 2 m of the animal
+  const perchBARGE_ME = 10.24; // ...and the animal itself over 3.2 m/s, squared
+  const perchAIR    = 0.16;   // s off the ground before they let go
+  const perchTHROW_V = 5.40;  // m/s upward that only the world can produce — see the hop
   const perchYAW    = [0.22, -0.31, 0.13];   // rad each seat sits off the animal's line
   const perchSeat = { x: 0, y: 0, z: 0 };
   const perchFrom = { x: 0, y: 0, z: 0 };
@@ -29514,8 +29561,12 @@ export function createSystems(game) {
   let perchLoafT = 0;     // s the animal has been sat down, for rule 3
   let perchGapT  = 0;     // s until the next one may climb
   let perchAirT  = 0;     // s the animal has been off the ground
+  let perchLeapt = false; // ...and whether it left the floor GOING UP
   let perchShake = false; // a barge happened this frame: everybody off
-  let perchMost  = 0;     // most on at once this visit — the record's number
+  let perchMost  = 0;     // most on at once this visit — the leaf's number
+  let perchToldEver = false;  // the one line the game ever says about this
+  let perchLastOff = '';      // ...and why the last one got down. See perchDebug.
+  let perchLastOffT = 0;
   /** How many are on the back right now. The card, the record and QA ask. */
   game.perchCount = function () {
     let n = 0;
@@ -29544,6 +29595,11 @@ export function createSystems(game) {
     const capy = game.capy;
     const out = { biome: live, on: game.perchCount(), most: perchMost,
                   loafT: +perchLoafT.toFixed(2), seats: capy ? capy.seats : 0,
+                  // WHICH OF THE FIVE TOOK THEM OFF. A passenger that is gone
+                  // is gone for one of five reasons and from outside they all
+                  // look identical, so a probe measuring how far you can carry
+                  // one cannot say whether it hit a wall, a kerb or the clock.
+                  off: perchLastOff, offAt: +perchLastOffT.toFixed(1),
                   kinds: [] };
     for (let k = 0; k < herdKinds.length; k++) {
       const rec = herdKinds[k];
@@ -29584,10 +29640,14 @@ export function createSystems(game) {
         n++;
       }
     }
-    if (n > 0 && why !== 'quiet') {
-      perchSfx.volume = 0.20 + n * 0.05;
-      perchSfx.pitch = 1.0;
-      sfx('rustle', perchSfx);
+    if (n > 0) {
+      perchLastOff = why;
+      perchLastOffT = game.state.time || 0;
+      if (why !== 'quiet') {
+        perchSfx.volume = 0.20 + n * 0.05;
+        perchSfx.pitch = 1.0;
+        sfx('rustle', perchSfx);
+      }
     }
     return n;
   }
@@ -29601,7 +29661,14 @@ export function createSystems(game) {
     const capy = game.capy, p = capy && capy.position;
     if (!p || !e.position) return;
     const dx = e.position.x - p.x, dz = e.position.z - p.z;
-    if (dx * dx + dz * dz > 9) return;      // 3 m
+    if (dx * dx + dz * dz > perchBARGE_R2) return;
+    // ...AND YOU HAVE TO BE THE ONE MOVING. `prop:impact` also fires when a
+    // prop LANDS, so a pebble the animal scuffed a second ago coming down on
+    // the ice two metres away was reading as a charge — measured, two of three
+    // Antarctic legs lost the passenger to `barge` at fifteen metres with the
+    // animal walking. A barge is something you did.
+    const v = capy.velocity;
+    if (!v || v.x * v.x + v.z * v.z < perchBARGE_ME) return;
     perchShake = true;
   });
   function perchUpdate(dt) {
@@ -29619,12 +29686,39 @@ export function createSystems(game) {
     else if (perchShake) off = 'barge';
     else if (capy.diving || capy.sliding || capy.climbing) off = 'move';
     else {
-      // The hop needs a little patience: `grounded` is false for a frame at the
-      // top of a step on rough ground, and three passengers leaving because a
-      // kerb went past is not a mechanic, it is a fault.
+      // ---- A HOP IS AN UPWARD LAUNCH, NOT AN ABSENT FLOOR (N2) ----------
+      //
+      // This was `!capy.grounded` held for a seventh of a second, and the note
+      // beside it said "three passengers leaving because a kerb went past is
+      // not a mechanic, it is a fault" — which is exactly what it then did.
+      // MEASURED (`qa/n2-carry.js`, three attempts in five chapters): every
+      // single dismount in fifteen was `hop`, and the median carry was **3.5
+      // metres**. Manly 3.1, Göreme 2.6, Antarctica 2.9, Venice 3.5. Only
+      // Sydney's open lawn ever reached 74. A capybara walking over ordinary
+      // ground leaves the floor constantly, and the whole "stand up and walk
+      // off with it" half of this mechanic was a lie everywhere but a lawn.
+      //
+      // The second attempt read the upward velocity instead, and that was
+      // wrong too: something in the ordinary walk cycle is worth **2.9 m/s**
+      // upward and it appeared, to two decimal places, in nine of the fifteen
+      // legs. A threshold above it and below `capyJUMP_V`'s 6.0 exists, but
+      // picking one is guessing at a number nobody authored.
+      //
+      // THE HONEST TEST IS THE INPUT. `input.jumpPressed` is the edge the
+      // player made, cleared at the end of the frame and read here because
+      // systems.js runs after capybara.js has already applied it — so
+      // `grounded` is false and vy is the launch by the time this asks. A
+      // kerb cannot press a key. The second half is for the world throwing
+      // you: `launch()` (a geyser, a wave) sets a vy no gait produces, and
+      // that is a dismount too. A plain FALL off a ledge is deliberately
+      // neither: neither of them is bothered, which is the joke.
       const airborne = !capy.grounded && !capy.swimming && !capy.carriedBy;
-      perchAirT = airborne ? perchAirT + dt : 0;
-      if (perchAirT > perchAIR) off = 'hop';
+      if (airborne) {
+        perchAirT += dt;
+        if (capy.velocity && capy.velocity.y > perchTHROW_V) perchLeapt = true;
+      } else { perchAirT = 0; perchLeapt = false; }
+      if (input && input.jumpPressed && airborne) perchLeapt = true;
+      if (perchLeapt && perchAirT > perchAIR) off = 'hop';
     }
     perchShake = false;
     if (off) { perchAllOff(off); perchLoafT = 0; if (off !== 'quiet') perchGapT = perchGAP; }
@@ -29646,7 +29740,11 @@ export function createSystems(game) {
         // A PASSENGER WHOSE COMPANY HAS RUN OUT GETS DOWN — rule 2. `led` is
         // cleared by herdUpdate on the same frame, so this is read and never
         // written here.
-        if (!s.led || rec.biome !== live) { s.on = false; s.seat = -1; s.mt = 0; continue; }
+        if (!s.led || rec.biome !== live) {
+          s.on = false; s.seat = -1; s.mt = 0;
+          perchLastOff = 'hold'; perchLastOffT = game.state.time || 0;
+          continue;
+        }
         for (let q = 0; q < rec.span; q++) {
           const t = s.seat + q;
           if (t >= 0 && t < taken.length) taken[t] = true;
@@ -29693,9 +29791,27 @@ export function createSystems(game) {
           perchSfx.pitch = best.rec.pitch * (0.98 + Math.random() * 0.10);
           sfx(best.rec.voice, perchSfx);
         }
+        // ---- ...AND THE GAME SAYS IT ONCE, EVER (N2) ---------------------
+        // Not per chapter and not per animal: the joke is the discovery, and a
+        // toast every time something climbs on is a mechanic nagging you about
+        // itself. After the first one the picture is the message. The find
+        // (`sat-on`) carries the rest.
+        if (!perchToldEver) {
+          perchToldEver = true;
+          toast('there is a ' + best.rec.kind + ' on you', 'note');
+        }
       }
     }
-    if (onN > perchMost) perchMost = onN;
+    if (onN > perchMost) {
+      perchMost = onN;
+      // ---- THE HIGH-WATER MARK (N2) --------------------------------------
+      // Written here rather than on a timer because this is the only line in
+      // the game that knows the number went up. `todoChapter()` is the same
+      // reader the other four counters use, so a picker jump files the number
+      // under the place it happened in.
+      const cn = todoChapter();
+      if (cn > 0 && onN > (jrChapPerch[cn] || 0)) { jrChapPerch[cn] = onN; saveSoon(); }
+    }
     // ---- and every one of them is put on its seat, every frame -----------
     if (!onN) return;
     const yaw = (capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
@@ -29747,7 +29863,8 @@ export function createSystems(game) {
   // anyway, so this is the same rule stated once more rather than a new one.
   game.events.on('biome:enter', function () {
     perchAllOff('quiet');
-    perchMost = 0; perchLoafT = 0; perchGapT = 0; perchAirT = 0; perchShake = false;
+    perchMost = 0; perchLoafT = 0; perchGapT = 0;
+    perchAirT = 0; perchLeapt = false; perchShake = false;
   });
   // ---- THE REFUSALS --------------------------------------------------------
   // Two of the eight chapters that offer an animal are not given `lift`, and
