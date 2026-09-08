@@ -1627,6 +1627,12 @@ let capyWhiffPend = false;          // a grab attempt found nothing THIS frame
 let capyStillT = 0;                 // s settled, mouth EMPTY — see capyWHEEK_CALM_T
 let capyRestT  = 0;                 // ...and the same with something in it. See THE CALM.
 let capyLoaf   = 0;                 // 0..1 sat down. See THE LOAF.
+let capyNap    = 0;                 // 0..1 asleep. See THE NAP.
+// NOT capyWakeT — that name is already the boat WAKE on the water, twenty
+// lines into the swim block, and shadowing it would have silently stopped the
+// rings from spawning. The same shape as the B15 name clash that broke a
+// feature eleven hundred lines away.
+let capyNapWake = 0;                // s since somebody last pressed something
 // THE PURR (F4). Fires while the animal is actually sat, not while it is on
 // its way down: 0.6 is past the point the pose has committed, so the sound and
 // the picture agree. See sfxPurr in systems.js.
@@ -1652,6 +1658,36 @@ const capyLOAF_PITCH = -0.05;  // rad of nose-up, because the front end goes dow
 const capyLOAF_LEG_F = -0.837; // front legs folded under, soles down
 const capyLOAF_LEG_R = 1.234;  // ...and the rears stretched back onto the hock
 const capyLOAF_TUCK_Z = 0.05;  // m the rear hips walk forward, so the feet tuck
+// ---- THE NAP (N4) ----------------------------------------------------------
+//
+// A FOURTH REST TIER ON THE SAME TIMER. The ladder is: settled (capyRestT
+// running), the calm (systems.js opens the camera and closes the score), the
+// loaf at 6.5 s (it sits down), and now this. Every one of them is a reading of
+// the ONE number that says how long this animal has been doing nothing, which
+// is why there is no new gate and no new busy list to drift from the old one.
+//
+// THE SECOND MOST-SHARED FACT about this species is a capybara asleep in a hot
+// spring with a tangerine on its head, and the whole reason the word "cozy"
+// attaches to it. The game rewarded stillness three times and then stopped:
+// past the loaf a player who left it running got the same frame for an hour.
+//
+// TWENTY SECONDS AFTER IT SITS DOWN, not twenty from cold: the loaf is the
+// gesture that says "I have stopped", and the nap is what happens if nobody
+// interrupts it. Slow in and quick out on the loaf's own asymmetry, and quicker
+// than the loaf both ways — an animal that took four seconds to wake up would
+// feel like input lag.
+const capyNAP_T     = 26.0;   // s of rest before it is asleep (the loaf is 6.5)
+const capyNAP_LAM   = 0.85;   // in; ×9 waking, because a wake is a response
+const capyNAP_DROP  = 0.045;  // m more than the loaf: the chin goes down
+const capyNAP_HEAD  = 0.34;   // rad the head drops onto the paws
+const capyNAP_HZ    = 0.125;  // breath, asleep. Half the loaf's again.
+const capyNAP_Y     = 0.023;  // ...and deeper, which is the whole tell
+const capyNAP_EAR   = 0.30;   // rad the ears go down and out
+const capyNAP_PITCH = -0.02;  // rad on top of the loaf's nose-up
+// s the nap is held off by a key press. Long enough that a player tapping
+// through a card cannot watch the animal doze between presses, short enough
+// that putting the controller down goes straight back to the mode.
+const capyNAP_WAKE  = 2.5;
 
 // ---------------------------------------------------------------------------
 // BREATH, SETTLE AND TAIL (R5) - THE THREE THINGS AN ANIMAL DOES WHEN IT IS
@@ -3937,6 +3973,9 @@ export function createCapybara(game) {
     restT: 0,                        // ...and with anything in it. THE CALM reads this.
     loaf: 0,                         // 0..1 sat down. The camera, the score and
                                      // the critters read this. See THE LOAF.
+    nap: 0,                          // 0..1 asleep. The fourth rest tier, and
+                                     // the one systems.js turns the camera and
+                                     // the score over to. See THE NAP.
     loafAsk: 0,                      // a biome writes 1 here per frame to ASK
                                      // for the loaf where the rest test cannot
                                      // reach — a hot spring. Cleared every frame.
@@ -4048,6 +4087,23 @@ export function createCapybara(game) {
      * Safe before the first frame and safe every frame — one parent-chain
      * matrix update, no children, for at most three calls.
      */
+    /**
+     * SOMEBODY IS STILL THERE. See THE NAP.
+     *
+     * `capyBusy` cannot see a key that does not move the animal — a wheek, a
+     * grab that finds nothing, opening the journal — and every one of those is
+     * a player saying they have not gone away. systems.js owns the keyboard,
+     * the pad and the touch layer and calls this from all three; this file owns
+     * what waking looks like.
+     *
+     * It holds the nap OFF for `s` seconds rather than zeroing it, so a run of
+     * key presses does not let it creep back between them, and so the animal
+     * cannot fall asleep again the instant a player stops typing.
+     */
+    wake(s) {
+      const t = typeof s === 'number' && s === s ? s : capyNAP_WAKE;
+      if (t > capyNapWake) capyNapWake = t;
+    },
     get seats() { return capySEAT_Z.length; },
     back(i, out) {
       const o = out || {};
@@ -4267,6 +4323,15 @@ export function createCapybara(game) {
                hold: (capy.carriedBy && capy.carriedBy.hold) || '',
                carryT: capyCarryT, hangSway: capyHangSway,
                mood: capyMood, blink: capyBlinkK(),
+               // ---- N4 ----
+               // THE NAP is four small numbers on four channels that already
+               // existed, and every one of them is invisible in a description:
+               // "the head goes down" is 19 degrees, "the ears go out" is 17,
+               // and "it breathes more slowly" is a rate nothing on screen
+               // states. A pose nobody can measure is a pose nobody can defend.
+               nap: capyNap, loaf: capyLoaf,
+               headX: head.rotation.x, earZ: earR.rotation.z,
+               modelY: capyModel.position.y, eyeOpen: eyeR.scale.y,
                // Which way it is POINTING. Published because frameShot takes a
                // bearing from the animal to the camera, so a probe that wants
                // to look at the face needs this and there was no way to get it.
@@ -4340,6 +4405,7 @@ export function createCapybara(game) {
     capyDiving = false; capyDiveGrace = 0; capyDiveT = 0; capyDiveDeep = 0;
     capy.diving = false; capy.swimming = false; capy.depth = 0; capy.diveTime = 0;
     capyLoaf = 0; capy.loaf = 0;
+    capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
     capyLaunchT = 0;
     capyPlatVX = 0; capyPlatVZ = 0; capyPlatT = 0;
     capyRideBody = null; capyRideT = 0; capy.rideBody = null;
@@ -4674,6 +4740,7 @@ export function createCapybara(game) {
     capyStillT = 0; capyRestT = 0;
     capy.stillT = 0; capy.restT = 0; // ...and the calm reads the published ones
     capyLoaf = 0; capy.loaf = 0; capy.loafAsk = 0;   // ...and the loaf. See THE LOAF.
+    capyNap = 0; capy.nap = 0; capyNapWake = 0;      // ...and THE NAP (N4)
     capyShakePend = 0; capyShakeP = -1;
     capyWhiffT = 0; capyWhiffPend = false;
     // ...and the face's one opinion belongs to the square it was earned in (F2).
@@ -6316,6 +6383,29 @@ export function createCapybara(game) {
     if (capyLoaf < 0.0015 && loafWant === 0) capyLoaf = 0;
     capy.loaf = capyLoaf;
 
+    // ---- THE NAP (N4) ----------------------------------------------------
+    // See the constants block. Three conditions and no new list: it is sitting
+    // down, it has been doing nothing for capyNAP_T, and nobody has pressed
+    // anything for capyWAKE_HOLD.
+    //
+    // ...AND THE WAKE IS AN EXPLICIT CHANNEL, because `capyBusy` cannot see a
+    // key that does not move the animal. A wheek, a grab that finds nothing, a
+    // press of the journal — none of them touch `capyRestT`, and every one of
+    // them is somebody saying "I am still here". systems.js owns the keyboard
+    // and calls `capy.wake()`; this file owns what waking looks like.
+    //
+    // NOT AT THE HELM AND NOT BEING CARRIED, on the loaf's own terms — a
+    // capybara asleep at the wheel of a ferry is a bug report — and `atHelm` is
+    // already on the loaf's want, so this inherits it. Swimming is NOT
+    // excluded: an animal asleep in a hot spring is the entire point, and the
+    // float skill is what makes the loaf reachable there in the first place.
+    if (capyNapWake > 0) capyNapWake -= dt;
+    const napWant = (capyLoaf > 0.9 && capyRestT >= capyNAP_T && capyNapWake <= 0 &&
+                     !capy.atHelm && !carried) ? 1 : 0;
+    capyNap = damp(capyNap, napWant, napWant > capyNap ? capyNAP_LAM : capyNAP_LAM * 9, dt);
+    if (capyNap < 0.0015 && napWant === 0) capyNap = 0;
+    capy.nap = capyNap;
+
     // ---- ...AND IT SAYS SO (F4) -----------------------------------------
     // The whole calm layer — the pose drop, the pad coming up, the filter
     // closing, `calmLean` widening on sysLoafNow — rewards sitting down, and
@@ -6902,6 +6992,9 @@ export function createCapybara(game) {
     // ...and less of it in the water, where buoyancy already owns the height
     // and a full 14.5 cm would put the animal's eyes under the surface.
     capyModel.position.y -= capyLoaf * capyLOAF_DROP * (capySwimming ? 0.30 : 1);
+    // ...and a little more asleep (N4), which is the chin going down onto the
+    // paws rather than a second sit. Same water rule for the same reason.
+    capyModel.position.y -= capyNap * capyNAP_DROP * (capySwimming ? 0.30 : 1);
 
     // ---- THE HILL, READ AND WORN (see capyPOSE_TERRAIN) -------------------
     // Four extra samples of the terrain law per frame — the same law the walk
@@ -7026,7 +7119,8 @@ export function createCapybara(game) {
     // The speed lean damps on its OWN variable. Damping capyModel.rotation.x
     // toward the lean while the terrain pitch is also written into it would
     // feed the hill back into its own filter every frame.
-    capyLean = damp(capyLean, lerp(leanTarget, capyLOAF_PITCH, capyLoaf), 8, dt);
+    capyLean = damp(capyLean, lerp(leanTarget, capyLOAF_PITCH + capyNAP_PITCH * capyNap,
+                                   capyLoaf), 8, dt);
     // The slide's nose-down goes on OUTSIDE the filter, beside the terrain
     // pitch, for the reason the comment above gives: capySlideW is already
     // damped on its own clock and running it through this one as well would
@@ -7055,14 +7149,16 @@ export function createCapybara(game) {
     // time constant and a hop is shorter than that. capyAirPose is ALREADY a
     // damped channel, at 13, so this is still a cross-fade and not a step.
     const restW = capyBreathAmt * (1 - capyAirPose);
-    capyBreathPh += lerp(capyBREATH_HZ, capyBREATH_HZ_LOAF, capyLoaf) *
+    // ...and slower again asleep (N4). The rate is the tell: a sleeping
+    // animal at a loafing animal's rate is a loafing animal with its eyes shut.
+    capyBreathPh += lerp(lerp(capyBREATH_HZ, capyBREATH_HZ_LOAF, capyLoaf), capyNAP_HZ, capyNap) *
                     (1 - capyIdleBreath * 0.44) * Math.PI * 2 * dt;
     if (capyBreathPh > Math.PI * 2) capyBreathPh -= Math.PI * 2;
     // Deeper when it has sat down, and deeper again on idle act 4, which is
     // the only readout the stamina system has. Both were already true; the
     // numbers are the hand-off's.
     capyBreath = Math.sin(capyBreathPh) * restW *
-                 lerp(capyBREATH_Y, capyBREATH_Y_LOAF, capyLoaf) *
+                 lerp(lerp(capyBREATH_Y, capyBREATH_Y_LOAF, capyLoaf), capyNAP_Y, capyNap) *
                  (1 + capyIdleBreath);
     // x and z share one number here because the squash does: `set(sqXZ, sqY,
     // sqXZ)` is one term for both, and 0.6% of fore-and-aft on a body that is
@@ -7120,7 +7216,11 @@ export function createCapybara(game) {
     // ADDED to the pose, never in place of it — see the gaze block up top.
     // ...plus the landing settle (R5), which is the fourth term on this line
     // and the only one that is not a want: it is what the body just did.
-    head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod;
+    // ...and the head goes down asleep (N4). ADDED, like the gaze and the
+    // nod, so nothing about the pose stack changes for the ninety-nine per cent
+    // of the time the animal is awake.
+    head.rotation.x = capyHeadPitch + capyGazePitch + capyIdlePitch + capyHeadNod +
+                      capyNap * capyNAP_HEAD;
     head.rotation.z = clamp(-capyYawRate * 0.05, -0.2, 0.2);
     // the look-around (see the idle beat) plus whatever is worth looking at.
     // Nothing else writes the head's yaw, and the mouth anchor is derived from
@@ -7185,8 +7285,11 @@ export function createCapybara(game) {
     earR.rotation.x = -earBack - earWhip;
     earL.rotation.y = turn;
     earR.rotation.y = turn;
-    earL.rotation.z = -0.18 - flick - earDown + turn * 0.35;
-    earR.rotation.z = 0.18 + flick + earDown + turn * 0.35;
+    // ...and they go down and out asleep (N4), which is the one part of this
+    // pose that reads at playing distance: a capybara's ears are the only thing
+    // on it that points, and asleep they stop pointing.
+    earL.rotation.z = -0.18 - flick - earDown - capyNap * capyNAP_EAR + turn * 0.35;
+    earR.rotation.z = 0.18 + flick + earDown + capyNap * capyNAP_EAR + turn * 0.35;
 
     // ---- THE NOSE (v54) --------------------------------------------------
     // A capybara standing still was completely inert above the neck except for
@@ -7278,7 +7381,12 @@ export function createCapybara(game) {
                     Math.abs(moodTgt) > Math.abs(capyMood) ? capyMOOD_IN : capyMOOD_OUT, dt);
     capy.mood = capyMood;
     capyBlink = capyBlink > 0 ? capyBlink - dt : 0;
-    capyFacePose(capyMood, capyBlinkK());
+    // ...AND ASLEEP THEY STAY SHUT (N4). `capyFacePose` already takes a 0..1
+    // "how closed", and a nap is a blink that does not end — so this is the
+    // greater of the two and there is no second eyelid channel to keep in step
+    // with the first. The loaf's own -0.50 mood is still underneath it, which
+    // is the brow, and a brow is worth having on a shut eye.
+    capyFacePose(capyMood, Math.max(capyBlinkK(), capyNap));
 
     // wet fur darkening (hysteresis so it doesn't strobe at the threshold)
     const wantDark = capyWetLevel > (capyWetDark ? 0.28 : 0.42);

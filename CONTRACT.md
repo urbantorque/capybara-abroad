@@ -14,6 +14,99 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH FOUR — THE NAP (N4 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 3, first batch: the animal.** The mode it opens — the
+camera, the photograph, the wake-up line — is N5. This is the fourth rest tier
+and the wake channel it needs, because a nap you cannot get out of is not a nap.
+
+### A FOURTH READING OF ONE NUMBER
+
+The ladder is: settled (`capyRestT` running), the calm (systems.js opens the
+camera and closes the score), the loaf at 6.5 s (it sits down), and now this at
+26. **Every one of them is a reading of the ONE number that says how long this
+animal has been doing nothing** — which is why there is no new gate and no
+second busy list to drift from the first. The calm field and the graze both
+shipped twice with the wrong one of `capyStillT` / `capyRestT`; a fifth list
+would have been a third chance at it.
+
+Twenty seconds after it sits down, not twenty from cold. The loaf is the gesture
+that says "I have stopped"; the nap is what happens if nobody interrupts it.
+
+**MEASURED (`qa/n4-nap.js`, Sydney, open lawn, the animal placed once and then
+left entirely alone):** loaf on at 6.8 s of rest, nap beginning at 26, full by
+33. Asymmetric on the loaf's own shape and quicker both ways — an animal that
+took four seconds to wake would feel like input lag.
+
+### THE POSE, AS NUMBERS
+
+"The head goes down" is not a measurement, and a still at playing distance
+cannot settle one — the crop in `qa/N4-*-close.png` is a lower, longer
+silhouette and that is all a picture can say. `animAudit()` now carries the four
+channels, and none of them is a new one:
+
+| | asleep | loafing, awake | delta |
+|---|---|---|---|
+| `head.rotation.x` | 0.340 | 0.000 | **+0.340 rad (19.5°)** |
+| `earR.rotation.z` | 0.480 | 0.155 | **+0.325 rad (18.6°)** |
+| `capyModel.position.y` | −0.530 | −0.485 | **−0.045 m** |
+| eye `scale.y` | 0.006 | 0.050 | **shut** |
+
+Plus the breath rate: `capyBREATH_HZ` 0.28 standing, 0.20 loafing, **0.125
+asleep**, and deeper with it. The rate is the tell — a sleeping animal at a
+loafing animal's rate is a loafing animal with its eyes shut.
+
+**THE EYES NEEDED NO NEW CHANNEL.** `capyFacePose` already takes a 0..1 "how
+closed", and a nap is a blink that does not end: `Math.max(capyBlinkK(),
+capyNap)`. The loaf's own −0.50 mood stays underneath it, which is the brow, and
+a brow is worth having on a shut eye.
+
+### THE WAKE IS ITS OWN CHANNEL, AND IT HAD TO BE
+
+`capyBusy` cannot see a key that does not move the animal — a wheek, a grab that
+finds nothing, opening the journal, checking the map — and every one of those is
+a player saying they have not gone away. **systems.js owns the keyboard, the pad
+and the touch layer; capybara.js owns what waking looks like.** `capy.wake(s)`
+holds the nap off for `capyNAP_WAKE` (2.5 s) rather than zeroing it, so a run of
+key presses cannot let it creep back between them.
+
+`sysWake()` is called from three places and one of them matters: **the top of
+the keydown handler, before every early return in it.** Half the branches below
+return — the title card's, the album's, the ledger's, the pause card's — and a
+wake put after any of them would be a wake that does not happen while the player
+is reading something, which is the one case the item singles out.
+
+**MEASURED:** a wheek takes the nap from 1.000 to 0.148 in a quarter second and
+to 0.000 in one, and the animal is asleep again about twelve seconds later.
+
+### IT WILL NOT SLEEP AT THE HELM
+
+The loaf's want already refuses `atHelm`, and the nap requires `capyLoaf > 0.9`,
+so the refusal is inherited rather than restated. **Measured rather than
+reasoned about** — the seven-ways memory is about exactly this class of
+assumption: forcing `atHelm` takes the loaf AND the nap to 0.000 within half a
+second. Being carried is refused on the same terms.
+
+**Swimming is deliberately NOT refused.** An animal asleep in a hot spring is
+the entire point of the item, and the `float` skill is what makes the loaf
+reachable on water in the first place.
+
+### ONE NAME THAT WOULD HAVE BROKEN SOMETHING ELSE
+
+`capyWakeT` was the obvious name for the hold-off timer and it is **already the
+boat WAKE on the water**, twenty lines into the swim block. Shadowing it would
+have silently stopped the rings spawning — the same shape as the B15 clash that
+broke a feature eleven hundred lines away. It is `capyNapWake`.
+
+### AND ONE PROBE FAILURE THAT LOOKED LIKE A DEAD FEATURE
+
+The first wake test pressed **J**, which opens the journal — and the journal
+PAUSES the game, and `paused` skips every module except systems.js. So
+capybara.js was not ticked at all: `restT` frozen at 43.8 for five consecutive
+samples and the nap unchanged at 1.000, which reads exactly like a wake channel
+that does nothing. Q — the wheek — is a real key, a real verb, and the game
+keeps running under it.
+
 ## THE NEXT PASS, BATCH THREE — THE STOWAWAY (N3 — 8 Sep 2026)
 
 **ROADMAP-NEXT item 2, last batch, and the one part of it that asks the herd to

@@ -25959,11 +25959,35 @@ export function createSystems(game) {
     startResume();
   });
 
+  /**
+   * SOMEBODY IS STILL THERE. See THE NAP in capybara.js.
+   *
+   * One line, guarded, called from the keyboard, the pad and the touch layer.
+   * Guarded because this file is created before capybara.js on one path and
+   * because a probe may drive the DOM with no animal at all.
+   */
+  function sysWake() {
+    const c = game.capy;
+    if (c && typeof c.wake === 'function') c.wake();
+  }
   // --- keyboard ---
   addEventListener('keydown', function (e) {
     // On the card this also brings the score up; in the game it is the plain
     // unlock it has always been. titleAudio() is audioUnlock() plus two lines.
     if (started) audioUnlock(); else titleAudio();
+    // ---- SOMEBODY IS STILL THERE (N4) ------------------------------------
+    // THE NAP is the fourth reading of `capyRestT`, and that clock cannot see a
+    // key that does not move the animal: a wheek, a grab that finds nothing,
+    // opening the journal, checking the map. Every one of those is a player
+    // saying they have not gone away. This file owns the keyboard, the pad and
+    // the touch layer; capybara.js owns what waking looks like.
+    //
+    // AT THE TOP, before every early return in this handler. Half the branches
+    // below return — the card's, the album's, the ledger's, the pause card's —
+    // and a wake put after any of them would be a wake that does not happen
+    // while the player is reading something, which is the one case the item
+    // singles out.
+    sysWake();
     const c = e.code;
     if (c === 'Space' || c === 'ArrowUp' || c === 'ArrowDown' || c === 'ArrowLeft' || c === 'ArrowRight') e.preventDefault();
     // ---- AND THE CARD OWNS THE KEYBOARD WHENEVER IT IS UP (F4) --------
@@ -26507,6 +26531,7 @@ export function createSystems(game) {
       audioUnlock();
       if (!started) { startResume(); return; }
       el.classList.add('press');
+      sysWake();                       // THE NAP (N4) — see sysWake
       // The fan is divs with a captured pointer, not <button>s, so it never
       // reaches the delegated click listener that gives every other control
       // in the HUD its press. D6: it gets the same one here.
@@ -26919,6 +26944,10 @@ export function createSystems(game) {
       if (wantHonk   && !padWasHonk)   padEdgeHonk = true;
       if (wantAction && !padWasAction) padEdgeAction = true;
     }
+    // THE NAP (N4). Any of the three, on the edge — a held button is not a
+    // player arriving, and a stick that is being pushed already moves the
+    // animal and resets `capyRestT` on its own.
+    if (padEdgeJump || padEdgeHonk || padEdgeAction) sysWake();
     padWasJump = wantJump; padWasHonk = wantHonk; padWasAction = wantAction;
     padJump = started && wantJump;
     padHonk = started && wantHonk;

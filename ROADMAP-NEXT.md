@@ -291,6 +291,28 @@ that is furniture to every other species.
 
 ### 3. SLEEP ON IT — the nap, and the picture you come back to
 
+> **BUILT, the animal, 9 Sep 2026 (N4). See CONTRACT.md.** The fourth rest tier
+> and the wake channel it needs. The mode it opens — the camera, the
+> photograph, the wake-up line — is N5. What the measurement changed:
+>
+> - **A fourth tier needed no new gate.** It is a fourth reading of
+>   `capyRestT`, which is what the calm and the loaf already are. Loaf at 6.8 s
+>   measured, nap beginning at 26, full by 33.
+> - **The pose is four channels that already existed** and nothing new: the
+>   head down 0.340 rad, the ears out 0.325, the model 45 mm lower, the eyes
+>   shut through `capyFacePose`'s existing 0..1 — a nap is a blink that does
+>   not end. Breath 0.28 standing, 0.20 loafing, 0.125 asleep.
+> - **"Any key wakes it" cannot be done from `capyRestT`.** A wheek, a grab
+>   that finds nothing and opening the journal are all invisible to the busy
+>   list, and all three are a player saying they are still there. `capy.wake()`
+>   is a new channel, called from the keyboard, the pad and the touch fan —
+>   and it has to be at the TOP of the keydown handler, before the four early
+>   returns for the cards, or it does not fire while somebody is reading, which
+>   is the one case the item names.
+> - **The helm refusal is inherited, not restated** — and measured anyway:
+>   forcing `atHelm` takes the loaf and the nap to zero in half a second.
+>   Swimming is deliberately not refused; that is the hot spring.
+
 **Concept.** Leave the capybara alone. After the calm and the loaf (6.5 s),
 at about twenty seconds of no input, it **falls asleep** — the loaf tucks, the
 breath slows, the score goes to the chapter's calm bed and stays there — and
