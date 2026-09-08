@@ -14,6 +14,123 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH THREE — THE STOWAWAY (N3 — 8 Sep 2026)
+
+**ROADMAP-NEXT item 2, last batch, and the one part of it that asks the herd to
+break its own rule.** One animal — one, and only one — crosses a border on the
+capybara's back. All six that can be ridden can travel; measured out of every
+one of their chapters and into somebody else's.
+
+### THE RULE IT BREAKS, AND WHY IT IS SAFE TO BREAK IT ONCE
+
+The herd drops everything across a chapter change, and that is a good rule for
+two reasons: fourteen Venetian pigeons following a capybara through a Vietnamese
+mountain is nonsense, and — the load-bearing half — **the chapter that draws
+them is not being ticked once you leave it.** The exception is exactly one
+animal, and it is safe for the same reason the rule exists: one pigeon on your
+head in Antarctica is a gag, and fourteen on the ice is a second chapter's worth
+of actors somebody has to own.
+
+### WHO DRAWS IT — A THIRD OPTIONAL FUNCTION
+
+    stow: function (i) { return <THREE.Object3D>; }
+
+A **standalone drawable**, built by the chapter from its own geometry and
+materials, owned by the caller, in nobody's scene. systems.js adds it LOOSE —
+`THREE.Object3D.prototype.add.call(scene, obj)`, physSceneAddLoose's own idiom,
+because main.js claims everything added while a capture tag is up and a
+stowaway captured into the chapter it is standing in would vanish the next time
+you left — and **never disposes it.** One per kind, cached for the session, so
+carrying six pigeons over six borders allocates one pigeon.
+
+**GEOMETRIES AND MATERIALS ARE SHARED, NEVER CLONED,** in all six. Four of them
+are one or two `new THREE.Mesh(instanced.geometry, instanced.material)`; the
+heron is `Object3D.clone(true)`, which shares materials by reference. A cloned
+material loses the rim — see the nose pad in capybara.js and the five flat seas
+before it.
+
+The cost per chapter is between four and fourteen lines. The ibis is the only
+awkward one: it is four InstancedMeshes driven by four node matrices, so its
+drawable is the same four geometries at `buildIbis`'s own rest offsets — which
+is the pose a bird being carried is in anyway.
+
+### `biome:leave` — MAIN.JS HAD NEVER HAD A "BEFORE"
+
+`biome:enter` fires on the far side, by which time the chapter you were in is
+detached, its meshes are hidden and its module is not in the update list. That
+is right for the seven subscribers that existed, and it makes one thing
+impossible: taking something with you. **N3 adds `biome:leave`**, emitted before
+`onExit` and before the detach, so a listener is talking to a chapter that is
+entirely intact. Nothing may cancel the move — `switchTo` has already committed
+by the time it reaches there.
+
+### IT IS NOT A PASSENGER, AND THAT IS NOT PEDANTRY
+
+`perchCount()` is what the three finds and the ledger leaf read, and **a place's
+number is a claim about that place.** Carry one pigeon round the world and every
+leaf in the game would say "carried a passenger" without a single local animal
+ever having climbed on. The stowaway takes a seat — it has to, or the pigeon you
+carried in and the first gentoo that climbs on are drawn in the same place — and
+it counts for nothing but its own find (`stowaway`) and its own line.
+
+### THE LINE, AND THE ONE CARD IT OUTRANKS
+
+The arrival card's fourth line is B14's notoriety headline. The stowaway takes
+it for exactly one crossing: **what the place has heard about you is true every
+time you arrive anywhere, and there being a heron on you is not.**
+`stowHeadline()` clears itself by being read, so the next arrival gets the
+rumour back. Plus one line from somebody within twenty-two metres, delayed 2.2 s
+past the white, because a speech bubble behind a sheet of paper is a line nobody
+hears.
+
+### WHEN IT GOES
+
+The same five reasons the perch uses, minus one: **the chapter change itself is
+the event this animal exists to survive**, so `off === 'quiet'` does not release
+it and the other four do. Then it gets down and walks away from the animal at
+1.6 m/s for 2.4 s, shrinking to nothing over the last 0.7. **No fade**: the
+materials are the chapter's own and shared, and turning one transparent would
+take every mesh in Venice made of the same colour with it. A shrink is free and
+touches nothing.
+
+And it goes home properly. A pigeon carried to Antarctica and back to San Marco
+walks off into its own square rather than being deleted mid-air — the same
+branch that catches main.js's failed-build rollback, which arrives here as the
+same fact ("the place I have landed in is the place this animal came from").
+
+### MEASURED
+
+`qa/n3-stow.js`, all six out of their own chapter and into somebody else's:
+pigeon → Antarctica, cat → Venice, silver gull → Cappadocia, gentoo → Manly,
+ibis → Kyoto, heron → Sydney. Every one arrives on the back, `built` rises 1 to
+6 (one cached drawable per kind, never a seventh), `perchCount()` is 0 on the
+far side in all six (the herd itself still does not travel), the `stowaway` find
+is on the file, and every one gets down and is gone within three seconds of the
+animal being thrown. Pictures in `qa/N3-*.png`.
+
+### FOUR PROBE FAILURES, ALL FOUR THE PROBE
+
+1. **The mount loop breaks on the frame it mounts**, and `perchRISE` is 0.55 s
+   of climbing after that. The stowaway will not take a passenger that is still
+   on its way up, which is right — and it made the first run report `seated: 0`
+   and no stowaway in all six chapters against a mechanic that was working.
+2. **One at a time is a rule, and it ate the second leg.** A stowaway left over
+   from the previous leg makes `biome:leave` return early, correctly, so leg two
+   reported nothing.
+3. **`switchTo` does not move the animal** — that is `biomeGo`'s job — so it
+   arrives at the previous chapter's coordinates and is as likely to be in the
+   sea as on a floor. Two of six legs reported a stowaway surviving a launch,
+   which is CORRECT (swimming is deliberately not a dismount) and reads as a
+   broken rule. `spawnOf(to)` fixed it.
+4. **A Space press is not a reliable dismount from a probe** for the same
+   reason. `capy.launch(0, 8, 0)` is the world throwing you, which is the other
+   half of the same rule and is deterministic.
+
+`game.stowDebug()` reports `canStow` / `on` / `seated` separately, because
+"the chapter offers no drawable", "nothing is on the back" and "something is on
+the back but still climbing" are three different failures that look identical
+from outside — and two of the four above were exactly that.
+
 ## THE NEXT PASS, BATCH TWO — WHAT THE PERCH IS WORTH (N2 — 8 Sep 2026)
 
 **ROADMAP-NEXT item 2, second batch.** N1 built a mechanic and told nobody. This

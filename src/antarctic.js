@@ -4515,6 +4515,17 @@ function antUpdatePenguins(game, dt) {
           antPengPerch[i] = 0.25;      // re-asked every frame — see antUpdatePeng
           antPengPerchY[i] = y;
         },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE CONTINENT (N3) -------------
+        // See THE STOWAWAY in systems.js. One mesh off the colony's own
+        // geometry and material, shared and never cloned. A gentoo in Venice
+        // is the best sentence this mechanic can produce and it costs one
+        // instanced geometry it already owns.
+        stow: function () {
+          if (!antPengMesh) return null;
+          const m = new THREE.Mesh(antPengMesh.geometry, antPengMesh.material);
+          m.castShadow = true;
+          return m;
+        },
       });
     }
   }

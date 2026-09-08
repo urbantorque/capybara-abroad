@@ -1406,6 +1406,25 @@ function kyoUpdateHeron(game, dt) {
             kyoHeronPerchY = y;
             if (kyoHeronGroup) kyoHeronGroup.position.y = y;
           },
+          // ---- ...AND IT MAY LEAVE THE GARDEN (N3) ----------------------
+          // See THE STOWAWAY in systems.js. `Object3D.clone` shares materials
+          // by reference, which is the ONLY safe way to copy anything in this
+          // game — a cloned material loses the rim (see the nose pad in
+          // capybara.js and the five flat seas before it). The wings go: this
+          // bird is standing on something, not flying, and kyoHeronWing is
+          // hidden for exactly that reason while it wades.
+          stow: function () {
+            if (!kyoHeronGroup) return null;
+            const g = kyoHeronGroup.clone(true);
+            g.position.set(0, 0, 0);
+            g.rotation.set(0, 0, 0);
+            // NOTHING IN THIS GARDEN IS NAMED, so the wing is found by index:
+            // `clone(true)` copies children in order, so the wing's child index
+            // in the original is its child index in the copy.
+            const idx = kyoHeronWing ? kyoHeronGroup.children.indexOf(kyoHeronWing) : -1;
+            if (idx >= 0 && g.children[idx]) g.children[idx].visible = false;
+            return g;
+          },
         });
       }
     }

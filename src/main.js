@@ -621,6 +621,21 @@ function mainMakeBiomes(game) {
       const from = biome.current, to = name;
       const fromSet = sets.get(from), toSet = setOf(to);
 
+      // ---- YOU ARE ABOUT TO LEAVE (N3) -------------------------------------
+      //
+      // There has never been a "before" event here — `biome:enter` fires on the
+      // far side, by which time the chapter you were in is detached, its meshes
+      // are hidden and its module is not being ticked. That is right for the
+      // seven subscribers that exist, and it makes one thing impossible:
+      // taking something WITH you. THE STOWAWAY (systems.js) has to ask Venice
+      // for a drawable pigeon while Venice is still the live chapter, and this
+      // is the only frame on which it can.
+      //
+      // Emitted BEFORE `onExit` and before the detach, so a listener is talking
+      // to a chapter that is entirely intact. Nothing may cancel the move: this
+      // is a notification, and `switchTo` has already committed by the time it
+      // reaches here.
+      game.events.emit('biome:leave', { name: from, to: to });
       if (fromSet && fromSet.api && fromSet.api.onExit) { try { fromSet.api.onExit(); } catch (e) { console.error(e); } }
       biome.attach(from, false);
 

@@ -2762,6 +2762,17 @@ function manUpdateGulls(game, dt) {
           manGullPerch[i] = 0.25;      // re-asked every frame — see manUpdateGulls
           manGullData[q + 1] = y;
         },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE BEACH (N3) -----------------
+        // See THE STOWAWAY in systems.js. One mesh off the flock's own
+        // geometry and material, shared and never cloned. A silver gull that
+        // has worked out it can be carried is the most in-character thing any
+        // animal in this game does.
+        stow: function () {
+          if (!manGullMesh) return null;
+          const m = new THREE.Mesh(manGullMesh.geometry, manGullMesh.material);
+          m.castShadow = true;
+          return m;
+        },
       });
     }
     // ---- ...AND THIS IS THE CHAPTER WITH THE CHIP SHOP IN IT -------------

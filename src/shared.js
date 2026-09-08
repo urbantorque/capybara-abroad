@@ -3279,6 +3279,7 @@ export const FINDS = [
   { id: 'sat-on',         text: 'Held still long enough that something climbed on you' },
   { id: 'carried-on',     text: 'Walked fifty metres with a passenger' },
   { id: 'full-house',     text: 'Had three of them on your back at once' },
+  { id: 'stowaway',       text: 'Took something across a border' },
 
   // ---- WHERE YOU WENT ---------------------------------------------------
   { id: 'high-point',     text: 'Stood on the highest ground there is here' },

@@ -1398,6 +1398,19 @@ function gorUpdateCats(game, dt) {
           c.py = y;
           c.st = 'flop'; c.t = 6;             // a cat that has got up there stays
         },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE VALLEY (N3) ----------------
+        // See THE STOWAWAY in systems.js. One mesh off the instanced cat's own
+        // geometry and material, shared and never cloned. It travels SITTING —
+        // the flop is a cat that has decided to stay where it is, and a cat
+        // being carried to Antarctica is a cat paying attention.
+        stow: function (i) {
+          if (!gorCatMesh) return null;
+          const c = gorCats[i];
+          const m = new THREE.Mesh(gorCatMesh.geometry, gorCatMesh.material);
+          m.castShadow = true;
+          m.scale.setScalar(c ? c.sc : 1);
+          return m;
+        },
       });
     }
   }

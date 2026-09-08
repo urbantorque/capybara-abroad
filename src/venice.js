@@ -2804,6 +2804,30 @@ function venUpdatePigeons(game, dt) {
           // stored as an offset over whatever paving is under the animal now.
           venPigeonData[q + 5] = y - venTerrain(venPigeonData[q], venPigeonData[q + 1]) - 0.16;
         },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE CITY (N3) -------------------
+        // See THE STOWAWAY in systems.js. The flock is three InstancedMeshes
+        // and none of them is drawn once Venice detaches, so this is a plain
+        // pair of meshes off the SAME geometry and the SAME material — shared,
+        // never cloned, because a cloned material loses the rim (see the note
+        // on the nose pad in capybara.js) and a cloned geometry would be a
+        // second copy of a bird that is already in the file.
+        //
+        // The wings are left off rather than scaled to nothing: a stowaway is
+        // sitting still, and the two boards are only ever out when it flies.
+        // Its colour is the authored pale morph — `instanceColor` is what makes
+        // a third of the square darker and a plain Mesh cannot read one.
+        stow: function () {
+          if (!venPigeonMesh) return null;
+          const g = new THREE.Group();
+          const PS = 0.88;
+          const b = new THREE.Mesh(venPigeonMesh.body.geometry, venPigeonMesh.body.material);
+          const h = new THREE.Mesh(venPigeonMesh.head.geometry, venPigeonMesh.head.material);
+          h.position.set(0, 0.15, 0.15);
+          b.castShadow = true; h.castShadow = true;
+          g.add(b); g.add(h);
+          g.scale.setScalar(PS);
+          return g;
+        },
       });
     }
     // ---- ...AND THEY WILL COME FOR A DROPPED ANYTHING (see THE FLOCK) ----

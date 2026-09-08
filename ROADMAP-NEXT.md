@@ -188,9 +188,27 @@ be friends with, finally with somebody who *is*.
 >   wait, not a new gesture — and it needed no new cast, no new timer and no
 >   new event.
 >
-> Still open: **the stowaway** (one animal crossing a border), which is the one
-> part of this item that asks the herd to break its own rule, and the passenger
-> COUNT as a shareable number, which belongs with item 5.
+> **BUILT, the stowaway, 8 Sep 2026 (N3). ITEM 2 IS CLOSED.** All six ridable
+> animals travel. What the measurement changed:
+>
+> - **The owner kept the rule and the exception both**, as the item allowed for.
+>   The herd still drops everything across a border; exactly one animal does not.
+> - **The expensive half was never the rule, it was the DRAWING.** The chapter
+>   that owns an animal is detached, hidden and not ticked once you leave, so a
+>   travelling animal needs a standalone drawable — a third optional function on
+>   the offer, four to fourteen lines per chapter, cached one per kind for the
+>   session.
+> - **main.js had no "before" event.** `biome:leave` is new, and it is the only
+>   frame on which a chapter can be asked for anything on the way out.
+> - **The stowaway does not count as a passenger**, or one pigeon carried round
+>   the world would put "carried a passenger" on all nineteen ledger leaves
+>   without a single local animal ever having climbed on.
+> - The arrival card's fourth line is B14's rumour, and this outranks it for
+>   exactly one crossing — the rumour is true every time you arrive anywhere,
+>   and a heron on you is not.
+>
+> Still open from this item: the passenger count as a shareable number, which
+> belongs with item 5.
 
 
 **Concept.** Loaf for a few seconds within earshot of the chapter's animals

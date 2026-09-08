@@ -28017,8 +28017,13 @@ export function createSystems(game) {
         // HERE rather than at the top of the crossing, because the incident
         // that tipped you into a tier may have been the one you caused on the
         // way to the door.
+        // ...and THE STOWAWAY outranks the rumour for exactly one crossing
+        // (N3). What the place has heard about you is true every time you
+        // arrive anywhere; there being a heron on you is not, and the card has
+        // one line for both. `stowHeadline` clears itself by being read, so the
+        // next arrival gets the rumour back.
         if (title) setTimeout(function () {
-          showPlace(title, sub || '', notoHeadline(chapterOf(name)));
+          showPlace(title, sub || '', stowHeadline() || notoHeadline(chapterOf(name)));
         }, sysFADE_CARD_LAG);
         // and the art goes with the white, once it has finished leaving
         setTimeout(function () {
@@ -29285,6 +29290,11 @@ export function createSystems(game) {
       pitch: o.pitch || 1,
       count: o.count, at: o.at, put: o.put,
       lift: typeof o.lift === 'function' ? o.lift : null,
+      // ...and a THIRD, for THE STOWAWAY (N3): a standalone drawable of animal
+      // `i`, owned by the caller, in nobody's scene. Omit it and this animal
+      // cannot cross a border, which is the right answer for anything the
+      // chapter cannot cheaply draw one of on its own.
+      stow: typeof o.stow === 'function' ? o.stow : null,
       span: clamp(Math.round(o.span || 1), 1, 3),
       st: [],
     };
@@ -29721,7 +29731,17 @@ export function createSystems(game) {
       if (perchLeapt && perchAirT > perchAIR) off = 'hop';
     }
     perchShake = false;
-    if (off) { perchAllOff(off); perchLoafT = 0; if (off !== 'quiet') perchGapT = perchGAP; }
+    if (off) {
+      perchAllOff(off);
+      perchLoafT = 0;
+      if (off !== 'quiet') perchGapT = perchGAP;
+      // THE STOWAWAY GOES ON THE SAME FIVE REASONS. It is not a passenger for
+      // counting, and it is one for physics: a hop that puts three pigeons on
+      // the paving may not leave a Venetian pigeon floating over a glacier.
+      // 'quiet' is the exception — that is the chapter change itself, which is
+      // the one event this animal exists to survive.
+      if (off !== 'quiet') stowRelease(capy);
+    }
     // ---- rule 3: you have to be still ------------------------------------
     const sat = !!(capy && capy.loaf >= perchLOAF);
     perchLoafT = sat ? perchLoafT + dt : 0;
@@ -29731,6 +29751,12 @@ export function createSystems(game) {
     if (!seats) return;
     const taken = perchTaken;
     for (let i = 0; i < taken.length; i++) taken[i] = false;
+    // ...AND A STOWAWAY IS SITTING IN ONE OF THEM. It does not count, and it
+    // does take up room — otherwise the Venetian pigeon you carried in and the
+    // first gentoo that climbs on are drawn in the same place.
+    if (stowObj && stowGo <= 0) {
+      for (let q = 0; q < stowSpan && q < taken.length; q++) taken[q] = true;
+    }
     let onN = 0;
     for (let k = 0; k < herdKinds.length; k++) {
       const rec = herdKinds[k];
@@ -29866,6 +29892,194 @@ export function createSystems(game) {
     perchMost = 0; perchLoafT = 0; perchGapT = 0;
     perchAirT = 0; perchLeapt = false; perchShake = false;
   });
+  // =========================================================================
+  // THE STOWAWAY (N3) — one animal crosses a border.
+  // =========================================================================
+  // THE HERD'S OWN RULE IS THAT NOTHING TRAVELS, and it is a good rule: it was
+  // written about fourteen Venetian pigeons following a capybara through a
+  // Vietnamese mountain, and about the fact that the chapter which draws them
+  // is not being ticked once you leave it. This is a deliberate exception of
+  // exactly one animal, and the reason it is safe is the same reason the rule
+  // exists — one pigeon on your head in Antarctica is a gag, and fourteen on
+  // the ice is a second chapter's worth of actors somebody has to own.
+  //
+  // WHO DRAWS IT. Not the chapter it came from: that module is detached, its
+  // meshes are hidden and it is not in the update list. So a chapter that wants
+  // its animal to be able to travel hands over a STANDALONE DRAWABLE — a third
+  // optional function on the herd offer —
+  //
+  //   stow: function (i) { return <THREE.Object3D>; }
+  //
+  // built from the chapter's own geometry and materials, owned by the caller,
+  // in nobody's scene. systems.js adds it LOOSE (the physSceneAddLoose idiom:
+  // main.js claims everything added while a capture tag is up, and a stowaway
+  // captured into the chapter it is standing in would vanish the next time you
+  // left) and never disposes it — one per kind, cached for the session, so
+  // carrying six pigeons over six borders allocates one pigeon.
+  //
+  // WHEN IT IS ASKED. `biome:leave`, which N3 added to main.js because there
+  // had never been a "before" event: `biome:enter` fires on the far side, by
+  // which time the only module that could build this is asleep.
+  //
+  // IT IS NOT A PASSENGER, AND THAT IS NOT PEDANTRY. `perchCount()` is what the
+  // finds and the ledger leaf read, and a place's number is a claim about that
+  // place — carry one pigeon round the world and every leaf in the game would
+  // say "carried a passenger" without a single local animal ever having
+  // climbed on. It takes a seat and it is drawn on the back; it counts for
+  // nothing but its own find and its own line.
+  const stowLEAVE = 2.4;      // s of getting down and going, once it is over
+  const stowWALK  = 1.6;      // m/s it wanders off at
+  const stowCache = Object.create(null);   // 'venice:pigeon' -> Object3D, once
+  const stowAt = { x: 0, y: 0, z: 0 };
+  let stowObj = null, stowKind = '', stowFrom = '', stowSpan = 1;
+  let stowGo = 0, stowGoX = 0, stowGoZ = 0, stowNews = '', stowErr = '';
+  /** 'a pigeon', 'an ibis'. The article is the only grammar this needs. */
+  function stowName(k) {
+    return (/^[aeiou]/i.test(k) ? 'an ' : 'a ') + k;
+  }
+  /**
+   * THE LINE THE ARRIVAL CARD SAYS INSTEAD OF THE RUMOUR.
+   *
+   * The card's fourth line is B14's notoriety headline, and this outranks it
+   * for exactly one crossing: what the place has heard about you is true every
+   * time you arrive anywhere, and there being a heron on you is not. Cleared by
+   * reading it, so the next arrival gets the rumour back.
+   */
+  function stowHeadline() {
+    const s = stowNews;
+    stowNews = '';
+    return s || '';
+  }
+  /** Put it back down and let it go. Never disposes: see stowCache. */
+  function stowRelease(capy) {
+    if (!stowObj || stowGo > 0) return;
+    stowGo = stowLEAVE;
+    const p = capy && capy.position;
+    const yaw = (capy && capy.group && capy.group.rotation) ? capy.group.rotation.y : 0;
+    // away from the animal, and across it rather than along it, so it walks
+    // out of the frame the camera is holding rather than up the middle of it
+    stowGoX = Math.cos(yaw); stowGoZ = -Math.sin(yaw);
+    if (p) { stowAt.x = p.x + stowGoX * 0.6; stowAt.z = p.z + stowGoZ * 0.6; }
+  }
+  game.events.on('biome:leave', function (e) {
+    if (stowObj) return;                       // one at a time, and one only
+    const live = (e && e.name) || (game.biome && game.biome.current);
+    const capy = game.capy;
+    if (!capy || typeof capy.can !== 'function' || !capy.can('herd')) return;
+    // the FRONT seat's passenger, because there may be three and only one goes
+    let best = null;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live || typeof rec.stow !== 'function') continue;
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (!s || !s.on || s.mt < 1) continue;
+        if (!best || s.seat < best.s.seat) best = { rec: rec, i: i, s: s };
+      }
+    }
+    if (!best) return;
+    const key = live + ':' + best.rec.kind;
+    let obj = stowCache[key];
+    if (obj === undefined) {
+      obj = null;
+      try { obj = best.rec.stow(best.i) || null; } catch (err) { obj = null; stowErr = (err && err.message) || String(err); }
+      stowCache[key] = obj;
+      if (obj) {
+        obj.visible = false;
+        THREE.Object3D.prototype.add.call(scene, obj);
+        registerShadowTarget(obj);
+      }
+    }
+    if (!obj) return;
+    stowObj = obj; stowKind = best.rec.kind; stowFrom = live;
+    stowSpan = best.rec.span; stowGo = 0;
+  });
+  game.events.on('biome:enter', function (e) {
+    if (!stowObj) return;
+    const to = (e && e.name) || (game.biome && game.biome.current);
+    // ---- IT IS HOME (or the crossing was rolled back) -------------------
+    // Both cases arrive here as "the place I have landed in is the place this
+    // animal came from", and both want the same thing: it gets down and goes,
+    // rather than being deleted mid-air. A pigeon carried to Antarctica and
+    // back to San Marco walking off into its own square is the right end to
+    // that story, and main.js's failed-build rollback (`biome:enter` with the
+    // chapter you never left) reads as one too.
+    if (to === stowFrom) {
+      stowObj.visible = true;
+      stowRelease(game.capy);
+      return;
+    }
+    stowObj.visible = true;
+    const def = chapterDef(chapterOf(to));
+    stowNews = 'you have brought ' + stowName(stowKind) + ' to ' + (def ? def.name : to);
+    foundFind('stowaway');
+    // ...and somebody says so, which is the whole joke: the place notices the
+    // passenger before it notices the capybara.
+    // `sayNear` is (x, z, radius, text) and it wants ONE line — see
+    // saySomebodyNear in npc.js. Delayed past the white, because the card and
+    // the crossing own the first second of an arrival and a speech bubble
+    // behind a sheet of paper is a line nobody hears.
+    const cp = game.capy && game.capy.position;
+    if (cp && typeof game.sayNear === 'function') {
+      const pool = ['There is ' + stowName(stowKind) + ' on that.',
+                    'That is not from here.',
+                    'How did that get here?'];
+      const line = pool[(Math.random() * pool.length) | 0];
+      const sx = cp.x, sz = cp.z;
+      setTimeout(function () { try { game.sayNear(sx, sz, 22, line); } catch (err) {} }, 2200);
+    }
+  });
+  function stowUpdate(dt) {
+    if (!stowObj) return;
+    const capy = game.capy;
+    if (!capy || !capy.position) return;
+    if (stowGo > 0) {
+      // ---- getting down, and going ---------------------------------------
+      // No fade: the materials are the chapter's own and shared, and turning
+      // one transparent for this would turn every mesh in Venice made of the
+      // same colour transparent with it. A shrink is free and touches nothing.
+      stowGo -= dt;
+      const u = clamp(stowGo / stowLEAVE, 0, 1);
+      stowAt.x += stowGoX * stowWALK * dt;
+      stowAt.z += stowGoZ * stowWALK * dt;
+      const gy = sysGroundY(stowAt.x, stowAt.z);
+      const sc = u > 0.3 ? 1 : clamp(u / 0.3, 0, 1);
+      stowObj.position.set(stowAt.x, gy, stowAt.z);
+      stowObj.rotation.y = Math.atan2(stowGoX, stowGoZ);
+      stowObj.scale.setScalar(sc);
+      if (stowGo <= 0) {
+        stowObj.visible = false;
+        stowObj.scale.setScalar(1);
+        stowObj = null; stowKind = ''; stowFrom = '';
+      }
+      return;
+    }
+    capy.back((stowSpan - 1) * 0.5, stowAt);
+    stowObj.position.set(stowAt.x, stowAt.y, stowAt.z);
+    stowObj.rotation.y = ((capy.group && capy.group.rotation) ? capy.group.rotation.y : 0) + 0.18;
+  }
+  /** Is anything riding across borders, and what. The harness asks. */
+  game.stowDebug = function () {
+    const live = game.biome && game.biome.current;
+    let canStow = 0, onNow = 0, climbed = 0;
+    for (let k = 0; k < herdKinds.length; k++) {
+      const rec = herdKinds[k];
+      if (rec.biome !== live) continue;
+      if (typeof rec.stow === 'function') canStow++;
+      for (let i = 0; i < rec.st.length; i++) {
+        const s = rec.st[i];
+        if (s && s.on) { onNow++; if (s.mt >= 1) climbed++; }
+      }
+    }
+    return { kind: stowObj ? stowKind : null, from: stowFrom || null,
+             going: +Math.max(0, stowGo).toFixed(2),
+             built: Object.keys(stowCache).length,
+             // WHY IT DID NOT TAKE ONE. Three separate reasons — the chapter
+             // offers no drawable, nothing is on the back, or something is on
+             // the back but still climbing — and from outside all three look
+             // like a stowaway that does not work.
+             canStow: canStow, on: onNow, seated: climbed, err: stowErr || null };
+  };
   // ---- THE REFUSALS --------------------------------------------------------
   // Two of the eight chapters that offer an animal are not given `lift`, and
   // the reason is the same for both: an Icelandic ewe is 45 kg and a Pantanal
@@ -32195,6 +32409,11 @@ export function createSystems(game) {
     // passenger's seat has to be written after the trail walk that would
     // otherwise have put it on the ground behind you.
     perchUpdate(dt);
+    // ...and THE STOWAWAY, which is drawn by nobody else — the chapter that
+    // owns this animal is detached. Outside perchUpdate because that function
+    // returns early on every frame with nothing on the back, and a stowaway is
+    // precisely the passenger that is not counted.
+    stowUpdate(dt);
     // ...and the birds, which is a different mechanic on the same contract.
     flockStep(dt);
     // The live record line, on the same raw clock and for a third version of

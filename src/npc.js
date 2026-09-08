@@ -10979,6 +10979,29 @@ export function createNPCs(game) {
           r.perch = 0.25;              // re-asked every frame — see stepIbis
           r.group.position.y = y;
         },
+        // ---- ...AND ONE OF THEM MAY LEAVE THE GARDENS (N3) --------------
+        // See THE STOWAWAY in systems.js. An ibis is four InstancedMeshes
+        // driven by four node matrices, and none of them is drawn once Sydney
+        // detaches — so this is the same four geometries at their REST offsets,
+        // which is `buildIbis`'s own table and the pose a bird being carried is
+        // in anyway. Geometries and materials shared, never cloned.
+        stow: function (n) {
+          const r = ibises[n];
+          const g = new THREE_.Group();
+          const mk = function (geo, im, x, y, z) {
+            const m = new THREE_.Mesh(geo, im.material);
+            m.position.set(x, y, z);
+            m.castShadow = true;
+            g.add(m);
+            return m;
+          };
+          mk(gIbisBody, iIbisB, 0, 0.32, 0);
+          mk(gIbisNeck, iIbisN, 0, 0.40, 0.09);
+          mk(gIbisLeg, iIbisLA, -0.06, 0.32, 0);
+          mk(gIbisLeg, iIbisLB, 0.06, 0.32, 0);
+          g.scale.setScalar(r && r.group ? r.group.scale.x : 1);
+          return g;
+        },
       });
     }
 
