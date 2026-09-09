@@ -584,6 +584,41 @@ world's calmest animal, with a criminal record that reads like a dance card.
 
 ### 5. WISH YOU WERE HERE — the postcard that leaves the game
 
+> **BUILT, first half, 9 Sep 2026 (W1). See CONTRACT.md.** K composes a
+> postcard — the picture, the place, the journey clock, up to two stamps and
+> one line in the world’s voice — and it leaves by share, clipboard or file.
+>
+> - **TWO OF THE FIVE PREMISES WERE FALSE.** There is no `@font-face` in this
+>   repository, so `document.fonts.ready` has nothing to wait for: the same
+>   string measures 583.6 px on a canvas before AND after it, 580.2 in the DOM,
+>   and 593.8 in a face that is deliberately not installed. And the harness
+>   does NOT block the clipboard — `clipboard.write` of a PNG blob returns ok
+>   — so the rung a desktop player gets is the rung a probe can prove.
+> - **The stamps are drawn from the souvenir’s own primitive list**, not from
+>   a serialised SVG: `sysDrawShapes` is `['r',x,y,w,h,key]` and three
+>   siblings, so a canvas draws it directly. Nothing asynchronous can be in
+>   the shutter’s turn, and an image that has to load is.
+> - **PNG is 44 ms and 1.6 MB at 1200x750; JPEG at .85 is 11 ms and 113 KB.**
+>   That is why the auto-shots are NOT postcards in this batch — 44 ms every
+>   ninety seconds is three dropped frames for a picture nobody asked for.
+> - **The card is as wide as the frame it is made of.** A phone’s buffer is
+>   390 px, so a fixed 1200 card is a 2.9x upscale and looks it on the one
+>   device that can share. Floored at 760, ceilinged at 1600, everything drawn
+>   through one scale factor.
+> - **The album keeps the RAW frame**, measured at 288x180 after a real
+>   keypress: the ledger, the title card and the shelf draw thumbnails as
+>   pictures OF A PLACE, and a letterboxed card with a caption on it is not
+>   one. The postcard is what leaves; the frame is what stays.
+> - **A headline is not a sentence.** Sentence-cased, the gossip pool reads
+>   "Hanoi asked to secure its bins." — a fragment with the verb missing. It
+>   stays in capitals, as the clipping it is. Neither the stunt template nor
+>   the souvenir one supplies an article either: both pools carry their own,
+>   and the first cut said "the the flat white".
+> - **The blame line is not reachable**: npc.js publishes blame counts and no
+>   text, so that caption needs plumbing in another file. Every other source
+>   the item names is readable at the shutter.
+> - The contact sheet is the second batch.
+
 **Concept.** `K` composes a *postcard* instead of downloading a frame: the
 letterbox, the chapter name in its own register, the souvenir drawn in the
 corner as a stamp if you hold it, the notoriety tier as a second stamp, the

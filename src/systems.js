@@ -5269,6 +5269,55 @@ function sysDrawShapes(list, vb, fit) {
   return svg;
 }
 
+/**
+ * THE SAME SHAPES, PAINTED ON A CANVAS (W1) — the postcard's stamps.
+ *
+ * ROADMAP-NEXT item 5 proposes serialising the souvenir SVGs and decoding them
+ * as images. This is the shorter honest route and it exists because of what
+ * `sysDrawShapes` above actually is: not art, but a LIST OF PRIMITIVES —
+ * `['r',x,y,w,h,key]`, `['c',cx,cy,r,key]`, `['e',cx,cy,rx,ry,key]` and a
+ * polygon otherwise. A canvas can draw all four directly, so the postcard
+ * needs no serialiser, no image decode, and above all NOTHING ASYNCHRONOUS:
+ * the shutter renders and reads in one JS turn (see photoShoot) and an image
+ * that has to load cannot be part of that turn.
+ *
+ * A deliberate twin of the function above, primitive for primitive and palette
+ * lookup for palette lookup, so a souvenir cannot look like one thing on the
+ * shelf and another on a postcard. `meet` only: every caller wants the shape
+ * to keep its aspect inside its box.
+ */
+function sysPaintShapes(g2, list, vb, x, y, w, h) {
+  const b = String(vb).split(/\s+/).map(Number);
+  const vw = b[2] || 1, vh = b[3] || 1;
+  const s = Math.min(w / vw, h / vh);
+  g2.save();
+  g2.translate(x + (w - vw * s) / 2, y + (h - vh * s) / 2);
+  g2.scale(s, s);
+  g2.translate(-(b[0] || 0), -(b[1] || 0));
+  for (let i = 0; i < list.length; i++) {
+    const sh = list[i];
+    const raw = PALETTE[sh[sh.length - 1]];
+    g2.fillStyle = sysHex(raw !== undefined ? raw : PALETTE.stone);
+    g2.beginPath();
+    if (sh[0] === 'r') {
+      g2.rect(+sh[1], +sh[2], +sh[3], +sh[4]);
+    } else if (sh[0] === 'c') {
+      g2.arc(+sh[1], +sh[2], +sh[3], 0, 6.2832);
+    } else if (sh[0] === 'e') {
+      g2.ellipse(+sh[1], +sh[2], +sh[3], +sh[4], 0, 0, 6.2832);
+    } else {
+      const pts = String(sh[1]).trim().split(/\s+/);
+      for (let k = 0; k < pts.length; k++) {
+        const p = pts[k].split(',');
+        if (k === 0) g2.moveTo(+p[0], +p[1]); else g2.lineTo(+p[0], +p[1]);
+      }
+      g2.closePath();
+    }
+    g2.fill();
+  }
+  g2.restore();
+}
+
 // ---------------------------------------------------------------------------
 // THE DEVICE UNDER THE MASTHEAD.
 //
@@ -19041,6 +19090,339 @@ export function createSystems(game) {
     } catch (e) { return false; }
   }
 
+  // =========================================================================
+  // WISH YOU WERE HERE (W1) — the postcard that leaves the game
+  // =========================================================================
+  // The camera has taken a raw frame and dropped it into the downloads folder
+  // since v22. The frame is the game's best argument for itself and it arrives
+  // somewhere else with nothing on it: no place, no clock, no reason anybody
+  // who was not playing would look twice. This is the same frame, made into a
+  // thing you would actually send.
+  //
+  // ---- FIVE PREMISES, MEASURED FIRST (`qa/w1-premise.js`) ---------------
+  //
+  //  1. THE BUFFER IS NOT HUGE. The renderer caps its own pixel ratio: an 1800
+  //     x 1200 window has a 1530 x 1020 drawing buffer, and a phone at 360 has
+  //     360 x 740. So the composite always UPSCALES a little and never has to
+  //     deal with a 4K read.
+  //  2. PNG COSTS 44 ms AND 1.6 MB at 1200x750; JPEG at .85 costs 11 ms and
+  //     113 KB. PNG is right for a thing somebody presses a key for once and
+  //     sends to a friend, and it is the reason the auto-shots (the nap, the
+  //     scene card) are NOT postcards in this batch — a 44 ms encode every
+  //     ninety seconds is three dropped frames for a picture nobody asked for.
+  //  3. THE FONT PREMISE IS FALSE HERE, and pleasantly so. The item warns that
+  //     the first postcard of a session prints in a fallback face. There is no
+  //     @font-face anywhere in this repository — the HUD is Trebuchet, Segoe,
+  //     system-ui — so `document.fonts.ready` has nothing to wait for. Proved
+  //     rather than assumed: the same string measures 583.6 px on a canvas
+  //     before and after `fonts.ready`, 580.2 in the DOM, and 593.8 in a face
+  //     that is deliberately not installed. Canvas and HUD are the same face.
+  //  4. THE HARNESS DOES NOT BLOCK THE CLIPBOARD, which the item assumed it
+  //     would. `clipboard.write` of a PNG blob returns ok under playwright;
+  //     `navigator.share` exists and throws AbortError with nobody there to
+  //     accept it. So the chain below is share on a phone, clipboard
+  //     otherwise, download when neither will have it — and the middle rung,
+  //     the one a desktop player actually gets, is testable.
+  //  5. THE BLAME LINE IS NOT REACHABLE. npc.js publishes blame COUNTS and no
+  //     text, so "the blame pair's accusation" cannot be a caption without new
+  //     plumbing in another file. Every other source the item names can be
+  //     read at the moment the shutter goes, and photoLine reads them.
+  //
+  // ---- AND THE STAMPS ARE DRAWN, NOT DECODED ---------------------------
+  // See sysPaintShapes. The souvenirs are a list of primitives, so the
+  // postcard draws the same list the shelf draws rather than serialising an
+  // SVG and waiting for an image — which it could not do anyway, because the
+  // render and the read are one JS turn.
+  //
+  // TWO STAMPS, NOT THREE. The item asks for the passenger as a third. There
+  // is no drawn art for a heron and inventing some to put it in a 108 px box
+  // is a worse joke than the sentence: "something has been sat on your back
+  // for a while" is funnier written down, so the passenger is a CAPTION.
+  const sysCARD_W = 1200;
+  const sysCARD_H = 750;
+  const sysCARD_BAND = 128;     // the written strip under the picture
+  const sysCARD_PAD = 26;
+  const sysCARD_STAMP = 108;
+  const sysCARD_FACE = '"Trebuchet MS","Segoe UI",system-ui,sans-serif';
+  const sysCARD_FRESH = 75;     // s a named stunt is still "that one"
+  let cardCan = null, cardCtx = null;
+  // ...and how the caption last set, so a probe can see the shrink-to-fit
+  // working rather than only its result. See cardDebug.
+  let cardFit = null;
+
+  /**
+   * ONE LINE, IN THE WORLD'S VOICE — and the order is the whole design.
+   *
+   * The item's argument is that the picture is better the more the world knows
+   * you, so the pool is read MOST-EARNED FIRST and falls all the way back to
+   * the chapter's own subtitle, which every place has and which is never
+   * wrong. A player who has done nothing gets a postcard that says where they
+   * are; a player who has a regular, a nickname and a named stunt gets a
+   * different sentence every time.
+   *
+   * SECOND PERSON AND IMPERSONAL, like the rest of the game. A postcard would
+   * naturally be first person — "wish you were here" is — but the capybara has
+   * never spoken and the one artefact that leaves the game is the wrong place
+   * to invent a voice for it.
+   */
+  function photoLine(n) {
+    const def = chapterDef(n);
+    const live = (game.biome && game.biome.current) || 'sydney';
+    // 1. the thing that just happened, if it was just now. Q1 names a chain
+    //    and Q2 counts it; this is the third surface and the only one that
+    //    leaves. `repLastAt` is why it says "that one" honestly.
+    if (repLast && (performance.now() - repLastAt) < sysCARD_FRESH * 1000) {
+      // NO ARTICLE IN FRONT OF IT. Twenty-six of the forty names begin with
+      // "THE" and fourteen do not — SAME AGAIN, BIN DAY, KLEPTOMANIA — so a
+      // template that supplies one says "the the flat white" on most of the
+      // table and a template that supplies none is right on all of it.
+      return 'They are calling it ' + repLast.toLowerCase() + '.';
+    }
+    // 2. ...and the person who knows you here (O1/O2). Tier 3 is the tier the
+    //    nickname arrives on, so it is the tier that can be quoted.
+    const tier = jrChapPal[n] || 0;
+    if (tier >= 3) {
+      let who = null;
+      try { who = game.palWho ? game.palWho(live) : null; } catch (e) { who = null; }
+      if (who && who.call) {
+        return tier >= sysPAL_MAX
+          ? who.who.charAt(0).toUpperCase() + who.who.slice(1) +
+            ' keeps a chair out for ' + who.call + '.'
+          : who.who.charAt(0).toUpperCase() + who.who.slice(1) +
+            ' calls this one ' + who.call + '.';
+      }
+    }
+    // 3. ...and whatever is sat on you (N2). The best frame in the game
+    //    according to the item, and it deserves saying rather than stamping.
+    let on = 0;
+    try { on = game.perchCount ? game.perchCount() : 0; } catch (e) { on = 0; }
+    if (on >= 2) return 'There are ' + on + ' of them on your back.';
+    if (on === 1) return 'Something has been sat on your back for a while.';
+    // 4. ...and what the places have started saying (B14/B15).
+    //    LEFT IN CAPITALS, WHICH IS THE OPPOSITE OF THE FIRST CUT AND THE
+    //    MEASUREMENT IS WHY. Sentence-cased, '{P} ASKED TO SECURE ITS BINS'
+    //    reads as "Hanoi asked to secure its bins." — a fragment with the verb
+    //    missing, because a headline is not a sentence and drops exactly the
+    //    words a sentence needs. In its own register it is a clipping somebody
+    //    has stuck on the card, which is what it always was.
+    const head = notoHeadline(n);
+    if (head) return head;
+    // 5. ...and the thing you are carrying out of here.
+    if (def && def.keep && keepHeld(n) && !def.keepNone) {
+      // ...and no article here either, for the reason above: the souvenirs are
+      // authored with their own — "a tea whisk, slightly chewed" — so a
+      // template that supplies one says "the a tea whisk".
+      return 'Leaving with ' + def.keep.toLowerCase() + '.';
+    }
+    // 6. ...and the place's own line, which is never wrong and never absent.
+    return def && def.sub ? def.sub.charAt(0).toUpperCase() + def.sub.slice(1) + '.' : '';
+  }
+
+  /**
+   * COMPOSE IT. Called from photoShoot in the same turn as the render, and it
+   * reads `canvas` on its first line for that reason.
+   *
+   * Returns a dataURL, or '' — everything here is allowed to fail quietly, on
+   * photoShoot's own terms: a browser that will not give a postcard has still
+   * flashed the shutter, and the raw download is still behind it.
+   */
+  function photoCard(n) {
+    try {
+      // ---- THE CARD IS AS WIDE AS THE FRAME IT IS MADE OF ---------------
+      // MEASURED: a phone's drawing buffer is 390 px (the renderer caps its
+      // own pixel ratio; a 1280 window gives 1280 and an 1800 one gives
+      // 1530). Fixed at 1200 the phone's postcard is a 2.9x upscale and it
+      // looks it — soft on the one device that can actually share it. So the
+      // card takes the buffer's width, floored at 760 because the band's type
+      // stops being a postcard below that and ceilinged at 1600 because
+      // nothing is gained past it, and everything on the card is drawn
+      // through `k`. The proportions are identical at every size.
+      const W = Math.max(760, Math.min(1600, canvas.width || sysCARD_W));
+      const H = Math.round(W * sysCARD_H / sysCARD_W);
+      const k = W / sysCARD_W;
+      if (!cardCan) {
+        cardCan = document.createElement('canvas');
+        cardCtx = cardCan.getContext('2d');
+      }
+      if (cardCan.width !== W || cardCan.height !== H) {
+        cardCan.width = W; cardCan.height = H;
+      }
+      const g2 = cardCtx;
+      if (!g2) return '';
+      const def = chapterDef(n);
+      const paper = sysHex(PALETTE.sail);
+      const ink = sysHex(PALETTE.ibisHead);
+      g2.fillStyle = paper;
+      g2.fillRect(0, 0, W, H);
+
+      // ---- the picture, COVER-CROPPED and never stretched ----------------
+      // The buffer is 1.6 wide and the picture is 1.93, so a plain drawImage
+      // squashes the animal. The crop is centred, which loses equal amounts of
+      // sky and ground — the two things a flat-shaded frame has most of.
+      const pad = Math.round(sysCARD_PAD * k);
+      const px = pad, py = pad;
+      const pw = W - pad * 2;
+      const ph = H - Math.round(sysCARD_BAND * k) - pad;
+      const sw = canvas.width, sh = canvas.height;
+      const want = pw / ph;
+      let cw = sw, ch = Math.round(sw / want);
+      if (ch > sh) { ch = sh; cw = Math.round(sh * want); }
+      g2.drawImage(canvas, Math.round((sw - cw) / 2), Math.round((sh - ch) / 2), cw, ch,
+                   px, py, pw, ph);
+
+      // ---- the stamps, top right, on the picture -------------------------
+      const keep = def && !def.keepNone && keepHeld(n) ? sysKEEPS[def.biome] : null;
+      const tier = notoTier();
+      const st = Math.round(sysCARD_STAMP * k);
+      let sx = px + pw - pad - st;
+      const sy = py + pad;
+      function stampBox() {
+        g2.fillStyle = paper;
+        g2.fillRect(sx, sy, st, st);
+        g2.strokeStyle = sysRgba(PALETTE.stoneDark, 0.55);
+        g2.lineWidth = Math.max(1, 2 * k);
+        g2.strokeRect(sx + 1, sy + 1, st - 2, st - 2);
+      }
+      if (tier > 0) {
+        stampBox();
+        // FIVE PIPS, THE EARNED ONES FILLED. The HUD already draws the chain
+        // as a row of pips, so a row of pips is the vocabulary this game uses
+        // for "how far along a five" — and a tier is unreadable as a word in a
+        // hundred-pixel box.
+        const r = 7 * k, gap = 20 * k, x0 = sx + st / 2 - gap * 2;
+        const cy = sy + st / 2 + 6 * k;
+        for (let i = 0; i < 5; i++) {
+          g2.beginPath();
+          g2.arc(x0 + i * gap, cy, r, 0, 6.2832);
+          if (i < tier) { g2.fillStyle = sysHex(PALETTE.cloth1); g2.fill(); }
+          else { g2.strokeStyle = sysRgba(PALETTE.ibisHead, 0.35);
+                 g2.lineWidth = Math.max(1, 2 * k); g2.stroke(); }
+        }
+        g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.7);
+        g2.font = '700 ' + Math.round(12 * k) + 'px ' + sysCARD_FACE;
+        g2.textAlign = 'center';
+        g2.fillText(notoName(tier).toUpperCase(), sx + st / 2, sy + 30 * k);
+        g2.textAlign = 'left';
+        sx -= st + 12 * k;
+      }
+      if (keep) {
+        stampBox();
+        sysPaintShapes(g2, keep.s, sysKEEP_VB, sx + 12 * k, sy + 12 * k,
+                       st - 24 * k, st - 24 * k);
+      }
+
+      // ---- the written strip ---------------------------------------------
+      const by = H - Math.round(sysCARD_BAND * k);
+      g2.fillStyle = ink;
+      g2.font = '700 ' + Math.round(46 * k) + 'px ' + sysCARD_FACE;
+      g2.textBaseline = 'alphabetic';
+      g2.fillText((def ? def.name : '').toUpperCase(), px, by + 52 * k);
+      // the journey's clock, right-aligned on the same line
+      const total = jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0);
+      g2.textAlign = 'right';
+      g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.7);
+      g2.font = '700 ' + Math.round(24 * k) + 'px ' + sysCARD_FACE;
+      g2.fillText(sysFmtTime(total) + ' on the road', px + pw, by + 50 * k);
+      g2.textAlign = 'left';
+      // ...and the line the world would put on it
+      const line = photoLine(n);
+      if (line) {
+        g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.86);
+        // SHRUNK TO FIT RATHER THAN HOPED AT. The pool is nineteen chapter
+        // subtitles, seventeen nicknames, twelve headlines and forty stunt
+        // names, and the longest of them is not knowable from here — so the
+        // card measures its own line and steps down until it fits the picture's
+        // width. A postcard whose caption runs off the edge is the one failure
+        // that would reach somebody who is not playing.
+        let fs = Math.round(28 * k);
+        g2.font = 'italic 500 ' + fs + 'px ' + sysCARD_FACE;
+        while (fs > 19 * k && g2.measureText(line).width > pw) {
+          fs -= 1;
+          g2.font = 'italic 500 ' + fs + 'px ' + sysCARD_FACE;
+        }
+        cardFit = { line: line, fs: fs, w: Math.round(g2.measureText(line).width), pw: pw };
+        g2.fillText(line, px, by + 96 * k);
+      }
+      return cardCan.toDataURL('image/png');
+    } catch (e) { return ''; }
+  }
+
+  /**
+   * ...AND GET IT OUT OF THE GAME. Share on a phone, clipboard on a desktop,
+   * the file when neither will have it — every rung measured (see the note
+   * above) and every rung says what it did, because a postcard that has
+   * silently gone to the clipboard is indistinguishable from one that failed.
+   *
+   * An AbortError is the player pressing cancel on their own share sheet and
+   * it ends the chain: falling through to a download because somebody changed
+   * their mind is the game arguing with them.
+   */
+  function photoSend(url, file) {
+    let blob = null;
+    try {
+      const i = url.indexOf(',');
+      const bin = atob(url.slice(i + 1));
+      const arr = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+      blob = new Blob([arr], { type: 'image/png' });
+    } catch (e) { blob = null; }
+    const save = function () {
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast('postcard saved');
+      } catch (e) { /* a browser that will not save it has still shown it */ }
+    };
+    const copy = function () {
+      try {
+        if (!blob || !navigator.clipboard || !navigator.clipboard.write ||
+            typeof ClipboardItem !== 'function') { save(); return; }
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+          .then(function () { toast('postcard copied — paste it anywhere'); })
+          .catch(function () { save(); });
+      } catch (e) { save(); }
+    };
+    if (sysIsTouch() && blob && navigator.canShare && navigator.share) {
+      try {
+        const f = new File([blob], file, { type: 'image/png' });
+        if (navigator.canShare({ files: [f] })) {
+          navigator.share({ files: [f], title: 'Wish you were here' })
+            .then(function () { toast('postcard sent'); })
+            .catch(function (e) { if (!e || e.name !== 'AbortError') copy(); });
+          return;
+        }
+      } catch (e) { /* fall through */ }
+    }
+    copy();
+  }
+  /**
+   * COMPOSE ONE WITHOUT PRESSING ANYTHING (W1).
+   *
+   * A test hook, never a verb, on `forceRep`'s terms: it renders, composes and
+   * hands back the dataURL — and takes no photograph. The album is untouched,
+   * nothing leaves, nothing is counted, and no shutter is heard. It is the
+   * only way to LOOK at a postcard, which is the one thing in this batch that
+   * no number can judge: a caption that overruns the card, a stamp over the
+   * animal's head and a crop through its middle are all valid dataURLs.
+   *
+   * It renders before it composes, for photoShoot's reason exactly.
+   */
+  game.cardDebug = function (what) {
+    const n = chapterOf((game.biome && game.biome.current) || 'sydney');
+    if (what === 'line') return photoLine(n);
+    if (what === 'fit') return cardFit;
+    try {
+      if (game.post && game.post.enabled) game.post.render();
+      else renderer.render(scene, camera);
+    } catch (e) { /* a composite of a blank buffer is still a measurement */ }
+    return photoCard(n);
+  };
+
   function photoShoot() {
     if (!photoOn) return;
     photoShots++;
@@ -19068,20 +19450,19 @@ export function createSystems(game) {
                     (photoSky.textContent && photoSky.textContent !== '·'
                        ? ' ' + photoSky.textContent : '') +
                     ' ' + photoTime.textContent);
-      url = canvas.toDataURL('image/png');
+      // ---- ...AND THE POSTCARD IS COMPOSED HERE TOO (W1) ---------------
+      // In this turn, off this read, for the same reason the read itself is
+      // here: without `preserveDrawingBuffer` the buffer is gone by the next
+      // task. The RAW frame is what the album keeps — the ledger's leaves, the
+      // title card and the shelf all draw album thumbnails at 288x180 as
+      // pictures OF A PLACE, and a letterboxed card with a caption baked into
+      // it is not one. The postcard is what leaves; the frame is what stays.
+      url = photoCard(chapterOf(place));
+      if (!url) url = canvas.toDataURL('image/png');
     } catch (e) { url = ''; }
     if (!url) { toast('the camera did not catch that one'); return; }
     if (kept) albRefresh();
-    try {
-      const name = (game.biome && game.biome.current) || 'sydney';
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'capybara-' + name + '-' + photoShots + '.png';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (e) { /* a browser that will not save it has still shown it */ }
+    photoSend(url, 'capybara-' + place + '-' + photoShots + '.png');
   }
 
   // --- flight readout: altimeter, airspeed, thermal tell ---
@@ -31820,6 +32201,10 @@ export function createSystems(game) {
     return out;
   };
   let repLast = '';
+  // ...and WHEN, because the postcard’s caption wants the name of the thing
+  // that just happened and not the name of a thing that happened in Kyoto an
+  // hour ago. See photoLine.
+  let repLastAt = -1e9;
   /**
    * NAME IT, COUNT IT, AND HAVE SOMEBODY SAY IT.
    *
@@ -31830,8 +32215,9 @@ export function createSystems(game) {
    */
   function repName(x, z) {
     const p = repMatch(repEv);
-    if (!p) { repLast = ''; return null; }
+    if (!p) { repLast = ''; repLastAt = -1e9; return null; }
     repLast = p.name;
+    repLastAt = performance.now();
     jrRep[p.id] = (jrRep[p.id] || 0) + 1;
     saveSoon();
     // AND THE PEOPLE SAY IT. B13 already has the nearest pair arguing about
@@ -32075,6 +32461,12 @@ export function createSystems(game) {
     // chapter is authored in the same ones. See THE INCIDENT.
     incN = 0; incT = -1; incCarded = 0; incCool = 0;
     for (const k in incSeen) delete incSeen[k];
+    // ...AND SO DOES THE NAME IT WAS GIVEN (W1). `repLast` is "the thing that
+    // just happened" and the postcard's caption asks for it by that name, so a
+    // Flat White pulled off in Venice was still captioning a photograph taken
+    // in Kyoto a minute later. The chain above belongs to the square it was
+    // made in; the word for it belongs to the same square.
+    repEv.length = 0; repLast = ''; repLastAt = -1e9;
     if (game.capy && game.capy.ghost) game.capy.ghost.hide();
     // A shot belongs to the moment that asked for it. Crossing a border ends
     // the moment, and a framing left running into a teleport would fight the

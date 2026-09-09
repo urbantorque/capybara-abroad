@@ -1,3 +1,129 @@
+## THE NEXT PASS, BATCH TEN — WISH YOU WERE HERE (W1 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 5, first batch.** The camera has taken a raw frame and
+dropped it in the downloads folder since v22. The frame is the game's best
+argument for itself and it arrives somewhere else with nothing on it: no place,
+no clock, no reason anybody who is not playing would look twice. This is the
+same frame, made into a thing you would send — and it is where items 1, 2 and 4
+turn into something you can show.
+
+### FIVE PREMISES MEASURED FIRST, AND TWO OF THEM WERE FALSE
+
+`qa/w1-premise.js`:
+
+| | |
+|---|---|
+| the drawing buffer, 1800 x 1200 window | **1530 x 1020** — the renderer caps its own ratio |
+| the drawing buffer, a phone | **390 x 844** |
+| PNG at 1200 x 750 | **44 ms, 1.6 MB** |
+| JPEG at .85, same size | 11 ms, 113 KB |
+| `document.fonts.ready` | resolved, and **it changes nothing** |
+| `clipboard.write` of a PNG blob, under the harness | **ok** |
+| `navigator.share` | present; AbortError with nobody there |
+
+**THE FONT PREMISE IS FALSE FOR THIS REPOSITORY, and pleasantly so.** The item
+warns that the first postcard of a session prints in a fallback face. There is
+no `@font-face` anywhere here — the HUD is Trebuchet, Segoe, system-ui — so
+there is nothing to wait for. Proved rather than assumed: the same string
+measures **583.6 px on a canvas before and after `fonts.ready`, 580.2 in the
+DOM, and 593.8 in a face that is deliberately not installed**. Canvas and HUD
+are the same face and the metric can tell faces apart.
+
+**AND THE HARNESS DOES NOT BLOCK THE CLIPBOARD**, which the item assumed it
+would. So the rung a desktop player actually gets is the rung that can be
+proved, and `qa/w1-shoot.js` presses K and Enter and reads the toast back.
+
+**THE BLAME LINE IS NOT REACHABLE.** npc.js publishes blame counts and no text,
+so "the blame pair's accusation" cannot be a caption without new plumbing in
+another file. Every other source the item names can be read at the shutter.
+
+### THE STAMPS ARE DRAWN, AND NOT BY THE ROUTE THE ITEM PROPOSES
+
+The item proposes serialising the souvenir SVGs and decoding them as images.
+`sysDrawShapes` is not art — it is a **list of primitives**: `['r',x,y,w,h,key]`,
+`['c',cx,cy,r,key]`, `['e',...]`, polygon otherwise. So `sysPaintShapes` is a
+deliberate twin of it, primitive for primitive and palette lookup for palette
+lookup, and the postcard draws the same list the shelf draws. No serialiser, no
+decode, and above all **nothing asynchronous** — the render and the read are one
+JS turn and an image that has to load cannot be in it.
+
+**TWO STAMPS, NOT THREE.** The item asks for the passenger as a third. There is
+no drawn art for a heron and inventing some to fill a 108 px box is a worse joke
+than the sentence, so the passenger is a caption: *"Something has been sat on
+your back for a while."* The tier is five pips with the earned ones filled,
+which is the vocabulary the HUD already uses for "how far along a five" — a tier
+is unreadable as a word in a hundred-pixel box, and the name sits above it.
+
+### THE CAPTION IS A LADDER, MOST-EARNED FIRST
+
+Six rungs, and all six were measured firing on a clean file (`qa/w1-card.js`):
+
+| the file | the line |
+|---|---|
+| nothing at all | *The gardens, unsupervised.* |
+| a chain named a minute ago | *They are calling it the flat white.* |
+| a tier-5 regular | *The gondolier keeps a chair out for Fifty Minutes.* |
+| a menace | *HANOI ASKED TO SECURE ITS BINS* |
+| a finished chapter | *Leaving with a tea whisk, slightly chewed.* |
+
+**SECOND PERSON AND IMPERSONAL, like the rest of the game.** A postcard would
+naturally be first person — "wish you were here" is — but the capybara has never
+spoken and the one artefact that leaves the game is the wrong place to invent a
+voice for it.
+
+**THE HEADLINE STAYS IN CAPITALS, and that is the opposite of the first cut.**
+Sentence-cased, `'{P} ASKED TO SECURE ITS BINS'` reads as *"Hanoi asked to
+secure its bins."* — a fragment with the verb missing, because a headline is not
+a sentence and drops exactly the words a sentence needs. In its own register it
+is a clipping somebody stuck on the card, which is what it always was.
+
+**AND NEITHER TEMPLATE SUPPLIES AN ARTICLE**, because both pools already carry
+their own. The first cut said *"the the flat white"* (26 of the 40 names begin
+with THE) and *"the a tea whisk, slightly chewed"*.
+
+### THREE MORE THINGS THE MEASUREMENT DECIDED
+
+**THE CARD IS AS WIDE AS THE FRAME IT IS MADE OF.** Fixed at 1200 the phone's
+postcard is a 2.9x upscale and it looks it — soft on the one device that can
+actually share it. The card now takes the buffer's width, floored at 760 and
+ceilinged at 1600, and everything on it is drawn through one scale factor, so
+the proportions are identical at every size.
+
+**THE ALBUM KEEPS THE RAW FRAME.** The ledger's leaves, the title card and the
+shelf all draw album thumbnails at 288 x 180 as pictures OF A PLACE, and a
+letterboxed card with a caption baked into it is not one. The postcard is what
+leaves; the frame is what stays. Measured after a real keypress: the stored row
+is still 288 x 180.
+
+**AND THE NAME BELONGS TO THE SQUARE IT WAS EARNED IN.** `repLast` was never
+cleared, so a Flat White pulled off in Venice was still captioning a photograph
+taken in Kyoto a minute later. It is cleared on `biome:enter` beside the chain
+itself, which has belonged to its own square since B4.
+
+### WHAT LEAVING LOOKS LIKE NOW
+
+Share on a phone, clipboard on a desktop, the file when neither will have it —
+and every rung says which it was, because a postcard that has silently gone to
+the clipboard is indistinguishable from one that failed. An AbortError ends the
+chain rather than falling through: a player who cancels their own share sheet
+should not then be handed a download. **This replaces the unconditional
+download**, which is the item's explicit intent — the toast names what happened
+either way.
+
+`qa/p6-static.cjs` now checks the item's own last premise across the whole pool
+— 107 lines: nineteen subtitles, nineteen souvenirs, seventeen nicknames, forty
+stunt names and twelve headlines — and fails any that names a control or is a
+task id. Clean.
+
+### WHAT IS NOT HERE
+
+The contact sheet — the album as one image, the nineteen tiles, the clock, the
+tier, the shelf — which is the item's *"I finished it"* picture and a second
+batch on its own. And the auto-shots (the nap, the scene card, the marquee lift)
+as postcards, which is measured out of this one rather than forgotten: 44 ms of
+PNG every ninety seconds is three dropped frames for a picture nobody asked for,
+so if they become postcards they become JPEG ones.
+
 ## THE NEXT PASS, BATCH NINE — WHAT THE FORTY ARE FOR (Q2 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 4, second batch, and it closes the item.** Q1 gave forty

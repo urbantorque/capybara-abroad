@@ -133,6 +133,50 @@ const wowActs = [];
   }
 }
 
+// ---- THE POSTCARD'S CAPTION POOL (W1) -------------------------------------
+// ROADMAP-NEXT item 5's own last premise: "the caption must never be a line
+// that names a key or a task id". It is the strictest place in the game for
+// that rule, because a postcard is the one thing here that reaches somebody
+// who is not playing — a picture captioned "press E at the fire" is the game
+// giving an instruction to a stranger's phone.
+//
+// `photoLine` has six rungs and every one of them is a table: a chapter's
+// `sub`, its `keep`, a regular's `call` (npc.js), a stunt's name and a gossip
+// headline (systems.js). All five are checked, all in one place, because the
+// pool is the union and a rule that only covers the rung somebody remembered
+// is not a rule.
+{
+  const NAMES_A_KEY = /press |hold |\btap\b|\bkey\b|\bwith E\b|\bwith Q\b|Shift|Enter|Escape|\bWASD\b/i;
+  const sys = fs.readFileSync('src/systems.js', 'utf8');
+  const npc = fs.readFileSync('src/npc.js', 'utf8');
+  const taskIds = new Set(tasks.map((t) => t.id));
+  const pool = [];
+  for (const c of chaps) {
+    if (c.sub) pool.push(['ch' + c.n + ' sub', c.sub]);
+    if (c.keep) pool.push(['ch' + c.n + ' keep', c.keep]);
+  }
+  for (const m of npc.matchAll(/call: '([^']*)'/g)) pool.push(['a regular’s call', m[1]]);
+  {
+    const a = sys.indexOf('const sysREP = [');
+    const t = sys.slice(a, sys.indexOf('\n  ];', a));
+    for (const m of t.matchAll(/name: '((?:[^'\\]|\\.)*)'/g)) pool.push(['a stunt', m[1]]);
+    for (const m of t.matchAll(/name: "([^"]*)"/g)) pool.push(['a stunt', m[1]]);
+  }
+  {
+    const a = sys.indexOf('const sysNOTO_NEWS = [');
+    const t = sys.slice(a, sys.indexOf('\n  ];', a));
+    for (const m of t.matchAll(/'([A-Z{][^']*)'/g)) pool.push(['a headline', m[1]]);
+  }
+  let bad = 0;
+  for (const [where, line] of pool) {
+    if (NAMES_A_KEY.test(line)) { fail.push('caption pool — ' + where + ' names a control: ' + line); bad++; }
+    if (taskIds.has(line.toLowerCase().replace(/[^a-z0-9]+/g, '-'))) {
+      fail.push('caption pool — ' + where + ' is a task id: ' + line); bad++;
+    }
+  }
+  console.log('caption pool: ' + pool.length + ' lines checked' + (bad ? ', ' + bad + ' BAD' : ', clean'));
+}
+
 console.log('chapters ' + chaps.length + ', tasks ' + tasks.length);
 console.log('marquees: ' + chaps.filter((c) => c.marquee).length + '/' + chaps.length +
   ', wow in act 1: ' + wowActs.filter((a) => a === 1).length +
