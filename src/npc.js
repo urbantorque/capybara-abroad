@@ -1336,8 +1336,23 @@ export function createNPCs(game) {
     const bH = [0.955, 1.0, 1.045][arch] * rand(0.99, 1.01);
     const bGirth = [1.13, 1.0, 0.91][arch] * rand(0.99, 1.01);
     g.scale.set(bGirth, bH, bGirth);
-    g.add(npcLocPart(0.17, 0.78, 0.19, legs, -0.12, 0.39, 0));
-    g.add(npcLocPart(0.17, 0.78, 0.19, legs, 0.12, 0.39, 0));
+    // ---- LEGS ON HIPS, WHICH THEY WERE NOT (v55) -------------------------
+    // These were two boxes added straight to the group: drawn, and welded to
+    // the pelvis. The file's own note said so — "no legs are drawn: a local's
+    // legs are a merged mesh with no joints in it" — and argued that the bob
+    // and the lean sell it at six metres. They do, for somebody STANDING. They
+    // do not for somebody crossing two metres of square, and now that the
+    // shuffle is three times wider that is a thing you watch them do.
+    //
+    // A pivot at the hip and the box hanging under it, which is exactly the
+    // arms' own construction eight lines down. Same box, same size, same
+    // colour, same two draw calls: the figure is identical with the swing at
+    // zero, and every chapter's hand-placed pose is untouched.
+    const legL = new THREE_.Object3D(); legL.position.set(-0.12, 0.78, 0);
+    const legR = new THREE_.Object3D(); legR.position.set(0.12, 0.78, 0);
+    legL.add(npcLocPart(0.17, 0.78, 0.19, legs, 0, -0.39, 0));
+    legR.add(npcLocPart(0.17, 0.78, 0.19, legs, 0, -0.39, 0));
+    g.add(legL); g.add(legR);
     g.add(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0));
     // a collar, so the shirt reads as clothing rather than as a painted block
     g.add(npcLocPart(0.52, 0.07, 0.30, hair, 0, 1.38, 0));
@@ -1389,6 +1404,7 @@ export function createNPCs(game) {
     armR.add(npcLocPart(0.12, 0.13, 0.13, skin, 0, -0.60, 0));
     g.add(armL); g.add(armR);
     return { group: g, head: headN, armL: armL, armR: armR,
+             legL: legL, legR: legR,
              face: { eyeN: eyeN, browL: browL, browR: browR,
                      browY: 0.228, upK: 0.6 },
              arch: arch };
@@ -1836,6 +1852,11 @@ export function createNPCs(game) {
   const npcLOC_STEP_V   = 0.45;  // m/s. A shuffle, not a walk.
   const npcLOC_STEP_GAP = 7;     // s between shuffles, jittered hard per person
   const npcLOC_STEP_BOB = 0.020; // m of step bob while actually moving
+  // rad of hip swing at full move. The shuffle is 0.45 m/s at 2.36 steps/s, so
+  // the stride is about 19 cm and a 0.78 m leg wants asin(0.095/0.78) = 0.12 rad
+  // of it. 0.17 is that plus a little, because a leg reads at six metres only
+  // if it slightly oversells — and much more than this is a march.
+  const npcLOC_SWING    = 0.17;
   const npcLOC_STEP_TRY = 6;     // candidate spots before giving up and staying put
   const npcLOC_STEP_DY  = 0.35;  // m of ground step a shuffle may not cross
 
@@ -5122,6 +5143,22 @@ export function createNPCs(game) {
         r.group.rotation.x = -f * npcLOC_FL_LEAN + lean + r.hud * 0.06
                              - r.mv * 0.035 - satK * npcSIT_LEAN;
         r.group.rotation.z = rock + r.stum * npcSTUM_ROLL;
+        // ---- AND THE LEGS SWING, ON THE BOB'S OWN PHASE (v55) -------------
+        // `r.t * 7.4` is the step clock the bob one line up already runs on:
+        // |sin| there is one dip per step, sin here is one swing per step with
+        // the legs in antiphase, so a foot is planted at the bottom of every
+        // dip. Any other phase and the figure bobs on one rhythm and steps on
+        // another, which reads worse than not swinging at all.
+        //
+        // Scaled by r.mv, the same damped move flag, so a person who has
+        // stopped closes their stance over about a sixth of a second instead of
+        // freezing mid-stride. A SIT overrides it to zero: the legs are folded
+        // under by npcSIT_DROP and a seated figure paddling is a puppet.
+        if (r.fig && r.fig.legL) {
+          const sw = r.mv * (1 - satK) * npcLOC_SWING * Math.sin(r.t * 7.4);
+          r.fig.legL.rotation.x = sw;
+          r.fig.legR.rotation.x = -sw;
+        }
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
