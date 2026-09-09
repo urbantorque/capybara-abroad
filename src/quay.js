@@ -344,7 +344,7 @@ function quayMerger() {
  */
 function quayVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearScale: 6, contact: 1, broad: 0.07, broadM: 14,
+               { scale: 0.45, amount: 0.09, warp: 0.5, near: 0.34, nearPale: 0.60, nearScale: 6, contact: 1, broad: 0.07, broadM: 14,
                  // THE WATER'S EDGE (D5). `grep -c foam` read six here, all of
                  // them the ferry's wake — the harbour itself met seven hundred
                  // metres of sandstone at a polygon join. Circular Quay has no

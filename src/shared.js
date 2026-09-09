@@ -3974,6 +3974,11 @@ const _grainFresK = { value: 1 };
 export function skyTick(color) { if (color) _grainSkyC.value.copy(color); }
 /** A multiplier on every Fresnel strength in the game: 1 to play, 0 to cut. */
 export function fresnelTick(k) { _grainFresK.value = k > 0 ? (k < 3 ? k : 3) : 0; }
+// The pale-ground gate's own switch — see `nearPale` in grain(). 1 to play,
+// 0 to cut (the gate collapses to its no-op and the near octave is what it
+// was before the pass), so an A/B can read the term away in one session.
+const _grainPaleK = { value: 1 };
+export function paleTick(k) { _grainPaleK.value = k > 0 ? (k < 1 ? k : 1) : 0; }
 const _wetDARK  = 0.26;   // fraction of the diffuse a fully wet surface loses
 const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
 const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
@@ -4435,6 +4440,30 @@ export function grain(m, opts) {
   const near = o.near === undefined ? 0 : o.near;
   const nearScale = o.nearScale === undefined ? 6 : o.nearScale;
   // ---------------------------------------------------------------------
+  // PALE GROUND — the near octave gated on albedo (the beauty pass, 10 Sep
+  // 2026, ROADMAP-BEAUTY.md item 4).
+  //
+  // At 1:1 (qa/BYC-venice.png, qa/BYC-quay.png) the near octave on pale
+  // stone reads as crumpled paper or dirty snow, while the same term on
+  // Kyoto's mid-grey lane and Sydney's lawn reads as ground. The reason is
+  // perceptual, not a bug in the field: a luminance wobble of a sixth on a
+  // mid-value surface is texture, and the same wobble on a near-white
+  // surface is STAINS. Venice ran near 0.68, the highest ground value in the
+  // game, on the whitest ground in the game.
+  //
+  //   nearPale   the gain on the near octave where the fragment's own albedo
+  //              (after vertex colour) is bright. 1 is an exact no-op. 0.5
+  //              halves the wobble on white and leaves a mid-value surface
+  //              exactly as it was.
+  //
+  // It is an option and not a retune of `near` because of the chapters
+  // whose ground is ONE mesh with a lawn and a pavement in it (Cali, the
+  // Quay's verges): a single `near` number cannot be right for both, and a
+  // gate on the albedo can — the lawn keeps its tufts and the paving stops
+  // looking mended. The ramp is 0.55..0.85 luma of the albedo; a lawn sits
+  // under it, sand and stone and snow above.
+  const nearPale = o.nearPale === undefined ? 1 : o.nearPale;
+  // ---------------------------------------------------------------------
   // BROAD — THE OCTAVE ABOVE, AND THE ONE CHANNEL THIS FIELD NEVER HAD.
   //
   // Everything above varies BRIGHTNESS. `gn` is a multiply on the diffuse and
@@ -4574,7 +4603,7 @@ export function grain(m, opts) {
               '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM +
               '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
               '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
-              '|' + fres + '|' + fresPow;
+              '|' + fres + '|' + fresPow + '|' + nearPale;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -4619,6 +4648,7 @@ export function grain(m, opts) {
       shader.uniforms.uGrSkyC = _grainSkyC;
       shader.uniforms.uGrFresK = _grainFresK;
     }
+    if (!wetOnly && near > 0 && nearPale !== 1) shader.uniforms.uGrPaleK = _grainPaleK;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
                '#include <common>\nvarying vec3 vGrainW;' +
@@ -4650,6 +4680,7 @@ export function grain(m, opts) {
         !rimHere ? _CLOUD_GLSL : '',
         fres > 0 ? 'uniform vec3 uGrSkyC;' : '',
         fres > 0 ? 'uniform float uGrFresK;' : '',
+        (!wetOnly && near > 0 && nearPale !== 1) ? 'uniform float uGrPaleK;' : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
         wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
@@ -4703,6 +4734,17 @@ export function grain(m, opts) {
         (wetOnly || near <= 0) ? '' : '  float gnr = ((grNoise(gnq) - 0.5) * 0.62 * clamp(1.0 - nfw * 2.00, 0.0, 1.0)',
         (wetOnly || near <= 0) ? '' : '             + (grNoise(gnq2) - 0.5) * 0.38 * clamp(1.0 - nfw * 4.34, 0.0, 1.0))',
         (wetOnly || near <= 0) ? '' : '             * ' + near.toFixed(4) + ';',
+        // ---- PALE GROUND: see `nearPale` above. The gate reads the albedo
+        // AFTER vertex colour, so one mesh with a lawn and a pavement in it
+        // gets two answers. uGrPaleK is the A/B's hand and is 1 in play.
+        (wetOnly || near <= 0 || nearPale === 1) ? '' :
+        // THE RAMP IS IN LINEAR LIGHT, because diffuseColor is. Written first
+        // as 0.55..0.85 — sRGB numbers, read off a screenshot — it measured
+        // 0.04 % of the Erg's frame changed and 0.00 % of Hanoi's: pale stone
+        // is ~0.6 in linear and never reached the ramp. sRGB 0.51..0.77 is
+        // linear 0.24..0.52; a lawn (sRGB ~0.55, linear ~0.26) sits under it.
+          '  gnr *= mix(1.0, ' + nearPale.toFixed(4) + ', uGrPaleK * smoothstep(0.24, 0.52, ' +
+          'dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))));',
         // ---- THE BROAD OCTAVE ------------------------------------------
         // See the note on `broad` above. Warped by `gn` before it is sampled,
         // which costs two multiplies and is what stops an eighteen-metre

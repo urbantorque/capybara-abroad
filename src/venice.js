@@ -440,7 +440,7 @@ const venSHORE = { shore: 0.26, shoreBand: 0.24, shoreWet: 0.40, shoreDark: 0.72
                    shoreScale: 1.8, shoreColor: PALETTE.venFoam };
 function venVC() {
   if (!venWallMat) venWallMat = grainOwn(mat(0xffffff, { vertexColors: true }),
-    Object.assign({ scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearScale: 8, contact: 1 },
+    Object.assign({ scale: 0.45, amount: 0.09, warp: 0.55, near: 0.30, nearPale: 0.60, nearScale: 8, contact: 1 },
                   venSHORE));
   return venWallMat;
 }
@@ -448,7 +448,7 @@ function venVC() {
  *  so it wants no vertical shear in the sample at all. */
 function venVCG() {
   if (!venGroundMat) venGroundMat = grainOwn(mat(0xffffff, { vertexColors: true }),
-    Object.assign({ scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearScale: 7, contact: 1,
+    Object.assign({ scale: 0.72, amount: 0.14, warp: 0, near: 0.68, nearPale: 0.45, nearScale: 7, contact: 1,
                     broad: 0.08, broadM: 15 },
                   // THE ACQUA ALTA IS THE ONE PLACE THE BAND IS WIDE. The tide
                   // climbs 2.25 m over a piazza that is flat to within a few

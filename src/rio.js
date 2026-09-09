@@ -205,13 +205,13 @@ function rioMerger() {
  */
 function rioVC() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.32, nearScale: 8, contact: 1 });
+               { scale: 0.45, amount: 0.09, warp: 0.55, near: 0.32, nearPale: 0.60, nearScale: 8, contact: 1 });
 }
 /** The same thing at ground strength, and flat: the ground is horizontal,
  *  so it wants no vertical shear in the sample at all. */
 function rioVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.58, amount: 0.18, warp: 0, near: 0.55, nearScale: 7, contact: 1, broad: 0.1, broadM: 17 });
+               { scale: 0.58, amount: 0.18, warp: 0, near: 0.55, nearPale: 0.55, nearScale: 7, contact: 1, broad: 0.1, broadM: 17 });
 }
 function rioPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function rioInstance(root, geo, color, list, cast, recv) {

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
-         rimTick, cloudTick, skyTick, fresnelTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, skyTick, fresnelTick, paleTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
@@ -28399,6 +28399,8 @@ export function createSystems(game) {
     if (scene.background && scene.background.isColor) skyTick(scene.background);
     fresnelTick(game.state.noFresnel ? 0
                 : (typeof game.state.fresnelK === 'number' ? game.state.fresnelK : 1));
+    // ...and the pale-ground gate's, the same shape. See `nearPale` in grain().
+    paleTick(game.state.noPale ? 0 : 1);
 
     // ---- the rim ----------------------------------------------------------
     // Same deal as the wet ground and for the same reason: one float and one

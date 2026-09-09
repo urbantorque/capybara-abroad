@@ -381,7 +381,7 @@ function antGlow(color, intensity) {
 }
 function antVCI() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearScale: 34, contact: 1, broad: 0.09, broadM: 22,
+               { scale: 0.10, amount: 0.055, warp: 0.9, near: 0.30, nearPale: 0.50, nearScale: 34, contact: 1, broad: 0.09, broadM: 22,
                  // THE WATER'S EDGE (D5), AND THIS IS THE CHAPTER THE REVIEW
                  // NAMED. `qa/rv-antarctic.png`: fifteen floes sitting ON a
                  // flat grey wash rather than IN it, because a floe is a slab
