@@ -1661,11 +1661,92 @@ function kyoBuildUji(game, root) {
         U.box(bx + s * 3.9, y + 1.38, z, 0.34, 0.18, L / N + 0.5, PALETTE.templeWoodDk);
       }
     }
+    // ---- AND THE BALUSTRADE IS SOLID, EXCEPT WHERE IT IS THE DOOR ----------
+    // Posts every other segment and a rail over them, drawn and never collided:
+    // a humped deck three metres over a river with a balustrade you walk
+    // through is a plank, which is Hanoi's Huc bridge word for word. Collided
+    // on EVERY segment, not every other one, because the gap between two posts
+    // is exactly the width an animal falls through.
+    //
+    // THE EAST SIDE IS LEFT OPEN AT THE SHRINE BAY. The bay hangs off this side
+    // at bx + 4.6, outside the rail line at bx + 3.9, and it is where the Uji
+    // run starts — "a set piece whose start is 'step off the edge' needs an
+    // edge that looks like somewhere people step off". Colliding the rail
+    // across it would wall off the only signposted way into the river, so the
+    // rail stops short and the bay is the doorway. That is what a real bridge
+    // with a shrine bay on it does.
+    for (let s = -1; s <= 1; s += 2) {
+      if (s > 0 && Math.abs(z - bz) < 2.6) continue;
+      kyoStaticBox(game, bx + s * 3.9, y + 0.82, z, 0.22, 0.65, L / N * 0.6);
+    }
     if (i > 0 && i < N - 1 && i % 3 === 0) {
       U.cyl(bx - 3.6, (y - 2.6) * 0.5, z, 0.28, y + 2.6, PALETTE.templeWoodDk);
       U.cyl(bx + 3.6, (y - 2.6) * 0.5, z, 0.28, y + 2.6, PALETTE.templeWoodDk);
     }
   }
+  // ---- THE APPROACHES, WITHOUT WHICH NONE OF THE ABOVE EXISTS -------------
+  // THE BRIDGE WAS UNREACHABLE. Not awkward — unreachable: a flood fill over
+  // the physics surface, seeded from 1563 ground cells so every side was tried,
+  // reached 0 of its 426 deck cells, and the smallest step onto it from
+  // anywhere was 2.55 m against a standing jump that peaks at 0.75 m
+  // (capyJUMP_V 6.0, gravity -24, v^2/2g). The deck ends at y = 1.5 because
+  // `1.5 + sin(t*pi)*1.5` is 1.5 at both ends, and the banks are at -0.8 and
+  // -1.5. Nothing was ever built to bridge that.
+  //
+  // Which means, until now: a 452 m2 structure with a full set of colliders, a
+  // balustrade, a shrine bay, a stack of barrels put there as signposting, and
+  // a local standing on the crown saying "The water for the tea comes from
+  // under this bridge" — and no player had ever stood on any of it. The Uji run
+  // survived only because its clock starts anywhere "at or above the bridge",
+  // so the chapter's marquee could be finished by getting in somewhere else and
+  // the defect never showed up as a broken task.
+  //
+  // Ramps rather than a lowered deck: the hump, the bay, the barrels, the
+  // balustrade and every collider above keep the position they were authored
+  // at, and a timber bridge with approach ramps is what the reference looks
+  // like anyway. Graded at 0.25 — the default contact friction is 0.4, so
+  // tan(theta) has to stay well under that or the animal slides back down —
+  // and the LENGTH is derived from the rise at each end rather than fixed,
+  // because the north bank is 0.7 m lower than the south.
+  {
+    const RAMP_GRADE = 0.25;
+    const deckTop = 0.175;                     // the planks, above the deck centre
+    for (let side = -1; side <= 1; side += 2) {
+      const zEnd = bz + side * L * 0.5;         // the end of the span proper
+      const yEnd = 1.5;                         // ...which is always this high
+      // how far out do we have to go to come down to the bank at that grade?
+      let run = 8;
+      for (let k = 0; k < 6; k++) {
+        const gy = kyoTerrain(bx, zEnd + side * run);
+        const rise = (yEnd + deckTop) - (gy + 0.18);
+        run = Math.max(6, Math.min(26, rise / RAMP_GRADE));
+      }
+      // SHORT SEGMENTS, BECAUSE A BOX HAS A FLAT TOP. The first cut used the
+      // span's own 3.8 m segments and built a STAIRCASE with 0.78 m risers —
+      // three centimetres above the jump — so the fill still reported 0 of 426.
+      // A metre a segment puts each riser at about 0.27 m, which reads as a
+      // slope and walks like one.
+      const RN = Math.max(6, Math.round(run / 1.1));
+      for (let i = 1; i <= RN; i++) {
+        const t = i / RN;
+        const z = zEnd + side * run * t;
+        const gy = kyoTerrain(bx, z);
+        // straight line down to the bank, but never under it
+        const y = Math.max(yEnd + (gy + 0.18 - deckTop - yEnd) * t, gy + 0.12);
+        U.box(bx, y, z, 8.0, 0.35, run / RN + 0.4, PALETTE.templeWood);
+        kyoStaticBox(game, bx, y - 0.065, z, 4.0, 0.24, (run / RN) * 0.6);
+        // the same balustrade as the span, and collided for the same reason
+        if (i < RN) {
+          for (let s = -1; s <= 1; s += 2) {
+            U.box(bx + s * 3.9, y + 0.75, z, 0.20, 1.2, 0.20, PALETTE.templeWoodDk);
+            U.box(bx + s * 3.9, y + 1.38, z, 0.34, 0.18, run / RN + 0.5, PALETTE.templeWoodDk);
+            kyoStaticBox(game, bx + s * 3.9, y + 0.82, z, 0.22, 0.65, (run / RN) * 0.6);
+          }
+        }
+      }
+    }
+  }
+
   // The shrine bay halfway across — where the water for the tea is drawn, and,
   // since chapter four acquired a river run, where you get in. The stack of
   // barrels is the whole of the signposting: a set piece whose start is "step

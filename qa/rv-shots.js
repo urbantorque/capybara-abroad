@@ -3,7 +3,7 @@ async page => {
   await page.waitForTimeout(6000);
   await page.keyboard.press('Space');
   await page.waitForTimeout(3500);
-  const shots = ['sydney', 'rio', 'venice', 'goreme', 'drift', 'hanoi'];
+  const shots = ['kyoto', 'cali', 'antarctic', 'cave', 'iceland', 'hanoi'];
   for (const b of shots) {
     await page.evaluate((n) => { try { window.__capy.hud.cross(n); } catch (e) { window.__capy.biome.switchTo(n); } }, b);
     await page.waitForTimeout(5000);

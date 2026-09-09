@@ -717,8 +717,21 @@ function caliBuildRiverside(game, root) {
   const bx = caliBRIDGE_X;
   R.box(bx, 0.75, caliRIVER_Z, 9, 0.55, (caliRIVER_HZ + 4) * 2, PALETTE.caliStone);
   caliStaticBox(game, bx, 0.62, caliRIVER_Z, 4.5, 0.42, caliRIVER_HZ + 4);
+  // ---- ...AND THE PARAPETS ARE SOLID ---------------------------------------
+  // They were drawn and not collided, along their whole length, both sides:
+  // measured, eighteen rays out of eighteen found stone at 2.05 m and nothing
+  // at all in the physics world. A bridge with a waist-high wall you walk
+  // straight through is worse than a bridge with no wall, because the wall is
+  // the game telling you it is safe to stand there.
+  //
+  // Same rule as this chapter's own chiva ("THE LUGGAGE RAILS ARE SOLID... They
+  // are drawn already; they were not collided") and Hanoi's Huc bridge. The
+  // chiva is KINEMATIC, so making these solid cannot stop the bus crossing —
+  // and the deck collider is 9 m wide against the bus's own width, so it never
+  // touched them anyway.
   for (let s = -1; s <= 1; s += 2) {
     R.box(bx + s * 4.3, 1.55, caliRIVER_Z, 0.5, 1.2, (caliRIVER_HZ + 4) * 2, PALETTE.caliStoneDark);
+    caliStaticBox(game, bx + s * 4.3, 1.55, caliRIVER_Z, 0.25, 0.6, caliRIVER_HZ + 4);
     for (let k = -2; k <= 2; k++) {
       R.cyl(bx + s * 4.3, 1.9, caliRIVER_Z + k * 3.6, 0.22, 0.7, PALETTE.caliStone, 0, 0, 0, 6);
     }

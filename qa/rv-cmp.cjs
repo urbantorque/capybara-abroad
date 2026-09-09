@@ -22,6 +22,25 @@
 // a 98 % overlap looks like a pass and a 98 % overlap is also exactly what a
 // broken run looks like if you have no idea what a clean one scores.
 //
+// WHAT THIS CANNOT JUDGE, AND IT IS MOST CHANGES. This tool answers exactly one
+// question: "did a refactor that must change nothing change nothing". It is
+// useless the moment a change ADDS GEOMETRY OR CONSUMES A RANDOM NUMBER.
+//
+// Measured 9 Sep 2026, adding an approach ramp to Kyoto's bridge: nine chapters
+// that the diff never touched came back with different vertex counts —
+// Antarctica 116 644 -> 115 108, Hanoi 300 654 -> 303 538 — and it reproduced
+// across runs, so it was not the bad-sample mode below. Every one of them is
+// built AFTER Kyoto. Their scatter is procedural and reads from the same
+// Math.random stream, so twenty new boxes upstream re-rolls everything
+// downstream. Building Kyoto LAST did not fix it either; it just re-rolled a
+// different set.
+//
+// AND THAT IS NOT A DEFECT. In real play the stream is not seeded at all and
+// chapters build on first entry, so a player who goes to Venice before Iceland
+// already gets different scatter in both. The variation this tool reports for
+// such a change is the game working. Use it for refactors; for a change that
+// adds anything, verify the affected chapters directly instead.
+//
 // A SINGLE FAIL IS NOT A FAIL. RE-RUN IT BEFORE BELIEVING IT. Measured on
 // 9 Sep 2026: immediately after rewriting eight source files, one run came back
 // 94.60 % — sixty-one batches below the floor — with a plausible-looking
