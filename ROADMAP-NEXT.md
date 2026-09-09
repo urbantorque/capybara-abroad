@@ -619,6 +619,29 @@ world's calmest animal, with a criminal record that reads like a dance card.
 >   the item names is readable at the shutter.
 > - The contact sheet is the second batch.
 
+> **BUILT, second half, 9 Sep 2026 (W2). ITEM CLOSED, AND SO IS THIS
+> ROADMAP.** The album as one image: nineteen tiles, the numbers, the shelf,
+> the clock and the ledger’s own verdict.
+>
+> - **It is not the album.** Thirty-six pictures of Sydney is a worse
+>   artefact than one photograph of Sydney, so the sheet is ONE TILE PER
+>   CHAPTER, always all nineteen — photographed, been there (the authored
+>   postcard at full strength), or never been (the same postcard at a third).
+>   That is why it works at both ends: the empty sheet is nineteen pale
+>   postcards rather than nineteen holes.
+> - **Async is allowed here and nowhere else in the camera.** The postcard
+>   reads the live buffer and must finish in one JS turn; the sheet reads
+>   nothing live, so nineteen image decodes can be awaited.
+> - **MEASURED: 27 ms and 206 KB empty, 74 ms and 1.28 MB when the journey
+>   has been everywhere**, 1504x1196 throughout — comfortably pasteable,
+>   which matters because the clipboard is the desktop rung. Two presses
+>   inside the compose window produce one sheet.
+> - **And it found something that was never about postcards.** `jrSeen` is
+>   written on `biome:enter` and THE CHAPTER YOU START IN FIRES NONE.
+>   MEASURED: nine seconds in Sydney, a crossing to Venice, and the file read
+>   `seen: [10]`. The ledger has had it all along — a player who wandered
+>   around Sydney and left without ticking anything got no Sydney leaf.
+
 **Concept.** `K` composes a *postcard* instead of downloading a frame: the
 letterbox, the chapter name in its own register, the souvenir drawn in the
 corner as a stamp if you hold it, the notoriety tier as a second stamp, the

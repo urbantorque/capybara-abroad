@@ -5283,16 +5283,25 @@ function sysDrawShapes(list, vb, fit) {
  *
  * A deliberate twin of the function above, primitive for primitive and palette
  * lookup for palette lookup, so a souvenir cannot look like one thing on the
- * shelf and another on a postcard. `meet` only: every caller wants the shape
- * to keep its aspect inside its box.
+ * shelf and another on a postcard.
+ *
+ * `stretch` is sysDrawShapes's `none` and it exists for the same reason it
+ * does there: a POSTCARD stretches to its tile, because it is a scene and the
+ * tile is the window; an OBJECT keeps its aspect, because a souvenir squashed
+ * to a rectangle is a different souvenir. The contact sheet draws both.
  */
-function sysPaintShapes(g2, list, vb, x, y, w, h) {
+function sysPaintShapes(g2, list, vb, x, y, w, h, stretch) {
   const b = String(vb).split(/\s+/).map(Number);
   const vw = b[2] || 1, vh = b[3] || 1;
   const s = Math.min(w / vw, h / vh);
   g2.save();
-  g2.translate(x + (w - vw * s) / 2, y + (h - vh * s) / 2);
-  g2.scale(s, s);
+  if (stretch) {
+    g2.translate(x, y);
+    g2.scale(w / vw, h / vh);
+  } else {
+    g2.translate(x + (w - vw * s) / 2, y + (h - vh * s) / 2);
+    g2.scale(s, s);
+  }
   g2.translate(-(b[0] || 0), -(b[1] || 0));
   for (let i = 0; i < list.length; i++) {
     const sh = list[i];
@@ -8167,6 +8176,11 @@ function sysBuildCSS() {
 '.capyui-albshot figcaption{font-size:' + tMd + ';color:' + accentInk + ';',
   'font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px;',
   'text-align:center;font-variant-numeric:tabular-nums;}',
+/* W2: the way to the contact sheet. The journal's own ledger/album button,
+   because it is the same kind of control — a door out of this card to a thing
+   made of what is on it — and it is capped to the grid's measure so it does
+   not become a 900 px bar across the bottom of the album. */
+'.capyui-albsheet{width:100%;max-width:420px;margin-top:clamp(10px,2.4vw,18px);}',
 '.capyui-albnone{grid-column:1/-1;text-align:center;color:' + ink + ';opacity:.75;',
   'font-size:clamp(11px,2.2vw,14px);padding:clamp(18px,5vw,44px) 10px;text-wrap:balance;}',
 /* Each leaf comes in on its own beat. It is the one place in this HUD where a
@@ -19357,7 +19371,8 @@ export function createSystems(game) {
    * it ends the chain: falling through to a download because somebody changed
    * their mind is the game arguing with them.
    */
-  function photoSend(url, file) {
+  function photoSend(url, file, what) {
+    const noun = what || 'postcard';
     let blob = null;
     try {
       const i = url.indexOf(',');
@@ -19375,7 +19390,7 @@ export function createSystems(game) {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast('postcard saved');
+        toast(noun + ' saved');
       } catch (e) { /* a browser that will not save it has still shown it */ }
     };
     const copy = function () {
@@ -19383,7 +19398,7 @@ export function createSystems(game) {
         if (!blob || !navigator.clipboard || !navigator.clipboard.write ||
             typeof ClipboardItem !== 'function') { save(); return; }
         navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-          .then(function () { toast('postcard copied — paste it anywhere'); })
+          .then(function () { toast(noun + ' copied — paste it anywhere'); })
           .catch(function () { save(); });
       } catch (e) { save(); }
     };
@@ -19392,7 +19407,7 @@ export function createSystems(game) {
         const f = new File([blob], file, { type: 'image/png' });
         if (navigator.canShare({ files: [f] })) {
           navigator.share({ files: [f], title: 'Wish you were here' })
-            .then(function () { toast('postcard sent'); })
+            .then(function () { toast(noun + ' sent'); })
             .catch(function (e) { if (!e || e.name !== 'AbortError') copy(); });
           return;
         }
@@ -19400,6 +19415,244 @@ export function createSystems(game) {
     }
     copy();
   }
+  // =========================================================================
+  // THE CONTACT SHEET (W2) — the whole journey as one image
+  // =========================================================================
+  // W1 made the single frame worth sending. This is the other half of item 5's
+  // retention hook: the "I finished it" picture, and the one thing that has
+  // ever made somebody else open a game like this.
+  //
+  // ---- IT IS NOT THE ALBUM, AND THAT IS THE WHOLE DESIGN ----------------
+  // The album is thirty-six pictures, newest first, however they fell. A
+  // contact sheet of thirty-six pictures of Sydney is a worse artefact than
+  // one photograph of Sydney. So the sheet is ONE TILE PER CHAPTER, always all
+  // of them, in the order the journey runs — which is the shelf's rule
+  // (nineteen slots and the empty ones are half of what it is for) and the
+  // ledger's shape (a row per place, not a row per event).
+  //
+  // THREE STATES PER TILE, and every one of them is drawn rather than absent:
+  //   - photographed  ....  your picture, cover-cropped
+  //   - been there    ....  the authored postcard, at full strength
+  //   - never been    ....  the same postcard at a third, over the paper
+  // A place you have not been to is a promise, exactly as an unearned souvenir
+  // is; a place you went to and never photographed is still somewhere you went.
+  // `albShotOn` has made the same call on three surfaces since v36 and this is
+  // the fourth.
+  //
+  // ---- ASYNC IS ALLOWED HERE, AND IT IS THE ONLY REASON THIS IS POSSIBLE --
+  // The postcard composes in one JS turn because it reads the live drawing
+  // buffer, which is gone by the next task. The sheet reads NOTHING live: every
+  // tile is a stored dataURL, so the nineteen decodes can be awaited. It is the
+  // difference that lets a sheet exist at all.
+  const sysSHEET_COLS  = 5;
+  const sysSHEET_TW    = 272;
+  const sysSHEET_TH    = 170;
+  const sysSHEET_CAP   = 28;    // the paper strip under a tile, with its name
+  const sysSHEET_GAP   = 16;
+  const sysSHEET_PAD   = 40;
+  const sysSHEET_HEAD  = 176;
+  const sysSHEET_SHELF = 122;
+  const sysSHEET_FOOT  = 58;
+  let sheetCan = null, sheetCtx = null, sheetBusy = false;
+
+  /** Decode one stored thumbnail, or null. Never throws and never hangs. */
+  function sheetImage(u) {
+    return new Promise(function (done) {
+      if (!u) { done(null); return; }
+      let settled = false;
+      const im = new Image();
+      const end = function (v) { if (!settled) { settled = true; done(v); } };
+      im.onload = function () { end(im); };
+      im.onerror = function () { end(null); };
+      // A dataURL cannot be slow, but a dataURL that will not decode can be
+      // silent — and nineteen silent promises is a button that does nothing.
+      setTimeout(function () { end(null); }, 4000);
+      im.src = u;
+    });
+  }
+
+  /**
+   * COMPOSE THE SHEET. Async, and the only async thing the camera does.
+   * Returns a dataURL, or '' — quietly, on photoShoot's terms.
+   */
+  async function sheetMake() {
+    try {
+      const rows = Math.ceil(chapMax / sysSHEET_COLS);
+      const W = sysSHEET_PAD * 2 + sysSHEET_COLS * sysSHEET_TW +
+                (sysSHEET_COLS - 1) * sysSHEET_GAP;
+      const gridH = rows * (sysSHEET_TH + sysSHEET_CAP) + (rows - 1) * sysSHEET_GAP;
+      const H = sysSHEET_HEAD + gridH + sysSHEET_SHELF + sysSHEET_FOOT;
+      if (!sheetCan) {
+        sheetCan = document.createElement('canvas');
+        sheetCtx = sheetCan.getContext('2d');
+      }
+      if (sheetCan.width !== W || sheetCan.height !== H) {
+        sheetCan.width = W; sheetCan.height = H;
+      }
+      const g2 = sheetCtx;
+      if (!g2) return '';
+      // ---- every picture first, then one synchronous draw ----------------
+      const shots = [];
+      for (let n = 1; n <= chapMax; n++) {
+        const def = chapterDef(n);
+        const best = def ? albBest(def.biome) : null;
+        shots.push(best && best.u ? best.u : '');
+      }
+      const imgs = await Promise.all(shots.map(sheetImage));
+
+      const paper = sysHex(PALETTE.sail);
+      const paper2 = sysHex(PALETTE.sailShade);
+      const ink = sysHex(PALETTE.ibisHead);
+      g2.fillStyle = paper;
+      g2.fillRect(0, 0, W, H);
+      g2.textBaseline = 'alphabetic';
+
+      // ---- the head -------------------------------------------------------
+      let done = 0;
+      for (const k in taskRec) if (taskRec[k].done) done++;
+      let places = 0;
+      for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) places++;
+      g2.fillStyle = ink;
+      g2.font = '700 62px ' + sysCARD_FACE;
+      g2.fillText('THE JOURNEY', sysSHEET_PAD, 84);
+      g2.font = '700 24px ' + sysCARD_FACE;
+      g2.fillStyle = sysRgba(PALETTE.cloth1, 1);
+      const bits = [done + ' of ' + TASKS.length, places + ' of ' + chapMax + ' places',
+                    keepCount() + ' kept'];
+      const noticed = findCount();
+      if (noticed) bits.push(noticed + ' noticed');
+      const nm = notoName();
+      if (nm) bits.push(nm);
+      g2.fillText(bits.join('   ·   ').toUpperCase(), sysSHEET_PAD, 126);
+      g2.strokeStyle = sysRgba(PALETTE.stoneDark, 0.55);
+      g2.lineWidth = 2;
+      g2.beginPath();
+      g2.moveTo(sysSHEET_PAD, sysSHEET_HEAD - 24);
+      g2.lineTo(W - sysSHEET_PAD, sysSHEET_HEAD - 24);
+      g2.stroke();
+
+      // ---- the tiles ------------------------------------------------------
+      for (let n = 1; n <= chapMax; n++) {
+        const def = chapterDef(n);
+        const i = n - 1;
+        const cx = sysSHEET_PAD + (i % sysSHEET_COLS) * (sysSHEET_TW + sysSHEET_GAP);
+        const cy = sysSHEET_HEAD + Math.floor(i / sysSHEET_COLS) *
+                   (sysSHEET_TH + sysSHEET_CAP + sysSHEET_GAP);
+        // ...AND THE ONE YOU ARE STANDING IN. `jrSeen` is written on
+        // `biome:enter` and the first chapter of a session never fires one, so
+        // a sheet taken eight seconds into a fresh journey had SYDNEY dimmed as
+        // a place the player had not been to — while they were in it. The
+        // per-chapter clock does not save it either: `jrChapMs` is committed on
+        // the way OUT of a place.
+        const here = chapterOf((game.biome && game.biome.current) || '');
+        const seen = n === here || !!jrSeen[n] || chapComplete(n) ||
+                     (jrChapMs[n] || 0) > 0;
+        g2.save();
+        g2.beginPath();
+        g2.rect(cx, cy, sysSHEET_TW, sysSHEET_TH);
+        g2.clip();
+        // the ground under it, which is the picker's own tint
+        g2.fillStyle = sysMarkTint(def.biome, seen ? 0.42 : 0.16);
+        g2.fillRect(cx, cy, sysSHEET_TW, sysSHEET_TH);
+        const im = imgs[i];
+        if (im) {
+          // cover-cropped, though a 288x180 thumbnail into a 272x170 tile is
+          // very nearly the same rectangle
+          const want = sysSHEET_TW / sysSHEET_TH;
+          let sw = im.width, shh = Math.round(im.width / want);
+          if (shh > im.height) { shh = im.height; sw = Math.round(im.height * want); }
+          g2.drawImage(im, Math.round((im.width - sw) / 2), Math.round((im.height - shh) / 2),
+                       sw, shh, cx, cy, sysSHEET_TW, sysSHEET_TH);
+        } else {
+          const mk = sysMARKS[def.biome];
+          if (mk) {
+            g2.globalAlpha = seen ? 1 : 0.34;
+            sysPaintShapes(g2, mk.s, sysMARK_VB, cx, cy, sysSHEET_TW, sysSHEET_TH, true);
+            g2.globalAlpha = 1;
+          }
+        }
+        g2.restore();
+        g2.strokeStyle = sysRgba(PALETTE.stoneDark, seen ? 0.55 : 0.28);
+        g2.lineWidth = 2;
+        g2.strokeRect(cx + 1, cy + 1, sysSHEET_TW - 2, sysSHEET_TH - 2);
+        // ...and its name, on the paper under it, like a frame number
+        g2.fillStyle = sysRgba(PALETTE.ibisHead, seen ? 0.86 : 0.4);
+        g2.font = '700 17px ' + sysCARD_FACE;
+        let label = (def ? def.name : '').toUpperCase();
+        while (label.length > 4 && g2.measureText(label).width > sysSHEET_TW - 46) {
+          label = label.slice(0, -1);
+        }
+        g2.fillText(label, cx + 2, cy + sysSHEET_TH + 21);
+        // the clock for that place, right-aligned against the tile
+        // ...and only once there is a minute of it to print: a row of 0:00s
+        // under places you have been to for four seconds is noise wearing a
+        // number's clothes.
+        const ms = jrChapMs[n] || 0;
+        if (ms >= 1000) {
+          g2.textAlign = 'right';
+          g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.45);
+          g2.font = '700 15px ' + sysCARD_FACE;
+          g2.fillText(sysFmtTime(ms), cx + sysSHEET_TW - 2, cy + sysSHEET_TH + 21);
+          g2.textAlign = 'left';
+        }
+      }
+
+      // ---- the shelf ------------------------------------------------------
+      // The one thing on the sheet that is not a place: the objects you carried
+      // out of them. Drawn from the same primitive lists the journal's shelf
+      // draws, through sysPaintShapes — see W1.
+      const shY = sysSHEET_HEAD + gridH + 30;
+      const box = 62, sgap = 8;
+      const shW = chapMax * box + (chapMax - 1) * sgap;
+      let shX = Math.round((W - shW) / 2);
+      for (let n = 1; n <= chapMax; n++) {
+        const def = chapterDef(n);
+        const have = def && !def.keepNone && keepHeld(n) && sysKEEPS[def.biome];
+        g2.fillStyle = have ? paper2 : paper;
+        g2.fillRect(shX, shY, box, box);
+        g2.strokeStyle = sysRgba(PALETTE.stoneDark, have ? 0.55 : 0.22);
+        g2.lineWidth = 2;
+        g2.strokeRect(shX + 1, shY + 1, box - 2, box - 2);
+        if (have) {
+          sysPaintShapes(g2, sysKEEPS[def.biome].s, sysKEEP_VB,
+                         shX + 7, shY + 7, box - 14, box - 14);
+        }
+        shX += box + sgap;
+      }
+
+      // ---- the foot -------------------------------------------------------
+      // The ledger's own last line, word for word (see repVerdict): the sheet
+      // and the ledger are the same retrospective in two media, and two
+      // different verdicts on one journey would be the game disagreeing with
+      // itself.
+      const road = sysFmtTime(jrTotalMs()) + ' on the road';
+      const verdict = repVerdict();
+      g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.7);
+      g2.font = '700 22px ' + sysCARD_FACE;
+      g2.textAlign = 'center';
+      g2.fillText(road + (verdict ? '   ·   ' + verdict : ''),
+                  W / 2, H - sysSHEET_FOOT + 34);
+      g2.textAlign = 'left';
+      return sheetCan.toDataURL('image/png');
+    } catch (e) { return ''; }
+  }
+
+  /**
+   * The button's whole job. Guarded against a second press while the first is
+   * still decoding: nineteen images is not instant, and two sheets composing
+   * into one canvas is one torn sheet.
+   */
+  function sheetSave() {
+    if (sheetBusy) return;
+    sheetBusy = true;
+    toast('composing the contact sheet');
+    sheetMake().then(function (u) {
+      sheetBusy = false;
+      if (!u) { toast('the contact sheet did not come out'); return; }
+      photoSend(u, 'capybara-the-journey.png', 'the contact sheet');
+    }).catch(function () { sheetBusy = false; });
+  }
+
   /**
    * COMPOSE ONE WITHOUT PRESSING ANYTHING (W1).
    *
@@ -19412,6 +19665,12 @@ export function createSystems(game) {
    *
    * It renders before it composes, for photoShoot's reason exactly.
    */
+  /**
+   * ...AND THE SHEET, on the same terms (W2). Async, because the sheet is: it
+   * waits on nineteen image decodes and nothing live. Composes and hands back;
+   * nothing leaves, nothing is stored, nothing is counted.
+   */
+  game.sheetDebug = function () { return sheetMake(); };
   game.cardDebug = function (what) {
     const n = chapterOf((game.biome && game.biome.current) || 'sydney');
     if (what === 'line') return photoLine(n);
@@ -20258,9 +20517,29 @@ export function createSystems(game) {
   const albGrid = sysEl('div', 'capyui-albgrid');
   const albHint = sysEl('div', 'capyui-ledhint',
     sysScheme('ESC to close', 'tap outside the card to close'));
+  // ---- THE CONTACT SHEET'S ONE DOOR (W2) ---------------------------------
+  // On the album and nowhere else. The sheet is the whole journey as one
+  // image, and the album is the card that is already about "the pictures of
+  // this journey" — a second entry point on the ledger would be two buttons
+  // for one artefact on two cards that are already siblings.
+  //
+  // ALWAYS THERE, unlike the album's own button on the journal. That button is
+  // hidden until there is a first photograph because an empty album is a card
+  // with nothing on it; a contact sheet of a journey with no photographs in it
+  // is still nineteen postcards, a shelf and a clock, which is the whole point
+  // of drawing the places you have not photographed rather than leaving holes.
+  const albSheetBtn = sysEl('button', 'capyui-jrled capyui-albsheet');
+  albSheetBtn.type = 'button';
+  albSheetBtn.textContent = 'the whole journey, as one picture';
+  albSheetBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  albSheetBtn.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    sheetSave();
+  });
   albEl.appendChild(albTitle);
   albEl.appendChild(albSub);
   albEl.appendChild(albGrid);
+  albEl.appendChild(albSheetBtn);
   albEl.appendChild(albHint);
   albEl.inert = true;
   hudRoot.appendChild(albEl);
@@ -26557,6 +26836,20 @@ export function createSystems(game) {
     // opening toast — four parallel ladders that had to agree, in a function
     // that is run exactly once. It is one row of CHAPTERS now.
     const cdef = chapterDef(chapterOf(where));
+    // ---- ...AND YOU HAVE BEEN THERE (W2) --------------------------------
+    // `jrSeen` is written on `biome:enter` and THE CHAPTER YOU START IN FIRES
+    // NONE — Sydney lands with `biomeGo` skipped entirely, and a start abroad
+    // is a `biomeGo` for the place you are going TO. MEASURED: after nine
+    // seconds in Sydney and a crossing to Venice, the file read `seen: [10]`
+    // and `chapms: {}`. So the place the whole journey begins in was, on the
+    // record, somewhere the player had never been.
+    //
+    // It surfaced on the contact sheet, which dims a place you have not been
+    // to and dimmed the one you were standing in — but the ledger has had it
+    // all along: `if (!d && !jrSeen[n] && !anyFind) continue` means a player
+    // who wandered around Sydney and left without ticking anything got no
+    // Sydney leaf at all.
+    jrSeen[chapterOf(where)] = 1;
     const landed = cdef.biome !== 'sydney' ? biomeGo(cdef.biome) : false;
     // The atmosphere blend is a ~1 s damp and there is nothing to cross-fade
     // FROM on frame one: land on the chapter's own light rather than open the

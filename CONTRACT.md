@@ -1,3 +1,105 @@
+## THE NEXT PASS, BATCH ELEVEN — THE CONTACT SHEET (W2 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 5, second batch, and it closes the item and the roadmap.**
+W1 made the single frame worth sending. This is the other half of the item's
+retention hook: the whole journey as one image — the *"I finished it"* picture,
+and the thing the item calls the one that has ever made somebody else open a
+game like this.
+
+### IT IS NOT THE ALBUM, AND THAT IS THE WHOLE DESIGN
+
+The album is thirty-six pictures, newest first, however they fell. A contact
+sheet of thirty-six pictures of Sydney is a worse artefact than one photograph
+of Sydney. So the sheet is **one tile per chapter, always all nineteen**, in the
+order the journey runs — the shelf's rule (the empty ones are half of what it is
+for) with the ledger's shape (a row per place, not a row per event).
+
+**THREE STATES PER TILE, AND EVERY ONE OF THEM IS DRAWN:**
+
+| | |
+|---|---|
+| photographed | your picture, cover-cropped |
+| been there | the authored postcard, at full strength |
+| never been | the same postcard at a third, over the paper |
+
+A place you have not been to is a promise, exactly as an unearned souvenir is.
+It is why the sheet works at *both* ends: the empty one is nineteen pale
+postcards and a clock rather than nineteen holes, and the full one is your own
+photographs with the drawings still under the ones you missed. `albShotOn` has
+made this same call on three surfaces since v36 and this is the fourth.
+
+### ASYNC IS ALLOWED HERE, AND IT IS THE ONLY REASON THE SHEET CAN EXIST
+
+The postcard composes in one JS turn because it reads the live drawing buffer,
+which is gone by the next task (no `preserveDrawingBuffer`). The sheet reads
+**nothing live** — every tile is a stored dataURL — so nineteen image decodes
+can be awaited. It is the difference that makes the two artefacts different
+kinds of thing.
+
+### WHAT IT COSTS, MEASURED (`qa/w2-sheet.js`)
+
+| the journey | compose | the PNG |
+|---|---|---|
+| fresh, eight seconds old | **27 ms** | 206 KB |
+| three photographs | 36 ms | 453 KB |
+| been everywhere, eight places finished | 74 ms | **1.28 MB** |
+
+1504 × 1196 at every state. Nineteen decodes and a poster-sized PNG for 74 ms
+and 1.3 MB — the flat art compresses, which is why this is a PNG and not the
+JPEG the cost table in W1 would have suggested. It is comfortably a thing you
+paste into a chat window, which matters, because the clipboard is the rung a
+desktop player gets.
+
+The button guards itself: two presses inside the compose window produce **one**
+sheet, measured by clicking it twice and reading back one "composing" toast.
+
+### THE FOOT IS THE LEDGER'S OWN LAST LINE
+
+`repVerdict` from Q2, word for word — *"they had 6 words for what you did"* —
+because the sheet and the ledger are the same retrospective in two media, and
+two different verdicts on one journey would be the game disagreeing with itself.
+
+### ONE DOOR, AND IT IS THE ALBUM'S
+
+The sheet is made of the pictures, and the album is the card that is already
+about the pictures. A second entry point on the ledger would be two buttons for
+one artefact on two cards that are already siblings. Unlike the album's own
+button on the journal, this one is **always there**: an empty album is a card
+with nothing on it, but a contact sheet of a journey with no photographs is
+still nineteen postcards, a shelf and a clock.
+
+### THE THING THIS BATCH FOUND, WHICH WAS NEVER ABOUT POSTCARDS
+
+**THE CHAPTER YOU START IN WAS NEVER RECORDED AS SOMEWHERE YOU HAD BEEN.**
+`jrSeen` is written on `biome:enter`, and the first chapter of a session fires
+none: Sydney lands with `biomeGo` skipped entirely, and a start abroad is a
+`biomeGo` for the place you are going *to*. MEASURED (`qa/w2-seen.js`), after
+nine seconds in Sydney and a crossing to Venice:
+
+> `seen: [10]`, `chapms: {}`
+
+The place the whole journey begins in was, on the record, somewhere the player
+had never been. It surfaced here because the sheet dims a place you have not
+been to and dimmed the one you were standing in — but **the ledger has had it
+all along**: `if (!d && !jrSeen[n] && !anyFind) continue` means a player who
+wandered around Sydney and left without ticking anything got no Sydney leaf at
+all. One line in `startGame`; the file now reads `seen: [1, 10]`.
+
+Left alone deliberately: the flag is set without forcing a `saveSoon`, so
+pressing Begin and closing the tab still writes no file. The journey is saved
+when something happens to it, and starting is not something happening yet.
+
+### WHAT IS NOT HERE
+
+The auto-shots (the nap, the scene card, the marquee lift) as postcards, which
+W1 measured out and this batch does not change: 44 ms of PNG every ninety
+seconds is three dropped frames for a picture nobody asked for. And a second
+door on the final ledger, which is where the *"I finished it"* moment actually
+happens — it is the one place a sheet button would land better than the album,
+and it is behind 231 of 231, which is a path this batch could not test.
+
+**ROADMAP-NEXT is now closed: all five items built, each measured first.**
+
 ## THE NEXT PASS, BATCH TEN — WISH YOU WERE HERE (W1 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 5, first batch.** The camera has taken a raw frame and
