@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 15 — THE PANTANAL. WHERE YOU ARE, AS IT HAPPENS, FROM.
@@ -280,58 +280,17 @@ function panInitGeos() {
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF; panStaticBox
  *  speaks this one so the drawn thing and the solid thing cannot differ by 2x. */
 function panMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      panCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(panCol.r, panCol.g, panCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(panG.box, panXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? panG.cyl4 : seg === 8 ? panG.cyl8 : panG.cyl6;
-      return M.add(g, panXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 8 ? panG.cone8 : panG.cone6;
-      return M.add(g, panXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color, seg) {
-      return M.add(seg === 8 ? panG.sph8 : panG.sph6,
-                   panXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    /** A flat quad standing upright, w wide and h tall, centred on (cx,cy,cz).
-     *  Only ever useful on a DoubleSide material — see panVCL. */
-    quad(cx, cy, cz, w, h, color, rx, ry, rz) {
-      return M.add(panG.quad, panXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, w, h, 1), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(panG, {
+    xform: panXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+  });
+  /** A flat quad standing upright, w wide and h tall, centred on (cx,cy,cz).
+   *  Only ever useful on a DoubleSide material — see panVCL.
+   *  This stays here rather than moving into makeMerger because panG.quad is
+   *  the ONE quad in the game that is NOT rotated flat: the other five are
+   *  ground decals and this one is a standing sheet. Same name, different
+   *  geometry, and sharing it would have laid this chapter's quads down. */
+  M.quad = function (cx, cy, cz, w, h, color, rx, ry, rz) {
+    return M.add(panG.quad, panXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, w, h, 1), color);
   };
   return M;
 }

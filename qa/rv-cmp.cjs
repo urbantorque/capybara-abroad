@@ -21,6 +21,23 @@
 // behaviour-preserving; one that scores near zero is not. Without the control
 // a 98 % overlap looks like a pass and a 98 % overlap is also exactly what a
 // broken run looks like if you have no idea what a clean one scores.
+//
+// A SINGLE FAIL IS NOT A FAIL. RE-RUN IT BEFORE BELIEVING IT. Measured on
+// 9 Sep 2026: immediately after rewriting eight source files, one run came back
+// 94.60 % — sixty-one batches below the floor — with a plausible-looking
+// per-chapter breakdown. The next four runs, with NOT ONE CHARACTER changed in
+// between, all came back at exactly 98.52 %. The bad sample was the browser
+// serving a half-cached module set (harness traps 3 and 25 in the QA notes),
+// and it cost a diagnosis that had already started attributing the fault to
+// particular chapters.
+//
+// The tell that it is a bad sample rather than a defect: the noise is
+// EXTREMELY stable when it is honest. Three baselines and every clean run
+// score 1533/1556, and the twenty-three that move are the same twenty-three
+// batches in the same six chapters every time. A real change moves batches in
+// the chapter you touched; a bad sample sprays them everywhere, including
+// chapters the diff never went near. Close the browser session and open it
+// again before drawing any conclusion from a red run.
 const fs = require('fs');
 const argv = process.argv.slice(2);
 const sep = argv.indexOf('--');

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 18 — MONTE CARLO
@@ -430,69 +430,24 @@ function monInitGeos() {
 
 /** CONTRACT: box() takes FULL extents; CANNON.Box takes HALF. */
 function monMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      monCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(monCol.r, monCol.g, monCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(monG.box, monXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? monG.cyl4 : seg === 8 ? monG.cyl8 : seg === 12 ? monG.cyl12 : monG.cyl6;
-      return M.add(g, monXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? monG.cone4 : monG.cone6;
-      return M.add(g, monXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, sx, sy, sz, color, seg) {
-      return M.add(seg === 8 ? monG.sph8 : monG.sph6,
-                   monXform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
-    },
-    /** A quad, wound so the normal is +y before the transform. Roofs and roads. */
-    quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color) {
-      monCol.set(color);
-      const s = M.n;
-      const v = [ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz];
-      // one flat normal for all four, recomputed by computeVertexNormals below
-      for (let i = 0; i < 12; i += 3) {
-        pos.push(v[i], v[i + 1], v[i + 2]);
-        nor.push(0, 1, 0);
-        col.push(monCol.r, monCol.g, monCol.b);
-      }
-      idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
-      M.n += 4;
-      return M;
-    },
-    empty() { return M.n === 0; },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(monG, {
+    xform: monXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+  });
+  /** A quad, wound so the normal is +y before the transform. Roofs and roads.
+   *  World-space corners, so it writes the buffers itself — see hanMerger. */
+  M.quad = function (ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color) {
+    monCol.set(color);
+    const s = M.n;
+    const v = [ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz];
+    // one flat normal for all four, recomputed by computeVertexNormals in build
+    for (let i = 0; i < 12; i += 3) {
+      M.pos.push(v[i], v[i + 1], v[i + 2]);
+      M.nor.push(0, 1, 0);
+      M.col.push(monCol.r, monCol.g, monCol.b);
+    }
+    M.idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
+    M.n += 4;
+    return M;
   };
   return M;
 }

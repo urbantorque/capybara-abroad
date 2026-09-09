@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 19 — HANOI
@@ -299,66 +299,24 @@ function hanInitGeos() {
  * across the road like a cattle grid.
  */
 function hanMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      hanCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(hanCol.r, hanCol.g, hanCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(hanG.box, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? hanG.cyl4 : seg === 8 ? hanG.cyl8 : seg === 12 ? hanG.cyl12 : hanG.cyl6;
-      return M.add(g, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? hanG.cone4 : hanG.cone6;
-      return M.add(g, hanXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, sx, sy, sz, color, seg) {
-      return M.add(seg === 8 ? hanG.sph8 : hanG.sph6,
-                   hanXform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
-    },
-    quad(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color) {
-      hanCol.set(color);
-      const s = M.n;
-      const v = [ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz];
-      for (let i = 0; i < 12; i += 3) {
-        pos.push(v[i], v[i + 1], v[i + 2]);
-        nor.push(0, 1, 0);
-        col.push(hanCol.r, hanCol.g, hanCol.b);
-      }
-      idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
-      M.n += 4;
-      return M;
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(hanG, {
+    xform: hanXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+  });
+  /** Four corners in order, as one flat quad. The shared merger cannot express
+   *  this: every shape it has is a unit primitive under a transform, and this
+   *  one is given world-space vertices. So it writes the buffers itself. */
+  M.quad = function (ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, color) {
+    hanCol.set(color);
+    const s = M.n;
+    const v = [ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz];
+    for (let i = 0; i < 12; i += 3) {
+      M.pos.push(v[i], v[i + 1], v[i + 2]);
+      M.nor.push(0, 1, 0);
+      M.col.push(hanCol.r, hanCol.g, hanCol.b);
+    }
+    M.idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
+    M.n += 4;
+    return M;
   };
   return M;
 }

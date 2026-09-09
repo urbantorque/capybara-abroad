@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 7 — ICELAND
@@ -306,62 +306,16 @@ function iceInitGeos() {
 
 /** Vertex-coloured geometry merger — one draw call per merged batch. */
 function iceMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const c = new THREE.Color();
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      c.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(c.r, c.g, c.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    // CONTRACT: the merger takes FULL extents, CANNON.Box takes HALF.
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(iceG.box, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? iceG.cyl4 : seg === 8 ? iceG.cyl8 : seg === 16 ? iceG.cyl16 : iceG.cyl6;
-      return M.add(g, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? iceG.cone4 : iceG.cone6;
-      return M.add(g, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color) {
-      return M.add(iceG.sph6, iceXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    tet(cx, cy, cz, s, color, rx, ry, rz) {
-      return M.add(iceG.tet, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
-    },
-    /** An irregular lump — see iceG.rock. Twenty triangles instead of four, and
-     *  the difference between a boulder and a paper dart. */
-    lump(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(iceG.rock, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(iceG, {
+    xform: iceXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+  });
+  M.tet = function (cx, cy, cz, s, color, rx, ry, rz) {
+    return M.add(iceG.tet, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
+  };
+  /** An irregular lump — see iceG.rock. Twenty triangles instead of four, and
+   *  the difference between a boulder and a paper dart. */
+  M.lump = function (cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
+    return M.add(iceG.rock, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
   };
   return M;
 }

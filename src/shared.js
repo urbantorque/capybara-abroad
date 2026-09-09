@@ -5103,50 +5103,21 @@ const _bE   = new THREE.Euler();
 const _bP   = new THREE.Vector3();
 const _bS   = new THREE.Vector3();
 
-// The twentieth copy of this merger in the repo, and the first one in shared.js.
-// It is here rather than in a chapter because the board belongs to no chapter.
+// The board belongs to no chapter, so it has no chapter geometry cache and no
+// chapter transform — it brings the two-member versions of both. It was the
+// twentieth copy of the merger and is now the last call site of the only one.
+//
+// Note 'keep': this is one of the two mergers that never recomputed its normals
+// (environment's terrain is the other). Preserved rather than harmonised —
+// see the note on makeMerger.
+const _bG = { box: _bBox };
+function _bXform(px, py, pz, rx, ry, rz, sx, sy, sz) {
+  _bE.set(rx, ry, rz);
+  _bM4.compose(_bP.set(px, py, pz), _bQ.setFromEuler(_bE), _bS.set(sx, sy, sz));
+  return _bM4;
+}
 function _bMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const c = new THREE.Color();
-  const M = {
-    n: 0,
-    add(geo, color) {
-      const g = geo.clone();
-      g.applyMatrix4(_bM4);
-      const p = g.attributes.position.array, nm = g.attributes.normal.array;
-      c.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(c.r, c.g, c.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) {
-        const ia = g.index.array;
-        for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]);
-      } else {
-        for (let i = 0; i < vc; i++) idx.push(start + i);
-      }
-      M.n += vc;
-      g.dispose();
-    },
-    box(x, y, z, w, h, d, color, rx, ry, rz) {
-      _bE.set(rx || 0, ry || 0, rz || 0);
-      _bM4.compose(_bP.set(x, y, z), _bQ.setFromEuler(_bE), _bS.set(w, h, d));
-      M.add(_bBox, color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeBoundingSphere();
-      return g;
-    }
-  };
-  return M;
+  return makeMerger(_bG, { xform: _bXform, normals: 'keep' });
 }
 
 // ===========================================================================

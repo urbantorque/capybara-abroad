@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -356,78 +356,42 @@ function envPush9(list, px, py, pz, rx, ry, rz, sx, sy, sz) {
 
 // ------------------------------------------------------------- the merger --
 function envMerger(base) {
-  const pos = [], nor = [], col = [], idx = [];
-  const c = new THREE.Color();
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      envDeTint(c.set(color), base);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(c.r, c.g, c.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    /** like add(), but the geometry brings its own per-vertex `color`. */
-    addC(geo, m4) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      const cv = g.attributes.color.array;
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        c.setRGB(cv[i], cv[i + 1], cv[i + 2]);
-        envDeTint(c, base);
-        col.push(c.r, c.g, c.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(envG.box, envXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? envG.cyl4 : seg === 8 ? envG.cyl8 : envG.cyl6;
-      return M.add(g, envXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    vert(x, y, z, color) {
-      pos.push(x, y, z); nor.push(0, 1, 0);
-      envDeTint(c.set(color), base); col.push(c.r, c.g, c.b);
-      return M.n++;
-    },
-    tri(a, b, d) { idx.push(a, b, d); },
-    quad(x0, z0, x1, z1, y, color) {
-      const a = M.vert(x0, y, z1, color), b = M.vert(x1, y, z1, color);
-      const d = M.vert(x1, y, z0, color), e = M.vert(x0, y, z0, color);
-      idx.push(a, b, d, a, d, e);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeBoundingSphere();
-      return g;
-    },
+  // THE ONE MERGER IN THE GAME THAT DOES NOT RECOMPUTE ITS NORMALS, and the
+  // only one with a colour hook. Both were already true; makeMerger just made
+  // them sayable. The de-tint fades a colour toward the horizon with distance,
+  // so it has to run over every colour this merger writes — including the
+  // per-vertex ones in addC below.
+  const M = makeMerger(envG, {
+    xform: envXform, cylSegs: [4, 8], coneSegs: [], sphSegs: [],
+    normals: 'keep', tint: function (c) { envDeTint(c, base); },
+  });
+  const envC = new THREE.Color();
+  /** like add(), but the geometry brings its own per-vertex `color`. */
+  M.addC = function (geo, m4) {
+    const g = geo.clone();
+    g.applyMatrix4(m4);
+    const p = g.attributes.position.array;
+    const nm = g.attributes.normal.array;
+    const cv = g.attributes.color.array;
+    const start = M.n;
+    for (let i = 0; i < p.length; i += 3) {
+      M.pos.push(p[i], p[i + 1], p[i + 2]);
+      M.nor.push(nm[i], nm[i + 1], nm[i + 2]);
+      envC.setRGB(cv[i], cv[i + 1], cv[i + 2]);
+      envDeTint(envC, base);
+      M.col.push(envC.r, envC.g, envC.b);
+    }
+    const vc = p.length / 3;
+    if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) M.idx.push(start + ia[i]); }
+    else { for (let i = 0; i < vc; i++) M.idx.push(start + i); }
+    M.n += vc;
+    g.dispose();
+    return M;
+  };
+  M.quad = function (x0, z0, x1, z1, y, color) {
+    const a = M.vert(x0, y, z1, color), b = M.vert(x1, y, z1, color);
+    const d = M.vert(x1, y, z0, color), e = M.vert(x0, y, z0, color);
+    M.idx.push(a, b, d, a, d, e);
   };
   return M;
 }

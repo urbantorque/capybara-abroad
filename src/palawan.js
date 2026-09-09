@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -255,73 +255,28 @@ function palInitGeos() {
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF, and palStaticBox
  *  below speaks THIS one so the two cannot end up a factor of two apart. */
 function palMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      palCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(palCol.r, palCol.g, palCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(palG.box, palXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    /** A flat horizontal facet. Two triangles, not twelve. See palG.quad. */
-    quad(cx, cy, cz, sx, sz, color, ry) {
-      return M.add(palG.quad, palXform(cx, cy, cz, 0, ry || 0, 0, sx, 1, sz), color);
-    },
-    /** One blade, standing on (cx, cy, cz). See palG.blade. */
-    blade(cx, cy, cz, w, h, color, ry, tilt) {
-      return M.add(palG.blade, palXform(cx, cy, cz, tilt || 0, ry || 0, 0, w, h, w), color);
-    },
-    /**
-     * A CONE WITH THE TOP CUT OFF. Not in the geometry set, so it is a lathe of
-     * exactly two rings: eight triangles for a six-sided one, and it is the only
-     * primitive that can say "wider at the bottom than the top" — which is what
-     * a limestone tower, a coral bommie and a barrel sponge all are.
-     */
-    taper(cx, cy, cz, rb, rt, h, color, ry, seg) {
-      const g = new THREE.CylinderGeometry(rt, rb, h, seg || 6);
-      const r = M.add(g, palXform(cx, cy, cz, 0, ry || 0, 0, 1, 1, 1), color);
-      g.dispose();
-      return r;
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? palG.cyl4 : seg === 8 ? palG.cyl8 : palG.cyl6;
-      return M.add(g, palXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? palG.cone4 : palG.cone6;
-      return M.add(g, palXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color, seg) {
-      return M.add(seg === 8 ? palG.sph8 : palG.sph6,
-                   palXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(palG, {
+    xform: palXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+  });
+  /** A flat horizontal facet. Two triangles, not twelve. See palG.quad. */
+  M.quad = function (cx, cy, cz, sx, sz, color, ry) {
+    return M.add(palG.quad, palXform(cx, cy, cz, 0, ry || 0, 0, sx, 1, sz), color);
+  };
+  /** One blade, standing on (cx, cy, cz). See palG.blade. */
+  M.blade = function (cx, cy, cz, w, h, color, ry, tilt) {
+    return M.add(palG.blade, palXform(cx, cy, cz, tilt || 0, ry || 0, 0, w, h, w), color);
+  };
+  /**
+   * A CONE WITH THE TOP CUT OFF. Not in the geometry set, so it is a lathe of
+   * exactly two rings: eight triangles for a six-sided one, and it is the only
+   * primitive that can say "wider at the bottom than the top" — which is what
+   * a limestone tower, a coral bommie and a barrel sponge all are.
+   */
+  M.taper = function (cx, cy, cz, rb, rt, h, color, ry, seg) {
+    const g = new THREE.CylinderGeometry(rt, rb, h, seg || 6);
+    const r = M.add(g, palXform(cx, cy, cz, 0, ry || 0, 0, 1, 1, 1), color);
+    g.dispose();
+    return r;
   };
   return M;
 }

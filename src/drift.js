@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 9 — THE DRIFT
@@ -328,84 +328,15 @@ function driInitGeos() {
 
 /** Vertex-coloured geometry merger — one draw call per merged batch. */
 function driMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const c = new THREE.Color();
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      c.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(c.r, c.g, c.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    // FULL extents in. CANNON.Box takes HALF; driStaticBox does the halving.
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(driG.box, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? driG.cyl4 : seg === 8 ? driG.cyl8
-              : seg === 16 ? driG.cyl16 : driG.cyl6;
-      return M.add(g, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? driG.cone4 : driG.cone6;
-      return M.add(g, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color) {
-      return M.add(driG.sph6, driXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    oct(cx, cy, cz, s, color, rx, ry, rz) {
-      return M.add(driG.oct, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
-    },
-    tet(cx, cy, cz, s, color, rx, ry, rz) {
-      return M.add(driG.tet, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
-    },
-    /**
-     * Take geometry that ALREADY carries its own colour attribute, in world
-     * space. `add` above writes one flat colour over everything it is given,
-     * which is right for a primitive and wrong for a painted deck — see
-     * driDeck. Same buffers, same draw call.
-     */
-    addPainted(g) {
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      const gc = g.attributes.color.array;
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(gc[i], gc[i + 1], gc[i + 2]);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      return M;
-    },
-    empty() { return M.n === 0; },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  // FULL extents in. CANNON.Box takes HALF; driStaticBox does the halving.
+  const M = makeMerger(driG, {
+    xform: driXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+  });
+  M.oct = function (cx, cy, cz, s, color, rx, ry, rz) {
+    return M.add(driG.oct, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
+  };
+  M.tet = function (cx, cy, cz, s, color, rx, ry, rz) {
+    return M.add(driG.tet, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);
   };
   return M;
 }

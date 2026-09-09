@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -275,66 +275,22 @@ function gorInitGeos() {
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF, and gorStaticBox
  *  below speaks THIS one so the two cannot end up a factor of two apart. */
 function gorMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      gorCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(gorCol.r, gorCol.g, gorCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(gorG.box, gorXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    /** A flat horizontal facet. See gorG.quad — two triangles, not twelve. */
-    quad(cx, cy, cz, sx, sz, color, ry) {
-      return M.add(gorG.quad, gorXform(cx, cy, cz, 0, ry || 0, 0, sx, 1, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? gorG.cyl4 : seg === 8 ? gorG.cyl8 : gorG.cyl6;
-      return M.add(g, gorXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    taper(cx, cy, cz, rb, rt, h, color, ry) {
-      // a fairy chimney is a CONE WITH THE TOP CUT OFF and a rock balanced on
-      // it; the cut-off cone is not in the geometry set, so it is a lathe of
-      // exactly two rings and it costs eight triangles
-      const g = new THREE.CylinderGeometry(rt, rb, h, 7);
-      const r = M.add(g, gorXform(cx, cy, cz, 0, ry || 0, 0, 1, 1, 1), color);
-      g.dispose();
-      return r;
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 8 ? gorG.cone8 : gorG.cone6;
-      return M.add(g, gorXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color, seg) {
-      return M.add(seg === 8 ? gorG.sph8 : gorG.sph6,
-                   gorXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
+  const M = makeMerger(gorG, {
+    xform: gorXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+  });
+  /** A flat horizontal facet. See gorG.quad — two triangles, not twelve. */
+  M.quad = function (cx, cy, cz, sx, sz, color, ry) {
+    return M.add(gorG.quad, gorXform(cx, cy, cz, 0, ry || 0, 0, sx, 1, sz), color);
+  };
+  /** A fairy chimney is a CONE WITH THE TOP CUT OFF and a rock balanced on it;
+   *  the cut-off cone is not in the geometry set, so it is a lathe of exactly
+   *  two rings and it costs eight triangles. Built per call and disposed, which
+   *  is why it cannot live in a shared geometry cache. */
+  M.taper = function (cx, cy, cz, rb, rt, h, color, ry) {
+    const g = new THREE.CylinderGeometry(rt, rb, h, 7);
+    const r = M.add(g, gorXform(cx, cy, cz, 0, ry || 0, 0, 1, 1, 1), color);
+    g.dispose();
+    return r;
   };
   return M;
 }
