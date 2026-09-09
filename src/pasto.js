@@ -1383,8 +1383,34 @@ const pastoBUNT = [
 const pastoBUNT_COL = [PALETTE.awning1, PALETTE.awning2, PALETTE.awning3, PALETTE.awning4,
                        PALETTE.churchTrim];
 
-function pastoBuildBunting(parts) {
+/**
+ * THE POSTS ARE SOLID (9 Sep 2026), AND IT WAS A DECISION AND NOT A BUG.
+ *
+ * ROADMAP-PHYSICS X9 found the twelve of them drawn and not solid — 22 cm
+ * square and 11.6 m tall — and deliberately refused to settle it: *"collide
+ * them or write down that thin plaza furniture stays open... that is the
+ * owner's call, not a probe's"*. What it wanted was the Göreme test, where
+ * the baskets were collided at 2.4 m and the 1.9 m fan was left open BECAUSE
+ * A TASK RUNS THROUGH IT. MEASURED here (`qa/px-pasto-bunting.js`):
+ *
+ *   where they are ......  all twelve at x ±22.5, six z's — two columns 1.5 m
+ *                          inside the plaza's rim, not scattered across it
+ *   walked at, one by one  **ten of twelve go straight through**; the two at
+ *                          z 28 already stop you 1.6 m out, on a neighbour
+ *   the carroza's line ..  x 10.5, half-width 1.62 — **10.4 m clear**
+ *
+ * So nothing needs the ground they stand on, the behaviour was already
+ * inconsistent across the twelve, and a post that visibly holds up a line of
+ * flags is not the same class of object as a bollard nobody looks at. Thin is
+ * an argument about the collider's SIZE, not about whether there is one: the
+ * boxes below are the drawn post's own half-extents to the centimetre, so
+ * nothing sticks out that you cannot see.
+ *
+ * One pooled body, twelve shapes.
+ */
+function pastoBuildBunting(game, parts) {
   const flagG = new THREE.ConeGeometry(0.5, 1, 3);
+  const pb = pastoBody(game, 0);
   for (let r = 0; r < pastoBUNT.length; r++) {
     const B = pastoBUNT[r];
     const x0 = B[0], z0 = B[1], x1 = B[2], z1 = B[3], hy = B[4], sag = B[5];
@@ -1395,6 +1421,10 @@ function pastoBuildBunting(parts) {
       const px = e ? x1 : x0, pz = e ? z1 : z0;
       pastoBox(parts, null, PALETTE.stoneDark, px, hy * 0.5, pz, 0.11, hy * 0.5, 0.11);
       pastoBox(parts, null, PALETTE.stoneDark, px, hy, pz, 0.20, 0.09, 0.20);
+      // the same box, as a shape. The cap at the top is not collided: it is
+      // 20 cm of finial eleven metres up, and nothing in this game can be
+      // eleven metres up at x ±22.5.
+      pastoBodyBox(pb, px, hy * 0.5, pz, 0.11, hy * 0.5, 0.11);
     }
     const n = Math.max(6, Math.round(len / 1.5));
     let prevY = hy, prevT = 0;
@@ -1419,6 +1449,7 @@ function pastoBuildBunting(parts) {
       prevY = y; prevT = t;
     }
   }
+  pastoBodyDone(game, pb, 0, 0, 0);
   flagG.dispose();
 }
 
@@ -1467,7 +1498,7 @@ function pastoBuildPlazaFurniture(game, root) {
 
   // …and the sky over the square, in its own non-casting mesh. See PAPEL PICADO.
   const bunt = [];
-  pastoBuildBunting(bunt);
+  pastoBuildBunting(game, bunt);
   root.add(pastoTownMesh(bunt, 'pastoBunting', false, false));
   oct8.dispose(); octOpen.dispose(); clump.dispose();
 

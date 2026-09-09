@@ -1,3 +1,64 @@
+## PASTO'S BUNTING POSTS — COLLIDED (9 Sep 2026)
+
+**The last of ROADMAP-PHYSICS X9's three, and the one it explicitly refused to
+settle:** *"Collide them or write down that thin plaza furniture stays open —
+either is defensible... That is the owner's call, not a probe's."*
+
+**They are solid now.** X9 named the test that should decide it — the Göreme
+precedent, where the baskets were collided at 2.4 m and the 1.9 m fan was left
+open BECAUSE A TASK RUNS THROUGH IT — and nothing runs through these.
+
+### WHAT THE MEASUREMENT CHANGED ABOUT THE QUESTION
+
+`qa/px-pasto-bunting.js`. X9 describes six runs hung *across the plaza on twelve
+posts*, which reads as twelve posts in the play space. `pastoBUNT` puts all
+twelve at **x ±22.5**, at six z's — two columns 1.5 m inside the plaza's rim.
+The runs cross overhead; the posts stand at the edges.
+
+| | |
+|---|---|
+| walked at, one by one, before | **ten of twelve went straight through** |
+| the other two, at z 28 | already stopped you 1.6 m out, on a neighbour |
+| the carroza's line | x 10.5, half-width 1.62 — **10.4 m clear** |
+| after | **twelve of twelve stop**, at \|x\| 22.07 |
+
+22.07 plus the animal's own radius is 22.39, which is the drawn post's face to
+the centimetre: **gap 0**. The collider is the drawn box's own half-extents and
+nothing sticks out that you cannot see. The 20 cm finial on top is not
+collided — it is eleven metres up, and nothing in this game can be eleven
+metres up at x ±22.5.
+
+### WHY COLLIDE RATHER THAN LEAVE OPEN
+
+Three things, and the first is the one that actually decides it:
+
+- **Nothing needs the ground they stand on.** The carroza — the chapter's
+  marquee, and the only large thing that crosses the plaza — runs ten metres
+  clear. That is the Göreme test, and it comes out the other way here.
+- **The behaviour was already inconsistent.** Two of the twelve stopped you and
+  ten did not, for no reason a player could see: the two at z 28 happen to
+  stand behind market furniture.
+- **A post that visibly holds up a line of flags is not a bollard.** "Thin" is
+  an argument about how big the collider should be, not about whether there is
+  one — and at 22 cm the answer to the first is "22 cm".
+
+### AND IT DID NOT MAKE THE PLAZA A SNAG
+
+The counter-argument to colliding was that a thin post at the rim of the
+chapter's main play space becomes something you catch on while running. Soaked
+rather than argued: `qa/fuzz.js`, nineteen chapters, **0 errors, 0 NaN, 0
+solver saves**, and Pasto's own stuck-frame count went **466 → 395** across the
+change. `qa/herdsoak.js` 19/0/0. There is still 1.8 m of open cobble between
+each post and the kerb.
+
+### THIS CLOSES X9's THREE
+
+The Cave's slab stays open (scenery behind a solid wall), Kyoto's mesh was a
+doorway drawn shut (fixed), and these are collided. What is left on that list
+is the **`recessed` category, which has never been re-measured** — Pasto
+(−23, 40) shows the shape, drawn face at 0.39 m against a collider at 3.60,
+and X9 only noticed it in passing.
+
 ## KYOTO'S MESH — A DOOR THAT WAS DRAWN SHUT (9 Sep 2026)
 
 **ROADMAP-PHYSICS X9's second unidentified face**, and unlike the Cave's it is

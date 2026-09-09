@@ -140,7 +140,7 @@ Named (`qa/px-x5-name14.js`), the fourteen are mostly *not* defects:
 | Cali instanced cylinders ×8, `PALETTE.caliCaneStem` | 2 | cane stems — vegetation |
 | Palawan (−48, 40), drawn face 0.10 m away | 1 | the animal is INSIDE it; the audit's own filter 2 |
 | Göreme (−37, 20), the 135 × 37 × 124 valley mesh | 1 | relief, already disqualified above |
-| **Pasto's bunting posts** | 2 | real, and a judgement call |
+| ~~**Pasto's bunting posts**~~ | 2 | **COLLIDED 9 Sep 2026 — nothing runs through them, and two of the twelve already stopped you. See CONTRACT.md.** |
 | ~~**Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18**~~ | 2 | **FIXED 9 Sep 2026 — `kyoZenGarden`: the dry garden's south wall, drawn across a 7 m doorway its own colliders left open. See CONTRACT.md.** |
 | ~~**Cave's 32 × 15.6 m slab at z −200**~~ | 1 | **SETTLED 9 Sep 2026 — `cavExitJungle`, scenery behind a solid wall. Stays open. See CONTRACT.md.** |
 | Cali (67, −30) | 1 | no hit on the naming pass — moving |
@@ -1436,9 +1436,20 @@ unchanged: V is inert underwater. The full candidate list is re-ranked
 What that leaves is **three named faces and one decision**, all small, none
 urgent, and none of them safe for a probe to settle on its own:
 
-- **Pasto's twelve bunting posts** are drawn and not solid, at 22 cm square.
+- ~~**Pasto's twelve bunting posts** are drawn and not solid, at 22 cm square.
   Collide them or write down that thin plaza furniture stays open — either is
-  defensible, and the contract should say which.
+  defensible, and the contract should say which.~~
+
+  **COLLIDED, 9 Sep 2026, and the contract says so.** The test this document
+  named is the Göreme one — the fan was left open BECAUSE A TASK RUNS THROUGH
+  IT — and it comes out the other way here: all twelve stand at x ±22.5, two
+  columns 1.5 m inside the plaza's rim rather than scattered across it, and the
+  carroza's line is 10.4 m clear. MEASURED: ten of the twelve went straight
+  through and the other two already stopped you on market furniture, which is
+  an inconsistency no player could see a reason for. Twelve of twelve stop now,
+  at the drawn post's own face to the centimetre. Soaked rather than argued:
+  fuzz 19/0/0 with Pasto's stuck-frame count going 466 → 395 across the change.
+  `qa/px-pasto-bunting.js`, CONTRACT.md.
 - ~~**Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19**~~ and ~~**the Cave's
   32 × 15.6 m slab at z −200**~~ are wall-shaped, unsolid, and their builders are
   not identified. ~~The Cave one matters most: a 32 m face at the end of a chamber
