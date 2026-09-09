@@ -1563,6 +1563,29 @@ export function createNPCs(game) {
                'I have never seen {O} in this town before.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
                'Slow down!', 'It has somewhere to be.'],
+    // ---- ...AND THE TWO PAIRS OF VERBS THAT ALREADY WORKED (item 2) -------
+    // Both of these were proposed as things to BUILD and both turned out to be
+    // things the animal could already do that nothing had ever noticed —
+    // measured in `qa/nr-verbs.js`, which hopped, grabbed at 0.88 m off the
+    // ground, and got the prop. A move nobody reacts to is not a move; it is
+    // an accident that happens to work. So the build is the reaction.
+    //
+    // `snatch` is a theft taken OUT OF THE AIR, and it is a bigger deal than
+    // an ordinary one — you were not even standing there. Held to the same
+    // chapter-neutral standard as `thief`: no country, no object, nothing that
+    // assumes what was taken.
+    snatch:   ['It jumped for it!', 'Out of the air. Out of the actual air.',
+               'Did — did you see that?', 'It LEAPT.',
+               'That was not on the ground.', 'Oh, that is not fair.',
+               'You cannot do that. You just did that.'],
+    // ...and a capybara coming at you on its belly at a flat run, which is the
+    // single most alarming thing a person in this game can be shown and which
+    // for four versions had no reaction at all: the slide had a scrape, a
+    // camera term and a dust plume, and nobody in nineteen chapters could see
+    // it coming.
+    slide:    ['LOOK OUT —', 'It is not stopping!', 'Get out of the way!',
+               'It is on its belly!', 'Coming through, apparently.',
+               'Whoa — whoa!', 'Mind yourself!'],
     // ---- AND ONE MORE, FOR SOMEBODY WHO REMEMBERS YOU (v19) --------------
     // Said when you come back to a person you have already had a go at, and
     // held to the same chapter-neutral standard as the four above: no season,
@@ -1804,6 +1827,16 @@ export function createNPCs(game) {
   const npcLOC_REACT_N = 2;      // never more than two people speak at once
   const npcLOC_RUSH_V  = 6.2;    // m/s past somebody that counts as belting past
   const npcLOC_RUSH_R  = 3.4;    // ...and how close you have to be for it to matter
+  const npcLOC_SLIDE_R = 5.0;    // ...and the same thing for a belly. See below.
+  // ---- ...AND A BELLY DOES NOT HAVE TO BE GOING 6.2 TO BE ALARMING -------
+  // MEASURED, and it is the reason this constant exists rather than reusing
+  // the one above: a slide is a way of CARRYING speed rather than making it,
+  // and it bleeds — `qa/nr-pairs.js` clocked a real one passing at 4.41 m/s,
+  // which is under npcLOC_RUSH_V and would have made the whole slide reaction
+  // dead code at exactly the moment it is most wanted, the end of a long one.
+  // 3.4 is a shade over capySLIDE_MIN (3.30), which is the slowest a slide can
+  // legally start at — so any slide anybody can see is one worth reacting to.
+  const npcLOC_SLIDE_V = 3.4;    // m/s of belly that counts as coming at you
 
   // ---- ...AND THE OTHER HALF OF THAT, WHICH WAS NEVER BUILT --------------
   // The two constants above are the world's ONLY response to a player running,
@@ -4319,7 +4352,21 @@ export function createNPCs(game) {
     // leaves the rim under it, which is the right shape: you were nearly out
     // of their world. It also costs a slightly bigger flinch (9.6 against 7.4
     // at four metres) and that is correct — a splash is not a theft.
-    localsReact('thief', b.position.x, b.position.z, 0.8, 6.5);
+    // ---- ...AND TAKING IT OUT OF THE AIR IS NOT THE SAME THING (item 2) --
+    // THE SNATCH. `air` says the animal's feet were off the ground when the
+    // grab fired, and it is not a new verb — the measurement that produced it
+    // (`qa/nr-verbs.js`) found that hopping and grabbing has ALWAYS worked and
+    // that nothing anywhere had an opinion about it. Two of the six pairs that
+    // batch was written to build turned out to be like this: already possible,
+    // never acknowledged, and therefore never discovered.
+    //
+    // What it buys is a bigger reaction and its own words, which is the whole
+    // of the difference between an accident and a move. Not a card, not a
+    // tick, and nothing is gated on it: the game's own rule for a thing you
+    // find out by doing it.
+    const air = !!(e && e.air);
+    localsReact(air ? 'snatch' : 'thief', b.position.x, b.position.z,
+                air ? 1.0 : 0.8, air ? 8.0 : 6.5);
     // ...AND WHOEVER IT BELONGS TO COMES AND GETS IT.
     const own = localOwnerOf(pr);
     if (own) localOwnStart(own, pr, npcSay(own, 'thief'));
@@ -4892,6 +4939,10 @@ export function createNPCs(game) {
     const cv = capy && capy.velocity;
     const csp = cv ? Math.sqrt(cv.x * cv.x + cv.z * cv.z) : 0;
     const rushing = csp > npcLOC_RUSH_V;
+    // ...and whether it is upright while it does it. Read once for the whole
+    // population, like the speed above and for the same reason.
+    const capySliding = !!(capy && capy.sliding);
+    const sliding = capySliding && csp > npcLOC_SLIDE_V;
     // ---- B7: how long the animal has been doing nothing ------------------
     // `capy.restT` is capybara.js's own loaf clock — the same list as the calm
     // with `heldProp` taken out of it — so a capybara standing still holding
@@ -5213,12 +5264,25 @@ export function createNPCs(game) {
       // A rising edge on "close AND fast", so one pass is one reaction and
       // running circles round somebody is not a machine gun (their own
       // cooldown is what actually stops that; this stops the flinch).
-      const rushNow = rushing && d2 < npcLOC_RUSH_R * npcLOC_RUSH_R;
+      // ---- ...AND GOING PAST ON YOUR BELLY IS NOT GOING PAST (item 2) ----
+      // THE SLIDE SCATTER. The slide has had a scrape, a camera term, a slip
+      // model and a dust plume since v44, and in nineteen chapters not one
+      // person could see it coming: `capy.sliding` is published and npc.js has
+      // never read it. Same latch, same spring, same one-reaction-per-pass
+      // rule — a wider circle, a harder jump and its own words.
+      //
+      // WIDER BECAUSE IT IS WIDER. A running animal is a thing that goes past
+      // you; a sliding one is a low object with no brakes on it, and the
+      // radius at which that is your problem is bigger. It is still small
+      // enough to be about YOU: five metres, against the thirteen at which a
+      // bang is merely something that happened.
+      const rushR = capySliding ? npcLOC_SLIDE_R : npcLOC_RUSH_R;
+      const rushNow = (capySliding ? sliding : rushing) && d2 < rushR * rushR;
       if (rushNow && !r.rushWas) {
-        r.flV -= 9.5;   // scaled with the react kick above
+        r.flV -= capySliding ? 16 : 9.5;   // scaled with the react kick above
         r.flYaw = Math.atan2(dx, dz);
         if (r.cd <= 0) {
-          const arr = npcSay(r, 'rush');
+          const arr = npcSay(r, capySliding ? 'slide' : 'rush');
           if (arr && arr.length) { r.cd = r.cool * rand(0.8, 1.4); localLine(r, arr); }
         }
       }

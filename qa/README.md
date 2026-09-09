@@ -30,6 +30,14 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-verbs.js` and `nr-pairs.js` are item 2. The first MEASURES THE PREMISE and
+half of it was wrong — hop-then-grab and grab-then-slide already work — and the
+second checks the reactions that were built instead. Between them they record
+four separate ways a movement probe lies: a camera-relative key is not a
+direction, a local is a solid body you will run into, Shift and G are wrapped by
+one latch, and a chapter made of cliffs leaves the animal wedged for the next
+run.
+
 `nr-march.js` is item 3, push your luck: it builds a chain out of stamped props
 and watches somebody walk over about it. Read its header before writing any
 probe about a local who is supposed to be walking somewhere — three separate

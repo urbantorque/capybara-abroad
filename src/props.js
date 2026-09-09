@@ -2937,6 +2937,18 @@ function physGrab(prop) {
   // and tick 'steal-hat' whichever field it reads.
   physGrabPayload.prop = prop;
   physGrabPayload.from = prev || null;
+  // ---- ...AND WHETHER ITS FEET WERE ON THE GROUND (THE SNATCH) -----------
+  // MEASURED FIRST, because the feature this feeds was proposed on the premise
+  // that it was impossible: `qa/nr-verbs.js` hops the animal, presses the key
+  // at 0.88 m off the ground, and gets the prop. There is no `grounded` gate
+  // anywhere on the grab and there never was — taking something out of the air
+  // has always worked, and nothing in nineteen chapters has ever noticed.
+  //
+  // One field on a payload that is already allocated once and rewritten in
+  // place. capybara.js owns the animal's state and props.js owns the event, so
+  // this is read rather than passed in: adding an argument to physGrab would
+  // touch six call sites for a fact the callee can see for itself.
+  physGrabPayload.air = !!(capy && capy.grounded === false);
   physGame.events.emit('capy:grab', physGrabPayload);
   physStampTouch(prop);
   prop.lastWX = b.position.x;
