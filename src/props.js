@@ -1686,6 +1686,11 @@ export function createProps(game) {
     // edible; guessing that from the type name is how an audit reports a
     // chapter has no food in it because the food is called `pylsa`.
     typeOf: function (t) { return physTYPES[t] || null; },
+    // item 5: the one thing you brought with you. See physTravelThrough.
+    travelAudit: physTravelAudit,
+    // ...and the verb itself. systems.js is the only caller: see biomeGo,
+    // and the note there on why the decision cannot be taken on this side.
+    travelThrough: physTravelThrough,
     spill: physSpill,
     // ---- B9: a thing inside a thing (item 4a) ----
     // capybara.js asks `vesselNear` on the frame the action key goes down, to
@@ -2123,6 +2128,13 @@ function physMakeProp(type, x, z, variant, yaw, restY, loose) {
     // Which place's souvenir this is, or '' for the four hundred props that
     // are not one. See physKEEPS.
     keep: def.keep || '',
+    // ---- ...AND WHETHER YOU BROUGHT IT WITH YOU (item 5) ----------------
+    // Declared here rather than left to appear on first write, which is the
+    // shape that gave `talkCd` to seventeen chapters with nothing anywhere to
+    // decrement it. Set only by physTravelThrough; read by npc.js, which must
+    // not let anybody own it or read its pickup as a robbery.
+    travelled: false,
+    travelFrom: "",              // ...and the chapter it was carried out of
     vol: physVolume(def),
     floatFrac: physFloatFrac(def),
     rho: def.mass / (physVolume(def) * physFloatFrac(def)),
@@ -4291,6 +4303,76 @@ const physPATIO = [
   ['coffeesack', -0.4, 1.2], ['cuencobowl', 2.4, -0.6], ['arepa', -2.1, 0.3],
 ];
 
+// ---- THE ONE THING YOU MAY BRING WITH YOU (item 5) ------------------------
+// See the note inside physOnBiomeEnter. `physTravelP` is the single loose copy
+// alive at any moment; there is deliberately no list.
+let physTravelP = null;
+let physTravelWhy = "never called";   // the last decision, for the harness
+// WHAT MAY NOT TRAVEL, and each of these is a different reason rather than a
+// longer version of the same one:
+//   poster    it is not the chapter's, it is YOURS, and posterPut already
+//             stands a fresh one wherever you land — a travelling one would
+//             be two of the same joke in the same square
+//   keep      a keepsake is not confiscated in the first place, so it never
+//             reaches this code; naming it here is the assertion that it
+//             must not ALSO be copied if that ever changes
+//   planted   a planted prop is scenery with a body, not luggage
+const physNO_TRAVEL = { poster: 1 };
+/**
+ * Send a loose copy of `type` through the border and put it in the mouth.
+ * Called with the ORIGINAL's type after it has already been sent home.
+ */
+function physTravelThrough(type, from, capy) {
+  capy = capy || (physGame && physGame.capy);
+  const def = physTYPES[type];
+  physTravelWhy = "called";
+  if (!def) { physTravelWhy = "no def for " + type; return; }
+  if (physNO_TRAVEL[type]) { physTravelWhy = "refused: " + type; return; }
+  if (def.planted) { physTravelWhy = "planted"; return; }
+  if (def.grabbable === false) { physTravelWhy = "not grabbable"; return; }
+  if (def.keep) { physTravelWhy = "keepsake"; return; }
+  // The previous traveller went home. Removed BEFORE the new one is made, so
+  // the count can never be two even for a frame.
+  if (physTravelP && !physTravelP.removed) physRemoveProp(physTravelP);
+  physTravelP = null;
+  const p = capy && capy.position;
+  if (!p) { physTravelWhy = "no animal"; return; }
+  let made = null;
+  try {
+    made = physMakeProp(type, p.x, p.z, type === "flower" ? randInt(0, 2) : 0,
+                        undefined, undefined, true);
+  } catch (err) { made = null; physTravelWhy = "threw: " + err.message; }
+  if (!made) { if (!physTravelWhy) physTravelWhy = "makeProp returned null"; return; }
+  physTravelWhy = "travelled";
+  made.disturbed = true;                // it is yours; you brought it
+  // ...and NOBODY HERE OWNS IT. See localOwnerOf in npc.js: ownership is
+  // proximity to a prop's home, a travelled prop's home is wherever it landed,
+  // and the pickup below emits `capy:grab` like any other — so without this
+  // the nearest person to the arrival spawn read your luggage as a robbery and
+  // walked over and took it back, measured, every single time.
+  made.travelled = true;
+  // ...and WHERE IT CAME FROM, which is the half that makes it worth
+  // carrying. npc.js already has a pool for an object that is not from here
+  // (see npcKeepStep) and it keyed on `keep`, so it could only ever remark on
+  // the nineteen souvenirs. This is the same fact about ordinary luggage.
+  made.travelFrom = from || "";
+  physTravelP = made;
+  // ...and straight back into the mouth, because the animal never let go of
+  // it. A crossing that puts your luggage on the floor at your feet is a
+  // different and much worse sentence.
+  try {
+    physTravelWhy = physGrab(made) ? "travelled, in the mouth" : "travelled, grab refused";
+  } catch (err) { physTravelWhy = "travelled, grab threw: " + err.message; }
+}
+/** For the harness. Nothing in src reads this. */
+function physTravelAudit() {
+  return { has: !!(physTravelP && !physTravelP.removed),
+           type: physTravelP ? physTravelP.type : '',
+           held: !!(physTravelP && physTravelP.held),
+           biome: physTravelP ? physTravelP.biome : null,
+           from: physTravelP ? physTravelP.travelFrom : "", why: physTravelWhy };
+}
+
 function physOnBiomeEnter(e) {
   // A prop carried through the departures board cannot be released abroad: its
   // body was removed from the world with its home biome, so physRelease would
@@ -4318,6 +4400,33 @@ function physOnBiomeEnter(e) {
     capy.heldProp = null;
     physSetSolo(held, false);
     physRescue(held);
+    // ---- ...AND YOU MAY BRING ONE THING WITH YOU (item 5) ---------------
+    // Customs stays strict and the paragraph above is untouched: the ORIGINAL
+    // goes home, whole, for the reason it always did — its body left the world
+    // with its own chapter and releasing it abroad would leave it dynamic,
+    // unsimulated and invisible, which is a task soft-lock.
+    //
+    // What crosses is a LOOSE COPY, made through the one hatch in this file
+    // that already carries objects between chapters every day: `physMakeProp`
+    // with `loose` set gives it `biome: ''`, adds its mesh through
+    // physSceneAddLoose and its body through physWorldAddLoose, and draws it
+    // solo. Nineteen keepsakes have been doing exactly this since they were
+    // built, and props.js's own note calls a keepsake "the only object in the
+    // game that genuinely travels". This makes that one instead of nineteen.
+    //
+    // IDENTITY IS NOT PRESERVED AND NOTHING IN THE GAME READS IT. No task, no
+    // find, no record and no name is keyed to a prop instance; they are keyed
+    // to types and to events. What the player experiences — I carried my cone
+    // through the door and I still have my cone — is exactly true, and the
+    // alternative (re-tagging a live prop, moving its mesh out of the chapter's
+    // capture group and its body out of the chapter's list) is surgery on the
+    // three mechanisms this confiscation exists to protect.
+    //
+    // ONE AT A TIME, EVER. The previous traveller is removed on the way
+    // through, which bounds the whole feature at a single extra draw call
+    // against a budget this file puts at 220 with a worst case of 122 — and
+    // makes the rule sayable: you can bring one thing.
+    physTravelThrough(held.type, capy);
   }
   // ---- ...AND THE ONE KIND OF PROP CUSTOMS DOES NOT TOUCH ----------------
   // A keepsake in the mouth crosses with the animal and is not confiscated:

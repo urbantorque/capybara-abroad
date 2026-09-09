@@ -29139,11 +29139,34 @@ export function createSystems(game) {
     // Anything in the mouth belongs to the biome being left behind: it is about to
     // be pulled out of the physics world and hidden, and the capybara would spend
     // the rest of the game miming a hat it no longer has.
+    // ---- ...AND WHAT IT WAS IS REMEMBERED FOR ONE LINE (item 5) ----------
+    // CUSTOMS IS STRICT AND STAYS STRICT: the thing in the mouth belongs to
+    // the chapter being left and is put down in it, exactly as it always was.
+    // What crosses is a loose copy, made by props.js through the hatch its
+    // nineteen keepsakes already use. One at a time, and never a prop that
+    // file refuses — see physTravelThrough.
+    //
+    // AND THIS IS WHY IT IS HERE AND NOT IN props.js. That file has a
+    // carefully-written confiscation block on `biome:enter` whose comment
+    // explains the whole problem, and MEASURED, IT HAS NEVER RUN: this
+    // release empties the mouth before `switchTo`, so by the time the event
+    // fires there is nothing held to confiscate. `qa/nr-travel.js` found it by
+    // asking why nothing travelled. The block is left where it is — it is the
+    // right safety net for any future path that does not come through here —
+    // but the live decision has to be taken on this side of the release.
+    // ...and WHERE FROM, read before the switch for the obvious reason.
+    let carried = '', from = bio.current || '';
+    if (game.capy && game.capy.heldProp) carried = game.capy.heldProp.type || '';
     if (game.capy && game.capy.heldProp && game.physics && game.physics.release) {
       try { game.physics.release(null); } catch (e) {}
     }
     if (!bio.switchTo(name)) return false;
     teleportCapy(typeof bio.spawnOf === 'function' ? bio.spawnOf(name) : bio.SYDNEY_SPAWN, true);
+    // AFTER the teleport, because the copy is put down where the animal IS and
+    // before it the animal is still standing in the country it has left.
+    if (carried && game.physics && typeof game.physics.travelThrough === 'function') {
+      try { game.physics.travelThrough(carried, from); } catch (e) { /* luggage is optional */ }
+    }
     return true;
   }
 

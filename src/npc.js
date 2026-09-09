@@ -3615,6 +3615,19 @@ export function createNPCs(game) {
     if (!(prop.mass > 0) || prop.mass > npcOWN_MASS) return null;
     // A souvenir is the spine of the journey and may never be taken back.
     if (prop.keep) return null;
+    // ---- ...AND NEITHER MAY THE THING YOU BROUGHT WITH YOU (item 5) ------
+    // MEASURED, and it was the whole of why customs looked broken: the copy
+    // that crosses the border is set down at the arrival spawn and put in the
+    // mouth, and `physGrab` emits `capy:grab` like any other pickup — so the
+    // nearest person to the spawn became its owner, read the pickup as a
+    // robbery, walked over and took it out of the animal's mouth. Twelve
+    // hundred milliseconds in Göreme and about three seconds later it was
+    // gone, every time.
+    //
+    // Ownership is proximity to a prop's HOME, and a travelled prop's home is
+    // wherever it landed — which is somebody's pitch through no fault of
+    // anybody's. You did not take it from them. They have never seen it.
+    if (prop.travelled) return null;
     const live = game.biome && game.biome.current;
     if (!live) return null;
     const hx = prop.homeX, hz = prop.homeZ;
@@ -4339,6 +4352,12 @@ export function createNPCs(game) {
     const pr = e && e.prop;
     const b = pr && pr.body;
     if (!b) return;
+    // ...AND PICKING UP YOUR OWN LUGGAGE IS NOT A ROBBERY (item 5). The
+    // travelled copy is put into the mouth by props.js on the way through the
+    // border, which emits this event like any other pickup — and a square that
+    // gasps at you for holding the thing you walked in with is the api-key
+    // mismatch again, in the other direction. See physTravelThrough.
+    if (pr.travelled) return;
     // ---- 0.5 WAS TOO SOFT TO BE WITNESSED, AND IT WAS MEASURED (v33) -----
     // `kick` is strength × (0.35…1.0 by nearness), and `npcWARY_HEAT` — the
     // bar above which somebody counts as watching FOR you — is 0.35. At
@@ -12044,7 +12063,14 @@ export function createNPCs(game) {
       npcKeepLine = ''; npcKeepFor = '';
     }
     const held = game.capy && game.capy.heldProp;
-    const from = (held && !held.removed && held.keep) ? held.keep : '';
+    // ---- ...AND ORDINARY LUGGAGE COUNTS NOW, NOT ONLY THE NINETEEN -------
+    // This keyed on `keep` alone, which meant it could only ever be about a
+    // souvenir — the only object class that could cross a border at the time
+    // it was written. Item 5 opened that: props.js now sends a loose copy of
+    // whatever was in the mouth through with you and stamps `travelFrom` on
+    // it. A traffic cone that has been to five countries is exactly the thing
+    // this pool was written for and it could not see one.
+    const from = (held && !held.removed) ? (held.keep || held.travelFrom || '') : '';
     const pair = (from && live && from !== live) ? live + '|' + from : '';
     if (pair !== npcKeepFor) {
       npcKeepFor = pair;
@@ -12053,8 +12079,18 @@ export function createNPCs(game) {
       if (pair && !npcKeepSaid[pair]) {
         const pool = npcLOC_SAY.keepsake;
         if (pool && pool.length) {
-          npcKeepLine = pool[randInt(0, pool.length - 1)]
-                          .split('{O}').join(held.name || 'that');
+          // ---- THE TWO NAME TABLES DO NOT AGREE ABOUT ARTICLES -----------
+          // physKEEPS writes them in — 'a chewed tea whisk', 'a piece of the
+          // glacier' — because a souvenir's name is a phrase. physTYPES does
+          // not: 'traffic cone', 'wine bottle', 'rubbish bin', because a type
+          // name is a label. Every line in this pool puts the name in the
+          // middle of a sentence, so ordinary luggage read "Is that traffic
+          // cone? Carried all this way?" the moment item 5 let one through.
+          let nm = held.name || 'that';
+          if (!/^(a|an|the) /i.test(nm)) {
+            nm = (/^[aeiou]/i.test(nm) ? 'an ' : 'a ') + nm;
+          }
+          npcKeepLine = pool[randInt(0, pool.length - 1)].split('{O}').join(nm);
         }
       }
     }

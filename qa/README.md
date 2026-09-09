@@ -30,6 +30,12 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-travel.js` is item 5, customs. It is the file that found the dead
+confiscation: props.js has a carefully-argued block for a held prop at the
+border and `biomeGo` empties the mouth before `switchTo`, so it had never once
+run. Read its header before touching anything about carrying a prop between
+chapters.
+
 `nr-err.js` is item 4, the standing order. It seeds a regular's TIER through the
 save file and drives one errand end to end. Its header carries the two
 measurement traps that cost the most: `wary` decays over 26 s so it must be read
