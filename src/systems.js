@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
-         rimTick, cloudTick, skyTick, fresnelTick, paleTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
@@ -303,6 +303,36 @@ const sysSHADOW_SKY = {
   kyoto: 1.0, cave: 1.0, iceland: 1.0, antarctic: 0.62, drift: 1.0,
   goreme: 0.72, kowloon: 0.84, monaco: 0.76, hanoi: 0.74,
 };
+// ---------------------------------------------------------------------------
+// ...AND WHAT COLOUR THE SHADE IS — see the block above shadeTick in shared.js
+// for the term. This is how far a chapter's shade goes toward the hue of its
+// own sky, 0..1: 0 is the game as it was, where shade was less light and not
+// bluer light.
+//
+// The rows come off a frame histogram of all nineteen arrival frames, and the
+// number they are keyed on is the fraction of the frame carrying any real
+// chroma: Kyoto 34 %, Venice 37 %, Iceland 38 %, Palawan 45 % against the
+// Erg's 99.9 % and the Pantanal's 98.8 %. The four grey ones take the most,
+// because they are the chapters with a large well-lit shade and nothing in it.
+//
+// THREE ROWS ARE ZERO AND EACH IS A DIFFERENT REASON. The cave has no sky at
+// all — its light is six emitters and a shaft, and tinting its dark toward a
+// sky that is not there is inventing a light source. The Drift is ABOVE the
+// weather, where the argument for a blue shade is that the shade is lit by a
+// blue dome, and up there it is not. Mong Kok's hemisphere is a neon magenta
+// and the rim already had to back forty per cent off it to stop the animal
+// being edged in pink; a magenta shade under a magenta sign is that mistake
+// twice.
+const sysSHADE_DEF = 0.40;
+const sysSHADE = {
+  kyoto: 0.72, venice: 0.68, iceland: 0.62, palawan: 0.60,
+  quay: 0.52, sydney: 0.46, hanoi: 0.50, antarctic: 0.55, manly: 0.44,
+  pasto: 0.40, cali: 0.40, rio: 0.38, sahara: 0.30, goreme: 0.34,
+  pantanal: 0.34, monaco: 0.36,
+  cave: 0, drift: 0, kowloon: 0,
+};
+const sysColSh = new THREE.Color(1, 1, 1);
+const sysSHADE_WHITE = new THREE.Color(1, 1, 1);
 
 // Goose-game framing: tight, steep, capybara sitting ~40% up from the bottom of
 // the frame with the world it is walking into filling the upper two thirds.
@@ -28428,6 +28458,30 @@ export function createSystems(game) {
       sysColR.lerp(sysRIM_WHITE, 0.40);
     }
     rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
+    // ---- ...and what colour the shade is ---------------------------------
+    // See the block above sysSHADE. THE MAX CHANNEL FIRST, THEN THE LUMA, and
+    // the order is the whole of it: normalising the max channel keeps the
+    // sky's HUE at full chroma whatever the hour (Reykjavik's hemisphere at
+    // half past eleven is a very dark blue and a straight copy would tint the
+    // shade toward black); walking back toward white by the chapter's own
+    // number is the strength; renormalising the LUMA afterwards is what makes
+    // this move the hue and never the level, so a chapter's exposure, its
+    // grade and its bright-pass threshold are all untouched by it.
+    {
+      const shK = game.state.noShade ? 0
+                : (sysSHADE[name] === undefined ? sysSHADE_DEF : sysSHADE[name]);
+      if (shK <= 0) {
+        shadeTick(sysSHADE_WHITE, sysAxDir);
+      } else {
+        sysColSh.copy(hemi.color);
+        const smx = Math.max(sysColSh.r, Math.max(sysColSh.g, sysColSh.b));
+        if (smx > 0.001) sysColSh.multiplyScalar(1 / smx); else sysColSh.setRGB(1, 1, 1);
+        sysColSh.lerp(sysSHADE_WHITE, 1 - shK);
+        const slm = 0.2126 * sysColSh.r + 0.7152 * sysColSh.g + 0.0722 * sysColSh.b;
+        if (slm > 0.001) sysColSh.multiplyScalar(1 / slm); else sysColSh.setRGB(1, 1, 1);
+        shadeTick(sysColSh, sysAxDir);
+      }
+    }
     // ---- the cloud ----------------------------------------------------------
     // One vec4 and one vec2, and a shadow crosses everything in the live
     // chapter. The strength walks in from the chapter's row at the rate the

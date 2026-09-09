@@ -1747,8 +1747,55 @@ export function shadeEnable() { _shadeOn = true; }
  * biome change from sysSHADOW_SKY; 1.0 is "no change from before this existed".
  */
 export function skyOccTick(v) { _skyOcc.value = v > 0 ? (v < 1 ? v : 1) : 0; }
-/** For a probe: the live value, and whether the shader half is actually in. */
-export function shadeInfo() { return { sky: _skyOcc.value, on: _shadeOn }; }
+// ---------------------------------------------------------------------------
+// ...AND WHAT COLOUR IT IS — COLOUR IN THE SHADE (the second beauty pass,
+// 10 Sep 2026, ROADMAP-BEAUTY.md item 1).
+//
+// `_skyOcc` says how MUCH sky survives where the sun does not. It has never
+// said what colour that sky is, so shade in this game was less light and not
+// bluer light — and those are different pictures. Measured over a frame
+// histogram of all nineteen arrival frames: Kyoto carries real chroma on 34 %
+// of its pixels, Venice 37 %, Iceland 38 %, Palawan 45 %. Two thirds of those
+// frames are grey, and the greyest part of each is its shade.
+//
+// The composite's split tone already cools dark pixels, and that is NOT this:
+// it keys on LUMA, so it cools a dark red awning standing in full sun and does
+// nothing for a white wall standing in shadow. This keys on the shadow itself.
+//
+// It multiplies `irradiance`, which after <lights_fragment_begin> is the whole
+// of the indirect term — and in shadow the indirect term is the only light
+// there is, so tinting it IS tinting the shade. Normalised to luma 1 in
+// systems.js before it arrives, so the strength moves the hue and never the
+// level: at uShadeC = vec3(1) this is bit-for-bit the line it replaces.
+// AND IT IS NOT ONLY CAST SHADOW, which is the thing that made this term
+// worth building rather than merely correct. First cut gated on `capyShadowV`
+// alone and measured: Kyoto's chroma went 33.7 % of frame to 52.0 %, and
+// Venice, Palawan and Iceland did not move at all. Kyoto is a narrow lane
+// between two rows of houses, so most of its ground IS in cast shadow; the
+// other three are open. **In a world built out of boxes most shade is not a
+// shadow, it is a face turned away from the sun** — every north wall, every
+// underside, every trunk's dark side — and none of that is in the shadow map
+// at all. So the hue follows `max(cast shadow, facing away)`, and the LEVEL
+// follows cast shadow exactly as it did before: `uShadowSky` is a shipped
+// per-chapter number tuned against the picture and this may not re-base it.
+const _shadeC = { value: new THREE.Color(1, 1, 1) };
+const _shadeSun = { value: new THREE.Vector3(0, 1, 0) };
+/**
+ * The colour of the shade, already normalised, and where the sun is in WORLD
+ * space. systems.js calls this once a frame off the hemisphere and off the
+ * live sun axis, for the reason rimTick and wetTick do: shade is sky light, so
+ * every event that already moves the sky moves this with it and there is no
+ * second table to keep in step.
+ */
+export function shadeTick(color, sunDirWorld) {
+  if (color) _shadeC.value.copy(color);
+  if (sunDirWorld) _shadeSun.value.copy(sunDirWorld).normalize();
+}
+/** For a probe: the live values, and whether the shader half is actually in. */
+export function shadeInfo() {
+  const c = _shadeC.value;
+  return { sky: _skyOcc.value, on: _shadeOn, tint: [+c.r.toFixed(3), +c.g.toFixed(3), +c.b.toFixed(3)] };
+}
 
 // `irradiance` is the accumulated indirect (ambient + light probes + every
 // hemisphere light); lights_fragment_END is what hands it to RE_IndirectDiffuse,
@@ -1758,7 +1805,10 @@ export function shadeInfo() { return { sky: _skyOcc.value, on: _shadeOn }; }
 const _RIM_FS_SHADE = `capyShadowV = 1.0;
 #include <lights_fragment_begin>
 #if defined( RE_IndirectDiffuse )
-  irradiance *= mix(1.0, uShadowSky, 1.0 - capyShadowV);
+  float capyShF = 1.0 - capyShadowV;
+  irradiance *= mix(1.0, uShadowSky, capyShF);
+  float capyShT = max(capyShF, 1.0 - clamp(dot(normalize(vRimN), uShadeSun), 0.0, 1.0));
+  irradiance *= mix(vec3(1.0), uShadeC, capyShT);
 #endif`;
 
 const _RIM_FS_COMMON = `#include <common>
@@ -1767,6 +1817,8 @@ varying vec3 vRimN;
 uniform float uRimK;
 uniform vec3 uRimC;
 uniform float uShadowSky;
+uniform vec3 uShadeC;
+uniform vec3 uShadeSun;
 uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
@@ -1899,6 +1951,8 @@ function _rimInjectWith(kU, cU) {
     shader.uniforms.uRimK = kU;
     shader.uniforms.uRimC = cU;
     shader.uniforms.uShadowSky = _skyOcc;
+    shader.uniforms.uShadeC = _shadeC;
+    shader.uniforms.uShadeSun = _shadeSun;
     shader.uniforms.uSpillP = _spillP;
     shader.uniforms.uSpillC = _spillC;
     shader.uniforms.uSpillOn = _spillOn;
@@ -5210,6 +5264,26 @@ export function warnOnce(tag, err) {
 // they are genuinely one-offs, and pretending otherwise is how the nineteen
 // copies happened in the first place.
 // ===========================================================================
+/**
+ * A stable 0..1 draw from a place in the world, quantised to 5 cm.
+ *
+ * Deliberately the same hash grain() uses in GLSL, so the two fields cannot
+ * drift apart in character: a sin-fract, which is not a good hash and is a
+ * perfectly good one for this — all it has to do is decorrelate neighbours.
+ */
+function _mergeHash(x, y, z) {
+  const q = Math.round(x * 20) * 0.31 + Math.round(y * 20) * 0.17 + Math.round(z * 20) * 0.53;
+  const s = Math.sin(q) * 43758.5453123;
+  return s - Math.floor(s);
+}
+/** Value up or down, hue warm or cool with it. See `jit` in makeMerger. */
+function _mergeJitter(c, x, y, z, amt, hue) {
+  const v = (_mergeHash(x, y, z) - 0.5) * 2 * amt;
+  const w = v * hue;
+  c.r = Math.min(1, Math.max(0, c.r * (1 + v + w)));
+  c.g = Math.min(1, Math.max(0, c.g * (1 + v)));
+  c.b = Math.min(1, Math.max(0, c.b * (1 + v - w)));
+}
 export function makeMerger(G, opts) {
   const o = opts || {};
   const xform = o.xform;
@@ -5217,6 +5291,35 @@ export function makeMerger(G, opts) {
   const coneSegs = o.coneSegs || [];
   const sphSegs = o.sphSegs || [];
   const tint = o.tint || null;
+  // ---------------------------------------------------------------------
+  // JITTER — NO TWO OF ANYTHING ARE THE SAME COLOUR (the second beauty
+  // pass, 10 Sep 2026, ROADMAP-BEAUTY.md item 3).
+  //
+  // Measured across 169 000 lines: there is no continuous hue or value
+  // variation anywhere in this game. Three chapters index a swatch array
+  // (Hanoi's five house colours, Pasto's walls and shutters, Venice's
+  // COLS) and every other repeated structure is one hex. Kyoto builds
+  // EIGHTEEN townhouses down the Gion lane that are identical in width,
+  // in depth and in colour, and differ only in a height drawn from
+  // rand(4.4, 5.6) — which is exactly the row of buildings the frame
+  // histogram reports as ten hue families over 33 % of the frame.
+  //
+  // A wall is not the same colour as the wall next to it. This is one
+  // multiply per primitive at BUILD time: no draw call, no triangle, no
+  // uniform, and nothing at all at runtime.
+  //
+  // IT IS KEYED ON THE PRIMITIVE'S OWN PLACE IN THE WORLD, quantised to
+  // 5 cm, for two reasons. A `Math.random()` here would make the world
+  // different on every load, and `qa/rv-geom.js` fingerprints the colour
+  // array of every merged batch to prove a change did not move the
+  // geometry — a random tint turns that instrument off. Quantised, the
+  // same box in the same place is the same colour for ever.
+  //
+  // AND THE HUE FOLLOWS THE VALUE, brighter to warmer, which is the same
+  // correlation `broad` makes in grain() and for the same physical
+  // reason: the bright face of a thing is the one the sun is on.
+  const jit = o.jitter || 0;
+  const jitHue = o.jitterHue === undefined ? 0.45 : o.jitterHue;
   const recompute = o.normals !== 'keep';
   const pos = [], nor = [], col = [], idx = [];
   const c = new THREE.Color();
@@ -5241,6 +5344,9 @@ export function makeMerger(G, opts) {
       const nm = g.attributes.normal.array;
       c.set(color);
       if (tint) tint(c);
+      // See the block above `jit`. The translation is elements 12..14 of a
+      // column-major mat4, which is where the primitive actually stands.
+      if (jit) _mergeJitter(c, m4.elements[12], m4.elements[13], m4.elements[14], jit, jitHue);
       const start = M.n;
       for (let i = 0; i < p.length; i += 3) {
         pos.push(p[i], p[i + 1], p[i + 2]);
