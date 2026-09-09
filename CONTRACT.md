@@ -1,3 +1,72 @@
+## KYOTO'S MESH — A DOOR THAT WAS DRAWN SHUT (9 Sep 2026)
+
+**ROADMAP-PHYSICS X9's second unidentified face**, and unlike the Cave's it is
+a real defect. *"Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19 is
+wall-shaped, unsolid, and its builder is not identified."*
+
+**It is the dry garden's south wall, and the hole in it is the way in.** The
+builder is `kyoBuildZen` — `kyoZEN` is `{ x −34, z 8, hx 15, hz 10 }`, which is
+that bounding box to the centimetre. The wall has always been collided in two
+pieces with a gap between them, and the comment beside them has always said
+why: *"the south wall has a gap in it, or nobody could get in to spoil it."*
+
+**What was never true is that you could SEE it.** The wall was drawn straight
+across the full width and a 4.4 m gravel-coloured panel was painted on the
+middle of it. So the player met an unbroken 1.9 m earth wall and walked
+through it — and the panel, photographed, is a patch of lighter render on a
+wall, which is not a door.
+
+### MEASURED BEFORE AND AFTER (`qa/px-kyoto-zen.js`)
+
+A ray sweep along the whole south face at 50 cm steps, from a metre outside it,
+drawn and physical, plus a walk test at seven x positions:
+
+| | before | after |
+|---|---|---|
+| gap in the DRAWN wall | **none, anywhere** | −37.5 … −30.5 |
+| gap in the COLLIDERS | −37 … −30.5 | −37 … −30.5 |
+| walked in at x −37, −34, −32 | yes | yes |
+| stopped at x −45, −40, −29, −24 | yes | yes |
+
+The walk results are identical on purpose: **nothing about where you can go has
+changed.** The only change is that the opening is now drawn where it always
+was.
+
+### HOW
+
+The south wall is two segments, and their inner ends are the colliders' own
+inner ends *by construction* — `hx * 0.62 − hx * 0.38` is written once and used
+for both, so the drawn opening and the walk-through opening cannot drift apart
+the way they had. The tiled coping stops with each segment, which is what makes
+it read as a gateway rather than as a wall with a bite out of it. The
+gravel-coloured panel is gone; in its place is a granite sill across the
+threshold, 10 cm tall and with no collider of its own — under the step the
+animal takes without noticing, because a drawn lip you can walk over is the
+exact thing this block exists to stop.
+
+`kyoZenGarden` is named now, for the reason cave.js's four exit meshes are: X9
+could only report `Mesh < kyoto < Scene`, and both of its unidentified faces
+were unidentified because their chapters build anonymous meshes.
+
+### THE PATTERN THE TWO OF THEM MAKE
+
+X9 flagged two faces with the same instrument and the same words. They are
+opposite findings:
+
+- **the Cave's** is scenery seventeen metres behind a solid wall, at a sample
+  position a probe teleported to — nothing to fix, and it stays open;
+- **Kyoto's** is a doorway in the chapter's main garden that the drawing never
+  admitted to — a real defect, and a player would have met it in the first ten
+  minutes.
+
+A wall audit cannot tell those apart, because both look like "drawn geometry
+with no physics behind it". What separates them is whether a player can stand
+where the sample was taken, and neither of X9's numbers said.
+
+**Still open from that list:** Pasto's twelve bunting posts, which is the
+judgement call X9 left, and the `recessed` category, which has never been
+re-measured.
+
 ## THE CAVE SLAB — A DECISION, NOT A FIX (9 Sep 2026)
 
 **ROADMAP-PHYSICS X9 left three named faces and a decision, and said this one

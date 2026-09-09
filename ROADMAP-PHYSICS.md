@@ -141,7 +141,7 @@ Named (`qa/px-x5-name14.js`), the fourteen are mostly *not* defects:
 | Palawan (−48, 40), drawn face 0.10 m away | 1 | the animal is INSIDE it; the audit's own filter 2 |
 | Göreme (−37, 20), the 135 × 37 × 124 valley mesh | 1 | relief, already disqualified above |
 | **Pasto's bunting posts** | 2 | real, and a judgement call |
-| **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18** | 2 | real, builder not yet identified |
+| ~~**Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18**~~ | 2 | **FIXED 9 Sep 2026 — `kyoZenGarden`: the dry garden's south wall, drawn across a 7 m doorway its own colliders left open. See CONTRACT.md.** |
 | ~~**Cave's 32 × 15.6 m slab at z −200**~~ | 1 | **SETTLED 9 Sep 2026 — `cavExitJungle`, scenery behind a solid wall. Stays open. See CONTRACT.md.** |
 | Cali (67, −30) | 1 | no hit on the naming pass — moving |
 
@@ -1439,7 +1439,7 @@ urgent, and none of them safe for a probe to settle on its own:
 - **Pasto's twelve bunting posts** are drawn and not solid, at 22 cm square.
   Collide them or write down that thin plaza furniture stays open — either is
   defensible, and the contract should say which.
-- **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19** and ~~**the Cave's
+- ~~**Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19**~~ and ~~**the Cave's
   32 × 15.6 m slab at z −200**~~ are wall-shaped, unsolid, and their builders are
   not identified. ~~The Cave one matters most: a 32 m face at the end of a chamber
   that is not solid is a way out of the mountain.~~
@@ -1455,7 +1455,24 @@ urgent, and none of them safe for a probe to settle on its own:
   and the four meshes in that function are named now** — the audit could not
   identify a builder because every one of them went in anonymous, which is the
   transferable finding. `qa/px-cave-slab.js`, `qa/px-cave-sill.js`, CONTRACT.md.
-  Kyoto's is untouched and is the same class of question.
+  **KYOTO'S IS FIXED, 9 Sep 2026, AND IT WAS THE OPPOSITE FINDING.** It is
+  `kyoBuildZen`'s wall round the dry garden, and its south side has been
+  collided in two pieces with a gap between them since it was built — *"the
+  south wall has a gap in it, or nobody could get in to spoil it"*. The wall
+  was DRAWN straight across the full width with a 4.4 m gravel-coloured panel
+  painted on the middle, so the player met an unbroken 1.9 m earth wall and
+  walked through it. MEASURED, a ray sweep along the whole face: no gap drawn
+  anywhere, a 6.5 m gap in the physics, and a walk test that got in at x −37,
+  −34 and −32. The wall is two segments now, on the colliders' own numbers, and
+  the walk results are identical — nothing about where you can go changed, only
+  whether you can see it. `qa/px-kyoto-zen.js`, CONTRACT.md.
+
+  **The two of them together are the lesson.** Same instrument, same words, and
+  one is scenery seventeen metres behind a solid wall while the other is a
+  doorway in the chapter's main garden. A wall audit cannot tell them apart,
+  because both are "drawn geometry with no physics behind it" — what separates
+  them is whether a player can stand where the sample was taken, and neither of
+  X9's numbers said.
 - The audit's `recessed` category was never re-measured at all. Pasto (−23, 40)
   shows the shape — drawn face at 0.39 m, collider at 3.60 — and X9 only noticed
   it in passing.

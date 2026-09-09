@@ -706,15 +706,47 @@ function kyoBuildZen(game, root) {
   }
   kyoStaticBox(game, x, y - 0.2, z, hx, 0.35, hz);
   // the wall around it: earth-coloured, tiled top, the way they always are
+  //
+  // ---- ...AND THE SOUTH WALL'S GAP IS A GAP YOU CAN SEE NOW -------------
+  // It was not. The wall was drawn STRAIGHT ACROSS the full width and a 4.4 m
+  // gravel-coloured panel was painted on the middle of it, while the two
+  // colliders below left a 7.2 m hole — so the player met an unbroken 1.9 m
+  // earth wall and walked through it. MEASURED (`qa/px-kyoto-zen.js`), a ray
+  // sweep along the whole south face from a metre outside it: the drawn wall
+  // had NO gap anywhere, the physics had one at x −37…−30.5, and a walk test
+  // got in at x −37, −34 and −32 and was stopped at −40 and −29. Photographed,
+  // it is a pale panel on a wall, which is not a door.
+  //
+  // ROADMAP-PHYSICS X9 found the same thing from the other end and could only
+  // call it "Kyoto's 32 × 22 × 2.4 m mesh, builder not identified".
+  //
+  // The south wall is two segments now, and their inner ends are the
+  // colliders' own inner ends by construction — the same two expressions, so
+  // the drawn opening and the walk-through opening cannot drift apart.
+  const gapIn = hx * 0.62 - hx * 0.38;      // 3.6 m: the inner edge of each side
+  const gapOut = hx + 0.8;                  // ...and the outer, at the side wall
+  const segC = (gapOut + gapIn) * 0.5, segW = gapOut - gapIn;
   for (let s = -1; s <= 1; s += 2) {
     Zg.box(x + s * (hx + 0.5), y + 0.95, z, 0.5, 1.9, hz * 2 + 1.6, PALETTE.adobeShade);
     Zg.box(x + s * (hx + 0.5), y + 2.02, z, 0.95, 0.24, hz * 2 + 2.0, PALETTE.kawara);
     kyoStaticBox(game, x + s * (hx + 0.5), y + 0.95, z, 0.35, 1.0, hz + 0.8);
-    Zg.box(x, y + 0.95, z + s * (hz + 0.5), hx * 2 + 1.6, 1.9, 0.5, PALETTE.adobeShade);
-    Zg.box(x, y + 2.02, z + s * (hz + 0.5), hx * 2 + 2.0, 0.24, 0.95, PALETTE.kawara);
+    if (s < 0) {
+      // the north wall is whole, and solid across its whole width
+      Zg.box(x, y + 0.95, z + s * (hz + 0.5), hx * 2 + 1.6, 1.9, 0.5, PALETTE.adobeShade);
+      Zg.box(x, y + 2.02, z + s * (hz + 0.5), hx * 2 + 2.0, 0.24, 0.95, PALETTE.kawara);
+    } else {
+      for (let t = -1; t <= 1; t += 2) {
+        Zg.box(x + t * segC, y + 0.95, z + hz + 0.5, segW, 1.9, 0.5, PALETTE.adobeShade);
+        Zg.box(x + t * segC, y + 2.02, z + hz + 0.5, segW + 0.4, 0.24, 0.95, PALETTE.kawara);
+      }
+    }
   }
-  // ...but the south wall has a gap in it, or nobody could get in to spoil it
-  Zg.box(x, y + 0.95, z + hz + 0.5, 4.4, 1.9, 0.6, PALETTE.gravelZen);
+  // ...and a stone sill across the opening, because a gap in a wall with
+  // nothing at its foot reads as a wall that is missing rather than as a way
+  // in. Ten centimetres and no collider of its own — that is under the step
+  // the animal takes without noticing, and a drawn lip you CAN walk over is
+  // not the thing this block just fixed.
+  Zg.box(x, y + 0.05, z + hz + 0.5, gapIn * 2, 0.10, 1.1, PALETTE.granite);
   kyoStaticBox(game, x - hx * 0.62, y + 0.95, z + hz + 0.5, hx * 0.38, 1.0, 0.35);
   kyoStaticBox(game, x + hx * 0.62, y + 0.95, z + hz + 0.5, hx * 0.38, 1.0, 0.35);
   kyoStaticBox(game, x, y + 0.95, z - hz - 0.5, hx + 0.8, 1.0, 0.35);
@@ -731,6 +763,10 @@ function kyoBuildZen(game, root) {
   const m = new THREE.Mesh(Zg.build(), kyoVC());
   m.castShadow = true;
   m.receiveShadow = true;
+  // Named, for the reason cave.js's four exit meshes are: X9 could only report
+  // `Mesh < kyoto < Scene` and had to leave "builder not identified" on a
+  // finding that turned out to be a door drawn shut.
+  m.name = 'kyoZenGarden';
   root.add(m);
 
   // paw prints, written into an instanced mesh as the capybara wrecks the place
