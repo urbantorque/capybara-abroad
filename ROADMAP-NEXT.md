@@ -484,6 +484,37 @@ already emit. Capybara trope: the animal whose entire brand is *relaxed*.
 >   LUNCH HOUR immediately — `sandwich` is in no scatter list, so it was a
 >   chapter-locked pattern that did not say so.
 
+> **BUILT, second half, 9 Sep 2026 (Q2). ITEM CLOSED. See CONTRACT.md.** The
+> journal page of forty silhouettes, notoriety’s variety term, and the ledger
+> foot saying which you were.
+>
+> - **The page is a FOLD on the journal, not a fourth full-screen card.** The
+>   ledger and the album are full-screen because one is the last word about a
+>   journey and the other wants width for photographs; this is a list you
+>   scan, and a fourth modal is nine more places in systems.js that have to be
+>   told which card is on top.
+> - **An unearned name is drawn as the SHAPE OF THE WORDS** — one bar per
+>   word, in the width of the word — which is the shelf’s own rule applied to
+>   text. MEASURED at four widths: 360 px gives two columns of 145 and the
+>   longest name still sets on one line, and an unearned cell is exactly as
+>   tall as an earned one at every width, so a name arriving lights a cell up
+>   rather than reflowing forty of them.
+> - **VARIETY IS THE ONE TERM A MASHER CANNOT FARM**, and that is measured
+>   rather than hoped for. The directed troublemaker — nine minutes, 292
+>   throws, twelve cards — wrote EIGHT names that were **two distinct names**
+>   (THE HAT TRICK ×7, KLEPTOMANIA), because the nearest prop is the same prop.
+> - **Weight 1, and it cannot run away with B14’s table.** `repName` has one
+>   call site, so `variety <= inc + scn` is structural and the term can at most
+>   double the trouble it sits beside. MEASURED: the masher file goes 15 → 17
+>   and does not change tier; the same trouble spread over eight names is 23;
+>   all forty is 112. The static check now asserts the single writer.
+> - **The foot reads the SHAPE of `jrRep`, not its size**, because eight names
+>   off twelve cards and eight off eight are identical in every number the game
+>   had before the forty. *"they had one word for most of it: the hat trick"*
+>   against *"they had 8 words for what you did"*. On every ledger and not only
+>   the last: the tier is a verdict on a finished journey, this is a
+>   description of one that is still going.
+
 **Concept.** The incident chain counts *how many* witnessed things happened
 in twelve seconds. The Repertoire reads the same window and asks *which*.
 Forty-odd authored patterns over the event kinds the chain already sees —

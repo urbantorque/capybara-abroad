@@ -1,3 +1,126 @@
+## THE NEXT PASS, BATCH NINE — WHAT THE FORTY ARE FOR (Q2 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 4, second batch, and it closes the item.** Q1 gave forty
+chains a name, put it on the card, in a bystander's mouth and on the save file,
+and gave the player no way to see the set — which makes forty names forty
+accidents rather than a thing to go looking for. This is the page, the term
+notoriety was missing, and the last line of the ledger.
+
+### THE PAGE IS A FOLD ON THE JOURNAL, NOT A FOURTH MODAL
+
+The ledger and the album are full-screen because one is the last word about a
+journey and the other wants width for photographs. This is a list you scan, the
+journal is the card it belongs on, and a fourth modal is **nine more places in
+systems.js** that have to be told which card is on top — `albShown` is named at
+nine sites, and the file's own comments record what happens when one of them is
+missed. It is the controls' `<details>`, styled off the controls' own summary,
+so the card has two of one thing rather than one of two.
+
+**THE SHELF'S RULE, ON A NAME.** Always forty; the ones you have not found are
+half of what the page is for. An unearned souvenir is drawn but grey and nearly
+out. An unearned NAME is drawn as the shape of the words — one bar per word, in
+the width of the word — so you can see that there is something in the box and
+not what it is. THE GONDOLIER'S FAREWELL is three bars, 13, 18 and 18 px, and
+tells you nothing except that there is a long one in there somewhere.
+
+**HIDDEN UNTIL THE FIRST NAME**, on the album button's terms: a fold reading
+"0 of 40" is a nag about a system the player has not been told exists. MEASURED
+on a clean file: the fold is in the DOM, `hidden`, and has drawn nothing.
+
+### THREE MEASUREMENTS THE PAGE COULD NOT SHIP WITHOUT
+
+`qa/q2-page.js` and `qa/q2-phone.js`, four viewports:
+
+| | 360 px | 1280 px |
+|---|---|---|
+| the card | 338 px | 666 px |
+| the grid | **2 columns of 145** | 4 columns |
+| the type | 8.5 px | 10.5 px |
+| cells outside the card | **0** | **0** |
+| the longest name | **one line** | two lines |
+
+and the one that actually matters: **an unearned cell is exactly as tall as an
+earned one** at every width (30/30, 31/31, 38/38, 38/38), because they are grid
+row siblings. A name arriving lights a cell up where it already was instead of
+reflowing forty of them under the player's eye.
+
+**`hud.forceRep` exists for `forceNoto`'s reason**, and the reason is measured
+below: a chain pays out at most once every fifty seconds, most chains have no
+name, and which name you get is whichever the props to hand allow — so playing
+to a full page is hours of work that still cannot choose what it gets.
+
+### THE VARIETY TERM, AND WHY IT IS THE ONE A MASHER CANNOT FARM
+
+B14's formula could only ask how MUCH trouble you caused. It was written before
+the forty existed. This is the first term that can ask what KIND.
+
+`qa/q2-names.js` — noto-ceiling's directed troublemaker, grab the nearest prop
+and throw it at the nearest person every 0.9 s, three chapters, nine minutes,
+292 throws:
+
+| | |
+|---|---|
+| cards | **12** (6 incidents, 6 scenes, spread 3) |
+| names written | **8** |
+| DISTINCT names | **2** — THE HAT TRICK ×7, KLEPTOMANIA |
+
+Two of forty AT THE CEILING, because the nearest prop is the same prop and the
+same prop three times is THE HAT TRICK every single time. Q1 predicted this
+shape from the random masher and it holds for the directed one.
+
+**WEIGHT 1, AND IT CANNOT RUN AWAY WITH THE TABLE.** A name is only ever
+written on the beat that decides a card is owed — `repName` has one call site —
+so `variety <= names <= inc + scn` is structural, and the term can at most
+double the trouble it is counted beside. `qa/q1-static.cjs` now asserts the one
+writer, because a second one would break the bound silently and the only
+symptom would be a tier table that had quietly stopped meaning what it was
+calibrated to mean.
+
+**MEASURED AGAINST B14's OWN BOUNDARIES**, `qa/q2-foot.js`:
+
+| the file | before | after | tier |
+|---|---|---|---|
+| the measured masher (2 names) | 15 | **17** | a nuisance, unchanged |
+| the same trouble, spread over 8 | 15 | **23** | a nuisance, six from a menace |
+| all forty (40 inc, 20 scn, 12 places) | 72 | **112** | a natural disaster |
+
+So the boundaries do not move for the player they were calibrated on, and the
+top of the table is now reachable two ways — by volume, as it always was, and
+by breadth, which is the point.
+
+### THE LEDGER FOOT SAYS WHICH OF THE TWO YOU WERE
+
+Eight names off twelve cards and eight names off eight cards read the same in
+every number the game had before the forty. So the foot reads the SHAPE of
+`jrRep` rather than its size, and the branch was set by the measurement above:
+
+> 0:07 on the road  ·  **they had one word for most of it: the hat trick**
+
+which is a true and unflattering thing to say about that file, and the sentence
+somebody who went looking never sees. They get *"they had 8 words for what you
+did"*. Silent with nothing to say, on the tier's own rule: a player who caused
+no trouble has not done anything wrong and does not need telling.
+
+**ON EVERY LEDGER, NOT ONLY THE LAST ONE**, unlike the tier. The tier is a
+verdict on a finished journey; this is a description of one that is still going,
+and it is the sentence that tells a player at four names that there is another
+way to be read. Measured at 360 px: two lines at the longest, nothing off the
+card, and the final ledger's three clauses — road, tier, verdict — still fit.
+
+### THE ONE THING THAT MEASURED WRONG
+
+The page built nothing and the fold never appeared. The hook had been anchored
+on `jrAlbBtn.hidden = !albAll().length;`, which occurs **twice** in systems.js —
+and the first of them is `albRefresh`, not `jrRefresh`. So the journal's page
+was rebuilt when the album refreshed. `qa/q1-static.cjs` now asserts that
+`repPage()` has exactly one caller.
+
+### WHAT THIS CLOSES
+
+ROADMAP-NEXT item 4, both halves. Item 5, WISH YOU WERE HERE, is the last one,
+and two numbers are waiting for it: N2's passenger count and O2's "how many
+places know you".
+
 # CAPYBARA SYDNEY — LOCKED MODULE CONTRACT v1
 
 **Do not deviate.** Every developer agent writes exactly ONE file. Any change to this contract

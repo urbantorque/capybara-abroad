@@ -6539,6 +6539,40 @@ function sysBuildCSS() {
   'outline-offset:2px;}',
 '.capyui-jrkeys[open] summary{margin-bottom:9px;}',
 '.capyui-jrkeys .capyui-legend{max-width:none;}',
+/* ---------- THE REPERTOIRE, ON THE JOURNAL (Q2) ----------
+   THE SHELF’S OWN RULE, applied to the forty names: always forty, and the
+   ones you have not found are half of what the page is for. An unearned
+   souvenir is DRAWN but grey and nearly out; an unearned name is drawn as the
+   SHAPE OF THE WORDS — one bar per word, in the width of the word — so you
+   can see that there is something in the box and not what it is, which is the
+   difference between a promise and a spoiler.
+
+   It is a fold on the journal and not a fourth full-screen card. The ledger
+   and the album are full-screen because one is the last word about a journey
+   and the other wants width for photographs; this is a list you scan, the
+   journal is the card it belongs on, and a fourth modal is nine more places
+   in this file that have to be told which card is on top. Styled off the
+   controls’ own summary, so the card has two of one thing and not one of
+   two. */
+'.capyui-repgrid{display:grid;gap:4px;',
+  'grid-template-columns:repeat(auto-fill,minmax(134px,1fr));}',
+'.capyui-repcell{border:1px dashed ' + inkFaint + ';border-radius:' + rSm + ';',
+  'padding:5px 7px;min-height:29px;display:flex;align-items:center;gap:5px;',
+  'font-size:' + tSm + ';font-weight:700;letter-spacing:.06em;line-height:1.2;',
+  'color:' + inkSoft + ';opacity:.55;}',
+/* ...and a name you have been given is the shelf’s `have`: solid rather than
+   dashed, filled rather than empty, at full strength. The same three changes
+   the shelf makes, so the two surfaces read as the same kind of thing. */
+'.capyui-repcell.have{opacity:1;border-style:solid;border-color:' + rule + ';',
+  'background:' + veil2 + ';color:' + ink + ';}',
+/* the silhouette. Widths are written per word by repPage; .52em a letter is
+   about the mean advance of this face in capitals at this size. */
+'.capyui-repbar{display:inline-block;height:.66em;border-radius:2px;',
+  'background:' + inkFaint + ';}',
+/* how many times, and only past the first: a 1 beside every name you have is
+   a column of ones. */
+'.capyui-repn{margin-left:auto;padding-left:4px;font-size:' + tXs + ';',
+  'color:' + accentInk + ';font-variant-numeric:tabular-nums;}',
 
 /* ---------- title card ---------- */
 /* align-items:flex-start, not center: a centred flex child that is TALLER than
@@ -20533,9 +20567,16 @@ export function createSystems(game) {
     // has just finished. The tier is said here as a SENTENCE rather than as
     // the chip above, because this is the one time it is a verdict.
     const road = sysFmtTime(jrTotalMs()) + ' on the road';
-    ledFoot.textContent = (ledFinal && noto)
-      ? road + '  ·  you leave as ' + notoName()
-      : road;
+    // ---- ...AND WHICH OF THE TWO YOU WERE (Q2) -------------------------
+    // On EVERY ledger and not only the last one, unlike the tier: the tier is
+    // a verdict on a finished journey, and this is a description of one that
+    // is still going — "they had one word for most of it" is a thing a player
+    // wants to read at four names, because it is the sentence that tells them
+    // there is a way to be read differently. See repVerdict.
+    const verdict = repVerdict();
+    ledFoot.textContent = road +
+      ((ledFinal && noto) ? '  ·  you leave as ' + notoName() : '') +
+      (verdict ? '  ·  ' + verdict : '');
     // A journey of nowhere is still a card, and it should say something.
     if (!rows) {
       const row = sysEl('div', 'capyui-ledrow');
@@ -20807,6 +20848,33 @@ export function createSystems(game) {
     if (from && from !== document.body) albReturnFocus = from;
   });
   jrCard.appendChild(jrAlbBtn);
+  // ---- THE REPERTOIRE (Q2) ----------------------------------------------
+  // Q1 gave forty chains a name, put it on the card and on the save, and gave
+  // the player NO WAY TO SEE THE SET — which makes forty names forty
+  // accidents rather than a thing to go looking for. This is the set: the
+  // shelf’s rule (always forty, the empty ones are half of it) on the
+  // controls’ own fold, so it costs one line on the card until it is opened.
+  //
+  // HIDDEN UNTIL THE FIRST NAME, like the album’s button and for the same
+  // reason: a fold reading "0 of 40" over a system the player has never met is
+  // a nag about a thing they have not been told exists. SAME AGAIN is the
+  // entry tier by construction (see sysREP), so the page introduces itself the
+  // first time a chain gets a word.
+  const jrRepDet = sysEl('details', 'capyui-jrkeys capyui-jrrep');
+  const jrRepSum = sysEl('summary');
+  jrRepSum.appendChild(sysGlyphEl('chev'));
+  const jrRepSumT = document.createTextNode('the repertoire');
+  jrRepSum.appendChild(jrRepSumT);
+  jrRepDet.appendChild(jrRepSum);
+  const jrRepGrid = sysEl('div', 'capyui-repgrid');
+  // A list, and the cells are `listitem` rather than nothing: an unearned cell
+  // has no text in it at all — it is four coloured bars — so without this a
+  // screen reader is handed forty empty boxes.
+  jrRepGrid.setAttribute('role', 'list');
+  jrRepGrid.setAttribute('aria-label', 'named stunts');
+  jrRepDet.appendChild(jrRepGrid);
+  jrRepDet.hidden = true;
+  jrCard.appendChild(jrRepDet);
   jrCard.appendChild(jrKeys);
   jrCard.appendChild(jrFoot);
 
@@ -20878,6 +20946,9 @@ export function createSystems(game) {
     // The album's button appears the moment there is a first picture in it and
     // never before. See where it is built.
     try { jrAlbBtn.hidden = !albAll().length; } catch (e) { /* pre-init */ }
+    // ...and the forty names, on exactly the same terms: a fold that is only
+    // on the card once there is something in it. See repPage.
+    repPage();
     let done = 0;
     for (const k in taskRec) if (taskRec[k].done) done++;
     let places = 0;
@@ -25053,6 +25124,40 @@ export function createSystems(game) {
   // failure this formula exists to avoid. At one it rewards travelling without
   // ever outweighing the trouble itself.
   const sysNOTO_SPREAD = 1;    // a place that has heard of you at all
+  // ---- ...AND VARIETY, WHICH IS THE TERM B14 COULD NOT HAVE HAD (Q2) ----
+  //
+  // The count of DISTINCT names this journey holds — see sysREP. B14 was
+  // written before the forty existed and its formula could only ask how MUCH
+  // trouble you caused; this is the first term that can ask what KIND, and it
+  // is the difference between a masher and a stylist.
+  //
+  // IT IS THE ONE TERM A MASHER CANNOT FARM, and that is measured rather than
+  // hoped for. `qa/q2-names.js`, the directed troublemaker — grab the nearest
+  // prop, throw it at the nearest person, every 0.9 s — three chapters, nine
+  // minutes, 292 throws:
+  //
+  //   twelve cards ..................  6 incidents, 6 scenes, spread 3
+  //   names written .................  8
+  //   DISTINCT names ................  2   (THE HAT TRICK x7, KLEPTOMANIA)
+  //
+  // Two of forty, at the ceiling, because the nearest prop is the SAME prop
+  // and the same prop three times is THE HAT TRICK every single time. Variety
+  // asks for the thing a masher structurally does not do: put its hands on
+  // different things.
+  //
+  // WEIGHT 1, AND IT CANNOT RUN AWAY WITH THE TABLE. A name is only ever
+  // written on a beat that also increments `inc` or `scn` (repName is called
+  // from the one line in incAdd that decides a card is owed), so
+  //
+  //     variety <= names written <= inc + scn
+  //
+  // is a structural bound, not a hope: the term can at most double the trouble
+  // it is counted beside. On the measured file above it is 15 -> 17, which is
+  // the same tier — so the boundaries B14 calibrated do not move for the
+  // player they were calibrated on. At the other end, all forty names cost at
+  // least forty cards, so a full page is a natural disaster twice over, which
+  // is the correct verdict on somebody who has been everything to everyone.
+  const sysNOTO_VAR = 1;       // a name nobody had had out of you before
   const sysNOTO_TIERS = [
     { at:  0, name: '' },
     { at:  3, name: 'a rumour' },
@@ -25072,8 +25177,13 @@ export function createSystems(game) {
     for (let n = 1; n <= chapMax; n++) {
       if ((jrChapInc[n] || 0) > 0 || (jrChapScene[n] || 0) > 0) spread++;
     }
-    return { inc: inc, scn: scn, spread: spread,
-             score: inc + scn + spread * sysNOTO_SPREAD };
+    // `repFound` is declared with the table it reads, a long way below this —
+    // a hoisted function declaration, on the same terms as incAdd calling
+    // repName. Nothing in this file asks for the number before the module has
+    // finished building, and nothing may start to.
+    const variety = repFound();
+    return { inc: inc, scn: scn, spread: spread, variety: variety,
+             score: inc + scn + spread * sysNOTO_SPREAD + variety * sysNOTO_VAR };
   }
   /** 0-5. Zero is "nobody has heard of you", and it has no name on purpose. */
   function notoTier(score) {
@@ -30977,7 +31087,8 @@ export function createSystems(game) {
     notoAudit: function () {
       const a = notoScore();
       const t = notoTier(a.score);
-      return { inc: a.inc, scn: a.scn, spread: a.spread, score: a.score,
+      return { inc: a.inc, scn: a.scn, spread: a.spread, variety: a.variety,
+               score: a.score,
                tier: t, name: notoName(t),
                next: sysNOTO_TIERS[t + 1] ? sysNOTO_TIERS[t + 1].at : null,
                tiers: sysNOTO_TIERS.map(function (r) { return [r.at, r.name]; }) };
@@ -31013,6 +31124,31 @@ export function createSystems(game) {
       }
       saveSoon();
       return this.notoAudit();
+    },
+    /**
+     * THE SAME HOOK FOR THE FORTY NAMES (Q2), and it exists for forceNoto's
+     * reason exactly: a chain pays out at most once every fifty seconds
+     * (sysINC_COOL), most chains have no name at all, and the ones that do are
+     * whichever names the props to hand allow — so a probe that wanted to look
+     * at a full page, or at the longest name on a phone, would have to play for
+     * hours and still could not choose what it got.
+     *
+     * A TEST HOOK, NEVER A VERB: it writes the counts and saves them, which is
+     * what the chains would have left behind, and it does nothing else — no
+     * card, nobody says anything, and the notoriety it moves is the notoriety
+     * those names would have been worth. Unknown ids are dropped rather than
+     * stored, so a probe cannot invent a forty-first name.
+     */
+    forceRep: function (counts) {
+      for (const k in jrRep) delete jrRep[k];
+      const known = Object.create(null);
+      for (let i = 0; i < sysREP.length; i++) known[sysREP[i].id] = 1;
+      for (const k in (counts || {})) {
+        const n = counts[k] | 0;
+        if (known[k] && n > 0) jrRep[k] = n;
+      }
+      saveSoon();
+      return game.repDebug();
     },
     setMuted: setMuted,
     setMusicMuted: setMusicMuted,
@@ -31675,7 +31811,10 @@ export function createSystems(game) {
       }
       return { id: m ? m.id : null, name: m ? m.name : null, all: all };
     }
-    const out = { n: sysREP.length, found: 0, counts: {}, ring: repRing() };
+    // `ids` so a probe can name the whole table without hard-coding forty
+    // strings that go stale the moment a name is added or renamed (Q2).
+    const out = { n: sysREP.length, found: 0, counts: {}, ring: repRing(),
+                  ids: sysREP.map(function (p) { return p.id; }) };
     for (const k in jrRep) { out.counts[k] = jrRep[k]; if (jrRep[k] > 0) out.found++; }
     out.last = repLast;
     return out;
@@ -31713,6 +31852,83 @@ export function createSystems(game) {
     return p;
   }
 
+  /** How many of the forty this journey holds. Also notoriety's fourth term. */
+  function repFound() { let n = 0; for (const k in jrRep) if (jrRep[k] > 0) n++; return n; }
+  /**
+   * WHICH OF THE TWO YOU WERE (Q2), for the foot of the ledger.
+   *
+   * The ledger's last line has always said how long you were out and, at the
+   * end, what the places think of you. Neither of those can tell the two
+   * players apart that this batch exists to tell apart: eight names off twelve
+   * cards and eight names off eight cards read the same in every number the
+   * game had before the forty.
+   *
+   * So it is the shape of jrRep rather than its size. MEASURED, and the
+   * measurement is what set the branch: the directed troublemaker of
+   * `qa/q2-names.js` came away with EIGHT names that were TWO names — seven
+   * hat tricks and one kleptomania — because the nearest prop is the same prop.
+   * "One word for most of it" is a true and unflattering thing to say about
+   * that file, and it is the sentence somebody who went looking never sees.
+   *
+   * Silent with nothing to say, like the tier below 1: a player who caused no
+   * trouble has not done anything wrong and does not need telling.
+   */
+  function repVerdict() {
+    let variety = 0, total = 0, topN = 0, topId = '';
+    for (const k in jrRep) {
+      const n = jrRep[k] || 0;
+      if (n <= 0) continue;
+      variety++; total += n;
+      if (n > topN) { topN = n; topId = k; }
+    }
+    if (!variety) return '';
+    if (total >= 3 && variety <= 2) {
+      let nm = '';
+      for (let i = 0; i < sysREP.length; i++) if (sysREP[i].id === topId) nm = sysREP[i].name;
+      // ...and lower-cased, for repName's reason: the table stores the names
+      // the way the card sets them and nobody speaks in capitals.
+      return 'they had one word for most of it: ' + nm.toLowerCase();
+    }
+    return variety === 1 ? 'they had a word for what you did'
+                         : 'they had ' + variety + ' words for what you did';
+  }
+  /**
+   * THE PAGE (Q2). Rebuilt from nothing every time the journal opens — the
+   * ledger’s leaves are, for the same reason: it is forty divs once per card
+   * open, and the alternative is a page that goes stale in exactly the case
+   * nobody tests, which is the name earned while the journal was shut.
+   *
+   * Reads jrRep and writes nothing. The fold is hidden with nothing in it, so
+   * the summary is only ever written when there is a count to put in it.
+   */
+  function repPage() {
+    const found = repFound();
+    jrRepDet.hidden = !found;
+    if (!found) return;
+    jrRepSumT.nodeValue = 'the repertoire  ·  ' + found + ' of ' + sysREP.length;
+    while (jrRepGrid.firstChild) jrRepGrid.removeChild(jrRepGrid.firstChild);
+    for (let i = 0; i < sysREP.length; i++) {
+      const p = sysREP[i], n = jrRep[p.id] || 0;
+      const c = sysEl('div', 'capyui-repcell' + (n ? ' have' : ''));
+      c.setAttribute('role', 'listitem');
+      if (n) {
+        c.appendChild(sysEl('span', null, p.name));
+        if (n > 1) c.appendChild(sysEl('span', 'capyui-repn', '×' + n));
+      } else {
+        // THE SILHOUETTE. One bar per word, in the width of the word: the
+        // count of words and the length of each is the shape of a name, and
+        // it is everything about it that is not the name itself.
+        const words = p.name.split(' ');
+        for (let w = 0; w < words.length; w++) {
+          const b = sysEl('i', 'capyui-repbar');
+          b.style.width = (words[w].length * 0.52).toFixed(2) + 'em';
+          c.appendChild(b);
+        }
+        c.setAttribute('aria-label', 'not found yet');
+      }
+      jrRepGrid.appendChild(c);
+    }
+  }
   function incTick(dt) {
     if (incCool > 0) incCool -= dt;
     if (incT >= 0) {

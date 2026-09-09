@@ -203,8 +203,40 @@ const need = [
   [sys, "'water', wp.type", 'the water handler does not say what it was'],
   [sys, "'break', dp.type", 'the destroy handler does not say what it was'],
   [sys, "'theft', gp.type", 'the grab handler does not say what it was'],
+  // ---- and the second half of the item (Q2) ----------------------------
+  [sys, 'function repPage()', 'there is no journal page'],
+  [sys, "sysEl('div', 'capyui-repcell'", 'the page draws no cells'],
+  [sys, "'.capyui-repbar{", 'the silhouette has no bar to draw'],
+  [sys, 'const variety = repFound();', 'notoriety does not count the names'],
+  [sys, 'variety * sysNOTO_VAR', 'the variety term is counted and not scored'],
+  [sys, 'function repVerdict()', 'the ledger has no verdict to print'],
+  [sys, 'const verdict = repVerdict();', 'the ledger foot never asks for it'],
+  [sys, 'forceRep: function', 'there is no way to seed a page for a probe'],
 ];
 for (const [hay, needle, why] of need) if (hay.indexOf(needle) < 0) fail(why);
+
+// ---- THE ONE THING THAT WOULD BREAK NOTORIETY'S BOUND (Q2) ---------------
+// `variety <= inc + scn` holds because a name is only ever written on the beat
+// that decides a card is owed — which is to say `repName` is called from
+// exactly one place. A second call site anywhere would let the fourth term
+// outrun the three it is weighed against, silently, and the only symptom would
+// be a tier table that has quietly stopped meaning what it was calibrated to
+// mean. One definition, one call.
+{
+  const calls = (sys.match(/repName\(/g) || []).length;
+  if (calls !== 2) {
+    fail('repName appears ' + calls + ' times (1 definition + 1 call expected); ' +
+         'notoriety’s variety term is only bounded while there is one writer');
+  }
+}
+// ...and the page is built from exactly one place, for the reason it was built
+// from the WRONG one first: `jrAlbBtn.hidden = ...` occurs twice in this file
+// and the first of them is albRefresh, so the hook landed on the album's
+// refresh and the fold never appeared at all.
+{
+  const calls = (sys.match(/\brepPage\(\);/g) || []).length;
+  if (calls !== 1) fail('repPage() is called ' + calls + ' times; the journal is the one caller');
+}
 
 console.log(bad ? bad + ' FAILURES' : 'the repertoire checks out' + (warn ? ' (' + warn + ' warnings)' : ''));
 process.exit(bad ? 1 : 0);
