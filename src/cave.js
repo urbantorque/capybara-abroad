@@ -1360,6 +1360,16 @@ function cavBuildExit(game, root) {
     }).clone());
     sky.position.set(0, (SILL + HEAD) * 0.5 + 1, ZO - 5);
     sky.frustumCulled = false;
+    // ---- NAMED, AND THE REASON IS AN AUDIT THAT COULD NOT ------------
+    // ROADMAP-PHYSICS X9 left three wall-shaped faces whose "builders are
+    // not identified", and the one it said mattered most was a 32 x 15.6 m
+    // slab at z −200 in this chapter — which is the jungle silhouette forty
+    // lines below. It could not be named because every mesh this function
+    // adds went in anonymous, so the audit could only report
+    // `Mesh < cave < Scene`. Göreme's rows in the same audit came back as
+    // `gorValley` and `gorCliff`, because goreme.js names what it builds.
+    // Four names, and the next audit answers its own question.
+    sky.name = 'cavExitSky';
     root.add(sky);
     // a band of haze along the bottom of it, which is what a valley floor
     // seen from inside a mountain at eight in the morning actually is
@@ -1372,6 +1382,7 @@ function cavBuildExit(game, root) {
     hz.position.set(0, SILL + 2.4, ZO - 4.6);
     hz.renderOrder = 4;
     hz.frustumCulled = false;
+    hz.name = 'cavExitHaze';
     root.add(hz);
   }
   {
@@ -1395,6 +1406,17 @@ function cavBuildExit(game, root) {
     S.box(0, SILL - 3.2, ZO - 3.0, HW * 2 + 8, 4.0, 1.2, PALETTE.cavRockDk, 0, 0, 0);
     const sm = new THREE.Mesh(S.build(), mat(0xffffff, { vertexColors: true }));
     sm.frustumCulled = false;
+    // THIS IS X9's SLAB, and it is scenery on purpose. MEASURED
+    // (`qa/px-cave-slab.js`, `qa/px-cave-sill.js`): it stands three metres
+    // beyond the OUTER face of a fourteen-metre wall whose INNER face is
+    // solid — driven at hard from the passage floor and from sill height,
+    // the animal stops dead at z −182.3 every time. The gap over the sill is
+    // 2.8 m above that floor and the best hop the game has peaks at 13.86,
+    // 1.44 m short, from a standing start, a run and a long run alike. And
+    // there is no collided floor out there at all: placed at z −198 the
+    // animal falls and the rescue puts it back by the river. Colliding a
+    // backdrop behind a solid wall would buy a static body and nothing else.
+    sm.name = 'cavExitJungle';
     root.add(sm);
   }
 
@@ -1523,6 +1545,10 @@ function cavBuildExit(game, root) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
+  // The reveal, the lintel, the fangs and the rubble. Solid by the TERRAIN
+  // rather than by a collider of its own — which is why the walk stops at the
+  // inner face and not at the drawn one. Named for the audit's sake.
+  mesh.name = 'cavExitRock';
   root.add(mesh);
 
   // ---- THE DUST IN IT ----------------------------------------------------

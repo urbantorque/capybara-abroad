@@ -1,3 +1,75 @@
+## THE CAVE SLAB — A DECISION, NOT A FIX (9 Sep 2026)
+
+**ROADMAP-PHYSICS X9 left three named faces and a decision, and said this one
+mattered most:** *"the Cave's 32 × 15.6 m slab at z −200 is wall-shaped,
+unsolid, and its builder is not identified. A 32 m face at the end of a chamber
+that is not solid is a way out of the mountain."*
+
+**It is not a way out of the mountain. It is scenery behind a solid wall, and
+it stays open.** Measured before anything was collided, because the cheapest
+possible outcome of this item was a static body bought for nothing.
+
+### 1. THE BUILDER, IDENTIFIED
+
+It is the jungle silhouette in `cavBuildExit` — the twenty-six dark cylinders
+and the hillside lip that stand three metres in front of the bright plane,
+because *"one thing between you and the light is the whole difference between a
+doorway and a lamp."* The audit could not name it for one reason: **every mesh
+that function adds went in anonymous**, so a probe could only report
+`Mesh < cave < Scene`. Göreme's rows in the same audit came back as `gorValley`
+and `gorCliff`, because goreme.js names what it builds and cave.js named one
+thing, the root.
+
+Four names, and the next audit answers its own question: `cavExitSky`,
+`cavExitHaze`, `cavExitJungle` (X9's slab) and `cavExitRock`.
+
+### 2. THE WALL IN FRONT OF IT IS SOLID
+
+`qa/px-cave-slab.js`. The slab sits beyond the OUTER face of a fourteen-metre
+wall (`ZI −183`, `ZO −197`), and the inner face is collided:
+
+| driven hard at the wall | stops at |
+|---|---|
+| along the passage floor, from z −160 | **z −182.3** |
+| level with the sill, from z −175 | **z −182.3** |
+| a long run, from z −172 | **z −182.4** |
+
+A physics ray down the passage at chest height hits a body at exactly 8 m from
+z −175 — the inner face. The animal never gets within seventeen metres of the
+slab.
+
+### 3. THE ONE PATH LEFT IS 1.44 m TOO HIGH
+
+The slot is a hole through that wall, and a hole is not solid — so the question
+is whether the animal can get up into it. `qa/px-cave-sill.js`: the sill is at
+y 15.3, the passage floor under it is at 12.5, and the best hop this game has
+peaks at **13.86** — from a standing start, from a run and from a long run
+alike, all three identical, because the wall stops the run before the hop.
+Nothing on that floor is a step: the rubble on the sill is drawn into the
+exit's merger and has no collider, which is the same reason the slab has none.
+
+### 4. AND THERE IS NO FLOOR OUT THERE ANYWAY
+
+Placed at z −198 by force, the animal **falls and the stuck-rescue puts it back
+by the river at z +42**. `cavTerrain` answers 12.5 out there, but the collider
+does not reach it — beyond about z −19x the region is outside the collided
+world entirely, and the rescue is the net that already covers it.
+
+### WHY IT STAYS OPEN
+
+Colliding a 32 m backdrop that stands behind a solid wall, seventeen metres past
+the furthest point the animal can reach, buys a static body and nothing else.
+The audit's sample at (−17, −200) was a position a probe teleported to, not a
+position a player can occupy — which is the standing hazard with a grid-sampled
+wall audit and is worth remembering the next time one runs.
+
+**What is NOT closed by this.** Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18 is
+the same class of finding and has not been looked at; Pasto's twelve bunting
+posts are still the judgement call X9 left; and the `recessed` category has
+still never been re-measured. Cave.js is also still a chapter of anonymous
+meshes apart from these four — the inner face the walk stops against is one of
+them, and naming the shell is a bigger job than this decision needed.
+
 ## THE NEXT PASS, BATCH ELEVEN — THE CONTACT SHEET (W2 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 5, second batch, and it closes the item and the roadmap.**

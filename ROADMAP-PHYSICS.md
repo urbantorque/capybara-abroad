@@ -142,7 +142,7 @@ Named (`qa/px-x5-name14.js`), the fourteen are mostly *not* defects:
 | Göreme (−37, 20), the 135 × 37 × 124 valley mesh | 1 | relief, already disqualified above |
 | **Pasto's bunting posts** | 2 | real, and a judgement call |
 | **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18** | 2 | real, builder not yet identified |
-| **Cave's 32 × 15.6 m slab at z −200** | 1 | real, builder not yet identified |
+| ~~**Cave's 32 × 15.6 m slab at z −200**~~ | 1 | **SETTLED 9 Sep 2026 — `cavExitJungle`, scenery behind a solid wall. Stays open. See CONTRACT.md.** |
 | Cali (67, −30) | 1 | no hit on the naming pass — moving |
 
 **The one with a name is the one worth arguing about.** `pastoBuildBunting` hangs
@@ -1439,10 +1439,23 @@ urgent, and none of them safe for a probe to settle on its own:
 - **Pasto's twelve bunting posts** are drawn and not solid, at 22 cm square.
   Collide them or write down that thin plaza furniture stays open — either is
   defensible, and the contract should say which.
-- **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19** and **the Cave's
-  32 × 15.6 m slab at z −200** are wall-shaped, unsolid, and their builders are
-  not identified. The Cave one matters most: a 32 m face at the end of a chamber
-  that is not solid is a way out of the mountain.
+- **Kyoto's 32 × 22 × 2.4 m mesh at x −50…−18, z −3…19** and ~~**the Cave's
+  32 × 15.6 m slab at z −200**~~ are wall-shaped, unsolid, and their builders are
+  not identified. ~~The Cave one matters most: a 32 m face at the end of a chamber
+  that is not solid is a way out of the mountain.~~
+
+  **THE CAVE ONE IS SETTLED, 9 Sep 2026, AND IT IS NOT A WAY OUT OF THE
+  MOUNTAIN.** It is `cavExitJungle`, the silhouette in front of the bright plane
+  in `cavBuildExit`, and it stands beyond the OUTER face of a fourteen-metre
+  wall whose inner face is solid: driven at hard from the passage floor and from
+  sill height, the animal stops at z −182.3 every time, seventeen metres short of
+  it. The slot over the sill is 2.8 m up and the best hop the game has peaks at
+  13.86 — 1.44 m short, identically from a standstill, a run and a long run.
+  Placed out there by force it falls and the rescue returns it. **It stays open,
+  and the four meshes in that function are named now** — the audit could not
+  identify a builder because every one of them went in anonymous, which is the
+  transferable finding. `qa/px-cave-slab.js`, `qa/px-cave-sill.js`, CONTRACT.md.
+  Kyoto's is untouched and is the same class of question.
 - The audit's `recessed` category was never re-measured at all. Pasto (−23, 40)
   shows the shape — drawn face at 0.39 m, collider at 3.60 — and X9 only noticed
   it in passing.
