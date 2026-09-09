@@ -431,7 +431,7 @@ function monInitGeos() {
 /** CONTRACT: box() takes FULL extents; CANNON.Box takes HALF. */
 function monMerger() {
   const M = makeMerger(monG, {
-    xform: monXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+    xform: monXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.060,
   });
   /** A quad, wound so the normal is +y before the transform. Roofs and roads.
    *  World-space corners, so it writes the buffers itself — see hanMerger. */

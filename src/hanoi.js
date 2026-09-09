@@ -300,7 +300,7 @@ function hanInitGeos() {
  */
 function hanMerger() {
   const M = makeMerger(hanG, {
-    xform: hanXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+    xform: hanXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.060,
   });
   /** Four corners in order, as one flat quad. The shared merger cannot express
    *  this: every shape it has is a unit primitive under a transform, and this

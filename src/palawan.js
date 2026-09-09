@@ -256,7 +256,7 @@ function palInitGeos() {
  *  below speaks THIS one so the two cannot end up a factor of two apart. */
 function palMerger() {
   const M = makeMerger(palG, {
-    xform: palXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+    xform: palXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.042,
   });
   /** A flat horizontal facet. Two triangles, not twelve. See palG.quad. */
   M.quad = function (cx, cy, cz, sx, sz, color, ry) {

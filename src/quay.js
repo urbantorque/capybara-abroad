@@ -326,7 +326,7 @@ function quayInitGeos() {
  */
 function quayMerger() {
   return makeMerger(quayG, {
-    xform: quayXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: quayXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
 }
 

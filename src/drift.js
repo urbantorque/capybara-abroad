@@ -330,7 +330,7 @@ function driInitGeos() {
 function driMerger() {
   // FULL extents in. CANNON.Box takes HALF; driStaticBox does the halving.
   const M = makeMerger(driG, {
-    xform: driXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: driXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.040,
   });
   M.oct = function (cx, cy, cz, s, color, rx, ry, rz) {
     return M.add(driG.oct, driXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);

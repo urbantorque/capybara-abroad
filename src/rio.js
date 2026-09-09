@@ -188,7 +188,7 @@ function rioInitGeos() {
  */
 function rioMerger() {
   return makeMerger(rioG, {
-    xform: rioXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: rioXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
 }
 /**

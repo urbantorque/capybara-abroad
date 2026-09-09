@@ -326,7 +326,7 @@ function venInitGeos() {
  */
 function venMerger() {
   return makeMerger(venG, {
-    xform: venXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: venXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.060,
   });
 }
 /**

@@ -276,7 +276,7 @@ function gorInitGeos() {
  *  below speaks THIS one so the two cannot end up a factor of two apart. */
 function gorMerger() {
   const M = makeMerger(gorG, {
-    xform: gorXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+    xform: gorXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.060,
   });
   /** A flat horizontal facet. See gorG.quad — two triangles, not twelve. */
   M.quad = function (cx, cy, cz, sx, sz, color, ry) {

@@ -281,7 +281,7 @@ function panInitGeos() {
  *  speaks this one so the drawn thing and the solid thing cannot differ by 2x. */
 function panMerger() {
   const M = makeMerger(panG, {
-    xform: panXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+    xform: panXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.050,
   });
   /** A flat quad standing upright, w wide and h tall, centred on (cx,cy,cz).
    *  Only ever useful on a DoubleSide material — see panVCL.

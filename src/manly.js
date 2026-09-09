@@ -283,7 +283,7 @@ function manInitGeos() {
  *  speaks THIS one so the drawn thing and the solid thing cannot differ by 2x. */
 function manMerger() {
   return makeMerger(manG, {
-    xform: manXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+    xform: manXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.052,
   });
 }
 

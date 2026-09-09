@@ -307,7 +307,7 @@ function iceInitGeos() {
 /** Vertex-coloured geometry merger — one draw call per merged batch. */
 function iceMerger() {
   const M = makeMerger(iceG, {
-    xform: iceXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: iceXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
   M.tet = function (cx, cy, cz, s, color, rx, ry, rz) {
     return M.add(iceG.tet, iceXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, s, s, s), color);

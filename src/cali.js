@@ -246,7 +246,7 @@ function caliInitGeos() {
 
 function caliMerger() {
   return makeMerger(caliG, {
-    xform: caliXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: caliXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
   });
 }
 /**

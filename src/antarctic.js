@@ -358,7 +358,7 @@ function antInitGeos() {
 /** CONTRACT: box() takes FULL extents; CANNON.Box takes HALF. */
 function antMerger() {
   return makeMerger(antG, {
-    xform: antXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+    xform: antXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.030,
   });
 }
 

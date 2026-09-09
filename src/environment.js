@@ -363,7 +363,7 @@ function envMerger(base) {
   // per-vertex ones in addC below.
   const M = makeMerger(envG, {
     xform: envXform, cylSegs: [4, 8], coneSegs: [], sphSegs: [],
-    normals: 'keep', tint: function (c) { envDeTint(c, base); },
+    normals: 'keep', jitter: 0.050, tint: function (c) { envDeTint(c, base); },
   });
   const envC = new THREE.Color();
   /** like add(), but the geometry brings its own per-vertex `color`. */

@@ -237,7 +237,7 @@ function hkInitGeos() {
  *  below speaks THIS one so the two cannot be a factor of two apart. */
 function hkMerger() {
   return makeMerger(hkG, {
-    xform: hkXform, cylSegs: [4, 8, 16], coneSegs: [], sphSegs: [], normals: 'recompute',
+    xform: hkXform, cylSegs: [4, 8, 16], coneSegs: [], sphSegs: [], normals: 'recompute', jitter: 0.065,
   });
 }
 /**

@@ -271,7 +271,7 @@ function cavInitGeos() {
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF. */
 function cavMerger() {
   return makeMerger(cavG, {
-    xform: cavXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+    xform: cavXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute', jitter: 0.040,
   });
 }
 

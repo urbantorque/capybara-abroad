@@ -175,7 +175,7 @@ function kyoInitGeos() {
 
 function kyoMerger() {
   return makeMerger(kyoG, {
-    xform: kyoXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: kyoXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.060,
   });
 }
 /**

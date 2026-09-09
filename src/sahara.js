@@ -276,7 +276,7 @@ function sahNoShadowOnGhosts(root) {
 
 function sahMerger() {
   return makeMerger(sahG, {
-    xform: sahXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute',
+    xform: sahXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.058,
   });
 }
 /**
