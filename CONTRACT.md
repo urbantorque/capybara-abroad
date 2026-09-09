@@ -1,3 +1,97 @@
+## THE RECESSED CATEGORY, RE-MEASURED (9 Sep 2026)
+
+**ROADMAP-PHYSICS X9's last open item**, and the one it said had *"never been
+re-measured at all"*: a collider sitting BEHIND its own drawn face, so you walk
+into a cliff before anything stops you. Thirty-two samples across ten chapters.
+
+### THE AUDIT'S NUMBER IS NOT THE PLAYER'S NUMBER
+
+The original instrument compared two rays from one point — a drawn hit at `dg`,
+a physics hit at `pd` — and called `pd − dg > 0.7` recessed. That is a fact
+about two rays. What a player meets is how far their own body ends up **inside**
+the drawn surface, and nobody had measured it. `qa/px-recessed.js` re-walks all
+thirty-two: stand at the sample, look for the drawn face again, drive at it
+until it stops, and see where the nose finished.
+
+### THIRTY-TWO SAMPLES, AND MOST OF THEM ARE NOT DEFECTS
+
+| verdict | n | |
+|---|---|---|
+| the drawn face has gone | **8** | nothing within 6 m of that point now |
+| nothing stops you at all | **3** | the animal walked 7, 25 and 29 m |
+| **the numbers move between identical runs** | **7** | see below |
+| stops you outside the face | 9 | ≤ 0.24 m, which is skin |
+| **real, repeatable, and fixed** | **5** | the Göreme cliff |
+| real, repeatable, left | 4 | a box inside a tapered rock |
+
+**SEVEN OF THEM ARE NOT MEASUREMENTS.** All five Drift rows, plus Iceland
+(36, 133) and Cali (18, 45), gave different answers on three identical runs —
+Drift (−47, −110) read −0.35, 1.71 and 1.68 m, and its drawn face moved from
+2.99 m away to 0.96. Those chapters' geometry MOVES: the Drift is a chapter of
+floating islands. A fixed-coordinate sample there means a different thing every
+time it is taken, and the original audit sampled a grid at one instant. Göreme's
+cliff and Kowloon, by contrast, repeated to two decimal places across all three
+runs.
+
+### THE ONE REAL CAUSE, AND IT IS ONE LINE
+
+Five of the six repeatable Göreme rows are `gorCliff`, and both halves of it
+were in the collider loop:
+
+- **The face is a curve and six boxes cannot follow it.** `faceX(z)` is two
+  sines with a maximum slope of 0.22 m per metre, and each box took faceX at
+  its OWN CENTRE across an 8.4 m span — so wherever the face bulged east inside
+  a box, the drawn rock stood proud of its own collider by up to 0.92 m.
+- **And the row stopped short of the rock.** The ribs are drawn from `C.z0 − 4`
+  in 3.1 m slabs, putting the massif's south face at z −71.55, while the
+  collider row began at −70.2. That 1.35 m is the whole of what the four
+  samples along z −72 were reporting, and they were walking at the cliff's END
+  rather than at its face.
+
+Both fixed together: the east face is now the **furthest east the drawn face
+gets anywhere in the box's own span**, sampled rather than evaluated once, so
+being inside the rock is impossible by construction; the boxes are four metres
+rather than eight, so the price — stopping slightly short where the face
+recedes inside a span — is at most 0.48 m instead of 0.92; and the row runs
+from `C.z0 − 6.5` so it reaches the end of the drawn massif.
+
+| sample | before | after |
+|---|---|---|
+| (−71, −37) | 1.01 m inside | **−0.41** (stops outside) |
+| (−90, −72) | 1.03 | **0.16** |
+| (−87, −72) | 1.03 | **0.15** |
+| (−85, −72) | 1.03 | **0.15** |
+| (−73, −72) | 1.03 | **0.16** |
+| (−71, −15) | 1.42 | 0.82 — see below |
+
+Fifteen boxes where there were six. `qa/px-goreme-foot.js` walks the whole foot
+of the cliff at half-metre steps, 396 positions from the collider's own face out
+to six metres east: **0 inside geometry, 0 shoved**. Pushing the face east has
+not swallowed any ground you could stand on.
+
+### WHAT IS LEFT, NAMED PRECISELY
+
+- **(−71, −15), 0.82 m — the talus.** Arithmetic rather than a guess: at z −15,
+  `faceX` is −76.30, the batter tapers reach −73.70, and the drawn hit is at
+  −72.55 — east of the taper, inside the band where `M.sph` scatters **46
+  boulders 0.5 to 2 m across, drawn and not collided**. That is the bunting-post
+  question again with a bigger object, and it is a separate call: forty-six
+  bodies at the foot of a cliff is a snag risk in a way twelve posts at a
+  plaza's rim was not.
+- **goreme (−21, −2) 1.14, kowloon (13, −60) 1.32, goreme (−42, 65) 0.72,
+  goreme (−4, 53) 0.54** — each is a single axis-aligned box inside a tapered
+  rock (a 2.9 m box in a 68 m mesh, a 16 m box in the 111 m valley mesh). A box
+  inside a cone is recessed at every corner by construction. Making colliders
+  follow silhouettes is a different project from fixing a loop.
+
+### AND THE INSTRUMENT ITSELF
+
+The lesson is the same one the Cave and Kyoto findings made, one level up: a
+grid-sampled audit records a coordinate and a distance, and neither says whether
+a player can stand there, whether the geometry is still there, or whether it
+holds still between two runs. **Of thirty-two rows, eighteen were answered by
+re-walking them rather than by fixing anything.**
+
 ## PASTO'S BUNTING POSTS — COLLIDED (9 Sep 2026)
 
 **The last of ROADMAP-PHYSICS X9's three, and the one it explicitly refused to

@@ -2031,10 +2031,38 @@ function gorBuildCliff(game, root) {
   // faceX - 0.2. Everything in front of that line was rock you walked into and
   // through, which was ten of Goreme's forty-one hits along x -70 to -75. The
   // west face is left where it was; it is inside the hill either way.
-  for (let z = C.z0 - 4; z < C.z1 + 4; z += 8) {
-    const g = gorTerrain(C.x, z);
-    gorStaticBox(game, faceX(z + 4) - 9.8, g + C.top * 0.5 + 4, z + 4,
-                 24.8, C.top + 22, 8.4);
+  //
+  // ...AND THE FACE IS A CURVE, WHICH SIX BOXES CANNOT FOLLOW (9 Sep 2026).
+  // The line above took faceX AT THE BOX'S OWN CENTRE and gave the box an 8.4 m
+  // span. faceX changes by up to 0.22 m a metre, so wherever the face bulged
+  // east within a box's four metres the drawn rock stood proud of its own
+  // collider — and the audit's `recessed` category is mostly this one line.
+  // MEASURED (`qa/px-recessed.js`, `qa/px-recessed-why.js`): walking at the
+  // face at (−71, −15) put the animal's nose **1.42 m inside the drawn rock**
+  // before anything stopped it, and (−71, −37) 1.01 m.
+  //
+  // Two changes, and between them the error can only be in the safe direction:
+  //  - the east face is the FURTHEST EAST the drawn face gets anywhere in the
+  //    box's own span, sampled rather than evaluated once, so it is impossible
+  //    to be inside the rock;
+  //  - four-metre boxes rather than eight, so the price of that — stopping
+  //    slightly short where the face recedes inside a span — is at most 0.48 m
+  //    instead of 0.92.
+  //
+  // AND THE ROW REACHES THE END OF THE ROCK NOW. The ribs are drawn from
+  // C.z0 − 4 in 3.1 m slabs, so the massif's south face is at z −071.55 while
+  // the collider row began at −70.2 — which is the whole of the 1.35 m the four
+  // samples along z −72 reported, and they were walking at the cliff's END and
+  // not at its face.
+  const CSTEP = 4;
+  for (let z = C.z0 - 6.5; z < C.z1 + 6.5; z += CSTEP) {
+    const cz = z + CSTEP * 0.5;
+    const g = gorTerrain(C.x, cz);
+    let fmax = -1e9;
+    for (let k = 0; k <= 8; k++) fmax = Math.max(fmax, faceX(z - 0.3 + (CSTEP + 0.6) * k / 8));
+    // east face at fmax + 2.6, which is where the batter tapers reach
+    gorStaticBox(game, fmax + 2.6 - 12.4, g + C.top * 0.5 + 4, cz,
+                 24.8, C.top + 22, CSTEP + 0.4);
   }
 
   const mesh = new THREE.Mesh(M.build(), gorVC());

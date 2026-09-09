@@ -108,9 +108,16 @@ mostly instanced vegetation, which is deliberate. What is left after
 classification is small and specific — see batch X5. ~~The highest-count
 non-vegetation hits are Kowloon at (±5, −65), a Venice block at x −77…−37, the
 Göreme town mesh, three Sahara meshes, `palBeach`, and two Cali structures.~~
-Separately, **ten Göreme cliff samples are "recessed"**: the drawn face is at
+~~Separately, **ten Göreme cliff samples are "recessed"**: the drawn face is at
 0.95 m and the collider at 2.30 m, so you walk 1.35 m into a cliff before it
-stops you.
+stops you.~~ **RE-MEASURED AND MOSTLY FIXED, 9 Sep 2026. See CONTRACT.md.**
+Re-walked as a player rather than compared as two rays: of the thirty-two
+`recessed` samples, eight have no drawn face there any more, three stop you
+nowhere at all (7 to 29 m), seven give a DIFFERENT ANSWER on every run because
+their chapters' geometry moves, and nine already stop you outside the face.
+Five were real, repeatable and all one cause — `faceX` is a curve sampled at
+each box's centre across an 8.4 m span, and the row stopped 1.35 m short of the
+drawn massif's south end — and they now read −0.41 to +0.16 m.
 
 **X9's re-rank: 99 samples, 14 wall-shaped, and the ranking was wrong at the
 top.** Every non-vegetation sample the audit recorded was put through the wall
@@ -1484,6 +1491,20 @@ urgent, and none of them safe for a probe to settle on its own:
   because both are "drawn geometry with no physics behind it" — what separates
   them is whether a player can stand where the sample was taken, and neither of
   X9's numbers said.
-- The audit's `recessed` category was never re-measured at all. Pasto (−23, 40)
-  shows the shape — drawn face at 0.39 m, collider at 3.60 — and X9 only noticed
-  it in passing.
+- ~~The audit's `recessed` category was never re-measured at all.~~ **DONE,
+  9 Sep 2026.** `qa/px-recessed.js` re-walks all thirty-two as a player and
+  `qa/px-recessed-why.js` names what each one is inside. Eighteen of the
+  thirty-two were answered by re-walking them rather than by fixing anything:
+  the face has gone (8), nothing stops you at all (3), or the number moves
+  between identical runs because the chapter does (7 — all five Drift rows,
+  plus one Iceland and one Cali; Drift (−47, −110) read −0.35, 1.71 and 1.68 on
+  three runs). The Göreme cliff was the one real cause and is fixed; four
+  remain, each a single axis-aligned box inside a tapered rock, which is a
+  different project from fixing a loop. The talus — 46 boulders 0.5–2 m drawn
+  and not collided at the cliff's foot — is the bunting-post question again
+  with a bigger object, and is named in CONTRACT.md rather than answered.
+
+  **And the instrument is the lesson, one level up.** A grid-sampled audit
+  records a coordinate and a distance, and neither says whether a player can
+  stand there, whether the geometry is still there, or whether it holds still
+  between two runs.
