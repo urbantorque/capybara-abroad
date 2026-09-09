@@ -1,3 +1,140 @@
+## THE BEAUTY PASS — THE STAR, THE CLOUD, THE HORIZON, THE PALE GROUND, THE LAWN (10 Sep 2026)
+
+Five commits on `beauty-pass`, from `ROADMAP-BEAUTY.md`, which is the review
+that produced them and carries the measured state they started from. Nothing
+here touches physics, tasks, the score or a mesh; every term keeps the
+aesthetic law and every one has a `game.state.noX` switch that CUTS.
+
+**Where it started.** Nineteen arrival frames at 1600x900 (`qa/BY-*.png`) and
+two instruments over all nineteen chapters. `qa/by-light.json.png` is the live
+sun, hemisphere, fill and ambient per chapter; `qa/by-cast.json.png` is what
+fraction of the visible geometry casts a shadow. Two facts came out of the
+tables that no single frame shows: eight chapters were lit by ONE star
+(`sysSUN_BY_BIOME` handing Pasto's 61-degree noon to Iceland, the Erg, the
+Drift, Mong Kok, Palawan, Antarctica and Monaco), and shadows were wired
+everywhere — 43–96 % of what each chapter draws casts. The flat frames were
+a sun-angle problem, not a wiring one.
+
+### 1. The star, per chapter — `sysSunAt`, three rows (systems.js)
+
+`sysSunAt(base, elevDeg)` keeps a star's bearing and sets its elevation.
+Antarctica 61 → 28 (a January midday on the Peninsula), Palawan 61 → 44 (a
+mid-afternoon beach), the Pantanal 41 → 30 ("an hour before sundown", and the
+shadow half-box goes to 34 in `sysBIO_SH_HALF` so a gallery tree's 21 m of
+shadow is not cut at the box edge). `sysSHADOW_SKY.antarctic` came off the
+1.0 list to 0.62: measured with the shadow pass toggled
+(`qa/by-shadow-ab.json.png`), the 28-degree sun touched 22.43 % of the frame
+by 15.7 levels — present, and invisible on snow that kept all of its sky in
+the shade. Pasto, the Erg and the four nights keep their star on purpose;
+Iceland's is recorded in the roadmap as an open art decision.
+
+### 2. The cloud — `cloudTick` (shared.js), `sysCLOUD` (systems.js)
+
+A slow, soft, ~55 m cloud-shadow field drifting along the chapter's wind, the
+first thing that has ever moved across the ground. It lives in the rim's
+`<opaque_fragment>` block — which compiles into nearly every material and
+already carries `vRimW` — and there `reflectedLight.directDiffuse` is still
+in scope, so it subtracts a fraction of the DIRECT light and a quarter as
+much sky: a fragment already in a building's shadow loses nothing. Water and
+the wet-only prop material are not rimmed and take the same field in
+`grain()` on the diffuse at 0.7 of the strength, bound to the same uniform
+objects under different GLSL names (`uGrCloudP` / `uCloudP`: two
+declarations of one name in one shader is a compile error). It fades to
+nothing by 150 m, which is also what keeps it off every sky dome without a
+flag — all of them ride the lens at 200–900 m.
+
+`sysCLOUD` is one number per chapter, zero and one coherent branch for the
+four nights, the cave, the Drift and Kyoto (an overcast sky IS the light).
+The strength walks in at `sysCLOUD_LAMBDA`; the drift is INTEGRATED as a
+position so a swinging gust does not jump the field, along the same
+`gust()` vector the awnings lean to, at 2 m/s; frozen with the sparkle under
+prefers-reduced-motion. Measured (`qa/BYCL-*.png`, arms captured
+synchronously at dt = 0): Sydney 39.2 % of the frame moved, mean −10.3
+levels, peak −37.7; the Quay 30.1 % / −6.6; and the two Sydney frames six
+seconds apart show the patch has moved. `game.state.noCloud` cuts.
+
+### 3. The horizon — `fresnel` on `grain()`, `skyTick` (shared.js)
+
+Lambert has no view-dependent term, so the far half of every sea was the
+colour of the near half. `fresnel: k` on a grained water mixes the diffuse
+toward the sky AT THE HORIZON — `scene.background`, written once a frame by
+`skyTick`, the same colour the dome's horizon and the fog already use — by
+`pow(1 − viewDir.y, 3) · k`, the water's normal taken as +Y. On a
+transparent sea it also raises the alpha toward 1 at grazing angles, which
+is what a lagoon does and hides the seabed where a real one would. NOT gated
+on `sparkle`: Antarctica's and the Pantanal's seas are opaque by design and
+carry no glitter, and they wanted a horizon most. Opt-in per call site, the
+house rule: 21 seas at 0.65, Palawan's lagoon and the Antarctic channel at
+0.55. `game.state.fresnelK` is the sweep knob (the 0 / 1 / 1.7 arms are
+`qa/BYF-*.png`); `noFresnel` cuts.
+
+### 4. Pale ground — `nearPale` on `grain()` (shared.js)
+
+At 1:1 the near octave on pale stone read as crumpled paper
+(`qa/BYC-venice.png`, `qa/BYC-quay.png`) while the same term on Kyoto's
+mid-grey lane read as ground: a luminance wobble that is texture on a
+mid-value surface is STAINS on a white one. `nearPale` is a gain on the near
+octave that eases in as the fragment's own albedo (after vertex colour) goes
+past a ramp; default 1, an exact no-op. It is an option and not a retune of
+`near` because Cali's ground is one mesh with a lawn and a pavement in it,
+and a gate on the albedo gives the two surfaces two answers.
+
+THE RAMP IS IN LINEAR LIGHT. Written first as 0.55..0.85 — sRGB numbers read
+off a screenshot — it measured 0.04 % of the Erg's frame changed and 0.00 %
+of Hanoi's: pale stone is ~0.6 linear and never reached it. At 0.24..0.52
+(sRGB 0.51..0.77) Venice moved 16.6 % of its frame and its near-ground
+high-pass SD went 3.09 → 2.59; Sahara 11.6 %, the Quay 6.3 %, Cali 1.2 %
+(the lawn untouched), Sydney and Kyoto 0.00 % as controls
+(`qa/by-pale.json.png`, `qa/BYP-venice-on.png` against `-off`). Thirteen
+ground materials in nine chapters opted in at 0.45–0.60. `noPale` cuts.
+
+### 5. Lawn life — `speck` on `grain()` (shared.js)
+
+A sparse thresholded field — the sparkle's own two-noise product, so it
+never shows the lattice — painting small pale specks (`PALETTE.sail`) into a
+lawn's diffuse in the near band, with the near octave's footprint fade. It
+ONLY GROWS IN GRASS: the gate is the albedo's hue, green over red and blue
+by a margin, so on the meshes that carry a lawn and a path in one geometry
+the path gets nothing. It comes in clumps, for the sparkle's reason.
+
+Three goes at the size: at 4 cells/m and cut 0.5 the specks were three
+pixels at playing distance and the lawn read exactly as before
+(`qa/BYS-sydney.png`); at 2.4 cells and cut 0.5 they were 30 cm white blobs
+and the lawn read as snow patches; at 4 cells and cut 0.66 they are dots,
+and a daisy is a dot (`qa/BYS2-sydney.png`). THE CUT SETS THE SIZE. Also:
+the first rollout put the option on the merged-world material (the first
+`near:` line in each file) rather than on the ground's, and nothing showed —
+the two are ten lines apart and look alike. On Sydney's, Cali's, Manly's and
+Kyoto's grounds at 0.55–0.70.
+
+### What it cost (10 Sep 2026, 1600x900)
+
+Real rAF frames, 120 sampled, all three shader terms cut and then live,
+interleaved three times (`qa/by-raf.json.png`): Sydney 16.6 → 16.8 ms
+median, Antarctica 16.4 → 16.5, Venice 16.7 → 16.8; p95 18.5–20.9 both
+arms. A locked 60 before and after. The `post.render()` x 60 harness on
+this machine today has a ±1 ms floor between iterations and could not
+resolve the terms (`qa/by-perf.json.png`), which is itself worth knowing:
+the historic ±0.1 ms figure is not a property of the instrument, it is a
+property of the machine on the day. Draw calls and triangles: unchanged, by
+construction — nothing here is a mesh.
+
+`npm test` 11/11. `qa/fuzz.js` 19/19: 0 NaN frames, 0 void falls, 0 errors;
+`solverSaves` read 2 from Mong Kok onward, which is a cumulative
+`state.solverSaves` counter and a physics event this pass cannot cause —
+nothing in it touches a body — and is noted rather than claimed.
+
+### The instruments
+
+In the session scratchpad, outputs in `qa/`: `by-frames` (the nineteen),
+`by-light`, `by-cast`, `by-shadow-ab`, `by-cloud`, `by-fres`, `by-pale`,
+`by-some` (any chapters, any tag), `by-perf`, `by-raf`. Three harness notes
+worth keeping: a picker probe that presses digits WITHOUT reloading between
+them reads Sydney nineteen times (the picker is on the title); the
+`post.render()` timing floor must be read off the raw iterations before a
+delta is believed; and a chapter's ground material is the SECOND `near:`
+line in its builder, not the first.
+
 ## THE RECESSED CATEGORY, RE-MEASURED (9 Sep 2026)
 
 **ROADMAP-PHYSICS X9's last open item**, and the one it said had *"never been

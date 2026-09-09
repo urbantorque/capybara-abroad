@@ -225,3 +225,44 @@ nineteen frames and against `qa/fuzz.js` (19/19 clean), `npm test`, and
 frame time in the affected chapters (16.x ms median at 1600x900, the same
 before and after). Every term gets a `game.state.noX` switch that cuts
 rather than fades, so the next pass can measure it away.
+
+---
+
+## What shipped (10 Sep 2026, branch `beauty-pass`, five commits)
+
+All five, in order, and the full mechanism of each is in **CONTRACT.md ➜
+"THE BEAUTY PASS"**. What follows is what the measurement changed about the
+plan above.
+
+| item | shipped as | measured |
+|---|---|---|
+| 1 the star | `sysSunAt`; Antarctica 28°, Palawan 44°, Pantanal 30° (+34 m shadow half-box); `sysSHADOW_SKY.antarctic` 1.0 → 0.62 | shadow pass touches 22.4 % of the Antarctic frame by 15.7 levels — it was there and invisible on snow until the shade stopped keeping all of its sky |
+| 2 the cloud | rim block + grain diffuse path; `sysCLOUD` 13 rows, 0 for six | Sydney 39.2 % of frame, mean −10.3, peak −37.7; the Quay 30.1 %; moves between two frames six seconds apart |
+| 3 the horizon | `fresnel` on 23 waters, 0.65 (0.55 on the lagoon and the channel); `skyTick` from `scene.background` | swept 0 / 1 / 1.7 in four chapters; the Antarctic channel and Palawan's lagoon are the two frames that changed most |
+| 4 pale ground | `nearPale` on 13 ground materials in nine chapters, 0.45–0.60 | Venice 16.6 % of frame, near-ground high-pass SD 3.09 → 2.59; Sydney and Kyoto 0.00 % as controls |
+| 5 lawn life | `speck` on four grounds, 0.55–0.70, grass-gated | third try at the size; the cut sets the size, and a daisy is a dot |
+
+Cost: real rAF frames, three chapters, terms cut then live, interleaved
+three times — 16.6 → 16.8 / 16.4 → 16.5 / 16.7 → 16.8 ms median. Locked 60
+before and after. `npm test` 11/11; `qa/fuzz.js` 0 NaN, 0 void, 0 errors in
+all nineteen.
+
+**Three things the plan got wrong, in the order they cost time:**
+
+1. **The albedo gate was written in sRGB.** `diffuseColor` is linear, and a
+   pale stone is ~0.6 there, not 0.85. The first ramp measured 0.04 % of the
+   Erg's frame and read as a dead wire; it was a ramp nothing could reach.
+2. **A chapter's ground is the SECOND `near:` line in its builder.** The
+   speck rollout put the option on the merged-world material (the first
+   line) in all four chapters, and the lawn read exactly as before — which
+   is what "opted in and invisible" looks like, and it is also what
+   "reads as nothing" looks like. Check which material a line is before
+   judging a term by its absence.
+3. **The `post.render()` harness has no fixed noise floor.** On this
+   machine today its five iterations drifted 11.1 → 9.3 ms with nothing
+   changed; the historic ±0.1 ms is a property of the day. Only the
+   interleaved rAF A/B is quotable.
+
+Still open, unchanged from the list above: Iceland's lamps on the road,
+Iceland's sun, Rio's stripe staircase, Monaco's harbour reflection, Mong
+Kok's reflection pucks.
