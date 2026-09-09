@@ -812,12 +812,42 @@ export function createNPCs(game) {
   const THREE_ = game.THREE || THREE;
 
   // ---------------------------------------------------------------- geometry
+  // ---- A GARMENT HAS MORE THAN ONE COLOUR ON IT (the second beauty pass,
+  // item 6) ---------------------------------------------------------------
+  // Every person in this game was one flat colour from the shoulders to the
+  // hips, and there are thirty-two of them in Sydney and a hundred and forty
+  // in the Piazza. The shoulders slab below has been the only relief on that
+  // surface since v54 and it proves the mechanism: `c` is a LINEAR MULTIPLIER
+  // on whatever shirt colour the instance was given, so one geometry serves
+  // every colour a person can wear and the band is right in all of them.
+  //
+  // Two more, and they are chosen for what reads at the distance this game is
+  // played at rather than for what a garment has:
+  //
+  //   THE HEM, because the bottom edge of a shirt is the line that separates a
+  //   person's top from their trousers, and without it a torso and a pair of
+  //   hips in two different colours meet at a join with nothing on it. Proud
+  //   by 8 mm so it catches its own sliver of light.
+  //
+  //   THE PLACKET, a narrow strip down the FRONT — which is the only face of a
+  //   person this camera ever sees square on. It is the difference between a
+  //   coloured box and a shirt with a front to it, and at six metres it is the
+  //   one detail on a torso that survives.
+  //
+  // Cost is twenty-four triangles a person, in the SAME geometry and therefore
+  // the same instanced draw call. Nothing here is a new mesh: a per-person
+  // part is a whole new buffer and a whole new draw call, which is why the
+  // umbrella in weather.js is locals-only and why this is not a pocket.
   const gTorso = npcMakeGeo([
     { w: 0.50, h: 0.60, d: 0.30, y: 1.02 },
     // The shoulders slab is where a shirt has a seam and a person has a
     // collarbone, and it is the only horizontal on the torso: 0.88 turns it
     // from a step in the outline into a step in the GARMENT.
     { w: 0.62, h: 0.14, d: 0.32, y: 1.24, c: npcSRGB(0.88) },   // shoulders
+    // The torso runs y 0.72..1.32, so the hem sits on its bottom edge.
+    { w: 0.516, h: 0.085, d: 0.316, y: 0.757, c: npcSRGB(0.80) },  // hem
+    // ...and the placket, on the front face at z = +0.15 and 6 mm proud.
+    { w: 0.085, h: 0.44, d: 0.02, y: 1.03, z: 0.156, c: npcSRGB(0.91) },
   ]);
   const gHips = npcMakeGeo([{ w: 0.46, h: 0.26, d: 0.32, y: 0.68 }]);
   const gHead = npcMakeGeo([
