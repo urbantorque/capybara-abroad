@@ -1416,7 +1416,26 @@ const sysCREST_RISE = 0.85;   // damp lambda in. Slow: it is a reveal, not a sna
 const sysCREST_FALL = 2.6;    // ...and out, as the ground comes back up
 const sysCREST_DOLLY = 2.30;  // m the boom pulls back at a full crest
 const sysCREST_PITCH = 0.085; // rad it lifts its eye by, so the far side is in frame
-const sysCREST_SKY   = 0.30;  // ...and how much of the sky voice it borrows
+// THE THIRD TERM IS NOT WIRED, AND THAT IS A DECISION NOBODY HAS MADE YET.
+// The block comment above says the crest "pays out through the two camera terms
+// the loaf and the flow already share and one the sky already owns", and the
+// payout site says it "borrows a little of the sky voice to do it". It does not:
+// only DOLLY and PITCH are applied. sysCREST_SKY is read by nothing, and it is
+// one of three tuning constants in the whole repo that nothing reads — which is
+// why qa/xmodule.mjs now checks for them and names this one.
+//
+// It is left unwired rather than quietly connected because connecting it is a
+// VISIBLE change to how the game feels at every rise in nineteen chapters, and
+// that is the author's call. Measured, at a full crest: skyT would go to 0.30,
+// which walks camPitch from 41 deg toward sysSKY_PITCH's 11 and camReach from
+// 9.5 m toward sysSKY_DIST's 13 — about 9 degrees of extra eye-lift and a metre
+// of boom, ON TOP of the 4.9 deg sysCREST_PITCH already gives. It would also
+// partly cancel itself: the dolly and pitch below are multiplied by (1 - skyT),
+// so they would lose 30 % at the same moment.
+//
+// To wire it, contribute to skyWant beside skyEyeT and skyRestT, BEFORE skyT is
+// damped — not at the payout site, which runs after.
+const sysCREST_SKY   = 0.30;  // ...and how much of the sky voice it WOULD borrow
 const sysCREST_EVERY = 0.22;  // s between samples — four terrainHeight calls, not per frame
 const sysCALM_APPR_L = 1.6;   // damp lambda on the approach term. Slow either way.
 
@@ -33490,8 +33509,12 @@ export function createSystems(game) {
     // The loaf and the flow both move the boom and neither touches the pitch:
     // a longer boom at the same angle shows you more GROUND. A view is the
     // other thing — the horizon has to come up the frame — so this is the one
-    // that takes pitch off as well, and borrows a little of the sky voice to
-    // do it. Gated off the same three rigs as everything else here.
+    // that takes pitch off as well. Gated off the same three rigs as everything
+    // else here.
+    //
+    // IT DOES NOT BORROW THE SKY VOICE, though this comment said it did and the
+    // constant for it exists. See sysCREST_SKY, which has the measurement and
+    // the reason it is still a decision rather than a line of code.
     if (sysCrestNow > 0.001) {
       const cw = sysCrestNow * (1 - flyT) * (1 - sailT) * (1 - skyT);
       camReach += sysCREST_DOLLY * cw;

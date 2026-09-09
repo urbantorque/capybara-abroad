@@ -196,6 +196,57 @@ for (const f of files) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// A TUNING CONSTANT NOTHING READS.
+//
+// This codebase tunes by named constant — 841 of them at the top of systems.js
+// alone — and that is why it is worth checking. A `sysFOO_BAR` that nothing
+// reads is not tidiness: it is usually A TERM THAT WAS DESIGNED, NAMED,
+// COMMENTED AND THEN NEVER WIRED, and the comment next to it goes on describing
+// a behaviour the game does not have. That is the failure mode
+// capy3-names-nothing-publishes is about, and reading a file cannot find it —
+// the constant looks exactly like its neighbours.
+//
+// Three across 169 000 lines when this was written, and one of the three was
+// real: sysCREST_SKY, the third payout term of the crest camera, declared and
+// commented and never applied.
+//
+// The allowlist below is small on purpose. An entry must say WHY, and the right
+// way to remove one is to wire the constant or delete it.
+// ---------------------------------------------------------------------------
+{
+  const KNOWN_UNREAD = {
+    sysCREST_SKY: 'the crest camera\'s third term — designed, not wired. See its own note.',
+    sysMARK_STEM: 'the stencil stem width, hand-inlined as 2.6 throughout sysLETTERS.',
+    physGRP_STATIC: 'cannon\'s own default collision group, named so the other three read as a set.',
+  };
+  const unread = [];
+  for (const f of files) {
+    const raw = readFileSync(join(DIR, f), 'utf8');
+    const cl = strip(raw).split('\n');
+    for (let i = 0; i < cl.length; i++) {
+      const m = cl[i].match(/^const ([a-z]{2,6}[A-Z][A-Z0-9_]{2,})\s*=/);
+      if (!m) continue;
+      const name = m[1];
+      const re = new RegExp('(^|[^\\w$.])' + name + '([^\\w$]|$)');
+      let used = false;
+      for (let j = 0; j < cl.length && !used; j++) if (j !== i && re.test(cl[j])) used = true;
+      if (!used) for (const g of files) {
+        if (g === f) continue;
+        if (re.test(strip(readFileSync(join(DIR, g), 'utf8')))) { used = true; break; }
+      }
+      if (!used && !(name in KNOWN_UNREAD)) unread.push({ f, line: i + 1, name });
+    }
+  }
+  for (const u of unread) {
+    console.log('UNREAD CONST  ' + u.f + ':' + u.line + '  ' + u.name +
+                '  -> declared and never read. Wire it, delete it, or say why in xmodule.mjs.');
+  }
+  if (unread.length) process.exitCode = 1;
+  else console.log('tuning constants: none unread beyond the ' +
+                   Object.keys(KNOWN_UNREAD).length + ' named and explained');
+}
+
 findings.sort((a, b) => (a.owners.length - b.owners.length) || a.file.localeCompare(b.file));
 if (!findings.length) {
   console.log('clean: every called name is declared in, or imported by, the file that uses it');
