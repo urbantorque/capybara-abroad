@@ -482,7 +482,7 @@ function caliBuildRiver() {
   // and a sheet of coloured card. See grain() in shared.js.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.9 }),
     { scale: 0.6, amount: 0.05, warp: 0,
-      sparkle: 0.40, sparkleScale: 1.7, sparkleSpeed: 0.52, sparkleCut: 0.655,
+      sparkle: 0.40, sparkleScale: 1.7, sparkleSpeed: 0.52, sparkleCut: 0.655, fresnel: 0.65,
       sparkleColor: PALETTE.caliHaze }));
   m.receiveShadow = true;
   m.frustumCulled = false;

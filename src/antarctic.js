@@ -1112,8 +1112,12 @@ function antBuildSea(root) {
     col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  // `fresnel` is the horizon — see skyTick in shared.js. This sea carries no
+  // sparkle (opaque, by design, so the pack can sit on it) and until the
+  // beauty pass it was the one flat sheet in the chapter; now the far channel
+  // goes to the colour of the sky the way the near water does not.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
-                                    { scale: 0.06, amount: 0.05, warp: 1.1 }));
+                                    { scale: 0.06, amount: 0.05, warp: 1.1, fresnel: 0.55 }));
   m.frustumCulled = false;
   m.receiveShadow = true;
   antSeaMesh = m;

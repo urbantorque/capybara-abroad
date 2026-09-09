@@ -2214,7 +2214,7 @@ function sahBuildPalmeraie(game, root) {
     wg.translate(120, -0.16, sgZ);
     const wm = new THREE.Mesh(wg, grainOwn(mat(PALETTE.sahTileBlue), {
       scale: 0.9, amount: 0.14, warp: 0,
-      sparkle: 0.85, sparkleScale: 1.1, sparkleSpeed: 0.55,
+      sparkle: 0.85, sparkleScale: 1.1, sparkleSpeed: 0.55, fresnel: 0.65,
       sparkleCut: 0.60, sparkleBand: 0.12, sparkleColor: PALETTE.sahSun,
     }));
     wm.receiveShadow = true;

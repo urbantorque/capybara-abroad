@@ -860,7 +860,7 @@ function iceBuildSea() {
   // Grained BEFORE the clone, so the aurora still owns its own instance.
   const m = new THREE.Mesh(g, grainOwn(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.9 }),
     { scale: 0.45, amount: 0.05, warp: 0,
-      sparkle: 0.26, sparkleScale: 1.2, sparkleSpeed: 0.24, sparkleCut: 0.68,
+      sparkle: 0.26, sparkleScale: 1.2, sparkleSpeed: 0.24, sparkleCut: 0.68, fresnel: 0.65,
       sparkleColor: PALETTE.iceSkyLow }));
   m.receiveShadow = true;
   m.frustumCulled = false;
@@ -886,7 +886,7 @@ function iceBuildLagoon(root) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.88 }),
     { scale: 0.5, amount: 0.05, warp: 0,
-      sparkle: 0.22, sparkleScale: 1.4, sparkleSpeed: 0.16, sparkleCut: 0.69,
+      sparkle: 0.22, sparkleScale: 1.4, sparkleSpeed: 0.16, sparkleCut: 0.69, fresnel: 0.65,
       sparkleColor: PALETTE.iceSkyLow }));
   m.receiveShadow = true;
   iceLagAttr = g.attributes.position;

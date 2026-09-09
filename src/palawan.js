@@ -2634,7 +2634,7 @@ function palBuildWater(root) {
     vertexColors: true, transparent: true, opacity: 0.45,
     side: THREE.DoubleSide, depthWrite: false,
   }), { scale: 0.4, amount: 0.05, warp: 0,
-        sparkle: 1.25, sparkleScale: 1.25, sparkleSpeed: 0.30, sparkleCut: 0.65,
+        sparkle: 1.25, sparkleScale: 1.25, sparkleSpeed: 0.30, sparkleCut: 0.65, fresnel: 0.55,
         sparkleColor: PALETTE.palShallow }));
   m.position.y = palWATER;
   m.frustumCulled = false;

@@ -2911,7 +2911,7 @@ function hkBuildHarbour(game, root) {
   // and a sheet of coloured card. See grain() in shared.js.
   const wm = new THREE.Mesh(g, grainOwn(mat(PALETTE.hkHarbour),
     { scale: 0.35, amount: 0.06, warp: 0,
-      sparkle: 0.34, sparkleScale: 0.95, sparkleSpeed: 0.22, sparkleCut: 0.685,
+      sparkle: 0.34, sparkleScale: 0.95, sparkleSpeed: 0.22, sparkleCut: 0.685, fresnel: 0.65,
       sparkleColor: PALETTE.hkSkyLow }));
   wm.position.y = -0.5;
   wm.receiveShadow = true;

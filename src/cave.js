@@ -3349,7 +3349,7 @@ function cavBuildRiver(root) {
   cavRiverMesh = new THREE.Mesh(g, grain(mat(0xffffff, {
     vertexColors: true, transparent: true, opacity: 1, depthWrite: false,
   }), { scale: 0.5, amount: 0.09, warp: 0,
-        sparkle: 0.6, sparkleScale: 1.5, sparkleSpeed: 0.7,
+        sparkle: 0.6, sparkleScale: 1.5, sparkleSpeed: 0.7, fresnel: 0.65,
         sparkleCut: 0.66, sparkleBand: 0.09, sparkleColor: PALETTE.cavEcho }));
   cavRiverMesh.frustumCulled = false;
   cavRiverMesh.renderOrder = 3;

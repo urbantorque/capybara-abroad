@@ -613,7 +613,7 @@ function rioBuildSea() {
   // and a sheet of coloured card. See grain() in shared.js.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.92 }),
     { scale: 0.45, amount: 0.05, warp: 0,
-      sparkle: 0.66, sparkleScale: 1.05, sparkleSpeed: 0.34, sparkleCut: 0.635,
+      sparkle: 0.66, sparkleScale: 1.05, sparkleSpeed: 0.34, sparkleCut: 0.635, fresnel: 0.65,
       sparkleColor: PALETTE.rioSeaFoam }));
   m.receiveShadow = true;
   m.frustumCulled = false;

@@ -3632,7 +3632,7 @@ function venBuildWater(root) {
     // not twinkle, the distance fade eats it, and the far half of the square
     // had no glitter on it at all. See the fwidth note in grain().
     { scale: 0.7, amount: 0.13, warp: 0,
-      sparkle: 0.55, sparkleScale: 0.88, sparkleSpeed: 0.17, sparkleCut: 0.655,
+      sparkle: 0.55, sparkleScale: 0.88, sparkleSpeed: 0.17, sparkleCut: 0.655, fresnel: 0.65,
       sparkleBand: 0.10, sparkleColor: PALETTE.venSkyLow });
   venWaves(venWaterMat);
   venWaterMat.depthWrite = false;
@@ -3654,7 +3654,7 @@ function venBuildWater(root) {
   lg.translate(-20, 0, 132);
   const lmat = grainOwn(mat(PALETTE.venLagoon, { transparent: true, opacity: 0.94 }),
     { scale: 0.4, amount: 0.05, warp: 0,
-      sparkle: 0.50, sparkleScale: 0.95, sparkleSpeed: 0.26, sparkleCut: 0.65,
+      sparkle: 0.50, sparkleScale: 0.95, sparkleSpeed: 0.26, sparkleCut: 0.65, fresnel: 0.65,
       sparkleColor: PALETTE.venSkyLow });
   venWaves(lmat);
   const lm = new THREE.Mesh(lg, lmat);

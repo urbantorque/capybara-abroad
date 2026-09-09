@@ -481,7 +481,7 @@ function quayBuildWater() {
   // and a sheet of coloured card. See grain() in shared.js.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true }),
     { scale: 0.4, amount: 0.05, warp: 0,
-      sparkle: 0.62, sparkleScale: 0.95, sparkleSpeed: 0.28, sparkleCut: 0.635,
+      sparkle: 0.62, sparkleScale: 0.95, sparkleSpeed: 0.28, sparkleCut: 0.635, fresnel: 0.65,
       sparkleColor: PALETTE.foam }));
   m.receiveShadow = true;
   m.castShadow = false;

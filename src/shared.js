@@ -3941,6 +3941,39 @@ export function wetTick(level, color) {
   _grainWet.value = level > 0 ? (level < 1 ? level : 1) : 0;
   if (color) _grainWetC.value.copy(color);
 }
+// ---------------------------------------------------------------------------
+// THE SEA HAS A HORIZON — the Fresnel term on water (the beauty pass, 10 Sep
+// 2026, ROADMAP-BEAUTY.md item 3).
+//
+// Lambert has no view-dependent term, so the far half of every sea in the
+// game was the same colour as the near half: the harbour at Circular Quay a
+// third of the frame and one cyan, the Atlantic off Copacabana a flat blue
+// with a hard line at the sky. Real water is dark under your feet and the
+// colour of the sky at the horizon, and that gradient is most of what makes
+// a flat plane read as a body of water. The sparkle bought the glitter; this
+// buys the sheet.
+//
+// It is a grazing-angle term against the real view vector, exactly as the
+// wet sheen does it, with the water's normal taken as +Y — every sea here is
+// horizontal, and the swell in Manly moves vertices, not the answer to "is
+// the lens looking along the surface". It mixes the diffuse toward the sky
+// AT THE HORIZON, which is `scene.background` — the same colour the dome's
+// horizon and the fog already use, so every event that moves the atmosphere
+// (the tide, the storm, the Symphony, going under in Palawan) moves the
+// reflection with it and no second table is kept. On a transparent sea it
+// also raises the alpha toward 1 at grazing angles, which is what a lagoon
+// does and hides the seabed where a real one would.
+//
+// Opt-in per call site (`fresnel: k` on a sparkling material), following
+// the rule every other option here follows: no existing picture changes
+// until its owner asks. `fresnelTick` is the audit's hand on the strength —
+// 1 in every frame the game plays, 0 under game.state.noFresnel.
+const _grainSkyC = { value: new THREE.Color(0.80, 0.85, 0.90) };
+const _grainFresK = { value: 1 };
+/** The sky at the horizon, once a frame. systems.js passes scene.background. */
+export function skyTick(color) { if (color) _grainSkyC.value.copy(color); }
+/** A multiplier on every Fresnel strength in the game: 1 to play, 0 to cut. */
+export function fresnelTick(k) { _grainFresK.value = k > 0 ? (k < 3 ? k : 3) : 0; }
 const _wetDARK  = 0.26;   // fraction of the diffuse a fully wet surface loses
 const _wetSHEEN = 0.55;   // ...and how hard the grazing highlight comes back
 const _wetPOW   = 4.0;    // how tight to the grazing angle the sheen stays
@@ -4491,6 +4524,12 @@ export function grain(m, opts) {
   const sparkCut = o.sparkleCut === undefined ? 0.52 : o.sparkleCut;
   const sparkBand = o.sparkleBand === undefined ? 0.11 : o.sparkleBand;
   const sparkCol = o.sparkleColor === undefined ? 0xffffff : o.sparkleColor;
+  // FRESNEL — water only, off unless asked. See the block above skyTick.
+  // Not gated on `spark`: two seas in the game (Antarctica's, the Pantanal's
+  // river) are opaque by design and carry no glitter, and they want a horizon
+  // as much as the others. The call site says it is water by asking.
+  const fres = (wetOnly || o.fresnel === undefined) ? 0 : o.fresnel;
+  const fresPow = o.fresnelPow === undefined ? 3.0 : o.fresnelPow;
   // CONTACT — see the block above _grainCache. Off unless a call site asks, so
   // every surface in the game keeps the picture it was tuned against until it
   // opts in, one at a time.
@@ -4534,7 +4573,8 @@ export function grain(m, opts) {
               spark + '|' + sparkScale + '|' + sparkSpeed + '|' + sparkCut + '|' + sparkBand + '|' + sparkCol +
               '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM +
               '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
-              '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale;
+              '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
+              '|' + fres + '|' + fresPow;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -4575,6 +4615,10 @@ export function grain(m, opts) {
       shader.uniforms.uGrCloudP = _cloudP;
       shader.uniforms.uGrCloudS = _cloudS;
     }
+    if (fres > 0) {
+      shader.uniforms.uGrSkyC = _grainSkyC;
+      shader.uniforms.uGrFresK = _grainFresK;
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
                '#include <common>\nvarying vec3 vGrainW;' +
@@ -4604,6 +4648,8 @@ export function grain(m, opts) {
         !rimHere ? 'uniform vec4 uGrCloudP;' : '',
         !rimHere ? 'uniform vec2 uGrCloudS;' : '',
         !rimHere ? _CLOUD_GLSL : '',
+        fres > 0 ? 'uniform vec3 uGrSkyC;' : '',
+        fres > 0 ? 'uniform float uGrFresK;' : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
         wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
@@ -4771,6 +4817,21 @@ export function grain(m, opts) {
           '    sLace *= clamp(1.0 - max(fwidth(slq.x), fwidth(slq.y)) * 0.30, 0.0, 1.0);',
           '    diffuseColor.rgb += sLace * ' + shore.toFixed(4) +
             ' * vec3(' + shc.r.toFixed(4) + ', ' + shc.g.toFixed(4) + ', ' + shc.b.toFixed(4) + ');',
+          '  }',
+        ].join('\n') : '',
+        fres > 0 ? [
+          // ---- THE HORIZON. See the block above skyTick. --------------------
+          // BEFORE the sparkle, so a glint is added on top of the reflected
+          // sky rather than mixed away by it. The normal is +Y by construction
+          // — see the block for why — so the grazing term is the view vector's
+          // own elevation and costs one normalize and one pow.
+          '  {',
+          '    vec3 fV = normalize(cameraPosition - vGrainW);',
+          '    float fF = pow(1.0 - clamp(fV.y, 0.0, 1.0), ' + fresPow.toFixed(2) + ')',
+          '               * ' + fres.toFixed(4) + ' * uGrFresK;',
+          '    fF = clamp(fF, 0.0, 1.0);',
+          '    diffuseColor.rgb = mix(diffuseColor.rgb, uGrSkyC, fF);',
+          m.transparent ? '    diffuseColor.a = mix(diffuseColor.a, 1.0, fF);' : '',
           '  }',
         ].join('\n') : '',
         spark > 0 ? [

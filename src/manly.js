@@ -317,7 +317,7 @@ function manVCW() {
   return grain(mat(0xffffff, { vertexColors: true }),
                { scale: 0.22, amount: 0.045, warp: 0,
                  sparkle: 0.62, sparkleScale: 1.35, sparkleSpeed: 0.5,
-                 sparkleCut: 0.70, sparkleBand: 0.075, sparkleColor: 0xf2fbff });
+                 sparkleCut: 0.70, sparkleBand: 0.075, sparkleColor: 0xf2fbff, fresnel: 0.65 });
 }
 
 function manSyncBody(b) {
@@ -3075,7 +3075,7 @@ function manBuildWater(root) {
   const seaMat = grain(mat(PALETTE.manSea), {
     scale: 0.12, amount: 0.045, warp: 0,
     sparkle: 0.5, sparkleScale: 0.55, sparkleSpeed: 0.3,
-    sparkleCut: 0.66, sparkleBand: 0.1, sparkleColor: 0xeaf6ff,
+    sparkleCut: 0.66, sparkleBand: 0.1, sparkleColor: 0xeaf6ff, fresnel: 0.65,
   });
   const seaPanels = [
     [0, -800, 1600, 1444],        // out to the horizon, seaward of the surf mesh

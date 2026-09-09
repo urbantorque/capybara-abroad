@@ -490,7 +490,7 @@ function kyoBuildWater(cx, cz, hx, hz, y, near, far, round) {
   // and a sheet of coloured card. See grain() in shared.js.
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.92 }),
     { scale: 0.6, amount: 0.05, warp: 0,
-      sparkle: 0.34, sparkleScale: 1.7, sparkleSpeed: 0.22, sparkleCut: 0.665,
+      sparkle: 0.34, sparkleScale: 1.7, sparkleSpeed: 0.22, sparkleCut: 0.665, fresnel: 0.65,
       sparkleColor: PALETTE.kyotoHaze }));
   m.receiveShadow = true;
   m.frustumCulled = false;
@@ -2993,7 +2993,7 @@ function kyoBuildRiverMesh() {
   // the Uji, which the whole run down the river is looked at across
   const m = new THREE.Mesh(g, grain(mat(0xffffff, { vertexColors: true, transparent: true, opacity: 0.94 }),
     { scale: 0.6, amount: 0.05, warp: 0,
-      sparkle: 0.40, sparkleScale: 1.6, sparkleSpeed: 0.46, sparkleCut: 0.665,
+      sparkle: 0.40, sparkleScale: 1.6, sparkleSpeed: 0.46, sparkleCut: 0.665, fresnel: 0.65,
       sparkleColor: PALETTE.kyotoHaze }));
   m.receiveShadow = true;
   m.frustumCulled = false;

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
-         rimTick, cloudTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, skyTick, fresnelTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
@@ -28390,6 +28390,15 @@ export function createSystems(game) {
     } else {
       wetTick(0, null);
     }
+    // ---- the sky at the horizon, for the water -----------------------------
+    // See the block above skyTick in shared.js. `scene.background` is the
+    // colour every atmosphere event already finishes the frame on, so the
+    // seas reflect whatever sky the chapter is under without a table.
+    // `fresnelK` is the audit's sweep knob and `noFresnel` its cut; nothing
+    // in src writes either.
+    if (scene.background && scene.background.isColor) skyTick(scene.background);
+    fresnelTick(game.state.noFresnel ? 0
+                : (typeof game.state.fresnelK === 'number' ? game.state.fresnelK : 1));
 
     // ---- the rim ----------------------------------------------------------
     // Same deal as the wet ground and for the same reason: one float and one

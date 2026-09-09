@@ -2470,7 +2470,7 @@ export function createEnvironment(game) {
   // and a sheet of coloured card. See grain() in shared.js.
   const matVCSea = grain(mat(envVC_BASE, { vertexColors: true }),
     { scale: 0.5, amount: 0.055, warp: 0,
-      sparkle: 0.55, sparkleScale: 1.1, sparkleSpeed: 0.30, sparkleCut: 0.63,
+      sparkle: 0.55, sparkleScale: 1.1, sparkleSpeed: 0.30, sparkleCut: 0.63, fresnel: 0.65,
       sparkleColor: PALETTE.foam });
   const water = new THREE.Mesh(wGeo, matVCSea);
   water.position.y = -0.5;

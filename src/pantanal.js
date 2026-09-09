@@ -340,7 +340,7 @@ function panVCW(own) {
   // clone applied one step too late.
   const base = mat(0xffffff, { vertexColors: true, transparent: true, opacity: 1, depthWrite: false });
   const o = { scale: 0.35, amount: 0.05, warp: 0,
-              sparkle: 0.17, sparkleScale: 3.1, sparkleSpeed: 0.16,
+              sparkle: 0.17, sparkleScale: 3.1, sparkleSpeed: 0.16, fresnel: 0.65,
               sparkleCut: 0.76, sparkleBand: 0.055, sparkleColor: 0xfff0d4 };
   return own ? grainOwn(base, o) : grain(base, o);
 }
