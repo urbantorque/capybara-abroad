@@ -4464,6 +4464,40 @@ export function grain(m, opts) {
   // under it, sand and stone and snow above.
   const nearPale = o.nearPale === undefined ? 1 : o.nearPale;
   // ---------------------------------------------------------------------
+  // SPECK — daisies and clover in the near band (the beauty pass, 10 Sep
+  // 2026, ROADMAP-BEAUTY.md item 5).
+  //
+  // Sydney's lawn is the first thing the player sees and it is sixty per
+  // cent of the frame, and it is one green with grain on it. The Pantanal's
+  // tufts show what ground WITH something on it looks like beside ground
+  // with a texture on it. Geometry across nineteen chapters is a placement
+  // problem no chapter-neutral system can answer; this is what can be done
+  // everywhere for nothing: a sparse thresholded field, the sparkle's own
+  // two-noise product so it never shows the lattice, painting small pale
+  // specks into the diffuse in the near band and dying on its footprint
+  // before it can crawl.
+  //
+  //   speck        how far a speck goes toward speckColor, 0 (off) .. 1
+  //   speckScale   cells per metre — 4 is a 25 cm lattice, a speck ~6 cm
+  //   speckCut     the threshold on the product; higher is sparser
+  //   speckColor   PALETTE.sail unless told otherwise — a daisy, not a light
+  //
+  // AND IT ONLY GROWS IN GRASS. The gate is the albedo's own hue — green
+  // over red and blue by a margin — so on the meshes that carry a lawn and a
+  // path in one geometry (Sydney, Cali, Manly) the path gets nothing, which
+  // is the same argument `nearPale` makes one block up. It comes in clumps
+  // rather than as an even dusting, for the sparkle's reason: an even
+  // dusting is static, and a lawn has daisies in some places and not others.
+  // `o.wetOnly` read directly: `wetOnly` itself is declared further down
+  // and a const in its temporal dead zone throws on the first module load.
+  const speck = (o.wetOnly === true || o.speck === undefined) ? 0 : o.speck;
+  // 4 cells a metre and a HIGH cut: at 2.4 cells and cut 0.5 the specks came
+  // out as 30 cm white blobs and the lawn read as snow patches; the cut is
+  // what sets the size, and a daisy is a dot.
+  const speckScale = o.speckScale === undefined ? 4.0 : o.speckScale;
+  const speckCut = o.speckCut === undefined ? 0.66 : o.speckCut;
+  const speckCol = o.speckColor === undefined ? PALETTE.sail : o.speckColor;
+  // ---------------------------------------------------------------------
   // BROAD — THE OCTAVE ABOVE, AND THE ONE CHANNEL THIS FIELD NEVER HAD.
   //
   // Everything above varies BRIGHTNESS. `gn` is a multiply on the diffuse and
@@ -4603,7 +4637,8 @@ export function grain(m, opts) {
               '|' + cont + '|' + (wetOnly ? 'w' : '') + '|' + broad + '|' + broadM +
               '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
               '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
-              '|' + fres + '|' + fresPow + '|' + nearPale;
+              '|' + fres + '|' + fresPow + '|' + nearPale +
+              '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -4618,6 +4653,7 @@ export function grain(m, opts) {
                   m.blending === THREE.NormalBlending && m.depthWrite !== false &&
                   !(m.emissive && (m.emissive.r > 0.001 || m.emissive.g > 0.001 || m.emissive.b > 0.001));
   const sc = new THREE.Color(sparkCol);
+  const skc = new THREE.Color(speckCol);
   const shc = new THREE.Color(shoreCol);
   const shtc = new THREE.Color(shoreTintC);
   // THE WET TERM IS FOR GROUND, NOT FOR WATER. `spark > 0` is this helper's
@@ -4758,12 +4794,31 @@ export function grain(m, opts) {
         // term joins the same bracket for the same reason — and it is the one
         // term in here that is a vec3, because it is the only one that moves a
         // hue rather than a level.
+        // ---- THE SPECK. See `speck` above. Computed BEFORE the grain
+        // multiply so its gate reads the plain albedo, applied AFTER it so a
+        // daisy is not textured like the lawn it sits on.
+        speck > 0 ? [
+          '  float skM = 0.0;',
+          '  {',
+          '    vec2 skq = vec2(vGrainW.x * 0.9553 - vGrainW.z * 0.2955,',
+          '                    vGrainW.x * 0.2955 + vGrainW.z * 0.9553) * ' + speckScale.toFixed(4) + ' + 13.7;',
+          '    float skn = grNoise(skq) * grNoise(skq * 1.87 + 7.31);',
+          '    float skfw = max(fwidth(skq.x), fwidth(skq.y));',
+          '    skM = smoothstep(' + speckCut.toFixed(3) + ', ' + (speckCut + 0.06).toFixed(3) + ', skn)',
+          '        * clamp(1.0 - skfw * 0.9, 0.0, 1.0);',
+          '    skM *= smoothstep(0.38, 0.62, grNoise(vGrainW.xz * 0.09 + 5.1));',
+          '    skM *= smoothstep(0.02, 0.10, diffuseColor.g - max(diffuseColor.r, diffuseColor.b));',
+          '  }',
+        ].join('\n') : '',
         wetOnly ? '' : '  diffuseColor.rgb *= vec3(1.0 + gn * ' + amount.toFixed(4) +
                        ((!wetOnly && near > 0) ? ' + gnr' : '') + ')' +
                        ((!wetOnly && broad > 0)
                          ? ' + gb * vec3(' + _BROAD_K[0].toFixed(3) + ', ' +
                            _BROAD_K[1].toFixed(3) + ', ' + _BROAD_K[2].toFixed(3) + ')'
                          : '') + ';',
+        speck > 0 ? '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(' +
+                    skc.r.toFixed(4) + ', ' + skc.g.toFixed(4) + ', ' + skc.b.toFixed(4) + '), skM * ' +
+                    speck.toFixed(4) + ');' : '',
         wet ? [
           // ---- THE WET SURFACE ------------------------------------------
           // GATED ON WHICH WAY THE FACE POINTS, and that gate is most of what

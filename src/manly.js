@@ -294,7 +294,7 @@ function manVC() {
 /** Ground strength, and no vertical shear: the sand is horizontal. */
 function manVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.5, amount: 0.16, warp: 0, near: 0.44, nearScale: 8, contact: 1, broad: 0.1, broadM: 18 });
+               { scale: 0.5, amount: 0.16, warp: 0, near: 0.44, speck: 0.65, nearScale: 8, contact: 1, broad: 0.1, broadM: 18 });
 }
 /**
  * THE SEA, AND IT IS THE BRIGHTEST WATER IN THE GAME.

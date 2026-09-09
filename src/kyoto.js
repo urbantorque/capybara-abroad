@@ -198,7 +198,7 @@ function kyoVC() {
  *  so it wants no vertical shear in the sample at all. */
 function kyoVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, nearScale: 7, contact: 1, broad: 0.09, broadM: 14 });
+               { scale: 0.62, amount: 0.17, warp: 0, near: 0.72, speck: 0.55, nearScale: 7, contact: 1, broad: 0.09, broadM: 14 });
 }
 function kyoPush9(l, px, py, pz, rx, ry, rz, sx, sy, sz) { l.push(px, py, pz, rx, ry, rz, sx, sy, sz); }
 function kyoInstance(root, geo, color, list, cast, recv) {

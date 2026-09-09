@@ -2294,7 +2294,7 @@ export function createEnvironment(game) {
   // one chapter with no paving in it at all, so the ground carries twice the
   // whisper the buildings do.
   const matVCGnd = grain(mat(envVC_BASE, { vertexColors: true }),
-                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, nearScale: 8, contact: 1, broad: 0.11, broadM: 17 });
+                         { scale: 0.68, amount: 0.17, warp: 0, near: 1.00, speck: 0.70, nearScale: 8, contact: 1, broad: 0.11, broadM: 17 });
   const matVC2  = mat(envVC_BASE2, { vertexColors: true, side: THREE.DoubleSide });
   // DoubleSide defaults shadowSide to DoubleSide -> the open sail surfaces would
   // sample their own depth and speckle. Front faces only.
