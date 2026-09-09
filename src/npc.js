@@ -2051,6 +2051,10 @@ export function createNPCs(game) {
   function addTraveller(o) {
     if (!o) return null;
     o.figure = npcTRAV_FIG;
+    // ...and THE REGULARS may not pick them (O1). See npcPalPick: the
+    // traveller is the nearest person to the spawn in two of their four
+    // chapters, and they are already the character who remembers you.
+    o.trav = true;
     if (o.near === undefined) o.near = 8;
     return addLocal(o);
   }
@@ -2070,7 +2074,7 @@ export function createNPCs(game) {
       if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(g);
     }
     const rec = {
-      biome: o.biome, group: g,
+      biome: o.biome, group: g, trav: !!o.trav,
       x: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       y: o.y !== undefined ? o.y : (g ? g.position.y : 0),
       z: o.z !== undefined ? o.z : (g ? g.position.z : 0),
@@ -4456,6 +4460,28 @@ export function createNPCs(game) {
       const r = locals[i];
       if (r.biome !== live) continue;
       if (r.cd > 0) r.cd -= dt;
+      // ---- ...AND THE OTHER MOUTH CLOCK, WHICH NOTHING HAS EVER RUN (O1) --
+      // `talkCd` is what stops an ADDRESSED line interrupting a person, and
+      // it is set on a local in exactly two places: saySomebodyNear, which is
+      // how B15’s rumour and every game.sayNear line finds a mouth, and THE
+      // REGULARS’ own armed line. It has never been decremented anywhere but
+      // `stepHuman` — which is Sydney’s and Pasto’s roster, and no local has
+      // ever been through it. The field is not even in the local record’s
+      // initialiser; it appears the first time somebody is picked, and it
+      // stays.
+      //
+      // SO EVERY LOCAL IN SEVENTEEN CHAPTERS HAD ONE ADDRESSED LINE IN THEM,
+      // for the life of the session. MEASURED: talkCd 20.0 for forty
+      // unbroken seconds two metres from the person, with the game running.
+      // sayNear picks the nearest FREE speaker, so it walks outward through
+      // the cast one line each and a chapter you keep coming back to goes
+      // quiet from the middle out — which is invisible, because a line that
+      // is never said looks exactly like a line that was not armed.
+      //
+      // Found by THE REGULARS, whose whole surface is an addressed line said
+      // by one named person on every arrival, and which therefore hit the
+      // ceiling on the second visit rather than the twentieth.
+      if (r.talkCd > 0) r.talkCd -= dt;
       r.t += dt;
       const dx = cx - r.x, dz = cz - r.z;
       const d2 = dx * dx + dz * dz;
@@ -9794,6 +9820,11 @@ export function createNPCs(game) {
   // ================================================================== events
   game.events.on('biome:enter', (p) => {
     parkBubbles();
+    // ---- ONE TIER PER VISIT, AND THIS IS THE WHOLE OF "PER VISIT" (O1) --
+    // Cleared here and nowhere else. npcPalStep sets it on the first
+    // warming and systems.js decides what a warming is worth.
+    npcPalWarm = false;
+    npcPalLine = '';
     // The ending is STAGED EVERY TIME and closed once — props.js huddles all
     // seventeen souvenirs at the next chapter's spawn on the way out, so
     // sysFinaleStage runs again on every return and this must be able to
@@ -9820,6 +9851,28 @@ export function createNPCs(game) {
     for (let i = 0; i < locals.length; i++) {
       const L = locals[i];
       if (L) { L.wary = 0; L.alarm = 0; }
+      // ---- ...AND THE SAME FREEZE WITH THE SIGN FLIPPED (O1) -----------
+      // `fam` has exactly the fault the paragraph above describes and it was
+      // never noticed, because a frozen fondness does not look like anything.
+      // MEASURED: the gondolier left at 0.618 was still at 0.618 after two
+      // minutes in Kyoto — to four decimal places, because the only thing
+      // that decays it is a loop this chapter is gated out of.
+      //
+      // THE REGULARS is what made it matter. A tier is earned by `fam`
+      // crossing npcFAM_HEAT, one per visit; with the number frozen, the
+      // second tier and the third and the fourth cost a step through a door
+      // and back, and the whole item is bought in ninety seconds without
+      // anybody sitting anywhere. Cleared here, so every visit starts the
+      // twenty-five seconds again.
+      //
+      // AND IT IS RIGHT ON ITS OWN TERMS, not just for the tier. `fam` is
+      // built out of THE CALM, which is a fact about right now; a stallholder
+      // who is as fond of you as they were an hour and six chapters ago,
+      // having seen nothing since, is the crowd-left-mid-panic bug being
+      // read as a feature. What crosses the boundary is the TIER, which is on
+      // the save file, and that is the whole of what a person is owed to
+      // remember.
+      if (L) { L.fam = 0; L.famWas = false; }
       // ...AND ANYTHING THEY WERE CARRYING GOES DOWN (F4). `localOwnStep` is
       // the only other place that releases the pin and it does not run in a
       // chapter that is not live — so a local halfway home with somebody's hat
@@ -10909,6 +10962,10 @@ export function createNPCs(game) {
     // ...and the rumour from the last place, which is looking for anybody at
     // all and therefore belongs above the gate with the heat. See npcRumArm.
     npcRumStep(dt);
+    // ...and THE REGULARS (O1), above the gate for the same reason: the
+    // armed tier line is looking for one person in seventeen chapters and
+    // Sydney is not one of them.
+    npcPalStep(dt);
 
     // --- biome gate ------------------------------------------------------
     // In Pasto every Sydneysider is detached from the scene and the physics
@@ -11256,6 +11313,318 @@ export function createNPCs(game) {
     if (saySomebodyNear(p.x, p.z, npcRUM_R, npcRumLine)) npcRumLine = '';
   }
 
+  // =========================================================================
+  // THE REGULARS — ONE PERSON PER PLACE WHO DOES NOT FORGET (ROADMAP-NEXT 1, O1)
+  //
+  // Every relationship in this game is a state of the current visit. `wary`
+  // and `fam` are both damped numbers on a record that is rebuilt when the
+  // chapter is, `saveWrite` writes no per-person field, and the checklist is
+  // the only thing that has ever crossed a reload — so a player coming back to
+  // a chapter they spent an hour in is a total stranger to every person in it,
+  // and the save proves they were here only with a tally.
+  //
+  // A REGULAR IS THE ONE PERSON PER CHAPTER WHO REMEMBERS. Five tiers, at most
+  // one tier per visit, and the tier is on the file. It is not a new kind of
+  // person and not a new system: it is a lookup that names somebody who is
+  // already standing there, a line pool, and a counter in systems.js.
+  //
+  // ---- WHO, AND HOW THEY ARE NAMED ---------------------------------------
+  // A local record has no id. It has no name, no kind and no key — a chapter
+  // calls addLocal with coordinates and lines, and what comes back is
+  // identified by nothing at all. Three ways to point at one, and the third is
+  // the only honest one:
+  //   BY INDEX into `locals` — stable today and silently wrong the first time
+  //     a chapter file reorders two calls, which is the failure that seated
+  //     five diners on thin air.
+  //   BY A NEW FIELD on addLocal — correct, and seventeen biome files edited
+  //     for a field only this table reads.
+  //   BY WHAT THEY SAY, which is what they are. `find` is a substring of the
+  //     person's own first line, so the row below IS legible as a person, and
+  //     a rewording breaks it LOUDLY: `palAudit()` reports every chapter whose
+  //     regular could not be found, and qa/o1-static.cjs asserts seventeen.
+  //
+  // SEVENTEEN, NOT NINETEEN, AND THE REASON IS NOT THE ONE THE ITEM ASSUMED.
+  // Sydney and Pasto register zero locals — their people are the steering cast
+  // and they walk — so neither has anybody who can be a fixed regular.
+  // Measured: the item guessed the two empty chapters were the Pantanal and
+  // Son Doong, and both of those have seven locals each; they are simply
+  // thirty metres from the spawn, which the arming below makes irrelevant.
+  //
+  // ---- WHAT EARNS A TIER, AND WHAT IT COSTS ------------------------------
+  // `fam` crossing npcFAM_HEAT — which is THE CALM, read on one person. It is
+  // "sit near them and let something be nothing for a while", which is the one
+  // thing this game has always wanted a player to be rewarded for.
+  // MEASURED, four chapters, animal placed 2.5 m away and never touched again:
+  // the crossing lands at 24.4 s in all four, and full familiarity at 61-97.
+  // So a tier is about twenty-five seconds of deliberately doing nothing.
+  //
+  // IT LATCHES ON THE CROSSING AND IS NEVER A HELD STATE, and that is not
+  // fussiness. In the same runs `wary` spiked to 0.5-0.97 between 25 and 30
+  // seconds in every chapter with props near the counter, off a prop:impact
+  // inside npcWARY_BLAME of a MOTIONLESS animal — the blame radius is a
+  // radius, not an accusation — and `fam` was wiped to zero in two of the
+  // four. A tier that asked the player to HOLD a number would be a coin flip
+  // on the world's own furniture. Crossing it once is the whole condition.
+  //
+  // ---- AND THE LINE WAITS FOR THEM ---------------------------------------
+  // The item wanted the tier line on arrival, and that was measured against
+  // the spawns: only twelve of the seventeen have their regular within twelve
+  // metres of where you land, and the Drift's is 26 m away, Son Doong's 31,
+  // the Pantanal's 32. Nobody is moved and no regular is re-chosen for being
+  // far away. The line is ARMED instead, exactly as B15's rumour is — held
+  // until the person it belongs to is within earshot and free, then spent.
+  // The difference from the rumour is the only interesting part: a rumour
+  // wants ANYBODY and this wants one named person, so it cannot go through
+  // saySomebodyNear and keeps its own six lines of earshot.
+  const npcPAL_R    = 11;    // m the regular has to be inside to say their line
+  const npcPAL_WAIT = 1.6;   // s after arming before it is first tried
+  const npcPAL_TRY  = 0.8;   // s between tries while they are out of earshot
+  const npcPAL_KEEP = 210;   // s an unspoken line is kept before it is dropped
+  // ---- THE SEVENTEEN ------------------------------------------------------
+  // `find` identifies them (see above). `who` is what the paper calls them.
+  // `call` is THEIR NAME FOR YOU, which arrives at tier three and is theirs —
+  // the joke of the whole item is that the capybara is famous and this person
+  // is not impressed, so the name is never flattering and never the animal's.
+  // `tiers` is one line per tier, said the moment the tier is earned and then
+  // used as their greeting on every arrival until the next one is. That is
+  // deliberate and not a saving: the line a person has for you IS the state of
+  // the friendship, and hearing "Oh. It is you." on three arrivals running is
+  // the joke working rather than a pool that ran dry.
+  const npcPAL = {
+    quay: { who: 'the platform guard', find: 'Mind the gap', call: 'Gap',
+      tiers: ['Oh. It is you.',
+              'You again. Nobody has reported you yet.',
+              'Morning, Gap. That is what I have got you down as.',
+              'Between us: the gate on the end has never locked.',
+              'Chair is behind the barrier. Do not tell the ferry people.'] },
+    kyoto: { who: 'the step-sweeper', find: 'swept this step', call: 'Sweeper',
+      tiers: ['You are standing on the step.',
+              'Sixty years, and you are the first to come back.',
+              'You sweep as well as anybody. Sweeper.',
+              'The moss on the north corner is four hundred years old. Nobody is told that.',
+              'I have left the low stone clear. That one is yours.'] },
+    cali: { who: 'the lulada seller', find: 'Lulada! Con hielo! Two thousand!', call: 'Primo',
+      tiers: ['Ah. The animal.',
+              'Twice. Twice is a customer.',
+              'Primo. Con hielo, no charge, do not tell anybody.',
+              'The good lulo comes off the second cart, never the first.',
+              'That crate is yours. I stopped selling off it a week ago.'] },
+    rio: { who: 'the Globo man', find: 'Biscoito Globo', call: 'Doce',
+      tiers: ['You are in the way.',
+              'Back. Right. Still in the way.',
+              'Doce, then. Sweet. You look like the sweet ones.',
+              'The tide turns at the third post. That is when the beach is yours.',
+              'Sit under the umbrella. It is not for customers, it is for you.'] },
+    iceland: { who: 'the pylsa stand', find: 'Eina með öllu', call: 'Everything',
+      tiers: ['One with everything?',
+              'You do not eat them. You just stand there.',
+              'One With Everything. That is your name now. You earned it.',
+              'The lights are best from behind the stand, and not before midnight.',
+              'The hatch is open on your side. Sit in the warm.'] },
+    sahara: { who: 'the orange cart', find: 'Four dirham! Fresh', call: 'Four Dirham',
+      tiers: ['No. No animals at the cart.',
+              'You came back to a man who said no. Interesting.',
+              'Four Dirham. Because you have never once paid it.',
+              'The drummers start when the light comes off the mosque. Not before.',
+              'I have moved the crate. You fit it exactly.'] },
+    drift: { who: 'the ice fisherman', find: 'I have been at it eleven years', call: 'Eleven Years',
+      tiers: ['There is nothing down there, and now there is you.',
+              'Eleven years alone. Two days of company.',
+              'Eleven Years. You have nearly been here as long as I have.',
+              'Under the second ridge it is warm. Do not ask me how I know.',
+              'Second stool. It has been out since you left.'] },
+    venice: { who: 'the gondolier', find: 'Gondola, gondola', call: 'Fifty Minutes',
+      tiers: ['Gondola? No. Not for you.',
+              'Still no. But you are consistent.',
+              'Fifty Minutes. That is what you cost me every time.',
+              'The water comes up the calle before it comes up the square. Watch the calle.',
+              'Get in. Sit at the front. Nobody sits at the front.'] },
+    kowloon: { who: 'the egg tart baker', find: 'Egg tart', call: 'Two Minutes',
+      tiers: ['Ah. No. Shoo.',
+              'Shoo. Softer, that time.',
+              'Two Minutes. Because you turn up when they come out. Every time.',
+              'It is the four o clock tray. It has never been the noon tray.',
+              'The stool is out. It is out because of you.'] },
+    palawan: { who: 'the net mender', find: 'Net has a hole', call: 'Hole',
+      tiers: ['Mind the net.',
+              'You did mind the net. Nobody minds the net.',
+              'Hole. You are named after the net. Here that is an honour.',
+              'The far reef opens an hour after the tide turns, and only an hour.',
+              'The dry end of the mat is yours now.'] },
+    goreme: { who: 'the tea maker', find: 'There is always tea', call: 'Cay',
+      tiers: ['Sit, then. Everybody sits.',
+              'You sat. And you came back to sit again.',
+              'Cay. That is you. You are the tea now.',
+              'The balloons go up off the west field while the valley is still dark.',
+              'The cushion by the stove. I have stopped putting anybody else on it.'] },
+    // MANLY'S REGULAR IS THE LIFEGUARD AND WAS THE CHIP SHOP, and the reason
+    // is a measurement rather than a preference. A tier is earned by sitting
+    // still beside somebody, so a regular has to be somebody a capybara can
+    // actually sit beside. Eight bearings at 2.4 m, forty-five seconds each:
+    // at the chip shop the animal WEDGED on two of them — restT flat at 0.0
+    // for the whole run, which is the calm never starting, which is the tier
+    // being unreachable from that side — and slid up to 5.5 m on three more.
+    // At the lifeguard it wedged on none and slid on one.
+    //
+    // AND MANLY IS SLOW EVEN SO. Its calm settles at 0.775 against Kyoto's
+    // 0.996 (the surf keeps `chaos` alive), and `fam` rises with the calm as
+    // a multiplier — so a tier here is about a minute where everywhere else
+    // it is twenty-five seconds. That is the beach being a beach, and it is
+    // left alone.
+    manly: { who: 'the lifeguard', find: 'Swim between the flags, mate', call: 'Flags',
+      tiers: ['Not between the flags. Nothing is, today.',
+              'You again. Still not between the flags.',
+              'Flags. That is you. You have never once been between them.',
+              'The rip runs out past the second flag. That is the fast way round.',
+              'Tower is open. Sit up there, out of the wind.'] },
+    pantanal: { who: 'the cattle hand', find: 'Eleven in the pen', call: 'Twelve',
+      tiers: ['Eleven in the pen and one at the gate.',
+              'Twice at the gate. That is a habit.',
+              'Twelve. I have started counting you.',
+              'The otters come through at first light and not at dusk. Everybody gets that wrong.',
+              'The gate is open on the shady side. That is where you go.'] },
+    cave: { who: 'the rope man', find: 'Rope is good', call: 'Good Rope',
+      tiers: ['Do not touch the rope.',
+              'You did not touch the rope. Twice.',
+              'Good Rope. It is the best thing I can call anybody.',
+              'There is a way through at the back of the second chamber. It is not on the survey.',
+              'I have coiled one flat for you. That is a bed.'] },
+    antarctic: { who: 'the base bar', find: 'We open at six', call: 'Six',
+      tiers: ['We open at six. It is not six.',
+              'It is not six, and here you are again.',
+              'Six. Because you have never once come at six.',
+              'The pack breaks off the point about an hour before anybody says it will.',
+              'That end of the bench is yours. I have stopped wiping it.'] },
+    monaco: { who: 'the deckhand', find: 'The owner is in Gstaad', call: 'Sir',
+      tiers: ['Off the boat. Off.',
+              'Off the boat, sir. That is a promotion.',
+              'Sir. I have decided you are the owner and he is not.',
+              'The gate at the end of the pontoon is never locked before ten.',
+              'The cushion is out. The owner has never sat on it. You have.'] },
+    hanoi: { who: 'the tea lady', find: 'It is always tea', call: 'Always Tea',
+      tiers: ['Too hot for tea. Have some tea.',
+              'You have had two teas and drunk neither.',
+              'Always Tea. That is what the street calls you now. My fault.',
+              'The traffic stops for nothing, so you go slowly. Slowly is the whole trick.',
+              'The little stool. The blue one. It is not for customers.'] },
+  };
+  const npcPAL_MAX = 5;
+  let npcPalRec = null, npcPalFor = '';   // the cached pick and the chapter it is for
+  let npcPalFind = 0;                     // s until the next attempt to find them
+  let npcPalLine = '', npcPalT = 0, npcPalKeep = 0;
+  let npcPalWarm = false;                 // has this visit already reported a warming
+  /**
+   * THE REGULAR IN THE LIVE CHAPTER, OR NULL. Cached per chapter, and the
+   * cache is only filled by a HIT: a chapter's locals are registered while it
+   * builds, so the first call can legitimately come before the person exists,
+   * and a cached null would be permanent for the session. A miss re-searches
+   * twice a second, which is a handful of string tests, and stops mattering
+   * the moment the chapter has finished building.
+   */
+  function npcPalPick(dt) {
+    const live = game.biome && game.biome.current;
+    if (!live || !npcPAL[live]) { npcPalRec = null; npcPalFor = live || ''; return null; }
+    if (npcPalFor === live && npcPalRec) return npcPalRec;
+    if (npcPalFor !== live) { npcPalFor = live; npcPalRec = null; npcPalFind = 0; }
+    npcPalFind -= dt || 0;
+    if (npcPalFind > 0) return null;
+    npcPalFind = 0.5;
+    const find = npcPAL[live].find;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      // The traveller is excluded BY NAME rather than by luck: they are the
+      // nearest person to the spawn in Marrakech and in Cappadocia, they are
+      // already the recurring character who remembers you, and a regular who
+      // was also the traveller would be one person doing two jobs in four of
+      // the seventeen chapters.
+      if (!L || L.biome !== live || L.trav || !L.lines || !L.lines.length) continue;
+      const f = L.lines[0];
+      const t = typeof f === 'string' ? f : (f && f.t);
+      if (t && t.indexOf(find) >= 0) { npcPalRec = L; return L; }
+    }
+    return null;
+  }
+  /**
+   * HOLD A LINE UNTIL THE REGULAR CAN SAY IT. systems.js owns the tier and
+   * calls this; the pool, the earshot and the waiting are here, which is the
+   * split B15 settled. `n` is 1..5.
+   */
+  function npcPalArm(n) {
+    const live = game.biome && game.biome.current;
+    const row = live && npcPAL[live];
+    npcPalLine = '';
+    if (!row || !(n >= 1 && n <= npcPAL_MAX)) return '';
+    npcPalLine = row.tiers[n - 1] || '';
+    npcPalT = npcPAL_WAIT;
+    npcPalKeep = npcPAL_KEEP;
+    return npcPalLine;
+  }
+  /** Who a chapter's regular is, for the paper. Never their tier: that is a
+   *  fact about the journey and it lives on the file, in systems.js. */
+  function npcPalWho(name) {
+    const row = npcPAL[name];
+    return row ? { who: row.who, call: row.call, max: npcPAL_MAX } : null;
+  }
+  /**
+   * THE HARNESS'S WINDOW, and it exists because of the `find` decision above:
+   * a regular who cannot be found is a chapter with the whole item switched
+   * off in it, and nothing in the game would ever say so.
+   */
+  function npcPalAudit() {
+    const out = { found: [], missing: [], live: (game.biome && game.biome.current) || '',
+                  line: npcPalLine, warm: npcPalWarm };
+    for (const k in npcPAL) {
+      let hit = null;
+      for (let i = 0; i < locals.length; i++) {
+        const L = locals[i];
+        if (!L || L.biome !== k || L.trav || !L.lines || !L.lines.length) continue;
+        const f = L.lines[0], t = typeof f === 'string' ? f : (f && f.t);
+        if (t && t.indexOf(npcPAL[k].find) >= 0) { hit = L; break; }
+      }
+      if (hit) out.found.push({ b: k, who: npcPAL[k].who, x: +hit.x.toFixed(1),
+                                z: +hit.z.toFixed(1), fam: +(hit.fam || 0).toFixed(2) });
+      else out.missing.push(k);
+    }
+    return out;
+  }
+  function npcPalStep(dt) {
+    if (!game.state.started) return;
+    const rec = npcPalPick(dt);
+    // ---- the armed line, waiting for its person -------------------------
+    if (npcPalLine) {
+      npcPalKeep -= dt;
+      if (npcPalKeep <= 0) npcPalLine = '';
+      else {
+        npcPalT -= dt;
+        if (npcPalT <= 0) {
+          npcPalT = npcPAL_TRY;
+          const p = game.capy && game.capy.position;
+          // Their own mouth, and not saySomebodyNear's nearest free one: this
+          // line belongs to one person, and being said by the man on the next
+          // stall is worse than not being said at all.
+          if (rec && p && rec.fig && rec.anchor && (rec.talkCd || 0) <= 0 && !rec.own &&
+              (rec.x - p.x) * (rec.x - p.x) + (rec.z - p.z) * (rec.z - p.z) < npcPAL_R * npcPAL_R) {
+            rec.talkCd = rand(10, 22);
+            rec.lookX = p.x; rec.lookZ = p.z;
+            rec.cd = Math.max(rec.cd || 0, 4.5);   // and they do not talk over themselves
+            try { rec.anchor.speak(npcPalLine); } catch (e) { /* the bubble is optional */ }
+            npcPalLine = '';
+          }
+        }
+      }
+    }
+    // ---- and the warming, which is what earns the tier -------------------
+    // ONE REPORT PER VISIT, and it is a report and not a decision: systems.js
+    // holds the number, knows whether the tier is already five, and may say
+    // no. The flag is cleared by `biome:enter` and by nothing else.
+    if (npcPalWarm || !rec) return;
+    if ((rec.fam || 0) > npcFAM_HEAT && (rec.wary || 0) <= npcWARY_HEAT) {
+      npcPalWarm = true;
+      try { game.events.emit('pal:warm', { biome: npcPalFor, who: npcPAL[npcPalFor].who }); }
+      catch (e) { /* the bus is optional */ }
+    }
+  }
+
   /**
    * HOW MANY PEOPLE ARE NEAR THIS POINT, IN THIS CHAPTER (B5).
    *
@@ -11314,6 +11683,12 @@ export function createNPCs(game) {
            // same reason charmAudit and notoAudit exist: an armed line that
            // never finds a speaker is invisible from outside.
            rumourArm: npcRumArm, rumourAudit: npcRumAudit,
+           // ---- THE REGULARS (O1) ----
+           // Same split as the rumour above it, and for the same reason:
+           // systems.js owns the tier because the tier is on the save file,
+           // and this module owns who the person is, what they say and how
+           // long a line waits for them.
+           palArm: npcPalArm, palWho: npcPalWho, palAudit: npcPalAudit,
            // ---- THE PLACE, rather than the person (v33) ----
            // `placeHeat` is what the music and the finds read; `forceHeat` is
            // the differential lever and is a test hook, not a feature.

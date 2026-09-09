@@ -74,6 +74,34 @@ other (2 and 3) and the order below respects that.
 
 ### 1. THE REGULARS — one friend per place, who remembers you across days
 
+> **BUILT, first half, 9 Sep 2026 (O1). See CONTRACT.md.** The seventeen
+> regulars, five tiers each, one tier per visit, the tier on the save file,
+> the line said by them and the line on the record board. What the friendship
+> BUYS is the second batch.
+>
+> Four premises measured, and three of them moved the design:
+>
+> - **It is seventeen, and not for the reason above.** Sydney and Pasto
+>   register ZERO locals; the Pantanal and Son Doong, which this item guessed
+>   were the empty two, have seven each — standing 31 m from the door.
+> - **Only twelve of the seventeen have their regular within earshot of the
+>   spawn.** Nobody was moved and nobody was re-chosen for it: the tier line
+>   is ARMED, like B15’s rumour, and waits for the person it belongs to.
+>   Measured in the four furthest: silent at the spawn, spent on arrival at
+>   the counter.
+> - **A tier costs 24.4 s of sitting still**, identically in four chapters —
+>   but it must LATCH on the crossing, because a prop banging within the blame
+>   radius of a motionless animal wiped `fam` to zero in two runs of four.
+> - **Manly’s regular is the lifeguard and not the chip shop**, because eight
+>   bearings at 2.4 m WEDGED the animal on two of them: `restT` flat at zero,
+>   the calm never starting, the tier unreachable from that side.
+>
+> And two bugs that only a relationship could find: `fam` is frozen the
+> moment you leave a chapter (0.618 for two minutes in Kyoto — F3’s bug with
+> the sign flipped, and it made tiers 2 to 5 free), and **`talkCd` has never
+> been decremented for a local**, so every local in seventeen chapters had
+> exactly one `sayNear` line in them for the life of the session.
+
 **Concept.** Every chapter names one local — a stallholder, a gardener, the
 gondolier, the barista, the doorman, the station cook — as *the regular*: the
 person in that place who notices you first and, uniquely in the game, does not

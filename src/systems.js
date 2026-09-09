@@ -22837,6 +22837,24 @@ export function createSystems(game) {
       // The record board is the last thing the paper ever says about a place,
       // so it is where the souvenir belongs: it is the one line on it that is
       // about somewhere else.
+      // ---- AND THE ONE PERSON HERE WHO KNOWS YOU (O1) --------------------
+      // The board is a list of numbers you hold and a door to leave by, and
+      // it is the last thing the paper ever says about a place. THE REGULARS
+      // is the only reason to come back to a finished chapter that is not a
+      // figure to beat, so this is the line that says so. Silent in Sydney
+      // and Pasto, which register no locals and have no regular — the same
+      // silence THE PERCH keeps in the thirteen chapters with nothing to
+      // ride, and it is how a player finds out which places have one.
+      {
+        const who = (typeof game.palWho === 'function') ? game.palWho((chapterDef(n) || {}).biome) : null;
+        const t = jrChapPal[n] || 0;
+        if (who) {
+          best += (best ? '\n' : '') + 'the regular: ' + who.who + ' — ' +
+            (t >= sysPAL_MAX ? 'knows you'
+              : t > 0 ? t + ' of ' + sysPAL_MAX + ', come back'
+              : 'has not noticed you yet');
+        }
+      }
       if (cdef && cdef.keep) best += (best ? '\n' : '') + 'you kept: ' + cdef.keep;
       clueEl.textContent = best || 'nothing left undone here';
       clueEl.classList.remove('off');
@@ -23066,6 +23084,8 @@ export function createSystems(game) {
         pho: jrChapPho, fed: jrChapFed,
         // ...and THE PERCH's high-water mark (N2). See jrChapPerch.
         pas: jrChapPerch,
+        // ...and THE REGULARS’ tier (O1), on exactly the same terms.
+        pal: jrChapPal,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -24812,6 +24832,67 @@ export function createSystems(game) {
   // the api-key mismatch that seated five diners on thin air. It lives on the
   // ledger leaf instead, beside the four counts that are already there.
   const jrChapPerch = Object.create(null);    // chapter -> most on at once
+  // ---- ...AND THE ONE THAT IS A RELATIONSHIP (O1) ------------------------
+  // THE REGULARS: chapter -> what tier this place’s one person has reached
+  // with you, 1 to 5. Additive on the save on the same terms as the five
+  // above and the version does not move for it; a file written before it
+  // existed reads as nobody knowing you, which is the correct history.
+  //
+  // THE NUMBER IS HERE AND THE PERSON IS IN npc.js, and that split is B15’s
+  // rather than a preference: a tier is a fact about the JOURNEY, so it
+  // belongs beside the counts that are already saved, and who the gondolier
+  // is and what he says belongs beside the other hundred and ten people.
+  // This module never learns a name and npc.js never learns a number.
+  //
+  // AT MOST ONE TIER PER VISIT is enforced by npc.js clearing its own
+  // once-per-visit flag on `biome:enter`, and by nothing on this side — a
+  // second guard here would be two clocks for one rule, which is how the
+  // catch-all state came to reset the timer it was waiting on.
+  const sysPAL_MAX = 5;                       // tiers. npc.js authors five lines.
+  const jrChapPal = Object.create(null);      // chapter -> the regular’s tier
+  game.events.on('pal:warm', function () {
+    const cn = todoChapter();
+    if (cn <= 0 || (jrChapPal[cn] || 0) >= sysPAL_MAX) return;
+    jrChapPal[cn] = (jrChapPal[cn] || 0) + 1;
+    saveSoon();
+    // Said by THEM, now, in place. `palArm` holds a line until the person it
+    // belongs to is in earshot and free, which for a warming is very nearly
+    // the same frame: you are standing next to them, and that is what
+    // earned it.
+    try { if (typeof game.palArm === 'function') game.palArm(jrChapPal[cn]); }
+    catch (e) { /* an older npc.js has no regulars */ }
+  });
+  // ---- ...AND THEY SAY IT AGAIN WHEN YOU COME BACK (O1) ------------------
+  // The tier line IS their greeting until the next tier replaces it, so this
+  // is the whole of "somebody in this place is glad you came back". Only
+  // from tier 1: at nought they do not know you, and a stranger greeting you
+  // by arrangement is the opposite of the thing being built.
+  //
+  // IT DOES NOT FIGHT THE RUMOUR, by construction rather than by a gate.
+  // npcPAL_WAIT is 1.6 s and npcRUM_WAIT is 6.0, so the regular speaks first
+  // and their own talkCd then takes them out of saySomebodyNear’s reach —
+  // the rumour finds somebody else on the next stall, which is where a
+  // rumour should come from anyway.
+  //
+  // REGISTERED AFTER npc.js’s OWN HANDLER, which is not luck: main.js builds
+  // npcs before systems, that handler clears the armed line as part of
+  // resetting the visit, and a line armed before it would be thrown away on
+  // the frame it was written.
+  game.events.on('biome:enter', function () {
+    const cn = todoChapter();
+    const t = cn > 0 ? (jrChapPal[cn] || 0) : 0;
+    if (t < 1) return;
+    try { if (typeof game.palArm === 'function') game.palArm(t); }
+    catch (e) { /* an older npc.js has no regulars */ }
+  });
+  /** THE HARNESS’S WINDOW ON THE NUMBER. npc.js’s palAudit is the window on
+   *  the person; neither can see the other half, which is the point. */
+  game.palDebug = function () {
+    const out = { max: sysPAL_MAX, here: todoChapter(), tiers: {} };
+    for (const k in jrChapPal) out.tiers[k] = jrChapPal[k];
+    out.tier = out.tiers[out.here] || 0;
+    return out;
+  };
   game.events.on('npc:photo', function () {
     const cn = todoChapter();
     if (cn > 0) jrChapPho[cn] = (jrChapPho[cn] || 0) + 1;
@@ -25855,6 +25936,16 @@ export function createSystems(game) {
       // ...and THE PERCH's mark (N2), on exactly the same terms.
       const pas = jrFile.pas || {};
       for (const k in pas) if (typeof pas[k] === 'number') jrChapPerch[k] = pas[k];
+      // ...and THE REGULARS (O1), CLAMPED on the way in, which the four above
+      // do not need to be: those are counts and a silly one prints a silly
+      // number, and this one INDEXES A LINE POOL. A hand-edited file handing
+      // a chapter a sixth tier would greet the player with `undefined` on
+      // every arrival for the rest of the journey.
+      const pl = jrFile.pal || {};
+      for (const k in pl) {
+        if (typeof pl[k] !== 'number') continue;
+        jrChapPal[k] = Math.max(0, Math.min(sysPAL_MAX, Math.round(pl[k])));
+      }
       const fnd = jrFile.finds || [];
       for (let i = 0; i < fnd.length; i++) foundFind(fnd[i], true);
       const fat = jrFile.foundAt || {};

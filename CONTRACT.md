@@ -14,6 +14,178 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH SIX — THE REGULARS (O1 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 1, first batch: the memory.** One person per chapter who
+does not forget you, five tiers, at most one tier per visit, and the tier is on
+the save file. This batch is who they are, what earns a tier, what they say and
+where it is written down; what a friendship BUYS — the gift you carry away, the
+favour at tier four, the chair at tier five, the ledger leaf — is the second.
+
+Every relationship in the game was a state of the current visit. `wary` and
+`fam` are damped numbers on a record, `saveWrite` had no per-person field, and
+the checklist was the only thing that had ever crossed a reload — so a player
+coming back to a chapter they had spent an hour in was a stranger to everybody
+in it, and the file proved they had been there with a tally.
+
+### SEVENTEEN, AND NOT FOR THE REASON THE ITEM GAVE
+
+The item said nineteen and guessed the two blanks would be the Pantanal and Son
+Doong, "who have nobody by design". Measured, first thing:
+
+| | locals | nearest to the spawn |
+|---|---|---|
+| Sydney, Pasto | **0 each** | — |
+| the Pantanal | 7 | 31.7 m |
+| Son Doong | 7 | 31.4 m |
+| the other fifteen | 6–13 | 3.9 m to 26.1 m |
+
+Sydney and Pasto register no locals at all — their people are the steering cast
+and they walk — so it is seventeen, and the two chapters the item was worried
+about have a full cast that simply stands a long way from the door.
+
+### HOW YOU POINT AT A PERSON WHO HAS NO NAME
+
+A local record has no id, no name and no key: a chapter calls `addLocal` with
+coordinates and lines and what comes back is identified by nothing. Three ways,
+and the third is the only honest one — **by index** (silently wrong the first
+time a chapter file reorders two calls, which is the failure that seated five
+diners on thin air); **by a new field** on `addLocal` (correct, and seventeen
+biome files edited for a field one table reads); and **by what they say**.
+
+`find` is a substring of the person's own first line, so the table reads as a
+cast list, and a rewording breaks it LOUDLY rather than quietly: `palAudit()`
+reports any chapter with no regular, and **`qa/o1-static.cjs` asserts that all
+seventeen `find` strings match exactly one line in exactly one chapter file** —
+which caught four ambiguous ones on its first run (`Lulada` appears thirty
+times in cali.js, mostly as `caliLuladaMesh`).
+
+The traveller is excluded by name, not by luck: they are the nearest person to
+the spawn in Marrakech and in Cappadocia, and they are already the recurring
+character who remembers you.
+
+### A TIER IS TWENTY-FIVE SECONDS OF DOING NOTHING
+
+`fam` crossing `npcFAM_HEAT`, which is THE CALM read on one person. Measured,
+four chapters, animal put down 2.5 m away and never touched again: the crossing
+lands at **24.4 s in all four**, and full familiarity at 61–97.
+
+**IT LATCHES ON THE CROSSING AND IS NEVER A HELD STATE.** In the same runs
+`wary` spiked to 0.5–0.97 between 25 and 30 seconds in every chapter with props
+near the counter, off a `prop:impact` inside `npcWARY_BLAME` of a **motionless**
+animal — the blame radius is a radius, not an accusation — and `fam` was wiped
+to zero in two of the four. A tier that asked a player to HOLD a number would
+be a coin flip on the world's own furniture.
+
+Then all seventeen were measured end to end, and two of them moved the design:
+
+| | tier 1 at | note |
+|---|---|---|
+| twelve chapters | 23.6–27.9 s | |
+| Marrakech | 30.7 s | |
+| the Antarctic | 90.7 s | the busiest square measured |
+| Kowloon | 105.3 s | calm settles at 0.593, the lowest in the game |
+| **Manly** | **never** | see below |
+
+**MANLY'S REGULAR IS THE LIFEGUARD AND WAS THE CHIP SHOP.** A tier is earned by
+sitting still beside somebody, so a regular has to be somebody a capybara can
+sit beside. Eight bearings at 2.4 m, forty-five seconds each: at the chip shop
+the animal **WEDGED on two of them** — `restT` flat at 0.0 for the whole run,
+which is the calm never starting, which is the tier unreachable from that side
+— and slid up to 5.5 m on three more. At the lifeguard it wedged on none.
+Manly is slow even so (calm 0.775 against Kyoto's 0.996, because the surf keeps
+`chaos` alive), so a tier there is about a minute. That is the beach being a
+beach and it is left alone.
+
+### TWO BUGS THAT ONLY A RELATIONSHIP COULD FIND
+
+**1. `fam` IS FROZEN THE MOMENT YOU LEAVE, WHICH IS F3's BUG WITH THE SIGN
+FLIPPED.** The only thing that decays it is a loop the chapter is gated out of.
+MEASURED: the gondolier left at 0.618 was still at **0.618 after two minutes in
+Kyoto**, to four decimal places. Nobody had noticed, because a frozen fondness
+does not look like anything — but with the number frozen the second tier and
+the third and the fourth cost a step through a door and back, and the whole
+item is bought in ninety seconds without anybody sitting anywhere. Cleared on
+`biome:enter`, in the loop three lines below the one F3 wrote for `wary`, and
+it is right on its own terms: `fam` is built out of the calm, which is a fact
+about right now, and what crosses the boundary is the TIER.
+
+**2. `talkCd` HAS NEVER BEEN DECREMENTED FOR A LOCAL, so every local in
+seventeen chapters had exactly ONE addressed line in them for the life of the
+session.** It is set in two places — `saySomebodyNear`, which is how B15's
+rumour and every `game.sayNear` line finds a mouth, and now the regular's own
+armed line — and it is decremented only in `stepHuman`, which is Sydney's and
+Pasto's roster. The field is not even in the local record's initialiser: it
+appears the first time somebody is picked, and it stays. MEASURED: **20.0 for
+forty unbroken seconds two metres from the person, with the game running.**
+`sayNear` picks the nearest FREE speaker, so it walks outward through a cast one
+line each and a chapter you keep returning to goes quiet from the middle out —
+invisible, because a line that is never said looks exactly like a line that was
+never armed. Found by the one feature whose whole surface is an addressed line
+from one named person on every arrival, which hit the ceiling on the second
+visit rather than the twentieth.
+
+### THE LINE WAITS FOR THEM
+
+The item wanted the tier line said on arrival, and that was measured against
+the spawns: only **twelve of the seventeen** have their regular within twelve
+metres of where the player lands. Nobody is moved and nobody is re-chosen for
+being far away — the line is ARMED, exactly as B15's rumour is, and held until
+the person it belongs to is in earshot and free. The one difference is the
+interesting part: a rumour wants ANYBODY and this wants one named person, so it
+cannot go through `saySomebodyNear`.
+
+Measured in the four far chapters, arriving at the spawn and standing there ten
+seconds before walking over: **silent at the spawn in every case, the line
+still held, and spent when the animal reached them.**
+
+It does not fight the rumour, by construction rather than by a gate:
+`npcPAL_WAIT` is 1.6 s and `npcRUM_WAIT` is 6.0, so the regular speaks first and
+their own `talkCd` takes them out of `saySomebodyNear`'s reach — the rumour
+finds somebody on the next stall, which is where a rumour should come from.
+
+### ONE LINE PER TIER, AND IT IS ALSO THE GREETING
+
+Eighty-five lines, five per person, said the moment the tier is earned and then
+used as their greeting on every arrival until the next one replaces it. That is
+deliberate and not a saving: **the line a person has for you IS the state of the
+friendship**, and hearing "Oh. It is you." on three arrivals running is the joke
+working rather than a pool that ran dry. The nickname arrives at tier three and
+is theirs, never the animal's — Cali's lulada seller says *Primo*, Monaco's
+deckhand *Sir*, Venice's gondolier *Fifty Minutes* — and the static check
+asserts that every tier-three line actually contains the name, or the item's one
+running joke would be a field nobody ever hears.
+
+Measured, five visits to Venice with a real thirty-second leg between each:
+tiers 1–5 at 24.2, 26.7, 27.2, 27.0 and 27.8 seconds, one per visit, the sixth
+visit adding nothing; **and after a real reload the gondolier greets the
+returning animal with "Get in. Sit at the front. Nobody sits at the front."**
+
+### WHERE IT IS WRITTEN DOWN
+
+`pal: {chapter: tier}` on the journey file, additive, no version bump, on
+exactly the terms of `pho`, `fed` and `pas` — with one difference: it is CLAMPED
+on the way in, which the counts are not. Those are numbers and a silly one
+prints a silly number; this one indexes a line pool, and a hand-edited file
+handing a chapter a sixth tier would greet the player with `undefined` for the
+rest of the journey.
+
+The number is in systems.js and the person is in npc.js — B15's split, for
+B15's reason. This module never learns a name and npc.js never learns a number.
+
+The record board gains one line: *the regular: the gondolier — 2 of 5, come
+back*, and *knows you* at five. It is silent in Sydney and Pasto, the same
+silence THE PERCH keeps in the thirteen chapters with nothing to ride, and it is
+how a player finds out which places have one.
+
+### WHAT IS NOT HERE
+
+What the friendship BUYS is the second batch: the gift off their stall you can
+carry away, the "looks the other way" wariness multiplier at tier four, the
+chair at tier five, the finds, and the ledger leaf. The tier lines already
+promise all four, which is the right order — the promise is the thing that makes
+a player come back to find out.
+
 ## THE NEXT PASS, BATCH FIVE — SLEEP ON IT (N5 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 3, second batch: the mode.** N4 built the animal. This is

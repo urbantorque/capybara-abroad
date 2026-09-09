@@ -1904,6 +1904,14 @@ function mainBoot() {
     // the only caller; npc.js owns the pool, the earshot and the waiting.
     game.rumourArm = npcs.rumourArm;
     game.rumourAudit = npcs.rumourAudit;
+    // THE REGULARS (O1, ROADMAP-NEXT item 1). The same three-line shape as the
+    // rumour above, and the same split: systems.js holds the tier because the
+    // tier is a fact about the journey and lives on the save file, and npc.js
+    // holds the person, the pool and the earshot. `palAudit` is the harness
+    // window on a lookup that can silently find nobody.
+    game.palArm = npcs.palArm;
+    game.palWho = npcs.palWho;
+    game.palAudit = npcs.palAudit;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.
