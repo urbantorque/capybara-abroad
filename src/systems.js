@@ -20469,6 +20469,17 @@ export function createSystems(game) {
         // this place has one and that one did not.
         const pa = jrChapPerch[n] || 0;
         if (pa) nb.push(pa === 1 ? 'carried a passenger' : 'carried ' + pa + ' at once');
+        // ---- ...AND WHO KNOWS YOU HERE (O2) ----------------------------
+        // The leaf is four counts and a high-water mark, and every one of them
+        // is something the player DID. This is the one line on it about
+        // somebody else, and it is on the leaf rather than only on the record
+        // board because the ledger is the thing you read at the end — and
+        // "somebody in that place has a chair out for you" is the closing
+        // sentence this whole item was written for.
+        const pt = jrChapPal[n] || 0;
+        if (pt >= 5) nb.push('the regular has a chair out');
+        else if (pt >= 3) nb.push('the regular knows you by name');
+        else if (pt > 0) nb.push('the regular is coming round');
         if (nb.length) row.appendChild(sysEl('div', 'capyui-lednoto', nb.join('  ·  ')));
       }
       // ---- ...AND WHAT THE PLACE WAS LIKE (P6) ---------------------------
@@ -23985,6 +23996,20 @@ export function createSystems(game) {
     },
     'full-house':    function () { return game.perchCount() >= 3; },
 
+    // ---- ...and who came to know you while you did (O2) ------------------
+    // THE REGULARS’ discovery channel. Nothing in this game tells a player
+    // that sitting still beside one particular person for twenty-five seconds
+    // is worth anything at all, and a mechanic whose whole cost is patience is
+    // the one that most needs a line saying it happened.
+    //
+    // Read off the SAVED tiers rather than off an event, exactly as the perch
+    // finds read `perchCount()`: a tier is a state, it survives a reload, and
+    // a find armed off the bump would be unreachable for a player who earned
+    // the tier in a session that ended before the predicate next ran.
+    'known-here':    function () { return palBest() >= 3; },
+    'chair-out':     function () { return palBest() >= 5; },
+    'five-places':   function () { return palCount(3) >= 5; },
+
     // ---- what you did with the time --------------------------------------
     'perfectly-still': function (c) {
       if (c.sp > 0.15 || !c.capy.grounded || c.capy.carriedBy) { findS.stillT = 0; return false; }
@@ -24859,8 +24884,14 @@ export function createSystems(game) {
     // belongs to is in earshot and free, which for a warming is very nearly
     // the same frame: you are standing next to them, and that is what
     // earned it.
-    try { if (typeof game.palArm === 'function') game.palArm(jrChapPal[cn]); }
-    catch (e) { /* an older npc.js has no regulars */ }
+    try {
+      if (typeof game.palSet === 'function') game.palSet(jrChapPal[cn]);
+      if (typeof game.palArm === 'function') game.palArm(jrChapPal[cn]);
+    } catch (e) { /* an older npc.js has no regulars */ }
+    // O2: the tier is the only number npc.js is ever told, and it is told it
+    // HERE and on `biome:enter` and nowhere else. What it does with it — the
+    // gift at three, the favour at four — is its own business, in the same way
+    // the line pool is.
   });
   // ---- ...AND THEY SAY IT AGAIN WHEN YOU COME BACK (O1) ------------------
   // The tier line IS their greeting until the next tier replaces it, so this
@@ -24881,16 +24912,38 @@ export function createSystems(game) {
   game.events.on('biome:enter', function () {
     const cn = todoChapter();
     const t = cn > 0 ? (jrChapPal[cn] || 0) : 0;
+    // O2: SET BEFORE THE `t < 1` RETURN, and that is the whole of the bug this
+    // shape avoids. `palSet` has to be told about a chapter whose regular does
+    // NOT know you as much as one whose does — otherwise the tier left over
+    // from the last place is still in npc.js, and the fourth-tier favour and
+    // the third-tier gift follow the player into a chapter where nobody has
+    // ever met them.
+    try { if (typeof game.palSet === 'function') game.palSet(t); }
+    catch (e) { /* an older npc.js has no regulars */ }
     if (t < 1) return;
     try { if (typeof game.palArm === 'function') game.palArm(t); }
     catch (e) { /* an older npc.js has no regulars */ }
   });
   /** THE HARNESS’S WINDOW ON THE NUMBER. npc.js’s palAudit is the window on
    *  the person; neither can see the other half, which is the point. */
+  /** The best tier reached anywhere, and how many places are at least `t`.
+   *  Read by the three finds above and by nothing else. */
+  function palBest() {
+    let b = 0;
+    for (const k in jrChapPal) if (jrChapPal[k] > b) b = jrChapPal[k];
+    return b;
+  }
+  function palCount(t) {
+    let c = 0;
+    for (const k in jrChapPal) if (jrChapPal[k] >= t) c++;
+    return c;
+  }
   game.palDebug = function () {
     const out = { max: sysPAL_MAX, here: todoChapter(), tiers: {} };
     for (const k in jrChapPal) out.tiers[k] = jrChapPal[k];
     out.tier = out.tiers[out.here] || 0;
+    out.best = palBest();
+    out.atThree = palCount(3);
     return out;
   };
   game.events.on('npc:photo', function () {

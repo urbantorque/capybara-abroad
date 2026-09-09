@@ -35,14 +35,14 @@ for (let i = npc.indexOf('{', tStart); i < npc.length; i++) {
 }
 const body = npc.slice(npc.indexOf('{', tStart), tEnd);
 const rows = {};
-const rowRe = /(\w+):\s*\{\s*who:\s*'([^']*)',\s*find:\s*'([^']*)',\s*call:\s*'([^']*)',\s*tiers:\s*\[([\s\S]*?)\]\s*\}/g;
+const rowRe = /(\w+):\s*\{\s*who:\s*'([^']*)',\s*find:\s*'([^']*)',\s*call:\s*'([^']*)',\s*gift:\s*'([^']*)',\s*giftSay:\s*'((?:[^'\\]|\\.)*)',\s*tiers:\s*\[([\s\S]*?)\]\s*\}/g;
 let m;
 while ((m = rowRe.exec(body))) {
   const lines = [];
   const lRe = /'((?:[^'\\]|\\.)*)'/g;
   let q;
-  while ((q = lRe.exec(m[5]))) lines.push(q[1]);
-  rows[m[1]] = { who: m[2], find: m[3], call: m[4], tiers: lines };
+  while ((q = lRe.exec(m[7]))) lines.push(q[1]);
+  rows[m[1]] = { who: m[2], find: m[3], call: m[4], gift: m[5], giftSay: m[6], tiers: lines };
 }
 const keys = Object.keys(rows);
 console.log('regulars in the table: ' + keys.length);
@@ -65,6 +65,38 @@ for (const k of keys) {
     fail(k + ': tier 3 does not use the name "' + r.call + '"');
   }
   if (!/^the /.test(r.who)) note(k + ': `who` reads oddly on the board — "' + r.who + '"');
+}
+
+// ---- O2: the gift has to be a real prop type, and one that survives -------
+// A gift is SET DOWN and not thrown (see npcPalGive), which is what lets a
+// fragile or spilling type be one at all — measured, eight of the seventeen
+// candidates shattered or spilled when the lob was tried. Two things still
+// have to hold: the type must exist, and it must be something a capybara can
+// pick up, or the one object a person means you to have is scenery.
+{
+  const props = fs.readFileSync(path.join(SRC, 'props.js'), 'utf8');
+  const tS = props.indexOf('const physTYPES = {');
+  let dd = 0, tE = -1;
+  for (let i = props.indexOf('{', tS); i < props.length; i++) {
+    if (props[i] === '{') dd++;
+    else if (props[i] === '}') { dd--; if (dd === 0) { tE = i + 1; break; } }
+  }
+  const tBody = props.slice(tS, tE);
+  const defs = {};
+  for (const line of tBody.split(/\r?\n/)) {
+    const mm = line.match(/^  ([a-z0-9-]+):\s*\{/);
+    if (mm) defs[mm[1]] = line;
+  }
+  for (const k of keys) {
+    const g = rows[k].gift;
+    if (!g) { fail(k + ': no gift'); continue; }
+    if (!defs[g]) { fail(k + ': gift "' + g + '" is not a physTYPES entry'); continue; }
+    if (/grabbable:\s*false/.test(defs[g])) fail(k + ': gift "' + g + '" cannot be picked up');
+    if (/planted:\s*true/.test(defs[g])) fail(k + ': gift "' + g + '" is planted');
+    const mass = +(defs[g].match(/mass:\s*([\d.]+)/) || [])[1];
+    if (mass > 5) note(k + ': gift "' + g + '" weighs ' + mass + ' kg');
+    if (!rows[k].giftSay || rows[k].giftSay.length < 8) fail(k + ': gift has no line');
+  }
 }
 
 // ---- and every `find` matches exactly one person in that chapter ----------
@@ -109,6 +141,18 @@ const need = [
   [sys, 'pal: jrChapPal,', 'the tier is not written to the save'],
   [sys, 'const pl = jrFile.pal || {};', 'the tier is not read back from the save'],
   [sys, "'the regular: '", 'the record board has no line for the regular'],
+  // ---- O2 ----
+  [npc, 'function npcPalSoft(rec)', 'npc.js has no favour'],
+  [npc, 'function npcPalGive(rec)', 'npc.js has no gift'],
+  [npc, 'kick * npcPalSoft(L)', 'the bang does not read the favour'],
+  [npc, 'k * 0.5 * npcPalSoft(rec)', 'the barge does not read the favour'],
+  [npc, '0.5 * npcPalSoft(own)', 'the graze-owner does not read the favour'],
+  [main, 'game.palSet = npcs.palSet;', 'main.js does not publish palSet'],
+  [sys, 'game.palSet(t)', 'the tier is never handed to npc.js on arrival'],
+  [sys, "'the regular has a chair out'", 'the ledger leaf has no line for the regular'],
+  [sys, "'known-here':", 'the finds do not read the tiers'],
+  [fs.readFileSync(path.join(SRC, 'shared.js'), 'utf8'), "id: 'chair-out'",
+   'the finds table has no O2 rows'],
 ];
 for (const [hay, needle, why] of need) if (hay.indexOf(needle) < 0) fail(why);
 

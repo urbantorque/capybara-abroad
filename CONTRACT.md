@@ -14,6 +14,135 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH SEVEN — WHAT THE FRIENDSHIP BUYS (O2 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 1, second batch, and the item is closed.** O1 built the
+memory: seventeen regulars, five tiers, one tier per visit, the tier on the save
+file. This is the half where the tiers are not only a line — the thing off their
+stall at three, the favour at four, the chair at five, three finds and a line on
+the ledger leaf.
+
+The tier lines already promised all four, which is the right order: the promise
+is what makes a player come back to find out.
+
+### THE GIFT IS SET DOWN AND NOT THROWN, AND THAT WAS MEASURED
+
+B8's gift is an underarm lob because a snack can be lobbed. A regular's own
+thing is a bowl, a bottle, a mug, a paper cone of chips — and the roadmap's
+premise was that most chapters would have nothing suitable and the gift would
+have to "cap at the snack where nothing fits".
+
+Measured, the seventeen candidates dropped from hand height:
+
+| | |
+|---|---|
+| shattered on landing | cuencobowl, mug, winebottle, sunglasses, phobowl |
+| spilled | chips, coffee, flowers |
+| survived | ticket, dango, sandwich, basket, towel, hat, snack |
+
+**Eight of seventeen destroyed themselves on arrival** — correctly: `fragile`
+and `spill` are doing exactly what they are for. Set down at rest height
+instead, **all seventeen survive, all seventeen are grabbable, and every chapter
+gets a thing that is actually theirs.** The fallback the item asked for is not
+needed anywhere.
+
+And the fiction is better for it. A stranger who likes you throws you a snack;
+somebody who knows you puts the thing on the ground beside you and looks away —
+which is the one theft in this game that is consented to. `owner` is left null,
+exactly as `giveSnack` does: the one object a person means you to have must not
+be the one they come and fetch back.
+
+The gondolier gives you a bottle, the ice fisherman a mug, the platform guard
+yesterday's ferry ticket, Monaco's deckhand the owner's sunglasses. Thirteen of
+the seventeen come out of their own chapter's scatter palette.
+
+**ONE AT A TIME.** Measured before the guard existed: five minutes beside the
+gondolier at tier three left **three wine bottles standing on the pavement**.
+Each was correct on its own terms — the clock had run down each time — and
+together they are a person restocking a shelf nobody is taking anything off.
+`npcPalGiftOut` tests where the thing IS rather than whether an event fired:
+picked up, kicked in the canal, eaten, or knocked away by the animal walking
+past all read the same and all mean the same.
+
+### THE FAVOUR IS THE INTERLOCK RUNNING BACKWARDS
+
+`wary` is what shuts the charm economy down: over `npcWARY_HEAT` a person stops
+warming to you, stops photographing you and stops giving you anything. **Nothing
+in this game has ever been able to buy any of that back**, so a player who liked
+the mischief half was permanently poorer at the quiet half. At tier four one
+person stops holding it against you.
+
+MEASURED on the person rather than assumed — clear their wariness, bang
+something 0.85 m from their feet at 9 m/s, read what stuck:
+
+| tier | wary left behind |
+|---|---|
+| 1, 2, 3 | 0.509 |
+| **4, 5** | **0.126** |
+
+It scales the wariness WRITTEN and not `alarm`, not the flinch and not the line.
+They still jump, still turn round, still say something — the nine-skills pass
+found that soft feet had to do exactly this or the world stops reacting, which
+reads as a broken game rather than as a kindness. What changes is only what they
+REMEMBER. Three write sites, all three of them a local's: the bang, the barge
+and eating their stock in front of them.
+
+`npcQUIET_K` (0.45, soft feet) is the shape; 0.25 is the number, because this is
+meant to be worth more than a skill and it is ONE PERSON rather than everybody.
+
+### AND THE TIER IS THE ONLY NUMBER npc.js IS EVER TOLD
+
+O1's split was "systems.js owns the number, npc.js owns the person". O2 refines
+it rather than breaking it: systems.js owns the number because a tier is on the
+save file, and **npc.js owns what the number MEANS**, because that is the same
+kind of thing the line pool is. `palSet(n)` is the whole of the traffic, and the
+thresholds — gift at three, favour at four — live beside the lines.
+
+**IT IS SET BEFORE THE `t < 1` RETURN**, and that is the whole of the bug this
+shape avoids: `palSet` has to be told about a chapter whose regular does NOT
+know you as much as one whose does, or the tier left over from the last place is
+still in npc.js and the favour follows the player into a chapter where nobody
+has ever met them. Measured: tier 5 in Venice, then Kyoto — tier 0, multiplier
+1, an identical bang leaves the full 0.509, no gift.
+
+### WHERE IT IS SAID OUT LOUD
+
+**The ledger leaf**, which is the one line on it about somebody else — the other
+five are things the player did. *the regular is coming round* at one, *knows you
+by name* at three, *has a chair out* at five. The ledger is what you read at the
+end, and "somebody in that place has a chair out for you" is the closing
+sentence this whole item was written for.
+
+**And three finds**, read off the saved tiers rather than off an event — a tier
+is a state, it survives a reload, and a find armed off the bump would be
+unreachable for a player who earned it in a session that ended first:
+`known-here` (a nickname), `chair-out` (tier five), `five-places` (five chapters
+at three or better). Nothing in this game tells a player that sitting still
+beside one particular person is worth anything at all.
+
+### A HARNESS TRAP WORTH THE FOUR LINES
+
+**`localStorage.clear()` FOLLOWED BY `page.reload()` DOES NOT CLEAR THE SAVE.**
+The reload fires `pagehide`, the pagehide flush is unconditional — it has to be,
+the clock is always stale — and it writes the still-live in-memory journey
+straight back over the clear. Symptom: tiers in chapters the probe never
+visited, and five tiers out of three visits, which read exactly like the
+one-per-visit rule being broken. Reload first, clear on the fresh page, reload
+again: the second flush runs on a page that has never started a game, and
+`saveWrite` refuses to manufacture a file at the title card.
+
+Two smaller ones: **the ledger is `hud.ledger()` and Escape**, not a key — J, L
+and K open nothing and `.capyui-lednoto` never appears; and **the ledger pauses
+the game**, so npc.js is not ticked and nothing about a regular happens while it
+is up, which measures as a dead gift.
+
+### THE ITEM, CLOSED
+
+Nothing from ROADMAP-NEXT item 1 is left unbuilt. The one thing deliberately not
+done is a ledger line for the seventeen as a set — "eleven places know you" — 
+which is a number about the whole journey and belongs with item 5's postcard,
+where the passenger count from N2 is already waiting.
+
 ## THE NEXT PASS, BATCH SIX — THE REGULARS (O1 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 1, first batch: the memory.** One person per chapter who

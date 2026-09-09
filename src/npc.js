@@ -2435,7 +2435,10 @@ export function createNPCs(game) {
         // people five simultaneous gasps and a third of the chaos bar.
         if (kick > loudK) { loudK = kick; loud = L; }
         // ...and they remember it was you, for about half a minute.
-        if (mine) L.wary = Math.min(1, (L.wary || 0) + kick);
+        // ...and the one person in this chapter who has stopped minding (O2).
+        // The flinch above and the line below are untouched: they still jump
+        // and they still say something. Only the MEMORY is scaled.
+        if (mine) L.wary = Math.min(1, (L.wary || 0) + kick * npcPalSoft(L));
       }
       if (said < npcLOC_REACT_N && L.cd <= 0) {
         const arr = npcSay(L, kind);
@@ -3686,7 +3689,7 @@ export function createNPCs(game) {
       if (rec.biome !== live) return;
       rec.flV -= npcBARGE_KICK * k;
       rec.flYaw = Math.atan2(rec.x - px, rec.z - pz);
-      rec.wary = Math.min(1, (rec.wary || 0) + k * 0.5);
+      rec.wary = Math.min(1, (rec.wary || 0) + k * 0.5 * npcPalSoft(rec));   // O2: see npcPalSoft
       // ---- B11: AND THEY HAVE A BODY (item 4e) --------------------------
       //
       // Two of the item's three events, and the third is written down below
@@ -3860,7 +3863,7 @@ export function createNPCs(game) {
       own.cd = own.cool * rand(0.5, 0.9);
       localReactLine(own, own.says.produce || npcLOC_PRODUCE);
     }
-    own.wary = Math.min(1, (own.wary || 0) + 0.5);
+    own.wary = Math.min(1, (own.wary || 0) + 0.5 * npcPalSoft(own));   // O2: see npcPalSoft
     // Eating somebody's stock in front of them is the most witnessed thing in
     // the game and it is the one mischief path that never reaches localsReact.
     if (cp) npcHeatBump(cp.x, cp.z, 'graze:owner');
@@ -9825,6 +9828,9 @@ export function createNPCs(game) {
     // warming and systems.js decides what a warming is worth.
     npcPalWarm = false;
     npcPalLine = '';
+    // O2: the prop belonged to the chapter that has just been detached, so
+    // the reference is a pointer into a world that no longer exists.
+    npcPalGiftP = null;
     // The ending is STAGED EVERY TIME and closed once — props.js huddles all
     // seventeen souvenirs at the next chapter's spawn on the way out, so
     // sysFinaleStage runs again on every return and this must be able to
@@ -11392,66 +11398,77 @@ export function createNPCs(game) {
   // the joke working rather than a pool that ran dry.
   const npcPAL = {
     quay: { who: 'the platform guard', find: 'Mind the gap', call: 'Gap',
+      gift: 'ticket', giftSay: 'Ferry ticket. It is yesterday\u2019s. Nobody checks.',
       tiers: ['Oh. It is you.',
               'You again. Nobody has reported you yet.',
               'Morning, Gap. That is what I have got you down as.',
               'Between us: the gate on the end has never locked.',
               'Chair is behind the barrier. Do not tell the ferry people.'] },
     kyoto: { who: 'the step-sweeper', find: 'swept this step', call: 'Sweeper',
+      gift: 'dango', giftSay: 'Take one. They go hard by the evening anyway.',
       tiers: ['You are standing on the step.',
               'Sixty years, and you are the first to come back.',
               'You sweep as well as anybody. Sweeper.',
               'The moss on the north corner is four hundred years old. Nobody is told that.',
               'I have left the low stone clear. That one is yours.'] },
     cali: { who: 'the lulada seller', find: 'Lulada! Con hielo! Two thousand!', call: 'Primo',
+      gift: 'cuencobowl', giftSay: 'Con hielo. Put it down and I will fill it again.',
       tiers: ['Ah. The animal.',
               'Twice. Twice is a customer.',
               'Primo. Con hielo, no charge, do not tell anybody.',
               'The good lulo comes off the second cart, never the first.',
               'That crate is yours. I stopped selling off it a week ago.'] },
     rio: { who: 'the Globo man', find: 'Biscoito Globo', call: 'Doce',
+      gift: 'snack', giftSay: 'Doce. On the house, and do not tell the beach.',
       tiers: ['You are in the way.',
               'Back. Right. Still in the way.',
               'Doce, then. Sweet. You look like the sweet ones.',
               'The tide turns at the third post. That is when the beach is yours.',
               'Sit under the umbrella. It is not for customers, it is for you.'] },
     iceland: { who: 'the pylsa stand', find: 'Eina með öllu', call: 'Everything',
+      gift: 'sandwich', giftSay: 'One with everything. You will not eat it. Take it.',
       tiers: ['One with everything?',
               'You do not eat them. You just stand there.',
               'One With Everything. That is your name now. You earned it.',
               'The lights are best from behind the stand, and not before midnight.',
               'The hatch is open on your side. Sit in the warm.'] },
     sahara: { who: 'the orange cart', find: 'Four dirham! Fresh', call: 'Four Dirham',
+      gift: 'cuencobowl', giftSay: 'Four dirham. I am not going to say it again.',
       tiers: ['No. No animals at the cart.',
               'You came back to a man who said no. Interesting.',
               'Four Dirham. Because you have never once paid it.',
               'The drummers start when the light comes off the mosque. Not before.',
               'I have moved the crate. You fit it exactly.'] },
     drift: { who: 'the ice fisherman', find: 'I have been at it eleven years', call: 'Eleven Years',
+      gift: 'mug', giftSay: 'It is hot. It will be cold in four minutes. Drink it.',
       tiers: ['There is nothing down there, and now there is you.',
               'Eleven years alone. Two days of company.',
               'Eleven Years. You have nearly been here as long as I have.',
               'Under the second ridge it is warm. Do not ask me how I know.',
               'Second stool. It has been out since you left.'] },
     venice: { who: 'the gondolier', find: 'Gondola, gondola', call: 'Fifty Minutes',
+      gift: 'winebottle', giftSay: 'Not the good one. Not the bad one either.',
       tiers: ['Gondola? No. Not for you.',
               'Still no. But you are consistent.',
               'Fifty Minutes. That is what you cost me every time.',
               'The water comes up the calle before it comes up the square. Watch the calle.',
               'Get in. Sit at the front. Nobody sits at the front.'] },
     kowloon: { who: 'the egg tart baker', find: 'Egg tart', call: 'Two Minutes',
+      gift: 'chips', giftSay: 'Straight out. Two minutes. Do not carry it far.',
       tiers: ['Ah. No. Shoo.',
               'Shoo. Softer, that time.',
               'Two Minutes. Because you turn up when they come out. Every time.',
               'It is the four o clock tray. It has never been the noon tray.',
               'The stool is out. It is out because of you.'] },
     palawan: { who: 'the net mender', find: 'Net has a hole', call: 'Hole',
+      gift: 'basket', giftSay: 'Basket has a hole in it as well. You will manage.',
       tiers: ['Mind the net.',
               'You did mind the net. Nobody minds the net.',
               'Hole. You are named after the net. Here that is an honour.',
               'The far reef opens an hour after the tide turns, and only an hour.',
               'The dry end of the mat is yours now.'] },
     goreme: { who: 'the tea maker', find: 'There is always tea', call: 'Cay',
+      gift: 'mug', giftSay: 'Tea. You did not ask. That is not how it works here.',
       tiers: ['Sit, then. Everybody sits.',
               'You sat. And you came back to sit again.',
               'Cay. That is you. You are the tea now.',
@@ -11472,47 +11489,69 @@ export function createNPCs(game) {
     // it is twenty-five seconds. That is the beach being a beach, and it is
     // left alone.
     manly: { who: 'the lifeguard', find: 'Swim between the flags, mate', call: 'Flags',
+      gift: 'towel', giftSay: 'Towel. It is not clean. Nothing here is clean.',
       tiers: ['Not between the flags. Nothing is, today.',
               'You again. Still not between the flags.',
               'Flags. That is you. You have never once been between them.',
               'The rip runs out past the second flag. That is the fast way round.',
               'Tower is open. Sit up there, out of the wind.'] },
     pantanal: { who: 'the cattle hand', find: 'Eleven in the pen', call: 'Twelve',
+      gift: 'hat', giftSay: 'Hat. The sun does not care that you are an animal.',
       tiers: ['Eleven in the pen and one at the gate.',
               'Twice at the gate. That is a habit.',
               'Twelve. I have started counting you.',
               'The otters come through at first light and not at dusk. Everybody gets that wrong.',
               'The gate is open on the shady side. That is where you go.'] },
     cave: { who: 'the rope man', find: 'Rope is good', call: 'Good Rope',
+      gift: 'mug', giftSay: 'Hot. It is the only hot thing in nine hundred metres.',
       tiers: ['Do not touch the rope.',
               'You did not touch the rope. Twice.',
               'Good Rope. It is the best thing I can call anybody.',
               'There is a way through at the back of the second chamber. It is not on the survey.',
               'I have coiled one flat for you. That is a bed.'] },
     antarctic: { who: 'the base bar', find: 'We open at six', call: 'Six',
+      gift: 'mug', giftSay: 'There. That is the mug nobody else gets.',
       tiers: ['We open at six. It is not six.',
               'It is not six, and here you are again.',
               'Six. Because you have never once come at six.',
               'The pack breaks off the point about an hour before anybody says it will.',
               'That end of the bench is yours. I have stopped wiping it.'] },
     monaco: { who: 'the deckhand', find: 'The owner is in Gstaad', call: 'Sir',
+      gift: 'sunglasses', giftSay: 'The owner\u2019s. The owner is in Gstaad.',
       tiers: ['Off the boat. Off.',
               'Off the boat, sir. That is a promotion.',
               'Sir. I have decided you are the owner and he is not.',
               'The gate at the end of the pontoon is never locked before ten.',
               'The cushion is out. The owner has never sat on it. You have.'] },
     hanoi: { who: 'the tea lady', find: 'It is always tea', call: 'Always Tea',
+      gift: 'phobowl', giftSay: 'Sit. Eat. It is not tea and I am not explaining.',
       tiers: ['Too hot for tea. Have some tea.',
               'You have had two teas and drunk neither.',
               'Always Tea. That is what the street calls you now. My fault.',
               'The traffic stops for nothing, so you go slowly. Slowly is the whole trick.',
               'The little stool. The blue one. It is not for customers.'] },
   };
-  const npcPAL_MAX = 5;
+  // ---- WHAT THE FRIENDSHIP BUYS (O2) --------------------------------------
+  // O1 built the memory and the lines. These are the two tiers that are not
+  // only a line, and the thresholds live HERE rather than in systems.js: that
+  // module owns the NUMBER, because a tier is on the save file, and this one
+  // owns what the number MEANS, because that is the same thing the line pool
+  // is. `palSet` is the whole of the traffic between them.
+  const npcPAL_MAX    = 5;
+  const npcPAL_GIFT_T = 3;    // tier at which they start putting things out
+  const npcPAL_SOFT_T = 4;    // ...and at which they stop noticing what you do
+  const npcPAL_SOFT   = 0.25; // × the wariness THEY write. See the block below.
+  const npcPAL_GIFT_CD = 95;  // s between one being put out. It is not a shop.
+  const npcPAL_GIFT_R  = 12;  // m — they do not do it to an empty street
+  const npcPAL_GIFT_D  = 1.35;// m from them it is set down
+  const npcPAL_GIFT_KEEP = 2.2;// m: within this of them, the last one is still there
   let npcPalRec = null, npcPalFor = '';   // the cached pick and the chapter it is for
   let npcPalFind = 0;                     // s until the next attempt to find them
   let npcPalLine = '', npcPalT = 0, npcPalKeep = 0;
   let npcPalWarm = false;                 // has this visit already reported a warming
+  let npcPalTier = 0;                     // O2: handed over by systems.js. See npcPalSet.
+  let npcPalGiftT = 0, npcPalGiven = 0;   // O2: the gift clock, and the session count
+  let npcPalGiftP = null;                 // O2: the last one, while it is still lying there
   /**
    * THE REGULAR IN THE LIVE CHAPTER, OR NULL. Cached per chapter, and the
    * cache is only filled by a HIT: a chapter's locals are registered while it
@@ -11559,6 +11598,111 @@ export function createNPCs(game) {
     npcPalKeep = npcPAL_KEEP;
     return npcPalLine;
   }
+  /**
+   * THE TIER, HANDED OVER BY THE ONLY MODULE THAT KNOWS IT (O2).
+   *
+   * systems.js calls this on `biome:enter` and on every bump. Nothing else
+   * writes it and nothing here persists it — a reload with no save leaves it
+   * at nought, which is the correct history for somebody nobody has met.
+   */
+  function npcPalSet(t) {
+    npcPalTier = (typeof t === 'number' && t > 0) ? Math.min(npcPAL_MAX, Math.round(t)) : 0;
+    return npcPalTier;
+  }
+  /**
+   * ...AND THEY LOOK THE OTHER WAY (O2, tier 4).
+   *
+   * THE INTERLOCK RUNNING BACKWARDS. `wary` is the memory of what the animal
+   * did and it is what shuts the charm economy down: over npcWARY_HEAT a
+   * person stops warming to you, stops photographing you and stops giving you
+   * anything. Until now nothing in the game could ever buy any of that back,
+   * so a player who liked the mischief half was permanently poorer at the
+   * quiet half. This is the first thing that goes the other way — and it is
+   * ONE PERSON in a chapter, at the fourth of five tiers, so it is a friend
+   * covering for you and not a difficulty setting.
+   *
+   * IT SCALES THE WARINESS WRITTEN AND NOT `alarm`, `fl` OR THE LINE. They
+   * still jump, still turn round, still say something — the nine-skills pass
+   * found that soft feet had to do exactly this or the world stops reacting,
+   * which reads as a broken game rather than as a kindness. What changes is
+   * only what they REMEMBER, which is the thing the tier is about.
+   *
+   * npcQUIET_K (0.45, soft feet) is the shape and 0.25 is the number: this is
+   * meant to be more than a skill, and it is one person rather than everybody.
+   */
+  function npcPalSoft(rec) {
+    if (!rec || npcPalTier < npcPAL_SOFT_T || rec !== npcPalRec) return 1;
+    return npcPAL_SOFT;
+  }
+  /**
+   * PUT SOMETHING OF THEIRS DOWN WHERE YOU CAN REACH IT (O2, tier 3).
+   *
+   * IT IS SET DOWN AND NOT THROWN, and that was measured rather than chosen.
+   * B8’s gift is an underarm lob because a snack can be lobbed; a regular’s
+   * own thing is a bowl, a bottle, a mug, a paper cone of chips — and eight of
+   * the seventeen candidates SHATTERED OR SPILLED on landing when the lob was
+   * measured (fragile: cuencobowl, mug, winebottle, sunglasses, phobowl;
+   * spill: chips, coffee, flowers). Set down at rest height instead, all
+   * seventeen survive and every one of them can be picked up.
+   *
+   * And the fiction is better for it. A stranger who likes you throws you a
+   * snack; somebody who knows you puts the thing on the ground next to you
+   * and looks away, which is the one theft in this game that is consented to.
+   *
+   * `owner` is left null on purpose, exactly as giveSnack does: the one object
+   * a person means you to have must not be the one they come and fetch back.
+   */
+  /**
+   * IS THE LAST ONE STILL LYING THERE (O2).
+   *
+   * MEASURED, before this existed: five minutes beside the gondolier at tier
+   * three left THREE WINE BOTTLES standing on the pavement between the two of
+   * them. Every one of them is correct on its own terms — the clock had run
+   * down each time — and together they are a person restocking a shelf that
+   * nobody is taking anything off.
+   *
+   * The test is where the thing IS and not whether an event fired: picked up,
+   * kicked into the canal, eaten, knocked away by the animal walking past —
+   * all of them read the same and all of them mean the same, which is that
+   * the gift has been dealt with. A prop that has been hidden (eaten, or down
+   * a vent) is parked at y -900, so the height test catches that for free.
+   */
+  function npcPalGiftOut(rec) {
+    const p = npcPalGiftP;
+    if (!p || !p.body) return false;
+    if (p.held) return true;                       // in the mouth counts as still theirs
+    const b = p.body.position;
+    if (b.y < -100) { npcPalGiftP = null; return false; }   // hidden or destroyed
+    const dx = b.x - rec.x, dz = b.z - rec.z;
+    if (dx * dx + dz * dz > npcPAL_GIFT_KEEP * npcPAL_GIFT_KEEP) { npcPalGiftP = null; return false; }
+    return true;
+  }
+  function npcPalGive(rec) {
+    const row = npcPAL[npcPalFor];
+    if (!row || !row.gift || !game.physics || typeof game.physics.spawnProp !== 'function') return null;
+    const yaw = rec.yaw || rec.face || 0;
+    const gx = rec.x + Math.sin(yaw) * npcPAL_GIFT_D + Math.cos(yaw) * 0.35;
+    const gz = rec.z + Math.cos(yaw) * npcPAL_GIFT_D - Math.sin(yaw) * 0.35;
+    let p = null;
+    try { p = game.physics.spawnProp(row.gift, gx, gz, rec.y); } catch (e) { p = null; }
+    if (!p) return null;
+    p.owner = null;
+    p.disturbed = true;
+    npcPalGiftP = p;
+    npcPalGiven++;
+    emit('npc:gift', rec);
+    try { game.events.emit('pal:gift', { biome: npcPalFor, kind: row.gift }); }
+    catch (e) { /* the bus is optional */ }
+    sfx('rustle', rec, 0.42, 0.95);
+    rec.gest = Math.max(rec.gest || 0, 1.1);
+    if (row.giftSay && (rec.talkCd || 0) <= 0) {
+      rec.talkCd = rand(8, 16);
+      rec.lookX = rec.x; rec.lookZ = rec.z;
+      rec.cd = Math.max(rec.cd || 0, 4.0);
+      try { rec.anchor.speak(row.giftSay); } catch (e) { /* optional */ }
+    }
+    return p;
+  }
   /** Who a chapter's regular is, for the paper. Never their tier: that is a
    *  fact about the journey and it lives on the file, in systems.js. */
   function npcPalWho(name) {
@@ -11572,7 +11716,12 @@ export function createNPCs(game) {
    */
   function npcPalAudit() {
     const out = { found: [], missing: [], live: (game.biome && game.biome.current) || '',
-                  line: npcPalLine, warm: npcPalWarm };
+                  line: npcPalLine, warm: npcPalWarm,
+                  tier: npcPalTier, given: npcPalGiven,
+                  giftIn: +npcPalGiftT.toFixed(1),
+                  giftOut: !!(npcPalRec && npcPalGiftOut(npcPalRec)),
+                  gift: (npcPAL[npcPalFor] && npcPAL[npcPalFor].gift) || null,
+                  soft: npcPalRec ? npcPalSoft(npcPalRec) : 1 };
     for (const k in npcPAL) {
       let hit = null;
       for (let i = 0; i < locals.length; i++) {
@@ -11611,6 +11760,22 @@ export function createNPCs(game) {
             npcPalLine = '';
           }
         }
+      }
+    }
+    // ---- ...and from the third tier they put something out (O2) ----------
+    // On a clock rather than on an event, and deliberately not on arrival: the
+    // thing is put out while you are standing there, which is the only way a
+    // player sees it happen rather than finding it. They will not do it to an
+    // empty street (npcPAL_GIFT_R) and they will not do it twice in a minute.
+    if (npcPalGiftT > 0) npcPalGiftT -= dt;
+    if (rec && npcPalTier >= npcPAL_GIFT_T && npcPalGiftT <= 0 && rec.fig &&
+        !npcPalGiftOut(rec) &&
+        !rec.own && rec.sat <= 0 && (rec.wary || 0) < npcWARY_HEAT) {
+      const cp = game.capy && game.capy.position;
+      if (cp && (rec.x - cp.x) * (rec.x - cp.x) + (rec.z - cp.z) * (rec.z - cp.z)
+                < npcPAL_GIFT_R * npcPAL_GIFT_R) {
+        npcPalGiftT = npcPAL_GIFT_CD * rand(0.9, 1.25);
+        npcPalGive(rec);
       }
     }
     // ---- and the warming, which is what earns the tier -------------------
@@ -11689,6 +11854,8 @@ export function createNPCs(game) {
            // and this module owns who the person is, what they say and how
            // long a line waits for them.
            palArm: npcPalArm, palWho: npcPalWho, palAudit: npcPalAudit,
+           // ...and O2: the tier, which is the only thing this module is told.
+           palSet: npcPalSet,
            // ---- THE PLACE, rather than the person (v33) ----
            // `placeHeat` is what the music and the finds read; `forceHeat` is
            // the differential lever and is a test hook, not a feature.

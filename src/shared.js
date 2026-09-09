@@ -3280,6 +3280,11 @@ export const FINDS = [
   { id: 'carried-on',     text: 'Walked fifty metres with a passenger' },
   { id: 'full-house',     text: 'Had three of them on your back at once' },
   { id: 'stowaway',       text: 'Took something across a border' },
+  // ---- THE REGULARS (O2). Sitting still beside one person is the whole
+  // cost of these three, and nothing else in the game asks for that.
+  { id: 'known-here',     text: 'Got a nickname out of somebody' },
+  { id: 'chair-out',      text: 'Had a chair put out for you' },
+  { id: 'five-places',    text: 'Five places know you by name' },
 
   // ---- WHERE YOU WENT ---------------------------------------------------
   { id: 'high-point',     text: 'Stood on the highest ground there is here' },

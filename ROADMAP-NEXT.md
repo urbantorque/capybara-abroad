@@ -101,6 +101,31 @@ other (2 and 3) and the order below respects that.
 > the sign flipped, and it made tiers 2 to 5 free), and **`talkCd` has never
 > been decremented for a local**, so every local in seventeen chapters had
 > exactly one `sayNear` line in them for the life of the session.
+>
+> **BUILT, second half, 9 Sep 2026 (O2). THE ITEM IS CLOSED.** The gift at
+> tier three, the favour at four, the chair on the ledger leaf at five, and
+> three finds.
+>
+> - **The gift is SET DOWN, not thrown, and that is why every chapter gets
+>   one.** Dropped from hand height like B8’s snack, EIGHT of the seventeen
+>   candidates destroyed themselves on landing (fragile: cuencobowl, mug,
+>   winebottle, sunglasses, phobowl; spill: chips, coffee, flowers). Set down,
+>   all seventeen survive and are grabbable — so "cap the gift at the snack
+>   where nothing fits" was not needed anywhere. And a thing put on the ground
+>   beside you is better fiction than a thing lobbed at you.
+> - **One at a time.** Five minutes beside the gondolier at tier three left
+>   three wine bottles on the pavement before the guard existed.
+> - **The favour scales the wariness WRITTEN**, as this item insisted.
+>   Measured on the person: an identical bang leaves 0.509 at tier three and
+>   0.126 at tier four. The flinch, the line and `alarm` are untouched.
+> - **The tier is handed to npc.js BEFORE the "nobody knows you here" return**,
+>   or the favour follows the player into the next chapter. Measured: tier 5
+>   in Venice, tier 0 and the full 0.509 in Kyoto on the next arrival.
+>
+> Harness note for whoever is next: `localStorage.clear()` followed by
+> `page.reload()` does NOT clear the save — the reload’s pagehide flush writes
+> the live journey straight back over it, which reads as the one-tier-per-visit
+> rule being broken.
 
 **Concept.** Every chapter names one local — a stallholder, a gardener, the
 gondolier, the barista, the doorman, the station cook — as *the regular*: the

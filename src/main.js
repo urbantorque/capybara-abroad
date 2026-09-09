@@ -1912,6 +1912,10 @@ function mainBoot() {
     game.palArm = npcs.palArm;
     game.palWho = npcs.palWho;
     game.palAudit = npcs.palAudit;
+    // O2: the tier, handed down. systems.js owns the number because it is on
+    // the save file; npc.js owns what the number buys, because that is the
+    // same kind of thing the line pool is.
+    game.palSet = npcs.palSet;
     game.locals = npcs.locals;
     // How many people near a point are currently watching FOR you — both crowds
     // in one number. See the npcWARY_* block in npc.js; the finds read it.
