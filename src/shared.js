@@ -1516,6 +1516,72 @@ export function rimTick(k, color) {
   _rimK.value = k > 0 ? (k < 2 ? k : 2) : 0;
   if (color) _rimC.value.copy(color);
 }
+// ---------------------------------------------------------------------------
+// THE CLOUD — THE ONE THING THAT HAD NEVER MOVED ON THE GROUND (the beauty
+// pass, 10 Sep 2026, ROADMAP-BEAUTY.md item 2).
+//
+// Every daylight chapter's light was a still photograph. Nothing crossed the
+// lawn, the square or the beach; the only motion on the ground was the animal
+// and the people. A slow, soft, large cloud shadow drifting over the world is
+// the cheapest "alive" the picture can buy, and it is the thing every arrival
+// frame was missing that a screenshot cannot show.
+//
+// WHERE IT LIVES, AND WHY THERE. The term is in the rim's <opaque_fragment>
+// block, which already compiles into essentially every material in the game
+// and already carries the fragment's world position. At that point
+// `reflectedLight.directDiffuse` is still in scope, so the cloud subtracts a
+// fraction of the DIRECT light and a quarter as much of the sky: under a
+// building's shadow nothing changes, which is what a cloud does. Water and
+// the wet-only prop material are not rimmed and take the same field in
+// grain() on the diffuse, bound to the SAME uniform objects under different
+// GLSL names (the uWetK / uGrainWet rule: two declarations of one name in one
+// shader is a compile error, and the material goes black rather than warn).
+//
+// IT FADES TO NOTHING BY 150 m. Two reasons, and the second is the one that
+// matters: the far field is already inside the haze and the defocus, so a
+// shadow out there is invisible work; and every sky dome in the game rides
+// the lens at 200-900 m, so the fade is what keeps a cloud pattern off the
+// sky itself without a per-material flag.
+//
+//   uCloudP  x, y   the drift, in metres, along the chapter's wind
+//            z      1 / wavelength
+//            w      how much of the direct light a full cloud takes
+//   uCloudS  x, y   the coverage ramp on a 0..1 noise: patches, not a wash
+//
+// systems.js owns the per-chapter number (sysCLOUD) and the clock.
+const _cloudP = { value: new THREE.Vector4(0, 0, 1 / 55, 0) };
+const _cloudS = { value: new THREE.Vector2(0.46, 0.70) };
+/**
+ * The cloud field, once a frame. `k` 0 is an exact no-op and takes one
+ * coherent branch; `offX/offZ` are the accumulated drift in metres.
+ */
+export function cloudTick(k, offX, offZ, wavelength, lo, hi) {
+  const v = _cloudP.value;
+  v.x = offX || 0; v.y = offZ || 0;
+  if (wavelength > 0.5) v.z = 1 / wavelength;
+  v.w = k > 0 ? (k < 1 ? k : 1) : 0;
+  if (lo !== undefined && hi !== undefined && hi > lo) _cloudS.value.set(lo, hi);
+}
+/** What the cloud is doing, for an audit. */
+export function cloudInfo() {
+  const v = _cloudP.value;
+  return { k: v.w, offX: v.x, offZ: v.y, wavelength: 1 / v.z, lo: _cloudS.value.x, hi: _cloudS.value.y };
+}
+const _CLOUD_GLSL = `float rmHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float rmNoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(rmHash(i), rmHash(i + vec2(1.0, 0.0)), u.x),
+             mix(rmHash(i + vec2(0.0, 1.0)), rmHash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float rmCloud(vec3 w, vec4 P, vec2 S){
+  float cL = length(cameraPosition - w);
+  float cF = clamp(1.0 - cL / 150.0, 0.0, 1.0);
+  if (cF <= 0.0) return 0.0;
+  vec2 cq = (w.xz + P.xy) * P.z;
+  float cn = rmNoise(cq) * 0.62 + rmNoise(cq * 2.13 + vec2(7.7, 3.1)) * 0.38;
+  return smoothstep(S.x, S.y, cn) * P.w * cF;
+}`;
 /**
  * The declarations and the term, shared by mat()'s hook and grain()'s.
  *
@@ -1705,7 +1771,10 @@ uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
 uniform float uSpillN;
-uniform float uWetK;`;
+uniform float uWetK;
+uniform vec4 uCloudP;
+uniform vec2 uCloudS;
+${_CLOUD_GLSL}`;
 // ADDED TO outgoingLight, NOT to diffuseColor. Multiplying the diffuse would
 // make the rim take the object's own colour and its own lighting, which is a
 // brighter version of the thing rather than light on it. Added at the end it is
@@ -1785,6 +1854,15 @@ const _RIM_FS_OUT = `{
     // would wash every surface to the same colour and read as fog.
     outgoingLight += sAcc * diffuseColor.rgb;
   }
+  // ---- THE CLOUD. See the block above cloudTick. ---------------------------
+  // Subtracted from the DIRECT term, so a fragment already in a building's
+  // shadow loses nothing — and a quarter as much from the sky, which is what
+  // a cloud overhead does to the sky as well as to the sun. One coherent
+  // branch in every chapter whose row is zero.
+  if (uCloudP.w > 0.0005) {
+    float cd = rmCloud(vRimW, uCloudP, uCloudS);
+    outgoingLight -= (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse * 0.25) * cd;
+  }
 }
 #include <opaque_fragment>`;
 // ---------------------------------------------------------------------------
@@ -1832,6 +1910,8 @@ function _rimInjectWith(kU, cU) {
     // name in one shader is a compile error, and the material would have gone
     // black rather than warned.
     shader.uniforms.uWetK = _grainWet;
+    shader.uniforms.uCloudP = _cloudP;
+    shader.uniforms.uCloudS = _cloudS;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', _RIM_VS_COMMON)
       .replace('#include <begin_vertex>', _RIM_VS_BEGIN);
@@ -4488,6 +4568,13 @@ export function grain(m, opts) {
       shader.uniforms.uCtcK = _contactK;
       shader.uniforms.uCtcOn = _contactOn;
     }
+    // The cloud, for the surfaces the rim does not reach — a sea, a glow
+    // quad, the shared prop material. Same objects, different GLSL names;
+    // see the block above cloudTick.
+    if (!rimHere) {
+      shader.uniforms.uGrCloudP = _cloudP;
+      shader.uniforms.uGrCloudS = _cloudS;
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',
                '#include <common>\nvarying vec3 vGrainW;' +
@@ -4512,6 +4599,11 @@ export function grain(m, opts) {
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcOn;' : '',
+        // The cloud's own helpers, under their own names (rm*), on the
+        // materials the rim does not reach. See the block above cloudTick.
+        !rimHere ? 'uniform vec4 uGrCloudP;' : '',
+        !rimHere ? 'uniform vec2 uGrCloudS;' : '',
+        !rimHere ? _CLOUD_GLSL : '',
         // Nothing samples the noise field in the wet-only build, so the helpers
         // do not go in either — the shader is the wet gate and nothing else.
         wetOnly ? '' : 'float grHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }',
@@ -4748,6 +4840,12 @@ export function grain(m, opts) {
           '    diffuseColor.rgb *= 1.0 - cOcc * ' + (cont * _contactMAX).toFixed(4) + ';',
           '  }',
         ].join('\n') : '',
+        // ---- THE CLOUD, where there is no rim to carry it -------------------
+        // On the diffuse rather than on the direct term, because this path has
+        // no lighting split to reach; 0.7 of the strength is what makes a sea
+        // under a cloud match the lawn beside it, which takes k of its direct
+        // light and a quarter of its sky.
+        !rimHere ? '  if (uGrCloudP.w > 0.0005) diffuseColor.rgb *= 1.0 - rmCloud(vGrainW, uGrCloudP, uGrCloudS) * 0.7;' : '',
         '}',
       ].join('\n'));
     // LAST, and it has to BE last: _rimInject anchors on '#include <common>'

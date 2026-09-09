@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
-         rimTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
@@ -1548,6 +1548,25 @@ const sysRIM = {
   kowloon: 0.085, palawan: 0.048, goreme: 0.075, manly: 0.062, pantanal: 0.085,
   cave: 0.100, antarctic: 0.040, monaco: 0.090, hanoi: 0.085,
 };
+// ---- THE CLOUD (the beauty pass, 10 Sep 2026) -----------------------------
+// How much of the direct light a full cloud takes, per chapter. See the block
+// above cloudTick in shared.js for the term. Zero — an exact no-op and one
+// coherent branch — for every chapter with no sun to cloud: the four nights,
+// the cave, the Drift (above the weather), and Kyoto, where an overcast sky
+// IS the light and there is nothing to cast a cloud shadow with. A chapter
+// with no row gets zero, so a twentieth chapter cannot be wrong by omission.
+const sysCLOUD = {
+  sydney: 0.40, pasto: 0.34, quay: 0.38, cali: 0.36, rio: 0.30,
+  sahara: 0.14, venice: 0.30, palawan: 0.32, goreme: 0.20, manly: 0.36,
+  pantanal: 0.36, antarctic: 0.26, hanoi: 0.16,
+};
+const sysCLOUD_WAVE  = 55;    // metres — the wavelength of the coverage field
+const sysCLOUD_SPEED = 2.0;   // m/s along the chapter's wind; slow enough to be weather, not a flicker
+const sysCLOUD_LO    = 0.46;  // the coverage ramp on a 0..1 noise: about a third of the ground
+const sysCLOUD_HI    = 0.70;  // ...under cloud at any moment, with soft edges
+const sysCLOUD_LAMBDA = 0.5;  // how fast a chapter's strength walks in
+let sysCloudK = 0, sysCloudX = 0, sysCloudZ = 0;
+let sysCloudDX = 0.62, sysCloudDZ = 0.78;
 // ---- ...AND THE SAME TABLE FOR THE ANIMAL, OFF A MEASUREMENT (P1) ---------
 // sysRIM is tuned so the rim reads the same against every chapter's LIGHT. This
 // one is tuned against a different fact: how far the capybara's own silhouette
@@ -28398,6 +28417,36 @@ export function createSystems(game) {
       sysColR.lerp(sysRIM_WHITE, 0.40);
     }
     rimTick(sysRIM[name] === undefined ? sysRIM_DEF : sysRIM[name], sysColR);
+    // ---- the cloud ----------------------------------------------------------
+    // One vec4 and one vec2, and a shadow crosses everything in the live
+    // chapter. The strength walks in from the chapter's row at the rate the
+    // rest of the atmosphere does; the DRIFT is integrated as a position so a
+    // wind that swings does not make the whole field jump. Direction is
+    // weather.js's gust() — the same vector the awnings lean to — so the
+    // cloud crosses the square the way the bunting says the wind is blowing.
+    //
+    // `noCloud` CUTS rather than fades, for the reason every other noX switch
+    // does: an A/B reads two frames at dt = 0, and a damped switch makes both
+    // arms identical and the term measure as nothing.
+    //
+    // FROZEN UNDER prefers-reduced-motion with the sparkle and the wind, by
+    // holding the drift rather than the strength: a world asked to hold still
+    // keeps its weather and stops its clock.
+    {
+      const want = sysCLOUD[name] === undefined ? 0 : sysCLOUD[name];
+      sysCloudK += (want - sysCloudK) * (1 - Math.exp(-sysCLOUD_LAMBDA * dt));
+      if (sysCloudK < 0.0005) sysCloudK = 0;
+      const gg = game.weather ? game.weather.gust() : null;
+      const gx = gg ? gg.x : 0, gz = gg ? gg.z : 0;
+      const gm = Math.sqrt(gx * gx + gz * gz);
+      if (gm > 0.05) { sysCloudDX = gx / gm; sysCloudDZ = gz / gm; }
+      if (!sysCalmOn()) {
+        sysCloudX += sysCloudDX * sysCLOUD_SPEED * dt;
+        sysCloudZ += sysCloudDZ * sysCLOUD_SPEED * dt;
+      }
+      cloudTick(game.state.noCloud ? 0 : sysCloudK, sysCloudX, sysCloudZ,
+                sysCLOUD_WAVE, sysCLOUD_LO, sysCLOUD_HI);
+    }
     // ...and the animal's, off the same hemisphere and one step further toward
     // white. See sysSELF.
     //
