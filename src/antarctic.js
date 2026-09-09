@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue } from './shared.js';
+import { PALETTE, mat, matEmit, rand, randInt, clamp, damp, lerp, grain, placeCue, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 17 — THE ANTARCTIC PENINSULA
@@ -357,55 +357,9 @@ function antInitGeos() {
 
 /** CONTRACT: box() takes FULL extents; CANNON.Box takes HALF. */
 function antMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      antCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(antCol.r, antCol.g, antCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(antG.box, antXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? antG.cyl4 : seg === 8 ? antG.cyl8 : seg === 12 ? antG.cyl12 : antG.cyl6;
-      return M.add(g, antXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? antG.cone4 : antG.cone6;
-      return M.add(g, antXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, sx, sy, sz, color, seg) {
-      return M.add(seg === 8 ? antG.sph8 : antG.sph6,
-                   antXform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
-  };
-  return M;
+  return makeMerger(antG, {
+    xform: antXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute',
+  });
 }
 
 function antVC() {

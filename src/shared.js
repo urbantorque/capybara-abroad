@@ -4863,6 +4863,176 @@ export function placeCue(o, x, y, z, far) {
 }
 
 // ===========================================================================
+// THE MERGER — ONE COPY OF IT, AT LAST.
+//
+// Every chapter builds its world by pouring unit primitives through a
+// vertex-colour merger and handing the result to one draw call. That merger was
+// written once and then COPIED NINETEEN TIMES: 1 056 lines across eighteen
+// chapters plus the departures board, no two of them byte-identical, and the
+// comment on the last one to be written said so ("the twentieth copy of this
+// merger in the repo") without doing anything about it.
+//
+// The cost of that is not the line count. It is that a fix applied to the
+// merger reaches one chapter, and nothing on screen says which eighteen it
+// missed. That has already happened here more than once, and it had happened
+// again by the time this was written:
+//
+//   SEVENTEEN OF THE NINETEEN CALL computeVertexNormals() IN build(), AND TWO
+//   DO NOT. That is not cosmetic. The merged `normal` attribute is not read by
+//   the Lambert lighting — mat() sets flatShading, so the fragment shader takes
+//   its normal from screen-space derivatives — but it IS read by the rim
+//   (_RIM_VS_BEGIN writes vRimN from objectNormal) and by the wet grain
+//   (vGrainN). Recomputing throws away the source geometry's own normals and
+//   substitutes face averages, measured here as (0,0,1) becoming
+//   (0.383,0,0.924) on an eight-sided cylinder. So two chapters rim their
+//   curved props off the authored normals and seventeen rim them off an
+//   approximation, and nobody ever chose that.
+//
+// This function does NOT decide that question. Every call site passes what its
+// own copy did, so the pixels are unchanged and the divergence is now VISIBLE
+// — one word at nineteen call sites instead of a line buried in nineteen
+// near-identical functions. Deciding it is a one-line change here, once.
+//
+// WHAT IS NOT SHARED, AND WHY. Two things stayed with the chapters on purpose:
+//
+//   THE GEOMETRY CACHE. `G` is the chapter's own, passed in. The caches look
+//   interchangeable and are not: `quad` is rotated flat in five chapters and
+//   upright in pantanal, `plane` is never rotated, and quay and environment
+//   carry a `sph5`/`cone4` their own dispatch never branches on. Building one
+//   shared cache keyed by segment count would have quietly rotated some decals
+//   and changed the silhouette of others.
+//
+//   THE TRANSFORM. `xform` is the chapter's own for the same reason: fifteen
+//   compose their Euler in 'YXZ' and cave, manly and pantanal use the default
+//   'XYZ'. Identical-looking helpers, different rotations.
+//
+// And the segment dispatch is passed explicitly rather than inferred. The
+// obvious shortcut — G['cyl' + seg] || G.cyl6 — was checked against all
+// eighteen chapters and is NOT equivalent: three of them define a segment
+// geometry their own dispatch ignores, so the shortcut would start picking up
+// quay's sph5 and environment's cone4. The lists below are what each chapter's
+// own `if` ladder actually branched on, and nothing else.
+//
+//   G          the chapter's geometry cache: box, cyl6, cone6, sph6 and friends
+//   opts.xform (px,py,pz, rx,ry,rz, sx,sy,sz) -> a Matrix4, reused per call
+//   opts.cylSegs / coneSegs / sphSegs   segment counts this chapter dispatches on
+//   opts.normals  'recompute' (default, what seventeen do) | 'keep'
+//   opts.tint     optional hook run over the colour after set() — environment's
+//                 distance de-tint is the only caller
+//
+// The raw buffers are exposed on the returned object because six chapters have
+// a bespoke shape (hanoi's and monaco's four-corner quad, palawan's blade,
+// iceland's lump) that writes into them directly. Those stay in their chapters;
+// they are genuinely one-offs, and pretending otherwise is how the nineteen
+// copies happened in the first place.
+// ===========================================================================
+export function makeMerger(G, opts) {
+  const o = opts || {};
+  const xform = o.xform;
+  const cylSegs = o.cylSegs || [];
+  const coneSegs = o.coneSegs || [];
+  const sphSegs = o.sphSegs || [];
+  const tint = o.tint || null;
+  const recompute = o.normals !== 'keep';
+  const pos = [], nor = [], col = [], idx = [];
+  const c = new THREE.Color();
+  // Exactly the chapter's own ladder: a segment count it did not branch on
+  // falls through to the six-sided default, which is what every one of those
+  // ladders did with its final `: G.cyl6`.
+  function pick(kind, seg, segs) {
+    if (seg !== undefined && segs.indexOf(seg) >= 0) {
+      const g = G[kind + seg];
+      if (g) return g;
+    }
+    return G[kind + '6'];
+  }
+  const M = {
+    n: 0,
+    // For the bespoke shapes that write vertices themselves. See the note above.
+    pos, nor, col, idx,
+    add(geo, m4, color) {
+      const g = geo.clone();
+      g.applyMatrix4(m4);
+      const p = g.attributes.position.array;
+      const nm = g.attributes.normal.array;
+      c.set(color);
+      if (tint) tint(c);
+      const start = M.n;
+      for (let i = 0; i < p.length; i += 3) {
+        pos.push(p[i], p[i + 1], p[i + 2]);
+        nor.push(nm[i], nm[i + 1], nm[i + 2]);
+        col.push(c.r, c.g, c.b);
+      }
+      const vc = p.length / 3;
+      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
+      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
+      M.n += vc;
+      g.dispose();
+      return M;
+    },
+    /**
+     * Geometry that ALREADY carries its own colour attribute, in world space.
+     * `add` writes one flat colour over everything it is given, which is right
+     * for a primitive and wrong for a painted deck. Same buffers, same call.
+     */
+    addPainted(g) {
+      const p = g.attributes.position.array;
+      const nm = g.attributes.normal.array;
+      const gc = g.attributes.color.array;
+      const start = M.n;
+      for (let i = 0; i < p.length; i += 3) {
+        pos.push(p[i], p[i + 1], p[i + 2]);
+        nor.push(nm[i], nm[i + 1], nm[i + 2]);
+        col.push(gc[i], gc[i + 1], gc[i + 2]);
+      }
+      const vc = p.length / 3;
+      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
+      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
+      M.n += vc;
+      return M;
+    },
+    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
+      return M.add(G.box, xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
+    },
+    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
+      return M.add(pick('cyl', seg, cylSegs),
+                   xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
+    },
+    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
+      return M.add(pick('cone', seg, coneSegs),
+                   xform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
+    },
+    sph(cx, cy, cz, sx, sy, sz, color, seg) {
+      return M.add(pick('sph', seg, sphSegs),
+                   xform(cx, cy, cz, 0, 0, 0, sx * 2, sy * 2, sz * 2), color);
+    },
+    /** One vertex, returning its index. The floor-and-ceiling chapters build
+     *  their terrain out of these and stitch it with tri(). */
+    vert(x, y, z, color) {
+      pos.push(x, y, z);
+      nor.push(0, 1, 0);
+      c.set(color);
+      if (tint) tint(c);
+      col.push(c.r, c.g, c.b);
+      return M.n++;
+    },
+    tri(a, b, d) { idx.push(a, b, d); },
+    empty() { return M.n === 0; },
+    build() {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      if (recompute) g.computeVertexNormals();
+      g.computeBoundingSphere();
+      return g;
+    },
+  };
+  return M;
+}
+
+// ===========================================================================
 // THE EXIT BOARD — THE DOOR, AS AN OBJECT (D6)
 //
 // Every chapter has exactly one way out of it. `CHAPTERS.way` has carried the

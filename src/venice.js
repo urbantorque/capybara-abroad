@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 10 — VENICE, AND THE WATER IS COMING IN
@@ -325,56 +325,9 @@ function venInitGeos() {
  * apart. That mistake cost Rio half its parade avenue.
  */
 function venMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      venCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(venCol.r, venCol.g, venCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(venG.box, venXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? venG.cyl4 : seg === 8 ? venG.cyl8
-              : seg === 16 ? venG.cyl16 : venG.cyl6;
-      return M.add(g, venXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? venG.cone4 : venG.cone6;
-      return M.add(g, venXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color) {
-      return M.add(venG.sph6, venXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    empty() { return M.n === 0; },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
-  };
-  return M;
+  return makeMerger(venG, {
+    xform: venXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute',
+  });
 }
 /**
  * EVERY SURFACE IN THIS CHAPTER WAS ONE FLAT VALUE.

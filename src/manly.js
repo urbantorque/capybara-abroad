@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, dampAngle, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 14 — MANLY. THE SEA HAS A SHAPE HERE.
@@ -282,55 +282,9 @@ function manInitGeos() {
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF, and manStaticBox
  *  speaks THIS one so the drawn thing and the solid thing cannot differ by 2x. */
 function manMerger() {
-  const pos = [], nor = [], col = [], idx = [];
-  const M = {
-    n: 0,
-    add(geo, m4, color) {
-      const g = geo.clone();
-      g.applyMatrix4(m4);
-      const p = g.attributes.position.array;
-      const nm = g.attributes.normal.array;
-      manCol.set(color);
-      const start = M.n;
-      for (let i = 0; i < p.length; i += 3) {
-        pos.push(p[i], p[i + 1], p[i + 2]);
-        nor.push(nm[i], nm[i + 1], nm[i + 2]);
-        col.push(manCol.r, manCol.g, manCol.b);
-      }
-      const vc = p.length / 3;
-      if (g.index) { const ia = g.index.array; for (let i = 0; i < ia.length; i++) idx.push(start + ia[i]); }
-      else { for (let i = 0; i < vc; i++) idx.push(start + i); }
-      M.n += vc;
-      g.dispose();
-      return M;
-    },
-    box(cx, cy, cz, sx, sy, sz, color, rx, ry, rz) {
-      return M.add(manG.box, manXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, sx, sy, sz), color);
-    },
-    cyl(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 4 ? manG.cyl4 : seg === 8 ? manG.cyl8 : manG.cyl6;
-      return M.add(g, manXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    cone(cx, cy, cz, r, h, color, rx, ry, rz, seg) {
-      const g = seg === 8 ? manG.cone8 : manG.cone6;
-      return M.add(g, manXform(cx, cy, cz, rx || 0, ry || 0, rz || 0, r * 2, h, r * 2), color);
-    },
-    sph(cx, cy, cz, rx2, ry2, rz2, color, seg) {
-      return M.add(seg === 8 ? manG.sph8 : manG.sph6,
-                   manXform(cx, cy, cz, 0, 0, 0, rx2 * 2, ry2 * 2, rz2 * 2), color);
-    },
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      g.setIndex(idx);
-      g.computeVertexNormals();
-      g.computeBoundingSphere();
-      return g;
-    },
-  };
-  return M;
+  return makeMerger(manG, {
+    xform: manXform, cylSegs: [4, 8], coneSegs: [8], sphSegs: [8], normals: 'recompute',
+  });
 }
 
 function manVC() {
