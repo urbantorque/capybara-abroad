@@ -1499,6 +1499,40 @@ export function createNPCs(game) {
                 'They said you were no trouble at all in {P}. Were you?',
                 'Word from {P} is that you are all right.',
                 'They fed you in {P}, did they.'],
+    // ---- ...AND THE ONE THAT IS NOT ABOUT A PLACE AT ALL -----------------
+    // THE TWO POOLS ABOVE ARE ABOUT WHERE YOU HAVE BEEN. These are about WHO
+    // YOU ARE, and that is the difference between B15's gossip and item 6's
+    // last unbuilt half: `heardBad` names the chapter you have just left,
+    // needs one incident there and says nothing about the other seventeen.
+    // NOTORIETY is the journey-wide number — incidents, scenes, how many
+    // places have heard of you, and how many different words they had for it
+    // — and it has been computed, tiered, saved and read by NOTHING except
+    // whether a poster goes up.
+    //
+    // NO {P}, deliberately, and that is the whole reason this is a separate
+    // pool rather than a sixth line in `heardBad`. A reputation that has to
+    // name a town is a rumour about that town; the point of this one is that
+    // it arrived before you did and it is not from anywhere.
+    //
+    // AND IT MAY NOT NAME WHAT YOU DID, for the reason none of the pools may:
+    // the tier is a number over nineteen chapters and the thing behind it
+    // could be forty broken bowls or one memorable afternoon in Hong Kong.
+    notorious: ['So you are the one.',
+                'We had heard you were coming.',
+                'Ah. It is you, is it.',
+                'They said to look out for you.',
+                'You have a reputation, you know.',
+                'Word travels faster than you do.'],
+    // ...and the same sentence from a place that is genuinely alarmed. Split
+    // rather than scaled, because "you have a reputation" and "we have been
+    // told what you are" are different sentences and a tier table that only
+    // changes an adjective is a tier table nobody notices. Tiers 4 and 5.
+    notoriousBig: ['Oh no. Not here. Not today.',
+                   'We have been told what you are.',
+                   'They warned us. They actually warned us.',
+                   'Somebody put the word out about you.',
+                   'You are worse than they said, and they said a lot.',
+                   'I know exactly what you are.'],
     // ---- ...AND THE THING IN ITS MOUTH THAT IS NOT FROM HERE -------------
     // THE ONLY OBJECT IN THE GAME THAT GENUINELY TRAVELS, and until now
     // nothing anywhere reacted to one arriving. props.js is explicit about
@@ -1824,6 +1858,39 @@ export function createNPCs(game) {
   // IT IS STILL A HEAD DIRECTION AND NOTHING ELSE. `watching` is read by no
   // other consumer, the hold spends no mouth cooldown, arms no line, and at
   // flow below npcFLOW_SEE it never starts.
+  // ---- ...AND A THIRD CAUSE FOR THE SAME RADIUS: THEY KNEW YOU WERE COMING
+  // Item 6's last half. `notoTier()` in systems.js is the journey-wide number
+  // — incidents, scenes, how many places have heard of you, how many different
+  // words they had — and until now the ONLY thing in the game that read it was
+  // whether a WANTED poster went up.
+  //
+  // A tier is not a thing that can be said in nineteen different ways, so what
+  // it buys here is the two things a place does when it has been warned: it
+  // says so once (see the `notorious` pools) and it WATCHES THE DOOR. The
+  // second is this: for a while after you land, everybody has their eye on you
+  // from further out than they otherwise would.
+  //
+  // IT IS THE SAME FACTOR SHAPE AS THE OTHER TWO and multiplies with them,
+  // which is correct — a legend running well through a square that is already
+  // cross with them should be the most-looked-at thing in the game — but it is
+  // the smallest of the three on purpose. Three factors at once is 1.6 × 1.5 ×
+  // 1.4 = 3.4 × a 7 m base, and 47 m is as far as this ever goes.
+  //
+  // IT IS NOT `wary` AND MUST NOT BE. Wariness means THIS person has had
+  // something done to them by you and its pool says so — 'You again', 'Not
+  // this time'. A stranger in a chapter you have never visited saying "you
+  // again" because of something you did in Hong Kong is the api-key mismatch
+  // in dialogue form. This widens attention and nothing else.
+  const npcNOTO_TIER   = 3;      // 'a menace'. Below it a place has heard
+                                 // nothing and behaves exactly as it always did.
+  const npcNOTO_LOOK   = 1.4;    // × the look range while the door is watched
+  const npcNOTO_DOOR   = 25;     // s of it after an arrival. Long enough to
+                                 // cover the arrival shot and the first walk
+                                 // away from the spawn; short enough that it
+                                 // is an arrival and not a permanent state.
+  let npcNotoTier = 0;           // handed down by systems.js. See npcNotoSet.
+  let npcNotoT = 0;              // s of door-watching left on this arrival
+
   const npcFLOW_SEE    = 0.60;   // flow that counts as a line worth turning for
   const npcFLOW_HOLD   = 2.6;    // s they go on watching after you have gone.
                                  // npcCHAIN_LOOK's number, because it is the
@@ -4616,6 +4683,14 @@ export function createNPCs(game) {
     // systems.js that is older or has thrown, so it defaults to zero — which
     // is the no-op.
     const flowNow = (game.state && game.state.flow) || 0;
+    // ...and whether this place was expecting you (see npcNOTO_TIER). A scalar
+    // read once for the whole population, like the flow and the calm — and a
+    // SCALAR rather than a per-person field precisely so that the order the
+    // two modules' `biome:enter` handlers run in cannot matter: this one is
+    // cleared and re-armed by npc.js's own handler and the tier is set by
+    // systems.js whenever it likes, one frame either way.
+    if (npcNotoT > 0) npcNotoT -= dt;
+    const notoNow = (npcNotoT > 0 && npcNotoTier >= npcNOTO_TIER) ? 1 : 0;
     // ---- THE MARQUEE LINE NOBODY WAS THERE TO SAY ------------------------
     // Delivered by the first person the player comes back within earshot of,
     // at the PRAISE radius rather than the wow radius: this one is said to your
@@ -5111,7 +5186,8 @@ export function createNPCs(game) {
         // kind of fact about the same radius: a market that is already looking
         // at you does not stop when you start running.
         const watchR = r.near * 2 * (1 + hHere * (npcHEAT_LOOK - 1))
-                                  * (1 + flowNow * (npcFLOW_LOOK - 1));
+                                  * (1 + flowNow * (npcFLOW_LOOK - 1))
+                                  * (1 + notoNow * (npcNOTO_LOOK - 1));
         const inR = d2 < watchR * watchR;
         // ...AND IT GOES ON AFTER YOU HAVE GONE. See npcFLOW_HOLD. Armed while
         // the animal is inside the widened circle AND moving well, and it is
@@ -10086,6 +10162,11 @@ export function createNPCs(game) {
     // answer it again. A latch that never clears would mean the lawn had a
     // crowd the first time you came home and nobody ever after.
     npcGathered = false;
+    // ---- ...AND THE PLACE STARTS WATCHING THE DOOR (item 6) -------------
+    // Armed on every arrival and spent by the clock in localsStep. It does
+    // nothing at all unless systems.js has handed down a tier of npcNOTO_TIER
+    // or better, so this line is a no-op for the whole of a quiet journey.
+    npcNotoT = npcNOTO_DOOR;
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
     }
@@ -11558,6 +11639,19 @@ export function createNPCs(game) {
   function npcRumArm(place, kind) {
     npcRumLine = '';
     npcRumT = npcRUM_WAIT;
+    // ---- ...AND THE TWO KINDS THAT NAME NO PLACE (item 6) ----------------
+    // NOTORIETY comes through this same door and not a second one, because
+    // ONE LINE PER ARRIVAL is a rule about the arrival and not about the
+    // rumour: two armed sentences racing for the first mouth in earshot is
+    // two people greeting you in the same breath. systems.js owns which of the
+    // four kinds this arrival is worth — it holds the counters and the tier —
+    // and this owns the words and the waiting, exactly as before.
+    if (kind === 'noto' || kind === 'noto2') {
+      const np = npcLOC_SAY[kind === 'noto2' ? 'notoriousBig' : 'notorious'];
+      if (!np || !np.length) return '';
+      npcRumLine = np[randInt(0, np.length - 1)];
+      return npcRumLine;
+    }
     if (!place) return '';
     const pool = npcLOC_SAY[kind === 'good' ? 'heardGood' : 'heardBad'];
     if (!pool || !pool.length) return '';
@@ -11655,6 +11749,20 @@ export function createNPCs(game) {
       npcKeepSaid[npcKeepFor] = 1;
       npcKeepLine = '';
     }
+  }
+  /**
+   * THE TIER, HANDED DOWN (item 6). The same three-line shape as npcPalSet and
+   * for the same reason: systems.js holds the number because it is a fact
+   * about the journey and lives on the save file, and this module holds what
+   * the number buys. This module never computes a score and that module never
+   * learns what a widened radius is.
+   */
+  function npcNotoSet(t) { npcNotoTier = Math.max(0, Math.min(5, t | 0)); }
+  /** For the harness. See npcNOTO_TIER. */
+  function npcNotoAudit() {
+    return { tier: npcNotoTier, door: +npcNotoT.toFixed(2),
+             on: npcNotoT > 0 && npcNotoTier >= npcNOTO_TIER,
+             at: npcNOTO_TIER, look: npcNOTO_LOOK };
   }
   /** The armed line and its clock, for the harness. Nothing in src reads it. */
   function npcKeepAudit() {
@@ -12194,6 +12302,7 @@ export function createNPCs(game) {
            // never finds a speaker is invisible from outside.
            rumourArm: npcRumArm, rumourAudit: npcRumAudit,
            keepAudit: npcKeepAudit,
+           notoSet: npcNotoSet, notoAudit: npcNotoAudit,
            // ---- THE REGULARS (O1) ----
            // Same split as the rumour above it, and for the same reason:
            // systems.js owns the tier because the tier is on the save file,

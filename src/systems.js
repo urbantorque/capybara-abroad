@@ -25938,6 +25938,20 @@ export function createSystems(game) {
    * span — the structure has one writer and it stays that way.
    */
   function notoChip() { return notoName().replace(/ /g, '\u00a0'); }
+  /**
+   * THE NUMBER AND ITS PARTS, FOR THE HARNESS. Nothing in src reads this.
+   *
+   * Item 6 finally gave the tier a consumer, and the first probe written
+   * against it could not tell "the save did not restore" from "the tier is
+   * being computed and ignored" from "npc.js was never handed it" \u2014 three
+   * different faults with one symptom, and no way in from outside to separate
+   * them. `repRing` and `palAudit` exist for exactly this reason.
+   */
+  game.notoDebug = function () {
+    const s = notoScore();
+    return { inc: s.inc, scn: s.scn, spread: s.spread, variety: s.variety,
+             score: s.score, tier: notoTier(s.score), name: notoName() };
+  };
 
   // ---- GOSSIP: WHAT THIS PLACE HEARD ABOUT THE LAST ONE (item 6, B15) ----
   //
@@ -25968,7 +25982,27 @@ export function createSystems(game) {
   // becomes wallpaper. Six is a couple of minutes of actually being liked
   // somewhere, and it is unreachable in a chapter you walked through.
   const sysHEARD_GOOD = 6;
+  // ---- ...AND THE TIER OUTRANKS BOTH OF THEM (item 6) --------------------
+  // B15 wrote, correctly for what it was building, that gossip is "NOT GATED
+  // ON THE TIER, deliberately" — because a player who caused a scene in Kyoto
+  // and nothing anywhere else should still hear about Kyoto in Cali, and
+  // making them earn a global 11 first would push the whole feature out of the
+  // first hour. That argument is about the FLOOR and it still holds: nothing
+  // below is gated, and the place rumour fires exactly when it always did.
+  //
+  // This is the CEILING, which B15 left open and item 6 was always about. Past
+  // 'a menace' the interesting fact about an arrival stops being where you
+  // were last and starts being what you are, and a place that has been warned
+  // about you saying "we heard what happened in Venice" is the smaller of the
+  // two sentences it has available.
+  const sysNOTO_SAY  = 3;   // tier at which the reputation line takes over
+  const sysNOTO_SAY2 = 4;   // ...and at which the place is properly alarmed
   game.events.on('biome:enter', function (p) {
+    // The tier is handed down whether or not there is a line to say — npc.js
+    // uses it for the door-watching as well, and that has no sentence in it.
+    try {
+      if (typeof game.notoSet === 'function') game.notoSet(notoTier());
+    } catch (e) { /* an older npc.js has no notoriety */ }
     if (typeof game.rumourArm !== 'function') return;
     let place = '', kind = '';
     // A ROLLBACK ARRIVES HERE TOO, with `from` set to the chapter that failed
@@ -25984,6 +26018,16 @@ export function createSystems(game) {
         const d = chapterDef(fn);
         place = (d && d.name) || '';
       }
+    }
+    // ...and the reputation takes the mouth off the place rumour when there is
+    // one to take. Resolved HERE and not in npc.js for the reason the whole
+    // split exists: this module owns the counters and the tier, so it is the
+    // only one that can know which of the four an arrival is worth. Note the
+    // place is dropped with it — a reputation names no town.
+    const notoT = notoTier();
+    if (notoT >= sysNOTO_SAY) {
+      kind = notoT >= sysNOTO_SAY2 ? 'noto2' : 'noto';
+      place = '';
     }
     try { game.rumourArm(place, kind); } catch (e) { /* older npc.js */ }
     posterPut();

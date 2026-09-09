@@ -30,6 +30,12 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-noto.js` is item 6, the reputation that arrives before you do: it seeds a
+tier through the SAVE FILE and restores, because a played tier 3 is twenty
+minutes of trouble a row. Its header is the record of two traps — `addInitScript`
+persists per browser context, and a LIVE game overwrites a seeded save with its
+own counts before you can reload onto it.
+
 `nr-look.js`, `nr-keep.js`, `nr-led.js` and `nr-soak.js` are the no-regret
 batch: the flow look and its hold (`npcFLOW_LOOK`/`npcFLOW_HOLD`), customs
 (`npcKeepStep`), the longest line on the ledger (`jrChapLine`), and the

@@ -1909,6 +1909,12 @@ function mainBoot() {
     // is no `keepArm` beside it because nothing outside npc.js decides this:
     // the prop is on `game.capy.heldProp` and its home chapter is on the prop.
     game.keepAudit = npcs.keepAudit;
+    // Item 6: the notoriety tier, handed down on every arrival. Same split as
+    // the regulars' tier one block below — systems.js computes the number
+    // because it is a projection of the save file, npc.js decides what a place
+    // that has been warned about you actually does.
+    game.notoSet = npcs.notoSet;
+    game.notoAudit = npcs.notoAudit;
     // THE REGULARS (O1, ROADMAP-NEXT item 1). The same three-line shape as the
     // rumour above, and the same split: systems.js holds the tier because the
     // tier is a fact about the journey and lives on the save file, and npc.js
