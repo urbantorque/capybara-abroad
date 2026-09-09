@@ -66,3 +66,11 @@ for (const [a, b] of suspicious) console.log('  ' + JSON.stringify(a) + ' -> ' +
 const lone = clues.filter(c => /\b[A-Z]\b/.test(c) && !/\b(Q|E|G|R)\b/.test(c));
 console.log('\nclues with some other lone capital:', lone.length);
 for (const c of lone.slice(0, 12)) console.log('  ' + JSON.stringify(c));
+
+// THIS ONE INVARIANT FAILS THE BUILD; the rest of the file stays a listing.
+// A lone capital in a clue is not a style question — the control tables eat it
+// and the player is shown a key that does nothing. It has been zero for as long
+// as it has been printed, which is exactly the condition worth nailing down
+// before the next clue is written. Everything above is a description of the
+// clue set and has no right answer, so nothing above can turn this red.
+if (lone.length) process.exit(1);

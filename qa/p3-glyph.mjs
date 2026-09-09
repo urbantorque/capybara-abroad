@@ -32,3 +32,11 @@ for (const ch of Object.keys(per).sort((a, b) => a - b)) {
 const ids = new Set(rows.map(m => m[1]));
 const orphans = [...recs].filter(k => !ids.has(k));
 console.log('RECORDS keys that are not task ids:', orphans.length, orphans.join(' '));
+
+// THIS ONE INVARIANT FAILS THE BUILD; the per-chapter listing above does not.
+// An orphaned RECORDS key is measured, stored and shown nowhere — the exact
+// silent failure capy3-names-nothing-publishes is about, and the kind that only
+// ever gets found by someone reading a report they had no reason to open. The
+// count above (how many tasks are timed per chapter) is a description of the
+// game and has no target, so it stays a listing.
+if (orphans.length) process.exit(1);

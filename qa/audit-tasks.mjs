@@ -157,9 +157,28 @@ for (const c of chapNs) {
 }
 
 // ---- 7c. the finds (v19) -------------------------------------------------
-// A find with no predicate can never happen; a predicate with no find can
+// A find that nothing can award can never happen; an award with no find row can
 // never be shown. Both are silent failures, which is exactly the kind of thing
 // a table is supposed to make impossible.
+//
+// THERE ARE TWO WAYS TO AWARD A FIND, AND THIS USED TO KNOW ABOUT ONE. Most are
+// SAMPLED: a predicate in sysFINDS that findTick polls, and that is the shape
+// this section was written for. But a find that is an EDGE rather than a state
+// has nothing to sample — `stowaway` fires inside the `biome:enter` handler at
+// the moment a passenger crosses a border, and there is no later frame on which
+// "you have just brought something here" is still true. Those call foundFind()
+// with a literal id and are just as wired as any predicate.
+//
+// Checking only the predicate table reported `stowaway` as a BLOCKER — a find
+// that "can never happen" — for as long as the check has existed, against a
+// find that works. It was the only blocker in the run, so the one line anybody
+// would act on was noise, which is worse than not checking at all. Both award
+// paths count now, and both directions are still checked.
+//
+// (`red-handed` looks like the same shape and is not: its `capy:grab` listener
+// sets findS.redHanded and a predicate reads the flag on the next tick. It is
+// sampled, and it is in sysFINDS. The distinction is whether foundFind is
+// called with a literal id, which is exactly what the scan below looks for.)
 const findsBlock = shared.slice(shared.indexOf('export const FINDS = ['),
                                 shared.indexOf('\n];', shared.indexOf('export const FINDS = [')));
 const findIdsDecl = [...findsBlock.matchAll(/\{\s*id:\s*'([^']+)'\s*,\s*text:\s*'([^']*)'/g)].map(x => x[1]);
@@ -168,11 +187,21 @@ const findPreds = new Set(
   [...systems.slice(systems.indexOf('const sysFINDS = {'),
                     systems.indexOf('\n  };', systems.indexOf('const sysFINDS = {')))
     .matchAll(/^\s*'([a-z0-9-]+)':\s*function/gm)].map(x => x[1]));
+// The imperative half: foundFind('some-id'). A call with a variable id is the
+// predicate loop and the album restore, and neither names a find here.
+const findAwards = new Set(
+  [...systems.matchAll(/\bfoundFind\(\s*'([a-z0-9-]+)'/g)].map(x => x[1]));
+console.log('find awards: ' + findPreds.size + ' sampled, ' + findAwards.size + ' imperative');
 for (const id of findIdsDecl) {
-  if (!findPreds.has(id)) P('BLOCKER', id, 'FINDS row with no sysFINDS predicate — can never happen');
+  if (!findPreds.has(id) && !findAwards.has(id)) {
+    P('BLOCKER', id, 'FINDS row with no sysFINDS predicate and no foundFind() call — can never happen');
+  }
 }
 for (const id of findPreds) {
   if (!findIdsDecl.includes(id)) P('BLOCKER', id, 'sysFINDS predicate with no FINDS row — can never be shown');
+}
+for (const id of findAwards) {
+  if (!findIdsDecl.includes(id)) P('BLOCKER', id, 'foundFind() call with no FINDS row — can never be shown');
 }
 // A find id may not collide with a task id: both live in the same save file and
 // the same journal, and the ledger looks both up by name.
@@ -317,3 +346,14 @@ console.log('\n' + blockers.length + ' blockers, ' + warns.length + ' warnings, 
             tasks.length + ' tasks in ' + chapNs.length + ' chapters (' +
             tasks.filter(t => t.wow).length + ' marquee, ' +
             tasks.filter(t => t.mini).length + ' mini)');
+
+// A BLOCKER NOW TURNS THE BUILD RED. This audit printed its findings and exited
+// 0 for its whole life, which put it in run.mjs's REPORTS list — the half of the
+// suite that cannot fail anything. It stood at one blocker for months and the
+// blocker was a false positive (see 7c), so the one line anybody might have
+// acted on was noise and the habit became to skim past it.
+//
+// Warnings deliberately do NOT fail. Kyoto's marquee really is in act 1 of 2 and
+// that is a judgement about a chapter, not a defect; a warning that fails a
+// build is just a blocker with a quieter name.
+if (blockers.length) process.exit(1);
