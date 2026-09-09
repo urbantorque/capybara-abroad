@@ -6,9 +6,24 @@
 // object, saved, restored, and still be clipped, mis-pluralised or sitting
 // under a fold nobody opens.
 async page => {
-  await page.goto('http://localhost:5188/', { waitUntil: 'load' });
+  await page.goto("http://localhost:5188/", { waitUntil: "load" });
+  await page.waitForTimeout(5500);
+  // Seed a file with both of this batch's new leaf numbers on it, from the
+  // TITLE (a live game rewrites the file before a reload can land on it).
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem("capy3.journey.v1", JSON.stringify({
+        v: 1, tasks: ["to-pasto", "steal-empanada"], seen: [1, 2, 4, 8, 10],
+        recs: {}, ms: 900000, chapms: {}, finds: [], foundAt: {},
+        inc: { 2: 1 }, scn: {}, pho: { 6: 3 }, fed: {}, pas: {}, pal: { 10: 4 },
+        rep: {}, lin: { 4: 67, 6: 64, 8: 72, 10: 52 }, err: { 10: 3, 4: 1 },
+        biome: "sydney", fin: 0, slid: 1, slip: 1,
+      }));
+    } catch (e) {}
+  });
+  await page.reload();
   await page.waitForTimeout(6500);
-  await page.keyboard.press('Space');
+  await page.evaluate(() => { const b = document.querySelector(".capyui-carry"); if (b) b.click(); });
   await page.waitForTimeout(3000);
 
   // Escape opens the pause card, which is the only door to the journey.

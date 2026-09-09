@@ -1919,6 +1919,10 @@ function mainBoot() {
     // they have got. There is no `marchArm` beside it — systems.js emits
     // `capy:chain` and npc.js decides who cares.
     game.marchAudit = npcs.marchAudit;
+    // THE STANDING ORDER (item 4): is a parcel out, is it in the mouth, and
+    // how many have been delivered. systems.js counts and saves the number off
+    // `pal:errand`; this is the window on the errand itself.
+    game.errAudit = npcs.errAudit;
     // THE REGULARS (O1, ROADMAP-NEXT item 1). The same three-line shape as the
     // rumour above, and the same split: systems.js holds the tier because the
     // tier is a fact about the journey and lives on the save file, and npc.js

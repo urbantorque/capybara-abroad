@@ -30,6 +30,12 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-err.js` is item 4, the standing order. It seeds a regular's TIER through the
+save file and drives one errand end to end. Its header carries the two
+measurement traps that cost the most: `wary` decays over 26 s so it must be read
+either side of the delivery rather than either side of the run, and heat is
+bumped by anything banging nearby so it must be read on the two ADJACENT frames.
+
 `nr-verbs.js` and `nr-pairs.js` are item 2. The first MEASURES THE PREMISE and
 half of it was wrong — hop-then-grab and grab-then-slide already work — and the
 second checks the reactions that were built instead. Between them they record

@@ -21223,6 +21223,12 @@ export function createSystems(game) {
         // which is a thing worth having on a leaf and is not most of them.
         const ln = jrChapLine[n] || 0;
         if (ln >= sysLINE_SHOW) nb.push('a clean line of ' + ln + ' m');
+        // ---- ...AND THE FAVOURS (item 4). See jrChapErr -------------------
+        // No floor on this one, unlike the line: running an errand is a thing
+        // you chose to do rather than a number every chapter produces, so one
+        // of them is already worth a sentence.
+        const er = jrChapErr[n] || 0;
+        if (er) nb.push(er === 1 ? 'ran an errand' : 'ran ' + er + ' errands');
         // ---- ...AND WHO KNOWS YOU HERE (O2) ----------------------------
         // The leaf is four counts and a high-water mark, and every one of them
         // is something the player DID. This is the one line on it about
@@ -23891,6 +23897,8 @@ export function createSystems(game) {
         // never held a line — which is the correct history, because until now
         // nothing was counting. See jrChapLine.
         lin: jrChapLine,
+        // ...and THE STANDING ORDER's, ditto. See jrChapErr.
+        err: jrChapErr,
         // ...and THE REGULARS’ tier (O1), on exactly the same terms.
         pal: jrChapPal,
         // ...and THE REPERTOIRE (Q1): name id -> how many times. Additive,
@@ -25682,6 +25690,24 @@ export function createSystems(game) {
   // screen") and this obeys it. It is a thing you find at the end, which is
   // also how you find out that the place had one.
   const jrChapLine = Object.create(null);     // chapter -> longest line, metres
+  // ---- ...AND THE FAVOURS YOU HAVE RUN HERE (item 4) ---------------------
+  // THE STANDING ORDER's number. Additive on the save on exactly the terms of
+  // the five above, no version bump, and a file written before it existed
+  // reads as somebody who never ran an errand — which is the correct history
+  // for a player who could not have.
+  //
+  // IT GATES NOTHING, and that is not an oversight. The errand already pays
+  // for itself the moment it is finished: npc.js takes wariness off everybody
+  // in the chapter and cools the place's heat, which is the only thing in the
+  // whole game that runs the mischief economy backwards. This is the record
+  // that it happened, in the one place the journey is written down.
+  const jrChapErr = Object.create(null);      // chapter -> errands run
+  game.events.on('pal:errand', function () {
+    const cn = todoChapter();
+    if (cn <= 0) return;
+    jrChapErr[cn] = (jrChapErr[cn] || 0) + 1;
+    saveSoon();
+  });
   // ---- ...AND THE ONE THAT IS A RELATIONSHIP (O1) ------------------------
   // THE REGULARS: chapter -> what tier this place’s one person has reached
   // with you, 1 to 5. Additive on the save on the same terms as the five
@@ -26899,7 +26925,10 @@ export function createSystems(game) {
       for (const k in pas) if (typeof pas[k] === 'number') jrChapPerch[k] = pas[k];
       // ...and THE FLOW's mark, on exactly the same terms. See jrChapLine.
       const lin = jrFile.lin || {};
-      for (const k in lin) if (typeof lin[k] === 'number') jrChapLine[k] = lin[k];
+      for (const k in lin) if (typeof lin[k] === "number") jrChapLine[k] = lin[k];
+      // ...and THE STANDING ORDER's tally, ditto. See jrChapErr.
+      const errf = jrFile.err || {};
+      for (const k in errf) if (typeof errf[k] === "number") jrChapErr[k] = errf[k];
       // ...and THE REGULARS (O1), CLAMPED on the way in, which the four above
       // do not need to be: those are counts and a silly one prints a silly
       // number, and this one INDEXES A LINE POOL. A hand-edited file handing

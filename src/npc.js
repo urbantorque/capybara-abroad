@@ -10463,6 +10463,11 @@ export function createNPCs(game) {
     // O2: the prop belonged to the chapter that has just been detached, so
     // the reference is a pointer into a world that no longer exists.
     npcPalGiftP = null;
+    // ...and THE STANDING ORDER's parcel, for the same reason: it belonged to
+    // a chapter that has just been detached, so the reference is a pointer
+    // into a world that no longer exists. The thank-you goes with it — a
+    // favour done in Venice is not owed a line in Hong Kong.
+    npcErrProp = null; npcErrTTL = 0; npcErrT = 0; npcErrThank = '';
     // The ending is STAGED EVERY TIME and closed once — props.js huddles all
     // seventeen souvenirs at the next chapter's spawn on the way out, so
     // sysFinaleStage runs again on every return and this must be able to
@@ -12485,6 +12490,165 @@ export function createNPCs(game) {
     }
     return p;
   }
+  // =========================================================================
+  // THE STANDING ORDER — SOMETHING ON TODAY (item 4)
+  //
+  // A regular has five tiers, they are on the save file, and at five they are
+  // FINISHED — and because they were the only thing in the room with a memory,
+  // the room is finished too. Nineteen chapters end up as record boards you
+  // have no reason to travel to. This is the repeatable thing a place gets.
+  //
+  // ---- ONE ERRAND SHAPE, AND THE REASON IT IS THE DELIVERY ---------------
+  // A LOCAL HAS NO NAME. Not an id, not a kind, not a key — O1 settled this
+  // when it had to point at one and ended up matching a substring of their own
+  // first line. So "take this to Halil, he is on the corner" is a sentence the
+  // game cannot say in seventeen chapters, and an errand whose target is a
+  // PLACE needs nineteen hand-authored places.
+  //
+  // "Take that over to somebody" needs neither. The target is anybody in this
+  // chapter who is not the person who asked, which is legible without a name,
+  // works in all seventeen, and is the same verb the player already has: pick
+  // a thing up, carry it, be near a person.
+  //
+  // ---- WHAT IT PAYS, AND IT IS NOT A TICK --------------------------------
+  // Doing somebody a favour SOFTENS THE PLACE: every local's `wary` drops and
+  // the heat sites in this chapter cool. That is the only thing in the game
+  // that runs the mischief economy backwards — until now wariness and heat
+  // decayed on a clock and nothing a player did could ever buy them back — and
+  // it is the right payment for an errand, because it is not a number, it is
+  // the square being easier to be in.
+  //
+  // The count is saved per chapter by systems.js, on the same additive terms
+  // as the perch and the line. It gates nothing.
+  const npcERR_T     = 3;     // tier at which they start asking. The gift's own.
+  const npcERR_CD    = 70;    // s between offers. It is not a job.
+  const npcERR_R     = 11;    // m — they ask somebody who is standing there
+  const npcERR_TO_R  = 3.2;   // m from the recipient that counts as delivered
+  const npcERR_TTL   = 240;   // s before they give up on it and take it back
+  const npcERR_FORGIVE = 0.45;// how much wariness a favour takes off everybody
+  const npcERR_COOL  = 0.55;  // ...and the share of the place's heat it cools
+  const npcLOC_ERR_ASK = ['Do me a favour — take that over to somebody.',
+                          'Here. Somebody over there could do with that.',
+                          'Take that off my hands, would you. Anybody will do.',
+                          'Give that to whoever looks like they want it.',
+                          'That has been sat there all day. Pass it on.'];
+  const npcLOC_ERR_GOT = ['Oh — for me?', 'Well. Thank you.',
+                          'That is very good of you.', 'Somebody sent this over?',
+                          'I will take that, yes.', 'That is the nicest thing all week.'];
+  const npcLOC_ERR_TY  = ['You did it. You actually did it.',
+                          'Good. That is one less thing.',
+                          'I saw. Thank you.',
+                          'You are all right, you are.',
+                          'That is twice now, is it? Or am I counting wrong.'];
+  let npcErrProp = null;      // the parcel, while it is out
+  let npcErrT = 0;            // s until they may ask again
+  let npcErrTTL = 0;          // ...and s before an unfinished one is dropped
+  let npcErrDone = 0;         // this session, for the audit
+  let npcErrThank = '';       // held for the regular to say next time you are near
+
+  /** Put the parcel out and ask. Returns it, or null. */
+  function npcErrAsk(rec) {
+    const row = npcPAL[npcPalFor];
+    if (!row || !row.gift || !game.physics ||
+        typeof game.physics.spawnProp !== 'function') return null;
+    const yaw = rec.yaw || rec.face || 0;
+    const gx = rec.x + Math.sin(yaw) * npcPAL_GIFT_D - Math.cos(yaw) * 0.35;
+    const gz = rec.z + Math.cos(yaw) * npcPAL_GIFT_D + Math.sin(yaw) * 0.35;
+    let p = null;
+    try { p = game.physics.spawnProp(row.gift, gx, gz, rec.y); } catch (e) { p = null; }
+    if (!p) return null;
+    p.owner = null;
+    p.disturbed = true;
+    npcErrProp = p;
+    npcErrTTL = npcERR_TTL;
+    rec.gest = Math.max(rec.gest || 0, 1.1);
+    sfx('rustle', rec, 0.42, 0.95);
+    if (rec.cd <= 0) { rec.cd = rec.cool * rand(0.9, 1.5); localLine(rec, npcLOC_ERR_ASK); }
+    return p;
+  }
+  /** The parcel is gone from the world, one way or another. */
+  function npcErrDrop() { npcErrProp = null; npcErrTTL = 0; }
+  /**
+   * ...AND THE FAVOUR IS PAID IN THE ONE CURRENCY THIS GAME HAS.
+   *
+   * `wary` is a memory of what you did and `npcHeatSites` is the square's
+   * version of the same thing; both decay on a clock and NOTHING a player has
+   * ever been able to do could take either of them down. This is that, and it
+   * is deliberately the whole chapter rather than the recipient: you did
+   * something decent in front of everybody.
+   */
+  function npcErrForgive() {
+    const live = game.biome && game.biome.current;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (!L || L.biome !== live) continue;
+      L.wary = Math.max(0, (L.wary || 0) - npcERR_FORGIVE);
+    }
+    for (let i = npcHeatSites.length - 1; i >= 0; i--) {
+      const s = npcHeatSites[i];
+      if (s.biome !== live) continue;
+      s.h *= (1 - npcERR_COOL);
+      if (s.h <= 0.01) npcHeatSites.splice(i, 1);
+    }
+  }
+  function npcErrStep(rec, dt) {
+    // ---- the offer -------------------------------------------------------
+    if (npcErrT > 0) npcErrT -= dt;
+    const capy = game.capy;
+    const cp = capy && capy.position;
+    if (!npcErrProp) {
+      // Never while the ordinary gift is still lying there: two things on the
+      // pavement between you and one person is one thing too many, and there
+      // is no way for the player to tell which is which.
+      if (npcPalTier >= npcERR_T && npcErrT <= 0 && cp && !npcPalGiftOut(rec) &&
+          Math.hypot(cp.x - rec.x, cp.z - rec.z) < npcERR_R) {
+        if (npcErrAsk(rec)) npcErrT = npcERR_CD;
+      }
+      return;
+    }
+    // ---- the parcel, while it is out -------------------------------------
+    const p = npcErrProp;
+    if (p.removed || !p.body || p.body.position.y < -100) { npcErrDrop(); return; }
+    npcErrTTL -= dt;
+    if (npcErrTTL <= 0) { npcErrDrop(); return; }
+    // ---- ...and the delivery ---------------------------------------------
+    // The test is the animal HOLDING it near somebody who is not the regular.
+    // Not "the prop is near somebody": kicking it across a square is not doing
+    // anybody a favour, and the mouth is what makes it a delivery.
+    if (!p.held || !cp) return;
+    const live = game.biome && game.biome.current;
+    for (let i = 0; i < locals.length; i++) {
+      const L = locals[i];
+      if (!L || L === rec || L.biome !== live || !L.group) continue;
+      const dx = cp.x - L.x, dz = cp.z - L.z;
+      if (dx * dx + dz * dz > npcERR_TO_R * npcERR_TO_R) continue;
+      // Done. They take it out of the animal's mouth, which is the one verb
+      // props.js already has for this — see localOwnStep's caught branch.
+      try {
+        if (game.physics && typeof game.physics.release === 'function') {
+          game.physics.release(null);
+        }
+      } catch (e) { /* the mouth is not worth an exception */ }
+      if (L.cd <= 0) { L.cd = L.cool * rand(0.8, 1.4); localLine(L, npcLOC_ERR_GOT); }
+      L.flV -= 4;
+      L.flYaw = Math.atan2(cp.x - L.x, cp.z - L.z);
+      npcErrDone++;
+      npcErrThank = npcLOC_ERR_TY[randInt(0, npcLOC_ERR_TY.length - 1)];
+      npcErrForgive();
+      npcErrDrop();
+      // systems.js counts it and saves it. Same split as everything else here:
+      // this owns the errand, that owns the ledger.
+      try { game.events.emit('pal:errand', { biome: live }); } catch (e) {}
+      return;
+    }
+  }
+  /** For the harness. Nothing in src reads this. */
+  function npcErrAudit() {
+    return { on: !!npcErrProp, held: !!(npcErrProp && npcErrProp.held),
+             ttl: +npcErrTTL.toFixed(1), cd: +npcErrT.toFixed(1),
+             done: npcErrDone, thank: npcErrThank, tier: npcPalTier, at: npcERR_T };
+  }
+
   /** Who a chapter's regular is, for the paper. Never their tier: that is a
    *  fact about the journey and it lives on the file, in systems.js. */
   function npcPalWho(name) {
@@ -12560,6 +12724,18 @@ export function createNPCs(game) {
         npcPalGive(rec);
       }
     }
+    // ---- ...AND THE STANDING ORDER, ON THE SAME TERMS (item 4) -----------
+    // After the gift and not before it, so a chapter's first tier-three
+    // meeting is still somebody giving you something rather than somebody
+    // asking you for a favour. Both are gated on being near them and neither
+    // will run while the other's prop is lying on the pavement.
+    if (rec && rec.fig && !rec.own && rec.sat <= 0) npcErrStep(rec, dt);
+    // ...and the thank-you rides the SAME armed-line channel the tiers do,
+    // rather than a second one — see npcPalArm's note on one mouth, one line.
+    if (npcErrThank && !npcPalLine) {
+      npcPalLine = npcErrThank; npcErrThank = '';
+      npcPalT = npcPAL_WAIT; npcPalKeep = npcPAL_KEEP;
+    }
     // ---- and the warming, which is what earns the tier -------------------
     // ONE REPORT PER VISIT, and it is a report and not a decision: systems.js
     // holds the number, knows whether the tier is already five, and may say
@@ -12632,6 +12808,7 @@ export function createNPCs(game) {
            rumourArm: npcRumArm, rumourAudit: npcRumAudit,
            keepAudit: npcKeepAudit,
            notoSet: npcNotoSet, notoAudit: npcNotoAudit, marchAudit: npcMarchAudit,
+           errAudit: npcErrAudit,
            // ---- THE REGULARS (O1) ----
            // Same split as the rumour above it, and for the same reason:
            // systems.js owns the tier because the tier is on the save file,
