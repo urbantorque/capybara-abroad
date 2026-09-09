@@ -203,7 +203,18 @@ function sysSunAt(base, elevDeg) {
 }
 const sysSUN_BY_BIOME = {
   pasto:     sysPASTO_SUN_DIR,
-  iceland:   sysPASTO_SUN_DIR,
+  // Half past eleven at night in Reykjavik in June, and it had a Colombian
+  // noon over it. This is the chapter the light table was most obviously
+  // wrong about and it was left open by the first beauty pass as an art call
+  // rather than a fix; the frame histogram then named it as one of the four
+  // greyest pictures in the game — median luma 59, and only 38 % of the frame
+  // carrying any chroma at all. A midnight sun at this latitude sits at about
+  // two degrees, which throws a shadow no frustum in this game could hold and
+  // rakes so flat that a low wall blacks out the street behind it. Sixteen is
+  // the compromise the frame wanted: a person throws seven metres instead of
+  // one, the harbour goes gold down one side, and the aurora above it still
+  // has a dark sky to happen in.
+  iceland:   sysSunAt(sysPASTO_SUN_DIR, 16),
   sahara:    sysPASTO_SUN_DIR,
   drift:     sysPASTO_SUN_DIR,
   kowloon:   sysPASTO_SUN_DIR,
@@ -271,7 +282,7 @@ const sysSHADOW_HYST     = 1.5;    // only refit past this much drift (projectio
 // ...and the Pantanal, since its sun came down to 30 degrees (sysSUN_BY_BIOME):
 // a 12 m gallery tree throws 21 m at that hour, and a 22 half-box centred on
 // the animal cuts that shadow off at its edge as she walks under it.
-const sysBIO_SH_HALF = { rio: 44, venice: 34, pantanal: 34 };
+const sysBIO_SH_HALF = { rio: 44, venice: 34, pantanal: 34, iceland: 34 };
 // ---------------------------------------------------------------------------
 // HOW MUCH SKY SURVIVES IN THE SHADE — see the block above _RIM_FS_COMMON in
 // shared.js for what this number does and why the shadow needed it.
@@ -2737,7 +2748,17 @@ const sysICE_FOG_F = 940;
 //
 // It reads unmistakably as night — nothing else in this game is blue — and you
 // can see where you are going.
-const sysICE_SUN_I = 0.60;      // multiplier on whatever the day/biome axes said
+// 1.05, and it was 0.60 for as long as this chapter was lit from 61 degrees.
+// Its star came down to 16 with the second beauty pass, and a sun at 16
+// degrees puts sin(16)/sin(61) = 0.32 of the light on a horizontal surface
+// that a sun at 61 does: the road went to a third of its brightness and the
+// chapter, already the second darkest in the game, lost its floor. THE POINT
+// OF THE CHANGE IS THE DIRECTION AND NOT THE LEVEL — long shadows, and a
+// raking light that finally lands on the fronts of the houses rather than on
+// their roofs — so the level is bought back here. Not all the way: 0.60/0.32
+// would be 1.87 and would blow out every west-facing wall in Reykjavik,
+// which at this angle is most of what the sun can now see.
+const sysICE_SUN_I = 1.05;      // multiplier on whatever the day/biome axes said
 const sysICE_HEMI_I = 0.88;
 const sysICE_AMB_I = 0.56;      // absolute, blended in
 const sysICE_SUN_C = new THREE.Color(PALETTE.iceSun);
