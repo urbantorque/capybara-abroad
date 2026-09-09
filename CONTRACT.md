@@ -14,6 +14,144 @@ must be requested from the Coordinator, not made unilaterally.
 > re-dated. Rewriting the rest would be rewriting the record of what was true
 > when a decision was made, which is the thing this file is for.
 
+## THE NEXT PASS, BATCH EIGHT — THE REPERTOIRE (Q1 — 9 Sep 2026)
+
+**ROADMAP-NEXT item 4, first batch: the language.** The chain counts HOW MANY
+witnessed things happened in twelve seconds and has never known WHICH. This
+reads the same window, asks which, and gives the answer a name — on the card,
+out of a bystander's mouth, and on the save file. The journal page of forty
+silhouettes and notoriety's variety term are the second batch.
+
+### IT IS A READ-ONLY CONSUMER, AND THAT IS LOAD-BEARING
+
+`incAdd`, the twelve seconds, the twenty-two metres, the same-prop gate,
+`sysINC_COOL` and both tiers are exactly as they were. The whole addition is
+**two optional arguments at the five handlers that feed the chain** — the kind
+of thing that happened and the type of prop it happened to, both already in
+hand at every one of them — and a ring of the last eight. Nothing here can make
+an incident happen, stop one happening, or change what one is worth.
+
+The roadmap's first premise was measured on 8 Sep and held: `incAdd(x, z, key)`
+kept a count, a window, a position and a per-prop timer, and `key` is the prop's
+id — **an identity, not a description**. So a spilt coffee, a bin in a canal and
+a hat off a tourist were three identical facts.
+
+**FIVE KINDS, AND A STARTLED PERSON IS DELIBERATELY NOT ONE.** `npc:startled`
+does not feed the chain at all, so the roadmap's second premise — that the
+startle must carry its cause — turns out to be a requirement for a LATER batch
+and not this one: adding people to the chain would change what an incident IS,
+which a read-only consumer may not do.
+
+### WHAT A CHAIN IS ACTUALLY MADE OF, MEASURED BEFORE A NAME WAS WRITTEN
+
+`qa/q1-chains.js`, the same xorshift masher `eng-rate6.js` uses, six chapters,
+sixty seconds each:
+
+| | |
+|---|---|
+| cards in the whole run | **1** (Göreme) |
+| what it was made of | **three baskets** |
+| every event in every chapter | **`bang`** |
+
+Two things follow and both of them shaped the table.
+
+**1. A RANDOM PLAYER ALMOST NEVER CHAINS**, so the roadmap's freebie worry is
+the wrong way round: a name is not something the game hands out for flailing.
+
+**2. WHAT A MASHER DOES GET is the same prop three times**, which is exactly
+why SAME AGAIN, THE HAT TRICK, BIN DAY and THE CONE ZONE are the ENTRY tier.
+They are the ones a player finds out by accident, and finding one out is the
+invitation to look for the other thirty-nine. Everything that needs two KINDS
+is deliberate by construction, because spilling something and breaking
+something are different verbs with different props.
+
+### FORTY NAMES, AND THE RANKING IS THE HARD PART
+
+A pattern is a list of requirements, each consuming distinct events —
+`{k:'spill', t:'coffee'}`, `{t:'hat', n:3}`, `{kinds:3}`, `{same:4}`,
+`{any:2}`. The most specific match wins. Getting "most specific" right took
+three measured passes, and every one of them was a name winning by requiring
+LESS:
+
+| the chain | named, before | named, after |
+|---|---|---|
+| a broken mug, a theft, a bang | HIGH TEA | **THE SMASH AND GRAB** |
+| three things in the water | THE BIN SHOT | **THE DEEP SIX** |
+| a bang, a spill and a splash | THE CHIP SHOP | **MOPPING UP** |
+| two in the canal, in Venice | THE BIN SHOT | **THE GONDOLIER'S FAREWELL** |
+
+Three rules came out of it, and all three are in the code with the measurement
+beside them:
+ - **An `any` is a length, not a description, and scores nothing.** It says how
+   long the chain has to be, not what was in it.
+ - **A chapter-locked pattern outranks a neutral one by three, not by one.** At
+   one, the Gondolier's Farewell never won a single ring — all four locked names
+   were dead code in a table nothing else could tell you about.
+ - **The three breadth names sit at the very bottom of the table on purpose.**
+   THE CLEAN SWEEP is the fallback for a varied chain nothing else has a word
+   for, not the prize for one: at `kinds × 3` it beat THE SMASH AND GRAB, which
+   is a breadth name beating a specific one that describes the same chain
+   better. At `× 2` they tie and the table order decides.
+
+**A CHAIN THAT MATCHES NOTHING IS STILL THE CARD IT ALWAYS WAS** — no empty
+slot, no dash, nothing to notice. Three plain bangs of three different props
+have no name, and that is the design: most chains are ordinary.
+
+### WHERE THE NAME GOES
+
+The name takes the card's big line and the chain's own sentence moves under it,
+because the name is the payout and the sentence is the colour. `showMoment`
+gained an optional third argument; every other caller in the game passes two and
+gets exactly the card it always got, because the row is `display:none` with
+nothing in it.
+
+**AND THE PEOPLE SAY IT.** B13 already has the nearest pair arguing about who
+did it; this is what they argue about it BEING. Measured: *"That one has a name.
+The flat white."* The first cut said *"That has a name. the flat white."* — the
+table stores names in capitals because that is how the card sets them, and a
+person does not speak in capitals.
+
+`rep: {id: n}` on the save, additive, no version bump. Measured: named, counted,
+written, and still there after a reload.
+
+### THE TWO PREMISES THAT WERE CHECKS RATHER THAN DESIGN
+
+**THE LONGEST NAME ON THE NARROWEST LAYOUT.** `qa/q1-width.js`, four viewports:
+at 360 px the card is **254 × 101** and *"THE GONDOLIER'S FAREWELL"* (24
+characters) renders on ONE line at 14 px. Nothing wraps, nothing overflows the
+card, nothing leaves the screen. 26 characters is the budget that leaves and
+`qa/q1-static.cjs` asserts it, so the forty-first name cannot quietly wrap a
+phone.
+
+**AND EVERY PATTERN HAS TO BE REACHABLE.** A name that names a prop no chapter
+builds, or asks a spill of something that cannot spill, is a silhouette FOR
+EVER — and it fails in exactly the way nothing in the game can report, because a
+name never awarded looks identical to one nobody has earned yet. The static
+check reads `physTYPES` for what a prop can do and `physBIOME_SCATTER` for where
+it is, and prints the ceiling per chapter:
+
+> drift 17, palawan 17, cali 18, manly 19, pantanal 19, cave 20, goreme 21,
+> rio 23, monaco 23, sahara 25, kowloon 26, antarctic 26, kyoto 27, iceland 27,
+> hanoi 27, quay 28, venice 28
+
+It caught one straight away: **`sandwich` is in no chapter's scatter list** — it
+is the picnic, placed by hand on one lawn — so THE LUNCH HOUR was a
+chapter-locked pattern that did not say so, which is the worst kind. It is
+locked to Sydney now, which has no regular and no perch and can have a name of
+its own.
+
+The Drift's seventeen is theoretical: it is the chapter with nobody in it, and
+the chain's own did-anybody-see-it gate means it can never produce an incident
+at all. That is the chain's rule, not this batch's.
+
+### WHAT IS NOT HERE
+
+The journal page of forty silhouettes, drawn like the shelf's unearned
+souvenirs; notoriety's missing `variety` term — the count of distinct names,
+which is the difference between a masher and a stylist; and the ledger foot
+saying which you were. All three are the second batch, and all three read
+`jrRep`, which is now on the file.
+
 ## THE NEXT PASS, BATCH SEVEN — WHAT THE FRIENDSHIP BUYS (O2 — 9 Sep 2026)
 
 **ROADMAP-NEXT item 1, second batch, and the item is closed.** O1 built the

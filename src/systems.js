@@ -7712,6 +7712,11 @@ function sysBuildCSS() {
   'margin:5px auto 6px;transform:rotate(.6deg);}',
 '.capyui-momenttext{font-size:clamp(14px,3.6vw,25px);font-weight:700;line-height:1.12;',
   'letter-spacing:.02em;}',
+/* Q1: the chain’s own sentence, under the name it has been given. Quiet,
+   and it wraps rather than widening the card — the card is already capped
+   at min(86vw,520px) and the name above it is the thing that must not. */
+'.capyui-momentnote{font-size:clamp(10px,2vw,12px);font-weight:500;line-height:1.25;',
+  'margin-top:6px;opacity:.72;max-width:38ch;margin-left:auto;margin-right:auto;}',
 
 /* ---------- perf ---------- */
 '.capyui-perf{position:absolute;right:10px;top:10px;background:' + sysRgba(PALETTE.ibisHead, 0.72) + ';',
@@ -20148,14 +20153,27 @@ export function createSystems(game) {
   const momentEl = sysEl('div', 'capyui-moment');
   const momentKick = sysEl('div', 'capyui-momentkick', '');
   const momentText = sysEl('div', 'capyui-momenttext', '');
+  // Q1: the third line, empty and hidden until a chain has a name.
+  const momentNote = sysEl('div', 'capyui-momentnote', '');
+  momentNote.style.display = 'none';
   momentEl.appendChild(momentKick);
   momentEl.appendChild(sysEl('div', 'capyui-momentrule'));
   momentEl.appendChild(momentText);
+  momentEl.appendChild(momentNote);
   hudRoot.appendChild(momentEl);
   let momentTimer = 0;
-  function showMoment(kicker, text) {
+  /**
+   * THE CARD. `note` is a third line under the big one and is optional (Q1):
+   * THE REPERTOIRE puts the name in `text` and the chain’s own sentence here,
+   * and every other caller in the game passes two arguments and gets exactly
+   * the card it always got — the row is display:none with nothing in it, so
+   * the layout does not move.
+   */
+  function showMoment(kicker, text, note) {
     momentKick.textContent = kicker || '';
     momentText.textContent = text || '';
+    momentNote.textContent = note || '';
+    momentNote.style.display = note ? '' : 'none';
     momentEl.classList.add('show');
     if (momentTimer) clearTimeout(momentTimer);
     momentTimer = setTimeout(function () { momentEl.classList.remove('show'); }, sysMOMENT_CARD);
@@ -23097,6 +23115,10 @@ export function createSystems(game) {
         pas: jrChapPerch,
         // ...and THE REGULARS’ tier (O1), on exactly the same terms.
         pal: jrChapPal,
+        // ...and THE REPERTOIRE (Q1): name id -> how many times. Additive,
+        // no version bump, and a file written before it existed reads as a
+        // player who has not found any out, which is what they had.
+        rep: jrRep,
         biome: (game.biome && game.biome.current) || 'sydney',
         // Additive, exactly like `chapms` and `finds` above, and the version
         // does not move for it. `fin` means the closing beat on the lawn has
@@ -25994,6 +26016,8 @@ export function createSystems(game) {
       // number, and this one INDEXES A LINE POOL. A hand-edited file handing
       // a chapter a sixth tier would greet the player with `undefined` on
       // every arrival for the rest of the journey.
+      const rp = jrFile.rep || {};
+      for (const k in rp) if (typeof rp[k] === 'number' && rp[k] > 0) jrRep[k] = rp[k];
       const pl = jrFile.pal || {};
       for (const k in pl) {
         if (typeof pl[k] !== 'number') continue;
@@ -31134,7 +31158,8 @@ export function createSystems(game) {
     // through would put a thud and a shake on top of them.
     if (p && p.spill) {
       if (p.prop && p.prop.disturbed && p.position) {
-        incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type);
+        incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type,
+               'spill', p.prop.type);
       }
       return;
     }
@@ -31171,7 +31196,8 @@ export function createSystems(game) {
     // did — and the speed gate is above a walk, so brushing past a crate is not
     // an event either.
     if (s >= sysINC_HIT && p && p.prop && p.prop.disturbed && p.position) {
-      incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type);
+      incAdd(p.position.x, p.position.z, p.prop.id !== undefined ? p.prop.id : p.prop.type,
+             'bang', p.prop.type);
     }
   });
   game.events.on('prop:water', function (p) {
@@ -31188,14 +31214,16 @@ export function createSystems(game) {
     // Something went in the drink, and it counts if it was yours to put there.
     const wp = p && p.prop, wb = wp && wp.body;
     if (wp && wp.disturbed && wb) {
-      incAdd(wb.position.x, wb.position.z, wp.id !== undefined ? wp.id : wp.type);
+      incAdd(wb.position.x, wb.position.z, wp.id !== undefined ? wp.id : wp.type,
+             'water', wp.type);
     }
   });
   // ...and the other two halves of "a thing you did that somebody saw".
   game.events.on('prop:destroy', function (p) {
     const dp = p && p.prop, db = dp && dp.body;
     if (dp && dp.disturbed && db) {
-      incAdd(db.position.x, db.position.z, dp.id !== undefined ? dp.id : dp.type);
+      incAdd(db.position.x, db.position.z, dp.id !== undefined ? dp.id : dp.type,
+             'break', dp.type);
     }
   });
   game.events.on('capy:grab', function (p) {
@@ -31204,7 +31232,7 @@ export function createSystems(game) {
     const gp = p && p.prop;
     const cp = game.capy && game.capy.position;
     if (gp && (gp.owner || (p && p.from)) && cp) {
-      incAdd(cp.x, cp.z, gp.id !== undefined ? gp.id : gp.type);
+      incAdd(cp.x, cp.z, gp.id !== undefined ? gp.id : gp.type, 'theft', gp.type);
     }
   });
   game.events.on('npc:startled', function (p) {
@@ -31300,12 +31328,39 @@ export function createSystems(game) {
   let incCool = 0;         // s until another card may be earned
   let incCarded = 0;       // the tier already shown for this chain
   const incSeen = Object.create(null);   // prop id -> game time it last counted
+  // ---- WHAT THE CHAIN IS MADE OF (Q1, ROADMAP-NEXT item 4) ---------------
+  //
+  // The chain counts HOW MANY witnessed things happened in twelve seconds and
+  // has never known WHICH. `incAdd(x, z, key)` kept a count, a window, the
+  // first position and a per-prop last-counted time; `key` is the prop’s id,
+  // which is an identity and not a description. So a coffee going over, a bin
+  // going in the canal and a hat coming off a tourist were three identical
+  // facts, and the one card the game can show for any of them says the same
+  // five sentences.
+  //
+  // THE RING IS THE WHOLE OF THE ADDITION. Two optional arguments at the five
+  // handlers that feed the chain — the kind of thing that happened and the
+  // type of prop it happened to, both already in hand at every one of them —
+  // and a list of the last few. The chain’s arithmetic is untouched: the
+  // count, the window, the radius, the same-prop gate, the cooldown and both
+  // tiers behave exactly as they did, and a caller that passes neither
+  // argument (there are none, but there could be) simply contributes an event
+  // with no description rather than breaking anything.
+  //
+  // FIVE KINDS, AND THEY ARE THE ONES THE CHAIN ALREADY SEES: a bang, a
+  // spill, something in the water, something broken, something stolen. A
+  // startled person is deliberately NOT one — `npc:startled` does not feed
+  // the chain and adding it would change what an incident IS, which this is
+  // not allowed to do. It reads the chain; it does not move it.
+  const repRING = 8;                     // events remembered. The chain caps at 5.
+  const repEv = [];                      // [{k, t}] oldest first, cleared with the chain
 
   /**
-   * ONE THING HAPPENED, AT A POINT. Called from the four handlers below.
+   * ONE THING HAPPENED, AT A POINT. Called from the five handlers below.
    * `key` identifies the prop so the same one cannot count twice in a row.
+   * `kind` and `type` are what it WAS — see the ring above. Both optional.
    */
-  function incAdd(x, z, key) {
+  function incAdd(x, z, key, kind, type) {
     if (!started || game.state.paused) return;
     if (typeof x !== 'number' || x !== x) return;
     const t = game.state.time;
@@ -31323,8 +31378,14 @@ export function createSystems(game) {
     if (!(saw > 0)) return;
     if (incT < 0 || Math.hypot(x - incX, z - incZ) > sysINC_R) {
       incN = 0; incX = x; incZ = z; incCarded = 0;
+      repEv.length = 0;   // Q1: a new chain is a new sentence
     }
     incN++;
+    // Q1: ...and WHAT it was. After the same-prop gate and after the
+    // did-anybody-see-it gate, so the ring holds exactly the events the
+    // count holds and cannot drift from it.
+    repEv.push({ k: kind || '', t: type || '' });
+    if (repEv.length > repRING) repEv.shift();
     incT = sysINC_T;
     const tier = incN >= sysINC_N2 ? 2 : (incN >= sysINC_N ? 1 : 0);
     // ---- THE CHAIN CLIMBS, AND THAT IS THE WHOLE OF WHAT IT SAYS (v51) ----
@@ -31383,12 +31444,273 @@ export function createSystems(game) {
     sfx('chime', { volume: 0.5, pitch: tier === 2 ? 1.32 : 1.18, force: true });
     const cp = game.capy && game.capy.position;
     if (cp) confettiBurst(cp.x, cp.y + 0.5, cp.z, tier === 2 ? 22 : 16);
+    // ---- ...AND IT HAS A NAME (Q1). See THE REPERTOIRE --------------------
+    // The name takes the big line and the sentence moves below it, because
+    // the name IS the payout the item is about and the sentence is the
+    // colour. A chain that matches nothing shows exactly the card it always
+    // showed — no empty slot, no dash, nothing to notice.
+    const named = repName(x, z);
+    const sentence = pool[randInt(0, pool.length - 1)];
     showMoment(tier === 2 ? 'A SCENE' : 'AN INCIDENT',
-               pool[randInt(0, pool.length - 1)]);
+               named ? named.name : sentence,
+               named ? sentence : '');
     punch(tier === 2 ? 0.12 : 0.09);
     // ...and the people say the one thing they only say when it has been three
     // in a row. npc.js owns what that sounds like; this owns when.
-    game.events.emit('capy:incident', { x: x, z: z, n: incN, tier: tier, saw: saw });
+    game.events.emit('capy:incident', { x: x, z: z, n: incN, tier: tier, saw: saw,
+                                        ev: repEv.slice() });
+  }
+
+  /** THE RING, FOR THE HARNESS. Nothing in src reads this — it is the only
+   *  way to see what a chain was made of from outside, and the pattern table
+   *  was authored against six chapters of it rather than against a guess. */
+  function repRing() { return repEv.slice(); }
+  game.repRing = repRing;
+
+  // =========================================================================
+  // THE REPERTOIRE — NAMED STUNTS (ROADMAP-NEXT item 4, Q1)
+  //
+  // The chain counts HOW MANY witnessed things happened in twelve seconds.
+  // This reads the same window and asks WHICH, and gives the answer a name.
+  // Do a spilt coffee, a hat and a bin inside one chain and the card that says
+  // AN INCIDENT says, underneath, THE FLAT WHITE — and the nearest person says
+  // it too, because in this square it has one now.
+  //
+  // IT IS A READ-ONLY CONSUMER. `incAdd`, the twelve seconds, the twenty-two
+  // metres, the same-prop gate, `sysINC_COOL` and both tiers are exactly as
+  // they were; the ring above is two optional arguments at five call sites
+  // that already had both values in hand. Nothing here can make an incident
+  // happen, stop one happening, or change what one is worth.
+  //
+  // ---- WHAT A CHAIN IS ACTUALLY MADE OF, MEASURED FIRST -------------------
+  // `qa/q1-chains.js`, the same xorshift masher `eng-rate6.js` uses, six
+  // chapters, sixty seconds each: ONE card in the whole run, and every event
+  // in every chapter was a `bang`. Göreme's card was three baskets.
+  //
+  // Two things follow, and both of them shaped the table below.
+  //  1. A RANDOM PLAYER ALMOST NEVER CHAINS, so a name is not something the
+  //     game hands out for flailing — the roadmap's freebie worry is the wrong
+  //     way round.
+  //  2. WHAT A MASHER DOES GET is the same prop three times, which is why
+  //     THE HAT TRICK and its family are the ENTRY tier: they are the ones a
+  //     player finds out by accident, and finding one out is the invitation to
+  //     look for the rest.
+  // Everything that needs two KINDS is deliberate by construction, because
+  // spilling something and breaking something are different verbs with
+  // different props.
+  //
+  // ---- HOW A PATTERN IS WRITTEN -------------------------------------------
+  // `want` is a list of requirements, each of which consumes `n` (default 1)
+  // DISTINCT events from the ring:
+  //   { k: 'spill' }            one spill, of anything
+  //   { t: 'hat', n: 3 }        three events involving a hat, of any kind
+  //   { k: 'break', t: 'mug' }  a broken mug
+  //   { any: 3 }                three events of any sort at all
+  //   { kinds: 2 }              events of two DIFFERENT kinds
+  // `biome` locks a pattern to one chapter. Everything without one is
+  // chapter-neutral, which is what makes the second visit to a place a hunt
+  // rather than a replay: a hat is a hat in sixteen chapters.
+  //
+  // THE MOST SPECIFIC MATCH WINS, scored as the number of events consumed
+  // plus one per constraint — so THE FLAT WHITE (a named prop, spilt) beats
+  // THE DOUBLE SPILL (two spills of anything) on the same chain, and both beat
+  // the generic tier names. Ties go to table order.
+  const sysREP = [
+    // ---- the entry tier: one prop, over and over ------------------------
+    // These are what a masher gets, and they are supposed to be.
+    { id: 'hat-trick',   name: 'THE HAT TRICK',        want: [{ t: 'hat', n: 3 }] },
+    { id: 'bin-day',     name: 'BIN DAY',              want: [{ t: 'bin', n: 3 }] },
+    { id: 'cone-zone',   name: 'THE CONE ZONE',        want: [{ t: 'cone', n: 3 }] },
+    { id: 'roadworks',   name: 'ROADWORKS',            want: [{ t: 'sign', n: 2 }, { t: 'cone', n: 2 }] },
+    { id: 'same-again',  name: 'SAME AGAIN',           want: [{ same: 3 }] },
+    { id: 'clearance',   name: 'THE CLEARANCE',        want: [{ same: 4 }] },
+    // ---- two of a verb ---------------------------------------------------
+    { id: 'double-spill', name: 'THE DOUBLE SPILL',    want: [{ k: 'spill', n: 2 }] },
+    { id: 'butterfingers', name: 'BUTTERFINGERS',      want: [{ k: 'break', n: 2 }] },
+    { id: 'magpie',      name: 'THE MAGPIE',           want: [{ k: 'theft', n: 2 }] },
+    { id: 'burial',      name: 'BURIAL AT SEA',        want: [{ k: 'water', n: 2 }] },
+    // ---- three of a verb, which nobody does by accident -------------------
+    { id: 'triple-spill', name: 'THE TRIPLE SPILL',    want: [{ k: 'spill', n: 3 }] },
+    { id: 'demolition',  name: 'THE DEMOLITION',       want: [{ k: 'break', n: 3 }] },
+    { id: 'kleptomania', name: 'KLEPTOMANIA',          want: [{ k: 'theft', n: 3 }] },
+    { id: 'deep-six',    name: 'THE DEEP SIX',         want: [{ k: 'water', n: 3 }] },
+    // ---- mixed verbs, which is the whole point ---------------------------
+    { id: 'smash-grab',  name: 'THE SMASH AND GRAB',   want: [{ k: 'break' }, { k: 'theft' }] },
+    { id: 'wet-work',    name: 'WET WORK',             want: [{ k: 'theft' }, { k: 'water' }] },
+    { id: 'clumsy-thief', name: 'THE CLUMSY THIEF',    want: [{ k: 'theft' }, { k: 'spill' }] },
+    { id: 'mopping-up',  name: 'MOPPING UP',           want: [{ k: 'spill' }, { k: 'water' }] },
+    { id: 'housekeeping', name: 'HOUSEKEEPING',        want: [{ k: 'spill' }, { k: 'break' }] },
+    // ---- named props, chapter-neutral because the prop is ----------------
+    { id: 'flat-white',  name: 'THE FLAT WHITE',       want: [{ k: 'spill', t: 'coffee' }, { any: 2 }] },
+    { id: 'paparazzo',   name: 'THE PAPARAZZO',        want: [{ k: 'break', t: 'camera' }] },
+    { id: 'camera-shy',  name: 'CAMERA SHY',           want: [{ k: 'theft', t: 'camera' }] },
+    { id: 'shades-off',  name: 'SHADES OFF',           want: [{ k: 'break', t: 'sunglasses' }] },
+    { id: 'high-tea',    name: 'HIGH TEA',             want: [{ k: 'break', t: 'mug' }, { any: 2 }] },
+    { id: 'the-service', name: 'THE SERVICE',          want: [{ k: 'break', t: 'cuencobowl' }, { any: 2 }] },
+    { id: 'last-orders', name: 'LAST ORDERS',          want: [{ k: 'break', t: 'winebottle' }, { any: 2 }] },
+    { id: 'chip-shop',   name: 'THE CHIP SHOP',        want: [{ k: 'spill', t: 'chips' }, { any: 2 }] },
+    { id: 'handbags',    name: 'HANDBAGS',             want: [{ k: 'spill', t: 'handbag' }, { any: 2 }] },
+    { id: 'bin-shot',    name: 'THE BIN SHOT',         want: [{ k: 'water', t: 'bin' }, { any: 2 }] },
+    { id: 'beach-day',   name: 'THE BEACH DAY',        want: [{ t: 'ball' }, { t: 'towel' }, { any: 1 }] },
+    { id: 'day-off',     name: 'THE DAY OFF',          want: [{ t: 'deckchair' }, { t: 'towel' }, { any: 1 }] },
+    { id: 'the-picnic',  name: 'THE PICNIC',           want: [{ t: 'basket' }, { t: 'esky' }, { any: 1 }] },
+    // Locked to Sydney because it already was: qa/q1-static.cjs found that
+    // `sandwich` is in no chapter's scatter list — it is the picnic, placed by
+    // hand on one lawn — so this was a chapter-locked pattern that did not say
+    // so, which is the worst kind. Sydney has no regular and no perch; it can
+    // have a name of its own.
+    { id: 'lunch-hour',  name: 'THE LUNCH HOUR', biome: 'sydney',
+      want: [{ t: 'sandwich' }, { t: 'coffee' }, { any: 1 }] },
+    // ---- and the ones a place owns ---------------------------------------
+    // Chapter-locked by construction and marquee-adjacent, exactly as the item
+    // asks: you cannot do a gondola anywhere else.
+    { id: 'gondoliers-farewell', name: "THE GONDOLIER'S FAREWELL", biome: 'venice',
+      want: [{ k: 'water', n: 2 }, { any: 1 }] },
+    { id: 'the-checkout', name: 'THE CHECKOUT', biome: 'monaco',
+      want: [{ k: 'theft' }, { k: 'break' }, { any: 1 }] },
+    { id: 'the-tea-house', name: 'THE TEA HOUSE', biome: 'goreme',
+      want: [{ k: 'break' }, { any: 2 }] },
+    { id: 'rush-hour', name: 'RUSH HOUR', biome: 'hanoi', want: [{ any: 5 }] },
+    // ---- and the fallback tier, LAST on purpose (see repScore) -----------
+    // A varied chain that nothing above has a word for still gets one.
+    { id: 'clean-sweep', name: 'THE CLEAN SWEEP',      want: [{ kinds: 3 }] },
+    { id: 'full-set',    name: 'THE FULL SET',         want: [{ kinds: 4 }] },
+    { id: 'the-lot',     name: 'THE LOT',              want: [{ kinds: 5 }] },
+  ];
+  const sysREP_R = 15;        // m of earshot for somebody to repeat the name
+  const jrRep = Object.create(null);   // pattern id -> how many times
+
+  /**
+   * DOES THIS CHAIN MATCH THIS PATTERN, and how specific was it.
+   *
+   * Greedy over the requirements in the order they are written, each consuming
+   * DISTINCT events — so `[{t:'hat'},{t:'hat'}]` needs two hats and not one hat
+   * counted twice, which is the same rule `sysINC_SAME` applies to the chain
+   * itself. Returns the specificity, or 0 for no match.
+   */
+  function repScore(pat, ev) {
+    const used = new Array(ev.length).fill(false);
+    let score = 0;
+    for (let i = 0; i < pat.want.length; i++) {
+      const w = pat.want[i];
+      // `kinds` and `same` are counted over the whole ring rather than consumed
+      if (w.kinds !== undefined) {
+        const seen = {};
+        let d = 0;
+        for (let j = 0; j < ev.length; j++) if (ev[j].k && !seen[ev[j].k]) { seen[ev[j].k] = 1; d++; }
+        if (d < w.kinds) return 0;
+        // n events and n constraints. Tuned twice and the second one stuck:
+        // at 3n a bang, a break and a theft was THE CLEAN SWEEP rather than
+        // THE SMASH AND GRAB, which is a breadth name beating a specific one
+        // that describes the SAME chain better. At 2n they tie at six and the
+        // table order decides — which is why the three breadth names sit at
+        // the very bottom of it. They are the fallback for a varied chain that
+        // nothing else has a word for, not the prize for one.
+        score += w.kinds * 2;
+        continue;
+      }
+      if (w.same !== undefined) {
+        const cnt = {};
+        let best = 0;
+        for (let j = 0; j < ev.length; j++) if (ev[j].t) best = Math.max(best, (cnt[ev[j].t] = (cnt[ev[j].t] || 0) + 1));
+        if (best < w.same) return 0;
+        score += w.same;
+        continue;
+      }
+      let need = w.n || (w.any || 1);
+      const bits = (w.k ? 1 : 0) + (w.t ? 1 : 0);
+      for (let j = 0; j < ev.length && need > 0; j++) {
+        if (used[j]) continue;
+        if (w.k && ev[j].k !== w.k) continue;
+        if (w.t && ev[j].t !== w.t) continue;
+        used[j] = true; need--;
+      }
+      if (need > 0) return 0;
+      // AN  IS A LENGTH, NOT A DESCRIPTION, AND SCORES NOTHING.
+      // MEASURED with it scoring like a constraint: a broken mug and a theft
+      // was named HIGH TEA (a broken mug, plus any two) rather than THE SMASH
+      // AND GRAB, three things in the water was THE BIN SHOT rather than THE
+      // DEEP SIX, and three different kinds was THE CHIP SHOP rather than THE
+      // CLEAN SWEEP — in every case a pattern won by requiring LESS. What a
+      // name is worth is how much of the chain it actually accounts for.
+      score += (w.any ? 0 : (w.n || 1)) + bits * 2;
+    }
+    return score;
+  }
+  /** The best-matching pattern for a chain, or null. See sysREP. */
+  function repMatch(ev) {
+    if (!ev || !ev.length) return null;
+    const live = (game.biome && game.biome.current) || '';
+    let best = null, bestS = 0;
+    for (let i = 0; i < sysREP.length; i++) {
+      const p = sysREP[i];
+      if (p.biome && p.biome !== live) continue;
+      const sc = repScore(p, ev);
+      // ...and a chapter-locked pattern outranks a neutral one of equal
+      // specificity, because it is the rarer thing to have found out.
+      // ...and a chapter-locked pattern outranks a neutral one, by three
+      // rather than by one. MEASURED at one: the Gondolier’s Farewell never
+      // won a single ring, because a neutral pattern one point more specific
+      // took every one — which would have made all four locked names dead
+      // code in a table nothing else could tell you about.
+      const adj = sc + (p.biome ? 3 : 0);
+      if (sc > 0 && adj > bestS) { bestS = adj; best = p; }
+    }
+    return best;
+  }
+  /**
+   * THE HARNESS WINDOW. With no argument: how many names this journey holds.
+   * With a ring — [{k, t}, ...] — the pattern that ring would be given and how
+   * specifically, which is the only way to check the RANKING without playing
+   * out forty chains. A test hook and never a verb, on the same terms as
+   * `forceHeat`: it writes nothing and counts nothing.
+   */
+  game.repDebug = function (ring) {
+    if (ring && ring.length) {
+      const m = repMatch(ring);
+      const all = [];
+      for (let i = 0; i < sysREP.length; i++) {
+        const sc = repScore(sysREP[i], ring);
+        if (sc > 0) all.push({ id: sysREP[i].id, s: sc, biome: sysREP[i].biome || null });
+      }
+      return { id: m ? m.id : null, name: m ? m.name : null, all: all };
+    }
+    const out = { n: sysREP.length, found: 0, counts: {}, ring: repRing() };
+    for (const k in jrRep) { out.counts[k] = jrRep[k]; if (jrRep[k] > 0) out.found++; }
+    out.last = repLast;
+    return out;
+  };
+  let repLast = '';
+  /**
+   * NAME IT, COUNT IT, AND HAVE SOMEBODY SAY IT.
+   *
+   * Called from the one line in `incAdd` that decides a card is owed, so a
+   * name happens exactly when an incident does — never on a chain that did not
+   * pay out, and never twice for the same chain (the card climbs through both
+   * tiers, and tier 2 gets its own look at the ring, which by then is longer).
+   */
+  function repName(x, z) {
+    const p = repMatch(repEv);
+    if (!p) { repLast = ''; return null; }
+    repLast = p.name;
+    jrRep[p.id] = (jrRep[p.id] || 0) + 1;
+    saveSoon();
+    // AND THE PEOPLE SAY IT. B13 already has the nearest pair arguing about
+    // who did it; this is what they argue about it BEING. Deliberately after
+    // the card and on the ordinary earshot, so a square with nobody in it
+    // simply does not name it out loud — the card still does.
+    const n = jrRep[p.id];
+    // THE NAMES ARE STORED IN CAPITALS because that is how the card sets them,
+    // and a person does not speak in capitals. Lower-cased for the middle of a
+    // sentence and sentence-cased at the start of one — measured, because the
+    // first cut said "That has a name. the flat white."
+    const low = p.name.toLowerCase();
+    const cap = low.charAt(0).toUpperCase() + low.slice(1);
+    const say = n === 1 ? 'That one has a name. ' + cap + '.'
+                        : 'That is ' + low + '. Again.';
+    try { if (typeof game.sayNear === 'function') game.sayNear(x, z, sysREP_R, say); }
+    catch (e) { /* an older npc.js */ }
+    return p;
   }
 
   function incTick(dt) {
@@ -31408,6 +31730,7 @@ export function createSystems(game) {
         // which is not a thing to be disappointed about.
         else if (incN >= sysINC_N - 1) sfx('tick', { volume: 0.11, pitch: 0.70 });
         incN = 0; incCarded = 0;
+        repEv.length = 0;   // Q1
       }
     }
     incPaint();

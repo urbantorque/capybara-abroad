@@ -456,6 +456,34 @@ already emit. Capybara trope: the animal whose entire brand is *relaxed*.
 
 ### 4. THE REPERTOIRE — named stunts, found out by doing them
 
+> **BUILT, first half, 9 Sep 2026 (Q1). See CONTRACT.md.** Forty names, the
+> matcher, the name on the card, a bystander saying it, and `rep: {id: n}` on
+> the save. The journal page of silhouettes, notoriety’s variety term and the
+> ledger foot are the second batch.
+>
+> - **A random masher almost never chains**, which is the freebie worry the
+>   wrong way round. MEASURED, six chapters × 60 s of the eng-rate masher:
+>   ONE card in the whole run, and every event in every chapter was a `bang`.
+>   What a masher DOES get is the same prop three times — so SAME AGAIN and
+>   THE HAT TRICK are the entry tier by design, and anything needing two
+>   KINDS is deliberate by construction.
+> - **The ranking was the hard part, and it took three measured passes** —
+>   each one a name winning by requiring LESS. An `any` is a length, not a
+>   description, and scores nothing; a chapter-locked name outranks a neutral
+>   one by three, not one (at one, all four locked names were dead code); and
+>   the three breadth names sit at the bottom of the table, because THE CLEAN
+>   SWEEP is the fallback for a varied chain, not the prize for one.
+> - **`npc:startled` does not feed the chain at all**, so this item’s second
+>   premise is a requirement for a LATER batch: adding people to the chain
+>   changes what an incident IS, which a read-only consumer may not do.
+> - **The longest name fits.** 360 px: the card is 254×101 and "THE
+>   GONDOLIER’S FAREWELL" (24) sets on one line at 14 px. 26 is the budget and
+>   the static check asserts it.
+> - **Every pattern is reachable**, checked against `physTYPES` and
+>   `physBIOME_SCATTER`: 17 to 28 of the forty per chapter. It caught THE
+>   LUNCH HOUR immediately — `sandwich` is in no scatter list, so it was a
+>   chapter-locked pattern that did not say so.
+
 **Concept.** The incident chain counts *how many* witnessed things happened
 in twelve seconds. The Repertoire reads the same window and asks *which*.
 Forty-odd authored patterns over the event kinds the chain already sees —
