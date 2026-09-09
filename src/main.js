@@ -1915,6 +1915,10 @@ function mainBoot() {
     // that has been warned about you actually does.
     game.notoSet = npcs.notoSet;
     game.notoAudit = npcs.notoAudit;
+    // THE MARCH (item 3): who is walking over about the chain, and how close
+    // they have got. There is no `marchArm` beside it — systems.js emits
+    // `capy:chain` and npc.js decides who cares.
+    game.marchAudit = npcs.marchAudit;
     // THE REGULARS (O1, ROADMAP-NEXT item 1). The same three-line shape as the
     // rumour above, and the same split: systems.js holds the tier because the
     // tier is a fact about the journey and lives on the save file, and npc.js

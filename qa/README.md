@@ -30,6 +30,12 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-march.js` is item 3, push your luck: it builds a chain out of stamped props
+and watches somebody walk over about it. Read its header before writing any
+probe about a local who is supposed to be walking somewhere — three separate
+wrong answers came out of it, and the last one (`gave up: gesturing` two metres
+short) was a real defect the probe found rather than a probe fault.
+
 `nr-noto.js` is item 6, the reputation that arrives before you do: it seeds a
 tier through the SAVE FILE and restores, because a played tier 3 is twenty
 minutes of trouble a row. Its header is the record of two traps — `addInitScript`

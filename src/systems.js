@@ -32337,6 +32337,23 @@ export function createSystems(game) {
     if (repEv.length > repRING) repEv.shift();
     incT = sysINC_T;
     const tier = incN >= sysINC_N2 ? 2 : (incN >= sysINC_N ? 1 : 0);
+    // ---- ...AND EVERY RUNG OF IT IS SAID OUT LOUD NOW ---------------------
+    // `capy:incident` fires only where a CARD does — three and five — so the
+    // two rungs in between have never been visible to anything outside this
+    // function. The chain is the only repeatable reward in the game and the
+    // player's whole relationship with it is "did that count", which the pips
+    // answer, and "is this going to cost me anything", which nothing did.
+    //
+    // ONE EVENT PER WITNESSED THING, carrying the count. What listens is
+    // npc.js: at two, somebody stops and looks; at four, somebody puts down
+    // what they are doing and comes over. See npcMarchOn.
+    //
+    // EMITTED BEFORE EVERY EARLY RETURN BELOW, and that is not tidiness: the
+    // three returns under this line are about whether a CARD is owed — the
+    // tier has already been carded, the cooldown is running — and none of them
+    // is about whether the thing happened. A chain that is counting but cannot
+    // card is exactly the chain a player most needs to see a reaction to.
+    game.events.emit('capy:chain', { x: x, z: z, n: incN, tier: tier, saw: saw });
     // ---- THE CHAIN CLIMBS, AND THAT IS THE WHOLE OF WHAT IT SAYS (v51) ----
     // This is the only repeatable reward in the game and it was completely
     // silent until the moment it paid out: three things happened, a card
@@ -32409,6 +32426,38 @@ export function createSystems(game) {
     game.events.emit('capy:incident', { x: x, z: z, n: incN, tier: tier, saw: saw,
                                         ev: repEv.slice() });
   }
+
+  // =========================================================================
+  // ...AND THE CHAIN CAN NOW BE ENDED BY SOMEBODY ELSE
+  //
+  // THE DECISION THIS EXISTS TO CREATE. Until now the chain had no stakes in
+  // it at all: three things in twelve seconds is a card, five is a better
+  // card, and the only thing that could ever stop you was the twelve seconds.
+  // So the most repeatable reward in the game contained no choices — it
+  // happened TO the player, who could not aim at it, could not lose it, and
+  // was never asked whether the fifth one was worth it.
+  //
+  // Somebody walking over is the cost. Get clear of them and the window is
+  // still open and A SCENE is still there; let them reach you and the chain
+  // is over — the card you have already earned STAYS EARNED, and the tally
+  // keeps it, because taking back a thing that already paid out is a
+  // punishment and this game does not have those.
+  //
+  // WHY IT IS AN EVENT AND NOT A CALL. npc.js decides who comes over, how
+  // fast, how far they will go and when they give up, because all of that is
+  // what a person is; this module decides what reaching you is WORTH, because
+  // the chain, the tiers and the cooldown are its own. It is the same split as
+  // the regulars' tier and the rumour, in the one direction those two never
+  // needed: npc.js already emits `npc:startled` the same way.
+  //
+  // THE COOLDOWN IS NOT SET HERE. `incTick` starts it when the window closes
+  // and only if a card was earned, and that stays true: being caught on a
+  // two-chain that never carded costs nothing but the two, which is right.
+  // Zeroing `incT` is what makes incTick run its own ending on the next frame.
+  game.events.on('npc:caught', function () {
+    if (incT < 0) return;              // no chain open; nothing to end
+    incT = 0.0001;                     // ...and incTick does the rest
+  });
 
   /** THE RING, FOR THE HARNESS. Nothing in src reads this — it is the only
    *  way to see what a chain was made of from outside, and the pattern table

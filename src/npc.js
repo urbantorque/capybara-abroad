@@ -2400,6 +2400,10 @@ export function createNPCs(game) {
       // write, which is the shape that gave `talkCd` to seventeen chapters
       // with nothing anywhere to decrement it.
       flowSeen: 0,
+      // ...and THE MARCH's own cooldown, declared here for the same reason:
+      // `talkCd` appeared on first write and went seventeen chapters with
+      // nothing to decrement it.
+      marCool: 0,
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -2758,6 +2762,93 @@ export function createNPCs(game) {
   const npcOWN_BACK_T = 14;    // s of walking home, ditto
   const npcOWN_COOL   = 20;    // s before the same person will set off again
   const npcOWN_SAY_T  = 3.2;   // s between the lines they say while following you
+
+  // =========================================================================
+  // THE MARCH — SOMEBODY PUTS DOWN WHAT THEY ARE DOING AND COMES OVER
+  //
+  // systems.js counts a CHAIN: three witnessed things inside twelve seconds
+  // and twenty-two metres is AN INCIDENT, five is A SCENE. It is the only
+  // repeatable reward in the game and until now it contained no decision at
+  // all — nobody could aim at it, nobody could lose it, and nothing ever
+  // asked whether the fifth one was worth going for.
+  //
+  // This is the cost. `capy:chain` now fires on EVERY rung, and two of them
+  // are answered here:
+  //
+  //   at two    the nearest witness stops what they are doing and looks. Two
+  //             numbers, the same `chatT`/`chatYaw` pair the chain-look uses.
+  //   at four   one of them comes over. Not a sprint and not a threat — a
+  //             purposeful walk, at the retrieval speed, saying retrieval's
+  //             own lines. If they reach you the chain is over.
+  //
+  // ---- IT IS RETRIEVAL WITHOUT THE PROP, AND DELIBERATELY SO --------------
+  // Every hard part of this was solved by F4's `own` state and is reused
+  // rather than rewritten: the walk target, `localStepBlocked`'s two-way
+  // sidestep, npcOWN_V, and — the part that matters — THE LEASH. A local does
+  // not leave their pitch. The march is bounded by the same npcOWN_LEASH from
+  // the same anchor, so the worst case is somebody fifteen metres from their
+  // stall, which is a case the game already has and already draws.
+  //
+  // ---- AND IT HAS THE CEILINGS THE CATCH-ALL STATE COST US ---------------
+  // §THE CATCH-ALL STATE: a steering state with no ceiling is how the waiter
+  // went forty seconds without reaching a table. This one cannot outlive the
+  // chain that started it (the window is twelve seconds), has a clock of its
+  // own, ends the instant the leash is reached, and ends when the chapter
+  // changes. ONE MARCHER AT A TIME, ever — a crowd converging on you is a
+  // cutscene, and it is also the failure mode where seven people all leave
+  // their pitches at once.
+  //
+  // ---- WHAT BEING CAUGHT COSTS, WHICH IS ALMOST NOTHING ------------------
+  // A line, a lunge on the flinch spring, a bump of `wary` on the one person,
+  // and the chain closes. The card you already earned at three stays earned
+  // and stays on the tally. Nothing is taken, nothing is undone, and the
+  // animal cannot be hurt — the stake is the run you were on, and it expires.
+  const npcMAR_AT     = 2;     // rung at which the nearest witness looks up
+  const npcMAR_GO     = 4;     // ...and at which one of them sets off
+  const npcMAR_R      = 18;    // m from the event inside which somebody saw it
+  // ---- THE PATIENCE AND THE LEASH HAVE TO AGREE, AND AT FIRST THEY DID NOT
+  // Seven seconds was chosen as "shorter than retrieval's ten, because they
+  // are coming to have a word rather than to get their hat back", and it is
+  // the wrong KIND of number: at npcOWN_V it buys 8.75 m of walking, while the
+  // radius that lets somebody set off at all is eighteen and the leash that
+  // stops them is fifteen. So anybody who set off from more than nine metres
+  // could never arrive however still you stood — measured, and it is exactly
+  // what the first clean run of `qa/nr-march.js` showed: a marcher closing at
+  // a textbook 1.25 m/s from 12.98 m, giving up at 4.25 with nothing wrong.
+  //
+  // Twelve seconds is 15 m at npcOWN_V, which is npcOWN_LEASH to the metre.
+  // The two ceilings now expire at the same distance and neither is silently
+  // the real one. It is LONGER than the chain's own twelve-second window on
+  // purpose: somebody who set off is allowed to finish the walk even if the
+  // chain has closed behind them, and being reached with no chain open costs
+  // nothing at all — systems.js returns on the first line.
+  const npcMAR_OUT_T  = 12.0;  // s of walking before they think better of it
+  const npcMAR_TAKE   = 1.7;   // m at which they have reached you. Just outside
+                               // npcOWN_TAKE, because there is no object here
+                               // to be within arm's length of.
+  const npcMAR_COOL   = 18;    // s before the same person will set off again
+  const npcMAR_SAY_T  = 2.6;   // s between the things they say on the way
+  const npcMAR_WARY   = 0.5;   // what reaching you does to their opinion of you
+  const npcLOC_MARCH = ['Right. That is enough of that.',
+                        'Come here a moment.',
+                        'I saw that. I saw all of it.',
+                        'You and I are going to have a word.',
+                        'That is the third thing.',
+                        'No. No, no, no.'];
+  const npcLOC_MARCH_END = ['There you are.',
+                            'Right. Settle down.',
+                            'That will do.',
+                            'I have got you.',
+                            'Enough now.'];
+  const npcLOC_MARCH_GAVE = ['...I have not got the legs for this.',
+                             'Go on, then. Go on.',
+                             'It is not worth it.',
+                             'Somebody else can deal with that.'];
+  let marWho = null;           // the one marcher, or null. ONE, ever.
+  let marT = 0;                // s spent marching
+  let marSayT = 0;             // s until the next thing they say
+  let marWhy = '';             // the last decision the rung handler made
+  let marBlocked = 0;          // frames of this march with the direct line shut
 
   // ---- CHAINS -------------------------------------------------------------
   // A crowd that all shouts at once is a cutscene and a crowd where one person
@@ -3749,11 +3840,24 @@ export function createNPCs(game) {
       rec.cd = rec.cool * rand(0.4, 0.8);
       localReactLine(rec, npcLOC_CHASE);
     }
+    localSteerTo(rec, px, pz, d);
+  }
+
+  /**
+   * POINT SOMEBODY AT A PLACE THEY ARE NOT STANDING, ROUND WHATEVER IS IN THE
+   * WAY. Lifted out of localOwnStep unchanged when THE MARCH needed the same
+   * three lines; `d` is the distance the caller has already computed, because
+   * both callers have.
+   *
+   * One try each way round an obstacle, then hold this frame. No path and no
+   * memory: a local has neither and is not getting either here.
+   */
+  function localSteerTo(rec, px, pz, d) {
+    let hit = false;
     const ux = (px - rec.x) / d, uz = (pz - rec.z) / d;
     let nx = rec.x + ux * 1.0, nz = rec.z + uz * 1.0;
     if (localStepBlocked(rec, nx, nz)) {
-      // one try each way round it, then hold this frame. No path, no memory:
-      // a local has neither and is not getting either here.
+      hit = true;
       const s = Math.sin(0.9), c = Math.cos(0.9);
       const ax2 = ux * c - uz * s, az2 = ux * s + uz * c;
       const bx2 = ux * c + uz * s, bz2 = -ux * s + uz * c;
@@ -3762,7 +3866,132 @@ export function createNPCs(game) {
       else { nx = rec.x; nz = rec.z; }
     }
     rec.tx = nx; rec.tz = nz;
+    // Whether the direct line was blocked, for THE MARCH's audit only. A
+    // marcher who never closes and a marcher who is walking into a wall look
+    // identical from every other number.
+    return hit;
   }
+
+  // ---- THE MARCH, and see the constants block for what it is for ----------
+  /**
+   * Is this person free to walk over? Every gate here is a state that owns
+   * their feet, their hands or their mouth already.
+   *
+   * ---- `gest` GATES WHO SETS OFF AND NOT WHO KEEPS GOING ------------------
+   * This distinction is the whole difference between a feature and a dead one,
+   * and the first cut did not have it. `gest` is not only "their hands are
+   * full": localLine sets it to `1.5 + line.length * 0.045` on EVERY line
+   * anybody says, because talking is a gesture. So a marcher who opened their
+   * mouth — and this one says npcLOC_MARCH on the way over, by design — failed
+   * its own continuation test on the next frame and turned round.
+   *
+   * MEASURED, and it is why the ceiling above was re-tuned twice before the
+   * real cause showed up: a marcher closing at a textbook 1.25 m/s from 11.95
+   * m, all the way to 2.12, and then `gave up: gesturing` two metres short.
+   *
+   * Retrieval has never had this problem because `own` is not gated on `gest`
+   * at all — it says npcLOC_CHASE the whole way across a square. The march is
+   * held to the same rule now: talking is part of coming over.
+   */
+  function marFree(r, starting) {
+    return !!r && !!r.fig && !!r.group && r.biome === game.biome.current &&
+           !r.own && !r.carry && (r.marCool || 0) <= 0 &&
+           (!starting || (r.gest || 0) <= 0);
+  }
+  function marEnd(r, caught, sayIt) {
+    if (!r) { marWho = null; return; }
+    r.marCool = npcMAR_COOL;
+    // Home, at shuffle speed, exactly as retrieval leaves somebody.
+    r.tx = r.ax; r.tz = r.az;
+    if (sayIt && r.cd <= 0) {
+      r.cd = r.cool * rand(0.8, 1.4);
+      localReactLine(r, npcLOC_MARCH_GAVE);
+    }
+    if (caught) {
+      if (r.cd <= 0) { r.cd = r.cool * rand(0.6, 1.0); localReactLine(r, npcLOC_MARCH_END); }
+      r.flV -= 8;                       // a lunge, on the flinch spring
+      const cp = game.capy && game.capy.position;
+      if (cp) r.flYaw = Math.atan2(cp.x - r.x, cp.z - r.z);
+      r.wary = Math.min(1, (r.wary || 0) + npcMAR_WARY);
+      // systems.js decides what reaching you is WORTH. See its npc:caught
+      // handler: the chain closes, and the card already earned stays earned.
+      emit('npc:caught', { x: r.x, z: r.z });
+    }
+    marWho = null; marT = 0;
+  }
+  function marStep(r, dt) {
+    marT += dt;
+    const cp = game.capy && game.capy.position;
+    // Every ceiling, in order of how little it trusts the world. Each one
+    // names itself, for the reason the refusals above do: they all look the
+    // same from outside, and the first run of `qa/nr-march.js` reported a
+    // marcher that set off and stopped after ninety-eight centimetres with no
+    // way to tell which of six things had ended it.
+    if (!cp) { marWhy = 'no animal'; marEnd(r, false); return; }
+    if (r.biome !== game.biome.current) { marWhy = 'left the chapter'; marEnd(r, false); return; }
+    if (!marFree(r)) {
+      marWhy = "gave up: " + (!r.fig ? "not our figure" : r.own ? "fetching"
+             : r.carry ? "carrying"
+             : (r.marCool || 0) > 0 ? "cooling" : "unknown");
+      marEnd(r, false); return;
+    }
+    if (marT > npcMAR_OUT_T) { marWhy = 'out of patience'; marEnd(r, false, true); return; }
+    // THE LEASH, and it is retrieval's own: a person does not leave their
+    // pitch, and this is the rule that makes the whole thing safe to switch on
+    // in seventeen chapters at once. Nobody can be led away.
+    if (Math.hypot(r.x - r.ax, r.z - r.az) > npcOWN_LEASH) {
+      marWhy = 'leashed'; marEnd(r, false, true); return;
+    }
+    const d = Math.hypot(cp.x - r.x, cp.z - r.z);
+    if (d < npcMAR_TAKE) { marWhy = 'caught you'; marEnd(r, true); return; }
+    if (localSteerTo(r, cp.x, cp.z, d)) marBlocked++;
+    marSayT -= dt;
+    if (marSayT <= 0 && r.cd <= 0) {
+      marSayT = npcMAR_SAY_T * rand(0.8, 1.4);
+      r.cd = r.cool * rand(0.4, 0.8);
+      localReactLine(r, npcLOC_MARCH);
+    }
+  }
+  /**
+   * THE RUNGS OF THE CHAIN. systems.js emits one of these per witnessed thing
+   * and owns what a chain is worth; this owns what a square does about one.
+   */
+  game.events.on('capy:chain', function (e) {
+    if (!e || !game.state.started) return;
+    const live = game.biome && game.biome.current;
+    // The nearest person who saw it and is free to react to it.
+    let best = null, bd = npcMAR_R * npcMAR_R;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.group) continue;
+      const dx = e.x - r.x, dz = e.z - r.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bd) continue;
+      bd = d2; best = r;
+    }
+    if (!best) { marWhy = 'nobody within ' + npcMAR_R + ' m'; return; }
+    // AT TWO: they look up. Two numbers, and it is the same pair the witness
+    // chain uses — a look, not a flinch.
+    if (e.n === npcMAR_AT) {
+      best.chatYaw = Math.atan2(e.x - best.x, e.z - best.z);
+      best.chatT = npcCHAIN_LOOK;
+      return;
+    }
+    // AT FOUR: one of them comes over. ONE, ever — see the constants block.
+    if (e.n < npcMAR_GO) { marWhy = 'rung ' + e.n; return; }
+    if (marWho) { marWhy = 'already marching'; return; }
+    if (!marFree(best, true)) {
+      // WHY, AND NOT JUST THAT. Six gates share one symptom — nobody comes —
+      // and from outside they are indistinguishable from the event never
+      // having fired. This cost a run to find out.
+      marWhy = !best.fig ? 'not our figure' : best.own ? 'fetching'
+             : best.carry ? 'carrying' : (best.gest || 0) > 0 ? 'gesturing'
+             : (best.marCool || 0) > 0 ? 'cooling ' + best.marCool.toFixed(1)
+             : best.biome !== live ? 'wrong biome' : 'unknown';
+      return;
+    }
+    marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching";
+  });
 
   // ---- WHAT THEY NOTICE ---------------------------------------------------
   // Three events that already existed, already carried a position, and were
@@ -5081,7 +5310,16 @@ export function createNPCs(game) {
         // and walks them there. See THE MISCHIEF ECONOMY.
         if (r.own) {
           localOwnStep(r, dt);
+        } else if (r === marWho) {
+          // ---- ...AND THE MARCH SITS BESIDE IT, ON THE SAME TERMS --------
+          // Below retrieval and above the shuffle. A person already walking
+          // out for their own hat is not also coming to have a word with you
+          // about the chain — `marFree` refuses anybody with `own` set, so
+          // these two can never both be true, and the ordering here is belt
+          // and braces rather than a rule.
+          marStep(r, dt);
         } else {
+          if (r.marCool > 0) r.marCool -= dt;
           if (r.ownCool > 0) r.ownCool -= dt;
           r.stepT -= dt;
           if (r.stepT <= 0) {
@@ -5100,7 +5338,9 @@ export function createNPCs(game) {
         const sx = r.tx - r.x, sz = r.tz - r.z;
         const sd = Math.sqrt(sx * sx + sz * sz);
         if (sd > 0.012) {
-          const step = Math.min(sd, (r.own ? npcOWN_V : npcLOC_STEP_V) * dt);
+          // THE MARCH WALKS AT RETRIEVAL SPEED, for the same reason retrieval
+          // does: somebody crossing a square on purpose does not shuffle.
+          const step = Math.min(sd, (r.own || r === marWho ? npcOWN_V : npcLOC_STEP_V) * dt);
           r.x += sx / sd * step;
           r.z += sz / sd * step;
           r.moving = 1;
@@ -5118,7 +5358,10 @@ export function createNPCs(game) {
           // for somebody standing on a jetty, a plinth or a step is not the
           // terrain at all. So: away, follow the ground; home, come back to
           // exactly the number the chapter chose.
-          const away = r.own || (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
+          // ...and the march follows the ground for the same reason retrieval
+          // does: it can go fifteen metres, and four chapters are not flat.
+          const away = r.own || r === marWho ||
+                       (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
                                 > npcLOC_STEP_R * npcLOC_STEP_R;
           if (away || Math.abs(r.y - r.baseY) > 0.004) {
             let ty = r.baseY;
@@ -10167,6 +10410,13 @@ export function createNPCs(game) {
     // nothing at all unless systems.js has handed down a tier of npcNOTO_TIER
     // or better, so this line is a no-op for the whole of a quiet journey.
     npcNotoT = npcNOTO_DOOR;
+    // ---- ...AND NOBODY IS STILL MARCHING IN A COUNTRY YOU HAVE LEFT -----
+    // `marStep` tears itself down on a biome mismatch anyway, but only if it
+    // is stepped — and it is stepped from the per-person loop, which is the
+    // loop this chapter is gated out of. The same freeze `wary`, `fam` and
+    // `flowSeen` all had, and the same one-line answer.
+    if (marWho) { marWho.marCool = npcMAR_COOL; marWho.tx = marWho.ax; marWho.tz = marWho.az; }
+    marWho = null; marT = 0;
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
     }
@@ -11758,6 +12008,21 @@ export function createNPCs(game) {
    * learns what a widened radius is.
    */
   function npcNotoSet(t) { npcNotoTier = Math.max(0, Math.min(5, t | 0)); }
+  /**
+   * THE MARCH, FOR THE HARNESS. Nothing in src reads this. `dist` is the one
+   * number that says whether it is working at all: a marcher who never closes
+   * is a marcher whose steer is blocked, and that is invisible from the state.
+   */
+  function npcMarchAudit() {
+    const cp = game.capy && game.capy.position;
+    return {
+      on: !!marWho, t: +marT.toFixed(2),
+      dist: marWho && cp ? +Math.hypot(cp.x - marWho.x, cp.z - marWho.z).toFixed(2) : -1,
+      fromAnchor: marWho ? +Math.hypot(marWho.x - marWho.ax, marWho.z - marWho.az).toFixed(2) : -1,
+      at: npcMAR_GO, take: npcMAR_TAKE, out: npcMAR_OUT_T, leash: npcOWN_LEASH,
+      why: marWhy, blocked: marBlocked,
+    };
+  }
   /** For the harness. See npcNOTO_TIER. */
   function npcNotoAudit() {
     return { tier: npcNotoTier, door: +npcNotoT.toFixed(2),
@@ -12302,7 +12567,7 @@ export function createNPCs(game) {
            // never finds a speaker is invisible from outside.
            rumourArm: npcRumArm, rumourAudit: npcRumAudit,
            keepAudit: npcKeepAudit,
-           notoSet: npcNotoSet, notoAudit: npcNotoAudit,
+           notoSet: npcNotoSet, notoAudit: npcNotoAudit, marchAudit: npcMarchAudit,
            // ---- THE REGULARS (O1) ----
            // Same split as the rumour above it, and for the same reason:
            // systems.js owns the tier because the tier is on the save file,
