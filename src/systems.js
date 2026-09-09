@@ -1363,6 +1363,11 @@ const sysFLOW_DOLLY  = 0.85;  // m the boom eases back with it
 const sysFLOW_MUS    = 0.34;  // ...and how far the score is allowed to lean
 const sysFLOW_WARM   = 0.16;  // share of the grade's own warm lift
 const sysFLOW_MARK   = 0.78;  // the one edge that makes a sound, once per streak
+// ...and the shortest line worth printing on a ledger leaf. See jrChapLine.
+// Not a tuning knob on the streak: nothing about how the flow behaves reads
+// this, and moving it changes only how many of the nineteen leaves say a
+// sentence about running.
+const sysLINE_SHOW   = 60;    // m
 
 // --- THE ECHO (v44) ---------------------------------------------------------
 // The wheek is this game's signature and its only voice, and in eighteen of
@@ -21208,6 +21213,16 @@ export function createSystems(game) {
         // this place has one and that one did not.
         const pa = jrChapPerch[n] || 0;
         if (pa) nb.push(pa === 1 ? 'carried a passenger' : 'carried ' + pa + ' at once');
+        // ---- ...AND THE LONGEST LINE YOU HELD HERE (see jrChapLine) ------
+        // Behind a floor, for the reason the four counts above are behind
+        // zero: this number exists in every chapter with ground in it, so
+        // printed unconditionally it would be on all nineteen rows and would
+        // stop being a remark. sysFLOW_MARK is reached at roughly thirty
+        // metres at a run, so anything recorded at all is already a line —
+        // sixty is a line held for about twice as long as it took to sing,
+        // which is a thing worth having on a leaf and is not most of them.
+        const ln = jrChapLine[n] || 0;
+        if (ln >= sysLINE_SHOW) nb.push('a clean line of ' + ln + ' m');
         // ---- ...AND WHO KNOWS YOU HERE (O2) ----------------------------
         // The leaf is four counts and a high-water mark, and every one of them
         // is something the player DID. This is the one line on it about
@@ -23871,6 +23886,11 @@ export function createSystems(game) {
         pho: jrChapPho, fed: jrChapFed,
         // ...and THE PERCH's high-water mark (N2). See jrChapPerch.
         pas: jrChapPerch,
+        // ...and THE FLOW's, on exactly the same terms: additive, no version
+        // bump, and a file written before it existed reads as a player who
+        // never held a line — which is the correct history, because until now
+        // nothing was counting. See jrChapLine.
+        lin: jrChapLine,
         // ...and THE REGULARS’ tier (O1), on exactly the same terms.
         pal: jrChapPal,
         // ...and THE REPERTOIRE (Q1): name id -> how many times. Additive,
@@ -25637,6 +25657,31 @@ export function createSystems(game) {
   // the api-key mismatch that seated five diners on thin air. It lives on the
   // ledger leaf instead, beside the four counts that are already there.
   const jrChapPerch = Object.create(null);    // chapter -> most on at once
+  // ---- ...AND THE OTHER HIGH-WATER MARK, WHICH IS ABOUT MOVING -----------
+  // THE FLOW's only surface. The streak is measured to a tenth of a second,
+  // damped, decayed and read by four channels — the field of view, the boom,
+  // the score and the dust — and not one of them survives the frame it is on.
+  // A player who threaded three hundred metres of Hanoi traffic at a flat run
+  // without breaking the line has done the most skilful thing this game asks
+  // for, and nothing anywhere remembered it for a second afterwards.
+  //
+  // METRES, NOT SECONDS, and it is the one decision on this row. `sysFlowT` is
+  // already a clock and would have been free; "a clean line of 212 m" is a
+  // sentence about a place and "a clean line of 29 seconds" is a sentence
+  // about a stopwatch. The distance is one multiply-add on a number the flow
+  // block has already read.
+  //
+  // IT IS NOT A RECORDS ROW, for the reason THE PERCH is not one, and the note
+  // there is the whole argument: a RECORDS key has to be a TASK id, because
+  // the chapter board and the picker both look it up as `RECORDS[taskId]`, and
+  // "the longest line held here" is not a task in any chapter. It lives on the
+  // ledger leaf beside the perch instead.
+  //
+  // AND IT IS SILENT WHILE YOU ARE SETTING IT. No pip, no counter, no live
+  // line — the flow's own comment names the rule ("none of them a number on a
+  // screen") and this obeys it. It is a thing you find at the end, which is
+  // also how you find out that the place had one.
+  const jrChapLine = Object.create(null);     // chapter -> longest line, metres
   // ---- ...AND THE ONE THAT IS A RELATIONSHIP (O1) ------------------------
   // THE REGULARS: chapter -> what tier this place’s one person has reached
   // with you, 1 to 5. Additive on the save on the same terms as the five
@@ -26808,6 +26853,9 @@ export function createSystems(game) {
       // ...and THE PERCH's mark (N2), on exactly the same terms.
       const pas = jrFile.pas || {};
       for (const k in pas) if (typeof pas[k] === 'number') jrChapPerch[k] = pas[k];
+      // ...and THE FLOW's mark, on exactly the same terms. See jrChapLine.
+      const lin = jrFile.lin || {};
+      for (const k in lin) if (typeof lin[k] === 'number') jrChapLine[k] = lin[k];
       // ...and THE REGULARS (O1), CLAMPED on the way in, which the four above
       // do not need to be: those are counts and a silly one prints a silly
       // number, and this one INDEXES A LINE POOL. A hand-edited file handing
@@ -29688,6 +29736,12 @@ export function createSystems(game) {
   // long we have forgiven being off the ground, `sysFlowStall` how long the
   // line has been below speed, and `sysFlowRang` the one-shot latch on the mark.
   let sysFlowNow = 0, sysFlowT = 0, sysFlowAir = 0, sysFlowStall = 0, sysFlowRang = false;
+  // ...and the LENGTH of the line that is open, and whether the chapter's mark
+  // moved during it. See jrChapLine. `sysFlowMarked` exists only so that the
+  // save is written ONCE, when the line ends, rather than on the frames the
+  // mark is climbing — which is the per-frame-write shape that made the record
+  // line spam localStorage sixty times a second.
+  let sysFlowD = 0, sysFlowMarked = false;
   // THE CREST. `sysCrestNow` is the damped 0..1 the camera reads; the timer
   // keeps the four terrain samples off the per-frame path.
   let sysCrestNow = 0, sysCrestT = 0, sysCrestWant = 0;
@@ -36112,7 +36166,7 @@ export function createSystems(game) {
                    capy.climbing || capy.diving || capy.swimming ||
                    (game.condor && game.condor.mounted);
       if (busy) {
-        sysFlowT = 0; sysFlowAir = 0; sysFlowStall = 0;
+        sysFlowT = 0; sysFlowAir = 0; sysFlowStall = 0; sysFlowD = 0;
       } else {
         // A HOP IS PART OF THE LINE. Airtime is forgiven for sysFLOW_AIR, which
         // is comfortably longer than the 1.37 m arc the whole game is sized
@@ -36124,15 +36178,29 @@ export function createSystems(game) {
         // asking the intent would have called it one for as long as you held it.
         if (sp >= sysFLOW_MIN) sysFlowStall = 0;
         else sysFlowStall += dt;
-        if (sysFlowAir > sysFLOW_AIR || sysFlowStall > sysFLOW_STALL) sysFlowT = 0;
+        // THE LINE IS ALSO A LENGTH. Integrated here rather than anywhere else
+        // because this is the one place that already knows both that the line
+        // is alive and how fast it is going, and it is reset on exactly the
+        // two breaks below that reset the streak itself — so the distance can
+        // never outlive the line it belongs to. See jrChapLine.
+        if (sysFlowAir > sysFLOW_AIR || sysFlowStall > sysFLOW_STALL) {
+          sysFlowT = 0; sysFlowD = 0;
+        }
         // ...and it accrues AT THE SPEED IT IS GOING. A flat walk is a line and
         // should count as one, but it should not count as much as a run — a
         // single threshold made the two identical, which meant the top of the
         // streak was five seconds of ambling and the whole thing was free.
         // Airborne holds the rate it left the ground at rather than reading a
         // horizontal speed that gravity is not touching.
-        else sysFlowT += dt * clamp((sp - sysFLOW_MIN) / (sysFLOW_REF - sysFLOW_MIN),
-                                    sysFLOW_SLOW, 1);
+        else {
+          sysFlowT += dt * clamp((sp - sysFLOW_MIN) / (sysFLOW_REF - sysFLOW_MIN),
+                                 sysFLOW_SLOW, 1);
+          // ...and the ground actually covered, which is NOT the same number.
+          // The streak accrues at a rate scaled by speed and the distance does
+          // not: an amble that holds for a minute is a long line and a short
+          // streak, and both of those are true.
+          sysFlowD += sp * dt;
+        }
       }
       const fw = clamp(sysFlowT / sysFLOW_FULL, 0, 1);
       sysFlowNow = damp(sysFlowNow, fw, fw > sysFlowNow ? sysFLOW_RISE : sysFLOW_FALL, dt);
@@ -36144,7 +36212,29 @@ export function createSystems(game) {
         sysFlowRang = true;
         if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.28 });
       } else if (sysFlowNow < sysFLOW_MARK * 0.45) {
+        // ---- THE LINE IS OVER, AND THIS IS WHERE IT IS WRITTEN DOWN ------
+        // FLUSHED ON THE FALLING EDGE AND NOWHERE ELSE. The mark below climbs
+        // on the frames a long line is getting longer, which is sixty frames a
+        // second of a number going up — calling saveSoon there is the bug that
+        // had the record line writing localStorage every frame of an attempt.
+        // Here it is once per line, and only if the line was actually a best.
+        if (sysFlowMarked) { sysFlowMarked = false; saveSoon(); }
         sysFlowRang = false;
+      }
+      // ---- ...AND THE MARK ITSELF (see jrChapLine) -----------------------
+      // Only while the line is PROPERLY long — `sysFlowRang` is the game's own
+      // definition of that, and it is the same latch the chime uses, so the
+      // number on the ledger is always a line that sang. A line that never got
+      // there was a walk, and the ledger is not a pedometer.
+      if (sysFlowRang) {
+        const lineCh = todoChapter();
+        if (lineCh > 0) {
+          const lineM = Math.round(sysFlowD);
+          if (lineM > (jrChapLine[lineCh] || 0)) {
+            jrChapLine[lineCh] = lineM;
+            sysFlowMarked = true;
+          }
+        }
       }
     }
 

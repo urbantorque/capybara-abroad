@@ -1904,6 +1904,11 @@ function mainBoot() {
     // the only caller; npc.js owns the pool, the earshot and the waiting.
     game.rumourArm = npcs.rumourArm;
     game.rumourAudit = npcs.rumourAudit;
+    // CUSTOMS: the same harness window on the other armed line — the one about
+    // the keepsake in the animal's mouth that came from somewhere else. There
+    // is no `keepArm` beside it because nothing outside npc.js decides this:
+    // the prop is on `game.capy.heldProp` and its home chapter is on the prop.
+    game.keepAudit = npcs.keepAudit;
     // THE REGULARS (O1, ROADMAP-NEXT item 1). The same three-line shape as the
     // rumour above, and the same split: systems.js holds the tier because the
     // tier is a fact about the journey and lives on the save file, and npc.js

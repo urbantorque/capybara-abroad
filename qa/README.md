@@ -30,6 +30,14 @@ a real clock, so the score and the ambience are actually running), `kine.js`
 `p8-spawn.cjs` says to check before believing it), `r10-soak.js` (`npm run
 soak`).
 
+`nr-look.js`, `nr-keep.js`, `nr-led.js` and `nr-soak.js` are the no-regret
+batch: the flow look and its hold (`npcFLOW_LOOK`/`npcFLOW_HOLD`), customs
+(`npcKeepStep`), the longest line on the ledger (`jrChapLine`), and the
+nineteen-chapter soak that covers all three. `nr-look.js`'s header is worth
+reading before writing any probe about npc attention — it measures the RADIUS
+rather than the population, and it says why the two obvious instruments both
+gave confident wrong answers first.
+
 Three of them do not hold a line and CONTRACT.md says by how much:
 `audit-solid.js`, `stillness.js` and `budget.js` move on their own between two
 runs with nothing changed. Read their numbers as a range, never as a value.

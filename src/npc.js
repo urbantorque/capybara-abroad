@@ -1499,6 +1499,34 @@ export function createNPCs(game) {
                 'They said you were no trouble at all in {P}. Were you?',
                 'Word from {P} is that you are all right.',
                 'They fed you in {P}, did they.'],
+    // ---- ...AND THE THING IN ITS MOUTH THAT IS NOT FROM HERE -------------
+    // THE ONLY OBJECT IN THE GAME THAT GENUINELY TRAVELS, and until now
+    // nothing anywhere reacted to one arriving. props.js is explicit about
+    // both halves of that: `physOnBiomeEnter` confiscates a held prop at the
+    // border because its body leaves the world with its home biome — "Customs
+    // are strict" — and a KEEPSAKE is the single exception, carrying
+    // `biome: ''` so that it crosses with the animal. Nineteen of them, one
+    // per place, and every one of them has been able to cross since the day it
+    // was built.
+    //
+    // `{O}` is the object's own name off its prop def — 'a chewed tea whisk',
+    // 'a piece of the glacier', 'a cracked plastic stool' — so this pool is
+    // nineteen jokes written once. NOT a per-place pool: nineteen origins
+    // against nineteen destinations is three hundred and sixty-one lines to
+    // author and the same argument npcPLACE_SAY already settled applies with
+    // more force here.
+    //
+    // The lines may not assume WHICH object it is, for the reason the incident
+    // pool may not assume what was done — {O} is a hat in one chapter and a
+    // plank off Scott's hut in another, and a line that works for both is a
+    // line about somebody carrying something that does not belong.
+    keepsake: ['Where did you get {O}?',
+               'That is {O}. That is not from round here.',
+               'You did not find {O} here.',
+               'Is that {O}? Carried all this way?',
+               'Somebody is missing {O}, I should think.',
+               'You have brought {O} with you. All right then.',
+               'I have never seen {O} in this town before.'],
     rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
                'Slow down!', 'It has somewhere to be.'],
     // ---- AND ONE MORE, FOR SOMEBODY WHO REMEMBERS YOU (v19) --------------
@@ -1742,6 +1770,64 @@ export function createNPCs(game) {
   const npcLOC_REACT_N = 2;      // never more than two people speak at once
   const npcLOC_RUSH_V  = 6.2;    // m/s past somebody that counts as belting past
   const npcLOC_RUSH_R  = 3.4;    // ...and how close you have to be for it to matter
+
+  // ---- ...AND THE OTHER HALF OF THAT, WHICH WAS NEVER BUILT --------------
+  // The two constants above are the world's ONLY response to a player running,
+  // and both of them are a flinch at 3.4 m: belting past somebody makes them
+  // jump. Nothing anywhere has ever noticed a player running WELL.
+  //
+  // systems.js has measured that for four versions — THE FLOW is a streak that
+  // accrues over 5.2 s of a held line, survives a hop, and collapses inside
+  // 0.3 s when the line breaks — and publishes it as `game.state.flow`. Its
+  // four readers are the field of view, the boom, the score and the dust, and
+  // its own comment names the rule they obey: none of them is a number on a
+  // screen. This is a fifth reader on exactly those terms.
+  //
+  // IT IS ONE FACTOR ON ONE RADIUS, and the radius already has a factor of
+  // this shape on it. `watchR` is the head-turn — how far out somebody's face
+  // is pointed at the animal — and v33 widened it with the heat because "heat
+  // is what actually widens the circle of faces pointed at the animal". A held
+  // line is the same sentence about a different cause: run a clean two hundred
+  // metres through a market and the market looks up.
+  //
+  // AT FLOW ZERO IT IS A MATHEMATICAL NO-OP, which is what makes it safe to
+  // switch on across seventeen casts at once — the same property weather.js
+  // relies on for its whole micro-state. It cannot start a line, cannot spend
+  // a mouth's cooldown and cannot deny anything: `watching` is read by nothing
+  // but the direction a head points.
+  const npcFLOW_LOOK   = 1.5;    // × the look range at a full line. Just under
+                                 // npcHEAT_LOOK's 1.6, because being watched
+                                 // for causing trouble should still out-reach
+                                 // being watched for moving well.
+  // ---- ...AND A WIDER RADIUS ON ITS OWN IS VERY NEARLY A DEAD FEATURE -----
+  // MEASURED before this constant existed, and it is the whole reason it does
+  // (`qa/nr-look.js`, six chapters, four bearings, eleven seconds each): 708
+  // frames at a full line, FIVE of them with anybody watching at all, and NOT
+  // ONE watcher beyond the radius they would have had anyway.
+  //
+  // The cause is geometry and it is obvious in hindsight: HOLDING A LINE MEANS
+  // LEAVING. A widened radius only ever catches somebody you are approaching,
+  // and at 7.4 m/s the widening buys about one extra second per person before
+  // you are past them — while the half of the streak that is actually full is
+  // spent in ground the animal has already cleared of people. The one clean
+  // reading in the whole first sweep came from a leg that ran BACK into the
+  // cast it had just left: Venice, 117 full-flow frames, a watcher in every
+  // one of them, the furthest at 1.353 × their own radius.
+  //
+  // So the look has to OUTLIVE the pass. Somebody who was inside the widened
+  // circle while the animal was moving well goes on facing it for a moment
+  // after it has gone — which is not a workaround, it is the thing the feature
+  // was always a description of. A market does not look up at a runner while
+  // they are still coming; it turns as they go past and watches them out of
+  // sight, and that is the same two numbers.
+  //
+  // IT IS STILL A HEAD DIRECTION AND NOTHING ELSE. `watching` is read by no
+  // other consumer, the hold spends no mouth cooldown, arms no line, and at
+  // flow below npcFLOW_SEE it never starts.
+  const npcFLOW_SEE    = 0.60;   // flow that counts as a line worth turning for
+  const npcFLOW_HOLD   = 2.6;    // s they go on watching after you have gone.
+                                 // npcCHAIN_LOOK's number, because it is the
+                                 // same gesture: how long a head stays turned.
 
   // ---- WARINESS (v19) -----------------------------------------------------
   // The mildest possible version of the world pushing back, and deliberately
@@ -2242,6 +2328,11 @@ export function createNPCs(game) {
       // it is published for the soak, because "is anybody looking" measured off
       // a drawn yaw catches somebody who happens to be pointed the right way.
       gd: null, gdT: 0, grd: 0, watching: 0,
+      // ...and how long they go on watching a line that has already gone past
+      // (see npcFLOW_HOLD). Declared HERE rather than left to appear on first
+      // write, which is the shape that gave `talkCd` to seventeen chapters
+      // with nothing anywhere to decrement it.
+      flowSeen: 0,
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -4519,6 +4610,12 @@ export function createNPCs(game) {
     // and ten times a frame for one float is the cost that only shows up in
     // the chapter with the most people in it. See THE CALM in systems.js.
     const calmNow = typeof game.calm === 'function' ? game.calm() : 0;
+    // ...and THE FLOW, read once for the whole population for exactly the same
+    // reason. See npcFLOW_LOOK. `game.state.flow` is written unconditionally
+    // every frame by systems.js, but this module is `mainSafe`d against a
+    // systems.js that is older or has thrown, so it defaults to zero — which
+    // is the no-op.
+    const flowNow = (game.state && game.state.flow) || 0;
     // ---- THE MARQUEE LINE NOBODY WAS THERE TO SAY ------------------------
     // Delivered by the first person the player comes back within earshot of,
     // at the PRAISE radius rather than the wow radius: this one is said to your
@@ -5008,8 +5105,22 @@ export function createNPCs(game) {
         // about it. Heat is what actually widens the circle of faces pointed
         // at the animal, which is the whole of 2a and is worth nothing unless
         // it is this number.
-        const watchR = r.near * 2 * (1 + hHere * (npcHEAT_LOOK - 1));
-        const watch = d2 < watchR * watchR && d2 > 0.25;
+        // ---- ...AND FURTHER AGAIN WHEN THE ANIMAL IS MOVING WELL ---------
+        // See npcFLOW_LOOK. Multiplied rather than added, and multiplied onto
+        // the heat term rather than beside it, because the two are the same
+        // kind of fact about the same radius: a market that is already looking
+        // at you does not stop when you start running.
+        const watchR = r.near * 2 * (1 + hHere * (npcHEAT_LOOK - 1))
+                                  * (1 + flowNow * (npcFLOW_LOOK - 1));
+        const inR = d2 < watchR * watchR;
+        // ...AND IT GOES ON AFTER YOU HAVE GONE. See npcFLOW_HOLD. Armed while
+        // the animal is inside the widened circle AND moving well, and it is
+        // the arming that is gated on the flow rather than the holding — a
+        // player who breaks their line two metres past somebody does not get
+        // their head snapped back round mid-turn.
+        if (inR && flowNow > npcFLOW_SEE) r.flowSeen = npcFLOW_HOLD;
+        else if (r.flowSeen > 0) r.flowSeen -= dt;
+        const watch = (inR || r.flowSeen > 0) && d2 > 0.25;
         r.watching = watch ? 1 : 0;
         // ...and while a flinch is running they are looking at whatever just
         // went off, not at you. That is the whole point of turning round.
@@ -10017,6 +10128,14 @@ export function createNPCs(game) {
       // the save file, and that is the whole of what a person is owed to
       // remember.
       if (L) { L.fam = 0; L.famWas = false; }
+      // ...AND THE HELD LOOK, WHICH IS THE SAME FAULT A THIRD TIME. The only
+      // thing that decays `flowSeen` is the per-person loop this chapter is
+      // gated out of, so leaving a place at a sprint would leave everybody in
+      // it mid-turn — and it would land on the arrival shot, exactly as the
+      // frozen flinch above does. Bounded at npcFLOW_HOLD and therefore small,
+      // and cleared anyway: a head still turned after a walk round the block
+      // is watching a line that ended in another country.
+      if (L) L.flowSeen = 0;
       // ...AND ANYTHING THEY WERE CARRYING GOES DOWN (F4). `localOwnStep` is
       // the only other place that releases the pin and it does not run in a
       // chapter that is not live — so a local halfway home with somebody's hat
@@ -11106,6 +11225,10 @@ export function createNPCs(game) {
     // ...and the rumour from the last place, which is looking for anybody at
     // all and therefore belongs above the gate with the heat. See npcRumArm.
     npcRumStep(dt);
+    // ...and CUSTOMS, above the gate for exactly the same reason: it is
+    // looking for anybody at all, and it is the one line in the game that is
+    // about something the player brought with them. See npcKeepStep.
+    npcKeepStep(dt);
     // ...and THE REGULARS (O1), above the gate for the same reason: the
     // armed tier line is looking for one person in seventeen chapters and
     // Sydney is not one of them.
@@ -11455,6 +11578,90 @@ export function createNPCs(game) {
     // A line that lands is spent; one that finds nobody is kept and tried
     // again, which is the whole point of arming it.
     if (saySomebodyNear(p.x, p.z, npcRUM_R, npcRumLine)) npcRumLine = '';
+  }
+
+  // =========================================================================
+  // CUSTOMS — THE THING IN ITS MOUTH THAT IS NOT FROM HERE
+  //
+  // See the `keepsake` pool in npcLOC_SAY for what this says and why it is one
+  // pool rather than nineteen. This is when.
+  //
+  // ARMED AND SPENT, exactly like the rumour above, and for the same measured
+  // reason: four chapters have nobody within sixteen metres of where you land,
+  // so a line that must be said AT a moment is a line that four chapters never
+  // say. This one has it worse — the moment is "you are carrying something",
+  // which lasts as long as you carry it — so waiting for a mouth is not a
+  // fallback here, it is the whole mechanism. Pick the whisk up in Uji, walk
+  // it to Hanoi, and the first person you get near has something to say about
+  // it.
+  //
+  // THE PAIR IS THE LATCH, and it is `here|from` rather than either alone. One
+  // line per object per place per visit: carrying the same shell round Venice
+  // is one remark, and taking it on to Hong Kong is another, because that is a
+  // different joke. Re-entering a place clears the set, because coming back
+  // somewhere with the same thing in your mouth is the same joke again and it
+  // has been an hour.
+  //
+  // IT CANNOT FIRE ON A SOUVENIR AT HOME. `from !== live` is the whole gate,
+  // and it is the difference between a keepsake and a piece of luggage: the
+  // pine cone lying in Manly is Manly's, and nobody remarks on a pine cone in
+  // Manly.
+  const npcKEEP_R    = 14;   // m of earshot. Inside npcRUM_R's 16 on purpose:
+                             // a rumour is shouted across a square, an object
+                             // in somebody's mouth has to be seen.
+  const npcKEEP_WAIT = 2.5;  // s of carrying it before anybody remarks. Long
+                             // enough that picking a thing up and putting it
+                             // straight back down says nothing.
+  const npcKEEP_TRY  = 2.0;  // s between attempts to find a mouth
+  const npcKeepSaid = Object.create(null);   // 'here|from' -> already said
+  let npcKeepLine = '';
+  let npcKeepT = 0;
+  let npcKeepFor = '';       // the pair the armed line is about
+  let npcKeepBiome = '';     // ...and the place the `said` set belongs to
+  function npcKeepStep(dt) {
+    if (!game.state || !game.state.started) return;
+    const live = (game.biome && game.biome.current) || '';
+    // ONE WRITER AND NO EVENT HANDLER. The set is this module's alone, so the
+    // race npcRumArm's note describes cannot arise here — and detecting the
+    // crossing off the live name costs one string compare a frame and removes
+    // a listener that would have to be reasoned about at every rollback.
+    if (live !== npcKeepBiome) {
+      npcKeepBiome = live;
+      for (const k in npcKeepSaid) delete npcKeepSaid[k];
+      npcKeepLine = ''; npcKeepFor = '';
+    }
+    const held = game.capy && game.capy.heldProp;
+    const from = (held && !held.removed && held.keep) ? held.keep : '';
+    const pair = (from && live && from !== live) ? live + '|' + from : '';
+    if (pair !== npcKeepFor) {
+      npcKeepFor = pair;
+      npcKeepLine = '';
+      npcKeepT = npcKEEP_WAIT;
+      if (pair && !npcKeepSaid[pair]) {
+        const pool = npcLOC_SAY.keepsake;
+        if (pool && pool.length) {
+          npcKeepLine = pool[randInt(0, pool.length - 1)]
+                          .split('{O}').join(held.name || 'that');
+        }
+      }
+    }
+    if (!npcKeepLine) return;
+    npcKeepT -= dt;
+    if (npcKeepT > 0) return;
+    npcKeepT = npcKEEP_TRY;
+    const p = game.capy && game.capy.position;
+    if (!p) return;
+    if (saySomebodyNear(p.x, p.z, npcKEEP_R, npcKeepLine)) {
+      npcKeepSaid[npcKeepFor] = 1;
+      npcKeepLine = '';
+    }
+  }
+  /** The armed line and its clock, for the harness. Nothing in src reads it. */
+  function npcKeepAudit() {
+    let said = 0;
+    for (const k in npcKeepSaid) said++;
+    return { line: npcKeepLine, pair: npcKeepFor, t: +npcKeepT.toFixed(2),
+             r: npcKEEP_R, said: said };
   }
 
   // =========================================================================
@@ -11986,6 +12193,7 @@ export function createNPCs(game) {
            // same reason charmAudit and notoAudit exist: an armed line that
            // never finds a speaker is invisible from outside.
            rumourArm: npcRumArm, rumourAudit: npcRumAudit,
+           keepAudit: npcKeepAudit,
            // ---- THE REGULARS (O1) ----
            // Same split as the rumour above it, and for the same reason:
            // systems.js owns the tier because the tier is on the save file,
