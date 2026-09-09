@@ -119,10 +119,18 @@ the historic ±0.1 ms figure is not a property of the instrument, it is a
 property of the machine on the day. Draw calls and triangles: unchanged, by
 construction — nothing here is a mesh.
 
-`npm test` 11/11. `qa/fuzz.js` 19/19: 0 NaN frames, 0 void falls, 0 errors;
-`solverSaves` read 2 from Mong Kok onward, which is a cumulative
-`state.solverSaves` counter and a physics event this pass cannot cause —
-nothing in it touches a body — and is noted rather than claimed.
+`npm test` 11/11. `qa/fuzz.js` 19/19: 0 NaN frames, 0 void falls, 0 errors.
+`solverSaves` is a CUMULATIVE `state.solverSaves` counter, and it read 2
+from Mong Kok onward in both full runs and 306 from Monaco onward in one of
+them. Differential, same script (Sydney to start the game, then Monaco,
+Hanoi, Mong Kok, Antarctica), shipped tree against `73277f2` restored
+under the dev server: Mong Kok +2 on BOTH, Monaco 0 on both, three valid
+Monaco soaks in a row at 0. The two are pre-existing and deterministic
+(the soak's PRNG is seeded by the chapter name); the 306 did not
+reproduce and is the random soak's own business. Nothing in this pass
+touches a body. And two of the five Monaco runs were STALE — the run-code
+had died and the previous result file was read back as new — which is
+harness trap 20 again: check the mtime before believing a result.
 
 ### The instruments
 
