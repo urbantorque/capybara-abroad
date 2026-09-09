@@ -1810,10 +1810,34 @@ export function createNPCs(game) {
   // What sells it is the bob at step frequency and the lean into the move,
   // which is what a person shifting their weight actually looks like from the
   // six metres this game is played at.
-  const npcLOC_STEP_R   = 0.55;  // m from the anchor a person may ever drift
-  const npcLOC_STEP_V   = 0.40;  // m/s. A shuffle, not a walk.
-  const npcLOC_STEP_GAP = 15;    // s between shuffles, jittered hard per person
+  // ---- HOW BIG THE SHUFFLE IS, AND WHY IT GOT BIGGER ----------------------
+  // It was 0.55 m every 15 s at 0.40 m/s, and the honest description of that is
+  // A STATUE. Measured across the seventeen chapters this cast stands in: the
+  // MEDIAN local moved 0.000 m in seven seconds of real frames, and only one to
+  // three of each chapter's six-to-thirteen people moved more than 30 cm. The
+  // gap is jittered to 0.45..2.1 of itself, so most people never even started a
+  // shuffle inside a window that long — and a player stands next to somebody
+  // for a few seconds, not for half a minute.
+  //
+  // Three times the radius and roughly twice the frequency puts the duty cycle
+  // at about a quarter: a person who has visibly shifted their weight and moved
+  // a pace or two while you were looking, which is what standing about looks
+  // like. It is still a shuffle and not a walk — a local has no gait and no
+  // legs to swing, and pretending otherwise at 0.4 m/s reads as a glide.
+  //
+  // THE RADIUS IS ONLY SAFE BECAUSE THE TARGET IS NOW TESTED. The old comment
+  // above is right that a metre of ground needs no navigation; two and a half
+  // does. See npcLocalSpot: every candidate is rejected if it is inside static
+  // world geometry, or if the ground there is a step away from the ground under
+  // the anchor — which is what keeps somebody placed on a jetty, a plinth or a
+  // doorstep on the thing the chapter put them on, since `baseY` is still the
+  // authority for their height inside the radius.
+  const npcLOC_STEP_R   = 1.70;  // m from the anchor a person may ever drift
+  const npcLOC_STEP_V   = 0.45;  // m/s. A shuffle, not a walk.
+  const npcLOC_STEP_GAP = 7;     // s between shuffles, jittered hard per person
   const npcLOC_STEP_BOB = 0.020; // m of step bob while actually moving
+  const npcLOC_STEP_TRY = 6;     // candidate spots before giving up and staying put
+  const npcLOC_STEP_DY  = 0.35;  // m of ground step a shuffle may not cross
 
   // =========================================================================
   // A PERSON WITH A JOB — `beat` on addLocal.
@@ -2896,6 +2920,85 @@ export function createNPCs(game) {
       try { const y = api.terrainHeight(x, z); if (isFinite(y)) return y; } catch (e) { /* not built */ }
     }
     return NaN;
+  }
+
+  /**
+   * WHERE A STANDING PERSON SHUFFLES TO NEXT.
+   *
+   * At the old 0.55 m this was two lines of trigonometry and it did not need to
+   * be anything else: half a metre of ground is level and clear by definition,
+   * because the chapter put somebody on it. At 1.7 m it is not, so a candidate
+   * has to be checked before it is committed to.
+   *
+   * TWO REJECTIONS, AND THEY ARE DIFFERENT PROBLEMS:
+   *
+   *   navBlocked   static world geometry. A local has no avoidance of any kind,
+   *                so an untested target walks them into a wall and leaves them
+   *                standing inside it until the next shuffle.
+   *   the step     ground more than npcLOC_STEP_DY from the ground under the
+   *                anchor. Height inside the radius is still `baseY` — the
+   *                number the chapter measured — so somebody on a jetty, a
+   *                plinth or a doorstep who wanders off the edge of it does not
+   *                fall, they FLOAT, which is worse. Comparing the terrain at
+   *                the candidate against the terrain at the anchor keeps them on
+   *                whatever they were standing on without having to know what it
+   *                is.
+   *
+   * Six tries and then they stay where they are, which is the old behaviour and
+   * the right failure: a person in a doorway is meant to stay in the doorway.
+   */
+  function npcLocalSpot(r) {
+    const g0 = localGroundY(r.ax, r.az);
+    for (let k = 0; k < npcLOC_STEP_TRY; k++) {
+      const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
+      const tx = r.ax + Math.sin(a) * rr, tz = r.az + Math.cos(a) * rr;
+      if (localNavBlocked(tx, tz, 0.34)) continue;
+      if (g0 === g0) {
+        const g1 = localGroundY(tx, tz);
+        if (g1 === g1 && Math.abs(g1 - g0) > npcLOC_STEP_DY) continue;
+      }
+      r.tx = tx; r.tz = tz;
+      return;
+    }
+    // ---- AND THE FALLBACK IS THE OLD BEHAVIOUR, NOT STANDING STILL ---------
+    // Six rejections means a cramped spot — a doorway, a ledge, a stall you
+    // were placed against — and the honest answer there is the shuffle this
+    // cast had before, which needs no test at all: half a metre of ground that
+    // a chapter chose to stand somebody on is clear by construction.
+    //
+    // Without this, Son Doong went from three movers to NONE: rough ground
+    // rejected every candidate on the step test and everybody froze, which is
+    // a fix that made the thing it was fixing worse in one chapter.
+    for (let k = 0; k < 3; k++) {
+      const a = rand(0, 6.283185), rr = 0.5 * Math.sqrt(Math.random());
+      const tx = r.ax + Math.sin(a) * rr, tz = r.az + Math.cos(a) * rr;
+      if (localNavBlocked(tx, tz, 0.30)) continue;
+      r.tx = tx; r.tz = tz;
+      return;
+    }
+    r.tx = r.ax; r.tz = r.az;
+  }
+
+  /**
+   * navBlocked FOR THE CHAPTER YOU ARE ACTUALLY IN.
+   *
+   * The module's own `navBlocked` reads `game.env.navBlocked`, and env is the
+   * ENVIRONMENT module — envNavBlocked tests envNavC and envNavR, which are
+   * SYDNEY'S nav circles and rectangles and nothing else. Asked from any other
+   * chapter it answers a question about a city that is not there, and since the
+   * chapters overlap the same coordinate range the answer is not even reliably
+   * "no": the first cut of the shuffle used it and Son Doong's people froze
+   * against Sydney's buildings.
+   *
+   * Thirteen chapters publish their own `navBlocked`; this reaches the live
+   * one, exactly the way localGroundY reaches the live terrainHeight, and
+   * returns false where a chapter has none rather than guessing.
+   */
+  function localNavBlocked(x, z, r) {
+    const live = game.biome && game.biome.current;
+    const api = live === 'sydney' ? game.env : game[live];
+    if (!api || typeof api.navBlocked !== 'function') return false;
+    try { return !!api.navBlocked(x, z, r); } catch (e) { return false; }
   }
 
   /** A reaction line, which also arms the chain. Greetings do not. */
@@ -4793,9 +4896,7 @@ export function createNPCs(game) {
             // A new spot, measured from the ANCHOR and never from where they
             // have got to — which is what stops a random walk from wandering off
             // across the square one step at a time.
-            const a = rand(0, 6.283185), rr = npcLOC_STEP_R * Math.sqrt(Math.random());
-            r.tx = r.ax + Math.sin(a) * rr;
-            r.tz = r.az + Math.cos(a) * rr;
+            npcLocalSpot(r);
             // ---- 2b: …UNLESS THEY HAVE SOMETHING TO STAND IN FRONT OF ----
             // Points the shuffle instead of replacing it, inside the same
             // envelope, and refuses to close on the stock itself. See
