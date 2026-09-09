@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -2920,11 +2920,11 @@ const rioBondePos = new THREE.Vector3();
 // default volume and pitch and what wraps every voice in a try/catch.
 function rioBondeSfx(n, o) {
   const g = rioGame;
-  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
+  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) { warnOnce('rio.sfx', e); } }
 }
 function rioBondeToast(t) {
   const g = rioGame;
-  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) { warnOnce('rio.toast', e); } }
 }
 
 /** Cumulative arc length along the line, so speed is metres and not nodes. */

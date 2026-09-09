@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, swayMesh, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 13 — CAPPADOCIA. AND YOU DO NOT GET A STEERING WHEEL.
@@ -4713,11 +4713,11 @@ function gorUpdateVoices(game, dt) {
 
 function gorTask(id) {
   const g = gorGame;
-  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) {} }
+  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) { warnOnce('goreme.completeTask', e); } }
 }
 function gorToast(t) {
   const g = gorGame;
-  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) { warnOnce('goreme.toast', e); } }
 }
 /**
  * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
@@ -4728,14 +4728,14 @@ function gorToast(t) {
  */
 function gorSay(t) {
   const g = gorGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('goreme.say', e); } }
   else gorToast(t);
 }
 function gorSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
   const g = gorGame;
-  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
+  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) { warnOnce('goreme.sfx', e); } }
 }
 
 /**

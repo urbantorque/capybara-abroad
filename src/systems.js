@@ -7981,7 +7981,15 @@ function sysBuildCSS() {
    task list's tick boxes have carried since v13, with the same drawn pen
    inside it. The pause card and the to-do list now agree about what a
    checked box looks like, which they never have. */
+// THE ONLY THREE CONTROLS IN THE HUD WITHOUT `touch-action`. Every other one
+// of the 320 sets `manipulation`, which is what removes the 300 ms double-tap
+// delay and, more to the point, stops a double-tap ZOOMING THE PAGE. These
+// three checkboxes were relying on the viewport meta's `user-scalable=no` to do
+// it for them — and that has gone, because blocking pinch document-wide is
+// WCAG 1.4.4 and it was stopping players enlarging the journal. Measured: 310
+// manipulation, 7 none, 3 auto, and the three were these.
 '.capyui-setcalm input{width:16px;height:16px;flex:0 0 auto;cursor:pointer;',
+  'touch-action:manipulation;',
   'appearance:none;-webkit-appearance:none;margin:0;position:relative;',
   'border:1.6px solid ' + inkFaint + ';border-radius:' + rSm + ';background:none;',
   'transform:rotate(-2deg);color:' + tick + ';}',
@@ -31080,7 +31088,21 @@ export function createSystems(game) {
                     'How did that get here?'];
       const line = pool[(Math.random() * pool.length) | 0];
       const sx = cp.x, sz = cp.z;
-      setTimeout(function () { try { game.sayNear(sx, sz, 22, line); } catch (err) {} }, 2200);
+      // GATED ON THE CHAPTER IT WAS SCHEDULED IN. This is the only delayed
+      // callback in the game that touches the world without re-checking which
+      // world it is in, and 2.2 s is long enough to leave: travel is three
+      // whistles and a player who arrives with a passenger and immediately
+      // whistles again is gone before this fires. The line would then be said
+      // in the NEXT chapter, at a point recorded in the last one — so a
+      // stranger in Venice remarks on a pigeon nobody there can see, which is
+      // the shape of bug that takes an hour to find because it happens once.
+      const said = to;
+      setTimeout(function () {
+        try {
+          if (!game.biome || game.biome.current !== said) return;
+          game.sayNear(sx, sz, 22, line);
+        } catch (err) {}
+      }, 2200);
     }
   });
   function stowUpdate(dt) {

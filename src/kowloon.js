@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -4330,11 +4330,11 @@ function hkUpdateLion(game, dt) {
 
 function hkTask(id) {
   const g = hkGame;
-  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) {} }
+  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) { warnOnce('kowloon.completeTask', e); } }
 }
 function hkToast(t) {
   const g = hkGame;
-  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) { warnOnce('kowloon.toast', e); } }
 }
 /**
  * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
@@ -4346,14 +4346,14 @@ function hkToast(t) {
  */
 function hkSay(t) {
   const g = hkGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('kowloon.say', e); } }
   else hkToast(t);
 }
 function hkSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
   const g = hkGame;
-  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
+  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) { warnOnce('kowloon.sfx', e); } }
 }
 
 // =============================================================== THE VOICES =

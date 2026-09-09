@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 10 — VENICE, AND THE WATER IS COMING IN
@@ -4683,18 +4683,18 @@ function venCalliFile(game) {
 
 function venTask(id) {
   const g = venGame;
-  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) {} }
+  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) { warnOnce('venice.completeTask', e); } }
 }
 function venToast(t) {
   const g = venGame;
-  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) { warnOnce('venice.toast', e); } }
 }
 /**
  * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
  */
 function venSay(t) {
   const g = venGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('venice.say', e); } }
   else venToast(t);
 }
 function venSfx(n, o) {
@@ -4703,7 +4703,7 @@ function venSfx(n, o) {
   // and pitch AND wraps every voice in a try/catch. A direct call passed
   // undefined, NaN reached exponentialRampToValueAtTime, and the throw landed in
   // systems.update, which takes the camera and the HUD with it on the fourth one.
-  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
+  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) { warnOnce('venice.sfx', e); } }
 }
 
 // =============================================================== THE VOICES =

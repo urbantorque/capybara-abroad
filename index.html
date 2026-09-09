@@ -2,7 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- NO `maximum-scale=1, user-scalable=no`, AND THE GAME DOES NOT NEED IT.
+     Blocking pinch-zoom document-wide is WCAG 1.4.4 (Resize Text), and here it
+     was buying nothing that was not already bought per element: the canvas is
+     `touch-action:none`, so a pinch on the world does not zoom the page, and
+     every control in the HUD is `touch-action:manipulation`, which is what
+     kills the double-tap-to-zoom delay on a button. The only thing the meta
+     added on top of those was stopping a player enlarging the JOURNAL, the
+     SETTINGS SHEET and the TO-DO CARD — the three places in the game that are
+     actually made of text, and the exact thing somebody pinches a phone for.
+     The touch layer holds one MENU button and no drag-stick, so there is no
+     gesture left for a stray pinch to interrupt. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Untitled Capybara Game — Sydney</title>
 <meta name="description" content="A physics sandbox where a mischievous capybara terrorises nineteen places.">
 <meta name="theme-color" content="#cfe8ef">

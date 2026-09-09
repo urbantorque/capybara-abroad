@@ -161,6 +161,41 @@ for (const f of files) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// THE VOCABULARY CHECK — an exported list that nothing imports.
+//
+// shared.js exports HANG_KINDS, five strings naming the shapes hangThing() can
+// build, and it was the only export in the repo that no other file referenced.
+// The obvious reading is that it is dead and should go. It is not dead — it is
+// a CONTRACT with no enforcement: systems.js's per-chapter table names a kind
+// per chapter as a bare string, hangThing switches on it, and a typo there
+// hangs nothing from a hook in one chapter with no error anywhere. Exactly the
+// shape of capy3-names-nothing-publishes.
+//
+// So rather than delete the list, this makes it the thing that checks the
+// table. The export now has a reader, and the typo now has a test.
+// ---------------------------------------------------------------------------
+{
+  const shared = readFileSync(join(DIR, 'shared.js'), 'utf8');
+  const systems = readFileSync(join(DIR, 'systems.js'), 'utf8');
+  const m = shared.match(/export const HANG_KINDS = \[([^\]]*)\]/);
+  if (!m) {
+    console.log('HANG_KINDS  the list is gone — either restore it or drop this check');
+    process.exitCode = 1;
+  } else {
+    const kinds = new Set([...m[1].matchAll(/'([a-z]+)'/g)].map(x => x[1]));
+    const used = new Map();
+    for (const r of systems.matchAll(/^\s*([a-z]+):\s*\{ kind: '([a-z]+)'/gm)) used.set(r[1], r[2]);
+    const bad = [...used].filter(([, k]) => !kinds.has(k));
+    for (const [chapter, k] of bad) {
+      console.log("HANG_KINDS  " + chapter + " hangs '" + k +
+                  "' — not one of " + [...kinds].join(', ') + ', so nothing is drawn');
+    }
+    if (bad.length) process.exitCode = 1;
+    else console.log('hang kinds: ' + used.size + ' chapters, all ' + kinds.size + ' kinds accounted for');
+  }
+}
+
 findings.sort((a, b) => (a.owners.length - b.owners.length) || a.file.localeCompare(b.file));
 if (!findings.length) {
   console.log('clean: every called name is declared in, or imported by, the file that uses it');

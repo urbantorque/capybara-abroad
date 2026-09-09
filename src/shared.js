@@ -4863,6 +4863,34 @@ export function placeCue(o, x, y, z, far) {
 }
 
 // ===========================================================================
+// A CATCH THAT SAYS SOMETHING, ONCE.
+//
+// Six chapters carry the same four one-line wrappers — completeTask, toast, say
+// and sfx, each guarded with `typeof g.x === 'function'` and each swallowing
+// whatever the call throws. Eighteen sites, and the guard is right: a chapter
+// must not blank the screen because the coordinator has not published a hook
+// yet. The SWALLOW is what is wrong with them.
+//
+// The case that matters is completeTask. If it throws, the task never
+// completes, the paper never ticks, and there is no error anywhere — the player
+// does the thing and the game does not notice. That is indistinguishable from a
+// gameplay bug and it is the most expensive kind of silence in this codebase.
+//
+// So: still caught, still never fatal, but it says so — ONCE per site, because
+// most of these are called from an update loop and a throw at sixty hertz is a
+// console nobody can read. First failure names the chapter and the hook; after
+// that the same site is silent for the rest of the session.
+//
+// Not a logger, not a level, not a channel. One function and a Set.
+// ===========================================================================
+const _warnedOnce = new Set();
+export function warnOnce(tag, err) {
+  if (_warnedOnce.has(tag)) return;
+  _warnedOnce.add(tag);
+  try { console.warn('[' + tag + '] ' + ((err && err.message) || err)); } catch (e) {}
+}
+
+// ===========================================================================
 // THE MERGER — ONE COPY OF IT, AT LAST.
 //
 // Every chapter builds its world by pouring unit primitives through a

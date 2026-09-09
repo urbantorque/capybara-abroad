@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, TASKS, rand, randInt, clamp, damp, dampAngle, lerp, grain, swayMesh, leafMesh, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // AGENT A — ENVIRONMENT.  Sydney as low-poly stage dressing.
@@ -1386,7 +1386,7 @@ const envPlanePos = new THREE.Vector3();
 // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
 // default volume and pitch and what wraps every voice in a try/catch.
 function envPlaneSfx(game, n, o) {
-  if (game && typeof game.sfx === 'function') { try { game.sfx(n, o); } catch (e) {} }
+  if (game && typeof game.sfx === 'function') { try { game.sfx(n, o); } catch (e) { warnOnce('environment.sfx', e); } }
 }
 
 function envBuildSeaplane(root, material) {

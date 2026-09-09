@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, matOwn, EMIT_OVER, emitSet, rand, randInt, clamp, damp, lerp, grain, grainOwn, placeCue, swayMesh, makeMerger, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 12 — PALAWAN. THE INTERESTING HALF IS UNDERNEATH.
@@ -3939,11 +3939,11 @@ function palSaysNow(who, lines, wheek) {
 
 function palTask(id) {
   const g = palGame;
-  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) {} }
+  if (g && typeof g.completeTask === 'function') { try { g.completeTask(id); } catch (e) { warnOnce('palawan.completeTask', e); } }
 }
 function palToast(t) {
   const g = palGame;
-  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) {} }
+  if (g && typeof g.toast === 'function') { try { g.toast(t); } catch (e) { warnOnce('palawan.toast', e); } }
 }
 /**
  * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1).
@@ -3959,14 +3959,14 @@ function palToast(t) {
  */
 function palSay(t) {
   const g = palGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) {} }
+  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('palawan.say', e); } }
   else palToast(t);
 }
 function palSfx(n, o) {
   // ALWAYS through the dispatcher, never a bare synth: it is what supplies the
   // default volume and pitch and what wraps every voice in a try/catch.
   const g = palGame;
-  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) {} }
+  if (g && typeof g.sfx === 'function') { try { g.sfx(n, o); } catch (e) { warnOnce('palawan.sfx', e); } }
 }
 
 // ---- THE THREE MEASURED THINGS IN THIS CHAPTER, EACH FILED ONCE ------------
