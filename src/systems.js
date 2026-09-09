@@ -181,16 +181,45 @@ const sysPASTO_SUN_DIR = new THREE.Vector3(-0.448, 0.875, 0.182).normalize();
 // round shadows directly underneath themselves: a dawn palette with noon
 // shadows, which is what a photograph of it shows. Same bearing, low.
 const sysGOREME_SUN_DIR = new THREE.Vector3(-0.710, 0.643, 0.287).normalize();
+// ---------------------------------------------------------------------------
+// THE SAME STAR, LOWER — the beauty pass (10 Sep 2026, ROADMAP-BEAUTY.md).
+//
+// The table below used to hand Pasto's 61-degree noon to eight chapters, and
+// its own comment said that giving one of them its own sun "is an art decision
+// that wants the frame in front of you". Measured over all nineteen arrival
+// frames (qa/by-light.json.png, qa/by-cast.json.png): every chapter casts
+// shadows from 43-96 % of what it draws, and in four daylight chapters none of
+// them is visible, because at 61 degrees a 1.7 m person throws 0.9 m of
+// shadow and the contact patch already covers that. The sun was wired and
+// doing no work.
+//
+// This keeps a star's BEARING — every chapter's shadows already run the way
+// its layout was built for, and the Pasto azimuth was swung on purpose to
+// keep the church's slab off the plaza — and sets only its elevation.
+function sysSunAt(base, elevDeg) {
+  const el = elevDeg * Math.PI / 180;
+  const h = Math.sqrt(base.x * base.x + base.z * base.z) || 1;
+  return new THREE.Vector3(base.x / h * Math.cos(el), Math.sin(el), base.z / h * Math.cos(el)).normalize();
+}
 const sysSUN_BY_BIOME = {
   pasto:     sysPASTO_SUN_DIR,
   iceland:   sysPASTO_SUN_DIR,
   sahara:    sysPASTO_SUN_DIR,
   drift:     sysPASTO_SUN_DIR,
   kowloon:   sysPASTO_SUN_DIR,
-  palawan:   sysPASTO_SUN_DIR,
+  // A mid-afternoon beach. The palms lay something on the sand now.
+  palawan:   sysSunAt(sysPASTO_SUN_DIR, 44),
   goreme:    sysGOREME_SUN_DIR,
-  antarctic: sysPASTO_SUN_DIR,
+  // Midday on the Peninsula in January is a 30-degree sun, and long blue
+  // shadows across the snow are most of why the place looks the way it does.
+  // It was lit from 61 degrees — a polar station under an equatorial noon —
+  // and the frame was flat grey snow with no shadow anywhere in it.
+  antarctic: sysSunAt(sysPASTO_SUN_DIR, 28),
   monaco:    sysPASTO_SUN_DIR,
+  // "An hour before sundown", lit by Sydney's mid-afternoon star. The gallery
+  // trees reach across the campo now, which is what that hour is FOR — and
+  // the shadow box widens to take them (sysBIO_SH_HALF).
+  pantanal:  sysSunAt(sysSUN_DIR, 30),
 };
 const sysSUN_DIST     = 68;
 const sysSHADOW_HALF  = 22;      // ~44 unit box
@@ -239,7 +268,10 @@ const sysSHADOW_HYST     = 1.5;    // only refit past this much drift (projectio
 // and the bathers' own shadows appear (qa/d1-rio.png against qa/d1-rio-44.png).
 // Venice wants 34 and no more — the campanile is the caster that matters there
 // and it arrives at 34.
-const sysBIO_SH_HALF = { rio: 44, venice: 34 };
+// ...and the Pantanal, since its sun came down to 30 degrees (sysSUN_BY_BIOME):
+// a 12 m gallery tree throws 21 m at that hour, and a 22 half-box centred on
+// the animal cuts that shadow off at its edge as she walks under it.
+const sysBIO_SH_HALF = { rio: 44, venice: 34, pantanal: 34 };
 // ---------------------------------------------------------------------------
 // HOW MUCH SKY SURVIVES IN THE SHADE — see the block above _RIM_FS_COMMON in
 // shared.js for what this number does and why the shadow needed it.
@@ -260,8 +292,15 @@ const sysBIO_SH_HALF = { rio: 44, venice: 34 };
 // The four evening and low-sun rows take a softer number because their shadows
 // are already long, already coloured, and were tuned as they stand.
 const sysSHADOW_SKY_DEF = 0.45;
+//
+// ANTARCTICA CAME OFF THE 1.0 LIST when its sun came down (sysSUN_BY_BIOME).
+// "Any extra darkening reads as a bruise" was measured under a 61-degree sun
+// that threw almost nothing; at 28 degrees the shadow pass touches 22 % of
+// the arrival frame and moved it by 15.7 levels — present, and invisible on
+// snow (qa/by-shadow-ab.json.png). Snow in shade is lit by the sky and not by
+// the ground bounce, which is the physical excuse this number has always had.
 const sysSHADOW_SKY = {
-  kyoto: 1.0, cave: 1.0, iceland: 1.0, antarctic: 1.0, drift: 1.0,
+  kyoto: 1.0, cave: 1.0, iceland: 1.0, antarctic: 0.62, drift: 1.0,
   goreme: 0.72, kowloon: 0.84, monaco: 0.76, hanoi: 0.74,
 };
 
