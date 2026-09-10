@@ -347,14 +347,46 @@ const sysSHADE_WHITE = new THREE.Color(1, 1, 1);
 
 // Goose-game framing: tight, steep, capybara sitting ~40% up from the bottom of
 // the frame with the world it is walking into filling the upper two thirds.
-const sysCAM_PITCH = 41 * Math.PI / 180;
-// AT 41 DEGREES THE SKY IS NOT IN THE PICTURE, AND THAT IS A PROBLEM EXACTLY
-// ONCE. The rig sits ~7.4 m above the animal and looks 41 degrees down; the
-// vertical half-FOV is 24; so the top edge of the frame points 17 degrees BELOW
-// horizontal and meets flat ground 24 m out. Every biome so far has been fine
-// with that, because everything worth seeing in them is ON the ground.
 //
-// Then chapter 7 put its entire payoff a hundred metres up in the air. The
+// ---- ...AND IT WAS A PROBLEM EVERY TIME, IN NINETEEN CHAPTERS (L2) --------
+// This constant was 41 degrees, and the paragraph below it said the sky being
+// out of the picture "is a problem exactly once". That is the sentence this
+// change is about. Measured on the live camera in eighteen chapters, both
+// walking and settled — the horizon's height in the frame is
+// tan(pitch)/tan(halfFov) in NDC and depends on nothing else, so it is exact:
+//
+//     walking   pitch 28-39 deg, horizon at 1.05-1.80  (well off the top)
+//     settled   pitch 22.8 deg,  horizon at 0.94       (3% down from the top)
+//     sky, by a 273-ray grid                     0.0% in 18 of 18, both states
+//
+// A previous pass measured the same 0% and drew the opposite conclusion from
+// it — that clouds in twelve skies would never be seen, so they were not
+// built. But the game's premise is one capybara in nineteen of the most
+// photographed places on earth, and the frame it spends its life in contained
+// none of them: Venice standing between the two columns of San Marco is grey
+// flagstones and two column stumps, and Pasto — a chapter whose whole subject
+// is a volcano — is 70% beige paving with Galeras nowhere in it.
+//
+// The right answer was already in the file, and it was already validated on
+// nineteen arrival PNGs: sysARRIVE_PITCH, 16 degrees, which puts the horizon
+// at 0.64 and about a fifth of the frame above it. The game knew what its good
+// lens was, showed it for 3.6 seconds on arrival, and then eased back to the
+// floor plan for the next forty minutes.
+//
+// So two numbers move, and they move toward that shot rather than toward a new
+// one. 41 -> 34 for the driving lens: still a firmly overhead-behind rig — it
+// is the angle you steer a rodent through a flowerbed at, and seven degrees
+// does not stop it being that — but seven degrees of world instead of seven
+// degrees of pavement. And sysREST_W 0.55 -> 0.80 below, which lands the
+// settled lens ON the arrival composition instead of six degrees short of it.
+const sysCAM_PITCH = 34 * Math.PI / 180;
+// The rig sits ~7.4 m above the animal; the vertical half-FOV is 24; so at the
+// old 41 the top edge of the frame pointed 17 degrees BELOW horizontal and met
+// flat ground 24 m out. Every biome was said to be fine with that, because
+// everything worth seeing in them is ON the ground. Chapter 7 was the first to
+// disprove it and it was not the last.
+//
+// Chapter 7 put its entire payoff a hundred metres up in the air. The
 // first build of the aurora was correct, expensive and completely invisible —
 // the instrumented shot of the ignition is a photograph of some grass.
 //
@@ -515,9 +547,24 @@ const sysEYE_LAMBDA  = 2.6;
 //   slide costs three quarters of a second of the bank and the shot survives;
 //   anything sustained — a slope that really is carrying you, a moving deck —
 //   empties it in well under a second and the shot closes.
-const sysREST_W      = 0.55;  // share of the crane blend a settled rig asks for
+// ---- HOW FAR THE SETTLED LENS OPENS, AND HOW SOON (L2) -------------------
+// 0.55 blended 41 degrees toward sysSKY_PITCH's 11 and arrived at 22.8, which
+// measured with the horizon 3% down from the top of the frame — inside it, and
+// worth nothing. From the new 34, 0.80 arrives at 15.6 degrees: the arrival
+// lens, near enough to the degree, and a composition this project has already
+// judged good on nineteen PNGs. It carries the rest of the crane with it —
+// the boom to 12.3 m and the look point 2.5 m above the animal — which is the
+// same wide "look where you are" shot the arrival is, and that coherence is
+// the argument for moving one number rather than authoring a fourth rig.
+//
+// sysREST_T 1.5 -> 1.0 for a plainer reason: the shot is gated on standing
+// still, and players do not stand still for a second and a half very often. A
+// full second is still long enough that it never fires on a direction change
+// (the STICK zeroes the bank outright, so a turn is not stillness at all) and
+// short enough that stopping to look at something is enough to be shown it.
+const sysREST_W      = 0.80;  // share of the crane blend a settled rig asks for
 const sysREST_FORGET = 3.0;   // how much faster the bank drains than it fills
-const sysREST_T      = 1.5;   // s of banked stillness before it starts to open out
+const sysREST_T      = 1.0;   // s of banked stillness before it starts to open out
 const sysREST_LAMBDA = 1.15;  // opening out: ~2.5 s, under the player's notice
 const sysREST_DROP   = 5.0;   // ...and closing again: under half a second
 const sysREST_SKY    = 2.0;   // what skyT follows the rest voice at
