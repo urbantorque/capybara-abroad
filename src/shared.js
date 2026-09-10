@@ -1651,6 +1651,58 @@ const _spillWRAP = 0.34;
 const _spillANISO = 2.4;
 /** How many slots the pool has. systems.js ranks into this many. */
 export function spillSlots() { return _SPILL_N; }
+// ---------------------------------------------------------------------------
+// THE BOUNCE — LIGHT THAT HAS BEEN SOMEWHERE ELSE FIRST (the second beauty
+// pass, item 2).
+//
+// The light model in this game is a sun, a hemisphere, a horizontal fill, a
+// flat ambient, the spill from things that are switched on, and the air. All
+// six are GLOBAL: the only bounce in the whole game is the hemisphere's
+// `groundColor`, which is one colour for a whole chapter. So a red awning
+// does not tint the wall it hangs on, pale sand does not throw light up into
+// the hull of a blue boat, and a green lawn does not make the underside of a
+// bench green. Everything is lit by the average of the world instead of by
+// its neighbours, and that is most of what makes a stylised render look flat.
+//
+// It is the SPILL's machinery, one input over: the same nearest-N pool, the
+// same reach ramp, the same multiply by albedo. The difference is entirely in
+// what feeds it — the spill is fed by things that emit, and this is fed by
+// things that are merely big, near and saturated.
+//
+// FOUR SLOTS AND NOT EIGHT. A bounce is a whisper; the eight-slot pool exists
+// because Mong Kok has eight sign clusters worth resolving separately, and
+// nowhere has eight distinct bounce sources that a player could tell apart.
+const _BOUNCE_N = 4;
+const _bounceP = { value: [] };
+const _bounceC = { value: [] };
+const _bounceOn = { value: 0 };
+const _bounceN = { value: 0 };
+for (let i = 0; i < _BOUNCE_N; i++) {
+  _bounceP.value.push(new THREE.Vector4(0, -999, 0, 1));
+  _bounceC.value.push(new THREE.Vector3(0, 0, 0));
+}
+export function bounceSlots() { return _BOUNCE_N; }
+/** The live uniform objects, for an audit. Never copies — see spillUniforms. */
+export function bounceUniforms() {
+  return { P: _bounceP, C: _bounceC, on: _bounceOn, n: _bounceN };
+}
+/** Ranked, packed to the front, exactly as spillTick takes them. */
+export function bounceTick(list, n) {
+  const P = _bounceP.value, C = _bounceC.value;
+  let live = 0;
+  for (let i = 0; i < _BOUNCE_N; i++) {
+    if (i < n) {
+      const e = list[i];
+      P[i].set(e.x, e.y, e.z, e.r > 0.5 ? e.r : 0.5);
+      C[i].set(e.cr, e.cg, e.cb);
+      if (e.cr + e.cg + e.cb > 0.002) live++;
+    } else {
+      C[i].set(0, 0, 0);
+    }
+  }
+  _bounceOn.value = live > 0 ? 1 : 0;
+  _bounceN.value = n < _BOUNCE_N ? n : _BOUNCE_N;
+}
 /**
  * THE SAME UNIFORM OBJECTS, for the composite pass to bind (v48).
  *
@@ -1823,6 +1875,10 @@ uniform vec4 uSpillP[${_SPILL_N}];
 uniform vec3 uSpillC[${_SPILL_N}];
 uniform float uSpillOn;
 uniform float uSpillN;
+uniform vec4 uBounceP[${_BOUNCE_N}];
+uniform vec3 uBounceC[${_BOUNCE_N}];
+uniform float uBounceOn;
+uniform float uBounceN;
 uniform float uWetK;
 uniform vec4 uCloudP;
 uniform vec2 uCloudS;
@@ -1906,6 +1962,25 @@ const _RIM_FS_OUT = `{
     // would wash every surface to the same colour and read as fog.
     outgoingLight += sAcc * diffuseColor.rgb;
   }
+  // ---- THE BOUNCE. See the block above bounceSlots. ------------------------
+  // The spill's shape with the spill's reasoning: a reach ramp rather than an
+  // inverse square, because the thing being modelled is a WALL several metres
+  // across and not a point; a wrap term so a surface turned away from it does
+  // not go black; and multiplied by the albedo, because bounce is light and
+  // not paint. The wrap is higher than the spill's — bounce arrives from a
+  // whole surface rather than from a bulb, so it is much less directional.
+  if (uBounceOn > 0.5) {
+    vec3 bAcc = vec3(0.0);
+    for (int bi = 0; bi < ${_BOUNCE_N}; bi++) {
+      if (float(bi) >= uBounceN) break;
+      vec3 bD = uBounceP[bi].xyz - vRimW;
+      float bL = length(bD);
+      float bAt = 1.0 - smoothstep(uBounceP[bi].w * 0.15, uBounceP[bi].w, bL);
+      float bNd = max(dot(rN, bD / max(bL, 0.0001)), 0.0);
+      bAcc += uBounceC[bi] * bAt * (0.45 + 0.55 * bNd);
+    }
+    outgoingLight += bAcc * diffuseColor.rgb;
+  }
   // ---- THE CLOUD. See the block above cloudTick. ---------------------------
   // Subtracted from the DIRECT term, so a fragment already in a building's
   // shadow loses nothing — and a quarter as much from the sky, which is what
@@ -1957,6 +2032,10 @@ function _rimInjectWith(kU, cU) {
     shader.uniforms.uSpillC = _spillC;
     shader.uniforms.uSpillOn = _spillOn;
     shader.uniforms.uSpillN = _spillN;
+    shader.uniforms.uBounceP = _bounceP;
+    shader.uniforms.uBounceC = _bounceC;
+    shader.uniforms.uBounceOn = _bounceOn;
+    shader.uniforms.uBounceN = _bounceN;
     // The SAME uniform object grain() binds as uGrainWet, under a second name
     // — and the second name is not cosmetic. grain() injects its own
     // `uniform float uGrainWet;` at `#include <common>` and then calls this

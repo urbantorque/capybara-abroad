@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
          CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
-         rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
+         rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
          exitBoard, BOARD_ROWS, BOARD_FLAPS, hangThing, waterYAt } from './shared.js';
@@ -9267,6 +9267,196 @@ export function createSystems(game) {
    * fifties near a cluster and leaves the grade alone.
    */
   let sysSplRescan = 2;
+  // =========================================================================
+  // THE BOUNCE — see the block above bounceSlots in shared.js for the term.
+  // This is where its sources come from, and the whole design problem is that
+  // they are NOT MESHES.
+  //
+  // The spill can walk the chapter looking for `material.emissive`, because a
+  // lamp is a material. A red awning is not: nineteen chapters merge their
+  // whole world into a handful of enormous vertex-coloured meshes whose
+  // material is white, so there is no object called "the awning" to find. The
+  // colour is in the VERTEX BUFFER, and that is what this reads.
+  //
+  // It subsamples positions, normals and colours off every merged batch in the
+  // live chapter, drops everything that cannot bounce anything interesting,
+  // and buckets what is left into a coarse grid. A cell that comes back big
+  // and saturated is a bounce source. Runs ONCE per chapter attach, on the
+  // same deferred frame as the spill's scan and for the same reason.
+  //
+  // THREE FILTERS, AND EACH ONE IS LOAD-BEARING:
+  //
+  //   NOT FACING UP (`normal.y < 0.55`). The single biggest saturated surface
+  //   in most chapters is the GROUND — Sydney's lawn is a hundred and sixty
+  //   metres of green — and the bounce off the ground is the one bounce this
+  //   game already has: it is `hemisphere.groundColor`, per chapter, and has
+  //   been since chapter one. Letting the lawn in here would apply it twice.
+  //
+  //   ABOVE THE FLOOR (`sysBNC_MINY`). sysSPL_MINY's argument exactly.
+  //
+  //   AND ONLY THE COLOURED PART OF IT. The emitted colour is scaled by the
+  //   cell's own SATURATION, so a white wall contributes nothing at all. This
+  //   is the other half of not double-counting the ambient: a neutral surface
+  //   bouncing neutral light is already in the four global terms, and the only
+  //   thing missing from them is HUE. It is also what stops the term being a
+  //   brightness control with extra steps.
+  // =========================================================================
+  const sysBNC_MINY   = 0.60;  // m above the chapter floor
+  const sysBNC_CELL   = 5.0;   // m — the grid a source is a cell of
+  const sysBNC_MINS   = 14;    // samples in a cell before it is a surface
+  const sysBNC_SAT    = 0.18;  // below this a vertex is not carrying a hue
+  const sysBNC_STRIDE = 9;     // vertices skipped between samples
+  const sysBNC_MAXC   = 20;    // cells kept; the pool takes the nearest 4
+  const sysBNC_FAR    = 42;    // m from the camera past which a cell cannot claim
+  const sysBNC_REACH  = 15.0;  // m — a wall lights what is beside it, not a street
+  const sysBNC_LAMBDA = 2.4;   // the fade, slower than contact and faster than a lamp
+  const sysBNC_K      = 0.30;  // how much of a saturated surface's colour arrives
+  const sysBNC_CAP    = 0.055; // ...and the most any one source may ever add
+  const sysBncFound = [];
+  const sysBncWant = [];
+  const sysBncSlots = [];
+  const sysBncOut = [];
+  const sysBncV = new THREE.Vector3();
+  const sysBncN = new THREE.Vector3();
+  const sysBncM3 = new THREE.Matrix3();
+  function sysBounceScan() {
+    sysBncFound.length = 0;
+    const B = game.biome;
+    const roots = [];
+    const bRoot = B && B.current ? scene.getObjectByName(B.current) : null;
+    if (bRoot) roots.push(bRoot);
+    if (B && B.current === 'sydney') {
+      const eRoot = scene.getObjectByName('environment');
+      if (eRoot) roots.push(eRoot);
+    }
+    if (!roots.length) return;
+    const cells = new Map();
+    const visit = function (o) {
+      if (!o.isMesh || !o.visible || o.isInstancedMesh) return;
+      const g = o.geometry;
+      if (!g || !g.attributes || !g.attributes.color || !g.attributes.normal) return;
+      const pa = g.attributes.position, ca = g.attributes.color, na = g.attributes.normal;
+      if (pa.count < sysBNC_MINS * sysBNC_STRIDE) return;
+      o.updateMatrixWorld();
+      sysBncM3.getNormalMatrix(o.matrixWorld);
+      for (let i = 0; i < pa.count; i += sysBNC_STRIDE) {
+        sysBncN.set(na.getX(i), na.getY(i), na.getZ(i)).applyMatrix3(sysBncM3);
+        if (sysBncN.y > 0.55 * sysBncN.length()) continue;
+        const r = ca.getX(i), gr = ca.getY(i), b = ca.getZ(i);
+        const mx = Math.max(r, Math.max(gr, b));
+        if (mx < 0.06) continue;
+        const sat = (mx - Math.min(r, Math.min(gr, b))) / mx;
+        if (sat < sysBNC_SAT) continue;
+        sysBncV.set(pa.getX(i), pa.getY(i), pa.getZ(i)).applyMatrix4(o.matrixWorld);
+        if (sysBncV.y < sysBNC_MINY) continue;
+        const key = Math.round(sysBncV.x / sysBNC_CELL) + ',' +
+                    Math.round(sysBncV.y / sysBNC_CELL) + ',' +
+                    Math.round(sysBncV.z / sysBNC_CELL);
+        let c = cells.get(key);
+        if (!c) { c = { n: 0, x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 }; cells.set(key, c); }
+        c.n++; c.x += sysBncV.x; c.y += sysBncV.y; c.z += sysBncV.z;
+        c.r += r; c.g += gr; c.b += b; c.s += sat;
+      }
+    };
+    for (let i = 0; i < roots.length; i++) roots[i].traverse(visit);
+    const list = [];
+    cells.forEach(function (c) {
+      if (c.n < sysBNC_MINS) return;
+      const inv = 1 / c.n, sat = c.s * inv;
+      list.push({ x: c.x * inv, y: c.y * inv, z: c.z * inv, r: sysBNC_REACH,
+                  // THE CHROMATIC RESIDUAL, which is the colour with its own
+                  // grey taken out — and taking the grey out is the whole
+                  // difference between a bounce and a brightness control.
+                  // Swept with the full colour instead, the term read as +9.4
+                  // levels of luma over 72 % of Mong Kok at its top strength:
+                  // a dimmer switch with a hue on it. A neutral surface has no
+                  // residual and contributes exactly nothing, which is also
+                  // what stops this double-counting the four global terms —
+                  // they already carry every bounce that has no colour in it.
+                  cr: (c.r - Math.min(c.r, Math.min(c.g, c.b))) * inv * sat,
+                  cg: (c.g - Math.min(c.r, Math.min(c.g, c.b))) * inv * sat,
+                  cb: (c.b - Math.min(c.r, Math.min(c.g, c.b))) * inv * sat,
+                  w: c.n * sat });
+    });
+    list.sort(function (a, b) { return b.w - a.w; });
+    for (let i = 0; i < list.length && i < sysBNC_MAXC; i++) sysBncFound.push(list[i]);
+  }
+
+  /**
+   * The nearest four, damped. Deliberately simpler than sysSpillFrame: that
+   * one carries hysteresis and a hold because a LAMP leaving the pool is a
+   * light going out, which is the most obvious pop in the game. A bounce is a
+   * few per cent of hue on a wall — nothing to pop — so this ranks by distance
+   * and damps, and the damping alone is enough to make the swap invisible.
+   */
+  function sysBounceFrame(dt) {
+    const N = bounceSlots();
+    if (sysBncSlots.length === 0) {
+      for (let i = 0; i < N; i++) {
+        sysBncSlots.push({ src: null, k: 0, cr: 0, cg: 0, cb: 0 });
+        sysBncOut.push({ x: 0, y: -999, z: 0, r: 1, cr: 0, cg: 0, cb: 0 });
+      }
+    }
+    // Cuts rather than fades, for sysSpillFrame's reason. Nothing in play
+    // sets this.
+    if (game.state.noBounce) {
+      for (let s = 0; s < N; s++) { sysBncSlots[s].src = null; sysBncSlots[s].k = 0; }
+      bounceTick(sysBncOut, 0);
+      return;
+    }
+    sysBncWant.length = 0;
+    for (let i = 0; i < sysBncFound.length; i++) {
+      const f = sysBncFound[i];
+      const dx = f.x - camera.position.x, dy = f.y - camera.position.y, dz = f.z - camera.position.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > sysBNC_FAR * sysBNC_FAR) continue;
+      f._d2 = d2;
+      sysBncWant.push(f);
+    }
+    sysBncWant.sort(function (a, b) { return a._d2 - b._d2; });
+    // `bounceSnap` LANDS THE POOL ON ITS TARGET IN ONE FRAME, and it exists
+    // because a damped pool cannot be swept. Every picture probe in this
+    // repository reads its arms at dt = 0 so that nothing else in the world
+    // can move between them; at dt = 0 this damp does not move either, so a
+    // sweep of the strength either reads four identical frames or has to tick
+    // real time between arms — and two seconds of Mong Kok is two buses, a
+    // crowd and a drifting cloud. Measured that way the term appeared to move
+    // 72 % of the frame with a peak of 220 at EVERY strength including 0.03,
+    // which is the world moving and not the bounce. Nothing in play sets this.
+    const kk = game.state.bounceSnap ? 1 : 1 - Math.exp(-sysBNC_LAMBDA * dt);
+    for (let s = 0; s < N; s++) {
+      const src = s < sysBncWant.length ? sysBncWant[s] : null;
+      const sl = sysBncSlots[s];
+      sl.src = src;
+      // A CAP AS WELL AS A GAIN, because the two ends of this want different
+      // numbers. Swept, one gain could not serve both: at a strength that made
+      // Pasto's awnings and Manly's flags do anything at all, Mong Kok — which
+      // is four storeys of saturated red either side of a narrow street — put
+      // five and a half levels of luma over sixty per cent of the frame, and a
+      // bounce you can read as "brighter" has stopped being a bounce. The gain
+      // is set for the quiet chapters and the cap is what the loud one hits.
+      const bk = typeof game.state.bounceK === 'number' ? game.state.bounceK : sysBNC_K;
+      const tr = src ? Math.min(src.cr * bk, sysBNC_CAP) : 0;
+      const tg = src ? Math.min(src.cg * bk, sysBNC_CAP) : 0;
+      const tb = src ? Math.min(src.cb * bk, sysBNC_CAP) : 0;
+      sl.cr += (tr - sl.cr) * kk;
+      sl.cg += (tg - sl.cg) * kk;
+      sl.cb += (tb - sl.cb) * kk;
+      const o = sysBncOut[s];
+      if (src) { o.x = src.x; o.y = src.y; o.z = src.z; o.r = src.r; }
+      o.cr = sl.cr; o.cg = sl.cg; o.cb = sl.cb;
+    }
+    bounceTick(sysBncOut, N);
+  }
+  /** What the bounce found and what it is doing, for a probe. */
+  game.bounceAudit = function () {
+    return { biome: game.biome && game.biome.current, found: sysBncFound.length,
+             live: sysBncOut.map(function (o) {
+               return { at: [+o.x.toFixed(1), +o.y.toFixed(1), +o.z.toFixed(1)],
+                        c: [+o.cr.toFixed(4), +o.cg.toFixed(4), +o.cb.toFixed(4)] };
+             }) };
+  };
+
   function sysSpillScan() {
     sysSplFound.length = 0;
     const cand = [];
@@ -28387,8 +28577,9 @@ export function createSystems(game) {
     // still making its roots visible on the frame the grade is switched, and a
     // scan run there finds an empty world and leaves the neon chapter dark
     // until the next swap. Two frames costs nothing and cannot race.
-    if (sysSplRescan > 0 && --sysSplRescan === 0) sysSpillScan();
+    if (sysSplRescan > 0 && --sysSplRescan === 0) { sysSpillScan(); sysBounceScan(); }
     sysSpillFrame(dt);
+    sysBounceFrame(dt);
     // ---- the wind, in the picture -----------------------------------------
     // One float, one clock and one unit vector, and every swaying material in
     // the live chapter leans. The vector is weather.js's gust() UNCHANGED — it
