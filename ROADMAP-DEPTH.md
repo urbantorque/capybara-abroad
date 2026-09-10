@@ -713,3 +713,40 @@ birds are already standing next to the food.
 D3's C2 and C6 · D4.10 (Sơn Đoòng's column) · D4.14 (Kyoto's weir, which
 needs a per-station waterline and has a wide blast radius) · D4.15 (Cali's
 passengers) · a demonstration of D4.12 by somebody with hands.
+
+### D4.15 — the chiva goes back down
+
+`arrived` was terminal, so the chapter's best set piece could be ridden once
+per visit and its seven-of-seven tally attempted once. She turns round and
+deadheads back down empty. Measured: **arrived 0.4 s → returning 15.3 s →
+parked 54.7 s (all seven cables re-armed) → rolling 56.4 s.** The first
+values made it a sixty-nine second wait, which is the thing the item exists
+to stop. The passengers half needed nothing — it shipped in Tier 2.
+
+### THE PREMISE THIS DOCUMENT ASKED TO BE MEASURED
+
+Premise 1 asked for the frame cost of the D1 crowd term in Marrakech, and it
+is answered here for every per-frame term this pass added.
+
+**The frame timer cannot answer it.** All nine chapters measure a median of
+16.6–16.8 ms, because the display is locked to 60 — a term costing a tenth
+of a millisecond is invisible there, and two of the A/B deltas came back
+NEGATIVE, which is the signature of noise rather than signal.
+
+`game.tick(dt, false)` runs the whole update with rendering off, which is the
+number a new loop actually adds to. Median of 24 batches of 20 ticks:
+
+| chapter | whole simulation | the new term costs |
+|---|---|---|
+| Marrakech (crowd is cover) | 0.80–0.96 ms | **0.027 ms** |
+| Marrakech (crowd parts) | 0.75–0.88 ms | **0.052 ms** |
+| Hanoi (the jam) | 0.90–1.01 ms | **0.045 ms** |
+| Antarctica (the skua) | 1.27–1.46 ms | **0.135 ms** |
+| Palawan (the terns) | 0.73–1.09 ms | below noise |
+| Pantanal (the onça) | 0.74–0.86 ms | below noise |
+| Manly (the carve) | 1.97–2.03 ms | below noise |
+
+The whole simulation is 0.7–2.0 ms against a 16.7 ms budget. **The largest
+measurable new term is 0.135 ms, which is eight tenths of one per cent of a
+frame**, and four of the seven are at or under the run-to-run noise floor of
+about 0.15 ms. No chapter left 60 fps with any term on.
