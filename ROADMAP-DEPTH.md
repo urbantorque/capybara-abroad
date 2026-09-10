@@ -502,6 +502,42 @@ was right, but Manly and Antarctica were not among them.
 
 ---
 
+## TIER 3 IN PROGRESS (10 Sep 2026) — THREE OF NINE
+
+- **D4.1 Hong Kong, conduct the harbour — DONE.** A wheek on the roof does
+  something different in each of the four movements; the eighth calls the
+  finale, spent on the next beat so the ending still lands on the music. Six
+  wheeks from the roof register 6 of 6 and take the tower count from 6 to 9
+  against the clock's own 6; the same six from the pavement register 0 and move
+  nothing. Mong Kok had no wheek handler at all before this.
+- **D4.2 Palawan — REFUSED as written, and replaced.** The item wanted a task on
+  the wheek shell; `palawan.js` says of that shell "there is no task on this and
+  there never will be", and it is right. The larger half shipped already when
+  the marquee moved to the manta. What shipped instead: **she stirs the
+  plankton** — motes within 6 m of her move at 0.603 m/s against 0.121 for the
+  control band.
+- **D4.3 Cappadocia, join the burn — DONE.** `sunrise` needs the burner lit
+  inside the window and the player aboard; the chief calls it if you are up
+  there cold; the doves come off the rock for the light rather than only for
+  the capybara. Flown end to end: 0 to 113.8 m, ticks at sun 0.466.
+
+**Six left**, in the order this document gave them: Sydney (lead the birds to
+the sails), Venice (the surge), Marrakech (a shape on the dune), the Drift (the
+lamp-lit descent), Monte Carlo (the tow), Hanoi (out on the roof).
+
+**AND A HARNESS FAULT THAT INVALIDATED FOUR EARLIER COMMITS' WORDING.** The
+probe had never started the game: a save file opens the title on page two,
+`titleEl`'s pointerdown only calls `startResume()` on page one, and while
+`state.started` is false systems.js's keydown handler drops every key. Every
+`q` and `w` in every smoke test before this was discarded, so "entered, wheeked
+and walked" was true only about *entered*. Nothing shipped on the strength of
+it — they were negative checks and the chapters were still entered, built,
+updated and rendered — but the claim was wider than the evidence. The smoke
+harness now reloads, clears the save, reloads again, presses Begin, verifies
+`state.started` and retries, and reports a HARNESS error if it never begins.
+
+---
+
 ## ORDER, AND WHAT EACH TIER BUYS
 
 **Tier 1 — do first. No new systems, no new draws.**
