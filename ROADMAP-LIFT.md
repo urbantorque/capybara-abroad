@@ -54,7 +54,7 @@ question**, and they should not be.
 
 ## WHAT WAS DONE
 
-Ten commits. Each one is measured, and where a measurement could not resolve a
+Thirteen commits. Each one is measured, and where a measurement could not resolve a
 change the commit says so rather than claiming the change.
 
 ### L1 — four ways this build could fail in front of a player
