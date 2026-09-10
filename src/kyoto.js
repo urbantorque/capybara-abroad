@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 4 — KYOTO & UJI
@@ -171,6 +171,66 @@ function kyoInitGeos() {
   kyoG.cone4 = new THREE.ConeGeometry(0.5, 1, 4);
   kyoG.sph6 = new THREE.SphereGeometry(0.5, 6, 4);
   kyoG.plane = new THREE.PlaneGeometry(1, 1);
+}
+
+// ============================================================= THE RICKSHAW ==
+/**
+ * ONE THING MOVING ON HANAMIKOJI.
+ *
+ * Kyoto is the ONLY chapter in the game with no vehicle of any kind — not a
+ * cart, not a boat under way, not a bicycle — and its arrival frame is a
+ * hundred and eight metres of granite setts with two men standing on it. A
+ * jinrikisha is the one wheeled thing that belongs on that lane, and it is
+ * still the thing every visitor photographs there.
+ *
+ * One way and wrapping past the ends of the built lane, like Iceland's car
+ * and the Harbour Bridge traffic: a rickshaw that reversed would be a joke
+ * at the puller's expense.
+ */
+const kyoRICK_X = 26;         // the wrap, past both ends of the lane
+const kyoRICK_V = 2.3;        // m/s — a jogging pull, which is the real pace
+let kyoRick = null, kyoRickMover = null;
+
+function kyoBuildRickshaw(game, root) {
+  kyoRick = new THREE.Group();
+  const M = kyoMerger();
+  // the seat box, the hood over it, two big wheels and a pair of shafts
+  M.box(0, 0.86, -0.10, 1.06, 0.52, 1.10, PALETTE.templeWood);
+  M.box(0, 1.32, -0.50, 1.02, 0.62, 0.16, PALETTE.torii);
+  M.box(0, 1.52, -0.05, 1.06, 0.12, 0.98, PALETTE.torii);
+  for (let sgn = -1; sgn <= 1; sgn += 2) {
+    M.cyl(sgn * 0.60, 0.56, -0.10, 0.56, 0.10, PALETTE.stoneDark, 0, 0, Math.PI / 2, 10);
+    M.box(sgn * 0.40, 0.72, 1.05, 0.08, 0.08, 2.20, PALETTE.templeWood);
+  }
+  // the man between the shafts
+  M.box(0, 0.92, 2.05, 0.42, 0.62, 0.26, PALETTE.kyotoSky);
+  M.box(0, 1.34, 2.05, 0.24, 0.26, 0.23, PALETTE.skin2);
+  M.box(0, 1.49, 2.04, 0.26, 0.10, 0.25, PALETTE.hair1);
+  const mesh = new THREE.Mesh(M.build(), kyoVC());
+  mesh.castShadow = true;
+  kyoRick.add(mesh);
+  root.add(kyoRick);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.62, 0.55, 1.4)),
+              new CANNON.Vec3(0, 0.8, 0));
+  cb.allowSleep = false;
+  cb.previousPosition.copy(cb.position);
+  cb.interpolatedPosition.copy(cb.position);
+  game.world.addBody(cb);
+
+  const zLane = kyoGION_Z - 2.4;
+  const span = kyoRICK_X * 2;
+  kyoRickMover = makeMover({
+    body: cb, group: kyoRick,
+    at: function (t) {
+      const u = ((t * kyoRICK_V) % span + span) % span;
+      const x = -kyoRICK_X + u;
+      return { x: x, z: zLane, y: kyoTerrain(x, zLane), yaw: Math.PI * 0.5 };
+    },
+  });
 }
 
 function kyoMerger() {
@@ -4376,6 +4436,7 @@ export function createKyoto(game) {
     },
 
     update(dt) {
+      if (kyoRickMover) kyoRickMover.step(dt);
       if (!kyoBuilt) return;
       if (!game.biome.isActive('kyoto')) return;
       kyoTime += dt;
@@ -4491,6 +4552,7 @@ function kyoBuild(game) {
 
   kyoBuildTorii(game, kyoRoot);
   kyoBuildPavilion(game, kyoRoot);
+  kyoBuildRickshaw(game, kyoRoot);
   kyoBuildHeron(kyoRoot);
   kyoBuildZen(game, kyoRoot);
   kyoBuildGion(game, kyoRoot);

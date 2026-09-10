@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 8 — MARRAKECH AND THE ERG
@@ -271,6 +271,62 @@ function sahNoShadowOnGhosts(root) {
     if (m.transparent || m.depthWrite === false || m.blending === THREE.AdditiveBlending) {
       n.castShadow = false;
     }
+  });
+}
+
+// ============================================================ THE HANDCART ===
+/**
+ * SOMETHING ON WHEELS IN THE MEDINA.
+ *
+ * The chapter has a hundred and seventy-odd people in it and the only thing
+ * that moves across the ground is a camel string eighty metres east of the
+ * gate. Jemaa el-Fnaa's defining quality is people ON THEIR WAY somewhere,
+ * and a handcart is what everything in that souk is moved on.
+ *
+ * Along the south edge of the square, which is open ground: the stalls are
+ * north of it and the acrobats' mat is at z 20.
+ */
+const sahCART_X = 30;         // the wrap, past both ends of the square
+const sahCART_V = 1.5;        // m/s — a man pushing a barrow
+let sahCart = null, sahCartMover = null;
+
+function sahBuildHandcart(game, root) {
+  sahCart = new THREE.Group();
+  const M = sahMerger();
+  M.box(0, 0.62, 0, 1.30, 0.10, 2.00, PALETTE.sahCedar);
+  for (let sgn = -1; sgn <= 1; sgn += 2)
+    M.box(sgn * 0.63, 0.80, 0, 0.06, 0.30, 1.96, PALETTE.sahCedar);
+  M.box(0, 0.86, -0.30, 1.10, 0.42, 1.10, PALETTE.sahOrange);   // the load
+  for (let sgn = -1; sgn <= 1; sgn += 2)
+    M.cyl(sgn * 0.66, 0.40, -0.20, 0.40, 0.09, PALETTE.sahCedarDk, 0, 0, Math.PI / 2, 8);
+  for (let sgn = -1; sgn <= 1; sgn += 2)
+    M.box(sgn * 0.44, 0.74, 1.30, 0.06, 0.06, 1.20, PALETTE.sahCedar);
+  // the man on the handles
+  M.box(0, 0.92, 2.05, 0.44, 0.66, 0.28, PALETTE.cloth5);
+  M.box(0, 1.36, 2.05, 0.24, 0.26, 0.23, PALETTE.skin3);
+  const mesh = new THREE.Mesh(M.build(), sahVC());
+  mesh.castShadow = true;
+  sahCart.add(mesh);
+  root.add(sahCart);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.7, 0.5, 1.2)),
+              new CANNON.Vec3(0, 0.62, 0));
+  cb.allowSleep = false;
+  sahSyncBody(cb);
+  game.world.addBody(cb);
+
+  const zRun = sahSQ_Z0 + 3.5;
+  const span = sahCART_X * 2;
+  sahCartMover = makeMover({
+    body: cb, group: sahCart,
+    at: function (t) {
+      const u = ((t * sahCART_V) % span + span) % span;
+      const x = -sahCART_X + u;
+      return { x: x, z: zRun, y: sahTerrain(x, zRun), yaw: Math.PI * 0.5 };
+    },
   });
 }
 
@@ -5083,6 +5139,7 @@ export function createSahara(game) {
     onFire() { return sahFireTakeover > 0; },
 
     update(dt) {
+      if (sahCartMover) sahCartMover.step(dt);
       if (!sahBuilt) return;
       if (!game.biome.isActive('sahara')) return;
       sahTime += dt;
@@ -5151,6 +5208,7 @@ function sahBuild(game) {
   sahBuildSmoke(sahRoot);
   sahBuildStormWall(sahRoot);
   sahBuildStars(sahRoot);
+  sahBuildHandcart(game, sahRoot);
   // LAST, because sahAddPerson is called from a dozen builders above and the
   // roster is not complete until every one of them has run.
   sahBuildPeopleBodies(game);

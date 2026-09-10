@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, grainOwn, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 7 — ICELAND
@@ -305,6 +305,81 @@ function iceInitGeos() {
 }
 
 /** Vertex-coloured geometry merger — one draw call per merged batch. */
+// ================================================================== THE CAR ==
+/**
+ * ONE CAR ON THE STREET AT HALF PAST ELEVEN AT NIGHT.
+ *
+ * This chapter is lit almost entirely by windows. It has forty-six painted
+ * houses with light coming out of them, two sodium lamps, eleven PARKED cars
+ * and a hot-dog van, and nothing in it moved. A single car with its
+ * headlights on is the only moving light in the whole town, and it is the
+ * cheapest thing in this chapter that says somebody else is awake.
+ *
+ * IT DOES NOT TURN ROUND. A shuttle would reverse it up its own street or
+ * spin it on the spot at the end of a leg, and neither is what a car does.
+ * It drives one way and wraps beyond x +/- 62, which is outside the built
+ * street (the houses stop at 56) and therefore off the end of anything the
+ * player can be standing on -- the same trick the thirty-eight cars on the
+ * Harbour Bridge use in chapter three.
+ */
+const iceCAR_X = 62;               // the wrap, beyond the last house at 56
+const iceCAR_V = 8.5;              // m/s. Twenty knots through a sleeping town.
+let iceCar = null, iceCarMover = null;
+
+function iceBuildCar(game, root) {
+  iceCar = new THREE.Group();
+  const M = iceMerger();
+  M.box(0, 0.62, 0, 1.76, 0.56, 4.10, PALETTE.iceHullBlue);
+  M.box(0, 1.06, -0.20, 1.62, 0.52, 2.10, PALETTE.iceHullBlue);
+  M.box(0, 1.08, 0.86, 1.46, 0.40, 0.06, PALETTE.iceGeoBlue);      // windscreen
+  for (let i = 0; i < 4; i++)
+    M.cyl((i < 2 ? -0.84 : 0.84), 0.34, (i % 2 ? -1.34 : 1.34), 0.33, 0.22,
+          PALETTE.iceBasaltDk, 0, 0, Math.PI / 2, 8);
+  const body = new THREE.Mesh(M.build(), iceVC());
+  body.castShadow = true;
+  iceCar.add(body);
+
+  // ---- AND THE POINT OF IT ---------------------------------------------
+  // Emissive rather than a light: this game has no point lights in a chapter
+  // and is not about to grow two for a car. The same law the windows, the
+  // beacon and the hot spring already use.
+  const lamp = mat(0xffffff, { emissive: PALETTE.iceWindow, emissiveIntensity: 0.9 });
+  for (let sgn = -1; sgn <= 1; sgn += 2) {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.18, 0.10), lamp);
+    h.position.set(sgn * 0.62, 0.72, 2.06);
+    iceCar.add(h);
+  }
+  const tail = mat(0xffffff, { emissive: PALETTE.iceRoofRed, emissiveIntensity: 0.7 });
+  for (let sgn = -1; sgn <= 1; sgn += 2) {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.08), tail);
+    h.position.set(sgn * 0.66, 0.80, -2.06);
+    iceCar.add(h);
+  }
+  root.add(iceCar);
+
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.88, 0.60, 2.05)),
+              new CANNON.Vec3(0, 0.62, 0));
+  cb.allowSleep = false;
+  iceSyncBody(cb);
+  game.world.addBody(cb);
+
+  const zRoad = iceLANES[0] - 2.2;   // the near lane, not the middle of the road
+  const span = iceCAR_X * 2;
+  iceCarMover = makeMover({
+    body: cb, group: iceCar,
+    // one way, wrapping outside the town
+    at: function (t) {
+      const u = ((t * iceCAR_V) % span + span) % span;
+      return { x: -iceCAR_X + u, z: zRoad, y: iceTerrain(-iceCAR_X + u, zRoad),
+               yaw: Math.PI * 0.5 };
+    },
+  });
+}
+
 function iceMerger() {
   const M = makeMerger(iceG, {
     xform: iceXform, cylSegs: [4, 8, 16], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
@@ -4510,6 +4585,7 @@ export function createIceland(game) {
     geyserSwelling() { return iceGeyPhase === 1; },
 
     update(dt) {
+      if (iceCarMover) iceCarMover.step(dt);
       if (!iceBuilt) return;
       if (!game.biome.isActive('iceland')) return;
       iceTime += dt;
@@ -5323,6 +5399,7 @@ function iceBuild(game) {
   iceBuildColumns(game, iceRoot);
   iceBuildSheep(iceRoot);
   iceBuildSnowcat(game, iceRoot);
+  iceBuildCar(game, iceRoot);
   iceBuildFox(iceRoot);
   iceBuildWhale(iceRoot);
   iceBuildSteam(iceRoot);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, placeCue, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 18 — MONTE CARLO
@@ -429,6 +429,56 @@ function monInitGeos() {
 }
 
 /** CONTRACT: box() takes FULL extents; CANNON.Box takes HALF. */
+// =============================================================== THE SCOOTER ==
+/**
+ * SOMEBODY WHO LIVES HERE, ON THE SAME ROAD THE RACE IS ON.
+ *
+ * Monte Carlo has three Formula cars and four cars nobody is ever going to
+ * move, and the town therefore reads as a closed circuit with nobody living
+ * in it. A scooter is the most Mediterranean object there is and it uses the
+ * polyline the race already drives, at a fifth of the speed — so it costs one
+ * route function and it is the thing that says these are streets.
+ */
+const monSCOOT_V = 7.5;       // m/s, against the cars' 5.4 to 26.5
+let monScoot = null, monScootMover = null;
+
+function monBuildScooter(game, root) {
+  monScoot = new THREE.Group();
+  const M = monMerger();
+  M.box(0, 0.44, -0.10, 0.34, 0.26, 1.10, PALETTE.monHull);
+  M.box(0, 0.72, -0.42, 0.30, 0.34, 0.30, PALETTE.monHull);
+  M.box(0, 0.86, 0.44, 0.44, 0.08, 0.10, PALETTE.monBrass);      // bars
+  for (let i = 0; i < 2; i++)
+    M.cyl(0, 0.26, i ? 0.52 : -0.62, 0.26, 0.08, PALETTE.monTyre, 0, 0, Math.PI / 2, 8);
+  // the rider
+  M.box(0, 0.98, -0.12, 0.40, 0.60, 0.26, PALETTE.monCloth);
+  M.box(0, 1.40, -0.12, 0.25, 0.26, 0.24, PALETTE.monMarshalHat);
+  const mesh = new THREE.Mesh(M.build(), monVC());
+  mesh.castShadow = true;
+  monScoot.add(mesh);
+  root.add(monScoot);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.34, 0.45, 0.85)),
+              new CANNON.Vec3(0, 0.5, 0));
+  cb.allowSleep = false;
+  monSyncBody(cb);
+  game.world.addBody(cb);
+
+  const tmp = { x: 0, y: 0, z: 0, yaw: 0, i: 0, t: 0 };
+  monScootMover = makeMover({
+    body: cb, group: monScoot,
+    at: function (t) {
+      // ...and half a lap behind the cars, so the two are never on the same
+      // corner at the same moment.
+      monTrackAt(t * monSCOOT_V + 140, tmp);
+      return { x: tmp.x, y: tmp.y, z: tmp.z, yaw: tmp.yaw };
+    },
+  });
+}
+
 function monMerger() {
   const M = makeMerger(monG, {
     xform: monXform, cylSegs: [4, 8, 12], coneSegs: [4], sphSegs: [8], normals: 'recompute', jitter: 0.060,
@@ -4257,6 +4307,7 @@ function monBuild(game) {
   // LAST, because every builder above may have asked for a lit window and this
   // is the one draw call all of them land in.
   monBuildWindows(monRoot);
+  monBuildScooter(game, monRoot);
   monBuildLocals(game);
 
   if (typeof game.registerShadowTarget === 'function') {
@@ -4692,6 +4743,7 @@ export function createMonaco(game) {
     },
 
     update(dt) {
+      if (monScootMover) monScootMover.step(dt);
       if (!monBuilt) return;
       if (!game.biome.isActive('monaco')) return;
       monTime += dt;

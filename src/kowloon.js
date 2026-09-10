@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, matEmit, emitSet, rand, randInt, clamp, damp, dampAngle, lerp, grain, grainOwn, makeMerger, makeMover, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 11 — HONG KONG. UP IS A DIRECTION HERE.
@@ -235,6 +235,74 @@ function hkInitGeos() {
 
 /** CONTRACT: box() takes FULL extents, CANNON.Box takes HALF, and hkStaticBox
  *  below speaks THIS one so the two cannot be a factor of two apart. */
+// ================================================================= THE TAXI ==
+/**
+ * ONE RED TAXI ON THE DENSEST STREET IN THE WORLD.
+ *
+ * The file says it itself: "a centre line, three parked taxis and nothing
+ * else at all". The road furniture, the guard rails, the crossing clock and
+ * the eighty people who wait at it were all built for a road that has never
+ * had anything on it. This is one car, in the colour half of Hong Kong's
+ * fleet is painted, and it STOPS AT THE RED like the crowd does.
+ */
+const hkTAXI_Z0 = -52, hkTAXI_Z1 = 72;   // the wrap, past both ends of the street
+const hkTAXI_V = 9.0;
+let hkTaxi = null, hkTaxiMover = null, hkTaxiHold = 0;
+
+function hkBuildTaxi(game, root) {
+  hkTaxi = new THREE.Group();
+  const M = hkMerger();
+  M.box(0, 0.60, 0, 1.80, 0.60, 4.20, PALETTE.hkTaxi);
+  M.box(0, 1.04, -0.20, 1.64, 0.50, 2.20, PALETTE.hkTaxi);
+  M.box(0, 1.30, -0.20, 1.30, 0.22, 1.90, PALETTE.hkTaxiRoof);
+  M.box(0, 1.06, 0.92, 1.48, 0.38, 0.06, PALETTE.hkHarbourLit);
+  for (let i = 0; i < 4; i++)
+    M.cyl((i < 2 ? -0.86 : 0.86), 0.34, (i % 2 ? -1.40 : 1.40), 0.33, 0.22,
+          PALETTE.hkConcreteDk, 0, 0, Math.PI / 2, 8);
+  const mesh = new THREE.Mesh(M.build(), hkVC());
+  mesh.castShadow = true;
+  hkTaxi.add(mesh);
+  root.add(hkTaxi);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.9, 0.62, 2.1)),
+              new CANNON.Vec3(0, 0.62, 0));
+  cb.allowSleep = false;
+  hkSyncBody(cb);
+  game.world.addBody(cb);
+
+  const lane = -3.4;   // the empty lane the file already names
+  const span = hkTAXI_Z1 - hkTAXI_Z0;
+  hkTaxiMover = makeMover({
+    body: cb, group: hkTaxi,
+    at: function (t) {
+      // `t` is advanced by the caller and HELD at the red, so the stop is a
+      // stop rather than a jump: see hkUpdateTaxi.
+      const u = ((t * hkTAXI_V) % span + span) % span;
+      return { x: lane, z: hkTAXI_Z0 + u, y: 0, yaw: 0 };
+    },
+  });
+}
+
+/**
+ * ...AND IT WAITS AT THE LIGHT. The crossing clock is already there and the
+ * crowd already reads it (hkUpdateCrowd), so the taxi reads the same one. The
+ * clock is FROZEN rather than the position being overwritten, which is the
+ * only way to stop a parametric mover without it teleporting when it starts
+ * again — the trick the Pantanal anteater uses for its termite mounds.
+ */
+function hkUpdateTaxi(dt) {
+  if (!hkTaxiMover) return;
+  const z = hkTaxiMover.at().z;
+  const stopZ = hkCROSS_Z[0] - 6.5;
+  const red = typeof hkCrossGreen === 'function' ? !hkCrossGreen() : false;
+  if (red && z > stopZ - 3.5 && z < stopZ + 1.2) hkTaxiHold = 1;
+  else if (!red) hkTaxiHold = 0;
+  hkTaxiMover.step(hkTaxiHold ? 0 : dt);
+}
+
 function hkMerger() {
   return makeMerger(hkG, {
     xform: hkXform, cylSegs: [4, 8, 16], coneSegs: [], sphSegs: [], normals: 'recompute', jitter: 0.065,
@@ -4739,6 +4807,7 @@ export function createKowloon(game) {
     climbing() { return !!(game.capy && game.capy.climbing); },
 
     update(dt) {
+      hkUpdateTaxi(dt);
       if (!hkBuilt) return;
       if (!game.biome.isActive('kowloon')) return;
       hkTime += dt;
@@ -4824,6 +4893,7 @@ function hkBuild(game) {
 
   hkBuildStreet(game, hkRoot);
   hkBuildBus(game, hkRoot);
+  hkBuildTaxi(game, hkRoot);
   hkBuildLion(game, hkRoot);
   hkBuildScaffold(game, hkRoot);
   hkBuildPoles(game, hkRoot);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, warnOnce } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover, warnOnce } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 6 — RIO DE JANEIRO
@@ -186,6 +186,54 @@ function rioInitGeos() {
  * Vertex-coloured geometry merger. One draw call per merged batch, which is how
  * a whole city fits inside the contract's 220-call budget.
  */
+// ================================================================== THE CAR ===
+/**
+ * THE AVENIDA HAD NO TRAFFIC ON IT.
+ *
+ * Four kilometres of frontage, a wall of hotels, and a dead road in front of
+ * them: the only vehicles in the chapter are two bondes over in Lapa. One car
+ * on the avenue, on the far carriageway so it never crosses the parade's own
+ * column, is the difference between a boulevard and a corridor.
+ */
+const rioCAR_V = 12.0;
+let rioCar = null, rioCarMover = null;
+
+function rioBuildCar(game, root) {
+  rioCar = new THREE.Group();
+  const M = rioMerger();
+  M.box(0, 0.60, 0, 1.78, 0.58, 4.15, PALETTE.rioTileBlue);
+  M.box(0, 1.04, -0.22, 1.62, 0.50, 2.15, PALETTE.rioTileBlue);
+  M.box(0, 1.06, 0.90, 1.46, 0.38, 0.06, PALETTE.rioSeaFoam);
+  for (let i = 0; i < 4; i++)
+    M.cyl((i < 2 ? -0.85 : 0.85), 0.34, (i % 2 ? -1.38 : 1.38), 0.33, 0.22,
+          PALETTE.rioAsphalt, 0, 0, Math.PI / 2, 8);
+  const mesh = new THREE.Mesh(M.build(), rioVC());
+  mesh.castShadow = true;
+  rioCar.add(mesh);
+  root.add(rioCar);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.9, 0.6, 2.08)),
+              new CANNON.Vec3(0, 0.6, 0));
+  cb.allowSleep = false;
+  rioSyncBody(cb);
+  game.world.addBody(cb);
+
+  const zLane = rioAVE_Z + 7.5;    // the far carriageway, clear of the column
+  const x0 = rioAVE_X0 - 14, x1 = rioAVE_X1 + 14;
+  const span = x1 - x0;
+  rioCarMover = makeMover({
+    body: cb, group: rioCar,
+    at: function (t) {
+      const u = ((t * rioCAR_V) % span + span) % span;
+      const x = x0 + u;
+      return { x: x, z: zLane, y: rioTerrain(x, zLane), yaw: Math.PI * 0.5 };
+    },
+  });
+}
+
 function rioMerger() {
   return makeMerger(rioG, {
     xform: rioXform, cylSegs: [4, 8], coneSegs: [4], sphSegs: [], normals: 'recompute', jitter: 0.055,
@@ -4407,6 +4455,7 @@ export function createRio(game) {
     cabin() { return rioCabinGroup; },
 
     update(dt) {
+      if (rioCarMover) rioCarMover.step(dt);
       if (!rioBuilt) return;
       if (!game.biome.isActive('rio')) return;
       rioTime += dt;
@@ -4528,6 +4577,7 @@ function rioBuild(game) {
   rioBuildFlora(rioRoot);
   rioBuildBirds(rioRoot);
   rioBuildSparks(rioRoot);
+  rioBuildCar(game, rioRoot);
 
   // ---- AND THE BODIES FOR THEM, ONCE, HERE (D5.1) -------------------------
   // This call used to sit in `onEnter`, mis-indented, in the middle of the

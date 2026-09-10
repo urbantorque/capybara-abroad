@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger } from './shared.js';
+import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, swayMesh, makeMerger, makeMover } from './shared.js';
 
 // ===========================================================================
 // CHAPTER 5 — SANTIAGO DE CALI, VALLE DEL CAUCA
@@ -242,6 +242,61 @@ function caliInitGeos() {
   caliG.cone4 = new THREE.ConeGeometry(0.5, 1, 4);
   caliG.sph6 = new THREE.SphereGeometry(0.5, 6, 4);
   caliG.plane = new THREE.PlaneGeometry(1, 1);
+}
+
+// =================================================================== THE MOTO ==
+/**
+ * A CITY OF TWO AND A HALF MILLION WITH ONE VEHICLE IN IT.
+ *
+ * The chiva drives four hundred and sixty-five metres of town street with
+ * absolutely nothing else on the road. A moto is the most common vehicle in
+ * Colombia by a distance, and this one runs the chiva's own route the other
+ * way — so it costs one route function, it is always somewhere plausible, and
+ * it passes the bus rather than following it.
+ */
+const caliMOTO_V = 8.5;
+let caliMoto = null, caliMotoMover = null;
+
+function caliBuildMoto(game, root) {
+  caliMoto = new THREE.Group();
+  const M = caliMerger();
+  M.box(0, 0.46, -0.06, 0.30, 0.24, 1.16, PALETTE.caliNeonPink);
+  M.box(0, 0.74, -0.40, 0.28, 0.32, 0.30, PALETTE.caliNeonPink);
+  M.box(0, 0.88, 0.46, 0.46, 0.07, 0.09, PALETTE.stoneDark);
+  for (let i = 0; i < 2; i++)
+    M.cyl(0, 0.27, i ? 0.56 : -0.64, 0.27, 0.09, PALETTE.stoneDark, 0, 0, Math.PI / 2, 8);
+  M.box(0, 1.00, -0.10, 0.40, 0.60, 0.26, PALETTE.caliNeonCyan);
+  M.box(0, 1.42, -0.10, 0.25, 0.26, 0.24, PALETTE.denim);
+  const mesh = new THREE.Mesh(M.build(), caliVC());
+  mesh.castShadow = true;
+  caliMoto.add(mesh);
+  root.add(caliMoto);
+  const cb = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  cb.addShape(new CANNON.Box(new CANNON.Vec3(0.32, 0.45, 0.9)),
+              new CANNON.Vec3(0, 0.5, 0));
+  cb.allowSleep = false;
+  cb.previousPosition.copy(cb.position);
+  cb.interpolatedPosition.copy(cb.position);
+  game.world.addBody(cb);
+
+  caliMotoMover = makeMover({
+    body: cb, group: caliMoto,
+    at: function (t) {
+      // caliRouteAt CLAMPS rather than wrapping, so the parameter is folded
+      // into a there-and-back triangle by hand: a moto that stopped dead at
+      // the end of the route and stayed there is worse than none.
+      const len = caliRouteLen || 1;
+      const cyc = len * 2;
+      let u = ((t * caliMOTO_V) % cyc + cyc) % cyc;
+      const back = u > len;
+      if (back) u = cyc - u;
+      const o = caliRouteAt(u);
+      return { x: o.x, y: o.y + 0.02, z: o.z, yaw: o.yaw + (back ? Math.PI : 0) };
+    },
+  });
 }
 
 function caliMerger() {
@@ -4129,6 +4184,7 @@ export function createCali(game) {
     },
 
     update(dt) {
+      if (caliMotoMover) caliMotoMover.step(dt);
       if (!caliBuilt) return;
       if (!game.biome.isActive('cali')) return;
       caliTime += dt;
@@ -4332,6 +4388,7 @@ function caliBuild(game) {
   caliBuildCristo(game, caliRoot);
   caliBuildFlora(caliRoot);
   caliBuildSparks(caliRoot);
+  caliBuildMoto(game, caliRoot);
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,

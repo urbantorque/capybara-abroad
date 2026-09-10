@@ -6040,3 +6040,128 @@ export function calmSet(v) {
 }
 /** What the player chose, NOT what is in force — the switch's own state. */
 export function calmPreference() { return calmPref; }
+
+
+// ============================================================ AMBIENT MOVERS ==
+/**
+ * ONE THING THAT IS GOING SOMEWHERE, IN A CHAPTER THAT HAS NONE.
+ *
+ * Fourteen of the nineteen chapters have no traffic at all. Kyoto, Manly,
+ * Antarctica and the Pantanal had nothing on wheels or hooves moving anywhere;
+ * Iceland has eleven parked cars and an empty road at half past eleven at
+ * night; Mong Kok has one bus on the densest street in the world. It is the
+ * most consistent "this is a diorama" signal in the game, and every chapter
+ * that fixes it was about to write the same forty lines.
+ *
+ * THE CHAPTER OWNS THE ROUTE AND THE GEOMETRY; THIS OWNS THE MECHANICS. Those
+ * are the parts that are identical everywhere and the parts that are easy to
+ * get wrong: a kinematic body whose velocity is DIFFERENCED against its own
+ * previous target rather than assigned (the carrier contract in CONTRACT.md —
+ * a body that is teleported carries nothing and a body with a made-up velocity
+ * throws the animal off), the interpolated position for the mesh so it does
+ * not judder between solver steps, and a heading that the caller can override
+ * because a reversing vehicle points the way it came.
+ *
+ * `at(t)` returns { x, z, y?, yaw? } and is the whole route. Anything it does
+ * not give is derived: y from the caller's `groundY` if it passed one, yaw
+ * from the direction of travel.
+ *
+ * Returns a handle with `step(dt)`; the chapter calls it from its own update,
+ * which is what keeps it inside the pause and the biome gate for free.
+ */
+export function makeMover(opts) {
+  const at = opts.at;
+  const group = opts.group || null;
+  let t = opts.t0 || 0;
+  const tgt = { x: 0, y: 0, z: 0 };
+  const prev = { x: 0, y: 0, z: 0 };
+  // ---- THE CHAPTER MAKES THE BODY, NOT THIS -------------------------------
+  // shared.js imports three and nothing else, on purpose: cannon is wrapped in
+  // its own IIFE by the bundler and this module has never needed it. The first
+  // cut of this function built the body itself behind a
+  // `typeof CANNON !== 'undefined'` guard, which is always false here — so it
+  // would have shipped every ambient mover in the game with no collider at all
+  // and nothing to say why. The caller has CANNON in scope, knows its own
+  // collider shape, and has to add the body under its own capture tag anyway.
+  // All this wants is something with .position, .velocity and .quaternion.
+  const body = opts.body || null;
+  let lastYaw = 0;
+
+  const s0 = at(t);
+  const y0 = s0.y !== undefined ? s0.y
+           : (opts.groundY ? opts.groundY(s0.x, s0.z) : 0);
+  tgt.x = prev.x = s0.x; tgt.z = prev.z = s0.z; tgt.y = prev.y = y0;
+  lastYaw = s0.yaw !== undefined ? s0.yaw : 0;
+  if (body) {
+    body.position.set(s0.x, y0, s0.z);
+    body.previousPosition.copy(body.position);
+    body.interpolatedPosition.copy(body.position);
+  }
+
+  function step(dt) {
+    if (!(dt > 0)) return;
+    t += dt;
+    prev.x = tgt.x; prev.y = tgt.y; prev.z = tgt.z;
+    const s = at(t);
+    tgt.x = s.x; tgt.z = s.z;
+    tgt.y = s.y !== undefined ? s.y : (opts.groundY ? opts.groundY(s.x, s.z) : prev.y);
+    const inv = 1 / dt;
+    // ...and a heading. `yaw` from the route wins, because a vehicle that is
+    // reversing or being towed does not point where it is going; otherwise it
+    // is the direction of travel, HELD when the thing is stopped so it does
+    // not spin on the spot at the end of a leg.
+    if (s.yaw !== undefined) lastYaw = s.yaw;
+    else {
+      const dx = tgt.x - prev.x, dz = tgt.z - prev.z;
+      if (dx * dx + dz * dz > 1e-8) lastYaw = Math.atan2(dx, dz);
+    }
+    if (body) {
+      body.velocity.set((tgt.x - prev.x) * inv,
+                        Math.max(-4, Math.min(4, (tgt.y - prev.y) * inv)),
+                        (tgt.z - prev.z) * inv);
+      body.quaternion.setFromEuler(0, lastYaw, 0);
+      body.angularVelocity.set(0, 0, 0);
+      body.previousPosition.copy(body.position);
+      body.previousQuaternion.copy(body.quaternion);
+    }
+    if (group) {
+      if (body) {
+        const ip = body.interpolatedPosition;
+        group.position.set(ip.x, ip.y, ip.z);
+      } else group.position.set(tgt.x, tgt.y, tgt.z);
+      group.rotation.y = lastYaw;
+    }
+  }
+
+  return {
+    step: step, get body() { return body; }, get group() { return group; },
+    get yaw() { return lastYaw; },
+    at: function () { return { x: tgt.x, y: tgt.y, z: tgt.z }; },
+    get t() { return t; }, set t(v) { t = v; },
+  };
+}
+
+/**
+ * A ROUTE THAT RUNS ONE WAY AND COMES BACK, WITH A WAIT AT EACH END.
+ *
+ * The shape almost every ambient mover in this game wants, and the one that is
+ * fiddliest to get right by hand: four phases on one clock, with the total
+ * cycle derived rather than authored so that changing a speed cannot silently
+ * desynchronise the legs. `pt(u)` is the path, u in 0..1.
+ */
+export function makeShuttle(pt, opts) {
+  const o = opts || {};
+  const vOut = o.speed || 5, vBack = o.speedBack || o.speed || 5;
+  const len = o.length || 1;
+  const waitEnd = o.waitEnd === undefined ? 8 : o.waitEnd;
+  const waitHome = o.waitHome === undefined ? 8 : o.waitHome;
+  const tOut = len / vOut, tBack = len / vBack;
+  const cycle = tOut + waitEnd + tBack + waitHome;
+  return function (t) {
+    const u = ((t % cycle) + cycle) % cycle;
+    if (u < tOut) return pt(u / tOut, 1);
+    if (u < tOut + waitEnd) return pt(1, 1);
+    if (u < tOut + waitEnd + tBack) return pt(1 - (u - tOut - waitEnd) / tBack, -1);
+    return pt(0, -1);
+  };
+}
