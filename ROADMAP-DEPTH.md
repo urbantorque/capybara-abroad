@@ -502,39 +502,32 @@ was right, but Manly and Antarctica were not among them.
 
 ---
 
-## TIER 3 IN PROGRESS (10 Sep 2026) — THREE OF NINE
+## TIER 3 AS BUILT (10 Sep 2026) — CLOSED
 
-- **D4.1 Hong Kong, conduct the harbour — DONE.** A wheek on the roof does
-  something different in each of the four movements; the eighth calls the
-  finale, spent on the next beat so the ending still lands on the music. Six
-  wheeks from the roof register 6 of 6 and take the tower count from 6 to 9
-  against the clock's own 6; the same six from the pavement register 0 and move
-  nothing. Mong Kok had no wheek handler at all before this.
-- **D4.2 Palawan — REFUSED as written, and replaced.** The item wanted a task on
-  the wheek shell; `palawan.js` says of that shell "there is no task on this and
-  there never will be", and it is right. The larger half shipped already when
-  the marquee moved to the manta. What shipped instead: **she stirs the
-  plankton** — motes within 6 m of her move at 0.603 m/s against 0.121 for the
-  control band.
-- **D4.3 Cappadocia, join the burn — DONE.** `sunrise` needs the burner lit
-  inside the window and the player aboard; the chief calls it if you are up
-  there cold; the doves come off the rock for the light rather than only for
-  the capybara. Flown end to end: 0 to 113.8 m, ticks at sun 0.466.
+Nine marquee verbs, three commits. Eight shipped as designed, one was refused
+on contact with the file that owns it, and one shipped without a demonstration
+and says so.
 
-**Six left**, in the order this document gave them: Sydney (lead the birds to
-the sails), Venice (the surge), Marrakech (a shape on the dune), the Drift (the
-lamp-lit descent), Monte Carlo (the tow), Hanoi (out on the roof).
+| # | chapter | what the moment asks for now | measured |
+|---|---|---|---|
+| D4.1 | Hong Kong | a wheek per movement; the eighth calls the finale on the next beat | 6 of 6 register from the roof, towers 6 → 9 against the clock's 6; 0 of 6 from the pavement |
+| D4.2 | Palawan | **refused** — the file forbids a task on the wheek shell. The manta stirs the plankton instead | 0.603 m/s near her against 0.121 in the control band |
+| D4.3 | Cappadocia | the burner lit inside the window, and aboard | flown: 0 → 113.8 m, ticks at sun 0.466 |
+| D4.4 | Sydney | the gull mob follows a *carried* cone | **not demonstrated** — the gull meshes carry no name |
+| D4.5 | Venice | the tide is a current, not only a level | peak 1.35 m/s toward the square |
+| D4.6 | Marrakech | avalanche lobes to leave the ground on | clean 48.6 → 12.4 m descent, worst rise 7.8 cm |
+| D4.7 | the Drift | the lantern buys a wind-carried ride home | wind held 60 s on the bearing home |
+| D4.8 | Monte Carlo | cars that bunch, so you can cross between them | closest approach 107 m → 16.2 m |
+| D4.9 | Hanoi | a way up to a roof that was always rideable | stair tops 9 cm above a passing roof |
 
-**AND A HARNESS FAULT THAT INVALIDATED FOUR EARLIER COMMITS' WORDING.** The
-probe had never started the game: a save file opens the title on page two,
-`titleEl`'s pointerdown only calls `startResume()` on page one, and while
-`state.started` is false systems.js's keydown handler drops every key. Every
-`q` and `w` in every smoke test before this was discarded, so "entered, wheeked
-and walked" was true only about *entered*. Nothing shipped on the strength of
-it — they were negative checks and the chapters were still entered, built,
-updated and rendered — but the claim was wider than the evidence. The smoke
-harness now reloads, clears the save, reloads again, presses Begin, verifies
-`state.started` and retries, and reports a HARNESS error if it never begins.
+**Three items measured wrong on the first cut and each was caught before it
+shipped.** Venice's flow gated on "is there water over this paving", which
+makes the term unreachable exactly where the chapter wants it — the current
+runs during the ramp and the square is only wet at the top of it. Monte Carlo's
+lookahead did nothing at all, because three cars sharing one speed law can
+never close; they needed paces of their own. And Cappadocia's gate had to latch
+across the window rather than sample one frame, which is a mistake that file
+had already made once.
 
 ---
 
