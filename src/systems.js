@@ -6800,9 +6800,9 @@ function sysBuildCSS() {
 '.capyui-jrkeys summary .capyui-g{margin-right:7px;',
   'transition:transform ' + dFast + ' ' + mSnap + ';transform-origin:50% 50%;}',
 '.capyui-jrkeys[open] summary .capyui-g{transform:rotate(90deg);}',
-'.capyui-jrkeys summary:hover{color:' + accent + ';}',
+'.capyui-jrkeys summary:hover{color:' + accentInk + ';}',
 /* a ring, not a colour: a colour change alone is not a focus state */
-'.capyui-jrkeys summary:focus-visible{color:' + accent + ';outline:2px solid ' + accent + ';',
+'.capyui-jrkeys summary:focus-visible{color:' + accentInk + ';outline:2px solid ' + accent + ';',
   'outline-offset:2px;}',
 '.capyui-jrkeys[open] summary{margin-bottom:9px;}',
 '.capyui-jrkeys .capyui-legend{max-width:none;}',
@@ -7057,7 +7057,7 @@ function sysBuildCSS() {
   'background:' + paper2 + ';border:1px solid ' + rule + ';color:' + inkSoft + ';',
   'transition:color ' + dFast + ' ease,border-color ' + dFast + ' ease,transform ' + dFast + ' ' + mSnap + ';}',
 '.capyui-more2 .capyui-g{margin-left:5px;}',
-'.capyui-more2:hover{color:' + accent + ';border-color:' + accent + ';transform:translateY(1px);}',
+'.capyui-more2:hover{color:' + accentInk + ';border-color:' + accent + ';transform:translateY(1px);}',
 '.capyui-more2:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 '.capyui-more2[hidden]{display:none;}',
 /* ---------- start over, and the question it asks first ----------
@@ -7199,7 +7199,7 @@ function sysBuildCSS() {
 '.capyui-p2stat{grid-column:3;justify-self:end;text-align:right;',
   'font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;',
   'font-weight:700;color:' + inkSoft + ';line-height:1.35;}',
-'.capyui-p2stat b{display:block;color:' + accent + ';font-variant-numeric:tabular-nums;}',
+'.capyui-p2stat b{display:block;color:' + accentInk + ';font-variant-numeric:tabular-nums;}',
 '@media (max-width:560px){.capyui-p2head{grid-template-columns:auto 1fr;}',
   '.capyui-h2{grid-column:1 / -1;grid-row:2;text-align:left;}',
   '.capyui-p2stat{grid-column:2;grid-row:1;}}',
@@ -7229,8 +7229,8 @@ function sysBuildCSS() {
 '.capyui-more summary .capyui-g{margin-right:7px;',
   'transition:transform ' + dFast + ' ' + mSnap + ';}',
 '.capyui-more[open] summary .capyui-g{transform:rotate(90deg);}',
-'.capyui-more summary:hover{color:' + accent + ';}',
-'.capyui-more summary:focus-visible{color:' + accent + ';outline:2px solid ' + accent + ';',
+'.capyui-more summary:hover{color:' + accentInk + ';}',
+'.capyui-more summary:focus-visible{color:' + accentInk + ';outline:2px solid ' + accent + ';',
   'outline-offset:2px;}',
 '.capyui-more .capyui-legend{margin-top:9px;}',
 /* ---------- page one: the one door ---------- */
@@ -7259,7 +7259,7 @@ function sysBuildCSS() {
   'box-shadow:' + shMd + ';}',
 '.capyui-go:active{transform:translateY(0);}',
 '.capyui-go:focus-visible{outline:2px solid ' + ink + ';outline-offset:3px;}',
-'.capyui-go.alt{background:none;color:' + accent + ';box-shadow:none;',
+'.capyui-go.alt{background:none;color:' + accentInk + ';box-shadow:none;',
   'border-color:' + rule + ';}',
 '.capyui-go.alt:hover{border-color:' + accent + ';background:' + veil2 + ';filter:none;}',
 /* an ink ring is right on the filled button and reads as a second border on
@@ -7289,7 +7289,7 @@ function sysBuildCSS() {
    descendant rule put 7px of right margin on the STUCK mark inside a
    `justify-content:center` flex box and shifted it 3.5px off centre. */
 '.capyui-p2head .capyui-back .capyui-g{margin-right:7px;}',
-'.capyui-p2head .capyui-back:hover{color:' + accent + ';border-color:' + accent + ';}',
+'.capyui-p2head .capyui-back:hover{color:' + accentInk + ';border-color:' + accent + ';}',
 '.capyui-p2head .capyui-back:focus-visible{outline:2px solid ' + accent + ';outline-offset:2px;}',
 /* The short-screen shelf budget USED TO LIVE HERE and did nothing at all: it
    is the same specificity as the base .capyui-picks rule forty lines below,
@@ -7401,7 +7401,7 @@ function sysBuildCSS() {
 '.capyui-pickarrow{position:absolute;right:clamp(12px,2vw,22px);top:50%;',
   'transform:translateY(-50%);display:flex;align-items:center;justify-content:center;',
   'width:clamp(28px,4vw,38px);height:clamp(28px,4vw,38px);border-radius:50%;',
-  'border:1px solid ' + rule + ';color:' + accent + ';',
+  'border:1px solid ' + rule + ';color:' + accentInk + ';',
   'font-size:clamp(13px,2.2vw,17px);font-weight:700;line-height:1;',
   'transition:transform ' + dFast + ' ' + mSnap + ',background ' + dFast + ' ease,border-color ' + dFast + ' ease,color ' + dFast + ' ease;}',
 '.capyui-pick.hero:hover .capyui-pickarrow,.capyui-pick.hero:focus-visible .capyui-pickarrow{',
@@ -7574,7 +7574,7 @@ function sysBuildCSS() {
 '.capyui-pick.hero i{-webkit-line-clamp:3;}',
 '.capyui-pick.hero i{font-size:clamp(10px,2vw,12.5px);margin-top:3px;}',
 '.capyui-pickrec{display:block;margin-top:3px;font-style:normal;font-weight:700;',
-  'font-size:' + tSm + ';color:' + accent + ';',
+  'font-size:' + tSm + ';color:' + accentInk + ';',
   'font-variant-numeric:tabular-nums;}',
 /* ---- THE HERO'S LAST LINE IS A VOICE, NOT A LABEL (T2) -----------------
    It was small caps, letter-spaced, in the accent — a fourth uppercase label
@@ -7674,7 +7674,7 @@ function sysBuildCSS() {
    drift apart when there is only one box. */
 '.capyui-label{grid-column:1 / -1;}',
 '.capyui-label{margin-top:clamp(9px,1.8vw,14px);font-size:' + tSm + ';',
-  'letter-spacing:.2em;text-transform:uppercase;color:' + accent + ';font-weight:700;',
+  'letter-spacing:.2em;text-transform:uppercase;color:' + accentInk + ';font-weight:700;',
   'text-align:left;}',
 /* ---------- P: the furniture off the window ----------
    Named element by element rather than as "everything under #hud", because the
@@ -7791,7 +7791,7 @@ function sysBuildCSS() {
   '18%{transform:rotate(-.4deg) scale(1.075)}',
   '46%{transform:rotate(-2.3deg) scale(.986)}100%{transform:rotate(-1.7deg) scale(1)}}',
 '.capyui-todo h2{font-size:clamp(11px,1.7vw,12px);letter-spacing:.3em;text-transform:uppercase;',
-  'color:' + accent + ';font-weight:700;margin:4px 0 7px;}',
+  'color:' + accentInk + ';font-weight:700;margin:4px 0 7px;}',
 /* Five rows at the very most (see sysTODO_WINDOW), so the card is small enough
    to never need a scrollbar and never reach the touch stick. No max-height, no
    overflow, no scroll position to keep honest. */
@@ -7840,10 +7840,10 @@ function sysBuildCSS() {
 /* THE WAY ON. A row, so it inherits the bearing and the distance and the whole
    of the card's navigation for free — but not a TASK: no checkbox, nothing to
    tick, and nothing that can be pinned. It reads as the sentence it is. */
-'.capyui-task.capyui-way{cursor:default;pointer-events:none;color:' + accent + ';',
+'.capyui-task.capyui-way{cursor:default;pointer-events:none;color:' + accentInk + ';',
   'font-weight:700;font-style:italic;padding-left:1.75em;}',
-'@media (hover:hover){.capyui-task.capyui-way:hover .capyui-txt{color:' + accent + ';}}',
-'@media (hover:hover){.capyui-task:hover .capyui-txt{color:' + accent + ';}}',
+'@media (hover:hover){.capyui-task.capyui-way:hover .capyui-txt{color:' + accentInk + ';}}',
+'@media (hover:hover){.capyui-task:hover .capyui-txt{color:' + accentInk + ';}}',
 /* Out of the window is out of the FLOW: a zero-height row still collects the ul
    flex gap, and twenty-three of them would be 69 px of blank paper. */
 '.capyui-hidden{display:none !important;}',
@@ -7909,7 +7909,7 @@ function sysBuildCSS() {
   'border-top:1px dashed ' + paper2 + ';font-variant-numeric:tabular-nums;}',
 '.capyui-rec.on{display:block;}',
 '.capyui-recnow{display:block;font-size:clamp(10px,1.55vw,12.5px);line-height:1.25;',
-  'color:' + accent + ';font-weight:700;}',
+  'color:' + accentInk + ';font-weight:700;}',
 '.capyui-recbest{display:block;font-size:clamp(8.5px,1.35vw,10.5px);line-height:1.3;',
   'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;}',
 /* ...and the one thing a live number can say without a word: you are past the
@@ -7941,7 +7941,7 @@ function sysBuildCSS() {
 '.capyui-tier.mini{color:' + inkSoft + ';opacity:.66;}',
 '.capyui-task.done .capyui-tier{opacity:.3;}',
 '.capyui-aim{flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:4px;',
-  'align-self:center;color:' + accent + ';font-weight:700;white-space:nowrap;',
+  'align-self:center;color:' + accentInk + ';font-weight:700;white-space:nowrap;',
   'font-size:clamp(8.5px,1.35vw,11px);font-variant-numeric:tabular-nums;opacity:0;',
   'transition:opacity ' + dMed + ' ease;}',
 '.capyui-aim.on{opacity:1;}',
@@ -7971,7 +7971,7 @@ function sysBuildCSS() {
    still wants it. 16em is Monte Carlo, which has the most rows of any chapter
    at five, with the way clue wrapped to two lines above them. */
 '.capyui-clue.recs{white-space:pre-line;font-style:normal;font-weight:700;',
-  'color:' + accent + ';font-variant-numeric:tabular-nums;line-height:1.45;',
+  'color:' + accentInk + ';font-variant-numeric:tabular-nums;line-height:1.45;',
   'max-height:16em;}',
 
 /* ---------- toast ---------- */
@@ -8016,7 +8016,7 @@ function sysBuildCSS() {
   'opacity:0;transition:opacity ' + dSlow + ' ease,transform ' + dSlow + ' ' + mSpring + ';}',
 '.capyui-moment.show{opacity:1;transform:translate(-50%,0) rotate(-.7deg);}',
 '.capyui-momentkick{font-size:clamp(11px,2vw,12px);letter-spacing:.3em;font-weight:700;',
-  'text-transform:uppercase;color:' + accent + ';}',
+  'text-transform:uppercase;color:' + accentInk + ';}',
 '.capyui-momentrule{height:2px;width:min(22vw,110px);border-radius:' + rSm + ';background:' + rule + ';',
   'margin:5px auto 6px;transform:rotate(.6deg);}',
 '.capyui-momenttext{font-size:clamp(14px,3.6vw,25px);font-weight:700;line-height:1.12;',
@@ -8301,7 +8301,7 @@ function sysBuildCSS() {
 '.capyui-keepart{width:78px;height:78px;margin:0 auto 9px;display:block;}',
 '.capyui-keepart svg{display:block;width:100%;height:100%;}',
 '.capyui-keepkick{font-size:' + tMd + ';letter-spacing:.34em;text-transform:uppercase;',
-  'color:' + accent + ';font-weight:700;}',
+  'color:' + accentInk + ';font-weight:700;}',
 '.capyui-keeprule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:6px auto;width:44px;}',
 '.capyui-keeptext{font-size:clamp(13px,2.9vw,18px);color:' + ink + ';font-weight:700;}',
 
@@ -8327,7 +8327,7 @@ function sysBuildCSS() {
 '@supports not (aspect-ratio:1/1){.capyui-doneart{height:clamp(90px,26vw,170px);}}',
 '.capyui-doneart svg{display:block;width:100%;height:100%;}',
 '.capyui-donekick{margin-top:10px;font-size:' + tMd + ';letter-spacing:.34em;',
-  'text-transform:uppercase;color:' + accent + ';font-weight:700;}',
+  'text-transform:uppercase;color:' + accentInk + ';font-weight:700;}',
 '.capyui-donename{font-size:clamp(19px,4.6vw,32px);color:' + ink + ';font-weight:700;',
   'letter-spacing:.05em;line-height:1.06;margin-top:3px;text-wrap:balance;}',
 /* The sentence, above the rule. Italic and at reading size, because it is
@@ -8363,7 +8363,7 @@ function sysBuildCSS() {
 '.capyui-led.show{opacity:1;pointer-events:auto;}',
 '.capyui-led h2{font-size:clamp(20px,5.4vw,42px);color:' + ink + ';letter-spacing:.05em;',
   'font-weight:700;transform:rotate(-1.2deg);text-align:center;text-wrap:balance;}',
-'.capyui-ledsub{font-size:clamp(11px,2.1vw,13px);color:' + accent + ';font-weight:700;',
+'.capyui-ledsub{font-size:clamp(11px,2.1vw,13px);color:' + accentInk + ';font-weight:700;',
   'letter-spacing:.2em;text-transform:uppercase;text-align:center;margin-top:5px;',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-ledlist{width:100%;max-width:620px;margin-top:clamp(10px,2.4vw,18px);',
@@ -8433,7 +8433,7 @@ function sysBuildCSS() {
    a record is how well you did what you were asked, a find is a thing nobody
    asked about at all. The bullet is drawn rather than typed so it lines up. */
 '.capyui-ledfind{grid-column:2 / 4;margin-top:2px;display:flex;flex-direction:column;gap:1px;',
-  'font-size:' + tMd + ';color:' + accent + ';min-width:0;}',
+  'font-size:' + tMd + ';color:' + accentInk + ';min-width:0;}',
 '.capyui-ledfind span{position:relative;padding-left:11px;overflow-wrap:anywhere;}',
 '.capyui-ledfind span::before{content:"";position:absolute;left:2px;top:.52em;',
   'width:4px;height:4px;border-radius:50%;background:' + accent + ';opacity:.7;}',
@@ -8515,7 +8515,7 @@ function sysBuildCSS() {
 '.capyui-place h2{font-size:' + tHu + ';color:' + ink + ';font-weight:700;',
   'letter-spacing:.09em;line-height:1.02;transform:rotate(-1.2deg);}',
 '.capyui-placesub{font-size:clamp(11px,2.4vw,14px);letter-spacing:.34em;font-weight:700;',
-  'text-transform:uppercase;color:' + accent + ';}',
+  'text-transform:uppercase;color:' + accentInk + ';}',
 /* The rumour, under the chapter's own line. Deliberately the smallest and
    palest thing on the card — it is a piece of gossip about the player, not the
    name of the place, and it must never out-shout the two lines above it. Wider
@@ -8536,7 +8536,7 @@ function sysBuildCSS() {
   'opacity:0;pointer-events:none;transition:opacity ' + dSlow + ' ease;}',
 '.capyui-fly.show{opacity:1;}',
 '.capyui-flyk{font-size:clamp(7.5px,1.15vw,9px);letter-spacing:.24em;text-transform:uppercase;',
-  'color:' + accent + ';font-weight:700;}',
+  'color:' + accentInk + ';font-weight:700;}',
 '.capyui-flyv{font-size:clamp(14px,2.6vw,19px);font-weight:700;color:' + ink + ';line-height:1.15;',
   'font-variant-numeric:tabular-nums;}',
 '.capyui-flyv small{font-size:.5em;letter-spacing:.1em;color:' + inkSoft + ';margin-left:3px;',
