@@ -142,6 +142,15 @@ const antPOD_CALL   = 185;        // metres a wheek carries to them
 const antPOD_HOLD   = 16.5;       // how close is "with the pod"
 const antPOD_RIDE   = 9.0;        // seconds of it that is the marquee
 const antPOD_LEAVE  = 64;         // ...and how long they will put up with you
+// ---- D4.12: the run -------------------------------------------------------
+// How long the escort lasts before they break, how fast they go when they do,
+// and how long you may be outside antPOD_HOLD before they are gone. 11.0
+// against a hull that does 12.6 in clear water: catchable, and only in the
+// lead, which is the whole point of putting them on antLeadX.
+const antPOD_RUN_AT = 8.0;
+const antPOD_RUN_V  = 11.0;
+const antPOD_LOSE   = 6.0;
+let antPodRunPX = 0, antPodRunPZ = 0, antPodGap = 0, antPodToldGap = false;
 
 // ------------------------------------------------------------------ scratch --
 const antV3 = new THREE.Vector3();
@@ -3776,7 +3785,10 @@ function antStepBoat(game, dt) {
   // ---- what the water is doing to her -------------------------------------
   const ice = antIceAt(antBoatX, antBoatZ);
   antBoatIce = damp(antBoatIce, ice, 3.0, dt);
-  const wake = antPodState === 'escort' ? antPodWakeK() : 0;
+  // ...and in `run` the gain is the SAME function, which already falls off
+  // with the gap — so a boat that has dropped out of antPOD_HOLD gets none of
+  // it, which is what makes holding the lead worth doing.
+  const wake = antPodTight() ? antPodWakeK() : 0;
   const vmax = antTEN_VMAX * (1 - antICE_DRAG * antBoatIce) + antWAKE_GAIN * wake;
   const acc = antTEN_ACC * (1 - antICE_ACC * antBoatIce);
 
@@ -4138,6 +4150,17 @@ function antToDeep(px, pz) {
 }
 
 /** 0..1 — how much of the pod's moving water the hull is actually sitting in. */
+/**
+ * IS THE POD RUNNING WITH THE BOAT? Six sites tested `antPodState === 'escort'`
+ * directly, so D4.12's `run` state would have been drawn as a loose patrol —
+ * wide formation, slow porpoising, no wake gain and no `withPod()` — during
+ * the one part of the chapter that it is the subject of. One predicate, so a
+ * fifth state cannot be half-admitted the same way.
+ */
+function antPodTight() {
+  return antPodState === 'escort' || antPodState === 'run';
+}
+
 function antPodWakeK() {
   const dx = antPodCX - antBoatX, dz = antPodCZ - antBoatZ;
   const d = Math.sqrt(dx * dx + dz * dz);
@@ -4145,7 +4168,7 @@ function antPodWakeK() {
 }
 
 function antPodSummon() {
-  if (antPodState === 'escort' || antPodState === 'coming') return false;
+  if (antPodTight() || antPodState === 'coming') return false;
   const dx = antPodCX - antBoatX, dz = antPodCZ - antBoatZ;
   if (dx * dx + dz * dz > antPOD_CALL * antPOD_CALL) return false;
   antPodState = 'coming';
@@ -4166,6 +4189,26 @@ function antPodSummon() {
  * exactly the point. Wheek from the boat and they come; hold your speed and
  * they stay; stop, and one of them will come up and look at you.
  */
+/**
+ * THE RIDE IS OVER. Bank the best of it and stop the live line.
+ *
+ * The note inside the marquee branch says "antPodBest is banked above and
+ * flushed when the ride ends — see antPodEndRide", and antPodEndRide has never
+ * existed: nothing anywhere called it and nothing anywhere did the flush. It
+ * did not matter while `escort` was the only state, because the orcas could
+ * not be lost and the ride only ever ended by the pod giving up on a boat that
+ * had already stopped. D4.12 makes losing them a thing that happens at speed,
+ * which is exactly the case where a ride worth recording is thrown away.
+ */
+function antPodEndRide(game) {
+  if (antPodRide > antPodBest) antPodBest = antPodRide;
+  if (antPodBest > 0.5 && !antRideDone) antRecord('orca-ride', antPodBest);
+  antPodRide = 0;
+  if (typeof game.recordLive === 'function') {
+    try { game.recordLive('orca-ride', 0); } catch (e) { /* optional hook */ }
+  }
+}
+
 function antUpdatePod(game, dt) {
   if (!antPodGroup) return;
   antPodStateT += dt;
@@ -4212,12 +4255,95 @@ function antUpdatePod(game, dt) {
                                 antPodCX, antWATER, antPodCZ, 150));
     }
     if (antPodStateT > 26) antPodState = 'patrol';    // they gave up on you
+  } else if (antPodState === 'run') {
+    // ---- D4.12: THE POD LEADS ------------------------------------------
+    //
+    // `escort` damps the pod centre onto the boat at 5.0/s, which means the
+    // orcas are GLUED to you: they cannot be lost except by stopping, they go
+    // wherever you go, and the marquee — the one moment in this chapter that
+    // is about keeping up with something — was a throttle test with the thing
+    // you are keeping up with welded to your bow.
+    //
+    // After `antPOD_RUN_AT` seconds of escort they break north and run the
+    // lead. `antLeadX(z)` is the wandering trough of open water this whole
+    // chapter navigates by; six orcas going up it at eleven metres a second
+    // is a line through the pack that you have to read as well as chase,
+    // because the boat's twelve and a half is only twelve and a half IN
+    // CLEAR WATER and the lead is the only clear water there is.
+    //
+    // Catchable, and only just: 11.0 against a hull that does 12.6 clean and
+    // rather less in brash, plus whatever the wake is worth — which is why
+    // the wake gain and the ride clock now accrue ONLY inside antPOD_HOLD.
+    // Falling out of that for antPOD_LOSE seconds and they are gone.
+    antPodCZ -= antPOD_RUN_V * dt;
+    const wantX = antLeadX(antPodCZ);
+    antPodCX = damp(antPodCX, wantX, 1.6, dt);
+    yaw = Math.atan2(antPodCX - antPodRunPX, antPodCZ - antPodRunPZ);
+    antPodRunPX = antPodCX; antPodRunPZ = antPodCZ;
+    const gap = Math.hypot(antBoatX - antPodCX, antBoatZ - antPodCZ);
+    antPodGap = gap;
+    if (gap < antPOD_HOLD) {
+      antSlowT = 0;
+      antPodRide += dt;
+      if (antPodRide > antPodBest) antPodBest = antPodRide;
+      antLive('orca-ride', antPodRide);
+      if (antPodRide >= antPOD_RIDE && !antRideDone) {
+        antRideDone = true;
+        antRecord('orca-ride', antPodBest);
+        antTask('orca-ride');
+        if (typeof game.frameShot === 'function')
+          game.frameShot({ yaw: antBoatYaw + Math.PI, dist: 26, pitch: 0.24,
+                           raise: 6.5, hold: 3.2, over: true });
+      }
+    } else {
+      // ---- AND YOU CAN LOSE THEM, WHICH IS NEW --------------------------
+      // Not instantly: a boat that drops to seventeen metres for half a
+      // second on a turn has not lost anything, and a marquee that punishes
+      // one bad rudder input is a marquee nobody finishes.
+      antSlowT += dt;
+      if (!antPodToldGap && antSlowT > 1.6) {
+        antPodToldGap = true;
+        antToast('they are pulling away. the lead is the only fast water.');
+      }
+      if (antSlowT > antPOD_LOSE) {
+        antPodState = 'patrol';
+        antPodStateT = 0;
+        antPodU = 0.5;
+        antPodEndRide(game);
+        antToast('gone. they were never waiting for you.');
+      }
+    }
+    // ...and they do not run for ever either. Sixty-four seconds is the same
+    // patience `escort` always had.
+    if (antPodStateT > antPOD_LEAVE || antPodCZ < -520) {
+      antPodState = 'patrol';
+      antPodStateT = 0;
+      antPodU = 0.5;
+      antPodEndRide(game);
+      antToast('they have gone on. they were always going to.');
+    }
   } else {
     // escort (and spy-hop, which is an escort with one of them standing up)
     antPodCX = damp(antPodCX, antBoatX, 5.0, dt);
     antPodCZ = damp(antPodCZ, antBoatZ, 5.0, dt);
     yaw = antBoatYaw;
     const sp = Math.abs(antBoatSpeed);
+    // ---- ...AND THEN THEY GO (D4.12) -----------------------------------
+    // The escort is the introduction, not the event: they form up, they let
+    // you settle into it, and then they leave and you find out whether you
+    // meant it. Gated on the helm and on speed, so it cannot fire at a boat
+    // sitting still with nobody driving it.
+    if (antPodStateT > antPOD_RUN_AT && antHelmOn && sp > 4.0 &&
+        !(game.state && game.state.noPodRun)) {
+      antPodState = 'run';
+      antPodStateT = 0;
+      antSlowT = 0;
+      antPodToldGap = false;
+      antPodRunPX = antPodCX; antPodRunPZ = antPodCZ;
+      antToast('they have broken north. that is the lead. GO.');
+      antSfx('splash', placeCue({ volume: 0.6, pitch: 0.42 },
+                                antPodCX, antWATER, antPodCZ, 180));
+    }
 
     // --- the marquee: HOLD IT, at speed -----------------------------------
     if (sp > 5.5 && antHelmOn) {
@@ -4318,7 +4444,7 @@ function antUpdatePod(game, dt) {
 
   // ---- each animal --------------------------------------------------------
   const cs = Math.cos(antPodYaw), sn = Math.sin(antPodYaw);
-  const spread = antPodState === 'escort' ? 1.0 : 1.9;
+  const spread = antPodTight() ? 1.0 : 1.9;
   for (let i = 0; i < antPOD_N; i++) {
     const mesh = antPodParts[i];
     const ox = antPodOffX[i] * spread, oz = antPodOffZ[i] * spread;
@@ -4330,9 +4456,9 @@ function antUpdatePod(game, dt) {
     // porpoising: the back breaks the surface for about a third of the cycle,
     // and the pitch is the DERIVATIVE of that, so the nose comes up before the
     // body does and goes down after it. That is the whole animation.
-    const per = antPodState === 'escort' ? 2.2 : 4.2;
+    const per = antPodTight() ? 2.2 : 4.2;
     const ph = (antTime / per + antPodPh[i]) * Math.PI * 2;
-    const escort = antPodState === 'escort';
+    const escort = antPodTight();
     let rise = Math.sin(ph);
     let y = (escort ? antWATER - 0.34 : antWATER - 0.85) +
             Math.max(0, rise) * (escort ? 1.15 : 1.35);
@@ -4415,8 +4541,8 @@ function antUpdatePod(game, dt) {
         blow.position.set(antPodX[i], antWATER + 1.3, antPodZ[i]);
         blow.visible = true;
       }
-      if (antPodState === 'escort' || Math.random() < 0.35) {
-        antSfx('hiss', { volume: antPodState === 'escort' ? 0.20 : 0.10, pitch: rand(0.30, 0.42) });
+      if (antPodTight() || Math.random() < 0.35) {
+        antSfx('hiss', { volume: antPodTight() ? 0.20 : 0.10, pitch: rand(0.30, 0.42) });
       }
     }
   }
@@ -5799,6 +5925,8 @@ export function createAntarctic(game) {
       // should remember about them, and it is the only number in the chapter
       // that is about somebody else.
       antSkuaLap = -1; antSkuaGot = false; antSkuaHeavy = 0; antSkuaT = 0;
+      // D4.12: and the run does not survive travel either
+      antPodToldGap = false; antPodGap = 0; antPodRunPX = 0; antPodRunPZ = 0;
       antCallR = -1;
       antCallR = -1;
       antCallT[0] = -1; antCallT[1] = -1; antCallT[2] = -1;
@@ -5852,6 +5980,26 @@ export function createAntarctic(game) {
                z: antSkua ? Math.round(antSkua.position.z * 10) / 10 : null,
                phase: Math.round(((antSkuaT % 26) / 26) * 1000) / 1000 };
     },
+    /** D4.12, measured. `gap` is metres to the pod; `hold` is antPOD_HOLD. */
+    /** Put them on the boat now, so the run needs no summon and no helm. */
+    podForce() {
+      antPodCX = antBoatX; antPodCZ = antBoatZ;
+      antPodState = 'escort'; antPodStateT = 0; antPodRide = 0; antSlowT = 0;
+      return antPodState;
+    },
+    podDebug() {
+      return { st: antPodState, stateT: Math.round(antPodStateT * 10) / 10,
+               gap: Math.round(Math.hypot(antBoatX - antPodCX, antBoatZ - antPodCZ) * 10) / 10,
+               hold: antPOD_HOLD, ride: Math.round(antPodRide * 100) / 100,
+               best: Math.round(antPodBest * 100) / 100,
+               wake: Math.round(api.withPod() * 1000) / 1000,
+               podZ: Math.round(antPodCZ * 10) / 10,
+               podX: Math.round(antPodCX * 10) / 10,
+               leadX: Math.round(antLeadX(antPodCZ) * 10) / 10,
+               boatZ: Math.round(antBoatZ * 10) / 10,
+               boatSp: Math.round(antBoatSpeed * 100) / 100,
+               slowT: Math.round(antSlowT * 10) / 10, helm: antHelmOn };
+    },
     /** Wind the skua's clock to just before a strike, so a probe need not wait. */
     skuaTo(u) {
       // NEXT lap, not this one. Winding within the current lap leaves
@@ -5885,7 +6033,7 @@ export function createAntarctic(game) {
     /** Have the orcas ever formed up on you? The exit opens on this. */
     seenPod() { return antSeenPod; },
     /** 0..1 — are they on you NOW. The score and the ambience both read it. */
-    withPod() { return antPodState === 'escort' ? antPodWakeK() : 0; },
+    withPod() { return antPodTight() ? antPodWakeK() : 0; },
     atHelm() { return antHelmOn; },
 
     boat: {

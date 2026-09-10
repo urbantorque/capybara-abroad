@@ -3259,6 +3259,30 @@ function panUpdateHerd(game, dt) {
       const at = panTrailAt(back, panPt2);
       if (at) { r.tx = at.x; r.tz = at.z; }
       else if (p) { r.tx = p.x; r.tz = p.z; }
+      // ---- D4.13: AND THE RIVER HAS MOVED THE LINE SINCE YOU SWAM IT -----
+      //
+      // The current has to be applied HERE, to the aim point, and not only to
+      // the animal. MEASURED, with it applied to the position alone: the line
+      // was strung over 16.09 m with the river and 16.14 m without it — the
+      // river moved the herd by five centimetres. The follow law is a
+      // bang-bang controller, moving at speed `sp` toward the trail point
+      // whatever the distance, so any offset smaller than sp*dt is closed on
+      // the very next frame and a cross-flow can only ever hold an offset of
+      // about flow*dt. Correct code, useless term, and the number said so.
+      //
+      // What is actually true is better: the trail is where the LEADER WAS,
+      // and in moving water that place has drifted since. The tail of the line
+      // is aiming at the oldest point, so it has drifted furthest — which is
+      // why a line crossing a river bows, and why it is always the back of it
+      // that loses the crossing. `back / panHERD_LEAD_V` is the age of that
+      // trail point in seconds, and the water has had all of it.
+      if (!(game.state && game.state.noRiver) &&
+          panTerrain(r.tx, r.tz) < panWATER - 0.45) {
+        panFlowAt(r.tx, r.tz, panFlow);
+        const age = Math.min(back / panHERD_LEAD_V, panHERD_AGE_MAX);
+        r.tx += panFlow.x * panHERD_DRAG * age;
+        r.tz += panFlow.z * panHERD_DRAG * age;
+      }
     } else {
       r.restT -= dt;
       if (r.restT <= 0) {
@@ -3284,7 +3308,24 @@ function panUpdateHerd(game, dt) {
       // A FOLLOWER RUNS IF IT IS BEHIND. Without this the line stretches every
       // time the player sprints and never comes back, and by the second corner
       // the herd is a queue in a different postcode.
-      const sp = r.st === 'follow' ? clamp(1.4 + (d - 2) * 1.5, 1.4, 8.5) : 1.05;
+      // ---- AND A CAPYBARA IN WATER SWIMS AT A CAPYBARA'S SPEED (D4.13) ---
+      //
+      // The follow law let a straggler close at up to 8.5 m/s, which is a
+      // sprint, and it applied on land and in mid-river alike. Two things
+      // wrong with that. It is not true — the player's own swim is capped at
+      // 2.6 and a follower crossing a river faster than the animal it is
+      // following is absurd. And it made the current below UNMEASURABLE:
+      // measured, the first cut moved the bow of the line by 0.9 m, because a
+      // 0.84 m/s cross-flow against an 8.5 m/s corrective steer is erased on
+      // the frame after it is applied.
+      //
+      // Capped to panHERD_SWIM_V while swimming. The current is then about
+      // forty per cent of a follower's forward speed, which is what a river
+      // this size actually does to a swimming animal and is the whole of why
+      // the item exists.
+      const swimNow = panTerrain(r.x, r.z) < panWATER - 0.45;
+      const spCap = swimNow ? panHERD_SWIM_V : 8.5;
+      const sp = r.st === 'follow' ? clamp(1.4 + (d - 2) * 1.5, 1.4, spCap) : 1.05;
       const k = Math.min(1, (sp * dt) / d);
       r.x += dx * k; r.z += dz * k;
       r.yaw = dampAngle(r.yaw, Math.atan2(dx, dz), 8, dt);
@@ -3312,6 +3353,55 @@ function panUpdateHerd(game, dt) {
     const bed = panTerrain(r.x, r.z);
     // in the deep, they swim, which for a capybara means most of it is under
     const swim = bed < panWATER - 0.45;
+    // ---- D4.13: AND THE RIVER CONTESTS THE LINE --------------------------
+    //
+    // `panFlowAt` is 1.35 m/s down the middle of the channel. It moves the
+    // rafts, it moves the player, and until this line it did not move the nine
+    // animals following the player across it — so the marquee was a line of
+    // capybaras walking through a current that visibly carried everything else
+    // in the shot. They swam a straight line across a moving river.
+    //
+    // THE BOW IS THE WHOLE THING. A follower is dragged downstream while it
+    // swims, so a line entering square comes out bent, and the ones furthest
+    // back — which are the pups, because `order` is the join order — are bent
+    // furthest. Leading nine of your own kind across is now a matter of
+    // ferrying: you aim upstream of where you want them, or you lose the tail.
+    //
+    // Applied to the POSITION and not to the target, which is the difference
+    // between a current and a steering law: the target stays where the trail
+    // says it is, and the water takes the animal off it. That is also what
+    // makes the recovery legible — a follower that has been pushed off simply
+    // has further to swim back.
+    if (swim && !(game.state && game.state.noRiver)) {
+      panFlowAt(r.x, r.z, panFlow);
+      // pups are lighter and get taken further. r.order is the join order, so
+      // the tail of the line is the part that loses it, which is both true and
+      // the right thing to make the player watch.
+      const drag = panHERD_DRAG * (1 + clamp(r.order, 0, 8) * 0.06);
+      r.x += panFlow.x * drag * dt;
+      r.z += panFlow.z * drag * dt;
+      // ---- AND THERE IS NO "IT LOSES THE LINE", ON PURPOSE ---------------
+      //
+      // The first cut dropped a follower out of `follow` once it was more than
+      // three gaps off its own trail point. That branch is UNREACHABLE by
+      // construction once the aim point is drifted with the water, which is
+      // the right design: the follower sits on its own carried target, so the
+      // off-trail distance stays under a metre no matter how far downstream
+      // the whole line has been taken. A term that can never fire is the
+      // `iceSheepSpook` fault — declared, decremented, read, and constant —
+      // and it was removed rather than left in to imply a mechanic.
+      //
+      // What the player is told about instead is the thing that is MEASURABLY
+      // TRUE: the line bows, the back of it bows furthest, and it is nine
+      // metres wide by mid-channel. Said once, on the bow itself.
+      if (!panToldRiver && r.order >= 3 && p) {
+        const bx = r.x - p.x, bz = r.z - p.z;
+        if (bx * bx + bz * bz > panHERD_BOW_SAY * panHERD_BOW_SAY) {
+          panToldRiver = true;
+          game.toast('the water has the back of the line. aim upstream of them.');
+        }
+      }
+    }
     // ---- AND YOU HEAR THEM GO IN --------------------------------------
     // The marquee is nine of your own kind following you into a river and the
     // only sound it has ever made is the one the player's own splash makes.
@@ -3509,7 +3599,22 @@ function panWheek(game) {
   // setTimeout, so it cannot fire after a chapter change or behind a pause.
   panEchoT[0] = 0.62; panEchoT[1] = 1.35;
 
-  let best = -1, bestD = 16 * 16;
+  // ---- D4.13: AND IT CARRIES FURTHER OVER WATER ------------------------
+  //
+  // Sixteen metres is right on a bank, where an animal that wants to follow
+  // you can simply walk over. It is wrong in mid-river, which is now a place
+  // a follower can be TAKEN FROM: the current bows the line, the tail loses
+  // it, and a recruit radius that cannot reach a capybara the river has just
+  // put eight metres downstream of you makes the loss permanent for the rest
+  // of the crossing. A shout over open water carries, and this is the one
+  // place in the chapter that needs it to.
+  //
+  // Gated on the PLAYER being in the water, not on the animal: standing on
+  // the bank shouting across the whole river at a herd that is fine where it
+  // is would undo the gather, which is act two's own task.
+  const overWater = panTerrain(p.x, p.z) < panWATER - 0.30;
+  const rr = overWater ? 26 : 16;
+  let best = -1, bestD = rr * rr;
   for (let i = 0; i < panHERD_N; i++) {
     const r = panHerd[i];
     if (r.st === 'follow') continue;
@@ -3959,6 +4064,36 @@ const panJAG_ARM    = 42;             // s of dusk before she comes at all
 // bank, which is long enough to be noticed from the crossing and short enough
 // that a player who has noticed has to decide rather than deliberate.
 const panJAG_STALK_MIN = 18;
+// ---- D4.13: how hard the river pulls on a swimming follower ---------------
+// A fraction of the full flow, not all of it: a capybara swims, and one that
+// is carried at the full 1.35 m/s of mid-channel is a log.
+//
+// AND 0.62 WAS TOO LITTLE, MEASURED. The follow law is a bang-bang controller
+// — it moves at speed sp toward the trail point whatever the distance — so any
+// offset smaller than sp*dt is closed on the next frame and a cross-flow can
+// only ever produce a standing offset of about flow*dt. The measured bow was
+// 1.29 m across a twenty-four metre channel, which is a rounding error, not a
+// river. At 0.95 the current is 1.28 m/s against a 2.2 m/s swim: over half a
+// follower's whole budget, so it cannot both hold its line and keep up, and
+// the thing that gives is the tail.
+const panHERD_DRAG = 0.95;
+// How far the back of the line has to be off the player before the chapter
+// says so. Twelve metres is well past anything the follow gaps alone produce
+// and well inside the nine-metre bow the current makes by mid-channel.
+const panHERD_BOW_SAY = 12.0;
+// ...and how fast a follower can swim. The player is capped at 2.6; a follower
+// that could cross a river faster than the animal it is following is absurd,
+// and an 8.5 m/s corrective steer erases a 0.84 m/s cross-current on the frame
+// after it is applied. Measured: the bow of the line moved 0.9 m before this.
+const panHERD_SWIM_V = 2.2;
+// How fast the LEADER is assumed to have been going, for working out how old a
+// trail point is. A capybara swims at 2.6 and wades slower; 2.2 is the honest
+// middle and it only sets the scale of the bow.
+const panHERD_LEAD_V = 2.2;
+// ...and a cap on that age, so a player who stops mid-river for a minute does
+// not come back to a trail that has been carried into the next state.
+const panHERD_AGE_MAX = 6.0;
+let panToldRiver = false;
 let panJag = null, panJagSt = 'away', panJagT = 0;
 let panJagX = -72, panJagZ = -92, panJagYaw = 0, panJagU = 0;
 let panJagCrouch = 0, panJagRuined = false, panJagRuns = 0, panJagSpoiled = 0;
@@ -5169,6 +5304,8 @@ export function createPantanal(game) {
       // this chapter that is a record of what the player did for somebody else.
       panJagSt = 'away'; panJagRuined = false; panJagArm = 0; panJagT = 0;
       panJagStruck = false; panJagOtter = false; panJagCrouch = 0; panJagU = 0;
+      // D4.13: and the river forgets what it took last time
+      panToldRiver = false;
       if (panJag) panJag.visible = false;
       panSayCool = 0;
       for (const k in panSaid) delete panSaid[k];
@@ -5225,6 +5362,31 @@ export function createPantanal(game) {
      * how many times she has had a go at the line and `spoiled` how many times
      * the player put her off it.
      */
+    /**
+     * D4.13, measured. `bow` is how far the tail of the line has been carried
+     * downstream of the head, which is the number the whole item is about, and
+     * `lost` counts followers the river has taken off the line this visit.
+     */
+    riverDebug() {
+      let head = null, tail = null, n = 0, maxOff = 0;
+      for (let i = 0; i < panHERD_N; i++) {
+        const r = panHerd[i];
+        if (r.st !== 'follow') continue;
+        n++;
+        if (!head || r.order < head.order) head = r;
+        if (!tail || r.order > tail.order) tail = r;
+        const off = Math.hypot(r.tx - r.x, r.tz - r.z);
+        if (off > maxOff) maxOff = off;
+      }
+      let strung = 0;
+      if (head && tail) strung = Math.hypot(head.x - tail.x, head.z - tail.z);
+      return { following: n,
+               strung: Math.round(strung * 100) / 100,
+               swimming: (function () { let k = 0; for (let i = 0; i < panHERD_N; i++) { const r = panHerd[i]; if (r.st === 'follow' && panTerrain(r.x, r.z) < panWATER - 0.45) k++; } return k; })(),
+               bow: (head && tail) ? Math.round((head.x - tail.x) * 100) / 100 : null,
+               maxOffTrail: Math.round(maxOff * 100) / 100,
+               drag: panHERD_DRAG };
+    },
     jaguarDebug() {
       let scattered = 0, following = 0;
       for (let i = 0; i < panHERD_N; i++) {
