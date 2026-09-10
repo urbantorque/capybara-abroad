@@ -117,11 +117,25 @@ const caliMERCY_MAX = 4;            // ...four times and no further: x1.75, 199 
 //   The tutorial for that is not a line of text, it is THE BAND: the three
 //   musicians riding up front duck about a second before each wire reaches
 //   them. Nobody has ever needed to be told what that means.
+const caliCHIVA_V0 = 5.6;           // the deadhead speed the return leg uses
 const caliCHIVA_V_FLAT = 7.2;       // m/s on the level — about 26 km/h, which is plenty
 const caliCHIVA_V_HILL = 4.4;       // m/s at 10% and worse; a chiva climbs in first
 const caliCHIVA_ACC = 2.6;          // m/s^2 the engine can add or take away
 const caliCHIVA_STOP_T = 5.0;       // s stood at a stop, collecting
 const caliCHIVA_PULL_T = 1.3;       // s on the roof before she pulls away
+// ---- D4.15: the return leg ------------------------------------------------
+// How long she stands at the mirador with nobody on her before turning round,
+// and how much quicker she is coming back down empty.
+//
+// MEASURED at the first values (22 s and 1.75): arrived at t 0.4, returning at
+// 22.0, parked again at 69.5 — a sixty-nine second wait for a second run at a
+// four-hundred-and-sixty-five metre set piece. That is a player standing about,
+// which is what the roadmap item exists to stop. 15 s and 2.10 make it about
+// fifty-three, and 2.10 x 5.6 is 11.8 m/s, which is forty-two km/h for an empty
+// wooden bus coming down a hill in low gear. Fast, and not silly.
+const caliCHIVA_TURN   = 15.0;
+const caliCHIVA_DOWN_K = 2.10;
+let caliTurnT = 0, caliToldAgain = false;
 const caliCHIVA_L = 9.5, caliCHIVA_W = 2.9;
 const caliROOF_TOP = 3.70;          // top of the roof collider, in chiva-local metres
 // Wire height above the ROAD, not above the bus: the bus pitches on the grades,
@@ -2189,6 +2203,50 @@ function caliStepChiva(game, dt) {
   if (caliSweptT > 0) caliSweptT -= dt;
   caliOnRoof = caliSweptT <= 0 && caliRoofCheck(game);
 
+  // ---- D4.15: AND SHE GOES BACK DOWN --------------------------------------
+  //
+  // `arrived` was TERMINAL. A chiva that reaches the mirador stayed at the
+  // mirador for the rest of the visit, which means the chapter's best set
+  // piece — four hundred and sixty-five metres of climb with seven cables to
+  // hop on the way — could be ridden exactly ONCE per visit, and the seven-of-
+  // seven tally it scores you on could be attempted exactly once. A verb you
+  // may practise once is not a verb, it is a cutscene with a score attached.
+  //
+  // She waits at the top for `caliCHIVA_TURN` with nobody on her, and then she
+  // deadheads back down. Empty, at `caliCHIVA_DOWN_K` times her climbing
+  // speed, because a chiva coming down a hill in low gear with no passengers
+  // is faster than one grinding up it with fourteen — and because the return
+  // leg is not the set piece and should not take another forty seconds of
+  // anybody's evening.
+  //
+  // NOBODY ON HER, which is what makes this safe. If the animal is on the roof
+  // the clock does not run at all: a bus that pulls away from under you as a
+  // reward for reaching the top would be a punishment for winning.
+  if (caliChivaState === 'arrived') {
+    if (caliOnRoof) caliTurnT = 0;
+    else caliTurnT += dt;
+    if (caliTurnT > caliCHIVA_TURN) {
+      caliChivaState = 'returning';
+      caliTurnT = 0;
+      caliHornT = 1.4;
+      if (typeof game.sfx === 'function') game.sfx('horn', { pitch: 0.8, volume: 0.6 });
+    }
+  } else if (caliChivaState === 'returning') {
+    // straight back down the same polyline. No stops: the four 5 s halts are
+    // for picking people up and there is nobody at the top to pick up.
+    caliChivaV = caliCHIVA_V0 * caliCHIVA_DOWN_K;
+    caliChivaS -= caliChivaV * dt;
+    if (caliChivaS <= 0.05) {
+      caliChivaS = 0;
+      caliChivaV = 0;
+      caliChivaReset();          // parked, wires re-armed, ready to be ridden
+      if (!caliToldAgain && typeof game.toast === 'function') {
+        caliToldAgain = true;
+        game.toast('she does the route all evening. get back on.');
+      }
+    }
+  }
+
   // ---- parked: she waits for a passenger, and then she stops waiting -------
   if (caliChivaState === 'parked') {
     if (caliOnRoof) {
@@ -2243,6 +2301,7 @@ function caliStepChiva(game, dt) {
       caliChivaS = caliRouteLen;
       caliChivaV = 0;
       caliChivaState = 'arrived';
+      caliTurnT = 0;              // D4.15: the turn-round clock starts here
       caliHornT = 2.2;
       if (typeof game.sfx === 'function') game.sfx('horn', { pitch: 0.9, volume: 0.9 });
       // ---- AND THE CABLES ARE SCORED AT THE TOP ------------------------
@@ -2384,6 +2443,7 @@ function caliStepChiva(game, dt) {
  */
 function caliChivaReset() {
   caliChivaState = 'parked';
+  caliTurnT = 0;
   caliChivaS = 0;
   caliChivaV = 0;
   caliStopIdx = 0;
@@ -4102,6 +4162,7 @@ export function createCali(game) {
       // parked at the kerb, in a state that can never start a ride again: the
       // pull-away only fires from 'parked'. Put her where the comment says she
       // is.
+      caliToldAgain = false;   // D4.15: the come-back line, once per visit
       if (caliMiradorDone) {
         caliNightT = 1;
         caliChivaState = 'arrived';
@@ -4141,6 +4202,30 @@ export function createCali(game) {
   });
 
   const api = {
+    /** D4.15, measured: whether the set piece can be ridden more than once. */
+    /** Put her at the mirador, so the return leg needs no 465 m ride first. */
+    chivaToTop() {
+      caliChivaState = 'arrived'; caliChivaS = caliRouteLen; caliChivaV = 0;
+      caliTurnT = 0; caliStopIdx = caliSTOPS.length;
+      if (caliWires) for (let i = 0; i < caliWires.length; i++) caliWires[i].has = true;
+      return caliChivaState;
+    },
+    chivaDebug() {
+      let clear = 0, armed = 0;
+      if (caliWires) for (let i = 0; i < caliWires.length; i++) {
+        if (caliWires[i].has) clear++;
+        if (!caliWires[i].has) armed++;
+      }
+      return { st: caliChivaState, s: Math.round(caliChivaS * 10) / 10,
+               x: Math.round(caliChivaX * 10) / 10, y: Math.round(caliChivaY * 10) / 10,
+               z: Math.round(caliChivaZ * 10) / 10,
+               len: Math.round(caliRouteLen * 10) / 10,
+               v: Math.round(caliChivaV * 100) / 100,
+               turnT: Math.round(caliTurnT * 10) / 10, turnAt: caliCHIVA_TURN,
+               onRoof: caliOnRoof, wires: caliWires ? caliWires.length : 0,
+               wiresTouched: clear, wiresArmed: armed,
+               clearScore: caliWireClear };
+    },
     built() { return caliBuilt; },
     terrainHeight: caliTerrain,
     // Built from the static boxes themselves — see makeSolidIndex in shared.js.
