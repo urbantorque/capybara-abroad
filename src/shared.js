@@ -1006,6 +1006,15 @@ export const PALETTE = {
   panCapy:      0x9a7852,      // the locals
   panCapyDk:    0x6a4e34,
   panCapyPup:   0xa98a62,
+  // ONÇA-PINTADA. The chapter's dialogue has promised her three times since
+  // it was written and she has never been in the file. Deliberately close to
+  // panCapy in value and warmer in hue: the whole of a stalk is a thing you
+  // half-see against the reeds and then resolve, and a jaguar that reads
+  // instantly from ninety metres is a jaguar nothing could ever have crept up
+  // on. The rosettes carry the recognition, not the base.
+  panJag:       0xc79a52,
+  panJagDk:     0x3a2c1c,      // the rosettes and the tail rings
+  panJagBelly:  0xe8dcc2,
   panCaiman:    0x4e5240,      // jacaré. Two hundred to a bend, and asleep
   panCaimanDk:  0x35392c,
   panCaimanPl:  0xb4a878,

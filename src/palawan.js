@@ -1971,6 +1971,31 @@ function palUpdateBaitBall(game, dt) {
         x += dx / d * push; y += dy / d * push; z += dz / d * push;
       }
     }
+    // ---- ...AND IT OPENS FOR THE BIRD TOO (Tier 5) -----------------------
+    // The identical push, from a different thing. The whole block above has
+    // been hard-coded to `game.capy` since it was written, which is why a
+    // shoal of four hundred and seventy sardines could be dived on twenty
+    // times a minute by twenty-two terns and never move: the terns' dive was
+    // a keyframed y-lerp that stopped half a metre under the surface, six
+    // metres above the ball, and neither system read the other. Grep found
+    // zero cross-references in either direction.
+    //
+    // `palTernHitK` is how far into a strike the deepest bird is and
+    // `palTernHitX/Y/Z` is where it is. One strike at a time — a wall of
+    // simultaneous punctures reads as noise, and a single hole that closes is
+    // legible from the surface, which is the point of the whole tern block.
+    // ...and it cuts. `game.state.noHunt` is the shared flag for the whole
+    // Tier 5 layer in all three chapters, so the ecosystem can be measured
+    // against its own absence rather than against a memory of the reef.
+    if (palTernHitK > 0 && !(game.state && game.state.noHunt)) {
+      const bx = x - palTernHitX, by = y - palTernHitY, bz = z - palTernHitZ;
+      const bd = Math.sqrt(bx * bx + by * by + bz * bz);
+      const R = palTERN_PUNCH * palTernHitK;
+      if (bd < R && bd > 0.001) {
+        const push = (R - bd);
+        x += bx / bd * push; y += by / bd * push; z += bz / bd * push;
+      }
+    }
     palBallMesh.setMatrixAt(i, palXform(x, y, z, Math.sin(b) * 0.4, a + Math.PI * 0.5, 0, 1, 1, 1));
   }
   palBallMesh.instanceMatrix.needsUpdate = true;
@@ -3348,6 +3373,20 @@ function palBuildTerns(root) {
 }
 const palTERN_DIVE = 5.6;              // s between one bird's dives
 let palTernSplash = 0;
+// ---- Tier 5: THE FIRST PREDATOR-PREY COUPLING IN THIS CHAPTER -------------
+// Where the deepest tern in the shoal is this frame, and how far into its
+// strike. Written by palUpdateTerns, read by palUpdateBaitBall — and the
+// update order matters: terns run BEFORE the ball in the dispatcher, so the
+// hole is opened on the same frame the bird is drawn inside it rather than
+// one frame late. Checked, not assumed.
+let palTernHitK = 0, palTernHitX = 0, palTernHitY = 0, palTernHitZ = 0;
+// How wide the hole is at full strike. 3.2 m against a torus of major radius
+// 3.35 and tube 1.2 — so a strike on the ring displaces most of the fish
+// within about a tube-and-a-half of where it went in, and leaves the rest of
+// the ring intact. Big enough to be a hole; not so big that one bird blows the
+// shoal apart, which would undo the thing the marquee is about.
+const palTERN_PUNCH = 3.2;
+const palTernDbgM = new THREE.Matrix4();   // instrument only
 function palUpdateTerns(game, dt) {
   if (!palTernMesh) return;
   const capy = game.capy;
@@ -3363,6 +3402,11 @@ function palUpdateTerns(game, dt) {
   if (palTernScare > 0) palTernScare = Math.max(0, palTernScare - dt * 0.26);
   const scare = palTernScare * palTernScare;
   if (palTernSplash > 0) palTernSplash -= dt;
+  // ---- TIER 5: THE STRIKE REACHES THE FISH -------------------------------
+  // Reset each frame and claimed by the deepest bird in the loop below, so
+  // there is exactly one hole in the shoal at a time. See the note at the
+  // apply site in palUpdateBaitBall.
+  palTernHitK = 0;
   for (let i = 0; i < palTERN_N; i++) {
     const o = i * 4;
     const r = palTernData[o] * (1 + scare * 1.6);
@@ -3377,9 +3421,44 @@ function palUpdateTerns(game, dt) {
       const t = dv / 0.26;
       // fold, fall, hit, and climb back out — the hit is at t = 0.62
       const drop = t < 0.62 ? palSmooth(t / 0.62) : 1 - palSmooth((t - 0.62) / 0.38);
-      y = lerp(y, palWATER - 0.5, drop);
+      // ---- AND IT GOES ALL THE WAY IN (Tier 5) -------------------------
+      //
+      // It stopped at `palWATER - 0.5` — half a metre under a surface with a
+      // shoal six metres below it. A tern that hunts a bait ball goes THROUGH
+      // the surface; the half-metre version was drawn for the splash and for
+      // nothing else, and it is why nothing downstream could ever have
+      // noticed. It reaches palBALL_Y now, and on the way it aims at the ball
+      // rather than at whatever point of its own orbit it happened to be over.
+      const deep = lerp(palWATER - 0.5, palBALL_Y + palBALL_TUBE * 0.6,
+                        clamp((drop - 0.45) / 0.55, 0, 1));
+      y = lerp(y, deep, drop);
+      // It converges on the shoal as it falls, and comes back out where it
+      // went in — a bird that fell straight down its own orbit radius would
+      // miss the ball by up to eighteen metres.
+      //
+      // AND IT AIMS AT THE WALL OF IT, NOT THE MIDDLE. The first cut converged
+      // on palBALL.x/z, which is the AXIS of a torus — the hole in the
+      // doughnut. Measured: mean shoal spread 3.363 m hunting against 3.350 m
+      // with the term cut, a difference of thirteen millimetres, because every
+      // fish is at least 2.15 m off that axis and a 2.6 m punch barely grazed
+      // the inside of the ring. A tern hits the BALL. The aim point is a spot
+      // on the ring itself, chosen per bird so twenty-two of them do not all
+      // drill the same hole.
+      const ring = palTernData[o + 2] * 2.7;         // its own bearing, stable per bird
+      const ax = palBALL.x + Math.cos(ring) * palBALL_R;
+      const az = palBALL.z + Math.sin(ring) * palBALL_R;
+      const conv = palSmooth(clamp((drop - 0.25) / 0.75, 0, 1));
+      x = lerp(x, ax, conv * 0.94);
+      z = lerp(z, az, conv * 0.94);
       pitch = drop * 1.15;
       roll = 0;
+      // The deepest bird this frame owns the hole. `k` is how open it is:
+      // full at the bottom of the stoop and gone by the time the bird is out.
+      const punch = clamp((drop - 0.55) / 0.45, 0, 1);
+      if (punch > palTernHitK) {
+        palTernHitK = punch;
+        palTernHitX = x; palTernHitY = y; palTernHitZ = z;
+      }
       if (t > 0.60 && t < 0.66 && palTernSplash <= 0) {
         // ONE SPLASH AT A TIME. Two dozen birds each throwing one is a hailstorm;
         // the ration is the same argument as Manly's spray.
@@ -4319,6 +4398,50 @@ export function createPalawan(game) {
   });
 
   const api = {
+    /**
+     * TIER 5, measured. `hitK` is how far into a strike the deepest tern is
+     * and `deepest` how far under the water the lowest bird has actually got —
+     * the number that says whether the dive reaches the fish at all. `spread`
+     * is the mean radius of the shoal from its own centre, which is what a
+     * hole in it moves.
+     */
+    ternDebug() {
+      let deepest = 99, lowY = 99;
+      if (palTernMesh) {
+        for (let i = 0; i < palTERN_N; i++) {
+          palTernMesh.getMatrixAt(i, palTernDbgM);
+          const y = palTernDbgM.elements[13];
+          if (y < lowY) lowY = y;
+        }
+        deepest = palWATER - lowY;
+      }
+      // ...and the MAX per-fish displacement from where that fish would have
+      // been with no bird in the water, which is the number that says whether
+      // a hole exists. Mean spread over a hundred and eighteen clumps is a
+      // blunt instrument for a local 3 m hole: it moved thirteen millimetres
+      // on the first measured cut and said nothing useful either way.
+      let spread = 0, maxOff = 0;
+      if (palBallMesh) {
+        for (let i = 0; i < palBALL_N; i++) {
+          palBallMesh.getMatrixAt(i, palTernDbgM);
+          const e = palTernDbgM.elements;
+          const rr = Math.hypot(e[12] - palBALL.x, e[14] - palBALL.z);
+          spread += rr;
+          // how far outside the undisturbed torus this clump has been pushed
+          const off = Math.abs(rr - palBALL_R) - palBALL_TUBE;
+          if (off > maxOff) maxOff = off;
+        }
+        spread /= palBALL_N;
+      }
+      return { hitK: Math.round(palTernHitK * 1000) / 1000,
+               hitY: Math.round(palTernHitY * 100) / 100,
+               lowestBirdY: Math.round(lowY * 100) / 100,
+               underWaterBy: Math.round(deepest * 100) / 100,
+               ballY: palBALL_Y, water: palWATER,
+               spread: Math.round(spread * 1000) / 1000,
+               maxOff: Math.round(maxOff * 1000) / 1000,
+               scare: Math.round(palTernScare * 100) / 100 };
+    },
     built() { return palBuilt; },
     terrainHeight: palTerrain,
     // ---- THE BLOOM IS ON A HUNDRED AND TWENTY-FOUR SECOND CLOCK (P3) ----

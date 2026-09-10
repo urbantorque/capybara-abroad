@@ -232,6 +232,18 @@ let antSwimPeng = null;
 const antSWIM_N = 18;
 let antSwimData = null;
 let antSkua = null, antSkuaT = 0;
+// ---- Tier 5: the first predator in the game -------------------------------
+// `antSkuaNest` is which nest this lap is aimed at, `antSkuaLap` the lap it was
+// chosen on, `antSkuaGot` whether this lap's strike has already resolved, and
+// `antSkuaHeavy` a 0..1 that flies it out low and slow afterwards. The two
+// counters are the only score this keeps, and neither is a task.
+let antSkuaNest = 0, antSkuaLap = -1, antSkuaGot = false, antSkuaHeavy = 0;
+let antSkuaTook = 0, antSkuaSaved = 0;
+// How much flush counts as having put it off. Not "any flush at all": a wheek
+// from ninety metres that happens to land on a dive should not save a chick.
+// antSkuaFlush is written 1 and decays at 1.2/s, so 0.35 is about nine tenths
+// of a second of having actually been there.
+const antSKUA_SPOIL = 0.35;
 let antPetrels = null;
 const antPETREL_N = 26;
 const antCAPE_N = 54;                // the cape petrels round the gate
@@ -4851,34 +4863,142 @@ function antUpdateBirds(game, dt) {
     }
     antCapes.instanceMatrix.needsUpdate = true;
   }
-  // THE SKUA. It works a slow figure over the colony, drops on a nest, gets
-  // shouted at, and goes round again. It wants nothing from the player at all.
+  // ---- THE SKUA, AND IT ACTUALLY HUNTS NOW (Tier 5) ----------------------
+  //
+  // The note that stood here said the skua "drops on a nest, gets shouted at,
+  // and goes round again", and BOTH halves were false. It flew a fixed
+  // 22 x 15 ellipse and dipped at a fixed phase, consulting `antNests` never
+  // and targeting nobody; and nothing in antUpdatePenguins read `antSkuaT`,
+  // `antSkuaFlush` or the dive at all, so a hundred and thirty-two birds sat
+  // through it in silence. A second note thirty lines up called it "the only
+  // thing in this chapter that is actively up to something."
+  //
+  // NOTHING IN THIS GAME HUNTS. Verified across the whole tree before
+  // building: `addCritter` is a flee registry measured against the player,
+  // `herdOffer` is a follow-the-leader solver whose leader is always the
+  // capybara, and the one real chase solver is in npc.js and is a person
+  // chasing you about a sandwich. There is no predator-prey coupling
+  // anywhere. This is the first.
+  //
+  // THREE PHASES, AND THE MIDDLE ONE IS THE POINT.
+  //
+  //   pick   — it chooses a NEST, not a phase of a circle, and it works
+  //            round to be upwind of it. Which nest is a function of the
+  //            clock, so it is not the same one every time.
+  //   stoop  — it commits. Once committed the geometry is a fall at a fixed
+  //            point on the ground, which is what makes it readable from a
+  //            hundred metres and what makes it interruptible.
+  //   after  — it lands, and the colony goes up FROM THE POINT IT LANDED.
+  //
+  // THE COLONY REACTION COST FOUR LINES, because `antCallX/Z/R` is already a
+  // wave front parameterised by an arbitrary point — it was built for the
+  // wheek and it never occurred to anyone to fire it from anything else. The
+  // penguins update BEFORE the birds do, so the shout lands on the next
+  // frame, which is correct: they see it hit, and then they shout.
+  //
+  // AND THE PLAYER CAN STOP IT. `antSkuaFlush` already broke off a stoop
+  // when you wheeked inside forty metres, on the reasoning that this is what
+  // a bird half way down does when something unexpected happens under it.
+  // That was a cosmetic flinch on a dive that was going nowhere. It is now
+  // the difference between a chick and no chick, and it is the only place in
+  // nineteen chapters where the animal can spend its voice on somebody
+  // else's behalf.
   if (antSkua) {
+    const wasFlush = antSkuaFlush;
     antSkuaFlush = damp(antSkuaFlush, 0, 1.2, dt);
-    const prevU = (antSkuaT % 26) / 26;
     antSkuaT += dt;
     const T = 26;
     const u = (antSkuaT % T) / T;
+    // Which nest this lap. The golden ratio off the lap number, so a player
+    // who watches four laps sees four different corners of the colony and
+    // never learns a spot to stand in.
+    const lap = Math.floor(antSkuaT / T);
+    if (lap !== antSkuaLap) {
+      antSkuaLap = lap;
+      antSkuaGot = false;
+      if (antNests.length >= 2) {
+        const nn = antNests.length / 2;
+        antSkuaNest = Math.floor(((lap * 0.6180339887) % 1) * nn) % nn;
+      }
+    }
+    const tnx = antNests.length ? antNests[antSkuaNest * 2] : antCOLONY.x;
+    const tnz = antNests.length ? antNests[antSkuaNest * 2 + 1] : antCOLONY.z;
+    // The approach: the same slow figure it always flew, but centred so that
+    // the low point of it passes over the nest it has picked rather than over
+    // whatever happened to be at phase 0.62.
     const a = u * Math.PI * 2;
-    const x = antCOLONY.x + Math.cos(a) * 22;
-    const z = antCOLONY.z + Math.sin(a) * 15;
-    // ...and it BREAKS OFF when the capybara shouts, which is what a bird
-    // halfway down a stoop does when something unexpected happens under it
+    const cx = lerp(antCOLONY.x, tnx, 0.5), cz = lerp(antCOLONY.z, tnz, 0.5);
+    const rx = 22, rz = 15;
+    let x = cx + Math.cos(a) * rx;
+    let z = cz + Math.sin(a) * rz;
     const dive = clamp(1 - Math.abs(u - 0.62) / 0.10, 0, 1) * (1 - antSkuaFlush);
+    // ...and inside the stoop it stops flying the ellipse and falls at the
+    // nest. A circle that happens to be low is a bird doing a circuit; a line
+    // that ends on one nest is a bird that has chosen something.
+    if (dive > 0) {
+      const k = antSmooth(dive);
+      x = lerp(x, tnx, k);
+      z = lerp(z, tnz, k);
+    }
     const y = antLandOnly(x, z) + lerp(11, 1.4, antSmooth(dive)) + antSkuaFlush * 9;
     antSkua.position.set(x, y, z);
     antSkua.rotation.set(dive * -0.7, a + 1.57, Math.sin(a) * 0.35 + antSkuaFlush * 0.7, 'YXZ');
-    // ONE CRY PER DIVE, NOT NINE. The old test was a 0.15 s WINDOW on a clock
-    // that advances by dt, so it was true for nine consecutive frames and the
-    // skua screamed nine times in a seventh of a second. An edge crossing is
-    // true exactly once however long the frame is.
-    if (prevU < 0.618 && u >= 0.618) {
-      antSfx('gull', { volume: 0.15, pitch: 1.9 });
+    // ---- THE STRIKE, once per lap, and only if it was not broken off -----
+    // The edge is the same 0.618 crossing the cry has always used, so the
+    // scream and the hit are the same event rather than two near ones.
+    const prevU = ((antSkuaT - dt) % T) / T;
+    const crossed = prevU < 0.618 && u >= 0.618;
+    if (crossed) antSfx('gull', { volume: 0.15, pitch: 1.9 });
+    // ...and the whole strike cuts, on the shared Tier 5 flag. With it set
+    // the skua flies its old cosmetic circuit and the colony never hears it,
+    // which is exactly what this chapter did before.
+    if (crossed && !antSkuaGot && !(game.state && game.state.noHunt)) {
+      antSkuaGot = true;
+      if (antSkuaFlush > antSKUA_SPOIL) {
+        // ---- YOU PUT IT OFF -------------------------------------------
+        antSkuaSaved++;
+        antSfx('gull', { volume: 0.22, pitch: 2.3 });
+        if (antSkuaSaved === 1) {
+          antToast('it pulled out. the colony is still shouting about it.');
+        }
+        // the colony still goes up — they do not know why, only that
+        // something came at them and left
+        antSkuaShout(tnx, tnz, 0.7);
+      } else {
+        // ---- IT GOT ONE -----------------------------------------------
+        // NOT DRAWN, and that is a decision rather than a shortcut. This is
+        // a game about a capybara knocking things over; a chick being eaten
+        // on screen is a different game. What is drawn is the fall, the
+        // colony going up, and the bird leaving heavy and low — which is
+        // how anybody actually watching a skua works out what happened.
+        antSkuaTook++;
+        antSkuaHeavy = 1;
+        antSfx('gull', { volume: 0.26, pitch: 1.6 });
+        antSkuaShout(tnx, tnz, 1);
+        if (antSkuaTook === 1) {
+          antToast('the whole colony went up at once. one of them did not.');
+        }
+      }
     }
-    if (antSkuaFlush > 0.75 && antSkuaFlush - dt * 1.2 <= 0.75) {
+    // it flies out heavy — low, slow, and straight, for about four seconds
+    if (antSkuaHeavy > 0) antSkuaHeavy = Math.max(0, antSkuaHeavy - dt * 0.25);
+    if (wasFlush > 0.75 && antSkuaFlush <= 0.75) {
       antSfx('gull', { volume: 0.18, pitch: 2.2 });
     }
   }
+}
+
+/**
+ * A HUNDRED AND THIRTY-TWO BIRDS ANSWER A POINT ON THE GROUND.
+ *
+ * `antCallX/Z/R` is the colony's ecstatic-display wave front and it has been
+ * a general "something happened at (x, z)" channel since it was written — it
+ * simply had exactly one caller, the wheek. The skua fires it now, which is
+ * the entire cost of the reaction the file has been claiming for months.
+ */
+function antSkuaShout(x, z, k) {
+  antCallX = x; antCallZ = z; antCallR = 0;
+  antColonyCall = Math.max(antColonyCall, k);
 }
 
 /**
@@ -5674,6 +5794,12 @@ export function createAntarctic(game) {
       antCalveT = 16; antCalveLive = 0; antCrackT = -1;
       antCalveWave = 0; antCalveLift = 0;
       antColonyCall = 0; antSkuaFlush = 0; antPetrelScat = 0; antEchoT = -1;
+      // Tier 5: a fresh visit is a fresh lap. The two counters are NOT reset —
+      // how many chicks this player has saved is the kind of thing a place
+      // should remember about them, and it is the only number in the chapter
+      // that is about somebody else.
+      antSkuaLap = -1; antSkuaGot = false; antSkuaHeavy = 0; antSkuaT = 0;
+      antCallR = -1;
       antCallR = -1;
       antCallT[0] = -1; antCallT[1] = -1; antCallT[2] = -1;
       // ONCE PER VISIT, not once per session. The tick on the list stays
@@ -5701,6 +5827,42 @@ export function createAntarctic(game) {
   });
 
   const api = {
+    /**
+     * TIER 5, measured. `took` and `saved` are the two outcomes of a strike;
+     * `callR` is the colony's wave-front radius, which is the whole of the
+     * reaction the file used to claim and not have.
+     */
+    skuaDebug() {
+      let displaying = 0;
+      if (antPengData) {
+        for (let i = 0; i < antPENG_COL; i++) {
+          if (antPengData[i * antPENG_S + 4] > 0.05) displaying++;
+        }
+      }
+      return { nest: antSkuaNest, lap: antSkuaLap, got: antSkuaGot,
+               flush: Math.round(antSkuaFlush * 100) / 100,
+               heavy: Math.round(antSkuaHeavy * 100) / 100,
+               took: antSkuaTook, saved: antSkuaSaved,
+               callR: Math.round(antCallR * 10) / 10,
+               callX: Math.round(antCallX * 10) / 10,
+               callZ: Math.round(antCallZ * 10) / 10,
+               displaying: displaying, nests: antNests.length / 2,
+               y: antSkua ? Math.round(antSkua.position.y * 100) / 100 : null,
+               x: antSkua ? Math.round(antSkua.position.x * 10) / 10 : null,
+               z: antSkua ? Math.round(antSkua.position.z * 10) / 10 : null,
+               phase: Math.round(((antSkuaT % 26) / 26) * 1000) / 1000 };
+    },
+    /** Wind the skua's clock to just before a strike, so a probe need not wait. */
+    skuaTo(u) {
+      // NEXT lap, not this one. Winding within the current lap leaves
+      // antSkuaGot true, so a second measured strike silently never fires and
+      // the probe reports the FIRST strike's outcome twice. Cost one run.
+      const lap = Math.floor(antSkuaT / 26) + 1;
+      antSkuaT = lap * 26 + clamp(u, 0, 0.999) * 26;
+      return antSkuaT;
+    },
+    /** Put it off, the way a wheek inside forty metres does. */
+    skuaFlush() { antSkuaFlush = 1; return antSkuaFlush; },
     built() { return antBuilt; },
     terrainHeight: antTerrain,
     slopeAt: antSlope,

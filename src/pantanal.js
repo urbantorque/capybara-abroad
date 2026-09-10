@@ -691,6 +691,8 @@ function panBuild(game) {
   panBuildHerd(panRoot);
   panBuildCaimans(game, panRoot);
   panBuildOtters(panRoot);
+  // Tier 5: the onca. AFTER the otters, because she is what they shout at.
+  panBuildJaguar(game, panRoot);
   panBuildJabiru(panRoot);
   panBuildMacaws(panRoot);
   panBuildCowbird(panRoot);
@@ -3901,6 +3903,285 @@ function panUpdateMacaws(game, dt) {
   }
 }
 
+// ================================================================ THE ONÇA ==
+/**
+ * TIER 5 — THE THIRD HUNT, AND THE ONLY ONE THAT HAD TO BE BUILT FROM NOTHING.
+ *
+ * This chapter promises a jaguar THREE TIMES in dialogue that has been in the
+ * file since it was written:
+ *
+ *   'They will shout at a jaguar. They will certainly shout at you.'
+ *   'They shouted at you. You are on the list now, with the jaguars.'
+ *   'All five at once. They do that to jaguars. You are in good company.'
+ *
+ * Grep before building: those three strings are the only occurrences of the
+ * word in the file. No mesh, no state, no palette entry, no task. The joke in
+ * all three lines is a comparison to something the player can never see, and
+ * the otters' whole set piece is built on it.
+ *
+ * WHAT SHE IS AND IS NOT. She hunts the CAPYBARA HERD, not the player. The
+ * animal you are is a capybara and a jaguar's favourite food is a capybara,
+ * and this game does not have fail states outside one chase in Marrakech —
+ * so a predator that could eat the player would be a different game and would
+ * quietly poison every other chapter. She ignores you completely, which is
+ * also funnier: the most dangerous animal in South America walks past you.
+ *
+ * FOUR STATES, and only the middle two are visible:
+ *
+ *   away   — not in the world. The default, and where she spends most of it.
+ *   stalk  — she comes along the far bank at a walk, belly low, using the
+ *            reeds. Slow enough to be noticed by somebody paying attention
+ *            and quiet enough to be missed by somebody who is not.
+ *   rush   — twelve metres of commit. The herd scatters.
+ *   leave  — she goes, at a walk, whether or not she got anything.
+ *
+ * AND YOU CAN RUIN IT, which is the whole reason this is a mechanic and not a
+ * cutscene. A wheek inside panJAG_HEAR during `stalk` blows it: she stops,
+ * looks at you for a second and a half, and leaves without rushing. The herd
+ * never knows. That is the second place in the game where the animal's voice
+ * is spent on somebody else's behalf, and unlike Antarctica's it is spent on
+ * animals the player has probably spent ten minutes gathering.
+ *
+ * THE OTTERS PAY IT OFF. They already shout at anything in their zone; a
+ * jaguar inside it gets the full four-call volley, and the boatman's line
+ * about being "on the list, with the jaguars" finally has a jaguar in it.
+ */
+const panJAG_PATH = [                 // the far bank, west to east past the crossing
+  [-72, -92], [-58, -90], [-46, -88], [-34, -87], [-22, -88], [-8, -90],
+];
+const panJAG_V      = 1.15;           // m/s stalking. A jaguar is not in a hurry.
+const panJAG_RUSH_V = 9.4;            // ...and this is, for about a second and a half
+const panJAG_RUSH_D = 13;             // m of commit
+const panJAG_HEAR   = 34;             // m a wheek carries to her
+const panJAG_SEE    = 26;             // m at which the herd notices the rush
+const panJAG_ARM    = 42;             // s of dusk before she comes at all
+// The floor on a stalk. Eighteen seconds at 1.15 m/s is about twenty metres of
+// bank, which is long enough to be noticed from the crossing and short enough
+// that a player who has noticed has to decide rather than deliberate.
+const panJAG_STALK_MIN = 18;
+let panJag = null, panJagSt = 'away', panJagT = 0;
+let panJagX = -72, panJagZ = -92, panJagYaw = 0, panJagU = 0;
+let panJagCrouch = 0, panJagRuined = false, panJagRuns = 0, panJagSpoiled = 0;
+let panJagArm = 0, panJagSaid = false;
+let panJagTx = 0, panJagTz = 0, panJagStruck = false, panJagOtter = false;
+const panJagPt = { x: 0, z: 0 };
+// The stalk path, measured once at build rather than assumed: the polyline is
+// authored in world metres and a speed in m/s needs its length to advance a
+// 0..1 parameter at the right rate. Same trap as the chiva road.
+let panJagPathLen = 1;
+
+function panBuildJaguar(game, root) {
+  const M = panMerger();
+  const B = PALETTE.panJag, D = PALETTE.panJagDk, W = PALETTE.panJagBelly;
+  // A jaguar is a very short-legged, very heavy cat: the body is nearly twice
+  // the depth of the leg length and the head is enormous for the frame. Both
+  // of those are what stops this reading as a big domestic cat.
+  M.box(0, 0.60, 0, 0.52, 0.46, 1.36, B);
+  M.box(0, 0.44, 0, 0.44, 0.20, 1.30, W);            // the pale underside
+  M.box(0, 0.66, -0.80, 0.42, 0.40, 0.34, B);        // the shoulders
+  M.box(0, 0.72, -1.08, 0.40, 0.38, 0.36, B);        // and the head, which is huge
+  M.box(0, 0.62, -1.28, 0.26, 0.22, 0.16, W);        // muzzle
+  for (let s = -1; s <= 1; s += 2) {
+    M.box(s * 0.15, 0.92, -1.02, 0.14, 0.12, 0.10, D);   // ears
+    M.box(s * 0.20, 0.30, -0.52, 0.16, 0.60, 0.18, B);   // front legs
+    M.box(s * 0.20, 0.30, 0.48, 0.18, 0.60, 0.20, B);    // back legs
+  }
+  // the tail: five segments, ringed, and it is nearly as long as she is
+  for (let k = 0; k < 5; k++) {
+    M.box(0, 0.58 + k * 0.02, 0.76 + k * 0.20, 0.14 - k * 0.012, 0.14 - k * 0.012,
+          0.20, k % 2 ? D : B);
+  }
+  // THE ROSETTES. Twenty-two of them, seeded off a fixed lattice rather than
+  // at random, because a random scatter clumps and a clumped jaguar reads as a
+  // dirty jaguar. They are what makes her recognisable at range and they are
+  // the reason the base colour is allowed to be close to the reeds.
+  for (let k = 0; k < 22; k++) {
+    const t = (k * 0.6180339887) % 1;
+    const side = k % 2 ? 1 : -1;
+    M.box(side * (0.19 + ((k * 7) % 3) * 0.04), 0.50 + ((k * 5) % 4) * 0.13,
+          -0.98 + t * 2.0, 0.10, 0.10, 0.12, D);
+  }
+  panJagPathLen = 0;
+  for (let i = 1; i < panJAG_PATH.length; i++) {
+    panJagPathLen += Math.hypot(panJAG_PATH[i][0] - panJAG_PATH[i - 1][0],
+                                panJAG_PATH[i][1] - panJAG_PATH[i - 1][1]);
+  }
+  if (!(panJagPathLen > 1)) panJagPathLen = 1;
+  panJag = new THREE.Mesh(M.build(), panVC());
+  panJag.castShadow = true;
+  panJag.visible = false;
+  panJag.name = 'panJaguar';
+  root.add(panJag);
+}
+
+/** Where the stalk path is at parameter u (0..1). */
+function panJagAt(u, out) {
+  const n = panJAG_PATH.length - 1;
+  const t = clamp(u, 0, 1) * n;
+  const i = Math.min(n - 1, Math.floor(t));
+  const f = t - i;
+  out.x = lerp(panJAG_PATH[i][0], panJAG_PATH[i + 1][0], f);
+  out.z = lerp(panJAG_PATH[i][1], panJAG_PATH[i + 1][1], f);
+  return out;
+}
+
+function panUpdateJaguar(game, dt) {
+  if (!panJag) return;
+  const capy = game.capy;
+  const p = capy && capy.body ? capy.body.position : null;
+  panJagT += dt;
+
+  // ---- when she comes ----------------------------------------------------
+  // Dusk, and not before: `panDusk` is switched on by the crossing, so she
+  // arrives after the chapter's own event rather than on a timer of her own.
+  // One appearance per visit — a jaguar you can watch four times is a fox.
+  if (panJagSt === 'away') {
+    // ...and she cuts, on the shared Tier 5 flag: with noHunt set she never
+    // comes at all, which is the state this chapter shipped in for its whole
+    // life and is the honest control for every number below.
+    if (panDusk > 0.5 && !panJagRuined && !(game.state && game.state.noHunt)) {
+      panJagArm += dt;
+      if (panJagArm > panJAG_ARM) {
+        panJagSt = 'stalk';
+        panJagT = 0;
+        panJagU = 0;
+        panJagRuined = true;          // once per visit, whatever happens next
+        panJagCrouch = 0;
+        panJagAt(0, panJagPt);
+        panJagX = panJagPt.x; panJagZ = panJagPt.z;
+        panJag.visible = true;
+      }
+    }
+    return;
+  }
+
+  if (panJagSt === 'stalk') {
+    panJagU += (panJAG_V * dt) / panJagPathLen;
+    panJagAt(panJagU, panJagPt);
+    const dx = panJagPt.x - panJagX, dz = panJagPt.z - panJagZ;
+    if (dx || dz) panJagYaw = Math.atan2(dx, dz);
+    panJagX = panJagPt.x; panJagZ = panJagPt.z;
+    panJagCrouch = damp(panJagCrouch, 1, 2.0, dt);
+    // ---- AND A WHEEK RUINS IT ------------------------------------------
+    // The one place in this chapter the voice does something for somebody
+    // else. She does not flee — a jaguar is not afraid of a capybara — she
+    // simply stops, looks at the thing that made the noise, and gives up on
+    // an ambush that is no longer an ambush.
+    if (p && game.input && game.input.honkPressed &&
+        Math.hypot(p.x - panJagX, p.z - panJagZ) < panJAG_HEAR) {
+      panJagSt = 'leave';
+      panJagT = 0;
+      panJagSpoiled++;
+      panSfx.volume = 0.30; panSfx.pitch = 0.42;
+      game.sfx('thud', panSfx);
+      game.toast('she looked straight at you and left. the herd never knew.');
+      return;
+    }
+    // ---- ...OR SHE COMMITS, BUT NOT YET --------------------------------
+    // MEASURED, on the first cut: she rushed at u = 0.14. The herd stands on
+    // the crossing and the path starts thirty metres from it, so the "is
+    // anybody within twenty-one metres" test was true almost immediately and
+    // the entire stalk — the thing this whole state exists to draw — lasted
+    // about eight seconds and happened off at the west end of the bank where
+    // nobody is standing.
+    //
+    // A stalk has to be WATCHABLE or it is a spawn. panJAG_STALK_MIN is the
+    // floor: she will not commit inside it however close the herd wanders,
+    // which also makes the wheek a real window rather than a reflex test.
+    const nearHerd = panJagNearestHerd();
+    const mayRush = panJagT > panJAG_STALK_MIN;
+    if (panJagU >= 1 || (mayRush && nearHerd && nearHerd.d < panJAG_RUSH_D)) {
+      if (nearHerd && nearHerd.d < panJAG_RUSH_D * 1.6) {
+        panJagSt = 'rush';
+        panJagT = 0;
+        panJagTx = nearHerd.x; panJagTz = nearHerd.z;
+        panSfx.volume = 0.42; panSfx.pitch = 0.30;
+        game.sfx('gasp', panSfx);
+      } else {
+        panJagSt = 'leave'; panJagT = 0;
+      }
+    }
+  } else if (panJagSt === 'rush') {
+    panJagCrouch = damp(panJagCrouch, 0.25, 6, dt);
+    const dx = panJagTx - panJagX, dz = panJagTz - panJagZ;
+    const d = Math.hypot(dx, dz) || 1;
+    const step = Math.min(d, panJAG_RUSH_V * dt);
+    panJagX += dx / d * step; panJagZ += dz / d * step;
+    panJagYaw = Math.atan2(dx, dz);
+    // ---- THE HERD SCATTERS ----------------------------------------------
+    // Everything inside panJAG_SEE breaks. Not a state of its own: a
+    // capybara that has seen a jaguar wants to be in the water and away from
+    // it, and `tx/tz` is the only thing panUpdateHerd steers on, so the
+    // scatter IS a target write. Followers are dropped out of `follow`,
+    // which is the cost of not having warned them.
+    if (!panJagStruck) {
+      for (let i = 0; i < panHERD_N; i++) {
+        const r = panHerd[i];
+        const hx = r.x - panJagX, hz = r.z - panJagZ;
+        if (hx * hx + hz * hz > panJAG_SEE * panJAG_SEE) continue;
+        const hd = Math.hypot(hx, hz) || 1;
+        r.tx = r.x + hx / hd * 26;
+        r.tz = r.z + hz / hd * 26;
+        r.st = 'graze';               // out of the line, and it is your fault
+        r.order = -1;
+        // ...and the scatter target has to SURVIVE. The graze branch replaces
+        // tx/tz the moment `restT` runs out, and `restT` is a leftover from
+        // whenever this one last picked a patch — so a capybara could be given
+        // twenty-six metres of run and drop it on the very next frame.
+        r.restT = rand(6, 10);
+        r.look = 0.9;
+      }
+      panJagStruck = true;
+      panJagRuns++;
+      game.toast('the whole line broke at once. now you know what they listen for.');
+      if (typeof game.shake === 'function') game.shake(0.10);
+    }
+    if (panJagT > 1.7 || d < 1.2) { panJagSt = 'leave'; panJagT = 0; }
+  } else if (panJagSt === 'leave') {
+    panJagCrouch = damp(panJagCrouch, 0, 1.6, dt);
+    // she goes north into the trees, at a walk
+    panJagZ -= panJAG_V * 1.4 * dt;
+    panJagYaw = Math.PI;
+    if (panJagT > 14) { panJagSt = 'away'; panJag.visible = false; }
+  }
+
+  // ---- AND THE OTTERS SHOUT AT HER, which is the line the chapter has ----
+  // been carrying for months with nothing to point at.
+  if (panJagSt !== 'away' && panInZone('otters', panJagX, panJagZ)) {
+    if (!panJagOtter) {
+      panJagOtter = true;
+      panOtterVolley = 4;
+      panOtterNext = 0;
+      panOtterArmed = true;
+      if (!panJagSaid) {
+        panJagSaid = true;
+        game.toast('the otters are screaming at something on the bank.');
+      }
+    }
+  } else panJagOtter = false;
+
+  // ---- draw -------------------------------------------------------------
+  // A stalking cat is LOW: the crouch drops her thirty centimetres and pitches
+  // the shoulders, which at this size is the difference between a walk and a
+  // stalk from any distance at all.
+  const gy = panTerrain(panJagX, panJagZ);
+  const gait = Math.sin(panJagT * (panJagSt === 'rush' ? 13 : 3.4)) * 0.03;
+  panJag.position.set(panJagX, gy - panJagCrouch * 0.17 + gait, panJagZ);
+  panJag.rotation.set(panJagCrouch * 0.07, panJagYaw, gait * 0.5, 'YXZ');
+}
+
+/** The nearest herd member to her, or null. */
+function panJagNearestHerd() {
+  let best = null, bd = 1e9;
+  for (let i = 0; i < panHERD_N; i++) {
+    const r = panHerd[i];
+    const dx = r.x - panJagX, dz = r.z - panJagZ;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bd) { bd = d2; best = r; }
+  }
+  return best ? { x: best.x, z: best.z, d: Math.sqrt(bd) } : null;
+}
+
 function panUpdateOtters(game, dt) {
   if (!panOtterMesh) return;
   panOtterT += dt;
@@ -4880,6 +5161,15 @@ export function createPantanal(game) {
         r.reply = 0; r.replyP = 1.2; r.look = 0;
       }
       panHerdChat = 4; panShakeT = 0;
+      // ---- Tier 5: a fresh visit is a fresh onça ---------------------------
+      // `panJagRuined` is the once-per-visit latch and it MUST be cleared here
+      // or she comes exactly once for the life of the page. The two counters —
+      // how many times she got a run at the line, and how many times you
+      // stopped her — are deliberately NOT cleared: they are the only thing in
+      // this chapter that is a record of what the player did for somebody else.
+      panJagSt = 'away'; panJagRuined = false; panJagArm = 0; panJagT = 0;
+      panJagStruck = false; panJagOtter = false; panJagCrouch = 0; panJagU = 0;
+      if (panJag) panJag.visible = false;
       panSayCool = 0;
       for (const k in panSaid) delete panSaid[k];
       panMatRun = 0; panMatLast = -1;
@@ -4930,6 +5220,42 @@ export function createPantanal(game) {
   });
 
   const api = {
+    /**
+     * TIER 5, measured. Nothing in the game calls it. `st` is her state, `runs`
+     * how many times she has had a go at the line and `spoiled` how many times
+     * the player put her off it.
+     */
+    jaguarDebug() {
+      let scattered = 0, following = 0;
+      for (let i = 0; i < panHERD_N; i++) {
+        const r = panHerd[i];
+        if (r.st === 'follow') following++;
+        if (Math.hypot(r.tx - r.x, r.tz - r.z) > 12) scattered++;
+      }
+      return { st: panJagSt, x: Math.round(panJagX * 10) / 10,
+               z: Math.round(panJagZ * 10) / 10,
+               u: Math.round(panJagU * 100) / 100,
+               crouch: Math.round(panJagCrouch * 100) / 100,
+               visible: !!(panJag && panJag.visible),
+               runs: panJagRuns, spoiled: panJagSpoiled,
+               dusk: Math.round(panDusk * 100) / 100, arm: Math.round(panJagArm * 10) / 10,
+               following: following, scattered: scattered,
+               otterVolley: panOtterVolley };
+    },
+    /** Put her on the bank now, so the hunt needs no forty-second dusk wait. */
+    forceJaguar() {
+      panDusk = 1; panJagRuined = false; panJagArm = panJAG_ARM + 1;
+      return panJagSt;
+    },
+    /** Move the herd onto the crossing so there is something to hunt. */
+    herdToCrossing() {
+      for (let i = 0; i < panHERD_N; i++) {
+        const r = panHerd[i];
+        r.x = panCROSS.x + (i - 4) * 2.2; r.z = -86 + (i % 3) * 2.0;
+        r.tx = r.x; r.tz = r.z; r.st = 'graze'; r.restT = 30;
+      }
+      return panHERD_N;
+    },
     built() { return panBuilt; },
     terrainHeight: panTerrain,
     /** The static ground, without the drifting mats. See panStandH. */
@@ -5075,6 +5401,7 @@ export function createPantanal(game) {
       panUpdateJabiru(game, dt);
       panUpdateMacawFlight(game, dt);
       panUpdateMacaws(game, dt);
+      panUpdateJaguar(game, dt);
       panUpdateOtters(game, dt);
       panUpdateCowbird(game, dt);
       panUpdateTasks(game, dt);
