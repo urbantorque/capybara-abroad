@@ -157,6 +157,109 @@ const physCAUSE_WATER = 8.0;     // s — a thrown ball can take a while to bob 
 // short enough that a hat lying on the lawn since the last chapter is litter.
 const physCAUSE_SNATCH = 12.0;
 
+// ===========================================================================
+// A THROWN THING THAT HITS A PERSON (the lift pass)
+// ===========================================================================
+//
+// The charged throw has existed since B10 and this file gives all nineteen
+// chapters rigid bodies, and the two facts never met: five of the two hundred
+// and thirty-two tasks mention throwing anything, and NOTHING in the game
+// distinguished an orange landing on a person from an orange landing on the
+// pavement beside them. npc.js has answered `prop:impact` since v33 — but with
+// `localsReact` only, at a flat 4.2 m/s, on a thirteen-metre circle, scaled
+// DOWN by distance. So a direct hit and a near miss were the same event, and
+// Sydney's and Pasto's walking casts (which are `humans`/`paHumans`, not
+// `locals`) were not reached by it at all.
+//
+// This is the one generic rule that makes the throw a verb: hit somebody and
+// they jump, at full strength, and the incident chain that systems.js already
+// runs off `prop:impact` opens on it. Four gates, and every one of them is
+// load-bearing:
+//
+//   IT MUST HAVE BEEN THROWN. `releaseTime` is stamped by every let-go
+//   including a set-down into a vessel, by npc.js's fumble and by the Pasto
+//   stall collapse, so it is the wrong mark — a crate shaken off a barrow onto
+//   a stallholder is the world's doing, not yours. physRelease stamps
+//   `thrownT` only when it is handed a launch impulse, which is only ever
+//   capybara.js's capyTryRelease. The mark EXPIRES (physHIT_WINDOW) and is
+//   SPENT on the first person struck, so one throw is at most one incident
+//   however many people it ricochets through.
+//
+//   IT MUST STILL BE FLYING. A prop in a mouth, in a hand or in a basket is
+//   KINEMATIC and out of the collision set; the DYNAMIC test says so directly
+//   rather than by listing the states that are not.
+//
+//   IT MUST HAVE ARRIVED. physHIT_MIN is along the contact normal, and the
+//   number comes off a measurement rather than off taste. MEASURED over 160
+//   solved throws at people in Sahara, Venice, Kowloon and Sydney (qa/throw-
+//   hit.js), 60 of which touched somebody: the normal speeds come out in two
+//   clusters with an empty band between them —
+//
+//       0.00 - 2.67 m/s   (14 of 60)  a prop that has already bounced off the
+//                                     ground, or is rolling into an ankle
+//       ----- nothing at all between 2.67 and 3.62 -----
+//       3.62 - 14.0 m/s   (42 of 60)  the throw arriving
+//
+//   — so 3.6 sits in the gap. It is not a taste threshold: it is the line the
+//   data draws between "you hit them" and "it ended up near them", and it is
+//   also why a prop that skips off the pavement into somebody earns nothing.
+//
+//   AND IT MUST NOT BE THE SIXTH THIS SECOND. A player in the souk has thirty
+//   oranges within reach. physHIT_COOL is a whole-game floor between two of
+//   these. MEASURED (qa/throw-rate.js): eight throws at one Kowloon local
+//   inside 2.0 s produced six contacts over the gate, of which TWO paid out and
+//   four were refused — exactly ceil(2.0 / 1.2), so the ceiling is the cooldown
+//   and not the player's hands.
+//
+// physHIT_R is deliberately under half npcLOC_REACT_R: a bang is heard across
+// a square, but being HIT is about the person it happened to and the two or
+// three standing with them. `startlePeople` is npc.js's own published sweep —
+// nothing new is invented here, it is simply reached for the first time by
+// something the player did on purpose.
+//
+// WHAT THE DIFFERENTIAL SAYS IT BUYS. The same eighty throws, run against this
+// file and against the same file stashed. npc.js has answered a bang since v33,
+// so the baseline is NOT zero — the question was only ever whether a hit is
+// louder than a near miss, and it was not. Peak flinch spring on the person
+// actually struck, read off npc.js's own record:
+//
+//                    without        with
+//     Sahara     4.80 / max 7.62    20.97 / max 20.97
+//     Venice     4.40 / max 6.96    11.33 / max 23.45
+//     Kowloon    5.31 / max 8.10     8.94 / max 22.01
+//
+// The means move; the CEILING is the real finding. Struck by a thrown prop, the
+// old build's spring never once passed 8.1 in any of the three chapters, which
+// is the most (speed - 4.2)/9 can produce at the 5-9 m/s a throw arrives at.
+// With the rule it reaches 21-23 every time, because a hit asks for strength 1
+// and a bang cannot. Sydney's walkers have no flinch spring — they have a state
+// machine instead — and there all three hits put the victim into a fright state.
+const physHIT_WINDOW = 3.0;      // s a throw stays "in flight, and yours"
+const physHIT_MIN    = 3.6;      // m/s along the normal before it is a hit
+const physHIT_COOL   = 1.2;      // s — the whole-game floor between two of these
+const physHIT_R      = 7.0;      // m of people who react, centred on the victim
+// The lens kick, scaled by how hard it landed. 0.10 is capybara.js's own
+// hop-landing punch and 0.26 is Hanoi's worst; a thrown mango is nearer the
+// first than the second, so it tops out below both ends of that range.
+const physHIT_PUNCH  = 0.09;
+const physHIT_PUNCH_K = 0.014;   // ...per m/s over physHIT_MIN
+const physHIT_PUNCH_MAX = 0.20;
+// One line, from the person nearest the impact who still has a mouth. NOT the
+// victim by construction: `startlePeople` has just spent their line pool on the
+// startle itself and `saySomebodyNear` skips anybody whose talkCd is running,
+// so this lands on a bystander when there is one and on nobody when there is
+// not — which is the right shape for it. Kept short and place-neutral: this
+// fires in nineteen cities and a line that names a currency or a coastline is
+// wrong in eighteen of them.
+const physHIT_LINES = [
+  'Oi!',
+  'That hit me!',
+  'Who threw that?',
+  'Watch it!',
+  'It threw that. At me.',
+  'Right at my head!',
+];
+
 // ---- the wheek is a pressure wave -----------------------------------------
 // THIS IS EXPRESSION AND IT IS NOT A MECHANIC. Same rule wariness follows — IT
 // DOES NOT DENY ANYTHING — read the other way round: it does not GRANT anything
@@ -317,6 +420,15 @@ let physLightMat = null;
 let physPropMat = null;
 let physNextId = 1;
 let physLastTick = -1;
+// ---- the thrown hit (see physPersonHit) ----
+// The cooldown is a TIMESTAMP and not a counter ticked in update(): the gate is
+// read a handful of times a session, from inside a cannon collide callback, and
+// a per-frame decrement for something that idle is a per-frame cost for nothing.
+let physHitT = -1e9;             // state.time of the last hit that landed
+let physHitN = 0;                // ...and how many, for physHitAudit
+let physHitBlocked = 0;          // ...and how many were refused by a gate
+let physHitLine = 0;             // rotating index into physHIT_LINES
+let physThrowN = 0;              // charged/tapped throws armed, for the same audit
 const physGeoCache = new Map();
 const physInstGroups = [];
 const physInstByKey = new Map();
@@ -1688,6 +1800,12 @@ export function createProps(game) {
     typeOf: function (t) { return physTYPES[t] || null; },
     // item 5: the one thing you brought with you. See physTravelThrough.
     travelAudit: physTravelAudit,
+    // ---- the thrown hit (the lift pass) ----
+    // The window on physPersonHit's four gates. Read-only, and a harness hook
+    // rather than a verb — there is deliberately no `forceHit` beside it,
+    // because a hit that did not come out of a real launch impulse is exactly
+    // the thing the rule exists to refuse.
+    hitAudit: physHitAudit,
     // ...and the verb itself. systems.js is the only caller: see biomeGo,
     // and the note there on why the decision cannot be taken on this side.
     travelThrough: physTravelThrough,
@@ -2159,6 +2277,11 @@ function physMakeProp(type, x, z, variant, yaw, restY, loose) {
     disturbed: false,          // has anything external ever moved this prop?
     lastCapyTouch: -1e9,       // last contact with the capy (or its cargo)
     releaseTime: -1e9,         // last time the capy let go of / threw it
+    // ...and the narrower mark: the last time the capybara THREW it, meaning
+    // physRelease was handed a launch impulse. Separate from releaseTime
+    // because a set-down, an npc fumble and a collapsing stall all stamp that
+    // one and none of them is a thing the player aimed. See physPersonHit.
+    thrownT: -1e9,
     spin: def.spin,
     gustT: Math.random() * physGUST_KICK_T,   // the puff clock. See physGustKick.
     dampL: light ? 0.02 : 0.06,
@@ -3015,6 +3138,10 @@ function physRelease(impulse) {
   prop.inWater = false;
   physStampTouch(prop);
   prop.releaseTime = physGame.state.time;   // the capybara owns what happens next
+  // ...and this one only if there was a launch vector. physPutIn calls this
+  // function with null to get the held-state transition for free, and a prop
+  // lowered into a basket has not been thrown at anybody.
+  if (impulse) { prop.thrownT = physGame.state.time; physThrowN++; }
   capy.heldProp = null;
   physSetSolo(prop, false);
   // Only a real throw arms a spill — setting a cup down gently leaves it intact.
@@ -3342,6 +3469,12 @@ function physOnCollide(prop, e) {
   // Presentation (thud + shake) belongs to systems.js's 'prop:impact' handler —
   // firing it here too double-shakes and flanges the sample.
   physGame.events.emit('prop:impact', physImpactPayload);
+  // AFTER the emit and not before it: systems.js's own 'prop:impact' handler is
+  // what opens the incident (sysINC_HIT is 2.6 m/s and `disturbed` is stamped at
+  // the top of this function), so by the time the startle fires the chain has
+  // already counted the bang. Reversing these two would make the person jump
+  // before the thing that startled them was reported.
+  physPersonHit(prop, e, speed);
   if (speed > 5) {
     physDust3(prop.body.position.x, prop.body.position.y - prop.originY * 0.5, prop.body.position.z, 3);
   }
@@ -3399,6 +3532,103 @@ function physOnCollide(prop, e) {
   if (prop.fragile && speed > physSHATTER_MIN) { physShatter(prop); return; }
 
   if (!prop.spilled && speed > physSPILL_MIN && physTYPES[prop.type].spill) physSpill(prop);
+}
+
+/**
+ * ---- ...AND IF IT HITS SOMEBODY, THAT IS A DIFFERENT EVENT ----------------
+ *
+ * One rule, in the one place every prop collision in the game already passes
+ * through. See the block above physHIT_WINDOW for why each gate is there.
+ *
+ * WHAT IT DOES NOT DO, and this is the whole of the safety argument:
+ *
+ *   it invents no state. `startlePeople` is npc.js's own published sweep (main
+ *   .js:1903), and until now systems.js's herd loop was its only caller. It
+ *   reaches `locals` in all nineteen chapters and `humans`/`paHumans` in the
+ *   two that have a walking cast, and everything downstream of it — the flinch
+ *   spring, the line, the witness chain, the `npc:startled` that systems.js
+ *   turns into a gasp and chaos — is code that has been running for versions.
+ *
+ *   it does not open a channel of its own. The incident was already opened by
+ *   the `prop:impact` emit four lines above the call site, which is where it
+ *   belongs: systems.js gates that on `disturbed` and on sysINC_HIT (2.6 m/s),
+ *   both of which a thrown prop clears by construction, and `incSeen` already
+ *   dedupes on the prop's id — so throwing the same orange at the same market
+ *   twice in a row cannot ratchet the chain. Nothing new is counted here.
+ *
+ *   and it cannot cost the player a task. Three layers, deliberately:
+ *
+ *     npc.js's `startle` returns immediately for anybody with `carryT >= 0`,
+ *     and routes anybody holding a drink to 'fluster' or 'lookAt' rather than
+ *     'flee' — the cast has protected its carriers since v19;
+ *
+ *     `localsReact` never MOVES a local at all. It is a flinch spring and a
+ *     line, so in the seventeen chapters whose only people are fixed locals the
+ *     reaction is by construction non-destructive — nobody can run away with
+ *     anything because nobody runs;
+ *
+ *     and on top of both, the two states in which a person is actually
+ *     executing a task-shaped errand — `carryT`, the delivery walk, and `own`,
+ *     the retrieval errand F4 pins the stolen prop to — take the lens kick and
+ *     the line and NOT the sweep. That costs the bystanders their jump in a
+ *     case that is rare, and it is the right way round: a startle that fires
+ *     and should not have is a bug you find in an hour, and a task that became
+ *     unwinnable is one you find in a bug report six weeks later.
+ */
+function physPersonHit(prop, e, speed) {
+  if (speed < physHIT_MIN) return;
+  const b = e.body;
+  const ud = b && b.userData;
+  const who = ud && (ud.npc || ud.local);
+  if (!who) return;
+  // In a mouth, in a hand or in a basket: KINEMATIC and, in the last two
+  // cases, out of the collision set entirely. Not a thing in flight.
+  if (prop.body.type !== CANNON.Body.DYNAMIC) return;
+  const t = physGame.state ? physGame.state.time : 0;
+  if (t - prop.thrownT >= physHIT_WINDOW) return;
+  // SPENT HERE, before the cooldown is read and not after it. A prop that hit
+  // somebody is a prop whose throw is over, whether or not this one paid out —
+  // otherwise a refused hit leaves the mark armed and the ricochet off the
+  // shoulder into the person behind pays out instead, half a second later.
+  prop.thrownT = -1e9;
+  if (t - physHitT < physHIT_COOL) { physHitBlocked++; return; }
+  physHitT = t;
+  physHitN++;
+
+  const px = b.position.x, pz = b.position.z;
+  // The lens knows it connected. Scaled by how hard, capped well under the
+  // punch a bin going over already gets — this is a mango, not a collision.
+  if (typeof physGame.punch === 'function') {
+    physGame.punch(Math.min(physHIT_PUNCH + (speed - physHIT_MIN) * physHIT_PUNCH_K,
+                            physHIT_PUNCH_MAX));
+  }
+  // The third layer of the carrier guard. See the note above.
+  const busy = (who.carryT >= 0) || !!who.own;
+  if (!busy && typeof physGame.startlePeople === 'function') {
+    physGame.startlePeople(px, pz, 1, physHIT_R);
+  }
+  // ...and somebody says so. `saySomebodyNear` returns false rather than
+  // throwing when every mouth in range is cooling down, which after a startle
+  // is most of them — so this is a line SOMETIMES, by design, and the index
+  // only advances when one was actually said.
+  if (typeof physGame.sayNear === 'function') {
+    let said = false;
+    try { said = physGame.sayNear(px, pz, physHIT_R, physHIT_LINES[physHitLine]); }
+    catch (err) { said = false; }
+    if (said) physHitLine = (physHitLine + 1) % physHIT_LINES.length;
+  }
+}
+
+/**
+ * The harness window on the rule above. Same shape and the same reason as
+ * travelAudit and hangAudit: a gate that refuses is invisible from outside, and
+ * "the throw never armed" and "the throw armed and missed" are the same zero.
+ */
+function physHitAudit(reset) {
+  const r = { hits: physHitN, blocked: physHitBlocked, throws: physThrowN,
+              last: +physHitT.toFixed(2), min: physHIT_MIN, cool: physHIT_COOL };
+  if (reset) { physHitN = 0; physHitBlocked = 0; physThrowN = 0; }
+  return r;
 }
 
 function physSpill(prop) {
