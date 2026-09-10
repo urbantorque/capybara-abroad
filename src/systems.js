@@ -7891,6 +7891,14 @@ function sysBuildCSS() {
 '@keyframes capyui-nib{to{clip-path:inset(-4px -4px -4px 0);}}',
 '.capyui-count{margin-top:8px;font-size:' + tMd + ';letter-spacing:.16em;',
   'color:' + inkSoft + ';text-transform:uppercase;}',
+/* ---------- and the things nobody mentions (L5) -----------------------------
+   Deliberately NOT uppercase and NOT letterspaced, unlike every other line on
+   this card: the whole point of it is that it is not part of the list. It is a
+   remark under the tally, in the same ink as the clue lines, and it names
+   nothing and points at nothing. */
+'.capyui-finds{display:none;margin-top:5px;font-size:' + tSm + ';font-style:italic;',
+  'color:' + inkSoft + ';letter-spacing:.01em;text-transform:none;opacity:.85;}',
+'.capyui-finds.on{display:block;}',
 /* ---------- the record you are setting, while you are setting it (v32) ------ */
 /* Under the tally, on the same paper, and `display:none` unless an attempt is
    actually open — see recordLive. Two lines, because they are two different
@@ -19286,6 +19294,19 @@ export function createSystems(game) {
   todoEl.appendChild(clueEl);
   const countEl = sysEl('div', 'capyui-count', '');
   todoEl.appendChild(countEl);
+  // ---- THE GAME NEVER SAID THESE EXISTED (L5) ------------------------------
+  // Sixty-eight finds, forty of them belonging to a named place — two in every
+  // chapter, three in Palawan and Sơn Đoòng — written to three good rules, and
+  // the only surface any of them had was the ledger at the END of the journey,
+  // listing the ones you had already tripped over. A discovery nobody knows is
+  // there is not a discovery, it is dead content; and the difference between a
+  // world that is solved and a world that is searched is one sentence.
+  //
+  // A COUNT, NEVER A NAME AND NEVER A PLACE. The moment this line can be used
+  // to locate anything, the finds stop being finds and become two more tasks
+  // with the arrow switched off, which is worse than not mentioning them.
+  const findsEl = sysEl('div', 'capyui-finds', '');
+  todoEl.appendChild(findsEl);
   // ---- AND THE NUMBER YOU ARE CHASING WHILE YOU CHASE IT (v32) ------------
   // Inside the card rather than beside it: it belongs to the same sheet of
   // paper as the thing you are doing, it inherits the card's fade, its rotate
@@ -19987,8 +20008,13 @@ export function createSystems(game) {
       g2.fillStyle = sysRgba(PALETTE.cloth1, 1);
       const bits = [done + ' of ' + TASKS.length, places + ' of ' + chapMax + ' places',
                     keepCount() + ' kept'];
-      const noticed = findCount();
-      if (noticed) bits.push(noticed + ' noticed');
+      // ---- ...AND THE DENOMINATOR, WHICH WAS THE MISSING HALF (L5) -------
+      // This read `noticed + ' noticed'` and was hidden entirely at zero, so
+      // the one surface in the game that could have said how much there is to
+      // notice said nothing at all until after you had noticed something. The
+      // count is the whole invitation, and it belongs on the player's own
+      // record of the journey rather than on the working list.
+      bits.push(findCount() + ' of ' + FINDS.length + ' noticed');
       const nm = notoName();
       if (nm) bits.push(nm);
       g2.fillText(bits.join('   ·   ').toUpperCase(), sysSHEET_PAD, 126);
@@ -23687,6 +23713,36 @@ export function createSystems(game) {
   let todoTopId = '';
 
   // --- the rolling window --------------------------------------------------
+  // ---- HOW MANY THINGS NOBODY MENTIONS, AND HOW MANY YOU HAVE (L5) --------
+  // The denominator is the STATIC `chapter` field, because it has to be true
+  // before anything has been found; the numerator is findDone against the same
+  // field, so a find made here counts here and the twenty-eight chapter-neutral
+  // ones — the dive, the climb, the cold, what nobody saw, what you did with
+  // the time — never appear on any chapter's line. Those belong to the whole
+  // journey and the journal is where they are counted.
+  //
+  // The sentence is written the long way round on purpose. "2/2 finds" is a
+  // collectible counter and would turn the paper into a checklist with a
+  // secret; "two things nobody mentions here" is the same information said as
+  // a remark, and it is the only line on this card that is not an instruction.
+  const sysNUMWORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
+  function sysNumWord(k) { return sysNUMWORD[k] || String(k); }
+  function todoFindsLine(n) {
+    let have = 0, all = 0;
+    for (let i = 0; i < FINDS.length; i++) {
+      if (FINDS[i].chapter !== n) continue;
+      all++;
+      if (findDone[FINDS[i].id]) have++;
+    }
+    if (!all) { findsEl.classList.remove('on'); return; }
+    let t = sysNumWord(all) + ' things nobody mentions here';
+    if (have >= all) t += '  ·  found';                      // all of them
+    else if (have === 1 && all === 2) t += '  ·  one of them found';
+    else if (have > 0) t += '  ·  ' + sysNumWord(have) + ' found';
+    if (findsEl.textContent !== t) findsEl.textContent = t;
+    findsEl.classList.add('on');
+  }
+
   function chapComplete(n) {
     const rec = chapRec[n];
     if (!rec) return false;
@@ -24064,6 +24120,7 @@ export function createSystems(game) {
       todoEl.insertBefore(clueEl, countEl);
     }
     countEl.textContent = chapLabel(n) + '  ·  ' + done + ' / ' + rec.ids.length;
+    todoFindsLine(n);
 
     // ---- A FINISHED CHAPTER IS NOT AN EMPTY CARD ---------------------------
     // Tick the last thing in a place and the paper went blank: four hidden rows,
