@@ -193,6 +193,65 @@ for good and every later recovery path drew to nowhere as well. The score's
 `setInterval` — which main.js's never-drop list cannot reach — stands down for
 two seconds after three consecutive throws.
 
+### 11. A THROWN THING HITS SOMEBODY — `physPersonHit` (props.js)
+
+Four gates, and the first is the whole design. **`releaseTime` is the wrong
+mark** — it is stamped by set-downs, by npc fumbles and by the Pasto stall
+collapse as well — so `prop.thrownT` is stamped in `physRelease` ONLY when it is
+handed a launch impulse (which is only ever `capyTryRelease`), expires after
+3 s, and is **spent on the first person struck**, so one throw is at most one
+incident however many people it ricochets through. Then: `body.type === DYNAMIC`
+(a prop in a mouth, a hand or a basket is KINEMATIC, so a carried thing brushing
+somebody is not a throw); 3.6 m/s along the normal; and a 1.2 s whole-game
+floor.
+
+The reaction reaches for what exists: `game.startlePeople`, `game.sayNear`,
+`game.punch`. **The incident and notoriety channel is NOT re-plumbed** —
+systems.js already opens it off the `prop:impact` four lines above and `incSeen`
+dedupes per prop.
+
+Nothing becomes unwinnable: npc.js's `startle` already exempts `carryT >= 0`,
+`localsReact` never moves a local at all (so the seventeen local-built chapters
+are non-destructive by construction), and a victim mid-errand takes the punch
+and the line but not the sweep. 0 owned props lost across four chapters.
+
+Differential, 80 solved throws each, peak flinch spring on the person struck:
+Marrakech max 7.62 -> 20.97, Venice 6.96 -> 23.45, Mong Kok 8.10 -> 22.01, rule
+firings 0 -> 18. The baseline is not zero — npc.js has answered bangs since v33
+— but its ceiling is 8.1.
+
+### 12. THE CRANE DOES NOT ASK FOR A SHOT THE PLACE CANNOT GIVE — `restBlocked`
+
+A consequence of §1. The wide shot puts the boom out to 12.5 m; cutting it drags
+the eye up the boom axis toward the anchor, so a blocked crane ACHIEVES 26
+degrees instead of 11 and the frame is the back of the animal's head.
+
+**A LATCH, NOT A SCALE.** Scaling the ask by `camClearF` is the obvious version
+and it oscillates on a five-second cycle: retract, ray clears, `camClearF` eases
+out at 3.2/s, ask rises, extend, cut again. The place gets ONE answer and it
+stays said until the player moves — which is the same signal that zeroes
+`restIdleT`, so it needs no second rule and there is no path from the crane's
+own position back into the ask.
+
+Both numbers come from frames, and both were wrong first:
+
+```
+skyRestT > sysREST_W * 0.42   the crane must be genuinely OUT before a cut
+                              means anything. 0.05 is the driving boom, so a
+                              spot tight at 9.5 m latched on a cut it was
+                              always going to have.
+camClearF < 0.48              the cut has to be severe. Judged by eye:
+                              quay 0.15 bad, kowloon 0.38 bad,
+                              antarctic 0.53 GOOD. And at 12.5 m of boom,
+                              0.48 is 6.0 m of eye — under sysCAM_MIN, closer
+                              than a player may ever zoom by hand.
+```
+
+After: wide shot delivered **19/19**, animal on screen **19/19**, Antarctica
+keeps its 0.53 cut and its frame.
+
+---
+
 ### THE INSTRUMENT WORTH KNOWING ABOUT
 
 `qa/pnghist.mjs` — frame statistics from a PNG with **no dependencies**: parse
