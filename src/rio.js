@@ -198,6 +198,72 @@ function rioInitGeos() {
 const rioCAR_V = 12.0;
 let rioCar = null, rioCarMover = null;
 
+// ========================================================== THE PASSENGERS ===
+/**
+ * THIRTY-SIX SECONDS ALONE IN A CABLE CAR.
+ *
+ * The bondinho is the biggest altitude change in the chapter and there is
+ * nothing to do aboard but stand. Four people in it is the difference between
+ * a ride and a lift.
+ *
+ * The cabin floor is the box at local y -1.15, 0.14 thick, so its top is
+ * -1.08 and this figure's feet are 0.31 below its own origin.
+ */
+const rioPAX_N = 4;
+let rioPaxBody = null, rioPaxHead = null;
+const rioPaxData = new Float32Array(rioPAX_N * 3);
+
+function rioBuildPax(group) {
+  if (!group) return;
+  const B = rioMerger();
+  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  const H = rioMerger();
+  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  const c = new THREE.Color();
+  const SH = [PALETTE.rioTileYellow, PALETTE.rioTileBlue, PALETTE.rioTileGreen, PALETTE.rioTileRed];
+  const mk = (geo, tint) => {
+    const im = new THREE.InstancedMesh(geo, rioVC(), rioPAX_N);
+    im.castShadow = false;
+    // A child of a moving vehicle whose bounding sphere is computed at the
+    // origin: cull it and the whole load vanishes the moment it pulls away.
+    im.frustumCulled = false;
+    if (tint) {
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(rioPAX_N * 3), 3);
+      for (let i = 0; i < rioPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
+      im.instanceColor.needsUpdate = true;
+    }
+    return im;
+  };
+  rioPaxBody = mk(B.build(), true);
+  rioPaxHead = mk(H.build(), false);
+  group.add(rioPaxBody); group.add(rioPaxHead);
+  for (let i = 0; i < rioPAX_N; i++) {
+    const a = i * Math.PI * 0.5 + 0.4;
+    rioPaxData[i * 3] = Math.sin(a) * 0.82;
+    rioPaxData[i * 3 + 1] = Math.cos(a) * 0.82;
+    rioPaxData[i * 3 + 2] = rand(0, Math.PI * 2);
+  }
+  rioUpdatePax();
+}
+
+function rioUpdatePax() {
+  if (!rioPaxBody) return;
+  for (let i = 0; i < rioPAX_N; i++) {
+    const o = i * 3;
+    const lx = rioPaxData[o], lz = rioPaxData[o + 1], ph = rioPaxData[o + 2];
+    // facing OUT of the cabin, which is what everybody in one does
+    const yaw = Math.atan2(lx, lz);
+    const lean = Math.sin(rioTime * 0.55 + ph) * 0.03;
+    const m = rioXform(lx, -0.77, lz, 0, yaw, lean, 1, 1, 1);
+    rioPaxBody.setMatrixAt(i, m);
+    rioPaxHead.setMatrixAt(i, m);
+  }
+  rioPaxBody.instanceMatrix.needsUpdate = true;
+  rioPaxHead.instanceMatrix.needsUpdate = true;
+}
+
 function rioBuildCar(game, root) {
   rioCar = new THREE.Group();
   const M = rioMerger();
@@ -4455,6 +4521,7 @@ export function createRio(game) {
     cabin() { return rioCabinGroup; },
 
     update(dt) {
+      rioUpdatePax();
       if (rioCarMover) rioCarMover.step(dt);
       if (!rioBuilt) return;
       if (!game.biome.isActive('rio')) return;
@@ -4578,6 +4645,8 @@ function rioBuild(game) {
   rioBuildBirds(rioRoot);
   rioBuildSparks(rioRoot);
   rioBuildCar(game, rioRoot);
+  // ...and four people in the cable car. AFTER the cabin is built.
+  rioBuildPax(rioCabinGroup);
 
   // ---- AND THE BODIES FOR THEM, ONCE, HERE (D5.1) -------------------------
   // This call used to sit in `onEnter`, mis-indented, in the middle of the

@@ -257,6 +257,79 @@ function caliInitGeos() {
 const caliMOTO_V = 8.5;
 let caliMoto = null, caliMotoMover = null;
 
+// ========================================================== THE PASSENGERS ===
+/**
+ * A PARTY BUS WITH NO PARTY.
+ *
+ * The chiva is the chapter's marquee: ninety to a hundred and twenty seconds
+ * on the roof of a moving bus, with a band on the rack behind you playing the
+ * chapter's own salsa. And the benches under that roof were empty for the
+ * whole ride. A chiva that nobody is on is a lorry.
+ *
+ * On the BENCHES, not the rack. The roof is where the player goes and where
+ * the cables are, and the one thing worse than an empty bus is a bus so full
+ * the hop you came for is blocked.
+ */
+const caliPAX_N = 8;
+let caliPaxBody = null, caliPaxHead = null;
+const caliPaxData = new Float32Array(caliPAX_N * 3);   // lx, lz, phase
+
+function caliBuildPax(group) {
+  if (!group) return;
+  const B = caliMerger();
+  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  const H = caliMerger();
+  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  const c = new THREE.Color();
+  const SH = [PALETTE.caliNeonPink, PALETTE.caliNeonCyan, PALETTE.caliNeonGold, PALETTE.caliWall1];
+  const mk = (geo, tint) => {
+    const im = new THREE.InstancedMesh(geo, caliVC(), caliPAX_N);
+    im.castShadow = false;
+    // A child of a moving vehicle whose bounding sphere is computed at the
+    // origin: cull it and the whole load vanishes the moment it pulls away.
+    im.frustumCulled = false;
+    if (tint) {
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(caliPAX_N * 3), 3);
+      for (let i = 0; i < caliPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
+      im.instanceColor.needsUpdate = true;
+    }
+    return im;
+  };
+  caliPaxBody = mk(B.build(), true);
+  caliPaxHead = mk(H.build(), false);
+  group.add(caliPaxBody); group.add(caliPaxHead);
+  for (let i = 0; i < caliPAX_N; i++) {
+    caliPaxData[i * 3] = (i % 2 ? 1 : -1) * 0.86;
+    caliPaxData[i * 3 + 1] = -3.4 + Math.floor(i / 2) * 2.2;
+    caliPaxData[i * 3 + 2] = rand(0, Math.PI * 2);
+  }
+  caliUpdatePax();
+}
+
+function caliUpdatePax() {
+  if (!caliPaxBody) return;
+  // The chassis top is at local 0.87 and this figure's feet are 0.31 below
+  // its own origin; seated, it is scaled to two thirds. They face out through
+  // the open sides, which is the whole point of a chiva.
+  const beat = (caliGame && caliGame.music && typeof caliGame.music.beats === 'function')
+    ? caliGame.music.beats() : 0;
+  for (let i = 0; i < caliPAX_N; i++) {
+    const o = i * 3;
+    const lx = caliPaxData[o], lz = caliPaxData[o + 1], ph = caliPaxData[o + 2];
+    const yaw = lx > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+    // ...and they are on the same beat the band is. Half a bar apart from
+    // each other, because a bus that bobs in unison is a chorus line.
+    const bob = Math.abs(Math.sin(beat * Math.PI + ph)) * 0.05;
+    const m = caliXform(lx, 1.18 + bob, lz, 0, yaw, 0, 1, 0.66, 1);
+    caliPaxBody.setMatrixAt(i, m);
+    caliPaxHead.setMatrixAt(i, m);
+  }
+  caliPaxBody.instanceMatrix.needsUpdate = true;
+  caliPaxHead.instanceMatrix.needsUpdate = true;
+}
+
 function caliBuildMoto(game, root) {
   caliMoto = new THREE.Group();
   const M = caliMerger();
@@ -4184,6 +4257,7 @@ export function createCali(game) {
     },
 
     update(dt) {
+      caliUpdatePax();
       if (caliMotoMover) caliMotoMover.step(dt);
       if (!caliBuilt) return;
       if (!game.biome.isActive('cali')) return;
@@ -4389,6 +4463,9 @@ function caliBuild(game) {
   caliBuildFlora(caliRoot);
   caliBuildSparks(caliRoot);
   caliBuildMoto(game, caliRoot);
+  // ...and somebody on the benches. AFTER caliBuildChiva, which is what makes
+  // the group; called before it this takes a null and returns in silence.
+  caliBuildPax(caliChivaGroup);
 
   // ---- THE PEOPLE WHO LIVE HERE ------------------------------------------
   // See npc.js, THE LOCALS. Each of these is a point somebody is standing at,

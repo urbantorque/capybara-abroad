@@ -249,6 +249,69 @@ const hkTAXI_Z0 = -52, hkTAXI_Z1 = 72;   // the wrap, past both ends of the stre
 const hkTAXI_V = 9.0;
 let hkTaxi = null, hkTaxiMover = null, hkTaxiHold = 0;
 
+// ========================================================== THE PASSENGERS ===
+/**
+ * NOBODY HAS EVER RIDDEN THE OPEN TOP.
+ *
+ * hkBuildBus draws bench seats down the upper deck -- two rows of them, with
+ * backs -- and in eleven chapters not one person has sat in one. The mini asks
+ * the player to ride it down the street; they ride it alone.
+ *
+ * The seats are at hkBUS_TOP + 0.24 at x +/- 0.62, so the centre aisle the
+ * player stands in stays clear.
+ */
+const hkPAX_N = 6;
+let hkPaxBody = null, hkPaxHead = null;
+const hkPaxData = new Float32Array(hkPAX_N * 3);
+
+function hkBuildPax(group) {
+  if (!group) return;
+  const B = hkMerger();
+  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  const H = hkMerger();
+  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.hkSkin || 0xd7a98a);
+  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hkHair || 0x2a2320);
+  const c = new THREE.Color();
+  const SH = [PALETTE.hkLaundry, PALETTE.hkNeonCyan, PALETTE.hkCrate, PALETTE.hkAwning];
+  const mk = (geo, tint) => {
+    const im = new THREE.InstancedMesh(geo, hkVC(), hkPAX_N);
+    im.castShadow = false;
+    // A child of a moving vehicle whose bounding sphere is computed at the
+    // origin: cull it and the whole load vanishes the moment it pulls away.
+    im.frustumCulled = false;
+    if (tint) {
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(hkPAX_N * 3), 3);
+      for (let i = 0; i < hkPAX_N; i++) { c.set(SH[i % SH.length]); im.setColorAt(i, c); }
+      im.instanceColor.needsUpdate = true;
+    }
+    return im;
+  };
+  hkPaxBody = mk(B.build(), true);
+  hkPaxHead = mk(H.build(), false);
+  group.add(hkPaxBody); group.add(hkPaxHead);
+  for (let i = 0; i < hkPAX_N; i++) {
+    hkPaxData[i * 3] = (i % 2 ? 1 : -1) * 0.62;
+    hkPaxData[i * 3 + 1] = -3.2 + Math.floor(i / 2) * 1.5;
+    hkPaxData[i * 3 + 2] = rand(0, Math.PI * 2);
+  }
+  hkUpdatePax();
+}
+
+function hkUpdatePax() {
+  if (!hkPaxBody) return;
+  for (let i = 0; i < hkPAX_N; i++) {
+    const o = i * 3;
+    const lx = hkPaxData[o], lz = hkPaxData[o + 1], ph = hkPaxData[o + 2];
+    const lean = Math.sin(hkTime * 0.6 + ph) * 0.03;
+    const m = hkXform(lx, hkBUS_TOP + 0.55, lz, 0, 0, lean, 1, 0.66, 1);
+    hkPaxBody.setMatrixAt(i, m);
+    hkPaxHead.setMatrixAt(i, m);
+  }
+  hkPaxBody.instanceMatrix.needsUpdate = true;
+  hkPaxHead.instanceMatrix.needsUpdate = true;
+}
+
 function hkBuildTaxi(game, root) {
   hkTaxi = new THREE.Group();
   const M = hkMerger();
@@ -4807,6 +4870,7 @@ export function createKowloon(game) {
     climbing() { return !!(game.capy && game.capy.climbing); },
 
     update(dt) {
+      hkUpdatePax();
       hkUpdateTaxi(dt);
       if (!hkBuilt) return;
       if (!game.biome.isActive('kowloon')) return;
@@ -4894,6 +4958,8 @@ function hkBuild(game) {
   hkBuildStreet(game, hkRoot);
   hkBuildBus(game, hkRoot);
   hkBuildTaxi(game, hkRoot);
+  // ...and somebody on the open top. AFTER hkBuildBus, which makes the group.
+  hkBuildPax(hkBusGroup);
   hkBuildLion(game, hkRoot);
   hkBuildScaffold(game, hkRoot);
   hkBuildPoles(game, hkRoot);
