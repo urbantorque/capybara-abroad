@@ -417,6 +417,76 @@ function gorStaticBox(game, x, y, z, sx, sy, sz, ry) {
 }
 function gorSmooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 
+// ---- C1: THE ONE THAT GOES -----------------------------------------------
+//
+// gorFIELD_GO is a phase, not a time: everything in this chapter hangs off
+// gorPhase and a launch on a stopwatch of its own would drift out of the dawn
+// within two cycles. It sits 0.045 past gorLAUNCH_P — the decor wave starts
+// at gorLAUNCH_P with up to 0.11 of stagger, so the near one goes INSIDE that
+// wave rather than before or after it, which is the difference between "the
+// field is launching" and "one balloon left".
+//
+// 0.045 * 156 s is about seven seconds after the wave starts, which from the
+// arrival square at z 34 is roughly the time it takes to walk to the field.
+const gorFIELD_GO   = gorLAUNCH_P + 0.045;
+const gorFIELD_RATE = 3.4;        // the exponential's rate — see the decor curve
+const gorFIELD_CEIL = 96;         // m above its own pad, where it joins the layer
+let gorFieldLaunch = null;        // the live group, or null
+let gorFieldLaunchBody = null;    // ...and its basket collider, which goes with it
+let gorFieldLaunchGY = 0;
+let gorFieldLaunchY = 0;          // metres above the pad
+let gorFieldLaunchSaid = false;
+// ...and where it started, so onEnter can put it back exactly there.
+let gorFieldLaunchX0 = 0, gorFieldLaunchZ0 = 0;
+let gorFieldLaunchPad = null;   // the basket collider's pad, for the re-add
+
+/**
+ * The one balloon on the field that is not merged, leaving.
+ *
+ * The curve is the decor balloons' own — `(1 - exp(-go * rate)) * ceiling` —
+ * on purpose and not by accident: a near balloon that rises on a different law
+ * from the twenty-six behind it reads as a different kind of object, and the
+ * whole value of this item is that the thing twenty-five metres away is doing
+ * what the things six hundred metres away are doing.
+ *
+ * THE COLLIDER IS THE HALF THAT IS EASY TO FORGET. The basket is a 1.1 m hop
+ * and is deliberately solid so it can be got onto. Left where it was, it stays
+ * a solid invisible box on the field for the rest of the chapter — the exact
+ * class of fault the walk-through-buildings audit was written for — so it goes
+ * up with the group and is taken out of the world once it is over head height.
+ */
+function gorUpdateFieldLaunch(game, dt) {
+  if (!gorFieldLaunch) return;
+  const go = clamp((gorPhase - gorFIELD_GO) / 0.30, 0, 1);
+  const target = go <= 0 ? 0 : (1 - Math.exp(-go * gorFIELD_RATE)) * gorFIELD_CEIL;
+  gorFieldLaunchY = damp(gorFieldLaunchY, target, 0.6, dt);
+  gorFieldLaunch.position.y = gorFieldLaunchY;
+  // it leans away as it takes up the wind, exactly as the player's does
+  const w = gorWindAt(gorFieldLaunchGY + gorFieldLaunchY,
+                      gorFieldLaunch.position.x, gorFieldLaunch.position.z);
+  if (w) {
+    gorFieldLaunch.rotation.z = clamp(-w.x * 0.012, -0.10, 0.10);
+    gorFieldLaunch.rotation.x = clamp(w.z * 0.012, -0.10, 0.10);
+    // ...and it DRIFTS. A balloon that goes straight up is a lift.
+    gorFieldLaunch.position.x += w.x * dt * 0.55 * (gorFieldLaunchY > 0.4 ? 1 : 0);
+    gorFieldLaunch.position.z += w.z * dt * 0.55 * (gorFieldLaunchY > 0.4 ? 1 : 0);
+  }
+  if (gorFieldLaunchBody) {
+    if (gorFieldLaunchY > 2.4) {
+      try { game.world.removeBody(gorFieldLaunchBody); } catch (e) { /* already gone */ }
+      gorFieldLaunchBody = null;
+    } else {
+      gorFieldLaunchBody.position.y = gorFieldLaunchGY + 0.55 + gorFieldLaunchY;
+      gorSyncBody(gorFieldLaunchBody);
+    }
+  }
+  if (!gorFieldLaunchSaid && gorFieldLaunchY > 1.2) {
+    gorFieldLaunchSaid = true;
+    gorSfx('burner', { volume: 0.55, pitch: 0.78 });
+    gorToast('that one is going. yours is the one that is still on the ground.');
+  }
+}
+
 /**
  * THE GROUND GRID'S SQUEEZE — Pasto's, Palawan's, Marrakech's. Same function,
  * same reason, and this chapter had never had it: a flat 120 x 120 over three
@@ -2055,6 +2125,7 @@ function gorBuildCliff(game, root) {
   // — which is the picture, and which the old code could not have had at any
   // price, the ledges being inside the rock.
   gorPigeonData = new Float32Array(gorPIGEON_N * 10);   // x,y,z, vx,vy,vz, phase, hx,hy,hz
+  gorPigeonHole = new Float32Array(gorPIGEON_N * 3);    // C5: the cliff hole, kept
   const np = Math.max(1, perches.length / 3);
   for (let i = 0; i < gorPIGEON_N; i++) {
     const o = i * 10;
@@ -2066,6 +2137,12 @@ function gorBuildCliff(game, root) {
     gorPigeonData[o + 1] = gorPigeonData[o + 8];
     gorPigeonData[o + 2] = gorPigeonData[o + 9];
     gorPigeonData[o + 6] = rand(0, Math.PI * 2);
+    // C5: the hole it actually belongs in, kept aside. Slots 7-9 are the LIVE
+    // home and the lure rewrites them, so without this copy a bird that has
+    // come down for a chip has nowhere on the cliff to go back to.
+    gorPigeonHole[i * 3] = gorPigeonData[o + 7];
+    gorPigeonHole[i * 3 + 1] = gorPigeonData[o + 8];
+    gorPigeonHole[i * 3 + 2] = gorPigeonData[o + 9];
   }
   // A PIGEON HAS A BODY AND TWO WINGS. One box at 0.50 x 0.16 x 0.28 is a chip
   // of grey card: at rest it is invisible against tuff and in the air it is a
@@ -2153,6 +2230,69 @@ function gorUpdateGroundSound(game, dt) {
 // standing on the ground for a chip to be dropped in front of. A flock may
 // offer either channel, and this one is scatter and nothing else.
 let gorFlockOffered = false;
+// ---- C5: AND THEY COME DOWN (D3) -----------------------------------------
+//
+// The comment above says this chapter "offers no at/put: its pigeons live in a
+// Float32Array of velocities and there is no such thing as a Göreme pigeon
+// standing on the ground for a chip to be dropped in front of." The first half
+// is a data-layout fact and it is not an obstacle — a home is three floats and
+// there is nothing about those three floats that has to be on a cliff. The
+// second half is a design decision that was never made; it was inherited from
+// the fact that nobody had written the branch.
+//
+// So: a lure. Something worth landing for on the paving brings a PART of the
+// flock down round it — sixty of two hundred and sixty, not all of them,
+// because four hundred birds mobbing one chip is a horror film and twenty is a
+// square in Göreme. They come in on the same "coming in" branch the cliff
+// return uses, and when the lure goes they get their own holes back.
+//
+// THE ONE THING THAT MAKES IT READ: they land in a RING, not on the point. A
+// dove will not stand on the thing it wants; it stands two feet away and edges
+// in, and sixty of them doing that is a doughnut with a chip in the middle.
+let gorPigeonHole = null;         // the cliff hole, per bird
+let gorLureX = 0, gorLureZ = 0;
+let gorLureT = 0;                 // seconds of lure left, 0 = none
+const gorLURE_N    = 60;          // how many of them care
+const gorLURE_HOLD = 14;          // s — and then they go home
+const gorLURE_R0   = 1.2;         // m — nobody stands on it
+const gorLURE_R1   = 4.6;         // ...and the outside of the ring
+
+/** Bring part of the flock down to (x, z). Returns how many came. */
+function gorPigeonLand(x, z) {
+  if (!gorPigeonData || !gorPigeonHole) return 0;
+  const gy = gorTerrain(x, z);
+  // ...but not from the far side of the valley. The scare carries fifty
+  // metres and a chip does not carry further than a shout.
+  if (Math.hypot(x - (gorCLIFF.x + 6), z - (gorCLIFF.z0 + gorCLIFF.z1) * 0.5) > 62) return 0;
+  gorLureX = x; gorLureZ = z; gorLureT = gorLURE_HOLD;
+  // ...and they have to be IN THE AIR to arrive. Birds on their ledges get put
+  // up first, which is also the right picture: something lands in the square,
+  // the cliff empties, and the square fills.
+  if (gorPigeonOut < 0.34) gorPigeonOut = 0.34;
+  for (let i = 0; i < gorLURE_N && i < gorPIGEON_N; i++) {
+    const o = i * 10;
+    const a = (i * 2.399963) % 6.28318;              // the golden angle: no clumps
+    const r = gorLURE_R0 + Math.sqrt((i + 0.5) / gorLURE_N) * (gorLURE_R1 - gorLURE_R0);
+    gorPigeonData[o + 7] = x + Math.cos(a) * r;
+    gorPigeonData[o + 8] = gy + 0.10;
+    gorPigeonData[o + 9] = z + Math.sin(a) * r;
+  }
+  return gorLURE_N;
+}
+
+/** Hand the lured birds their own holes back. */
+function gorPigeonUnlure() {
+  if (!gorPigeonData || !gorPigeonHole) return;
+  gorLureT = 0;
+  for (let i = 0; i < gorLURE_N && i < gorPIGEON_N; i++) {
+    const o = i * 10;
+    gorPigeonData[o + 7] = gorPigeonHole[i * 3];
+    gorPigeonData[o + 8] = gorPigeonHole[i * 3 + 1];
+    gorPigeonData[o + 9] = gorPigeonHole[i * 3 + 2];
+  }
+  if (gorPigeonOut < 0.34) gorPigeonOut = 0.34;      // they have to fly home
+}
+
 function gorPigeonScare(x, z) {
   if (!gorPigeonData || gorPigeonOut >= 0.5) return 0;
   const cd = Math.hypot(x - (gorCLIFF.x + 6), z - (gorCLIFF.z0 + gorCLIFF.z1) * 0.5);
@@ -2173,9 +2313,33 @@ function gorUpdatePigeons(dt) {
   if (!gorFlockOffered && typeof gorGame === 'object' && gorGame &&
       typeof gorGame.flockOffer === 'function') {
     gorFlockOffered = true;
-    gorGame.flockOffer({ biome: 'goreme', kind: 'rock dove', voice: 'rustle',
-                         pitch: 1.1, fleeR: 50,
-                         scare: function (x, z) { return gorPigeonScare(x, z); } });
+    gorGame.flockOffer({
+      biome: 'goreme', kind: 'rock dove', voice: 'rustle', pitch: 1.1, fleeR: 50,
+      scare: function (x, z) { return gorPigeonScare(x, z); },
+      // ---- C5: the other channel, which this chapter refused ------------
+      count: function () { return gorLURE_N; },
+      at: function (i, o) {
+        const q = i * 10;
+        o.x = gorPigeonData[q]; o.y = gorPigeonData[q + 1]; o.z = gorPigeonData[q + 2];
+      },
+      // `put` moves ONE bird's landing spot, and only while a lure is live:
+      // dragging a bird that is on a ledge forty metres up the cliff face to a
+      // point on the paving would teleport it through the rock. The flock's
+      // own steering does the rest, on the branch that already exists.
+      put: function (i, x, z) {
+        if (gorLureT <= 0 || i >= gorLURE_N) return;
+        const q = i * 10;
+        gorPigeonData[q + 7] = x;
+        gorPigeonData[q + 8] = gorTerrain(x, z) + 0.10;
+        gorPigeonData[q + 9] = z;
+      },
+      land: function (x, z) { gorPigeonLand(x, z); },
+    });
+  }
+  // the lure runs out, and they go back to the rock
+  if (gorLureT > 0) {
+    gorLureT -= dt;
+    if (gorLureT <= 0) gorPigeonUnlure();
   }
   // THE FLOCK LANDS AGAIN. Fourteen seconds of wheeling — which is about what
   // a real one does — and then eight of coming back in to the same holes.
@@ -3398,11 +3562,52 @@ function gorBuildField(game, root) {
       M.box(cr.x - Math.sin(ry) * 8.2, gy + 0.25, cr.z - Math.cos(ry) * 8.2,
             1.3, 0.5, 1.3, PALETTE.gorBasaltDk, 0, ry);
     } else {
-      // and one that is up, five minutes from going, with the burner lit
+      // ---- C1: AND IT ACTUALLY GOES (D3) --------------------------------
+      //
+      // "Five minutes from going" is what the comment below has said since the
+      // chapter was written, and this crew has been five minutes from going
+      // for the life of the chapter. A launch field on which nothing launches,
+      // in a chapter whose entire subject is a launch, with a local who says
+      // out loud that "eighty of them go up at first light".
+      //
+      // WHY IT NEEDED A GROUP AND NOT A HOIST. The envelope was a live Mesh
+      // and everything under it — throat, basket, coping, uprights — was
+      // merged into the field's one big static mesh at build. Raising the
+      // envelope on its own would have flown the bag off the basket. So the
+      // whole of THIS crew's balloon is a live group now; the four other
+      // crews are untouched and still merge, because four static balloons and
+      // one that leaves is the picture, and five that leave is a cutscene.
+      //
+      // The collider goes with it (see gorUpdateFieldLaunch), which is the
+      // half of this that is easy to forget: a basket you could hop onto at
+      // 1.1 m must not still be there at 1.1 m once the basket is at ninety.
+      const lg = new THREE.Group();
+      lg.position.set(cr.x, 0, cr.z);
       const env = new THREE.Mesh(gorEnvelopeGeo(5.4, col, PALETTE.gorEnvC), gorVCOwn());
-      env.position.set(cr.x, gy + 5.4 * 1.15 + 3.0, cr.z);
+      env.position.set(0, gy + 5.4 * 1.15 + 3.0, 0);
       env.castShadow = true;
-      root.add(env);
+      lg.add(env);
+      {
+        const LM = gorMerger();
+        LM.cone(0, gy + 2.7, 0, 1.3, 2.1, PALETTE.gorEnvC, Math.PI, 0, 0, 8);
+        LM.box(0, gy + 0.55, 0, 2.4, 1.1, 2.4, PALETTE.gorBasket, 0, ry);
+        LM.box(0, gy + 1.15, 0, 2.6, 0.12, 2.6, PALETTE.gorBasketDk, 0, ry);
+        for (let s = 0; s < 4; s++) {
+          LM.cyl((s & 1 ? 0.8 : -0.8), gy + 1.9, (s & 2 ? 0.8 : -0.8),
+                 0.045, 1.8, PALETTE.gorSteel, 0, 0, 0, 4);
+        }
+        const rig = new THREE.Mesh(LM.build(), gorVC());
+        rig.castShadow = true; rig.receiveShadow = true;
+        lg.add(rig);
+      }
+      root.add(lg);
+      gorFieldLaunch = lg;
+      gorFieldLaunchGY = gy;
+      gorFieldLaunchX0 = cr.x; gorFieldLaunchZ0 = cr.z;
+      gorFieldLaunchPad = { x: cr.x, y: gy + 0.55, z: cr.z, sx: 2.4, sy: 1.1, sz: 2.4, ry: ry };
+      gorFieldLaunchBody =
+        gorStaticBox(game, cr.x, gy + 0.55, cr.z, 2.4, 1.1, 2.4, ry) || null;
+      lamps.push(cr.x, gy + 2.15, cr.z, 0.8);
       // ...AND ITS BURNER GOES TOO, on its own clock. Five crews, all at a
       // different point of the same twenty minutes, and every one of them is
       // topping up: the field at ten past five is a row of paper lanterns
@@ -3414,17 +3619,6 @@ function gorBuildField(game, root) {
       // gorUpdateFieldBurners; this is only the seed now, but a seed that
       // clusters is still a field that starts by clapping in time.
       gorFieldEnv.push({ mat: env.material, ph: (c * 0.6180339887) % 1, x: cr.x, z: cr.z, was: false });
-      M.cone(cr.x, gy + 2.7, cr.z, 1.3, 2.1, PALETTE.gorEnvC, Math.PI, 0, 0, 8);
-      M.box(cr.x, gy + 0.55, cr.z, 2.4, 1.1, 2.4, PALETTE.gorBasket, 0, ry);
-      M.box(cr.x, gy + 1.15, cr.z, 2.6, 0.12, 2.6, PALETTE.gorBasketDk, 0, ry);
-      // The one with a pilot standing in it. 1.1 m is a deliberate hop, so
-      // making it solid also makes it something you can get up onto.
-      gorStaticBox(game, cr.x, gy + 0.55, cr.z, 2.4, 1.1, 2.4, ry);
-      for (let s = 0; s < 4; s++) {
-        M.cyl(cr.x + (s & 1 ? 0.8 : -0.8), gy + 1.9, cr.z + (s & 2 ? 0.8 : -0.8),
-              0.045, 1.8, PALETTE.gorSteel, 0, 0, 0, 4);
-      }
-      lamps.push(cr.x, gy + 2.15, cr.z, 0.8);
     }
 
     // every crew has a truck and a trailer, and they are all the same truck
@@ -3850,6 +4044,44 @@ function gorBuildTruck(root) {
     g.userData.beams = lm;
     g.userData.beamMat = bm;
   }
+  // ---- C3: AND YOU CAN SEE IT (D3) --------------------------------------
+  //
+  // The chase truck is the best system in this chapter — it reads the wind,
+  // predicts where the balloon will come down, drives there over rough ground
+  // and speaks from its own position — and it is a khaki box on a khaki valley
+  // floor, seen from six hundred metres up. From the basket it is invisible,
+  // which means the one thing in the chapter that is FOLLOWING YOU cannot be
+  // watched doing it.
+  //
+  // An amber rotating beacon, which is what every recovery vehicle in the
+  // world has and what this one was missing. Its own cloned emissive material
+  // off gorGlowMat, so nothing else in the valley is dragged with it, and it
+  // spins rather than flashing: a flash at this distance is one pixel that
+  // may or may not be on when the eye lands on it, and a rotation is a thing
+  // that is always partly lit.
+  {
+    const B = gorMerger();
+    B.cyl(0, 2.30, -0.30, 0.13, 0.10, PALETTE.gorBasaltDk, 0, 0, 0, 8);
+    B.cyl(0, 2.42, -0.30, 0.115, 0.18, PALETTE.gorAmber, 0, 0, 0, 8);
+    const beacon = new THREE.Mesh(B.build(), gorGlowMat(PALETTE.gorAmber, 1.5));
+    beacon.userData.noShadow = true;
+    beacon.renderOrder = 3;
+    g.add(beacon);
+    g.userData.beacon = beacon;
+    // the wedge of light it throws, which is what actually carries at range
+    const W = gorMerger();
+    W.cyl(0, 2.42, -0.30, 0.42, 0.30, PALETTE.gorAmber, 0, 0, 0, 6);
+    const wm = mat(PALETTE.gorAmber, {
+      transparent: true, opacity: 0.30, depthWrite: false,
+      blending: THREE.AdditiveBlending, vertexColors: true,
+    }).clone();
+    const wedge = new THREE.Mesh(W.build(), wm);
+    wedge.userData.noShadow = true;
+    wedge.renderOrder = 3;
+    g.add(wedge);
+    g.userData.beaconWedge = wedge;
+    g.userData.beaconMat = wm;
+  }
   root.add(g);
   gorTruck = g;
 }
@@ -4109,6 +4341,23 @@ function gorUpdateTruck(dt) {
               (0.86 + Math.sin(gorTime * 9.3) * 0.09 * (d > 3 ? 1 : 0.15));
     bm.opacity = 0.46 * k;
     gorTruck.userData.beams.visible = k > 0.02;
+  }
+  // ---- C3: the beacon turns, and it does NOT go out at dawn --------------
+  // The headlights above are keyed off gorSun because headlights are for the
+  // dark. A beacon is for being seen, and the whole reason this one exists is
+  // the twenty minutes after sunrise when the balloon is at six hundred metres
+  // and the truck is a khaki dot. It turns whenever the truck is chasing, and
+  // it turns FASTER when it is moving, which is the one bit of body language
+  // a recovery vehicle has.
+  const bc = gorTruck.userData.beacon;
+  if (bc) {
+    bc.rotation.y = gorTime * (d > 3 ? 5.2 : 2.1);
+    const w = gorTruck.userData.beaconWedge;
+    const wm = gorTruck.userData.beaconMat;
+    if (w) w.rotation.y = bc.rotation.y;
+    // the wedge brightens as its face comes round, which is what makes a
+    // rotation read as a rotation from a kilometre away
+    if (wm) wm.opacity = 0.16 + 0.22 * (0.5 + 0.5 * Math.sin(bc.rotation.y));
   }
   gorUpdateDust(dt, d > 3);
 }
@@ -4838,6 +5087,7 @@ function gorSfx(n, o) {
  *   two echoes, at the delay a two-hundred-metre rim actually returns.
  */
 let gorEcho1 = -1, gorEcho2 = -1, gorSpook = 0;
+let gorToldCall = false;      // C4: the herd-call line, once per visit
 function gorUpdateWheek(game, dt) {
   const capy = game.capy;
   if (gorEcho1 > 0) { gorEcho1 -= dt; if (gorEcho1 <= 0) { gorEcho1 = -1; gorSfx('wheek', { volume: 0.20, pitch: 0.97 }); } }
@@ -4880,7 +5130,35 @@ function gorUpdateWheek(game, dt) {
   }
 
   // ---- the herd ----------------------------------------------------------
-  if (Math.hypot(p.x - gorHERD_X, p.z - gorHerdZ) < 45) gorSpook = 4.0;
+  // ---- C4: AND YOU CAN CALL THEM (D3) ------------------------------------
+  //
+  // The mare is the best kinetic thing in this chapter — eleven horses running
+  // a 86 m shuttle at 6.2 m/s with a rideable kinematic body on the lead one —
+  // and the only way to get on it was to stand at one end of the line and wait
+  // out a nine-second dwell plus however much of the run was left. A twenty-
+  // three second intercept, in a chapter whose whole subject is a thing that
+  // leaves at a fixed time.
+  //
+  // The wheek already reaches them: the spook test three lines down has been
+  // 45 m since the herd was written. This is the SAME TEST doing one more
+  // thing — if they are standing at the end of the line, the wait ends now.
+  //
+  // NOT A SUMMONS. It does not change where they go, how fast, or which way,
+  // and it cannot be used to hold them: it only spends the dwell they were
+  // going to spend anyway. A player who wheeks at the wrong end still watches
+  // them go the wrong way, which is the joke and is worth keeping.
+  const herdD = Math.hypot(p.x - gorHERD_X, p.z - gorHerdZ);
+  if (herdD < 45) {
+    gorSpook = 4.0;
+    if (gorHerdWait > 0.35) {
+      gorHerdWait = 0.3;                    // ...and they go on the next beat
+      gorSfx('wheek', { volume: 0.16, pitch: 0.72 });
+      if (!gorToldCall) {
+        gorToldCall = true;
+        gorToast('they were waiting for something. apparently that was it.');
+      }
+    }
+  }
 
   // ---- and every cat in the square looks up ------------------------------
   // Nine of them, all at once, deciding it was not worth getting to their feet
@@ -5036,6 +5314,31 @@ export function createGoreme(game) {
       gorSun = 0; gorDawnLit = 0; gorWarned = false; gorSyncSaid = false;
       // D4.3: a fresh dawn is a fresh burn, a fresh nag and a fresh flock.
       gorSunBurned = false; gorSunNagged = false; gorSunDoves = false;
+      // C4: and a fresh call. The toast is the only thing that tells a player
+      // the wheek reaches the horses at all, so a second visit gets it again.
+      gorToldCall = false;
+      // ---- C1: AND THE NEAR BALLOON IS BACK ON ITS PAD -------------------
+      // A fresh dawn is a fresh launch, which is the rule the three lines
+      // above follow. It is also the one thing in this reset that has to put a
+      // CANNON body back: gorUpdateFieldLaunch takes the basket collider out
+      // of the world once the basket is over head height, and a second visit
+      // that did not re-add it would find the one hoppable thing on the field
+      // had become scenery. Re-added rather than kept and moved, because a
+      // solid box parked at ninety metres is worse than no box at all.
+      if (gorFieldLaunch) {
+        gorFieldLaunchY = 0;
+        gorFieldLaunch.position.set(gorFieldLaunchX0, 0, gorFieldLaunchZ0);
+        gorFieldLaunch.rotation.set(0, 0, 0);
+        gorFieldLaunchSaid = false;
+        if (!gorFieldLaunchBody && gorFieldLaunchPad) {
+          const q = gorFieldLaunchPad;
+          gorFieldLaunchBody = gorStaticBox(gorGame, q.x, q.y, q.z, q.sx, q.sy, q.sz, q.ry);
+        } else if (gorFieldLaunchBody && gorFieldLaunchPad) {
+          gorFieldLaunchBody.position.set(gorFieldLaunchPad.x, gorFieldLaunchPad.y,
+                                          gorFieldLaunchPad.z);
+          gorSyncBody(gorFieldLaunchBody);
+        }
+      }
       gorTime = 0;
       gorBalX = gorFIELD.x; gorBalZ = gorFIELD.z - 6;
       gorBalY = gorTerrain(gorBalX, gorBalZ);
@@ -5123,6 +5426,42 @@ export function createGoreme(game) {
   const api = {
     built() { return gorBuilt; },
     terrainHeight: gorTerrain,
+    /**
+     * C1, C3, C4 and C5, measured. Nothing in the game calls it — the
+     * walkAudit footing. `launchY` is how far the near balloon is off its own
+     * pad, `launchBody` whether its collider is still in the world, `herdWait`
+     * the dwell C4 spends, and `lured`/`lureT` the state of C5's ring.
+     */
+    fieldDebug() {
+      let down = 0;
+      if (gorPigeonData && gorLureT > 0) {
+        for (let i = 0; i < gorLURE_N && i < gorPIGEON_N; i++) {
+          const o = i * 10;
+          const dy = gorPigeonData[o + 1] - gorTerrain(gorPigeonData[o], gorPigeonData[o + 2]);
+          if (dy < 0.9) down++;
+        }
+      }
+      return {
+        phase: Math.round(gorPhase * 1000) / 1000,
+        goAt: Math.round(gorFIELD_GO * 1000) / 1000,
+        launchY: Math.round(gorFieldLaunchY * 100) / 100,
+        launchBody: !!gorFieldLaunchBody,
+        launchX: gorFieldLaunch ? Math.round(gorFieldLaunch.position.x * 10) / 10 : null,
+        beacon: !!(gorTruck && gorTruck.userData && gorTruck.userData.beacon),
+        herdWait: Math.round(gorHerdWait * 100) / 100,
+        herdZ: Math.round(gorHerdZ * 10) / 10,
+        lureT: Math.round(gorLureT * 10) / 10,
+        onTheGround: down,
+        pigeonOut: Math.round(gorPigeonOut * 100) / 100,
+        // where the things a probe has to stand next to actually are
+        herdX: gorHERD_X,
+        cliffX: gorCLIFF.x, cliffZ: (gorCLIFF.z0 + gorCLIFF.z1) * 0.5,
+      };
+    },
+    /** Bring the doves down at a point, so C5 can be measured without a chip. */
+    lureDoves(x, z) { return gorPigeonLand(x, z); },
+    /** Drive the dawn clock straight to a phase, so C1 needs no 40 s wait. */
+    setPhase(p) { gorPhase = clamp(p, 0, 0.999); return gorPhase; },
     // ---- HOW LONG THE GROUND IS GOING TO LAST (P3) ----------------------
     // The window that ticks `sunrise` is gorPhase 0.5235..0.5804 — about
     // eleven seconds of a hundred and fifty-six — and the comment on that gate
@@ -5265,6 +5604,7 @@ export function createGoreme(game) {
       gorUpdateWheek(game, dt);
       gorUpdateHerd(game, dt);
       gorUpdateDecor(dt);
+      gorUpdateFieldLaunch(game, dt);   // C1: the near one leaves the ground
       gorUpdateShadows();
       gorUpdateFieldBurners(dt);
       gorUpdateWisps(dt);

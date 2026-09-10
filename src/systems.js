@@ -30772,7 +30772,17 @@ export function createSystems(game) {
           const f = cp ? flockFoodNear(live, cp.x, cp.z) : null;
           if (f && f !== rec.bored) {
             rec.food = f; rec.foodT = flockFOOD_HOLD; rec.lands++;
-            if (rec.land) rec.land();
+            // ---- AND IT SAYS WHERE (C5) ----------------------------------
+            // `land()` took no arguments, which quietly restricted the whole
+            // channel to chapters whose birds are ALREADY standing next to
+            // the food: the walk below only recruits birds inside
+            // flockFOOD_R of it, and a chapter whose flock lives on a cliff
+            // forty metres up has nobody inside that radius, ever. Such a
+            // chapter can do nothing with a callback that says only "there
+            // is food somewhere" — it needs the point, to fly to.
+            // Manly's `land: function () {...}` ignores the two new arguments
+            // and is untouched.
+            if (rec.land) rec.land(f.body.position.x, f.body.position.z);
           }
         }
       }

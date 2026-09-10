@@ -155,7 +155,26 @@ let sahPursuerMesh = null, sahPursuerHeads = null;
 const sahPurData = new Float32Array(sahPURSUER_N * 8);
 // One latch per trader for THE NEAR MISS (see sahUpdateChase), cleared the
 // moment they see you again and on every fresh chase.
+// ---- M3: WHICH PEOPLE ARE COVER ------------------------------------------
+// The index range sahBuildSouk wrote into the shared people roster — the stall
+// fronts and the alley walkers, which is everybody inside the maze. Nothing
+// else recorded a subset of that roster except sahCarPeople; this is the
+// second, and it exists because sahLineOfSight cannot afford to sweep all two
+// hundred and fifty. Set at build, and zero until then.
+let sahSoukPpl0 = 0, sahSoukPplN = 0;
+const sahLOS_BODY  = 0.38;              // m — see sahLineOfSight
+const sahLOS_BODY2 = sahLOS_BODY * sahLOS_BODY;
+const sahLOS_END   = 1.30;              // m of either end that is not cover
 const sahPurMiss = new Uint8Array(sahPURSUER_N);
+// ---- M2: WHO CAN SEE IT, AND WHO HAS BEEN TOLD ---------------------------
+// `sahPurTellSeen` is written by the sense loop each frame (canSee), and
+// `sahPurTell` is the SNAPSHOT of it the relay pass reads, so a shout cannot
+// be relayed on by the person who has just heard it in the same frame.
+const sahPurTellSeen = new Uint8Array(sahPURSUER_N);
+const sahPurTell = new Uint8Array(sahPURSUER_N);
+let sahPurTold = 0;
+let sahTellPairs = 0, sahTellNear = 0, sahTellLos = 0;   // M2 instrument only              // how many hand-offs this chase — for the toast
+const sahPUR_TELL_R = 20;        // m. A shout across a souk lane, not a radio.
 let sahMissN = 0;
 const sahPUR_MISS_R = 4.2;     // m of "and he did not look"
 let sahCamelMesh = null, sahCamelLegs = null;
@@ -607,17 +626,80 @@ function sahNavBlocked(x, z, r) {
   return false;
 }
 
-/** Can A see B? Six samples along the segment — cheap, and the souk is convex
- *  blocks so more would not buy anything. */
-function sahLineOfSight(ax, az, bx, bz) {
+/**
+ * Can A see B? Six samples along the segment — cheap, and the souk is convex
+ * blocks so more would not buy anything.
+ *
+ * ---- M3: AND A CROWD IS COVER, WHICH THIS FILE HAS CLAIMED TWICE ----------
+ *
+ * The stall-front note says "the souk is a chase arena and a crowd is also the
+ * only cover in it" and the alley-walker note says "a lane with thirty people
+ * in it is a lane where a corner is worth taking". Neither was true. This
+ * function tested souk BLOCKS and nothing else, so sixty people in the maze
+ * were scenery with colliders and the only thing that ever broke a sight line
+ * was a wall. The one chapter in the game with a losable task had exactly one
+ * cover mechanic and it was architecture.
+ *
+ * A person is a disc on the segment — point-to-segment distance, not another
+ * six samples, because a sample every seventh of the way misses a 0.38 m
+ * target at any range over about five metres and would have made this a
+ * lottery rather than a mechanic.
+ *
+ * THREE THINGS THAT KEEP IT HONEST:
+ *  - only the souk's own crowd counts. `sahSoukPpl0`/`sahSoukPplN` is the
+ *    index range sahBuildSouk wrote, recorded there for this. The square's
+ *    hundred and forty are in the open, and hiding behind one of them across
+ *    forty metres of Jemaa el-Fnaa is not a thing that should work.
+ *  - nobody within sahLOS_END of either end blocks. The trader's own
+ *    neighbour at the next stall is not cover, and neither is somebody
+ *    standing on top of the capybara.
+ *  - it is ONE person deep and you have to actually be behind them. 0.38 m
+ *    against a 0.26 m-wide figure is the width of the person and a hand
+ *    either side, which is what "behind" means.
+ */
+function sahLineOfSight(ax, az, bx, bz, ignoreCrowd) {
   for (let k = 1; k <= 6; k++) {
     const t = k / 7;
     if (sahSoukBlocked(ax + (bx - ax) * t, az + (bz - az) * t, 0)) return false;
+  }
+  // ---- AND SOUND IS NOT LIGHT (found by measuring M2 after M3) ------------
+  //
+  // M2's shout is gated on this same function, on the reasoning that a shout
+  // does not go round corners — which is true of the WALLS and false of the
+  // people. With the crowd term in, a bystander standing between two traders
+  // stopped one of them shouting to the other, and the relay measured ZERO
+  // hand-offs anywhere in the souk: sixty-four people in a maze is a person on
+  // nearly every line, so M3 had silently switched M2 off. Caught because the
+  // number went from 1382 to 0 rather than from 1382 to something sensible.
+  //
+  // `ignoreCrowd` is the one caller that wants walls only.
+  if (!ignoreCrowd && sahSoukPplN > 0 &&
+      !(sahGame && sahGame.state && sahGame.state.noCover)) {
+    const ex = bx - ax, ez = bz - az;
+    const len2 = ex * ex + ez * ez;
+    if (len2 > 1e-6) {
+      const inv = 1 / len2;
+      const endT = sahLOS_END / Math.sqrt(len2);
+      const t0 = endT, t1 = 1 - endT;
+      if (t1 > t0) {
+        for (let i = sahSoukPpl0; i < sahSoukPpl0 + sahSoukPplN; i++) {
+          const o = i * sahPPL_STRIDE;
+          const t = ((sahPplData[o] - ax) * ex + (sahPplData[o + 2] - az) * ez) * inv;
+          if (t < t0 || t > t1) continue;
+          const qx = ax + ex * t - sahPplData[o];
+          const qz = az + ez * t - sahPplData[o + 2];
+          if (qx * qx + qz * qz < sahLOS_BODY2) return false;
+        }
+      }
+    }
   }
   return true;
 }
 
 function sahBuildSouk(game, root) {
+  // M3: everybody this function adds to the shared roster is inside the maze,
+  // and inside the maze is where a person is cover. See sahLineOfSight.
+  sahSoukPpl0 = sahPplN;
   const M = sahMerger();
   const RM = sahMerger();
   // ONE BODY FOR THE WHOLE SOUK. Thirty-two blocks and four fountain rims were
@@ -792,6 +874,10 @@ function sahBuildSouk(game, root) {
     if (sahSoukBlocked(gx, gzz, 1.5)) continue;
     sahAddPerson(gx, 0, gzz, rand(0, 6.283), sahPPL_STAND);
   }
+  // ...and that is the cover roster closed. Counted rather than assumed: the
+  // loop above `continue`s on a blocked sample and does not retry, so "28" is
+  // a ceiling and not a count.
+  sahSoukPplN = sahPplN - sahSoukPpl0;
 
   const mesh = new THREE.Mesh(M.build(), sahVC());
   mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1669,11 +1755,26 @@ const sahNOT_TURN = [1.0, 0.55, 0.5];   // STAND, SIT, PLAY
 let sahNotWheek = 0;
 
 // 15, not 14: index 14 is the damped notice above.
-const sahPPL_STRIDE = 15;
+// 16, not 15: index 15 is M4's shove, and see the note above index 14.
+const sahPPL_STRIDE = 16;
+// ---- M4: SOMEBODY JUST PUSHED PAST ME ------------------------------------
+// Under the souk roof you cannot see a trader coming. You can see the crowd
+// he is coming THROUGH, and until this term you could not: sixty people stood
+// perfectly still while six men ran between them. A pursuer inside sahPART_R
+// of a person writes a SIGNED impulse into slot 15 — the sign is which side he
+// went past on — and it damps back out over about a second. The chase now has
+// a wake, and the wake is the only thing that tells you where the chase is
+// when the mats are over your head.
+const sahPART_R  = 1.7;         // m — arm's length plus a shoulder
+const sahPART_R2 = sahPART_R * sahPART_R;
+const sahPART_L  = 2.4;         // how fast it lets go
+const sahPART_YAW = 0.62;       // rad at full — a turn, not a pirouette
+const sahPART_LEAN = 0.20;      // ...and the sway that goes with it
 let sahPplBody = null, sahPplHead = null, sahPplN = 0;
 const sahPplBodies = [];        // one static box per instanced person
 // x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height,
-// fidget clock, fidget now, fidget target, step distance this frame, gait phase
+// fidget clock, fidget now, fidget target, step distance this frame, gait phase,
+// damped notice (14, D1), signed shove (15, M4)
 const sahPplData = new Float32Array(sahPPL_MAX * sahPPL_STRIDE);
 let sahPplBodyCol = null, sahPplHeadCol = null;
 const sahPplCol = new THREE.Color();
@@ -1886,6 +1987,12 @@ function sahUpdatePeople(dt) {
            ? null : (capy && capy.position);
   const notR = sahNOT_R * (sahNotWheek > 0 ? sahNOT_WHEEK_K : 1);
   const notR2 = notR * notR;
+  // M4's gate. Only while somebody is actually running: the six pursuers sit
+  // at their own stalls the rest of the time, and a crowd that parts around a
+  // man standing still selling oranges is not a chase wake, it is a bug. The
+  // cut is `noPart`, on the same footing as `noNotice` above.
+  const parting = sahChase === 1 &&
+                  !(sahGame && sahGame.state && sahGame.state.noPart);
   const band = sahFireTakeover > 0 ? 1 : 0;
   // THE THREE HALQA CLOCKS. Each ring is one sentence being told to thirteen
   // people, so it gets one number: a slow build to the turn (they lean in) and
@@ -1993,6 +2100,32 @@ function sahUpdatePeople(dt) {
         rx += not * sahNOT_LEAN;
       }
     } else if (not !== 0) { sahPplData[o + 14] = 0; }
+    // ---- ...AND SOMEBODY PUSHED PAST THEM (M4) ---------------------------
+    // Applied after the notice for the same reason the notice is applied after
+    // the fidget: being shouldered out of the way outranks looking at a
+    // rodent. `part` carries its own sign, so the crowd opens along the line
+    // the trader actually took instead of flinching symmetrically.
+    let part = sahPplData[o + 15];
+    if (parting) {
+      for (let q = 0; q < sahPURSUER_N; q++) {
+        const qo = q * 8;
+        const qdx = sahPurData[qo] - x, qdz = sahPurData[qo + 1] - z;
+        const qd2 = qdx * qdx + qdz * qdz;
+        if (qd2 > sahPART_R2) continue;
+        // which side he came past on, in the person's own frame
+        const side = qdx * Math.cos(yaw) - qdz * Math.sin(yaw);
+        const k = 1 - Math.sqrt(qd2) / sahPART_R;
+        const want = (side >= 0 ? -k : k);
+        if (Math.abs(want) > Math.abs(part)) part = want;
+      }
+    }
+    if (part !== 0) {
+      part = damp(part, 0, sahPART_L, dt);
+      if (Math.abs(part) < 0.002) part = 0;
+      sahPplData[o + 15] = part;
+      yaw += part * sahPART_YAW;
+      rz  += part * sahPART_LEAN;
+    }
     sahPplBody.setMatrixAt(i, sahXform(x, y, z, rx, yaw, rz, tall, sy, tall));
     sahPplHead.setMatrixAt(i, sahXform(x - rz * 1.3 * tall, y + 1.42 * sy, z + rx * 1.3 * tall,
                                        rx, yaw, rz, tall, tall, tall));
@@ -2113,7 +2246,9 @@ function sahStartChase(game) {
   // walk past the end of your alley in silence and neither line is ever said
   // again for the life of the page.
   sahMissN = 0;
-  for (let i = 0; i < sahPURSUER_N; i++) sahPurMiss[i] = 0;
+  // ...and M2's counter with them, for the reason the paragraph above gives.
+  sahPurTold = 0; sahTellPairs = 0; sahTellNear = 0; sahTellLos = 0;
+  for (let i = 0; i < sahPURSUER_N; i++) { sahPurMiss[i] = 0; sahPurTellSeen[i] = 0; }
   for (let i = 0; i < sahPURSUER_N; i++) {
     const o = i * 8;
     sahPurData[o] = sahPurData[o + 2];
@@ -2189,6 +2324,7 @@ function sahUpdateChase(game, dt) {
     const d = Math.hypot(dx, dz);
     if (d < nearest) nearest = d;
     const canSee = d < sahSIGHT && sahLineOfSight(px, pz, p.x, p.z);
+    sahPurTellSeen[i] = canSee ? 1 : 0;      // M2: only a witness has news
     if (canSee) {
       seen = true;
       sahPurData[o + 6] = p.x; sahPurData[o + 7] = p.z;
@@ -2223,6 +2359,66 @@ function sahUpdateChase(game, dt) {
     else if (!sahNavBlocked(nx, pz, 0.6)) { sahPurData[o] = nx; }
     else if (!sahNavBlocked(px, nz, 0.6)) { sahPurData[o + 1] = nz; }
     sahPurData[o + 4] = Math.atan2(gx, gz);
+  }
+  // ---- M2: AND THEY TELL EACH OTHER ---------------------------------------
+  //
+  // Six pursuers, and until this line each of them ran its own private chase.
+  // A trader who lost you kept walking to the last place IT had seen you, and
+  // the one forty metres away who could see you perfectly well never said so.
+  // The souk's whole promise — that a maze full of people is a maze full of
+  // people who can shout — was unbuilt, and the chase read as six independent
+  // pathfinders rather than as a market closing on one animal.
+  //
+  // A SHOUT, NOT TELEPATHY, and the three constraints are what make it read
+  // that way rather than as omniscience:
+  //
+  //  - only somebody who can SEE you passes it on. `sahPurTell` is written on
+  //    this frame's `canSee`, so a trader who has lost you has nothing to say.
+  //  - it carries about twenty metres, and a shout does not go round corners:
+  //    the same `sahLineOfSight` the sight test uses gates the hearing too, so
+  //    a souk block between two traders is a souk block between two traders.
+  //  - it is a POSITION, not a lock. The listener adopts the shouter's
+  //    `lastSeen` and then goes there on its own legs; if you have moved, it
+  //    arrives at an empty alley and casts about exactly as before.
+  //
+  // Two passes, and they cannot be one: a listener that updates in the same
+  // sweep it is read in would relay the shout across the whole square in one
+  // frame, which is the difference between six people shouting and a hive.
+  // ...and it cuts, per the house rule. game.state.noTell removes the whole
+  // relay so the chase can be measured against six private pathfinders.
+  const telling = !(sahGame && sahGame.state && sahGame.state.noTell);
+  const tellR2 = sahPUR_TELL_R * sahPUR_TELL_R;
+  for (let i = 0; i < sahPURSUER_N; i++) sahPurTell[i] = sahPurTellSeen[i] ? 1 : 0;
+  for (let i = 0; telling && i < sahPURSUER_N; i++) {
+    if (!sahPurTell[i]) continue;
+    const o = i * 8, sx = sahPurData[o], sz = sahPurData[o + 1];
+    for (let j = 0; j < sahPURSUER_N; j++) {
+      if (j === i || sahPurTell[j]) continue;      // he can see it himself
+      sahTellPairs++;
+      const oj = j * 8;
+      const hx = sahPurData[oj] - sx, hz = sahPurData[oj + 1] - sz;
+      if (hx * hx + hz * hz > tellR2) continue;
+      sahTellNear++;
+      // walls only — see AND SOUND IS NOT LIGHT in sahLineOfSight
+      if (!sahLineOfSight(sx, sz, sahPurData[oj], sahPurData[oj + 1], true)) continue;
+      sahTellLos++;
+      // ---- AND A HAND-OFF IS NEWS, NOT A FRAME ---------------------------
+      // Measured on the first cut: 1382 "hand-offs" in fifteen seconds, which
+      // is one per listener per frame — the counter was ticking every frame a
+      // shouter was in range, so the toast below fired on the frame the chase
+      // started and said nothing about anything. A relay only counts when it
+      // MOVES the listener's belief: if he is already walking to within three
+      // metres of where you are, he does not need telling.
+      const news = Math.hypot(sahPurData[oj + 6] - sahPurData[o + 6],
+                              sahPurData[oj + 7] - sahPurData[o + 7]) > 3;
+      sahPurData[oj + 6] = sahPurData[o + 6];
+      sahPurData[oj + 7] = sahPurData[o + 7];
+      if (!news) continue;
+      sahPurTold++;
+      // ONCE PER CHASE, and only when it is worth hearing: the third time a
+      // trader is redirected by somebody else, the market says so.
+      if (sahPurTold === 3) sahToast('one of them shouted. now they all know.');
+    }
   }
   sahPursuerSync();
   sahChaseNear = nearest;
@@ -2687,6 +2883,149 @@ function sahBuildTrades(game, root) {
  *     ankle deep in what the palms have dropped.
  */
 const sahPALM_X0 = 96, sahPALM_Z0 = -34;
+
+// ================================================================ THE GOATS ==
+/**
+ * M5 — THE ONE CHAPTER IN THE GAME WITH NO ANIMALS IN IT.
+ *
+ * Measured before this: `grep` for a critter registration in this file returns
+ * nothing. Five camels on a fixed loop, twelve storks that perch, and a cobra
+ * in a basket — none of them registered, none of them addressable, and the
+ * word "goat" appearing only as the material of the nomads' tents. Marrakech
+ * is a city with a working agricultural belt round it and the belt was empty.
+ *
+ * A HERD, NOT SCENERY, which is the whole point: `game.herdOffer` at obey 1 is
+ * the same contract Iceland's sheep take, so the wheek finally does something
+ * west of the gate. Twenty-two goats in the palmeraie, in three loose groups
+ * on the plots that already have walls round them.
+ *
+ * WHY GOATS AND WHY IN THE TREES. A Moroccan goat climbs an argan and this is
+ * a date palmeraie, so they are on the ground — but the reason they belong
+ * here at all is the seguia: four irrigated plots with pisé walls and gaps
+ * somebody made in them is a picture of animals getting in, which the walls
+ * already say and nothing was ever doing.
+ *
+ * Deliberately NOT given: a flee state of their own, a chase, a task. The herd
+ * contract owns the wheek and the calm owns the approach; a chapter whose one
+ * losable task is a chase does not need a second thing running away from you.
+ */
+const sahGOAT_STRIDE = 6;        // x, z, yaw, phase, home angle, chew
+const sahGOAT_PENS = [
+  { x: 110, z: -18, r: 7.5, n: 8 },
+  { x: 140, z: 6,   r: 6.5, n: 7 },
+  { x: 116, z: 22,  r: 8.0, n: 7 },
+];
+let sahGoatBody = null, sahGoatHead = null, sahGoatData = null, sahGoatN = 0;
+let sahGoatCrit = null;
+const sahGOAT_NEAR = 5.4;        // m of shuffle round the group's own centre
+const sahGOAT_APPR_STOP = 2.4;   // ...and how close one comes to a sat capybara
+
+function sahBuildGoats(game, root) {
+  let n = 0;
+  for (let p = 0; p < sahGOAT_PENS.length; p++) n += sahGOAT_PENS[p].n;
+  sahGoatN = n;
+  sahGoatData = new Float32Array(n * sahGOAT_STRIDE);
+  const bodies = [], heads = [];
+  let k = 0;
+  for (let p = 0; p < sahGOAT_PENS.length; p++) {
+    const P = sahGOAT_PENS[p];
+    for (let i = 0; i < P.n; i++, k++) {
+      const a = rand(0, 6.28318), r = Math.sqrt(Math.random()) * P.r;
+      const x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+      const o = k * sahGOAT_STRIDE;
+      sahGoatData[o] = x; sahGoatData[o + 1] = z;
+      sahGoatData[o + 2] = rand(0, 6.28318);
+      sahGoatData[o + 3] = rand(0, 6.28318);
+      sahGoatData[o + 4] = a;
+      sahGoatData[o + 5] = rand(0, 6.28318);
+      const gy = sahTerrain(x, z);
+      sahPush9(bodies, x, gy + 0.40, z, 0, sahGoatData[o + 2], 0, 0.46, 0.44, 0.78);
+      sahPush9(heads, x, gy + 0.62, z, 0, sahGoatData[o + 2], 0, 0.22, 0.22, 0.30);
+    }
+  }
+  // Two browns and no white: a herd of white goats in an ochre palmeraie is
+  // the one thing in this chapter that would read as snow. See A MEDINA IS
+  // NOT A CARNIVAL above.
+  sahGoatBody = sahInstance(root, sahG.sph6, PALETTE.sahOchreDk, bodies, true, true);
+  sahGoatHead = sahInstance(root, sahG.box, PALETTE.sahOchreDust, heads, true, false);
+  if (sahGoatBody) {
+    sahGoatBody.name = 'sahGoats';
+    sahGoatBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  }
+  if (sahGoatHead) {
+    sahGoatHead.name = 'sahGoatHeads';
+    sahGoatHead.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  }
+  // The calm reads THIS — the herd offer returns its own record and does not
+  // carry `near` or `appr`. bold 0.55: a goat will come and look at you, and
+  // it makes its mind up slower than a sheep and much faster than it looks.
+  // See THE LOAF in systems.js.
+  if (typeof game.addCritter === 'function') {
+    sahGoatCrit = game.addCritter({ biome: 'sahara', r: sahGOAT_NEAR, bold: 0.55 });
+  }
+  if (typeof game.herdOffer === 'function') {
+    game.herdOffer({
+      biome: 'sahara', kind: 'goat', obey: 1, voice: 'wheek', pitch: 1.55,
+      count: function () { return sahGoatN; },
+      at: function (i, out) {
+        const o = i * sahGOAT_STRIDE;
+        out.x = sahGoatData[o]; out.z = sahGoatData[o + 1];
+        out.y = sahTerrain(out.x, out.z);
+      },
+      put: function (i, x, z, yaw) {
+        const o = i * sahGOAT_STRIDE;
+        sahGoatData[o] = x; sahGoatData[o + 1] = z; sahGoatData[o + 2] = yaw;
+      },
+    });
+  }
+}
+
+function sahUpdateGoats(dt) {
+  if (!sahGoatBody || !sahGoatN) return;
+  const near = sahGoatCrit && sahGoatCrit.near ? sahGoatCrit.near : sahGOAT_NEAR;
+  const appr = sahGoatCrit && sahGoatCrit.appr ? sahGoatCrit.appr : 0;
+  let k = 0;
+  for (let p = 0; p < sahGOAT_PENS.length; p++) {
+    const P = sahGOAT_PENS[p];
+    for (let i = 0; i < P.n; i++, k++) {
+      const o = k * sahGOAT_STRIDE;
+      let x = sahGoatData[o], z = sahGoatData[o + 1];
+      // ---- the shuffle round the group's own centre ---------------------
+      // The herd system owns them whenever it wants them (`put` writes x and
+      // z straight in), so this only has to be what a goat does when nobody
+      // is asking: drift back toward its own place on the ring, slowly.
+      const ha = sahGoatData[o + 4];
+      const hx = P.x + Math.cos(ha) * P.r * 0.72, hz = P.z + Math.sin(ha) * P.r * 0.72;
+      const dx = hx - x, dz = hz - z;
+      const d = Math.hypot(dx, dz);
+      if (d > near) {
+        const s = Math.min(d, 0.55 * dt) / d;
+        x += dx * s; z += dz * s;
+        sahGoatData[o + 2] = Math.atan2(dx, dz);
+      }
+      sahGoatData[o] = x; sahGoatData[o + 1] = z;
+      // ---- and the head, which is the whole of the animation -------------
+      // A goat grazing is a head going down and coming up, and nothing else
+      // moves. `chew` runs on its own clock so twenty-two of them are never
+      // in phase. `appr` is the calm's approach term: a goat walking up to a
+      // capybara that has sat down keeps its head UP, which is the difference
+      // between an animal grazing near you and an animal interested in you.
+      sahGoatData[o + 5] += dt * (1.4 + Math.sin(sahGoatData[o + 3]) * 0.5);
+      const graze = appr > 0.02 ? 0 : (0.5 + Math.sin(sahGoatData[o + 5]) * 0.5);
+      const gy = sahTerrain(x, z);
+      const yaw = sahGoatData[o + 2];
+      const bob = Math.sin(sahGoatData[o + 5] * 0.5 + sahGoatData[o + 3]) * 0.012;
+      sahGoatBody.setMatrixAt(k, sahXform(x, gy + 0.40 + bob, z,
+                                          graze * 0.22, yaw, 0, 0.46, 0.44, 0.78));
+      // the head hangs off the front of the body along its own yaw
+      const hxo = Math.sin(yaw) * 0.34, hzo = Math.cos(yaw) * 0.34;
+      sahGoatHead.setMatrixAt(k, sahXform(x + hxo, gy + 0.62 - graze * 0.30 + bob, z + hzo,
+                                          graze * 0.85, yaw, 0, 0.22, 0.22, 0.30));
+    }
+  }
+  sahGoatBody.instanceMatrix.needsUpdate = true;
+  if (sahGoatHead) sahGoatHead.instanceMatrix.needsUpdate = true;
+}
 
 function sahBuildSeguia(game, root) {
   const M = sahMerger();
@@ -5122,6 +5461,35 @@ export function createSahara(game) {
   const api = {
     built() { return sahBuilt; },
     terrainHeight: sahTerrain,
+    /**
+     * M2, M3 and M4, measured. `told` is how many hand-offs the shout has
+     * made this chase, `cover` how many of the souk crowd are registered as
+     * cover, `shoved` how many people are being pushed past right now, and
+     * `seeing` how many of the six pursuers have a live sight line.
+     */
+    chaseDebug() {
+      let shoved = 0;
+      for (let i = 0; i < sahPplN; i++) {
+        if (Math.abs(sahPplData[i * sahPPL_STRIDE + 15]) > 0.02) shoved++;
+      }
+      let seeing = 0;
+      for (let i = 0; i < sahPURSUER_N; i++) if (sahPurTellSeen[i]) seeing++;
+      return { chase: sahChase, told: sahPurTold, cover: sahSoukPplN,
+               tellPairs: sahTellPairs, tellNear: sahTellNear, tellLos: sahTellLos,
+               cover0: sahSoukPpl0, shoved: shoved, seeing: seeing,
+               ppl: sahPplN, goats: sahGoatN, near: Math.round(sahChaseNear * 10) / 10 };
+    },
+    /** Start one from a probe, so the chase can be measured without a theft. */
+    forceChase() { if (sahChase !== 1) sahStartChase(sahGame); return sahChase; },
+    /** Is A's sight line to B clear? The instrument M3 is measured with. */
+    losTest(ax, az, bx, bz) { return sahLineOfSight(ax, az, bx, bz); },
+    /** Where the souk crowd is, so a probe can stand behind one of them. */
+    coverAt(k) {
+      const i = sahSoukPpl0 + k;
+      if (k < 0 || k >= sahSoukPplN) return null;
+      const o = i * sahPPL_STRIDE;
+      return { x: sahPplData[o], z: sahPplData[o + 2] };
+    },
     /** The storm's own accumulators, so the bleed-back can be measured. */
     stormDebug() {
       return { erg: +sahErgT.toFixed(2), phase: sahStormPhase,
@@ -5198,6 +5566,7 @@ export function createSahara(game) {
       sahUpdateDust(game, dt);
       sahUpdateSmoke();
       sahUpdateStorks(game, dt);
+      sahUpdateGoats(dt);
       sahUpdateDates(game, dt);
       sahUpdateTasks(game, dt);
 
@@ -5237,6 +5606,9 @@ function sahBuild(game) {
   sahBuildErg(sahRoot);
   sahBuildVariety(game, sahRoot);
   sahBuildSeguia(game, sahRoot);
+  // M5: the palmeraie has animals in it now. AFTER the seguia, because the
+  // pens sit inside the plots it walls.
+  sahBuildGoats(game, sahRoot);
   sahBuildKsar(game, sahRoot);
   sahBuildKhettara(game, sahRoot);
   sahBuildTowers(game, sahRoot);

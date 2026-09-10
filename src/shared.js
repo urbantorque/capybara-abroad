@@ -882,6 +882,11 @@ export const PALETTE = {
   gorBurner:    0xffb14a,      // and the one warm light in the frame at 5 a.m.
   gorSteel:     0xa8a49e,
   gorTruck:     0x5a6b52,
+  // C3: the chase truck's beacon. Deliberately NOT gorBurner — the burner is
+  // the warm light the whole chapter is lit by, and a recovery beacon that is
+  // the same colour as the thing it is chasing disappears into it. Amber
+  // against the burner's orange is the one hue separation available at 600 m.
+  gorAmber:     0xffc31f,
   gorSkyTop:    0x3f4f7a,      // still night at the zenith
   gorSkyLow:    0xf5b98a,      // and sunrise on the rim
   gorSkyHigh:   0x6a7fb0,
