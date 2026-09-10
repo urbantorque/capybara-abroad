@@ -293,6 +293,82 @@ in Marrakech     1, visible false — hidden, not detached
 staged again     1. Not two.
 ```
 
+### L10 — a thrown thing that hits somebody
+
+The charged throw was built in an earlier pass, `props.js` gives all nineteen
+chapters rigid bodies, and about five tasks in 232 use it.
+
+`physPersonHit` has four gates, and the first is the whole design. `releaseTime`
+was the wrong mark — it is stamped by set-downs, npc fumbles and the Pasto stall
+collapse too — so `prop.thrownT` is stamped in `physRelease` **only** when it is
+handed a launch impulse, expires after 3 s, and is **spent on the first person
+struck**, so one throw is at most one incident however many people it ricochets
+through. Then: still flying (DYNAMIC, so a carried prop brushing somebody is not
+a throw), 3.6 m/s along the normal, and a 1.2 s whole-game floor.
+
+Nothing becomes unwinnable: npc.js's startle already exempts `carryT >= 0`,
+`localsReact` never moves a local at all, and a victim mid-errand takes the
+punch and the line but not the sweep. 0 owned props lost across four chapters.
+
+Differential, 80 solved throws each, `props.js` stashed for the baseline — peak
+flinch spring on the person actually struck, read off npc.js's own record:
+
+| | without | with |
+|---|---|---|
+| Marrakech | 4.80 / max **7.62** | 20.97 / max **20.97** |
+| Venice | 4.40 / max **6.96** | 11.33 / max **23.45** |
+| Mong Kok | 5.31 / max **8.10** | 8.94 / max **22.01** |
+| rule firings | **0** | **18** |
+
+The baseline is not zero — npc.js has answered bangs since v33 — but its ceiling
+is 8.1. The gates are proved separately rather than assumed: 8 throws in 2.0 s
+gave exactly 2 hits, which is `ceil(2.0/1.2)`; a prop set down and shoved into a
+person by hand at 7.5–8.5 m/s gave 0 hits.
+
+### L11 — do not ask for a shot the place cannot give
+
+A consequence of L2, found by looking at all nineteen sweep frames rather than
+at the numbers. The wide shot puts the boom out to 12.5 m and in a tight place
+there is nothing to put it into: cutting the boom drags the eye up the boom axis
+toward the anchor, so the pitch it *achieves* is 26° instead of 11° and the
+frame is the back of the animal's head.
+
+**A latch, not a scale, and that is the whole of the design.** Scaling the ask by
+`camClearF` oscillates on about a five-second cycle: retract, ray clears,
+`camClearF` eases out at 3.2/s, ask rises, extend, cut again. So the place gets
+one answer, and it stays said until the player moves — which is the same signal
+that zeroes `restIdleT`, so the latch needs no second rule and there is no path
+from the crane's position back into the ask.
+
+**Both numbers came from frames, and both were wrong first.** The crane must be
+half out before a cut means anything (0.05 is the driving boom, so a spot tight
+at 9.5 m latched on a cut it was always going to have). And the cut threshold
+was 0.82, which cost Antarctica a frame that was good:
+
+```
+quay 0.15       the back of the animal's head             bad
+kowloon 0.38    inside a wet-market stall, facing a wall  bad
+antarctic 0.53  the channel, the floes and the jetty      GOOD
+```
+
+0.48 sits between them and has a physical reading too: at 12.5 m of boom it is
+6.0 m of eye, under `sysCAM_MIN` — closer than a player may ever zoom by hand.
+
+After: **wide shot delivered 19/19, animal on screen 19/19**, Antarctica keeps
+its cut and its frame. In the tight-spot hunt (six chapters, six legs, sampled
+twice four seconds apart) the failure this prevents is 0 of 36 and one sample
+moved the blend by more than 0.06 across four seconds, which is not an
+oscillation.
+
+---
+
+## THE FINAL REGRESSION
+
+Build clean at 7258 top-level declarations, no collisions. 19 chapters crossed,
+walked and wheeked: **zero console errors, zero `state.lastError`**.
+`qa/fuzz.js` 19/19 — no void falls, no NaN, no solver runaway. `qa/rd-onscreen.js`
+19/19 on screen walking and settled. All nineteen settled frames looked at.
+
 ### The writing pass
 
 48 task names rewritten. All seventeen "Ride the ⟨noun⟩" rows are gone, each
@@ -325,7 +401,7 @@ street local's existing line.
 - **The wide crease octave.** The art review named a second AO ring at ~1.6 m
   world radius as the largest single beauty term still available, reusing
   `mainCrW` verbatim for 8 extra taps. Not attempted here.
-- **The theft class.** The design review's strongest remaining idea: gate the 24
+- **The theft class**, still open. The design review's strongest remaining idea: gate the 24
   theft rows on "held four seconds and outside the owner's heat site", so a
   theft ticks when you get *away* with it. It reuses the heat field and the
   chase state machine unchanged, and it is the one change that would put stakes
