@@ -1041,6 +1041,27 @@ const sysSFX_PAN_K  = 1.35;   // widen the middle: 45 degrees off axis is well p
 // ambience ring tops out at 6 m of lift over a 14–34 m radius, so the ladder
 // sees at most a nine per cent narrowing and its ninety-odd tuned volumes are
 // untouched — which is the same promise sysAmb was built on.
+// ---- THE TWO NAMES THAT WERE NEVER DECLARED (L7) -------------------------
+// `f.type = lowpass` and `f.type = highshelf`, in the one-shot routing block,
+// with no `lowpass` and no `highshelf` anywhere in the tree — bare identifiers,
+// so a ReferenceError on the line after the node was made. They are the only
+// two such uses in this file; every other `.type = x` is a real parameter.
+//
+// The whole of A2 was therefore dead, and it failed in the worst available
+// way. The throw is inside the panner's try, whose catch is
+// `{ node = null; acMaster = bus; }` — so a sound that was behind you or above
+// you lost its filter AND ITS STEREO PANNER, and arrived as flat centred mono.
+// The cue that exists to tell you something is behind you was the one thing
+// that guaranteed you could not tell where it was.
+//
+// It was invisible because nothing looked: the failure is swallowed by a catch
+// written for a genuinely expected condition (the node budget), the branch only
+// fires past `back` 0.15, and the audit hook reports `sysSfxBack`, which is the
+// INPUT to the branch and was always correct. Same family as every other flag
+// in this repo that answered a table instead of a count. Found by widening the
+// branch until it fired on nearly every placed call.
+const sysLOWPASS = 'lowpass';
+const sysHIGHSHELF = 'highshelf';
 const sysSFX_BACK_T  = 0.15;   // `back` past which a one-shot is given a filter
 const sysSFX_BACK_LP = 15500;  // Hz taken off the ceiling when fully astern
 const sysSFX_UP_T    = 0.20;   // `up` past which it gets the shelf instead
@@ -10219,12 +10240,21 @@ export function createSystems(game) {
   // and, from S2, by the one-shots. 0..1 both: `back` is 1 dead astern, `up`
   // is 1 directly overhead or underfoot. See sysEarFwd.
   let sysSfxBack = 0, sysSfxUp = 0;
+  // ---- ...AND HOW FAR AWAY IT WAS (L7) -------------------------------------
+  // The one number this function has always had and never published. The
+  // movers have taken the top off with distance since A1 — a continuous engine
+  // at ninety metres is duller as well as quieter, which is what air does — and
+  // the four hundred one-shots got the level law and nothing else. A gull at a
+  // hundred metres was full bandwidth, just quieter, which is the single
+  // loudest "this is a flat stereo field" cue in the mix.
+  let sysSfxDist = 0;
   function audioPlace(x, y, z, near, far) {
     audioEar();
     const n = near > 0 ? near : sysSFX_NEAR;
     const f = far > 0 ? far : sysSFX_FAR;
     sysEarTo.set(x - sysEar.x, y - sysEar.y, z - sysEar.z);
     const d = sysEarTo.length();
+    sysSfxDist = d;
     if (d >= f) return 0;
     let g = d <= n ? 1 : n / (n + sysSFX_ROLL * (d - n));
     // ...and a taper into the far plane, so a sound does not sit at 0.1 for
@@ -17197,7 +17227,7 @@ export function createSystems(game) {
     if (at && typeof at.x === 'number' && at.x === at.x) { px = at.x; py = at.y || 0; pz = at.z || 0; placed = true; }
     else if (opts && typeof opts.x === 'number' && opts.x === opts.x) { px = opts.x; py = opts.y || 0; pz = opts.z || 0; placed = true; }
 
-    let pan = 0, back = 0, up = 0;
+    let pan = 0, back = 0, up = 0, dist = 0;
     if (placed) {
       const g = audioPlace(px, py, pz, opts.near, opts.far);
       // THE CULL IS THE POINT, AND IT COMES BEFORE THE THROTTLE. A gull four
@@ -17212,6 +17242,7 @@ export function createSystems(game) {
       // they live on the module and the next audioPlace call overwrites them.
       up = sysSfxUp;
       back = sysSfxBack;
+      dist = sysSfxDist;
       pan = sysSfxPan * (1 - sysSFX_UP_PAN * up);
     }
     if (!force && lastPlay[name] !== undefined && now - lastPlay[name] < gap) return;
@@ -17279,15 +17310,36 @@ export function createSystems(game) {
         // you is a fact about the world, where the shelf is a hint about a
         // dimension two speakers do not have. A gull that is both above and
         // behind is a gull behind you.
+        // ---- ...AND HOW FAR IT CAME (L7) ---------------------------------
+        // Air takes the top off before it takes the level, and until now that
+        // was true of the ten continuous movers and of none of the four hundred
+        // one-shots. Same curve, same three constants, same node: a gull, a
+        // church bell, a spilled crate or a shout at eighty metres arrives dull
+        // as well as quiet, which is the difference between a stereo field and
+        // a depth field.
+        //
+        // FOLDED INTO THE BACK BRANCH RATHER THAN ADDED BESIDE IT. A biquad is
+        // one thing at a time and both of these want a lowpass, so the two cues
+        // take the MINIMUM of their two ceilings — exactly what the mover does
+        // at sysMOVER_LPSPAN. That keeps the node count where it was: at most
+        // one filter per placed call, and none at all inside sysMOVER_FLAT
+        // where distance has nothing to say.
         let tail = node;
-        if (back > sysSFX_BACK_T) {
+        const over = Math.max(0, Math.min(dist, 400) - sysMOVER_FLAT);
+        const airT = clamp(over / sysMOVER_LPSPAN, 0, 1);
+        const airHz = over > 0
+          ? sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - airT) * (1 - airT)
+          : 20000;
+        const backHz = back > sysSFX_BACK_T ? 20000 - back * sysSFX_BACK_LP : 20000;
+        const lpHz = Math.min(airHz, backHz);
+        if (lpHz < 19000) {
           const f = c.createBiquadFilter();
-          f.type = lowpass;
-          f.frequency.value = 20000 - back * sysSFX_BACK_LP;
+          f.type = sysLOWPASS;
+          f.frequency.value = Math.max(200, lpHz);
           node.connect(f); tail = f;
         } else if (up > sysSFX_UP_T) {
           const f = c.createBiquadFilter();
-          f.type = highshelf;
+          f.type = sysHIGHSHELF;
           f.frequency.value = 6000;
           f.gain.value = sysSFX_UP_DB * up;
           node.connect(f); tail = f;
