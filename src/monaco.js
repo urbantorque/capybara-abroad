@@ -3210,13 +3210,39 @@ function monBuildWatchers(game, root) {
   }
   monUpdateWatchers(0);
 }
+// m — inside this a spectator would rather look at the animal than the race.
+// Nine metres is the width of the run-off plus the barrier: close enough that
+// a person leaning on the armco is looking down at it.
+const monWATCH_NEAR = 9;
 function monUpdateWatchers(dt) {
   if (!monWatchMesh) return;
+  // ---- AND IT CUTS (the house rule) ------------------------------------
+  // Every term added to the picture in this repository carries a state flag
+  // that removes it, so it can be measured against its own absence rather
+  // than against a memory of last week. game.state.noNotice is that flag for
+  // the whole D1 crowd term, in all four chapters that carry one.
+  const monCapy = monGame && monGame.capy;
+  const monCapyP = (monGame && monGame.state && monGame.state.noNotice)
+                 ? null : (monCapy && monCapy.position);
   for (let i = 0; i < monWatchN; i++) {
     const x = monWatchPh[i * 4], y = monWatchPh[i * 4 + 1], z = monWatchPh[i * 4 + 2];
     const ph = monWatchPh[i * 4 + 3];
     // the nearest car, and they all turn to it
     let bd = 1e9, bx = x, bz = z + 1;
+    // ---- ...UNLESS IT IS STANDING RIGHT THERE (D1) ----------------------
+    // Forty-six people paid to watch a road, and the ONLY thing any of them
+    // could look at was a car — including while a capybara walked along the
+    // barrier in front of them. This is the same "preferred, not pinned"
+    // shape the ridden car below already uses, one rung nearer: inside
+    // monWATCH_NEAR the animal is simply another candidate, and because it
+    // is a much smaller radius than the 90 m car gate it wins on distance
+    // wherever it applies. No damp, for the same reason the cars need none —
+    // the target moves continuously, so the heads follow rather than snap.
+    if (monCapyP) {
+      const dx = monCapyP.x - x, dz = monCapyP.z - z;
+      const d = dx * dx + dz * dz;
+      if (d < monWATCH_NEAR * monWATCH_NEAR) { bd = d; bx = monCapyP.x; bz = monCapyP.z; }
+    }
     // ---- ...UNLESS THERE IS A CAPYBARA ON ONE OF THEM (F2) --------------
     //
     // Forty-six people are paid to watch this road, `monRider` has been module

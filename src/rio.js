@@ -2362,6 +2362,36 @@ let rioVoleiT = 3.0, rioVoleiLast = -1, rioVoleiCel = 0;
 let rioPplBody = null, rioPplHead = null, rioPplN = 0;
 // x, y, z, yaw, kind, phase, rate
 const rioPplData = new Float32Array(rioPPL_MAX * 7);
+// ---- AND WHETHER ANYBODY HAS NOTICED YOU (D1) ---------------------------
+// Two hundred and twenty in the grandstand, thirty-eight on the sand, and the
+// only thing any of them read was |x - rioBateriaX| — so people on a towel at
+// Copacabana bobbed to a parade a hundred metres away that they cannot see,
+// and nobody in Rio had ever noticed a capybara. The stand already owns the
+// shape this needs: a proximity scalar, an amplitude, a lean over the barrier
+// and a shortest-arc turn. It had one source. This gives it a second.
+//
+// A SIDE ARRAY RATHER THAN A WIDER STRIDE, unlike Marrakech's. Rio's stride is
+// the literal 7 written out at seven call sites rather than a named constant,
+// so widening it means editing every one of them correctly; a parallel channel
+// is one allocation and cannot be got wrong.
+const rioPplNot = new Float32Array(rioPPL_MAX);
+// ---- A PLATEAU, NOT A RAMP, AND IT WAS MEASURED WRONG FIRST -------------
+// The first cut wrote want = 1 - d/R, which reads as "notices you more the
+// closer you get" and is not how noticing works: somebody six metres away has
+// either seen a giant rodent or has not. That shape put full attention only
+// at arm's length — at 6 m of a 7.5 m radius it is 0.2, so a fifth of a turn —
+// and it measured as nothing. Mean |bearing error| over the near band came
+// back at 1.363 rad against a far-band control of 1.478, where a crowd facing
+// away at random scores pi/2 = 1.571 and one that has turned scores near 0.
+// So: full inside (R - EDGE), falling off across the last EDGE metres, with
+// the damp still doing all the smoothing in time.
+const rioNOT_R    = 8.0;    // m — inside this, a person has noticed
+const rioNOT_EDGE = 2.2;    // m of falloff at the rim
+const rioNOT_L    = 3.0;    // damping — about half a second to come round
+// How far round each kind comes: standing, on a towel, on the rock at
+// Arpoador. A sitter turns from the waist; the rock crowd is already facing
+// roughly the right way and only has to look down.
+const rioNOT_TURN = [1.0, 0.6, 0.75];
 let rioPplBodyCol = null, rioPplHeadCol = null;
 let rioClap = 0;
 const rioPplCol = new THREE.Color();
@@ -2489,6 +2519,15 @@ function rioUpdatePeople(dt) {
   if (!rioPplBody || rioPplN < 1) return;
   if (rioClap > 0) rioClap -= dt;
   const pulse = rioBateriaPulse;
+  // ---- AND IT CUTS (the house rule) ------------------------------------
+  // Every term added to the picture in this repository carries a state flag
+  // that removes it, so it can be measured against its own absence rather
+  // than against a memory of last week. game.state.noNotice is that flag for
+  // the whole D1 crowd term, in all four chapters that carry one.
+  const capy = rioGame && rioGame.capy;
+  const cp = (rioGame && rioGame.state && rioGame.state.noNotice)
+           ? null : (capy && capy.position);
+  const notR2 = rioNOT_R * rioNOT_R;
   for (let i = 0; i < rioPplN; i++) {
     const o = i * 7;
     const kind = rioPplData[o + 4];
@@ -2496,6 +2535,19 @@ function rioUpdatePeople(dt) {
     let x = rioPplData[o], z = rioPplData[o + 2];
     let y = rioPplData[o + 1], yaw = rioPplData[o + 3];
     let rx = 0, sy = 1, sxz = 1;
+    // ---- HOW MUCH OF THIS PERSON'S ATTENTION THE ANIMAL HAS (D1) --------
+    // Computed before the branches because two of them want it, and applied
+    // after them because it should win over an idle clock rather than average
+    // with one. The parade and the float are excluded: they are marching, and
+    // the salute at rioUpdateParade is already their reaction to the player.
+    let not = 0, ndx = 0, ndz = 0;
+    if (cp && kind !== rioPPL_PARADE && kind !== rioPPL_FLOAT) {
+      ndx = cp.x - x; ndz = cp.z - z;
+      const nd2 = ndx * ndx + ndz * ndz;
+      const want = nd2 < notR2 ? clamp((rioNOT_R - Math.sqrt(nd2)) / rioNOT_EDGE, 0, 1) : 0;
+      not = damp(rioPplNot[i], want, rioNOT_L, dt);
+      rioPplNot[i] = not;
+    }
     if (kind === rioPPL_PARADE || kind === rioPPL_FLOAT) {
       // ---- THE PEOPLE IN THE PARADE -----------------------------------
       // A desfile is not a hundred and fifty drums walking down an empty road.
@@ -2573,20 +2625,41 @@ function rioUpdatePeople(dt) {
       // comes up as the bateria arrives and sits back down behind it, and
       // there is no separate clock anywhere for it to drift against.
       const near = clamp(1 - Math.abs(x - rioBateriaX) / 30, 0, 1);
-      const amp = 0.014 + near * (0.05 + pulse * 0.13);
-      y += Math.abs(Math.sin(rioTime * (1.4 + near * 3.2) * rate + ph)) * amp;
-      sy = 1 + near * pulse * 0.05;
+      // D1: the stand has two things worth standing up for now, and the nearer
+      // one wins. The thirty-eight people on the sand run this branch too, and
+      // they are a hundred metres from the avenue with a hotel between — so on
+      // the beach the capybara is now the only term that ever fires here.
+      const drum = near > not ? near : not;
+      const amp = 0.014 + drum * (0.05 + pulse * 0.13);
+      y += Math.abs(Math.sin(rioTime * (1.4 + drum * 3.2) * rate + ph)) * amp;
+      sy = 1 + drum * pulse * 0.05;
       // ...and they LEAN OVER THE BARRIER as it comes past, which is the thing
       // everybody in that stand is actually doing and is worth one number.
-      rx = -near * (0.10 + pulse * 0.16);
-      if (near > 0.02) {
-        // and they turn to watch it go past
-        const want = Math.atan2(rioBateriaX - x, rioAVE_Z - z);
+      rx = -drum * (0.10 + pulse * 0.16);
+      if (drum > 0.02) {
+        // and they turn to watch it go past — or to watch you, if you are the
+        // nearer of the two. The same shortest-arc blend, one of two targets.
+        const want = not > near ? Math.atan2(ndx, ndz)
+                                : Math.atan2(rioBateriaX - x, rioAVE_Z - z);
         let d = want - yaw;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
-        yaw += d * near * 0.9;
+        yaw += d * drum * 0.9;
       }
+      not = 0;   // this branch has spent it
+    }
+    // ---- AND THE ONES THE BRANCH DID NOT SPEND IT ON (D1) ----------------
+    // The towels and the rock at Arpoador. A TURN ONLY, no lean, and the
+    // reason is worth writing down: this file draws a sitter RECLINING at
+    // rx -0.34 (see the head-offset note below, which measures the shoulders
+    // travelling half a metre in z) while Marrakech draws one leaning IN at
+    // -0.16. The sign of a lean is not portable between the two files, and
+    // the turn is the large half of the effect in both.
+    if (not > 0.004) {
+      let d = Math.atan2(ndx, ndz) - yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      yaw += d * not * rioNOT_TURN[kind];
     }
     rioPplBody.setMatrixAt(i, rioXform(x, y, z, rx, yaw, 0, sxz, sy, sxz));
     // A HEAD SITS ON A NECK, AND THE NECK IS ON A BODY THAT LEANS.

@@ -414,6 +414,62 @@ distance while their neighbours in the same sequence are gated
 
 ---
 
+## TIER 1 AS BUILT (10 Sep 2026, branch `depth-tier1`)
+
+Two commits. Everything claimed below was measured, and the one thing that was
+not is named as such.
+
+**The six defects** — D5.1 to D5.6 — all landed. D5.4 was **wrong on the first
+cut and caught before it shipped**: dropping goreme's `* 0` outright reads 1,
+not 0, for the ~90 % of the cycle before the ramp, because `gorSun` is clamped
+to zero until `gorSUN_P`. It needs three branches. Written down because this
+document's own preamble is about claims that fail on contact.
+
+**Two re-tierings of three.** Rio's banner moved to `fragata-ride` and
+Palawan's to `the-manta`; both chapters keep one wow and two minis, and both
+now publish `marqueeAt` so the beacon tracks the live bird and the live ray.
+The Iceland one is refused above.
+
+**D1, the crowd term, in four chapters** — and it took four instruments,
+three of which were wrong:
+
+1. *Count the heads that moved.* Useless: with a control leg the idle-fidget
+   noise floor was as large as the signal in all four chapters (Marrakech 303
+   noise against 319 signal, Rio 280 against 279).
+2. *Mean |bearing error|, near band against a far band.* Better, and it found
+   the first cut of the term was **too weak to see**: `want = 1 - d/R` gives a
+   fifth of a turn at six metres, and the near band read 1.363 rad against a
+   far control of 1.478 where random is pi/2 = 1.571. The ramp became a
+   plateau with a 2.2 m edge, which is also the honest model — somebody six
+   metres away has either seen a giant rodent or has not.
+3. *The term against its own absence*, via a new `game.state.noNotice` that
+   cuts it — the house rule this batch had been ignoring, and the only probe
+   that needs no guess about which mesh is the crowd.
+
+Measured, term off then on, animal parked in the crowd:
+
+| chapter | figures the flag moves | mean |bearing error| off → on |
+|---|---|---|
+| Marrakech | 147 of 174 | 2.924 → **0.955** rad |
+| Rio | 155 of 306 | near band **0.174** against a far control of 0.801 |
+| Monte Carlo | 46 of 46 | 1.451 → **0.000** rad (14 watchers in range) |
+| Hanoi | — | **not demonstrated** |
+
+**Hanoi is honest as blank.** The seventy pavement folk are drawn as ten
+variant meshes of about seven instances each, which every probe's minimum-count
+filter threw away, and the one run that included them found two people inside
+the radius at the spot it chose. The code is the same shape as the three that
+are proven and it is gated on the same flag, but *this document does not claim
+a chapter it did not measure.* It needs a probe that can name the folk meshes.
+
+**And the whole tree still runs.** All nineteen chapters entered, wheeked,
+walked and wheeked again: **zero console errors, zero page errors, zero NaN
+positions, every crossing landing in the chapter it asked for.** Rio entered
+three times in succession reports `world.bodies.length` 99, 99, 99 — which is
+D5.1, proven from the outside.
+
+---
+
 ## ORDER, AND WHAT EACH TIER BUYS
 
 **Tier 1 — do first. No new systems, no new draws.**

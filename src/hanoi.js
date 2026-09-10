@@ -249,6 +249,37 @@ const hanFolkGroups = [];
 let hanFolkData = null;
 let hanFolkBodies = null;        // one box each — see ...AND SEVENTY OF THEM ARE THERE
 const hanFOLK_N = 70;
+// ---- AND WHETHER ANY OF THEM HAS NOTICED YOU (D1) ------------------------
+// Seventy people on the pavement, and the only thing any of them read was
+// their own lane parameter. The two hundred and forty riders have seen the
+// animal since the chapter was built — they swerve, they brake, they jam,
+// they line up under it in the air — and the people standing three metres
+// away on the kerb did not know it was there.
+//
+// A WALKER GLANCES AND A SITTER TURNS ROUND. The figure has one yaw and no
+// neck, so a full turn on somebody who is still walking their lane is a
+// moonwalk; they get less than half of it, which reads as a look over the
+// shoulder. The stool-sitters face a wall with nothing to do and get most of
+// it, which is what somebody on a plastic stool on Ta Hien actually does.
+const hanFolkNot = new Float32Array(hanFOLK_N);
+// ---- A PLATEAU, NOT A RAMP, AND IT WAS MEASURED WRONG FIRST -------------
+// The first cut wrote want = 1 - d/R, which reads as "notices you more the
+// closer you get" and is not how noticing works: somebody six metres away has
+// either seen a giant rodent or has not. That shape put full attention only
+// at arm's length — at 6 m of a 7.5 m radius it is 0.2, so a fifth of a turn —
+// and it measured as nothing. Mean |bearing error| over the near band came
+// back at 1.363 rad against a far-band control of 1.478, where a crowd facing
+// away at random scores pi/2 = 1.571 and one that has turned scores near 0.
+// So: full inside (R - EDGE), falling off across the last EDGE metres, with
+// the damp still doing all the smoothing in time.
+const hanNOT_R       = 6.5;    // m
+const hanNOT_EDGE    = 2.0;    // m of falloff at the rim
+const hanNOT_L       = 3.4;    // damping
+const hanNOT_WALK    = 0.42;   // how far round a walker comes
+const hanNOT_SIT     = 0.85;   // ...and somebody on a stool
+const hanNOT_WHEEK   = 3.0;    // s a shout holds the radius open
+const hanNOT_WHEEK_K = 2.2;
+let hanFolkWheek = 0;
 let hanLanternMesh = null;
 
 // bookkeeping
@@ -2963,6 +2994,17 @@ function hanFolkFoot(i, out) {
 }
 function hanUpdateFolk(dt) {
   if (!hanFolkMeshes.length) return;
+  if (hanFolkWheek > 0) hanFolkWheek -= dt;
+  // ---- AND IT CUTS (the house rule) ------------------------------------
+  // Every term added to the picture in this repository carries a state flag
+  // that removes it, so it can be measured against its own absence rather
+  // than against a memory of last week. game.state.noNotice is that flag for
+  // the whole D1 crowd term, in all four chapters that carry one.
+  const capy = hanGame && hanGame.capy;
+  const cp = (hanGame && hanGame.state && hanGame.state.noNotice)
+           ? null : (capy && capy.position);
+  const notR = hanNOT_R * (hanFolkWheek > 0 ? hanNOT_WHEEK_K : 1);
+  const notR2 = notR * notR;
   for (let v = 0; v < hanFolkMeshes.length; v++) {
    const idx = hanFolkGroups[v], mm = hanFolkMeshes[v];
    for (let k = 0; k < idx.length; k++) {
@@ -2980,8 +3022,26 @@ function hanUpdateFolk(dt) {
     const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
     // ON THE PAVEMENT, and the sitters are further out and facing the wall
     const off = (i & 2 ? 1 : -1) * (hanLANES[L].w + (sit ? 2.9 : 1.7));
-    const yaw = sit ? (hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2))
-                    : (hanFolkData[o + 2] > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI);
+    let yaw = sit ? (hanTmp.yaw + (off > 0 ? Math.PI / 2 : -Math.PI / 2))
+                  : (hanFolkData[o + 2] > 0 ? hanTmp.yaw : hanTmp.yaw + Math.PI);
+    // ---- ...UNLESS SOMETHING IS GOING PAST THAT IS NOT A MOPED (D1) ----
+    // The drawn position is computed below from the lane and is NOT touched:
+    // hanFolkBodies.step() puts each box where its walker went, and a figure
+    // that is drawn off its own collider is worse than one that does not move.
+    if (cp) {
+      const fx = hanTmp.x + nx * off, fz = hanTmp.z + nz * off;
+      const ndx = cp.x - fx, ndz = cp.z - fz;
+      const nd2 = ndx * ndx + ndz * ndz;
+      const want = nd2 < notR2 ? clamp((notR - Math.sqrt(nd2)) / hanNOT_EDGE, 0, 1) : 0;
+      const not = damp(hanFolkNot[i], want, hanNOT_L, dt);
+      hanFolkNot[i] = not;
+      if (not > 0.004) {
+        let d = Math.atan2(ndx, ndz) - yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        yaw += d * not * (sit ? hanNOT_SIT : hanNOT_WALK);
+      }
+    }
     const bob = sit ? 0 : Math.abs(Math.sin(hanTime * 3.4 + hanFolkData[o + 5])) * 0.045;
     hanE.set(0, yaw, 0, 'YXZ');
     hanM.compose(hanV3.set(hanTmp.x + nx * off, hanGROUND + bob - (sit ? 0.52 : 0),
@@ -3228,6 +3288,9 @@ function hanWheek(game) {
   const capy = game.capy;
   if (!capy || !capy.position) return;
   const p = capy.position;
+  // ...and on the pavement it is a noise, so heads come round further and for
+  // longer than a walk-past earns. See hanUpdateFolk (D1).
+  hanFolkWheek = hanNOT_WHEEK;
   // in the traffic it is a HORN, and horns are answered
   if (hanLaneAt(p.x, p.z) < hanLaneW + 2 && hanBikeN) {
     let n = 0;

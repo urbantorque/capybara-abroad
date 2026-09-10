@@ -1557,7 +1557,42 @@ const sahFID_A = 2.6, sahFID_B = 8.5;   // s between one person's decisions
 const sahFID_STAND = 0.42;              // rad they turn through, either way
 const sahFID_SIT   = 0.30;              // ...and a seated rock is smaller
 const sahFID_L     = 2.6;               // damping: a fidget takes about 0.4 s
-const sahPPL_STRIDE = 14;
+// ---- ...AND WHETHER ANYBODY HAS NOTICED YOU (D1) -------------------------
+// The square held about a hundred and seventy people and the ONLY inputs to any
+// of them were sahStorm, sahFireTakeover and sahTime. Not one read the animal's
+// position. Jemaa el-Fnaa is the densest crowd in the game and it was the least
+// alive place in it, which is the whole finding of ROADMAP-DEPTH.
+//
+// A TURN AND A LEAN, AND DELIBERATELY NOT A STEP. Every one of these people
+// carries their own static box (see sahBuildPeopleBodies) placed once at build,
+// and moving the drawn figure without moving the body is the exact fault this
+// file already names — "a figure that slides across the ground without moving".
+// Backing away half a metre would need 170 body writes and a desync risk for
+// the smallest half of the effect. The turn is the large half: a figure that
+// tracks you across a square stops being scenery in about four frames.
+// ---- A PLATEAU, NOT A RAMP, AND IT WAS MEASURED WRONG FIRST -------------
+// The first cut wrote want = 1 - d/R, which reads as "notices you more the
+// closer you get" and is not how noticing works: somebody six metres away has
+// either seen a giant rodent or has not. That shape put full attention only
+// at arm's length — at 6 m of a 7.5 m radius it is 0.2, so a fifth of a turn —
+// and it measured as nothing. Mean |bearing error| over the near band came
+// back at 1.363 rad against a far-band control of 1.478, where a crowd facing
+// away at random scores pi/2 = 1.571 and one that has turned scores near 0.
+// So: full inside (R - EDGE), falling off across the last EDGE metres, with
+// the damp still doing all the smoothing in time.
+const sahNOT_R       = 7.5;    // m — inside this, a person has noticed
+const sahNOT_EDGE    = 2.2;    // m of falloff at the rim
+const sahNOT_L       = 3.2;    // damping — about half a second to come round
+const sahNOT_LEAN    = 0.13;   // rad of lean AWAY at full notice (+rx is back)
+const sahNOT_WHEEK   = 3.1;    // s — a shout holds the radius open this long
+const sahNOT_WHEEK_K = 2.4;    // ...and multiplies it by this
+// How far round each kind actually comes. Somebody sitting cross-legged in a
+// halqa does not swing their whole body at you; they turn from the waist.
+const sahNOT_TURN = [1.0, 0.55, 0.5];   // STAND, SIT, PLAY
+let sahNotWheek = 0;
+
+// 15, not 14: index 14 is the damped notice above.
+const sahPPL_STRIDE = 15;
 let sahPplBody = null, sahPplHead = null, sahPplN = 0;
 const sahPplBodies = [];        // one static box per instanced person
 // x, y, z, yaw, kind, phase, rate, halqa (index+1 or 0), height,
@@ -1760,6 +1795,20 @@ function sahUpdatePeople(dt) {
   if (!sahPplBody || sahPplN < 1) return;
   // the storm leans on everybody, not only on the capybara
   const lean = sahStorm * 0.22;
+  // ...and so, now, does the capybara. One hypot per person per frame against a
+  // squared radius; the branch below it is worth nothing at all for everybody
+  // who is not near, which on a 340 m map is almost all of them.
+  if (sahNotWheek > 0) sahNotWheek -= dt;
+  // ---- AND IT CUTS (the house rule) ------------------------------------
+  // Every term added to the picture in this repository carries a state flag
+  // that removes it, so it can be measured against its own absence rather
+  // than against a memory of last week. game.state.noNotice is that flag for
+  // the whole D1 crowd term, in all four chapters that carry one.
+  const capy = sahGame && sahGame.capy;
+  const cp = (sahGame && sahGame.state && sahGame.state.noNotice)
+           ? null : (capy && capy.position);
+  const notR = sahNOT_R * (sahNotWheek > 0 ? sahNOT_WHEEK_K : 1);
+  const notR2 = notR * notR;
   const band = sahFireTakeover > 0 ? 1 : 0;
   // THE THREE HALQA CLOCKS. Each ring is one sentence being told to thirteen
   // people, so it gets one number: a slow build to the turn (they lean in) and
@@ -1848,6 +1897,25 @@ function sahUpdatePeople(dt) {
       rz -= Math.sin(sahTime * 0.41 * rate + ph) * 0.02 + fid * 0.22;
       y -= Math.abs(fid) * 0.028;
     }
+    // ---- AND THEN SOMEBODY LOOKS UP (D1) ---------------------------------
+    // Applied last, so it wins over the fidget and the halqa lean rather than
+    // being averaged with them: a ring that has stopped listening to the story
+    // is the picture, and the story's own lean is what it stops doing.
+    let not = sahPplData[o + 14];
+    if (cp) {
+      const ndx = cp.x - x, ndz = cp.z - z;
+      const nd2 = ndx * ndx + ndz * ndz;
+      const want = nd2 < notR2 ? clamp((notR - Math.sqrt(nd2)) / sahNOT_EDGE, 0, 1) : 0;
+      not = damp(not, want, sahNOT_L, dt);
+      sahPplData[o + 14] = not;
+      if (not > 0.004) {
+        let dy = Math.atan2(ndx, ndz) - yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        yaw += dy * not * sahNOT_TURN[kind];
+        rx += not * sahNOT_LEAN;
+      }
+    } else if (not !== 0) { sahPplData[o + 14] = 0; }
     sahPplBody.setMatrixAt(i, sahXform(x, y, z, rx, yaw, rz, tall, sy, tall));
     sahPplHead.setMatrixAt(i, sahXform(x - rz * 1.3 * tall, y + 1.42 * sy, z + rx * 1.3 * tall,
                                        rx, yaw, rz, tall, tall, tall));
@@ -4903,6 +4971,15 @@ function sahInZone(name, x, z) {
 // =============================================================== LIFECYCLE ===
 export function createSahara(game) {
   sahGame = game;
+
+  // ---- THE SHOUT (D1) ----------------------------------------------------
+  // THE GATE, as monaco.js and cave.js keep it: registered on the global event
+  // and never removed, so it must test the live chapter or a wheek in Iceland
+  // opens the radius on a square nobody is standing in.
+  game.events.on('capy:wheek', function () {
+    if (!game.biome.isActive('sahara')) return;
+    sahNotWheek = sahNOT_WHEEK;
+  });
 
   game.biome.register('sahara', {
     ensureBuilt() { sahBuild(game); },
