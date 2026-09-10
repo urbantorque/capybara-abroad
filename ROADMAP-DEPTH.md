@@ -710,7 +710,7 @@ birds are already standing next to the food.
 
 ### What is still open
 
-D3's C2 and C6 · D4.10 (Sơn Đoòng's column) · D4.14 (Kyoto's weir, which
+D3's C2 and C6 · D4.14 (Kyoto's weir, which
 needs a per-station waterline and has a wide blast radius) · D4.15 (Cali's
 passengers) · a demonstration of D4.12 by somebody with hands.
 
@@ -750,3 +750,44 @@ The whole simulation is 0.7–2.0 ms against a 16.7 ms budget. **The largest
 measurable new term is 0.135 ms, which is eight tenths of one per cent of a
 frame**, and four of the seven are at or under the run-to-run noise floor of
 about 0.15 ms. No chapter left 60 fps with any term on.
+
+### D4.10 — Sơn Đoòng gets a vertical, and the marquee stops being a zone test
+
+`the-doline` keeps its shot, its swell and its line and becomes the act-2
+entry. The wow moves to a 28 m column of collapsed roof in the light shaft,
+and to the way down off it.
+
+The audit changed the design three times before a line was written. **It is a
+walked ramp, not a `climbHold`**: `cavSkyK`, the camera's crane toward the
+hole and the largest in the chapter at 0.92, is zeroed the moment
+`capy.climbing` is true, so a clung ascent would drop the lens to level for
+the whole climb in the one room whose subject is what is overhead. It clears
+the swifts' r 5.5 spiral by design. And it goes in the middle, which the
+breakdown loop already leaves bare on purpose.
+
+| | measured |
+|---|---|
+| the ramp | rests on the shelf at **138 of 138** sample heights, zero failures, reaches 28.63 m |
+| the camera | **skyK 0.92** and `climbing` false for the whole ascent |
+| the drop | form reaches 1.0, sixteen birds at a mean **6.3 m**, **23.8 m** recorded, task ticks |
+
+**Three mistakes of my own, all caught.** A state stored as a small number —
+armed at 0.001 and branched on `<= 0.02`, so every frame re-armed it and the
+ramp never left 0.001; the gate fired correctly and the swifts never moved,
+which reads exactly like a broken formation. A lerp at k = 0.92 on all three
+axes, harmless across a 27 m spiral in x and z and ruinous across a 196 m one
+in y. And a formation that was a mob rather than an escort — visible only in
+a screenshot; the number was fine.
+
+---
+
+## WHERE THIS PASS STOPPED (10 Sep 2026)
+
+Nine commits. Block A, D3, Tier 5, and D4.10 through D4.15 except D4.14.
+
+**Still open:** D3's C2 (the twenty crew figures are merged BufferGeometry
+with their colliders drained into a separate array — animating one means
+un-merging it) and C6 (the windows share a cached material with the whole
+town) · D4.14, Kyoto's weir, which needs a per-station waterline and has a
+wide blast radius · a demonstration of D4.12 by somebody with hands on the
+tiller.
