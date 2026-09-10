@@ -1,3 +1,211 @@
+## THE LIFT PASS — THE FRAME, THE DOOR, AND TWO NAMES (11 Sep 2026)
+
+Eleven commits on `lift-pass`. Full write-up in `ROADMAP-LIFT.md`. Six review
+agents over the whole tree before a line was written; two findings came back
+independently from more than one of them, and both are load-bearing for
+anything built after this.
+
+### 1. THE CAMERA — `sysCAM_PITCH`, `sysREST_W`, `sysREST_T`
+
+**The resting frame is no longer a photograph of the ground.** The horizon's
+height in the picture is `tan(pitch)/tan(halfFov)` in NDC and depends on nothing
+else, so it is exact rather than judged. Measured on the live camera in eighteen
+chapters, walking and settled:
+
+| | pitch | horizon (1.0 = top edge) | sky, 273-ray grid |
+|---|---|---|---|
+| walking, before | 28–39° | 1.05–1.80 | 0.0% in 18 of 18 |
+| settled, before | 22.8° | 0.94 | 0.0% in 18 of 18 |
+| settled, after | **11.2°** | **0.44** | — |
+
+```
+sysCAM_PITCH   41 -> 34    the driving lens
+sysREST_W    0.55 -> 0.80  the settled lens, now ON the arrival composition
+sysREST_T     1.5 -> 1.0
+```
+
+`sysARRIVE_PITCH` (16°) was already validated on nineteen arrival PNGs. The
+settled lens now lands on it rather than six degrees short, and carries the
+crane with it: boom 9.5 -> 12.5 m, look point 2.5 m up.
+
+**THE GATE FOR ANY FUTURE CAMERA CHANGE IS `qa/rd-onscreen.js`:** is the animal
+in the picture, walking AND settled, in all nineteen. It is 19/19 both, at 65%
+down the frame — subject on the lower third. Boom cut (`clear`) 1.00 in 18/19;
+Antarctica is 0.53 and that is the clamp doing its job against the slope behind
+the station.
+
+**AND THE INFERENCE THIS PASS REVERSED.** The second beauty pass measured the
+same 0% sky and concluded that clouds in twelve skies would never be seen, so
+they were not built. That reasoning is now void in both directions: there is sky
+in the frame, and the right response to a frame with no sky in it was never
+"skies are worthless". Anything previously rejected on "nobody would ever see it
+up there" is worth re-asking.
+
+### 2. THE DOOR — `chapEnough`, and it is a SECOND predicate
+
+`jrOpen` gated chapter n on `chapComplete(n-1)`, which demands every row, so all
+232 tasks were compulsory.
+
+```
+chapEnough(n)    the marquee, and seven of every ten rows.   THE DOOR ONLY.
+chapComplete(n)  every row.  UNCHANGED, and still governs everything else.
+```
+
+`chapComplete` keeps the souvenir, the keep, the ledger, the chapter-done
+ceremony, the nineteen-of-nineteen finale and the picker's tick. **Do not move a
+second reader onto `chapEnough`** without saying why here: the whole safety of
+this change is that exactly one call site moved.
+
+232 compulsory rows become 170. Measured both orders, because "the marquee plus
+seven in ten" has two and only one of them gets thought about when it is
+written: marquee-last, enough and complete coincide at 11/11 (you cannot skip
+the marquee); marquee-first, enough fires at 8 of 11 with complete still false
+at 8, 9 and 10.
+
+The way-on row appears at ENOUGH now, and while anything is still open it does
+NOT take the pointer — the arrow, the beacon and the metres stay on whatever the
+player was doing. It becomes the pointer only at complete, as before.
+
+`game.gateInfo(n)` publishes both predicates, the id list and the marquee. One
+getter, no setter, nothing in src reads it back.
+
+### 3. TWO NAMES THAT WERE NEVER DECLARED — `sysLOWPASS`, `sysHIGHSHELF`
+
+```js
+f.type = lowpass;      f.type = highshelf;     // no such names, anywhere
+```
+
+The only two bare identifiers of their kind in the file. A ReferenceError on the
+line after the node was created, **inside the panner's try, whose catch is
+`{ node = null; acMaster = bus; }`** — so every sound behind or above the player
+lost its filter AND ITS STEREO PANNER and arrived as flat centred mono. The
+whole of A2 had shipped as measured-and-working, because the audit hook reports
+`sysSfxBack`, which is the INPUT to the branch and was always correct.
+
+**`sysSFX_BACK_LP` (15500) is now audible for the first time and has never been
+tuned by ear.** It is left at the authored value.
+
+### 4. AIR ABSORPTION ON ONE-SHOTS
+
+The ten continuous movers have taken the top off with distance since A1; the
+four hundred one-shots had the level law and nothing else. Same curve, same
+three constants (`sysMOVER_FLAT` 8 m, `sysMOVER_LPSPAN` 62 m, `sysMOVER_LPMIN`
+780 Hz), FOLDED into the back-cue branch as a `min()` of the two ceilings, so
+the node count is unchanged: at most one filter per placed call, none inside
+8 m. `audioPlace` now publishes `sysSfxDist` beside `sysSfxPan`/`Back`/`Up`.
+
+Measured on a `pop` (a sine and a gain, no filters of its own) forced past the
+throttle, placed on the camera's own forward bearing:
+
+```
+in front   2 m none  6 m none  9 m 17618 Hz  20 m 11841  55 m 1505  80 m 780
+behind     6 m 4500  20 m 4500  80 m 780
+```
+
+### 5. THE PAPER GAINS ONE LINE — `.capyui-finds`
+
+Sixty-eight finds, forty of them belonging to a named place, and the only
+surface any of them had was the ledger at the END of the journey.
+
+> *two things nobody mentions here*
+
+**A COUNT, NEVER A NAME AND NEVER A PLACE.** The moment that line can locate
+anything, the finds stop being finds and become two more tasks with the arrow
+switched off. `qa/rd-finds.js` asserts the rendered text against thirteen words
+from the finds' own descriptions. The denominator is the static `chapter` field
+so it is true before anything is found; the twenty-eight chapter-neutral finds
+belong to the whole journey and are counted on the journey sheet, whose footer
+now reads `0 of 68 noticed` from the first minute instead of hiding at zero.
+
+Set in italic, lower case, unspaced — the only line on the card that is not
+uppercase, not letterspaced and not an instruction.
+
+### 6. THE ENDING HAS A WITNESS — `npcTravellerHome`
+
+The five who gather were all strangers who happened to be in the gardens. THE
+TRAVELLER, who already exists in four chapters with a fixed palette, is now on
+the lawn with the last line of their arc.
+
+**Built on `finale:staged`, NOT in a chapter file.** A traveller registered in
+Sydney stands on that lawn in the first minute of a new game — before the Quay,
+before the map, before they have any reason to know you — which spends the whole
+arc for nothing. Built once and kept: the finale is staged again on every return
+(props.js re-huddles the souvenirs), so a fresh figure per staging is a small
+crowd of identical travellers by the third visit. Because it is made outside a
+chapter build, main.js's capture tag does not own it, so npc.js hides it on
+`biome:enter` itself. Left alone it is a man with a rucksack standing at
+Sydney's coordinates in the middle of the Sahara.
+
+### 7. CONTRAST — the in-play HUD, not the title card
+
+`accentInk` (#9e5f53, 4.62:1) existed and was used at ten sites, ALL on the
+title card. `accent` (2.28:1) was still the TEXT colour at twenty-five others.
+`qa/uicontrast.js` measures the title card, which is exactly why it never caught
+it. Every `color:` that sets text moved; `border-color`, `outline-color` and
+`background` did not.
+
+**New rule: `accent` is a rule, a border, a hover ring or a fill. It is never
+the colour of words.** `qa/rd-contrast.js` measures the in-play HUD, on rendered
+colour against the nearest opaque ancestor: eight of eight at 4.62–11.52.
+
+### 8. A LOW SUN IS A WARM SUN — `sysSunLow`
+
+0 at a high sun, 1 at the horizon, referenced to `sin(elevation)` because that is
+what the air mass goes as. Written in `sunAxes` — a chapter change, never per
+frame — so a chapter that moves its own sun gets the right tint without
+registering anywhere. It goes inside `atmosApply`, which runs BEFORE the ten
+authored `sun.color.lerp` sites, so a chapter that has stated its own colour
+keeps it. Six chapters at 61° are bit-identical.
+
+**Stated at the size it is.** The frame histogram cannot resolve it: Iceland's
+frame improved most on every statistic and Iceland's light did not move at all,
+which is proof those deltas are framing noise. A correctness fix, and worth
+having because it makes the next low-sun chapter right by default.
+
+### 9. PEOPLE HAVE A KNEE AND AN ELBOW (npc.js)
+
+`gArm`/`gLeg` split into `gArm`+`gForearm` and `gLeg`+`gShin`+`gShoe`; six new
+nodes; `handR` is now a child of `elbowR` and carries every held prop, so props
+follow the forearm rather than the shoulder. Knee on
+`max(0, -cos(walkPhase))^2`, which IS the swing half — **a knee that bends on
+the stance leg reads as a limp, so measure it**: 0.07 rad across the whole of
+stance. The ankle counter-rotates and holds the sole within 0.09 rad of level,
+where before it rode the full 1.15 rad of hip swing. +11 to +24 draw calls,
+4–6%.
+
+**STILL ONE-BOX, AND VISIBLY SO:** the big background crowds in `venice.js`,
+`kowloon.js`, `quay.js` and `cali.js` are separate `InstancedMesh` casts outside
+npc.js. They are the majority of the 760 and they stand beside people who are
+not.
+
+### 10. THE ERROR STRIP DOES NOT SHIP — `?debug`
+
+`#err` is a raw stack-trace panel across the bottom 45% of the screen and was
+suppressed only when the boot card was already up. `textContent +=` had no cap
+and no dedup, so a per-frame throw covered the screen in a second and grew for
+as long as the tab lived. Now opt-in on `?debug`, capped at 8 kB, repeats
+counted; `console.error` still gets every one in every build.
+
+`game.post.render()` is inside the strike system, and **its `finally` is the
+load-bearing half**: `post.render` binds `sceneRT` at its top and unbinds only
+at the end, so a throw mid-pass left the renderer pointed at an offscreen target
+for good and every later recovery path drew to nowhere as well. The score's
+`setInterval` — which main.js's never-drop list cannot reach — stands down for
+two seconds after three consecutive throws.
+
+### THE INSTRUMENT WORTH KNOWING ABOUT
+
+`qa/pnghist.mjs` — frame statistics from a PNG with **no dependencies**: parse
+IHDR, inflate IDAT with node's zlib, undo the five scanline filters. Every
+previous attempt at a histogram here went through the canvas and came back
+black, because the renderer has no `preserveDrawingBuffer` and the read is never
+in the same JS turn as the draw. A screenshot is already a raster PNG. It
+excludes the two HUD panels, which are opaque paper in fixed corners and would
+otherwise put a CONSTANT error into every frame — worse than useless, because it
+looks like a measurement.
+
+---
+
 ## THE SECOND BEAUTY PASS — THE SHADE, THE BOUNCE, THE JITTER (10 Sep 2026)
 
 Six commits, from the review at the head of `ROADMAP-BEAUTY.md` ("what would
