@@ -789,6 +789,9 @@ function panBuild(game) {
     // THE PEAO, at the gate of his own corral, and he is the only person here
     // who is actually working.
     put('peao', panFAZENDA.x - 22 + 13.6, panFAZENDA.z + 1.5, {
+      // D2: a hundred and forty kilometres of raised dirt and nobody on it. The
+      // campo is the flattest ground in the game after Venice.
+      walk: { dx: 10, dz: 4, dwell: 5 },
       face: 3.4, near: 8,
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.panFence, legs: PALETTE.denim, skin: PALETTE.skin4 },
       // counting them again

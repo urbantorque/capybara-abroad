@@ -4661,6 +4661,10 @@ function kyoBuild(game) {
       praise: ['Yes. Very good. I am still late.', 'Mm. Congratulations. Move.'] });
     kyoLocSweep = game.addLocal({ biome: 'kyoto', x: -2.0, y: kyoTerrain(-2.0, kyoGION_Z - 3.8) + 0.13,
       z: kyoGION_Z - 3.8, near: 6, face: 1.6,
+      // D2: he sweeps a step and the lane is a hundred and eight metres of
+      // granite setts. The only moving body in the arrival frame of a chapter
+      // whose first view has none.
+      walk: { dx: 8.5, dz: 0, dwell: 5 },
       figure: { shirt: PALETTE.templeWood, legs: PALETTE.stoneDark },
       // sixty years of the same broom
       beat: { kind: 'work', every: 3.4, dur: 0.95, sfx: 'rustle', volume: 0.10, pitch: 0.85, tool: 'basket' },  // B12: sixty years of the same broom, and the basket it goes into

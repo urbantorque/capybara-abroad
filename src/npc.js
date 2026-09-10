@@ -2435,6 +2435,25 @@ export function createNPCs(game) {
       // to, and it may never be more than npcLOC_STEP_R from it.
       ax: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       az: o.z !== undefined ? o.z : (g ? g.position.z : 0),
+      // ---- D2: A PERSON WHO GOES SOMEWHERE ----------------------------
+      // `walk: {dx, dz, dwell, v}` paces between where the chapter stood them
+      // and one offset from it, for ever. NOT a list of coordinates, and the
+      // reason is the trap this rig has fallen into before (see THE LOCALS in
+      // the design notes): two anchors in the shipped game were on the bed of
+      // a river because somebody trusted a landmark constant. An offset is
+      // measured from a point the chapter has ALREADY chosen to stand a person
+      // on, and the far end is probed against the terrain on the first live
+      // tick and thrown away if it does not hold up — so the worst case is a
+      // person who stands still, which is what they all did before.
+      //
+      // Everything downstream is already built: moving `ax`/`az` moves the
+      // shuffle anchor, the existing steering walks `x`/`z` toward it, the
+      // ground-follow and the collider writes and the bubble anchor are all
+      // in the block that retrieval already uses, and the yaw ranks "where
+      // you are walking" below "the capybara" and above "the way you were
+      // placed". A walking local costs one branch.
+      walk: o.walk || null, walkOk: false, walkTried: false,
+      wA: null, wB: null, wNode: 1, wDwell: 0,
       tx: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       tz: o.z !== undefined ? o.z : (g ? g.position.z : 0),
       stepT: rand(2, npcLOC_STEP_GAP * 1.6), moving: 0, mv: 0,
@@ -2808,6 +2827,10 @@ export function createNPCs(game) {
   // reason: this is a market pitch, not a handshake.
   const npcOWN_R      = 11;    // m from a prop's HOME inside which somebody owns it
   const npcOWN_V      = 1.25;  // m/s. A purposeful walk — nobody in this game sprints.
+  // D2: a shade under retrieval speed. Somebody doing their rounds is not
+  // chasing anything, and 0.95 reads as "on the way somewhere" against the
+  // 0.45 shuffle without reading as a hurry.
+  const npcLOC_WALK_V = 0.95;
   // ...and the LEASH has to clear the radius, or a person can own a thing they
   // are not allowed to walk to and the state exists only to time out.
   const npcOWN_LEASH  = 15;    // m from their own anchor they will ever go. See below.
@@ -3280,6 +3303,52 @@ export function createNPCs(game) {
    * Six tries and then they stay where they are, which is the old behaviour and
    * the right failure: a person in a doorway is meant to stay in the doorway.
    */
+  /**
+   * D2: A PERSON DOING THEIR ROUNDS.
+   *
+   * Moves the ANCHOR and lets the rig do the walking. Returns false if this
+   * route was refused, in which case the caller falls through to the shuffle.
+   *
+   * THE PROBE IS THE WHOLE SAFETY ARGUMENT and it runs once, on the first
+   * tick in the live chapter rather than at registration, because a local is
+   * registered during the build and `terrainHeight` may not answer yet — the
+   * same reason B12 spawns a beat's tool lazily. Two ways to be refused:
+   * the far end is not on the terrain at all (NaN), or it is more than
+   * npcWALK_DY above or below the near end, which on this geometry means a
+   * wall, a roof, a jetty or the water. A refused walk is silent and the
+   * person keeps the behaviour they shipped with.
+   */
+  const npcWALK_DY = 1.6;    // m of height change a route may cross
+  const npcWALK_HIT = 0.42;  // m — close enough to a node to have arrived
+  function localWalkStep(r, dt) {
+    if (!r.walkTried) {
+      r.walkTried = true;
+      const w = r.walk;
+      const bx = r.ax + (w.dx || 0), bz = r.az + (w.dz || 0);
+      const ga = localGroundY(r.ax, r.az), gb = localGroundY(bx, bz);
+      const flat = !(ga === ga) || !(gb === gb) ? false : Math.abs(gb - ga) <= npcWALK_DY;
+      if (flat && !localNavBlocked(bx, bz, 0.34)) {
+        r.wA = [r.ax, r.az]; r.wB = [bx, bz];
+        r.wNode = 1; r.wDwell = rand(0, (w.dwell || 4));
+        r.walkOk = true;
+      }
+    }
+    if (!r.walkOk) return false;
+    const node = r.wNode ? r.wB : r.wA;
+    r.tx = node[0]; r.tz = node[1];
+    // The anchor travels with them, so the shuffle radius, the heat guard and
+    // the go-home of an errand all follow the person rather than the spot the
+    // chapter first put them on.
+    r.ax = node[0]; r.az = node[1];
+    if (r.wDwell > 0) { r.wDwell -= dt; return true; }
+    const dx = node[0] - r.x, dz = node[1] - r.z;
+    if (dx * dx + dz * dz < npcWALK_HIT * npcWALK_HIT) {
+      r.wDwell = (r.walk.dwell || 4) * rand(0.7, 1.4);
+      r.wNode = r.wNode ? 0 : 1;
+    }
+    return true;
+  }
+
   function npcLocalSpot(r) {
     const g0 = localGroundY(r.ax, r.az);
     for (let k = 0; k < npcLOC_STEP_TRY; k++) {
@@ -5423,6 +5492,12 @@ export function createNPCs(game) {
         // and walks them there. See THE MISCHIEF ECONOMY.
         if (r.own) {
           localOwnStep(r, dt);
+        } else if (r.walk && localWalkStep(r, dt)) {
+          // D2. Ranked below retrieval and the march for the same reason the
+          // march is ranked below retrieval: somebody fetching their own hat
+          // back is not also doing their rounds. Returns false if the route
+          // failed its ground probe, and then this person shuffles like any
+          // other and nothing anywhere knows the difference.
         } else if (r === marWho) {
           // ---- ...AND THE MARCH SITS BESIDE IT, ON THE SAME TERMS --------
           // Below retrieval and above the shuffle. A person already walking
@@ -5453,7 +5528,10 @@ export function createNPCs(game) {
         if (sd > 0.012) {
           // THE MARCH WALKS AT RETRIEVAL SPEED, for the same reason retrieval
           // does: somebody crossing a square on purpose does not shuffle.
-          const step = Math.min(sd, (r.own || r === marWho ? npcOWN_V : npcLOC_STEP_V) * dt);
+          const step = Math.min(sd,
+            (r.own || r === marWho ? npcOWN_V
+             : r.walkOk ? (r.walk.v || npcLOC_WALK_V)
+             : npcLOC_STEP_V) * dt);
           r.x += sx / sd * step;
           r.z += sz / sd * step;
           r.moving = 1;
@@ -5473,7 +5551,13 @@ export function createNPCs(game) {
           // exactly the number the chapter chose.
           // ...and the march follows the ground for the same reason retrieval
           // does: it can go fifteen metres, and four chapters are not flat.
-          const away = r.own || r === marWho ||
+          // ...and a D2 walker is ALWAYS away, whatever the arithmetic says.
+          // Its anchor travels with it, so at the far end of a route `x` and
+          // `ax` agree and this test would read "home" and damp the person
+          // back to `baseY` — the height the chapter measured at the OTHER
+          // end. On anything but a flat floor that is a person sinking into
+          // the ground every time they finish their walk.
+          const away = r.own || r === marWho || r.walkOk ||
                        (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
                                 > npcLOC_STEP_R * npcLOC_STEP_R;
           if (away || Math.abs(r.y - r.baseY) > 0.004) {
@@ -5620,7 +5704,11 @@ export function createNPCs(game) {
         // this exemption the job is least visible at exactly the moment
         // somebody is standing there looking at it.
         const armJob = r.beat && r.beat.kind !== 'rock';
+        // D2: ...and a seventh reason, which is standing somewhere else. The
+        // walk is already covered by `r.moving`; this is the dwell at the far
+        // end of it, where a person is stopped and is still not at their job.
         const beatBusy = f > 0.02 || r.grd > 0.05 || !!r.own || r.moving > 0 ||
+                         !localAtWork(r) ||
                          (armJob && (r.gest > 0 || r.umb > 0.05));
         // ...and WHICH of the six, for beatAudit. A beat that is not happening
         // is either waiting or suppressed, and a suppressed one has six
@@ -5628,7 +5716,8 @@ export function createNPCs(game) {
         if (r.beat) {
           r.beatWhy = !beatBusy ? ''
             : f > 0.02 ? 'flinch' : r.grd > 0.05 ? 'guard' : r.own ? 'fetch'
-            : r.moving > 0 ? 'walk' : r.gest > 0 ? 'talk' : 'umbrella';
+            : r.moving > 0 ? 'walk' : !localAtWork(r) ? 'away'
+            : r.gest > 0 ? 'talk' : 'umbrella';
         }
         // ---- B12: IS THE TOOL STILL THERE ------------------------------
         // Spawned lazily and asked every tick. Both are cheap and both have
@@ -6072,8 +6161,26 @@ export function createNPCs(game) {
     if (!ph || typeof ph.spawnProp !== 'function') return;
     r.toolMade = true;      // once, whether or not it worked — see below
     // Half a metre in front of them, on the side the working arm is.
-    const fx = Math.sin(r.face), fz = Math.cos(r.face);
-    const p = ph.spawnProp(b.tool, r.ax + fx * 0.55 + 0.18, r.az + fz * 0.55, r.y + 0.05);
+    let fx = Math.sin(r.face), fz = Math.cos(r.face);
+    // ---- ...UNLESS THEY WALK, IN WHICH CASE NOT ALONG THE ROUTE (D2) -----
+    // Measured, and it is why this branch exists: Kyoto's sweeper faces down
+    // the lane, his round runs down the lane, and his basket was therefore
+    // planted 0.73 m along it. He walked into it on the first leg and shoved
+    // it 3.8 m up the street, at which point it was 4.57 m from his step —
+    // past npcTOOL_R — and B12 read a sixty-year-old broom as STOLEN and put
+    // him into empty strokes for the rest of the chapter. A tool goes beside
+    // the route, never on it, and the cross product is the whole fix.
+    if (r.walkOk && r.wA && r.wB) {
+      const rx = r.wB[0] - r.wA[0], rz = r.wB[1] - r.wA[1];
+      const rl = Math.hypot(rx, rz);
+      if (rl > 0.1) {
+        // the perpendicular, taken on whichever side the person already faces
+        let px = -rz / rl, pz = rx / rl;
+        if (px * fx + pz * fz < 0) { px = -px; pz = -pz; }
+        fx = px; fz = pz;
+      }
+    }
+    const p = ph.spawnProp(b.tool, localWorkX(r) + fx * 0.55 + 0.18, localWorkZ(r) + fz * 0.55, r.y + 0.05);
     if (!p) return;
     r.tool = p;
     // The prop's HOME is what ownership reads, and spawnProp has just set it
@@ -6086,6 +6193,25 @@ export function createNPCs(game) {
    * grab: a tool kicked into a canal is just as gone as a stolen one, and a
    * flag would have to know about every way a prop can leave.
    */
+  /**
+   * D2: WHERE A PERSON'S JOB IS, WHICH IS NOT ALWAYS WHERE THEY ARE.
+   *
+   * For everybody who stands still these are the same point and this costs a
+   * branch. For a walker they are not: the anchor travels with them, and a
+   * broom measured against a travelling anchor is a broom that has been
+   * STOLEN the moment its owner walks up the lane — B12 would put the sweeper
+   * into empty strokes and have him complain about it. The tool belongs to
+   * the home end of the route.
+   */
+  function localWorkX(r) { return (r.walkOk && r.wA) ? r.wA[0] : r.ax; }
+  function localWorkZ(r) { return (r.walkOk && r.wA) ? r.wA[1] : r.az; }
+  /** ...and whether they are standing at it. Everybody who cannot walk is. */
+  function localAtWork(r) {
+    if (!r.walkOk || !r.wA) return true;
+    const dx = r.x - r.wA[0], dz = r.z - r.wA[1];
+    return dx * dx + dz * dz < 2.25;
+  }
+
   function localToolGone(r) {
     const p = r.tool;
     if (!p) return false;
@@ -6093,7 +6219,7 @@ export function createNPCs(game) {
     if (p.held) return true;
     const b = p.body;
     if (!b) return true;
-    const dx = b.position.x - r.ax, dz = b.position.z - r.az;
+    const dx = b.position.x - localWorkX(r), dz = b.position.z - localWorkZ(r);
     return (dx * dx + dz * dz) > npcTOOL_R * npcTOOL_R;
   }
 
@@ -13107,6 +13233,37 @@ export function createNPCs(game) {
                       wary: wary, castWitnessing: castLook,
                       chainArmed: !!locChainFrom, witCalls: st.witCalls || 0,
                       witLast: st.witLast || 0, witSpoke: st.witSpoke || 0 };
+           },
+           /**
+            * D2: WHICH ROUTES THE GROUND PROBE ACCEPTED.
+            *
+            * A refused walk is silent by design — the person keeps the
+            * behaviour they shipped with — which is exactly the failure mode
+            * that ships a batch of walking people none of whom walk. Nothing in
+            * src reads this; the harness does. See qa/walk.js.
+            */
+           walkAudit: function () {
+             const live = game.biome && game.biome.current;
+             const rows = [];
+             for (let i = 0; i < locals.length; i++) {
+               const r = locals[i];
+               if (r.biome !== live || !r.walk) continue;
+               rows.push({ ax: +r.ax.toFixed(1), az: +r.az.toFixed(1),
+                           x: +r.x.toFixed(1), z: +r.z.toFixed(1),
+                           dx: r.walk.dx || 0, dz: r.walk.dz || 0,
+                           tried: !!r.walkTried, ok: !!r.walkOk,
+                           wA: r.wA ? [+r.wA[0].toFixed(1), +r.wA[1].toFixed(1)] : null,
+                           wB: r.wB ? [+r.wB[0].toFixed(1), +r.wB[1].toFixed(1)] : null,
+                           toolAtHome: (r.tool && r.tool.body && r.wA)
+                             ? +Math.hypot(r.tool.body.position.x - r.wA[0],
+                                           r.tool.body.position.z - r.wA[1]).toFixed(2) : null,
+                           toolPos: (r.tool && r.tool.body)
+                             ? [+r.tool.body.position.x.toFixed(2), +r.tool.body.position.z.toFixed(2)] : null,
+                           node: r.wNode, dwell: +(r.wDwell || 0).toFixed(1),
+                           moving: r.moving ? 1 : 0 });
+             }
+             return { biome: live, withWalk: rows.length,
+                      ok: rows.filter(function (q) { return q.ok; }).length, rows: rows };
            },
            // ...and who is mid-sentence, for the gaze. See sayBubble.
            speaker: npcSpeaker };

@@ -3414,6 +3414,14 @@ function antBuildLocals(game) {
   }, antJETTY.y + 0.11);
   put(antCOLONY.x - 8, antCOLONY.z - 9, {
     near: 8, face: 1.6, kit: 'counter',
+    // D2: a colony count is a transect walked at the same pace every day, and a
+    // transect runs OUT from the edge rather than along it — which is lucky,
+    // because the colony sits on a rise and the tangent this was first written
+    // as failed the ground probe by more than a metre and a half. Swept the
+    // terrain round his feet at three lengths and twelve bearings: this is the
+    // one that both leads away from eleven hundred nesting birds and is level
+    // to 0.3 m over nine metres.
+    walk: { dx: -7.8, dz: -4.5, dwell: 6 },
     figure: { shirt: PALETTE.antHutRed, legs: PALETTE.antMast, hat: PALETTE.antIceLt },
     lines: ['Four thousand two hundred and six. Give or take. Mostly give.',
             'Do not stand between a gentoo and the sea. You will lose.',

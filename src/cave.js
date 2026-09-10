@@ -3191,6 +3191,9 @@ function cavBuildCamp(game, root) {
   //     moment and would like that noted
   put(24, -70, {
     face: 0.8, near: 9, kit: 'load',
+    // D2: "carried forty kilos over that, twice, today". In a chapter where the
+    // only light is the one you make, a person who moves is a landmark.
+    walk: { dx: -6, dz: 11, dwell: 7 },
     figure: { shirt: PALETTE.cavJungle, legs: PALETTE.cavRockWarm },
     lines: ['Forty kilos over that. Twice. Today.',
             'It is warmer in here than outside. Everybody is surprised by that.',

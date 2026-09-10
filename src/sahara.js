@@ -5315,6 +5315,9 @@ function sahBuild(game) {
       onTask: { 'souk-escape': ['This is the best souk in Morocco for exactly that reason.'] },
       praise: ['Whatever colour that was, it was not one of mine.'] });
     sahLocWater = game.addLocal({ biome: 'sahara', x: 16, y: 0, z: -4, near: 7,
+      // D2: a guerrab has no pitch. Walking the square is the whole trade, and
+      // this is the flattest ground in the chapter.
+      walk: { dx: -9, dz: 5.5, dwell: 3.5 },
       figure: { shirt: PALETTE.sahDye1, skin: PALETTE.skin3, hat: PALETTE.sahDye1 },
       lines: ['Water! Cold water! Photograph is five dirham, water is free.',
               'Everybody wants the hat. Nobody wants the water.',

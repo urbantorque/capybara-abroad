@@ -1960,6 +1960,8 @@ function mainBoot() {
     // Who has a job in this chapter and whether they are doing it. See A
     // PERSON WITH A JOB in npc.js.
     game.beatAudit = npcs.beatAudit;
+    // D2: which walk routes the ground probe accepted. See walkAudit.
+    game.walkAudit = npcs.walkAudit;
     // B13: the exchange pairs and the accusations they have been handed.
     game.exAudit = npcs.exAudit;
     game.forceBlame = npcs.forceBlame;

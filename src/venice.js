@@ -5722,6 +5722,9 @@ function venBuild(game) {
                 'mirror-swim': ['Do not stop playing. Do NOT stop playing.'],
                 'volo': ['That is the Flight of the Angel, and that is a rodent doing it.'] } });
     venCrewRec = game.addLocal({ biome: 'venice', x: -8.5, y: venTerrain(-8.5, 10.0), z: 10.0, near: 7, face: 2.6,
+      // D2: six hundred metres of passerelle do not carry themselves, and the
+      // Piazzetta is the flattest floor in the game.
+      walk: { dx: 6.5, dz: -3, dwell: 4 },
       figure: { shirt: PALETTE.venBriccolaR, hat: PALETTE.cloth3 },
       // stacking the passerelle, two hands
       beat: { kind: 'reach', every: 6.2, dur: 1.2, sfx: 'thud', volume: 0.11, pitch: 0.9 },
