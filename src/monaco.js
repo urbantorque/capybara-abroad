@@ -4019,6 +4019,9 @@ function monBuildLocals(game) {
             { t: 'They say one of the guards moved. They never move.', after: 'palace-guard' }],
   });
   monLocQuay = put(-58, -30, {
+    // D2: the quay at Port Hercule is a level concrete apron and the whole town
+    // is drawn as a place people promenade round. Nobody moved on it.
+    walk: { dx: 10, dz: 0, dwell: 5 },
     figure: { shirt: PALETTE.monCrowdD, hat: PALETTE.monCrowdE }, face: 1.2, near: 8,
     // and he has not moved either
     beat: { kind: 'rock', every: 7.0, dur: 2.6 },

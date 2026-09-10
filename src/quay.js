@@ -5745,6 +5745,11 @@ function quayBuild(game) {
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['Nobody even looked up. That is Sydney for you.'] });
     game.addLocal({ biome: 'quay', x: -11, y: 0.20, z: quayAPRON_Z1 - 9.2, near: 6, face: 0.2,
+      // D2: a commuter on the apron, commuting. The paving here is the flattest
+      // and busiest ground in the chapter and the crowd already walks through it.
+      // SOUTH rather than north: +9 put the far end inside the finger sheds and
+      // the nav probe refused the whole route (walkAudit `why: blocked`).
+      walk: { dx: 0, dz: -9, dwell: 4 },
       figure: { shirt: PALETTE.cloth2, hat: PALETTE.wharfIron },
       lines: ['Tap on, tap off. There is no tap for whatever you are.',
               { t: 'Wharf three for Manly, wharf five for Taronga. Do not ask me why.', before: 'to-quay' },

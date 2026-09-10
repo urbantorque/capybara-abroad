@@ -4407,6 +4407,16 @@ function caliBuild(game) {
     // pair of hands.
     game.addLocal({ biome: 'cali', x: caliKITE.x + 3.5,
       y: caliTerrain(caliKITE.x + 3.5, caliKITE.z - 2), z: caliKITE.z - 2, near: 7, face: 0.6,
+      // D2: this was the embankment man first, and the nav probe refused his
+      // route in BOTH directions -- the shelf he stands on is level for nine
+      // metres each way and solid at both ends. Flying a kite is the one job in
+      // this chapter that is done by walking about, and the ground under him is
+      // the open bank he needs for forty metres of string.
+      // The offset is swept, not guessed: navBlocked and terrainHeight are both
+      // public on the biome api, so the harness can ask the same two questions
+      // the rig's probe asks. Seventy of ninety-six candidates round him are
+      // clear and level; this is one of them.
+      walk: { dx: 0, dz: -9, dwell: 5 },
       figure: { shirt: PALETTE.caliNeonCyan, legs: PALETTE.denim },
       lines: ['August is the month of the wind. Everybody knows this.',
               'Forty metres of string. My father made this one.',

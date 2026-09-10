@@ -4606,6 +4606,9 @@ function rioBuild(game) {
     // bottom station of the bondinho, the top of Arpoador, and the man on the
     // running board of a bonde that is standing at its terminus.
     game.addLocal({ biome: 'rio', x: -34, y: rioTerrain(-34, -4.5), z: -4.5, near: 8,
+      // D2: a lifeguard patrols. Along the sand rather than down it, so the
+      // route stays on one contour of the beach's tilt into the Atlantic.
+      walk: { dx: 0, dz: 10, dwell: 4.5 },
       figure: { shirt: PALETTE.rioTileRed, legs: PALETTE.rioTileWhite, hat: PALETTE.rioTileYellow },
       face: Math.PI,
       lines: ['Between the flags. There are no flags. Use your judgement.',

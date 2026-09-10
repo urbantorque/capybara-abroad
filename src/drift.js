@@ -5360,6 +5360,10 @@ function driBuild(game) {
     // ON THE ORCHARD, with the lampflies. She is the reason there are forty-six
     // of them and the reason six of them is the number.
     game.addLocal({ biome: 'drift', x: driORCH_KEEP.x, y: driORCH_KEEP.y, z: driORCH_KEEP.z,
+      // D2: the orchard is one of the larger islands. Short, because the ground
+      // here is optional -- and if the far end is off the edge the probe refuses
+      // the whole route and he keeps standing where he always has.
+      walk: { dx: 5, dz: 3, dwell: 6 },
       near: 8, face: 2.3,
       figure: { shirt: PALETTE.driLampGlow, legs: PALETTE.driBark, hat: PALETTE.driPaper },
       lines: ['They sleep in the day. There is no day. They sleep anyway.',

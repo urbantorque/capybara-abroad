@@ -2452,7 +2452,7 @@ export function createNPCs(game) {
       // in the block that retrieval already uses, and the yaw ranks "where
       // you are walking" below "the capybara" and above "the way you were
       // placed". A walking local costs one branch.
-      walk: o.walk || null, walkOk: false, walkTried: false,
+      walk: o.walk || null, walkOk: false, walkTried: false, walkWhy: '',
       wA: null, wB: null, wNode: 1, wDwell: 0,
       tx: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       tz: o.z !== undefined ? o.z : (g ? g.position.z : 0),
@@ -3327,6 +3327,14 @@ export function createNPCs(game) {
       const bx = r.ax + (w.dx || 0), bz = r.az + (w.dz || 0);
       const ga = localGroundY(r.ax, r.az), gb = localGroundY(bx, bz);
       const flat = !(ga === ga) || !(gb === gb) ? false : Math.abs(gb - ga) <= npcWALK_DY;
+      // ...and WHICH test refused it, for walkAudit. A silent refusal is how a
+      // batch of walkers ships with none of them walking; a refusal that will
+      // not say whether the far end is a slope or a wall is how the second
+      // attempt at the offset is another guess.
+      r.walkWhy = !(ga === ga) ? 'no ground here'
+                : !(gb === gb) ? 'no ground there'
+                : !flat ? ('step ' + (gb - ga).toFixed(2) + ' m')
+                : localNavBlocked(bx, bz, 0.34) ? 'blocked' : '';
       if (flat && !localNavBlocked(bx, bz, 0.34)) {
         r.wA = [r.ax, r.az]; r.wB = [bx, bz];
         r.wNode = 1; r.wDwell = rand(0, (w.dwell || 4));
@@ -13251,7 +13259,7 @@ export function createNPCs(game) {
                rows.push({ ax: +r.ax.toFixed(1), az: +r.az.toFixed(1),
                            x: +r.x.toFixed(1), z: +r.z.toFixed(1),
                            dx: r.walk.dx || 0, dz: r.walk.dz || 0,
-                           tried: !!r.walkTried, ok: !!r.walkOk,
+                           tried: !!r.walkTried, ok: !!r.walkOk, why: r.walkWhy || '',
                            wA: r.wA ? [+r.wA[0].toFixed(1), +r.wA[1].toFixed(1)] : null,
                            wB: r.wB ? [+r.wB[0].toFixed(1), +r.wB[1].toFixed(1)] : null,
                            toolAtHome: (r.tool && r.tool.body && r.wA)

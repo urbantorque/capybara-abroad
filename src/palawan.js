@@ -4694,6 +4694,9 @@ function palBuild(game) {
     // ---- AND FIVE MORE. Four houses on stilts with nobody in them is a model
     // village, and this chapter had the second-emptiest cast in the game.
     palLocals.netman = game.addLocal({ biome: 'palawan', x: -4.5, y: palTerrain(-4.5, 52), z: 52, near: 7,
+      // D2: a man mending a net walks its length. Along the beach, parallel to
+      // the water, so the route keeps one depth.
+      walk: { dx: 8.5, dz: 0, dwell: 5 },
       figure: { shirt: PALETTE.palBangkaTrim, skin: PALETTE.skin3, hat: PALETTE.palThatch },
       // mending it, for as long as there is light
       beat: { kind: 'work', every: 4.6, dur: 0.9, sfx: 'rustle', volume: 0.08, pitch: 1.25 },

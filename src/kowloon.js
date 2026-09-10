@@ -4990,6 +4990,9 @@ function hkBuild(game) {
                 'neon-sign': ['That is half a tonne of glass and he is HANGING off it.'],
                 'symphony': ['Told you it was the reason. Nobody ever believes me.'] } });
     hkLaundryRec = game.addLocal({ biome: 'kowloon', x: -9.3, y: 0, z: 20.5, near: 6, face: 1.5,
+      // D2: the pavement of the densest street in the world. Along it, on the
+      // shop side, clear of the crossing.
+      walk: { dx: 0, dz: -8, dwell: 4 },
       figure: { shirt: PALETTE.cloth5 },
       // forty years of it, on a pole
       beat: { kind: 'reach', every: 6.0, dur: 1.3, sfx: 'rustle', volume: 0.09, tool: 'basket' },  // B12: forty years of it, on a pole, into a basket

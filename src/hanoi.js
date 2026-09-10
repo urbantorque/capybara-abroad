@@ -3184,6 +3184,9 @@ function hanBuildLocals(game) {
     onTask: { 'the-train': ['I saw where you were standing. Do not do it again.'] },
   });
   hanLocFlower = put(-8, -7.5, {
+    // D2: a flower seller with a bicycle sells them by pushing it round the
+    // quarter; hers was parked and so was she.
+    walk: { dx: 0, dz: 9, dwell: 4.5 },
     figure: { shirt: PALETTE.hanWash4, hat: PALETTE.hanConical }, face: 0.4, near: 8,
     // tying them, which is two hands
     beat: { kind: 'reach', every: 6.4, dur: 1.2, tool: 'flowers' },  // B12: tying them, and they are the thing being tied

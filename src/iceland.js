@@ -5423,6 +5423,9 @@ function iceBuild(game) {
     // one at the church door, one at the hot pool and one at the head of the
     // moraine, which are the four places the chapter stops you anyway.
     iceLocStreet = game.addLocal({ biome: 'iceland', x: -6, y: iceTerrain(-6, iceLANES[0] + 4.5),
+      // D2: half past eleven at night on a Reykjavik pavement, and the one
+      // person out was standing perfectly still.
+      walk: { dx: 9, dz: 0, dwell: 5 },
       z: iceLANES[0] + 4.5, near: 7, face: Math.PI,
       figure: { shirt: PALETTE.iceHullBlue, legs: PALETTE.denim, hat: PALETTE.iceRoofRed },
       lines: ['Half eleven. It does not get darker than this until October.',

@@ -976,6 +976,9 @@ function manBuild(game) {
                 'take-off': ['He caught one. He actually caught one.'],
                 'sandcastle': ['I saw nothing. I was looking at the water.'] } });
     manLocals.club = game.addLocal({ biome: 'manly', x: 24, y: manTerrain(24, 47), z: 47, near: 7,
+      // D2: along the promenade rather than down the beach, so the route holds
+      // one contour instead of walking into the surf.
+      walk: { dx: -9, dz: 0, dwell: 5 },
       figure: { shirt: PALETTE.cloth2 },
       lines: [{ t: 'Boat goes out at four if the bank holds.', before: 'the-surfboat' },
               'Nippers finish at eleven. It gets loud.',

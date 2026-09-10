@@ -5653,6 +5653,9 @@ function gorBuild(game) {
                 'chimney-top': ['That is the same rock. All of it is the same rock.'] } });
 
     gorLocals.crew = game.addLocal({ biome: 'goreme', x: gorFIELD.x - 12, y: gorTerrain(gorFIELD.x - 12, gorFIELD.z + 12),
+      // D2: twenty crew figures on a launch field at five in the morning, in one
+      // pose each. This is one of them, and he has a basket to walk to.
+      walk: { dx: 8, dz: -5, dwell: 5 },
       z: gorFIELD.z + 12, near: 7,
       figure: { shirt: PALETTE.gorEnvD, legs: PALETTE.denim, hat: PALETTE.hiVis },
       lines: [{ t: 'Walk the length of it. Look for tears. Every single morning.', before: 'the-envelope' },
