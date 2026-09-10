@@ -454,15 +454,24 @@ function antToast(s) {
   if (g && typeof g.toast === 'function') g.toast(s);
 }
 /**
- * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1). See palSay.
+ * THE SAME LINE, IN THE SCHEME THE PLAYER IS HOLDING (F1).
  *
  * The tiller line is the whole control scheme of the only vehicle in a chapter
  * whose subtitle is "and you are not walking anywhere", so it is the single
  * worst string in the game to write in keycaps a device may not have.
+ *
+ * D5.2: this used to call `g.say(s)`. `game.say` is npc.js's
+ * `sayAt(x, y, z, text)` — the sentence landed in `x`, `text` was undefined,
+ * and `sayAt` returned at its own `if (!text)`. The `antToast` fallback was
+ * skipped too, because `typeof g.say === 'function'` is true. So the tiller
+ * line — the only instruction this chapter ever gives — had never once been
+ * drawn. `game.control` is the narrow door to systems.js's substitution
+ * table, whose first two rows were written for this exact sentence.
+ * (The old comment said "See palSay"; there is no palSay in the tree.)
  */
 function antSay(s) {
   const g = antGame;
-  if (g && typeof g.say === 'function') g.say(s);
+  if (g && typeof g.control === 'function') g.control(s);
   else antToast(s);
 }
 function antSfx(name, opts) {

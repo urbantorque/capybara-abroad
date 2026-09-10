@@ -4070,8 +4070,6 @@ export function createRio(game) {
       // Put the column somewhere the player can see it coming rather than
       // wherever it happened to be when they left.
       rioBateriaX = rioAVE_X0 + 20;
-
-  rioBuildPeopleBodies(game);
       rioBateriaPX = rioBateriaX;
       rioParadeHold = 0;
       rioBondeRideT = 0; rioBondePassed = false; rioBondeTold = false;
@@ -4276,6 +4274,23 @@ export function createRio(game) {
     bounds() { return { x0: -150, x1: 150, z0: -120, z1: 130 }; },
 
     /**
+     * THE MARQUEE IS THE BIRD, ONCE THERE IS A BIRD (D4.0).
+     *
+     * Pasto has had this since the condor landed and it is the only moving
+     * marquee in the game; now that `fragata-ride` carries the banner here,
+     * Rio is the second. Null while the bird is away, which drops the beacon
+     * back to the CHAPTERS point — the rock at Arpoador, where the sea breeze
+     * starts and where you whistle from. So the arrow leads you to the place
+     * you call from, and then to the thing you called.
+     */
+    marqueeAt() {
+      const c = game.condor;
+      if (!c || !c.active || !c.group) return null;
+      const q = c.group.position;
+      return (q && q.x === q.x) ? { x: q.x, y: q.y, z: q.z } : null;
+    },
+
+    /**
      * FRAME THE LAUNCH. The same channel Pasto's condorShot uses, and it wants
      * the opposite bearing: Galeras looks UP at a volcano, and the whole point
      * of this one is what is BEHIND the bird as it leaves the beach — the bay,
@@ -4440,6 +4455,16 @@ function rioBuild(game) {
   rioBuildFlora(rioRoot);
   rioBuildBirds(rioRoot);
   rioBuildSparks(rioRoot);
+
+  // ---- AND THE BODIES FOR THEM, ONCE, HERE (D5.1) -------------------------
+  // This call used to sit in `onEnter`, mis-indented, in the middle of the
+  // block that resets the parade — and `onEnter` runs on every arrival while
+  // `ensureBuilt` runs once. main.js sets the capture tag to the destination
+  // BEFORE calling onEnter, so every copy was tagged `rio` and every copy came
+  // back on the next attach: a second visit carried two three-hundred-shape
+  // compound bodies, a fifth carried five. It belongs at the end of the build,
+  // after `rioBuildBateria` has made the last of the three hundred and six.
+  rioBuildPeopleBodies(game);
 
   rioBateriaX = rioAVE_X0 + 20;
 

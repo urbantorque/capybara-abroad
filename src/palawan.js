@@ -4320,6 +4320,22 @@ export function createPalawan(game) {
      * nothing over a collision plane, and letting the player sink into one
      * would be a way to be stuck rather than a mechanic.
      */
+    /**
+     * THE MARQUEE IS THE MANTA (D4.0).
+     *
+     * Pasto's condor and Rio's fragata are the other two live marquees. Hers is
+     * the only one that is neither a bird nor summonable: she laps the drop-off
+     * whether anybody is watching or not, so the arrow points at a thing that is
+     * always there and always moving, and finding her is most of the task.
+     *
+     * No null branch and no fallback needed — unlike a bird that has to be
+     * whistled down, she exists from the first frame of the chapter.
+     */
+    marqueeAt() {
+      const g = palMantaGroup;
+      if (!g || !g.position || g.position.x !== g.position.x) return null;
+      return { x: g.position.x, y: g.position.y, z: g.position.z };
+    },
     canDive: true,
     // The reef is a place you fall through rather than walk over, and a hop off
     // a coral head wants steering. Nowhere near the Drift's 0.64 — this is not

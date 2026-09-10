@@ -30267,6 +30267,28 @@ export function createSystems(game) {
   game.recordLive = recordLive;
   game.recordEnd = recordEnd;
   game.toast = toast;
+  /**
+   * A CONTROL LINE, TOASTED IN THE SCHEME THE PLAYER IS HOLDING (D5.2).
+   *
+   * `sysSay` has existed since F1 and the first two rows of its table
+   * (`W/S` -> `stick up/down`, `A/D` -> `stick left/right`) were written FOR
+   * the two helms — and no chapter could reach it, because nothing put it on
+   * `game`. Both helms then tried the nearest-looking thing and got the same
+   * wrong answer: `game.say` is npc.js's `sayAt(x, y, z, text)`, so
+   * `game.say('W/S throttle...')` puts the sentence in `x`, leaves `text`
+   * undefined, and returns at `sayAt`'s own `if (!text)` guard. Worse, both
+   * call sites guard with `typeof g.say === 'function'` — which is TRUE — so
+   * the `toast` fallback underneath was skipped as well. Net effect, until
+   * now: neither the ferry nor the tender has ever told anybody how to drive
+   * it, in the two chapters that hand the player a vehicle and nothing else.
+   *
+   * It is deliberately NOT `toast` with the rewrite folded in. sysSay's own
+   * comment says the bare `\bE\b` and `\bQ\b` rules are safe against the 191
+   * authored clue strings and "would not be safe on arbitrary prose" — and
+   * every toast in the game is arbitrary prose. This is the narrow door: a
+   * caller asks for the rewrite by name, or does not get it.
+   */
+  game.control = function (s) { if (s) toast(sysSay(s)); };
   game.shake = shake;
   /**
    * HOW MUCH SHAKE IS LIVE, 0..sysSHAKE_MAX. Nothing in src reads it; the

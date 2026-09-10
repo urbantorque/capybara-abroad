@@ -2684,7 +2684,19 @@ function monUpdateRide(game, dt) {
   for (let i = 0; i < monCarG.length; i++) {
     const g = monCarG[i];
     const dx = p.x - g.position.x, dz = p.z - g.position.z;
-    const c = Math.cos(-g.rotation.y), s = Math.sin(-g.rotation.y);
+    // ---- THE WORLD DELTA, IN THE CAR'S FRAME (D5.3) --------------------
+    // This read `cos(-yaw)`/`sin(-yaw)` and then applied the FORWARD matrix to
+    // them, which composes to R(+yaw) — the rotation, not its inverse. three.js
+    // maps a local (lx, lz) to world as (lx·cos + lz·sin, −lx·sin + lz·cos),
+    // so the inverse is lx = dx·cos − dz·sin, lz = dx·sin + dz·cos.
+    //
+    // It matters because the well is not square: monROOF_HX 0.94 against
+    // monROOF_HZ 2.10, a 2.2 : 1 rectangle. Checked numerically at yaw 45°, a
+    // point 2 m behind the car ON ITS OWN AXIS came back as (lx −2.0, lz 0) —
+    // the box turned ninety degrees, allowing 2.65 m across the car and 1.49 m
+    // along it. Every diagonal on this circuit was testing the wrong half of
+    // the cockpit, which is some of what the grace latch below was hiding.
+    const c = Math.cos(g.rotation.y), s = Math.sin(g.rotation.y);
     const lx = dx * c - dz * s, lz = dx * s + dz * c;
     const dy = p.y - (g.position.y + monROOF_Y);
     if (Math.abs(lx) < monROOF_HX + 0.55 && Math.abs(lz) < monROOF_HZ + 0.55 &&

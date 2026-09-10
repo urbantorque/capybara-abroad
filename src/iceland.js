@@ -3129,7 +3129,8 @@ function iceBuildColumns(game, root) {
  * grazing round a centre on its own slow clock. They are not a mechanic and
  * they are not a task: they are the thing that makes a hundred and fifty
  * metres of empty moss read as somewhere rather than as a gap between two
- * places. They scatter when wheeked at, which is the only thing they do.
+ * places. A wheek RECRUITS them (herdOffer, obey 1) rather than scattering
+ * them, which is better and is what the code has done since the herd landed.
  */
 const iceFLOCKS = [
   { x: -40, z: 54, r: 13, n: 14 },
@@ -3165,7 +3166,12 @@ function iceBuildSheep(root) {
   }
 }
 
-let iceSheepSpook = 0;
+// D5.5: `iceSheepSpook` lived here. It was declared, decremented every frame
+// and read in the speed term below, and NOTHING IN THE TREE EVER SET IT — so a
+// term reading "+1.8 m/s while startled" has been a constant zero for the life
+// of the chapter. Removed rather than wired, because the thing it was written
+// for (a wheek scatters the flock) was replaced by the thing the flock does
+// now (a wheek recruits it).
 // SIX AND A HALF METRES OF SHUFFLE, and it used to be the literal `42` in a
 // squared-distance test. It is the base of a calm-aware radius now — a flock
 // that keeps its distance from an animal walking about and closes over one
@@ -3178,7 +3184,6 @@ let iceSheepCrit = null;
 function iceUpdateSheep(game, dt) {
   if (!iceSheep.length) return;
   const p = game.capy && game.capy.position;
-  if (iceSheepSpook > 0) iceSheepSpook -= dt;
   if (!iceSheepCrit && typeof game.addCritter === 'function') {
     // bold 0.7: a sheep will come and look at you, and it will take longer to
     // make up its mind about it than a heron does. See THE LOAF in systems.js.
@@ -3264,7 +3269,7 @@ function iceUpdateSheep(game, dt) {
           tz = D[o + 1] - dz / d * pull;
         }
       }
-      const spd = (D[o + 5] > 0.02 ? 2.4 : 0.42) + iceSheepSpook * 1.8;
+      const spd = (D[o + 5] > 0.02 ? 2.4 : 0.42);
       const mx = tx - D[o], mz = tz - D[o + 1];
       const md = Math.hypot(mx, mz);
       if (md > 0.05) {

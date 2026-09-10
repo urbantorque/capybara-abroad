@@ -4864,10 +4864,16 @@ function quayTakeHelm() {
   // three keycaps a phone does not have and a pad does not have either. The
   // helm reads `input.x` and `input.z`, which is the abstract stick every
   // scheme fills, so the CONTROL was always right on all three and only the
-  // sentence was wrong. `game.say` runs systems.js's substitution table, which
-  // now carries rows for W/S and A/D.
-  if (typeof g.say === 'function') g.say('W/S throttle · A/D wheel · E to step away');
-  else if (typeof g.toast === 'function') g.toast('W/S throttle · A/D wheel · E to step away');
+  // sentence was wrong.
+  //
+  // D5.2: it named `game.say`, which is npc.js's `sayAt(x, y, z, text)` — the
+  // sentence went into `x`, `text` was undefined, and `sayAt` returned at its
+  // own guard. The `toast` fallback below it never ran either, because
+  // `typeof g.say === 'function'` is true. This line has never been seen by
+  // anybody. `game.control` is the door to the substitution table.
+  const line = 'W/S throttle · A/D wheel · E to step away';
+  if (typeof g.control === 'function') g.control(line);
+  else if (typeof g.toast === 'function') g.toast(line);
   quayTask('take-helm');
 }
 

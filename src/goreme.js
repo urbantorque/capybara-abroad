@@ -2713,9 +2713,22 @@ function gorUpdateDawnLine(dt) {
   // gorSyncBurn ramps over the last twelve seconds before gorSUN_P and then
   // dies over the sunrise itself. It ADDS to each balloon's own clock rather
   // than replacing it, so nothing snaps and no two are exactly together.
+  // D5.4: the else branch used to end in `* 0`, so the whole term went from
+  // ~1 to 0 in a single frame at the instant `toSun` crossed zero — which is
+  // the exact frame `sunrise` fires. A hundred and fifty envelopes stopped
+  // being lanterns on the frame of the chapter's own marquee.
+  //
+  // IT NEEDS THREE BRANCHES AND NOT TWO, which is why the `* 0` was there.
+  // `toSun` is positive BEFORE the sun point and negative after, so one else
+  // covers both the long pre-dawn and the decay — and the decay term reads
+  // `1 - gorSmooth(gorSun · 2.2)` while `gorSun` is clamped to 0 for every
+  // frame before `gorSUN_P` (:4455). Simply dropping the `* 0` therefore
+  // reads 1, not 0, for the ~90 % of the cycle before the ramp: the whole
+  // valley on full burn all night. Measured on paper before it was typed.
   const toSun = (gorSUN_P - gorPhase) * gorCYCLE;
-  const gorSyncBurn = (toSun > 0 && toSun < 12) ? gorSmooth(1 - toSun / 12)
-                                                : (1 - gorSmooth(clamp(gorSun * 2.2, 0, 1))) * 0;
+  const gorSyncBurn = toSun > 12 ? 0
+                    : toSun > 0  ? gorSmooth(1 - toSun / 12)
+                                 : (1 - gorSmooth(clamp(gorSun * 2.2, 0, 1)));
   if (gorSyncBurn > 0.45 && !gorSyncSaid) {
     gorSyncSaid = true;
     gorToast('every burner in the valley, all at once. it is coming.');
@@ -4646,20 +4659,38 @@ function gorSaysNow(who, lines, wheek) {
  * keep: per-key cooldowns so nobody is a smoke alarm, one voice in the valley
  * at a time, and every line is CAUSED rather than scheduled.
  */
+/**
+ * ...AND FROM WHERE THE SPEAKER ACTUALLY IS (D5.6).
+ *
+ * `at` is an optional {x, y, z}. Without it the line comes from the local's
+ * registration point, which is right for the nine people in this chapter who
+ * stand still. It is wrong for exactly one of them: the chase driver, who is
+ * DRIVING. His two lines — "You are a speck" and "I am right underneath you"
+ * — were both drawn at the landing plain where his record is registered
+ * (:5693), wherever the truck happened to be, and the second one says out
+ * loud that he is underneath you. The truck's whole job is to be somewhere
+ * else.
+ */
 const gorSaid = {};
 let gorSayCool = 0;
-function gorCall(who, key, text, cool) {
+function gorCall(who, key, text, cool, at) {
   if (gorSayCool > 0) return false;
   const g = gorGame;
   if (!g || typeof g.say !== 'function') return false;
   const r = gorLocals[who];
-  if (!r) return false;
+  if (!r && !at) return false;
   const t = gorSaid[key];
   if (t !== undefined && gorTime - t < (cool || 45)) return false;
   gorSaid[key] = gorTime;
   gorSayCool = 3.4;
-  try { g.say(r.x, r.y, r.z, text); } catch (e) {}
+  const x = at ? at.x : r.x, y = at ? at.y : r.y, z = at ? at.z : r.z;
+  try { g.say(x, y, z, text); } catch (e) {}
   return true;
+}
+
+/** Where the chase driver is right now — the cab, not his registration point. */
+function gorTruckAt() {
+  return { x: gorTruckX, y: gorTerrain(gorTruckX, gorTruckZ) + 1.75, z: gorTruckZ };
 }
 
 /**
@@ -4681,14 +4712,16 @@ function gorUpdateVoices(game, dt) {
     // this chapter that somebody on the ground is definitely looking at you
     gorCall('chief', 'launch', 'Hands off the rope. Choose a height and stay in it!', 120);
   } else if (gorAboard && alt > 150) {
-    gorCall('chase', 'high', 'You are a speck. I can see you and you are a speck.', 90);
+    gorCall('chase', 'high', 'You are a speck. I can see you and you are a speck.', 90,
+            gorTruckAt());
   } else if (gorAboard && Math.hypot(gorBalX + 26, gorBalZ + 52) < 34 && alt < 55) {
     // the vine man, directly underneath, and what everybody who works a field
     // says to a balloon that is thirty metres over it
     gorCall('vine', 'vines', 'Higher! HIGHER! Not over the vines!', 100);
   } else if (gorAboard && !gorLandDone &&
              Math.hypot(gorBalX - gorTruckX, gorBalZ - gorTruckZ) < 14 && alt < 34) {
-    gorCall('chase', 'under', 'I am right underneath you. Come down. Come DOWN.', 55);
+    gorCall('chase', 'under', 'I am right underneath you. Come down. Come DOWN.', 55,
+            gorTruckAt());
   } else if (gorPigeonOut > 0.55) {
     gorCall('dovecote', 'birds', 'Eight hundred years and none of them has ever seen one of you.', 70);
   } else if (gorSpook > 2.4 && Math.hypot(p.x - gorHERD_X, p.z - gorHerdZ) < 60) {

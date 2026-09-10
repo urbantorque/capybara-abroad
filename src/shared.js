@@ -2617,31 +2617,58 @@ export const TASKS = [
   { id: 'kiosk',          text: 'Help yourself at the kiosk',           chapter: 6 },
   { id: 'selaron-steps',  text: 'Take Selarón’s steps at speed',        chapter: 6, act: 2 },
   { id: 'bateria',        text: 'Get in among the bateria',             chapter: 6, act: 2 },
-  { id: 'samba-parade',   text: 'Samba down the avenue, on the two',    chapter: 6, act: 2, wow: 'RIO' },
+  // ---- THE BANNER MOVED OFF THIS ROW (D4.0) ------------------------------
+  // It is still one of the best-staged things in the chapter and it keeps a
+  // middle rung. What it is not is the chapter's ONE moment: the input is a
+  // press on the beat inside a box that moves, which is chapter 5's floor with
+  // a moving zone, and the file says so itself at rio.js:6-24. A player who has
+  // done Cali learns nothing new here. See fragata-ride below.
+  { id: 'samba-parade',   text: 'Samba down the avenue, on the two',    chapter: 6, act: 2,
+    mini: 'A AVENIDA' },
   { id: 'bondinho',       text: 'Stow away on the Sugarloaf cable car', chapter: 6, act: 3 },
   { id: 'arpoador',       text: 'Take the applause at Arpoador',        chapter: 6, act: 3 },
   // The mini, and it is built entirely out of flow() — a wave is a patch of
   // water that is itself going somewhere, not a force and not a new verb.
   { id: 'take-a-wave',   text: 'Take a wave in at Arpoador',                     chapter: 6,
     mini: 'THE SET' },
-  // The second mini, and it was half built already: rioBuildLapa put forty-two
-  // arches over Lapa with a deck on top and the comment "where the tram runs",
-  // and then nothing ran on it and nothing could stand on it.
-  { id: 'o-bonde',       text: 'Cross the arches on the running board',          chapter: 6, act: 2,
-    mini: 'O BONDE' },
+  // Half built already: rioBuildLapa put forty-two arches over Lapa with a deck
+  // on top and the comment "where the tram runs", and then nothing ran on it and
+  // nothing could stand on it.
+  //
+  // D4.0: this held the second mini and has given it up to samba-parade. The cap
+  // is two a chapter and Rio had four candidates for three rungs; of the four
+  // this is the one where the player does least — you stand on a running board
+  // and the tram does the rest. A good line, an ordinary tick.
+  { id: 'o-bonde',       text: 'Cross the arches on the running board',          chapter: 6, act: 2 },
   // ---- THE SECOND FLIER, AND IT IS DELIBERATELY NOT A THIRD SET PIECE -----
   // condor.js stopped belonging to Pasto (see condorHost) and Rio is the second
   // chapter to host it: eighty-four metres of Corcovado for the air to rise off
   // and nine frigatebirds already drawn over the bay, which nothing could reach.
   //
-  // Two ordinary lines and no `mini`, on purpose. Rio already carries the wow
-  // (samba-parade) and TWO minis — it was one of the four chapters the pacing
-  // audit measured shortest, so it got a second — and the middle-rung rule says
-  // no chapter has two of the same KIND of moment in it. A third elevated
-  // moment here would take from the three that are already earned. The flight
-  // is its own reward; it does not need a banner to say so.
+  // This used to read: "Two ordinary lines and no `mini`, on purpose... a third
+  // elevated moment here would take from the three that are already earned."
+  //
+  // D4.0 DOES NOT ADD A FOURTH RUNG — it moves the three Rio already has. The
+  // argument above was about the BUDGET, and the budget is untouched: one wow,
+  // two minis, exactly as before. What it never asked was whether the rows
+  // holding them were the right rows. They were not. This chapter contains the
+  // complete condor.js flight law — lift proportional to airspeed squared,
+  // induced drag, a G-limited elevator, four authored thermal columns off the
+  // loaf, Urca, Corcovado and Lapa (rio.js:4218-4227) — and gave its banner to
+  // a rhythm test. The best-simulated thing in the chapter was two plain lines
+  // that most players will never find, because nothing anywhere tells them a
+  // whistle brings down a bird.
+  //
+  // The middle-rung rule holds and is why samba-parade keeps a rung rather than
+  // losing one: a flight, a wave and a beat are three KINDS. And act three's own
+  // kick line has been pointing here the whole time — "there is a cable car, and
+  // there is a much better way up".
+  //
+  // The caption names the mountain the flight goes up, the way Pasto's names the
+  // volcano rather than the town.
   { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6, act: 3 },
-  { id: 'fragata-ride',  text: 'Ride the sea breeze up the Sugarloaf',           chapter: 6, act: 3 },
+  { id: 'fragata-ride',  text: 'Ride the sea breeze up the Sugarloaf',           chapter: 6, act: 3,
+    wow: 'PÃO DE AÇÚCAR' },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
   // The first chapter that happens at NIGHT, and the first one whose centrepiece
@@ -2811,14 +2838,29 @@ export const TASKS = [
   { id: 'sea-turtle',   text: 'Keep up with the turtle',                chapter: 12, act: 2 },
   { id: 'giant-clam',   text: 'Take something from the giant clam',     chapter: 12, act: 2 },
   { id: 'cathedral',    text: 'Find the room with the hole in the roof',chapter: 12, act: 3 },
-  { id: 'the-bloom',    text: 'Be under when the water lights up',      chapter: 12, act: 3, wow: 'PALAWAN' },
+  // ---- THE BANNER MOVED OFF THIS ROW TOO (D4.0) --------------------------
+  // The bloom is the most beautiful thing in the chapter and it asks the player
+  // for nothing: a 124 s clock decides when, and the requirement is to be under
+  // water — which is what this chapter has spent ten minutes teaching. The
+  // moment the banner drops, the player is doing the thing they were already
+  // doing. It keeps a rung; the manta takes the banner.
+  { id: 'the-bloom',    text: 'Be under when the water lights up',      chapter: 12, act: 3,
+    mini: 'THE BLOOM' },
   // The mini, and the one thing down here that reacts to you.
   { id: 'bait-ball',     text: 'Swim into the middle of the bait ball',          chapter: 12, act: 2,
     mini: 'THE BALL' },
-  // The second mini. Everything else that has ever carried this animal was on
-  // rails — a berth, a road, a wind, a rope. This one is going where it likes.
+  // ---- AND ONTO THIS ONE ---------------------------------------------------
+  // Everything else that has ever carried this animal was on rails — a berth, a
+  // road, a wind, a rope. This one is going where it likes, and that is the
+  // sentence the whole game has been building toward: the only thing in nineteen
+  // chapters that takes you somewhere BY DECIDING TO. It was a mini.
+  //
+  // The middle-rung rule is satisfied without moving anything else, because
+  // promoting this row frees the slot the demoted bloom needs. Two minis, one
+  // wow, three kinds: a shoal that opens around you, a creature that carries
+  // you, and a room that lights up.
   { id: 'the-manta',     text: 'Take hold of the manta, and stay on',            chapter: 12, act: 2,
-    mini: 'THE MANTA' },
+    wow: 'THE MANTA' },
   // capy.wet has existed since Sydney — it darkens the coat and it drips — and
   // it has never once been a mechanic.
   { id: 'beach-fire',   text: 'Put the beach fire out',                 chapter: 12 },
@@ -3189,7 +3231,12 @@ export const CHAPTERS = [
     arrive: 'to-rio',     far: 1400, tall: false, pal: 6,
     hint: 'a bateria, and it is not waiting for you', open: 'follow the drums.', way: 'the rock at Arpoador',
     keep: 'a tile off Selarón’s steps',
-    marquee: { x: -47.8, z: 46, up: 4, say: 'the avenue, and the drums are already on it' },
+    // D4.0: was the avenue at (-47.8, 46) — "the drums are already on it" —
+    // which is where samba-parade happens, and samba-parade is a mini now. The
+    // rock at Arpoador is where the sea breeze lifts off the headland and where
+    // the whistle brings the bird down. rio.js publishes `marqueeAt`, so this
+    // point is only what the arrow shows BEFORE a fragata is in the air.
+    marquee: { x: -62, z: -26, up: 11, say: 'the rock at the west end, and whatever is circling over it' },
     note: 'The bateria did not slow down for you, and you did not ask it to.',
     acts: [
       { kick: 'COPACABANA', line: 'four kilometres of pavement with a pattern in it.' },
@@ -3257,7 +3304,12 @@ export const CHAPTERS = [
     arrive: 'to-palawan', far: 1100, tall: true,  pal: 12,
     hint: 'twelve chapters of paddling. enough.',     open: 'you have been paddling about on the top of the water for eleven chapters.', way: 'the end of the bamboo jetty',
     keep: 'a pearl out of the giant clam',
-    marquee: { x: 0, z: -70, up: 1, say: 'out past the reef, and then straight down' },
+    // D4.0: was (0, -70) — the hidden lagoon, reached through a submerged
+    // lintel, for a moment that actually fired anywhere under water. The
+    // cleaning station over the drop-off is where the manta laps, and
+    // palawan.js publishes `marqueeAt`, so once you are in the water the arrow
+    // tracks her rather than a patch of sea.
+    marquee: { x: -4, z: -17, up: 1, say: 'over the drop-off, and something big is working it' },
     note: 'Eleven chapters of paddling about on the surface, and the whole thing was underneath.',
     acts: [
       { kick: 'THE ISLAND', line: 'a beach, a jetty, and a boat that goes out to the good part.' },
