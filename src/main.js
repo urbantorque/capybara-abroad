@@ -1277,6 +1277,8 @@ const MAIN_CREASE_RANGE = 0.30;
 // pixels of circle at 720 — a softness rather than an effect.
 const MAIN_DOF_RADIUS = 1.6;
 const mainPostSize = new THREE.Vector2();
+// Rate limit on the composite pass's own failure log — see game.tick's finally.
+let mainPostLoudAt = 0;
 // Scratch for the airlight ray basis. Nothing in post.render allocates.
 const mainAirR = new THREE.Vector3();
 const mainAirU = new THREE.Vector3();
@@ -2167,7 +2169,34 @@ function mainBoot() {
         }
       }
     }
-    if (render !== false) game.post.render();
+    // ---- ...AND THE COMPOSITE PASS IS INSIDE THE NET TOO -------------------
+    // Everything above this line gets a try/catch, a strike count and a
+    // never-drop list. The one per-frame call that had none was the picture
+    // itself — five terms, several render targets, and per-chapter uniforms
+    // read live off game.camera every frame. A throw here escapes game.tick,
+    // and because mainLoop queues the next frame BEFORE calling tick, the loop
+    // survives it: the game goes on simulating behind a frozen image, firing
+    // window.onerror sixty times a second.
+    //
+    // The finally is the other half and is the load-bearing half. post.render
+    // binds sceneRT at its top and only unbinds at the very end, so a throw in
+    // the middle leaves the renderer pointed at an offscreen target for good —
+    // and every later recovery path then draws to nowhere as well, which is a
+    // black screen that no longer has an error to explain it.
+    if (render !== false) {
+      try {
+        game.post.render();
+      } catch (e) {
+        const nowS = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+        if (!mainPostLoudAt || nowS - mainPostLoudAt > 4) {
+          mainPostLoudAt = nowS;
+          console.error('[post.render] threw — the picture is one frame stale', e);
+        }
+        game.state.lastError = 'post.render: ' + (e && e.message || e);
+      } finally {
+        try { renderer.setRenderTarget(null); } catch (x) { /* context lost */ }
+      }
+    }
   };
 
   function mainLoop() {

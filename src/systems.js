@@ -16064,8 +16064,45 @@ export function createSystems(game) {
     }
   }
 
-  // Lookahead scheduler on the AudioContext clock — never the render loop.
+  // ---- THE SCORE RUNS OUTSIDE EVERY SAFETY NET IN THE GAME -----------------
+  // main.js wraps all 23 module updates in try/catch, strikes and a never-drop
+  // list, and systems is ON that never-drop list because a non-finite value
+  // reaching setTargetAtTime is exactly the failure it exists to survive. But
+  // that protection covers systems.update(dt), and the score does not run
+  // there: it runs on its own setInterval, which is never cleared, never
+  // paused and — until now — never wrapped.
+  //
+  // So one bad number out of any of the thirty-odd setValueAtTime /
+  // setTargetAtTime calls this tick reaches killed the music for the rest of
+  // the session, silently, and then went on throwing at 1000/sysMUS_TICK Hz
+  // into the developer strip for as long as the tab lived. The note at the top
+  // of this file names this exact class of failure and it was the one path
+  // that had no cover.
+  //
+  // A failure here must not be fatal and must not be loud: the score is the
+  // one system whose absence a player can live with for a few hundred
+  // milliseconds. Three consecutive throws stand it down for two seconds and
+  // it tries again — a transient bad frame recovers by itself, and a genuinely
+  // broken palette costs a quiet chapter rather than a jammed browser.
+  let musThrows = 0, musHoldTo = 0;
   function musTick() {
+    const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (nowMs < musHoldTo) return;
+    try {
+      musTickBody();
+      musThrows = 0;
+    } catch (e) {
+      if (++musThrows >= 3) { musHoldTo = nowMs + 2000; musThrows = 0; }
+      game.state.lastError = 'musTick: ' + (e && e.message || e);
+      if (!musTick.__loudAt || nowMs - musTick.__loudAt > 4000) {
+        musTick.__loudAt = nowMs;
+        console.error('[musTick] threw — the score is standing down briefly', e);
+      }
+    }
+  }
+
+  // Lookahead scheduler on the AudioContext clock — never the render loop.
+  function musTickBody() {
     if (!ac || !musVol || ac.state !== 'running') return;
     const now = ac.currentTime;
     if (musChordAt < now) musChordAt = now + 0.05;

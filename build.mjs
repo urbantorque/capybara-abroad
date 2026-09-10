@@ -127,15 +127,31 @@ const bodies = ORDER.map(f => {
 
 // Collision check: two modules declaring the same top-level function name would silently
 // clobber each other once concatenated. Fail loudly instead.
-const DECL_RE = /^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)|^(?:const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
+// This gate is the ONLY thing standing between the one-scope contract and a
+// silent clobber, and it had two holes in it: a generator (`function* gen`) and
+// a top-level destructure (`const { a, b } = ...`, `const [x] = ...`) are both
+// legal, both collide once concatenated, and neither matched. Nothing in the
+// tree uses either today — which is precisely when a gate is cheap to fix.
+const DECL_RE = /^(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|^(?:const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
+const DESTRUCT_RE = /^(?:const|let|var)\s*[{[]([^}\]]*)[}\]]\s*=/gm;
 const seen = new Map();
+const note = (name, f) => {
+  if (!name) return;
+  if (seen.has(name)) problems.push(`NAME COLLISION: "${name}" declared in both ${seen.get(name)} and ${f}`);
+  else seen.set(name, f);
+};
 ORDER.forEach((f, i) => {
   let m;
   DECL_RE.lastIndex = 0;
-  while ((m = DECL_RE.exec(bodies[i]))) {
-    const name = m[1] || m[2];
-    if (seen.has(name)) problems.push(`NAME COLLISION: "${name}" declared in both ${seen.get(name)} and ${f}`);
-    else seen.set(name, f);
+  while ((m = DECL_RE.exec(bodies[i]))) note(m[1] || m[2], f);
+  DESTRUCT_RE.lastIndex = 0;
+  while ((m = DESTRUCT_RE.exec(bodies[i]))) {
+    // `{ a, b: c, d = 1 }` binds a, c and d — the name is what follows a colon
+    // where there is one, and what precedes a default where there is one.
+    for (const part of m[1].split(',')) {
+      const bit = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;
+      note(bit.split('=')[0].trim().replace(/^\.\.\./, ''), f);
+    }
   }
 });
 

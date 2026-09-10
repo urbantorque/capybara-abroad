@@ -2547,6 +2547,15 @@ const total = Math.hypot(palBANGKA_B.x - palBANGKA_A.x, palBANGKA_B.z - palBANGK
 
   const yaw = palBANGKA_YAW + (palBangkaDir > 0 ? 0 : Math.PI);
   palBangkaBody.quaternion.setFromEuler(0, yaw, 0);
+  // The one direct body write in this file that was not paired with its own
+  // helper. Every equivalent carrier in the game pairs them — gorSyncBody,
+  // rioSyncBody, sahSyncBody, panSyncBody, cavSyncBody, manSyncBody — and the
+  // bangka's own build at palBuildBangka does too. It has been masked because
+  // the boat is DRAWN from palBangkaGroup rather than from the body, so the
+  // smear had nothing to smear; but the yaw above flips 180 degrees at each
+  // berth with interpolatedQuaternion left on the old heading, and anything
+  // that starts reading this body's interpolated transform inherits it.
+  palSyncBody(palBangkaBody);
   if (palBangkaGroup) {
     palBangkaGroup.position.set(x, 0.55 + Math.sin(palTime * 1.4) * 0.06, z);
     palBangkaGroup.rotation.y = yaw;

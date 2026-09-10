@@ -268,10 +268,42 @@
 </script>
 <script type="module" src="./src/main.js"></script>
 <script>
+  // ---- THE DEVELOPER STRIP IS FOR A DEVELOPER, AND IT WAS SHIPPING --------
+  // #err is a raw stack-trace panel across the bottom 45% of the screen, and
+  // the only thing that ever suppressed it was the boot card already being up
+  // (`#boot.failed ~ #err`). Every other window-level throw painted it over a
+  // running game: the composite pass, the score's setInterval, and the ~100 DOM
+  // handlers in systems.js are all outside the per-module strike system, so a
+  // per-frame throw appended ~80 characters sixty times a second into a
+  // pre-wrap block that is re-laid-out every frame — the screen covered in a
+  // second, and the string growing without bound for as long as the tab lives.
+  //
+  // So: the strip is opt-in on ?debug, the append is capped, and a repeat is
+  // counted rather than re-printed. console.error still gets every one of them
+  // in every build, which is where a developer was going to look anyway.
+  const errDebug = /[?&]debug\b/.test(location.search);
+  let errLast = '', errRepeat = 0;
+  function errShow(line) {
+    try {
+      if (typeof console !== 'undefined' && console.error) console.error(line);
+      if (!errDebug) return;
+      const el = document.getElementById('err');
+      if (!el) return;
+      el.style.display = 'block';
+      if (line === errLast) {
+        errRepeat++;
+        el.textContent = el.textContent.replace(/(?: \(x\d+\))?\n$/, ' (x' + (errRepeat + 1) + ')\n');
+        return;
+      }
+      errLast = line; errRepeat = 0;
+      // 8 kB is about eighty distinct failures, which is far past the point
+      // where the eighty-first one tells anybody anything new.
+      if (el.textContent.length > 8000) el.textContent = '… earlier errors dropped …\n';
+      el.textContent += line + '\n';
+    } catch (x) { /* the error reporter may not fail louder than the error */ }
+  }
   window.addEventListener('error', e => {
-    const el = document.getElementById('err');
-    el.style.display = 'block';
-    el.textContent += (e.message || e.error) + '\n  ' + (e.filename||'') + ':' + (e.lineno||'') + '\n';
+    errShow((e.message || e.error) + '\n  ' + (e.filename||'') + ':' + (e.lineno||''));
     // A throw before the game object exists is a boot failure, not a bad
     // frame: nothing is on screen to go back to, so say so in words.
     if (!window.__capy && window.__capyFail) {
@@ -282,9 +314,7 @@
     }
   });
   window.addEventListener('unhandledrejection', e => {
-    const el = document.getElementById('err');
-    el.style.display = 'block';
-    el.textContent += 'Promise: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason) + '\n';
+    errShow('Promise: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason));
   });
 </script>
 </body>
