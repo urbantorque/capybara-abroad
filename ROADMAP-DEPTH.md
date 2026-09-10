@@ -609,3 +609,107 @@ records eighteen of its own claims failing on measurement:
 6. **The Cappadocia tether already permits a passenger on a collider that is
    removed at 104 m** (`goreme.js:4921-4936`). Either a hidden gag or a fall from
    a hundred metres. **Unverified in play** — check it before C1 goes near it.
+
+---
+
+## TIER 4 AND TIER 5 AS BUILT (10 Sep 2026) — CLOSED
+
+Five commits. The two chapters the brief named are done, three of the six
+remaining marquee verbs shipped, and the layer nobody had built exists.
+
+### Block A — the open defects
+
+D5.7, D5.8 and D5.9 all landed, plus the storm accumulator and the Kyoto
+bell's fifth promise. Measured: the four people whose kind is `queue` all
+reach the queue; Pasto's cast answers a shatter; a barged llama spits and a
+barged dog barks; one pinned machine on Hanoi's ring stops **25 riders
+behind it over a 26.6 m tail**, against 0 with the term cut; two of six
+cormorants go in on a bell strike; `sahErgT` bleeds 9.86 → 5.16.
+
+**And the first Hanoi brake law was wrong.** It reused the capybara brake's
+linear `(gap - 1.5) * 1.6` and two riders piled up at 0.0 m and 0.1 m —
+inside the pin. A linear cap asks for zero speed only once the gap is
+already gone. It is `sqrt(2 a room)` now, with the brake quicker than the
+throttle.
+
+**THREE OF THIS DOCUMENT'S OWN CLAIMS MEASURED FALSE and were not acted on:**
+D5.6 was already fixed (`gorTruckAt()` exists and both chase lines pass it);
+"cavSeenLight is once per session while Antarctica and the Pantanal reset
+theirs" is backwards, since neither of those resets anything; and the four
+`force: true` sounds are seven, every one of which is either a payoff where
+the player is the subject or carries its own distance term.
+
+### D3 — the two chapters the brief named
+
+Marrakech M2/M3/M4/M5 and Cappadocia C1/C3/C4/C5. M1 and M6 needed nothing
+— they shipped in Tiers 1 and 2 and this document did not know it.
+
+| item | measured |
+|---|---|
+| M2 traders shout | 6 real hand-offs a lap, 0 relay executions cut |
+| M3 crowd is cover | **32 of 60** souk people break a line that is clear without them |
+| M4 crowd parts | 17 people shoved at peak, 0 cut |
+| M5 animals | 22 goats on `herdOffer` + `addCritter`, in a chapter that had **none** |
+| C1 the field launches | 0 → 71.7 m, 25 m from the arrival lens, collider rides up and out |
+| C3 the beacon | amber, own hue, does not go out at dawn |
+| C4 call the mare | dwell 6.51 → 0 on a wheek; 8.97 → 8.48 without |
+| C5 doves come down | 60 of 60 on the paving in nine seconds |
+
+**M3 silently switched M2 off** — the shout was gated on the same sight
+test, so a bystander between two traders stopped one shouting to the other
+and the relay measured zero everywhere in the souk. Sound is not light.
+Caught because the number went 1382 → 0 rather than 1382 → something.
+
+**C2 is NOT done and is not claimed.** The twenty crew figures are merged
+BufferGeometry baked at build with their colliders drained into a separate
+array. Animating one means un-merging it.
+
+### D4.11, D4.12, D4.13 — three of the six remaining verbs
+
+- **Manly, the carve.** The stick swings the water under a rider by 6.8 m/s
+  side to side on a full face. Stick + term 19.0 m of ride, 15.5 m of it
+  along the crest; no stick 7.3 m; **stick with the term cut 2.5 m**, which
+  is worse than doing nothing, because paddling sideways off a wave loses
+  it. The 34 m marquee was not reached in any run — rides are set-dependent
+  and the harness cannot wait for a good set.
+- **Pantanal, the river.** Bow of a seven-animal line **9.36 m with the
+  current against 0.01 m without it**. Two earlier cuts measured as doing
+  nothing, and the second zero is the finding: the follow law is a
+  bang-bang controller, so a cross-flow applied to the POSITION is closed on
+  the next frame. The water carries the AIM POINT, aged by how long ago the
+  leader was there.
+- **Antarctica, the pod run.** Built, and **not demonstrated**. Three probes
+  could not reach it: the entry is gated on `antHelmOn`, and no scripted
+  probe has managed to board the helm.
+
+### Tier 5 — something eats something
+
+Verified before building: nothing in 172,000 lines hunts. Three hunts, and
+the player is never the prey.
+
+| chapter | with it | cut |
+|---|---|---|
+| Antarctica, the skua | 86 penguins display, front 49 m | 8, no front |
+| Palawan, the terns | bird 5.68 m under, fish pushed 2.26 m | 0.00 m |
+| Pantanal, the onça | 9 of 9 herd scatter | she never comes |
+
+**And in two of the three the player's voice saves them**: wheek at the skua
+and the chick lives (took 1, saved 1); wheek at the onça and she leaves
+without rushing (0 of 9 scattered). The first time in nineteen chapters the
+animal can spend its voice on somebody else's behalf.
+
+Two aim points were wrong on the first cut and both were caught by
+measurement: the tern converged on the AXIS of the torus — the hole in the
+doughnut — and moved the shoal by thirteen millimetres; and the onça rushed
+at u = 0.14, so the stalk lasted eight seconds at the far end of the bank
+from anybody.
+
+**One shared file changed for all of it**: `rec.land()` took no arguments,
+which quietly restricted the whole flock come-down channel to chapters whose
+birds are already standing next to the food.
+
+### What is still open
+
+D3's C2 and C6 · D4.10 (Sơn Đoòng's column) · D4.14 (Kyoto's weir, which
+needs a per-station waterline and has a wide blast radius) · D4.15 (Cali's
+passengers) · a demonstration of D4.12 by somebody with hands.

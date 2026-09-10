@@ -5454,6 +5454,14 @@ export function createGoreme(game) {
         onTheGround: down,
         pigeonOut: Math.round(gorPigeonOut * 100) / 100,
         // where the things a probe has to stand next to actually are
+        // C1: the group must carry BOTH the envelope and the merged rig, or
+        // the bag has flown off its own basket. Two children, and the world
+        // y of the lowest vertex of each, so a detachment is arithmetic.
+        launchParts: gorFieldLaunch ? gorFieldLaunch.children.length : 0,
+        launchEnvY: (gorFieldLaunch && gorFieldLaunch.children[0])
+          ? Math.round((gorFieldLaunch.position.y + gorFieldLaunch.children[0].position.y) * 100) / 100 : null,
+        launchRigY: (gorFieldLaunch && gorFieldLaunch.children[1])
+          ? Math.round((gorFieldLaunch.position.y + gorFieldLaunch.children[1].position.y) * 100) / 100 : null,
         herdX: gorHERD_X,
         cliffX: gorCLIFF.x, cliffZ: (gorCLIFF.z0 + gorCLIFF.z1) * 0.5,
       };
