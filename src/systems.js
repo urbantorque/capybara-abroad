@@ -22051,11 +22051,14 @@ export function createSystems(game) {
    * and the board showed a single unlocked line reading 'Sydney' for two hours.
    * Measured on the first build of it, and it made the board useless.
    */
+  // ...and the third clause asks chapEnough, not chapComplete. See chapEnough:
+  // the door is the marquee plus seven rows in ten, and the rest of the list
+  // stays on the paper as something you may do rather than something you must.
   function jrOpen(n) {
     if (n === 1) return true;
     if (jrSeen[n]) return true;
     for (let k = 2; k <= chapMax; k++) {
-      if (!chapComplete(k)) return k === n;
+      if (!chapEnough(k)) return k === n;
     }
     return false;
   }
@@ -23694,6 +23697,53 @@ export function createSystems(game) {
     return true;
   }
 
+  // ---- ENOUGH IS NOT THE SAME QUESTION AS FINISHED (L4) --------------------
+  //
+  // Every one of the 232 rows in this game was compulsory. jrOpen gated
+  // chapter n on chapComplete(n-1), chapComplete demands every row, and so the
+  // whole list — including `the-well`, `barber`, `jabiru-nest`, `turtle-tower`
+  // and the four separate rows that are "have a swim" — stood between a player
+  // and the next country. Nothing here was optional except the finds and the
+  // records, and a chapter's weakest quarter is exactly the part that should
+  // have been optional colour from the beginning.
+  //
+  // The fix is a SECOND predicate, not a weaker one. `chapComplete` is
+  // untouched and still governs everything it should: the souvenir, the keep,
+  // the ledger, the chapter-done ceremony, the nineteen-of-nineteen finale and
+  // the picker's "you have finished this" tick. Only the DOOR moves.
+  //
+  //   the marquee, and seven of every ten rows.
+  //
+  // The marquee is in it because it is the thing the chapter is for, and a
+  // player who skipped it has not seen the chapter — that is the one row it
+  // would be dishonest to let anybody past. Seven in ten rather than a flat
+  // count because chapters run from 8 rows to 19 and a fixed number is a
+  // different bargain in each: it asks for 6 of 8 at Circular Quay and 14 of 19
+  // in Sydney, which is proportionate in both.
+  //
+  // Nothing is taken away. The rest of the list stays on the paper, keeps its
+  // arrow and its beacon, and still ticks; what changes is that it is now a
+  // thing you may do rather than a thing you must. See the way-on row in
+  // todoRefresh, which now appears at ENOUGH rather than only at complete, so
+  // the player is told the door is open instead of having to guess.
+  const sysCHAP_ENOUGH = 0.70;
+  function chapEnough(n) {
+    const rec = chapRec[n];
+    if (!rec || !rec.ids.length) return false;
+    let done = 0;
+    for (let i = 0; i < rec.ids.length; i++) {
+      const r = taskRec[rec.ids[i]];
+      if (r && r.done) done++;
+    }
+    if (done < Math.ceil(rec.ids.length * sysCHAP_ENOUGH)) return false;
+    // A chapter with no marquee — there is none today, and the guard is here so
+    // that authoring one out does not silently lock a chapter shut for ever.
+    const w = wowOfChapter(n);
+    if (!w) return true;
+    const wr = taskRec[w.id];
+    return !!(wr && wr.done);
+  }
+
   /**
    * Which chapter the paper is showing. It follows the BIOME, not progress:
    * the list is meant to answer "what am I doing here", and a Pasto task on the
@@ -23910,10 +23960,20 @@ export function createSystems(game) {
     // nothing nags, and standing in a finished place is still a thing you may
     // do for as long as you like. It is the same amount of help the card gives
     // for every other line in the chapter, given for the last one as well.
+    // ---- ...AND THE DOOR OPENS BEFORE THE LIST RUNS OUT (L4) --------------
+    // chapEnough is what actually unlocks the next place now, and a door the
+    // player is not told about is not a door. So the row comes up at ENOUGH as
+    // well — but with one difference that is the whole of its manners: while
+    // there is still something open here it does NOT take `top`. The arrow, the
+    // beacon and the metres stay on whatever the player was doing; the way on
+    // is a line on the paper saying the road is open, not a hand on the elbow.
+    // It only becomes the pointer once the chapter really is finished, which is
+    // exactly what it did before.
     const wayRec = taskRec[sysWAY_ID];
-    const wayOn = openIds.length === 0 && chapComplete(n) && !!(cdef && cdef.way);
+    const wayDone = openIds.length === 0 && chapComplete(n) && !!(cdef && cdef.way);
+    const wayOn = wayDone || (chapEnough(n) && !!(cdef && cdef.way));
     if (wayOn) {
-      top = sysWAY_ID;
+      if (wayDone) top = sysWAY_ID;
       show[sysWAY_ID] = true;
       const wtxt = 'the way on: ' + cdef.way;
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
@@ -30406,6 +30466,42 @@ export function createSystems(game) {
    * toast nobody saw. Nothing in src reads this; the harness does.
    */
   game.noticed = function (id) { return id === undefined ? findCount() : !!findDone[id]; };
+  /**
+   * WHAT THE DOOR THINKS (L4). One getter, no setter, and nothing in src reads
+   * it back.
+   *
+   * `chapEnough` and `chapComplete` are now two different questions and only
+   * one of them unlocks the next place, which makes "did the gate move, and did
+   * anything that belongs to a FINISHED chapter move with it" the exact thing a
+   * probe has to be able to ask. Both predicates and the id list live inside
+   * the journal's closure and never left it, so the only surface the harness
+   * had was the picker's own pixels — and a dimmed row on a canvas is not
+   * evidence about a rule.
+   *
+   * With no argument, the whole ladder, which is what a regression run wants.
+   */
+  game.gateInfo = function (n) {
+    const one = (k) => {
+      const rec = chapRec[k];
+      if (!rec) return null;
+      let done = 0;
+      for (let i = 0; i < rec.ids.length; i++) {
+        const r = taskRec[rec.ids[i]];
+        if (r && r.done) done++;
+      }
+      const w = wowOfChapter(k);
+      const wr = w ? taskRec[w.id] : null;
+      return { n: k, rows: rec.ids.length, done: done,
+               need: Math.ceil(rec.ids.length * sysCHAP_ENOUGH),
+               wow: w ? w.id : null, wowDone: !!(wr && wr.done),
+               enough: chapEnough(k), complete: chapComplete(k), open: jrOpen(k),
+               ids: rec.ids.slice() };
+    };
+    if (n !== undefined) return one(n);
+    const all = [];
+    for (let k = 1; k <= chapMax; k++) all.push(one(k));
+    return all;
+  };
   /** A measured task hands its number here. See RECORDS in shared.js. */
   game.record = recordValue;
   /**
