@@ -1,3 +1,160 @@
+## THE SECOND BEAUTY PASS — THE SHADE, THE BOUNCE, THE JITTER (10 Sep 2026)
+
+Six commits, from the review at the head of `ROADMAP-BEAUTY.md` ("what would
+lift it another 30 %"). Same law as every pass before it: flat Lambert, no
+textures, palette only, and every term carries a `game.state.noX` that CUTS.
+
+**THE MEASUREMENT THAT SET THE SCOPE, AND IT KILLED HALF THE IDEAS.** A 117-ray
+NDC grid over all nineteen arrival frames (`qa/nx-frame.json.png`):
+
+- **the sky is 0 % of the frame in eighteen of nineteen chapters** (the Drift,
+  12 %, is the exception). Clouds in the sky, a sun disc, sky detail of any
+  kind: nobody would ever see them. This retires the sky permanently, and it
+  is the second time it has been retired — `/presence 2` reached the same
+  place from the other direction.
+- **49 % to 97 % of every frame is within 20 m of the lens**, and beyond 60 m
+  is under a fifth everywhere and under 5 % in nine chapters. Distant
+  backdrops and far silhouettes are behind the haze and the defocus already.
+- All nineteen chapters already carry an ambient mote row, and Hanoi's
+  shophouses already carry balconies, washing, shutters, water tanks and
+  cornices. **The frames read flat for lighting reasons, not geometry ones.**
+
+A frame histogram (`qa/nx-hist.json.png`) then named three faults with named
+chapters: one value over half the frame (Quay 58 %, cave 51 %, Iceland 48 %,
+Palawan 48 %); two thirds of the frame with no chroma in it (Kyoto 34 %,
+Venice 37 %, Iceland 38 %); and one hue family (the Erg 3, Venice 4).
+
+### 1. Colour in the shade — `shadeTick` (shared.js), `sysSHADE` (systems.js)
+
+Shade was less light, not bluer light. `_skyOcc` has said how MUCH sky
+survives where the sun does not since D1 and has never said what colour it
+is. This multiplies `irradiance` — which after `<lights_fragment_begin>` is
+the whole indirect term, and in shadow the only light there is — by a tint
+taken from the hemisphere.
+
+**It is not only cast shadow, and that is the finding.** The first cut gated
+on `capyShadowV` alone: Kyoto's chroma went 33.7 % of frame to 52.0 % and
+Venice, Palawan and Iceland did not move at all. Kyoto is a narrow lane where
+most of the ground IS in cast shadow; the others are open. **In a world built
+out of boxes most shade is a face turned away from the sun**, and none of that
+is in the shadow map. The hue follows `max(cast shadow, facing away)`; the
+LEVEL still follows cast shadow alone, because `uShadowSky` is nineteen
+shipped numbers tuned against the picture and this may not re-base them.
+
+The tint is normalised max-channel first (so a dark midnight hemisphere keeps
+its hue rather than tinting toward black), walked back toward white by the
+chapter's own number, then normalised to luma 1 — so the term moves hue and
+never level. Measured per pixel, all nineteen (`qa/nx-shade3.json.png`):
+Manly 84.3 % of frame moved, Antarctica 72 %, Palawan 70.9 %, Kyoto 64.5 %,
+and **`lumaBy` is within 0.6 of zero in every row with a real sample**, which
+is the proof the normalisation holds. Three rows are 0 and each for its own
+reason: the cave has no sky, the Drift is above the weather, and Mong Kok's
+hemisphere is a neon magenta the rim already had to back away from.
+
+### 2. The bounce — `bounceTick` (shared.js), `sysBounceScan` (systems.js)
+
+The only bounce in the game was `hemisphere.groundColor`, one colour per
+chapter, so a red awning did not tint the wall it hangs on. This is the
+spill's machinery with a different input: a nearest-4 pool, a reach ramp, a
+wrap term, multiplied by albedo.
+
+**THE SOURCES ARE NOT MESHES.** The spill can look for `material.emissive`
+because a lamp is a material; an awning is a run of vertices inside a merged
+white-materialled batch. So the scan subsamples the position, normal and
+colour buffers of every merged batch in the live chapter and buckets them
+into a 5 m grid. Three filters, each load-bearing: **not facing up**, because
+the ground's bounce is `groundColor` and letting the lawn in applies it
+twice; **above the floor**, which is `sysSPL_MINY`'s argument; and **the
+chromatic residual only** — the colour with its own grey removed — because a
+neutral surface's bounce is already in the four global terms and the only
+thing missing from them is hue.
+
+Swept with the full colour instead of the residual it read as +9.4 levels of
+luma over 72 % of Mong Kok: a dimmer switch with a hue on it. It also needs
+**a cap as well as a gain**, because one number could not serve both ends —
+at a strength that made Pasto's awnings do anything, Mong Kok blew out. Ships
+at gain 0.30, cap 0.055: Mong Kok 29.6 % of frame, Cali 18.8 %, Göreme
+20.6 %, Manly 2.8 %, peaks all under 40.
+
+### 3. The jitter — `makeMerger({ jitter })` (shared.js)
+
+There was no continuous hue or value variation anywhere in 169 000 lines.
+Three chapters index a swatch array and every other repeated structure is one
+hex: Kyoto builds **eighteen townhouses identical in width, depth and colour**,
+differing only in a height from `rand(4.4, 5.6)`. One multiply per primitive
+at build time — no draw call, no triangle, nothing at runtime — keyed on the
+primitive's own place in the world quantised to 5 cm, so the world is the same
+on every load and `qa/rv-geom.js` still means something. Hue follows value,
+brighter to warmer, the correlation `broad` already makes. Eighteen chapters
+at 0.030 (Antarctica, where a wrong facet on snow is an error) to 0.060.
+Pasto has no merger and is not wired.
+
+### 4. Iceland's midnight sun
+
+Left open by the first pass as an art call, then named by the histogram as one
+of the four greyest frames in the game. 61° to **16°**, shadow half-box to 34.
+A real midnight sun there is about 2°, which no frustum in this game could
+hold. `sysICE_SUN_I` 0.60 → **1.05**, because sin(16)/sin(61) is 0.32 and the
+road went to a third of its brightness: the point of the change is the
+DIRECTION, not the level. Measured after: chroma 37.8 % of frame → 86.9 %,
+mean saturation 0.16 → 0.274.
+
+### 5. The Quay apron, and two grounds that were one value
+
+The apron was **one box, 96 m by 28 m, in one colour**, and it is what the
+player stands on for the whole chapter. It is eleven bays by four courses now,
+each its own draw from the jitter, with grooves between them; the collider is
+unchanged, because a 12 mm joint is not something anybody trips on. Palawan's
+sand and the cave floor took a wider, stronger `broad` octave (0.11 → 0.24 at
+26 m, and 0.11 → 0.22 at 17 m), which is the existing tool for exactly this:
+value structure at ten metres rather than at one.
+
+### 6. A garment has more than one colour on it
+
+Every roster person was one flat colour from shoulders to hips, and there are
+32 in Sydney and 140 in the Piazza. A hem and a front placket, both as `c`
+multipliers in the same `npcMakeGeo` geometry, so one geometry serves every
+shirt colour and it is **the same instanced draw call**. Twenty-four triangles
+a person. The hand-built locals are deliberately NOT wired: each of their
+parts is its own mesh, so two bands on eight locals is sixteen draw calls for
+eight figures that already have a collar.
+
+### What it cost
+
+Real rAF frames on a QUIET machine, 240 sampled, five interleaved reps, all
+five terms cut then live (`qa/nx-raf.json.png`): Sydney **16.7 → 16.7 ms**
+median, Kyoto **16.7 → 16.7**, p95 17.7–18.3 in both arms, and every one of
+the ten raw pairs agrees to 0.1 ms. A locked 60 before and after.
+
+**AND THE FIRST RUN OF THAT SAID 17–20 ms IN BOTH ARMS.** Three other
+`playwright-cli` sessions were open. The frame-time instrument needs the
+machine to itself, and the tell is the OFF arm moving from its own historic
+figure — an on/off delta measured against a contaminated baseline is a
+guess. Same family as the `post.render()` noise floor in the first pass.
+
+`npm test` 11/11. `qa/fuzz.js` **19/19 clean**: 0 NaN frames, 0 camera NaN,
+0 void falls, 0 errors. `solverSaves` reads 2 from Mong Kok onward, which is
+the pre-existing deterministic pair the first pass differentialled against
+`73277f2` and proved is not ours.
+
+### Instruments
+
+In the session scratchpad, outputs in `qa/`: `nx-frame` (where the frame IS,
+and the death of the sky), `nx-hist` (the value and chroma histogram),
+`nx-shade3` (the shade, per pixel), `nx-bounce` / `nx-bsweep2` (the bounce and
+its sweep), `nx-manly` (attribution), `nx-raf` (frame time), `nx-crop`.
+
+**Three traps this pass paid for, and two are new.** A luma-quartile split is
+NOT a lit-versus-shade split in a chapter whose ground is entirely shaded, so
+a "warm highlights, cool shadows" metric read Kyoto as unchanged while its
+frame was transformed — the per-pixel diff is the only honest instrument for
+a term. **Manly's histogram row cannot hold a line at all**: two runs of
+identical code read p50 113 and p50 154 with saturation 0.385 and 0.185, while
+all five terms together accounted for 9 to 15 levels within either run. And a
+damped pool cannot be swept at dt = 0, which is why `bounceSnap` exists —
+ticking real time between arms instead measured two seconds of Mong Kok and
+reported 72 % of the frame moving at every strength including the smallest.
+
 ## THE BEAUTY PASS — THE STAR, THE CLOUD, THE HORIZON, THE PALE GROUND, THE LAWN (10 Sep 2026)
 
 Five commits on `beauty-pass`, from `ROADMAP-BEAUTY.md`, which is the review

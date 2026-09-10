@@ -266,3 +266,90 @@ all nineteen.
 Still open, unchanged from the list above: Iceland's lamps on the road,
 Iceland's sun, Rio's stripe staircase, Monaco's harbour reflection, Mong
 Kok's reflection pucks.
+
+---
+
+# The second beauty pass: what another 30 % is made of
+
+Written 10 Sep 2026, straight after the pass above, from "what else would you
+add". The full mechanism of everything below is in **CONTRACT.md ➜ "THE SECOND
+BEAUTY PASS"**; this is the review that chose it and what the review got wrong.
+
+## The measurement that set the scope
+
+A 117-ray NDC grid over all nineteen arrival frames, and a histogram of each
+rendered frame.
+
+| finding | value |
+|---|---|
+| sky in frame | **0 % in eighteen of nineteen chapters** |
+| frame within 20 m of the lens | 49 % to 97 % |
+| frame beyond 60 m | under 20 % everywhere, under 5 % in nine chapters |
+
+**The picture is the near field.** That killed three of the four ideas the
+review started with, and one of them was embarrassing: the first pass had just
+given thirteen chapters cloud shadows on the ground and only Sydney has clouds
+in the sky, so "put clouds in the other twelve skies" looked obvious. Nobody
+would ever see them. Distant backdrops are behind the haze and the defocus.
+Ambient airborne particles already exist in all nineteen. And the architecture
+is not the problem: Hanoi's shophouses already carry balconies, washing,
+shutters, water tanks, cornices and signs.
+
+Then the histogram named three faults and the chapters that have them:
+
+| fault | worst |
+|---|---|
+| one value fills the frame | Quay 58 %, cave 51 %, Iceland 48 %, Palawan 48 % |
+| the frame has no colour in it | Kyoto 34 %, Venice 37 %, Iceland 38 % |
+| the frame is one hue | the Erg 3 families, Venice 4 |
+
+## What shipped
+
+| item | shipped as | measured |
+|---|---|---|
+| 1 colour in the shade | `shadeTick`, `sysSHADE`, 16 rows and 3 zeroes | per pixel: Manly 84 % of frame, Antarctica 72 %, Kyoto 64 %; luma within 0.6 of zero everywhere |
+| 2 the bounce | `bounceTick`, `sysBounceScan`, nearest 4, gain 0.30 cap 0.055 | Mong Kok 30 % of frame, Cali 19 %, Göreme 21 %, peaks under 40 |
+| 3 the jitter | `makeMerger({ jitter })`, 18 chapters at 0.030–0.060 | build-time; nothing at runtime |
+| 4 Iceland's sun | 61° → 16°, box 34, `sysICE_SUN_I` 0.60 → 1.05 | chroma 37.8 % → 86.9 %, saturation 0.16 → 0.274 |
+| 5 the flat grounds | Quay apron 1 box → 44 bays; Palawan and cave `broad` roughly doubled | Quay mode 58 % → 53 % before the bays even landed |
+| 6 the cast | a hem and a placket in the same instanced geometry | 24 triangles a person, no new draw call |
+
+Cost: **16.7 → 16.7 ms median** in Sydney and Kyoto, locked 60, ten raw pairs
+agreeing to 0.1 ms. `npm test` 11/11, `qa/fuzz.js` 19/19 clean.
+
+## Four things the review got wrong
+
+1. **The sky.** See above. Measured before building, which is the only reason
+   it cost nothing.
+2. **"There is no colour variation anywhere."** True of continuous jitter and
+   false of the game: Hanoi picks from five house colours and randomises its
+   awnings, Pasto indexes walls and shutters, Venice indexes a column array.
+   The claim had to narrow to "no CONTINUOUS variation" before it was true.
+3. **Mean saturation is the wrong metric for a shade tint.** Venice and
+   Palawan both LOST chroma and both frames got better: a blue tint on warm
+   stone neutralises it, and what the picture gains is the separation between
+   a warm sun side and a cool shade side. Three metrics were tried before the
+   per-pixel diff, which is the one this repository already trusted.
+4. **Manly's histogram row is noise.** Two runs of identical code: p50 113 and
+   154, saturation 0.385 and 0.185. It looked like a serious regression from
+   item 1 for twenty minutes. Within either run all six arms agreed to 15
+   levels.
+
+## Still open after both passes
+
+- **Iceland's street lamps light nothing on the road.** Unchanged, and now
+  more visible than it was, because the chapter is no longer flat-lit.
+- **Rio's stripe pavement staircases** at every stripe edge. Vertex colour on
+  a 3.4 m grid; the honest fixes are a finer grid under the promenade only or
+  an analytic stripe in the fragment.
+- **Monaco's harbour reflects no window.** The spill's anisotropic wet smear
+  on the sea is the affordable version.
+- **The cave is still the flattest frame in the game** (spread 63 against a
+  median of 105). Its fault is neither shade nor hue: it is one dark green
+  value over half the picture, and the fix is contrast between the shaft and
+  the dark, which is a lighting composition and its own job.
+- **The near 3 m is usually empty.** Everything measured says the frame is the
+  near field, and the very front of it has nothing in it. Foreground framing —
+  a frond, a railing, a branch the camera looks past — is the biggest single
+  thing left, and it is risky: P1 already measured that a canopy between the
+  lens and the animal is a camera problem, not an occlusion one.
