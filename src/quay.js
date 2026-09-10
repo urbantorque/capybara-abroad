@@ -570,9 +570,43 @@ function quayBuildQuayside(game, root) {
   // does not collide it.
   const F = quayPool();
 
-  // ---- the apron. One broad sandstone deck with a stone kerb at the water.
-  A.box(0, -0.10, (quayAPRON_Z + quayAPRON_Z1) * 0.5, quayAPRON_HX * 2, 0.60,
-        quayAPRON_Z1 - quayAPRON_Z, PALETTE.path);
+  // ---- the apron, AND IT WAS ONE BOX (the second beauty pass, item 5) ------
+  //
+  // Ninety-six metres by twenty-eight, in a single colour, and it is the thing
+  // the player stands on for the whole chapter. Measured on a frame histogram
+  // of all nineteen arrival frames, the Quay is the worst in the game for it:
+  // 58 % of the picture sits within eight levels of one value, against 15 %
+  // in Cali and 17 % in Rio. Grain, the near octave and the broad octave are
+  // all on it already and none of them can help — they are a texture ON a
+  // value, and the complaint is the value.
+  //
+  // So it is laid stone now: eleven bays by four courses, each one its own
+  // box and therefore its own draw from the merger's colour jitter, with a
+  // groove between them. That is what a stone apron IS, and the jitter that
+  // item 3 put in the merger is what makes it cost one option rather than a
+  // table of forty-four colours.
+  //
+  // The collider does not change: it was one box before this and it is one
+  // box after, because a joint 12 mm deep is not a thing anybody can trip on.
+  {
+    const az0 = quayAPRON_Z, az1 = quayAPRON_Z1;
+    const NX = 11, NZ = 4;
+    const bw = (quayAPRON_HX * 2) / NX, bd = (az1 - az0) / NZ;
+    for (let i = 0; i < NX; i++) {
+      for (let j = 0; j < NZ; j++) {
+        A.box(-quayAPRON_HX + (i + 0.5) * bw, -0.10, az0 + (j + 0.5) * bd,
+              bw - 0.09, 0.60, bd - 0.09, PALETTE.path);
+      }
+    }
+    // the grooves, one course lower so they read as a joint and not a line
+    for (let i = 1; i < NX; i++) {
+      A.box(-quayAPRON_HX + i * bw, -0.13, (az0 + az1) * 0.5, 0.10, 0.56, az1 - az0,
+            PALETTE.sandstoneDark);
+    }
+    for (let j = 1; j < NZ; j++) {
+      A.box(0, -0.13, az0 + j * bd, quayAPRON_HX * 2, 0.56, 0.10, PALETTE.sandstoneDark);
+    }
+  }
   A.box(0, 0.14, quayAPRON_Z + 0.35, quayAPRON_HX * 2, 0.12, 0.70, PALETTE.stone);
   quayStaticBox(game, 0, -0.20, (quayAPRON_Z + quayAPRON_Z1) * 0.5,
                 quayAPRON_HX, 0.40, (quayAPRON_Z1 - quayAPRON_Z) * 0.5);

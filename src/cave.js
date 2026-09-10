@@ -281,7 +281,7 @@ function cavVC() {
 }
 function cavVCG() {
   return grain(mat(0xffffff, { vertexColors: true }),
-               { scale: 0.28, amount: 0.22, warp: 0.25, near: 0.70, nearScale: 11, contact: 1, broad: 0.11, broadM: 12 });
+               { scale: 0.28, amount: 0.22, warp: 0.25, near: 0.70, nearScale: 11, contact: 1, broad: 0.22, broadM: 17 });
 }
 /**
  * ANYTHING IN HERE THAT GIVES OFF LIGHT IS BUILT WITH THIS.
