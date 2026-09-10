@@ -2983,7 +2983,25 @@ export const TASKS = [
   // is why it OPENS the last act rather than closing the middle one.
   { id: 'great-wall',    text: 'Climb the Great Wall of Vietnam',        chapter: 16, act: 3,
     mini: 'THE GREAT WALL' },
-  { id: 'the-doline',    text: 'Stand in the light inside the mountain', chapter: 16, act: 2,
+  // ---- D4.10: THE RE-TIERING, AND IT COSTS ONLY THIS FILE ----------------
+  //
+  // `the-doline` was the chapter's wow and the whole of it was WALKING INTO A
+  // ZONE. A zone test, a framed shot and a swell — nothing to do, nothing to
+  // get wrong, nothing to get better at. It is a beautiful place and it is not
+  // a moment, and it was one of the two lowest-asking marquees in the game.
+  //
+  // It keeps its shot, its swell and its line, and it becomes what it always
+  // was: the act-2 ENTRY, the thing that makes you stop when you first walk in
+  // here. The wow moves to the one vertical the chapter has ever had.
+  { id: 'the-doline',    text: 'Stand in the light inside the mountain', chapter: 16, act: 2 },
+  // ...and this is the marquee. Two hundred metres of daylight coming down a
+  // hole in a mountain, a column of collapsed roof standing in the middle of
+  // it, and the only way down that is quicker than the way up. The sixteen
+  // swifts that spiral this shaft all day form on you while you fall, which is
+  // chapter 17's gentoos-on-the-bow figure said in a cave — and it is the one
+  // moment in nineteen chapters where the game hands you height and then asks
+  // you to give it back.
+  { id: 'the-column',    text: 'Come down the column the fast way',      chapter: 16, act: 2,
     wow: 'SƠN ĐOÒNG' },
   { id: 'phytokarst',    text: 'Shout at the garden that leans',         chapter: 16, act: 2 },
   // The second mini. There is a river in here and things come down it.

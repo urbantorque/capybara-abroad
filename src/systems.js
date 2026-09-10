@@ -22902,6 +22902,18 @@ export function createSystems(game) {
                       return 'the roof has fallen in somewhere. go and stand under it.';
                     },
                     where: function () { return hintObj(game.cave && game.cave.doline); } },
+    // D4.10. Three clues, because the marquee has three states and a hint that
+    // says the same thing whether you are looking up at it, standing on top of
+    // it, or falling off it is a hint that has stopped helping.
+    'the-column':     { clue: function () {
+                      const c = game.cave;
+                      if (!c || !c.columnDebug) return 'get up the column in the light';
+                      const d = c.columnDebug();
+                      if (d.fall > 0.05) return 'you are doing it';
+                      if (d.topped) return 'now go over the side';
+                      return 'there is a way up it. it is a long way round.';
+                    },
+                    where: function () { return hintObj(game.cave && game.cave.column); } },
     'phytokarst':     { clue: 'everything green in here is leaning the same way',
                     where: function () { return hintObj(game.cave && game.cave.phyto); } },
     'the-log':        { clue: 'something came down the river. get on it.',

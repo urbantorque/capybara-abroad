@@ -1957,6 +1957,237 @@ function cavBuildWall(game, root) {
  * mountain, with a mist over it in the mornings. None of that is invented and
  * none of it needed to be.
  */
+// ================================================================ THE COLUMN =
+/**
+ * D4.10 — THE CHAPTER'S ONE VERTICAL.
+ *
+ * Sơn Đoòng's marquee was a zone test. `the-doline` fired when you walked into
+ * the light, framed a shot, swelled the score and ticked — and that was the
+ * whole of it. It is the most beautiful room in the game and it asked the
+ * player for nothing at all, which is why it was rated 2 out of 5 alongside
+ * Sydney's rectangle.
+ *
+ * What the room did not have was a REASON TO LOOK UP AND THEN GO UP. Two
+ * hundred and eleven metres of clear air over a bare disc of floor, sixteen
+ * swifts spiralling down it all day, two hundred and sixty motes drifting in
+ * the shaft, and nothing to stand on.
+ *
+ * THREE THINGS THE AUDIT OF THIS FILE DECIDED, and each of them changed the
+ * design rather than the other way round:
+ *
+ *  1. IT IS A WALKED RAMP, NOT A `climbHold`. The chapter publishes climbHold
+ *     for the Great Wall, and it was the obvious way to build a column — and
+ *     it is wrong here, because `cavSkyK` (the camera's crane toward the hole,
+ *     0.92 in the doline and the largest in the chapter) is ZEROED the moment
+ *     `capy.climbing` is true. A clung ascent would drop the lens to level for
+ *     the whole climb, in the one place in the game whose entire subject is
+ *     what is overhead. The Hand of Dog's spiral shelf is the precedent and it
+ *     is walked: twelve degrees, boxes overlapping by two thirds, headroom
+ *     checked as well as rise.
+ *
+ *  2. IT HAS TO CLEAR THE SWIFTS. `cavUpdateShaftLife` tightens their spiral
+ *     to r 5.5 at the floor. The column is 3.6 m at the foot and the shelf
+ *     stands 1.05 m proud of it, so the widest thing here is 4.65 m and the
+ *     birds thread past the outside of it — which is a better picture than
+ *     clearance would have been.
+ *
+ *  3. IT GOES IN THE MIDDLE, WHICH IS ALREADY EMPTY. The build notes on the
+ *     breakdown say the centre five metres are left bare on purpose. The
+ *     motes, the mist, the shaft, the point light, the sky disc and the
+ *     marquee's own frameShot are all centred on (4, -48). Nothing had to move.
+ */
+const cavCOL = { x: 4, z: -48, h: 28 };
+const cavCOL_RB = 3.6, cavCOL_RT = 1.5;      // radius at the foot and at the cap
+const cavCOL_RAMP_RISE = 0.20;               // m of gain per shelf — the Hand's
+const cavCOL_RAMP_CHORD = 0.95;              // ...and the step along it
+let cavColBase = 0, cavColTop = 0;
+
+/** How wide the column is `dy` above its own foot. */
+function cavColR(dy) {
+  return lerp(cavCOL_RB, cavCOL_RT, clamp(dy / cavCOL.h, 0, 1));
+}
+
+// ---- D4.10: coming down it -------------------------------------------------
+//
+// `cavColFall` is 0..1, how much of a descent through the shaft is happening
+// right now — the number the swifts form on. `cavColP` is where the animal is
+// while it does, published for the same reason.
+//
+// The gates are deliberately generous about WHERE and strict about WHAT. Any
+// unsupported descent inside the glade, from high enough that it took a climb
+// to get there, counts: the column is the only way up, so a player who has
+// found some other way is not going to be told they did it wrong. What it will
+// not accept is a hop, a slope, or a walk off the rim — hence the height floor
+// and the requirement that the animal is actually falling.
+const cavCOL_ARM   = 15;      // m above the doline floor before a drop counts
+const cavCOL_LAND  = 5.0;     // ...and below this, it has landed
+const cavCOL_VY    = -3.4;    // m/s of descent before it is a fall and not a step
+const cavCOL_TICK  = 17;      // m of drop the tick asks for
+let cavColFall = 0, cavColFrom = 0, cavColDrop = 0, cavColBest = 0;
+let cavColDone = false, cavColTopped = false, cavColP = null;
+let cavColOn = false;          // is a descent in progress — see the note below
+// the gate inputs, published for the instrument only
+let cavColVy = 0, cavColAbove = 0, cavColGrounded = false, cavColInGlade = false;
+
+function cavUpdateColumn(game, dt) {
+  const capy = game.capy;
+  const p = capy && capy.position;
+  if (!p) { cavColFall = Math.max(0, cavColFall - dt * 2.4); return; }
+  const dx = p.x - cavCOL.x, dz = p.z - cavCOL.z;
+  const inGlade = dx * dx + dz * dz < 26 * 26;
+  const above = p.y - cavColBase;
+  const vy = capy.velocity ? capy.velocity.y : 0;
+  const grounded = !!capy.grounded;
+  cavColVy = vy; cavColAbove = above; cavColGrounded = grounded; cavColInGlade = inGlade;
+
+  // ---- topping out, which is worth saying on its own -------------------
+  if (!cavColTopped && inGlade && grounded && above > cavCOL.h - 3) {
+    cavColTopped = true;
+    game.toast('two hundred metres of daylight, and you are standing in it.');
+    if (typeof game.frameShot === 'function')
+      game.frameShot({ yaw: 0, dist: 13, pitch: -0.30, raise: 2.0, hold: 3.0 });
+  }
+
+  // ---- the drop ---------------------------------------------------------
+  //
+  // `cavColOn` is a BOOLEAN and `cavColFall` is a 0..1 ramp, and the two are
+  // separate on purpose. The first cut used the ramp as both — armed it at
+  // 0.001 and branched on `cavColFall <= 0.02` — so every frame of the fall
+  // re-took the arming branch and re-armed it, and the ramp never left 0.001.
+  // Measured: the gate fired correctly at vy -4.39 and the swifts never moved,
+  // which reads exactly like a broken formation and was a threshold sitting on
+  // the wrong side of its own initial value. A state is not a small number.
+  if (!cavColOn) {
+    if (inGlade && !grounded && above > cavCOL_ARM && vy < cavCOL_VY) {
+      cavColOn = true;
+      cavColFrom = p.y;                     // where it started, for the record
+      cavColDrop = 0;
+      cavColFall = 0;
+      cavSfx.volume = 0.16; cavSfx.pitch = 1.9;
+      game.sfx('rustle', cavSfx);
+    }
+  } else {
+    cavColP = p;
+    cavColDrop = Math.max(cavColDrop, cavColFrom - p.y);
+    if (!grounded && above > cavCOL_LAND) {
+      // the form comes ON over about half a second and holds
+      cavColFall = Math.min(1, cavColFall + dt * 2.2);
+      cavMoteStir = 1;                      // ...and the shaft stirs round it
+      // ...and the paper counts it as it happens, the way the log ride does
+      if (typeof game.recordLive === 'function' && cavColDrop > 2) {
+        game.recordLive('the-column', cavColDrop);
+      }
+    } else {
+      // ---- LANDED ------------------------------------------------------
+      // The birds peel off over about six tenths of a second rather than
+      // snapping back onto their spiral, which is what `cavColOn` is holding
+      // open: the state ends when the FORM has ended, not when the animal
+      // touched the floor.
+      const drop = cavColDrop;
+      cavColFall = Math.max(0, cavColFall - dt * 1.6);
+      if (cavColFall <= 0.02) { cavColP = null; cavColOn = false; }
+      if (drop > 2 && cavColDrop > 0) {
+        cavColDrop = 0;
+        if (drop > cavColBest) cavColBest = drop;
+        if (drop >= cavCOL_TICK) {
+          // the room answers a landing the way it answers a shout, which is
+          // the one thing this chapter already knew how to do
+          cavCrickScat = 1;
+          cavPhyShake = 1;
+          cavMoteStir = 1;
+          cavSfx.volume = 0.42; cavSfx.pitch = 0.55;
+          game.sfx('thud', cavSfx);
+          if (typeof game.shake === 'function') game.shake(0.16);
+          if (typeof game.record === 'function') game.record('the-column', drop);
+          if (!cavColDone) {
+            cavColDone = true;
+            cavTask(game, 'the-column');
+            game.toast('all sixteen of them came down with you.');
+            if (typeof game.frameShot === 'function')
+              game.frameShot({ yaw: 0, dist: 15, pitch: 0.10, raise: 3.2, hold: 3.0 });
+          }
+        }
+      }
+    }
+  }
+}
+
+function cavBuildColumn(game, root) {
+  const M = cavMerger();
+  const x = cavCOL.x, z = cavCOL.z;
+  const base = cavTerrain(x, z);
+  cavColBase = base;
+
+  // ---- the rock ----------------------------------------------------------
+  // Eight stacked cones on alternating rotations, exactly as the Hand of Dog
+  // is built: a single cone reads as a traffic cone and eight of them read as
+  // something that grew.
+  for (let k = 0; k < 8; k++) {
+    const t = k / 7;
+    M.cone(x, base + t * cavCOL.h + 2.4, z, cavColR(t * cavCOL.h), 8.0,
+           k % 2 ? PALETTE.cavRockWarm : PALETTE.cavFlow, 0, k * 0.7 + 0.3, 0, 8);
+  }
+
+  // ---- the trunk collider, per level and OCTAGONAL ----------------------
+  // One box for a cone is the fault this file already wrote down once: it
+  // leaves metres of invisible rock round the top and buries the shelves. Two
+  // boxes at 45 degrees per 2.15 m level, each sized from that level's OWN
+  // top, is the shape the Hand of Dog settled on and it is copied verbatim.
+  {
+    let b = cavPoolBody(game), n = 0;
+    const LEV = 2.15;
+    for (let k = 0; k * LEV < cavCOL.h; k++) {
+      const y0 = k * LEV, y1 = y0 + LEV;
+      const rr = cavColR(y1) * 0.86;
+      cavPoolBox(b, x, base + (y0 + y1) * 0.5, z, rr, LEV * 0.5, rr);
+      cavPoolBox(b, x, base + (y0 + y1) * 0.5, z, rr, LEV * 0.5, rr, Math.PI / 4);
+      n += 2;
+      if (n >= 16) { cavPoolDone(game, b); b = cavPoolBody(game); n = 0; }
+    }
+    cavPoolDone(game, b);
+  }
+
+  // ---- the shelf, which is the whole of the climb ------------------------
+  // One continuous flowstone ramp at about twelve degrees. `cavCOL.h / rise`
+  // shelves rather than a literal, so changing the height cannot silently
+  // leave the ramp short of the cap — which is exactly how the Hand's tick
+  // ended up four metres above its highest ledge.
+  const RAMP_N = Math.ceil((cavCOL.h - 0.5) / cavCOL_RAMP_RISE);
+  {
+    let ra = 2.1;                        // start it away from the camp side
+    let b = cavPoolBody(game), n = 0;
+    for (let k = 0; k < RAMP_N; k++) {
+      const dy = 0.5 + k * cavCOL_RAMP_RISE;
+      const rr = cavColR(dy) + 1.05;
+      const lx = x + Math.cos(ra) * rr, lz = z + Math.sin(ra) * rr;
+      M.cyl(lx, base + dy, lz, 0.86, 0.38,
+            k % 6 === 0 ? PALETTE.cavCalcite : PALETTE.cavFlow, 0, ra, 0, 6);
+      cavPoolBox(b, lx, base + dy - 0.02, lz, 0.84, 0.19, 0.84);
+      if (++n >= 16) { cavPoolDone(game, b); b = cavPoolBody(game); n = 0; }
+      ra += cavCOL_RAMP_CHORD / rr;
+    }
+    cavPoolDone(game, b);
+  }
+
+  // ---- the cap you step off ----------------------------------------------
+  // Wider than the trunk, so the last shelf delivers you onto a floor rather
+  // than onto a point, and so the step off is a DECISION rather than a slip.
+  cavColTop = base + 0.5 + (RAMP_N - 1) * cavCOL_RAMP_RISE + 0.42;
+  M.cyl(x, cavColTop - 0.2, z, 2.9, 0.55, PALETTE.cavCalcite, 0, 0, 0, 8);
+  cavStaticBox(game, x, cavColTop - 0.2, z, 4.6, 0.55, 4.6);
+  // ...and a lip round it, low enough to walk over and high enough to see.
+  for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2 + 0.2;
+    M.box(x + Math.cos(a) * 2.5, cavColTop + 0.16, z + Math.sin(a) * 2.5,
+          0.9, 0.3, 0.5, PALETTE.cavRockDk, 0, a, 0);
+  }
+
+  const mesh = new THREE.Mesh(M.build(), cavVC());
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.name = 'cavColumn';
+  root.add(mesh);
+}
+
 function cavBuildDoline(game, root) {
   const D = cavDOLINE;
   // 1. the sky, seen through the hole. It is up at 210 m and it is the
@@ -2206,6 +2437,10 @@ function cavBuildDoline(game, root) {
     root.add(cavMist);
   }
 
+  // D4.10: the column goes in AFTER the trees and the breakdown, so its own
+  // colliders are the last thing added inside the glade and the bare centre
+  // the breakdown loop leaves is still bare when it gets there.
+  cavBuildColumn(game, root);
   cavBuildShaftLife(root);
   cavBuildPhyto(game, root);
 }
@@ -2489,14 +2724,63 @@ function cavUpdateShaftLife(dt) {
       const z = D.z + Math.sin(a) * rr * 0.9;
       // the tangent of that spiral IS the heading, and the bank is how hard it
       // is turning — which at the bottom, on a five-metre radius, is hard over
-      const yaw = a + Math.PI * 0.5;
+      let yaw = a + Math.PI * 0.5;
       const bank = -lerp(0.35, 1.15, cavSmooth(u));
       // ...and it FADES IN rather than popping: the last tenth of the drop is
       // spent leaving under the rim, so it is smallest exactly where it appears
       const sc = lerp(0.7, 1.25, cavSmooth(u)) * clamp(Math.min(u, 1 - u) / 0.07, 0.06, 1);
-      cavM.compose(cavV3.set(x, y, z),
-                   cavQ.setFromEuler(cavE.set(0.18, yaw, bank, 'YXZ')),
-                   cavSc.set(sc, sc, sc));
+      // ---- D4.10: AND THEY FORM ON A FALLING CAPYBARA ------------------
+      //
+      // Chapter 17's gentoos form on the bow of a moving boat; this is the
+      // same figure said in a cave, and it is the whole of what makes the
+      // drop a moment rather than a fall. `cavColFall` is 0..1 — how much of
+      // the animal's descent is happening in the shaft — and each bird lerps
+      // from its own place on the spiral toward a slot around the animal.
+      //
+      // A LERP, NOT A REPLACEMENT. At full form they are still 8% on their
+      // own spiral, so the flock keeps the twist it had rather than snapping
+      // into a rigid ring; and because the spiral keeps running underneath,
+      // they resume it exactly where they would have been when you land.
+      //
+      // The slot is BELOW and AROUND: a swift that formed level with you
+      // would be edge-on and invisible against two hundred metres of bright
+      // shaft, and one below you is seen from above with the light on its
+      // back, which is the only way this reads at all.
+      let px = x, py = y, pz = z, pbank = bank, psc = sc;
+      if (cavColFall > 0.02 && cavColP) {
+        // THEY DO NOT ALL ARRIVE AT ONCE. A staggered join over about a third
+        // of the form — the bird nearest the bottom of its own spiral first —
+        // so sixteen birds converge as a stream rather than snapping into a
+        // ring on one frame.
+        const jk = clamp((cavColFall - (i / cavSWIRL_N) * 0.32) / 0.62, 0, 1);
+        // ---- AND IT IS AN ESCORT, NOT A MOB -----------------------------
+        // Photographed at r 2.4-4.95 and 1.1-2.5 m below: sixteen birds that
+        // close on a capybara read as a swarm going for it, which is the
+        // wrong animal and the wrong feeling. Spread over 3.2-7.7 m of radius
+        // and 1.4-5.8 m of depth they read as a flock that has fallen in
+        // alongside — which is the gentoos-on-the-bow figure this is meant to
+        // be quoting, and that formation is wide.
+        const sa = (i / cavSWIRL_N) * Math.PI * 2 + cavTime * 1.35;
+        const sr = 3.2 + (i % 4) * 1.5;
+        // ---- AND THE HEIGHT LERP HAS TO REACH ONE ------------------------
+        // MEASURED at k = 0.92 on all three axes: the mean bird settled 8.82 m
+        // from the animal instead of the three or four the slots ask for. The
+        // eight per cent residual is harmless in x and z, where the spiral is
+        // 27 m across at its widest — and ruinous in Y, where it spans a
+        // hundred and ninety-six metres, so a bird still high in the shaft
+        // kept fifteen metres of altitude at "full" form. Y goes all the way;
+        // x and z keep the residual, because that is the twist the flock
+        // arrived with and losing it makes a rigid carousel.
+        px = lerp(x, cavColP.x + Math.cos(sa) * sr, jk * 0.92);
+        py = lerp(y, cavColP.y - 1.4 - (i % 5) * 1.1, jk);
+        pz = lerp(z, cavColP.z + Math.sin(sa) * sr, jk * 0.92);
+        pbank = lerp(bank, -0.85, jk);
+        psc = lerp(sc, 1.25, jk);
+        yaw = sa + Math.PI * 0.5;
+      }
+      cavM.compose(cavV3.set(px, py, pz),
+                   cavQ.setFromEuler(cavE.set(0.18, yaw, pbank, 'YXZ')),
+                   cavSc.set(psc, psc, psc));
       cavSwirl.setMatrixAt(i, cavM);
     }
     cavSwirl.instanceMatrix.needsUpdate = true;
@@ -4416,17 +4700,60 @@ export function createCave(game) {
       cavSeenSlot = false; cavSwiftMine = false;
       cavRiverT = 0; cavFallT = 0;
       cavSkyK = 0;
+      // ---- D4.10 ---------------------------------------------------------
+      // The mid-drop state MUST be cleared, and it is the whole reason this
+      // block exists: leave the chapter in the two seconds after stepping off
+      // and `cavColFall` stays live with `cavColP` pointing at a position
+      // object that is now in Antarctica, so sixteen swifts form on a
+      // capybara that is not in this cave. Exactly Marrakech's armed-acrobat
+      // fault and Iceland's geyser ride. `cavColDone` and `cavColBest` are
+      // NOT cleared — the tick and the personal best are the player's.
+      cavColFall = 0; cavColP = null; cavColDrop = 0; cavColFrom = 0;
+      cavColOn = false; cavColTopped = false;
     },
     onExit() {
       // anything stateful that could hold the player, cleared on the way out
       cavLogCarrying = false;
       cavWallT = -1;
       cavEchoT = -1;
+      cavColFall = 0; cavColP = null; cavColOn = false;   // D4.10, see onEnter
       if (cavEchoLight) cavEchoLight.intensity = 0;
     },
   });
 
   const api = {
+    /**
+     * D4.10, measured. `fall` is how formed the swifts are on the animal,
+     * `drop` the metres of this descent, `swiftR` the mean distance of the
+     * sixteen from the animal — which is the number that says whether they
+     * actually came with you — and `skyK` the camera's crane toward the hole,
+     * which is the thing a climbHold implementation would have killed.
+     */
+    columnDebug() {
+      let r = 0, n = 0;
+      if (cavSwirl && cavColP) {
+        for (let i = 0; i < cavSWIRL_N; i++) {
+          cavSwirl.getMatrixAt(i, cavM);
+          const e = cavM.elements;
+          r += Math.sqrt((e[12] - cavColP.x) * (e[12] - cavColP.x) +
+                         (e[13] - cavColP.y) * (e[13] - cavColP.y) +
+                         (e[14] - cavColP.z) * (e[14] - cavColP.z));
+          n++;
+        }
+      }
+      return { fall: Math.round(cavColFall * 1000) / 1000,
+               drop: Math.round(cavColDrop * 100) / 100,
+               best: Math.round(cavColBest * 100) / 100,
+               done: cavColDone, topped: cavColTopped,
+               base: Math.round(cavColBase * 100) / 100,
+               top: Math.round(cavColTop * 100) / 100,
+               height: Math.round((cavColTop - cavColBase) * 100) / 100,
+               swiftR: n ? Math.round((r / n) * 100) / 100 : null,
+               skyK: Math.round(cavSkyK * 1000) / 1000,
+               vy: Math.round(cavColVy * 100) / 100,
+               above: Math.round(cavColAbove * 100) / 100,
+               grounded: cavColGrounded, inGlade: cavColInGlade };
+    },
     built() { return cavBuilt; },
     terrainHeight: cavTerrain,
     slopeAt: cavSlope,
@@ -4535,6 +4862,13 @@ export function createCave(game) {
     river: { x: cavRIVER_X, z: 20 },
     hand: { x: cavHAND.x, z: cavHAND.z },
     doline: { x: cavDOLINE.x, z: cavDOLINE.z },
+    // D4.10. Its own landmark, because the hint arrow for the marquee should
+    // point at the thing you climb and not at the middle of a fifty-two metre
+    // room — they happen to be the same x and z here, and would not be if the
+    // column ever moved.
+    column: { x: cavCOL.x, z: cavCOL.z },
+    /** ...and the beacon tracks the CAP, which is where the moment starts. */
+    marqueeAt() { return { x: cavCOL.x, y: cavColTop, z: cavCOL.z }; },
     wall: { x: 0, z: cavWALL.z + 8 },
     roost: { x: cavROOST.x, z: cavROOST.z },
     pearls: { x: cavPEARLS.x, z: cavPEARLS.z },
@@ -4566,6 +4900,10 @@ export function createCave(game) {
       cavUpdateCrickets(dt);
       cavUpdateMotes(dt);
       cavUpdateSlotMotes(dt);
+      // D4.10: BEFORE the shaft life, because the swifts form on cavColFall
+      // and cavColP and a form that is one frame late is a form that lags the
+      // animal by half a metre at terminal velocity.
+      cavUpdateColumn(game, dt);
       cavUpdateShaftLife(dt);
       cavUpdatePhyto(dt);
       cavUpdateSound(game, dt);
