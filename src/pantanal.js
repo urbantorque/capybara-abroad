@@ -129,6 +129,30 @@ const panCaranda = [];
 
 // the anteater
 let panAnt = null, panAntBody = null;
+// ---- THE TRUCK THE CHAPTER HAS BEEN TALKING ABOUT (Tier 2c) --------------
+// Three people mention it -- the boss, the cattleman and the road crew all
+// say the truck cannot get over the bad bridge -- and the road has worn tyre
+// bands drawn down the middle of it. There was no truck. There was no vehicle
+// of any kind in this chapter, and it is one of four chapters in the game
+// with nothing on wheels or hooves moving anywhere in it.
+//
+// AND IT STOPS AT THE BRIDGE, which is the entire point of building it. It
+// runs the causeway south, pulls up short of the missing plank at z -20,
+// stands there with the engine going, gives up, and reverses all the way
+// back north. Nothing scores it and nothing points at it; it is the
+// "things that are simply there" rule -- a 70 s cycle so it is never the
+// thing you are watching, only the thing that turns out to have been
+// happening. What it buys is that the dialogue stops being a lie.
+let panTruck = null, panTruckBody = null;
+let panTruckT = 0;
+const panTruckTarget = { x: 0, y: 0, z: 0 };
+const panTruckPrev = { x: 0, y: 0, z: 0 };
+const panTRUCK_Z0 = 92;        // the north end of the run
+const panTRUCK_Z1 = -13.5;     // ...and short of panBRIDGES[1], the bad one at -20
+const panTRUCK_V  = 6.0;       // m/s south, which is fast for a dirt causeway
+const panTRUCK_VR = 3.6;       // ...and slower backwards, because it is reversing
+const panTRUCK_WAIT = 11;      // s at the bridge, thinking about it
+const panTRUCK_REST = 8;       // s at the top before it tries again
 let panAntT = 0, panAntCarrying = false, panAntRide = 0;
 let panAntDig = 0, panAntDigAt = -1, panAntDigCool = 8;
 const panAntTarget = { x: 0, y: 0, z: 0 };
@@ -671,6 +695,7 @@ function panBuild(game) {
   panBuildMacaws(panRoot);
   panBuildCowbird(panRoot);
   panBuildAnteater(game, panRoot);
+  panBuildTruck(game, panRoot);
   panBuildBugs(panRoot);
   panBuildEgrets(panRoot);
   panBuildCrossing(game, panRoot);
@@ -2895,6 +2920,101 @@ function panBuildCowbird(root) {
  * body's own position, because cannon integrates a kinematic body inside
  * world.step, which runs before this.
  */
+/**
+ * WHERE THE TRUCK IS AT TIME t, and which way it is pointing.
+ *
+ * Four phases on one clock, the same shape panAntRouteAt uses: run south,
+ * wait at the bridge, reverse north, wait at the top. `dir` is +1 while it is
+ * driving forwards and -1 while it is backing, because a reversing truck
+ * points the way it came and the yaw cannot be taken from the velocity.
+ */
+const panTRUCK_RUN = (panTRUCK_Z0 - panTRUCK_Z1) / panTRUCK_V;
+const panTRUCK_BACK = (panTRUCK_Z0 - panTRUCK_Z1) / panTRUCK_VR;
+const panTRUCK_CYCLE = panTRUCK_RUN + panTRUCK_WAIT + panTRUCK_BACK + panTRUCK_REST;
+function panTruckRouteAt(t) {
+  const u = ((t % panTRUCK_CYCLE) + panTRUCK_CYCLE) % panTRUCK_CYCLE;
+  let z, dir;
+  if (u < panTRUCK_RUN) { z = panTRUCK_Z0 - u * panTRUCK_V; dir = 1; }
+  else if (u < panTRUCK_RUN + panTRUCK_WAIT) { z = panTRUCK_Z1; dir = 1; }
+  else if (u < panTRUCK_RUN + panTRUCK_WAIT + panTRUCK_BACK) {
+    z = panTRUCK_Z1 + (u - panTRUCK_RUN - panTRUCK_WAIT) * panTRUCK_VR; dir = -1;
+  } else { z = panTRUCK_Z0; dir = -1; }
+  return { x: panRoadX(z), z: z, dir: dir };
+}
+
+function panBuildTruck(game, root) {
+  panTruck = new THREE.Group();
+  const M = panMerger();
+  // a flatbed, in the colour every working vehicle out there is: dust
+  M.box(0, 0.62, -0.35, 1.86, 0.62, 2.5, PALETTE.panPlank);          // bed
+  M.box(0, 0.98, -1.55, 1.86, 0.30, 0.14, PALETTE.panPlank);          // tailgate
+  for (let sgn = -1; sgn <= 1; sgn += 2)
+    M.box(sgn * 0.93, 0.98, -0.35, 0.10, 0.30, 2.5, PALETTE.panPlank);
+  M.box(0, 0.72, 1.35, 1.80, 0.80, 1.40, PALETTE.panRoof);            // bonnet + cab base
+  M.box(0, 1.42, 1.05, 1.66, 0.72, 1.05, PALETTE.panRoof);            // cab
+  M.box(0, 1.44, 1.58, 1.42, 0.46, 0.06, PALETTE.panSkyLow);          // windscreen
+  M.box(0, 0.52, 2.05, 1.70, 0.26, 0.14, PALETTE.panTrunk);           // bar
+  for (let i = 0; i < 4; i++)
+    M.cyl((i < 2 ? -0.86 : 0.86), 0.34, (i % 2 ? -1.05 : 1.25), 0.34, 0.24,
+          PALETTE.panAnteaterK, 0, 0, Math.PI / 2, 8);
+  const mesh = new THREE.Mesh(M.build(), panVC());
+  mesh.castShadow = true;
+  panTruck.add(mesh);
+  root.add(panTruck);
+
+  panTruckBody = new CANNON.Body({
+    mass: 0, type: CANNON.Body.KINEMATIC,
+    material: (game.mats && game.mats.ground) || undefined,
+  });
+  // THE BED IS THE FLOOR, exactly as the anteater's back is: one box, over
+  // the tray, and nothing round the cab. A collider on the bonnet would sweep
+  // the animal off the causeway every time the thing came past.
+  panTruckBody.addShape(new CANNON.Box(new CANNON.Vec3(0.93, 0.14, 1.25)),
+                        new CANNON.Vec3(0, 1.02, -0.35));
+  panTruckBody.allowSleep = false;
+  const s0 = panTruckRouteAt(0);
+  panTruckBody.position.set(s0.x, panROAD_Y, s0.z);
+  panSyncBody(panTruckBody);
+  game.world.addBody(panTruckBody);
+  panTruckTarget.x = s0.x; panTruckTarget.z = s0.z; panTruckTarget.y = panROAD_Y;
+  panTruckPrev.x = s0.x; panTruckPrev.z = s0.z; panTruckPrev.y = panROAD_Y;
+}
+
+function panUpdateTruck(game, dt) {
+  if (!panTruckBody) return;
+  panTruckT += dt;
+  panTruckPrev.x = panTruckTarget.x; panTruckPrev.z = panTruckTarget.z;
+  const s = panTruckRouteAt(panTruckT);
+  panTruckTarget.x = s.x; panTruckTarget.z = s.z;
+  // The causeway is a made road at a constant height; unlike the anteater
+  // this does not read the terrain, because the terrain under a causeway is
+  // the floodplain it was built up out of.
+  panTruckTarget.y = panROAD_Y;
+  const inv = dt > 0.0001 ? 1 / dt : 0;
+  panTruckBody.velocity.set((panTruckTarget.x - panTruckPrev.x) * inv, 0,
+                            (panTruckTarget.z - panTruckPrev.z) * inv);
+  // ---- IT ALWAYS FACES SOUTH, AND THAT IS THE POINT ---------------------
+  // The first cut took the heading from the direction of travel, which turned
+  // the truck round at the bridge and drove it home nose-first — and looked
+  // wrong for a reason the picture made obvious: the Transpantaneira is a
+  // raised one-lane causeway with water on both sides and a hundred and twenty
+  // wooden bridges. You cannot turn a truck round on it. He reverses, all the
+  // way, which is what the constant called VR has always meant.
+  //
+  // So the yaw is the road's own southward tangent at wherever he is, taken
+  // from panRoadX rather than from any delta of his: constant through all four
+  // phases, curving with the causeway, and never flipping.
+  const STEP = -0.35;
+  const yaw = Math.atan2(panRoadX(s.z + STEP) - s.x, STEP);
+  panTruckBody.quaternion.setFromEuler(0, yaw, 0);
+  panTruckBody.angularVelocity.set(0, 0, 0);
+  if (panTruck) {
+    const ip = panTruckBody.interpolatedPosition;
+    panTruck.position.set(ip.x, ip.y, ip.z);
+    panTruck.rotation.y = yaw;
+  }
+}
+
 function panBuildAnteater(game, root) {
   panAnt = new THREE.Group();
   const M = panMerger();
@@ -4948,6 +5068,7 @@ export function createPantanal(game) {
       panTime += dt;
       panUpdateMats(game, dt);
       panUpdateAnteater(game, dt);
+      panUpdateTruck(game, dt);
       panUpdateHerd(game, dt);
       panUpdateCattle(game, dt);
       panUpdateCaimans(game, dt);
