@@ -219,6 +219,16 @@ let manGroper = null;
 
 // tasks / measured things
 let manRideDist = 0, manRideBest = 0, manRideOff = 0, manRideTop = 0;
+// ---- D4.11: THE CARVE ------------------------------------------------------
+// -1..1, the rider's lateral demand along the crest. Written once a frame by
+// manUpdateSurfTasks and read by manFlowAt, which stays a pure field function.
+let manCarve = 0;
+let manCarveDist = 0;       // how far along the crest this ride has actually gone
+const manCARVE_MIN  = 3.0;  // m of ride before the stick does anything — you have
+                            // to be ON the wave before you can steer on it
+const manCARVE_V    = 3.4;  // m/s of lateral at full lock on a full face
+const manCARVE_GAIN = 0.55; // ...and the shoreward bonus for being angled
+const manCARVE_L    = 3.2;  // how fast the demand follows the stick
 let manRipT = -1, manRipDone = false;
 let manTookOff = false, manTakeTop = 0;
 // ...AND THE SAME FOR THE FULL RIDE. See the payout: the condition it tested was
@@ -252,6 +262,7 @@ const manCol = new THREE.Color();
 const manCol2 = new THREE.Color();
 const manWave = { y: 0, amp: 0, face: 0, foam: 0, push: 0, depth: 0, brk: 0, ground: 0, f: 0 };
 const manFlow = { x: 0, z: 0 };
+const manFlowProbeOut = { x: 0, z: 0 };   // D4.11 instrument only
 const manFoamFlow = { x: 0, z: 0 };   // the foam loop, never the api's object
 const manSfx = { volume: 1, pitch: 1 };
 
@@ -830,6 +841,32 @@ function manFlowAt(x, z, out, dep) {
       const fk = (1 - rk) * manSmooth((22 - z) / 16) * clamp(1 - Math.abs(dxr) / 42, 0, 1);
       vx -= Math.sign(dxr) * fk * 1.5;
     }
+  }
+  // ---- D4.11: AND A RIDER CAN STEER (the carve) --------------------------
+  //
+  // `all-the-way` was thirty-four metres of shoreward drift, and the fastest
+  // way to earn it was to point at the sand and do nothing. A wave is a thing
+  // you go ALONG, and every surf photograph ever taken is of somebody doing
+  // that; the chapter had a whole flow field and the only input to it was
+  // whether you were in the water.
+  //
+  // `manCarve` is the rider's lateral demand, written once a frame by
+  // manUpdateSurfTasks from the stick and damped there, so this stays a pure
+  // field function with no game reference in it. It is applied HERE rather
+  // than as a shove on the body for one reason: everything else that reads
+  // this field — the foam, the boards, the bathers' drift — then agrees about
+  // what the water is doing, and a carve that only the capybara can feel is a
+  // carve that leaves no wake.
+  //
+  // THE ANGLE BONUS IS THE WHOLE MECHANIC. Angling across the face trades
+  // shoreward speed for speed ALONG the crest, and the sum is bigger: a wave
+  // pushes hardest on the part of you that is square to it, so a rider at
+  // forty degrees covers more water than one pointed at the beach. That is
+  // real and it is why the record is measured along the path now.
+  if (manCarve !== 0 && manRideDist > manCARVE_MIN && dep <= 0.55) {
+    const face = clamp(manWave.foam * 3.2, 0, 1);      // only where there IS a face
+    vx += manCarve * manCARVE_V * face;
+    vz += Math.abs(manCarve) * manCARVE_GAIN * face * (vz > 0 ? 1 : 0);
   }
   out.x = vx;
   out.z = vz;
@@ -4054,9 +4091,31 @@ function manUpdateSurfTasks(game, dt) {
   // never have reached forty. A capybara swims at 2.6; anything over that is
   // the sea.
   const riding = swimming && push > 2.2 && manWave.foam > 0.12 && p.z < manSHORE_Z + 3;
+  // ---- D4.11: the stick, in the wave's frame ----------------------------
+  // Camera-relative, exactly as capybara.js resolves ordinary movement — a
+  // carve that is in world x would reverse itself every time the player swung
+  // the camera round, which is the reference-frame fault this repository has
+  // made three times. The crest runs along x here, so the wave-frame lateral
+  // is the x component of the resolved stick.
+  const inp = game.input;
+  let want = 0;
+  if (riding && inp && !(game.state && game.state.noCarve)) {
+    const cy = Math.cos(inp.camYaw || 0), sy = Math.sin(inp.camYaw || 0);
+    want = clamp((inp.x || 0) * cy + (inp.z || 0) * sy, -1, 1);
+  }
+  manCarve = damp(manCarve, want, manCARVE_L, dt);
+  if (Math.abs(manCarve) < 0.004) manCarve = 0;
   if (riding) {
     manRideOff = 0;
-    manRideDist += Math.max(0, capy.velocity.z) * dt;
+    // ---- ALONG THE PATH, NOT TOWARD THE BEACH (D4.11) -------------------
+    // `velocity.z` measures how fast you are approaching the sand, which is
+    // exactly the quantity a rider gives up in exchange for going along the
+    // wave — so the old record paid for pointing at the beach and doing
+    // nothing, and a carve would have made the number go DOWN. The ride is
+    // how much water you covered.
+    const along = Math.hypot(capy.velocity.x, Math.max(0, capy.velocity.z)) * dt;
+    manRideDist += along;
+    manCarveDist += Math.abs(capy.velocity.x) * dt;
     if (speed > manRideTop) manRideTop = speed;
     if (speed > manTakeTop) manTakeTop = speed;
     // ---- WHICH OF THE TWO NUMBERS A RIDE IS ABOUT (v32) ------------------
@@ -4172,6 +4231,7 @@ function manUpdateSurfTasks(game, dt) {
         game.record('all-the-way', manRideBest);
       }
       manRideDist = 0; manRideOff = 0; manRideTop = 0;
+      manCarve = 0; manCarveDist = 0;
     }
   }
 
@@ -4463,6 +4523,7 @@ export function createManly(game) {
       // big one on the horizon and eighty metres of open water to get to it.
       manTime = 4 * manPERIOD - 20;
       manRideDist = 0; manRideOff = 0; manRideTop = 0;
+      manCarve = 0; manCarveDist = 0;
       manRipT = -1;
       manDuckT = 0; manPoolEnd = 0; manBigNear = 0; manBommieHit = false;
       manFlagHeld = false; manFlagHeldB = false; manFlagCool = 0; manFlagMovedT = 0;
@@ -4497,11 +4558,39 @@ export function createManly(game) {
       // Anything stateful that could hold the player, cleared on the way out.
       manFlagHeld = false;
       manBoatCarrying = false; manBoatOut = false;
-      manRideDist = 0; manRipT = -1;
+      manRideDist = 0; manRipT = -1; manCarve = 0; manCarveDist = 0;
     },
   });
 
   const api = {
+    /**
+     * D4.11, measured. `carve` is the rider's live lateral demand,
+     * `carveDist` how much of this ride has been along the crest rather than
+     * at the sand, and `rideDist` the record as it now stands.
+     */
+    /**
+     * The flow field at a point, with a carve of your choosing. The ride
+     * itself is set-dependent and hard to land from a script; the FIELD is
+     * not, and the field is what the mechanic is.
+     */
+    flowProbe(x, z, carve, dep) {
+      const was = manCarve, wasD = manRideDist;
+      manCarve = carve || 0;
+      manRideDist = Math.max(manRideDist, manCARVE_MIN + 1);   // pretend a ride
+      manFlowAt(x, z, manFlowProbeOut, dep || 0);
+      const r = { x: Math.round(manFlowProbeOut.x * 1000) / 1000,
+                  z: Math.round(manFlowProbeOut.z * 1000) / 1000,
+                  foam: Math.round(manWave.foam * 1000) / 1000 };
+      manCarve = was; manRideDist = wasD;
+      return r;
+    },
+    surfDebug() {
+      return { riding: manRideDist > 0, rideDist: Math.round(manRideDist * 100) / 100,
+               carve: Math.round(manCarve * 1000) / 1000,
+               carveDist: Math.round(manCarveDist * 100) / 100,
+               best: Math.round(manRideBest * 100) / 100,
+               top: Math.round(manRideTop * 100) / 100 };
+    },
     built() { return manBuilt; },
     terrainHeight: manTerrain,
     slopeAt: manSlope,
