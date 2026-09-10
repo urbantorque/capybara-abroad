@@ -13,7 +13,7 @@ async page => {
     const r = await page.evaluate(async (o) => {
       const g = window.__capy, T = g.THREE;
       const biome = o.biome, shots = o.shots;
-      const cam = g.camera;
+      const cam = g.camera, fov0 = cam.fov;
       const v = new T.Vector3(), tgt = new T.Vector3();
       // Every person this module draws, roster or local, with a world point.
       function people() {
@@ -44,18 +44,21 @@ async page => {
         // 3.4 m out, three-quarter on from the front-left, eye at chest height:
         // the angle a walk is legible from. A side-on shot hides the twist and
         // a head-on shot hides the knee.
-        const a = p.yaw + 2.25;
-        cam.position.set(p.x + Math.sin(a) * 3.4, p.y + 1.05, p.z + Math.cos(a) * 3.4);
-        tgt.set(p.x, p.y + 0.80, p.z);
+        const a = p.yaw + [0.9, 1.6, 2.4, -0.9, -1.6, -2.4][k % 6];
+        cam.fov = 24; cam.updateProjectionMatrix();
+        cam.position.set(p.x + Math.sin(a) * 5.0, p.y + 2.55, p.z + Math.cos(a) * 5.0);
+        tgt.set(p.x, p.y + 0.92, p.z);
         cam.lookAt(tgt);
         cam.updateMatrixWorld(true);
         g.post.render();
         const c = g.canvas || g.renderer.domElement;
         urls.push(c.toDataURL('image/png'));
       }
+      cam.fov = fov0; cam.updateProjectionMatrix();
       for (let i = 0; i < urls.length; i++)
         await fetch('/shot?name=LIMB-' + biome + '-' + i, { method: 'POST', body: urls[i] });
       return { biome: g.biome.current, shots: urls.length, seen,
+               errs: (window.__capyConsoleErrs || []).length,
                err: g.state.lastError || null };
     }, { biome, shots });
     out.rows.push(r);

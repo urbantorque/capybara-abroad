@@ -1425,6 +1425,43 @@ export function createNPCs(game) {
     { k: 'cyl', rt: 0.30, rb: 0.30, h: 0.030, seg: 8 },
     { k: 'cyl', rt: 0.14, rb: 0.17, h: 0.150, seg: 8, y: 0.090 },
   ]);
+  // ---- THE LOWER LIMBS, AND WHAT THEY COST HERE (v56) --------------------
+  // A local is a hand-built Group and every box in it is its OWN DRAW CALL —
+  // it is not instanced, which is the whole reason it can be placed by hand
+  // behind a specific counter in seventeen chapters. So a knee here is not
+  // free the way the roster's is, and the accounting was done before the code:
+  // the busiest chapter (Kyoto) builds thirteen figures, so a shin apiece is
+  // thirteen more meshes and a forearm apiece would have been thirteen more
+  // again.
+  //
+  // The forearm is FREE and that is why it is shaped the way it is. An arm was
+  // already two meshes — a sleeve box and a hand box — so folding the hand
+  // into the forearm's own buffer keeps the count at two and buys the joint
+  // for nothing. The consequence is that the forearm is BARE: it is one merged
+  // geometry in one material, and the material is skin because the hand on the
+  // end of it is. Short sleeves on everybody, which is a change, and a good
+  // one — a colour break at the elbow is exactly what makes a bend legible at
+  // the six metres this game is played at.
+  //
+  // The shin is NOT free, and it pays for itself twice: the knee, and a SHOE,
+  // which the locals have never had. Same argument as gShoe on the roster —
+  // it is the bottom of the silhouette and it is the cheapest colour on a
+  // person — and merged into the shin's own buffer it costs nothing extra.
+  // That needs a vertexColors material so npcMakeGeo's multiplier lands (a
+  // colour attribute on a plain Lambert is silently ignored; see the note on
+  // npcLocEyeMat), so this one asks mat() rather than npcLocMat, which also
+  // gets it the flat shading the rest of the game is drawn with.
+  const npcLOC_UARM  = 0.29;   // shoulder -> elbow, of a 0.665 m arm
+  const npcLOC_THIGH = 0.40;   // hip -> knee, of a 0.78 m leg
+  const npcLocShinGeo = npcMakeGeo([
+    { w: 0.16, h: 0.30, d: 0.18, y: -0.145 },
+    { w: 0.185, h: 0.09, d: 0.25, y: -0.335, z: 0.04,
+      c: npcSRGB3(0.55, 0.55, 0.58) },                 // shoe
+  ]);
+  const npcLocFarmGeo = npcMakeGeo([
+    { w: 0.12, h: 0.28, d: 0.13, y: -0.135 },
+    { w: 0.12, h: 0.13, d: 0.13, y: -0.31 },           // hand
+  ]);
   function npcLocPart(w, h, d, hex, x, y, z) {
     const m = new THREE_.Mesh(new THREE_.BoxGeometry(w, h, d), npcLocMat(hex));
     m.position.set(x, y, z);
@@ -1465,14 +1502,32 @@ export function createNPCs(game) {
     // arms' own construction eight lines down. Same box, same size, same
     // colour, same two draw calls: the figure is identical with the swing at
     // zero, and every chapter's hand-placed pose is untouched.
+    // ---- ...AND A KNEE IN THEM (v56) -------------------------------------
+    // Thigh 0.40, shin 0.38, and the sole still lands on y = 0 with the leg
+    // straight — so every chapter's hand-placed pose is untouched, exactly as
+    // when v55 put the hip in.
     const legL = new THREE_.Object3D(); legL.position.set(-0.12, 0.78, 0);
     const legR = new THREE_.Object3D(); legR.position.set(0.12, 0.78, 0);
-    legL.add(npcLocPart(0.17, 0.78, 0.19, legs, 0, -0.39, 0));
-    legR.add(npcLocPart(0.17, 0.78, 0.19, legs, 0, -0.39, 0));
+    legL.add(npcLocPart(0.17, 0.42, 0.19, legs, 0, -0.20, 0));
+    legR.add(npcLocPart(0.17, 0.42, 0.19, legs, 0, -0.20, 0));
+    const shinM = mat(legs, { vertexColors: true });
+    const kneeL = new THREE_.Object3D(); kneeL.position.y = -npcLOC_THIGH;
+    const kneeR = new THREE_.Object3D(); kneeR.position.y = -npcLOC_THIGH;
+    const shL = new THREE_.Mesh(npcLocShinGeo, shinM); shL.castShadow = true;
+    const shR = new THREE_.Mesh(npcLocShinGeo, shinM); shR.castShadow = true;
+    kneeL.add(shL); kneeR.add(shR);
+    legL.add(kneeL); legR.add(kneeR);
     g.add(legL); g.add(legR);
-    g.add(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0));
+    // ---- THE TORSO IS A NODE NOW, and only so it can twist ---------------
+    // Everything above the hips hangs off it: the shirt, the collar, the head
+    // and both arms. The legs stay on the group, so a shoulder yaw and a hip
+    // yaw are two different numbers instead of one rotation of the whole
+    // person, which is what a counter-rotation has to be to be one at all.
+    const torsoN = new THREE_.Object3D();
+    g.add(torsoN);
+    torsoN.add(npcLocPart(0.50, 0.62, 0.28, shirt, 0, 1.09, 0));
     // a collar, so the shirt reads as clothing rather than as a painted block
-    g.add(npcLocPart(0.52, 0.07, 0.30, hair, 0, 1.38, 0));
+    torsoN.add(npcLocPart(0.52, 0.07, 0.30, hair, 0, 1.38, 0));
     const headN = new THREE_.Object3D();
     headN.position.set(0, 1.42, 0);
     headN.add(npcLocPart(0.26, 0.30, 0.25, skin, 0, 0.15, 0));
@@ -1512,16 +1567,26 @@ export function createNPCs(game) {
     browL.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
     browR.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
     headN.add(eyeN); headN.add(browL); headN.add(browR);
-    g.add(headN);
+    torsoN.add(headN);
+    // ---- ...AND AN ELBOW (v56) -------------------------------------------
+    // Sleeve to the elbow, bare forearm and hand below it in ONE buffer, so
+    // the arm is still the two meshes it always was. The hand ends up at the
+    // -0.535..-0.665 it has always occupied with the elbow straight.
     const armL = new THREE_.Object3D(); armL.position.set(-0.30, 1.32, 0);
     const armR = new THREE_.Object3D(); armR.position.set(0.30, 1.32, 0);
-    armL.add(npcLocPart(0.13, 0.56, 0.14, shirt, 0, -0.28, 0));
-    armR.add(npcLocPart(0.13, 0.56, 0.14, shirt, 0, -0.28, 0));
-    armL.add(npcLocPart(0.12, 0.13, 0.13, skin, 0, -0.60, 0));
-    armR.add(npcLocPart(0.12, 0.13, 0.13, skin, 0, -0.60, 0));
-    g.add(armL); g.add(armR);
+    armL.add(npcLocPart(0.13, 0.30, 0.14, shirt, 0, -0.15, 0));
+    armR.add(npcLocPart(0.13, 0.30, 0.14, shirt, 0, -0.15, 0));
+    const skinM = npcLocMat(skin);
+    const elbowL = new THREE_.Object3D(); elbowL.position.y = -npcLOC_UARM;
+    const elbowR = new THREE_.Object3D(); elbowR.position.y = -npcLOC_UARM;
+    const faL = new THREE_.Mesh(npcLocFarmGeo, skinM); faL.castShadow = true;
+    const faR = new THREE_.Mesh(npcLocFarmGeo, skinM); faR.castShadow = true;
+    elbowL.add(faL); elbowR.add(faR);
+    armL.add(elbowL); armR.add(elbowR);
+    torsoN.add(armL); torsoN.add(armR);
     return { group: g, head: headN, armL: armL, armR: armR,
-             legL: legL, legR: legR,
+             legL: legL, legR: legR, torso: torsoN,
+             kneeL: kneeL, kneeR: kneeR, elbowL: elbowL, elbowR: elbowR,
              face: { eyeN: eyeN, browL: browL, browR: browR,
                      browY: 0.228, upK: 0.6 },
              arch: arch };
@@ -5921,16 +5986,45 @@ export function createNPCs(game) {
         // freezing mid-stride. A SIT overrides it to zero: the legs are folded
         // under by npcSIT_DROP and a seated figure paddling is a puppet.
         if (r.fig && r.fig.legL) {
-          const sw = r.mv * (1 - satK) * npcLOC_SWING * Math.sin(r.t * 7.4);
+          const th = r.t * 7.4;
+          const gw = r.mv * (1 - satK);
+          const sw = gw * npcLOC_SWING * Math.sin(th);
           r.fig.legL.rotation.x = sw;
           r.fig.legR.rotation.x = -sw;
+          // ---- THE KNEE AND THE TWIST (v56) ------------------------------
+          // Identical phase logic to the roster's — see THE GAIT — on this
+          // rig's own clock: the hip is +sin, so the left leg is in SWING
+          // exactly while cos < 0, and the squared hump cannot leak into
+          // stance. The rest bend is unconditional and is the half of this
+          // that is on screen most, because a local is standing still most of
+          // the time and a locked knee is a mannequin.
+          const cw = Math.cos(th);
+          const swL = cw < 0 ? -cw : 0, swR = cw > 0 ? cw : 0;
+          const kk = gw * npcLOC_KNEE;
+          r.fig.kneeL.rotation.x = npcKNEE_REST + swL * swL * kk;
+          r.fig.kneeR.rotation.x = npcKNEE_REST + swR * swR * kk;
+          // Shoulders one way, hips the other. The torso node carries the
+          // shirt, the head and both arms; the legs are on the group, so they
+          // take the pelvis half directly.
+          const tw = gw * npcLOC_TWIST * Math.sin(th);
+          r.fig.torso.rotation.y = tw;
+          r.fig.legL.rotation.y = -tw;
+          r.fig.legR.rotation.y = -tw;
+          r.twist = tw;
         }
         if (r.fig) {
           // The head leads the turn and overshoots it slightly, which is what
           // makes a look read as a look rather than as a body rotating: the
           // neck gets there first and the shoulders follow.
           const lead = clamp(dyaw, -0.75, 0.75);
-          r.fig.head.rotation.y = damp(r.fig.head.rotation.y, lead, 7, dt);
+          // Damped on a field of its own rather than on the node, because the
+          // node is inside the twisting torso now: damping the node would make
+          // the shoulder twist an INPUT to the head's own turn and the two
+          // would chase each other. `npcHEAD_HOLD` of the twist is taken back
+          // out, on the roster's own reasoning — a head is aimed at a thing in
+          // the world, but the neck does come along a little.
+          r.headY = damp(r.headY || 0, lead, 7, dt);
+          r.fig.head.rotation.y = r.headY - (r.twist || 0) * npcHEAD_HOLD;
           // ...and the head DIPS a little for something the size of a capybara,
           // which is the whole joke of being looked at by a person.
           // ...and the head goes BACK during a flinch, which is the opposite of
@@ -6038,6 +6132,26 @@ export function createNPCs(game) {
                                        - hold * 0.20 - fold * 0.34, armR, dt);
           r.fig.armL.rotation.z = damp(r.fig.armL.rotation.z,
                                        f * 0.4 + fold * 0.34, armL, dt);
+          // ---- THE ELBOW (v56) -------------------------------------------
+          // Read off the shoulder angle that was just written rather than from
+          // the pose stack, because that stack is fourteen additive terms
+          // (sway, talk, guard, umbrella, huddle, beat, photo, gift, pat…) and
+          // there is no one number in it that means "this arm is busy". The
+          // shoulder IS that number, once they have all landed on it.
+          //
+          // MASKED THE SAME WAY THE ROSTER'S IS, and for the same reason it
+          // matters more here: npcLOC_UMB_ARM's 2.55 was MEASURED against a
+          // straight arm putting a hand at (0.30, 1.82, 0.33), under a canopy
+          // pinned at (0.27, 1.80, 0.17). Let a persistent bend into that pose
+          // and every local in Venice is holding a hand up beside an umbrella
+          // they are not touching. At |shoulder| >= 1.25 the mask is 0, so the
+          // umbrella, the guard and the photograph all get the geometry they
+          // were measured with, and what is left over — a person standing,
+          // talking, or shuffling — gets the bend.
+          const mkL = clamp(1 - Math.abs(r.fig.armL.rotation.x) * 0.8, 0, 1);
+          const mkR = clamp(1 - Math.abs(r.fig.armR.rotation.x) * 0.8, 0, 1);
+          r.fig.elbowL.rotation.x = -npcELBOW_REST * mkL;
+          r.fig.elbowR.rotation.x = -npcELBOW_REST * mkR;
           // ---- THE FACE (v54) ---------------------------------------------
           // Every input here already existed and none of it was drawn above
           // the neck: the flinch spring, the guard that goes up when the
