@@ -175,6 +175,21 @@ let gorBasketPX = 0, gorBasketPY = 0, gorBasketPZ = 0;
 
 let gorBalVX = 0, gorBalVY = 0, gorBalVZ = 0;
 let gorBalBurn = 0;
+// ---- JOINING THE BURN (D4.3) ---------------------------------------------
+// The marquee of this chapter was a stat-check on a clock: be above 55 m in
+// an eleven-second window and it pays, whatever you are doing. The one lever
+// the chapter gives you -- the burner -- was not part of its own big moment.
+// And the valley IS burning at that moment: gorSyncBurn ramps every one of
+// the twenty-six envelopes over the twelve seconds before the sun, which is
+// the thing everybody who has been there describes.
+//
+// So the row asks you to be in it. NOT on the frame the sun crosses -- this
+// file has already been bitten once by a single-frame gate (see the note on
+// the 0.12 payout) -- but at ANY point in the window, which is a thing you
+// do rather than a thing you hit.
+let gorSunBurned = false;    // has the burner been lit inside the window
+let gorSunNagged = false;    // ...and has the chief said so, once
+let gorSunDoves = false;     // the flock round the basket, once per sunrise
 let gorAboard = false, gorAboardT = 0, gorFlown = false;
 let gorCarry = { x: 0, z: 0 };
 let gorCarrying = false;
@@ -2725,6 +2740,17 @@ function gorUpdateDawnLine(dt) {
   // frame before `gorSUN_P` (:4455). Simply dropping the `* 0` therefore
   // reads 1, not 0, for the ~90 % of the cycle before the ramp: the whole
   // valley on full burn all night. Measured on paper before it was typed.
+  // ---- D4.3: AND THE ROCK LETS GO OF ITS BIRDS -------------------------
+  // The dovecote local promises this out loud — "they come off the rock when
+  // the light hits it, same as you did" — and the flock only ever went up for
+  // the capybara. It goes up for the LIGHT now, once per sunrise, and it goes
+  // up round the basket when there is somebody in one: gorPigeonScare takes
+  // the centre of the loop, so the same call serves the cliff and the balloon.
+  if (!gorSunDoves && gorSun > 0.35) {
+    gorSunDoves = true;
+    if (gorAboard) gorPigeonScare(gorBalX, gorBalZ);
+    else gorPigeonScare(gorCLIFF.x + 13, -42);
+  }
   const toSun = (gorSUN_P - gorPhase) * gorCYCLE;
   const gorSyncBurn = toSun > 12 ? 0
                     : toSun > 0  ? gorSmooth(1 - toSun / 12)
@@ -4370,7 +4396,25 @@ function gorUpdateBalloon(game, dt) {
     // which is fine for anyone already up and cruel to anyone still on the
     // ground — so the tea man's warning below now comes 0.18 of a cycle out
     // instead of 0.075. A full-burn climb from the field to 55 m measures 32 s.
-    if (gorSun > 0.465 && gorSun < 0.96 && alt > 55 && !gorSunDone) {
+    // ---- D4.3: AND THE BURNER HAS TO BE LIT ------------------------------
+    // Latched across the whole window rather than sampled at the tick, so a
+    // player who burned to get up there and is coasting at the top of it has
+    // already earned it, and nobody has to hold a key at a frame they cannot
+    // see coming.
+    // ...and ABOARD, which the old gate never said. It tested altitude alone,
+    // so in principle the row could pay out with the balloon up and the player
+    // standing in the field watching it. It cannot now, and the row has always
+    // read "be up there".
+    const gorSunWin = gorAboard && gorSun > 0.465 && gorSun < 0.96 && alt > 55;
+    if (gorSunWin && gorBalBurn > 0.5) gorSunBurned = true;
+    // ...and if they are up there NOT burning while the whole valley is, the
+    // chief says so. Once, on the radio, which is the only voice that reaches
+    // a basket at seventy metres.
+    if (gorSunWin && !gorSunBurned && !gorSunNagged && !gorSunDone) {
+      gorSunNagged = true;
+      gorCall('chief', 'topup', 'Top up! Everybody is burning — get in it!', 999);
+    }
+    if (gorSunWin && gorSunBurned && !gorSunDone) {
       gorSunDone = true;
       gorTask('sunrise');
       // FRAMED — batch 3 built game.frameShot and no chapter from 12 to 17 had
@@ -4990,6 +5034,8 @@ export function createGoreme(game) {
       // you come back to opens the way it opened the first time.
       gorPhase = 0.06;
       gorSun = 0; gorDawnLit = 0; gorWarned = false; gorSyncSaid = false;
+      // D4.3: a fresh dawn is a fresh burn, a fresh nag and a fresh flock.
+      gorSunBurned = false; gorSunNagged = false; gorSunDoves = false;
       gorTime = 0;
       gorBalX = gorFIELD.x; gorBalZ = gorFIELD.z - 6;
       gorBalY = gorTerrain(gorBalX, gorBalZ);

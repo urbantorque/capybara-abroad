@@ -2975,6 +2975,22 @@ function palUpdateBloom(game, dt) {
   // brighter, which is what makes a stroke leave a trail rather than a smudge.
   const stir = capy && capy.velocity
              ? Math.hypot(capy.velocity.x || 0, capy.velocity.z || 0) : 0;
+  // ---- AND THE MANTA STIRS IT TOO (D4.2) ---------------------------------
+  // The marine snow was moved by exactly one thing in the bay: the capybara.
+  // A two-and-a-half metre animal crossing the same water at cruise left no
+  // mark on it at all — and she is the chapter's marquee now, so the one
+  // moment the chapter is FOR happened in water that did not notice her.
+  //
+  // The same term, from a second source. Nothing new is allocated and no new
+  // draw call: this is the loop that was already writing all two hundred and
+  // forty motes, and the second source is a position and a speed the manta
+  // publishes anyway. Her reach is wider than the animal's because she is,
+  // and her wake is what a rider is inside.
+  const mg = palMantaGroup;
+  const mx = mg ? mg.position.x : 0, my = mg ? mg.position.y : 0, mz = mg ? mg.position.z : 0;
+  // she is never still, so the speed term is her own cruise rather than a
+  // differenced velocity nothing else needs
+  const mStir = mg ? palMANTA_STIR : 0;
   const scale = 0.16 + palBloom * 1.28;
   for (let i = 0; i < palMOTE_N; i++) {
     const o = i * 6;
@@ -2998,6 +3014,19 @@ function palUpdateBloom(game, dt) {
       const inv = 1 / Math.sqrt(d2 + 0.05);
       palMoteData[o + 3] += dx * inv * stir * 0.9 * dt;
       palMoteData[o + 5] += dz * inv * stir * 0.9 * dt;
+    }
+    // D4.2: and again for the manta, on her own radius. Written after the
+    // capybara term rather than instead of it, so a rider stirs the water
+    // twice — which is exactly what being on her back is.
+    if (mStir > 0) {
+      const ex = x - mx, ey = y - my, ez = z - mz;
+      const e2 = ex * ex + ey * ey + ez * ez;
+      if (e2 < palMANTA_STIR_R2) {
+        const inv2 = 1 / Math.sqrt(e2 + 0.05);
+        palMoteData[o + 3] += ex * inv2 * mStir * dt;
+        palMoteData[o + 5] += ez * inv2 * mStir * dt;
+        palMoteData[o + 4] += ey * inv2 * mStir * 0.35 * dt;
+      }
     }
     const bed = palTerrain(x, z);
     if (y < bed + 0.2) { y = bed + 0.2; palMoteData[o + 4] = Math.abs(palMoteData[o + 4]); }
@@ -4891,6 +4920,13 @@ function palBuild(game) {
  * pressing since Sydney, and the first time it happens in the dark it is the
  * best twenty seconds in the chapter that nobody designed.
  */
+// ---- HOW HARD A MANTA STIRS THE WATER (D4.2) -----------------------------
+// A shade under the capybara's own 0.9 coefficient, over four times the
+// radius: she is a much bigger animal moving much more gently, and the thing
+// that reads on screen is the WIDTH of the disturbance rather than its
+// violence. 36 is 6 m squared, against the animal's 12 (3.46 m).
+const palMANTA_STIR = 0.62;
+const palMANTA_STIR_R2 = 36;
 const palWHEEK_V = 8.2;            // m/s — the shell's speed. Slow enough to SEE.
 const palWHEEK_W = 2.6;            // m — how thick the shell is
 const palWHEEK_LIFE = 4.2;         // s — it fades out at about thirty-four metres
