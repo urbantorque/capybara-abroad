@@ -470,6 +470,44 @@ D5.1, proven from the outside.
 
 ---
 
+## TIER 2 AS BUILT SO FAR (10 Sep 2026) — AND WHAT IS LEFT
+
+Three commits. Tier 2 is the biggest tier in this document — one small system
+applied across ten chapters and four vehicles — and it is **part done**, which
+is recorded here rather than rounded up.
+
+**Done.**
+
+- **The locals learn to walk (D2), six chapters.** The rig needed no new walk:
+  the shuffle, the ground-follow, the collider writes and the bubble anchor
+  have all existed since retrieval. It needed a MOVING ANCHOR, so `walk:
+  {dx, dz, dwell, v}` is one branch. An offset rather than a coordinate list,
+  probed against the terrain and the nav grid on the first live tick, with
+  `game.walkAudit()` to report refusals. Marrakech's water-seller, Kyoto's
+  sweeper, Venice's passerelle crew, Antarctica's penguin counter, Sơn Đoòng's
+  porter, the Pantanal's peão. Measured: 6.3 m to 13.3 m of ground covered per
+  30 s, six of six routes accepted after Antarctica's was re-cut.
+- **MV Wheek sails with eight people on her.** Parented to the hull, so heel
+  and trim come free.
+- **The Pantanal has the truck its dialogue promises three times**, and it
+  stops at the bad bridge and reverses away from it.
+
+**Left, and each is a real item rather than a tidy-up.**
+
+- **Ambient movers in the other nine chapters.** Kyoto, Manly and Antarctica
+  still have no vehicle at all; Iceland has eleven parked cars and nothing
+  moving at half past eleven at night, where one car with headlights would be
+  the only moving light in a chapter lit by windows; Marrakech has nothing on
+  wheels or hooves in the medina; Monte Carlo has three racing cars and no
+  civilian traffic; Mong Kok has one bus on the densest street in the world.
+  This is the largest remaining block of Tier 2 and the most visible.
+- **Passengers on the other three empty vehicles**: Cali's chiva (a party bus
+  with no party, and it is a marquee), Mong Kok's open-top and Star Ferry,
+  Rio's cable car.
+- **The other twelve chapters' walkers.** Six people is a proof, not a pass.
+
+---
+
 ## ORDER, AND WHAT EACH TIER BUYS
 
 **Tier 1 — do first. No new systems, no new draws.**
