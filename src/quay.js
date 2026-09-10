@@ -4689,6 +4689,103 @@ function quayBuildPax(root) {
   quayUpdatePax();
 }
 
+// ======================================================= HER OWN PASSENGERS ==
+/**
+ * EIGHT PEOPLE ON MV WHEEK, WHICH HAD NONE.
+ *
+ * The marquee of this chapter is a seventy-second passage at the wheel of a
+ * working Sydney ferry, and she sailed EMPTY — while the Freshwater went past
+ * with fourteen people on her rail, and the hand at the Manly wharf called
+ * "all ashore" to a boat with nobody on it. It is the largest hole in the
+ * fiction of the strongest chapter in the game.
+ *
+ * PARENTED TO THE HULL, WHICH THE FRESHWATER'S ARE NOT. Hers are placed by
+ * hand every frame out of quayBigPos/quayBigYaw because she has no group to
+ * hang anything on. MV Wheek has one, and it is given a full quaternion every
+ * frame — yaw, plus heel into the rudder, plus trim by the stern under power
+ * — so a child of it gets all three for nothing. Eight instances placed ONCE
+ * at build; the only per-frame work is a weight shift and an arm.
+ *
+ * WHERE THEY STAND is the deck, and the deck is at boat-local y 0.36 (the
+ * teak box is 0.16 thick at y 0.28). This figure's feet are 0.31 below its
+ * own origin, the same rig the Freshwater uses, so the origin goes at 0.67.
+ * They keep out of z 2.2..4.0, because the helm is at (0, 3.1) and the one
+ * thing worse than an empty ferry is a passenger standing inside the wheel.
+ */
+const quayWPAX_N = 8;
+let quayWPaxMesh = null, quayWPaxHead = null, quayWPaxArm = null;
+const quayWPaxData = new Float32Array(quayWPAX_N * 4);   // lx, lz, yaw, phase
+
+function quayBuildWheekPax(group) {
+  if (!group) return;
+  const B = quayMerger();
+  B.box(0, 0.30, 0, 0.42, 0.58, 0.24, 0xffffff);
+  B.box(0, -0.14, 0, 0.30, 0.34, 0.20, 0xffffff);
+  const H = quayMerger();
+  H.box(0, 0.66, 0, 0.23, 0.26, 0.22, PALETTE.skin2);
+  H.box(0, 0.81, -0.01, 0.25, 0.09, 0.24, PALETTE.hair1);
+  H.box(0, 0.66, 0.12, 0.05, 0.05, 0.05, PALETTE.skin2);
+  const A = quayMerger();
+  A.box(0, -0.24, 0, 0.11, 0.50, 0.12, PALETTE.skin2);
+  A.box(0, -0.54, 0, 0.12, 0.13, 0.13, PALETTE.skin2);
+  const c = new THREE.Color();
+  const mk = (geo, tint) => {
+    const im = new THREE.InstancedMesh(geo, quayVC(), quayWPAX_N);
+    im.castShadow = false;
+    // A child of a moving hull whose own bounding sphere is computed at the
+    // origin: cull it and the whole complement disappears the moment she
+    // leaves the berth.
+    im.frustumCulled = false;
+    if (tint) {
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(quayWPAX_N * 3), 3);
+      for (let i = 0; i < quayWPAX_N; i++) {
+        c.set(quayCROWD_SHIRT[(i * 3 + 1) % quayCROWD_SHIRT.length]);
+        im.setColorAt(i, c);
+      }
+      im.instanceColor.needsUpdate = true;
+    }
+    group.add(im);
+    return im;
+  };
+  quayWPaxMesh = mk(B.build(), true);
+  quayWPaxHead = mk(H.build(), false);
+  quayWPaxArm = mk(A.build(), false);
+  for (let i = 0; i < quayWPAX_N; i++) {
+    const side = i % 2 ? 1 : -1;
+    const row = Math.floor(i / 2);
+    quayWPaxData[i * 4] = side * 1.72;                 // inboard of the rail
+    quayWPaxData[i * 4 + 1] = -5.0 + row * 1.8;        // aft of the helm
+    quayWPaxData[i * 4 + 2] = side > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+    quayWPaxData[i * 4 + 3] = rand(0, Math.PI * 2);
+  }
+  quayUpdateWheekPax();
+}
+
+function quayUpdateWheekPax() {
+  if (!quayWPaxMesh) return;
+  // ...and they wave back when the Freshwater answers, on the same clock her
+  // own fourteen do — out of time with each other, which is the only way a
+  // crowd waving has ever looked right.
+  const wave = quayBigWave > 0 ? clamp(quayBigWave / 3.4, 0, 1) : 0;
+  for (let i = 0; i < quayWPAX_N; i++) {
+    const o = i * 4;
+    const lx = quayWPaxData[o], lz = quayWPaxData[o + 1];
+    const yaw = quayWPaxData[o + 2], ph = quayWPaxData[o + 3];
+    const lean = Math.sin(quayTime * 0.7 + ph) * 0.035;
+    const m = quayXform(lx, 0.67, lz, 0, yaw, lean, 1, 1, 1);
+    quayWPaxMesh.setMatrixAt(i, m);
+    quayWPaxHead.setMatrixAt(i, m);
+    const up = wave > 0 ? (2.35 + Math.sin(quayTime * 7.5 + ph * 3) * 0.55) * wave : 0.05;
+    quayWPaxArm.setMatrixAt(i, quayXform(lx + Math.cos(yaw) * 0.26 * (lx > 0 ? 1 : -1),
+                                         1.19,
+                                         lz - Math.sin(yaw) * 0.26 * (lx > 0 ? 1 : -1),
+                                         0, yaw, up, 1, 1, 1));
+  }
+  quayWPaxMesh.instanceMatrix.needsUpdate = true;
+  quayWPaxHead.instanceMatrix.needsUpdate = true;
+  quayWPaxArm.instanceMatrix.needsUpdate = true;
+}
+
 function quayUpdatePax() {
   if (!quayPaxMesh) return;
   const cs = Math.cos(quayBigYaw), sn = Math.sin(quayBigYaw);
@@ -5024,6 +5121,7 @@ function quayStepBoat(game, dt) {
   quayBoatGroup.position.set(quayBoatX, y, quayBoatZ);
   quayBoatGroup.quaternion.set(quayQ.x, quayQ.y, quayQ.z, quayQ.w);
   if (quayWheelMesh) quayWheelMesh.rotation.z = -quayRudder * 2.4;
+  quayUpdateWheekPax();
   if (quayFlagMesh) {
     const st = clamp(Math.abs(quayBoatSpeed) / quayBOAT_VMAX, 0, 1);
     quayFlagMesh.rotation.y = Math.PI * 0.5;
@@ -5548,6 +5646,11 @@ function quayBuild(game) {
   quayBuildLine(quayRoot);
   quayBuildChips(quayRoot);
   quayBuildBoat(game, quayRoot);
+  // ...and hers, parented to the hull rather than placed against it — so this
+  // has to come AFTER quayBuildBoat, which is what makes quayBoatGroup. Called
+  // before it, quayBuildWheekPax takes a null group and returns silently, and
+  // MV Wheek sails empty exactly as she did before with nothing to show why.
+  quayBuildWheekPax(quayBoatGroup);
 
   // ---- WHAT THEY SAY WHEN SOMETHING HAPPENS ------------------------------
   // addLocal takes four optional reaction lists — startled / splash / thief /
