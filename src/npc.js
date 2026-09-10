@@ -11295,8 +11295,19 @@ export function createNPCs(game) {
     for (let i = 0; i < arr.length; i++) {
       const p = arr[i];
       if (!p || p.type !== 'chips') continue;
-      if (p.removed || p.held || p.owner || p.hidden || p.spilled) continue;
-      if (!p.mesh || p.mesh.parent !== scene || !p.body) continue;
+      // ---- ...AND A HELD CONE IS THE BEST TARGET THERE IS (D4.4) --------
+      // The mob would only ever come for chips ON THE GROUND, so the one thing
+      // a player naturally does with a cone of chips — pick it up and walk off
+      // with it — was the one thing that switched the gulls off. Eight birds
+      // following the animal across the gardens is the chapter's own best
+      // picture and it was one clause away.
+      //
+      // Everything else about the target stays: it must still have been
+      // DISTURBED, so a cone nobody has touched is still scenery, and the mob
+      // still has its cooldown and its ceiling.
+      if (p.removed || p.owner || p.hidden || p.spilled) continue;
+      if (!p.held && (!p.mesh || p.mesh.parent !== scene)) continue;
+      if (!p.body) continue;
       // Causation, same rule as props.js: chips that were never touched are
       // scenery. `disturbed` is stamped by any capybara contact or carry.
       if (!p.disturbed) continue;
@@ -11319,7 +11330,10 @@ export function createNPCs(game) {
   function qgStep(dt) {
     qgCryCd -= dt;
     if (qgCool > 0) qgCool -= dt;
-    if (qgTarget && (qgTarget.removed || qgTarget.held || qgTarget.owner ||
+    // D4.4: `held` is no longer a reason to drop the target — it is the
+    // reason to keep it. The rest still stand: a cone that is removed, owned,
+    // hidden or bodiless is not a thing eight gulls can be over.
+    if (qgTarget && (qgTarget.removed || qgTarget.owner ||
                      qgTarget.hidden || !qgTarget.body)) { qgTarget = null; qgMobT = 0; }
     // Without the cooldown the flock re-acquires the same cone on the very frame
     // it gives up on it — `disturbed` never clears — and mobs it forever.
@@ -11392,7 +11406,11 @@ export function createNPCs(game) {
       // (measured: 3.6 m up over open pavement with nothing under it). A gap
       // longer than the hop's own airtime is what makes it a peck.
       qgPeckT -= dt;
-      if (qgMobT > 0.5 && qgPeckT <= 0) {
+      // D4.4: ...and nobody pecks a cone that is in the animal's mouth. The
+      // body of a held prop is driven by the carry, so a velocity written here
+      // would either be thrown away or fight it — and a mob that mugs you while
+      // you are carrying their dinner is a different, much worse joke.
+      if (qgMobT > 0.5 && qgPeckT <= 0 && !qgTarget.held) {
         qgPeckT = rand(0.5, 0.9);
         const b = qgTarget.body;
         b.wakeUp();

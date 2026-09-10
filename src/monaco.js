@@ -2583,6 +2583,18 @@ function monBuildCar(colours) {
   return g;
 }
 
+// ---- HOW FAR A DRIVER LOOKS, AND HOW MUCH A TOW IS WORTH (D4.8) -----------
+// Eighteen metres is about seven car lengths, which is where a following car
+// on a street circuit actually has to lift. Beyond that and out to thirty-two
+// there is a tow: eight per cent, which is a real slipstream figure and is
+// enough to close a gap over a lap without letting anybody run away.
+const monCAR_SEE = 18;
+// One per car, spread either side of 1. Fixed rather than random: a record
+// that depends on which car you got on must not also depend on the seed.
+const monCarPace = [1.00, 0.920, 1.080];
+const monCAR_TOW = 32;
+const monCAR_TOW_K = 1.08;
+
 function monBuildCars(game, root) {
   monInitTrack();
   monCarRoot = new THREE.Group();
@@ -2652,7 +2664,45 @@ function monUpdateCars(game, dt) {
   if (!monCarG.length || dt <= 0) return;
   const capy = game.capy;
   for (let i = 0; i < monCarG.length; i++) {
-    const want = monCarTarget(monCarU[i]);
+    // ---- AND EACH CAR HAS A PACE OF ITS OWN (D4.8) ---------------------
+    // The lookahead below cannot do anything on its own: three cars sharing
+    // one curvature law start a third of a lap apart and hold that gap for
+    // ever, so nothing is ever within eighteen metres of anything. Measured
+    // before this line: closest approach over twenty-seven seconds was 107 m,
+    // which is exactly the even spacing they were built with.
+    //
+    // A few per cent is all it takes. Over a 300 m lap a 6 % difference closes
+    // a hundred metres in about six laps, so they bunch, tow, and come apart
+    // again -- which is what a practice session looks like and is what makes
+    // the tunnel record a thing you can go back and beat.
+    //
+    // Measured at +/-4.5 % first: closest approach over ninety-six seconds went
+    // from 107 m (the even spacing they are built with) to 58.6 -- closing, but
+    // at about eight metres a lap, so a player riding half a lap would never
+    // see two cars together. +/-8 % roughly doubles that.
+    let want = monCarTarget(monCarU[i]) * monCarPace[i];
+    // ---- AND THEY CAN SEE EACH OTHER NOW (D4.8) --------------------------
+    // The speed law was curvature and nothing else, so three cars on one
+    // polyline held their starting third of a lap for ever: they could never
+    // bunch, never catch, and never pass. The chapter's own comment promised a
+    // tunnel record "a player can go back and beat by picking a better car and
+    // a better corner to get on at" -- and with no car-car term the speed at
+    // the bore exit is a deterministic function of arclength, so there was
+    // nothing to pick.
+    //
+    // One lookahead: a car within monCAR_SEE ahead on the same loop caps this
+    // one to its speed, and a car just outside that gets a slipstream. The
+    // gap is taken MODULO the lap so a car at the start line still sees one
+    // just past it. They bunch into twos and threes now, which is the whole
+    // point: two cars nose to tail through a dark bore at twenty-six metres a
+    // second is a thing you can step across.
+    for (let j = 0; j < monCarG.length; j++) {
+      if (j === i) continue;
+      let gap = monCarU[j] - monCarU[i];
+      if (gap < 0) gap += monTrackTotal;
+      if (gap > 0 && gap < monCAR_SEE) want = Math.min(want, monCarV[j] * 0.98);
+      else if (gap >= monCAR_SEE && gap < monCAR_TOW) want *= monCAR_TOW_K;
+    }
     const a = want > monCarV[i] ? monCAR_ACC : -monCAR_BRAKE;
     monCarV[i] = a > 0 ? Math.min(want, monCarV[i] + a * dt)
                        : Math.max(want, monCarV[i] + a * dt);

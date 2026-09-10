@@ -743,6 +743,68 @@ function venIsOverWater(x, z) {
 }
 function venWaterHeightAt() { return venWaterY; }
 
+// ================================================================ THE SURGE ==
+/**
+ * THE WATER IS GOING SOMEWHERE (D4.5).
+ *
+ * Ten chapters agreed the ground is where it was last time you looked and
+ * Venice never agreed to it -- but the sea it argues with was, until now, a
+ * LEVEL and nothing else. It rose, the paving went under, and the water it
+ * put there was as still as a bath. An acqua alta is not still: a hundred and
+ * fifty million cubic metres come in through three inlets in about six hours
+ * and they run, which is why the boards are laid the way they are laid.
+ *
+ * `flow(x, z)` is the reference-frame channel -- the fourth thing to use it,
+ * after a ferry deck, the Drift's air and the Uji. capybara.js adds it to the
+ * platform velocity ONLY while capySwimming, which is what makes this safe:
+ * somebody walking the passerelle is not swimming, so the duckboard run, the
+ * crowd filing along it and every task on dry stone are untouched by
+ * construction rather than by a gate somebody has to remember.
+ *
+ * DIRECTION IS THE TIDE'S OWN SIGN. The lagoon is +z and the square is -z, so
+ * a flood runs toward -z and an ebb back toward +z. STRENGTH IS THE
+ * DERIVATIVE, not the level: the water moves fastest when it is changing
+ * fastest, which is the middle of each ramp, and it is slack at the top and
+ * the bottom. That falls out of a sine over the ramp and needs no table.
+ *
+ * And it is always beatable. Peak 1.35 m/s against a 2.6 m/s swim: you can
+ * always cross it and you can always get out, which is the same contract the
+ * Uji signs at six.
+ */
+const venFLOW_MAX = 1.35;        // m/s at the middle of a ramp
+const venFLOW_OPEN = 0.28;       // ...and how much of it survives in open lagoon
+const venFlowOut = { x: 0, z: 0 };
+function venFlow(x, z) {
+  venFlowOut.x = 0; venFlowOut.z = 0;
+  const ph = venPhase;
+  let dir = 0, t = 0;
+  if (ph >= venTIDE_RISE0 && ph < venTIDE_RISE1) {
+    dir = -1; t = (ph - venTIDE_RISE0) / (venTIDE_RISE1 - venTIDE_RISE0);
+  } else if (ph >= venTIDE_FALL0 && ph < venTIDE_FALL1) {
+    dir = 1; t = (ph - venTIDE_FALL0) / (venTIDE_FALL1 - venTIDE_FALL0);
+  } else return venFlowOut;                    // slack: high water and low water
+  // ---- AND NOT GATED ON THE PAVING -------------------------------------
+  // The first cut returned zero unless venIsOverWater(x, z), which sounds
+  // right and makes the whole term unreachable: the current runs during the
+  // RAMP and the square is only under water at the TOP of it, so on the
+  // piazza the flow was zero for every frame the player could be swimming in
+  // it. Measured -- sixty seconds of sampling in the middle of San Marco
+  // produced not one non-zero reading.
+  //
+  // It needs no gate anyway. capybara.js applies flow ONLY while capySwimming,
+  // so by construction this is never asked about a place the animal is not
+  // already in the water. What it does need is to be off at dead low, when
+  // there is no tide running at all.
+  if (venTideLevel() < 0.10 && dir > 0) return venFlowOut;
+  const k = Math.sin(Math.PI * clamp(t, 0, 1));
+  // The flood RUNS in the square and the calli, which are shallow and narrow,
+  // and merely drifts in the open lagoon, which is neither. This is the same
+  // distinction the chapter already draws everywhere else.
+  const tight = venInZone('square', x, z) || venInZone('calli', x, z) ? 1 : venFLOW_OPEN;
+  venFlowOut.z = dir * k * venFLOW_MAX * tight;
+  return venFlowOut;
+}
+
 /** 0..1 — how far up the tide is, for anything that wants to react to it. */
 function venTideLevel() {
   return clamp((venWaterY - venTIDE_LOW) / (venTIDE_HIGH - venTIDE_LOW), 0, 1);
@@ -5402,6 +5464,8 @@ export function createVenice(game) {
     // threshold, the float height and the clamber ceiling all move with it.
     waterLevel: venTIDE_LOW,
     isOverWater: venIsOverWater,
+    /** D4.5: the tide is a current as well as a level. See THE SURGE. */
+    flow: venFlow,
     waterHeightAt: venWaterHeightAt,
     inZone: venInZone,
     // ---- WHICH ROOM THE EAR IS IN (P4) ----------------------------------

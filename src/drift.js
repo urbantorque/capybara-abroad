@@ -3808,6 +3808,21 @@ function driRecord(id, v) { if (driGame && typeof driGame.record === 'function')
  */
 function driUpdateWind(dt) {
   driShelter = 1;
+  // ---- D4.7: ...UNLESS THE LANTERN IS LIT ------------------------------
+  // For one minute after the lantern takes, the breath stops turning and the
+  // whole void blows one way: home. It is the only time this chapter takes
+  // the wind off the player, and it is doing it to GIVE them something --
+  // the crossing that is impossible into the breath is a free ride with it
+  // behind you, and that is the sentence the chapter has been teaching for
+  // eleven rows.
+  if (driLampRide > 0) {
+    driLampRide -= dt;
+    driWindAng = damp(driWindAng, driLAMP_BEAR, 1.4, dt);
+    const magL = driWIND_MAX * (0.72 + 0.28 * Math.sin(driTime * 0.6));
+    driWindX = Math.cos(driWindAng) * magL;
+    driWindZ = Math.sin(driWindAng) * magL;
+    return;
+  }
   driWindAng += driWIND_TURN * dt;
   const swing = Math.sin(driTime * 6.28318 / driBREATH);
   const gust = Math.sin(driTime * 0.83) * Math.sin(driTime * 0.37 + 1.1) * driGUST;
@@ -4234,6 +4249,22 @@ let driSeedRide = 0;
 let driSeedBest = 0;
 let driSeedDone = false;
 let driSeedCool = 0;
+// ---- THE LAMP-LIT DESCENT (D4.7) -----------------------------------------
+// Lighting the lantern is the END of the chapter: the last island, the last
+// task, a seven-second shot and then a two-hundred-metre walk back down
+// everything you have already crossed. And the chapter has one genuinely new
+// dynamic in it -- hanging off a wind-carried seed at a third of a gravity --
+// which is filed as a mini and lives on five randomly placed seeds in a band
+// thirty metres thick, so most players will never find fifty metres of it.
+//
+// So the lantern buys the ride. One seed is put at the plinth, the wind is
+// held on the bearing that runs back down the arrival route, and the way home
+// is the way home THROUGH your own lit archipelago -- the beacons and the
+// lampflies you have just set going are underneath you the whole way.
+let driLampRide = 0;              // s left of the held wind
+let driLampArmed = false;         // ...armed once, on the rising edge of driLit
+const driLAMP_RIDE_T = 60;        // ...and how long that is
+const driLAMP_BEAR = Math.PI;     // the bearing home, +z toward the Shelf
 const driSeedPos = new THREE.Vector3();
 
 function driBuildSeeds(root) {
@@ -4903,6 +4934,27 @@ function driUpdateLantern(game, dt) {
   }
   if (driLitT > 0) driLitT -= dt;
   driGlow = damp(driGlow, driLit ? 1 : 0, 0.55, dt);
+  // ---- D4.7: and the way down is a seed ---------------------------------
+  // Armed on the rising edge of driLit. One of the five seeds is moved to the
+  // plinth rather than a sixth being made, because five is the number the
+  // sky is drawn for; the one chosen is whichever is furthest away, so
+  // nothing visible is teleported out from under the player.
+  if (driLit && !driLampArmed) {
+    driLampArmed = true;
+    driLampRide = driLAMP_RIDE_T;
+    let far = 0, fd = -1;
+    for (let i = 0; i < driSeeds.length; i++) {
+      const d = Math.hypot(driSeeds[i].x - driLANTERN.x, driSeeds[i].z - driLANTERN.z);
+      if (d > fd) { fd = d; far = i; }
+    }
+    const sd = driSeeds[far];
+    if (sd) {
+      sd.x = driLANTERN.x + 3.2;
+      sd.z = driLANTERN.z + 1.0;
+      sd.y = driLANTERN.y + 4.5;
+    }
+    driToast('the wind has turned all the way round. take the seed and go home.');
+  }
 
   if (driLanternMat) {
     // a flame is never steady; a paper lantern with one in it least of all

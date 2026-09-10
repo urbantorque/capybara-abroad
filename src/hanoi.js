@@ -2073,6 +2073,38 @@ function hanBuildTrainStreet(game, root) {
     }
   }
 
+  // ---- THE WAY UP (D4.9) -------------------------------------------------
+  // The train's collider is a chain of boxes 1.7 m half-height centred at 1.7,
+  // so its ROOF is a solid surface at 3.4 m -- and it is kinematic with an
+  // honest velocity, which means the carrier contract already applies to it.
+  // Everything needed to ride the train out of Train Street was in place and
+  // there was simply no way to get up there: the awnings that fold to 3.5 m are
+  // draw-only (and they MOVE, so a static collider on one would desync), and
+  // measured in the running game the animal against a house front rises 0.68 m
+  // and stops -- Hanoi publishes no climbHold and the generic wall climb does
+  // not engage on these.
+  //
+  // So: a stack, which is the most Train Street object there is. Five crates in
+  // a stair against the north houses, 0.68 m a tread, topping out at 3.40 --
+  // level with a passing roof. It stands at dz 2.5 from the centreline, which
+  // is a metre outside the train's own 1.45 half-width, so it is not something
+  // the train hits and not something that has to fold.
+  {
+    const sx = (x0 + x1) * 0.5 + 6;
+    const sz = z - 2.5;
+    for (let i = 0; i < 5; i++) {
+      const ty = hanGROUND + 0.34 + i * 0.68;
+      const w = 1.30 - i * 0.06;
+      K.box(sx - i * 0.30, ty, sz, w, 0.68, 1.15,
+            i % 2 ? PALETTE.hanCrate : PALETTE.hanCrate2, 0, 0.06 * i, 0);
+      hanPoolBox(body, sx - i * 0.30, ty, sz, w, 0.68, 1.15, 0.06 * i);
+    }
+    // ...and a pallet on the top one, so the last tread is a place to stand
+    // rather than a ledge to balance on.
+    K.box(sx - 1.35, hanGROUND + 3.44, sz, 1.6, 0.10, 1.5, PALETTE.hanCrate);
+    hanPoolBox(body, sx - 1.35, hanGROUND + 3.44, sz, 1.6, 0.10, 1.5, 0);
+  }
+
   // ---- the two crossing gates, which are the alley's own way in ---------
   for (let s = 0; s < 2; s++) {
     const gx = s ? x1 + 1.5 : x0 - 1.5;

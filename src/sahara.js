@@ -67,6 +67,7 @@ const sahDUNE_X  = 280;             // the crest
 const sahDUNE_W  = 88;              // windward run, west of the crest
 const sahDUNE_L  = 58;              // the lee slipface, east of it
 const sahDUNE_H  = 42;
+const sahDUNE_LIP = 0.9;            // m — the avalanche lobes on the slipface
 const sahDUNE_Z  = 10, sahDUNE_HZ = 78;               // where the ridge runs, and how long
 const sahERG_X   = 165;             // east of this you are in the erg proper
 
@@ -482,6 +483,26 @@ function sahTerrain(x, z) {
       h = sahDUNE_H * (u * u * (3 - 2 * u) * 0.22 + u * 0.78);
     } else if (dx > 0 && dx < sahDUNE_L) {
       h = sahDUNE_H * (1 - dx / sahDUNE_L);        // the slipface, 36 degrees
+      // ---- AND IT IS NOT A RAMP (D4.6) ---------------------------------
+      // The marquee of this chapter was a hundred metres of straight, on the
+      // same groundSlip verb Iceland introduced four chapters earlier, with
+      // nothing to steer round and nothing to do. A real slipface is not a
+      // plane: sand avalanches off the brink in lobes and leaves a chain of
+      // convex rolls down the face, and they are what a board or a sledge
+      // leaves the ground on.
+      //
+      // A sine down the face, skewed by z so the lips are not a row of steps
+      // across it. Fourteen metres of wavelength and 0.9 m of amplitude, which
+      // is a slope contribution of +/-0.405 against the face's own 0.724 --
+      // so every part of the face still falls AWAY (0.319 at the flattest) and
+      // there is nowhere on it to stall. The convex halves are the launches.
+      //
+      // Tapered off the brink and off the runout, so the drop-in is clean and
+      // the landing is flat. sahGroundSlip's band is in z and is untouched;
+      // the walk-up track is on the shoulders where zt has already faded this
+      // whole term away.
+      const lip = clamp(dx / 8, 0, 1) * clamp((sahDUNE_L - dx) / 14, 0, 1);
+      h += Math.sin(dx * 0.45 + z * 0.05) * sahDUNE_LIP * lip;
     } else if (dx <= -sahDUNE_W) h = 0;
     y += h * zt;
   }
