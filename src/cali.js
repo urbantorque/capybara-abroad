@@ -3956,7 +3956,7 @@ function caliUpdateDance(game, dt) {
       caliTask('salsa-dance');
       caliBurstSparks(capy.position.x, y + 0.6, capy.position.z, 18, 1.4);
       if (typeof game.shake === 'function') game.shake(0.2);
-      if (typeof game.toast === 'function') game.toast('a capybara. dancing salsa. in Cali.');
+      if (typeof game.toast === 'function') game.toast('four feet, no hips, and eight in a row.');
     }
   } else if (caliCombo > 0) {
     caliCombo = 0;

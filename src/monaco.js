@@ -4164,7 +4164,7 @@ function monBuildLocals(game) {
     beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'clink', volume: 0.10, pitch: 1.25 },
     lines: ['Change, sir? Madam? I shall guess.',
             'The wheel does not stop. It has not stopped since nineteen-ten.',
-            'Green pays eight. Green does not happen.',
+            'One green pocket in thirty-seven. I have seen it twice.',
             { t: 'You will want to be ten up before you try to leave.', before: 'chip-stack' },
             { t: 'Ten up, and out of the door. I have worked here nine years.', after: 'chip-stack' },
             { t: 'Somebody has watered the carpet with a very good year.', after: 'champagne' }],

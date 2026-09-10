@@ -573,6 +573,52 @@ const npcBUB_PANEL_T   = 0.20;   // s between layout reads
 const npcLEG_L = 0.62;      // hip pivot height == leg length
 const npcHIP_Y = 0.92;      // where the torso actually bends
 
+// ===========================================================================
+// THE GAIT (v56).  Everything below is a number about a JOINT, and the one
+// that matters is the PHASE, not the size.
+//
+// The hip already ran on `sin(walkPhase)`, positive meaning the leg is BEHIND
+// (rotation about +X takes the limb's -Y down-axis toward -Z, and a person
+// faces +Z).  So for the left leg:
+//
+//     walkPhase = pi/2   hip = +max   toe-off      swing STARTS
+//     walkPhase = pi     hip =  0     thigh vertical, mid-swing
+//     walkPhase = 3pi/2  hip = -max   heel strike  swing ENDS
+//
+// which means `cos(walkPhase) < 0` is EXACTLY the swing half of the cycle and
+// `-cos` peaks precisely at mid-swing.  That is the whole trick: the knee is
+// driven by `max(0, -cos)` squared, which is zero at toe-off, zero at heel
+// strike and 1 in the middle, so the knee CANNOT bend on the stance leg.  A
+// knee that bends in stance is not a knee, it is a limp, and it is the one
+// way this can be built wrong while still looking like it is doing something.
+// The right leg is the same expression on `+cos`, because its hip is `-sin`,
+// which is `sin` half a cycle later.
+//
+// Sizes are read off a real walk and then cut, because this rig's hip swing is
+// already theatrical (+/-0.72 rad, where a person walks at about +/-0.35): a
+// literal 60-degree swing knee on top of a 41-degree hip reads as a high-step.
+const npcKNEE_REST  = 0.07;   // rad. Nobody stands with a locked knee.
+const npcKNEE_SWING = 0.95;   // rad at mid-swing, full speed. ~54 deg.
+// THE FOOT PLANT. The sole's world angle is hip + knee + ankle, so holding it
+// near level through stance is one subtraction — and it is masked OUT across
+// mid-swing, where a foot that stays rigidly level while the leg tucks reads
+// like a mannequin being carried. 0.82 rather than 1.0 leaves a little heel
+// strike and a little toe-off in it, which is the part you actually see.
+const npcFOOT_PLANT = 0.82;
+// THE ELBOW. A persistent bend first — nobody walks with straight arms — and
+// then a little more of it on the forward half of the swing, which is where a
+// real arm folds. Negative on this rig is forward and up (see the locals'
+// umbrella note), so both terms are subtracted.
+const npcELBOW_REST  = 0.26;  // rad, ~15 deg, always
+const npcELBOW_SWING = 0.34;  // rad more at the front of the swing
+// THE TWIST. Shoulders against hips, on the hip's own phase: when the LEFT leg
+// is forward (sin < 0) the pelvis has yawed +Y (rotating +Y carries -X toward
+// +Z), so the pelvis is -k*sin and the shoulders are +k*sin. About 6 degrees
+// each way, which is roughly what a person does and is deliberately under what
+// looks like a swagger from a 12.5 m boom.
+const npcTORSO_TWIST = 0.105;  // rad on the shoulders at full speed
+const npcHEAD_HOLD   = 0.8;    // ...of which the head refuses to come along
+
 const npcSKINS = [PALETTE.skin1, PALETTE.skin2, PALETTE.skin3, PALETTE.skin4];
 const npcHAIRS = [PALETTE.hair1, PALETTE.hair2, PALETTE.hair3, PALETTE.hair4, PALETTE.hair5];
 const npcCLOTH = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE.cloth4,
@@ -902,17 +948,52 @@ export function createNPCs(game) {
     { w: 0.058, h: 0.044, d: 0.02, x: 0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
   ]);
   const gBrow = npcMakeGeo([{ w: 0.092, h: 0.020, d: 0.022 }]);
+  // ---- THE LIMBS HAVE JOINTS IN THEM NOW (v56) --------------------------
+  // A leg was ONE box pivoting at the hip and an arm was ONE box pivoting at
+  // the shoulder, and this file admitted it twice in its own comments ("the
+  // arm is a single box with no elbow"). At the old camera — 22.8 degrees of
+  // pitch on a 9.5 m boom — that was defensible. It is not at 11.2 on 12.5:
+  // the frame now holds a lot more ground and a lot more people, and the
+  // single most visible thing about them was that they marched.
+  //
+  // Four geometries where there were two, and the SPLIT POINTS ARE CHOSEN SO
+  // THE SILHOUETTE AT ZERO BEND IS IDENTICAL to what shipped: the thigh runs
+  // to -0.31 and the shin picks up at -0.305 (a 5 mm overlap, so no gap opens
+  // at the back of a bent knee), and the whole leg still ends at -0.60 with
+  // the shoe at -0.52..-0.62 — which is what puts the sole on y = 0 given a
+  // hip pivot at npcLEG_L. Same for the arm: the hand box is at exactly the
+  // -0.465..-0.595 it has always been, so every tuned hand pose in this file
+  // (the camera, the rake, the 99, the tray) still lands where it landed.
+  //
+  // COST is four more instanced buffers per cast — shin L/R and forearm L/R —
+  // plus two for the shoes, and NOT one mesh per person: a per-person mesh is
+  // a draw call, which is the rule the umbrella and the pocket both lost to.
+  const npcUARM_L  = 0.29;    // shoulder -> elbow
+  const npcTHIGH_L = 0.31;    // hip -> knee
+  const npcSHIN_L  = 0.29;    // knee -> ankle
   const gArm = npcMakeGeo([
-    { w: 0.12, h: 0.48, d: 0.12, y: -0.24 },
-    { w: 0.13, h: 0.13, d: 0.13, y: -0.53 },           // hand
+    { w: 0.12, h: 0.31, d: 0.12, y: -0.145 },          // upper arm, 0.01 .. -0.30
+  ]);
+  const gForearm = npcMakeGeo([
+    // Slightly thinner than the upper arm, which is the cheapest way to make
+    // a bend read as a JOINT rather than as a box that has come apart.
+    { w: 0.113, h: 0.27, d: 0.113, y: -0.125 },
+    { w: 0.13, h: 0.13, d: 0.13, y: -0.24 },           // hand
   ]);
   const gLeg = npcMakeGeo([
-    { w: 0.15, h: 0.60, d: 0.16, y: -0.30 },
+    { w: 0.15, h: 0.33, d: 0.16, y: -0.155 },          // thigh, 0.01 .. -0.32
+  ]);
+  const gShin = npcMakeGeo([
+    { w: 0.142, h: 0.30, d: 0.152, y: -0.145 },
+  ]);
+  const gShoe = npcMakeGeo([
     // A SHOE IS THE CHEAPEST COLOUR ON A PERSON. It is at the bottom of the
     // silhouette, where the eye starts, it is already its own box, and it is
     // the one edge every real garment has. Slightly blue, because leather is.
-    { w: 0.17, h: 0.10, d: 0.24, y: -0.57, z: 0.04,
-      c: npcSRGB3(0.55, 0.55, 0.58) },                 // shoe
+    // It is its OWN buffer now rather than a part of the leg, and only so that
+    // an ankle can hold the sole level through stance — see THE FOOT PLANT.
+    { w: 0.17, h: 0.10, d: 0.24, y: 0.03, z: 0.04,
+      c: npcSRGB3(0.55, 0.55, 0.58) },
   ]);
   // THE BRIM IS TWO CYLINDERS NOW, and only so that its UNDERSIDE can be dark
   // (R6): a part is the smallest thing `c` can address, and a brim that is one
@@ -994,8 +1075,14 @@ export function createNPCs(game) {
   const iHair  = mkInst(gHair, HUMANS);
   const iArmL  = mkInst(gArm, HUMANS);
   const iArmR  = mkInst(gArm, HUMANS);
+  const iFarmL = mkInst(gForearm, HUMANS);
+  const iFarmR = mkInst(gForearm, HUMANS);
   const iLegL  = mkInst(gLeg, HUMANS);
   const iLegR  = mkInst(gLeg, HUMANS);
+  const iShinL = mkInst(gShin, HUMANS);
+  const iShinR = mkInst(gShin, HUMANS);
+  const iShoeL = mkInst(gShoe, HUMANS);
+  const iShoeR = mkInst(gShoe, HUMANS);
   const iHat   = mkInst(gHat, HUMANS);
   // the face: one instance for the pair of eyes, two for the brows (see
   // FACES). Two extra draw calls buys an expression for thirty-two people.
@@ -2073,6 +2160,20 @@ export function createNPCs(game) {
   // of it. 0.17 is that plus a little, because a leg reads at six metres only
   // if it slightly oversells — and much more than this is a march.
   const npcLOC_SWING    = 0.17;
+  // ---- ...AND THE JOINTS THAT SWING WITH IT (v56) ------------------------
+  // The comment fifteen lines up ("a local has no gait and no legs to swing")
+  // has been out of date since v55 gave them hips; it is now out of date twice.
+  // These are the same three joints the roster got, sized DOWN to the shuffle
+  // rather than copied: the roster bends its knee 0.95 rad on a 0.72 rad hip,
+  // which is a ratio of 1.32, and 0.17 x 1.32 is 0.22. Copying the roster's own
+  // number onto a 0.17 rad hip would be a person high-stepping on the spot.
+  //
+  // Most of what these buy is not the swing at all — a local is a fixed point
+  // and is standing still nearly all of the time — it is npcKNEE_REST and
+  // npcELBOW_REST, which are the difference between somebody standing and
+  // somebody at attention, and they are on every frame.
+  const npcLOC_KNEE     = 0.22;  // rad of knee at the top of the shuffle
+  const npcLOC_TWIST    = 0.055; // rad of shoulder against hip, same ratio
   const npcLOC_STEP_TRY = 6;     // candidate spots before giving up and staying put
   const npcLOC_STEP_DY  = 0.35;  // m of ground step a shuffle may not cross
 
@@ -6440,6 +6541,20 @@ export function createNPCs(game) {
     const legL = new THREE_.Object3D();
     const legR = new THREE_.Object3D();
     const holdN = new THREE_.Object3D();   // guitar / waiter's tray, carried on the chest
+    // ---- the joints (v56) -------------------------------------------------
+    // Six Object3Ds and no geometry of their own. `hipsN` is the odd one: the
+    // hips block used to be drawn on `bob`'s matrix, which meant that the
+    // moment `bob` started yawing for the shoulder twist the pelvis yawed WITH
+    // it and the counter-rotation cancelled itself out — the whole person
+    // simply turned. It is a child of `bob` carrying -2x the twist, so its
+    // world yaw is the opposite of the shoulders'.
+    const hipsN = new THREE_.Object3D();
+    const kneeL = new THREE_.Object3D();
+    const kneeR = new THREE_.Object3D();
+    const footL = new THREE_.Object3D();
+    const footR = new THREE_.Object3D();
+    const elbowL = new THREE_.Object3D();
+    const elbowR = new THREE_.Object3D();
 
     // the face — see npcFace. Three nodes, no geometry: the two eyes are one
     // instance and the two brows are two instances of the same buffer.
@@ -6448,10 +6563,18 @@ export function createNPCs(game) {
     const browR = new THREE_.Object3D();
 
     root.add(bob); root.add(legL); root.add(legR);
-    bob.add(head); bob.add(armL); bob.add(armR);
+    bob.add(head); bob.add(armL); bob.add(armR); bob.add(hipsN);
     head.add(hatN);
     head.add(eyeN); head.add(browL); head.add(browR);
-    armR.add(handR); handR.add(camN); handR.add(toolN); handR.add(coneN);
+    legL.add(kneeL); kneeL.add(footL);
+    legR.add(kneeR); kneeR.add(footR);
+    armL.add(elbowL); armR.add(elbowR);
+    // THE HAND HANGS OFF THE FOREARM, not off the shoulder. This is the one
+    // line that keeps the props honest: camN, toolN, coneN and (in Pasto)
+    // broomN are all children of handR, and the held prop in stepHuman reads
+    // handR.matrixWorld — so a bending elbow carries the rake, the camera, the
+    // ice cream and the broom with it and nothing has to be re-tuned.
+    elbowR.add(handR); handR.add(camN); handR.add(toolN); handR.add(coneN);
     bob.add(holdN);
     holdN.position.set(0.02, 1.02, 0.20);
     holdN.scale.setScalar(0);
@@ -6459,7 +6582,15 @@ export function createNPCs(game) {
     head.position.set(0, 1.34, 0);
     armL.position.set(-0.34, 1.18, 0);
     armR.position.set(0.34, 1.18, 0);
-    handR.position.set(0, -0.56, 0);
+    // -0.56 from the SHOULDER is where it was; -0.27 from an elbow at -0.29 is
+    // the same point with the arm straight, so every pose keeps its hand.
+    handR.position.set(0, -0.27, 0);
+    elbowL.position.y = -npcUARM_L;
+    elbowR.position.y = -npcUARM_L;
+    kneeL.position.y = -npcTHIGH_L;
+    kneeR.position.y = -npcTHIGH_L;
+    footL.position.y = -npcSHIN_L;
+    footR.position.y = -npcSHIN_L;
     camN.position.set(0, 0.02, 0.12);
     toolN.position.set(0, 0.0, 0.06);
     coneN.position.set(0, -0.02, 0.12);
@@ -6529,7 +6660,8 @@ export function createNPCs(game) {
       heldProp: null,
       idx,
       nodes: { bob, head, hatN, armL, armR, handR, camN, toolN, coneN, legL, legR, holdN,
-               eyeN, browL, browR },
+               eyeN, browL, browR,
+               hipsN, kneeL, kneeR, footL, footR, elbowL, elbowR },
       // the face pack npcFace() takes, and the two clocks that drive it
       face: { eyeN: eyeN, browL: browL, browR: browR, browY: 0.253 },
       blinkT: rand(0, npcBLINK_MAX), mood: 0,
@@ -6616,8 +6748,14 @@ export function createNPCs(game) {
     iHair.setColorAt(rec.idx, npcColor.setHex(rec.cHr).multiplyScalar(1 - wet * 0.30));
     iArmL.setColorAt(rec.idx, npcColor.setHex(rec.cS).multiplyScalar(ks));
     iArmR.setColorAt(rec.idx, npcColor.setHex(rec.cS).multiplyScalar(ks));
+    iFarmL.setColorAt(rec.idx, npcColor.setHex(rec.cS).multiplyScalar(ks));
+    iFarmR.setColorAt(rec.idx, npcColor.setHex(rec.cS).multiplyScalar(ks));
     iLegL.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
     iLegR.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
+    iShinL.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
+    iShinR.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
+    iShoeL.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
+    iShoeR.setColorAt(rec.idx, npcColor.setHex(rec.cH).multiplyScalar(k));
     iHat.setColorAt(rec.idx, npcColor.setHex(rec.cHat).multiplyScalar(k));
     iBrow.setColorAt(rec.idx * 2, npcColor.setHex(rec.cHr).multiplyScalar(1 - wet * 0.30));
     iBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(rec.cHr).multiplyScalar(1 - wet * 0.30));
@@ -6635,8 +6773,19 @@ export function createNPCs(game) {
     iHair.setColorAt(rec.idx, npcColor.setHex(cHair));
     iArmL.setColorAt(rec.idx, npcColor.setHex(cSkin));
     iArmR.setColorAt(rec.idx, npcColor.setHex(cSkin));
+    // The forearm is the arm's own colour — the roster's arms have always been
+    // bare skin with a hand on the end, so splitting them changes nothing but
+    // where the bend is. The SHOE carries its own multiplier in gShoe, so the
+    // instance colour it wants is the trousers, exactly as when it was a part
+    // of the leg buffer.
+    iFarmL.setColorAt(rec.idx, npcColor.setHex(cSkin));
+    iFarmR.setColorAt(rec.idx, npcColor.setHex(cSkin));
     iLegL.setColorAt(rec.idx, npcColor.setHex(cHips));
     iLegR.setColorAt(rec.idx, npcColor.setHex(cHips));
+    iShinL.setColorAt(rec.idx, npcColor.setHex(cHips));
+    iShinR.setColorAt(rec.idx, npcColor.setHex(cHips));
+    iShoeL.setColorAt(rec.idx, npcColor.setHex(cHips));
+    iShoeR.setColorAt(rec.idx, npcColor.setHex(cHips));
     iHat.setColorAt(rec.idx, npcColor.setHex(cHat));
     // The brow is the HAIR colour, which is why it never needed a palette
     // entry of its own and why a blond and a black-haired man read
@@ -8859,8 +9008,38 @@ export function createNPCs(game) {
     // seated diners swing their thighs forward under the table
     rec.seatPose = damp(rec.seatPose, rec.seated, 9, dt);
     const seatK = rec.seatPose * npcSEAT_LEG;
-    n.legL.rotation.x = s * amp * 0.72 + seatK;
-    n.legR.rotation.x = -s * amp * 0.72 + seatK;
+    const hipL = s * amp * 0.72 + seatK;
+    const hipR = -s * amp * 0.72 + seatK;
+    n.legL.rotation.x = hipL;
+    n.legR.rotation.x = hipR;
+    // ---- THE KNEE (v56) --------------------------------------------------
+    // See THE GAIT. `c` is cos(walkPhase) and is already in hand: the left leg
+    // is in SWING exactly while c < 0 and the right exactly while c > 0, so
+    // these two clamps are the phase and there is nothing to get out of step.
+    // Squared, so the hump is zero AT toe-off and AT heel strike rather than
+    // merely small there — a knee still folding when the heel lands is the
+    // limp this is written to avoid.
+    //
+    // A SEATED PERSON IS A SPECIAL CASE and it is not optional: `seatK` swings
+    // the thigh 0.72 rad forward under a café table, and a shin that carried
+    // straight on out of it would be a diner with their leg on the tablecloth.
+    // The knee folds to a right angle instead, scaled by the same seatPose, so
+    // the shin drops to the floor where a sitting person's shin is.
+    const swL = c < 0 ? -c : 0;
+    const swR = c > 0 ? c : 0;
+    const kneeSit = rec.seatPose * 1.42;      // 81 deg: thigh out, shin down
+    const kL = npcKNEE_REST + swL * swL * amp * npcKNEE_SWING + kneeSit;
+    const kR = npcKNEE_REST + swR * swR * amp * npcKNEE_SWING + kneeSit;
+    n.kneeL.rotation.x = kL;
+    n.kneeR.rotation.x = kR;
+    // ---- THE FOOT PLANT --------------------------------------------------
+    // The sole's angle in the world is hip + knee + ankle, so this is that sum
+    // undone. Masked by (1 - swing²) — the same hump the knee rides, inverted
+    // — so the ankle is at full authority through the whole of stance and lets
+    // go across mid-swing, where a foot held rigidly level while the shin
+    // tucks up behind reads as a boot on a stick.
+    n.footL.rotation.x = -(hipL + kL) * npcFOOT_PLANT * (1 - swL * swL);
+    n.footR.rotation.x = -(hipR + kR) * npcFOOT_PLANT * (1 - swR * swR);
     // legs live on the root, so they have to follow the hips down by hand.
     // `bLeg` is the build (see THREE BUILDS in buildHuman) and multiplies IN
     // here rather than being a second write on scale.y from the builder —
@@ -8888,6 +9067,24 @@ export function createNPCs(game) {
     n.armR.rotation.x = rec.poseArmR + s * amp * 0.58 * maskR - talk;
     n.armL.rotation.z = 0.09 + rec.poseArmL * 0.06;
     n.armR.rotation.z = -0.09 - rec.poseArmR * 0.06 - talk * 0.7;
+    // ---- THE ELBOW (v56) -------------------------------------------------
+    // A rest bend that is always there, and more of it on the FORWARD half of
+    // the swing, which is where a real arm folds. The arm swings on `-s` (left)
+    // and `+s` (right) — opposite the leg on that side, which is what the
+    // counter-swing already was — so the forward half is the positive half of
+    // each of those.
+    //
+    // MASKED BY THE SAME maskL/maskR THE SWING TAKES, and that is load-bearing
+    // rather than tidy. Every carried thing in this file — the camera at -2.6,
+    // the rake at -1.9, the 99 at -1.15, the tray — was tuned against a
+    // straight arm, and the mask is already 0 by the time any of those poses
+    // is fully in. So a walking arm gets an elbow and a working arm hands its
+    // geometry back exactly as it was measured. The alternative was re-tuning
+    // nineteen poses to buy a bend nobody would see under a rake.
+    const fwdL = -s > 0 ? -s : 0;
+    const fwdR = s > 0 ? s : 0;
+    n.elbowL.rotation.x = -(npcELBOW_REST + fwdL * amp * npcELBOW_SWING) * maskL;
+    n.elbowR.rotation.x = -(npcELBOW_REST + fwdR * amp * npcELBOW_SWING) * maskR;
 
     // ---- ...AND THIS CAST FEELS THE WEATHER TOO, WITHIN LIMITS -----------
     // Sydney's and Pasto's people are a richer rig than a local — a real state
@@ -8941,6 +9138,24 @@ export function createNPCs(game) {
     n.bob.position.z = -npcHIP_Y * sl;
     n.bob.rotation.x = rec.poseLean;
     n.bob.rotation.z = s * amp * 0.05 + rec.stumble * Math.sin(rec.stateT * 21) * 0.22;
+    // ---- THE TWIST (v56) -------------------------------------------------
+    // `bob` had lean and it had sway and it had NO rotation.y, which is the
+    // one channel a walk actually needs: shoulders going one way while the
+    // hips go the other is the difference between a person walking and a box
+    // being slid along the pavement. It is nearly free — one write on a node
+    // that already exists — and it is the cheapest thing in this whole pass.
+    //
+    // NOT applied while seated: a diner in a chair whose shoulders rotate is
+    // fidgeting, and `amp` is already ~0 for them anyway, so this is belt and
+    // braces on a term that is 0 by construction.
+    const twist = s * amp * npcTORSO_TWIST * (1 - rec.seatPose);
+    n.bob.rotation.y = twist;
+    // The pelvis takes the OPPOSITE half. `hipsN` is a child of bob, so it has
+    // to undo bob's twist before it can apply its own — hence 2x — and the
+    // legs are on the root, so they take the pelvis angle directly.
+    n.hipsN.rotation.y = -2 * twist;
+    n.legL.rotation.y = -twist;
+    n.legR.rotation.y = -twist;
 
     // yOff carries the harbour (negative) — the chair is done with poseCrouch
     rec.group.position.y = rec.hop + rec.yOff;
@@ -8955,7 +9170,11 @@ export function createNPCs(game) {
     // head turns toward whatever it is looking at
     const hy = npcWrapAngle(Math.atan2(rec.lookX - rec.group.position.x, rec.lookZ - rec.group.position.z) - rec.yaw);
     rec.headYaw = damp(rec.headYaw, clamp(hy, -1.15, 1.15), rec.alarm > 0.5 ? 26 : 9, dt);
-    n.head.rotation.y = rec.headYaw;
+    // ...minus most of the shoulder twist, because a head is aimed at a thing
+    // in the world and does not swing with the chest it is standing on. Not
+    // ALL of it: the neck does come along a little, and taking the whole twist
+    // out makes the head look bolted to the horizon.
+    n.head.rotation.y = rec.headYaw - twist * npcHEAD_HOLD;
     // rec.lookUp (0..1) is the Pasto cast craning at a condor; it is undefined
     // for every Sydneysider, so this is a no-op on the old crowd.
     const pitchTgt = rec.lookUp > 0.01 ? -1.0 * rec.lookUp
@@ -9084,6 +9303,9 @@ export function createNPCs(game) {
   let pTorso = null, pHips = null, pHead = null, pHair = null, pArmL = null, pArmR = null;
   let pEyes = null, pBrow = null;
   let pLegL = null, pLegR = null, pHat = null, pTool = null, pBroom = null;
+  // the joints (v56) — same six buffers Sydney gets, on Pasto's own count
+  let pFarmL = null, pFarmR = null, pShinL = null, pShinR = null;
+  let pShoeL = null, pShoeR = null;
   let pLlamaB = null, pLlamaN = null, pLlamaL = null, pLlamaT = null;
   let pDogB = null, pDogH = null, pDogL = null, pDogT = null;
 
@@ -10255,8 +10477,14 @@ export function createNPCs(game) {
     pHair.setColorAt(rec.idx, npcColor.setHex(cHr));
     pArmL.setColorAt(rec.idx, npcColor.setHex(cS));
     pArmR.setColorAt(rec.idx, npcColor.setHex(cS));
+    pFarmL.setColorAt(rec.idx, npcColor.setHex(cS));
+    pFarmR.setColorAt(rec.idx, npcColor.setHex(cS));
     pLegL.setColorAt(rec.idx, npcColor.setHex(cH));
     pLegR.setColorAt(rec.idx, npcColor.setHex(cH));
+    pShinL.setColorAt(rec.idx, npcColor.setHex(cH));
+    pShinR.setColorAt(rec.idx, npcColor.setHex(cH));
+    pShoeL.setColorAt(rec.idx, npcColor.setHex(cH));
+    pShoeR.setColorAt(rec.idx, npcColor.setHex(cH));
     pHat.setColorAt(rec.idx, npcColor.setHex(cHat));
     pEyes.setColorAt(rec.idx, npcColor.setHex(PALETTE.capyEye));
     pBrow.setColorAt(rec.idx * 2, npcColor.setHex(cHr));
@@ -10397,8 +10625,14 @@ export function createNPCs(game) {
     pHair = mkInst(gHair, PA_H);
     pArmL = mkInst(gArm, PA_H);
     pArmR = mkInst(gArm, PA_H);
+    pFarmL = mkInst(gForearm, PA_H);
+    pFarmR = mkInst(gForearm, PA_H);
     pLegL = mkInst(gLeg, PA_H);
     pLegR = mkInst(gLeg, PA_H);
+    pShinL = mkInst(gShin, PA_H);
+    pShinR = mkInst(gShin, PA_H);
+    pShoeL = mkInst(gShoe, PA_H);
+    pShoeR = mkInst(gShoe, PA_H);
     pHat = mkInst(gHat, PA_H);
     pEyes = mkInst(gEyes, PA_H);
     pBrow = mkInst(gBrow, PA_H * 2);
@@ -10608,8 +10842,14 @@ export function createNPCs(game) {
     pHair.instanceColor.needsUpdate = true;
     pArmL.instanceColor.needsUpdate = true;
     pArmR.instanceColor.needsUpdate = true;
+    pFarmL.instanceColor.needsUpdate = true;
+    pFarmR.instanceColor.needsUpdate = true;
     pLegL.instanceColor.needsUpdate = true;
     pLegR.instanceColor.needsUpdate = true;
+    pShinL.instanceColor.needsUpdate = true;
+    pShinR.instanceColor.needsUpdate = true;
+    pShoeL.instanceColor.needsUpdate = true;
+    pShoeR.instanceColor.needsUpdate = true;
     pHat.instanceColor.needsUpdate = true;
     pEyes.instanceColor.needsUpdate = true;
     pBrow.instanceColor.needsUpdate = true;
@@ -10630,8 +10870,14 @@ export function createNPCs(game) {
       pBrow.setMatrixAt(i * 2 + 1, n.browR.matrixWorld);
       pArmL.setMatrixAt(i, n.armL.matrixWorld);
       pArmR.setMatrixAt(i, n.armR.matrixWorld);
+      pFarmL.setMatrixAt(i, n.elbowL.matrixWorld);
+      pFarmR.setMatrixAt(i, n.elbowR.matrixWorld);
       pLegL.setMatrixAt(i, n.legL.matrixWorld);
       pLegR.setMatrixAt(i, n.legR.matrixWorld);
+      pShinL.setMatrixAt(i, n.kneeL.matrixWorld);
+      pShinR.setMatrixAt(i, n.kneeR.matrixWorld);
+      pShoeL.setMatrixAt(i, n.footL.matrixWorld);
+      pShoeR.setMatrixAt(i, n.footR.matrixWorld);
       pTool.setMatrixAt(i, n.toolN.matrixWorld);
       pBroom.setMatrixAt(i, n.broomN.matrixWorld);
     }
@@ -10644,8 +10890,14 @@ export function createNPCs(game) {
     pBrow.instanceMatrix.needsUpdate = true;
     pArmL.instanceMatrix.needsUpdate = true;
     pArmR.instanceMatrix.needsUpdate = true;
+    pFarmL.instanceMatrix.needsUpdate = true;
+    pFarmR.instanceMatrix.needsUpdate = true;
     pLegL.instanceMatrix.needsUpdate = true;
     pLegR.instanceMatrix.needsUpdate = true;
+    pShinL.instanceMatrix.needsUpdate = true;
+    pShinR.instanceMatrix.needsUpdate = true;
+    pShoeL.instanceMatrix.needsUpdate = true;
+    pShoeR.instanceMatrix.needsUpdate = true;
     pTool.instanceMatrix.needsUpdate = true;
     pBroom.instanceMatrix.needsUpdate = true;
 
@@ -11626,8 +11878,14 @@ export function createNPCs(game) {
       iBrow.setMatrixAt(i * 2 + 1, n.browR.matrixWorld);
       iArmL.setMatrixAt(i, n.armL.matrixWorld);
       iArmR.setMatrixAt(i, n.armR.matrixWorld);
+      iFarmL.setMatrixAt(i, n.elbowL.matrixWorld);
+      iFarmR.setMatrixAt(i, n.elbowR.matrixWorld);
       iLegL.setMatrixAt(i, n.legL.matrixWorld);
       iLegR.setMatrixAt(i, n.legR.matrixWorld);
+      iShinL.setMatrixAt(i, n.kneeL.matrixWorld);
+      iShinR.setMatrixAt(i, n.kneeR.matrixWorld);
+      iShoeL.setMatrixAt(i, n.footL.matrixWorld);
+      iShoeR.setMatrixAt(i, n.footR.matrixWorld);
       iCam.setMatrixAt(i, n.camN.matrixWorld);
       iTool.setMatrixAt(i, n.toolN.matrixWorld);
       iCone.setMatrixAt(i, n.coneN.matrixWorld);
@@ -11641,8 +11899,14 @@ export function createNPCs(game) {
     iBrow.instanceMatrix.needsUpdate = true;
     iArmL.instanceMatrix.needsUpdate = true;
     iArmR.instanceMatrix.needsUpdate = true;
+    iFarmL.instanceMatrix.needsUpdate = true;
+    iFarmR.instanceMatrix.needsUpdate = true;
     iLegL.instanceMatrix.needsUpdate = true;
     iLegR.instanceMatrix.needsUpdate = true;
+    iShinL.instanceMatrix.needsUpdate = true;
+    iShinR.instanceMatrix.needsUpdate = true;
+    iShoeL.instanceMatrix.needsUpdate = true;
+    iShoeR.instanceMatrix.needsUpdate = true;
     iCam.instanceMatrix.needsUpdate = true;
     iTool.instanceMatrix.needsUpdate = true;
     iCone.instanceMatrix.needsUpdate = true;
@@ -11700,8 +11964,14 @@ export function createNPCs(game) {
     iHair.instanceColor.needsUpdate = true;
     iArmL.instanceColor.needsUpdate = true;
     iArmR.instanceColor.needsUpdate = true;
+    iFarmL.instanceColor.needsUpdate = true;
+    iFarmR.instanceColor.needsUpdate = true;
     iLegL.instanceColor.needsUpdate = true;
     iLegR.instanceColor.needsUpdate = true;
+    iShinL.instanceColor.needsUpdate = true;
+    iShinR.instanceColor.needsUpdate = true;
+    iShoeL.instanceColor.needsUpdate = true;
+    iShoeR.instanceColor.needsUpdate = true;
     iHat.instanceColor.needsUpdate = true;
   }
 

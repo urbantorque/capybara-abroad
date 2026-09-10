@@ -4289,13 +4289,20 @@ const physPASTO_STALLS = [
 ];
 // What each stall sells, cycled. Three items per table keeps the produce
 // readable from above and the body count honest.
+//
+// These are TYPE KEYS, not labels — what the player reads is the `name` on the
+// row in physTYPES ('ruana', 'Nariño hat', 'painted bowl'), and those are right.
+// What was wrong was the MIX: two of the six tables sold nothing but things you
+// wear, which is a market of a culture rather than a market. A Pasto plaza
+// stall is produce with a bit of craft on the end of it, so every table now
+// has something you can eat on it.
 const physSTALL_MENU = [
   ['empanada', 'empanada', 'arepa'],
   ['maiz', 'plantain', 'arepa'],
   ['cuencobowl', 'empanada', 'maiz'],
-  ['ruana', 'sombrero', 'cuencobowl'],
+  ['ruana', 'cuencobowl', 'plantain'],
   ['plantain', 'maiz', 'empanada'],
-  ['sombrero', 'ruana', 'arepa'],
+  ['sombrero', 'maiz', 'arepa'],
 ];
 // The coffee drying patio, laid out around one anchor point on the terraces.
 const physPATIO = [

@@ -1589,6 +1589,35 @@ const sysSHAKE_HIT   = 4.5;    // prop impact speed below which nothing shakes
 const sysDAY_LAMBDA  = 0.34;
 const sysDAY_SUN_A   = new THREE.Color(PALETTE.sunLight);
 const sysDAY_SUN_B   = new THREE.Color(PALETTE.cloth8);     // warm sandy gold
+// ---- A LOW SUN IS A WARM SUN, AND NOTHING HERE KNEW THAT (L3) -------------
+// sysSUN_BY_BIOME hands out elevations from 16 to 61 degrees. Sun COLOUR came
+// from the two-point day blend below and knew nothing about any of it, so the
+// beauty pass brought Antarctica down to 28 degrees and the Pantanal to 30 —
+// and left both lit by a Sydney noon. A polar station and an hour before
+// sundown on the Paraguay, rendered at the colour temperature of a white
+// afternoon in New South Wales. Ten chapters carry an authored `sun.color.lerp`
+// further down and those still win, because they run after atmosApply; the nine
+// that do not were getting the wrong star.
+//
+// The physics is one line of it: light from a low sun has been through more air,
+// so it has lost its blue, and it has lost some of its total as well — while the
+// SKY becomes relatively more of what is lighting the scene, and the sky is
+// blue. Warm key, cool fill, and the gap between them opening as the sun falls,
+// is also just what a low sun looks like, which is why it is worth having.
+//
+// Referenced to sin(elevation) rather than to the angle, because that is what
+// the air mass actually goes as. At and above sysSUN_ELEV_HI the term is zero
+// and every chapter lit from up there is untouched — Sydney, Pasto, Marrakech,
+// Monte Carlo, Mong Kok and the Drift all sit at 61 and see none of this.
+const sysSUN_ELEV_HI  = Math.sin(55 * Math.PI / 180);
+const sysSUN_LOW_K    = 0.55;   // how far a horizon sun warms toward cloth8
+const sysSUN_LOW_DIM  = 0.16;   // ...and how much of itself it loses on the way
+const sysHEMI_LOW_K   = 0.40;   // how far the sky end cools back toward blue
+const sysHEMI_LOW_UP  = 0.18;   // ...and how much more of the picture it becomes
+const sysGND_LOW_K    = 0.30;   // warm ground, warm bounce, warm shade
+// 0 at a high sun, 1 at the horizon. Written in sunAxes, which runs on a biome
+// change and never per frame, so this costs one asin per chapter.
+let sysSunLow = 0;
 const sysDAY_SKY_A   = new THREE.Color(PALETTE.skyLight);
 const sysDAY_SKY_B   = new THREE.Color(PALETTE.towel);      // blush high sky
 const sysDAY_GND_A   = new THREE.Color(PALETTE.groundLight);
@@ -9019,6 +9048,10 @@ export function createSystems(game) {
     fill.target.position.set(0, 0, 0);
     fill.target.updateMatrixWorld();
     sysAxDir.copy(dir);
+    // sysAxDir is a unit vector from the target toward the light, so its y IS
+    // the sine of the sun's elevation and no table lookup is needed — a chapter
+    // that moves its own sun gets the right tint without registering anywhere.
+    sysSunLow = clamp(1 - clamp(sysAxDir.y, 0, 1) / sysSUN_ELEV_HI, 0, 1);
     sysLightOff.copy(sysAxDir).multiplyScalar(sysSUN_DIST);
     sysAxRight.crossVectors(sysWorldUp, sysAxDir).normalize();
     sysAxUp.crossVectors(sysAxDir, sysAxRight).normalize();
@@ -9060,6 +9093,26 @@ export function createSystems(game) {
     hemi.groundColor.copy(sysColA);
     hemi.intensity = lerp(lerp(sysDAY_HEMI_I[0], sysDAY_HEMI_I[1], d), sysBIO_HEMI_I, b);
     amb.intensity = lerp(lerp(sysDAY_AMB_I[0], sysDAY_AMB_I[1], d), sysBIO_AMB_I, b);
+
+    // ---- ...AND THEN THE STAR'S OWN HEIGHT HAS A SAY (L3) ----------------
+    // See sysSunLow. Zero in the six chapters lit from 61 degrees, so those are
+    // bit-identical to what they were; strongest in Iceland at 16. It goes here
+    // rather than at any of the ten authored `sun.color.lerp` sites because
+    // those run after this and a chapter that has stated its own colour must
+    // keep it — this is the answer for the nine chapters that never stated one.
+    if (sysSunLow > 0.001) {
+      const lo = sysSunLow;
+      sun.color.lerp(sysDAY_SUN_B, lo * sysSUN_LOW_K);
+      sun.intensity *= 1 - lo * sysSUN_LOW_DIM;
+      // Back toward the flat sky blue: the hemisphere's warm end is the day
+      // drift's blush, and a low sun is exactly when the shade should stop
+      // being blush and start being sky.
+      hemi.color.lerp(sysDAY_SKY_A, lo * sysHEMI_LOW_K);
+      hemi.intensity *= 1 + lo * sysHEMI_LOW_UP;
+      hemi.groundColor.lerp(sysDAY_GND_B, lo * sysGND_LOW_K);
+      // The fill is bounce and bounce is the sky, so it follows — it is
+      // re-copied below, but the intensity multiply has to land before that.
+    }
     // the fill is bounce light and bounce light is the sky
     fill.color.copy(hemi.color);
     fill.intensity = hemi.intensity * sysFILL_K;

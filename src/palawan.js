@@ -4290,7 +4290,7 @@ function palUpdateTasks(game, dt) {
       palTask('the-bloom');
       palSaysNow('fire',
         ['Told you. Wait for the water. Every time.',
-         'My grandmother called it the sea remembering something.',
+         'Put a paw in and lift it out. It runs off you and then it stops.',
          'It will go again in a minute. It always does.'],
         ['Quiet. Look at the water.']);
       palSaysNow('netman',

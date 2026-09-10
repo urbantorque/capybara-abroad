@@ -2473,7 +2473,7 @@ export const TASKS = [
   { id: 'bin-chicken',  text: 'Knock over a bin (for the ibis)',        chapter: 1 },
   { id: 'dig-flower',   text: 'Dig up the gardener’s prize rose',       chapter: 1 },
   { id: 'chased',       text: 'Get chased by the gardener',             chapter: 1 },
-  { id: 'photo-op',     text: 'Get your photo taken',                   chapter: 1 },
+  { id: 'photo-op',     text: 'End up in somebody’s holiday photos',      chapter: 1 },
   // ---- ACT TWO: THE FORECOURT (F4) --------------------------------------
   // Sydney was the last flat list in the first third of the game and the one
   // where a shape matters most: it is the chapter every player opens on, it
@@ -2495,7 +2495,7 @@ export const TASKS = [
   // chapter does. `dog-loose` and `sprinkler` stay in act one: both are on the
   // lawn, and both are things you do to somebody having a nice afternoon,
   // which is what act one IS.
-  { id: 'cafe-table',    text: 'Stand on a café table',                 chapter: 1, act: 3 },
+  { id: 'cafe-table',    text: 'Stand in somebody’s brunch',               chapter: 1, act: 3 },
   { id: 'busker-hat',    text: 'Rob the busker mid-song',               chapter: 1, act: 3 },
   { id: 'dog-loose',     text: 'Let the dog off its lead',              chapter: 1 },
   { id: 'seagull-chips', text: 'Introduce the seagulls to the chips',   chapter: 1, act: 3 },
@@ -2503,7 +2503,7 @@ export const TASKS = [
   { id: 'ferry-ride',    text: 'Stow away on the ferry',                chapter: 1, act: 3 },
   // The mini. Sydney had exactly one moving thing in it and it was forty metres
   // offshore; this one comes past you, twice a minute, ringing.
-  { id: 'whippy-run',    text: 'Ride the ice cream van down the promenade', chapter: 1,
+  { id: 'whippy-run',    text: 'Do the promenade from the van roof',        chapter: 1,
     act: 3, mini: 'MR WHIPPY' },
 
   // ---- Chapter 2: Pasto, Nariño — the Galeras volcano ----
@@ -2515,14 +2515,14 @@ export const TASKS = [
   { id: 'market-chaos',    text: 'Bring down a market stall',             chapter: 2 },
   { id: 'whistle-condor',  text: 'Call down a condor',                 chapter: 2, act: 2 },
   { id: 'condor-ride',     text: 'Grab its talons and hold on',           chapter: 2, act: 2, wow: 'GALERAS' },
-  { id: 'thermal-peak',    text: 'Ride a thermal to the crater rim',      chapter: 2, act: 3 },
+  { id: 'thermal-peak',    text: 'Rise on nothing but warm air',          chapter: 2, act: 3 },
   { id: 'crater-drop',     text: 'Post something into the crater',        chapter: 2, act: 3 },
   { id: 'ruana-thief',     text: 'Make off with a ruana',                 chapter: 2 },
   { id: 'church-bell',     text: 'Ring the church bell (badly)',          chapter: 2 },
   { id: 'coffee-scatter',  text: 'Scatter the coffee harvest',            chapter: 2 },
   // The mini. Pasto is the Carnaval de Negros y Blancos and the chapter
   // never said so; the plaza also never moved.
-  { id: 'carroza',       text: 'Ride the carnival float up the plaza',           chapter: 2,
+  { id: 'carroza',       text: 'Join the carnival, on the float',                chapter: 2,
     mini: 'EL CARNAVAL' },
 
   // ---- Chapter 3: Sydney Harbour — Circular Quay to Manly ----
@@ -2531,7 +2531,7 @@ export const TASKS = [
   // out past the Bridge, and hold a heading for seven hundred metres of open
   // water. Everything else on it is something worth turning the wheel for.
   { id: 'to-quay',        text: 'Cast off from the Quay',                chapter: 3 },
-  { id: 'take-helm',      text: 'Take the helm',                         chapter: 3 },
+  { id: 'take-helm',      text: 'Relieve the skipper of his boat',       chapter: 3 },
   { id: 'under-bridge',   text: 'Sound off under the Bridge',            chapter: 3, act: 2 },
   { id: 'yacht-race',     text: 'Cut through the yacht race',            chapter: 3, act: 2 },
   { id: 'dolphin-escort', text: 'Earn a dolphin escort',                 chapter: 3, act: 2 },
@@ -2571,7 +2571,7 @@ export const TASKS = [
   { id: 'torii-run',      text: 'Run the whole torii tunnel',            chapter: 4,
     mini: 'SENBON TORII' },
   { id: 'zen-ruin',       text: 'Redesign the rock garden',              chapter: 4 },
-  { id: 'golden-swim',    text: 'Swim in the golden pond',               chapter: 4 },
+  { id: 'golden-swim',    text: 'Do lengths in front of the Golden Pavilion', chapter: 4 },
   // The pond's other half. The six granite stones out to the island have been
   // there since the chapter was written, described in their own comment as the
   // only dry way aboard, and nothing ever asked anybody to use them.
@@ -2594,18 +2594,18 @@ export const TASKS = [
   // a RHYTHM: the dance floor is judged against the actual audio clock, so
   // 'Dance salsa, properly' is the one task in the game you cannot brute-force.
   { id: 'to-cali',        text: 'Land in Cali',                          chapter: 5 },
-  { id: 'gato-sit',       text: 'Sit on the Cat of Tejada',              chapter: 5 },
+  { id: 'gato-sit',       text: 'Sit on the cat, for once',                      chapter: 5 },
   { id: 'lulada',         text: 'Make off with a lulada',                chapter: 5 },
   // The Rio Cali is the axis this whole chapter is laid out along — the Gato on
   // one bank, La Ermita on the other, the chiva over the top — and in nine tasks
   // it was scenery with a bridge across it.
-  { id: 'puente-ortiz',   text: 'Swim under the Puente Ortiz',             chapter: 5 },
+  { id: 'puente-ortiz',   text: 'Go under both arches, not one',           chapter: 5 },
   { id: 'chiva-ride',     text: 'Get on the chiva',                      chapter: 5, act: 2 },
   // The chapter's set piece, and it is fifth for the same reason the condor is
   // fourth in Pasto: you get on the roof, and then the roof leaves. Everything
   // after this line happens at night, because the ride is what puts the sun
   // down — see caliNight() in cali.js.
-  { id: 'chiva-mirador',  text: 'Ride it up to the mirador',             chapter: 5, act: 2, wow: 'CALI' },
+  { id: 'chiva-mirador',  text: 'Stay on the roof, all the way up',         chapter: 5, act: 2, wow: 'CALI' },
   { id: 'cane-run',       text: 'Disappear into the sugarcane',          chapter: 5 },
   { id: 'salsa-dance',    text: 'Dance salsa, properly',                 chapter: 5 },
   { id: 'cristo-rey',     text: 'Climb up to Cristo Rey',                chapter: 5, act: 3 },
@@ -2643,7 +2643,7 @@ export const TASKS = [
   { id: 'arpoador',       text: 'Take the applause at Arpoador',        chapter: 6, act: 3 },
   // The mini, and it is built entirely out of flow() — a wave is a patch of
   // water that is itself going somewhere, not a force and not a new verb.
-  { id: 'take-a-wave',   text: 'Take a wave in at Arpoador',                     chapter: 6,
+  { id: 'take-a-wave',   text: 'Come in to Arpoador on a wave',                  chapter: 6,
     mini: 'THE SET' },
   // Half built already: rioBuildLapa put forty-two arches over Lapa with a deck
   // on top and the comment "where the tram runs", and then nothing ran on it and
@@ -2681,7 +2681,7 @@ export const TASKS = [
   // The caption names the mountain the flight goes up, the way Pasto's names the
   // volcano rather than the town.
   { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6, act: 3 },
-  { id: 'fragata-ride',  text: 'Ride the sea breeze up the Sugarloaf',           chapter: 6, act: 3,
+  { id: 'fragata-ride',  text: 'Take the bird, not the cable car',               chapter: 6, act: 3,
     wow: 'PÃO DE AÇÚCAR' },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
@@ -2695,8 +2695,8 @@ export const TASKS = [
   { id: 'to-iceland',     text: 'Get off the boat at Reykjavík',         chapter: 7 },
   { id: 'pylsa',          text: 'Rob the hot dog stand',                 chapter: 7 },
   { id: 'organ',          text: 'Lean on the church organ',              chapter: 7 },
-  { id: 'geysir',         text: 'Ride Strokkur',                         chapter: 7, act: 2 },
-  { id: 'puffins',        text: 'Get in among the puffins',              chapter: 7 },
+  { id: 'geysir',         text: 'Still be on Strokkur when it goes',     chapter: 7, act: 2 },
+  { id: 'puffins',        text: 'Put up eleven hundred puffins at once', chapter: 7 },
   { id: 'glacier-run',    text: 'Take the glacier down in one go',       chapter: 7, act: 2 },
   // The snowcat was built as a pacing fix — the moraine is the toll on the best
   // twenty seconds in the chapter, charged every attempt — and it did the job so
@@ -2725,7 +2725,7 @@ export const TASKS = [
   { id: 'souk-escape',    text: 'Lose them in the souk',                 chapter: 8 },
   // Ninety palms in the palmeraie, and not one of them had anything on it.
   { id: 'date-palm',      text: 'Bring the dates down',                   chapter: 8, act: 2 },
-  { id: 'caravan',        text: 'Ride out with the caravan',             chapter: 8, act: 2 },
+  { id: 'caravan',        text: 'Leave town on somebody’s camel',        chapter: 8, act: 2 },
   { id: 'dune-surf',      text: 'Come down the great dune',              chapter: 8, act: 2, wow: 'THE ERG' },
   { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8, act: 3 },
   { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8, act: 3 },
@@ -2785,10 +2785,10 @@ export const TASKS = [
   // The duckboards end at the campo, and in the middle of the campo is the one
   // thing every square in Venice has: the cap of a rainwater cistern, because a
   // city standing in water has none of it fit to drink.
-  { id: 'the-well',     text: 'Look down the campo’s well',             chapter: 10 },
+  { id: 'the-well',     text: 'Put your nose in the campo’s well',      chapter: 10 },
   // ...and the maze the duckboards lead INTO, which had no task in it at all.
   { id: 'the-calli',    text: 'Cross the calli, side to side',          chapter: 10 },
-  { id: 'gondola-ride', text: 'Ride the prow of a gondola',             chapter: 10 },
+  { id: 'gondola-ride', text: 'Be the figurehead of a gondola',         chapter: 10 },
   { id: 'rialto',       text: 'Take the Rialto at a run',               chapter: 10 },
   { id: 'acqua-alta',   text: 'Be in San Marco when it goes under',     chapter: 10, act: 2, wow: 'SAN MARCO' },
   { id: 'mirror-swim',  text: 'Swim the length of the flooded square',  chapter: 10, act: 2 },
@@ -2817,21 +2817,21 @@ export const TASKS = [
   // ever is a punishment and this is a game about a rodent.
   { id: 'to-kowloon',   text: 'Get out at street level in Mong Kok',    chapter: 11 },
   { id: 'egg-tart',     text: 'Rob the bakery on Fa Yuen Street',       chapter: 11 },
-  { id: 'bamboo-climb', text: 'Go up the bamboo',                       chapter: 11, act: 2 },
+  { id: 'bamboo-climb', text: 'Treat the scaffolding as a staircase',   chapter: 11, act: 2 },
   { id: 'laundry-pole', text: 'Cross the street on the laundry poles',  chapter: 11, act: 2 },
   { id: 'wet-market',   text: 'Let the fish out at the wet market',     chapter: 11 },
   { id: 'neon-sign',    text: 'Hang off the biggest sign in Mong Kok',  chapter: 11, act: 2 },
   { id: 'symphony',     text: 'Be on the roof when the lights come on', chapter: 11, act: 2, wow: 'HONG KONG' },
-  { id: 'star-ferry',   text: 'Ride the Star Ferry across',             chapter: 11, act: 3 },
+  { id: 'star-ferry',   text: 'Take the Star Ferry like a commuter',     chapter: 11, act: 3 },
   // Sydney sounds off under the Bridge and it is the best thirty seconds in
   // chapter three. This ship has had a horn on it since 1957.
   { id: 'ferry-horn',   text: 'Lean on the Star Ferry’s horn',          chapter: 11, act: 3 },
   // Eight hundred metres of harbour across the bottom of the map, and eleven
   // tasks that never once suggested getting in it.
-  { id: 'harbour-swim', text: 'Swim in Victoria Harbour',               chapter: 11, act: 3 },
+  { id: 'harbour-swim', text: 'Swim in Victoria Harbour anyway',        chapter: 11, act: 3 },
   // The mini. Eleven chapters, and the one surface the player spends this
   // whole chapter beside had nothing on it.
-  { id: 'bus-top',       text: 'Ride the open top down the street',              chapter: 11,
+  { id: 'bus-top',       text: 'Sit up the front of the top deck',               chapter: 11,
     mini: 'THE OPEN TOP' },
   // The second mini. The open top gave the street something moving on it; this
   // gives it something HAPPENING on it, on a clock, whether you turn up or not.
@@ -2842,15 +2842,15 @@ export const TASKS = [
   // a road, and none in which it was a ROOM. Every line here is under it except
   // the two that get you there.
   { id: 'to-palawan',   text: 'Wash up on a beach, for once on purpose', chapter: 12 },
-  { id: 'outrigger',    text: 'Ride the bangka out to the island',      chapter: 12 },
+  { id: 'outrigger',    text: 'Let the bangka do the swimming',         chapter: 12 },
   // The oldest thing anybody has ever done off a jetty, and the exact opposite
   // of 'first-dive': that one is a key you hold, this one is a decision you make
   // at a run and then cannot take back.
   { id: 'jetty-jump',   text: 'Go off the end of the jetty',            chapter: 12 },
-  { id: 'first-dive',   text: 'Go under',                               chapter: 12, act: 2 },
+  { id: 'first-dive',   text: 'Remember what you are',                  chapter: 12, act: 2 },
   { id: 'the-crack',    text: 'Get into the hidden lagoon',             chapter: 12, act: 2 },
   { id: 'sea-turtle',   text: 'Keep up with the turtle',                chapter: 12, act: 2 },
-  { id: 'giant-clam',   text: 'Take something from the giant clam',     chapter: 12, act: 2 },
+  { id: 'giant-clam',   text: 'Rob the giant clam, keep the paw',             chapter: 12, act: 2 },
   { id: 'cathedral',    text: 'Find the room with the hole in the roof',chapter: 12, act: 3 },
   // ---- THE BANNER MOVED OFF THIS ROW TOO (D4.0) --------------------------
   // The bloom is the most beautiful thing in the chapter and it asks the player
@@ -2882,7 +2882,7 @@ export const TASKS = [
   // CHAPTER 13 — CAPPADOCIA. The opposite chapter, deliberately: dry, cold,
   // upward, and the one place in the game where the player cannot steer.
   { id: 'to-cappadocia',text: 'Be in the valley before it gets light',  chapter: 13 },
-  { id: 'chimney-top',  text: 'Top out on a fairy chimney',             chapter: 13 },
+  { id: 'chimney-top',  text: 'Go up a chimney nobody built',           chapter: 13 },
   { id: 'dovecote',     text: 'Let the pigeons out of the rock',        chapter: 13 },
   { id: 'the-tether',   text: 'Chew through something important',       chapter: 13 },
   // The launch field is the best-observed thing in this chapter — three states
@@ -2891,12 +2891,12 @@ export const TASKS = [
   { id: 'the-envelope', text: 'Walk an envelope, end to end',           chapter: 13, act: 2 },
   { id: 'the-mouth',    text: 'Get inside one while it is filling',     chapter: 13, act: 2 },
   { id: 'aboard',       text: 'Get in a basket before it goes',         chapter: 13, act: 2 },
-  { id: 'three-winds',  text: 'Ride three different winds',             chapter: 13, act: 3 },
+  { id: 'three-winds',  text: 'Find three winds and use all of them',   chapter: 13, act: 3 },
   { id: 'sunrise',      text: 'Be up there when the sun clears the rim',chapter: 13, act: 3, wow: 'CAPPADOCIA' },
   { id: 'on-the-trailer', text: 'Put it down on the trailer',           chapter: 13, act: 3 },
   // The mini, and it is in the chapter's name: Kapadokya is the Persian
   // katpatuka, the land of beautiful horses, and there were none.
-  { id: 'the-herd',      text: 'Ride the lead mare up the valley',               chapter: 13,
+  { id: 'the-herd',      text: 'Pick the mare the others follow',                chapter: 13,
     mini: 'KATPATUKA' },
 
   // ---- Chapter 14: Manly ----
@@ -2917,11 +2917,11 @@ export const TASKS = [
   // The mini. Standing up is not the moment — a capybara does not stand up.
   // The moment is the two seconds where the water stops going past you and
   // starts taking you with it, which is exactly what a take-off is.
-  { id: 'take-off',      text: 'Catch one',                              chapter: 14, act: 2,
+  { id: 'take-off',      text: 'Catch a wave, on purpose',               chapter: 14, act: 2,
     mini: 'THE TAKE-OFF' },
   { id: 'all-the-way',   text: 'Take the biggest of the set to the sand', chapter: 14, act: 2, wow: 'MANLY' },
   { id: 'the-bommie',    text: 'Sit on the bommie while it breaks over you', chapter: 14, act: 3 },
-  { id: 'bower-pool',    text: 'Swim a length of the ocean pool',         chapter: 14, act: 3 },
+  { id: 'bower-pool',    text: 'Use the ocean pool properly',               chapter: 14, act: 3 },
   { id: 'blue-groper',   text: 'Introduce yourself to the blue groper',   chapter: 14, act: 3 },
   // The second mini, and it is the counter-argument to the whole chapter: the
   // one way out through the break that is not swimming.
@@ -2938,18 +2938,18 @@ export const TASKS = [
   { id: 'the-locals',    text: 'Meet the neighbours',                    chapter: 15 },
   // The mini. The first time in fifteen chapters that the world falls in
   // behind the player instead of getting out of the way.
-  { id: 'gather',        text: 'Get five of them to follow you',         chapter: 15,
+  { id: 'gather',        text: 'Acquire a following',                    chapter: 15,
     mini: 'THE HERD' },
   { id: 'camalote',      text: 'Cross the bay on the floating meadow',   chapter: 15, act: 2 },
   { id: 'caiman-nap',    text: 'Sit on a sleeping jacaré',               chapter: 15 },
-  { id: 'jabiru-nest',   text: 'Look into the jabiru’s nest',            chapter: 15 },
+  { id: 'jabiru-nest',   text: 'Look into a nest nobody can reach',      chapter: 15 },
   { id: 'cowbird',       text: 'Give a cowbird a lift',                  chapter: 15 },
   { id: 'the-otters',    text: 'Get told off by the giant otters',       chapter: 15, act: 2 },
   { id: 'missing-plank', text: 'Cross the bridge that is missing a plank', chapter: 15, act: 2 },
   { id: 'macaw-nut',     text: 'Take a palm nut off a hyacinth macaw',   chapter: 15, act: 2 },
   // The second mini, and the only carrier in the game that is walking on its
   // knuckles because its claws are too long to put down.
-  { id: 'tamandua',      text: 'Ride the anteater across the campo',     chapter: 15, act: 2,
+  { id: 'tamandua',      text: 'Cross the campo without touching it',    chapter: 15, act: 2,
     mini: 'O TAMANDUÁ' },
   { id: 'the-crossing',  text: 'Take the whole herd across the river',   chapter: 15, act: 2, wow: 'O PANTANAL' },
 
@@ -2974,7 +2974,7 @@ export const TASKS = [
   { id: 'first-echo',    text: 'Find out what your voice is for',        chapter: 16 },
   { id: 'glow-trail',    text: 'Follow the glow-worms down to the river', chapter: 16 },
   { id: 'cave-river',    text: 'Swim the river in the dark',             chapter: 16 },
-  { id: 'hand-of-dog',   text: 'Top out on the biggest stalagmite',      chapter: 16, act: 2 },
+  { id: 'hand-of-dog',   text: 'Stand on the Hand of Dog',               chapter: 16, act: 2 },
   { id: 'swiftlets',     text: 'Put up the swiftlets (they steer on sound too)', chapter: 16, act: 3 },
   { id: 'cave-pearl',    text: 'Pocket a cave pearl',                    chapter: 16, act: 3 },
   { id: 'blind-fish',    text: 'Meet something with no eyes',            chapter: 16, act: 2 },
@@ -2993,7 +2993,7 @@ export const TASKS = [
   // It keeps its shot, its swell and its line, and it becomes what it always
   // was: the act-2 ENTRY, the thing that makes you stop when you first walk in
   // here. The wow moves to the one vertical the chapter has ever had.
-  { id: 'the-doline',    text: 'Stand in the light inside the mountain', chapter: 16, act: 2 },
+  { id: 'the-doline',    text: 'Find the forest inside the mountain',         chapter: 16, act: 2 },
   // ...and this is the marquee. Two hundred metres of daylight coming down a
   // hole in a mountain, a column of collapsed roof standing in the middle of
   // it, and the only way down that is quicker than the way up. The sixteen
@@ -3005,7 +3005,7 @@ export const TASKS = [
     wow: 'SƠN ĐOÒNG' },
   { id: 'phytokarst',    text: 'Shout at the garden that leans',         chapter: 16, act: 2 },
   // The second mini. There is a river in here and things come down it.
-  { id: 'the-log',       text: 'Ride a log through the dark',            chapter: 16,
+  { id: 'the-log',       text: 'Go downstream on whatever floats past',  chapter: 16,
     mini: 'THE DRIFTWOOD' },
 
   // ---- Chapter 17: the Antarctic Peninsula ----
@@ -3017,13 +3017,13 @@ export const TASKS = [
   // things this place has that nowhere else does: ice you cannot stand up on,
   // and something very large that has decided to come and look at you.
   { id: 'to-antarctic',    text: 'Get to the bottom of the world',        chapter: 17 },
-  { id: 'take-tiller',     text: 'Take the tiller',                       chapter: 17 },
-  { id: 'the-lead',        text: 'Find the lead through the pack',        chapter: 17, act: 2 },
+  { id: 'take-tiller',     text: 'Appoint yourself skipper',              chapter: 17 },
+  { id: 'the-lead',        text: 'Find the crack in the ice and take it', chapter: 17, act: 2 },
   { id: 'station-mug',     text: 'Rob the southernmost bar on earth',     chapter: 17 },
   { id: 'haul-out',        text: 'Haul out on a floe',                    chapter: 17, act: 2 },
   { id: 'leopard-seal',    text: 'Be looked at by a leopard seal',        chapter: 17, act: 3 },
   { id: 'berg-arch',       text: 'Take her through the arch in the berg', chapter: 17, act: 2 },
-  { id: 'whale-bones',     text: 'Sit down inside the whale',             chapter: 17, act: 2 },
+  { id: 'whale-bones',     text: 'Sit inside what is left of a whale',          chapter: 17, act: 2 },
   { id: 'spy-hop',         text: 'Get spy-hopped',                        chapter: 17, act: 3 },
   // ...and the one thing on this list that is done with the voice rather than
   // with the boat. Four thousand of them answer, and it rolls up the hill.
@@ -3035,9 +3035,9 @@ export const TASKS = [
   { id: 'blue-ice',        text: 'Slide the glacier into the sea',        chapter: 17, act: 2 },
   // The second mini, and the only carrier in the game that is a piece of the
   // sea. It is going north through the gate with or without you.
-  { id: 'floe-drift',      text: 'Ride a floe down the channel',          chapter: 17, act: 2,
+  { id: 'floe-drift',      text: 'Let a floe take you north',             chapter: 17, act: 2,
     mini: 'THE FLOE' },
-  { id: 'orca-ride',       text: 'Run with the pod',                      chapter: 17, act: 3, wow: 'THE PENINSULA' },
+  { id: 'orca-ride',       text: 'Be let in by the orcas',                chapter: 17, act: 3, wow: 'THE PENINSULA' },
 
   // ---- Chapter 18: Monte Carlo -------------------------------------------
   // A HEIST, IN THREE MOVEMENTS, and the acts are geography: the water, the
@@ -3049,17 +3049,17 @@ export const TASKS = [
   { id: 'superyacht',   text: 'Board a boat nobody invited you onto',   chapter: 18 },
   { id: 'black-tie',    text: 'Acquire a dinner jacket',                chapter: 18 },
   { id: 'high-dive',    text: 'Go off the top deck into the harbour',   chapter: 18 },
-  { id: 'the-rock',     text: 'Get up onto the Rock',                   chapter: 18 },
+  { id: 'the-rock',     text: 'Look down on the entire country',        chapter: 18 },
   { id: 'palace-guard', text: 'Make the palace guard break',            chapter: 18 },
   // Act two. The one building in this game with an inside, and the only room
   // in it where anybody minds that you are there.
-  { id: 'pass-the-door',text: 'Get past the man on the door',           chapter: 18, act: 2 },
+  { id: 'pass-the-door',text: 'Walk in as though you were expected',    chapter: 18, act: 2 },
   { id: 'the-floor',    text: 'Cross the floor without being seen',     chapter: 18, act: 2 },
   { id: 'chip-stack',   text: 'Leave the table ten up',                 chapter: 18, act: 2 },
   { id: 'champagne',    text: 'Redistribute the champagne',             chapter: 18, act: 2 },
   { id: 'piano-solo',   text: 'Give the salon a piano solo',            chapter: 18, act: 2 },
   // The first mini, and the only carrier in the game that is furniture.
-  { id: 'the-wheel',    text: 'Ride the roulette wheel',                chapter: 18, act: 2,
+  { id: 'the-wheel',    text: 'Climb into the wheel, mid-spin',           chapter: 18, act: 2,
     mini: 'ROUGE ET NOIR' },
   // Act three. Everything here happens on the roof of somebody else's car.
   { id: 'chicane',      text: 'Put the chicane in the harbour',         chapter: 18, act: 3 },
@@ -3076,19 +3076,19 @@ export const TASKS = [
   // quiet place in the city, then an alley that goes completely silent eleven
   // seconds before it is not silent at all.
   { id: 'to-hanoi',     text: 'Get across the first road',              chapter: 19 },
-  { id: 'cross-the-road', text: 'Cross the road without stopping',      chapter: 19 },
+  { id: 'cross-the-road', text: 'Walk into the traffic and trust it',   chapter: 19 },
   { id: 'pho-raid',     text: 'Get your whole face in a bowl of pho',   chapter: 19 },
   { id: 'flower-bike',  text: 'Unload a flower bicycle',                chapter: 19 },
-  { id: 'barber',       text: 'Look into the pavement barber’s mirror', chapter: 19 },
+  { id: 'barber',       text: 'Give the barber’s mirror a surprise',       chapter: 19 },
   // The first mini, and the fourteenth thing in this game that carries you.
-  { id: 'ride-the-flow', text: 'Get on a scooter and stay on it',       chapter: 19,
+  { id: 'ride-the-flow', text: 'Travel by stranger’s footwell',         chapter: 19,
     mini: 'HANG NGANG' },
   // The second mini. Ninety-six of them, twenty centimetres high.
-  { id: 'the-stools',   text: 'Bring down the whole terrace',           chapter: 19,
+  { id: 'the-stools',   text: 'Take the whole terrace down with you',   chapter: 19,
     mini: 'BIA HOI' },
   // Act two: everything inside the ring road, which is where it is quiet.
   { id: 'the-huc',      text: 'Cross the red bridge',                   chapter: 19, act: 2 },
-  { id: 'turtle-tower', text: 'Get out to the tower on the island',     chapter: 19, act: 2 },
+  { id: 'turtle-tower', text: 'Reach the tower without a boat',         chapter: 19, act: 2 },
   { id: 'shuttlecock',  text: 'Stand in the middle of the da cau',      chapter: 19, act: 2 },
   { id: 'water-puppets',text: 'Get in among the water puppets',         chapter: 19, act: 2 },
   { id: 'egg-coffee',   text: 'Take an egg coffee off a balcony',       chapter: 19, act: 2 },
@@ -3275,12 +3275,22 @@ export const CHAPTERS = [
       { kick: 'THE AVENUE', line: 'follow the drums. they have already started.' },
       { kick: 'THE MOUNTAIN', line: 'there is a cable car, and there is a much better way up.' },
     ] },
-  { n: 7, biome: 'iceland', name: 'Iceland',         sub: 'half past eleven, and the sun is not the plan',
+  { n: 7, biome: 'iceland', name: 'Iceland',         sub: 'late August, and the dark has only just come back',
     arrive: 'to-iceland', far: 1200, tall: true,  pal: 7,
-    hint: 'dark, and the ground does not hold',       open: 'it will not get properly dark. plan accordingly.', way: 'the end of the pier',
+    hint: 'dark, and the ground does not hold',       open: 'it gets dark again this month. only just, and not for long.', way: 'the end of the pier',
     keep: 'a piece of the glacier',
     marquee: { x: -40, z: -10, up: 60, say: 'the whole sky, out past the last of the town lights' },
-    note: 'It never got properly dark, so nothing you did here was ever quite unobserved.',
+    // ---- ONE SEASON, NOT TWO ----------------------------------------------
+    // The chapter used to be the midnight sun — 'half past eleven, and the sun
+    // is not the plan', 'it never got properly dark' — and its marquee is an
+    // aurora, which you cannot see under a sun that does not set. Late August
+    // is the one week that holds both: the sky goes properly dim again for the
+    // first time since spring, and the last of the puffins are still on the
+    // cliff before they go to sea. Nothing in iceland.js moves — it has always
+    // rendered half past eleven at night, and the local on the pavement has
+    // always said it does not get darker than this until October, which is now
+    // the truth rather than a contradiction.
+    note: 'The dark had only just come back, and the sky spent your one night here showing off with it.',
     acts: [
       { kick: 'REYKJAVÍK', line: 'nobody is out. that is the good news.' },
       { kick: 'OUT OF TOWN', line: 'the ground stops holding you somewhere past here.' },

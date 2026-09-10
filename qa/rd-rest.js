@@ -3,7 +3,7 @@ async page => {
   // the same spot, so a change to the two pitch numbers can be judged as a
   // pair of pictures rather than as a pair of numbers. Tag is a literal and is
   // rewritten between runs (run-code takes no argument — trap 14).
-  const TAG = 'B'
+  const TAG = 'C'
   const shot = async (name) => {
     const b = await page.screenshot({ type: 'png' })
     await page.evaluate(async (o) => {
