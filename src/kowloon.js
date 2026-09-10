@@ -171,6 +171,21 @@ const hkDPD_BULBS = [], hkDPD_FLAME = [];
 const hkMarketBulbs = [];
 let hkLaserMesh = null, hkLaserMat = null;
 let hkSweepMesh = null, hkSweepMat = null;
+// ---- CONDUCTING (D4.1) ---------------------------------------------------
+// The show was thirty-nine seconds of watching. It is scored to the live audio
+// clock, split into four movements, and it owns five light channels — and the
+// player, forty metres up a bamboo scaffold they climbed to get there, could
+// do nothing with any of it. The wheek is the one input this game has that is
+// a NOISE, the far shore is the thing making the noise back, and nothing else
+// in nineteen chapters is a call and a response on a beat.
+let hkConductN = 0;          // wheeks spent in this run of the show
+let hkConductT = 0;          // s of cooldown, so a held key is not a solo
+let hkConductSaid = false;   // the one-shot that says it is possible at all
+let hkSweepAnswer = 0;       // s left of the far shore pointing back at you
+let hkSweepAt = 0;           // ...and where it is pointing
+let hkFinaleWant = false;    // the eighth wheek, spent on the next beat
+const hkCONDUCT_MAX = 8;     // ...and how many that is
+const hkCONDUCT_COOL = 0.42; // s between wheeks that count
 let hkWaterMesh = null;
 let hkFerryGroup = null, hkFerryBody = null;
 let hkFerryT = 0, hkFerryDir = 1, hkFerryRideT = 0, hkFerryFrom = 0;
@@ -3529,6 +3544,88 @@ function hkUpdateFerry(game, dt) {
  * has been in the background) it falls back to a fixed interval, because
  * CONTRACT: sound is never a requirement, only a reward.
  */
+/**
+ * AND IT FINISHES.
+ *
+ * A set piece that stops rather than ends is a set piece the player does not
+ * know they have watched. Everything up at once, one low note under it, and
+ * the frame moves — the only time this chapter shakes the camera at all.
+ *
+ * Lifted out of the beat ladder by D4.1, because there are two ways to reach
+ * it now: the clock, and the eighth wheek.
+ */
+function hkFireFinale(game) {
+  if (hkFinaleDone) return;
+  hkFinaleDone = true;
+  hkLitCount = hkTOWER_N;
+  // ...FROM THE FAR SHORE, which is where it is coming from. 0 of 31 hkSfx
+  // calls in this file passed a position, so the loudest moment in the chapter
+  // played dead centre while the thing making it was a hundred and eighty
+  // metres across the water.
+  const skyAt = { x: 0, y: 50, z: hkSHORE_Z };
+  hkSfx('chime', { volume: 0.45, pitch: 0.5, at: skyAt });
+  hkSfx('chime', { volume: 0.30, pitch: 1.0, at: skyAt });
+  if (typeof game.shake === 'function') game.shake(0.14);
+  const cp2 = game.capy && game.capy.position;
+  if (cp2 && cp2.y > 20)
+    hkToast(hkConductN >= hkCONDUCT_MAX ? 'and all of it, because you asked.'
+                                        : 'and all of it, at once.');
+}
+
+/**
+ * THE VOICE, ON THE ROOF, DURING THE SHOW (D4.1).
+ *
+ * One wheek does something different in each of the four movements, because
+ * the movements already do different things and the point is to be inside the
+ * piece rather than to have a button. It reads the same hkShowT and the same
+ * u2 the beat ladder does, so the two can never disagree about which movement
+ * this is.
+ *
+ * ONLY FROM THE ROOF. The whole argument of this chapter is that the climb and
+ * the view are the same gesture; conducting the harbour from the pavement
+ * would throw that away. And only while the show is up, 39 s in every 152.
+ */
+function hkWheek(game) {
+  // THE GATE — see monaco.js and cave.js. Registered on the global event and
+  // never removed, so it has to test the live chapter or a wheek in Iceland
+  // conducts a skyline nobody is looking at.
+  if (!game.biome.isActive('kowloon')) return;
+  const capy = game.capy;
+  if (!capy || !capy.position) return;
+  if (hkShowT < 0 || capy.position.y <= hkSHOW_ROOF) return;
+  if (hkConductT > 0) return;
+  hkConductT = hkCONDUCT_COOL;
+  hkConductN++;
+
+  // the far shore answers, and it answers by pointing at you
+  hkSweepAnswer = 1.5;
+  hkSweepAt = clamp(capy.position.x / 26, -1, 1);
+
+  const u2 = clamp(hkShowT / ((hkSHOW_OFF - hkSHOW_ON) * hkCYCLE), 0, 1);
+  if (hkConductN >= hkCONDUCT_MAX) {
+    // the eighth. Not fired here: it is spent on the next BEAT, so even the
+    // ending lands on the music rather than on a keypress.
+    hkFinaleWant = true;
+    hkSfx('chime', { volume: 0.30, pitch: 0.55 });
+  } else if (u2 < hkSHOW_M1) {
+    // M1 is towers coming up one per beat. Take the next one NOW, and re-zero
+    // the fallback accumulator so the clock does not immediately take another.
+    if (hkLitCount < hkTOWER_N) {
+      hkLitCount++;
+      hkBeatAcc = 0;
+      hkSfx('chime', { volume: 0.26, pitch: 0.9 + hkLitCount * 0.055 });
+    }
+  } else if (u2 < hkSHOW_M2) {
+    // M2 is a wave running the skyline. Send it back from your end.
+    hkChase = 0;
+    hkSfx('chime', { volume: 0.24, pitch: 1.5 });
+  } else if (u2 < hkSHOW_M3) {
+    // M3 is odds against evens. Flip which is which.
+    hkShowBeat++;
+    hkSfx('chime', { volume: 0.22, pitch: hkShowBeat % 2 ? 1.32 : 0.86 });
+  }
+}
+
 function hkUpdateShow(game, dt) {
   const prev = hkPhase;
   hkPhase += dt / hkCYCLE;
@@ -3536,6 +3633,17 @@ function hkUpdateShow(game, dt) {
 
   const warnNow = hkPhase >= hkSHOW_WARN && hkPhase < hkSHOW_ON;
   const onNow = hkPhase >= hkSHOW_ON && hkPhase < hkSHOW_OFF;
+  if (hkConductT > 0) hkConductT -= dt;
+  if (hkSweepAnswer > 0) hkSweepAnswer -= dt;
+  // ...and the one line that says the harbour is listening. On the roof, in
+  // the show, once per session.
+  if (!hkConductSaid && hkShowT >= 0) {
+    const cpc = game.capy && game.capy.position;
+    if (cpc && cpc.y > hkSHOW_ROOF) {
+      hkConductSaid = true;
+      hkSay('wheek at it. it is a hundred and eighty metres away and it is listening.');
+    }
+  }
 
   // ---- TWO WARNINGS, BECAUSE ELEVEN SECONDS IS NOT A CLIMB ---------------
   // The only notice was hkSHOW_WARN, which is 11.4 s before the lights and is
@@ -3574,6 +3682,9 @@ function hkUpdateShow(game, dt) {
     hkShowBeat = 0;
     hkChase = 0;
     hkFinaleDone = false;
+    // D4.1: a fresh run of the show is a fresh eight.
+    hkConductN = 0;
+    hkFinaleWant = false;
     hkSeenShow = true;
     if (!hkShowDone) {
       const capy0 = game.capy;
@@ -3675,6 +3786,9 @@ function hkUpdateShow(game, dt) {
     if (step) {
       hkShowBeat++;
       hkChase++;
+      // D4.1: the eighth wheek, spent on a beat rather than on the keypress,
+      // so the ending is still on the music.
+      if (hkFinaleWant && !hkFinaleDone) { hkFireFinale(game); hkFinaleWant = false; }
       const u2 = clamp(hkShowT / ((hkSHOW_OFF - hkSHOW_ON) * hkCYCLE), 0, 1);
       if (u2 < hkSHOW_M1) {
         if (hkLitCount < hkTOWER_N) {
@@ -3690,25 +3804,9 @@ function hkUpdateShow(game, dt) {
         hkSfx('chime', { volume: 0.15, pitch: hkShowBeat % 2 ? 1.32 : 0.86 });
         hkLitCount = hkTOWER_N;
       } else if (!hkFinaleDone) {
-        // ---- AND IT FINISHES. --------------------------------------------
-        // A set piece that stops rather than ends is a set piece the player
-        // does not know they have watched. Everything up at once, one low note
-        // under it, and the frame moves — which is the only time this chapter
-        // shakes the camera at all.
-        hkFinaleDone = true;
-        hkLitCount = hkTOWER_N;
-        // ...FROM THE FAR SHORE, which is where it is coming from. 0 of 31
-        // hkSfx calls in this file passed a position, so the loudest moment in
-        // the chapter played dead centre while the thing making it was a
-        // hundred and eighty metres across the water. Two cues already
-        // hand-roll a distance falloff with no pan at all — the law v16
-        // replaced.
-        const skyAt = { x: 0, y: 50, z: hkSHORE_Z };
-        hkSfx('chime', { volume: 0.45, pitch: 0.5, at: skyAt });
-        hkSfx('chime', { volume: 0.30, pitch: 1.0, at: skyAt });
-        if (typeof game.shake === 'function') game.shake(0.14);
-        const cp2 = game.capy && game.capy.position;
-        if (cp2 && cp2.y > 20) hkToast('and all of it, at once.');
+        // Lifted out to hkFireFinale by D4.1: there are two ways to reach it
+        // now, the clock and the eighth wheek.
+        hkFireFinale(game);
       }
       if (u2 >= hkSHOW_M1) hkLitCount = hkTOWER_N;
     }
@@ -3815,8 +3913,13 @@ function hkUpdateShow(game, dt) {
     const vis2 = hkShow > 0.02 && k2 > 0.02;
     if (vis2 !== hkSweepMesh.visible) hkSweepMesh.visible = vis2;
     if (vis2) {
-      hkSweepMesh.rotation.z = Math.sin(hkTime * 0.33) * 0.30;
-      hkSweepMesh.rotation.x = -0.62 + Math.sin(hkTime * 0.21 + 1.1) * 0.20;
+      // D4.1: while the far shore is answering a wheek it stops wandering and
+      // POINTS, which is the whole tell that the noise went anywhere.
+      const ans = clamp(hkSweepAnswer / 1.5, 0, 1);
+      const idleZ = Math.sin(hkTime * 0.33) * 0.30;
+      const idleX = -0.62 + Math.sin(hkTime * 0.21 + 1.1) * 0.20;
+      hkSweepMesh.rotation.z = lerp(idleZ, hkSweepAt * 0.55, ans);
+      hkSweepMesh.rotation.x = lerp(idleX, -0.30, ans);
     }
   }
 
@@ -4743,6 +4846,12 @@ function hkUpdateTasks(game, dt) {
 export function createKowloon(game) {
   hkGame = game;
 
+  // ---- THE VOICE, ON THE ROOF (D4.1) --------------------------------------
+  // Mong Kok had no wheek handler at all — eleven chapters in, the one input
+  // this game has that is a NOISE did nothing on the street whose far shore is
+  // a thing that answers noise. hkWheek carries its own chapter gate.
+  game.events.on('capy:wheek', function () { hkWheek(game); });
+
   game.biome.register('kowloon', {
     ensureBuilt() { hkBuild(game); },
     onEnter() {
@@ -4866,6 +4975,8 @@ export function createKowloon(game) {
     showing() { return hkShowT >= 0; },
     seenShow() { return hkSeenShow; },
     litTowers() { return hkLitCount; },
+    /** D4.1: how many wheeks the roof has spent on this run of the show. */
+    conducted() { return hkConductN; },
     neon() { return hkNeonPulse; },
     climbing() { return !!(game.capy && game.capy.climbing); },
 
