@@ -3756,6 +3756,82 @@ export function createNPCs(game) {
   }
   game.events.on('finale:staged', npcGather);
 
+  // ---- ...AND ONE OF THEM HAS BEEN THERE THE WHOLE TIME (L9) --------------
+  //
+  // The ending is the best-designed thing in this file: come home, find every
+  // souvenir laid out in a horseshoe on the lawn, and sit down with it. Five
+  // people wander over to look. And all five of them are strangers who were
+  // already in the gardens — so the journey is closed by an audience that did
+  // not see any of it.
+  //
+  // The person who did see it already exists. THE TRAVELLER (see npcTRAV_FIG)
+  // has six months and a very bad map and turns up in four chapters, and their
+  // arc is written and then simply stops: 'Six months. I have got six months
+  // and a very bad map' at the Quay, 'Of course. Of course you are here. I
+  // have stopped asking' in Cappadocia, and then nothing. This is the last
+  // line of that, and it is the only thing in the game that says the journey
+  // was witnessed by somebody other than the person holding the keyboard.
+  //
+  // WHY THIS IS BUILT HERE AND NOT IN sydney's OWN FILE. A traveller
+  // registered in Sydney would be standing on that lawn in the first minute of
+  // a new game, before the Quay, before the map, before they have any reason
+  // to know you — which is the one thing that would spend the whole arc for
+  // nothing. This person may only exist at the end, so they are built at the
+  // end, on the one event that means it.
+  //
+  // Built ONCE and kept: the finale is staged again on every return to Sydney
+  // (props.js re-huddles the souvenirs each time), so a fresh figure per
+  // staging would put a small crowd of identical travellers on the lawn by the
+  // third visit. The group is hidden on the way out and shown on the way back,
+  // and because it was made outside a chapter build main.js's capture tag does
+  // not own it — which is the whole reason it can be hidden rather than
+  // detached, and the reason this file has to hide it itself.
+  const npcTRAV_FIN_LINES = [
+    'That is the map used up.',
+    'I take photographs now. They are all blurry. I have made my peace with it.',
+    'Six months, and I still could not tell you how you got to half of them.',
+    'You are back where you started. So am I. Only one of us meant to be.',
+  ];
+  // 'There it is. Every time.' is what they say in Cappadocia. This is that
+  // line one chapter later, and it is the only place it can land.
+  const npcTRAV_FIN_WHEEK = ['There it is. Last time, I suppose.'];
+  let npcTravFin = null;
+  function npcTravellerHome() {
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney') return;
+    if (npcTravFin) {
+      if (npcTravFin.group) npcTravFin.group.visible = true;
+      return;
+    }
+    // OUTSIDE the five, and on the open side. npcGather spreads its people over
+    // the mouth-facing three quarters starting at a quarter turn, so the far
+    // quarter is the one bearing on the ring that is deliberately empty — which
+    // is where somebody stands who is not part of the group that wandered over.
+    const a = -Math.PI * 0.42;
+    const rad = npcGATHER_R + 2.3;
+    const gx = sysFIN_LAWN_X + Math.cos(a) * rad;
+    const gz = sysFIN_LAWN_Z + Math.sin(a) * rad;
+    // The lawn is flat at y = 0 and this is Sydney, but ask anyway: a landmark
+    // constant taken on trust as a place to stand is what once left two locals
+    // talking from the bed of the Uji.
+    let gy = 0;
+    try {
+      const th = game.env && game.env.terrainHeight;
+      if (typeof th === 'function') gy = th(gx, gz) || 0;
+    } catch (e) { gy = 0; }
+    npcTravFin = addTraveller({
+      biome: 'sydney', x: gx, y: gy, z: gz,
+      // facing the horseshoe, which is what everybody on that ring is doing
+      face: Math.atan2(sysFIN_LAWN_X - gx, sysFIN_LAWN_Z - gz),
+      // Wider than a conversation. The player is SITTING at the middle of the
+      // horseshoe and the ending is reached by staying there — they are not
+      // going to walk over, so the line has to reach them where the moment is.
+      near: 9.5, cool: 30,
+      lines: npcTRAV_FIN_LINES, wheek: npcTRAV_FIN_WHEEK,
+    });
+  }
+  game.events.on('finale:staged', npcTravellerHome);
+
   /**
    * ARM THE CHAIN FROM WHOEVER IS NEAREST TO (x, z), in the two chapters that
    * have no `locals`. npcWitnessChain takes a PERSON, because a look has to
@@ -11067,6 +11143,14 @@ export function createNPCs(game) {
     // answer it again. A latch that never clears would mean the lawn had a
     // crowd the first time you came home and nobody ever after.
     npcGathered = false;
+    // ---- ...AND THE TRAVELLER GOES AWAY AGAIN (L9) -----------------------
+    // See npcTravellerHome. That figure was built outside a chapter build, so
+    // main.js's capture tag does not own it and nothing else will ever take it
+    // off the lawn — which, left alone, is a man with a rucksack standing at
+    // Sydney's coordinates in the middle of the Sahara. Hidden here rather
+    // than removed, because the finale is staged again on every return and the
+    // same person has to be able to come back.
+    if (npcTravFin && npcTravFin.group) npcTravFin.group.visible = false;
     // ---- ...AND THE PLACE STARTS WATCHING THE DOOR (item 6) -------------
     // Armed on every arrival and spent by the clock in localsStep. It does
     // nothing at all unless systems.js has handed down a tier of npcNOTO_TIER
