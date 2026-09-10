@@ -27304,6 +27304,8 @@ export function createSystems(game) {
   let skyEyeT = 0;              // the PLAYER'S share of the skyward blend. See sysEYE_RAISE_W.
   let skyRestT = 0;             // ...and the STILLNESS's share of it. See sysREST_W.
   let restIdleT = 0;            // banked stillness, which camIdleT is not. See sysREST_FORGET.
+  // ...and whether this SPOT has already refused the wide shot. See restAsk.
+  let restBlocked = false;
   let shakeAmt = 0;
   let camInit = false;
   // flight rig: blend 0..1, the heading the rig is chasing, and its damped follow
@@ -34380,9 +34382,16 @@ export function createSystems(game) {
     // and that one is gated.
     //
     // The bank. See sysREST_FORGET for why this is not simply camIdleT.
-    restIdleT = (Math.abs(ix) + Math.abs(iz) >= 0.02) ? 0
-              : clamp(restIdleT + (camIdle ? dt : -dt * sysREST_FORGET),
-                      0, sysREST_T + 0.5);
+    if (Math.abs(ix) + Math.abs(iz) >= 0.02) {
+      restIdleT = 0;
+      // ...and the place gets to be asked again, because it is a different
+      // place now. See restBlocked below: the stick is the only thing that
+      // clears it, and it is the same signal that zeroes the bank.
+      restBlocked = false;
+    } else {
+      restIdleT = clamp(restIdleT + (camIdle ? dt : -dt * sysREST_FORGET),
+                        0, sysREST_T + 0.5);
+    }
     // ---- ...AND NOT IF YOU ASKED FOR LESS MOTION (F4) -------------------
     // This is the rest lens: stand still long enough and the camera opens out
     // and lifts on its own. It is one of the nicest things in the game and it
@@ -34391,7 +34400,62 @@ export function createSystems(game) {
     // and it was the one motion system in the file that had never read the
     // switch. Every other term in this block already does (`breathe` on the
     // field of view, the shake, the sway, the bob).
-    const restAsk = (started && !mounted && !sysCalmOn() &&
+    // ---- ...AND NOT WHERE THE SHOT CANNOT BE HAD (L11) -------------------
+    // The wide shot puts the boom out from 9.5 m to 12.5 m, and in a tight
+    // place there is nothing there to put it into. Measured at Circular Quay
+    // with the animal parked beside the ferry: the crane asks for the full
+    // 0.80, `camClearF` cuts the boom to 0.15, and cutting the boom drags the
+    // eye up the boom axis toward the anchor — so the pitch it actually
+    // achieves is 26 degrees instead of 11, and the frame is the back of the
+    // animal's head with a stranger's torso filling the other half. That is
+    // strictly worse than the driving lens it opened out of.
+    //
+    // So the ask is scaled by how much of the boom the place will actually
+    // give. A wide shot you cannot have is not a compromise, it is a close-up.
+    //
+    // ON LAST FRAME'S VALUE, WHICH IS WHAT MAKES IT SAFE. The ray for this
+    // frame has not been cast yet (see sysLook.y below, which reads it the same
+    // way and for the same reason), so this cannot be a same-frame loop. And
+    // the two rates are already an order apart in the right direction:
+    // camClearF eases OUT at 3.2/s and cuts instantly, while skyRestT damps at
+    // 1.15/s — about 2.5 s — so the ask always moves slower than the thing it
+    // is reading and cannot ring against it.
+    //
+    // A LATCH, NOT A SCALE, AND THAT IS THE WHOLE OF THE DESIGN. Scaling the
+    // ask by camClearF is the obvious version and it OSCILLATES: the crane
+    // retracts, the shorter boom clears the ray, camClearF eases back out at
+    // 3.2/s, the ask rises, the crane extends, and it is cut again — a five
+    // second breath in and out, for as long as the player stands there.
+    //
+    // So the place gets ONE answer. The first real cut while the wide shot is
+    // opening says "not here", and it stays said until the player goes
+    // somewhere else — which is exactly the event that zeroes restIdleT below,
+    // so the latch clears on the same signal and needs no second rule. There is
+    // no path from the crane's own position back into the ask, so there is
+    // nothing to ring.
+    //
+    // THE THRESHOLD IS FROM THE FRAMES, NOT FROM FEEL. A cut boom is not by
+    // itself a bad picture — it is a closer one — so the number has to separate
+    // the shots that are merely tight from the ones that are a photograph of
+    // the animal's head. Three settled frames were judged by eye:
+    //
+    //   quay 0.15      the back of the animal's head and a stranger's torso
+    //   kowloon 0.38   inside a wet-market stall, looking at a wall
+    //   antarctic 0.53 the channel, the floes and the jetty. A good frame.
+    //
+    // 0.48 is between them, and it has a physical reading as well: at the full
+    // crane's 12.5 m of boom it is 6.0 m of eye, which is under sysCAM_MIN —
+    // closer than a player is ever allowed to zoom by hand. Below that the
+    // wide shot has stopped being a wide shot.
+    //
+    // AND THE CRANE HAS TO BE GENUINELY OUT BEFORE A CUT MEANS ANYTHING. The
+    // first cut of this used skyRestT > 0.05, which is a boom of about 9.7 m —
+    // the driving boom, near enough — so a spot that is tight at 9.5 latched on
+    // a cut it was always going to have. The question this latch asks is not
+    // "is the boom cut", it is "is the boom cut BY OPENING OUT", and only a
+    // crane that is already half extended can answer it.
+    if (camClearF < 0.48 && skyRestT > sysREST_W * 0.42) restBlocked = true;
+    const restAsk = (started && !mounted && !sysCalmOn() && !restBlocked &&
                      camHandT <= 0 && restIdleT >= sysREST_T) ? sysREST_W : 0;
     skyRestT = damp(skyRestT, restAsk,
                     restAsk > 0 ? sysREST_LAMBDA : sysREST_DROP, dt);
