@@ -3190,6 +3190,10 @@ function kyoBuildGates(game, root) {
         x: bx - nx * s * 0.9, z: bz - nz * s * 0.9,
         yaw: Math.atan2(seg.tx, seg.tz) + (s > 0 ? 0.5 : -0.5),
         t: rand(0, 9), state: 0, dive: 0,
+        // ...and how long this one has left of being startled off its gunwale.
+        // See kyoUpdateBirds and THE BELL: `bell` is a per-bird countdown so
+        // six of them do not come off six boats on the same frame.
+        bell: 0, bellD: rand(0, 0.55), bellIn: false,
       });
       // the mooring pole, which is what actually stops you swimming through it
       kyoStaticBox(game, bx, kyoRIVER_Y + 0.5, bz, 0.9, 0.55, 3.0, yaw);
@@ -3240,14 +3244,68 @@ function kyoBuildGates(game, root) {
  * come down the thread within eight metres of a moored boat during the run.
  */
 const kyoBirds = [];
+let kyoBirdBellWas = 0;      // last frame's kyoBellPulse — see kyoUpdateBirds
+let kyoBirdBellN = 0;        // which of them went in, so it is not always the same three
 let kyoBirdMesh = null, kyoBirdWing = null;
 function kyoUpdateBirds(game, dt) {
   if (!kyoBirdMesh) return;
   const cp = game && game.capy && game.capy.position;
+  // ---- AND THE BELL PUTS THEM OFF THEIR BOATS -----------------------------
+  //
+  // The note at the strike site names five things that answer one bell — the
+  // lanterns, the petals, the grove, the koi and "the cormorants off their
+  // boats" — and this function read `kyoBellPulse` NOWHERE. Four of the five
+  // agreed about the moment and the sixth thing on the river went on standing
+  // there drying its wings. A comment that promises a reaction and a loop that
+  // does not have one is worse than never having claimed it.
+  //
+  // A rising edge, not a level: `kyoBellPulse` decays over about two seconds
+  // and a level test would re-startle a bird every frame of that. Each bird
+  // carries its own `bellD` delay, so six birds come off six boats over half a
+  // second — which is what a shock front crossing a river actually looks like,
+  // and what a single frame of six simultaneous flaps does not.
+  const rang = kyoBellPulse > 0.92 && kyoBirdBellWas <= 0.92;
+  kyoBirdBellWas = kyoBellPulse;
+  if (rang) {
+    // WHO GOES IN IS DECIDED HERE, ONCE, and not per bird as each one's timer
+    // runs out. The first cut asked `(i * 7 + kyoBirdBellN) % 3 === 0` at the
+    // END of each bird's startle, and `kyoBirdBellN` was incrementing as those
+    // timers expired — so the modulus walked and FOUR of six went in on a
+    // strike that was supposed to send about two. Measured 4/6, twice.
+    // One counter step per RING, and the choice made on the frame of the ring.
+    kyoBirdBellN++;
+    for (let i = 0; i < kyoBirds.length; i++) {
+      const b = kyoBirds[i];
+      b.bell = 1.9 + b.bellD;
+      b.bellIn = ((i + kyoBirdBellN) % 3) === 0;   // about one in three, and a
+    }                                             // different third each time
+  }
   for (let i = 0; i < kyoBirds.length; i++) {
     const b = kyoBirds[i];
     b.t += dt;
     let wing = 0, lift = 0, sink = 0, lean = 0;
+    // The startle outranks the drying cycle and the dive alike — a bird that
+    // is already under stays under, but one on the gunwale comes off it.
+    if (b.bell > 0) {
+      b.bell -= dt;
+      if (b.state !== 2 && b.bell < 1.9) {
+        // wings out hard, a hop, and about one in three goes into the water
+        const u = clamp(b.bell / 1.9, 0, 1);
+        wing = clamp(u * 1.35, 0, 1);
+        lift = Math.sin(clamp((1 - u) * 3.4, 0, Math.PI)) * 0.42;
+        lean = Math.sin(b.bell * 13 + i) * 0.16;
+        if (b.bell <= 0 && b.bellIn) {
+          b.state = 2; b.dive = 0; b.t = 0;
+          if (game && game.sfx) game.sfx('splash', { volume: 0.26, pitch: 1.28 });
+        }
+        const hy0 = Math.sin(b.t * 0.6 + i) * 0.10;
+        kyoBirdMesh.setMatrixAt(i, kyoXform(b.x, kyoRIVER_Y + 0.85 + lift, b.z,
+                                            lean, b.yaw + hy0 * 0.9, 0, 1, 1, 1));
+        kyoBirdWing.setMatrixAt(i, kyoXform(b.x, kyoRIVER_Y + 1.02 + lift, b.z,
+                                            0, b.yaw + hy0 * 0.9, 0, wing, wing, wing));
+        continue;
+      }
+    }
     if (b.state === 2) {
       // under, and back up: a half-second down, three quarters under, and it
       // surfaces already facing downstream
@@ -4321,6 +4379,24 @@ export function createKyoto(game) {
   const api = {
     built() { return kyoBuilt; },
     terrainHeight: kyoTerrain,
+    /**
+     * THE BELL AND THE BIRDS, MEASURED. `startled` is how many cormorants are
+     * inside the bell's own startle window this frame and `under` how many are
+     * in the water — the two numbers that say whether the fifth thing the
+     * strike note promises actually happens.
+     */
+    birdDebug() {
+      let startled = 0, under = 0, wings = 0;
+      for (let i = 0; i < kyoBirds.length; i++) {
+        const b = kyoBirds[i];
+        if (b.bell > 0) startled++;
+        if (b.state === 2) under++;
+        if (b.state === 1) wings++;
+      }
+      return { n: kyoBirds.length, startled, under, wings, pulse: +kyoBellPulse.toFixed(3) };
+    },
+    /** Ring it from a probe, so the reaction can be measured without a climb. */
+    ringBell() { kyoBellWave = 1; kyoBellPulse = 1; return true; },
     // Built from the static boxes themselves — see makeSolidIndex in shared.js.
     navBlocked(x, z, r) { return kyoSolids.blocked(x, z, r, kyoTerrain); },
     slopeAt: kyoSlope,
@@ -4864,7 +4940,7 @@ function kyoBuild(game) {
     }
     // THE UKAI MASTER, on the bank beside the moored boats at the first narrow.
     // The cormorants have been the chapter's gates since the run was written and
-    // the birds have never had anybody working them — twelve leashed cormorants
+    // the birds have never had anybody working them — six leashed cormorants
     // and an empty boat is a picture of a man who has drowned.
     {
       const seg = kyoRiverSeg(kyoRunAt(0.20));
@@ -4873,7 +4949,7 @@ function kyoBuild(game) {
       game.addLocal({ biome: 'kyoto', x: ux, y: kyoTerrain(ux, uz), z: uz, near: 9,
         face: Math.atan2(seg.x - ux, seg.z - uz),
         figure: { shirt: PALETTE.toriiBase, legs: PALETTE.toriiBase, hat: PALETTE.toriiBase },
-        lines: ['Twelve birds. Each one has a name and each one knows it.',
+        lines: ['Six birds. Each one has a name and each one knows it.',
                 'The season is June. The rest of the year we sit here and mend things.',
                 'A ring round the throat, not tight. They swallow the small ones. That is the deal.',
                 { t: 'You went between the boats. Nobody goes between the boats.', after: 'uji-run' },

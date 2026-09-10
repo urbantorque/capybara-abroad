@@ -4681,7 +4681,21 @@ function sahUpdateStorm(game, dt) {
   const out = !!(p && p.x > sahERG_X);
 
   if (sahStormPhase === 0) {
-    if (out) {
+    if (!out) {
+      // ---- AND IT BLEEDS BACK ---------------------------------------------
+      // The accumulator only ever went up. Walk out into the erg for twenty
+      // seconds, come back to the palmeraie for ten minutes, step past the
+      // line again and the storm arrived in TWO — the warning toast and the
+      // brown line on the horizon fired on a second visit that had not earned
+      // either. `sahStormStood` twenty lines below has bled back at 2 dt since
+      // it was written, for exactly this reason; this is that rule applied to
+      // the term it should always have been applied to.
+      //
+      // Half rate on the way down, not equal: the desert does not forget you
+      // were out in it as fast as you walked back, and a player who ducks
+      // behind the gate for four seconds should not get a clean slate for it.
+      if (sahErgT > 0) sahErgT = Math.max(0, sahErgT - dt * 0.5);
+    } else {
       sahErgT += dt;
       if (sahErgT > sahSTORM_WARN) {
         sahStormPhase = 1; sahStormT = 0;
@@ -5108,6 +5122,12 @@ export function createSahara(game) {
   const api = {
     built() { return sahBuilt; },
     terrainHeight: sahTerrain,
+    /** The storm's own accumulators, so the bleed-back can be measured. */
+    stormDebug() {
+      return { erg: +sahErgT.toFixed(2), phase: sahStormPhase,
+               storm: +sahStorm.toFixed(3), stood: +sahStormStood.toFixed(2),
+               warnAt: sahSTORM_WARN };
+    },
     slopeAt: sahSlope,
     groundSlip: sahGroundSlip,
     // There is no standing water anywhere in this chapter, which is the point of

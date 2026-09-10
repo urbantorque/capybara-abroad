@@ -4198,12 +4198,22 @@ export function createNPCs(game) {
    */
   function castReact(kind, x, z, s, radius) {
     localsReact(kind, x, z, s, radius);
-    if (!biomeLive()) return;   // `humans` is Sydney's roster and nowhere else's
+    // ---- ...AND THE SAME IN PASTO (D5.8) ---------------------------------
+    // This was `if (!biomeLive()) return`, which is hard-coded to
+    // isActive('sydney'), so a plate going over or a crate shattering startled
+    // Sydney and NOBODY in chapter 2 — where the only thing that ever noticed
+    // a broken prop was the vendor-only `prop:impact` handler further down.
+    // Exactly the precedent set by `capy:graze` above: both casts come out of
+    // `buildHuman`, so `startle` works on either and the only per-chapter part
+    // is which array to sweep.
+    const live = game.biome && game.biome.current;
+    const cast = live === 'sydney' ? humans : live === 'pasto' ? paHumans : null;
+    if (!cast) return;
     const r = radius > 0 ? radius : npcLOC_REACT_R;
     const r2 = r * r;
     let n = 0;
-    for (let i = 0; i < humans.length && n < npcCAST_REACT_N; i++) {
-      const rec = humans[i];
+    for (let i = 0; i < cast.length && n < npcCAST_REACT_N; i++) {
+      const rec = cast[i];
       if (!rec || !rec.group || rec.dejected > 0) continue;
       if (rec.state === 'chase' || rec.state === 'swim' || rec.state === 'plunge') continue;
       const dx = rec.group.position.x - x, dz = rec.group.position.z - z;
@@ -4389,6 +4399,21 @@ export function createNPCs(game) {
         // which is exactly what being shouldered is worth, and every chapter
         // that has written its own startled row gets its own voice for free.
         localReactLine(rec, npcSay(rec, 'startled'));
+      }
+    } else if (rec.kind === 'streetdog' || rec.kind === 'llama') {
+      // ---- AND A BEAST IS NOT A PERSON (D5.8) ---------------------------
+      // Pasto's sweep now includes `paBeasts`, and the human branch below
+      // would have made a llama gasp and armed a witness chain on a dog. Both
+      // already have the right answer written for them elsewhere in this file:
+      // a shouldered dog barks at you and a shouldered llama spits. No
+      // `alarm`, no chain — neither field means anything on a beast record.
+      rec.lookX = px; rec.lookZ = pz;
+      if (rec.kind === 'streetdog') {
+        if (rec.state !== 'bark') { paSet(rec, 'bark'); sfx('wheek', rec, npcSFX_VOL * 0.9, 1.18); }
+      } else if (rec.state !== 'spit' && (rec.spitCd || 0) <= 0 && sp >= npcBARGE_HARD) {
+        paSet(rec, 'spit');
+      } else {
+        rec.yaw = Math.atan2(rec.group.position.x - px, rec.group.position.z - pz);
       }
     } else if (rec.group) {
       // a member of one of the two old casts — same idea, their own channels
@@ -6536,7 +6561,10 @@ export function createNPCs(game) {
       poiA: 0, loopI: 0, jogOff: 0,
       mate: null,         // who they came with — see pickPOI and chatStep
       // ---- Mr Whippy ----
-      queueI: 0, queueCd: rand(4, 40), coneT: -1,
+      // A person whose KIND is `queue` is at the quay FOR the van and starts
+      // ready for it; everybody else is at the quay for their own reasons and
+      // notices her when they notice her. See the join test.
+      queueI: 0, queueCd: kind === 'queue' ? rand(0, 5) : rand(4, 40), coneT: -1,
       // ---- Circular Quay ----
       quay: !!npcQUAY_KINDS[kind], homeYaw: 0,
       seated: 0, seatPose: 0, chatPhase: rand(0, 6.28), sipT: rand(2, 8),
@@ -7570,17 +7598,31 @@ export function createNPCs(game) {
     // so. It costs one state, it is entirely optional, and it turns the mini
     // into something the crowd is visibly interested in — which is the whole
     // reason to ride the roof of it.
-    if ((rec.kind === 'tourist' || rec.kind === 'commuter') && st !== 'queue' &&
+    // ---- AND THE FOUR PEOPLE WHOSE KIND IS LITERALLY `queue` ---------------
+    // The roster pushes four of them (:976) and this test admitted `tourist`
+    // and `commuter` only, so for the life of the chapter the four people
+    // named after the queue were the four people who could never be in it.
+    // They landed in the generic `rec.quay` branch at :6837, got no prop and
+    // no camera, and were commuters with less to do — in the chapter that is
+    // the reference for every other chapter. They are admitted here, and they
+    // walk further for it (34 m against 20): somebody who is at the quay FOR
+    // the van crosses the promenade for it, and somebody who happened to be
+    // passing does not.
+    const qKind = rec.kind === 'queue';
+    if ((rec.kind === 'tourist' || rec.kind === 'commuter' || qKind) && st !== 'queue' &&
         rec.coneT < 0 && rec.queueCd <= 0 && vanQueueOpen()) {
       const q = vanQueueSpotAt(vanQueue.length);
       const dvx = q.x - rec.group.position.x, dvz = q.z - rec.group.position.z;
-      if (dvx * dvx + dvz * dvz < 20 * 20) {
+      const reach = qKind ? 34 : 20;
+      if (dvx * dvx + dvz * dvz < reach * reach) {
         rec.queueI = vanQueueJoin(rec);
         setState(rec, 'queue');
         if (rec.talkCd <= 0) { rec.talkCd = rand(9, 20); pickLine(rec, 'whippyQ'); }
         return;
       }
-      rec.queueCd = rand(12, 30);       // too far — do not ask again this stop
+      // too far — do not ask again this stop. The four dedicated ones ask
+      // again at the next one rather than at the one after that.
+      rec.queueCd = qKind ? rand(4, 10) : rand(12, 30);
     }
 
     // tourists
@@ -8688,7 +8730,9 @@ export function createNPCs(game) {
           if (place === 0 && npcDwell(rec, rec.stateT, 2.2, 3.4)) {
             rec.coneT = rand(14, 26);
             rec.nodes.coneN.scale.setScalar(1);
-            rec.queueCd = rand(70, 140);       // one each, and not again soon
+            // one each, and not again soon — except for the four whose whole
+            // reason to be on this promenade is the van.
+            rec.queueCd = rec.kind === 'queue' ? rand(38, 74) : rand(70, 140);
             pickLine(rec, 'whippyGot');
             sfx('pop', rec);
             pickPOI(rec);
@@ -11847,7 +11891,13 @@ export function createNPCs(game) {
       // used to sit below the Sydney gate, which is why a bubble was a thing
       // that could only happen on one lawn in the world.
       if (paLive()) chatStep(dt, paCast);
-      if (paLive()) npcBargeSweep(dt, paHumans);
+      // `paCast`, not `paHumans` (D5.8). The sweep took the human array only,
+      // so shouldering a llama or a street dog at four metres a second — in
+      // the chapter that has both, and the only chapter that has either —
+      // fired no `npc:barge` at all. `paCast` is the union the chat step
+      // beside it already takes, and the handler answers a beast in its own
+      // voice rather than making a dog gasp.
+      if (paLive()) npcBargeSweep(dt, paCast);
       localsStep(dt);
       localsChat(dt);
       npcExStep(dt);

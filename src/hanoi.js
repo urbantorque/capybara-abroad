@@ -183,6 +183,7 @@ let hanLakeMesh = null, hanLakeAttr = null;
 const hanBikeMeshes = [];         // one per body colour — see the note above
 const hanBikeGroups = [];         // ...and which bikes are in each
 let hanBikeN = 0;
+let hanJamPin = -1, hanJamWas = -1;   // jamTest's pin — see the api
 let hanBikeData = null;           // lane, s, dir, off, offWant, v, vWant, colour, phase
 // ...and slot 9 is "this one is currently going round the capybara", which is
 // what makes the record a COUNT OF PEOPLE rather than an integral of time.
@@ -1361,6 +1362,7 @@ function hanBuildBikes(game, root) {
     }
   }
   hanBikeN = n;
+  hanFollowInit();      // the per-lane rank arrays — see THE FOLLOWING TERM
   // ...and now one mesh per body colour. See the note above: instanceColor
   // would have tinted the tyres, the helmet and the rider's face as well.
   for (let c = 0; c < hanBIKE_COL.length; c++) {
@@ -1555,6 +1557,126 @@ function hanUpdateTraffic(game, dt, p) {
   }
 }
 
+// ---- THE FOLLOWING TERM (D5.9) --------------------------------------------
+//
+// Four constants, and each is a measurement rather than a taste.
+//
+//   hanFOLLOW_D    how far ahead a rider looks. Six metres at 11 m/s is a
+//                  little over half a second, which is about right for a city
+//                  where nobody has ever used a brake in anger.
+//   hanFOLLOW_OFF  how far across the lane two riders have to be before they
+//                  are not in each other's way. 1.2 m against a lane whose
+//                  offsets run 0.8 to 2.6, so a rider follows roughly the two
+//                  nearest lines to its own and ignores the far side.
+//   hanFOLLOW_MIN  the gap it will actually sit at, stopped. 1.5 m, which is
+//                  the same standoff the capybara brake uses, so a machine
+//                  jammed behind another and one jammed behind a capybara
+//                  come to rest the same distance off.
+//   hanFOLLOW_K    1.6 m/s per metre — the capybara brake law's own gain, on
+//                  purpose. A jam that decays at a different rate from the
+//                  thing that caused it reads as two mechanics.
+//
+// hanFOLLOW_SCAN caps the walk so a solid lane cannot make this quadratic:
+// six neighbours is more than can fit inside six metres at any density this
+// chapter builds, and if it ever were, the sixth is the one that matters.
+const hanFOLLOW_D    = 6.0;
+const hanFOLLOW_OFF  = 1.2;
+const hanFOLLOW_MIN  = 1.5;
+// The deceleration the braking law is built on, m/s^2. Six is brisk for a
+// city scooter and not a panic stop, and it is what sets how far back the
+// tail of a jam reaches: a rider needs sqrt(2*6*room) metres of warning.
+const hanFOLLOW_A    = 6.0;
+// ...and how fast a rider can shed speed, against the 2.2 the rest of the loop
+// damps at. See the note at the apply site.
+const hanFOLLOW_LAG  = 9.0;
+const hanFOLLOW_SCAN = 6;
+const hanFollowRank = [];       // one Int16Array per lane, sorted by arclength
+const hanFollowOf   = [];       // ...and bike index -> its rank in that array
+let hanFollowGap    = null;     // m to the machine ahead, or -1
+let hanFollowLeadV  = null;     // ...and how fast that machine is going
+
+/** Build the per-lane rank arrays once, after hanBikeData is filled. */
+function hanFollowInit() {
+  hanFollowRank.length = 0;
+  hanFollowOf.length = 0;
+  hanFollowGap = new Float32Array(hanBikeN);
+  hanFollowLeadV = new Float32Array(hanBikeN);
+  for (let L = 0; L < hanLANES.length; L++) {
+    const idx = [];
+    for (let i = 0; i < hanBikeN; i++) if ((hanBikeData[i * hanBIKE_STRIDE] | 0) === L) idx.push(i);
+    idx.sort(function (a, b) {
+      return hanBikeData[a * hanBIKE_STRIDE + 1] - hanBikeData[b * hanBIKE_STRIDE + 1];
+    });
+    hanFollowRank.push(Int16Array.from(idx));
+    const of = new Int16Array(hanBikeN);
+    for (let r = 0; r < idx.length; r++) of[idx[r]] = r;
+    hanFollowOf.push(of);
+  }
+}
+
+/** Insertion sort each lane by arclength. Nearly sorted already, so linear. */
+function hanFollowSort() {
+  if (!hanFollowGap) return;
+  for (let L = 0; L < hanFollowRank.length; L++) {
+    const a = hanFollowRank[L], of = hanFollowOf[L], n = a.length;
+    for (let r = 1; r < n; r++) {
+      const v = a[r], s = hanBikeData[v * hanBIKE_STRIDE + 1];
+      let k = r - 1;
+      while (k >= 0 && hanBikeData[a[k] * hanBIKE_STRIDE + 1] > s) { a[k + 1] = a[k]; k--; }
+      a[k + 1] = v;
+    }
+    for (let r = 0; r < n; r++) of[a[r]] = r;
+  }
+}
+
+/**
+ * The nearest machine ahead of bike i in its own lane and direction, inside
+ * hanFOLLOW_D and hanFOLLOW_OFF. Writes its speed into hanFollowLeadV and
+ * returns the gap in metres, or -1.
+ *
+ * TWO THINGS THAT ARE EASY TO GET WRONG HERE, both written down because the
+ * first cut got both of them wrong:
+ *
+ *  - "Ahead" depends on `dir`. For dir > 0 it is the next higher arclength,
+ *    for dir < 0 the next lower — a rider coming the other way down the same
+ *    lane is not in front of you, it is a near miss, and this function must
+ *    not brake for it. Same `dir` is required as well as the right side.
+ *  - A CLOSED lane wraps. Without the wrap the first rider on a ring gets no
+ *    lead at all and a ring jam always has one hole in it, which reads as a
+ *    bug rather than as traffic.
+ */
+function hanFollowScan(i) {
+  const o = i * hanBIKE_STRIDE;
+  const L = hanBikeData[o] | 0;
+  const a = hanFollowRank[L];
+  if (!a || a.length < 2) return -1;
+  const of = hanFollowOf[L];
+  const dir = hanBikeData[o + 2];
+  const s = hanBikeData[o + 1], off = hanBikeData[o + 3];
+  const total = hanLaneTotal[L], closed = !!hanLANES[L].closed;
+  const step = dir > 0 ? 1 : -1;
+  let r = of[i];
+  for (let k = 0; k < hanFOLLOW_SCAN; k++) {
+    r += step;
+    if (r < 0 || r >= a.length) {
+      if (!closed) return -1;
+      r = r < 0 ? a.length - 1 : 0;
+    }
+    const j = a[r];
+    if (j === i) return -1;
+    const oj = j * hanBIKE_STRIDE;
+    let d = (hanBikeData[oj + 1] - s) * step;
+    if (closed && d < 0) d += total;      // it is ahead, round the ring
+    if (d < 0) return -1;
+    if (d > hanFOLLOW_D) return -1;
+    if (hanBikeData[oj + 2] !== dir) continue;                 // oncoming
+    if (Math.abs(hanBikeData[oj + 3] - off) > hanFOLLOW_OFF) continue;  // another line
+    hanFollowLeadV[i] = hanBikeData[oj + 5];
+    return d;
+  }
+  return -1;
+}
+
 function hanUpdateBikes(game, dt) {
   if (!hanBikeN || dt <= 0) return;
   const capy = game.capy;
@@ -1593,6 +1715,35 @@ function hanUpdateBikes(game, dt) {
   // inside seven metres carries straight on, and where it carries on to is a
   // footwell. Hop into the traffic. That is the verb.
   const airborne = !!(capy && !capy.grounded && p && p.y > hanGROUND + 0.55);
+
+  // ---- AND THEY CAN SEE EACH OTHER (D5.9) ---------------------------------
+  //
+  // This loop was forty independent brakes. Every rider read the capybara and
+  // NOTHING ELSE — no inner loop over bikes anywhere in the function — so the
+  // fan of stopped machines the comment below describes could only ever be as
+  // wide as the animal's own nine-metre window. A rider two metres behind a
+  // stopped one carried straight through it at full cruise.
+  //
+  // The jam has to PROPAGATE, and that is what makes it a jam rather than a
+  // clearing: you stop one rider, the one behind stops, and thirty seconds
+  // later the street is solid for forty metres in both directions. It is also
+  // what finally gives the horn something to be about.
+  //
+  // O(n), not O(n^2). `hanFollowRank` is a per-lane index sorted by arclength,
+  // insertion-sorted in place each frame — the order barely changes between
+  // frames at 11 m/s and 1/60 s, so the sort is linear in practice — and each
+  // rider then walks at most hanFOLLOW_SCAN neighbours in its own direction of
+  // travel. Measured cost is below the noise floor of the frame timer.
+  // ...and it cuts, which is the house rule: game.state.noJam removes the
+  // whole term so it can be measured against its own absence rather than
+  // against a memory of what the street looked like last week.
+  const jamOn = !(game.state && game.state.noJam);
+  if (jamOn) {
+    hanFollowSort();
+    for (let i = 0; i < hanBikeN; i++) hanFollowGap[i] = hanFollowScan(i);
+  } else if (hanFollowGap) {
+    for (let i = 0; i < hanBikeN; i++) hanFollowGap[i] = -1;
+  }
 
   let clipped = -1;
   for (let i = 0; i < hanBikeN; i++) {
@@ -1684,8 +1835,39 @@ function hanUpdateBikes(game, dt) {
         } else if (dd > hanSWERVE + 4) hanBikeData[o + 9] = 0;
       } else hanBikeData[o + 9] = 0;
     }
+    // ---- ...and the rider in front of me (D5.9) --------------------------
+    // Exactly the shape of the brake law above: close the gap to `gap - 1.5`
+    // at 1.6 m/s per metre, and never ask for more than the machine ahead is
+    // doing plus a little — a rider does not overtake through the back of the
+    // one in front. `hanFollowGap` is -1 when nothing is in range.
+    const gap = hanFollowGap ? hanFollowGap[i] : -1;
+    let vLag = 2.2;
+    if (gap >= 0) {
+      // ---- A BRAKING-DISTANCE LAW, AND IT HAD TO BE (D5.9) ---------------
+      //
+      // The first cut used the capybara brake's own linear shape —
+      // `(gap - 1.5) * 1.6` — on the reasoning that a jam should decay at the
+      // same rate as the thing that caused it. MEASURED, with one machine
+      // pinned to a stop: two riders piled up behind it at 0.0 m and 0.1 m.
+      // They were inside it. A linear cap asks for zero speed only once the
+      // gap is already gone, and a follower damping at 2.2/s carries 2.7 m
+      // through the standoff before it can answer.
+      //
+      // sqrt(2 a room) is the distance a body needs to stop at deceleration
+      // `a`, which is the honest law and is self-correcting: at six metres it
+      // asks for 7.3 m/s and does nothing, at three it asks for 4.2, at two
+      // for 2.4, and it reaches zero AT the standoff rather than past it.
+      //
+      // ...and the brake is quicker than the throttle. hanFOLLOW_LAG against
+      // the 2.2 everything else in this loop uses: a rider who has to stop
+      // stops, and a rider whose road has opened up rolls away gently, which
+      // is also the difference between a jam that clears and one that snaps.
+      const lead = hanFollowLeadV[i];
+      const cap = Math.sqrt(2 * hanFOLLOW_A * Math.max(0, gap - hanFOLLOW_MIN)) + lead * 0.92;
+      if (cap < vWant) { vWant = cap; if (cap < hanBikeData[o + 5]) vLag = hanFOLLOW_LAG; }
+    }
     hanBikeData[o + 3] = damp(hanBikeData[o + 3], want, 3.4, dt);
-    hanBikeData[o + 5] = damp(hanBikeData[o + 5], vWant, 2.2, dt);
+    hanBikeData[o + 5] = damp(hanBikeData[o + 5], vWant, vLag, dt);
     // ---- and along the street --------------------------------------------
     hanBikeData[o + 1] += hanBikeData[o + 5] * dir * dt;
     const total = hanLaneTotal[L];
@@ -3663,6 +3845,47 @@ export function createHanoi(game) {
   const api = {
     built() { return hanBuilt; },
     terrainHeight: hanTerrain,
+    /**
+     * THE JAM, MEASURED (D5.9). Not a feature — an instrument, on the same
+     * footing as `game.walkAudit`. `stopped` is how many machines are under a
+     * walking pace, `following` how many are inside somebody else's six
+     * metres, and `run` the longest unbroken chain of stopped riders in one
+     * lane, which is the number that says whether the jam PROPAGATED or
+     * whether forty riders independently arrived at the same conclusion.
+     */
+    bikeDebug() {
+      let stopped = 0, following = 0, run = 0, best = 0, lastL = -1;
+      const order = [];
+      for (let L = 0; L < hanFollowRank.length; L++) {
+        const a = hanFollowRank[L];
+        for (let r = 0; r < a.length; r++) order.push([L, a[r]]);
+      }
+      for (let k = 0; k < order.length; k++) {
+        const L = order[k][0], i = order[k][1], o = i * hanBIKE_STRIDE;
+        if (hanFollowGap && hanFollowGap[i] >= 0) following++;
+        const slow = hanBikeData[o + 5] < 1.2;
+        if (slow) stopped++;
+        if (L !== lastL) { run = 0; lastL = L; }
+        run = slow ? run + 1 : 0;
+        if (run > best) best = run;
+      }
+      // ...and the number the claim actually rests on: a rider WITH somebody
+      // in front of it must be slower than one with an open road, and the two
+      // means must separate. If they do not, the term is decorative.
+      let sAll = 0, sLed = 0, nLed = 0, sFree = 0, nFree = 0, sGap = 0;
+      for (let i = 0; i < hanBikeN; i++) {
+        const v = hanBikeData[i * hanBIKE_STRIDE + 5];
+        sAll += v;
+        if (hanFollowGap && hanFollowGap[i] >= 0) { sLed += v; nLed++; sGap += hanFollowGap[i]; }
+        else { sFree += v; nFree++; }
+      }
+      const r3 = x => Math.round(x * 1000) / 1000;
+      return { n: hanBikeN, stopped, following, longestRun: best,
+               meanV: r3(hanBikeN ? sAll / hanBikeN : 0),
+               meanVLed: r3(nLed ? sLed / nLed : 0),
+               meanVFree: r3(nFree ? sFree / nFree : 0),
+               meanGap: r3(nLed ? sGap / nLed : 0) };
+    },
     // ---- NINETY-SIX SECONDS, AND THE PAPER NEVER SAID (P3) ---------------
     // Both of act three's rows are the same event: the street folds because the
     // train is coming, and then the train comes. `hanTrainS >= 0` is it being
@@ -3673,6 +3896,49 @@ export function createHanoi(game) {
       if (id !== 'the-train' && id !== 'fold-the-street') return -1;
       if (hanTrainS >= 0) return 0;
       return hanTrainT > 0 ? hanTrainT : 0;
+    },
+    /**
+     * ONE MACHINE STOPS. WHO ELSE DOES? (D5.9)
+     *
+     * The ambient street never comes to a halt on its own — it bunches into
+     * platoons and rolls — so "the jam propagates" cannot be read off a free-
+     * running road. This pins one rider's cruise to zero and reports the chain
+     * behind it: how many riders in the same lane, within thirty metres
+     * upstream, are under a walking pace, and the slowest one's distance back.
+     * Pass 0 to release. A test hook, like walkAudit — nothing in the game
+     * calls it.
+     */
+    jamTest(i, on) {
+      if (!hanBikeN) return null;
+      const idx = Math.max(0, Math.min(hanBikeN - 1, i | 0));
+      const o = idx * hanBIKE_STRIDE;
+      if (on === false) { hanBikeData[o + 6] = hanJamWas < 0 ? 7 : hanJamWas; hanJamPin = -1; return null; }
+      if (hanJamPin !== idx) { hanJamWas = hanBikeData[o + 6]; hanJamPin = idx; }
+      hanBikeData[o + 6] = 0;
+      const L = hanBikeData[o] | 0, dir = hanBikeData[o + 2];
+      const s0 = hanBikeData[o + 1], total = hanLaneTotal[L], closed = !!hanLANES[L].closed;
+      let chain = 0, deepest = 0;
+      const near = [];
+      for (let j = 0; j < hanBikeN; j++) {
+        if (j === idx) continue;
+        const oj = j * hanBIKE_STRIDE;
+        if ((hanBikeData[oj] | 0) !== L || hanBikeData[oj + 2] !== dir) continue;
+        // BEHIND, which is the opposite sense to hanFollowScan's "ahead"
+        let back = (s0 - hanBikeData[oj + 1]) * dir;
+        if (closed && back < 0) back += total;
+        if (back <= 0 || back > 30) continue;
+        if (hanBikeData[oj + 5] < 1.2) { chain++; if (back > deepest) deepest = back; }
+        near.push([Math.round(back * 10) / 10,
+                   Math.round(hanBikeData[oj + 5] * 100) / 100,
+                   Math.round((hanBikeData[oj + 3] - hanBikeData[o + 3]) * 100) / 100,
+                   hanFollowGap ? Math.round(hanFollowGap[j] * 10) / 10 : -1]);
+      }
+      near.sort((a, b) => a[0] - b[0]);
+      return { pinned: idx, lane: L, dir, chain, deepestM: Math.round(deepest * 10) / 10,
+               pinnedV: Math.round(hanBikeData[o + 5] * 100) / 100,
+               pinnedOff: Math.round(hanBikeData[o + 3] * 100) / 100,
+               // [metres behind, its speed, its offset minus mine, its own gap]
+               behind: near.slice(0, 8) };
     },
     slopeAt: hanSlope,
     waterLevel: hanWATER,

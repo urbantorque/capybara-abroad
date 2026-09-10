@@ -1,33 +1,49 @@
 async page => {
   await page.reload()
-  await page.waitForTimeout(5000)
+  await page.waitForTimeout(5200)
   await page.mouse.click(400, 400)
-  await page.waitForTimeout(2500)
-  const out = {}
-  for (const n of ['drift','venice','kowloon','pasto','rio']) {
-    await page.evaluate((name) => {
+  await page.waitForTimeout(2200)
+  const NAMES = ['sydney','pasto','quay','kyoto','cali','rio','iceland','sahara','drift',
+                 'venice','kowloon','palawan','goreme','manly','pantanal','cave',
+                 'antarctic','monaco','hanoi']
+  const out = { rows: [], errs: [] }
+  for (const n of NAMES) {
+    const r = await page.evaluate(async nm => {
       const g = window.__capy
-      g.biome.switchTo(name)
-      const sp = g.biome.spawnOf(name), b = g.capy.body
-      b.position.set(sp.x, sp.y, sp.z); b.velocity.set(0,0,0)
-      b.previousPosition.copy(b.position); b.interpolatedPosition.copy(b.position)
+      g.state.lastError = null
+      g.biome.switchTo(nm)
+      const sp = g.biome.spawnOf(nm)
+      g.capy.body.position.set(sp.x, sp.y, sp.z)
+      g.capy.body.velocity.set(0, 0, 0)
+      await new Promise(r => setTimeout(r, 2600))
+      const p = g.capy.body.position
+      return { n: nm, biome: g.biome.current,
+               bodies: g.world.bodies.length,
+               objs: g.scene.children.length,
+               pos: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)],
+               nan: !(isFinite(p.x) && isFinite(p.y) && isFinite(p.z)),
+               err: g.state.lastError || null }
     }, n)
-    await page.waitForTimeout(1600)
-    out[n] = await page.evaluate(() => {
-      const g = window.__capy
-      let tris = 0, meshes = 0, inst = 0, mats = new Set()
-      g.scene.traverse(o => {
-        if (!o.visible) return
-        for (let p = o; p; p = p.parent) if (!p.visible) return
-        if (o.isInstancedMesh) { inst++; const gg=o.geometry; const c = gg.index? gg.index.count/3 : gg.attributes.position.count/3; tris += c*o.count; mats.add(o.material.uuid) }
-        else if (o.isMesh) { meshes++; const gg=o.geometry; const c = gg.index? gg.index.count/3 : gg.attributes.position.count/3; tris += c; mats.add(Array.isArray(o.material)?o.material[0].uuid:o.material.uuid) }
-      })
-      const npcs = (g.npcs||[]).filter(r => r.biome === g.biome.current)
-      return { tris: Math.round(tris), meshes, inst, mats: mats.size, bodies: g.world.bodies.length,
-               npcs: npcs.length, npcKinds: npcs.map(r=>r.kind||r.type||'?'),
-               err: g.state && g.state.lastError || null,
-               calls: g.renderer.info.render.calls }
-    })
+    out.rows.push(r)
+    if (r.err) out.errs.push(n + ': ' + r.err)
   }
-  await page.evaluate(async (o) => { const s = btoa(unescape(encodeURIComponent(JSON.stringify(o)))); await fetch('/shot?name=t4base.json', {method:'POST', body:s}) }, out)
+  // re-entry leak check: three round trips through rio and goreme
+  const leak = await page.evaluate(async () => {
+    const g = window.__capy, seq = []
+    for (let i = 0; i < 3; i++) {
+      for (const nm of ['rio','goreme','sydney']) {
+        g.biome.switchTo(nm)
+        const sp = g.biome.spawnOf(nm)
+        g.capy.body.position.set(sp.x, sp.y, sp.z)
+        await new Promise(r => setTimeout(r, 900))
+      }
+      seq.push({ pass: i, bodies: g.world.bodies.length, objs: g.scene.children.length })
+    }
+    return seq
+  })
+  out.leak = leak
+  const con = await page.evaluate(() => window.__capy.state.lastError || null)
+  out.finalErr = con
+  await page.evaluate(o => fetch('/shot?name=T4-base.json', { method: 'POST',
+    body: btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 1)))) }), out)
 }
