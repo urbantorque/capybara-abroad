@@ -34,6 +34,7 @@ import { PALETTE, mat, rand, randInt, clamp, damp, lerp, grain, makeSolidIndex, 
 // ===========================================================================
 
 // ---------------------------------------------------------------- geography --
+let caliRiverBed = null;            // M13
 const caliRIVER_Z = 0;              // the Río Cali runs east-west
 const caliRIVER_HZ = 9;             // half-width of the channel
 const caliRIVER_Y = -1.5;           // water surface (the channel is cut below 0)
@@ -4348,6 +4349,19 @@ export function createCali(game) {
       if (caliMotoMover) caliMotoMover.step(dt);
       if (!caliBuilt) return;
       if (!game.biome.isActive('cali')) return;
+      // ---- THE RIVER IS A LINE YOU CAN WALK TOWARD (M13) --------------
+      // The channel is single-valued in z, so the nearest point on it is
+      // directly across from wherever you are standing and this is one
+      // expression. It is also the chapter's one piece of geography that
+      // does not move, which is what makes it useful to steer by.
+      if (!caliRiverBed && game.sfxMover) {
+        caliRiverBed = game.sfxMover('river', { key: 'cali:river', near: 18, far: 130 });
+      }
+      if (caliRiverBed && game.capy && game.capy.position) {
+        const cp2 = game.capy.position;
+        caliRiverBed.at(cp2.x, caliRIVER_Y + 0.2, caliRIVER_Z);
+        caliRiverBed.set(0.55);
+      }
       caliTime += dt;
       caliRipT += dt;
       if (caliRipT >= 0.0333 && caliRiverAttr) {

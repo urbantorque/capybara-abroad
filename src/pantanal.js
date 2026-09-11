@@ -64,6 +64,7 @@ const panLAST_BRIDGE = { z: -96 };
 
 const panBAIA = { x: -55, z: 6, r: 40 };
 const panRIVER = { z0: -80, z1: -56, bed: -4.2 };
+let panRiverBed = null;              // M13
 const panSANDBAR = { x: 34, z: -68, r: 13 };
 const panFAZENDA = { x: 36, z: 76, r: 24 };
 // the corral, in one place: panBuildFazenda draws it and panUpdateCattle has
@@ -5558,6 +5559,19 @@ export function createPantanal(game) {
     update(dt) {
       if (!panBuilt) return;
       if (!game.biome.isActive('pantanal')) return;
+      // ---- THE RIVER, WHICH IS THE CHAPTER (M13) ----------------------
+      // Four of this chapter's twelve rows begin with the word Cross, and
+      // the thing being crossed made no sound at all. It is a band in z, so
+      // the nearest point is a clamp; x is free.
+      if (!panRiverBed && game.sfxMover) {
+        panRiverBed = game.sfxMover('river', { key: 'pan:river', near: 20, far: 140 });
+      }
+      if (panRiverBed && game.capy && game.capy.position) {
+        const pp2 = game.capy.position;
+        panRiverBed.at(pp2.x, panWATER + 0.2,
+                       clamp(pp2.z, panRIVER.z0, panRIVER.z1));
+        panRiverBed.set(0.48);
+      }
       panTime += dt;
       panUpdateMats(game, dt);
       panUpdateAnteater(game, dt);

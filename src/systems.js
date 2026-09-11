@@ -4814,6 +4814,14 @@ const sysLEGEND_MORE = [
   // uses for the same card, so the two schemes cannot describe it differently.
   ['Esc', 'pause  ·  sound  ·  the journey  ·  the title'],
   ['Tab', 'the journal'],
+  // ---- THE KEY THAT FINDS THE KEYS WAS PRINTED NOWHERE (M12) ------------
+  // H and ? open the journal with its control fold already unrolled, and that
+  // is the only place in play where the full table exists. It appears on no
+  // card, on no legend, and on no rail — so the one key a player reaches for
+  // when they have forgotten which key slides was discoverable only by already
+  // knowing the thing it tells you. Directly under Tab because it is the same
+  // screen, opened at a different page.
+  ['H  ·  ?', 'the controls'],
   ['P', 'hide the paper'],
   // Photo mode goes in the FOLD and not on the front, by the rule the fold
   // exists for: it is not a verb the capybara has and nothing is needed to
@@ -17520,6 +17528,21 @@ export function createSystems(game) {
   const sysVOICE_WIN = 0.165;
   const sysVoiceAt = new Float64Array(sysVOICE_N);
   let sysVoiceHead = 0, sysVoiceDrop = 0;
+  // ---- WHAT THE SYNTH CATCH SWALLOWS (M12) -------------------------------
+  //
+  // One `catch (e) { /* ignore */ }` wraps every one of the fifty-one sfx*
+  // functions, with no log, no counter and no state.lastError. It is the exact
+  // mechanism that let `f.type = lowpass` -- a bare undeclared identifier
+  // throwing ReferenceError -- sit in the tree for months killing a whole
+  // feature with a clean console, and the comment's stated cause ("audio node
+  // budget exhausted") is a GUESS: a RangeError and a ReferenceError arrive
+  // here identically and silently.
+  //
+  // It is not opened up, because a throw on a voice genuinely must not take the
+  // frame with it. It is COUNTED and NAMED, which is the whole difference
+  // between a swallow and a silence, and rate-limited to one console line every
+  // four seconds because the failure mode this exists for is per-frame.
+  let sysSynthThrew = 0, sysSynthWhy = '', sysSynthLogT = -99;
   function sfx(name, opts) {
     if (muted) return;
     // ---- THE WORLD IS ONLY ALLOWED TO SPEAK WHILE IT IS BEING PLAYED ------
@@ -17726,7 +17749,15 @@ export function createSystems(game) {
       } catch (e) { node = null; acMaster = bus; }
     } else acMaster = bus;
     try { fn(vol, pitch, extra, wetness); }
-    catch (e) { /* audio node budget exhausted — ignore */ }
+    catch (e) {
+      // See the sysSynthThrew block. Counted, named, and said out loud at most
+      // once every four seconds -- the frame is still safe, and the console is
+      // no longer clean while a voice is broken.
+      sysSynthThrew++;
+      sysSynthWhy = name + ': ' + (e && e.message ? e.message : String(e));
+      const nowT = (game.state && game.state.time) || 0;
+      if (nowT - sysSynthLogT > 4) { sysSynthLogT = nowT; console.error('[sfx ' + name + ']', e); }
+    }
     finally { acMaster = saved; }
   }
   /**
@@ -19092,6 +19123,19 @@ export function createSystems(game) {
     // again is returned to BODY with both cards shut behind them.
     const from = document.activeElement;
     pauseHide();
+    jrShow(false);
+    if (from && from !== document.body) jrReturnFocus = from;
+  });
+  // ---- A FIFTH DOOR, AND IT IS THE ONE PLAYERS LOOK FOR HERE (M12) --------
+  // The pause card is the reflex place to go for "how do I do that again", and
+  // it had four doors, none of which said controls. The escape hatch was H,
+  // which is printed on no card anywhere — so the only route to the control
+  // table went through knowing a control. Not a new surface: the same three
+  // statements the KeyH branch already runs, on a button.
+  const pauseKeysBtn = pauseBtn('', 'the controls', function () {
+    const from = document.activeElement;
+    pauseHide();
+    jrKeys.open = true;
     jrShow(false);
     if (from && from !== document.body) jrReturnFocus = from;
   });
@@ -32938,6 +32982,9 @@ export function createSystems(game) {
         // fires in ordinary play is eating the game's own sounds — the number
         // is the only way to know which of the two you have built.
         voiceDrops: sysVoiceDrop,
+        // M12: a COUNT of synth functions that threw, and the last one's name.
+        // voiceDrops is a budget refusal and is normal; this is a defect.
+        synthThrew: sysSynthThrew, synthWhy: sysSynthWhy,
         // ...and the fifth bed voice, 0..1. See sysBedRush.
         rush: sysRushNow,
         // ...and the sixth, which is the only one driven by a VERB. See

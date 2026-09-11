@@ -1971,6 +1971,7 @@ function pastoUpdateBell(dt) {
 // Physics of the collapse proper is Agent C's; this side owns the geometry, the
 // bodies, and the hook.
 // ---------------------------------------------------------------------------
+let pastoPlazaBed = null;            // M13
 const pastoSTALL_SPEC = [
   { x: -18, z: 12, yaw: 0 },
   { x: -6,  z: 12, yaw: 0 },
@@ -3196,6 +3197,19 @@ export function createPasto(game) {
     update(dt) {
       if (!pastoBuilt) return;
       if (!game.biome.isActive('pasto')) { pastoSfxQ.length = 0; return; }  // biome not live
+      // ---- THE SECOND CHAPTER IN THE GAME WAS SILENT (M13) ------------
+      // Ten stalls ring this plaza and a carnival goes through it, and there
+      // was no floor under any of it. The market ring is x[-22,22] z[12,28];
+      // clamped into it, so from the church or the colonial street the
+      // market is a bearing rather than a level.
+      if (!pastoPlazaBed && game.sfxMover) {
+        pastoPlazaBed = game.sfxMover('crowd', { key: 'pasto:plaza', near: 24, far: 170 });
+      }
+      if (pastoPlazaBed && game.capy && game.capy.position) {
+        const zp2 = game.capy.position;
+        pastoPlazaBed.at(clamp(zp2.x, -22, 22), 1.4, clamp(zp2.z, 12, 28));
+        pastoPlazaBed.set(0.52);
+      }
       pastoSfxStep(game, dt);
       pastoUpdateSmoke(dt);
       pastoUpdateMotes(dt);

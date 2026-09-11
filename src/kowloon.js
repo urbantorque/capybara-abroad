@@ -2661,6 +2661,12 @@ const hkCrowdData = new Float32Array(hkCROWD_N * 6);
 const hkCrowdBodies = [];              // one static box per walker, see hkUpdateCrowd
 
 function hkCrowdGeo(parts) { const M = hkMerger(); parts(M); return M.build(); }
+// M14: see the long note on venCrowdBuild in venice.js — these two casts are
+// the same helper written twice, and this is the same fix.
+function hkCrowdBuild(i) {
+  const h = Math.sin(i * 12.9898 + 4.1) * 43758.5453;
+  return 0.94 + (h - Math.floor(h)) * 0.12;
+}
 function hkBuildCrowd(game, root) {
   const limb = (sgn) => hkCrowdGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);          // the leg
@@ -2852,22 +2858,24 @@ function hkUpdateCrowd(game, dt) {
     const bob = Math.abs(Math.sin(ph)) * 0.045 * (1 - look);
     // and a head tipped UP at the far shore, which is the whole gesture
     const upv = faceZ && hold > 0.35 ? -0.30 - Math.sin(i) * 0.08 : 0;
-    hkCrowd.a.setMatrixAt(i, hkXform(x, 0.82 + bob, z, swing, yaw, 0, 1, 1, 1));
-    hkCrowd.b.setMatrixAt(i, hkXform(x, 0.82 + bob, z, -swing, yaw, 0, 1, 1, 1));
-    hkCrowd.body.setMatrixAt(i, hkXform(x, 1.14 + bob, z, 0, yaw, 0, 1, 1, 1));
+    // M14: one build per person, and the whole rig moves with it.
+    const bld = hkCrowdBuild(i);
+    hkCrowd.a.setMatrixAt(i, hkXform(x, 0.82 * bld + bob, z, swing, yaw, 0, bld, bld, bld));
+    hkCrowd.b.setMatrixAt(i, hkXform(x, 0.82 * bld + bob, z, -swing, yaw, 0, bld, bld, bld));
+    hkCrowd.body.setMatrixAt(i, hkXform(x, 1.14 * bld + bob, z, 0, yaw, 0, bld, bld, bld));
     // the head dips for something capybara-sized, which is the whole gesture
-    hkCrowd.head.setMatrixAt(i, hkXform(x, 1.62 + bob, z, look * 0.5 + upv, yaw, 0, 1, 1, 1));
+    hkCrowd.head.setMatrixAt(i, hkXform(x, 1.62 * bld + bob, z, look * 0.5 + upv, yaw, 0, bld, bld, bld));
     const kind = hkCrowdData[o + 5];
     const bs = (kind & 1) ? 1 : 0.0001;
-    hkCrowd.brolly.setMatrixAt(i, hkXform(x + Math.sin(yaw) * 0.16, 1.62 + bob,
-      z + Math.cos(yaw) * 0.16, 0.12, yaw, 0, bs, bs, bs));
+    hkCrowd.brolly.setMatrixAt(i, hkXform(x + Math.sin(yaw) * 0.16, 1.62 * bld + bob,
+      z + Math.cos(yaw) * 0.16, 0.12, yaw, 0, bs * bld, bs * bld, bs * bld));
     // the bag hangs off the same hip the swinging arm does, so it swings
     const gs = (kind & 2) ? 1 : 0.0001;
     const hx2 = Math.cos(yaw) * 0.30, hz2 = -Math.sin(yaw) * 0.30;
     hkCrowd.bag.setMatrixAt(i, hkXform(
-      x + hx2 - Math.sin(yaw) * Math.sin(ph) * 0.16, 1.02 + bob,
+      x + hx2 - Math.sin(yaw) * Math.sin(ph) * 0.16, 1.02 * bld + bob,
       z + hz2 - Math.cos(yaw) * Math.sin(ph) * 0.16,
-      -swing * 0.5, yaw, 0, gs, gs, gs));
+      -swing * 0.5, yaw, 0, gs * bld, gs * bld, gs * bld));
   }
   for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag']) {
     hkCrowd[k].instanceMatrix.needsUpdate = true;

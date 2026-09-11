@@ -306,6 +306,7 @@ function sahNoShadowOnGhosts(root) {
  * Along the south edge of the square, which is open ground: the stalls are
  * north of it and the acrobats' mat is at z 20.
  */
+let sahSquareBed = null;   // M13: the square's own floor of sound
 const sahCART_X = 30;         // the wrap, past both ends of the square
 const sahCART_V = 1.5;        // m/s — a man pushing a barrow
 let sahCart = null, sahCartMover = null;
@@ -5553,6 +5554,24 @@ export function createSahara(game) {
       if (sahCartMover) sahCartMover.step(dt);
       if (!sahBuilt) return;
       if (!game.biome.isActive('sahara')) return;
+      // ---- JEMAA EL-FNAA MAKES A NOISE (M13) --------------------------
+      // The `crowd` recipe's own comment names this square as the thing it
+      // was written for, and it was never wired here: the loudest place in
+      // the game had four hundred one-shots and no floor under them.
+      //
+      // Clamped INTO the rectangle rather than pinned at its centre, because
+      // a square is an area and the nearest point of it is what you walk
+      // toward. Standing in the middle it is all round you; from the souk it
+      // is a direction, which is the whole point of a bed.
+      if (!sahSquareBed && game.sfxMover) {
+        sahSquareBed = game.sfxMover('crowd', { key: 'sah:square', near: 26, far: 190 });
+      }
+      if (sahSquareBed && game.capy && game.capy.position) {
+        const sp = game.capy.position;
+        sahSquareBed.at(clamp(sp.x, sahSQ_X0, sahSQ_X1), 1.4,
+                        clamp(sp.z, sahSQ_Z0, sahSQ_Z1));
+        sahSquareBed.set(0.68);
+      }
       sahTime += dt;
 
       sahUpdateChase(game, dt);

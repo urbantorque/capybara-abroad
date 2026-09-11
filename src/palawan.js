@@ -57,6 +57,7 @@ const palSPAWN = { x: 0, y: 2.0, z: 46 };
 // is an offset that will be forgotten in one of them.
 const palWATER = 0;
 
+let palShoreBed = null;              // M13
 const palBEACH_Z = 26;               // where the sand goes under
 const palFLAT_Z = -12;               // where the reef flat ends
 // SEVEN AND A HALF, NOT SIX AND A HALF. Measured on the coral garden: the
@@ -4589,6 +4590,19 @@ export function createPalawan(game) {
     update(dt) {
       if (!palBuilt) return;
       if (!game.biome.isActive('palawan')) return;
+      // ---- TWELVE CHAPTERS OF PADDLING AND NO SEA (M13) ---------------
+      // palBEACH_Z is where the sand goes under, so it is the waterline, and
+      // the nearest point of it is directly offshore of wherever you are.
+      // Quieter than Manly's break on purpose: this is a sheltered bay and
+      // the whole chapter is about how still the water is.
+      if (!palShoreBed && game.sfxMover) {
+        palShoreBed = game.sfxMover('surf', { key: 'pal:shore', near: 34, far: 200 });
+      }
+      if (palShoreBed && game.capy && game.capy.position) {
+        const lp2 = game.capy.position;
+        palShoreBed.at(lp2.x, palWATER + 0.4, palBEACH_Z);
+        palShoreBed.set(0.34);
+      }
       palTime += dt;
 
       palUpdateClock(game, dt);

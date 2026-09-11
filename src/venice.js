@@ -5955,6 +5955,33 @@ const venCROWD_WALK = 0, venCROWD_TOBOARD = 1, venCROWD_ONBOARD = 2, venCROWD_WA
 
 function venCrowdGeo(parts) { const M = venMerger(); parts(M); return M.build(); }
 
+// ---- ONE HEIGHT, EIGHTY TIMES (M14) --------------------------------------
+//
+// npc.js gives every roster person one of three build archetypes (bH 0.95 /
+// 1.00 / 1.03, plus a child) and npc.js's locals get the same. The instanced
+// crowds get NONE of it: these are all the same height to the millimetre,
+// standing next to people who are not.
+//
+// The art review's finding, and it is the one that matters here: PORTING L8's
+// KNEES AND ELBOWS IS THE WRONG TOOL AT THIS COUNT. A knee needs a second
+// matrix in the leg's frame — six meshes become ten, plus a Matrix4.multiply
+// per person per frame — for a joint that is 0.3 of a pixel at the 35 m these
+// are seen from. A uniform-height crowd at the L2 camera reads as a PICKET
+// FENCE, and that is a far stronger cue than a joint nobody can resolve.
+//
+// Derived from the instance index rather than stored, so no array changes and
+// no stride to keep in step: the same person is the same height on every frame
+// and in every session, for one multiply. The three rig heights scale with it —
+// hip, body centre and head are a RIG and not three numbers (see the note
+// below), so they have to move together or a tall person's head comes off.
+//
+// LEFT AS IT IS, and it is visible if you look for it: the collider half-extents
+// are authored for a 1.72 m person, so a 0.94 build stands in a box 5 cm too
+// big. Five centimetres on a body nobody can walk into on purpose.
+function venCrowdBuild(i) {
+  const h = Math.sin(i * 12.9898 + 4.1) * 43758.5453;
+  return 0.94 + (h - Math.floor(h)) * 0.12;
+}
 function venBuildCrowd(game, root) {
   const limb = (sgn) => venCrowdGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);
@@ -6277,23 +6304,25 @@ function venUpdateCrowd(game, dt) {
     // centimetre gap between every shoulder and every head — forty-eight
     // floating heads, and it is the first thing in the frame. Measured off the
     // rendered PNG, 24 Aug 2026; same rig as Mong Kok's eighty, deliberately.
-    venCrowd.a.setMatrixAt(i, venXform(x, fy + 0.82 + bob, z, sw, yaw, 0, 1, 1, 1));
-    venCrowd.b.setMatrixAt(i, venXform(x, fy + 0.82 + bob, z, -sw, yaw, 0, 1, 1, 1));
-    venCrowd.body.setMatrixAt(i, venXform(x, fy + 1.14 + bob, z, 0, yaw, 0, 1, 1, 1));
+    // M14: one build per person, and the whole rig moves with it.
+    const bld = venCrowdBuild(i);
+    venCrowd.a.setMatrixAt(i, venXform(x, fy + 0.82 * bld + bob, z, sw, yaw, 0, bld, bld, bld));
+    venCrowd.b.setMatrixAt(i, venXform(x, fy + 0.82 * bld + bob, z, -sw, yaw, 0, bld, bld, bld));
+    venCrowd.body.setMatrixAt(i, venXform(x, fy + 1.14 * bld + bob, z, 0, yaw, 0, bld, bld, bld));
     // the head tips back for the campanile, which is the whole gesture
     const upv = (st === venCROWD_WALK && venCrowdData[o + 8] > 0) ? -0.42 : 0;
-    venCrowd.head.setMatrixAt(i, venXform(x, fy + 1.62 + bob, z, upv, yaw, 0, 1, 1, 1));
+    venCrowd.head.setMatrixAt(i, venXform(x, fy + 1.62 * bld + bob, z, upv, yaw, 0, bld, bld, bld));
     // ---- the camera is only up while they are actually looking ------------
     // A crowd all holding cameras to their faces while they walk is a crowd of
     // mannequins. It appears on the gawpers, and it is the only reason the
     // gawp reads from across the square.
     const cs = (st === venCROWD_WALK && venCrowdData[o + 8] > 0 && (i % 3) === 0) ? 1 : 0.0001;
-    venCrowd.cam.setMatrixAt(i, venXform(x, fy + 1.60 + bob, z, upv, yaw, 0, cs, cs, cs));
+    venCrowd.cam.setMatrixAt(i, venXform(x, fy + 1.60 * bld + bob, z, upv, yaw, 0, cs * bld, cs * bld, cs * bld));
     // and the umbrella, once the water is on its way, on some of them
     const bs = ((coming || high) && (i % 4) === 1) ? 1 : 0.0001;
     venCrowd.brolly.setMatrixAt(i, venXform(
-      x + Math.sin(yaw) * 0.16, fy + 1.62 + bob, z + Math.cos(yaw) * 0.16,
-      0.12, yaw, 0, bs, bs, bs));
+      x + Math.sin(yaw) * 0.16, fy + 1.62 * bld + bob, z + Math.cos(yaw) * 0.16,
+      0.12, yaw, 0, bs * bld, bs * bld, bs * bld));
   }
   for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
     venCrowd[k].instanceMatrix.needsUpdate = true;
