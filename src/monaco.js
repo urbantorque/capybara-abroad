@@ -4550,6 +4550,8 @@ function monBuildLocals(game) {
   });
   monLocBar = put(monCASINO.x + monCASINO.w * 0.5 - 7.5, monFRONT_Z + 6, {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: -1.5708, near: 8,
+    // THE ERRAND (L3-8): a bottle from the caisse to the near side of the second table (monTABLES[1], 130 / monFRONT_Z + 17)
+    errand: { to: [-4.5, 8.6], carry: 'winebottle', every: 42 },
     // the shaker, twice a minute, all evening
     beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'clink', volume: 0.10, pitch: 1.25 },
     lines: ['Change, sir? Madam? I shall guess.',
@@ -4563,6 +4565,8 @@ function monBuildLocals(game) {
   }, monFLOOR_Y);
   monLocCroup = put(monWHEEL.x - 3.4, monWHEEL.z - 1.2, {
     figure: { shirt: PALETTE.monShirt, legs: PALETTE.monTux }, face: 1.4, near: 8,
+    // THE ERRAND (L3-8): a coffee to the dealer at the third table (monTABLES[2], 104 / monFRONT_Z + 27), its east end
+    errand: { to: [-7.2, 2.2], carry: 'coffee', every: 54 },
     // the ball, and it goes round for a long time
     beat: { kind: 'work', every: 8.0, dur: 0.9, sfx: 'roulette', volume: 0.10 },
     lines: ['Rien ne va plus.', 'Faites vos jeux. Or do not. It is all the same to me.',

@@ -5770,6 +5770,8 @@ function quayBuild(game) {
     game.addLocal({ biome: 'quay', x: quayCHIPS.x + 1.5, y: quayWATER_Y + 1.125,
       z: quayCHIPS.z + 1.6, near: 8, face: Math.PI,
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.cloth6 },
+      // THE ERRAND (L3-8): a cone of chips down the Corso to the first shop's verandah
+      errand: { to: [1.1, 11.0], carry: 'chips', every: 34 },
       // the fryer basket, every few seconds
       beat: { kind: 'work', every: 6.5, dur: 0.8, sfx: 'rustle', volume: 0.11, pitch: 1.35 },
       lines: ['Chips are two minutes. They are always two minutes.',
@@ -5866,6 +5868,8 @@ function quayBuild(game) {
     quayLand = game.addLocal({ biome: 'quay', x: quayMANLY.x - 6.4, y: quayWATER_Y + 1.61,
       z: quayMANLY.z + 6.0, near: 9, face: Math.PI * 0.5,
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
+      // THE ERRAND (L3-8): a coffee across the deck to the bench by the shed
+      errand: { to: [10.8, -1.4], carry: 'coffee', every: 44 },
       lines: [{ t: 'She is not due for twenty minutes and she is not that colour.', before: 'manly-voyage' },
               { t: 'Throw us a line when you come alongside. If you come alongside.', before: 'manly-voyage' },
               'Everything on this wharf came off a boat. Including me.',

@@ -2810,6 +2810,11 @@ export function createNPCs(game) {
       // you are walking" below "the capybara" and above "the way you were
       // placed". A walking local costs one branch.
       walk: o.walk || null, walkOk: false, walkTried: false, walkWhy: '',
+      // ---- THE ERRAND (L3-8): a person who carries a thing from here to
+      // there, every so often, through the barge and grab rules everybody
+      // else's props already obey. See localErrandStep.
+      //   errand: { to: [dx, dz], carry: 'coffee', every: 40, v: 1.15 }
+      errand: o.errand || null, errT: rand(5, 14), errP: null, errPhase: '', errX: 0, errZ: 0, errWait: 0, errN: 0, errLegT: 0,
       wA: null, wB: null, wNode: 1, wDwell: 0,
       tx: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       tz: o.z !== undefined ? o.z : (g ? g.position.z : 0),
@@ -6381,6 +6386,8 @@ export function createNPCs(game) {
       // bang is merely something that happened.
       const rushR = capySliding ? npcLOC_SLIDE_R : npcLOC_RUSH_R;
       const rushNow = (capySliding ? sliding : rushing) && d2 < rushR * rushR;
+      // ...and going past somebody carrying something takes it off them (L3-8)
+      if (rushNow && !r.rushWas && r.errP && r.errPhase === 'out' && d2 < 2.4 * 2.4) localErrandLost(r, true);
       if (rushNow && !r.rushWas) {
         r.flV -= capySliding ? 16 : 9.5;   // scaled with the react kick above
         r.flYaw = Math.atan2(dx, dz);
@@ -6480,6 +6487,8 @@ export function createNPCs(game) {
           escStep(r, dt);
         } else if (r.own) {
           localOwnStep(r, dt);
+        } else if (r.errand && localErrandStep(r, dt)) {
+          // THE ERRAND (L3-8): a plan you can interrupt. See localErrandStep.
         } else if (r.walk && localWalkStep(r, dt)) {
           // D2. Ranked below retrieval and the march for the same reason the
           // march is ranked below retrieval: somebody fetching their own hat
@@ -6520,6 +6529,7 @@ export function createNPCs(game) {
           // does: somebody crossing a square on purpose does not shuffle.
           const step = Math.min(sd,
             (r.escT >= 0 ? npcAUTH_ESC_V
+             : r.errPhase ? (r.errand.v || npcERR_V)
              : r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : 1) * (r.authority ? npcAUTH_V_K : 1)
              : r.own || r.wel > 0 ? npcOWN_V
              : r.walkOk ? (r.walk.v || npcLOC_WALK_V)
@@ -6549,7 +6559,7 @@ export function createNPCs(game) {
           // back to `baseY` — the height the chapter measured at the OTHER
           // end. On anything but a flat floor that is a person sinking into
           // the ground every time they finish their walk.
-          const away = r.own || r === marWho || r.wel > 0 || r.walkOk || r.escT >= 0 ||
+          const away = r.own || r === marWho || r.wel > 0 || r.walkOk || r.escT >= 0 || !!r.errPhase ||
                        (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
                                 > npcLOC_STEP_R * npcLOC_STEP_R;
           if (away || Math.abs(r.y - r.baseY) > 0.004) {
@@ -7251,6 +7261,121 @@ export function createNPCs(game) {
    * into empty strokes and have him complain about it. The tool belongs to
    * the home end of the route.
    */
+  // =========================================================================
+  // THE ERRAND (L3-8) — somebody with a job you can interrupt.
+  //
+  // Mischief in seventeen chapters was a switch on geometry: be here at speed,
+  // be here when X happens. The two casts that predate addLocal are the only
+  // people with plans you can break — Sydney's waiter and Pasto's stalls —
+  // and they are the only two with a restock. Everybody else stood on a
+  // pitch. An errand is the smallest plan there is: pick a thing up at home,
+  // carry it to there, come back, and do it again in a while. The thing is a
+  // real prop in the hand (kinematic, like the roster's cups), so the barge
+  // knocks it out, the grab takes it, a drink spills where it lands and the
+  // chain, the ownership and the repertoire all read it as they read every
+  // other prop. Interrupted, they go home and start again sooner — the
+  // restock, generic.
+  // =========================================================================
+  const npcERR_V = 1.15;        // m/s, carrying; a walker's own pace
+  const npcERR_HAND = 0.38;     // m in front, and ~0.95 up: the hand
+  const npcERR_REACH = 0.7;     // m: arrived
+  const npcLOC_ERRAND = ['Coming through.', 'Mind the — thank you.', 'Hot. Hot hot hot.',
+                         'Not for you.', 'Same as every day.'];
+  const npcLOC_ERR_LOST = ['That was for somebody.', 'Right. Again, then.',
+                           'I will make another one. Not for you.', 'Every time. Every single time.'];
+  function localErrandStep(r, dt) {
+    const E = r.errand;
+    if (!E) return false;
+    const ph = game.physics;
+    if (!r.errPhase) {
+      r.errT -= dt;
+      if (r.errT > 0) return false;
+      if (!ph || typeof ph.spawnProp !== 'function') { r.errT = 20; return false; }
+      let p = null;
+      try { p = ph.spawnProp(E.carry || 'coffee', r.ax, r.az, r.y + 0.95); } catch (e) { p = null; }
+      if (!p) { r.errT = 20; return false; }
+      p.owner = r;
+      if (p.body) {
+        p.body.type = CANNON.Body.KINEMATIC;
+        p.body.updateMassProperties();
+        p.body.allowSleep = false;
+        p.body.collisionResponse = false;
+        p.body.wakeUp();
+      }
+      r.errP = p; r.errPhase = 'out'; r.errLegT = 0;
+      r.errX = r.ax + (E.to ? E.to[0] : 6); r.errZ = r.az + (E.to ? E.to[1] : 0);
+      r.errN++;
+      if (r.cd <= 0 && Math.random() < 0.5) { r.cd = r.cool * rand(0.8, 1.4); localLine(r, npcLOC_ERRAND); }
+      return true;
+    }
+    if (r.errPhase === 'wait') {
+      r.errWait -= dt;
+      if (r.errWait <= 0) r.errPhase = 'back';
+      return true;
+    }
+    const out = r.errPhase === 'out';
+    // ---- A LEG THAT CANNOT BE WALKED IS GIVEN UP (measured: the Pantanal's
+    // cattleman stalled 5.8 m out for the whole of a forty-second run). Twenty
+    // seconds is three times the longest route; past it the thing is put down
+    // where they are and they go home, or are simply home.
+    r.errLegT += dt;
+    if (r.errLegT > 20) {
+      if (r.errP && ph && typeof ph.removeProp === 'function') { try { ph.removeProp(r.errP); } catch (e) {} }
+      r.errP = null; r.errLegT = 0;
+      if (out) { r.errPhase = 'back'; } else { r.errPhase = ''; r.errT = (E.every || 40); r.tx = r.ax; r.tz = r.az; }
+      return true;
+    }
+    const tx = out ? r.errX : r.ax, tz = out ? r.errZ : r.az;
+    const d = Math.hypot(tx - r.x, tz - r.z);
+    if (d > npcERR_REACH * 0.5) localSteerTo(r, tx, tz, d);
+    const p = r.errP;
+    if (p) {
+      if (p.held || p.spilled || p.removed || p.owner !== r) {
+        // taken, or spilt, or gone: the errand is over and they say so
+        localErrandLost(r, false);
+      } else {
+        const hx = r.x + Math.sin(r.yaw) * npcERR_HAND, hz = r.z + Math.cos(r.yaw) * npcERR_HAND;
+        const hy = r.y + 0.95;
+        if (p.body) {
+          npcPlaceBody(p.body, hx, hy, hz);
+          npcPlaceQuat(p.body, 0, Math.sin(r.yaw * 0.5), 0, Math.cos(r.yaw * 0.5));
+          p.body.velocity.set(0, 0, 0); p.body.angularVelocity.set(0, 0, 0);
+        }
+        if (p.mesh) { p.mesh.position.set(hx, hy, hz); p.mesh.rotation.set(0, r.yaw, 0); }
+      }
+    }
+    if (d <= npcERR_REACH) {
+      if (out) {
+        // delivered: it goes in through the door, or onto the table, or wherever
+        if (r.errP && ph && typeof ph.removeProp === 'function') { try { ph.removeProp(r.errP); } catch (e) {} }
+        r.errP = null; r.errLegT = 0;
+        r.errPhase = 'wait'; r.errWait = (E.dwell || 2.2) * rand(0.7, 1.3);
+        r.chatYaw = r.face; r.chatT = r.errWait;
+      } else {
+        r.errPhase = ''; r.errT = (E.every || 40) * rand(0.8, 1.25);
+        r.tx = r.ax; r.tz = r.az;
+      }
+    }
+    return true;
+  }
+  /** The thing left the hand — by a barge (`shove`) or a grab or a spill. */
+  function localErrandLost(r, shove) {
+    const p = r.errP;
+    if (p && shove && !p.held && !p.spilled && !p.removed && p.owner === r &&
+        game.physics && typeof game.physics.dropOwned === 'function') {
+      const t = (game.state && game.state.time) || 0;
+      try { game.physics.dropOwned(p, capyVX * 0.6, 2.0, capyVZ * 0.6); } catch (e) {}
+      // props.js's spill gate needs a victim and a fresh capybara fingerprint
+      p.stolenFrom = r; p.disturbed = true; p.lastCapyTouch = t; p.releaseTime = t; p.lastImpact = t;
+      r.flV -= 9; sfx('gasp', r);
+      try { game.shake(0.14); } catch (e) {}
+    }
+    if (p && p.owner === r && !shove) p.owner = null;
+    r.errP = null; r.errLegT = 0;
+    r.errPhase = 'back';
+    r.errT = (r.errand.every || 40) * 0.45;   // the restock: sooner, not later
+    if (r.cd <= 0) { r.cd = r.cool * rand(0.8, 1.4); localReactLine(r, npcLOC_ERR_LOST); }
+  }
   function localWorkX(r) { return (r.walkOk && r.wA) ? r.wA[0] : r.ax; }
   function localWorkZ(r) { return (r.walkOk && r.wA) ? r.wA[1] : r.az; }
   /** ...and whether they are standing at it. Everybody who cannot walk is. */
@@ -11981,6 +12106,7 @@ export function createNPCs(game) {
     for (let i = 0; i < locals.length; i++) {
       const r = locals[i];
       if (r.escT >= 0) { r.escT = -1; r.tx = r.ax; r.tz = r.az; if (game.capy && game.capy.carriedBy === r) game.capy.carriedBy = null; }
+      if (r.errPhase) { if (r.errP && game.physics && game.physics.removeProp) { try { game.physics.removeProp(r.errP); } catch (e) {} } r.errP = null; r.errPhase = ''; r.tx = r.ax; r.tz = r.az; }
     }
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');

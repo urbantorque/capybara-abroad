@@ -6065,6 +6065,8 @@ function sahBuild(game) {
     sahLocCart = game.addLocal({ biome: 'sahara', x: sahCART.x - 2.4, y: 0, z: sahCART.z + 0.5,
       near: 7, face: 1.78,
       figure: { shirt: PALETTE.cloth8, skin: PALETTE.skin3 },
+      // THE ERRAND (L3-8): a glass of juice across the square to the front of the stall on the south side (a = 11/14)
+      errand: { to: [-1.7, -9.5], carry: 'mug', every: 36 },
       lines: [{ t: 'Four dirham! Fresh! Squeezed while you watch!', before: 'orange-cart' },
               { t: 'My friend. My friend. Only look. Looking is free.', before: 'orange-cart' },
               'Same price for everyone. Almost everyone.',
@@ -6176,6 +6178,8 @@ function sahBuild(game) {
     sahLocDyer = game.addLocal({ biome: 'sahara', x: sahSOUK_X0 + 3.5 * sahSOUK_CELL,
       y: 0, z: sahSOUK_Z0 + 1.0 * sahSOUK_CELL, near: 7, face: 0,
       figure: { shirt: PALETTE.sahDye2, skin: PALETTE.skin3 },
+      // THE ERRAND (L3-8): the day's hanks down the alley to the fountain square (cell 2,1) to rinse
+      errand: { to: [-9.5, 4.5], carry: 'basket', every: 44 },
       // lifting a hank out of the vat
       beat: { kind: 'work', every: 4.4, dur: 0.9, sfx: 'thud', volume: 0.09, pitch: 0.7 },
       lines: ['Saffron, indigo, cochineal. And one of them is beetroot.',
@@ -6214,6 +6218,8 @@ function sahBuild(game) {
     sahLocMaalem = game.addLocal({ biome: 'sahara', x: sahCAMP.x - 4.6,
       y: sahTerrain(sahCAMP.x - 4.6, sahCAMP.z + 3.2), z: sahCAMP.z + 3.2, near: 9,
       figure: { shirt: PALETTE.sahTileWhite, skin: PALETTE.skin4, legs: PALETTE.sahTent },
+      // THE ERRAND (L3-8): a glass of tea round the fire to the far carpet (the one at a = 4.2)
+      errand: { to: [2.0, -6.2], carry: 'mug', every: 40 },
       // three strings, and it has never needed a fourth
       beat: { kind: 'work', every: 3.8, dur: 0.85, sfx: 'strum', volume: 0.12, pitch: 0.9 },
       lines: ['Three strings. That is all it has ever needed.',

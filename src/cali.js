@@ -4862,6 +4862,8 @@ function caliBuild(game) {
       y: caliTerrain(caliLULADA.x - 0.4, caliLULADA.z - 1.9),
       z: caliLULADA.z - 1.9, near: 6, face: 0,
       figure: { shirt: PALETTE.cloth3, skin: PALETTE.skin3 },
+      // THE ERRAND (L3-8): a cup of lulada along the walk to the foot of the Gato's plinth
+      errand: { to: [-9.0, 2.6], carry: 'coffee', every: 38 },
       // ---- AND THEY KNOW WHAT HAS HAPPENED (v20) -------------------------
       // Every person in this chapter said the same three sentences whether the
       // sun was up, the bus was at the kerb and the jug was on the counter — or
@@ -4964,6 +4966,8 @@ function caliBuild(game) {
     game.addLocal({ biome: 'cali', x: -29, y: caliRoadY(-29, caliSTREET_Z - 6.6),
       z: caliSTREET_Z - 6.6, near: 6, face: 0,
       figure: { shirt: PALETTE.caliWall6, skin: PALETTE.skin2 },
+      // THE ERRAND (L3-8): an arepa along the pavement to the next open door, the house at x = -22
+      errand: { to: [7.0, 1.2], carry: 'arepa', every: 42 },
       lines: ['Blue was my mother’s idea. The whole street argued for a year.',
               'They dance down there until six. SIX. And then they go to work.',
               { t: 'Sit in the shade, mijo. Whatever you are.',

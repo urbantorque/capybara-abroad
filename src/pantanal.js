@@ -972,6 +972,8 @@ function panBuild(game) {
     // water.
     put('cattleman', -41, -47, {
       face: 2.36,
+      // THE ERRAND (L3-8): a mug of tereré up the capão (panCAPOES[5], dry all the way) to the boatman at (-46, -40)
+      errand: { to: [-3.2, 4.0], carry: 'mug', every: 58 },   // stops 3 m short of him: his body is solid and the leg stalled at his feet
       figure: { shirt: PALETTE.cloth4, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       lines: ['They go over here. Same place every evening.',
               { t: 'Let them go first. They will not wait for you.', before: 'gather' },

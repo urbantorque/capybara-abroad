@@ -5040,6 +5040,8 @@ function kyoBuild(game) {
     kyoLocLate = game.addLocal({ biome: 'kyoto', x: -6.5, y: kyoTerrain(-6.5, kyoGION_Z + 3.8) + 0.13,
       z: kyoGION_Z + 3.8, near: 6, face: -1.4,
       figure: { shirt: PALETTE.indigo, legs: PALETTE.indigo, hat: PALETTE.shoji },
+      // THE ERRAND (L3-8): a box of dango ten metres down the lane to the next door, late
+      errand: { to: [-10.0, -0.6], carry: 'dango', every: 46 },
       lines: ['I am late. I have been late since 1846.',
               'Walk on the stones, not the gutter. The gutter is the gutter.',
               'Do not photograph me. …you have no camera. Good.',
@@ -5148,6 +5150,8 @@ function kyoBuild(game) {
       y: kyoTerrain(kyoUJI.x - 12.6, kyoUJI.z - 4.6) + 0.13,
       z: kyoUJI.z - 4.6, near: 6, face: 0,
       figure: { shirt: PALETTE.matchaField, legs: PALETTE.indigo },
+      // THE ERRAND (L3-8): a pot of sencha across the street to the doorway by the lantern opposite
+      errand: { to: [-8.4, 8.2], carry: 'mug', every: 40 },
       lines: ['Twelve shops. All tea. Yes, all of it. No, they are not the same.',
               'First flush is April. What you are looking at is the second.',
               { t: 'You are dripping on the gyokuro. That is nine thousand yen an ounce.',

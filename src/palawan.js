@@ -4947,6 +4947,8 @@ function palBuild(game) {
                 'the-manta': ['You were ON it. It came out of the water and you were ON it.'] } });
     palLocals.fire = game.addLocal({ biome: 'palawan', x: palFIRE.x + 2.5, y: palTerrain(palFIRE.x + 2.5, palFIRE.z),
       z: palFIRE.z, near: 6,
+      // THE ERRAND (L3-8): a coffee along the sand to the drying mat under the third hut (16, 52.5)
+      errand: { to: [10.3, -2.0], carry: 'coffee', every: 46 },
       figure: { shirt: PALETTE.cloth8, skin: PALETTE.skin3 },
       lines: ['Fire is for after dark. It is barely after dark.',
               { t: 'Wait for the water to light up. Then you will see something.',
@@ -4998,6 +5000,8 @@ function palBuild(game) {
                 'giant-clam': ['That clam is older than this village. It did not even shut.'] } });
 
     palLocals.drying = game.addLocal({ biome: 'palawan', x: 16, y: palTerrain(16, 52.5), z: 52.5, near: 7,
+      // THE ERRAND (L3-8): a basket of fish along the sand to the neighbours' drying rack (huts[3], x 24-27, z 54.4)
+      errand: { to: [9.4, 0.7], carry: 'basket', every: 52 },
       figure: { shirt: PALETTE.palCoralOrange, skin: PALETTE.skin3 },
       lines: ['Dry them two days. Three if the rain comes. It comes.',
               'That is not washing. Half of it is lunch.',

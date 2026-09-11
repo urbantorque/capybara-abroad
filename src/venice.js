@@ -5882,6 +5882,8 @@ function venBuild(game) {
       z: venCAFE.z, near: 6,
       // THE AUTHORITY (L3, F1): the tables are for the guests
       authority: true, role: 'the waiter',
+      // THE ERRAND (L3-8): a flat white from the bar to the far table, every so often
+      errand: { to: [-0.35, -6.0], carry: 'coffee', every: 36 },
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.hair2 },
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere

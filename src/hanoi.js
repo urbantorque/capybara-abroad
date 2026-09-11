@@ -3818,6 +3818,8 @@ function hanBuildLocals(game) {
     wheek: ['Yeah. All right. Yeah.'] });
   hanLocPho = put(12, 14, {
     figure: { shirt: PALETTE.hanWash1, hat: PALETTE.hanConical }, face: -2.2, near: 8,
+    // THE ERRAND (L3-8): a bowl up the frontage to the regular who keeps turning up (the traveller at 9, 19)
+    errand: { to: [-2.8, 4.6], carry: 'phobowl', every: 36 },
     // ---- AND WHAT THEY SAY CHANGES (v30) -------------------------------
     // Chapter 19 shipped with no conditional line in it at all. `onTask`
     // fires once and is gone, so the woman who watched you put your whole
@@ -3836,6 +3838,8 @@ function hanBuildLocals(game) {
   });
   hanLocBia = put(hanBIA.x - 4.5, hanBIA.z + 3.5, {
     figure: { shirt: PALETTE.hanWash3 }, face: -0.7, near: 9,
+    // THE ERRAND (L3-8): a glass from the keg to the first table (g = 0: hanBIA.x + 3.2, hanBIA.z), away from the road
+    errand: { to: [7.0, -3.0], carry: 'coffee', every: 30 },
     // the tap, and the glass under it
     beat: { kind: 'work', every: 6.0, dur: 0.8, sfx: 'pop', volume: 0.09, pitch: 1.2, tool: 'coffee' },  // B12: the tap, and the glass under it
     lines: ['Four thousand a glass. It has been four thousand since 1994.',

@@ -5474,6 +5474,8 @@ function hkBuild(game) {
 
   if (typeof game.addLocal === 'function') {
     hkBakerRec = game.addLocal({ biome: 'kowloon', x: hkBAKERY.x - 0.2, y: 0, z: hkBAKERY.z + 3.2, near: 6, face: 1.5,
+      // THE ERRAND (L3-8): a tray up the west pavement to the shop next door, the way the served queue goes
+      errand: { to: [1.4, 8.0], carry: 'snack', every: 44 },
       figure: { shirt: PALETTE.cloth3 },
       lines: ['Egg tart! Just out! Two minutes ago!',
               { t: 'Hey. Hey. That tray is not for you.', before: 'egg-tart' },
@@ -5493,6 +5495,8 @@ function hkBuild(game) {
     hkFishRec = game.addLocal({ biome: 'kowloon', x: hkMARKET.x - 2, y: 0, z: hkMARKET.z, near: 7,
       // THE AUTHORITY (L3, F1): the lane is his, and he has the cleaver
       authority: true, role: 'the fishmonger',
+      // THE ERRAND (L3-8): a basket down the aisle to the siu mei counter (hkMARKET.x + 9.5)
+      errand: { to: [9.6, 0], carry: 'basket', every: 50 },
       figure: { shirt: PALETTE.cloth2, legs: PALETTE.stoneDark },
       // the cleaver, which is the sound of the market
       beat: { kind: 'work', every: 3.1, dur: 0.7, sfx: 'cleaver', volume: 0.14 },
@@ -5656,6 +5660,8 @@ function hkBuild(game) {
     // where nobody is SITTING is a street nobody lives on.
     hkCookRec = game.addLocal({ biome: 'kowloon', x: hkDPD.x + 2.6, y: 0, z: hkDPD.z - 2.6,
       near: 6, face: -1.5,
+      // THE ERRAND (L3-8): a plate down the lane to the far table (t = 3, hkDPD.z + 3.3), stool side
+      errand: { to: [-3.6, 5.9], carry: 'snack', every: 34 },
       figure: { shirt: PALETTE.hkLaundry, legs: PALETTE.hkGrille },
       // the wok, and the fire under it
       beat: { kind: 'work', every: 2.9, dur: 0.65, sfx: 'hiss', volume: 0.10, pitch: 1.3, tool: 'chips' },  // B12: what comes out of the wok

@@ -1063,6 +1063,8 @@ function manBuild(game) {
 
     manLocals.pool = game.addLocal({ biome: 'manly', x: manPOOL.x0 + 2.5,
       y: manTerrain(manPOOL.x0 + 2.5, manPOOL.z1 + 2.6), z: manPOOL.z1 + 2.6, near: 7,
+      // THE ERRAND (L3-8): a towel along the shoreward wall to the deep end (the strip z1 + 1.4..26 carries no rocks)
+      errand: { to: [10.0, 0], carry: 'towel', every: 48 },
       figure: { shirt: PALETTE.manTowelD, skin: PALETTE.skin2, hat: PALETTE.manBoardC },
       lines: ['Sixty-one years I have swum this pool. Every day but one.',
               'The wall keeps the swell out. Mostly. Not always.',
@@ -1095,6 +1097,8 @@ function manBuild(game) {
 
     manLocals.shelly = game.addLocal({ biome: 'manly', x: manSHELLY.x + 3.5, y: manTerrain(manSHELLY.x + 3.5, manSHELLY.z + 4),
       z: manSHELLY.z + 4, near: 7,
+      // THE ERRAND (L3-8): an ice cream round the west side of the kiosk to the first picnic table (kx - 8, kz + 1.2)
+      errand: { to: [-3.9, 4.6], carry: 'icecream', every: 40 },
       figure: { shirt: PALETTE.manAwning2, skin: PALETTE.skin3 },
       lines: ['Round the corner and the whole ocean gives up. Look at it.',
               'Kiosk has been there since nineteen thirty-two. So has the queue.',

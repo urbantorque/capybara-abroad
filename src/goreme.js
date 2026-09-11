@@ -6091,6 +6091,8 @@ function gorBuild(game) {
     gorLocals.tea = game.addLocal({ biome: 'goreme', x: gorPLAZA.x - 8.4,
       y: gorTerrain(gorPLAZA.x - 8.4, gorPLAZA.z + 6.2), z: gorPLAZA.z + 6.2,
       near: 7,
+      // THE ERRAND (L3-8): a glass across the square to the man behind the carpets (gorLocals.town, P.x + 5, P.z), past the dog
+      errand: { to: [11.0, -4.6], carry: 'mug', every: 38 },
       figure: { shirt: PALETTE.gorEnvE, legs: PALETTE.gorTuffDk, skin: PALETTE.skin2 },
       // pouring it from a height, because that is how
       beat: { kind: 'reach', every: 7.0, dur: 1.2, sfx: 'clink', volume: 0.09, pitch: 1.2 },
@@ -6108,6 +6110,8 @@ function gorBuild(game) {
                 'the-herd': ['On the MARE. He will not stop talking about that.'] } });
 
     gorLocals.potter = game.addLocal({ biome: 'goreme', x: 19, y: gorTerrain(19, 40.4), z: 40.4, near: 7,
+      // THE ERRAND (L3-8): a basket of the week's pots down to the east edge of the square (gorPLAZA.r = 13, flattened)
+      errand: { to: [-7.5, -4.4], carry: 'basket', every: 56 },
       figure: { shirt: PALETTE.gorPot, legs: PALETTE.gorBasaltDk, skin: PALETTE.skin2 },
       // the wheel, and a hand coming down on it
       beat: { kind: 'work', every: 3.4, dur: 0.9, sfx: 'thud', volume: 0.10, pitch: 0.9 },

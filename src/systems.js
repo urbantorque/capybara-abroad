@@ -5189,6 +5189,81 @@ function sysFillLegend(el, which) {
  * own key. That is not a legend, it is the same information twice with the
  * useful copy taken away, and it blinked.
  */
+// ===========================================================================
+// THE ROUTE (L3-8, UX) — nineteen dots on a hand-drawn world.
+//
+// The picker was a shelf of postcards and the departures board a list;
+// nothing said where Pasto is relative to Sydney, or that the Quay and Manly
+// are the same city, or that the journey has a shape at all. One inline SVG
+// on page two, above the shelf: the places at their longitude and latitude
+// (the Drift, which is not anywhere, sits in the middle of the Indian
+// Ocean), the chapter order as a dotted thread, the places you have stood
+// in stamped, and the one you are choosing from lit. It is the cheapest
+// place to give the journey a shape.
+// ===========================================================================
+const sysROUTE_LL = {
+  sydney: [151.2, -33.9], pasto: [-77.3, 1.2], quay: [151.2, -33.9], kyoto: [135.8, 35.0],
+  cali: [-76.5, 3.4], rio: [-43.2, -22.9], iceland: [-21.9, 64.1], sahara: [-8.0, 31.6],
+  drift: [72.0, -12.0], venice: [12.3, 45.4], kowloon: [114.2, 22.3], palawan: [118.7, 9.8],
+  goreme: [34.8, 38.6], manly: [151.3, -33.8], pantanal: [-57.0, -17.5], cave: [106.3, 17.5],
+  antarctic: [-64.0, -65.0], monaco: [7.4, 43.7], hanoi: [105.8, 21.0],
+};
+const sysROUTE_LBL = {
+  monaco: [8, 6, 'start'], venice: [8, -8, 'start'], goreme: [8, 13, 'start'], sahara: [-8, 9, 'end'],
+  cali: [-8, -4, 'end'], pasto: [-8, 12, 'end'],
+  rio: [8, 8, 'start'], pantanal: [-8, 3.5, 'end'],
+  kowloon: [8, -3, 'start'], hanoi: [-8, 12, 'end'], cave: [8, 9, 'start'], palawan: [8, 12, 'start'],
+  sydney: [-8, -2, 'end'], quay: [-8, 4, 'end'], manly: [-8, 10, 'end'],
+};
+function sysBuildRouteMap(seen, here) {
+  const NS = 'http://www.w3.org/2000/svg';
+  // a wide strip, stretched to the wrap's own width (the labels are read at
+  // their authored size; the wrap's aspect is within a few per cent of this)
+  const W = 1000, H = 175;
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('class', 'capyui-route');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'the route: nineteen places on a map');
+  const px = function (ll) { return [ (ll[0] + 180) / 360 * (W - 120) + 40, (72 - ll[1]) / 145 * (H - 30) + 14 ]; };
+  const el = function (tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  };
+  // the graticule, faint
+  for (let lon = -150; lon <= 150; lon += 50) { const a = px([lon, 75]), b = px([lon, -75]); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'capyui-routegrid' }); }
+  for (let lat = -60; lat <= 60; lat += 30) { const a = px([-180, lat]), b = px([180, lat]); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'capyui-routegrid' }); }
+  // the thread, in chapter order, with a little spread where two dots share a city
+  const pts = [];
+  const jitter = { quay: [0, 13], manly: [0, 26] };
+  for (let n = 1; n <= CHAPTERS.length; n++) {
+    const d = CHAPTERS[n - 1];
+    const ll = sysROUTE_LL[d.biome] || [0, 0];
+    const p = px(ll);
+    const j = jitter[d.biome] || [0, 0];
+    pts.push({ n: n, d: d, x: p[0] + j[0], y: p[1] + j[1] });
+  }
+  let path = '';
+  for (let i = 0; i < pts.length; i++) path += (i ? ' L' : 'M') + pts[i].x.toFixed(1) + ' ' + pts[i].y.toFixed(1);
+  el('path', { d: path, class: 'capyui-routethread' });
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const was = !!(seen && seen(p.n));
+    const cls = 'capyui-routedot' + (was ? ' seen' : '') + (p.n === here ? ' here' : '');
+    el('circle', { cx: p.x, cy: p.y, r: was ? 5 : 3.5, class: cls });
+    // the label: to the right by default; the crowded corners of the world
+    // (the Med, the Andes, Indochina, the Brazilian pair, Sydney's three)
+    // carry their own offset and anchor so no two names sit on each other
+    const L = sysROUTE_LBL[p.d.biome] || [8, 3.5, 'start'];
+    el('text', { x: p.x + L[0], y: p.y + L[1], class: 'capyui-routelbl' + (was ? ' seen' : ''),
+                 'text-anchor': L[2] }, p.d.name);
+  }
+  return svg;
+}
 function sysTitleFoot(rows, note, touchNote) {
   const el = sysEl('div', 'capyui-foot');
   // ---- A KEYCAP IS A PROMISE, AND ON A PHONE IT IS A FALSE ONE (R5) -------
@@ -7484,6 +7559,20 @@ function sysBuildCSS() {
    restated here or both pages are in the flow at once and the card is twice as
    long as it was before the split. */
 '.capyui-page{display:flex;flex-direction:column;}',
+/* THE ROUTE (L3-8): a strip of world above the shelf. Paper on paper, so the
+   map is the card's own colour with a hairline, and the thread is the ink at
+   a third. Hidden under 560px of height, where the shelf needs every row. */
+'.capyui-routewrap{margin:clamp(6px,1.2vw,10px) 0 2px;border:1px solid ' + rule + ';border-radius:' + rSm + ';',
+  'background:' + sysRgba(PALETTE.sail, 0.55) + ';overflow:hidden;}',
+'.capyui-route{display:block;width:100%;height:clamp(120px,20vh,175px);}',
+'.capyui-routegrid{stroke:' + sysRgba(PALETTE.ibisHead, 0.08) + ';stroke-width:1;}',
+'.capyui-routethread{fill:none;stroke:' + sysRgba(PALETTE.ibisHead, 0.20) + ';stroke-width:1;stroke-dasharray:2 5;}',
+'.capyui-routedot{fill:' + sysRgba(PALETTE.ibisHead, 0.35) + ';}',
+'.capyui-routedot.seen{fill:' + accent + ';}',
+'.capyui-routedot.here{stroke:' + accent + ';stroke-width:2;fill:' + paper + ';}',
+'.capyui-routelbl{font-size:11px;font-weight:600;fill:' + sysRgba(PALETTE.ibisHead, 0.55) + ';letter-spacing:.02em;}',
+'.capyui-routelbl.seen{fill:' + ink + ';}',
+'@media (max-height:560px){.capyui-routewrap{display:none;}}',
 '.capyui-page[hidden]{display:none;}',
 /* ---- THE CARD IS DEALT, AND THE PAGE IS TURNED (T3) --------------------
    The exit was the only transition on this screen: a 0.75 s fade and scale as
@@ -14055,6 +14144,13 @@ export function createSystems(game) {
   // object — and it has to move on the same line the object does or a chapter
   // gets the previous one's answering voice for a bar.
   let musPalN = 0;
+  // which palettes get which pad spectrum (see musPadSpectrum); the rest keep the saws
+  const sysMUS_PAD_OF = { 0: 'felt', 2: 'felt', 3: 'felt', 12: 'felt', 14: 'felt', 18: 'felt',
+                          13: 'reed', 20: 'reed', 8: 'reed',
+                          7: 'string', 17: 'string', 15: 'string', 9: 'string' };
+  // ...and which get a bass that moves (0..1; bands stay at 0)
+  const sysMUS_BASSWALK = { 0: 1, 2: 1, 3: 1, 4: 1, 7: 1, 9: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 20: 1 };
+  let musDwellNow = 0;   // the dwell the current chord was given (s), for the walk
   let musShakuAt = 0, musBuoyAt = 0;   // the slow voices keep their own clocks
   let musTranhAt = 0, musLoanAt = 0;   // ...and so do chapter 19's two
   let musBendirAt = 0;                 // ...and Cappadocia's frame drum
@@ -14335,8 +14431,58 @@ export function createSystems(game) {
     musBreath = damp(musBreath, want, 1.4, dt);
   }
 
+  // ---- ONE PAD SYNTH IN TWENTY-ONE KEYS (L3-8, audio). The pad was two saw
+  // banks and two triangle banks everywhere; a palette could change its cut,
+  // its bus, its bass and its chords, and Sydney, the Quay, Manly and the
+  // title were the same instrument in three keys. createPeriodicWave had zero
+  // uses. Three spectra, and a palette names one in `pad`:
+  //   felt    odd harmonics at 1/n² — a soft, hollow thing (Sydney, Manly,
+  //           Palawan, the title)
+  //   reed    1/n to the ninth and then a cliff — a nasal reed (Cappadocia,
+  //           Hanoi, Marrakech)
+  //   string  1/n with the second harmonic lifted — bowed and bright
+  //           (Iceland, Antarctica, the Pantanal)
+  // Set on the RUNNING oscillators at a palette change (setPeriodicWave is
+  // allowed mid-flight), and given back their sawtooth/triangle where the
+  // palette names nothing, so every other row is bit-identical.
+  let musWaves = null;
+  function musWave(name) {
+    if (!ac) return null;
+    if (!musWaves) {
+      const N = 24;
+      const mk = function (f) {
+        const re = new Float32Array(N), im = new Float32Array(N);
+        for (let n = 1; n < N; n++) im[n] = f(n);
+        return ac.createPeriodicWave(re, im, { disableNormalization: false });
+      };
+      musWaves = {
+        felt:   mk(function (n) { return (n % 2) ? 1 / (n * n) : 0; }),
+        reed:   mk(function (n) { return n <= 9 ? 1 / n : 0.04 / n; }),
+        string: mk(function (n) { return (n === 2 ? 1.6 : 1) / n; }),
+      };
+    }
+    return musWaves[name] || null;
+  }
+  // the normalised waves are hotter than a saw at the same gain: measured
+  // +2.6 to +4.6 dB RMS in the pad palettes (qa/s1-spectrum.js), so each
+  // spectrum carries a trim into the one writer of musPad.gain
+  const sysMUS_SPEC_K = { felt: 0.50, reed: 0.58, string: 0.56 };
+  let musPadSpecK = 1;
+  function musPadSpectrum(name) {
+    const w = name ? musWave(name) : null;
+    musPadSpecK = (w && sysMUS_SPEC_K[name]) ? sysMUS_SPEC_K[name] : 1;
+    for (let i = 0; i < musVoices.length; i++) {
+      const v = musVoices[i];
+      for (let b = 0; b < v.banks.length; b++) {
+        const oscs = v.banks[b].oscs;
+        for (let k = 0; k < oscs.length; k++) {
+          if (w) oscs[k].setPeriodicWave(w); else oscs[k].type = v.type;
+        }
+      }
+    }
+  }
   function musMakeVoice(centre, level, type, spread, out) {
-    const v = { centre: centre, note: centre, level: level, active: 0, banks: [] };
+    const v = { centre: centre, note: centre, level: level, active: 0, banks: [], type: type };
     for (let b = 0; b < 2; b++) {
       const g = ac.createGain();
       g.gain.value = b === 0 ? level : 0;
@@ -14356,8 +14502,10 @@ export function createSystems(game) {
     return v;
   }
 
+  let musNextIdx = -1;   // the chord after this one, chosen now so the bass can lean toward it
   function musSetChord(idx, when, xf) {
     const chord = musPal.chords[idx];
+    { const nxA = musPal.next[idx] || musPal.next[0]; musNextIdx = nxA[randInt(0, nxA.length - 1)]; }
     const fade = xf || sysMUS_XFADE;
     musPrevChord = musCurChord;
     musCurChord = chord;
@@ -14384,7 +14532,27 @@ export function createSystems(game) {
       const idle = v.banks[1 - v.active];
       const act = v.banks[v.active];
       const hz = sysMidiHz(n);
-      for (let k = 0; k < idle.oscs.length; k++) idle.oscs[k].frequency.setValueAtTime(hz, when);
+      for (let k = 0; k < idle.oscs.length; k++) {
+        const f = idle.oscs[k].frequency;
+        f.cancelScheduledValues(when);
+        f.setValueAtTime(hz, when);
+        // ---- ...AND IT MOVES (L3-8, audio). A pedal root under a fifteen-
+        // second dwell is why the pad palettes felt static whatever the chord
+        // table said. Under `pal.bassWalk` the same bank goes to the fifth at
+        // half the dwell and to a whole-tone approach under the next root a
+        // third of a second before it arrives — the scheduler already knows
+        // the next chord. Bands stay at 0: their tune is the arrangement.
+        const walkK = musPal.bassWalk !== undefined ? musPal.bassWalk : (sysMUS_BASSWALK[musPalN] || 0);
+        if (walkK > 0 && musDwellNow > 4) {
+          const t5 = when + musDwellNow * 0.5;
+          const nextIdx = musNextIdx >= 0 ? musNextIdx : (idx + 1) % musPal.roots.length;
+          const nextRoot = musPal.roots[nextIdx];
+          const appr = nextRoot - 2;
+          f.setValueAtTime(hz, t5 - 0.02);
+          f.setValueAtTime(sysMidiHz(n + 7), t5);
+          f.setValueAtTime(sysMidiHz(appr), when + musDwellNow - 0.35);
+        }
+      }
       idle.g.gain.setValueAtTime(0, when);
       idle.g.gain.linearRampToValueAtTime(v.level, when + fade);
       act.g.gain.setValueAtTime(v.level, when);
@@ -14402,6 +14570,7 @@ export function createSystems(game) {
     if (musPal === pal) return;
     musPal = pal;
     musPalN = sysMUS_PAL.indexOf(pal);
+    musPadSpectrum(pal.pad || (sysMUS_PAD_OF[musPalN] || null));
     // The index must move with the pointer even when the context is suspended:
     // the band palettes' next-tables are shorter than the pad palettes', so a
     // stale musIdx indexes past the end and musTick throws on every interval.
@@ -14416,6 +14585,7 @@ export function createSystems(game) {
     const far = Math.min(sysMUS_XFADE2, pal.xfade * 2);
     musSetChord(0, when, immediate === false ? pal.xfade : far);
     musChordAt = when + rand(pal.dwellA, pal.dwellB);
+    musDwellNow = musChordAt - when;
     musBarAt = 0;     // re-anchor the rhythm to the new palette's own grid
     musApplyT = 10;   // force the bus/filter/bass glide on the next update
   }
@@ -15129,7 +15299,15 @@ export function createSystems(game) {
     }
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
     lp.frequency.value = Math.min(7000, hz * 8);
-    g.connect(lp);
+    // ---- ...AND A BAR UNDER IT (L3-8, audio): the partials were a credible
+    // marimba with no body. A narrow band at the fundamental, mixed beside
+    // the dry sum, is the resonator tube — the note rings on after the strike
+    // instead of only decaying.
+    const bar = ac.createBiquadFilter(); bar.type = 'bandpass'; bar.frequency.value = hz; bar.Q.value = 14;
+    const dry = ac.createGain(); dry.gain.value = 0.6;
+    const wetB = ac.createGain(); wetB.gain.value = 1.4;
+    g.connect(dry); dry.connect(lp);
+    g.connect(bar); bar.connect(wetB); wetB.connect(lp);
     let tail = lp;
     if (ac.createStereoPanner) {
       const pan = ac.createStereoPanner(); pan.pan.value = panv;
@@ -15278,16 +15456,39 @@ export function createSystems(game) {
   }
 
   /** A brass stab: the whole section hitting one chord and stopping dead. */
+  // ---- A LIP (L3-8, audio). Every voice in this file was oscillator + biquad
+  // + envelope: nothing could BITE, because a filter cannot add the odd
+  // harmonics a saturating lip does. One tanh curve, made once, and the stab
+  // is driven INTO it — the drive rises over the first forty milliseconds,
+  // which is the blat. Two nodes per stab, and the S2 shelf still caps the top.
+  let musLipCurve = null;
+  function musLip() {
+    if (!musLipCurve) {
+      const n = 1024; const c = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); }
+      musLipCurve = c;
+    }
+    const ws = ac.createWaveShaper(); ws.curve = musLipCurve; ws.oversample = '2x';
+    return ws;
+  }
   function musBrassStab(when, chord, vel) {
     const lp = ac.createBiquadFilter();
     lp.type = 'lowpass'; lp.Q.value = 1.4;
-    lp.frequency.setValueAtTime(1200, when);
+    lp.frequency.setValueAtTime(600, when);
     lp.frequency.linearRampToValueAtTime(3200, when + 0.05);
     lp.frequency.exponentialRampToValueAtTime(900, when + 0.30);
+    const lip = musLip();
+    const drive = ac.createGain();
+    drive.gain.setValueAtTime(0.3, when);
+    drive.gain.linearRampToValueAtTime(1.4, when + 0.04);
+    drive.gain.linearRampToValueAtTime(0.8, when + 0.30);
+    drive.connect(lip); lip.connect(lp);
     const g = ac.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(vel * 0.055, when + 0.022);   // brass has a lip on it
-    g.gain.setValueAtTime(vel * 0.055, when + 0.13);
+    // 0.10, not 0.055: the shaper folds three saws that summed to ~3 into ±1,
+    // so the level comes up by the same amount and the stab sits where it sat
+    g.gain.exponentialRampToValueAtTime(vel * 0.10, when + 0.022);
+    g.gain.setValueAtTime(vel * 0.10, when + 0.13);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.34);
     for (let i = 0; i < 3; i++) {
       const n = chord[Math.min(chord.length - 1, i + 1)] + 12;
@@ -15295,9 +15496,12 @@ export function createSystems(game) {
       o.type = 'sawtooth';
       o.frequency.value = sysMidiHz(n);
       o.detune.value = rand(-7, 7);
-      o.connect(lp);
+      o.connect(drive);
       o.start(when); o.stop(when + 0.4);
     }
+    // the shaper sums three saws at unity and folds them: the level comes
+    // down by the same amount so the stab sits where it sat
+    g.gain.setValueAtTime(0.0001, when);
     lp.connect(g); g.connect(musPluckDry); g.connect(musSend);
   }
 
@@ -17120,10 +17324,13 @@ export function createSystems(game) {
     let guard = 0;
     while (musChordAt < horizon && guard++ < 8) {
       const nx = musPal.next[musIdx] || musPal.next[0];
-      musIdx = nx[randInt(0, nx.length - 1)];
+      // the chord musSetChord already leaned the bass toward, when it is legal
+      musIdx = (musNextIdx >= 0 && nx.indexOf(musNextIdx) >= 0) ? musNextIdx : nx[randInt(0, nx.length - 1)];
       musChordStart = musChordAt;
       musSetChord(musIdx, musChordAt, musPal.xfade);
-      musChordAt += rand(musPal.dwellA, musPal.dwellB);
+      const dw = rand(musPal.dwellA, musPal.dwellB);
+      musDwellNow = dw;
+      musChordAt += dw;
     }
     guard = 0;
     const lead = musPal.lead;
@@ -17806,6 +18013,7 @@ export function createSystems(game) {
     musChordStart = ac.currentTime;
     musSetChord(musIdx, ac.currentTime + 0.05, musPal.xfade);
     musChordAt = ac.currentTime + rand(musPal.dwellA, musPal.dwellB);
+    musDwellNow = musChordAt - ac.currentTime;
     musPluckAt = ac.currentTime + rand(4, 8);
 
     // fade in over a few seconds — the game has already started by here
@@ -19216,6 +19424,17 @@ export function createSystems(game) {
   picksEl.setAttribute('aria-label', 'the other places');
   for (let i = 1; i < pickDefs.length; i++) {
     picksEl.appendChild(buildPick(pickDefs[i], i, false));
+  }
+  // ---- THE ROUTE (L3-8): the world, with the journey on it, above the shelf
+  {
+    const wrap = sysEl('div', 'capyui-routewrap');
+    wrap.appendChild(sysBuildRouteMap(function (n) {
+      if (jrFileSeen[n]) return true;
+      const ids = tasksInChapter(n);
+      for (let k = 0; k < ids.length; k++) if (jrFileDone[ids[k]]) return true;
+      return false;
+    }, jrFileCount > 0 ? chapterOf(jrFile.biome || 'sydney') : 0));
+    p2El.appendChild(wrap);
   }
   p2El.appendChild(picksEl);
 
@@ -39117,7 +39336,7 @@ export function createSystems(game) {
       if (musSpeak < 0.01) musSpeak = 0;
       sysAudioSet(musPad.gain, musPal.bus * (1 - musIntensity * 0.3) *
         (1 + 0.32 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
-        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak),
+        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak) * musPadSpecK,
         nowA, lift > 0.02 ? 0.6 : musSpeak > 0.5 ? 0.35 : 1.2);
       sysAudioSet(musFilt.frequency, Math.max(180,
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +

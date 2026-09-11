@@ -3834,7 +3834,10 @@ function physSpill(prop) {
   physSfxOpts.volume = 0.8;
   physGame.sfx(def.spillSfx || 'splash', physSfxOpts);
   physDust3(b.position.x, b.position.y - prop.originY + 0.12, b.position.z, 5);
-  if (earnedSpill) physTask('coffee-spill');
+  // ...AND IT IS SYDNEY'S ROW (L3-8). The errand puts owned cups in other
+  // people's hands in other places now, and a flat white spilt in Venice
+  // must not tick a line on the Gardens' list (memory: shared-space leaks).
+  if (earnedSpill && physGame.biome && physGame.biome.current === 'sydney') physTask('coffee-spill');
   // A burst sack throws its harvest across the drying patio.
   if (prop.type === 'coffeesack') {
     physThrowShards(b.position.x, b.position.y + 0.15, b.position.z, 6, 1);

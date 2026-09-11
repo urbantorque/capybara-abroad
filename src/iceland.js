@@ -5594,6 +5594,8 @@ function iceBuild(game) {
       x: icePYLSA.x + 2.9, y: iceTerrain(icePYLSA.x + 2.9, icePYLSA.z + 1.5),
       z: icePYLSA.z + 1.5, near: 7, face: -2.05,
       figure: { shirt: PALETTE.cloth1, hat: PALETTE.cloth6 },
+      // THE ERRAND (L3-8): one with everything, across the road to the door of the house on the near row
+      errand: { to: [2.3, -9.0], carry: 'sandwich', every: 40 },
       lines: [{ t: 'Eina með öllu? One with everything?', before: 'pylsa' },
               { t: 'Four hundred and ninety krona. To you, four hundred and ninety krona.', before: 'pylsa' },
               'It is not that cold. You are just wet.',
@@ -5698,6 +5700,8 @@ function iceBuild(game) {
     iceLocSpring = game.addLocal({ biome: 'iceland', x: iceSPRING.x + 9.5,
       y: iceTerrain(iceSPRING.x + 9.5, iceSPRING.z + 2), z: iceSPRING.z + 2, near: 8,
       figure: { shirt: PALETTE.iceHouse4, legs: PALETTE.iceRope },
+      // THE ERRAND (L3-8): a mug of something hot round the rim to the gap in the rope fence, where they come in
+      errand: { to: [-6.2, 9.8], carry: 'mug', every: 50 },
       lines: [{ t: 'Get in. Sit still. That is the whole of it.', before: 'hot-spring' },
               { t: 'Thirty-eight degrees, all year, for nothing.', before: 'hot-spring' },
               'People come a very long way to do absolutely nothing here.',
