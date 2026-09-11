@@ -11,6 +11,14 @@ import { PALETTE, mat, matSelf, TASKS, rand, randInt, clamp, damp, lerp, waterYA
 // --- dimensions ------------------------------------------------------------
 const capyR = 0.34;                 // collision sphere radius
 const capyFOOT_Y = 0.34;            // resting body-centre height on flat ground
+// M10: THE WET FOOTFALL. `game.weather.splash()` was the only input to the step
+// voice's wet layer and it is a pure function of the rain, so a capybara walking
+// up a beach with the North Atlantic running off it played dry sand. The band
+// this was written for — walking on submerged ground — does not exist in this
+// game's geometry; see the long note at the footfall. Coming OUT of the water
+// does, in every chapter that has any.
+const capyWADE_DRIP = 4.0;          // s of wet footfalls after leaving the water
+const capyWADE_IN = 0.55;           // ...and standing in it, where that happens at all
 const capySPAWN = { x: 0, y: 1.2, z: 22 };
 const capyWALK = 4.2;
 const capyRUN = 7.4;
@@ -6675,7 +6683,58 @@ export function createCapybara(game) {
           // `splash()` is deliberately zero below a damp baseline: a cave
           // floor is wet and does not splash under every step, and a street in
           // a shower does.
-          capySfxOpts.wet = game.weather ? game.weather.splash() : 0;
+          //
+          // ---- ...AND `splash()` ONLY KNOWS ABOUT RAIN (M10) -------------
+          // It is `clamp((wet - 0.34)/0.5) * clamp(0.35 + rainT)` and nothing
+          // else — a pure function of how wet the WEATHER is. It knows nothing
+          // about water being there, so wading the Manly shallows, the Quay's
+          // edge, Palawan's bay, the Uji, the Pantanal marsh, the cave river and
+          // the acqua alta over the Piazzetta all played the dry material voice.
+          //
+          // And it is exactly the band a player actually walks through:
+          // `capySwimming` turns the footfall off entirely, so the stretch
+          // between "dry" and "swimming" — which is where somebody walks INTO
+          // the sea — had no water in it at all.
+          //
+          // The wet layer is already built, already mixed as its own layer, and
+          // already the right weight (its peak is 0.070 against the material's
+          // 0.075-0.085, so a full wade reads as a splash the same size as the
+          // step). This is the second question it should have been asked. The
+          // MAXIMUM of the two rather than a sum: standing in a puddle in the
+          // rain is not twice as wet as either.
+          //
+          // ---- THERE IS NO WADING BAND IN THIS GAME, AND THERE IS A DRIP ---
+          //
+          // The obvious version of this ramps on how far the foot is under the
+          // surface. It measured ZERO over a fourteen-second walk into the sea
+          // at Manly, and the zero was right: `capySWIM_ENTER` is 0.70 and is
+          // measured from the BODY CENTRE, the foot is `capyFOOT_Y` (0.34)
+          // below that, so the animal is swimming — and this whole block is
+          // skipped — before the foot is 36 cm under.
+          //
+          // Asked of the geometry instead of by walking (`qa/m10-wade.js`), a
+          // 121 m grid in twelve chapters: the number of points where the animal
+          // could stand on GROUND THAT IS UNDER WATER is zero in Rio, Venice,
+          // the cave, Antarctica and Monte Carlo, and in the rest the terrain
+          // function simply stops at the waterline, so the "shallows" every
+          // chapter appears to have are dry ground inside a water REGION. The
+          // state this was written for does not exist.
+          //
+          // What does exist, in every chapter with water in it, is an animal
+          // that has just climbed out of it. `capySwimAgo` is already kept — it
+          // is what the haul-out reads — and a capybara walking up a beach with
+          // the sea running off it is the commonest wet footfall in the game and
+          // had the driest sound in it. So the term is a DRIP: full for the
+          // first stride out and gone within a few seconds, which is also how
+          // long it takes to stop sounding like that.
+          //
+          // The overWater term is kept beside it at a fraction of the weight,
+          // because where the band does exist it is correct — and the maximum
+          // rather than a sum, since standing in a puddle in the rain is not
+          // twice as wet as either.
+          const drip = clamp(1 - capySwimAgo / capyWADE_DRIP, 0, 1);
+          const wade = Math.max(drip, overWater ? capyWADE_IN : 0);
+          capySfxOpts.wet = Math.max(game.weather ? game.weather.splash() : 0, wade);
           game.sfx('step', capySfxOpts);
           // ...and at a run it kicks up whatever it is running on
           if (gaitSpeed > capyWALK * 1.05 && capyStepPhase % 2 === 0) {

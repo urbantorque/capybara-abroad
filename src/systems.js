@@ -1092,6 +1092,10 @@ const sysSFX_BACK_T  = 0.15;   // `back` past which a one-shot is given a filter
 const sysSFX_BACK_LP = 15500;  // Hz taken off the ceiling when fully astern
 const sysSFX_UP_T    = 0.20;   // `up` past which it gets the shelf instead
 const sysSFX_UP_DB   = 2.0;    // dB of 6 kHz shelf when directly overhead
+// The mover's own lowpass sets 0.4, sfxStep sets 0.7, acSubLP sets 0.5. The
+// one-shot's set nothing and therefore inherited Web Audio's default of 1,
+// which puts about a decibel of RESONANCE at the corner frequency. See M10.
+const sysSFX_LP_Q    = 0.4;
 const sysSFX_UP_PAN  = 0.55;   // share of the pan width elevation takes away
 
 // --- ...AND THE PLACE HAS A SHAPE AS WELL AS A DIRECTION ---------------------
@@ -10557,6 +10561,31 @@ export function createSystems(game) {
   // and, from S2, by the one-shots. 0..1 both: `back` is 1 dead astern, `up`
   // is 1 directly overhead or underfoot. See sysEarFwd.
   let sysSfxBack = 0, sysSfxUp = 0;
+  // ---- THE FILTER BRANCH, AS TWO FUNCTIONS (M10) ------------------------
+  //
+  // These were two expressions inlined in sfx(), which meant the ONLY way to
+  // see what the branch built was to play a sound and listen to it — and a Web
+  // Audio graph is write-only, so that is not a way at all. The first cut of
+  // the probe published the last value sfx() happened to set, which reads as a
+  // constant 7072 Hz at every bearing and every distance: a stale number that
+  // looks exactly like a curve that is not working.
+  //
+  // Lifted out so that sfx() and audioProbe run THE SAME ARITHMETIC rather
+  // than two copies of it. That is the whole value of the change: a probe that
+  // re-implements the thing it measures can only ever prove itself right.
+  //
+  // Returns 20000 (i.e. no filter) when there is nothing to say.
+  function sysSfxLpFor(dist, back) {
+    const over = Math.max(0, Math.min(dist, 400) - sysMOVER_FLAT);
+    const airT = clamp(over / sysMOVER_LPSPAN, 0, 1);
+    const airHz = over > 0
+      ? sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - airT) * (1 - airT)
+      : 20000;
+    const backHz = back > sysSFX_BACK_T ? 20000 - back * sysSFX_BACK_LP : 20000;
+    return Math.min(airHz, backHz);
+  }
+  /** dB of 6 kHz shelf for an elevation term, or 0 for no shelf at all. */
+  function sysSfxShelfFor(up) { return up > sysSFX_UP_T ? sysSFX_UP_DB * up : 0; }
   // ---- ...AND HOW FAR AWAY IT WAS (L7) -------------------------------------
   // The one number this function has always had and never published. The
   // movers have taken the top off with distance since A1 — a continuous engine
@@ -17642,24 +17671,45 @@ export function createSystems(game) {
         // one filter per placed call, and none at all inside sysMOVER_FLAT
         // where distance has nothing to say.
         let tail = node;
-        const over = Math.max(0, Math.min(dist, 400) - sysMOVER_FLAT);
-        const airT = clamp(over / sysMOVER_LPSPAN, 0, 1);
-        const airHz = over > 0
-          ? sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - airT) * (1 - airT)
-          : 20000;
-        const backHz = back > sysSFX_BACK_T ? 20000 - back * sysSFX_BACK_LP : 20000;
-        const lpHz = Math.min(airHz, backHz);
+        const lpHz = sysSfxLpFor(dist, back);
+        // ---- ...AND THE `else` WAS KILLING THE ELEVATION CUE (M10) --------
+        //
+        // Arithmetic, not opinion. The air curve above crosses the `lpHz <
+        // 19000` gate at 9.63 m: 19220*(1-t)^2 = 18220 gives t = 0.0264, so
+        // `over` = 1.63 and `dist` = 9.63. L7 folded air into this branch and
+        // left the `else`, so from ten metres out the first arm ALWAYS wins and
+        // the shelf is unreachable — sysSFX_UP_DB has had no effect on any
+        // sound more than ten metres away since, which is every gull, every
+        // flock (a wingburst's centroid crosses fourteen metres), every bell off
+        // a campanile and every bird in the Antarctic colony. The comment above
+        // describes a cue the code stopped building.
+        //
+        // They are not alternatives and never were: one is a fact about
+        // distance and bearing, the other is about a dimension two speakers do
+        // not have, and a gull that is far AND overhead is both. Chained, and
+        // the "common case must not pay" promise is kept exactly — a sound in
+        // front of you and level with you still builds neither node.
         if (lpHz < 19000) {
           const f = c.createBiquadFilter();
           f.type = sysLOWPASS;
           f.frequency.value = Math.max(200, lpHz);
+          // ---- A LOWPASS WITH NO Q IS A LOWPASS WITH A RESONANCE (M10) ----
+          // Unset, this inherits the Web Audio default of 1, which is about a
+          // decibel of lift AT THE CORNER — so at full back the one-shot got an
+          // emphasis at 4.5 kHz, in the presence band, which is the opposite of
+          // "something behind you". L7's comment says this is "the same node"
+          // as the mover's; the mover sets 0.4 explicitly, sfxStep sets 0.7 and
+          // acSubLP sets 0.5. This was the only lowpass in the file that set
+          // none. sysSFX_BACK_LP has never been tuned by ear and this is why.
+          f.Q.value = sysSFX_LP_Q;
           node.connect(f); tail = f;
-        } else if (up > sysSFX_UP_T) {
-          const f = c.createBiquadFilter();
-          f.type = sysHIGHSHELF;
-          f.frequency.value = 6000;
-          f.gain.value = sysSFX_UP_DB * up;
-          node.connect(f); tail = f;
+        }
+        if (up > sysSFX_UP_T) {
+          const f2 = c.createBiquadFilter();
+          f2.type = sysHIGHSHELF;
+          f2.frequency.value = 6000;
+          f2.gain.value = sysSFX_UP_DB * up;
+          tail.connect(f2); tail = f2;
         }
         tail.connect(bus);
         acMaster = node;
@@ -32649,6 +32699,18 @@ export function createSystems(game) {
                // quietly stops being overhead goes unnoticed.
                back: g > 0 ? +sysSfxBack.toFixed(3) : 0,
                up: g > 0 ? +sysSfxUp.toFixed(3) : 0,
+               dist: g > 0 ? +sysSfxDist.toFixed(2) : 0,
+               // ---- WHAT THE BRANCH BUILT, NOT WHAT WENT INTO IT (M10) ----
+               // `back` and `up` above are the INPUTS to the filter branch, and
+               // they were always correct for the whole time that branch was
+               // throwing a ReferenceError and, after that, for the whole time
+               // its `else` made the shelf unreachable past 9.6 m. A flag that
+               // reports a table is not evidence about a rule. These two are
+               // the Hz and the dB the last placed call actually set: `lp` is 0
+               // when no lowpass was built and `shelf` is 0 when no shelf was.
+               lp: g > 0 ? Math.round(sysSfxLpFor(sysSfxDist, sysSfxBack)) : 0,
+               shelf: g > 0 ? +sysSfxShelfFor(sysSfxUp).toFixed(2) : 0,
+               lpQ: sysSFX_LP_Q,
                ear: { x: sysEar.x, y: sysEar.y, z: sysEar.z },
                earVel: { x: +sysEarVel.x.toFixed(2), y: +sysEarVel.y.toFixed(2),
                          z: +sysEarVel.z.toFixed(2) } };
