@@ -129,6 +129,48 @@ const sahSURF_STALL_V = 3.2;
 const sahSURF_STALL_T = 1.8;
 
 const sahCARAVAN_N = 5;
+// ================================================================ THE JETPACK ==
+// THE MARQUEE, AND IT IS RIDICULOUS ON PURPOSE (X3).
+//
+// The great dune was the chapter's big one: a hundred metres of sand at
+// twenty metres a second, and then a walk back up. Now the walk up is worth
+// something else: a jetpack sits on the crest, E straps it on, and the way
+// home is FLOWN — hold Space to burn, W/A/S/D to lean, let go and drop. The
+// tank is four seconds, so it is not a helicopter: it is a series of leaps
+// with a landing between each, and the tank refills on the sand while you
+// stand on it. Four rings across the erg and the palmeraie, and the fifth
+// stop is the top of the Koutoubia, which you land on.
+//
+// KINEMATIC, PARKED AT THE HELM, like the helicopter and the car: the module
+// integrates a position and a velocity of its own and writes the animal
+// there every frame. Gravity is the chapter's own number, the thrust is a
+// little over twice it, and the horizontal is camera-relative because a
+// jetpack is worn, not steered — you lean the way you are looking.
+// ON THE FIRM SHOULDER, at the top of the staked track — not on the slip
+// band, where a capybara stood next to the crate for a second and a half and
+// was then forty metres down the face. Measured. x is finished at build
+// time, because the crest wanders (sahCrest).
+const sahJET = { x: sahDUNE_X - 5, z: sahDUNE_Z + 45 };
+const sahJET_DOOR_R = 3.4;      // m from the crate E straps it on
+const sahJET_G      = 14.0;     // m/s² down
+const sahJET_THRUST = 32.0;     // m/s² up, Space held and tank not empty
+const sahJET_TANK   = 4.0;      // s of burn
+const sahJET_REFILL = 2.2;      // s to a full tank, on the ground
+const sahJET_ACC    = 15.0;     // m/s² of lean
+const sahJET_VMAX   = 22.0;     // m/s across
+const sahJET_VFALL  = -22.0;    // m/s terminal
+const sahJET_VUP    = 16.0;     // m/s ceiling on the climb
+const sahJET_DRAG   = 0.9;      // /s in the air
+const sahJET_WALK   = 5.5;      // m/s on the ground with it on
+const sahJET_RING_R = 5.0;      // m from a ring's centre that is "through"
+const sahJET_N      = 5;
+// the course: four rings, then the minaret. x, z; y is the ground plus a rise
+const sahJET_RINGS = [[238, -34, 9], [194, 52, 10], [128, -12, 11], [38, 42, 12]];
+let sahJetG = null, sahJetPack = null, sahJetFlame = null, sahJetRings = null, sahJetRingMats = null;
+let sahJetX = 0, sahJetY = 0, sahJetZ = 0, sahJetVX = 0, sahJetVY = 0, sahJetVZ = 0, sahJetYaw = 0;
+let sahJetOn = false, sahJetWorn = false, sahJetCool = 0, sahJetFuel = sahJET_TANK, sahJetBurn = 0;
+let sahJetNext = 0, sahJetDone = false, sahJetT = 0, sahJetGround = true, sahJetBurnSfxT = 0;
+let sahJetToldFuel = false, sahJetRingT = 0, sahJetOnMinaret = false, sahJetBest = 0;
 const sahDUST_N = 260;   // was 150; the avalanche (W1) wants a wall of it behind the run
 const sahSTAR_N = 200;
 const sahPALM_N = 90;
@@ -5132,6 +5174,253 @@ function sahUpdateStorm(game, dt) {
 
 }
 
+/** The crate on the crest, the pack itself, and the four rings (X3). */
+function sahBuildJet(game, root) {
+  // the pack: two tanks, a harness plate, a nozzle each side
+  const g = new THREE.Group();
+  const K = sahMerger();
+  const steel = 0xb9b4a8, brass = PALETTE.sahBrass, dark = 0x4a4038;
+  K.box(0, 0.42, 0, 0.62, 0.14, 0.30, dark);                        // the plate
+  K.cyl(-0.18, 0.45, -0.20, 0.13, 0.62, steel, 0, 0, 0, 8);         // the tanks
+  K.cyl(0.18, 0.45, -0.20, 0.13, 0.62, steel, 0, 0, 0, 8);
+  K.sph(-0.18, 0.78, -0.20, 0.13, 0.10, 0.13, brass, 6);
+  K.sph(0.18, 0.78, -0.20, 0.13, 0.10, 0.13, brass, 6);
+  K.cyl(-0.28, 0.12, -0.22, 0.07, 0.16, brass, 0, 0, 0, 6);         // the nozzles
+  K.cyl(0.28, 0.12, -0.22, 0.07, 0.16, brass, 0, 0, 0, 6);
+  const m = new THREE.Mesh(K.build(), sahVC());
+  m.castShadow = true;
+  g.add(m);
+  // the flame: a cone under the nozzles, scaled by the burn
+  const fl = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.6, 6, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }));
+  fl.rotation.x = Math.PI;
+  fl.position.set(0, -0.7, -0.22);
+  fl.scale.set(1, 0.01, 1);
+  fl.userData.noShadow = true;
+  g.add(fl);
+  sahJetFlame = fl;
+  // parked on the crest until worn — on a DECK. The top of the shoulder is a
+  // thirty-degree side-slope and a capybara set down beside the crate was a
+  // metre further away every second; four metres of planks, flat, with a
+  // collider, is somewhere to stand and put a thing on.
+  sahJET.x = sahDUNE_X - 5 + sahCrest(sahJET.z);
+  const deckY = sahTerrain(sahJET.x, sahJET.z) + 0.25;
+  sahStaticBox(game, sahJET.x, deckY - 0.2, sahJET.z, 5.0, 0.4, 5.0);
+  const D = sahMerger();
+  for (let i = 0; i < 8; i++) D.box(sahJET.x - 2.2 + i * 0.63, deckY - 0.06, sahJET.z, 0.56, 0.12, 5.0, i & 1 ? 0x8a6a48 : 0x9a7a55);
+  for (let sd = -1; sd <= 1; sd += 2) D.box(sahJET.x, deckY - 0.5, sahJET.z + sd * 2.3, 5.0, 0.7, 0.2, 0x6a5038);
+  const dm = new THREE.Mesh(D.build(), sahVC());
+  dm.castShadow = true; dm.receiveShadow = true;
+  root.add(dm);
+  sahJetX = sahJET.x; sahJetZ = sahJET.z; sahJetY = deckY;
+  g.position.set(sahJetX, sahJetY, sahJetZ);
+  root.add(g);
+  sahJetG = g;
+  // the rings, and a pole under each so they read from the ground
+  sahJetRings = []; sahJetRingMats = [];
+  const tg = new THREE.TorusGeometry(4.2, 0.30, 6, 20);
+  for (let i = 0; i < sahJET_RINGS.length; i++) {
+    const r = sahJET_RINGS[i];
+    const gy = sahTerrain(r[0], r[1]);
+    const mat = new THREE.MeshLambertMaterial({ color: PALETTE.sahBrass, emissive: 0xff9a2a, emissiveIntensity: 0.4 });
+    const ring = new THREE.Mesh(tg, mat);
+    ring.position.set(r[0], gy + r[2], r[1]);
+    const p = i === 0 ? [sahJET.x, sahJET.z] : sahJET_RINGS[i - 1];
+    ring.rotation.y = Math.atan2(r[0] - p[0], r[1] - p[1]);
+    ring.userData.noShadow = true;
+    root.add(ring);
+    sahJetRings.push(ring); sahJetRingMats.push(mat);
+    const P = sahMerger();
+    P.cyl(r[0], gy + r[2] * 0.5 - 2.1, r[1], 0.12, r[2] - 4.2, 0x4a4038, 0, 0, 0, 6);
+    const pm = new THREE.Mesh(P.build(), sahVC());
+    root.add(pm);
+  }
+}
+function sahJetTake(game) {
+  const capy = game.capy;
+  sahJetWorn = true; sahJetOn = true; sahJetCool = 0.4;
+  if (capy) { capy.atHelm = true; capy.rideBody = null; }
+  const p = capy && capy.body ? capy.body.position : null;
+  if (p) { sahJetX = p.x; sahJetZ = p.z; sahJetY = Math.max(p.y - 0.45, sahTerrain(p.x, p.z)); }
+  sahJetVX = 0; sahJetVY = 0; sahJetVZ = 0; sahJetFuel = sahJET_TANK; sahJetGround = true;
+  sahJetT = 0; if (!sahJetDone) sahJetNext = 0;
+  sahSfx('chime', { volume: 0.6, pitch: 1.05 });
+  if (typeof game.control === 'function') game.control('hold Space to burn · W/A/S/D to lean · let go and you drop. four seconds a tank; it refills on the sand. E to take it off');
+}
+function sahJetLeave(game) {
+  const capy = game.capy;
+  sahJetOn = false; sahJetCool = 0.4;
+  if (capy) capy.atHelm = false;
+  if (capy && capy.body) {
+    capy.body.position.set(sahJetX, sahJetY + 0.6, sahJetZ);
+    capy.body.velocity.set(0, 0, 0);
+    capy.body.previousPosition.copy(capy.body.position);
+    capy.body.interpolatedPosition.copy(capy.body.position);
+    if (capy.position) capy.position.set(sahJetX, sahJetY + 0.6, sahJetZ);
+  }
+  // the pack stays where it was taken off, and can be put back on there
+  sahJetWorn = false;
+}
+/** The ground under the jetpack: the sand, or the top of the minaret. */
+function sahJetFloor(x, z, y) {
+  const K = sahKOUTOUBIA;
+  if (Math.abs(x - K.x) < 2.5 && Math.abs(z - K.z) < 2.5 && y > K.h + 4.5) return K.h + 5.9;
+  return sahTerrain(x, z);
+}
+function sahUpdateJet(game, dt) {
+  if (!sahJetG || dt <= 0) return;
+  const input = game.input, capy = game.capy;
+  if (sahJetCool > 0) sahJetCool -= dt;
+  // ---- on and off ---------------------------------------------------------
+  if (capy && capy.body && input && input.actionPressed && sahJetCool <= 0) {
+    if (sahJetOn) {
+      if (sahJetGround) sahJetLeave(game);
+      else if (typeof game.control === 'function') game.control('land first — let go of Space');
+    } else if (!capy.carriedBy && !capy.atHelm && !capy.climbing) {
+      const dx = capy.body.position.x - sahJetX, dz = capy.body.position.z - sahJetZ;
+      const dy = capy.body.position.y - sahJetY;
+      if (dx * dx + dz * dz < sahJET_DOOR_R * sahJET_DOOR_R && dy > -2 && dy < 3) sahJetTake(game);
+    }
+  }
+  // the rings breathe: the next one bright
+  sahJetRingT += dt;
+  if (sahJetRingMats) {
+    for (let i = 0; i < sahJetRingMats.length; i++) {
+      const next = sahJetOn && !sahJetDone && i === sahJetNext;
+      const done = sahJetDone || i < sahJetNext;
+      const want = next ? 1.4 + Math.sin(sahJetRingT * 5) * 0.7 : done ? 0.8 : 0.3;
+      sahJetRingMats[i].emissiveIntensity = damp(sahJetRingMats[i].emissiveIntensity, want, 6, dt);
+    }
+  }
+  if (!sahJetOn) {
+    sahJetG.position.set(sahJetX, sahJetY, sahJetZ);
+    sahJetG.rotation.set(0, sahJetYaw, 0);
+    if (sahJetFlame) sahJetFlame.scale.y = damp(sahJetFlame.scale.y, 0.01, 8, dt);
+    return;
+  }
+  sahJetT += dt;
+  // ---- the lean, camera-relative ------------------------------------------
+  const cy = input ? (input.camYaw || 0) : 0;
+  const ix = input ? clamp(input.x, -1, 1) : 0, iz = input ? clamp(input.z, -1, 1) : 0;
+  // forward is away from the camera; right is forward turned a quarter clockwise
+  const fx = -Math.sin(cy), fz = -Math.cos(cy);
+  const rx = Math.cos(cy), rz = -Math.sin(cy);
+  let mx = -iz * fx + ix * rx, mz = -iz * fz + ix * rz;
+  const ml = Math.hypot(mx, mz);
+  if (ml > 1) { mx /= ml; mz /= ml; }
+  const burnWant = !!(input && input.jump) && sahJetFuel > 0;
+  sahJetBurn = damp(sahJetBurn, burnWant ? 1 : 0, burnWant ? 14 : 8, dt);
+  if (burnWant) sahJetFuel = Math.max(0, sahJetFuel - dt);
+  if (sahJetGround) {
+    // on the sand: a walk, and the tank fills
+    sahJetFuel = Math.min(sahJET_TANK, sahJetFuel + dt * sahJET_TANK / sahJET_REFILL);
+    sahJetVX = damp(sahJetVX, mx * sahJET_WALK, 8, dt);
+    sahJetVZ = damp(sahJetVZ, mz * sahJET_WALK, 8, dt);
+  } else {
+    sahJetVX += mx * sahJET_ACC * dt;
+    sahJetVZ += mz * sahJET_ACC * dt;
+    const k = Math.max(0, 1 - sahJET_DRAG * dt);
+    sahJetVX *= k; sahJetVZ *= k;
+    const hv = Math.hypot(sahJetVX, sahJetVZ);
+    if (hv > sahJET_VMAX) { sahJetVX *= sahJET_VMAX / hv; sahJetVZ *= sahJET_VMAX / hv; }
+  }
+  sahJetVY += ((burnWant ? sahJET_THRUST : 0) - sahJET_G) * dt;
+  sahJetVY = clamp(sahJetVY, sahJET_VFALL, sahJET_VUP);
+  if (sahJetGround && !burnWant) sahJetVY = Math.min(0, sahJetVY);
+  sahJetX += sahJetVX * dt; sahJetY += sahJetVY * dt; sahJetZ += sahJetVZ * dt;
+  // ---- the floor ----------------------------------------------------------
+  const floor = sahJetFloor(sahJetX, sahJetZ, sahJetY);
+  const wasGround = sahJetGround;
+  // ...and it is only a landing if you are coming DOWN: measured on flat
+  // sand, a burn from standing put the pack a centimetre up, the floor test
+  // put it back, and it never took off again.
+  if (sahJetY <= floor + 0.02 && sahJetVY <= 0) {
+    sahJetY = floor;
+    if (!wasGround) {
+      // a landing: a puff, a hiss, and the harder the drop the bigger
+      const hard = clamp(-sahJetVY / 12, 0, 1);
+      sahSfx('hiss', { volume: 0.18 + hard * 0.3, pitch: 0.5 });
+      if (hard > 0.5 && typeof game.shake === 'function') game.shake(0.08 * hard);
+      if (typeof game.confetti !== 'function') { /* no dust hook; fine */ }
+    }
+    sahJetVY = 0; sahJetGround = true;
+    // ...and the top of the minaret is the fifth stop
+    const K = sahKOUTOUBIA;
+    if (!sahJetDone && sahJetNext >= sahJET_RINGS.length && floor > K.h) {
+      sahJetDone = true; sahJetOnMinaret = true;
+      sahTask('jetpack');
+      if (typeof game.record === 'function') game.record('jetpack', +sahJetT.toFixed(1));
+      sahSfx('cheer', { volume: 0.7, force: true, at: { x: K.x, y: 3, z: K.z } });
+      sahSfx('chime', { volume: 0.6, pitch: 1.4, force: true });
+      if (typeof game.punch === 'function') game.punch(0.18);
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: 0.6, dist: 24, pitch: 0.12, raise: 1.2, hold: 3.2, over: true });
+      }
+      sahToast('on top of the Koutoubia. the whole medina is under you.');
+    }
+  } else if (sahJetY > floor + 0.35) {
+    sahJetGround = false;
+  }
+  if (sahJetGround && sahJetVY > 0.5) sahJetGround = false;
+  // the world's edge
+  sahJetX = clamp(sahJetX, -220, 400); sahJetZ = clamp(sahJetZ, -240, 240);
+  if (sahJetY - floor > sahJetBest) sahJetBest = sahJetY - floor;
+  // ---- the rings ----------------------------------------------------------
+  if (!sahJetDone && sahJetNext < sahJET_RINGS.length) {
+    const r = sahJetRings[sahJetNext].position;
+    const d = Math.hypot(sahJetX - r.x, sahJetY + 0.6 - r.y, sahJetZ - r.z);
+    if (d < sahJET_RING_R) {
+      sahJetNext++;
+      sahSfx('chime', { volume: 0.5, pitch: 0.95 + sahJetNext * 0.08, force: true });
+      if (typeof game.confetti === 'function') game.confetti(sahJetX, sahJetY + 1, sahJetZ, 10);
+      if (typeof game.punch === 'function') game.punch(0.06);
+      if (sahJetNext >= sahJET_RINGS.length) sahToast('four. now the minaret — land on the top of it.');
+    }
+  }
+  // ---- the noise ----------------------------------------------------------
+  if (sahJetBurn > 0.2) {
+    sahJetBurnSfxT -= dt;
+    if (sahJetBurnSfxT <= 0) {
+      sahJetBurnSfxT = 0.28;
+      sahSfx('burner', { volume: 0.5 * sahJetBurn, pitch: 1.35, force: true });
+    }
+  }
+  if (sahJetFuel <= 0 && !sahJetToldFuel) { sahJetToldFuel = true; sahToast('empty. land on the sand and it fills.'); }
+  // ---- the pose, the passenger --------------------------------------------
+  const hv2 = Math.hypot(sahJetVX, sahJetVZ);
+  if (hv2 > 0.8) sahJetYaw = Math.atan2(sahJetVX, sahJetVZ);
+  sahJetG.position.set(sahJetX - Math.sin(sahJetYaw) * 0.35, sahJetY + 0.55, sahJetZ - Math.cos(sahJetYaw) * 0.35);
+  sahJetG.rotation.set(clamp(hv2 * 0.02, 0, 0.35), sahJetYaw, 0);
+  if (sahJetFlame) sahJetFlame.scale.y = damp(sahJetFlame.scale.y, sahJetBurn * (0.8 + Math.sin(sahTime * 40) * 0.2), 12, dt);
+  if (capy && capy.body) {
+    const cb = capy.body;
+    cb.position.set(sahJetX, sahJetY + 1.0, sahJetZ);
+    cb.velocity.set(sahJetVX, sahJetVY, sahJetVZ);
+    cb.angularVelocity.set(0, 0, 0);
+    cb.previousPosition.copy(cb.position);
+    cb.interpolatedPosition.copy(cb.position);
+    if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    if (capy.group) {
+      capy.group.position.set(cb.position.x, cb.position.y, cb.position.z);
+      capy.group.rotation.y = sahJetYaw;
+    }
+  }
+  if (typeof game.wowLive === 'function' && !sahJetDone) {
+    let bar = '';
+    const seg = Math.round(sahJetFuel / sahJET_TANK * 4);
+    for (let i = 0; i < 4; i++) bar += i < seg ? '▮' : '▯';
+    let where;
+    if (sahJetNext < sahJET_RINGS.length) {
+      const r = sahJetRings[sahJetNext].position;
+      where = 'ring ' + (sahJetNext + 1) + ' of 4 · ' + Math.round(Math.hypot(sahJetX - r.x, sahJetZ - r.z)) + ' m';
+    } else {
+      where = 'the minaret · ' + Math.round(Math.hypot(sahJetX - sahKOUTOUBIA.x, sahJetZ - sahKOUTOUBIA.z)) + ' m · land on top';
+    }
+    game.wowLive(where + ' · fuel ' + bar + (sahJetGround ? ' · filling' : ''), sahJetNext / sahJET_N);
+  }
+}
+
 /** Coming down the great dune, which is a hundred metres of 23 degrees. */
 function sahUpdateSurf(game, dt) {
   const capy = game.capy;
@@ -5480,9 +5769,13 @@ export function createSahara(game) {
       // the caravan is put where the player can see it coming, not wherever it
       // happened to be standing when they left
       sahCaravanT = -0.14;
+      // X3: the pack is back on the crest
+      if (sahJetG && !sahJetOn) { sahJetX = sahJET.x; sahJetZ = sahJET.z; sahJetY = sahTerrain(sahJetX, sahJetZ) + 0.25; sahJetNext = 0; }
     },
     onExit() {
       sahChase = 0; sahRiding = false; sahSurfT = -1;
+      // X3: nobody flies out of a country
+      if (sahJetOn) { sahJetOn = false; sahJetWorn = false; if (game.capy) game.capy.atHelm = false; }
       // ARMED FLAGS DO NOT SURVIVE TRAVEL, and the acrobats' throw was not on
       // the list. Leave Marrakech in the two seconds after being launched off
       // the mat and `sahAcroFlying` stays true with a live `sahAcroTop`; the
@@ -5588,6 +5881,22 @@ export function createSahara(game) {
     datePalm: sahDATE,
     camp: sahCAMP,
     duneTop: { x: sahDUNE_X - 4, z: sahDUNE_Z },
+    // ---- THE JETPACK (X3) -----------------------------------------------
+    jet() { return { on: sahJetOn, x: sahJetX, y: sahJetY, z: sahJetZ, vy: sahJetVY, fuel: sahJetFuel, ground: sahJetGround, next: sahJetNext, done: sahJetDone, t: sahJetT, best: sahJetBest }; },
+    jetPack() { return { x: sahJetX, y: sahJetY, z: sahJetZ }; },
+    jetTarget() {
+      if (sahJetNext < sahJET_RINGS.length && sahJetRings) { const p = sahJetRings[sahJetNext].position; return { x: p.x, y: p.y, z: p.z }; }
+      return { x: sahKOUTOUBIA.x, y: sahKOUTOUBIA.h + 6, z: sahKOUTOUBIA.z };
+    },
+    jetDebug(o) {
+      if (o && o.take && !sahJetOn) sahJetTake(game);
+      if (o && typeof o.x === 'number') { sahJetX = o.x; sahJetY = o.y; sahJetZ = o.z; sahJetVX = sahJetVY = sahJetVZ = 0; }
+      return this.jet();
+    },
+    rig() {
+      if (!sahJetOn || sahJetGround) return null;
+      return { w: 1, dist: 14, pitch: 0.30, raise: 0.8, lambda: 2.5 };
+    },
     /** The souk's centre, which is where 'lose them' actually means. */
     souk: { x: sahSOUK_X0 + sahSOUK_NX * sahSOUK_CELL * 0.5,
             z: sahSOUK_Z0 + sahSOUK_NZ * sahSOUK_CELL * 0.5 },
@@ -5644,6 +5953,7 @@ export function createSahara(game) {
       sahSyncStormWall(game);
       sahUpdateAcrobats(game, dt);
       sahUpdateSurf(game, dt);
+      sahUpdateJet(game, dt);   // X3
       sahUpdateDust(game, dt);
       sahUpdateSmoke();
       sahUpdateStorks(game, dt);
@@ -5679,6 +5989,7 @@ function sahBuild(game) {
   sahBuildAcrobats(game, sahRoot);
   sahBuildSouk(game, sahRoot);
   sahBuildKoutoubia(game, sahRoot);
+  sahBuildJet(game, sahRoot);   // X3: the marquee is a jetpack
   sahBuildStorks(sahRoot);
   sahBuildProps(game, sahRoot);
   sahBuildPursuers(sahRoot);

@@ -2730,7 +2730,10 @@ export const TASKS = [
   // Ninety palms in the palmeraie, and not one of them had anything on it.
   { id: 'date-palm',      text: 'Bring the dates down',                   chapter: 8, act: 2 },
   { id: 'caravan',        text: 'Leave town on somebody’s camel',        chapter: 8, act: 2 },
-  { id: 'dune-surf',      text: 'Sandboard down the great dune, flat out', chapter: 8, act: 2, wow: 'THE GREAT DUNE' },
+  { id: 'dune-surf',      text: 'Sandboard down the great dune, flat out', chapter: 8, act: 2 },
+  // The marquee, and it is ridiculous on purpose (X3): the pack on the crest,
+  // four rings across the erg, and the top of the minaret to land on.
+  { id: 'jetpack',        text: 'Strap on the jetpack and fly the rings to the top of the minaret', chapter: 8, act: 2, wow: 'THE JETPACK' },
   { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8, act: 3 },
   { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8, act: 3 },
   // The mini, and the only one of the thirteen that uses capy.launch():
@@ -3308,7 +3311,7 @@ export const CHAPTERS = [
     arrive: 'to-sahara',  far: 1600, tall: true,  pal: 8,
     hint: 'a maze, and then no maze at all',          open: 'a thousand people in this square and every one of them is working.', way: 'the fire at the desert camp',
     keep: 'an orange off the cart',
-    marquee: { x: 276, z: 10, up: 4, say: 'the big dune, east past the maze' },
+    marquee: { x: 275, z: 55, up: 4, say: 'the jetpack at the top of the staked track, on the big dune' },
     note: 'By the second evening the square knew your face.',
     acts: [
       { kick: 'JEMAA EL-FNAA', line: 'do not rob anybody yet. or do.' },
@@ -3783,6 +3786,7 @@ export const RECORDS = {
   'bamboo-dash':   { label: 'the grove in', unit: ' s', better: 'lower', dp: 1, par: 17 },
   'glacier-run':   { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1, par: 18 },
   'dune-surf':     { label: 'top speed', unit: ' m/s', better: 'higher', dp: 1 },
+  'jetpack':       { label: 'to the minaret in', unit: ' s', better: 'lower', dp: 1, par: 90 },
   'souk-escape':   { label: 'shook them in', unit: ' s', better: 'lower', dp: 1 },
   'selaron-steps': { label: 'the whole flight in', unit: ' s', better: 'lower', dp: 1, par: 7 },
   // ---- THE THREE THE PARITY SWEEP LEFT UNCLAIMED (R7) ---------------------

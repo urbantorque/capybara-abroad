@@ -23489,6 +23489,20 @@ export function createSystems(game) {
                       return 'up the staked track to the top, then straight down the middle of the face';
                     },
                     where: function () { return hintObj(game.sahara && game.sahara.duneTop); } },
+    'jetpack':        { clue: function () {
+                      const sa = game.sahara;
+                      const j = sa && typeof sa.jet === 'function' ? sa.jet() : null;
+                      if (j && j.on && j.fuel <= 0.2 && !j.ground) return 'empty — drop to the sand and it fills';
+                      if (j && j.on && j.next >= 4) return 'the Koutoubia: burn up to the lantern and land on it';
+                      if (j && j.on) return 'hold Space to burn · W/A/S/D to lean · through the lit ring';
+                      return 'up the staked track to the crest: the pack is there. press E to strap it on';
+                    },
+                    where: function () {
+                      const sa = game.sahara;
+                      if (!sa || typeof sa.jet !== 'function') return null;
+                      const j = sa.jet();
+                      return hintObj(j.on ? sa.jetTarget() : sa.jetPack());
+                    } },
     'sandstorm':      { clue: function () {
                       const sa = game.sahara;
                       if (sa && sa.storm() > 0.2) return 'do not run. just stay out here.';
