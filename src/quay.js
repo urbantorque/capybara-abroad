@@ -3711,6 +3711,26 @@ function quayUpdateBigFerry(game, dt) {
 }
 
 /** Extra heel on the player's boat while the Freshwater's wash is under her. */
+// ---- THE HEADS (W1) --------------------------------------------------------
+// Seventy seconds of open water with one event in it (the Freshwater's wash,
+// if she happens to pass). The passage has a middle now: between North and
+// South Head the harbour is open to the Tasman and the swell comes in under
+// her — a metre of lift on a nine-second period, a pitch you can see on the
+// bow, spray over it at speed — and Manly Cove behind the Heads is flat again.
+// A bell curve in z, 0 inside the harbour and in the cove, 1 in the gap.
+const quayHEADS_Z0 = -230;   // where the swell starts to be felt
+const quayHEADS_Z1 = -360;   // the middle of the gap
+const quayHEADS_Z2 = -470;   // flat again, in the cove
+const quayHEADS_LIFT = 0.85; // m, crest to trough is twice this
+const quayHEADS_W = 0.68;    // rad/s — a nine-second ocean swell
+let quayHeadsK = 0;          // 0..1, damped, how much sea is under her right now
+function quayHeadsAt(z) {
+  if (z > quayHEADS_Z0 || z < quayHEADS_Z2) return 0;
+  const t = z > quayHEADS_Z1 ? (quayHEADS_Z0 - z) / (quayHEADS_Z0 - quayHEADS_Z1)
+                             : (z - quayHEADS_Z2) / (quayHEADS_Z1 - quayHEADS_Z2);
+  return t * t * (3 - 2 * t);
+}
+
 function quayWashHeel() {
   if (quayBigRoll <= 0) return 0;
   // A wash is two or three big ones and then nothing, so the envelope decays
@@ -5101,12 +5121,25 @@ function quayStepBoat(game, dt) {
   quayShore(game, dt);
 
   const b = quayBoatBody;
-  const swell = Math.sin(quayTime * 0.85 + quayBoatX * 0.02) * 0.10;
+  // ...and the ocean, in the Heads (W1). See quayHeadsAt.
+  quayHeadsK = damp(quayHeadsK, quayHeadsAt(quayBoatZ), 1.2, dt);
+  const hk = quayHeadsK;
+  const hph = quayTime * quayHEADS_W + quayBoatZ * 0.012;
+  const swell = Math.sin(quayTime * 0.85 + quayBoatX * 0.02) * 0.10 + Math.sin(hph) * quayHEADS_LIFT * hk;
   const y = quayWATER_Y + quayBOAT_DECK + swell;
   b.position.set(quayBoatX, y, quayBoatZ);
-  // heel into the turn, and squat by the stern under power
-  const heel = -quayRudder * auth * 0.16 + quayWashHeel();
-  const trim = -clamp(quayBoatSpeed / quayBOAT_VMAX, 0, 1) * 0.045;
+  // heel into the turn, and squat by the stern under power — and in the gap,
+  // the swell's slope under the keel: the bow goes up the face and over.
+  const heel = -quayRudder * auth * 0.16 + quayWashHeel() + Math.sin(hph * 0.5 + 1.1) * 0.045 * hk;
+  const trim = -clamp(quayBoatSpeed / quayBOAT_VMAX, 0, 1) * 0.045 + Math.cos(hph) * 0.075 * hk;
+  // Spray off the bow when she puts it into one at speed: the crest is where
+  // cos(hph) is near 1 and the bow is going DOWN into the next one.
+  if (hk > 0.25 && Math.abs(quayBoatSpeed) > 4 && Math.cos(hph) > 0.55 && Math.random() < dt * 9 * hk) {
+    const fx = Math.sin(quayBoatYaw), fz = Math.cos(quayBoatYaw);
+    quaySprayEmit(quayBoatX + fx * 6.5 + rand(-1.6, 1.6), quayWATER_Y + 0.9,
+                  quayBoatZ + fz * 6.5 + rand(-1.6, 1.6),
+                  fx * 2.5 + rand(-1.2, 1.2), rand(2.2, 3.6), fz * 2.5 + rand(-1.2, 1.2), 0.8);
+  }
   quayEu.set(trim, quayBoatYaw, heel, 'YXZ');
   quayQ.setFromEuler(quayEu);
   b.quaternion.set(quayQ.x, quayQ.y, quayQ.z, quayQ.w);
@@ -5406,6 +5439,16 @@ function quayCheckVoyage(game, dt) {
     // player watches is the figure they end up with rather than one a second
     // adrift of it.
     if (game.recordLive) game.recordLive('manly-voyage', Math.max(0, quayRunT - quayArrivalT));
+    // ...AND THE SIGNPOST SAYS WHERE SHE IS (W1). Metres to the wharf head
+    // and the sea state, so the Heads announce themselves on the paper before
+    // they do under the keel.
+    if (typeof game.wowLive === 'function') {
+      const dm = Math.hypot(quayBoatX - quayMANLY.x, quayBoatZ - (quayMANLY.z + 12));
+      const total = Math.hypot(quayMANLY.x, quayMANLY.z + 12 - quayAPRON_Z);
+      const sea = quayHeadsK > 0.55 ? ' · the Heads' : quayHeadsK > 0.2 ? ' · swell coming in' : '';
+      game.wowLive('under way · ' + Math.round(dm / 10) * 10 + ' m to Manly · ' + Math.floor(quayRunT) + ' s' + sea,
+                   clamp(1 - dm / total, 0, 1));
+    }
   }
 
   if (!quayCastOff && quayHelmOn && quayBoatZ < quayAPRON_Z - 26) {
@@ -6198,6 +6241,10 @@ export function createQuay(game) {
       return clamp((quayAPRON_Z - quayBoatZ) / total, 0, 1);
     },
     arrived() { return quayVoyaged; },
+    /** W1, the Heads: how much ocean is under her, 0..1. */
+    headsK() { return quayHeadsK; },
+    /** The harness's window on the passage: put her somewhere. Test hook. */
+    boatDebugTo(x, z) { quayBoatX = x; quayBoatZ = z; },
 
     update(dt) {
       if (!quayBuilt) return;

@@ -2869,6 +2869,20 @@ let kyoMillWheel = null, kyoMillSpin = 0;
 const kyoAheadOut = { x: 0, z: 0 };
 let kyoRunT = -1, kyoRunBest = 0, kyoRunDone = false;
 let kyoRunOutT = 0, kyoInRiver = false, kyoRunFlow = 0;
+// ---- THE CHUTE (W1) --------------------------------------------------------
+// The run had one shape from the first attempt to the tenth: a float, some
+// boulders, a pond. It has a climax now. At the last narrow — the 5.5 m gap
+// the widths table already pinches to, where continuity has the water at its
+// fastest — a standing wave stands across the whole channel, and an animal
+// carried into it at speed is thrown: a real launch off the tongue, a second
+// in the air over the gorge, and back into the water below with the run
+// still open (kyoRUN_OUT forgives 1.5 s out, and the flight is under one).
+// Authored as a fraction of the RUN like the boulders, and drawn as three
+// foam chevrons across the gap so it is visible from the bend above.
+const kyoCHUTE_AT = 0.45;           // fraction of the run: the straight reach below the second bend, between the 0.41 and 0.49 boulders, and clear of the mill pond the hook comes back to
+const kyoCHUTE_V = 6.0;             // m/s up, off the tongue: clear of the waterline spring inside the launch hold
+const kyoCHUTE_MIN = 2.2;           // m/s downstream before the wave throws you
+let kyoChuteS = -1, kyoChuteFired = false, kyoChuteSaid = false, kyoChuteAir = 0;
 let kyoRiverMover = null;                  // the Uji, as a place (A1)
 const kyoBARREL_N = 14;
 
@@ -3176,6 +3190,29 @@ function kyoBuildRocks(game, root) {
     }
     kyoStaticBox(game, x, kyoRIVER_Y + 0.2, z, r * 0.72, h * 0.5, r * 0.72);
     kyoRocks.push({ x: x, z: z, r: r, ex: x + seg.tx * (r + 1.9), ez: z + seg.tz * (r + 1.9) });
+  }
+  // ---- the chute (W1): a wave across the narrow. See kyoCHUTE_AT. ---------
+  {
+    kyoChuteS = kyoRunAt(kyoCHUTE_AT);
+    const seg = kyoRiverSeg(kyoChuteS);
+    const nx = -seg.tz, nz = seg.tx;
+    const fy = Math.atan2(seg.tx, seg.tz);
+    const w = seg.w;
+    // three chevrons, bank to bank, each a little further downstream at the
+    // edges than in the middle: the tongue of a rapid is a V pointing down
+    for (let k = -1; k <= 1; k++) {
+      const ax = seg.x + nx * k * w * 0.62, az = seg.z + nz * k * w * 0.62;
+      const back = Math.abs(k) * 1.4;
+      R.box(ax + seg.tx * back, kyoRIVER_Y + 0.22, az + seg.tz * back,
+            w * 0.72, 0.42, 0.6, PALETTE.ujiFoam, 0, fy + k * 0.35, 0);
+      R.sph(ax + seg.tx * (back - 0.9), kyoRIVER_Y + 0.12, az + seg.tz * (back - 0.9),
+            w * 0.36, 0.26, 0.7, PALETTE.ujiFoam);
+    }
+    // ...and the slick below it, where the water lands again
+    for (let k = -2; k <= 2; k++) {
+      R.sph(seg.x + seg.tx * 4.5 + nx * k * w * 0.36, kyoRIVER_Y + 0.08,
+            seg.z + seg.tz * 4.5 + nz * k * w * 0.36, 0.9, 0.12, 1.3, PALETTE.ujiFoam);
+    }
   }
   const m = new THREE.Mesh(R.build(), kyoVC());
   m.castShadow = true;
@@ -3725,6 +3762,35 @@ function kyoUpdateRun(game, dt) {
       if (kyoRunOutT > kyoRUN_OUT) kyoRunT = -1;        // out of the river: no run
     }
   }
+  // ---- the chute (W1) -------------------------------------------------------
+  if (kyoRunT === 0) { kyoChuteFired = false; kyoChuteAir = 0; }
+  if (kyoRunT >= 0 && kyoChuteS > 0) {
+    const v = capy.velocity;
+    if (!kyoChuteFired && wet && nr.s >= kyoChuteS - 1.5 && nr.s < kyoChuteS + 5 && nr.d < nr.w * 0.95) {
+      const down = v ? v.x * nr.tx + v.z * nr.tz : 0;
+      if (down > kyoCHUTE_MIN && typeof capy.launch === 'function') {
+        kyoChuteFired = true;
+        kyoChuteAir = 0.9;
+        capy.launch(v.x * 1.25 + nr.tx * 1.5, kyoCHUTE_V, v.z * 1.25 + nr.tz * 1.5);
+        if (typeof game.sfx === 'function') {
+          game.sfx('splash', { volume: 0.9, pitch: 0.8, at: p });
+          game.sfx('gasp', { volume: 0.7 });
+        }
+        if (typeof game.punch === 'function') game.punch(0.2); else if (game.shake) game.shake(0.2);
+        if (!kyoChuteSaid && typeof game.toast === 'function') { kyoChuteSaid = true; game.toast('the chute'); }
+      }
+    }
+    if (kyoChuteAir > 0) kyoChuteAir -= dt;
+  }
+  // ---- the run, on the signpost (W1) --------------------------------------
+  if (kyoRunT >= 0 && typeof game.wowLive === 'function') {
+    let gates = 0;
+    for (let i = 0; kyoGates && i < kyoGates.length; i++) if (kyoGates[i].through) gates++;
+    const left = Math.max(0, kyoRiverLen - nr.s);
+    game.wowLive((kyoChuteAir > 0 ? 'AIR · ' : 'in the river · ') + Math.round(left) + ' m to the mill · ' +
+                 gates + ' of 3 boats · ' + kyoRunT.toFixed(1) + ' s',
+                 clamp((nr.s - kyoRunFromS) / Math.max(1, kyoRiverLen - kyoRunFromS), 0, 1));
+  }
 
   // --- the clock, on the paper (v32) ---
   // `kyoRunT >= 0` is the whole definition of "an attempt is open" and it is
@@ -3735,7 +3801,11 @@ function kyoUpdateRun(game, dt) {
   else if (game.recordEnd) game.recordEnd('uji-run');
 
   // --- the finish ---
-  if (kyoRunT >= 0 && dMill2 < kyoRUN_END_R * kyoRUN_END_R) {
+  // ...AND ONLY FROM THE HOOK (W1). The gorge's outbound reach passes eleven
+  // metres from the middle of the mill pond — the hook comes back on itself —
+  // so a run was being finished from the far side of the bend with a hundred
+  // metres of river still to go. Measured: run ended at 96 m to the mill.
+  if (kyoRunT >= 0 && dMill2 < kyoRUN_END_R * kyoRUN_END_R && nr.s > kyoRiverLen - 30) {
     const t = kyoRunT;
     kyoRunT = -2;                                    // landed; see the clock above
     // ...AND A RUN IS TWO HUNDRED METRES OF RIVER.
@@ -4539,6 +4609,13 @@ export function createKyoto(game) {
     runBest() { return kyoRunBest; },
     runLength() { return kyoRiverLen - kyoRunFromS; },
     riverLength() { return kyoRiverLen; },
+    /** W1: the chute, and a point `back` metres upstream of it. Test hook. */
+    chuteAt(back) {
+      if (!kyoRX || kyoChuteS < 0) return null;
+      const c = kyoRiverSeg(kyoChuteS);
+      const u = kyoRiverSeg(clamp(kyoChuteS - (back || 25), 0, kyoRiverLen));
+      return { x: c.x, z: c.z, s: kyoChuteS, ux: u.x, uz: u.z, fired: kyoChuteFired };
+    },
     /**
      * A point on the centreline `ahead` metres downstream of wherever (x, z)
      * is — which is what "swim down the river" actually means when the river

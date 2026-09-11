@@ -240,6 +240,19 @@ let venGondPX = 0, venGondPZ = 0;   // previous TARGET — see the note in venUp
 let venLampT = 0;
 let venSirenT = -1, venSirenStep = 0;
 let venSeenFlood = false;
+// ---- STAY IN IT (W1) -------------------------------------------------------
+// The window below said "you were in the square when the water came", and the
+// tick landed on the crossing frame — with the tide at 0.68 of a rise that
+// goes to 1.0, and thirty seconds of the best thing in the chapter still to
+// come. The window now ARMS the moment; the tick is the top of the tide with
+// the animal still in the square. Between the two there is a verb — the
+// surge (D4.5) runs down the piazza toward the Molo at over a metre a second
+// and you are swimming against it — and a place to lose it: out of the
+// square, and this tide is spent. At the top the Campanile rings, every
+// pigeon in the square goes up at once, and the paper says so.
+const venFLOOD_TOP = 0.95;    // of the tide; the crest
+let venFloodArm = false;      // in the square inside the window
+let venFloodTopSaid = false;
 let venFloodedNow = false;
 let venWasFlooded = false;
 // How long the marquee stays claimable after the water crosses the square.
@@ -5052,6 +5065,7 @@ function venUpdateTide(game, dt) {
   const capy = game.capy;
   const p = capy && capy.position;
   venFloodedNow = venIsOverWater(0, -34);
+  if (!venFloodedNow) venFloodArm = false;         // the tide is out: nothing to stay in
   if (venFloodedNow && !venWasFlooded) {
     venSeenFlood = true;
     if (typeof game.shake === 'function') game.shake(0.1);
@@ -5098,11 +5112,31 @@ function venUpdateTide(game, dt) {
   // minutes later. Two gates for one idea, and the second one was wrong.
   if (venFloodWin > 0) {
     venFloodWin -= dt;
-    if (!venFloodDone && p && venInZone('square', p.x, p.z)) {
-      venFloodDone = true;
+    if (!venFloodDone && !venFloodArm && p && venInZone('square', p.x, p.z)) {
+      venFloodArm = true;
       venFloodWin = 0;
+      venToast('you are in it. now stay in it — it wants you out through the Molo.');
+      venSfx('splash', { volume: 0.6, pitch: 0.7, at: { x: p.x, y: venWaterHeightAt(p.x, p.z), z: p.z } });
+    }
+  }
+  // ---- armed: the tide comes up round you, or you leave -------------------
+  if (venFloodArm && !venFloodDone) {
+    const inSq = !!(p && venInZone('square', p.x, p.z));
+    if (!inSq) {
+      venFloodArm = false;
+      venToast('out of the square. it will come again; be in it next time.');
+    } else if (typeof game.wowLive === 'function') {
+      game.wowLive('in the square · the sea at ' + Math.round(lvl * 100) + '% · stay in it', lvl);
+    }
+    if (inSq && lvl >= venFLOOD_TOP) {
+      venFloodDone = true;
+      venFloodArm = false;
       venTask('acqua-alta');
-      venToast('the whole square, in about ninety seconds. nobody is surprised but you.');
+      venToast('the whole square, and you in the middle of it. nobody is surprised but you.');
+      // THE TOP OF THE TIDE: the bells, and every pigeon in the square.
+      venSfx('campanile', { volume: 0.9, at: { x: venCAMPANILE.x, y: venCAMPANILE.h, z: venCAMPANILE.z }, force: true });
+      venPigeonScare(p.x, p.z, 80, 1);
+      venSfx('pigeons', { volume: 0.7, at: { x: p.x, y: 2, z: p.z } });
       // ---- THE MARQUEE MADE NO SOUND AT ALL --------------------------------
       // A toast and a completeTask, and nothing else: no cue, no punch, no
       // camera. The whole of San Marco going under, and the game's response was
@@ -5539,6 +5573,8 @@ export function createVenice(game) {
     tideY() { return venWaterY; },
     rising() { return venPhase >= venTIDE_WARN && venPhase < venTIDE_RISE1; },
     flooded() { return venFloodedNow; },
+    /** The harness's window on the clock: set the phase. Test hook. */
+    phaseDebug(p) { if (typeof p === 'number') venPhase = clamp(p, 0, 0.999); return venPhase; },
     seenFlood() { return venSeenFlood; },
     boardsOut() { return venBoardOut; },
     onBoards() { return venOnBoards; },

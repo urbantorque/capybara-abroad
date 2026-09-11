@@ -4663,6 +4663,22 @@ function gorUpdateBalloon(game, dt) {
     // read "be up there".
     const gorSunWin = gorAboard && gorSun > 0.465 && gorSun < 0.96 && alt > 55;
     if (gorSunWin && gorBalBurn > 0.5) gorSunBurned = true;
+    // ---- aloft, on the paper (W1) ------------------------------------------
+    // The chapter's one control is the burner and the marquee needs it lit
+    // at height in an eleven-second window; none of that was on screen. The
+    // line says how high, whether you are burning, and where the sun is, so
+    // the window is something you can see coming rather than something the
+    // chief shouts about.
+    if (gorAboard && !gorSunDone && typeof game.wowLive === 'function') {
+      // gorSun is 0 until gorSUN_P and reaches the rim (0.465) about 0.055
+      // of a cycle later, so the countdown is on the PHASE, in seconds.
+      const winAt = gorSUN_P + 0.115 * 0.48;
+      const sunIn = (winAt - gorPhase) * gorCYCLE;
+      const line = 'aloft · ' + Math.round(alt) + ' m up · burner ' + (gorBalBurn > 0.5 ? 'ON' : 'off') +
+                   (gorSun >= 0.465 ? ' · THE SUN IS UP' + (alt > 55 ? '' : ' · get above 55 m')
+                    : sunIn > 0 ? ' · sun over the rim in ' + Math.ceil(sunIn) + ' s' : '');
+      game.wowLive(line, 0.5 * clamp(alt / 55, 0, 1) + 0.5 * clamp(1 - sunIn / 60, 0, 1));
+    }
     // ...and if they are up there NOT burning while the whole valley is, the
     // chief says so. Once, on the radio, which is the only voice that reaches
     // a basket at seventy metres.

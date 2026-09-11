@@ -4137,6 +4137,15 @@ function manUpdateSurfTasks(game, dt) {
       if (!manTookOff) game.recordLive('take-off', manTakeTop);
       else game.recordLive('all-the-way', manRideDist);
     }
+    // ...and on the signpost (W1): the ride against the 34 m the sand is at,
+    // and how much of it was along the face rather than straight in.
+    if (manTookOff && manRideDist > 2 && typeof game.wowLive === 'function' &&
+        !(typeof game.taskDone === 'function' && game.taskDone('all-the-way'))) {
+      const carveShare = manRideDist > 0 ? manCarveDist / manRideDist : 0;
+      game.wowLive('riding · ' + manRideDist.toFixed(0) + ' m of 34' +
+                   (carveShare > 0.35 ? ' · on the face' : '') + ' · ' + speed.toFixed(1) + ' m/s',
+                   clamp(manRideDist / 34, 0, 1));
+    }
     // THE MINI. Not standing up — a capybara does not stand up. The moment is
     // the second and a half where the water stops going past you and starts
     // taking you with it, and four and a half metres a second is a speed the

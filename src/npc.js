@@ -3999,6 +3999,100 @@ export function createNPCs(game) {
   }
   game.events.on('finale:staged', npcGather);
 
+  // =========================================================================
+  // THE CONCERT (W1). Sydney's marquee was standing on a rectangle for five
+  // seconds. It is now a performance: the animal on the Opera House podium
+  // wheeks, and the forecourt comes to listen. Same `gather` state as the
+  // ending's five — steer to a spot, face a point, lean in — with three
+  // differences that are all on the record and not in the state: the point
+  // they face is the stage (gathLX/gathLZ, which the ending leaves unset and
+  // reads as the lawn), they say nothing on arrival (gathQuiet — the gather
+  // pool's lines are about nineteen things laid out on grass), and they can
+  // be told to CHEER (cheerT), which is both arms up with a bob for a few
+  // seconds and then back to whatever they were doing.
+  //
+  // EIGHT, IN TWO ROWS, ON THE FORECOURT. The podium is x -9..9, z 1..4 and
+  // the sails stand behind it to the north, so the house is south of the
+  // steps at z 7.5 and 9.3, fanned across the width of the stage: from the
+  // stage, a semicircle of faces with the harbour behind them, and from the
+  // opera shot, an audience in the foreground of the sails.
+  // =========================================================================
+  const npcCONCERT_N   = 8;
+  const npcCONCERT_SPD = 1.7;     // m/s — quicker than the ending's stroll; something is happening
+  const npcCONCERT_CEIL = 22;     // s. The ceiling. Same rule as the gather's.
+  const npcCONCERT_MAX_D = npcCONCERT_CEIL * npcCONCERT_SPD * 0.7;
+  let npcConcertOn = false;
+  /** Call the house to the podium. Returns how many are coming. Idempotent
+   *  while a concert is on. */
+  function npcConcert(sx, sz) {
+    if (npcConcertOn) return npcConcertHouse(true);
+    const live = game.biome && game.biome.current;
+    if (live !== 'sydney') return 0;
+    const pool = [];
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || !r.group || !r.group.visible) continue;
+      if (r.kind === 'patron' || r.kind === 'waiter' || r.kind === 'gardener') continue;
+      if (r.carryT >= 0 || r.state === 'gather' || r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
+      const dx = r.group.position.x - sx, dz = r.group.position.z - sz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > npcCONCERT_MAX_D * npcCONCERT_MAX_D) continue;
+      pool.push({ r: r, d2: d2 });
+    }
+    pool.sort(function (a, b) { return a.d2 - b.d2; });
+    const n = Math.min(npcCONCERT_N, pool.length);
+    for (let i = 0; i < n; i++) {
+      const r = pool[i].r;
+      const row = i < 5 ? 0 : 1;
+      const k = row === 0 ? i : i - 5;
+      const across = row === 0 ? 5 : 3;
+      let gx = sx + ((k + 0.5) / across - 0.5) * (row === 0 ? 13 : 8) + rand(-0.4, 0.4);
+      let gz = sz + 4.4 + row * 1.9 + rand(-0.3, 0.3);
+      for (let t = 0; t < 6 && navBlocked(gx, gz, 0.45); t++) { gx += rand(-1.2, 1.2); gz += 0.6; }
+      r.gathX = gx; r.gathZ = gz;
+      r.gathLX = sx; r.gathLZ = sz;
+      r.gathQuiet = 1; r.cheerT = 0; r.gathSaid = 0;
+      setState(r, 'gather');
+    }
+    npcConcertOn = n > 0;
+    return n;
+  }
+  /** How many of the house are IN PLACE (or, with `any`, on their way). */
+  function npcConcertHouse(any) {
+    let n = 0;
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || r.state !== 'gather' || !r.gathQuiet) continue;
+      if (any) { n++; continue; }
+      const dx = r.group.position.x - r.gathX, dz = r.group.position.z - r.gathZ;
+      if (dx * dx + dz * dz < 1.2 * 1.2 || r.stateT > npcCONCERT_CEIL) n++;
+    }
+    return n;
+  }
+  /** The house cheers for `sec` seconds and three of them take a photo. */
+  function npcConcertCheer(sec) {
+    let k = 0;
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || r.state !== 'gather' || !r.gathQuiet) continue;
+      r.cheerT = sec + rand(-0.6, 0.8);
+      if (k < 3 && r.nodes && r.nodes.camN) {
+        k++;
+        r.cheerPhoto = 0.4 + k * 0.5;      // s until the flash, staggered
+      }
+    }
+  }
+  /** The concert is over: everybody back to their afternoon. */
+  function npcConcertEnd() {
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || r.state !== 'gather' || !r.gathQuiet) continue;
+      r.gathQuiet = 0; r.cheerT = 0; r.cheerPhoto = 0;
+      setState(r, 'idle');
+    }
+    npcConcertOn = false;
+  }
+
   // ---- ...AND ONE OF THEM HAS BEEN THERE THE WHOLE TIME (L9) --------------
   //
   // The ending is the best-designed thing in this file: come home, find every
@@ -8596,6 +8690,11 @@ export function createNPCs(game) {
       const dx = sx - rec.group.position.x, dz = sz - rec.group.position.z;
       const d2 = dx * dx + dz * dz;
       if (d2 > 20 * 20) continue;
+      // THE HOUSE IS NOT STARTLED BY THE SHOW (W1). The concert's audience
+      // came over BECAUSE of the wheek; the second one sent seven of them
+      // running (measured: 7 listening, then 0). They hop where they stand
+      // instead — the same reach as a startle, without the state change.
+      if (rec.state === 'gather' && rec.gathQuiet) { if (rec.hopV < 1.2 && rec.hop < 0.02) rec.hopV = 1.2; continue; }
       startle(rec, sx, sz);
       rec.reactMode = (Math.random() < 0.45 || laughs > 2) ? 1 : 0;   // 1 = flee, 0 = laugh+point
       if (rec.reactMode === 0) laughs++;
@@ -9207,8 +9306,35 @@ export function createNPCs(game) {
       // failure mode is a picture rather than a bug.
       case 'gather': {
         const d = steerTo(rec, rec.gathX, rec.gathZ, dt);
-        spd = npcGATHER_SPD;
-        rec.lookX = sysFIN_LAWN_X; rec.lookZ = sysFIN_LAWN_Z;
+        spd = rec.gathQuiet ? npcCONCERT_SPD : npcGATHER_SPD;
+        // The ending's five look at the lawn; the concert's eight look at the
+        // stage (W1). Unset reads as the lawn, so the ending is untouched.
+        rec.lookX = rec.gathLX !== undefined ? rec.gathLX : sysFIN_LAWN_X;
+        rec.lookZ = rec.gathLZ !== undefined ? rec.gathLZ : sysFIN_LAWN_Z;
+        if (rec.gathQuiet && (d < 0.45 || rec.stateT > npcCONCERT_CEIL)) {
+          spd = 0;
+          rec.tgtLean = 0.04;
+          if (rec.cheerT > 0) {
+            // BOTH ARMS UP, with a bob that is not in step with the person
+            // beside them (the record's own yaw seeds the phase). -2.6 is the
+            // gardener's lift; a cheer is the same reach, happier.
+            rec.cheerT -= dt;
+            const bob = Math.sin(rec.stateT * 7.5 + rec.yaw * 3) * 0.25;
+            rec.tgtArmL = -2.6 + bob; rec.tgtArmR = -2.6 - bob;
+            rec.tgtCrouch = 0.04 + Math.abs(bob) * 0.06;
+            if (rec.cheerPhoto > 0) {
+              rec.cheerPhoto -= dt;
+              if (rec.cheerPhoto <= 0) {
+                rec.cheerPhoto = 0;
+                npcV1.setFromMatrixPosition(rec.nodes.camN.matrixWorld);
+                fireFlash(npcV1.x, npcV1.y, npcV1.z);
+                emit('npc:photo', rec);
+                sfx('pop', rec);
+              }
+            }
+          }
+          break;
+        }
         if (d < 0.45 || rec.stateT > npcGATHER_CEIL) {
           spd = 0;
           rec.tgtLean = 0.04;      // the smallest lean-in this rig has
@@ -13980,6 +14106,9 @@ export function createNPCs(game) {
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
            peopleNear: peopleNear,
+           // ---- THE CONCERT (W1) ----
+           concert: npcConcert, concertHouse: npcConcertHouse,
+           concertCheer: npcConcertCheer, concertEnd: npcConcertEnd,
            // M11: how many of the traveller's four chapters the player actually
            // stopped in. A COUNT, and read-only: the find and the closing lines
            // are its only readers and neither may set it.

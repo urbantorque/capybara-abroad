@@ -1903,6 +1903,10 @@ function mainBoot() {
     // B11 (5d): the one way to make the people near a point jump, from
     // outside npc.js. systems.js's herd loop is the only caller.
     game.startlePeople = npcs.startlePeople;
+    // W1: the Opera House concert's house — call, count, cheer, dismiss.
+    // environment.js is the only caller; npc.js owns who comes and how.
+    game.concert = { call: npcs.concert, house: npcs.concertHouse,
+                     cheer: npcs.concertCheer, end: npcs.concertEnd };
     // B15 (item 6): the rumour from the place you have just left. systems.js
     // owns the counters that decide whether there is anything to repeat and is
     // the only caller; npc.js owns the pool, the earshot and the waiting.

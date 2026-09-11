@@ -44,6 +44,22 @@ let envAsleep = false;   // true once Sydney's update has parked itself for Past
 // 0..1, how long the animal has been on the Opera House podium. The grade layer
 // reads it through api.stageGlow(). Zeroed on the way out — see envUpdate.
 let envStageT = 0;
+// ---- THE CONCERT (W1) -------------------------------------------------------
+// The marquee was "stand on the podium for five seconds". It is now: get up
+// on the podium and WHEEK, and the forecourt comes. Each wheek from the stage
+// is a note — the sails pulse, the house is called on the first — and at
+// envCONCERT_NOTES notes with envCONCERT_HOUSE people actually in place the
+// house cheers, three of them photograph it, and the task ticks. Leaving the
+// stage for envCONCERT_LEAVE seconds ends the concert and sends everybody back
+// to their afternoon; the count starts again next time.
+const envCONCERT_NOTES = 3;
+const envCONCERT_HOUSE = 2;
+const envCONCERT_LEAVE = 8;
+let envConcertOn = false;
+let envConcertNotes = 0;
+let envConcertOff = 0;       // s off the stage while a concert is on
+let envStagePulse = 0;       // 0..1, decays; a wheek from the stage lights the sails
+let envConcertDone = false;  // this concert has paid out (the tick is idempotent; this gates the cheer)
 
 // ---- Circular Quay (chapter 1) -----------------------------------------------
 const envCafeTables = [];     // {x, z, top} — climbable café tables
@@ -3494,6 +3510,11 @@ export function createEnvironment(game) {
       // others and a held weight would light somebody else's chapter — the
       // same trap `opera-stage` itself is gated against in systems.js.
       envStageT = 0;
+      envStagePulse = 0;
+      if (envConcertOn) {
+        envConcertOn = false; envConcertNotes = 0;
+        if (game.concert && typeof game.concert.end === 'function') game.concert.end();
+      }
       return;
     }
     envAsleep = false;
@@ -3502,6 +3523,32 @@ export function createEnvironment(game) {
       const on = !!(capy && capy.position && envInZone('operaStage', capy.position.x, capy.position.z) &&
                     capy.position.y > 0.9);
       envStageT += (( on ? 1 : 0) - envStageT) * (1 - Math.exp(-2.4 * dt));
+      envStagePulse *= Math.exp(-1.6 * dt);
+      // ---- the concert's clock (W1). See stageNote above. -------------------
+      if (envConcertOn) {
+        envConcertOff = on ? 0 : envConcertOff + dt;
+        const house = (game.concert && typeof game.concert.house === 'function') ? game.concert.house(false) : 0;
+        const coming = (game.concert && typeof game.concert.house === 'function') ? game.concert.house(true) : 0;
+        if (!envConcertDone) {
+          if (typeof game.wowLive === 'function') {
+            const nn = Math.min(envConcertNotes, envCONCERT_NOTES);
+            const line = 'on stage · ' + nn + ' of ' + envCONCERT_NOTES + ' wheeks · ' +
+                         (house > 0 ? house + ' listening' : coming > 0 ? coming + ' coming over' : 'nobody yet');
+            game.wowLive(line, 0.5 * nn / envCONCERT_NOTES + 0.5 * Math.min(house, 4) / 4);
+          }
+          if (envConcertNotes >= envCONCERT_NOTES && house >= envCONCERT_HOUSE && on) {
+            envConcertDone = true;
+            envStagePulse = 1;
+            if (game.concert && typeof game.concert.cheer === 'function') game.concert.cheer(4.5);
+            if (typeof game.completeTask === 'function') game.completeTask('opera-stage');
+          }
+        }
+        if (envConcertOff > envCONCERT_LEAVE) {
+          envConcertOn = false;
+          envConcertNotes = 0;
+          if (game.concert && typeof game.concert.end === 'function') game.concert.end();
+        }
+      }
     }
     envTime += dt;
     envFerryStep(game, dt);
@@ -3680,7 +3727,32 @@ export function createEnvironment(game) {
      * Damped here rather than in the grade so the chapter owns the shape of its
      * own signal; the grade only decides what to do with it.
      */
-    stageGlow: function () { return envStageT; },
+    stageGlow: function () { return Math.min(1, envStageT + envStagePulse * 0.7); },
+    /**
+     * A WHEEK FROM THE STAGE (W1). capybara.js calls this instead of ticking
+     * the task itself. Returns the note count so the caller can toast.
+     */
+    stageNote: function () {
+      if (!game.biome || !game.biome.isActive('sydney')) return 0;
+      envStagePulse = 1;
+      if (!envConcertOn) {
+        envConcertOn = true;
+        envConcertNotes = 0;
+        envConcertDone = false;
+        envConcertOff = 0;
+        const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5) : 0;
+        if (typeof game.toast === 'function') {
+          game.toast(coming > 0 ? 'they are coming over. keep going' : 'nobody about. keep going anyway');
+        }
+      }
+      envConcertNotes++;
+      return envConcertNotes;
+    },
+    /** The concert, for the harness: notes, house in place, on, done. */
+    concertAudit: function () {
+      const house = (game.concert && typeof game.concert.house === 'function') ? game.concert.house(false) : 0;
+      return { on: envConcertOn, notes: envConcertNotes, house: house, done: envConcertDone, pulse: envStagePulse };
+    },
     /**
      * FRAME THE PODIUM PAYOUT — the fourth channel, for the one silhouette
      * this whole game is most recognisable by.

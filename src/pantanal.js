@@ -5158,6 +5158,16 @@ function panUpdateTasks(game, dt) {
     if (game.recordLive) game.recordLive('the-crossing', panCrossN);
     // the score lifts for the whole width of it, not for the tick at the end
     if (game.music && typeof game.music.swell === 'function') game.music.swell(0.85);
+    // ...and the line, on the signpost (W1): how many are behind you NOW —
+    // which the current is working on — and how far the far bank is.
+    if (typeof game.wowLive === 'function' &&
+        !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'))) {
+      const width = panRIVER.z1 - panRIVER.z0;
+      const across = clamp((panRIVER.z1 - p.z) / width, 0, 1);
+      game.wowLive('in the river · ' + panFollowing + ' behind you' +
+                   (panFollowing < panCrossN ? ' (' + (panCrossN - panFollowing) + ' lost)' : '') +
+                   ' · ' + Math.round((1 - across) * width) + ' m to the far bank', across);
+    }
   }
   // THE ORDER OF THESE TWO IS THE WHOLE THING, and the first build had it
   // backwards: the moment the animal reaches the far bank it is no longer IN

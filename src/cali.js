@@ -198,7 +198,7 @@ let caliChivaGroup = null;
 let caliGatoGroup = null;
 let caliLuladaMesh = null, caliLuladaGone = false, caliLuladaT = 0;
 let caliSpark = null;
-const caliSPARK_N = 28;
+const caliSPARK_N = 160;   // was 28; the fireworks (W1) want forty a burst
 const caliSparkData = new Float32Array(caliSPARK_N * 7);   // x,y,z,vx,vy,vz,life
 
 // --- task / dance state ---
@@ -2397,6 +2397,16 @@ function caliStepChiva(game, dt) {
     }
   }
 
+  // ---- the ride, on the signpost (W1) -------------------------------------
+  if (!caliMiradorDone && caliOnRoof && (caliChivaState === 'rolling' || caliChivaState === 'stopped') &&
+      typeof game.wowLive === 'function') {
+    const nWires = caliWires ? caliWires.length : 7;
+    game.wowLive('on the roof · ' + caliWireClear + ' of ' + nWires + ' cables · ' +
+                 Math.round(Math.max(0, caliRouteLen - caliChivaS)) + ' m to the top',
+                 clamp(caliChivaS / Math.max(1, caliRouteLen), 0, 1));
+  }
+  caliUpdateFireworks(game, dt);
+
   // ---- night falls as she climbs ------------------------------------------
   // Not on a timer: on PROGRESS ALONG THE ROUTE. The sun goes down over the
   // ride whether you spend ninety seconds on it or four minutes chasing a bus
@@ -2421,6 +2431,7 @@ function caliStepChiva(game, dt) {
       caliVistaT = 0;
       caliTask('chiva-mirador');
       caliBurstSparks(caliChivaX, caliChivaY + 4.4, caliChivaZ, 18, 1.4);
+      if (caliOnRoof) caliFwT = 5.5;      // W1: the city answers. See caliUpdateFireworks.
       if (typeof game.punch === 'function') game.punch(0.12);
       else if (typeof game.shake === 'function') game.shake(0.12);
       // THE WHOLE RIDE IS MONO: 0 of 70 sfx calls across the 121 s up the hill
@@ -3585,18 +3596,43 @@ function caliBuildSparks(root) {
   root.add(caliSpark);
 }
 
-function caliBurstSparks(x, y, z, n, up) {
+function caliBurstSparks(x, y, z, n, up, spd) {
   for (let k = 0; k < n; k++) {
     let slot = -1;
     for (let i = 0; i < caliSPARK_N; i++) if (caliSparkData[i * 7 + 6] <= 0) { slot = i; break; }
     if (slot < 0) return;
     const o = slot * 7;
-    const a = rand(0, Math.PI * 2), s = rand(1.4, 4.0);
+    const a = rand(0, Math.PI * 2), s = rand(1.4, 4.0) * (spd || 1);
     caliSparkData[o] = x; caliSparkData[o + 1] = y; caliSparkData[o + 2] = z;
     caliSparkData[o + 3] = Math.cos(a) * s;
     caliSparkData[o + 4] = rand(2.0, 5.0) * (up || 1);
     caliSparkData[o + 5] = Math.sin(a) * s;
     caliSparkData[o + 6] = 1;
+  }
+}
+// ---- FIREWORKS OVER THE CITY (W1) ------------------------------------------
+// The top of the ride paid out a chime, eighteen sparks and a view. A party
+// bus that has just climbed four hundred metres with a band on its roof gets
+// the city answering: a volley over the light field, one every half second
+// for a few seconds, each a spherical burst of the sparks the chapter already
+// has, thrown eight times as hard, from sixty metres up. Only when the
+// player rode the whole way — a fireworks display for somebody who walked up
+// after the bus is a display for the wrong person.
+let caliFwT = 0, caliFwNext = 0;
+function caliUpdateFireworks(game, dt) {
+  if (caliFwT <= 0) return;
+  caliFwT -= dt;
+  caliFwNext -= dt;
+  if (caliFwNext > 0) return;
+  caliFwNext = rand(0.35, 0.7);
+  // over the city, which lies east and below the mirador
+  const fx = caliMIRADOR.x + rand(55, 150), fz = caliMIRADOR.z + rand(-70, 60);
+  const fy = caliMIR_DECK + rand(38, 62);
+  caliBurstSparks(fx, fy, fz, 26, 0.35, 3.2);
+  caliBurstSparks(fx, fy, fz, 14, 0.35, 1.6);
+  if (typeof game.sfx === 'function') {
+    game.sfx('thud', { volume: 0.55, pitch: 0.5, at: { x: fx, y: fy, z: fz }, near: 40, far: 400 });
+    game.sfx('pop', { volume: 0.4, pitch: 0.7, at: { x: fx, y: fy, z: fz }, near: 40, far: 400 });
   }
 }
 

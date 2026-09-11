@@ -334,6 +334,11 @@ let condorLaunchLift = 0;               // 1 -> 0 over condorLAUNCH_T, fades the
 let condorLandSpeed = 0;
 let condorSummonedOnce = false;
 let condorRodeOnce = false;
+// The ride ticks after this long in the talons, not on the grab (W1). Twelve
+// seconds is past the launch and the first thermal — the animal is a hundred
+// metres up and the town is a map — and short enough that a bird that mushes
+// into the hillside early still pays out on the second go.
+const condorRIDE_T = 12;
 let condorStalled = false;
 // ---- THE TALONS DO NOT TAKE IT STRAIGHT BACK -------------------------------
 // condorTryMount counts "a leap into the talons" as any capybara inside the reach
@@ -1165,13 +1170,21 @@ function condorMount() {
   // every ride, because a ride in Pasto must not tick, or swallow, a ride in
   // Rio.
   condorRodeOnce = true;
-  const first = (typeof game.completeTask === 'function') &&
-                game.completeTask(condorTaskId('ride'));
-  // ...AND THE MARQUEE FIRES ON THE FIRST RIDE IN *THIS* CHAPTER, which is
-  // exactly what completeTask's return value already says: true only when the
-  // id went from open to done. Keyed off condorRodeOnce instead, a player who
-  // rode in Pasto would arrive in Rio and get the tick with no shot under it —
-  // the chapter's own payout, silently spent two chapters earlier.
+  // ---- THE RIDE IS THE RIDE, NOT THE GRAB (W1) ------------------------------
+  // The marquee used to tick on this line — the frame the talons closed — so
+  // the banner, the slow beat and the lift all landed with the animal still
+  // two metres off the market square, and the minute in the air that the
+  // chapter is FOR ran under a paper that had already moved on. Now the grab
+  // arms it: condorUpdate counts the seconds carried, hands them to the
+  // signpost as "hanging on · 8 s · 60 m up", and ticks at condorRIDE_T with
+  // the animal high over the place. Same id, same host rule, same once-per-
+  // chapter payout — later, and in the air.
+  const rideId = condorTaskId('ride');
+  const first = !!(rideId && typeof game.taskDone === 'function' && !game.taskDone(rideId));
+  // ...AND THE SHOT FIRES ON THE FIRST RIDE IN *THIS* CHAPTER, which is what
+  // an open ride id in this host already says. Keyed off condorRodeOnce
+  // instead, a player who rode in Pasto would arrive in Rio and get the shot
+  // spent two chapters earlier.
   if (first) {
     const shotHost = condorHost();
     if (shotHost && typeof shotHost.condorShot === 'function') shotHost.condorShot();
@@ -1400,6 +1413,21 @@ function condorUpdate(dt) {
 
   if (condorRegrabT > 0) condorRegrabT -= dt;
   condorStateT += dt;
+  // ---- the ride, counted (W1). See the note in condorMount. ------------------
+  if (condorState === 'carrying') {
+    const rideId = condorTaskId('ride');
+    if (rideId && typeof game.taskDone === 'function' && !game.taskDone(rideId)) {
+      const cb = game.capy && game.capy.body;
+      const alt = cb ? Math.max(0, cb.position.y - condorTerrain(cb.position.x, cb.position.z)) : 0;
+      if (typeof game.wowLive === 'function') {
+        game.wowLive('hanging on · ' + Math.floor(condorStateT) + ' s · ' + Math.round(alt) + ' m up',
+                     condorStateT / condorRIDE_T);
+      }
+      if (condorStateT >= condorRIDE_T && typeof game.completeTask === 'function') {
+        game.completeTask(rideId);
+      }
+    }
+  }
 
   // ---- body frame -----------------------------------------------------------
   condorBody.quaternion.vmult(condorLocalFwd, condorFwd);

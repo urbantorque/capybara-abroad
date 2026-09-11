@@ -2360,6 +2360,12 @@ function palUpdateManta(game, dt) {
   if (game.music && typeof game.music.swell === 'function') {
     game.music.swell(0.22 + palSmooth(u / 0.9) * 0.30);
   }
+  // ...and on the paper (W1): the ride, and what is coming at the end of it.
+  if (!palMantaDone && typeof game.wowLive === 'function') {
+    game.wowLive(u < 0.55 ? 'on the manta · ' + palMantaRideT.toFixed(0) + ' s · hold on'
+               : u < 0.85 ? 'on the manta · it is going up'
+               : 'on the manta · THE SURFACE', u);
+  }
   const bail = !!(input && input.actionPressed && palMantaCool <= 0 && palMantaRideT > 1.2);
 
   if (capy && capy.body) {

@@ -3941,6 +3941,19 @@ function monUpdateTunnel(game, dt) {
   // whole lap, and that is right: the tunnel is the four seconds of it that
   // matter, and this call sits after the hairpin's in the frame.
   if (inBore && game.recordLive) game.recordLive('the-tunnel', monCarV[monRider]);
+  // ...and on the signpost (W1): on the roof, how far the mouth is, and then
+  // the bore itself with the speed. `s` runs backwards past the lap seam, so
+  // the distance is clamped to the lap's own length rather than trusted.
+  if (!monTunnelDone && typeof game.wowLive === 'function') {
+    if (inBore) {
+      game.wowLive('IN THE TUNNEL · ' + monCarV[monRider].toFixed(0) + ' m/s · stay on', clamp((s - a) / (b - a), 0, 1));
+    } else {
+      let toMouth = a - s;
+      if (toMouth < 0) toMouth += monTrackTotal;
+      game.wowLive('on the roof · ' + monCarV[monRider].toFixed(0) + ' m/s · the tunnel in ' +
+                   Math.round(Math.max(0, toMouth)) + ' m', 0);
+    }
+  }
   // A ONE-FRAME GAP IS NOT GETTING OFF. The rider test is a box in the car's
   // own frame and at twenty-six metres a second a corner can put the animal
   // outside it for a frame or two while the contact is still perfectly sound;

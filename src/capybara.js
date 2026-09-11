@@ -4506,11 +4506,15 @@ export function createCapybara(game) {
     // a wheek from centre stage is the joke — the player earns the task.
     // game.env is Sydney's module and stays resident abroad; every biome shares
     // one coordinate space, so the zone test only means anything in Sydney.
+    // ---- ...AND IT IS A NOTE (W1). The task used to tick here on the first
+    // wheek from the podium. Now environment.js counts it: the house is
+    // called on the first, the sails pulse on each, and the third with a
+    // crowd in place is the concert. See envCONCERT_NOTES.
     const env = game.env;
-    if (env && typeof env.inZone === 'function' &&
+    if (env && typeof env.stageNote === 'function' &&
         game.biome && game.biome.isActive('sydney') &&
-        env.inZone('operaStage', capyPosition.x, capyPosition.z)) {
-      game.completeTask('opera-stage');
+        env.inZone('operaStage', capyPosition.x, capyPosition.z) && capyPosition.y > 0.9) {
+      env.stageNote();
     }
   }
 
@@ -6202,7 +6206,13 @@ export function createCapybara(game) {
         let want = capyDiving ? -capyDIVE_V : 0;
         if (body.position.y < floorY) want = clamp((floorY - body.position.y) * 3, 0, 1.6);
         body.velocity.y = damp(body.velocity.y, want, 6, dt);
-      } else if (!hauling && capyJumpT <= 0 && capyHaulT <= 0) {
+      } else if (!hauling && capyJumpT <= 0 && capyHaulT <= 0 && capyLaunchT <= 0) {
+        // ...NOR WHILE IT IS BEING THROWN (W1). A launch() out of the water —
+        // the Uji chute, Strokkur from the pool — was being damped back onto
+        // the waterline at lambda 7 for every frame the animal was still under
+        // waterY + capySWIM_ENTER: 4.6 m/s up measured as 0.58 m of rise. The
+        // launch hold already means "you are not standing on anything"; it
+        // now also means the water does not own your height.
         body.velocity.y = damp(body.velocity.y, rise, 7, dt);
       }
       capyWetLevel = 1;
@@ -6285,11 +6295,12 @@ export function createCapybara(game) {
     capyPosition.set(body.position.x, body.position.y, body.position.z);
     capyVelocity.set(body.velocity.x, body.velocity.y, body.velocity.z);
 
-    // ---- loitering on the podium also counts, eventually --------------
+    // ---- loitering on the podium used to count, eventually (W1) ------------
+    // Five silent seconds ticked the chapter's marquee. The stage is a
+    // performance now (see env.stageNote); the clock stays for the harness.
     if (env && typeof env.inZone === 'function' && !capySwimming && grounded &&
         env.inZone('operaStage', capyPosition.x, capyPosition.z)) {
       capyStageTime += dt;
-      if (capyStageTime > 5) game.completeTask('opera-stage');
     } else {
       capyStageTime = 0;
     }

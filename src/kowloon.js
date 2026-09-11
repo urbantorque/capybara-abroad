@@ -3721,12 +3721,27 @@ function hkUpdateShow(game, dt) {
   // WHILE THE LIGHTS ARE ON. Checked every frame the show is running, which
   // also means a player who climbs during the count-in gets it the moment they
   // top out rather than at some arbitrary later beat.
+  // ---- ...AND SINCE W1, THE SHOW IS THE CONDUCTING ------------------------
+  // D4.1 put the voice in the show — a wheek from the roof takes the next
+  // tower, flips the chase, calls the finale on the eighth — and the tick
+  // still landed on the first frame above twenty-six metres, before a note.
+  // Now the roof is the ARMING and the finale is the tick: eight wheeks call
+  // it early, the clock calls it at the end of the show, and either way the
+  // banner lands on the whole skyline going up at once with the animal that
+  // asked for it on the roof. Between the two, the paper counts the wheeks.
   if (!hkShowDone && hkShowT >= 0) {
     const capy = game.capy;
-    if (capy && capy.position && capy.position.y > hkSHOW_ROOF) {
+    const up = !!(capy && capy.position && capy.position.y > hkSHOW_ROOF);
+    if (up && typeof game.wowLive === 'function') {
+      game.wowLive('on the roof · conducted ' + Math.min(hkConductN, hkCONDUCT_MAX) + ' of ' + hkCONDUCT_MAX +
+                   ' · ' + hkLitCount + ' of ' + hkTOWER_N + ' towers lit',
+                   Math.max(hkConductN / hkCONDUCT_MAX, hkLitCount / hkTOWER_N));
+    }
+    if (up && hkFinaleDone) {
       hkShowDone = true;
       hkTask('symphony');
-      hkToast('all of it, from up here, for nothing.');
+      hkToast(hkConductN >= hkCONDUCT_MAX ? 'all of it, from up here, because you asked for it.'
+                                          : 'all of it, from up here, for nothing.');
       // ---- FRAMED (v26) -------------------------------------------------
       // The settled rig is already good here — `skyward()` puts 17 of the 18
       // towers inside NDC — but the player ARRIVES over the parapet facing

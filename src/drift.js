@@ -4885,6 +4885,24 @@ function driUpdateLantern(game, dt) {
   const dx = p.x - driLANTERN.x, dz = p.z - driLANTERN.z;
   const near = dx * dx + dz * dz < 7.5 * 7.5;
 
+  // ---- the climb, on the signpost (W1) ---------------------------------------
+  // Flies in hand, metres to the plinth, and which way the wind is blowing
+  // relative to the way you have to go — the one fact the crossing turns on.
+  if (!driLit && driFliesAwake > 0 && typeof game.wowLive === 'function') {
+    const d = Math.sqrt(dx * dx + dz * dz);
+    let wind = '';
+    if (d > 8) {
+      const ws = Math.sqrt(driWindX * driWindX + driWindZ * driWindZ);
+      if (ws > 0.8) {
+        const along = -(dx * driWindX + dz * driWindZ) / (d * ws);
+        wind = along > 0.35 ? ' · wind with you' : along < -0.35 ? ' · wind against you' : ' · crosswind';
+      }
+    }
+    game.wowLive(Math.min(driFliesAwake, driFLIES_NEED) + ' of ' + driFLIES_NEED + ' lampflies · ' +
+                 (near ? 'at the lantern' : Math.round(d) + ' m to the plinth') + wind,
+                 0.6 * Math.min(driFliesAwake, driFLIES_NEED) / driFLIES_NEED + 0.4 * clamp(1 - d / 260, 0, 1));
+  }
+
   if (!driLit && near && input && input.actionPressed) {
     if (driFliesAwake >= driFLIES_NEED) {
       driLit = true;

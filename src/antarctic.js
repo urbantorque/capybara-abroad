@@ -4351,6 +4351,13 @@ function antUpdatePod(game, dt) {
       if (antPodRide > antPodBest) antPodBest = antPodRide;
       // this hold, on the paper, while it lasts (v32)
       antLive('orca-ride', antPodRide);
+      // ...and on the signpost (W1): the hold against the 18 s it asks for,
+      // and whether the pod is running or still escorting.
+      if (!antRideDone && typeof game.wowLive === 'function') {
+        game.wowLive((antPodState === 'run' ? 'with the pod, running · ' : 'in the pod · ') +
+                     antPodRide.toFixed(1) + ' s of ' + antPOD_RIDE + ' · ' + sp.toFixed(1) + ' m/s',
+                     clamp(antPodRide / antPOD_RIDE, 0, 1));
+      }
       // ---- ONCE. `antPodRide >= antPOD_RIDE` IS A CONDITION, NOT AN EVENT --
       //
       // It stayed true for every frame of the rest of the ride, so the

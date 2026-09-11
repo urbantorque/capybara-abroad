@@ -2374,6 +2374,25 @@ function hanUpdateTrain(game, dt) {
   const p = capy && capy.position;
   const inAlley = p ? hanInRect(hanZ.alley, p.x, p.z) : false;
 
+  // ---- the alley, on the signpost (W1) --------------------------------------
+  // Standing in the alley is the whole of the task and the only thing that
+  // told you how long to stand there was a horn. The countdown to the next
+  // one, and then the gap as it passes, in the same place the paper says
+  // what the big thing here is.
+  if (!hanTrainDone && inAlley && typeof game.wowLive === 'function') {
+    if (hanTrainS < 0) {
+      game.wowLive('in the alley · the train in ' + Math.ceil(Math.max(0, hanTrainT)) + ' s · stand still',
+                   clamp(1 - hanTrainT / 40, 0, 0.6));
+    } else {
+      const x = hanTRAIN.x1 + 60 - hanTrainS;
+      const gap = p ? Math.max(0, Math.hypot(0, p.z - hanTRAIN.z) - 1.45) : 9;
+      const coming = x > (p ? p.x : hanTRAIN.x1) + 8;
+      game.wowLive(coming ? 'HERE IT COMES · ' + Math.round(x - p.x) + ' m · ' + gap.toFixed(1) + ' m of clearance'
+                          : 'THE TRAIN · ' + gap.toFixed(1) + ' m of clearance · stand still',
+                   coming ? 0.6 + 0.4 * clamp(1 - (x - p.x) / 60, 0, 1) : 1);
+    }
+  }
+
   if (hanTrainS < 0) {
     hanTrainT -= dt;
     // the horn, eleven seconds out, and the street starts folding on it

@@ -2401,7 +2401,11 @@ export function emitSet(m, k) {
 // were rewarded like the smallest.
 //
 // Exactly ONE task per chapter carries `wow`, and the value is the caption the
-// banner prints under it. The scarcity is the whole mechanism: a second one in
+// banner prints under it — AND, since W1, THE NAME on the signpost for the
+// whole chapter. So it is the thing, not the place: THE CONDOR RIDE, not
+// GALERAS. A player reads the name, then the sentence, then the where; the
+// sentence is written to be obeyed on a first read (a verb, the object, the
+// place), and the poetry lives in the `say` lines and the locals. The scarcity is the whole mechanism: a second one in
 // a chapter would halve what the first is worth, so if a new set piece is ever
 // better than the row that holds the flag, MOVE the flag — never add to it.
 //
@@ -2482,7 +2486,7 @@ export const TASKS = [
   // promenade. All the acts do is put the paper in the one you are standing
   // in; nothing is gated, and F still reaches every row (see the two rules
   // above).
-  { id: 'opera-stage',  text: 'Take the stage at the Opera House',      chapter: 1, act: 2, wow: 'SYDNEY' },
+  { id: 'opera-stage',  text: 'Wheek from the Opera House stage till a crowd comes', chapter: 1, act: 2, wow: 'THE OPERA HOUSE CONCERT' },
   { id: 'ball-harbour', text: 'Put the beach ball in the harbour',      chapter: 1, act: 2 },
   { id: 'swim',         text: 'Have a dignified swim',                  chapter: 1, act: 2 },
   { id: 'hat-harbour',  text: 'Drop the stolen hat in the harbour',     chapter: 1, act: 2 },
@@ -2514,7 +2518,7 @@ export const TASKS = [
   { id: 'steal-empanada',  text: 'Steal an empanada',                     chapter: 2 },
   { id: 'market-chaos',    text: 'Bring down a market stall',             chapter: 2 },
   { id: 'whistle-condor',  text: 'Call down a condor',                 chapter: 2, act: 2 },
-  { id: 'condor-ride',     text: 'Grab its talons and hold on',           chapter: 2, act: 2, wow: 'GALERAS' },
+  { id: 'condor-ride',     text: 'Hang from the condor over the volcano',   chapter: 2, act: 2, wow: 'THE CONDOR RIDE' },
   { id: 'thermal-peak',    text: 'Rise on nothing but warm air',          chapter: 2, act: 3 },
   { id: 'crater-drop',     text: 'Post something into the crater',        chapter: 2, act: 3 },
   { id: 'ruana-thief',     text: 'Make off with a ruana',                 chapter: 2 },
@@ -2535,7 +2539,7 @@ export const TASKS = [
   { id: 'under-bridge',   text: 'Sound off under the Bridge',            chapter: 3, act: 2 },
   { id: 'yacht-race',     text: 'Cut through the yacht race',            chapter: 3, act: 2 },
   { id: 'dolphin-escort', text: 'Earn a dolphin escort',                 chapter: 3, act: 2 },
-  { id: 'manly-voyage',   text: 'Bring her alongside at Manly',          chapter: 3, act: 2, wow: 'THE HARBOUR' },
+  { id: 'manly-voyage',   text: 'Steer the ferry across the harbour to Manly', chapter: 3, act: 2, wow: 'THE FERRY TO MANLY' },
   { id: 'manly-pine',     text: 'Raid the chip shop on the Corso',       chapter: 3, act: 3 },
   // The mini. The shortest list in the game, on four hundred metres of
   // water that had nothing else moving on it.
@@ -2581,7 +2585,7 @@ export const TASKS = [
   // to hold on to. It sits here because the four above it are the quiet ones and
   // this is where the chapter stops whispering — and because it is the way you
   // GET to Uji, so everything after it happens where the river put you.
-  { id: 'uji-run',        text: 'Take the Uji down to the mill',         chapter: 4, wow: 'THE UJI' },
+  { id: 'uji-run',        text: 'Ride the Uji rapids down to the mill',   chapter: 4, wow: 'THE RIVER RUN' },
   { id: 'matcha-raid',    text: 'Get into the matcha at Uji',            chapter: 4, act: 2 },
   { id: 'whisk-spin',     text: 'Whisk the largest bowl of tea in Japan', chapter: 4, act: 2 },
   // The mini, and the one that is not a ride: the loudest object in Japan,
@@ -2605,7 +2609,7 @@ export const TASKS = [
   // fourth in Pasto: you get on the roof, and then the roof leaves. Everything
   // after this line happens at night, because the ride is what puts the sun
   // down — see caliNight() in cali.js.
-  { id: 'chiva-mirador',  text: 'Stay on the roof, all the way up',         chapter: 5, act: 2, wow: 'CALI' },
+  { id: 'chiva-mirador',  text: 'Ride the party bus roof to the top, under every cable', chapter: 5, act: 2, wow: 'THE PARTY BUS' },
   { id: 'cane-run',       text: 'Disappear into the sugarcane',          chapter: 5 },
   { id: 'salsa-dance',    text: 'Dance salsa, properly',                 chapter: 5 },
   { id: 'cristo-rey',     text: 'Climb up to Cristo Rey',                chapter: 5, act: 3 },
@@ -2681,8 +2685,8 @@ export const TASKS = [
   // The caption names the mountain the flight goes up, the way Pasto's names the
   // volcano rather than the town.
   { id: 'fragata',       text: 'Call down a fragata',                            chapter: 6, act: 3 },
-  { id: 'fragata-ride',  text: 'Take the bird, not the cable car',               chapter: 6, act: 3,
-    wow: 'PÃO DE AÇÚCAR' },
+  { id: 'fragata-ride',  text: 'Hang from the frigatebird over Sugarloaf',       chapter: 6, act: 3,
+    wow: 'THE FRIGATEBIRD' },
 
   // ---- Chapter 7: Iceland — Reykjavik, the geysers and the glacier ----
   // The first chapter that happens at NIGHT, and the first one whose centrepiece
@@ -2708,7 +2712,7 @@ export const TASKS = [
   // what it had nothing of at all was something alive.
   { id: 'the-whale',     text: 'Be on the pier when the whale comes up',         chapter: 7,
     mini: 'THE BAY' },
-  { id: 'aurora',         text: 'Bring the sky down',                    chapter: 7, act: 3, wow: 'ICELAND' },
+  { id: 'aurora',         text: 'Sit in the hot spring till the northern lights come, then call to them', chapter: 7, act: 3, wow: 'THE AURORA' },
 
   // ---- Chapter 8: Marrakech & the Erg ----
   // The densest place in the game immediately followed by the emptiest, which
@@ -2726,7 +2730,7 @@ export const TASKS = [
   // Ninety palms in the palmeraie, and not one of them had anything on it.
   { id: 'date-palm',      text: 'Bring the dates down',                   chapter: 8, act: 2 },
   { id: 'caravan',        text: 'Leave town on somebody’s camel',        chapter: 8, act: 2 },
-  { id: 'dune-surf',      text: 'Come down the great dune',              chapter: 8, act: 2, wow: 'THE ERG' },
+  { id: 'dune-surf',      text: 'Sandboard down the great dune, flat out', chapter: 8, act: 2, wow: 'THE GREAT DUNE' },
   { id: 'sandstorm',      text: 'Stand in the sandstorm',                chapter: 8, act: 3 },
   { id: 'fire-circle',    text: 'Take over the fire circle',             chapter: 8, act: 3 },
   // The mini, and the only one of the thirteen that uses capy.launch():
@@ -2760,7 +2764,7 @@ export const TASKS = [
   { id: 'handed-back', text: 'Let the cloud hand you back',               chapter: 9, act: 2 },
   { id: 'wander-isle', text: 'Hitch a lift on a wandering island',        chapter: 9, act: 2 },
   { id: 'long-gap',    text: 'Cross twenty metres of nothing, in one go', chapter: 9, act: 2 },
-  { id: 'lantern',     text: 'Light the lantern at the top of the world', chapter: 9, act: 2, wow: 'THE DRIFT' },
+  { id: 'lantern',     text: 'Carry six lampflies up and light the lantern', chapter: 9, act: 2, wow: 'THE LANTERN' },
   // The mini, and the only thing up here you have to CATCH.
   { id: 'driftseed',     text: 'Cross the void on a seed',                       chapter: 9, act: 2,
     mini: 'THE SEED' },
@@ -2790,7 +2794,7 @@ export const TASKS = [
   { id: 'the-calli',    text: 'Cross the calli, side to side',          chapter: 10 },
   { id: 'gondola-ride', text: 'Be the figurehead of a gondola',         chapter: 10 },
   { id: 'rialto',       text: 'Take the Rialto at a run',               chapter: 10 },
-  { id: 'acqua-alta',   text: 'Be in San Marco when it goes under',     chapter: 10, act: 2, wow: 'SAN MARCO' },
+  { id: 'acqua-alta',   text: 'Stand in St Mark’s Square as the sea floods it', chapter: 10, act: 2, wow: 'THE ACQUA ALTA' },
   { id: 'mirror-swim',  text: 'Swim the length of the flooded square',  chapter: 10, act: 2 },
   // The mini. Everybody who lives here stands up for it; everybody who
   // does not sits down, and is laughed at.
@@ -2821,7 +2825,7 @@ export const TASKS = [
   { id: 'laundry-pole', text: 'Cross the street on the laundry poles',  chapter: 11, act: 2 },
   { id: 'wet-market',   text: 'Let the fish out at the wet market',     chapter: 11 },
   { id: 'neon-sign',    text: 'Hang off the biggest sign in Mong Kok',  chapter: 11, act: 2 },
-  { id: 'symphony',     text: 'Be on the roof when the lights come on', chapter: 11, act: 2, wow: 'HONG KONG' },
+  { id: 'symphony',     text: 'Conduct the harbour light show from the rooftop', chapter: 11, act: 2, wow: 'THE LIGHT SHOW' },
   { id: 'star-ferry',   text: 'Take the Star Ferry like a commuter',     chapter: 11, act: 3 },
   // Sydney sounds off under the Bridge and it is the best thirty seconds in
   // chapter three. This ship has had a horn on it since 1957.
@@ -2873,8 +2877,8 @@ export const TASKS = [
   // promoting this row frees the slot the demoted bloom needs. Two minis, one
   // wow, three kinds: a shoal that opens around you, a creature that carries
   // you, and a room that lights up.
-  { id: 'the-manta',     text: 'Take hold of the manta, and stay on',            chapter: 12, act: 2,
-    wow: 'THE MANTA' },
+  { id: 'the-manta',     text: 'Grab the manta ray and ride it',                 chapter: 12, act: 2,
+    wow: 'THE MANTA RIDE' },
   // capy.wet has existed since Sydney — it darkens the coat and it drips — and
   // it has never once been a mechanic.
   { id: 'beach-fire',   text: 'Put the beach fire out',                 chapter: 12 },
@@ -2892,7 +2896,7 @@ export const TASKS = [
   { id: 'the-mouth',    text: 'Get inside one while it is filling',     chapter: 13, act: 2 },
   { id: 'aboard',       text: 'Get in a basket before it goes',         chapter: 13, act: 2 },
   { id: 'three-winds',  text: 'Find three winds and use all of them',   chapter: 13, act: 3 },
-  { id: 'sunrise',      text: 'Be up there when the sun clears the rim',chapter: 13, act: 3, wow: 'CAPPADOCIA' },
+  { id: 'sunrise',      text: 'Fly the balloon up to meet the sunrise',  chapter: 13, act: 3, wow: 'THE BALLOON SUNRISE' },
   { id: 'on-the-trailer', text: 'Put it down on the trailer',           chapter: 13, act: 3 },
   // The mini, and it is in the chapter's name: Kapadokya is the Persian
   // katpatuka, the land of beautiful horses, and there were none.
@@ -2919,7 +2923,7 @@ export const TASKS = [
   // starts taking you with it, which is exactly what a take-off is.
   { id: 'take-off',      text: 'Catch a wave, on purpose',               chapter: 14, act: 2,
     mini: 'THE TAKE-OFF' },
-  { id: 'all-the-way',   text: 'Take the biggest of the set to the sand', chapter: 14, act: 2, wow: 'MANLY' },
+  { id: 'all-the-way',   text: 'Surf the biggest wave of the set all the way to the sand', chapter: 14, act: 2, wow: 'THE BIG WAVE' },
   { id: 'the-bommie',    text: 'Sit on the bommie while it breaks over you', chapter: 14, act: 3 },
   { id: 'bower-pool',    text: 'Use the ocean pool properly',               chapter: 14, act: 3 },
   { id: 'blue-groper',   text: 'Introduce yourself to the blue groper',   chapter: 14, act: 3 },
@@ -2951,7 +2955,7 @@ export const TASKS = [
   // knuckles because its claws are too long to put down.
   { id: 'tamandua',      text: 'Cross the campo without touching it',    chapter: 15, act: 2,
     mini: 'O TAMANDUÁ' },
-  { id: 'the-crossing',  text: 'Take the whole herd across the river',   chapter: 15, act: 2, wow: 'O PANTANAL' },
+  { id: 'the-crossing',  text: 'Lead the whole capybara herd across the river', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
 
   // ---- Chapter 16: Sơn Đoòng ----
   // Sixteen chapters and the game had never once turned the lights off. The
@@ -3001,8 +3005,8 @@ export const TASKS = [
   // chapter 17's gentoos-on-the-bow figure said in a cave — and it is the one
   // moment in nineteen chapters where the game hands you height and then asks
   // you to give it back.
-  { id: 'the-column',    text: 'Come down the column the fast way',      chapter: 16, act: 2,
-    wow: 'SƠN ĐOÒNG' },
+  { id: 'the-column',    text: 'Climb the column and drop through the shaft of daylight', chapter: 16, act: 2,
+    wow: 'THE DROP INTO THE LIGHT' },
   { id: 'phytokarst',    text: 'Shout at the garden that leans',         chapter: 16, act: 2 },
   // The second mini. There is a river in here and things come down it.
   { id: 'the-log',       text: 'Go downstream on whatever floats past',  chapter: 16,
@@ -3037,7 +3041,7 @@ export const TASKS = [
   // sea. It is going north through the gate with or without you.
   { id: 'floe-drift',      text: 'Let a floe take you north',             chapter: 17, act: 2,
     mini: 'THE FLOE' },
-  { id: 'orca-ride',       text: 'Be let in by the orcas',                chapter: 17, act: 3, wow: 'THE PENINSULA' },
+  { id: 'orca-ride',       text: 'Drive the boat into the orca pod and keep up with them', chapter: 17, act: 3, wow: 'THE ORCA POD' },
 
   // ---- Chapter 18: Monte Carlo -------------------------------------------
   // A HEIST, IN THREE MOVEMENTS, and the acts are geography: the water, the
@@ -3067,8 +3071,8 @@ export const TASKS = [
   // reason a capybara can get onto a moving car at all.
   { id: 'the-hairpin',  text: 'Take the Fairmont hairpin on the roof',  chapter: 18, act: 3,
     mini: 'LE GRAND VIRAGE' },
-  { id: 'the-tunnel',   text: 'Go through the tunnel on the roof',      chapter: 18, act: 3,
-    wow: 'MONTE CARLO' },
+  { id: 'the-tunnel',   text: 'Ride a race car’s roof through the tunnel, flat out', chapter: 18, act: 3,
+    wow: 'THE TUNNEL RUN' },
 
   // ---- Chapter 19: Hanoi --------------------------------------------------
   // THE THIRTY-SIX STREETS, THE LAKE, AND THE LINE — and the three acts are
@@ -3096,8 +3100,8 @@ export const TASKS = [
   // moving at all.
   { id: 'fold-the-street', text: 'Be there when the street folds up',   chapter: 19, act: 3 },
   { id: 'long-bien',    text: 'Walk out onto the old bridge',           chapter: 19, act: 3 },
-  { id: 'the-train',    text: 'Be in the alley when it comes through',  chapter: 19, act: 3,
-    wow: 'TRAIN STREET' },
+  { id: 'the-train',    text: 'Stand in the alley as the train squeezes through', chapter: 19, act: 3,
+    wow: 'THE TRAIN ALLEY' },
 ];
 
 

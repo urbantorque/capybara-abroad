@@ -53,6 +53,42 @@ const rioSUGAR = { x: 96, z: -54, r: 32, h: 62 };      // Pao de Acucar
 const rioURCA = { x: 74, z: -38, r: 20, h: 30 };       // the halfway hill
 const rioSTATION = { x: 58, z: -24 };                  // Praia Vermelha, the bottom station
 const rioCORCOVADO = { x: -96, z: 78, r: 72, h: 84 };  // and the Redentor on top
+// ---- THE TWO SUMMITS, FROM THE AIR (W1) ------------------------------------
+// The frigatebird is the condor's flight law over a different coast, and a
+// minute in the air over Rio passed two of the most recognisable summits on
+// earth without a word. Once per flight each: carried over the top of the
+// loaf, and past the Redentor at his own height, the chapter says so, and the
+// cable car — which is what the row says you did NOT take — cheers from its
+// cabin. Latched per mount, so circling the rock does not repeat it.
+let rioFlyLoaf = false, rioFlyChrist = false, rioFlyWas = false;
+function rioUpdateFlyover(game, dt) {
+  const c = game.condor;
+  const mounted = !!(c && c.mounted && c.hosted && c.hosted());
+  if (mounted !== rioFlyWas) { rioFlyWas = mounted; rioFlyLoaf = false; rioFlyChrist = false; }
+  if (!mounted) return;
+  const p = game.capy && game.capy.position;
+  if (!p) return;
+  if (!rioFlyLoaf) {
+    const dx = p.x - rioSUGAR.x, dz = p.z - rioSUGAR.z;
+    if (dx * dx + dz * dz < rioSUGAR.r * rioSUGAR.r * 1.3 && p.y > rioSUGAR.h * 0.85) {
+      rioFlyLoaf = true;
+      if (typeof game.toast === 'function') game.toast('over the top of the Sugarloaf. the cable car is waving');
+      if (typeof game.sfx === 'function') {
+        game.sfx('cheer', { volume: 0.55, pitch: 1.05, at: { x: rioSUGAR.x, y: rioSUGAR.h, z: rioSUGAR.z }, near: 30, far: 260, force: true });
+      }
+      if (typeof game.punch === 'function') game.punch(0.08);
+    }
+  }
+  if (!rioFlyChrist) {
+    const dx = p.x - rioCORCOVADO.x, dz = p.z - rioCORCOVADO.z;
+    if (dx * dx + dz * dz < 40 * 40 && p.y > rioCORCOVADO.h * 0.9) {
+      rioFlyChrist = true;
+      if (typeof game.toast === 'function') game.toast('eye to eye with the Redentor');
+      if (typeof game.sfx === 'function') game.sfx('chime', { volume: 0.7, pitch: 0.9 });
+      if (typeof game.punch === 'function') game.punch(0.08);
+    }
+  }
+}
 const rioAVE_Z = 46;                // the avenue the desfile comes down
 const rioAVE_X0 = -84, rioAVE_X1 = 84;
 const rioLAPA = { x: -28, z: 76 };                     // the arches
@@ -4533,6 +4569,7 @@ export function createRio(game) {
       if (!rioBuilt) return;
       if (!game.biome.isActive('rio')) return;
       rioTime += dt;
+      rioUpdateFlyover(game, dt);
 
       // the swell
       rioRipT += dt;

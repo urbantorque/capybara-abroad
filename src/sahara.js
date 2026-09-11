@@ -216,6 +216,12 @@ let sahDuskOn = false;              // the evening, once it has come, does not g
 let sahDusk = 0;
 let sahCaravanT = 0, sahRiding = false;
 let sahSurfT = -1, sahSurfStall = 0, sahSurfBest = 0;
+// ---- AIR (W1). D4.6 gave the face three lobes to leave the ground on and
+// nothing counted it: the best thing that can happen on the run went by as
+// a slightly quieter half-second. Time off the sand is accumulated per hop,
+// said on the landing when it was worth saying, and the run's biggest hop
+// goes on the signpost beside the speed.
+let sahSurfAir = 0, sahSurfAirBest = 0, sahSurfAirWas = false;
 // The dune BOOMS while the sand is moving — see sahUpdateSurf.
 let sahBoom = 0, sahBoomT = 0;
 let sahCartDone = false, sahSnakeDone = false, sahEscapeDone = false;
@@ -5150,6 +5156,7 @@ function sahUpdateSurf(game, dt) {
     if (p.x > sahSURF_TOP && sahGroundSlip(p.x, p.z) > 0.3 &&
         p.y > sahTerrain(p.x, p.z) - 2) {
       sahSurfT = 0; sahSurfStall = 0; sahSurfBest = 0;
+      sahSurfAir = 0; sahSurfAirBest = 0; sahSurfAirWas = false;
       sahBoom = 0;
       sahToast('down the windward face. do not stop.');
       // ---- DROPPING IN ---------------------------------------------------
@@ -5169,6 +5176,31 @@ function sahUpdateSurf(game, dt) {
     return;
   }
   sahSurfT += dt;
+  // ---- air (W1) -------------------------------------------------------------
+  {
+    const inAir = !capy.grounded && p.y > sahTerrain(p.x, p.z) + 0.55;
+    if (inAir) sahSurfAir += dt;
+    else if (sahSurfAirWas && sahSurfAir > 0) {
+      if (sahSurfAir > 0.45) {
+        if (sahSurfAir > sahSurfAirBest) sahSurfAirBest = sahSurfAir;
+        sahToast('air · ' + sahSurfAir.toFixed(1) + ' s');
+        for (let k = 0; k < 14; k++) {
+          sahDustSpawn(p.x + rand(-1.6, 1.6), sahTerrain(p.x, p.z) + rand(0.1, 0.8),
+            p.z + rand(-1.6, 1.6), -rand(2, 6), rand(0.5, 1.3), rand(0.5, 1.0));
+        }
+        sahSfx('thud', { volume: 0.5, pitch: 0.8 });
+        if (typeof game.punch === 'function') game.punch(0.1);
+      }
+      sahSurfAir = 0;
+    }
+    sahSurfAirWas = inAir;
+  }
+  // ...and the run, on the signpost (W1): the speed and the biggest hop.
+  if (!sahSurfDone && typeof game.wowLive === 'function') {
+    game.wowLive((sahSurfAir > 0.1 ? 'AIR · ' : 'on the face · ') + sp.toFixed(0) + ' m/s' +
+                 (sahSurfAirBest > 0.45 ? ' · best hop ' + sahSurfAirBest.toFixed(1) + ' s' : ''),
+                 clamp((sahSURF_TOP - p.x) / (sahSURF_TOP - sahSURF_END), 0, 1));
+  }
   // ---- AND THE DUNE SINGS -------------------------------------------------
   // Erg Chebbi is one of about thirty places on earth where a slipface BOOMS —
   // a low organ note you feel through your feet, for as long as the sand is

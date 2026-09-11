@@ -2040,6 +2040,17 @@ function cavUpdateColumn(game, dt) {
   const grounded = !!capy.grounded;
   cavColVy = vy; cavColAbove = above; cavColGrounded = grounded; cavColInGlade = inGlade;
 
+  // ---- the climb and the drop, on the signpost (W1) ---------------------
+  if (!cavColDone && inGlade && typeof game.wowLive === 'function') {
+    if (cavColOn && cavColDrop > 1) {
+      game.wowLive('FALLING · ' + cavColDrop.toFixed(0) + ' m · the swifts are with you',
+                   clamp(cavColDrop / cavCOL_TICK, 0, 1));
+    } else if (above > 3) {
+      game.wowLive('on the column · ' + Math.round(above) + ' m up' +
+                   (above > cavCOL.h - 3 ? ' · the top. step off' : ''),
+                   clamp(above / cavCOL.h, 0, 1) * 0.5);
+    }
+  }
   // ---- topping out, which is worth saying on its own -------------------
   if (!cavColTopped && inGlade && grounded && above > cavCOL.h - 3) {
     cavColTopped = true;

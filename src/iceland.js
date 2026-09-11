@@ -222,6 +222,19 @@ const iceLampPools = [];             // x, y, z of every sodium lamp's ground di
 // --- task / world state ---
 let iceGeyPhase = 0, iceGeyT = 0, iceGeyFired = 0;
 let iceAurora = 0, iceAuroraArmed = false;
+// ---- THE CALL (W1) ---------------------------------------------------------
+// The aurora was a thing that happened TO you: sit for seven seconds, and
+// twelve seconds later the task ticked itself. The sit is untouched — it is
+// the most capybara thing in the game — but the sky now wants ANSWERING. A
+// wheek from the pool, once the curtains are up, sends a wave down them from
+// where you are: the ripple doubles and a bright band runs the length of the
+// sheet, out from your x at four hundred metres in three seconds, and the
+// score's lift figure answers in the chapter's own key. The first call is the
+// tick; every call after it still gets the wave, because a sky that answers
+// once is a cutscene.
+const iceCALL_R = 16;              // m from the spring a call still counts
+const iceCALL_MIN = 0.35;          // how far up the curtains must be to answer
+let iceAurKick = 0, iceAurCallX = 0, iceAurCalls = 0;
 let iceSoak = 0, iceSoakShown = false;
 let iceSoakMark = 0;
 // The marks for the overstay. See THE LONG SIT in iceUpdateSpring: the last
@@ -2584,21 +2597,33 @@ function iceUpdateAurora(dt) {
     if (!vis) continue;
     c.phase += c.speed * dt;
     const a = c.attr.array, b = c.base;
+    // THE ANSWER (W1): a band running out along x from where the call came,
+    // 400 m in the kick's three seconds, fading as it goes. See iceAuroraCall.
+    const kick = iceAurKick;
+    const ringR = (1 - kick) * 420;
+    let bright = 0;
     for (let k = 0; k < a.length; k += 3) {
       const x = b[k];
       // the ripple runs ALONG the curtain and gets bigger toward the top, which
       // is the only way it reads as a sheet in a magnetic field rather than a
       // flag in a breeze
       const up = (b[k + 1] - 46) / 100;
-      a[k + 2] = Math.sin(x * c.wave + c.phase) * c.amp * (0.35 + up) +
-                 Math.sin(x * c.wave * 2.7 - c.phase * 1.6) * c.amp * 0.3 * up;
-      a[k + 1] = b[k + 1] + Math.sin(x * c.wave * 1.6 + c.phase * 0.7) * 7 * up;
+      let ring = 0;
+      if (kick > 0) {
+        const dr = Math.abs(x - iceAurCallX) - ringR;
+        ring = Math.exp(-dr * dr / (2 * 55 * 55)) * kick;
+        if (ring > bright) bright = ring;
+      }
+      a[k + 2] = Math.sin(x * c.wave + c.phase) * c.amp * (0.35 + up) * (1 + ring * 1.6) +
+                 Math.sin(x * c.wave * 2.7 - c.phase * 1.6) * c.amp * 0.3 * up +
+                 Math.sin(x * c.wave * 5 + iceTime * 4) * c.amp * 0.5 * up * ring;
+      a[k + 1] = b[k + 1] + Math.sin(x * c.wave * 1.6 + c.phase * 0.7) * 7 * up + ring * 9 * up;
     }
     c.attr.needsUpdate = true;
     // each curtain breathes on its own slow cycle, so the whole sky never
     // pulses in unison — which is the tell of a fake one
     const breathe = 0.55 + 0.45 * Math.sin(iceTime * 0.37 + c.phase * 2.1);
-    c.mesh.material.opacity = lvl * lvl * c.peak * breathe;
+    c.mesh.material.opacity = Math.min(1, lvl * lvl * c.peak * (breathe + bright * 1.3));
   }
   if (iceStarMat) iceStarMat.opacity = 0.85;
 }
@@ -4106,14 +4131,39 @@ function iceUpdateSpring(game, dt) {
     // its own the moment it stops.
     const g = iceGame;
     if (g && g.music && typeof g.music.swell === 'function') g.music.swell(0.55 + iceAurora * 0.45);
-    if (!iceAuroraDone && iceAurora > 0.9) {
-      iceAuroraDone = true;
-      iceTask('aurora');
-      iceToast('the whole northern sky, and it waited for you to sit down.');
-      iceSfx('chime', { volume: 1.0, pitch: 1.35 });
-      if (typeof game.shake === 'function') game.shake(0.10);
+    // The tick moved to the call (W1). The sky being up is the invitation.
+    if (!iceAuroraDone && iceAurora > 0.9 && !iceAurUpSaid) {
+      iceAurUpSaid = true;
+      iceToast('the whole northern sky, and it waited for you to sit down. call to it.');
     }
   }
+  // ---- the signpost (W1) ---------------------------------------------------
+  if (!iceAuroraDone && iceAuroraArmed && typeof game.wowLive === 'function') {
+    game.wowLive(iceAurora < 0.9 ? 'the sky is coming · ' + Math.round(iceAurora * 100) + '%'
+                                 : 'the sky is up · wheek, and it answers',
+                 0.1 + 0.8 * iceAurora);
+  }
+  if (iceAurKick > 0) iceAurKick = Math.max(0, iceAurKick - dt / 3.2);
+}
+let iceAurUpSaid = false;
+/** A wheek near the spring under the aurora. See THE CALL. */
+function iceAuroraCall(game, p) {
+  if (iceAurora < iceCALL_MIN || !p) return false;
+  const dx = p.x - iceSPRING.x, dz = p.z - iceSPRING.z;
+  if (dx * dx + dz * dz > iceCALL_R * iceCALL_R) return false;
+  iceAurKick = 1;
+  iceAurCallX = p.x;
+  iceAurCalls++;
+  if (game.music && typeof game.music.swell === 'function') game.music.swell(1);
+  iceSfx('chime', { volume: 0.55, pitch: 1.6 });
+  if (!iceAuroraDone) {
+    iceAuroraDone = true;
+    iceTask('aurora');
+    if (typeof game.shake === 'function') game.shake(0.10);
+  } else if (iceAurCalls === 2) {
+    iceToast('it heard that. it hears all of them.');
+  }
+  return true;
 }
 
 /**
@@ -4425,6 +4475,12 @@ function iceInZone(name, x, z) {
 // =============================================================== LIFECYCLE ===
 export function createIceland(game) {
   iceGame = game;
+  // THE CALL (W1): a wheek under the aurora, from the pool, is answered.
+  game.events.on('capy:wheek', function (pl) {
+    if (!game.biome || !game.biome.isActive('iceland')) return;
+    const p = (pl && pl.position) || (game.capy && game.capy.position);
+    iceAuroraCall(game, p);
+  });
 
   game.biome.register('iceland', {
     ensureBuilt() { iceBuild(game); },

@@ -850,6 +850,16 @@ const sysDONE_HOLD  = 3.4;     // s at full weight, under a card that is up for 
 // nobody has time to try to steer out of it. Only `wow` may ask.
 const sysWOW_SLOW    = 0.55;
 const sysWOW_SLOW_T  = 0.75;
+// ---- THE BIG ONE, WHILE IT IS HAPPENING (W1) ------------------------------
+// Every channel above pays out AFTER the moment. A chapter that is in the
+// middle of its marquee — the animal on the condor, the ferry underway, the
+// tide coming up the square — hands a line and a 0..1 to game.wowLive() every
+// frame, and the signpost turns into the moment's own readout: "on the condor
+// · 212 m up", a bar filling under it, the score's bed leaning in without the
+// flourish. The watchdog closes it, so a chapter that stops calling cannot
+// leave the paper saying NOW.
+const sysWOW_LIVE_STALE = 0.7;   // s since the last wowLive() before it closes
+const sysWOW_LIVE_BED   = 0.55;  // how far the live bed lifts the score at t = 1
 
 // --- THE PAD ----------------------------------------------------------------
 // This game has had two input devices since it was written — a keyboard and a
@@ -8056,12 +8066,43 @@ function sysBuildCSS() {
    `say` would push the card wider rather than wrap inside it. `text-wrap:
    pretty` keeps a two-line sentence off a one-word last line, which on a card
    this narrow is most of them. */
-'.capyui-marqtxt{grid-column:1 / -1;grid-row:2;font-size:clamp(9.5px,1.55vw,13px);',
+/* THE NAME OF THE THING (W1). "Bring the sky down" is a sentence a player has
+   to decode; THE AURORA is not. The name goes under the eyebrow in the card's
+   biggest type, the sentence says what to do under it, and the italic says
+   where. The name is the one line that stays up whether the row is on the
+   paper or not — see .capyui-marq.row — so the star, the eyebrow and the
+   name are the same three things for the whole chapter. */
+'.capyui-marqname{grid-column:1 / -1;grid-row:2;font-size:clamp(12px,1.9vw,16px);',
+  'line-height:1.1;letter-spacing:.06em;text-transform:uppercase;font-weight:800;',
+  'color:' + ink + ';margin-top:3px;min-width:0;overflow-wrap:break-word;}',
+'.capyui-marqtxt{grid-column:1 / -1;grid-row:3;font-size:clamp(9.5px,1.55vw,13px);',
   'line-height:1.28;color:' + ink + ';font-weight:700;margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
-'.capyui-marqsay{grid-column:1 / -1;grid-row:3;font-size:clamp(8.5px,1.4vw,11px);',
+'.capyui-marqsay{grid-column:1 / -1;grid-row:4;font-size:clamp(8.5px,1.4vw,11px);',
   'line-height:1.25;color:' + inkSoft + ';font-style:italic;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
+/* The row is on the paper: the sentence is a row now, with its arrow and its
+   metres, and the signpost keeps only the name over it. */
+'.capyui-marq.row .capyui-marqtxt{display:none;}',
+/* ...AND WHILE IT IS HAPPENING (W1). The eyebrow says NOW in the accent, the
+   sentence and the where give way to the moment's own line, and a bar fills
+   under it. The bar is a paper track with an ink fill — the same two colours
+   as the stamina bar, so it reads as the same kind of instrument. */
+'.capyui-marqlive{display:none;grid-column:1 / -1;grid-row:3;font-size:clamp(9.5px,1.55vw,13px);',
+  'line-height:1.28;color:' + accentInk + ';font-weight:700;margin-top:2px;',
+  'min-width:0;overflow-wrap:break-word;font-variant-numeric:tabular-nums;}',
+'.capyui-marqbar{display:none;grid-column:1 / -1;grid-row:4;height:4px;margin-top:4px;',
+  'border-radius:2px;background:' + paper2 + ';overflow:hidden;}',
+'.capyui-marqbar i{display:block;height:100%;width:0;background:' + accentInk + ';',
+  'transition:width .25s linear;}',
+'.capyui-marq.live .capyui-marqtxt,.capyui-marq.live .capyui-marqsay{display:none;}',
+'.capyui-marq.live .capyui-marqlive{display:block;}',
+'.capyui-marq.live.bar .capyui-marqbar{display:block;}',
+'.capyui-marq.live .capyui-marqhead{color:' + accentInk + ';}',
+'@keyframes capyui-marqpulse{0%,100%{opacity:1}50%{opacity:.55}}',
+'.capyui-marq.live .capyui-marqtier{animation:capyui-marqpulse 1.1s ease-in-out infinite;}',
+'@media (prefers-reduced-motion:reduce){.capyui-marq.live .capyui-marqtier{animation:none;}',
+  '.capyui-marqbar i{transition:none;}}',
 '.capyui-todo ul{list-style:none;display:flex;flex-direction:column;gap:3px;}',
 /* max-height is stated even at rest so the roll-up has something to animate FROM
    — a transition out of `none` is a snap. 4.2em clears a two-line row comfortably. */
@@ -13936,7 +13977,7 @@ export function createSystems(game) {
 
   function musBreathStep(dt) {
     const allowed = !musPal.band && musIntensity < sysMUS_BREATH_MAXI &&
-                    musLift * musLiftEnv() < 0.02;
+                    musLiftNow() < 0.02;
     if (musBreathT > 0) {
       musBreathT -= dt;
       if (!allowed) musBreathT = Math.min(musBreathT, sysMUS_BREATH_OUT);
@@ -14267,6 +14308,18 @@ export function createSystems(game) {
     }
     return s.deg.length;
   }
+
+  // ---- THE BED WITHOUT THE FLOURISH (W1) ----------------------------------
+  // musSwell is a MOMENT: an envelope with a figure at the front of it, held
+  // by re-calling. A marquee that lasts a minute — the condor, the ferry, the
+  // river — wants the room to get bigger for the whole minute and does not
+  // want the figure every five seconds of it. So the live channel drives the
+  // same three voices and the same lean through a second scalar, damped, with
+  // no arpeggio at all; the figure still plays once, at the tick, from
+  // completeTask. Read wherever musLift * musLiftEnv() is read.
+  let musLive = 0, musLiveWant = 0;
+  function musLiveSet(k) { musLiveWant = clamp(typeof k === 'number' ? k : 0, 0, 1); }
+  function musLiftNow() { return Math.max(musLift * musLiftEnv(), musLive); }
 
   function musSwell(k) {
     const s = clamp(typeof k === 'number' ? k : 1, 0, 1);
@@ -19654,13 +19707,52 @@ export function createSystems(game) {
   marqTierEl.setAttribute('role', 'img');
   marqTierEl.setAttribute('aria-label', 'the big one here');
   marqTierEl.title = 'the big one here';
+  // ---- AND IT HAS A NAME (W1) ---------------------------------------------
+  // The `wow` caption on the row — THE CONDOR RIDE, THE AURORA, THE TRAIN
+  // ALLEY — was printed once, on the banner, after the fact. It is the one
+  // line that says what the chapter is FOR in words a player does not have to
+  // decode, so it goes on the signpost for the whole chapter, and it stays
+  // when the sentence becomes a row on the paper (.row) and when the moment
+  // is under way (.live).
+  const marqNameEl = sysEl('span', 'capyui-marqname', '');
   const marqTxtEl = sysEl('span', 'capyui-marqtxt', '');
   const marqSayEl = sysEl('span', 'capyui-marqsay', '');
+  const marqLiveEl = sysEl('span', 'capyui-marqlive', '');
+  marqLiveEl.setAttribute('aria-live', 'polite');
+  const marqBarEl = sysEl('span', 'capyui-marqbar');
+  const marqBarFill = sysEl('i');
+  marqBarEl.appendChild(marqBarFill);
+  marqBarEl.setAttribute('role', 'progressbar');
+  marqBarEl.setAttribute('aria-valuemin', '0');
+  marqBarEl.setAttribute('aria-valuemax', '100');
+  marqBarEl.setAttribute('aria-label', 'how far through the big one');
   marqEl.appendChild(marqTierEl);
   marqEl.appendChild(marqHeadEl);
+  marqEl.appendChild(marqNameEl);
   marqEl.appendChild(marqTxtEl);
+  marqEl.appendChild(marqLiveEl);
   marqEl.appendChild(marqSayEl);
+  marqEl.appendChild(marqBarEl);
   todoEl.appendChild(marqEl);
+  // ---- THE LIVE CHANNEL (W1) ----------------------------------------------
+  // game.wowLive(line, t): the chapter is in the middle of its marquee and it
+  // stands at `line`, `t` of the way through (optional, 0..1; omit for a moment
+  // with no natural length and the bar stays off). Every frame, like
+  // recordLive, and closed by the watchdog like recordLive. Read by the
+  // signpost, the score's bed and the composite; nothing here gates anything.
+  let wowLiveLine = '';
+  let wowLiveT = -1;
+  let wowLiveSince = 99;
+  let wowLiveOn = false;
+  let wowLiveBar = -1;           // last width written, in whole per cent
+  function wowLive(line, t) {
+    wowLiveLine = String(line || '');
+    wowLiveT = (typeof t === 'number' && t === t) ? clamp(t, 0, 1) : -1;
+    wowLiveSince = 0;
+  }
+  game.wowLive = wowLive;
+  /** Is a marquee under way right now, and how far through (0..1, or -1). */
+  game.wowLiveAt = function () { return wowLiveOn ? (wowLiveT < 0 ? 0.5 : wowLiveT) : -1; };
   todoEl.appendChild(todoHeadEl);
   let marqId = '';
   let marqSay = '';    // the authored sentence, before the metres are added
@@ -23015,7 +23107,7 @@ export function createSystems(game) {
                     where: function () { return hintNpc(function (r) { return r.kind === 'gardener'; }); } },
     'photo-op':     { clue: 'stand still and face them',
                     where: function () { return hintNpc(function (r) { return r.hasCamera; }); } },
-    'opera-stage':  { clue: 'get up on the podium', where: function () { return hintZone('operaStage'); } },
+    'opera-stage':  { clue: 'get up on the podium and wheek. three times, once they have come over', where: function () { return hintZone('operaStage'); } },
     'ball-harbour': { clue: hintHoldingBall, where: function () { return hintHolding('ball') ? hintWater() : hintProp('ball'); } },
     swim:           { clue: 'walk in and keep going', where: hintWater },
     'hat-harbour':  { clue: 'carry a stolen hat to the water',
@@ -23111,7 +23203,7 @@ export function createSystems(game) {
     'steal-empanada': { clue: 'grab one off a stall with E', where: function () { return hintProp('empanada'); } },
     'market-chaos':   { clue: 'run straight through the frame', where: hintStall },
     'whistle-condor': { clue: 'wheek out in the open — press Q', where: function () { return null; } },
-    'condor-ride':    { clue: 'wheek again, then press E under it',
+    'condor-ride':    { clue: 'wheek again, then press E under it — and hold on for twelve seconds',
                     where: function () { return (game.condor && game.condor.active) ? hintObj(game.condor.group) : null; } },
     'thermal-peak':   { clue: 'steer into the rising air off the volcano',
                     where: function () { return hintObj(game.pasto && game.pasto.craterCentre); } },
@@ -23234,7 +23326,7 @@ export function createSystems(game) {
                       return 'do nothing  ·  ' + (i.soakSeconds * (1 - t)).toFixed(1) + ' s';
                     },
                     where: function () { return hintObj(game.iceland && game.iceland.spring); } },
-    'aurora':         { clue: 'sit still long enough and it turns up on its own',
+    'aurora':         { clue: 'sit still in the pool till the sky comes, then wheek at it',
                     where: function () { return hintObj(game.iceland && game.iceland.spring); } },
     // ---- Marrakech ---------------------------------------------------------
     'to-sahara':      { clue: 'somebody else is steering',
@@ -23352,9 +23444,9 @@ export function createSystems(game) {
     'acqua-alta':     { clue: function () {
                       const v = game.venice;
                       if (!v) return 'be in the square when the water arrives';
-                      if (v.rising()) return 'it is coming in NOW. get in the square.';
+                      if (v.rising()) return 'it is coming in NOW. get in the square, and stay in it to the top';
                       if (v.tide() > 0.8) return 'you missed it. it comes back.';
-                      return 'wait for the siren, then stand in the middle of it';
+                      return 'wait for the siren, then stand in the middle of it and stay there';
                     },
                     where: function () { return hintObj(game.venice && game.venice.piazza); } },
     'traghetto': { clue: 'get on at a pontoon and stay on your feet the whole way over',
@@ -23387,8 +23479,8 @@ export function createSystems(game) {
     'symphony':       { clue: function () {
                       const k = game.kowloon;
                       if (!k) return 'be somewhere high when it starts';
-                      if (k.showing()) return 'IT IS ON. get up there.';
-                      return 'be on a roof at eight. up the bamboo.';
+                      if (k.showing()) return 'IT IS ON. get up there, and wheek — each one lights a tower';
+                      return 'be on the roof at eight, up the bamboo, then wheek at the skyline';
                     },
                     where: function () { return hintObj(game.kowloon && game.kowloon.roof); } },
     'bus-top': { clue: 'one hop to the rear platform, then up the stair',
@@ -23413,7 +23505,7 @@ export function createSystems(game) {
     'fragata':        { clue: 'wheek out on the sand — press Q', where: function () { return null; } },
     'fragata-ride':   { clue: function () {
                       const c = game.condor;
-                      if (c && c.active) return 'wheek again, then press E under it';
+                      if (c && c.active) return 'wheek again, then press E under it — and hold on for twelve seconds';
                       return 'call one down first. they hang over the loaf all afternoon.';
                     },
                     where: function () {
@@ -24629,9 +24721,15 @@ export function createSystems(game) {
     // opens, which is the frame a player is looking at the card.
     const wowDef = wowOfChapter(n);
     const wowRec = wowDef ? taskRec[wowDef.id] : null;
-    const marqOn = !!(wowDef && wowRec && !wowRec.done && !show[wowDef.id] && !wayOn);
+    // ...AND IT STAYS UP WHILE THE ROW IS ON THE PAPER (W1). It used to go
+    // away then, so the name and the eyebrow went with it and the chapter's
+    // one big thing was a sentence with a star on it again. Now the block
+    // keeps the star, THE BIG ONE HERE and the name, and only the sentence
+    // steps aside for the row that carries it (.row).
+    const marqOn = !!(wowDef && wowRec && !wowRec.done && !wayOn);
     if (marqOn && marqId !== wowDef.id) {
       marqId = wowDef.id;
+      marqNameEl.textContent = sysSay(typeof wowDef.wow === 'string' ? wowDef.wow : '');
       marqTxtEl.textContent = wowDef.text;
       const mq = cdef && cdef.marquee;
       marqSay = sysSay((mq && mq.say) || '');
@@ -24641,6 +24739,7 @@ export function createSystems(game) {
       marqSay = '';
     }
     marqEl.classList.toggle('on', marqOn);
+    marqEl.classList.toggle('row', marqOn && !!show[wowDef.id]);
     if (top !== todoTopId) {
       // clear the aim off whoever used to be top
       const old = taskRec[todoTopId];
@@ -24882,8 +24981,9 @@ export function createSystems(game) {
         if (!ad || todoChapter() !== n || todoActShown !== to || chapComplete(n)) return;
         // ---- ...AND NOT THE HEADLINE THAT IS ALREADY ON SCREEN (P3) ------
         // A `wow` row raises a banner through the same showPlace, and Pasto
-        // has the act kick and the marquee on the SAME WORD: `condor-ride`
-        // carries `wow: 'GALERAS'` and act three opens with `kick: 'GALERAS'`.
+        // HAD the act kick and the marquee on the SAME WORD: `condor-ride`
+        // carried `wow: 'GALERAS'` and act three opens with `kick: 'GALERAS'`
+        // (W1 renamed the wow THE CONDOR RIDE; the guard stays, it is right).
         // Ride the bird and the card says GALERAS, then says GALERAS again
         // 2.9 s later — which reads as the game stuttering rather than as two
         // things happening. The wait exists precisely so a tick's own card is
@@ -30241,7 +30341,7 @@ export function createSystems(game) {
         try {
           // Never over a marquee. The lift is a held moment and this is
           // punctuation; an arrival cannot be both.
-          if (musLift * musLiftEnv() > 0.02) return;
+          if (musLiftNow() > 0.02) return;
           musSting('arrive', 1);
         } catch (e) {}
       }, 550);
@@ -34770,8 +34870,9 @@ export function createSystems(game) {
           // leaves its own ease-in, which is the documented way to ask for a
           // camera move and get nothing. `stageShot` latches until the animal
           // steps off.
+          // The tick left this line in W1: standing here is the SHOT, and the
+          // concert (environment.js, stageNote) is the task.
           if (!stageShot) { stageShot = true; if (envApi.operaShot) envApi.operaShot(); }
-          completeTask('opera-stage');
         }
       } else { stageT = 0; stageShot = false; }
     }
@@ -35741,6 +35842,34 @@ export function createSystems(game) {
     // the same reason: an attempt does not stop being open because a `wow` put
     // the world at 0.45x, and sysREC_STALE is a wall-clock promise.
     recLiveTick(game.state.rawDt || dt);
+    // ---- THE BIG ONE, LIVE (W1) ----------------------------------------
+    // Wall clock, for the reason the record line uses it: the marquee is the
+    // one thing that puts the world at 0.55x, and its own readout must not
+    // close because of it. Painted here and not on the hint tick because the
+    // line moves — metres up, seconds, of seven — and a quarter-second stutter
+    // on the one live instrument the paper has would read as a fault.
+    wowLiveSince += (game.state.rawDt || dt);
+    const wl = !!marqId && wowLiveSince < sysWOW_LIVE_STALE;
+    if (wl !== wowLiveOn) {
+      wowLiveOn = wl;
+      marqHeadEl.textContent = wl ? 'the big one · now' : 'the big one here';
+      marqEl.classList.toggle('live', wl);
+      if (!wl) { wowLiveBar = -1; marqLiveEl.textContent = ''; }
+    }
+    if (wl) {
+      if (marqLiveEl.textContent !== wowLiveLine) marqLiveEl.textContent = wowLiveLine;
+      const hasBar = wowLiveT >= 0;
+      marqEl.classList.toggle('bar', hasBar);
+      if (hasBar) {
+        const pc = Math.round(wowLiveT * 100);
+        if (pc !== wowLiveBar) {
+          wowLiveBar = pc;
+          marqBarFill.style.width = pc + '%';
+          marqBarEl.setAttribute('aria-valuenow', String(pc));
+        }
+      }
+    }
+    musLiveSet(wl ? (0.45 + 0.55 * (wowLiveT < 0 ? 0.5 : wowLiveT)) * sysWOW_LIVE_BED : 0);
     // ...and the ghost, on the same wall clock the line's watchdog runs on. A
     // ghost stepped by the SCALED dt would slow down inside a hitstop and be
     // racing a run that never happened. See THE GHOST.
@@ -37936,7 +38065,7 @@ export function createSystems(game) {
       // filter and the bass terms are proportional rather than absolute
       // because the palettes run from cut 470 to cut 1320 and a flat 500 Hz
       // subtraction would take the Drift's pad below its own fundamental.
-      const lift = musLift * musLiftEnv();
+      const lift = musLiftNow();
       // ---- ...AND THE LOAF SWELLS IT FURTHER (v23) ---------------------
       // musCalm saturates at 1 and sysCalmNow gets there on eight seconds of
       // rest, which is only a beat and a half after the animal sits down — so
@@ -38027,9 +38156,12 @@ export function createSystems(game) {
       // otherwise leaves two overlapping ramps fighting over the same gain and
       // the level lands wherever the race lands it.
       if (musLiftGain) {
-        musLiftGain.gain.setTargetAtTime(0.0001 + musLift * musLiftEnv(), nowA, 0.55);
+        musLiftGain.gain.setTargetAtTime(0.0001 + musLiftNow(), nowA, 0.55);
       }
     }
+    // The live bed: up in about a second and a half, down in three, so a
+    // marquee that ends reads as the room settling rather than a cut.
+    musLive += (musLiveWant - musLive) * (1 - Math.exp(-(musLiveWant > musLive ? 0.7 : 0.35) * dt));
     // The lift's clock. Off the frame timer, not the audio clock, because it is
     // an ENVELOPE the mix reads and not a scheduled note — and it has to keep
     // running while the context is suspended, or an alt-tab in the middle of the
