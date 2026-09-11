@@ -1947,6 +1947,30 @@ const capyBLINK_DUR = 0.11;         // s, and it is a TRIANGLE — see capyFaceP
 // brow belongs on). qa/crop.cjs exists because of this decision.
 const capyBROW_Y    = 0.060;        // m above the eye bead, at rest
 let capyLand = 0, capyLandVel = 0;  // the landing absorb spring (render only)
+// ---- THE FOOT PLANTS (L3, E2) ---------------------------------------------
+// The gait was a pendulum: legs[i].rotation.x = sin(phase) * amp, stance and
+// swing the same arc, so the foot never planted and never lifted — at nine
+// metres it read as windscreen wipers. A walking leg is two things: a STANCE,
+// the slow sixty per cent where the sole is on the ground and the leg sweeps
+// back linearly as the body goes over it, and a SWING, the fast forty where
+// the foot comes off, the shin shortens and the toes trail. capyGait writes
+// the angle and publishes the lift per leg; the shin is shortened about the
+// hip by scaling the leg group, which is what lifts the foot. The bob peaks at
+// mid-stance now, not mid-swing. See capyGait.
+const capyGAIT_STANCE = 0.60;   // share of the cycle the foot is down
+const capyGAIT_SHIN = 0.16;     // how much the shin shortens at the top of the swing
+const capyGAIT_TOE = 0.42;      // rad the toes trail at the top of the swing
+const capyLegLift = [0, 0, 0, 0];
+/** The leg angle for a cycle fraction u (0..1), amplitude amp; writes lift. */
+function capyGait(u, amp, i) {
+  if (u < capyGAIT_STANCE) {
+    capyLegLift[i] = 0;
+    return amp * (1 - 2 * (u / capyGAIT_STANCE));            // +amp -> -amp, linear
+  }
+  const s = (u - capyGAIT_STANCE) / (1 - capyGAIT_STANCE);   // 0..1 through the swing
+  capyLegLift[i] = Math.sin(s * Math.PI);
+  return -amp * Math.cos(s * Math.PI);                       // -amp -> +amp, smooth
+}
 let capyFallV = 0;                  // fastest descent of the current flight, m/s
 let capyStepPhase = 0;              // which half gait-cycle the last footfall was in
 
@@ -4313,6 +4337,8 @@ export function createCapybara(game) {
     },
     animAudit: function () {
       return { speed: capySpeedSm, legPhase: capyLegPhase, gaitRate: capyGaitRate,
+               // THE FOOT PLANTS (L3, E2): the swing lift per leg, and the shin
+               legLift: capyLegLift.slice(), shin0: legs[0].scale.y,
                swingAmp: capySwingAmp, stride: capyStride,
                pop: capyPop, popVel: capyPopVel,
                lean: capyLean, leanTarget: capyLeanTgt, accel: capyAccelSm,
@@ -6872,7 +6898,8 @@ export function createCapybara(game) {
           // Airborne the legs stop being a gait and become a POSE: fronts reach,
           // rears trail. Cross-faded on capyAirPose so a one-frame contact blip
           // during a stair climb cannot make the legs snap.
-          const walk = Math.sin(phase) * swingAmp;
+          const u = ((phase / 6.283185) % 1 + 1) % 1;
+          const walk = capyGait(u, swingAmp, i);
           const tuck = (i < 2 ? -0.62 : 0.52) + (body.velocity.y > 0 ? -0.16 : 0.20);
           // ...and the LOAF is a third pose on the same cross-fade. It cannot
           // fight the air tuck: capyLoaf is only ever non-zero when the animal
@@ -6917,7 +6944,13 @@ export function createCapybara(game) {
       // standing on its heel with its toes in the air. The foot takes the
       // leg's own loaf rotation straight back off, so the sole stays flat on
       // the ground through the whole fold — which is what an ankle is.
-      feet[i].rotation.x = -legs[i].rotation.x * capyLoaf;
+      // ...and the swing's lift (L3, E2): the shin shortens about the hip and the
+      // toes trail, only while the gait is the writer — not in the air, not in
+      // the loaf, not on a wall, not swimming
+      const lift = capyLegLift[i] * (1 - capyAirPose) * (1 - capyLoaf) * (1 - capyClimbPose) *
+                   (capySwimming ? 0 : 1) * clamp(gaitSpeed / capyWALK, 0, 1);
+      legs[i].scale.y = 1 - capyGAIT_SHIN * lift;
+      feet[i].rotation.x = -legs[i].rotation.x * capyLoaf + capyGAIT_TOE * lift;
     }
 
     // squash & stretch spring — stiff and under-damped, so a wheek is a sharp
@@ -6952,7 +6985,9 @@ export function createCapybara(game) {
     // ~2.5x the bob, ~2.3x the forward lean, ears further back, head up.
     const bobAmp = capySwimming ? 0.02
       : clamp(0.010 + gaitSpeed * 0.010, 0, 0.085) * (running ? 1.55 : 1);
-    const bob = Math.abs(Math.sin(capyLegPhase)) * bobAmp + (capySwimming ? Math.sin(t * 2.3) * 0.02 : 0);
+    // mid-stance is where the weight is (L3, E2): u = 0.3 and 0.8 of leg 0's cycle
+    const bobU = ((capyLegPhase / 6.283185) % 1 + 1) % 1;
+    const bob = Math.abs(Math.cos(6.283185 * (bobU - capyGAIT_STANCE * 0.5))) * bobAmp + (capySwimming ? Math.sin(t * 2.3) * 0.02 : 0);
     // ---- LANDING ABSORB ----------------------------------------------
     // A hop that ends the instant the collider touches has no weight in it: the
     // animal simply stops being in the air. Real landings are absorbed by the
@@ -7251,6 +7286,7 @@ export function createCapybara(game) {
     capyTail = Math.sin(t * capyTAIL_HZ * Math.PI * 2) * capyTAIL_SWAY * restW
                + capyTailFlick * capyTAIL_KICK;
     tailPivot.rotation.x = capyTail;
+    tailPivot.rotation.y = clamp(-capyYawRate * 0.06, -0.2, 0.2);
     // head: dips to grab / dig, tips up to wheek
     let headTarget = 0;
     if (carried) headTarget = -0.3;
@@ -7300,7 +7336,9 @@ export function createCapybara(game) {
     // this euler further down — which is right: a capybara looking left has its
     // mouth on the left. That is also why the gaze is clamped and coned rather
     // than wrapped, and why a held prop resolves to a glance and not a target.
-    head.rotation.y = capyIdleYaw + capyGazeYaw;
+    // ...and the head LEADS a turn while the tail trails it (L3, E2): an S
+    // through the spine from two nodes, on the yaw rate the roll already reads
+    head.rotation.y = capyIdleYaw + capyGazeYaw + clamp(capyYawRate * 0.08, -0.26, 0.26);
 
     if (capyWheekHold > 0) { capyWheekHold -= dt; capyJawOpen = 1; }
     // snaps open, drifts shut
@@ -7354,8 +7392,10 @@ export function createCapybara(game) {
     capyEarLag = damp(capyEarLag, body.velocity.y, capyEAR_LAG_L, dt);
     const earWhip = clamp((body.velocity.y - capyEarLag) * capyEAR_LAG_K,
                           -capyEAR_LAG_MAX, capyEAR_LAG_MAX);
-    earL.rotation.x = -earBack - earWhip;
-    earR.rotation.x = -earBack - earWhip;
+    // ...and they flop forward as the landing spring bottoms (L3, E2): the whip
+    // only sees a change of vertical velocity, the settle is the body going down
+    earL.rotation.x = -earBack - earWhip + capyLand * 0.9;
+    earR.rotation.x = -earBack - earWhip + capyLand * 0.9;
     earL.rotation.y = turn;
     earR.rotation.y = turn;
     // ...and they go down and out asleep (N4), which is the one part of this

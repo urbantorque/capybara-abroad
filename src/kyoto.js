@@ -2107,6 +2107,116 @@ function kyoBuildUjiStreet(game, root) {
   root.add(m);
 }
 
+// ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ----
+/**
+ * THE LANE WAS ONE FLAT VALUE FROM NEAR TO FAR.
+ *
+ * qa/l3-kyoto.png: the Gion lane is 108 m of one granite value, forty to
+ * fifty-five per cent of the settled frame with no shape in it at the one-to-
+ * three-metre scale. The gutter kyoBuildGion draws down each side does not
+ * help, because it sits UNDER the slab it was meant to edge — its top is at
+ * ly + 0.09 against a slab top of ly + 0.13, so it shows as a fifteen-
+ * centimetre sliver at the very edge and the lane reads as a poured floor.
+ * Uji's is worse: both of its gutters, water and all, are wholly inside the
+ * gravel bed. The Quay's apron is the counter-proof — a grid of joints and
+ * the same slab reads as laid stone.
+ *
+ * Graphics only, one merged mesh, no collider and no new material: a kerb
+ * line and a gutter stripe on each DRAWN edge, joints across the setts, a
+ * manhole every twenty-five metres, a crossing where the lane is actually
+ * crossed, a worn patch or two, and the gravel strip between Gion's kerb and
+ * the machiya sills. Every line lands on the lanes' own constants — kyoGION_Z
+ * and the 9.0 m slab; kyoUJI, the 11.4 m bed and its 4.6 m spine — so it
+ * sits exactly on the edge that is already drawn. The strips off the slabs
+ * are on the ground, and the ground is sampled per segment and the segment
+ * pitched to it: nothing here has a flat y where kyoTerrain is not flat.
+ */
+function kyoBuildKerbs(game, root) {
+  const K = kyoMerger();
+  const KERB = PALETTE.graniteDark;     // one step down from the granite
+  const GUTTER = PALETTE.kawaraDark;    // and one more
+  const JOINT = PALETTE.kawaraDark;
+  const IRON = PALETTE.ironDark;
+  const BAR = PALETTE.shoji;
+  const GRAVEL = PALETTE.gravelZen;
+  /** A strip along x whose TOP is topAt(x, z) + proud, in `seg`-metre pieces
+   *  each pitched between its two ends. One piece when the surface is a slab. */
+  function stripX(x0, x1, z, w, h, topAt, proud, color, seg) {
+    const n = Math.max(1, Math.round((x1 - x0) / seg));
+    for (let i = 0; i < n; i++) {
+      const xa = lerp(x0, x1, i / n), xb = lerp(x0, x1, (i + 1) / n);
+      const ya = topAt(xa, z) + proud, yb = topAt(xb, z) + proud;
+      K.box((xa + xb) * 0.5, (ya + yb) * 0.5 - h * 0.5, z, Math.hypot(xb - xa, yb - ya) + 0.02,
+            h, w, color, 0, 0, Math.atan2(yb - ya, xb - xa));
+    }
+  }
+
+  // ---- Gion: the granite lane, kyoBuildGion's 108 x 9.0 slab at ly + 0.13 --
+  {
+    const lz = kyoGION_Z, ly = kyoTerrain(0, lz), top = ly + 0.13;
+    const X0 = -54, X1 = 54, HZ = 4.5;
+    const slab = () => top;
+    for (let s = -1; s <= 1; s += 2) {
+      stripX(X0, X1, lz + s * (HZ - 0.08), 0.16, 0.06, slab, 0.02, KERB, 1e9);
+      stripX(X0, X1, lz + s * (HZ - 0.30), 0.14, 0.05, slab, 0.01, GUTTER, 1e9);
+      // the gravel between the kerb and the sills: off the slab, so on the
+      // ground, sampled every six metres
+      stripX(X0, X1, lz + s * 5.0, 0.86, 0.06, kyoTerrain, 0.02, GRAVEL, 6);
+    }
+    // the setts: three courses down the lane and a joint every 2.4 m across
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(0, top - 0.01, lz + s * 1.5, X1 - X0, 0.04, 0.06, JOINT);
+    }
+    for (let x = X0 + 2.4; x < X1 - 1; x += 2.4) {
+      K.box(x, top - 0.01, lz, 0.06, 0.04, (HZ - 0.30) * 2 - 0.14, JOINT);
+    }
+    // a manhole every twenty-five metres, off the centre so the courses run
+    for (let x = -40; x <= 40; x += 25) {
+      K.cyl(x, top - 0.01, lz + 1.1, 0.30, 0.04, IRON, 0, 0, 0, 8);
+    }
+    // the crossing, between the late shopper and the sweeper (kyoLocLate,
+    // kyoLocSweep stand at x = -6.5 and -2.0 on opposite sills)
+    for (let k = 0; k < 8; k++) {
+      K.box(-5, top - 0.005, lz + (k - 3.5), 2.8, 0.04, 0.5, BAR);
+    }
+    // two worn patches, a shade darker, where the carts have been turning
+    K.box(22, top - 0.015, lz - 1.2, 2.4, 0.04, 1.5, KERB, 0, 0.18, 0);
+    K.box(-31, top - 0.015, lz + 1.8, 1.9, 0.04, 1.3, KERB, 0, -0.26, 0);
+  }
+
+  // ---- Uji: kyoBuildUjiStreet's 11.4 m gravel bed at y + 0.13 with the
+  // 4.6 m granite spine at y + 0.16 down the middle of it -------------------
+  {
+    const cz = kyoUJI.z, x0 = kyoUJI.x - 32, x1 = kyoUJI.x + 30;
+    const y = kyoTerrain((x0 + x1) * 0.5, cz);
+    const bed = y + 0.13, spine = y + 0.16;
+    const onBed = () => bed, onSpine = () => spine;
+    for (let s = -1; s <= 1; s += 2) {
+      stripX(x0, x1, cz + s * (5.7 - 0.08), 0.16, 0.06, onBed, 0.02, KERB, 1e9);
+      stripX(x0, x1, cz + s * (5.7 - 0.30), 0.14, 0.05, onBed, 0.01, GUTTER, 1e9);
+      // and the spine's own edge, where the granite meets the rammed earth
+      stripX(x0, x1, cz + s * 2.3, 0.08, 0.04, onSpine, 0.01, JOINT, 1e9);
+    }
+    for (let x = x0 + 2.0; x < x1 - 1; x += 2.0) {
+      K.box(x, spine - 0.01, cz, 0.06, 0.04, 4.6, JOINT);
+    }
+    for (let x = x0 + 12; x < x1 - 4; x += 25) {
+      K.cyl(x, spine - 0.01, cz + 0.9, 0.30, 0.04, IRON, 0, 0, 0, 8);
+    }
+    // the crossing, where the street is left for the mill and the bowl
+    for (let k = 0; k < 8; k++) {
+      const z = cz + (k - 3.5);
+      K.box(kyoUJI.x - 5, (Math.abs(z - cz) < 2.3 ? spine : bed) - 0.005, z, 2.8, 0.04, 0.5, BAR);
+    }
+    K.box(kyoUJI.x + 14, spine - 0.015, cz + 0.6, 2.0, 0.04, 1.2, KERB, 0, 0.22, 0);
+  }
+
+  const m = new THREE.Mesh(K.build(), kyoVC());
+  m.castShadow = false;                 // two centimetres of kerb throws nothing
+  m.receiveShadow = true;
+  root.add(m);
+}
+
 // ============================================================ THE PICKERS ===
 /**
  * NINE TERRACES OF TEA AND NOBODY ON THEM.
@@ -4772,6 +4882,7 @@ function kyoBuild(game) {
   kyoBuildLanterns(game, kyoRoot);
   kyoBuildUji(game, kyoRoot);
   kyoBuildUjiStreet(game, kyoRoot);
+  kyoBuildKerbs(game, kyoRoot);
   kyoBuildPickers(kyoRoot);
   kyoBuildMill(game, kyoRoot);
   kyoBuildRocks(game, kyoRoot);

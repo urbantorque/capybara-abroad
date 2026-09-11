@@ -1473,6 +1473,85 @@ function iceBuildCity(game, root) {
   }
 }
 
+// ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ----
+/**
+ * THE STREET WAS ONE FLAT VALUE FROM NEAR TO FAR.
+ *
+ * qa/l3-iceland.png: from the animal's feet to the far end of town the road is
+ * one unbroken iceMoraineDk with a dashed line down it, and either side of the
+ * slab the ground is the lava field the town is built on — the same value a
+ * shade darker. Forty to fifty-five per cent of the settled frame with no
+ * shape in it at the one-to-three-metre scale, and at night, where the lamp
+ * pools are the only thing that says the road is a surface at all. The Quay's
+ * apron is the counter-proof: joints, and a slab reads as laid stone.
+ *
+ * Graphics only, one merged mesh, no collider and no new material: a kerb line
+ * and a gutter stripe on the slab's drawn edge (iceLANES[0], the 100 x 9 slab
+ * iceBuildCity lays at x = -2), a PAVEMENT each side of it — because a joint
+ * grid drawn on black lava is invisible, and a Reykjavik street has a pavement
+ * the lamps stand on — with its joints every 1.8 m, a manhole every twenty-
+ * five metres, a crossing to the church path and one to the harbour, and two
+ * patches. The pavement is on the ground, not the slab, so it is laid in
+ * five-metre pieces each sampled from iceTerrain and pitched to it: the
+ * street happens to be flat, and the code does not assume so.
+ */
+function iceBuildKerbs(game, root) {
+  const K = iceMerger();
+  const z = iceLANES[0];
+  const X0 = -52, X1 = 48, HZ = 4.5;                 // iceBuildCity's slab
+  const top = iceTerrain(-2, z) + 0.06;               // its top
+  const KERB = PALETTE.iceBasalt;                     // one step down from iceMoraineDk
+  const GUTTER = PALETTE.iceBasaltDk;                 // and one more
+  const PAVE = PALETTE.iceMoraine;
+  const JOINT = PALETTE.iceMoraineDk;
+  const IRON = PALETTE.iceBasaltDk;
+  const BAR = PALETTE.iceGeoRim;                      // the dashes' own pale
+  for (let s = -1; s <= 1; s += 2) {
+    K.box(-2, top - 0.01, z + s * (HZ - 0.08), X1 - X0, 0.06, 0.16, KERB);
+    K.box(-2, top - 0.015, z + s * (HZ - 0.30), X1 - X0, 0.05, 0.14, GUTTER);
+    // the pavement: kerb to the lamp line, in pieces that follow the ground
+    const PZ0 = HZ + 0.16, PZ1 = 8.9;
+    const pz = z + s * (PZ0 + PZ1) * 0.5, pw = PZ1 - PZ0;
+    const N = 20;
+    for (let i = 0; i < N; i++) {
+      const xa = lerp(X0, X1, i / N), xb = lerp(X0, X1, (i + 1) / N);
+      const ya = iceTerrain(xa, pz) + 0.08, yb = iceTerrain(xb, pz) + 0.08;
+      K.box((xa + xb) * 0.5, (ya + yb) * 0.5 - 0.04, pz, Math.hypot(xb - xa, yb - ya) + 0.02,
+            0.08, pw, PAVE, 0, 0, Math.atan2(yb - ya, xb - xa));
+    }
+    // its joints: one down the middle and one across every 1.8 m
+    for (let i = 0; i < N; i++) {
+      const xa = lerp(X0, X1, i / N), xb = lerp(X0, X1, (i + 1) / N);
+      const ya = iceTerrain(xa, pz) + 0.09, yb = iceTerrain(xb, pz) + 0.09;
+      K.box((xa + xb) * 0.5, (ya + yb) * 0.5 - 0.02, pz, Math.hypot(xb - xa, yb - ya) + 0.02,
+            0.04, 0.05, JOINT, 0, 0, Math.atan2(yb - ya, xb - xa));
+    }
+    for (let x = X0 + 1.8; x < X1 - 0.5; x += 1.8) {
+      K.box(x, iceTerrain(x, pz) + 0.07, pz, 0.05, 0.04, pw - 0.1, JOINT);
+    }
+  }
+  // a manhole every twenty-five metres, off the dashes and clear of the stand
+  for (let x = -40; x <= 40; x += 25) {
+    K.cyl(x + (x > 0 ? 2 : 0), top - 0.01, z - 1.4, 0.30, 0.04, IRON, 0, 0, 0, 8);
+  }
+  // the crossings: to the church path at x = -16, and to the pier at 27.
+  // Bars along the road, stacked across it, between the dashes and the kerbs.
+  const CX = [iceCHURCH.x, icePIER.x + 1];
+  for (let c = 0; c < CX.length; c++) {
+    for (let k = 0; k < 8; k++) {
+      K.box(CX[c], top - 0.005, z + (k - 3.5), 3.0, 0.04, 0.5, BAR);
+    }
+  }
+  // two patches of newer asphalt, a shade darker than the wet grey
+  K.box(-30, top - 0.015, z + 1.6, 2.0, 0.04, 1.4, KERB, 0, 0.2, 0);
+  K.box(20, top - 0.015, z - 1.8, 1.7, 0.04, 1.2, KERB, 0, -0.28, 0);
+
+  const m = new THREE.Mesh(K.build(), iceVC());
+  m.castShadow = false;                 // two centimetres of kerb throws nothing
+  m.receiveShadow = true;
+  root.add(m);
+}
+
 /**
  * The plumes off the chimneys. Rationed hard — one puff every couple of
  * seconds across the whole town, from whichever chimney is nearest the player,
@@ -5453,6 +5532,7 @@ function iceBuild(game) {
   iceBuildSpring(iceRoot);
   iceBuildGeothermal(game, iceRoot);
   iceBuildCity(game, iceRoot);
+  iceBuildKerbs(game, iceRoot);
   iceBuildChurch(game, iceRoot);
   iceBuildPylsa(game, iceRoot);
   iceBuildHarbour(game, iceRoot);

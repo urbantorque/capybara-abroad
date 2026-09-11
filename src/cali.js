@@ -1528,6 +1528,151 @@ function caliBuildRoad(game, root) {
   caliRoadMesh = m;
 }
 
+// ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ----
+/**
+ * THE ROAD WAS ONE FLAT VALUE FROM NEAR TO FAR.
+ *
+ * qa/l3-cali.png: the asphalt across the foreground of the settled frame is
+ * one unbroken caliRoad from the shoulder to the horizon, and behind it San
+ * Antonio's stone is the same thing in a paler value — between them, forty to
+ * fifty-five per cent of the frame with no shape at the one-to-three-metre
+ * scale. The street's own gutters cannot help: caliBuildStreet lays them at
+ * sy + 0.11 inside a slab whose top is sy + 0.16, so all that shows of each is
+ * the twenty-five centimetres that pokes out past the edge. The Quay's apron
+ * is the counter-proof — joints, and a slab reads as stone.
+ *
+ * Graphics only, one merged mesh, no collider and no new material. The ribbon
+ * gets a kerb line and a gutter stripe at its drawn edge (HW, the same 3.6 m
+ * caliBuildRoad uses), manholes every twenty-five metres of arclength, a
+ * crossing at the cat and one at the cart, and three tar patches; the street
+ * gets the same pair on its 13 m slab plus the joints of its setts and two
+ * crossings — one to the salsoteca; the mirador, which is the nearest thing
+ * this chapter has to a plaza, gets its paving grid in its own axes. Every
+ * strip on the ribbon rides caliRY sample by sample and is pitched to the
+ * grade between samples, so it follows the road down to the river and up onto
+ * the bridge exactly as the asphalt does. The town half only: the flank road
+ * has a shoulder, not a kerb.
+ */
+function caliBuildKerbs(game, root) {
+  const K = caliMerger();
+  const HW = 3.6;                       // caliBuildRoad's half width
+  const KERB = PALETTE.caliGatoDark;    // one step down from caliRoad
+  const GUTTER = PALETTE.caliGrille;    // and one more
+  const IRON = PALETTE.caliGrille;
+  const LINE = PALETTE.caliRoadLine;    // the dashes' own pale, for the bars
+  const SKERB = PALETTE.caliStoneDark;  // one step down from caliStone
+  const SGUTTER = PALETTE.caliGatoDark;
+  const SJOINT = PALETTE.caliGatoDark;
+  const SBAR = PALETTE.caliErmitaTr;
+  const paved = (x, z) => caliStreetT(x, z) > 0.5 || caliMiradorT(x, z) > 0.5;
+  // the town half of the route, by the same ellipse the flank is authored on
+  const EK = 1 / Math.sqrt(0.55);
+  const town = (x, z) => Math.hypot(x - caliCRISTO.x, (z - caliCRISTO.z) / EK) > 74;
+
+  // ---- the ribbon --------------------------------------------------------
+  const n = caliRX.length;
+  for (let i = 1; i < n; i++) {
+    const ax = caliRX[i - 1], az = caliRZ[i - 1], bx = caliRX[i], bz = caliRZ[i];
+    if (paved(ax, az) || paved(bx, bz) || !town(ax, az)) continue;
+    const dx = bx - ax, dz = bz - az, seg = Math.hypot(dx, dz);
+    if (seg < 0.01) continue;
+    const yaw = Math.atan2(dx, dz);
+    const nx = Math.cos(yaw), nz = -Math.sin(yaw);
+    const ya = caliRY[i - 1] + 0.05, yb = caliRY[i] + 0.05;    // the drawn surface
+    const pitch = -Math.atan2(yb - ya, seg);
+    const len = Math.hypot(seg, yb - ya) + 0.06;
+    const mx = (ax + bx) * 0.5, mz = (az + bz) * 0.5, my = (ya + yb) * 0.5;
+    for (let s = -1; s <= 1; s += 2) {
+      const ok = HW - 0.08, og = HW - 0.30;
+      K.box(mx + nx * s * ok, my - 0.01, mz + nz * s * ok, 0.16, 0.06, len, KERB, pitch, yaw, 0);
+      K.box(mx + nx * s * og, my - 0.015, mz + nz * s * og, 0.14, 0.05, len, GUTTER, pitch, yaw, 0);
+    }
+  }
+  for (let s = 12; s < caliRouteLen; s += 25) {
+    const a = caliRouteAt(s);
+    if (paved(a.x, a.z) || !town(a.x, a.z)) continue;
+    const nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw);
+    K.cyl(a.x + nx * 1.2, a.y + 0.05 - 0.01, a.z + nz * 1.2, 0.30, 0.04, IRON, 0, a.yaw, 0, 8);
+  }
+  // the crossings: seven bars each, lying along the road and stacked across
+  // it, at the sample nearest the cat and the one nearest the lulada cart
+  const XING = [[caliGATO.x, -23], [caliLULADA.x + 6, -24]];
+  for (let c = 0; c < XING.length; c++) {
+    let best = -1, bd = 1e9;
+    for (let i = 0; i < n; i++) {
+      const d = Math.hypot(caliRX[i] - XING[c][0], caliRZ[i] - XING[c][1]);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (best < 0 || bd > 12) continue;
+    const a = caliRouteAt(caliRS[best]);
+    const nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw);
+    const pitch = -Math.atan(a.grade);
+    for (let k = 0; k < 7; k++) {
+      const o = (k - 3) * 1.0;
+      K.box(a.x + nx * o, a.y + 0.05 - 0.005, a.z + nz * o, 0.5, 0.04, 2.8, LINE, pitch, a.yaw, 0);
+    }
+  }
+  // tar patches, a shade darker, where the surface has been cut and filled
+  const PATCH = [0.08, 0.31, 0.62];
+  for (let p = 0; p < PATCH.length; p++) {
+    const a = caliRouteAt(caliRouteLen * PATCH[p]);
+    if (paved(a.x, a.z) || !town(a.x, a.z)) continue;
+    const nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw);
+    const o = (p % 2 ? -1 : 1) * 1.4;
+    K.box(a.x + nx * o, a.y + 0.05 - 0.015, a.z + nz * o, 1.6 + p * 0.3, 0.04, 2.2,
+          KERB, -Math.atan(a.grade), a.yaw + (p - 1) * 0.2, 0);
+  }
+
+  // ---- San Antonio: caliBuildStreet's 120 x 13 slab at sy + 0.16 --------
+  {
+    const sz = caliSTREET_Z, sy = caliTerrain(0, sz), top = sy + caliSTREET_TOP;
+    const X0 = -60, X1 = 60, HZ = caliSTREET_HZ;
+    for (let s = -1; s <= 1; s += 2) {
+      K.box(0, top - 0.01, sz + s * (HZ - 0.08), X1 - X0, 0.06, 0.16, SKERB);
+      K.box(0, top - 0.015, sz + s * (HZ - 0.30), X1 - X0, 0.05, 0.14, SGUTTER);
+      // three courses down the street
+      K.box(0, top - 0.01, sz + s * 2.2, X1 - X0, 0.04, 0.06, SJOINT);
+    }
+    for (let x = X0 + 2.2; x < X1 - 1; x += 2.2) {
+      K.box(x, top - 0.01, sz, 0.06, 0.04, (HZ - 0.30) * 2 - 0.14, SJOINT);
+    }
+    for (let x = -50; x <= 50; x += 25) {
+      K.cyl(x, top - 0.01, sz + 1.6, 0.30, 0.04, IRON, 0, 0, 0, 8);
+    }
+    // the crossing to the salsoteca's plot (caliFLOOR.x), and one up the street
+    const CX = [caliFLOOR.x, 12];
+    for (let c = 0; c < CX.length; c++) {
+      for (let k = 0; k < 8; k++) {
+        K.box(CX[c], top - 0.005, sz + (k - 3.5), 2.8, 0.04, 0.5, SBAR);
+      }
+    }
+    K.box(-38, top - 0.015, sz - 1.4, 2.2, 0.04, 1.4, SKERB, 0, 0.2, 0);
+    K.box(31, top - 0.015, sz + 2.0, 1.8, 0.04, 1.2, SKERB, 0, -0.3, 0);
+  }
+
+  // ---- the mirador: caliBuildMirador's deck, 18 x 12 at caliMIR_DECK, in
+  // its own axes (caliMIR_YAW), a joint every two metres both ways ---------
+  {
+    const cx = caliMIRADOR.x, cz = caliMIRADOR.z, yaw = caliMIR_YAW, D = caliMIR_DECK;
+    const ox = Math.sin(yaw), oz = Math.cos(yaw);            // outward, over the valley
+    const ax = Math.cos(yaw), az = -Math.sin(yaw);           // along the contour
+    for (let k = -2; k <= 2; k++) {
+      K.box(cx + ox * k * 2, D - 0.01, cz + oz * k * 2, caliMIR_HX * 2 - 0.3, 0.04, 0.06,
+            SJOINT, 0, yaw, 0);
+    }
+    for (let k = -4; k <= 4; k++) {
+      K.box(cx + ax * k * 2, D - 0.01, cz + az * k * 2, 0.06, 0.04, caliMIR_HZ * 2 - 0.3,
+            SJOINT, 0, yaw, 0);
+    }
+  }
+
+  const m = new THREE.Mesh(K.build(), caliVC());
+  m.castShadow = false;                 // two centimetres of kerb throws nothing
+  m.receiveShadow = true;
+  m.frustumCulled = false;              // it spans the town, as the ribbon does
+  root.add(m);
+}
+
 // ============================================================== THE CARRETILLA ==
 // THE MINI, and it solves a pacing problem as well as being one.
 //
@@ -4681,6 +4826,7 @@ function caliBuild(game) {
   caliBuildKites(caliRoot);
   caliBuildLoros(caliRoot);
   caliBuildMirador(game, caliRoot);
+  caliBuildKerbs(game, caliRoot);
   // ...and somebody selling chontaduro on it, which is what the end of the
   // chapter's marquee ride was missing
   const caliMirLife = caliBuildMiradorLife(game, caliRoot);

@@ -914,6 +914,86 @@ function venBuildSquares(game, root) {
     M.box((venPZ_X0 + venPZ_X1) * 0.5, 0.03, z, venPZ_X1 - venPZ_X0 - 3, 0.06, 0.6, PALETTE.venStone);
   }
 
+  // ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ------------------------
+  // The ribs are four and a half metres apart, and between them the trachyte
+  // was one value: measured on the settled frame, half the picture is the
+  // Molo and the Piazzetta with no shape in them at the one-to-three metre
+  // scale, and the Quay's apron reads for the one reason this did not — its
+  // paving has joints. So the fields between the ribs get theirs: the
+  // Istrian pattern is long bands with cross joints, two metres along and a
+  // metre and a half across, a shade darker than the field and a centimetre
+  // and a half proud. The Molo, which has no ribs at all, gets a plain grid,
+  // a wet band along the lip where the Bacino has been slapping at it all
+  // afternoon, a few wet patches back from that, and its drains.
+  //
+  // Everything is drawn, nothing is solid, and it is all in the squares'
+  // merger — no draw call. Every line is laid off the rib spacing and the
+  // square's own rectangles, so a joint lands between two ribs and not
+  // through one; the Molo lines are laid off venMOLO_Z0/Z1 and the Molo
+  // rect's own x extent. y is venTerrain at the piece, plus the proud height,
+  // in pieces short enough that a line never crosses a blend at one number.
+  const venJOINT = 0.015;
+  function joint(x0, z0, x1, z1, w, color) {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const n = Math.max(1, Math.ceil(len / 8));
+    const yaw = Math.atan2(x1 - x0, z1 - z0);
+    for (let k = 0; k < n; k++) {
+      const t0 = k / n, t1 = (k + 1) / n;
+      const cx = lerp(x0, x1, (t0 + t1) * 0.5), cz = lerp(z0, z1, (t0 + t1) * 0.5);
+      M.box(cx, venTerrain(cx, cz) + venJOINT, cz, w, 0.02, len / n + 0.02, color, 0, yaw);
+    }
+  }
+  {
+    const RIB_DX = (venPZ_X1 - venPZ_X0 - 4) / 5;            // the long ribs' pitch
+    const RIB_DZ = (venPT_Z1 - venPZ_Z0 - 6) / 13;           // and the cross ribs'
+    const jz0 = venPZ_Z0 + 1, jz1 = venMOLO_Z0 - 3.5;        // short of the Molo blend
+    // the long joints, one down the middle of each band
+    for (let i = 0; i < 5; i++) {
+      const x = venPZ_X0 + 2 + (i + 0.5) * RIB_DX;
+      joint(x, jz0, x, jz1, 0.10, PALETTE.venTrachyteD);
+    }
+    // the cross joints, two per bay, so a bay is a metre and a half
+    for (let i = 0; i < 13; i++) {
+      const zr = venPZ_Z0 + 3 + i * RIB_DZ;
+      for (let k = 1; k <= 2; k++) {
+        const z = zr + RIB_DZ * (k / 3);
+        if (z > jz1) continue;
+        joint(venPZ_X0 + 1.6, z, venPZ_X1 - 1.6, z, 0.10, PALETTE.venTrachyteD);
+      }
+    }
+    // the drains: one at every third rib crossing, down the middle band
+    for (let i = 1; i < 13; i += 3) {
+      const z = venPZ_Z0 + 3 + i * RIB_DZ;
+      const x = venPZ_X0 + 2 + 2.5 * RIB_DX;
+      M.cyl(x, venTerrain(x, z) + venJOINT, z, 0.32, 0.02, PALETTE.venTrachyteD, 0, 0, 0, 8);
+    }
+  }
+  {
+    // the Molo: its rect is x -40..34, z venMOLO_Z0..venMOLO_Z1, one metre in
+    // from the blend on every side
+    const mx0 = -40 + 1.0, mx1 = 34 - 1.0, mz0 = venMOLO_Z0 + 0.8, mz1 = venMOLO_Z1 - 0.6;
+    for (let x = mx0 + 1.0; x < mx1; x += 2.0) joint(x, mz0, x, mz1, 0.10, PALETTE.venStoneDark);
+    for (let k = 1; k <= 2; k++) {
+      const z = mz0 + (mz1 - mz0) * (k / 3);
+      joint(mx0, z, mx1, z, 0.10, PALETTE.venStoneDark);
+    }
+    // the lip: the last sixty centimetres before the steps, and it is never dry
+    joint(mx0, venMOLO_Z1 - 0.32, mx1, venMOLO_Z1 - 0.32, 0.64, PALETTE.venStoneWet);
+    // the wet patches back from it, where the last wash lay longest
+    let seed = 1562;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    for (let i = 0; i < 8; i++) {
+      const x = lerp(mx0 + 2, mx1 - 2, rnd());
+      const z = venMOLO_Z1 - 1.2 - rnd() * 2.2;
+      M.cyl(x, venTerrain(x, z) + venJOINT - 0.004, z, 0.9 + rnd() * 1.0, 0.02, PALETTE.venStoneWet, 0, rnd() * 0.4, 0, 16);
+    }
+    // and the drains, every twelve metres along the second joint
+    for (let x = mx0 + 6; x < mx1; x += 12) {
+      const z = mz0 + (mz1 - mz0) * (2 / 3);
+      M.cyl(x, venTerrain(x, z) + venJOINT + 0.002, z, 0.30, 0.02, PALETTE.venStoneDark, 0, 0, 0, 8);
+    }
+  }
+
   // ---- the arcades ---------------------------------------------------------
   // Procuratie: three storeys over a colonnade, both long sides of the piazza,
   // and the Ala Napoleonica closing the west end. Built as a helper because the
@@ -2284,6 +2364,58 @@ function venBuildCalli(game, root) {
     }
     M.box(cx, gy + 3.1, cz, 2.3, 0.14, 0.14, PALETTE.venFerro);
     venStaticBox(game, cx, gy + 0.55, cz, 1.9, 1.1, 1.9);
+
+    // ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ----------------------
+    // The campo was one octagon of one value with a well in the middle of
+    // it. Joints across the disc in the same band-and-cross pattern as the
+    // piazza — two metres one way, a metre and a half the other, clipped to
+    // the octagon's inscribed circle so no line runs off the edge — a
+    // darker worn ring round the wellhead where four hundred years of buckets
+    // have been set down, and drain discs at the low corners. The disc's top
+    // is a drawn plane at gy + 0.12, so the lines sit on THAT, not on the
+    // terrain under it. Drawn, not solid, in the calli merger.
+    {
+      const top = gy + 0.12 + 0.015;
+      const R = 8.5 * Math.cos(Math.PI / 8) - 0.35;
+      for (let o = -6; o <= 6; o += 2) {
+        const h = Math.sqrt(R * R - o * o);
+        M.box(cx + o, top, cz, 0.10, 0.02, h * 2, PALETTE.venTrachyteD);
+      }
+      for (let o = -6; o <= 6; o += 1.5) {
+        const h = Math.sqrt(R * R - o * o);
+        M.box(cx, top, cz + o, h * 2, 0.02, 0.10, PALETTE.venTrachyteD);
+      }
+      M.cyl(cx, top + 0.004, cz, 1.9, 0.02, PALETTE.venStoneWet, 0, 0, 0, 8);
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI * 0.5 + Math.PI * 0.25;
+        M.cyl(cx + Math.cos(a) * 5.2, top + 0.006, cz + Math.sin(a) * 5.2, 0.28, 0.02,
+              PALETTE.venTrachyteD, 0, 0, 0, 8);
+      }
+    }
+  }
+
+  // ---- and the fondamenta's edge, along the rio -----------------------------
+  // The bank is a metre and a half of one value between the retaining wall
+  // and the house fronts. A darker band along the lip — the half-metre that
+  // is always damp — laid at the rio's own cut line (venRIO_W / 2 + 2.2 is
+  // where the terrain starts to fall), in pieces with the terrain sampled
+  // under each, and broken at the bridges exactly where the wall is.
+  for (let s = -1; s <= 1; s += 2) {
+    const x = venRIO_X + s * (venRIO_W * 0.5 + 2.2 + 0.30);
+    const cuts = [venCAL_Z0 + 0.5];
+    for (let k = 0; k < venRIO_BRIDGES.length; k++) {
+      cuts.push(venRIO_BRIDGES[k] - 1.9, venRIO_BRIDGES[k] + 1.9);
+    }
+    cuts.push(venCAL_Z1 - 0.5);
+    for (let k = 0; k + 1 < cuts.length; k += 2) {
+      const z0 = cuts[k], z1 = cuts[k + 1];
+      const n = Math.max(1, Math.ceil((z1 - z0) / 8));
+      for (let p = 0; p < n; p++) {
+        const za = lerp(z0, z1, p / n), zb = lerp(z0, z1, (p + 1) / n);
+        const zc = (za + zb) * 0.5;
+        M.box(x, venTerrain(x, zc) + 0.015, zc, 0.5, 0.02, zb - za + 0.02, PALETTE.venStoneWet);
+      }
+    }
   }
 
   const mesh = new THREE.Mesh(M.build(), venVC());

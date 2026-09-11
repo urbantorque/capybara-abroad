@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // and the two shape-type constants it must ignore. See sysCamClear.
 import * as CANNON from 'cannon-es';
 import { PALETTE, mat, grain, TASKS, tasksInChapter, wowOfChapter, chapterCount, rand, randInt, clamp, damp, lerp,
-         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY,
+         CHAPTERS, chapterOf, chapterDef, RECORDS, FINDS, grainTick, wetTick, shoreTick, shoreY, cloudSet,
          rimTick, cloudTick, skyTick, fresnelTick, paleTick, shadeTick, bounceSlots, bounceTick, selfRimTick, contactSlots, contactTick, swayTick, wakeTick, spillSlots, spillTick,
          leafTick, rimInfo, calmOn, calmSet, calmPreference,
          shadeEnable, skyOccTick, shadeInfo,
@@ -1401,6 +1401,10 @@ const sysPHOTO_VIG = 0.10;
 // blacker, so it fades out as the lift comes in.
 const sysPHOTO_LIFT = 0.085;
 let sysSceneLit = 1;
+// the cloud shadows' strength (L3, E2): a floor under any sun, and more under a cloud
+const sysCLOUD_SHADOW_BASE = 0.20;
+const sysCLOUD_SHADOW_MORE = 0.16;
+let sysCloudForce = -1;   // the harness: a fixed strength, or -1 for the weather's
 // Reused by the core event handlers: they run on every prop impact in the game
 // and update() may not allocate. `at` is nulled after every use so a stale
 // position can never be inherited by the next caller.
@@ -32164,6 +32168,8 @@ export function createSystems(game) {
   game.hidden = function () { return sysHideNow; };
   /** The registry, for the harness. */
   game.hides = function () { return sysHides.slice(); };
+  /** The harness: force the cloud shadows' strength (L3, E2); -1 gives it back to the weather. */
+  game.cloudForce = function (k) { sysCloudForce = typeof k === 'number' ? k : -1; };
   /** What it is hidden in ('' when it is not), for the row. */
   game.hiddenIn = function () { return sysHideNow > 0.5 ? sysHideKind : ''; };
   function hideTick(dt) {
@@ -37401,6 +37407,17 @@ export function createSystems(game) {
     // and a black JPEG. See sysPHOTO_LIFT.
     sysSceneLit = clamp((hemi.intensity * 0.55 + amb.intensity * 0.9 +
                          sun.intensity * 0.35) / 1.30, 0, 1);
+    // ---- CLOUD SHADOWS (L3, E2). See _cloudK in shared.js. A floor of them
+    // whenever there is a sun to cast one (scattered cloud is what a sky
+    // mostly is), more while the weather has a cloud in front of it, none
+    // under a moon or a mountain, none under prefers-reduced-motion — a
+    // field that drifts is motion. The daylight term is the sun's own share
+    // of sysSceneLit, so Iceland at midnight gets nothing.
+    {
+      const day = clamp((sun.intensity * 0.35 / 1.30) / 0.32, 0, 1) * clamp((sysSceneLit - 0.35) / 0.4, 0, 1);
+      const cv = (game.weather && typeof game.weather.cloud === 'function') ? clamp(game.weather.cloud(), 0, 1) : 0;
+      cloudSet(sysCloudForce >= 0 ? sysCloudForce : sysCalmOn() ? 0 : day * (sysCLOUD_SHADOW_BASE + cv * sysCLOUD_SHADOW_MORE));
+    }
     sysDressFrame(dt);
     // ...and the bed the atmosphere is heard over. Immediately after the
     // picture, because it is the other half of the same state: the shower that

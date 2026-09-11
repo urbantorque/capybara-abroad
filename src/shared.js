@@ -4144,6 +4144,20 @@ export function dampAngle(current, target, lambda, dt) {
 // `uniform.value` at draw time, so moving the water in eight chapters at once is
 // a single float write per frame and no per-material work whatsoever.
 const _grainTime = { value: 0 };
+// ---- CLOUD SHADOWS (L3, E2) ------------------------------------------------
+// Every chapter opts into the broad octave — a static warm/cool field at
+// about seventeen metres — and the weather's passing cloud only ever dimmed
+// the sun globally (wxCLOUD_SUN), a shape-less fade. This is the shape: a
+// second, slower value field on world XZ, DRIFTING with time, multiplied
+// into the albedo of every grained surface by one uniform that systems.js
+// writes each frame from the weather's cloud pulse and the daylight
+// (nothing casts a cloud shadow at night, or in a cave). The flat slabs the
+// art review named get slow moving value across them for one vec2 add in a
+// shader that is already running. `cloud: 0` on a grain() call opts a
+// material out; the default is in.
+const _cloudK = { value: 0 };
+export function cloudSet(k) { _cloudK.value = k > 0 ? (k < 1 ? k : 1) : 0; }
+export function cloudGet() { return _cloudK.value; }
 /** Advance the sparkle clock. systems.js calls this once per frame. */
 export function grainTick(t) { _grainTime.value = t; }
 
@@ -4800,6 +4814,8 @@ export function grain(m, opts) {
   // fine field, and at sixteen metres there is nothing to stretch.
   const broad = o.broad === undefined ? 0 : o.broad;
   const broadM = o.broadM === undefined ? 16 : o.broadM;
+  // cloud shadows: a multiplier on the shared uniform, 1 by default (see _cloudK)
+  const cloud = o.wetOnly === true ? 0 : (o.cloud === undefined ? 1 : o.cloud);
   // How the per-channel gain splits. Red rises fastest and blue slowest, so
   // the bright half of the field is the warm half. Not in PALETTE because it
   // is not a colour — it is the shape of a ramp, exactly like MAIN_SPLIT_WARM.
@@ -4891,7 +4907,7 @@ export function grain(m, opts) {
               '|' + shore + '|' + shoreBand + '|' + shoreDark + '|' + shoreWet + '|' + shoreDeep +
               '|' + shoreTint + '|' + shoreTintC + '|' + shoreCol + '|' + shoreScale +
               '|' + fres + '|' + fresPow + '|' + nearPale +
-              '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol;
+              '|' + speck + '|' + speckScale + '|' + speckCut + '|' + speckCol + '|' + cloud;
   const hit = _grainCache.get(key);
   if (hit) return hit;
 
@@ -4915,7 +4931,8 @@ export function grain(m, opts) {
   // and it already has the sparkle doing the same job better.
   const wet = spark <= 0;
   g.onBeforeCompile = function (shader) {
-    if (spark > 0 || shore > 0) shader.uniforms.uGrainT = _grainTime;
+    if (spark > 0 || shore > 0 || cloud > 0) shader.uniforms.uGrainT = _grainTime;
+    if (cloud > 0) shader.uniforms.uCloudK = _cloudK;
     if (shore > 0) shader.uniforms.uShoreY = _shoreY;
     if (wet) {
       shader.uniforms.uGrainWet = _grainWet;
@@ -4957,7 +4974,8 @@ export function grain(m, opts) {
         wet ? 'varying vec3 vGrainN;' : '',
         wet ? 'uniform float uGrainWet;' : '',
         wet ? 'uniform vec3 uGrainWetC;' : '',
-        (spark > 0 || shore > 0) ? 'uniform float uGrainT;' : '',
+        (spark > 0 || shore > 0 || cloud > 0) ? 'uniform float uGrainT;' : '',
+        cloud > 0 ? 'uniform float uCloudK;' : '',
         shore > 0 ? 'uniform float uShoreY;' : '',
         cont > 0 ? 'uniform vec4 uCtcP[' + _CONTACT_N + '];' : '',
         cont > 0 ? 'uniform float uCtcK[' + _CONTACT_N + '];' : '',
@@ -5041,6 +5059,16 @@ export function grain(m, opts) {
         (wetOnly || broad <= 0) ? '' : '  vec2 gbq = vGrainW.xz * ' + (1 / broadM).toFixed(5) + ' + 7.13;',
         (wetOnly || broad <= 0) ? '' : '  gbq += gn * 0.8;',
         (wetOnly || broad <= 0) ? '' : '  float gb = (grNoise(gbq) - 0.5) * ' + broad.toFixed(4) + ';',
+        // ---- CLOUD SHADOWS (L3, E2). See _cloudK. Two octaves of the same
+        // value noise at ~12 m and ~5 m, drifting at about half a metre a
+        // second, thresholded so a cloud is a SHAPE with an edge and not a
+        // wash; the strength is the frame's uniform.
+        cloud > 0 ? '  float gc = 0.0;' : '',
+        cloud > 0 ? '  if (uCloudK > 0.001) {' : '',
+        cloud > 0 ? '    vec2 gcq = vGrainW.xz * 0.083 + vec2(uGrainT * 0.036, uGrainT * 0.015) + 21.3;' : '',
+        cloud > 0 ? '    float gcn = grNoise(gcq) * 0.62 + grNoise(gcq * 2.31 + 4.9) * 0.38;' : '',
+        cloud > 0 ? '    gc = smoothstep(0.44, 0.66, gcn) * uCloudK * ' + cloud.toFixed(3) + ';' : '',
+        cloud > 0 ? '  }' : '',
         // ONE multiply, not two: a second `*=` on the same channel compounds,
         // so a chapter that tuned `amount` against the picture would quietly
         // get a different number back the day it opted into `near`. The broad
@@ -5069,6 +5097,7 @@ export function grain(m, opts) {
                          ? ' + gb * vec3(' + _BROAD_K[0].toFixed(3) + ', ' +
                            _BROAD_K[1].toFixed(3) + ', ' + _BROAD_K[2].toFixed(3) + ')'
                          : '') + ';',
+        cloud > 0 ? '  diffuseColor.rgb *= 1.0 - gc;' : '',
         speck > 0 ? '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(' +
                     skc.r.toFixed(4) + ', ' + skc.g.toFixed(4) + ', ' + skc.b.toFixed(4) + '), skM * ' +
                     speck.toFixed(4) + ');' : '',

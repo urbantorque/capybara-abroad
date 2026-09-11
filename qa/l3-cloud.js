@@ -1,0 +1,18 @@
+async page => {
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.goto('http://localhost:5188/')
+  await page.waitForTimeout(5000)
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(8000)
+  await page.evaluate(() => window.__capy.cloudForce(0))
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: 'qa/l3-cloud-off.png' })
+  await page.evaluate(() => window.__capy.cloudForce(0.6))
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: 'qa/l3-cloud-on.png' })
+  await page.evaluate(() => window.__capy.cloudForce(-1))
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: 'qa/l3-cloud-a.png' })
+  const r = await page.evaluate(() => ({ err: window.__capy.state.lastError || null, biome: window.__capy.biome.current }))
+  await page.evaluate((o) => fetch('/shot?name=l3-cloud.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o))))}), r)
+}

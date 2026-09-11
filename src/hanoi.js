@@ -867,6 +867,7 @@ function hanBuildStreets(game, root) {
       px = x; pz = z; pnx = nx; pnz = nz; have = true;
     }
   }
+  hanStreetGraphics(K);
   const m = new THREE.Mesh(K.build(), hanVC());
   m.receiveShadow = true; m.castShadow = false;
   root.add(m);
@@ -874,6 +875,163 @@ function hanBuildStreets(game, root) {
   mb.receiveShadow = true; mb.castShadow = false;
   root.add(mb);
   hanPoolDone(game, body);
+}
+
+// ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) --------------------------
+/**
+ * HALF THE SETTLED FRAME WAS ONE VALUE. The asphalt quads and the concrete
+ * under them are each one colour from the kerb foot to the horizon, and
+ * grain() cannot fix that on its own: it is a texture ON a value and the
+ * complaint is the value. The Quay's apron reads for exactly one reason — its
+ * paving has joints — and a street has the same thing at the one-to-three
+ * metre scale, only it calls them edges and scars: the gutter along the kerb
+ * foot, a manhole every so often, tar over last year's trench, a faded dash
+ * down the middle, and the zebra where two streets meet.
+ *
+ * All of it is drawn and none of it is solid — the tallest thing here is two
+ * centimetres — and all of it goes into the asphalt merger, so it costs no
+ * draw call and about four thousand triangles: the stripes and the paint are
+ * quads, two triangles each, not boxes.
+ *
+ * Every line is walked off the same four centrelines the asphalt and the kerbs
+ * are, at the same HALF = w + 0.5, so a stripe lands on the drawn edge and not
+ * on a hand-typed guess of it; the crossings are found by intersecting the
+ * polylines rather than by writing down where they seem to meet. y is sampled
+ * from hanTerrain plus the asphalt's own 0.04 plus the proud height at every
+ * corner — the streets are flat, and that is not a reason to write a flat
+ * number.
+ */
+const hanZEBRA_SET = 2.4;          // m clear of the other street's kerb
+function hanLaneCrossings() {
+  hanInitLanes();
+  const out = [];
+  for (let A = 0; A < hanLANES.length; A++) {
+    for (let B = A + 1; B < hanLANES.length; B++) {
+      const la = hanLANES[A], lb = hanLANES[B];
+      const na = la.closed ? la.pts.length : la.pts.length - 1;
+      const nb = lb.closed ? lb.pts.length : lb.pts.length - 1;
+      for (let i = 0; i < na; i++) {
+        for (let j = 0; j < nb; j++) {
+          const p = la.pts[i], q = la.pts[(i + 1) % la.pts.length];
+          const r = lb.pts[j], s2 = lb.pts[(j + 1) % lb.pts.length];
+          const dx1 = q[0] - p[0], dz1 = q[1] - p[1];
+          const dx2 = s2[0] - r[0], dz2 = s2[1] - r[1];
+          const den = dx1 * dz2 - dz1 * dx2;
+          if (Math.abs(den) < 1e-6) continue;
+          const t = ((r[0] - p[0]) * dz2 - (r[1] - p[1]) * dx2) / den;
+          const u = ((r[0] - p[0]) * dz1 - (r[1] - p[1]) * dx1) / den;
+          if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+          out.push({ A: A, sA: hanLaneLen[A][i] + t * (hanLaneLen[A][i + 1] - hanLaneLen[A][i]),
+                     B: B, sB: hanLaneLen[B][j] + u * (hanLaneLen[B][j + 1] - hanLaneLen[B][j]) });
+        }
+      }
+    }
+  }
+  return out;
+}
+function hanStreetGraphics(K) {
+  let seed = 19010;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  const yAt = (x, z, lift) => hanTerrain(x, z) + 0.04 + lift;
+  /** A flat strip between two lane samples, from lateral offset o0 to o1
+   *  (signed along the lane's normal), in the asphalt quad's own winding. */
+  function strip(px, pz, pnx, pnz, cx, cz, nx, nz, o0, o1, lift, color) {
+    const ax = px + pnx * o0, az = pz + pnz * o0, bx = px + pnx * o1, bz = pz + pnz * o1;
+    const qx = cx + nx * o1, qz = cz + nz * o1, dx = cx + nx * o0, dz = cz + nz * o0;
+    K.quad(ax, yAt(ax, az, lift), az, bx, yAt(bx, bz, lift), bz,
+           qx, yAt(qx, qz, lift), qz, dx, yAt(dx, dz, lift), dz, color);
+  }
+  for (let L = 0; L < hanLANES.length; L++) {
+    const lane = hanLANES[L];
+    const total = hanLaneTotal[L];
+    const HALF = lane.w + 0.5;
+    // ---- the two stripes along each edge, in 3 m pieces so they take the
+    // bends the way the kerb does. Outermost is the kerb foot — the line the
+    // kerb's own shadow makes, two steps down from the road — and inside it
+    // the gutter, one step down. Neither is a colour the palette did not
+    // already have on this street.
+    const n = Math.ceil(total / 3.0);
+    let px = 0, pz = 0, pnx = 0, pnz = 0, have = false;
+    for (let i = 0; i <= n; i++) {
+      hanLaneAtS(L, (i / n) * total, hanTmp);
+      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const x = hanTmp.x, z = hanTmp.z;
+      if (have) {
+        for (let sd = -1; sd <= 1; sd += 2) {
+          const a = (HALF - 0.14) * sd, b = HALF * sd;
+          strip(px, pz, pnx, pnz, x, z, nx, nz, Math.min(a, b), Math.max(a, b), 0.014, PALETTE.hanCable);
+          const c = (HALF - 0.30) * sd, d = (HALF - 0.14) * sd;
+          strip(px, pz, pnx, pnz, x, z, nx, nz, Math.min(c, d), Math.max(c, d), 0.012, PALETTE.hanShopDk);
+        }
+      }
+      px = x; pz = z; pnx = nx; pnz = nz; have = true;
+    }
+    // ---- the centreline: a dash every six metres, and it is FADED. Nobody
+    // in this city has looked at a lane marking in years, which is why it is
+    // the kerb's colour and not white.
+    for (let s = 3.0; s + 2.0 < total; s += 6.0) {
+      hanLaneAtS(L, s, hanTmp); hanLaneAtS(L, s + 2.0, hanTmp2);
+      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const mx = Math.cos(hanTmp2.yaw), mz = -Math.sin(hanTmp2.yaw);
+      strip(hanTmp.x, hanTmp.z, nx, nz, hanTmp2.x, hanTmp2.z, mx, mz, -0.06, 0.06, 0.010, PALETTE.hanKerb);
+    }
+    // ---- a manhole every twenty-five metres or so, off the centre, and the
+    // one thing here with any height: a centimetre.
+    for (let s = 9.0 + rnd() * 8; s < total - 4; s += 21 + rnd() * 8) {
+      hanLaneAtS(L, s, hanTmp);
+      const off = (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * (HALF - 1.6));
+      const x = hanTmp.x + Math.cos(hanTmp.yaw) * off, z = hanTmp.z - Math.sin(hanTmp.yaw) * off;
+      K.cyl(x, yAt(x, z, 0.0), z, 0.30, 0.02, PALETTE.hanShopDk, 0, rnd() * 0.5, 0, 12);
+    }
+    // ---- tar patches: a trench was dug and filled, roughly, every twenty
+    // metres. Four corners nobody measured, a shade blacker than the road.
+    for (let s = 6.0 + rnd() * 10; s < total - 4; s += 16 + rnd() * 12) {
+      hanLaneAtS(L, s, hanTmp);
+      const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+      const tx = Math.sin(hanTmp.yaw), tz = Math.cos(hanTmp.yaw);
+      const off = (rnd() - 0.5) * (HALF - 2.2) * 2;
+      const w = 0.6 + rnd() * 0.7, l = 0.7 + rnd() * 1.1;
+      const cx = hanTmp.x + nx * off, cz = hanTmp.z + nz * off;
+      const c4 = [];
+      for (let k = 0; k < 4; k++) {
+        const sw = (k === 1 || k === 2) ? 1 : -1, sl = (k >= 2) ? 1 : -1;
+        const jw = w * (0.8 + rnd() * 0.4), jl = l * (0.8 + rnd() * 0.4);
+        c4.push(cx + nx * jw * sw + tx * jl * sl, cz + nz * jw * sw + tz * jl * sl);
+      }
+      K.quad(c4[0], yAt(c4[0], c4[1], 0.006), c4[1], c4[2], yAt(c4[2], c4[3], 0.006), c4[3],
+             c4[4], yAt(c4[4], c4[5], 0.006), c4[5], c4[6], yAt(c4[6], c4[7], 0.006), c4[7],
+             PALETTE.hanTyre);
+    }
+  }
+  // ---- the zebras, on every arm of every junction the four polylines make.
+  // Bars along the traffic, half a metre wide and half a metre apart, from
+  // gutter to gutter; set back clear of the other street's kerb so they do
+  // not run into the junction itself.
+  const X = hanLaneCrossings();
+  for (let i = 0; i < X.length; i++) {
+    for (let side = 0; side < 2; side++) {
+      const L = side ? X[i].B : X[i].A, s0 = side ? X[i].sB : X[i].sA;
+      const other = side ? X[i].A : X[i].B;
+      const lane = hanLANES[L], total = hanLaneTotal[L];
+      const HALF = lane.w + 0.5;
+      const set = hanLANES[other].w + 0.5 + hanZEBRA_SET;
+      for (let dir = -1; dir <= 1; dir += 2) {
+        const sa = s0 + dir * set, sb = sa + dir * 2.4;
+        const lo = Math.min(sa, sb), hi = Math.max(sa, sb);
+        if (!lane.closed && (lo < 0 || hi > total)) continue;
+        hanLaneAtS(L, lo, hanTmp); hanLaneAtS(L, hi, hanTmp2);
+        const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
+        const mx = Math.cos(hanTmp2.yaw), mz = -Math.sin(hanTmp2.yaw);
+        const span = 2 * (HALF - 0.45);
+        const nb = Math.floor(span / 1.0);
+        const start = -(nb - 1) * 0.5;
+        for (let b = 0; b < nb; b++) {
+          const o = start + b * 1.0;
+          strip(hanTmp.x, hanTmp.z, nx, nz, hanTmp2.x, hanTmp2.z, mx, mz, o - 0.25, o + 0.25, 0.016, PALETTE.hanTrim);
+        }
+      }
+    }
+  }
 }
 
 // ============================================================ THE QUARTER ====
