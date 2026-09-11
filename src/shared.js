@@ -3071,8 +3071,10 @@ export const TASKS = [
   // reason a capybara can get onto a moving car at all.
   { id: 'the-hairpin',  text: 'Take the Fairmont hairpin on the roof',  chapter: 18, act: 3,
     mini: 'LE GRAND VIRAGE' },
-  { id: 'the-tunnel',   text: 'Ride a race car’s roof through the tunnel, flat out', chapter: 18, act: 3,
-    wow: 'THE TUNNEL RUN' },
+  // The marquee, and it is yours to drive (X1): the red car on the grid, one
+  // lap of the circuit against the pack, through the tunnel.
+  { id: 'the-tunnel',   text: 'Drive the red car one lap of the circuit and pass the pack', chapter: 18, act: 3,
+    wow: 'THE GRAND PRIX' },
 
   // ---- Chapter 19: Hanoi --------------------------------------------------
   // THE THIRTY-SIX STREETS, THE LAKE, AND THE LINE — and the three acts are
@@ -3425,7 +3427,7 @@ export const CHAPTERS = [
     hint: 'the first place that minds you being here', open: 'somewhere in this town is the first person who will mind.',
     way: 'the steps of the Casino',
     keep: 'a mother-of-pearl plaque', win: 3,
-    marquee: { x: 152, z: -12, up: 4, say: 'the tunnel under the hotel' },
+    marquee: { x: 14, z: -96, up: 4, say: 'the red car on the grid, in front of the stand' },
     note: 'The first place in the world that asked what you thought you were doing.',
     acts: [
       { kick: 'THE PORT', line: 'it is twenty past eight. everything is switched on.' },
@@ -3899,7 +3901,7 @@ export const RECORDS = {
   // is nine and a half metres of yacht and is simply funny.
   'chip-stack':      { label: 'left the table', unit: ' up', better: 'higher', dp: 0, par: 20 },
   'the-floor':       { label: 'across in', unit: ' s', better: 'lower', dp: 1 },
-  'the-tunnel':      { label: 'through it at', unit: ' m/s', better: 'higher', dp: 1, par: 22 },
+  'the-tunnel':      { label: 'the lap in', unit: ' s', better: 'lower', dp: 1, par: 38 },
   'the-hairpin':     { label: 'rode', unit: ' m of the lap', better: 'higher', dp: 0 },
   'high-dive':       { label: 'went in from', unit: ' m up', better: 'higher', dp: 1, par: 9 },
   // Chapter 19, and the first of these is the best question in the game: not

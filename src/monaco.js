@@ -253,6 +253,62 @@ const monROOF_HX   = 0.94, monROOF_HZ = 2.10;
 const monRIDE_GRACE = 0.30;       // s the ride survives a frame outside the box
 const monCAR_HY    = 0.0;         // ...so the body origin IS the road
 
+// ============================================================ THE GRAND PRIX ==
+// THE MARQUEE, AND IT IS YOURS TO DRIVE (X1).
+//
+// Three acts of this chapter happen on the roof of somebody else's car, and
+// the biggest thing in it — the tunnel — was four and a half seconds of being
+// carried. The red car on the grid at Sainte-Devote is the one you drive: E at
+// the door, a three-light start, and one lap of the same nineteen-node
+// polyline the pack runs on, with the pack set off ahead of you to be passed.
+//
+// IT IS A RAIL RACER, and that is the whole reason it can be chill. The road
+// is a centreline (see the chiva road, the Uji run): the car has an arclength
+// and a lateral offset, throttle moves the first and the wheel moves the
+// second, and the kerb is a number. Nothing can leave the circuit, nothing can
+// spin, and a corner taken too fast does the one thing a corner does — pushes
+// the car wide, onto the kerb, where it rumbles and loses way — rather than
+// the eleven things a physics car does. The pack are kinematic and so is
+// this; contact between them is analytic (a gap and a lane), and being behind
+// one in its lane simply holds you to its speed until you move over.
+const monME_VMAX   = 32.0;        // m/s. Over the pack's 26.5 (28.6 for the quick one) — you are meant to win
+const monME_ACC    = 12.0;        // m/s²
+const monME_BRAKE  = 20.0;
+const monME_DRAG   = 3.0;         // off the throttle
+const monME_LAT    = 3.3;         // m either side of the centreline the tarmac allows
+const monME_STEER  = 5.2;         // m/s of lateral at full lock, with way
+const monME_GRIP   = 1.32;        // × the pack's corner speed before you push wide
+const monME_PUSH   = 4.5;         // m/s of lateral push per unit of excess
+const monME_KERB_K = 4.0;         // /s of way lost on the kerb
+const monME_LANE   = 1.9;         // m of lateral gap that is "beside" rather than "behind"
+const monME_NOSE   = 4.8;         // m of arclength that is "on top of" another car
+const monME_DOOR_R = 4.2;         // m from the car E takes the wheel
+const monME_GRID_S = -7;          // m before the line the red car waits
+// THE LINE IS IN FRONT OF THE STAND, not at Sainte-Devote: the harbour
+// straight is the one open stretch of the lap, the forty-six people on the
+// fence are right there, and a camera parked thirteen metres behind a car at
+// the bottom of the ravine was inside the hill. Measured: the grid shot was
+// the back of the car and nothing else.
+function monMeLineS() { monInitTrack(); return monTrackLen[13] - 10; }
+const monME_GRID_L = -2.2;        // ...and on the left of the road
+const monME_LIGHTS = 3;           // the start: three ticks and a chime
+const monME_STEP_T = 0.9;         // s between them
+let monMeG = null, monMeBody = null;
+let monMeS = 0, monMeV = 0, monMeLat = 0, monMeYaw = 0, monMeLean = 0;
+let monMeTX = 0, monMeTY = 0, monMeTZ = 0;
+let monRaceOn = false;            // at the wheel
+let monRaceT = -1;                // s since GO; < 0 is the lights
+let monRaceLights = 0;
+let monRaceLap = 0;               // laps completed at the wheel this visit
+let monRaceDone = false;
+let monRacePassed = 0;
+const monRaceAhead = [];          // per pack car: was it ahead last frame
+let monMeKerbT = 0, monMeBumpT = 0, monMeBoreIn = false, monMeMover = null;
+let monMeDist = 0;                // m driven since GO — the lap is a distance, not a seam
+let monRaceBest = 0;
+let monRaceCool = 0;
+let monRaceToldWide = false;
+
 // ------------------------------------------------------------------ the eye --
 // Five people looking at one room. See THE EYE at the top of the file.
 const monEYE_RANGE = 15.0;        // metres a sweep reaches
@@ -2592,9 +2648,78 @@ const monCAR_SEE = 18;
 // One per car, spread either side of 1. Fixed rather than random: a record
 // that depends on which car you got on must not also depend on the seed.
 const monCarPace = [1.00, 0.920, 1.080];
+// ...and each keeps a lane (X1): a pack you have to pick a side of, rather than
+// one you pass on either side of at will.
+const monCarLat = [0.0, 1.3, -1.3];
 const monCAR_TOW = 32;
 const monCAR_TOW_K = 1.08;
 
+/**
+ * THE RED CAR, AND THE LINE. Same mesh, same two-box collider as the pack, so
+ * the roof act works on it too; parked on the grid until somebody takes it.
+ */
+function monBuildGrid(game, root) {
+  monInitTrack();
+  monMeG = monBuildCar(monCAR_COL[1]);
+  root.add(monMeG);
+  const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
+                              material: (game.mats && game.mats.prop) || undefined });
+  b.allowSleep = false;
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.96, 0.475, 2.15)), new CANNON.Vec3(0, 0.475, 0));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.16, 0.24, 0.86)), new CANNON.Vec3(-0.80, 1.19, -0.55));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.16, 0.24, 0.86)), new CANNON.Vec3(0.80, 1.19, -0.55));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.90, 0.24, 0.16)), new CANNON.Vec3(0, 1.14, -1.52));
+  b.addShape(new CANNON.Box(new CANNON.Vec3(0.90, 0.24, 0.16)), new CANNON.Vec3(0, 1.14, 0.36));
+  game.world.addBody(b);
+  monMeBody = b;
+  monMeToGrid();
+  // the line: a chequered strip across the road, in front of the stand
+  const K = monMerger();
+  monTrackAt(monMeLineS(), monTrackTmp);
+  const yaw = monTrackTmp.yaw;
+  const c = Math.cos(yaw), sn = Math.sin(yaw);
+  for (let i = 0; i < 12; i++) {
+    const lx = -monTRACK_HALF + (i + 0.5) * (monTRACK_HALF * 2 / 12);
+    for (let r = 0; r < 2; r++) {
+      const lz = (r - 0.5) * 0.5;
+      const wx = monTrackTmp.x + lx * c + lz * sn, wz = monTrackTmp.z - lx * sn + lz * c;
+      K.box(wx, monTrackTmp.y + 0.03, wz, monTRACK_HALF * 2 / 12, 0.02, 0.5,
+            ((i + r) & 1) ? PALETTE.monMarble : PALETTE.monCarDk, 0, yaw, 0);
+    }
+  }
+  const m = new THREE.Mesh(K.build(), monVCF());
+  m.receiveShadow = true;
+  root.add(m);
+}
+/** Park the red car on the grid, engine off. */
+function monMeToGrid() {
+  monMeS = monMeLineS() + monME_GRID_S; monMeV = 0; monMeLat = monME_GRID_L;
+  monMePlace(0);
+  monSyncBody(monMeBody);
+  monMeG.position.copy(monMeBody.position);
+  monMeG.quaternion.copy(monMeBody.quaternion);
+}
+/** Write the red car's pose from (s, lat). dt 0 parks it. */
+function monMePlace(dt) {
+  monTrackAt(monMeS, monTrackTmp);
+  const yaw = monTrackTmp.yaw;
+  const c = Math.cos(yaw), sn = Math.sin(yaw);
+  const tx = monTrackTmp.x + monMeLat * c, tz = monTrackTmp.z - monMeLat * sn;
+  const ty = monTrackTmp.y + monCAR_HY;
+  const b = monMeBody;
+  if (dt > 0) {
+    b.velocity.set((tx - monMeTX) / dt, (ty - monMeTY) / dt, (tz - monMeTZ) / dt);
+    let dy = yaw - monMeYaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    b.angularVelocity.set(0, dy / dt, 0);
+  } else {
+    b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+    b.position.set(tx, ty, tz);
+    b.quaternion.setFromEuler(0, yaw, 0);
+  }
+  monMeTX = tx; monMeTY = ty; monMeTZ = tz; monMeYaw = yaw;
+}
 function monBuildCars(game, root) {
   monInitTrack();
   monCarRoot = new THREE.Group();
@@ -2708,7 +2833,8 @@ function monUpdateCars(game, dt) {
                        : Math.max(want, monCarV[i] + a * dt);
     monCarU[i] = (monCarU[i] + monCarV[i] * dt) % monTrackTotal;
     monTrackAt(monCarU[i], monTrackTmp);
-    const tx = monTrackTmp.x, tz = monTrackTmp.z, ty = monTrackTmp.y + monCAR_HY;
+    const lc = Math.cos(monTrackTmp.yaw), ls = Math.sin(monTrackTmp.yaw);
+    const tx = monTrackTmp.x + monCarLat[i] * lc, tz = monTrackTmp.z - monCarLat[i] * ls, ty = monTrackTmp.y + monCAR_HY;
     const b = monCarBody[i];
     // RULE 3: the difference is taken against the PREVIOUS TARGET, never
     // against the body's own position — cannon integrates a kinematic body
@@ -2767,6 +2893,227 @@ function monUpdateCars(game, dt) {
     }
   }
   monUpdateRide(game, dt);
+  monUpdateRace(game, dt);   // X1
+}
+
+/**
+ * THE GRAND PRIX, ONCE PER FRAME. See the constants block.
+ */
+function monRaceTake(game) {
+  const capy = game.capy;
+  monRaceOn = true; monRaceCool = 0.4;
+  if (capy) { capy.atHelm = true; capy.rideBody = monMeBody; }
+  monRaceT = -monME_LIGHTS * monME_STEP_T - 0.4; monRaceLights = 0;
+  monRacePassed = 0; monRaceToldWide = false; monMeDist = 0;
+  // the pack: set off ahead of you, staggered across the road, from a
+  // standing start — a grid, not a rolling lap
+  for (let j = 0; j < monCarG.length; j++) {
+    monCarU[j] = (monMeLineS() + 2 + j * 8) % monTrackTotal;
+    monCarV[j] = 0;
+    monRaceAhead[j] = true;
+  }
+  monSfx('chime', { volume: 0.6, pitch: 0.9 });
+  monToast('W throttle · S brake · A/D steer · one lap, and pass all three · E to get out');
+}
+function monRaceLeave(game) {
+  const capy = game.capy;
+  monRaceOn = false; monRaceCool = 0.4;
+  if (capy) { capy.atHelm = false; if (capy.rideBody === monMeBody) capy.rideBody = null; }
+  if (capy && capy.body) {
+    // out of the door, onto the road beside the car, standing still
+    const c = Math.cos(monMeYaw), sn = Math.sin(monMeYaw);
+    const ox = monMeTX + 2.4 * c, oz = monMeTZ - 2.4 * sn;
+    capy.body.position.set(ox, monMeTY + 0.9, oz);
+    capy.body.velocity.set(0, 0, 0);
+    capy.body.previousPosition.copy(capy.body.position);
+    capy.body.interpolatedPosition.copy(capy.body.position);
+    if (capy.position) capy.position.set(ox, monMeTY + 0.9, oz);
+  }
+  if (monRaceT < 0) monRaceT = -1;
+}
+function monUpdateRace(game, dt) {
+  if (!monMeG || dt <= 0) return;
+  const input = game.input, capy = game.capy;
+  if (monRaceCool > 0) monRaceCool -= dt;
+  // ---- the door -----------------------------------------------------------
+  if (capy && capy.body && input && input.actionPressed && monRaceCool <= 0) {
+    if (monRaceOn) {
+      if (Math.abs(monMeV) > 5.0) monToast('slow down first.');
+      else monRaceLeave(game);
+    } else if (!capy.carriedBy && !capy.atHelm && !capy.climbing) {
+      const dx = capy.body.position.x - monMeTX, dz = capy.body.position.z - monMeTZ;
+      const dy = capy.body.position.y - monMeTY;
+      if (dx * dx + dz * dz < monME_DOOR_R * monME_DOOR_R && dy > -2 && dy < 3) monRaceTake(game);
+    }
+  }
+  if (!monRaceOn) {
+    // parked: it rolls to a stop wherever it was left, and goes back to the
+    // grid once nobody is near it — so the next lap starts from the line
+    if (monMeV > 0) { monMeV = Math.max(0, monMeV - monME_BRAKE * dt); monMeS += monMeV * dt; monMePlace(dt); }
+    else if (capy && capy.position && Math.abs(monMeS - (monMeLineS() + monME_GRID_S)) > 1 &&
+             Math.hypot(capy.position.x - monMeTX, capy.position.z - monMeTZ) > 60) monMeToGrid();
+    monMeG.position.copy(monMeBody.interpolatedPosition);
+    monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+    if (monMeMover) monMeMover.set(0);
+    return;
+  }
+  // ---- the lights ---------------------------------------------------------
+  monRaceT += dt;
+  if (monRaceT < 0) {
+    const lit = Math.min(monME_LIGHTS, Math.floor((monRaceT + monME_LIGHTS * monME_STEP_T + 0.4) / monME_STEP_T));
+    while (monRaceLights < lit) {
+      monRaceLights++;
+      monSfx('tick', { volume: 0.5, pitch: 0.8 + monRaceLights * 0.12, force: true });
+    }
+    if (typeof game.wowLive === 'function') {
+      let lights = '';
+      for (let i = 0; i < monME_LIGHTS; i++) lights += i < monRaceLights ? '● ' : '○ ';
+      game.wowLive('ON THE GRID · ' + lights.trim() + (monRaceLights >= monME_LIGHTS ? ' · set…' : ''), 0);
+    }
+    monMeV = 0;
+  } else if (monRaceT - dt < 0) {
+    monSfx('chime', { volume: 0.7, pitch: 1.3, force: true });
+    monToast('GO');
+    if (typeof game.punch === 'function') game.punch(0.08);
+  }
+  // ---- the pedals ---------------------------------------------------------
+  const go = monRaceT >= 0;
+  const gas = go && input ? clamp(-input.z, 0, 1) : 0;
+  const brake = go && input ? clamp(input.z, 0, 1) : 0;
+  if (gas > 0) monMeV = Math.min(monME_VMAX, monMeV + monME_ACC * gas * dt);
+  else if (brake > 0) monMeV = Math.max(0, monMeV - monME_BRAKE * brake * dt);
+  else monMeV = Math.max(0, monMeV - monME_DRAG * dt);
+  // ---- the wheel, and the corner ------------------------------------------
+  const auth = clamp(monMeV / 7, 0, 1);
+  const steer = go && input ? clamp(input.x, -1, 1) : 0;
+  monMeLat += steer * monME_STEER * auth * dt;
+  // too fast for this corner: pushed wide, toward the outside of the bend
+  const vCorner = monCarTarget(monMeS) * monME_GRIP;
+  if (monMeV > vCorner) {
+    monTrackAt(monMeS + 10, monTrackTmp2);
+    let dy = monTrackTmp2.yaw - monMeYaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    const excess = (monMeV - vCorner) / vCorner;
+    // a left-hander (yaw falling) pushes you right (+lat), and vice versa
+    monMeLat += -Math.sign(dy) * monME_PUSH * excess * dt * 3;
+  }
+  // the kerb
+  let onKerb = false;
+  if (monMeLat > monME_LAT) monMeLat = monME_LAT;
+  if (monMeLat < -monME_LAT) monMeLat = -monME_LAT;
+  if (Math.abs(monMeLat) >= monME_LAT - 0.05) onKerb = true;
+  if (onKerb) {
+    // THE KERB IS THE CORNER'S OWN SPEED: pushed wide, you are held to what
+    // the pack would do here, and no faster, until you are back on the road.
+    // On a straight that is the pack's top speed and costs almost nothing;
+    // in the hairpin it is a crawl, which is what a hairpin taken wide is.
+    const vk = monCarTarget(monMeS);
+    if (monMeV > vk) monMeV = Math.max(vk, monMeV * (1 - monME_KERB_K * dt));
+    monMeKerbT -= dt;
+    if (monMeKerbT <= 0 && monMeV > 4) {
+      monMeKerbT = 0.32;
+      monSfx('rustle', { volume: 0.22, pitch: 0.55, force: true });
+      if (typeof game.shake === 'function') game.shake(0.05);
+      if (!monRaceToldWide && monMeV > 12) { monRaceToldWide = true; monToast('the kerb. ease off into the corners.'); }
+    }
+  }
+  // ---- the pack: behind one in its lane holds you; passing counts ---------
+  let holding = -1;
+  for (let j = 0; j < monCarG.length; j++) {
+    let gap = monCarU[j] - monMeS;
+    gap = ((gap % monTrackTotal) + monTrackTotal) % monTrackTotal;
+    if (gap > monTrackTotal / 2) gap -= monTrackTotal;
+    const beside = Math.abs(monCarLat[j] - monMeLat) < monME_LANE;
+    if (beside && gap > 0 && gap < monME_NOSE) {
+      if (monMeV > monCarV[j] * 0.92) { monMeV = monCarV[j] * 0.92; holding = j; }
+    } else if (beside && gap <= 0 && gap > -monME_NOSE) {
+      // you are on its nose: it lifts (a fair pack lifts for a car alongside)
+      monCarV[j] = Math.min(monCarV[j], Math.max(4, monMeV * 0.9));
+    }
+    const ahead = gap > 0;
+    if (monRaceAhead[j] && !ahead && gap > -monTrackTotal / 4) {
+      monRacePassed++;
+      monSfx('whistle', { volume: 0.28, pitch: 1.35, force: true });
+    } else if (!monRaceAhead[j] && ahead && gap < monTrackTotal / 4) {
+      monRacePassed = Math.max(0, monRacePassed - 1);
+    }
+    monRaceAhead[j] = ahead;
+  }
+  if (holding >= 0) {
+    monMeBumpT -= dt;
+    if (monMeBumpT <= 0) { monMeBumpT = 1.4; monSfx('horn', { volume: 0.18, pitch: 1.2, force: true }); }
+  }
+  // ---- along --------------------------------------------------------------
+  const s0 = monMeS;
+  monMeS += monMeV * dt;
+  if (go) monMeDist += monMeV * dt;
+  if (monMeS >= monTrackTotal) monMeS -= monTrackTotal;
+  // the bore: the loud four seconds, and the lift
+  const a = monTrackLen[monTUNNEL_A], b = monTrackLen[monTUNNEL_B];
+  const inBore = monMeS > a && monMeS < b;
+  if (inBore && !monMeBoreIn) monCue('hiss', monMeTX, monMeTY + 1.5, monMeTZ, 0.5, 0.6);
+  monMeBoreIn = inBore;
+  if (inBore && game.music && typeof game.music.swell === 'function') game.music.swell(0.9);
+  // ---- the line -----------------------------------------------------------
+  // THE LINE IS A DISTANCE, NOT THE SEAM: the grid is seven metres before
+  // it, so the lap is over on the SECOND crossing — a full lap plus the grid.
+  if (go && monMeDist >= monTrackTotal - monME_GRID_S) {
+    monMeDist -= monTrackTotal;
+    monRaceLap++;
+    const lapT = monRaceT;
+    monRaceT = 0.0001;
+    monCue('cheer', monWATCH_MID.x, monWATCH_MID.y, monWATCH_MID.z, 0.7, 1.05);
+    if (typeof game.punch === 'function') game.punch(0.12);
+    monRecord('the-tunnel', +lapT.toFixed(1));
+    if (!monRaceDone) {
+      monRaceDone = true;
+      monTask('the-tunnel');
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: monMeYaw + Math.PI, dist: 18, pitch: 0.22, raise: 2.4, hold: 1.8, over: true, why: 'the grand prix' });
+      }
+    }
+    monToast((monRacePassed >= monCarG.length ? 'P1. ' : 'P' + (monCarG.length - monRacePassed + 1) + '. ') +
+             lapT.toFixed(1) + ' s · again if you like');
+    monRacePassed = 0;
+    for (let j = 0; j < monCarG.length; j++) monRaceAhead[j] = monCarU[j] > monMeS;
+  }
+  // ---- the pose, the passenger, the line on the signpost ----------------
+  monMePlace(dt);
+  monMeG.position.copy(monMeBody.interpolatedPosition);
+  monMeG.quaternion.copy(monMeBody.interpolatedQuaternion);
+  monMeLean = damp(monMeLean, clamp(-steer * auth * 0.10 - (onKerb ? 0.04 : 0), -0.16, 0.16), 6, dt);
+  monMeG.children[0].rotation.z = monMeLean;
+  monMeG.children[0].rotation.x = damp(monMeG.children[0].rotation.x, clamp((gas - brake) * -0.03, -0.05, 0.05), 6, dt);
+  const bm = monMeG.userData.beam;
+  if (bm) bm.material.opacity = 0.035 + Math.max(monTunnelK2(monMeTX, monMeTZ), 0.30) * 0.075;
+  if (!monMeMover && game.sfxMover) monMeMover = game.sfxMover('v8', { key: 'mon:me', near: 6, far: 120 });
+  if (monMeMover) {
+    monMeMover.at(monMeTX, monMeTY + 0.8, monMeTZ);
+    monMeMover.vel(monMeBody.velocity.x, 0, monMeBody.velocity.z);
+    monMeMover.set(clamp(0.15 + monMeV / monME_VMAX, 0, 1));
+  }
+  if (capy && capy.body) {
+    const cb = capy.body;
+    const c = Math.cos(monMeYaw), sn = Math.sin(monMeYaw);
+    cb.position.set(monMeTX - 0.55 * sn, monMeTY + monROOF_Y + 0.02, monMeTZ - 0.55 * c);
+    cb.velocity.set(monMeBody.velocity.x, 0, monMeBody.velocity.z);
+    cb.angularVelocity.set(0, 0, 0);
+    cb.previousPosition.copy(cb.position);
+    cb.interpolatedPosition.copy(cb.position);
+    if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    if (capy.group) {
+      capy.group.position.set(cb.position.x, cb.position.y, cb.position.z);
+      capy.group.rotation.y = monMeYaw;
+    }
+  }
+  if (go && typeof game.wowLive === 'function' && !monRaceDone) {
+    const left = Math.max(0, monTrackTotal - monME_GRID_S - monMeDist);
+    game.wowLive((inBore ? 'THE TUNNEL · ' : holding >= 0 ? 'behind one — move over · ' : '') +
+                 Math.round(monMeV) + ' m/s · ' + Math.round(left) + ' m to the line · ' +
+                 monRacePassed + ' of ' + monCarG.length + ' passed', clamp(monMeDist / (monTrackTotal - monME_GRID_S), 0, 1));
+  }
 }
 
 /**
@@ -2778,7 +3125,7 @@ function monUpdateCars(game, dt) {
  */
 function monUpdateRide(game, dt) {
   const capy = game.capy;
-  if (!capy || !capy.position) { monRider = -1; return; }
+  if (!capy || !capy.position || monRaceOn) { monRider = -1; return; }
   const p = capy.position;
   let on = -1;
   for (let i = 0; i < monCarG.length; i++) {
@@ -3940,20 +4287,8 @@ function monUpdateTunnel(game, dt) {
   // record takes. It takes the line off `the-hairpin`, which is live for the
   // whole lap, and that is right: the tunnel is the four seconds of it that
   // matter, and this call sits after the hairpin's in the frame.
-  if (inBore && game.recordLive) game.recordLive('the-tunnel', monCarV[monRider]);
-  // ...and on the signpost (W1): on the roof, how far the mouth is, and then
-  // the bore itself with the speed. `s` runs backwards past the lap seam, so
-  // the distance is clamped to the lap's own length rather than trusted.
-  if (!monTunnelDone && typeof game.wowLive === 'function') {
-    if (inBore) {
-      game.wowLive('IN THE TUNNEL · ' + monCarV[monRider].toFixed(0) + ' m/s · stay on', clamp((s - a) / (b - a), 0, 1));
-    } else {
-      let toMouth = a - s;
-      if (toMouth < 0) toMouth += monTrackTotal;
-      game.wowLive('on the roof · ' + monCarV[monRider].toFixed(0) + ' m/s · the tunnel in ' +
-                   Math.round(Math.max(0, toMouth)) + ' m', 0);
-    }
-  }
+  // X1: the signpost's live line belongs to the Grand Prix now; the roof run
+  // says its speed on the hairpin's own row.
   // A ONE-FRAME GAP IS NOT GETTING OFF. The rider test is a box in the car's
   // own frame and at twenty-six metres a second a corner can put the animal
   // outside it for a frame or two while the contact is still perfectly sound;
@@ -3966,10 +4301,11 @@ function monUpdateTunnel(game, dt) {
     if (done && monTunnelIn < a + 14) {
       const len = b - a;
       const spd = monCarV[monRider];
-      if (spd > monTunnelBest) { monTunnelBest = spd; monRecord('the-tunnel', spd); }
+      // X1: the marquee is the lap now, and the record is the lap time — the
+      // roof run through the bore keeps its shot and its lift and files nothing.
+      if (spd > monTunnelBest) { monTunnelBest = spd; }
       if (!monTunnelDone) {
         monTunnelDone = true;
-        monTask('the-tunnel');
         // THE VEHICLE CHAPTER'S OWN SHOT. `over` says the chapter that owns the
         // car is the one asking, which is the only way this channel is reachable
         // from a marquee that happens ON a vehicle — see frameShot in systems.js.
@@ -4362,6 +4698,7 @@ function monBuild(game) {
   monBuildCasino(game, monRoot);
   monBuildCircuit(game, monRoot);
   monBuildCars(game, monRoot);
+  monBuildGrid(game, monRoot);   // X1: the one you drive
   monBuildYacht(game, monRoot);
   monBuildSmallCraft(monRoot);
   monBuildPalms(monRoot);
@@ -4589,6 +4926,7 @@ export function createMonaco(game) {
       monSeen = 0; monOutT = -1; monCoolT = 0; monWarned = false;
       monInside = false; monFloorRun = -1;
       monRider = -1; monRideT = 0; monRideDist = 0; monTunnelIn = -1; monTunnelK = 0;
+      if (monMeBody) monMeToGrid();   // X1: back on the grid
       monWheelRideT = 0; monPayT = -1;
       monAboardT = 0; monDiveTop = 0;
       monRockT = 0;
@@ -4641,6 +4979,10 @@ export function createMonaco(game) {
     onExit() {
       monRider = -1;
       monOutT = -1;
+      // X1: nobody drives out of a country. The wheel is let go without the
+      // door (the animal is being moved anyway) and the car parks itself.
+      if (monRaceOn) { monRaceOn = false; if (game.capy) { game.capy.atHelm = false; if (game.capy.rideBody === monMeBody) game.capy.rideBody = null; } }
+      monRaceT = -1; if (monMeBody) { monMeBody.velocity.setZero(); monMeBody.angularVelocity.setZero(); }
       monFrame.x = 0; monFrame.z = 0;
       for (let i = 0; i < monCarBody.length; i++) {
         monCarBody[i].velocity.setZero();
@@ -4735,6 +5077,24 @@ export function createMonaco(game) {
     },
     /** Which car the animal is on, or -1. */
     riding() { return monRider; },
+    // ---- THE GRAND PRIX (X1) --------------------------------------------
+    race() { return { on: monRaceOn, t: monRaceT, s: monMeS, v: monMeV, lat: monMeLat, passed: monRacePassed, lap: monRaceLap, done: monRaceDone, total: monTrackTotal }; },
+    gridCar() { return { x: monMeTX, z: monMeTZ }; },
+    // the camera sits behind the car while you drive it, close and low: the
+    // helm rig is a ship's (21 m, 27°) and on a street with walls it was
+    // shoved up to a plan view. See rideYaw in systems.js and the rig chain.
+    rideYaw() { return monRaceOn ? monMeYaw : NaN; },
+    rig() {
+      if (!monRaceOn) return null;
+      return { w: 1, dist: 13, pitch: 0.30, raise: 1.2, lambda: 3.0 };
+    },
+    raceDebug(o) {
+      // the harness: hold the pedals without a keyboard
+      if (o && o.take && !monRaceOn) monRaceTake(monGame);
+      if (o && typeof o.s === 'number') monMeS = o.s;
+      if (o && typeof o.v === 'number') monMeV = o.v;
+      return this.race();
+    },
     ridingSpeed() { return monRider >= 0 ? monCarV[monRider] : 0; },
     /** Metres round the lap, and where the bore starts and ends. Harness only. */
     lap() { return monRider >= 0 ? monCarU[monRider] : -1; },
@@ -4753,6 +5113,7 @@ export function createMonaco(game) {
     yacht: { x: monYACHT.x, z: monYACHT.z - 12 },
     sunDeck: { x: monYACHT.x, z: monYACHT.z - 4 },
     hairpin: { x: monTRACK[7][0], z: monTRACK[7][1] },
+    get line() { monTrackAt(monMeLineS(), monTrackTmp); return { x: monTrackTmp.x, z: monTrackTmp.z }; },
     tunnelMouth: { x: monTRACK[monTUNNEL_A][0], z: monTRACK[monTUNNEL_A][1] },
     grandstand: { x: 2, z: -101 },
     quay: { x: -58, z: -30 },

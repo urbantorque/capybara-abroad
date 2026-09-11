@@ -23973,11 +23973,12 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.monaco && game.monaco.hairpin); } },
     'the-tunnel':     { clue: function () {
                       const m = game.monaco;
-                      const on = m && typeof m.riding === 'function' ? m.riding() >= 0 : false;
-                      if (on) return 'stay on. the tunnel comes round';
-                      return 'at the hairpin the cars crawl: Space onto a roof';
+                      const r = m && typeof m.race === 'function' ? m.race() : null;
+                      if (r && r.on && r.t < 0) return 'wait for the lights';
+                      if (r && r.on) return 'W to go · S to brake · A/D round the pack. one lap';
+                      return 'the red car on the grid by the harbour stand: press E at its door';
                     },
-                    where: function () { return hintObj(game.monaco && game.monaco.tunnelMouth); } },
+                    where: function () { return hintObj(game.monaco && game.monaco.gridCar && game.monaco.gridCar()); } },
 
     // ---- chapter 19 ----
     'to-hanoi':       { clue: 'somewhere with no gap in it at all',
@@ -35170,6 +35171,12 @@ export function createSystems(game) {
     // camYaw is the bearing FROM the capybara TO the camera, so behind is + PI.
     let rideYaw = NaN;
     if (inCali && game.cali && typeof game.cali.rideYaw === 'function') rideYaw = game.cali.rideYaw();
+    // ...and any chapter with a vehicle of its own may publish the same (X1):
+    // Monaco's red car answers its heading while you drive it and NaN otherwise.
+    if (!(rideYaw === rideYaw)) {
+      const ra = sysLiveBiomeApi(game);
+      if (ra && ra !== game.cali && typeof ra.rideYaw === 'function') rideYaw = ra.rideYaw();
+    }
     // ---- THE TITLE OWNS THE BEARING BEFORE THE GAME OWNS ANYTHING (T1) ---
     // Ahead of the shot rung, because nothing below can legitimately be asking
     // for this camera yet: there is no chapter running, no vehicle, no marquee
