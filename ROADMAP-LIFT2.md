@@ -31,7 +31,7 @@ result, because it bounds where the next bug can be.
 
 ## WHAT WAS DONE
 
-Four commits. Every claim below is a measurement, and where a measurement
+Five commits. Every claim below is a measurement, and where a measurement
 refused to support a change the change was altered or recorded as unresolved
 rather than asserted.
 
@@ -383,3 +383,127 @@ learned nothing that one grid sweep answered in one run.
 backspace inside a regex, and the census silently reported 0% for two checks it
 should have failed. `cat -A` is two seconds. The rule stands: **never put a
 backslash escape in a Bash-tool argument.**
+
+### M12 — the key that finds the keys, and the catch that hid the last bug
+
+`H` and `?` open the journal with its control fold already unrolled, and that is
+the only place in play where the full control table exists. **It appeared on no
+card, no legend and no rail** — so the one key a player reaches for when they
+have forgotten which key slides was discoverable only by already knowing a
+control. It is on the fold now, and the pause card has a fifth door: that card
+is the reflex place to look, and it had four, none of which said controls.
+
+And the swallow: one `catch (e) { /* ignore */ }` wraps all fifty-one `sfx*`
+functions with no log, no counter and no `lastError`. It is the exact mechanism
+that let `f.type = lowpass` sit in the tree for months with a clean console, and
+the comment's stated cause ("audio node budget exhausted") is a guess — a
+`RangeError` and a `ReferenceError` arrive identically and silently. Not opened
+up, because a throw on a voice genuinely must not take the frame: **counted and
+named**, rate-limited to one console line every four seconds, with
+`synthThrew`/`synthWhy` beside `voiceDrops` (which is a budget refusal and
+normal, where this is a defect).
+
+### M13 — ten of nineteen chapters had no continuous sound in them at all
+
+Every `sfxMover` call site in the tree covers sydney, quay, kyoto, rio, kowloon,
+manly, monaco, antarctic and hanoi. Manly's own wiring comment says why it
+matters: *"A shoreline you can walk toward is the most legible spatial cue an
+open world has, and nineteen of them had none."*
+
+Five, and only the five with an unarguable anchor — Jemaa el-Fnaa (whose square
+the `crowd` recipe was authored for and never wired to), the Río Cali, the
+Pantanal river the chapter is *about crossing*, Palawan's waterline, and the
+Pasto plaza. No new voice and no new primitive: four bed recipes already exist
+and the shape is Manly's, verbatim. Göreme and the Drift have no obvious
+candidate and are left alone rather than given an invented one.
+
+**The first cut put all five outside the chapter's own active guard**, and the
+probe caught it on the first run because it prints the mover's *key* next to the
+chapter's name: `pal:shore` and `pasto:plaza` were both built and positioned
+while the player was standing in Marrakech. Every module's `update` runs every
+frame; the two lines that make it a chapter's update are the two guards.
+
+| | mover | gain, near → far | distance, near → far |
+|---|---|---|---|
+| sahara | `sah:square` | 0.120 | 2.6 → 0.6 |
+| cali | `cali:river` | 0.120 | 17.4 → 17.4 |
+| **pantanal** | `pan:river` | **0.033 → 0.053** | **108 → 91** |
+| palawan | `pal:shore` | 0.140 | 12.1 → 2.2 |
+| pasto | `pasto:plaza` | 0.120 | 2.6 → 5.1 |
+
+The Pantanal row is the proof of the whole idea: **the gain rose as the distance
+fell.** That is a place you can walk toward. Every stale key from a previous
+chapter reads `live=false, d=9999` — parked, not leaking.
+
+### M14 — a hundred and twenty-eight people, all exactly the same height
+
+`npc.js` gives every roster person one of three build archetypes and its locals
+the same. The instanced crowds in Venice and Mong Kok get **none** of it.
+
+**Porting L8's knees and elbows is the wrong tool at this count**, and that is
+the art review's finding rather than a shortcut: a knee needs a second matrix in
+the leg's frame — six meshes become ten, plus a `Matrix4.multiply` per person per
+frame — for a joint that is 0.3 of a pixel at the 35 m these are seen from. A
+uniform-height crowd at the L2 camera reads as a picket fence, which is a far
+stronger cue than a joint nobody can resolve.
+
+Derived from the instance index rather than stored, so no array change and no
+stride to keep in step. The three rig heights scale together, because hip, body
+centre and head are a *rig* and not three numbers — the file's own comment
+records what happened the first time that was got wrong (forty-eight floating
+heads).
+
+Measured off the **matrices**, not off the table saying how tall they should be,
+and the probe had to be retargeted once for trap 11 — the first cut took "the
+largest InstancedMesh" and found a piece of scenery:
+
+```
+venice   48 instances, 48 DISTINCT scales, 0.942 to 1.059, head spread 28 cm
+```
+
+Left as it is and visible if you look: the collider half-extents are authored for
+a 1.72 m person, so a 0.94 build stands in a box 5 cm too big.
+
+---
+
+## STILL OPEN AFTER BATCH THREE
+
+Everything in the list above stands, less the four that were taken, plus:
+
+- **The Quay's thirty people walk with their arms welded to their sides** — the
+  body and shirt meshes carry the arms and are drawn with rotation `0`. And
+  Venice's and Mong Kok's `limb(sgn)` helper merges *a leg and the opposite arm
+  into one geometry*, so the arm cannot be posed independently of the leg even
+  in principle. A shoe on its own instance, counter-rotated, is L8's foot plant
+  for one draw call and no hierarchy.
+- **Venice, Iceland and the cave still have no bed.** All three want a judgement
+  about *where*, which is worth making separately — Venice's water is still, the
+  cave's river is behind geometry, and Iceland's candidate is a waterfall the
+  chapter may not want to hear from everywhere.
+- **The Cali dancers are one fully merged figure that does not move at all**, and
+  the watchers next to them sway.
+- **Speech bubbles dodge the HUD panels, the screen edges and the capybara's own
+  column, and they do not dodge each other** — and two people answering at once
+  is the *designed* case, not a rare one (`localsSay` and `npcOnIncident` both
+  allow two). Seen by eye in three chapters in one sweep: in the Jemaa el-Fnaa
+  "My snake is listening." sat squarely across "…is asleep.", and in the Piazza
+  three of them stacked into one grey block.
+
+  **Attempted and reverted, and the measurement is the useful part.**
+  `qa/m15-bubbles.js` samples the rendered rectangles at 10 Hz for thirty
+  seconds in four crowded chapters and counts frames containing an overlap:
+
+  ```
+  before   sahara 21/301   venice 15/300   kowloon 20/302   sydney  0/301
+  after    sahara 23/302   venice 14/299   kowloon 15/302   sydney 11/301
+  ```
+
+  A dodge against the boxes already placed this frame — the same shape as the
+  panel dodge, which works — moved nothing outside the instrument's own
+  run-to-run noise, and that noise is ±10 hits with the code unchanged (Sydney
+  went 0 → 11 on two runs of the same build). **The likely blocker was found
+  and not fixed:** `b.bw` is only measured under `if (!b.bw && b.shown)`, and
+  `b.shown` is still false on the frame a bubble is first placed — so the very
+  frame that most needs the box width uses the 0.16 NDC fallback, which for a
+  long line is less than half the truth. Fix that first, then re-measure; and
+  build a quieter instrument than this one before believing a small delta.
