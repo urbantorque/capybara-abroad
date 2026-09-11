@@ -1,3 +1,116 @@
+## THE SECOND LIFT PASS — THE SKY, THE SQUARE'S VOICE, AND A THEFT THAT HAS TO BE GOT AWAY WITH (11 Sep 2026)
+
+Four commits. Full write-up in `ROADMAP-LIFT2.md`. Six review agents over the
+whole tree first; two of them corrected the brief they were given, which is the
+most useful thing a review can do.
+
+### 1. THE SKY — `sysCLOUD_SKY_*`, and THREE RULES FOR ANYTHING ADDED TO THE DOME
+
+`sysCLOUD` has walked a cloud shadow across the ground of thirteen chapters since
+the beauty pass and NOTHING WAS EVER DRAWN OVERHEAD TO CAST IT. There is a layer
+now: one InstancedMesh, one draw call, a child of `sysSkyMesh` so it rides the
+lens and hides with it, count and opacity off `sysCLOUD` and nothing else.
+
+**(a) IT IS UNLIT, AND THAT IS NOT A SHORTCUT.** The first cut copied Sydney's
+Lambert-plus-emissive and was invisible. The hemisphere light's GROUND colour is
+a per-chapter number and it is not small — manly (1.198, 1.052, 0.705), antarctic
+(1.694, 1.757, 1.773), quay (0.733, 0.597, 0.335). Every cloud base was clipping
+past white before the sun was considered. ONE BODY COLOUR CANNOT BE RIGHT IN
+ELEVEN CHAPTERS WHEN THE LAMP UNDER THEM VARIES BY TWO AND A HALF TIMES. The
+shape is a ramp baked into vertex colour (base 0.66 of top) and the one colour it
+takes is the live horizon.
+
+**(b) THE FRAME HOLDS TWELVE DEGREES OF SKY.** The settled rig pitches DOWN 11.2,
+so elevation `e` lands at `tan(e + 11.2)/tan(24)` and the top edge is e = 12.8.
+Two cuts put the layer above the picture; Rio went 5.82% of the top band covered
+-> 0.00% when the second "narrowing" moved it further up. The band is 2 to 12.
+
+**(c) A DIFFERENTIAL NEEDS THE WORLD FROZEN.** The first measurement took its
+on/off pair 700 ms apart with everything running and reported 86% coverage on the
+Quay, in a frame with no sky in it: harbour water, a ferry, two pedestrians.
+`state.paused` between the exposures is the whole validity of the instrument.
+
+Controls fix the floor at 0.55 / 1.42 / 0.03 (Sydney owns its sky; Kyoto and
+Hanoi have no row). Eight of eleven, honestly — cali 18.7, hanoi 11.1, rio 10.5,
+pantanal 10.4, sahara 8.7, manly 8.4, quay 8.1, venice 1.95, palawan 1.77, and
+antarctic 0.64 / pasto 0.62 at the floor for reasons that are real (Galeras fills
+Pasto's upper third; a white cloud over an ice shelf is what Antarctica is).
+
+### 2. A THEFT TICKS WHEN YOU GET AWAY WITH IT — `physArmTheft`, and it CANNOT LOSE A ROW
+
+Two dozen rows ticked on the frame the prop entered the mouth, so the owner's
+errand, the leash, the ceiling and the reclaim all played out over a row already
+crossed off. THREE PROPERTIES MAKE IT UNLOSABLE AND ALL THREE ARE LOAD-BEARING:
+the arm is BY TASK ID and not by prop, so a prop reclaimed / drowned / destroyed
+/ left in another chapter costs nothing; NOTHING EVER DISARMS IT (there is no
+failure branch); and it is DISTANCE **OR** PERSISTENCE — 15 m is `npcOWN_LEASH`
+exactly, and twelve seconds of simply holding on is also getting away with it, so
+a chapter with no fifteen metres in it cannot hold a row hostage on its floor
+plan. **Do not add a disarm.**
+
+Found on the way: TWO SECOND OWNERS ON THE SAME ROW. systems.js ticked
+`picnic-thief` from `capy:grab` one listener after props.js did — invisible while
+both fired on the grab, load-bearing the moment one stopped (`armed: 1,
+ticked: 0` beside `done: true`). And props.js ticked `steal-empanada` on any
+grab, which defeated F4's being-seen deferral. Pasto's rule is now composed with
+the getaway, not beaten by it.
+
+### 3. THE SQUARE HAS ONE MEMORY — `npcEcho`
+
+Two people in the Pasto plaza said 'Sinvergüenza. Come here.' in the same frame,
+in two bubbles, side by side. `localLine`'s bag is PER PERSON and guarantees
+nothing about the person next to them. One ring of the last six lines ANYBODY
+said, shared by every mouth. It can never fail to produce a line, only fail to
+improve one.
+
+### 4. THREE AUDIO CUES THAT COULD NOT BE HEARD
+
+`sysSFX_UP_DB` was unreachable past 9.63 m because L7 left an `else` — so the
+elevation cue was dead on every gull, flock, bell and colony in the game. The
+back lowpass had NO Q and inherited Web Audio's default of 1, which is a
+resonance at its own corner, in the presence band, on the cue that means
+"behind you". And `audioProbe` published `back` and `up` — the INPUTS to that
+branch — while publishing nothing about what it built. It now publishes `lp`,
+`shelf`, `dist` and `lpQ`, off `sysSfxLpFor`/`sysSfxShelfFor`, WHICH sfx() ALSO
+CALLS: a probe that re-implements the thing it measures can only prove itself
+right.
+
+### 5. THE WADING BAND DOES NOT EXIST, AND IT IS WORTH KNOWING
+
+`capySWIM_ENTER` is 0.70 from the BODY CENTRE and the foot is 0.34 below it, so
+the animal is swimming — and the footfall block skipped — before the foot is
+36 cm under. `qa/m10-wade.js`, a 121 m grid in twelve chapters: points where the
+animal could stand on submerged ground come back ZERO in Rio, Venice, the cave,
+Antarctica and Monte Carlo, and elsewhere `terrainHeight` stops at the waterline.
+Anything written for "walking in shallow water" has nowhere to run. The wet
+footfall is a DRIP off `capySwimAgo` instead.
+
+### 6. `npcPLACE_SAY` IS THE MOST-HEARD POOL IN THE GAME AND IT WAS A TEMPLATE
+
+'You. Again.' byte-identical in five chapters; wary[1] "I know / I remember" in
+fifteen of seventeen; incident[0] opening on the number three in SEVENTEEN OF
+SEVENTEEN. With the neutral merge that made 70% of what a cross place says
+identical everywhere. 102 lines -> 204. `qa/m9-voice.mjs` is the gate and its
+checks are CEILINGS ON DISTRIBUTIONS, not on slots — the first cut tested
+`incident[0]`, reported 17 of 17 after the rewrite, and was correct and
+meaningless, because `localLine` shuffles the bag.
+
+### 7. THE ENDING SPEAKS — and `game.travMet()`
+
+`case 'gather'` never opened a mouth: the closing image of an eight-hour game was
+five silent strangers. The traveller's four lines all assumed acquaintance and
+nothing counted whether you had met (`o.trav` had been set since they were
+written and only the pair-chat exclusion ever read it), and at `cool: 30` with
+`sysFIN_BEAT` 2600 the player heard exactly one of them. Now: `npcTravMet` is a
+SET of the chapters they were spoken to in, the lines carry `when`, two more
+exist for a player who never stopped, and `sysFIN_BEAT` is 9200.
+
+**AND THE GAME SAYS WHAT IT IS ABOUT, TWICE, AND NEVER AGAIN** — once by the
+traveller and once under the arithmetic on the final ledger only:
+*nineteen places, and not one of them agreed with another about what you were.*
+
+---
+
 ## THE LIFT PASS — THE FRAME, THE DOOR, AND TWO NAMES (11 Sep 2026)
 
 Eleven commits on `lift-pass`. Full write-up in `ROADMAP-LIFT.md`. Six review
