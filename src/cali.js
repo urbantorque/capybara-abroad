@@ -221,6 +221,8 @@ let caliChivaS = 0, caliChivaV = 0, caliChivaYaw = 0.32, caliChivaHold = 0;
 let caliChivaX = 0, caliChivaY = 0, caliChivaZ = 0, caliChivaPitch = 0, caliChivaRoll = 0;
 let caliRoofT = 0;                  // s the capybara has been stood on the rack
 let caliOnRoof = false;
+let caliLadderTold = false;
+const caliLadderOut = { x: 0, y: 0, z: 0 };
 let caliStopIdx = 0;
 let caliMiradorDone = false;
 let caliNightT = 0, caliVistaT = 0;
@@ -2272,6 +2274,16 @@ function caliStepChiva(game, dt) {
 
   // ---- parked: she waits for a passenger, and then she stops waiting -------
   if (caliChivaState === 'parked') {
+    // ...AND SHE SAYS HOW (W3). Playtest: "I was not sure how to climb and get
+    // on the party bus." Once, the first time you are near her while she is
+    // parked and not on her, in the scheme you are holding.
+    if (!caliLadderTold && !caliOnRoof && game.capy && game.capy.position) {
+      const cp = game.capy.position;
+      if (Math.abs(cp.x - caliChivaX) < 9 && Math.abs(cp.z - caliChivaZ) < 9) {
+        caliLadderTold = true;
+        if (typeof game.control === 'function') game.control('the ladder is on the back of the bus. walk into it and press Space up the steps — she goes when you are on the roof.');
+      }
+    }
     if (caliOnRoof) {
       caliRoofT += dt;
       if (caliRoofT > caliCHIVA_PULL_T) {
@@ -4367,6 +4379,13 @@ export function createCali(game) {
     /** WHERE SHE IS, for the hint arrow — she is the only thing in this chapter
      *  that moves, and an arrow pointing at the kerb she left is worse than no
      *  arrow at all. */
+    /** The foot of the ladder on the back of the bus (W3): where the arrow points while she is parked. */
+    chivaLadder() {
+      caliLadderOut.x = caliChivaX - Math.sin(caliChivaYaw) * (caliCHIVA_L * 0.5 + 0.9);
+      caliLadderOut.y = caliChivaY + 0.7;
+      caliLadderOut.z = caliChivaZ - Math.cos(caliChivaYaw) * (caliCHIVA_L * 0.5 + 0.9);
+      return caliLadderOut;
+    },
     chivaAt() {
       caliChivaOut.x = caliChivaX; caliChivaOut.y = caliChivaY; caliChivaOut.z = caliChivaZ;
       caliChivaOut.yaw = caliChivaYaw; caliChivaOut.v = caliChivaV;

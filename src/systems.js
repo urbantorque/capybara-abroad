@@ -8078,9 +8078,21 @@ function sysBuildCSS() {
 '.capyui-marqtxt{grid-column:1 / -1;grid-row:3;font-size:clamp(9.5px,1.55vw,13px);',
   'line-height:1.28;color:' + ink + ';font-weight:700;margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
-'.capyui-marqsay{grid-column:1 / -1;grid-row:4;font-size:clamp(8.5px,1.4vw,11px);',
+'.capyui-marqsay{grid-column:1 / -1;grid-row:5;font-size:clamp(8.5px,1.4vw,11px);',
   'line-height:1.25;color:' + inkSoft + ';font-style:italic;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
+/* HOW (W3). The clue under the top row was the only place the game ever said
+   which button a marquee wants, and the marquee is rarely the top row. So
+   the signpost carries its clue too — the same sysHINTS text, in the clue's
+   own register (soft, not italic, so the where-line under it still reads as
+   the where) — and hides it when the row IS the top row, where the clue is
+   already printed under it. Refreshed on the hint tick; the state-aware
+   clues change as you get closer. */
+'.capyui-marqhow{display:none;grid-column:1 / -1;grid-row:4;font-size:clamp(8.5px,1.4vw,11px);',
+  'line-height:1.28;color:' + accentInk + ';margin-top:2px;',
+  'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
+'.capyui-marqhow::before{content:"how: ";color:' + inkSoft + ';}',
+'.capyui-marq.how .capyui-marqhow{display:block;}',
 /* The row is on the paper: the sentence is a row now, with its arrow and its
    metres, and the signpost keeps only the name over it. */
 '.capyui-marq.row .capyui-marqtxt{display:none;}',
@@ -8091,7 +8103,7 @@ function sysBuildCSS() {
 '.capyui-marqlive{display:none;grid-column:1 / -1;grid-row:3;font-size:clamp(9.5px,1.55vw,13px);',
   'line-height:1.28;color:' + accentInk + ';font-weight:700;margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;font-variant-numeric:tabular-nums;}',
-'.capyui-marqbar{display:none;grid-column:1 / -1;grid-row:4;height:4px;margin-top:4px;',
+'.capyui-marqbar{display:none;grid-column:1 / -1;grid-row:6;height:4px;margin-top:4px;',
   'border-radius:2px;background:' + paper2 + ';overflow:hidden;}',
 '.capyui-marqbar i{display:block;height:100%;width:0;background:' + accentInk + ';',
   'transition:width .25s linear;}',
@@ -19718,6 +19730,7 @@ export function createSystems(game) {
   const marqTxtEl = sysEl('span', 'capyui-marqtxt', '');
   const marqSayEl = sysEl('span', 'capyui-marqsay', '');
   const marqLiveEl = sysEl('span', 'capyui-marqlive', '');
+  const marqHowEl = sysEl('span', 'capyui-marqhow', '');
   // NOT aria-live: the line rewrites every frame the moment is running —
   // metres up, seconds, of seven — and a live region that changes sixty
   // times a second is a screen reader reading numbers for a minute. The
@@ -19735,6 +19748,7 @@ export function createSystems(game) {
   marqEl.appendChild(marqNameEl);
   marqEl.appendChild(marqTxtEl);
   marqEl.appendChild(marqLiveEl);
+  marqEl.appendChild(marqHowEl);
   marqEl.appendChild(marqSayEl);
   marqEl.appendChild(marqBarEl);
   todoEl.appendChild(marqEl);
@@ -23111,7 +23125,13 @@ export function createSystems(game) {
                     where: function () { return hintNpc(function (r) { return r.kind === 'gardener'; }); } },
     'photo-op':     { clue: 'stand still and face them',
                     where: function () { return hintNpc(function (r) { return r.hasCamera; }); } },
-    'opera-stage':  { clue: 'get up on the podium and wheek. three times, once they have come over', where: function () { return hintZone('operaStage'); } },
+    'opera-stage':  { clue: function () {
+                      const e = game.env;
+                      const a = e && typeof e.concertAudit === 'function' ? e.concertAudit() : null;
+                      if (a && a.on && a.notes < 3) return 'they are coming. press Q again — ' + (3 - a.notes) + ' more, once they are in front of you';
+                      if (a && a.on) return 'press Q once more with the crowd in front of you';
+                      return 'walk up onto the red podium under the sails and press Q. a crowd comes; press Q twice more';
+                    }, where: function () { return hintZone('operaStage'); } },
     'ball-harbour': { clue: hintHoldingBall, where: function () { return hintHolding('ball') ? hintWater() : hintProp('ball'); } },
     swim:           { clue: 'walk in and keep going', where: hintWater },
     'hat-harbour':  { clue: 'carry a stolen hat to the water',
@@ -23141,7 +23161,11 @@ export function createSystems(game) {
                     where: function () { return hintXZ(70, -330); } },
     'dolphin-escort': { clue: 'hold her flat out for a while',
                     where: function () { return null; } },
-    'manly-voyage':   { clue: 'north, then ease off alongside',
+    'manly-voyage':   { clue: function () {
+                      const q = game.quay;
+                      if (!q || !q.boat || !q.boat.atHelm) return 'the wooden ferry at the wharf: stand at her wheel and press E to take it';
+                      return 'W/S throttle · A/D wheel. north out of the harbour, through the Heads, then slow right down beside the Manly wharf';
+                    },
                     where: function () { return hintXZ(118, -544); } },
     'ferry-salute': { clue: 'get inside eighty metres of her, then blow the horn',
                     where: function () { return hintObj(game.quay && game.quay.freshwater && game.quay.freshwater()); } },
@@ -23172,7 +23196,7 @@ export function createSystems(game) {
     'uji-run':        { clue: function () {
                       const k = game.kyoto;
                       if (!k) return 'in at the bridge, out at the mill';
-                      if (!k.inRiver()) return 'off the shrine bay, into the water';
+                      if (!k.inRiver()) return 'walk into the river at the shrine bay. it carries you — A/D to pick a side, and the mill pond is the end';
                       const t = k.runTime();
                       return (t >= 0 ? t.toFixed(1) + ' s  ·  ' : '')
                              + (k.riverMid() > 0.55 ? 'you are in the thread' : 'get off the bank');
@@ -23207,7 +23231,13 @@ export function createSystems(game) {
     'steal-empanada': { clue: 'grab one off a stall with E', where: function () { return hintProp('empanada'); } },
     'market-chaos':   { clue: 'run straight through the frame', where: hintStall },
     'whistle-condor': { clue: 'wheek out in the open — press Q', where: function () { return null; } },
-    'condor-ride':    { clue: 'wheek again, then press E under it — and hold on for twelve seconds',
+    'condor-ride':    { clue: function () {
+                      const c = game.condor;
+                      if (!c || !c.active) return 'press Q to whistle. a condor comes down and circles';
+                      if (c.mounted) return 'hold on. twelve seconds in the air and it is yours';
+                      if (c.talonInReach()) return 'it is right over you: hold E to grab the talons';
+                      return 'press Q again and it drops lower. stand under it and hold E when the talons are in reach';
+                    },
                     where: function () { return (game.condor && game.condor.active) ? hintObj(game.condor.group) : null; } },
     'thermal-peak':   { clue: 'steer into the rising air off the volcano',
                     where: function () { return hintObj(game.pasto && game.pasto.craterCentre); } },
@@ -23234,9 +23264,9 @@ export function createSystems(game) {
     'chiva-mirador':  { clue: function () {
                       const c = game.cali;
                       if (!c) return 'stay on the roof';
-                      if (c.chivaState() === 'parked') return 'get on the roof and she will go';
-                      if (c.onChiva()) return 'hop the wires — the band ducks first';
-                      return 'catch her up — the ladder is at the back';
+                      if (c.chivaState() === 'parked') return 'the bus is parked at the foot of the hill. go round to the BACK of it: a ladder. walk into the bottom step and press Space up the steps onto the roof. she leaves when you are up';
+                      if (c.onChiva()) return 'a cable is coming: press Space to hop over it when the band ducks. seven of them';
+                      return 'catch her up — the ladder is on the back of the bus. Space up the steps';
                     },
                     where: function () {
                       const c = game.cali;
@@ -23245,7 +23275,10 @@ export function createSystems(game) {
                       // there: if you were swept off in the barrio the thing you
                       // are chasing is a bus, and if she has already parked the
                       // thing you want is the lookout.
-                      return hintObj(c.chivaState() === 'arrived' ? c.mirador : c.chivaAt());
+                      // ...and the LADDER while she is parked (W3): the arrow on the
+                      // middle of a nine-metre bus points at a wall of benches.
+                      return hintObj(c.chivaState() === 'arrived' ? c.mirador
+                                   : (c.chivaState() === 'parked' && !c.onChiva() && c.chivaLadder) ? c.chivaLadder() : c.chivaAt());
                     } },
     'cane-run':       { clue: 'in one side and keep going',
                     where: function () { return hintObj(game.cali && game.cali.cane); } },
@@ -23330,7 +23363,13 @@ export function createSystems(game) {
                       return 'do nothing  ·  ' + (i.soakSeconds * (1 - t)).toFixed(1) + ' s';
                     },
                     where: function () { return hintObj(game.iceland && game.iceland.spring); } },
-    'aurora':         { clue: 'sit still in the pool till the sky comes, then wheek at it',
+    'aurora':         { clue: function () {
+                      const i = game.iceland;
+                      const a = i && typeof i.aurora === 'function' ? i.aurora() : 0;
+                      if (a > 0.9) return 'the sky is up. press Q and it answers you';
+                      if (a > 0.05) return 'it is coming. stay in the pool; when it is up, press Q';
+                      return 'get into the hot pool and let go of the stick — do nothing for seven seconds. the sky comes; then press Q';
+                    },
                     where: function () { return hintObj(game.iceland && game.iceland.spring); } },
     // ---- Marrakech ---------------------------------------------------------
     'to-sahara':      { clue: 'somebody else is steering',
@@ -23356,8 +23395,8 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.sahara && game.sahara.caravan()); } },
     'dune-surf':      { clue: function () {
                       const sa = game.sahara;
-                      if (sa && sa.surfing()) return 'keep going. do not turn across it.';
-                      return 'up the staked track on the shoulder, then straight back down the middle';
+                      if (sa && sa.surfing()) return 'keep going straight down. do not turn across the face';
+                      return 'walk up the staked track on the shoulder to the top of the big dune, then run straight down the middle of the face';
                     },
                     where: function () { return hintObj(game.sahara && game.sahara.duneTop); } },
     'sandstorm':      { clue: function () {
@@ -23413,8 +23452,8 @@ export function createSystems(game) {
                       const d = game.drift;
                       if (!d) return 'take some light up there with you';
                       const n = d.lampflies();
-                      if (n < d.lampfliesNeeded) return 'it needs light  ·  ' + n + ' of ' + d.lampfliesNeeded + ' following';
-                      return 'press E at the lantern';
+                      if (n < d.lampfliesNeeded) return 'press Q near the lampflies in the orchard and they follow you  ·  ' + n + ' of ' + d.lampfliesNeeded + '. then climb to the plinth';
+                      return 'you have six. get up to the plinth at the top and press E at the lantern';
                     },
                     where: function () { return hintObj(game.drift && game.drift.crown); } },
     // ---- Venice. Every clue that can be is written against the TIDE, because
@@ -23448,9 +23487,9 @@ export function createSystems(game) {
     'acqua-alta':     { clue: function () {
                       const v = game.venice;
                       if (!v) return 'be in the square when the water arrives';
-                      if (v.rising()) return 'it is coming in NOW. get in the square, and stay in it to the top';
-                      if (v.tide() > 0.8) return 'you missed it. it comes back.';
-                      return 'wait for the siren, then stand in the middle of it and stay there';
+                      if (v.rising()) return 'it is coming in NOW. get into the middle of St Mark’s Square and stay there — swim against the pull until the paper says 95%';
+                      if (v.tide() > 0.8) return 'you missed it. it comes back in a few minutes; be in the square when the siren goes';
+                      return 'wait for the siren, then stand in the middle of the square and stay there while it fills';
                     },
                     where: function () { return hintObj(game.venice && game.venice.piazza); } },
     'traghetto': { clue: 'get on at a pontoon and stay on your feet the whole way over',
@@ -23483,8 +23522,8 @@ export function createSystems(game) {
     'symphony':       { clue: function () {
                       const k = game.kowloon;
                       if (!k) return 'be somewhere high when it starts';
-                      if (k.showing()) return 'IT IS ON. get up there, and wheek — each one lights a tower';
-                      return 'be on the roof at eight, up the bamboo, then wheek at the skyline';
+                      if (k.showing()) return 'IT IS ON. up the bamboo scaffold — hold E against it and push up — and press Q from the roof: each wheek lights a tower';
+                      return 'the bamboo scaffold on the harbour side: hold E against it and push up to climb. be on the roof when the show starts, then press Q at the skyline';
                     },
                     where: function () { return hintObj(game.kowloon && game.kowloon.roof); } },
     'bus-top': { clue: 'one hop to the rear platform, then up the stair',
@@ -23509,8 +23548,10 @@ export function createSystems(game) {
     'fragata':        { clue: 'wheek out on the sand — press Q', where: function () { return null; } },
     'fragata-ride':   { clue: function () {
                       const c = game.condor;
-                      if (c && c.active) return 'wheek again, then press E under it — and hold on for twelve seconds';
-                      return 'call one down first. they hang over the loaf all afternoon.';
+                      if (c && c.active && c.mounted) return 'hold on. twelve seconds in the air and it is yours';
+                      if (c && c.active && c.talonInReach()) return 'it is right over you: hold E to grab the talons';
+                      if (c && c.active) return 'press Q again and it drops lower. stand under it and hold E when the talons are in reach';
+                      return 'press Q at Arpoador to whistle one down. they hang over the loaf all afternoon';
                     },
                     where: function () {
                       const c = game.condor;
@@ -23574,9 +23615,9 @@ export function createSystems(game) {
     'bait-ball': { clue: 'over the drop-off. it opens if you go straight at it',
                     where: function () { return hintObj(game.palawan && game.palawan.baitBall && game.palawan.baitBall()); } },
     'the-manta':      { clue: function () {
-                      if (game.capy && game.capy.carriedBy) return 'do not let go. it is not finished.';
-                      if (game.capy && (game.capy.depth || 0) > 0.65) return 'get alongside the front edge and tap E';
-                      return 'it is four metres down. you cannot reach it from up here.';
+                      if (game.capy && game.capy.carriedBy) return 'do not let go. it is not finished';
+                      if (game.capy && (game.capy.depth || 0) > 0.65) return 'swim alongside its front edge and press E to take hold';
+                      return 'swim out over the lagoon and hold E to dive. it is four metres down — get alongside its front edge and press E';
                     },
                     where: function () { return hintObj(game.palawan && game.palawan.manta && game.palawan.manta()); } },
     'the-bloom':      { clue: function () {
@@ -23618,10 +23659,13 @@ export function createSystems(game) {
     'sunrise':        { clue: function () {
                       const g = game.goreme;
                       if (!g) return 'be high up when it comes over the ridge';
-                      if (g.sunUp() > 0.05 && g.sunUp() < 0.95) return 'IT IS COMING UP. get higher.';
-                      return 'be more than fifty metres up when it clears the ridge';
+                      const up = typeof g.aboard === 'function' ? g.aboard() : false;
+                      if (!up) return 'the balloon on the launch field: press Space to hop into the basket. then hold E — that is the burner — and it climbs';
+                      if (g.sunUp() > 0.05 && g.sunUp() < 0.95) return 'IT IS COMING UP. hold E and get above 55 m';
+                      return 'hold E to burn and climb; let go and it sinks. be above 55 m when the sun clears the ridge — the paper counts down';
                     },
-                    where: function () { return hintObj(game.goreme && game.goreme.valley); } },
+                    // the basket until you are in it, the sky once you are (W3)
+                    where: function () { const g = game.goreme; if (!g) return null; return hintObj(g.aboard && g.aboard() ? g.valley : g.balloon()); } },
     'the-herd': { clue: 'the one with the blanket. get on while they are standing',
                     where: function () { return hintObj(game.goreme && game.goreme.mare && game.goreme.mare()); } },
     'on-the-trailer': { clue: 'the truck is following you. come down where it can be.',
@@ -23660,9 +23704,9 @@ export function createSystems(game) {
     'all-the-way':    { clue: function () {
                       const m = game.manly;
                       if (!m) return 'take the biggest one of the set all the way in';
-                      if (m.riding()) return 'do not let it go — ' + m.rideDist().toFixed(0) + ' m';
-                      if (m.setNear() > 0.4) return 'THAT ONE. get in front of it.';
-                      return 'the big one comes round about every minute';
+                      if (m.riding()) return 'do not let it go — ' + m.rideDist().toFixed(0) + ' m. A/D to run along the face';
+                      if (m.setNear() > 0.4) return 'THAT ONE. swim toward the beach in front of it and let it take you';
+                      return 'swim out past the break to the bank. the big one of the set comes round about every minute — face the beach and swim in front of it';
                     },
                     where: function () { return hintObj(game.manly && game.manly.bank()); } },
     'the-bommie':     { clue: 'the rock out the back that stands the swell up',
@@ -23708,8 +23752,8 @@ export function createSystems(game) {
                       const g = game.pantanal;
                       if (!g) return 'take them over the river';
                       const n = g.following();
-                      if (n < 4) return 'not enough of them yet — ' + n + ' behind you';
-                      return 'go in. they will come. do not look round.';
+                      if (n < 4) return 'walk up to the herd and press Q; they fall in behind you. four or more — ' + n + ' so far — then swim the river';
+                      return 'go in and swim straight across. they will come. if something comes for them, press Q at it';
                     },
                     where: function () { return hintObj(game.pantanal && game.pantanal.bank); } },
 
@@ -23751,8 +23795,8 @@ export function createSystems(game) {
                       if (!c || !c.columnDebug) return 'get up the column in the light';
                       const d = c.columnDebug();
                       if (d.fall > 0.05) return 'you are doing it';
-                      if (d.topped) return 'now go over the side';
-                      return 'there is a way up it. it is a long way round.';
+                      if (d.topped) return 'now walk off the edge into the light. the birds come with you';
+                      return 'a ramp winds up the column of rock under the hole. walk up it, all the way round, to the top';
                     },
                     where: function () { return hintObj(game.cave && game.cave.column); } },
     'phytokarst':     { clue: 'everything green in here is leaning the same way',
@@ -23792,7 +23836,12 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.antarctic && game.antarctic.blueIce); } },
     'floe-drift':     { clue: 'get on one and stay on it. they all go north.',
                     where: function () { return hintObj(game.antarctic && game.antarctic.nearestFloe()); } },
-    'orca-ride':      { clue: 'wheek from the tiller, then hold your speed',
+    'orca-ride':      { clue: function () {
+                      const a = game.antarctic;
+                      const helm = a && typeof a.atHelm === 'function' ? a.atHelm() : false;
+                      if (!helm) return 'the orange tender at the jetty: stand at the back of it and press E for the tiller';
+                      return 'W/S throttle · A/D tiller. head for the blows, press Q from the tiller, and keep above 5.5 m/s inside the pod when they run';
+                    },
                     where: function () { return hintObj(game.antarctic && game.antarctic.pod()); } },
 
     // ---- chapter 18 ----
@@ -23824,7 +23873,12 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.monaco && game.monaco.chicane()); } },
     'the-hairpin':    { clue: 'they are down to four metres a second there. get on the roof.',
                     where: function () { return hintObj(game.monaco && game.monaco.hairpin); } },
-    'the-tunnel':     { clue: 'stay on the roof. do nothing. that is the whole thing.',
+    'the-tunnel':     { clue: function () {
+                      const m = game.monaco;
+                      const on = m && typeof m.riding === 'function' ? m.riding() >= 0 : false;
+                      if (on) return 'stay on the roof. do nothing. the tunnel comes round on its own';
+                      return 'the cars slow to a walk at the hairpin: stand by the road there and press Space onto a roof as one goes by. then stay on';
+                    },
                     where: function () { return hintObj(game.monaco && game.monaco.tunnelMouth); } },
 
     // ---- chapter 19 ----
@@ -23856,7 +23910,7 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
     'long-bien':      { clue: 'over the dyke, and then keep going',
                     where: function () { return hintObj(game.hanoi && game.hanoi.bridge); } },
-    'the-train':      { clue: 'stand still. that is all of it. stand still.',
+    'the-train':      { clue: 'the alley with the rails down the middle of it. stand in it, just off the rails, and wait for the horn. then do not move',
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
   };
   function hintHoldingBall() { return hintHolding('ball') ? 'carry it into the harbour' : 'grab the ball with E'; }
@@ -35946,6 +36000,14 @@ export function createSystems(game) {
         // todoParLine's, one card element over.
         if (when) line += '\u00a0·  ' + when;
         if (marqSayEl.textContent !== line) marqSayEl.textContent = line;
+        // ---- HOW (W3): the marquee's own clue, unless the row is top -----
+        const hw = sysHINTS[marqId];
+        let how = '';
+        if (hw && todoTopId !== marqId) {
+          try { how = sysSay(typeof hw.clue === 'function' ? hw.clue() : hw.clue) || ''; } catch (e) { how = ''; }
+        }
+        if (marqHowEl.textContent !== how) marqHowEl.textContent = how;
+        marqEl.classList.toggle('how', !!how);
       }
       hintHas = false;
       const h = started && todoTopId ? sysHINTS[todoTopId] : null;

@@ -85,6 +85,34 @@ Nineteen chapters call it. The ones whose moment has no natural length
 - **Cali's fireworks were invisible.** 0.28 m sparks at 60 m over the clouds. Size and life are now per spark; the bursts are 10–30 m over the terrace, over the city.
 - **Hunt state carried across a teleport.** `panHuntDone` is reset on entry and on leaving the river, and the hunt refuses a "line" whose tail is out of the water or more than 30 m from the animal.
 
+### W3 — HOW (11 Sep 2026)
+
+Playtest: *"it wasn't clear you needed to hold E near the flame of the balloon;
+in Cali I wasn't sure how to climb onto the party bus."*
+
+**The balloon line had never been drawn.** `gorSay(t)` called `game.say(t)` —
+npc.js's `sayAt(x, y, z, text)` — with one string, so the sentence landed in
+`x` and `sayAt` returned at `if (!text)`: the D5.2 bug antarctic.js was cured
+of, still alive in **goreme, kowloon, palawan and venice** (the burner, the
+bamboo climb, "wheek at the skyline", "hold E to dive", the traghetto). All
+four now go through `game.control`, which is the toast that runs the key-name
+substitution. Measured: *hold E for the burner…* on screen for the first time.
+
+**The signpost carries the HOW.** `sysHINTS[wow].clue` was printed only under
+the TOP row, and the marquee is rarely top. `.capyui-marqhow` prints it under
+the sentence on the signpost, refreshed on the hint tick (the state-aware
+clues change as you get closer), hidden when the row is top (its own clue is
+there). All nineteen marquee clues rewritten as steps with the button in
+them — *go round to the BACK of the bus: a ladder. walk into the bottom step
+and press Space up the steps onto the roof* — and eleven made state-aware
+(no bird / circling / in reach / mounted; not at the wheel / at the wheel;
+not aboard / aboard; and so on). The arrow points at the LADDER while the
+chiva is parked and at the BASKET until you are in it, not at the middle of
+a nine-metre bus or "the valley".
+
+Two one-shot boarding lines: near the parked chiva, and near the basket on
+the ground. `qa/w3-how.js` reads all of it back.
+
 ### TEST HOOKS ADDED
 
 `env.concertAudit()` · `kyoto.chuteAt(back)` · `quay.headsK()` / `quay.boatDebugTo(x, z)` · `venice.phaseDebug(p)` · `manly.barrelDebug(force)` · `pantanal.huntDebug()` / `pantanal.herdFollow(n)` · `sahara.dustDebug()` · `cali.fireworksDebug()`. Probes: `qa/w1-sydney.js`, `qa/w1-condor.js`, `qa/w1-marquees.js`, `qa/w1-venice.js`, `qa/w1-batch2.js`, `qa/w1-pan-dbg.js`, `qa/w1-barrel-dbg.js`, `qa/w1-cali-dbg.js`.

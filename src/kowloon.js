@@ -4604,7 +4604,13 @@ function hkToast(t) {
  */
 function hkSay(t) {
   const g = hkGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('kowloon.say', e); } }
+  // THROUGH game.control, NOT game.say (W3). `game.say` is npc.js's
+  // sayAt(x, y, z, text): the sentence landed in x, text was undefined, and
+  // sayAt returned at its own `if (!text)` — so this line had never once
+  // been drawn (the D5.2 bug in antarctic.js, in three more chapters).
+  // `control` is the toast that runs the key-name substitution, which is
+  // exactly what a sentence with "hold E" in it wants.
+  if (g && typeof g.control === 'function') { try { g.control(t); } catch (e) { warnOnce('kowloon.say', e); } }
   else hkToast(t);
 }
 function hkSfx(n, o) {

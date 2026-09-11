@@ -191,6 +191,7 @@ let gorSunBurned = false;    // has the burner been lit inside the window
 let gorSunNagged = false;    // ...and has the chief said so, once
 let gorSunDoves = false;     // the flock round the basket, once per sunrise
 let gorAboard = false, gorAboardT = 0, gorFlown = false;
+let gorBoardTold = false;
 let gorCarry = { x: 0, z: 0 };
 let gorCarrying = false;
 let gorGroundedT = 0, gorEmptyT = 0;
@@ -4407,6 +4408,17 @@ function gorUpdateBalloon(game, dt) {
                  Math.abs(capy.position.x - gorBalX) < gorBASKET.w * 0.5 + 0.35 &&
                  Math.abs(capy.position.z - gorBalZ) < gorBASKET.d * 0.5 + 0.35 &&
                  capy.position.y > floorY - 0.4 && capy.position.y < floorY + 2.2);
+  // ...AND HOW TO GET IN (W3). Playtest: "it was not clear you needed to hold
+  // E near the flame." The burner line below had never been drawn (see
+  // gorSay), and nothing said how to board. Once, near the basket on the
+  // ground with the envelope up, not aboard.
+  if (!gorAboard && !gorBoardTold && capy && capy.position && gorBalY - groundY < 1.5) {
+    const dx = capy.position.x - gorBalX, dz = capy.position.z - gorBalZ;
+    if (dx * dx + dz * dz < 8 * 8) {
+      gorBoardTold = true;
+      gorSay('press Space to hop into the basket. once you are in, hold E — the burner — and it climbs.');
+    }
+  }
   if (gorAboard && !wasAboard) {
     gorAboardT = 0;
     if (!gorToldBurner) {
@@ -5103,7 +5115,13 @@ function gorToast(t) {
  */
 function gorSay(t) {
   const g = gorGame;
-  if (g && typeof g.say === 'function') { try { g.say(t); } catch (e) { warnOnce('goreme.say', e); } }
+  // THROUGH game.control, NOT game.say (W3). `game.say` is npc.js's
+  // sayAt(x, y, z, text): the sentence landed in x, text was undefined, and
+  // sayAt returned at its own `if (!text)` — so this line had never once
+  // been drawn (the D5.2 bug in antarctic.js, in three more chapters).
+  // `control` is the toast that runs the key-name substitution, which is
+  // exactly what a sentence with "hold E" in it wants.
+  if (g && typeof g.control === 'function') { try { g.control(t); } catch (e) { warnOnce('goreme.say', e); } }
   else gorToast(t);
 }
 function gorSfx(n, o) {
