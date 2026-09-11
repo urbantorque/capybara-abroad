@@ -2246,6 +2246,8 @@ function hanUpdateCub(game, dt) {
     game.wowLive((hanCubHold >= 0 ? 'behind one — go round · ' : '') + dr[2] + ' · ' + dd + ' m · ' +
                  Math.round(Math.abs(hanCubV) * 3.6) + ' km/h · pho ' + (heat > 0.66 ? 'hot' : heat > 0.33 ? 'warm' : 'cooling'),
                  hanCubNext / hanDROPS.length);
+    // the run time is the record, and the line has to run against it
+    if (typeof game.recordLive === 'function' && hanCubT > 0) game.recordLive('pho-run', hanCubT);
   }
 }
 function hanBuildRideBody(game) {

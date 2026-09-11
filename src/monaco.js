@@ -3113,6 +3113,8 @@ function monUpdateRace(game, dt) {
     game.wowLive((inBore ? 'THE TUNNEL · ' : holding >= 0 ? 'behind one — move over · ' : '') +
                  Math.round(monMeV) + ' m/s · ' + Math.round(left) + ' m to the line · ' +
                  monRacePassed + ' of ' + monCarG.length + ' passed', clamp(monMeDist / (monTrackTotal - monME_GRID_S), 0, 1));
+    // the lap time is the record, and the line has to run against it
+    if (typeof game.recordLive === 'function' && monRaceT > 0) game.recordLive('the-tunnel', monRaceT);
   }
 }
 

@@ -2971,8 +2971,7 @@ const sahGOAT_PENS = [
 ];
 let sahGoatBody = null, sahGoatHead = null, sahGoatData = null, sahGoatN = 0;
 let sahGoatCrit = null;
-const sahGOAT_NEAR = 5.4;        // m of shuffle round the group's own centre
-const sahGOAT_APPR_STOP = 2.4;   // ...and how close one comes to a sat capybara
+const sahGOAT_NEAR = 5.4;        // m of shuffle round the group's own centre; how close one comes to a sat capybara is the calm's (THE LOAF, systems.js)
 
 function sahBuildGoats(game, root) {
   let n = 0;
@@ -5418,6 +5417,8 @@ function sahUpdateJet(game, dt) {
       where = 'the minaret · ' + Math.round(Math.hypot(sahJetX - sahKOUTOUBIA.x, sahJetZ - sahKOUTOUBIA.z)) + ' m · land on top';
     }
     game.wowLive(where + ' · fuel ' + bar + (sahJetGround ? ' · filling' : ''), sahJetNext / sahJET_N);
+    // the flight time is the record, and the line has to run against it
+    if (typeof game.recordLive === 'function' && sahJetT > 0) game.recordLive('jetpack', sahJetT);
   }
 }
 

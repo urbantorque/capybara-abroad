@@ -257,13 +257,12 @@ let panCaimanSat = -1, panCaimanNotice = 0;
 // when the line goes past and lie on the bottom. A crossing needs something
 // in the water that wants the last one in the line. Once per crossing, with
 // the herd mid-river, the nearest jacaré comes off the bank and closes on the
-// tail of the line at panHUNT_V — eyes and back out, a V of ripples — and
+// tail of the line at panBOSS_V[round] — eyes and back out, a V of ripples — and
 // either takes the last follower off the line (a splash, and it is gone to
 // graze on the far bank, your fault) or is turned by the voice: a wheek
 // inside panHUNT_HEAR sends it under and it does not come back this tide.
 // The same shape as the onça and the skua — the animal's voice spent on
 // somebody else's behalf — in the one place the chapter is for.
-const panHUNT_V = 2.7;          // m/s in the water; the herd swims about 1.8
 const panHUNT_HEAR = 20;        // m: a wheek nearer than this turns it
 const panHUNT_TAKE = 1.5;       // m from the last follower: it has it
 // ---- ...AND IT IS O GRANDÃO NOW (X4): a mini-boss, in three rounds ---------
