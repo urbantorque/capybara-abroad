@@ -24033,6 +24033,19 @@ export function createSystems(game) {
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
     'long-bien':      { clue: 'over the dyke, and then keep going',
                     where: function () { return hintObj(game.hanoi && game.hanoi.bridge); } },
+    'pho-run':        { clue: function () {
+                      const h = game.hanoi;
+                      const c = h && typeof h.cub === 'function' ? h.cub() : null;
+                      if (c && c.on && c.hold >= 0) return 'behind one — A/D round it';
+                      if (c && c.on) return 'W throttle · S brake · A/D steer · stop inside the lit lantern’s ring';
+                      return 'the red scooter by the pho stall: press E at the seat';
+                    },
+                    where: function () {
+                      const h = game.hanoi;
+                      if (!h || typeof h.cub !== 'function') return null;
+                      const c = h.cub();
+                      return hintObj(c.on && !c.done ? h.dropAt(c.next) : h.cubAt());
+                    } },
     'the-train':      { clue: 'stand in the rail alley, off the rails. wait for the horn, then hold still',
                     where: function () { return hintObj(game.hanoi && game.hanoi.rails); } },
   };

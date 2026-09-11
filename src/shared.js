@@ -3091,6 +3091,11 @@ export const TASKS = [
   { id: 'to-hanoi',     text: 'Get across the first road',              chapter: 19 },
   { id: 'cross-the-road', text: 'Walk into the traffic and trust it',   chapter: 19 },
   { id: 'pho-raid',     text: 'Get your whole face in a bowl of pho',   chapter: 19 },
+  // The marquee, and it is a scooter (X5): the stall's Cub, three bowls on
+  // the rack, three lanterns round the quarter, and two hundred and forty
+  // riders in the way.
+  { id: 'pho-run',      text: 'Take the pho scooter round the quarter — three deliveries through the traffic', chapter: 19,
+    wow: 'THE PHO RUN' },
   { id: 'flower-bike',  text: 'Unload a flower bicycle',                chapter: 19 },
   { id: 'barber',       text: 'Give the barber’s mirror a surprise',       chapter: 19 },
   // The first mini, and the fourteenth thing in this game that carries you.
@@ -3109,8 +3114,7 @@ export const TASKS = [
   // moving at all.
   { id: 'fold-the-street', text: 'Be there when the street folds up',   chapter: 19, act: 3 },
   { id: 'long-bien',    text: 'Walk out onto the old bridge',           chapter: 19, act: 3 },
-  { id: 'the-train',    text: 'Stand in the alley as the train squeezes through', chapter: 19, act: 3,
-    wow: 'THE TRAIN ALLEY' },
+  { id: 'the-train',    text: 'Stand in the alley as the train squeezes through', chapter: 19, act: 3 },
 ];
 
 
@@ -3446,7 +3450,7 @@ export const CHAPTERS = [
     hint: 'the road is not going to stop',            open: 'seven million people and six million of them are on a moped.',
     way: 'the head of the Long Biên bridge',
     keep: 'a plastic stool, slightly cracked', win: 3,
-    marquee: { x: -82, z: 46, up: 3, say: 'the train alley' },
+    marquee: { x: 6.0, z: 15.5, up: 3, say: 'the pho stall’s scooter, on Hang Ngang' },
     note: 'You crossed six lanes without stopping and the road never noticed you were there.',
     acts: [
       { kick: 'THE THIRTY-SIX STREETS', line: 'do not wait for a gap. there is no gap.' },
@@ -3919,6 +3923,7 @@ export const RECORDS = {
   'ride-the-flow':   { label: 'carried', unit: ' m through the quarter', better: 'higher', dp: 0 },
   'the-stools':      { label: 'had', unit: ' down at once', better: 'higher', dp: 0, par: 30 },
   'the-train':       { label: 'stood your ground within', unit: ' m of it', better: 'lower', dp: 2, par: 1.8 },
+  'pho-run':       { label: 'three bowls in', unit: ' s', better: 'lower', dp: 1, par: 95 },
 };
 
 

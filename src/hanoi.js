@@ -244,6 +244,42 @@ let hanLocBarber = null, hanLocPuppet = null, hanLocMarket = null;
 
 // instanced fields
 let hanWinMesh = null;
+// ================================================================ THE PHO RUN ==
+// THE MARQUEE, AND IT IS A SCOOTER (X5).
+//
+// Two hundred and forty engines are the medium of this chapter and the animal
+// could only ever be a passenger in them. The pho stall has a Honda Cub with
+// three bowls on the rack, and E at the seat makes it yours: W/S throttle and
+// brake, A/D to steer, and the road is the road — the four centrelines are the
+// only tarmac, and the kerb is a wall that costs you your speed. Three
+// deliveries round the quarter, each a lantern on a pole with a ring under it,
+// lit one at a time: the bia hoi corner, the market, the water puppets. The
+// bowls come off the rack as they go. The pho cools, and the time is the
+// record.
+//
+// The traffic is what makes it a game: the riders swerve for the animal as
+// they always did, but only ahead of themselves, so a scooter coming up
+// behind one is held to its speed until it moves over. Kinematic, parked at
+// the helm, like every vehicle in this game.
+const hanCUB = { x: 6.0, z: 15.5, yaw: 0 };          // parked at the pho stall, on the road's edge
+const hanCUB_DOOR_R = 3.2;
+const hanCUB_VMAX  = 12.5;      // m/s — a Cub, ridden hard
+const hanCUB_ACC   = 6.5;
+const hanCUB_BRAKE = 11.0;
+const hanCUB_DRAG  = 2.0;
+const hanCUB_REV   = 2.0;       // m/s astern
+const hanCUB_TURN  = 2.4;       // rad/s at full lock, with way
+const hanCUB_KERB  = 1.2;       // m past the lane's half-width the wheels may go
+const hanCUB_HOLD  = 1.7;       // m to a rider ahead that holds you to their speed
+const hanCUB_DROP_R = 6.0;      // m from a lantern, stopped, that delivers
+const hanCUB_DROP_V = 2.5;      // ...and "stopped" is under this
+const hanCUB_COLD  = 150;       // s the pho takes to go cold — the timer, not a fail
+// the three drops, each at a road's edge: x, z, name
+const hanDROPS = [[60, 22.5, 'the bia hoi corner'], [-52, 83.5, 'the market'], [40, -24.5, 'the water puppets']];
+let hanCubG = null, hanCubBowls = null, hanCubOn = false, hanCubCool = 0;
+let hanCubX = hanCUB.x, hanCubZ = hanCUB.z, hanCubYaw = hanCUB.yaw, hanCubV = 0, hanCubLean = 0;
+let hanCubNext = 0, hanCubDone = false, hanCubT = 0, hanCubHold = -1, hanCubHornT = 0, hanCubKerbT = 0;
+let hanCubMover = null, hanDropMeshes = null, hanDropMats = null, hanDropT = 0, hanCubBest = 0;
 let hanSignMesh = null;
 const hanFolkMeshes = [];
 const hanFolkGroups = [];
@@ -2001,6 +2037,217 @@ function hanUpdateCrossing(game, dt) {
  * Palawan uses and is invisible from outside.
  */
 let hanRideBody = null;
+/** The Cub at the stall, the three bowls on its rack, and the three lanterns (X5). */
+function hanBuildCub(game, root) {
+  const g = new THREE.Group();
+  const K = hanMerger();
+  const body = PALETTE.hanLantern, chrome = PALETTE.hanChrome;
+  K.cyl(0, 0.30, 0.62, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+  K.cyl(0, 0.30, -0.60, 0.30, 0.12, PALETTE.hanTyre, 0, 0, Math.PI / 2, 8);
+  K.box(0, 0.40, 0, 0.26, 0.26, 1.30, body);
+  K.box(0, 0.62, -0.34, 0.34, 0.20, 0.62, PALETTE.hanSeat);
+  K.box(0, 0.60, 0.30, 0.30, 0.34, 0.34, body);
+  K.box(0, 0.88, 0.46, 0.62, 0.06, 0.08, chrome);
+  K.cyl(0, 0.74, 0.52, 0.07, 0.44, chrome, 0.35, 0, 0, 4);
+  K.box(0, 0.94, 0.56, 0.16, 0.12, 0.10, PALETTE.hanLampGlass);
+  K.box(0, 0.74, -0.80, 0.50, 0.06, 0.40, chrome);                    // the rack
+  const m = new THREE.Mesh(K.build(), hanVC());
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  // three bowls on the rack, stacked; one comes off per delivery
+  hanCubBowls = [];
+  for (let i = 0; i < 3; i++) {
+    const B = hanMerger();
+    B.cyl(0, 0.84 + i * 0.16, -0.80, 0.20, 0.14, 0xf2ead8, 0, 0, 0, 8);
+    B.cyl(0, 0.91 + i * 0.16, -0.80, 0.16, 0.03, 0xd9a25a, 0, 0, 0, 8);
+    const bm = new THREE.Mesh(B.build(), hanVC());
+    bm.castShadow = true;
+    g.add(bm);
+    hanCubBowls.push(bm);
+  }
+  g.position.set(hanCubX, hanGROUND, hanCubZ);
+  g.rotation.y = hanCubYaw;
+  root.add(g);
+  hanCubG = g;
+  // the lanterns: a pole, a red lantern, a ring on the road
+  hanDropMeshes = []; hanDropMats = [];
+  for (let i = 0; i < hanDROPS.length; i++) {
+    const d = hanDROPS[i];
+    const P = hanMerger();
+    P.cyl(d[0], hanGROUND + 2.2, d[1], 0.08, 4.4, 0x4a4038, 0, 0, 0, 6);
+    const pm = new THREE.Mesh(P.build(), hanVC());
+    root.add(pm);
+    const mat = new THREE.MeshLambertMaterial({ color: PALETTE.hanLantern, emissive: PALETTE.hanLantern, emissiveIntensity: 0.3 });
+    const lan = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), mat);
+    lan.position.set(d[0], hanGROUND + 4.6, d[1]);
+    root.add(lan);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.14, 4, 20), mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(d[0], hanGROUND + 0.05, d[1]);
+    root.add(ring);
+    hanDropMeshes.push(lan); hanDropMats.push(mat);
+  }
+}
+function hanCubTake(game) {
+  const capy = game.capy;
+  hanCubOn = true; hanCubCool = 0.4;
+  if (capy) { capy.atHelm = true; capy.rideBody = null; }
+  hanCubV = 0;
+  if (!hanCubDone) { hanCubNext = 0; hanCubT = 0; if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true; }
+  hanSfx('chime', { volume: 0.6, pitch: 1.0 });
+  if (typeof game.control === 'function') game.control('W throttle · S brake · A/D steer · the lit lantern is the drop: stop inside its ring · E to get off');
+  else hanToast('W throttle · S brake · A/D steer');
+}
+function hanCubLeave(game) {
+  const capy = game.capy;
+  hanCubOn = false; hanCubCool = 0.4;
+  if (capy) capy.atHelm = false;
+  if (capy && capy.body) {
+    const ox = hanCubX + 1.3 * Math.cos(hanCubYaw), oz = hanCubZ - 1.3 * Math.sin(hanCubYaw);
+    capy.body.position.set(ox, hanGROUND + 0.9, oz);
+    capy.body.velocity.set(0, 0, 0);
+    capy.body.previousPosition.copy(capy.body.position);
+    capy.body.interpolatedPosition.copy(capy.body.position);
+    if (capy.position) capy.position.set(ox, hanGROUND + 0.9, oz);
+  }
+}
+function hanUpdateCub(game, dt) {
+  if (!hanCubG || dt <= 0) return;
+  const input = game.input, capy = game.capy;
+  if (hanCubCool > 0) hanCubCool -= dt;
+  // ---- on and off ---------------------------------------------------------
+  if (capy && capy.body && input && input.actionPressed && hanCubCool <= 0) {
+    if (hanCubOn) {
+      if (Math.abs(hanCubV) > 3) { if (typeof game.control === 'function') game.control('S to stop first'); }
+      else hanCubLeave(game);
+    } else if (!capy.carriedBy && !capy.atHelm && !capy.climbing && hanRider < 0) {
+      const dx = capy.body.position.x - hanCubX, dz = capy.body.position.z - hanCubZ;
+      const dy = capy.body.position.y - hanGROUND;
+      if (dx * dx + dz * dz < hanCUB_DOOR_R * hanCUB_DOOR_R && dy > -1 && dy < 3) hanCubTake(game);
+    }
+  }
+  // the lanterns: the next one bright and breathing
+  hanDropT += dt;
+  if (hanDropMats) {
+    for (let i = 0; i < hanDropMats.length; i++) {
+      const next = hanCubOn && !hanCubDone && i === hanCubNext;
+      const done = hanCubDone || i < hanCubNext;
+      const want = next ? 1.6 + Math.sin(hanDropT * 5) * 0.8 : done ? 0.9 : 0.3;
+      hanDropMats[i].emissiveIntensity = damp(hanDropMats[i].emissiveIntensity, want, 6, dt);
+    }
+  }
+  if (!hanCubMover && game.sfxMover) hanCubMover = game.sfxMover('twostroke', { key: 'han:cub', near: 6, far: 70 });
+  if (hanCubMover) {
+    hanCubMover.at(hanCubX, hanGROUND + 0.6, hanCubZ);
+    hanCubMover.vel(Math.sin(hanCubYaw) * hanCubV, 0, Math.cos(hanCubYaw) * hanCubV);
+    hanCubMover.set(hanCubOn ? 0.25 + 0.75 * clamp(Math.abs(hanCubV) / hanCUB_VMAX, 0, 1) : 0);
+  }
+  if (!hanCubOn) {
+    if (hanCubV !== 0) { hanCubV = 0; }
+    hanCubG.position.set(hanCubX, hanGROUND, hanCubZ);
+    hanCubG.rotation.set(0, hanCubYaw, 0);
+    return;
+  }
+  hanCubT += dt;
+  // ---- the throttle, the bars ---------------------------------------------
+  const gas = input ? clamp(-input.z, 0, 1) : 0;
+  const brake = input ? clamp(input.z, 0, 1) : 0;
+  if (gas > 0) hanCubV = Math.min(hanCUB_VMAX, hanCubV + hanCUB_ACC * gas * dt);
+  else if (brake > 0) hanCubV = hanCubV > 0.2 ? Math.max(0, hanCubV - hanCUB_BRAKE * brake * dt) : Math.max(-hanCUB_REV, hanCubV - 2.0 * dt);
+  else hanCubV = hanCubV > 0 ? Math.max(0, hanCubV - hanCUB_DRAG * dt) : Math.min(0, hanCubV + hanCUB_DRAG * dt);
+  const steer = input ? clamp(input.x, -1, 1) : 0;
+  // a Cub turns at walking pace: a third of the lock from standing, the rest
+  // bought with way — so a rider who has stopped facing a wall can get out
+  const auth = clamp(0.35 + Math.abs(hanCubV) / 3.5, 0, 1);
+  hanCubYaw -= steer * hanCUB_TURN * auth * (hanCubV < -0.2 ? -1 : 1) * dt;
+  // ---- the traffic: a rider ahead in your line holds you ------------------
+  hanCubHold = -1;
+  if (hanBikeN && hanCubV > 1) {
+    const fx = Math.sin(hanCubYaw), fz = Math.cos(hanCubYaw);
+    let bestD = 1e9;
+    for (let i = 0; i < hanBikeN; i++) {
+      hanBikeAt(i, hanV3b);
+      const dx = hanV3b.x - hanCubX, dz = hanV3b.z - hanCubZ;
+      const along = dx * fx + dz * fz, across = Math.abs(dx * fz - dz * fx);
+      if (along > 0.4 && along < 3.2 && across < hanCUB_HOLD && along < bestD) { bestD = along; hanCubHold = i; }
+    }
+    if (hanCubHold >= 0) {
+      const bv = hanBikeData[hanCubHold * hanBIKE_STRIDE + 5];
+      if (hanCubV > bv * 0.9) hanCubV = Math.max(0, bv * 0.9);
+      hanCubHornT -= dt;
+      if (hanCubHornT <= 0) { hanCubHornT = 1.6; hanSfx('horn', { volume: 0.16, pitch: 1.6, force: true }); }
+    }
+  }
+  // ---- along, and the kerb ------------------------------------------------
+  const nx = hanCubX + Math.sin(hanCubYaw) * hanCubV * dt;
+  const nz = hanCubZ + Math.cos(hanCubYaw) * hanCubV * dt;
+  const d = hanLaneAt(nx, nz);
+  const w = hanLaneW;
+  if (d > w + hanCUB_KERB) {
+    // THE KERB IS A WALL: slide back onto the road, and it costs the way
+    hanLaneAtS(hanLaneI, hanLaneS, hanTmp);
+    const vx = hanTmp.x - nx, vz = hanTmp.z - nz, vl = Math.hypot(vx, vz) || 1;
+    const push = d - (w + hanCUB_KERB);
+    hanCubX = nx + vx / vl * push; hanCubZ = nz + vz / vl * push;
+    hanCubV *= Math.max(0, 1 - 4.0 * dt);
+    hanCubKerbT -= dt;
+    if (hanCubKerbT <= 0 && Math.abs(hanCubV) > 2) {
+      hanCubKerbT = 0.5;
+      hanSfx('thud', { volume: 0.22, pitch: 1.2, force: true });
+      if (typeof game.shake === 'function') game.shake(0.04);
+    }
+  } else { hanCubX = nx; hanCubZ = nz; }
+  // ---- the drops ----------------------------------------------------------
+  if (!hanCubDone && hanCubNext < hanDROPS.length) {
+    const dr = hanDROPS[hanCubNext];
+    const dd = Math.hypot(hanCubX - dr[0], hanCubZ - dr[1]);
+    if (dd < hanCUB_DROP_R && Math.abs(hanCubV) < hanCUB_DROP_V) {
+      if (hanCubBowls && hanCubBowls[2 - hanCubNext]) hanCubBowls[2 - hanCubNext].visible = false;
+      hanCubNext++;
+      hanSfx('chime', { volume: 0.5, pitch: 1.0 + hanCubNext * 0.12, force: true });
+      hanCue('cheer', dr[0], hanGROUND + 1.4, dr[1], 0.35, 1.1, 60);
+      if (typeof game.confetti === 'function') game.confetti(hanCubX, hanGROUND + 1.4, hanCubZ, 10);
+      if (typeof game.punch === 'function') game.punch(0.06);
+      if (hanCubNext >= hanDROPS.length) {
+        hanCubDone = true;
+        hanTask('pho-run');
+        hanRecord('pho-run', +hanCubT.toFixed(1));
+        hanToast('three bowls, ' + (hanCubT < hanCUB_COLD ? 'still hot. ' : 'gone cold, but delivered. ') + hanCubT.toFixed(0) + ' seconds round the quarter.');
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+        if (typeof game.punch === 'function') game.punch(0.14);
+        if (typeof game.frameShot === 'function') game.frameShot({ yaw: hanCubYaw + Math.PI + 0.5, dist: 12, pitch: 0.22, raise: 1.0, hold: 2.4, over: true });
+      } else {
+        hanToast(dr[2] + ' — one down. next: ' + hanDROPS[hanCubNext][2]);
+      }
+    }
+  }
+  // ---- the pose, the passenger, the line ----------------------------------
+  hanCubLean = damp(hanCubLean, -steer * auth * 0.22, 6, dt);
+  hanCubG.position.set(hanCubX, hanGROUND, hanCubZ);
+  hanCubG.rotation.set(0, hanCubYaw, hanCubLean);
+  if (capy && capy.body) {
+    const cb = capy.body;
+    cb.position.set(hanCubX - Math.sin(hanCubYaw) * 0.3, hanGROUND + 1.42, hanCubZ - Math.cos(hanCubYaw) * 0.3);
+    cb.velocity.set(Math.sin(hanCubYaw) * hanCubV, 0, Math.cos(hanCubYaw) * hanCubV);
+    cb.angularVelocity.set(0, 0, 0);
+    cb.previousPosition.copy(cb.position);
+    cb.interpolatedPosition.copy(cb.position);
+    if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    if (capy.group) {
+      capy.group.position.set(cb.position.x, cb.position.y, cb.position.z);
+      capy.group.rotation.y = hanCubYaw;
+    }
+  }
+  hanFrame.x = 0; hanFrame.z = 0;
+  if (typeof game.wowLive === 'function' && !hanCubDone) {
+    const dr = hanDROPS[hanCubNext];
+    const dd = Math.round(Math.hypot(hanCubX - dr[0], hanCubZ - dr[1]));
+    const heat = clamp(1 - hanCubT / hanCUB_COLD, 0, 1);
+    game.wowLive((hanCubHold >= 0 ? 'behind one — go round · ' : '') + dr[2] + ' · ' + dd + ' m · ' +
+                 Math.round(Math.abs(hanCubV) * 3.6) + ' km/h · pho ' + (heat > 0.66 ? 'hot' : heat > 0.33 ? 'warm' : 'cooling'),
+                 hanCubNext / hanDROPS.length);
+  }
+}
 function hanBuildRideBody(game) {
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
                               material: (game.mats && game.mats.prop) || undefined });
@@ -3850,6 +4097,7 @@ function hanBuild(game) {
   hanBuildStools(game, hanRoot);
   hanBuildCables(game, hanRoot);
   hanBuildBikes(game, hanRoot);
+  hanBuildCub(game, hanRoot);   // X5: the marquee is a scooter
   hanBuildRideBody(game);
   hanBuildFolk(game, hanRoot);
   hanBuildLanterns(hanRoot);
@@ -4109,7 +4357,8 @@ export function createHanoi(game) {
       }
       hanUpdateLake(dt);
       hanUpdateBikes(game, dt);
-      hanUpdateRide(game, dt);
+      hanUpdateCub(game, dt);   // X5
+      if (!hanCubOn) hanUpdateRide(game, dt);   // ...and nobody's footwell takes a rider off her own scooter
       hanUpdateCrossing(game, dt);
       hanUpdateTrain(game, dt);
       hanUpdateStools(game, dt);
@@ -4132,6 +4381,8 @@ export function createHanoi(game) {
       hanCrossLane = -1; hanCrossOk = false; hanDither = 0;
       hanRider = -1; hanRideT = 0; hanRideDist = 0; hanRideGrace = 0; hanRideHave = false;
       hanFrame.x = 0; hanFrame.z = 0;
+      // X5: the Cub is back at the stall with its bowls
+      if (hanCubG && !hanCubOn) { hanCubX = hanCUB.x; hanCubZ = hanCUB.z; hanCubYaw = hanCUB.yaw; hanCubV = 0; if (!hanCubDone) { hanCubNext = 0; if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true; } }
       if (hanRideBody) {
         hanRideBody.position.set(0, -900, 0);
         hanRideBody.velocity.setZero();
@@ -4169,12 +4420,28 @@ export function createHanoi(game) {
     },
     onExit() {
       hanRider = -1;
+      // X5: nobody rides out of a country
+      if (hanCubOn) { hanCubOn = false; if (game.capy) game.capy.atHelm = false; }
+      if (hanCubMover) hanCubMover.set(0);
       hanFrame.x = 0; hanFrame.z = 0;
       if (hanRideBody) hanRideBody.velocity.setZero();
       if (hanTrainBody) hanTrainBody.velocity.setZero();
     },
   });
 
+  // ---- THE PHO RUN (X5) --------------------------------------------------
+  api.cub = function () { return { on: hanCubOn, x: hanCubX, z: hanCubZ, yaw: hanCubYaw, v: hanCubV, next: hanCubNext, done: hanCubDone, t: hanCubT, hold: hanCubHold }; };
+  api.cubAt = function () { return { x: hanCubX, y: hanGROUND, z: hanCubZ }; };
+  api.dropAt = function (i) { const d = hanDROPS[Math.max(0, Math.min(hanDROPS.length - 1, i | 0))]; return { x: d[0], y: hanGROUND + 1, z: d[1], name: d[2] }; };
+  api.cubDebug = function (o) {
+    if (o && o.take && !hanCubOn) hanCubTake(game);
+    if (o && typeof o.x === 'number') { hanCubX = o.x; hanCubZ = o.z; hanCubV = 0; if (typeof o.yaw === 'number') hanCubYaw = o.yaw; }
+    return api.cub();
+  };
+  api.rideYaw = function () { return hanCubOn ? hanCubYaw : NaN; };
+  // above the awnings (ground + 3.2, 2.2 m deep off every shop): a chase
+  // camera at three metres was a red tarpaulin for most of the run
+  api.rig = function () { return hanCubOn ? { w: 1, dist: 7.5, pitch: 0.55, raise: 0.9, lambda: 3.0 } : null; };
   game.hanoi = api;
   return api;
 }
