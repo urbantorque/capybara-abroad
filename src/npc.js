@@ -1857,66 +1857,172 @@ export function createNPCs(game) {
   // The resolver is general — any kind may be given a chapter row later —
   // and only these two are written, because 17 chapters of a pool nobody can
   // tell apart from the neutral one is work that buys nothing.
+  // ---- ...AND SEVENTEEN CHAPTER VOICES WRITTEN TO ONE TEMPLATE (M9) -----
+  //
+  // The merge above is right and it made this table matter more than it could
+  // carry. Static census of what was here:
+  //
+  //   wary[0]      'You. Again.' BYTE-IDENTICAL in five chapters (Iceland,
+  //                Marrakech, Son Doong, Antarctica, Monte Carlo), plus
+  //                'You again, mate.' identical in two more (the Quay, Manly),
+  //                against a neutral pool that also opens 'You again.'
+  //   wary[1]      "I know / I remember ..." in fifteen of seventeen
+  //   wary[2]      begins "Not ..." in fourteen of seventeen
+  //   incident[0]  OPENS ON THE NUMBER THREE IN SEVENTEEN OF SEVENTEEN, twelve
+  //                of them on the literal word (Three / Tres / Third)
+  //
+  // ...and because npcSayFor merges three chapter lines with seven neutral
+  // ones, seventy per cent of what a player hears when a place is cross with
+  // them was the same in all nineteen chapters. On the pool the comment above
+  // correctly identifies as the most-heard in the game.
+  //
+  // Six each now, and the two shared slots are gone. That moves the mix to
+  // 46/54. Three rules held throughout, and the third is the one that was
+  // actually being broken:
+  //   1. NO LINE NAMES WHAT YOU DID. An incident line is a person reacting to a
+  //      square, not a receipt. (This was already true and is kept.)
+  //   2. A line has to be unsayable anywhere else. Every string in this table
+  //      is unique across it; qa/m9-voice.mjs asserts it.
+  //   3. NOT EVERY REACTION IS A COUNT. Seventeen of seventeen opening on the
+  //      number is a template wearing seventeen hats, and it is the single most
+  //      legible way this table said so.
+  //
+  // Two deliberate keeps. The Quay keeps 'You again, mate.' — one of the two
+  // should, and it is the chapter that earned it. And Antarctica keeps the log,
+  // which four chapters were running as the same gag with the same noun; it is
+  // the best of the four and it is now the only one.
   const npcPLACE_SAY = {
     quay: {
-      wary:     ['You again, mate.', 'Yeah, I know you.', 'Not on this wharf.'],
+      wary:     ['You again, mate.', 'Yeah, I know you.', 'Not on this wharf.',
+                 'Off. Go on. Off.', 'You are not getting on that one either.',
+                 'I have got a whole timetable, and I have got you.'],
       incident: ['That is three off this wharf.', 'Righto. That is a pattern.',
-                 'Somebody wants to ring somebody.'],
+                 'Somebody wants to ring somebody.',
+                 'The nine-forty is going to be late and I know why.',
+                 'Eleven years on this run and this is new.',
+                 'I am not paid enough to describe this.'],
     },
     kyoto: {
-      wary:     ['Ah. You.', 'I remember.', 'Please. Not again.'],
+      wary:     ['Ah. You.', 'I remember.', 'Please. Not again.',
+                 'We were having such a quiet morning.',
+                 'You are very welcome. Somewhere else.',
+                 'It has worked out where the gate is.'],
       incident: ['Three times now.', 'Everyone is being very polite about this.',
-                 'It is not confused. It has decided.'],
+                 'It is not confused. It has decided.',
+                 'Four hundred years, and then this afternoon.',
+                 'Nobody is going to say anything. That is the problem.',
+                 'Something is going to have to be rearranged.'],
     },
     cali: {
-      wary:     ['Otra vez vos.', 'I know you now.', 'Ay, no. Not you.'],
+      wary:     ['Otra vez vos.', 'I know you now.', 'Ay, no. Not you.',
+                 'You come back every afternoon, vos.',
+                 'The whole barrio knows the animal.',
+                 'Go on. Go and bother the other block.'],
       incident: ['Tres. Three of them.', 'Somebody is going to have to say something.',
-                 'That one is enjoying itself.'],
+                 'That one is enjoying itself.',
+                 'It is on the beat. That is the worst part.',
+                 'Nobody here is even surprised any more.',
+                 'Put on something louder. Drown it out.'],
     },
     rio: {
-      wary:     ['Ah, e voce.', 'I know that one.', 'Not on my stretch.'],
+      wary:     ['Ah, e voce.', 'I know that one.', 'Not on my stretch.',
+                 'Every day now. Every single day.',
+                 'You were down by the rock yesterday.',
+                 'Go and be somebody else’s problem.'],
       incident: ['Tres! Three!', 'It is still going and nobody is stopping it.',
-                 'The whole beach saw that.'],
+                 'The whole beach saw that.',
+                 'Somebody is filming. Somebody is always filming.',
+                 'It is Saturday. Of course it is Saturday.',
+                 'That is not a dog. I have said so twice.'],
     },
     iceland: {
-      wary:     ['You. Again.', 'I know what you are now.', 'Not this time.'],
-      incident: ['Three, in one hour.', 'That was deliberate.',
-                 'There is nobody else out here to blame.'],
+      wary:     ['Oh. The animal.', 'I know what you are now.',
+                 'Not in this weather. Not again.',
+                 'Do not make me put a coat on.',
+                 'There is nobody else out here, you know.',
+                 'I have got all night. So have you, apparently.'],
+      incident: ['That is three, on an island with nobody on it.', 'That was deliberate.',
+                 'There is nobody else out here to blame.',
+                 'It has stopped being weather and started being you.',
+                 'Nothing here has ever needed a rule before.',
+                 'I am going to have to mention this to somebody.'],
     },
     sahara: {
-      wary:     ['You. Again.', 'I have seen you before.', 'Not at this cart.'],
+      wary:     ['Ah. The rodent.', 'I have seen you before.', 'Not at this cart.',
+                 'You come past twice and you buy nothing.',
+                 'Everybody in the square knows you now.',
+                 'Go and be somebody else’s afternoon.'],
       incident: ['Three times in this square.', 'Everybody saw that.',
-                 'It is not lost. It is choosing.'],
+                 'It is not lost. It is choosing.',
+                 'And it is not yet noon.',
+                 'Somebody go and find whoever owns it.',
+                 'It has learnt where everything is.'],
     },
     drift: {
-      wary:     ['Oh. It is you.', 'I remember you from lower down.', 'Careful. This time.'],
+      wary:     ['Oh. It is you.', 'I remember you from lower down.', 'Careful. This time.',
+                 'There is nothing under us. Remember that.',
+                 'You came all the way up here to do that.',
+                 'Hold on to something. Anything.'],
       incident: ['Three. Even up here.', 'Nothing up here is safe from it.',
-                 'It has worked out how this place works.'],
+                 'It has worked out how this place works.',
+                 'Whatever that was, it is still falling.',
+                 'We are a very long way from a replacement.',
+                 'It does not mind the drop at all.'],
     },
     venice: {
-      wary:     ['Ancora tu.', 'I know you now, signore.', 'Not in my calle.'],
+      wary:     ['Ancora tu.', 'I know you now, signore.', 'Not in my calle.',
+                 'You were in the campo on Tuesday.',
+                 'The whole sestiere is talking about it.',
+                 'Go and swim somewhere else.'],
       incident: ['Three. In one campo.', 'This one is not the water.',
-                 'Somebody is going to have to fish that out.'],
+                 'Somebody is going to have to fish that out.',
+                 'For once we cannot blame the tide.',
+                 'It knows the bridges better than the tourists do.',
+                 'This city has survived worse. Not much worse.'],
     },
     kowloon: {
-      wary:     ['You again, ah.', 'I know your face.', 'Not on my street.'],
+      wary:     ['You again, ah.', 'I know your face.', 'Not on my street.',
+                 'Every night, this one.',
+                 'The whole building knows about you.',
+                 'Go. Next street. Go.'],
       incident: ['Three already.', 'Aiyah. Again and again and again.',
-                 'Whole street saw that one.'],
+                 'Whole street saw that one.',
+                 'Business is bad enough without this.',
+                 'Somebody has put it in the group chat already.',
+                 'It is faster than the delivery boys.'],
     },
     palawan: {
-      wary:     ['Ay, ikaw na naman.', 'I know this one.', 'Not the boat. Please.'],
+      wary:     ['Ay, ikaw na naman.', 'I know this one.', 'Not the boat. Please.',
+                 'You were on the far beach this morning.',
+                 'The whole barangay has met you now.',
+                 'Go on. The water is that way.'],
       incident: ['Three, and it is still morning.', 'It is going down the whole beach.',
-                 'Somebody watch the bangka.'],
+                 'Somebody watch the bangka.',
+                 'Nothing on this island moves that fast.',
+                 'The tide will take it. The tide takes everything.',
+                 'It has been in the water again.'],
     },
     goreme: {
-      wary:     ['Sen yine.', 'I remember you from the valley.', 'Not the ropes again.'],
+      wary:     ['Sen yine.', 'I remember you from the valley.', 'Not the ropes again.',
+                 'Every morning before the sun. Every one.',
+                 'The crews all know the animal now.',
+                 'Stay on the ground. Please stay on the ground.'],
       incident: ['Three. Before sunrise.', 'Everything it goes near goes over.',
-                 'The crews have started watching it.'],
+                 'The crews have started watching it.',
+                 'It waits for the burner. It has worked that out.',
+                 'Somebody is going to have to explain the invoice.',
+                 'That is the valley for you. That is not the valley.'],
     },
     manly: {
-      wary:     ['You again, mate.', 'Yeah, I remember you.', 'Not on my beach.'],
+      wary:     ['Not you. Not on a Saturday.', 'Yeah, I remember you.', 'Not on my beach.',
+                 'You were down the other end yesterday.',
+                 'Half the surf club knows your face.',
+                 'Righto. Off you go, then.'],
       incident: ['Three. That is three.', 'Righto, that is a habit.',
-                 'Half the beach just watched that.'],
+                 'Half the beach just watched that.',
+                 'Somebody is going to put that on the internet.',
+                 'It is not the wind doing that.',
+                 'That is a Saturday, that is.'],
     },
     // The Pantanal is the one place that does not mind you, and its whole
     // premise is that nobody looks up. So its wariness is not wariness and
@@ -1924,29 +2030,61 @@ export function createNPCs(game) {
     // exception, and it only reads as one because the sixteen above it are
     // not exceptions.
     pantanal: {
-      wary:     ['Ha. You again.', 'Still here, then.', 'You are no trouble.'],
+      wary:     ['Ha. You again.', 'Still here, then.', 'You are no trouble.',
+                 'Sit where you like, primo.',
+                 'Nobody here has ever asked you to leave.',
+                 'You have been here longer than I have.'],
       incident: ['Third one. Nobody minds.', 'That is just what they do.',
-                 'Leave it. It will sort itself out.'],
+                 'Leave it. It will sort itself out.',
+                 'The river will have it by morning.',
+                 'Nothing out here belongs to anybody.',
+                 'That is not a problem. That is a Tuesday.'],
     },
     cave: {
-      wary:     ['You. Again.', 'I heard you coming this time.', 'Stay where I can hear you.'],
+      wary:     ['I could hear you coming. Again.', 'I heard you coming this time.',
+                 'Stay where I can hear you.',
+                 'Do not go quiet on me.',
+                 'You are the only other thing moving down here.',
+                 'Right. Where are you off to now.'],
       incident: ['Three. Down HERE.', 'Nothing down here is replaceable.',
-                 'That echoed for a long time.'],
+                 'That echoed for a long time.',
+                 'Everything in this cave is older than everybody in it.',
+                 'We carried all of that in on our backs.',
+                 'I am going to stop saying be careful.'],
     },
     antarctic: {
-      wary:     ['You. Again.', 'I know that shape now.', 'Not the boat. Not again.'],
-      incident: ['Three. On a station of nine people.', 'Nobody is going to believe this.',
-                 'I am writing this one down.'],
+      wary:     ['Oh good. It is the animal.', 'I know that shape now.',
+                 'Not the boat. Not again.',
+                 'Nine of us and one of you, and you are the problem.',
+                 'There is nowhere for you to have come from.',
+                 'You never sign in. Nobody ever signs in.'],
+      incident: ['Three, on a station of nine people.', 'Nobody is going to believe this.',
+                 'I am writing this one down.',
+                 'We are eight hundred miles from another one of anything.',
+                 'That is the most that has happened since March.',
+                 'The log is getting very strange this season.'],
     },
     monaco: {
-      wary:     ['You. Again.', 'I have your face now.', 'Not in here.'],
+      wary:     ['Ah. Sir.', 'I have your face now.', 'Not in here.',
+                 'You are not on the list and you are still here.',
+                 'I have been asked about you twice this evening.',
+                 'We shall both pretend this is fine.'],
       incident: ['That is three, sir.', 'Three is when we stop being polite.',
-                 'Somebody has been counting since you came in.'],
+                 'Somebody has been counting since you came in.',
+                 'The management is aware.',
+                 'I am to describe you, and I am struggling.',
+                 'There is a form for this. There is a form for everything.'],
     },
     hanoi: {
-      wary:     ['Lai la ban.', 'I know you now.', 'Not my stool. Not again.'],
+      wary:     ['Lai la ban.', 'Yes. You.', 'Not my stool. Not again.',
+                 'You crossed at the lights. Nobody crosses at the lights.',
+                 'The whole corner knows the animal.',
+                 'Sit. Do not move. Just sit.'],
       incident: ['Three. In ten minutes.', 'It is not the traffic. It is that.',
-                 'Everybody on this corner saw it.'],
+                 'Everybody on this corner saw it.',
+                 'The road does not stop. Neither does that.',
+                 'My mother has had this corner for thirty years.',
+                 'Somebody is going to hit something.'],
     },
   };
   /**
