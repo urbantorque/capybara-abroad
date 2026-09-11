@@ -2826,6 +2826,7 @@ export function createNPCs(game) {
       // `talkCd` appeared on first write and went seventeen chapters with
       // nothing to decrement it.
       marCool: 0,
+      wel: 0, welX: 0, welZ: 0, welSaid: false,   // the welcome party (N1)
       // ---- what the weather has done to them (see ...AND THEY NOTICE) ----
       umb: 0, umbG: null, umbUp: false,   // the umbrella: level, mesh, latch
       hud: 0,                             // the huddle, 0..1
@@ -3300,6 +3301,19 @@ export function createNPCs(game) {
   // animal cannot be hurt — the stake is the run you were on, and it expires.
   const npcMAR_AT     = 2;     // rung at which the nearest witness looks up
   const npcMAR_GO     = 4;     // ...and at which one of them sets off
+  // ---- ...AND BOTH RUNGS MOVE WITH THE REPUTATION (N1) --------------------
+  // The five tiers on the ledger changed a look radius for twenty-five
+  // seconds after an arrival and nothing a player could feel. Now they move
+  // the two rungs above, which are the two numbers the chain is made of:
+  //   a nuisance   the crowd turns at ONE — a known face draws an audience,
+  //                which is the one way up the ladder gets easier;
+  //   a menace     somebody sets off at THREE — the place has been warned;
+  //   a disaster   at TWO, and they run (npcMAR_RUN_K).
+  // systems.js prints the same three facts on the card that announces the
+  // tier (sysNOTO_DOES), so the rule is said before it is met.
+  function marAtRung()  { return npcNotoTier >= 2 ? 1 : npcMAR_AT; }
+  function marGoRung()  { return npcNotoTier >= 5 ? 2 : npcNotoTier >= 3 ? 3 : npcMAR_GO; }
+  const npcMAR_RUN_K  = 1.6;   // × npcOWN_V for a natural disaster's marcher
   const npcMAR_R      = 18;    // m from the event inside which somebody saw it
   // ---- THE PATIENCE AND THE LEASH HAVE TO AGREE, AND AT FIRST THEY DID NOT
   // Seven seconds was chosen as "shorter than retrieval's ten, because they
@@ -4672,8 +4686,80 @@ export function createNPCs(game) {
    */
   function marFree(r, starting) {
     return !!r && !!r.fig && !!r.group && r.biome === game.biome.current &&
-           !r.own && !r.carry && (r.marCool || 0) <= 0 &&
+           !r.own && !r.carry && (r.marCool || 0) <= 0 && !(r.wel > 0) &&
            (!starting || (r.gest || 0) <= 0);
+  }
+  // =========================================================================
+  // THE WELCOME PARTY (N1) — what 'a legend' buys
+  //
+  // From tier 4 the headline says the place has been expecting you, and now it
+  // has: a few seconds after you land, up to npcWEL_N of the nearest locals
+  // walk over to where you are standing, make a ring, say the praise line
+  // and cheer. It is the march turned round — the same steering, the same
+  // speed, the same ground-following — with nothing at the end of it but a
+  // photograph. They go home when the clock runs out. See npcWelcomeArm.
+  const npcWEL_N    = 4;      // how many come
+  const npcWEL_R    = 44;     // m from the spawn they are drawn from
+  const npcWEL_RING = 3.0;    // m from the animal they stand
+  const npcWEL_T    = 11;     // s they stay
+  const npcWEL_WAIT = 3.2;    // s after the arrival before they set off
+  let npcWelArm = 0;          // s until the party is picked
+  let npcWelCheered = false;
+  // Armed on every arrival and DECIDED when it fires, because the two
+  // biome:enter handlers — this one and the one in systems.js that hands the
+  // tier down — run in an order nothing guarantees.
+  function npcWelcomeArm() { npcWelArm = npcWEL_WAIT; npcWelCheered = false; }
+  function npcWelcomePick() {
+    if (npcNotoTier < 4) return;
+    const cp = game.capy && game.capy.position;
+    const live = game.biome && game.biome.current;
+    if (!cp || !live) return;
+    const cand = [];
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.fig || !r.group || r.own || r.carry || r === marWho) continue;
+      const dx = cp.x - r.x, dz = cp.z - r.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > npcWEL_R * npcWEL_R || d2 < 4) continue;
+      cand.push([d2, r]);
+    }
+    cand.sort(function (a, b) { return a[0] - b[0]; });
+    const n = Math.min(npcWEL_N, cand.length);
+    for (let k = 0; k < n; k++) {
+      const r = cand[k][1];
+      const a = (k / Math.max(1, n)) * Math.PI * 2 + 0.6;
+      r.wel = npcWEL_T + k * 0.4;
+      r.welX = cp.x + Math.sin(a) * npcWEL_RING;
+      r.welZ = cp.z + Math.cos(a) * npcWEL_RING;
+      r.welSaid = false;
+      r.tx = r.welX; r.tz = r.welZ;
+    }
+    if (n > 0 && typeof game.toast === 'function') game.toast('they have been expecting you.');
+  }
+  function welStep(r, dt) {
+    r.wel -= dt;
+    const cp = game.capy && game.capy.position;
+    if (r.wel <= 0 || !cp || r.biome !== game.biome.current) {
+      r.wel = 0; r.tx = r.ax; r.tz = r.az; return;
+    }
+    // the ring follows the animal a little, so a player who walks off is
+    // followed for a step and then let go
+    const d = Math.hypot(cp.x - r.x, cp.z - r.z);
+    if (d > npcWEL_RING * 3) { r.wel = 0; r.tx = r.ax; r.tz = r.az; return; }
+    if (localSteerTo(r, r.welX, r.welZ, Math.hypot(r.welX - r.x, r.welZ - r.z))) { /* blocked: stand */ }
+    if (Math.hypot(r.welX - r.x, r.welZ - r.z) < 0.6) {
+      r.chatYaw = Math.atan2(cp.x - r.x, cp.z - r.z); r.chatT = 1.0;
+      if (!r.welSaid) {
+        r.welSaid = true;
+        if (r.cd <= 0) { r.cd = r.cool * rand(0.8, 1.4); localLine(r, r.praise || npcLOC_PRAISE); }
+        r.flV -= 4;
+        if (!npcWelCheered) {
+          npcWelCheered = true;
+          game.sfx('cheer', { volume: 0.32, pitch: 1.05, force: true });
+          if (typeof game.confetti === 'function') game.confetti(cp.x, cp.y + 0.6, cp.z, 14);
+        }
+      }
+    }
   }
   function marEnd(r, caught, sayIt) {
     if (!r) { marWho = null; return; }
@@ -4749,15 +4835,35 @@ export function createNPCs(game) {
     if (!best) { marWhy = 'nobody within ' + npcMAR_R + ' m'; return; }
     // AT TWO: they look up. Two numbers, and it is the same pair the witness
     // chain uses — a look, not a flinch.
-    if (e.n === npcMAR_AT) {
+    if (e.n === marAtRung()) {
       best.chatYaw = Math.atan2(e.x - best.x, e.z - best.z);
       best.chatT = npcCHAIN_LOOK;
+      // ...and from 'a nuisance' up it is not one head: everybody who could
+      // have seen it turns (N1). An audience is the thing a reputation buys.
+      if (npcNotoTier >= 2) {
+        for (let i = 0; i < locals.length; i++) {
+          const r = locals[i];
+          if (r === best || r.biome !== live || !r.group) continue;
+          const dx = e.x - r.x, dz = e.z - r.z;
+          if (dx * dx + dz * dz > npcMAR_R * npcMAR_R) continue;
+          r.chatYaw = Math.atan2(dx, dz); r.chatT = npcCHAIN_LOOK;
+        }
+      }
       return;
     }
-    // AT FOUR: one of them comes over. ONE, ever — see the constants block.
-    if (e.n < npcMAR_GO) { marWhy = 'rung ' + e.n; return; }
+    // AT FOUR — or three, or two, by the tier: one of them comes over. ONE,
+    // ever — see the constants block.
+    if (e.n < marGoRung()) { marWhy = 'rung ' + e.n; return; }
     if (marWho) { marWhy = 'already marching'; return; }
+    // ---- REFUSED FOR A PASSING REASON IS OWED, NOT DROPPED (N1) ----------
+    // The go rung and the incident card land a second apart, and the card
+    // makes the nearest person SAY something — which sets `gest`, which is
+    // the one thing marFree refuses a starter for. Measured: a fresh save's
+    // marcher set off at five, not four, every run. So a refused go rung is
+    // remembered for a few seconds and retried each frame from localsStep,
+    // against the nearest FREE person, until somebody goes or the chain ends.
     if (!marFree(best, true)) {
+      marOwed.t = npcMAR_OWED_T; marOwed.x = e.x; marOwed.z = e.z; marOwed.n = e.n;
       // WHY, AND NOT JUST THAT. Six gates share one symptom — nobody comes —
       // and from outside they are indistinguishable from the event never
       // having fired. This cost a run to find out.
@@ -4767,8 +4873,33 @@ export function createNPCs(game) {
              : best.biome !== live ? 'wrong biome' : 'unknown';
       return;
     }
-    marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching";
+    marGo(best, e.n);
   });
+  const npcMAR_OWED_T = 4.0;    // s a refused go rung is retried for
+  const marOwed = { t: 0, x: 0, z: 0, n: 0 };
+  function marGo(best, n) {
+    marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching"; marOwed.t = 0;
+    // ...and systems.js turns the row amber (N1). Emitted here, not in
+    // marStep, so it fires once per marcher and never for a walk that ended.
+    emit('npc:march', { x: best.x, z: best.z, n: n });
+  }
+  /** The owed march, retried once a frame. See the go-rung handler. */
+  function marOwedStep(dt) {
+    if (marOwed.t <= 0) return;
+    marOwed.t -= dt;
+    if (marWho) { marOwed.t = 0; return; }
+    const live = game.biome && game.biome.current;
+    let best = null, bd = npcMAR_R * npcMAR_R;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.biome !== live || !r.group || !marFree(r, true)) continue;
+      const dx = marOwed.x - r.x, dz = marOwed.z - r.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bd) continue;
+      bd = d2; best = r;
+    }
+    if (best) marGo(best, marOwed.n);
+  }
 
   // ---- WHAT THEY NOTICE ---------------------------------------------------
   // Three events that already existed, already carried a position, and were
@@ -5752,7 +5883,11 @@ export function createNPCs(game) {
     // cleared and re-armed by npc.js's own handler and the tier is set by
     // systems.js whenever it likes, one frame either way.
     if (npcNotoT > 0) npcNotoT -= dt;
-    const notoNow = (npcNotoT > 0 && npcNotoTier >= npcNOTO_TIER) ? 1 : 0;
+    if (npcWelArm > 0) { npcWelArm -= dt; if (npcWelArm <= 0) npcWelcomePick(); }
+    marOwedStep(dt);
+    // ...A LADDER NOW, NOT A STEP (N1): a rumour is a third of a menace's
+    // look, a nuisance two thirds, and the clock is the same.
+    const notoNow = npcNotoT > 0 ? Math.min(1, npcNotoTier / npcNOTO_TIER) : 0;
     // ---- THE MARQUEE LINE NOBODY WAS THERE TO SAY ------------------------
     // Delivered by the first person the player comes back within earshot of,
     // at the PRAISE radius rather than the wow radius: this one is said to your
@@ -6162,6 +6297,8 @@ export function createNPCs(game) {
           // back is not also doing their rounds. Returns false if the route
           // failed its ground probe, and then this person shuffles like any
           // other and nothing anywhere knows the difference.
+        } else if (r.wel > 0) {
+          welStep(r, dt);
         } else if (r === marWho) {
           // ---- ...AND THE MARCH SITS BESIDE IT, ON THE SAME TERMS --------
           // Below retrieval and above the shuffle. A person already walking
@@ -6193,7 +6330,8 @@ export function createNPCs(game) {
           // THE MARCH WALKS AT RETRIEVAL SPEED, for the same reason retrieval
           // does: somebody crossing a square on purpose does not shuffle.
           const step = Math.min(sd,
-            (r.own || r === marWho ? npcOWN_V
+            (r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : 1)
+             : r.own || r.wel > 0 ? npcOWN_V
              : r.walkOk ? (r.walk.v || npcLOC_WALK_V)
              : npcLOC_STEP_V) * dt);
           r.x += sx / sd * step;
@@ -6221,7 +6359,7 @@ export function createNPCs(game) {
           // back to `baseY` — the height the chapter measured at the OTHER
           // end. On anything but a flat floor that is a person sinking into
           // the ground every time they finish their walk.
-          const away = r.own || r === marWho || r.walkOk ||
+          const away = r.own || r === marWho || r.wel > 0 || r.walkOk ||
                        (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
                                 > npcLOC_STEP_R * npcLOC_STEP_R;
           if (away || Math.abs(r.y - r.baseY) > 0.004) {
@@ -11642,13 +11780,14 @@ export function createNPCs(game) {
     // nothing at all unless systems.js has handed down a tier of npcNOTO_TIER
     // or better, so this line is a no-op for the whole of a quiet journey.
     npcNotoT = npcNOTO_DOOR;
+    npcWelcomeArm();   // N1: a legend is met
     // ---- ...AND NOBODY IS STILL MARCHING IN A COUNTRY YOU HAVE LEFT -----
     // `marStep` tears itself down on a biome mismatch anyway, but only if it
     // is stepped — and it is stepped from the per-person loop, which is the
     // loop this chapter is gated out of. The same freeze `wary`, `fam` and
     // `flowSeen` all had, and the same one-line answer.
     if (marWho) { marWho.marCool = npcMAR_COOL; marWho.tx = marWho.ax; marWho.tz = marWho.az; }
-    marWho = null; marT = 0;
+    marWho = null; marT = 0; marOwed.t = 0;
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
     }
@@ -13394,7 +13533,7 @@ export function createNPCs(game) {
   function npcMarchAudit() {
     const cp = game.capy && game.capy.position;
     return {
-      on: !!marWho, t: +marT.toFixed(2),
+      on: !!marWho, t: +marT.toFixed(2), atRung: marAtRung(), goRung: marGoRung(),
       dist: marWho && cp ? +Math.hypot(cp.x - marWho.x, cp.z - marWho.z).toFixed(2) : -1,
       fromAnchor: marWho ? +Math.hypot(marWho.x - marWho.ax, marWho.z - marWho.az).toFixed(2) : -1,
       at: npcMAR_GO, take: npcMAR_TAKE, out: npcMAR_OUT_T, leash: npcOWN_LEASH,

@@ -8985,12 +8985,15 @@ function sysBuildCSS() {
 '.capyui-pipslbl{font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;font-weight:700;',
   'font-style:normal;color:' + ink + ';background:' + sysRgba(PALETTE.sail, 0.72) + ';',
   'padding:2px 7px;border-radius:999px;box-shadow:' + shSm + ';align-self:flex-start;',
-  'margin-bottom:2px;}',
+  'margin-bottom:2px;white-space:nowrap;}',
 '.capyui-pips u{display:flex;gap:4px;align-items:center;text-decoration:none;}',
 '.capyui-pips b{flex:1 1 0;height:5px;border-radius:999px;font-weight:400;',
   'background:' + sysRgba(PALETTE.ibisHead, 0.20) + ';box-shadow:' + shSm + ';',
   'transition:background ' + dMed + ' ease;}',
 '.capyui-pips b.lit{background:' + accent + ';}',
+/* somebody is coming (N1): the lit pips go amber and so does the word */
+'.capyui-pips.warn b.lit{background:' + sysHex(PALETTE.ibisHead) + ';}',
+'.capyui-pips.warn .capyui-pipslbl{color:' + sysHex(PALETTE.ibisHead) + ';}',
 /* the third is the one that makes a card, so it is the one that is drawn
    differently BEFORE it is lit rather than after — a threshold you can see
    coming is a threshold you can play for. */
@@ -25296,6 +25299,7 @@ export function createSystems(game) {
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         // Additive, like everything below it. See jrChapInc.
         inc: jrChapInc, scn: jrChapScene,
+        told: jrIncTold ? 1 : 0,   // the chain explainer, once (N1)
         // ...and the other economy (B8). See jrChapPho.
         pho: jrChapPho, fed: jrChapFed,
         // ...and THE PERCH's high-water mark (N2). See jrChapPerch.
@@ -28349,6 +28353,8 @@ export function createSystems(game) {
       const inc = jrFile.inc || {}, scn = jrFile.scn || {};
       for (const k in inc) if (typeof inc[k] === 'number') jrChapInc[k] = inc[k];
       for (const k in scn) if (typeof scn[k] === 'number') jrChapScene[k] = scn[k];
+      jrIncTold = !!jrFile.told;
+      notoSeenTier = notoTier();   // N1: a restored rank is not news
       // ...and the other economy (B8). An older file has neither key and reads
       // as zero of each, which is what it was.
       const pho = jrFile.pho || {}, fed = jrFile.fed || {};
@@ -33950,6 +33956,27 @@ export function createSystems(game) {
   const sysINC_SAME  = 4;      // s before the same prop may count again
   const sysINC_COOL  = 50;     // s after a card before another may be earned
   const sysINC_HIT   = 2.6;    // m/s of impact that is a thing happening
+  // ---- THE FIVE RUNGS HAVE NAMES NOW (N1) ---------------------------------
+  // The pips said "chain · 2 of 5" and nothing about what a two IS. Each rung
+  // is a state of the square, and the label says the state: what just changed
+  // out there, in four words, so the row is a story and not a score.
+  const sysCHAIN_STATE = ['', 'a head turns', 'they are watching', 'AN INCIDENT',
+                          'one more for a scene', 'A SCENE'];
+  const sysCHAIN_MARCH = 'somebody is coming';   // said by npc:march, not by a rung
+  // ...AND WHAT A REPUTATION BUYS, TIER BY TIER (N1). Every line here is a
+  // thing the game actually does — see npcNotoSet's ladder, the marcher's
+  // rung, the headline, the poster and the welcome — said once, on the card
+  // that announces the tier, because a rank nobody can feel is a word.
+  const sysNOTO_DOES = ['',
+    'the next place will have heard about the last one',
+    'a headline meets you when you land · a crowd forms at the first thing you do',
+    'posters go up · they come over at three now, not four',
+    'a welcome party meets you where you land',
+    'they come over at two · and they do not walk'];
+  let incMarchOn = false;  // npc:march has fired for this chain
+  let notoPendT = 0, notoPendTier = 0;   // a tier card owed, after the incident's
+  let notoSeenTier = -1;                  // the last tier announced (or restored)
+  let jrIncTold = false;   // the one-time explainer, on the save
   // Chapter-neutral to the same standard the locals' pools are held to: these
   // are spoken over a Venetian square, a Mong Kok doorway and an Antarctic
   // jetty, so not one of them may name a season, a country, a building or a
@@ -34018,13 +34045,25 @@ export function createSystems(game) {
     // nobody in it — can never produce one of these however much is thrown off
     // how many islands.
     let saw = 0;
-    try { saw = findPeople(x, z, sysINC_SEE); } catch (e) { saw = 0; }
+    // A KNOWN FACE DRAWS A CROWD (N1): from 'a nuisance' up, four more metres
+    // of square count as having seen it. The one way the ladder makes the
+    // chain EASIER, set against the two ways it makes it harder.
+    const seeR = sysINC_SEE + (notoTier() >= 2 ? 4 : 0);
+    try { saw = findPeople(x, z, seeR); } catch (e) { saw = 0; }
     if (!(saw > 0)) return;
     if (incT < 0 || Math.hypot(x - incX, z - incZ) > sysINC_R) {
       incN = 0; incX = x; incZ = z; incCarded = 0;
       repEv.length = 0;   // Q1: a new chain is a new sentence
     }
     incN++;
+    // ---- SAID ONCE, THE FIRST TIME IT IS EVER COUNTED (N1) ----------------
+    // The rule was learnt by ear or not at all. One toast, on the save, on
+    // the first rung of the first chain: what three is, what five is, and
+    // what ends it.
+    if (incN === 1 && !jrIncTold) {
+      jrIncTold = true; saveSoon();
+      toast('somebody saw that. three things in front of people is AN INCIDENT, five is A SCENE — unless one of them reaches you first.');
+    }
     // Q1: ...and WHAT it was. After the same-prop gate and after the
     // did-anybody-see-it gate, so the ring holds exactly the events the
     // count holds and cannot drift from it.
@@ -34120,6 +34159,20 @@ export function createSystems(game) {
     // in a row. npc.js owns what that sounds like; this owns when.
     game.events.emit('capy:incident', { x: x, z: z, n: incN, tier: tier, saw: saw,
                                         ev: repEv.slice() });
+    // ---- AND IF THAT MADE YOU SOMETHING, IT IS SAID (N1) -------------------
+    // The tier moved on the ledger and nowhere else. A card of its own, after
+    // the incident's has gone, naming the rank and the one thing the world does
+    // differently from now on. See sysNOTO_DOES. Checked against the last tier
+    // ANNOUNCED rather than a before/after round the tally, because the name
+    // repName just recorded is a point too and it lands after the tally.
+    notoCheck();
+  }
+  function notoCheck() {
+    const t = notoTier();
+    if (notoSeenTier < 0) { notoSeenTier = t; return; }
+    if (t <= notoSeenTier) return;
+    notoSeenTier = t;
+    notoPendTier = t; notoPendT = sysMOMENT_CARD / 1000 + 0.6;
   }
 
   // =========================================================================
@@ -34151,6 +34204,9 @@ export function createSystems(game) {
   // Zeroing `incT` is what makes incTick run its own ending on the next frame.
   game.events.on('npc:caught', function () {
     if (incT < 0) return;              // no chain open; nothing to end
+    // ...and it is SAID what that cost (N1): the chain, and only the chain.
+    if (incN > 0) toast(incCarded > 0 ? 'they reached you. the chain is over — the card stays.'
+                                      : 'they reached you. the chain is over.');
     incT = 0.0001;                     // ...and incTick does the rest
   });
 
@@ -34159,6 +34215,8 @@ export function createSystems(game) {
    *  was authored against six chapters of it rather than against a guess. */
   function repRing() { return repEv.slice(); }
   game.repRing = repRing;
+  /** Confetti at a point, for the modules (N1: the welcome). */
+  game.confetti = function (x, y, z, n) { confettiBurst(x, y, z, Math.min(n || 8, sysCONF_MAX)); };
 
   // =========================================================================
   // THE REPERTOIRE — NAMED STUNTS (ROADMAP-NEXT item 4, Q1)
@@ -34506,6 +34564,20 @@ export function createSystems(game) {
   }
   function incTick(dt) {
     if (incCool > 0) incCool -= dt;
+    // the rank you start with is not news — seeded on the first frame (N1)
+    if (notoSeenTier < 0 && started) notoSeenTier = notoTier();
+    if (notoPendT > 0) {
+      notoPendT -= dt;
+      // not over a crossing, and not over the card it is the sequel to
+      if (notoPendT <= 0 && (transBusy || momentEl.classList.contains('show'))) notoPendT = 0.4;
+      if (notoPendT <= 0) {
+        const nm = notoName(notoPendTier);
+        showMoment('YOU ARE NOW', nm.toUpperCase(), sysNOTO_DOES[notoPendTier] || '');
+        sfx('chime', { volume: 0.5, pitch: 1.5, force: true });
+        musSwell(sysMINI_SWELL * 0.8);
+        if (typeof game.notoSet === 'function') game.notoSet(notoPendTier);
+      }
+    }
     if (incT >= 0) {
       incT -= dt;
       if (incT < 0) {
@@ -34520,12 +34592,16 @@ export function createSystems(game) {
         // half a pattern. Never after a card — that chain ended in a card,
         // which is not a thing to be disappointed about.
         else if (incN >= sysINC_N - 1) sfx('tick', { volume: 0.11, pitch: 0.70 });
-        incN = 0; incCarded = 0;
+        incN = 0; incCarded = 0; incMarchOn = false;
         repEv.length = 0;   // Q1
       }
     }
     incPaint();
   }
+  // THE ROW TURNS AMBER WHEN SOMEBODY SETS OFF (N1). npc.js decides who and
+  // when — and from 'a menace' that is a rung earlier — so it says so, and the
+  // label stops being a count and becomes the one instruction that matters.
+  game.events.on('npc:march', function () { if (incT > 0) { incMarchOn = true; pipsLit = -1; } });
 
   /**
    * THE CHAIN, ON SCREEN, WHILE IT IS OPEN (B4, item 2).
@@ -34569,8 +34645,12 @@ export function createSystems(game) {
       // "chain · 2 of 5", and past the third — the one that made a card — the
       // word changes to what it has become, in the chain's own two tiers.
       // Written only when a pip does.
-      pipsLbl.textContent = (lit >= sysINC_N2 ? 'a scene' : lit >= sysINC_N ? 'an incident' : 'chain') +
-                            '  ·  ' + lit + ' of ' + sysINC_N2;
+      // THE STATE, NOT THE SCORE (N1): "2 of 5 · they are watching". And the
+      // moment somebody sets off, whatever rung that was, the row says so.
+      const st = incMarchOn ? (lit >= sysINC_N2 ? 'A SCENE · ' + sysCHAIN_MARCH : sysCHAIN_MARCH)
+                            : (sysCHAIN_STATE[lit] || '');
+      pipsLbl.textContent = lit + ' of ' + sysINC_N2 + (st ? '  ·  ' + st : '');
+      pipsEl.classList.toggle('warn', incMarchOn);
     }
     // Quantised to a fortieth, because this is a transform written every frame
     // and a float that never repeats is a style recalculation that never stops.
