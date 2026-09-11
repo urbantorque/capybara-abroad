@@ -2313,7 +2313,11 @@ const sysGRADES = {
   venice:  sysGrade(0.26, 1.06, 1.15, 0.12, 1.05, 0.18, 0.62, 1.012, 1.002, 0.986),
   // THE ONE THIS WHOLE PASS WAS BUILT FOR. A chapter whose entire subject is
   // light gets the lowest threshold, the widest blur and the most of it.
-  kowloon: sysGrade(0.88, 0.32, 1.45, 0.20, 1.14, 0.36, 0.44, 1.000, 0.998, 1.006),
+  // ...AND NOT THAT LOW (L3). At 0.32 the bus windows and the sign boards
+  // were blown to white blocks with no lettering in them (l3-kowloon.png);
+  // the threshold sits where only an emitter clears it, and the bloom comes
+  // down with it so the halo has an edge to hang off.
+  kowloon: sysGrade(0.70, 0.48, 1.45, 0.20, 1.14, 0.36, 0.44, 1.000, 0.998, 1.006),
   // Bleached. High threshold, because in Palawan everything is nearly white and
   // a lower one would fog the entire beach.
   palawan: sysGrade(0.30, 1.04, 1.15, 0.11, 1.04, 0.13, 0.66, 1.000, 1.000, 1.002),
@@ -2509,6 +2513,10 @@ const sysEXPOSURE = {
   // respectively and cost another three and six per cent, which is paying real
   // brightness for nothing anybody can see.
   palawan: 0.86,
+  // ...and the other way (L3): Antarctica's snow measured mid grey-blue
+  // (l3-antarctic.png, far mean 186 of 255 on a 1.2 albedo). A third of a
+  // stop up gets the snow white and leaves the shade blue.
+  antarctic: 1.08,
 };
 // PASTO IS DELIBERATELY NOT IN HERE, and it was in the first draft of this
 // table. It reads 6.62% over 235, which is second worst in the game and looks
@@ -2664,6 +2672,23 @@ const sysACT_LIGHT = {
   iceland:   { bloom: 0.10, threshold: -0.08, saturation: 0.03, vignette: 0.06,
                vigStart: -0.05, airlit: -0.008 },
 };
+// THE NIGHT LIFT (L3, E1). `uLift` has been plumbed since v40 and nothing ever
+// set it. It is the floor of the picture: added AFTER the tint, so it is the
+// colour the blacks sit on rather than a light in the scene. Blue, and
+// small — a night chapter's ambient came down to pay for it (sysICE_AMB_I).
+const sysNIGHT_LIFT = {
+  iceland: [0.012, 0.018, 0.040],
+  drift:   [0.014, 0.014, 0.044],
+  kowloon: [0.010, 0.012, 0.036],
+  monaco:  [0.010, 0.014, 0.034],
+  cave:    [0.006, 0.008, 0.020],
+};
+for (const k in sysNIGHT_LIFT) {
+  if (!sysGRADES[k]) continue;
+  sysGRADES[k].liftR = sysNIGHT_LIFT[k][0];
+  sysGRADES[k].liftG = sysNIGHT_LIFT[k][1];
+  sysGRADES[k].liftB = sysNIGHT_LIFT[k][2];
+}
 // A fifth of sysGRADE_LAMBDA: ~6 s of light for a change of movement.
 const sysACT_LAMBDA = 0.45;
 
@@ -2700,6 +2725,16 @@ const sysACT_LAMBDA = 0.45;
 //
 // A ROW OF ZEROES IS THE CHAPTER THAT SHIPPED. Every number here is additive
 // over a pass that was already finished.
+//
+// THE DAYLIGHT CEILINGS WERE HALVED IN L3 (E1). Measured in Palawan with the
+// term switched off (qa/l3-far-off.png against l3-far-a.png): the far band
+// went DARKER by twelve points and gained six points of spread, and the sky
+// went from blue to grey-white with it on. A pale haze at 0.17 over things
+// eighty metres away was the wash every review had been describing. Half the
+// ceiling, a darker colour on the ground (sysFAR), and the sky exempt.
+// THE NEAR BLUR WENT WITH IT: nearK halved on the same rows, which puts the
+// end of the near ramp inside the lens-to-animal distance and takes the soft
+// band off the ground the player is about to walk on (l3-rio.png).
 // ===========================================================================
 // THE AIR COLUMN WAS AUTHORED AT ROUGHLY TWICE THIS AND MEASURED WRONG.
 // The first table put 0.0038/m and a 0.26 ceiling on Sydney, which is 26% of
@@ -2712,22 +2747,22 @@ const sysACT_LAMBDA = 0.45;
 // not reach until well past anything the player is looking at.**
 const sysDEPTH = {
   //              dof   dofK  nearK   air     airMax crease
-  sydney:      [0.60, 1.55, 0.88,  0.0020, 0.15,  0.25],
+  sydney:      [0.60, 1.55, 0.44,  0.0020, 0.08,  0.25],
   // Two and a half thousand metres of thin air, and a volcano to put it in
   // front of. The haze is the whole reason you can tell how far away Galeras
   // is — but it is CLEAN air, so it goes FURTHER per metre and not harder: a
   // low coefficient under a high ceiling, which is the opposite shape to Hanoi
   // and is what altitude actually looks like.
-  pasto:       [0.55, 1.80, 0.00,  0.0014, 0.20,  0.22],
+  pasto:       [0.55, 1.80, 0.00,  0.0014, 0.10,  0.22],
   // Seven hundred metres of open water. Nothing to occlude and everything to
   // put distance into.
-  quay:        [0.50, 1.90, 0.00,  0.0016, 0.13,   0.15],
+  quay:        [0.50, 1.90, 0.00,  0.0016, 0.07,  0.15],
   // A lane four metres wide with a building on each side: the chapter with
   // more corners per square metre than any other, and the one where a
   // razor-edged shadow down the middle was doing all of the separating.
-  kyoto:       [0.62, 1.45, 0.90,  0.0014, 0.09,   0.32],
-  cali:        [0.58, 1.55, 0.88,  0.0018, 0.14,   0.27],
-  rio:         [0.55, 1.60, 0.86,  0.0016, 0.13,   0.25],
+  kyoto:       [0.62, 1.45, 0.45,  0.0014, 0.05,  0.32],
+  cali:        [0.58, 1.55, 0.44,  0.0018, 0.07,  0.27],
+  rio:         [0.55, 1.60, 0.43,  0.0016, 0.07,  0.25],
   // Half past eleven at night. Air at night is a scatter around a light, not a
   // veil over a distance, and a strong one greys out the only warm windows for
   // a mile — which in that chapter is the entire picture.
@@ -2735,7 +2770,7 @@ const sysDEPTH = {
   // Noon over a square with no shade in it, and forty minutes east of it,
   // three hundred metres of nothing. The most air in the game, and it is what
   // turns one flat sheet of ochre into a distance.
-  sahara:      [0.55, 1.75, 0.84,  0.0028, 0.24,  0.22],
+  sahara:      [0.55, 1.75, 0.42,  0.0028, 0.12,  0.22],
   // Cloud. There is no ground, the whole subject is the drop, and the near
   // half of the frame is the only thing that is real — so the near blur is the
   // strongest in the game here and the creases the weakest.
@@ -2744,7 +2779,7 @@ const sysDEPTH = {
   // forty-five, all of them equally crisp, under arches that read as flat
   // panels. This chapter is the one both halves of this pass were built for
   // and it gets the most of both.
-  venice:      [0.65, 1.45, 0.90,  0.0021, 0.17,  0.34],
+  venice:      [0.65, 1.45, 0.45,  0.0021, 0.09,  0.34],
   // Up is a direction here, so the near blur has to stay small: the frame is
   // full of things directly overhead and softening those loses the wall of
   // light that IS the chapter. The creases are worth a great deal — every sign
@@ -2752,26 +2787,68 @@ const sysDEPTH = {
   kowloon:     [0.55, 1.70, 0.72,  0.0018, 0.13,  0.32],
   // Sixty per cent of this frame is white sand at 1.2 albedo. It does not need
   // more bloom, it needs somewhere for the eye to stop.
-  palawan:     [0.62, 1.50, 0.90,  0.0020, 0.17,  0.22],
-  goreme:      [0.58, 1.75, 0.80,  0.0018, 0.19,  0.30],
-  manly:       [0.55, 1.60, 0.86,  0.0012, 0.10,   0.25],
+  palawan:     [0.62, 1.50, 0.45,  0.0020, 0.09,  0.22],
+  goreme:      [0.58, 1.75, 0.40,  0.0018, 0.10,  0.30],
+  manly:       [0.55, 1.60, 0.43,  0.0012, 0.05,  0.25],
   // Two hundred metres of road going to a horizon, and past twenty-two metres
   // nothing in this game casts a shadow at all. The air is doing the work a
   // second shadow cascade would have done, and it costs a great deal less.
-  pantanal:    [0.55, 1.70, 0.86,  0.0016, 0.13,   0.25],
+  pantanal:    [0.55, 1.70, 0.43,  0.0016, 0.07,  0.25],
   // Inside a mountain. There IS no distance and there is nothing to haze; what
   // there is, is more concave rock than the rest of the game put together.
   cave:        [0.58, 1.45, 0.84,  0.0009, 0.08,  0.36],
   // THE ALBEDO CEILING. Three colours, all of them near white, over a ground
   // that reads as flat mid-grey because nothing separates any part of it from
   // any other part. The crease is the only instrument that works here.
-  antarctic:   [0.58, 1.60, 0.84,  0.0016, 0.16,  0.36],
+  antarctic:   [0.58, 1.60, 0.42,  0.0016, 0.08,  0.36],
   // Blue hour, which is a haze with a colour in it. The one chapter where this
   // term is allowed to be noticed.
   monaco:      [0.62, 1.55, 0.88,  0.0014, 0.11,   0.30],
   // "ten in the morning, and it is a HAZE" — the palette row says exactly that
   // in words, and nothing in this renderer could draw it until now.
-  hanoi:       [0.58, 1.60, 0.84,  0.0024, 0.20,   0.30],
+  hanoi:       [0.58, 1.60, 0.42,  0.0024, 0.10,  0.30],
+};
+// ===========================================================================
+// THE FRAME HAS A DARK (L3, E1) — the far GROUND goes darker than the sky.
+//
+// Forty-one settled frames, and every daylight one measured the same way
+// (qa/l3-luma.mjs): the far band's mean within a few points of the middle
+// band's, a standard deviation of 16-20 against 35-40 near the animal, and
+// a p05 that never got under 90/255 in Palawan, Venice, Sahara, Pasto or
+// Sydney. The fog, the air and the sky all converge on ONE pale value, so the
+// picture has no edge where the world stops. Two terms on the composite,
+// both weighted by the view ray's elevation so only the ground plane takes
+// them (see THE FRAME HAS A DARK in main.js):
+//
+//   gnd    how much darker the air colour is on a ground ray, 0..1
+//   dark   the value drop the far ground takes, 0..1
+//   d0 d1  metres the drop ramps over
+//
+// Night rows take little: their far field is already dark and the term
+// would only eat the lit windows. The cave takes none.
+// ===========================================================================
+const sysFAR_DEF = [0.20, 0.12, 30, 170];
+const sysFAR = {
+  //              gnd   dark   d0   d1
+  sydney:      [0.40, 0.13,  30, 170],
+  pasto:       [0.36, 0.12,  40, 220],
+  quay:        [0.40, 0.14,  40, 260],
+  kyoto:       [0.36, 0.12,  24, 140],
+  cali:        [0.38, 0.12,  30, 170],
+  rio:         [0.40, 0.13,  30, 190],
+  iceland:     [0.05, 0.05,  30, 170],
+  sahara:      [0.40, 0.14,  36, 220],
+  drift:       [0.00, 0.00,  30, 170],
+  venice:      [0.40, 0.13,  24, 150],
+  kowloon:     [0.06, 0.05,  20, 120],
+  palawan:     [0.42, 0.15,  30, 190],
+  goreme:      [0.30, 0.10,  40, 260],
+  manly:       [0.40, 0.13,  30, 200],
+  pantanal:    [0.38, 0.12,  30, 170],
+  cave:        [0.00, 0.00,  30, 170],
+  antarctic:   [0.34, 0.12,  40, 240],
+  monaco:      [0.08, 0.06,  30, 170],
+  hanoi:       [0.38, 0.12,  30, 170],
 };
 // WHERE THE FRAME ACTUALLY IS, WHICH THE FIRST VERSION OF THIS GUESSED.
 // Measured with qa/depth-map.js — a raycast through a 3x5 NDC grid in seven
@@ -3036,7 +3113,12 @@ const sysICE_FOG_F = 940;
 // which at this angle is most of what the sun can now see.
 const sysICE_SUN_I = 1.05;      // multiplier on whatever the day/biome axes said
 const sysICE_HEMI_I = 0.88;
-const sysICE_AMB_I = 0.56;      // absolute, blended in
+// ...AND A THIRD OF THAT FLOOR IS THE GRADE'S NOW (L3, E1). 0.56 of ambient
+// is a dimmed day: the animal the same orange as on the lawn, the road one
+// flat slab. The level comes down here and the BLACKS come up in the grade's
+// lift (sysNIGHT_LIFT) — a floor that is blue rather than grey, and a
+// picture that has a dark in it. See THE FRAME HAS A DARK.
+const sysICE_AMB_I = 0.40;      // absolute, blended in
 const sysICE_SUN_C = new THREE.Color(PALETTE.iceSun);
 const sysICE_HEMI_C = new THREE.Color(PALETTE.iceSkyLow);
 const sysICE_GND_C = new THREE.Color(PALETTE.iceMoraine);
@@ -3066,7 +3148,7 @@ const sysDRI_FOG_N = 44;
 const sysDRI_FOG_F = 560;
 const sysDRI_SUN_I = 0.46;
 const sysDRI_HEMI_I = 1.05;
-const sysDRI_AMB_I = 0.62;
+const sysDRI_AMB_I = 0.46;      // was 0.62; see sysNIGHT_LIFT
 const sysDRI_SUN_C = new THREE.Color(PALETTE.driMoon);
 const sysDRI_HEMI_C = new THREE.Color(PALETTE.driVoidLow);
 const sysDRI_GND_C = new THREE.Color(PALETTE.driCloudDeep);
@@ -3107,7 +3189,7 @@ const sysHK_FOG_F = 420;
 // almost off and everything saturated is emitting rather than reflecting.
 const sysHK_SUN_I = 0.42;
 const sysHK_HEMI_I = 0.95;
-const sysHK_AMB_I = 0.55;
+const sysHK_AMB_I = 0.40;       // was 0.55; see sysNIGHT_LIFT
 const sysHK_SUN_C = new THREE.Color(PALETTE.hkNeonGold);
 const sysHK_HEMI_C = new THREE.Color(PALETTE.hkSkyLow);
 const sysHK_GND_C = new THREE.Color(PALETTE.hkWet);
@@ -30264,7 +30346,7 @@ export function createSystems(game) {
     {
       const dr = sysDEPTH[name] || null;
       if (!dr) {
-        pp.dof = 0; pp.air = 0; pp.crease = 0;
+        pp.dof = 0; pp.air = 0; pp.crease = 0; pp.airGnd = 0; pp.farDark = 0;
       } else {
         // The distance from the lens to the animal, every frame. It is a
         // multiple and not a metre count for exactly this reason: this number
@@ -30304,6 +30386,9 @@ export function createSystems(game) {
         // in linear working space, which is what the composite wants.
         const fc = scene.fog;
         if (fc) { pp.airR = fc.color.r; pp.airG = fc.color.g; pp.airB = fc.color.b; }
+        // ...and the ground's share of it (L3, E1) — see sysFAR
+        const fr = sysFAR[name] || sysFAR_DEF;
+        pp.airGnd = fr[0]; pp.farDark = fr[1]; pp.farDist0 = fr[2]; pp.farDist1 = fr[3];
       }
     }
     // ---- AND THE POSTCARD LEANS ON THE SAME THREE ------------------------

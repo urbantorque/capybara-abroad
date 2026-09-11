@@ -982,6 +982,10 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform float uDofK;',
   'uniform vec4  uDof;',
   'uniform float uAirK;',
+  // THE FRAME HAS A DARK (L3, E1). See the block over the air term.
+  'uniform float uAirGnd;',
+  'uniform float uFarDark;',
+  'uniform vec3  uFarDist;',
   'uniform float uAirMax;',
   'uniform vec3  uAirCol;',
   'uniform float uCreaseK;',
@@ -1170,9 +1174,36 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   //    buffer is exactly 1.0 and no piece of world ever is, so testing the raw
   //    value is both exact and free — and it costs nothing on the domes that
   //    do write depth, because they are handled a line below.
+  // ---- THE FRAME HAS A DARK (L3, E1) ---------------------------------
+  //    Forty-one settled frames and every bright one converged on a single
+  //    pale value: the fog, the air and the sky all go to the SAME colour, so
+  //    the picture has no edge where the world stops. Real aerial perspective
+  //    on the GROUND goes to the sky's horizon hue — darker and bluer than
+  //    the sky just above it — because a grazing surface takes less sun and
+  //    more sky. Two terms, both on the view ray's elevation, so a minaret or
+  //    a volcano keeps its haze and its colour and only the ground plane
+  //    recedes:
+  //      uAirGnd   how much darker the air colour is on a ray below the
+  //                horizon (the far ground goes to 0.8 of the fog, not 1.0)
+  //      uFarDark  a value drop over uFarDist.x .. uFarDist.y metres on
+  //                ground rays — the horizon getting DARKER, not paler
+  //    A ray at or above the horizon gets neither. The ray is the same one
+  //    the airlight reconstructs; it is computed whenever air is on now.
+  '    vec3 hrd = uRayBL + uRayDX * vUv.x + uRayDY * vUv.y;',
+  '    float hy = hrd.y / max(length(hrd), 0.0001);',
+  '    float gnd = 1.0 - smoothstep(-0.02, 0.10, hy);',
+  //    ...AND THE SKY TAKES ALMOST NONE OF IT. The raw-depth exemption below
+  //    only covers a dome that writes no depth; Palawan's does, and measured
+  //    (qa/l3-far-a/off.png) the whole sky went from blue to grey under a
+  //    0.17 ceiling. A ray above the horizon keeps 15% of the term — enough
+  //    for a volcano to sit in its air — and the ground plane takes it all.
   '    if (uAirK > 0.000001 && raw < 0.999999) {',
-  '      float a = min(1.0 - exp(-d * uAirK), uAirMax);',
-  '      lin = mix(lin, uAirCol, a);',
+  '      float a = min(1.0 - exp(-d * uAirK), uAirMax) * (0.15 + 0.85 * gnd);',
+  '      lin = mix(lin, uAirCol * (1.0 - uAirGnd * gnd), a);',
+  '    }',
+  '    if (uFarDark > 0.0001 && raw < 0.999999) {',
+  '      float fd = smoothstep(uFarDist.x, uFarDist.y, d) * gnd;',
+  '      lin *= 1.0 - uFarDark * fd;',
   '    }',
   // 4. AND THE LIGHT IN IT. Last, because it is the only one of the four that
   //    ADDS rather than modifying what is there: haze goes over the picture
@@ -1315,6 +1346,7 @@ function mainMakePost(game) {
       //   crease     how deep a corner may go, 0 .. ~0.35
       dof: 0.0, dofNear0: -1, dofNear1: 0, dofFar0: 1e6, dofFar1: 2e6,
       air: 0.0, airMax: 0.0, airR: 1, airG: 1, airB: 1,
+      airGnd: 0.0, farDark: 0.0, farDist0: 30, farDist1: 160,
       // v48. Light IN the air rather than on the things in it.
       airLight: 0.0,
       crease: 0.0,
@@ -1427,6 +1459,7 @@ function mainMakePost(game) {
       uDofK: { value: 0 },
       uDof: { value: new THREE.Vector4(-1, 0, 1e6, 2e6) },
       uAirK: { value: 0 }, uAirMax: { value: 0 },
+      uAirGnd: { value: 0 }, uFarDark: { value: 0 }, uFarDist: { value: new THREE.Vector3(30, 160, 0) },
       uAirCol: { value: new THREE.Vector3(1, 1, 1) },
       uCreaseK: { value: 0 },
       uAirLitK: { value: 0 }, uAirLitFar: { value: MAIN_AIRLIT_FAR },
@@ -1541,7 +1574,7 @@ function mainMakePost(game) {
       // frame and larger at the corners.
       const airLit = game.state.noAirLight ? 0 : p.airLight;
       cu.uAirLitK.value = airLit;
-      if (airLit > 0.0005) {
+      if (airLit > 0.0005 || p.air > 0.000001 || p.farDark > 0.0001) {
         cam.updateMatrixWorld();
         const e = cam.matrixWorld.elements;
         // the camera's own basis, straight out of its world matrix
@@ -1561,6 +1594,9 @@ function mainMakePost(game) {
       cu.uAirK.value = game.state.noAir ? 0 : p.air;
       cu.uAirMax.value = p.airMax;
       cu.uAirCol.value.set(p.airR, p.airG, p.airB);
+      cu.uAirGnd.value = game.state.noAir ? 0 : (p.airGnd || 0);
+      cu.uFarDark.value = game.state.noAir ? 0 : (p.farDark || 0);
+      cu.uFarDist.value.set(p.farDist0 || 30, p.farDist1 || 160, 0);
 
       const dofK = game.state.noDof ? 0 : p.dof;
       cu.uDofK.value = dofK;
