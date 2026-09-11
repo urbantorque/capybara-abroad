@@ -1000,7 +1000,10 @@ function manBuild(game) {
       // Manly used the conditional-line system in nought places, so the
       // lifeguard warned an animal that had already been out the back in the
       // gutter and back in on the wave of the set not to fight the rip.
-      lines: ['Swim between the flags, mate. That is the whole system.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'A balloon over Turkey. I am told it did not fall out. The water here does not care what you have done.', after: 'sunrise' },
+              'Swim between the flags, mate. That is the whole system.',
               { t: 'See that gutter? That is where you would go. Straight out.', before: 'the-rip' },
               { t: 'Do not fight it. Nobody wins that one. Swim across it.', before: 'the-rip' },
               { t: 'You have been out in it now. Told you it was quicker than walking.', after: 'the-rip' },

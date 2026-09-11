@@ -4866,7 +4866,10 @@ function caliBuild(game) {
       figure: { shirt: PALETTE.caliWall4, skin: PALETTE.skin4 },
       // pouring, and he does not measure it
       beat: { kind: 'reach', every: 7.0, dur: 1.2, sfx: 'clink', volume: 0.10 },
-      lines: ['Aguardiente or nothing. There is no third thing.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Ran a river in Japan, I am told. The Cali is not for running. It is for looking at.', after: 'uji-run' },
+              'Aguardiente or nothing. There is no third thing.',
               'They started at ten. They will still be here at six.',
               { t: 'You want to dance? Watch the feet. Never watch the face.', before: 'salsa-dance' },
               { t: 'I watched the feet. I do not know what I watched.', after: 'salsa-dance' },

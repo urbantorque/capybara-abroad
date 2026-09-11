@@ -5496,7 +5496,10 @@ function hkBuild(game) {
       figure: { shirt: PALETTE.cloth2, legs: PALETTE.stoneDark },
       // the cleaver, which is the sound of the market
       beat: { kind: 'work', every: 3.1, dur: 0.7, sfx: 'cleaver', volume: 0.14 },
-      lines: ['Grouper still swimming. You can see it is swimming.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Venice went under and it swam. Good. The grouper swims too, and the grouper is not for you.', after: 'acqua-alta' },
+              'Grouper still swimming. You can see it is swimming.',
               { t: 'Do not put your face in the tank.', before: 'wet-market' },
               { t: 'You did not put your face in the tank. You emptied it.', after: 'wet-market' },
               'Everything fresh. Everything alive. Some of it too alive.',

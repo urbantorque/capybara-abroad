@@ -5740,7 +5740,10 @@ function quayBuild(game) {
       // were standing at Manly having driven the boat there yourself. A
       // `before:` line belongs to a stranger; an `after:` line can only be
       // said to somebody who was there.
-      lines: ['Mind the gap. Everybody minds the gap eventually.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'The Opera House. I heard. This boat has a bell and it is not for you.', after: 'opera-stage' },
+              'Mind the gap. Everybody minds the gap eventually.',
               { t: 'She goes when she goes. Wheel is unlocked.', before: 'take-helm' },
               { t: 'Thirty minutes across, if the harbour behaves.', before: 'manly-voyage' },
               { t: 'You have got the wheel. I am going to sit down.', after: 'take-helm' },

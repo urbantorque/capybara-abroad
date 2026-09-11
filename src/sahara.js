@@ -6150,7 +6150,10 @@ function sahBuild(game) {
       // the square
       authority: true, role: 'the storyteller',
       figure: { shirt: PALETTE.sahCanvas, skin: PALETTE.skin4, hat: PALETTE.sahOchreDk },
-      lines: ['Sit down. It is a long one and it is not free.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Sat under the lights in Iceland. Sit under mine. Same price: nothing, and then a coin.', after: 'aurora' },
+              'Sit down. It is a long one and it is not free.',
               'Same story since my grandfather. He got it wrong too.',
               'You have come in at the part where everybody dies.',
               { t: 'There is a story about a rodent that emptied a juice cart. It is new.',

@@ -3626,9 +3626,13 @@ function hanBuildLocals(game) {
   put(9, 19, {
     face: -2.6,
     trav: true,
-    lines: ['Right. I am not even going to say it.',
-            'Four countries. Four. I have counted.',
-            'Are you following me or am I following you?',
+    // ---- ...AND THE COUNT IS THE COUNT (L3, E3): the line that counts the
+    // meetings only plays for a player who has had them; a stranger gets a
+    // stranger's line. game.travMet is npc.js's set of chapters spoken in.
+    lines: [{ t: 'Right. I am not even going to say it.', when: function () { return game.travMet() >= 2; } },
+            { t: 'Four countries. Four. I have counted.', when: function () { return game.travMet() >= 3; } },
+            { t: 'Are you following me or am I following you?', when: function () { return game.travMet() >= 2; } },
+            { t: 'You look like somebody I keep nearly meeting.', when: function () { return game.travMet() < 2; } },
             { t: 'Whatever you did in that cave, I heard about it in Laos.', after: 'to-cave' }],
     wheek: ['Yeah. All right. Yeah.'] });
   hanLocPho = put(12, 14, {
@@ -3705,7 +3709,10 @@ function hanBuildLocals(game) {
     // THE AUTHORITY (L3, F1): "you may not get in" is a job, and the person
     // whose job it is carries a nuisance out. put() hands the row to addLocal.
     authority: true, role: 'the usher',
-    lines: ['They are standing in the water. The people are standing in the water.',
+    lines: [
+            // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+            { t: 'Won a race in Monte Carlo. The traffic here is not a race. Everybody wins by not stopping.', after: 'the-tunnel' },
+            'They are standing in the water. The people are standing in the water.',
             'Eleven hundred years. Nobody knows who started it.',
             'You may look. You may not get in.',
             { t: 'The red bridge is that way. Everybody photographs the red bridge.', before: 'the-huc' },

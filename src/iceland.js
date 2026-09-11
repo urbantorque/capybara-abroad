@@ -5592,7 +5592,10 @@ function iceBuild(game) {
       // THE AUTHORITY (L3, F1): the one person in town whose job is the door
       authority: true, role: 'the verger',
       figure: { shirt: PALETTE.iceChurchDk, legs: PALETTE.stoneDark },
-      lines: [{ t: 'Five thousand two hundred and seventy-five pipes. Do not touch it.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'It flew under a frigatebird in Rio, they said. We have puffins. Do not get ideas.', after: 'fragata-ride' },
+              { t: 'Five thousand two hundred and seventy-five pipes. Do not touch it.',
                 before: 'organ' },
               { t: 'It is locked. It is always locked. Do not get any ideas.', before: 'organ' },
               'The wings are basalt columns. The whole building is a picture of the coast.',

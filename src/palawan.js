@@ -4840,7 +4840,10 @@ function palBuild(game) {
       // THE AUTHORITY (L3, F1): the boat is his, and the jetty goes with it
       authority: true, role: 'the boatman',
       figure: { shirt: PALETTE.cloth2, skin: PALETTE.skin3, hat: PALETTE.khaki },
-      lines: [{ t: 'Bangka leaves when the bangka leaves. Sit at the front.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Flew a helicopter in Hong Kong. Here it is the bangka, and the bangka does not go up.', after: 'symphony' },
+              { t: 'Bangka leaves when the bangka leaves. Sit at the front.',
                 before: 'outrigger' },
               { t: 'You sat at the front. Good. Everybody sits at the back and gets wet.',
                 after: 'outrigger' },

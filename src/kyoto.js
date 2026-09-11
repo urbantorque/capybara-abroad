@@ -4859,7 +4859,10 @@ function kyoBuild(game) {
       // the garden. See npc.js.
       authority: true, role: 'the monk',
       figure: { shirt: PALETTE.hair2, legs: PALETTE.hair2 },
-      lines: [{ t: 'Fifteen stones. You can never see all fifteen at once.', before: 'zen-ruin' },
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'A condor, they said. We have herons. Please do not.', after: 'condor-ride' },
+              { t: 'Fifteen stones. You can never see all fifteen at once.', before: 'zen-ruin' },
               { t: 'I raked that this morning. I will rake it again.', before: 'zen-ruin' },
               { t: 'Please. Look with the eyes.', before: 'zen-ruin' },
               { t: 'The gravel is not a path. It has never once been a path.', before: 'zen-ruin' },

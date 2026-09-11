@@ -3388,7 +3388,10 @@ function cavBuildCamp(game, root) {
     // carries a nuisance out. put() hands the row straight to addLocal.
     authority: true, role: 'the expedition leader',
     figure: { shirt: PALETTE.cavTentB, hat: PALETTE.cavTent, legs: PALETTE.cavRockDk },
-    lines: ['Second camp. We are two days in and one day out.',
+    lines: [
+            // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+            { t: 'Led a herd across a river, apparently. There is nothing to lead in here. Follow the rope.', after: 'the-crossing' },
+            'Second camp. We are two days in and one day out.',
             'You do not get in here without a permit. I am choosing not to ask.',
             'That hole is a hundred and forty metres across. Look up.',
             'Everything you can see grew because the roof fell in. Everything.',

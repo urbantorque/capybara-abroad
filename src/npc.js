@@ -246,7 +246,11 @@ const npcLINES = {
             { t: 'He’s wearing somebody’s hat.', after: 'steal-hat', before: 'hat-harbour' },
             { t: 'He carried it all that way and then threw it in.', after: 'hat-harbour' },
             { t: 'He’s soaked. He did that to himself.', after: 'swim' },
-            { t: 'He’s been in the sprinkler. On purpose.', after: 'sprinkler' }],
+            { t: 'He’s been in the sprinkler. On purpose.', after: 'sprinkler' },
+            // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): the one place that talks like
+            // a place hears about the last one
+            { t: 'Rode a scooter round Hanoi, apparently. Not on the lawn, mate.', after: 'pho-run' },
+            { t: 'Been round the world and come back for the sandwiches.', after: 'pho-run' }],
   // What somebody says the second time you come near them. See the npcWARY_*
   // block: this is the whole of what being remembered sounds like.
   wary:    ['You again.', 'Oh, it’s you.', 'I’m watching you, mate.', 'Not again.',

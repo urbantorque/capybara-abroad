@@ -5500,7 +5500,10 @@ function driBuild(game) {
       // THE AUTHORITY (L3, F1): the lantern is hers, and so is the island
       authority: true, role: 'the lantern keeper',
       figure: { shirt: PALETTE.driPaper, legs: PALETTE.driTimber },
-      lines: [{ t: 'I light it when there are enough of them. There are never enough of them.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Word came up on the wind. A rocket, in Marrakech. Up here you get a puff, and you will like it.', after: 'jetpack' },
+              { t: 'I light it when there are enough of them. There are never enough of them.',
                 before: 'lantern' },
               'You came the long way. Everybody comes the long way. There is no other way.',
               { t: 'It is not for anybody. It is just the last lit thing before the dark bit.',

@@ -4477,7 +4477,10 @@ function monBuildLocals(game) {
     // exactly as he greeted you the first time. `after:`/`before:` is the
     // channel that makes a place remember, and every other chapter with a cast
     // has between fifteen and forty-two of them.
-    lines: ['Good evening. The jacket is not, strictly, required.',
+    lines: [
+            // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+            { t: 'It rode an orca, they say. Orcas are not on the list either.', after: 'orca-ride' },
+            'Good evening. The jacket is not, strictly, required.',
             'You are on the list. I have not checked the list.',
             'Mind the step. Everybody minds the step.',
             'They are two thousand a night, the rooms. You have not asked.',

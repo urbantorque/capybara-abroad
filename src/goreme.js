@@ -6036,7 +6036,10 @@ function gorBuild(game) {
       // one who had ridden three winds and put it down on his trailer. A
       // `before:` line is the thing they say while you are still a stranger; an
       // `after:` line is the thing they can only say once it has happened.
-      lines: ['We do not steer. Nobody steers. We choose a height.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Rode a manta. Fine. A manta has no basket to fall out of.', after: 'the-manta' },
+              'We do not steer. Nobody steers. We choose a height.',
               'Wind goes one way down low and the other way up high.',
               { t: 'In the basket, please. Both feet. All four feet.', before: 'aboard' },
               { t: 'You have been in one now. So you know.', after: 'aboard' },

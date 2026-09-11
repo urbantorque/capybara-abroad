@@ -931,7 +931,10 @@ function panBuild(game) {
       // other half of the same argument, and the Pantanal used it nowhere. A
       // `before:` line is what a stranger is told and an `after:` line is what
       // only somebody who was there can be told.
-      lines: ['Road floods in March. Road floods in April. Road floods.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'Rode a wave at Manly, I heard. My river does not have waves. It has teeth.', after: 'all-the-way' },
+              'Road floods in March. Road floods in April. Road floods.',
               { t: 'Do not take the second bridge. Take the third.', before: 'missing-plank' },
               { t: 'You are not the strangest thing on this road today.', before: 'the-crossing' },
               'Ninety centimetres of water on the campo and the cattle do not mind.',

@@ -5751,7 +5751,10 @@ function venBuild(game) {
       // THE AUTHORITY (L3, F1): the tables are for the guests
       authority: true, role: 'the waiter',
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.hair2 },
-      lines: ['Signore. The tables are for the guests.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'It rode a lantern into the sky, they tell me. Our lanterns stay where they are put. So do the tables.', after: 'lantern' },
+              'Signore. The tables are for the guests.',
               { t: 'Eleven euros for the spritz. Sitting down.', before: 'spritz-theft' },
               { t: 'Eleven euros. I am putting it on somebody’s bill. Yours, ideally.',
                 after: 'spritz-theft' },

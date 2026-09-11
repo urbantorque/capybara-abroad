@@ -4777,7 +4777,10 @@ function rioBuild(game) {
       authority: true, role: 'the lifeguard',
       figure: { shirt: PALETTE.rioTileRed, legs: PALETTE.rioTileWhite, hat: PALETTE.rioTileYellow },
       face: Math.PI,
-      lines: ['Between the flags. There are no flags. Use your judgement.',
+      lines: [
+              // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
+              { t: 'The bus in Cali. I heard about the bus. We have a tram. Same rules: none.', after: 'chiva-mirador' },
+              'Between the flags. There are no flags. Use your judgement.',
               { t: 'The rip runs west off the point. You are built for it, but still.', before: 'take-a-wave' },
               'Sixty saves this summer. None of them a rodent.',
               { t: 'You took one all the way in. On your back. I have notes.', after: 'take-a-wave' },
