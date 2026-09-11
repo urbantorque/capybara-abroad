@@ -8074,7 +8074,7 @@ function sysBuildCSS() {
    name are the same three things for the whole chapter. */
 '.capyui-marqname{grid-column:1 / -1;grid-row:2;font-size:clamp(12px,1.9vw,16px);',
   'line-height:1.1;letter-spacing:.06em;text-transform:uppercase;font-weight:800;',
-  'color:' + ink + ';margin-top:3px;min-width:0;overflow-wrap:break-word;}',
+  'color:' + ink + ';margin-top:3px;min-width:0;overflow-wrap:break-word;text-wrap:balance;}',
 '.capyui-marqtxt{grid-column:1 / -1;grid-row:3;font-size:clamp(9.5px,1.55vw,13px);',
   'line-height:1.28;color:' + ink + ';font-weight:700;margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
@@ -19718,7 +19718,11 @@ export function createSystems(game) {
   const marqTxtEl = sysEl('span', 'capyui-marqtxt', '');
   const marqSayEl = sysEl('span', 'capyui-marqsay', '');
   const marqLiveEl = sysEl('span', 'capyui-marqlive', '');
-  marqLiveEl.setAttribute('aria-live', 'polite');
+  // NOT aria-live: the line rewrites every frame the moment is running —
+  // metres up, seconds, of seven — and a live region that changes sixty
+  // times a second is a screen reader reading numbers for a minute. The
+  // progressbar beside it carries the state; the eyebrow's change to NOW is
+  // announced by the toast that every marquee already starts with.
   const marqBarEl = sysEl('span', 'capyui-marqbar');
   const marqBarFill = sysEl('i');
   marqBarEl.appendChild(marqBarFill);

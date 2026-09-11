@@ -200,6 +200,7 @@ let caliLuladaMesh = null, caliLuladaGone = false, caliLuladaT = 0;
 let caliSpark = null;
 const caliSPARK_N = 160;   // was 28; the fireworks (W1) want forty a burst
 const caliSparkData = new Float32Array(caliSPARK_N * 7);   // x,y,z,vx,vy,vz,life
+const caliSparkSize = new Float32Array(caliSPARK_N).fill(1); // W1: a firework is a spark six times over
 
 // --- task / dance state ---
 let caliOnFloor = false, caliFloorT = 0;
@@ -3596,7 +3597,7 @@ function caliBuildSparks(root) {
   root.add(caliSpark);
 }
 
-function caliBurstSparks(x, y, z, n, up, spd) {
+function caliBurstSparks(x, y, z, n, up, spd, size, life) {
   for (let k = 0; k < n; k++) {
     let slot = -1;
     for (let i = 0; i < caliSPARK_N; i++) if (caliSparkData[i * 7 + 6] <= 0) { slot = i; break; }
@@ -3607,7 +3608,8 @@ function caliBurstSparks(x, y, z, n, up, spd) {
     caliSparkData[o + 3] = Math.cos(a) * s;
     caliSparkData[o + 4] = rand(2.0, 5.0) * (up || 1);
     caliSparkData[o + 5] = Math.sin(a) * s;
-    caliSparkData[o + 6] = 1;
+    caliSparkData[o + 6] = life || 1;
+    caliSparkSize[slot] = size || 1;
   }
 }
 // ---- FIREWORKS OVER THE CITY (W1) ------------------------------------------
@@ -3626,10 +3628,13 @@ function caliUpdateFireworks(game, dt) {
   if (caliFwNext > 0) return;
   caliFwNext = rand(0.35, 0.7);
   // over the city, which lies east and below the mirador
-  const fx = caliMIRADOR.x + rand(55, 150), fz = caliMIRADOR.z + rand(-70, 60);
-  const fy = caliMIR_DECK + rand(38, 62);
-  caliBurstSparks(fx, fy, fz, 26, 0.35, 3.2);
-  caliBurstSparks(fx, fy, fz, 14, 0.35, 1.6);
+  const fx = caliMIRADOR.x + rand(40, 120), fz = caliMIRADOR.z + rand(-60, 50);
+  const fy = caliMIR_DECK + rand(10, 30);      // over the city, which is below the terrace: in the frame from the rail, not over the clouds
+  // Big, and slow to die: a 1.4 m spark at a hundred metres is eight pixels,
+  // which is what a firework is from a hillside. Life 2.6 on a 1.5/s decay
+  // is a second and three quarters at full size and then the fade.
+  caliBurstSparks(fx, fy, fz, 26, 0.35, 4.6, 11, 2.6);
+  caliBurstSparks(fx, fy, fz, 14, 0.35, 2.4, 8, 2.2);
   if (typeof game.sfx === 'function') {
     game.sfx('thud', { volume: 0.55, pitch: 0.5, at: { x: fx, y: fy, z: fz }, near: 40, far: 400 });
     game.sfx('pop', { volume: 0.4, pitch: 0.7, at: { x: fx, y: fy, z: fz }, near: 40, far: 400 });
@@ -3653,7 +3658,7 @@ function caliUpdateSparks(dt) {
       caliSpark.setMatrixAt(i, caliXform(0, -900, 0, 0, 0, 0, 0.001, 0.001, 0.001));
       continue;
     }
-    const s = 0.22 * L + 0.06;
+    const s = (0.22 * Math.min(L, 1) + 0.06) * caliSparkSize[i];
     caliSpark.setMatrixAt(i, caliXform(caliSparkData[o], caliSparkData[o + 1], caliSparkData[o + 2],
                                        caliTime * 5 + i, i, 0, s, s, s));
   }
@@ -4411,6 +4416,8 @@ export function createCali(game) {
       return clamp(1 - Math.max(0, caliVistaT - 7) / 5, 0, 1) * 0.62;
     },
 
+    /** W1: the volley over the city, on demand. Test hook. */
+    fireworksDebug() { caliFwT = 5.5; caliFwNext = 0; caliNightT = 1; return true; },
     update(dt) {
       caliUpdatePax();
       if (caliMotoMover) caliMotoMover.step(dt);

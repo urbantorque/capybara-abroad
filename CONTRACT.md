@@ -1,3 +1,94 @@
+## THE BIG ONES — NAMED, LIVED, AND LIFTED (W1, W2 — 11 Sep 2026)
+
+Asked for: every chapter's marquee at four stars or better, twelve of the
+nineteen a genuine wow, and the big ones written so a player knows what they
+are about. Two batches. W1 is the shared frame and eight chapters; W2 is five
+more.
+
+### THE NAME IS THE THING, NOT THE PLACE
+
+`wow:` on a TASKS row was a caption printed once, on the banner, after the
+fact — and it was a place: GALERAS, THE ERG, O PANTANAL. The sentence under
+it was the poetry: *Bring the sky down*, *Be let in by the orcas*. A player
+opening a chapter read a star, a riddle, and a heading about something else.
+
+Now `wow` is a NAME — THE CONDOR RIDE, THE AURORA, THE TRAIN ALLEY — and the
+sentence is written to be obeyed on a first read: a verb, the object, the
+place (*Hang from the condor over the volcano*; *Stand in St Mark's Square as
+the sea floods it*; *Drive the boat into the orca pod and keep up with them*).
+The poetry stays in the `say` lines and the locals. The signpost prints the
+name in the card's biggest type under the eyebrow, and — new — it stays up
+when the row is on the paper: only the sentence steps aside for the row that
+carries it (`.capyui-marq.row`). All nineteen renamed; `qa/q2-hud.js` reads
+them back.
+
+### THE LIVE CHANNEL
+
+Every payoff the game had was AFTER the moment. `game.wowLive(line, t)` is
+the chapter saying it is IN the moment: called every frame like `recordLive`,
+closed by a 0.7 s watchdog like `recordLive`. The signpost's eyebrow turns
+to `THE BIG ONE · NOW` in the accent, the star pulses (not under
+`prefers-reduced-motion`), the sentence gives way to the chapter's own line
+— *hanging on · 8 s · 60 m up*, *in the square · the sea at 83% · stay in
+it*, *a jacaré on the line · 12 m behind the last one · WHEEK* — and a bar
+fills under it when the moment has a length (`t` optional; omit it and the
+bar stays off). Not `aria-live`: the line rewrites sixty times a second; the
+progressbar beside it carries the state.
+
+The score gets the same signal through a SECOND scalar, not through
+`musSwell`: `musSwell` is a moment — an envelope with the lift figure at the
+front of it, re-armed every `(up + dn) * 0.55` s while held — and a
+sixty-second condor ride would have played the flourish twelve times.
+`musLiveSet(k)` drives the same three voices and the same lean with no
+arpeggio, damped up in a second and a half and down in three, and every read
+of `musLift * musLiftEnv()` goes through `musLiftNow()` so the breath, the
+arrival sting and the lift gain all see it. The figure still plays once, at
+the tick.
+
+Nineteen chapters call it. The ones whose moment has no natural length
+(Sydney's house, Hanoi's countdown) pass a made-up `t` so the bar says
+"more than before".
+
+### WHAT EACH CHAPTER GOT, AND WHAT IT MEASURED
+
+| # | chapter | the big one, now | what changed | measured |
+|---|---|---|---|---|
+| 1 | Sydney | THE OPERA HOUSE CONCERT | standing on a rectangle for 5 s is gone. A wheek from the podium calls the house (npc.js `concert`: eight nearest, two rows on the forecourt, facing the stage, the same `gather` state as the ending with `gathLX/gathLZ`, `gathQuiet`, `cheerT`); each wheek pulses the sails; the third with two in place is the concert — arms up, three photographs, the tick | 7 listening at 9 s; **the second wheek sent all 7 running** (the wheek startle) — fixed: the house hops where it stands; 3 of 3 → done |
+| 2 | Pasto | THE CONDOR RIDE | the tick moves from the frame the talons close to `condorRIDE_T` 12 s in the air; the shot still fires on the grab | done at t 34 with the banner over the valley; live line 0→11 s |
+| 3 | Quay | THE FERRY TO MANLY | THE HEADS: `quayHeadsAt(z)` a bell over z −230..−470, 0.85 m of lift on a 9 s period, pitch and heel off the slope, bow spray on the crests at speed; live line with metres to Manly and the sea state | headsK 0.973 in the gap, 0.026 in the harbour |
+| 4 | Kyoto | THE RIVER RUN | THE CHUTE at run 0.45: three foam chevrons across the channel and a real `launch()` off the tongue at 6 m/s. **Two bugs under it**: the buoyancy spring ate any launch from water (4.6 m/s measured as 0.58 m of rise) — `capyLaunchT` now exempts it; and **the finish fired from the gorge's outbound reach**, 11 m from the mill pond the hook comes back to, a hundred metres early — it needs `nr.s > len − 30` now | launch: −0.67 → +0.43 m, 0.6 s of air, run continues |
+| 5 | Cali | THE PARTY BUS | fireworks over the city when you rode the whole way (`caliUpdateFireworks`, a volley for 5.5 s, sparks ×11 with life 2.6 so they read at 100 m; pool 28 → 160); live line with cables and metres | shot at night from the terrace |
+| 6 | Rio | THE FRIGATEBIRD | the 12 s ride rule from condor.js, plus two beats per flight: over the top of the loaf (the cable car cheers) and eye to eye with the Redentor | — |
+| 7 | Iceland | THE AURORA | the sit is untouched; the tick moves to THE CALL — a wheek within 16 m of the spring with the curtains past 0.35 sends a band out along them from your x (`iceAurKick`, 420 m in 3 s, ripple ×2.6, brightness +1.3) and the lift figure answers; every call after gets the wave | done on the first call at aurora 1.0; live 23% → up |
+| 8 | Marrakech | THE GREAT DUNE | air counted per hop and said on landing; the face comes down behind you past 8 m/s (`sahDUST_N` 150 → 260, a band 4–14 m uphill); live line with speed and best hop | 48 of 260 dust alive at 16 m/s |
+| 9 | the Drift | THE LANTERN | live line: flies of six, metres to the plinth, wind with/against/across | — |
+| 10 | Venice | THE ACQUA ALTA | the window ARMS; the tick is the top of the tide (0.95) with you still in the square, and leaving the square spends the tide; the Campanile rings and every pigeon goes up | armed 71%, ticked 95%, 8 m of drift in the surge |
+| 11 | Hong Kong | THE LIGHT SHOW | the roof arms; the finale (eighth wheek or the clock) ticks; live line counts the wheeks and the towers | — |
+| 12 | Palawan | THE MANTA RIDE | live line in three registers (hold on / going up / THE SURFACE) | — |
+| 13 | Cappadocia | THE BALLOON SUNRISE | live line: altitude, burner ON/off, seconds until the sun is over the rim (on the phase, since `gorSun` is 0 until `gorSUN_P`) | — |
+| 14 | Manly | THE BIG WAVE | THE LIP: twelve foam slabs on an arc from above and behind the rider's head over to hang ahead, scaled in while the ride is on the face (`carveShare > 0.38`) and gone otherwise; spray off it, the hiss in close, IN THE BARREL with the seconds. **Drawn as the lip only** — a first cut with a back wall put a slab between the chase camera and the animal | `barrelDebug(true)`: k 0.99; side and back shots |
+| 15 | Pantanal | THE HERD CROSSING | THE JACARÉ ON THE LINE: once per crossing, the nearest one comes off the bank and closes on the tail at 2.7 m/s with a V of ripples; a wheek inside 16 m sends it under for good, or it takes the last one off the line | started at crossT 2.6, closed 17 → 14 m, turned by the wheek (saved 1) |
+| 16 | Sơn Đoòng | THE DROP INTO THE LIGHT | live line for the climb and FALLING with the swifts | — |
+| 17 | Antarctica | THE ORCA POD | the tick is answered by three more breaches, queued 0.6 s apart through the same animation | — |
+| 18 | Monte Carlo | THE TUNNEL RUN | live line: on the roof, metres to the mouth, then IN THE TUNNEL with the speed | — |
+| 19 | Hanoi | THE TRAIN ALLEY | the tick moves from `d < 2.6` — which is true with the loco still eight metres up the alley — to the nose passing the animal; countdown to the horn on the paper, then the clearance | — |
+
+`qa/fuzz.js` nineteen chapters after each batch: 0 NaN, 0 void, 0 errors.
+
+### THINGS THAT WERE WRONG ON THE FIRST CUT
+
+- **The house ran from the show.** The second wheek startled the eight people the first had called. A gathered, quiet record now hops where it stands.
+- **`kyoRiverSeg` and `kyoRiverNear` return SHARED objects.** `chuteAt()`'s first cut returned the same object twice and the probe teleported to the chute instead of upstream of it. Copy before you hold two.
+- **The hook.** The chute at run 0.905 was inside the mill pond's finish radius from the OUTBOUND reach, and so was every run: the finish had been firing a hundred metres early. The chute moved to the straight reach at 0.45; the finish gained an arc-length gate.
+- **A launch out of water was a hop.** `capyLaunchT` did not exempt the buoyancy damp. It does.
+- **The Manly slabs fanned.** Rotating a slab by the normal's angle instead of the tangent's makes a shell; the rotation is `−a − π/2` for an arc in the (z, y) plane under three.js's Rx. And the back wall of a barrel is between the camera and the rider.
+- **Cali's fireworks were invisible.** 0.28 m sparks at 60 m over the clouds. Size and life are now per spark; the bursts are 10–30 m over the terrace, over the city.
+- **Hunt state carried across a teleport.** `panHuntDone` is reset on entry and on leaving the river, and the hunt refuses a "line" whose tail is out of the water or more than 30 m from the animal.
+
+### TEST HOOKS ADDED
+
+`env.concertAudit()` · `kyoto.chuteAt(back)` · `quay.headsK()` / `quay.boatDebugTo(x, z)` · `venice.phaseDebug(p)` · `manly.barrelDebug(force)` · `pantanal.huntDebug()` / `pantanal.herdFollow(n)` · `sahara.dustDebug()` · `cali.fireworksDebug()`. Probes: `qa/w1-sydney.js`, `qa/w1-condor.js`, `qa/w1-marquees.js`, `qa/w1-venice.js`, `qa/w1-batch2.js`, `qa/w1-pan-dbg.js`, `qa/w1-barrel-dbg.js`, `qa/w1-cali-dbg.js`.
+
 ## THE WAIST-HIGH PASS — WHAT THE SOLIDITY AUDIT COULD NOT SEE, AND WHAT THE PAPER NEVER SAID (V1, V2 — 11 Sep 2026)
 
 Reported from a screenshot of Cali: the camera inside a riverside parapet, the
