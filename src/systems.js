@@ -8121,6 +8121,19 @@ function sysBuildCSS() {
   'box-shadow:' + shMd + ';border:1px solid ' + paper2 + ';',
   'transition:opacity ' + dSlow + ' ease;opacity:0;}',
 '.capyui-todo.show{opacity:1;}',
+/* THE PAPER TUCKS (L3, E5). In forty-one settled frames the card covered a
+   fifth of the width and up to half the height, top-left, where the eye
+   enters. After four seconds of walking with nothing ticked it collapses to
+   one line — the row you are on, its arrow and its metres — and comes back
+   the moment you stop, tick something, or something opens. The list is what
+   you read standing still; the arrow is what you read moving. */
+'.capyui-todo .capyui-tab{display:none;align-items:center;gap:8px;font-size:' + tMd + ';',
+  'font-weight:600;color:' + ink + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+'.capyui-todo .capyui-tab .capyui-txt{overflow:hidden;text-overflow:ellipsis;min-width:0;}',
+'.capyui-todo.away{width:clamp(150px,26vw,240px);padding:7px 12px 8px;transform:rotate(-1.2deg) scale(.96);}',
+'.capyui-todo.away .capyui-tab{display:flex;}',
+'.capyui-todo.away > :not(.capyui-tab){display:none;}',
+'.capyui-todo{transition:opacity ' + dSlow + ' ease, width ' + dMed + ' ease, transform ' + dMed + ' ease;}',
 '.capyui-todo:before{content:"";position:absolute;left:14%;right:14%;top:-7px;height:14px;',
   'background:' + sand + ';opacity:.85;transform:rotate(-1.2deg);border-radius:' + rSm + ';',
   'box-shadow:' + shSm + ';}',
@@ -20061,6 +20074,47 @@ export function createSystems(game) {
 
   // --- to-do list ---
   const todoEl = sysEl('div', 'capyui-todo');
+  // THE TAB (L3, E5): what the paper is when it has tucked itself away. See
+  // the .away rules in the sheet and todoTuckTick.
+  const todoTab = sysEl('div', 'capyui-tab');
+  const todoTabTxt = sysEl('span', 'capyui-txt', '');
+  const todoTabAim = sysEl('span', 'capyui-aim on');
+  const todoTabArrow = sysEl('i', 'capyui-arrow');
+  const todoTabDist = sysEl('span', null, '');
+  todoTabAim.appendChild(todoTabArrow); todoTabAim.appendChild(todoTabDist);
+  todoTab.appendChild(todoTabTxt); todoTab.appendChild(todoTabAim);
+  todoEl.appendChild(todoTab);
+  let todoAway = false, todoAwayT = 0, todoAwayHold = 0;
+  const sysTUCK_AFTER = 4.0;    // s of walking before the paper tucks
+  const sysTUCK_V = 1.0;        // m/s: walking, not shuffling on the spot
+  const sysTUCK_HOLD = 5.0;     // s the paper stays open after a tick
+  function todoTuckTick(dt) {
+    const capy = game.capy;
+    const v = capy && capy.velocity;
+    const spd = v ? Math.hypot(v.x, v.z) : 0;
+    if (todoAwayHold > 0) todoAwayHold -= dt;
+    const busy = !started || transBusy || jrShown || ledShown || albShown || pauseShown || game.state.paused;
+    if (busy || todoAwayHold > 0 || spd < sysTUCK_V) todoAwayT = 0;
+    else todoAwayT += dt;
+    const want = todoAwayT > sysTUCK_AFTER;
+    if (want !== todoAway) {
+      todoAway = want;
+      todoEl.classList.toggle('away', want);
+    }
+    if (want) {
+      const top = taskRec[todoTopId];
+      const t = top && top.txt ? top.txt.textContent : '';
+      // ...with the tally in front of it, in the count's grey
+      const tally = countEl.textContent.replace(/^.*?·\s*/, '').replace(/\s*done.*$/i, '').toLowerCase();
+      const tt = (tally ? tally + '  ·  ' : '') + t;
+      if (todoTabTxt.textContent !== tt) todoTabTxt.textContent = tt;
+      const d = top && top.dist ? top.dist.textContent : '';
+      if (todoTabDist.textContent !== d) todoTabDist.textContent = d;
+      const on = !!(top && top.aim && top.aim.classList.contains('on'));
+      todoTabAim.style.display = on ? '' : 'none';
+      if (on && todoTabArrow.style.transform !== sysArrowLast) todoTabArrow.style.transform = sysArrowLast;
+    }
+  }
   // ---- THE HEADING SAYS WHAT KIND OF THING IT IS (V2) ----------------------
   // The kicker under the marquee is the live ACT's name — THE CITY, THE
   // VALLEY, MONG KOK — and it changes every few tasks with nothing on the card
@@ -27402,6 +27456,7 @@ export function createSystems(game) {
     todoEl.classList.remove('stamp');
     void todoEl.offsetWidth;                 // restart the animation, not queue it
     todoEl.classList.add('stamp');
+    todoAwayHold = sysTUCK_HOLD; todoAwayT = 0;   // ...and the paper stays open for it (L3, E5)
     game.events.emit('task:complete', { id: id });
     // Hold it on the paper long enough to be struck through, then let the next
     // one take its place. Refresh first so the tally moves on the same beat.
@@ -36742,6 +36797,7 @@ export function createSystems(game) {
         }
       }
     }
+    todoTuckTick(dt);
     const topRec = taskRec[todoTopId];
     if (topRec && hintHas && !mounted) {
       const hx = hintX - p.x, hz = hintZ - p.z;

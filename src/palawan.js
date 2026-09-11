@@ -1147,6 +1147,80 @@ function palBuildBeach(game, root) {
     M.sph(x, g + 0.5, z, rr(0.9, 2.2), rr(0.6, 1.3), rr(0.9, 2.2),
           rnd() < 0.5 ? PALETTE.palJungle : PALETTE.palPalm);
   }
+
+  // ---- THE KERB, THE GUTTER AND THE JOINTS (L3, E2) ------------------------
+  // Half the settled frame is sand, and from the waterline to the palms it is
+  // one value with nothing in it at the one-to-three metre scale. The scatter
+  // above puts THINGS on the beach; this puts the beach's own drawing on it —
+  // the lines the sea leaves, which are the only pattern a beach has: a band
+  // of damp sand just above the water, the wrack line of dried weed at the
+  // high-water mark, and two or three pale tide lines further up where each
+  // tide before it stopped.
+  //
+  // They are CONTOURS, not lines at a z. The beach in palTerrain is a smooth
+  // rise with two sine terms across it, so the height the water reached is a
+  // curve that wanders a couple of metres in and out over thirty — which is
+  // exactly what a tide line looks like, and it comes for free by asking the
+  // terrain "where is this height" down every metre and a half of x. The
+  // damp band runs from the waterline (h = 0) to the chapter's own wrack
+  // constant — palBEACH_Z + 1.4 + sin(x * 0.09) * 1.1 is where the weed
+  // scatter above lies, and the strip lies under it. Every corner of every
+  // strip has its y from palTerrain, a centimetre proud, so the strips lie on
+  // the slope and not through it.
+  //
+  // Drawn, not solid, in the beach merger: no draw call. Two triangles per
+  // metre and a half per strip, about eight hundred in all. Colours: the
+  // damp band is palRope, the one palette value a step below palSandWet —
+  // palSandWet itself reads PALER than the ground here, because the ground
+  // material's shore term darkens the swash and this mesh's does not. The
+  // tide lines are palPearl, the step above palSand; the wrack is palTrunk
+  // and palWeed, the two colours the scatter already uses for it.
+  //
+  // The gaps come off a hash of x and not off rnd(): see the note at the top
+  // of this builder — a call on the shared stream here would move every palm
+  // and every bush placed after it.
+  {
+    const X0 = -54, X1 = 54, DX = 1.5;
+    const wrack = (x) => palBEACH_Z + 1.4 + Math.sin(x * 0.09) * 1.1;
+    const hash = (x) => { const s = Math.sin(x * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+    /** z at which the beach reaches height c, for this x: walked up the sand
+     *  from the waterline in quarter-metres, then split twelve times. */
+    function contour(x, c) {
+      let z0 = palBEACH_Z + 0.2, z1 = z0;
+      if (palTerrain(x, z0) >= c) return z0;
+      for (let k = 0; k < 80; k++) { z1 = z0 + 0.25; if (palTerrain(x, z1) >= c) break; z0 = z1; }
+      for (let k = 0; k < 12; k++) { const zm = (z0 + z1) * 0.5; if (palTerrain(x, zm) >= c) z1 = zm; else z0 = zm; }
+      return (z0 + z1) * 0.5;
+    }
+    /** One strip between two z curves, a quad per DX of x with all four
+     *  corners on the sand; wound anticlockwise from above. `gap(x)` true
+     *  leaves that quad out. */
+    function band(zLo, zHi, lift, color, gap) {
+      let a = -1, b = -1;
+      for (let x = X0; x <= X1 + 1e-6; x += DX) {
+        const zl = zLo(x), zh = Math.max(zHi(x), zl + 0.12);
+        const lo = M.vert(x, palTerrain(x, zl) + lift, zl, color);
+        const hi = M.vert(x, palTerrain(x, zh) + lift, zh, color);
+        if (a >= 0 && !(gap && gap(x))) { M.tri(a, b, hi); M.tri(a, hi, lo); }
+        a = lo; b = hi;
+      }
+    }
+    // the damp band: waterline up to just short of the wrack
+    band((x) => contour(x, 0.0), (x) => wrack(x) - 0.35, 0.010, PALETTE.palRope);
+    // the wrack line: broken, two colours, on the scatter's own curve
+    band((x) => wrack(x) - 0.32, (x) => wrack(x) + 0.28, 0.012, PALETTE.palTrunk,
+         (x) => hash(Math.floor(x / 4.5)) < 0.30);
+    band((x) => wrack(x) - 0.10, (x) => wrack(x) + 0.16, 0.014, PALETTE.palWeed,
+         (x) => hash(Math.floor(x / 3.0) + 7) < 0.55);
+    // and the tide lines: three heights the water got to, each a pale scum
+    // line narrower than the last
+    const tides = [[0.35, 0.40], [0.62, 0.32], [1.00, 0.26]];
+    for (let t = 0; t < tides.length; t++) {
+      const c = tides[t][0], w = tides[t][1];
+      band((x) => contour(x, c) - w * 0.5, (x) => contour(x, c) + w * 0.5, 0.012, PALETTE.palPearl,
+           (x) => hash(Math.floor(x / 6.0) + 31 * t) < 0.12);
+    }
+  }
   palPoolDone(game, solid);
 
   const mesh = new THREE.Mesh(M.build(), palVC());

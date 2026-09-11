@@ -2135,7 +2135,7 @@ function kyoBuildKerbs(game, root) {
   const K = kyoMerger();
   const KERB = PALETTE.graniteDark;     // one step down from the granite
   const GUTTER = PALETTE.kawaraDark;    // and one more
-  const JOINT = PALETTE.kawaraDark;
+  const JOINT = PALETTE.graniteDark;    // a joint is quieter than a kerb
   const IRON = PALETTE.ironDark;
   const BAR = PALETTE.shoji;
   const GRAVEL = PALETTE.gravelZen;

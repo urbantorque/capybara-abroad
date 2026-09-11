@@ -1534,9 +1534,11 @@ function iceBuildKerbs(game, root) {
   for (let x = -40; x <= 40; x += 25) {
     K.cyl(x + (x > 0 ? 2 : 0), top - 0.01, z - 1.4, 0.30, 0.04, IRON, 0, 0, 0, 8);
   }
-  // the crossings: to the church path at x = -16, and to the pier at 27.
-  // Bars along the road, stacked across it, between the dashes and the kerbs.
-  const CX = [iceCHURCH.x, icePIER.x + 1];
+  // the crossings: to the church path at x = -16, and towards the pier at
+  // 20 — six metres short of it, so it is in the picture from the spawn and
+  // not behind the stand. Bars along the road, stacked across it, between
+  // the dashes and the kerbs.
+  const CX = [iceCHURCH.x, icePIER.x - 6];
   for (let c = 0; c < CX.length; c++) {
     for (let k = 0; k < 8; k++) {
       K.box(CX[c], top - 0.005, z + (k - 3.5), 3.0, 0.04, 0.5, BAR);

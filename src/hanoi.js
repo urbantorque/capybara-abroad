@@ -921,8 +921,15 @@ function hanLaneCrossings() {
           const t = ((r[0] - p[0]) * dz2 - (r[1] - p[1]) * dx2) / den;
           const u = ((r[0] - p[0]) * dz1 - (r[1] - p[1]) * dx1) / den;
           if (t < 0 || t > 1 || u < 0 || u > 1) continue;
-          out.push({ A: A, sA: hanLaneLen[A][i] + t * (hanLaneLen[A][i + 1] - hanLaneLen[A][i]),
-                     B: B, sB: hanLaneLen[B][j] + u * (hanLaneLen[B][j + 1] - hanLaneLen[B][j]) });
+          // a crossing that lands on a knot is found by both segments at it
+          const sA = hanLaneLen[A][i] + t * (hanLaneLen[A][i + 1] - hanLaneLen[A][i]);
+          const sB = hanLaneLen[B][j] + u * (hanLaneLen[B][j + 1] - hanLaneLen[B][j]);
+          let dup = false;
+          for (let k = 0; k < out.length; k++) {
+            if (out[k].A === A && out[k].B === B && Math.abs(out[k].sA - sA) < 0.5) dup = true;
+          }
+          if (dup) continue;
+          out.push({ A: A, sA: sA, B: B, sB: sB });
         }
       }
     }
@@ -934,10 +941,16 @@ function hanStreetGraphics(K) {
   function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
   const yAt = (x, z, lift) => hanTerrain(x, z) + 0.04 + lift;
   /** A flat strip between two lane samples, from lateral offset o0 to o1
-   *  (signed along the lane's normal), in the asphalt quad's own winding. */
+   *  (signed along the lane's normal). WOUND TO FACE UP: prev-low, cur-low,
+   *  cur-high, prev-high is anticlockwise seen from above, which is the side
+   *  the material draws. (The asphalt quad above goes prev-low, prev-high,
+   *  cur-high, cur-low — the other way round — so its computed normal points
+   *  at the ground and a front-side Lambert culls it from every camera this
+   *  chapter has; the road in the frame is the ground mesh's own vertex
+   *  colour. Not touched here; noted.) */
   function strip(px, pz, pnx, pnz, cx, cz, nx, nz, o0, o1, lift, color) {
-    const ax = px + pnx * o0, az = pz + pnz * o0, bx = px + pnx * o1, bz = pz + pnz * o1;
-    const qx = cx + nx * o1, qz = cz + nz * o1, dx = cx + nx * o0, dz = cz + nz * o0;
+    const ax = px + pnx * o0, az = pz + pnz * o0, bx = cx + nx * o0, bz = cz + nz * o0;
+    const qx = cx + nx * o1, qz = cz + nz * o1, dx = px + pnx * o1, dz = pz + pnz * o1;
     K.quad(ax, yAt(ax, az, lift), az, bx, yAt(bx, bz, lift), bz,
            qx, yAt(qx, qz, lift), qz, dx, yAt(dx, dz, lift), dz, color);
   }
@@ -993,8 +1006,9 @@ function hanStreetGraphics(K) {
       const w = 0.6 + rnd() * 0.7, l = 0.7 + rnd() * 1.1;
       const cx = hanTmp.x + nx * off, cz = hanTmp.z + nz * off;
       const c4 = [];
+      // anticlockwise from above: (-n,-t), (-n,+t), (+n,+t), (+n,-t)
       for (let k = 0; k < 4; k++) {
-        const sw = (k === 1 || k === 2) ? 1 : -1, sl = (k >= 2) ? 1 : -1;
+        const sw = (k >= 2) ? 1 : -1, sl = (k === 1 || k === 2) ? 1 : -1;
         const jw = w * (0.8 + rnd() * 0.4), jl = l * (0.8 + rnd() * 0.4);
         c4.push(cx + nx * jw * sw + tx * jl * sl, cz + nz * jw * sw + tz * jl * sl);
       }

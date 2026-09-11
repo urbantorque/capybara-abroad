@@ -1,0 +1,16 @@
+async page => {
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.goto('http://localhost:5188/')
+  await page.waitForTimeout(5000)
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(7000)
+  await page.keyboard.down('KeyW')
+  await page.waitForTimeout(5200)
+  const a = await page.evaluate(() => ({ away: document.querySelector('.capyui-todo').classList.contains('away'), tab: (document.querySelector('.capyui-tab') || {}).textContent }))
+  await page.screenshot({ path: 'qa/l3-tuck-away.png', clip: { x: 0, y: 0, width: 340, height: 120 } })
+  await page.keyboard.up('KeyW')
+  await page.waitForTimeout(900)
+  const b = await page.evaluate(() => ({ away: document.querySelector('.capyui-todo').classList.contains('away'), err: window.__capy.state.lastError || null }))
+  await page.screenshot({ path: 'qa/l3-tuck-back.png', clip: { x: 0, y: 0, width: 340, height: 300 } })
+  await page.evaluate((o) => fetch('/shot?name=l3-tuck.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o))))}), { a, b })
+}
