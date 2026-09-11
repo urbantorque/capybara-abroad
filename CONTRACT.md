@@ -113,6 +113,26 @@ a nine-metre bus or "the valley".
 Two one-shot boarding lines: near the parked chiva, and near the basket on
 the ground. `qa/w3-how.js` reads all of it back.
 
+### W4 — CHILL (11 Sep 2026)
+
+Playtest: *"the Cali bus runs into a wire that knocks you off; the game should
+be fairly chill. It wasn't easy to climb in Hong Kong to reach the marquee."*
+Every marquee re-read for the question "can a player who has just read the
+card do this in one go", and five things changed:
+
+| chapter | what made it hard | now |
+|---|---|---|
+| Cali | a missed hop scooped you off the back of the bus at the bus's speed + 5.5 — a four-hundred-metre run after her | a cable knocks you FLAT: a tumble straight up and back onto the roof with the bus's own velocity (you land where you were). It costs the clean tally, not the ride; seven clean is still the band's word. `wireDebug()` measured: on the roof 1.8 s after a strike, 0.38 m from where you stood |
+| Hong Kong | the climb itself works (measured: hold E + push, 34 m in 12 s, tops out) — the hard part was the clock: 39 s of show in 152, and the tick was the finale, the LAST movement | (1) the evening runs at ×6 while you are on the roof with the show still to come — a time-lapse, nothing snaps — so the lights start ~10 s after you top out; (2) the tick is all sixteen towers lit with you up there (~10 s in), the eighth wheek still calls the finale early; (3) the arrow points at the FOOT of the scaffold from the pavement, the roof once you are on the bamboo |
+| Venice | walk into the square at low water: up to three minutes of dry flagstones before the siren | ×5 while in the square in the low-water part of the cycle, until the siren; measured 5.02× |
+| Cappadocia | full-burn climb 32 s, window 11 s in 156: two minutes hanging at altitude with the burner going | ×4 while aboard, above 40 m, with the sun still under the rim |
+| Hanoi | 96 s between trains and the task is to stand still | ×3 in the alley until the horn is due; the horn's own eleven seconds run at one |
+| Manly | the sand at 34 m — a very good ride the harness never once reached | the tick at 24 m to the sand (`manALL_THE_WAY`); the record still files what you rode against par 34 |
+
+Re-read and left alone, with the reason: Pasto/Rio (a bird that does not flap still clears the crater; E while aloft lets go, and the clue says hold ON), Kyoto (a float), Iceland (a sit), Marrakech (a run), the Drift (the wind swings every 38 s and the paper now says with/against), Palawan (carried = breath free), Pantanal (the tally is the high-water mark, so the jacaré taking one does not fail it), Sơn Đoòng (a walked ramp), Antarctica (tender 12.6 vs pod 11), Monaco (4 m/s at the hairpin).
+
+`qa/w4-climb.js`, `qa/w4-ease.js`.
+
 ### TEST HOOKS ADDED
 
 `env.concertAudit()` · `kyoto.chuteAt(back)` · `quay.headsK()` / `quay.boatDebugTo(x, z)` · `venice.phaseDebug(p)` · `manly.barrelDebug(force)` · `pantanal.huntDebug()` / `pantanal.herdFollow(n)` · `sahara.dustDebug()` · `cali.fireworksDebug()`. Probes: `qa/w1-sydney.js`, `qa/w1-condor.js`, `qa/w1-marquees.js`, `qa/w1-venice.js`, `qa/w1-batch2.js`, `qa/w1-pan-dbg.js`, `qa/w1-barrel-dbg.js`, `qa/w1-cali-dbg.js`.

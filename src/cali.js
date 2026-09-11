@@ -222,6 +222,7 @@ let caliChivaX = 0, caliChivaY = 0, caliChivaZ = 0, caliChivaPitch = 0, caliChiv
 let caliRoofT = 0;                  // s the capybara has been stood on the rack
 let caliOnRoof = false;
 let caliLadderTold = false;
+let caliWireHits = 0;               // cables that had you this ride (W4)
 const caliLadderOut = { x: 0, y: 0, z: 0 };
 let caliStopIdx = 0;
 let caliMiradorDone = false;
@@ -1908,8 +1909,39 @@ function caliBuildWires(game, root) {
   caliWireMesh = m;
 }
 
-/** Taken off the roof by a cable, at speed, in front of a band. */
+/**
+ * Hit by a cable, at speed, in front of a band — AND YOU STAY ON (W4).
+ *
+ * This used to scoop the animal off the back of the bus at the bus's own
+ * speed plus five and a half, which is the truthful physics of being
+ * clotheslined and the wrong game: the marquee is a ride up a hill, the
+ * player asked for chill, and one missed hop turned the best set piece in
+ * the chapter into a four-hundred-metre run after a bus. Now a cable knocks
+ * you FLAT — a tumble, straight up and back down onto the roof with the
+ * bus's own velocity so you land where you were, the punch, the band's line
+ * — and it costs you the tally, not the ride. The hop is still the verb:
+ * seven clean is still the thing the band would like a word about, and a
+ * cable you did not see still hurts. It just does not throw you away.
+ */
 function caliWireSweep(game, w) {
+  const capy = game.capy;
+  if (!capy || !capy.body) return;
+  w.hit = 1.5;
+  caliWireHits++;
+  capy.launch(Math.sin(caliChivaYaw) * caliChivaV + rand(-0.3, 0.3), 3.6,
+              Math.cos(caliChivaYaw) * caliChivaV + rand(-0.3, 0.3));
+  capy.body.angularVelocity.set(rand(-4, 4), rand(-6, 6), rand(-4, 4));
+  caliBurstSparks(w.x, w.y, w.z, 10, 0.4);
+  if (typeof game.punch === 'function') game.punch(0.22);
+  else if (typeof game.shake === 'function') game.shake(0.22);
+  if (typeof game.sfx === 'function') {
+    game.sfx('thud', { volume: 0.8 });
+    game.sfx('wheek', { pitch: 1.25, volume: 0.7 });
+  }
+  if (typeof game.toast === 'function') game.toast(caliWIRE_LINES[randInt(0, caliWIRE_LINES.length - 1)]);
+}
+/** The old sweep, kept for the record and unused. */
+function caliWireSweepOff(game, w) {
   const capy = game.capy;
   if (!capy || !capy.body) return;
   w.hit = 1.5;
@@ -2291,6 +2323,7 @@ function caliStepChiva(game, dt) {
 
         caliHornT = 1.6;
         caliStopIdx = 0;
+        caliWireHits = 0;
         if (typeof game.sfx === 'function') { game.sfx('horn', { pitch: 1.15 }); game.sfx('strum'); }
         if (typeof game.toast === 'function') game.toast('hold on to something');
       }
@@ -2349,6 +2382,8 @@ function caliStepChiva(game, dt) {
           game.toast('every cable, clean. the band would like a word.');
         } else if (caliWireClear > 0) {
           game.toast(caliWireClear + ' of ' + caliWires.length + ' cables. the rest of them got you.');
+        } else if (caliWireHits > 0) {
+          game.toast('every cable got you, and you are still up here. that is the band’s favourite kind.');
         }
       }
       caliWireClear = 0;
@@ -4435,6 +4470,8 @@ export function createCali(game) {
       return clamp(1 - Math.max(0, caliVistaT - 7) / 5, 0, 1) * 0.62;
     },
 
+    /** W4: a cable strike, on demand, wherever the animal is. Test hook. */
+    wireDebug() { if (!caliWires || !caliWires.length) return false; caliWireSweep(game, caliWires[0]); return true; },
     /** W1: the volley over the city, on demand. Test hook. */
     fireworksDebug() { caliFwT = 5.5; caliFwNext = 0; caliNightT = 1; return true; },
     update(dt) {

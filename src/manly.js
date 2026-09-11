@@ -219,6 +219,7 @@ let manGroper = null;
 
 // tasks / measured things
 let manRideDist = 0, manRideBest = 0, manRideOff = 0, manRideTop = 0;
+const manALL_THE_WAY = 24;   // m to the sand that is the marquee (W4); the record's par stays 34
 // ---- D4.11: THE CARVE ------------------------------------------------------
 // -1..1, the rider's lateral demand along the crest. Written once a frame by
 // manUpdateSurfTasks and read by manFlowAt, which stays a pure field function.
@@ -3043,8 +3044,8 @@ function manUpdateBarrel(game, dt, p, riding, speed) {
     if (Math.random() < dt * 14) manPuffSpray(p.x + rand(-4, 4), manWave.y + 3.0, p.z + 0.8, 2, 0.6);
     if (typeof game.wowLive === 'function' &&
         !(typeof game.taskDone === 'function' && game.taskDone('all-the-way'))) {
-      game.wowLive('IN THE BARREL · ' + manBarrelT.toFixed(1) + ' s · ' + manRideDist.toFixed(0) + ' m of 34',
-                   clamp(manRideDist / 34, 0, 1));
+      game.wowLive('IN THE BARREL · ' + manBarrelT.toFixed(1) + ' s · ' + manRideDist.toFixed(0) + ' m of ' + manALL_THE_WAY,
+                   clamp(manRideDist / manALL_THE_WAY, 0, 1));
     }
   }
 }
@@ -4222,9 +4223,9 @@ function manUpdateSurfTasks(game, dt) {
     if (manTookOff && manRideDist > 2 && typeof game.wowLive === 'function' &&
         !(typeof game.taskDone === 'function' && game.taskDone('all-the-way'))) {
       const carveShare = manRideDist > 0 ? manCarveDist / manRideDist : 0;
-      game.wowLive('riding · ' + manRideDist.toFixed(0) + ' m of 34' +
+      game.wowLive('riding · ' + manRideDist.toFixed(0) + ' m of ' + manALL_THE_WAY +
                    (carveShare > 0.35 ? ' · on the face' : '') + ' · ' + speed.toFixed(1) + ' m/s',
-                   clamp(manRideDist / 34, 0, 1));
+                   clamp(manRideDist / manALL_THE_WAY, 0, 1));
     }
     // THE MINI. Not standing up — a capybara does not stand up. The moment is
     // the second and a half where the water stops going past you and starts
@@ -4261,7 +4262,11 @@ function manUpdateSurfTasks(game, dt) {
       // exists to protect exactly this cue, and five camera shakes. A marquee
       // that happens five times is not a marquee. The RECORD still runs every
       // ride, because a personal best is a thing you beat.
-      if (manRideDist >= 34 && onSand) {
+      // 24, NOT 34 (W4). Thirty-four metres is a very good ride — the harness
+      // never once reached it, and a stick-and-term run measured nineteen —
+      // and the tick is a marquee, not the record. Twenty-four is a wave you
+      // took to the sand; the number you rode still files against the par.
+      if (manRideDist >= manALL_THE_WAY && onSand) {
         game.record('all-the-way', manRideBest);
         if (!manAllWayDone) {
         manAllWayDone = true;

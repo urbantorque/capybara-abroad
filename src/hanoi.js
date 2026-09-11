@@ -2394,7 +2394,11 @@ function hanUpdateTrain(game, dt) {
   }
 
   if (hanTrainS < 0) {
-    hanTrainT -= dt;
+    // THE TRAIN HURRIES FOR YOU (W4). Ninety-six seconds between trains and
+    // the task is to stand still: in the alley with the marquee open, the gap
+    // runs at three times until the horn is due, and the horn's own eleven
+    // seconds run at one, so the warning is still a warning.
+    hanTrainT -= dt * ((!hanTrainDone && inAlley && hanTrainT > hanTRAIN_WARN + 3) ? 3 : 1);
     // the horn, eleven seconds out, and the street starts folding on it
     if (hanTrainT <= hanTRAIN_WARN && !hanTrainWarned) {
       hanTrainWarned = true;

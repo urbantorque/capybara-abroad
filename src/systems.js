@@ -23525,7 +23525,16 @@ export function createSystems(game) {
                       if (k.showing()) return 'IT IS ON. up the bamboo scaffold — hold E against it and push up — and press Q from the roof: each wheek lights a tower';
                       return 'the bamboo scaffold on the harbour side: hold E against it and push up to climb. be on the roof when the show starts, then press Q at the skyline';
                     },
-                    where: function () { return hintObj(game.kowloon && game.kowloon.roof); } },
+                    // the FOOT of the scaffold from the pavement, the roof once you
+                    // are on the bamboo (W4): an arrow at a point 34 m up reads as
+                    // "somewhere over there" from the street
+                    where: function () {
+                      const k = game.kowloon;
+                      if (!k) return null;
+                      const p = game.capy && game.capy.position;
+                      if (p && p.y < 3 && k.scaffoldFoot) return hintObj(k.scaffoldFoot);
+                      return hintObj(k.roof);
+                    } },
     'bus-top': { clue: 'one hop to the rear platform, then up the stair',
                     where: function () { return hintObj(game.kowloon && game.kowloon.bus && game.kowloon.bus()); } },
     'ferry-horn':     { clue: 'aboard, under way, and then make a noise',

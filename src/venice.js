@@ -4892,9 +4892,24 @@ function venUpdateVoices(game, dt) {
 }
 
 // ================================================================= THE TIDE =
+// ---- THE TIDE HURRIES FOR YOU (W4) ------------------------------------------
+// Two hundred and five seconds a cycle, and a player who walked into the
+// square with the water out was looking at up to three minutes of standing
+// on dry flagstones before the siren. While the marquee is still open and
+// the animal is IN the square in the low-water part of the cycle, the clock
+// runs at venHURRY until the siren: a time-lapse of the lagoon breathing in,
+// nothing snaps, and the siren, the boards and the rise all arrive in their
+// own order at their own pace once it goes.
+const venHURRY = 5;
 function venUpdateTide(game, dt) {
   const prevPhase = venPhase;
-  venPhase += dt / venTIDE_PERIOD;
+  let rate = 1;
+  if (!venFloodDone) {
+    const cp0 = game.capy && game.capy.position;
+    const low = venPhase < venTIDE_WARN - 0.02 || venPhase >= venTIDE_FALL1;
+    if (low && cp0 && venInZone('square', cp0.x, cp0.z)) rate = venHURRY;
+  }
+  venPhase += dt * rate / venTIDE_PERIOD;
   while (venPhase >= 1) venPhase -= 1;
 
   const target = venTideY(venPhase);

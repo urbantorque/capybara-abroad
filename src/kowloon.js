@@ -3634,9 +3634,25 @@ function hkWheek(game) {
   }
 }
 
+// ---- THE SHOW WAITS FOR NOBODY, SO IT HURRIES FOR YOU (W4) ------------------
+// Thirty-nine seconds of show in a hundred and fifty-two, and the climb is
+// twelve seconds if you know how and a lot longer the first time — so the
+// honest experience of the marquee was: top out, stand on a roof in the dark
+// for a minute and a half, wonder if this is it. Now the evening comes on
+// FASTER while you are up there with the show still to come: the clock runs
+// at hkHURRY until the window opens, which is a time-lapse of the dusk rather
+// than a cut (nothing snaps), and it does it only while the marquee is still
+// open, so the loop keeps its own rhythm once the row is ticked.
+const hkHURRY = 6;
 function hkUpdateShow(game, dt) {
   const prev = hkPhase;
-  hkPhase += dt / hkCYCLE;
+  let rate = 1;
+  if (!hkShowDone) {
+    const cp0 = game.capy && game.capy.position;
+    const inWin = hkPhase >= hkSHOW_ON && hkPhase < hkSHOW_OFF;
+    if (cp0 && cp0.y > hkSHOW_ROOF && !inWin) rate = hkHURRY;
+  }
+  hkPhase += dt * rate / hkCYCLE;
   while (hkPhase >= 1) hkPhase -= 1;
 
   const warnNow = hkPhase >= hkSHOW_WARN && hkPhase < hkSHOW_ON;
@@ -3733,11 +3749,18 @@ function hkUpdateShow(game, dt) {
     const capy = game.capy;
     const up = !!(capy && capy.position && capy.position.y > hkSHOW_ROOF);
     if (up && typeof game.wowLive === 'function') {
-      game.wowLive('on the roof · conducted ' + Math.min(hkConductN, hkCONDUCT_MAX) + ' of ' + hkCONDUCT_MAX +
-                   ' · ' + hkLitCount + ' of ' + hkTOWER_N + ' towers lit',
+      game.wowLive('on the roof · ' + hkLitCount + ' of ' + hkTOWER_N + ' towers lit · wheek ' +
+                   Math.min(hkConductN, hkCONDUCT_MAX) + ' of ' + hkCONDUCT_MAX + ' for the finale',
                    Math.max(hkConductN / hkCONDUCT_MAX, hkLitCount / hkTOWER_N));
     }
-    if (up && hkFinaleDone) {
+    // ...OR THE WHOLE SKYLINE UP WITH YOU ON THE ROOF (W4). The finale is the
+    // last movement of a thirty-nine second show; a player who climbed up
+    // and watched sixteen towers come on, one a second, then stood on a
+    // roof for half a minute with the paper saying the same thing, was being
+    // asked to wait for a tick they had already earned. All sixteen lit with
+    // you up there is the moment; the eighth wheek still calls the finale
+    // early for anybody conducting.
+    if (up && (hkFinaleDone || (hkLitCount >= hkTOWER_N && hkShowT > 6))) {
       hkShowDone = true;
       hkTask('symphony');
       hkToast(hkConductN >= hkCONDUCT_MAX ? 'all of it, from up here, because you asked for it.'
@@ -4971,6 +4994,8 @@ export function createKowloon(game) {
 
     /** THE NEW VERB. capybara.js asks the live biome and nobody else. */
     climbHold: hkClimbHold,
+    /** W4: where the bamboo meets the pavement — the arrow's target from the street. */
+    scaffoldFoot: { x: hkSCAF.x + hkSCAF.out + 1.2, y: 0.5, z: 0 },
     // A jump between two bamboo poles eleven metres over a road is a jump you
     // should be able to steer. Not the Drift's 0.64 — that is a world where the
     // jump IS the traversal — but well clear of the kerb-hopping default.

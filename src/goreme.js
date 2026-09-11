@@ -4784,7 +4784,19 @@ function gorUpdateBalloon(game, dt) {
 
 // ================================================================ THE CLOCK =
 function gorUpdateClock(game, dt) {
-  gorPhase += dt / gorCYCLE;
+  // THE DAWN HURRIES FOR YOU (W4). A full-burn climb is 32 s and the window
+  // is 11 s in a 156 s cycle: a player who got up early was hanging at
+  // altitude for two minutes with the burner going. Aboard, above 40 m and
+  // with the sun still under the rim, the sky runs at four times — a
+  // time-lapse of the light coming, nothing snaps — until the ramp begins.
+  {
+    let rate = 1;
+    if (!gorSunDone && gorAboard && gorPhase < gorSUN_P - 0.01 && gorPhase > 0.2) {
+      const alt = gorBalY - gorTerrain(gorBalX, gorBalZ);
+      if (alt > 40) rate = 4;
+    }
+    gorPhase += dt * rate / gorCYCLE;
+  }
   if (gorPhase >= 1) { gorPhase -= 1; gorWarned = false; gorToldLayer = -1; gorSyncSaid = false; }
 
   // the sun: nothing, then everything, over about eighteen seconds
