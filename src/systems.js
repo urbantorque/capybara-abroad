@@ -14504,6 +14504,81 @@ export function createSystems(game) {
               gap: 0.19, oct: 0, vel: 0.70, pan: 0.18 },
   };
   let musStingAt = 0;
+  // =========================================================================
+  // THE MELODY (L3, F2) — the lead used to throw dice.
+  //
+  // Every pluck picked ch[randInt(0, ch.length - 1)]: fourteen pad palettes
+  // were harmony plus a random chord tone, and nothing carried the previous
+  // pitch, so no chapter had a tune anybody could hum. The arrival phrase
+  // above proved the engine can carry a motif in-key across twenty-one keys —
+  // and was used for 3.6 seconds per chapter.
+  //
+  // Two things, and no new node or synth anywhere:
+  //   THE WALK. The lead keeps a degree (an index into two octaves of the
+  //   chord) and moves from it: a step of one 60% of the time, a leap of two
+  //   or three 25%, a repeat 15%. Every branch of the pluck loop reads
+  //   musMelPick instead of the dice, in its own register and on its own
+  //   instrument, so a koto in Kyoto and a mallet in Sydney say a LINE.
+  //   THE CELLS. Every fifth to eighth pluck is a phrase rather than a
+  //   note: one of sysMUS_CELLS, in degrees relative to where the walk is,
+  //   played through musLiftNote the way musSting does — and the arrival's
+  //   own contour is one of the cells, so the doorbell becomes the leitmotif
+  //   the place keeps quoting in its own accent. The walk continues from the
+  //   cell's last note.
+  // Bands (lead 'none') are untouched: their tune is the arrangement.
+  // =========================================================================
+  const sysMUS_CELLS = [
+    { deg: [0, 1, 2, 1],  dur: [2, 1, 1, 3] },      // the arrival, quoted
+    { deg: [0, 1, 2, 4],  dur: [1, 1, 1, 2.5] },    // a rise
+    { deg: [4, 2, 1, 0],  dur: [1, 1, 1, 2.5] },    // and the fall
+    { deg: [2, 3, 2, 0],  dur: [1, 0.5, 0.5, 2.5] },// a turn
+    { deg: [0, 2, 1, 3],  dur: [1, 1, 1, 2] },      // a skip
+    { deg: [0, -1, 0, 2], dur: [1, 1, 1, 2.5] },    // a lean under
+  ];
+  const sysMUS_CELL_A = 5, sysMUS_CELL_B = 8;       // plucks between cells (a pluck is ~5 s apart, so a cell every 25-40 s)
+  let musMelDeg = 2, musMelN = 0, musMelNext = 6, musMelCells = 0;
+  function musMelStep(L) {
+    const r = Math.random();
+    let d = musMelDeg;
+    if (r < 0.15) { /* repeat */ }
+    else if (r < 0.75) d += Math.random() < 0.5 ? -1 : 1;
+    else d += (Math.random() < 0.5 ? -1 : 1) * (2 + (Math.random() < 0.4 ? 1 : 0));
+    const hi = L * 2 - 1;
+    if (d < 0) d = -d;
+    if (d > hi) d = hi - (d - hi);
+    if (d < 0) d = 0; if (d > hi) d = hi;
+    musMelDeg = d;
+    return d;
+  }
+  /** The next lead note: a chord tone from the walk, in chord-table pitch. */
+  function musMelPick(ch) {
+    const L = ch.length;
+    const d = musMelStep(L);
+    return ch[d % L] + 12 * Math.floor(d / L);
+  }
+  /** A cell from where the walk is, on the palette's lead. Returns its length. */
+  function musMelCell(when, ch, inst, pan) {
+    const c = sysMUS_CELLS[randInt(0, sysMUS_CELLS.length - 1)];
+    const L = ch.length, hi = L * 2 - 1;
+    const ph = sysMUS_PHRASE[musPalN];
+    const gap = sysMUS_STING.arrive.gap * (ph && ph.gap > 0 ? ph.gap : 1);
+    const base = musMelDeg;
+    let t = 0, last = base;
+    for (let i = 0; i < c.deg.length; i++) {
+      let d = base + c.deg[i];
+      if (d > hi) d -= L;
+      if (d < 0) d += L;
+      const midi = musFold(ch[d % L] + 12 * Math.floor(d / L) + (ph && ph.oct ? ph.oct : 0),
+                           sysMUS_LIFT_LO, sysMUS_LIFT_HI);
+      const step = gap * c.dur[i];
+      musLiftNote(inst, when + t, midi, pan * (i % 2 ? 0.6 : 1),
+                  musVel(0.10 * (ph && ph.vel > 0 ? ph.vel : 1) * (0.8 + musIntensity * 0.4)), step);
+      t += step; last = d;
+    }
+    musMelDeg = last;
+    musMelCells++;
+    return t;
+  }
   // ---- THE BAND DID NOT NOTICE THE PAUSE CARD (P4) ------------------------
   // `pauseShow` sets `paused`, which gates the sfx and floors the weather bed
   // — but `musTick` is gated only on `ac.state`, so the pad, the bands and the
@@ -17046,8 +17121,17 @@ export function createSystems(game) {
           pan = rand(-0.75, 0.75);
           played = true;
           const v = rand(0.028, 0.075) * (0.75 + musIntensity * 0.5);
-          if (lead === 'quena') {
-            musQuena(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
+          // THE MELODY (L3, F2): every fifth to eighth pluck is a cell
+          musMelN++;
+          const cellNow = musMelN >= musMelNext && lead && lead !== 'none';
+          if (cellNow) {
+            musMelN = 0; musMelNext = randInt(sysMUS_CELL_A, sysMUS_CELL_B);
+            const ph = sysMUS_PHRASE[musPalN];
+            const inst = (ph && ph.inst) ? ph.inst : lead;
+            // ...and the plucks wait for it: the walk resumes after the phrase
+            musPluckAt += musMelCell(musPluckAt, ch, inst, pan) * 0.85;
+          } else if (lead === 'quena') {
+            musQuena(musPluckAt, musFold(musMelPick(ch), sysMUS_QNA_LO, sysMUS_QNA_HI),
               rand(0.030, 0.058) * (0.8 + musIntensity * 0.4));
           } else if (lead === 'ney') {
             // THE SAME REGISTER AND THE SAME CHORD TONE AS THE QUENA IT
@@ -17056,7 +17140,7 @@ export function createSystems(game) {
             // pitches and none of that is what was wrong. Only the velocity
             // moves, and downward: this voice carries a great deal more breath
             // per unit of tone, so the same number is louder.
-            musNey(musPluckAt, musFold(ch[randInt(0, ch.length - 1)], sysMUS_QNA_LO, sysMUS_QNA_HI),
+            musNey(musPluckAt, musFold(musMelPick(ch), sysMUS_QNA_LO, sysMUS_QNA_HI),
               rand(0.024, 0.046) * (0.8 + musIntensity * 0.4));
           } else if (lead === 'caipira') {
             // A PONTEIO, NOT A NOTE — and it keeps the violin's argument, which
@@ -17064,7 +17148,7 @@ export function createSystems(game) {
             // somebody testing an instrument. Three or four steps through the
             // chord in one direction, at the same quaver the row already used.
             const cdir = Math.random() < 0.55 ? 1 : -1;
-            let cidx = randInt(0, ch.length - 1);
+            let cidx = musMelStep(ch.length) % ch.length;
             const cn = randInt(3, 4);
             for (let k = 0; k < cn; k++) {
               const m = musFold(ch[((cidx % ch.length) + ch.length) % ch.length] + 12, 55, 79);
@@ -17076,25 +17160,25 @@ export function createSystems(game) {
             // Same register and same octave choice the mallet had, because the
             // row's lydian voicing was written for it. A gong carries further
             // than felt on wood, so the velocity comes down rather than up.
-            musKulintang(musPluckAt, Math.min(88, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2)),
+            musKulintang(musPluckAt, Math.min(88, musMelPick(ch) + 12),
               pan, v * 0.95);
           } else if (lead === 'koto') {
             // A koto sits LOW compared with the pluck it replaces — the open
             // strings of a standard hirajoshi tuning run from about D3 — and the
             // chapter's chord set was written for exactly those pitches.
-            musKoto(musPluckAt, musFold(ch[randInt(0, ch.length - 1)] + 12 * randInt(0, 1), 50, 74),
+            musKoto(musPluckAt, musFold(musMelPick(ch), 50, 74),
               pan, v * 1.15);
           } else if (lead === 'bow') {
             // A bowed note is a LONG note and two of them overlapping is a
             // chord, which the pad is already doing, so the register is pushed
             // up out of the pad's way and the velocity down under it.
-            musBow(musPluckAt, musFold(ch[randInt(0, ch.length - 1)] + 12, 62, 84),
+            musBow(musPluckAt, musFold(musMelPick(ch) + 12, 62, 84),
               pan * 0.6, rand(0.020, 0.040) * (0.85 + musIntensity * 0.35));
           } else if (lead === 'glass') {
             // A glass note lasts ten seconds, so two of them overlap by design
             // and the register has to stay clear of the pad — high, and quiet
             // enough that three at once is still a texture and not a chord.
-            musGlass(musPluckAt, musFold(ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2), 64, 88),
+            musGlass(musPluckAt, musFold(musMelPick(ch) + 12, 64, 88),
               pan * 0.7, rand(0.016, 0.032) * (0.85 + musIntensity * 0.3));
           } else if (lead === 'violin') {
             // A FIGURE, NOT A NOTE. Baroque melody is a line: every other
@@ -17103,7 +17187,7 @@ export function createSystems(game) {
             // stepping through the chord in one direction is the smallest
             // thing that reads as a phrase.
             const dir = Math.random() < 0.55 ? 1 : -1;
-            let idx = randInt(0, ch.length - 1);
+            let idx = musMelStep(ch.length) % ch.length;
             const n = randInt(3, 5);
             for (let k = 0; k < n; k++) {
               const m = musFold(ch[((idx % ch.length) + ch.length) % ch.length] + 12, 67, 88);
@@ -17116,13 +17200,13 @@ export function createSystems(game) {
             // ONE NOTE, and it is a gesture. The dan bau is bent into, bent
             // while it sounds and bent again on the tail; anything that plays
             // it in a hurry is playing a sine wave.
-            musDanBau(musPluckAt, musFold(ch[randInt(0, ch.length - 1)] + 12, 60, 80),
+            musDanBau(musPluckAt, musFold(musMelPick(ch) + 12, 60, 80),
                       rand(0.030, 0.060) * (0.8 + musIntensity * 0.4));
           } else if (lead === 'mallet') {
-            musMallet(musPluckAt, Math.min(88, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2)),
+            musMallet(musPluckAt, Math.min(88, musMelPick(ch) + 12),
               pan, v * 1.2);
           } else {
-            const n = Math.min(84, ch[randInt(0, ch.length - 1)] + 12 * randInt(1, 2));
+            const n = Math.min(84, musMelPick(ch) + 12);
             musPluck(musPluckAt, n, pan, v);
           }
         }
@@ -31970,6 +32054,8 @@ export function createSystems(game) {
       pal: musPalN, chapProg: +musProg.toFixed(3),
       skyRain: +skyRainNow.toFixed(3), skyCut: +skyCutNow.toFixed(1),
       second: !!sysMUS_2ND[musPalN], secondN: musSecondN,
+      // THE MELODY (L3, F2): where the walk is, and how many cells have played
+      melDeg: musMelDeg, melCells: musMelCells, melN: musMelN, melNext: musMelNext, throws: musThrows,
       skyVel: +musSkyVel.toFixed(4),
       band: (musPal && musPal.band) || null, bar: musBarIndex,
       // The rhythm GRID, for the crossing hold (F3b). `beatLen` 0 is the
