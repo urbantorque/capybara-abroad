@@ -3702,6 +3702,9 @@ function hanBuildLocals(game) {
   });
   hanLocPuppet = put(hanPUPPET.x - 7, hanPUPPET.z + 2.8, {
     figure: { shirt: PALETTE.hanWash1 }, face: -0.2, near: 9,
+    // THE AUTHORITY (L3, F1): "you may not get in" is a job, and the person
+    // whose job it is carries a nuisance out. put() hands the row to addLocal.
+    authority: true, role: 'the usher',
     lines: ['They are standing in the water. The people are standing in the water.',
             'Eleven hundred years. Nobody knows who started it.',
             'You may look. You may not get in.',
@@ -3757,6 +3760,21 @@ function hanBuildLocals(game) {
             { t: 'The pho is round the other side. Follow the smell, not me.', before: 'pho-raid' }],
     wheek: ['Ha. All right.'],
   });
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the usher
+  // walks to where you were and gives up. Every spot is beside a thing the
+  // quarter already draws: under the second market awning in the gap between
+  // two stalls, among the first ring of stools at the bia hoi and behind its
+  // keg, behind the flower seller's bicycle, and the far side of the
+  // barber's tree. The lake is a hide on its own and needs nothing here.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'hanoi', x: hanMARKET.x + 0.1, z: hanMARKET.z - 9 + 6.0 - 1.4, r: 1.6, kind: 'under the awning' });
+    game.addHide({ biome: 'hanoi', x: hanBIA.x + 3.2 + 1.2, z: hanBIA.z, r: 2.2, kind: 'among the stools' });
+    game.addHide({ biome: 'hanoi', x: hanBIA.x - 3.5 - 1.2, z: hanBIA.z - 3.5, r: 1.6, kind: 'behind the keg' });
+    game.addHide({ biome: 'hanoi', x: -8 + 1.3, z: -4, r: 1.6, kind: 'behind the flower bike' });
+    game.addHide({ biome: 'hanoi', x: hanBARBER.x - 1.4, z: hanBARBER.z, r: 1.8, kind: 'behind the barber’s tree' });
+  }
 
   if (typeof game.addExchange === 'function' && hanLocPho && hanLocBia) {
     game.addExchange({ biome: 'hanoi', a: hanLocPho, b: hanLocBia, gap: 28, lines: [

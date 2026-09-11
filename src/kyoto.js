@@ -4855,6 +4855,9 @@ function kyoBuild(game) {
     // twenty-six paw prints in it since the chapter shipped.
     kyoLocRake = game.addLocal({ biome: 'kyoto', x: kyoZEN.x + 8, y: kyoTerrain(kyoZEN.x + 8, kyoZEN.z),
       z: kyoZEN.z, near: 6,
+      // THE AUTHORITY (L3, F1): the monk is the one who carries you out of
+      // the garden. See npc.js.
+      authority: true, role: 'the monk',
       figure: { shirt: PALETTE.hair2, legs: PALETTE.hair2 },
       lines: [{ t: 'Fifteen stones. You can never see all fifteen at once.', before: 'zen-ruin' },
               { t: 'I raked that this morning. I will rake it again.', before: 'zen-ruin' },
@@ -5123,6 +5126,21 @@ function kyoBuild(game) {
         ] });
       }
     }
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ----------------
+  // See THE HIDE in systems.js. Each of these is beside or inside a thing the
+  // chapter already draws, at the expression that draws it: the middle of the
+  // grove, the reed clump at the pond's east rim (kyoBuildPondEdge, i = 0),
+  // under a Gion noren (kyoBuildGion, li = 0, i = 2), round the back of the
+  // summit shrine (its collider is 3.0 deep), and between the first two
+  // hedgerows on the bottom tea shelf, east of the picker.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'kyoto', x: kyoBAMBOO.x, z: kyoBAMBOO.z, r: 3.0, kind: 'the bamboo' });
+    game.addHide({ biome: 'kyoto', x: kyoPOND.x + kyoPOND.rx * 0.93, z: kyoPOND.z, r: 2.2, kind: 'the reeds' });
+    game.addHide({ biome: 'kyoto', x: -40 + 2 * 10, z: kyoGION_Z - 9 + 3.5 + 0.30 + 0.8, r: 1.6, kind: 'under the noren' });
+    game.addHide({ biome: 'kyoto', x: kyoHILL_X + 2, z: kyoHILL_Z + 18 - 3.0 - 1.5, r: 2.0, kind: 'behind the shrine' });
+    game.addHide({ biome: 'kyoto', x: 99.5 + 8, z: kyoUJI.z + 6 - 1.05, r: 2.0, kind: 'the tea hedge' });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(kyoRoot);

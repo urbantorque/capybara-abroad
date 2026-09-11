@@ -5589,6 +5589,8 @@ function iceBuild(game) {
                 'aurora': ['Right. Right. Everybody out.'] } });
     iceLocChurch = game.addLocal({ biome: 'iceland', x: iceCHURCH.x + 6.5,
       y: iceTerrain(iceCHURCH.x + 6.5, iceCHURCH.z + 6), z: iceCHURCH.z + 6, near: 7,
+      // THE AUTHORITY (L3, F1): the one person in town whose job is the door
+      authority: true, role: 'the verger',
       figure: { shirt: PALETTE.iceChurchDk, legs: PALETTE.stoneDark },
       lines: [{ t: 'Five thousand two hundred and seventy-five pipes. Do not touch it.',
                 before: 'organ' },
@@ -5689,6 +5691,21 @@ function iceBuild(game) {
       onTask: { 'puffins': ['ELEVEN HUNDRED of them. All at once. Off my cliff.'],
                 'the-whale': ['She has not come in that close since the spring.'] },
       praise: ['Right. Whatever that was.'] });
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The verger is the one who carries you out. Where you go so that he
+    // cannot: the back of the stand, the other side of the church door, in
+    // under the hanging fish, in among the flock, and the steam off the first
+    // tall vent. The hot pool is water, and water is a hide everywhere.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'iceland', x: icePYLSA.x, z: icePYLSA.z - 2.6, r: 1.8, kind: 'behind the stand' });
+      game.addHide({ biome: 'iceland', x: iceCHURCH.x - 6.5, z: iceCHURCH.z + 6, r: 2.2, kind: 'the church porch' });
+      game.addHide({ biome: 'iceland', x: iceRACK[0][0] + 1.3 * Math.cos(iceRACK[0][2]),
+        z: iceRACK[0][1] - 1.3 * Math.sin(iceRACK[0][2]), r: 2.0, kind: 'under the fish' });
+      game.addHide({ biome: 'iceland', x: iceFLOCKS[0].x, z: iceFLOCKS[0].z, r: 3.0, kind: 'among the sheep' });
+      game.addHide({ biome: 'iceland', x: iceVENT_SITES[0].x + iceVENT_SITES[0].r + 1.3,
+        z: iceVENT_SITES[0].z, r: 2.0, kind: 'the steam' });
+    }
 
     // ---- AND THREE CONVERSATIONS THAT ARE NOT WITH YOU -------------------
     // See addExchange in npc.js. Everything anybody said in this chapter was

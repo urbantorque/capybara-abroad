@@ -6025,6 +6025,9 @@ function gorBuild(game) {
   if (typeof game.addLocal === 'function') {
     gorLocals.chief = game.addLocal({ biome: 'goreme', x: gorFIELD.x + 6, y: gorTerrain(gorFIELD.x + 6, gorFIELD.z),
       z: gorFIELD.z, near: 8,
+      // THE AUTHORITY (L3, F1): the man who runs the launch field is the one
+      // who carries a nuisance off it. See npc.js.
+      authority: true, role: 'the field marshal',
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
       // ---- AND SOME OF IT DEPENDS ON WHAT YOU HAVE DONE (see localResolve
       // in npc.js). Cappadocia used the conditional-line system in exactly
@@ -6222,6 +6225,20 @@ function gorBuild(game) {
       onTask: { 'on-the-trailer': ['First go. Do you know how rare that is? It is rare.'],
                 'three-winds': ['You made me turn round twice. That is a good flight.'],
                 'sunrise': ['Best seat in the province and you were in it.'] } });
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the field
+  // marshal walks to where you were and gives up. Every spot is beside a
+  // thing the square or the valley already draws: under the tea house
+  // canopy, behind the carpets on the rack, under the plane tree, in the
+  // vine man's rows, at the foot of the dovecote cliff.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'goreme', x: gorPLAZA.x - 7.2, z: gorPLAZA.z + 4.4, r: 2.2, kind: 'under the canopy' });
+    game.addHide({ biome: 'goreme', x: gorPLAZA.x + 6.7, z: gorPLAZA.z + 1.5, r: 1.8, kind: 'behind the carpets' });
+    game.addHide({ biome: 'goreme', x: gorPLAZA.x + 9.9, z: gorPLAZA.z + 8.0, r: 2.0, kind: 'under the plane tree' });
+    game.addHide({ biome: 'goreme', x: -26 + 1.5, z: -52, r: 2.4, kind: 'the vines' });
+    game.addHide({ biome: 'goreme', x: gorCLIFF.x + 14, z: -42, r: 2.2, kind: 'the foot of the cliff' });
   }
 
   // ---- AND THREE CONVERSATIONS THAT ARE NOT WITH YOU ----------------------

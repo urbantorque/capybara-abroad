@@ -5729,6 +5729,9 @@ function quayBuild(game) {
     // been standing twenty centimetres over his own wharf. Probe the surface;
     // never guess it — see the note on the Kyoto miller in npc.js.
     quayHand = game.addLocal({ biome: 'quay', x: 0, y: 0.20, z: 24, near: 7,
+      // THE AUTHORITY (L3, F1): the deckhand is the one person on this apron
+      // whose job it is to put a nuisance off the wharf. See npc.js.
+      authority: true, role: 'the deckhand',
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.denim },
       // ---- AND SOME OF THESE ONLY EXIST ONCE SOMETHING HAS HAPPENED -------
       // localResolve in npc.js has taken conditional lines since v20 and this
@@ -5879,6 +5882,19 @@ function quayBuild(game) {
               { t: 'The gulls are all up the Corso now. That is somebody’s doing.', after: 'manly-pine' }],
       startled: W.startled, splash: W.splash, thief: W.thief, rush: W.rush,
       wheek: ['…that is not a whistle I know.'] });
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ----------------
+  // See THE HIDE in systems.js. Every one of these is a thing the apron already
+  // draws, at the coordinates it draws it: under the shelter on the middle
+  // finger, under the cafe tables outside the coffee cart, round the back of
+  // the cart, behind the departures board, and against a fig tub.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'quay', x: quayWHARF_X[1], z: 12.2, r: 2.2, kind: 'the shelter' });
+    game.addHide({ biome: 'quay', x: 20 + 4.6 + 3.0, z: quayAPRON_Z1 - 13.5 - 0.6 + 2.2, r: 1.8, kind: 'under the table' });
+    game.addHide({ biome: 'quay', x: 20, z: quayAPRON_Z1 - 13.5 + 2.6, r: 1.8, kind: 'behind the coffee cart' });
+    game.addHide({ biome: 'quay', x: -29, z: quayAPRON_Z1 - 5.4 + 1.2, r: 2.0, kind: 'behind the board' });
+    game.addHide({ biome: 'quay', x: -38 + 3 * 11, z: quayAPRON_Z1 - 17.5 + 1.4 + 1.2, r: 1.8, kind: 'the fig tub' });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(quayBoatGroup);

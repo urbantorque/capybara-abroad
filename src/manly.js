@@ -990,6 +990,9 @@ function manBuild(game) {
     // saying '…was that deliberate?'
     manLocals.guard = game.addLocal({ biome: 'manly', x: manFLAG_HOME.x, y: manTerrain(manFLAG_HOME.x, manFLAG_HOME.z),
       z: manFLAG_HOME.z, near: 8,
+      // THE AUTHORITY (L3, F1): the lifeguard is the one who carries you off
+      // the beach. See npc.js.
+      authority: true, role: 'the lifeguard',
       figure: { shirt: PALETTE.hiVis, legs: PALETTE.cloth1, hat: PALETTE.hiVis },
       // ---- AND HALF OF IT IS CONDITIONAL NOW (see localResolve in npc.js).
       // `onTask` below is what somebody says the MOMENT you finish something
@@ -1162,6 +1165,20 @@ function manBuild(game) {
       onTask: { 'to-manly': ['Over the hill and there it is. Gets everybody, that.'],
                 'all-the-way': ['The whole ferry saw that. The WHOLE ferry.'],
                 'the-surfboat': ['In the boat. With the crew. Forty minutes from Wynyard.'] } });
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the lifeguard
+  // walks to where you were and gives up. Every spot is beside a thing the
+  // front already draws: the bus shelter, the fourth Norfolk pine, the last
+  // cafe umbrella, the kiosk awning at Shelly, the picnic tables behind it.
+  // The water is a hide on its own and needs nothing here.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'manly', x: 8, z: manSHOP_Z - 8.4, r: 2.0, kind: 'the bus shelter' });
+    game.addHide({ biome: 'manly', x: -50.4 + 3 * 11.2 + 1.4, z: manPINE_Z, r: 2.2, kind: 'under the pines' });
+    game.addHide({ biome: 'manly', x: 40 + 3 * 5.4, z: manSHOP_Z - 2.1, r: 1.8, kind: 'under the umbrella' });
+    game.addHide({ biome: 'manly', x: manSHELLY.x + 7.5 - 1.2, z: manSHELLY.z + 9.0 - 4.3, r: 1.8, kind: 'under the kiosk awning' });
+    game.addHide({ biome: 'manly', x: manSHELLY.x + 7.5 - 4.6, z: manSHELLY.z + 9.0 + 4.9, r: 2.0, kind: 'the picnic tables' });
   }
 
   if (typeof game.addExchange === 'function' && manLocals.volley && manLocals.partner) {

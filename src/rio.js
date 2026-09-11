@@ -4772,6 +4772,9 @@ function rioBuild(game) {
       // D2: a lifeguard patrols. Along the sand rather than down it, so the
       // route stays on one contour of the beach's tilt into the Atlantic.
       walk: { dx: 0, dz: 10, dwell: 4.5 },
+      // THE AUTHORITY (L3, F1): sixty saves this summer, and the one person on
+      // this beach whose job it is to carry something off it. See npc.js.
+      authority: true, role: 'the lifeguard',
       figure: { shirt: PALETTE.rioTileRed, legs: PALETTE.rioTileWhite, hat: PALETTE.rioTileYellow },
       face: Math.PI,
       lines: ['Between the flags. There are no flags. Use your judgement.',
@@ -4893,6 +4896,23 @@ function rioBuild(game) {
         ] });
       }
     }
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ----------------
+  // See THE HIDE in systems.js. Each of these is beside or inside a thing the
+  // chapter already draws, at the expression that draws it: the landward side
+  // of the kiosk drum (its collider is 4.6 deep, so 2.3 half), under the sixth
+  // arch of the Lapa aqueduct (rioBuildLapa, piers 6.2 apart about rioLAPA.x),
+  // under the shopfront awning of block 5 on the frontage (rioBuildFrontage,
+  // k = 0), and the grass outside the west wall of Selarón's flight, four
+  // steps up from the foot.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'rio', x: rioKIOSK.x, z: rioKIOSK.z + 2.3 + 1.2, r: 1.8, kind: 'behind the kiosk' });
+    game.addHide({ biome: 'rio', x: rioLAPA.x + 6.2 * 0.5, z: rioLAPA.z, r: 1.8, kind: 'under the arch' });
+    game.addHide({ biome: 'rio', x: -75.6 + 5 * rioFRONT_PITCH - rioFRONT_W * 0.25,
+                   z: rioFRONT_Z - rioFRONT_D * 0.5 - 1.9 - 0.9, r: 2.0, kind: 'under the awning' });
+    game.addHide({ biome: 'rio', x: rioSELARON.x - (7.0 * 0.5 + 0.4) - 1.3,
+                   z: rioSELARON.z + 4 * rioSELARON_RUN, r: 1.8, kind: 'behind the wall' });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(rioRoot);

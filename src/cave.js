@@ -3384,6 +3384,9 @@ function cavBuildCamp(game, root) {
   // 1 & 2 — the camp, under the hole
   const cavLocCamp = put(cx + 3.4, cz + 4.0, {
     face: 2.4, kit: 'survey',
+    // THE AUTHORITY (L3, F1): the one with the permit book is the one who
+    // carries a nuisance out. put() hands the row straight to addLocal.
+    authority: true, role: 'the expedition leader',
     figure: { shirt: PALETTE.cavTentB, hat: PALETTE.cavTent, legs: PALETTE.cavRockDk },
     lines: ['Second camp. We are two days in and one day out.',
             'You do not get in here without a permit. I am choosing not to ask.',
@@ -3608,6 +3611,18 @@ function cavBuildCamp(game, root) {
              'Do that outside. It is better outside.'],
     startled: CAVE_STARTLED, splash: CAVE_SPLASH, thief: CAVE_THIEF, rush: CAVE_RUSH,
   }, true);
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the leader
+  // walks to where you were and gives up. Only three, because the camp is
+  // the only fixed furniture in the mountain: behind the washing strung
+  // between the first two tents, behind the third tent, and the far side of
+  // the column in the glade. The river is a hide on its own.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'cave', x: cx + 2.3, z: cz + 2.3, r: 1.6, kind: 'behind the washing' });
+    game.addHide({ biome: 'cave', x: cx + 2.4, z: cz - 3.6 - 2.6, r: 1.8, kind: 'behind the tent' });
+    game.addHide({ biome: 'cave', x: cavCOL.x - cavCOL_RB - 1.2, z: cavCOL.z, r: 2.0, kind: 'behind the column' });
+  }
 
   // ---- AND THE TWO IN THE CAMP TALK TO EACH OTHER --------------------
   // NO PAIR-CHAT ANYWHERE IN CHAPTER 16: `addExchange` occurs zero times in

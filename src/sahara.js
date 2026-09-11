@@ -6146,6 +6146,9 @@ function sahBuild(game) {
     // at all. One at a halqa, one dyer in the souk, the guerrab everybody
     // photographs and does not buy from, and the maalem at the fire.
     sahLocHalqa = game.addLocal({ biome: 'sahara', x: -14, y: 0, z: 12.6, near: 8,
+      // THE AUTHORITY (L3, F1): the ring is his, and so, he will tell you, is
+      // the square
+      authority: true, role: 'the storyteller',
       figure: { shirt: PALETTE.sahCanvas, skin: PALETTE.skin4, hat: PALETTE.sahOchreDk },
       lines: ['Sit down. It is a long one and it is not free.',
               'Same story since my grandfather. He got it wrong too.',
@@ -6291,6 +6294,23 @@ function sahBuild(game) {
                                 'I have watched four thousand people do that. Not like that.'],
                   'sandstorm': ['You stayed out in it. On the top. On purpose.'] },
         praise: ['The dune does not care. I care a bit.'] });
+    }
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The storyteller is the one who carries you out. Where you go so that he
+    // cannot: the far side of the juice cart, the smoke off the first stall's
+    // brazier (the stall ring is cos(a)·22, 4 + sin(a)·15 — see the stalls),
+    // in under the dyers' skeins in the first souk cell, the passage of Bab
+    // Agnaou itself (the wall and its piers stand at x = 70), and under the
+    // one palm with a crop on it.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'sahara', x: sahCART.x, z: sahCART.z - 1.9, r: 1.6, kind: 'behind the cart' });
+      game.addHide({ biome: 'sahara', x: Math.cos(0) * 22 + 1.9, z: 4 + Math.sin(0) * 15 + 1.4 + 1.3,
+        r: 1.6, kind: 'the smoke' });
+      game.addHide({ biome: 'sahara', x: sahSOUK_X0 + sahSOUK_BLOCK * 0.5,
+        z: sahSOUK_Z0 + sahSOUK_BLOCK + 0.35 + 1.1, r: 2.0, kind: 'the skeins' });
+      game.addHide({ biome: 'sahara', x: 70, z: sahGATE.z, r: 2.6, kind: 'the gateway' });
+      game.addHide({ biome: 'sahara', x: sahDATE.x + 1.6, z: sahDATE.z, r: 2.0, kind: 'under the palm' });
     }
 
     // ---- AND FOUR CONVERSATIONS THAT ARE NOT WITH YOU --------------------

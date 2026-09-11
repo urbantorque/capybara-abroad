@@ -4837,6 +4837,8 @@ function palBuild(game) {
     // chapter shipped. Caught by measuring every local's y against the live
     // terrainHeight — see [[the locals]], rule 4.
     palLocals.boatman = game.addLocal({ biome: 'palawan', x: palJETTY.x - 0.7, y: palJETTY.y, z: palJETTY.z0 + 2, near: 7,
+      // THE AUTHORITY (L3, F1): the boat is his, and the jetty goes with it
+      authority: true, role: 'the boatman',
       figure: { shirt: PALETTE.cloth2, skin: PALETTE.skin3, hat: PALETTE.khaki },
       lines: [{ t: 'Bangka leaves when the bangka leaves. Sit at the front.',
                 before: 'outrigger' },
@@ -5004,6 +5006,22 @@ function palBuild(game) {
               { t: 'Do that in the lagoon. Just once. You will see.', after: 'the-crack' }],
       onTask: { 'the-crack': ['Nine years. Nine years and a rodent does it on the first go.'],
                 'cathedral': ['The hole in the roof. So it IS real. I told them it was real.'] } });
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The boatman is the one who carries you out. Where you go so that he
+    // cannot: under two of the houses on stilts (the `huts` table in the beach
+    // build — only the walled room is solid), in among the third hut's line of
+    // washing (its poles hang at hx - 4.2..-7.0, hz - 2.4), and under the
+    // outrigger arms of the middle beached bangka (the `beached` table: the
+    // arms are a metre off the sand and the float is 3.5 m out). The sea is
+    // water, and water is a hide everywhere.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'palawan', x: -11, z: 58, r: 2.0, kind: 'under the house' });
+      game.addHide({ biome: 'palawan', x: 31, z: 52, r: 2.0, kind: 'under the house' });
+      game.addHide({ biome: 'palawan', x: 14 - 5.6, z: 56 - 2.4, r: 1.6, kind: 'the washing' });
+      game.addHide({ biome: 'palawan', x: -19 + Math.cos(0.2) * 2.2, z: 35 - Math.sin(0.2) * 2.2,
+        r: 1.6, kind: 'under the outrigger' });
+    }
 
     // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
     // Seven people on one beach, all of them facing the sea, none of them ever

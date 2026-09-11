@@ -5748,6 +5748,8 @@ function venBuild(game) {
     // in this chapter is placed off venTerrain now.
     venWaiterRec = game.addLocal({ biome: 'venice', x: venCAFE.x, y: venTerrain(venCAFE.x, venCAFE.z),
       z: venCAFE.z, near: 6,
+      // THE AUTHORITY (L3, F1): the tables are for the guests
+      authority: true, role: 'the waiter',
       figure: { shirt: PALETTE.cloth6, legs: PALETTE.hair2 },
       lines: ['Signore. The tables are for the guests.',
               { t: 'Eleven euros for the spritz. Sitting down.', before: 'spritz-theft' },
@@ -5940,6 +5942,20 @@ function venBuild(game) {
               'The whole canal heard that and it came back twice.'],
       onTask: { 'rialto': ['Over the Rialto at a RUN. In front of the tour boats as well.'],
                 'traghetto': ['Standing up the whole way. He is showing off and it is working.'] } });
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The waiter is the one who carries you out. Where you go so that he
+    // cannot: under the far table of his own row (the tables run along Z from
+    // venCAFE — see venBuildCafe), in the sotoportego through the west arcade,
+    // behind the seaward column on the Molo, and behind the Volo stage at the
+    // basilica end. At high water the square is water, and water is a hide
+    // everywhere.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'venice', x: venCAFE.x - 0.35, z: venCAFE.z - 6.0, r: 1.6, kind: 'under the table' });
+      game.addHide({ biome: 'venice', x: venPZ_X0 - 4.5, z: venARCH_Z, r: 2.4, kind: 'the sotoportego' });
+      game.addHide({ biome: 'venice', x: venCOLUMNS[1].x + 2.6, z: venCOLUMNS[1].z, r: 1.6, kind: 'behind the column' });
+      game.addHide({ biome: 'venice', x: venVOLO_A.x, z: venVOLO_A.z - 4.0, r: 1.6, kind: 'behind the stage' });
+    }
 
     // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
     // Nine people in the most crowded square in Europe and not one word of it

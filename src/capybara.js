@@ -3795,6 +3795,9 @@ export function createCapybara(game) {
       capySfxAt.volume = clamp(nv * 0.070, 0.14, 0.46);
       capySfxAt.pitch = clamp(0.78 - nv * 0.020, 0.52, 0.78);
       game.sfx('thud', capySfxAt);
+      // ...and the animal says something about it (L3, E4)
+      capySfxAt.volume = clamp(nv * 0.09, 0.25, 0.6); capySfxAt.pitch = clamp(1.05 - nv * 0.02, 0.85, 1.05);
+      game.sfx('grunt', capySfxAt);
       if (capyPop > -0.14) capyPop = -0.14;
       if (capyPopVel > -2.2) capyPopVel = -2.2;
       const bsB = clamp(nv * 0.08, 0.25, 1.1);

@@ -5497,6 +5497,8 @@ function driBuild(game) {
     // the rendered frame, she was a pale column with a head on it.
     game.addLocal({ biome: 'drift', x: driCROWN_KEEP.x - 2.2, y: driCROWN_KEEP.y,
       z: driCROWN_KEEP.z - 2.0, near: 9, face: -1.9,
+      // THE AUTHORITY (L3, F1): the lantern is hers, and so is the island
+      authority: true, role: 'the lantern keeper',
       figure: { shirt: PALETTE.driPaper, legs: PALETTE.driTimber },
       lines: [{ t: 'I light it when there are enough of them. There are never enough of them.',
                 before: 'lantern' },
@@ -5542,6 +5544,22 @@ function driBuild(game) {
       driTravRecs[t.id] = game.addLocal({
         biome: 'drift', x: t.x, y: t.y, z: t.z, near: t.near, face: t.face,
         figure: t.figure, lines: t.lines, wheek: t.wheek, beat: t.beat });
+    }
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The lantern keeper is the one who carries you out. Where you go so that
+    // she cannot: inside the roofless croft on the Shelf (its walls stand at
+    // -15, 36 — see driBuildKeepers), in under the lampfly house's rack on the
+    // Orchard, and behind the bench and the stack of unlit lanterns on the
+    // Crown. The pond is water, and water is a hide everywhere.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'drift', x: -15, z: 36 + 0.5, r: 2.0, kind: 'the ruin' });
+      game.addHide({ biome: 'drift', x: driORCH_KEEP.x + 1.6, z: driORCH_KEEP.z + 2.4 - 0.6,
+        r: 1.6, kind: 'the lampfly house' });
+      game.addHide({ biome: 'drift', x: driCROWN_KEEP.x - 0.6, z: driCROWN_KEEP.z + 2.8,
+        r: 1.6, kind: 'behind the bench' });
+      game.addHide({ biome: 'drift', x: driCROWN_KEEP.x + 2.3 + 1.5, z: driCROWN_KEEP.z - 0.9,
+        r: 1.6, kind: 'behind the lanterns' });
     }
   }
 

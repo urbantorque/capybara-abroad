@@ -4467,6 +4467,9 @@ function monBuildLocals(game) {
   monLocDoor = put(monSTEPS.x - 3.4, monSTEPS.z + 3.0, {
     figure: { shirt: PALETTE.monTux, legs: PALETTE.monTux, hat: PALETTE.monTux },
     face: Math.PI, near: 9,
+    // THE AUTHORITY (L3, F1): the doorman already throws you out of the
+    // building; now he can carry you off the square as well. See npc.js.
+    authority: true, role: 'the doorman',
     // ---- AND WHAT HE SAYS CHANGES (v30) --------------------------------
     // Chapter 18 shipped with no conditional line anywhere in it: `onTask`
     // fires once at the moment and is gone, so a doorman who has watched you
@@ -4562,6 +4565,20 @@ function monBuildLocals(game) {
     wheek: ['Rien ne va plus.'],
     onTask: { 'the-wheel': ['That is not what it is for.'] },
   }, monFLOOR_Y);
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the doorman
+  // walks to where you were and gives up. Outside only — the room has its
+  // own cover (monCOVER) and its own eyes. Every spot is a thing the square
+  // already draws: under the cafe awning between two of its tables, two of
+  // the four bougainvillea beds round the fountain, and under the tenth
+  // palm on the north quay. The harbour is a hide on its own.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'monaco', x: 118 - 1.3, z: 56 - 12.9, r: 2.0, kind: 'under the awning' });
+    game.addHide({ biome: 'monaco', x: monSQUARE.x + Math.cos(0.78) * 15, z: monSQUARE.z + Math.sin(0.78) * 13, r: 2.6, kind: 'the bougainvillea' });
+    game.addHide({ biome: 'monaco', x: monSQUARE.x + Math.cos(2 * 1.5708 + 0.78) * 15, z: monSQUARE.z + Math.sin(2 * 1.5708 + 0.78) * 13, r: 2.6, kind: 'the flower bed' });
+    game.addHide({ biome: 'monaco', x: lerp(monPORT.x0, monPORT.x1, 9 / 17), z: monPORT.z1 + 6.5 + 1.2, r: 2.0, kind: 'under the palms' });
+  }
 
   // ---- and two of them talk to each other -------------------------------
   if (typeof game.addExchange === 'function' && monLocDoor && monLocBar) {

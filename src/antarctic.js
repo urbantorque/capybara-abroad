@@ -3385,6 +3385,9 @@ function antBuildLocals(game) {
 
   const antLocBoss = put(antHUTS.x - 3.4, antHUTS.z + 4.2, {
     near: 8, face: 0.4, kit: 'clipboard',
+    // THE AUTHORITY (L3, F1): the one with the clipboard is the one who
+    // carries a nuisance off the station. put() hands the row to addLocal.
+    authority: true, role: 'the station leader',
     figure: { shirt: PALETTE.antHull, legs: PALETTE.antHutRoof, hat: PALETTE.antHutRed },
     lines: ['You are the first new face since March. Do not take that as praise.',
             'The bar opens at six. The bar is also the kitchen. And the library.',
@@ -3608,6 +3611,21 @@ function antBuildLocals(game) {
             'I will put it under shrinkage. We have a column for shrinkage.'],
     rush: ANT_RUSH,
   });
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the station
+  // leader walks to where you were and gives up. Every spot is beside a
+  // thing the chapter already draws: the drift tail in the lee of the bar
+  // hut, the far side of the fuel drums, the middle of the rookery — a
+  // hundred and thirty penguins are a better screen than any rock — the lee
+  // of the wreck, and behind the second boiler. The sea is a hide on its own.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'antarctic', x: antHUTS.x + 9.0 * 0.5 + 1.4, z: antHUTS.z, r: 2.2, kind: 'the drift' });
+    game.addHide({ biome: 'antarctic', x: antHUTS.x - 6 + 1.5 * 1.5, z: antHUTS.z + 15 + 1.6 + 1.3, r: 1.8, kind: 'behind the drums' });
+    game.addHide({ biome: 'antarctic', x: antCOLONY.x, z: antCOLONY.z, r: 3.0, kind: 'among the penguins' });
+    game.addHide({ biome: 'antarctic', x: antWHAL.x - 14 - 1.2, z: antWHAL.z + 6 + 2.2, r: 2.0, kind: 'the lee of the wreck' });
+    game.addHide({ biome: 'antarctic', x: antWHAL.x + 6 + 9, z: antWHAL.z + 18 - 4 + 3.5, r: 1.8, kind: 'behind the boiler' });
+  }
 
   // ---- AND THE ONLY TWO PEOPLE FOR ELEVEN HUNDRED KILOMETRES TALK TO EACH
   // ---- OTHER, WHICH UNTIL NOW THEY DID NOT ------------------------------

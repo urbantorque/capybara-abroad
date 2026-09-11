@@ -3253,6 +3253,22 @@ function pastoBuild(game) {
   pastoBuildStreet(game, pastoRoot);
   pastoBuildCoffeeFarm(game, pastoRoot);
 
+  // ---- WHERE TO HIDE FROM THEM (L3, F1) -----------------------------------
+  // See THE HIDE in systems.js. Pasto's people live in npc.js's own roster
+  // (paHumans) and its carry is already there, so the chapter flags no
+  // authority; it only says where the animal cannot be seen. Each spot is
+  // beside a thing the plaza already draws, at the expression that draws it:
+  // the back of a stall table on the south and north rows (the table body is
+  // 0.8 half-deep), the doorway of the first house on the north terrace
+  // (pastoHouse puts the door at the facade plane), and a coffee row on the
+  // hillside east of town (pastoBuildCoffee, column 4, second bush).
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'pasto', x: pastoSTALL_SPEC[1].x, z: pastoSTALL_SPEC[1].z - 0.8 - 1.2, r: 1.8, kind: 'behind the stall' });
+    game.addHide({ biome: 'pasto', x: pastoSTALL_SPEC[8].x, z: pastoSTALL_SPEC[8].z + 0.8 + 1.2, r: 1.8, kind: 'behind the stall' });
+    game.addHide({ biome: 'pasto', x: pastoSTR_X0 + pastoHOUSE_W[0] * 0.5, z: pastoSTR_NF - 1.0, r: 1.6, kind: 'the doorway' });
+    game.addHide({ biome: 'pasto', x: pastoCOF_X0 + 2.5 + 4 * 3.6, z: pastoCOF_Z0 + 1.6 + 1 * 2.4, r: 2.6, kind: 'the coffee bushes' });
+  }
+
   pastoApi = {
     // The biome streamer removes BODIES from the world but knows nothing about
     // CONSTRAINTS, so the bell's hinge has to be attached and detached by hand

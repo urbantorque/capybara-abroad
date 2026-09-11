@@ -5491,6 +5491,8 @@ function hkBuild(game) {
                              'Still warm. Of course it was still warm. That is the point of them.'],
                 'symphony': ['You watched it from up THERE? I have lived here forty years.'] } });
     hkFishRec = game.addLocal({ biome: 'kowloon', x: hkMARKET.x - 2, y: 0, z: hkMARKET.z, near: 7,
+      // THE AUTHORITY (L3, F1): the lane is his, and he has the cleaver
+      authority: true, role: 'the fishmonger',
       figure: { shirt: PALETTE.cloth2, legs: PALETTE.stoneDark },
       // the cleaver, which is the sound of the market
       beat: { kind: 'work', every: 3.1, dur: 0.7, sfx: 'cleaver', volume: 0.14 },
@@ -5693,6 +5695,22 @@ function hkBuild(game) {
               'That is about how the extractor sounds, to be fair.'],
       praise: ['I saw that from here. I see everything from here.',
                'Forty years at this table and that is new.'] });
+
+    // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) -------------
+    // The fishmonger is the one who carries you out. Where you go so that he
+    // cannot: in front of the roast meat window at the end of his own lane
+    // (the shop stands at hkMARKET.x + 9.5 — see hkBuildMarket), the foot of
+    // the bamboo, the walkway between the dai pai dong's tables and its range
+    // (x 5.7 to 8.25, under the awning), and the pavement side of the first
+    // litter bin on the kerb line. The harbour is water, and water is a hide
+    // everywhere.
+    if (typeof game.addHide === 'function') {
+      game.addHide({ biome: 'kowloon', x: hkMARKET.x + 7.4, z: hkMARKET.z, r: 1.6, kind: 'under the ducks' });
+      game.addHide({ biome: 'kowloon', x: hkSCAF.x + hkSCAF.out + 1.2, z: (hkSCAF.z0 + hkSCAF.z1) * 0.5,
+        r: 2.2, kind: 'the scaffold' });
+      game.addHide({ biome: 'kowloon', x: hkDPD.x - 0.6, z: hkDPD.z + 2.2, r: 1.6, kind: 'under the awning' });
+      game.addHide({ biome: 'kowloon', x: -(hkST_HALF + 0.75) - 1.2, z: hkST_Z0 + 12, r: 1.6, kind: 'behind the bin' });
+    }
 
     // ---- AND THEY TALK TO EACH OTHER ---------------------------------------
     // Twelve people on one street and every word of it was addressed to the

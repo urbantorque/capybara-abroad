@@ -922,6 +922,9 @@ function panBuild(game) {
     };
     put('boss', panFAZENDA.x - 6, panFAZENDA.z, {
       face: 3.0,
+      // THE AUTHORITY (L3, F1): it is his fazenda, so he is the one who
+      // carries a nuisance off it. put() hands the row straight to addLocal.
+      authority: true, role: 'the fazendeiro',
       figure: { shirt: PALETTE.cloth6, hat: PALETTE.khaki, skin: PALETTE.skin3 },
       // ---- AND WHAT THEY SAY MOVES WITH THE CHAPTER (see localResolve in
       // npc.js). The note above is about the RECORD being kept; this is the
@@ -1074,6 +1077,21 @@ function panBuild(game) {
       onTask: { 'caiman-nap': ['Now THAT is the correct attitude to four o clock.'],
                 'the-crossing': ['Ah. It is that time. Listen — the frogs start in about ten minutes.'],
                 'tamandua': ['Slowest ride in South America. Very sensible.'] } });
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ---------------
+  // See THE HIDE in systems.js. Still inside one of these and the fazendeiro
+  // walks to where you were and gives up. Every spot is beside a thing the
+  // chapter already draws: the veranda between its posts, the mango tree
+  // the hammock hangs from, the foot of the acuri, the far side of the dead
+  // tree, and the middle of the pen — eleven nelore are a better screen than
+  // any bush. The flood is a hide on its own and needs nothing here.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'pantanal', x: panFAZENDA.x + 3.75, z: panFAZENDA.z - 5.9, r: 1.8, kind: 'the veranda' });
+    game.addHide({ biome: 'pantanal', x: panFAZENDA.x + 16 + 1.4, z: panFAZENDA.z + 6, r: 2.4, kind: 'under the mango tree' });
+    game.addHide({ biome: 'pantanal', x: panPALM.x + 1.6, z: panPALM.z, r: 2.0, kind: 'under the palm' });
+    game.addHide({ biome: 'pantanal', x: panNEST.x - 1.6, z: panNEST.z + 0.3, r: 1.8, kind: 'behind the dead tree' });
+    game.addHide({ biome: 'pantanal', x: panPEN.x, z: panPEN.z, r: 3.0, kind: 'among the cattle' });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(panRoot);

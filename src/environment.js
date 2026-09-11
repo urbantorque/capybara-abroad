@@ -2929,6 +2929,23 @@ export function createEnvironment(game) {
   envStaticBox(game, 62.6, 0.8, 43, 1.5, 0.8, 13);
   envStaticBox(game, 43, 0.8, 63.1, 17, 0.8, 1.3);
 
+  // ---- WHERE TO HIDE FROM THEM (L3, F1) -----------------------------------
+  // See THE HIDE in systems.js. Sydney's people are npc.js's own roster and
+  // the gardener has carried the animal out since chapter one, so no authority
+  // is flagged here; this only says where the animal cannot be seen. Each spot
+  // is beside a thing the gardens already draw, at the expression that draws
+  // it: the outside of the first hedge run at its midpoint (its collider runs
+  // to x 18.2), the middle of the pond's arc of hedge (the one run with no
+  // collider), the fourth fig's buttress roots on the main path, the café
+  // table the 'cafe-table' task stands on, and the back wall of the kiosk.
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'sydney', x: 15.6 + 2.6 + 1.8, z: 14 + 0.5 * 38, r: 1.8, kind: 'the hedge' });
+    game.addHide({ biome: 'sydney', x: envPOND.x + Math.cos(0.45) * 9.2, z: envPOND.z + Math.sin(0.45) * 9.2, r: 2.0, kind: 'the hedge' });
+    game.addHide({ biome: 'sydney', x: envFIG_SPOTS[3][0] + 1.8, z: envFIG_SPOTS[3][1], r: 1.8, kind: 'the fig roots' });
+    game.addHide({ biome: 'sydney', x: envQUAY_TABLES[2], z: envQUAY_TABLES[3], r: 1.6, kind: 'under the table' });
+    game.addHide({ biome: 'sydney', x: envKIOSK_X - 1.1 - 1.2, z: envKIOSK_Z, r: 1.6, kind: 'behind the kiosk' });
+  }
+
   // lily pads
   const lilies = [];
   envPush9(lilies, 42.4, 0.07, 38.6, 0, 0.4, 0, 1.15, 0.08, 1.15);

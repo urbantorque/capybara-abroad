@@ -1642,8 +1642,15 @@ export function createNPCs(game) {
   // to work in a Venetian sacristy and on an Antarctic jetty. A local may
   // override any of them by passing its own array to addLocal.
   const npcLOC_SAY = {
-    startled: ['!', 'Whoa —', 'What was that?', 'Careful!', 'Oh — steady.', 'Do you mind?',
-               'That was not nothing.', 'I felt that.', 'Was that necessary?'],
+    // ---- THE MOST-HEARD LINES IN THE GAME, IN ITS OWN VOICE (L3, E3) ------
+    // These two pools fire on every barge in every chapter, and they were the
+    // only generic writing left: "Whoa —", "Careful!", "Slow down!". The
+    // standard is the one the `notool` pool set ("It was just here."):
+    // deadpan, no contractions, the number or the observation as the joke.
+    startled: ['I was standing there.', 'That is a lot of animal.', 'No. Go round.',
+               'I felt that in my knees.', 'It did not even look.', 'Was that necessary?',
+               'That was not nothing.', 'I have been hit by worse. Not today.',
+               'Right. Noted.'],
     splash:   ['In it goes.', 'Well. It is gone now.', 'Was that on purpose?', 'Lovely.',
                'That is not coming back.', 'Hope it floats.'],
     // ---- ...AND ONE FOR SOMETHING ON THE FLOOR (B9) ----------------------
@@ -1765,8 +1772,9 @@ export function createNPCs(game) {
                'Somebody is missing {O}, I should think.',
                'You have brought {O} with you. All right then.',
                'I have never seen {O} in this town before.'],
-    rush:     ['Whoa!', 'Mind out!', 'Where is it off to?', 'Somebody is in a hurry.',
-               'Slow down!', 'It has somewhere to be.'],
+    rush:     ['It has somewhere to be.', 'Where is it off to.', 'Nobody chases it. It just goes.',
+               'That is faster than it looks.', 'Late for something, apparently.',
+               'Somebody is in a hurry.', 'Mind the — never mind.'],
     // ---- ...AND THE TWO PAIRS OF VERBS THAT ALREADY WORKED (item 2) -------
     // Both of these were proposed as things to BUILD and both turned out to be
     // things the animal could already do that nothing had ever noticed —
@@ -2676,6 +2684,11 @@ export function createNPCs(game) {
     }
     const rec = {
       biome: o.biome, group: g, trav: !!o.trav,
+      // ---- THE AUTHORITY (L3, F1) ----------------------------------------
+      // One person per chapter who can pick you up. See THE AUTHORITY below
+      // the march. `role` is what the toast calls them.
+      authority: !!o.authority, role: o.role || 'somebody',
+      escT: -1, escX: 0, escZ: 0, escFrom: 0,
       x: o.x !== undefined ? o.x : (g ? g.position.x : 0),
       y: o.y !== undefined ? o.y : (g ? g.position.y : 0),
       z: o.z !== undefined ? o.z : (g ? g.position.z : 0),
@@ -3353,7 +3366,62 @@ export function createNPCs(game) {
                              'Go on, then. Go on.',
                              'It is not worth it.',
                              'Somebody else can deal with that.'];
+  // =========================================================================
+  // THE AUTHORITY (L3, F1) — one person per chapter who can pick you up.
+  //
+  // Fifteen of nineteen chapters had nobody who could do anything to you: the
+  // ladder climbed, somebody set off, and the whole of what reaching you cost
+  // was a line and a lunge. The Sydney gardener has carried the animal out of
+  // the gardens since chapter one, and Monte Carlo proved a cost that denies
+  // nothing — ten seconds and your dignity. This is that, generalised.
+  //
+  // A chapter flags one local `authority: true` (the monk, the inspector,
+  // the lifeguard, the ranger, the traffic cop). From the go rung on, the
+  // authority takes the march if they are inside npcAUTH_R — further than a
+  // witness, because it is their job — and they walk faster, keep at it
+  // longer and are let further from their pitch. On reaching you they do
+  // not lunge: they PICK YOU UP (the gardener's carry, `capy.carriedBy`),
+  // walk you npcAUTH_ESC_D metres back the way you came — toward the
+  // chapter's spawn if it is near — and put you down. The held prop stays
+  // where it fell. Nothing ticked is lost; the chain closes as it always did.
+  //
+  // ---- ...AND THE HIDE IS THE ANSWER TO THEM ------------------------------
+  // systems.js publishes game.hidden(): 1 while the animal is still inside a
+  // registered hide spot (game.addHide) or still in water with only its eyes
+  // out. A marcher who cannot see you walks to where you were last seen and,
+  // after npcHIDE_LOSE seconds of that, gives up — with a line, and with no
+  // card taken. It is the one verb in the game that answers a person coming
+  // for you, and it composes: a herd of fourteen cannot hide, a dinner
+  // jacket at the casino door is a hide of its own, water is a hide anywhere.
+  // =========================================================================
+  const npcAUTH_R      = 40;    // m: an authority who saw it, or was told
+  const npcAUTH_V_K    = 1.3;   // × the march speed
+  const npcAUTH_OUT_T  = 18;    // s of patience (a witness has 12)
+  const npcAUTH_LEASH  = 34;    // m from their pitch (a witness has 15)
+  const npcAUTH_ESC_T  = 3.4;   // s the carry lasts at most
+  const npcAUTH_ESC_D  = 9;     // m they walk you
+  const npcAUTH_SPAWN_R = 26;   // m: nearer than this, they put you at the spawn
+  const npcAUTH_ESC_V  = 2.2;   // m/s, carrying
+  const npcHIDE_LOSE   = 2.6;   // s hidden before a marcher gives up
+  const npcLOC_AUTH_GO = ['Right. That is enough.',
+                          'Stop there. I mean it.',
+                          'You. Yes, you. Here.',
+                          'I have been told about you.'];
+  const npcLOC_AUTH_CARRY = ['Out. Out you go.',
+                             'No. Not today.',
+                             'I have a whole square to look after.',
+                             'You weigh more than you look.'];
+  const npcLOC_AUTH_DROP = ['And stay there.',
+                            'Off you go.',
+                            'That is where you started. Start again.',
+                            'Somebody will be along to see you do not.'];
+  const npcLOC_MARCH_LOST = ['Where did it go.',
+                             '...it was just here.',
+                             'I am not looking under there.',
+                             'Fine. Fine.'];
   let marWho = null;           // the one marcher, or null. ONE, ever.
+  let marLost = 0;             // s the marcher has not been able to see you
+  let marSeenX = 0, marSeenZ = 0;  // where you were, the last time they could
   let marT = 0;                // s spent marching
   let marSayT = 0;             // s until the next thing they say
   let marWhy = '';             // the last decision the rung handler made
@@ -4686,7 +4754,7 @@ export function createNPCs(game) {
    */
   function marFree(r, starting) {
     return !!r && !!r.fig && !!r.group && r.biome === game.biome.current &&
-           !r.own && !r.carry && (r.marCool || 0) <= 0 && !(r.wel > 0) &&
+           !r.own && !r.carry && !(r.escT >= 0) && (r.marCool || 0) <= 0 && !(r.wel > 0) &&
            (!starting || (r.gest || 0) <= 0);
   }
   // =========================================================================
@@ -4771,16 +4839,87 @@ export function createNPCs(game) {
       localReactLine(r, npcLOC_MARCH_GAVE);
     }
     if (caught) {
-      if (r.cd <= 0) { r.cd = r.cool * rand(0.6, 1.0); localReactLine(r, npcLOC_MARCH_END); }
-      r.flV -= 8;                       // a lunge, on the flinch spring
       const cp = game.capy && game.capy.position;
-      if (cp) r.flYaw = Math.atan2(cp.x - r.x, cp.z - r.z);
       r.wary = Math.min(1, (r.wary || 0) + npcMAR_WARY);
+      if (r.authority && game.capy && game.capy.body && !game.capy.atHelm && !game.capy.carriedBy) {
+        // THE AUTHORITY picks you up. See the block above the march's state.
+        escBegin(r, cp);
+      } else {
+        if (r.cd <= 0) { r.cd = r.cool * rand(0.6, 1.0); localReactLine(r, npcLOC_MARCH_END); }
+        r.flV -= 8;                       // a lunge, on the flinch spring
+        if (cp) r.flYaw = Math.atan2(cp.x - r.x, cp.z - r.z);
+      }
       // systems.js decides what reaching you is WORTH. See its npc:caught
       // handler: the chain closes, and the card already earned stays earned.
-      emit('npc:caught', { x: r.x, z: r.z });
+      emit('npc:caught', { x: r.x, z: r.z, authority: !!r.authority });
     }
     marWho = null; marT = 0;
+  }
+  // ---- THE ESCORT ---------------------------------------------------------
+  function escBegin(r, cp) {
+    r.escT = 0; r.escFrom = 0;
+    // where to: toward the chapter's spawn, npcAUTH_ESC_D metres of it — or
+    // the spawn itself when it is near enough to be the obvious place
+    let tx = r.x, tz = r.z;
+    const sp = game.biome && typeof game.biome.spawnOf === 'function' ? game.biome.spawnOf(game.biome.current) : null;
+    if (sp) {
+      const dx = sp.x - r.x, dz = sp.z - r.z, d = Math.hypot(dx, dz);
+      if (d < npcAUTH_SPAWN_R) { tx = sp.x; tz = sp.z; }
+      else if (d > 0.01) { tx = r.x + dx / d * npcAUTH_ESC_D; tz = r.z + dz / d * npcAUTH_ESC_D; }
+    } else if (cp) {
+      const dx = r.x - cp.x, dz = r.z - cp.z, d = Math.hypot(dx, dz) || 1;
+      tx = r.x + dx / d * npcAUTH_ESC_D; tz = r.z + dz / d * npcAUTH_ESC_D;
+    }
+    r.escX = tx; r.escZ = tz;
+    game.capy.carriedBy = r;
+    if (game.physics && typeof game.physics.release === 'function') {
+      try { game.physics.release(null); } catch (e) { /* optional */ }
+    }
+    r.cd = 0; localReactLine(r, npcLOC_AUTH_CARRY); r.cd = r.cool * rand(0.6, 1.0);
+    sfx('pop', r);
+    try { game.shake(0.18); } catch (e) { /* optional */ }
+    emit('npc:escort', { x: r.x, z: r.z, role: r.role });
+  }
+  function escStep(r, dt) {
+    r.escT += dt;
+    const capy = game.capy;
+    const live = game.biome && game.biome.current;
+    const d = Math.hypot(r.escX - r.x, r.escZ - r.z);
+    if (d > 0.05) localSteerTo(r, r.escX, r.escZ, d);
+    // the head faces the way they are walking, whatever you are doing in
+    // their hands
+    r.chatYaw = Math.atan2(r.escX - r.x, r.escZ - r.z); r.chatT = 0.2;
+    const gy = localGroundY(r.x, r.z);
+    const fy = (gy === gy ? gy : r.y) + 1.25;
+    if (capy && capy.body && capy.carriedBy === r) {
+      // held out in front, in the hands
+      const fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
+      const hx = r.x + fx * 0.66, hz = r.z + fz * 0.66;
+      npcPlaceBody(capy.body, hx, fy, hz);
+      capy.body.velocity.set(0, 0, 0);
+      capy.body.angularVelocity.set(0, 0, 0);
+      if (capy.group) { capy.group.position.set(hx, fy, hz); capy.group.updateMatrixWorld(true); }
+      if (capy.position) capy.position.set(hx, fy, hz);
+    }
+    const lost = !capy || !capy.body || capy.carriedBy !== r || r.biome !== live;
+    if (lost || d < 1.2 || r.escT > npcAUTH_ESC_T) {
+      if (!lost) {
+        const fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
+        const px = r.x + fx * 1.6, pz = r.z + fz * 1.6;
+        npcPlaceBody(capy.body, px, fy, pz);
+        capy.body.velocity.set(fx * 2.6, 2.8, fz * 2.6);
+        if (capy.group) { capy.group.position.set(px, fy, pz); capy.group.updateMatrixWorld(true); }
+        if (capy.position) capy.position.set(px, fy, pz);
+        r.cd = 0; localReactLine(r, npcLOC_AUTH_DROP); r.cd = r.cool * rand(0.8, 1.4);
+        sfx('thud', r);
+        try { game.shake(0.3); } catch (e) { /* optional */ }
+        try { game.toast('put down by ' + r.role + '.'); } catch (e) { /* optional */ }
+      }
+      if (capy && capy.carriedBy === r) capy.carriedBy = null;
+      r.escT = -1;
+      r.marCool = npcMAR_COOL;
+      r.tx = r.ax; r.tz = r.az;
+    }
   }
   function marStep(r, dt) {
     marT += dt;
@@ -4798,16 +4937,30 @@ export function createNPCs(game) {
              : (r.marCool || 0) > 0 ? "cooling" : "unknown");
       marEnd(r, false); return;
     }
-    if (marT > npcMAR_OUT_T) { marWhy = 'out of patience'; marEnd(r, false, true); return; }
+    if (marT > (r.authority ? npcAUTH_OUT_T : npcMAR_OUT_T)) { marWhy = 'out of patience'; marEnd(r, false, true); return; }
     // THE LEASH, and it is retrieval's own: a person does not leave their
     // pitch, and this is the rule that makes the whole thing safe to switch on
     // in seventeen chapters at once. Nobody can be led away.
-    if (Math.hypot(r.x - r.ax, r.z - r.az) > npcOWN_LEASH) {
+    // ...an authority is let further: it is their square.
+    if (Math.hypot(r.x - r.ax, r.z - r.az) > (r.authority ? npcAUTH_LEASH : npcOWN_LEASH)) {
       marWhy = 'leashed'; marEnd(r, false, true); return;
     }
-    const d = Math.hypot(cp.x - r.x, cp.z - r.z);
-    if (d < npcMAR_TAKE) { marWhy = 'caught you'; marEnd(r, true); return; }
-    if (localSteerTo(r, cp.x, cp.z, d)) marBlocked++;
+    // ---- THE HIDE (L3, F1): a marcher who cannot see you walks to where
+    // you were, and gives up after a while of that. See THE AUTHORITY.
+    const hid = typeof game.hidden === 'function' ? game.hidden() : 0;
+    if (hid > 0.5) {
+      marLost += dt;
+      if (marLost > npcHIDE_LOSE) {
+        marWhy = 'lost you';
+        if (r.cd <= 0) { r.cd = r.cool * rand(0.8, 1.4); localReactLine(r, npcLOC_MARCH_LOST); }
+        emit('npc:lost', { x: r.x, z: r.z });
+        marEnd(r, false, false); return;
+      }
+    } else { marLost = 0; marSeenX = cp.x; marSeenZ = cp.z; }
+    const gx = hid > 0.5 ? marSeenX : cp.x, gz = hid > 0.5 ? marSeenZ : cp.z;
+    const d = Math.hypot(gx - r.x, gz - r.z);
+    if (d < npcMAR_TAKE && hid <= 0.5) { marWhy = 'caught you'; marEnd(r, true); return; }
+    if (d > 0.3 && localSteerTo(r, gx, gz, d)) marBlocked++;
     marSayT -= dt;
     if (marSayT <= 0 && r.cd <= 0) {
       marSayT = npcMAR_SAY_T * rand(0.8, 1.4);
@@ -4856,6 +5009,9 @@ export function createNPCs(game) {
     // ever — see the constants block.
     if (e.n < marGoRung()) { marWhy = 'rung ' + e.n; return; }
     if (marWho) { marWhy = 'already marching'; return; }
+    // ---- THE AUTHORITY TAKES IT, IF THERE IS ONE NEAR ENOUGH (L3, F1) ----
+    const auth = marAuthority(e.x, e.z);
+    if (auth) best = auth;
     // ---- REFUSED FOR A PASSING REASON IS OWED, NOT DROPPED (N1) ----------
     // The go rung and the incident card land a second apart, and the card
     // makes the nearest person SAY something — which sets `gest`, which is
@@ -4880,9 +5036,27 @@ export function createNPCs(game) {
   const marOwed = { t: 0, x: 0, z: 0, n: 0 };
   function marGo(best, n) {
     marWho = best; marT = 0; marSayT = 0; marBlocked = 0; marWhy = "marching"; marOwed.t = 0;
+    marLost = 0;
+    const cp0 = game.capy && game.capy.position;
+    if (cp0) { marSeenX = cp0.x; marSeenZ = cp0.z; }
+    if (best.authority && best.cd <= 0) { best.cd = best.cool * rand(0.5, 0.9); localReactLine(best, npcLOC_AUTH_GO); }
     // ...and systems.js turns the row amber (N1). Emitted here, not in
     // marStep, so it fires once per marcher and never for a walk that ended.
     emit('npc:march', { x: best.x, z: best.z, n: n });
+  }
+  /** The chapter's authority, if one is registered, free, and near enough. */
+  function marAuthority(x, z) {
+    const live = game.biome && game.biome.current;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      // talking is not a reason for the authority to stay put (a witness
+      // who is mid-line is refused as a starter; see marFree)
+      if (!r.authority || r.biome !== live || !r.group || !marFree(r, false)) continue;
+      const dx = x - r.x, dz = z - r.z;
+      if (dx * dx + dz * dz > npcAUTH_R * npcAUTH_R) continue;
+      return r;
+    }
+    return null;
   }
   /** The owed march, retried once a frame. See the go-rung handler. */
   function marOwedStep(dt) {
@@ -4899,6 +5073,8 @@ export function createNPCs(game) {
       if (d2 > bd) continue;
       bd = d2; best = r;
     }
+    const auth = marAuthority(marOwed.x, marOwed.z);
+    if (auth) best = auth;
     if (best) marGo(best, marOwed.n);
   }
 
@@ -6290,7 +6466,10 @@ export function createNPCs(game) {
         // metre the chapter put them on; the moment it clears, localOwnEnd has
         // already pointed them back at the anchor and the shuffle takes over
         // and walks them there. See THE MISCHIEF ECONOMY.
-        if (r.own) {
+        if (r.escT >= 0) {
+          // THE AUTHORITY carrying you out ranks above everything (L3, F1)
+          escStep(r, dt);
+        } else if (r.own) {
           localOwnStep(r, dt);
         } else if (r.walk && localWalkStep(r, dt)) {
           // D2. Ranked below retrieval and the march for the same reason the
@@ -6331,7 +6510,8 @@ export function createNPCs(game) {
           // THE MARCH WALKS AT RETRIEVAL SPEED, for the same reason retrieval
           // does: somebody crossing a square on purpose does not shuffle.
           const step = Math.min(sd,
-            (r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : 1)
+            (r.escT >= 0 ? npcAUTH_ESC_V
+             : r === marWho ? npcOWN_V * (npcNotoTier >= 5 ? npcMAR_RUN_K : 1) * (r.authority ? npcAUTH_V_K : 1)
              : r.own || r.wel > 0 ? npcOWN_V
              : r.walkOk ? (r.walk.v || npcLOC_WALK_V)
              : npcLOC_STEP_V) * dt);
@@ -6360,7 +6540,7 @@ export function createNPCs(game) {
           // back to `baseY` — the height the chapter measured at the OTHER
           // end. On anything but a flat floor that is a person sinking into
           // the ground every time they finish their walk.
-          const away = r.own || r === marWho || r.wel > 0 || r.walkOk ||
+          const away = r.own || r === marWho || r.wel > 0 || r.walkOk || r.escT >= 0 ||
                        (r.x - r.ax) * (r.x - r.ax) + (r.z - r.az) * (r.z - r.az)
                                 > npcLOC_STEP_R * npcLOC_STEP_R;
           if (away || Math.abs(r.y - r.baseY) > 0.004) {
@@ -11789,6 +11969,10 @@ export function createNPCs(game) {
     // `flowSeen` all had, and the same one-line answer.
     if (marWho) { marWho.marCool = npcMAR_COOL; marWho.tx = marWho.ax; marWho.tz = marWho.az; }
     marWho = null; marT = 0; marOwed.t = 0;
+    for (let i = 0; i < locals.length; i++) {
+      const r = locals[i];
+      if (r.escT >= 0) { r.escT = -1; r.tx = r.ax; r.tz = r.az; if (game.capy && game.capy.carriedBy === r) game.capy.carriedBy = null; }
+    }
     for (let i = 0; i < humans.length; i++) {
       if (humans[i] && humans[i].state === 'gather') setState(humans[i], 'calm');
     }
@@ -13535,6 +13719,8 @@ export function createNPCs(game) {
     const cp = game.capy && game.capy.position;
     return {
       on: !!marWho, t: +marT.toFixed(2), atRung: marAtRung(), goRung: marGoRung(),
+      authority: !!(marWho && marWho.authority), lost: +marLost.toFixed(2),
+      escort: (function () { for (let i = 0; i < locals.length; i++) if (locals[i].escT >= 0) return +locals[i].escT.toFixed(2); return -1; })(),
       dist: marWho && cp ? +Math.hypot(cp.x - marWho.x, cp.z - marWho.z).toFixed(2) : -1,
       fromAnchor: marWho ? +Math.hypot(marWho.x - marWho.ax, marWho.z - marWho.az).toFixed(2) : -1,
       at: npcMAR_GO, take: npcMAR_TAKE, out: npcMAR_OUT_T, leash: npcOWN_LEASH,

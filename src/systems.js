@@ -7338,6 +7338,9 @@ function sysBuildCSS() {
 '.capyui-sub{margin-top:6px;font-size:clamp(11px,2.4vw,14px);letter-spacing:.42em;',
   'text-transform:uppercase;color:' + accentInk + ';font-weight:700;',
   'text-wrap:balance;}',
+/* the reason (L3, E3): one sentence, lower case, the clue's italic */
+'.capyui-why{margin-top:7px;font-size:clamp(11px,2.2vw,13px);font-style:italic;',
+  'color:' + inkSoft + ';letter-spacing:.02em;text-wrap:balance;}',
 /* ---------- the ornament ----------
    A hairline rule broken in the middle by the animal the game is about. It is
    doing one job and it is not decoration for its own sake: the masthead had a
@@ -8241,6 +8244,9 @@ function sysBuildCSS() {
 '.capyui-task.capyui-way{cursor:default;pointer-events:none;color:' + accentInk + ';',
   'font-weight:700;font-style:italic;padding-left:1.75em;}',
 '@media (hover:hover){.capyui-task.capyui-way:hover .capyui-txt{color:' + accentInk + ';}}',
+/* ...and before the road is open it is the clue's grey, not a promise (L3, E3) */
+'.capyui-task.capyui-way.soon{color:' + inkSoft + ';font-weight:600;}',
+'.capyui-task.capyui-way.soon .capyui-aim{display:none;}',
 '@media (hover:hover){.capyui-task:hover .capyui-txt{color:' + accentInk + ';}}',
 /* Out of the window is out of the FLOW: a zero-height row still collects the ul
    flex gap, and twenty-three of them would be 69 px of blank paper. */
@@ -9077,6 +9083,10 @@ function sysBuildCSS() {
 /* somebody is coming (N1): the lit pips go amber and so does the word */
 '.capyui-pips.warn b.lit{background:' + sysHex(PALETTE.ibisHead) + ';}',
 '.capyui-pips.warn .capyui-pipslbl{color:' + sysHex(PALETTE.ibisHead) + ';}',
+/* ...and hidden (L3, F1): the word goes the green of the bin, which is the one
+   colour on this card that means safe */
+'.capyui-pips.hid .capyui-pipslbl{color:' + sysHex(PALETTE.hullGreen) + ';}',
+'.capyui-pips.hid b.lit{background:' + sysHex(PALETTE.binGreen) + ';}',
 /* the third is the one that makes a card, so it is the one that is drawn
    differently BEFORE it is lit rather than after — a threshold you can see
    coming is a threshold you can play for. */
@@ -11173,7 +11183,14 @@ export function createSystems(game) {
   // mouth rather than a knock, low enough to sit behind the score. `pitch`
   // arrives already multiplied by the speaker's own `vpitch` (npc.js), so two
   // people in a Venetian queue do not blip in unison.
+  // ---- SPEECH DUCKS THE PAD (L3, E4) ---------------------------------------
+  // Dialogue sits on the same 400-2000 Hz shelf as the pad and the lead, and
+  // nothing made room for it: musDuck had two callers, the pause card and the
+  // crossing. A term, not a writer — read in the one 0.3 s block that writes
+  // musPad.gain, and decayed there. Set by the blip every bubble plays.
+  let musSpeak = 0;
   function sfxBlip(vol, pitch, n) {
+    musSpeak = 1;
     const t = ac.currentTime;
     const cnt = clamp(Math.round(n || 2), 1, 4);
     const base = 640 * clamp(pitch, 0.5, 2.2);
@@ -11227,6 +11244,13 @@ export function createSystems(game) {
   //   timber — a low resonant peak that rings for a moment (a wharf, a deck)
   // Volume is scaled by the caller with the animal's speed, so a walk whispers
   // and a run is audible across the plaza.
+  // ---- ...AND IT HAS TWO SIDES AND TWO PARTS (L3, E4) ----------------------
+  // Every footfall was one mono hit. Real feet alternate, and a walking foot
+  // is a heel and then a toe. The side flips per call into a small pan; at a
+  // walk (the volume is the gait: 0.15 at a stand, 1.0 at a sprint) a second
+  // hit lands 38 ms behind the first at about half the level. A sprint is
+  // too fast for the ear to want two.
+  let sfxStepSide = 1;
   function sfxStep(vol, pitch, extra, wet) {
     const t = ac.currentTime;
     const soft = pitch < 0.9, wood = pitch > 1.15;
@@ -11235,6 +11259,24 @@ export function createSystems(game) {
     const f = ac.createBiquadFilter();
     const g = ac.createGain();
     const gg = g.gain;
+    sfxStepSide = -sfxStepSide;
+    const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    if (pan) pan.pan.value = sfxStepSide * 0.07;
+    if (vol < 0.62) {
+      // the toe: the same material, quieter, a beat later
+      const tn = noiseSrc();
+      const tf = ac.createBiquadFilter();
+      tf.type = soft ? 'lowpass' : 'bandpass';
+      tf.frequency.value = (soft ? 900 : wood ? 240 : 1700) * v * 1.12; tf.Q.value = soft ? 0.7 : wood ? 3.2 : 1.1;
+      const tg = ac.createGain();
+      const t2 = t + 0.038;
+      tg.gain.setValueAtTime(0.0001, t2);
+      tg.gain.exponentialRampToValueAtTime((soft ? 0.075 : wood ? 0.14 : 0.085) * vol * 0.55, t2 + 0.005);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.07);
+      tn.connect(tf); tf.connect(tg);
+      if (pan) { tg.connect(pan); } else tg.connect(acMaster);
+      tn.start(t2); tn.stop(t2 + 0.09);
+    }
     if (soft) {
       f.type = 'lowpass'; f.frequency.value = 900 * v; f.Q.value = 0.7;
       gg.setValueAtTime(0.0001, t);
@@ -11267,7 +11309,7 @@ export function createSystems(game) {
       ns.connect(f); f.connect(g);
       ns.start(t); ns.stop(t + 0.12);
     }
-    g.connect(acMaster);
+    if (pan) { g.connect(pan); pan.connect(acMaster); } else g.connect(acMaster);
 
     // ---- THE PUDDLE, ON TOP OF WHATEVER THAT WAS -------------------------
     // A SECOND LAYER, not a different material. The three branches above are
@@ -11388,7 +11430,7 @@ export function createSystems(game) {
    * audibly climbs instead of repeating.
    */
   function sfxTick(vol, pitch, streak) {
-    const t = ac.currentTime;
+    const t = musSnap(ac.currentTime + 0.01);   // on the band's grid (L3, E4)
     const chord = musCurChord || sysMUS_CHORDS[0];
     const lift = clamp(streak || 0, 0, 4) * 2;         // whole tones
     // root, third-ish, octave — read off the live chord so it is never dissonant
@@ -12935,6 +12977,86 @@ export function createSystems(game) {
     lfo.start(t); lfo.stop(t + dur + 0.06);
   }
 
+  // ---- THE ANIMAL HAS MORE THAN TWO WORDS (L3, E4) -------------------------
+  // A capybara has about eight: the wheek and the purr were the two this game
+  // had, and the purr rewards the rarest state there is. These three are
+  // built from the purr's and the pop's graphs and are what the animal says
+  // ABOUT things — a hard landing, a shove, a bite of something, a person
+  // who has had enough of it. Every one of them is short and under four
+  // nodes; the gap table keeps a caller from stacking two.
+  //
+  //   grunt    one pulse of the purr, low and short: landings, shoves, the barge
+  //   click    three or four pop-shaped ticks up where teeth are: munch, grab, find
+  //   chatter  the teeth going, under an 8-11 Hz gate: denied, shooed, an incident
+  function sfxGrunt(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.9, 1.1) * pitch;
+    const dur = rand(0.16, 0.22);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 320 * v; lp.Q.value = 0.8;
+    const chop = ac.createGain(); chop.gain.value = 0.5;
+    const lfo = ac.createOscillator(); lfo.type = 'sine';
+    lfo.frequency.value = rand(38, 44) * v;
+    const lg = ac.createGain(); lg.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(chop.gain);
+    const out = ac.createGain();
+    env(out, t, 0.16 * vol, 0.018, dur);
+    const o = ac.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(rand(70, 84) * v, t);
+    o.frequency.exponentialRampToValueAtTime(rand(52, 62) * v, t + dur);
+    o.connect(chop); chop.connect(lp); lp.connect(out); out.connect(acMaster);
+    // ...and a breath of noise on the front of it, which is the "h" in "huh"
+    const ns = noiseSrc();
+    const nb = ac.createBiquadFilter(); nb.type = 'bandpass'; nb.frequency.value = 700 * v; nb.Q.value = 1.4;
+    const ng = ac.createGain();
+    env(ng, t, 0.07 * vol, 0.006, 0.03);
+    ns.connect(nb); nb.connect(ng); ng.connect(acMaster);
+    o.start(t); o.stop(t + dur + 0.06);
+    lfo.start(t); lfo.stop(t + dur + 0.06);
+    ns.start(t); ns.stop(t + 0.05);
+  }
+  function sfxClick(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const n = 2 + Math.floor(rand(0, 3.99));
+    let at = t;
+    for (let i = 0; i < n; i++) {
+      const v = rand(0.94, 1.06) * pitch;
+      const o = ac.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(rand(2200, 3100) * v, at);
+      o.frequency.exponentialRampToValueAtTime(1400 * v, at + 0.03);
+      const g = ac.createGain();
+      env(g, at, 0.05 * vol, 0.002, 0.035);
+      o.connect(g); g.connect(acMaster);
+      o.start(at); o.stop(at + 0.06);
+      at += rand(0.055, 0.08);
+    }
+  }
+  function sfxChatter(vol, pitch) {
+    const t = ac.currentTime;
+    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    const v = rand(0.92, 1.08) * pitch;
+    const dur = rand(0.35, 0.5);
+    const ns = noiseSrc();
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 3400 * v; bp.Q.value = 2.0;
+    // the gate: a square LFO into a gain, which is teeth
+    const gate = ac.createGain(); gate.gain.value = 0.5;
+    const lfo = ac.createOscillator(); lfo.type = 'square';
+    lfo.frequency.value = rand(8, 11) * v;
+    const lg = ac.createGain(); lg.gain.value = 0.5;
+    lfo.connect(lg); lg.connect(gate.gain);
+    const out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.09 * vol, t + 0.03);
+    out.gain.linearRampToValueAtTime(0.07 * vol, t + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(bp); bp.connect(gate); gate.connect(out); out.connect(acMaster);
+    ns.start(t); ns.stop(t + dur + 0.05);
+    lfo.start(t); lfo.stop(t + dur + 0.05);
+  }
+
   function ambientStart() {
     if (!ac || acAmbGain) return;
     acAmbGain = ac.createGain();
@@ -14451,7 +14573,7 @@ export function createSystems(game) {
     const ph = (kind === 'arrive') ? sysMUS_PHRASE[musPalN] : null;
     const inst = (ph && ph.inst) ? ph.inst
                : ((musPal && musPal.lead && musPal.lead !== 'none') ? musPal.lead : 'pluck');
-    const when = now + 0.03;
+    const when = musSnap(now + 0.03);
     let g = clamp(typeof k === 'number' ? k : 1, 0, 2);
     if (ph && ph.vel > 0) g *= ph.vel;
     let t = 0;
@@ -14693,6 +14815,22 @@ export function createSystems(game) {
   // a note scheduled at 0 while the clock reads 12 is a note the whole band has
   // to catch up with. Six band schedulers and every voice in the file go
   // through here, so this is the one place it can be guaranteed.
+  // ---- STINGERS IN TIME (L3, E4) -------------------------------------------
+  // The band palettes keep a bar grid — musBarAnchor, musBeatLen — and the
+  // pattern voices swing every stroke against it. The stingers never asked:
+  // a record in Rio at 132 landed anywhere in the sixteenth grid and read as
+  // a UI sound over a band rather than the band answering. Under a band a
+  // one-shot is pushed to the next quaver (at most ~230 ms at 132; the
+  // visual half never waited on the sound anyway); under a pad palette the
+  // grid is zero and this returns the time it was given.
+  function musSnap(t) {
+    if (!musPal || !musPal.band || !(musBeatLen > 0) || !(musBarAnchor > 0)) return t;
+    const q = musBeatLen * 0.5;
+    const k = Math.ceil((t - musBarAnchor) / q);
+    const s = musBarAnchor + k * q;
+    // never more than a quaver away, and never in the past
+    return (s - t > q + 0.001 || s < t) ? t : s;
+  }
   function musFeel(t, spread, bias) {
     const j = t + bias * 0.001 +
               (Math.random() + Math.random() - 1) * spread * 0.001;
@@ -17731,6 +17869,8 @@ export function createSystems(game) {
     geyser: sfxGeyser, berg: sfxBerg, groan: sfxGroan, fluff: sfxFluff,
     // ...and the one the animal makes about itself. See sfxPurr.
     purr: sfxPurr,
+    // ...and three more of its own (L3, E4). See sfxGrunt.
+    grunt: sfxGrunt, click: sfxClick, chatter: sfxChatter,
     // ...and the one every line in the game goes through. See sfxBlip.
     blip: sfxBlip,
   };
@@ -17785,6 +17925,7 @@ export function createSystems(game) {
     // Past its own length, and the loaf timer never asks anywhere near this
     // often — the gap is there so a second caller can never stack two.
     purr: 2.4,
+    grunt: 0.35, click: 0.3, chatter: 0.7,
   };
 
   // The voice ceiling — see the block inside sfx(). Twelve starts inside a
@@ -18493,6 +18634,12 @@ export function createSystems(game) {
   }
   p1El.appendChild(sysEl('div', 'capyui-sub',
     'one capybara, ' + CHAPTERS.length + ' places, no supervision'));
+  // ---- THE SPINE, SAID ONCE (L3, E3) --------------------------------------
+  // Every chapter ends by putting one object at your feet and the finale
+  // lays nineteen of them on a lawn — and nothing ever said so. One line,
+  // under the subtitle, in the game's own voice: the quest is the keepsakes.
+  p1El.appendChild(sysEl('div', 'capyui-why',
+    'it is taking one thing from every place. it has not said why.'));
   {
     const orn = sysEl('div', 'capyui-orn');
     orn.appendChild(sysBuildCapyMark());
@@ -21787,6 +21934,7 @@ export function createSystems(game) {
   // the whole of it: the noun, and where you are in it. The line under the
   // pips still says how long; this says what.
   const pipsLbl = sysEl('span', 'capyui-pipslbl', '');
+  let pipsEye = '';   // the eye's last painted state (L3, F1)
   const pipsRow = sysEl('u');
   const pipsBars = [];
   const pipsWin = sysEl('s');
@@ -22420,7 +22568,24 @@ export function createSystems(game) {
    * field in it, so there is nothing to migrate, nothing that can desync, and
    * no way to be holding one you did not earn.
    */
-  function keepHeld(n) { return chapComplete(n); }
+  // ---- ...AND YOU LEAVE WITH IT (L3, E3) -----------------------------------
+  // It was chapComplete: a keepsake for a chapter with every box ticked, so
+  // the ending — the lawn, the traveller's last line, the ledger's closing
+  // sentence — was behind 234 of 234, while the road on opens at seventy per
+  // cent. The keepsake is the thing the animal takes when it LEAVES: enough
+  // done here, and the way on taken. The last chapter has no way on, so its
+  // keepsake is enough. A hundred per cent still means what it meant — see
+  // sysFinaleFull and the ledger's title.
+  function keepHeld(n) {
+    if (chapComplete(n)) return true;
+    if (!chapEnough(n)) return false;
+    const rec = chapRec[n];
+    if (!rec || !rec.ids.length) return false;
+    const last = rec.ids[rec.ids.length - 1];
+    if (last.indexOf('to-') !== 0) return true;          // no way on: the last place
+    const r = taskRec[last];
+    return !!(r && r.done);
+  }
   function keepCount() {
     let k = 0;
     for (let n = 1; n <= chapMax; n++) if (keepHeld(n)) k++;
@@ -22631,7 +22796,9 @@ export function createSystems(game) {
     if (ledShown) return;
     ledFinal = !!final;
     ledShown = true;
-    ledTitle.textContent = ledFinal ? 'MISCHIEF COMPLETE' : 'THE JOURNEY SO FAR';
+    // MISCHIEF COMPLETE is every box; a thing from every place is the other
+    // ending, and it has its own name (L3, E3)
+    ledTitle.textContent = ledFinal ? (sysFinaleFull() ? 'MISCHIEF COMPLETE' : 'ONE THING FROM EVERY PLACE') : 'THE JOURNEY SO FAR';
     // The old card's line, kept word for word for the one player who gets
     // here — plus the way out that did not used to exist. Reloading was the
     // ONLY thing you could do with the end of this game, and a sandbox whose
@@ -22764,7 +22931,8 @@ export function createSystems(game) {
     if (bm && bm.current === 'sydney') return;   // sysFinaleCheck has it
     sysEndHomeSaid = true;
     setTimeout(function () {
-      toast('everything is ticked. the lawn in Sydney is the last of it.');
+      toast(sysFinaleFull() ? 'everything is ticked. the lawn in Sydney is the last of it.'
+                            : 'a thing from every place. the lawn in Sydney is the last of it.');
     }, 2200);
   }
 
@@ -24989,14 +25157,28 @@ export function createSystems(game) {
     // is a line on the paper saying the road is open, not a hand on the elbow.
     // It only becomes the pointer once the chapter really is finished, which is
     // exactly what it did before.
+    // ---- ...AND FROM THE FIRST MINUTE, DIMMED (L3, E3) --------------------
+    // "How do I leave" had no on-screen answer until seventy per cent. The
+    // row is on the paper from the start, in the clue's grey, saying where
+    // the door is and how many more it wants — so leaving is a choice the
+    // player can see coming rather than a reward they are told about.
     const wayRec = taskRec[sysWAY_ID];
     const wayDone = openIds.length === 0 && chapComplete(n) && !!(cdef && cdef.way);
-    const wayOn = wayDone || (chapEnough(n) && !!(cdef && cdef.way));
+    const wayOpen = chapEnough(n) && !!(cdef && cdef.way);
+    const wayOn = !!(cdef && cdef.way);
     if (wayOn) {
       if (wayDone) top = sysWAY_ID;
       show[sysWAY_ID] = true;
-      const wtxt = 'the way on: ' + cdef.way;
+      let wtxt = 'the way on: ' + cdef.way;
+      if (!wayOpen) {
+        const rec = chapRec[n];
+        let dn = 0;
+        for (let i = 0; i < rec.ids.length; i++) { const r = taskRec[rec.ids[i]]; if (r && r.done) dn++; }
+        const need = Math.max(1, Math.ceil(rec.ids.length * sysCHAP_ENOUGH) - dn);
+        wtxt += ' · after ' + need + ' more';
+      }
       if (wayRec.txt.textContent !== wtxt) wayRec.txt.textContent = wtxt;
+      wayRec.li.classList.toggle('soon', !wayOpen);
     }
     for (let i = 0; i < winIds.length; i++) show[winIds[i]] = true;
     // ---- THE MARQUEE LINE (B1) --------------------------------------------
@@ -27925,6 +28107,11 @@ export function createSystems(game) {
 
   /** Every chapter ticked. A projection, like chapComplete — never a counter. */
   function sysFinaleAll() {
+    for (let k = 1; k <= chapMax; k++) if (!keepHeld(k)) return false;
+    return true;
+  }
+  /** ...and every box in every place: the completionist's variant. */
+  function sysFinaleFull() {
     for (let k = 1; k <= chapMax; k++) if (!chapComplete(k)) return false;
     return true;
   }
@@ -28362,6 +28549,15 @@ export function createSystems(game) {
   // something, or a real fall, dips. Measured against the resting boom, where
   // the look point is about nine and a half metres from the eye, so a metre of
   // drop is six degrees of pitch.
+  // ---- WHAT THE ANIMAL SAYS ABOUT IT (L3, E4) — see sfxGrunt --------------
+  game.events.on('capy:land', function (e) {
+    const f = (e && e.fall) || 0;
+    if (f > 5.5) sfx('grunt', { volume: clamp((f - 4) * 0.12, 0.3, 0.8), pitch: clamp(1.1 - f * 0.02, 0.8, 1.1) });
+  });
+  game.events.on('capy:grab', function () { sfx('click', { volume: 0.5, pitch: 1 }); });
+  game.events.on('capy:graze', function () { sfx('click', { volume: 0.4, pitch: 0.92 }); });
+  game.events.on('capy:incident', function () { sfx('chatter', { volume: 0.55, pitch: 1 }); });
+  game.events.on('npc:escort', function () { sfx('chatter', { volume: 0.8, pitch: 1.05 }); });
   game.events.on('capy:land', function (e) {
     const f = (e && e.fall) || 0;
     if (f <= sysDIP_V0 || sysCalmOn()) return;
@@ -31844,6 +32040,69 @@ export function createSystems(game) {
    * `k` (0..1, default 1) is how much of the shrink this particular animal
    * takes — a jacare is not impressed by anybody being quiet and passes 0.3.
    */
+  // =========================================================================
+  // THE HIDE (L3, F1) — the one verb that answers a person coming for you.
+  //
+  //     game.addHide({ biome: 'kyoto', x, z, r: 2.2, kind: 'bamboo' });
+  //     ...and any module can ask: game.hidden()   // 0..1
+  //
+  // A hide spot is a circle a chapter says the animal cannot be seen in —
+  // under a table, in the reeds, behind a stall, in a doorway. The animal is
+  // HIDDEN when it is inside one and still (ground speed under sysHIDE_V:
+  // a capybara thrashing in a bush is not hidden), or when it is in water
+  // and still — eyes and nose out, the rest under, which is what the animal
+  // actually does. Water needs no registry: capy.swimming is published by
+  // capybara.js in every chapter that has any.
+  //
+  // What reads it: npc.js's march (a marcher who cannot see you walks to
+  // where you were and gives up), and the paper's chain row (an eye that
+  // closes). It is a term, not a state: nothing here changes what the
+  // animal can do, and it damps so the eye does not strobe on the edge of a
+  // bush.
+  // =========================================================================
+  const sysHIDE_V = 0.9;        // m/s: stiller than this counts as hiding
+  const sysHIDE_LAMBDA = 6;     // how fast the published term follows
+  const sysHides = [];
+  let sysHideNow = 0, sysHideKind = '';
+  game.addHide = function (o) {
+    const rec = {
+      biome: (o && o.biome) || (game.biome && game.biome.current) || 'sydney',
+      x: (o && +o.x) || 0, z: (o && +o.z) || 0,
+      r: (o && o.r > 0) ? +o.r : 2.0,
+      kind: (o && o.kind) || 'cover',
+    };
+    sysHides.push(rec);
+    return rec;
+  };
+  /** 0..1: how hidden the animal is right now, damped. */
+  game.hidden = function () { return sysHideNow; };
+  /** The registry, for the harness. */
+  game.hides = function () { return sysHides.slice(); };
+  /** What it is hidden in ('' when it is not), for the row. */
+  game.hiddenIn = function () { return sysHideNow > 0.5 ? sysHideKind : ''; };
+  function hideTick(dt) {
+    const capy = game.capy;
+    let want = 0, kind = '';
+    if (capy && capy.position && started && !capy.carriedBy && !capy.atHelm) {
+      const v = capy.velocity;
+      const spd = v ? Math.hypot(v.x, v.z) : 0;
+      if (spd < sysHIDE_V) {
+        if (capy.swimming) { want = 1; kind = 'the water'; }
+        else {
+          const live = game.biome && game.biome.current;
+          const px = capy.position.x, pz = capy.position.z;
+          for (let i = 0; i < sysHides.length; i++) {
+            const h = sysHides[i];
+            if (h.biome !== live) continue;
+            const dx = px - h.x, dz = pz - h.z;
+            if (dx * dx + dz * dz < h.r * h.r) { want = 1; kind = h.kind; break; }
+          }
+        }
+      }
+    }
+    if (kind) sysHideKind = kind;
+    sysHideNow = damp(sysHideNow, want, sysHIDE_LAMBDA, dt);
+  }
   game.addCritter = function (o) {
     const rec = {
       biome: (o && o.biome) || (game.biome && game.biome.current) || 'sydney',
@@ -34336,10 +34595,18 @@ export function createSystems(game) {
   // and only if a card was earned, and that stays true: being caught on a
   // two-chain that never carded costs nothing but the two, which is right.
   // Zeroing `incT` is what makes incTick run its own ending on the next frame.
-  game.events.on('npc:caught', function () {
+  // ---- THE HIDE WORKED (L3, F1): the marcher lost you; the chain runs on --
+  game.events.on('npc:lost', function () {
+    toast(incT > 0 ? 'lost them. the chain is still open.' : 'lost them.');
+    sfx('tick', { volume: 0.14, pitch: 1.35, force: true });
+  });
+  game.events.on('npc:caught', function (e) {
     if (incT < 0) return;              // no chain open; nothing to end
     // ...and it is SAID what that cost (N1): the chain, and only the chain.
-    if (incN > 0) toast(incCarded > 0 ? 'they reached you. the chain is over — the card stays.'
+    // An authority says it differently: you are being carried out.
+    if (e && e.authority) toast(incCarded > 0 ? 'picked up. the chain is over — the card stays.'
+                                              : 'picked up. the chain is over.');
+    else if (incN > 0) toast(incCarded > 0 ? 'they reached you. the chain is over — the card stays.'
                                       : 'they reached you. the chain is over.');
     incT = 0.0001;                     // ...and incTick does the rest
   });
@@ -34698,6 +34965,7 @@ export function createSystems(game) {
   }
   function incTick(dt) {
     if (incCool > 0) incCool -= dt;
+    hideTick(dt);
     // the rank you start with is not news — seeded on the first frame (N1)
     if (notoSeenTier < 0 && started) notoSeenTier = notoTier();
     if (notoPendT > 0) {
@@ -34772,10 +35040,14 @@ export function createSystems(game) {
     const on = started && incT > 0 && !transBusy && !jrShown && !ledShown &&
                !albShown && !pauseShown && !game.state.paused;
     if (on !== pipsOn) { pipsOn = on; pipsEl.classList.toggle('on', on); }
-    if (!on) { pipsLit = -1; pipsW = -1; return; }
+    if (!on) { pipsLit = -1; pipsW = -1; pipsEye = ''; return; }
     const lit = Math.min(incN, sysINC_N2);
-    if (lit !== pipsLit) {
-      pipsLit = lit;
+    // THE EYE (L3, F1). While somebody is coming, the row says whether they
+    // can see you: "somebody is coming · seen" or "· hidden in the reeds".
+    // A state, written on change like the pips.
+    const eye = incMarchOn ? (game.hidden() > 0.5 ? ('hidden · ' + (game.hiddenIn() || 'out of sight')) : 'seen') : '';
+    if (lit !== pipsLit || eye !== pipsEye) {
+      pipsLit = lit; pipsEye = eye;
       for (let i = 0; i < pipsBars.length; i++) {
         pipsBars[i].classList.toggle('lit', i < lit);
       }
@@ -34786,8 +35058,9 @@ export function createSystems(game) {
       // moment somebody sets off, whatever rung that was, the row says so.
       const st = incMarchOn ? (lit >= sysINC_N2 ? 'A SCENE · ' + sysCHAIN_MARCH : sysCHAIN_MARCH)
                             : (sysCHAIN_STATE[lit] || '');
-      pipsLbl.textContent = lit + ' of ' + sysINC_N2 + (st ? '  ·  ' + st : '');
-      pipsEl.classList.toggle('warn', incMarchOn);
+      pipsLbl.textContent = lit + ' of ' + sysINC_N2 + (st ? '  ·  ' + st : '') + (eye ? '  ·  ' + eye : '');
+      pipsEl.classList.toggle('warn', incMarchOn && eye !== '' && eye.indexOf('hidden') !== 0);
+      pipsEl.classList.toggle('hid', eye.indexOf('hidden') === 0);
     }
     // Quantised to a fortieth, because this is a transform written every frame
     // and a float that never repeats is a style recalculation that never stops.
@@ -38503,13 +38776,18 @@ export function createSystems(game) {
       // Read by musVel, which is the one place a struck note's velocity is
       // decided: an overcast afternoon is a softer touch, not a quieter mix.
       musSkyVel = 1 - skyCloud * sysMUS_SKY_VEL;
+      // ...and somebody talking (L3, E4): 18% off the pad and 220 Hz off the
+      // filter for about a second after a bubble, decayed here because this
+      // block is the one writer. See sfxBlip.
+      musSpeak *= 0.72;
+      if (musSpeak < 0.01) musSpeak = 0;
       sysAudioSet(musPad.gain, musPal.bus * (1 - musIntensity * 0.3) *
         (1 + 0.32 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
-        (1 + skyRain * sysMUS_SKY_BUS),
-        nowA, lift > 0.02 ? 0.6 : 1.2);
+        (1 + skyRain * sysMUS_SKY_BUS) * (1 - 0.18 * musSpeak),
+        nowA, lift > 0.02 ? 0.6 : musSpeak > 0.5 ? 0.35 : 1.2);
       sysAudioSet(musFilt.frequency, Math.max(180,
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
-        musIntensity * 780 + lift * 760 - br * sysMUS_BREATH_CUT - skyCut),
+        musIntensity * 780 + lift * 760 - br * sysMUS_BREATH_CUT - skyCut - 220 * musSpeak),
         nowA, lift > 0.02 ? 0.7 : 1.4);
       // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
       // the moment somebody starts after you. A TERM in the one expression that

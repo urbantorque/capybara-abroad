@@ -4860,6 +4860,9 @@ function caliBuild(game) {
     caliLocBar = game.addLocal({ biome: 'cali', x: caliFLOOR.x + caliFLOOR.r * 0.1,
       y: caliTerrain(caliFLOOR.x, caliFLOOR.z) + 0.20,
       z: caliFLOOR.z + caliFLOOR.r + 1.4, near: 7, face: Math.PI,
+      // THE AUTHORITY (L3, F1): nineteen years behind the bar, and the one
+      // person in the salsoteca whose job it is to put an animal out. See npc.js.
+      authority: true, role: 'the barman',
       figure: { shirt: PALETTE.caliWall4, skin: PALETTE.skin4 },
       // pouring, and he does not measure it
       beat: { kind: 'reach', every: 7.0, dur: 1.2, sfx: 'clink', volume: 0.10 },
@@ -4937,6 +4940,21 @@ function caliBuild(game) {
         ] });
       }
     }
+  }
+
+  // ---- THE AUTHORITY, AND WHERE TO HIDE FROM THEM (L3, F1) ----------------
+  // See THE HIDE in systems.js. Each of these is beside or inside a thing the
+  // chapter already draws, at the expression that draws it: the bougainvillea
+  // over the third door on the north side of the painted street
+  // (caliBuildStreetLife, side = -1, i = 2), the open doorway of the second
+  // house (the light at hx - 2.0 in caliBuildCityLights), the back of the
+  // lulada cart beside the vendor, and a row of the cane field east of town
+  // (caliBuildCane, row 4, the tenth of fourteen z-bands).
+  if (typeof game.addHide === 'function') {
+    game.addHide({ biome: 'cali', x: -44 + 2 * 11 - 2.4, z: caliSTREET_Z - 11 + 5.2 - 0.3, r: 1.8, kind: 'the bougainvillea' });
+    game.addHide({ biome: 'cali', x: -44 + 1 * 11 - 2.0, z: caliSTREET_Z - 11 + 4.5, r: 1.6, kind: 'the doorway' });
+    game.addHide({ biome: 'cali', x: caliLULADA.x + 2.0, z: caliLULADA.z - 1.9, r: 1.8, kind: 'behind the cart' });
+    game.addHide({ biome: 'cali', x: caliCANE.x0 + 4 * 3.1, z: caliCANE.z0 + (10 / 14) * (caliCANE.z1 - caliCANE.z0), r: 3.0, kind: 'the cane' });
   }
 
   if (typeof game.registerShadowTarget === 'function') game.registerShadowTarget(caliRoot);
