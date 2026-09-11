@@ -4921,11 +4921,17 @@ function panUpdateCaimans(game, dt) {
     }
     // ---- the hunter, and the one that has just gone under (W1) ------------
     let cx = c.x, cz = c.z, cyaw = c.yaw0;
+    // ...and O Grandão between rounds (X4): under, on its way round, not
+    // lying back on its bank at one times the size until it resurfaces
+    const bossUnder = panHuntOn && i === panHuntI && panBossUnder > 0;
     if (c.hunt) {
       cx = c.hx; cz = c.hz; cyaw = c.hyaw;
       y = panWATER - 0.20 + Math.sin(panTime * 3.1 + c.ph) * 0.03;
       pitch = 0.04; roll = Math.sin(panTime * 2.2 + c.ph) * 0.04;
       c.gape = damp(c.gape, 0, 5, dt);
+    } else if (bossUnder) {
+      cx = c.hx; cz = c.hz; cyaw = c.hyaw;
+      y = panWATER - 2.5;
     } else if (c.gone > 0) {
       c.gone -= dt;
       y = panWATER - 2.5;           // under, out of sight, on its way home
@@ -4937,7 +4943,7 @@ function panUpdateCaimans(game, dt) {
     // digs the tail in, and at 12 degrees over a 3.4 m body that is 35 cm of
     // tail underground. So the pitch is small and the animal is RAISED with it.
     // O Grandão (X4): the hunter is drawn at twice the size — the big one
-    const bs = c.hunt ? panBOSS_SCALE : 1;
+    const bs = (c.hunt || bossUnder) ? panBOSS_SCALE : 1;
     panM.compose(panV3.set(cx, y + c.gape * 0.05, cz),
                  panQ.setFromEuler(panE.set(pitch - c.gape * 0.055, cyaw, roll)),
                  panSc.set(bs, bs, bs));

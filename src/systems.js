@@ -19848,7 +19848,7 @@ export function createSystems(game) {
   // with no natural length and the bar stays off). Every frame, like
   // recordLive, and closed by the watchdog like recordLive. Read by the
   // signpost, the score's bed and the composite; nothing here gates anything.
-  let wowLiveLine = '';
+  let wowLiveLine = '', wowLivePaintT = 1;
   let wowLiveT = -1;
   let wowLiveSince = 99;
   let wowLiveOn = false;
@@ -21487,14 +21487,17 @@ export function createSystems(game) {
           const tw = g2.measureText(wt).width;
           const padX = 6 * s, padY = 3 * s, edge = 3 * s;
           const bw = tw + padX * 2, bh = fs + padY * 2;
-          const tx = clamp(wx, bw * 0.5 + edge, w - bw * 0.5 - edge);
+          let tx = clamp(wx, bw * 0.5 + edge, w - bw * 0.5 - edge);
           // BELOW the door normally; ABOVE it whenever the door is in the
           // lower third, because the bottom centre of this chart is where the
           // distance readout lives and two pills on top of each other is
           // worse than a label on the wrong side of a ring.
           let below = wz < w * 0.66;
           const off = 5.2 * u + bh * 0.5;
-          const place = (b) => clamp(wz + (b ? 1 : -1) * off, bh * 0.5 + edge, w - bh * 0.5 - edge);
+          // ...and never over the distance pill, which lives on the bottom edge:
+          // the floor is one pill height above it (Iceland, 8 m from the pier,
+          // read as "th 8.0 m ne pier" — L3)
+          const place = (b) => clamp(wz + (b ? 1 : -1) * off, bh * 0.5 + edge, w - bh * 1.6 - edge);
           let ty = place(below);
           // ---- AND IT NEVER COVERS WHERE YOU ARE ---------------------------
           // MEASURED in Venice, where the molo is about twenty metres from the
@@ -21510,6 +21513,14 @@ export function createSystems(game) {
           if (hits(ty)) {
             const alt = place(!below);
             if (!hits(alt)) { below = !below; ty = alt; }
+            else {
+              // ...and when the door is in the bottom of the chart and you are
+              // standing at it — the end of the pier in Iceland — neither side
+              // is clear, so the pill goes ABOVE YOU: the one place that is
+              // clear of you by construction, and still next to the door (L3)
+              const up = pz - (3.4 * u + bh * 0.5 + 2 * s);
+              if (up > bh * 0.5 + edge) ty = up;
+            }
           }
           g2.fillStyle = sysRgba(PALETTE.sail, 0.86);
           g2.beginPath();
@@ -22269,7 +22280,7 @@ export function createSystems(game) {
       el.classList.remove('in');
       el.classList.add('out');
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
-    }, sysTOAST_HOLD[k]);
+    }, sysTOAST_HOLD[k] + (k === 'last' ? 0 : Math.max(0, String(text).length - 40) * 38));
     // ---- AND THE FOURTH TOAST LETS THE FIRST ONE GO, RATHER THAN DELETING IT
     // This was `while (children.length > 4) removeChild(firstChild)`: the
     // oldest pill was torn out of the document mid-frame with no `.out` on it,
@@ -34632,6 +34643,9 @@ export function createSystems(game) {
         else if (incN >= sysINC_N - 1) sfx('tick', { volume: 0.11, pitch: 0.70 });
         incN = 0; incCarded = 0; incMarchOn = false;
         repEv.length = 0;   // Q1
+        // ...and npc.js hears it, so a march it still owes is not started
+        // for a chain that has already closed (L3 audit)
+        game.events.emit('capy:chain-end', null);
       }
     }
     incPaint();
@@ -36142,7 +36156,11 @@ export function createSystems(game) {
       if (!wl) { wowLiveBar = -1; marqLiveEl.textContent = ''; }
     }
     if (wl) {
-      if (marqLiveEl.textContent !== wowLiveLine) marqLiveEl.textContent = wowLiveLine;
+      // ...at eight a second, not sixty: the five vehicle marquees rewrite the
+      // metres every frame, and a text node replaced per frame is a layout
+      // per frame (L3 audit)
+      wowLivePaintT += (game.state.rawDt || dt);
+      if (wowLivePaintT >= 0.12 && marqLiveEl.textContent !== wowLiveLine) { marqLiveEl.textContent = wowLiveLine; wowLivePaintT = 0; }
       const hasBar = wowLiveT >= 0;
       marqEl.classList.toggle('bar', hasBar);
       if (hasBar) {

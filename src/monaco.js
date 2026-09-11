@@ -2785,6 +2785,30 @@ function monCarTarget(s) {
   return clamp(v, monCAR_VMIN, monCAR_VMAX);
 }
 
+/**
+ * PUT A CAR SOMEWHERE — the target and the body together. The updater below
+ * differences the body's velocity against the PREVIOUS TARGET (RULE 3), so a
+ * caller that rewrites monCarU alone leaves a one-frame velocity of the whole
+ * jump, and at 120 Hz world.step runs no substep on that frame and the jump is
+ * simply lost: the drawn car stays where it was and the race logic holds you
+ * behind a car three hundred metres away. Found by the L3 audit.
+ */
+function monCarPlace(i, u, v) {
+  monCarU[i] = u; monCarV[i] = v;
+  monTrackAt(u, monTrackTmp);
+  const lc = Math.cos(monTrackTmp.yaw), ls = Math.sin(monTrackTmp.yaw);
+  const tx = monTrackTmp.x + monCarLat[i] * lc, tz = monTrackTmp.z - monCarLat[i] * ls;
+  monCarTX[i] = tx; monCarTZ[i] = tz;
+  monCarTY[i] = monTrackTmp.y + monCAR_HY;
+  monCarYaw[i] = monTrackTmp.yaw;
+  const b = monCarBody[i];
+  if (!b) return;
+  b.position.set(tx, monTrackTmp.y + monCAR_HY, tz);
+  b.quaternion.setFromEuler(0, monTrackTmp.yaw, 0);
+  b.velocity.setZero(); b.angularVelocity.setZero();
+  monSyncBody(b);
+}
+
 function monUpdateCars(game, dt) {
   if (!monCarG.length || dt <= 0) return;
   const capy = game.capy;
@@ -2828,6 +2852,8 @@ function monUpdateCars(game, dt) {
       if (gap > 0 && gap < monCAR_SEE) want = Math.min(want, monCarV[j] * 0.98);
       else if (gap >= monCAR_SEE && gap < monCAR_TOW) want *= monCAR_TOW_K;
     }
+    // ...and a grid is a grid: nobody moves until the lights go out
+    if (monRaceOn && monRaceT < 0) want = 0;
     const a = want > monCarV[i] ? monCAR_ACC : -monCAR_BRAKE;
     monCarV[i] = a > 0 ? Math.min(want, monCarV[i] + a * dt)
                        : Math.max(want, monCarV[i] + a * dt);
@@ -2908,8 +2934,7 @@ function monRaceTake(game) {
   // the pack: set off ahead of you, staggered across the road, from a
   // standing start — a grid, not a rolling lap
   for (let j = 0; j < monCarG.length; j++) {
-    monCarU[j] = (monMeLineS() + 2 + j * 8) % monTrackTotal;
-    monCarV[j] = 0;
+    monCarPlace(j, (monMeLineS() + 2 + j * 8) % monTrackTotal, 0);
     monRaceAhead[j] = true;
   }
   monSfx('chime', { volume: 0.6, pitch: 0.9 });
@@ -2922,7 +2947,10 @@ function monRaceLeave(game) {
   if (capy && capy.body) {
     // out of the door, onto the road beside the car, standing still
     const c = Math.cos(monMeYaw), sn = Math.sin(monMeYaw);
-    const ox = monMeTX + 2.4 * c, oz = monMeTZ - 2.4 * sn;
+    // ...and on the barrier side of the road the door opens toward the middle,
+    // or the Armco has you (lat + 2.4 at the hairpin is the barrier line)
+    const side = monMeLat > monME_LAT - 1 ? -2.4 : 2.4;
+    const ox = monMeTX + side * c, oz = monMeTZ - side * sn;
     capy.body.position.set(ox, monMeTY + 0.9, oz);
     capy.body.velocity.set(0, 0, 0);
     capy.body.previousPosition.copy(capy.body.position);
@@ -4938,19 +4966,7 @@ export function createMonaco(game) {
       monArrived = false;
       // the cars go back onto their spacing, because three cars that have
       // drifted into a queue over ten minutes is not a session, it is a jam
-      for (let i = 0; i < monCarG.length; i++) {
-        monCarU[i] = (i / monCAR_N) * monTrackTotal;
-        monCarV[i] = monCAR_VMAX * 0.5;
-        monTrackAt(monCarU[i], monTrackTmp);
-        monCarTX[i] = monTrackTmp.x; monCarTZ[i] = monTrackTmp.z;
-        monCarTY[i] = monTrackTmp.y + monCAR_HY;
-        monCarYaw[i] = monTrackTmp.yaw;
-        const b = monCarBody[i];
-        b.position.set(monTrackTmp.x, monTrackTmp.y + monCAR_HY, monTrackTmp.z);
-        b.quaternion.setFromEuler(0, monTrackTmp.yaw, 0);
-        b.velocity.setZero(); b.angularVelocity.setZero();
-        monSyncBody(b);
-      }
+      for (let i = 0; i < monCarG.length; i++) monCarPlace(i, (i / monCAR_N) * monTrackTotal, monCAR_VMAX * 0.5);
       // ...AND THE TOWER IS STACKED AGAIN. Once per visit, not once per
       // session: the tick on the list stays ticked and the SHOW replays, for
       // the same reason the cars are back on their spacing.

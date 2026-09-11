@@ -1220,7 +1220,7 @@ export function createNPCs(game) {
     'z-index:30;' +
     'display:none;opacity:0;white-space:nowrap;' +
     'font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;' +
-    'font-weight:600;font-size:15px;line-height:1.15;padding:7px 13px 8px;border-radius:7px;' +
+    'font-weight:600;font-size:calc(15px * var(--capyui-t,1));line-height:1.15;padding:7px 13px 8px;border-radius:7px;' +
     'background:' + bubPaper + ';color:' + npcCssHex(PALETTE.ibisHead) + ';' +
     'background-image:linear-gradient(158deg,' + npcCssRgba(PALETTE.sail, 1) + ' 0%,' +
     npcCssRgba(PALETTE.sandstone, 0.34) + ' 100%),' +
@@ -4819,6 +4819,7 @@ export function createNPCs(game) {
    * THE RUNGS OF THE CHAIN. systems.js emits one of these per witnessed thing
    * and owns what a chain is worth; this owns what a square does about one.
    */
+  game.events.on('capy:chain-end', function () { marOwed.t = 0; });
   game.events.on('capy:chain', function (e) {
     if (!e || !game.state.started) return;
     const live = game.biome && game.biome.current;

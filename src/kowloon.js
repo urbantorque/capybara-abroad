@@ -1372,7 +1372,11 @@ function hkHeliLeave(game) {
   hkHeliOn = false; hkHeliCool = 0.4;
   if (capy) capy.atHelm = false;
   if (capy && capy.body) {
-    const ox = hkHeliX + 2.2 * Math.cos(hkHeliYaw), oz = hkHeliZ - 2.2 * Math.sin(hkHeliYaw);
+    let ox = hkHeliX + 2.2 * Math.cos(hkHeliYaw), oz = hkHeliZ - 2.2 * Math.sin(hkHeliYaw);
+    // the door opens onto the deck, never over its edge
+    const dx0 = hkSCAF.x - 8.6;
+    if (ox < dx0 - 8.6) ox = dx0 - 8.6; else if (ox > dx0 + 8.6) ox = dx0 + 8.6;
+    if (oz < -15) oz = -15; else if (oz > 15) oz = 15;
     capy.body.position.set(ox, hkROOF_Y + 0.9, oz);
     capy.body.velocity.set(0, 0, 0);
     capy.body.previousPosition.copy(capy.body.position);
@@ -1388,7 +1392,10 @@ function hkUpdateHeli(game, dt) {
   if (!hkHeliG || dt <= 0) return;
   const input = game.input, capy = game.capy;
   if (hkHeliCool > 0) hkHeliCool -= dt;
-  const onPad = Math.hypot(hkHeliX - hkHELI.x, hkHeliZ - hkHELI.z) < hkHELI_ROOF_R && hkHeliY < hkROOF_Y + 0.6;
+  // ...and the pad is the DECK: the disc round the H hangs two metres over
+  // the deck's edge, and getting out there was a 34 m fall (L3 audit)
+  const onPad = hkOverDeck(hkHeliX, hkHeliZ) &&
+                Math.hypot(hkHeliX - hkHELI.x, hkHeliZ - hkHELI.z) < hkHELI_ROOF_R && hkHeliY < hkROOF_Y + 0.6;
   // ---- the door -----------------------------------------------------------
   if (capy && capy.body && input && input.actionPressed && hkHeliCool <= 0) {
     if (hkHeliOn) {

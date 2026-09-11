@@ -1555,6 +1555,9 @@ function sahBuildKoutoubia(game, root) {
   mesh.castShadow = true; mesh.receiveShadow = true;
   root.add(mesh);
   sahStaticBox(game, sahKOUTOUBIA.x, H * 0.5, sahKOUTOUBIA.z, 8.4, H, 8.4);
+  // ...and the lantern, because the jetpack lands on top of it and the animal
+  // gets off there (X3): a floor at H + 5.8, not a drawing of one
+  sahStaticBox(game, sahKOUTOUBIA.x, H + 2.9, sahKOUTOUBIA.z, 5.2, 5.8, 5.2);
 
   // the walled garden at its foot, which is the only shade in the medina
   const GM = sahMerger();
@@ -5431,6 +5434,10 @@ function sahUpdateSurf(game, dt) {
   // first descent meant `dune-surf`, a `better: 'higher'` record, could only
   // ever hold the speed of the very first attempt.
   if (!capy || !capy.position) return;
+  // ...and not from the air: a flight over the erg with the pack on is not a
+  // descent, and it was arming this, sampling the jet velocity as the speed
+  // and writing a `higher` record from a flight (X3, L3 audit)
+  if (sahJetOn || capy.atHelm) { sahSurfT = -1; return; }
 
   const p = capy.position;
   const sp = capy.velocity ? Math.hypot(capy.velocity.x, capy.velocity.z) : 0;
