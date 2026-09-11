@@ -8602,6 +8602,10 @@ function sysBuildCSS() {
 '.capyui-setval{flex:0 0 34px;text-align:right;font-size:clamp(10px,1.8vw,11px);',
   'color:' + inkSoft + ';font-weight:700;font-variant-numeric:tabular-nums;}',
 /* the calm switch, which is a label wrapping a real checkbox */
+/* the journey's own row (L3, E5): two small buttons and a word */
+'.capyui-setsave{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;}',
+'.capyui-setsave .capyui-setnote{margin:0;flex:1 1 100%;}',
+'.capyui-pausebtn.small{padding:5px 10px;font-size:' + tMd + ';width:auto;}',
 '.capyui-setcalm{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer;',
   'font-size:clamp(10.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.06em;touch-action:manipulation;}',
@@ -19888,6 +19892,58 @@ export function createSystems(game) {
 
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
     'kept on this machine, not in the journey.'));
+  // ---- THE JOURNEY CAN LEAVE THE MACHINE (L3, E5) --------------------------
+  // The save is one localStorage key, and a three-hour game behind a cleared
+  // browser is gone. Two buttons: the journey goes to the clipboard as its
+  // own JSON, and a journey on the clipboard replaces this one (after a
+  // confirm, and after the current one is copied out first — no save is
+  // destroyed by a paste). Both are user gestures, which is what the
+  // clipboard wants. Reload after a paste, because the paper, the tallies
+  // and the shelf are all built from the file at boot.
+  {
+    const row = sysEl('div', 'capyui-setsave');
+    const copy = sysEl('button', 'capyui-pausebtn small', 'copy the journey');
+    copy.type = 'button';
+    const paste = sysEl('button', 'capyui-pausebtn small', 'paste a journey');
+    paste.type = 'button';
+    const note = sysEl('span', 'capyui-setnote', '');
+    for (const b of [copy, paste]) b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    copy.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      let raw = '';
+      try { raw = localStorage.getItem(sysSAVE_KEY) || ''; } catch (err) { raw = ''; }
+      if (!raw) { note.textContent = 'nothing on the file yet.'; return; }
+      const done = function () { note.textContent = 'copied. keep it somewhere.'; };
+      const fail = function () { note.textContent = 'the clipboard said no.'; try { window.prompt('the journey, as text:', raw); } catch (err) {} };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(raw).then(done, fail);
+      else fail();
+    });
+    paste.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      const take = function (txt) {
+        let ok = false;
+        try { const o = JSON.parse(txt); ok = !!(o && typeof o === 'object' && Array.isArray(o.tasks)); } catch (err) { ok = false; }
+        if (!ok) { note.textContent = 'that is not a journey.'; return; }
+        if (!window.confirm('replace the journey on this machine with the one on the clipboard? the current one is copied to the clipboard first.')) return;
+        let cur = '';
+        try { cur = localStorage.getItem(sysSAVE_KEY) || ''; } catch (err) {}
+        const put = function () {
+          try { localStorage.setItem(sysSAVE_KEY, txt); } catch (err) { note.textContent = 'could not write it.'; return; }
+          note.textContent = 'pasted. reloading.';
+          setTimeout(function () { location.reload(); }, 600);
+        };
+        if (cur && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(cur).then(put, put);
+        else put();
+      };
+      if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(take, function () {
+        const t = window.prompt('paste the journey here:'); if (t) take(t);
+      });
+      else { const t = window.prompt('paste the journey here:'); if (t) take(t); }
+    });
+    row.appendChild(copy); row.appendChild(paste); row.appendChild(note);
+    pauseSet.appendChild(sysEl('div', 'capyui-setsplit', 'and the journey itself'));
+    pauseSet.appendChild(row);
+  }
   pauseCard.appendChild(pauseSet);
   const pauseFoot = sysEl('div', 'capyui-pausefoot',
     sysScheme('esc to resume', 'tap RESUME, or anywhere outside the card'));
