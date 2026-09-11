@@ -8147,7 +8147,7 @@ function sysBuildCSS() {
 '.capyui-todo.away{width:clamp(150px,26vw,240px);padding:7px 12px 8px;transform:rotate(-1.2deg) scale(.96);}',
 '.capyui-todo.away .capyui-tab{display:flex;}',
 '.capyui-todo.away > :not(.capyui-tab){display:none;}',
-'.capyui-todo{transition:opacity ' + dSlow + ' ease, width ' + dMed + ' ease, transform ' + dMed + ' ease;}',
+'.capyui-todo{transition:opacity ' + dSlow + ' ease, transform ' + dMed + ' ease;}',
 '.capyui-todo:before{content:"";position:absolute;left:14%;right:14%;top:-7px;height:14px;',
   'background:' + sand + ';opacity:.85;transform:rotate(-1.2deg);border-radius:' + rSm + ';',
   'box-shadow:' + shSm + ';}',
@@ -19921,6 +19921,7 @@ export function createSystems(game) {
     const paste = sysEl('button', 'capyui-pausebtn small', 'paste a journey');
     paste.type = 'button';
     const note = sysEl('span', 'capyui-setnote', '');
+    note.setAttribute('aria-live', 'polite');
     for (const b of [copy, paste]) b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     copy.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();

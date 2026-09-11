@@ -1,3 +1,128 @@
+## THE THIRD LIFT — THE AUTHORITY AND THE HIDE, THE MELODY, AND THE FRAME GIVEN A DARK (L3 — 12 Sep 2026)
+
+Asked for: a game that is functional and enjoyable lifted to memorable —
+three to five areas of enhancement and one or two features that change what
+the game is. Five review agents (design, art, audio, writing/UX, QA) read the
+tree and 41 settled frames; ROADMAP-LIFT3.md is the synthesis. Eight commits,
+L3-0 to L3-6d; every batch measured under playwright and `npm test` green.
+
+### F1. THE AUTHORITY, AND THE HIDE (L3-3)
+
+Fifteen of nineteen chapters had nobody who could do anything to you: the
+ladder climbed, a marcher walked over, and reaching you cost a line and a
+lunge. **One local per chapter is `authority: true` with a `role`** (the monk,
+the deckhand, the barman, the lifeguard, the verger, the storyteller, the
+lantern keeper, the waiter, the fishmonger, the boatman, the field marshal,
+the fazendeiro, the expedition leader, the station leader, the doorman, the
+usher). From the go rung on they take the march if inside `npcAUTH_R` (40 m,
+a witness needs 18), walk at 1.3×, keep at it 18 s, are let 34 m from their
+pitch, and may set off mid-line. On reaching you they PICK YOU UP — the
+gardener's carry, `capy.carriedBy` — and walk you `npcAUTH_ESC_D` (9 m) toward
+the chapter's spawn (the spawn itself if it is within 26 m), put you down with
+a toss, a line and `put down by the monk.` The held prop stays where it fell;
+nothing ticked is lost; `npc:caught` carries `authority: true` so the toast
+says *picked up*. Sydney and Pasto keep their bespoke rosters (the gardener
+has carried the animal out since chapter one).
+
+**The hide is the answer.** `game.addHide({biome, x, z, r, kind})` — eighty-odd
+spots across seventeen chapters, every one on a constant that already places
+a visible thing (the reeds, under the table, the doorway, behind the stall,
+the bamboo, among the penguins) — and water everywhere, no registration:
+`capy.swimming` and still. `game.hidden()` is 0..1, damped at λ 6, only while
+the ground speed is under 0.9 m/s. A marcher who cannot see you walks to
+where you were last seen and after `npcHIDE_LOSE` (2.6 s) gives up with a
+line (*Where did it go.*), `npc:lost`, and the toast *lost them. the chain is
+still open.* **The chain row is an eye**: `somebody is coming · seen` in
+amber, `hidden · under the noren` in green. Proved by qa/l3-authority.js:
+Kyoto's monk carried the animal 9.1 m with the tally unchanged; a hide spot
+ended the march with no carry in Kyoto, Hanoi and Venice.
+
+### F2. THE MELODY (L3-4)
+
+Every lead pluck was `ch[randInt(0, ch.length - 1)]`. The lead keeps a
+degree now (two octaves of the chord) and walks: a step 60%, a leap of two or
+three 25%, a repeat 15% (`musMelPick`); every branch of the pluck loop reads
+it in its own register. Every fifth to eighth pluck is a **cell** —
+`sysMUS_CELLS`, six shapes in chord-degree space, the arrival's own
+long-short-short-long among them — through `musLiftNote` on the palette's
+lead. Measured (qa/l3-melody.js): one-step intervals 0.6–0.7 of all changes
+(dice on a five-note chord: ~0.3); a cell every 25–40 s. No new node; in key
+by construction; bands untouched.
+
+### E1. THE FRAME HAS A DARK (L3-2)
+
+Measured with qa/l3-luma.mjs (the frame in three bands, HUD excluded) against
+qa/l3-before: every daylight frame's far band within a few points of its
+middle band, sd 16–20, p05 never under 90 in five chapters. In Palawan with
+the composite air OFF the far band went darker by twelve points and the sky
+from grey to blue — the pale air at 0.17 was the wash. So: two terms on the
+composite weighted by the view ray's elevation (`uAirGnd`: the air colour on
+a ground ray is 0.6 of the fog; `uFarDark`: a value drop over the far metres,
+`sysFAR` per chapter); the sky keeps 15% of the air; the daylight `airMax`
+halved and the near blur off the ground in front of the animal (`nearK`
+halved). Night: Iceland/Drift/Kowloon ambient down a third and the blacks
+lifted onto blue through `uLift` (`sysNIGHT_LIFT`), which had been plumbed
+since v40 and never set. Kowloon's threshold 0.32 → 0.48 (the signs had no
+lettering); Antarctica exposure 1.08. Palawan far mean 138 → 127, sd 19 → 24.
+
+### E2. THE GROUND AND THE GAIT (L3-6a/d)
+
+The gait was a pendulum. `capyGait`: a stance that is the slow 60% with the
+sole down and the leg sweeping back linearly, a swing that is the fast 40%
+with the shin shortened about the hip (`legs[i].scale.y`, 0.84 at the top)
+and the toes trailing; the bob at mid-stance. Head leads a turn, tail trails
+it, ears flop forward as the landing spring bottoms. Measured 61% planted.
+**Cloud shadows**: a drifting two-octave value field at ~12 m in every grained
+material (`cloud` in grain(), `_cloudK` written each frame from the sun's
+share of the light and the weather's pulse; none at night, in the cave, or
+under prefers-reduced-motion). A first cut at 28 m cells sat inside one cell
+and measured as nothing. **Floor graphics**: kerbs, gutters, joints, manholes,
+crossings, tar in Kyoto, Cali, Iceland, Hanoi; rib joints, wet lip, drains,
+fondamenta band in Venice; tide lines, damp band, wrack in Palawan — one
+merged mesh each, on the chapter's material, off its terrain.
+
+### E3. THE SPINE AND THE VOICE (L3-3/5)
+
+The title says the quest: *it is taking one thing from every place. it has
+not said why.* The way-on row is on the paper from the first minute, dimmed,
+with how many more it wants. `keepHeld` = enough here and the way on taken
+(the last chapter: enough); `sysFinaleAll` is a keepsake from every place and
+`sysFinaleFull` keeps MISCHIEF COMPLETE for every box (the other ending is
+ONE THING FROM EVERY PLACE). Nineteen cross-chapter lines in the authorities'
+mouths, keyed `after:` a wow elsewhere; the Hanoi traveller counts only the
+meetings that happened (`game.travMet()`); the startled/rush pools in the
+game's register.
+
+### E4. THE ANIMAL'S WORDS, THE BAND IN TIME (L3-3)
+
+`grunt` (barge, hard landing), `click` (grab, graze), `chatter` (incident,
+pickup); footfalls alternate sides ±0.07 and walk heel-then-toe. `musSnap`:
+stingers and ticks to the band's next quaver. `musSpeak`: the blip ducks the
+pad 18% and the filter 220 Hz, decayed in the one writer block.
+
+### E5. THE HAND ON THE WHEEL (L3-1/6b/6c/6d)
+
+The audit's eight (Monaco's pack placed as bodies, the grid waits for the
+lights, the door opens toward the middle; the minaret top solid; the surf not
+armed under the jetpack; O Grandão under between rounds; the heli pad is the
+deck; an owed march dies with its chain); the live line at 8 Hz; the chart's
+label above you when neither side of the door is clear; bubbles honour the
+text-size setting; toasts hold for length; the paper tucks after 4 s of
+walking to one line (tally · row · arrow · metres); copy/paste the journey on
+the settings card; the pad's legend on the title; the world clock stops under
+the pause card.
+
+### STILL OPEN
+
+Hanoi's authored asphalt quads are wound face-down and have never drawn (the
+road is the ground's vertex-colour lerp) — fixing it darkens every road, so it
+is a decision. The errand (people carrying things A→B through the barge
+layer), the skill-gated rows, the wardrobe on the pause card, costume reads,
+the herd as a witness, notoriety that can go down, the mouths on the roster,
+the Sahara crowd's cones, per-palette pad spectra and a moving bass, occlusion
+on movers, the world route map — all in ROADMAP-LIFT3.md's source reports and
+not started.
+
 ## THE BIG ONES, LIFTED AGAIN — FIVE RIDICULOUS ONES, AND THE LADDER SAID OUT LOUD (X1–X5, N1, L1–L10 — 11 Sep 2026)
 
 Asked for: every marquee up another notch, five or so of them "ridiculous" —
