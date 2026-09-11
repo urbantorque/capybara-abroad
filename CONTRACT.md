@@ -133,6 +133,10 @@ Re-read and left alone, with the reason: Pasto/Rio (a bird that does not flap st
 
 `qa/w4-climb.js`, `qa/w4-ease.js`.
 
+### W5 — THREE LINES (11 Sep 2026)
+
+Playtest: *"capture the instructions succinctly; the card is distracting when it is full of text."* Measured on the Cali card: name, a two-line sentence, a four-line how, a two-line where — eleven lines before the act heading. Now the signpost is NAME · one instruction · one place: the sentence hides whenever a how is up (the how says the same thing as a step; the sentence is the row's and the banner's), the "how:" label went, every marquee clue was cut to one line (state-aware ones show only the current step: *hold E — grab the talons*), and the nineteen  captions are place names — *the party bus · 110 m*, not *the party bus. it goes up the hill and it does not wait · 110 m*.  keeps any longer caption to its first sentence.
+
 ### TEST HOOKS ADDED
 
 `env.concertAudit()` · `kyoto.chuteAt(back)` · `quay.headsK()` / `quay.boatDebugTo(x, z)` · `venice.phaseDebug(p)` · `manly.barrelDebug(force)` · `pantanal.huntDebug()` / `pantanal.herdFollow(n)` · `sahara.dustDebug()` · `cali.fireworksDebug()`. Probes: `qa/w1-sydney.js`, `qa/w1-condor.js`, `qa/w1-marquees.js`, `qa/w1-venice.js`, `qa/w1-batch2.js`, `qa/w1-pan-dbg.js`, `qa/w1-barrel-dbg.js`, `qa/w1-cali-dbg.js`.
