@@ -345,6 +345,20 @@ let antSprayMesh = null, antSprayData = null;
 let antSprayT = 0;
 // the breach: once, at the top of the ride, and it is the marquee's marquee
 let antBreachT = -1, antBreachIdx = 0, antBreachDone = false;
+// ---- AND THEN THE REST OF THEM (W1) ----------------------------------------
+// The bull breaches once, at two thirds of the hold, and the tick at the end
+// of it was a chime and a card. Now the tick is answered by the pod: three
+// more come out one after the other alongside the boat, six tenths of a
+// second apart, so the moment the paper says THE ORCA POD is the moment the
+// water round the tender is full of them. A queue, drained by the same breach
+// animation, so nothing about how a breach looks changed.
+const antBreachQueue = [];
+let antBreachWait = 0;
+function antPodAnswers() {
+  antBreachQueue.length = 0;
+  antBreachQueue.push(1, 2, 3);
+  antBreachWait = 0.3;
+}
 // A ONE-SHOT PAYOUT NEEDS A STATE MEANING ALREADY PAID. See antPodRide.
 let antRideDone = false;
 // the wave off a calving face, which lifts the boat
@@ -4287,10 +4301,15 @@ function antUpdatePod(game, dt) {
       antPodRide += dt;
       if (antPodRide > antPodBest) antPodBest = antPodRide;
       antLive('orca-ride', antPodRide);
+      if (!antRideDone && typeof game.wowLive === 'function') {
+        game.wowLive('with the pod, running · ' + antPodRide.toFixed(1) + ' s of ' + antPOD_RIDE + ' · ' +
+                     gap.toFixed(0) + ' m off them', clamp(antPodRide / antPOD_RIDE, 0, 1));
+      }
       if (antPodRide >= antPOD_RIDE && !antRideDone) {
         antRideDone = true;
         antRecord('orca-ride', antPodBest);
         antTask('orca-ride');
+        antPodAnswers();                                   // W1
         if (typeof game.frameShot === 'function')
           game.frameShot({ yaw: antBoatYaw + Math.PI, dist: 26, pitch: 0.24,
                            raise: 6.5, hold: 3.2, over: true });
@@ -4376,6 +4395,7 @@ function antUpdatePod(game, dt) {
         antRideDone = true;
         antRecord('orca-ride', antPodBest);
         antTask('orca-ride');
+        antPodAnswers();                                   // W1
         // FRAMED — chapters 12-17 asked for a shot in none of their marquees.
         // Measured at the tick: the camera sits dead astern (yaw = heading +
         // 180.0 deg, held to a tenth of a degree for the whole ride), 22.05 m
@@ -4447,6 +4467,19 @@ function antUpdatePod(game, dt) {
   if (antBreachT >= 0) {
     antBreachT += dt;
     if (antBreachT > 2.6) antBreachT = -1;
+  }
+  // the queue (W1): the next one goes when the last is clear of the water
+  if (antBreachQueue.length && antBreachT < 0) {
+    antBreachWait -= dt;
+    if (antBreachWait <= 0) {
+      antBreachIdx = antBreachQueue.shift();
+      antBreachT = 0;
+      antBreachWait = 0.6;
+      antSfx('splash', placeCue({ volume: 0.58, pitch: 0.40, force: true },
+                                antPodX[antBreachIdx] || antPodCX, antWATER,
+                                antPodZ[antBreachIdx] || antPodCZ, 150));
+      if (typeof game.shake === 'function') game.shake(0.08);
+    }
   }
 
   // ---- each animal --------------------------------------------------------
@@ -5941,7 +5974,7 @@ export function createAntarctic(game) {
       // ticked (that is systems.js's business); the SHOW replays, for the same
       // reason the tender is alongside and stopped again — a second visit that
       // is scenery is the bug chapter 3 shipped with.
-      antBreachT = -1; antBreachDone = false; antRideDone = false;
+      antBreachT = -1; antBreachDone = false; antRideDone = false; antBreachQueue.length = 0;
       antSprayT = 0;
       if (antSprayData) for (let i = 0; i < antSPRAY_N; i++) antSprayData[i * 7 + 6] = 1e9;
       if (antCalveBits) antCalveBits.visible = false;

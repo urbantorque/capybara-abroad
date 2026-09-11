@@ -252,6 +252,111 @@ let panToldWheek = false, panToldMat = false, panToldCaiman = false;
 let panCaimanSit = 0;
 // which one you are on, and the beat before it opens an eye. See panUpdateTasks.
 let panCaimanSat = -1, panCaimanNotice = 0;
+// ---- THE ONE IN THE WATER (W1) ---------------------------------------------
+// Fourteen jacarés and every one of them was scenery: they slide off the bank
+// when the line goes past and lie on the bottom. A crossing needs something
+// in the water that wants the last one in the line. Once per crossing, with
+// the herd mid-river, the nearest jacaré comes off the bank and closes on the
+// tail of the line at panHUNT_V — eyes and back out, a V of ripples — and
+// either takes the last follower off the line (a splash, and it is gone to
+// graze on the far bank, your fault) or is turned by the voice: a wheek
+// inside panHUNT_HEAR sends it under and it does not come back this tide.
+// The same shape as the onça and the skua — the animal's voice spent on
+// somebody else's behalf — in the one place the chapter is for.
+const panHUNT_V = 2.7;          // m/s in the water; the herd swims about 1.8
+const panHUNT_HEAR = 16;        // m: a wheek nearer than this turns it
+const panHUNT_TAKE = 1.5;       // m from the last follower: it has it
+let panHuntI = -1, panHuntOn = false, panHuntDone = false, panHuntT = 0, panHuntRip = 0;
+let panHuntTook = 0, panHuntSaved = 0;
+/** The last capybara on the line, or null. */
+function panLastFollower() {
+  let best = null;
+  for (let i = 0; i < panHERD_N; i++) {
+    const r = panHerd[i];
+    if (r.st !== 'follow') continue;
+    if (!best || r.order > best.order) best = r;
+  }
+  return best;
+}
+function panHuntStart(game) {
+  const tail = panLastFollower();
+  if (!tail) return;
+  // a LINE, in the river: the tail within thirty metres of the animal and wet
+  const cp = game.capy && game.capy.body ? game.capy.body.position : null;
+  if (!cp || Math.hypot(tail.x - cp.x, tail.z - cp.z) > 30 || tail.z > panRIVER.z1 + 1 || tail.z < panRIVER.z0 - 1) { panHuntDone = false; return; }
+  let bi = -1, bd = 1e9;
+  for (let i = 0; i < panCaimanAt.length; i++) {
+    const c = panCaimanAt[i];
+    if (c.slide > 0 || c.hunt || c.gone > 0) continue;
+    const dx = c.x - tail.x, dz = c.z - tail.z;
+    const d = dx * dx + dz * dz;
+    if (d < bd && d < 60 * 60) { bd = d; bi = i; }
+  }
+  if (bi < 0) return;
+  const c = panCaimanAt[bi];
+  c.hunt = 1; c.hx = c.x; c.hz = c.z; c.hyaw = c.yaw0;
+  panHuntI = bi; panHuntOn = true; panHuntT = 0;
+  panRipple(c.x, c.z, 1.6);
+  panSfx.volume = 0.32; panSfx.pitch = 0.6;
+  game.sfx('splash', placeCue(panSfx, c.x, panWATER, c.z, 60));
+  if (typeof game.toast === 'function') game.toast('one of them is in the water, and it is behind the last one. wheek at it.');
+}
+function panHuntEnd(game, how) {
+  const c = panHuntI >= 0 ? panCaimanAt[panHuntI] : null;
+  panHuntOn = false;
+  if (c) { c.hunt = 0; c.gone = 3.0; }     // under for three seconds, then back where it was
+  if (how === 'took') panHuntTook++; else if (how === 'turned') panHuntSaved++;
+}
+function panUpdateHunt(game, dt, p) {
+  if (!panHuntOn) {
+    // once per crossing, with the line in the water and past the near bank
+    if (!panHuntDone && panCrossT > 2.5 && panFollowing >= 3 && p && p.z < panRIVER.z1 - 5 && p.z > panRIVER.z0 + 4) {
+      panHuntDone = true;
+      panHuntStart(game);
+    }
+    return;
+  }
+  const c = panCaimanAt[panHuntI];
+  panHuntT += dt;
+  const tail = panLastFollower();
+  // ...and it does not follow the line up the bank: out of the water, out of reach
+  if (!tail || panCrossT <= 0 || tail.z > panRIVER.z1 + 1 || tail.z < panRIVER.z0 - 1) { panHuntEnd(game, 'lost'); return; }
+  const dx = tail.x - c.hx, dz = tail.z - c.hz;
+  const d = Math.hypot(dx, dz) || 1;
+  const step = Math.min(d, panHUNT_V * dt);
+  c.hx += dx / d * step; c.hz += dz / d * step;
+  c.hyaw = Math.atan2(dx, dz);
+  panHuntRip -= dt;
+  if (panHuntRip <= 0) { panHuntRip = 0.22; panRipple(c.hx, c.hz, 0.9); }
+  if (typeof game.wowLive === 'function' && !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'))) {
+    game.wowLive('a jacaré on the line · ' + Math.round(d) + ' m behind the last one · WHEEK',
+                 clamp((panRIVER.z1 - p.z) / (panRIVER.z1 - panRIVER.z0), 0, 1));
+  }
+  if (d < panHUNT_TAKE) {
+    // it has the last one: off the line, a splash, and away to the far bank
+    tail.st = 'graze'; tail.order = -1;
+    tail.tx = tail.x; tail.tz = panRIVER.z0 - 8; tail.restT = rand(8, 12); tail.look = 1;
+    panRipple(tail.x, tail.z, 2.2);
+    panSfx.volume = 0.6; panSfx.pitch = 0.5;
+    game.sfx('splash', placeCue(panSfx, tail.x, panWATER, tail.z, 80));
+    if (typeof game.punch === 'function') game.punch(0.12);
+    if (typeof game.toast === 'function') game.toast('it took the last one off the line. it will be on the far bank, sulking.');
+    panHuntEnd(game, 'took');
+  }
+}
+/** A wheek near the hunter turns it. Called from panWheek. */
+function panHuntHear(game, p) {
+  if (!panHuntOn || !p) return false;
+  const c = panCaimanAt[panHuntI];
+  const dx = c.hx - p.x, dz = c.hz - p.z;
+  if (dx * dx + dz * dz > panHUNT_HEAR * panHUNT_HEAR) return false;
+  panRipple(c.hx, c.hz, 2.0);
+  panSfx.volume = 0.45; panSfx.pitch = 0.55;
+  game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 80));
+  if (typeof game.toast === 'function') game.toast('it heard that. it has gone under, and it is not coming back.');
+  panHuntEnd(game, 'turned');
+  return true;
+}
 
 // scratch
 const panV3 = new THREE.Vector3();
@@ -3585,6 +3690,8 @@ function panWheek(game) {
       }
     }
   }
+  // ---- the one in the water, first (W1) -----------------------------------
+  panHuntHear(game, p);
   // ---- the jacares. Nothing on a sandbar waits to find out what a noise was.
   for (let i = 0; i < panCaimanAt.length; i++) {
     const c = panCaimanAt[i];
@@ -4687,6 +4794,7 @@ function panUpdateCaimans(game, dt) {
   if (!panCaimans) return;
   const capy = game.capy;
   const p = capy && capy.body ? capy.body.position : null;
+  panUpdateHunt(game, dt, p);
   if (!panCaimanCrit && typeof game.addCritter === 'function') {
     // 4.243 m is a body length — sqrt(18), the radius three lines down, which
     // is where that squared literal came from. See THE CALM REGISTRY above for
@@ -4749,13 +4857,25 @@ function panUpdateCaimans(game, dt) {
       c.gape = damp(c.gape, c.gapeOn ? 1 : 0, 1.6, dt);
       roll = Math.sin(panTime * 0.5 + c.ph) * 0.02;
     }
+    // ---- the hunter, and the one that has just gone under (W1) ------------
+    let cx = c.x, cz = c.z, cyaw = c.yaw0;
+    if (c.hunt) {
+      cx = c.hx; cz = c.hz; cyaw = c.hyaw;
+      y = panWATER - 0.20 + Math.sin(panTime * 3.1 + c.ph) * 0.03;
+      pitch = 0.04; roll = Math.sin(panTime * 2.2 + c.ph) * 0.04;
+      c.gape = damp(c.gape, 0, 5, dt);
+    } else if (c.gone > 0) {
+      c.gone -= dt;
+      y = panWATER - 2.5;           // under, out of sight, on its way home
+      if (c.gone <= 0) { c.slide = 2.0; }   // ...and it surfaces back on its bank
+    }
     c.y = y;
     // The gape is drawn by lifting the SNOUT, which on this model is the front
     // 95 cm of it: a yaw-space pitch on the whole animal opens the jaw and
     // digs the tail in, and at 12 degrees over a 3.4 m body that is 35 cm of
     // tail underground. So the pitch is small and the animal is RAISED with it.
-    panM.compose(panV3.set(c.x, y + c.gape * 0.05, c.z),
-                 panQ.setFromEuler(panE.set(pitch - c.gape * 0.055, c.yaw0, roll)),
+    panM.compose(panV3.set(cx, y + c.gape * 0.05, cz),
+                 panQ.setFromEuler(panE.set(pitch - c.gape * 0.055, cyaw, roll)),
                  panSc.set(1, 1, 1));
     panCaimans.setMatrixAt(i, panM);
   }
@@ -5160,7 +5280,7 @@ function panUpdateTasks(game, dt) {
     if (game.music && typeof game.music.swell === 'function') game.music.swell(0.85);
     // ...and the line, on the signpost (W1): how many are behind you NOW —
     // which the current is working on — and how far the far bank is.
-    if (typeof game.wowLive === 'function' &&
+    if (typeof game.wowLive === 'function' && !panHuntOn &&
         !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'))) {
       const width = panRIVER.z1 - panRIVER.z0;
       const across = clamp((panRIVER.z1 - p.z) / width, 0, 1);
@@ -5238,6 +5358,7 @@ function panUpdateTasks(game, dt) {
     panCrossT = 0; panCrossN = 0;
   } else if (!inRiver && p.z > panRIVER.z1 + 4) {
     panCrossT = 0; panCrossN = 0;
+    panHuntDone = false;                       // W1: the next crossing has one too
   }
   // ---- AND SOMEBODY SAYS SOMETHING ABOUT IT ----------------------------
   // See panCall. Every one of these is about the live state of the chapter
@@ -5348,6 +5469,10 @@ export function createPantanal(game) {
       panEgretGone = false;
       panEchoT[0] = -1; panEchoT[1] = -1;
       panCaimanSit = 0; panCaimanSat = -1; panCaimanNotice = 0;
+      // W1: the jacaré on the line, back on its bank
+      if (panHuntOn) panHuntEnd(game, 'lost');
+      panHuntDone = false;
+      for (let i = 0; i < panCaimanAt.length; i++) { panCaimanAt[i].hunt = 0; panCaimanAt[i].gone = 0; }
       panRipCool = 0;
       panRaftReset();
       for (let i = 0; i < panRIP_N; i++) panRipT[i] = 1e9;
@@ -5424,6 +5549,23 @@ export function createPantanal(game) {
     forceJaguar() {
       panDusk = 1; panJagRuined = false; panJagArm = panJAG_ARM + 1;
       return panJagSt;
+    },
+    /** W1: the jacaré on the line, for the harness. */
+    huntDebug() { const c = panHuntI >= 0 ? panCaimanAt[panHuntI] : null; return { on: panHuntOn, done: panHuntDone, i: panHuntI, hx: c ? c.hx : 0, hz: c ? c.hz : 0, took: panHuntTook, saved: panHuntSaved, crossT: panCrossT, following: panFollowing }; },
+    /** W1: put n of the herd on the line behind the animal, wherever it is. Test hook. */
+    herdFollow(n) {
+      const p = game.capy && game.capy.body ? game.capy.body.position : null;
+      if (!p) return 0;
+      // ...and a trail that leads to the animal from the near bank, so the
+      // followers have somewhere sensible to be walking to
+      panTrailHead = 0; panTrailCount = 0;
+      for (let k = 30; k >= 0; k--) panTrailPush(p.x, p.z + k * panTRAIL_STEP);
+      for (let i = 0; i < panHERD_N; i++) {
+        const r = panHerd[i];
+        if (i < n) { r.st = 'follow'; r.order = i; r.x = p.x + (i % 2 ? 1.2 : -1.2); r.z = p.z + 2.6 * (i + 1); r.tx = r.x; r.tz = r.z; }
+        else { r.st = 'graze'; r.order = -1; }
+      }
+      return n;
     },
     /** Move the herd onto the crossing so there is something to hunt. */
     herdToCrossing() {

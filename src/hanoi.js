@@ -2464,7 +2464,12 @@ function hanUpdateTrain(game, dt) {
       // The RECORD still files at despawn — it is the closest approach over the
       // whole pass, and that is not known until the pass is over. The moment is
       // not the same thing as the score.
-      if (!hanTrainDone && d < hanTRAIN_WOW) {
+      // ...AND THE MOMENT IS THE NOSE GOING PAST (W1). `d` is measured to the
+      // whole length of the train, so it dropped under hanTRAIN_WOW with the
+      // loco still eight or nine metres up the alley, and the banner, the
+      // 0.55x beat and the shot were all spent before the thing arrived. The
+      // nose is at `x` and it runs west, so "past" is x under the animal.
+      if (!hanTrainDone && d < hanTRAIN_WOW && x <= p.x + 1.0) {
         hanTrainDone = true;
         hanTask('the-train');
         if (typeof game.frameShot === 'function') {

@@ -961,6 +961,7 @@ function manBuild(game) {
   manBuildPelican(manRoot);
   manBuildGroper(manRoot);
   manBuildFoam(manRoot);
+  manBuildBarrel(manRoot);
   manBuildSpray(manRoot);
   manBuildHaze(manRoot);
   manBuildWater(manRoot);        // last: transparent, and it must sort over
@@ -2970,6 +2971,84 @@ function manBuildGroper(root) {
  * DRAW the fast line. Where they pile up is where the push is; where they run
  * seaward in a neat lane is the rip, and nobody had to be told.
  */
+// ------------------------------------------------------------------ the barrel --
+/**
+ * THE LIP COMES OVER (W1).
+ *
+ * The carve (D4.11) let a rider hold the face instead of pointing at the
+ * sand, and nothing in the picture said so: a diagonal ride looked like a
+ * straight one from three metres further along. A wave held on its face
+ * curls over the rider — that is what a face IS — so this is the lip: an arc
+ * of foam, twelve metres along the crest, standing up behind the animal and
+ * throwing over the top of it, present only while the ride is on the face
+ * and gone (scaled to nothing) the moment it is not. Spray comes off the
+ * lip, the sea's hiss comes in close, and the paper says IN THE BARREL with
+ * the seconds. Not a task: it is what a good ride looks like.
+ */
+let manBarrelG = null, manBarrel = 0, manBarrelT = 0, manBarrelHiss = 0, manBarrelBest = 0;
+let manBarrelForce = false;   // test hook: barrelDebug(true) stands the lip up wherever the animal is
+function manBuildBarrel(root) {
+  const g = new THREE.Group();
+  const M = manMerger();
+  // the arc: centre 1.35 m up and 0.6 m seaward of the rider, radius 2.0,
+  // from the water behind (seaward, -z) up and over toward the beach (+z)
+  const R = 2.2, N = 12;
+  for (let i = 0; i < N; i++) {
+    // THE LIP ONLY. The face under it is the sea mesh's own; drawing a back
+    // wall here put a sheet of foam between the chase camera and the animal
+    // (measured: the rider seen through a slab). So the arc starts above and
+    // behind the rider's head and curls over to hang ahead — the part of a
+    // barrel you look up at — and never comes down to the water.
+    const a0 = Math.PI * 0.70, a1 = Math.PI * 0.26;
+    const a = a0 + (a1 - a0) * (i + 0.5) / N;
+    const cz = -0.6 + Math.cos(a) * R, cy = 1.1 + Math.sin(a) * R;
+    const thick = 0.20 + (1 - i / N) * 0.18;
+    M.box(0, cy, cz, 12.5 - i * 0.5, thick, ((a0 - a1) * R / N) * 1.12, PALETTE.manFoam, -a - Math.PI / 2, 0, 0);
+  }
+  // the shoulders: the lip is highest over the rider and drops away along the crest
+  const mesh = new THREE.Mesh(M.build(), mat(PALETTE.manFoam, { transparent: true, opacity: 0.74, depthWrite: false }));
+  mesh.renderOrder = 4;
+  mesh.castShadow = false;
+  g.add(mesh);
+  g.scale.setScalar(0.001);
+  g.visible = false;
+  manBarrelG = g;
+  root.add(g);
+}
+function manUpdateBarrel(game, dt, p, riding, speed) {
+  if (!manBarrelG) return;
+  const carveShare = manRideDist > 4 ? manCarveDist / manRideDist : 0;
+  const want = (manBarrelForce || (riding && manTookOff && carveShare > 0.38 && manWave.foam > 0.45 && speed > 4.2)) ? 1 : 0;
+  manBarrel = damp(manBarrel, want, want ? 3.5 : 5.0, dt);
+  const on = manBarrel > 0.02;
+  if (on !== manBarrelG.visible) manBarrelG.visible = on;
+  if (!on) {
+    if (manBarrelT > 1.0) {
+      if (manBarrelT > manBarrelBest) manBarrelBest = manBarrelT;
+      if (typeof game.toast === 'function') game.toast('a barrel · ' + manBarrelT.toFixed(1) + ' s');
+      game.sfx('cheer', { volume: 0.5, pitch: 1.1, force: true });
+    }
+    manBarrelT = 0;
+    return;
+  }
+  manBarrelG.position.set(p.x, manWave.y, p.z);
+  manBarrelG.scale.set(manBarrel, manBarrel, manBarrel);
+  if (manBarrel > 0.6) {
+    manBarrelT += dt;
+    manBarrelHiss -= dt;
+    if (manBarrelHiss <= 0) {
+      manBarrelHiss = 0.5;
+      game.sfx('hiss', { volume: 0.32, pitch: 0.7, force: true });
+    }
+    if (Math.random() < dt * 14) manPuffSpray(p.x + rand(-4, 4), manWave.y + 3.0, p.z + 0.8, 2, 0.6);
+    if (typeof game.wowLive === 'function' &&
+        !(typeof game.taskDone === 'function' && game.taskDone('all-the-way'))) {
+      game.wowLive('IN THE BARREL · ' + manBarrelT.toFixed(1) + ' s · ' + manRideDist.toFixed(0) + ' m of 34',
+                   clamp(manRideDist / 34, 0, 1));
+    }
+  }
+}
+
 function manBuildFoam(root) {
   const M = manMerger();
   M.box(0, 0, 0, 1, 0.06, 1, PALETTE.manFoam);
@@ -4111,6 +4190,7 @@ function manUpdateSurfTasks(game, dt) {
   }
   manCarve = damp(manCarve, want, manCARVE_L, dt);
   if (Math.abs(manCarve) < 0.004) manCarve = 0;
+  manUpdateBarrel(game, dt, p, riding, speed);
   if (riding) {
     manRideOff = 0;
     // ---- ALONG THE PATH, NOT TOWARD THE BEACH (D4.11) -------------------
@@ -4695,6 +4775,8 @@ export function createManly(game) {
     atFlags(x, z) { return manInZone('flags', x, z); },
     surfHeight(x, z) { return manSurfY(x, z); },
 
+    /** W1: the barrel, for the harness — force it up, or read it. */
+    barrelDebug(force) { if (force !== undefined) manBarrelForce = !!force; return { k: manBarrel, t: manBarrelT, best: manBarrelBest }; },
     update(dt) {
       if (!manBuilt) return;
       if (!game.biome.isActive('manly')) return;

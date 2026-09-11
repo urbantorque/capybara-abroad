@@ -129,7 +129,7 @@ const sahSURF_STALL_V = 3.2;
 const sahSURF_STALL_T = 1.8;
 
 const sahCARAVAN_N = 5;
-const sahDUST_N = 150;
+const sahDUST_N = 260;   // was 150; the avalanche (W1) wants a wall of it behind the run
 const sahSTAR_N = 200;
 const sahPALM_N = 90;
 
@@ -222,6 +222,7 @@ let sahSurfT = -1, sahSurfStall = 0, sahSurfBest = 0;
 // said on the landing when it was worth saying, and the run's biggest hop
 // goes on the signpost beside the speed.
 let sahSurfAir = 0, sahSurfAirBest = 0, sahSurfAirWas = false;
+let sahSurfAvalSaid = false;
 // The dune BOOMS while the sand is moving — see sahUpdateSurf.
 let sahBoom = 0, sahBoomT = 0;
 let sahCartDone = false, sahSnakeDone = false, sahEscapeDone = false;
@@ -5201,6 +5202,27 @@ function sahUpdateSurf(game, dt) {
                  (sahSurfAirBest > 0.45 ? ' · best hop ' + sahSurfAirBest.toFixed(1) + ' s' : ''),
                  clamp((sahSURF_TOP - p.x) / (sahSURF_TOP - sahSURF_END), 0, 1));
   }
+  // ---- AND THE FACE COMES DOWN WITH YOU (W1) ------------------------------
+  // A slipface at the angle of repose does not hold under a running animal:
+  // past nine metres a second the sand behind you lets go, and what a player
+  // on the way down sees over their shoulder is a wall of dust coming down
+  // the face after them. Spawned in a band four to fourteen metres UPHILL
+  // (+x — the run goes from x 272 to 202) and seven metres either side,
+  // moving downhill a little slower than the animal, so it is always just
+  // behind and never in the frame ahead. Rate goes with speed: at the record
+  // pace it is most of the pool, at a jog it is nothing.
+  {
+    const rate = clamp((sp - 8.0) / 8.0, 0, 1);
+    if (rate > 0) {
+      const n = (rate * 18 * dt + Math.random()) | 0;
+      for (let k = 0; k < n; k++) {
+        const ax = p.x + rand(4, 14), az = p.z + rand(-7, 7);
+        sahDustSpawn(ax, sahTerrain(ax, az) + rand(0.2, 1.8), az,
+                     -sp * rand(0.55, 0.85), rand(0.9, 1.7), rand(0.7, 1.3));
+      }
+      if (!sahSurfAvalSaid && rate > 0.5) { sahSurfAvalSaid = true; sahToast('the face is coming down behind you. do not look.'); }
+    }
+  }
   // ---- AND THE DUNE SINGS -------------------------------------------------
   // Erg Chebbi is one of about thirty places on earth where a slipface BOOMS —
   // a low organ note you feel through your feet, for as long as the sand is
@@ -5586,6 +5608,8 @@ export function createSahara(game) {
     /** true while the capybara is running the band, which the score answers. */
     onFire() { return sahFireTakeover > 0; },
 
+    /** W1: how much of the dust pool is alive. Test hook. */
+    dustDebug() { let n = 0; for (let i = 0; i < sahDUST_N; i++) if (sahDustData[i * 8 + 6] > 0) n++; return { live: n, of: sahDUST_N, surfT: sahSurfT }; },
     update(dt) {
       if (sahCartMover) sahCartMover.step(dt);
       if (!sahBuilt) return;
