@@ -1,0 +1,21 @@
+async page => {
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.goto('http://localhost:5188/')
+  await page.waitForTimeout(5000)
+  await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(6000)
+  // earn two costumes by ticking their tasks through the hud, then open settings
+  const r0 = await page.evaluate(() => { const g = window.__capy; g.hud.completeTask('steal-hat'); g.hud.completeTask('first-dive'); return g.capy.worn })
+  await page.waitForTimeout(800)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500)
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.capyui-pausebtn')).find(x => /settings/i.test(x.textContent)); b.click() })
+  await page.waitForTimeout(500)
+  const r1 = await page.evaluate(() => Array.from(document.querySelectorAll('.capyui-ward button')).map(b => b.textContent + (b.classList.contains('on') ? '*' : '')))
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.capyui-ward button')).find(x => /snorkel/.test(x.textContent)); b.click() })
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(1200)
+  const r2 = await page.evaluate(() => ({ worn: window.__capy.capy.worn, err: window.__capy.state.lastError || null }))
+  await page.screenshot({ path: 'qa/l3-ward.png' })
+  await page.evaluate((o) => fetch('/shot?name=l3-ward.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o))))}), { r0, r1, r2 })
+}

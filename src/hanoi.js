@@ -854,10 +854,17 @@ function hanBuildStreets(game, root) {
       const x = hanTmp.x, z = hanTmp.z;
       if (have) {
         const y = hanGROUND + 0.04;
+        // ---- WOUND FACE UP NOW (L3-7). These were prev-low, prev-high,
+        // cur-high, cur-low — clockwise from above — and a FrontSide Lambert
+        // culled every one of them, so the road in every Hanoi frame since
+        // the chapter shipped was the ground mesh's vertex-colour lerp and
+        // this asphalt had never once drawn. Found by the L3 floor-graphics
+        // pass with a raycast from above that hit the ground at 1.20 and
+        // never the asphalt at 1.24.
         K.quad(px - pnx * HALF, y, pz - pnz * HALF,
-               px + pnx * HALF, y, pz + pnz * HALF,
+               x - nx * HALF, y, z - nz * HALF,
                x + nx * HALF, y, z + nz * HALF,
-               x - nx * HALF, y, z - nz * HALF, PALETTE.hanAsphalt);
+               px + pnx * HALF, y, pz + pnz * HALF, PALETTE.hanAsphalt);
       }
       // the kerb, both sides, and it is fifteen centimetres of nothing
       for (let sd = -1; sd <= 1; sd += 2) {

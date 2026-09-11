@@ -3527,6 +3527,7 @@ let sysTextK = 1;
 // Off by default and deliberately: holding is the right default feel for both
 // verbs, and this is an access setting rather than a mode. See sysLatch.
 let sysHoldToggle = false;
+let sysWearPick = '';          // the wardrobe pick (L3-7); '' is the place's own
 let sysRunLatch = false, sysSlideLatch = false, sysRunWas = false, sysSlideWas = false;
 /**
  * A held boolean, turned into a toggled one, on the PRESS edge.
@@ -3570,6 +3571,7 @@ function sysPrefsRead() {
   if (typeof o.fv === 'number' && o.fv === o.fv) sysFovPref = clamp(o.fv, sysFOV_MIN, sysFOV_MAX);
   if (typeof o.tk === 'number' && o.tk === o.tk) sysTextK = clamp(o.tk, 0.9, 1.15);
   sysHoldToggle = !!o.ht;
+  sysWearPick = typeof o.wp === 'string' ? o.wp : '';
   sysMuteMaster = !!o.mm;
   sysMuteMusic  = !!o.um;
   sysMuteSfx    = !!o.sm;
@@ -3590,6 +3592,7 @@ function sysPrefsWrite() {
       c: calmPreference(),
       lk: sysLookK, li: sysLookInv ? 1 : 0, fv: sysFovPref, tk: sysTextK,
       ht: sysHoldToggle ? 1 : 0,
+      wp: sysWearPick,
     }));
   } catch (e) { sysPrefsOff = true; }
 }
@@ -8620,6 +8623,7 @@ function sysBuildCSS() {
 '.capyui-setsave{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;}',
 '.capyui-setsave .capyui-setnote{margin:0;flex:1 1 100%;}',
 '.capyui-pausebtn.small{padding:5px 10px;font-size:' + tMd + ';width:auto;}',
+'.capyui-pausebtn.small.on{background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
 '.capyui-setcalm{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer;',
   'font-size:clamp(10.5px,1.9vw,11.5px);color:' + inkSoft + ';font-weight:700;',
   'letter-spacing:.06em;touch-action:manipulation;}',
@@ -19904,6 +19908,37 @@ export function createSystems(game) {
     });
   void pauseLook; void pauseInv; void pauseFov; void pauseText; void pauseHold;
 
+  // ---- THE WARDROBE (L3-7). See sysWearPick. Rebuilt every time the card
+  // opens, because what has been earned changes.
+  const wardRow = sysEl('div', 'capyui-setsave capyui-ward');
+  const wardSplit = sysEl('div', 'capyui-setsplit', 'and what it wears');
+  pauseSet.appendChild(wardSplit);
+  pauseSet.appendChild(wardRow);
+  function wardBuild() {
+    while (wardRow.firstChild) wardRow.removeChild(wardRow.firstChild);
+    const earned = [];
+    for (let i = 0; i < sysWARDROBE.length; i++) {
+      const w = sysWARDROBE[i];
+      const r = taskRec[w.task];
+      if (r && r.done) earned.push(w.wear);
+    }
+    const hide = earned.length === 0;
+    wardSplit.hidden = hide; wardRow.hidden = hide;
+    if (hide) return;
+    const opts = [''].concat(earned);
+    for (let i = 0; i < opts.length; i++) {
+      const id = opts[i];
+      const b = sysEl('button', 'capyui-pausebtn small' + (id === sysWearPick ? ' on' : ''), id ? (sysWEAR_NAMES[id] || id) : 'the place\u2019s own');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', id === sysWearPick ? 'true' : 'false');
+      b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        sysWearPick = id; prefsSoon(); wardBuild();
+      });
+      wardRow.appendChild(b);
+    }
+  }
   pauseSet.appendChild(sysEl('div', 'capyui-setnote',
     'kept on this machine, not in the journey.'));
   // ---- THE JOURNEY CAN LEAVE THE MACHINE (L3, E5) --------------------------
@@ -19993,7 +20028,7 @@ export function createSystems(game) {
     // appeared, which reads as "this row is selected" on a card where nothing
     // is selectable — measured off the first screenshot of it. The panel opens
     // directly beneath this button, so Tab already walks straight into it.
-    if (pauseSetOpen) pauseSync();
+    if (pauseSetOpen) { pauseSync(); wardBuild(); }
   }
   function pauseAskOpen() {
     pauseAsk.hidden = false;
@@ -26614,6 +26649,18 @@ export function createSystems(game) {
       line: 'hold your line and the world opens. it works everywhere.' },
   ];
 
+  // ---- ...AND THE PLAYER MAY CHOOSE (L3-7). The scoping argument below is
+  // kept as the DEFAULT: the place's own costume, in its place. But ten
+  // costumes and no say over any of them was a channel this game had no
+  // entry in, so the settings card lists the ones earned and a pick travels
+  // — fancy dress, chosen on purpose, which is a different thing from fancy
+  // dress by accident. Kept on this machine with the other preferences.
+  // (sysWearPick itself is module-level beside sysHoldToggle: the prefs file reads it)
+  const sysWEAR_NAMES = {
+    sunhat: 'the sun hat', ferrycap: 'the ferry cap', plumes: 'the plumes', boater: 'the boater',
+    snorkel: 'the snorkel', flycap: 'the flying cap', surfcap: 'the surf cap', cavehelm: 'the caving helmet',
+    parka: 'the parka', 'black-tie': 'the dinner jacket',
+  };
   const sysWARDROBE = [
     { biome: 'sydney',    task: 'steal-hat',    wear: 'sunhat' },
     { biome: 'quay',      task: 'manly-voyage', wear: 'ferrycap' },
@@ -27748,11 +27795,13 @@ export function createSystems(game) {
     const cn = todoChapter();
     if (cn > 0) jrChapPho[cn] = (jrChapPho[cn] || 0) + 1;
     saveSoon();
+    notoCheck();   // ...and the ladder can come down (L3-7)
   });
   game.events.on('npc:gift', function () {
     const cn = todoChapter();
     if (cn > 0) jrChapFed[cn] = (jrChapFed[cn] || 0) + 1;
     saveSoon();
+    notoCheck();
   });
 
   // =========================================================================
@@ -27863,6 +27912,14 @@ export function createSystems(game) {
   // least forty cards, so a full page is a natural disaster twice over, which
   // is the correct verdict on somebody who has been everything to everyone.
   const sysNOTO_VAR = 1;       // a name nobody had had out of you before
+  // ---- ...AND IT CAN GO DOWN (L3-7). The score was monotonic: incidents,
+  // scenes, spread and variety, and being photographed or fed was read once,
+  // to pick a rumour line. There was never a choice between charm and
+  // menace, so the animal had no personality the player authored. A gift is
+  // worth a whole point against the ladder and a photograph half of one —
+  // a place that likes you is a place that has stopped counting.
+  const sysNOTO_FED = 1.0;
+  const sysNOTO_PHO = 0.5;
   const sysNOTO_TIERS = [
     { at:  0, name: '' },
     { at:  3, name: 'a rumour' },
@@ -27887,9 +27944,20 @@ export function createSystems(game) {
     // repName. Nothing in this file asks for the number before the module has
     // finished building, and nothing may start to.
     const variety = repFound();
-    return { inc: inc, scn: scn, spread: spread, variety: variety,
-             score: inc + scn + spread * sysNOTO_SPREAD + variety * sysNOTO_VAR };
+    let charm = 0;
+    for (const k in jrChapFed) charm += (jrChapFed[k] || 0) * sysNOTO_FED;
+    for (const k in jrChapPho) charm += (jrChapPho[k] || 0) * sysNOTO_PHO;
+    const raw = inc + scn + spread * sysNOTO_SPREAD + variety * sysNOTO_VAR;
+    return { inc: inc, scn: scn, spread: spread, variety: variety, charm: charm,
+             score: Math.max(0, raw - charm) };
   }
+  /** Is THIS place warm to you: as much affection as trouble, and some of it. */
+  game.notoWarm = function (n) {
+    const cn = n || todoChapter();
+    const bad = (jrChapInc[cn] || 0) + (jrChapScene[cn] || 0);
+    const good = (jrChapPho[cn] || 0) + (jrChapFed[cn] || 0);
+    return good >= 2 && good >= bad;
+  };
   /** 0-5. Zero is "nobody has heard of you", and it has no name on purpose. */
   function notoTier(score) {
     const s = (typeof score === 'number') ? score : notoScore().score;
@@ -32867,10 +32935,29 @@ export function createSystems(game) {
   const herdSCARE_CD = 1.15;   // s between any two of these, anywhere
   const herdSCARE_S  = 0.52;   // strength — under a bang, over a spill
   let herdScareCd = 0;
+  // ---- THE PARADE (L3-7): the herd is a witnessed thing ------------------
+  // Fourteen followers through San Marco were noticed exactly as much as
+  // walking alone: the herd was positioned by kinematic put() and nothing in
+  // the reaction layer read it. Now a line of six or more, moving, with
+  // people near enough to see it, is a rung on the chain every few seconds
+  // — through incAdd, so every gate the chain has (the witness, the radius,
+  // the window, the same-key cooldown) is live — and two of them in one
+  // chain is THE PIED PIPER on the repertoire.
+  const sysPARADE_N = 6;
+  const sysPARADE_EVERY = 7;
+  let paradeT = 0;
   function herdUpdate(dt) {
     if (herdScareCd > 0) herdScareCd -= dt;
     const capy = game.capy;
     const p = capy && capy.position;
+    if (p && capy.velocity) {
+      paradeT -= dt;
+      if (paradeT <= 0) {
+        paradeT = sysPARADE_EVERY;
+        const spd = Math.hypot(capy.velocity.x, capy.velocity.z);
+        if (spd > 1.0 && game.herdCount() >= sysPARADE_N) incAdd(p.x, p.z, 'parade', 'parade', 'herd');
+      }
+    }
     const can = !!(capy && typeof capy.can === 'function' && capy.can('herd'));
     if (p && can) herdTrailPush(p.x, p.z);
     const live = game.biome && game.biome.current;
@@ -34781,10 +34868,15 @@ export function createSystems(game) {
   function notoCheck() {
     const t = notoTier();
     if (notoSeenTier < 0) { notoSeenTier = t; return; }
-    if (t <= notoSeenTier) return;
+    if (t === notoSeenTier) return;
+    // ...and DOWN is news too (L3-7): a place that fed you has softened the
+    // word. The card says so in its own sentence, and the rank reading ''
+    // (nobody has heard of you) gets a name for the one time it is a relief.
+    notoDown = t < notoSeenTier;
     notoSeenTier = t;
     notoPendTier = t; notoPendT = sysMOMENT_CARD / 1000 + 0.6;
   }
+  let notoDown = false;
 
   // =========================================================================
   // ...AND THE CHAIN CAN NOW BE ENDED BY SOMEBODY ELSE
@@ -34916,6 +35008,8 @@ export function createSystems(game) {
     { id: 'bombardment', name: 'THE BOMBARDMENT',      want: [{ k: 'hit', n: 3 }] },
     // ---- mixed verbs, which is the whole point ---------------------------
     { id: 'smash-grab',  name: 'THE SMASH AND GRAB',   want: [{ k: 'break' }, { k: 'theft' }] },
+    // ---- the herd, seen (L3-7): see THE PARADE over herdUpdate ------------
+    { id: 'pied-piper',  name: 'THE PIED PIPER',       want: [{ k: 'parade', n: 2 }] },
     // Take it off them and then hit them with it. There is no other way to get
     // this one, and that is the point of it.
     { id: 'hit-and-run', name: 'HIT AND RUN',          want: [{ k: 'theft' }, { k: 'hit' }] },
@@ -35191,8 +35285,9 @@ export function createSystems(game) {
       // not over a crossing, and not over the card it is the sequel to
       if (notoPendT <= 0 && (transBusy || momentEl.classList.contains('show'))) notoPendT = 0.4;
       if (notoPendT <= 0) {
-        const nm = notoName(notoPendTier);
-        showMoment('YOU ARE NOW', nm.toUpperCase(), sysNOTO_DOES[notoPendTier] || '');
+        const nm = notoName(notoPendTier) || 'nobody in particular';
+        showMoment(notoDown ? 'WORD HAS SOFTENED' : 'YOU ARE NOW', nm.toUpperCase(),
+                   notoDown ? 'they fed you. the place has stopped counting.' : (sysNOTO_DOES[notoPendTier] || ''));
         sfx('chime', { volume: 0.5, pitch: 1.5, force: true });
         musSwell(sysMINI_SWELL * 0.8);
         if (typeof game.notoSet === 'function') game.notoSet(notoPendTier);
@@ -35546,6 +35641,15 @@ export function createSystems(game) {
         const r = taskRec[w.task];
         if (r && r.done) put = w.wear;
         break;                          // one chapter, one row, one answer
+      }
+      // ...unless the player picked one they have earned (L3-7)
+      if (sysWearPick) {
+        for (let i = 0; i < sysWARDROBE.length; i++) {
+          const w = sysWARDROBE[i];
+          if (w.wear !== sysWearPick) continue;
+          const r = taskRec[w.task];
+          if (r && r.done) put = w.wear;
+        }
       }
       // ---- AND PUTTING IT ON WAS SILENT TOO (P4) -------------------------
       // Ten costumes, each earned by a specific task, and the animal simply

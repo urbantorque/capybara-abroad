@@ -5262,7 +5262,8 @@ export function createCapybara(game) {
     const stamWantRun = !!input.run && stamMag2 > 0.01 && !stamFree;
     if (capyDiving) {
       capyStamHold = capySTAM_DELAY;
-      capyStam -= capySTAM_BREATH * dt;
+      // ...and the snorkel is a longer breath (L3-7): a third more, worn
+      capyStam -= capySTAM_BREATH * (capyWorn === 'snorkel' ? 0.75 : 1) * dt;
     } else if (stamFree) {
       capyStamHold = 0;
       capyStam += capySTAM_REGEN * dt;

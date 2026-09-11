@@ -3846,7 +3846,12 @@ function monUpdateEye(game, dt) {
     e.k = k;
     if (k > best) best = k;
   }
-  if (best > 0) monSeen = Math.min(1, monSeen + monEYE_FILL * (0.40 + best) * dt);
+  // ...AND THE JACKET HALVES IT (L3-7): the one costume with an obvious
+  // mechanical joke — a dinner jacket at the casino door — was a taskDone
+  // flag. Worn, the eye fills at half the rate; the door still sees you, it
+  // takes twice as long to be sure.
+  const jacket = game.capy && game.capy.worn === 'black-tie' ? 0.5 : 1;
+  if (best > 0) monSeen = Math.min(1, monSeen + monEYE_FILL * (0.40 + best) * jacket * dt);
   else monSeen = Math.max(0, monSeen - monEYE_DRAIN * dt);
   monEyeTint();
 

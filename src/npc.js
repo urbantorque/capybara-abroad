@@ -4757,7 +4757,9 @@ export function createNPCs(game) {
    * held to the same rule now: talking is part of coming over.
    */
   function marFree(r, starting) {
-    return !!r && !!r.fig && !!r.group && r.biome === game.biome.current &&
+    // ...and never somebody who has fed you (L3-7): the gift was the one
+    // thing in the other economy that cost them something
+    return !!r && !!r.fig && !!r.group && r.biome === game.biome.current && !r.gifted &&
            !r.own && !r.carry && !(r.escT >= 0) && (r.marCool || 0) <= 0 && !(r.wel > 0) &&
            (!starting || (r.gest || 0) <= 0);
   }
@@ -4782,7 +4784,10 @@ export function createNPCs(game) {
   // tier down — run in an order nothing guarantees.
   function npcWelcomeArm() { npcWelArm = npcWEL_WAIT; npcWelCheered = false; }
   function npcWelcomePick() {
-    if (npcNotoTier < 4) return;
+    // ...or a place that is simply warm to you (L3-7): as much affection as
+    // trouble here, and some of it. See game.notoWarm.
+    const warm = typeof game.notoWarm === 'function' && game.notoWarm();
+    if (npcNotoTier < 4 && !warm) return;
     const cp = game.capy && game.capy.position;
     const live = game.biome && game.biome.current;
     if (!cp || !live) return;
