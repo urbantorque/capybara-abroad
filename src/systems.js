@@ -8675,6 +8675,16 @@ function sysBuildCSS() {
 '.capyui-ledfoot{margin-top:clamp(12px,2.6vw,20px);text-align:center;',
   'font-size:clamp(11px,2.1vw,13px);color:' + ink + ';font-weight:700;',
   'font-variant-numeric:tabular-nums;}',
+/* M11: THE ONE LINE ON THIS SCREEN THAT IS NOT A COUNT. Everything above it
+   is arithmetic -- places, souvenirs, time on the road, a verdict off the rap
+   sheet. This is the game saying what it was about, once, on the last card,
+   and it is set in the FINDS' register rather than the ledger's for exactly
+   the reason L5 gave that line: italic, lower case, unspaced, because it is
+   not part of the list. */
+'.capyui-ledlast{margin-top:clamp(10px,2vw,15px);text-align:center;',
+  'font-size:clamp(10.5px,2vw,12.5px);color:' + inkSoft + ';font-style:italic;',
+  'font-weight:400;letter-spacing:0;text-transform:none;max-width:36em;',
+  'margin-left:auto;margin-right:auto;line-height:1.5;}',
 '.capyui-ledhint{margin-top:8px;text-align:center;font-size:clamp(11px,2.1vw,12px);',
   'color:' + inkSoft + ';letter-spacing:.1em;text-transform:uppercase;',
   'animation:capyui-blink 2s ease-in-out infinite;}',
@@ -21402,11 +21412,14 @@ export function createSystems(game) {
   const ledSub = sysEl('div', 'capyui-ledsub', '');
   const ledList = sysEl('div', 'capyui-ledlist');
   const ledFoot = sysEl('div', 'capyui-ledfoot', '');
+  // M11: between the arithmetic and the way out. See .capyui-ledlast.
+  const ledLast = sysEl('div', 'capyui-ledlast', '');
   const ledHint = sysEl('div', 'capyui-ledhint', '');
   ledEl.appendChild(ledTitle);
   ledEl.appendChild(ledSub);
   ledEl.appendChild(ledList);
   ledEl.appendChild(ledFoot);
+  ledEl.appendChild(ledLast);
   ledEl.appendChild(ledHint);
   ledEl.inert = true;
   hudRoot.appendChild(ledEl);
@@ -22166,6 +22179,18 @@ export function createSystems(game) {
     ledFoot.textContent = road +
       ((ledFinal && noto) ? '  ·  you leave as ' + notoName() : '') +
       (verdict ? '  ·  ' + verdict : '');
+    // ---- AND THE SENTENCE, ON THE LAST CARD ONLY (M11) ----------------
+    // Nineteen chapter `note` fields circle this idea and not one of them
+    // states it. It is said twice in the whole game and never again: once by
+    // the traveller on the lawn, who has been deciding for six months what
+    // you are, and once here, by the game itself, under the numbers.
+    //
+    // `ledFinal` only, and deliberately: on a ledger opened halfway through a
+    // journey it would be a claim about chapters the player has not seen.
+    ledLast.textContent = ledFinal
+      ? 'nineteen places, and not one of them agreed with another about what you were.'
+      : '';
+    ledLast.hidden = !ledFinal;
     // A journey of nowhere is still a card, and it should say something.
     if (!rows) {
       const row = sysEl('div', 'capyui-ledrow');
@@ -25772,6 +25797,12 @@ export function createSystems(game) {
     // ...and the opposite, which is braver: take it anyway, off somebody who
     // is already looking straight at you. Set by the grab listener below.
     'red-handed':    function () { return !!findS.redHanded; },
+    // M11. npc.js owns the set; this asks it for a count and nothing here can
+    // write to it. Four is all four -- the whole point of the character is that
+    // it stops being a coincidence.
+    'same-face':     function () {
+      return typeof game.travMet === 'function' && game.travMet() >= 4;
+    },
     'took-the-poster': function () { return !!findS.tookPoster; },
 
     // ---- ...and what sat on you while you did it (N2) --------------------
@@ -27345,7 +27376,12 @@ export function createSystems(game) {
   const sysFIN_IN = 1.8;                // "inside the ring", for the closing test
   const sysFIN_LOAF = 0.6;              // and settled, not merely standing there
   const sysFIN_HOLD = 1.1;              // s held before it counts, so a pause is not an ending
-  const sysFIN_BEAT = 2600;             // ms between the line and the ledger
+  // M11: 9200, not 2600. The traveller is the last word of the game, and at
+  // 2.6 seconds the player heard one line of four before MISCHIEF COMPLETE
+  // covered the lawn. Nine seconds is three or four of them — a person talking
+  // to you while you sit in the horseshoe, rather than a receipt with somebody
+  // standing near it. Nothing simulated depends on this; it delays a card.
+  const sysFIN_BEAT = 9200;             // ms between the line and the ledger
   let sysFinStaged = false;             // laid out this session
   let sysFinDone = false;               // the closing beat has been spent (persisted as `fin`)
   let sysFinT = 0;                      // how long we have been sat in the middle

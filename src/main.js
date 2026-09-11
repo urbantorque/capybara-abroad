@@ -1898,6 +1898,8 @@ function mainBoot() {
     // own count walked `game.npcs` with no chapter test, and that array is
     // Sydney's cast, built at boot and never removed. See peopleNear.
     game.peopleNear = npcs.peopleNear;
+    // M11: the traveller's arc, as a number. See npcTravMet.
+    game.travMet = npcs.travMet;
     // B11 (5d): the one way to make the people near a point jump, from
     // outside npc.js. systems.js's herd loop is the only caller.
     game.startlePeople = npcs.startlePeople;

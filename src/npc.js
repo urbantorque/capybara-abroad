@@ -219,6 +219,22 @@ function npcMakeGeo(parts) {
 
 // --- dialogue (dry, Australian, never repeated back to back) ---------------
 const npcLINES = {
+  // ---- THE LAST THING ANYBODY SAYS IN THIS GAME (M11) ----------------------
+  // Read by the `gather` state and by nothing else. Five strangers from the
+  // Botanic Gardens walk over and look at nineteen souvenirs laid out on the
+  // grass, and the rule for this pool is the whole of the ending's design:
+  // NOTHING HERE MAY NAME A PLACE OR A THING THAT WAS DONE. These people were
+  // here the whole time and saw none of it — that is why the traveller, who did
+  // see it, is standing on the far side of the ring. They can tell that it went
+  // somewhere. They cannot tell where, and it is funnier that they cannot.
+  gather:  ['Where has all this come from?',
+            'It has laid them out. Look — it has laid them out.',
+            'Is it going to sit there all afternoon?',
+            'That one is not from here. None of them are from here.',
+            'Has it been somewhere?',
+            'Well. It has been busier than I have.',
+            'It is not showing anybody. It is just sitting with them.',
+            'Do you think somebody is missing all this?'],
   startle: ['Oi!', 'Bloody hell.', 'What was that?', 'Right then.', 'That’s not a wombat.', 'Strewth.',
             'Nope. Nope nope nope.', 'Is it meant to be here?', 'It’s the size of a labrador.',
             'Do NOT let it near the esky.'],
@@ -2610,6 +2626,20 @@ export function createNPCs(game) {
   // Everything else is the chapter's: where they stand, what they say, and
   // which task gates it. They are not a system, they are a person who keeps
   // turning up.
+  // ---- WHICH CHAPTERS THE TRAVELLER HAS BEEN SPOKEN TO IN (M11) -----------
+  // A SET and not a count, so four visits to the Quay is one. It is written in
+  // the approach branch of localsStep — the only moment in the game that means
+  // "the player stood in front of this person and they said something" — and it
+  // is read by the closing lines and by one find. Session-scoped on purpose: it
+  // is not on the save file, so it says what happened on this journey rather
+  // than what has ever happened, which is what the last scene is about.
+  const npcTravMet = Object.create(null);
+  function npcTravCount() { let n = 0; for (const k in npcTravMet) n++; return n; }
+  // Two of the four is the bar for "you know each other". One is a stranger you
+  // walked past; two is a coincidence you have both noticed, which is the whole
+  // joke of the character and is what the closing lines assume.
+  function npcTravKnown() { return npcTravCount() >= 2; }
+
   const npcTRAV_FIG = { shirt: PALETTE.cloth4, legs: PALETTE.khaki,
                         hair: PALETTE.hair2, skin: PALETTE.skin2,
                         hat: PALETTE.sail };
@@ -3993,11 +4023,50 @@ export function createNPCs(game) {
   // and because it was made outside a chapter build main.js's capture tag does
   // not own it — which is the whole reason it can be hidden rather than
   // detached, and the reason this file has to hide it itself.
+  // ---- ...AND THE PLAYER HEARD EXACTLY ONE OF THEM (M11) -----------------
+  //
+  // Four lines at `cool: 30`, and sysFIN_BEAT put the ledger up 2.6 seconds
+  // after the player sat down. So the game's one recurring character closed the
+  // game with a coin flip, and then MISCHIEF COMPLETE covered the lawn.
+  //
+  // All four also ASSUMED ACQUAINTANCE — 'That is the map used up' is a line
+  // between two people who have met — and nothing counted whether you had. A
+  // player who never walked within eight metres of them in Marrakech got a
+  // stranger claiming a shared history.
+  //
+  // Both are fixed in the same place, by the machinery `localResolve` already
+  // has: `when` gates a line on a predicate, so the four keep their register and
+  // acquire the condition they were written under, and a fifth exists for the
+  // player who never stopped. `cool` comes down to 4.5 s and sysFIN_BEAT goes to
+  // 9.2 s, which is three or four of them — somebody talking to you while you
+  // sit in the horseshoe, instead of a receipt with a person standing near it.
   const npcTRAV_FIN_LINES = [
-    'That is the map used up.',
-    'I take photographs now. They are all blurry. I have made my peace with it.',
-    'Six months, and I still could not tell you how you got to half of them.',
-    'You are back where you started. So am I. Only one of us meant to be.',
+    { t: 'That is the map used up.', when: npcTravKnown },
+    { t: 'I take photographs now. They are all blurry. I have made my peace with it.',
+      when: npcTravKnown },
+    { t: 'Six months, and I still could not tell you how you got to half of them.',
+      when: npcTravKnown },
+    { t: 'You are back where you started. So am I. Only one of us meant to be.',
+      when: npcTravKnown },
+    // ---- THE ONE SENTENCE THIS GAME HAS NEVER SAID OUT LOUD --------------
+    // Nineteen chapter `note` fields circle it and not one of them states it:
+    // "Nobody in these gardens had ever had to think about a rodent this size.
+    // Several of them do now." / "By the second evening the square knew your
+    // face." / "Nothing on this continent had any opinion about you
+    // whatsoever." / "The first place in the world that asked what you thought
+    // you were doing."
+    //
+    // It may only be said by somebody who has been deciding for six months what
+    // you are, which is the entire reason this character exists.
+    { t: 'Nineteen places. Every one of them made its own mind up about you.',
+      when: npcTravKnown },
+    // ...and the version for a player who never once stopped in front of them.
+    // Four cameos you walked past are still four cameos, and the honest scene
+    // there is a stranger — which is also funnier.
+    { t: 'You will not know me. I have been three steps behind you since Sydney.',
+      when: function () { return !npcTravKnown(); } },
+    { t: 'Do not mind me. I am just working out how you got here.',
+      when: function () { return !npcTravKnown(); } },
   ];
   // 'There it is. Every time.' is what they say in Cappadocia. This is that
   // line one chapter later, and it is the only place it can land.
@@ -4033,7 +4102,9 @@ export function createNPCs(game) {
       // Wider than a conversation. The player is SITTING at the middle of the
       // horseshoe and the ending is reached by staying there — they are not
       // going to walk over, so the line has to reach them where the moment is.
-      near: 9.5, cool: 30,
+      // 4.5 rather than 30 (M11): see the note on npcTRAV_FIN_LINES. At thirty
+      // the player heard one line of four and then the ledger arrived.
+      near: 9.5, cool: 4.5,
       lines: npcTRAV_FIN_LINES, wheek: npcTRAV_FIN_WHEEK,
     });
   }
@@ -6465,6 +6536,13 @@ export function createNPCs(game) {
       // ---- and they say something the first time you arrive -------------
       if (near && !r.was && r.cd <= 0 && r.lines) {
         r.cd = r.cool * rand(0.8, 1.4);
+        // ---- ...AND THE ONE PERSON WHO IS IN FOUR CHAPTERS IS COUNTED (M11)
+        // `o.trav` has been set since the traveller was written and NOTHING has
+        // ever read it except the pair-chat exclusion. Four cameos with nothing
+        // joining them is four cameos; this is the only place in the game that
+        // can know a player actually stood in front of them, because nothing
+        // else in the arc is gated on anything at all.
+        if (r.trav && r.biome) npcTravMet[r.biome] = 1;
         localLine(r, r.lines);
       }
       r.was = near;
@@ -9128,6 +9206,23 @@ export function createNPCs(game) {
         if (d < 0.45 || rec.stateT > npcGATHER_CEIL) {
           spd = 0;
           rec.tgtLean = 0.04;      // the smallest lean-in this rig has
+          // ---- ...AND SOMEBODY SAYS SOMETHING (M11) ----------------------
+          // Five people walk across a lawn to look at nineteen things laid out
+          // in a horseshoe, and this state steered, looked and leaned and NEVER
+          // ONCE OPENED A MOUTH. The closing image of an eight-hour game was a
+          // silent crowd.
+          //
+          // Once each, latched, and on the person's own cooldown so five of them
+          // arriving together do not answer in chorus — the anti-echo ring (M2)
+          // does the rest. The pool may not name a place and may not name
+          // anything that was done: they were in these gardens the whole time
+          // and saw none of it, which is the entire reason the traveller is
+          // standing on the far side of the ring.
+          if (!rec.gathSaid && (rec.talkCd || 0) <= 0) {
+            rec.gathSaid = 1;
+            rec.talkCd = 999;
+            pickLine(rec, 'gather');
+          }
         }
         break;
       }
@@ -13810,6 +13905,10 @@ export function createNPCs(game) {
 
   return { update, humans, ibises, pastoCast: paCast, pastoHumans: paHumans, pastoBeasts: paBeasts,
            peopleNear: peopleNear,
+           // M11: how many of the traveller's four chapters the player actually
+           // stopped in. A COUNT, and read-only: the find and the closing lines
+           // are its only readers and neither may set it.
+           travMet: npcTravCount,
            addLocal: addLocal, addTraveller: addTraveller,
            addExchange: addExchange, say: sayAt, sayNear: saySomebodyNear, heat: npcHeat,
            // ---- THE RUMOUR FROM THE LAST PLACE (B15) ----

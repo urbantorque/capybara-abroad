@@ -3569,6 +3569,13 @@ export const FINDS = [
   { id: 'most-wanted',    text: 'Got five people watching you at once' },
   { id: 'forgiven',       text: 'Stayed where you could be seen until somebody stopped minding' },
   { id: 'red-handed',     text: 'Robbed somebody who was already watching you' },
+  // ---- ...AND THE ONE PERSON WHO KEPT TURNING UP (M11) ------------------
+  // THE TRAVELLER is in four chapters and the game has never once said so. It
+  // keeps all three rules a find is written to: nothing lists it, nothing is
+  // gated on it, and it can be finished at any point -- every chapter you have
+  // seen stays on the departures board, so a player who walked past them in
+  // Marrakech can go back and stand in front of them.
+  { id: 'same-face',      text: 'Kept running into the same stranger, in four different countries' },
 
   // ---- WHAT YOU DID WITH THE TIME ---------------------------------------
   { id: 'perfectly-still', text: 'Did nothing whatsoever for a full minute' },
