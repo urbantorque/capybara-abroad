@@ -3777,6 +3777,8 @@ function kyoUpdateRun(game, dt) {
           game.sfx('gasp', { volume: 0.7 });
         }
         if (typeof game.punch === 'function') game.punch(0.2); else if (game.shake) game.shake(0.2);
+        // the top of the arc is held (L3): the one airborne second of the run
+        if (typeof game.slowmo === 'function') game.slowmo(0.55, 0.8);
         if (!kyoChuteSaid && typeof game.toast === 'function') { kyoChuteSaid = true; game.toast('the chute'); }
       }
     }

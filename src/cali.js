@@ -2480,6 +2480,8 @@ function caliStepChiva(game, dt) {
       caliTask('chiva-mirador');
       caliBurstSparks(caliChivaX, caliChivaY + 4.4, caliChivaZ, 18, 1.4);
       if (caliOnRoof) caliFwT = 5.5;      // W1: the city answers. See caliUpdateFireworks.
+      if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.2);   // L10: the top, held
+      if (typeof game.confetti === 'function' && p) game.confetti(p.x, p.y + 1.2, p.z, 20);
       if (typeof game.punch === 'function') game.punch(0.12);
       else if (typeof game.shake === 'function') game.shake(0.12);
       // THE WHOLE RIDE IS MONO: 0 of 70 sfx calls across the 121 s up the hill

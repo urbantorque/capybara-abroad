@@ -1,3 +1,113 @@
+## THE BIG ONES, LIFTED AGAIN — FIVE RIDICULOUS ONES, AND THE LADDER SAID OUT LOUD (X1–X5, N1, L1–L10 — 11 Sep 2026)
+
+Asked for: every marquee up another notch, five or so of them "ridiculous" —
+a vehicle, a mini-boss, a mini-game that tests the mechanics — each unique;
+and the incident dynamic with its five banded ratings given a purpose the
+player can see.
+
+### N1. THE LADDER, SAID
+
+The five ratings are the NOTORIETY tiers — *a rumour · a nuisance · a menace
+· a legend · a natural disaster* — fed by AN INCIDENT (three witnessed things
+in twelve seconds) and A SCENE (five). Before this they changed a look radius
+for twenty-five seconds after an arrival, a headline, and a poster. Nothing a
+player could feel, and nothing said what a rung was.
+
+**Every rung of the chain has a name on the pips now**, and it is the state
+of the square, not a score: `1 of 5 · a head turns`, `they are watching`,
+`AN INCIDENT`, `one more for a scene`, `A SCENE`. The moment somebody sets
+off the row goes amber and says `somebody is coming` (`npc:march`, emitted
+once per marcher). Being reached says what it cost: *the chain is over — the
+card stays.* A one-time toast on the first rung ever counted says the rule.
+
+**Every tier changes something, and the card that announces it says which**
+(`YOU ARE NOW · A MENACE · posters go up · they come over at three now, not
+four`), on its own card after the incident's, checked against the last tier
+announced rather than a before/after round the tally (the name repName
+records is a point too, and it lands after the tally):
+
+| tier | what the place does about you |
+|---|---|
+| a rumour | the next place has heard (the arrival line); the door-watch is a third of a menace's |
+| a nuisance | a headline; **the crowd turns at rung one** (an audience, which is the one way up the ladder gets easier); four more metres count as having seen it |
+| a menace | posters; **somebody sets off at three, not four** |
+| a legend | **a welcome party**: up to four locals walk to where you land, make a ring, say the praise line and cheer |
+| a natural disaster | **they come over at two, and they run** (1.6 × the walk) |
+
+And the march is OWED now: the go rung and the incident card land a second
+apart, the card makes the nearest person say something, `gest` is the one
+thing `marFree` refuses a starter for — measured, a fresh save's marcher set
+off at five, not four, every run. A refused go rung is retried each frame
+for four seconds against the nearest free person.
+
+`qa/n1-ladder.js`: fresh save — rungs 2/4, march at 4, amber, the rumour
+card; a save seeded to a legend — rungs 1/3, march at 3, the welcome (two
+came, nearest 2.98 m).
+
+### X1–X5. THE FIVE RIDICULOUS ONES
+
+Each is a vehicle or a boss, each unique, each parked at the helm the way the
+ferry and the tender already were: the module integrates a position of its
+own and writes the animal there every frame, `capy.atHelm` holds the pose,
+and the chapter publishes `rideYaw()` and `rig()` so the camera sits behind
+the vehicle (generalised from Cali's bus — any chapter may publish
+`rideYaw` now). Nobody drives, flies or rides out of a country: `onExit`
+lets go.
+
+| | the marquee | the toy | the tick | the record |
+|---|---|---|---|---|
+| X1 Monte Carlo | **THE GRAND PRIX** | the red car on the grid in front of the stand, three lights, one lap on the rail against the pack — lanes, a hold behind one, a lift when you are on its nose; the kerb is the corner's own speed; the tunnel lifts the score | the lap | the lap in s, par 38 (a masher on the kerb: 33.5 s, P4; a clean lap is under 30 and P1) |
+| X2 Hong Kong | **THE HELICOPTER** | a helicopter on an H on the scaffold roof: W/S, A/D, Space to climb, let go to sink; eight neon rings over the harbour lit one at a time; the eighth is the eighth wheek — the show comes on if it is off and the finale is spent on the next beat | the finale, from the cockpit | — |
+| X3 Marrakech | **THE JETPACK** | a pack on a deck at the top of the staked track: hold Space to burn (four seconds a tank, refilled on the sand), lean with the camera, four rings across the erg and the palmeraie, the top of the Koutoubia to land on | landing on the lantern | to the minaret in s, par 90 (the autopilot: 59 s) |
+| X4 the Pantanal | **THE HERD CROSSING** with a boss in it | O GRANDÃO: the one in the water is drawn at twice the size and takes three — a wheek inside twenty metres sends it under, it comes back from the other side quicker, the third sends it down for good and the whole line turns round; a take is a breath, and it comes back for the next | the crossing, as before | — |
+| X5 Hanoi | **THE PHO RUN** | the stall's Honda Cub: W/S, A/D (a third of the lock from standing — a rider stopped facing a wall can get out), the four centrelines are the road and the kerb is a wall that costs the way, a rider ahead in your line holds you to their speed until you move over, three lanterns round the quarter, three bowls off the rack as they go | the third bowl | three bowls in s, par 95 (the autopilot: 56–68 s) |
+
+Three things every one of them had to learn:
+
+- **The lap is a distance, not a seam.** The grid is seven metres before the
+  line, so the first cut finished the Grand Prix after seven metres.
+- **A floor test must know which way you are going.** On flat sand a burn
+  from standing put the jetpack a centimetre up, the floor test put it back,
+  and it never took off; a landing is `y <= floor && vy <= 0`.
+- **The chase camera is the chapter's problem.** The helm rig is a ship's
+  (21 m, 27°) and on a street with walls it was shoved into a plan view; a
+  camera parked thirteen metres behind a car at the bottom of a ravine was
+  inside the hill (so the grid moved to the harbour straight); a camera at
+  three metres in Hanoi was a red tarpaulin for most of the run (so it sits
+  above the awnings, 7.5 m at 32°); the helicopter's cabin lost its roof and
+  its sills came down to 0.95 because the lens is above and behind and a
+  wall is a lid on the pilot.
+
+The rows that lost their star keep their row: the dune surf, the tunnel on a
+roof (its shot and its lift, no record), the train alley.
+
+### L1–L10. THE OTHER FOURTEEN, ONE MORE BEAT EACH
+
+Pasto and Rio: **the roll** — Space while carrying, with thirteen metres a
+second under the wings, is a barrel roll drawn on top of the flight (the
+physics keeps flying straight, the talons keep the animal); the line counts
+them. Sydney: **the encore** — eight seconds after the cheer, one more wheek
+with the house still there is a longer cheer, every camera, confetti, the
+score all the way up. Iceland: **the valley answers** — a call pulls
+Strokkur's next eruption forward to a second from now, so the sky and the
+ground go together. Venice: **the sea lifts you** — the crest is felt, a
+surge picks the animal up, held at half speed. Cappadocia: the whole valley
+answers the sun — the crews cheer, the moment held. The Drift: **the whole
+orchard comes** — the forty lampflies six did not wake come up the hill after
+you at the light. Manly: the lip closing over is held, the sand is cheered.
+Kyoto: the chute's airborne second is held. Sơn Đoòng: the thirty-metre drop
+with the swifts forming is held at half speed for its length. Antarctica:
+the three breaches beside the tender are held. Cali: the top is held.
+`game.slowmo(scale, s)` had one caller before this; it has eleven.
+
+Not touched, and honestly: the Quay (it already has dolphins on the bow —
+a second flock was written and reverted when the first turned up), Palawan
+(the manta already breaches).
+
+`qa/fuzz.js`: nineteen chapters, no errors, no NaN. Probes: `x1-gp.js`,
+`x2-heli.js`, `x3-jet.js`, `x4-boss.js`, `x5-cub.js` each drive their toy to
+the tick on the keys.
+
 ## THE SOUND REVIEW, MEASURED — THE FRONT PAGE SINGS, THE NAME, AND THE TOP TAKEN OFF (S1, S2 — 11 Sep 2026)
 
 Asked for: the score from the first title page; a better name than *Untitled

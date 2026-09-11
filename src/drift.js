@@ -4908,6 +4908,19 @@ function driUpdateLantern(game, dt) {
       driLit = true;
       driLitT = 12;
       driTask('lantern');
+      // ---- AND THE WHOLE ORCHARD COMES (L8) -----------------------------
+      // Six lampflies lit it; the other forty wake at the light and come up
+      // the hill after you, a few frames apart so it arrives as a river of
+      // them rather than a switch.
+      for (let i = 0; i < driFLY_N; i++) {
+        const o = i * 11;
+        if (driFlyData[o + 7] !== 0) continue;
+        driFlyData[o + 7] = 1;
+        driFlyData[o + 10] = driTime + i * 0.06;
+        driFlyData[o + 8] = driFliesAwake;
+        driFliesAwake++;
+      }
+      if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.0);
       driToast('there. now the whole sky knows where you are.');
       // THE TWO LOUDEST CUES IN THE CHAPTER, AND BOTH WERE MONO. 0 of 30
       // driSfx calls in this file passed a position, in a biome whose whole

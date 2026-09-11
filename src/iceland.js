@@ -4156,6 +4156,13 @@ function iceAuroraCall(game, p) {
   iceAurCalls++;
   if (game.music && typeof game.music.swell === 'function') game.music.swell(1);
   iceSfx('chime', { volume: 0.55, pitch: 1.6 });
+  // ---- AND THE VALLEY ANSWERS TOO (L4) -------------------------------------
+  // The sky answered a call and nothing else did. Strokkur is a hundred and
+  // fifty metres off and goes every thirteen seconds on its own clock; a
+  // call pulls its next one forward to a second from now, so the sky and the
+  // ground go together, which is the whole valley answering.
+  if (iceGeyPhase === 0) { iceGeyPhase = 1; iceGeyT = Math.max(iceGeyT, iceGEY_SWELL - 0.9); }
+  if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 1.2, p.z, 8);
   if (!iceAuroraDone) {
     iceAuroraDone = true;
     iceTask('aurora');

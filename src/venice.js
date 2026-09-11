@@ -5166,6 +5166,17 @@ function venUpdateTide(game, dt) {
       const at = { x: p.x, y: venWaterHeightAt(p.x, p.z), z: p.z };
       venSfx('splash', { volume: 0.8, pitch: 0.7, at: at });
       if (typeof game.punch === 'function') game.punch(0.16);
+      // ---- AND THE SEA LIFTS YOU (L6) ----------------------------------
+      // The crest was a number reaching 95%. Now it is felt: a surge comes
+      // through the square and picks the animal up, held at half speed for
+      // the second it is in the air, and puts it back in the water.
+      const capy = game.capy;
+      if (capy && typeof capy.launch === 'function') {
+        const v = capy.velocity || { x: 0, z: 0 };
+        capy.launch(v.x * 0.5, 4.6, v.z * 0.5);
+      }
+      if (typeof game.slowmo === 'function') game.slowmo(0.55, 1.0);
+      if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 1.0, p.z, 14);
       // ---- FRAMED (v26) ----------------------------------------------------
       // Measured mid-piazza at tide 0.62: ninety per cent pavement and one
       // stray plank. The Basilica, the Campanile and the two columns were all

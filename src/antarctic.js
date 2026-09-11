@@ -358,6 +358,10 @@ function antPodAnswers() {
   antBreachQueue.length = 0;
   antBreachQueue.push(1, 2, 3);
   antBreachWait = 0.3;
+  // the first breach is held (L10): three orcas coming out of the water beside
+  // a four-metre tender is the picture, and it was over in a second
+  const g = antGame;
+  if (g && typeof g.slowmo === 'function') g.slowmo(0.55, 1.4);
 }
 // A ONE-SHOT PAYOUT NEEDS A STATE MEANING ALREADY PAID. See antPodRide.
 let antRideDone = false;

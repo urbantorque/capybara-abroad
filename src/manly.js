@@ -3035,6 +3035,8 @@ function manUpdateBarrel(game, dt, p, riding, speed) {
   manBarrelG.position.set(p.x, manWave.y, p.z);
   manBarrelG.scale.set(manBarrel, manBarrel, manBarrel);
   if (manBarrel > 0.6) {
+    // the lip closes over (L9): the first frame inside is held at half speed
+    if (manBarrelT === 0 && typeof game.slowmo === 'function') game.slowmo(0.5, 1.3);
     manBarrelT += dt;
     manBarrelHiss -= dt;
     if (manBarrelHiss <= 0) {
@@ -4280,6 +4282,9 @@ function manUpdateSurfTasks(game, dt) {
         // taken up for four seconds rather than fired at the tick.
         manPuffSpray(p.x, manWave.y + 0.4, p.z + 1.2, 12, 0.9);
         manRideEndT = 4.0;
+        if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.0);
+        if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 1.0, p.z, 18);
+        game.sfx('cheer', { volume: 0.7, pitch: 1.05, force: true });
         manSaysNow('guard',
           ['From the bank to the sand. I timed it. I am not telling you what I got.',
            'That is the wave of the set and you had it the whole way.',

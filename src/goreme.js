@@ -4701,6 +4701,13 @@ function gorUpdateBalloon(game, dt) {
     if (gorSunWin && gorSunBurned && !gorSunDone) {
       gorSunDone = true;
       gorTask('sunrise');
+      // ---- AND THE WHOLE VALLEY ANSWERS (L7) ----------------------------
+      // Every burner was already going together; now the field crews cheer,
+      // the moment is held for a second, and the sky gets confetti.
+      if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.2);
+      gorSfx('cheer', { volume: 0.55, pitch: 0.95, force: true });
+      if (typeof game.confetti === 'function') { const cp = game.capy && game.capy.position; if (cp) game.confetti(cp.x, cp.y + 1.5, cp.z, 22); }
+      if (typeof game.punch === 'function') game.punch(0.1);
       // FRAMED — batch 3 built game.frameShot and no chapter from 12 to 17 had
       // ever asked for it. `yaw` is the bearing FROM the animal TO the camera,
       // and the disc sits at x = +760, so the camera belongs at -X looking back

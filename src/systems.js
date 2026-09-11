@@ -23324,7 +23324,7 @@ export function createSystems(game) {
     'condor-ride':    { clue: function () {
                       const c = game.condor;
                       if (!c || !c.active) return 'press Q. a condor comes down';
-                      if (c.mounted) return 'hold on. twelve seconds';
+                      if (c.mounted) return 'hold on · A/D steer · Shift to tuck · Space to roll';
                       if (c.talonInReach()) return 'hold E — grab the talons';
                       return 'Q again to bring it lower, then hold E under it';
                     },
@@ -23667,7 +23667,7 @@ export function createSystems(game) {
     'fragata':        { clue: 'wheek out on the sand — press Q', where: function () { return null; } },
     'fragata-ride':   { clue: function () {
                       const c = game.condor;
-                      if (c && c.active && c.mounted) return 'hold on. twelve seconds';
+                      if (c && c.active && c.mounted) return 'hold on · A/D steer · Shift to tuck · Space to roll';
                       if (c && c.active && c.talonInReach()) return 'hold E — grab the talons';
                       if (c && c.active) return 'Q again to bring it lower, then hold E under it';
                       return 'press Q at Arpoador. a frigatebird comes down';

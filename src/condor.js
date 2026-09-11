@@ -350,6 +350,19 @@ let condorStalled = false;
 // The same loop would have caught an auto-release too. So the talons are shut for
 // long enough that the passenger has to have actually fallen away.
 let condorRegrabT = 0;
+// ---- THE ROLL (L1) ---------------------------------------------------------
+// Twelve seconds of hanging on was the marquee, and the bird could already
+// flap (Q), tuck (Shift) and steer. Space while carrying, with air under the
+// wings, is a barrel roll: the drawn bird goes round its own nose once in a
+// second and a quarter, the score gets a note, and the paper counts them. It
+// is a render-side rotation — the physics keeps flying straight, the talons
+// keep the animal, and nothing can fall off — which is the only kind of stunt
+// a game about being carried can afford.
+const condorROLL_T = 1.25;
+const condorROLL_V = 13.0;              // m/s of airspeed it wants
+let condorRollT = 0, condorRolls = 0, condorRollCool = 0;
+const condorRollQ = new THREE.Quaternion();
+const condorRollAxis = new THREE.Vector3(0, 0, 1);
 let condorPeakDone = false;             // latch: the soaring task fires exactly once
 let condorBestAGL = 0;                  // best height over the ground while carried
 
@@ -1066,7 +1079,7 @@ function condorDespawn(silent) {
 
 function condorSetState(s) {
   condorState = s;
-  condorStateT = 0;
+  condorStateT = 0; condorRolls = 0; condorRollT = 0;
   if (condorApi) {
     condorApi.state = s;
     condorApi.mounted = (s === 'carrying');
@@ -1412,7 +1425,23 @@ function condorUpdate(dt) {
   }
 
   if (condorRegrabT > 0) condorRegrabT -= dt;
+  if (condorRollCool > 0) condorRollCool -= dt;
+  if (condorRollT > 0) condorRollT -= dt;
   condorStateT += dt;
+  // ---- the roll (L1) --------------------------------------------------------
+  if (condorState === 'carrying' && input && input.jumpPressed && condorRollT <= 0 && condorRollCool <= 0) {
+    const v0 = condorBody.velocity;
+    const sp0 = Math.sqrt(v0.x * v0.x + v0.y * v0.y + v0.z * v0.z);
+    if (sp0 >= condorROLL_V) {
+      condorRollT = condorROLL_T; condorRollCool = condorROLL_T + 0.4; condorRolls++;
+      if (typeof game.sfx === 'function') game.sfx('whistle', { volume: 0.34, pitch: 1.2, force: true });
+      if (typeof game.punch === 'function') game.punch(0.06);
+      if (typeof game.toast === 'function' && condorRolls === 1) game.toast('a roll. it liked that.');
+    } else if (typeof game.control === 'function' && condorRollCool <= 0) {
+      condorRollCool = 1.5;
+      game.control('too slow to roll — Shift to tuck and pick up speed, then Space');
+    }
+  }
   // ---- the ride, counted (W1). See the note in condorMount. ------------------
   if (condorState === 'carrying') {
     const rideId = condorTaskId('ride');
@@ -1420,7 +1449,8 @@ function condorUpdate(dt) {
       const cb = game.capy && game.capy.body;
       const alt = cb ? Math.max(0, cb.position.y - condorTerrain(cb.position.x, cb.position.z)) : 0;
       if (typeof game.wowLive === 'function') {
-        game.wowLive('hanging on · ' + Math.floor(condorStateT) + ' s · ' + Math.round(alt) + ' m up',
+        game.wowLive('hanging on · ' + Math.floor(condorStateT) + ' s · ' + Math.round(alt) + ' m up' +
+                     (condorRolls ? ' · ' + condorRolls + (condorRolls === 1 ? ' roll' : ' rolls') : ' · Space to roll'),
                      condorStateT / condorRIDE_T);
       }
       if (condorStateT >= condorRIDE_T && typeof game.completeTask === 'function') {
@@ -2836,4 +2866,11 @@ function condorRender(dt) {
   }
   condorRenderQ.slerp(condorRenderTmpQ, k);
   condorGroup.quaternion.copy(condorRenderQ);
+  // the roll (L1): once round the nose, eased, drawn on top of the flight
+  if (condorRollT > 0) {
+    const u = 1 - clamp(condorRollT / condorROLL_T, 0, 1);
+    const a = (u * u * (3 - 2 * u)) * Math.PI * 2;
+    condorRollQ.setFromAxisAngle(condorRollAxis, a);
+    condorGroup.quaternion.multiply(condorRollQ);
+  }
 }

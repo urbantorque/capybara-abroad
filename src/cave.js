@@ -2076,6 +2076,13 @@ function cavUpdateColumn(game, dt) {
       cavColFall = 0;
       cavSfx.volume = 0.16; cavSfx.pitch = 1.9;
       game.sfx('rustle', cavSfx);
+      // ---- AND THE FALL IS HELD (L3) ------------------------------------
+      // Thirty metres at terminal velocity is a second and a half, and the
+      // sixteen swifts forming round you were most of what the chapter is
+      // for — held at half speed for the length of the drop, so the shape
+      // is seen. The same beat the marquee card takes, longer.
+      if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.8);
+      game.sfx('gasp', { volume: 0.5, pitch: 0.9 });
     }
   } else {
     cavColP = p;

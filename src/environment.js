@@ -60,6 +60,13 @@ let envConcertNotes = 0;
 let envConcertOff = 0;       // s off the stage while a concert is on
 let envStagePulse = 0;       // 0..1, decays; a wheek from the stage lights the sails
 let envConcertDone = false;  // this concert has paid out (the tick is idempotent; this gates the cheer)
+// ---- THE ENCORE (L5) --------------------------------------------------------
+// The house cheered and that was the end of it. For eight seconds after the
+// cheer the stage is still yours: one more wheek with the house still there
+// is the encore — a longer cheer, every camera in the crowd, confetti off the
+// podium, and the score all the way up. Once per concert.
+const envENCORE_WIN = 8;
+let envEncoreT = 0, envEncoreDone = false;
 
 // ---- Circular Quay (chapter 1) -----------------------------------------------
 const envCafeTables = [];     // {x, z, top} — climbable café tables
@@ -3539,13 +3546,19 @@ export function createEnvironment(game) {
           if (envConcertNotes >= envCONCERT_NOTES && house >= envCONCERT_HOUSE && on) {
             envConcertDone = true;
             envStagePulse = 1;
+            envEncoreT = envENCORE_WIN; envEncoreDone = false;
             if (game.concert && typeof game.concert.cheer === 'function') game.concert.cheer(4.5);
             if (typeof game.completeTask === 'function') game.completeTask('opera-stage');
+            if (typeof game.toast === 'function') game.toast('they liked that. once more, while they are here — the encore.');
           }
+        }
+        if (envEncoreT > 0) {
+          envEncoreT -= dt;
+          if (typeof game.wowLive === 'function' && !envEncoreDone) game.wowLive('THE ENCORE · wheek once more · ' + Math.ceil(envEncoreT) + ' s', 1);
         }
         if (envConcertOff > envCONCERT_LEAVE) {
           envConcertOn = false;
-          envConcertNotes = 0;
+          envConcertNotes = 0; envEncoreT = 0;
           if (game.concert && typeof game.concert.end === 'function') game.concert.end();
         }
       }
@@ -3746,6 +3759,16 @@ export function createEnvironment(game) {
         }
       }
       envConcertNotes++;
+      // the encore (L5): a note after the cheer, inside the window
+      if (envConcertDone && !envEncoreDone && envEncoreT > 0) {
+        envEncoreDone = true; envEncoreT = 0;
+        if (game.concert && typeof game.concert.cheer === 'function') game.concert.cheer(6.5);
+        if (typeof game.confetti === 'function') { const cp = game.capy && game.capy.position; if (cp) game.confetti(cp.x, cp.y + 1.2, cp.z, 28); }
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+        if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.7, pitch: 1.1, force: true });
+        if (typeof game.punch === 'function') game.punch(0.12);
+        if (typeof game.toast === 'function') game.toast('AN ENCORE. the whole forecourt.');
+      }
       return envConcertNotes;
     },
     /** The concert, for the harness: notes, house in place, on, done. */
