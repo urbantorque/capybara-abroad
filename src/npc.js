@@ -1322,6 +1322,11 @@ export function createNPCs(game) {
       npcSpeak.biome = game.biome ? game.biome.current : '';
     }
     slot.txt.textContent = text;
+    // ---- THE BOX IS A NEW BOX (M15) ---------------------------------------
+    // `bw`/`bh` were measured once per SLOT and kept for its life, so a slot
+    // reused for a different line dodged the panels with the previous line's
+    // width. Reset here, measured on the first frame the new line is drawn.
+    slot.bw = 0; slot.bh = 0;
     // ---- AND MEASURE IT, ONCE, HERE ------------------------------------
     // The size is needed every frame to keep the box on screen, and
     // offsetWidth is a layout read: doing it in the update loop would force
@@ -11784,6 +11789,14 @@ export function createNPCs(game) {
   // npcBUB_PANEL_PAD — these come from game.hud.panels(), which does a layout
   // read, so this is deliberately not a per-frame question.
   const npcBubPanels = [];
+  // ---- ...AND BUBBLES DODGE THE PAPER BUT NOT EACH OTHER (M15) -----------
+  // Two people answering at once is by design — localsSay and npcOnIncident
+  // both allow two — so two boxes over the same patch of screen is the DESIGNED
+  // case, not a rare one. The boxes placed so far this frame, x0,x1,y0,y1 in
+  // NDC, four floats per bubble in one flat array; cleared once a frame and
+  // never allocated inside the draw loop.
+  const npcBubBox = [];
+  const npcBUB_GAP = 0.012;   // NDC, the same clearance the panel dodge leaves
   let npcBubPanelT = 0;
 
   function updateBubbles(dt) {
@@ -11795,6 +11808,7 @@ export function createNPCs(game) {
       // an empty list and the bubble behaves exactly the way it did before.
       if (game.hud && typeof game.hud.panels === 'function') game.hud.panels(npcBubPanels);
       else npcBubPanels.length = 0;
+      npcBubBox.length = 0;
     }
     // Where the capybara is on screen. At the closer camera a bubble parked on
     // top of him hides the one thing the player is watching, so bubbles slide
@@ -11852,7 +11866,17 @@ export function createNPCs(game) {
         // spans 2 across innerWidth px and the half-width is width/2. Same
         // for the height, which matters because the box is drawn ENTIRELY
         // above its anchor.
-        if (!b.bw && b.shown) { b.bw = b.el.offsetWidth; b.bh = b.el.offsetHeight; }
+        // ---- MEASURED ON THE FIRST FRAME, NOT THE SECOND (M15) -----------
+        // This was gated on `b.shown`, which is still false on the frame a
+        // bubble is first placed — so the one frame that most needs the box
+        // width used the 0.16 NDC fallback, less than half the truth for a long
+        // line, and every dodge below was computed against a box that was not
+        // the box. The element is made display:block here to force a layout;
+        // `a` is t/0.12 on this frame, i.e. effectively 0, so nothing shows.
+        if (!b.bw) {
+          if (!b.shown) b.el.style.display = 'block';
+          b.bw = b.el.offsetWidth; b.bh = b.el.offsetHeight;
+        }
         const halfX = b.bw ? (b.bw * sc) / Math.max(1, innerWidth) : 0.16;
         const fullY = b.bh ? (b.bh * sc * 2) / Math.max(1, innerHeight) : 0.14;
         const limX = clamp(1 - halfX - 0.012, 0.05, 0.93);
@@ -11875,8 +11899,28 @@ export function createNPCs(game) {
           const goL = pz.x0 - npcBUB_PANEL_PAD - halfX - bx;   // < 0, push left
           want += (goR < -goL) ? goR : goL;
         }
-        b.ox = damp(b.ox, want, 10, dt);
+        // ---- ...AND OFF EACH OTHER (M15). Same shape as the panel loop,
+        // against the boxes already placed this frame. Two sweeps, because
+        // clearing one box can land on the next; not iterated to convergence,
+        // and the clamp to limX is the backstop for three that cannot all fit.
+        for (let pass = 0; pass < 2; pass++) {
+          for (let q = 0; q < npcBubBox.length; q += 4) {
+            const bx = clamp(npcV1.x + want, -limX, limX);
+            if (bx + halfX <= npcBubBox[q] || bx - halfX >= npcBubBox[q + 1]) continue;
+            if (ny + fullY <= npcBubBox[q + 2] || ny >= npcBubBox[q + 3]) continue;
+            const goR = npcBubBox[q + 1] + npcBUB_GAP + halfX - bx;
+            const goL = npcBubBox[q] - npcBUB_GAP - halfX - bx;
+            want += (goR < -goL) ? goR : goL;
+          }
+        }
+        // The first placement is not a move, so it does not damp: `ox` starts
+        // at 0 and easing it toward `want` at 10/s is right for a bubble that
+        // is ADJUSTING and wrong for one appearing, which would spend two
+        // tenths of a second sliding out from under the thing it dodged.
+        if (!b.shown) b.ox = want;
+        else b.ox = damp(b.ox, want, 10, dt);
         const nx = clamp(npcV1.x + b.ox, -limX, limX);
+        npcBubBox.push(nx - halfX, nx + halfX, ny, ny + fullY);
         b.el.style.left = ((nx * 0.5 + 0.5) * 100) + '%';
         b.el.style.top = ((-ny * 0.5 + 0.5) * 100) + '%';
         b.el.style.transform = 'translate(-50%,-100%) scale(' + sc.toFixed(3) + ')';

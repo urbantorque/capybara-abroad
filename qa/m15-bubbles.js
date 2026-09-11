@@ -27,7 +27,7 @@ async page => {
     // which is the case this is about. Walk between them so the pool refills.
     await page.evaluate(() => {
       const g = window.__capy
-      window.__ov = { frames: 0, hits: 0, worst: 0, pairs: 0, maxUp: 0 }
+      window.__ov = { frames: 0, multi: 0, hits: 0, worst: 0, pairs: 0, maxUp: 0 }
       window.__ovT = setInterval(function () {
         const els = document.querySelectorAll('div[style]')
         const boxes = []
@@ -48,6 +48,10 @@ async page => {
         }
         window.__ov.frames++
         if (boxes.length > window.__ov.maxUp) window.__ov.maxUp = boxes.length
+        // THE DENOMINATOR THAT MATTERS: frames with two or more up. A raw hit
+        // count moves by +/-10 between two runs of the same build because the
+        // cast is random; the share of multi-bubble frames that collide does not.
+        if (boxes.length >= 2) window.__ov.multi++
         let bad = 0
         for (let i = 0; i < boxes.length; i++) {
           for (let j = i + 1; j < boxes.length; j++) {
@@ -63,7 +67,7 @@ async page => {
         if (bad) { window.__ov.hits++; window.__ov.pairs += bad }
       }, 100)
     })
-    for (let k = 0; k < 6; k++) {
+    for (let k = 0; k < 12; k++) {
       await page.keyboard.press('KeyQ')
       await page.keyboard.down('KeyW')
       await page.waitForTimeout(1800)

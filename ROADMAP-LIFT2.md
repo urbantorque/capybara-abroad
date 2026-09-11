@@ -482,28 +482,48 @@ Everything in the list above stands, less the four that were taken, plus:
   chapter may not want to hear from everywhere.
 - **The Cali dancers are one fully merged figure that does not move at all**, and
   the watchers next to them sway.
-- **Speech bubbles dodge the HUD panels, the screen edges and the capybara's own
-  column, and they do not dodge each other** — and two people answering at once
-  is the *designed* case, not a rare one (`localsSay` and `npcOnIncident` both
-  allow two). Seen by eye in three chapters in one sweep: in the Jemaa el-Fnaa
-  "My snake is listening." sat squarely across "…is asleep.", and in the Piazza
-  three of them stacked into one grey block.
+### M15 — bubbles dodge each other
 
-  **Attempted and reverted, and the measurement is the useful part.**
-  `qa/m15-bubbles.js` samples the rendered rectangles at 10 Hz for thirty
-  seconds in four crowded chapters and counts frames containing an overlap:
+Speech bubbles dodged the HUD panels, the screen edges and the capybara's own
+column, and they did not dodge each other — and two people answering at once is
+the *designed* case (`localsSay` and `npcOnIncident` both allow two). Seen by
+eye in three chapters: in the Jemaa el-Fnaa "My snake is listening." sat across
+"…is asleep.", and in the Piazza three stacked into one grey block.
 
-  ```
-  before   sahara 21/301   venice 15/300   kowloon 20/302   sydney  0/301
-  after    sahara 23/302   venice 14/299   kowloon 15/302   sydney 11/301
-  ```
+**The first attempt was reverted because it measured inside the noise, and the
+reason it measured inside the noise was two bugs underneath it**, both found by
+reading rather than by the probe:
 
-  A dodge against the boxes already placed this frame — the same shape as the
-  panel dodge, which works — moved nothing outside the instrument's own
-  run-to-run noise, and that noise is ±10 hits with the code unchanged (Sydney
-  went 0 → 11 on two runs of the same build). **The likely blocker was found
-  and not fixed:** `b.bw` is only measured under `if (!b.bw && b.shown)`, and
-  `b.shown` is still false on the frame a bubble is first placed — so the very
-  frame that most needs the box width uses the 0.16 NDC fallback, which for a
-  long line is less than half the truth. Fix that first, then re-measure; and
-  build a quieter instrument than this one before believing a small delta.
+- `b.bw` — the box width every dodge is computed from — was measured under
+  `if (!b.bw && b.shown)`, and `b.shown` is still false on the frame a bubble
+  is first placed. So the one frame that most needs the width used the 0.16 NDC
+  fallback, less than half the truth for a long line.
+- It was measured once per *slot* and never reset, so a slot reused for a
+  different line dodged everything with the previous line's width.
+
+Both fixed; the box is measured on its first frame (the element is made
+`display:block` to force layout — opacity is t/0.12 on that frame, effectively
+zero). Then the dodge against boxes already placed this frame, same shape as the
+panel dodge, and the first placement snaps rather than damps.
+
+**And a quieter instrument**, because the raw hit count moved ±10 with nothing
+changed: the share of frames with two-or-more bubbles up in which any pair
+overlaps. Normalising by the multi-bubble frames removes the cast's randomness
+from the denominator.
+
+```
+before          sahara 66%   venice 52%   kowloon 40%   sydney 31%   TOTAL 40.8%
+after, run 1    sahara 39%   venice  0%   kowloon 30%   sydney  8%   TOTAL 21.1%
+after, run 2    sahara 10%   venice 38%   kowloon 18%   sydney 33%   TOTAL 21.4%
+```
+
+Per chapter is still noisy; the total holds to three tenths of a per cent across
+two runs. **A clean halving.** The 21% that remains is mostly three bubbles that
+cannot all fit inside `limX` and a pair from speakers at nearly the same screen
+x, where the push required exceeds the clamp — `worst` still reaches 0.9 on a
+frame or two per minute. A vertical fallback for that case is the next step.
+
+- **The remaining fifth of bubble collisions** — three that cannot all fit, or
+  two speakers at the same screen x. Needs a vertical fallback; the instrument
+  (`qa/m15-bubbles.js`, the multi-frame share) now holds a line well enough to
+  prove one.
