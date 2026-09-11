@@ -859,6 +859,12 @@ const sysWOW_SLOW_T  = 0.75;
 // flourish. The watchdog closes it, so a chapter that stops calling cannot
 // leave the paper saying NOW.
 const sysWOW_LIVE_STALE = 0.7;   // s since the last wowLive() before it closes
+// ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
+const sysSFX_SHELF_HZ = 5500;   // the sfx bus: a shelf from here...
+const sysSFX_SHELF_DB = -5;     // ...this far down
+const sysSFX_TOP_HZ   = 11000;  // ...and nothing above this
+const sysMUS_SUB_HZ   = 38;     // the score: nothing under this (Antarctica's loudest bin was 23 Hz)
+const sysMUS_LIFT_K   = 0.72;   // the lift figure, against the bed: it peaked 8 dB over it
 const sysWOW_LIVE_BED   = 0.55;  // how far the live bed lifts the score at t = 1
 
 // --- THE PAD ----------------------------------------------------------------
@@ -5160,7 +5166,9 @@ const sysMUS_SHIM_L = 0.052;
 // in Kyoto and Hong Kong's A minor vamp in Mong Kok, because it is reading the
 // live palette. One layer, eleven characters, and no new score to maintain.
 const sysMUS_LIFT   = [79, 84, 88];      // G5, C6, E6 — above everything else
-const sysMUS_LIFT_L = [0.050, 0.040, 0.028];
+// 0.050/0.040/0.028 before S2: the three sustained voices measured as the
+// loudest thing in the score, 6–8 dB over the bed, on the hush palettes.
+const sysMUS_LIFT_L = [0.036, 0.029, 0.020];
 const sysMUS_LIFT_UP  = 1.4;             // s to bloom      (default; see `lift`)
 const sysMUS_LIFT_DN  = 9.0;             // s to be gone again
 const sysMUS_LIFT_ARP = 9;               // notes in the rising figure
@@ -6150,6 +6158,13 @@ const sysLETTERS = {
       ['r', 7, 7.4, 2.6, 6.6], ['r', 5, 7.4, 4.6, 2.3]],
   M: [12.4, ['r', 0.6, 2, 2.6, 12], ['r', 8.4, 2, 2.6, 12],
       ['p', '0.6,2 3.2,2 6.7,9.6 4.9,9.6'], ['p', '11,2 8.4,2 4.9,9.6 6.7,9.6']],
+  // O (S1) — for ABROAD. The D's lesson in reverse: a rectangle with a hole
+  // in it IS an O, so this one is chamfered on all four corners where the D
+  // is chamfered on two, and it is one polygon with the bowl cut by winding —
+  // the outer ring clockwise, the inner anticlockwise, the seam retraced so
+  // it has no area. Nonzero fill leaves the middle empty.
+  O: [12.6, ['p', '1,4.4 3.4,2 8.2,2 10.6,4.4 10.6,11.6 8.2,14 3.4,14 1,11.6 1,4.4 ' +
+            '3.6,4.6 3.6,11.4 8,11.4 8,4.6 3.6,4.6']],
 };
 /**
  * A word or three, cut. Returns an <svg> whose viewBox is exactly the mark's
@@ -10562,7 +10577,25 @@ export function createSystems(game) {
       acSubLP.Q.value = 0.5;
       acSubLP.frequency.value = sysSUB_OPEN;
       acSfxBus.connect(acSubLP);
-      acSubLP.connect(acMaster);
+      // ---- THE TOP, TAKEN OFF (S2) ------------------------------------------
+      // Measured (qa/s1-sfx.js): the score's energy above 5 kHz is nil in all
+      // nineteen palettes, and everything the player hears as "harsh" is on
+      // THIS bus — the noise voices. The cicada is 67% above 5 kHz, the geyser
+      // 38% at −15 dBFS, the rustle 32%, the cheer 20%, the hiss 19%, the
+      // splash 11%. Two nodes, once, for all of them rather than fifty voice
+      // edits: a shelf that takes five decibels off above 5.5 kHz, and a
+      // low-pass at 11 kHz that removes the last octave of fizz. Nothing below
+      // 4 kHz changes; a footstep is a footstep.
+      let sfxOut = acSubLP;
+      try {
+        const shelf = ac.createBiquadFilter();
+        shelf.type = 'highshelf'; shelf.frequency.value = sysSFX_SHELF_HZ; shelf.gain.value = sysSFX_SHELF_DB;
+        const top = ac.createBiquadFilter();
+        top.type = 'lowpass'; top.frequency.value = sysSFX_TOP_HZ; top.Q.value = 0.5;
+        acSubLP.connect(shelf); shelf.connect(top);
+        sfxOut = top;
+      } catch (e) { sfxOut = acSubLP; }
+      sfxOut.connect(acMaster);
     } catch (e) { acSfxBus = null; acSubLP = null; }
     // ---- THE ROOM, AND IT IS FOUR NODES -----------------------------------
     //
@@ -10756,6 +10789,29 @@ export function createSystems(game) {
   // a browser will not give anybody an AudioContext until one of those
   // happens, and the ones that DO start the game already get their music from
   // startGame. Idempotent: musicStart returns immediately once musVol exists.
+  // ---- ...AND IT TRIES TO PLAY BEFORE ANYBODY TOUCHES ANYTHING (S1) -------
+  // A browser will not run an AudioContext until the page has had a gesture —
+  // except when it will: Chrome lets a site the player has listened to before
+  // autoplay (its media-engagement score), Firefox and Safari can be set to,
+  // and a page reached by a click on the previous page often has activation
+  // already. So the card ASKS, once, at load: make the context, call resume,
+  // and if the browser says 'running' the score is up before the first press.
+  // If it says 'suspended' nothing has been lost — the gesture path below is
+  // untouched — and the console's one autoplay warning is the price. Called
+  // again on the context's own statechange, because a browser may grant the
+  // resume later than it answers the promise.
+  function titleAutoplay() {
+    if (started || musVol) return;
+    const c = audioEnsure();
+    if (!c) return;
+    const go = function () { if (!started && c.state === 'running') titleAudio(); };
+    try {
+      const p = c.resume && c.resume();
+      if (p && p.then) p.then(go, function () {});
+    } catch (e) {}
+    try { c.addEventListener('statechange', go); } catch (e) {}
+    setTimeout(go, 250);
+  }
   function titleAudio() {
     audioUnlock();
     if (started || !ac || musVol) return;
@@ -11458,9 +11514,10 @@ export function createSystems(game) {
     gg.exponentialRampToValueAtTime(0.1 * vol, t + 0.4);
     gg.exponentialRampToValueAtTime(0.0001, t + 1.05);
     // the sweep is in the filter, not the level: it reads as the jet passing you
-    bp.frequency.setValueAtTime(2600 * v, t + 0.3);
-    bp.frequency.exponentialRampToValueAtTime(6200 * v, t + 0.66);
-    bp.frequency.exponentialRampToValueAtTime(2400 * v, t + 1.05);
+    // the sweep topped at 6200 and read as a whistle in the top octave (S2)
+    bp.frequency.setValueAtTime(2400 * v, t + 0.3);
+    bp.frequency.exponentialRampToValueAtTime(4300 * v, t + 0.66);
+    bp.frequency.exponentialRampToValueAtTime(2200 * v, t + 1.05);
     ns.connect(hp); hp.connect(bp); bp.connect(g); g.connect(acMaster);
     ns.start(t); ns.stop(t + 1.1);
   }
@@ -12503,7 +12560,9 @@ export function createSystems(game) {
    */
   function sfxBurner(vol, pitch) {
     const t = ac.currentTime;
-    vol = sfxArg(vol, 1); pitch = sfxArg(pitch, 1);
+    // Measured at +1.1 dBFS post-limiter at volume 1 — the only voice in the
+    // table over the rail (S2). Half.
+    vol = sfxArg(vol, 1) * 0.5; pitch = sfxArg(pitch, 1);
     const v = rand(0.9, 1.14) * pitch;
     const dur = rand(1.1, 2.2);
     // the valve, first — a hard little click and then the gas catches
@@ -14417,7 +14476,11 @@ export function createSystems(game) {
       // NEGATIVE at fourteen notes and silently truncated any figure longer
       // than that, which is most of the interesting ones.
       const fall = shape === 'swell' ? -0.42 : 0.52;
-      const vel = 0.115 * (ch.vel || 1) * (1 - (n > 1 ? i / (n - 1) : 0) * fall)
+      // ...AND UNDER THE CEILING (S2). Measured post-limiter: the bed peaks
+      // at −13 dBFS and the lift figure peaked at −4.4 (Sơn Đoòng), −4.9
+      // (Palawan), −6.2 (the Drift) — the loudest thing in the score by eight
+      // decibels, on the two glass palettes whose whole argument is hush.
+      const vel = 0.115 * sysMUS_LIFT_K * (ch.vel || 1) * (1 - (n > 1 ? i / (n - 1) : 0) * fall)
                 * (0.55 + s * 0.45);
       if (vel > 0.004) {
         const g = sysMusLiftGap(shape, gap, i, n);
@@ -17165,7 +17228,20 @@ export function createSystems(game) {
     musOutLP.frequency.value = sysSUB_OPEN;
     musPlaceGain.connect(musDuckG);
     musDuckG.connect(musOutLP);
-    musOutLP.connect(acMaster);
+    // ---- AND NOTHING UNDER 38 Hz (S2) ---------------------------------------
+    // The loudest bin of the score, measured over eighteen seconds in every
+    // palette, was between 23 and 105 Hz — the bass drone — with the mids ten
+    // to fifteen decibels under it. On headphones that is weight; on a laptop
+    // it is nothing; on a good speaker it is mud. A high-pass at 38 Hz with a
+    // soft knee takes the rumble and leaves the note.
+    let musOut = musOutLP;
+    try {
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = sysMUS_SUB_HZ; hp.Q.value = 0.6;
+      musOutLP.connect(hp);
+      musOut = hp;
+    } catch (e) { musOut = musOutLP; }
+    musOut.connect(acMaster);
 
     // ---- THE SCORE WAS IN THE SAME ROOM IN ALL NINETEEN PLACES (v41) ------
     //
@@ -18325,8 +18401,8 @@ export function createSystems(game) {
     // graphic. A wordmark that costs a page its <h1> is not a wordmark, it
     // is a picture where a heading was.
     const h1 = sysEl('h1', 'capyui-mast');
-    h1.appendChild(sysBuildWordmark('Untitled Capybara Game'));
-    h1.appendChild(sysEl('span', 'capyui-sr', 'Untitled Capybara Game'));
+    h1.appendChild(sysBuildWordmark('Capybara Abroad'));
+    h1.appendChild(sysEl('span', 'capyui-sr', 'Capybara Abroad'));
     p1El.appendChild(h1);
   }
   p1El.appendChild(sysEl('div', 'capyui-sub',
@@ -28464,6 +28540,14 @@ export function createSystems(game) {
   // lands. Starting Sydney because somebody missed Reykjavik by four pixels
   // is the worst thing this card could do; on page two a stray click does
   // nothing at all, which is the correct amount.
+  // ANY press anywhere is the currency (S1): the buttons above each stop
+  // propagation and call titleAudio themselves, so this catches the rest —
+  // the backdrop, the page margin, a touch that lands nowhere — in the
+  // capture phase, before anything can swallow it. Harmless once the game has
+  // started (titleAudio returns at its first line).
+  document.addEventListener('pointerdown', function () { if (!started) titleAudio(); }, true);
+  document.addEventListener('touchend', function () { if (!started) titleAudio(); }, true);
+  titleAutoplay();
   titleEl.addEventListener('pointerdown', function (e) {
     e.preventDefault();
     // A press on the backdrop of page two does not start anything — but it is
@@ -38193,12 +38277,12 @@ export function createSystems(game) {
       // decided: an overcast afternoon is a softer touch, not a quieter mix.
       musSkyVel = 1 - skyCloud * sysMUS_SKY_VEL;
       sysAudioSet(musPad.gain, musPal.bus * (1 - musIntensity * 0.3) *
-        (1 + 0.5 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
+        (1 + 0.32 * lift) * (1 + calmLean * sysCALM_MUS) * musBreath *
         (1 + skyRain * sysMUS_SKY_BUS),
         nowA, lift > 0.02 ? 0.6 : 1.2);
       sysAudioSet(musFilt.frequency, Math.max(180,
         musPal.cut * (1 - clamp(calmLean, 0, 2) * 0.22) +
-        musIntensity * 780 + lift * 1100 - br * sysMUS_BREATH_CUT - skyCut),
+        musIntensity * 780 + lift * 760 - br * sysMUS_BREATH_CUT - skyCut),
         nowA, lift > 0.02 ? 0.7 : 1.4);
       // `musChaseHit` is P4's chase onset: a lean on the bottom of the band at
       // the moment somebody starts after you. A TERM in the one expression that

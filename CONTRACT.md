@@ -1,3 +1,66 @@
+## THE SOUND REVIEW, MEASURED — THE FRONT PAGE SINGS, THE NAME, AND THE TOP TAKEN OFF (S1, S2 — 11 Sep 2026)
+
+Asked for: the score from the first title page; a better name than *Untitled
+Capybara Game*; and a deep review of the soundtrack — serene, coherent, no
+harsh highs.
+
+### S1. THE FRONT PAGE, AND THE NAME
+
+**The card sings before anybody touches it, wherever the browser allows.**
+`titleAutoplay()` makes the context at load and calls `resume()`; if the
+browser answers `running` — Chrome does for a site the player has listened to
+before (media engagement), Firefox and Safari can be set to, and a page
+reached by a click on the last page often has activation — the title palette
+is up before the first press. If it answers `suspended`, one console warning
+and nothing lost: the gesture path is untouched, and it now listens to ANY
+press on the document in the capture phase (the backdrop, the margin, a
+touch that lands nowhere), not only the buttons. Headless Chromium says
+suspended → live on the first click; a returning player's Chrome says running.
+
+**The game is CAPYBARA ABROAD.** Same masthead, cut in the same stencil (an
+O cut for it: one polygon, outer ring clockwise, inner anticlockwise, the seam
+retraced so it has no area), same subtitle — *one capybara, 19 places, no
+supervision* — in `index.html`, the `<h1>`, the README. Nothing keys on the
+old string.
+
+### S2. THE MIX, MEASURED, NOT LISTENED TO
+
+Two instruments, both tapping the master **after** the limiter through a
+wrapped `createDynamicsCompressor` (`qa/s1-spectrum.js`, `qa/s1-sfx.js`):
+the score alone in all nineteen palettes for eighteen seconds each, and
+every voice in the sfx table alone.
+
+**The score has no top end at all.** Energy above 5 kHz: 0.00–0.09% in all
+nineteen; the loudest bin of every palette is between 23 and 105 Hz — the
+bass drone — with the mids ten to fifteen decibels under it. So the harshness
+a player hears is not the score. It is on the sfx bus:
+
+| voice | peak | above 5 kHz | after |
+|---|---|---|---|
+| cicada | −27.7 | **66.9%** | 42.5% |
+| geyser | −15.0 | **38.0%** | 14.4% |
+| rustle | −14.8 | **32.3%** | 10.6% |
+| cheer | −19.5 | 20.3% | 13.1% |
+| hiss | −17.4 | 19.4% (sweep to 6.2 kHz) | sweep to 4.3 kHz |
+| splash | −11.1 | 11.4% | 6.1% |
+| burner | **+1.1 dBFS** | — | −20.3 (halved) |
+
+Fixed with two nodes on the bus rather than fifty voice edits: a high-shelf
+−5 dB from 5.5 kHz and a low-pass at 11 kHz (`sysSFX_SHELF_*`,
+`sysSFX_TOP_HZ`). Nothing under 4 kHz changes.
+
+**And the lift was the loudest thing in the score.** The bed peaks at −13
+dBFS; `music.swell(1)` peaked at −4.4 (Sơn Đoòng), −4.9 (Palawan), −6.2
+(the Drift) — eight decibels over the bed, on the hush palettes. Three
+trims: the three sustained lift voices 0.050/0.040/0.028 → 0.036/0.029/
+0.020, the figure's velocity × 0.72 (`sysMUS_LIFT_K`), the pad's lean
+1.5× → 1.32× and its filter opening +1100 → +760 Hz. After: −6 to −7 on the
+three, which is a rise and not a jump.
+
+**And a high-pass at 38 Hz on the score** (`sysMUS_SUB_HZ`): Antarctica's
+loudest bin was 23 Hz. Weight on headphones, mud on a speaker, nothing on a
+laptop.
+
 ## THE BIG ONES — NAMED, LIVED, AND LIFTED (W1, W2 — 11 Sep 2026)
 
 Asked for: every chapter's marquee at four stars or better, twelve of the

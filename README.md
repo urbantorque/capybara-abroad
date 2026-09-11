@@ -1,4 +1,4 @@
-# Untitled Capybara Game — nineteen places, one rodent
+# Capybara Abroad — nineteen places, one rodent
 
 A physics sandbox where a mischievous capybara terrorises nineteen places: the Royal Botanic
 Gardens and the Opera House forecourt in Sydney; Sydney Harbour from Circular Quay out to
