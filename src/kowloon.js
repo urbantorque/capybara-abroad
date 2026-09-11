@@ -187,6 +187,47 @@ let hkFinaleWant = false;    // the eighth wheek, spent on the next beat
 const hkCONDUCT_MAX = 8;     // ...and how many that is
 const hkCONDUCT_COOL = 0.42; // s between wheeks that count
 let hkWaterMesh = null;
+// ============================================================ THE HELICOPTER ==
+// THE MARQUEE, AND IT IS YOURS TO FLY (X2).
+//
+// The scaffold roof was the place to WATCH the light show from. It is also a
+// helipad now: a small helicopter parked on the H, E at its door, and the
+// harbour is the room — W/S for forward and back, A/D to turn, Space held to
+// climb and let go to sink. Eight neon rings hang over the water between the
+// pier and the far shore, lit one at a time; through the eighth and the
+// skyline goes up all at once, which is the finale the wheeks used to have to
+// ask for. The show still conducts from the roof; this is the other way in,
+// and it is the one with a helicopter in it.
+//
+// KINEMATIC, LIKE EVERY VEHICLE HERE. There is no physics helicopter: a
+// position, a heading and a velocity, integrated by hand, with a floor that
+// is the roof over the deck and the water over the harbour, a ceiling, and a
+// wall along the pier so the town's facades are never something you can fly
+// into. The passenger is parked at the stick exactly as at a tiller.
+const hkHELI = { x: -20.5, z: -11, yaw: Math.PI };   // the H, on the harbour end of the deck
+const hkHELI_DOOR_R = 4.0;      // m from the pad E takes the stick
+const hkHELI_ACC   = 7.5;       // m/s² forward and back
+const hkHELI_VMAX  = 16.0;      // m/s
+const hkHELI_DRAG  = 0.9;       // /s
+const hkHELI_YAW   = 1.5;       // rad/s at full lock
+const hkHELI_UP    = 4.0;       // m/s climb, Space held
+const hkHELI_SINK  = 2.2;       // m/s sink, let go
+const hkHELI_CEIL  = 110;       // m
+const hkHELI_ROOF_R = 7;        // m from the H that still counts as the pad
+const hkRING_N     = 8;
+const hkRING_R     = 4.2;       // m, the hoop's radius
+const hkRING_TAKE  = 3.4;       // m from the centre that is "through"
+// the course: out over the harbour, up the far shore, back. x, y, z.
+const hkRINGS = [
+  [-26, 44, -70], [-52, 54, -100], [-30, 64, -135], [10, 50, -160],
+  [50, 64, -140], [72, 42, -105], [40, 30, -78], [0, 40, -60],
+];
+let hkHeliG = null, hkHeliRotor = null, hkHeliTail = null, hkHeliPadMesh = null;
+let hkHeliX = hkHELI.x, hkHeliY = hkROOF_Y, hkHeliZ = hkHELI.z, hkHeliYaw = hkHELI.yaw;
+let hkHeliVX = 0, hkHeliVY = 0, hkHeliVZ = 0, hkHeliBank = 0, hkHeliPitch = 0;
+let hkHeliOn = false, hkHeliCool = 0, hkHeliRotorK = 0, hkHeliMover = null, hkHeliAir = 0;
+let hkRingMeshes = null, hkRingMats = null, hkRingNext = 0, hkRingsDone = false, hkRingT = 0;
+let hkHeliTold = false, hkHeliBest = 0;
 let hkFerryGroup = null, hkFerryBody = null;
 let hkFerryT = 0, hkFerryDir = 1, hkFerryRideT = 0, hkFerryFrom = 0;
 let hkHornDone = false;
@@ -1245,6 +1286,231 @@ function hkBuildLitPanes(root) {
  * grid of 60 mm poles is a physics problem nobody wants and a velocity solve
  * against a plane is a physics problem that works.
  */
+/** The helicopter on its H, and the eight rings over the harbour (X2). */
+function hkBuildHeli(game, root) {
+  // the pad: a circle and an H, painted on the deck
+  const P = hkMerger();
+  P.cyl(hkHELI.x, hkROOF_Y + 0.006, hkHELI.z, 4.2, 0.012, 0x3a4348, 0, 0, 0, 16);
+  P.cyl(hkHELI.x, hkROOF_Y + 0.012, hkHELI.z, 3.7, 0.012, PALETTE.hkConcreteDk, 0, 0, 0, 16);
+  P.box(hkHELI.x - 1.1, hkROOF_Y + 0.02, hkHELI.z, 0.5, 0.012, 3.2, 0xe8e2d4);
+  P.box(hkHELI.x + 1.1, hkROOF_Y + 0.02, hkHELI.z, 0.5, 0.012, 3.2, 0xe8e2d4);
+  P.box(hkHELI.x, hkROOF_Y + 0.02, hkHELI.z, 1.8, 0.012, 0.5, 0xe8e2d4);
+  hkHeliPadMesh = new THREE.Mesh(P.build(), hkVC());
+  hkHeliPadMesh.receiveShadow = true;
+  root.add(hkHeliPadMesh);
+  // the machine: a bubble, a boom, a fin, two skids; the rotor is its own mesh
+  const g = new THREE.Group();
+  const K = hkMerger();
+  const body = PALETTE.hkNeonGold, dark = PALETTE.hkConcreteDk;
+  // AN OPEN CABIN, so the pilot is in the picture: a floor, a rear wall, two
+  // low sills and a windscreen, and the capybara sits in the middle of it.
+  K.box(0, 0.62, 0.2, 1.9, 0.30, 2.6, body);                       // the floor
+  // the sills are LOW (top at 0.95): the pilot's feet are at 0.77 and the
+  // lens is behind and above, so anything taller is a lid on the pilot
+  K.box(0, 0.86, -1.05, 1.9, 0.18, 0.16, body);                    // the rear sill
+  K.box(-0.88, 0.86, 0.2, 0.14, 0.18, 2.6, body);                  // the sills
+  K.box(0.88, 0.86, 0.2, 0.14, 0.18, 2.6, body);
+  K.box(0, 1.35, 1.35, 1.7, 1.1, 0.10, 0x9fd8ff, -0.35, 0, 0);     // the windscreen
+  // no canopy: the camera is above and behind, and a roof is a lid on the pilot
+  K.box(0, 1.35, -2.4, 0.5, 0.45, 3.4, body);                      // the boom
+  K.box(0, 2.0, -4.0, 0.16, 1.1, 0.7, body);                       // the fin
+  K.cyl(0.35, 1.95, -4.05, 0.55, 0.06, dark, 0, 0, Math.PI / 2, 8); // the tail rotor
+  K.box(0, 1.75, -0.7, 0.32, 0.9, 0.32, dark);                      // the mast, off the rear wall
+  for (let sd = -1; sd <= 1; sd += 2) {
+    K.box(sd * 0.95, 0.12, 0.2, 0.12, 0.12, 3.0, dark);            // a skid
+    K.box(sd * 0.75, 0.55, -0.6, 0.08, 0.8, 0.08, dark, 0, 0, sd * 0.45);
+    K.box(sd * 0.75, 0.55, 1.0, 0.08, 0.8, 0.08, dark, 0, 0, sd * 0.45);
+  }
+  const m = new THREE.Mesh(K.build(), hkVC());
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  const R = hkMerger();
+  R.box(0, 0, 0, 7.6, 0.06, 0.34, dark);
+  R.box(0, 0, 0, 0.34, 0.06, 7.6, dark);
+  hkHeliRotor = new THREE.Mesh(R.build(), hkVC());
+  hkHeliRotor.position.set(0, 2.22, -0.5);
+  hkHeliRotor.castShadow = true;
+  g.add(hkHeliRotor);
+  // a red light on the boom, so it reads at night
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), hkGlowMat(0xff4040, 2.2));
+  lamp.position.set(0, 2.6, -4.0);
+  g.add(lamp);
+  hkHeliTail = lamp;
+  g.position.set(hkHeliX, hkHeliY, hkHeliZ);
+  g.rotation.y = hkHeliYaw;
+  root.add(g);
+  hkHeliG = g;
+  // the rings
+  hkRingMeshes = []; hkRingMats = [];
+  const tg = new THREE.TorusGeometry(hkRING_R, 0.28, 6, 22);
+  for (let i = 0; i < hkRING_N; i++) {
+    const col = hkNEON_COLS[i % hkNEON_COLS.length];
+    const mat = hkGlowMat(col, 0.5);
+    const ring = new THREE.Mesh(tg, mat);
+    const r = hkRINGS[i];
+    ring.position.set(r[0], r[1], r[2]);
+    // face the ring at the previous one, so the course reads as a line
+    const p = hkRINGS[(i + hkRING_N - 1) % hkRING_N];
+    ring.rotation.y = Math.atan2(r[0] - p[0], r[2] - p[2]);
+    ring.castShadow = false; ring.receiveShadow = false;
+    ring.userData.noShadow = true;
+    root.add(ring);
+    hkRingMeshes.push(ring); hkRingMats.push(mat);
+  }
+}
+function hkHeliTake(game) {
+  const capy = game.capy;
+  hkHeliOn = true; hkHeliCool = 0.4;
+  if (capy) { capy.atHelm = true; capy.rideBody = null; }
+  hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkHeliAir = 0;
+  hkSfx('chime', { volume: 0.6, pitch: 0.95 });
+  hkSay('W/S forward and back · A/D turn · hold Space to climb, let go to sink · E on the H to get out');
+  if (!hkRingsDone) hkRingNext = 0;
+}
+function hkHeliLeave(game) {
+  const capy = game.capy;
+  hkHeliOn = false; hkHeliCool = 0.4;
+  if (capy) capy.atHelm = false;
+  if (capy && capy.body) {
+    const ox = hkHeliX + 2.2 * Math.cos(hkHeliYaw), oz = hkHeliZ - 2.2 * Math.sin(hkHeliYaw);
+    capy.body.position.set(ox, hkROOF_Y + 0.9, oz);
+    capy.body.velocity.set(0, 0, 0);
+    capy.body.previousPosition.copy(capy.body.position);
+    capy.body.interpolatedPosition.copy(capy.body.position);
+    if (capy.position) capy.position.set(ox, hkROOF_Y + 0.9, oz);
+  }
+}
+/** Is (x, z) over the roof deck the pad is on. */
+function hkOverDeck(x, z) {
+  return x > hkSCAF.x - 8.6 - 9.4 && x < hkSCAF.x - 8.6 + 9.4 && z > -16 && z < 16;
+}
+function hkUpdateHeli(game, dt) {
+  if (!hkHeliG || dt <= 0) return;
+  const input = game.input, capy = game.capy;
+  if (hkHeliCool > 0) hkHeliCool -= dt;
+  const onPad = Math.hypot(hkHeliX - hkHELI.x, hkHeliZ - hkHELI.z) < hkHELI_ROOF_R && hkHeliY < hkROOF_Y + 0.6;
+  // ---- the door -----------------------------------------------------------
+  if (capy && capy.body && input && input.actionPressed && hkHeliCool <= 0) {
+    if (hkHeliOn) {
+      if (onPad) hkHeliLeave(game);
+      else hkSay('back to the H on the roof to get out — let go of Space and she sinks');
+    } else if (!capy.carriedBy && !capy.atHelm && !capy.climbing) {
+      const dx = capy.body.position.x - hkHeliX, dz = capy.body.position.z - hkHeliZ;
+      const dy = capy.body.position.y - hkHeliY;
+      if (dx * dx + dz * dz < hkHELI_DOOR_R * hkHELI_DOOR_R && dy > -2 && dy < 3) hkHeliTake(game);
+    }
+  }
+  // ---- the rotor, the sound -----------------------------------------------
+  hkHeliRotorK = damp(hkHeliRotorK, hkHeliOn ? 1 : 0, hkHeliOn ? 1.6 : 0.8, dt);
+  if (hkHeliRotor) hkHeliRotor.rotation.y += hkHeliRotorK * 34 * dt;
+  if (hkHeliTail) hkHeliTail.material.emissiveIntensity = 1.2 + Math.sin(hkTime * 9) * 1.0;
+  if (!hkHeliMover && game.sfxMover) hkHeliMover = game.sfxMover('prop', { key: 'hk:heli', near: 8, far: 160 });
+  if (hkHeliMover) {
+    hkHeliMover.at(hkHeliX, hkHeliY + 2, hkHeliZ);
+    hkHeliMover.vel(hkHeliVX, hkHeliVY, hkHeliVZ);
+    hkHeliMover.set(hkHeliRotorK * (0.5 + 0.5 * clamp(Math.hypot(hkHeliVX, hkHeliVZ) / hkHELI_VMAX + Math.max(0, hkHeliVY) / hkHELI_UP, 0, 1)));
+    hkHeliMover.amp(hkHeliRotorK);
+  }
+  // ---- the rings' glow: the next one bright and breathing, the rest dim ---
+  hkRingT += dt;
+  if (hkRingMats) {
+    for (let i = 0; i < hkRING_N; i++) {
+      const next = !hkRingsDone && i === hkRingNext && hkHeliOn;
+      const done = hkRingsDone || i < hkRingNext;
+      const want = next ? 1.6 + Math.sin(hkRingT * 5) * 0.8 : done ? 0.9 : 0.35;
+      hkRingMats[i].emissiveIntensity = damp(hkRingMats[i].emissiveIntensity, want, 6, dt);
+    }
+  }
+  if (!hkHeliOn) return;
+  // ---- the stick ----------------------------------------------------------
+  const fwd = input ? clamp(-input.z, -1, 1) : 0;
+  const turn = input ? clamp(input.x, -1, 1) : 0;
+  const lift = !!(input && input.jump);
+  hkHeliYaw -= turn * hkHELI_YAW * dt;
+  const sn = Math.sin(hkHeliYaw), cs = Math.cos(hkHeliYaw);
+  hkHeliVX += sn * fwd * hkHELI_ACC * dt;
+  hkHeliVZ += cs * fwd * hkHELI_ACC * dt;
+  const hv = Math.hypot(hkHeliVX, hkHeliVZ);
+  const dragK = Math.max(0, 1 - hkHELI_DRAG * dt);
+  hkHeliVX *= dragK; hkHeliVZ *= dragK;
+  if (hv > hkHELI_VMAX) { hkHeliVX *= hkHELI_VMAX / hv; hkHeliVZ *= hkHELI_VMAX / hv; }
+  hkHeliVY = damp(hkHeliVY, lift ? hkHELI_UP : -hkHELI_SINK, 3.5, dt);
+  hkHeliX += hkHeliVX * dt; hkHeliY += hkHeliVY * dt; hkHeliZ += hkHeliVZ * dt;
+  // ---- the room: a floor, a ceiling, and walls ----------------------------
+  const overDeck = hkOverDeck(hkHeliX, hkHeliZ);
+  const inColumn = Math.abs(hkHeliX - (hkSCAF.x - 8.6)) < 9.4;
+  // the deck is a floor; the corridor from the deck out to the pier is roof
+  // height (the streets are under it, and you are never let below the
+  // roofline there — see zMax); the harbour is the water
+  const floor = overDeck ? hkROOF_Y : (hkHeliZ > hkPIER_Z ? (inColumn ? hkROOF_Y : 46) : 0.9);
+  if (hkHeliY < floor) {
+    hkHeliY = floor;
+    if (hkHeliVY < -1.2 && !overDeck) { hkSfx('splash', { volume: 0.3, pitch: 0.8 }); }
+    hkHeliVY = 0;
+    if (overDeck) { hkHeliVX *= 0.5; hkHeliVZ *= 0.5; }
+  }
+  if (hkHeliY > hkHELI_CEIL) { hkHeliY = hkHELI_CEIL; hkHeliVY = Math.min(0, hkHeliVY); }
+  // the town is behind you: south of the pier only, unless you are coming
+  // down onto the deck
+  const zMax = (inColumn && hkHeliY < hkROOF_Y + 14) ? 16 : hkPIER_Z + 4;
+  if (hkHeliZ > zMax) { hkHeliZ = zMax; hkHeliVZ = Math.min(0, hkHeliVZ); }
+  if (hkHeliZ < hkSHORE_Z + 6) { hkHeliZ = hkSHORE_Z + 6; hkHeliVZ = Math.max(0, hkHeliVZ); }
+  if (hkHeliX > 170) { hkHeliX = 170; hkHeliVX = Math.min(0, hkHeliVX); }
+  if (hkHeliX < -170) { hkHeliX = -170; hkHeliVX = Math.max(0, hkHeliVX); }
+  hkHeliAir += dt;
+  if (hkHeliY - hkROOF_Y > hkHeliBest) hkHeliBest = hkHeliY - hkROOF_Y;
+  // ---- the rings ----------------------------------------------------------
+  if (!hkRingsDone && hkRingNext < hkRING_N) {
+    const r = hkRINGS[hkRingNext];
+    const d = Math.hypot(hkHeliX - r[0], hkHeliY - r[1], hkHeliZ - r[2]);
+    if (d < hkRING_TAKE) {
+      hkRingNext++;
+      hkSfx('chime', { volume: 0.5, pitch: 0.9 + hkRingNext * 0.07, force: true });
+      if (typeof game.confetti === 'function') game.confetti(hkHeliX, hkHeliY + 1, hkHeliZ, 10);
+      if (typeof game.punch === 'function') game.punch(0.06);
+      if (hkRingNext >= hkRING_N) {
+        hkRingsDone = true;
+        // THE EIGHTH RING IS THE EIGHTH WHEEK: the show comes on if it is not
+        // on, and the finale is spent on the next beat.
+        if (hkShowT < 0) hkPhase = hkSHOW_ON + 0.002;
+        hkFinaleWant = true;
+        hkConductN = hkCONDUCT_MAX;
+        hkToast('all eight. the whole shore is yours.');
+      }
+    }
+  }
+  // ---- the pose, the passenger, the line ----------------------------------
+  hkHeliBank = damp(hkHeliBank, -turn * 0.28 - (hkHeliVX * cs - hkHeliVZ * sn) * 0.012, 4, dt);
+  hkHeliPitch = damp(hkHeliPitch, clamp((hkHeliVX * sn + hkHeliVZ * cs) * 0.022, -0.25, 0.25), 4, dt);
+  hkHeliG.position.set(hkHeliX, hkHeliY, hkHeliZ);
+  hkEu.set(hkHeliPitch, hkHeliYaw, hkHeliBank, 'YXZ');
+  hkHeliG.quaternion.setFromEuler(hkEu);
+  if (capy && capy.body) {
+    const cb = capy.body;
+    cb.position.set(hkHeliX + sn * 0.3, hkHeliY + 1.5, hkHeliZ + cs * 0.3);
+    cb.velocity.set(hkHeliVX, hkHeliVY, hkHeliVZ);
+    cb.angularVelocity.set(0, 0, 0);
+    cb.previousPosition.copy(cb.position);
+    cb.interpolatedPosition.copy(cb.position);
+    if (capy.position) capy.position.set(cb.position.x, cb.position.y, cb.position.z);
+    if (capy.group) {
+      capy.group.position.set(cb.position.x, cb.position.y, cb.position.z);
+      capy.group.rotation.y = hkHeliYaw;
+    }
+  }
+  if (typeof game.wowLive === 'function' && !hkShowDone) {
+    if (!hkRingsDone) {
+      const r = hkRINGS[hkRingNext];
+      const d = Math.hypot(hkHeliX - r[0], hkHeliY - r[1], hkHeliZ - r[2]);
+      const up = r[1] - hkHeliY;
+      game.wowLive('ring ' + (hkRingNext + 1) + ' of ' + hkRING_N + ' · ' + Math.round(d) + ' m' +
+                   (up > 4 ? ' · higher — hold Space' : up < -4 ? ' · lower — let go' : '') +
+                   ' · ' + Math.round(hkHeliY) + ' m up', hkRingNext / hkRING_N);
+    } else if (hkShowT >= 0) {
+      game.wowLive('the finale · ' + hkLitCount + ' of ' + hkTOWER_N + ' towers · ' + Math.round(hkHeliY) + ' m up', 1);
+    }
+  }
+}
 function hkBuildScaffold(game, root) {
   const M = hkMerger();
   const lash = [];
@@ -3650,7 +3916,8 @@ function hkUpdateShow(game, dt) {
   if (!hkShowDone) {
     const cp0 = game.capy && game.capy.position;
     const inWin = hkPhase >= hkSHOW_ON && hkPhase < hkSHOW_OFF;
-    if (cp0 && cp0.y > hkSHOW_ROOF && !inWin) rate = hkHURRY;
+    // ...and not from the helicopter (X2): its finale is the eighth ring
+    if (cp0 && cp0.y > hkSHOW_ROOF && !inWin && !hkHeliOn) rate = hkHURRY;
   }
   hkPhase += dt * rate / hkCYCLE;
   while (hkPhase >= 1) hkPhase -= 1;
@@ -3747,8 +4014,10 @@ function hkUpdateShow(game, dt) {
   // asked for it on the roof. Between the two, the paper counts the wheeks.
   if (!hkShowDone && hkShowT >= 0) {
     const capy = game.capy;
-    const up = !!(capy && capy.position && capy.position.y > hkSHOW_ROOF);
-    if (up && typeof game.wowLive === 'function') {
+    // X2: from the helicopter the tick is the rings and then the finale; the
+    // roof's own two ways in do not fire under a pilot who has three to go
+    const up = !!(capy && capy.position && capy.position.y > hkSHOW_ROOF) && (!hkHeliOn || hkRingsDone);
+    if (up && !hkHeliOn && typeof game.wowLive === 'function') {
       game.wowLive('on the roof · ' + hkLitCount + ' of ' + hkTOWER_N + ' towers lit · wheek ' +
                    Math.min(hkConductN, hkCONDUCT_MAX) + ' of ' + hkCONDUCT_MAX + ' for the finale',
                    Math.max(hkConductN / hkCONDUCT_MAX, hkLitCount / hkTOWER_N));
@@ -4912,6 +5181,10 @@ export function createKowloon(game) {
       // chapter you come back to opens the way it opened the first time.
       hkPhase = 0.06;
       hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false; hkSoonSaid = false;
+      // X2: the helicopter is back on its H and the rings are unlit
+      hkHeliX = hkHELI.x; hkHeliY = hkROOF_Y; hkHeliZ = hkHELI.z; hkHeliYaw = hkHELI.yaw;
+      hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkRingNext = 0; hkRingsDone = false;
+      if (hkHeliG) { hkHeliG.position.set(hkHeliX, hkHeliY, hkHeliZ); hkHeliG.rotation.set(0, hkHeliYaw, 0); }
       hkSkyward = 0;
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0;
       hkSignSway = 0; hkSignSwayV = 0;
@@ -4958,6 +5231,9 @@ export function createKowloon(game) {
       // Anything stateful that could hold the player, cleared on the way out.
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0; hkShowT = -1;
       hkLionShredT = -1; hkBusRideT = 0; hkHarbourT = 0;
+      // X2: nobody flies out of a country
+      if (hkHeliOn) { hkHeliOn = false; if (game.capy) game.capy.atHelm = false; }
+      if (hkHeliMover) hkHeliMover.set(0);
     },
   });
 
@@ -4996,6 +5272,20 @@ export function createKowloon(game) {
     climbHold: hkClimbHold,
     /** W4: where the bamboo meets the pavement — the arrow's target from the street. */
     scaffoldFoot: { x: hkSCAF.x + hkSCAF.out + 1.2, y: 0.5, z: 0 },
+    // ---- THE HELICOPTER (X2) ---------------------------------------------
+    heli() { return { on: hkHeliOn, x: hkHeliX, y: hkHeliY, z: hkHeliZ, yaw: hkHeliYaw, ring: hkRingNext, rings: hkRING_N, done: hkRingsDone, air: hkHeliAir, best: hkHeliBest }; },
+    heliPad: { x: hkHELI.x, y: hkROOF_Y, z: hkHELI.z },
+    ringAt(i) { const r = hkRINGS[Math.max(0, Math.min(hkRING_N - 1, i | 0))]; return { x: r[0], y: r[1], z: r[2] }; },
+    heliDebug(o) {
+      if (o && o.take && !hkHeliOn) hkHeliTake(hkGame);
+      if (o && typeof o.x === 'number') { hkHeliX = o.x; hkHeliY = o.y; hkHeliZ = o.z; hkHeliVX = hkHeliVY = hkHeliVZ = 0; }
+      return this.heli();
+    },
+    rideYaw() { return hkHeliOn ? hkHeliYaw : NaN; },
+    rig() {
+      if (!hkHeliOn) return null;
+      return { w: 1, dist: 15, pitch: 0.22, raise: 1.0, lambda: 3.0 };
+    },
     // A jump between two bamboo poles eleven metres over a road is a jump you
     // should be able to steer. Not the Drift's 0.64 — that is a world where the
     // jump IS the traversal — but well clear of the kerb-hopping default.
@@ -5043,6 +5333,7 @@ export function createKowloon(game) {
       hkTime += dt;
 
       hkUpdateShow(game, dt);
+      hkUpdateHeli(game, dt);   // X2
       hkUpdateBus(game, dt);
       hkUpdateLion(game, dt);
       hkUpdateFerry(game, dt);
@@ -5128,6 +5419,7 @@ function hkBuild(game) {
   hkBuildPax(hkBusGroup);
   hkBuildLion(game, hkRoot);
   hkBuildScaffold(game, hkRoot);
+  hkBuildHeli(game, hkRoot);   // X2: the marquee is a helicopter
   hkBuildPoles(game, hkRoot);
   hkBuildNeon(game, hkRoot);
   hkBuildWetRoad(hkRoot);

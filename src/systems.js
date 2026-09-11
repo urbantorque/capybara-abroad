@@ -859,6 +859,7 @@ const sysWOW_SLOW_T  = 0.75;
 // flourish. The watchdog closes it, so a chapter that stops calling cannot
 // leave the paper saying NOW.
 const sysWOW_LIVE_STALE = 0.7;   // s since the last wowLive() before it closes
+const hkROOF_HINT = 30;          // m: above this in Hong Kong you are on the roof (X2)
 // ---- THE MIX, MEASURED (S2). See qa/s1-spectrum.js and qa/s1-sfx.js. ------
 const sysSFX_SHELF_HZ = 5500;   // the sfx bus: a shelf from here...
 const sysSFX_SHELF_DB = -5;     // ...this far down
@@ -23611,8 +23612,12 @@ export function createSystems(game) {
     'symphony':       { clue: function () {
                       const k = game.kowloon;
                       if (!k) return 'be somewhere high when it starts';
-                      if (k.showing()) return 'IT IS ON. up the bamboo (hold E, push), then Q from the roof';
-                      return 'hold E on the bamboo and push up. on the roof, Q at the skyline';
+                      const h = typeof k.heli === 'function' ? k.heli() : null;
+                      if (h && h.on && !h.done) return 'W forward · A/D turn · hold Space to climb · through the lit ring';
+                      if (h && h.on) return 'the shore is going up. E on the H when you want down';
+                      const p = game.capy && game.capy.position;
+                      if (p && p.y > hkROOF_HINT) return 'the helicopter on the H: press E at its door';
+                      return 'hold E on the bamboo and push up. the helicopter is on the roof';
                     },
                     // the FOOT of the scaffold from the pavement, the roof once you
                     // are on the bamboo (W4): an arrow at a point 34 m up reads as
@@ -23622,7 +23627,9 @@ export function createSystems(game) {
                       if (!k) return null;
                       const p = game.capy && game.capy.position;
                       if (p && p.y < 3 && k.scaffoldFoot) return hintObj(k.scaffoldFoot);
-                      return hintObj(k.roof);
+                      const h = typeof k.heli === 'function' ? k.heli() : null;
+                      if (h && h.on && !h.done && typeof k.ringAt === 'function') return hintObj(k.ringAt(h.ring));
+                      return hintObj(k.heliPad || k.roof);
                     } },
     'bus-top': { clue: 'one hop to the rear platform, then up the stair',
                     where: function () { return hintObj(game.kowloon && game.kowloon.bus && game.kowloon.bus()); } },

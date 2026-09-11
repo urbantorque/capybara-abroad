@@ -2825,7 +2825,9 @@ export const TASKS = [
   { id: 'laundry-pole', text: 'Cross the street on the laundry poles',  chapter: 11, act: 2 },
   { id: 'wet-market',   text: 'Let the fish out at the wet market',     chapter: 11 },
   { id: 'neon-sign',    text: 'Hang off the biggest sign in Mong Kok',  chapter: 11, act: 2 },
-  { id: 'symphony',     text: 'Conduct the harbour light show from the rooftop', chapter: 11, act: 2, wow: 'THE LIGHT SHOW' },
+  // The marquee, and it is a helicopter (X2): off the scaffold roof, through
+  // the eight rings over the harbour, and the skyline goes up for you.
+  { id: 'symphony',     text: 'Fly the helicopter through the eight rings over the harbour', chapter: 11, act: 2, wow: 'THE HELICOPTER' },
   { id: 'star-ferry',   text: 'Take the Star Ferry like a commuter',     chapter: 11, act: 3 },
   // Sydney sounds off under the Bridge and it is the best thirty seconds in
   // chapter three. This ship has had a horn on it since 1957.
@@ -3341,7 +3343,7 @@ export const CHAPTERS = [
     // point eleven metres over it is eleven metres of empty sky — measured, in
     // qa/MF-kowloon.png, which framed black. The subject is the roof you have
     // to be standing on and the wall of neon under it, not the air above both.
-    marquee: { x: -19.1, z: 0, up: 34, say: 'the scaffold roof' },
+    marquee: { x: -20.5, z: -11, up: 34, say: 'the helicopter on the scaffold roof' },
     note: 'You spent most of this chapter above the people who live in it.',
     acts: [
       { kick: 'MONG KOK', line: 'nothing on this street is at ground level.' },

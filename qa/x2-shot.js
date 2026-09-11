@@ -1,0 +1,15 @@
+async page => {
+  await page.setViewportSize({ width: 1200, height: 700 })
+  await page.addInitScript(() => { try { localStorage.clear() } catch (e) {} })
+  await page.reload(); await page.waitForTimeout(4500)
+  await page.keyboard.press('Digit1'); await page.waitForTimeout(3500)
+  await page.evaluate(() => window.__capy.biome.switchTo('kowloon')); await page.waitForTimeout(3500)
+  const pad = await page.evaluate(() => window.__capy.kowloon.heliPad)
+  await page.evaluate(([x, y, z]) => { const g = window.__capy; const b = g.capy.body; b.position.set(x, y, z); b.velocity.set(0, 0, 0); b.previousPosition.copy(b.position); b.interpolatedPosition.copy(b.position) }, [pad.x + 2.6, pad.y + 1, pad.z + 1])
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: 'qa/x2-pad0.png' })
+  await page.keyboard.press('KeyE'); await page.waitForTimeout(2500)
+  await page.keyboard.down('Space'); await page.waitForTimeout(2500); await page.keyboard.down('KeyW'); await page.waitForTimeout(2500)
+  await page.screenshot({ path: 'qa/x2-fly.png' }); await page.screenshot({ path: 'qa/x2-flyz.png', clip: { x: 480, y: 280, width: 240, height: 180 } })
+  await page.keyboard.up('Space'); await page.keyboard.up('KeyW')
+}
