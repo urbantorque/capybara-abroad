@@ -264,10 +264,26 @@ let panCaimanSat = -1, panCaimanNotice = 0;
 // The same shape as the onça and the skua — the animal's voice spent on
 // somebody else's behalf — in the one place the chapter is for.
 const panHUNT_V = 2.7;          // m/s in the water; the herd swims about 1.8
-const panHUNT_HEAR = 16;        // m: a wheek nearer than this turns it
+const panHUNT_HEAR = 20;        // m: a wheek nearer than this turns it
 const panHUNT_TAKE = 1.5;       // m from the last follower: it has it
+// ---- ...AND IT IS O GRANDÃO NOW (X4): a mini-boss, in three rounds ---------
+// The one in the water was a single beat: a wheek and it was gone. Now it is
+// THE BIG ONE — drawn at twice the size of the fourteen on the banks — and it
+// takes three. Each wheek inside panHUNT_HEAR sends it under; it comes back
+// up a few seconds later from a different side, closer and quicker; the third
+// sends it down for good, with a splash the whole line turns round for. If it
+// reaches the tail it takes one and dives for a breath, and comes back for
+// the next — so the cost of ignoring it is the line getting shorter, and the
+// way to keep the line is the voice.
+const panBOSS_LIVES = 3;
+const panBOSS_SCALE = 2.0;
+const panBOSS_UNDER = [3.2, 2.6, 0];     // s under after the 1st, 2nd hit
+const panBOSS_BACK_R = [22, 16];         // m from the tail it comes back up
+const panBOSS_V = [2.7, 3.3, 3.9];       // m/s in each round
+const panBOSS_BREATH = 4.5;              // s under after a take
 let panHuntI = -1, panHuntOn = false, panHuntDone = false, panHuntT = 0, panHuntRip = 0;
 let panHuntTook = 0, panHuntSaved = 0;
+let panBossLives = panBOSS_LIVES, panBossRound = 0, panBossUnder = 0, panBossBeaten = false, panBossHits = 0;
 /** The last capybara on the line, or null. */
 function panLastFollower() {
   let best = null;
@@ -296,16 +312,33 @@ function panHuntStart(game) {
   const c = panCaimanAt[bi];
   c.hunt = 1; c.hx = c.x; c.hz = c.z; c.hyaw = c.yaw0;
   panHuntI = bi; panHuntOn = true; panHuntT = 0;
-  panRipple(c.x, c.z, 1.6);
-  panSfx.volume = 0.32; panSfx.pitch = 0.6;
-  game.sfx('splash', placeCue(panSfx, c.x, panWATER, c.z, 60));
-  if (typeof game.toast === 'function') game.toast('one of them is in the water, and it is behind the last one. wheek at it.');
+  panBossLives = panBOSS_LIVES; panBossRound = 0; panBossUnder = 0; panBossBeaten = false; panBossHits = 0;
+  panRipple(c.x, c.z, 2.6);
+  panSfx.volume = 0.5; panSfx.pitch = 0.45;
+  game.sfx('splash', placeCue(panSfx, c.x, panWATER, c.z, 80));
+  if (typeof game.punch === 'function') game.punch(0.10);
+  if (typeof game.toast === 'function') game.toast('O GRANDÃO. the big one is in the water behind the last of them. wheek at it — it takes three.');
 }
 function panHuntEnd(game, how) {
   const c = panHuntI >= 0 ? panCaimanAt[panHuntI] : null;
-  panHuntOn = false;
-  if (c) { c.hunt = 0; c.gone = 3.0; }     // under for three seconds, then back where it was
-  if (how === 'took') panHuntTook++; else if (how === 'turned') panHuntSaved++;
+  panHuntOn = false; panBossUnder = 0;
+  if (c) { c.hunt = 0; c.gone = how === 'beaten' ? 12.0 : 3.0; }   // under, then back on its bank
+  if (how === 'took') panHuntTook++; else if (how === 'turned' || how === 'beaten') panHuntSaved++;
+}
+/** Where O Grandão comes back up: r metres from the tail, off to one side. */
+function panBossResurface(game, r) {
+  const c = panCaimanAt[panHuntI];
+  const tail = panLastFollower();
+  const cp = game.capy && game.capy.body ? game.capy.body.position : null;
+  const ax = tail ? tail.x : (cp ? cp.x : c.x), az = tail ? tail.z : (cp ? cp.z : c.z);
+  // upstream or down, whichever side it was not on; never on the banks
+  const side = Math.random() < 0.5 ? -1 : 1;
+  c.hx = clamp(ax + side * r, -120, 120);
+  c.hz = clamp(az + rand(-4, 4), panRIVER.z0 + 3, panRIVER.z1 - 3);
+  c.hunt = 1;
+  panRipple(c.hx, c.hz, 2.6);
+  panSfx.volume = 0.45; panSfx.pitch = 0.5;
+  game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 80));
 }
 function panUpdateHunt(game, dt, p) {
   if (!panHuntOn) {
@@ -321,16 +354,26 @@ function panUpdateHunt(game, dt, p) {
   const tail = panLastFollower();
   // ...and it does not follow the line up the bank: out of the water, out of reach
   if (!tail || panCrossT <= 0 || tail.z > panRIVER.z1 + 1 || tail.z < panRIVER.z0 - 1) { panHuntEnd(game, 'lost'); return; }
+  const across = clamp((panRIVER.z1 - p.z) / (panRIVER.z1 - panRIVER.z0), 0, 1);
+  let hearts = '';
+  for (let i = 0; i < panBOSS_LIVES; i++) hearts += i < panBossLives ? '♥' : '♡';
+  const wl = typeof game.wowLive === 'function' && !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'));
+  // ---- under, between rounds ------------------------------------------
+  if (panBossUnder > 0) {
+    panBossUnder -= dt;
+    if (wl) game.wowLive('O GRANDÃO ' + hearts + ' · under · back in ' + Math.ceil(panBossUnder) + ' s', across);
+    if (panBossUnder <= 0) panBossResurface(game, panBOSS_BACK_R[Math.min(panBossRound, panBOSS_BACK_R.length - 1)]);
+    return;
+  }
   const dx = tail.x - c.hx, dz = tail.z - c.hz;
   const d = Math.hypot(dx, dz) || 1;
-  const step = Math.min(d, panHUNT_V * dt);
+  const step = Math.min(d, panBOSS_V[Math.min(panBossRound, panBOSS_V.length - 1)] * dt);
   c.hx += dx / d * step; c.hz += dz / d * step;
   c.hyaw = Math.atan2(dx, dz);
   panHuntRip -= dt;
-  if (panHuntRip <= 0) { panHuntRip = 0.22; panRipple(c.hx, c.hz, 0.9); }
-  if (typeof game.wowLive === 'function' && !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'))) {
-    game.wowLive('a jacaré on the line · ' + Math.round(d) + ' m behind the last one · WHEEK',
-                 clamp((panRIVER.z1 - p.z) / (panRIVER.z1 - panRIVER.z0), 0, 1));
+  if (panHuntRip <= 0) { panHuntRip = 0.18; panRipple(c.hx, c.hz, 1.4); }
+  if (wl) {
+    game.wowLive('O GRANDÃO ' + hearts + ' · ' + Math.round(d) + ' m behind the last one · WHEEK at it', across);
   }
   if (d < panHUNT_TAKE) {
     // it has the last one: off the line, a splash, and away to the far bank
@@ -340,21 +383,41 @@ function panUpdateHunt(game, dt, p) {
     panSfx.volume = 0.6; panSfx.pitch = 0.5;
     game.sfx('splash', placeCue(panSfx, tail.x, panWATER, tail.z, 80));
     if (typeof game.punch === 'function') game.punch(0.12);
-    if (typeof game.toast === 'function') game.toast('it took the last one off the line. it will be on the far bank, sulking.');
-    panHuntEnd(game, 'took');
+    if (typeof game.toast === 'function') game.toast('it took the last one. it will be on the far bank, sulking — and the big one is coming back for the next.');
+    panHuntTook++;
+    // a breath, and it comes back for the next one: the line is the stake
+    c.hunt = 0; panBossUnder = panBOSS_BREATH;
   }
 }
 /** A wheek near the hunter turns it. Called from panWheek. */
 function panHuntHear(game, p) {
-  if (!panHuntOn || !p) return false;
+  if (!panHuntOn || !p || panBossUnder > 0) return false;
   const c = panCaimanAt[panHuntI];
   const dx = c.hx - p.x, dz = c.hz - p.z;
   if (dx * dx + dz * dz > panHUNT_HEAR * panHUNT_HEAR) return false;
-  panRipple(c.hx, c.hz, 2.0);
-  panSfx.volume = 0.45; panSfx.pitch = 0.55;
-  game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 80));
-  if (typeof game.toast === 'function') game.toast('it heard that. it has gone under, and it is not coming back.');
-  panHuntEnd(game, 'turned');
+  panBossLives--; panBossHits++;
+  panRipple(c.hx, c.hz, 3.0);
+  panSfx.volume = 0.5; panSfx.pitch = 0.5;
+  game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 90));
+  if (typeof game.punch === 'function') game.punch(0.08);
+  if (panBossLives > 0) {
+    // under, and back from the other side, quicker
+    c.hunt = 0; panBossUnder = panBOSS_UNDER[Math.min(panBossRound, panBOSS_UNDER.length - 1)]; panBossRound++;
+    if (typeof game.toast === 'function') game.toast(panBossLives === 2 ? 'it went under. that is one — it comes back.' : 'two. it is coming back quicker. once more.');
+    return true;
+  }
+  // THE THIRD: gone for good, and the whole line turns round for it
+  panBossBeaten = true;
+  panRipple(c.hx, c.hz, 4.5);
+  panSfx.volume = 0.7; panSfx.pitch = 0.42;
+  game.sfx('splash', placeCue(panSfx, c.hx, panWATER, c.hz, 120));
+  game.sfx('whistle', { volume: 0.3, pitch: 1.3, force: true });
+  for (let i = 0; i < panHERD_N; i++) if (panHerd[i].st === 'follow') panHerd[i].look = 1;
+  if (typeof game.confetti === 'function') game.confetti(p.x, p.y + 0.6, p.z, 16);
+  if (typeof game.punch === 'function') game.punch(0.16);
+  if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+  if (typeof game.toast === 'function') game.toast('O GRANDÃO is gone. the river is yours — get them across.');
+  panHuntEnd(game, 'beaten');
   return true;
 }
 
@@ -4874,9 +4937,11 @@ function panUpdateCaimans(game, dt) {
     // 95 cm of it: a yaw-space pitch on the whole animal opens the jaw and
     // digs the tail in, and at 12 degrees over a 3.4 m body that is 35 cm of
     // tail underground. So the pitch is small and the animal is RAISED with it.
+    // O Grandão (X4): the hunter is drawn at twice the size — the big one
+    const bs = c.hunt ? panBOSS_SCALE : 1;
     panM.compose(panV3.set(cx, y + c.gape * 0.05, cz),
                  panQ.setFromEuler(panE.set(pitch - c.gape * 0.055, cyaw, roll)),
-                 panSc.set(1, 1, 1));
+                 panSc.set(bs, bs, bs));
     panCaimans.setMatrixAt(i, panM);
   }
   panCaimans.instanceMatrix.needsUpdate = true;
@@ -5280,7 +5345,7 @@ function panUpdateTasks(game, dt) {
     if (game.music && typeof game.music.swell === 'function') game.music.swell(0.85);
     // ...and the line, on the signpost (W1): how many are behind you NOW —
     // which the current is working on — and how far the far bank is.
-    if (typeof game.wowLive === 'function' && !panHuntOn &&
+    if (typeof game.wowLive === 'function' && !panHuntOn && panBossUnder <= 0 &&
         !(typeof game.taskDone === 'function' && game.taskDone('the-crossing'))) {
       const width = panRIVER.z1 - panRIVER.z0;
       const across = clamp((panRIVER.z1 - p.z) / width, 0, 1);
@@ -5473,6 +5538,7 @@ export function createPantanal(game) {
       if (panHuntOn) panHuntEnd(game, 'lost');
       panHuntDone = false;
       for (let i = 0; i < panCaimanAt.length; i++) { panCaimanAt[i].hunt = 0; panCaimanAt[i].gone = 0; }
+      panBossUnder = 0; panBossBeaten = false;
       panRipCool = 0;
       panRaftReset();
       for (let i = 0; i < panRIP_N; i++) panRipT[i] = 1e9;
@@ -5551,7 +5617,7 @@ export function createPantanal(game) {
       return panJagSt;
     },
     /** W1: the jacaré on the line, for the harness. */
-    huntDebug() { const c = panHuntI >= 0 ? panCaimanAt[panHuntI] : null; return { on: panHuntOn, done: panHuntDone, i: panHuntI, hx: c ? c.hx : 0, hz: c ? c.hz : 0, took: panHuntTook, saved: panHuntSaved, crossT: panCrossT, following: panFollowing }; },
+    huntDebug() { const c = panHuntI >= 0 ? panCaimanAt[panHuntI] : null; return { on: panHuntOn, done: panHuntDone, i: panHuntI, hx: c ? c.hx : 0, hz: c ? c.hz : 0, took: panHuntTook, saved: panHuntSaved, crossT: panCrossT, following: panFollowing, lives: panBossLives, round: panBossRound, under: +panBossUnder.toFixed(2), beaten: panBossBeaten, hits: panBossHits }; },
     /** W1: put n of the herd on the line behind the animal, wherever it is. Test hook. */
     herdFollow(n) {
       const p = game.capy && game.capy.body ? game.capy.body.position : null;

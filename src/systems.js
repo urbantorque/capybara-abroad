@@ -23872,7 +23872,10 @@ export function createSystems(game) {
                       if (!g) return 'take them over the river';
                       const n = g.following();
                       if (n < 4) return 'Q near the herd — they follow · ' + n + ' of 4, then swim across';
-                      return 'straight across. Q at anything that comes for them';
+                      const h = game.pantanal && typeof game.pantanal.huntDebug === 'function' ? game.pantanal.huntDebug() : null;
+                      if (h && h.on && h.under > 0) return 'it is under. stay with the line — it comes back';
+                      if (h && h.on) return 'O GRANDÃO is behind the last one: get within 20 m and press Q · ' + h.hits + ' of 3';
+                      return 'straight across. the big one comes up behind the line — Q at it, three times';
                     },
                     where: function () { return hintObj(game.pantanal && game.pantanal.bank); } },
 

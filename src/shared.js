@@ -2960,7 +2960,9 @@ export const TASKS = [
   // knuckles because its claws are too long to put down.
   { id: 'tamandua',      text: 'Cross the campo without touching it',    chapter: 15, act: 2,
     mini: 'O TAMANDUÁ' },
-  { id: 'the-crossing',  text: 'Lead the whole capybara herd across the river', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
+  // The marquee, with a boss in it (X4): O Grandão comes up behind the line
+  // and takes three wheeks to see off.
+  { id: 'the-crossing',  text: 'Lead the whole herd across the river and see off O Grandão', chapter: 15, act: 2, wow: 'THE HERD CROSSING' },
 
   // ---- Chapter 16: Sơn Đoòng ----
   // Sixteen chapters and the game had never once turned the lights off. The
