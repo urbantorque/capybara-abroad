@@ -1,0 +1,15 @@
+async page => {
+  await page.goto('http://localhost:5188/')
+  await page.waitForTimeout(5000)
+  await page.keyboard.press('Digit1')
+  await page.waitForTimeout(6000)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const t0 = await page.evaluate(() => window.__capy.state.time)
+  await page.waitForTimeout(1500)
+  const t1 = await page.evaluate(() => ({ t: window.__capy.state.time, paused: window.__capy.state.paused }))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(1200)
+  const t2 = await page.evaluate(() => ({ t: window.__capy.state.time, paused: window.__capy.state.paused, err: window.__capy.state.lastError || null }))
+  await page.evaluate((o) => fetch('/shot?name=l3-pause.json', { method: 'POST', body: btoa(unescape(encodeURIComponent(JSON.stringify(o))))}), { t0, t1, t2 })
+}

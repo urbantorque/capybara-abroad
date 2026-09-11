@@ -4892,6 +4892,20 @@ const sysLEGEND = [
   ['Q', 'WHEEK'],
   ['drag  ·  wheel', 'look around  ·  zoom'],
 ];
+// ---- AND THE SAME TABLE FOR SOMEBODY HOLDING A PAD (L3, E5) ---------------
+// The fold had three pad rows and the front of the game never switched to
+// them: a player who arrived with a controller read WASD. Same eight verbs,
+// in the pad's words (sysPAD_WORDS is where the clues get theirs).
+const sysLEGEND_PAD = [
+  ['left stick', 'waddle about'],
+  ['RT (held)', 'run'],
+  ['A', 'hop'],
+  ['LT (held)', 'slide'],
+  ['X', 'grab, dig, hold on'],
+  ['X (held) in water', 'dive  ·  deep water'],
+  ['B', 'WHEEK'],
+  ['right stick  ·  click', 'look around  ·  recentre'],
+];
 const sysLEGEND_MORE = [
   ['Z  /  X  ·  C', 'turn the camera  ·  recentre it'],
   // The fourth key of the camera row, and it goes in the FOLD by the same rule
@@ -5143,7 +5157,7 @@ function sysSay(s) {
  * nothing down there is needed to play.
  */
 function sysFillLegend(el, which) {
-  const core = sysIsTouch() ? sysLEGEND_TOUCH : sysLEGEND;
+  const core = sysIsTouch() ? sysLEGEND_TOUCH : sysPadSeen() ? sysLEGEND_PAD : sysLEGEND;
   const tables = which === 'more' ? [sysLEGEND_MORE]
                : which === 'all' ? [core, sysLEGEND_MORE]
                : [core];

@@ -1558,7 +1558,7 @@ function caliBuildKerbs(game, root) {
   const HW = 3.6;                       // caliBuildRoad's half width
   const KERB = PALETTE.caliGatoDark;    // one step down from caliRoad
   const GUTTER = PALETTE.caliGrille;    // and one more
-  const IRON = PALETTE.caliGrille;
+  const IRON = PALETTE.caliGatoDark;    // NOT the grille's near-black: at ten metres a black disc on a pale road read as a hole (L3)
   const LINE = PALETTE.caliRoadLine;    // the dashes' own pale, for the bars
   const SKERB = PALETTE.caliStoneDark;  // one step down from caliStone
   const SGUTTER = PALETTE.caliGatoDark;

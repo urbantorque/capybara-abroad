@@ -890,8 +890,9 @@ function hanBuildStreets(game, root) {
  *
  * All of it is drawn and none of it is solid — the tallest thing here is two
  * centimetres — and all of it goes into the asphalt merger, so it costs no
- * draw call and about four thousand triangles: the stripes and the paint are
- * quads, two triangles each, not boxes.
+ * draw call and under five thousand triangles (the merged mesh measured
+ * 5,276 with the asphalt in it): the stripes and the paint are quads, two
+ * triangles each, not boxes.
  *
  * Every line is walked off the same four centrelines the asphalt and the kerbs
  * are, at the same HALF = w + 0.5, so a stripe lands on the drawn edge and not
@@ -997,13 +998,14 @@ function hanStreetGraphics(K) {
       K.cyl(x, yAt(x, z, 0.0), z, 0.30, 0.02, PALETTE.hanShopDk, 0, rnd() * 0.5, 0, 12);
     }
     // ---- tar patches: a trench was dug and filled, roughly, every twenty
-    // metres. Four corners nobody measured, a shade blacker than the road.
+    // metres. Four corners nobody measured, ONE step darker than the road —
+    // measured on the walk frame, a black one at three metres read as a hole.
     for (let s = 6.0 + rnd() * 10; s < total - 4; s += 16 + rnd() * 12) {
       hanLaneAtS(L, s, hanTmp);
       const nx = Math.cos(hanTmp.yaw), nz = -Math.sin(hanTmp.yaw);
       const tx = Math.sin(hanTmp.yaw), tz = Math.cos(hanTmp.yaw);
       const off = (rnd() - 0.5) * (HALF - 2.2) * 2;
-      const w = 0.6 + rnd() * 0.7, l = 0.7 + rnd() * 1.1;
+      const w = 0.45 + rnd() * 0.45, l = 0.5 + rnd() * 0.7;
       const cx = hanTmp.x + nx * off, cz = hanTmp.z + nz * off;
       const c4 = [];
       // anticlockwise from above: (-n,-t), (-n,+t), (+n,+t), (+n,-t)
@@ -1014,7 +1016,7 @@ function hanStreetGraphics(K) {
       }
       K.quad(c4[0], yAt(c4[0], c4[1], 0.006), c4[1], c4[2], yAt(c4[2], c4[3], 0.006), c4[3],
              c4[4], yAt(c4[4], c4[5], 0.006), c4[5], c4[6], yAt(c4[6], c4[7], 0.006), c4[7],
-             PALETTE.hanTyre);
+             PALETTE.hanShopDk);
     }
   }
   // ---- the zebras, on every arm of every junction the four polylines make.

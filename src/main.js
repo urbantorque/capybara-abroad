@@ -2132,7 +2132,11 @@ function mainBoot() {
     dt = game.time.step(dt);
     game.state.timeScale = game.time.scale;
     game.state.dt = dt;
-    game.state.time += dt;
+    // ...and it does not run under the pause card (L3; LIFT2 left it open):
+    // every cooldown, phase and nudge reads this number, and a card that
+    // held the world still while the clock ran was a card that expired
+    // things behind it
+    if (!game.state.paused) game.state.time += dt;
 
     if (!game.state.paused) {
       // Three-argument step: cannon-es owns the accumulator AND fills every body's
