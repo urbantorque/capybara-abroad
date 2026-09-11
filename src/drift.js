@@ -1971,7 +1971,7 @@ function driBuildShelf(game, root) {
  * the wind up here has only ever blown along one axis and everything that grew
  * knows it.
  */
-function driBuildFlora(root) {
+function driBuildFlora(game, root) {
   // A TRUNK 12 CM ACROSS AND FOUR AND A HALF METRES TALL IS A POLE, and two
   // flat octahedra on the top of it are a diamond on a stick. Rendered on the
   // orchard — the island the chapter asks you to spend the longest on — the
@@ -1982,6 +1982,10 @@ function driBuildFlora(root) {
   function tree(x, y, z, s, lean, pale) {
     const ry = rand(0, 6.28);
     driPush9(trunks, x, y + s * 0.7, z, lean * 0.12, ry, 0, s * 0.26, s * 1.6, s * 0.26);
+    // ---- A TRUNK IS SOLID (V1). The bottom segment only — it is the one
+    // that is nearly vertical, and the one the animal walks into. Full
+    // extents, a little inside the drawn radius.
+    driStaticBox(game, x, y + s * 0.7, z, s * 0.44, s * 1.6, s * 0.44);
     driPush9(trunks, x + lean * s * 0.35, y + s * 2.4, z, lean * 0.34, ry, 0, s * 0.145, s * 2.6, s * 0.145);
     driPush9(trunks, x + lean * s * 1.1, y + s * 4.0, z, lean * 0.5, ry, 0, s * 0.1, s * 1.2, s * 0.1);
     for (let b = 0; b < 3; b++) {
@@ -2101,6 +2105,12 @@ function driBuildFlora(root) {
         const lz2 = s.z + lex * cl * s.sin + lez * cl * s.cos;
         driPush9(logs, lx2, s.y + 0.34, lz2, 0, la, Math.PI * 0.5, 0.62, len, 0.62);
         driPush9(stumps, wx, s.y + 0.36, wz, 0.1, la * 1.7, 0.06, 1.05, 0.72, 1.05);
+        // ...and a fallen trunk and its stump are solid (V1): a log 1.2 m
+        // through, lying across a meadow, was walked through. The log's axis
+        // is the cylinder's y turned onto x by rz and then swung by la about
+        // y, which is the same line a box turned by la carries its own x on.
+        driStaticBox(game, lx2, s.y + 0.34, lz2, len, 1.1, 1.1, la);
+        driStaticBox(game, wx, s.y + 0.36, wz, 0.9, 0.72, 0.9);
       }
     }
   }
@@ -5371,7 +5381,7 @@ function driBuild(game) {
   driBuildIslands(game, driRoot);
   driBuildRoots(driRoot);
   driBuildWanderers(game, driRoot);
-  driBuildFlora(driRoot);
+  driBuildFlora(game, driRoot);
   driBuildGroundCover(driRoot);
   driBuildWalls(game, driRoot);
   driBuildFarDressing(game, driRoot);

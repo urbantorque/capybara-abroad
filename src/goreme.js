@@ -1256,6 +1256,13 @@ function gorBuildScatter(game, root) {
                        0.03 * (k2 - 1), yaw + Math.sin(w + k2) * 0.11, 0.03 * ((w + k2) % 2 ? 1 : -1),
                        0.58 - k2 * 0.06, 0.34, 1.5 - k2 * 0.08);
             }
+            // ...AND A WALL IS A WALL (V1). A metre high, half a metre through,
+            // and walked through along its whole length: it was drawn only. One
+            // shape a segment on the scatter's pool body, turned with the row.
+            SB.addShape(new CANNON.Box(new CANNON.Vec3(0.27, 0.50, 0.75)),
+                        new CANNON.Vec3(x, y + 0.50, z),
+                        new CANNON.Quaternion().setFromEuler(0, yaw, 0));
+            solid = true;
           }
         }
       }

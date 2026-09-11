@@ -1528,6 +1528,10 @@ function sahBuildKoutoubia(game, root) {
     const x = rand(-20, 20), z = rand(-13, 13);
     if (Math.abs(z) < 2.2) continue;                 // not in the channel
     GM.cyl(x, 2.2, z, 0.32, 4.4, PALETTE.sahPalmTrunk);
+    // ...and the trunk is solid (V1): twenty palms in a walled garden whose
+    // wall was made solid and whose trees were not. World space — the merged
+    // mesh is positioned at the garden's centre below, and a body is not.
+    sahStaticBox(game, sahKOUTOUBIA.x + x, 2.2, sahKOUTOUBIA.z + 26 + z, 0.52, 4.4, 0.52);
     // THE SAME FOUNTAIN, NOT A PROPELLER — see sahBuildPalmeraie. These are the
     // twenty palms directly behind the spawn and they were the flattest thing
     // in the frame.

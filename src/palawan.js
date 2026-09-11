@@ -1114,6 +1114,15 @@ function palBuildBeach(game, root) {
     const lean = rr(-0.22, 0.22);
     const hgt = rr(5, 11);
     M.cyl(x + lean * hgt * 0.4, g + hgt * 0.5, z, 0.22, hgt, PALETTE.palTrunk, 0, 0, lean, 6);
+    // ---- A TRUNK IS SOLID (V1). Ninety palms and every one walked through.
+    // The trunk leans about z, so the box covers the bottom two metres of the
+    // tilted axis: centre where the axis is a metre up, width grown by the
+    // lean's run over that height. Full extents — palStaticBox halves.
+    {
+      const xc = x + lean * hgt * 0.4, sl = Math.sin(lean);
+      palStaticBox(game, xc + sl * (hgt * 0.5 - 1.0), g + 1.0, z,
+                   0.40 + Math.abs(sl) * 2.0, 2.0, 0.40);
+    }
     const top = g + hgt;
     const tx = x + lean * hgt * 0.8;
     // NINE, NOT SEVEN. A coconut palm carries about twenty fronds and seven is

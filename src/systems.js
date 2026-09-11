@@ -7906,7 +7906,7 @@ function sysBuildCSS() {
 '#hud.bare .capyui-todo,#hud.bare .capyui-map,#hud.bare .capyui-stam,',
 /* the pips go with the bar they sit over — the postcard key takes the paper
    off the window and a row of counters is paper. */
-'#hud.bare .capyui-pips,',
+'#hud.bare .capyui-pips,#hud.bare .capyui-stamlbl,',
 '#hud.bare .capyui-fly,#hud.bare .capyui-perf,#hud.bare .capyui-home{',
   'opacity:0 !important;pointer-events:none !important;}',
 /* the on-screen stick is display-driven and its children opt back into the
@@ -7992,7 +7992,7 @@ function sysBuildCSS() {
    One rung for the lot, below every card above and above the pool's own 30.
    The pool is where it belongs — a bubble is the world talking and the paper
    is the game talking, and the game is on top of the glass. */
-'.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-pips,.capyui-fly,',
+'.capyui-todo,.capyui-map,.capyui-toasts,.capyui-stam,.capyui-stamlbl,.capyui-pips,.capyui-fly,',
   '.capyui-home,.capyui-moment,.capyui-touch{z-index:40;}',
 /* ---------- to-do list ---------- */
 '.capyui-todo{position:absolute;left:14px;top:12px;width:clamp(172px,32vw,278px);',
@@ -8013,6 +8013,16 @@ function sysBuildCSS() {
   '46%{transform:rotate(-2.3deg) scale(.986)}100%{transform:rotate(-1.7deg) scale(1)}}',
 '.capyui-todo h2{font-size:clamp(11px,1.7vw,12px);letter-spacing:.3em;text-transform:uppercase;',
   'color:' + accentInk + ';font-weight:700;margin:4px 0 7px;}',
+/* ---------- the part of the chapter this is (V2) ----------
+   A fixed eyebrow over the act's own name, so the heading can change its
+   words without changing its kind: "part 2 of 3" is the same shape in every
+   chapter. Lowercase and unspaced against the kicker's caps, in the soft ink,
+   so the constant half is the quiet half. `hidden` when a chapter has one
+   act, and the [hidden] rule below wins over the display here. */
+'.capyui-part{display:block;font-size:' + tSm + ';letter-spacing:.06em;text-transform:none;',
+  'font-weight:400;font-style:italic;color:' + inkSoft + ';margin-bottom:1px;}',
+'.capyui-part[hidden]{display:none;}',
+'.capyui-kick{display:block;}',
 /* Five rows at the very most (see sysTODO_WINDOW), so the card is small enough
    to never need a scrollbar and never reach the touch stick. No max-height, no
    overflow, no scroll position to keep honest. */
@@ -8035,15 +8045,21 @@ function sysBuildCSS() {
 '.capyui-marq.on{display:grid;}',
 '.capyui-marqtier{grid-column:1;grid-row:1;align-self:center;color:' + ink + ';',
   'font-size:clamp(9.5px,1.55vw,13px);line-height:1;}',
+/* the words beside the star (V2): the kicker's register at the label size,
+   so "THE BIG ONE HERE" reads as the same kind of thing as the act heading
+   under it — a label for the line below, not a line itself. */
+'.capyui-marqhead{grid-column:2;grid-row:1;align-self:center;font-size:' + tSm + ';',
+  'letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:' + accentInk + ';',
+  'line-height:1.1;min-width:0;overflow-wrap:break-word;}',
 /* `min-width:0` on both text cells: a `1fr` track is `minmax(auto, 1fr)` and
    an auto minimum is the widest unbreakable word, so one long place name in a
    `say` would push the card wider rather than wrap inside it. `text-wrap:
    pretty` keeps a two-line sentence off a one-word last line, which on a card
    this narrow is most of them. */
-'.capyui-marqtxt{grid-column:2;grid-row:1;font-size:clamp(9.5px,1.55vw,13px);',
-  'line-height:1.28;color:' + ink + ';font-weight:700;',
+'.capyui-marqtxt{grid-column:1 / -1;grid-row:2;font-size:clamp(9.5px,1.55vw,13px);',
+  'line-height:1.28;color:' + ink + ';font-weight:700;margin-top:2px;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
-'.capyui-marqsay{grid-column:2;grid-row:2;font-size:clamp(8.5px,1.4vw,11px);',
+'.capyui-marqsay{grid-column:1 / -1;grid-row:3;font-size:clamp(8.5px,1.4vw,11px);',
   'line-height:1.25;color:' + inkSoft + ';font-style:italic;',
   'min-width:0;overflow-wrap:break-word;text-wrap:pretty;}',
 '.capyui-todo ul{list-style:none;display:flex;flex-direction:column;gap:3px;}',
@@ -8859,6 +8875,15 @@ function sysBuildCSS() {
 '.capyui-stam.blown{background:transparent;',
   'box-shadow:inset 0 0 0 1.5px ' + accent + ',' + shMd + ';animation:none;}',
 '.capyui-stam.blown i{background:transparent;}',
+/* the word beside the bar (V2): to its right, on the same baseline, in the
+   label size and the paper's ink on a soft paper pill so it reads over any
+   ground. Fades with the bar. */
+'.capyui-stamlbl{position:absolute;left:calc(16px + clamp(96px,17vw,148px) + 8px);bottom:11px;',
+  'font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;font-weight:700;',
+  'color:' + ink + ';background:' + sysRgba(PALETTE.sail, 0.72) + ';padding:2px 7px;',
+  'border-radius:999px;box-shadow:' + shSm + ';opacity:0;pointer-events:none;',
+  'transition:opacity ' + dMed + ' ease;}',
+'.capyui-stamlbl.show{opacity:1;}',
 
 /* ---------- the chain, while it is open (B4) ----------
    Five pips over the stamina bar, one per witnessed thing, with the third
@@ -8877,6 +8902,12 @@ function sysBuildCSS() {
 '.capyui-pips{position:absolute;left:16px;bottom:29px;display:none;',
   'flex-direction:column;gap:3px;width:clamp(96px,17vw,148px);pointer-events:none;}',
 '.capyui-pips.on{display:flex;}',
+/* the word over the pips (V2): the same register as the puff label, so the
+   two things that can share this corner read as one family. */
+'.capyui-pipslbl{font-size:' + tSm + ';letter-spacing:.14em;text-transform:uppercase;font-weight:700;',
+  'font-style:normal;color:' + ink + ';background:' + sysRgba(PALETTE.sail, 0.72) + ';',
+  'padding:2px 7px;border-radius:999px;box-shadow:' + shSm + ';align-self:flex-start;',
+  'margin-bottom:2px;}',
 '.capyui-pips u{display:flex;gap:4px;align-items:center;text-decoration:none;}',
 '.capyui-pips b{flex:1 1 0;height:5px;border-radius:999px;font-weight:400;',
   'background:' + sysRgba(PALETTE.ibisHead, 0.20) + ';box-shadow:' + shSm + ';',
@@ -19558,7 +19589,25 @@ export function createSystems(game) {
 
   // --- to-do list ---
   const todoEl = sysEl('div', 'capyui-todo');
-  const todoHeadEl = sysEl('h2', null, 'To do');
+  // ---- THE HEADING SAYS WHAT KIND OF THING IT IS (V2) ----------------------
+  // The kicker under the marquee is the live ACT's name — THE CITY, THE
+  // VALLEY, MONG KOK — and it changes every few tasks with nothing on the card
+  // to say that it is a section of the chapter and not a new place, a task, or
+  // a heading of the game. A player watching it change had no frame for it.
+  // So the kicker keeps its words and gets a fixed eyebrow that never changes
+  // shape: "part 2 of 3". Small, soft, lowercase; the constant part of the
+  // line is quiet and the variable part is loud, which is the right way round.
+  const todoHeadEl = sysEl('h2', null);
+  const todoPartEl = sysEl('span', 'capyui-part', '');
+  const todoKickEl = sysEl('span', 'capyui-kick', 'To do');
+  todoHeadEl.appendChild(todoPartEl);
+  todoHeadEl.appendChild(todoKickEl);
+  function todoHead(kick, part) {
+    if (todoKickEl.textContent !== kick) todoKickEl.textContent = kick;
+    const pt = part || '';
+    if (todoPartEl.textContent !== pt) todoPartEl.textContent = pt;
+    todoPartEl.hidden = !pt;
+  }
 
   // ---- ...AND ABOVE ALL OF IT, THE REASON YOU ARE HERE (B1) --------------
   //
@@ -19589,6 +19638,14 @@ export function createSystems(game) {
   const marqEl = sysEl('div', 'capyui-marq');
   const marqTierEl = sysEl('span', 'capyui-marqtier');
   marqTierEl.appendChild(sysGlyphEl('wow'));
+  // ---- AND IT SAYS SO IN WORDS (V2) ---------------------------------------
+  // The sparkle carried an aria-label and nothing a sighted player could read:
+  // a bold sentence at the top of the card with a star by it, above a heading
+  // that was about something else. "The big one here" is the same three words
+  // the label already used, printed. The star and the words share the first
+  // row; the sentence gets the full width under them, which also stops a long
+  // marquee wrapping into a narrow second column beside a glyph.
+  const marqHeadEl = sysEl('span', 'capyui-marqhead', 'the big one here');
   // `role="img"` and not a bare label. `aria-label` on a generic element with
   // no role is discarded by most screen readers, so the sparkle — the whole
   // difference between this line and any other sentence on the card — would
@@ -19596,9 +19653,11 @@ export function createSystems(game) {
   // aria-hidden inside sysBuildGlyph, so the label is the only thing said.
   marqTierEl.setAttribute('role', 'img');
   marqTierEl.setAttribute('aria-label', 'the big one here');
+  marqTierEl.title = 'the big one here';
   const marqTxtEl = sysEl('span', 'capyui-marqtxt', '');
   const marqSayEl = sysEl('span', 'capyui-marqsay', '');
   marqEl.appendChild(marqTierEl);
+  marqEl.appendChild(marqHeadEl);
   marqEl.appendChild(marqTxtEl);
   marqEl.appendChild(marqSayEl);
   todoEl.appendChild(marqEl);
@@ -19688,21 +19747,30 @@ export function createSystems(game) {
       // two are orthogonal — a marquee is often also timed and gets both.
       const tdef = taskDefOf(ids[i]);
       const tier = tdef && tdef.wow ? 'wow' : (tdef && tdef.mini ? 'mini' : '');
+      // ...AND EACH MARK SAYS WHAT IT IS ON HOVER (V2). The aria-label was
+      // the only place these three glyphs were ever named, and a sighted
+      // player on a desktop had a star, a smaller star and a clock with no
+      // key. `title` is the cheapest legend there is; it costs nothing on a
+      // phone, where the paper's one-time caption (see paperEver) names the
+      // star instead.
       if (tier) {
         const tm = sysEl('span', 'capyui-tier ' + tier);
         tm.appendChild(sysGlyphEl(tier));
-        tm.setAttribute('aria-label', tier === 'wow' ? 'the big one here'
-                                                     : 'a set piece');
+        const tl = tier === 'wow' ? 'the big one here' : 'a set piece';
+        tm.setAttribute('aria-label', tl);
+        tm.title = tl;
         li.appendChild(tm);
       }
       if (RECORDS[ids[i]]) {
         const rm = sysEl('span', 'capyui-meas');
         rm.appendChild(sysGlyphEl('clock'));
         rm.setAttribute('aria-label', 'this one is timed');
+        rm.title = 'timed — there is a record to beat';
         li.appendChild(rm);
       }
       // bearing + distance, filled in only while this is the top open row
       const aim = sysEl('span', 'capyui-aim');
+      aim.title = 'which way, and how far';
       const arrow = sysEl('i', 'capyui-arrow');
       const dist = sysEl('span', null, '');
       aim.appendChild(arrow);
@@ -21394,7 +21462,23 @@ export function createSystems(game) {
   const stamFill = sysEl('i');
   stamEl.appendChild(stamFill);
   hudRoot.appendChild(stamEl);
+  // ---- AND A WORD BESIDE IT (V2) -------------------------------------------
+  // The bar appeared bottom-left the moment the animal ran, with no word on
+  // it, and went away again when it was full. A bar that only exists while
+  // something is being spent is information; a bar with no name is a puzzle.
+  // One word to its right, in the label size, shown and hidden with the bar:
+  // "puff" on land, "breath" under the water, "no puff" while blown. A sibling
+  // rather than a child, because the bar is 7 px tall with overflow hidden.
+  const stamLblEl = sysEl('span', 'capyui-stamlbl', 'puff');
+  // The visible word is decoration to a screen reader; the BAR carries the
+  // name, and the same word goes onto it below whenever it changes, so the
+  // two cannot disagree.
+  stamLblEl.setAttribute('aria-hidden', 'true');
+  stamEl.setAttribute('role', 'img');
+  stamEl.setAttribute('aria-label', 'puff');
+  hudRoot.appendChild(stamLblEl);
   let stamShown = false, stamLow = false, stamBlownCls = false, stamFullT = 0;
+  let stamLblLast = '';
 
   // --- the chain, while it is open (B4) ---
   // See THE INCIDENT. Built once and hidden; `incPaint` is the only writer.
@@ -21404,9 +21488,16 @@ export function createSystems(game) {
   // `const` read at the first paint costs nothing and cannot go out of step
   // with the rule the way a hardcoded five would.
   const pipsEl = sysEl('div', 'capyui-pips');
+  // ---- A WORD OVER THE PIPS TOO (V2) --------------------------------------
+  // Five bars and a shrinking line appeared bottom-left after the first thing
+  // was knocked over, and nothing said what they counted. "chain · 2 of 5" is
+  // the whole of it: the noun, and where you are in it. The line under the
+  // pips still says how long; this says what.
+  const pipsLbl = sysEl('span', 'capyui-pipslbl', '');
   const pipsRow = sysEl('u');
   const pipsBars = [];
   const pipsWin = sysEl('s');
+  pipsEl.appendChild(pipsLbl);
   pipsEl.appendChild(pipsRow);
   pipsEl.appendChild(pipsWin);
   hudRoot.appendChild(pipsEl);
@@ -24209,10 +24300,12 @@ export function createSystems(game) {
   // the time — never appear on any chapter's line. Those belong to the whole
   // journey and the journal is where they are counted.
   //
-  // The sentence is written the long way round on purpose. "2/2 finds" is a
-  // collectible counter and would turn the paper into a checklist with a
-  // secret; "two things nobody mentions here" is the same information said as
-  // a remark, and it is the only line on this card that is not an instruction.
+  // The sentence is a remark and not a counter on purpose. "2/2 finds" would
+  // turn the paper into a checklist with a secret; "two secrets hidden here"
+  // is the same information said as a sentence, and it is the only line on
+  // this card that is not an instruction. (It read "two things nobody
+  // mentions here" until V2, which was the same rule in a voice a first-time
+  // player could not parse — see todoFindsLine.)
   const sysNUMWORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
   function sysNumWord(k) { return sysNUMWORD[k] || String(k); }
   function todoFindsLine(n) {
@@ -24223,10 +24316,14 @@ export function createSystems(game) {
       if (findDone[FINDS[i].id]) have++;
     }
     if (!all) { findsEl.classList.remove('on'); return; }
-    let t = sysNumWord(all) + ' things nobody mentions here';
-    if (have >= all) t += '  ·  found';                      // all of them
-    else if (have === 1 && all === 2) t += '  ·  one of them found';
+    // "secrets", said plainly (V2). "Things nobody mentions here" was the same
+    // count in a voice nobody could parse on a first read — the question it
+    // raised was what the line was FOR. The rule it was written to is
+    // untouched: a count, never a name and never a place.
+    let t = sysNumWord(all) + (all === 1 ? ' secret hidden here' : ' secrets hidden here');
+    if (have >= all) t += '  ·  ' + (all === 1 ? 'found' : 'all found');
     else if (have > 0) t += '  ·  ' + sysNumWord(have) + ' found';
+    else t += '  ·  none found yet';
     if (findsEl.textContent !== t) findsEl.textContent = t;
     findsEl.classList.add('on');
   }
@@ -24607,7 +24704,9 @@ export function createSystems(game) {
     } else if (clueEl.parentNode !== todoEl) {
       todoEl.insertBefore(clueEl, countEl);
     }
-    countEl.textContent = chapLabel(n) + '  ·  ' + done + ' / ' + rec.ids.length;
+    // "4 of 10 done", not "4 / 10": a fraction under a list reads as a score
+    // or a page number, and the one word says which (V2).
+    countEl.textContent = chapLabel(n) + '  ·  ' + done + ' of ' + rec.ids.length + ' done';
     todoFindsLine(n);
 
     // ---- A FINISHED CHAPTER IS NOT AN EMPTY CARD ---------------------------
@@ -24736,7 +24835,7 @@ export function createSystems(game) {
       // one announcement per chapter, which is the number of times a chapter
       // can be finished.
       clueEl.setAttribute('aria-live', 'polite');
-      todoHeadEl.textContent = 'Done here';
+      todoHead('Done here', '');
     } else {
       clueEl.classList.remove('recs');
       clueEl.removeAttribute('aria-live');
@@ -24745,7 +24844,10 @@ export function createSystems(game) {
       // whole of the structure being visible without a single extra element
       // on the card.
       const ad = acts && acts[actNow - 1];
-      todoHeadEl.textContent = ad ? ad.kick : 'To do';
+      // "part 2 of 3" only where there is more than one part to be in: a
+      // chapter of one act is not in part one of one, it has a list.
+      todoHead(ad ? ad.kick : 'To do',
+               (ad && acts.length > 1) ? 'part ' + actNow + ' of ' + acts.length : '');
     }
 
 
@@ -24972,6 +25074,8 @@ export function createSystems(game) {
         slid: slidEver ? 1 : 0,
         // ...and the slip, on the same terms (F4). See sysSLIP_SAY.
         slip: slipEver ? 1 : 0,
+        // ...and the paper, on the same terms (V2).
+        paper: paperEver ? 1 : 0,
       }));
       // ---- SAY IT ONCE ----------------------------------------------------
       // This game is three and a quarter hours long and it has kept a save file
@@ -27781,6 +27885,12 @@ export function createSystems(game) {
   // idea: the slide is a verb the player is given and the slip is one the
   // ground takes away. Saved beside it. See sysSLIP_SAY.
   let slipEver = false, slipT = 0;
+  // ...and the paper itself (V2). The card has a sparkle, a heading that
+  // changes, an arrow and a number, and nothing in the first hour ever said
+  // what any of it was; a new player read the star as a task and the act name
+  // as a place. One sentence, once per journey, a few seconds after the first
+  // place card has gone, saved beside the slide's so it is never said twice.
+  let paperEver = false, paperT = 0;
   // THE NUDGE. Banked seconds since anything was ticked, and whether this
   // chapter has already had its one. Deliberately NOT on the save: it is about
   // the last few minutes, and a journey resumed tomorrow is not stalled.
@@ -28031,6 +28141,7 @@ export function createSystems(game) {
       // it again. See THE SLIDE, ASKED FOR ONCE.
       slidEver = !!jrFile.slid;
       slipEver = !!jrFile.slip;
+      paperEver = !!jrFile.paper;
       // a chapter already finished on the file must not throw its party again
       for (let n = 1; n <= chapMax; n++) if (chapComplete(n)) jrChapDone[n] = true;
     } else if (!restore) {
@@ -34194,6 +34305,11 @@ export function createSystems(game) {
       for (let i = 0; i < pipsBars.length; i++) {
         pipsBars[i].classList.toggle('lit', i < lit);
       }
+      // "chain · 2 of 5", and past the third — the one that made a card — the
+      // word changes to what it has become, in the chain's own two tiers.
+      // Written only when a pip does.
+      pipsLbl.textContent = (lit >= sysINC_N2 ? 'a scene' : lit >= sysINC_N ? 'an incident' : 'chain') +
+                            '  ·  ' + lit + ' of ' + sysINC_N2;
     }
     // Quantised to a fortieth, because this is a transform written every frame
     // and a float that never repeats is a style recalculation that never stops.
@@ -36511,11 +36627,23 @@ export function createSystems(game) {
       if (stamT !== sysStamLast) { sysStamLast = stamT; stamFill.style.transform = stamT; }
       if (s > 0.999 && !capy.blown) stamFullT += dt; else stamFullT = 0;
       const want = started && stamFullT < 1.2;
-      if (want !== stamShown) { stamShown = want; stamEl.classList.toggle('show', want); }
+      if (want !== stamShown) {
+        stamShown = want;
+        stamEl.classList.toggle('show', want);
+        stamLblEl.classList.toggle('show', want);
+      }
       const low = s < 0.28;
       if (low !== stamLow) { stamLow = low; stamEl.classList.toggle('low', low); }
       const bl = !!capy.blown;
       if (bl !== stamBlownCls) { stamBlownCls = bl; stamEl.classList.toggle('blown', bl); }
+      // The word beside the bar (V2): what is being spent, in the player's
+      // terms. Change-guarded like everything else on this path.
+      const lbl = bl ? 'no puff' : (capy.diving ? 'breath' : 'puff');
+      if (lbl !== stamLblLast) {
+        stamLblLast = lbl;
+        stamLblEl.textContent = lbl;
+        stamEl.setAttribute('aria-label', lbl);
+      }
     }
 
     // ---- THE SLIDE, ASKED FOR ONCE, WHERE EVERYBODY STARTS ------------------
@@ -36550,6 +36678,26 @@ export function createSystems(game) {
           toast(sysSay('hold G while you are running. put your belly on it.'));
         }
       } else slidT = 0;
+    }
+
+    // ---- AND WHAT THE PAPER IS (V2) -------------------------------------
+    // Said once, in whichever chapter is the first, eight seconds after the
+    // game is live and the world is the player's — long enough for the place
+    // card to have gone and the eye to have found the corner, short enough
+    // that nothing has been misread yet. Three facts, the three that were
+    // asked about: the star, the arrow, and the key that moves the arrow.
+    // The default pill, the one the slide lesson uses, and kept to one
+    // breath: a toast holds for under three seconds.
+    if (started && !paperEver && !transBusy && !jrShown && !ledShown && !albShown &&
+        !pauseShown && !game.state.paused && !hudBare) {
+      paperT += dt;
+      if (paperT > 8) {
+        paperEver = true;
+        saveSoon();
+        toast(sysIsTouch()
+          ? 'top left is the paper. the star is the big thing here; tap a row to aim at it.'
+          : 'top left is the paper. the star is the big thing here; F moves the arrow.');
+      }
     }
 
     // ---- AND THE ONE VERB THE GROUND TAKES AWAY (F4) --------------------

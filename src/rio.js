@@ -2907,7 +2907,7 @@ function rioInArrivalGap(x, z) {
   return Math.abs(x - rioSPAWN.x) < rioPALM_GAP_X && z > rioPALM_GAP_Z0 && z < rioPALM_GAP_Z1;
 }
 
-function rioBuildFlora(root) {
+function rioBuildFlora(game, root) {
   const trunk = [], frond = [];
   for (let i = 0; i < rioPALM_N; i++) {
     let x, z;
@@ -2930,6 +2930,9 @@ function rioBuildFlora(root) {
     const h = rand(5.0, 8.5);
     const lean = rand(-0.09, 0.09);
     rioPush9(trunk, x, y + h * 0.5, z, lean, rand(0, 6.28), lean * 0.6, 0.34, h, 0.34);
+    // ---- A TRUNK IS SOLID (V1). The lean is under six degrees, so a box the
+    // bottom two metres of the trunk covers it. Full extents.
+    rioStaticBox(game, x, y + 1.0, z, 0.60, 2.0, 0.60);
     // A COCONUT PALM IS A FOUNTAIN, NOT A PROPELLER.
     //
     // Six flat blades radiating dead level off the top of a stick photographs,
@@ -2984,6 +2987,10 @@ function rioBuildFlora(root) {
     if (sx2 * sx2 + sz2 * sz2 < (rioSUGAR.r * 0.72) * (rioSUGAR.r * 0.72)) continue;
     const h = rand(3.5, 7.0);
     rioPush9(tree, x, y + h * 0.5, z, 0, rand(0, 6.28), 0, rand(2.2, 3.6), h, rand(2.2, 3.6));
+    // ...and the forest has trunks (V1). A cone two to three metres across at
+    // the ground is the one thing on these hills the animal walked through; a
+    // box the width of a trunk at its middle lets the skirt stay a skirt.
+    rioStaticBox(game, x, y + 1.0, z, 1.0, 2.0, 1.0);
   }
   rioInstance(root, rioG.cone6, PALETTE.rioForestDk, tree, false, false);
 }
@@ -4641,7 +4648,7 @@ function rioBuild(game) {
   rioBuildFrontage(game, rioRoot);
   rioBuildAvenue(game, rioRoot);
   rioBuildBateria(game, rioRoot);
-  rioBuildFlora(rioRoot);
+  rioBuildFlora(game, rioRoot);
   rioBuildBirds(rioRoot);
   rioBuildSparks(rioRoot);
   rioBuildCar(game, rioRoot);

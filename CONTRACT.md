@@ -1,3 +1,113 @@
+## THE WAIST-HIGH PASS — WHAT THE SOLIDITY AUDIT COULD NOT SEE, AND WHAT THE PAPER NEVER SAID (V1, V2 — 11 Sep 2026)
+
+Reported from a screenshot of Cali: the camera inside a riverside parapet, the
+animal inside a ceiba. Two passes. V1 is the colliders; V2 is the labelling.
+
+### V1. THE AUDIT HAD A FLOOR, AND THE PARAPET WAS UNDER IT
+
+`qa/audit-solid.js` keeps only drawn-but-not-collided things standing **1.6 m
+or taller** — the line it was written to draw between a building and a tuft of
+grass. The Cali parapet is a metre high. So is a terrace wall, a bench, a
+planter, a bar, and the bottom of every tree, and the animal is 0.68 m tall:
+**anything over `solidRISE` (0.62 m) is a wall to it.** The audit that had said
+"476, and the residue is vegetation" for a year was telling the truth about the
+question it asked.
+
+`qa/audit-solid2.js` asks the other one. Same chest-height cross on a 3 m grid,
+floor at 0.7 m, banded waist/tall — and a second pass that does not need a ray
+to happen to cross a 0.4 m trunk: **every instance of every InstancedMesh**,
+world AABB from its matrix, kept if it stands on the ground, is at least 0.25 m
+thick and at least 0.7 m tall, and then checked for any static collider under
+its footprint at ground + 0.5. `qa/solid-explain.js` names a hit by the vertex
+colour of the triangle it struck, which names the palette entry, which names
+the line of the builder — the only way a merged mesh with 38,000 triangles
+ever says which part of it you walked through.
+
+**WHAT IT FOUND, and it is the same omission as the 21 Aug 2026 solidity audit found, a
+rung lower:** loops that draw a thing and never carry the line that makes it
+solid. By chapter (instanced pass, bad/candidates; ray pass, hits):
+
+| chapter | before | after | what was drawn and not solid |
+|---|---|---|---|
+| cali | trunks 18/18 · riverside 32 rays | 0/22 · 13 | the parapet on both banks, 46 palms and ceibas, the salsoteca's bar and eight festoon posts, the road's downhill kerb on the mirador traverses, the two piers under the Puente Ortiz |
+| kyoto | sugi 36/36, maples 14/14 · 98 rays | 0/41, 1/12 · 49 | 360 cedars and 42 maples, the sando's yotsume-gaki fence and its maples, the tea street's twelve pieces of furniture, the shops' signposts |
+| rio | forest 18/22, palms 5/22 | 0/16, 0/22 | 110 coconut palms on the promenade, 260 forest cones on the hills |
+| drift | trunks 42/48, stumps 12/14 · 92 rays | 0/53, 0/16 · 66 | every tree's bottom segment, fourteen fallen logs 1.2 m through and their stumps |
+| goreme | walls 16 rays | 0 | the vineyards' terrace walls, a metre high and half a metre through |
+| palawan | trunk at (−53, 38) | 0 | ninety beach palms, leaning |
+| sahara | garden 5 rays | 0 | twenty palms in the Koutoubia garden — whose wall was made solid in an earlier pass and whose trees were not |
+
+Bodies: kyoto 254 → 718, cali 197 → 477, rio 59 → 188, drift 72 → 167,
+palawan 66 → 139, sahara 221 → 238. `qa/fuzz.js` nineteen chapters after:
+0 NaN, 0 void, 0 errors, and see the note on Monaco below.
+
+**PROVED BY WALKING, WITH A DIFFERENTIAL** (`qa/q1-walk.js`, real keys, real
+clock; the same script against the stashed tree):
+
+| | before | after |
+|---|---|---|
+| Cali parapet, from the walkway out | through it, onto the lawn (z −22.3, y 0.54) | stopped at z −13.07 — the front sphere exactly on the drawn face |
+| a ceiba (r 1.3) | standing in its centre, 0.07 m | 1.78 m — box half 1.1 + two spheres |
+| a sugi (r 1.19) | 0.04 m | 1.68 m |
+
+**THE ONE RULE THAT DECIDED WHAT WAS LEFT OPEN.** A trunk that stands on a
+route the chapter is scored on stays walk-through: `kyoOnPath` skips the torii
+corridor and the sando line, and it is why one maple of twelve reads as open.
+Moving the placer would have been the wrong fix — every random thing built
+after it would reshuffle. Cane, bamboo, shrubs, reeds, vines, bougainvillea
+and grass tufts stay open on purpose (the instanced pass lists them; `pasto`
+reads 1210 and that is 1210 shrubs). Kyoto's pond-rim stones and Iceland's
+lagoon-shore rocks stay open because they are the water's edge and the water
+is the task. The Cali chiva's chassis sits under its own deck collider
+(0.65 m); Göreme's truck likewise — kinematic carriers, not touched.
+
+**THREE THINGS THE NEW INSTRUMENT LIES ABOUT, so the next reader does not
+chase them:** (1) a pooled compound body's AABB is the whole vineyard, so
+`inSolid` reports every vine "inside a collider" once one wall is on the
+pool — read the ray pass for pooled chapters; (2) instance counts change
+between loads (the placers reject candidates off `rand()`), so pair rows by
+name/colour, never by count; (3) the sky's 66 cloud puffs hit the chest ray
+wherever a hill climbs into their altitude — Pasto's 35, the Galeras flank —
+and are not structures.
+
+**AND ONE NOTE ON `fuzz.js` — MONACO READ 605 SOLVER SAVES ONCE.** It read
+293 and 285 on two more runs, then 0, 0, 0 on the fixed tree and 0, 0, 0 on the
+stashed one, once the second browser session that had been running the audit
+alongside it was idle. Every save is the kinematic velocity cap (`MAIN_V_CAP`
+90) and the cars top out at 26.5: a frame stall in a chapter full of fast
+kinematic bodies, not a body in the wrong place. It is worth its own probe
+some day; it is not this pass.
+
+### V2. THE PAPER, LABELLED
+
+Playtest feedback, verbatim in spirit: *what is the star? why does the heading
+keep changing? what are the things bottom-left?* Every one of those was an
+element with an `aria-label` and no visible word.
+
+- **The marquee signpost** gets its eyebrow: `✦ THE BIG ONE HERE`, then the
+  sentence full-width under it. Same three words the label had.
+- **The act heading** gets a fixed frame over its changing name: *part 2 of 3*
+  in the label size, lowercase and soft, then THE CITY. Hidden in a chapter of
+  one act. The constant half is the quiet half.
+- **The tally** reads `CALI · 4 OF 10 DONE`, not `4 / 10`.
+- **The finds line** reads *two secrets hidden here · none found yet*. Same
+  rule (a count, never a name, never a place — `rd-finds.js`'s leak test still
+  passes), in a voice that parses on a first read.
+- **The stamina bar** has the word beside it — `PUFF`, `BREATH` under water,
+  `NO PUFF` when blown — on a paper pill, shown and hidden with the bar. The
+  bar itself now carries `role="img"` and the same word as its name.
+- **The chain pips** have `CHAIN · 2 OF 5` over them, and the noun changes to
+  what it has become at three and five.
+- **The three row glyphs and the aim** carry `title`s on hover. Not a legend
+  page; the cheapest one there is.
+- **One caption, once per journey** (`paperEver`, on the save beside `slid` and
+  `slip`): eight seconds into the first chapter, *top left is the paper. the
+  star is the big thing here; F moves the arrow.* — and the touch version says
+  *tap a row to aim at it.*
+
+Screenshots: `qa/q2-card.png`, `qa/q2-corner.png`, `qa/q2-cali-run.png`,
+`qa/q2-narrow.png`. `qa/q2-hud.js` asserts the words.
+
 ## THE SECOND LIFT PASS — THE SKY, THE SQUARE'S VOICE, AND A THEFT THAT HAS TO BE GOT AWAY WITH (11 Sep 2026)
 
 Four commits. Full write-up in `ROADMAP-LIFT2.md`. Six review agents over the

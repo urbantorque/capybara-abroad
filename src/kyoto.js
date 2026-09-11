@@ -1856,6 +1856,7 @@ function kyoBuildUji(game, root) {
       U.box(x, y + 2.5, z - s * 3.55, w - 1.6, 1.0, 0.10, PALETTE.matchaField);
       U.box(x - w * 0.36, y + 1.6, z - s * 3.7, 0.5, 2.6, 0.5, PALETTE.templeWoodDk);
       kyoStaticBox(game, x, y + h * 0.5, z, w * 0.5, h * 0.5, 3.2);
+      kyoStaticBox(game, x - w * 0.36, y + 1.6, z - s * 3.7, 0.24, 1.3, 0.24);   // the signpost (V1)
     }
   }
 
@@ -2065,8 +2066,13 @@ function kyoBuildUjiStreet(game, root) {
     const s = i % 2 ? 1 : -1;
     const pz = cz + s * 4.4;
     const py = kyoTerrain(px, pz);
+    // ---- AND THE FURNITURE IS SOLID (V1) --------------------------------
+    // Twelve pieces along the tea street — planters, stone lanterns, a bench
+    // with its chests — all between waist and head height on a capybara, and
+    // every one of them drawn only. Boxes a little inside each.
     if (i % 3 === 0) {
       // a potted maple: a glazed tub, a short trunk and a flat crown
+      kyoStaticBox(game, px, py + 0.45, pz, 0.55, 0.45, 0.55);
       S.cyl(px, py + 0.42, pz, 0.62, 0.84, PALETTE.indigo, 0, 0, 0, 8);
       S.cyl(px, py + 0.86, pz, 0.64, 0.10, PALETTE.paramoSoil, 0, 0, 0, 8);
       S.cyl(px, py + 1.55, pz, 0.10, 1.4, PALETTE.trunkDark, 0, 0, 0, 6);
@@ -2074,12 +2080,15 @@ function kyoBuildUjiStreet(game, root) {
       S.cyl(px, py + 2.44, pz, 0.72, 0.28, PALETTE.momijiDeep, 0, rand(0, 3), 0, 6);
     } else if (i % 3 === 1) {
       // a stone lantern, knee high, of the kind that stands beside a doorway
+      kyoStaticBox(game, px, py + 0.72, pz, 0.30, 0.72, 0.30);
       S.box(px, py + 0.14, pz, 0.72, 0.28, 0.72, PALETTE.graniteDark);
       S.cyl(px, py + 0.55, pz, 0.15, 0.60, PALETTE.granite, 0, 0, 0, 6);
       S.box(px, py + 0.98, pz, 0.60, 0.32, 0.60, PALETTE.gravelZen);
       S.cone(px, py + 1.28, pz, 0.56, 0.34, PALETTE.granite, 0, 0.4, 0, 6);
     } else {
       // a trestle of sample tins under the noren, and a stack of tea chests
+      kyoStaticBox(game, px, py + 0.38, pz, 1.1, 0.38, 0.45);
+      kyoStaticBox(game, px + 1.9, py + 0.62, pz, 0.42, 0.62, 0.42);
       S.box(px, py + 0.72, pz, 2.2, 0.10, 0.9, PALETTE.templeWood);
       for (let k = -1; k <= 1; k += 2) {
         S.box(px + k * 0.9, py + 0.36, pz, 0.10, 0.72, 0.8, PALETTE.templeWoodDk);
@@ -2258,7 +2267,42 @@ function kyoUpdatePickers(dt) {
  * town — is rejected the same way the maples are.
  */
 const kyoSUGI_N = 360;
-function kyoBuildSugi(root) {
+/**
+ * A TRUNK IS SOLID (V1).
+ *
+ * Three hundred and sixty cedars and forty-two maples, trunks up to 1.2 m
+ * across, and not one of them had a collider: the capybara walked through the
+ * biggest trees in the chapter. The box is a little inside the six-sided
+ * cylinder so the drawn bark is always outside the solid one.
+ *
+ * ...EXCEPT ON A PATH. The sugi placer already keeps out of the torii
+ * corridor; the maples' does not, and a maple that happens to stand on the
+ * sando or in the tunnel has been walk-through since the chapter was built
+ * and is more useful that way than as a wall across the one route the chapter
+ * is scored on. Placement is untouched — moving the placer would reshuffle
+ * every random thing built after it — so the trunk keeps its old manners
+ * exactly where a collider would cost a route, and nowhere else.
+ */
+function kyoOnPath(x, z) {
+  for (let i = 0; i < kyoTORII.length; i += 2) {
+    const dx = x - kyoTORII[i], dz = z - kyoTORII[i + 1];
+    if (dx * dx + dz * dz < (kyoTORII_CAM_R + 1.0) * (kyoTORII_CAM_R + 1.0)) return true;
+  }
+  for (let i = 0; i + 3 < kyoSANDO.length; i += 2) {
+    const x0 = kyoSANDO[i], z0 = kyoSANDO[i + 1], x1 = kyoSANDO[i + 2], z1 = kyoSANDO[i + 3];
+    const dx = x1 - x0, dz = z1 - z0, l2 = dx * dx + dz * dz || 1;
+    const t = clamp(((x - x0) * dx + (z - z0) * dz) / l2, 0, 1);
+    const px = x0 + dx * t, pz = z0 + dz * t;
+    if ((x - px) * (x - px) + (z - pz) * (z - pz) < 4.0 * 4.0) return true;
+  }
+  return false;
+}
+function kyoTrunkSolid(game, x, y, z, r, h) {
+  if (!game || kyoOnPath(x, z)) return;
+  kyoStaticBox(game, x, y + h * 0.5, z, r * 0.82, h * 0.5, r * 0.82);
+}
+
+function kyoBuildSugi(game, root) {
   const trunks = [], spires = [], caps = [], litter = [];
   const blocked = (x, z) => {
     if (Math.abs(x - kyoPOND.x) < kyoPOND.rx + 7 && Math.abs(z - kyoPOND.z) < kyoPOND.rz + 7) return true;
@@ -2305,6 +2349,7 @@ function kyoBuildSugi(root) {
     const cw = h * rand(0.105, 0.145);
     const yaw = rand(0, 3);
     kyoPush9(trunks, x, y + h * 0.26, z, 0, yaw, 0, h * 0.044, h * 0.52, h * 0.044);
+    kyoTrunkSolid(game, x, y, z, h * 0.044, h * 0.52);
     kyoPush9(spires, x, y + h * 0.50, z, 0, yaw, 0, cw, h * 0.40, cw);
     kyoPush9(spires, x, y + h * 0.70, z, 0, yaw + 1.1, 0, cw * 0.84, h * 0.36, cw * 0.84);
     kyoPush9(caps, x, y + h * 0.885, z, 0, yaw + 0.7, 0, cw * 0.60, h * 0.32, cw * 0.60);
@@ -2538,7 +2583,7 @@ function kyoUpdateMirror(game) {
 // Routed to miss the bell tower at (-15, 24) — it leaves the lane at the
 // arrival point and bends east to the head of the pond.
 const kyoSANDO = [-16, 46, -14, 37, -9, 29, -2, 23, 5, 19];   // x, z pairs
-function kyoBuildSando(root) {
+function kyoBuildSando(game, root) {
   const S = kyoMerger();
   const trunks = [], canopy = [];
   const N = kyoSANDO.length / 2;
@@ -2570,6 +2615,9 @@ function kyoBuildSando(root) {
           S.box(px, py + 0.24 + r * 0.28, pz, 0.065, 0.065, len / STEPS + 0.2,
                 PALETTE.bambooStem, 0, yaw, 0);
         }
+        // ...and the fence is a fence (V1): one thin wall a bay, the height
+        // of the top rail. It was walked through along its whole length.
+        kyoStaticBox(game, px, py + 0.46, pz, 0.06, 0.46, (len / STEPS + 0.2) * 0.5, yaw);
       }
       run += len / STEPS;
       // ---- a maple every eight metres or so, alternating sides ----------
@@ -2579,6 +2627,7 @@ function kyoBuildSando(root) {
         const ty = kyoTerrain(tx, tz);
         const h = rand(4.2, 6.0);
         kyoPush9(trunks, tx, ty + h * 0.5, tz, 0, rand(0, 6.28), 0, 0.34, h, 0.34);
+        kyoStaticBox(game, tx, ty + h * 0.5, tz, 0.28, h * 0.5, 0.28);   // V1
         // three overlapping lumps rather than one ball: a momiji is wide, flat
         // and layered, and one sphere at this camera angle is a lollipop
         for (let c = 0; c < 3; c++) {
@@ -2605,7 +2654,7 @@ function kyoBuildSando(root) {
   kyoInstance(root, kyoG.cyl6, PALETTE.momiji, canopy, true, false);
 }
 
-function kyoBuildMaples(root) {
+function kyoBuildMaples(game, root) {
   const trunks = [], canopy = [], under = [];
   for (let i = 0; i < kyoMOMIJI_N; i++) {
     let x = 0, z = 0, ok = false;
@@ -2625,6 +2674,7 @@ function kyoBuildMaples(root) {
     const y = kyoTerrain(x, z);
     const h = rand(4.5, 7.5);
     kyoPush9(trunks, x, y + h * 0.42, z, 0, rand(0, 3), 0, 0.5, h, 0.5);
+    kyoTrunkSolid(game, x, y, z, 0.5, h * 0.8);
     // a momiji is WIDE and FLAT, not a lollipop: three overlapping discs
     for (let k = 0; k < 3; k++) {
       kyoPush9(canopy, x + rand(-1.2, 1.2), y + h * (0.78 + k * 0.13), z + rand(-1.2, 1.2),
@@ -4650,12 +4700,12 @@ function kyoBuild(game) {
   kyoBuildBarrels(kyoRoot);
   kyoBuildFoam(kyoRoot);
   kyoBuildBowl(game, kyoRoot);
-  kyoBuildMaples(kyoRoot);
+  kyoBuildMaples(game, kyoRoot);
   // ...and the approach between the lane and the pond — see kyoBuildSando.
-  kyoBuildSando(kyoRoot);
+  kyoBuildSando(game, kyoRoot);
   // THE WOOD, and it goes in after the maples so its rejection list is read
   // against a hill that is otherwise finished. See kyoBuildSugi.
-  kyoBuildSugi(kyoRoot);
+  kyoBuildSugi(game, kyoRoot);
   kyoBuildPondEdge(kyoRoot);
   kyoBuildKoi(kyoRoot);
   kyoBuildPetals(kyoRoot);

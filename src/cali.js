@@ -851,9 +851,16 @@ function caliBuildRiverside(game, root) {
             420, 0.42, 0.85, PALETTE.caliStone);
     }
     // a low parapet, broken at the bridge
+    // ---- AND IT IS SOLID (V1) ---------------------------------------------
+    // Drawn along both banks since the chapter was built, a metre high, and
+    // never collided: the player walked into it from the lawn and then
+    // through it, with the camera inside the stone. It sat under audit-solid's
+    // 1.6 m floor for a year — a parapet is exactly the height that audit was
+    // written to ignore. Same numbers as the drawn box, halved.
     for (let x = -200; x < 200; x += 8) {
       if (Math.abs(x - caliBRIDGE_X) < 9) continue;
       R.box(x + 4, 1.25, zc + s * 2.3, 7.4, 1.0, 0.5, PALETTE.caliStoneDark);
+      caliStaticBox(game, x + 4, 1.25, zc + s * 2.3, 3.7, 0.5, 0.25);
     }
   }
   // --- the bridge -----------------------------------------------------------
@@ -882,6 +889,10 @@ function caliBuildRiverside(game, root) {
   // two arches under it
   for (let s = -1; s <= 1; s += 2) {
     R.cyl(bx, -0.4, caliRIVER_Z + s * 4.5, 2.2, 8.6, PALETTE.caliStoneDark, 0, 0, Math.PI / 2, 6);
+    // ...and a swimmer cannot pass through the piers (V1): the deck collider
+    // stops at y 0.2 and the arches reach 2.6 m under the water. A box
+    // inscribed in each cylinder, the river's width of the deck.
+    caliStaticBox(game, bx, -0.4, caliRIVER_Z + s * 4.5, 4.3, 1.55, 1.55);
   }
 
   // --- the lulada stand -----------------------------------------------------
@@ -1479,7 +1490,15 @@ function caliBuildRoad(game, root) {
     // road that is later routed over something else cannot acquire the bug
     // again — and only where it is actually needed, which on the flat is
     // nowhere, so the whole run costs a handful of boxes.
-    const lift = y - caliTerrain(x, z);
+    // ...MEASURED AT THE EDGES, NOT ONLY THE CENTRE (V1). On the mirador's
+    // traverses the centreline sits on the ground and the downhill kerb stands
+    // half a metre over it — the ribbon is flat across and the hill is not —
+    // so the box was never emitted and the animal walked up through the
+    // tarmac. Measured at (-72, -39): drawn 0.50 over terrain, no collider
+    // within three metres.
+    const lift = Math.max(y - caliTerrain(x, z),
+                          y - caliTerrain(x + nx * HW, z + nz * HW),
+                          y - caliTerrain(x - nx * HW, z - nz * HW));
     if (i && lift > 0.10) {
       const px = (x + caliRX[i - 1]) * 0.5, pz = (z + caliRZ[i - 1]) * 0.5;
       const dx = x - caliRX[i - 1], dz = z - caliRZ[i - 1];
@@ -2538,6 +2557,8 @@ function caliBuildSalsoteca(game, root) {
     const px = x + Math.cos(a) * (R + 1.9), pz = z + Math.sin(a) * (R + 1.9);
     S.cyl(px, y + 2.9, pz, 0.22, 5.8, PALETTE.caliChiva, 0, 0, 0, 6);
     S.cyl(px, y + 5.85, pz, 0.30, 0.24, PALETTE.caliChivaTrim, 0, 0, 0, 6);
+    // a post is solid (V1): the same call the street's poles make
+    caliStaticBox(game, px, y + 2.9, pz, 0.2, 2.9, 0.2);
     // the cable to the next post, sagging, as a short chain of segments
     const a2 = (i + 1) / POSTS * Math.PI * 2 + 0.4;
     const qx = x + Math.cos(a2) * (R + 1.9), qz = z + Math.sin(a2) * (R + 1.9);
@@ -2577,6 +2598,8 @@ function caliBuildSalsoteca(game, root) {
   // the way in moved
   S.box(x + R * 0.1, y + 0.6, z + R + 0.2, 7.0, 1.2, 1.0, PALETTE.caliWall3);
   S.box(x + R * 0.1, y + 1.26, z + R + 0.2, 7.4, 0.14, 1.3, PALETTE.caliStoneDark);
+  // ...and the bar is solid (V1): waist-high, drawn, walked through.
+  caliStaticBox(game, x + R * 0.1, y + 0.6, z + R + 0.2, 3.5, 0.6, 0.5);
   for (let i = 0; i < 9; i++) {
     S.cyl(x + R * 0.1 - 3.0 + i * 0.75, y + 1.55, z + R + 0.35, 0.11, 0.46,
           i % 3 ? PALETTE.caliCanePale : PALETTE.caliWall3, 0, 0, 0, 6);
@@ -3479,7 +3502,7 @@ function caliBuildCristo(game, root) {
 }
 
 // ==================================================================== FLORA ==
-function caliBuildFlora(root) {
+function caliBuildFlora(game, root) {
   const trunks = [], fronds = [], canopy = [];
   for (let i = 0; i < caliPALM_N; i++) {
     let x = 0, z = 0, ok = false;
@@ -3515,6 +3538,12 @@ function caliBuildFlora(root) {
       // different heights read as one big canopy and never fill the frame.
       const h = rand(9, 13);
       caliPush9(trunks, x, y + h * 0.45, z, 0, rand(0, 3), 0, 1.3, h, 1.3);
+      // ---- A CEIBA IS SOLID (V1) ------------------------------------------
+      // Forty-six trunks, the ceibas 2.6 m across, and not one of them had a
+      // collider: the capybara walked into the biggest tree in the valley and
+      // the camera ended up inside it. A box a little inside the six-sided
+      // trunk, the full height of it. The canopy stays open, as it should.
+      caliStaticBox(game, x, y + h * 0.45, z, 1.1, h * 0.5, 1.1);
       for (let k = 0; k < 4; k++) {
         const rr = h * (0.62 - k * 0.10);
         caliPush9(canopy, x + rand(-2.6, 2.6), y + h * (0.84 + k * 0.075), z + rand(-2.6, 2.6),
@@ -3524,6 +3553,8 @@ function caliBuildFlora(root) {
       // a palm
       const h = rand(8, 14);
       caliPush9(trunks, x, y + h * 0.5, z, 0, rand(0, 3), 0, 0.42, h, 0.42);
+      // ...and so is a palm (V1). See the ceiba above.
+      caliStaticBox(game, x, y + h * 0.5, z, 0.36, h * 0.5, 0.36);
       // fronds droop, and they are long: a palm read as a starburst of flat
       // planks is the tell of a placeholder
       for (let k = 0; k < 8; k++) {
@@ -4561,7 +4592,7 @@ function caliBuild(game) {
   caliBuildWatchers(game, caliRoot);
   caliBuildCane(caliRoot);
   caliBuildCristo(game, caliRoot);
-  caliBuildFlora(caliRoot);
+  caliBuildFlora(game, caliRoot);
   caliBuildSparks(caliRoot);
   caliBuildMoto(game, caliRoot);
   // ...and somebody on the benches. AFTER caliBuildChiva, which is what makes
