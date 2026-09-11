@@ -1250,7 +1250,7 @@ export function createNPCs(game) {
     el.appendChild(tail);
     const txt = document.createElement('span');
     el.appendChild(txt);
-    bubbles.push({ el, txt, mounted: false, owner: null, t: 0, life: 0, shown: false, ox: 0 });
+    bubbles.push({ el, txt, mounted: false, owner: null, t: 0, life: 0, shown: false, ox: 0, side: 0, cside: 0 });
   }
 
   // The live speaker, for the capybara gaze. One object, rewritten in place:
@@ -1291,6 +1291,7 @@ export function createNPCs(game) {
     slot.owner = npcRec;
     slot.t = 0;
     slot.ox = 0;
+    slot.side = 0; slot.cside = 0;  // a new line has not chosen a side yet (V3)
     slot.said = false;              // this line has not been read out yet (F4)
     slot.life = 1.7 + text.length * 0.05;
     // ---- ...AND THEIR ARM KNOWS ABOUT IT (D8) ----------------------------
@@ -11797,6 +11798,7 @@ export function createNPCs(game) {
   // never allocated inside the draw loop.
   const npcBubBox = [];
   const npcBUB_GAP = 0.012;   // NDC, the same clearance the panel dodge leaves
+  const npcBUB_FLIP = 0.10;   // NDC the other side must be shorter by to change sides (V3)
   let npcBubPanelT = 0;
 
   function updateBubbles(dt) {
@@ -11808,8 +11810,16 @@ export function createNPCs(game) {
       // an empty list and the bubble behaves exactly the way it did before.
       if (game.hud && typeof game.hud.panels === 'function') game.hud.panels(npcBubPanels);
       else npcBubPanels.length = 0;
-      npcBubBox.length = 0;
     }
+    // ---- CLEARED EVERY FRAME, WHICH THE M15 NOTE PROMISED AND THE CODE DID
+    // NOT DO (V3). The clear sat inside the slow panel tick above, so for the
+    // other eleven frames of every fifth of a second the list still held the
+    // boxes from earlier frames — INCLUDING EACH BUBBLE'S OWN. A bubble then
+    // dodged the box it had drawn a frame ago, moved, dodged that one, and
+    // flipped sides whenever the two pushes came close: on screen, every
+    // bubble swung back and forth for as long as it was up. The list is a
+    // picture of THIS frame and nothing else.
+    npcBubBox.length = 0;
     // Where the capybara is on screen. At the closer camera a bubble parked on
     // top of him hides the one thing the player is watching, so bubbles slide
     // out of his column rather than sitting over him.
@@ -11848,8 +11858,15 @@ export function createNPCs(game) {
         let want = 0;
         const ddx = npcV1.x - capyNX, ddy = npcV1.y - capyNY;
         if (Math.abs(ddx) < npcBUB_AVOID_X && Math.abs(ddy) < npcBUB_AVOID_Y) {
-          want = (ddx >= 0 ? 1 : -1) * (npcBUB_AVOID_X - Math.abs(ddx)) * 1.35;
-        }
+          // ...and this dodge keeps its side too (V3). The sign of ddx flips
+          // every time the animal walks under the speaker, and a bubble that
+          // follows the sign crosses the whole avoid width each time. It
+          // stays on the side it chose until the animal is clearly past.
+          let cs = ddx >= 0 ? 1 : -1;
+          if (b.cside && Math.abs(ddx) < npcBUB_FLIP * 0.5) cs = b.cside;
+          b.cside = cs;
+          want = cs * (npcBUB_AVOID_X - Math.abs(ddx)) * 1.35;
+        } else b.cside = 0;
         // legible up close, still readable across the lawn
         const sc = clamp(14 / Math.max(dist, 1) + 0.52, 0.78, 1.22);
         // ---- THE CLAMP HAD NO WIDTH TERM, SO THE BOX RAN OFF THE SCREEN --
@@ -11903,6 +11920,15 @@ export function createNPCs(game) {
         // against the boxes already placed this frame. Two sweeps, because
         // clearing one box can land on the next; not iterated to convergence,
         // and the clamp to limX is the backstop for three that cannot all fit.
+        // ---- ...AND A SIDE, ONCE CHOSEN, IS KEPT (V3). The nearer side is
+        // right on the frame a bubble first meets another, and wrong on every
+        // frame after that where the two pushes are within a whisker of each
+        // other — two speakers walking past one another cross that line every
+        // few frames, and a bubble that re-decides on each of them is the
+        // swing this note is about. `b.side` remembers which way it went;
+        // it changes only when the other way is shorter by npcBUB_FLIP, which
+        // is a real re-layout and not a tie.
+        let side = 0;
         for (let pass = 0; pass < 2; pass++) {
           for (let q = 0; q < npcBubBox.length; q += 4) {
             const bx = clamp(npcV1.x + want, -limX, limX);
@@ -11910,9 +11936,14 @@ export function createNPCs(game) {
             if (ny + fullY <= npcBubBox[q + 2] || ny >= npcBubBox[q + 3]) continue;
             const goR = npcBubBox[q + 1] + npcBUB_GAP + halfX - bx;
             const goL = npcBubBox[q] - npcBUB_GAP - halfX - bx;
-            want += (goR < -goL) ? goR : goL;
+            let goRight = goR < -goL;
+            if (b.side > 0 && goR < -goL + npcBUB_FLIP) goRight = true;
+            else if (b.side < 0 && -goL < goR + npcBUB_FLIP) goRight = false;
+            want += goRight ? goR : goL;
+            if (!side) side = goRight ? 1 : -1;
           }
         }
+        b.side = side;
         // The first placement is not a move, so it does not damp: `ox` starts
         // at 0 and easing it toward `want` at 10/s is right for a bubble that
         // is ADJUSTING and wrong for one appearing, which would spend two
