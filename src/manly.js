@@ -3871,11 +3871,17 @@ function manTask(game, id) { game.completeTask(id); }
  * gets the groper — each of them the thing they were standing in front of.
  */
 const manLocals = {};
+// Additive, not destructive (M3). This was `r.lines = lines`, which deleted six
+// of this chapter's nine locals' authored pools — including every `{ after: }`
+// payoff — the first time a set piece fired, permanently. See the long note on
+// `gorSaysNow` in goreme.js for why the destructive version was ever right and
+// what stopped being true about it.
 function manSaysNow(who, lines, wheek) {
   const r = manLocals[who];
   if (!r) return;
-  if (lines) r.lines = lines;
-  if (wheek) r.wheekLines = wheek;
+  if (r.lines0 === undefined) { r.lines0 = r.lines || []; r.wheek0 = r.wheekLines || []; }
+  if (lines) r.lines = lines.concat(r.lines0);
+  if (wheek) r.wheekLines = wheek.concat(r.wheek0);
 }
 
 const manSaid = {};
@@ -4190,7 +4196,8 @@ function manUpdateSurfTasks(game, dt) {
            'Forty minutes from the middle of the city to a rodent doing THAT.',
            'I am going to describe it badly and nobody is going to believe me.'],
           ['They will hear that at the Quay.']);
-        game.shake(0.30);
+        // M4: THE WAVE. This chapter's marquee, and it shook and nothing else.
+        if (typeof game.punch === 'function') game.punch(0.30, 0.07); else game.shake(0.30);
         // AND THE WHOLE CHAPTER WAS MONO. 48 game.sfx calls in the file, none
         // carrying an `at:` — the largest audio surface in the game and not one
         // panner in it, against seven positional sites in the Quay. The two cues
@@ -4328,7 +4335,8 @@ function manUpdateSurfTasks(game, dt) {
     if (dx * dx + dz * dz < 20 && speed > 1.6) {
       manCastleGone = true;
       manSandcastle.visible = false;
-      game.shake(0.35);
+      // M4: the sandcastle. A latched one-shot (manCastleGone).
+      if (typeof game.punch === 'function') game.punch(0.35); else game.shake(0.35);
       manSfx.volume = 0.6; manSfx.pitch = 0.7;
       game.sfx('thud', manSfx);
       // ---- A CASTLE DOES NOT STOP EXISTING, IT FALLS OVER ----------------

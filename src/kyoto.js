@@ -1650,7 +1650,12 @@ function kyoUpdateBell(game, dt) {
         game.sfx('organ', { volume: 1.0, pitch: 0.34, force: true });
         game.sfx('thud', { volume: 0.9, pitch: 0.5 });
       }
-      if (game.shake) game.shake(kyoUnderBell(cp) ? 0.55 : 0.22);
+      // M4: the bonsho, and it was the LARGEST shake request in the game —
+      // 1.6 times the cap — arriving with no lens kick, no pad and no freeze.
+      // Standing under it stops the world for ninety milliseconds; hearing it
+      // from across the valley does not, which is the whole difference.
+      if (game.punch) game.punch(kyoUnderBell(cp) ? 0.55 : 0.22, kyoUnderBell(cp) ? 0.09 : false);
+      else if (game.shake) game.shake(kyoUnderBell(cp) ? 0.55 : 0.22);
       // THE VALLEY HEARS IT. The loudest object in Japan went off and the only
       // thing in the chapter that changed was a number on a checklist: the
       // heron went on standing, the koi went on circling, and nine seconds of
@@ -4198,7 +4203,9 @@ function kyoCheckMatcha(game, dt) {
     kyoMatchaHeap.visible = false;
     kyoTask('matcha-raid');
     if (typeof game.sfx === 'function') { game.sfx('hiss', { volume: 0.9 }); game.sfx('pop'); }
-    if (typeof game.shake === 'function') game.shake(0.3);
+    // M4: the matcha heap going over.
+    if (typeof game.punch === 'function') game.punch(0.3);
+    else if (typeof game.shake === 'function') game.shake(0.3);
     if (typeof game.toast === 'function') game.toast('you are now, structurally, a matcha capybara');
     return;
   }

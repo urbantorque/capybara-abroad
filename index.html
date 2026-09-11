@@ -109,9 +109,15 @@
   #boot .fail p { font-size:15px; line-height:1.65; color:#3a332c; margin:14px 0 10px; }
   #boot .fail ul { text-align:left; display:inline-block; margin:2px 0 14px; padding-left:1.1em;
                    font-size:14px; line-height:1.7; color:rgba(58,51,44,.7); }
-  /* the card's own accent, its own radius and its own three shadows */
+  /* the card's own accent, its own radius and its own three shadows.
+     M6: the FILL is the deep coral, not the bright one. Cream on #e98b7a is
+     2.31:1 and this is 12.5px uppercase bold on the one screen a player reaches
+     when something has already gone wrong; #9e5f53 is the same hue at 68% value
+     and 4.62:1. Hand-copied from systems.js's `accentDeep` on purpose — this
+     card has to work before a single module has loaded, which is the whole
+     reason it duplicates the palette in the first place. */
   #boot .fail button { font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
-          color:#faf6ec; background:#e98b7a; border:1px solid #e98b7a; border-radius:5px;
+          color:#faf6ec; background:#9e5f53; border:1px solid #9e5f53; border-radius:5px;
           padding:10px 22px; letter-spacing:.1em; text-transform:uppercase;
           box-shadow:0 1px 3px rgba(0,0,0,.16),0 6px 16px rgba(0,0,0,.16); }
   #boot .fail button:hover { filter:brightness(1.06); }

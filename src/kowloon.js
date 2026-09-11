@@ -4438,7 +4438,8 @@ function hkUpdateLion(game, dt) {
       // opening: hkCrackT runs a burst of pops for two and a half seconds,
       // accelerating and then falling away, with the paper coming down after.
       hkCrackT = 0; hkCrackN = 0;
-      if (game.shake) game.shake(0.22);
+      // M4: the firecrackers. Loudest thirty seconds in the chapter.
+      if (game.punch) game.punch(0.22, false); else if (game.shake) game.shake(0.22);
       if (!aboard) hkToast('you were supposed to be on it.');
     }
     // ---- AND IT COUNTS FOR THE WHOLE REAR, NOT FOR ONE FRAME OF IT -------

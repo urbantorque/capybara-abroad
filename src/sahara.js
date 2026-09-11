@@ -5048,7 +5048,9 @@ function sahUpdateStorm(game, dt) {
     if (sahStormT > sahSTORM_BUILD) {
       sahStormPhase = 2; sahStormT = 0;
       sahToast('do not go anywhere. it is quicker than you.');
-      if (typeof game.shake === 'function') game.shake(0.3);
+      // M4: the storm front arriving (sahStormPhase 1 -> 2, once).
+      if (typeof game.punch === 'function') game.punch(0.3, false);
+      else if (typeof game.shake === 'function') game.shake(0.3);
     }
   } else if (sahStormPhase === 2) {
     sahStormT += dt;

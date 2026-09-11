@@ -2127,7 +2127,9 @@ function pastoCollapseStall(st) {
       pastoSfxIn(0.520, 'vendor',
                  { at: at, volume: 0.7, pitch: rand(0.86, 1.06), near: 5, far: 60 });
     }
-    if (g.shake) g.shake(0.5);
+    // M4: the market cascade — and it completes a task on the next line, so
+    // it is a latched one-shot and can afford to stop the world.
+    if (g.punch) g.punch(0.5, 0.08); else if (g.shake) g.shake(0.5);
     if (g.completeTask) g.completeTask('market-chaos');
   }
   return true;

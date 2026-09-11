@@ -4925,11 +4925,37 @@ function gorCheckField(game, dt) {
  * a crew chief notices you leave and the chase driver notices you arrive.
  */
 const gorLocals = {};
+// ---- WHAT THEY SAY NOW GOES IN FRONT OF WHAT THEY ALWAYS SAY (M3) --------
+//
+// This was `r.lines = lines`, and it DELETED a person's whole pool, for the
+// rest of the session. Chapters build once (`if (gorBuilt) return`) and nothing
+// ever prunes `locals`, so the loss is permanent the first time a set piece
+// fires — which in this chapter is the first time a balloon lands, about four
+// minutes in.
+//
+// It is the older of two mechanisms in this file for the same job. It was
+// written before `localResolve` grew `before` / `after` / `when`, when a
+// person's lines genuinely were a fixed bag of three sentences and replacing
+// them was the only way to make somebody react; the conditional pools arrived
+// later, went into the same records, and have been quietly eaten ever since.
+//
+// The tea seller at the bottom of this file has five authored lines, two of
+// them `{ after: ... }` payoffs that only exist because the player did
+// something. Land one balloon and all five are gone and she has three. NINE OF
+// THIS CHAPTER'S TEN LOCALS are overwritten by the thirteen call sites below.
+//
+// The original is stashed once, on the record, and everything after is
+// additive: newest event's lines first, the permanent pool behind them. Repeat
+// calls are correct and cannot grow without bound, because `lines0` is only
+// ever taken from the pool as authored.
+//
+// The same fault, the same fix, in `manSaysNow` and `panSaysNow`.
 function gorSaysNow(who, lines, wheek) {
   const r = gorLocals[who];
   if (!r) return;
-  if (lines) r.lines = lines;
-  if (wheek) r.wheekLines = wheek;
+  if (r.lines0 === undefined) { r.lines0 = r.lines || []; r.wheek0 = r.wheekLines || []; }
+  if (lines) r.lines = lines.concat(r.lines0);
+  if (wheek) r.wheekLines = wheek.concat(r.wheek0);
 }
 
 /**

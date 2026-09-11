@@ -3191,11 +3191,15 @@ function panTask(game, id) { game.completeTask(id); }
  * saying "…was that deliberate?"
  */
 const panLocals = {};
+// Additive, not destructive (M3). This was `r.lines = lines`, which deleted
+// four of this chapter's seven locals' authored pools the first time a set
+// piece fired, permanently. See the long note on `gorSaysNow` in goreme.js.
 function panSaysNow(who, lines, wheek) {
   const r = panLocals[who];
   if (!r) return;
-  if (lines) r.lines = lines;
-  if (wheek) r.wheekLines = wheek;
+  if (r.lines0 === undefined) { r.lines0 = r.lines || []; r.wheek0 = r.wheekLines || []; }
+  if (lines) r.lines = lines.concat(r.lines0);
+  if (wheek) r.wheekLines = wheek.concat(r.wheek0);
 }
 
 const panSaid = {};
@@ -5184,7 +5188,8 @@ function panUpdateTasks(game, dt) {
       game.sfx('splash', placeCue(panSfx, r.x, panWATER, r.z, 60));
     }
     panShakeT = 2.4;
-    game.shake(0.22);
+    // M4: the herd going into the river.
+    if (typeof game.punch === 'function') game.punch(0.22, false); else game.shake(0.22);
     // ---- FRAMED. THE MARQUEE IS A LINE, AND IT WAS SHOT DOWN A BACK ----
     //
     // Measured at task:complete on a real keyboard crossing: the rig sits

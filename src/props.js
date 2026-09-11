@@ -158,6 +158,106 @@ const physCAUSE_WATER = 8.0;     // s — a thrown ball can take a while to bob 
 const physCAUSE_SNATCH = 12.0;
 
 // ===========================================================================
+// THE GETAWAY (M7) — a theft is not the moment you take it
+// ===========================================================================
+//
+// Two dozen rows in this game are a theft, and every one of them ticked on the
+// frame the prop entered the animal's mouth. So the most-repeated row type in
+// the whole list was: walk up to a person, press E, done — and the machinery
+// that exists to make that interesting, which is a great deal of machinery,
+// happened AFTERWARDS, to a row that was already crossed off. The owner's
+// errand, the fifteen-metre leash, the ten-second ceiling, the reclaim at 1.5 m:
+// all of it plays out over a task the game has already awarded.
+//
+// The whole change is where the tick goes. Not a harder gate — the SAME gate,
+// moved four seconds later, to the moment it means something:
+//
+//     A THEFT TICKS WHEN YOU GET AWAY WITH IT.
+//
+// ---- AND IT CANNOT LOSE YOU THE ROW. This is the part that had to be got
+// right, because the review that proposed it named exactly this risk: if the
+// owner's chase reliably takes the prop back, a gated theft is a task the
+// player can be permanently denied, and `chapComplete` still governs the
+// souvenir and the nineteen-of-nineteen finale.
+//
+// Three properties make that impossible, and each is load-bearing:
+//
+//   1. THE ARM IS BY TASK ID, NOT BY PROP. Grabbing re-points the entry at
+//      whatever is in the mouth now. So a prop taken back, dropped in a canal,
+//      destroyed, or left behind in another chapter costs nothing: pick up
+//      another empanada and the same row is live again.
+//   2. NOTHING EVER DISARMS IT. There is no failure branch. Losing the prop
+//      leaves the entry exactly where it was — which is `paEmpWanted`'s rule,
+//      already in this tree, and its comment is the right one: IT IS NOT A
+//      GATE, IT IS A DEFERRAL.
+//   3. DISTANCE **OR** PERSISTENCE. Fifteen metres is `npcOWN_LEASH` — the
+//      exact radius at which the owner gives up and turns round, so the tick
+//      lands on the frame they do, which is the readable moment. But a chapter
+//      with no fifteen metres in it (a salon, a cave chamber, a drift island)
+//      must not be able to hold a row hostage on its floor plan, so simply
+//      keeping hold of the thing for twelve seconds is also getting away with
+//      it — and it is, because `npcOWN_OUT_T` gives up at ten.
+const physGETAWAY_T   = 4.0;    // s in the mouth before it can count at all
+const physGETAWAY_D   = 15.0;   // m from where it lived. npcOWN_LEASH exactly.
+const physGETAWAY_MAX = 12.0;   // s held, after which distance stops mattering
+// id -> the prop currently standing for it. One entry per row, overwritten on
+// every grab, never deleted except by success.
+const physGetaway = Object.create(null);
+let physGetawayN = 0;           // rows ticked this session — for the audit hook
+
+/**
+ * Arm a theft row. Called instead of `physTask` at the sites that used to tick
+ * on the grab itself; safe to call every frame and safe to call twice.
+ */
+function physArmTheft(id, prop) {
+  if (!id || !prop) return;
+  physGetaway[id] = prop;
+}
+
+/** Has this one got clear? See the three properties above. */
+function physGotAway(prop) {
+  if (!prop || !prop.held || prop.removed) return false;
+  const t = physGame.state ? physGame.state.time : 0;
+  const carried = t - (prop.grabTime || 0);
+  if (carried < physGETAWAY_T) return false;
+  if (carried >= physGETAWAY_MAX) return true;
+  const b = prop.body;
+  if (!b) return false;
+  const dx = b.position.x - prop.homeX, dz = b.position.z - prop.homeZ;
+  return dx * dx + dz * dz > physGETAWAY_D * physGETAWAY_D;
+}
+
+/** Once a frame, from physUpdate. At most a handful of entries, ever. */
+function physGetawayStep() {
+  for (const id in physGetaway) {
+    if (physGotAway(physGetaway[id])) {
+      delete physGetaway[id];
+      physGetawayN++;
+      physTask(id);
+    }
+  }
+}
+
+/**
+ * The harness window, and it reports COUNTS and the live arithmetic rather than
+ * the table — `physGetaway` having a key says a row is armed, which is the
+ * input, and this repo has shipped that mistake more than once.
+ */
+function physGetawayAudit() {
+  const t = physGame.state ? physGame.state.time : 0;
+  const rows = [];
+  for (const id in physGetaway) {
+    const p = physGetaway[id];
+    const b = p && p.body;
+    rows.push({ id: id, held: !!(p && p.held),
+                carried: p ? +(t - (p.grabTime || 0)).toFixed(2) : -1,
+                far: b ? +Math.hypot(b.position.x - p.homeX, b.position.z - p.homeZ).toFixed(1) : -1 });
+  }
+  return { armed: rows.length, ticked: physGetawayN, rows: rows,
+           t: physGETAWAY_T, d: physGETAWAY_D, max: physGETAWAY_MAX };
+}
+
+// ===========================================================================
 // A THROWN THING THAT HITS A PERSON (the lift pass)
 // ===========================================================================
 //
@@ -1806,6 +1906,13 @@ export function createProps(game) {
     // because a hit that did not come out of a real launch impulse is exactly
     // the thing the rule exists to refuse.
     hitAudit: physHitAudit,
+    // ---- the getaway (M7) ----
+    // The verb, for the theft rows this file does not own. Arming is safe from
+    // anywhere and is deliberately the ONLY surface: there is no `forceGetaway`
+    // and no disarm, because the whole safety argument is that nothing outside
+    // physGetawayStep may ever take a row back off the list.
+    armTheft: physArmTheft,
+    getawayAudit: physGetawayAudit,
     // ...and the verb itself. systems.js is the only caller: see biomeGo,
     // and the note there on why the decision cannot be taken on this side.
     travelThrough: physTravelThrough,
@@ -3090,9 +3197,23 @@ function physGrab(prop) {
   prop.lastWY = b.position.y;
   prop.lastWZ = b.position.z;
   physSetSolo(prop, true);
-  if (prop.type === 'sandwich') physTask('picnic-thief');
-  else if (prop.type === 'empanada') physTask('steal-empanada');
-  else if (prop.type === 'ruana') physTask('ruana-thief');
+  // WHEN it went in the mouth. The getaway is the only reader; it is stamped on
+  // every grab and never cleared, because `held` is what says whether the clock
+  // means anything and a stale stamp on a prop lying in a canal is harmless.
+  prop.grabTime = physGame.state ? physGame.state.time : 0;
+  // ---- ARMED, NOT TICKED (M7). See THE GETAWAY. ------------------------
+  // These three were the whole of this file's theft ticking and they fired on
+  // the frame the prop was taken. They now stand for a row until the animal is
+  // clear of where the thing lived — and re-arm on every grab, so nothing here
+  // can be lost.
+  //
+  // `empanada` is NOT here, and was: `physTask('steal-empanada')` fired on any
+  // grab of one, which quietly defeated the deferral npc.js's F4 built for that
+  // exact row — "the joke is being seen doing it". Two owners, one row, and the
+  // looser of the two won every time. Pasto owns that row; this file owns the
+  // getaway it now goes through.
+  if (prop.type === 'sandwich') physArmTheft('picnic-thief', prop);
+  else if (prop.type === 'ruana') physArmTheft('ruana-thief', prop);
   return true;
 }
 
@@ -3617,7 +3738,32 @@ function physPersonHit(prop, e, speed) {
     catch (err) { said = false; }
     if (said) physHitLine = (physHitLine + 1) % physHIT_LINES.length;
   }
+  // ---- ...AND IT COUNTS AS SOMETHING YOU DID (M8) ------------------------
+  //
+  // The charged throw is a whole verb — a mass-proportional launch on a 43.7
+  // degree arc, built two passes ago — and the last pass gave it a hit rule
+  // with a punch, a startle and a spoken line. Between them they fed NOTHING:
+  // no task in 232 needs a throw, `prop.thrownT` is read at exactly one place
+  // and that place is four lines above this one, and the incident chain — the
+  // only repeatable reward in the game — had five kinds and none of them was
+  // this. So the most deliberate thing a player can do went on a cooldown and
+  // then vanished.
+  //
+  // One event. systems.js owns the chain and this file must not reach into it;
+  // `prop:impact`, `prop:water` and `prop:destroy` are the three existing doors
+  // and this is the fourth, in the same shape. The gate is entirely upstream:
+  // everything above this line has already established that a thrown thing,
+  // still flying, hit a person hard enough, at most once every physHIT_COOL.
+  if (physGame.events && typeof physGame.events.emit === 'function') {
+    physHitEv.position = b.position;
+    physHitEv.prop = prop;
+    physHitEv.speed = speed;
+    physGame.events.emit('prop:hitperson', physHitEv);
+  }
 }
+// A shared payload, like every other emitter in this file: `prop:impact` fires
+// on cascades and nothing here may allocate inside a collision callback.
+const physHitEv = { position: null, prop: null, speed: 0 };
 
 /**
  * The harness window on the rule above. Same shape and the same reason as
@@ -6175,6 +6321,11 @@ function physUpdate(dt) {
   // was hit and settled in the same second would keep the flash material for
   // ever. See THE HIT FLASH.
   physFlashStep(dt * 1000);
+  // ---- the getaway (M7) ---------------------------------------------------
+  // Above the biome gate on purpose: an armed row belongs to the journey, not
+  // to the chapter it was armed in, and the props it points at are gated by
+  // `held` rather than by which world they were born in.
+  physGetawayStep();
   // ---- biome gate ---------------------------------------------------------
   // Props are tagged with the biome they were born into (main.js auto-tags
   // everything added at runtime). A detached biome's bodies are out of the

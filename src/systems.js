@@ -815,6 +815,32 @@ const sysDIP_MAX    = 1.40;    // ...and the cap, which is about eight degrees
 // harder than that, so the rig draws 57 per cent of what the algebra promises.
 // 0.19 puts a six-metre drop (10.8 m/s) at 2.8 degrees of pitch, which is the
 // middle of the 2-4 the batch was aiming at.
+// ---- ...AND A BIG ARRIVAL IS NOT A BIG HOP (M4) ---------------------------
+//
+// The dip is capped at sysDIP_MAX, and it is reached at 13.9 m/s — a nine-metre
+// drop. So coming off a Göreme chimney, off the Kowloon scaffold, out of the
+// condor, or into the Sơn Đoòng doline is IDENTICAL IN THE HANDS AND IDENTICAL
+// IN TIME to a hop off a bench: the same 1.4 m of look-target drop over the
+// same 0.45 s, no shake, no rumble, nothing. Landing is the most repeated verb
+// in the game and it had one channel and a ceiling.
+//
+// So it goes through `punch`, which is the file's one call for "that landed"
+// and already owns the other three channels and the reduced-motion gate. The
+// floor is deliberately ABOVE the dip's: the dip is the ordinary weight of
+// coming down and should stay the only thing a hop does. 11 m/s is a six-and-a-
+// half metre drop, which is the first height in this game that is a decision.
+//
+// The freeze is asked for EXPLICITLY rather than left to `sysPUNCH_MIN`. At the
+// cap `m` is 0.76, well over the 0.55 floor, so the automatic path would freeze
+// on every landing over about nine metres — and this game has a chapter of
+// nothing but falling. Above 20 m/s (a twenty-metre drop) it is a real event
+// and gets 35 ms; under it, `false` says shake and kick and rumble, but never
+// stop.
+const sysLAND_PUNCH_V0  = 11;      // m/s of descent below which nothing punches
+const sysLAND_PUNCH_K   = 0.016;   // ...and the shake per m/s over it
+const sysLAND_PUNCH_MAX = 0.26;    // reached at 27.3 m/s, a thirty-eight metre drop
+const sysLAND_FREEZE_V  = 20;      // m/s over which the world takes a moment
+const sysFREEZE_LAND    = 0.035;   // s. Two frames. Punctuation, not a stutter.
 // ---- THE CEREMONY'S SHOT (D4). See chapterCeremony. ------------------------
 const sysDONE_DOLLY = 6.0;     // m back from the resting boom
 const sysDONE_PITCH = 0.34;    // rad — 19 degrees against the resting 41
@@ -1705,6 +1731,138 @@ const sysCLOUD_HI    = 0.70;  // ...under cloud at any moment, with soft edges
 const sysCLOUD_LAMBDA = 0.5;  // how fast a chapter's strength walks in
 let sysCloudK = 0, sysCloudX = 0, sysCloudZ = 0;
 let sysCloudDX = 0.62, sysCloudDZ = 0.78;
+
+// ---- ...AND THE THING THAT WAS CASTING THEM (M1, 11 Sep 2026) -------------
+// The table above has, since the beauty pass, walked a soft shadow across the
+// ground of thirteen chapters. Nothing was ever drawn overhead to cast it. The
+// shared dome (see sysBuildSky) is three terms of arithmetic — a vertical ramp,
+// a sun lobe and a horizon band — and no geometry at all, and the D1 note that
+// signed off on that said the top quarter of the frame was empty and would stay
+// empty, which was TRUE OF THE FRAME IT WAS MEASURED ON: the horizon sat at NDC
+// 0.94, three per cent from the top edge.
+//
+// L2 moved it to 0.44. The top TWENTY-EIGHT per cent of every daylight frame is
+// now that bare ramp, and the reasoning that left it bare is void — the pass
+// that reversed it said so in as many words.
+//
+// So the sky gets clouds, and it gets them EXACTLY WHERE THE GROUND ALREADY HAS
+// THEIR SHADOW: count and opacity come off sysCLOUD and nothing else, so the two
+// halves of one weather cannot disagree, and a chapter with a zero row — the
+// four nights, the cave, the Drift, and Kyoto, whose overcast IS the light —
+// draws none. That is one coherent branch rather than a second table to keep.
+//
+// FOUR PROPERTIES, and each is the reason a previous attempt at this would have
+// gone wrong:
+//
+//   1. IT IS PART OF THE SKYBOX, NOT OF THE WORLD. A child of sysSkyMesh, so it
+//      rides the lens for free and one shell radius is correct for a
+//      four-hundred-metre far plane and a two-thousand-two-hundred-metre one
+//      alike. depthTest and depthWrite are both off and renderOrder is one step
+//      AFTER the dome, so it draws over the gradient and everything in the world
+//      draws over it. A cloud can never poke through a mountain.
+//   2. THE WIND IS A ROTATION, NOT A POSITION. Turning the whole layer about Y
+//      moves every cloud by the same angle of azimuth, which is exactly what
+//      perspective does to real wind — high cloud crosses the frame more slowly
+//      than cloud near the horizon, for nothing. It also means the per-frame
+//      cost is ONE float, not fifty-four matrix writes.
+//   3. A CLOUD IS NOT LIT BY THE SCENE'S LIGHTS AT ALL, AND THE FIRST CUT OF
+//      THIS WAS, WHICH IS WHY IT WAS INVISIBLE. Sydney's layer is Lambert with
+//      an emissive fill and its comment says why — a cloud is lit from inside,
+//      by light that has already been scattered in it, which no direct model
+//      produces. That is right, and copying it here still failed, because the
+//      hemisphere light's GROUND colour is a per-chapter number and it is not
+//      small. Measured on six chapters:
+//
+//        manly     hemiGround (1.198, 1.052, 0.705)   x a near-white body,
+//                  PLUS the emissive: every channel over 1.0 before the sun is
+//                  considered. The underside of every cloud was pure white.
+//        quay      (0.733, 0.597, 0.335) — half of Manly's
+//        antarctic (1.694, 1.757, 1.773) — two and a half times Quay's
+//
+//      So one body colour cannot be right in eleven chapters: the same material
+//      reads as a blown-out smear on a beach and as a dirty rag over a harbour.
+//      The layer is unlit, and the shape comes from a VERTICAL RAMP baked into
+//      the geometry's vertex colours instead — bottom `sysCLOUD_SKY_BASE` of
+//      top. That is the correct model as well as the robust one: what a cloud
+//      looks like is set by the sky it is in, not by a lamp pointed at the
+//      ground under it.
+//
+//      And the one colour it does take is the LIVE HORIZON — so every event
+//      that moves the atmosphere (a Cali night, a Marrakech dusk, an aurora)
+//      moves the clouds with it, and they can never drift out of step with
+//      their own sky.
+//   4. THE SEED IS THE CHAPTER'S NAME. Re-entering a place gives back the sky it
+//      had, which matters because the album keeps photographs of it.
+const sysCLOUD_SKY_MAXC = 22;    // clusters, and the array is sized for this
+const sysCLOUD_SKY_PUFF = 3;     // puffs per cluster — one big, two shoulders
+const sysCLOUD_SKY_N0   = 6;     // clusters at strength 0...
+const sysCLOUD_SKY_NK   = 38;    // ...and this many more per unit of strength
+// PLACED BY ELEVATION, NOT BY HEIGHT AND RADIUS, and the first cut of this was
+// the other way round and put half the layer off the top of the picture.
+//
+// The settled lens pitches 11.2 degrees up through a 48-degree vertical field,
+// so the frame runs from about -13 to +35 degrees of elevation and the horizon
+// sits 28% down from the top edge. Below about 8 degrees there is terrain, haze
+// or architecture in almost every chapter — measured by looking at nineteen
+// frames — and above 35 there is no picture. So the whole useful band is 9 to
+// 36 degrees, and it is BIASED LOW (the 1.6 power) because the sky nearest the
+// horizon is the part that is always visible and the part that carries depth.
+// THE FRAME HOLDS TWELVE DEGREES OF SKY AND THE FIRST TWO CUTS OF THIS PUT THE
+// LAYER ABOVE IT. Worth writing out, because the sign is easy to get backwards
+// and the symptom is a feature that measures as nothing:
+//
+//   The settled rig pitches DOWN 11.2 degrees — `qa/rd-onscreen.js` takes it as
+//   `asin(-forward.y)`, and it is a follow camera looking at an animal on the
+//   ground. So a thing at elevation `e` above eye level lands at
+//   `tan(e + 11.2) / tan(24)` in NDC, and the top edge (NDC 1) is reached at
+//   e = 12.8 degrees. The horizon is at NDC 0.44, 28% down.
+//
+//   THE WHOLE VISIBLE SKY IS ELEVATION 0 TO 12.8 DEGREES.
+//
+// The first band was 9-36 and the second 7-26, and both of them spent most of
+// the layer over the top edge of the picture: Rio went from 5.82% of the band
+// covered to 0.00% when the second "narrowing" moved it further up. 2 to 12
+// puts every cloud between 2% and 25% down the frame, which is the strip
+// between the top edge and the horizon and is the only sky there is.
+const sysCLOUD_SKY_ELO  = 2 * Math.PI / 180;
+const sysCLOUD_SKY_EHI  = 12 * Math.PI / 180;
+const sysCLOUD_SKY_EBIAS = 1.15;
+const sysCLOUD_SKY_DLO  = 90;    // m along the line of sight: the near shell...
+const sysCLOUD_SKY_DHI  = 170;   // ...and the far one, well inside sysSKY_R
+// Half-width as a FRACTION OF DISTANCE, so it is an angle: 0.07 to 0.14 of the
+// range is 4 to 8 degrees of frame, which is a cumulus at a few kilometres.
+// Written as a fraction rather than as metres because the two shells differ by
+// nearly a factor of two and a fixed size would make the far ones specks.
+// Smaller than the first cut, and the count went up to pay for it: one big lump
+// is a lump, and six small ones are weather. The flattening (sysCLOUD_SKY_FLAT)
+// matters more than usual here — 8 degrees wide is 2.7 degrees tall, which is a
+// fifth of the twelve degrees of sky the frame actually holds.
+const sysCLOUD_SKY_WLO  = 0.07;
+const sysCLOUD_SKY_WHI  = 0.14;
+const sysCLOUD_SKY_FLAT = 0.34;  // how tall a cloud is against its width
+const sysCLOUD_SKY_DEEP = 0.62;  // ...and how deep
+const sysCLOUD_SKY_SPIN = 0.014; // rad/s. 76 deg of frame in about ninety seconds
+// The top of a cloud is the sky, bleached: a quarter of the way back toward the
+// horizon keeps its hue — a dusty Marrakech cloud, a cold Antarctic one — with
+// no second table. The base is a FRACTION OF THE TOP and not a colour of its
+// own, which is what makes one pair of numbers correct in eleven chapters.
+// 0.66 is the ratio a real cumulus base holds against the sky beside it.
+const sysCLOUD_SKY_TINT = 0.25;
+const sysCLOUD_SKY_BASE = 0.66;
+// ...and a little between one puff and the next, or a cluster is one silhouette
+// rather than three lumps. Small: this is shape, not colour.
+const sysCLOUD_SKY_VARY = 0.08;
+let   sysCloudSkyMesh   = null;
+let   sysCloudSkyN      = 0;     // clusters currently placed
+const sysCloudSkyBody   = new THREE.Color();
+// Its own scratch rather than sysV3 and friends. Seeding runs on a chapter
+// change, which is the one moment in this file when half a dozen other systems
+// are also mid-rebuild, and sysV3 is shared by every one of them.
+const sysCloudSkyV      = new THREE.Vector3();
+const sysCloudSkyS      = new THREE.Vector3();
+const sysCloudSkyQ      = new THREE.Quaternion();
+const sysCloudSkyM      = new THREE.Matrix4();
+const sysCloudSkyTmp    = new THREE.Color();
 // ---- ...AND THE SAME TABLE FOR THE ANIMAL, OFF A MEASUREMENT (P1) ---------
 // sysRIM is tuned so the rim reads the same against every chapter's LIGHT. This
 // one is tuned against a different fact: how far the capybara's own silhouette
@@ -6621,6 +6779,36 @@ function sysBuildCSS() {
   // readable where it is words. #9e5f53 is the same hue at 68% value: 4.62:1.
   const accent  = sysHex(PALETTE.cloth1);
   const accentInk = '#9e5f53';
+  // ---- ...AND THE SPLIT ABOVE ONLY COVERED HALF OF IT (M6) --------------
+  //
+  // "an OUTLINE, a hover, a rule, a FILLED BUTTON — where contrast against the
+  // paper is not the question". True of the outline, the hover and the rule.
+  // Not true of the filled button, because a filled button has WORDS ON IT, and
+  // there the question is paper against coral — which is the same 2.31:1, in
+  // the other direction, and was never split.
+  //
+  // Measured in the browser before the start click, which is why neither
+  // existing probe could see it: `qa/rd-contrast.js` clicks `.capyui-go` and
+  // THEN measures, so it reports the button it just pressed as a miss, and
+  // `qa/uicontrast.js` only reads picker tiles.
+  //
+  //   .capyui-go b — the word "Begin", 17px bold — 2.31:1 against 4.5 required
+  //
+  // ...and the same fill carries "Carry on" and its subtitle, "resume" on the
+  // pause card, "KEEP IT" on the overwrite card, and the boot card's "Try
+  // again" in index.html. Those are the five biggest buttons in the game and
+  // the whole product funnels through them.
+  //
+  // THE RULE, and it is one sentence: CORAL IS THE FILL WHERE NOTHING IS
+  // WRITTEN ON IT; THIS IS THE FILL WHERE SOMETHING IS. The bars, the slider
+  // thumb, the pips and the map dot keep the bright coral, which is where the
+  // identity actually lives.
+  //
+  // The value is accentInk's, and deliberately: paper on #9e5f53 is 4.62:1,
+  // the same number that colour was chosen for in the other direction. It is a
+  // separate name rather than a reuse so that either half can be tuned without
+  // silently moving the other.
+  const accentDeep = '#9e5f53';
   const tick    = sysHex(PALETTE.leafC);
   const rule    = sysRgba(PALETTE.stoneDark, 0.55);
   const shadow  = sysRgba(PALETTE.screenShadow, 0.16);
@@ -7106,7 +7294,7 @@ function sysBuildCSS() {
 '.capyui-overyes{background:none;border:1px solid ' + rule + ';color:' + inkSoft + ';}',
 '.capyui-overyes:hover{color:' + ink + ';border-color:' + ink + ';}',
 /* KEEP IT is the filled one. The card should look like it wants you to say no. */
-'.capyui-overno{background:' + accent + ';border:1px solid ' + accent + ';',
+'.capyui-overno{background:' + accentDeep + ';border:1px solid ' + accentDeep + ';',
   'color:' + paper + ';}',
 '.capyui-overno:hover{transform:translateY(-1px);}',
 '.capyui-overyes:focus-visible,.capyui-overno:focus-visible{outline:2px solid ' + accent + ';',
@@ -7259,7 +7447,7 @@ function sysBuildCSS() {
    reads nothing else on this card can still not fail to find this. */
 '.capyui-go{display:flex;flex-direction:column;align-items:center;gap:2px;',
   'width:100%;margin-top:clamp(12px,2.4vw,18px);padding:clamp(9px,1.8vw,13px) 18px;',
-  'border-radius:' + rLg + ';border:1px solid ' + accent + ';background:' + accent + ';',
+  'border-radius:' + rLg + ';border:1px solid ' + accentDeep + ';background:' + accentDeep + ';',
   /* A FILLED SLAB OF ONE COLOUR IS A COLOUR SWATCH. Everything else on this
      card is a printed thing with light on it — the paper has a rake, the
      pictures now have a sun — and the one control the whole page is built
@@ -7426,7 +7614,7 @@ function sysBuildCSS() {
   'font-size:clamp(13px,2.2vw,17px);font-weight:700;line-height:1;',
   'transition:transform ' + dFast + ' ' + mSnap + ',background ' + dFast + ' ease,border-color ' + dFast + ' ease,color ' + dFast + ' ease;}',
 '.capyui-pick.hero:hover .capyui-pickarrow,.capyui-pick.hero:focus-visible .capyui-pickarrow{',
-  'background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
+  'background:' + accentDeep + ';border-color:' + accentDeep + ';color:' + paper + ';',
   'transform:translateY(-50%) translateX(3px);}',
 '@media (max-width:520px){.capyui-pickarrow{display:none;}',
   '.capyui-pick.hero .capyui-pickbody{padding-right:clamp(12px,2.2vw,20px);}}',
@@ -7562,7 +7750,7 @@ function sysBuildCSS() {
   'transition:background ' + dFast + ' ease,color ' + dFast + ' ease,border-color ' + dFast + ' ease;',
   'font-size:' + tMd + ';font-variant-numeric:tabular-nums;}',
 '.capyui-pick:hover .capyui-pickkey,.capyui-pick:focus-visible .capyui-pickkey{',
-  'background:' + accent + ';color:' + paper + ';border-color:' + accent + ';}',
+  'background:' + accentDeep + ';color:' + paper + ';border-color:' + accentDeep + ';}',
 /* ---- HOW FAR THROUGH THIS PLACE YOU ARE, WITHOUT READING A NUMBER --------
    A hairline along the foot of the tile. The tally in the corner is exact and
    is what you read when you are deciding; the bar is what you SCAN, and at
@@ -7664,7 +7852,7 @@ function sysBuildCSS() {
 '.capyui-carry{display:flex;align-items:center;justify-content:space-between;gap:12px;',
   'width:100%;margin-top:clamp(10px,2vw,15px);cursor:pointer;pointer-events:auto;',
   'font:inherit;text-align:left;touch-action:manipulation;',
-  'background:' + accent + ';border:1px solid ' + accent + ';border-radius:' + rMd + ';',
+  'background:' + accentDeep + ';border:1px solid ' + accentDeep + ';border-radius:' + rMd + ';',
   'padding:clamp(7px,1.5vw,11px) clamp(10px,2vw,15px);',
   'transition:transform ' + dFast + ' ' + mSnap + ',filter ' + dFast + ' ease;}',
 '.capyui-carry:hover,.capyui-carry:focus-visible{transform:translateY(-1px);',
@@ -8134,8 +8322,8 @@ function sysBuildCSS() {
 /* Resume is the one accented control, for the same reason "carry on" is on the
    title card: a pause menu whose most likely answer looks like its other three
    answers makes the player read four things to get back to the game. */
-'.capyui-pausebtn.go{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';}',
-'@media (hover:hover){.capyui-pausebtn.go:hover{filter:brightness(1.06);background:' + accent + ';}}',
+'.capyui-pausebtn.go{background:' + accentDeep + ';border-color:' + accentDeep + ';color:' + paper + ';}',
+'@media (hover:hover){.capyui-pausebtn.go:hover{filter:brightness(1.06);background:' + accentDeep + ';}}',
 '.capyui-pausebtn.warn{color:' + accentInk + ';}',
 /* ---- the settings block ---- */
 '.capyui-set{margin-top:clamp(10px,2vw,14px);border-top:1px solid ' + inkFaint + ';',
@@ -8185,8 +8373,8 @@ function sysBuildCSS() {
 /* Inverted: ink becomes paper and paper becomes the accent, so the glyph's
    own `o` shapes — the ones that are the BACKGROUND rather than the ink —
    follow the button instead of staying cream on coral. */
-'.capyui-setmute.off{background:' + accent + ';border-color:' + accent + ';color:' + paper + ';',
-  '--capyui-gbg:' + accent + ';}',
+'.capyui-setmute.off{background:' + accentDeep + ';border-color:' + accentDeep + ';color:' + paper + ';',
+  '--capyui-gbg:' + accentDeep + ';}',
 '.capyui-setmute.off .wave{display:none;}',
 /* ---- ...AND `inline` IS NOT A SIZE (F1) ------------------------------
    `.wave` and `.cross` used to be classes on <path> elements inside one <svg>,
@@ -9814,6 +10002,135 @@ export function createSystems(game) {
     sysSkyMesh = mesh;
   }
   sysBuildSky();
+
+  // =========================================================================
+  // 1e. THE CLOUDS ON IT. See the block above sysCLOUD_SKY_MAXC for the whole
+  // design; this is the mechanism. One InstancedMesh, one draw call, a CHILD of
+  // the dome so it inherits the ride and the hide, and its own material because
+  // the colour is written every frame off the live horizon.
+  // =========================================================================
+  function sysBuildCloudSky() {
+    if (!sysSkyMesh) return;
+    // Seven by five is the coarsest sphere that still reads as round at the ten
+    // to fourteen degrees of frame one of these subtends. Radius one: every
+    // instance is scaled, and nothing here is ever read back in metres.
+    const g = new THREEx.SphereGeometry(1, 7, 5);
+    // THE RAMP IS THE LIGHTING. See property 3 above: this layer takes no light
+    // from the scene, so the only thing that makes a sphere read as a cloud
+    // rather than as a disc is a vertical value gradient baked into it. `t` is
+    // 0 at the bottom of the unit sphere and 1 at the top; the curve is
+    // deliberately biased low (`t^0.8` rather than linear) so the base holds
+    // its value across most of the underside and the brightening happens near
+    // the shoulder, which is where it happens on a real one.
+    const pos = g.attributes.position;
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.pow(clamp((pos.getY(i) + 1) * 0.5, 0, 1), 0.8);
+      const v = sysCLOUD_SKY_BASE + (1 - sysCLOUD_SKY_BASE) * t;
+      col[i * 3] = v; col[i * 3 + 1] = v; col[i * 3 + 2] = v;
+    }
+    g.setAttribute('color', new THREEx.BufferAttribute(col, 3));
+    // NOT mat(). mat() caches on colour-plus-options and hands the same object
+    // to every caller, and this one is written per frame — see matOwn's note in
+    // shared.js for the sibling of this mistake that shipped once already. And
+    // NOT Lambert: unlit, so eleven chapters' hemisphere lights cannot each
+    // decide what a cloud looks like.
+    const m = new THREEx.MeshBasicMaterial({ color: 0xffffff, vertexColors: true });
+    m.fog = false;
+    m.depthWrite = false;
+    m.depthTest = false;
+    const mesh = new THREEx.InstancedMesh(g, m, sysCLOUD_SKY_MAXC * sysCLOUD_SKY_PUFF);
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    // One step AFTER the dome's -20 and still far in front of the world's zero.
+    mesh.renderOrder = -19;
+    mesh.visible = false;
+    sysSkyMesh.add(mesh);
+    sysCloudSkyMesh = mesh;
+  }
+  sysBuildCloudSky();
+
+  /**
+   * Lay out a chapter's sky. Runs on a chapter change and never per frame.
+   *
+   * The generator is a plain LCG seeded off the chapter's own name rather than
+   * Math.random, so a place gives back the sky it had when you come back to it.
+   * Clusters past the chapter's count are scaled to zero rather than left
+   * wherever the last chapter put them — an InstancedMesh has no count-below-
+   * capacity that survives a re-seed cheaply, and a stale cloud from Marrakech
+   * hanging over Antarctica is exactly the kind of leak this repo has shipped
+   * before.
+   */
+  function sysCloudSkySeed(name) {
+    const mesh = sysCloudSkyMesh;
+    if (!mesh) return;
+    const strength = sysCLOUD[name] || 0;
+    // The dome is hidden in the four chapters that own their sky, and a child of
+    // a hidden parent draws nothing — but say it anyway, so `visible` is the
+    // honest answer to "are there clouds here" for the audit hook below.
+    mesh.visible = strength > 0 && !sysSKY_OWN[name];
+    if (!mesh.visible) { sysCloudSkyN = 0; return; }
+    let s = 2166136261;
+    for (let i = 0; i < name.length; i++) { s ^= name.charCodeAt(i); s = Math.imul(s, 16777619); }
+    const rnd = function () { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    const rr = function (a, b) { return a + rnd() * (b - a); };
+    const n = Math.min(sysCLOUD_SKY_MAXC,
+                       Math.round(sysCLOUD_SKY_N0 + strength * sysCLOUD_SKY_NK));
+    sysCloudSkyN = n;
+    sysCloudSkyQ.identity();
+    for (let c = 0; c < sysCLOUD_SKY_MAXC; c++) {
+      if (c >= n) {
+        // A zero scale, not a move off screen: an instance parked at a great
+        // distance still costs a vertex shader and can still be caught by a
+        // wide near/far. Zero is the only size that is certainly nothing.
+        sysCloudSkyV.set(0, 0, 0); sysCloudSkyS.set(0, 0, 0);
+        for (let b = 0; b < sysCLOUD_SKY_PUFF; b++) {
+          sysCloudSkyM.compose(sysCloudSkyV, sysCloudSkyQ, sysCloudSkyS);
+          mesh.setMatrixAt(c * sysCLOUD_SKY_PUFF + b, sysCloudSkyM);
+        }
+        continue;
+      }
+      // Azimuth is stratified rather than uniform. Nine clusters thrown at
+      // random round a circle leave a gap you can drive a chapter through, and
+      // the frame only ever holds a fifth of the azimuth at once — so a gap is
+      // a chapter that looks cloudless from one bearing and busy from another.
+      const th = (c + rr(-0.36, 0.36)) * (Math.PI * 2 / n);
+      const el = sysCLOUD_SKY_ELO +
+                 (sysCLOUD_SKY_EHI - sysCLOUD_SKY_ELO) * Math.pow(rnd(), sysCLOUD_SKY_EBIAS);
+      const dst = rr(sysCLOUD_SKY_DLO, sysCLOUD_SKY_DHI);
+      const rad = Math.cos(el) * dst;
+      const cy = Math.sin(el) * dst;
+      const cx = Math.sin(th) * rad, cz = Math.cos(th) * rad;
+      const w = dst * rr(sysCLOUD_SKY_WLO, sysCLOUD_SKY_WHI);
+      // A cluster is an ellipsoid two and a half times as wide as it is deep,
+      // so turning it about Y is the whole of its silhouette. Without this every
+      // cloud in the sky is the same shape seen from a slightly different angle,
+      // which twenty-two of is a pattern rather than weather.
+      sysCloudSkyQ.setFromAxisAngle(sysWorldUp, rnd() * Math.PI * 2);
+      for (let b = 0; b < sysCLOUD_SKY_PUFF; b++) {
+        // Puff zero is the cluster; the shoulders are smaller, offset along the
+        // wind and dropped slightly, which is what gives a lump of spheres a
+        // flat base and a piled top instead of reading as three balls.
+        const f = b === 0 ? 1 : rr(0.52, 0.82);
+        const ox = b === 0 ? 0 : rr(-w * 0.95, w * 0.95);
+        const oy = b === 0 ? 0 : rr(-w * 0.16, w * 0.10);
+        const oz = b === 0 ? 0 : rr(-w * 0.34, w * 0.34);
+        sysCloudSkyV.set(cx + ox, cy + oy, cz + oz);
+        sysCloudSkyS.set(w * f, w * f * sysCLOUD_SKY_FLAT, w * f * sysCLOUD_SKY_DEEP);
+        sysCloudSkyM.compose(sysCloudSkyV, sysCloudSkyQ, sysCloudSkyS);
+        mesh.setMatrixAt(c * sysCLOUD_SKY_PUFF + b, sysCloudSkyM);
+        // A shoulder is a little duller than the head it sits on. This is the
+        // only thing separating three overlapping spheres from one blob, now
+        // that the material takes no light.
+        const v = 1 - (b === 0 ? 0 : rr(0, sysCLOUD_SKY_VARY));
+        sysCloudSkyTmp.setRGB(v, v, v);
+        mesh.setColorAt(c * sysCLOUD_SKY_PUFF + b, sysCloudSkyTmp);
+      }
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
 
   /**
    * Repaint the dome from a horizon colour and a zenith colour.
@@ -27426,6 +27743,11 @@ export function createSystems(game) {
     // a critically damped spring started at rest the peak is v/(omega*e), so
     // this is the seed that reaches `peak` and no more.
     camDipV -= peak * sysDIP_OMEGA * Math.E;
+    // ---- ...and past a real height, the other three channels (M4) --------
+    // See the sysLAND_PUNCH_* block. Below sysLAND_PUNCH_V0 this is exactly
+    // zero and the ordinary hop is untouched, which is the point.
+    const pa = clamp((f - sysLAND_PUNCH_V0) * sysLAND_PUNCH_K, 0, sysLAND_PUNCH_MAX);
+    if (pa > 0) punch(pa, f > sysLAND_FREEZE_V ? sysFREEZE_LAND : false);
   });
 
   function shake(a) {
@@ -29111,6 +29433,24 @@ export function createSystems(game) {
       const d1 = Math.abs(hz.r - sysSkyLastA.r) + Math.abs(hz.g - sysSkyLastA.g) + Math.abs(hz.b - sysSkyLastA.b);
       const d2 = Math.abs(sysColA.r - sysSkyLastB.r) + Math.abs(sysColA.g - sysSkyLastB.g) + Math.abs(sysColA.b - sysSkyLastB.b);
       if (d1 + d2 > 0.0025 || sysSkyDirty) sysSkyPaint(hz, sysColA);
+
+      // ---- and the clouds on it (M1) -------------------------------------
+      // Two writes and a float. The wind is the rotation — see property 2 in
+      // the block above sysCLOUD_SKY_MAXC — and the colour is taken from the
+      // horizon the dome was just painted with, so the base of a cloud is
+      // always the light that is actually under it. `hz` is scene.background,
+      // which every atmosphere event in the game already moves.
+      const cs = sysCloudSkyMesh;
+      if (cs && cs.visible) {
+        cs.rotation.y += sysCLOUD_SKY_SPIN * dt;
+        // ONE colour, and it is the TOP of the cloud; the baked ramp takes care
+        // of everything under it. A cloud is not white — it is the sky,
+        // bleached — so pull white a quarter of the way back toward the horizon
+        // and a dusty sky gets dusty cloud with no second table.
+        sysCloudSkyBody.setRGB(1, 1, 1).lerp(hz, sysCLOUD_SKY_TINT);
+        const cm = cs.material;
+        if (!cm.color.equals(sysCloudSkyBody)) cm.color.copy(sysCloudSkyBody);
+      }
     }
 
     // ---- the grade --------------------------------------------------------
@@ -29458,6 +29798,7 @@ export function createSystems(game) {
       sysSkyLastA.setRGB(-1, -1, -1);
       sysSkyLastB.setRGB(-1, -1, -1);
     }
+    sysCloudSkySeed(name);
   }
 
   function atmosPrime(name) {
@@ -32893,10 +33234,20 @@ export function createSystems(game) {
   //
   // capybara.js owns the animal's voice. This owns the lens and the room.
   game.events.on('capy:wheek', function () { shake(0.03); sysEchoCast(); });
-  game.events.on('capy:grab', function (e) {
-    const pr = e && e.prop;
-    if (pr && pr.type === 'sandwich') completeTask('picnic-thief');
-  });
+  // ---- ...AND THIS ONE WAS A SECOND MOUTH ON THE SAME ROW (M7) -----------
+  // props.js's physGrab already stood for `picnic-thief` and this ticked it
+  // too, on the same event, one listener later. It was invisible while both
+  // fired on the grab — two calls to `completeTask` with the same id are one
+  // tick — and it became the whole of the feature the moment props.js stopped
+  // ticking and started ARMING: the probe read `armed: 1, ticked: 0` beside
+  // `done: true`, which is a getaway working perfectly on a row that had
+  // already been given away. THE TELL WAS A GATE THAT REFUSED AND A TASK THAT
+  // WAS DONE ANYWAY.
+  //
+  // Deleted rather than converted: props.js owns this prop's arming, it does
+  // it from the same event, and a second arm would be the same duplication
+  // with a slower fuse.
+
   // The three payloads that already carry a position get it spatialised here
   // rather than in seventeen biomes: props.js and npc.js are core, so every
   // chapter inherits a bonk that comes from where the bin actually is.
@@ -32970,6 +33321,28 @@ export function createSystems(game) {
     if (wp && wp.disturbed && wb) {
       incAdd(wb.position.x, wb.position.z, wp.id !== undefined ? wp.id : wp.type,
              'water', wp.type);
+    }
+  });
+  // ---- A SIXTH KIND, AND IT IS THE ONE THE PLAYER MEANT (M8) -------------
+  //
+  // bang, spill, water, break, theft — five kinds, and every one of them is
+  // something that HAPPENED to a prop. Four of the five are satisfied by a
+  // shove. The one thing in this game that takes aim and commits — hold to
+  // charge, release on an arc, hit a person forty feet away — fed nothing at
+  // all, so the rap sheet could name three baskets going over and had no word
+  // for a direct hit.
+  //
+  // No new arithmetic: `incAdd` is untouched, the twelve seconds and the
+  // twenty-two metres and the same-prop gate are untouched, and props.js has
+  // already applied four gates before this event exists — thrown, still
+  // flying, hard enough, and once per throw however many people it ricochets
+  // through. `disturbed` is not tested because a thrown prop is by definition
+  // disturbed: it left the animal's mouth.
+  game.events.on('prop:hitperson', function (p) {
+    const hp = p && p.prop, hb = hp && hp.body;
+    if (hp && hb) {
+      incAdd(hb.position.x, hb.position.z, hp.id !== undefined ? hp.id : hp.type,
+             'hit', hp.type);
     }
   });
   // ...and the other two halves of "a thing you did that somebody saw".
@@ -33332,13 +33705,26 @@ export function createSystems(game) {
     { id: 'butterfingers', name: 'BUTTERFINGERS',      want: [{ k: 'break', n: 2 }] },
     { id: 'magpie',      name: 'THE MAGPIE',           want: [{ k: 'theft', n: 2 }] },
     { id: 'burial',      name: 'BURIAL AT SEA',        want: [{ k: 'water', n: 2 }] },
+    // ---- ...and the sixth kind (M8) --------------------------------------
+    // A `hit` is a thrown prop that connected with a person, and props.js
+    // spends the mark on the first person struck — so two of these is two
+    // throws, aimed, inside twelve seconds and twenty-two metres. That is the
+    // hardest thing on this table to do by accident, which is why the first
+    // rung asks for a hit plus any two rather than a hit alone: naming a
+    // one-off would make the rarest verb in the game the cheapest card in it.
+    { id: 'direct-hit',  name: 'THE DIRECT HIT',       want: [{ k: 'hit' }, { any: 2 }] },
+    { id: 'the-volley',  name: 'THE VOLLEY',           want: [{ k: 'hit', n: 2 }] },
     // ---- three of a verb, which nobody does by accident -------------------
     { id: 'triple-spill', name: 'THE TRIPLE SPILL',    want: [{ k: 'spill', n: 3 }] },
     { id: 'demolition',  name: 'THE DEMOLITION',       want: [{ k: 'break', n: 3 }] },
     { id: 'kleptomania', name: 'KLEPTOMANIA',          want: [{ k: 'theft', n: 3 }] },
     { id: 'deep-six',    name: 'THE DEEP SIX',         want: [{ k: 'water', n: 3 }] },
+    { id: 'bombardment', name: 'THE BOMBARDMENT',      want: [{ k: 'hit', n: 3 }] },
     // ---- mixed verbs, which is the whole point ---------------------------
     { id: 'smash-grab',  name: 'THE SMASH AND GRAB',   want: [{ k: 'break' }, { k: 'theft' }] },
+    // Take it off them and then hit them with it. There is no other way to get
+    // this one, and that is the point of it.
+    { id: 'hit-and-run', name: 'HIT AND RUN',          want: [{ k: 'theft' }, { k: 'hit' }] },
     { id: 'wet-work',    name: 'WET WORK',             want: [{ k: 'theft' }, { k: 'water' }] },
     { id: 'clumsy-thief', name: 'THE CLUMSY THIEF',    want: [{ k: 'theft' }, { k: 'spill' }] },
     { id: 'mopping-up',  name: 'MOPPING UP',           want: [{ k: 'spill' }, { k: 'water' }] },
@@ -33799,6 +34185,7 @@ export function createSystems(game) {
     sysSpillClear();
     sysSkyTopWant.set(sysSKY_TOP[name] || PALETTE.skyTop);
     if (sysSkyMesh) sysSkyMesh.visible = !sysSKY_OWN[name];
+    sysCloudSkySeed(name);
     // The list and the score both belong to the place, not to a progress
     // counter: crossing a hemisphere swaps the paper and the key together.
     todoRefresh();

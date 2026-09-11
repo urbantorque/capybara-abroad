@@ -2768,6 +2768,62 @@ export function createNPCs(game) {
    * becoming available) refills, which is the behaviour you want: the new line
    * is the next thing they say.
    */
+  // ---- ONE MOUTH IS NOT THE WHOLE SQUARE (M2, 11 Sep 2026) ----------------
+  //
+  // `localLine` below keeps a shuffled BAG per person, which guarantees a
+  // person never repeats until they have been through their whole pool, and
+  // guarantees nothing at all about the person standing next to them. Three
+  // sites in this file answer one event with TWO people — `localsSay`'s
+  // `said < 2`, `npcOnIncident`'s `said < 2`, and the witness chain, which
+  // picks one — and two of the three draw with a bare
+  // `arr[randInt(0, arr.length - 1)]` per speaker, independently.
+  //
+  // Measured by playing it: standing in the plaza in Pasto, two people said
+  // "Sinvergüenza. Come here." in the same frame, in two bubbles, side by side.
+  // It is the single most legible way a game can say OUT LOUD that it is
+  // reading from a list, and it is in the first two minutes of the second
+  // chapter.
+  //
+  // The fix is one ring, shared by every mouth in the game: the last few things
+  // ANYBODY said. A pick that lands in it swaps for one that does not, and if
+  // the pool is too small to offer one — `paSwat` is three lines — it takes the
+  // line anyway and nothing is worse than it was. That last property is the
+  // whole safety of this: the ring can never fail to produce a line, only fail
+  // to improve one.
+  //
+  // Six is chosen against the ceiling it has to beat: the widest simultaneous
+  // answer in the file is two, chains run three deep, and a pool with fewer
+  // than six lines is common. Six clears a whole conversation without ever
+  // starving a small pool for long.
+  const npcECHO_N = 6;
+  const npcEcho = new Array(npcECHO_N);
+  let npcEchoAt = 0;
+  function npcEchoHas(s) {
+    for (let i = 0; i < npcECHO_N; i++) if (npcEcho[i] === s) return true;
+    return false;
+  }
+  function npcEchoPush(s) { npcEcho[npcEchoAt] = s; npcEchoAt = (npcEchoAt + 1) % npcECHO_N; }
+  /**
+   * Pick a line from `arr` that nobody has said lately, and record it.
+   *
+   * For the two sites that had no bag at all. One pass over the pool from a
+   * random start, so the choice stays uniform when the ring is cold and simply
+   * skips what is warm — never a retry loop, because a pool entirely inside the
+   * ring would spin.
+   */
+  function npcPickSay(arr) {
+    const n = arr.length;
+    if (!n) return null;
+    const s = randInt(0, n - 1);
+    let pick = arr[s];
+    for (let k = 0; k < n; k++) {
+      const c = arr[(s + k) % n];
+      if (!npcEchoHas(c)) { pick = c; break; }
+    }
+    npcEchoPush(pick);
+    return pick;
+  }
+
   function localLine(rec, arr) {
     const pool = localResolve(arr, rec);
     if (!pool.length) return;
@@ -2785,7 +2841,20 @@ export function createNPCs(game) {
         const t = bag[bag.length - 1]; bag[bag.length - 1] = bag[0]; bag[0] = t;
       }
     }
-    const line = bag.pop();
+    let line = bag.pop();
+    // ---- ...AND THE RING GETS THE LAST WORD (M2) -------------------------
+    // The bag is a promise about ONE person over their whole pool; the ring is
+    // a promise about the square over the last few seconds. Both are wanted, so
+    // both run, in that order: take the bag's pick, and if somebody else has
+    // just said it, trade it for the deepest thing in the bag that nobody has.
+    // A trade rather than a discard — the bag's guarantee survives, because the
+    // line that was going to be said is still in it and still comes out later.
+    if (bag.length && npcEchoHas(line)) {
+      for (let i = bag.length - 1; i >= 0; i--) {
+        if (!npcEchoHas(bag[i])) { const t = bag[i]; bag[i] = line; line = t; break; }
+      }
+    }
+    npcEchoPush(line);
     rec.last = line;
     rec.gest = 1.5 + line.length * 0.045;   // as long as the bubble, near enough
     rec.anchor.speak(line);
@@ -3927,7 +3996,11 @@ export function createNPCs(game) {
     if (best) {
       best.talkCd = rand(9, 20);
       const arr = live === 'pasto' ? npcWIT_CHAIN_PA : npcWIT_CHAIN;
-      best.speak(arr[randInt(0, arr.length - 1)]);
+      // Through the ring (M2). Sydney and Pasto have no `locals`, so this cast
+      // never touches `localLine` and had no anti-repeat of any kind — the
+      // witness pool is short and it is the reaction a player hears most in the
+      // first two chapters of the game.
+      best.speak(npcPickSay(arr));
     }
     // A HARNESS HOOK, because this chain is invisible from outside otherwise.
     // A witness LOOKS, and a look is two numbers that the person's own step
@@ -4866,6 +4939,7 @@ export function createNPCs(game) {
   const npcPHOTO_HOLD  = 1.9;   // s the whole gesture lasts
   const npcPHOTO_SNAP  = 0.85;  // s in, the flash — the tourists' timing
   const npcPHOTO_ARM   = 1.55;  // rad the arms come up. A phone, not a salute.
+  const npcPHOTO_WAIT  = 30;    // s into a session before anybody may take one (M5)
   const npcPHOTO_HEAT  = 0.50;  // over this the square is too cross to admire you
   const npcLOC_PHOTO = ['Hold still. Hold still.', 'Nobody is going to believe this.',
     'Look at it. Just look at it.', 'One picture. One.',
@@ -5017,7 +5091,13 @@ export function createNPCs(game) {
       if (dx * dx + dz * dz > r2) continue;
       r.talkCd = rand(10, 22);
       r.lookX = x; r.lookZ = z;
-      r.speak(arr[randInt(0, arr.length - 1)]);
+      // THIS IS THE ONE THAT WAS MEASURED (M2). Two people, one incident, two
+      // independent draws from a pool of six or seven: in Pasto's plaza both of
+      // them said 'Sinvergüenza. Come here.' in the same frame, in two bubbles
+      // side by side. The `said < 2` ceiling above is right and is not the bug —
+      // two people answering is a square; two people answering IDENTICALLY is a
+      // list. The ring makes the second draw see the first.
+      r.speak(npcPickSay(arr));
       said++;
     }
   }
@@ -7873,7 +7953,32 @@ export function createNPCs(game) {
         }
       }
       // tourist photo opportunity — the capybara has to actually pose for it
-      if (rec.hasCamera && rec.photoCd <= 0 && d > 3.0 && d < 11 && vis > 0.42 && capySpd < 0.35) {
+      // ---- ...AND NOT IN THE FIRST HALF-MINUTE (M5) -----------------------
+      //
+      // MEASURED ON A FRESH FILE WITH THE KEYBOARD NEVER TOUCHED: `state.score`
+      // went from 0 to 1 between eleven and sixteen seconds, and on an earlier
+      // run at about three. The first thing this game rewarded a new player for
+      // was something they did not do.
+      //
+      // Nothing here is wrong on its own. The clue says "stand still and face
+      // them", and the SPAWN POSE already satisfies it — stationary, facing the
+      // forecourt, tourists at eight to ten metres — while `photoCd` starts at
+      // `rand(0, npcPHOTO_FIRST)`, which can be zero.
+      //
+      // The knock-on is why this is worth a gate rather than a shrug: that tick
+      // is the first save write, and the first save write is what fires "SAVED —
+      // YOU CAN CLOSE THIS AND COME BACK". So three seconds in, a stranger who
+      // has pressed nothing gets a place card, a struck-through row, three
+      // stacked toasts and two speech bubbles, and the one thing the pile-up
+      // teaches is that the list ticks itself — in a game that is entirely the
+      // list. Hold it off, and the save sentence lands on the player's own first
+      // tick, which is the moment it means anything.
+      //
+      // Thirty seconds, against `npcPHOTO_REST`'s 6.5 s of loafing: long enough
+      // that it cannot be the first thing, short enough that a player who sits
+      // down to watch the harbour still gets it.
+      if (rec.hasCamera && rec.photoCd <= 0 && game.state.time > npcPHOTO_WAIT &&
+          d > 3.0 && d < 11 && vis > 0.42 && capySpd < 0.35) {
         const cg = game.capy && game.capy.group;
         let capyFacing = 1;
         if (cg) {
@@ -8300,8 +8405,24 @@ export function createNPCs(game) {
     startChase(rec);
     // The busker's hat is his takings, not a sun hat: it is the Circular Quay task,
     // and it must NOT also hand out chapter 1's 'steal-hat'.
+    //
+    // ---- ARMED, NOT FINISHED (M7) ---------------------------------------
+    // The two hat rows are the first theft a player commits and the one the
+    // game's own opening line is about ("Watch the hat, would you. Just —
+    // watch the hat."), and they ticked on the frame the hat left his head —
+    // while `startChase` on the line above sets a man running after you. The
+    // chase was the epilogue to a row that was already crossed off.
+    //
+    // Everything else here is untouched: the outrage, the chase, the line, the
+    // robbed flag. Only the tick moves, to the moment he gives up. See THE
+    // GETAWAY in props.js for why this cannot cost the player the row.
     if (prop.type === 'hat') {
-      if (rec.kind === 'busker') { rec.robbed = true; finish('busker-hat'); pickLine(rec, 'buskRob'); }
+      const arm = game.physics && game.physics.armTheft;
+      if (rec.kind === 'busker') {
+        rec.robbed = true;
+        pickLine(rec, 'buskRob');
+        if (arm) arm('busker-hat', prop); else finish('busker-hat');
+      } else if (arm) arm('steal-hat', prop);
       else finish('steal-hat');
     }
   });
@@ -11319,10 +11440,23 @@ export function createNPCs(game) {
     // row instead: keep hold of it, walk back into the market, and it ticks
     // the moment anybody clocks what you are carrying. There is no way to be
     // stuck, and the row now means what it says.
+    //
+    // ---- AND A THIRD BEAT, ON THE SAME PRINCIPLE (M7) -------------------
+    // The deferral above is exactly right and is now composed with the getaway
+    // rather than replaced by it: being seen ARMS the row, and the row pays out
+    // when the animal is clear of the stall it came off. Take it, be caught
+    // taking it, get away with it. Both halves are deferrals and neither can
+    // fail, so the row is still impossible to lose.
+    const paArm = game.physics && game.physics.armTheft;
     if (prop.type === 'empanada') {
-      if (paAnyoneSaw()) finish('steal-empanada');
+      if (paAnyoneSaw()) { if (paArm) paArm('steal-empanada', prop); else finish('steal-empanada'); }
       else paEmpWanted = true;
-    } else if (prop.type === 'ruana') finish('ruana-thief');
+    } else if (prop.type === 'ruana') {
+      // props.js arms this one on the grab itself, which is the permissive path
+      // it has always had; arming again with the same id is a no-op and is here
+      // so a reader of this handler is not left thinking the row is unhandled.
+      if (paArm) paArm('ruana-thief', prop); else finish('ruana-thief');
+    }
   });
 
   /** Is anybody in the market actually looking at the animal right now? */
@@ -11392,7 +11526,12 @@ export function createNPCs(game) {
     if (paEmpWanted) {
       const held = game.capy && game.capy.heldProp;
       if (!held || held.type !== 'empanada') paEmpWanted = false;
-      else if (paAnyoneSaw()) { paEmpWanted = false; finish('steal-empanada'); }
+      else if (paAnyoneSaw()) {
+        paEmpWanted = false;
+        // Armed, not finished (M7) — see the prop:steal handler above.
+        const a = game.physics && game.physics.armTheft;
+        if (a) a('steal-empanada', held); else finish('steal-empanada');
+      }
     }
     paPush();
     if (paColorDirty) { paFlushColors(); paColorDirty = false; }

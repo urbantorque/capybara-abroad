@@ -1914,7 +1914,9 @@ function caliWireSweep(game, w) {
               Math.cos(caliChivaYaw) * away + rand(-1.4, 1.4));
   capy.body.angularVelocity.set(rand(-4, 4), rand(-6, 6), rand(-4, 4));
   caliBurstSparks(w.x, w.y, w.z, 10, 0.4);
-  if (typeof game.shake === 'function') game.shake(0.30);
+  // M4: the chiva throwing you off is a set piece, not a bump.
+  if (typeof game.punch === 'function') game.punch(0.30);
+  else if (typeof game.shake === 'function') game.shake(0.30);
   if (typeof game.sfx === 'function') {
     game.sfx('thud', { volume: 0.9 });
     game.sfx('wheek', { pitch: 1.25, volume: 0.8 });

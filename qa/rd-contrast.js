@@ -6,6 +6,13 @@ async page => {
   // exactly where the readable ink was already being used — so the check
   // passed for the whole time the in-play HUD was at 2.28:1.
   //
+  // ---- ...AND THIS ONE MEASURED THE CARD AFTER PRESSING ITS BUTTON (M6) ----
+  // It clicked `.capyui-go` and then measured, so it reported the door it had
+  // just walked through as `miss: true` — and the word "Begin", 17px bold cream
+  // on coral, was 2.31:1 for the whole time this file was the check that would
+  // have caught it. There are two passes now: the card, before the click, and
+  // the HUD after it. Same arithmetic, run twice.
+  //
   // Computed from the RENDERED colour of each element against the rendered
   // colour of its nearest opaque ancestor, so a change to the paper or to the
   // alpha on the ink cannot make this quietly wrong.
@@ -15,18 +22,18 @@ async page => {
       await fetch('/shot?name=' + o.n, { method: 'POST', body: o.b })
     }, { n: name, b: b.toString('base64') })
   }
-  const out = { rows: [] }
-  await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
-  await page.reload()
-  await page.waitForTimeout(6000)
-  await shot('contrast-title')
-  await page.evaluate(() => { document.querySelector('.capyui-go').click() })
-  await page.waitForTimeout(3000)
-  await page.evaluate((n) => { window.__capy.hud.cross(n) }, 'venice')
-  await page.waitForTimeout(9000)
-  await shot('contrast-hud')
 
-  out.rows = await page.evaluate(() => {
+  // The five biggest buttons in the game, plus the card's own body text. Every
+  // one of these is paper ON the accent, which is the direction the accent
+  // split never covered.
+  const TITLE_SEL = ['.capyui-go b', '.capyui-go i', '.capyui-carryl b',
+                     '.capyui-carryl i', '.capyui-carryn', '.capyui-legbig span',
+                     '.capyui-foot', '.capyui-h1', '.capyui-sub']
+  const HUD_SEL = ['.capyui-todo h2', '.capyui-aim', '.capyui-clue', '.capyui-count',
+                   '.capyui-finds', '.capyui-task .capyui-txt', '.capyui-recnow',
+                   '.capyui-label', '.capyui-momentkick', '.capyui-pickrec']
+
+  const measure = (sel) => {
     const lum = (c) => {
       const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
       return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2])
@@ -49,9 +56,6 @@ async page => {
       const a = fg[3]
       return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a)]
     }
-    const sel = ['.capyui-todo h2', '.capyui-aim', '.capyui-clue', '.capyui-count',
-                 '.capyui-finds', '.capyui-task .capyui-txt', '.capyui-recnow',
-                 '.capyui-label', '.capyui-momentkick', '.capyui-pickrec']
     const rows = []
     for (const s of sel) {
       const el = document.querySelector(s)
@@ -73,7 +77,25 @@ async page => {
                   shown: r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' })
     }
     return rows
+  }
+
+  const out = { title: [], rows: [] }
+  await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
+  await page.reload()
+  await page.waitForTimeout(6000)
+  await shot('contrast-title')
+  out.title = await page.evaluate(measure, TITLE_SEL)
+  await page.evaluate(() => {
+    const all = Array.prototype.slice.call(document.querySelectorAll('.capyui-go'))
+    const b = all.filter(function (e) { return !e.classList.contains('alt') })[0] || all[0]
+    if (b) b.click()
   })
+  await page.waitForTimeout(3000)
+  await page.evaluate((n) => { window.__capy.hud.cross(n) }, 'venice')
+  await page.waitForTimeout(9000)
+  await shot('contrast-hud')
+  out.rows = await page.evaluate(measure, HUD_SEL)
+
   await page.evaluate(async (o) => {
     await fetch('/shot?name=rd-contrast.json', { method: 'POST',
       body: btoa(unescape(encodeURIComponent(JSON.stringify(o)))) })

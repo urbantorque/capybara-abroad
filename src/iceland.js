@@ -3879,7 +3879,9 @@ function iceUpdateGeyser(game, dt) {
           } else {
             iceToast('again, then');
           }
-          if (typeof game.shake === 'function') game.shake(0.5);
+          // M4: the calving. The largest thing this chapter does.
+          if (typeof game.punch === 'function') game.punch(0.5, 0.08);
+          else if (typeof game.shake === 'function') game.shake(0.5);
         }
       }
     }
@@ -4876,7 +4878,8 @@ function iceUpdateWhale(game, dt) {
     iceWhalePhase = 0;
     iceWhaleT = iceWHALE_CYCLE;
     if (game.sfx) { game.sfx('splash', { volume: 1.0, pitch: 0.42, force: true }); }
-    if (game.shake) game.shake(0.45);
+    // M4: forty tonnes of humpback coming back down.
+    if (game.punch) game.punch(0.45, 0.06); else if (game.shake) game.shake(0.45);
     // The swell she puts out. A shove and not a launch: you are being LEANED ON
     // by a great deal of displaced North Atlantic, not thrown by it.
     if (cp && capy.shove) {

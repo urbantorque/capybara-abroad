@@ -2377,7 +2377,9 @@ function palUpdateManta(game, dt) {
   if (!palMantaBreached && u >= 0.90) {
     palMantaBreached = true;
     palSfx('splash', { volume: 1.0, pitch: 0.62, force: true });
-    if (typeof game.shake === 'function') game.shake(0.34);
+    // M4: the manta breaching.
+    if (typeof game.punch === 'function') game.punch(0.34, 0.05);
+    else if (typeof game.shake === 'function') game.shake(0.34);
     if (!palMantaDone) {
       palMantaDone = true;
       palTask('the-manta');
