@@ -4973,6 +4973,8 @@ function kyoBuild(game) {
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
               { t: 'A condor, they said. We have herons. Please do not.', after: 'condor-ride' },
+              // ...and what it is wearing (L3-11)
+              { t: 'A hat. In here.', when: function () { return game.capy && !!game.capy.worn; } },
               { t: 'Fifteen stones. You can never see all fifteen at once.', before: 'zen-ruin' },
               { t: 'I raked that this morning. I will rake it again.', before: 'zen-ruin' },
               { t: 'Please. Look with the eyes.', before: 'zen-ruin' },

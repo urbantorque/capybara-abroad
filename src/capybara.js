@@ -4037,6 +4037,11 @@ export function createCapybara(game) {
     diving: false,                   // under the surface on purpose — see capyDIVE_V
     depth: 0,                        // metres below the live waterline, 0 on land
     diveTime: 0,                     // s this breath has lasted
+    // ---- HOW OFTEN THE TRAVELLING SKILLS HAVE BEEN USED (L3-11) ------
+    // The nine skills were earned and no chapter ever asked for one back;
+    // the finds that ask (see FINDS, 'brought-vault' and its three siblings)
+    // read these. Session counters, like diveTime: a find fires once.
+    vaultN: 0, mantleN: 0, seedT: 0,
     threwAt: -1,
     // ---- B10: THE CHARGED THROW (item 4b) ----
     // `charge` is 0..1 while the action key is held with something in the
@@ -5533,6 +5538,7 @@ export function createCapybara(game) {
     const seedWant = capySkill.seed && input.jump && !grounded && !capySwimming &&
                      !capyClinging && !capy.carriedBy && !capyDiving &&
                      capyJumpArm === false && body.velocity.y < -0.4;
+    if (seedWant) capy.seedT += dt;
     // A DAMP ALONE LOSES TO GRAVITY, and by a lot. capybara.js runs BEFORE the
     // world step, so every frame the solver puts back what the damp just took:
     // at lambda 6 the equilibrium is where 9.5% of the gap equals one frame of
@@ -5581,6 +5587,7 @@ export function createCapybara(game) {
       if (h) {
         capyEatBuf(input, 'clearJumpBuf');
         capyVaultUsed = true;
+        capy.vaultN++;
         if (body.velocity.y < capyVAULT_V) body.velocity.y = capyVAULT_V;
         body.velocity.x += h.nx * capyVAULT_PUSH;
         body.velocity.z += h.nz * capyVAULT_PUSH;
@@ -5616,6 +5623,7 @@ export function createCapybara(game) {
         const rise = h.top - feet;
         if (rise > capyMANTLE_DOWN && rise < capyMANTLE_UP) {
           capyMantleT = 0.30;
+          capy.mantleN++;
           capyMantleCool = capyMANTLE_COOL;
           capySeedT = 0;
           capyEarFlick = 1;

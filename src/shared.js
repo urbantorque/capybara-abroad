@@ -3576,6 +3576,14 @@ export const FINDS = [
   { id: 'dark-water',     text: 'Went under where you could not see the bottom' },
   { id: 'brought-climb',  text: 'Climbed something in a place that never mentioned climbing' },
   { id: 'cold-swim',      text: 'Swam in water nobody sensible swims in' },
+  // ---- ...AND THE SKILLS, BROUGHT SOMEWHERE ELSE (L3-11) ------------
+  // Nine travelling skills and nothing in a later chapter ever asked for
+  // one. These do: each is a skill used well away from the chapter that
+  // taught it, which is the only place the ladder of verbs is felt.
+  { id: 'brought-vault',  text: 'Pushed off a wall somewhere with no acrobats in it' },
+  { id: 'brought-seed',   text: 'Came down like a seed somewhere with no wind' },
+  { id: 'brought-mantle', text: 'Got your chin over something a long way from Mong Kok' },
+  { id: 'brought-herd',   text: 'Led a line of somebody else\u2019s animals in a place that never asked' },
   { id: 'the-deep-end',   text: 'Found the bottom of the deepest water here' },
 
   // ---- WHAT NOBODY SAW --------------------------------------------------

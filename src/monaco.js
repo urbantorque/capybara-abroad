@@ -4485,6 +4485,8 @@ function monBuildLocals(game) {
     lines: [
             // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
             { t: 'It rode an orca, they say. Orcas are not on the list either.', after: 'orca-ride' },
+            // ...and what it is wearing (L3-11)
+            { t: 'At least it is dressed.', when: function () { return game.capy && game.capy.worn === 'black-tie'; } },
             'Good evening. The jacket is not, strictly, required.',
             'You are on the list. I have not checked the list.',
             'Mind the step. Everybody minds the step.',

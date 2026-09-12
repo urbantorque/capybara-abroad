@@ -989,6 +989,7 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   'uniform float uAirMax;',
   'uniform vec3  uAirCol;',
   'uniform float uCreaseK;',
+  'uniform vec3  uCreaseW;',
   'uniform vec2  uCrease;',
   // ---- AIRLIGHT (v48). See the block over mainAirLight below.
   'uniform float uAirLitK;',
@@ -1119,6 +1120,22 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   '  }',
   '  return acc;',
   '}',
+  'float mainCrWide(float d0, vec2 uv, vec2 o) {',
+  '  float dn = mainViewZ(texture(tDepth, uv + o).x, uCam.x, uCam.y);',
+  '  float df = d0 - dn;',
+  '  return smoothstep(0.0, uCreaseW.y, df) *',
+  '         (1.0 - smoothstep(uCreaseW.y, uCreaseW.y * 4.0, df));',
+  '}',
+  'float mainCreaseWide(float d0, vec2 uv) {',
+  '  float rpx = clamp(uFocalPx * uCreaseW.x / max(d0, 0.05), 4.0, 112.0);',
+  '  vec2 r = rpx * uPx;',
+  '  float occ = 0.0;',
+  '  for (int i = 0; i < 8; i += 2) {',
+  '    occ += min(mainCrWide(d0, uv, MAIN_CR[i]     * r),',
+  '               mainCrWide(d0, uv, MAIN_CR[i + 1] * r));',
+  '  }',
+  '  return occ * 0.25;',
+  '}',
   'float mainCrease(float d0, vec2 uv) {',
   '  float rpx = clamp(uFocalPx * uCrease.x / max(d0, 0.05), 1.5, 24.0);',
   '  vec2 r = rpx * uPx;',
@@ -1157,6 +1174,8 @@ const MAIN_POST_COMP = MAIN_POST_HEAD + '\n' + [
   //    itself as a post effect rather than as shape.
   '    if (uCreaseK > 0.0005) {',
   '      float oc = mainCrease(d, vUv) * uCreaseK * (1.0 - coc * uDofK);',
+  //    ...and the wide octave under it (L3-11): see MAIN_CREASE_WR
+  '      oc += mainCreaseWide(d, vUv) * uCreaseK * uCreaseW.z * (1.0 - coc * uDofK);',
   '      lin *= 1.0 - oc;',
   '    }',
   // 3. THE AIR. Exponential and starting at ZERO, which is the half that
@@ -1299,6 +1318,17 @@ const MAIN_POST_REF_H = 720;
 // object entirely and gets no weight at all.
 const MAIN_CREASE_R = 0.14;
 const MAIN_CREASE_RANGE = 0.30;
+// ---- THE WIDE OCTAVE (L3-11). LIFT2 called it the largest beauty term still
+// on the shelf and named the trap: at this fov uFocalPx is ~808, so a 1.6 m
+// ring clamped at 24 px is a screen-space radius for everything nearer than
+// 54 m — the whole playable frame. So the wide octave has its own radius
+// (1.6 m: the foot of a wall against the ground, the inside of an arcade,
+// the underside of a jetty), its own ceiling (112 px) and its own range
+// (a neighbour up to 2.4 m nearer is the same object folding at this
+// scale). Half the tight octave's weight, and the same DoF fade.
+const MAIN_CREASE_WR = 1.6;
+const MAIN_CREASE_WRANGE = 2.4;
+const MAIN_CREASE_WK = 0.55;
 
 // How wide the defocus blur is, in quarter-res texels at MAIN_POST_REF_H. It
 // is a lens constant and not a grade row because HOW BLURRED the out-of-focus
@@ -1468,6 +1498,7 @@ function mainMakePost(game) {
       uRayDX: { value: new THREE.Vector3() },
       uRayDY: { value: new THREE.Vector3() },
       uCrease: { value: new THREE.Vector2(MAIN_CREASE_R, MAIN_CREASE_RANGE) },
+      uCreaseW: { value: new THREE.Vector3(MAIN_CREASE_WR, MAIN_CREASE_WRANGE, MAIN_CREASE_WK) },
       // THE LIVE POOL, not a copy: systems.js goes on writing it exactly as
       // it did for the surfaces, and one ranking per frame feeds both.
       uSpillP: mainSpillU.p, uSpillC: mainSpillU.c,

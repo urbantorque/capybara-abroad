@@ -1003,6 +1003,8 @@ function manBuild(game) {
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
               { t: 'A balloon over Turkey. I am told it did not fall out. The water here does not care what you have done.', after: 'sunrise' },
+              // ...and what it is wearing (L3-11)
+              { t: 'That is a lifeguard cap. I am the lifeguard.', when: function () { return game.capy && game.capy.worn === 'surfcap'; } },
               'Swim between the flags, mate. That is the whole system.',
               { t: 'See that gutter? That is where you would go. Straight out.', before: 'the-rip' },
               { t: 'Do not fight it. Nobody wins that one. Swim across it.', before: 'the-rip' },

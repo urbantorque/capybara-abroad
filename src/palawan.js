@@ -4917,6 +4917,8 @@ function palBuild(game) {
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
               { t: 'Flew a helicopter in Hong Kong. Here it is the bangka, and the bangka does not go up.', after: 'symphony' },
+              // ...and what it is wearing (L3-11)
+              { t: 'It has a snorkel. It has a snorkel and I do not.', when: function () { return game.capy && game.capy.worn === 'snorkel'; } },
               { t: 'Bangka leaves when the bangka leaves. Sit at the front.',
                 before: 'outrigger' },
               { t: 'You sat at the front. Good. Everybody sits at the back and gets wet.',

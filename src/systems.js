@@ -27013,6 +27013,12 @@ export function createSystems(game) {
     'dark-water':    function (c) { return c.capy.diving && !!sysDARK_WATER[c.n]; },
     'brought-climb': function (c) { return c.capy.climbing && !sysCLIMB_TAUGHT[c.n]; },
     'cold-swim':     function (c) { return c.capy.swimming && c.cold > 0.55; },
+    // the skills, brought somewhere else (L3-11): counters on the animal,
+    // and not in the chapter that taught the skill
+    'brought-vault':  function (c) { return (c.capy.vaultN || 0) > 0 && c.n !== 8; },
+    'brought-seed':   function (c) { return (c.capy.seedT || 0) > 2.5 && c.n !== 9; },
+    'brought-mantle': function (c) { return (c.capy.mantleN || 0) > 0 && c.n !== 11; },
+    'brought-herd':   function (c) { return c.n !== 15 && c.n !== 1 && typeof game.herdCount === 'function' && game.herdCount() >= 4; },
     // The floor, and it has to be the floor rather than a depth: the deepest
     // water in the game is thirty metres and the shallowest you can dive in is
     // under two, so any fixed number is either unreachable or free.

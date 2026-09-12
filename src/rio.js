@@ -4782,6 +4782,8 @@ function rioBuild(game) {
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
               { t: 'The bus in Cali. I heard about the bus. We have a tram. Same rules: none.', after: 'chiva-mirador' },
+              // ...and what it is wearing (L3-11)
+              { t: 'Plumes. Of course. Everybody wants to be in the school.', when: function () { return game.capy && game.capy.worn === 'plumes'; } },
               'Between the flags. There are no flags. Use your judgement.',
               { t: 'The rip runs west off the point. You are built for it, but still.', before: 'take-a-wave' },
               'Sixty saves this summer. None of them a rodent.',

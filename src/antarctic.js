@@ -3392,6 +3392,8 @@ function antBuildLocals(game) {
     lines: [
             // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
             { t: 'Dropped through a cave in Vietnam, the report says. We have no caves. We have a bar hut. Same rules.', after: 'the-column' },
+            // ...and what it is wearing (L3-11)
+            { t: 'The parka is ours. Fine. Keep it. It suits it.', when: function () { return game.capy && game.capy.worn === 'parka'; } },
             'You are the first new face since March. Do not take that as praise.',
             'The bar opens at six. The bar is also the kitchen. And the library.',
             'Nine months. I have read the back of the cereal box in four languages.',

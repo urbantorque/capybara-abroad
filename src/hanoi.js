@@ -3897,6 +3897,8 @@ function hanBuildLocals(game) {
     lines: [
             // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
             { t: 'Won a race in Monte Carlo. The traffic here is not a race. Everybody wins by not stopping.', after: 'the-tunnel' },
+            // ...and what it is wearing (L3-11)
+            { t: 'It is in fancy dress. Everybody else paid.', when: function () { return game.capy && !!game.capy.worn; } },
             'They are standing in the water. The people are standing in the water.',
             'Eleven hundred years. Nobody knows who started it.',
             'You may look. You may not get in.',
