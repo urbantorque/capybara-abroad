@@ -227,6 +227,7 @@ const caliLadderOut = { x: 0, y: 0, z: 0 };
 let caliStopIdx = 0;
 let caliMiradorDone = false;
 let caliNightT = 0, caliVistaT = 0;
+let caliPerfectT = 0, caliPerfectN = 0;   // the band's song after a perfect run (L5)
 let caliWires = null;               // [{ s, x0, z0, x1, z1, y, hit, side }]
 // How many cables this ride has been got under cleanly. Scored at the mirador.
 let caliWireClear = 0;
@@ -1089,6 +1090,28 @@ function caliBuildChiva(game, root) {
   m.castShadow = true;
   m.receiveShadow = true;
   g.add(m);
+  // ---- THE FESTOON (L5): a string of coloured bulbs along both rails and
+  // across the front, dark by day and lit as the night comes (see the update)
+  {
+    const F = caliMerger();
+    const cols = [PALETTE.caliNeonGold, PALETTE.caliNeonPink, PALETTE.caliChivaBlue, PALETTE.caliChivaGrn];
+    let n = 0;
+    for (let s = -1; s <= 1; s += 2) {
+      for (let k = 0; k < 14; k++) {
+        const z = -L * 0.5 + 0.4 + k * (L - 0.8) / 13;
+        F.sph(s * (W * 0.5 + 0.2), 4.10 + Math.sin(k * 1.7) * 0.05, z, 0.11, 0.11, 0.11, cols[(n++) % cols.length], 5);
+      }
+    }
+    for (let k = 0; k < 7; k++) {
+      const x = -W * 0.5 + 0.2 + k * (W - 0.4) / 6;
+      F.sph(x, 4.10, L * 0.5 - 0.07, 0.11, 0.11, 0.11, cols[(n++) % cols.length], 5);
+    }
+    const fm = new THREE.Mesh(F.build(), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, fog: false }));
+    fm.material.color.setScalar(0.22);
+    fm.castShadow = false;
+    g.add(fm);
+    caliChivaBulbs = fm;
+  }
   caliBuildBand(g);
   // She is parked at the head of the route, pointing the way she is going to
   // go. Reading the pose off caliRouteAt(0) rather than hardcoding it is what
@@ -1207,7 +1230,7 @@ function caliBuildBand(g) {
     holder.position.set(k.x, caliROOF_TOP, k.z);
     holder.rotation.y = Math.PI;         // facing aft, at the passengers
     grp.add(holder);
-    caliBandMembers.push({ holder, mesh, phase: i * 0.37 });
+    caliBandMembers.push({ holder, mesh, phase: i * 0.37, x0: k.x });
   }
   g.add(grp);
   caliBandGroup = grp;
@@ -1335,6 +1358,21 @@ const caliSTOPS = [0.205, 0.455];
 // tangle over the street is a barrio thing, and the climb is deliberately clear
 // so that the last ninety seconds are for looking at the view.
 const caliWIRE_AT = [0.09, 0.16, 0.24, 0.33, 0.40, 0.47, 0.53];
+// ---- THE BANNERS (L5) --------------------------------------------------------
+// Seven cables and one verb — the hop — seven times. Three BANNERS now, in
+// the gaps between the cables: a shop's cloth hung from a balcony out over
+// one half of the street, too tall to hop (it hangs from the balcony rail
+// down to head height), so the only way under it is the OTHER side of the
+// roof — a sidestep, which is the roof's second verb and the one the rails
+// were built for. The band leans away from it a second out, as they duck for
+// a cable. `side` is in the wire's own `lat` sign; the banner covers
+// lat * side > caliBANNER_EDGE and the far half of the roof is clear.
+const caliBANNER_AT = [0.20, 0.29, 0.44];
+const caliBANNER_SIDE = [1, -1, 1];
+const caliBANNER_EDGE = 0.35;          // m past the centreline the cloth reaches
+const caliBANNER_BAND = [-2.3, 0.40];  // signed cloth-bottom minus centre: a hop is still inside it
+let caliBandLean = 0;                  // -1..1, the band leaning away from a banner
+let caliChivaBulbs = null;             // the festoon on the rails: lit by the night
 
 /**
  * Resample both halves into one dense polyline, round the corners, and measure
@@ -2047,6 +2085,41 @@ function caliBuildWires(game, root) {
       caliStaticBox(game, px, caliRoadY(px, pz) + 3.3, pz, 0.2, 3.3, 0.2, 0);
     }
   }
+  // ---- the banners (L5): a cloth from a balcony rail over half the street --
+  for (let i = 0; i < caliBANNER_AT.length; i++) {
+    const s = caliBANNER_AT[i] * caliRouteLen;
+    const a = caliRouteAt(s);
+    const nx = Math.cos(a.yaw), nz = -Math.sin(a.yaw);
+    const side = caliBANNER_SIDE[i];
+    const e = -side;                     // lat is minus the offset along n (see caliCheckWires)
+    const y = a.y + caliWIRE_Y;          // the cloth's bottom edge, at cable height
+    const SPAN = 6.2;
+    // the balcony it hangs from: a rail across the street's edge at the top
+    const bx = a.x + nx * SPAN * e, bz = a.z + nz * SPAN * e;
+    const top = y + 2.1;
+    M.box(a.x + nx * (SPAN * 0.5 + caliBANNER_EDGE * 0.5) * e, top + 0.1, a.z + nz * (SPAN * 0.5 + caliBANNER_EDGE * 0.5) * e,
+          0.10, 0.10, SPAN - caliBANNER_EDGE, PALETTE.caliCable, 0, a.yaw + Math.PI / 2, 0);
+    for (let k = 0; k < 2; k++) {
+      const px = bx - nx * e * (0.4 + k * 4.8), pz = bz - nz * e * (0.4 + k * 4.8);
+      M.cyl(px, top - 1.0, pz, 0.06, 2.2, PALETTE.caliCable, 0, 0, 0, 5);
+    }
+    // the cloth: three panels in the chapter's own wall colours, the middle
+    // one carrying a stripe, from the balcony down to head height
+    const cols = [[PALETTE.caliChiva, PALETTE.caliChivaTrim], [PALETTE.caliWall3, PALETTE.caliChivaBlue], [PALETTE.caliChivaGrn, PALETTE.caliWall5]];
+    const c = cols[i % cols.length];
+    const inner = a.x + nx * caliBANNER_EDGE * e, innerZ = a.z + nz * caliBANNER_EDGE * e;
+    const cx = (inner + bx) * 0.5, cz = (innerZ + bz) * 0.5, w = SPAN - caliBANNER_EDGE;
+    M.box(cx, y + 1.05, cz, 0.06, 2.1, w, c[0], 0, a.yaw + Math.PI / 2, 0);
+    M.box(cx, y + 1.05, cz, 0.08, 0.5, w * 0.94, c[1], 0, a.yaw + Math.PI / 2, 0);
+    // a scalloped hem so it reads as cloth and not as a wall
+    for (let k = 0; k < 7; k++) {
+      const u = (k + 0.5) / 7;
+      M.cone(lerp(inner, bx, u), y - 0.18, lerp(innerZ, bz, u), 0.30, 0.36, c[0], Math.PI, a.yaw, 0, 4);
+    }
+    caliWires.push({ s: s, x: a.x, z: a.z, dx: Math.sin(a.yaw), dz: Math.cos(a.yaw), y: y,
+                     prev: 0, has: false, hit: 0, banner: true, side: side });
+  }
+  caliWires.sort(function (p, q) { return p.s - q.s; });
   const m = new THREE.Mesh(M.build(), caliVC());
   m.castShadow = true;
   m.frustumCulled = false;
@@ -2083,7 +2156,7 @@ function caliWireSweep(game, w) {
     game.sfx('thud', { volume: 0.8 });
     game.sfx('wheek', { pitch: 1.25, volume: 0.7 });
   }
-  if (typeof game.toast === 'function') game.toast(caliWIRE_LINES[randInt(0, caliWIRE_LINES.length - 1)]);
+  if (typeof game.toast === 'function') game.toast(w.banner ? 'the banner. the OTHER side of the roof, when the band leans.' : caliWIRE_LINES[randInt(0, caliWIRE_LINES.length - 1)]);
 }
 /** The old sweep, kept for the record and unused. */
 function caliWireSweepOff(game, w) {
@@ -2133,7 +2206,7 @@ function caliCheckWires(game, dt) {
   const capy = game.capy;
   const p = capy && capy.position;
   const rolling = caliChivaState === 'rolling';
-  let duckWant = 0;
+  let duckWant = 0, leanWant = 0;
   for (let i = 0; i < caliWires.length; i++) {
     const w = caliWires[i];
     if (w.hit > 0) w.hit -= dt;
@@ -2142,7 +2215,10 @@ function caliCheckWires(game, dt) {
       // they have done this route every night for years, so they go down about a
       // second out. It is the only tutorial the mechanic gets and it is enough.
       const lead = (w.s - caliChivaS - 3.2) / Math.max(1.5, caliChivaV);
-      if (lead > -0.35 && lead < caliWIRE_WARN) duckWant = 1;
+      if (lead > -0.35 && lead < caliWIRE_WARN) {
+        if (w.banner) leanWant = w.side;     // ...and LEAN AWAY from a banner (L5): local +x is minus lat
+        else duckWant = 1;
+      }
     }
     // A WIRE IS A SEGMENT, NOT A PLANE, AND IT IS ONLY THERE WHEN YOU ARE.
     //
@@ -2165,7 +2241,11 @@ function caliCheckWires(game, dt) {
     w.prev = d;
     if (!crossed || w.hit > 0) continue;
     const dy = w.y - p.y;
-    if (dy < caliWIRE_BAND[0] || dy > caliWIRE_BAND[1]) {
+    // a banner is cleared on the far side of the roof, or under its hem; a
+    // cable is cleared by the hop (L5)
+    const band = w.banner ? caliBANNER_BAND : caliWIRE_BAND;
+    const aside = w.banner && lat * w.side <= caliBANNER_EDGE;
+    if (aside || dy < band[0] || dy > band[1]) {
       // ---- AND CLEARING ONE WAS WORTH NOTHING AT ALL (v20) --------------
       // Seven cables over four hundred and sixty-five metres, and the ONLY
       // thing the mechanic could ever do to you was take you off the roof.
@@ -2179,8 +2259,8 @@ function caliCheckWires(game, dt) {
       caliWireClear++;
       w.hit = 1.4;                      // the same latch a strike uses: once per pass
       if (game.sfx) {
-        game.sfx('hiss', { volume: clamp(0.16 + caliChivaV * 0.02, 0.16, 0.34),
-                           pitch: 1.5 + Math.min(caliWireClear, 7) * 0.08,
+        game.sfx(w.banner ? 'rustle' : 'hiss', { volume: clamp(0.16 + caliChivaV * 0.02, 0.16, 0.34),
+                           pitch: (w.banner ? 0.9 : 1.5) + Math.min(caliWireClear, 10) * 0.08,
                            at: { x: w.x, y: w.y, z: w.z } });
       }
       if (caliWireClear === 3 && game.toast) game.toast('three. the band has stopped watching you.');
@@ -2189,6 +2269,7 @@ function caliCheckWires(game, dt) {
     caliWireSweep(game, w);
   }
   caliBandDuck = duckWant ? Math.min(1, caliBandDuck + dt * 9) : damp(caliBandDuck, 0, 6, dt);
+  caliBandLean = leanWant ? damp(caliBandLean, leanWant, 9, dt) : damp(caliBandLean, 0, 6, dt);
 }
 
 // =============================================================== THE MIRADOR ==
@@ -2524,11 +2605,14 @@ function caliStepChiva(game, dt) {
       // on the roof at the end, which is the whole point of them.
       if (caliOnRoof && typeof game.toast === 'function') {
         if (caliWireClear >= caliWires.length) {
-          game.toast('every cable, clean. the band would like a word.');
+          game.toast('every cable and every banner, clean. the band would like a word — and then a song.');
+          // ---- THE PERFECT RUN (L5): the band's own number, and the city twice
+          caliPerfectT = 0.9;
+          if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
         } else if (caliWireClear > 0) {
-          game.toast(caliWireClear + ' of ' + caliWires.length + ' cables. the rest of them got you.');
+          game.toast(caliWireClear + ' of ' + caliWires.length + '. the rest of them got you.');
         } else if (caliWireHits > 0) {
-          game.toast('every cable got you, and you are still up here. that is the band’s favourite kind.');
+          game.toast('every one of them got you, and you are still up here. that is the band’s favourite kind.');
         }
       }
       // ---- AND THE TALLY IS THE RECORD (L4 E4) ---------------------------
@@ -2595,7 +2679,8 @@ function caliStepChiva(game, dt) {
       m.holder.position.y = caliROOF_TOP - caliBandDuck * 0.62
         + Math.abs(Math.sin((ph + m.phase) * Math.PI)) * 0.07;
       m.holder.rotation.x = caliBandDuck * 0.75;
-      m.holder.rotation.z = swing * 0.07;
+      m.holder.rotation.z = swing * 0.07 - caliBandLean * 0.42;
+      m.holder.position.x = m.x0 + caliBandLean * 0.45;
     }
   }
 
@@ -2603,7 +2688,7 @@ function caliStepChiva(game, dt) {
   if (!caliMiradorDone && caliOnRoof && (caliChivaState === 'rolling' || caliChivaState === 'stopped') &&
       typeof game.wowLive === 'function') {
     const nWires = caliWires ? caliWires.length : 7;
-    game.wowLive('on the roof · ' + caliWireClear + ' of ' + nWires + ' cables · ' +
+    game.wowLive('on the roof · ' + caliWireClear + ' of ' + nWires + ' · cables and banners · ' +
                  Math.round(Math.max(0, caliRouteLen - caliChivaS)) + ' m to the top',
                  clamp(caliChivaS / Math.max(1, caliRouteLen), 0, 1));
   }
@@ -2616,6 +2701,21 @@ function caliStepChiva(game, dt) {
     game.recordLive('chiva-mirador', caliWireClear);
   }
   caliUpdateFireworks(game, dt);
+  // ---- the band's song after a perfect run (L5): three strums, a beat apart
+  if (caliPerfectT > 0) {
+    caliPerfectT -= dt;
+    if (caliPerfectT <= 0) {
+      caliPerfectN++;
+      if (typeof game.sfx === 'function') game.sfx('strum', { volume: 0.9, pitch: 1 + caliPerfectN * 0.12, at: { x: caliChivaX, y: caliChivaY + 4.4, z: caliChivaZ } });
+      caliBurstSparks(caliChivaX, caliChivaY + 4.6, caliChivaZ, 10, 1.2);
+      if (caliPerfectN < 3) caliPerfectT = 0.55; else caliPerfectN = 0;
+    }
+  }
+  // ---- the festoon (L5): the bus is lit as the night comes ---------------
+  if (caliChivaBulbs) {
+    const k = 0.22 + 1.9 * caliNightT;
+    caliChivaBulbs.material.color.setScalar(k);
+  }
 
   // ---- night falls as she climbs ------------------------------------------
   // Not on a timer: on PROGRESS ALONG THE ROUTE. The sun goes down over the
@@ -2641,7 +2741,7 @@ function caliStepChiva(game, dt) {
       caliVistaT = 0;
       caliTask('chiva-mirador');
       caliBurstSparks(caliChivaX, caliChivaY + 4.4, caliChivaZ, 18, 1.4);
-      if (caliOnRoof) caliFwT = 5.5;      // W1: the city answers. See caliUpdateFireworks.
+      if (caliOnRoof) caliFwT = caliPerfectT > 0 || caliPerfectN > 0 ? 10 : 5.5;   // W1: the city answers; twice for a perfect run (L5)
       if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.2);   // L10: the top, held
       if (typeof game.confetti === 'function' && p) game.confetti(p.x, p.y + 1.2, p.z, 20);
       if (typeof game.punch === 'function') game.punch(0.12);
@@ -4510,7 +4610,33 @@ export function createCali(game) {
                turnT: Math.round(caliTurnT * 10) / 10, turnAt: caliCHIVA_TURN,
                onRoof: caliOnRoof, wires: caliWires ? caliWires.length : 0,
                wiresTouched: clear, wiresArmed: armed,
-               clearScore: caliWireClear };
+               clearScore: caliWireClear, hits: caliWireHits, lean: +caliBandLean.toFixed(2), duck: +caliBandDuck.toFixed(2),
+               night: +caliNightT.toFixed(2), bulbs: caliChivaBulbs ? +caliChivaBulbs.material.color.r.toFixed(2) : null,
+               perfectT: +caliPerfectT.toFixed(2), yaw: +caliChivaYaw.toFixed(3) };
+    },
+    /** For the harness (L5): the hazards, in route order. */
+    wireList() {
+      return (caliWires || []).map(function (w) { return { s: +w.s.toFixed(1), banner: !!w.banner, side: w.side || 0, y: +w.y.toFixed(2) }; });
+    },
+    /** For the harness (L5): jump her along the route, rolling. */
+    chivaSet(o) {
+      if (!o) return false;
+      if (typeof o.s === 'number') { caliChivaS = clamp(o.s, 0, caliRouteLen); if (caliWires) for (let i = 0; i < caliWires.length; i++) caliWires[i].has = false; }
+      if (o.state) caliChivaState = o.state;
+      if (typeof o.v === 'number') caliChivaV = o.v;
+      return true;
+    },
+    /** For the harness (L5): the animal on the roof at chiva-local x. */
+    roofPlace(lx) {
+      const capy = game.capy;
+      if (!capy || !capy.body || !caliChivaGroup) return false;
+      const c = Math.cos(caliChivaYaw), sn = Math.sin(caliChivaYaw);
+      const x = caliChivaX + lx * c, z = caliChivaZ - lx * sn, y = caliChivaY + caliROOF_TOP + 0.45;
+      const b = capy.body;
+      b.position.set(x, y, z); b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+      b.previousPosition.copy(b.position); b.interpolatedPosition.copy(b.position);
+      if (capy.position) capy.position.set(x, y, z);
+      return [+x.toFixed(2), +y.toFixed(2), +z.toFixed(2)];
     },
     built() { return caliBuilt; },
     terrainHeight: caliTerrain,

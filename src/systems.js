@@ -11226,6 +11226,126 @@ export function createSystems(game) {
   }
 
   // =========================================================================
+  // 1d. THE SPARKS — the world answering (L5).
+  // Confetti is thrown from the animal and says "you did a thing". This is
+  // thrown from a PLACE and says "the place saw it": a firework over the
+  // harbour at the encore, the spray off a manta clearing the surface, the
+  // champagne on a podium. Cali has had its own since W1 (caliBurstSparks)
+  // and three more chapters wanted one, so it is a channel now: one
+  // InstancedMesh of emissive squares over 1.0 so the bright pass takes them,
+  // additive, fog-free, pooled at sysSPARK_MAX, nothing allocated per burst.
+  // `game.firework(x, y, z, o)` is a shell burst with its sound at its
+  // position; `game.sparks(x, y, z, n, o)` is the raw burst.
+  // =========================================================================
+  const sysSPARK_MAX = 120;
+  const sparkMesh = new THREEx.InstancedMesh(
+    new THREEx.PlaneGeometry(0.34, 0.34),
+    new THREEx.MeshBasicMaterial({ color: 0xffffff, side: THREEx.DoubleSide, transparent: true, opacity: 0.92,
+                                   depthWrite: false, fog: false, toneMapped: false, blending: THREEx.AdditiveBlending }),
+    sysSPARK_MAX);
+  sparkMesh.castShadow = false;
+  sparkMesh.receiveShadow = false;
+  sparkMesh.frustumCulled = false;
+  sparkMesh.renderOrder = 4;
+  sparkMesh.instanceMatrix.setUsage(THREEx.DynamicDrawUsage);
+  sparkMesh.count = sysSPARK_MAX;
+  scene.add(sparkMesh);
+  const sparkPos = new Float32Array(sysSPARK_MAX * 3);
+  const sparkVel = new Float32Array(sysSPARK_MAX * 3);
+  const sparkLife = new Float32Array(sysSPARK_MAX);
+  const sparkLife0 = new Float32Array(sysSPARK_MAX);
+  const sparkSize = new Float32Array(sysSPARK_MAX);
+  const sparkGrav = new Float32Array(sysSPARK_MAX);
+  const sparkDrag = new Float32Array(sysSPARK_MAX);
+  let sparkHead = 0, sparkAny = false, sparkDirty = true;
+  for (let i = 0; i < sysSPARK_MAX; i++) { sparkLife[i] = 0; sparkMesh.setColorAt(i, sysColA.setRGB(2, 1.6, 1)); }
+  if (sparkMesh.instanceColor) sparkMesh.instanceColor.needsUpdate = true;
+  const sysSPARK_WARM = [[2.4, 1.7, 0.9], [2.4, 1.1, 0.7], [1.6, 2.2, 1.0], [2.2, 2.2, 1.6], [1.2, 1.6, 2.4]];
+  /**
+   * n sparks from a point. o: { spd (m/s, 4), up (bias, 0), grav (m/s², 9),
+   * drag (1/s, 0.8), life (s, 1.4), size (m, 1), rgb ([r,g,b] over 1.0, or
+   * 'warm' for a random warm), spread (0..1 of a sphere, 1) }.
+   */
+  function sparkBurst(x, y, z, n, o) {
+    o = o || {};
+    const spd = o.spd || 4, up = o.up || 0, grav = o.grav === undefined ? 9 : o.grav;
+    const drag = o.drag === undefined ? 0.8 : o.drag, life = o.life || 1.4, size = o.size || 1;
+    const rgb = Array.isArray(o.rgb) ? o.rgb : sysSPARK_WARM[Math.floor(rand(0, sysSPARK_WARM.length)) % sysSPARK_WARM.length];
+    const spread = o.spread === undefined ? 1 : clamp(o.spread, 0.05, 1);
+    n = Math.min(n || 24, sysSPARK_MAX);
+    for (let k = 0; k < n; k++) {
+      const i = sparkHead;
+      sparkHead = (sparkHead + 1) % sysSPARK_MAX;
+      // a point on a sphere, thinned toward the pole by `spread`
+      const a = rand(0, Math.PI * 2), c = 1 - rand(0, 2) * spread, sn = Math.sqrt(Math.max(0, 1 - c * c));
+      const v = spd * rand(0.55, 1.0);
+      sparkPos[i * 3] = x; sparkPos[i * 3 + 1] = y; sparkPos[i * 3 + 2] = z;
+      sparkVel[i * 3] = Math.cos(a) * sn * v;
+      sparkVel[i * 3 + 1] = c * v + up;
+      sparkVel[i * 3 + 2] = Math.sin(a) * sn * v;
+      sparkLife[i] = sparkLife0[i] = life * rand(0.7, 1.15);
+      sparkSize[i] = size * rand(0.7, 1.3);
+      sparkGrav[i] = grav; sparkDrag[i] = drag;
+      sparkMesh.setColorAt(i, sysColA.setRGB(rgb[0] * rand(0.85, 1.1), rgb[1] * rand(0.85, 1.1), rgb[2] * rand(0.85, 1.1)));
+    }
+    if (sparkMesh.instanceColor) sparkMesh.instanceColor.needsUpdate = true;
+    sparkAny = true; sparkDirty = true;
+  }
+  const sparkM4 = new THREEx.Matrix4();
+  const sparkV = new THREEx.Vector3();
+  const sparkS = new THREEx.Vector3();
+  function sparkStep(dt) {
+    if (!sparkAny && !sparkDirty) return;
+    let any = false;
+    for (let i = 0; i < sysSPARK_MAX; i++) {
+      if (sparkLife[i] <= 0) {
+        if (sparkDirty) {
+          sparkM4.compose(sparkV.set(0, -900, 0), camera.quaternion, sparkS.set(0, 0, 0));
+          sparkMesh.setMatrixAt(i, sparkM4);
+        }
+        continue;
+      }
+      any = true;
+      sparkLife[i] -= dt;
+      sparkVel[i * 3 + 1] -= sparkGrav[i] * dt;
+      const k = Math.max(0, 1 - sparkDrag[i] * dt);
+      sparkVel[i * 3] *= k; sparkVel[i * 3 + 1] *= k; sparkVel[i * 3 + 2] *= k;
+      sparkPos[i * 3] += sparkVel[i * 3] * dt;
+      sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt;
+      sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
+      const u = sparkLife0[i] > 0 ? clamp(sparkLife[i] / sparkLife0[i], 0, 1) : 0;
+      const sz = sparkSize[i] * (0.35 + 0.65 * u);
+      if (sparkLife[i] <= 0) sparkLife[i] = 0;
+      sparkV.set(sparkPos[i * 3], sparkPos[i * 3 + 1], sparkPos[i * 3 + 2]);
+      // face the lens: a square billboard, which at this size is a point of light
+      sparkM4.compose(sparkV, camera.quaternion, sparkS.set(sz, sz, sz));
+      sparkMesh.setMatrixAt(i, sparkM4);
+    }
+    sparkMesh.instanceMatrix.needsUpdate = true;
+    sparkDirty = any;
+    sparkAny = any;
+  }
+  /**
+   * A FIREWORK: a shell burst at a point, its thud and its pop placed there,
+   * heard from four hundred metres. o: { n, rgb, size, spd, volume }.
+   */
+  function firework(x, y, z, o) {
+    o = o || {};
+    const n = o.n || 40, size = o.size || 1.4, spd = o.spd || 9;
+    sparkBurst(x, y, z, n, { spd: spd, grav: 3.2, drag: 0.9, life: o.life || 2.4, size: size, rgb: o.rgb, spread: 1 });
+    sparkBurst(x, y, z, Math.max(6, n >> 2), { spd: spd * 0.45, grav: 2.4, drag: 0.7, life: (o.life || 2.4) * 0.8, size: size * 0.7, rgb: o.rgb || [2.4, 2.3, 2.0], spread: 1 });
+    const vol = o.volume === undefined ? 0.55 : o.volume;
+    try {
+      sfx('thud', { volume: vol, pitch: 0.5, at: { x: x, y: y, z: z }, near: 40, far: 420, force: true });
+      sfx('pop',  { volume: vol * 0.7, pitch: 0.7, at: { x: x, y: y, z: z }, near: 40, far: 420, force: true });
+    } catch (e) { /* the sound is a gift */ }
+  }
+  game.sparks = function (x, y, z, n, o) { sparkBurst(x, y, z, n, o); };
+  game.firework = firework;
+  /** For the harness: how many sparks are alive. */
+  game.sparksLive = function () { let n = 0; for (let i = 0; i < sysSPARK_MAX; i++) if (sparkLife[i] > 0) n++; return n; };
+
+  // =========================================================================
   // 5. AUDIO — pure WebAudio synth, lazily created on first gesture.
   // =========================================================================
   let ac = null, acMaster = null, acNoise = null, acAmbGain = null, acAmbOn = false;
@@ -25509,7 +25629,7 @@ export function createSystems(game) {
                       const c = game.cali;
                       if (!c) return 'stay on the roof';
                       if (c.chivaState() === 'parked') return 'the ladder is on the BACK of the bus: Space up the steps to the roof';
-                      if (c.onChiva()) return 'Space over each cable when the band ducks';
+                      if (c.onChiva()) return 'Space over a cable when the band ducks · the far rail when they lean';
                       return 'catch her up — Space up the ladder on her back';
                     },
                     where: function () {
@@ -27428,6 +27548,12 @@ export function createSystems(game) {
   // =========================================================================
   const jrSeen = Object.create(null);          // chapters the player has stood in
   const jrRecs = Object.create(null);          // task id -> best value
+  /** The generation of every row that has one, for the save (L5). */
+  function jrRecGen() {
+    const g = {};
+    for (const k in jrRecs) if (RECORDS[k] && RECORDS[k].gen) g[k] = RECORDS[k].gen;
+    return g;
+  }
   let jrCarriedMs = 0;                         // elapsed time from earlier sessions
   let saveT = 0, savePending = false;
   // Has this machine ever been told the game keeps a file? Set from the file
@@ -27550,7 +27676,7 @@ export function createSystems(game) {
       // in startGame), which is the same fact and needs no field. Removed in R3.
       // Nothing migrates — an old file simply carries a key nobody looks at.
       localStorage.setItem(sysSAVE_KEY, JSON.stringify({
-        v: 1, tasks: tasks, seen: seen, recs: jrRecs,
+        v: 1, tasks: tasks, seen: seen, recs: jrRecs, recg: jrRecGen(),
         ms: jrCarriedMs + (startMs > 0 ? performance.now() - startMs : 0),
         chapms: jrChapMs, finds: finds, foundAt: findWhere,
         // Additive, like everything below it. See jrChapInc.
@@ -30750,7 +30876,18 @@ export function createSystems(game) {
       const sn = jrFile.seen || [];
       for (let i = 0; i < sn.length; i++) jrSeen[sn[i]] = 1;
       const rc = jrFile.recs || {};
-      for (const k in rc) if (typeof rc[k] === 'number') jrRecs[k] = rc[k];
+      // ---- ...UNLESS THE ROW CHANGED WHAT IT MEASURES (L5) ---------------
+      // The manta's row was seconds held on; it is metres cleared now. The
+      // key is the wow task's id and cannot move (see RECORDS), so a row
+      // carries `gen` when its unit changes and a saved figure from an older
+      // generation is dropped rather than read as the new unit.
+      const rg = jrFile.recg || {};
+      for (const k in rc) {
+        if (typeof rc[k] !== 'number') continue;
+        const want = (RECORDS[k] && RECORDS[k].gen) || 1, had = typeof rg[k] === 'number' ? rg[k] : 1;
+        if (want !== had) continue;
+        jrRecs[k] = rc[k];
+      }
       jrCarriedMs = typeof jrFile.ms === 'number' ? jrFile.ms : 0;
       const cms = jrFile.chapms || {};
       for (const k in cms) if (typeof cms[k] === 'number') jrChapMs[k] = cms[k];
@@ -41669,6 +41806,7 @@ export function createSystems(game) {
     if (jrShown) jrTick();
 
     confettiStep(dt);
+    sparkStep(dt);
 
     // ---- perf readout ----
     const fpsDt = game.state.rawDt || dt;

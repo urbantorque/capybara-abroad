@@ -82,6 +82,37 @@ function envConcertFile(game) {
 // podium, and the score all the way up. Once per concert.
 const envENCORE_WIN = 8;
 let envEncoreT = 0, envEncoreDone = false;
+// ---- THE HARBOUR ANSWERS (L5) ------------------------------------------------
+// A note from the stage was a pulse on the sails and a count. Now it is a
+// call, and things answer it a beat later: the house in place cheers back
+// (scaled to how many are there — two people is two people), the ferry
+// sounds her horn on the second note if she is in the harbour, and every
+// note calls WIDER (game.concert.call takes the note number), so a podium
+// with nobody near it is a podium whose third wheek reaches the quay. The
+// state with nobody in reach is SAID now, on the paper and in the toast.
+//
+// THE ENCORE is the harbour's: the world at half speed, the lens from the
+// opera shot with the house in the foreground, seven shells over the water
+// behind the sails, and the sails held lit for ten seconds.
+const envANSWER_LAG = 0.55;    // s between the note and the house's answer
+const envENCORE_SHELLS = 7;
+let envAnswerT = -1;           // countdown to the answer, -1 idle
+let envAnswerNote = 0;
+let envEncoreFwT = 0, envEncoreFwNext = 0, envEncoreFwN = 0, envEncoreGlowT = 0;
+function envFireworkStep(game, dt) {
+  if (envEncoreGlowT > 0) envEncoreGlowT -= dt;
+  if (envEncoreFwN <= 0) return;
+  envEncoreFwNext -= dt;
+  if (envEncoreFwNext > 0) return;
+  envEncoreFwNext = 0.42 + Math.random() * 0.3;
+  envEncoreFwN--;
+  if (typeof game.firework !== 'function') return;
+  // over the harbour, north of the sails, high enough to clear them from the
+  // forecourt: the sails' tallest tip is 11.6 m
+  const fx = -34 + Math.random() * 68, fz = -34 - Math.random() * 22, fy = 15 + Math.random() * 9;
+  const pal = [[2.4, 1.2, 0.7], [2.4, 1.9, 0.8], [1.2, 1.6, 2.4], [2.2, 1.0, 1.6]];
+  game.firework(fx, fy, fz, { n: 56, size: 1.5, spd: 10, rgb: pal[envEncoreFwN % pal.length] });
+}
 
 // ---- Circular Quay (chapter 1) -----------------------------------------------
 const envCafeTables = [];     // {x, z, top} — climbable café tables
@@ -3605,6 +3636,22 @@ export function createEnvironment(game) {
           envEncoreT -= dt;
           if (typeof game.wowLive === 'function' && !envEncoreDone) game.wowLive('THE ENCORE · wheek once more · ' + Math.ceil(envEncoreT) + ' s', 1);
         }
+        // ---- the answer, a beat after the note (L5) ------------------------
+        if (envAnswerT >= 0) {
+          envAnswerT -= dt;
+          if (envAnswerT < 0) {
+            const k = (game.concert && typeof game.concert.answer === 'function') ? game.concert.answer() : 0;
+            if (k > 0 && typeof game.sfx === 'function') {
+              game.sfx('cheer', { volume: 0.18 + 0.06 * Math.min(k, 8), pitch: 1.2 + 0.04 * Math.min(k, 8), force: true,
+                                  at: { x: 0, y: 1.5, z: 8.4 }, near: 6, far: 60 });
+            }
+            // the second note: the ferry answers, if she is in the harbour
+            if (envAnswerNote === 2 && envFerry && envFerry.position && typeof game.sfx === 'function') {
+              const fp = envFerry.position;
+              game.sfx('horn', { volume: 0.7, pitch: 0.95, at: { x: fp.x, y: fp.y + 3, z: fp.z }, near: 20, far: 300, force: true });
+            }
+          }
+        }
         if (envConcertOff > envCONCERT_LEAVE) {
           envConcertOn = false;
           envConcertNotes = 0; envEncoreT = 0;
@@ -3614,6 +3661,7 @@ export function createEnvironment(game) {
       }
     }
     envTime += dt;
+    envFireworkStep(game, dt);
     envFerryStep(game, dt);
     envVanStep(game, dt);
     envPlaneStep(game, dt);
@@ -3790,7 +3838,7 @@ export function createEnvironment(game) {
      * Damped here rather than in the grade so the chapter owns the shape of its
      * own signal; the grade only decides what to do with it.
      */
-    stageGlow: function () { return Math.min(1, envStageT + envStagePulse * 0.7); },
+    stageGlow: function () { return Math.min(1, envStageT + envStagePulse * 0.7 + (envEncoreGlowT > 0 ? 1 : 0)); },
     /**
      * A WHEEK FROM THE STAGE (W1). capybara.js calls this instead of ticking
      * the task itself. Returns the note count so the caller can toast.
@@ -3807,12 +3855,18 @@ export function createEnvironment(game) {
         // opened with no figure: the paper shows the standing best alone until
         // somebody is actually in place (the documented opening call)
         if (typeof game.recordLive === 'function') game.recordLive('opera-stage');
-        const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5) : 0;
-        if (typeof game.toast === 'function') {
-          game.toast(coming > 0 ? 'they are coming over. keep going' : 'nobody about. keep going anyway');
-        }
       }
       envConcertNotes++;
+      // EVERY NOTE CALLS WIDER (L5): the first from the forecourt, the second
+      // from the far end of it, the third from the quay
+      const coming = (game.concert && typeof game.concert.call === 'function') ? game.concert.call(0, 2.5, envConcertNotes) : 0;
+      if (envConcertNotes <= 3 && typeof game.toast === 'function') {
+        game.toast(coming > 0 ? (envConcertNotes === 1 ? 'they are coming over. keep going' : coming + ' coming. again — louder carries further')
+                              : envConcertNotes < 3 ? 'nobody in reach yet. again — a wheek carries further each time'
+                              : 'nobody about at all. wheek from the podium with people on the forecourt');
+      }
+      // ...and the house answers, a beat later
+      envAnswerT = envANSWER_LAG; envAnswerNote = envConcertNotes;
       // the encore (L5): a note after the cheer, inside the window
       if (envConcertDone && !envEncoreDone && envEncoreT > 0) {
         envEncoreDone = true; envEncoreT = 0;
@@ -3821,7 +3875,11 @@ export function createEnvironment(game) {
         if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
         if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.7, pitch: 1.1, force: true });
         if (typeof game.punch === 'function') game.punch(0.12);
-        if (typeof game.toast === 'function') game.toast('AN ENCORE. the whole forecourt.');
+        if (typeof game.toast === 'function') game.toast('AN ENCORE. the whole forecourt — and the harbour.');
+        // ---- THE HARBOUR'S ENCORE (L5) -------------------------------------
+        if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.6);
+        envEncoreFwN = envENCORE_SHELLS; envEncoreFwNext = 0.3; envEncoreGlowT = 10;
+        if (typeof api.operaShot === 'function') api.operaShot(5.5);
       }
       return envConcertNotes;
     },
@@ -3851,7 +3909,7 @@ export function createEnvironment(game) {
      * camera on the OPPOSITE side of the animal from the shells is what leaves
      * the shells standing behind it.
      */
-    operaShot: function () {
+    operaShot: function (hold) {
       if (typeof game.frameShot !== 'function' || !game.capy) return false;
       const p = game.capy.position;
       // The visual mass of the building: the midpoint of the two clusters'
@@ -3862,9 +3920,14 @@ export function createEnvironment(game) {
         // 21 m and a low pitch: the tallest tip is 11.6 m and the podium mass
         // is 3.0 deep, so anything nearer or steeper cuts the sails off at the
         // top — which is precisely what the un-framed rig was doing.
-        dist: 17, pitch: 13 * Math.PI / 180, raise: 2.8, hold: 3.0
+        dist: 17, pitch: 13 * Math.PI / 180, raise: 2.8, hold: typeof hold === 'number' ? hold : 3.0
       });
       return true;
+    },
+    /** THE ENCORE, for the harness (L5). */
+    encoreAudit: function () {
+      return { encoreT: +envEncoreT.toFixed(2), encoreDone: envEncoreDone, shellsLeft: envEncoreFwN, glowT: +envEncoreGlowT.toFixed(2),
+               answerT: +envAnswerT.toFixed(2), notes: envConcertNotes };
     },
     update: envUpdate,
   };

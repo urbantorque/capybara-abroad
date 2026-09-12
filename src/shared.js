@@ -4061,7 +4061,9 @@ export const RECORDS = {
   // still on the roof at the top — cali.js's own rule for the toast, kept for
   // the record. Seven clean is the ceiling and the band's line; six is a ride
   // that gave one away.
-  'chiva-mirador': { label: 'ducked', unit: ' of the seven cables', better: 'higher', dp: 0, par: 6 },
+  // ...and three banners since L5 — ten hazards, two verbs. Eight is a ride
+  // that gave two away; ten is the band's song.
+  'chiva-mirador': { label: 'cleared', unit: ' of the ten', better: 'higher', dp: 0, par: 8 },
   // Chapter 7. The sky never goes back down once it is up, so this is the
   // stay: seconds within iceCALL_R (16 m) of the spring with the curtains at
   // full, in the water or on the bank. Idling, deliberately — the whole
@@ -4083,10 +4085,16 @@ export const RECORDS = {
   // Thirty-two is the torii margin over a machine floor — a person who has
   // to climb for four of them and turn for all of them.
   'symphony':      { label: 'the eight rings in', unit: ' s', better: 'lower', dp: 1, par: 32 },
-  // Chapter 12. The ride is authored — palMANTA_RIDE is 22 s and E lets go —
-  // so this is the one row here where the number is "did you stay on". The
-  // par is the whole ride, which is the only good one there is.
-  'the-manta':     { label: 'held on for', unit: ' s', better: 'higher', dp: 1, par: 22 },
+  // Chapter 12. Was seconds held on (gen 1): the ride is authored, so the
+  // par was the whole ride and the row measured sitting still. THE LEAP (L5):
+  // Space through the climb jumps off its back with the manta's own climb
+  // under you, and the number is metres clear of the water at the top of the
+  // arc. The manta's keyframe peak is 3.2 m over the surface and its climb
+  // through the breach is about four metres a second; a jump at the top of
+  // that carries to six and a half or so. Four and a half is a leap made at
+  // the top rather than the first frame Space did anything. `gen: 2` drops
+  // a saved gen-1 figure (see startGame's restore).
+  'the-manta':     { label: 'leapt', unit: ' m clear', better: 'higher', dp: 1, par: 4.5, gen: 2 },
   // Chapter 13. Not the peak (that is three-winds): how high you were AT THE
   // MOMENT the sun cleared the rim, which is a timing on the burner. The
   // marquee's own gate is 55 m and the burner stops at gorCEIL (205); a

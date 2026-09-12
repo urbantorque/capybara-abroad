@@ -2266,6 +2266,35 @@ const palMantaOff = new THREE.Vector3();
 // the four-legged flail every carry used to draw was a capybara pedalling the
 // open water on the back of a ray. See WHO IS HOLDING YOU in capybara.js.
 const palMantaApi = { what: 'manta', hold: 'ride' };
+// ---- THE LEAP, AND THE LEAN, AND THE SECOND ONE (L5) -----------------------
+// The ride was twenty-two authored seconds with E to let go, and the record
+// was how many of them you sat through. Three things, so it is a set piece
+// with a hand on it rather than a film:
+//
+//   THE LEAN. A/D on the wing and it banks — the roll takes a third of a
+//   radian of your lean, the lap's radius stretches and tucks by a tenth —
+//   the path is still its own, but the animal on it is doing something.
+//
+//   THE LEAP. Through the climb (u 0.84..0.97, the last three metres up and
+//   the arc over the surface) SPACE jumps off its back with the manta's own
+//   climb under you — the one skill on the ride is the timing, and the
+//   number is metres CLEAR of the water at the top of that arc. Replaces the
+//   seconds as the row (gen 2 in RECORDS).
+//
+//   THE SECOND MANTA. They come to the station in company. A second one laps
+//   a half-radian behind at the same depth and, on the ride, flies the same
+//   keyframes a beat late — so the breach is two animals, one after the
+//   other, and the splash you hear behind you is the other one.
+const palLEAP_U0 = 0.84, palLEAP_U1 = 0.975;
+const palLEAP_JUMP = 5.2;              // m/s of the animal's own, on top of the climb
+const palLEAP_CARRY = 0.85;            // how much of the manta's climb it keeps
+const palMANTA2_LAG = 0.55;            // rad behind on the lap
+const palMANTA2_LATE = 0.9;            // s behind on the ride
+let palMantaLean = 0;
+let palLeapOn = false, palLeapPeak = 0, palLeapY0 = 0, palLeapT = 0, palLeapBest = 0;
+let palManta2Group = null;
+const palManta2Pos = new THREE.Vector3();
+let palMantaSlowed = false;
 
 function palBuildManta(root) {
   const M = palMerger();
@@ -2340,6 +2369,14 @@ function palBuildManta(root) {
   palMantaGroup.name = 'palManta';
   palMantaGroup.add(mesh);
   root.add(palMantaGroup);
+  // the second one: the same geometry and material, its own transform (L5)
+  palManta2Group = new THREE.Group();
+  palManta2Group.name = 'palManta2';
+  const mesh2 = new THREE.Mesh(mesh.geometry, mesh.material);
+  mesh2.castShadow = true;
+  mesh2.scale.set(0.88, 0.88, 0.88);
+  palManta2Group.add(mesh2);
+  root.add(palManta2Group);
   palMantaA = 0.7;
   palMantaRideT = -1;
 }
@@ -2375,7 +2412,40 @@ function palMantaRoll(u) {
   return palSmooth((u - 0.32) / 0.26) * Math.PI * 2;
 }
 
+/**
+ * THE LEAP, MEASURED (L5). From the jump off the manta's back to the water:
+ * the top of the arc over the sea is the number, filed when the animal is
+ * back in it. A leap that comes down on the reef files what it reached.
+ */
+function palUpdateLeap(game, dt) {
+  if (!palLeapOn) return;
+  const capy = game.capy;
+  const cp = capy && capy.position;
+  if (!cp) { palLeapOn = false; return; }
+  palLeapT += dt;
+  const clear = cp.y - palWATER;
+  if (clear > palLeapPeak) palLeapPeak = clear;
+  if (typeof game.recordLive === 'function') game.recordLive('the-manta', Math.max(0, palLeapPeak));
+  // back in the water: below the surface line on the way down (the animal
+  // floats at the line, so `depth` never reads deep enough on its own), or
+  // on the reef, or on its feet anywhere
+  const down = palLeapT > 0.35 && (cp.y <= palWATER + 0.3 || (capy.depth || 0) > 0.2 || (capy.grounded && palLeapT > 0.6));
+  if (down || palLeapT > 8) {
+    palLeapOn = false;
+    const m = Math.max(0, palLeapPeak);
+    if (m > palLeapBest) palLeapBest = m;
+    if (typeof game.record === 'function') game.record('the-manta', +m.toFixed(1));
+    if (typeof game.recordEnd === 'function') game.recordEnd('the-manta');
+    palSfx('splash', { volume: 0.8, pitch: 0.8, force: true });
+    if (typeof game.sparks === 'function') game.sparks(cp.x, palWATER + 0.2, cp.z, 18, { spd: 3.5, up: 2.5, grav: 9, drag: 0.6, life: 0.9, size: 0.24, rgb: [1.2, 1.45, 1.7] });
+    palToast(m >= 4.5 ? 'off its back, ' + m.toFixed(1) + ' metres clear of the water. it will be round again.'
+           : m >= 2 ? m.toFixed(1) + ' metres clear. later off the back for more — it is still climbing at the top.'
+           : 'into the water. leap at the TOP of its arc, when the wings are over the surface.');
+  }
+}
+
 function palUpdateManta(game, dt) {
+  palUpdateLeap(game, dt);
   if (!palMantaGroup) return;
   const capy = game.capy;
   const cp = capy && capy.position;
@@ -2386,7 +2456,10 @@ function palUpdateManta(game, dt) {
 
   // ---- where it is --------------------------------------------------------
   palMantaA += palMANTA_RATE * (riding ? palMantaKey(palMANTA_K.s, u) : 1) * dt;
-  const k = riding ? palMantaKey(palMANTA_K.r, u) : 1;
+  // THE LEAN (L5): A/D on the wing, damped, and it banks and stretches the lap
+  const leanWant = (riding && input) ? clamp((input.x || 0), -1, 1) : 0;
+  palMantaLean = damp(palMantaLean, leanWant, 3.5, dt);
+  const k = (riding ? palMantaKey(palMANTA_K.r, u) : 1) * (1 + 0.10 * palMantaLean);
   const wantY = riding ? palMantaKey(palMANTA_K.y, u) : palMANTA_Y;
   const x = palMANTA.x + Math.sin(palMantaA) * palMANTA_RX * k;
   const z = palMANTA.z + Math.cos(palMantaA) * palMANTA_RZ * k;
@@ -2401,7 +2474,9 @@ function palUpdateManta(game, dt) {
   const yaw = Math.atan2(x2 - x, z2 - z);
   const climb = dt > 0 ? clamp((y - palMantaPos.y) / dt, -9, 9) : 0;
   const pitch = clamp(-Math.atan2(climb, 3.4), -0.95, 0.95);
-  const roll = palMantaRoll(u) + Math.sin(palMantaA * 2) * 0.10;
+  const roll = palMantaRoll(u) + Math.sin(palMantaA * 2) * 0.10 + palMantaLean * 0.34;
+  // the manta's own velocity this frame, for the leap
+  const mvx = dt > 0 ? (x - palMantaPos.x) / dt : 0, mvz = dt > 0 ? (z - palMantaPos.z) / dt : 0;
 
   palMantaPos.set(x, y, z);
   palMantaGroup.position.copy(palMantaPos);
@@ -2409,6 +2484,34 @@ function palUpdateManta(game, dt) {
   // the wings beat, slowly, and faster when it means it
   const beat = Math.sin(palTime * (riding ? 1.9 : 0.9)) * (riding ? 0.20 : 0.11);
   palMantaGroup.scale.set(1, 1 + beat * 0.35, 1);
+  // ---- THE SECOND ONE (L5): the same lap, a half-radian back; the same
+  // flight, a beat late, and its own breach ---------------------------------
+  if (palManta2Group) {
+    const t2 = riding ? Math.max(0, palMantaRideT - palMANTA2_LATE) : 0;
+    const u2 = riding ? clamp(t2 / palMANTA_RIDE, 0, 1) : 0;
+    const a2 = palMantaA - palMANTA2_LAG;
+    const k2 = (riding ? palMantaKey(palMANTA_K.r, u2) : 1) * 1.04;
+    const y2w = riding ? palMantaKey(palMANTA_K.y, u2) : palMANTA_Y - 0.8;
+    const x2m = palMANTA.x + Math.sin(a2) * palMANTA_RX * k2;
+    const z2m = palMANTA.z + Math.cos(a2) * palMANTA_RZ * k2;
+    const yy2 = Math.max(y2w, palTerrain(x2m, z2m) + 2.3);
+    const x2n = palMANTA.x + Math.sin(a2 + 0.06) * palMANTA_RX * k2;
+    const z2n = palMANTA.z + Math.cos(a2 + 0.06) * palMANTA_RZ * k2;
+    const yaw2 = Math.atan2(x2n - x2m, z2n - z2m);
+    const climb2 = dt > 0 ? clamp((yy2 - palManta2Pos.y) / dt, -9, 9) : 0;
+    const wasUnder2 = palManta2Pos.y < palWATER;
+    palManta2Pos.set(x2m, yy2, z2m);
+    palManta2Group.position.copy(palManta2Pos);
+    palManta2Group.rotation.set(clamp(-Math.atan2(climb2, 3.4), -0.95, 0.95), yaw2,
+                                palMantaRoll(u2) + Math.sin(a2 * 2) * 0.10, 'YXZ');
+    const beat2 = Math.sin(palTime * (riding ? 1.9 : 0.9) + 1.3) * (riding ? 0.20 : 0.11);
+    palManta2Group.scale.set(0.88, 0.88 * (1 + beat2 * 0.35), 0.88);
+    if (riding && wasUnder2 && yy2 >= palWATER) {
+      // the other one clears the surface: its own splash and spray, behind you
+      palSfx('splash', { volume: 0.7, pitch: 0.7, at: { x: x2m, y: 0, z: z2m }, force: true });
+      if (typeof game.sparks === 'function') game.sparks(x2m, palWATER + 0.3, z2m, 22, { spd: 4.5, up: 3.0, grav: 9, drag: 0.6, life: 1.1, size: 0.26, rgb: [1.2, 1.45, 1.7] });
+    }
+  }
 
   // ---- taking hold --------------------------------------------------------
   const under = capy ? (capy.depth || 0) > 0.65 : false;
@@ -2423,6 +2526,8 @@ function palUpdateManta(game, dt) {
         input && input.actionPressed && capy.body) {
       palMantaRideT = 0;
       palMantaBreached = false;
+      palMantaSlowed = false;
+      palMantaLean = 0;
       palMantaCool = 0.5;
       capy.carriedBy = palMantaApi;
       palSfx('pop', { volume: 0.55, pitch: 0.7 });
@@ -2440,9 +2545,9 @@ function palUpdateManta(game, dt) {
   }
   // ...and on the paper (W1): the ride, and what is coming at the end of it.
   if (!palMantaDone && typeof game.wowLive === 'function') {
-    game.wowLive(u < 0.55 ? 'on the manta · ' + palMantaRideT.toFixed(0) + ' s · hold on'
-               : u < 0.85 ? 'on the manta · it is going up'
-               : 'on the manta · THE SURFACE', u);
+    game.wowLive(u < 0.55 ? 'on the manta · ' + palMantaRideT.toFixed(0) + ' s · A/D to lean · hold on'
+               : u < palLEAP_U0 ? 'on the manta · it is going up · get ready to LEAP'
+               : 'on the manta · THE SURFACE · SPACE to leap off its back', u);
   }
   // ---- AND THE SECONDS ARE THE RECORD (L4 E4) --------------------------------
   // The ride is authored — palMANTA_RIDE seconds, one lap, one roll, one
@@ -2451,8 +2556,29 @@ function palUpdateManta(game, dt) {
   // the roll files what it got to. On the paper every ride frame (the dive's
   // own depth line stands down for it — see palUpdateTasks), filed once when
   // the ride ends, below, or from onExit.
-  if (typeof game.recordLive === 'function') game.recordLive('the-manta', palMantaRideT);
+  // (L5) the row is the leap now — see palUpdateLeap — so the ride keeps the
+  // standing best on the paper without a live figure until the jump is made
+  if (typeof game.recordLive === 'function') game.recordLive('the-manta');
   const bail = !!(input && input.actionPressed && palMantaCool <= 0 && palMantaRideT > 1.2);
+  // ---- THE LEAP (L5) --------------------------------------------------------
+  // Through the climb and the arc, Space is a jump off its back that keeps
+  // most of the manta's own climb. The task ticks here too if it has not —
+  // leaping before the breach is the better version of being there for it.
+  if (input && input.jumpPressed && u >= palLEAP_U0 && u <= palLEAP_U1 && capy && typeof capy.launch === 'function') {
+    const vy = Math.max(0, climb) * palLEAP_CARRY + palLEAP_JUMP;
+    capy.carriedBy = null;
+    capy.launch(mvx * 0.7, vy, mvz * 0.7);
+    palLeapOn = true; palLeapPeak = 0; palLeapY0 = y; palLeapT = 0;
+    palMantaRideT = -1;
+    palMantaCool = 0.8;
+    palSfx('hiss', { volume: 0.5, pitch: 1.3, force: true });
+    palSfx('wheek', { volume: 0.6, pitch: 1.2, force: true });
+    if (typeof game.punch === 'function') game.punch(0.10);
+    if (typeof game.slowmo === 'function') game.slowmo(0.5, 0.9);
+    if (typeof game.sparks === 'function') game.sparks(x, Math.max(y, palWATER) + 0.4, z, 30, { spd: 4.2, up: 2.6, grav: 9, drag: 0.6, life: 1.1, size: 0.26, rgb: [1.2, 1.45, 1.7] });
+    if (!palMantaDone) { palMantaDone = true; palTask('the-manta'); }
+    return;
+  }
 
   if (capy && capy.body) {
     // PARKED, NOT SIMULATED — the same decision as the ferry's wheel and for
@@ -2482,6 +2608,18 @@ function palUpdateManta(game, dt) {
     // M4: the manta breaching.
     if (typeof game.punch === 'function') game.punch(0.34, 0.05);
     else if (typeof game.shake === 'function') game.shake(0.34);
+    // ---- ...AND IT IS SEEN (L5): the world at half speed, the lens low over
+    // the water on the animal's flank with the ray clearing it, a sheet of
+    // spray off the wings, and every tern on the bay put up ----------------
+    if (!palMantaSlowed) {
+      palMantaSlowed = true;
+      if (typeof game.slowmo === 'function') game.slowmo(0.45, 1.4);
+      if (typeof game.frameShot === 'function') {
+        game.frameShot({ yaw: yaw + Math.PI * 0.5, dist: 13, pitch: 4 * Math.PI / 180, raise: 0.4, hold: 2.6, over: true });
+      }
+      if (typeof game.sparks === 'function') game.sparks(x, palWATER + 0.3, z, 44, { spd: 5.5, up: 3.4, grav: 9, drag: 0.6, life: 1.2, size: 0.28, rgb: [1.2, 1.45, 1.7] });
+      palTernScare = 1;
+    }
     if (!palMantaDone) {
       palMantaDone = true;
       palTask('the-manta');
@@ -2489,8 +2627,8 @@ function palUpdateManta(game, dt) {
   }
 
   if (u >= 1 || bail) {
-    // the ride is over: one number for how long it was. See the record note above.
-    if (palMantaRideT > 1 && typeof game.record === 'function') game.record('the-manta', palMantaRideT);
+    // the ride is over. (The seconds were the row until L5; the leap is now.)
+    if (typeof game.recordEnd === 'function') game.recordEnd('the-manta');
     palMantaRideT = -1;
     palMantaCool = 0.6;
     if (capy) capy.carriedBy = null;
@@ -4475,6 +4613,7 @@ export function createPalawan(game) {
 
       palCarrying = false; palCarry.x = 0; palCarry.z = 0;
       palMantaA = 0.7; palMantaRideT = -1; palMantaCool = 0; palMantaTold = false;
+      palMantaLean = 0; palLeapOn = false; palLeapPeak = 0; palMantaSlowed = false;
       palToldDive = false; palToldCrack = false;
       palClamOpen = 0;
       // Ambient state, put back. A school still bolting from a wheek the
@@ -4519,9 +4658,7 @@ export function createPalawan(game) {
       // A ride in progress holds the animal PARKED; leaving the chapter in the
       // middle of one would carry that hold into the next chapter.
       if (palMantaRideT >= 0 && game.capy) game.capy.carriedBy = null;
-      // ...and a ride cut short by travel is filed for what it got to
-      if (palMantaRideT > 1 && typeof game.record === 'function') game.record('the-manta', palMantaRideT);
-      palMantaRideT = -1; palMantaCool = 0;
+      palMantaRideT = -1; palMantaCool = 0; palLeapOn = false;
     },
   });
 
@@ -4572,6 +4709,22 @@ export function createPalawan(game) {
     },
     built() { return palBuilt; },
     terrainHeight: palTerrain,
+    /** THE MANTA, for the harness (L5): where it is, the ride clock, the leap. */
+    mantaAudit() {
+      return { x: +palMantaPos.x.toFixed(2), y: +palMantaPos.y.toFixed(2), z: +palMantaPos.z.toFixed(2),
+               a: +palMantaA.toFixed(3), rideT: +palMantaRideT.toFixed(2), u: palMantaRideT >= 0 ? +(palMantaRideT / palMANTA_RIDE).toFixed(3) : -1,
+               lean: +palMantaLean.toFixed(2), breached: palMantaBreached, done: palMantaDone,
+               leapOn: palLeapOn, leapPeak: +palLeapPeak.toFixed(2), leapBest: +palLeapBest.toFixed(2),
+               two: palManta2Group ? { x: +palManta2Pos.x.toFixed(2), y: +palManta2Pos.y.toFixed(2), z: +palManta2Pos.z.toFixed(2) } : null };
+    },
+    /** Put the animal on the manta at ride time t (for the harness). */
+    mantaForce(t) {
+      const capy = game.capy;
+      if (!palMantaGroup || !capy || !capy.body) return false;
+      palMantaRideT = typeof t === 'number' ? t : 0; palMantaBreached = false; palMantaSlowed = false; palMantaLean = 0;
+      capy.carriedBy = palMantaApi;
+      return true;
+    },
     // ---- THE BLOOM IS ON A HUNDRED AND TWENTY-FOUR SECOND CLOCK (P3) ----
     // `the-bloom` is the chapter marquee and it wants the player UNDER the
     // water when the plankton light up. Being under is a breath and a swim, so

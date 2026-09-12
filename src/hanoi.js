@@ -1558,6 +1558,7 @@ function hanBikeGeo(bodyCol, riderCol, helmCol) {
 function hanBuildBikes(game, root) {
   hanInitLanes();
   hanBikeData = new Float32Array(hanBIKE_N * hanBIKE_STRIDE);
+  hanBikeYield = new Float32Array(hanBIKE_N);
   // spread over the four lanes in proportion to how long they are, so a street
   // twice the length of another has twice the traffic on it and none of them
   // is a queue
@@ -1975,6 +1976,13 @@ function hanUpdateBikes(game, dt) {
     // ---- do I need to go round anything ---------------------------------
     let want = dir > 0 ? Math.abs(hanBikeData[o + 4]) : -Math.abs(hanBikeData[o + 4]);
     let vWant = hanBikeData[o + 6];
+    // THE HORN (L5): a rider giving way goes out to their own side and picks up
+    if (hanBikeYield && hanBikeYield[i] > 0) {
+      hanBikeYield[i] -= dt;
+      const sideOf = hanBikeData[o + 3] >= 0 ? 1 : -1;
+      want = clamp(want + sideOf * 1.9, -4.2, 4.2);
+      vWant *= 1.25;
+    }
     if (p && i !== hanRider) {
       hanBikeAt(i, hanV3b);
       const dx = p.x - hanV3b.x, dz = p.z - hanV3b.z;
@@ -2223,6 +2231,41 @@ function hanUpdateCrossing(game, dt) {
  * Palawan uses and is invisible from outside.
  */
 let hanRideBody = null;
+// ---- THE STAKES, THE HORN, AND THE SECOND RUN (L5) ---------------------------
+// The run had a timer and nothing could go wrong with it; the traffic held
+// you and there was nothing to do but wait; and when it was done, the Cub
+// was a scooter. Four things:
+//
+//   THE HORN. Space on the Cub. The rider holding you moves over — out to
+//   their own side of the road by a lane and a half, a shade quicker for a
+//   few seconds — and you go through. hanBikeYield is the per-rider clock.
+//
+//   THE SPILL. The kerb at speed (over hanCUB_SPILL_V) costs a hit; two hits
+//   and the top bowl comes off the rack — broth on the road, a thud, and one
+//   fewer to deliver with. Fewer bowls than drops left means the stall,
+//   which refills the rack. A bowl is a bowl: a hard kerb with the rack empty
+//   costs nothing but the speed.
+//
+//   THE COLD. Past hanCUB_COLD the pho is cold and the run is OVER — the
+//   bowls come off, the lanterns go quiet, and the stall has three more on.
+//   It was "a timer, not a fail"; a run you cannot lose is a tour.
+//
+//   THE SECOND RUN. E at the stall after the tick starts another — the
+//   bowls back on, the clock at zero — and the record keeps the best. The
+//   marquee's own line on the paper is once; the record is every time.
+//
+// ...and the third drop is a moment: the world at half speed, the puppets'
+// crowd on its feet, two shells over the lake.
+const hanCUB_SPILL_V = 4.0;     // m/s at the kerb that counts as a hit
+const hanCUB_SPILL_N = 2;       // hits that take a bowl off
+const hanCUB_YIELD_T = 3.2;     // s a horned rider stays over
+const hanCUB_STALL_R = 7.0;     // m of the stall, stopped, that refills
+let hanCubRun = false;          // a run is on: bowls on the rack, the clock going
+let hanCubLost = 0;             // bowls off the rack this run
+let hanCubHits = 0;             // kerb hits toward the next bowl
+let hanCubRuns = 0;             // runs finished, for the harness and the toast
+let hanCubHornCd = 0, hanCubEmptyT = 0;
+let hanBikeYield = null;        // Float32Array(hanBIKE_N): seconds a rider is giving way
 /** The Cub at the stall, the three bowls on its rack, and the three lanterns (X5). */
 function hanBuildCub(game, root) {
   const g = new THREE.Group();
@@ -2274,12 +2317,28 @@ function hanBuildCub(game, root) {
     hanDropMeshes.push(lan); hanDropMats.push(mat);
   }
 }
+/** Three hot bowls on the rack and the clock at zero (L5). */
+function hanCubRunStart(game, again) {
+  hanCubRun = true; hanCubNext = 0; hanCubT = 0; hanCubLost = 0; hanCubHits = 0;
+  if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true;
+  if (again) hanToast('three more, hot. the quarter again — the clock is running.');
+}
+/** The rack refilled mid-run: the bowls back, the clock kept (L5). */
+function hanCubRefill(game) {
+  hanCubLost = 0; hanCubHits = 0;
+  if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = i < 3 - hanCubNext;
+  hanSfx('chime', { volume: 0.5, pitch: 1.3 });
+  hanToast('the rack refilled. ' + (3 - hanCubNext) + ' to go.');
+}
+/** How many bowls are on the rack right now. */
+function hanCubBowlsOn() { return Math.max(0, 3 - hanCubNext - hanCubLost); }
 function hanCubTake(game) {
   const capy = game.capy;
   hanCubOn = true; hanCubCool = 0.4;
   if (capy) { capy.atHelm = true; capy.rideBody = null; }
   hanCubV = 0;
-  if (!hanCubDone) { hanCubNext = 0; hanCubT = 0; if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true; }
+  // a run starts here, first time or again — E at the stall is the verb
+  if (!hanCubRun) hanCubRunStart(game, hanCubDone);
   hanSfx('chime', { volume: 0.6, pitch: 1.0 });
   if (typeof game.control === 'function') game.control('W throttle · S brake · A/D steer · the lit lantern is the drop: stop inside its ring · E to get off');
   else hanToast('W throttle · S brake · A/D steer');
@@ -2304,7 +2363,10 @@ function hanUpdateCub(game, dt) {
   // ---- on and off ---------------------------------------------------------
   if (capy && capy.body && input && input.actionPressed && hanCubCool <= 0) {
     if (hanCubOn) {
-      if (Math.abs(hanCubV) > 3) { if (typeof game.control === 'function') game.control('S to stop first'); }
+      // E at the stall with no run on is "three more" before it is "get off" (L5)
+      const atStall = Math.hypot(hanCubX - hanCUB.x, hanCubZ - hanCUB.z) < hanCUB_STALL_R;
+      if (!hanCubRun && atStall && Math.abs(hanCubV) < hanCUB_DROP_V) hanCubRunStart(game, true);
+      else if (Math.abs(hanCubV) > 3) { if (typeof game.control === 'function') game.control('S to stop first'); }
       else hanCubLeave(game);
     } else if (!capy.carriedBy && !capy.atHelm && !capy.climbing && hanRider < 0) {
       const dx = capy.body.position.x - hanCubX, dz = capy.body.position.z - hanCubZ;
@@ -2316,8 +2378,8 @@ function hanUpdateCub(game, dt) {
   hanDropT += dt;
   if (hanDropMats) {
     for (let i = 0; i < hanDropMats.length; i++) {
-      const next = hanCubOn && !hanCubDone && i === hanCubNext;
-      const done = hanCubDone || i < hanCubNext;
+      const next = hanCubOn && hanCubRun && i === hanCubNext;
+      const done = hanCubRun ? i < hanCubNext : hanCubDone;
       const want = next ? 1.6 + Math.sin(hanDropT * 5) * 0.8 : done ? 0.9 : 0.3;
       hanDropMats[i].emissiveIntensity = damp(hanDropMats[i].emissiveIntensity, want, 6, dt);
     }
@@ -2334,7 +2396,7 @@ function hanUpdateCub(game, dt) {
     hanCubG.rotation.set(0, hanCubYaw, 0);
     return;
   }
-  hanCubT += dt;
+  if (hanCubRun) hanCubT += dt;
   // ---- the throttle, the bars ---------------------------------------------
   const gas = input ? clamp(-input.z, 0, 1) : 0;
   const brake = input ? clamp(input.z, 0, 1) : 0;
@@ -2359,10 +2421,19 @@ function hanUpdateCub(game, dt) {
     }
     if (hanCubHold >= 0) {
       const bv = hanBikeData[hanCubHold * hanBIKE_STRIDE + 5];
-      if (hanCubV > bv * 0.9) hanCubV = Math.max(0, bv * 0.9);
+      // ...unless they are already giving way to the horn (L5)
+      const yielding = hanBikeYield && hanBikeYield[hanCubHold] > 0;
+      if (!yielding && hanCubV > bv * 0.9) hanCubV = Math.max(0, bv * 0.9);
       hanCubHornT -= dt;
       if (hanCubHornT <= 0) { hanCubHornT = 1.6; hanSfx('horn', { volume: 0.16, pitch: 1.6, force: true }); }
     }
+  }
+  // ---- THE HORN (L5): Space, and the rider ahead moves over ----------------
+  if (hanCubHornCd > 0) hanCubHornCd -= dt;
+  if (input && input.jumpPressed && hanCubHornCd <= 0) {
+    hanCubHornCd = 0.5;
+    hanSfx('horn', { volume: 0.34, pitch: 1.7, force: true });
+    if (hanCubHold >= 0 && hanBikeYield) { hanBikeYield[hanCubHold] = hanCUB_YIELD_T; hanCubHornT = 1.6; }
   }
   // ---- along, and the kerb ------------------------------------------------
   const nx = hanCubX + Math.sin(hanCubYaw) * hanCubV * dt;
@@ -2381,24 +2452,70 @@ function hanUpdateCub(game, dt) {
       hanCubKerbT = 0.5;
       hanSfx('thud', { volume: 0.22, pitch: 1.2, force: true });
       if (typeof game.shake === 'function') game.shake(0.04);
+      // THE SPILL (L5): a hard kerb with bowls on the rack
+      if (hanCubRun && Math.abs(hanCubV) > hanCUB_SPILL_V && hanCubBowlsOn() > 0) {
+        hanCubHits++;
+        if (hanCubHits >= hanCUB_SPILL_N) {
+          hanCubHits = 0; hanCubLost++;
+          const top = hanCubBowls ? hanCubBowls[Math.max(0, hanCubBowlsOn())] : null;
+          if (top) top.visible = false;
+          hanSfx('thud', { volume: 0.5, pitch: 0.8, force: true });
+          hanSfx('splash', { volume: 0.4, pitch: 1.3, force: true });
+          if (typeof game.sparks === 'function') game.sparks(hanCubX, hanGROUND + 0.9, hanCubZ, 16, { spd: 2.6, up: 1.8, grav: 9, drag: 0.8, life: 0.8, size: 0.2, rgb: [1.4, 1.05, 0.55] });
+          if (typeof game.punch === 'function') game.punch(0.08);
+          const left = hanCubBowlsOn(), need = 3 - hanCubNext;
+          hanToast(left >= need ? 'a bowl off the rack. ' + left + ' left, ' + need + ' to deliver — no more kerbs.'
+                                : 'a bowl off the rack — ' + left + ' left and ' + need + ' to deliver. the stall refills it.');
+        } else {
+          hanToast('the bowls jumped. one more kerb like that and one comes off.');
+        }
+      }
     }
   } else { hanCubX = nx; hanCubZ = nz; }
   // ---- the drops ----------------------------------------------------------
-  if (!hanCubDone && hanCubNext < hanDROPS.length) {
+  // ---- THE STALL (L5): stopped at it mid-run with a bowl gone, the rack refills
+  if (hanCubRun && hanCubLost > 0 && Math.abs(hanCubV) < hanCUB_DROP_V &&
+      Math.hypot(hanCubX - hanCUB.x, hanCubZ - hanCUB.z) < hanCUB_STALL_R) {
+    hanCubRefill(game);
+  }
+  // ---- THE COLD (L5): the run is over; the stall has three more on
+  if (hanCubRun && hanCubT > hanCUB_COLD) {
+    hanCubRun = false;
+    if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = false;
+    hanSfx('thud', { volume: 0.3, pitch: 0.6, force: true });
+    hanToast('gone cold. ' + hanCubNext + ' of three delivered — back to the stall, she has three more on. E there.');
+    if (typeof game.recordEnd === 'function') game.recordEnd('pho-run');
+  }
+  if (hanCubRun && hanCubNext < hanDROPS.length) {
     const dr = hanDROPS[hanCubNext];
     const dd = Math.hypot(hanCubX - dr[0], hanCubZ - dr[1]);
-    if (dd < hanCUB_DROP_R && Math.abs(hanCubV) < hanCUB_DROP_V) {
-      if (hanCubBowls && hanCubBowls[2 - hanCubNext]) hanCubBowls[2 - hanCubNext].visible = false;
+    if (dd < hanCUB_DROP_R && Math.abs(hanCubV) < hanCUB_DROP_V && hanCubBowlsOn() <= 0) {
+      hanCubEmptyT -= dt;
+      if (hanCubEmptyT <= 0) { hanCubEmptyT = 7; hanToast('nothing on the rack for them. the stall refills it.'); }
+    }
+    if (dd < hanCUB_DROP_R && Math.abs(hanCubV) < hanCUB_DROP_V && hanCubBowlsOn() > 0) {
+      if (hanCubBowls) for (let i = 2; i >= 0; i--) if (hanCubBowls[i].visible) { hanCubBowls[i].visible = false; break; }
       hanCubNext++;
       hanSfx('chime', { volume: 0.5, pitch: 1.0 + hanCubNext * 0.12, force: true });
       hanCue('cheer', dr[0], hanGROUND + 1.4, dr[1], 0.35, 1.1, 60);
       if (typeof game.confetti === 'function') game.confetti(hanCubX, hanGROUND + 1.4, hanCubZ, 10);
       if (typeof game.punch === 'function') game.punch(0.06);
       if (hanCubNext >= hanDROPS.length) {
+        const first = !hanCubDone;
         hanCubDone = true;
+        hanCubRun = false;
+        hanCubRuns++;
         hanTask('pho-run');
         hanRecord('pho-run', +hanCubT.toFixed(1));
-        hanToast('three bowls, ' + (hanCubT < hanCUB_COLD ? 'still hot. ' : 'gone cold, but delivered. ') + hanCubT.toFixed(0) + ' seconds round the quarter.');
+        if (typeof game.recordEnd === 'function') game.recordEnd('pho-run');
+        hanToast('three bowls, still hot. ' + hanCubT.toFixed(0) + ' seconds round the quarter' + (hanCubLost > 0 ? ', ' + hanCubLost + ' on the road' : ', not a drop spilled') + '.' + (first ? ' E at the stall for another.' : ''));
+        // ---- THE THIRD DROP IS A MOMENT (L5) -------------------------------
+        if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.2);
+        if (typeof game.sfx === 'function') game.sfx('cheer', { volume: 0.55, pitch: 1.1, at: { x: dr[0], y: hanGROUND + 1.5, z: dr[1] }, force: true });
+        if (typeof game.firework === 'function') {
+          game.firework(hanLAKE.cx + 14, hanGROUND + 26, hanLAKE.cz + 4, { n: 44, rgb: [2.4, 1.2, 0.7], size: 1.3 });
+          setTimeout(function () { try { if (game.biome && game.biome.current === 'hanoi') game.firework(hanLAKE.cx - 10, hanGROUND + 30, hanLAKE.cz - 6, { n: 44, rgb: [2.4, 1.9, 0.8], size: 1.3 }); } catch (e) { /* the sky is a gift */ } }, 700);
+        }
         if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
         if (typeof game.punch === 'function') game.punch(0.14);
         if (typeof game.frameShot === 'function') game.frameShot({ yaw: hanCubYaw + Math.PI + 0.5, dist: 12, pitch: 0.22, raise: 1.0, hold: 2.4, over: true });
@@ -2425,7 +2542,7 @@ function hanUpdateCub(game, dt) {
     }
   }
   hanFrame.x = 0; hanFrame.z = 0;
-  if (typeof game.wowLive === 'function' && !hanCubDone) {
+  if (typeof game.wowLive === 'function' && !hanCubDone && hanCubRun) {
     const dr = hanDROPS[hanCubNext];
     const dd = Math.round(Math.hypot(hanCubX - dr[0], hanCubZ - dr[1]));
     const heat = clamp(1 - hanCubT / hanCUB_COLD, 0, 1);
@@ -2433,8 +2550,8 @@ function hanUpdateCub(game, dt) {
                  Math.round(Math.abs(hanCubV) * 3.6) + ' km/h · pho ' + (heat > 0.66 ? 'hot' : heat > 0.33 ? 'warm' : 'cooling'),
                  hanCubNext / hanDROPS.length);
     // the run time is the record, and the line has to run against it
-    if (typeof game.recordLive === 'function' && hanCubT > 0) game.recordLive('pho-run', hanCubT);
   }
+  if (hanCubRun && typeof game.recordLive === 'function' && hanCubT > 0) game.recordLive('pho-run', hanCubT);
 }
 function hanBuildRideBody(game) {
   const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC,
@@ -4602,7 +4719,7 @@ export function createHanoi(game) {
       hanRider = -1; hanRideT = 0; hanRideDist = 0; hanRideGrace = 0; hanRideHave = false;
       hanFrame.x = 0; hanFrame.z = 0;
       // X5: the Cub is back at the stall with its bowls
-      if (hanCubG && !hanCubOn) { hanCubX = hanCUB.x; hanCubZ = hanCUB.z; hanCubYaw = hanCUB.yaw; hanCubV = 0; if (!hanCubDone) { hanCubNext = 0; if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true; } }
+      if (hanCubG && !hanCubOn) { hanCubX = hanCUB.x; hanCubZ = hanCUB.z; hanCubYaw = hanCUB.yaw; hanCubV = 0; hanCubRun = false; hanCubNext = 0; hanCubLost = 0; hanCubHits = 0; if (hanCubBowls) for (let i = 0; i < 3; i++) hanCubBowls[i].visible = true; }
       if (hanRideBody) {
         hanRideBody.position.set(0, -900, 0);
         hanRideBody.velocity.setZero();
@@ -4650,7 +4767,18 @@ export function createHanoi(game) {
   });
 
   // ---- THE PHO RUN (X5) --------------------------------------------------
-  api.cub = function () { return { on: hanCubOn, x: hanCubX, z: hanCubZ, yaw: hanCubYaw, v: hanCubV, next: hanCubNext, done: hanCubDone, t: hanCubT, hold: hanCubHold }; };
+  api.cub = function () { return { on: hanCubOn, x: hanCubX, z: hanCubZ, yaw: hanCubYaw, v: hanCubV, next: hanCubNext, done: hanCubDone, t: hanCubT, hold: hanCubHold,
+                                     run: hanCubRun, lost: hanCubLost, hits: hanCubHits, bowls: hanCubBowlsOn(), runs: hanCubRuns,
+                                     yield: (hanCubHold >= 0 && hanBikeYield) ? +hanBikeYield[hanCubHold].toFixed(2) : 0 }; };
+  /** For the harness (L5): the clock, the rack, the kerb hits. */
+  api.cubSet = function (o) {
+    if (!o) return false;
+    if (typeof o.t === 'number') hanCubT = o.t;
+    if (typeof o.hits === 'number') hanCubHits = o.hits;
+    if (typeof o.next === 'number') hanCubNext = o.next;
+    if (o.run !== undefined) hanCubRun = !!o.run;
+    return true;
+  };
   api.cubAt = function () { return { x: hanCubX, y: hanGROUND, z: hanCubZ }; };
   api.dropAt = function (i) { const d = hanDROPS[Math.max(0, Math.min(hanDROPS.length - 1, i | 0))]; return { x: d[0], y: hanGROUND + 1, z: d[1], name: d[2] }; };
   api.cubDebug = function (o) {

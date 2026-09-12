@@ -4158,12 +4158,23 @@ export function createNPCs(game) {
   const npcCONCERT_CEIL = 22;     // s. The ceiling. Same rule as the gather's.
   const npcCONCERT_MAX_D = npcCONCERT_CEIL * npcCONCERT_SPD * 0.7;
   let npcConcertOn = false;
-  /** Call the house to the podium. Returns how many are coming. Idempotent
-   *  while a concert is on. */
-  function npcConcert(sx, sz) {
-    if (npcConcertOn) return npcConcertHouse(true);
+  /**
+   * Call the house to the podium. Returns how many are coming.
+   *
+   * EVERY NOTE CALLS WIDER (L5). The first cut was idempotent while a concert
+   * was on: the house was whoever stood inside 26 m when the first note went,
+   * and a podium with nobody near it could be wheeked at all afternoon. Now
+   * `note` (1, 2, 3...) widens the reach by half again per note and tops the
+   * house up to eight from whoever the wider circle finds — so the second
+   * wheek is what brings the far end of the forecourt, and the third the
+   * quay. The seats are dealt in the order the house arrives.
+   */
+  function npcConcert(sx, sz, note) {
     const live = game.biome && game.biome.current;
     if (live !== 'sydney') return 0;
+    const have = npcConcertOn ? npcConcertHouse(true) : 0;
+    if (have >= npcCONCERT_N) return have;
+    const reach = npcCONCERT_MAX_D * (1 + 0.5 * Math.max(0, (note || 1) - 1));
     const pool = [];
     for (let i = 0; i < humans.length; i++) {
       const r = humans[i];
@@ -4172,13 +4183,14 @@ export function createNPCs(game) {
       if (r.carryT >= 0 || r.state === 'gather' || r.state === 'flee' || r.state === 'plunge' || r.state === 'swim') continue;
       const dx = r.group.position.x - sx, dz = r.group.position.z - sz;
       const d2 = dx * dx + dz * dz;
-      if (d2 > npcCONCERT_MAX_D * npcCONCERT_MAX_D) continue;
+      if (d2 > reach * reach) continue;
       pool.push({ r: r, d2: d2 });
     }
     pool.sort(function (a, b) { return a.d2 - b.d2; });
-    const n = Math.min(npcCONCERT_N, pool.length);
-    for (let i = 0; i < n; i++) {
-      const r = pool[i].r;
+    const n = Math.min(npcCONCERT_N - have, pool.length);
+    for (let j = 0; j < n; j++) {
+      const r = pool[j].r;
+      const i = have + j;
       const row = i < 5 ? 0 : 1;
       const k = row === 0 ? i : i - 5;
       const across = row === 0 ? 5 : 3;
@@ -4190,8 +4202,25 @@ export function createNPCs(game) {
       r.gathQuiet = 1; r.cheerT = 0; r.gathSaid = 0;
       setState(r, 'gather');
     }
-    npcConcertOn = n > 0;
-    return n;
+    npcConcertOn = npcConcertOn || n > 0;
+    return have + n;
+  }
+  /**
+   * THE HOUSE ANSWERS A NOTE (L5): everybody in place bobs, arms up, for a
+   * second — the call and its response — and the answer is its own sound,
+   * scaled to how many are there. Returns how many answered.
+   */
+  function npcConcertAnswer() {
+    let k = 0;
+    for (let i = 0; i < humans.length; i++) {
+      const r = humans[i];
+      if (!r || r.state !== 'gather' || !r.gathQuiet) continue;
+      const dx = r.group.position.x - r.gathX, dz = r.group.position.z - r.gathZ;
+      if (dx * dx + dz * dz > 1.2 * 1.2 && r.stateT <= npcCONCERT_CEIL) continue;
+      if (r.cheerT <= 0) r.cheerT = 0.9 + rand(0, 0.5);
+      k++;
+    }
+    return k;
   }
   /** How many of the house are IN PLACE (or, with `any`, on their way). */
   function npcConcertHouse(any) {
@@ -14962,6 +14991,7 @@ export function createNPCs(game) {
            // ---- THE CONCERT (W1) ----
            concert: npcConcert, concertHouse: npcConcertHouse,
            concertCheer: npcConcertCheer, concertEnd: npcConcertEnd,
+           concertAnswer: npcConcertAnswer,
            // M11: how many of the traveller's four chapters the player actually
            // stopped in. A COUNT, and read-only: the find and the closing lines
            // are its only readers and neither may set it.
