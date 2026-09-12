@@ -227,6 +227,14 @@ let hkHeliX = hkHELI.x, hkHeliY = hkROOF_Y, hkHeliZ = hkHELI.z, hkHeliYaw = hkHE
 let hkHeliVX = 0, hkHeliVY = 0, hkHeliVZ = 0, hkHeliBank = 0, hkHeliPitch = 0;
 let hkHeliOn = false, hkHeliCool = 0, hkHeliRotorK = 0, hkHeliMover = null, hkHeliAir = 0;
 let hkRingMeshes = null, hkRingMats = null, hkRingNext = 0, hkRingsDone = false, hkRingT = 0;
+// ---- THE SECOND LAP, AND THE EIGHTH RING (L5) --------------------------------
+// The rings were once: through all eight and the hoops went dark for the
+// rest of the visit. hkRingRun is A LAP — E on the H starts one every time,
+// eight dark rings and the clock at zero, the record keeps the best; the
+// show is still the first lap's (hkRingsDone says it has ever been done).
+// The eighth ring is a moment: the world held, the lens on the flank, gold
+// off the hoop, the score up.
+let hkRingRun = false, hkRingLaps = 0;
 let hkHeliTold = false, hkHeliBest = 0;
 // ---- THE EIGHT RINGS HAVE A CLOCK (L4 E4) ----------------------------------
 // `symphony` is the chapter's marquee and it was eight switches in a row.
@@ -1422,8 +1430,9 @@ function hkHeliTake(game) {
   hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkHeliAir = 0;
   hkSfx('chime', { volume: 0.6, pitch: 0.95 });
   hkSay('W/S forward and back · A/D turn · hold Space to climb, let go to sink · E on the H to get out');
-  if (!hkRingsDone) hkRingNext = 0;
+  hkRingNext = 0; hkRingRun = true;
   hkRingClock = -1;                       // the rings start again, so does the lap
+  if (hkRingsDone) hkToast('the rings again. eight, dark, and the clock is at zero.');
 }
 function hkHeliLeave(game) {
   const capy = game.capy;
@@ -1480,8 +1489,8 @@ function hkUpdateHeli(game, dt) {
   hkRingT += dt;
   if (hkRingMats) {
     for (let i = 0; i < hkRING_N; i++) {
-      const next = !hkRingsDone && i === hkRingNext && hkHeliOn;
-      const done = hkRingsDone || i < hkRingNext;
+      const next = hkRingRun && i === hkRingNext && hkHeliOn;
+      const done = hkRingRun ? i < hkRingNext : hkRingsDone;
       const want = next ? 1.6 + Math.sin(hkRingT * 5) * 0.8 : done ? 0.9 : 0.35;
       hkRingMats[i].emissiveIntensity = damp(hkRingMats[i].emissiveIntensity, want, 6, dt);
     }
@@ -1526,11 +1535,11 @@ function hkUpdateHeli(game, dt) {
   if (hkHeliY - hkROOF_Y > hkHeliBest) hkHeliBest = hkHeliY - hkROOF_Y;
   // ---- the rings ----------------------------------------------------------
   // ...and the clock on them, running from the first to the last. See hkRingClock.
-  if (!hkRingsDone && hkRingClock >= 0) {
+  if (hkRingRun && hkRingClock >= 0) {
     hkRingClock += dt;
     if (typeof game.recordLive === 'function') game.recordLive('symphony', hkRingClock);
   }
-  if (!hkRingsDone && hkRingNext < hkRING_N) {
+  if (hkRingRun && hkRingNext < hkRING_N) {
     const r = hkRINGS[hkRingNext];
     const d = Math.hypot(hkHeliX - r[0], hkHeliY - r[1], hkHeliZ - r[2]);
     if (d < hkRING_TAKE) {
@@ -1538,18 +1547,31 @@ function hkUpdateHeli(game, dt) {
       if (hkRingNext === 1) hkRingClock = 0;          // the lap starts here
       hkSfx('chime', { volume: 0.5, pitch: 0.9 + hkRingNext * 0.07, force: true });
       if (typeof game.confetti === 'function') game.confetti(hkHeliX, hkHeliY + 1, hkHeliZ, 10);
+      if (typeof game.sparks === 'function') game.sparks(r[0], r[1], r[2], 16, { spd: 3, up: 0.5, grav: 2, drag: 1, life: 1.0, size: 0.5, rgb: [2.2, 1.6, 0.8] });
       if (typeof game.punch === 'function') game.punch(0.06);
       if (hkRingNext >= hkRING_N) {
-        hkRingsDone = true;
+        const first = !hkRingsDone;
+        hkRingsDone = true; hkRingRun = false; hkRingLaps++;
         // the lap is over: one number, filed once. See hkRingClock.
-        if (hkRingClock > 0 && typeof game.record === 'function') game.record('symphony', hkRingClock);
+        if (hkRingClock > 0 && typeof game.record === 'function') game.record('symphony', +hkRingClock.toFixed(1));
+        if (typeof game.recordEnd === 'function') game.recordEnd('symphony');
+        const lap = hkRingClock;
         hkRingClock = -1;
-        // THE EIGHTH RING IS THE EIGHTH WHEEK: the show comes on if it is not
-        // on, and the finale is spent on the next beat.
-        if (hkShowT < 0) hkPhase = hkSHOW_ON + 0.002;
-        hkFinaleWant = true;
-        hkConductN = hkCONDUCT_MAX;
-        hkToast('all eight. the whole shore is yours.');
+        // THE EIGHTH RING IS A MOMENT (L5): held, framed from the flank, gold off the hoop
+        if (typeof game.slowmo === 'function') game.slowmo(0.55, 1.2);
+        if (typeof game.frameShot === 'function') game.frameShot({ yaw: hkHeliYaw + Math.PI * 0.5, dist: 16, pitch: 6 * Math.PI / 180, raise: 1.5, hold: 2.4, over: true });
+        if (typeof game.sparks === 'function') game.sparks(r[0], r[1], r[2], 48, { spd: 5, up: 1, grav: 2.5, drag: 0.9, life: 1.8, size: 0.8, rgb: [2.4, 1.8, 0.9] });
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(0.8);
+        if (first) {
+          // THE EIGHTH RING IS THE EIGHTH WHEEK: the show comes on if it is not
+          // on, and the finale is spent on the next beat.
+          if (hkShowT < 0) hkPhase = hkSHOW_ON + 0.002;
+          hkFinaleWant = true;
+          hkConductN = hkCONDUCT_MAX;
+          hkToast('all eight. the whole shore is yours.');
+        } else {
+          hkToast('all eight, in ' + lap.toFixed(1) + ' s.');
+        }
       }
     }
   }
@@ -1573,7 +1595,7 @@ function hkUpdateHeli(game, dt) {
     }
   }
   if (typeof game.wowLive === 'function' && !hkShowDone) {
-    if (!hkRingsDone) {
+    if (hkRingRun) {
       const r = hkRINGS[hkRingNext];
       const d = Math.hypot(hkHeliX - r[0], hkHeliY - r[1], hkHeliZ - r[2]);
       const up = r[1] - hkHeliY;
@@ -5283,7 +5305,7 @@ export function createKowloon(game) {
       hkShow = 0; hkShowT = -1; hkLitCount = 0; hkWarned = false; hkSoonSaid = false;
       // X2: the helicopter is back on its H and the rings are unlit
       hkHeliX = hkHELI.x; hkHeliY = hkROOF_Y; hkHeliZ = hkHELI.z; hkHeliYaw = hkHELI.yaw;
-      hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkRingNext = 0; hkRingsDone = false; hkRingClock = -1;
+      hkHeliVX = 0; hkHeliVY = 0; hkHeliVZ = 0; hkRingNext = 0; hkRingsDone = false; hkRingClock = -1; hkRingRun = false;
       if (hkHeliG) { hkHeliG.position.set(hkHeliX, hkHeliY, hkHeliZ); hkHeliG.rotation.set(0, hkHeliYaw, 0); }
       hkSkyward = 0;
       hkPoleT = -1; hkFerryRideT = 0; hkSignStandT = 0;
@@ -5374,9 +5396,11 @@ export function createKowloon(game) {
     /** W4: where the bamboo meets the pavement — the arrow's target from the street. */
     scaffoldFoot: { x: hkSCAF.x + hkSCAF.out + 1.2, y: 0.5, z: 0 },
     // ---- THE HELICOPTER (X2) ---------------------------------------------
-    heli() { return { on: hkHeliOn, x: hkHeliX, y: hkHeliY, z: hkHeliZ, yaw: hkHeliYaw, ring: hkRingNext, rings: hkRING_N, done: hkRingsDone, air: hkHeliAir, best: hkHeliBest }; },
+    heli() { return { on: hkHeliOn, x: hkHeliX, y: hkHeliY, z: hkHeliZ, yaw: hkHeliYaw, ring: hkRingNext, rings: hkRING_N, done: hkRingsDone, air: hkHeliAir, best: hkHeliBest, run: hkRingRun, laps: hkRingLaps, clock: +hkRingClock.toFixed(2) }; },
     heliPad: { x: hkHELI.x, y: hkROOF_Y, z: hkHELI.z },
     ringAt(i) { const r = hkRINGS[Math.max(0, Math.min(hkRING_N - 1, i | 0))]; return { x: r[0], y: r[1], z: r[2] }; },
+    /** The H, for the harness (L5). */
+    heliHome() { return { x: hkHELI.x, y: hkROOF_Y, z: hkHELI.z }; },
     heliDebug(o) {
       if (o && o.take && !hkHeliOn) hkHeliTake(hkGame);
       if (o && typeof o.x === 'number') { hkHeliX = o.x; hkHeliY = o.y; hkHeliZ = o.z; hkHeliVX = hkHeliVY = hkHeliVZ = 0; }

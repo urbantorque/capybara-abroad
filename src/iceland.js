@@ -236,6 +236,23 @@ let iceAurora = 0, iceAuroraArmed = false;
 const iceCALL_R = 16;              // m from the spring a call still counts
 const iceCALL_MIN = 0.35;          // how far up the curtains must be to answer
 let iceAurKick = 0, iceAurCallX = 0, iceAurCalls = 0;
+// ---- THE CONDUCTOR (L5) ------------------------------------------------------
+// The sky answered every call the same way and the row was seconds sat
+// under it. Calls IN RHYTHM now — each inside iceRHYTHM_GAP of the last —
+// are a run, and the run is the number ('aurora' gen 2: the longest run of
+// calls the sky answered in time, par 6). Every call in a run lifts the
+// answer (the band brighter, the ring wider) and at iceBURST_N the whole
+// sky goes: every curtain to full and white for a breath, every vent in the
+// basin puffing, the spring boiling, the world at half speed, the lens up
+// the curtains; every fourth call in the run, and the run keeps counting. THE SKY COMES DOWN: after
+// iceAUR_STAY seconds at full it fades over a minute to the call floor — and
+// a call from the spring brings it back, so the aurora is a thing you can
+// LOSE and get back rather than a switch that was flipped once.
+const iceRHYTHM_GAP = [0.9, 3.6];   // s between calls that count as one run
+const iceBURST_N = 4;               // calls in a run that take the whole sky
+const iceAUR_STAY = 240;            // s at full before it starts to come down
+const iceAUR_FADE = 0.011;          // per second, down to the call floor
+let iceAurRun = 0, iceAurRunBest = 0, iceAurSince = 99, iceAurBurst = 0, iceAurUpT = 0, iceAurFading = false, iceAurBursts = 0;
 let iceSoak = 0, iceSoakShown = false;
 let iceSoakMark = 0;
 // The marks for the overstay. See THE LONG SIT in iceUpdateSpring: the last
@@ -2705,7 +2722,7 @@ function iceUpdateAurora(dt) {
     // each curtain breathes on its own slow cycle, so the whole sky never
     // pulses in unison — which is the tell of a fake one
     const breathe = 0.55 + 0.45 * Math.sin(iceTime * 0.37 + c.phase * 2.1);
-    c.mesh.material.opacity = Math.min(1, lvl * lvl * c.peak * (breathe + bright * 1.3));
+    c.mesh.material.opacity = Math.min(1, lvl * lvl * c.peak * (breathe + bright * 1.3) + iceAurBurst * 0.6);
   }
   if (iceStarMat) iceStarMat.opacity = 0.85;
 }
@@ -4182,7 +4199,19 @@ function iceUpdateSpring(game, dt) {
 
   // --- the sky ---------------------------------------------------------------
   if (iceAuroraHold > 0) iceAuroraHold -= dt;
-  if (iceAuroraArmed && iceAurora < 1) {
+  iceAurSince += dt;
+  if (iceAurBurst > 0) iceAurBurst = Math.max(0, iceAurBurst - dt / 3.5);
+  // THE SKY COMES DOWN (L5): a long time at full, then a slow fade to the
+  // floor a call can still reach; a call (iceAuroraCall) puts it back up
+  if (iceAuroraArmed && iceAurora >= 0.999 && !iceAurFading) {
+    iceAurUpT += dt;
+    if (iceAurUpT > iceAUR_STAY) { iceAurFading = true; iceToast('the sky is going. call it back, if you want it.'); }
+  }
+  if (iceAurFading) {
+    iceAurora = Math.max(iceCALL_MIN + 0.02, iceAurora - iceAUR_FADE * dt);
+    if (iceAurora <= iceCALL_MIN + 0.03) { /* it waits at the floor */ }
+  }
+  if (iceAuroraArmed && iceAurora < 1 && !iceAurFading) {
     if (iceAurora <= 0.001) {
       iceAuroraHold = 12;    // the ignition, framed
       // ---- AND NOW IT IS ACTUALLY FRAMED (v26) --------------------------
@@ -4245,20 +4274,16 @@ function iceUpdateSpring(game, dt) {
   // stay: walking out of the radius, or travel (onExit). Never per frame.
   {
     const nearSky = iceAurora >= 0.9 && dx * dx + dz * dz < iceCALL_R * iceCALL_R;
-    if (nearSky) {
-      iceSkyT += dt;
-      if (!(inPool && still) && typeof game.recordLive === 'function') {
-        game.recordLive('aurora', iceSkyT > 1 ? iceSkyT : undefined);
-      }
-    } else if (iceSkyT > 0) {
-      iceSkyFile(game);
-    }
+    if (nearSky) iceSkyT += dt;
+    else if (iceSkyT > 0) iceSkyFile(game);
+    // the run of calls (L5): broken once the rhythm window has passed, and filed
+    if (iceAurRun > 0 && iceAurSince > iceRHYTHM_GAP[1]) { iceAurRun = 0; iceAurRunFile(game); }
   }
 }
 let iceSkyT = 0;                    // s of this stay under the full sky, at the spring
 /** The stay is over: one number for how long it was. See THE STAY. */
 function iceSkyFile(game) {
-  if (iceSkyT > 3 && game && typeof game.record === 'function') game.record('aurora', iceSkyT);
+  // (L5) the stay is not the row any more — see THE CONDUCTOR; the clock is kept for the harness
   iceSkyT = 0;
 }
 let iceAurUpSaid = false;
@@ -4267,11 +4292,41 @@ function iceAuroraCall(game, p) {
   if (iceAurora < iceCALL_MIN || !p) return false;
   const dx = p.x - iceSPRING.x, dz = p.z - iceSPRING.z;
   if (dx * dx + dz * dz > iceCALL_R * iceCALL_R) return false;
-  iceAurKick = 1;
+  // THE CONDUCTOR (L5): in rhythm with the last call, or a new run
+  const inTime = iceAurSince >= iceRHYTHM_GAP[0] && iceAurSince <= iceRHYTHM_GAP[1];
+  iceAurRun = inTime ? iceAurRun + 1 : 1;
+  iceAurSince = 0;
+  if (iceAurRun > iceAurRunBest) iceAurRunBest = iceAurRun;
+  if (typeof game.recordLive === 'function') game.recordLive('aurora', iceAurRun);
+  // ...and a call brings a fading sky back (the recall)
+  if (iceAurFading) { iceAurFading = false; iceAurUpT = 0; iceToast('it is coming back.'); }
+  iceAurKick = Math.min(1.6, 1 + 0.15 * (iceAurRun - 1));
   iceAurCallX = p.x;
   iceAurCalls++;
   if (game.music && typeof game.music.swell === 'function') game.music.swell(1);
-  iceSfx('chime', { volume: 0.55, pitch: 1.6 });
+  iceSfx('chime', { volume: 0.55, pitch: 1.6 + 0.12 * Math.min(iceAurRun - 1, 4) });
+  if (iceAurRun % iceBURST_N === 0) {
+    // THE WHOLE SKY — every fourth call in time; the run keeps counting
+    iceAurBurst = 1; iceAurBursts++;
+    if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.4);
+    if (iceGame && typeof iceGame.frameShot === 'function') iceGame.frameShot({ yaw: Math.PI, pitch: 22 * Math.PI / 180, dist: 14, raise: 2.5, hold: 3.6 });
+    if (iceVents) {
+      for (let i = 0; i < iceVents.length; i += 4) {
+        iceSteamSpawn(iceVents[i], iceVents[i + 1] + 0.2, iceVents[i + 2], 2.4, iceVents[i + 3] * 0.6, rand(0.5, 1.0));
+      }
+    }
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * 6.283;
+      iceSteamSpawn(iceSPRING.x + Math.cos(a) * rand(0.5, 3), iceSPRING_Y + 0.2, iceSPRING.z + Math.sin(a) * rand(0.5, 3), 1.2, 0.6, rand(0.4, 0.8));
+    }
+    if (typeof game.sparks === 'function') game.sparks(p.x, p.y + 2, p.z, 40, { spd: 3.5, up: 4, grav: 1.5, drag: 0.6, life: 2.2, size: 0.28, rgb: [1.1, 2.2, 1.4] });
+    iceSfx('chime', { volume: 0.9, pitch: 2.2 });
+    iceSfx('hiss', { volume: 0.5, pitch: 0.8 });
+    if (typeof game.punch === 'function') game.punch(0.12);
+    iceToast(iceAurBursts === 1 ? 'THE WHOLE SKY. four in time, and all of it answered.' : 'the whole sky again.');
+  } else if (iceAurRun === 2 && !iceAurBursts) {
+    iceToast('in time. keep the rhythm — two more.');
+  }
   // ---- AND THE VALLEY ANSWERS TOO (L4) -------------------------------------
   // The sky answered a call and nothing else did. Strokkur is a hundred and
   // fifty metres off and goes every thirteen seconds on its own clock; a
@@ -4283,10 +4338,14 @@ function iceAuroraCall(game, p) {
     iceAuroraDone = true;
     iceTask('aurora');
     if (typeof game.shake === 'function') game.shake(0.10);
-  } else if (iceAurCalls === 2) {
-    iceToast('it heard that. it hears all of them.');
+    iceToast('it heard that. it hears all of them — and it likes them IN TIME. again, in a second or two.');
   }
   return true;
+}
+/** The run of calls is over (the rhythm broken, or travel): filed once. */
+function iceAurRunFile(game) {
+  if (iceAurRunBest > 0 && game && typeof game.record === 'function') game.record('aurora', iceAurRunBest);
+  if (game && typeof game.recordEnd === 'function') game.recordEnd('aurora');
 }
 
 /**
@@ -4636,6 +4695,7 @@ export function createIceland(game) {
     },
     onExit() {
       iceSkyFile(game);               // the stay under the sky, settled before it is forgotten
+      iceAurRunFile(game);            // ...and the run of calls (L5)
       iceSlideT = -1; iceCatCarrying = false; iceCatRodeT = 0;
       iceGeyRiding = false; iceGeyPeak = 0;
       icePuffinsUp = 0;
@@ -4737,6 +4797,11 @@ export function createIceland(game) {
 
     /** 0..1 — read by systems.js, which grows the score a choir on it. */
     aurora() { return iceAurora; },
+    /** THE CONDUCTOR, for the harness (L5): put the sky up, call, read the run. */
+    auroraForce(level) { iceAuroraArmed = true; iceAurora = typeof level === 'number' ? level : 1; iceAurUpT = 0; iceAurFading = false; return iceAurora; },
+    auroraCall() { const p = game.capy && game.capy.position; return iceAuroraCall(game, p); },
+    auroraAudit() { return { level: +iceAurora.toFixed(3), run: iceAurRun, best: iceAurRunBest, since: +iceAurSince.toFixed(2), burst: +iceAurBurst.toFixed(2), bursts: iceAurBursts, fading: iceAurFading, upT: +iceAurUpT.toFixed(1), calls: iceAurCalls, done: iceAuroraDone }; },
+    auroraAge(t) { iceAurUpT = t; return iceAurUpT; },
     /**
      * HOW FAR THE CAMERA SHOULD CRANE UP, 0..1 (systems.js reads it).
      *

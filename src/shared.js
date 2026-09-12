@@ -4076,7 +4076,11 @@ export const RECORDS = {
   // chapter's other row (hot-spring, par 58) rewards the same thing and this
   // is the half of it that happens after the sky comes. Ninety is a minute
   // and a half under it, the third soak mark plus the rise.
-  'aurora':        { label: 'under the sky for', unit: ' s', better: 'higher', dp: 1, par: 90 },
+  // ...and since L5 it is not the stay (the hot spring's own row is that):
+  // THE CONDUCTOR — the longest run of calls the sky answered IN TIME, each
+  // inside iceRHYTHM_GAP of the last; four takes the whole sky, six is a
+  // second one. gen 2 drops a saved stay.
+  'aurora':        { label: 'called in time', unit: ' running', better: 'higher', dp: 0, par: 6, gen: 2 },
   // Chapter 9. Six light it; the wood has twenty-two and a wheek wakes up to
   // four. Ten is the six and one more good shout. Once per session — the
   // lantern stays lit by design (see driLit in drift.js's onEnter).

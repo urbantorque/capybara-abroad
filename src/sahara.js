@@ -171,6 +171,16 @@ let sahJetX = 0, sahJetY = 0, sahJetZ = 0, sahJetVX = 0, sahJetVY = 0, sahJetVZ 
 let sahJetOn = false, sahJetWorn = false, sahJetCool = 0, sahJetFuel = sahJET_TANK, sahJetBurn = 0;
 let sahJetNext = 0, sahJetDone = false, sahJetT = 0, sahJetGround = true, sahJetBurnSfxT = 0;
 let sahJetToldFuel = false, sahJetRingT = 0, sahJetOnMinaret = false, sahJetBest = 0;
+// ---- THE RINGS FILL THE TANK; THE SECOND RUN; THE DUST (L5) ------------------
+// Four rings and a four-second tank, and a ring was a chime. Each ring puts
+// sahJET_RING_FUEL back in the tank as you go through — the rings are the
+// ROUTE now, the way to stay up between the sand and the minaret rather than
+// four hoops beside it. The fourth is slowed. A landing puts up sand in
+// proportion to how hard it was. And the pack runs AGAIN after the tick: E
+// on the crate is a fresh clock and four dark rings, the minaret files the
+// time every run, the record keeps the best.
+const sahJET_RING_FUEL = 1.6;   // s of burn a ring gives back
+let sahJetRun = false;          // a run is on: rings count, the minaret files
 const sahDUST_N = 260;   // was 150; the avalanche (W1) wants a wall of it behind the run
 const sahSTAR_N = 200;
 const sahPALM_N = 90;
@@ -5253,8 +5263,9 @@ function sahJetTake(game) {
   const p = capy && capy.body ? capy.body.position : null;
   if (p) { sahJetX = p.x; sahJetZ = p.z; sahJetY = Math.max(p.y - 0.45, sahTerrain(p.x, p.z)); }
   sahJetVX = 0; sahJetVY = 0; sahJetVZ = 0; sahJetFuel = sahJET_TANK; sahJetGround = true;
-  sahJetT = 0; if (!sahJetDone) sahJetNext = 0;
+  sahJetT = 0; sahJetNext = 0; sahJetRun = true; sahJetOnMinaret = false;
   sahSfx('chime', { volume: 0.6, pitch: 1.05 });
+  if (sahJetDone) sahToast('again. the rings are dark, the clock is at zero.');
   if (typeof game.control === 'function') game.control('hold Space to burn · W/A/S/D to lean · let go and you drop. four seconds a tank; it refills on the sand. E to take it off');
 }
 function sahJetLeave(game) {
@@ -5296,8 +5307,8 @@ function sahUpdateJet(game, dt) {
   sahJetRingT += dt;
   if (sahJetRingMats) {
     for (let i = 0; i < sahJetRingMats.length; i++) {
-      const next = sahJetOn && !sahJetDone && i === sahJetNext;
-      const done = sahJetDone || i < sahJetNext;
+      const next = sahJetOn && sahJetRun && i === sahJetNext;
+      const done = sahJetRun ? i < sahJetNext : sahJetDone;
       const want = next ? 1.4 + Math.sin(sahJetRingT * 5) * 0.7 : done ? 0.8 : 0.3;
       sahJetRingMats[i].emissiveIntensity = damp(sahJetRingMats[i].emissiveIntensity, want, 6, dt);
     }
@@ -5351,15 +5362,24 @@ function sahUpdateJet(game, dt) {
       const hard = clamp(-sahJetVY / 12, 0, 1);
       sahSfx('hiss', { volume: 0.18 + hard * 0.3, pitch: 0.5 });
       if (hard > 0.5 && typeof game.shake === 'function') game.shake(0.08 * hard);
-      if (typeof game.confetti !== 'function') { /* no dust hook; fine */ }
+      // THE DUST (L5): sand up off the landing, more for a harder one
+      if (typeof game.sparks === 'function') {
+        game.sparks(sahJetX, floor + 0.2, sahJetZ, Math.round(10 + 26 * hard), { spd: 2.2 + 3 * hard, up: 0.8 + 1.6 * hard, grav: 7, drag: 1.4, life: 0.9 + 0.5 * hard, size: 0.34, rgb: [1.25, 1.08, 0.82], spread: 0.6 });
+      }
     }
     sahJetVY = 0; sahJetGround = true;
     // ...and the top of the minaret is the fifth stop
     const K = sahKOUTOUBIA;
-    if (!sahJetDone && sahJetNext >= sahJET_RINGS.length && floor > K.h) {
-      sahJetDone = true; sahJetOnMinaret = true;
+    if (sahJetRun && sahJetNext >= sahJET_RINGS.length && floor > K.h) {
+      const first = !sahJetDone;
+      sahJetDone = true; sahJetOnMinaret = true; sahJetRun = false;
       sahTask('jetpack');
       if (typeof game.record === 'function') game.record('jetpack', +sahJetT.toFixed(1));
+      if (typeof game.recordEnd === 'function') game.recordEnd('jetpack');
+      // THE TOP (L5): the world held, sparks off the finial, said with the time
+      if (typeof game.slowmo === 'function') game.slowmo(0.5, 1.4);
+      if (typeof game.sparks === 'function') game.sparks(K.x, floor + 3.5, K.z, 36, { spd: 4, up: 3, grav: 3, drag: 0.8, life: 1.8, size: 0.9, rgb: [2.4, 1.8, 0.9] });
+      if (!first) sahToast(sahJetT.toFixed(1) + ' s to the top this time.');
       sahSfx('cheer', { volume: 0.7, force: true, at: { x: K.x, y: 3, z: K.z } });
       sahSfx('chime', { volume: 0.6, pitch: 1.4, force: true });
       if (typeof game.punch === 'function') game.punch(0.18);
@@ -5377,7 +5397,7 @@ function sahUpdateJet(game, dt) {
   sahJetX = clamp(sahJetX, -220, 400); sahJetZ = clamp(sahJetZ, -240, 240);
   if (sahJetY - floor > sahJetBest) sahJetBest = sahJetY - floor;
   // ---- the rings ----------------------------------------------------------
-  if (!sahJetDone && sahJetNext < sahJET_RINGS.length) {
+  if (sahJetRun && sahJetNext < sahJET_RINGS.length) {
     const r = sahJetRings[sahJetNext].position;
     const d = Math.hypot(sahJetX - r.x, sahJetY + 0.6 - r.y, sahJetZ - r.z);
     if (d < sahJET_RING_R) {
@@ -5385,7 +5405,16 @@ function sahUpdateJet(game, dt) {
       sahSfx('chime', { volume: 0.5, pitch: 0.95 + sahJetNext * 0.08, force: true });
       if (typeof game.confetti === 'function') game.confetti(sahJetX, sahJetY + 1, sahJetZ, 10);
       if (typeof game.punch === 'function') game.punch(0.06);
-      if (sahJetNext >= sahJET_RINGS.length) sahToast('four. now the minaret — land on the top of it.');
+      // THE RING FILLS THE TANK (L5)
+      sahJetFuel = Math.min(sahJET_TANK, sahJetFuel + sahJET_RING_FUEL);
+      if (typeof game.sparks === 'function') game.sparks(r.x, r.y, r.z, 22, { spd: 3.5, up: 0.5, grav: 2, drag: 1.0, life: 1.1, size: 0.6, rgb: [2.2, 1.7, 0.8] });
+      if (sahJetNext === 1 && !sahJetDone) sahToast('through — and the ring put a breath back in the tank. they all do.');
+      if (sahJetNext >= sahJET_RINGS.length) {
+        // the fourth, slowed (L5)
+        if (typeof game.slowmo === 'function') game.slowmo(0.55, 0.9);
+        if (game.music && typeof game.music.swell === 'function') game.music.swell(0.7);
+        sahToast('four. now the minaret — land on the top of it.');
+      }
     }
   }
   // ---- the noise ----------------------------------------------------------
@@ -5416,7 +5445,7 @@ function sahUpdateJet(game, dt) {
       capy.group.rotation.y = sahJetYaw;
     }
   }
-  if (typeof game.wowLive === 'function' && !sahJetDone) {
+  if (typeof game.wowLive === 'function' && !sahJetDone && sahJetRun) {
     let bar = '';
     const seg = Math.round(sahJetFuel / sahJET_TANK * 4);
     for (let i = 0; i < 4; i++) bar += i < seg ? '▮' : '▯';
@@ -5428,9 +5457,9 @@ function sahUpdateJet(game, dt) {
       where = 'the minaret · ' + Math.round(Math.hypot(sahJetX - sahKOUTOUBIA.x, sahJetZ - sahKOUTOUBIA.z)) + ' m · land on top';
     }
     game.wowLive(where + ' · fuel ' + bar + (sahJetGround ? ' · filling' : ''), sahJetNext / sahJET_N);
-    // the flight time is the record, and the line has to run against it
-    if (typeof game.recordLive === 'function' && sahJetT > 0) game.recordLive('jetpack', sahJetT);
   }
+  // the flight time is the record, and the line has to run against it — every run (L5)
+  if (sahJetRun && typeof game.recordLive === 'function' && sahJetT > 0) game.recordLive('jetpack', sahJetT);
 }
 
 /** Coming down the great dune, which is a hundred metres of 23 degrees. */
@@ -5898,7 +5927,7 @@ export function createSahara(game) {
     camp: sahCAMP,
     duneTop: { x: sahDUNE_X - 4, z: sahDUNE_Z },
     // ---- THE JETPACK (X3) -----------------------------------------------
-    jet() { return { on: sahJetOn, x: sahJetX, y: sahJetY, z: sahJetZ, vy: sahJetVY, fuel: sahJetFuel, ground: sahJetGround, next: sahJetNext, done: sahJetDone, t: sahJetT, best: sahJetBest }; },
+    jet() { return { on: sahJetOn, x: sahJetX, y: sahJetY, z: sahJetZ, vy: sahJetVY, fuel: +sahJetFuel.toFixed(2), ground: sahJetGround, next: sahJetNext, done: sahJetDone, t: +sahJetT.toFixed(2), best: sahJetBest, run: sahJetRun, rings: sahJetRings ? sahJetRings.map(function (r) { return [+r.position.x.toFixed(1), +r.position.y.toFixed(1), +r.position.z.toFixed(1)]; }) : null }; },
     jetPack() { return { x: sahJetX, y: sahJetY, z: sahJetZ }; },
     jetTarget() {
       if (sahJetNext < sahJET_RINGS.length && sahJetRings) { const p = sahJetRings[sahJetNext].position; return { x: p.x, y: p.y, z: p.z }; }

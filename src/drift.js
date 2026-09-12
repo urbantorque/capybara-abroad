@@ -288,6 +288,16 @@ let driRideT = 0, driRideId = '';
 let driColPeak = 0, driColIdx = -1, driColFoot = 0;
 let driFliesAwake = 0;
 let driLit = false, driLitT = 0, driGlow = 0;
+// ---- IT DIMS, AND CAN BE RELIT HIGHER (L5) -----------------------------------
+// The best world-response in the game happened once. After driRELIGHT_T
+// seconds burning the lantern goes down to a pilot glow, the lampflies go
+// home to the orchard (asleep, where they were found), and the climb is on
+// again: bring MORE up and E at the plinth relights it — the whole answer
+// again (the front out to the islands, the orchard waking, the skein called)
+// and the count filed, so the row can be beaten. The far lamps stay lit; the
+// plinth stays the way out. driGlowWant is what the paper burns at.
+const driRELIGHT_T = 300;           // s lit before it goes down
+let driGlowWant = 1, driLampAge = 0, driRelitArmed = false, driRelights = 0;
 let driPuffDone = false, driFlyDone = false, driDiveDone = false;
 let driColDone = false, driRideDone = false, driGapDone = false;
 let driHintPuff = false, driHintWind = false, driHintFlies = false;
@@ -3051,7 +3061,7 @@ let driAnswerLit = 0;             // how many of them have come up
  */
 function driAnswerTheLantern(dt) {
   if (!driFarLampMat) return;
-  if (!driLit) { driAnswerT = -1; driAnswerLit = 0; driFarLampMat.opacity = 0; return; }
+  if (!driLit || driRelitArmed) { driAnswerT = -1; driAnswerLit = 0; driFarLampMat.opacity = 0; return; }
   if (driAnswerT < 0) driAnswerT = 0;
   driAnswerT += dt;
   const n = driFARLAMP.length / 3;
@@ -4888,6 +4898,10 @@ function driUpdateLantern(game, dt) {
   // ---- the climb, on the signpost (W1) ---------------------------------------
   // Flies in hand, metres to the plinth, and which way the wind is blowing
   // relative to the way you have to go — the one fact the crossing turns on.
+  if (driLit && driRelitArmed && driFliesAwake > 0 && typeof game.wowLive === 'function') {
+    const d = Math.sqrt(dx * dx + dz * dz);
+    game.wowLive(driFliesAwake + ' lampflies · ' + (near ? 'E relights it' : Math.round(d) + ' m to the plinth · it burns higher with more'), 0.5);
+  }
   if (!driLit && driFliesAwake > 0 && typeof game.wowLive === 'function') {
     const d = Math.sqrt(dx * dx + dz * dz);
     let wind = '';
@@ -4922,12 +4936,37 @@ function driUpdateLantern(game, dt) {
     game.recordLive('lantern', driFliesAwake);
   }
 
+  // ---- THE RELIGHT (L5) --------------------------------------------------
+  if (driLit && driRelitArmed && driFliesAwake > 0 && capy.grounded && driSeedHeld < 0 && typeof game.recordLive === 'function') {
+    game.recordLive('lantern', driFliesAwake);
+  }
+  if (driLit && driRelitArmed && near && input && input.actionPressed && driFliesAwake > 0) {
+    driRelitArmed = false; driGlowWant = 1; driLampAge = 0; driRelights++;
+    const n = driFliesAwake;
+    if (typeof game.record === 'function') game.record('lantern', n);
+    if (typeof game.recordEnd === 'function') game.recordEnd('lantern');
+    for (let i = 0; i < driFLY_N; i++) {
+      const o = i * 11;
+      if (driFlyData[o + 7] !== 0) continue;
+      driFlyData[o + 7] = 2;
+      driFlyData[o + 10] = driTime;
+    }
+    driBeaconWave = 0;                                  // the front runs out to the islands again
+    if (typeof game.slowmo === 'function') game.slowmo(0.6, 1.0);
+    if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);
+    driSfx('chime', { volume: 1.0, pitch: 0.62 + 0.08 * Math.min(driRelights, 4), at: driLANTERN });
+    driSfx('organ', { volume: 0.5, at: driLANTERN });
+    if (typeof game.sparks === 'function') game.sparks(driLANTERN.x, driLANTERN.y + 6, driLANTERN.z, 40, { spd: 3, up: 2.5, grav: 1.2, drag: 0.9, life: 2.4, size: 0.5, rgb: [2.2, 1.6, 0.8] });
+    if (typeof game.frameShot === 'function') game.frameShot({ yaw: 168 * Math.PI / 180, dist: 16, pitch: 10 * Math.PI / 180, raise: 4.5, hold: 5.0 });
+    driToast('relit, with ' + n + '. the islands saw it again.');
+  }
   if (!driLit && near && input && input.actionPressed) {
     if (driFliesAwake >= driFLIES_NEED) {
       driLit = true;
-      driLitT = 12;
+      driLitT = 12; driLampAge = 0; driGlowWant = 1;
       driTask('lantern');
       if (typeof game.record === 'function') game.record('lantern', driFliesAwake);
+      if (game.music && typeof game.music.swell === 'function') game.music.swell(1.0);   // the swell at the light (L5)
       // ---- AND THE WHOLE ORCHARD COMES (L8) -----------------------------
       // Six lampflies lit it; the other forty wake at the light and come up
       // the hill after you, a few frames apart so it arrives as a river of
@@ -4994,7 +5033,24 @@ function driUpdateLantern(game, dt) {
     }
   }
   if (driLitT > 0) driLitT -= dt;
-  driGlow = damp(driGlow, driLit ? 1 : 0, 0.55, dt);
+  // THE DIM (L5): five minutes burning, then the pilot glow and the flies home
+  if (driLit && !driRelitArmed) {
+    driLampAge += dt;
+    if (driLampAge > driRELIGHT_T) {
+      driRelitArmed = true; driGlowWant = 0.22;
+      for (let i = 0; i < driFLY_N; i++) {
+        const o = i * 11;
+        driFlyData[o + 7] = 0;
+        driFlyData[o] = driFlyData[o + 3]; driFlyData[o + 1] = driFlyData[o + 4]; driFlyData[o + 2] = driFlyData[o + 5];
+      }
+      driFliesAwake = 0;
+      // ...and the archipelago goes dark with it, so the relight is the whole answer again
+      driBeaconWave = -1;
+      if (driBeaconOn) for (let i = 0; i < driBeaconOn.length; i++) driBeaconOn[i] = false;
+      driToast('the lantern is low. the flies have gone home to the orchard — bring more up, and it burns higher.');
+    }
+  }
+  driGlow = damp(driGlow, driLit ? driGlowWant : 0, 0.55, dt);
   // ---- D4.7: and the way down is a seed ---------------------------------
   // Armed on the rising edge of driLit. One of the five seeds is moved to the
   // plinth rather than a sixth being made, because five is the number the
@@ -5695,6 +5751,22 @@ export function createDrift(game) {
     gravity: driGRAVITY,
 
     lit() { return driLit; },
+    /** THE RELIGHT, for the harness (L5): light it, age it, wake flies at the plinth, read it. */
+    lanternDebug(o) {
+      o = o || {};
+      if (o.lit && !driLit) { driLit = true; driLampAge = 0; driGlowWant = 1; driBeaconWave = 0; }
+      if (typeof o.age === 'number') driLampAge = o.age;
+      if (typeof o.wake === 'number') {
+        let woke = 0;
+        for (let i = 0; i < driFLY_N && woke < o.wake; i++) {
+          const oo = i * 11;
+          if (driFlyData[oo + 7] !== 0) continue;
+          driFlyData[oo + 7] = 1; driFlyData[oo + 10] = driTime; driFlyData[oo + 8] = driFliesAwake; driFliesAwake++; woke++;
+        }
+      }
+      return { lit: driLit, age: +driLampAge.toFixed(1), glow: +driGlow.toFixed(3), want: driGlowWant, armed: driRelitArmed, flies: driFliesAwake, relights: driRelights,
+               wave: +driBeaconWave.toFixed(1), farLamp: driFarLampMat ? +driFarLampMat.opacity.toFixed(2) : null };
+    },
     glow() { return driGlow; },
     lampflies() { return driFliesAwake; },
     lampfliesNeeded: driFLIES_NEED,

@@ -150,6 +150,15 @@ const venTIDE_FALL0 = 0.780;
 const venTIDE_FALL1 = 0.960;
 const venTIDE_LOW  = -1.30;
 const venTIDE_HIGH =  0.95;         // a metre of water over the piazza. Swimmable.
+// ---- EVERY TIDE HIGHER (L5) --------------------------------------------------
+// The flood came round every 205 s to exactly the same line, so the second
+// one was the first one again. Each crest you have SEEN raises the next by
+// venTIDE_STEP, to venTIDE_CAP: the water reaches further up the steps, the
+// middle is under for longer, the surge runs harder — the boards (1.90 over
+// the paving) stay proud of it. The crest says so. venTideHigh is the live
+// ceiling; venTIDE_HIGH is the first tide's.
+const venTIDE_STEP = 0.09, venTIDE_CAP = 1.22;
+let venTideHigh = venTIDE_HIGH, venTideCrests = 0;
 const venTIDE_START = 0.055;        // where the clock is when you arrive: low, and
                                     // about a minute of it to look round in
 
@@ -267,6 +276,7 @@ let venWasFlooded = false;
 const venLOOK_R = 12;
 const venFLOOD_GRACE = 18;
 let venFloodWin = 0;
+let venCrestSaid = false;     // this tide's crest said (L5)
 // seconds of THIS stay in the flooded square — see IN IT, FOR HOW LONG
 let venFloodInT = 0;
 /** The stay is over: one number for how long it was. Never per frame. */
@@ -736,12 +746,12 @@ function venTideY(ph) {
   if (ph < venTIDE_RISE0) return venTIDE_LOW;
   if (ph < venTIDE_RISE1) {
     const t = (ph - venTIDE_RISE0) / (venTIDE_RISE1 - venTIDE_RISE0);
-    return lerp(venTIDE_LOW, venTIDE_HIGH, t * t * (3 - 2 * t));
+    return lerp(venTIDE_LOW, venTideHigh, t * t * (3 - 2 * t));
   }
-  if (ph < venTIDE_FALL0) return venTIDE_HIGH;
+  if (ph < venTIDE_FALL0) return venTideHigh;
   if (ph < venTIDE_FALL1) {
     const t = (ph - venTIDE_FALL0) / (venTIDE_FALL1 - venTIDE_FALL0);
-    return lerp(venTIDE_HIGH, venTIDE_LOW, t * t * (3 - 2 * t));
+    return lerp(venTideHigh, venTIDE_LOW, t * t * (3 - 2 * t));
   }
   return venTIDE_LOW;
 }
@@ -828,7 +838,7 @@ function venFlow(x, z) {
 
 /** 0..1 — how far up the tide is, for anything that wants to react to it. */
 function venTideLevel() {
-  return clamp((venWaterY - venTIDE_LOW) / (venTIDE_HIGH - venTIDE_LOW), 0, 1);
+  return clamp((venWaterY - venTIDE_LOW) / (venTideHigh - venTIDE_LOW), 0, 1);
 }
 
 // ================================================================== ZONES ===
@@ -5232,6 +5242,13 @@ function venUpdateTide(game, dt) {
   const p = capy && capy.position;
   venFloodedNow = venIsOverWater(0, -34);
   if (!venFloodedNow) venFloodArm = false;         // the tide is out: nothing to stay in
+  // EVERY TIDE HIGHER (L5): a crest you were in the city for raises the next
+  if (venWasFlooded && !venFloodedNow) {
+    venTideCrests++;
+    const was = venTideHigh;
+    venTideHigh = Math.min(venTIDE_CAP, venTIDE_HIGH + venTIDE_STEP * venTideCrests);
+    if (venTideHigh > was + 0.001) venToast('the sea is going out. the next one comes ' + Math.round((venTideHigh - was) * 100) + ' cm higher.');
+  }
   if (venFloodedNow && !venWasFlooded) {
     venSeenFlood = true;
     if (typeof game.shake === 'function') game.shake(0.1);
@@ -5319,6 +5336,21 @@ function venUpdateTide(game, dt) {
     }
   }
 
+  // ---- THE CREST, EVERY TIDE (L5) --------------------------------------------
+  // The bells, the pigeons and the lift were the ticked tide's alone; the
+  // next tide, higher, arrived in silence. In the square at the top of any
+  // later tide: the bells, the pigeons put up, the surge under you, and the
+  // depth said.
+  if (venFloodDone && p && venInZone('square', p.x, p.z) && venIsOverWater(p.x, p.z) && lvl >= 0.999 && !venCrestSaid) {
+    venCrestSaid = true;
+    venSfx('campanile', { volume: 0.8, at: { x: venCAMPANILE.x, y: venCAMPANILE.h, z: venCAMPANILE.z }, force: true });
+    venPigeonScare(p.x, p.z, 80, 1);
+    if (capy && typeof capy.launch === 'function') { const v = capy.velocity || { x: 0, z: 0 }; capy.launch(v.x * 0.5, 4.2, v.z * 0.5); }
+    if (typeof game.slowmo === 'function') game.slowmo(0.6, 0.8);
+    if (typeof game.sparks === 'function') game.sparks(p.x, venWaterHeightAt(p.x, p.z) + 0.3, p.z, 24, { spd: 3, up: 2.5, grav: 9, drag: 0.6, life: 1.0, size: 0.24, rgb: [1.2, 1.45, 1.7] });
+    venToast('the top of it — ' + Math.round((venTideHigh) * 100) + ' cm over the paving.');
+  }
+  if (lvl < 0.5) venCrestSaid = false;
   // ---- armed: the tide comes up round you, or you leave -------------------
   if (venFloodArm && !venFloodDone) {
     const inSq = !!(p && venInZone('square', p.x, p.z));
@@ -5331,8 +5363,10 @@ function venUpdateTide(game, dt) {
     if (inSq && lvl >= venFLOOD_TOP) {
       venFloodDone = true;
       venFloodArm = false;
+      venCrestSaid = true;                   // this crest is the tick's; the next is the tide's (L5)
       venTask('acqua-alta');
-      venToast('the whole square, and you in the middle of it. nobody is surprised but you.');
+      venToast(venTideCrests > 0 ? 'the whole square, and you in the middle of it — ' + Math.round(venTideHigh * 100) + ' cm over the paving, higher than the last.'
+                                  : 'the whole square, and you in the middle of it. nobody is surprised but you.');
       // THE TOP OF THE TIDE: the bells, and every pigeon in the square.
       venSfx('campanile', { volume: 0.9, at: { x: venCAMPANILE.x, y: venCAMPANILE.h, z: venCAMPANILE.z }, force: true });
       venPigeonScare(p.x, p.z, 80, 1);
@@ -5784,6 +5818,8 @@ export function createVenice(game) {
     /** 0..1 — how far up the tide is. systems.js reads it for the light. */
     tide: venTideLevel,
     tideY() { return venWaterY; },
+    /** EVERY TIDE HIGHER, for the harness (L5). */
+    tideAudit() { return { high: +venTideHigh.toFixed(3), crests: venTideCrests, phase: +venPhase.toFixed(3), y: +venWaterY.toFixed(3), flooded: venFloodedNow, done: venFloodDone, crestSaid: venCrestSaid, inT: +venFloodInT.toFixed(1) }; },
     rising() { return venPhase >= venTIDE_WARN && venPhase < venTIDE_RISE1; },
     flooded() { return venFloodedNow; },
     /** The harness's window on the clock: set the phase. Test hook. */
