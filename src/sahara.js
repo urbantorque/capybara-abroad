@@ -1853,6 +1853,14 @@ function sahBuildPeople(root) {
   M.cyl(0, 0.44, 0, 0.20, 0.88, 0xffffff, 0, 0, 0, 6);
   M.cyl(0, 1.02, 0, 0.26, 0.62, 0xffffff, 0, 0, 0, 6);
   M.cyl(0, 1.34, 0, 0.19, 0.18, 0xdedede, 0, 0, 0, 6);
+  // ---- A BELT AND A HEM (L3-9). At twelve metres the cones were
+  // indistinguishable from the traffic cones beside them (l3-sahara.png):
+  // two darker bands — a sash at the waist and a border at the hem — are
+  // what a garment has and a cone does not, and they are two more rings in
+  // the same merged buffer. Fractions of white, so they darken whatever robe
+  // the instance was given.
+  M.cyl(0, 0.90, 0, 0.275, 0.07, 0x8c8478, 0, 0, 0, 6);
+  M.cyl(0, 0.05, 0, 0.215, 0.06, 0x9a9288, 0, 0, 0, 6);
   // the sleeves, which hang
   for (let s = -1; s <= 1; s += 2) {
     M.box(s * 0.26, 1.06, 0.02, 0.14, 0.58, 0.16, 0xffffff, -0.14, 0, s * 0.16);

@@ -1410,6 +1410,9 @@ let sysCloudForce = -1;   // the harness: a fixed strength, or -1 for the weathe
 // position can never be inherited by the next caller.
 const sysSpatial    = { volume: 1, pitch: 1, at: null };
 const sysEar        = new THREE.Vector3();
+const sysOccTo      = { x: 0, y: 0, z: 0 };   // the mover occlusion ray's far end (L3-9)
+const sysMOVER_OCC_LP = 16000;   // Hz taken off the top behind a wall
+const sysMOVER_OCC_G  = 0.45;    // ...and the share of the level
 const sysEarRight   = new THREE.Vector3();
 const sysEarTo      = new THREE.Vector3();
 // ---- ...AND THE TWO AXES THE PAN DOES NOT HAVE (A2) ------------------------
@@ -14000,7 +14003,23 @@ export function createSystems(game) {
       let hz = sysMOVER_LPMIN + (20000 - sysMOVER_LPMIN) * (1 - t) * (1 - t);
       // ...and A2: something behind you is duller than the same thing in front.
       hz = Math.min(hz, 20000 - m.wantBack * sysSFX_BACK_LP);
-      sysAudioSet(m.g.gain, Math.max(sysMOVER_PARK, m.live ? m.want : sysMOVER_PARK),
+      // ---- ...AND A WALL BETWEEN YOU (L3-9, audio). Rooms existed and
+      // occlusion did not: the Monaco car was heard in the salon's room. Once
+      // a quarter-second per live mover, the camera's own clearing ray from
+      // the ear to the source (static bodies only, which is buildings; the
+      // terrain and people are skipped by the ray already), damped, and
+      // folded into the top and the level. Four rays a second at most.
+      m.occT = (m.occT || 0) - dt;
+      if (m.live && !m.bed && m.occT <= 0) {
+        m.occT = 0.25;
+        sysOccTo.x = m.x; sysOccTo.y = m.y + 0.6; sysOccTo.z = m.z;
+        let blocked = 0;
+        try { blocked = sysCamClear(sysEar, sysOccTo) < 0.999 ? 1 : 0; } catch (e) { blocked = 0; }
+        m.occWant = blocked;
+      }
+      m.occ = damp(m.occ || 0, m.occWant || 0, 3.3, dt);
+      hz = Math.min(hz, 20000 - m.occ * sysMOVER_OCC_LP);
+      sysAudioSet(m.g.gain, Math.max(sysMOVER_PARK, m.live ? m.want * (1 - sysMOVER_OCC_G * m.occ) : sysMOVER_PARK),
                   now, sysMOVER_TAU);
       sysAudioSet(m.lp.frequency, Math.max(200, hz), now, sysMOVER_TAU);
       // Something overhead is less lateralised than the same thing on the
@@ -26860,7 +26879,7 @@ export function createSystems(game) {
     // separate things about being a capybara that it can show you: `gather` is
     // five of your own kind falling in behind you, and `the-crossing` is the
     // water not being somewhere you are on your way through.
-    { task: 'gather',         skill: 'herd',   name: 'THE HERD',
+    { task: 'gather',         skill: 'herd',   name: 'THE HERD', alt: 'bin-chicken',
       line: 'wheek at anything small. keep wheeking, or they wander off.' },
     { task: 'the-crossing',   skill: 'float',  name: 'THE FLOAT',
       line: 'you can just sit in it now. any water, anywhere.' },
@@ -35909,7 +35928,12 @@ export function createSystems(game) {
         // silently never fires — which is how `the-rim-walk` shipped granting
         // nothing at all in the first measured run of this.
         const r = taskRec[s.task];
-        const on = !!(r && r.done) || !!findDone[s.task];
+        // ...or the row's second teacher (L3-9): THE HERD arrived at chapter
+        // fifteen of nineteen while the Sydney ibis had published a herd offer
+        // since chapter one. Knocking a bin over for the ibis teaches it too,
+        // so fourteen chapters can herd; chapter fifteen still asks for five.
+        const r2 = s.alt ? taskRec[s.alt] : null;
+        const on = !!(r && r.done) || !!findDone[s.task] || !!(r2 && r2.done);
         game.capy.learn(s.skill, on);
         if (on && !sysSkillTold[s.skill]) {
           sysSkillTold[s.skill] = 1;

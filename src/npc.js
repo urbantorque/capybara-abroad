@@ -845,7 +845,7 @@ const npcBLINK_DUR = 0.11;   // ...and how long one takes. Two frames is a bug.
  *           the brow node is the thing being moved and cannot also be the
  *           thing that remembers where it started.
  */
-function npcFace(f, mood, blink) {
+function npcFace(f, mood, blink, talk) {
   if (!f) return;
   const up = mood > 0 ? mood : 0;
   const dn = mood < 0 ? -mood : 0;
@@ -861,6 +861,19 @@ function npcFace(f, mood, blink) {
   const tilt = dn * npcBROW_TILT - up * npcBROW_LIFT;
   f.browL.rotation.z = -tilt;
   f.browR.rotation.z = tilt;
+  // ---- THE MOUTH (L3-9). A gasp, a shout and a laugh all happened with the
+  // same closed face. One dark box under the eyes: astonished, it goes to
+  // an "o" (tall and narrow); cross, it goes wide and flat; talking, it
+  // opens and shuts on the same clock the arm gestures on. Nothing here
+  // costs a node — the roster's is one more instance, a local's one mesh.
+  if (f.mouthN) {
+    const o = up * 1.6;
+    const wide = dn * 0.5;
+    const t = talk > 0 ? 0.55 + 0.45 * Math.sin(talk * 13.0) : 0;
+    const open = Math.max(o, t * 1.3);
+    f.mouthN.scale.set(1 + wide - o * 0.3, 1 + open * 1.8, 1);
+    f.mouthN.position.y = f.mouthY - open * 0.008;
+  }
 }
 /** The blink clock. Returns 0..1 closed; call it once per person per frame. */
 function npcBlink(rec, dt) {
@@ -968,6 +981,8 @@ export function createNPCs(game) {
     { w: 0.058, h: 0.044, d: 0.02, x: 0.072, c: npcOf(PALETTE.capyEye, PALETTE.sail) },
   ]);
   const gBrow = npcMakeGeo([{ w: 0.092, h: 0.020, d: 0.022 }]);
+  // the mouth (L3-9): a 3 cm dark box, scaled by npcFace
+  const gMouth = npcMakeGeo([{ w: 0.034, h: 0.010, d: 0.014, c: npcOf(PALETTE.capyEye, PALETTE.sail) }]);
   // ---- THE LIMBS HAVE JOINTS IN THEM NOW (v56) --------------------------
   // A leg was ONE box pivoting at the hip and an arm was ONE box pivoting at
   // the shoulder, and this file admitted it twice in its own comments ("the
@@ -1108,6 +1123,7 @@ export function createNPCs(game) {
   // FACES). Two extra draw calls buys an expression for thirty-two people.
   const iEyes  = mkInst(gEyes, HUMANS);
   const iBrow  = mkInst(gBrow, HUMANS * 2);
+  const iMouth = mkInst(gMouth, HUMANS);
   const iCam   = mkInst(gCam, HUMANS);
   const iTool  = mkInst(gTool, HUMANS);
   const iCone  = mkInst(gCone, HUMANS);
@@ -1592,7 +1608,11 @@ export function createNPCs(game) {
     browR.position.set(0.062, 0.230, 0.129);
     browL.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
     browR.add(npcLocPart(0.080, 0.017, 0.020, hair, 0, 0, 0));
-    headN.add(eyeN); headN.add(browL); headN.add(browR);
+    // the mouth (L3-9), see npcFace
+    const mouthN = new THREE_.Object3D();
+    mouthN.position.set(0, 0.118, 0.129);
+    mouthN.add(npcLocPart(0.034, 0.010, 0.014, PALETTE.capyEye, 0, 0, 0));
+    headN.add(eyeN); headN.add(browL); headN.add(browR); headN.add(mouthN);
     torsoN.add(headN);
     // ---- ...AND AN ELBOW (v56) -------------------------------------------
     // Sleeve to the elbow, bare forearm and hand below it in ONE buffer, so
@@ -1614,7 +1634,7 @@ export function createNPCs(game) {
              legL: legL, legR: legR, torso: torsoN,
              kneeL: kneeL, kneeR: kneeR, elbowL: elbowL, elbowR: elbowR,
              face: { eyeN: eyeN, browL: browL, browR: browR,
-                     browY: 0.228, upK: 0.6 },
+                     browY: 0.228, upK: 0.6, mouthN: mouthN, mouthY: 0.118 },
              arch: arch };
   }
 
@@ -6968,7 +6988,7 @@ export function createNPCs(game) {
           const cross = Math.max(r.own ? 0.85 : 0, r.grd * 0.7, r.hud * 0.35);
           const mTgt = f > cross ? f : -cross;
           r.mood = damp(r.mood, mTgt, Math.abs(mTgt) > Math.abs(r.mood) ? 15 : 3.2, dt);
-          npcFace(r.fig.face, r.mood, npcBlink(r, dt));
+          npcFace(r.fig.face, r.mood, npcBlink(r, dt), r.gest > 0 ? r.t : 0);
         }
       }
       // ---- and they say something the first time you arrive -------------
@@ -7600,11 +7620,12 @@ export function createNPCs(game) {
     const eyeN = new THREE_.Object3D();
     const browL = new THREE_.Object3D();
     const browR = new THREE_.Object3D();
+    const mouthN = new THREE_.Object3D();
 
     root.add(bob); root.add(legL); root.add(legR);
     bob.add(head); bob.add(armL); bob.add(armR); bob.add(hipsN);
     head.add(hatN);
-    head.add(eyeN); head.add(browL); head.add(browR);
+    head.add(eyeN); head.add(browL); head.add(browR); head.add(mouthN);
     legL.add(kneeL); kneeL.add(footL);
     legR.add(kneeR); kneeR.add(footR);
     armL.add(elbowL); armR.add(elbowR);
@@ -7702,7 +7723,7 @@ export function createNPCs(game) {
                eyeN, browL, browR,
                hipsN, kneeL, kneeR, footL, footR, elbowL, elbowR },
       // the face pack npcFace() takes, and the two clocks that drive it
-      face: { eyeN: eyeN, browL: browL, browR: browR, browY: 0.253 },
+      face: { eyeN: eyeN, browL: browL, browR: browR, browY: 0.253, mouthN: mouthN, mouthY: 0.150 },
       blinkT: rand(0, npcBLINK_MAX), mood: 0,
       // build (see THREE BUILDS above). bLeg is read by animHuman, which is
       // the only place allowed to touch legL.scale.y.
@@ -7834,6 +7855,7 @@ export function createNPCs(game) {
     // `sail`; see gEyes. Nothing per-person varies about an eye, so this is a
     // constant either way.
     iEyes.setColorAt(rec.idx, npcColor.setRGB(1, 1, 1));
+    iMouth.setColorAt(rec.idx, npcColor.setRGB(1, 1, 1));
     iBrow.setColorAt(rec.idx * 2, npcColor.setHex(cHair));
     iBrow.setColorAt(rec.idx * 2 + 1, npcColor.setHex(cHair));
     iCam.setColorAt(rec.idx, npcColor.setHex(cCam));
@@ -10324,7 +10346,7 @@ export function createNPCs(game) {
     // swapped rather than as a person.
     const mTgt = npcMoodOf(rec);
     rec.mood = damp(rec.mood, mTgt, Math.abs(mTgt) > Math.abs(rec.mood) ? 15 : 3.2, dt);
-    npcFace(rec.face, rec.mood, npcBlink(rec, dt));
+    npcFace(rec.face, rec.mood, npcBlink(rec, dt), rec.gest > 0 ? (rec.gestT || 0) : 0);
 
     rec.group.updateMatrixWorld(true);
 
@@ -13106,6 +13128,7 @@ export function createNPCs(game) {
       iEyes.setMatrixAt(i, n.eyeN.matrixWorld);
       iBrow.setMatrixAt(i * 2, n.browL.matrixWorld);
       iBrow.setMatrixAt(i * 2 + 1, n.browR.matrixWorld);
+      iMouth.setMatrixAt(i, humans[i].face.mouthN.matrixWorld);
       iArmL.setMatrixAt(i, n.armL.matrixWorld);
       iArmR.setMatrixAt(i, n.armR.matrixWorld);
       iFarmL.setMatrixAt(i, n.elbowL.matrixWorld);
@@ -13127,6 +13150,7 @@ export function createNPCs(game) {
     iHat.instanceMatrix.needsUpdate = true;
     iEyes.instanceMatrix.needsUpdate = true;
     iBrow.instanceMatrix.needsUpdate = true;
+    iMouth.instanceMatrix.needsUpdate = true;
     iArmL.instanceMatrix.needsUpdate = true;
     iArmR.instanceMatrix.needsUpdate = true;
     iFarmL.instanceMatrix.needsUpdate = true;
