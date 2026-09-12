@@ -165,11 +165,25 @@ second teacher for THE HERD (`alt:` on the skills row).
 flood), `steam` at the nearest fumarole, the cave river from the water
 nearest you.
 
-**Still open**: the Quay/Venice/Mong Kok instanced crowds' welded arms (a
-shoe on its own instance), the wide crease octave (needs its own pixel
-ceiling), skill-gated finds, costume `when:` lines, a Karplus-Strong
-string. The Cali dancers were already moving on the beat — LIFT2's note was
-stale.
+**L3-11.** The wide crease octave: `mainCreaseWide` with its own radius
+(1.6 m), pixel ceiling (4..112) and range (2.4 m), at 0.55 of the tight
+octave's weight (`uCreaseW`), under the same DoF fade — the foot of every
+wall and the inside of every arcade a shade darker with no line round a
+roofline. Four finds ask for a skill somewhere it was not taught
+(`brought-vault/seed/mantle/herd`, on `capy.vaultN/mantleN/seedT` and
+`game.herdCount`). Eight authorities have a line about what the animal is
+wearing (`when: game.capy.worn === ...`). **The crowds have arms and
+heights**: the Quay's thirty (arms out of the body and shirt onto two
+instances, ±0.45 rad against the leg, idle ±0.05; heights 0.92–1.08 from a
+hash of the index, everything scaled about the feet, the collider hook on
+the widened stride), Venice's and Mong Kok's (`limb(sgn)` is leg-only now,
+`arm(sgn)` on two instances at the shoulder line, Mong Kok's fading to the
+idle sway when a walker is held at a light; M14's build helper widened to
+0.92–1.08). +2 draw calls per chapter.
+
+**Still open**: a Karplus–Strong string (a worklet); nothing else from the
+three reviews remains unstarted. The Cali dancers were already moving on
+the beat — LIFT2's note was stale.
 
 ## THE BIG ONES, LIFTED AGAIN — FIVE RIDICULOUS ONES, AND THE LADDER SAID OUT LOUD (X1–X5, N1, L1–L10 — 11 Sep 2026)
 

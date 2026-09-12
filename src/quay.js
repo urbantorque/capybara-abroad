@@ -4470,7 +4470,29 @@ const quayCROWD_SHIRT = [PALETTE.cloth1, PALETTE.cloth2, PALETTE.cloth3, PALETTE
                          PALETTE.cloth5, PALETTE.cloth6, PALETTE.cloth7, PALETTE.cloth8,
                          PALETTE.hiVis, PALETTE.denim];
 let quayCrowdLegA = null, quayCrowdLegB = null;
+let quayCrowdArmA = null, quayCrowdArmB = null;   // L3-11, hung from the shoulder
 let quayCrowdBodies = null;      // one box each — see ...AND THE CONCOURSE IS SOLID
+
+// ---- ARMS, AND A HEIGHT (L3-11) ----
+// Thirty people and every one of them 1.65 m to the millimetre, which from the
+// apron camera is a picket fence; and their arms were welded to the shirt, so
+// the legs alternated under a torso that was being carried. Two things, both
+// cheap. A height per person — 0.92 to 1.08, hashed off the index so it is the
+// same person every load — stored as the seventh float and put into the scale
+// of the one compose that places every part, about the feet: the hip rises by
+// it, the legs and body stretch by it, the shoes stay on the apron. And the
+// arms come off both halves onto two more instanced draws (six, from four), a
+// bare arm each hung from the shoulder like the legs are from the hip, driven
+// off the leg phase and out of it — left arm forward with the right leg, which
+// is the one thing a walk cannot be drawn without. The cap of the sleeve stays
+// on the shirt at the pivot, where a quarter-radian moves it four centimetres:
+// the tint multiplies every vertex, so a sleeve and a hand cannot share a
+// swinging mesh, and a skin-coloured arm is the more legible one from thirty
+// metres anyway. Standing people get the idle everyone has: a twentieth of a
+// radian at half a hertz.
+const quayCROWD_STRIDE = 7;      // route, u, dir, speed, phase, dwell, height
+const quayCROWD_SHOULDER = 0.55; // above the hip, before the height scales it
+const quayCrowdHeight = (i) => 0.92 + 0.16 * (((i * 7 + 3) % 11) / 10);
 
 let quayCrowdShirt = null;
 /**
@@ -4482,25 +4504,29 @@ let quayCrowdShirt = null;
  * one extra draw call and the only way this works at all.
  */
 function quayBuildCrowd(game, root) {
-  // ---- the fixed half: head, hair, nose, bare arms, hips. Hip is the origin.
+  // ---- the fixed half: head, hair, nose, hips. Hip is the origin. (The arms
+  // used to be here too — L3-11 hung them from the shoulder instead.)
   const B = quayMerger();
   B.box(0, 0.78, 0, 0.25, 0.29, 0.24, PALETTE.skin2);
   B.box(0, 0.94, -0.01, 0.27, 0.10, 0.26, PALETTE.hair1);
   B.box(0, 0.78, 0.13, 0.05, 0.05, 0.05, PALETTE.skin2);
   B.box(0, 0.01, 0, 0.44, 0.20, 0.25, PALETTE.stoneDark);
-  for (let s = -1; s <= 1; s += 2) {
-    B.box(s * 0.29, 0.13, 0, 0.11, 0.34, 0.12, PALETTE.skin2);
-  }
-  // ---- the shirt: drawn white so the instance tint is the whole of it
+  // ---- the shirt: drawn white so the instance tint is the whole of it. The
+  // sleeve is a cap at the shoulder now, sitting on the arm's pivot.
   const S = quayMerger();
   S.box(0, 0.36, 0, 0.48, 0.52, 0.27, 0xffffff);
   S.box(0, 0.61, 0, 0.50, 0.06, 0.29, 0xffffff);
-  for (let s = -1; s <= 1; s += 2) S.box(s * 0.29, 0.40, 0, 0.13, 0.30, 0.14, 0xffffff);
+  for (let s = -1; s <= 1; s += 2) S.box(s * 0.29, 0.49, 0, 0.14, 0.12, 0.15, 0xffffff);
   // ---- a leg, hung from the hip so the pivot is at the top of it
   const L = quayMerger();
   L.box(0, -0.39, 0, 0.16, 0.74, 0.18, PALETTE.stoneDark);
   L.box(0, -0.78, 0.04, 0.17, 0.09, 0.26, PALETTE.hair2);
   const legGeo = L.build();
+  // ---- an arm, hung from the shoulder the same way: bare, with a hand
+  const A = quayMerger();
+  A.box(0, -0.31, 0, 0.11, 0.44, 0.12, PALETTE.skin2);
+  A.box(0, -0.56, 0.01, 0.12, 0.10, 0.13, PALETTE.skin2);
+  const armGeo = A.build();
 
   const c = new THREE.Color();
   const mk = (geo, tint) => {
@@ -4522,16 +4548,19 @@ function quayBuildCrowd(game, root) {
   quayCrowdShirt = mk(S.build(), true);
   quayCrowdLegA = mk(legGeo, false);
   quayCrowdLegB = mk(legGeo, false);
+  quayCrowdArmA = mk(armGeo, false);
+  quayCrowdArmB = mk(armGeo, false);
 
-  quayCrowdData = new Float32Array(quayCROWD_N * 6);   // route, u, dir, speed, phase, dwell
+  quayCrowdData = new Float32Array(quayCROWD_N * quayCROWD_STRIDE);
   for (let i = 0; i < quayCROWD_N; i++) {
-    const o = i * 6;
+    const o = i * quayCROWD_STRIDE;
     quayCrowdData[o] = i % quayCROWD_ROUTE.length;
     quayCrowdData[o + 1] = rand(0, 1);
     quayCrowdData[o + 2] = Math.random() < 0.5 ? -1 : 1;
     quayCrowdData[o + 3] = rand(0.85, 1.55);
     quayCrowdData[o + 4] = rand(0, Math.PI * 2);
     quayCrowdData[o + 5] = 0;
+    quayCrowdData[o + 6] = quayCrowdHeight(i);
   }
   quayCrowdBodies = game && typeof game.addCrowdBodies === 'function'
     ? game.addCrowdBodies({ n: quayCROWD_N, at: quayCrowdFoot, moving: true })
@@ -4548,7 +4577,7 @@ function quayBuildCrowd(game, root) {
 // in the update, and the foot height is the same GY the draw uses because the
 // apron is flat.
 //
-// Recomputed from the route rather than cached: `quayCrowdData` is six floats
+// Recomputed from the route rather than cached: `quayCrowdData` is seven floats
 // wide and everything in it is a parameter, not a position, so the position is
 // derived in exactly one place — here and in the draw — off the same two lines.
 // A cached copy is a second writer of the same fact, which is how a body ends
@@ -4556,7 +4585,7 @@ function quayBuildCrowd(game, root) {
 // ---------------------------------------------------------------------------
 function quayCrowdFoot(i, out) {
   if (!quayCrowdData) return false;
-  const o = i * 6;
+  const o = i * quayCROWD_STRIDE;
   const r = quayCROWD_ROUTE[quayCrowdData[o] | 0];
   const u = quayCrowdData[o + 1];
   out.x = lerp(r[0], r[2], u);
@@ -4578,7 +4607,7 @@ function quayUpdateCrowd(dt) {
   // lookups through two objects is not the shape this loop is written in.
   const cpQ = quayGame && quayGame.capy ? quayGame.capy.position : null;
   for (let i = 0; i < quayCROWD_N; i++) {
-    const o = i * 6;
+    const o = i * quayCROWD_STRIDE;
     const r = quayCROWD_ROUTE[quayCrowdData[o] | 0];
     const len = Math.hypot(r[2] - r[0], r[3] - r[1]);
     let moving = 1;
@@ -4610,7 +4639,7 @@ function quayUpdateCrowd(dt) {
     // legs, so turning a walker would have it walking sideways across its own
     // route. Somebody standing still can face wherever they like.
     //
-    // A STATELESS SHORTEST-ARC BLEND, because `quayCrowdData` is six floats a
+    // A STATELESS SHORTEST-ARC BLEND, because `quayCrowdData` is seven floats a
     // person with no spare for a damped yaw — and it wants no damper anyway.
     // The weight moves smoothly with the distance, so the head turns smoothly
     // as the animal approaches and follows it faster when it is running, which
@@ -4630,19 +4659,32 @@ function quayUpdateCrowd(dt) {
     const ph = quayCrowdData[o + 4];
     const swing = moving ? Math.sin(ph) * 0.62 : Math.sin(quayTime * 0.9 + i) * 0.03;
     const bob = moving ? Math.abs(Math.cos(ph)) * 0.035 : Math.sin(quayTime * 1.2 + i) * 0.012;
-    const hip = GY + 0.82 + bob;
-    const m = quayXform(px, hip, pz, 0, yaw, 0, 1, 1, 1);
+    // ---- ARMS, AND A HEIGHT (L3-11): the height scales y about the feet, so
+    // the hip goes up by it and every part hung off the hip stretches by it.
+    // The arm on the +x side swings against the leg on the +x side.
+    const h = quayCrowdData[o + 6];
+    const hip = GY + (0.82 + bob) * h;
+    const arm = moving ? -Math.sin(ph) * 0.45 : Math.sin(quayTime * Math.PI + i) * 0.05;
+    const sx = Math.cos(yaw), sz = -Math.sin(yaw);       // the person's local +x
+    const shoulder = hip + quayCROWD_SHOULDER * h;
+    const m = quayXform(px, hip, pz, 0, yaw, 0, 1, h, 1);
     quayCrowd.setMatrixAt(i, m);
     quayCrowdShirt.setMatrixAt(i, m);
-    quayCrowdLegA.setMatrixAt(i, quayXform(px + Math.cos(yaw) * 0.12, hip, pz - Math.sin(yaw) * 0.12,
-                                           swing, yaw, 0, 1, 1, 1));
-    quayCrowdLegB.setMatrixAt(i, quayXform(px - Math.cos(yaw) * 0.12, hip, pz + Math.sin(yaw) * 0.12,
-                                           -swing, yaw, 0, 1, 1, 1));
+    quayCrowdLegA.setMatrixAt(i, quayXform(px + sx * 0.12, hip, pz + sz * 0.12,
+                                           swing, yaw, 0, 1, h, 1));
+    quayCrowdLegB.setMatrixAt(i, quayXform(px - sx * 0.12, hip, pz - sz * 0.12,
+                                           -swing, yaw, 0, 1, h, 1));
+    quayCrowdArmA.setMatrixAt(i, quayXform(px + sx * 0.29, shoulder, pz + sz * 0.29,
+                                           arm, yaw, 0, 1, h, 1));
+    quayCrowdArmB.setMatrixAt(i, quayXform(px - sx * 0.29, shoulder, pz - sz * 0.29,
+                                           -arm, yaw, 0, 1, h, 1));
   }
   quayCrowd.instanceMatrix.needsUpdate = true;
   quayCrowdShirt.instanceMatrix.needsUpdate = true;
   quayCrowdLegA.instanceMatrix.needsUpdate = true;
   quayCrowdLegB.instanceMatrix.needsUpdate = true;
+  quayCrowdArmA.instanceMatrix.needsUpdate = true;
+  quayCrowdArmB.instanceMatrix.needsUpdate = true;
   // ...and every box goes where its commuter went, after the loop that moved
   // them and never before it.
   if (quayCrowdBodies) quayCrowdBodies.step();

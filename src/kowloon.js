@@ -2917,10 +2917,12 @@ function hkBuildMarket(game, root) {
  * The pattern is Rio's and Marrakech's ([[capy3-chapters-six-seven-eight]]),
  * with one thing added that those two did not have: the legs and the arms are
  * on their OWN instanced meshes, in antiphase, so this crowd walks rather than
- * bobbing. Five draw calls for eighty people.
+ * bobbing. Five draw calls for eighty people — seven since L3-11 put the arms
+ * on their own two.
  *
- *   limbA  left leg + right arm, pivoted at the hip
- *   limbB  right leg + left arm
+ *   limbA  right leg, pivoted at the hip (the arm came off it in L3-11)
+ *   limbB  left leg
+ *   al/ar  left and right arm, pivoted at the shoulder, against their own leg
  *   body   torso and shoulders
  *   head   head, hair and a nose, which is the only reason it has a front
  *   brolly one in seven of them, because the street is always wet
@@ -2936,16 +2938,26 @@ const hkCrowdBodies = [];              // one static box per walker, see hkUpdat
 function hkCrowdGeo(parts) { const M = hkMerger(); parts(M); return M.build(); }
 // M14: see the long note on venCrowdBuild in venice.js — these two casts are
 // the same helper written twice, and this is the same fix.
+// ---- ARMS, AND A HEIGHT (L3-11) ------------------------------------------
+// Same fix as Venice's, same reason: 0.92 to 1.08 is the ruler npc.js's
+// archetypes use, and the arm comes OUT of limb(sgn). The old limb welded a
+// leg and the opposite arm into one geometry, so the arm swung from the hip
+// with the leg and could never do anything else; on its own mesh it hangs from
+// the shoulder at 1.40 and swings against the leg on its side, and somebody
+// stopped at a red light gets a small drift instead of a frozen elbow. Two
+// draw calls more: seven for eighty people, with the bag.
 function hkCrowdBuild(i) {
   const h = Math.sin(i * 12.9898 + 4.1) * 43758.5453;
-  return 0.94 + (h - Math.floor(h)) * 0.12;
+  return 0.92 + (h - Math.floor(h)) * 0.16;
 }
 function hkBuildCrowd(game, root) {
   const limb = (sgn) => hkCrowdGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);          // the leg
     M.box(sgn * 0.11, -0.79, 0.03, 0.17, 0.1, 0.26, 0xdcdcdc);      // and its shoe
-    M.box(-sgn * 0.29, 0.24, 0, 0.13, 0.54, 0.14, 0xffffff);        // the opposite arm
-    M.box(-sgn * 0.29, -0.06, 0, 0.12, 0.12, 0.13, 0xe8e8e8);       // and its hand
+  });
+  const arm = (sgn) => hkCrowdGeo((M) => {
+    M.box(sgn * 0.29, -0.27, 0, 0.13, 0.54, 0.14, 0xffffff);        // the arm, from the shoulder
+    M.box(sgn * 0.29, -0.60, 0, 0.12, 0.12, 0.13, 0xe8e8e8);        // and its hand
   });
   const gBody = hkCrowdGeo((M) => {
     M.box(0, 0, 0, 0.46, 0.62, 0.27, 0xffffff);
@@ -2983,7 +2995,7 @@ function hkBuildCrowd(game, root) {
   // NAMED. qa/b6-crowds.js finds every crowd in the game by measuring its
   // instances, because a name-matched search finds Marrakech's and nothing else.
   hkCrowd = { a: mk(limb(1)), b: mk(limb(-1)), body: mk(gBody), head: mk(gHead),
-              brolly: mk(gBrolly), bag: mk(gBag) };
+              brolly: mk(gBrolly), bag: mk(gBag), al: mk(arm(-1)), ar: mk(arm(1)) };
   let seed = 60318;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   // jackets, and skins for the heads: a crowd all one colour is a queue
@@ -3005,7 +3017,9 @@ function hkBuildCrowd(game, root) {
     // in the rain half the street is holding both
     hkCrowdData[o + 5] = (rnd() < 0.14 ? 1 : 0) | (rnd() < 0.34 ? 2 : 0);
     col.set(JACKET[(rnd() * JACKET.length) | 0]);
-    for (const m of [hkCrowd.a, hkCrowd.b, hkCrowd.body]) m.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    for (const m of [hkCrowd.a, hkCrowd.b, hkCrowd.body, hkCrowd.al, hkCrowd.ar]) {
+      m.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    }
     col.set(SKIN[(rnd() * SKIN.length) | 0]);
     hkCrowd.head.instanceColor.setXYZ(i, col.r, col.g, col.b);
     col.set(rnd() < 0.5 ? 0x2f3438 : 0x8c3f3a);
@@ -3013,7 +3027,7 @@ function hkBuildCrowd(game, root) {
     col.set(hkBAG[(rnd() * hkBAG.length) | 0]);
     hkCrowd.bag.instanceColor.setXYZ(i, col.r, col.g, col.b);
   }
-  for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag']) {
+  for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag', 'al', 'ar']) {
     hkCrowd[k].instanceColor.needsUpdate = true;
   }
   // ---- ONE BOX EACH, not one pooled body with eighty shapes: these people
@@ -3136,6 +3150,17 @@ function hkUpdateCrowd(game, dt) {
     hkCrowd.a.setMatrixAt(i, hkXform(x, 0.82 * bld + bob, z, swing, yaw, 0, bld, bld, bld));
     hkCrowd.b.setMatrixAt(i, hkXform(x, 0.82 * bld + bob, z, -swing, yaw, 0, bld, bld, bld));
     hkCrowd.body.setMatrixAt(i, hkXform(x, 1.14 * bld + bob, z, 0, yaw, 0, bld, bld, bld));
+    // ---- ARMS, AND A HEIGHT (L3-11) --------------------------------------
+    // Shoulder at 1.40, the legs' phase, and the left arm (al, x -0.29) with
+    // the right leg (a, x +0.11) — the same sign as `a`, which is what the
+    // welded limb did, so only the pivot moved. `walk` is the same product
+    // that made `move`, so a person held at a crossing or turned for the show
+    // fades to the idle drift rather than freezing mid-stride.
+    const walk = clamp((1 - look) * (1 - hold), 0, 1);
+    const asw = Math.sin(ph) * 0.45 * walk +
+                Math.sin(hkTime * 3.14 + i * 1.7) * 0.05 * (1 - walk);
+    hkCrowd.al.setMatrixAt(i, hkXform(x, 1.40 * bld + bob, z, asw, yaw, 0, bld, bld, bld));
+    hkCrowd.ar.setMatrixAt(i, hkXform(x, 1.40 * bld + bob, z, -asw, yaw, 0, bld, bld, bld));
     // the head dips for something capybara-sized, which is the whole gesture
     hkCrowd.head.setMatrixAt(i, hkXform(x, 1.62 * bld + bob, z, look * 0.5 + upv, yaw, 0, bld, bld, bld));
     const kind = hkCrowdData[o + 5];
@@ -3150,7 +3175,7 @@ function hkUpdateCrowd(game, dt) {
       z + hz2 - Math.cos(yaw) * Math.sin(ph) * 0.16,
       -swing * 0.5, yaw, 0, gs * bld, gs * bld, gs * bld));
   }
-  for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag']) {
+  for (const k of ['a', 'b', 'body', 'head', 'brolly', 'bag', 'al', 'ar']) {
     hkCrowd[k].instanceMatrix.needsUpdate = true;
   }
 }

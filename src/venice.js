@@ -5898,6 +5898,8 @@ function venBuild(game) {
       lines: [
               // ---- THEY HAVE HEARD ABOUT YOU (L3, E3): one line keyed on a wow elsewhere
               { t: 'It rode a lantern into the sky, they tell me. Our lanterns stay where they are put. So do the tables.', after: 'lantern' },
+              // ...and what it is wearing (L3-11)
+              { t: 'A boater. He thinks he is a gondolier now.', when: function () { return game.capy && game.capy.worn === 'boater'; } },
               'Signore. The tables are for the guests.',
               { t: 'Eleven euros for the spritz. Sitting down.', before: 'spritz-theft' },
               { t: 'Eleven euros. I am putting it on somebody’s bill. Yours, ideally.',
@@ -6174,8 +6176,9 @@ function venBuild(game) {
  * a plank with a QUEUE on it, and the player has to get past them or go round —
  * which is exactly what the real thing is like and is much funnier.
  *
- * COST. Six InstancedMeshes of 48, no bodies (a crowd you can walk through is
- * the right crowd), and one pass of forty-eight in the update.
+ * COST. Eight InstancedMeshes of 48 (L3-11 put the arms on two of their own),
+ * no bodies (a crowd you can walk through is the right crowd), and one pass of
+ * forty-eight in the update.
  */
 const venCROWD_N = 48;
 let venCrowd = null;
@@ -6207,18 +6210,35 @@ function venCrowdGeo(parts) { const M = venMerger(); parts(M); return M.build();
 // below), so they have to move together or a tall person's head comes off.
 //
 // LEFT AS IT IS, and it is visible if you look for it: the collider half-extents
-// are authored for a 1.72 m person, so a 0.94 build stands in a box 5 cm too
-// big. Five centimetres on a body nobody can walk into on purpose.
+// are authored for a 1.72 m person, so a 0.92 build stands in a box 7 cm too
+// big. Seven centimetres on a body nobody can walk into on purpose.
+//
+// ---- ARMS, AND A HEIGHT (L3-11) ------------------------------------------
+// M14's spread was 0.94 to 1.06 and at the L2 camera it still read as a fence
+// with a slightly ragged top; 0.92 to 1.08 is the range npc.js's archetypes
+// actually span, so the crowd and the locals now come from the same ruler.
+// The other half of the fence was the ARM: limb(sgn) merged a leg and the
+// opposite arm into one box set, so every arm swung at the hip, from the hip,
+// with the leg — a person whose sleeve is welded to their trouser. The arm is
+// its own mesh now (one per side, two draw calls), hung from the SHOULDER at
+// 1.40 over the feet, and it swings on the leg's own phase but against the
+// leg on its side: left arm with right leg, which is how walking works. A
+// standing person's arms drift ±0.05 rad on the chapter clock instead of
+// freezing at whatever angle the last step left them.
 function venCrowdBuild(i) {
   const h = Math.sin(i * 12.9898 + 4.1) * 43758.5453;
-  return 0.94 + (h - Math.floor(h)) * 0.12;
+  return 0.92 + (h - Math.floor(h)) * 0.16;
 }
 function venBuildCrowd(game, root) {
+  // the leg and its shoe, hanging from the hip
   const limb = (sgn) => venCrowdGeo((M) => {
     M.box(sgn * 0.11, -0.4, 0, 0.16, 0.8, 0.18, 0xf2f2f2);
     M.box(sgn * 0.11, -0.79, 0.03, 0.17, 0.1, 0.26, 0xdcdcdc);
-    M.box(-sgn * 0.29, 0.24, 0, 0.13, 0.54, 0.14, 0xffffff);
-    M.box(-sgn * 0.29, -0.06, 0, 0.12, 0.12, 0.13, 0xe8e8e8);
+  });
+  // the arm and its hand, hanging from the shoulder (L3-11)
+  const arm = (sgn) => venCrowdGeo((M) => {
+    M.box(sgn * 0.29, -0.27, 0, 0.13, 0.54, 0.14, 0xffffff);
+    M.box(sgn * 0.29, -0.60, 0, 0.12, 0.12, 0.13, 0xe8e8e8);
   });
   const gBody = venCrowdGeo((M) => {
     M.box(0, 0, 0, 0.46, 0.62, 0.27, 0xffffff);
@@ -6252,7 +6272,7 @@ function venBuildCrowd(game, root) {
     return m;
   };
   venCrowd = { a: mk(limb(1)), b: mk(limb(-1)), body: mk(gBody), head: mk(gHead),
-               cam: mk(gCam), brolly: mk(gBrolly) };
+               cam: mk(gCam), brolly: mk(gBrolly), al: mk(arm(-1)), ar: mk(arm(1)) };
   let seed = 91741;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   // A WINTER SQUARE, NOT A SUMMER ONE. It is four in the afternoon in the wet
@@ -6284,7 +6304,9 @@ function venBuildCrowd(game, root) {
     // per frame by distance is a queue that swaps people round in front of you.
     venCrowdData[o + 9] = i / venCROWD_N;
     col.set(COAT[(rnd() * COAT.length) | 0]);
-    for (const m of [venCrowd.a, venCrowd.b, venCrowd.body]) m.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    for (const m of [venCrowd.a, venCrowd.b, venCrowd.body, venCrowd.al, venCrowd.ar]) {
+      m.instanceColor.setXYZ(i, col.r, col.g, col.b);
+    }
     col.set(SKIN[(rnd() * SKIN.length) | 0]);
     venCrowd.head.instanceColor.setXYZ(i, col.r, col.g, col.b);
     col.set(0x2f3438);
@@ -6292,7 +6314,7 @@ function venBuildCrowd(game, root) {
     col.set(rnd() < 0.55 ? 0x2f3438 : 0x54606a);
     venCrowd.brolly.instanceColor.setXYZ(i, col.r, col.g, col.b);
   }
-  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
+  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly', 'al', 'ar']) {
     venCrowd[k].instanceColor.needsUpdate = true;
   }
   venCrowdBodies = game && typeof game.addCrowdBodies === 'function'
@@ -6540,6 +6562,14 @@ function venUpdateCrowd(game, dt) {
     venCrowd.a.setMatrixAt(i, venXform(x, fy + 0.82 * bld + bob, z, sw, yaw, 0, bld, bld, bld));
     venCrowd.b.setMatrixAt(i, venXform(x, fy + 0.82 * bld + bob, z, -sw, yaw, 0, bld, bld, bld));
     venCrowd.body.setMatrixAt(i, venXform(x, fy + 1.14 * bld + bob, z, 0, yaw, 0, bld, bld, bld));
+    // ---- ARMS, AND A HEIGHT (L3-11) --------------------------------------
+    // Shoulder at 1.40 over the feet, same phase as the legs, and the LEFT arm
+    // (al, x -0.29) goes with the RIGHT leg (a, x +0.11): the same sign as `a`
+    // is what the old welded limb did, so the gait is unchanged and only the
+    // pivot moved. Standing, they drift on the chapter clock at half a hertz.
+    const asw = moving ? Math.sin(ph) * 0.45 : Math.sin(venTime * 3.14 + i * 1.7) * 0.05;
+    venCrowd.al.setMatrixAt(i, venXform(x, fy + 1.40 * bld + bob, z, asw, yaw, 0, bld, bld, bld));
+    venCrowd.ar.setMatrixAt(i, venXform(x, fy + 1.40 * bld + bob, z, -asw, yaw, 0, bld, bld, bld));
     // the head tips back for the campanile, which is the whole gesture
     const upv = (st === venCROWD_WALK && venCrowdData[o + 8] > 0) ? -0.42 : 0;
     venCrowd.head.setMatrixAt(i, venXform(x, fy + 1.62 * bld + bob, z, upv, yaw, 0, bld, bld, bld));
@@ -6555,7 +6585,7 @@ function venUpdateCrowd(game, dt) {
       x + Math.sin(yaw) * 0.16, fy + 1.62 * bld + bob, z + Math.cos(yaw) * 0.16,
       0.12, yaw, 0, bs * bld, bs * bld, bs * bld));
   }
-  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly']) {
+  for (const k of ['a', 'b', 'body', 'head', 'cam', 'brolly', 'al', 'ar']) {
     venCrowd[k].instanceMatrix.needsUpdate = true;
   }
   // ...and every box goes where its person went. AFTER the loop, not inside
