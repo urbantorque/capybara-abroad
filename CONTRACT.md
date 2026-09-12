@@ -181,9 +181,33 @@ the widened stride), Venice's and Mong Kok's (`limb(sgn)` is leg-only now,
 idle sway when a walker is held at a light; M14's build helper widened to
 0.92–1.08). +2 draw calls per chapter.
 
-**Still open**: a Karplus–Strong string (a worklet); nothing else from the
-three reviews remains unstarted. The Cali dancers were already moving on
-the beat — LIFT2's note was stale.
+**L3-12. THE STRING.** A Karplus–Strong string in an AudioWorklet
+(`sysMUS_KS_SRC`, a Blob URL so it ships in the one-file build): ten slots,
+a noise burst through a pluck-position comb, a fractional delay tuned to
+the pitch, the two-point average as the loss, a per-note decay for the
+duration asked, a pan, scheduled by `at`. The generic pluck goes through it
+(`musPluck`, level `sysMUS_KS_LEVEL`); the old recipe is the fallback on
+the same call. Koto and guembri keep their own recipes (a bend, a rattle on
+the drum bus). `musAudit().ks/ksN`.
+
+**L3-13.** Sound as text (`sysCaptions`, prefs `cc`; `sysCUE_TEXT` names
+thirty-odd cues, one toast per sound per six seconds, before the audio
+gates). "after Sydney" on the other eighteen tiles of a fresh file. A +2 dB
+shelf at 2.8 kHz on `musPluckDry` only. THE VERSE: every fourth chord the
+pad's outer two voices sit out (`musVerseN`; the outgoing bank leaves from
+`lvlNow`).
+
+**L3-14. RIDDLE FIRST.** `riddleShown` gates the aim, the beacon and the
+chart's goal ring: a row arrives as its clue and the arrow comes after
+`sysRIDDLE_T` (40 s) on that row with nothing ticked ("the arrow, then."),
+or on F; the first thing done in a chapter keeps its arrow, as do the
+marquee and the way on; "arrows straight away" (`sysArrowsNow`, prefs
+`ar`) switches it off.
+
+**Still open**: nothing from the five reviews or the two roadmaps remains
+unstarted; the design review's "line meter" (a streak counter on the
+paper) was judged redundant with the flow the animal already has. The Cali
+dancers were already moving on the beat — LIFT2's note was stale.
 
 ## THE BIG ONES, LIFTED AGAIN — FIVE RIDICULOUS ONES, AND THE LADDER SAID OUT LOUD (X1–X5, N1, L1–L10 — 11 Sep 2026)
 
