@@ -3477,6 +3477,52 @@ function monUpdateBoats(dt) {
 // ...the lamps.
 const monLAMPS = [];
 function monLamp(x, z) { monLAMPS.push(x, z); }
+// ---- THE HARBOUR IS WET (L4, E7 / art #5) -----------------------------------
+// Forty-two lamps ring the port and the basin under them was a flat blue:
+// measured on the resting frame, not one pixel of the water band was over
+// luma 180. Kowloon's answer (hkBuildWetRoad) is the answer here — a light
+// over a wet surface puts a broken streak on it, toward the eye. The eye is
+// wherever the camera is, which the geometry cannot know, so every streak
+// points from its lamp toward the basin's middle: from the west quay, where
+// the chapter starts, that is toward the lens, and from anywhere on the ring
+// the forty-two streaks together read as a ring of lamps in the water.
+// Four bars a lamp, dimming and narrowing away from the wall, additive at a
+// low opacity so they add light to the water rather than paint over it. One
+// draw call; the merger's vertex colours carry the ramp.
+const monWET_LEN = 22, monWET_BARS = 5, monWET_W = 1.6;
+function monBuildWetHarbour(root) {
+  const M = monMerger();
+  const cx = (monPORT.x0 + monPORT.x1) / 2, cz = (monPORT.z0 + monPORT.z1) / 2;
+  const grey = (v) => { const g = Math.max(0, Math.min(255, Math.round(v * 255))); return (g << 16) | (g << 8) | g; };
+  let n = 0;
+  for (let i = 0; i < monLAMPS.length; i += 2) {
+    const lx = monLAMPS[i], lz = monLAMPS[i + 1];
+    // only the lamps on the port's own ring: within six metres of its edge
+    const inX = lx > monPORT.x0 - 6 && lx < monPORT.x1 + 6, inZ = lz > monPORT.z0 - 6 && lz < monPORT.z1 + 6;
+    const onEdge = (Math.abs(lx - monPORT.x0) < 6 || Math.abs(lx - monPORT.x1) < 6 || Math.abs(lz - monPORT.z0) < 6 || Math.abs(lz - monPORT.z1) < 6);
+    if (!(inX && inZ && onEdge)) continue;
+    const dx = cx - lx, dz = cz - lz, dl = Math.hypot(dx, dz) || 1;
+    const ux = dx / dl, uz = dz / dl;
+    const yaw = Math.atan2(ux, uz);
+    // the streak starts where the water starts, four metres in from the lamp
+    for (let k = 0; k < monWET_BARS; k++) {
+      const u = (k + 0.5) / monWET_BARS;
+      const f = ((1 - u) * (1 - u) * 0.9 + 0.1) * (0.6 + 0.4 * Math.abs(Math.sin(k * 1.9 + i)));
+      const along = 4.5 + u * monWET_LEN;
+      const len = monWET_LEN / monWET_BARS * 0.72;
+      const w = monWET_W * (1 - u * 0.25);
+      M.box(lx + ux * along, monWATER + 0.03, lz + uz * along, w, 0.02, len, grey(f), 0, yaw, 0);
+    }
+    n++;
+  }
+  if (!n) return;
+  const mesh = new THREE.Mesh(M.build(), new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.42, color: 0xffe0a8,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  mesh.renderOrder = 3;
+  mesh.frustumCulled = false;
+  root.add(mesh);
+}
 function monBuildLamps(root) {
   // round the basin
   for (let i = 0; i < 26; i++) {
@@ -4769,6 +4815,7 @@ function monBuild(game) {
   monBuildSmallCraft(monRoot);
   monBuildPalms(monRoot);
   monBuildLamps(monRoot);
+  monBuildWetHarbour(monRoot);   // after the lamps: it reads monLAMPS (L4, E7)
   monBuildWatchers(game, monRoot);
   // LAST, because every builder above may have asked for a lit window and this
   // is the one draw call all of them land in.

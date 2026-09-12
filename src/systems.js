@@ -9970,6 +9970,122 @@ export function createSystems(game) {
   const fill = new THREEx.DirectionalLight(PALETTE.skyLight, 0.3);
   fill.castShadow = false;
   scene.add(fill);
+  // =========================================================================
+  // THE SUN AND THE CLOUDS (L4, E7 / art #4, #5)
+  // =========================================================================
+  // The sky was a dome with a lobe painted on it: measured on the nineteen
+  // arrival frames, the sky band's luma sd was 14-20 on the clear days —
+  // one flat gradient, and nothing in it that was ever IN it. Two things,
+  // biome-neutral like the dust and the weather, in systems' own scene:
+  //
+  //   THE SUN. A disc at the light's bearing, 0.92 of the way to the far
+  //   plane, sized to three degrees (larger than the real one, which is the
+  //   flat style's licence), its colour over 1.0 so the bright pass takes it
+  //   and the bloom gives it a halo — the one thing in a daylight frame that
+  //   reads as a source. Depth-tested, so a hill or a tower may stand in
+  //   front of it; fog-free, so the haze does not put it out.
+  //
+  //   THE CLOUDS. Three soft cards, each a canvas of overlapping ellipses
+  //   under a top-to-base gradient (warm white over a pale blue: lit from
+  //   above by the sun, from below by the ground), held at a bearing and a
+  //   height off the camera and turned to face it, drifting round the
+  //   compass in the direction the cloud-shadow field is drifting, so the
+  //   shadows crossing the lawn and the clouds over it move the same way.
+  //
+  // Both only in the chapters lit by a clear sun at height (sysKEY at 1 or
+  // more), and gone under water. Four draw calls.
+  const skyRig = new THREE.Group();
+  skyRig.name = 'sysSkyRig';
+  scene.add(skyRig);
+  function skyDiscTex() {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.62, 'rgba(255,255,255,1)');
+    r.addColorStop(0.80, 'rgba(255,255,255,0.35)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  function skyCloudTex(seed) {
+    const W = 256, H = 128;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    // the silhouette: a row of soft lobes on a flat base, each a radial
+    // gradient so the edge is air rather than a line
+    let sd = seed * 7919 + 13;
+    const rnd = () => { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+    for (let i = 0; i < 9; i++) {
+      const cx = 30 + rnd() * (W - 60), cy = 62 + rnd() * 28, rr = 28 + rnd() * 30;
+      const r = g.createRadialGradient(cx, cy, 0, cx, cy, rr);
+      r.addColorStop(0, 'rgba(255,255,255,0.95)'); r.addColorStop(0.55, 'rgba(255,255,255,0.7)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = r; g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill();
+    }
+    // lit from above, blue from below: a vertical tint multiplied on
+    g.globalCompositeOperation = 'source-atop';
+    const v = g.createLinearGradient(0, 24, 0, H);
+    v.addColorStop(0, 'rgba(255,250,240,1)'); v.addColorStop(0.55, 'rgba(238,236,236,1)'); v.addColorStop(1, 'rgba(178,196,220,1)');
+    g.fillStyle = v; g.fillRect(0, 0, W, H);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+  const skySunMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: skyDiscTex(), transparent: true, depthWrite: false, fog: false,
+                                  color: new THREE.Color(2.6, 2.35, 1.9), toneMapped: false }));
+  skySunMesh.renderOrder = -5;
+  skySunMesh.frustumCulled = false;
+  skyRig.add(skySunMesh);
+  const skyClouds = [];
+  // FOUR, LOW. The first cut put three cards at 9-15 degrees of elevation
+  // and the resting lens — whose sky is the top quarter of the frame, the
+  // horizon at about -13 degrees inside the top edge — saw one edge of one
+  // of them (qa/l4s-sydney-day.png). `h` is height over distance: 0.07 to
+  // 0.13 is four to seven degrees, the band a low sky actually has clouds
+  // in; four bearings ninety degrees apart so one is in the frame whichever
+  // way the rig has settled.
+  const sysCLOUD_CARDS = [
+    { b: 0.20, h: 0.085, w: 0.66, a: 0.62 },
+    { b: 1.75, h: 0.070, w: 0.52, a: 0.52 },
+    { b: 3.30, h: 0.115, w: 0.74, a: 0.58 },
+    { b: 4.85, h: 0.095, w: 0.58, a: 0.55 },
+  ];
+  for (let i = 0; i < sysCLOUD_CARDS.length; i++) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5),
+      new THREE.MeshBasicMaterial({ map: skyCloudTex(i + 1), transparent: true, depthWrite: false, fog: false,
+                                    opacity: sysCLOUD_CARDS[i].a, toneMapped: true }));
+    m.renderOrder = -4;
+    m.frustumCulled = false;
+    skyRig.add(m);
+    skyClouds.push(m);
+  }
+  let skyCloudDrift = 0;
+  const sysSKY_SUN_DEG = 3.0;
+  function skyRigFrame(dt, name, subT) {
+    const day = (sysKEY[name] === undefined ? sysKEY_DEF : sysKEY[name]) > 0 && subT < 0.5;
+    skyRig.visible = day;
+    if (!day) return;
+    const far = camera.far || 400;
+    const d = far * 0.92;
+    // the sun: at the light's bearing, sized to three degrees
+    skySunMesh.position.set(camera.position.x + sysAxDir.x * d, camera.position.y + sysAxDir.y * d, camera.position.z + sysAxDir.z * d);
+    const sz = 2 * d * Math.tan(sysSKY_SUN_DEG * Math.PI / 360);
+    skySunMesh.scale.set(sz, sz, 1);
+    skySunMesh.lookAt(camera.position);
+    // ...and a low sun is warmer and larger, the way the evening's is
+    const lowK = clamp(1 - sysAxDir.y / 0.5, 0, 1);
+    skySunMesh.material.color.setRGB(2.6, 2.35 - 0.5 * lowK, 1.9 - 0.9 * lowK);
+    skySunMesh.scale.multiplyScalar(1 + 0.35 * lowK);
+    // the clouds: round the compass with the shadow field's drift
+    if (!sysCalmOn()) skyCloudDrift += (sysCloudDX >= 0 ? 1 : -1) * 0.0035 * dt;
+    for (let i = 0; i < skyClouds.length; i++) {
+      const cd = sysCLOUD_CARDS[i], m = skyClouds[i];
+      const b = cd.b + skyCloudDrift * (0.7 + 0.3 * i);
+      const dd = far * 0.78;
+      m.position.set(camera.position.x + Math.sin(b) * dd, camera.position.y + cd.h * dd, camera.position.z + Math.cos(b) * dd);
+      m.scale.set(cd.w * dd, cd.w * dd * 0.62, 1);
+      m.lookAt(camera.position);
+      // lit by the chapter: the sun's colour on the card, dimmed with the sun
+      m.material.color.copy(sun.color).lerp(hemi.color, 0.35).multiplyScalar(0.55 + 0.45 * clamp(sun.intensity / 3, 0, 1));
+    }
+  }
   scene.add(fill.target);
 
   // The shadow frustum's DEPTH is per-biome: a flat harbour needs 64 units of it,
@@ -32027,6 +32143,8 @@ export function createSystems(game) {
    * place a chapter gets to say how it wants to be LOOKED at.
    */
   function sysDressFrame(dt) {
+    // THE SUN AND THE CLOUDS (L4, E7): see skyRigFrame
+    try { skyRigFrame(dt, (game.biome && game.biome.current) || 'sydney', subT || 0); } catch (e) { /* the sky is a gift */ }
     // ONE float, and every water surface in the game moves. See grain() in
     // shared.js: the sparkle uniform object is shared by every grained
     // material, so this is the entire per-frame cost of glitter on eight seas.
