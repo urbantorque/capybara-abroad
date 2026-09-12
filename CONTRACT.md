@@ -1,3 +1,158 @@
+## THE FOURTH LIFT — THE CAMERA, THE HOUR, THE CHASE AND THE DEPARTURE (L4 — 12–13 Sep 2026)
+
+Asked for, a fourth time: functional and enjoyable lifted to memorable —
+five to seven areas in detail and three to four features that change what
+the game is, nothing broken. Six reviewers (design, art, audio, writing/UX,
+QA/perf, a fresh-eyes playtest) read the tree and the 39 settled frames and
+this time PLAYED it; ROADMAP-LIFT4.md is the synthesis. Twelve commits,
+L4-0 to L4-11; every batch under playwright and `npm test` (14 checks now)
+green, the fuzz clean and *started* in nineteen chapters on every commit.
+
+### The four features
+
+**F1. THE CAMERA, AND THE CHAPTER TOLD BACK (L4-5).** K pauses the world —
+the journal's own flag — and hands the rig to a free orbit: drag/AD orbit,
+WS pitch −10..+35, wheel dolly 2–30 m, RF roll, 1–4 for 24/35/50/85 mm
+through the fov (a 36×24 sensor's `2 atan(12/f)`, outside the interactive
+clamp on purpose), click to focus with the DoF at full strength near and
+far, Q for the pose (as it is / look here / loaf / wheek — `capy.photoPose`,
+on the model alone since `capyUpdate` is not running), L for the look (as
+it is / golden / Kodachrome). A blend on `photoLens` so K is a lens opening;
+the camera's keys swallowed before the world's; a composed shot kept at
+960×600. **The game photographs the big one itself**: a third of a second
+after a marquee lands, a tag-2 album row named after the wow, never evicted
+by the nap's, the picture the done card, the ledger leaf and the postcard
+reach for first. **`chapRecap(n)`**: up to three lines ranked by rarity from
+the counters the journey already keeps — a scene over an incident, a record
+past par over a record, a passenger over a photograph, a regular who knows
+you — on the done card under the sentence and small on the postcard's band.
+qa/l4-camera.js, qa/l4-recap.js.
+
+**F2. THE HOUR TURNS (L4-8).** At ENOUGH in the ten clear-sun chapters the
+sun comes down over four minutes to twelve degrees on its own azimuth,
+through `sunAxes` — so `sysSunLow`, the dome's lobe and the shadow length
+follow for free — with the key light allowed to be darker (what it holds
+comes down 38 % with the sun; the sun is never pushed past twice its
+authored intensity, or a twelve-degree key would light the evening like a
+noon from the side) and a tenth more saturation and a warm tint on the
+grade. Saved as `eve`. Forced full in Sydney/Pasto/Venice: p01 38/48/50 →
+27/37/42, the dark share 4–10 % → 22–36 %, saturation 0.30/0.30/0.20 →
+0.31/0.32/0.29. qa/l4-eve.js.
+
+**F3. THE CHASE, SCORED (L4-9).** A chase made the score darker (centroid
+131 → 94 Hz). It is a layer now on the pad palettes: a pulse on the drum bus
+at 118 — bendir on one and three, clap on two and four — the pad filter up
+1500 Hz, the pad lifted a quarter (the calm lean inverted in the plain
+sense: the calm state's pad is boosted by the lean, so a chase at base level
+had fewer mids than a rest), the bass held, the lead doubled an octave up
+above 0.6, `npc:lost`/`npc:caught` cutting the tail to 0.6 s. Four cuts:
+chase 94 → 145 → 168 → 188 → 207 Hz against a calm E2 moved to 174–242
+across runs — level, inside the run-to-run spread, from a third darker.
+
+**F4. THE DEPARTURE, AND THE CODA (L4-7).** A line off the board asks for
+the ceremony's pull-back (12.4 → 16.5 m), says `chapter:leave` (heads turn,
+the nearest three say a farewell a beat apart, the regular with your name),
+shows THAT WILL DO HERE with the sentence and the keepsake when the place
+was enough, and cuts to the horn and the white 2.4 s later. The board's
+gate began its loop at chapter two — Pasto was open from the first minute
+while the paper said "after fourteen more"; it starts at one, and Sydney
+authors `door: 10`. THE CODA: nineteen notes, one per chapter on its
+palette's lead, on the current chord, panned by longitude, each keepsake on
+the lawn flashing as its note sounds; then THE HUSH — the bus to nothing,
+held 2.6 s — and the ledger brings the music back. qa/l4-depart.js.
+
+### The seven areas
+
+**E1. THE KEY LIGHT AND THE LENS (L4-2a/2b).** Direct sun on a horizontal
+was LESS than the diffuse light in nearly every daylight chapter. `sysKEY`
+holds the lit value in luma and moves only the split to 3.5:1, backing off
+as the sun does (luma ratio 0.78 → 3.1 in Sydney); the shade bluer and
+darker; the driving DoF 0.50–0.65 → 0.26–0.30, full for the camera and
+slow-mo. The walking lens 34 → 24°, fov 48 → 52, boom 9.5 → 10.5 m, the
+sprint dolly trimmed so the running lens stays at 16 — walk horizon in frame
+18/19 (was 16/19 and thinner), and the cost kept: the boom-cut fraction rises
+in eleven chapters (Sydney 0 → 0.18, Iceland 0.18 → 0.55). The rest lens
+drifts 20° round the flank and the animal LOOKS BACK over its shoulder as a
+sixth idle beat. Kowloon's pools one ramped disc each; the bus glazing under
+the bloom threshold; Monaco's fill and quay down so the quay sits under its
+sky.
+
+**E2. THE SCORE, VOICED (L4-3).** A second harmonic on the bass, the sine
+−4 dB, pad cut ×1.35, the pluck drier, a tilt on `musVol`, spectra re-trimmed;
+one writer on the world bus; nine footstep materials beside the pitch;
+distance has wetness; the herd answers one by one.
+
+**E3. THE FIRST MINUTE (L4-4).** A fresh file's first three minutes get a
+budget: a line in the game's voice waits six seconds from the last pill and
+2.5 from the last tick, at most two held. Minute-one pills 10/6/11 → 7/5/6
+(Sydney/Kyoto/Hanoi, stashed tree vs. working). Chapter-neutral finds silent
+for five minutes (3/2/2 → 0/0/0); the incident chain waits 90 s or a tick;
+`most-wanted` and `wrung-out` tightened; "noticed", not "found". THE REACH:
+the nearest grabbable inside 2.5 m takes a harder, warmer rim while E is
+held — per mesh, without a material, by lifting the rim uniforms in that
+mesh's `onBeforeRender` (`reachRim`) — and a whiff plays the detent an
+octave down. **THE EDGE IS A WALL**: the naive walk in Kyoto left the world
+at x = 170 (the ground is a plane) and the rescue landed five metres inside
+the line — four "put you back" in five seconds; inside 24 m of the line the
+outward velocity is taken off, and a bounds rescue lands fourteen metres in.
+
+**E4. EVERY MARQUEE A NUMBER (L4-6).** Eleven marquees without a RECORDS row
+have one (19/19, was 8/19), each routed through `recordLive`, each par
+AUTHORED from a named constant and saying so — the scripted-floor pass is
+owed. The paper's `.marq` state while the big one is live. Five movement
+names on the repertoire (THE SLIDE-OFF, THE KICK, THE MOUNT, THE LONG SHOT,
+THE CHAIN), awarded by a watcher on the animal's flags; the movement soak
+was not run.
+
+**E5. THE VOICE IN SYDNEY AND PASTO (L4-10).** Regulars for the two chapters
+whose people walk — the waiter ("Table Four") and the woman with the broom
+("Sinvergüenza") — found by kind in the cast; the cast on the bag-and-ring;
+the slide pool re-voiced; 28 cross-pool duplicates gone with an asserting
+check; the rumour arms Sydney → Pasto. Two things the seeded probe found:
+Sydney is the one place the game never ENTERS, so a restore there fired no
+`biome:enter` and the waiter had never met you (startGame arms him by
+hand); and the cast carries a fourteen-second talk cooldown and the abuela's
+state is `chase`, so neither was ever free. The crowd's distinct/total sits
+at 0.36–0.63 — a seventy-line pool read 192 times cannot reach 0.85; the
+honest number is the top line's share, 9/192.
+
+**E6. THE MACHINE (L4-1).** The fuzz starts with Enter and FAILS on
+`started !== true` (it had regressed to nineteen rows against the title
+card); the pasted save survives its reload; the string loads from `file://`
+(a `data:` URL first); the governor on absolute frame time with a second
+rung; the broadphase tests bounds first (Kyoto 118k → ~5k); pause keeps the
+beat; the overlay counts the whole frame; `npm test` runs `build.mjs`.
+qa/b5-cam.js was ALSO measuring the title card (`page.mouse.click`) — fixed.
+
+**E7. THE SKY AND THE WATER (L4-11).** A sun disc over 1.0 at the light's
+bearing; four cloud cards at four to seven degrees, drifting with the
+shadow field; Monaco's port-ring lamps put broken additive bars on the
+basin. The sun is behind the lens at rest in every front-lit chapter, so
+the cluster test shows only when the rig turns.
+
+### What the instruments said that the roadmap did not expect
+
+- **Trap 25 did not hold.** Module cache across `page.goto` in one session
+  was assumed; the E3 "before" run in a session opened before the edit
+  measured the AFTER (gaps exactly 6.0 s). A before is a stash, never a
+  session.
+- **`page.mouse.click(640, 400)` had been the start gesture of qa/b5-cam.js
+  as well as the fuzz**: every walk/run band was a gap and the idle band was
+  the title's drift rig. Assert `started` in every probe.
+- **A greeting cannot wait for a mouth that never closes**: the cast's
+  `talkCd` is fourteen seconds after every line.
+- **A cloud metric on the top 12 % of a frame whose sky is a strip** measures
+  the haze; the picture is the evidence.
+- **The chase's darkness was the bass**: three cuts moved the pulse and the
+  pad; the fourth held the intensity's own bass term off during a chase.
+
+### Not taken, and why
+
+The stowaway (held as the stretch item; untouched). A day/night cycle (F2 is
+the version that is a reward). The scripted floors for the eleven pars and
+the movement soak (owed to the next pass, said in the rows). The Quay's wet
+streaks (Monaco's harbour took them; the Quay's water is daylight).
+
 ## THE THIRD LIFT — THE AUTHORITY AND THE HIDE, THE MELODY, AND THE FRAME GIVEN A DARK (L3 — 12 Sep 2026)
 
 Asked for: a game that is functional and enjoyable lifted to memorable —
