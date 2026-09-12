@@ -1653,6 +1653,7 @@ let capyWhiffPend = false;          // a grab attempt found nothing THIS frame
 let capyStillT = 0;                 // s settled, mouth EMPTY — see capyWHEEK_CALM_T
 let capyRestT  = 0;                 // ...and the same with something in it. See THE CALM.
 let capyLoaf   = 0;                 // 0..1 sat down. See THE LOAF.
+let capyPhotoBaseY = null;          // the model's height when the camera came out (photoPose)
 let capyNap    = 0;                 // 0..1 asleep. See THE NAP.
 // NOT capyWakeT — that name is already the boat WAKE on the water, twenty
 // lines into the swim block, and shadowing it would have silently stopped the
@@ -4422,6 +4423,44 @@ export function createCapybara(game) {
                legX: [legs[0].rotation.x, legs[1].rotation.x,
                       legs[2].rotation.x, legs[3].rotation.x],
                pitch: capyModel.rotation.x, roll: capyModel.rotation.z };
+    },
+    // ---- THE POSE FOR THE CAMERA (L4, F1a) ---------------------------------
+    // systems.js calls this once a frame while the camera is out and the
+    // world is PAUSED — so capyUpdate is not running, the model's transforms
+    // are whatever the last simulated frame left, and anything written here
+    // simply stands until the world moves again and the update overwrites
+    // it. Four poses, all on the model alone:
+    //   0  as it is           nothing written
+    //   1  look here          the head turned to the lens, past the gaze's
+    //                         ordinary limit (a portrait is the neck at its limit)
+    //   2  loaf               the barrel down, the ears out, the head level
+    //   3  wheek              the mouth open, the head up, the ears back
+    // Damped on the wall clock the caller passes in through `k` (the lens
+    // scalar), so a pose arrives rather than pops. The one number kept across
+    // calls is the model's resting height, read on the first call so the
+    // loaf can drop from it and the next pose can put it back.
+    photoPose: function (mode, camPos, k) {
+      if (capyPhotoBaseY === null) capyPhotoBaseY = capyModel.position.y;
+      const w = k > 0 ? (k < 1 ? k : 1) : 0;
+      let hy = 0, hp = 0, drop = 0, jaw = 0, ear = 0;
+      if (mode === 1 && camPos) {
+        const dx = camPos.x - capyPosition.x, dz = camPos.z - capyPosition.z;
+        const flat = Math.sqrt(dx * dx + dz * dz);
+        const local = capyWrapAngle(Math.atan2(dx, dz) - capyYaw);
+        hy = clamp(local, -0.95, 0.95);
+        hp = clamp(-Math.atan2(camPos.y - (capyPosition.y + 0.55), Math.max(flat, 0.3)), -0.45, 0.30);
+      } else if (mode === 2) {
+        drop = capyLOAF_DROP; ear = 0.22; hp = 0.06;
+      } else if (mode === 3) {
+        jaw = 1; hp = -0.22; ear = -0.30;
+      }
+      head.rotation.y = lerp(head.rotation.y, hy, w);
+      head.rotation.x = lerp(head.rotation.x, hp, w);
+      capyModel.position.y = lerp(capyModel.position.y, capyPhotoBaseY - drop, w);
+      jawHinge.rotation.x = lerp(jawHinge.rotation.x, jaw * 0.5, w);
+      earL.rotation.z = lerp(earL.rotation.z, -0.18 - ear, w);
+      earR.rotation.z = lerp(earR.rotation.z, 0.18 + ear, w);
+      if (mode === 0 && w <= 0) capyPhotoBaseY = null;
     },
     update: capyUpdate,
   };

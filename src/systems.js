@@ -9206,7 +9206,10 @@ function sysBuildCSS() {
   'width:min(84vw,420px);}',
 '.capyui-done.show{opacity:1;transform:translate(-50%,-50%) rotate(-.9deg) scale(1);}',
 /* the postcard, at the aspect it is authored in (64 x 40) */
-'.capyui-doneart{width:100%;aspect-ratio:64 / 40;border-radius:' + rMd + ';overflow:hidden;',
+/* position:relative (L4, F1b): the photograph is an absolutely placed
+   .capyui-shot and this box is what it fills — without it the picture took
+   the whole card and the name under it (qa/l4recap-done.png, first cut). */
+'.capyui-doneart{position:relative;width:100%;aspect-ratio:64 / 40;border-radius:' + rMd + ';overflow:hidden;',
   'border:1px solid ' + rule + ';display:block;}',
 /* aspect-ratio is not universal; a height floor keeps the picture a picture on
    an engine that ignores it rather than collapsing it to nothing. */
@@ -9222,6 +9225,9 @@ function sysBuildCSS() {
    more of those would have been a fourth label rather than a line to read. */
 '.capyui-donenote{font-size:clamp(12px,2.4vw,15px);color:' + inkSoft + ';font-style:italic;',
   'line-height:1.4;margin:7px auto 0;max-width:min(78vw,30em);text-wrap:balance;}',
+'.capyui-donelines{font-size:clamp(10.5px,2vw,12.5px);letter-spacing:.14em;text-transform:uppercase;',
+  'color:' + sysRgba(PALETTE.ibisHead, 0.86) + ';font-weight:700;line-height:1.6;margin:6px auto 0;',
+  'max-width:min(80vw,34em);white-space:pre-line;}',
 '.capyui-donerule{height:2px;background:' + rule + ';border-radius:' + rSm + ';margin:8px auto 7px;',
   'width:min(30vw,140px);transform:rotate(.5deg);}',
 '.capyui-donesub{font-size:clamp(9.5px,2vw,12px);letter-spacing:.16em;font-weight:700;',
@@ -21643,6 +21649,152 @@ export function createSystems(game) {
   photoFlash.setAttribute('aria-hidden', 'true');
   hudRoot.appendChild(photoFlash);
   let photoOn = false, photoBareWas = false, photoShots = 0, photoCapT = 0;
+  // =========================================================================
+  // THE CAMERA (L4, F1a) — photo mode becomes a camera
+  // =========================================================================
+  // K used to take the paper off and put a frame round the driving lens: the
+  // picture you got was the picture you were already looking at, from 10 m
+  // behind and 24 degrees above the animal, every time. A camera is a lens
+  // you can move. So K now PAUSES THE WORLD — the same paused flag the
+  // journal sets, so nothing walks, sails, chatters or expires under the
+  // viewfinder — and hands the rig to a free orbit round the animal:
+  //
+  //   drag / A D        orbit                W S       pitch, -10..+35 deg
+  //   wheel             dolly, 2..30 m       R F       roll
+  //   1 2 3 4           24 / 35 / 50 / 85 mm through the fov
+  //   click             focus there (the DoF at full strength, near and far)
+  //   Q                 the animal's pose: as it is / look here / loaf / wheek
+  //   L                 the look: as it is / golden / Kodachrome
+  //   Enter             keep it            K / P    put the camera away
+  //
+  // The rig is a BLEND on photoLens, the same 2.6 s scalar the grade already
+  // opens on, so K is a lens opening rather than a cut, and putting the
+  // camera away eases back onto wherever the live rig has got to. Every
+  // number here is render-only: the world is paused, the animal's body does
+  // not move, and the pose is a head turned and a mouth opened on the model
+  // alone (capy.photoPose). The four focal lengths are a 36 x 24 sensor's:
+  // fov = 2 atan(12 / f), which is why 24 mm reads 53 and 85 mm 16.
+  const sysPHOTO_FOCAL = [24, 35, 50, 85];
+  const sysPHOTO_RAISE = 0.85;                 // m above the animal's origin the orbit centres
+  const sysPHOTO_DIST = [2, 30];
+  const sysPHOTO_PITCH = [-10 * Math.PI / 180, 35 * Math.PI / 180];
+  const sysPHOTO_ORBIT_V = 1.4;                // rad/s on a held key
+  const sysPHOTO_PITCH_V = 0.7;
+  const sysPHOTO_ROLL_V = 0.6;
+  const sysPHOTO_ROLL_MAX = 0.35;
+  const sysPHOTO_LOOKS = ['as it is', 'golden', 'kodachrome'];
+  const sysPHOTO_POSES = ['as it is', 'look here', 'loaf', 'wheek'];
+  let photoYaw = 0, photoPitch = 0.22, photoDist = 8, photoRoll = 0;
+  let photoFocal = 1, photoFocusM = -1, photoPose = 0, photoLook = 0;
+  let photoDragId = -1, photoDragX = 0, photoDragY = 0, photoDragMoved = 0;
+  let photoPausePre = false;
+  const photoRay = new THREE.Raycaster();
+  const photoNdc = new THREE.Vector2();
+  function photoFov() { return 2 * Math.atan(12 / sysPHOTO_FOCAL[photoFocal]) * 180 / Math.PI; }
+  /** Where the orbit is centred: the animal, a little above its origin. */
+  function photoTarget(v) {
+    const cp = game.capy && game.capy.position;
+    if (cp) v.set(cp.x, cp.y + sysPHOTO_RAISE, cp.z); else v.copy(sysLook);
+    return v;
+  }
+  /** Seed the orbit from wherever the live rig is, so K opens on the same frame. */
+  function photoSeed() {
+    photoTarget(sysV1);
+    const dx = camera.position.x - sysV1.x, dy = camera.position.y - sysV1.y, dz = camera.position.z - sysV1.z;
+    const flat = Math.sqrt(dx * dx + dz * dz);
+    photoYaw = Math.atan2(dx, dz);
+    photoPitch = clamp(Math.atan2(dy, flat), sysPHOTO_PITCH[0], sysPHOTO_PITCH[1]);
+    photoDist = clamp(Math.sqrt(dx * dx + dy * dy + dz * dz), sysPHOTO_DIST[0], sysPHOTO_DIST[1]);
+    photoRoll = 0; photoFocusM = -1;
+    // the focal nearest the live fov, so the first frame is the live frame
+    let best = 1, bd = 1e9;
+    for (let i = 0; i < sysPHOTO_FOCAL.length; i++) {
+      const f = 2 * Math.atan(12 / sysPHOTO_FOCAL[i]) * 180 / Math.PI;
+      const d = Math.abs(f - camera.fov);
+      if (d < bd) { bd = d; best = i; }
+    }
+    photoFocal = best;
+  }
+  function photoHintText() {
+    photoHint.textContent = 'drag to orbit  ·  wheel to dolly  ·  1-4 lens ' + sysPHOTO_FOCAL[photoFocal] + ' mm' +
+      '  ·  q ' + sysPHOTO_POSES[photoPose] + '  ·  l ' + sysPHOTO_LOOKS[photoLook] +
+      (photoFocusM > 0 ? '  ·  focus ' + photoFocusM.toFixed(1) + ' m' : '') +
+      '  ·  enter keeps it  ·  k puts it away';
+  }
+  /** The keys the camera owns while it is out. True when consumed. */
+  function photoKeyDown(c) {
+    if (c === 'Digit1' || c === 'Digit2' || c === 'Digit3' || c === 'Digit4') {
+      photoFocal = c.charCodeAt(5) - 49; photoHintText();
+      sfx('tick', { volume: 0.3, pitch: 1.3 + photoFocal * 0.1, ui: true, force: true });
+      return true;
+    }
+    if (c === 'KeyQ') {
+      photoPose = (photoPose + 1) % sysPHOTO_POSES.length; photoHintText();
+      sfx('tick', { volume: 0.3, pitch: 1.1, ui: true, force: true });
+      return true;
+    }
+    if (c === 'KeyL') {
+      photoLook = (photoLook + 1) % sysPHOTO_LOOKS.length; photoHintText();
+      sfx('tick', { volume: 0.3, pitch: 1.2, ui: true, force: true });
+      return true;
+    }
+    // held keys are read in the tick; swallowed here so the world's verbs
+    // (the arrow on F, the rescue on R, the wheek on Q) do not fire under
+    // the camera
+    return c === 'KeyW' || c === 'KeyA' || c === 'KeyS' || c === 'KeyD' || c === 'KeyR' || c === 'KeyF' ||
+           c === 'KeyE' || c === 'Space' || c === 'KeyC';
+  }
+  /** Held keys, once a frame, on the wall clock (the world clock is paused). */
+  function photoTick(rdt) {
+    if (!photoOn) return;
+    const m = sysLookMul() >= 0 ? 1 : -1;
+    if (keys.KeyA) photoYaw += sysPHOTO_ORBIT_V * rdt * m;
+    if (keys.KeyD) photoYaw -= sysPHOTO_ORBIT_V * rdt * m;
+    if (keys.KeyW) photoPitch = clamp(photoPitch + sysPHOTO_PITCH_V * rdt, sysPHOTO_PITCH[0], sysPHOTO_PITCH[1]);
+    if (keys.KeyS) photoPitch = clamp(photoPitch - sysPHOTO_PITCH_V * rdt, sysPHOTO_PITCH[0], sysPHOTO_PITCH[1]);
+    if (keys.KeyR) photoRoll = clamp(photoRoll + sysPHOTO_ROLL_V * rdt, -sysPHOTO_ROLL_MAX, sysPHOTO_ROLL_MAX);
+    if (keys.KeyF) photoRoll = clamp(photoRoll - sysPHOTO_ROLL_V * rdt, -sysPHOTO_ROLL_MAX, sysPHOTO_ROLL_MAX);
+  }
+  /** Click-to-focus: the distance to whatever is under the pointer. */
+  function photoFocusAt(cx, cy) {
+    const r = canvas.getBoundingClientRect();
+    photoNdc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    photoRay.setFromCamera(photoNdc, camera);
+    let hits;
+    try { hits = photoRay.intersectObjects(scene.children, true); } catch (e) { hits = []; }
+    for (let i = 0; i < hits.length; i++) {
+      const o = hits[i].object;
+      let vis = true;
+      for (let p = o; p; p = p.parent) if (p.visible === false) { vis = false; break; }
+      if (!vis || !(hits[i].distance > 0.3)) continue;
+      photoFocusM = clamp(hits[i].distance, 0.5, 400);
+      photoHintText();
+      sfx('tick', { volume: 0.26, pitch: 1.7, ui: true, force: true });
+      return true;
+    }
+    return false;
+  }
+  /** The rig, blended in by photoLens after the live rig has finished. */
+  function photoRig(lens) {
+    photoTarget(sysV1);
+    const cp = Math.cos(photoPitch), sp = Math.sin(photoPitch);
+    sysV2.set(sysV1.x + Math.sin(photoYaw) * cp * photoDist, sysV1.y + sp * photoDist, sysV1.z + Math.cos(photoYaw) * cp * photoDist);
+    // the same floor every other rig respects
+    if (sysV2.y < sysV1.y - 0.4) sysV2.y = sysV1.y - 0.4;
+    camera.position.lerp(sysV2, lens);
+    if (lens > 0.999) { camera.lookAt(sysV1); }
+    else {
+      // the two look points, blended, so the cut is one motion
+      sysV3.copy(sysLook).lerp(sysV1, lens);
+      camera.lookAt(sysV3);
+    }
+    if (photoRoll !== 0) camera.rotateZ(photoRoll * lens);
+    // ...and the animal's pose, on the model alone. capybara.js owns what
+    // each one looks like; this owns when.
+    if (game.capy && typeof game.capy.photoPose === 'function') {
+      try { game.capy.photoPose(photoPose, camera.position, lens); } catch (e) { /* older capybara.js */ }
+    }
+  }
 
   /** The caption. Three facts, and every one of them was already written down. */
   function photoCaption() {
@@ -21674,9 +21826,22 @@ export function createSystems(game) {
       hudBare = true;
       hudRoot.classList.add('bare');
       photoCaption();
+      // THE CAMERA (L4, F1a): the orbit opens on the live frame, and the
+      // world holds still under it — the journal's own flag, remembered so
+      // a camera opened over a pause card does not un-pause on its way out.
+      photoSeed();
+      photoPose = 0;
+      photoHintText();
+      photoPausePre = game.state.paused;
+      game.state.paused = true;
+      for (const k in keys) keys[k] = false;
     } else {
       hudBare = photoBareWas;
       hudRoot.classList.toggle('bare', hudBare);
+      if (!photoPausePre && !document.hidden && !jrShown && !ledShown && !albShown && !pauseShown) game.state.paused = false;
+      if (game.capy && typeof game.capy.photoPose === 'function') {
+        try { game.capy.photoPose(0, camera.position, 0); } catch (e) { /* older capybara.js */ }
+      }
     }
     photoEl.classList.toggle('show', on);
     sfx('tick', { volume: 0.34, pitch: on ? 1.5 : 1.1, ui: true });
@@ -21728,6 +21893,14 @@ export function createSystems(game) {
   // stay put: they are read only by albAdd and albWrite, neither of which can
   // run before the player has taken a picture.
   const sysALB_W = 288, sysALB_H = 180;   // 16:10, legible at the 150 px the grid uses
+  // ...AND A PICTURE THE PLAYER COMPOSED IS KEPT LARGER (L4, F1a). The camera
+  // is a lens the player moved, focused and framed; keeping it at 288 px is
+  // keeping a contact print of it. Hand-taken shots (tag 0) go in at 960 x
+  // 600 — about 90-140 KB of base64 each — and the quota rule below already
+  // evicts oldest-out when the store will not take another. The game's own
+  // shots (the nap, the marquee) stay at 288: they are a record, not a
+  // composition.
+  const sysALB_W2 = 960, sysALB_H2 = 600;
   const sysALB_Q = 0.72;
   const sysALB_MAX = 36;                  // ~0.5-0.7 MB of characters at worst
   // ...of which this many may be shots the GAME took rather than the player.
@@ -21773,15 +21946,16 @@ export function createSystems(game) {
     try {
       if (!albCan) {
         albCan = document.createElement('canvas');
-        albCan.width = sysALB_W; albCan.height = sysALB_H;
         albCtx = albCan.getContext('2d');
       }
       if (!albCtx) return false;
-      albCtx.drawImage(canvas, 0, 0, sysALB_W, sysALB_H);
+      const aw = tag ? sysALB_W : sysALB_W2, ah = tag ? sysALB_H : sysALB_H2;
+      if (albCan.width !== aw || albCan.height !== ah) { albCan.width = aw; albCan.height = ah; }
+      albCtx.drawImage(canvas, 0, 0, aw, ah);
       const u = albCan.toDataURL('image/jpeg', sysALB_Q);
       if (!u || u.length < 64) return false;
       const arr = albAll();
-      arr.push({ u: u, place: place, cap: cap, n: photoShots, tag: tag || 0 });
+      arr.push({ u: u, place: place, cap: cap, n: photoShots, tag: tag || 0, w: aw });
       // ---- A TAGGED SHOT MAY NEVER EVICT A HAND-TAKEN ONE (N5) ---------
       // THE NAP takes a photograph every ninety seconds and the album is
       // thirty-six deep, so a capybara left asleep for an hour would quietly
@@ -21810,11 +21984,83 @@ export function createSystems(game) {
     } catch (e) { return false; }
   }
 
-  /** The newest picture taken in a place, or null. The title card asks this. */
-  function albBest(place) {
+  /** The newest picture taken in a place, or null. The title card asks this.
+   *  With `tag`, the newest picture of THAT kind first (2 is the marquee's
+   *  own photograph — see wowShotTick), and any picture of the place after. */
+  function albBest(place, tag) {
     const arr = albAll();
+    if (tag) for (let i = arr.length - 1; i >= 0; i--) if (arr[i].place === place && arr[i].tag === tag) return arr[i];
     for (let i = arr.length - 1; i >= 0; i--) if (arr[i].place === place) return arr[i];
     return null;
+  }
+  // =========================================================================
+  // THE CHAPTER TOLD BACK (L4, F1b)
+  // =========================================================================
+  // The best twenty seconds of every chapter — the marquee — were never kept
+  // as a picture: the album held what the player happened to press Enter
+  // on and what the nap took at random. So the game takes one itself, a
+  // third of a second after the big one lands, with the world at 0.55x and
+  // the confetti in the air, and files it as tag 2: never evicted by the
+  // nap's tag-1 rows, and the picture the chapter-done card, the ledger
+  // leaf and the postcard reach for first.
+  //
+  // And the close says what happened here rather than three numbers that
+  // are the same three on every card: chapRecap(n) is up to three lines
+  // ranked by RARITY — a scene outranks an incident, a record past par
+  // outranks a record, a passenger outranks a photograph — from the per-
+  // chapter counters the journey already keeps, in the finds' voice.
+  const sysWOW_SHOT_T = 0.34;       // s after the marquee lands, wall clock
+  let wowShotT = 0, wowShotName = '', wowShotPlace = '';
+  function wowShotTick(rdt) {
+    if (wowShotT <= 0) return;
+    wowShotT -= rdt;
+    if (wowShotT > 0) return;
+    // Draw, then read — the same turn, for the reason photoShoot gives.
+    try {
+      if (game.post && game.post.enabled) game.post.render();
+      else renderer.render(scene, camera);
+      albAdd(wowShotPlace, wowShotName, 2);
+      albRefresh();
+    } catch (e) { /* the picture is a gift, not a promise */ }
+    wowShotT = 0;
+  }
+  function chapRecap(n) {
+    const out = [];
+    if (!(n > 0)) return out;
+    const rec = chapRec[n];
+    const sc = jrChapScene[n] || 0, ic = jrChapInc[n] || 0;
+    const ph = jrChapPho[n] || 0, fd = jrChapFed[n] || 0, pa = jrChapPerch[n] || 0;
+    const ln = jrChapLine[n] || 0, er = jrChapErr[n] || 0, ms = jrChapMs[n] || 0;
+    if (sc) out.push([6, sc === 1 ? 'you caused a scene here' : 'you caused ' + sysNumWord(sc) + ' scenes here']);
+    if (rec && rec.ids) {
+      for (let i = 0; i < rec.ids.length; i++) {
+        const id = rec.ids[i], rd = RECORDS[id], v = jrRecs[id];
+        if (!rd || v === undefined) continue;
+        const past = rd.par !== undefined && (rd.better === 'lower' ? v <= rd.par : v >= rd.par);
+        out.push([past ? 5 : 2.5, rd.label + ' ' + v.toFixed(rd.dp) + rd.unit + (past ? ' — past par' : '')]);
+      }
+    }
+    if (pa >= 2) out.push([5, sysNumWord(pa) + ' on your back at once']);
+    else if (pa === 1) out.push([3, 'somebody rode on your back']);
+    let fn = 0;
+    for (let i = 0; i < FINDS.length; i++) if (findDone[FINDS[i].id] && findWhere[FINDS[i].id] === n) fn++;
+    if (fn) out.push([3.5 + Math.min(fn, 3) * 0.3, fn === 1 ? 'one thing noticed here that nobody asked for' : sysNumWord(fn) + ' things noticed here that nobody asked for']);
+    if (ln >= sysLINE_SHOW) out.push([4, 'a clean line of ' + ln + ' m']);
+    if (ph) out.push([ph >= 3 ? 3.2 : 2, ph === 1 ? 'photographed once' : 'photographed ' + sysNumWord(ph) + ' times']);
+    if (fd) out.push([fd >= 2 ? 3.4 : 2.2, fd === 1 ? 'somebody gave you something' : 'given ' + sysNumWord(fd) + ' things']);
+    if (er) out.push([3, er === 1 ? 'you ran an errand' : 'you ran ' + sysNumWord(er) + ' errands']);
+    if (ic) out.push([ic >= 3 ? 2.6 : 1.8, ic === 1 ? 'one incident' : sysNumWord(ic) + ' incidents']);
+    {
+      const t = jrChapPal[n] || 0;
+      let who = null;
+      try { who = (typeof game.palWho === 'function') ? game.palWho((chapterDef(n) || {}).biome) : null; } catch (e) { who = null; }
+      if (who && t >= 3) out.push([t >= sysPAL_MAX ? 4.5 : 3.6, who.who + ' knows you' + (t >= sysPAL_MAX ? ' by name' : '')]);
+    }
+    if (ms > 0) out.push([1, sysFmtTime(ms) + ' here']);
+    out.sort(function (a, b) { return b[0] - a[0]; });
+    const lines = [];
+    for (let i = 0; i < out.length && lines.length < 3; i++) lines.push(out[i][1]);
+    return lines;
   }
 
   // ---- ...AND THREE SURFACES ASK IT NOW (v36) -----------------------------
@@ -21839,10 +22085,10 @@ export function createSystems(game) {
   //
   // Never throws. A dataURL that will not decode leaves the mark showing, which
   // is a complete tile on its own.
-  function albShotOn(biome, host) {
+  function albShotOn(biome, host, tag) {
     if (!host) return false;
     try {
-      const shot = albBest(biome);
+      const shot = albBest(biome, tag);
       if (!shot || !shot.u) return false;
       const im = document.createElement('img');
       im.className = 'capyui-shot';
@@ -22107,6 +22353,16 @@ export function createSystems(game) {
         }
         cardFit = { line: line, fs: fs, w: Math.round(g2.measureText(line).width), pw: pw };
         g2.fillText(line, px, by + 96 * k);
+      }
+      // ...and what happened here, small, on the right (L4, F1b): the recap's
+      // first line, which is the rarest thing you did in this place.
+      const rl = chapRecap(n);
+      if (rl.length) {
+        g2.fillStyle = sysRgba(PALETTE.ibisHead, 0.62);
+        g2.font = '700 ' + Math.round(14 * k) + 'px ' + sysCARD_FACE;
+        g2.textAlign = 'right';
+        g2.fillText(rl[0].toUpperCase().split('').join(String.fromCharCode(8202)), px + pw, by + 96 * k);
+        g2.textAlign = 'left';
       }
       return cardCan.toDataURL('image/png');
     } catch (e) { return ''; }
@@ -23461,10 +23717,14 @@ export function createSystems(game) {
   // sentence from the arithmetic. See CHAPTERS.note in shared.js.
   const doneNote = sysEl('div', 'capyui-donenote', '');
   const doneSub = sysEl('div', 'capyui-donesub', '');
+  // ...and the chapter told back (L4, F1b): up to three lines, under the
+  // sentence and above the rule. See chapRecap.
+  const doneLines = sysEl('div', 'capyui-donelines', '');
   doneEl.appendChild(doneArt);
   doneEl.appendChild(sysEl('div', 'capyui-donekick', 'that is the whole place'));
   doneEl.appendChild(doneName);
   doneEl.appendChild(doneNote);
+  doneEl.appendChild(doneLines);
   doneEl.appendChild(sysEl('div', 'capyui-donerule'));
   doneEl.appendChild(doneSub);
   hudRoot.appendChild(doneEl);
@@ -23479,9 +23739,15 @@ export function createSystems(game) {
     // shown at a size worth looking at.
     const g = sysBuildMark(def.biome);
     if (g) doneArt.appendChild(g);
+    // ...and over the authored mark, the game's own photograph of the big
+    // one if it took one (L4, F1b), or the player's newest picture here.
+    albShotOn(def.biome, doneArt, 2);
     doneName.textContent = def.name.toUpperCase();
     doneNote.textContent = def.note || '';
     doneNote.hidden = !def.note;
+    const rl = chapRecap(n);
+    doneLines.textContent = rl.join(String.fromCharCode(10));
+    doneLines.hidden = !rl.length;
     doneSub.textContent = sub || '';
     doneEl.classList.add('show');
     if (doneTimer) clearTimeout(doneTimer);
@@ -23981,7 +24247,8 @@ export function createSystems(game) {
       // ...and if you took a picture there, it is your picture. See albShotOn.
       // The ledger is rebuilt every time it opens, so a photograph taken five
       // minutes ago is on the leaf the next time it is read.
-      albShotOn(def.biome, mk);
+      // ...and the game's own photograph of the big one first (L4, F1b).
+      albShotOn(def.biome, mk, 2);
       row.appendChild(mk);
       row.appendChild(sysEl('div', 'capyui-ledname', def.name));
       const ms = jrChapMs[n];
@@ -28719,6 +28986,10 @@ export function createSystems(game) {
       // other caller in the game may ask for this: the scarcity is the whole
       // mechanism, exactly as it is for the banner itself.
       if (game.slowmo) game.slowmo(sysWOW_SLOW, sysWOW_SLOW_T);
+      // THE GAME PHOTOGRAPHS THE BIG ONE (L4, F1b): a third of a second in,
+      // with the world at 0.55x and the confetti still in the air. See
+      // wowShotTick.
+      wowShotT = sysWOW_SHOT_T; wowShotName = wow; wowShotPlace = (game.biome && game.biome.current) || 'sydney';
     } else if (mini) {
       musSwell(sysMINI_SWELL);
       // 'chime' and not 'cheer': the crowd noise belongs to the banner alone,
@@ -30605,6 +30876,9 @@ export function createSystems(game) {
     // if one is up there, and three of them at a departure point is the ticket
     // out. whistle* stays as an alias so every reader keeps working unchanged.
     // Q, because it is the one key the left hand reaches without leaving WASD.
+    // THE CAMERA OWNS THESE WHILE IT IS OUT (L4, F1a). Before Q, E, Space,
+    // F and R, which would otherwise fire under the viewfinder.
+    if (photoOn && started && photoKeyDown(c)) { e.preventDefault(); return; }
     if (c === 'KeyQ' && started) {
       input.honkPressed = true; input.honk = true;
       input.whistlePressed = true; input.whistle = true;
@@ -30704,6 +30978,13 @@ export function createSystems(game) {
   canvas.addEventListener('pointerdown', function (e) {
     audioUnlock();
     if (!started) { startResume(); return; }
+    // THE CAMERA (L4, F1a): any button, any finger, is the orbit; a press
+    // that does not move is a focus.
+    if (photoOn) {
+      photoDragId = e.pointerId; photoDragX = e.clientX; photoDragY = e.clientY; photoDragMoved = 0;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+      return;
+    }
     if (e.pointerType === 'mouse') {
       if (e.button === 0) { mouseAction = true; sysBufAction(); input.actionPressed = true; input.action = true; }
       else if (e.button === 2) { dragId = e.pointerId; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -30720,6 +31001,14 @@ export function createSystems(game) {
     }
   });
   canvas.addEventListener('pointermove', function (e) {
+    if (photoOn && e.pointerId === photoDragId) {
+      const dx = e.clientX - photoDragX, dy = e.clientY - photoDragY;
+      photoDragX = e.clientX; photoDragY = e.clientY;
+      photoDragMoved += Math.abs(dx) + Math.abs(dy);
+      photoYaw -= dx * 0.006 * sysLookMul();
+      photoPitch = clamp(photoPitch + dy * 0.004, sysPHOTO_PITCH[0], sysPHOTO_PITCH[1]);
+      return;
+    }
     // Every live finger on the canvas, so the two-finger case can be told from
     // the one-finger case. A mouse never gets in here — it has the wheel.
     if (e.pointerType !== 'mouse' && sysPinchPts.has(e.pointerId)) {
@@ -30759,6 +31048,11 @@ export function createSystems(game) {
     if (dx) { camYawTarget -= dx * 0.005 * sysLookMul(); camHandT = sysCAM_HAND_T; }
   });
   function endPointer(e) {
+    if (e.pointerId === photoDragId) {
+      photoDragId = -1;
+      if (photoOn && photoDragMoved < 6) photoFocusAt(e.clientX, e.clientY);
+      return;
+    }
     if (e.pointerType === 'mouse' && e.button === 0) mouseAction = false;
     if (e.pointerId === dragId) { dragId = -1; sysDragLastX = null; }
     if (sysPinchPts.delete(e.pointerId)) {
@@ -30772,6 +31066,7 @@ export function createSystems(game) {
   addEventListener('pointerup', function (e) { if (e.pointerType === 'mouse' && e.button === 0) mouseAction = false; });
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
+    if (photoOn) { photoDist = clamp(photoDist * (1 + e.deltaY * 0.0012), sysPHOTO_DIST[0], sysPHOTO_DIST[1]); return; }
     camDistTarget = clamp(camDistTarget + e.deltaY * 0.012, sysCAM_MIN, sysCAM_MAX);
   }, { passive: false });
 
@@ -32024,6 +32319,8 @@ export function createSystems(game) {
           const m = sysDepthV.distanceTo(camera.position);
           if (m > 0.5 && m < 4000) want = clamp(m, sysDOF_MIN, sysDOF_MAX);
         }
+        // ...unless the camera has been told where to look (L4, F1a)
+        if (photoOn && photoFocusM > 0) want = photoFocusM;
         sysDofDist = damp(sysDofDist, want, sysDOF_LAMBDA, game.state.dt || 0.016);
         const sd = sysDofDist;
         // ...AND THE LENS OPENS for the postcard and for slow motion (L4, E1;
@@ -32042,8 +32339,11 @@ export function createSystems(game) {
         const f0 = sd * dofKRow;
         pp.dofFar0 = f0;
         pp.dofFar1 = f0 * sysDOF_SPAN;
-        if (dr[2] > 0.001) {
-          const n1 = sd * dr[2];
+        // the near term comes on with the camera (L4, F1a): a focus pulled to
+        // a thing four metres away should soften the foreground as well
+        const nearK = photoLens > 0.002 ? Math.max(dr[2], 0.55 * photoLens) : dr[2];
+        if (nearK > 0.001) {
+          const n1 = sd * nearK;
           pp.dofNear1 = n1;
           pp.dofNear0 = n1 * sysDOF_NEAR0;
         } else {
@@ -32085,6 +32385,18 @@ export function createSystems(game) {
         pp.liftR += li; pp.liftG += li; pp.liftB += li;
         // opening up flattens everything, so give the contrast back
         pp.contrast += li * 1.4;
+      }
+      // ---- THE THREE LOOKS (L4, F1a) ------------------------------------
+      // 'golden' is a warm tint and a lifted shadow; 'kodachrome' is more
+      // saturation and contrast with a cool lift under the blacks. Both on
+      // the same three fields the chapter's grade already writes, scaled by
+      // the lens, so they are gone the moment the camera is.
+      if (photoLook === 1) {
+        pp.tintR *= 1 + 0.10 * photoLens; pp.tintB *= 1 - 0.10 * photoLens;
+        pp.liftR += 0.020 * photoLens; pp.liftG += 0.012 * photoLens;
+      } else if (photoLook === 2) {
+        pp.saturation += 0.22 * photoLens; pp.contrast += 0.10 * photoLens;
+        pp.tintR *= 1 + 0.04 * photoLens; pp.liftB += 0.018 * photoLens;
       }
     }
   }
@@ -35600,7 +35912,12 @@ export function createSystems(game) {
                bus: !!acSfxIn };
     },
     /** Is the camera out, and how many pictures has it taken. */
-    photoAudit: function () { return { on: photoOn, shots: photoShots, lens: photoLens }; },
+    photoAudit: function () { return { on: photoOn, shots: photoShots, lens: +photoLens.toFixed(3),
+                                         orbit: +(photoYaw * 180 / Math.PI).toFixed(1), pitch: +(photoPitch * 180 / Math.PI).toFixed(1),
+                                         dist: +photoDist.toFixed(2), fov: +camera.fov.toFixed(1), focal: sysPHOTO_FOCAL[photoFocal],
+                                         focusM: +photoFocusM.toFixed(2), pose: sysPHOTO_POSES[photoPose], look: sysPHOTO_LOOKS[photoLook],
+                                         roll: +photoRoll.toFixed(3), dof: +(game.post && game.post.params ? game.post.params.dof : 0).toFixed(3),
+                                         paused: !!game.state.paused }; },
     /** The key light (L4, E1): its live weight, the ratio it aims at, the
      *  three ratios the sky dome is putting back, and both lens scalars. */
     keyAudit: function () { return { live: +sysKeyLive.toFixed(3), ratio: sysKEY_RATIO, dome: keyDomeInfo(), photoLens: +photoLens.toFixed(3), slowLens: +slowLens.toFixed(3) }; },
@@ -35672,9 +35989,14 @@ export function createSystems(game) {
       try { stored = (localStorage.getItem(sysALB_KEY) || '').length; } catch (e) {}
       return { n: arr.length, cap: sysALB_MAX, places: places, chars: bytes,
                stored: stored, shown: albShown, btn: !jrAlbBtn.hidden,
-               caps: arr.map(function (s) { return s.cap; }) };
+               caps: arr.map(function (s) { return s.cap; }),
+               last: arr.length ? { place: arr[arr.length - 1].place, w: arr[arr.length - 1].w || sysALB_W, tag: arr[arr.length - 1].tag, bytes: (arr[arr.length - 1].u || '').length } : null };
     },
     albumShow: function () { albShow(); },
+    chapRecap: function (n) { return chapRecap(n); },
+    showDone: function (n, sub) { showDone(n, sub); },
+    wowShotAudit: function () { return { pending: wowShotT > 0, name: wowShotName, place: wowShotPlace,
+                                          tag2: albAll().filter(function (r) { return r.tag === 2; }).map(function (r) { return r.place + ':' + r.cap; }) }; },
     root: hudRoot,
     /**
      * THE OPAQUE PANELS, IN NDC, FOR ANYTHING THAT DRAWS OVER THE PICTURE.
@@ -38237,9 +38559,12 @@ export function createSystems(game) {
       // moves the whole lens without touching what speed, flow or a hitstop do
       // to it. Defaults to sysFOV_BASE exactly, so a player who never opens the
       // card gets the frame this game was composed in, to the degree.
-      const fovWant = clamp(sysFovPref + (fovSpeed * sysFOV_SPEED + sysFlowNow * sysFLOW_FOV
-                                          + fovKick - slow * sysFOV_SLOW) * breathe,
-                            sysFOV_MIN, sysFOV_MAX);
+      let fovWant = clamp(sysFovPref + (fovSpeed * sysFOV_SPEED + sysFlowNow * sysFLOW_FOV
+                                        + fovKick - slow * sysFOV_SLOW) * breathe,
+                          sysFOV_MIN, sysFOV_MAX);
+      // ...and the camera's focal length over it (L4, F1a), outside the
+      // interactive clamp: 85 mm is 16 degrees and that is the point of it
+      if (photoLens > 0.002) fovWant = lerp(fovWant, photoFov(), photoLens);
       // updateProjectionMatrix rebuilds a matrix and dirties the frustum, so it
       // is only called when a viewer could tell.
       if (Math.abs(fovWant - fovLast) > sysFOV_EPS) {
@@ -38271,6 +38596,9 @@ export function createSystems(game) {
       sysV1.copy(sysLook); sysV1.y += camDip;
       camera.lookAt(sysV1);
     } else camera.lookAt(sysLook);
+    // ---- THE CAMERA (L4, F1a): the orbit, over everything above ----------
+    photoTick(game.state.rawDt || 0.016);
+    if (photoLens > 0.002) photoRig(photoLens);
     game.state.chaos = damp(game.state.chaos, 0, 0.3, dt);
 
     // ---- shadows follow the capybara ----
@@ -38328,6 +38656,7 @@ export function createSystems(game) {
     // scaled one — a find should not take longer to notice in slow motion.
     findTick(game.state.rawDt || dt);
     if (sysFresh && started && !game.state.paused) { sysFreshT += dt; sysToastDrain(); }
+    wowShotTick(game.state.rawDt || dt);
     // THE HERD RUNS LAST OF ALL, and that is the whole reason it needs no
     // per-chapter surgery in the updaters: systems.js is the last module in
     // the frame (env → …16 biomes… → weather → props → capy → condor → npcs →
